@@ -92,6 +92,7 @@ namespace Armoury
             try { CastlePurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CastlePurse)", e); }   // 110: zawor kas zamkow (Last*)
             try { CrownIncome.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownIncome)", e); }   // 165: wplywy dnia korony (Last*)
             try { CrownGifts.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownGifts)", e); }     // 182: dary koron (Last*)
+            try { ClanBudget.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(ClanBudget)", e); }     // 166: budzet rodow (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -533,7 +534,8 @@ namespace Armoury
                   .Append(" (").Append(SoldierPay.LastNonPosLordN).Append(") = ").Append(ledgerFromSp)
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
-              .Append(", budowy do kas osad ").Append(build).Append(", dwor -, sprzet i werbunek -")
+              .Append(", budowy do kas osad ").Append(build).Append(", dwor (166/162m) do kas siedzib ").Append(ClanBudget.LastCourt).Append(" (w tym miasta pod tarcza dworu ").Append(ClanBudget.LastCourtTown)
+              .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", sprzet i werbunek -")
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
@@ -547,7 +549,7 @@ namespace Armoury
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
-              .Append("), markietani -, ze zwolnionymi -")
+              .Append("), markietani -, ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony -")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)

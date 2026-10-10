@@ -86,10 +86,12 @@ namespace Armoury
         internal const int MCastle = 7, MTrim = 8;                                                              // 110: zawor kas zamkow, dar startowy kas zamkow przyciety
         internal const int MCastleCrown = 9;                                                                    // 114: udzial korony z zaworu kas zamkow
         internal const int MTrade = 10;                                                                         // B-2: wywoz kupcow (PodazPopyt, SupplyDemand.DailyTrade) - dotad w "pozostale moduly ticku"
-        private const int Marks = 11;
+        internal const int MBudget = 11;                                                                        // 166/162m: budzet rodow - dwor do kas siedzib, sakiewki zwolnionych do kies wsi
+        private const int Marks = 12;
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
-                                                   "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)" };
+                                                   "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
+                                                   "budzet rodow (166): dwor do kas siedzib, sakiewki zwolnionych do kies wsi" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,

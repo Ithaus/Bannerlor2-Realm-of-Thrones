@@ -527,15 +527,16 @@ namespace Armoury
             catch { return -1; }
         }
 
-        /// <summary>166: D staly i liczba zmierzonych dob (do mieszania z D z zapisu, gdy pomiar krotszy niz 28 dob); false - brak pomiaru.</summary>
-        internal static bool StableDWithDays(Clan c, out double d, out int days)
+        /// <summary>166: D staly, liczba zmierzonych dob (do mieszania z D z zapisu, gdy pomiar krotszy niz 28 dob) i srednia "jednorazowych" bez
+        /// podwojnych (lup najezdzcow liczy sie do D - wyjatek lore W-1); false - brak pomiaru.</summary>
+        internal static bool StableDWithDays(Clan c, out double d, out int days, out double once)
         {
-            d = -1; days = 0;
+            d = -1; days = 0; once = 0;
             try
             {
                 StableParts p;
                 if (!StableDOn || !TryStable(c, out p)) return false;
-                d = Math.Max(0, p.D); days = p.Days;
+                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double);
                 return true;
             }
             catch { return false; }

@@ -125,7 +125,7 @@ namespace Armoury
         {
             _clan = null; _recs.Clear(); _haveNet = false; _netModel = null; _netDecl = null; _debtBefore = 0;
             _paidToday.Clear(); _castlePay.Clear(); _errLogged = false;
-            _held.Clear(); _regModel = null; _regDecl = null;
+            _held.Clear(); _court.Clear(); _regModel = null; _regDecl = null; _dCourtIn = _dCourtKept = _dCourtOut = _dCourtTrim = _dCourtDel = 0;
             _netTriedFor = null; _regTriedFor = null; _regReady = false;   // nowa kampania = nowe obiekty modeli (latki zostaja w procesie)
             ClearDay();
             ZeroLast();                                     // paczka 169
@@ -532,6 +532,59 @@ namespace Armoury
 
         private static bool ShieldOn { get { var s = Settings.Current; return s != null && s.TownWageShield; } }
 
+        // ------------------------------------------------------------ 162m: tarcza dworu (HouseholdShield) - znacznik wplat dworu do kasy MIASTA siedziby
+        // Inaczej niz znacznik zoldu: NIE wygasa z czasem. Schodzi tylko o czesc zlota, ktora zawor renty pana (PopulationLaw) i danina wojenna
+        // (KingdomTreasury.Levies) naprawde wyciagnely dzis z tej kasy (proporcjonalnie: znacznik / kasa ponad prog), i nigdy nie jest wiekszy niz
+        // nadwyzka kasy ponad cel regulatora (przyciecie = miasto wydalo to zloto na towar - nie skasowane). Regulator nie kasuje czesci nadwyzki pod
+        // znacznikiem (nic nie dosypuje). Bez tego regulator gry zjadalby ok. 83% wplaty dworu (projekt 166, R17).
+        private static readonly Dictionary<string, float> _court = new Dictionary<string, float>();
+        private static long _dCourtIn, _dCourtKept, _dCourtOut, _dCourtTrim, _dCourtDel;
+        private static bool CourtOn { get { var s = Settings.Current; return s != null && s.HouseholdShield && s.ClanBudgetEnabled; } }
+
+        /// <summary>162m: wplata dworu do kasy miasta - znacznik tarczy dworu. Samo zloto wplaca wolajacy (ClanBudget).</summary>
+        internal static void HoldCourt(Settlement st, int amount)
+        {
+            try
+            {
+                if (amount <= 0 || st == null || !st.IsTown || st.StringId == null || !CourtOn) return;
+                if (!EnsureShieldHook()) return;
+                float v; _court.TryGetValue(st.StringId, out v);
+                _court[st.StringId] = v + amount;
+                _dCourtIn += amount;
+            }
+            catch (Exception e) { Stumble("SoldierPay.HoldCourt", e); }
+        }
+
+        /// <summary>Dopisek do linii "Budzet rodow (166)": tarcza dworu dzis (liczniki zerowane po odczycie).</summary>
+        internal static string CourtNote()
+        {
+            float sum = 0f; foreach (var v in _court.Values) sum += v;
+            string t = "tarcza dworu " + (CourtOn ? "wlaczona: znacznik " + (long)sum + " w " + _court.Count + " miastach, regulator nie skasowal " + _dCourtKept
+                                               + ", zeszlo z zaworem i danina " + _dCourtOut + ", miasto wydalo (znacznik przyciety do nadwyzki) " + _dCourtTrim
+                                               + ", skasowane przez regulator " + _dCourtDel : "wylaczona");
+            _dCourtIn = _dCourtKept = _dCourtOut = _dCourtTrim = _dCourtDel = 0;
+            return t;
+        }
+
+        internal static string ExportCourt()
+        {
+            var parts = new List<string>();
+            foreach (var kv in _court)
+                if (kv.Value >= 1f) parts.Add(kv.Key + "=" + ((int)kv.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return string.Join(";", parts.ToArray());
+        }
+
+        internal static void ImportCourt(string data)
+        {
+            _court.Clear();
+            if (string.IsNullOrEmpty(data)) return;
+            foreach (var p in data.Split(';'))
+            {
+                var a = p.Split('='); int v;
+                if (a.Length == 2 && a[0].Length > 0 && int.TryParse(a[1], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0) _court[a[0]] = v;
+            }
+        }
+
         /// <summary>Zold wplacony do kasy miasta (zaloga albo wydatki ludzi z sakiewki) - dopisz znacznik tarczy. Samo zloto wplaca wolajacy.</summary>
         internal static void Hold(Settlement st, int amount)
         {
@@ -581,25 +634,47 @@ namespace Armoury
         /// <summary>GetTownGoldChange czynnego modelu kasy osad: kasowanie nadwyzki pomniejszone o czesc objeta znacznikiem zoldu.</summary>
         public static void RegulatorPostfix(object __instance, MethodBase __originalMethod, Town __0, ref int __result)
         {
-            if (_held.Count == 0) return;                               // tarcza wylaczona albo nic nie wplacono - bez zmian
+            if (_held.Count == 0 && _court.Count == 0) return;          // tarcze wylaczone albo nic nie wplacono - bez zmian
             try
             {
-                if (__0 == null || !ShieldOn || !Live) return;
+                if (__0 == null || !Live) return;
+                bool wageOn = ShieldOn, courtOn = CourtOn;
+                if (!wageOn && !courtOn) return;
                 var active = Campaign.Current.Models.SettlementEconomyModel;
                 if (!ReferenceEquals(__instance, active)) return;                  // model opakowany przez inny - liczy zewnetrzny
                 if (!ReferenceEquals(active, _regModel)) { _regModel = active; _regDecl = RegDeclOf(active.GetType()); }
                 if (__originalMethod == null || __originalMethod.DeclaringType != _regDecl) return;
                 var st = __0.Settlement;
                 if (st == null || !st.IsTown || st.StringId == null) return;
-                float held;
-                if (!_held.TryGetValue(st.StringId, out held) || held <= 0f) return;
-                if (__result >= 0) { _held.Remove(st.StringId); return; }          // kasa nie ponad celem: zold zastapil dosypke albo juz wyszedl - nie ma czego chronic
+                float held = 0f, court = 0f;
+                bool hasHeld = wageOn && _held.TryGetValue(st.StringId, out held) && held > 0f;
+                bool hasCourt = courtOn && _court.TryGetValue(st.StringId, out court) && court > 0f;
+                if (!hasHeld && !hasCourt) return;
+                bool due = MoneyLedger.RegulatorDue(__0);                          // dzienny tick osady (nie pytania z ekranow) - tylko wtedy liczniki i przyciecie znacznika dworu
+                if (__result >= 0)
+                {
+                    // kasa nie ponad celem: zold zastapil dosypke albo juz wyszedl - nie ma czego chronic; znacznik dworu schodzi do zera - miasto wydalo to zloto
+                    if (hasHeld) _held.Remove(st.StringId);
+                    if (hasCourt && due) { _dCourtTrim += (long)court; _court.Remove(st.StringId); }
+                    return;
+                }
                 float surplus = -__result / RegulatorRate;                         // nadwyzka ponad cel, ktora regulator zdejmuje po cwierci dziennie
-                if (held > surplus) { held = surplus; _held[st.StringId] = held; } // znacznik nigdy ponad faktyczna nadwyzke
-                int keep = Math.Min(-__result, (int)(held * RegulatorRate));
+                // znaczniki nigdy ponad faktyczna nadwyzke - najpierw miejsce dla znacznika dworu (nie wygasa), reszta dla znacznika zoldu (wygasa)
+                if (hasCourt && court > surplus) { if (due) { _dCourtTrim += (long)(court - surplus); _court[st.StringId] = surplus; } court = surplus; }
+                if (hasHeld && held > surplus - court) { held = Math.Max(0f, surplus - court); if (held <= 0f) _held.Remove(st.StringId); else _held[st.StringId] = held; }
+                int keepW = hasHeld ? (int)(held * RegulatorRate) : 0, keepC = hasCourt ? (int)(court * RegulatorRate) : 0;
+                int keep = Math.Min(-__result, keepW + keepC);
                 if (keep <= 0) return;
                 __result += keep;                                                  // zostaje <= 0: tarcza niczego nie dosypuje
-                if (MoneyLedger.RegulatorDue(__0)) { _dShielded += keep; _dShieldTicks++; }   // liczymy tylko dzienny tick osady, nie pytania z ekranow
+                if (due)
+                {
+                    int kc = Math.Min(keep, keepC);
+                    if (keep - kc > 0) { _dShielded += keep - kc; _dShieldTicks++; }   // liczymy tylko dzienny tick osady, nie pytania z ekranow
+                    _dCourtKept += kc;
+                    // kontrola: regulator kasuje tylko czesc nadwyzki bez znacznikow; czesc dworu skasowana = 0 z budowy (licznik testu "dwor: skasowane przez regulator")
+                    long removed = -__result, plain = (long)Math.Ceiling(Math.Max(0f, surplus - held - court) * RegulatorRate);
+                    if (hasCourt && removed > plain + 1) _dCourtDel += removed - plain;
+                }
             }
             catch (Exception e) { Stumble("SoldierPay.RegulatorPostfix", e); }
         }
@@ -617,6 +692,7 @@ namespace Armoury
         /// <summary>Raz na dobe: znacznik wygasa w tempie zaworu renty (i daniny wojennej); przy wylaczonej tarczy znika caly.</summary>
         private static void DecayHeld()
         {
+            DecayCourt();
             if (_held.Count == 0) return;
             var s = Settings.Current;
             if (s == null || !s.TownWageShield) { _held.Clear(); return; }
@@ -634,6 +710,33 @@ namespace Armoury
                 catch { }
                 float v = _held[id] * (1f - Math.Min(1f, rate));
                 if (v < 1f) _held.Remove(id); else _held[id] = v;
+            }
+        }
+
+        /// <summary>162m: znacznik dworu schodzi tylko o czesc zlota, ktora zawor renty i danina wojenna naprawde wyciagnely dzis z kasy miasta.</summary>
+        private static void DecayCourt()
+        {
+            if (_court.Count == 0) return;
+            if (!CourtOn) { _court.Clear(); return; }
+            EnsureShieldHook();                                         // znaczniki z zapisu gry: latka takze bez nowej wplaty
+            foreach (var id in new List<string>(_court.Keys))
+            {
+                try
+                {
+                    var st = Settlement.Find(id);
+                    if (st == null || !st.IsTown) { _court.Remove(id); continue; }
+                    long pay, avail; PopulationLaw.RentOf(st, out pay, out avail);
+                    int levy; KingdomTreasury.TownLevyToday.TryGetValue(st, out levy);
+                    float v = _court[id];
+                    long outGold = Math.Max(0, pay) + Math.Max(0, levy);
+                    if (outGold <= 0) continue;
+                    // czesc wyciagnietego zlota przypadajaca na znacznik: znacznik / kasa ponad prog (avail - przed zaworem)
+                    float part = (float)Math.Min((double)v, outGold * Math.Min(1.0, v / Math.Max(1.0, Math.Max((double)v, avail))));
+                    _dCourtOut += (long)part;
+                    v -= part;
+                    if (v < 1f) _court.Remove(id); else _court[id] = v;
+                }
+                catch (Exception e) { Stumble("SoldierPay.DecayCourt", e); }
             }
         }
 

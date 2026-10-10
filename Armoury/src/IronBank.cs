@@ -227,7 +227,7 @@ namespace Armoury
         private static int _famRatesViaLoan;                // licznik doby: raty oplacone dzieki przelewowi z kroku pozyczki (w _famRates)
         private static readonly Dictionary<string, int> _famToday = new Dictionary<string, int>();   // doba: rod -> zloto od rodziny w kroku pozyczki
 
-        internal static bool FamilyOn { get { var s = Settings.Current; return s != null && s.IronBankFamilyPays; } }
+        internal static bool FamilyOn { get { var s = Settings.Current; return s != null && s.IronBankFamilyPays && !ClanBudget.FamilyRuleOn; } }   // 166: kiesa rodziny budzetu zastepuje T5 (jedna regula)
 
         /// <summary>Dorosli czlonkowie rodu AI oddaja glowie do 'need' z nadwyzki ponad prog. allOrNothing: przelew tylko,
         /// gdy rodzina pokryje caly brak (rata - czesciowa pomoc i tak nie ratuje przed spoznieniem). Zwraca przelana kwote.</summary>

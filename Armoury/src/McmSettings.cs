@@ -2608,9 +2608,129 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownDuesFromLand { get; set; } = true;
 
-        [SettingPropertyBool("Clan Budget Enabled", HintText = "AI houses keep only as many men as their steady income allows (house budget, stage 2) - needed by Crown Current Income")]
+        [SettingPropertyBool("Clan Budget Enabled", HintText = "AI houses keep only as many men as their steady income allows: each day a house's wage ceiling (its parties, garrisons and caravans together) is set from its steady income - in peace about a quarter of it, in war three fifths plus a share of its war chest above the reserve; garrisons stay full in war and are held at half their war strength in peace. A house above its ceiling for three days sends 15% of the excess home each day (garrison men above the peace target first, then hired mercenaries, then the lowest tier) - the men return to the nearest village of the house, with a share of the party's purse; the game no longer drives men off for wages over the limit. The house also pays its court into the purse of its seat, its grown members top up its head's purse, and its arms purchases and building works come out of their own shares. AI houses in a realm only, not mercenaries; you are never budgeted. Off = armies as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public bool ClanBudgetEnabled { get; set; } = false;
+        public bool ClanBudgetEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Ai Wage Limit Desertion Off", HintText = "with Clan Budget Enabled: the game no longer drives men of budgeted AI houses away for wages over the party limit - the budget sends the excess home instead (no one lost to the woods); desertion from an overfull party and from unpaid garrison wages stays")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool AiWageLimitDesertionOff { get; set; } = true;
+
+        [SettingPropertyBool("Clan Budget Stable D", HintText = "the budget reckons on the house's steady income (land of the fiefs it holds today, crown, contract, workshops and caravans); off = the plain 28-day average of all its income")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool ClanBudgetStableD { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Peace Wage Share", 0.00f, 1.12f, "0.00", HintText = "wage ceiling in peace: this share of the steady income a day (parties, garrisons and caravans together)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float PeaceWageShare { get; set; } = 0.28f;
+
+        [SettingPropertyFloatingInteger("War Wage Share", 0.00f, 2.40f, "0.00", HintText = "wage ceiling at war: this share of the steady income a day, plus the war chest below")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarWageShare { get; set; } = 0.6f;
+
+        [SettingPropertyFloatingInteger("Household Share Peace", 0.00f, 1.40f, "0.00", HintText = "the court and the food in peace: this share of the steady income (the parties' food is bought by the parties; the rest goes into the seat's purse)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float HouseholdSharePeace { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Household Share War", 0.00f, 1.00f, "0.00", HintText = "the court and the food at war")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float HouseholdShareWar { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Gear Share Peace", 0.00f, 1.00f, "0.00", HintText = "arms, armour and horses bought by the lord in peace: at most this share of the steady income a day, kept up to AI Gear Days Cap days")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GearSharePeace { get; set; } = 0.17f;
+
+        [SettingPropertyFloatingInteger("Gear Share War", 0.00f, 1.00f, "0.00", HintText = "arms, armour and horses bought by the lord at war (plus a share of the war chest above the reserve)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GearShareWar { get; set; } = 0.17f;
+
+        [SettingPropertyFloatingInteger("War Chest To Wages", 0.00f, 3.20f, "0.00", HintText = "at war, this share of the house's gold above its war reserve is spent on wages over War Chest Days")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarChestToWages { get; set; } = 0.8f;
+
+        [SettingPropertyFloatingInteger("War Chest Days", 0.00f, 180.00f, "0.00", HintText = "the war chest above the reserve is spread over this many days of war")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarChestDays { get; set; } = 45f;
+
+        [SettingPropertyFloatingInteger("Reserve Days Peace", 0.00f, 240.00f, "0.00", HintText = "in peace a house with less than this many days of its steady income in gold cuts its shares a little (at most a tenth)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float ReserveDaysPeace { get; set; } = 60f;
+
+        [SettingPropertyFloatingInteger("Reserve Cap Days", 0.00f, 480.00f, "0.00", HintText = "in peace a house with more than this many days of its steady income (plus 50 000) spends one part in 180 of the excess a day on its court and building works")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float ReserveCapDays { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("War Reserve Days", 0.00f, 80.00f, "0.00", HintText = "war reserve: this many days of steady income (at least War Reserve Floor), plus War Reserve Per Adult for every grown member - kept untouched by the war chest")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarReserveDays { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("War Reserve Floor", 0.00f, 80000.00f, "0.00", HintText = "the smallest war reserve of any house")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarReserveFloor { get; set; } = 20000f;
+
+        [SettingPropertyFloatingInteger("War Reserve Per Adult", 0.00f, 20000.00f, "0.00", HintText = "war reserve added for every grown member of the house (the family's own purses)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float WarReservePerAdult { get; set; } = 5000f;
+
+        [SettingPropertyFloatingInteger("Poverty Deep Share", 0.00f, 1.00f, "0.00", HintText = "at war, a house with gold under this share of its war reserve keeps only Poverty Deep Factor of its wage ceiling")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float PovertyDeepShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Poverty Deep Factor", 0.00f, 2.00f, "0.00", HintText = "the wage ceiling of a house deep in poverty at war (share of the normal one)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float PovertyDeepFactor { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Budget Hysteresis", 0.00f, 4.40f, "0.00", HintText = "a house is over its budget only when its wages pass this many times the ceiling")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float BudgetHysteresis { get; set; } = 1.1f;
+
+        [SettingPropertyInteger("Budget Hysteresis Days", 0, 12, "0", HintText = "... for this many days in a row before men are sent home")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int BudgetHysteresisDays { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Release Per Day", 0.00f, 1.00f, "0.00", HintText = "share of the excess wages sent home each day (as men, lowest first)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float ReleasePerDay { get; set; } = 0.15f;
+
+        [SettingPropertyInteger("Min New Party Men", 0, 120, "0", HintText = "a house raises a new party only when its ceiling has room for this many more men (a house with no party at all may always raise one)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int MinNewPartyMen { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Garrison Peace Share", 0.00f, 2.00f, "0.00", HintText = "in peace a garrison is held at this share of its average war strength (in wages)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GarrisonPeaceShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Garrison War Full", HintText = "at war garrisons keep the game's own limit and are paid first; the parties get the rest of the ceiling. Off = garrisons are held at the peace target in war too")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool GarrisonWarFull { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Garrison Max Share Of Budget Peace", 0.00f, 3.20f, "0.00", HintText = "in peace all garrisons of a house together take at most this share of its wage ceiling")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float GarrisonMaxShareOfBudgetPeace { get; set; } = 0.8f;
+
+        [SettingPropertyFloatingInteger("Ai Gear Days Cap", 0.00f, 120.00f, "0.00", HintText = "unspent arms shares are kept for at most this many days")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float AiGearDaysCap { get; set; } = 30f;
+
+        [SettingPropertyInteger("Family Purse Floor", 0, 20000, "0", HintText = "a grown member tops up the head's purse only from what he holds above this; the court is not paid from the head's purse below it")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int FamilyPurseFloor { get; set; } = 5000;
+
+        [SettingPropertyBool("Family Tops Up Head", HintText = "the grown members of an AI house top up its head's purse to this floor or a day of the house's costs, whichever is more - one family purse (replaces Iron Bank Family Pays while the budget is on)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool FamilyTopsUpHead { get; set; } = true;
+
+        [SettingPropertyBool("Unpaid Troops Cap In Men", HintText = "troops without wages (the Night's Watch) are held by the budget in men: the gold ceiling divided by the wage the men would have")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool UnpaidTroopsCapInMen { get; set; } = true;
+
+        [SettingPropertyBool("Household Minimal", HintText = "each AI house pays its court into the purse of its seat (town or castle) every day - the share for the court and food less the parties' own food")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool HouseholdMinimal { get; set; } = true;
+
+        [SettingPropertyBool("Household Shield", HintText = "the court's money paid into a town purse is kept out of the game's purse regulator: it leaves only with the lord's rents and the war subsidy, and never more than the purse holds above its target")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool HouseholdShield { get; set; } = true;
 
         [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -4116,6 +4236,36 @@ namespace Armoury
             s.CrownCustomsSingleTake = CrownCustomsSingleTake;
             s.CrownDuesFromLand = CrownDuesFromLand;
             s.ClanBudgetEnabled = ClanBudgetEnabled;
+            s.AiWageLimitDesertionOff = AiWageLimitDesertionOff;
+            s.ClanBudgetStableD = ClanBudgetStableD;
+            s.PeaceWageShare = PeaceWageShare;
+            s.WarWageShare = WarWageShare;
+            s.HouseholdSharePeace = HouseholdSharePeace;
+            s.HouseholdShareWar = HouseholdShareWar;
+            s.GearSharePeace = GearSharePeace;
+            s.GearShareWar = GearShareWar;
+            s.WarChestToWages = WarChestToWages;
+            s.WarChestDays = WarChestDays;
+            s.ReserveDaysPeace = ReserveDaysPeace;
+            s.ReserveCapDays = ReserveCapDays;
+            s.WarReserveDays = WarReserveDays;
+            s.WarReserveFloor = WarReserveFloor;
+            s.WarReservePerAdult = WarReservePerAdult;
+            s.PovertyDeepShare = PovertyDeepShare;
+            s.PovertyDeepFactor = PovertyDeepFactor;
+            s.BudgetHysteresis = BudgetHysteresis;
+            s.BudgetHysteresisDays = BudgetHysteresisDays;
+            s.ReleasePerDay = ReleasePerDay;
+            s.MinNewPartyMen = MinNewPartyMen;
+            s.GarrisonPeaceShare = GarrisonPeaceShare;
+            s.GarrisonWarFull = GarrisonWarFull;
+            s.GarrisonMaxShareOfBudgetPeace = GarrisonMaxShareOfBudgetPeace;
+            s.AiGearDaysCap = AiGearDaysCap;
+            s.FamilyPurseFloor = FamilyPurseFloor;
+            s.FamilyTopsUpHead = FamilyTopsUpHead;
+            s.UnpaidTroopsCapInMen = UnpaidTroopsCapInMen;
+            s.HouseholdMinimal = HouseholdMinimal;
+            s.HouseholdShield = HouseholdShield;
             s.CrownGifts = CrownGifts;
             s.GiftNorthToWatchShare = GiftNorthToWatchShare;
             s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;

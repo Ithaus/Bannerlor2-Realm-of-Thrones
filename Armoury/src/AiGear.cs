@@ -661,6 +661,9 @@ namespace Armoury
                     }
                     else GarrisonCarts.NotePause();
                 }
+                // 166: pan rodu AI z budzetem placi najwyzej z niewydanego przydzialu sprzetu (0.17 D na dobe, najwyzej AiGearDaysCap dni)
+                int gearCap;
+                if (lordPays && lord != null && ClanBudget.GearCap(lord.Clan, out gearCap)) budget = Math.Min(budget, gearCap);
                 // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda; K1: zaloga - ze swojej sakiewki (zold)
                 int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st)) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
@@ -686,6 +689,7 @@ namespace Armoury
                     int fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, cost) : 0;
                     lord.ChangeHeroGold(-(cost - fromPurse));
                     lordPart += cost - fromPurse;
+                    ClanBudget.GearSpent(lord.Clan, cost - fromPurse);   // 166: schodzi z przydzialu sprzetu rodu
                     if (garrison) MenUpgrade.NoteGarrisonGap(fromPurse);
                     return fromPurse;
                 };

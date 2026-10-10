@@ -23,9 +23,8 @@ namespace Armoury
         internal const int KRefund = 0, KCrownLevies = 1, KThird = 2;
         private const int Days = 28;
 
-        // 6.4 projektu, przebieg na sucho - klucze MCM w 166 (D12)
-        private const double PeaceWageShare = 0.25, WarWageShare = 0.55, WarChestToWages = 0.8, WarChestDays = 45, ReserveDaysPeace = 60,
-                             WarReserveDays = 20, WarReserveFloor = 20000, BudgetHysteresis = 1.10, ReleasePerDay = 0.15, CeilingFill = 0.9,
+        // 6.4 projektu, przebieg na sucho - 166: udzialy pulapu przeszly do Settings (ClanBudget.Ceiling - jedna formula dla logu i gry); tu zostaje reszta przebiegu na sucho
+        private const double BudgetHysteresis = 1.10, ReleasePerDay = 0.15, CeilingFill = 0.9,
                              IronBankIncomeDays82 = 15, InstalmentShare = 0.10, SeizeFloor = 38000, SeizeWageDays = 10;
         private const int BudgetHysteresisDays = 3;
 
@@ -467,14 +466,11 @@ namespace Armoury
                     double D = r.D, G = r.G;
                     int leaderGold = c.Leader != null ? c.Leader.Gold : 0;
                     long wage = r.HadTick ? (long)r.WageLastLord + r.WageLastGar : -1;
-                    double R = Math.Max(WarReserveFloor, WarReserveDays * D);
-                    double ceiling;
-                    if (atWar)
-                    {
-                        double chest = G > R ? WarChestToWages * (G - R) / WarChestDays : 0;
-                        ceiling = D > 0 ? (WarWageShare * D + chest) * (G < R ? 0.8 + 0.2 * G / R : 1) : chest;
-                    }
-                    else ceiling = D > 0 ? PeaceWageShare * D * (G < ReserveDaysPeace * D ? 1 - 0.1 * (1 - G / (ReserveDaysPeace * D)) : 1) : 0;
+                    // 166: jedna formula pulapu dla logu i gry (ClanBudget.Ceiling - udzialy z Settings, R z podlogami rodziny); rod z budzetem w grze - ta sama
+                    // liczba, ktora dzis stosuje gra (na D stalym); bez budzetu - formula na D169 (przebieg na sucho jak dotad)
+                    double R, fq, chestQ;
+                    double ceiling = ClanBudget.Ceiling(D, G, atWar, ClanBudget.AdultsOf(c), out R, out fq, out chestQ);
+                    double capGame; if (ClanBudget.TryCap(c, out capGame)) ceiling = capGame;
                     bool onCeil = partyLimit > 0 && partyMen >= CeilingFill * partyLimit;
                     long released = 0;
                     bool budget = isAi && r.HadTick;
