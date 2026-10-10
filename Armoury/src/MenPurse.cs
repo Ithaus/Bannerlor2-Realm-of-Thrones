@@ -100,7 +100,7 @@ namespace Armoury
                 var win = destroyer != null ? destroyer.MobileParty : null;
                 if (win != null && win.LeaderHero != null && win.LeaderHero.IsAlive)
                 {
-                    if (win.IsMainParty) Add(win, purse);   // ludzie gracza - do ich sakiewki
+                    if (win.IsMainParty) { Add(win, purse); Ransom178.NotePlayerPurse(purse); }   // ludzie gracza - do ich sakiewki; 178: korona 1/9 sakwy (jutro z sakiewki)
                     else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
                     if (!win.IsMainParty) ClanIncomeBook.NoteInflow(win.LeaderHero, purse / 3, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
                     MoneyLedger.NotePurseGone(purse, false);                                                             // paczka 169: linia "Obieg" (tylko licznik)

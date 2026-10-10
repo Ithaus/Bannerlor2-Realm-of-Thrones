@@ -2908,6 +2908,54 @@ namespace Armoury
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
         public bool PlayerSameLadder { get; set; } = true;
 
+        [SettingPropertyBool("Lord Ransom By Income", HintText = "with Debt Ladder Enabled: one rule for every ransom of a lord or lady - between AI houses, by courier, through a broker, and your own: the head of a house costs Ransom Head Years of its steady income, any other member Ransom Lord Days of it. The house pays at once at most Ransom Cash Share of what its family holds above 5000, and owes the rest to the captor as a debt paid off with its other debts (all instalments at most All Instalments Max Share of its steady income); the captive goes free as soon as the cash is paid. A house never owes more than Ransom Debt Cap Days of its steady income in ransoms - a ransom above that is smaller. The chance a captor accepts stays 10% a day, and time in captivity changes neither price nor chance. Between AI houses the gold goes from the captive's family to the captor's head (no barter from nowhere). Off = the game's and Realistic Captivity's ransoms, as before")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool LordRansomByIncome { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ransom Head Years", 0.00f, 3.00f, "0.00", HintText = "the ransom of the head of a house, in years of its steady income (half a year)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomHeadYears { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Ransom Lord Days", 0.00f, 240.00f, "0.00", HintText = "the ransom of any other lord or lady, in days of the house's steady income (about two months)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomLordDays { get; set; } = 60f;
+
+        [SettingPropertyFloatingInteger("Ransom Cash Share", 0.00f, 1.00f, "0.00", HintText = "the house pays at once at most this share of its family's gold above 5000; the rest becomes a ransom debt")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomCashShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Ransom Queue No Block", HintText = "a new ransom debt queues behind the older ones (the same daily instalment, a longer term) - no lord stays captive because his house is already paying another ransom. Off = a house still paying a ransom gets no new ransom deal between AI houses")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomQueueNoBlock { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ransom Debt Cap Days", 0.00f, 1456.00f, "0.00", HintText = "a house owes at most this many days of its steady income in ransoms altogether; a ransom that would go above it is cut down to it (the captor gets less)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomDebtCapDays { get; set; } = 364f;
+
+        [SettingPropertyBool("Ransom King From Treasury", HintText = "a captive king's ransom is paid by his realm's treasury, reckoned on the crown's income (Ransom Head Years of its daily income): what the treasury holds above its reserve pays the cash part, the rest is a debt of the crown paid in instalments out of its daily income, like war reparations. Off = his house pays, like any head of a house")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomKingFromTreasury { get; set; } = true;
+
+        [SettingPropertyBool("Crown Great Captives", HintText = "a captured king or heir to the throne passes to the captor's crown: the whole ransom (cash and instalments) goes to the captor's treasury, and the captor gets Crown Great Captive Reward of the ransom from the treasury at once (out of the day's income, then the hoard above the reserve; what is missing comes out of the first ransom payments). A captor without a realm keeps the ransom, as with any other captive")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool CrownGreatCaptives { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Great Captive Reward", 0.00f, 1.00f, "0.00", HintText = "the captor's reward for a king or heir handed to his crown, as a share of the ransom")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float CrownGreatCaptiveReward { get; set; } = 0.1f;
+
+        [SettingPropertyBool("Crown Thirds", HintText = "the crown of a realm at war takes its third of a third from what its houses win: a ninth of every ransom they receive (cash and instalments, not for a king or heir), a third of a lord's third of the loot his men sold, a ninth of the loot a lord sells in town, and from you a ninth of the purses your men take; settled once a day out of the purse of who received it, like the dues")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool CrownThirds { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Thirds Share", 0.000f, 0.500f, "0.000", HintText = "the crown's share of what the houses win (1/9 - a third of the captain's third, as in the indentures of 1415)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float CrownThirdsShare { get; set; } = 0.111f;
+
+        [SettingPropertyBool("Crown Thirds Player Loot", HintText = "as a vassal of a realm at war you also pay the crown a ninth of the value of the loot you take from the battlefield (at the price the nearest town would pay you), the next day out of your purse")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool CrownThirdsPlayerLoot { get; set; } = true;
+
         [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before")]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public bool GentryNoParties { get; set; } = true;
@@ -4482,6 +4530,18 @@ namespace Armoury
             s.WageDebtToMen = WageDebtToMen;
             s.GameWalletsNoAdvance = GameWalletsNoAdvance;
             s.PlayerSameLadder = PlayerSameLadder;
+            s.LordRansomByIncome = LordRansomByIncome;
+            s.RansomHeadYears = RansomHeadYears;
+            s.RansomLordDays = RansomLordDays;
+            s.RansomCashShare = RansomCashShare;
+            s.RansomQueueNoBlock = RansomQueueNoBlock;
+            s.RansomDebtCapDays = RansomDebtCapDays;
+            s.RansomKingFromTreasury = RansomKingFromTreasury;
+            s.CrownGreatCaptives = CrownGreatCaptives;
+            s.CrownGreatCaptiveReward = CrownGreatCaptiveReward;
+            s.CrownThirds = CrownThirds;
+            s.CrownThirdsShare = CrownThirdsShare;
+            s.CrownThirdsPlayerLoot = CrownThirdsPlayerLoot;
             s.GentryNoParties = GentryNoParties;
             s.GentryKnightWage = GentryKnightWage;
             s.GentryEstateSpendCap = GentryEstateSpendCap;

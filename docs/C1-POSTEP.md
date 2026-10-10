@@ -878,3 +878,89 @@ pod R: wyplata podnosi G ponad R, nastepnego dnia KW znika (skrzynia wojenna), p
 (c) D4 przenosi karawany i warsztaty do notabli - rzadkie, do obejrzenia w autotescie (0 bledow); (d) `MercenaryWallet` ma setter internal - ponowne otwarcie portfela
 najemnikow przez refleksje (portfel najemnikow zmienia tylko kontrakt gracza); (e) dlug wobec korony przeniesiony z gry: `ChangeKingdomAction` juz go nie kasuje
 (bez umorzenia), a warunek gry "najemnicy odchodza od krola z dlugiem > 10 000" nie zachodzi.
+
+---
+
+## D - 178 okupy wedlug majatku, wielcy jency i prawo trzecich
+
+Projekt: rozdz. "178" (krok D; 2.13, 2.14), 2.0b (kolejnosc: 1/9 przed darami, nagroda za wielkiego jenca po kontraktach, przed zwrotem), odpowiedzi Jeffa 11:05
+(pulap rok D, okup krola ze skarbca). Build Release Armoury i RealisticCaptivity kod 0, `python -I tools/gen_mcm.py`, gra nie uruchamiana.
+
+**Pliki:** nowy `Armoury/src/Ransom178.cs` (cena, przeplyw okupu, AI-AI, kurier, posrednik, okup gracza, wielcy jency, 1/9, linia "Okupy (178)", zapis `arm_rans178`);
+zmienione `CrownIncome.cs` (dlug korony za okup krola - raty jak reparacje, odbiorca krolestwo albo "h:" bohater; 1/9 w "naszych" wplywach dnia), `DebtLadder.cs` (rata okupu -> 1/9),
+`RansomFlows.cs` (kurier i okup gracza przez 178, harness 178), `ClanIncomeBook.cs` (trzecia lorda -> 1/9), `MenPurse.cs` (sakwa ludzi gracza -> 1/9), `MoneyLedger.Obieg.cs`,
+`ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs`, `tools/gen_mcm.py`; RealisticCaptivity: nowy `src/ArmouryBridge.cs` (refleksja do `Armoury.Ransom178`),
+`src/FairRansom.cs` (`LordPrice` - cena z Armoury dla lordow trzymanych/sprzedawanych przez gracza, bez potracen RC; `SalePostfix` - pominiety przy 178), `src/Patches.cs`
+(`RansomAmountPatch` - gotowka okupu gracza z Armoury).
+
+**Co dziala (LordRansomByIncome; czynne z drabina 168 - raty okupow w tej samej ksiedze):**
+- **Cena** (`PriceOf`): glowa rodu `RansomHeadYears` (0.5) x 364 x D, kazdy inny lord i dama `RansomLordDays` (60) x D; D = D rodu do rat 168 (D budzetu, D staly, D169).
+  Krol (`RansomKingFromTreasury`): 0.5 x 364 x srednia 28 dob wplywow dnia jego korony (165), placi skarbiec. Bez minimow, bez wzrostu za czas niewoli.
+- **Zaplata** (`Execute`): gotowka = min(cena, `RansomCashShare` (0.5) x (kiesy rodziny - 5 000)), zbierana z kiesy glowy, potem doroslych czlonkow (kazdy do 5 000);
+  reszta - dlug okupu w ksiedze 168 (wierzyciel glowa rodu porywacza; raty w limicie 15% D po Banku, kolejka wedlug wieku), pulap wszystkich dlugow okupow rodu
+  `RansomDebtCapDays` (364) x D - okup ponad pulap mniejszy (porywacz dostaje mniej). Krol: gotowka z polowy nadwyzki skarbca ponad `CrownReserveGold`, reszta - dlug korony
+  (`CrownIncome.AddCrownDebt`, raty najwyzej 50% wplywow dnia placacego, jak reparacje). Jeniec wolny po gotowce (`EndCaptivityAction.ApplyByRansom`).
+- **AI-AI:** prefiks `RansomOfferCampaignBehavior.ConsiderRansomPrisoner` (gra wola go raz na dobe dla jenca z rodu z co najmniej 2 lordami) - stale 10% dziennie,
+  wlasny przeplyw zamiast barteru gry (rodzina jenca -> glowa rodu porywacza); `ExecuteAiBarter` dla okupow juz nie biegnie.
+- **Kurier** (jeniec u gracza albo gracz placi za czlonka rodu): oferta bez sprawdzania kiesy placacego (ta sama szansa 20% / 12% po odmowie); wartosc w dialogu
+  = cena 178 (postfiks `SetPrisonerFreeBarterable.GetUnitValueForFaction` - cena / 1.1, gra mnozy x1.1); przyjecie (`RansomFlows.AcceptPrefix` -> `CourierAccept`): ten sam
+  przeplyw, bez dosypki z niczego; gracz placacy - czesc gotowka, reszta jego dlug (przycisk czynny takze przy kiesie < ceny - prefiks `IsAffirmativeOptionEnabled`).
+- **Posrednik i ekran druzyny** (gracz sprzedaje lorda): RC `LordPrice` bierze cene z Armoury - przy sprzedazy tylko gotowke (tyle gra wyplaca graczowi z niczego);
+  postfiks `SellPrisonersAction.ApplyInternal`: rodzina jenca oddaje te gotowke (w nicosc - rownowazy zloto gry, netto 0), reszta ceny - dlug rodu wobec gracza.
+  Lord przeniesiony do lochu osady (osada w wojnie z jencem - nie uwolniony) - jak w grze, licznik.
+- **Okup gracza:** RC `RansomAmountPatch` - kwota w menu niewoli = gotowka (polowa kies rodu gracza ponad 5 000, z ceny 0.5 roku D gracza); `RansomFlows.MenuRansomPrefix` (2.14)
+  placi ja porywaczowi i `PlayerRansomPaid` zapisuje reszte jako dlug gracza wobec odbiorcy (ksiega 168). Przy graczu poza drabina (`PlayerSameLadder` wylaczone) - RC jak dotad.
+- **Wielcy jency** (`CrownGreatCaptives`): krol albo nastepca tronu (najwyzej punktowany w `Clan.GetHeirApparents` rodu krola) pojmany przez rod krolestwa - przy pojmaniu
+  (zdarzenie `HeroPrisonerTaken`) przechodzi na korone zdobywcy (wpis do zapisu); caly okup (gotowka i raty) do skarbca zdobywcy; nagroda `CrownGreatCaptiveReward` (1/10)
+  okupu dla zdobywcy w kroku korony (po kontraktach, wezwaniach 168, przed zwrotem): z wplywow dnia, potem zapasu ponad rezerwe; reszta czeka (pierwsze wplaty okupu).
+  Zdobywca bez krolestwa - okup dla niego. Gracz - nagroda i komunikat; okup jenca u gracza idzie do skarbca jego krola.
+- **Prawo trzecich** (`CrownThirds`, 1/9 = `CrownThirdsShare` 0.111): korona krolestwa w wojnie (bez najemnikow; gracz - wasal, nie krol) - podstawa doby: okupy otrzymane
+  (gotowka, raty; bez wielkich jencow), 1/3 trzeciej lorda AI (`NoteInflow` KThird: nadwyzki ludzi, sakwy rozbitych), sprzedaz lupu lorda AI przez gre (pre/postfiks
+  `PartiesSellLootCampaignBehavior.OnSettlementEntered` - przyrost kiesy wodza), od gracza 1/9 sakw jego ludzi (z sakiewki ludzi) i 1/9 wartosci lupu z ekranu po bitwie
+  (`PlayerEncounter.DoLootInventory`, cena najblizszego miasta przy sprzedazy; `CrownThirdsPlayerLoot`). Rozliczenie raz na dobe (`ThirdsSettle`, krok korony po daninie
+  i cle, przed `CrownIncome.Begin`) z kiesy odbiorcy do skarbca jego krolestwa; czego brak - zaleglosc na jutro (zapis). Wplacone 1/9 sa "naszymi" wplywami dnia 165.
+
+**Nowe klucze (grupa "Ransoms by wealth (stage 2)"):** `LordRansomByIncome` true, `RansomHeadYears` 0.5, `RansomLordDays` 60, `RansomCashShare` 0.5, `RansomQueueNoBlock` true,
+`RansomDebtCapDays` 364, `RansomKingFromTreasury` true, `CrownGreatCaptives` true, `CrownGreatCaptiveReward` 0.10, `CrownThirds` true, `CrownThirdsShare` 0.111,
+`CrownThirdsPlayerLoot` true.
+
+**Nowe / zmienione linie logu:**
+- NOWA (kampania) `Okupy (178): latki - okup AI-AI i oferty kuriera (ConsiderRansomPrisoner), kurier: gracz placi czesc gotowka (IsAffirmativeOptionEnabled), cena w barterze i kurierze (GetUnitValueForFaction), posrednik i ekran druzyny (SellPrisonersAction), 1/9 sprzedazy lupu lorda AI (PartiesSellLoot), 1/9 lupu gracza z ekranu po bitwie (DoLootInventory); BRAK: -.`
+- NOWE (zdarzenia) `Okupy (178): AI-AI - <jeniec> (glowa rodu|lord, <rod>) wolny za P zl (D d[, placi skarbiec <krolestwo>]): gotowka C, dlug X -> <odbiorca> (<rod>)|skarbiec <krolestwo> (wielki jeniec).` (tez `kurier - `), `Okupy (178): posrednik - gracz sprzedal ...`, `Okupy (178): okup gracza - gotowka ...`, `Okupy (178): wielki jeniec - <jeniec> (krol|nastepca tronu, <krolestwo>) pojmany przez <zdobywca> - przechodzi na korone ...; okup ok. P zl ..., nagroda dla zdobywcy R zl ze skarbca.`
+- NOWA (po "Okupy (2.14)") `Okupy (178): dzien N | okupy dzis: AI-AI a, kurier b, posrednik i ekran druzyny c, okup gracza d - cena razem P = gotowka C + dlug okupu X (najwiekszy: ...) | pulap dlugu okupow (364 D): przycieto n okupow o Y; okup 0 (...) z, bez umowy - kolejka zablokowana q | krol ze skarbca: k (gotowka, nowy dlug korony; raty dlugu korony dzis, do splaty razem) | wielcy jency: pojmani dzis, u koron zdobywcow, okup do skarbcow zdobywcow; nagrody zdobywcow: nowe, wyplacone, czeka | prawo trzecich (1/9): podstawa - trzecie lordow (korona 1/3), sprzedaz lupu lordow AI, okupy otrzymane, sakwy ludzi gracza, lup gracza z ekranu; nalezne z dzisiejszej podstawy F | sciagniete do skarbcow (rozliczenie dzis rano, podstawa wczoraj) S (z sakiewki ludzi gracza), zaleglosc odbiorcow | lochy: ..., posrednik - gotowki nie zebrano od rodziny | latki: ...`
+- NOWE (harness autotestu, doba sesji 8, zamiast krokow 2b/2c przy 178) `Harness niewoli (178): krok 2 - kurier prawdziwy, okup wedlug majatku: ... -> rodzina zaplacila gotowka X, gracz dostal Y, z niczego 0, dlug okupu wobec gracza +D, jeniec wolny, oferta zamknieta - OK|BLAD.`
+- ZMIENIONA `Korona: wplywy dnia (165)`: "nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow, 1/9 prawa trzecich (178) X"; "raty reparacji" obejmuja raty okupu krola (skarbiec -> skarbiec albo porywacz).
+- ZMIENIONA `Obieg: dzien N` (korona): `, 1/9 (178) z kies odbiorcow okupow i lupu do skarbcow X, okupy wielkich jencow do skarbcow zdobywcow Y, raty okupu krola skarbiec -> porywacz Z, nagrody za wielkich jencow skarbiec -> zdobywca W`.
+- ZMIENIONA w tresci: `Niewola lordow i okupy (169c)` "okupy AI-AI (barter gry)" = 0 (barter gry dla okupow juz nie biegnie - liczba w "Okupy (178)"); RC `Wykup: vanilla N -> M (178 Armoury: gotowka okupu wedlug majatku, reszta na raty)`.
+
+**Odstepstwa / rozstrzygniecia (z powodem):**
+1. Klucze 178 w Armoury (projekt: `LordRansomByIncome` w RC) - cena potrzebuje D i ksiegi 168 (Armoury); RC pyta Armoury przez refleksje (`ArmouryBridge`), bez Armoury - RC jak dotad.
+2. `PrisonerRansomValue` gry nie jest zmieniany dla wszystkich lordow (lapowki w lochach, dyplomacja, darowizny liczylyby sie od 0.5 roku D) - cena 178 dziala w przeplywach
+   okupu (AI-AI, kurier, posrednik, okup gracza) i w wycenie lordow trzymanych/sprzedawanych przez gracza (jak RC dotad).
+3. Posrednik: gra dalej placi graczowi z niczego - ale tylko gotowke, ktora rodzina jenca w tej samej chwili oddaje w nicosc (netto 0); lord sprzedany do lochu osady
+   bedacej w wojnie z jencem nie jest uwalniany - zostaje zloto gry (licznik "lochy").
+4. Nagroda za wielkiego jenca przy pojmaniu ("od razu"), nie przy okupie; jeniec, ktory ucieknie, kosztuje korone nagrode (ryzyko wojny). Nastepca tronu = najwyzej
+   punktowany kandydat `GetHeirApparents` rodu krola (gra wybiera nastepce z remisow losowo - tu wiek).
+5. Okup krola: gotowka z polowy nadwyzki skarbca ponad rezerwe 165 (projekt: "gdy skarbca nie starcza - raty"); bez pulapu 364 D (to pulap rodow). Odbiorca bez krolestwa -
+   dlug korony wobec bohatera ("h:<id>"). Okup krola dla porywacza bez krolestwa nie ma 1/9.
+6. 1/9 z okupow i sprzedazy lupu liczone wedlug krolestwa odbiorcy w chwili wplywu (w wojnie, nie najemnik), rozliczane nastepnego ranka; gracz-krol nie placi 1/9 (sam jest korona).
+   "Rozliczenie z licznikow" - podstawa dzienna na bohatera, bez zaokraglen na sztuce.
+7. Okup gracza: cena 0.5 roku D rodu gracza (gracz jest glowa rodu) - ten sam wzor; dlug honorowy RC (`OfferDebtDeal`) zostaje jako osobna droga RC (kwota od gotowki 178).
+8. Harness autotestu: krok 2 (kurier prawdziwy) sprawdza przeplyw 178; scenariusz "krol AI jako jeniec lorda AI i gracza" - nie dodany (pojmanie krola w autotescie zmienia
+   wojne swiata); sprawdzenie w logu: linie "wielki jeniec" i "nagrody zdobywcow" co do 1 zl z "Obieg".
+9. AI-AI dalej tylko dla jencow z rodu z co najmniej 2 lordami (warunek gry przed `ConsiderRansomPrisoner`) - zmiana warunku poza prefiksem zmienialaby takze kuriera.
+
+**Czego sie spodziewac w tescie 120 dob:**
+- `Okupy (178)`: AI-AI kilka dziennie (10% dziennie od kazdego jenca z rodu z 2+ lordami; w C3c w niewoli 20-45 lordow) - wobec 57 barterow gry w 91 dobach C3c duzo wiecej;
+  `Niewola lordow i okupy (169c)`: "uwolnieni dzis: okup" rosnie, "ponad 60 dni" ok. 0, mediana dni w niewoli spada.
+- Kwoty: lord (nie glowa) ok. 60 D (pan zamku ok. 60-80 tys.), glowa ok. 182 D; gotowka zwykle polowa kies ponad 5 000, reszta dlug okupu -> `Dlugi (168)` "sam dlug okupu" rosnie,
+  raty okupow w "raty z D: pozostali"; "suma rat ponad 15% D: 0"; "pulap dlugu okupow: przycieto" > 0 u rodow pojmanych wielokrotnie.
+- Prawo trzecich: "sciagniete do skarbcow" / "nalezne" bliskie 100% (zaleglosc odbiorcow mala); `Korona: wplywy dnia (165)` "nasze" rosnie o 1/9; `Pieniadz swiata` bez zmiany tempa
+  (przelewy rod -> rod, rod -> skarbiec; posrednik netto 0).
+- Kula sniezna (prog rozdz. 1): stale przeplywy od przegranych do zwyciezcow - obserwowac wojsko na krolestwo i udzial wygranych bitew wobec biegu bez 178.
+- Wielcy jency rzadko (krol i nastepca w polu rzadko wpadaja); gdy wpadna - "nagrody zdobywcow: nowe" = 0.1 x okup, "wyplacone" w kolejnych dobach.
+
+**Ryzyka:** (a) liczba okupow AI-AI rosnie kilkukrotnie - wieksze przeplywy miedzy rodami i wiecej dlugow okupow (raty 15% D tna budzet przegranych); jesli kula sniezna
+przekroczy prog - "gotowka 60% zamiast 50%" (jedna liczba, `RansomCashShare`) albo mniejsza szansa; (b) kurier przy 178 nie sprawdza kiesy placacego - oferty czestsze;
+(c) RC i Armoury musza byc wgrane razem (bez Armoury RC liczy po staremu - spojnie, bez dubla); (d) `ExplainedNumber`/sygnatury latek sprawdzone w dekompilacji 1.4.8,
+ale `IsAffirmativeOptionEnabled` zwraca krotke `(bool, string)` - pierwszy realny test w autotescie (linia latek: BRAK = nic sie nie zmienia w dialogu).

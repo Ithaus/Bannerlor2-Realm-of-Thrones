@@ -125,7 +125,7 @@ namespace Armoury
                 r.Today += amount;
                 if (kind == KRefund) { r.TodayRefund += amount; DayRefund += amount; }
                 else if (kind == KCrownLevies) { r.TodayCrown += amount; DayCrown += amount; }
-                else if (kind == KThird) { r.TodayThird += amount; DayThird += amount; }
+                else if (kind == KThird) { r.TodayThird += amount; DayThird += amount; Ransom178.NoteThird(h, amount); }   // 178: korona 1/3 trzeciej lorda
                 else if (kind == KContract) { r.TodayContract += amount; }
                 else if (kind == KRent) { r.TodayRent += amount; DayCrownRent += amount; }
                 else if (kind == KRansom) { r.TodayRansom += amount; }

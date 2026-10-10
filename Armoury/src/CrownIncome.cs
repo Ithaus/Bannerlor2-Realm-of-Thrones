@@ -55,7 +55,9 @@ namespace Armoury
         private static bool _open;                                                                // Begin bylo dzis, End jeszcze nie
 
         // dlugi reparacji (korona -> korona)
-        private sealed class Debt { public string Payer, Receiver; public long Left, Total; public int Day; }
+        // 178: Kind 'k' - okup krola placony przez skarbiec (Receiver: id krolestwa albo "h:" + id bohatera porywacza bez krolestwa); 'r' - reparacje
+        private sealed class Debt { public string Payer, Receiver; public long Left, Total; public int Day; public char Kind = 'r'; }
+        internal static long LastKingRansomPaid; private static long _dKingRansomPaid;
         private static readonly List<Debt> _debts = new List<Debt>();
 
         // wydatki ludzi partii w polu we wlasnych miastach rodu od ostatniego zwrotu (K3)
@@ -172,7 +174,8 @@ namespace Armoury
                         long dues; KingdomTreasury.DuesToday.TryGetValue(k, out dues);
                         long lev; KingdomTreasury.LeviesToday.TryGetValue(k, out lev);
                         long cas; CastlePurse.CrownToday.TryGetValue(k, out cas);
-                        d.Own = dues + lev + cas;
+                        long thirds = Ransom178.ThirdsOf(k);   // 178: 1/9 z licznikow doby (prawo trzecich) - wplacone przed Begin
+                        d.Own = dues + lev + cas + thirds;
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
@@ -204,8 +207,16 @@ namespace Armoury
                     var debt = _debts[i];
                     try
                     {
-                        var a = FindKingdom(debt.Payer); var b = FindKingdom(debt.Receiver);
-                        if (a == null || b == null || a.IsEliminated || b.IsEliminated)
+                        var a = FindKingdom(debt.Payer);
+                        Kingdom b = null; Hero bh = null;
+                        if (debt.Receiver != null && debt.Receiver.StartsWith("h:", StringComparison.Ordinal))
+                        {
+                            // 178: okup krola dla porywacza bez krolestwa - zapasowy odbiorca: glowa jego rodu
+                            try { bh = Hero.Find(debt.Receiver.Substring(2)); } catch { bh = null; }
+                            if (bh != null && !bh.IsAlive) { var lead = bh.Clan != null ? bh.Clan.Leader : null; bh = lead != null && lead.IsAlive ? lead : null; }
+                        }
+                        else b = FindKingdom(debt.Receiver);
+                        if (a == null || a.IsEliminated || (b == null && bh == null) || (b != null && b.IsEliminated))
                         {
                             _dDropped += debt.Left; _dDroppedN++; debt.Left = 0;   // krolestwa nie ma - dlug przepada (nikt nie dostaje z niczego)
                             continue;
@@ -218,11 +229,21 @@ namespace Armoury
                         if (pay <= 0) continue;
                         int ip = (int)Math.Min(int.MaxValue, pay);
                         a.KingdomBudgetWallet -= ip;                     // najpierw placacy, potem odbiorca: odbiorca dostaje dokladnie rate
-                        b.KingdomBudgetWallet += ip;
                         debt.Left -= ip; paidBy[a] = p0 + ip;
                         da.Left -= ip; da.RepOut += ip;
-                        var db = DayOf(b);
-                        if (db != null) { db.RepIn += ip; db.Left += ip; }   // rata przyjeta - wplyw dnia odbiorcy (do zwrotu tego samego dnia)
+                        if (debt.Kind == 'k') _dKingRansomPaid += ip;
+                        if (b != null)
+                        {
+                            b.KingdomBudgetWallet += ip;
+                            var db = DayOf(b);
+                            if (db != null) { db.RepIn += ip; db.Left += ip; }   // rata przyjeta - wplyw dnia odbiorcy (do zwrotu tego samego dnia)
+                        }
+                        else
+                        {
+                            bh.ChangeHeroGold(ip);
+                            CirculationWindows.NoteHeroGold(bh, ip);
+                            if (bh != Hero.MainHero) ClanIncomeBook.NoteInflow(bh, ip, ClanIncomeBook.KRansom);
+                        }
                     }
                     catch (Exception e) { Stumble("Reparations(dlug)", e); }
                 }
@@ -230,6 +251,21 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Reparations", e); }
         }
+
+        /// <summary>178: dlug korony (okup krola placony przez skarbiec) - raty z wplywow dnia placacego jak reparacje (najwyzej CrownReparationShare wplywow dnia
+        /// na wszystkie raty razem). receiver: id krolestwa albo "h:" + id bohatera.</summary>
+        internal static void AddCrownDebt(Kingdom payer, string receiver, long amount)
+        {
+            try
+            {
+                if (payer == null || payer.StringId == null || string.IsNullOrEmpty(receiver) || amount <= 0) return;
+                _debts.Add(new Debt { Payer = payer.StringId, Receiver = receiver, Left = amount, Total = amount, Day = (int)CampaignTime.Now.ToDays, Kind = 'k' });
+            }
+            catch (Exception e) { Stumble("AddCrownDebt", e); }
+        }
+
+        /// <summary>178: dlug korony z okupow krola (reszta do splaty) - linia "Okupy (178)".</summary>
+        internal static long KingRansomDebtLeft() { long t = 0; foreach (var d in _debts) if (d.Kind == 'k') t += d.Left; return t; }
 
         private static Kingdom FindKingdom(string id)
         {
@@ -250,6 +286,7 @@ namespace Armoury
                 foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated && k.StringId != null) _wEnd[k.StringId] = k.KingdomBudgetWallet;
                 _wEndDay = today;
                 LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
+                LastKingRansomPaid = _dKingRansomPaid; _dKingRansomPaid = 0;   // 178: raty okupu krola ze skarbca (licznik doby)
                 if (!_open) { LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0; return; }
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0; int noSnap = 0;
                 var parts = new List<KeyValuePair<long, string>>();
@@ -276,7 +313,7 @@ namespace Armoury
                 {
                     var sb = new StringBuilder(2048);
                     sb.Append("Korona: wplywy dnia (165): dzien ").Append(today)
-                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow ").Append(own)
+                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow, 1/9 prawa trzecich (178) ").Append(own)
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)
                       .Append(" = do wydania ").Append(spend)
@@ -513,6 +550,7 @@ namespace Armoury
                     if (d.Left <= 0 || d.Payer == null || d.Receiver == null || d.Payer.IndexOfAny(Bad) >= 0 || d.Receiver.IndexOfAny(Bad) >= 0) continue;
                     if (!first) sb.Append(';'); first = false;
                     sb.Append(d.Payer).Append('>').Append(d.Receiver).Append('>').Append(d.Left.ToString(Inv)).Append('>').Append(d.Total.ToString(Inv)).Append('>').Append(d.Day.ToString(Inv));
+                    if (d.Kind != 'r') sb.Append('>').Append(d.Kind);   // 178: szoste pole tylko dla okupu krola (stary zapis - 5 pol)
                 }
                 sb.Append('|');
                 first = true;
@@ -554,9 +592,9 @@ namespace Armoury
                     foreach (var p in f[3].Split(';'))
                     {
                         var x = p.Split('>'); long left, total; int day;
-                        if (x.Length == 5 && x[0].Length > 0 && x[1].Length > 0 && long.TryParse(x[2], NumberStyles.Integer, Inv, out left) && long.TryParse(x[3], NumberStyles.Integer, Inv, out total)
+                        if ((x.Length == 5 || x.Length == 6) && x[0].Length > 0 && x[1].Length > 0 && long.TryParse(x[2], NumberStyles.Integer, Inv, out left) && long.TryParse(x[3], NumberStyles.Integer, Inv, out total)
                             && int.TryParse(x[4], NumberStyles.Integer, Inv, out day) && left > 0)
-                        { _debts.Add(new Debt { Payer = x[0], Receiver = x[1], Left = left, Total = total, Day = day }); _importN++; }
+                        { _debts.Add(new Debt { Payer = x[0], Receiver = x[1], Left = left, Total = total, Day = day, Kind = x.Length == 6 && x[5].Length > 0 ? x[5][0] : 'r' }); _importN++; }
                         else _importBad++;
                     }
                 if (f.Length >= 5 && f[4].Length > 0)   // recenzja C1 (OBIEG-1): zaliczki gry; zapis bez tego pola - brak zaliczek (dlugi zostaja przy skarbcu, tabela 165)

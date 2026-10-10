@@ -74,6 +74,15 @@ namespace RealisticCaptivity
             {
                 var s = Settings.Current;
                 if (_vanillaOnly) return;                                     // liczymy cene gry (do potracenia nadwyzki)
+                // 178 (Armoury, projekt etapu 2 krok D): okup wedlug majatku - cena z Armoury (sprzedaje gracz: gotowka, ktora rod jenca odda; trzyma gracz: pelna
+                // cena); rod jenca rozlicza Armoury (gotowka w nicosc - rownowazy zloto gry, reszta dlug w ksiedze 168) - tu bez potracen
+                // tylko lordowie, ktorych trzyma albo sprzedaje gracz (jak RC) - okupy miedzy AI, lapowki w lochach itd. bez zmian (Armoury ma wlasny przeplyw AI-AI)
+                if (h != null && h != Hero.MainHero && h.Clan != null && h.Clan != Clan.PlayerClan && !h.Clan.IsBanditFaction && h.IsLord && h.CompanionOf == null
+                    && ((seller != null && seller == Hero.MainHero) || HeldByPlayer(h)))
+                {
+                    int arm = ArmouryBridge.LordPrice(h, seller, result);
+                    if (arm >= 0) { result = arm; return; }
+                }
                 if (s == null || !s.LordRansomByRank || h == null || h == Hero.MainHero) return;
                 var clan = h.Clan;
                 if (clan == null || clan == Clan.PlayerClan || clan.IsBanditFaction) return;
@@ -164,6 +173,7 @@ namespace RealisticCaptivity
             try
             {
                 if (__3 || __0 != TaleWorlds.CampaignSystem.Party.PartyBase.MainParty || __2 == null) return;
+                if (ArmouryBridge.Active) return;   // 178: ekran druzyny rozlicza Armoury (Ransom178.SalePostfix)
                 var model = Campaign.Current.Models.RansomValueCalculationModel;
                 foreach (var el in __2.GetTroopRoster())
                 {

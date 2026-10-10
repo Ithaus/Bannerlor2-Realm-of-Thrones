@@ -149,6 +149,15 @@ namespace RealisticCaptivity
                 var s = Settings.Current;
                 var pc = Campaign.Current.PlayerCaptivity;
                 int baseAmount = pc.CurrentRansomAmount;
+                // 178 (Armoury, projekt etapu 2 krok D): okup gracza wedlug majatku - dzis gotowka (najwyzej polowa kies rodu ponad 5 000), reszta dlug wobec porywacza
+                // w ksiedze Armoury (raty z dochodu); gdy Armoury nie ma albo 178 wylaczone - stawka RC jak dotad
+                int arm = ArmouryBridge.PlayerRansom();
+                if (arm > 0)
+                {
+                    pc.CurrentRansomAmount = arm;
+                    Log.Info("Wykup: vanilla " + baseAmount + " -> " + arm + " (178 Armoury: gotowka okupu wedlug majatku, reszta na raty)");
+                    return;
+                }
                 float renown = (Hero.MainHero.Clan != null) ? Hero.MainHero.Clan.Renown : 0f;
                 long amount = (long)(baseAmount * s.RansomMultiplier + renown * s.RansomRenownFactor);
                 var b = CaptivityBehavior.Instance;

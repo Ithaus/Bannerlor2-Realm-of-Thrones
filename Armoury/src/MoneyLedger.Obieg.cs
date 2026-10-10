@@ -591,6 +591,8 @@ namespace Armoury
               .Append(" (splata zaliczki gry - portfel uznany z niczego - w nicosc ").Append(CrownIncome.LastAdvanceRepaid).Append(")")   // recenzja C1 (OBIEG-1)
               .Append(", clo jednym poborem (licznik cel -> skarbiec) ").Append(KingdomTreasury.LastCustomsSingle)
               .Append(", zwrot przyciety o wydatki ludzi we wlasnych miastach (K3) ").Append(KingdomTreasury.LastOwnCut)
+              .Append(", 1/9 (178) z kies odbiorcow okupow i lupu do skarbcow ").Append(Ransom178.LastThirds).Append(", okupy wielkich jencow do skarbcow zdobywcow ").Append(Ransom178.LastToCrown)
+              .Append(", raty okupu krola skarbiec -> porywacz ").Append(CrownIncome.LastKingRansomPaid).Append(", nagrody za wielkich jencow skarbiec -> zdobywca ").Append(Ransom178.LastRewards)
               .Append("; wyplaty - zwrot zoldu ").Append(KingdomTreasury.LastRefundGiven).Append(" (").Append(pct).Append("% z ").Append(KingdomTreasury.LastRefundPaid)
               .Append(" zaplaconego zoldu), zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-")

@@ -174,6 +174,9 @@ namespace Armoury
                 DayPlayerToNothing += amt; _dToNothing += amt;   // oryginal gry: kwota do nikogo (wylacznik albo brak odbiorcy)
                 return true;
             }
+            // 178: reszta okupu gracza (ponad gotowke z menu) - dlug gracza wobec odbiorcy w ksiedze 168
+            try { Hero rh; Settlement rs; int rr; ResolveRecipient(captor, out rh, out rs, out rr); if (rh != null) Ransom178.PlayerRansomPaid(rh, amt); }
+            catch (Exception e) { Stumbles++; Log.Error("RansomFlows.PlayerRansomPaid", e); }
             // to samo, co dalej robi oryginal (po przelewie do nikogo) - wyjatek idzie do gry jak w oryginale
             Hero leaderHero = captor != null ? captor.LeaderHero : null;
             EndCaptivityAction.ApplyByRansom(Hero.MainHero, leaderHero);
@@ -202,6 +205,8 @@ namespace Armoury
                 var hero = _fHero.GetValue(__instance) as Hero;
                 var payer = _fPayer.GetValue(__instance) as Hero;
                 if (hero == null || payer == null) return true;
+                // 178: okup wedlug majatku - gotowka od rodziny placacego (bez dosypki), reszta dlug w ksiedze 168, jeniec wolny (oryginal gry pominiety)
+                if (Ransom178.On && Ransom178.CourierAccept(__instance, hero, payer)) { DayCourierN++; return false; }
                 int price = __0;
                 DayCourierN++;
                 if (payer == Hero.MainHero)
@@ -446,6 +451,26 @@ namespace Armoury
                 if (!prisoner.IsPrisoner) { TakePrisonerAction.Apply(PartyBase.MainParty, prisoner); taken = true; }
                 if (!InMainParty(prisoner)) { Log.Info(pre + Name(prisoner) + " nie trafil do druzyny gracza - BLAD."); return; }
                 string who = Name(prisoner) + " (rod " + (prisoner.Clan != null ? prisoner.Clan.Name.ToString() : "-") + (taken ? ", wziety w niewole przez harness" : ", jeniec gracza") + "), placacy " + Name(payer);
+                if (Ransom178.On)
+                {
+                    // 178: kurier placi okup wedlug majatku - gotowka od rodziny jenca (najwyzej polowa ponad 5 000), reszta dlug okupu w ksiedze 168, jeniec wolny;
+                    // cena z oferty ignorowana (178 liczy sama), dosypki z niczego brak: rodzina zaplacila = gracz dostal
+                    try
+                    {
+                        var pc = prisoner.Clan;
+                        long q0 = ClanIncomeBook.FamilyGoldOf(pc), p0 = me.Gold, d0 = DebtLadder.RansomDebtOf(pc);
+                        beh.SetCurrentRansomHero(prisoner, payer);
+                        _mAccept.Invoke(beh, new object[] { 1 });
+                        long paidBy = q0 - ClanIncomeBook.FamilyGoldOf(pc), got = me.Gold - p0, debt = DebtLadder.RansomDebtOf(pc) - d0;
+                        bool free = !prisoner.IsPrisoner, gone = _fHero.GetValue(beh) == null;
+                        bool ok = paidBy >= 0 && paidBy == got && free && gone && debt >= 0;
+                        Log.Info("Harness niewoli (178): krok 2 - kurier prawdziwy, okup wedlug majatku: " + who + " -> rodzina zaplacila gotowka " + paidBy + ", gracz dostal " + got
+                                 + ", z niczego " + (got - paidBy) + ", dlug okupu wobec gracza +" + debt + ", jeniec " + (free ? "wolny" : "DALEJ W NIEWOLI") + ", oferta " + (gone ? "zamknieta" : "WISI")
+                                 + " - " + (ok ? "OK" : "BLAD") + ".");
+                    }
+                    catch (Exception e) { Stumbles++; Log.Error("RansomFlows.Harness(178)", e); Log.Info("Harness niewoli (178): krok 2 - wyjatek (" + e.GetType().Name + ") - BLAD."); }
+                    return;
+                }
                 // 2b: placacy nie ma ceny - oferta przepada, jeniec zostaje, kiesy bez zmian
                 try
                 {

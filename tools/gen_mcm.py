@@ -45,6 +45,11 @@ RANGES = {
     'WarCreditLootRepayShare': (0.0, 1.0, "0.00"),
     'IronBankMaxInstalmentShare': (0.0, 0.5, "0.00"),
     'AllInstalmentsMaxShare': (0.0, 0.5, "0.00"),
+    # 178 (D): udzialy przycinane w kodzie do 0..1
+    'RansomCashShare': (0.0, 1.0, "0.00"),
+    'CrownGreatCaptiveReward': (0.0, 1.0, "0.00"),
+    'CrownThirdsShare': (0.0, 0.5, "0.000"),
+    'RansomHeadYears': (0.0, 3.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

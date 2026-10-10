@@ -846,6 +846,7 @@ namespace Armoury
                         h.ChangeHeroGold(ix);
                         CirculationWindows.NoteHeroGold(h, x);
                         if (h != Hero.MainHero) ClanIncomeBook.NoteInflow(h, ix, ClanIncomeBook.KRansom);
+                        Ransom178.NoteRansomIn(h, x);   // 178: korona porywacza 1/9 z kazdej raty (rozliczenie raz na dobe)
                         _dRansomPaid += x;
                         return;
                     }
