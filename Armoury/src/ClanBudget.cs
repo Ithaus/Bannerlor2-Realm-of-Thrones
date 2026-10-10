@@ -226,6 +226,7 @@ namespace Armoury
                         if (mp.IsCaravan) { long v; wCar.TryGetValue(c, out v); wCar[c] = v + Math.Max(0, mp.TotalWage); continue; }
                         if (!mp.IsLordParty && !mp.IsGarrison) continue;
                         int wage = Math.Max(0, mp.TotalWage), men = mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+                        if (!mp.IsGarrison) wage += GentryService.KnightWage(mp);   // 179: zold rycerzy w druzynie - w pulapie partii pana
                         var dw = mp.IsGarrison ? wGar : wPar; var dm = mp.IsGarrison ? mGar : mPar;
                         long w0; dw.TryGetValue(c, out w0); dw[c] = w0 + wage;
                         int m0; dm.TryGetValue(c, out m0); dm[c] = m0 + men;
@@ -375,6 +376,7 @@ namespace Armoury
         // ------------------------------------------------------------ limity zoldu partii i zalog (stosowane tez w rozliczeniu rodu - postfiksy)
         private static void ApplyPartyLimits(Clan c, B b)
         {
+            if (GentryService.HoldParties(c)) return;   // 179: rod rycerza bez wlasnych druzyn - stare partie z limitem 0 (bez rekrutow), BK rozwiaze je w majatku
             var wps = c.WarPartyComponents;
             if (wps == null || wps.Count == 0) return;
             int max = Campaign.Current.Models.PartyWageModel.MaxWagePaymentLimit;
@@ -384,7 +386,7 @@ namespace Armoury
                 var mp = wps[i] != null ? wps[i].MobileParty : null;
                 if (mp == null || !mp.IsLordParty) continue;
                 wsum += mp.LeaderHero == c.Leader ? 1.5 : 1.0;
-                wage += Math.Max(0, mp.TotalWage);
+                wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);   // 179: zold rycerzy w druzynie (gra go nie liczy w TotalWage)
             }
             if (wsum <= 0) return;
             // test 120 dob (wojsko w wojnie): staly podzial 1.5 : 1 zostawial luz rodu niewykorzystany - partia ponad swoja czescia (zwykle druzyna glowy,
@@ -403,10 +405,13 @@ namespace Armoury
                 else
                 {
                     double w = mp.LeaderHero == c.Leader ? 1.5 : 1.0;
+                    int kw = GentryService.KnightWage(mp);                     // 179: limit gry liczy tylko zold ludzi - zold rycerzy schodzi z czesci partii
+                    double pw = Math.Max(0, mp.TotalWage) + kw;
                     double x;
                     if (!free) x = b.PartyCap * w / wsum;                                                     // stary podzial (wylacznik)
-                    else if (room >= 0) x = Math.Max(0, mp.TotalWage) + room * w / wsum;                     // swoj zold + czesc wolnego miejsca rodu
-                    else x = wage > 0 ? b.PartyCap * Math.Max(0, mp.TotalWage) / wage : b.PartyCap * w / wsum; // rod ponad pulapem partii
+                    else if (room >= 0) x = pw + room * w / wsum;                                             // swoj zold + czesc wolnego miejsca rodu
+                    else x = wage > 0 ? b.PartyCap * pw / wage : b.PartyCap * w / wsum;                       // rod ponad pulapem partii
+                    x -= kw;
                     lim = x >= max ? max : (int)Math.Max(0, x);
                 }
                 if (mp.PaymentLimit != lim) { mp.SetWagePaymentLimit(lim); _dPartyLimited++; }
@@ -688,6 +693,12 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>179 (GentryService.FinishPrefix): ludzie do ludnosci BK wsi (tylko wies z danymi BK); false - nikt nie przeszedl.</summary>
+        internal static bool ToVillagePop(Settlement v, CharacterObject ch, int n)
+        {
+            return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n);
+        }
+
         private static bool ToVillage(Settlement v, CharacterObject ch, int n)
         {
             try
@@ -792,7 +803,7 @@ namespace Armoury
         /// <summary>Po ocenie finansow rodu przez gre/BK (BK zwraca false z prefiksu - postfiks biegnie): limity partii z budzetu.</summary>
         public static void EvalPostfix(Clan __0)
         {
-            try { var b = Of(__0); if (b != null) ApplyPartyLimits(__0, b); }
+            try { var b = Of(__0); if (b != null) ApplyPartyLimits(__0, b); else GentryService.HoldParties(__0); }   // 179: partie rodu rycerza z limitem 0 takze bez budzetu
             catch (Exception e) { Stumble("EvalPostfix", e); }
         }
 
@@ -811,7 +822,9 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (__0 == null || s == null || !s.AiWageLimitDesertionOff || !(__0.IsLordParty || __0.IsGarrison) || Of(OwnerOf(__0)) == null || !__0.HasLimitedWage()) return;
+                if (__0 == null || s == null || !(__0.IsLordParty || __0.IsGarrison) || !__0.HasLimitedWage()) return;
+                // 179: stara partia rodu rycerza ma limit 0 (bez rekrutow) - nikt nie odchodzi do lasu z limitu, BK rozwiaze ja w majatku (ludzie do wsi)
+                if (!GentryService.IsHeldParty(__0) && (!s.AiWageLimitDesertionOff || Of(OwnerOf(__0)) == null)) return;
                 __state = __0.PaymentLimit;
                 __0.SetWagePaymentLimit(Campaign.Current.Models.PartyWageModel.MaxWagePaymentLimit);
                 _dDesertOff++;
@@ -836,6 +849,7 @@ namespace Armoury
         {
             try
             {
+                if (GentryService.BlocksSpawn(__0)) { __result = null; return false; }   // 179: rod rycerza bez wlasnej druzyny (rycerz jedzie w druzynie pana)
                 var s = Settings.Current;
                 var c = __0 != null ? __0.Clan : null;
                 var b = Of(c);

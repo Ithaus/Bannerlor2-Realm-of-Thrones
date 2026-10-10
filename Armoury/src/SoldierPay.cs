@@ -471,6 +471,13 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>179: zold rycerza w druzynie pana (GentryService.Pay) - podstawa zwrotu korony jak zold partii (WageRefund: krolestwo w wojnie, nie najemnik).</summary>
+        internal static void AddKnightPaid(Hero payer, int amt)
+        {
+            try { var s = Settings.Current; if (s != null) AddPaid(payer, amt, s); }
+            catch (Exception e) { Stumble("SoldierPay.AddKnightPaid", e); }
+        }
+
         private static void AddPaid(Hero payer, int amt, Settings s)
         {
             if (payer == null || amt <= 0 || !s.CrownWageRefundEnabled) return;

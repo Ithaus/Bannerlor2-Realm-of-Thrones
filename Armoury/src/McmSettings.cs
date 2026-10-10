@@ -2816,6 +2816,18 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentGarrisonNormKingdom { get; set; } = true;
 
+        [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before")]
+        [SettingPropertyGroup("Knights without fiefs (stage 2)")]
+        public bool GentryNoParties { get; set; } = true;
+
+        [SettingPropertyInteger("Gentry Knight Wage", 0, 96, "0", HintText = "a knight's wage a day (two shillings, a knight's pay in the contracts of 1282-1300), paid by the head of the house whose party he rides in - counted in that house's wage ceiling and in the crown's wage refund at war, like any party wage; the brothers of the Night's Watch take none")]
+        [SettingPropertyGroup("Knights without fiefs (stage 2)")]
+        public int GentryKnightWage { get; set; } = 24;
+
+        [SettingPropertyBool("Gentry Estate Spend Cap", HintText = "with Clan Budget Enabled: the purchases of a Banner Kings estate (slaves, supplies for the village) come out of the house's arms share of its budget, and never take its head's purse below the Family Purse Floor - a knight without an army does not lose his purse faster than his income allows. Off = the estates buy as before")]
+        [SettingPropertyGroup("Knights without fiefs (stage 2)")]
+        public bool GentryEstateSpendCap { get; set; } = true;
+
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
         public bool ArmyClothingEnabled { get; set; } = true;
@@ -4355,6 +4367,9 @@ namespace Armoury
             s.CrownRentServiceDays = CrownRentServiceDays;
             s.CrownRentGarrisonShare = CrownRentGarrisonShare;
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
+            s.GentryNoParties = GentryNoParties;
+            s.GentryKnightWage = GentryKnightWage;
+            s.GentryEstateSpendCap = GentryEstateSpendCap;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;

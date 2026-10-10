@@ -95,6 +95,7 @@ namespace Armoury
             try { ClanBudget.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(ClanBudget)", e); }     // 166: budzet rodow (Last*)
             try { MercContract.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(MercContract)", e); } // 185: kontrakty najemnikow (Last*)
             try { CrownRents.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownRents)", e); }     // 180: renty korony (Last*)
+            try { GentryService.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(GentryService)", e); } // 179: zold rycerzy (Last*)
         }
 
         // ------------------------------------------------------------ 169b: RB wedlug odcinkow naszego ticku (granice: Mark renty, budowy, korona, paser band)
@@ -537,7 +538,7 @@ namespace Armoury
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor (166/162m) do kas siedzib ").Append(ClanBudget.LastCourt).Append(" (w tym miasta pod tarcza dworu ").Append(ClanBudget.LastCourtTown)
-              .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", sprzet i werbunek -")
+              .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", zold rycerzy (179) pan -> rycerz ").Append(GentryService.LastPaid).Append(", sprzet i werbunek -")
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
