@@ -652,3 +652,76 @@ pomiar C2), wydajnosc (pamiec rodow rycerzy raz na dobe; skan rosteru tylko przy
 oba. (b) Ryzyko 183: zalogi AI maja morale gry 50 +/- (glod w oblezeniu, zima) - przy progu t1 < 25 glodne zalogi w oblezeniu traca ludzi szybciej niz
 w grze; linia `Dezercja AI (183)` liczy zalogi osobno. (c) Ryzyko R7 (179) - bohater obcego rodu w partii AI: wymaga autotestu (0 bledow), szczegolnie
 smierc pana, rozbicie i niewola druzyny z rycerzem, ekran druzyny gracza z rycerzem.
+
+---
+
+## C3 po tescie 120 dob (kopia-c3-120 wobec kopia-c2-120; poprawka 179 w a5063af)
+
+Dane: `kopia-c3-120/Armoury-2026-10-10_02-44-22.log` + CSV, `kopia-c2-120/Armoury-2026-10-10_01-14-58.log` + CSV; skrypty `scratchpad/c3diag/*.py`.
+Build Release kod 0, gra nie uruchamiana.
+
+### Problem 1 (blad): rycerze nigdy nie jechali - POPRAWIONE (a5063af)
+
+**Linie `Rycerze (179)` (121):** rody rycerzy 92 codziennie; w sluzbie 0, wolni w krolestwach w wojnie 0, bez armii 0 - przez caly bieg; armie 1-19
+(srednio 10.2), z rycerzem 0; wezwania BK 164 w biegu - wszystkie "rycerz niedostepny"; wlasne partie 0, nowe partie zablokowane 177 (0-2 na dobe); potkniecia 0.
+Czyli kazdy z 92 rodow odpadal na filtrze `Free()` (gdyby nie - bylby "wolny" albo "bez armii").
+
+**Przyczyna:** `Free()` wymagal `h.IsActive`. Glowy rodow BK gentry sa w stanie `NotSpawned`: gra aktywuje bohaterow raz, przy tworzeniu swiata
+(`HeroSpawnCampaignBehavior.OnNewGameCreatedPartialFollowUp`, i == 0), a BK tworzy rody rycerzy pozniej (`OnCharacterCreationIsOver` -> `InitializeGentry`
+-> `CreateGentryClan` -> `HeroCreator.CreateSpecialHero`, stan poczatkowy `NotSpawned`) i co tydzien sadza rodzine w majatku przez
+`EnterSettlementAction.ApplyForCharacterOnly`, ktora stanu nie zmienia. Aktywuja tylko `TeleportHeroAction`, dorastanie (`OnHeroComesOfAge`), ucieczka
+z niewoli - albo dawniej wlasna partia BK i jej rozwiazanie. Po 179 (bez partii) glowy rodow rycerzy nie stawaly sie czynne nigdy. Slad w danych: gra
+(`ConsiderSpawningLordParties` -> `GetBestAvailableCommander`, tez wymaga `IsActive`) probowala wystawic partie rycerzom tylko 0-2 razy na dobe
+(dorosle dzieci po `OnHeroComesOfAge`), przy czynnych glowach bylaby to prawie kazda doba kazdego rodu. Drugi mozliwy filtr: `IsNoncombatant` (gra: zadna
+umiejetnosc broni >= 100) - bez danych szablonow BK nie do rozstrzygniecia z logu; zdjety (projekt: "jedzie glowa rodu"; BK przy wezwaniu AI tez go nie sprawdza).
+**Sciezka BK `SummonGentry`:** BK AI (`CallBannersGoal.DoAiDecision`) wzywa wszystkich wasali z majatkiem bez `IsAvailableForSummoning`; nasz prefiks
+odrzucal ich tym samym `Free()` - stad "rycerz niedostepny" 164. Ta sama poprawka.
+
+**Poprawka (`GentryService.cs`):**
+1. `Free()`: stan czynny albo `NotSpawned` (`CanRide`); ucieczka, podroz, wylaczony - czekamy, az gra przywroci bohatera. Bez warunku "walczacy".
+2. `Join()`: `NotSpawned` -> `Active` przed dolaczeniem (jak kazdy lord w druzynie; powrot `TeleportHeroAction` i tak aktywuje). Dziala w wezwaniu AI
+   (codziennie) i w prefiksie BK `SummonGentry`.
+3. Linia `Rycerze (179)` (zmieniona): po "wolni w krolestwach w wojnie F (bez armii G)" - `, niedostepni w krolestwach w wojnie N (niewola a, wlasna partia b,
+   stan gry - ucieczka, podroz, wylaczony c, oblezona osada d, inne e), niewalczacy w sluzbie x`; po "wezwani dzis: ..." - `; pierwszy wyjazd (BK NotSpawned
+   -> czynny, od wczoraj) w`. Kontrola: rody w krolestwach w wojnie = w sluzbie + wolni + niedostepni.
+
+**Skutek uboczny (oczekiwany):** rycerz po pierwszej wyprawie jest czynny jak kazdy lord bez partii: gra probuje co dobe wystawic mu partie (latka 166
+`SpawnLordParty` -> `BlocksSpawn`, licznik "nowe partie zablokowane" wzrosnie do kilkudziesieciu na dobe), czasem przenosi go do innej osady krolestwa
+(`OnHeroDailyTick`), BK co tydzien sadza z powrotem w majatku. Wezwanie liczy odleglosc od majatku - bez zmian.
+
+### Problem 2 (pomiar): wojsko lordow w wojnie C2 101.8 tys. -> C3 90.7 tys. - rozklad (bez zmian w kodzie 183 i 180m)
+
+**Wskaznik `sprawdz_logi` (srednia dob 94-121):** C2 101 796 (26.0 krolestw w wojnie), C3 90 701 (26.5) = **-11.1 tys.**
+
+| Przyczyna | Tys. ludzi | Dowod |
+|---|---|---|
+| Los: Dorzecze w pokoju w C3 | -6.1 | C2: wojna w dobach 45-61 i 89-121, srednio 6 084 ludzi w dobach 94-121; C3: wojna 57-92, pokoj od 93 (1 529; doba 93 "reszta" -4 042 = ciecie 166 do pokoju). Krolestw w wojnie 26.5 w C3, bo bunty licza sie osobno: Norvos + Konfederacja Quarro 2 415 -> 2 491, Tyrosh + Spisek Ryndoon 1 484 -> 1 563 - bez straty. |
+| 179 (zgodnie z projektem) | -0.4 | partie rodow gentry w tych krolestwach: C2 395 ludzi, C3 0. |
+| 183 dezercja AI z morale | ok. -2.4 | AI lordowie (169c: morale + morale w glodzie) C2 2 483, C3 4 862 w 120 dobach; 73% w dobach 54-88 (C2 47%). Przyczyna morale: dlug snu T10 = 3 (morale -95%, ok. 3-5) u 11-15 partii AI przez ok. 2 tygodnie (NocnyMarsz "z dlugiem teraz 3" w dobach 66-82: 11-15; probki kar: Oberyn Martell, Obara i Nymeria Sand - Dorne -1.4 tys.) plus glod. C2 mial taki sam epizod (12 partii, doby 51-60) przy dezercji gry 50-100/dobe. |
+| Smierc w bitwach (los) | ok. -2.2 | zabici z partii rodow C3 34.6 tys., C2 32.2 tys.; duze bitwy C3 w dobach 75, 79, 84, 90, 95 (1.2-1.6 tys. zabitych na dobe). |
+| 180m | ok. 0 | renty dob 94-121 C3 41.8 tys./dobe, C2 23.0 tys. (bez warunku 53 wobec 102 rodow); pulap 166 bez Dorzecza 1.548 mln wobec 1.517 mln (+2%), G +3.8%; zold partii 463 tys. wobec 496 tys. - pulap uzyty w 42% (C2 46%): pieniadz nie ogranicza wojska. |
+| Reszta (werbunek, zwolnienia 166) | ok. 0..-0.5 | zwolnienia 166 z partii C3 18.9 tys., C2 24.3 tys. w biegu (mniej). |
+
+Kontrola przeplywami (linia `Ludzie`, wszystkie partie rodow, srednia dob 94-121): stan C3 - C2 = -10.4 tys. = start +1.0, werbunek -6.9 (glownie
+Dorzecze: wojenny werbunek w C2, pokoj w C3), zabici -2.2, dezercja -2.4, reszta +0.1.
+
+**183 - czy wycina za duzo:** AI ma dokladnie to samo prawo co gracz (`TierDesertionModel.Governs` - jedna sciezka, ta sama tabela i podloga 30) - decyzja
+Jeffa spelniona, bledu liczenia brak (linia `Ludzie` "dezercja partie rodow" = 169c: 740 w dobach 94-121). Oblezenia: zalogi AI z morale 0 ludzi
+w calym biegu. Prog projektu (169c "AI morale i zalegly zold", srednia 28 dob): ostatnie 28 dob 23.2/dobe (C2 22.3, baza 41.7 -> prog 62) - TAK; najgorsze
+okno (od doby 69) 116.6/dobe - ponad prog (C2 najgorsze 51.7). Przy morale 0-5 prawo daje t1-t3 14-25%/dobe, gra ok. 8-15%; miedzy 10 a 25 gra nic.
+Wedlug projektu (rozdz. 183): "wiecej niz prog - naprawiamy morale, nie dezercje" -> **do decyzji (poza C3):** partie AI z dlugiem snu 3 przez
+2 tygodnie (T10; "zapasc trwa", Dorne). Kod 183 bez zmian.
+
+**Zalogi:** swiat 81.7 -> 77.5 tys. (-4.2 tys.): Dorzecze w pokoju 3 347 -> 1 296 (-2.05 tys., cel pokojowy 166), krolestwa buntow trzymaja 1.7 tys.
+(twierdze Norvos 5 -> 3, Tyrosh 5 -> 4), reszta ok. -2.2 tys. (na twierdze bez Dorzecza 367.9 -> 355.9, -3.3%). Nie 183 (z morale 0, z limitu zoldu
+i przepelnienia 249 wobec 350 w C2), nie 180m (zold zalog 192 wobec 199 tys./dobe, pulap wyzszy) - los oblezen i szturmow.
+
+### Czego sie spodziewac w kolejnym tescie 120 dob
+
+- `Rycerze (179)`: "pierwszy wyjazd" > 0 przy pierwszych armiach (ok. doby 7-25), potem prawie 0; "w sluzbie" w okresie wojny ok. 40-80 (92 rody, armie
+  srednio ok. 10 na dobe), "armie z rycerzem" bliskie "armie" (poza krolestwami bez rycerzy); "niedostepni" pojedyncze (niewola, stan gry);
+  zold rycerzy ok. 1-2 tys./dobe (= `Obieg` "zold rycerzy (179)"); "nowe partie zablokowane" do kilkudziesieciu na dobe (oczekiwane);
+  "niewalczacy w sluzbie" pokaze, czy `IsNoncombatant` byl drugim filtrem.
+- 0 bledow - pierwszy prawdziwy test R7 (bohater obcego rodu w partii AI: smierc pana, rozbicie i niewola druzyny z rycerzem, ekran druzyny gracza).
+- Wojsko lordow: 179 -0.4 tys. jak w projekcie; 183 zalezy od epizodow dlugu snu 3 (T10); 180m ok. 0. Wskaznik "w wojnie" zalezy od skladu wojen -
+  jedno krolestwo jak Dorzecze to +-6 tys.
