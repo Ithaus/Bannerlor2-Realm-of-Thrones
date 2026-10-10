@@ -487,3 +487,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   z kapitalu Banku ponad 2 mln (pula 1/60 nadwyzki dziennie), limit 180 dni sredniego podatku, cena jak krol w Banku (20% + 10 pp przy dlugu), rata pierwszy wydatek dnia
   (1/182 najwiekszego dlugu, max 30% podatku); zaleglosc (< 50% rat w 28 dobach) -> Bank nie pozycza jej ani jej rodom, wrogom limit x1.5. Klucze CrownBorrows i 6 innych,
   zapis arm_crown186, linia "Kredyt korony (186): dzien". DLL test\Armoury-e2c-186.dll (9dc69ff6). **TEST 120 dob w toku** -> test\at-186-120.out.txt.
+- (09:30) Jeff: okupy B -> bcb5fe1 (RansomHeadYears 0.165, RansomLordDays 20). DLL 186+B: test\Armoury-e2c-186b.dll (d7222bfb). Plan: po tescie 186 (w toku) - test 120 dob
+  na 186b (186 + okupy B) -> zapis -> WGRANIE 20 razem. Potem koniec etapu 2: bieg 2-letni (Days 728) + bieg z wymuszonym pokojem.

@@ -1034,3 +1034,5 @@ marszu, potem oboz do dlugu 0; wyjatek tylko ucieczka przed 2x silniejszym; wodz
 brak porodu roznych ras, dlug snu 3 > 2 doby tylko przy ucieczce, wojsko lordow w wojnie 100.0 tys., zalogi +0.6%, dezercja AI 7/d (baza 49), glowy < 5000 = 4,
 bankruci 0; zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc19 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc19-przed.
 ZATWIERDZONE: Armoury aeb2ba51, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.
+- **Okupy - wariant B (Jeff 10.10 "Okup - B"):** glowa rodu ok. 60 dni D (RansomHeadYears 0.165), lord 20 D, krol ok. 60 dni wplywow korony (ta sama miara - moja
+  decyzja dla spojnosci). Commit bcb5fe1 na w-toku/e2c. Powod: test D - okupy 65.5 mln w 120 dobach, dlug okupow +270 tys./d (w grze niewola 4-5 x w roku na rod).
