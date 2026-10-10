@@ -466,3 +466,9 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   drzewa e2c) + ja: 182-W dar Strazy z Westeros wedlug potrzeby (procenty Jeffa, GiftWatch* + GiftWatchNeedDays 60). DLL: test\Armoury-e2c-d.dll (aebd0e94) +
   test\d\RealisticCaptivity.dll (5f98df70) - WGRYWAC RAZEM. **TEST 120 dob w toku** (-ExtraDll RC) -> test\at-d-120.out.txt. Potem zapis 9 dob -> WGRANIE 18
   (Armoury + RealisticCaptivity, kopie obu). Limit tygodnia 96%.
+- (07:20) **TEST D 120 dob (Armoury aebd0e94 + RC 5f98df70; kopia SCRATCH(7016) kopia-d-120\):** 120/120, 0 bledow Armoury. TAK: glowy < 5000 = 1, bankruci 0,
+  wojsko lordow w wojnie 96.1 tys. (pas 95-115!), zalogi -2.9%, dezercja AI 21/d, reszta ksiegi -1.6 tys.; KW u 14 rodow (Bank 259 tys., w tym KW 247 tys.); dar Strazy 0
+  (oszczednosci 2.27 mln > 60 dob x 7.6 tys.); Call to War z korony dziala (2 porozumienia). NIE: wojsko swiata -16% (z pokojem na starcie), Free Folk -27%, Aegon -25%,
+  Ibben -30%; "2.14 kurier 2b/2c brak linii" = narzedzie (harness 178 ma nowa linie "Harness niewoli (178): krok 2 - kurier prawdziwy ... z niczego 0" - OK).
+  **DO DECYZJI JEFFA - OKUPY 178:** suma cen okupow w 120 dobach ok. 65.5 mln (dzis 775 tys.: Stormcrows -> Ko Jhago 442 tys. za Sallora), dlug okupow rosnie
+  liniowo ok. 270 tys./dobe -> 32.3 mln u 54 rodow; swiat ma D ok. 0.9 mln/dobe. Ryzyko kuli snieznej w biegu 2-letnim. Test zapisu 9 dob w toku -> WGRANIE 18.
