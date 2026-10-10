@@ -424,3 +424,8 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   23/d (baza 49), renty - bez warunku 20.9% (bylo 43.7%), zalogi na twierdze -4.3%. **ZLE: (1) rycerze 179 NIE JADA** ("Rycerze (179)": rody 92, w sluzbie 0, armie 19 z
   rycerzem 0, "rycerz niedostepny 7") - blad filtra kandydatow; (2) wojsko lordow w wojnie 90.7 tys. (C2 101.8) - przyczyna nieznana (179 wg projektu tylko ok. 0.4 tys.;
   183? 180m? los kampanii?). C3 NIE WGRANY. Pomocnik w tle: naprawa 179 + rozklad roznicy C2->C3 na danych -> commit na e2c + sekcja "C3 po tescie 120 dob" w C1-POSTEP.md.
+- (04:00) **C3 PO TESCIE** (pomocnik; a5063af poprawka 179, bb2dc86 opis): rycerze nie jechali, bo Free() wymagal IsActive, a glowy BK gentry sa NotSpawned (BK tworzy je
+  po utworzeniu swiata) - teraz Free() przyjmuje NotSpawned, Join() przestawia na Active. Rozklad wojska C2->C3 (-11.1 tys.): los - Dorzecze pokoj od doby 93 -6.1,
+  bitwy -2.2; 183 dezercja -2.4 (zrodlo: DLUG SNU T10 = 3, morale -95%, u 11-15 partii AI przez ok. 2 tygodnie, doby 66-82, Dorne/Oberyn) - prawo to samo co gracza;
+  179 -0.4. **DO ZROBIENIA POZNIEJ (poza C3): AI na dlugu snu ma odpoczywac** (T10 - AI nie wie, ze trzeba rozbic oboz; to logika AI, nie nowa regula).
+  DLL test\Armoury-e2c-c3b.dll (3e0a3d12). **TEST 120 dob w toku** -> test\at-c3b-120.out.txt; cel: rycerze w sluzbie > 0, 0 bledow (R7: bohater obcego rodu w partii AI).
