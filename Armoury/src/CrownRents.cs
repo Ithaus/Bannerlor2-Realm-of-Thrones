@@ -66,11 +66,12 @@ namespace Armoury
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static string _playerNote;     // ostatni powod wstrzymania renty gracza (komunikat tylko przy zmianie)
+        private static long _playerWeekSum; private static int _playerWeekStart = -1;   // renta gracza zbiorczo co 7 dob
 
         internal static void Reset()
         {
             ClearState(); _rows.Clear();
-            ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _playerNote = null;
+            ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _playerNote = null; _playerWeekSum = 0; _playerWeekStart = -1;
         }
 
         /// <summary>Stan sluzby, norm i przejec twierdz (wylaczone 180 = stan sprzed paczki: nic nie liczymy i nic nie zapisujemy).</summary>
@@ -375,7 +376,15 @@ namespace Armoury
                 // gracz: renta albo powod wstrzymania (komunikat tylko przy zmianie powodu)
                 try
                 {
-                    if (playerPaid > 0) Log.Player("The crown paid your house " + playerPaid + " denars in rents for its fiefs.");
+                    // renta gracza zbiorczo raz na 7 dob, nie codziennie (Jeff: za duzo komunikatow); suma tygodnia tylko w pamieci - po wczytaniu liczy od nowa
+                    _playerWeekSum += playerPaid;
+                    int dayNow = (int)CampaignTime.Now.ToDays;
+                    if (_playerWeekStart < 0 || dayNow < _playerWeekStart) _playerWeekStart = dayNow;
+                    if (dayNow - _playerWeekStart >= 7)
+                    {
+                        if (_playerWeekSum > 0) Log.Player("The crown paid your house " + _playerWeekSum + " denars in rents for its fiefs this past week.");
+                        _playerWeekSum = 0; _playerWeekStart = dayNow;
+                    }
                     if (playerWhy != null && playerWhy != _playerNote)
                     {
                         Log.Player(playerWhy == "garrison"
