@@ -126,7 +126,7 @@ zapisy, `EnsureHooks`), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs`.
   Sprzet zostaje w zbrojowni partii (DTE) - nadwyzki sprzedaje jak dotad `SellArmorySurplus`.
 - `AiWageLimitDesertionOff`: prefiks/finalizer na `DefaultPartyDesertionModel.GetTroopsToDesertDueToWageAndPartySize` - dla partii i zalog rodu z budzetem
   limit zoldu zdjety na czas wywolania (czesc "limit zoldu" = 0); przepelnienie partii i zalegly zold zalogi bez zmian.
-- Nowa partia (`ConsiderSpawningLordParties`): tylko gdy w pulapie partii miejsce na `MinNewPartyMen` ludzi x sredni zold; rod bez zadnej partii i nowa kampania - zawsze.
+- Nowa partia (po przegladzie: `SpawnLordParty`, kazda osobno): tylko gdy w pulapie partii miejsce na `MinNewPartyMen` ludzi x sredni zold; glowa rodu, rod bez zadnej partii i nowa kampania - zawsze.
 - Straz (182, `UnpaidTroopsCapInMen`): pulap w ludziach = pulap zoldu / sredni nominalny zold czlowieka Strazy (`MountedWage.Nominal`); werbunek partii
   (`CheckRecruiting`) i zalog (`TickAutoRecruitmentGarrisonChange`, `TickGarrisonChangeForTown`) staja na nim; zwolnienia w ludziach, zalogi na Murze nie ciete.
 - Kiesa rodziny (`FamilyTopsUpHead`): czlonkowie ponad `FamilyPurseFloor` dopelniaja glowe do max(5 000; koszt dnia rodu = zold + dwor) przez
@@ -215,3 +215,28 @@ reparacji, przed zwrotem; zapis `arm_merc185`; EnsureHooks), `SubModuleMain.cs`,
 **Ryzyka:** (a) JIT moglby wkleic `AddMercenaryIncome` w wolajacego - wtedy "kontrakt gry wylaczony 0" przy kompaniach w sluzbie i niezerowa linia
 "kontrakt" u AI w `D staly (169c)`; (b) kompanie w pokoju traca polowe ludzi (zgodnie z projektem "w oczekiwaniu"); (c) biedna korona nie placi -> po 28 dobach
 kompanie odchodza (projekt: "biedna korona nie utrzyma najemnikow").
+
+---
+
+## Poprawki po przegladzie kodu (commity 57cbc1b, a660030)
+
+Niezalezny przeglad diffu `ae01f8e..HEAD` (podpisy latek Harmony sprawdzone w dekompilacji 1.4.8, BK i Diplomacy - wszystkie zgodne; przelewy w parach;
+wylacznik glowny = stan sprzed paczek poza tekstem logu). Poprawione:
+1. **185 przeglad w pokoju** - porownanie z ludzmi wymaganymi dzis (w pokoju polowa umowy), nie z pelna umowa; obnizka proporcjonalna do tej liczby.
+   Bez tego kazdy pokoj obcinal umowe do ok. 55%.
+2. **185 umowa zerowa** - umowa powstaje dopiero, gdy kompania ma ludzi i zold (kompania Strazy - stawka nominalna `MountedWage.Nominal`); gra przestaje
+   placic ("za tier", kontrakt gry) tylko kompaniom z umowa u obecnej korony (`HasDeal`), ksiega obiegu tak samo (`CancelsTier`).
+3. **165 splata DebtToKingdom** - skarbiec dostaje splate dopiero na koncu rozliczenia rodu (`SoldierPay.ClanTickPostfix` -> `CrownIncome.ClanTickEnd`) i tylko
+   czesc naprawde zaplacona: splata minus brak salda w kiesie glowy (saldo nie zmiescilo sie w kiesie - BK dopisuje wydatki po tym kroku); bez znanego salda - nic.
+   Licznik w linii "Korona: wplywy dnia (165)": "niezaplacone mimo wpisu w saldzie - nie do skarbca X". **Uwaga do decyzji (przeglad):** dlug wobec korony
+   powstaje w grze, gdy rod nie ma na swoj udzial w portfelu najemnikow/trybutu/wezwania do wojny, a portfel jest uznawany w calosci (z niczego) - dotad splata
+   ginela i to "rownowazylo" tamto zrodlo. Zostawione wedlug projektu (165: "splata DebtToKingdom -> skarbiec, dzis w nicosc"): sama splata jest przelewem
+   rod -> skarbiec (bez zlota z niczego); zrodlem z niczego jest pozyczka gry przy braku udzialu - zamyka ja 168 (krok D: dlug i drabina).
+4. **Bank: pomoc rodziny** wylaczona tylko u rodow z budzetem dzis (`ClanBudget.FamilyRuleFor`); rody bez budzetu (pomniejsze, najemnicy bez umowy) - jak dotad.
+   Ryzyko zostaje: u rodow z budzetem kiesa rodziny dopelnia glowe PO Banku (kolejnosc 2.0b) i do max(5 000; koszt dnia), nie do raty - spoznienia rat
+   moga byc czestsze (linia IronBank).
+5. **Zwolnienia z zalog** pomijaja zaloge w bitwie (`MapEvent`) i osade w oblezeniu.
+6. **Pulap Strazy w ludziach** sprawdzany przy werbunku/przyroscie zalog od biezacego stanu ludzi rodu (`LiveMen`), nie od porannego.
+7. **Nowa partia** - prefiks przeniesiony z `ConsiderSpawningLordParties` na `SpawnLordParty(Hero, bool)` (jedyny wolajacy): kazda partia sprawdzana osobno,
+   z miejscem zajetym przez nowe partie tej doby; glowa rodu zawsze moze wystawic partie; nowa partia dostaje limit zoldu od razu (postfiks).
+   Linia latek: "nowa partia (SpawnLordParty)".
