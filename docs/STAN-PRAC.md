@@ -961,3 +961,8 @@ tier 0) + 120 dob z krokiem B (0 bledow). Poprzedni CS: CrashScribe.dll.bak-2026
 KROK B etapu 2 (w-toku/e2b) NIE wgrany - 12/48 progow NIE; naprawa wf_f6909cac-c64.
 **DECYZJE JEFFA 09.10 ok. 17:40 (W2):** (1) wlocznie lore (Nieskalani, Qohor, Zlota Kompania, Manderly...) - BEZ wyjatku od tieru; (2) kopia do szarzy dopiero od tieru 5
 (jazda t1-t4 bez kopii). Oba punkty zgodne z W2 w grze (wgranie 13) - bez zmian w kodzie.
+**WGRANIE 14 (09.10 ok. 19:45 zegara komp.):** Armoury dff8a9b0 (w-toku/e2b b422a5f = sklad10 + etap 2 krok B: 110 zawor kasy zamku (zamek bez "zakupow" z niczego, platnosci
+z nadwyzki ponad zapas), 112 utarg wsi bez znikania (zaplata lorda zostaje we wsi, sakwy taborow do zwyciezcy), 114 podzial 2/3 pan / 1/3 korona; B-1..B-4 poprawki, ksiega 169 bez
+podwojnego liczenia sakw), CrashScribe bez zmian 6507c842. Testy: 120 dob nowej kampanii - glowy < 5000 = 9 (baza 19, prog <= 10 SPELNIONY), bankruci Banku 4 (baza 5),
+wojsko w wojnie 115.4 tys.; 1 ERROR ValyrianBlades.Census (177, nie krok B - do naprawy); zapis 9 dob OK (25.9 s, 0 bledow). Poprzedni: Armoury.dll.bak-2026-10-09-przed-noc14
++ D:. ZATWIERDZONE: Armoury dff8a9b0, CrashScribe 6507c842. Baza Armoury: w-toku/e2b.
