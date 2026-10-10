@@ -351,3 +351,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (21:50) **C1 WYKONANIE** - jeden pomocnik w tle w drzewie noc2\e2c (galaz w-toku/e2c), kawalki po kolei 165 -> 182 -> 166+162m -> 185, commit + push po kazdym
   i stan w docs/C1-POSTEP.md W DRZEWIE e2c (tam patrz, jesli konto sie skonczy). Potem: jedna recenzja (kod + skutki), poprawki, test 120 dob z
   --baza SCRATCH(7016)\e2b-p\baza-B4.json (tools/sprawdz_logi.py --grupa etap2), wgranie.
+- (21:35) **WGRANIE 15: Armoury ddf01297 (noc/wgranie-15 = e2c ae01f8e, 177-fix miecza)**, CS 6507c842. Test 40 dob OK (0 bledow Armoury, CS 8 = szum startowy, spis 17/17).
+  Uwaga dla C1: galaz w-toku/e2c zawiera juz 177-fix (ae01f8e) - C1 idzie na nim.
