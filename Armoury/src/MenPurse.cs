@@ -517,7 +517,7 @@ namespace Armoury
                         if (it == null || !arm.TryGetValue(it, out cnt) || cnt <= 0) break;
                         var el = new EquipmentElement(it, AiWear.TakeCondition(mp, it));
                         int unit = SellPriceHere(el, st, mp);
-                        if (st.Town.Gold < unit) { AiWear.PutBack(mp, it, el.ItemModifier); stop = true; break; }   // kasa pusta - koniec na dzis (stan wraca)
+                        if (CastlePurse.Spendable(st.Town) < unit) { AiWear.PutBack(mp, it, el.ItemModifier); stop = true; break; }   // kasa pusta - koniec na dzis (stan wraca); B-2: zamek - tylko nadwyzka ponad zapas kupcow
                         if (cnt > 1) arm[it] = cnt - 1; else arm.Remove(it);
                         st.ItemRoster.AddToCounts(el, 1);
                         Measure174b.NoteSurplusSale(it, 1, unit);                          // 174b.0 M3 (tylko licznik)

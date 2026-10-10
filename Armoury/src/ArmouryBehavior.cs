@@ -1426,8 +1426,9 @@ namespace Armoury
             try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
             try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); }         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
             try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); }                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
+            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2 / B-2: kasy osad przed wywozem kupcow - pozostale moduly osobno
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
-            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2: kasy osad przed kontraktami - pozostale moduly osobno
+            try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }  // B-2: wywoz kupcow osobna pozycja w "Przeplywy osad" (kasy zamkow placa za konie i uprzaz - tylko z nadwyzki)
             try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); }   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"
             try { MoneyLedger.Mark(MoneyLedger.MOrders); } catch { }
             try { ArmsScrap.Daily(); } catch (Exception e) { Log.Error("ArmsScrap.Daily", e); }   // 174 pytanie 4: pomiar popytu koszykow zawsze; skup na zlom tylko przy OldStockToScrap (domyslnie wylaczony)

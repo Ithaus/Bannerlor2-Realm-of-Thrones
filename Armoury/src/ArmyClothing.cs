@@ -230,7 +230,7 @@ namespace Armoury
                 var market = MarketTown(st);
                 if (market == null) { _dCastleNoTown++; return; }
                 if (market.IsUnderSiege) { _dCastleWait++; return; }
-                int budget = Math.Max(0, st.Town.Gold);
+                int budget = Math.Max(0, CastlePurse.Spendable(st.Town));   // B-2: kasa zamku placi tylko z nadwyzki ponad zapas kupcow (wylaczone - cala kasa)
                 int spent = Buy(market, garrison, need, budget, got, false, out lacked, out poor);
                 if (poor) _dCastleNoGold++;
                 if (spent <= 0) return;

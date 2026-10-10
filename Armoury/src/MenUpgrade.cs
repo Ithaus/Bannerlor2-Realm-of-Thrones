@@ -467,7 +467,7 @@ namespace Armoury
                     EquipmentElement soldEl;
                     if (sellTo == null || sellTo.Town == null || !kit.TakeOld(oldP, out soldEl)) { v.Kept++; _dKept++; continue; }
                     int unit = MenPurse.SellPriceHere(soldEl, sellTo, mp);
-                    if (!SwapMath.MerchantPays(sellTo.Town.Gold, unit)) { kit.PutBackOld(oldP, soldEl); v.Kept++; _dKept++; continue; }
+                    if (!SwapMath.MerchantPays(CastlePurse.Spendable(sellTo.Town), unit)) { kit.PutBackOld(oldP, soldEl); v.Kept++; _dKept++; continue; }   // B-2: zamek - tylko nadwyzka ponad zapas kupcow
                     sellTo.ItemRoster.AddToCounts(soldEl, 1);
                     Stale(wares, sellTo, soldEl.Item);   // ceny hurtu (09.10): sztuka doszla na polke - ceny tego koszyka i kategorii od nowa
                     sellTo.Town.ChangeGold(-unit);

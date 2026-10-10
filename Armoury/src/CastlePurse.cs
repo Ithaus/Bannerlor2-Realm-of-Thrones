@@ -44,9 +44,19 @@ namespace Armoury
     ///     zalogi wlasnego zamku; z podzialem zaloga "u siebie" kosztuje go co najmniej trzecia czesc zoldu. 114-p: renta i zawor MIASTA ida
     ///     dzis w 100% do pana (PopulationLaw, TownRentShare) - ten sam podzial 2/3 : 1/3 dla miast przyjdzie dopiero z 111' (etap 5, K6 OB);
     ///     do tego czasu zamek i miasto maja rozne udzialy korony (przejsciowa niespojnosc, wpisana w CHANGELOG 114-p).
-    ///     114-p (Z8, 2.0b): w wojnie korona zwraca 50% zoldu zalog (CrownWageRefundGarrisons); zold zalogi zamku, ktory laduje w kasie
-    ///     PONAD zapasem, wraca panu zaworem - ta czesc nie jest podstawa zwrotu (HomePart, CastleGarrisonPayComesHome), inaczej z 1 zl
-    ///     zoldu wracalo ok. 1.16 zl (gracz2.py: 0.5 zwrotu + ok. 0.66 zaworu). Do 165 (zwrot bez zalog) - tylko zamki.
+    ///     114-p (Z8, 2.0b): w wojnie korona zwraca 50% zoldu zalog (CrownWageRefundGarrisons); zold zalogi zamku, ktory wraca panu zaworem,
+    ///     nie jest podstawa zwrotu (CastleGarrisonPayComesHome), inaczej z 1 zl zoldu wracalo ok. 1.16 zl (gracz2.py: 0.5 zwrotu + ok. 0.66
+    ///     zaworu). B-2: "wraca" = to, co pan NAPRAWDE dostal dzis z zaworu swoich zamkow (LordDuesToday), najwyzej zold jego zalog zamkow od
+    ///     poprzedniego zwrotu (SoldierPay.TakePaid) - dotad przewidywane przy wplacie jako cala czesc ponad zapasem (114-p HomePart), a kupcy
+    ///     podzamcza wydaja te nadwyzke na towar, zanim zawor ja wezmie (bieg 120 dob kroku B: odliczone 17.7 tys./dobe, wrocilo zaworem 5.9 tys.).
+    ///     Z 1 zl zoldu wraca teraz 0.5 + 0.5 x czesc z zaworu, najwyzej 0.83. Do 165 (zwrot bez zalog) - tylko zamki.
+    ///  3b. B-2 (krok B po tescie 120 dob): KASA ZAMKU PLACI TYLKO Z NADWYZKI PONAD ZAPAS KUPCOW (Spendable; ta sama regula co tabory wsi w
+    ///     CanPayCart - jedna regula na wydatki kasy zamku): kupcy wiozacy konie i uprzaz do zamku (SupplyDemand), odziez zalogi (ArmyClothing),
+    ///     skup nadwyzek zalogi i starych sztuk przy dozbrajaniu (MenPurse, MenUpgrade). Bieg 120 dob: prawdziwe przeplywy kas zamkow netto
+    ///     ok. -30 tys./dobe (zold zalog +38 tys., kupno koni i uprzezy przez kupcow ok. -57 tys., odziez -9 tys.) - dziure, ktora dotad
+    ///     zatykaly "zakupy" z niczego, po 110 zatykala dosypka regulatora trybu 1 (44 tys./dobe z niczego wobec 3.7 tys. z projektu). Zapas
+    ///     kupcow to cel regulatora gry - ponizej niego gra dosypuje z niczego, wiec wydatek ponizej zapasu byl w praktyce oplacany z niczego.
+    ///     Wylacznik CastlePaysFromSurplus (wylaczony = cala kasa jak dotad); bez zaworu (CastlePurseEnabled) - jak dotad.
     ///  4. Tabory: wies, ktorej targ lezy za MarketMaxDistance, dalej wozi do zamku pana - ale tylko wtedy, gdy zamek ma ponad
     ///     zapasem dosc na caly ladunek; inaczej tabor jedzie na daleki targ (MarketRoad pyta CanPayCart). Pusty zamek nie kupuje.
     ///  5. Start nowej kampanii: dar startowy w kasach zamkow (gra 20 000 + BK 40 x dobrobyt) jest raz, w pierwszej dobie, przycinany
@@ -96,6 +106,7 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby (linia "Zawor zamkow (110)")
         private static long _dRegUp, _dRegDown, _dConsBack, _dCartValue;
         private static int _dRegUpN, _dRegDownN, _dConsN, _dConsHit, _dCartPaid, _dCartSent, _stumbles;
+        private static int _dSpendAsk, _dSpendZero;          // B-2: zapytania o kase zamku do wydania (Spendable) i te, w ktorych kasa stala przy zapasie (0 do wydania)
         private static bool _errLogged;
 
         // ------------------------------------------------------------ odczyty dnia dla innych modulow (169c D staly, ksiega pieniadza)
@@ -128,6 +139,7 @@ namespace Armoury
         {
             _dRegUp = _dRegDown = _dConsBack = _dCartValue = 0;
             _dRegUpN = _dRegDownN = _dConsN = _dConsHit = _dCartPaid = _dCartSent = _stumbles = 0;
+            _dSpendAsk = _dSpendZero = 0;
         }
 
         internal static string Export()
@@ -324,35 +336,59 @@ namespace Armoury
                                                                 : " dla pana zamku (podzial z korona 114 wylaczony)")
                      + ", dar startowy przycinany w pierwszej dobie nowej kampanii: " + (s != null && s.CastlePurseTrimAtStart ? "tak" : "nie")
                      + ", tabor do zamku tylko gdy zamek ma czym zaplacic: " + (s != null && s.CastleCartsNeedCoin ? "tak" : "nie")
+                     + ", pozostale zakupy kasy zamku (kupcy z konmi i uprzeza, odziez zalogi, skup nadwyzek zalogi) tylko z nadwyzki ponad zapas (B-2): " + (s != null && s.CastlePaysFromSurplus ? "tak" : "nie")
+                     + ", zwrot korony bez zoldu zalogi zamku, ktory wrocil panu zaworem (Z8, B-2 - z tego, co wrocilo, nie z przewidywania): " + (s != null && s.CastleGarrisonPayComesHome ? "tak" : "nie")
                      + "; hak kiesy ludu (etap 5) CastleDuesSuburbShare " + CastleDuesSuburbShare.ToString("0.##", CultureInfo.InvariantCulture) + ".");
         }
 
-        // ------------------------------------------------------------ zwrot zoldu z korony a zaloga "u siebie" (114-p, Z8)
+        // ------------------------------------------------------------ zwrot zoldu z korony a zaloga "u siebie" (114-p, Z8; B-2)
         /// <summary>
-        /// 114-p (Z8 z 2.0b; z galezi 114 TownPurse.HomePart/PayComesHome, tylko dla zamkow): ile z zoldu zalogi, ktory ZARAZ wplynie do kasy
-        /// jej zamku, wyladuje ponad zapasem kupcow. Tylko ta czesc wraca panu zaworem - i tylko ona nie jest podstawa zwrotu zoldu z korony
-        /// (inaczej zaloga dawalaby panu w wojnie wiecej, niz kosztuje: 0.5 zwrotu + do 2/3 zaworu). Czesc dopelniajaca kase do zapasu nie wraca
-        /// nigdy (zastepuje dosypke regulatora) - za nia zwrot zostaje jak dotad. Warunki: zawor czynny (CastlePurseEnabled, CastleDuesShare > 0),
-        /// pan ma w nim udzial > 0 (bez krolestwa - calosc; w krolestwie CastleDuesLordShare przy podziale), CastleGarrisonPayComesHome.
-        /// Miasta - nie (renta miasta: TownWageShield; zwrot bez zalog wprowadza 165). Wolac PRZED wplata zoldu. Wyjatek albo wylacznik = 0.
+        /// 114-p / B-2 (Z8 z 2.0b, tylko zamki): czy zold zalogi tego zamku moze wrocic panu zaworem - wtedy SoldierPay liczy go do podstawy
+        /// ciecia zwrotu korony (SoldierPay.TakePaid odejmuje od zwrotu to, co pan NAPRAWDE dostal dzis z zaworu swoich zamkow, najwyzej zold
+        /// jego zalog zamkow). Warunki: zawor czynny (CastlePurseEnabled, CastleDuesShare > 0), pan ma w nim udzial > 0 (bez krolestwa - calosc;
+        /// w krolestwie CastleDuesLordShare przy podziale), CastleGarrisonPayComesHome. Miasta - nie (renta miasta: TownWageShield; zwrot bez
+        /// zalog wprowadza 165). Dotad (114-p HomePart) przy wplacie odliczana byla cala czesc zoldu ponad zapasem kasy - kupcy podzamcza wydaja
+        /// ja jednak na towar, zanim zawor ja wezmie, wiec pan tracil polowe zwrotu za pieniadze, ktore do niego nie wracaly. Blad/wylacznik = false.
         /// </summary>
-        internal static int HomePart(Settlement st, int amount)
+        internal static bool ComesHome(Settlement st)
         {
             try
             {
                 var s = Settings.Current;
-                if (amount <= 0 || s == null || st == null || !st.IsCastle || st.Town == null) return 0;
-                if (!s.CastlePurseEnabled || !s.CastleGarrisonPayComesHome) return 0;
-                if (float.IsNaN(s.CastleDuesShare) || s.CastleDuesShare <= 0f) return 0;
+                if (s == null || st == null || !st.IsCastle || st.Town == null) return false;
+                if (!s.CastlePurseEnabled || !s.CastleGarrisonPayComesHome) return false;
+                if (float.IsNaN(s.CastleDuesShare) || s.CastleDuesShare <= 0f) return false;
                 var clan = st.OwnerClan;
-                if (clan == null) return 0;
+                if (clan == null) return false;
                 var k = clan.Kingdom;
                 float lordShare = s.CastleDuesSplitWithCrown && k != null && !k.IsEliminated ? LordShare(s) : 1f;
-                if (lordShare <= 0f) return 0;                   // calosc zaworu bierze korona - do pana nic nie wraca, zwrot jak dotad
-                long above = (long)st.Town.Gold + amount - Reserve(st.Town);
-                return above <= 0 ? 0 : (above >= amount ? amount : (int)above);
+                return lordShare > 0f;                           // calosc zaworu bierze korona - do pana nic nie wraca, zwrot jak dotad
             }
-            catch (Exception e) { Stumble("CastlePurse.HomePart", e); return 0; }
+            catch (Exception e) { Stumble("CastlePurse.ComesHome", e); return false; }
+        }
+
+        // ------------------------------------------------------------ B-2: wydatki kasy zamku tylko z nadwyzki ponad zapas kupcow
+        /// <summary>
+        /// B-2: ile kasa osady moze dzis wydac na zakup. ZAMEK przy czynnym zaworze (CastlePurseEnabled) i CastlePaysFromSurplus: tylko nadwyzke
+        /// ponad zapas kupcow (Reserve) - ta sama regula co tabory wsi (CanPayCart). Zapas to cel regulatora gry: ponizej niego gra dosypuje
+        /// z niczego (tryb 1), wiec zakup z zapasu oplacala w praktyce dosypka z niczego. Miasto, wylaczniki i blad - cala kasa jak dotad.
+        /// Sam odczyt (i licznik do linii "Zawor zamkow (110)"); wolajacy sprawdza przed kazda sztuka, jak dotad z kasa.
+        /// </summary>
+        internal static int Spendable(Town town)
+        {
+            if (town == null) return 0;
+            int gold = town.Gold;
+            try
+            {
+                if (!town.IsCastle) return gold;
+                var s = Settings.Current;
+                if (s == null || !s.CastlePurseEnabled || !s.CastlePaysFromSurplus) return gold;
+                _dSpendAsk++;
+                long spare = (long)gold - Reserve(town);
+                if (spare <= 0) { _dSpendZero++; return 0; }
+                return spare >= gold ? gold : (int)spare;
+            }
+            catch (Exception e) { Stumble("CastlePurse.Spendable", e); return gold; }
         }
 
         // ------------------------------------------------------------ tabory wsi bez bliskiego targu
@@ -617,6 +653,8 @@ namespace Armoury
                              + ", mediana " + (onlyN > 0 ? onlyList[onlyN / 2].ToString(CultureInfo.InvariantCulture) : "-") + " zl dzis"
                              + " | tabory wsi z targiem za daleko: do zamku (ma czym zaplacic) " + _dCartPaid + ", na daleki targ (zamek nie mial na caly ladunek) " + _dCartSent
                              + (_dCartSent > 0 ? " - ladunki warte " + _dCartValue : "")
+                             + " | zakupy z kasy zamku tylko z nadwyzki ponad zapas (B-2): " + (s.CastlePaysFromSurplus ? "zapytan " + _dSpendAsk + ", przy zapasie (0 do wydania) " + _dSpendZero
+                                                                                                                       : "WYLACZONE (MCM Castle Pays From Surplus) - zamek placi cala kasa")
                              + (_stumbles > 0 ? " | potkniecia (wyjatki, pierwszy w logu): " + _stumbles : "") + ".");
                 }
             }

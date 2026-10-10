@@ -556,9 +556,10 @@ namespace Armoury
                                 // sklad8-p (uwaga 3, ceny hurtu Jeffa 09.10 08:00): kazda sztuka po cenie straganu zrodla, liczonej od nowa po zdjeciu poprzedniej
                                 // (ShelfBuy.Take - jak gra w SellItemsAction); sztuka tylko, gdy odbiorce stac na nia z reszty kasy. Stan sztuki w cenie (wartosc
                                 // ze stanem - ItemValue - jak B4). Dotad: wartosc x 50% x mnoznik zawalonej polki, jedna cena za n sztuk stosu.
+                                // B-2: odbiorca-ZAMEK placi tylko z nadwyzki kasy ponad zapas kupcow (CastlePurse.Spendable; miasto - cala kasa jak dotad)
                                 var eel = el.EquipmentElement;
                                 int cost, first, last;
-                                int n = ShelfBuy.Take(shelf, eel, Math.Min(want - got, el.Amount), best.Town.Gold,
+                                int n = ShelfBuy.Take(shelf, eel, Math.Min(want - got, el.Amount), CastlePurse.Spendable(best.Town),
                                                       () => market.Town.MarketData.GetPrice(eel, null, false, market.Party), out cost, out first, out last, 0, false);
                                 if (n <= 0) break;   // odbiorcy nie stac na kolejna sztuke (jak dotad przy afford <= 0)
                                 tradeEvals += n;

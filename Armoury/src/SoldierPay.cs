@@ -72,12 +72,15 @@ namespace Armoury
 
         // ------------------------------------------------------------ zaplacone dzis wedlug platnika (podstawa zwrotu ze skarbca)
         private static readonly Dictionary<Hero, int> _paidToday = new Dictionary<Hero, int>();
+        // B-2 (Z8): zold zalog ZAMKOW wplacony do kas zamkow od poprzedniego zwrotu, na rod (tylko zamki, z ktorych zold moze wrocic panu zaworem -
+        // CastlePurse.ComesHome); gorna granica ciecia zwrotu w TakePaid
+        private static readonly Dictionary<Clan, long> _castlePay = new Dictionary<Clan, long>();
 
         // ------------------------------------------------------------ liczniki doby (linia "Zold:")
         private static long _dLordAcc, _dLordTaken, _dGarAcc, _dGarTaken, _dToPurse, _dPlayer, _dToTowns, _dToCastles;
         private static long _dUndead, _dNoTown, _dOff, _dOther, _dCut, _dBlindGold, _dDebtCut;
         private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
-        private static long _dGarHome; private static int _dGarHomeN;         // 114-p (Z8): zold zalog zamkow ponad zapas kasy - bez zwrotu korony
+        private static long _dGarHome; private static int _dGarHomeN;         // 114-p / B-2 (Z8): zold zalog zamkow, ktory wrocil panu zaworem - bez zwrotu korony (rody)
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -119,7 +122,7 @@ namespace Armoury
         internal static void Reset()
         {
             _clan = null; _recs.Clear(); _haveNet = false; _netModel = null; _netDecl = null; _debtBefore = 0;
-            _paidToday.Clear(); _errLogged = false;
+            _paidToday.Clear(); _castlePay.Clear(); _errLogged = false;
             _held.Clear(); _regModel = null; _regDecl = null;
             _netTriedFor = null; _regTriedFor = null; _regReady = false;   // nowa kampania = nowe obiekty modeli (latki zostaja w procesie)
             ClearDay();
@@ -388,13 +391,16 @@ namespace Armoury
                 // Pieniadze i tak koncza w tej samej kasie, tylko pozniej i jako zakup sprzetu (decyzja z 05.10 "zold garnizonu do kasy
                 // jego osady" w mocy co do miejsca). GarrisonShare tylko czyta (sakiewke i ustawienia) - liczone przed zwrotem korony
                 int toPurse = toCoffers ? GarrisonShare(mp, amt, r.Wage, s) : 0, coffers = amt - toPurse;
-                // 114-p (Z8, 2.0b): czesc zoldu, ktora wyladuje w kasie ZAMKU ponad zapasem, wraca panu zaworem - nie jest podstawa zwrotu
-                // korony (CastlePurse.HomePart liczy przed wplata; miasta, wylaczniki i blad = 0 - caly zold jak dotad)
-                int home = toCoffers ? CastlePurse.HomePart(st, coffers) : 0;
+                // 114-p / B-2 (Z8, 2.0b): zold zalogi ZAMKU, ktory wraca panu zaworem, nie jest podstawa zwrotu korony. B-2: "wraca" liczone przy
+                // zwrocie (TakePaid) z tego, co pan naprawde dostal z zaworu swoich zamkow, najwyzej ten zold - nie przewidywane tu przy wplacie
+                // (114-p HomePart odliczal cala czesc ponad zapasem kasy, a kupcy podzamcza wydaja ja na towar, zanim zawor ja wezmie)
                 if (s.CrownWageRefundGarrisons)
                 {
-                    if (amt > home) AddPaid(clan.Leader, amt - home, s);   // kiese zalogi wyrownuje rod z salda - placi glowa
-                    if (home > 0 && s.CrownWageRefundEnabled) { _dGarHome += home; _dGarHomeN++; }
+                    AddPaid(clan.Leader, amt, s);                       // kiese zalogi wyrownuje rod z salda - placi glowa
+                    if (toCoffers && coffers > 0 && s.CrownWageRefundEnabled && clan.Leader != null && CastlePurse.ComesHome(st))
+                    {
+                        long c0; _castlePay.TryGetValue(clan, out c0); _castlePay[clan] = c0 + coffers;
+                    }
                 }
                 if (!s.GarrisonPayToCoffers) { _dOff += amt; return; }
                 if (town == null) { _dNoTown += amt; return; }
@@ -457,11 +463,33 @@ namespace Armoury
             _paidToday[payer] = v + amt;
         }
 
-        /// <summary>Zold partii i garnizonow naprawde zaplacony od poprzedniego rozliczenia korony, wedlug platnika; czysci licznik.</summary>
+        /// <summary>
+        /// Zold partii i garnizonow naprawde zaplacony od poprzedniego rozliczenia korony, wedlug platnika; czysci licznik. B-2 (Z8): glowie rodu
+        /// odejmujemy to, co dzis wrocilo jej z zaworu zamkow rodu (CastlePurse.LordDuesToday - CastlePurse.Daily biegnie w tym samym ticku przed
+        /// zwrotem korony), najwyzej zold zalog tych zamkow od poprzedniego rozliczenia (_castlePay) - ta czesc nie jest podstawa zwrotu.
+        /// </summary>
         internal static List<KeyValuePair<Hero, int>> TakePaid()
         {
-            var list = new List<KeyValuePair<Hero, int>>(_paidToday);
-            _paidToday.Clear();
+            var list = new List<KeyValuePair<Hero, int>>(_paidToday.Count);
+            foreach (var kv in _paidToday)
+            {
+                int v = kv.Value;
+                try
+                {
+                    var h = kv.Key;
+                    var c = h != null ? h.Clan : null;
+                    long pay;
+                    if (c != null && h == c.Leader && v > 0 && _castlePay.TryGetValue(c, out pay) && pay > 0)
+                    {
+                        int dues; CastlePurse.LordDuesToday.TryGetValue(c, out dues);
+                        long cut = Math.Min(Math.Min(pay, (long)Math.Max(0, dues)), v);
+                        if (cut > 0) { v -= (int)cut; _dGarHome += cut; _dGarHomeN++; }
+                    }
+                }
+                catch (Exception e) { Stumble("SoldierPay.TakePaid", e); }
+                list.Add(new KeyValuePair<Hero, int>(kv.Key, v));
+            }
+            _paidToday.Clear(); _castlePay.Clear();
             return list;
         }
 
@@ -618,7 +646,7 @@ namespace Armoury
         {
             try
             {
-                _paidToday.Clear();                                     // gdyby zwrot ze skarbca dzis nie biegl
+                _paidToday.Clear(); _castlePay.Clear();                 // gdyby zwrot ze skarbca dzis nie biegl
                 if (Campaign.Current == null) return;
                 float heldSum = 0f; foreach (var v in _held.Values) heldSum += v;
                 int heldTowns = _held.Count;
@@ -631,7 +659,7 @@ namespace Armoury
                              + " (" + _dToPurseN + " partii, w tym ludzie gracza " + _dPlayer + ")"
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
                              + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
-                             + ", zold zalog zamkow ponad zapas kasy - wraca zaworem, bez zwrotu korony (114-p) " + _dGarHome + " (" + _dGarHomeN + ")"
+                             + ", zold zalog zamkow, ktory wrocil panom zaworem - bez zwrotu korony (Z8, B-2) " + _dGarHome + " (" + _dGarHomeN + " rodow)"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
                              + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "

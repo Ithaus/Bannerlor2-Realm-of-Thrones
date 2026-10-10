@@ -2560,7 +2560,7 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesLordShare { get; set; } = 0.67f;
 
-        [SettingPropertyBool("Castle Garrison Pay Comes Home", HintText = "in war the crown no longer repays the part of a castle garrison's pay that lands in the castle purse above its working coin: that part comes back to the castle's lord through the dues, and repaid by the crown as well it would earn him more than the garrison costs - you and the AI lords alike. Pay that only fills the purse up to its working coin, and the part the men keep for their own kit, are repaid as before. Town garrisons are left as they are until the crown's refund is reworked (stage 2, step C). Off = the crown repays castle garrison pay in full, as before")]
+        [SettingPropertyBool("Castle Garrison Pay Comes Home", HintText = "in war the crown no longer repays the part of a castle garrison's pay that has come back to the castle's lord through the dues: each day what the lord's own share of his castles' dues brought him is taken off the pay the crown repays him (never more than his castle garrisons were paid). Repaid by the crown as well, that coin would earn him more than the garrison costs - you and the AI lords alike. Whatever the sutlers under the walls spend on goods never comes back, so it is repaid as before, and so is the part the men keep for their own kit. Town garrisons are left as they are until the crown's refund is reworked (stage 2, step C). Off = the crown repays castle garrison pay in full, as before")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastleGarrisonPayComesHome { get; set; } = true;
 
@@ -2571,6 +2571,10 @@ namespace Armoury
         [SettingPropertyBool("Castle Carts Need Coin", HintText = "villagers whose market town lies beyond Market Max Distance sell at their lord's castle only when its purse holds enough above the working coin to pay for the whole cartload; otherwise they take the long road to the market town (off = they haul to the castle whether it can pay or not)")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastleCartsNeedCoin { get; set; } = true;
+
+        [SettingPropertyBool("Castle Pays From Surplus", HintText = "a castle purse pays for its other purchases too only with the coin it holds above the working coin, as it does for cartloads: merchants bringing horses and harness to the castle, cloth and shoes for its garrison, the garrison's spare kit and the old pieces it sells when it buys better. Below the working coin the game tops the purse up from nowhere, so whatever was spent from it was in truth paid from nowhere. Needs Castle Purse Enabled. Off = the castle spends its whole purse, as before")]
+        [SettingPropertyGroup("The castle's purse")]
+        public bool CastlePaysFromSurplus { get; set; } = true;
 
         [SettingPropertyBool("Army Clothing Enabled", HintText = "every soldier on pay wears out his shoes, clothes and linen: men in a lord's party (yours too) buy leather, felt (woollen cloth) and linen in the towns they leave - piece by piece at the market price, out of their own purse, before they spend the rest on food and drink; a town garrison takes them from its own town's market without paying, for its pay already went into that town's purse; a castle garrison has the castle purse buy them in the town its villages trade with. What cannot be had waits (Army Clothing Max Wait Days), then is only noted in the log. Banner Kings party supplies no longer buy or use up wool, linen or flax for the troops, and their 'Textiles supplies' morale penalty is gone - one rule for clothing, rags carry no penalty (off = no wear, Banner Kings textiles and their morale penalty as before)")]
         [SettingPropertyGroup("The soldier's clothes")]
@@ -4050,6 +4054,7 @@ namespace Armoury
             s.CastleGarrisonPayComesHome = CastleGarrisonPayComesHome;
             s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
             s.CastleCartsNeedCoin = CastleCartsNeedCoin;
+            s.CastlePaysFromSurplus = CastlePaysFromSurplus;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
             s.ArmyClothingFieldLeatherKg = ArmyClothingFieldLeatherKg;
             s.ArmyClothingFieldClothKg = ArmyClothingFieldClothKg;
