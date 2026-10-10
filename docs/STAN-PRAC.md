@@ -959,3 +959,5 @@ vlandia_lance_1_t3 = tier 5) poza zamiana 175 -> W2 w toku. ZATWIERDZONE OD TERA
 t3-t4 bez kopii/wloczni t5-6; Polnoc 131/134 wobec swiata 122/119), Armoury bez zmian 1cc7890a. Test: 40 dob z Armoury w grze OK (14.2 s, 0 bledow, jednostek z bronia ponad
 tier 0) + 120 dob z krokiem B (0 bledow). Poprzedni CS: CrashScribe.dll.bak-2026-10-09-przed-noc13 + D:. ZATWIERDZONE: Armoury 1cc7890a, CrashScribe 6507c842.
 KROK B etapu 2 (w-toku/e2b) NIE wgrany - 12/48 progow NIE; naprawa wf_f6909cac-c64.
+**DECYZJE JEFFA 09.10 ok. 17:40 (W2):** (1) wlocznie lore (Nieskalani, Qohor, Zlota Kompania, Manderly...) - BEZ wyjatku od tieru; (2) kopia do szarzy dopiero od tieru 5
+(jazda t1-t4 bez kopii). Oba punkty zgodne z W2 w grze (wgranie 13) - bez zmian w kodzie.
