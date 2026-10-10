@@ -449,3 +449,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   bankructwa; 178 okupy wedlug majatku, wielcy jency 1/10, okup krola ze skarbca, dlug okupu najwyzej rok) wedlug PROJEKT-ETAP2 rozdz. 168 (ok. 614) i 178 (ok. 684);
   potem test 120 dob + bieg z wymuszonym pokojem + 2 lata (koniec etapu 2). Potem etap 3. Odlozone: AI ma odpoczywac na dlugu snu (T10); Mends - porod roznych ras;
   pytanie do Jeffa - koszt wezwania sojusznika z korony zamiast z kies.
+- (05:45) **KROK D - START** (limit tygodnia 95%): jeden pomocnik w tle, drzewo noc2\e2c (w-toku/e2c od 0175e8d), kolejno 168 (dlug, KW w pulapie 166, szczeble
+  zamiast bankructwa, dluznik w budzecie, zrodlo zaliczki gry) -> 178 (okupy wedlug majatku, wielcy jency 1/10, okup krola ze skarbca, dlug okupu najwyzej rok),
+  commit + push po kazdym + sekcje "D - 168" / "D - 178" w docs/C1-POSTEP.md drzewa e2c (TAM patrz po przejeciu konta). Potem: test 120 dob (--baza baza-B4),
+  zapis 9 dob, WGRANIE 18; potem bieg z wymuszonym pokojem + 2 lata = koniec etapu 2.
