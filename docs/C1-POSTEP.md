@@ -100,3 +100,77 @@ od wczoraj" < 0; (b) `AddPaymentForDebts` - JIT moglby wkleic metode (mala) - wt
    (175) ma "lorath" zamiast "nord" - tylko pomiar 175, nie ruszane (uwaga do przegladu).
 
 **Nie zrobione:** pulap Strazy w ludziach - kawalek 3 (166).
+
+---
+
+## Kawalek 3: 166 budzet rodu + 162m dwor - ZROBIONE (commit 6dff51b)
+
+**Pliki:** nowy `Armoury/src/ClanBudget.cs`; `SoldierPay.cs` (tarcza dworu `HoldCourt`, `DecayCourt`, regulator z dwoma znacznikami, zapis),
+`AiGear.cs` (przydzial sprzetu), `BuildFunding.cs` (przydzial budow), `IronBank.cs` (`FamilyOn` wylaczone przy kiesie rodziny budzetu),
+`ClanIncomeBook.cs` (linia na sucho: jedna formula `ClanBudget.Ceiling`), `ClanIncomeBook.StableD.cs` (`StableDWithDays` + jednorazowe),
+`MoneyLedger.cs` (pozycja `MBudget`), `MoneyLedger.Obieg.cs`, `ArmouryBehavior.cs` (krok po Banku miedzy `Mark(MRest)` a `Mark(MBudget)`,
+zapisy, `EnsureHooks`), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs`.
+
+**Co dziala (ClanBudgetEnabled = true - teraz domyslnie; wlacza tez 165 i 182):**
+- Rody: AI w krolestwie, nie najemnicy (185), nie dworzanie BK, nie Inni; gracz nigdy. Rody pomniejsze poza krolestwem - bez budzetu (ich dochod to
+  "za tier" z niczego, poza D - budzet na D zabralby im cale wojsko; etap 3).
+- D: D staly 169c (`ClanBudgetStableD`), u najezdzcow (krolestwa `sturgia` Zelazne Wyspy, `khuzait` Dothrakowie, `freefolk`) + srednie "jednorazowe"
+  bez podwojnych (lup); pomiar krotszy niz 28 dob mieszany z D z zapisu (pierscienie D stalego sa tylko w sesji) albo G/60 (start). Bez D stalego - D169.
+- Pulap (jedna formula `ClanBudget.Ceiling` - ta sama w linii "Budzet rodow (na sucho)"), udzialy dworu/sprzetu/budow, R z podloga na doroslego.
+- Zalogi: w wojnie (`GarrisonWarFull`) pulap gry, finansowane pierwsze; w pokoju cel = `GarrisonPeaceShare` x srednia zoldu zalogi z dob wojny (28-dobowa;
+  przed pierwsza wojna - stan pierwszej doby), razem najwyzej 80% pulapu -> `SetGarrisonWagePaymentLimit` (w Daily i w postfiksie
+  `UpdateClanSettlementsPaymentLimit`). Partie: reszta pulapu, glowa 1.5 : inni 1 -> `SetWagePaymentLimit` (Daily + postfiks `MakeClanFinancialEvaluation`).
+- Zwolnienia: `BudgetHysteresis`/`BudgetHysteresisDays`/`ReleasePerDay`; kolejnosc: zalogi ponad cel (pokoj), najemnicy (Occupation.Mercenary), najnizszy
+  tier partii; zalogi w wojnie nietkniete. Ludzie -> `PopulationData.UpdatePopFromSoldiers` wsi z danymi BK (zaloga: wsie tej twierdzy; partia: najblizsza
+  wies rodu, potem krolestwa); bez takiej wsi - nikt nie odchodzi (licznik "nie zwolniono"). Czesc sakiewki partii (ludzie odchodzacy / ludzie) -> kiesa wsi.
+  Sprzet zostaje w zbrojowni partii (DTE) - nadwyzki sprzedaje jak dotad `SellArmorySurplus`.
+- `AiWageLimitDesertionOff`: prefiks/finalizer na `DefaultPartyDesertionModel.GetTroopsToDesertDueToWageAndPartySize` - dla partii i zalog rodu z budzetem
+  limit zoldu zdjety na czas wywolania (czesc "limit zoldu" = 0); przepelnienie partii i zalegly zold zalogi bez zmian.
+- Nowa partia (`ConsiderSpawningLordParties`): tylko gdy w pulapie partii miejsce na `MinNewPartyMen` ludzi x sredni zold; rod bez zadnej partii i nowa kampania - zawsze.
+- Straz (182, `UnpaidTroopsCapInMen`): pulap w ludziach = pulap zoldu / sredni nominalny zold czlowieka Strazy (`MountedWage.Nominal`); werbunek partii
+  (`CheckRecruiting`) i zalog (`TickAutoRecruitmentGarrisonChange`, `TickGarrisonChangeForTown`) staja na nim; zwolnienia w ludziach, zalogi na Murze nie ciete.
+- Kiesa rodziny (`FamilyTopsUpHead`): czlonkowie ponad `FamilyPurseFloor` dopelniaja glowe do max(5 000; koszt dnia rodu = zold + dwor) przez
+  `GiveGoldAction` (jak T5); `IronBank.FamilyOn` = false przy tej regule.
+- Sprzet: `AiGear` - budzet pana = min(dotychczasowy, niewydany przydzial; przydzial +0.17 D/dobe, najwyzej `AiGearDaysCap` dni), kazda zaplata pana schodzi z przydzialu.
+- Budowy: `BuildFunding` - przydzial budow budzetu (0.10 D w pokoju + polowa nadwyzki ponad 120 D + 50 000 po 1/180; w wojnie 0 - takze mury).
+- 162m dwor (`HouseholdMinimal`): glowa -> kasa siedziby: udzial dworu (0.35/0.20 D x bieda) minus jedzenie partii (szacunek: zuzycie dnia `FoodChange` x cena
+  zboza w siedzibie), nie ponizej `FamilyPurseFloor` w kiesie glowy. Siedziba: `HomeSettlement` (wies -> `Village.Bound`), inaczej miasto, w ktorym jest glowa,
+  inaczej najblizsze miasto krolestwa. "Wlasne" D stalego (NoteOwnPaid). Kasa MIASTA - znacznik tarczy dworu (`HouseholdShield`): regulator nie kasuje,
+  schodzi tylko o czesc zaworu renty i daniny wojennej tego miasta dzis (proporcjonalnie znacznik / kasa ponad prog), przyciety do nadwyzki ponad cel
+  regulatora (miasto wydalo). Zamek - bez znacznika (110: regulator zamku tylko w dol).
+
+**Nowe klucze (grupa "The crown's income (stage 2)"):** `ClanBudgetEnabled` true (byl false w kawalkach 1-2), `AiWageLimitDesertionOff` true,
+`ClanBudgetStableD` true, `PeaceWageShare` 0.28, `WarWageShare` 0.60, `HouseholdSharePeace` 0.35, `HouseholdShareWar` 0.20, `GearSharePeace` 0.17,
+`GearShareWar` 0.17, `WarChestToWages` 0.8, `WarChestDays` 45, `ReserveDaysPeace` 60, `ReserveCapDays` 120, `WarReserveDays` 20, `WarReserveFloor` 20000,
+`WarReservePerAdult` 5000, `PovertyDeepShare` 0.25, `PovertyDeepFactor` 0.5, `BudgetHysteresis` 1.10, `BudgetHysteresisDays` 3, `ReleasePerDay` 0.15,
+`MinNewPartyMen` 30, `GarrisonPeaceShare` 0.5, `GarrisonWarFull` true, `GarrisonMaxShareOfBudgetPeace` 0.8, `AiGearDaysCap` 30, `FamilyPurseFloor` 5000,
+`FamilyTopsUpHead` true, `UnpaidTroopsCapInMen` true, `HouseholdMinimal` true, `HouseholdShield` true. Udzial budow = istniejacy `BuildIncomeShare` (0.10).
+
+**Nowe / zmienione linie logu:**
+- NOWA (kampania) `Budzet rodow (166): latki gry - limit partii (MakeClanFinancialEvaluation), limit zalog (...), dezercja z limitu zoldu (...), nowa partia (...), werbunek Strazy (...), zaloga Strazy: werbunek (...), zaloga Strazy: przyrost (...); BRAK: -.`
+- NOWA `Budzet rodow (166): dzien N | rody AI z budzetem N (pokoj a, wojna b; ...) | D razem, pulap zoldu razem X, zold naliczony (partie + zalogi + karawany) Y (Z%) | ponad 1.10 x pulap N rodow, od 3 dob (zwalniaja) M | zwolnieni: do wsi N ludzi (z partii a, z zalog b), zniklo 0, nie zwolniono - brak wsi z danymi BK c, sakiewki zwolnionych do kies wsi d zl | dezercja gry z limitu zoldu wylaczona (rody z budzetem): N wywolan | limity: partie zmienione N, zalogi przyciete do celu pokojowego N, nowe partie wstrzymane N | dwor (162m): wplacone do kas siedzib X (w tym miasta pod tarcza dworu Y), jedzenie partii (szacunek, odjete) F, tarcza dworu wlaczona: znacznik ..., regulator nie skasowal ..., zeszlo z zaworem i danina ..., miasto wydalo (...) ..., skasowane przez regulator 0 | kiesa rodziny do glow: X zl w N przelewach; glowy < 5000 (rody z budzetem): N | sprzet: przydzial dnia X, wydane przez panow od wczoraj Y | budowy: przydzial dnia X | Straz w ludziach X / pulap w ludziach Y (werbunek wstrzymany a, przyrost zalog wstrzymany b).`
+- ZMIENIONA `Budzet rodow (na sucho)`: pulap z jednej formuly (`ClanBudget.Ceiling`, udzialy z Settings 0.28/0.60, R z podloga na doroslego); u rodow z
+  budzetem - pulap policzony dzis w grze. Liczby "pulap zoldu wg planu" zmieniaja sie wobec biegu bazowego (0.25/0.55 -> 0.28/0.60).
+- ZMIENIONA `Przeplywy osad`: nowa pozycja "budzet rodow (166): dwor do kas siedzib, sakiewki zwolnionych do kies wsi".
+- ZMIENIONA `Obieg: dzien N`: "dwor (166/162m) do kas siedzib X (w tym miasta pod tarcza dworu Y), kiesa rodziny czlonek -> glowa Z" i "ze zwolnionymi do kies wsi (166) X (ludzi N)".
+- Bez zmian, potrzebne do testu: `Dezercja AI wedlug przyczyny (169c)` ("limit zoldu i wielkosci partii (gra)" - po 166 tylko przepelnienie), `Skarbce:`, `budzet-rodow.csv`.
+
+**Odstepstwa (z powodem):**
+1. Rody pomniejsze poza krolestwem - bez budzetu (powod wyzej); najemnicy AI - bez budzetu do kawalka 4 (pulap = umowa 185).
+2. Zakup sprzetu: min(dotychczasowy budzet 25% kiesy, przydzial), nie sam przydzial - pan nie wyda wiecej niz dzis; `GearUnspentToHouseholdDays` (niewydany
+   sprzet po 30 dniach na dwor) - nie zrobione: przydzial po prostu nie rosnie ponad 30 dni (zostaje w kiesie glowy - zapas rodu).
+3. Werbunek (koszt rekruta) nie jest liczony w przydziale "sprzet i werbunek" - hamuje go limit zoldu partii (gra nie werbuje ponad limit).
+   Zaopatrzenie majatkow BK (rycerze) poza budzetem - pomiar "Wydatki rycerzy (169c)" zdecyduje o osobnym pulapie (projekt).
+4. Jedzenie partii odejmowane od dworu jako szacunek (zuzycie dnia x cena zboza w siedzibie), nie z licznika zakupow (gra/BK kupuja jedzenie bez naszego okna).
+5. Dluznik (budowy 0, dwor -50%) i warunki zakupu karawan/warsztatow BK (B5) - z 168 (krok D), nie zrobione.
+6. Zwolnieni: sprzet zostaje w zbrojowni partii (MusterOut nie ma juz mechanizmu oddawania - cofniete 29.08); "do karczmy" (167) - etap 4.
+7. Pierscienie D stalego nie sa zapisywane (zapisujemy tylko D uzyte wczoraj na rod i mieszamy) - mniej danych w zapisie (R14), ten sam skutek po 28 dobach.
+8. `ConsiderSpawningLordParties`: rod bez zadnej partii moze ja zawsze wystawic (inaczej glowa rodu zostaje bez druzyny na stale).
+
+**Ryzyka dla testu 40/120 dob:**
+- Straz: pulap w ludziach z D Strazy (dar Polnocy + wlasne wsie) moze byc duzo mniejszy niz dzisiejsze ok. 3.8 tys. - zwolnienia partii Strazy (zalogi na
+  Murze nie ciete). Prog projektu: Straz -25%..+10%. Linia "Straz w ludziach X / pulap w ludziach Y".
+- Wojsko w wojnie: pulap 0.60 D + skrzynia wojenna; projekt zaklada ok. -4% bez KW (168) - prog >= 90 tys. w druzynach lordow.
+- Pierwsze doby po wczytaniu starego zapisu: D = G/60 (brak D w zapisie) - u rodow z duza kiesa pulap moze byc za wysoki, u biednych za niski przez ok. 28 dob.
+- Zwolnienia potrzebuja wsi z danymi BK (`IsSettlementPopulated`); licznik "nie zwolniono - brak wsi z danymi BK".
+- Dwor do kas miast + tarcza: "skasowane przez regulator" ma byc 0; "miasto wydalo" to zloto, ktore kasa wydala na towar (nie strata).
