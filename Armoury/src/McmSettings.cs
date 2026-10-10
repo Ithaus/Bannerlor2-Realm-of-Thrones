@@ -2760,6 +2760,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float MercReviewFloor { get; set; } = 0.75f;
 
+        [SettingPropertyFloatingInteger("Merc Hire Floor Share", 0.00f, 2.00f, "0.00", HintText = "a company hired after a battle or a peace signs for at least this share of its full size (the sum of its parties' size limits), at today's wage per man - otherwise a contract made on a remnant never lets the company grow back")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float MercHireFloorShare { get; set; } = 0.5f;
+
         [SettingPropertyInteger("Merc Unpaid Leave Days", 0, 112, "0", HintText = "a company paid less than half its contract for this many days in a row leaves the service")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int MercUnpaidLeaveDays { get; set; } = 28;
@@ -4309,6 +4313,7 @@ namespace Armoury
             s.MercPeaceShare = MercPeaceShare;
             s.MercReviewDays = MercReviewDays;
             s.MercReviewFloor = MercReviewFloor;
+            s.MercHireFloorShare = MercHireFloorShare;
             s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
             s.MercGameContractAiOff = MercGameContractAiOff;
             s.CrownGifts = CrownGifts;

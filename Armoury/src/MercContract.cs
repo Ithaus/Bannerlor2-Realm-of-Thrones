@@ -88,6 +88,25 @@ namespace Armoury
             }
         }
 
+        /// <summary>C1-m: pelna wielkosc kompanii - suma limitow wielkosci jej aktywnych partii minus bohaterowie (miejsca dla zwyklych ludzi).</summary>
+        private static int CompanySize(Clan c)
+        {
+            int n = 0;
+            try
+            {
+                var wps = c.WarPartyComponents;
+                if (wps == null) return 0;
+                for (int i = 0; i < wps.Count; i++)
+                {
+                    var mp = wps[i] != null ? wps[i].MobileParty : null;
+                    if (mp == null || !mp.IsActive || mp.Party == null) continue;
+                    n += Math.Max(0, mp.Party.PartySizeLimit - (mp.MemberRoster != null ? mp.MemberRoster.TotalHeroes : 0));
+                }
+            }
+            catch { }
+            return n;
+        }
+
         /// <summary>166: pulap zoldu kompanii w sluzbie = zold ludzi z umowy (w pokoju polowa); false - brak umowy.</summary>
         internal static bool CapOf(Clan c, bool war, out double cap)
         {
@@ -129,6 +148,12 @@ namespace Armoury
                             // przeglad C1 (uwaga 2): bez ludzi albo bez zoldu nie ma z czego liczyc umowy - czekamy na doba z kompania w polu
                             // (do tego czasu gra placi jak dotad: MercIncomePrefix/TierPostfix dzialaja tylko dla rodow z umowa)
                             if (men <= 0 || wage <= 0) { if (d != null) _deals.Remove(c.StringId); continue; }
+                            // C1-m (test 120 dob: najemnicy -79%): kompania najeta po bitwie albo po pokoju (Moon Brothers: 31 ludzi, w bazie 350) dostawala umowe
+                            // na resztke, a przeglad idzie tylko w dol - nie odrastala nigdy. Umowa co najmniej na MercHireFloorShare (0.5) pelnej wielkosci
+                            // kompanii (suma PartySizeLimit jej partii bez bohaterow), ta sama stawka na czlowieka co dzis; kondotier najmowal sie na okreslona
+                            // liczbe kopii, ktora dopelnial po najmie. Zold i tak placi rod z kontraktu (zamknieta ekonomia - korona -> glowa kompanii).
+                            int full = CompanySize(c), floorMen = (int)Math.Round(full * Math.Max(0f, Math.Min(1f, s.MercHireFloorShare)));
+                            if (floorMen > men) { wage = (long)Math.Round((double)wage * floorMen / men); men = floorMen; }
                             // dzien najmu: kontrakt z dzisiejszego zoldu kompanii (zold + jedzenie + sprzet)
                             d = new Deal { Kingdom = c.Kingdom.StringId, Wage = wage, K = (long)Math.Round(factor * wage), Men = men, Day = today, Review = today, Peace = war ? NoPeace : today };
                             _deals[c.StringId] = d; LastNew++;

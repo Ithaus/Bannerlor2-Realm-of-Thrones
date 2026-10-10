@@ -778,6 +778,7 @@ namespace Armoury
         public float MercPeaceShare = 0.5f;                // in peace a hired company waits on this share of its contract and of its men
         public int MercReviewDays = 28;                    // the contract is reviewed this often - only downwards
         public float MercReviewFloor = 0.75f;              // at a review, a company whose wages have fallen below this share of its contracted wages (half of them in peace) has its contract, wages and men cut in proportion to what it has
+        public float MercHireFloorShare = 0.5f;            // a company hired after a battle or a peace signs for at least this share of its full size (the sum of its parties' size limits), at today's wage per man - otherwise a contract made on a remnant never lets the company grow back
         public int MercUnpaidLeaveDays = 28;               // a company paid less than half its contract for this many days in a row leaves the service
         public bool MercGameContractAiOff = true;          // with Merc Contract Enabled: AI companies in service get nothing from the game itself - no gold 'for their tier' from nowhere and no game contract drawn on the realm's mercenary purse (so the vassals no longer pay for the AI companies a second time); your own contract is unchanged
         // 182 (projekt etapu 2, krok C1): dary miedzy koronami i Straz bez zoldu
