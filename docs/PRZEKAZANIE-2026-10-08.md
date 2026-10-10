@@ -586,3 +586,15 @@ PO ETAPIE 3. Dotad: bieg 457 dob (kopia-okup1-457) i 218 dob (kopia-bk-218): glo
 (181 w PROJEKT-ETAP2) -> 3.1 szczelnosc 164a -> 3.4-3.7 BK/ROT -> 3.8 ceny historyczne -> 3.9/3.10 drobne. Kazdy krok: kod (pomocnik), recenzja, test 120 dob + zapis 9 dob,
 wgranie. Na koniec etapu 3: bieg 2-letni (728 dob, -TimeoutMin 480) = zamkniecie etapow 2 i 3.
 **Na pozniej (decyzje Jeffa w STAN-PRAC 10.10):** budowy Strazy (najmuje robotnikow; AI w wojnie przestawia kolejke na budowe wojskowa; wieczna wojna buduje tez cywilne).
+
+## 23. NOC 10/11.10 - NOWE KONTO (sesja ae222cb7, start 15:20 zegara komp.; Jeff wraca ok. 03:20)
+
+**Zadanie Jeffa (15:20):** "dokoncz etap 2, zrob pelny etap 3 i jak starczy czasu etap 4; pilnuj okna 5h, zeby nie przerywac pracy; stosuj metodyke oszczedzania".
+Kolejnosc: (1) dezercja AI w 2. polowie roku + bandy, (2) werbunek Strazy, (4) Tent -> ETAP 3 (3.2 -> 3.3 -> 3.1 -> 3.4-3.7 -> 3.8 -> 3.9/3.10) -> bieg 2-letni
+(w jego trakcie kod etapu 4) -> etap 4, ile sie zmiesci. Kazdy krok: kod, recenzja, test 120 dob + zapis 9 dob, wgranie z kopia.
+**ZASADA PRACY (pelny tekst; dotad byla tylko skrotem w rozdz. 18/20, reszta w pamieci starej sesji):**
+- tor wedlug RYZYKA: S (liczby/mala poprawka) - sam, bez workflow; M (mechanika w 1 obszarze, blad o nieznanej przyczynie) - 1 workflow: rozpoznanie (najpierw logi)
+  -> kod -> JEDNA recenzja -> poprawki -> autotest; L (obieg pieniadza swiata, nowe systemy) - rozpoznanie, projekt, krytyka, kod, 2 recenzje, autotest 40 + zapis + 120 dob;
+- okno 5h: odczyt get_usage miedzy krokami, przy 85% nie startowac nowych watkow, przy 90% pauza do resetu; jedna gra naraz; w czasie dlugiego testu kod nastepnej pozycji;
+- tydzien 99% -> STAN-PRAC + PRZEKAZANIE + push; prompty pomocnikow: "nie uzywaj spawn_task".
+Pamiec tego repo (laduje sie sama): tory-pracy-i-limity.md, stala-zgoda-wgrywaj-po-tescie.md.
