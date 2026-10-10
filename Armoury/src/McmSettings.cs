@@ -2976,13 +2976,13 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool LordRansomByIncome { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ransom Head Years", 0.00f, 3.00f, "0.00", HintText = "the ransom of the head of a house, in years of its steady income (half a year)")]
+        [SettingPropertyFloatingInteger("Ransom Head Years", 0.00f, 3.00f, "0.00", HintText = "the ransom of the head of a house, in years of its steady income (about 60 days; Jeff 10.10 option B - in the game lords are taken captive several times a year, far more often than in history, so the ransom is a third of the historical year)")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
-        public float RansomHeadYears { get; set; } = 0.5f;
+        public float RansomHeadYears { get; set; } = 0.165f;
 
-        [SettingPropertyFloatingInteger("Ransom Lord Days", 0.00f, 240.00f, "0.00", HintText = "the ransom of any other lord or lady, in days of the house's steady income (about two months)")]
+        [SettingPropertyFloatingInteger("Ransom Lord Days", 0.00f, 80.00f, "0.00", HintText = "the ransom of any other lord or lady, in days of the house's steady income (Jeff 10.10 option B)")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
-        public float RansomLordDays { get; set; } = 60f;
+        public float RansomLordDays { get; set; } = 20f;
 
         [SettingPropertyFloatingInteger("Ransom Cash Share", 0.00f, 1.00f, "0.00", HintText = "the house pays at once at most this share of its family's gold above 5000; the rest becomes a ransom debt")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
