@@ -2716,7 +2716,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int FamilyPurseFloor { get; set; } = 5000;
 
-        [SettingPropertyBool("Family Tops Up Head", HintText = "the grown members of an AI house top up its head's purse to this floor or a day of the house's costs, whichever is more - one family purse (replaces Iron Bank Family Pays while the budget is on)")]
+        [SettingPropertyBool("Family Tops Up Head", HintText = "the grown members of an AI house top up its head's purse to this floor or a day of the house's costs, whichever is more - one family purse (Iron Bank Family Pays still runs first, before the bank lends or marks an instalment as missed)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool FamilyTopsUpHead { get; set; } = true;
 
@@ -2732,7 +2732,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool HouseholdShield { get; set; } = true;
 
-        [SettingPropertyBool("Merc Contract Enabled", HintText = "with Crown Current Income: an AI mercenary company is hired on a fixed contract - on the day it enters a realm's service the crown agrees to pay it Merc Contract Factor times its daily wages (wages, food and kit) for the men it brings; in peace it waits on half the money and half the men; every Merc Review Days the contract is cut (never raised) to the men it still has if it falls below Merc Review Floor of them. The crown pays it out of its daily income before the wage refunds; a company left unpaid by more than half for Merc Unpaid Leave Days in a row leaves the service. The house budget holds the company to the men of its contract. Your own mercenary contract is the game's, as before. Off = the game's mercenary pay for the AI, as before")]
+        [SettingPropertyBool("Merc Contract Enabled", HintText = "with Crown Current Income: an AI mercenary company is hired on a fixed contract - on the day it enters a realm's service the crown agrees to pay it Merc Contract Factor times its daily wages (wages, food and kit) for the men it brings; in peace it waits on half the money and half the men; every Merc Review Days the contract is cut (never raised) to the wages of the men it still has if those fall below Merc Review Floor of the contracted wages (half of them in peace and in the first review days of a war after peace); no review while the company is not in the field. The crown pays it out of its daily income before the wage refunds; a company left unpaid by more than half for Merc Unpaid Leave Days in a row leaves the service. The house budget holds the company to the wages of the men of its contract. Your own mercenary contract is the game's, as before. Off = the game's mercenary pay for the AI, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercContractEnabled { get; set; } = true;
 
@@ -2748,7 +2748,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int MercReviewDays { get; set; } = 28;
 
-        [SettingPropertyFloatingInteger("Merc Review Floor", 0.00f, 3.00f, "0.00", HintText = "at a review, a company with fewer than this share of its contracted men has its contract cut to the men it has")]
+        [SettingPropertyFloatingInteger("Merc Review Floor", 0.00f, 3.00f, "0.00", HintText = "at a review, a company whose wages have fallen below this share of its contracted wages (half of them in peace) has its contract, wages and men cut in proportion to what it has")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float MercReviewFloor { get; set; } = 0.75f;
 

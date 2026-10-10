@@ -240,3 +240,60 @@ wylacznik glowny = stan sprzed paczek poza tekstem logu). Poprawione:
 7. **Nowa partia** - prefiks przeniesiony z `ConsiderSpawningLordParties` na `SpawnLordParty(Hero, bool)` (jedyny wolajacy): kazda partia sprawdzana osobno,
    z miejscem zajetym przez nowe partie tej doby; glowa rodu zawsze moze wystawic partie; nowa partia dostaje limit zoldu od razu (postfiks).
    Linia latek: "nowa partia (SpawnLordParty)".
+
+---
+
+## Recenzja C1 (workflow) - poprawki
+
+Recenzja diffu `ae01f8e..HEAD` (soczewki: zloto, gra, wojsko), 10 potwierdzonych uwag. Build Release kod 0, `python tools/gen_mcm.py` (opisy 3 kluczy), gra
+nie uruchamiana. Kazda poprawka ma w kodzie komentarz "recenzja C1 (id)".
+
+1. **OBIEG-1 (165, splata dlugu wobec korony)** - `CrownIncome.cs`, `SoldierPay.cs`, `MoneyLedger.Obieg.cs`. Nowa ewidencja "zaliczki gry": `SoldierPay.Settle`
+   liczy nowy dlug rodu w rozliczeniu brutto (zmiana `DebtToKingdom` + dzisiejsza splata w `AddPaymentForDebts`) i odejmuje czesc zrownowazona obcietym
+   zoldem (`cutByDebt` = min(przyrost, zold nalezny minus brak salda)); reszta (portfel najemnikow / trybutu / wezwania do wojny uznany przez gre z niczego) ->
+   `CrownIncome.NoteAdvance` (rod bez partii z zoldem albo saldo nieznane - caly nowy dlug). `ClanTickEnd`: splata naprawde zaplacona najpierw gasi zaliczke -
+   ta czesc w nicosc (jak przed C1), do skarbca tylko reszta; zaliczka przycinana do dlugu przy kazdym rozliczeniu. Dlug z obcietego zoldu i dlugi ze starego
+   zapisu (bez wpisu) - do skarbca jak w tabeli 165. Zapis: piate pole `arm_crown165` ("idRodu=zaliczka;...", tylko zywe rody z dlugiem; zapis bez tego pola
+   wczytuje sie jak dotad). Log: w `Korona: wplywy dnia (165)` po "splata dlugu wobec korony do skarbcow" - ", splata zaliczki gry (portfel uznany z niczego) -
+   w nicosc X (nowe zaliczki gry od wczoraj Y, niesplacone razem Z u N rodow)"; w `Obieg` (korona) - "(splata zaliczki gry - portfel uznany z niczego - w nicosc X)".
+   Roznica wobec propozycji recenzenta: nowy dlug liczony brutto (z dzisiejsza splata), nie netto - rod, ktory tego samego dnia splacil stary dlug i dostal
+   nowy z wezwania do wojny, inaczej zanizalby zaliczke o te splate. Zrodlo (uznawanie portfela w calosci) zostaje do 168 (krok D). Rozstrzyga "Uwage do decyzji"
+   z pkt 3 poprawek po przegladzie.
+2. **C1-G1 (Bank, pomoc rodziny)** - `IronBank.cs`, `ClanBudget.cs`. Usuniete wylaczenie T5 u rodow z budzetem (`ClanBudget.FamilyRuleFor` usuniete): rodzina
+   pomaga glowie przed pozyczka i rata u wszystkich rodow AI, kiesa rodziny 166 dopelnia glowe po Banku. **Odstepstwo od projektu 166** ("`IronBankFamilyPays` ->
+   false"): prog Banku to 10/20 dni zoldu, a cel `FamilyTopUp` - max(5 000; koszt dnia), wiec bez T5 Bank pozyczal rodom, ktorych rodzina ma zloto (powrot do
+   stanu sprzed T5: 83 dluznikow), i liczyl spoznienia rat, ktore rodzina by pokryla. Oba przelewy czlonek -> glowa (`GiveGoldAction`). Prog pozyczki - 168.
+3. **C1-G2 (185, umowa zerowa)** - `MercContract.cs`. Przeglad tylko przy kompanii w polu (ludzie > 0, zold > 0, glowa nie w niewoli) - inaczej `d.Review`
+   zostaje i przeglad odbywa sie w pierwszej dobie z kompania w polu. Umowa przycieta do 0 (K, zold albo ludzie) jest usuwana - przy przegladzie i przy wejsciu
+   (umowy zerowe z zapisu); gra placi wtedy jak dotad, nowa umowa powstaje w pierwszej dobie z kompania w polu. Dotad umowa 0 = brak dochodu, brak odejscia
+   po niedoplacie i pulap 166 = 0 na zawsze.
+4. **C1-G3 + W2 (185, przeglad)** - `MercContract.cs`, `Settings.cs` (opisy `MercContractEnabled`, `MercReviewFloor`). Przeglad **w zlocie** (zold kompanii
+   wobec zoldu ludzi z umowy - ta sama jednostka co pulap 166 `CapOf`); K, zold i ludzie z umowy proporcjonalnie. Nowe pole umowy `Peace` (ostatnia doba pokoju
+   korony): w pokoju i przez pierwsze `MercReviewDays` wojny po pokoju przeglad mierzy polowe umowy. Zapis: 9. pole `arm_merc185` (8-polowe wpisy ze starego
+   zapisu - "dluga wojna"). **Rozstrzygniecie miedzy uwagami:** obie dodawaly 9. pole na przejscie pokoj -> wojna (C1-G3: `Peace`; W2: `War` i przesuniecie
+   przegladu o 28 dob przy kazdej zmianie stanu). Wybrane `Peace` z C1-G3 - zachowuje rytm przegladu co 28 dob z projektu i dalej lapie kompanie rozbita w
+   pierwszych tygodniach wojny (wobec polowy); jednostka przegladu - z W2. **Odstepstwo od litery projektu 185** ("< 75% ludzi z umowy"): przeglad w zlocie, bo
+   pulap 166 najemnika jest w zlocie (zold ludzi z umowy) - przeglad w ludziach przy pulapie w zlocie cial umowe geometrycznie (zwolnienia od najtanszych
+   zabieraja wiecej ludzi niz zlota, awanse do limitu podnosza zold czlowieka). "Ludzie z umowy" sa teraz informacyjne (maleja proporcjonalnie z umowa);
+   test "ludzie najemnikow +-10% umowy" czytac razem z zoldem kompanii wobec zoldu umowy (awanse zmniejszaja ludzi przy tym samym zoldzie).
+5. **C1-G4 (166, wczytanie w tym samym procesie)** - `ClanBudget.cs`. `Reset` czysci uchwyty BK (`_bkTried`, `_popMgr`, `_getPopData`, `_fromSoldiers`,
+   `_populated`), `_grain`/`_grainTried`, `_spawnUsed`/`_spawnDay` (jak `LosersFlee.Reset`). Latki Harmony zostaja (zyja przez caly proces).
+6. **W3 (166, rozklad zwolnien)** - `ClanBudget.cs`. Limity partii i zalog ustawiane przed zwolnieniami; kwota dnia dzielona miedzy partie: najpierw wedlug
+   nadwyzki kazdej ponad jej wlasny limit zoldu, reszta wedlug zoldu partii (Straz bez zoldu - wedlug ludzi), osobno w przejsciu "najemnicy" i "wszyscy".
+   Dotad cala kwota szla z pierwszej partii na liscie (petla werbunek -> zwolnienie, inne partie nad limitem na stale).
+7. **W4 (166, zwolnienia w oblezeniu)** - `ClanBudget.cs`. Partie w obozie oblezniczym (`SiegeEvent`, `BesiegedSettlement`) i w oblezonej osadzie
+   (`CurrentSettlement.IsUnderSiege`) pomijane jak partie w bitwie; reszta czeka (licznik dob ponad pulapem trwa).
+8. **W5 (166, budowy w wojnie)** - `ClanBudget.cs`, `BuildFunding.cs` (komentarz). Przydzial budow 0.10 D takze w wojnie (dopelnienie ponad 120 D + 50 000 -
+   tylko w pokoju); `BuildFunding` w wojnie i tak finansuje tylko mury, wieze i koszary. **Odstepstwo od tabeli 166** ("budowy w wojnie 0"): regula Jeffa
+   05.10 "w wojnie 0, chyba ze mury - tak" (naglowek `BuildFunding`) - projekt jej nie odwolal, a "0" wylaczalo cala galaz wojskowa na niemal cala kampanie.
+9. **W1 (test C1 - tylko plan testu, kod bez zmian)**: cel pokojowy zalog z 1. doby i ciecia od 4. doby sa wiazace (166). W biegu bazowym 267 z 308 rodow
+   jest w pokoju do ok. d22, wiec C1 przytnie zalogi i partie przed wojna, a dobor do pelnych zalog trwa tygodnie. **Progi testu C1 zmienione** (tez we wpisie
+   C1 w `CHANGELOG.md`; zastepuja "zalogi w wojnie >= 95% bazy", "wojsko w druzynach lordow w wojnie >= 90 tys." i ryzyko "prog >= 90 tys." wyzej):
+   - zalogi w wojnie >= 95% bazy na krolestwo - tylko twierdze rodow, ktore w OBU biegach sa w wojnie nieprzerwanie od >= 28 dob; gdy w d40 takich krolestw
+     brak albo pojedyncze - pomiar zalog w d60+ (bieg przedluzony albo odczyt z biegu 120);
+   - wojsko w druzynach lordow w wojnie >= **96% bazy tej samej doby, w tym samym zbiorze rodow** (w wojnie w obu biegach od >= 18 dob), zamiast 90 tys.
+     bezwzglednie (sam pulap wojenny C1 bez historii pokoju daje w d40 ok. 88.3-89.1 tys. wobec 91.7 tys. bazy - prog 90 tys. oblewa okno, nie kod);
+   - do raportu dla Jeffa: przejscie pokoj -> wojna z polowa zalog to zamierzony skutek 166, dobor do pelnych zalog trwa kilka tygodni.
+
+**Nie zmienione:** `tools/sprawdz_logi.py` (grupa etap2 ma progi bezwzgledne wojska dla etapu po C3 - progi C1 z pkt 9 czytac recznie z `budzet-rodow.csv`
+obu biegow); projekt `PROJEKT-ETAP2-BANKRUCTWA-2026-10-09.md` (repo glowne) - odstepstwa opisane tutaj.

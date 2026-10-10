@@ -158,7 +158,8 @@ namespace Armoury
                     }
                     float budget = Math.Max(0f, inc) * Math.Max(0f, s.BuildIncomeShare) / Math.Max(1, count[clan]);
                     float share;
-                    if (ClanBudget.BuildShare(clan, out share)) budget = share / Math.Max(1, count[clan]);   // 166: przydzial budow budzetu rodu (0.10 D w pokoju, 0 w wojnie)
+                    // 166: przydzial budow budzetu rodu (0.10 D); w wojnie tylko wojskowe - cywilne odciete wyzej (recenzja C1, W5: Jeff 05.10 "chyba ze mury - tak")
+                    if (ClanBudget.BuildShare(clan, out share)) budget = share / Math.Max(1, count[clan]);
                     budget = Math.Min(budget, Math.Max(0, lord.Gold));
                     if (budget < 1f) continue;
                     float ppp = military ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);

@@ -15,7 +15,9 @@ namespace Armoury
     /// z wplywow dnia korony).
     ///  - W dniu najmu (pierwsza doba w sluzbie u tej korony) kontrakt K = MercContractFactor (1.3) x dzienny zold kompanii (zold 1.0 + jedzenie ok. 0.15
     ///    + sprzet ok. 0.15) i ludzie z umowy = ludzie kompanii. W pokoju "w oczekiwaniu": MercPeaceShare (polowa) K i polowa ludzi.
-    ///  - Przeglad co MercReviewDays (28) tylko w dol: kompania ma mniej niz MercReviewFloor (75%) ludzi z umowy -> K i ludzie do stanu faktycznego.
+    ///  - Przeglad co MercReviewDays (28) tylko w dol: zold kompanii ponizej MercReviewFloor (75%) zoldu ludzi z umowy (recenzja C1, W2: w zlocie, jak pulap
+    ///    166; w pokoju i przez pierwsze 28 dob wojny po pokoju - wobec polowy) -> K, zold i ludzie z umowy proporcjonalnie do stanu faktycznego. Tylko przy
+    ///    kompanii w polu (glowa nie w niewoli, ludzie > 0); umowa zerowa jest usuwana (gra placi wtedy jak dotad do nowej umowy).
     ///  - Pulap 166 najemnika = zold ludzi z umowy (ClanBudget; bez udzialu "dwor"). Bez zwrotu 50% (KingdomTreasury - jak dotad).
     ///  - Placi skarbiec pracodawcy z wplywow dnia, w kolejnosci 165 (po ratach reparacji, przed zwrotem); gdy nie starcza - proporcjonalnie, niedoplata
     ///    przepada; niedoplata > 50% przez MercUnpaidLeaveDays (28) dob z rzedu - kompania odchodzi ze sluzby.
@@ -38,7 +40,9 @@ namespace Armoury
             return c != null && c.StringId != null && c.Kingdom != null && _deals.TryGetValue(c.StringId, out d) && d.Kingdom == c.Kingdom.StringId;
         }
 
-        private sealed class Deal { public string Kingdom; public long K, Wage; public int Men, Day, Review, Unpaid; }
+        // recenzja C1 (C1-G3): Peace - ostatnia doba pokoju korony przy tej umowie (NoPeace - umowa zawarta w wojnie / stary zapis: dluga wojna)
+        private const int NoPeace = int.MinValue / 2;
+        private sealed class Deal { public string Kingdom; public long K, Wage; public int Men, Day, Review, Unpaid, Peace = NoPeace; }
         private static readonly Dictionary<string, Deal> _deals = new Dictionary<string, Deal>();   // id rodu -> umowa
 
         // liczniki doby
@@ -126,21 +130,36 @@ namespace Armoury
                             // (do tego czasu gra placi jak dotad: MercIncomePrefix/TierPostfix dzialaja tylko dla rodow z umowa)
                             if (men <= 0 || wage <= 0) { if (d != null) _deals.Remove(c.StringId); continue; }
                             // dzien najmu: kontrakt z dzisiejszego zoldu kompanii (zold + jedzenie + sprzet)
-                            d = new Deal { Kingdom = c.Kingdom.StringId, Wage = wage, K = (long)Math.Round(factor * wage), Men = men, Day = today, Review = today };
+                            d = new Deal { Kingdom = c.Kingdom.StringId, Wage = wage, K = (long)Math.Round(factor * wage), Men = men, Day = today, Review = today, Peace = war ? NoPeace : today };
                             _deals[c.StringId] = d; LastNew++;
                             Log.Info("Kontrakty najemnikow (185): " + c.Name + " w sluzbie " + c.Kingdom.Name + " - kontrakt " + d.K + " zl dziennie w wojnie (" + factor.ToString("0.00", Inv)
                                      + " x zold " + wage + "), ludzi z umowy " + men + "; w pokoju polowa.");
                         }
-                        else if (today - d.Review >= reviewDays)
+                        else
                         {
-                            d.Review = today;
-                            // przeglad C1 (uwaga 1): w pokoju kompania czeka na polowie ludzi - porownanie z ludzmi wymaganymi dzis, nie z pelna umowa
-                            double want = war ? d.Men : d.Men * peace;
-                            if (d.Men > 0 && men < floor * want)
+                            // recenzja C1 (C1-G2): umowa zerowa (przycieta do 0 przed ta poprawka, takze z zapisu) - usuwamy: z nia gra nie placi kompanii nic
+                            // (HasDeal), kontrakt 0 nie liczy niedoplaty (kompania nigdy nie odchodzi), a pulap 166 = 0 zwalnia kazdego rekruta. Bez umowy gra placi
+                            // jak dotad, a nowa umowa powstaje w pierwszej dobie z kompania w polu.
+                            if (d.K <= 0 || d.Wage <= 0 || d.Men <= 0) { _deals.Remove(c.StringId); continue; }
+                            if (!war) d.Peace = today;   // recenzja C1 (C1-G3)
+                            // recenzja C1 (C1-G2): przeglad tylko przy kompanii w polu - glowa w niewoli albo partie rozbite (men 0) to nie "mniej ludzi z umowy";
+                            // d.Review zostaje, wiec przeglad odbedzie sie w pierwszej dobie z kompania w polu
+                            if (today - d.Review >= reviewDays && men > 0 && wage > 0 && !c.Leader.IsPrisoner)
                             {
-                                // przeglad tylko w dol: kontrakt i ludzie do stanu faktycznego
-                                double k = Math.Max(0.0, (double)men / Math.Max(1.0, want));   // umowa do stanu faktycznego (wobec ludzi wymaganych dzis)
-                                d.K = (long)Math.Round(d.K * k); d.Wage = (long)Math.Round(d.Wage * k); d.Men = (int)Math.Round(d.Men * k); LastCut++;
+                                d.Review = today;
+                                // recenzja C1 (W2): przeglad w zlocie - ta sama jednostka co pulap 166 (zold ludzi z umowy, CapOf). Przeglad w ludziach przy pulapie
+                                // w zlocie cial umowe geometrycznie: zwolnienia od najtanszych (tier 1) zabieraja duzo wiecej ludzi niz zlota, a awanse do limitu
+                                // podnosza zold czlowieka - kompania schodzila ponizej 75% ludzi przy pelnym zoldzie i kolejne przeglady ciely ja az do zera.
+                                // W pokoju (przeglad C1, uwaga 1) i przez pierwsze reviewDays wojny po pokoju (recenzja C1, C1-G3: kompanie skurczyly nasze wlasne
+                                // zwolnienia pokojowe, a dobor ludzi trwa) - wobec polowy z umowy.
+                                double wantW = (war && today - d.Peace >= reviewDays) ? d.Wage : d.Wage * peace;
+                                if (wage < floor * wantW)
+                                {
+                                    // przeglad tylko w dol: kontrakt, zold i ludzie z umowy proporcjonalnie do stanu faktycznego (wobec zoldu wymaganego dzis)
+                                    double k = Math.Max(0.0, Math.Min(1.0, wage / Math.Max(1.0, wantW)));
+                                    d.K = (long)Math.Round(d.K * k); d.Wage = (long)Math.Round(d.Wage * k); d.Men = (int)Math.Round(d.Men * k); LastCut++;
+                                    if (d.K <= 0 || d.Wage <= 0 || d.Men <= 0) { _deals.Remove(c.StringId); continue; }   // C1-G2: zerowej umowy nie zostawiamy
+                                }
                             }
                         }
                         long due = war ? d.K : (long)(d.K * peace);
@@ -287,7 +306,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_merc185")
-        /// <summary>"v1|idRodu:idKrolestwa:K:zold:ludzie:doba:przeglad:niedoplata;..."</summary>
+        /// <summary>"v1|idRodu:idKrolestwa:K:zold:ludzie:doba:przeglad:niedoplata:pokoj;..." (9. pole - recenzja C1, C1-G3; wpisy 8-polowe ze starego zapisu
+        /// wczytuja sie z "dluga wojna")</summary>
         internal static string Export()
         {
             try
@@ -301,7 +321,8 @@ namespace Armoury
                     if (kv.Key.IndexOfAny(Bad) >= 0 || d.Kingdom == null || d.Kingdom.IndexOfAny(Bad) >= 0) continue;
                     if (!first) sb.Append(';'); first = false;
                     sb.Append(kv.Key).Append(':').Append(d.Kingdom).Append(':').Append(d.K.ToString(Inv)).Append(':').Append(d.Wage.ToString(Inv)).Append(':').Append(d.Men.ToString(Inv))
-                      .Append(':').Append(d.Day.ToString(Inv)).Append(':').Append(d.Review.ToString(Inv)).Append(':').Append(d.Unpaid.ToString(Inv));
+                      .Append(':').Append(d.Day.ToString(Inv)).Append(':').Append(d.Review.ToString(Inv)).Append(':').Append(d.Unpaid.ToString(Inv))
+                      .Append(':').Append(d.Peace.ToString(Inv));
                 }
                 return sb.ToString();
             }
@@ -320,11 +341,12 @@ namespace Armoury
                 if (f[1].Length == 0) return;
                 foreach (var p in f[1].Split(';'))
                 {
-                    var x = p.Split(':'); long k, w; int men, day, rev, un;
-                    if (x.Length == 8 && x[0].Length > 0 && x[1].Length > 0 && long.TryParse(x[2], NumberStyles.Integer, Inv, out k) && long.TryParse(x[3], NumberStyles.Integer, Inv, out w)
+                    var x = p.Split(':'); long k, w; int men, day, rev, un, pc = NoPeace;
+                    if ((x.Length == 8 || x.Length == 9) && x[0].Length > 0 && x[1].Length > 0 && long.TryParse(x[2], NumberStyles.Integer, Inv, out k) && long.TryParse(x[3], NumberStyles.Integer, Inv, out w)
                         && int.TryParse(x[4], NumberStyles.Integer, Inv, out men) && int.TryParse(x[5], NumberStyles.Integer, Inv, out day)
-                        && int.TryParse(x[6], NumberStyles.Integer, Inv, out rev) && int.TryParse(x[7], NumberStyles.Integer, Inv, out un))
-                    { _deals[x[0]] = new Deal { Kingdom = x[1], K = k, Wage = w, Men = men, Day = day, Review = rev, Unpaid = un }; _importN++; }
+                        && int.TryParse(x[6], NumberStyles.Integer, Inv, out rev) && int.TryParse(x[7], NumberStyles.Integer, Inv, out un)
+                        && (x.Length == 8 || int.TryParse(x[8], NumberStyles.Integer, Inv, out pc)))
+                    { _deals[x[0]] = new Deal { Kingdom = x[1], K = k, Wage = w, Men = men, Day = day, Review = rev, Unpaid = un, Peace = pc }; _importN++; }
                     else _importBad++;
                 }
             }

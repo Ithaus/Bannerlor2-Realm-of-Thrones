@@ -24,7 +24,8 @@ namespace Armoury
     ///    zapisu, dopoki pomiar ma mniej niz 28 dob (pierscienie D stalego zyja tylko w sesji); start kampanii D = G/60. G = kiesy rodziny (glowa +
     ///    dorosli). R = max(20 000; 20 x D) + 5 000 x doroslych.
     ///  - pulap zoldu (partie + zalogi + karawany): pokoj 0.28 D, wojna 0.60 D + 0.8 (G - R)/45 przy G > R; bieda: pokoj G < 60 D -> x (1 - 0.1 (1 - G/60D)),
-    ///    wojna G < R -> x (0.8 + 0.2 G/R), G < 0.25 R -> x 0.5. Dwor i wyzywienie 0.35/0.20 D, sprzet 0.17 D (+0.2 (G-R)/45 w wojnie), budowy 0.10 D / 0.
+    ///    wojna G < R -> x (0.8 + 0.2 G/R), G < 0.25 R -> x 0.5. Dwor i wyzywienie 0.35/0.20 D, sprzet 0.17 D (+0.2 (G-R)/45 w wojnie), budowy 0.10 D
+    ///    (w wojnie tylko na mury, wieze i koszary - recenzja C1, W5).
     ///  - zalogi: w wojnie pulap gry bez zmian i finansowane pierwsze; w pokoju cel 50% zalogi wojennej (srednia z dob wojny), najwyzej 80% pulapu.
     ///    Partie dostaja reszte - SetWagePaymentLimit (postfiks MakeClanFinancialEvaluation; dzialaja hamulce gry: werbunek i awanse ponad limit).
     ///  - ZWOLNIENIA zamiast dezercji gry z limitu zoldu (AiWageLimitDesertionOff): zold > 1.10 x pulap przez 3 doby -> codziennie 15% nadwyzki ludzi:
@@ -32,10 +33,11 @@ namespace Armoury
     ///    wsi tej twierdzy), czesc sakiewki partii do kiesy tej wsi; bez wsi z danymi BK nikt nie jest zwalniany (nikt nie znika - Z6).
     ///  - Straz bez zoldu (182): pulap w ludziach = pulap zoldu / nominalny zold czlowieka; werbunek, nowe partie i przyrost zalog Strazy staja na nim.
     ///  - nowa partia rodu: nie, gdy wolne miejsce w pulapie partii < 30 ludzi x sredni zold (rod bez zadnej partii - tak).
-    ///  - KIESA RODZINY: dorosly czlonek AI z kiesa ponad 5 000 dopelnia kiese glowy do max(5 000; koszt dnia rodu), sam nie schodzi ponizej 5 000
-    ///    (zastepuje IronBankFamilyPays - jedna regula).
+    ///  - KIESA RODZINY: dorosly czlonek AI z kiesa ponad 5 000 dopelnia kiese glowy do max(5 000; koszt dnia rodu), sam nie schodzi ponizej 5 000.
+    ///    Recenzja C1 (C1-G1): IronBankFamilyPays (T5) dziala dalej przed Bankiem - prog Banku (10/20 dni zoldu) jest wyzszy niz cel kiesy rodziny.
     ///  - SPRZET: zakupy AI (AiGear) placone przez pana najwyzej z niewydanego przydzialu sprzetu (0.17 D na dobe, najwyzej 30 dni).
-    ///  - BUDOWY (BuildFunding): z przydzialu budow budzetu (0.10 D w pokoju, 0 w wojnie) zamiast 10% dochodu modelu.
+    ///  - BUDOWY (BuildFunding): z przydzialu budow budzetu (0.10 D w pokoju i w wojnie - w wojnie BuildFunding finansuje tylko mury, wieze i koszary,
+    ///    Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; recenzja C1, W5) zamiast 10% dochodu modelu.
     ///  - 162m DWOR: glowa -> kasa siedziby raz na dobe (udzial "dwor i wyzywienie" minus jedzenie partii - szacunek: zuzycie dnia x cena zboza);
     ///    siedziba = Clan.HomeSettlement (wies -> jej miasto albo zamek; bez - najblizsze miasto krolestwa). Kasa MIASTA: znacznik tarczy dworu
     ///    (SoldierPay.HoldCourt) - regulator gry go nie kasuje, schodzi tylko z zaworem renty i dania wojenna, nigdy ponad nadwyzke kasy.
@@ -76,6 +78,12 @@ namespace Armoury
         {
             _b.Clear(); _saved.Clear(); _warGar.Clear(); _garTarget.Clear(); _day = -1; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
             ZeroLast(); ClearDay();
+            // recenzja C1 (C1-G4): uchwyty BK i obiekty poprzedniej sesji (jak LosersFlee.Reset, PopulationLaw.Reset "wpis 87") - BK tworzy przy kazdym
+            // wczytaniu nowy PopulationManager kluczowany obiektami Settlement; stary menedzer nie zna nowych osad, wiec po wczytaniu innego zapisu w tym
+            // samym procesie nikt nie bylby zwalniany (a dezercja gry z limitu jest wylaczona). BkResolve jest leniwe - podepnie sie do nowego menedzera.
+            // Latki Harmony (_hooksTried, _harmony, _wired, _missing) zyja przez caly proces - zostaja.
+            _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _populated = null;
+            _grain = null; _grainTried = false; _spawnUsed.Clear(); _spawnDay = -1;
         }
 
         internal static void ZeroLast()
@@ -251,7 +259,9 @@ namespace Armoury
                         double shareF = f;   // te same mnozniki biedy dla wszystkich udzialow
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
                         b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) : 0);
-                        b.Build = b.War ? 0 : Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
+                        // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
+                        // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
+                        b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
                         if (merc) { b.Cap = mcap; b.Household = 0; b.Build = 0; f = 1; }   // 185: pulap najemnika = zold ludzi z umowy (nie udzial D), bez dworu
                         else if (!b.War)
                         {
@@ -284,8 +294,9 @@ namespace Armoury
                         // kiesa rodziny, dwor, zwolnienia, limity - kazde we wlasnym try
                         try { FamilyTopUp(c, b, s); } catch (Exception e) { Stumble("FamilyTopUp", e); }
                         try { Court(c, b, s); } catch (Exception e) { Stumble("Court", e); }
-                        try { Releases(c, b, s); } catch (Exception e) { Stumble("Releases", e); }
+                        // recenzja C1 (W3): limity przed zwolnieniami - zwolnienia dziela kwote wedlug nadwyzki partii ponad jej dzisiejszy limit
                         try { ApplyPartyLimits(c, b); ApplyGarrisonLimits(c, b); } catch (Exception e) { Stumble("Limits", e); }
+                        try { Releases(c, b, s); } catch (Exception e) { Stumble("Releases", e); }
                         if (c.Leader.Gold < 5000) _dPoor++;
                     }
                     catch (Exception e) { Stumble("Daily(rod)", e); }
@@ -492,13 +503,50 @@ namespace Armoury
             // 2. najemnicy z karczmy, 3. najnizszy tier - partie rodu (zalogi w wojnie pelne - nie ruszane)
             var wps = c.WarPartyComponents;
             if (wps == null) return;
+            // recenzja C1 (W4): nie z partii w bitwie, w obozie oblezniczym ani zamknietych w oblezonej osadzie (ludzie nie przechodza przez linie oblezenia,
+            // armia nie topnieje pod murami); niezwolniona reszta czeka - licznik dob ponad pulapem trwa, zwolnienia wracaja po oblezeniu
+            var parties = new List<MobileParty>();
+            for (int i = 0; i < wps.Count; i++)
+            {
+                var mp = wps[i] != null ? wps[i].MobileParty : null;
+                if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null
+                    || (mp.CurrentSettlement != null && mp.CurrentSettlement.IsUnderSiege)) continue;
+                parties.Add(mp);
+            }
+            if (parties.Count == 0) return;
+            // recenzja C1 (W3): kwota dnia dzielona miedzy partie - najpierw wedlug nadwyzki kazdej ponad jej wlasny limit zoldu (limity juz z dzisiejszego pulapu),
+            // reszta wedlug zoldu partii (Straz bez zoldu - limit w zlocie nic nie znaczy: wedlug ludzi). Dotad cala kwota szla z pierwszej partii na liscie: ta
+            // spadala ponizej swojego limitu i werbowala z powrotem (petla werbunek -> zwolnienie na koszt rodu), a inne zostawaly ponad limitem na stale.
+            var weight = new double[parties.Count];
             for (int pass = 0; pass < 2 && left > 0; pass++)
-                for (int i = 0; i < wps.Count && left > 0; i++)
+            {
+                double sumE = 0;
+                for (int i = 0; i < parties.Count; i++)
                 {
-                    var mp = wps[i] != null ? wps[i].MobileParty : null;
-                    if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.MapEvent != null) continue;
-                    left -= ReleaseFrom(mp, null, c, left, b.Zero, pass == 0, false);
+                    var mp = parties[i];
+                    weight[i] = b.Zero ? 0 : Math.Max(0, (double)mp.TotalWage - mp.PaymentLimit);
+                    sumE += weight[i];
                 }
+                if (sumE > 0)
+                {
+                    double part = Math.Min(left, sumE);
+                    for (int i = 0; i < parties.Count && left > 0; i++)
+                        if (weight[i] > 0) left -= ReleaseFrom(parties[i], null, c, Math.Min(left, part * weight[i] / sumE), b.Zero, pass == 0, false);
+                }
+                if (left <= 0) break;
+                // partie ponizej wlasnego limitu ruszane dopiero teraz, gdy nadwyzki innych nie starczylo
+                double sumW = 0;
+                for (int i = 0; i < parties.Count; i++)
+                {
+                    var mp = parties[i];
+                    weight[i] = b.Zero ? (mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0) : Math.Max(0, mp.TotalWage);
+                    sumW += weight[i];
+                }
+                if (sumW <= 0) continue;
+                double rest = left;
+                for (int i = 0; i < parties.Count && left > 0; i++)
+                    if (weight[i] > 0) left -= ReleaseFrom(parties[i], null, c, Math.Min(left, rest * weight[i] / sumW), b.Zero, pass == 0, false);
+            }
         }
 
         /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru; mercsOnly -
@@ -644,14 +692,11 @@ namespace Armoury
             b.GearLeft = Math.Max(0, b.GearLeft - amount); _dGearSpent += amount;
         }
 
-        /// <summary>BuildFunding: dzienny przydzial budow rodu (0.10 D w pokoju, 0 w wojnie); false - rod bez budzetu (stara podstawa).</summary>
+        /// <summary>BuildFunding: dzienny przydzial budow rodu (0.10 D; w wojnie BuildFunding finansuje nim tylko budowy wojskowe - W5); false - rod bez budzetu (stara podstawa).</summary>
         internal static bool BuildShare(Clan c, out float share)
         {
             var b = Of(c); share = b != null ? (float)Math.Max(0, b.Build) : 0f; return b != null;
         }
-
-        /// <summary>IronBank: kiesa rodziny w budzecie zastepuje "rodzina placi" Banku (jedna regula) - tylko u rodow z budzetem dzis.</summary>
-        internal static bool FamilyRuleFor(Clan c) { var s = Settings.Current; return s != null && s.FamilyTopsUpHead && Of(c) != null; }
 
         // ------------------------------------------------------------ latki gry (w kampanii, raz na proces - pulapka konstruktorow statycznych modeli)
         private static Harmony _harmony;

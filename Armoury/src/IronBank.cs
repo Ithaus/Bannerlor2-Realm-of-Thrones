@@ -234,7 +234,10 @@ namespace Armoury
         private static int FamilyCover(Clan c, int need, bool allOrNothing)
         {
             if (need <= 0 || c == null || c == Clan.PlayerClan || !FamilyOn) return 0;
-            if (ClanBudget.FamilyRuleFor(c)) return 0;   // 166: rod z budzetem - kiesa rodziny budzetu zastepuje T5 (jedna regula); inne rody jak dotad
+            // recenzja C1 (C1-G1): T5 zostaje takze u rodow z budzetem 166 (odstepstwo od projektu "IronBankFamilyPays -> false"). Kiesa rodziny 166
+            // (ClanBudget.FamilyTopUp) biegnie PO Banku i dopelnia glowe tylko do max(5 000; koszt dnia), a Bank pozycza ponizej 10/20 dni zoldu - bez T5
+            // Bank pozyczalby rodom, ktorych rodzina ma zloto (i liczyl spoznienia rat, ktore rodzina by pokryla). Oba przelewy czlonek -> glowa (GiveGoldAction).
+            // Do przebudowy progu pozyczki w 168 (krok D).
             int got = 0, donors = 0, minLeft = int.MaxValue;
             try
             {

@@ -22,7 +22,8 @@ namespace Armoury
     ///  - REPARACJE Diplomacy (KingdomWalletCost.ApplyCost z portfelami "Reparations"): zamiast zabrac placacemu skarbiec ponad 2 mln i dlug
     ///    trybutu rodow, a odbiorcy dac z gory 1/3 krolowi i 1/6 najemnikom - dlug korona A -> korona B, rata najwyzej CrownReparationShare (50%)
     ///    wplywow dnia A, B dostaje dokladnie rate do skarbca. Rody nie placa, DebtToKingdom z reparacji nie powstaje.
-    ///  - SPLATA DebtToKingdom (stary zapis; gra AddPaymentForDebts): z kiesy rodu do skarbca jego krolestwa (dotad w nicosc).
+    ///  - SPLATA DebtToKingdom (stary zapis; gra AddPaymentForDebts): z kiesy rodu do skarbca jego krolestwa (dotad w nicosc) - poza splata zaliczki gry
+    ///    (recenzja C1, OBIEG-1: czesc dlugu, ktora gra uznala odbiorcy portfela z niczego - jej splata dalej w nicosc).
     ///  - Zwrot (KingdomTreasury.WageRefund): tylko partie w polu (bez zalog), minus wydatki ich ludzi we wlasnych miastach rodu (K3).
     ///
     /// Platnik -> odbiorca: skarbiec A -> skarbiec B (raty), glowa rodu -> skarbiec (splata dlugu). Zadnego zlota z niczego; kazdy przelew
@@ -57,6 +58,16 @@ namespace Armoury
         // wydatki ludzi partii w polu we wlasnych miastach rodu od ostatniego zwrotu (K3)
         private static readonly Dictionary<Clan, long> _ownSpend = new Dictionary<Clan, long>();
 
+        // recenzja C1 (OBIEG-1): ZALICZKA GRY w dlugu wobec korony. Gra uznaje portfel najemnikow / trybutu / wezwania do wojny w calosci, choc rod nie
+        // mial na swoj udzial (brak dopisuje do DebtToKingdom) - odbiorca dostal te kwote z niczego. Czesc tego przyrostu SoldierPay rownowazy obcietym
+        // zoldem (zloto zeszlo z kiesy, a nie trafilo do ludzi); reszta to zaliczka z niczego. Przed C1 splata dlugu ginela i domykala ten cykl; od C1 idzie
+        // do skarbca - bez tej ewidencji ta sama kwota istnialaby dwa razy (u odbiorcy zaliczki i w skarbcu). Splata najpierw gasi zaliczke (w nicosc, jak przed
+        // C1), do skarbca idzie tylko reszta (dlug z obcietego zoldu i dlugi ze starego zapisu - bez wpisu tutaj - tabela 165). Zrodlo (uznawanie portfela
+        // w calosci) zamyka 168 (krok D). Zapis w arm_crown165.
+        private static readonly Dictionary<string, long> _advance = new Dictionary<string, long>();   // id rodu -> niesplacona zaliczka gry (najwyzej dlug)
+        internal static long LastAdvanceRepaid, LastAdvanceNew;
+        private static long _dAdvRepaid, _dAdvNew;
+
         // liczniki doby (linia i "Obieg")
         internal static long LastMeasured, LastOwn, LastOther, LastRelease, LastSpend, LastGiftOut, LastRepOut, LastRepIn, LastContract, LastRefund, LastLeft;
         internal static long LastDebtRepaid, LastOwnCut, LastNewDebt; internal static int LastNewDebtN;
@@ -68,15 +79,15 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear();
-            ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0;
+            _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
+            ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
         }
 
         internal static void ZeroLast()
         {
             LastMeasured = LastOwn = LastOther = LastRelease = LastSpend = LastGiftOut = LastRepOut = LastRepIn = LastContract = LastRefund = LastLeft = 0;
-            LastDebtRepaid = LastOwnCut = LastNewDebt = 0; LastNewDebtN = 0;
+            LastDebtRepaid = LastOwnCut = LastNewDebt = 0; LastNewDebtN = 0; LastAdvanceRepaid = LastAdvanceNew = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -232,6 +243,7 @@ namespace Armoury
                 _wEnd.Clear();
                 foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated && k.StringId != null) _wEnd[k.StringId] = k.KingdomBudgetWallet;
                 _wEndDay = today;
+                LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
                 if (!_open) { LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0; return; }
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0; int noSnap = 0;
                 var parts = new List<KeyValuePair<long, string>>();
@@ -268,6 +280,8 @@ namespace Armoury
                       .Append(" | dlugi reparacji: ").Append(_debts.Count).Append(" na ").Append(debtSum).Append(" zl, nowe dzis ").Append(LastNewDebtN).Append(" na ").Append(LastNewDebt)
                       .Append(", przepadly (krolestwa nie ma) ").Append(_dDroppedN).Append(" na ").Append(_dDropped)
                       .Append(" | splata dlugu wobec korony do skarbcow (stary zapis) ").Append(LastDebtRepaid).Append(" (niezaplacone mimo wpisu w saldzie - nie do skarbca ").Append(_dDebtUnpaid).Append(')')
+                      .Append(", splata zaliczki gry (portfel uznany z niczego) - w nicosc ").Append(LastAdvanceRepaid).Append(" (nowe zaliczki gry od wczoraj ").Append(LastAdvanceNew)
+                      .Append(", niesplacone razem ").Append(AdvanceTotal()).Append(" u ").Append(_advance.Count).Append(" rodow)")
                       .Append(" | krolestwa bez wczorajszej migawki (tylko nasze liczniki) ").Append(noSnap)
                       .Append(" | reparacje Diplomacy przechwycone: ").Append(_repWired ? "TAK" : "BRAK").Append(", splata dlugu wobec korony: ").Append(_debtWired ? "TAK" : "BRAK")
                       .Append(" | na krolestwo (wplywy+zapas, wydatki): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
@@ -342,25 +356,73 @@ namespace Armoury
             catch (Exception e) { Stumble("DebtPostfix", e); }
         }
 
-        /// <summary>SoldierPay.ClanTickPostfix (koniec rozliczenia rodu): splata dlugu wobec korony do skarbca - najwyzej to, co glowa naprawde zaplacila.
-        /// haveNet - znane saldo i kiesa glowy przed jego dopisaniem; bez nich - nic (nie wiemy, czy zaplacono).</summary>
-        internal static void ClanTickEnd(Clan c, bool haveNet, int goldMid, int net)
+        /// <summary>SoldierPay.ClanTickPostfix (koniec rozliczenia rodu): splata dlugu wobec korony do skarbca - najwyzej to, co glowa naprawde zaplacila,
+        /// minus zaliczka gry (OBIEG-1 - ta czesc w nicosc). haveNet - znane saldo i kiesa glowy przed jego dopisaniem; bez nich - nic (nie wiemy, czy zaplacono).
+        /// Zwraca, o ile gra zmniejszyla dzis dlug rodu w AddPaymentForDebts (0 - bez splaty) - SoldierPay liczy z tego brutto nowego dlugu.</summary>
+        internal static int ClanTickEnd(Clan c, bool haveNet, int goldMid, int net)
+        {
+            int paid = 0;
+            try
+            {
+                if (_debtClan != null && ReferenceEquals(_debtClan, c)) paid = _debtPaid;
+                _debtClan = null; _debtPaid = 0;
+                if (paid > 0 && c.Kingdom != null && On)
+                {
+                    long gap = haveNet ? Math.Max(0L, -((long)goldMid + net)) : paid;   // brak salda - najpierw obciaza splate dlugu
+                    long real = Math.Max(0L, paid - gap);
+                    _dDebtUnpaid += paid - real;
+                    if (real > 0)
+                    {
+                        // recenzja C1 (OBIEG-1): splata najpierw gasi zaliczke gry - ta czesc wraca w nicosc (odbiorca portfela dostal ja juz z niczego);
+                        // do skarbca tylko reszta (glowa zaplacila w saldzie - przelew rod -> skarbiec, nie w nicosc)
+                        long adv = TakeAdvance(c, real);
+                        long toWallet = real - adv;
+                        if (toWallet > 0) { c.Kingdom.KingdomBudgetWallet += (int)toWallet; _dDebtRepaid += toWallet; }
+                        _dAdvRepaid += adv;
+                    }
+                }
+                else if (paid > 0) TakeAdvance(c, paid);   // bez skarbca (165 wylaczone w trakcie, rod bez krolestwa) - splata w nicosc gasi zaliczke tak samo
+                TrimAdvance(c);                             // zaliczka nigdy wieksza niz dlug (dlug darowany albo splacony poza nasza latka)
+            }
+            catch (Exception e) { Stumble("ClanTickEnd", e); }
+            return paid;
+        }
+
+        /// <summary>Recenzja C1 (OBIEG-1), SoldierPay.Settle: czesc dzisiejszego przyrostu dlugu rodu, ktorej nie zrownowazyl obciety zold - zaliczka gry z niczego.</summary>
+        internal static void NoteAdvance(Clan c, long amount)
         {
             try
             {
-                if (_debtClan == null || !ReferenceEquals(_debtClan, c)) { _debtClan = null; _debtPaid = 0; return; }
-                int paid = _debtPaid;
-                _debtClan = null; _debtPaid = 0;
-                if (paid <= 0 || c.Kingdom == null || !On) return;
-                long gap = haveNet ? Math.Max(0L, -((long)goldMid + net)) : paid;   // brak salda - najpierw obciaza splate dlugu
-                long real = Math.Max(0L, paid - gap);
-                _dDebtUnpaid += paid - real;
-                if (real <= 0) return;
-                c.Kingdom.KingdomBudgetWallet += (int)real;      // glowa zaplacila w saldzie - do skarbca, nie w nicosc
-                _dDebtRepaid += real;
+                if (c == null || c.StringId == null || amount <= 0 || !On) return;
+                long v; _advance.TryGetValue(c.StringId, out v);
+                v = Math.Min(v + amount, Math.Max(0L, (long)c.DebtToKingdom));
+                if (v > 0) _advance[c.StringId] = v; else _advance.Remove(c.StringId);
+                _dAdvNew += amount;
             }
-            catch (Exception e) { Stumble("ClanTickEnd", e); }
+            catch (Exception e) { Stumble("NoteAdvance", e); }
         }
+
+        /// <summary>Splata `amount` gasi najpierw zaliczke gry rodu - zwraca zgaszona czesc.</summary>
+        private static long TakeAdvance(Clan c, long amount)
+        {
+            long v;
+            if (c == null || c.StringId == null || amount <= 0 || !_advance.TryGetValue(c.StringId, out v)) return 0;
+            long adv = Math.Min(amount, v);
+            v -= adv;
+            if (v > 0) _advance[c.StringId] = v; else _advance.Remove(c.StringId);
+            return adv;
+        }
+
+        private static void TrimAdvance(Clan c)
+        {
+            long v;
+            if (c == null || c.StringId == null || !_advance.TryGetValue(c.StringId, out v)) return;
+            long debt = Math.Max(0L, (long)c.DebtToKingdom);
+            if (debt <= 0) _advance.Remove(c.StringId);
+            else if (v > debt) _advance[c.StringId] = debt;
+        }
+
+        private static long AdvanceTotal() { long t = 0; foreach (var kv in _advance) t += kv.Value; return t; }
 
         private static Harmony _harmony;
 
@@ -408,12 +470,13 @@ namespace Armoury
         private static bool _debtTried;
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_crown165")
-        /// <summary>"v1|doba migawki|id=skarbiec;...|placacy>odbiorca>reszta>calosc>doba;..."</summary>
+        /// <summary>"v1|doba migawki|id=skarbiec;...|placacy>odbiorca>reszta>calosc>doba;...|idRodu=zaliczka gry;..." (piate pole - recenzja C1, OBIEG-1;
+        /// zapis bez niego wczytuje sie jak dotad, starsza wersja moda piate pole pomija)</summary>
         internal static string Export()
         {
             try
             {
-                var sb = new StringBuilder(64 + _wEnd.Count * 24 + _debts.Count * 48);
+                var sb = new StringBuilder(64 + _wEnd.Count * 24 + _debts.Count * 48 + _advance.Count * 32);
                 sb.Append("v1|").Append(_wEndDay.ToString(Inv)).Append('|');
                 bool first = true;
                 foreach (var kv in _wEnd)
@@ -430,6 +493,21 @@ namespace Armoury
                     if (!first) sb.Append(';'); first = false;
                     sb.Append(d.Payer).Append('>').Append(d.Receiver).Append('>').Append(d.Left.ToString(Inv)).Append('>').Append(d.Total.ToString(Inv)).Append('>').Append(d.Day.ToString(Inv));
                 }
+                sb.Append('|');
+                first = true;
+                if (_advance.Count > 0)
+                {
+                    // tylko zywe rody z dlugiem (rod wymarly albo bez dlugu - zaliczki juz nie ma czym splacac)
+                    var live = new Dictionary<string, int>();
+                    foreach (var c in Clan.All) if (c != null && !c.IsEliminated && c.StringId != null && c.DebtToKingdom > 0) live[c.StringId] = c.DebtToKingdom;
+                    foreach (var kv in _advance)
+                    {
+                        int debt;
+                        if (kv.Key == null || kv.Key.IndexOfAny(Bad) >= 0 || kv.Value <= 0 || !live.TryGetValue(kv.Key, out debt)) continue;
+                        if (!first) sb.Append(';'); first = false;
+                        sb.Append(kv.Key).Append('=').Append(Math.Min(kv.Value, (long)debt).ToString(Inv));
+                    }
+                }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -438,7 +516,7 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _wEnd.Clear(); _wEndDay = -1; _debts.Clear(); _importN = 0; _importBad = 0;
+            _wEnd.Clear(); _wEndDay = -1; _debts.Clear(); _advance.Clear(); _importN = 0; _importBad = 0;
             try
             {
                 if (string.IsNullOrEmpty(data)) return;
@@ -458,6 +536,13 @@ namespace Armoury
                         if (x.Length == 5 && x[0].Length > 0 && x[1].Length > 0 && long.TryParse(x[2], NumberStyles.Integer, Inv, out left) && long.TryParse(x[3], NumberStyles.Integer, Inv, out total)
                             && int.TryParse(x[4], NumberStyles.Integer, Inv, out day) && left > 0)
                         { _debts.Add(new Debt { Payer = x[0], Receiver = x[1], Left = left, Total = total, Day = day }); _importN++; }
+                        else _importBad++;
+                    }
+                if (f.Length >= 5 && f[4].Length > 0)   // recenzja C1 (OBIEG-1): zaliczki gry; zapis bez tego pola - brak zaliczek (dlugi zostaja przy skarbcu, tabela 165)
+                    foreach (var p in f[4].Split(';'))
+                    {
+                        var kv = p.Split('='); long v;
+                        if (kv.Length == 2 && kv[0].Length > 0 && long.TryParse(kv[1], NumberStyles.Integer, Inv, out v) && v > 0) _advance[kv[0]] = v;
                         else _importBad++;
                     }
             }

@@ -324,16 +324,23 @@ namespace Armoury
             var clan = _clan;
             _clan = null;
             if (clan == null) return;
-            try { CrownIncome.ClanTickEnd(clan, _haveNet, _goldMid, _net); } catch (Exception e) { Stumble("SoldierPay.ClanTickEnd", e); }   // 165: splata dlugu wobec korony do skarbca
-            try { Settle(clan); }
+            int debtPaid = 0;
+            try { debtPaid = CrownIncome.ClanTickEnd(clan, _haveNet, _goldMid, _net); } catch (Exception e) { Stumble("SoldierPay.ClanTickEnd", e); }   // 165: splata dlugu wobec korony do skarbca
+            try { Settle(clan, debtPaid); }
             catch (Exception e) { Stumble("SoldierPay.Settle", e); }
             finally { _recs.Clear(); _haveNet = false; }
         }
 
         // ------------------------------------------------------------ rozdzial zaplaconego zoldu
-        private static void Settle(Clan clan)
+        private static void Settle(Clan clan, int debtPaid)
         {
-            if (_recs.Count == 0) return;
+            // recenzja C1 (OBIEG-1): nowy dlug wobec korony w tym rozliczeniu (brutto: zmiana dlugu + dzisiejsza splata w AddPaymentForDebts). Ta jego czesc,
+            // ktorej nie zrownowazy obciety zold ponizej (cutByDebt), to zaliczka gry z niczego (portfel najemnikow/trybutu/wezwania do wojny uznany w calosci) -
+            // jej pozniejsza splata wraca w nicosc (CrownIncome), nie do skarbca. Rod bez partii z zoldem albo saldo nieznane - caly nowy dlug.
+            long debtDelta = (long)clan.DebtToKingdom - _debtBefore;
+            long newDebt = Math.Max(0L, debtDelta + Math.Max(0, debtPaid));
+            long cutByDebt = 0;
+            if (_recs.Count == 0) { if (newDebt > 0) CrownIncome.NoteAdvance(clan, newDebt); return; }
             var s = Settings.Current;
             if (s == null) return;
             long owed = 0;
@@ -353,9 +360,10 @@ namespace Armoury
                 if (!blind)
                 {
                     // brak ukryty w dlugu wobec korony: gra dopisala go do Clan.DebtToKingdom i wyrownala saldo do kiesy (opis w naglowku klasy)
-                    long hidden = Math.Max(0L, (long)clan.DebtToKingdom - _debtBefore);
+                    long hidden = Math.Max(0L, debtDelta);
                     if (hidden > 0)
                     {
+                        cutByDebt = Math.Min(hidden, Math.Max(0L, owed - shortfall));   // OBIEG-1: tyle przyrostu dlugu rownowazy obciety zold
                         if (shortfall < owed) { _dDebtClans++; _dDebtCut += Math.Min(hidden, owed - shortfall); }
                         shortfall += hidden;
                     }
@@ -363,6 +371,7 @@ namespace Armoury
                 }
                 if (shortfall > 0) ClanIncomeBook.NoteWageCut(clan, Math.Min(shortfall, owed), blind);   // 169c: miara bankructwa K39 (tylko licznik, wlasny try); blind - saldo nieznane, liczone osobno
             }
+            if (newDebt > cutByDebt) CrownIncome.NoteAdvance(clan, newDebt - cutByDebt);   // OBIEG-1: zaliczka gry (wlasny try)
             // takze gdy nic nie zeszlo z kies: Route dolicza zold naliczony (linia "Zold:" ma sie zgadzac z licznikiem ksiegi pieniadza)
             for (int i = 0; i < _recs.Count; i++)
             {
