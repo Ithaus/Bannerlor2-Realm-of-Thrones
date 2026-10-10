@@ -1036,3 +1036,9 @@ bankruci 0; zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc19 + D:\B
 ZATWIERDZONE: Armoury aeb2ba51, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.
 - **Okupy - wariant B (Jeff 10.10 "Okup - B"):** glowa rodu ok. 60 dni D (RansomHeadYears 0.165), lord 20 D, krol ok. 60 dni wplywow korony (ta sama miara - moja
   decyzja dla spojnosci). Commit bcb5fe1 na w-toku/e2c. Powod: test D - okupy 65.5 mln w 120 dobach, dlug okupow +270 tys./d (w grze niewola 4-5 x w roku na rod).
+
+**WGRANIE 20 (10.10 ok. 10:30 zegara komp.):** Armoury d7222bfb (galaz noc/wgranie-20 = w-toku/e2c bcb5fe1 = WGRANIE 19 + 186 korona pozycza w Zelaznym Banku (CrownBorrow.cs)
++ 178-B okupy mniejsze (glowa ok. 60 D, lord 20 D, krol ok. 60 dni wplywow korony)). RealisticCaptivity 5f98df70 i CrashScribe 6507c842 bez zmian. Testy: 120 dob - 0 bledow,
+glowy < 5000 = 2, bankruci 0, wojsko lordow w wojnie 95.8 tys., zalogi -2.2%, reszta ksiegi -3.9 tys./d; dlug okupow d120 4.3 mln u 16 rodow (bylo 32 mln u 54);
+korony pozyczaja 15-23 tys./d u 5-10 krolestw; zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc20 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc20-przed.
+ZATWIERDZONE: Armoury d7222bfb, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.

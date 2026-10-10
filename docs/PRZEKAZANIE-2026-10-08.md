@@ -491,3 +491,6 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   na 186b (186 + okupy B) -> zapis -> WGRANIE 20 razem. Potem koniec etapu 2: bieg 2-letni (Days 728) + bieg z wymuszonym pokojem.
 - (09:45) TEST 186 120 dob OK (kopia-186-120): 0 bledow, glowy < 5000 = 4, bankruci 0, wojsko lordow w wojnie 97.0 tys., zalogi -2.1%, reszta ksiegi -2.6 tys.; korony pozyczaja
   15-23 tys./d u 5-10 krolestw, pula Banku czasem przycina (1/60 nadwyzki ponad 2 mln). **TEST 186b (186 + okupy B) 120 dob w toku** -> test\at-186b-120.out.txt -> zapis -> WGRANIE 20.
+- (10:30) **WGRANIE 20: Armoury d7222bfb (noc/wgranie-20 = e2c bcb5fe1 = 186 + okupy B)**. Dalej: KONIEC ETAPU 2 - bieg 2-letni (autotest -Days 728, nowa kampania;
+  ok. 3.5 h) + bieg z wymuszonym pokojem (warunki konca etapu z projektu rozdz. 1: pokoj - zalogi pokojowe 45-50% wojennych, zold / D panow zamkow <= 0.3, wojsko 35-40%
+  wojennego). Potem etap 3 krok po kroku.
