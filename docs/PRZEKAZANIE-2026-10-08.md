@@ -395,3 +395,8 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   (b) ja - commit 4e4e627 C1-m: umowa najemnika przy najmie >= MercHireFloorShare 0.5 pelnej wielkosci kompanii (kompania najeta po bitwie odrasta; bylo -79%).
   DLL test\Armoury-e2c-c1w.dll (d9a127bc). **TEST 120 dob w toku** -> test\at-c1w-120.out.txt. Ocena: sprawdz_logi --grupa etap2 --baza e2b-p\baza-B4.json;
   wojsko lordow w wojnie (doby 94-121) cel ok. 95+ tys. (baza 111.5, C1-r 89.7); jesli >= ok. 96% bazy albo luka wyraznie do zamkniecia kredytem 168 -> WGRANIE 16.
+- (01:55) **TEST C1-w 120 dob (DLL d9a127bc; kopia SCRATCH(7016) kopia-c1w-120\):** 120/120, 17.9 s/dobe, 0 bledow Armoury (CS 9 = szum + Harrenhal ROT;
+  GAME HANG 61 s po wyjsciu z kampanii - tak samo w poprzednich biegach). Glowy < 5000 = 6, bankruci 2 (ETAP), reszta ksiegi -0.5 tys. (TAK). Wojsko lordow
+  w wojnie 91.5 tys. (C1-r 89.7, baza 111.5) - poprawki 385e7ec/4e4e627 daly malo; Dothraki -29% (bylo -47), zalogi na twierdze -7.8%. **Wniosek:** w skarbcach
+  zostaje ok. 90 tys. zl/dobe niewydanych wplywow (linia "Korona: wplywy dnia (165)": "zostalo z wplywow dnia w skarbcach") = ok. 15 tys. ludzi zoldu - to luka;
+  rozdaje ja C2 (180 renty wedlug lenn). **C1 NIE WGRYWAM OSOBNO** - dalej C2 na tej samej galezi w-toku/e2c, test 120 dob C1+C2, wgranie razem (WGRANIE 16).
