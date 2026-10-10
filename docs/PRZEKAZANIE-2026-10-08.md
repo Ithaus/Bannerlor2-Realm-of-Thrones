@@ -353,3 +353,8 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   --baza SCRATCH(7016)\e2b-p\baza-B4.json (tools/sprawdz_logi.py --grupa etap2), wgranie.
 - (21:35) **WGRANIE 15: Armoury ddf01297 (noc/wgranie-15 = e2c ae01f8e, 177-fix miecza)**, CS 6507c842. Test 40 dob OK (0 bledow Armoury, CS 8 = szum startowy, spis 17/17).
   Uwaga dla C1: galaz w-toku/e2c zawiera juz 177-fix (ae01f8e) - C1 idzie na nim.
+- (21:55) **Jeff: "i potem rob etap 3 tez krok po kroku"** (ultracode wlaczony). Kolejnosc wiazaca: etap 2 do konca (C1 -> C2 180 renty -> C3 179+183 -> D 168+178,
+  kazdy krok: kod, jedna recenzja, test 120 dob z --baza baza-B4, wgranie), potem ETAP 3 krok po kroku wedlug PLAN-DO-KONCA-MODA rozdz. "Etap 3":
+  3.2 (cale zloto taboru/bandy dla zwyciezcy - Jeff juz zdecydowal 09.10: "jak rozbije karawane, to zabiera sie wszystko zwyciezca") -> 3.3 statki do portu
+  (181 zaprojektowany w PROJEKT-ETAP2 rozdz. 181) -> 3.1 szczelnosc 164a -> 3.4-3.7 (BK, rada, wedrowcy, ROT) -> 3.8 ceny historyczne -> 3.9/3.10 drobne.
+  Koniec etapu 3: reszta niewyjasniona ksiegi obiegu < 10 tys./dobe (sr. 28 dob). Kazdy krok osobno: wykonanie, recenzja, test 40 dob (+120 dla obiegu), wgranie.
