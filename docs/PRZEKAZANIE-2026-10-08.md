@@ -413,3 +413,10 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
 - (02:05) **WGRANIE 16: Armoury b43f65cf (noc/wgranie-16 = w-toku/e2c 1220510 = C1+C2)**, CS 6507c842. Zapis 9 dob OK (0 bledow). Dalej: **C3** (179 rycerze bez lenna
   bez wlasnych partii - jada w druzynie pana; 183 dezercja AI wedlug poziomu, podloga 30 ludzi przy zaleglym zoldzie) wedlug PROJEKT-ETAP2 rozdz. 179 (ok. 548) i 183
   (ok. 585), na galezi w-toku/e2c; do obserwacji: warunek sluzby rent 180 (44% rodow bez renty). Potem D (168 + 178), potem etap 3.
+- (03:00) **C3 GOTOWE** (pomocnik; w-toku/e2c b159d70 179, 6273048 183, fdb9d43 180m pomiar sluzby, 1238127 recenzja wlasna, docs 9926b99). 179 GentryService.cs:
+  rody rycerzy bez wlasnych partii (latki gry + BK SummonGentry), glowa rodu jedzie w druzynie pana (wlasciciel wsi majatku; bez partii pana - najblizsza armia
+  krolestwa), zold rycerza 24 zl/d od pana (w pulapie 166, zwrocie 50%, D rycerza "kontrakt"), +1 do limitu partii; stare partie rycerzy - limit 0, ludzie do ludnosci
+  BK wsi majatku (jency/statki starych partii nadal przepadaja przy rozwiazaniu przez BK - jednorazowo, liczone). UWAGA: rycerz "teleportuje sie" do/z armii.
+  183: DesertionLawForAi true (AI, zalogi, karawany - te same progi morale co gracz; Inni bez zmian), WarLedger AI pelna stawka, podloga 30 ludzi przy zaleglym zoldzie
+  (gracz tez). 180m: sluzba liczona przez cala dobe (bitwy, najazdy, szturmy, poscig, odsiecz) i dzien wojny tylko z prawdziwym kontaktem; zapis rent v2.
+  Nowe linie: "Rycerze (179): dzien", "Dezercja AI (183): dzien". DLL test\Armoury-e2c-c3.dll (64900093). **TEST 120 dob w toku** -> test\at-c3-120.out.txt.
