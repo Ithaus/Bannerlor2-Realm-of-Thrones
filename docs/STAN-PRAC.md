@@ -955,3 +955,7 @@ dokladnie (30 broni obnizonych) + E1b pokoj z biedy (wniosek tylko od chetnego p
 + D:\Backup-Bannerlord\wgrane\2026-10-09-noc12-przed. Testy: nowa kampania 40 dob OK (14.1-14.2 s, 0 bledow, harness okupu 2b/2c OK), zapis 9 dob OK (26.2 s). E1b: 0 wnioskow
 z biedy (biedne krolestwa w wojnach fabularnych ROT - pomijane wedlug T9); gra sama 14 wnioskow o pokoj w 9 dobach. Polnoc nadal 138/134 - przyczyna: bron skladana (np.
 vlandia_lance_1_t3 = tier 5) poza zamiana 175 -> W2 w toku. ZATWIERDZONE OD TERAZ: Armoury 1cc7890a, CrashScribe d68532a6.
+**WGRANIE 13 (09.10 ok. 17:35 zegara komp.):** tylko CrashScribe 6507c842 (w-toku/175-armie-cs 511c08e = W2: tier broni skladanych liczony tak jak przy starcie sesji - ok. 78 jednostek
+t3-t4 bez kopii/wloczni t5-6; Polnoc 131/134 wobec swiata 122/119), Armoury bez zmian 1cc7890a. Test: 40 dob z Armoury w grze OK (14.2 s, 0 bledow, jednostek z bronia ponad
+tier 0) + 120 dob z krokiem B (0 bledow). Poprzedni CS: CrashScribe.dll.bak-2026-10-09-przed-noc13 + D:. ZATWIERDZONE: Armoury 1cc7890a, CrashScribe 6507c842.
+KROK B etapu 2 (w-toku/e2b) NIE wgrany - 12/48 progow NIE; naprawa wf_f6909cac-c64.
