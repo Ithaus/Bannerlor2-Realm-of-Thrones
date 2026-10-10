@@ -1044,3 +1044,9 @@ korony pozyczaja 15-23 tys./d u 5-10 krolestw; zapis 9 dob OK. Kopie: Armoury.dl
 ZATWIERDZONE: Armoury d7222bfb, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.
 - **Okupy - wariant 1 (Jeff 10.10 "1 i rob test"; zastepuje B):** glowa rodu ok. 30 dni D (RansomHeadYears 0.0824), zwykly lord 10 D, krol 20 dni wplywow korony
   (nowy klucz RansomKingDays 20). Commit d341e7b na w-toku/e2c, DLL test\Armoury-e2c-okup1.dll (87b03e2b). Szacunek: okupy ok. 9.6 mln / 120 dob (B: 19.2, A: 65.5).
+
+**WGRANIE 21 (10.10 ok. 13:50 zegara komp.):** Armoury 87b03e2b (galaz noc/wgranie-21 = w-toku/e2c d341e7b = WGRANIE 20 + okupy wariant 1: glowa ok. 30 D, lord 10 D,
+krol 20 dni wplywow korony - RansomKingDays). RealisticCaptivity 5f98df70, CrashScribe 6507c842 bez zmian. Testy: bieg 2-letni dotarl do doby 457 (wywrotka BannerKings
+ClaimantDemand.SetTexts NullReference w BKDiplomacyBehavior.OnDailyTick - nie nasz kod; okno ButterLib zawiesilo gre), w 457 dobach 1 potkniecie Armoury (Tent KeyNotFound,
+obsluzone); zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc21 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc21-przed.
+ZATWIERDZONE: Armoury 87b03e2b, RealisticCaptivity 5f98df70, CrashScribe 6507c842.

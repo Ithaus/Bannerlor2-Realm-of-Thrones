@@ -527,3 +527,22 @@ nie dotykac zapisow Jeffa i Armoury.json; zadnego spawn_task; przy 99% tygodnia 
   (SettlementParties.PartiesInSettlement): moneta = karawana (ok. 13), "widly" (General\Icons\Militia, IsDefault) = kazda inna partia (ok. 200!). Czyli ok. 200 partii stoi
   w The Eyrie - nienormalne. Podejrzani: wozy wsi (130) / wozy zamkow (171), wiesniacy, partie rozwiazane, BK. Do zrobienia: dzienna linia diagnostyczna "Osady z najwieksza
   liczba partii: <osada> N (lordowie, karawany, wiesniacy, wozy, inne)" + sprawdzenie, czemu nie wychodza (gora / Krwawa Brama, straznik drog GuardSettlementMove).
+
+## 21. START TUTAJ - AKTUALIZACJA (10.10 ok. 13:50; limit tygodnia 97%; Jeff: "po tescie sprawdzenie, wnioski i przekazanie na drugie konto")
+
+**W grze:** Armoury 87b03e2b (noc/wgranie-21 = w-toku/e2c d341e7b), RealisticCaptivity 5f98df70, CrashScribe 6507c842. Reszta jak w rozdz. 20 (drzewo noc2\e2c, autotest, progi).
+**Bieg 2-letni (okupy 1) - wynik:** wywrotka w dobie 457 = BLAD BANNERKINGS: NullReferenceException w BannerKings.Behaviours.Diplomacy.Groups.Demands.ClaimantDemand.SetTexts
+(:220) <- Demand.Fulfill <- Demand.DoAiChoice <- RadicalGroup.Tick <- KingdomDiplomacy.Update <- BKDiplomacyBehavior.OnDailyTick; BLSE ExceptionInterceptor -> okno ButterLib
+(ImGui) -> gra stoi. Logi: SCRATCH(7016)\kopia-okup1-457\ (Armoury-2026-10-10_10-38-24.log + CSV), CS session-2026-10-10_10-38-22.log (linia 11737 "PIERWOTNY WYJATEK").
+**Wnioski z 457 dob (progi sprawdz_logi):** glowy < 5000: d120 1, d364 4, d458 3 (TAK <= 10); bankruci 2 (K39, doba 414; ETAP <= baza 5); wojsko lordow w wojnie (ost. 28 dob)
+98.9 tys. (TAK 95-115); zalogi -3.2% (TAK); Bank kapital min 2.56 mln (TAK >= 1 mln); reszta ksiegi -5.5 tys./d (TAK); okupy 54.2 mln w 457 dobach (ok. 118 tys./d), dlug okupow
+male (d120 178 tys., d364 11 tys., d457 140 tys.); KW Banku u 10-17 rodow, zajecie 1-2; kredyt koron (186) 1.66 -> 2.15 -> 2.59 mln (d120/364/457, 23-26 krolestw, zaleglosci 0 -
+rosnie ok. 2-3 tys./d, obserwowac); skarbce na koniec srednio 583 tys. (rezerwa 500 tys. dziala). NIE: dezercja AI ost. 28 dob 200/d (baza 49) - mieszanka glodu ("w glodzie"
+do 54/d) i limitu zoldu/przepelnienia gry u partii bez budzetu (do 162/d) - do zbadania; Ibben -33%, Iron Islands -55% (biedni z lore).
+**NASTEPNE KROKI (po kolei):**
+1. **CrashScribe Mends: zabezpieczyc BK ClaimantDemand** (finalizer na ClaimantDemand.SetTexts i/lub Demand.Fulfill: polknac wyjatek, log "wyjatek BK polkniety", jak Harrenhal) -
+   drzewo CS: SCRATCH(7016)\noc2\a175cs (w-toku/175-armie-cs 511c08e = CS w grze); wersja autotestowa: worktree + `git apply -3 SCRATCH(7016)\test\at1-cs.diff` + build;
+   test 40 dob + zapis; WGRANIE CS. Potem powtorzyc bieg 728 dob (Armoury 87b03e2b) -> zamkniecie etapu 2 (raport dla Jeffa).
+2. **The Eyrie ok. 200 partii** (zrzut Jeffa): dzienna linia "osady z najwieksza liczba partii wg rodzaju" + przyczyna (wozy 130/171? wiesniacy? straznik drog BK?).
+3. Dezercja AI pod koniec roku 2 (glod + limit zoldu gry u partii bez budzetu 166) i potkniecie "ERROR in Tent" (KeyNotFound, 13:15:46 w logu 457).
+4. ETAP 3 krok po kroku (rozdz. 20 kolejka). Budowy Strazy przy powrocie do budow.
