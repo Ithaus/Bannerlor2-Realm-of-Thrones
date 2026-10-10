@@ -174,3 +174,44 @@ zapisy, `EnsureHooks`), `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs`.
 - Pierwsze doby po wczytaniu starego zapisu: D = G/60 (brak D w zapisie) - u rodow z duza kiesa pulap moze byc za wysoki, u biednych za niski przez ok. 28 dob.
 - Zwolnienia potrzebuja wsi z danymi BK (`IsSettlementPopulated`); licznik "nie zwolniono - brak wsi z danymi BK".
 - Dwor do kas miast + tarcza: "skasowane przez regulator" ma byc 0; "miasto wydalo" to zloto, ktore kasa wydala na towar (nie strata).
+
+---
+
+## Kawalek 4: 185 kontrakt najemnika AI - ZROBIONE (commit 1aa1580)
+
+**Pliki:** nowy `Armoury/src/MercContract.cs`; `ClanBudget.cs` (najemnik w budzecie: pulap = zold ludzi z umowy, bez dworu), `ClanIncomeBook.cs` +
+`ClanIncomeBook.StableD.cs` (nowy rodzaj wplywu `KContract` - czesc "kontrakt" D stalego, nie "jednorazowe"), `ArmouryBehavior.cs` (krok po ratach
+reparacji, przed zwrotem; zapis `arm_merc185`; EnsureHooks), `SubModuleMain.cs`, `MoneyLedger.Obieg.cs`, `Settings.cs` + `McmSettings.cs`.
+
+**Co dziala (MercContractEnabled i 165 czynne):**
+- Kompania AI w sluzbie (nie gracz): w pierwszej dobie u danej korony umowa K = `MercContractFactor` (1.3) x dzisiejszy zold jej partii, ludzie z umowy =
+  dzisiejsi ludzie partii. Zmiana korony = nowa umowa; rod poza sluzba - umowa wygasa. Stary zapis: umowy od pierwszej doby po wczytaniu.
+- W wojnie korony K, w pokoju `MercPeaceShare` (0.5) x K; pulap budzetu 166 = zold ludzi z umowy (w pokoju polowa), bez dworu i budow.
+- Przeglad co `MercReviewDays` (28) tylko w dol: ludzi < `MercReviewFloor` (0.75) x umowa -> K, zold i ludzie proporcjonalnie do stanu.
+- Zaplata: skarbiec -> glowa rodu najemnego z reszty wplywow dnia (po darach i ratach, przed zwrotem), proporcjonalnie (`KingdomTreasury.Split`);
+  niedoplata > 50% przez `MercUnpaidLeaveDays` (28) dob z rzedu -> `ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary`.
+- `MercGameContractAiOff`: prefiks `DefaultClanFinanceModel.AddMercenaryIncome` (AI w sluzbie - bez wplywu i bez `MercenaryWallet`) i postfiks
+  `CalculateClanIncomeInternal` (AI w sluzbie bez lenn: "za tier" Tier x 120 zdjete tym samym wpisem bez opisu). Gracz-najemnik bez zmian. Latki w kampanii
+  (pulapka konstruktora statycznego modelu finansow).
+
+**Nowe klucze:** `MercContractEnabled` true, `MercContractFactor` 1.3, `MercPeaceShare` 0.5, `MercReviewDays` 28, `MercReviewFloor` 0.75,
+`MercUnpaidLeaveDays` 28, `MercGameContractAiOff` true.
+
+**Nowe / zmienione linie logu:**
+- NOWA (kampania) `Kontrakty najemnikow (185): kontrakt gry dla AI (AddMercenaryIncome) wpiety|BRAK, "za tier" AI (CalculateClanIncomeInternal) wpiety|BRAK; ...`
+- NOWA `Kontrakty najemnikow (185): <rod> w sluzbie <krolestwo> - kontrakt K zl dziennie w wojnie (1.30 x zold W), ludzi z umowy N; w pokoju polowa.`
+- NOWA `Kontrakty najemnikow (185): <rod> odchodzi ze sluzby <krolestwo> - korona nie placila ponad polowy kontraktu przez 28 dob.`
+- NOWA `Kontrakty najemnikow (185): dzien N | kompanii AI w sluzbie N (nowe umowy a, przeglad w dol b, odeszly po niedoplacie c) | kontrakty nalezne X, zaplacone z wplywow dnia Y, niedoplata Z | ludzie najemnikow AI A / z umowy (w pokoju polowa) B | gra dla AI w sluzbie: "za tier" wylaczone T zl, kontrakt gry wylaczony G zl (od wczoraj; AI dostaje 0 z gry) | MercenaryWallet krolestw razem W (zmienia sie tylko o kontrakt gracza).`
+- `Korona: wplywy dnia (165)`: "kontrakty najemnikow (185) X" i na krolestwo "kontr. X".
+- `Obieg: dzien N` (korona): "kontrakty najemnikow AI (185) skarbce -> glowy kompanii X (nalezne Y; gra dla AI: za tier wylaczone T, kontrakt gry wylaczony G)".
+- `D staly (169c)`: kontrakt od korony w czesci "kontrakt" (dotad "kontrakt" = linia modelu gry; dla AI teraz 0, dla gracza bez zmian).
+
+**Odstepstwa:**
+1. "W dniu najmu" = pierwsza doba w sluzbie widziana przez nasz tick (nie zdarzenie najmu gry) - obejmuje tez kompanie juz w sluzbie przy wczytaniu.
+2. Zold kompanii przy najmie = suma `TotalWage` jej partii lordow (bez karawan). Ludzie w pokoju "polowa" realizuje pulap budzetu (zwolnienia 15%/dobe
+   po 3 dobach), nie natychmiast.
+3. "za tier" znoszony wpisem ujemnym bez opisu (ta sama kwota co gra), nie przez wyciecie dodawania (transpiler) - wynik ten sam, mniejsze ryzyko.
+
+**Ryzyka:** (a) JIT moglby wkleic `AddMercenaryIncome` w wolajacego - wtedy "kontrakt gry wylaczony 0" przy kompaniach w sluzbie i niezerowa linia
+"kontrakt" u AI w `D staly (169c)`; (b) kompanie w pokoju traca polowe ludzi (zgodnie z projektem "w oczekiwaniu"); (c) biedna korona nie placi -> po 28 dobach
+kompanie odchodza (projekt: "biedna korona nie utrzyma najemnikow").
