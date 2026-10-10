@@ -5,10 +5,13 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Armoury
@@ -38,8 +41,18 @@ namespace Armoury
     ///     (wodz - GiveGoldAction partia -> bohater; partia z kiesa handlowa - partia -> partia), a gdy nie moze wziac - do kasy jego osady (milicja,
     ///     zaloga, patrol), inaczej do kasy najblizszego miasta (jak 112-p i sakiewki MenPurse). Tabor wsi - jak dotad 112 (VillageTakings).
     ///     Rozwiazane bez bitwy (niszczyciel null) - poza regula, tylko licznik (jak dotad znikaja).
+    ///     Recenzja 3.2 (3): niszczyciel nie zawsze jest zwyciezca - gra niszczy tez partie ZWYCIESKIEJ strony bez ludzi (niszczyciel = przywodca
+    ///     przegranych, MapEventSide.HandleMapEventEndForPartyInternal), a DestroyPartyAction z niszczycielem bywa bez bitwy (banda przylacza sie do
+    ///     gracza, upadek rodu - DestroyClanAction, zadania). Dlatego pkt 3 tylko dla partii POKONANYCH w bitwie: SplitPostfix zapamietuje pokonanych
+    ///     (karawany i bandy, takze z bohaterem na czele, takze zasadzka przy oblezeniu), a nasluch zniszczenia przyjmuje tylko zapamietanego, gdy
+    ///     niszczy go przywodca strony zwyciezcow tej samej bitwy przy jej koncu. Reszta (niszczyciel nie pokonal ich w bitwie) - poza regula jak
+    ///     rozwiazane (znika jak przed 3.2, osobny licznik; przylaczenie band do gracza - do decyzji Jeffa).
     ///  4. KORONA 1/9 (prawo trzecich 178): czesc z kies wzieta przez wodza-wasala krolestwa w wojnie (takze gracza) idzie do podstawy 1/9
     ///     (Ransom178.NoteBeatenGold - z kiesy odbiorcy nastepnego ranka, jak reszta 1/9).
+    ///  5. PODDANIE GRACZOWI BEZ BITWY (recenzja 3.2 (1)): karawana albo tabor wsi oddaje graczowi kiese w rozmowie (poddanie i odjazd, wziecie
+    ///     do niewoli, okup za przepuszczenie) - gra: GiveGoldAction partia -> gracz (CaravansCampaignBehavior / VillagerCampaignBehavior,
+    ///     conversation_*_surrender_leave / took_prisoner / looted_leave). Prefiks/postfiks tych metod mierzy spadek kiesy: osobny licznik w linii
+    ///     3.2 i 1/9 korony od gracza-wasala (jedna regula z bitwa). Kopie tych metod w BK BKCaravansBehavior sa martwe (AddDialogs BK = samo ret).
     /// Platnik -> odbiorca: kiesa rozbitej partii -> zwyciezcy wedlug wkladu / niszczyciel / jego osada / najblizsze miasto; 1/9 -> skarbiec.
     /// Ksiega pieniadza: lup wodza to zdarzenie gry z niczego (ZRODLA "bitwy"), kiesa pokonanego maleje bez zdarzenia (NETTO "bitwy - zloto partii
     /// bez wodza") - razem przelew, ksiega zamyka sie jak dotad; "kiesy partii bez wodza, ktore zniknely z mapy" (karawany, bandy) spadaja do rozwiazanych
@@ -54,7 +67,12 @@ namespace Armoury
         private const int TVill = 0, TBand = 1, TCar = 2, T = 3;
 
         private static bool _modelHooked, _splitHooked, _hooksLogged;
+        private static int _yieldHooked;                                               // pkt 5: ile metod poddania wpietych (z 6)
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+
+        // pkt 3 (recenzja 3.2): pokonani w bitwie (karawany i bandy) -> bitwa, w ktorej przegrali; czyszczone przy zniszczeniu, co dobe i w Reset
+        // (bitwa AI liczy lup i konczy sie w tym samym ticku, bitwa gracza - przy zatrzymanym czasie w menu spotkania)
+        private static readonly Dictionary<MobileParty, MapEvent> _beaten = new Dictionary<MobileParty, MapEvent>();
 
         // ------------------------------------------------------------ liczniki doby
         private static int _raisedN, _battles, _stumbles;
@@ -63,6 +81,12 @@ namespace Armoury
         private static readonly int[] _paidN = new int[T], _goneN = new int[T], _disbN = new int[T];
         private static long _toLords, _toPlayer, _toBands, _toParties;                 // pkt 2: wyplata gry, rozbicie wedlug zwyciezcow
         private static long _dLords, _dPlayer, _dBands, _dParties, _dSettl, _dTown, _dLost;   // pkt 3: reszta przy zniszczeniu
+        private static readonly long[] _dWin = new long[T];                            // pkt 3: reszta przy zniszczeniu do zwyciezcy (wodz, partia, jego osada) wedlug rodzaju
+        private static readonly long[] _odd = new long[T];                             // pkt 3: zniszczone z niszczycielem, ktory ich nie pokonal w bitwie (poza regula)
+        private static readonly int[] _oddN = new int[T];
+        private static readonly long[] _yield = new long[T];                           // pkt 5: kiesy oddane graczowi w rozmowie (tabory, karawany)
+        private static readonly int[] _yieldN = new int[T];
+        private static long _yieldBribe;                                               // pkt 5: z tego okup za przepuszczenie (czesc kiesy)
 
         /// <summary>Ksiega pieniadza (MoneyLedger.Daily biegnie przed naszym Daily - te same granice doby): kiesy pokonanych zdjete w wyplacie gry.</summary>
         internal static long DayTaken { get { return _paid[TVill] + _paid[TBand] + _paid[TCar]; } }
@@ -83,6 +107,9 @@ namespace Armoury
             Array.Clear(_paidN, 0, T); Array.Clear(_goneN, 0, T); Array.Clear(_disbN, 0, T);
             _toLords = _toPlayer = _toBands = _toParties = 0;
             _dLords = _dPlayer = _dBands = _dParties = _dSettl = _dTown = _dLost = 0;
+            Array.Clear(_dWin, 0, T); Array.Clear(_odd, 0, T); Array.Clear(_oddN, 0, T); Array.Clear(_yield, 0, T); Array.Clear(_yieldN, 0, T);
+            _yieldBribe = 0;
+            _beaten.Clear();
         }
 
         /// <summary>Wyjatek przy jednym zdarzeniu: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -136,6 +163,14 @@ namespace Armoury
             try
             {
                 if (!On || !Live || __instance == null || __0 == null || __1 == null) return;
+                // pkt 3 (recenzja 3.2): pokonani tej bitwy - karawany i bandy, takze z bohaterem na czele (gra bierze im tylko 5% zlota wodza) i takze
+                // w zasadzce przy oblezeniu; tylko ich reszte przy zniszczeniu bierze zwyciezca (nie partie zwycieskiej strony bez ludzi)
+                foreach (var d in __1)
+                {
+                    var dmp = d != null && d.Party != null ? d.Party.MobileParty : null;
+                    int dt = TypeOf(dmp);
+                    if (dt == TBand || dt == TCar) _beaten[dmp] = __instance;
+                }
                 if (__instance.IsSiegeAmbush) return;          // gra nie liczy tu lupu - kiesa zostaje, przy zniszczeniu bierze ja niszczyciel (pkt 3)
                 long total = 0, purse = 0;
                 foreach (var d in __1)
@@ -232,13 +267,24 @@ namespace Armoury
         {
             try
             {
-                if (party == null || !On || !Live) return;
+                if (party == null) return;
+                MapEvent ev = null;
+                bool known = _beaten.TryGetValue(party, out ev);
+                if (known) _beaten.Remove(party);
+                if (!On || !Live) return;
                 if (party.IsVillager || (party.IsLordParty && party.LeaderHero != null)) return;   // tabor wsi - 112; kiesa wodza zostaje z wodzem
                 int t = TypeOf(party);
                 if (t < 0) return;
                 int g = party.PartyTradeGold;
                 if (g <= 0) return;
                 if (destroyer == null) { _disb[t] += g; _disbN[t]++; return; }   // rozwiazana bez bitwy - poza regula (jak dotad znika; licznik)
+                // recenzja 3.2 (3): zwyciezca tylko dla partii pokonanej w bitwie - zapamietanej w SplitPostfix i niszczonej przy koncu tej bitwy
+                // (IsFinalized) przez przywodce strony zwyciezcow (gra: niszczyciel pokonanego = GetLeaderParty(strona przeciwna)). Inaczej
+                // (partia zwycieskiej strony bez ludzi - niszczyciel = przywodca przegranych; banda przylacza sie do gracza; upadek rodu; zadania)
+                // - poza regula jak rozwiazana: znika jak przed 3.2, bez 1/9, osobny licznik
+                bool beaten = known && ev != null && ev.IsFinalized && ev.WinningSide != BattleSideEnum.None
+                              && ReferenceEquals(destroyer, ev.GetLeaderParty(ev.WinningSide));
+                if (!beaten) { _odd[t] += g; _oddN[t]++; return; }
                 _gone[t] += g; _goneN[t]++;
                 var win = destroyer.MobileParty;
                 if (win != null && !ReferenceEquals(win, party) && win.IsActive && !Undead.Party(win))
@@ -249,6 +295,7 @@ namespace Armoury
                         GiveGoldAction.ApplyForPartyToCharacter(party.Party, hero, g, true);
                         int moved = g - party.PartyTradeGold;
                         _dLords += moved; if (hero == Hero.MainHero) _dPlayer += moved;
+                        _dWin[t] += moved;
                         Ransom178.NoteBeatenGold(hero, moved);   // 4: korona 1/9 od wodza-wasala
                     }
                     else if (hero == null && win.IsPartyTradeActive)
@@ -256,6 +303,7 @@ namespace Armoury
                         GiveGoldAction.ApplyForPartyToParty(party.Party, win.Party, g, true);
                         int moved = g - party.PartyTradeGold;
                         if (OutlawLaw.IsOutlawParty(win)) _dBands += moved; else _dParties += moved;
+                        _dWin[t] += moved;
                     }
                     g = party.PartyTradeGold;
                     if (g <= 0) return;
@@ -266,7 +314,7 @@ namespace Armoury
                 if (st == null || st.SettlementComponent == null) { _dLost += g; return; }
                 GiveGoldAction.ApplyForPartyToSettlement(party.Party, st, g, true);   // zdarzenie gry: ksiega widzi przelew partia -> osada
                 int m = g - party.PartyTradeGold;
-                if (own != null) _dSettl += m; else _dTown += m;
+                if (own != null) { _dSettl += m; _dWin[t] += m; } else _dTown += m;
                 _dLost += party.PartyTradeGold;
             }
             catch (Exception e) { Stumble("BeatenPurse.OnPartyDestroyed", e); }
@@ -284,6 +332,47 @@ namespace Armoury
                 if (mp != null && (mp.IsMilitia || mp.IsGarrison || mp.IsPatrolParty)) st = mp.CurrentSettlement ?? mp.HomeSettlement;
             }
             return st != null && (st.IsTown || st.IsCastle || st.IsVillage) ? st : null;
+        }
+
+        // ------------------------------------------------------------ 5. poddanie graczowi bez bitwy (karawana, tabor wsi)
+        /// <summary>Stan miedzy prefiksem a postfiksem metody poddania: partia, jej kiesa przed oddaniem, czy to okup za przepuszczenie.</summary>
+        internal sealed class YieldState { internal MobileParty P; internal int Gold; internal bool Bribe; }
+
+        /// <summary>
+        /// Prefiks metod rozmowy, w ktorych gra oddaje graczowi kiese karawany albo taboru wsi (GiveGoldAction partia -> Hero.MainHero): poddanie
+        /// i odjazd, wziecie do niewoli (partia znika - DestroyPartyAction po oddaniu kiesy, wiec nasluch zniszczenia widzi kiese 0), okup za
+        /// przepuszczenie. Gra bierze partie z MobileParty.ConversationParty, a przy niewoli z PlayerEncounter (takze po rozmowie - ConversationEndOneShot).
+        /// </summary>
+        public static void YieldPrefix(MethodBase __originalMethod, out YieldState __state)
+        {
+            __state = null;
+            try
+            {
+                if (!On || !Live) return;
+                string n = __originalMethod != null ? __originalMethod.Name : "";
+                MobileParty mp = null;
+                if (n.IndexOf("took_prisoner", StringComparison.Ordinal) >= 0 && PlayerEncounter.Current != null) mp = PlayerEncounter.EncounteredMobileParty;
+                if (mp == null) mp = MobileParty.ConversationParty;
+                if (mp == null || !(mp.IsCaravan || mp.IsVillager)) return;
+                __state = new YieldState { P = mp, Gold = mp.PartyTradeGold, Bribe = n.IndexOf("looted", StringComparison.Ordinal) >= 0 };
+            }
+            catch (Exception e) { Stumble("BeatenPurse.YieldPrefix", e); }
+        }
+
+        /// <summary>Postfiks: spadek kiesy = zloto oddane graczowi (jedyna zmiana kiesy w tych metodach) - licznik "poddane graczowi" i 1/9 korony.</summary>
+        public static void YieldPostfix(YieldState __state)
+        {
+            try
+            {
+                if (__state == null || __state.P == null) return;
+                long moved = (long)Math.Max(0, __state.Gold) - Math.Max(0, __state.P.PartyTradeGold);
+                if (moved <= 0) return;
+                int t = __state.P.IsVillager ? TVill : TCar;
+                _yield[t] += moved; _yieldN[t]++;
+                if (__state.Bribe) _yieldBribe += moved;
+                Ransom178.NoteBeatenGold(Hero.MainHero, moved);   // 4: korona 1/9 od gracza-wasala - jak z kiesy rozbitej w bitwie
+            }
+            catch (Exception e) { Stumble("BeatenPurse.YieldPostfix", e); }
         }
 
         // ------------------------------------------------------------ latki
@@ -313,6 +402,30 @@ namespace Armoury
                 else miss.Add("podzial lupu zlota (brak MapEvent.CalculatePlunderedAndLostGoldAmounts(winners, defeated))");
             }
             catch (Exception e) { miss.Add("podzial lupu zlota (" + e.Message + ")"); Log.Error("BeatenPurse.ApplyAll(podzial)", e); }
+            // pkt 5 (recenzja 3.2): poddanie graczowi bez bitwy - metody rozmowy gry (klasy bez konstruktora statycznego - latka przy ladowaniu bezpieczna)
+            var yieldM = new[]
+            {
+                new KeyValuePair<Type, string>(typeof(CaravansCampaignBehavior), "conversation_caravan_surrender_leave_on_consequence"),
+                new KeyValuePair<Type, string>(typeof(CaravansCampaignBehavior), "conversation_caravan_took_prisoner_on_consequence"),
+                new KeyValuePair<Type, string>(typeof(CaravansCampaignBehavior), "conversation_caravan_looted_leave_on_consequence"),
+                new KeyValuePair<Type, string>(typeof(VillagerCampaignBehavior), "conversation_village_farmer_surrender_leave_on_consequence"),
+                new KeyValuePair<Type, string>(typeof(VillagerCampaignBehavior), "conversation_village_farmer_took_prisoner_on_consequence"),
+                new KeyValuePair<Type, string>(typeof(VillagerCampaignBehavior), "conversation_village_farmer_looted_leave_on_consequence"),
+            };
+            var yMiss = new List<string>();
+            foreach (var kv in yieldM)
+            {
+                try
+                {
+                    var ym = AccessTools.Method(kv.Key, kv.Value, Type.EmptyTypes);
+                    if (ym == null) { yMiss.Add(kv.Value); continue; }
+                    h.Patch(ym, prefix: new HarmonyMethod(typeof(BeatenPurse), nameof(YieldPrefix)), postfix: new HarmonyMethod(typeof(BeatenPurse), nameof(YieldPostfix)) { priority = Priority.Last });
+                    _yieldHooked++;
+                }
+                catch (Exception e) { yMiss.Add(kv.Value + " (" + e.Message + ")"); Log.Error("BeatenPurse.ApplyAll(poddanie)", e); }
+            }
+            done.Add("poddanie graczowi bez bitwy " + _yieldHooked + "/" + yieldM.Length);
+            if (yMiss.Count > 0) miss.Add("poddanie graczowi: " + string.Join(", ", yMiss.ToArray()));
             var s = Settings.Current;
             Log.Info("BeatenPurse (3.2): cala kiesa rozbitej partii bez wodza dla zwyciezcy - latki wpiete: " + (done.Count > 0 ? string.Join(", ", done.ToArray()) : "zadne")
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "") + "; reszta przy zniszczeniu karawany i bandy - z nasluchu zdarzen. Wylacznik Beaten Purse To Victor "
@@ -340,7 +453,8 @@ namespace Armoury
                 foreach (var n in names) if (n == typeof(DefaultBattleRewardModel).FullName) def = true;
                 return "Kiesy rozbitych (3.2) - model lupu: " + (names.Count > 0 ? string.Join(" -> ", names.ToArray()) : "brak")
                        + (def ? " (dochodzi do DefaultBattleRewardModel - latka modelu dziala)" : " (NIE dochodzi do DefaultBattleRewardModel - lup z kies jak w grze)")
-                       + "; latki: model " + (_modelHooked ? "tak" : "NIE") + ", podzial " + (_splitHooked ? "tak" : "NIE") + ".";
+                       + "; latki: model " + (_modelHooked ? "tak" : "NIE") + ", podzial " + (_splitHooked ? "tak" : "NIE")
+                       + ", poddanie graczowi bez bitwy " + _yieldHooked + "/6.";
             }
             catch (Exception e) { return "Kiesy rozbitych (3.2) - model lupu: blad odczytu (" + e.Message + ")."; }
         }
@@ -354,23 +468,34 @@ namespace Armoury
                 if (!_hooksLogged) { _hooksLogged = true; Log.Info(HooksLine()); }
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 long paid = DayTaken, kept = _kept[TVill] + _kept[TBand] + _kept[TCar];
+                // recenzja 3.2 (2): zloto do zwyciezcow = wyplata gry w bitwie + reszta przy zniszczeniu (pkt 3) + sakwy taborow z 112 (VillageTakings - jego
+                // Daily biegnie PO nas, liczniki doby sa jeszcze cale); "do band" ze wszystkich trzech drog (miara wzrostu band dla autotestu)
+                long cartLords = VillageTakings.CartToLords, cartBands = VillageTakings.CartToBands;
+                long toBandsAll = _toBands + _dBands + cartBands;
                 var sb = new StringBuilder(1024);
                 sb.Append("Kiesy rozbitych (3.2): dzien ").Append(day);
                 if (!On) sb.Append(" | WYLACZONE (Beaten Purse To Victor) - lup z kies jak w grze (10% taboru i karawany, 50% bandy), reszta znika z partia");
-                sb.Append(" | zloto rozbitych do zwyciezcow: tabory ").Append(_paid[TVill]).Append(", bandy ").Append(_paid[TBand]).Append(", karawany ").Append(_paid[TCar])
-                  .Append("; z tego do band ").Append(_toBands)
-                  .Append(" (razem ").Append(paid).Append(" z ").Append(_paidN[TVill]).Append("/").Append(_paidN[TBand]).Append("/").Append(_paidN[TCar]).Append(" partii w ").Append(_battles)
+                sb.Append(" | zloto rozbitych do zwyciezcow: tabory ").Append(_paid[TVill] + cartLords + cartBands).Append(", bandy ").Append(_paid[TBand] + _dWin[TBand])
+                  .Append(", karawany ").Append(_paid[TCar] + _dWin[TCar]).Append("; z tego do band ").Append(toBandsAll)
+                  .Append(" (wyplata gry w bitwie: tabory ").Append(_paid[TVill]).Append(", bandy ").Append(_paid[TBand]).Append(", karawany ").Append(_paid[TCar])
+                  .Append(", do band ").Append(_toBands).Append("; reszta przy zniszczeniu: bandy ").Append(_dWin[TBand]).Append(", karawany ").Append(_dWin[TCar])
+                  .Append(", do band ").Append(_dBands).Append("; sakwy taborow (112): wodzom ").Append(cartLords).Append(", bandom ").Append(cartBands).Append(")")
+                  .Append(" | wyplata gry w bitwie: razem ").Append(paid).Append(" z ").Append(_paidN[TVill]).Append("/").Append(_paidN[TBand]).Append("/").Append(_paidN[TCar]).Append(" partii w ").Append(_battles)
                   .Append(" bitwach; do wodzow ").Append(_toLords).Append(_toPlayer > 0 ? " (w tym gracz " + _toPlayer + ")" : "").Append(", do kies band ").Append(_toBands)
                   .Append(", do kies innych partii bez wodza ").Append(_toParties).Append("; model gry podniosl lup ").Append(_raisedN).Append(" razy o ").Append(_raisedGold)
-                  .Append(", zaokraglenia gry dopisane zwyciezcom ").Append(_remAdded).Append(")")
+                  .Append(", zaokraglenia gry dopisane zwyciezcom ").Append(_remAdded)
                   .Append(" | w bitwie bez zwyciezcy, ktory moze wziac (milicja, patrol, Inni), zostalo w kiesach pokonanych ").Append(kept)
                   .Append(" (tabory ").Append(_kept[TVill]).Append(", bandy ").Append(_kept[TBand]).Append(", karawany ").Append(_kept[TCar]).Append("; Innym nie wyplacono ").Append(_undeadCut).Append(")")
                   .Append(" | reszta przy zniszczeniu rozbitych (karawany i bandy; tabory - 112): bandy ").Append(_gone[TBand]).Append(" (").Append(_goneN[TBand])
                   .Append("), karawany ").Append(_gone[TCar]).Append(" (").Append(_goneN[TCar]).Append(") -> wodzom ").Append(_dLords).Append(_dPlayer > 0 ? " (w tym gracz " + _dPlayer + ")" : "")
                   .Append(", bandom ").Append(_dBands).Append(", innym partiom ").Append(_dParties).Append(", kasie osady zwyciezcy ").Append(_dSettl)
                   .Append(", najblizszemu miastu ").Append(_dTown).Append(", zniklo ").Append(_dLost)
+                  .Append(" | poddane graczowi bez bitwy (kiesa oddana w rozmowie, korona 1/9 jak z bitwy): tabory ").Append(_yield[TVill]).Append(" (").Append(_yieldN[TVill])
+                  .Append("), karawany ").Append(_yield[TCar]).Append(" (").Append(_yieldN[TCar]).Append("); w tym okup za przepuszczenie ").Append(_yieldBribe)
                   .Append(" | rozwiazane bez bitwy (poza regula - jak dotad w \"kiesy partii bez wodza, ktore zniknely\"): bandy ").Append(_disb[TBand]).Append(" (").Append(_disbN[TBand])
                   .Append("), karawany ").Append(_disb[TCar]).Append(" (").Append(_disbN[TCar]).Append(")")
+                  .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula jak rozwiazane, znika): bandy ")
+                  .Append(_odd[TBand]).Append(" (").Append(_oddN[TBand]).Append("), karawany ").Append(_odd[TCar]).Append(" (").Append(_oddN[TCar]).Append(")")
                   .Append(" | ksiega: kiesy pokonanych zdjete bez zdarzenia ").Append(paid).Append(" (NETTO \"bitwy - zloto partii bez wodza\"), z tego wodzom zdarzeniem gry z niczego ")
                   .Append(_toLords).Append(" (ZRODLA \"bitwy\") i kiesom partii bez wodza ").Append(_toBands + _toParties).Append(" (NETTO) - przelew, nie zrodlo");
                 if (_stumbles > 0) sb.Append(" | wyjatki zlapane ").Append(_stumbles).Append(" (pierwszy z kazdego miejsca w logu jako ERROR)");
