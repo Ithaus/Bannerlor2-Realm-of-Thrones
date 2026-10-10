@@ -362,3 +362,10 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   odstepstwa: docs/C1-POSTEP.md W DRZEWIE e2c). Klucze M13: zadnego nowego klucza nie ma w Armoury.json Jeffa - dzialaja domyslne. DLL probny test\Armoury-e2c-c1.dll
   (ff325b37). W toku rownolegle: (a) autotest 40 dob nowej kampanii -> test\at-c1-40.out.txt; (b) recenzja C1 workflow wf_a018ac0c-77c (3 soczewki: zloto, gra,
   wojsko -> sceptyk -> poprawki z commitem na e2c). Potem: test 120 dob na DLL po poprawkach z --baza e2b-p\baza-B4.json, wgranie 16.
+- (23:40) **TEST C1 40 dob (DLL ff325b37, przed recenzja; kopia SCRATCH(7016) kopia-c1-40\):** 40/40, 14.5 s/dobe, 0 bledow Armoury. Dobre: glowy < 5000 = 0
+  (z budzetem), bankruci 0, zwrot korony wyplacony 97.1%, dary 182 co do zaokraglen (59 zl zostaje w skarbcach odbiorcow), zwolnieni do wsi 91 / zniklo 0,
+  dwor - skasowane przez regulator 0, Straz 3461 ludzi (pulap 4955; ok. -9% wobec 3.8 tys.), najemnicy 605 / umowa 548, "za tier" AI wylaczone.
+  **ZLE (NIE 3 z 58 progow): WOJSKO.** swiat 58.5 tys. wobec bazy 85.2 tys. (-31%, doby 14-41), druzyny lordow w wojnie 51.4 tys. (baza 69.7; doba 40: 76.1 tys.),
+  zalogi 39.4 tys. wobec 81.8 tys. (-52%), krolestwa -29..-46%. A zold naliczony to tylko 49% pulapu 166 (1.14 mln) - czyli NIE brak pieniedzy, tylko mechanika
+  (podejrzenia: limit zoldu partii/zalog ustawiany przez postfiks 166 - np. zalogi "pierwsze" zjadaja pulap partii albo SetGarrisonWagePaymentLimit w wojnie
+  nie = wartosc gry; brak zwrotu za zalogi (165) obniza limit zalog liczony przez gre z kiesy; hamulec nowych partii). Do diagnozy po recenzji (wf_a018ac0c-77c).
