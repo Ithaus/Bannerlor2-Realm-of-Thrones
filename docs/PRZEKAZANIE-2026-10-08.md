@@ -520,3 +520,6 @@ za zgoda Jeffa).
    kasuje +25-38 tys./d tego, co zatrzymal B (zamyka 111' w etapie 5); renty 180 - ok. 20% rodow bez warunku sluzby (OK).
 **Zasady pracy (pamiec):** jedna rzecz naraz; pomocnik (Agent) na kod, ja test + wgranie; tor S/M/L; po polsku prostym jezykiem; Jeff gra dopiero po projekcie (NOWA kampania);
 nie dotykac zapisow Jeffa i Armoury.json; zadnego spawn_task; przy 99% tygodnia - pelne przekazanie.
+- (10:45) Jeff: okupy wariant 1 (d341e7b) i "po tescie sprawdzenie, wnioski i przekazanie na drugie konto". Pierwszy bieg 2-letni przerwany na prosbe Jeffa (doba 26).
+  **BIEG 2-LETNI (728 dob) w toku** na test\Armoury-e2c-okup1.dll (87b03e2b) -> test\at-okup1-728.out.txt (ok. 3.5 h). Po nim: kopia logow (SCRATCH kopia-okup1-728),
+  sprawdz_logi --grupa etap2 --koniec-etapu, wnioski dla Jeffa, test zapisu 9 dob i WGRANIE 21 (jesli OK), rozdz. 20 START TUTAJ - aktualizacja.

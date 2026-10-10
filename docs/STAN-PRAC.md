@@ -1042,3 +1042,5 @@ ZATWIERDZONE: Armoury aeb2ba51, RealisticCaptivity 5f98df70, CrashScribe 6507c84
 glowy < 5000 = 2, bankruci 0, wojsko lordow w wojnie 95.8 tys., zalogi -2.2%, reszta ksiegi -3.9 tys./d; dlug okupow d120 4.3 mln u 16 rodow (bylo 32 mln u 54);
 korony pozyczaja 15-23 tys./d u 5-10 krolestw; zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc20 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc20-przed.
 ZATWIERDZONE: Armoury d7222bfb, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.
+- **Okupy - wariant 1 (Jeff 10.10 "1 i rob test"; zastepuje B):** glowa rodu ok. 30 dni D (RansomHeadYears 0.0824), zwykly lord 10 D, krol 20 dni wplywow korony
+  (nowy klucz RansomKingDays 20). Commit d341e7b na w-toku/e2c, DLL test\Armoury-e2c-okup1.dll (87b03e2b). Szacunek: okupy ok. 9.6 mln / 120 dob (B: 19.2, A: 65.5).
