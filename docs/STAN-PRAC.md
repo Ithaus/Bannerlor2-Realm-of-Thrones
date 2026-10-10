@@ -1011,3 +1011,6 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
   Dragonstone 1) tylko wtedy, gdy oszczednosci rodow Strazy spadna ponizej zapasu na 60 dob jej wydatkow (zold + dwor + zakupy, srednia 28 dob); powyzej - dar 0.
   Test c3c: budowy Strazy (Castle Black, Shadow Tower, Eastwatch) stoja 119 dob - moc budowy 0 (brak ludzi przy Murze). Pytanie otwarte: Straz placi za budowy
   swoim zlotem (robotnicy z najblizszych wsi/miast, zloto do ich kies) - czeka na slowo Jeffa.
+- **Straz placi za budowy - TAK, ale "do budowy jeszcze wrocimy"** (Jeff 10.10): przy powrocie do budow (138 dniowki robotnikow, 152 BuildFunding) - Straz najmuje
+  robotnikow z najblizszych wsi/miast (Mole's Town, wsie Darow), dniowki do ich kies wedlug 138; dzis budowy Muru stoja (moc 0 - brak ludzi przy Murze).
+  Pozniej osobno: odbudowa i obsadzanie opuszczonych zamkow Muru za zloto Strazy (lore: Jon w "Tancu ze smokami"), jesli mapa ROT je ma.
