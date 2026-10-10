@@ -129,6 +129,7 @@ namespace Armoury
             if (morale < DesertionAi.MinMorale) DesertionAi.MinMorale = morale;
             bool hungry = false; try { hungry = mp.Party != null && mp.Party.IsStarving; } catch { }
             if (hungry) DesertionAi.Hungry += byMorale;
+            if (kind == 0) DesertionAi.NoteMoraleLines(mp, byMorale);   // 183d: skladniki morale (diagnoza dezercji AI)
         }
 
         public override float GetDesertionChanceForTroop(MobileParty mobileParty, in TroopRosterElement troopRosterElement)
@@ -200,10 +201,32 @@ namespace Armoury
         // [rodzaj]: 0 partie lordow, 1 zalogi, 2 karawany i inne
         internal static readonly int[] Parties = new int[3], Morale = new int[3], Wage = new int[3];
         internal static int T12, T34, T5, Hungry; internal static float MinMorale = float.MaxValue;
+        // 183d: suma skladnikow morale (opis modelu morale gry) w partiach lordow AI z dezercja z morale; waga = 1 partia
+        internal static readonly Dictionary<string, float> MoraleLines = new Dictionary<string, float>();
+        internal static readonly Dictionary<string, int> MoraleLinesN = new Dictionary<string, int>();
+        internal static int MoraleParties, MoraleMen;
+        internal static void NoteMoraleLines(MobileParty mp, int men)
+        {
+            try
+            {
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.PartyMoraleModel : null;
+                if (model == null) return;
+                var en = model.GetEffectivePartyMorale(mp, true);
+                MoraleParties++; MoraleMen += men;
+                foreach (var ln in en.GetLines())
+                {
+                    string k = ln.name ?? "?";
+                    float v; MoraleLines.TryGetValue(k, out v); MoraleLines[k] = v + ln.number;
+                    int c; MoraleLinesN.TryGetValue(k, out c); MoraleLinesN[k] = c + 1;
+                }
+            }
+            catch { }
+        }
         internal static void Clear()
         {
             Array.Clear(Parties, 0, 3); Array.Clear(Morale, 0, 3); Array.Clear(Wage, 0, 3);
             T12 = T34 = T5 = Hungry = 0; MinMorale = float.MaxValue;
+            MoraleLines.Clear(); MoraleLinesN.Clear(); MoraleParties = MoraleMen = 0;
         }
     }
 

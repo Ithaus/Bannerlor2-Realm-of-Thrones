@@ -196,7 +196,58 @@ namespace Armoury
                      + ", podloga " + Math.Max(0, s.WarLedgerMinMen) + " ludzi zatrzymala: AI " + _floorAiMen + " w " + _floorAiN + " partiach, gracz i jego rod "
                      + _floorClanMen + " w " + _floorClanN + (s.WarLedgerMinMenPlayer ? "" : " (podloga gracza wylaczona)")
                      + " | prog 183: dezercja AI z morale i zaleglego zoldu (linia 169c 'AI morale i zalegly zold') <= bieg bazowy + 50%.");
+            try { Line183d(inv); } catch (Exception e) { Log.Error("WarLedger.Line183d", e); }
             DesertionAi.Clear();
+        }
+
+        /// <summary>183d (diagnoza): skladniki morale partii lordow AI z dezercja z morale (od wczoraj) i przeglad morale
+        /// wszystkich partii lordow AI teraz - zeby wiedziec, CO zbija morale (glod, przegrane, zold, inne mody).</summary>
+        private static void Line183d(System.Globalization.CultureInfo inv)
+        {
+            var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.PartyMoraleModel : null;
+            var parts = new List<KeyValuePair<string, float>>(DesertionAi.MoraleLines);
+            parts.Sort((a, b) => a.Value.CompareTo(b.Value));
+            var sb = new System.Text.StringBuilder();
+            int np = Math.Max(1, DesertionAi.MoraleParties);
+            foreach (var kv in parts)
+            {
+                int c; DesertionAi.MoraleLinesN.TryGetValue(kv.Key, out c);
+                if (sb.Length > 0) sb.Append("; ");
+                sb.Append(kv.Key).Append(' ').Append((kv.Value / np).ToString("+0.0;-0.0", inv)).Append(" (u ").Append(c).Append(')');
+            }
+            // przeglad wszystkich partii lordow AI
+            int n = 0, lt25 = 0, lt10 = 0, starving = 0, starvingLow = 0, noFood = 0, inArmy = 0, lowInArmy = 0;
+            float sumM = 0f, sumRecent = 0f, sumRecentLow = 0f; int nLow = 0;
+            foreach (var mp in MobileParty.AllLordParties)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || mp.IsMainParty || mp.ActualClan == Clan.PlayerClan || Undead.Party(mp)) continue;
+                    if (mp.MemberRoster == null || mp.MemberRoster.TotalManCount <= 1) continue;
+                    n++;
+                    float mor = mp.Morale; sumM += mor; sumRecent += mp.RecentEventsMorale;
+                    bool st = mp.Party != null && mp.Party.IsStarving;
+                    if (st) starving++;
+                    if (mp.Food <= 0f) noFood++;
+                    if (mp.Army != null) inArmy++;
+                    if (mor < 25f)
+                    {
+                        lt25++; nLow++; sumRecentLow += mp.RecentEventsMorale;
+                        if (st) starvingLow++;
+                        if (mp.Army != null) lowInArmy++;
+                    }
+                    if (mor < 10f) lt10++;
+                }
+                catch { }
+            }
+            Log.Info("Morale AI (183d): dzien " + (int)CampaignTime.Now.ToDays
+                     + " | model morale gry: " + (model != null ? model.GetType().FullName : "-")
+                     + " | partie lordow z dezercja z morale (od wczoraj) " + DesertionAi.MoraleParties + " (ludzi " + DesertionAi.MoraleMen + "), skladniki srednio na partie: "
+                     + (sb.Length > 0 ? sb.ToString() : "-")
+                     + " | wszystkie partie lordow AI teraz " + n + ": morale srednio " + (n > 0 ? (sumM / n).ToString("0.0", inv) : "-")
+                     + ", ponizej 25: " + lt25 + ", ponizej 10: " + lt10 + ", w glodzie " + starving + " (z nich ponizej 25: " + starvingLow + "), bez jedzenia " + noFood
+                     + ", w armii " + inArmy + " (ponizej 25: " + lowInArmy + "), 'recent events' srednio " + (n > 0 ? (sumRecent / n).ToString("0.0", inv) : "-")
+                     + " (ponizej 25: " + (nLow > 0 ? (sumRecentLow / nLow).ToString("0.0", inv) : "-") + ").");
         }
 
         /// <summary>Najemnik zna swoja cene: dezerteruja od najwyzszego tieru.</summary>
