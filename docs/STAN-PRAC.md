@@ -1027,3 +1027,10 @@ gotowka do 50% (G-5000), reszta dlug do 364 D, wielki jeniec - korona zdobywcy, 
 **Do decyzji Jeffa: wielkosc okupow 178** (65.5 mln w 120 dobach, dlug okupow 32 mln u 54 rodow, rosnie ok. 270 tys./d) - propozycja B: glowa 60 D, lord 20 D.
 Kopie: *.bak-2026-10-10-przed-noc18 (Armoury i RealisticCaptivity) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc18-przed.
 ZATWIERDZONE: Armoury aebd0e94, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza Armoury/RC: w-toku/e2c.
+
+**WGRANIE 19 (10.10 ok. 08:40 zegara komp.):** Armoury aeb2ba51 (galaz noc/wgranie-19 = w-toku/e2c 432e8e9 = WGRANIE 18 + T10-R odpoczynek AI (max 2 noce forsownego
+marszu, potem oboz do dlugu 0; wyjatek tylko ucieczka przed 2x silniejszym; wodz armii wedlug najgorszego dlugu armii; naprawa ksiegi snu - gubione ticki) + RaceLaw
+(sluby i ciaze tylko w tej samej rasie; ciaza roznych ras bez porodu)). RealisticCaptivity 5f98df70 i CrashScribe 6507c842 bez zmian. Testy: 120 dob - 0 bledow Armoury,
+brak porodu roznych ras, dlug snu 3 > 2 doby tylko przy ucieczce, wojsko lordow w wojnie 100.0 tys., zalogi +0.6%, dezercja AI 7/d (baza 49), glowy < 5000 = 4,
+bankruci 0; zapis 9 dob OK. Kopie: Armoury.dll.bak-2026-10-10-przed-noc19 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc19-przed.
+ZATWIERDZONE: Armoury aeb2ba51, RealisticCaptivity 5f98df70, CrashScribe 6507c842. Baza: w-toku/e2c.
