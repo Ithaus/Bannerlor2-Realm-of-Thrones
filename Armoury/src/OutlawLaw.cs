@@ -185,15 +185,34 @@ namespace Armoury
             return _pool.TryGetValue(region.StringId, out d) ? d.Values.Sum() : 0f;
         }
 
-        private static float Avail(Settlement region)
+        // W4b (recenzja): ludzie, ktorych Draw/DrawOnly moga dac - bez kluczy starych wightow (SkipUndeadKey). Tylko dla bramek narodzin band,
+        // wyboru regionu i werbunku band; Count/Total/PoolIn zostaja pelne dla pomiaru (WarLedger, PeopleLedger, linia Wyrzutki).
+        private static float LivingIn(Dictionary<string, float> d)
+        {
+            if (d == null) return 0f;
+            var s = Settings.Current;
+            if (s == null || !s.OutlawNoUndead) return d.Values.Sum();      // wylaczone: jak dotad (Draw bierze tez wighty)
+            float n = 0f;
+            foreach (var kv in d) if (!SkipUndeadKey(kv.Key)) n += kv.Value;
+            return n;
+        }
+
+        private static float CountLiving(Settlement region)
+        {
+            Dictionary<string, float> d;
+            return region != null && _pool.TryGetValue(region.StringId, out d) ? LivingIn(d) : 0f;
+        }
+
+        private static float Avail(Settlement region)      // bramki i wybor regionu: ci, ktorych Draw da (W4b - bez wightow)
         {
             if (region == null) return 0f;
             float n = 0f;
-            foreach (var r in Near(region)) n += Count(r);
+            foreach (var r in Near(region)) n += CountLiving(r);
             return n;
         }
 
         private static float Total() { return _pool.Values.Sum(d => d.Values.Sum()); }
+        private static float TotalLiving() { return _pool.Values.Sum(d => LivingIn(d)); }     // W4b: GateGlobal
 
         // odczyt dla ksiegi "Ludzie:" (PeopleLedger, tylko log) - ta sama geografia regionow i ta sama pula, niczego nie zmienia
         internal static List<Settlement> RegionNodes() { return Nodes(); }
@@ -776,7 +795,7 @@ namespace Armoury
                             if (want > 0)
                             {
                                 var region = NearestNode(p.Position.ToVec2());
-                                if (Count(region) >= 1f)
+                                if (CountLiving(region) >= 1f)      // W4b: DrawOnly nie bierze starych wightow
                                 {
                                     var got = DrawOnly(region, want, p.ActualClan);
                                     if (got.TotalManCount > 0) { p.MemberRoster.Add(got); _bandRecruit += got.TotalManCount; }
@@ -965,7 +984,7 @@ namespace Armoury
             {
                 if (!On) return true;
                 Seed();
-                if (Total() >= MinBand * 3) return true;
+                if (TotalLiving() >= MinBand * 3) return true;      // W4b: bez starych wightow, ktorych Draw nie da
                 _refused++;
                 return false;
             }

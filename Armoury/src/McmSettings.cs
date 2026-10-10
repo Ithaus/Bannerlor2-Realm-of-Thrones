@@ -500,7 +500,7 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int BkSupplyMaxPieces { get; set; } = 12;
 
-        [SettingPropertyBool("Bk Supply Morale By Days", HintText = "the Banner Kings morale penalty for missing alcohol, animal products, wood and textiles counts DAYS of shortage, for every party alike (yours too): the shortfall over the party's true daily need from its men, never more than Banner Kings' own maximum (20 alcohol, 30 wood, 20 animal products at supplies factor 0.5) - no longer the whole shortfall at once inside a town or castle, in a small party or in a party shrunk since; a party's stored shortfall is also kept within Banner Kings' own bounds for its present men every day. Purchases and consumption of supplies are not changed (off = Banner Kings as before)")]
+        [SettingPropertyBool("Bk Supply Morale By Days", HintText = "the Banner Kings morale penalty for missing alcohol, animal products, wood and textiles counts DAYS of shortage, for every party alike (yours too): the shortfall over the party's true daily need from its men, never more than Banner Kings' own maximum (20 alcohol, 30 wood, 20 animal products at supplies factor 0.5) - no longer the whole shortfall at once inside a town or castle, in a small party or in a party shrunk since; a party's stored shortfall is also kept within Banner Kings' own bounds for its present men every day. Banner Kings purchases and consumption follow the trimmed shortfall of a shrunk party (less, never more); for every other party they are not changed (off = Banner Kings as before)")]
         [SettingPropertyGroup("The lean quartermasters")]
         public bool BkSupplyMoraleByDays { get; set; } = true;
 

@@ -209,8 +209,10 @@ namespace Armoury
         // liczy od potrzeby przycietej do klamry. Kara = min(Need, k x ludzi) / max(dzienna, 1): dni braku, najwyzej k / (stawka x factor) =
         // 20 / 20 / 60 / 30 przy factor 0.5 (tekstylia przy odziezy wojska 150 i tak 0); mala partia (dzienna < 1) - jak w BK, potrzeba / 1, czyli
         // najwyzej k x ludzi. Nigdy wiecej niz wzor BK (dzielnik >= dzielnik BK), z jednym wyjatkiem: kwatermistrz, ktory w BK PODNOSI dzienna potrzebe.
-        // Nadwyzka (Need < 0): premia BK bez zmian (+|Need| - wzor BK nie zalezy wtedy od dzielnika). Przyrost potrzeby (Tick liczy model wprost),
-        // zakupy i zuzycie BK - bez zmian. Gracz tak samo (jedna regula).
+        // Nadwyzka (Need < 0): premia BK bez zmian (+|Need| - wzor BK nie zalezy wtedy od dzielnika). Przyrost potrzeby (Tick liczy model wprost) -
+        // bez zmian; zakupy (Need x DaysOfProvision) i zuzycie (Need x 2) BK ida za przycieta potrzeba (klamra nizej przed BuyItems/ConsumeItems) -
+        // inaczej niz w BK tylko u partii z zamknieta brama stosow (przy otwartej BK przycina sam przed zakupem), zawsze mniej, nigdy wiecej.
+        // Gracz tak samo (jedna regula).
         // Klamra (TickClampPrefix, prefiks PartySupplies.Tick): zapisane Alcohol/AnimalProducts/Cloth/WoodNeed do +-k x dzisiejszych ludzi przy kazdym
         // ticku dobowym, przed przyrostem BK - BK przycina tylko przy przyroscie, za brama MemberRoster.Count (liczba STOSOW, nie ludzi) > progu, wiec
         // potrzeba partii, ktora sie skurczyla albo ma malo rodzajow jednostek, zamarzala ponad klamra.
