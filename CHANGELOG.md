@@ -7,7 +7,7 @@
 
 **Problem:** etap 2 (rozdz. 0-1 projektu): po roku 72 rody bankrutuja i 88 glow < 5 000 zl - wojsko AI bez zwiazku z dochodem, a korona oddaje zwrot z zapasu, ktory sie konczy.
 
-**Zmiana:** 4 kawalki, kazdy osobny commit (165 50bc17b, 182 d4d9c0b, 166+162m 6dff51b, 185 1aa1580) - opis w `docs/C1-POSTEP.md`. Kolejnosc dobowa (2.0b, kazdy krok we wlasnym try): powinnosci -> danina, clo -> wplywy dnia 165 -> dary 182 -> raty reparacji -> kontrakty 185 -> zwrot -> migawka skarbcow -> ... -> Bank -> budzet 166 (miedzy granicami ksiegi MRest/MBudget) -> ksiega rodow 169.
+**Zmiana:** 4 kawalki, kazdy osobny commit (165 50bc17b, 182 d4d9c0b, 166+162m 6dff51b, 185 1aa1580; poprawki po przegladzie kodu 57cbc1b, a660030) - opis w `docs/C1-POSTEP.md`. Kolejnosc dobowa (2.0b, kazdy krok we wlasnym try): powinnosci -> danina, clo -> wplywy dnia 165 -> dary 182 -> raty reparacji -> kontrakty 185 -> zwrot -> migawka skarbcow -> ... -> Bank -> budzet 166 (miedzy granicami ksiegi MRest/MBudget) -> ksiega rodow 169.
 
 **Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
 - Regresje: wylaczony `ClanBudgetEnabled` wylacza tez 165, 182, WatchUnpaid i 185 (R1) - zachowanie sprzed paczek; wyjatek: linia "Budzet rodow (na sucho)" liczy pulap jedna formula z Settings (0.28/0.60 zamiast 0.25/0.55 - tylko log). `CrownWageRefundGarrisons` dziala tylko przy wylaczonym 165.
