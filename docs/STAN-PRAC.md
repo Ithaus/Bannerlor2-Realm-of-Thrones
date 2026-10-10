@@ -1014,3 +1014,6 @@ ZATWIERDZONE: Armoury c38bd62f, CrashScribe 6507c842. Baza Armoury: w-toku/e2c.
 - **Straz placi za budowy - TAK, ale "do budowy jeszcze wrocimy"** (Jeff 10.10): przy powrocie do budow (138 dniowki robotnikow, 152 BuildFunding) - Straz najmuje
   robotnikow z najblizszych wsi/miast (Mole's Town, wsie Darow), dniowki do ich kies wedlug 138; dzis budowy Muru stoja (moc 0 - brak ludzi przy Murze).
   Pozniej osobno: odbudowa i obsadzanie opuszczonych zamkow Muru za zloto Strazy (lore: Jon w "Tancu ze smokami"), jesli mapa ROT je ma.
+- **SPROSTOWANIE (10.10, kod BuildFunding.cs):** budowy Strazy stoja nie z braku ludzi, tylko przez regule "w wojnie tylko budowy wojskowe" (BuildFunding :140-141,
+  warNow && !IsMilitaryProject -> pomin) - Straz jest stale w wojnie, a w kolejce ma same cywilne (drogi, kwartal rzemieslnikow, spichlerz). Do zrobienia przy powrocie
+  do budow: AI w wojnie przestawia kolejke na budowe wojskowa (jesli jest), krolestwa w wiecznej wojnie (Straz) buduja tez cywilne, Straz najmuje robotnikow z okolicy.
