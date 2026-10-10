@@ -489,3 +489,5 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   zapis arm_crown186, linia "Kredyt korony (186): dzien". DLL test\Armoury-e2c-186.dll (9dc69ff6). **TEST 120 dob w toku** -> test\at-186-120.out.txt.
 - (09:30) Jeff: okupy B -> bcb5fe1 (RansomHeadYears 0.165, RansomLordDays 20). DLL 186+B: test\Armoury-e2c-186b.dll (d7222bfb). Plan: po tescie 186 (w toku) - test 120 dob
   na 186b (186 + okupy B) -> zapis -> WGRANIE 20 razem. Potem koniec etapu 2: bieg 2-letni (Days 728) + bieg z wymuszonym pokojem.
+- (09:45) TEST 186 120 dob OK (kopia-186-120): 0 bledow, glowy < 5000 = 4, bankruci 0, wojsko lordow w wojnie 97.0 tys., zalogi -2.1%, reszta ksiegi -2.6 tys.; korony pozyczaja
+  15-23 tys./d u 5-10 krolestw, pula Banku czasem przycina (1/60 nadwyzki ponad 2 mln). **TEST 186b (186 + okupy B) 120 dob w toku** -> test\at-186b-120.out.txt -> zapis -> WGRANIE 20.
