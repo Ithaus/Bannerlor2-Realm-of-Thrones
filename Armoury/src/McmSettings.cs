@@ -3548,6 +3548,10 @@ namespace Armoury
         [SettingPropertyGroup("The Others and Valyrian steel (175c)")]
         public int OthersCastleSteelPercent { get; set; } = 50;
 
+        [SettingPropertyBool("Same Race Only", HintText = "giants wed and bear children only with giants, men only with men (likewise wights and the Others): no marriage and no child across races. Mixed couples wed before the war stay married, but no child is born to them - a pregnancy across races ends without a birth")]
+        [SettingPropertyGroup("Blood and race")]
+        public bool SameRaceOnly { get; set; } = true;
+
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillagesEnabled { get; set; } = true;
@@ -4730,6 +4734,7 @@ namespace Armoury
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;
+            s.SameRaceOnly = SameRaceOnly;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;
