@@ -62,3 +62,41 @@ miejsca w kolejnosci sa (`CrownIncome.Spent/Received/DayOf`).
 **Ryzyka dla testu:** (a) wplywy netto moga byc zanizone w dobie, gdy Diplomacy/gra wyda ze skarbca duzo (np. koszt dyplomacji) - widac w "inne do skarbcow
 od wczoraj" < 0; (b) `AddPaymentForDebts` - JIT moglby wkleic metode (mala) - wtedy "splata dlugu wobec korony: BRAK" nie, ale licznik 0 przy rodach z dlugiem;
 (c) dlugi reparacji rosna tylko przy pokojach Diplomacy z odszkodowaniem (rzadko - test: suma przyjeta = suma zaplacona co do 1 zl w linii).
+
+---
+
+## Kawalek 2: 182 dary miedzy koronami, Straz bez zoldu - ZROBIONE (commit d4d9c0b)
+
+**Pliki:** nowy `Armoury/src/CrownGifts.cs`; `MountedWage.cs` (zold Strazy 0), `ArmouryBehavior.cs` (krok po `CrownIncome.Begin`, Reset), `MoneyLedger.Obieg.cs`,
+`Settings.cs` + `McmSettings.cs`.
+
+**Co dziala:**
+- Dary tylko przy 165 (`CrownGifts` i `CrownIncome.On` - dar to udzial w "wplywach dnia"). Polnoc -> Straz: `GiftNorthToWatchShare` (0.25) x do wydania
+  Polnocy dzis (wplywy + 1/360). Wolne Miasta -> Dothrakowie: kazde `GiftFreeCitiesToDothrakiShare` (0.10) swoich. Najwyzej reszta wplywow dawcy.
+- Dar: skarbiec dawcy -> skarbiec odbiorcy -> tego samego dnia glowy rodow odbiorcy wedlug wag (Straz: miasto/zamek 1, wies 0.25, rod bez lenna 0.5;
+  Dothrakowie: rowno na rod); rody: bez najemnikow, dworzan BK i Innych. Reszta z zaokraglen zostaje w skarbcu odbiorcy. Do D (czesc "korona":
+  `ClanIncomeBook.NoteInflow(..., KCrownLevies)`). Nie ma komu dac - dar nie wychodzi.
+- Id krolestw ROT (z `balans-krolestw.csv` i `budzet-rodow.csv` biegu e2b120): Polnoc `battania`, Straz `nightswatch`, Dothrakowie `khuzait`, Wolne
+  Miasta `bravos`, `volantis`, `pentos`, `myr`, `lys`, `tyrosh`, `norvos`, `qohor`, `nord` (Lorath - kultura `nord`). Pierwsza linia doby
+  "Dary koron (182): krolestwa - ..." pokazuje, ktore znaleziono.
+- `WatchUnpaid`: w kontekscie zoldu partii (`GetTotalWage` - nowy znacznik `_total` w MountedWage) zold jednostki w partii/zalodze Strazy (MapFaction
+  `nightswatch`, takze gracz w Strazy) = 0. Cena werbunku i stawka nominalna (`MountedWage.Nominal` - do pulapu w ludziach 166) bez zmian. Czynne tylko z
+  `ClanBudgetEnabled` (bez pulapu w ludziach werbunek Strazy nie mialby hamulca - zold 0 = limit zoldu nigdy nie wiaze).
+
+**Nowe klucze:** `CrownGifts` true, `GiftNorthToWatchShare` 0.25, `GiftFreeCitiesToDothrakiShare` 0.10, `WatchUnpaid` true.
+
+**Nowe / zmienione linie logu:**
+- NOWA `Dary koron (182): krolestwa - Polnoc (battania) ..., Straz (nightswatch) ..., Dothrakowie (khuzait) ..., Wolne Miasta N z 9 (...)` (raz na sesje).
+- NOWA `Dary koron (182): dzien N | Polnoc -> Straz X zl do N rodow (wagi stale: ...) | Wolne Miasta -> Dothrakowie Y zl do M rodow (rowno na rod) | ze skarbcow dawcow zeszlo A, do rodow doszlo B, w skarbcach odbiorcow zostalo (zaokraglenia) C | szczegoly: ... | Straz bez zoldu (WatchUnpaid): TAK/NIE.` - test "dary co do 1 zl": A = B + C.
+- `Korona: wplywy dnia (165)`: pozycja "dary (182) X (przeszly do rodow odbiorcow Y)" i na krolestwo "dar -X / dar +Y".
+- `Obieg: dzien N` (korona): "dary (182) skarbce dawcow -> glowy rodow Strazy X i Dothrakow Y (ze skarbcow dawcow A, reszta w skarbcach odbiorcow C)".
+
+**Odstepstwa:**
+1. `GiftSplitFixedWeights` - klucza nie dodalem: jedyna alternatywa (wedlug liczby ludzi) jest zakazana przez Z8, wiec klucz bylby martwy.
+2. Regula korekty 10% -> 15% (Dothrakowie biedni po 40/120 dobach) - nie automatyczna: suwak `GiftFreeCitiesToDothrakiShare` (opis MCM mowi o 0.15),
+   decyzja przy tescie (projekt: "udzial rosnie do 15% i test sie powtarza").
+3. Dar liczony od "do wydania" dawcy (wplywy + 1/360) przed ratami reparacji przyjetymi tego dnia (kolejnosc 2.0b: dary przed ratami).
+4. Lista Wolnych Miast z id krolestw (nie z kultury): bunty Wolnych Miast (`new_kingdom*`, np. "Volentin League") nie placa. `KingdomBalance.FreeCities`
+   (175) ma "lorath" zamiast "nord" - tylko pomiar 175, nie ruszane (uwaga do przegladu).
+
+**Nie zrobione:** pulap Strazy w ludziach - kawalek 3 (166).
