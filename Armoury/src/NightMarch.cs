@@ -34,6 +34,22 @@ namespace Armoury
     /// > 0.35 jedn. w godzinie obozu i co T10 o nim wiedzial), "NocnyMarsz: swit" i "NocnyMarsz: kara - probka" (glowny log).
     /// Na sucho: wylaczniki MCM albo DLL budowany z -p:T10Dry=true (stala T10_DRY) - ksiega i klasyfikacja tylko w logu,
     /// zachowanie i kary jak w T1.
+    ///
+    /// T10-R - AI MUSI ODPOCZYWAC (decyzja Jeffa 10.10, wiazaca: "musza odpoczywac; najwyzej 2 dni forsownego marszu, tylko w sytuacjach
+    ///   wyjatkowych"). Test 120 dob: 11-15 partii na dlugu 3 (morale -95%) przez ok. 2 tygodnie (Dorne: czlonkowie armii Dorana Martella) -
+    ///   czlonek armii nie mogl wejsc w sen dlugu (doczepiony), a wodz z dlugiem 0 gonil noca dalej; oboz oblezenia, oblezona osada i morze
+    ///   tez nie daja snu ciaglego, a dlug 3 wymaga 21 h naraz. Do tego ksiega gubila 1-5 tikow na dobe (numer godziny z zaokraglenia czasu,
+    ///   a tick godzinowy gry ma dowolna faze) - zgubiona godzina obozu 0-6 to 5 h zamiast 6 i dlug 1 dla polowy swiata (doby 24, 27, 68...).
+    ///   R4 - OBOWIAZKOWY ODPOCZYNEK: seria nocy bez snu (doby bez bazy z rzedu) albo dlug >= MaxForcedNights -> partia (a w armii wodz za cala
+    ///   armie) nie idzie noca ani za poscigiem, ani na odsiecz, ani w ucieczce, spi snem dlugu az do dlugu 0; jedyny wyjatek to ucieczka przed
+    ///   wrogiem co najmniej CrushRatio razy silniejszym (zniszczylby ja) - licznik wyjatkow w linii switu. Alarm przy obowiazkowym odpoczynku
+    ///   tez tylko od takiego wroga.
+    ///   R5 - ARMIA ODPOCZYWA RAZEM: wodz decyduje wedlug najbardziej zmeczonej partii (dlug i odpoczynek obowiazkowy z wodza i doczepionych):
+    ///   oboz splaty od 20:00 albo sen ciagly calej armii; doczepieni spia z wodzem (SleepsWithLeader).
+    ///   R6 - SEN CIAGLY NA MIEJSCU: partia z dlugiem >= 2, ktorej nie wolno polozyc snem dlugu (oboz oblezenia, oblezona osada, morze, doczepiona
+    ///   do armii, AI trzyma inny mod), a ktora w tej godzinie odpoczywa - licznik snu ciaglego (Acc) biegnie jak w snie dlugu; ruch go konczy.
+    ///   R7 - KAZDY TICK GODZINOWY TO JEDNA GODZINA (jak ksiega gracza): numer godziny ksiegi z licznika wywolan, nie z czasu; tick nadrabiany
+    ///   w tej samej klatce (dwie godziny naraz) powtarza stan odpoczynku poprzedniej godziny, a swit liczy sie raz.
     /// </summary>
     internal static partial class NightRest
     {
@@ -46,6 +62,9 @@ namespace Armoury
         private const float RestMoveLimit = Drill.RestStep;   // jak gracz (OnHourly) i musztra (grupa11: jedna stala 0.35): ponizej - partia stoi
         private const double AlarmGraceHours = 0.5;   // AI sprawdza inicjatywe co ok. 0.15-0.18 h (AiCheckInterval 0.25 x 0.6-0.7)
         private const int AiSaveCap = 1500;           // wpisow ksiegi w zapisie (lordow ROT ok. 500-700)
+        // T10-R (R4): wrog, ktory "by ja zniszczyl" - co najmniej dwa razy silniejszy (sila armii albo partii, jak przy ucieczce w grze);
+        // tylko przed takim partia w obowiazkowym odpoczynku ucieka dalej
+        private const float CrushRatio = 2f;
 
         // co T10 zrobil z partia w ostatnim ticku - do niezaleznego pomiaru ruchu w nastepnej godzinie
         private const byte StNone = 0, StSkip = 1, StSlept = 2, StReason = 3, StAlarm = 4, StDebt = 5, StOldLot = 6, StOldOther = 7, StOther = 8;
@@ -66,6 +85,12 @@ namespace Armoury
             public int DawnDebt;             // poprawka recenzji (P5): dlug zaraz po poprzednim swicie - losy dlugu 1 do nastepnego switu; MUSZTRA-j: kara
                                              // musztry "noc bez snu = dzien bez cwiczen" (NightRest.DawnDebtOf), w zapisie szoste pole wpisu
             public bool PaidSinceDawn;       // splata od reki od poprzedniego switu
+            // T10-R: seria dob bez bazy snu z rzedu (forsowny marsz noca) - zeruje ja przespana baza albo splata; w zapisie siodme pole
+            public int Streak;
+            public int D3;                   // T10-R: ile switow z rzedu na dlugu 3 (cel testu: nikt > 2 poza ucieczka); w zapisie osme pole
+            public bool Passive;             // T10-R (R6): w ostatniej godzinie sen ciagly na miejscu (bez snu dlugu) - tylko w pamieci
+            public bool LastRest;            // T10-R (R7): czy ostatnia godzina byla odpoczynkiem - powtarzana w ticku nadrabianym
+            public int CrushDay = -1;        // T10-R: dzien ostatniej ucieczki-wyjatku (wrog >= CrushRatio) - tylko w pamieci, do linii switu
         }
 
         private sealed class DebtSleeper { public NightOrder Order; public Vec2 Bed; public int Kind; }
@@ -94,6 +119,11 @@ namespace Armoury
         private static double _ledgerMsSum, _ledgerMsMax; private static int _ledgerCalls;
         private static bool _nrWasOn;                // przelacznik glowny NightRestEnabled byl wlaczony (zmiana na wylaczony = jednorazowe sprzatanie)
         private static PropertyInfo _enableAtProp; private static bool _enableAtTried;
+        // T10-R (R7): numer godziny ksiegi = licznik wywolan AiHourly (tick godzinowy gry ma dowolna faze - zaokraglony czas dawal ten sam
+        // numer dwom tikom i ksiega gubila godzine); czas gry poprzedniego wywolania (nadrabianie w jednej klatce) i ostatniego switu
+        private static long _hourTick;
+        private static double _lastTickH = -1, _lastDawnH = -1;
+        private static int _restExN;
 
         private sealed class DayCounters
         {
@@ -106,6 +136,11 @@ namespace Armoury
             public int HFlee, HChase, HRelief, HAlarm, HAlarmFled, HAlarmSlept, HAlarmOther, HTownHeld, HTownOut;
             public int MoveHours, MoveLone, MoveNoReason, MoveExit, MoveWoken, MoveAlarmStay, MoveDebtWoken, MoveOther, MoveLead, MoveLeadNoReason;
             public int DebtWoken;
+            // T10-R: obowiazkowy odpoczynek (nowe o tym switcie), marsz zablokowany regula (partio-godziny wedlug powodu i partie),
+            // wyjatki (ucieczka przed wrogiem >= CrushRatio), wodzowie trzymani dlugiem czlonkow, sen ciagly na miejscu (R6), ticki nadrabiane
+            public int MustNew, BlockFlee, BlockChase, BlockRelief, BlockAlarm, CrushHours, ArmyHeld, PassiveHours, PassivePaid, CatchUps;
+            public readonly HashSet<MobileParty> BlockedP = new HashSet<MobileParty>();
+            public readonly HashSet<MobileParty> CrushP = new HashSet<MobileParty>();
             // stopery (P7): petla obozu swiata, oboz splaty, straznicy T10 - ms na wywolanie
             public double CampMsSum, CampMsMax, DebtMsSum, DebtMsMax, GuardMsSum, GuardMsMax;
             public int CampCalls, DebtCalls, GuardCalls;
@@ -167,7 +202,9 @@ namespace Armoury
         private static bool ByReason(Settings s) { return s != null && s.AiNightMarchByReason && !DryBuild; }
         /// <summary>Dlugosc okna obozu swiata w godzinach (0-6 -> 6) = zasieg poscigu w h marszu; odsiecz 2x.</summary>
         private static int CampLen() { int st = CampStart, e = CampEnd; return st == e ? 0 : Mod24(e - st); }
-        private static long HourStamp() { return (long)Math.Round(CampaignTime.Now.ToHours); }
+        // T10-R (R7): numer godziny ksiegi z licznika tikow (bylo: Math.Round(czas w h) - przy fazie ticku ok. 0.5 h dwa ticki z rzedu dostawaly
+        // ten sam numer, drugi wypadal z ksiegi, a pomiar ruchu laczyl dwie godziny w jedna)
+        private static long HourStamp() { return _hourTick; }
         private static double NowH() { return CampaignTime.Now.ToHours; }
         private static bool IsLeader(MobileParty mp) { return mp.Army != null && mp.Army.LeaderParty == mp; }
         private static string F1(float v) { return v.ToString("0.0", CultureInfo.InvariantCulture); }
@@ -305,18 +342,163 @@ namespace Armoury
             return route / UnitsPerHour(mp);
         }
 
+        // ------------------------------------------------------------ R4-R5: obowiazkowy odpoczynek, armia odpoczywa razem
+        /// <summary>T10-R: MaxForcedNights z ustawien (0 = bez limitu - stare reguly).</summary>
+        private static int MaxForced(Settings s) { return s != null ? Math.Max(0, s.MaxForcedNights) : 2; }
+
+        /// <summary>T10-R (R4): obowiazkowy odpoczynek - seria nocy bez snu albo dlug >= MaxForcedNights; trwa, az dlug zejdzie do 0
+        /// (splata zeruje serie, a dlug nie maleje czesciowo, wiec warunek trzyma do pelnej splaty).</summary>
+        private static bool Must(AiSleep e, int max) { return e != null && max > 0 && e.Debt > 0 && (e.Debt >= max || e.Streak >= max); }
+
+        /// <summary>
+        /// T10-R (R5, Jeff 10.10: "jesli partia jest w armii, decyduje wodz"): dlug, wedlug ktorego decyduje partia - samotny lord swoj, wodz armii
+        /// najgorszy z siebie i doczepionych (czlonek nie moze sam polozyc sie spac, wiec odpoczywa razem z armia); must - obowiazkowy odpoczynek
+        /// kogokolwiek z nich. Czlonek armii zwraca swoj (o nim i tak decyduje wodz).
+        /// </summary>
+        private static int EffDebt(MobileParty mp, AiSleep e, int max, out bool must)
+        {
+            int d = e != null ? e.Debt : 0;
+            must = Must(e, max);
+            if (mp == null || !IsLeader(mp)) return d;
+            try
+            {
+                var att = mp.AttachedParties;
+                if (att != null)
+                    for (int i = 0; i < att.Count; i++)
+                    {
+                        var m = att[i]; AiSleep me;
+                        if (m == null || m == MobileParty.MainParty || !_ai.TryGetValue(m, out me)) continue;
+                        if (me.Debt > d) d = me.Debt;
+                        if (Must(me, max)) must = true;
+                    }
+            }
+            catch (Exception ex) { AiStumble("EffDebt", mp, ex); }
+            return d;
+        }
+
+        /// <summary>T10-R: sila wroga tak, jak liczy ja gra przy ucieczce - wodz i doczepieni armii sila calej armii.</summary>
+        private static float ThreatStrength(MobileParty p)
+        {
+            try
+            {
+                if (p.Army != null && (p.Army.LeaderParty == p || p.AttachedTo == p.Army.LeaderParty)) return p.Army.EstimatedStrength;
+            }
+            catch { }
+            return Strength(p);
+        }
+
+        /// <summary>T10-R (R4): czy ucieczka jest wyjatkiem - wrog, przed ktorym partia ucieka (cel ucieczki gry), albo czuwajacy wrog idacy na nia
+        /// w promieniu alarmu jest co najmniej CrushRatio razy silniejszy (zniszczylby ja).</summary>
+        private static bool Crushing(MobileParty mp, MobileParty from, Settings s, out string how)
+        {
+            how = null;
+            float own = Strength(mp);
+            try
+            {
+                if (from != null && from.IsActive && Hostile(mp, from))
+                {
+                    float fs = ThreatStrength(from);
+                    if (fs >= CrushRatio * own)
+                    {
+                        how = from.Name + " (sila " + F0(fs) + " >= " + F1(CrushRatio) + " x " + F0(own) + ")";
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex) { AiStumble("Crushing", mp, ex); }
+            float ts, ms; string h;
+            if (AlarmThreat(mp, s, null, CrushRatio, out ts, out ms, out h) != null) { how = h; return true; }
+            return false;
+        }
+
+        /// <summary>T10-R (R4): alarm - przy obowiazkowym odpoczynku budzi tylko wrog, ktory by partie zniszczyl; slabszy (silniejszy od partii,
+        /// ale ponizej CrushRatio) liczony jako marsz zablokowany regula (blockedBefore - ta godzina juz policzona jako zablokowana ucieczka).</summary>
+        private static MobileParty AlarmFor(MobileParty mp, Settings s, HashSet<MobileParty> campSet, bool must, NReason blockedBefore, out string how)
+        {
+            float ts, ms;
+            var th = AlarmThreat(mp, s, campSet, must ? CrushRatio : 1f, out ts, out ms, out how);
+            if (th != null || !must || blockedBefore != NReason.None) return th;
+            string h2;
+            if (AlarmThreat(mp, s, campSet, 1f, out ts, out ms, out h2) != null)
+            {
+                _day.BlockAlarm++; _day.BlockedP.Add(mp);
+                RestExample(mp, "alarm zablokowany (wrog silniejszy, ale nie zniszczylby jej): " + h2 + " - spi dalej", null);
+            }
+            return null;
+        }
+
+        /// <summary>T10-R: liczniki reguly R4 z wyniku Classify - marsz zablokowany (partia w obowiazkowym odpoczynku spi) albo wyjatek (ucieczka
+        /// przed wrogiem >= CrushRatio).</summary>
+        private static void CountRule(MobileParty mp, AiSleep e, NReason blocked, bool crush, string det)
+        {
+            if (blocked != NReason.None)
+            {
+                if (blocked == NReason.Flee) _day.BlockFlee++; else if (blocked == NReason.Chase) _day.BlockChase++; else if (blocked == NReason.Relief) _day.BlockRelief++;
+                _day.BlockedP.Add(mp);
+                RestExample(mp, "marsz zablokowany - " + det + " - odpoczywa", e);
+            }
+            if (crush)
+            {
+                _day.CrushHours++; _day.CrushP.Add(mp);
+                if (e != null) e.CrushDay = (int)CampaignTime.Now.ToDays;
+                RestExample(mp, "WYJATEK - " + det, e);
+            }
+        }
+
+        private static void RestExample(MobileParty mp, string what, AiSleep e)
+        {
+            _restExN++;
+            if (_restExN > 5 && _restExN % 25 != 0) return;
+            try
+            {
+                if (e == null) _ai.TryGetValue(mp, out e);
+                Log.Info("NocnyMarsz: odpoczynek - " + mp.Name + (IsLeader(mp) ? " (wodz armii)" : "") + ": " + what + " (dlug " + (e != null ? e.Debt : 0)
+                         + ", seria nocy bez snu " + (e != null ? e.Streak : 0) + ") [przyklad " + _restExN + " w sesji]");
+            }
+            catch { }
+        }
+
+        /// <summary>T10-R: gdzie jest partia - do linii switu (dlug 3 dluzej niz 2 doby).</summary>
+        private static string Where(MobileParty mp)
+        {
+            try
+            {
+                if (!mp.IsActive) return "nieaktywna (rejs BK)";
+                if (mp.AttachedTo != null) return "w armii " + (mp.AttachedTo.LeaderHero != null ? mp.AttachedTo.LeaderHero.Name.ToString() : mp.AttachedTo.Name.ToString());
+                string w = IsLeader(mp) ? "wodz armii, " : "";
+                if (_debtSleep.ContainsKey(mp)) return w + "sen dlugu";
+                if (mp.BesiegerCamp != null) return w + "oboz oblezenia";
+                if (mp.MapEvent != null) return w + "bitwa";
+                if (mp.IsCurrentlyAtSea) return w + "na morzu";
+                var st = mp.CurrentSettlement;
+                if (st != null) return w + (st.SiegeEvent != null ? "oblezona osada " : "w osadzie ") + st.Name + (mp.Ai != null && mp.Ai.IsDisabled && !_townHold.Contains(mp) ? " (AI trzyma inny mod)" : "");
+                return w + "w polu" + (mp.IsFleeing() ? " (ucieka)" : "");
+            }
+            catch { return "?"; }
+        }
+
         // ------------------------------------------------------------ R1: powod
         /// <summary>
         /// Powod nocnego marszu. slept != null = partia spi (AI wylaczone, rozkaz Hold) - liczy sie rozkaz zapamietany przed snem.
         /// Ucieczka zawsze; poscig i odsiecz tylko przy dlugu < AiNightsAwakeInChase (lord z dlugiem traci wiecej, niz zyska).
+        /// T10-R (R4): must = obowiazkowy odpoczynek - zaden powod nie wazy (blocked = powod zablokowany regula), poza ucieczka przed wrogiem
+        /// >= CrushRatio (crush = wyjatek). debt i must u wodza armii - najgorsze z armii (EffDebt).
         /// </summary>
-        private static NReason Classify(MobileParty mp, Settings s, int debt, bool leader, NightOrder slept, out string detail)
+        private static NReason Classify(MobileParty mp, Settings s, int debt, bool must, bool leader, NightOrder slept, out string detail,
+                                        out NReason blocked, out bool crush)
         {
-            detail = null;
+            detail = null; blocked = NReason.None; crush = false;
             if (slept == null && mp.IsFleeing())
             {
                 var from = mp.ShortTermTargetParty;
-                detail = "ucieczka" + (from != null ? " przed " + from.Name + " (sila " + F0(Strength(from)) + " vs " + F0(Strength(mp)) + ")" : "");
+                detail = "ucieczka" + (from != null ? " przed " + from.Name + " (sila " + F0(ThreatStrength(from)) + " vs " + F0(Strength(mp)) + ")" : "");
+                if (must)
+                {
+                    string how;
+                    if (!Crushing(mp, from, s, out how)) { blocked = NReason.Flee; return NReason.None; }
+                    crush = true;
+                    detail += " - obowiazkowy odpoczynek, ale " + how + " zniszczylby ja: ucieka dalej";
+                }
                 return NReason.Flee;
             }
             if (debt >= s.AiNightsAwakeInChase) return NReason.None;
@@ -341,6 +523,7 @@ namespace Armoury
                     {
                         detail = "odsiecz " + defS.Name + " (" + (raid ? "rabunek" : "oblezenie") + ", " + F1(hr) + " h marszu, trasa " + F1(route)
                                  + " jedn., prosto " + F1(straight) + ")";
+                        if (must) { blocked = NReason.Relief; return NReason.None; }
                         return NReason.Relief;
                     }
                 }
@@ -355,6 +538,7 @@ namespace Armoury
                 if (hr <= len)
                 {
                     detail = "poscig za " + tgt.Name + " (" + F1(hr) + " h marszu, prosto " + F1(d) + " jedn., trasa ok. " + F1(d * 1.1f) + ")";
+                    if (must) { blocked = NReason.Chase; return NReason.None; }
                     return NReason.Chase;
                 }
             }
@@ -365,8 +549,9 @@ namespace Armoury
         /// ALARM: wrogi lord, banda albo gracz w promieniu AiCampDangerRadius, ktory NIE SPI (poza obozem, poza snem dluznikow,
         /// z wlaczonym AI), jest SILNIEJSZY (miara gry przy ucieczce: sila armii albo partii) i IDZIE NA LORDA (cel = lord albo
         /// odleglosc zmalala od poprzedniej godziny o > 0.2 jedn.). Wyszukiwanie przez lokator mapy (jak gra), nie po wszystkich.
+        /// T10-R: ratio - ile razy silniejszy ma byc wrog (1 = silniejszy; CrushRatio = zniszczylby partie w obowiazkowym odpoczynku).
         /// </summary>
-        private static MobileParty AlarmThreat(MobileParty mp, Settings s, HashSet<MobileParty> campSet, out float ts, out float ms, out string how)
+        private static MobileParty AlarmThreat(MobileParty mp, Settings s, HashSet<MobileParty> campSet, float ratio, out float ts, out float ms, out string how)
         {
             ts = 0f; ms = 0f; how = null;
             float r = s.AiCampDangerRadius;
@@ -392,9 +577,9 @@ namespace Armoury
                     // nie spi
                     if (t == main) { if (PlayerCamped || _sleeping) continue; }
                     else if ((campSet != null && campSet.Contains(t)) || _debtSleep.ContainsKey(t) || (t.Ai != null && t.Ai.IsDisabled)) continue;
-                    // silniejszy
+                    // silniejszy (T10-R: przy ratio > 1 - tyle razy silniejszy)
                     float st = Strength(t);
-                    if (st <= ms) continue;
+                    if (st <= ms * ratio) continue;
                     // idzie na lorda
                     string why = null;
                     if (t.ShortTermTargetParty == mp || t.TargetParty == mp) why = "idzie na niego";
@@ -405,7 +590,7 @@ namespace Armoury
                             why = "zbliza sie (" + F1(myPrev.Distance(tPrev)) + " -> " + F1(dist) + " jedn.)";
                     }
                     if (why == null) continue;
-                    ts = st; how = t.Name + " (sila " + F0(st) + " > " + F0(ms) + ", " + F1(dist) + " jedn., " + why + ")";
+                    ts = st; how = t.Name + " (sila " + F0(st) + " > " + (ratio > 1.001f ? F1(ratio) + " x " : "") + F0(ms) + ", " + F1(dist) + " jedn., " + why + ")";
                     return t;
                 }
                 catch (Exception ex) { AiStumble("AlarmThreat", t, ex); }   // poprawka recenzji: liczone i w logu, nie polykane
@@ -431,7 +616,14 @@ namespace Armoury
         private static void AiHourly(Settings s, int h)
         {
             FlushHourCounters();
-            try { AiSleepLedger(s, h); } catch (Exception e) { Log.Error("NightRest.AiSleepLedger", e); }
+            // T10-R (R7): kazde wywolanie to jedna godzina gry (gra wola tick godzinowy raz na kazda minieta godzine - CampaignPeriodicEvent.CheckUpdate);
+            // dwa wywolania w tej samej chwili gry to nadrabianie w jednej klatce - ksiega powtarza wtedy stan odpoczynku poprzedniej godziny
+            _hourTick++;
+            double nowH = NowH();
+            bool catchUp = _lastTickH >= 0 && nowH >= _lastTickH && nowH - _lastTickH < 0.5;
+            _lastTickH = nowH;
+            if (catchUp) _day.CatchUps++;
+            try { AiSleepLedger(s, h, catchUp); } catch (Exception e) { Log.Error("NightRest.AiSleepLedger", e); }
             long t0 = Stopwatch.GetTimestamp();
             try { AiDebtCamp(s, h); } catch (Exception e) { Log.Error("NightRest.AiDebtCamp", e); }
             long t1 = Stopwatch.GetTimestamp();
@@ -471,6 +663,7 @@ namespace Armoury
             _hFled = 0; _hSlept = 0; _hOther = 0; _hResets = 0; _hBattle = 0; _hDebtWoken = 0;
             _ledgerMsSum = 0; _ledgerMsMax = 0; _ledgerCalls = 0;
             _nrWasOn = false;
+            _hourTick = 0; _lastTickH = -1; _lastDawnH = -1; _restExN = 0;
             _day = new DayCounters();
         }
 
@@ -554,9 +747,12 @@ namespace Armoury
             // inny mod przejal AI w nocy (dluzsza blokada niz nasza godzina) - jego blokada zostaje, nie skracamy jej
             if (held && ForeignHold(mp)) { _townHold.Remove(mp); t.TownForeign++; Mark(e, StSkip); return; }
             bool leader = IsLeader(mp);
-            int debt = debtOn && e != null ? e.Debt : 0;
-            string det;
-            var r = Classify(mp, s, debt, leader, null, out det);   // rozkaz lorda nietkniety - liczy sie biezacy
+            // T10-R (R4, R5): wodz armii decyduje wedlug najgorszego dlugu armii; obowiazkowy odpoczynek blokuje wyjazd (poza ucieczka-wyjatkiem)
+            bool must = false;
+            int debt = debtOn && e != null ? EffDebt(mp, e, MaxForced(s), out must) : 0;
+            string det; NReason blk; bool crush;
+            var r = Classify(mp, s, debt, must, leader, null, out det, out blk, out crush);   // rozkaz lorda nietkniety - liczy sie biezacy
+            CountRule(mp, e, blk, crush, det);
             if (r != NReason.None)
             {
                 if (held) { _townHold.Remove(mp); EnableAi(mp); }
@@ -567,8 +763,8 @@ namespace Armoury
             }
             if (!st.IsFortification)
             {
-                float ts, ms; string how;
-                if (AlarmThreat(mp, s, campSet, out ts, out ms, out how) != null)
+                string how;
+                if (AlarmFor(mp, s, campSet, must, blk, out how) != null)
                 {
                     if (held) { _townHold.Remove(mp); EnableAi(mp); }
                     t.TownAlarm++; _day.VillageAlarm++;
@@ -600,9 +796,12 @@ namespace Armoury
             bool asleep = campSet.Contains(mp);
             NightOrder mine = null;
             if (asleep) _orders.TryGetValue(mp, out mine);
-            int debt = debtOn && e != null ? e.Debt : 0;
-            string det;
-            var r = Classify(mp, s, debt, leader, asleep ? (mine ?? EmptyOrder) : null, out det);
+            // T10-R (R4, R5): wodz armii decyduje wedlug najgorszego dlugu armii; obowiazkowy odpoczynek - tylko ucieczka-wyjatek
+            bool must = false;
+            int debt = debtOn && e != null ? EffDebt(mp, e, MaxForced(s), out must) : 0;
+            string det; NReason blk; bool crush;
+            var r = Classify(mp, s, debt, must, leader, asleep ? (mine ?? EmptyOrder) : null, out det, out blk, out crush);
+            CountRule(mp, e, blk, crush, det);
             if (r != NReason.None)
             {
                 if (asleep)
@@ -619,8 +818,8 @@ namespace Armoury
                 Example(mp, "idzie noca: " + det, debt, leader);
                 return;
             }
-            float ts, ms; string how;
-            var th = AlarmThreat(mp, s, campSet, out ts, out ms, out how);
+            string how;
+            var th = AlarmFor(mp, s, campSet, must, blk, out how);
             if (th != null)
             {
                 // ALARM: wstaje, stary cel wstrzymany (bez powodu nie idzie), AI ocenia ucieczke; rozkaz sprzed snu zostaje w _orders
@@ -661,14 +860,14 @@ namespace Armoury
             bool asleep = campSet.Contains(mp);
             NightOrder mine = null;
             if (asleep) _orders.TryGetValue(mp, out mine);
-            string det;
+            string det; NReason blk; bool crush;
             // poprawka recenzji: na sucho dlug nie ma splaty (bez obozu od 20:00 i snu ciaglego), wiec rosnie sztucznie do 3 - klasyfikacja
-            // z dlugiem 0, inaczej poscig i odsiecz bylyby odciete i P0 zanizalby "szloby z powodem"
-            r = Classify(mp, s, 0, leader, asleep ? (mine ?? EmptyOrder) : null, out det);
+            // z dlugiem 0, inaczej poscig i odsiecz bylyby odciete i P0 zanizalby "szloby z powodem"; T10-R: na sucho bez obowiazkowego odpoczynku
+            r = Classify(mp, s, 0, false, leader, asleep ? (mine ?? EmptyOrder) : null, out det, out blk, out crush);
             if (r == NReason.None)
             {
                 float a, b; string how;
-                alarm = AlarmThreat(mp, s, campSet, out a, out b, out how) != null;
+                alarm = AlarmThreat(mp, s, campSet, 1f, out a, out b, out how) != null;
             }
             return true;
         }
@@ -741,7 +940,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ R2: ksiega snu AI
-        private static void AiSleepLedger(Settings s, int h)
+        private static void AiSleepLedger(Settings s, int h, bool catchUp)
         {
             if (!LedgerOn(s))
             {
@@ -767,8 +966,11 @@ namespace Armoury
             float dayF = MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
             float baza = Math.Max(1f, s.SleepHoursNeeded);
             bool campPast = InCamp(h - 1);                         // godzina, ktora wlasnie minela, byla godzina obozu
-            bool isDawn = h == dawn;
             double nowH = NowH();
+            // T10-R (R7): swit rozlicza sie raz - tick nadrabiany w tej samej klatce ma te sama godzine doby
+            bool isDawn = h == dawn && (_lastDawnH < 0 || nowH - _lastDawnH > 12.0);
+            if (isDawn) _lastDawnH = nowH;
+            int maxF = MaxForced(s);
             var mt = campPast ? new MoveTally() : null;
             bool changed = imported;   // wczytane dlugi - kary od pierwszego ticku
             var lords = MobileParty.AllLordParties;
@@ -810,6 +1012,18 @@ namespace Armoury
                         // morze, oboz swiata (_bedPos) i sen dlugu to zasady snu - dochodza tylko tutaj
                         bool resting = Drill.RestHour(mp, step) || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
                                        || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp);
+                        // T10-R (R7): tick nadrabiany w tej samej klatce - pozycja sie nie zmienila, wiec krok 0 dalby darmowy odpoczynek;
+                        // ta godzina wyglada jak poprzednia
+                        if (catchUp && known) resting = e.LastRest;
+                        e.LastRest = resting;
+                        // T10-R (R6): sen ciagly na miejscu - dlug >= 2, odpoczywa, a snem dlugu polozyc jej nie wolno albo jeszcze nie lezy
+                        // (oboz oblezenia, oblezona osada, morze, czlonek armii, AI trzyma inny mod); licznik biegnie jak w snie dlugu, ruch go konczy.
+                        // Doczepieni do gracza - jak dotad (o snie decyduje gracz).
+                        bool inDebtSleep = _debtSleep.ContainsKey(mp);
+                        bool passive = on && resting && e.Debt >= 2 && !withLead && !inDebtSleep && mp.AttachedTo != main;
+                        if (passive) { if (e.Acc < 0f) e.Acc = e.Rest; _day.PassiveHours++; }
+                        else if (e.Passive && !withLead && !inDebtSleep) LeaveAcc(e);
+                        e.Passive = passive;
                         if (resting)
                         {
                             float inc = night ? 1f : dayF;
@@ -827,9 +1041,14 @@ namespace Armoury
                         if (!e.Credited && eff >= NeededAi(baza, e.Debt))
                         {
                             e.Credited = true;
-                            if (e.Debt > 0) { _day.PaidBy[Math.Min(3, e.Debt)]++; e.Debt = 0; e.PaidSinceDawn = true; _day.Paid++; changed = true; }
+                            if (e.Debt > 0)
+                            {
+                                _day.PaidBy[Math.Min(3, e.Debt)]++; e.Debt = 0; e.PaidSinceDawn = true; _day.Paid++; changed = true;
+                                if (e.Passive) _day.PassivePaid++;
+                                e.Streak = 0; e.D3 = 0;   // T10-R: splata konczy obowiazkowy odpoczynek i serie
+                            }
                         }
-                        if (isDawn && SettleAi(e, baza, nowH)) changed = true;
+                        if (isDawn && SettleAi(e, baza, nowH, maxF)) changed = true;
                     }
                     catch (Exception ex) { AiStumble("AiSleepLedger", mp, ex); }
                 }
@@ -865,12 +1084,14 @@ namespace Armoury
             }
         }
 
-        /// <summary>Swit ksiegi AI - jak SettleNight gracza: kto nie przespal bazy (i nie spi snem ciaglym), temu dlug +1 (maks. 3).</summary>
-        private static bool SettleAi(AiSleep e, float baza, double nowH)
+        /// <summary>Swit ksiegi AI - jak SettleNight gracza: kto nie przespal bazy (i nie spi snem ciaglym), temu dlug +1 (maks. 3).
+        /// T10-R: seria nocy bez snu (doba bez bazy = noc forsownego marszu), doby na dlugu 3 i nowe obowiazkowe odpoczynki.</summary>
+        private static bool SettleAi(AiSleep e, float baza, double nowH, int maxF)
         {
             bool full = nowH - e.SinceH >= 18.0;
             bool sleptBase = e.Acc >= 0f || e.Rest >= baza;
             bool ch = false;
+            bool wasMust = Must(e, maxF);
             if (e.NightFlags != 0) { _day.Marched++; if (sleptBase) _day.MarchedNoDebt++; }
             if (!full) _day.NoFullDay++;
             else if (!sleptBase)
@@ -893,6 +1114,11 @@ namespace Armoury
                 else if (e.Debt >= 2) _day.C1Up++;
                 else _day.C1Stay++;
             }
+            // T10-R: seria rosnie o kazda pelna dobe bez bazy, przespana baza ja zeruje; doby na dlugu 3 z rzedu (cel testu: nikt > 2 poza ucieczka)
+            if (full) e.Streak = sleptBase ? 0 : e.Streak + 1;
+            if (e.Debt == 0) e.Streak = 0;
+            e.D3 = e.Debt >= 3 ? e.D3 + 1 : 0;
+            if (!wasMust && Must(e, maxF)) _day.MustNew++;
             e.DawnDebt = e.Debt; e.PaidSinceDawn = false;
             e.Rest = 0f; e.Credited = false; e.NightFlags = 0;
             return ch;
@@ -978,8 +1204,9 @@ namespace Armoury
               .Append("; oboz splaty od ").Append(DebtCampHour).Append(":00 partii ").Append(d.EveningCamps).Append(", sen ciagly ").Append(d.ContSleeps)
               .Append(", zwolnione ze snu dlugu ").Append(d.Released).Append(", dluznik szedl z powodem ").Append(d.DebtReason)
               .Append(", alarm dluznika ").Append(d.DebtAlarm).Append(", dluznicy obudzeni cudza reka ").Append(d.DebtWoken)
-              .Append("; zapasci (nowy dlug 3) ").Append(d.Collapses)
-              .Append(" | ruch w oknie obozu (pomiar z pozycji, ").Append(d.MoveHours).Append(" h): samotni lordowie ").Append(d.MoveLone)
+              .Append("; zapasci (nowy dlug 3) ").Append(d.Collapses);
+            AppendRestRule(sb, now, d);
+            sb.Append(" | ruch w oknie obozu (pomiar z pozycji, ").Append(d.MoveHours).Append(" h): samotni lordowie ").Append(d.MoveLone)
               .Append(" partio-godzin, BEZ WPISU POWODU ").Append(d.MoveNoReason)
               .Append(" (sr. ").Append((d.MoveHours > 0 ? d.MoveNoReason / (float)d.MoveHours : 0f).ToString("0.0", ci)).Append(" na godzine; wyjazd z osady / po bitwie ")
               .Append(d.MoveExit).Append(", obudzeni cudza reka ").Append(d.MoveWoken).Append(", alarm bez ucieczki ").Append(d.MoveAlarmStay)
@@ -996,6 +1223,54 @@ namespace Armoury
               .Append(_alarmDhMax.ToString("0.000", ci)).Append(" h gry; potkniecia T10 w sesji ").Append(_aiStumbles).Append('.');
             Log.Info(sb.ToString());
             _debtDhMax = 0; _alarmDhMax = 0;
+        }
+
+        /// <summary>
+        /// T10-R: czesc linii switu o regule odpoczynku - partie na dlugu 1/2/3, obowiazkowy odpoczynek (teraz i nowe), najdluzsza seria nocy bez snu,
+        /// dlug 3 dluzej niz 2 doby z rzedu (cel testu: 0 poza ucieczka; do 3 nazw z miejscem), wymuszone odpoczynki i wyjatki (ucieczka) dzis,
+        /// wodzowie trzymani dlugiem czlonkow, sen ciagly na miejscu (R6) i ticki nadrabiane (R7).
+        /// </summary>
+        private static void AppendRestRule(StringBuilder sb, int[] now, DayCounters d)
+        {
+            int maxF = MaxForced(Settings.Current);
+            int today = (int)CampaignTime.Now.ToDays;
+            int mustNow = 0, bestStreak = 0, overStreak = 0, d3Long = 0, d3LongFlee = 0;
+            string bestName = "-";
+            var names = new List<string>();
+            foreach (var kv in _ai)
+            {
+                var e = kv.Value; var mp = kv.Key;
+                if (e == null || mp == null) continue;
+                if (Must(e, maxF)) mustNow++;
+                if (e.Streak > bestStreak) { bestStreak = e.Streak; try { bestName = mp.Name.ToString(); } catch { bestName = "?"; } }
+                if (maxF > 0 && e.Streak > maxF) overStreak++;
+                if (e.D3 > 2)
+                {
+                    d3Long++;
+                    bool fled = e.CrushDay >= 0 && e.CrushDay >= today - e.D3;
+                    if (fled) d3LongFlee++;
+                    if (names.Count < 3)
+                    {
+                        string nm; try { nm = mp.Name.ToString(); } catch { nm = "?"; }
+                        names.Add(nm + " " + e.D3 + " dob, " + Where(mp) + (fled ? ", ucieczka-wyjatek" : ""));
+                    }
+                }
+            }
+            sb.Append(" | ODPOCZYNEK T10-R (najwyzej ").Append(maxF).Append(" noce marszu z rzedu, potem oboz do dlugu 0): na dlugu 1/2/3: ")
+              .Append(now[1]).Append('/').Append(now[2]).Append('/').Append(now[3])
+              .Append("; obowiazkowy odpoczynek teraz ").Append(mustNow).Append(" (nowe dzis ").Append(d.MustNew).Append(")")
+              .Append("; najdluzsza seria nocy bez snu ").Append(bestStreak).Append(bestStreak > 0 ? " (" + bestName + ")" : "")
+              .Append(", serii dluzszych niz ").Append(maxF).Append(": ").Append(overStreak)
+              .Append("; dlug 3 dluzej niz 2 doby z rzedu ").Append(d3Long).Append(" (w tym z ucieczka-wyjatkiem ").Append(d3LongFlee).Append(")");
+            if (names.Count > 0) sb.Append(" [").Append(string.Join("; ", names)).Append("]");
+            sb.Append("; wymuszone odpoczynki dzis: partii ").Append(d.BlockedP.Count).Append(" (zablokowany marsz, partio-godziny: ucieczka ").Append(d.BlockFlee)
+              .Append(", poscig ").Append(d.BlockChase).Append(", odsiecz ").Append(d.BlockRelief).Append(", alarm ").Append(d.BlockAlarm).Append(")")
+              .Append("; wyjatki dzis - ucieczka przed wrogiem >= ").Append(F1(CrushRatio)).Append(" x silniejszym: partii ").Append(d.CrushP.Count)
+              .Append(" (partio-godzin ").Append(d.CrushHours).Append(")")
+              .Append("; wodzowie armii spia za zmeczonych czlonkow (partio-godziny) ").Append(d.ArmyHeld)
+              .Append("; sen ciagly na miejscu bez snu dlugu (oblezenie, oblezona osada, morze, armia, inny mod - partio-godziny) ").Append(d.PassiveHours)
+              .Append(", splacone tak ").Append(d.PassivePaid)
+              .Append("; ticki nadrabiane w jednej klatce ").Append(d.CatchUps);
         }
 
         /// <summary>
@@ -1092,6 +1367,7 @@ namespace Armoury
                 }
             bool evening = InDebtEvening(h);
             HashSet<MobileParty> campSet = null;
+            int maxF = MaxForced(s);
             foreach (var kv in _ai)
             {
                 var mp = kv.Key; var e = kv.Value;
@@ -1102,8 +1378,12 @@ namespace Armoury
                     bool inDebt = _debtSleep.TryGetValue(mp, out ds);
                     // sen ciagly bez snu dlugu (wczytany zapis, splata w trakcie, doczepiony po zwolnieniu wodza) - koniec licznika
                     // jak LeaveSleep gracza; inaczej Acc >= 0 zwalnialby partie z dlugu o kazdym swicie (SettleAi)
-                    if (!inDebt && e.Acc >= 0f && !SleepsWithLeader(mp)) LeaveAcc(e);
-                    if (e.Debt < 1 && !inDebt) continue;
+                    // T10-R (R6): sen ciagly na miejscu (e.Passive) trwa - konczy go ruch (AiSleepLedger)
+                    if (!inDebt && e.Acc >= 0f && !e.Passive && !SleepsWithLeader(mp)) LeaveAcc(e);
+                    // T10-R (R5): wodz armii decyduje wedlug najgorszego dlugu armii (czlonek nie moze sam sie polozyc - spi z wodzem)
+                    bool must;
+                    int ed = EffDebt(mp, e, maxF, out must);
+                    if (ed < 1 && !inDebt) continue;
                     // poprawka recenzji (R1b): AI trzyma INNY mod (uczta / gentry / statek BK) - nie kladziemy spac i nie skracamy cudzej
                     // blokady (DisableForHours(1) nadpisalby DisableAi, a ReleaseDebt -> EnableAi wypuscilby goscia z uczty)
                     if (inDebt && ForeignHold(mp))
@@ -1118,7 +1398,7 @@ namespace Armoury
                         _day.DebtForeign++;
                         continue;
                     }
-                    bool want = e.Debt >= 2 || (e.Debt == 1 && evening);
+                    bool want = ed >= 2 || (ed == 1 && evening);
                     var st = mp.CurrentSettlement;
                     bool can = mp.AttachedTo == null && mp.MapEvent == null && mp.BesiegerCamp == null && !mp.IsCurrentlyAtSea
                                && (st == null || st.SiegeEvent == null);
@@ -1127,20 +1407,22 @@ namespace Armoury
                     string det;
                     // spiacy w polu: rozkaz sprzed snu; spiacy w osadzie: rozkaz nietkniety (tylko AI wstrzymane) - liczy sie biezacy
                     NightOrder slept = !inDebt ? null : (ds.Order != null ? ds.Order : (st != null ? null : EmptyOrder));
-                    var r = Classify(mp, s, e.Debt, leader, slept, out det);
+                    NReason blk; bool crush;
+                    var r = Classify(mp, s, ed, must, leader, slept, out det, out blk, out crush);
+                    CountRule(mp, e, blk, crush, det);
                     if (r != NReason.None)
                     {
                         if (inDebt) ReleaseDebt(mp, e, ds);
                         _day.DebtReason++;
                         Mark(e, StReason, r);
-                        Example(mp, "dluznik idzie: " + det, e.Debt, leader);
+                        Example(mp, "dluznik idzie: " + det, ed, leader);
                         continue;
                     }
                     if (st == null)
                     {
                         if (campSet == null) campSet = new HashSet<MobileParty>(_camping);
-                        float ts, ms; string how;
-                        var th = AlarmThreat(mp, s, campSet, out ts, out ms, out how);
+                        string how;
+                        var th = AlarmFor(mp, s, campSet, must, blk, out how);
                         if (th != null)
                         {
                             NightOrder keep = inDebt ? ds.Order : TakeOrder(mp);
@@ -1151,14 +1433,15 @@ namespace Armoury
                             _alarmed[mp] = new AlarmInfo { AtH = NowH(), Pos = mp.GetPosition2D, DebtPath = true, Order = keep };
                             _day.DebtAlarm++;
                             Mark(e, StAlarm);
-                            Example(mp, "ALARM dluznika - " + how + " - AI ocenia ucieczke", e.Debt, leader);
+                            Example(mp, "ALARM dluznika - " + how + " - AI ocenia ucieczke", ed, leader);
                             continue;
                         }
                     }
-                    if (!inDebt) EnterDebt(mp, e, null);
+                    if (leader && ed > e.Debt) _day.ArmyHeld++;   // T10-R (R5): wodz spi za zmeczonych czlonkow armii
+                    if (!inDebt) EnterDebt(mp, e, null, ed);
                     else
                     {
-                        if (e.Debt >= 2 && ds.Kind != 2) { ds.Kind = 2; if (e.Acc < 0f) e.Acc = e.Rest; _day.ContSleeps++; }
+                        if (ed >= 2 && ds.Kind != 2) { ds.Kind = 2; if (e.Acc < 0f) e.Acc = e.Rest; _day.ContSleeps++; }
                         mp.Ai.DisableForHours(1);
                         if (st == null && mp.DefaultBehavior != AiBehavior.Hold)
                         {
@@ -1191,11 +1474,12 @@ namespace Armoury
             _townHold.Remove(mp);
         }
 
-        private static void EnterDebt(MobileParty mp, AiSleep e, NightOrder given)
+        /// <summary>ed - dlug, wedlug ktorego partia spi (T10-R R5: u wodza armii najgorszy z armii): 2-3 sen ciagly, 1 oboz splaty.</summary>
+        private static void EnterDebt(MobileParty mp, AiSleep e, NightOrder given, int ed)
         {
             // w osadzie wystarczy wstrzymac AI (gra nie wypusci partii z wylaczonym AI) - rozkaz zostaje nietkniety
             bool inTown = mp.CurrentSettlement != null;
-            var ds = new DebtSleeper { Bed = mp.GetPosition2D, Kind = e.Debt >= 2 ? 2 : 1, Order = given ?? (inTown ? null : TakeOrder(mp)) };
+            var ds = new DebtSleeper { Bed = mp.GetPosition2D, Kind = ed >= 2 ? 2 : 1, Order = given ?? (inTown ? null : TakeOrder(mp)) };
             DropFromCamp(mp);
             _debtSleep[mp] = ds;
             if (ds.Kind == 2) { if (e.Acc < 0f) e.Acc = e.Rest; _day.ContSleeps++; } else _day.EveningCamps++;
@@ -1326,7 +1610,10 @@ namespace Armoury
             int h = CampaignTime.Now.GetHourOfDay;
             if (a.DebtPath)
             {
-                if (s != null && DebtOn(s) && e != null && (e.Debt >= 2 || (e.Debt == 1 && InDebtEvening(h)))) { EnterDebt(mp, e, a.Order); return; }
+                // T10-R (R5): wodz armii wedlug najgorszego dlugu armii
+                bool must;
+                int ed = e != null ? EffDebt(mp, e, MaxForced(s), out must) : 0;
+                if (s != null && DebtOn(s) && e != null && (ed >= 2 || (ed == 1 && InDebtEvening(h)))) { EnterDebt(mp, e, a.Order, ed); return; }
                 ApplyOrder(mp, a.Order, false);   // dlug splacony albo koniec okna - rozkaz sprzed snu
                 return;
             }
@@ -1359,7 +1646,8 @@ namespace Armoury
                     var e = kv.Value;
                     if (kv.Key == null) continue;   // poprawka recenzji: partia chwilowo nieaktywna (rejs BK) tez idzie do zapisu
                     // MUSZTRA-j: takze wpis z samym dlugiem o swicie (dlug splacony w ciagu dnia - dzien cwiczen dalej stracony do nastepnego switu)
-                    if (e.Debt > 0 || e.DawnDebt > 0 || e.Rest > 0.05f || e.Acc >= 0f || e.Credited) list.Add(kv);
+                    // T10-R: takze sama seria nocy bez snu albo doby na dlugu 3
+                    if (e.Debt > 0 || e.DawnDebt > 0 || e.Rest > 0.05f || e.Acc >= 0f || e.Credited || e.Streak > 0 || e.D3 > 0) list.Add(kv);
                 }
                 list.Sort((a, b) => a.Value.Debt != b.Value.Debt ? b.Value.Debt.CompareTo(a.Value.Debt) : b.Value.Rest.CompareTo(a.Value.Rest));
                 var ci = CultureInfo.InvariantCulture;
@@ -1372,8 +1660,10 @@ namespace Armoury
                     if (string.IsNullOrEmpty(id) || id.IndexOf(':') >= 0 || id.IndexOf(';') >= 0 || id.IndexOf('|') >= 0) { skipped++; continue; }
                     var e = kv.Value;
                     // MUSZTRA-j: szoste pole - dlug o swicie; format "v1" zostaje (stary DLL czyta pola 0-4 i szoste pomija, nowy czyta je, jesli jest)
+                    // T10-R: siodme pole - seria nocy bez snu, osme - doby na dlugu 3 (stary DLL je pomija; napis idzie przez SaveText.Sync - "arm_nightrest_ai")
                     sb.Append(id).Append(':').Append(e.Debt).Append(':').Append(e.Rest.ToString("0.##", ci)).Append(':')
-                      .Append(e.Credited ? '1' : '0').Append(':').Append(e.Acc.ToString("0.##", ci)).Append(':').Append(e.DawnDebt).Append(';');
+                      .Append(e.Credited ? '1' : '0').Append(':').Append(e.Acc.ToString("0.##", ci)).Append(':').Append(e.DawnDebt)
+                      .Append(':').Append(e.Streak).Append(':').Append(e.D3).Append(';');
                     n++;
                     if (e.Debt > 0) debts++;
                     if (e.Acc >= 0f) sleeps++;
@@ -1449,6 +1739,11 @@ namespace Armoury
                     int dd;
                     if (f.Length > 5 && int.TryParse(f[5], NumberStyles.Integer, ci, out dd)) e.DawnDebt = Math.Max(0, Math.Min(3, dd));
                     else { e.DawnDebt = e.Debt; noDawnField++; }
+                    // T10-R: seria nocy bez snu i doby na dlugu 3 (zapis sprzed T10-R - od zera)
+                    int sk, d3;
+                    if (f.Length > 6 && int.TryParse(f[6], NumberStyles.Integer, ci, out sk)) e.Streak = Math.Max(0, Math.Min(999, sk));
+                    if (f.Length > 7 && int.TryParse(f[7], NumberStyles.Integer, ci, out d3)) e.D3 = Math.Max(0, Math.Min(999, d3));
+                    if (e.Debt == 0) e.Streak = 0;
                     _ai[mp] = e;
                     n++; debts[e.Debt]++; if (e.Acc >= 0f) sleeps++; if (e.DawnDebt > 0) dawn++;
                 }

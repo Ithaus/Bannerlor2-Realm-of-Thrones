@@ -300,6 +300,7 @@ namespace Armoury
             // T10: nowe przelaczniki i progi w tym samym podpisie (zmiana w MCM = nowa linia)
             sig = sig * 31 + (s.AiNightMarchByReason ? 1 : 0) * 8 + (s.AiSleepDebt ? 1 : 0) * 4 + (s.AiNightReliefWider ? 1 : 0) * 2 + (DryBuild ? 1 : 0);
             sig = sig * 31 + (int)Math.Round(s.AiNightsAwakeInChase * 100f) * 7 + (int)Math.Round(s.AiCampDangerRadius * 10f);
+            sig = sig * 31 + s.MaxForcedNights;   // T10-R
             if (sig == _cfgSig) return;
             _cfgSig = sig;
             Log.Info("NightRest: oboz swiata " + (st == e ? "WYLACZONY (rowne godziny " + st + "/" + e + ")" : st + ":00-" + e + ":00")
@@ -311,6 +312,8 @@ namespace Armoury
                      + s.AiNightsAwakeInChase.ToString("0.##", CultureInfo.InvariantCulture) + ", promien alarmu "
                      + s.AiCampDangerRadius.ToString("0.#", CultureInfo.InvariantCulture) + " jedn., poscig do " + CampLen()
                      + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00"
+                     + "; T10-R: MaxForcedNights=" + s.MaxForcedNights + (s.MaxForcedNights > 0 ? " (potem obowiazkowy odpoczynek do dlugu 0, ucieczka tylko przed wrogiem >= "
+                        + CrushRatio.ToString("0.#", CultureInfo.InvariantCulture) + " x silniejszym; armia wedlug najbardziej zmeczonej partii)" : " (bez limitu - stare reguly)")
                      + (DryBuild ? " - DLL NA SUCHO (T10_DRY): tylko log, zachowanie i kary jak w T1" : "")
                      + (!DryBuild && !s.AiNightMarchByReason ? " - powody nocnego marszu tylko w logu (na sucho)" : "")
                      + (!DryBuild && !s.AiSleepDebt ? " - ksiega snu AI tylko w logu (na sucho)" : "") + ".");

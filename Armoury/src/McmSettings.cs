@@ -3180,7 +3180,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool BanditsRestByDay { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0", HintText = "whole sleepless nights owed after which a lord no longer chases or rides to relief at night - the loss would outweigh the gain; fleeing is always allowed. 0 = only flight by night, 3 or more = only the collapse stops them")]
+        [SettingPropertyFloatingInteger("Ai Nights Awake In Chase", 0.00f, 4.00f, "0", HintText = "whole sleepless nights owed after which a lord no longer chases or rides to relief at night - the loss would outweigh the gain; fleeing stays allowed until Max Forced Nights orders a rest. 0 = only flight by night, 3 or more = only the collapse stops them")]
         [SettingPropertyGroup("A night's rest")]
         public float AiNightsAwakeInChase { get; set; } = 1f;
 
@@ -3199,6 +3199,10 @@ namespace Armoury
         [SettingPropertyBool("Ai Night Relief Wider", HintText = "on: lords also march through the night to relieve a BESIEGED town or castle of their realm, and army leaders ride to relief too; off: only a lone lord, and only to stop a raid in progress")]
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightReliefWider { get; set; } = false;
+
+        [SettingPropertyInteger("Max Forced Nights", 0, 5, "0", HintText = "AI lords march through at most this many sleepless nights in a row: after that - or once they owe this many nights - they must make camp and rest until the debt is fully slept off, with no night chase, relief or flight; only a foe at least twice as strong (who would destroy them) still sends them running. A host rests as one: its leader decides by the most tired party in the army. 0 = no limit (old rules)")]
+        [SettingPropertyGroup("A night's rest")]
+        public int MaxForcedNights { get; set; } = 2;
 
         [SettingPropertyBool("Camp Tent Icon", HintText = "pitched camps show a tent on the map (yours and theirs)")]
         [SettingPropertyGroup("A night's rest")]
@@ -4639,6 +4643,7 @@ namespace Armoury
             s.AiNightMarchByReason = AiNightMarchByReason;
             s.AiSleepDebt = AiSleepDebt;
             s.AiNightReliefWider = AiNightReliefWider;
+            s.MaxForcedNights = MaxForcedNights;
             s.CampTentIcon = CampTentIcon;
             s.CoursePlotterEnabled = CoursePlotterEnabled;
             s.NightfallPromptEnabled = NightfallPromptEnabled;
