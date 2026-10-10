@@ -438,3 +438,7 @@ LIMITY 13:30: 5h 32%, TYDZIEN 82% (reset 15.10) - przy 100% tygodnia przejsc na 
   dla rodu rycerza w cudzej partii zold 0. DLL test\Armoury-e2c-c3c.dll (c38bd62f). **TEST 120 dob w toku** -> test\at-c3c-120.out.txt.
   **DO DECYZJI JEFFA (pozniej):** koszt "wezwania sojusznika do wojny" (gra AddExpensesForCallToWarAgreements) placa kiesy rodow, takze rycerzy bez lenna
   (Pentos: -57 tys., -40 tys. ... w kilka dob) - propozycja: z korony (skarbca) zamiast z kies; zmienia wszystkie rody, wiec pytanie do Jeffa.
+- (05:00) **TEST C3c 120 dob ZAWIESIL SIE w dobie 43** (hang-2026-10-10_04-43-29.log: brak ramek zarzadzanych, gleboko w silniku; 1 s wczesniej SilentAssert w
+  HeroCreator.DeliverOffSpring: "mother.Race == father.Race" - porod dziecka rodzicow roznych ras; pierwszy raz w historii testow). Hipoteza: po 179 glowy BK gentry
+  sa czynne (NotSpawned -> Active), wiec biora sluby/ciaze; szablon BK gentry moze miec inna Race niz ROT. Bieg C3b (tez z aktywacja) przeszedl 120 dob bez tego.
+  Powtorka testu w toku -> test\at-c3c2-120.out.txt. Jesli powtorzy sie: latka (prefiks DeliverOffSpring albo wyrownanie Race rycerza przy aktywacji w Join()).
