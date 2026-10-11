@@ -1174,6 +1174,8 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   P2 miasta dopelniane ze wsi regionu do udzialu miejskiego w ok. rok (`TownMigrationRefillDays` 364), nie tylko o ubytek naturalny; P3 nowa druzyna lorda - najpierw wolne rece
   krainy, potem zaloga siedziby, bez obu mniejsza; E4/10 pyt. 1 - rekrut tier 1-2 po zwolnieniu zawsze do domu, do karczmy tylko od tieru 3 (`VeteranMinTier` 3).
   (E4/10 pyt. 2 - sprzet zwolnionego ze zbrojowni pana - osobny krok po etapie 4, bez zmian.)
+- (11:05) **Jeff: pytania planu E4/9 - "tak, tak":** zalogi Strazy dalej rosna same, ale z prawdziwych ludzi Westeros (Mur nie slabnie); rozbici bracia wracaja
+  na Mur, uciekinierzy do puli wyrzutkow Polnocy.
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli

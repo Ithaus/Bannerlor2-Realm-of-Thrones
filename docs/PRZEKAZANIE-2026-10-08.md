@@ -767,3 +767,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (10:55) **WGRANIE 31** (Armoury cf40fefa = w-toku/zbior31 dfb12df, galaz noc/wgranie-31; kopia .bak-2026-10-11-przed-noc31 + D:\...\2026-10-11-noc31-przed) - po
   testach A, B (zima) i zapisie 9 dob (0 ERROR Armoury; flaga zimy po tescie B usunieta przez skrypt - gra jej nie kasuje). Opis w STAN-PRAC "WGRANIE 31".
   Dalej (zasada Jeffa): reszta E4 bez testow po drodze -> jeden test koncowy etapu -> poprawki -> wgranie.
+- (11:05) **Jeff: E4/9 "tak, tak"** (zalogi Strazy rosna z ludzi Westeros; rozbici bracia na Mur, uciekinierzy do wyrzutkow Polnocy) + "rob dalej".

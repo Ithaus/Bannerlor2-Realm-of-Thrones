@@ -536,6 +536,8 @@ Wszystkie cele na watku glownym kampanii (myslenie AI godzinowe, werbunek, sprze
 
 ## 15. Pytania i informacje
 
+**ROZSTRZYGNIETE (Jeff 11.10 ok. 11:05, "tak, tak"): (1) zalogi Strazy dalej rosna same, ale z prawdziwych ludzi Westeros - TAK; (2) rozbici bracia wracaja na Mur, uciekinierzy do puli wyrzutkow Polnocy - TAK.**
+
 **Pytania do Jeffa (tylko kierunek):**
 - **P1. Zalogi Nocnej Strazy:** dzis zalogi Strazy rosna co dzien same (przyrost z gry), a od E4/8 wszystkie inne zalogi juz nie. Po E4/9 kazdy taki brat bylby prawdziwym czlowiekiem z Westeros
   (najpierw skazancy, potem wyrzutki, potem ludzie z krain wedlug ich liczby). Zostawic ten doplyw Strazy (Mur nie slabnie), czy jak wszedzie - zaloga Strazy rosnie tylko z werbunku
