@@ -802,3 +802,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   rozwiazuje armie i odmraza dowodce, naprawa starych zapisow (tylko dowodca zapamietany przez ROT; inni zamrozeni - lista w logu). 4 wylaczniki w Config/settings.xml.
   DLL: test\CrashScribe-bledy.dll d971bc42, CrashScribe-at-bledy.dll eac95b1c (z at1-cs.diff). OTWARTE (pytanie do Jeffa): nasz port Muru (WallSetupWith) ma ten sam
   problem - zastepca zostaje zamrozony na koncu wydarzenia. Stare zachowanie ROT (nie nasze): armia < 75% obroncow -> ROT moze trzymac dowodce zamrozonego bez konca.
+- (14:50) **Jeff: "tak, napraw i rob dalej"** - B6c port Muru (odmrazanie zastepcy na koncu wydarzenia, wzorem B6b) - workflow wf_83274572-3f7 na w-toku/cs-bledy.
