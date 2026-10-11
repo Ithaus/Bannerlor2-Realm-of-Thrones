@@ -74,6 +74,7 @@ namespace RealisticCaptivity
             {
                 var s = Settings.Current;
                 if (_vanillaOnly) return;                                     // liczymy cene gry (do potracenia nadwyzki)
+                if (RotEnlistLoot37.TryCap(h, ref result)) return;            // 3.7: lup zaciagu ROT - lord min(nasz okup, cena gry), nikt nie placi
                 // 178 (Armoury, projekt etapu 2 krok D): okup wedlug majatku - cena z Armoury (sprzedaje gracz: gotowka, ktora rod jenca odda; trzyma gracz: pelna
                 // cena); rod jenca rozlicza Armoury (gotowka w nicosc - rownowazy zloto gry, reszta dlug w ksiedze 168) - tu bez potracen
                 // tylko lordowie, ktorych trzyma albo sprzedaje gracz (jak RC) - okupy miedzy AI, lapowki w lochach itd. bez zmian (Armoury ma wlasny przeplyw AI-AI)

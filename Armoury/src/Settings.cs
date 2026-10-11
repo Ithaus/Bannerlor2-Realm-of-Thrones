@@ -1156,6 +1156,10 @@ namespace Armoury
         public bool BkVillageMarketPaysWhatItHas = true;   // a village with a Banner Kings marketplace buys a surplus good from its town only while it has the coin for it, and the town gets exactly what the village paid (Banner Kings let the village pay more than it had and gave the town the full price out of nothing; off = as before)
         public bool BkSlaveSalePaidByTown = true;          // surplus slaves sold off by a settlement's owner (Banner Kings decision to sell surplus slaves) are paid for by the merchants of that town or castle - at most what its purse may spend - instead of with coin out of nothing; the slaves they cannot pay for stay in the settlement (off = as before)
         public bool BkKnightKitPaidToTown = true;          // when an AI lord raises a new household knight (Banner Kings with the ROT patch), the price of the knight's arms and armour goes to the market of the knight's village instead of vanishing (off = as before)
+        // --- Realm of Thrones without gold from nowhere (3.7) ---
+        // 3.7 ROT: podmiana rekruta ROT bez zwrotu z niczego (doplata za drozszego jak awans gry) i rebelia z kasy osady (RotLeaks37.cs)
+        public bool RotSwapNoGold = true;                  // when Realm of Thrones turns an AI lord's soldier into a cheaper man of the lord's house, the lord no longer gets the difference in recruit cost out of thin air: it is the same man, and the kit he lacks is bought on the market as usual. A swap into a dearer man still costs the lord the difference, just as a troop upgrade does (off = Realm of Thrones also pays the lord the difference out of nowhere)
+        public bool RebelPurseFromTown = true;             // the 50,000 gold a rebel leader gets when a town or castle rebels come out of that settlement's own coffers, as much as they hold - not out of thin air (off = the game's gift from nowhere)
 
         public static void Load(string moduleDataDir)
         {

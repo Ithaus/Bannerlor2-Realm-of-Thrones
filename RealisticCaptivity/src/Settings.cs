@@ -150,6 +150,10 @@ namespace RealisticCaptivity
         public int EnlistedPostBattleHealHp = 10;          // a field dressing after the fight - this many hit points, no more
         public int EnlistedDailyCareHp = 15;               // the army medicus can restore this much each day
 
+        // --- Realm of Thrones without gold from nowhere (3.7) ---
+        // 3.7 ROT: wycena lorda w lupie zaciagnietego gracza - min(nasz okup, cena gry) (RotEnlistLoot37.cs)
+        public bool RotEnlistLootGamePrice = true;         // while you serve enlisted under a lord, a captured lord in your share of the loot is valued at the game's ransom price or at the ransom his house would pay you, whichever is lower - nobody pays that ransom here, the value only turns into goods for you (off = valued at the ransom his house would pay you, as before)
+
         // --- Other ---
         public bool LogEnabled = true;                     // write a log file in the module folder
 
