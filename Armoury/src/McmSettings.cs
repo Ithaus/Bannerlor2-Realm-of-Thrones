@@ -1428,7 +1428,7 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool TravellersNoGoods { get; set; } = true;
 
-        [SettingPropertyBool("Travellers Real Goods", HintText = "Banner Kings travellers carry real goods: no road food or pack animals from nowhere - they take only the food their road needs from the stalls of their home town or castle, and between two towns they carry a small load bought from the home merchants, picked by the profit it fetches at the destination; the destination town pays for the goods and the takings go back to the home town's coffers (works only with Travellers No Goods on; off = Banner Kings road food and pack animals from nowhere, as before)")]
+        [SettingPropertyBool("Travellers Real Goods", HintText = "Banner Kings travellers carry real goods: no road food or pack animals from nowhere - they take only the food their road needs from the stalls of their home town or castle (if the stalls run short, the rest comes out of its food stores), and between two towns they carry a small load of goods (not food) bought from the home merchants, picked by the profit it fetches at the destination; the destination town pays for the goods and the takings go back to the home town's coffers (works only with Travellers No Goods on; off = Banner Kings road food and pack animals from nowhere, as before)")]
         [SettingPropertyGroup("Smithing materials")]
         public bool TravellersRealGoods { get; set; } = true;
 

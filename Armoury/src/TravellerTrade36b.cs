@@ -30,7 +30,13 @@ namespace Armoury
     ///     (odleglosc / (predkosc partii z modelu x 16 h marszu na dobe) w gore + 2 doby zapasu, 2-8 dob; droga nieznana - 4). Zwierzat jucznych nie ma wcale (pozycja planu 3.11: "albo wcale,
     ///     gdy ladunek miesci sie w udzwigu ludzi") - zywnosc na kilka dob i maly towar mieszcza sie w udzwigu samych ludzi (10 + 20 na zdrowego),
     ///     a sprzedaz jucznych u celu (kara gry +0.8 dla nie-karawany) i stale przesuwanie ich z miasta A do B (BK wysyla z A zawsze do tego samego
-    ///     celu) bylyby gorsze niz brak. Gdy na polce brak zywnosci - partia bierze, co jest (licznik "brak na polce").
+    ///     celu) bylyby gorsze niz brak. Gdy na polce brak zywnosci (licznik "brak na polce" - zwykle zamki), reszte potrzeby daje ZAPAS ZYWNOSCI
+    ///     osady pochodzenia (Fief.FoodStocks - miasto i zamek; najwyzej polowa zapasu): jednostka zapasu = sztuka zywnosci (BK GetItemFoodValue,
+    ///     dostawa konwoju zywnosci) = 100 punktow PartyBase.RemainingFoodPercentage - partia dostaje ja jako zapas bez sztuk (gra zjada go przed
+    ///     sztukami: FoodConsumptionBehavior.PartyConsumeFood odejmuje dzienne zuzycie od RemainingFoodPercentage, sztuki je dopiero ponizej 0),
+    ///     a co z niego zostanie u celu, wraca do zapasu osady, do ktorej weszli (poprawka po recenzji: glodujacy wedrowcy dostaja rany -
+    ///     PartyHealCampaignBehavior, SlowHealing - a BK u celu liczy rannych podwojnie, Helpers.GetRosterCount = Number + WoundedNumber,
+    ///     wiec glod tworzyl ludzi z niczego). Brak takze w zapasie - licznik "brak takze w zapasie".
     ///  2. TOWAR W KOMIS OD KUPCOW MIASTA POCHODZENIA (tylko miasto -> miasto: zamek to nie targ, 171 C2.3; bez wojny i bez oblezenia celu).
     ///     Wedrowcy nie maja wlasnego pieniadza (ludnosc BK bez kiesy; kiesa ludu to etap 5), a kasa miasta to kapital kupcow targu (zasada L1
     ///     PROJEKT-KIESA-LUDU) - kupcy powierzaja im towar z polki (zaliczka na kiese wedrowcow = zaplata za towar w tej samej kasie, wiec bez przeplywu).
@@ -38,8 +44,10 @@ namespace Armoury
     ///     tylko gdy zysk >= 10% ceny i >= 1 zl; kolejnosc - najwiekszy zysk na zlotowke; kazda sztuka po swojej cenie liczonej od nowa (zasada "ceny hurtu"
     ///     09.10), zakup towaru konczy sie, gdy zysk spadnie ponizej progu. Mala ilosc: budzet = TravellerTradePerHead x ludzie, najwyzej 5% kasy
     ///     pochodzenia i 5% kasy celu; jeden towar najwyzej polowa budzetu i polowa pozycji polki; ladunek do 90% udzwigu. Bez surowcow masowych i kuzni
-    ///     (ruda, drewno, skory, skora, len, plotno, welna, wegiel, sztaby - maja wlasne drogi: CaravanBulk wedlug brakow miast, kontrakty 174) i bez
-    ///     "stolen_goods".
+    ///     (ruda, drewno, skory, skora, len, plotno, welna, wegiel, sztaby - maja wlasne drogi: CaravanBulk wedlug brakow miast, kontrakty 174), bez
+    ///     "stolen_goods" i BEZ ZYWNOSCI (poprawka po recenzji: gra zjada w drodze losowa sztuke zywnosci z ladunku - FoodConsumptionBehavior.
+    ///     MakeFoodConsumption - wiec zywnosc kupiona na handel szlaby w brzuchy, a u celu liczylaby sie jako "zywnosc", nie "towar"; zywnosc
+    ///     w ladunku to tylko zywnosc drogi).
     ///  3. U CELU (prefiks AddPopulationPartyBehavior, priorytet ponad First - PRZED oknem pomiaru O21 ksiegi obiegu, ktore inaczej wzieloby zaplate
     ///     za "konwoj w nicosc"): caly ladunek handlowy (towar, zywnosc, zwierzeta - takze zapasy BK partii sprzed wlaczenia) idzie na polke osady,
     ///     do ktorej weszli (miasto albo zamek), kazda sztuka po swojej cenie sprzedazy liczonej od nowa; kasa osady placi tylko, co ma (reszta na polke
@@ -47,11 +55,17 @@ namespace Armoury
     ///     Kiesy wedrowcow (PartyTradeGold) nie ruszamy - zaplata idzie wprost kasa celu -> kasa pochodzenia, wiec w drodze kiesa jest pusta i z rozbita
     ///     partia nie ginie zloto (towar - lup zwyciezcy, jak u karawan). Zostawione na polce celu bez zaplaty i powrot do domu - towar nie ginie.
     ///     Wedrowcy zawroceni do domu: ladunek wraca na polke domu bez zaplaty (kasa placilaby sama sobie). Osada bez targu (Town == null) - nic.
+    ///     Zaplata liczona osobno za towar, zywnosc i zwierzeta - zysk wypraw to utarg za towar wobec ceny zakupu towaru, ktory doszedl do obcego
+    ///     targu (zywnosc drogi ma osobny rachunek: wydana, zjedzona, na polke celu). Przed liczeniem BK: cywile w skladzie (szeregowi z tym samym
+    ///     filtrem w StringId co BK - villager / craftsman / noble) i ilu z nich rannych - tylu BK dopisze drugi raz (licznik; leczenie przed
+    ///     liczeniem BK to osobna decyzja Jeffa - poprawiloby tez rannych z bitew).
     ///
     /// Ksiega towarow (GoodsLedger): zakup i sprzedaz w ramkach "handel partii" (FSell) - przewoz miedzy polka a partia znosi sie do zera
     /// ("inne partie kupily / sprzedaly"); zywnosc drogi zjedzona = "zywnosc partii"; dar BK (GiveFood) nie rodzi sie juz w "inne ticki dobowe (osady)"
     /// i nie ginie w "przepadlo z rozbitymi partiami". Ksiega pieniadza (MoneyLedger.Note, rodzaj NTravel): kasa celu -R i kasa pochodzenia +R w tej
     /// samej chwili - przelew miedzy posiadaczami (zloto swiata bez zmian), w linii "Przeplywy osad" para "wedrowcy BK (36b)".
+    /// Zapas zywnosci osady (FoodStocks) to nie sztuki - ksiega towarow go nie widzi; jego droga w linii 36b: zapas pochodzenia -> zjedzony w drodze
+    /// albo do zapasu osady celu (albo przepadl z partia - wies bez zapasu, partia zniknela).
     /// Wyjatki liczone per partia (potkniecia), bez globalnego wylacznika. Stan (spis wypraw w drodze) czyszczony przy innej kampanii; nie idzie
     /// do zapisu - partie w drodze w chwili wczytania sprzedaja u celu tak samo (licznik "spoza spisu").
     /// </summary>
@@ -64,6 +78,7 @@ namespace Armoury
         private const float ShelfShare = 0.5f;   // z jednej pozycji polki najwyzej polowa
         private const float ItemShare = 0.5f;    // jeden towar najwyzej polowa budzetu
         private const float LoadUse = 0.9f;      // ladunek do 90% udzwigu (jak karawany gry)
+        private const float StockShare = 0.5f;   // luka zywnosci drogi z zapasu osady (FoodStocks) - najwyzej polowa zapasu (zaloga zamku tez je)
         private const float RoadPace = 2f;       // predkosc partii (jednostek na godzine), gdy model nie odpowie - tylko do liczenia dni drogi
         private const float MarchHours = 16f;    // godzin marszu na dobe (postoje, noc) - ostroznie, zeby zywnosci starczylo
         private const int ExtraDays = 2, MinDays = 2, MaxDays = 8, UnknownRoadDays = 4;
@@ -77,18 +92,24 @@ namespace Armoury
         private static bool _inCreate, _createTrading;
         private static string _wiredLine = "nie wpiete";
 
-        private sealed class Venture { public int Units, Food; public long Cost, Est, FoodV; public double Day; }
+        private sealed class Venture { public int Units, Food, Bank; public long Cost, Est, FoodV; public double Day; }   // Bank - jednostki z zapasu osady (FoodStocks)
         private struct Cand { public EquipmentElement El; public int Buy, Sell, Have; public float Gain; }
         private static readonly Dictionary<MobileParty, Venture> _ventures = new Dictionary<MobileParty, Venture>();
         private static object _camp;   // kampania, ktorej dotyczy spis i liczniki (inna kampania = od zera)
 
         // liczniki doby (linia "Wedrowcy BK - prawdziwy towar (36b)")
         private static int _dParties, _dMen, _dPackSkipped, _dFoodSkippedMen, _dFoodNeed, _dFood, _dFoodShort, _dShortParties;
+        private static int _dStock, _dStockShort, _dStockShortParties;   // luka z zapasu osady (FoodStocks) i brak takze w zapasie
         private static long _dFoodV, _dDaysSum;
-        private static int _dVentures, _dNoGain, _dCastle, _dWar, _dSiege, _dNoBudget, _dUnits, _dLimLoad, _dLimBudget, _dLimMarket;
+        private static int _dVentures, _dWithGoods, _dNoGain, _dCastle, _dWar, _dSiege, _dNoBudget, _dUnits, _dLimLoad, _dLimBudget, _dLimMarket;
         private static long _dBudget, _dCost, _dEst;
         private static int _dArrived, _dOld, _dHome, _dHomeUnits, _dNoMarket, _dSoldGoods, _dSoldFood, _dSoldAnimals, _dUnpaid, _dStarved;
-        private static long _dPaid, _dArrCost, _dArrEst;
+        private static long _dPaid, _dPaidGoods, _dPaidFood, _dPaidAnimals;
+        // partie ze spisu: towar sprzedany u obcego targu (zysk) i zywnosc drogi (wydana / doszla) oraz zapas osady (dany / wrocil / przepadl)
+        private static long _dKGoodsCost, _dKGoodsEst, _dKGoodsPaid;
+        private static int _dKGoodsOut, _dKGoodsBack, _dKFoodOut, _dKFoodBack, _dBankOut, _dBankBack, _dBankLost;
+        // cywile u celu (przed liczeniem BK): ludzie, ranni (BK dopisze ich drugi raz), ranni w glodnych partiach, partie z rannymi
+        private static int _dCiv, _dCivWounded, _dCivWoundedStarved, _dWoundedParties;
         private static double _dRoadDays;
         private static int _dArrKnown;
         private static int _dStumbles, _stumbles;
@@ -252,7 +273,19 @@ namespace Armoury
                 got += n; v.Food += n; v.FoodV += cost;
             }
             _dFood += got; _dFoodV += v.FoodV;
-            if (got < need) { _dFoodShort += need - got; _dShortParties++; }
+            if (got >= need) return;
+            int gap = need - got;
+            _dFoodShort += gap; _dShortParties++;
+            // luka z zapasu zywnosci osady pochodzenia (poprawka po recenzji - glodujacy wedrowcy dostaja rany, a BK liczy rannych u celu
+            // podwojnie): jednostka zapasu = sztuka zywnosci = 100 punktow RemainingFoodPercentage; zapas bez sztuk, gra zjada go przed sztukami
+            int give = Math.Min(gap, (int)Math.Floor(Math.Max(0f, town.FoodStocks) * StockShare));
+            if (give > 0)
+            {
+                town.FoodStocks -= give;
+                party.Party.RemainingFoodPercentage = Math.Max(0, party.Party.RemainingFoodPercentage) + give * 100;
+                v.Bank = give; _dStock += give;
+            }
+            if (gap > give) { _dStockShort += gap - give; _dStockShortParties++; }
         }
 
         private static void Trade(MobileParty party, Settlement origin, Settlement target, int men, Venture v)
@@ -272,7 +305,8 @@ namespace Armoury
             {
                 var el = shelf.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
-                if (it == null || el.Amount < 2 || !it.IsTradeGood || it.NotMerchandise || el.EquipmentElement.ItemModifier != null || Excluded(it)) continue;
+                // bez zywnosci (po recenzji): gra zjada w drodze losowa sztuke zywnosci z ladunku - zywnosc w ladunku to tylko zywnosc drogi
+                if (it == null || el.Amount < 2 || !it.IsTradeGood || it.IsFood || it.NotMerchandise || el.EquipmentElement.ItemModifier != null || Excluded(it)) continue;
                 int b = from.GetItemPrice(el.EquipmentElement, party, false);
                 if (b <= 0 || b > budget) continue;
                 int s = to.GetItemPrice(el.EquipmentElement, party, true);
@@ -307,6 +341,7 @@ namespace Armoury
                 v.Units += n; v.Cost += cost; v.Est += (long)sell * n;
             }
             _dUnits += v.Units; _dCost += v.Cost; _dEst += v.Est;
+            if (v.Units > 0) _dWithGoods++;   // "z towarem" - proba wyprawy (_dVentures) liczy tez te, ktore nic nie kupily
             if (v.Units == 0) _dNoGain++;
             else if (full) _dLimLoad++;
             else if (left < budget / 10) _dLimBudget++;
@@ -383,10 +418,14 @@ namespace Armoury
             _dArrived++;
             if (v != null)
             {
-                _dArrKnown++; _dArrCost += v.Cost + v.FoodV; _dArrEst += v.Est;
+                _dArrKnown++;
                 _dRoadDays += Math.Max(0.0, CampaignTime.Now.ToDays - v.Day);
             }
-            try { if (mp.Party != null && mp.Party.IsStarving) _dStarved++; } catch { }   // zywnosci drogi zabraklo przed celem
+            bool starving = false;
+            try { starving = mp.Party != null && mp.Party.IsStarving; } catch { }   // zywnosci drogi zabraklo przed celem
+            if (starving) _dStarved++;
+            try { Wounded(mp, starving); } catch (Exception e) { Stumble("Wounded", e); }
+            if (v != null) { try { BankBack(mp, st, v); } catch (Exception e) { Stumble("BankBack", e); } }   // blad tu nie zatrzymuje sprzedazy ladunku
             var town = st.Town;
             var r = mp.ItemRoster;
             if (town == null || r == null || st.ItemRoster == null) { _dNoMarket++; return; }
@@ -394,7 +433,8 @@ namespace Armoury
             bool same = home == null || home == st || home.Town == null;
             if (same) _dHome++;
             var shelf = st.ItemRoster;
-            long paid = 0;
+            long paid = 0, pGoods = 0, pFood = 0, pAnimals = 0;
+            int goodsBack = 0, foodBack = 0;
             var frame = GoodsLedger.Begin(GoodsLedger.FSell, mp.Party, st.Party, r, shelf);
             try
             {
@@ -425,7 +465,10 @@ namespace Armoury
                         shelf.AddToCounts(el.EquipmentElement, rest);
                         if (same) _dHomeUnits += rest; else _dUnpaid += rest;
                     }
-                    if (it.HasHorseComponent) _dSoldAnimals += n; else if (it.IsFood) _dSoldFood += n; else _dSoldGoods += n;
+                    // zaplata osobno za zwierzeta, zywnosc i towar (ta sama kolejnosc co liczniki sztuk)
+                    if (it.HasHorseComponent) { _dSoldAnimals += n; pAnimals += itemPaid; }
+                    else if (it.IsFood) { _dSoldFood += n; pFood += itemPaid; foodBack += n; }
+                    else { _dSoldGoods += n; pGoods += itemPaid; goodsBack += n; }
                 }
             }
             finally
@@ -439,7 +482,56 @@ namespace Armoury
                     MoneyLedger.Note(MoneyLedger.NTravel, home, (int)paid);
                     _dPaid += paid;
                 }
+                _dPaidGoods += pGoods; _dPaidFood += pFood; _dPaidAnimals += pAnimals;
+                if (v != null)
+                {
+                    _dKFoodOut += v.Food; _dKFoodBack += foodBack;   // zjedzona = wydana - doszla (towar bez zywnosci, dar BK pominiety)
+                    if (!same)
+                    {
+                        // zysk: utarg za towar wobec ceny zakupu towaru tej partii (powrot do domu - towar na polke domu, bez zysku i straty)
+                        _dKGoodsCost += v.Cost; _dKGoodsEst += v.Est; _dKGoodsPaid += pGoods;
+                        _dKGoodsOut += v.Units; _dKGoodsBack += goodsBack;
+                    }
+                }
             }
+        }
+
+        /// <summary>
+        /// Cywile przed liczeniem BK: BK dopisze osadzie Helpers.GetRosterCount(MemberRoster, filtr) = Number + WoundedNumber szeregowych
+        /// z filtrem w StringId (dekompilacja BannerKings.dll 11.10), a Number juz zawiera rannych - ranni wchodza do ludnosci drugi raz.
+        /// </summary>
+        private static void Wounded(MobileParty mp, bool starving)
+        {
+            var roster = mp.MemberRoster;
+            if (roster == null) return;
+            var pop = _pPop.GetValue(mp.PartyComponent, null);
+            string p = pop != null ? pop.ToString() : "";
+            string filter = p == "Serfs" ? "villager" : p == "Craftsmen" ? "craftsman" : "noble";   // ta sama regula co BK AddPopulationPartyBehavior
+            int civ = 0, wounded = 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var ch = roster.GetCharacterAtIndex(i);
+                if (ch == null || ch.IsHero || ch.StringId == null || !ch.StringId.Contains(filter)) continue;
+                civ += roster.GetElementNumber(i);
+                wounded += roster.GetElementWoundedNumber(i);
+            }
+            _dCiv += civ; _dCivWounded += wounded;
+            if (wounded > 0) { _dWoundedParties++; if (starving) _dCivWoundedStarved += wounded; }
+        }
+
+        /// <summary>
+        /// Zapas z FoodStocks, ktory zostal u celu, wraca do zapasu osady, do ktorej weszli (ludzie wchodza do jej ludnosci). RemainingFoodPercentage
+        /// >= 100 zostaje tylko z naszego zapasu: zjedzona sztuka daje +100, a gra je sztuki tylko ponizej 0 - wiec po sztukach wynik jest w 0-99.
+        /// </summary>
+        private static void BankBack(MobileParty mp, Settlement st, Venture v)
+        {
+            if (v.Bank <= 0 || mp.Party == null) return;
+            _dBankOut += v.Bank;
+            int left = Math.Min(v.Bank, Math.Max(0, mp.Party.RemainingFoodPercentage) / 100);
+            if (left <= 0) return;
+            mp.Party.RemainingFoodPercentage -= left * 100;
+            if (st.Town != null) { st.Town.FoodStocks += left; _dBankBack += left; }
+            else _dBankLost += left;   // wies - bez zapasu zywnosci (BK i tak dopisze tam ludzi)
         }
 
         // ------------------------------------------------------------ porzadki i linia doby
@@ -463,11 +555,15 @@ namespace Armoury
         private static void Clear()
         {
             _dParties = _dMen = _dPackSkipped = _dFoodSkippedMen = _dFoodNeed = _dFood = _dFoodShort = _dShortParties = 0;
+            _dStock = _dStockShort = _dStockShortParties = 0;
             _dFoodV = _dDaysSum = 0;
-            _dVentures = _dNoGain = _dCastle = _dWar = _dSiege = _dNoBudget = _dUnits = _dLimLoad = _dLimBudget = _dLimMarket = 0;
+            _dVentures = _dWithGoods = _dNoGain = _dCastle = _dWar = _dSiege = _dNoBudget = _dUnits = _dLimLoad = _dLimBudget = _dLimMarket = 0;
             _dBudget = _dCost = _dEst = 0;
             _dArrived = _dOld = _dHome = _dHomeUnits = _dNoMarket = _dSoldGoods = _dSoldFood = _dSoldAnimals = _dUnpaid = _dStarved = 0;
-            _dPaid = _dArrCost = _dArrEst = 0;
+            _dPaid = _dPaidGoods = _dPaidFood = _dPaidAnimals = 0;
+            _dKGoodsCost = _dKGoodsEst = _dKGoodsPaid = 0;
+            _dKGoodsOut = _dKGoodsBack = _dKFoodOut = _dKFoodBack = _dBankOut = _dBankBack = _dBankLost = 0;
+            _dCiv = _dCivWounded = _dCivWoundedStarved = _dWoundedParties = 0;
             _dRoadDays = 0; _dArrKnown = 0;
             _dStumbles = 0; _dTicks = 0;
         }
@@ -477,7 +573,7 @@ namespace Armoury
             try
             {
                 SameCampaign();
-                int lostN = 0, lostUnits = 0, transitN = 0, transitUnits = 0;
+                int lostN = 0, lostUnits = 0, lostBank = 0, transitN = 0, transitUnits = 0;
                 long lostV = 0, transitV = 0;
                 List<MobileParty> gone = null;
                 foreach (var kv in _ventures)
@@ -486,6 +582,12 @@ namespace Armoury
                     if (mp == null || !mp.IsActive)
                     {
                         lostN++; lostUnits += v.Units; lostV += v.Cost;
+                        if (v.Bank > 0)   // zapas z FoodStocks, ktory zostal w partii (ostatni stan; partia bez obiektu - caly)
+                        {
+                            int left = v.Bank;
+                            try { if (mp != null && mp.Party != null) left = Math.Min(v.Bank, Math.Max(0, mp.Party.RemainingFoodPercentage) / 100); } catch { }
+                            lostBank += left;
+                        }
                         if (gone == null) gone = new List<MobileParty>();
                         gone.Add(mp);
                     }
@@ -498,15 +600,21 @@ namespace Armoury
                 Log.Info("Wedrowcy BK - prawdziwy towar (36b): dzien " + (int)CampaignTime.Now.ToDays + (On ? "" : " (WYLACZONE - tylko dojscia sprzed wylaczenia)")
                          + " | wyruszylo " + _dParties + " partii (ludzi " + _dMen + "); BK nie dal z niczego: jucznych " + _dPackSkipped + ", zywnosci drogi dla " + _dFoodSkippedMen + " ludzi"
                          + " | zywnosc drogi z polek osad pochodzenia " + _dFood + " szt. za " + _dFoodV + " zl wedlug cen targu (potrzeba wedlug drogi " + _dFoodNeed
-                         + ", srednio " + (_dParties > 0 ? ((double)_dDaysSum / _dParties).ToString("0.0", inv) : "0") + " dob drogi (szacunek z zapasem 2 dob); brak na polce " + _dFoodShort + " szt. w " + _dShortParties + " partiach)"
-                         + " | towar w komis od kupcow miasta pochodzenia: wypraw " + _dVentures + ", kupiono " + _dUnits + " szt. za " + _dCost + " zl (budzet " + _dBudget
+                         + ", srednio " + (_dParties > 0 ? ((double)_dDaysSum / _dParties).ToString("0.0", inv) : "0") + " dob drogi (szacunek z zapasem 2 dob); brak na polce " + _dFoodShort + " szt. w " + _dShortParties + " partiach"
+                         + " -> z zapasu zywnosci osady pochodzenia (FoodStocks, najwyzej polowa) " + _dStock + " jedn.; brak takze w zapasie " + _dStockShort + " jedn. w " + _dStockShortParties + " partiach)"
+                         + " | towar w komis od kupcow miasta pochodzenia (bez zywnosci): prob wyprawy " + _dVentures + ", z towarem " + _dWithGoods + "; kupiono " + _dUnits + " szt. za " + _dCost + " zl (budzet " + _dBudget
                          + " zl, spodziewany utarg u celu " + _dEst + " zl); bez oplacalnego towaru " + _dNoGain + "; bez wyprawy: zamek na koncu drogi " + _dCastle + ", wojna " + _dWar
                          + ", oblezony cel " + _dSiege + ", bez budzetu " + _dNoBudget + "; koniec zakupu: udzwig " + _dLimLoad + ", budzet " + _dLimBudget + ", polka i marza " + _dLimMarket
                          + " | doszlo " + _dArrived + " partii (spoza spisu - sprzed wczytania albo wlaczenia: " + _dOld + ", glodnych u celu " + _dStarved + "): na polki osad celu towar " + _dSoldGoods + " szt., zywnosc " + _dSoldFood + ", zwierzeta " + _dSoldAnimals
-                         + "; kasy celu zaplacily " + _dPaid + " zl -> do kas osad pochodzenia (koszt wedlug cen zakupu " + _dArrCost + " zl - towar i zywnosc drogi " + _dArrKnown
-                         + " partii; spodziewany utarg " + _dArrEst + " zl; srednio " + (_dArrKnown > 0 ? (_dRoadDays / _dArrKnown).ToString("0.0", inv) : "0") + " dob w drodze)"
+                         + "; kasy celu zaplacily " + _dPaid + " zl -> do kas osad pochodzenia (za towar " + _dPaidGoods + ", zywnosc " + _dPaidFood + ", zwierzeta " + _dPaidAnimals + ")"
                          + ", bez zaplaty (kasa celu pusta) " + _dUnpaid + " szt., powrot do domu " + _dHome + " partii (" + _dHomeUnits + " szt. na polke domu bez zaplaty), osada bez targu " + _dNoMarket
-                         + " | zniknely w drodze " + lostN + " partii z towarem " + lostUnits + " szt. za " + lostV + " zl (bitwa - towar w lupie zwyciezcy, inne - przepadl)"
+                         + " | zysk towaru (partie ze spisu u obcego targu): koszt wedlug cen zakupu " + _dKGoodsCost + " zl (" + _dKGoodsOut + " szt., doszlo " + _dKGoodsBack + "), utarg za towar " + _dKGoodsPaid
+                         + " zl (spodziewany " + _dKGoodsEst + " zl); partii ze spisu (wszystkie dojscia) " + _dArrKnown + ", srednio " + (_dArrKnown > 0 ? (_dRoadDays / _dArrKnown).ToString("0.0", inv) : "0") + " dob w drodze"
+                         + " | zywnosc drogi u celu (partie ze spisu): wydana z polek " + _dKFoodOut + " szt., zjedzona " + (_dKFoodOut - _dKFoodBack) + ", na polke celu " + _dKFoodBack
+                         + "; z zapasu osady " + _dBankOut + " jedn.: zjedzona " + (_dBankOut - _dBankBack - _dBankLost) + ", do zapasu osady celu " + _dBankBack + ", przepadla (osada bez zapasu) " + _dBankLost
+                         + " | cywile u celu: BK dopisze " + _dCiv + " ludzi + " + _dCivWounded + " rannych drugi raz (BK liczy Number + WoundedNumber - ranni z niczego; partii z rannymi " + _dWoundedParties
+                         + ", rannych w glodnych partiach " + _dCivWoundedStarved + ")"
+                         + " | zniknely w drodze " + lostN + " partii z towarem " + lostUnits + " szt. za " + lostV + " zl (bitwa - towar w lupie zwyciezcy, inne - przepadl; zapas osady w nich " + lostBank + " jedn. - przepadl)"
                          + " | w drodze " + transitN + " partii z towarem " + transitUnits + " szt. za " + transitV + " zl"
                          + " | czas " + ms.ToString("0.0", inv) + " ms" + (_dStumbles > 0 ? "; potkniecia " + _dStumbles + " (od wczytania " + _stumbles + ")" : "") + ".");
             }
