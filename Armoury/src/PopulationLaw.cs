@@ -379,7 +379,8 @@ namespace Armoury
         //   zmiana dobowa = hearth x g / 100 / dni roku,   g [% rocznie] = G0 + GW x W - GH x H - GU x U, obciete do [-1.3; +0.8]
         //   W - dobrobyt warowni wsi wobec mediany warowni tego samego rodzaju (miasto albo zamek) w tej samej krainie (kultura z dnia kalibracji - U3), -0.5..+0.5;
         //       mediana krainy, nie srednia kroczaca: nie zalezy od wspolnego dryfu, nie potrzebuje stanu w zapisie, nie skacze w dniu wlaczenia ani po wczytaniu;
-        //   H - glod wsi (czesc plonu, ktora zabiera jej zima - WinterBite.VillageCut, E4/1 z czynnikiem krainy); WYLACZONY do E4/6 (GrowthHungerEnabled);
+        //   H - glod okregu (E4/6, R1): brak jedzenia gospodarzy wsi w ostatniej dobie ze spichlerza okregu (Famine.HungerOf, 0..1; 0 bez glodu, 0.1 w przednowku);
+        //       dawniej ciecie plonu zima (WinterBite.VillageCut) - zima glodem nie jest, dopoki spichlerz karmi; w glodzie (brak ponad prog) dodatni przyrost = 0 (GL 2.10);
         //   U - niebezpieczenstwo: 0.4 x (1 - bezpieczenstwo warowni / 100) + 0.3 x [region w wojnie - ta sama regula co powrot rozbitych E4/3: bez wiecznych
         //       wojen z Wolnymi Ludzmi i Innymi, OutlawLaw.WarWithoutEternal] + 0.3 x udzial spalonych i lupionych wsi regionu.
         // Premie hearth gry, BK i BKROT (perki, budynki, polityki, laski bogow, podatki, prawa) nie dopisuja hearth, tylko mnoza DODATNIE g:
@@ -402,6 +403,7 @@ namespace Armoury
             public bool Set;                // policzone przez postfiks (przyrost czynny)
             public bool Blocked;            // wies nie jest w stanie Normal (spalona, lupiona, pod przymusem): 0
             public float W, H, U;           // dobrobyt -0.5..+0.5; glod 0..1 (liczony takze, gdy wylaczony); niebezpieczenstwo 0..1
+            public bool Starving;           // E4/6: glod ponad prog - dodatni przyrost wyzerowany (GL 2.10)
             public bool War; public float Security, Burnt;
             public float Base, Prosper, Hunger, Danger;     // G0; +GW x W; -GH x H (0 przy wylaczonym glodzie); -GU x U
             public float Raw;               // suma przed premiami gry
@@ -535,7 +537,7 @@ namespace Armoury
             Settlement node = v.Bound;      // region wsi: jej miasto albo zamek
             g.W = ProsperityIndex(node);
             g.U = Danger(v, out g.Security, out g.War, out g.Burnt);       // E4/5: ta sama miara dla udzialu "las" przy spustoszeniu (Devastation)
-            g.H = MBMath.ClampFloat(WinterBite.VillageCut(v), 0f, 1f);
+            g.H = MBMath.ClampFloat(Famine.HungerOf(v), 0f, 1f);          // E4/6: brak jedzenia ze spichlerza okregu (0 przy wylaczonym E4/6), nie ciecie zimy
 
             g.Base = s.GrowthBasePercent;
             g.Prosper = Math.Max(0f, s.GrowthProsperityWeight) * g.W;
@@ -551,6 +553,8 @@ namespace Armoury
                 if (float.IsNaN(m) || float.IsInfinity(m)) m = 1f;
                 g.Bonus = MBMath.ClampFloat(m, BonusMin, BonusMax);
                 rate *= g.Bonus;
+                // E4/6 (GL 2.10): w glodzie (brak ponad prog Famine Threshold Percent) nikt sie nie rodzi ponad zgony - dodatni przyrost 0; zgony z glodu liczy Famine
+                if (s.GrowthHungerEnabled && g.H > Famine.ThresholdNow) { g.Starving = true; rate = 0f; }
             }
             if (float.IsNaN(rate)) rate = 0f;
             g.G = MBMath.ClampFloat(rate, g.Lo, g.Hi);
@@ -566,7 +570,7 @@ namespace Armoury
         }
         private static readonly TextObject[] _txtBirths = Lines("Births over deaths"), _txtProsper = Lines("Prosperity of the land"),
             _txtHunger = Lines("Hunger"), _txtDanger = Lines("War, raids and lawlessness"), _txtBonus = Lines("Lord's care (perks, buildings, laws)"),
-            _txtLimit = Lines("Limit of natural growth"), _txtRefugees = Lines("Refugees returning");
+            _txtLimit = Lines("Limit of natural growth"), _txtRefugees = Lines("Refugees returning"), _txtFamine = Lines("Famine - no births");
 
         /// <summary>Linia opisu, ktora NIE wchodzi do wyniku: dopisana i od razu zdjeta bez opisu (ExplainedNumber nie umie inaczej pokazac liczby w innej
         /// jednostce niz wynik). Dymek gry pomija linie ponizej 0.01, a dobowa zmiana hearth to ok. 0.005 - dlatego linie mowia o ludziach na rok.</summary>
@@ -590,7 +594,7 @@ namespace Armoury
             Line(ref r, unit * g.Danger, _txtDanger, people);
             double before = g.Raw;
             if (g.Raw > 0f) { before = (double)g.Raw * g.Bonus; Line(ref r, unit * (before - g.Raw), _txtBonus, people); }
-            Line(ref r, unit * (g.G - before), _txtLimit, people);
+            Line(ref r, unit * (g.G - before), g.Starving ? _txtFamine : _txtLimit, people);
             Line(ref r, (double)g.Refugees * YearDays() * (people ? k : 1f), _txtRefugees, people);
         }
 
@@ -721,7 +725,7 @@ namespace Armoury
                 var s = Settings.Current;
                 Log.Info("PopulationLaw: przyrost naturalny wsi (E4/4) zamiast stalej gry (+4 / +1.2 / +0.2 hearth dziennie) " + (GrowthOn ? "CZYNNY" : "wylaczony w ustawieniach startowych")
                          + (s != null ? " - g = " + F(s.GrowthBasePercent) + " + " + F(s.GrowthProsperityWeight) + " x dobrobyt - " + F(s.GrowthDangerWeight) + " x niebezpieczenstwo"
-                                        + (s.GrowthHungerEnabled ? " - " + F(s.GrowthHungerWeight) + " x glod" : " (glod wylaczony do E4/6)")
+                                        + (s.GrowthHungerEnabled ? " - " + F(s.GrowthHungerWeight) + " x glod ze spichlerza okregu (E4/6; w glodzie ponad prog bez dodatniego przyrostu)" : " (glod ze spichlerza wylaczony - Growth Hunger Enabled)")
                                         + " [% rocznie], korytarz -" + F(Math.Max(0f, s.GrowthMaxDeclinePercent)) + "..+" + F(Math.Max(0f, s.GrowthMaxPercent))
                                         + "; ludzie miast jako stan: " + (s.TownPeopleFrozen ? "TAK" : "NIE") : "")
                          + "; " + floor + "; latka na DefaultSettlementProsperityModel.CalculateHearthChange wpieta, na razie: " + PatchOrder() + ".");
@@ -800,7 +804,7 @@ namespace Armoury
                     catch (Exception e) { Log.Error("PopulationLaw.GrowthDaily(model)", e); }
                 }
 
-                int n = 0, up = 0, down = 0, flat = 0, blocked = 0, war = 0, burnt = 0, capHi = 0, capLo = 0, refugees = 0, bonusN = 0, hungerN = 0, tiny = 0, noK = 0, stumbles = 0, dup = 0;
+                int n = 0, up = 0, down = 0, flat = 0, blocked = 0, war = 0, burnt = 0, capHi = 0, capLo = 0, refugees = 0, bonusN = 0, hungerN = 0, tiny = 0, noK = 0, stumbles = 0, dup = 0, famineN = 0;
                 double hearthAll = 0, weightAll = 0, weightLive = 0, peopleAll = 0, modelHearth = 0, takenHearth = 0, gainPeople = 0;
                 double backHearth = 0, backPeople = 0;      // powrot uchodzcow (+0.5 hearth przy dnie) - siedzi w wyniku modelu, ale przyrostem naturalnym nie jest
                 double wBase = 0, wProsper = 0, wDanger = 0, wHunger = 0, wDryHunger = 0, wBonus = 0, wSec = 0, wRate = 0, sumH = 0;
@@ -858,6 +862,7 @@ namespace Armoury
                         wBase += weight * g.Base; wProsper += weight * g.Prosper; wDanger += weight * g.Danger; wHunger += weight * g.Hunger;
                         wSec += weight * g.Security;
                         if (g.H > 0f) { hungerN++; sumH += g.H; wDryHunger += weight * gh * g.H; }
+                        if (g.Starving) famineN++;
                         if (g.Raw > 0f)
                         {
                             wBonus += weight * g.Bonus;
@@ -937,8 +942,10 @@ namespace Armoury
                           .Append(", dobrobyt wobec mediany krainy ").Append(Sg(wProsper / weightLive, "0.###"))
                           .Append(", niebezpieczenstwo ").Append(Sg(wDanger / weightLive, "0.###")).Append(" (wsi regionow w wojnie bez wiecznych wojen ").Append(war)
                           .Append(", wsi w regionach ze spalonymi ").Append(burnt).Append(", bezpieczenstwo warowni srednio ").Append(F(wSec / weightLive)).Append(')');
-                        if (s.GrowthHungerEnabled) sb.Append(", glod ").Append(Sg(wHunger / weightLive, "0.###")).Append(" (zima tnie plon ").Append(hungerN).Append(" wsi)");
-                        else sb.Append(", glod WYLACZONY do E4/6 (na sucho: zima tnie plon ").Append(hungerN).Append(" wsi").Append(hungerN > 0 ? ", srednio o " + F(100.0 * sumH / hungerN) + "%" : "")
+                        // E4/6: H = brak jedzenia ze spichlerza okregu (Famine), nie ciecie zimy
+                        if (s.GrowthHungerEnabled) sb.Append(", glod ze spichlerza (E4/6) ").Append(Sg(wHunger / weightLive, "0.###")).Append(" (wsi z brakiem jedzenia ").Append(hungerN)
+                               .Append(hungerN > 0 ? ", srednio " + F(100.0 * sumH / hungerN) + "%" : "").Append(", w glodzie bez dodatniego przyrostu ").Append(famineN).Append(')');
+                        else sb.Append(", glod ze spichlerza wylaczony - Growth Hunger Enabled (na sucho: wsi z brakiem jedzenia ").Append(hungerN).Append(hungerN > 0 ? ", srednio " + F(100.0 * sumH / hungerN) + "%" : "")
                                .Append("; z waga ").Append(F(gh)).Append(" byloby ").Append(Sg(-wDryHunger / weightLive, "0.###")).Append(')');
                         sb.Append(", premie gry srednio x").Append(F3(wBonus / weightLive)).Append(" (wsi z premia ").Append(bonusN);
                         if (bonusN > 0) sb.Append(", od x").Append(F(bonusMin)).Append(" do x").Append(F(bonusMax));

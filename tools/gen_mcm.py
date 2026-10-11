@@ -74,6 +74,13 @@ RANGES = {
     'RefugeeReturnDays': (30, 1092, "0"),
     'RefugeeYearlyLossPercent': (0.0, 20.0, "0.0"),
     'DevastationYieldElasticity': (0.0, 2.0, "0.00"),
+    # E4/6 (191): spichlerze - suwaki zgodne z przycieciem w kodzie (udzial 0..1, prog 0..90, zgony 0..100, sufit od 0.05 roku)
+    'FamineStartShare': (0.0, 1.0, "0.00"),
+    'FamineThresholdPercent': (0, 90, "0"),
+    'FamineDeathMaxPercent': (0, 100, "0"),
+    'FamineBarnYears': (0.05, 8.0, "0.00"),
+    'FamineYieldPerPerson': (0.5, 3.0, "0.00"),
+    'FamineRefugeRadius': (0.0, 1000.0, "0"),
 }
 
 def gen(module_dir, ns, display):
