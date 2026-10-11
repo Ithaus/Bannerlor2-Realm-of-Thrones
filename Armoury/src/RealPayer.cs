@@ -199,7 +199,7 @@ namespace Armoury
                 if (c.HeroRepay > 0)
                 {
                     int h = (int)Math.Min(int.MaxValue, c.HeroRepay);
-                    if (c.RecHero != null) GiveGoldAction.ApplyBetweenCharacters(null, c.RecHero, h, true);
+                    if (c.RecHero != null) GiveGoldAction.ApplyBetweenCharacters(null, c.RecHero, h, c.RecHero != Hero.MainHero);   // graczowi - komunikat gry jak dotad
                     else if (c.RecParty != null && c.RecParty.IsSettlement) GiveGoldAction.ApplyForPartyToSettlement(null, c.RecParty.Settlement, h, true);
                     _heroRepay += h;
                 }

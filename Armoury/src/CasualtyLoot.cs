@@ -30,7 +30,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CasualtyLootFromPurse && BeatenPurse.On && MenPurse.On; } }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
-        private sealed class Snap { public long Purse0; public long Men0; }
+        private sealed class Snap { public long Purse0; public long Men0; public long Bodies; public long Taken; }
         private static readonly Dictionary<MapEventParty, Snap> _snap = new Dictionary<MapEventParty, Snap>();
         private static long _lastThird;
         private static long _playerLostRun;
@@ -94,10 +94,17 @@ namespace Armoury
                 _bodies++; _gameGold += num;
                 if (Undead.Party(wmp)) { _undeadSkip += num; return false; }                // trup monety nie bierze (jak 3.2)
                 var dmp = __2.Party != null ? __2.Party.MobileParty : null;
-                Snap sn;
-                long limit = dmp != null && _snap.TryGetValue(__2, out sn) ? sn.Purse0 / sn.Men0 : 0;
+                Snap sn = null;
+                long limit = 0;
+                if (dmp != null && _snap.TryGetValue(__2, out sn))
+                {
+                    // udzial na glowe narastajaco (bez gubienia ulamkow): po k cialach najwyzej sakiewka x k / ludzie przed bitwa
+                    sn.Bodies++;
+                    limit = Math.Max(0L, sn.Purse0 * Math.Min(sn.Bodies, sn.Men0) / sn.Men0 - sn.Taken);
+                }
                 int want = (int)Math.Min(num, limit);
                 t = want > 0 ? MenPurse.Take(dmp, want) : 0;
+                if (sn != null) sn.Taken += t;
                 _cut += num - t;
                 if (t <= 0) { _empty++; return false; }
                 int third = t / 3;
