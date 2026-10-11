@@ -1155,6 +1155,7 @@ namespace Armoury
             try { CirculationWindows.EnsureModelHooks(); } catch (Exception e) { Log.Error("CirculationWindows.EnsureModelHooks", e); }   // paczka 169: linie modelu finansow i kapital nowych karawan (latki w kampanii, tylko log)
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
+            try { Leaks310.EnsureHooks(); } catch (Exception e) { Log.Error("Leaks310.EnsureHooks", e); }   // 3.10: zold zaciagu ROT od pana (latka modelu finansow ROT - w kampanii)
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
@@ -1407,6 +1408,7 @@ namespace Armoury
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
             finally { GoodsLedger.End(gfForage); }
+            try { Leaks310.Daily(); } catch (Exception e) { Log.Error("Leaks310.Daily", e); }   // 3.10: zold zaciagu ROT od pana i linia "Drobne z niczego (3.10)" (furaz tej doby)
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); }   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
             try { Orders.DailyTick(); }

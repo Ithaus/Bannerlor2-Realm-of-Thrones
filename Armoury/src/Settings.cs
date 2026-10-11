@@ -371,6 +371,10 @@ namespace Armoury
         public int ScarThresholdHearth = 150;              // below this many hearths a village counts as scarred and heals slowly
         public int ScarRegenPercent = 25;                  // share of normal hearth growth a scarred village keeps (vanilla springs back at +4/day)
         public int RefugeeFloorHearth = 40;                // below this the refugees trickle home (+0.5/day flat) - regions never die for good
+        // 3.10 (drobne z niczego, Leaks310.cs): furaz z zapasu wsi, herszt kryjowki z wlasnych ludzi, zold zaciagu ROT od pana
+        public bool ForageFromVillageStock = true;         // an army living off enemy land takes its food from the village's own stores - grain first, then any other food; nothing appears from nowhere, and a village with empty stores feeds no one (off = the old rule: grain from nowhere)
+        public bool HideoutBossFromOwnMen = true;          // when the game puts a chief into a spotted hideout, he is the best man of the chief's own band raised to lead it, not a man from nowhere; a band with no men gets no chief (off = the game adds him from nowhere)
+        public bool EnlistedPayFromLord = true;            // while you serve in a lord's army (Realm of Thrones enlistment), your company's pay comes once a day from that lord's purse, each hero his own wage - Realm of Thrones paid every hero of your party your own wage, from nowhere; a lord with an empty purse pays what he has (off = Realm of Thrones pay)
         public bool WagesDueEnabled = true;                // unpaid wages: vanilla already cuts morale - we add desertion, the best-paid men first
         public int WagesGraceDays = 2;                     // days of unpaid wages the men will stomach before walking
         public float WagesDesertPercentPerDay = 0.5f;      // share of the party deserting per day past grace, growing with every unpaid day (AI the same since 183 - War Ledger Ai Half)

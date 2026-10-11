@@ -1260,6 +1260,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int RefugeeFloorHearth { get; set; } = 40;
 
+        [SettingPropertyBool("Forage From Village Stock", HintText = "an army living off enemy land takes its food from the village's own stores - grain first, then any other food; nothing appears from nowhere, and a village with empty stores feeds no one (off = the old rule: grain from nowhere)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool ForageFromVillageStock { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Boss From Own Men", HintText = "when the game puts a chief into a spotted hideout, he is the best man of the chief's own band raised to lead it, not a man from nowhere; a band with no men gets no chief (off = the game adds him from nowhere)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool HideoutBossFromOwnMen { get; set; } = true;
+
+        [SettingPropertyBool("Enlisted Pay From Lord", HintText = "while you serve in a lord's army (Realm of Thrones enlistment), your company's pay comes once a day from that lord's purse, each hero his own wage - Realm of Thrones paid every hero of your party your own wage, from nowhere; a lord with an empty purse pays what he has (off = Realm of Thrones pay)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool EnlistedPayFromLord { get; set; } = true;
+
         [SettingPropertyBool("Wages Due Enabled", HintText = "unpaid wages: vanilla already cuts morale - we add desertion, the best-paid men first")]
         [SettingPropertyGroup("The marching column")]
         public bool WagesDueEnabled { get; set; } = true;
@@ -4194,6 +4206,9 @@ namespace Armoury
             s.ScarThresholdHearth = ScarThresholdHearth;
             s.ScarRegenPercent = ScarRegenPercent;
             s.RefugeeFloorHearth = RefugeeFloorHearth;
+            s.ForageFromVillageStock = ForageFromVillageStock;
+            s.HideoutBossFromOwnMen = HideoutBossFromOwnMen;
+            s.EnlistedPayFromLord = EnlistedPayFromLord;
             s.WagesDueEnabled = WagesDueEnabled;
             s.WagesGraceDays = WagesGraceDays;
             s.WagesDesertPercentPerDay = WagesDesertPercentPerDay;
