@@ -1182,6 +1182,8 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
 - (13:50-14:00) **Jeff E4/11:** wyglad spalonej wioski - etap 7 (7.10); niebezpieczenstwo z pustych osad - po tescie koncowym E4 (PLAN-DO-KONCA 4.20);
   ryby/mlyny wiosek - etap 6 (6.18). (14:45) port Muru - naprawic (B6c). (15:50) **Etap 5: test zbioru A OSOBNO, zaraz po tescie koncowym etapu 4** (E5/0 pomiar
   jedzie w tescie E4, bo nic nie zmienia w grze).
+- (16:10) **Jeff: etap 5 - (1) A1 bez dosypki kas od razu (regulator tryb 2, miasta i zamki; tryb 1 jako opcja MCM) - "usun to ostatnie zrodlo z niczego";
+  (2) E5/0 liczy udzial zysku kupcow zabierany przez pana i korone (porownanie z historycznym ok. 10%).** Opis w projekcie etapu 5, rozdz. 6.
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli

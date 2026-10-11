@@ -640,6 +640,16 @@ bilans otwarcia nie dotyczy (regula od nastepnej doby).
 
 **ROZSTRZYGNIETE (Jeff 11.10 ok. 15:50): test zbioru A OSOBNO, zaraz po tescie koncowym etapu 4 (wariant a).**
 
+**DECYZJE JEFFA 11.10 ok. 16:10 (WIAZACE dla E5/0 i A1, zmieniaja v2):**
+1. **A1: regulator kas BEZ DOSYPKI od razu** - `TownPurseRegulator` domyslnie **2** (regulator gry nic nie robi: nic nie kasuje i nic nie dosypuje), dla miast i zamkow ta sama regula
+   (R2; zamki: CastlePurse - dzis dosypka zamkow ok. 1 tys./d). Tryb 1 zostaje jako opcja MCM (powrot, gdyby kasy wysychaly). C1 (5.8) przechodzi do A1 - w C zostaje tylko kontrola.
+   Skutek do pilnowania w tescie A: miasta-zaulki ponizej zapasu kupcow bez doplywu - E5/0 i linia "Kasy miast" licza: ile kas ponizej zapasu / ponizej 1 000 / 0, ile dni z rzedu,
+   czego nie kupily z braku zlota (towar wsi, ktory nie zszedl). Zawor i podatki biora tylko z nadwyzki (R3) - kasa ponizej zapasu nic nie oddaje.
+2. **E5/0: udzial zysku kupcow zabierany przez pana i korone** - jedna liczba dziennie (i srednia 28 dob) na swiat i dla kazdego miasta: (zawor panu + zawor koronie + danina
+   wojenna z kasy miasta + podatki polityk/Road Tolls z kasy miasta) / (czysty doplyw do kasy kupcow przed tymi poborami: sprzedaz - zakupy - koszty, bez przelewow z niczego).
+   W linii obok wartosc odniesienia: obciazenie historyczne miast ok. 10% (INFO, bez progu - decyzja Jeffa po tescie). Ten sam wzor po A1 w linii "Kasy miast".
+
+
 1. **Test porcji A (kasy miast, dwor, markietani, notable, BetterEconomy): osobno czy w tescie koncowym etapu 4?**
    (a) **osobny test zaraz po tescie koncowym etapu 4** (40 dob + zapis 9 dob + 120 dob, **v2:** ok. 50-85 min) - gdy cos nie przejdzie (wojsko, glowy rodow), wiadomo od razu, czy to etap 4 (zalogi, nowe druzyny),
    czy kasy miast; a z tego biegu ustawiamy stawki kiesy ludu (zaleza od kas miast i markietanow);
