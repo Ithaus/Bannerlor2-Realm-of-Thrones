@@ -627,6 +627,10 @@ namespace Armoury
         // ------------------------------------------------------------ zwolnienia (15% nadwyzki dziennie po 3 dobach ponad 1.10 x pulap)
         private static void Releases(Clan c, B b, Settings s)
         {
+            // 2-n (bieg 2-letni 10/11.10): Nocna Straz NIE zwalnia ludzi - zakon strzeze Muru przed Innymi zawsze, takze w pokoju z Wolnymi Ludzmi. Dotad pokoj
+            // (pulap pokojowy 0.28 D zamiast wojennego z zapasem) zbil pulap puli z ok. 20 tys. do 1.4 tys. i zwolnienia odeslaly do domu ok. 5 tys. ludzi Strazy
+            // w kilka dni (7.2 -> 1.2 tys.). Pulap Strazy tylko zatrzymuje werbunek (RecruitPrefix/GarRecruitPrefix/SpawnPrefix); ubytek - bitwy i zgony.
+            if (b.Zero && s.WatchNoReleases) { b.Streak = 0; return; }
             double hyst = Math.Max(1f, s.BudgetHysteresis);
             long wage = b.WPar + b.WGar + b.WCar;
             int men = b.MenPar + b.MenGar;

@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 (noc, po biegu 2-letnim) - 2-n: NOCNA STRAZ BEZ ZWOLNIEN (pokoj z Wolnymi Ludzmi nie rozpuszcza Muru)
+**Mod:** Armoury | **Galaz:** `w-toku/e4-0` | **Pliki:** `ClanBudget.cs` (Releases), `Settings.cs` + MCM (`WatchNoReleases` = true)
+
+**Problem (bieg 728 dob na WGRANIU 28, log Armoury-2026-10-10_20-58-02):** ok. doby 590 Straz zawarla pokoj; pulap puli spadl z ok. 20 tys. (wojna, z zapasem) do 1.4 tys. (pokoj 0.28 D)
+i zwolnienia 166 odeslaly do domu ok. 5 tys. ludzi Strazy w kilka dni (Straz 6.7 -> 1.2 tys., "werbunek wstrzymany" 30-90/d); po powrocie wojny Straz odbudowywala sie od 1.6 tys.
+**Przyczyna:** Releases tnie Straz jak kazdy rod ponad pulapem (recenzja 2 ostrzegala: "jesli dojdzie do pokoju ... scenariusz masowy"). Projekt etapu 4 (E4/9) ma "Straz bez zwolnien".
+**Zmiana:** Straz (b.Zero) nie zwalnia ludzi; pulap tylko zatrzymuje werbunek i nowe partie. Wylacznik `WatchNoReleases`.
+**Ryzyko / co sprawdzic:** Straz ponad pulapem w pokoju trzyma ludzi (koszt: tylko jedzenie, zoldu nie ma) - zadnego zlota z niczego; reszta rodow bez zmian. Test: linia 166 "Straz w ludziach" nie spada skokowo przy pokoju.
+**Status:** DO SPRAWDZENIA (build kod 0; test 120 dob razem z E4/0).
+
 ## 2026-10-10 (etap 4, paczka E4/0 = 188) - POMIAR LUDZI, JENCOW I ZIMY: BUDZET HEARTH Z PRZYCZYNA, DOBROBYT, MILICJA Z MODELU, PARTIE TWORZONE I ZNIKAJACE, JENCY (SKAD I DOKAD), INNI WEDLUG MIEJSCA, ZARAZA WEDLUG KRAIN, STRAZ I WOLNI LUDZIE, ZIMA WEDLUG KRAIN - GRA BEZ ZMIAN
 **Mod:** Armoury | **Galaz:** `w-toku/e4-0` (od dc290b3 = wersja w grze: etap 2 + etap 3) | **Projekt:** `PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md` wersja 2, rozdz. 3 "E4/0", rozdz. 4, 5, 8 | **Pliki:** NOWY `Measure40.cs`; wpiecia: `SubModuleMain.cs` (ApplyAll po ScorchedEarth, we wlasnym try), `ArmouryBehavior.cs` (Reset, Daily przed PeopleLedger.Daily, 3 nasluchy partii do PeopleLedger), `PeopleLedger.cs` (podzial frakcji w 4 istniejacych nasluchach, nasluchy partii, linie "Partie (E4/0)", "Krainy (4.15)", "Straz i Wolni Ludzie (4.15)", 6 kolumn w `ludzie-regiony.csv`), `Measure169c.cs` (W8 rozszerzone, NOWE okno W9 rajd ROT, odcinek milicji w "Zalogi", odcinek E4/0 w "Wzrost Innych", niewolni BK wedlug krainy), `CampFever.cs` (2x NoteDisease), `OutlawLaw.cs` (TakeSeed, TakeOutlaw, NoteReturnNoVillage, 3 gettery), `LosersFlee.cs` (TakeFlee w finally, 2 gettery), `ScorchedEarth.cs` (NoteHearth przy zerowaniu, NoteScar w bliznie), `VillageTakings.cs` (HooksLine - tylko obce prefiksy, U25), `WinterBite.cs` (VillageCut, PartyFoodBonus - odczyt), `WesterosClimate.cs` (SeasonInfo - odczyt), `PopulationLaw.cs` (KOf - odczyt), `Settings.cs` + `McmSettings.cs` (`PeopleMeasureEnabled`, `python tools/gen_mcm.py`: Armoury 1002, RC/GT bez zmian), `tools/sprawdz_logi.py` (`--grupa etap4`)
 

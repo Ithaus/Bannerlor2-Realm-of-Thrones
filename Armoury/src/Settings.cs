@@ -797,6 +797,7 @@ namespace Armoury
         public float AiGearDaysCap = 30f;                  // unspent arms shares are kept for at most this many days
         public int FamilyPurseFloor = 5000;                // a grown member tops up the head's purse only from what he holds above this; the court is not paid from the head's purse below it
         public bool FamilyTopsUpHead = true;               // the grown members of an AI house top up its head's purse to this floor or a day of the house's costs, whichever is more - one family purse (Iron Bank Family Pays still runs first, before the bank lends or marks an instalment as missed)
+        public bool WatchNoReleases = true;                // the Night's Watch never sends its men home for lack of budget - peace with the Free Folk does not disband the Wall; its ceiling only stops new recruits (off = the Watch is released like any house over its ceiling)
         public bool UnpaidTroopsCapInMen = true;           // troops without wages (the Night's Watch) are held by the budget in men: the gold ceiling divided by the wage the men would have
         public bool HouseholdMinimal = true;               // each AI house pays its court into the purse of its seat (town or castle) every day - the share for the court and food less the parties' own food
         public bool HouseholdShield = true;                // the court's money paid into a town purse is kept out of the game's purse regulator: it leaves only with the lord's rents and the war subsidy, and never more than the purse holds above its target

@@ -2804,6 +2804,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool FamilyTopsUpHead { get; set; } = true;
 
+        [SettingPropertyBool("Watch No Releases", HintText = "the Night's Watch never sends its men home for lack of budget - peace with the Free Folk does not disband the Wall; its ceiling only stops new recruits (off = the Watch is released like any house over its ceiling)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool WatchNoReleases { get; set; } = true;
+
         [SettingPropertyBool("Unpaid Troops Cap In Men", HintText = "troops without wages (the Night's Watch) are held by the budget in men: the gold ceiling divided by the wage the men would have")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool UnpaidTroopsCapInMen { get; set; } = true;
@@ -4720,6 +4724,7 @@ namespace Armoury
             s.AiGearDaysCap = AiGearDaysCap;
             s.FamilyPurseFloor = FamilyPurseFloor;
             s.FamilyTopsUpHead = FamilyTopsUpHead;
+            s.WatchNoReleases = WatchNoReleases;
             s.UnpaidTroopsCapInMen = UnpaidTroopsCapInMen;
             s.HouseholdMinimal = HouseholdMinimal;
             s.HouseholdShield = HouseholdShield;
