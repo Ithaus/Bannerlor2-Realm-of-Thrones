@@ -2392,11 +2392,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float GrowthDangerWeight { get; set; } = 0.6f;
 
-        [SettingPropertyBool("Growth Hunger Enabled", HintText = "hunger slows natural growth: a village whose harvest winter cuts loses growth by Growth Hunger Weight. Off until the district granaries come (the daily line shows what it would do)")]
+        [SettingPropertyBool("Growth Hunger Enabled", HintText = "hunger slows natural growth: a village whose people went short of food from the granary of its countryside (Famine Enabled) loses growth by Growth Hunger Weight times the share of food missing, and while famine kills nobody is born beyond those who die. Off = growth ignores hunger")]
         [SettingPropertyGroup("Iron Bank")]
-        public bool GrowthHungerEnabled { get; set; } = false;
+        public bool GrowthHungerEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Growth Hunger Weight", 0.00f, 6.00f, "0.00", HintText = "percent a year lost by a village whose whole harvest is gone (winter takes a part of it, more in the north); works only with Growth Hunger Enabled")]
+        [SettingPropertyFloatingInteger("Growth Hunger Weight", 0.00f, 6.00f, "0.00", HintText = "percent a year lost by a village with no food at all (a tenth short in the lean weeks before harvest costs a tenth of it); works only with Growth Hunger Enabled and Famine Enabled")]
         [SettingPropertyGroup("Iron Bank")]
         public float GrowthHungerWeight { get; set; } = 1.5f;
 
@@ -2467,6 +2467,58 @@ namespace Armoury
         [SettingPropertyBool("Looted Produces By People", HintText = "a plundered village keeps working with the people who stayed instead of producing nothing for two weeks (the harvest falls with the share of people away). Works only with Devastation Enabled")]
         [SettingPropertyGroup("Iron Bank")]
         public bool LootedProducesByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Famine Enabled", HintText = "every village stands for a countryside with a granary of its own: its fields give in an ordinary year a fifth more food than its people eat and the surplus fills the granary (beyond Famine Barn Years of food it goes to market as before); winter, raids, missing hands and a plundered village shrink the harvest by themselves. When the granary is empty and the harvest falls short people go hungry - a tenth short kills nobody, beyond that famine kills as in the great famines of history, and as many as die take to the road. When a town's food runs out its townsfolk starve too. Needs People Unit Enabled and Natural Growth Enabled. Off = no granaries, nobody dies of hunger (as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FamineEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Famine Yield Per Person", 0.50f, 3.00f, "0.00", HintText = "food a village's fields give in an ordinary year for each person who eats from them (1.2 = a fifth more than they eat; the harvest follows the game's food production of the village, so winter, raids and plunder cut it)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FamineYieldPerPerson { get; set; } = 1.2f;
+
+        [SettingPropertyFloatingInteger("Famine Barn Years", 0.05f, 8.00f, "0.00", HintText = "the most food a countryside's granary holds, in years of its people's food")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FamineBarnYears { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Famine Start Share", 0.00f, 1.00f, "0.00", HintText = "how full the granaries are at the start of a campaign (and in a game saved before the granaries came), as a share of Famine Barn Years (1 = full - long summers before the war)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FamineStartShare { get; set; } = 1f;
+
+        [SettingPropertyInteger("Famine Ration Days", 0, 360, "0", HintText = "when a granary holds less than this many days of food and the harvest does not feed the village, everyone eats a tenth less (nobody dies of it; growth slows)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineRationDays { get; set; } = 90;
+
+        [SettingPropertyInteger("Famine Threshold Percent", 0, 90, "0", HintText = "how much food may be missing before people die of hunger, in percent (they eat less, eat substitutes, slaughter their animals); also the share beyond which nobody is born")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineThresholdPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Famine Death Max Percent", 0, 100, "0", HintText = "yearly deaths with no food at all, in percent; deaths grow with the square of the food missing beyond the threshold (a third short - about 3.5% a year, as in 1315-17; half short - about 14%)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineDeathMaxPercent { get; set; } = 70;
+
+        [SettingPropertyBool("Famine Flee Enabled", HintText = "as many as die of hunger leave their village and become refugees in the nearest land of the same realm (else of a realm not at war with it) whose granaries hold more than Famine Refuge Min Days of food; with none in reach they stay and starve. They go home when their village's granary holds Famine Return Min Days again, all of the living within Refugee Return Days of that. Works only with Devastation Enabled")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FamineFleeEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Famine Refuge Min Days", 0, 720, "0", HintText = "a land takes in famine refugees only while its granaries hold more than this many days of food for its own people and its guests")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineRefugeMinDays { get; set; } = 180;
+
+        [SettingPropertyFloatingInteger("Famine Refuge Radius", 0.00f, 1000.00f, "0", HintText = "how far famine refugees go looking for a land with food (map distance from their town or castle)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FamineRefugeRadius { get; set; } = 250f;
+
+        [SettingPropertyInteger("Famine Move Days", 0, 120, "0", HintText = "the refugees of a village move on to another land at most once in this many days")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineMoveDays { get; set; } = 30;
+
+        [SettingPropertyInteger("Famine Return Min Days", 0, 360, "0", HintText = "no refugee goes home to a village whose granary holds less than this many days of food (nobody goes back to hunger)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int FamineReturnMinDays { get; set; } = 90;
+
+        [SettingPropertyBool("Famine Siege Shelter", HintText = "when a town or castle is besieged, the refugees of its land shelter behind its walls and eat from its food stores ('Refugees sheltering'); they stay until the siege ends and starve with the townsfolk when the food runs out. Works only with Famine Enabled")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FamineSiegeShelter { get; set; } = true;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4828,6 +4880,19 @@ namespace Armoury
             s.RefugeeYearlyLossPercent = RefugeeYearlyLossPercent;
             s.DevastationYieldElasticity = DevastationYieldElasticity;
             s.LootedProducesByPeople = LootedProducesByPeople;
+            s.FamineEnabled = FamineEnabled;
+            s.FamineYieldPerPerson = FamineYieldPerPerson;
+            s.FamineBarnYears = FamineBarnYears;
+            s.FamineStartShare = FamineStartShare;
+            s.FamineRationDays = FamineRationDays;
+            s.FamineThresholdPercent = FamineThresholdPercent;
+            s.FamineDeathMaxPercent = FamineDeathMaxPercent;
+            s.FamineFleeEnabled = FamineFleeEnabled;
+            s.FamineRefugeMinDays = FamineRefugeMinDays;
+            s.FamineRefugeRadius = FamineRefugeRadius;
+            s.FamineMoveDays = FamineMoveDays;
+            s.FamineReturnMinDays = FamineReturnMinDays;
+            s.FamineSiegeShelter = FamineSiegeShelter;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

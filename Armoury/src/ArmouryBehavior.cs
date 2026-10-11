@@ -1434,6 +1434,7 @@ namespace Armoury
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
             finally { GoodsLedger.End(gfForage); }
             try { Devastation.Daily(); } catch (Exception e) { Log.Error("Devastation.Daily", e); }   // E4/5 (113n): smierc i powrot uchodzcow - PO zerowaniu armii (zegar regionu widzi dzisiejsze zerowanie)
+            try { Famine.Daily(); } catch (Exception e) { Log.Error("Famine.Daily", e); }   // E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu - PO spustoszeniu i powrocie uchodzcow, PRZED ksiega ludzi (PeopleBook.Daily zamyka dobe konta UCHODZCY)
             try { Leaks310.Daily(); } catch (Exception e) { Log.Error("Leaks310.Daily", e); }   // 3.10: zold zaciagu ROT od pana i linia "Drobne z niczego (3.10)" (furaz tej doby)
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
             try { DefeatMorale.Daily(); } catch (Exception e) { Log.Error("DefeatMorale.Daily", e); }   // D11-1: linia "Kara za przegrana (D11-1)" zaraz po liniach wojny (dezercja AI 183) - tylko log

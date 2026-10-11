@@ -96,6 +96,7 @@ namespace Armoury
         // K3: powrot, smierc, wstrzymania (doba)
         private static double _dBack, _dDied, _dLinErr;
         private static int _dBackVillages, _dStopQuiet, _dStopSiege, _dNoClock, _dNoVillage, _dAbandonLeft;
+        private static int _dStopHunger;                                    // E4/6: powrot wstrzymany - wies nie przyjmuje (Famine.ReturnGate: glod, albo pole nie karmi i spichlerz ponizej FamineReturnMinDays) albo nieodzyskana po glodzie
         private static readonly HashSet<string> _dBackRegions = new HashSet<string>();
         private static bool _abandonLogged;
 
@@ -117,6 +118,7 @@ namespace Armoury
             _dSteps = _dRaids = _dRaidsFull = _dRaidMen = _dResumed = _dForagers = _dNoK = _dMoveFail = _dForeign = 0;
             _dBack = _dDied = _dLinErr = 0.0;
             _dBackVillages = _dStopQuiet = _dStopSiege = _dNoClock = _dNoVillage = _dAbandonLeft = 0;
+            _dStopHunger = 0;
             _dBackRegions.Clear();
             _dLootedOn = _dLootedMade = _dLootedChanged = _dLootedGate = 0; _dLootedPieces = 0;
             _stumbles = 0;
@@ -239,6 +241,7 @@ namespace Armoury
             double capt = hit * cap, fled = hit * flee;
             double refugees = hit - dead - capt - fled;
             if (refugees < 0.0) refugees = 0.0;
+            double lBefore = (double)Math.Max(0f, v.Hearth) * k + away;       // E4/6: ludzie okregu przed ruchem (ulamek spalonego spichlerza)
             // JEDYNY ruch hearth (U23): trafieni z DOM
             double moved = -PeopleBook.Move(v, PeopleBook.ADom, PeopleBook.ARefugees, hit, kind == KRaid ? PeopleBook.MDevRaid : PeopleBook.MDevForage, PeopleUnit.GamePerMan);
             if (!(moved > 0.0)) { _dMoveFail++; return 0.0; }         // Move nie rzuca; 0 = wyjatek w Shift - nikogo nie przenosimy
@@ -247,6 +250,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             PeopleBook.Devastated(v, refugees * f, dead * f, region, day);
             if (fled > 0.0) OutlawLaw.AddFled(v.Settlement, (float)(fled * f));   // pula regionu 1:1, bez hearth (zdjal Move)
+            if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
             // pojmani (od E4/9): capt * f -> konto JENCY; w E4/5 capt == 0
             double h = hit * f;
             if (rs != null) { rs.Hit += h; rs.Dead += dead * f; rs.CapWould += h * capW; }
@@ -643,10 +647,18 @@ namespace Armoury
                         if (!(away > 0.0)) continue;
                         var region = OutlawLaw.RegionFor(v.Settlement);
                         int last;
-                        if (!PeopleBook.LastStrike(region, out last)) { last = today - Q; _dNoClock++; }    // nie powinno sie zdarzyc (zegar rusza razem z kontem)
+                        bool clock = PeopleBook.LastStrike(region, out last);
+                        // E4/6 (GL 2.6): nikt nie wraca do wsi z pustym spichlerzem; schronieni w murach oblezonej warowni nie wychodza; uchodzcy z glodu - rok od dnia,
+                        // w ktorym spichlerz ich wsi znow ma FamineReturnMinDays dni (famDay; bez rabunku w regionie - bez 30 dob spokoju)
+                        int famDay;
+                        int famStop = Famine.ReturnGate(v, today, out famDay);
+                        if (famStop == 1) { _dStopHunger++; continue; }
+                        if (famStop == 2) { _dStopSiege++; continue; }
+                        if (!clock) { if (famDay >= 0) last = famDay; else { last = today - Q; _dNoClock++; } }    // bez zegara i bez glodu nie powinno sie zdarzyc (zegar rusza razem z kontem)
                         int d = today - last;
-                        if (d < Q) { _dStopQuiet++; continue; }
+                        if (clock && d < Q) { _dStopQuiet++; continue; }
                         if (region != null && region.IsUnderSiege) { _dStopSiege++; continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
+                        if (famDay > last) d = today - famDay;                                         // E4/6: rok od pozniejszego zdarzenia (rabunek albo odzyskany spichlerz)
                         double back = away / Math.Max(1, D - d);
                         if (away - back < 1.0) back = away;                                            // ostatni czlowiek wraca caly
                         double got = PeopleBook.RefugeesHome(v, back, PeopleBook.MRefugeeHome, PeopleUnit.GamePerMan);
@@ -836,6 +848,7 @@ namespace Armoury
                   .Append(" w ").Append(_dVillages[KRaid].Count).Append(" wsiach rabunku i ").Append(_dVillages[KForage].Count).Append(" zerowania");
                 sb.Append(" | powrot: ludzi ").Append(F(_dBack, "0.#")).Append(" do ").Append(_dBackVillages).Append(" wsi, regionow w fazie powrotu ").Append(_dBackRegions.Count)
                   .Append("; wstrzymany: ").Append(Q).Append(" dob spokoju ").Append(_dStopQuiet).Append(" wsi, oblezenie ").Append(_dStopSiege).Append(" wsi")
+                  .Append(", wies nie przyjmuje - glod albo pole nie karmi i spichlerz ponizej ").Append(Math.Max(0, s.FamineReturnMinDays)).Append(" dni dla gospodarzy, albo nieodzyskana po glodzie (E4/6) ").Append(_dStopHunger).Append(" wsi")
                   .Append("; kontrola liniowosci max ").Append(_dLinErr.ToString("0.######", Inv));
                 if (_dNoClock > 0) sb.Append("; bez zegara regionu ").Append(_dNoClock).Append(" wsi");
                 if (seg.Has)

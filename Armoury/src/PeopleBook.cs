@@ -29,6 +29,8 @@ namespace Armoury
     /// E4/5 (113n): konto UCHODZCY ("u:" w "arm_people" - wies pochodzenia -> poza domem, zabici przy spustoszeniu, zmarli na koncie) i zegar regionu ("r:" - warownia
     /// regionu -> doba ostatniego rabunku albo zerowania z trafionymi > 0). Trafieni rabunkiem i zerowaniem armii schodza z DOM przez Move (MDevRaid, MDevForage),
     /// konta dopisuje Devastated; powrot (MRefugeeHome) i podloga 10 (MRefugeeFloor, najpierw z uchodzcow tej wsi) schodza z konta; uchodzcy umieraja 1.3%/rok (bez narodzin).
+    /// E4/6 (191): smierc z glodu schodzi z DOM przez Move (konto ADead, MFamineDead - ubytek trwaly), uchodzcy z glodu - Move DOM -> UCHODZCY (MFamineFled) i FamineFled
+    /// (konto wsi bez zegara rabunku); mieszczanie przy Food 0 - TownDie (stan miasta "t:"). Stan spichlerzy (Famine.cs) w tej samej sekcji zapisu ("f:").
     /// Kolejne konta (SLUZBA z pochodzeniem, JENCY...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
@@ -67,10 +69,11 @@ namespace Armoury
         // ---------------------------------------------------------------- E4/3 (108n): konta ludzi i jedna droga ruchu hearth
         // konta: DOM (wsie: hearth x k_v), WYRZUTKI (pula OutlawLaw), TABOR (tabory wsi i lodzie), SLUZBA (wojsko - konto od E4/7), poza ksiega (zadania gracza)
         internal const int ADom = 0, AOutlaws = 1, ACarts = 2, AService = 3, AOutside = 4, ARefugees = 5;      // UCHODZCY (E4/5): konto wsi pochodzenia
+        internal const int ADead = 6;     // E4/6: smierc (ubytek z DOM bez konta docelowego - zmarli z glodu, R3)
         // przyczyny ruchu ludzi (indeksy licznikow)
         internal const int MSeed = 0, MMisery = 1, MRaidFlee = 2, MPoolHome = 3, MCart = 4, MH3Cart = 5, MDisband = 6, MCommon = 7, MSoldier = 8,
                            M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15,
-                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MKinds = 20;
+                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MFamineDead = 20, MFamineFled = 21, MKinds = 22;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -78,11 +81,13 @@ namespace Armoury
             "pobor wymuszony gracza", "zadania gracza (hearth gry = 2 ludzi)", "incydenty gracza (zostaja w hearth gry)",
             "podloga 10 hearth z puli wyrzutkow regionu (E4/4 R17; hearth dopisala gra/BK)",
             "spustoszenie: rabunek (trafieni = zabici + pojmani + las + uchodzcy; E4/5)", "spustoszenie: zerowanie armii (trafieni; E4/5)",
-            "powrot uchodzcow do swojej wsi (E4/5)", "podloga 10 z uchodzcow tej wsi (E4/5; hearth dopisala gra/BK)" };
+            "powrot uchodzcow do swojej wsi (E4/5)", "podloga 10 z uchodzcow tej wsi (E4/5; hearth dopisala gra/BK)",
+            "glod: zmarli z glodu (E4/6, R10 - ubytek trwaly)", "glod: uciekli z glodu do regionu z zapasem (E4/6, konto UCHODZCY)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
-        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false };
+        // E4/6: zmarli i uciekli z glodu ruszaja hearth (DOM -> smierc, DOM -> UCHODZCY)
+        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false, true, true };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -124,6 +129,7 @@ namespace Armoury
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
             lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = _floorRefMen = 0; _floorN = 0; }
             ClearRefugees();
+            try { Famine.Reset(); } catch (Exception e) { Stumble("Reset(E4/6)", e); }      // E4/6: spichlerze - stan tej samej sekcji zapisu
         }
 
         /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
@@ -180,6 +186,8 @@ namespace Armoury
             }
             // E4/5 (113n): konto UCHODZCY i zegary regionow - tylko gdy jest co zapisac (bez sekcji = brak uchodzcow, jak stary zapis)
             try { ExportRefugees(sb); } catch (Exception e) { Stumble("Export(E4/5)", e); }
+            // E4/6 (191): spichlerze okregow i miejsca pobytu kont ("f:") - tylko gdy zalozone (bez sekcji = stary zapis, spichlerze zaloza sie przy pierwszej dobie)
+            try { sb.Append(Famine.Export()); } catch (Exception e) { Stumble("Export(E4/6)", e); }
             return sb.ToString();
         }
 
@@ -235,6 +243,7 @@ namespace Armoury
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
             lock (Gate) _town.Clear();
             ClearRefugees();                          // E4/5: stary zapis (bez "u:" / "r:") - brak uchodzcow i zegarow
+            try { Famine.Clear(); } catch (Exception e) { Stumble("Import(E4/6 czyszczenie)", e); }   // E4/6: zapis bez "f:" - spichlerze zaloza sie przy pierwszej dobie
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
@@ -304,6 +313,11 @@ namespace Armoury
                                 if (away > 0.0) _refCount++;
                             }
                         }
+                    }
+                    else if (part.StartsWith("f:", StringComparison.Ordinal))
+                    {
+                        // E4/6: spichlerze okregow (Famine) - zepsuty wpis pomijany w Famine.Import
+                        try { Famine.Import(part.Substring(2)); } catch (Exception e) { Stumble("Import(E4/6)", e); }
                     }
                     else if (part.StartsWith("r:", StringComparison.Ordinal))
                     {
@@ -545,6 +559,50 @@ namespace Armoury
                 lock (RefGate) _dRefFloor += n;
             }
             return n;
+        }
+
+        /// <summary>
+        /// E4/6 (R10, GL 2.6): TYLKO z Famine.TryFlee, PO PeopleBook.Move (DOM -> UCHODZCY, MFamineFled): n ludzi na konto wsi (nowi w odcinku doby) - BEZ zegara
+        /// rabunku regionu (powrot uchodzcow z glodu liczy Famine od dnia odzyskania spichlerza wsi, ReturnGate). Nie rzuca (U24).
+        /// </summary>
+        internal static void FamineFled(Village v, double n)
+        {
+            try
+            {
+                string id = VillageId(v);
+                if (id == null || !(n > 0.0) || double.IsInfinity(n)) return;
+                lock (RefGate)
+                {
+                    Ref r;
+                    if (!_ref.TryGetValue(id, out r)) _ref[id] = r = new Ref();
+                    bool had = r.Away > 0.0;
+                    r.Away += n;
+                    if (!had && r.Away > 0.0) _refCount++;
+                    _dRefIn += n;
+                }
+            }
+            catch (Exception e) { RefStumble("FamineFled", e); }
+        }
+
+        /// <summary>
+        /// E4/6 (R10): mieszczanie umieraja z glodu w miescie przy Food 0 - stan miasta (E4/4 "t:") w dol o min(n, stan). Zwraca, ilu faktycznie zeszlo (float stanu);
+        /// 0 = miasto bez stanu (Town People Frozen wylaczone - ludzie miasta z dobrobytu, nie ma z czego zdjac). Nie rzuca.
+        /// </summary>
+        internal static double TownDie(Settlement s, double n)
+        {
+            if (s == null || s.StringId == null || !(n > 0.0) || double.IsInfinity(n)) return 0.0;
+            try
+            {
+                lock (Gate)
+                {
+                    float p;
+                    if (!_town.TryGetValue(s.StringId, out p) || !(p > 0f)) return 0.0;
+                    float left = (float)Math.Max(0.0, (double)p - n);
+                    _town[s.StringId] = left;
+                    return (double)p - left;
+                }
+            }
+            catch (Exception e) { Stumble("TownDie", e); return 0.0; }
         }
 
         /// <summary>Uchodzcy umieraja w drodze (1.3%/rok, bez narodzin): zdejmuje min(men, poza domem), Died += n; hearth bez zmian (sa poza wsia). Zwraca n.</summary>
