@@ -2,7 +2,8 @@
 
 Uzycie (Python 3, tylko odczyt):
     python -I tools/sprawdz_logi.py --grupa etap2 <Armoury-*.log> [--baza baza.json] [--zapisz-baze baza.json] [--csv budzet-rodow.csv] [--start-kampanii N]
---grupa etap2     : jedyna grupa na dzis (miejsce na kolejne).
+--grupa etap2     : progi etapu 2.
+--grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -390,6 +391,77 @@ def baseline_of(lines, rows=None, start=None, balp=None):
     return base
 
 
+def etap3_main(logp, start_arg):
+    """3.1 (31, E3/0): progi fali 1 etapu 3 (projekt PROJEKT-ETAP3-SZCZELNOSC-STATKI, rozdz. 5) i kontrolki "prog 0" kawalkow fali 2 tego drzewa.
+    Fala 1: |R| srednia 28 dob < 10 000 (w dobie 40 i na koncu), RB3 |srednia| < 500, ARYTMETYKA OK, linia "Szczelnosc (164a)" codziennie, potkniecia 0,
+    bledy 0; pomiar statkow, U8r i Innych - liczby (INFO). Fala 2 (gdy kawalki w logu): "bez platnika", "miasto ponizej zapasu kupcow", "bez odbiorcy" = 0."""
+    lines = read(logp)
+    rep = Report()
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    sea = by_day(lines, "Szczelnosc (164a): dzien")
+    days = sorted(cau)
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    if start is None:
+        start = days[0] if days else 0
+    print(f"plik: {logp} | doby z linia przyczyn: {len(days)} | start kampanii {start}")
+    # reszta ksiegi - srednia 28 dob z linii (pierscien w kodzie) i RB3 z kontroli
+    avg = {d: num(r"srednia 28 dob ([+-]?\d+)", s) for d, s in cau.items()}
+    d40 = [d for d in days if run_day(d, start) == 40]
+    if d40 and avg.get(d40[0]) is not None:
+        v = avg[d40[0]]
+        rep.add("reszta R - srednia 28 dob w dobie 40", v, "|R| < 10 000 (prog etapu 3; gdy nie - plan B rozdz. 7)", abs(v) < 10000)
+    if days and avg.get(days[-1]) is not None:
+        v = avg[days[-1]]
+        rep.add("reszta R - srednia 28 dob (ostatnia doba)", f"{v} (doba {run_day(days[-1], start)})", "|R| < 10 000", abs(v) < 10000)
+    else:
+        rep.add("reszta R - srednia 28 dob", "brak linii", "|R| < 10 000", None)
+    rb3 = [num(r"\bRB3=(-?\d+)", cau[d]) for d in last_window(days)]
+    rb3 = [x for x in rb3 if x is not None]
+    if rb3:
+        m = st.mean(rb3)
+        rep.add("RB3 (od budow do korony) - srednia 28 dob", f"{m:.0f}", "|sr.| < 500 (portfele wezwan nazwane)", abs(m) < 500)
+    bad = [d for d in days if "ARYTMETYKA OK" not in cau[d]]
+    rep.add("arytmetyka linii przyczyn", f"bledy w {len(bad)} z {len(days)} dob", "0", len(bad) == 0 if days else None)
+    # linia 164a codziennie, potkniecia 0
+    miss = [d for d in days if d not in sea]
+    rep.add("linia Szczelnosc (164a) codziennie", f"brak w {len(miss)} z {len(days)} dob", "0", len(miss) == 0 if days else None)
+    stum = sum(num(r"potkniecia (\d+)", sea[d], int, 0) or 0 for d in sea)
+    rep.add("Szczelnosc (164a) - potkniecia", stum, "0", stum == 0 if sea else None)
+    # pomiar (INFO): U8r, portfele wezwan, statki, lupienie cial, Inni - srednie 28 dob
+    def mean_of(pat, src):
+        vals = [num(pat, src[d]) for d in last_window(sorted(src))]
+        vals = [x for x in vals if x is not None]
+        return st.mean(vals) if vals else None
+    for name, pat, src in (("U8r - kiesy partii usunietych bez zniszczenia", r"kiesy partii usunietych bez zniszczenia \(U8r\) (\d+)", cau),
+                           ("portfele wezwan - wplaty do ujemnego portfela", r"wplaty do ujemnego portfela wezwanego (\d+)", cau),
+                           ("portfele wezwan - dlug sprzed paczki", r"dlug portfela sprzed paczki ze skarbcow (\d+)", cau),
+                           ("statki: drugi zwrot tej samej partii w dobie", r"DRUGI zwrot tej samej partii w dobie (\d+)", sea),
+                           ("statki zatopione w bitwach morskich (PlunderedGold)", r"bitwach morskich \(PlunderedGold\) (-?\d+)", sea),
+                           ("lupienie cial: bitwy z wywolaniami > 3 x ciala", r"bitew z wywolaniami > 3 x ciala (\d+)", sea),
+                           ("Inni: reszta wplywow bez nazwy", r"Inni: .*?\+ reszta ([+-]?\d+)", sea)):
+        m = mean_of(pat, src)
+        rep.add(name + " (srednia 28 dob)", f"{m:.0f}" if m is not None else "brak linii", "liczba (wejscie fali 3 / E3/8d)", None)
+    # fala 2 - kontrolki "prog 0" tego drzewa (gdy kawalki w logu)
+    for name, pat in (("platnik: bez platnika", r"bez platnika (\d+)"), ("platnik: miasto ponizej zapasu kupcow przez nasza wyplate", r"ponizej zapasu kupcow przez nasza wyplate (\d+)"),
+                      ("awanse: bez odbiorcy", r"awanse \(164a-4\): .*?bez odbiorcy \(prog 0\) (\d+)"), ("kapital: bez odbiorcy", r"kapital \(164a-6\): .*?bez odbiorcy \(prog 0\) (\d+)")):
+        vals = [num(pat, sea[d]) for d in sea]
+        vals = [x for x in vals if x is not None]
+        rep.add(name + " (suma)", sum(vals) if vals else "brak linii", "0", (sum(vals) == 0) if vals else None)
+    wer = [num(r"bez odbiorcy \(prog 0\) (\d+); ochotnicy", s) for s in lines if s.startswith("Werbunek: dzien")]
+    wer = [x for x in wer if x is not None]
+    rep.add("werbunek: bez odbiorcy (suma)", sum(wer) if wer else "brak linii", "0", (sum(wer) == 0) if wer else None)
+    errs = [s for s in lines if s.startswith("ERROR in ")]
+    rep.add("bledy Armoury (ERROR in)", len(errs), "0", len(errs) == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -410,6 +482,8 @@ def main(argv):
         if a == "--start-kampanii":
             start_arg = int(args[i + 1]); i += 2; continue
         logp = a; i += 1
+    if group == "etap3" and logp:
+        return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
