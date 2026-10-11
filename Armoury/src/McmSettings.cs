@@ -1996,7 +1996,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistAmmoLaborMultiplier { get; set; } = 8f;
 
-        [SettingPropertyFloatingInteger("Hist Tournament Scale", 0.00f, 16.00f, "0.00", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)")]
+        [SettingPropertyFloatingInteger("Hist Tournament Scale", 0.00f, 16.00f, "0.00", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece). Used only while Hist Worth Windows Old Coin is off (or cannot reach the game's prize list): with it on, the range is compared with a piece's worth before the repricing and is not divided")]
         [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
@@ -3880,7 +3880,7 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool PlayerWorkshopsSameRule { get; set; } = true;
 
-        [SettingPropertyBool("Hist Worth Windows Old Coin", HintText = "tournament prizes (the game's own and Tournaments XPanded's), the modest local prize of Grand Tourney, the cap on lords' armour orders and the experience a companion earns at your bellows are reckoned from fixed sums of the old coin (a prize worth 1600 to 5000, an order piece worth at most 12000). With historical prices they are compared with what a piece was worth before the repricing, so prizes and orders are again the kinds of goods their makers meant - good swords, helmets, mail and horses, not only the heaviest plate and warhorses - while the piece keeps its historical worth on the market (needs Historical Prices; off = compared with today's worth, the game's prize range divided by Hist Tournament Scale)")]
+        [SettingPropertyBool("Hist Worth Windows Old Coin", HintText = "tournament prizes (the game's own and Tournaments XPanded's), the modest local prize of Grand Tourney and the cap on lords' armour orders are reckoned from fixed sums of the old coin (a prize worth 1600 to 5000, an order piece worth at most 12000). With historical prices they are compared with what a piece was worth before the repricing, so prizes and orders are again the kinds of goods their makers meant - good swords, helmets, mail and horses, not only the heaviest plate and warhorses - while the piece keeps its historical worth on the market. With RBM's tournament module on, RBM itself picks the main prize by the town's culture and your tier, and the game's and Tournaments XPanded's ranges serve only when its list is empty (needs Historical Prices; off = compared with today's worth, the game's prize range divided by Hist Tournament Scale)")]
         [SettingPropertyGroup("Worth windows in the old coin (3.8)")]
         public bool HistWorthWindowsOldCoin { get; set; } = true;
 

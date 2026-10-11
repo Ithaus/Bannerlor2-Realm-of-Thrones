@@ -297,7 +297,7 @@ namespace Armoury
                 days *= (1f - relief * s.HelperTimeRelief);
                 if (helper != null)
                 {
-                    Helper.GiveXp(helper, FixedSums38.Worth(item) * 0.08f);   // 3.8: XP od wartosci sprzed przeliczenia (jak XP kowalstwa gracza)
+                    Helper.GiveXp(helper, item.Value * 0.08f);
                     Log.Player(helper.Name + " works the bellows for you - the labour goes faster.");
                     Log.Info("Pomocnik: " + helper.Name + " ulga=" + relief.ToString("0.00"));
                 }

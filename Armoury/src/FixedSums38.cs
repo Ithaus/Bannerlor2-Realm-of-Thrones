@@ -26,11 +26,18 @@ namespace Armoury
     ///  - przedzial Tournaments XPanded (czynny u Jeffa: EnablePrizeGeneration, prefiks GetTournamentPrize zastepuje losowanie gry):
     ///    ponad 1600 do 2100 + 100 x poziom gracza + 100 x lord - w nowej monecie same plyty t5-t6, barde i rumaki, nigdy bron;
     ///  - nagroda lokalna GrandTourney (400 - LocalPrizeMaxValue) - GrandTourney pyta o Worth przez WorthLink38;
-    ///  - pulap zamowien lordow (OrderMaxItemValue 12 000) - w nowej monecie martwy (najdrozsza zbroja ok. 11 400);
-    ///  - XP pomocnika przy kuzni (0.08 x Value) - po przeliczeniu ok. 21 razy mniej (XP kowalstwa gracza juz od dawnej wartosci).
-    /// Regula - ta sama co progi legend i XP kowalstwa od 04.10 (wpis 42), a przed nimi PriceLaw (8baa95d, cofniety razem z PriceLaw):
+    ///  - pulap zamowien lordow (OrderMaxItemValue 12 000) - w nowej monecie martwy (najdrozsza zbroja ok. 11 400).
+    /// Regula - ta sama co progi legend i XP kowalstwa modelu gry od 04.10 (wpis 42), a przed nimi PriceLaw (8baa95d, cofniety razem z PriceLaw):
     /// kwota nie-cenowa w starej monecie porownywana z wartoscia przedmiotu SPRZED przeliczenia (HistoricalPrices.Orig). Sztuka zostaje przy
     /// cenie historycznej (targ, lup, skup). Zloto: zaden nowy przeplyw (nagroda i zamowienie to przedmiot).
+    /// XP pomocnika na starcie roboty (Forge, 0.08 x Value) NIE nalezy do tej reguly (poprawka po recenzji): to mnoznik od ceny, nie stala
+    /// kwota, a XP w kuzni Armoury placi ProjectXp (czas i trudnosc, z sufitem) - od starej wartosci dawaloby 4 096 XP za plyte t6 na starcie
+    /// wobec najwyzej 1 980 przy oddaniu.
+    /// RBM (poprawka po recenzji): przy RBMTournament (u Jeffa wlaczony, Configs/RBM/config.xml) nagrode glowna wybiera postfiks RBM na
+    /// FightTournamentGame.GetTournamentPrize - losowa sztuka kultury miasta i tieru gracza, BEZ patrzenia na wartosc; nadpisuje wybor gry
+    /// i TXP zawsze, gdy jego lista nie jest pusta. Okna gry i TXP dzialaja wtedy tylko jako zapas (pusta lista RBM: ok. 18 z 582 par
+    /// miasto x tier gracza na starcie, np. Pentos, Volantis, Qarth, Ibben przy tierze 2) albo przy wylaczonym RBMTournament.
+    /// Linia "Stale kwoty (3.8)" wypisuje, kto wisi na GetTournamentPrize (Harmony.GetPatchInfo).
     ///
     /// ZLOTY SMOK nie wystepuje w grze jako moneta ani kwota: ROT nazywa monete gry "Stags" (str_gold, str_clan_finance_current_gold w
     /// ROT_module_strings.xml), smoki sa tylko w dwoch dialogach bez liczb (wand54, lordrecruit4), a "Gold Dragon" to wierzchowiec-smok
@@ -157,6 +164,39 @@ namespace Armoury
             return (zl / (double)GoldDragonPence).ToString("0", CultureInfo.InvariantCulture) + " smokow";
         }
 
+        /// <summary>
+        /// Kto naprawde wybiera nagrode glowna (poprawka po recenzji): latki Harmony na FightTournamentGame.GetTournamentPrize. Postfiks
+        /// RBMTournament (owner com.rbmt, RBM.SubModule.ApplyHarmonyPatches przy RBMTournament/Enabled=1) nadpisuje __result losowa sztuka
+        /// kultury miasta i tieru gracza bez patrzenia na wartosc - takze gdy prefiks TXP zwrocil false. Wtedy okna gry i TXP to tylko zapas.
+        /// </summary>
+        private static string PrizePickers(out bool rbm)
+        {
+            rbm = false;
+            var m = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.TournamentGames.FightTournamentGame), "GetTournamentPrize");
+            var info = m != null ? Harmony.GetPatchInfo(m) : null;
+            if (info == null) return "bez latek - wybiera gra wedlug okna 1600-5000";
+            var pre = new List<string>(); var post = new List<string>();
+            foreach (var p in info.Prefixes) pre.Add(Who(p));
+            foreach (var p in info.Postfixes) { post.Add(Who(p)); if (IsRbm(p)) rbm = true; }
+            string list = "prefiksy [" + string.Join(", ", pre.ToArray()) + "], postfiksy [" + string.Join(", ", post.ToArray()) + "]";
+            return rbm
+                ? "WYBIERA RBMTournament (losowa sztuka kultury miasta i tieru gracza, bez patrzenia na wartosc) - okna gry i TXP ponizej tylko jako zapas, gdy lista RBM pusta; " + list
+                : "RBMTournament nie wpiety - wybiera TXP albo gra wedlug okien ponizej; " + list;
+        }
+
+        private static string Who(HarmonyLib.Patch p)
+        {
+            var mm = p.PatchMethod;
+            return p.owner + ":" + (mm != null && mm.DeclaringType != null ? mm.DeclaringType.Name + "." + mm.Name : "?");
+        }
+
+        private static bool IsRbm(HarmonyLib.Patch p)
+        {
+            if (p.owner == "com.rbmt") return true;
+            var mm = p.PatchMethod;
+            return mm != null && mm.DeclaringType != null && mm.DeclaringType.Assembly.GetName().Name == "RBMTournament";
+        }
+
         /// <summary>Z ArmouryBehavior.OnSessionLaunched (PO HistoricalPrices.Apply - wartosci sprzed przeliczenia zapisane): TXP drugi raz i linia "Stale kwoty (3.8)".</summary>
         internal static void SessionStart()
         {
@@ -170,6 +210,10 @@ namespace Armoury
                 sb.Append(" - wpiete: ").Append(_done.Count > 0 ? string.Join(", ", _done.ToArray()) : "nic");
                 if (_miss.Count > 0) sb.Append("; brak: ").Append(string.Join(", ", _miss.ToArray()));
                 if (_stumbles > 0) sb.Append("; potkniecia ").Append(_stumbles);
+                bool rbm = false;
+                try { sb.Append(" | nagroda glowna turnieju: ").Append(PrizePickers(out rbm)); }
+                catch (Exception e) { Stumble("SessionStart(RBM)", e); }
+                string spare = rbm ? " (ZAPAS za RBM)" : "";
 
                 // pule nagrod: wedlug wartosci sprzed przeliczenia (regula 3.8) i wedlug dzisiejszej (bez reguly)
                 var gOld = new Pool(); var gNew = new Pool(); var gQuart = new Pool();
@@ -222,16 +266,15 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("SessionStart(przedmiot)", e); }
                 }
-                sb.Append(" | nagroda turnieju gry 1600-5000: wedlug wartosci sprzed przeliczenia ").Append(Txt(gOld))
+                sb.Append(" | nagroda turnieju gry 1600-5000").Append(spare).Append(": wedlug wartosci sprzed przeliczenia ").Append(Txt(gOld))
                   .Append(", wedlug dzisiejszej ").Append(Txt(gNew)).Append(", dawny podzial /").Append(k.ToString("0.#", CultureInfo.InvariantCulture))
                   .Append(" (").Append(qMin).Append("-").Append(qMax).Append(") ").Append(Txt(gQuart));
                 if (txpMax > 0)
-                    sb.Append(" | Tournaments XPanded ponad ").Append(txpMin).Append(" do ").Append(txpMax).Append(" (bez lordow): sprzed przeliczenia ")
+                    sb.Append(" | Tournaments XPanded").Append(spare).Append(" ponad ").Append(txpMin).Append(" do ").Append(txpMax).Append(" (bez lordow): sprzed przeliczenia ")
                       .Append(Txt(xOld)).Append(", dzisiejsza ").Append(Txt(xNew));
                 else sb.Append(" | Tournaments XPanded: brak (przedzial nieznany)");
                 sb.Append(" | zamowienia lordow (zbroje t").Append(s.OrderMinTier).Append("-t").Append(s.OrderMaxTier).Append(", pulap ").Append(s.OrderMaxItemValue)
                   .Append("): sprzed przeliczenia ").Append(Txt(oOld)).Append(", dzisiejsza ").Append(Txt(oNew));
-                sb.Append(" | XP pomocnika kuzni: 0.08 x wartosc ").Append(On ? "sprzed przeliczenia" : "dzisiejsza");
 
                 // stale kwoty-ceny (zostaja; spis 2.1-2.3) i zloty smok
                 sb.Append(" | zloty smok = ").Append(GoldDragonPence).Append(" zl (1 zl = 1 jelen ROT = 1 pens)");
