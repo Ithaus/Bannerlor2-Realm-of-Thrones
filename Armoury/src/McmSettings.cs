@@ -1816,7 +1816,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradeEquipmentScale { get; set; } = 0.2f;
 
-        [SettingPropertyFloatingInteger("Workshop Trade Price Years", 0.00f, 12.00f, "0.00", HintText = "a workshop sells for this many years of its profit after the workshop tax its buyer will really pay (a notable pays Banner Kings' tax; you and the lords pay none unless Banner Kings' own workshop model is the game's), never less than its tools and fittings, plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years")]
+        [SettingPropertyFloatingInteger("Workshop Trade Price Years", 0.00f, 12.00f, "0.00", HintText = "a workshop sells for this many years of its profit after the workshop tax its buyer will really pay (a notable pays Banner Kings' tax; you and the lords pay it to the town's lord for a workshop in a town of another house when Workshop Owner Pays Town Tax is on - otherwise only if Banner Kings' own workshop model is the game's - and none in a town of your own house), never less than its tools and fittings, plus the coin in its till; town rents sold at about ten years' purchase and merchant ventures paid 15-30% a year, but here a workshop is seized without payment whenever its owner's realm goes to war with the town's - so a buyer wants his coin back in three years")]
         [SettingPropertyGroup("Workshops")]
         public float WorkshopTradePriceYears { get; set; } = 3f;
 
@@ -3992,7 +3992,7 @@ namespace Armoury
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool CaravanWageToPurse { get; set; } = true;
 
-        [SettingPropertyBool("Bk Workshop Tax To Lord", HintText = "the Banner Kings tax on a notable's workshop is really paid by the notable to the lord of the town (the town keeps its autonomy share), instead of vanishing on one side and being created from nothing on the other. A workshop tax nobody pays (a lord's or your workshop in another lord's town - Banner Kings does not charge it here) is no longer paid to the town's lord either. Needs town rents (Population Rent Enabled, Rent Replaces Town Tax) - otherwise as before (off = as before)")]
+        [SettingPropertyBool("Bk Workshop Tax To Lord", HintText = "the Banner Kings tax on a notable's workshop is really paid by the notable to the lord of the town (the town keeps its autonomy share), instead of vanishing on one side and being created from nothing on the other. Banner Kings does not charge the tax on a lord's or your workshop in another lord's town: with Workshop Owner Pays Town Tax on, its owner pays it to the town's lord; with that off - and always for a workshop of the town lord's own house - nobody pays it and the town's lord no longer gets it from nothing either. Needs town rents (Population Rent Enabled, Rent Replaces Town Tax) - otherwise as before (off = as before)")]
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool BkWorkshopTaxToLord { get; set; } = true;
 
