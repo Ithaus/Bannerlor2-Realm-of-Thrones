@@ -1147,3 +1147,6 @@ ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841
 - (03:00) Jeff: "wgraj" - E4/2 (Inni tylko z poleglych) WGRAC razem z D11 (wspolny test 120 + zapis -> WGRANIE 30). Kolejnosc dalej: E4/3 (punkty powrotu - bandy) ->
   E4/4 (przyrost ludnosci) -> E4/1 zima (wymaga zgody/polecenia Jeffa na zmiane 4 kluczy klimatu w plikach gry na czas testu - w ROT jesien trwa > 400 dni, w biegu
   2-letnim zima nie przyszla) -> E4/5..E4/11 + wedrowcy BK z prawdziwym towarem.
+- (03:05) **Jeff - ZASADA TESTOW:** "najpierw wgrywaj wieksze paczki zmian i potem testy w grze, bo te testy zabieraja za duzo czasu; jak je uruchamiasz, to zeby testowac
+  duzo zmian". Od teraz: kod kilku paczek (kazda z recenzja, wylacznikiem MCM, osobnym commitem i wpisem CHANGELOG) -> jedna galaz -> JEDEN test 120 dob + zapis -> jedno
+  wgranie. Najblizszy zbiorczy test: D11 + E4/2 + E4/3 + E4/4.
