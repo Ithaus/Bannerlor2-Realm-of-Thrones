@@ -14,15 +14,19 @@ namespace Armoury
     /// KROK 3.7 (PLAN-DO-KONCA-MODA-2026-10-09, etap 3 - szczelnosc): zloto z niczego / w nicosc przy podmianie rekruta ROT i przy rebelii.
     ///  - PODMIANA ROT (RotSwapNoGold): ROTTroopRecruiter.ExchangeClanTroops zamienia zolnierza lorda AI (nie rodu gracza - IsHeroManageable) na czlowieka
     ///    rodu; przy innym tierze albo elitarnosci robi GiveGoldAction.ApplyBetweenCharacters(null, pan, koszt_stary - koszt_nowy): dodatnia = zloto
-    ///    z niczego, ujemna = w nicosc (ApplyInternal bez dajacego nie przycina kwoty). Raz na porcje zamiany, nie razy liczba ludzi. Wola to: werbunek
-    ///    u notabla (echo OnTroopRecruited), dzienny tick partii (ExchangeRoster) i podzial lupu. To ten sam czlowiek (RotSwapSameMan), roznice
-    ///    kompletu dokupuje AiGear z targu (zakup ma platnika i odbiorce) - zloto ROT nie ma ani platnika, ani odbiorcy, wiec go nie ma.
+    ///    z niczego, ujemna = w nicosc (ApplyInternal bez dajacego nie przycina kwoty; kiesa nie schodzi ponizej 0). Raz na porcje zamiany, nie razy liczba
+    ///    ludzi. Wola to: werbunek u notabla (echo OnTroopRecruited), dzienny tick partii (ExchangeRoster) i podzial lupu.
+    ///    DODATNIA (tanszy zamiennik - zwrot roznicy) blokowana: ten sam czlowiek (RotSwapSameMan), zwrotu nie ma od kogo (gra nie zwraca nic za nizszy
+    ///    tier). UJEMNA (drozszy zamiennik = w praktyce awans) zostaje jak w grze (w nicosc) - ta sama regula co oplata za awans gry
+    ///    (PartyUpgraderCampaignBehavior.ApplyEffects -> GiveGoldAction(pan, null), pozycja "awanse" ksiegi); obie zamknac razem, gdy awanse dostana odbiorce
+    ///    (3.1). Poprawka po recenzji: wczesniej blokowane obie strony = awans przez podmiane ROT za darmo, a zwykly awans platny.
     ///    Transpiler podmienia to jedno wywolanie (asercja: dokladnie 1 w metodzie) na SwapGold - licznik; wylacznik wylaczony = wywolanie gry.
     ///  - REBELIA (RebelPurseFromTown): RebellionsCampaignBehavior.CreateRebelPartyAndClan daje przywodcy 50 000 przez Hero.ChangeHeroGold (z niczego,
     ///    bez zdarzenia - siedzi w reszcie ksiegi pieniadza). Rebelie wola gra (miasta, DailyTickSettlement) i BK (zamki, BKSettlementBehavior.CheckRebellion),
     ///    obie przez StartRebellionEvent. Transpiler (asercja: dokladnie 1 ChangeHeroGold w metodzie): ta sama kwota z kasy zbuntowanej osady, najwyzej tyle,
     ///    ile w niej jest (GiveGoldAction osada -> przywodca; brak w kasie - nie dosypujemy).
-    /// Platnik -> odbiorca: kasa osady -> przywodca rebelii; podmiana ROT - bez przeplywu. Wpiecie raz na proces (OnSessionLaunched - typ ROT juz wczytany).
+    /// Platnik -> odbiorca: kasa osady -> przywodca rebelii; zwrot podmiany ROT - bez przeplywu; doplata za drozszego - jak awans gry (pan -> nicosc, 3.1).
+    /// Wpiecie raz na proces (OnSessionLaunched - typ ROT juz wczytany).
     /// Wyjatki per wywolanie liczone (potkniecia), pierwszy na miejsce do logu; nic nie gasimy. Stan tylko licznikowy (doba i sesja), zerowany w EnsureHooks.
     /// </summary>
     internal static class RotLeaks37
@@ -50,22 +54,37 @@ namespace Armoury
         /// <summary>Zamiast GiveGoldAction.ApplyBetweenCharacters w ROTTroopRecruiter.ExchangeClanTroops (ta sama sygnatura - stos bez zmian).</summary>
         public static void SwapGold(Hero giver, Hero recipient, int amount, bool disableNotification)
         {
-            bool skip = false;
+            bool skip = false, countPaid = false;
+            int before = 0;
             try
             {
-                // tylko przypadek ROT: brak dajacego (zloto z niczego / w nicosc); bez odbiorcy (zaloga, owner null) gra i tak nic nie robi
+                // tylko przypadek ROT: brak dajacego; bez odbiorcy (zaloga, owner null) gra i tak nic nie robi
                 if (SwapOn && giver == null)
                 {
-                    skip = true;
-                    if (recipient != null && amount != 0)
+                    if (amount > 0)
                     {
-                        if (amount > 0) { for (int i = 0; i < 2; i++) { _fromN[i]++; _from[i] += amount; } }
-                        else { for (int i = 0; i < 2; i++) { _toN[i]++; _to[i] -= amount; } }
+                        // zwrot za tanszego zamiennika - z niczego: blokujemy
+                        skip = true;
+                        if (recipient != null) for (int i = 0; i < 2; i++) { _fromN[i]++; _from[i] += amount; }
+                    }
+                    else if (amount < 0 && recipient != null)
+                    {
+                        // doplata za drozszego (awans) - jak w grze, tylko liczymy faktycznie zdjete (kiesa nie schodzi ponizej 0)
+                        countPaid = true;
+                        before = recipient.Gold;
                     }
                 }
             }
-            catch (Exception e) { Stumble("SwapGold", e); skip = false; }
-            if (!skip) GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, disableNotification);
+            catch (Exception e) { Stumble("SwapGold", e); skip = false; countPaid = false; }
+            if (skip) return;
+            GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, disableNotification);
+            if (!countPaid) return;
+            try
+            {
+                long paid = (long)before - recipient.Gold;
+                if (paid > 0) for (int i = 0; i < 2; i++) { _toN[i]++; _to[i] += paid; }
+            }
+            catch (Exception e) { Stumble("SwapGold.licznik", e); }
         }
 
         public static IEnumerable<CodeInstruction> SwapTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -163,7 +182,7 @@ namespace Armoury
 
         private static string StatusLine(string when)
         {
-            return "ROT szczelnosc (3.7) " + when + ": podmiana rekruta ROT bez zlota z niczego / w nicosc "
+            return "ROT szczelnosc (3.7) " + when + ": podmiana rekruta ROT bez zwrotu z niczego (doplata za drozszego jak awans gry) "
                    + (_swapHooked ? "wpieta" : "BRAK (ROTTroopRecruiter.ExchangeClanTroops: wywolan GiveGoldAction " + _swapCalls + ", oczekiwane 1)")
                    + " (wylacznik Rot Swap No Gold " + (SwapOn ? "wl." : "wyl.") + "); 50 000 przywodcy rebelii z kasy osady "
                    + (_rebelHooked ? "wpiete" : "BRAK (CreateRebelPartyAndClan: wywolan ChangeHeroGold " + _rebelCalls + ", oczekiwane 1)")
@@ -177,9 +196,9 @@ namespace Armoury
             {
                 if (_fromN[0] + _toN[0] + _rebelN[0] == 0 && _stumbles == _stumblesShown) return;
                 _stumblesShown = _stumbles;
-                Log.Info("ROT szczelnosc (3.7): dzien | podmiana ROT: doplat z niczego zablokowanych " + _fromN[0] + " (" + _from[0] + " zl), oplat w nicosc zablokowanych "
-                         + _toN[0] + " (" + _to[0] + " zl) - ten sam czlowiek, bez przeplywu | rebelie " + _rebelN[0] + ": z kas osad do przywodcow " + _rebelPaid[0]
-                         + " zl, brak w kasie (nie dosypany) " + _rebelShort[0] + " zl | sesja: podmiana +" + _from[1] + " / -" + _to[1] + " zl w " + (_fromN[1] + _toN[1])
+                Log.Info("ROT szczelnosc (3.7): dzien | podmiana ROT: zwrotow z niczego zablokowanych " + _fromN[0] + " (" + _from[0] + " zl; ten sam czlowiek, bez przeplywu), doplat za drozszego jak w grze "
+                         + _toN[0] + " (" + _to[0] + " zl w nicosc, jak oplata za awans - do zamkniecia razem z awansami, 3.1) | rebelie " + _rebelN[0] + ": z kas osad do przywodcow " + _rebelPaid[0]
+                         + " zl, brak w kasie (nie dosypany) " + _rebelShort[0] + " zl | sesja: podmiana - zwroty zablokowane " + _from[1] + " zl w " + _fromN[1] + " porcjach, doplaty jak w grze " + _to[1] + " zl w " + _toN[1]
                          + " porcjach, rebelie " + _rebelN[1] + " (" + _rebelPaid[1] + " zl z kas) | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }

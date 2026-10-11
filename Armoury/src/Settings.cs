@@ -1138,8 +1138,8 @@ namespace Armoury
         public bool PlayerWorkshopsSameRule = true;        // your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game
 
         // --- Realm of Thrones without gold from nowhere (3.7) ---
-        // 3.7 ROT: podmiana rekruta ROT i rebelia bez zlota z niczego / w nicosc (RotLeaks37.cs)
-        public bool RotSwapNoGold = true;                  // when Realm of Thrones turns an AI lord's soldier into a man of the lord's house of another tier, no gold appears from thin air and none vanishes: it is the same man, and the kit he lacks is bought on the market as usual (off = Realm of Thrones pays the lord, or takes from him, the difference in recruit cost - out of nowhere and into nowhere)
+        // 3.7 ROT: podmiana rekruta ROT bez zwrotu z niczego (doplata za drozszego jak awans gry) i rebelia z kasy osady (RotLeaks37.cs)
+        public bool RotSwapNoGold = true;                  // when Realm of Thrones turns an AI lord's soldier into a cheaper man of the lord's house, the lord no longer gets the difference in recruit cost out of thin air: it is the same man, and the kit he lacks is bought on the market as usual. A swap into a dearer man still costs the lord the difference, just as a troop upgrade does (off = Realm of Thrones also pays the lord the difference out of nowhere)
         public bool RebelPurseFromTown = true;             // the 50,000 gold a rebel leader gets when a town or castle rebels come out of that settlement's own coffers, as much as they hold - not out of thin air (off = the game's gift from nowhere)
 
         public static void Load(string moduleDataDir)
