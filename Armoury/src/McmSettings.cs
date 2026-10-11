@@ -3880,6 +3880,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool PlayerWorkshopsSameRule { get; set; } = true;
 
+        [SettingPropertyBool("Hist Worth Windows Old Coin", HintText = "tournament prizes (the game's own and Tournaments XPanded's), the modest local prize of Grand Tourney, the cap on lords' armour orders and the experience a companion earns at your bellows are reckoned from fixed sums of the old coin (a prize worth 1600 to 5000, an order piece worth at most 12000). With historical prices they are compared with what a piece was worth before the repricing, so prizes and orders are again the kinds of goods their makers meant - good swords, helmets, mail and horses, not only the heaviest plate and warhorses - while the piece keeps its historical worth on the market (needs Historical Prices; off = compared with today's worth, the game's prize range divided by Hist Tournament Scale)")]
+        [SettingPropertyGroup("Worth windows in the old coin (3.8)")]
+        public bool HistWorthWindowsOldCoin { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4849,6 +4853,7 @@ namespace Armoury
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
             s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
+            s.HistWorthWindowsOldCoin = HistWorthWindowsOldCoin;
         }
 
         internal static void Apply()

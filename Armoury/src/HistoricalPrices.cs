@@ -889,6 +889,7 @@ namespace Armoury
         public static void PrizeRangePrefix(ref int __1, ref int __2)
         {
             if (!_applied) return;
+            if (FixedSums38.GameWindowOldCoin) return;   // 3.8: przedzial 1600-5000 porownywany z wartoscia sprzed przeliczenia (transpiler) - bez dzielenia
             float k = Math.Max(1f, Settings.Current.HistTournamentScale);
             __1 = Math.Max(1, (int)(__1 / k)); __2 = Math.Max(__1 + 1, (int)(__2 / k));
         }

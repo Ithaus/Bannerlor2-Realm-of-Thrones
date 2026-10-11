@@ -216,7 +216,8 @@ namespace GrandTourney
                 {
                     if (it == null || it.NotMerchandise) continue;
                     if (!it.HasWeaponComponent && !it.HasArmorComponent) continue;
-                    if (it.Value < 400 || it.Value > s.LocalPrizeMaxValue) continue;
+                    int worth = WorthLink38.Worth(it);   // 3.8: przedzial w starej monecie - wartosc sprzed cen historycznych Armoury
+                    if (worth < 400 || worth > s.LocalPrizeMaxValue) continue;
                     pool.Add(it);
                 }
                 if (pool.Count == 0) return;
