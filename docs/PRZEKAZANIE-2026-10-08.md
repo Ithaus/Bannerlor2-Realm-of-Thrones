@@ -857,3 +857,4 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   w niewole od siewu razem ze zmarlymi (zostawic); karawany osad Strazy biora z pul 3% (zostawic). E5/0 (a1f9a87) i A1 (e8868d2, regulator tryb 2) gotowe;
   E5/0 ma "udzial zysku kupcow zabierany przez pana i korone". Workflow wf_05af8d5e-ebf: scalenie koncowe E4/9 + E5/0 + ujednolicenie R6/W5 -> DLL
   test\Armoury-e4-koncowy.dll -> TEST KONCOWY E4.
+- (UWAGA ZEGAR) Komputer chodzi w PDT (UTC-7); Jeff w CEST (UTC+2). Godziny w nawiasach z 11.10 po poludniu to szacunki - od teraz podaje UTC. Teraz 21:27 UTC (23:27 CEST). Termin raportu Jeffa: 12:00 CEST = 10:00 UTC. Okno 5h odnawia sie 23:20 UTC (57% o 21:27 UTC); tydzien 56%.
