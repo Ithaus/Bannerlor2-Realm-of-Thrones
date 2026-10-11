@@ -155,4 +155,30 @@
        through - only for the commander of that single siege setup, never for any other army. Every other army in the
        world keeps Banner Kings' rules. Set HarrenhalBkArmyPass to false to restore the old behaviour. -->
   <HarrenhalBkArmyPass>true</HarrenhalBkArmyPass>
+
+  <!-- Waiting for Roose Bolton at Harrenhal (needs Realm of Thrones). When the siege of Harrenhal is being set up and
+       Roose Bolton is alive, free and leads his own party, but is fighting a battle or taking part in another siege
+       right now, the setup is put off hour by hour (as Realm of Thrones itself retries) instead of handing the siege
+       to a stand-in lord at once. Nobody is moved to the gates while we wait. Only after HarrenhalWaitHours in-game
+       hours (72 = 3 days; a day is 24 hours whatever the calendar length), or when Roose is dead, captive or without
+       a party, a stand-in lord of the North leads the siege - never Roose himself. Set HarrenhalWaitForRoose to false
+       to hand the siege to a stand-in at once (old behaviour); HarrenhalWaitHours 0 or less means no waiting. -->
+  <HarrenhalWaitForRoose>true</HarrenhalWaitForRoose>
+  <HarrenhalWaitHours>72</HarrenhalWaitHours>
+
+  <!-- Releasing the commander of the siege of Harrenhal (needs Realm of Thrones). The commander of the siege is held
+       in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only releases the
+       North's lords if Roose Bolton's own army was the siege army - a stand-in commander stayed frozen for good, and
+       the game keeps that in the save. With this on, when the event ends the siege army of its commander is disbanded
+       and the commander is released; when a stand-in is replaced by another one, the previous one is released at once.
+       A party held by a quest, by a party disbanding, or by another active Realm of Thrones siege event is left alone.
+       Set HarrenhalReleaseCommander to false to leave it to Realm of Thrones (old behaviour). -->
+  <HarrenhalReleaseCommander>true</HarrenhalReleaseCommander>
+
+  <!-- Repair of older saves (needs Realm of Thrones). Once after loading: if the siege of Harrenhal is already over,
+       but the party that commanded it is still frozen (no decisions of its own) and nothing else holds it (a quest,
+       a party disbanding, another active Realm of Thrones siege event), its leftover siege army is disbanded and the
+       party is released. Other frozen lords of the North are only listed in the CrashScribe log, never changed.
+       Set HarrenhalOldSaveFix to false to switch the repair off. -->
+  <HarrenhalOldSaveFix>true</HarrenhalOldSaveFix>
 </CrashScribe>

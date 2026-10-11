@@ -70,6 +70,11 @@ namespace CrashScribe
 
         // --- Oblezenie Harrenhal: przepustka BK (B6; patrz Mends.HarrenhalBkPass) ---
         public static bool HarrenhalBkArmyPass = true; // BK nie odmawia armii dowodcy jednego skryptowego CreateArmy oblezenia Harrenhal (Roose albo zastepca); false = po staremu (NRE polykany, zastepca)
+        // --- Oblezenie Harrenhal: czekanie na Roose'a i sprzatanie po wydarzeniu (B6b; patrz Mends.HarrenhalWait, HarrenhalEnd, HarrenhalOldSaveCheck) ---
+        public static bool HarrenhalWaitForRoose = true;     // Roose w bitwie albo w cudzym oblezeniu: proba odlozona (co godzine), zastepca dopiero po HarrenhalWaitHours; false = zastepca od razu (po staremu)
+        public static int HarrenhalWaitHours = 72;           // limit czekania w godzinach gry (doba = 24 h niezaleznie od kalendarza Armoury); <= 0 = nie czekamy
+        public static bool HarrenhalReleaseCommander = true; // koniec wydarzenia (postfiks CompleteEvent) i zmiana dowodcy w naszym porcie: armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
+        public static bool HarrenhalOldSaveFix = true;       // po wczytaniu: wydarzenie skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Polnocy tylko w logu)
 
         internal static void Load(string moduleDataDir)
         {
@@ -128,6 +133,10 @@ namespace CrashScribe
                         case "PovertyPeaceArrearsMeasure": PovertyPeaceArrearsMeasure = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
                         case "HarrenhalBkArmyPass": HarrenhalBkArmyPass = B(v); break;
+                        case "HarrenhalWaitForRoose": HarrenhalWaitForRoose = B(v); break;
+                        case "HarrenhalWaitHours": HarrenhalWaitHours = I(v, HarrenhalWaitHours); break;
+                        case "HarrenhalReleaseCommander": HarrenhalReleaseCommander = B(v); break;
+                        case "HarrenhalOldSaveFix": HarrenhalOldSaveFix = B(v); break;
                     }
                 }
             }
