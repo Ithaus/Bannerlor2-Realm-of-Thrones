@@ -1415,7 +1415,23 @@ def etap4_e48(rep, lines, start, win, hea, until):
         lm = mia[mdays[-1]]
         u = fnum(r"udzial miejski swiata dzis " + F_ + r"%", lm)
         u0 = fnum(r"\(odniesienie " + F_ + r"%", lm)
-        rep.add(f"E4/8 N11: udzial miejski swiata d{run_day(mdays[-1], start)} wobec odniesienia", f"{u}% wobec {u0}%" if u is not None else "-", "+-2 pkt", (abs(u - u0) <= 2.0) if (u is not None and u0 is not None) else None)
+        # E4 fixB (P1-3): N11 na udziale miast wobec WLASNYCH wsi (ten sam zbior miast po obu stronach, pole "miasta wobec wlasnych wsi dzis X% (start Y%, ...)");
+        # udzial swiata tylko INFO - jego mianownik ma wszystkie wsie (z wsiami zamkow), a odniesienie tr: tylko wsie miast (blad planu E48:436)
+        uo = fnum(r"miasta wobec wlasnych wsi dzis " + F_ + r"%", lm)
+        uo0 = fnum(r"miasta wobec wlasnych wsi dzis -?\d+(?:\.\d+)?% \(start " + F_ + r"%", lm)
+        on_ = num(r"miasta wobec wlasnych wsi dzis [^|]*?, miast (\d+)\)", lm, int, None)
+        gap = fnum(r"luka do udzialu " + F_ + r" ludzi", lm)
+        gapp = fnum(r"luka do udzialu -?\d+ ludzi \(" + F_ + r"% celu\)", lm)
+        dN = run_day(mdays[-1], start)
+        if uo is None:
+            rep.add(f"E4/8 N11: udzial miast wobec wlasnych wsi d{dN} wobec startu", "brak pola \"miasta wobec wlasnych wsi\" (log sprzed poprawki P1-3)", "+-2 pkt", None)
+        else:
+            rep.add(f"E4/8 N11: udzial miast wobec wlasnych wsi d{dN} wobec startu", f"{uo}% wobec {uo0}% (miast {on_})", "+-2 pkt",
+                    (abs(uo - uo0) <= 2.0) if uo0 is not None else None)
+            rep.add(f"E4/8 N11b: luka do udzialu miejskiego d{dN} (mechanizm R2)", f"{gap:.0f} ludzi = {gapp}% celu" if gap is not None and gapp is not None else "-",
+                    "<= 5% celu (d728 spodziewane ok. 2.6%)", (gapp <= 5.0) if gapp is not None else None)
+        rep.add(f"E4/8 N11 (INFO): udzial miejski swiata d{dN} wobec odniesienia tr:", f"{u}% wobec {u0}%" if u is not None else "-",
+                "INFO (rozne mianowniki: swiat z wsiami zamkow / tr: tylko wsie miast)", None)
     # N12 - rownanie krain z migracja (E4/7 T3)
     rep.add("E4/8 N12: rownanie krain z MigIn/MigOut", "patrz E4/7 T3 (odcinek E4/7 \"Ludzie (ksiega)\" z czlonem migracji E4/8)", "<= 0.1% ludzi krainy", None)
     # N13 - RESZTA linii Hearth

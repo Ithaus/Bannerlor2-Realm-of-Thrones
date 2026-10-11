@@ -150,7 +150,9 @@ namespace Armoury
             if (_budgetDay == day) return;
             _lastBudgetAll = _budgetAll; _lastBudgetUsed = _budgetUsed; _lastBudgetRegions = _budgetRegions;
             _budgetDay = day;
-            _budget.Clear(); _budgetAll = 0; _budgetUsed = 0; _budgetRegions = 0; _qPool.Clear(); _qPeople.Clear();
+            // E4 fixB (K4): _qPeople NIE zerowana co dobe - kolejka kwot ludnosci trwa miedzy dobami (zerowanie tylko w Reset); przy zerowaniu co dobe pierwszy
+            // czlowiek doby szedl zawsze do najwiekszego regionu (d120: reach 41.3% wobec 29.1% z tabeli). _qPool zostaje dobowa (budzet pul i tak jest dobowy).
+            _budget.Clear(); _budgetAll = 0; _budgetUsed = 0; _budgetRegions = 0; _qPool.Clear();
             var s = S;
             if (s == null || !OutlawLaw.On) return;
             EnsureLists();
@@ -235,7 +237,9 @@ namespace Armoury
         }
 
         /// <summary>Krok 3: ludnosc Westeros - wagi = DOM regionow-zrodel z widoku doby; kolejka kwot (q_r += w_r / suma w na czlowieka), region o najwiekszej kwocie,
-        /// PeopleBook.LevyWatchPeople (wsie wedlug ludzi, podloga 50 hearth); region bez miejsca wypada z tego wolania.</summary>
+        /// PeopleBook.LevyWatchPeople (wsie wedlug ludzi, podloga 50 hearth); region bez miejsca wypada z tego wolania.
+        /// E4 fixB (K4): kolejka trwa miedzy dobami (bez zerowania w EnsureBudget), a kwoty zmieniaja sie tylko o to, co naprawde zdjeto: wybor regionu bez zapisu,
+        /// potem wszystkim czynnym q_r += got * w_r / suma, wybranemu q -= got - suma kwot stoi na 0 i region bez miejsca nie zbiera kwoty (bez serii po odblokowaniu).</summary>
         private static void FromPeople(double want, PeopleBook.Shares into)
         {
             EnsureLists();
@@ -260,22 +264,32 @@ namespace Armoury
                 {
                     if (dry != null && dry.Contains(kv.Key)) continue;
                     double q; _qPeople.TryGetValue(kv.Key, out q);
-                    q += u * kv.Value / sum; _qPeople[kv.Key] = q;
+                    q += u * kv.Value / sum;                                // E4 fixB (K4): tylko wybor - bez zapisu (zapis nizej, o to, co zdjeto)
                     if (q > bq) { bq = q; best = kv.Key; }
                 }
                 if (best == null) break;
                 var node = Node(best);
                 double got = node != null ? PeopleBook.LevyWatchPeople(node, u) : 0.0;
                 if (!(got > 0.0)) got = 0.0;
-                _qPeople[best] = _qPeople[best] - got;
                 if (got > Eps)
                 {
+                    foreach (var kv in w)
+                    {
+                        if (dry != null && dry.Contains(kv.Key)) continue;
+                        double q; _qPeople.TryGetValue(kv.Key, out q);
+                        _qPeople[kv.Key] = q + got * kv.Value / sum;
+                    }
+                    _qPeople[best] = _qPeople[best] - got;
                     into.Add(best, got);
                     string realm = FreeHands.RealmOf(node);
                     double v; _dRealm.TryGetValue(realm, out v); _dRealm[realm] = v + got;
                     _sRealm.TryGetValue(realm, out v); _sRealm[realm] = v + got;
                 }
-                if (got < u - 1e-6) { if (dry == null) dry = new HashSet<string>(); dry.Add(best); }
+                if (got < u - 1e-6)
+                {
+                    if (dry == null) dry = new HashSet<string>(); dry.Add(best);
+                    double qb; if (_qPeople.TryGetValue(best, out qb) && qb > 1.0) _qPeople[best] = 1.0;   // asekuracja: region bez miejsca nie trzyma kwoty ponad 1 czlowieka
+                }
             }
         }
 
