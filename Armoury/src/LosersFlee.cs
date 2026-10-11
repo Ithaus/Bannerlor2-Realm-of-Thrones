@@ -203,6 +203,7 @@ namespace Armoury
             _sumJChk = _taken = _lostByGame = _controlDiff = _checked = _unchecked = 0;
             _oddApplyTypes = _oddApplyMen = _oddPostTypes = _oddPostMen = 0;
             _freed = _freedOutside = 0;
+            _tavernRouted = _tavernFreed = 0;
             _toBk = _asSerfs = _asNobles = _toVillageMen = _toCommon = _template = _templateGarr = _templateBandit = _homeless = _vanished = _bkOddCalls = _bkOddDiff = 0;
             _toVillageHearth = _toCommonHearth = _templateFloat = 0f;
             Array.Clear(_bkBy, 0, Srcs); Array.Clear(_hearthBy, 0, Srcs); Array.Clear(_tplBy, 0, Srcs);
@@ -378,6 +379,9 @@ namespace Armoury
         internal static void NoteHomeless(int n, bool toPool) { if (n <= 0) return; _homeless += n; if (!toPool) _vanished += n; }
         internal static void NoteTemplateFloat(float m) { if (m > 0f) _templateFloat += m; }
         internal static void NoteUndead(int n) { if (n > 0) _undeadRouted += n; }
+        /// <summary>E4/10: zolnierze, ktorzy zamiast do domu staneli w karczmie (rozbici H3 - OutlawLaw.RoutedH3Body, uwolnieni jency - tutaj) - linia "Przegrani (H3)".</summary>
+        internal static void NoteTavern(int n, int src) { if (n <= 0) return; if (src == SrcFreed) _tavernFreed += n; else _tavernRouted += n; }
+        private static int _tavernRouted, _tavernFreed;
         /// <summary>Czas czesci H3 poza ta klasa (rozbici w OutlawLaw.RoutedH3, powrot z puli w OutlawLaw.Daily) - do linii dnia.</summary>
         internal static void AddTicks(int which, long t) { if (which >= 0 && which < _ticksH3.Length && t > 0) _ticksH3[which] += t; }
 
@@ -1166,9 +1170,14 @@ namespace Armoury
                         fp.Roster.AddToCounts(fp.T, -n);
                         _freed += n; bp.FreedN += n;
                         Row(OutlawLaw.RegionAt(pos)).Freed += n;
+                        // E4/10 (W3, R16): 1/3 uprawnionych (od tieru VeteranMinTier) do karczmy najblizszego miasta, reszta do domu jak dotad (nie rzuca)
+                        int vt = PeopleBook.VetDivert(null, fp.T, n, pos, PeopleBook.VFreed, org);
+                        if (vt > 0) NoteTavern(vt, SrcFreed);
+                        int n2 = n - vt;
+                        if (n2 <= 0) continue;
                         int cat;
-                        int got = SendHome(null, fp.T, n, pos, null, SrcFreed, out cat, org);
-                        int left = n - got;
+                        int got = SendHome(null, fp.T, n2, pos, null, SrcFreed, out cat, org);
+                        int left = n2 - got;
                         if (left > 0)
                         {
                             if (law) { OutlawLaw.PoolAdd(region, fp.T, left); NoteWoods(region, left); }
@@ -1383,7 +1392,7 @@ namespace Armoury
 
         /// <summary>Bitwa gracza: jedna linia z liczbami po wyniku i podzialem rozbitych (3.2). Walka w polu - H3 jej nie rusza ("pominieta");
         /// autobitwa objeta przez F1 - liczby po H3 (plan w linii "Bitwa: H3 autobitwa gracza").</summary>
-        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool, int undead)
+        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool, int undead, int tavern = 0)
         {
             try
             {
@@ -1413,6 +1422,7 @@ namespace Armoury
                 }
                 sb.Append(" | rozbici: do puli ").Append(pool).Append(", do domu ").Append(bk + village).Append(" (BK ").Append(bk).Append(", wies ").Append(village)
                   .Append("), z szablonu ").Append(template).Append(", bez domu ").Append(homeless).Append(homeless > 0 ? (toPool ? " (do puli)" : " (znikneli - prawo wyrzutkow wylaczone)") : "")
+                  .Append(", do karczmy (E4/10) ").Append(tavern)
                   .Append(undead > 0 ? ", Inni (wighty - z niczego, do niczego) " + undead : "").Append('.');
                 Log.Info(sb.ToString());
             }
@@ -1513,7 +1523,8 @@ namespace Armoury
                   .Append(" ludzi = ").Append(_toCommonHearth.ToString("0.0", ci)).Append(" hearth, z szablonu ").Append(_template).Append(" (garnizony ").Append(_templateGarr)
                   .Append(", bandyci przy wylaczonym prawie wyrzutkow ").Append(_templateBandit)
                   .Append(", z puli straz karawan ").Append(_templateFloat.ToString("0.0", ci)).Append("), bez domu ").Append(_homeless)
-                  .Append(_vanished > 0 ? " (znikneli - prawo wyrzutkow wylaczone " + _vanished + ")" : " (do puli)");
+                  .Append(_vanished > 0 ? " (znikneli - prawo wyrzutkow wylaczone " + _vanished + ")" : " (do puli)")
+                  .Append(", do karczmy (E4/10) ").Append(_tavernRouted + _tavernFreed).Append(" (rozbici ").Append(_tavernRouted).Append(", uwolnieni jency ").Append(_tavernFreed).Append(')');
                 // ta sama suma wedlug zrodla: "rozbici z bitew" tej doby = dopisek H3 linii "Wyrzutki:" tej samej doby (ludnosc BK, do wsi,
                 // z szablonu); "z puli" pochodzi z powrotu w OutlawLaw.Daily, ktory biegnie PO tej linii - to liczba z linii "Wyrzutki:" doby wczesniej
                 sb.Append(" | domy wedlug zrodla: rozbici z bitew - BK ").Append(_bkBy[SrcRouted]).Append(", wies ").Append(_hearthBy[SrcRouted]).Append(", z szablonu ").Append(_tplBy[SrcRouted])

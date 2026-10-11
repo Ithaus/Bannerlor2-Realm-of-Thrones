@@ -745,6 +745,12 @@ namespace Armoury
         public float FreeHandsIronIslandsExtraMax = 0.2f;  // Iron Islands: thralls work the land, so up to this much more of the men may go reaving (grows with the number of thralls)
         public bool FreeHandsBrake = true;                 // a land with no free hands left raises no new volunteers until births make up its losses (the Free Folk and the Watch excepted)
         public bool PeopleMenuEntry = true;                // "People of this land" in the menus of villages, towns and castles: the land's people at home, under arms, held captive, outlawed, fallen and its free hands
+        // E4/10 (167, PLAN 4.14; plan docs/etap4/PLAN-KODU-E410.md rozdz. 8.1): weterani - karczma tylko z puli zolnierzy, ktorzy odeszli ze sluzby zywi (zwolnieni,
+        // rozbici, wypuszczeni jency, rozwiazane partie); 1/3 do karczmy najblizszego miasta, niewynajety po 120 dobach do domu - PeopleBook.Veterans.cs, Veterans.cs
+        public bool VeteransEnabled = true;                // a tavern's hirelings are real men: soldiers who left service - released by their lord, routed from a lost battle, freed from captivity or sent off when their company was disbanded - and stopped at the nearest town to sell their sword. No hireling appears from nowhere; at the start the taverns hold the old soldiers already there. Off = taverns as in the game (veterans already waiting still go home in time)
+        public float VeteranShareToTavern = 0.33f;         // share of soldiers leaving service alive who stop at the tavern of the nearest town instead of going straight home
+        public int VeteranWaitDays = 120;                  // days a veteran waits in a tavern for a master before he gives up and goes home
+        public int VeteranMinTier = 3;                     // only a soldier of at least this tier stops at a tavern - a green levy would stand there as a seasoned sellsword he never was; lower ranks always go home
         public int OutlawMinBand = 6;                      // fewest men needed nearby before a new band can form
         public int OutlawNeighbourRegions = 4;             // a new band gathers men from its own region and this many nearest ones
         public float OutlawBandSizeScale = 1f;             // size of a new band against the game's usual size (still only as many as there are men)

@@ -870,9 +870,11 @@ namespace Armoury
             for (int i = PeopleBook.MBackH3; i <= PeopleBook.MBackDisband; i++) o11 += mv[i];
             // E4/6: glod - zmarli z glodu i uciekli z glodu (DOM -> smierc, DOM -> UCHODZCY) - hearth z ksiegi (scalenie z E4/7: o12, w paczce E4/6 bylo o10)
             double o12 = mv[PeopleBook.MFamineDead] + mv[PeopleBook.MFamineFled];
+            // E4/10: weterani niewynajeci po czasie czekania wracaja do DOM regionu pochodzenia (z hearth, jak MBack*) - inaczej RESZTA hearth wchlonie te powroty
+            double o13 = mv[PeopleBook.MBackVeteran];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -907,7 +909,8 @@ namespace Armoury
                   .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)")
                   .Append(", spustoszenie (E4/5: rabunek, zerowanie) ").Append(S(o8)).Append(", powrot uchodzcow +").Append(F2(o9))
                   .Append(", glod (E4/6: zmarli i uciekli z glodu) ").Append(S(o12))
-                  .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11));
+                  .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11))
+                  .Append(", powroty weteranow (E4/10) +").Append(F2(o13));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

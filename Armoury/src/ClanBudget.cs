@@ -73,6 +73,7 @@ namespace Armoury
         internal static int LastReleasedMen, LastReleasedPar, LastReleasedGar, LastNoVillage, LastFamilyN;
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
+        private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
         private static int _dDesertOff, _dSpawnBlock, _dRecruitBlock, _dGarBlock, _dGarLimited, _dPartyLimited, _dWatchMen, _dWatchCap = -1;
         // 2 (werbunek Strazy, 10.10): JEDEN pulap w ludziach dla calej Strazy (jeden zakon, jedna kiesa). Dotad pulap liczony osobno na rod: rody Strazy
         // bez dochodu mialy pulap ok. 0 i ich druzyny nie werbowaly (werbunek wstrzymany 50-200/d przy Strazy 1.5-2 tys. wobec pulapu calosci 3-5 tys.),
@@ -116,6 +117,7 @@ namespace Armoury
         {
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
+            _dRelTavern = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
             _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
@@ -742,7 +744,7 @@ namespace Armoury
                 // E4/7: udzialy pochodzenia zwalnianych - tuz PRZED ToVillage (zdjecie z rosteru jest po nim - Take nie stoi miedzy zdjeciem a dopisaniem, U24)
                 PeopleBook.Shares org = null;
                 try { if (PeopleBook.OriginLive) org = PeopleBook.Take(r, n, PeopleBook.FRelease166); } catch { org = null; }
-                if (!ToVillage(village, ch, n, PeopleBook.M166, org)) { try { PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch { } _dNoVillage++; continue; }
+                if (!ToVillage(village, ch, n, PeopleBook.M166, org, mp)) { try { PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch { } _dNoVillage++; continue; }
                 r.AddToCounts(ch, -n, false, -wounded);
                 done += (double)n * w; gone += n;
             }
@@ -796,30 +798,67 @@ namespace Armoury
 
         /// <summary>179 (GentryService.FinishPrefix) i W4c (OverflowHome.SendHome): ludzie do ludnosci BK wsi (tylko wies z danymi BK); false - nikt nie przeszedl.
         /// cause - przyczyna w ksiedze ludzi (PeopleBook.M179 / MW4c).</summary>
-        internal static bool ToVillagePop(Settlement v, CharacterObject ch, int n, int cause, PeopleBook.Shares org = null)
+        internal static bool ToVillagePop(Settlement v, CharacterObject ch, int n, int cause, PeopleBook.Shares org = null, MobileParty party = null)
         {
-            return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n, cause, org);
+            return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n, cause, org, party);
+        }
+
+        /// <summary>E4/10 (W1): weterani do ludnosci BK miasta karczmy (sklad, nie ludzie - R0) - ta sama refleksja co ToVillage, bez ksiegi ludzi. false - miasto bez danych BK.</summary>
+        internal static bool BkPopAdd(Settlement town, CharacterObject ch, int n)
+        {
+            if (town == null || ch == null || n <= 0 || !BkResolve() || !HasPop(town)) return false;
+            try
+            {
+                var pd = _getPopData.Invoke(_popMgr, new object[] { town });
+                if (pd == null) return false;
+                _fromSoldiers.Invoke(pd, new object[] { ch, n });
+                return true;
+            }
+            catch (Exception e) { Stumble("BkPopAdd(E4/10)", e); return false; }
         }
 
         /// <summary>Drugi punkt powrotu do DOM (R0, U2): zwolnieni 166, przepelnienie W4c, rycerze 179 - do ludnosci BK wsi (sklad BK) i do ksiegi ludzi
         /// (PeopleBook: SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje rekruta z DOM, wiec hearth bylby ludzmi z niczego).</summary>
-        private static bool ToVillage(Settlement v, CharacterObject ch, int n, int cause, PeopleBook.Shares org = null)
+        private static bool ToVillage(Settlement v, CharacterObject ch, int n, int cause, PeopleBook.Shares org = null, MobileParty party = null)
         {
-            try
+            // E4/10 (W1, R16): plan weteranow PRZED ludnoscia BK wsi (bez zapisu stanu): t z n stanie w karczmie najblizszego miasta (1/3 uprawnionych od tieru
+            // VeteranMinTier), wies dostaje n - t. BK wsi zawiedzie - false PRZED zapisem weteranow (nikt nie zszedl, ReleaseFrom nie zdejmuje - jak dotad).
+            PeopleBook.VetTicket vt = null;
+            int vsrc = cause == PeopleBook.M166 ? PeopleBook.V166 : cause == PeopleBook.MW4c ? PeopleBook.VW4c : cause == PeopleBook.M179 ? PeopleBook.V179 : -1;
+            try { if (vsrc >= 0 && PeopleBook.VetLive && v != null) vt = PeopleBook.VetPlan(party, ch, n, v.GetPosition2D, vsrc); } catch { vt = null; }
+            int t = vt != null && vt.Reason == PeopleBook.VROk ? vt.T : 0;
+            if (n - t > 0)
             {
-                var pd = _getPopData.Invoke(_popMgr, new object[] { v });
-                if (pd == null) return false;
-                _fromSoldiers.Invoke(pd, new object[] { ch, n });
+                try
+                {
+                    var pd = _getPopData.Invoke(_popMgr, new object[] { v });
+                    if (pd == null) return false;
+                    _fromSoldiers.Invoke(pd, new object[] { ch, n - t });
+                }
+                catch (Exception e) { Stumble("ToVillage", e); return false; }
             }
-            catch (Exception e) { Stumble("ToVillage", e); return false; }
+            int put = 0;
+            if (vt != null)
+            {
+                put = PeopleBook.VetCommit(vt, org);          // nie rzuca; dopisanie do puli ostatnim krokiem; org pomniejszony o put
+                if (cause == PeopleBook.M166) _dRelTavern += put;
+            }
+            if (put < t)
+            {
+                // pula nie przyjela (wyjatek - potkniecie E4/10) - ci ludzie do ludnosci BK wsi jak dotad (nikt nie znika)
+                try { var pd = _getPopData.Invoke(_popMgr, new object[] { v }); if (pd != null) _fromSoldiers.Invoke(pd, new object[] { ch, t - put }); }
+                catch (Exception e) { Stumble("ToVillage(E4/10 zwrot)", e); }
+            }
+            int home = n - put;
+            if (home <= 0) return true;
             // E4/3: wlasny try w ksiedze (U24) - po dopisaniu, nie miedzy zdjeciem a dopisaniem. E4/7: czesc znana pochodzeniem - DOM regionu pochodzenia z hearth
             // (MBack166/MBackW4c/MBack179), reszta - jak w E4/3 (tylko liczona); ludnosc BK dostaje ich tam, gdzie dotad
             if (org != null)
             {
                 int known = cause == PeopleBook.M166 ? PeopleBook.MBack166 : cause == PeopleBook.MW4c ? PeopleBook.MBackW4c : cause == PeopleBook.M179 ? PeopleBook.MBack179 : -1;
-                if (known >= 0) PeopleBook.HomeOrNote(org, n, known, cause); else PeopleBook.Note(n, cause, 0.0);
+                if (known >= 0) PeopleBook.HomeOrNote(org, home, known, cause); else PeopleBook.Note(home, cause, 0.0);
             }
-            else PeopleBook.Note(n, cause, 0.0);
+            else PeopleBook.Note(home, cause, 0.0);
             return true;
         }
 
@@ -1115,6 +1154,7 @@ namespace Armoury
               .Append(", rody ponad pulapem partii ").Append(_dPartyOverCap)
               .Append(" | ponad 1.10 x pulap ").Append(_dOver).Append(" rodow, od 3 dob (zwalniaja) ").Append(_dStreak)
               .Append(" | zwolnieni: do wsi ").Append(_dRelMen).Append(" ludzi (z partii ").Append(_dRelPar).Append(", z zalog ").Append(_dRelGar).Append("), zniklo ").Append(_dVanished)
+              .Append(", z tego do karczmy (E4/10) ").Append(_dRelTavern)
               .Append(", nie zwolniono - brak wsi z danymi BK ").Append(_dNoVillage).Append(", sakiewki zwolnionych do kies wsi ").Append(_dRelPurse).Append(" zl")
               .Append(" | dezercja gry z limitu zoldu wylaczona (rody z budzetem): ").Append(_dDesertOff).Append(" wywolan")
               .Append(" | limity: partie zmienione ").Append(_dPartyLimited).Append(", zalogi przyciete do celu pokojowego ").Append(_dGarLimited)

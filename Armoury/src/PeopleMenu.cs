@@ -13,6 +13,7 @@ namespace Armoury
     /// okno informacyjne (InformationManager.ShowInquiry) z kontami regionu osady (warownia OutlawLaw.RegionFor): w domu, pod bronia, w niewoli, wyrzutki, uchodzcy,
     /// polegli i narodziny od poczatku ksiegi, wolne rece i plon. Liczby z cache doby (ta sama doba co linie "Pochodzenie (E4/7)" i "Wolne rece (E4/7)").
     /// Bez GameMenu.SwitchToMenu (CLAUDE.md 7) i bez stanu. Napisy po angielsku. Wylacznik PeopleMenuEntry. E4/11 rozszerzy te sama pozycje o wioski poboczne.
+    /// E4/10 (167): weterani krainy czekajacy w karczmach (konto WETERANI wedlug regionu pochodzenia) i - w miescie - weterani w karczmie tego miasta.
     /// </summary>
     internal static class PeopleMenu
     {
@@ -84,6 +85,16 @@ namespace Armoury
                         if (c.Brake && Settings.Current != null && Settings.Current.FreeHandsBrake) sb.Append("No new levies: this land has no free hands left.\n");
                     }
                     if (c != null && c.L < 1.0) sb.Append("Harvest of the fields: ").Append(P(c.L)).Append('\n');
+                    if (PeopleBook.VetLive) sb.Append("Veterans of this land waiting in taverns: ").Append(N(v.Vet)).Append('\n');
+                }
+                // E4/10: karczma tego miasta - weterani z calego swiata, ktorzy staneli tu najblizej (ta sama liczba co linia dzienna "Weterani (E4/10)")
+                if (st.IsTown && PeopleBook.VetLive)
+                {
+                    int mounted, days;
+                    int men = PeopleBook.VetInTown(st, out mounted, out days);
+                    if (men > 0) sb.Append("In this town's tavern: ").Append(men).Append(men == 1 ? " veteran waits" : " veterans wait").Append(" for a master (").Append(mounted).Append(" mounted); the longest has waited ")
+                                   .Append(days).Append(days == 1 ? " day." : " days.").Append('\n');
+                    else sb.Append("No veterans wait in this town's tavern.\n");
                 }
                 InformationManager.ShowInquiry(new InquiryData(title, sb.ToString().TrimEnd('\n'), true, false, "Close", null, delegate { }, null), true);
             }

@@ -647,7 +647,7 @@ namespace Armoury
                         // E4/7: udzialy pochodzenia przed dopisaniem do wsi (zdjecie z rosteru po nim - U24); wies nie przyjela - cofniete
                         PeopleBook.Shares org = null;
                         try { if (PeopleBook.OriginLive && !PeopleBook.IsWight(ch)) org = PeopleBook.Take(r, el.Number, PeopleBook.FGentry179); } catch { org = null; }
-                        if (v != null && ClanBudget.ToVillagePop(v, ch, el.Number, PeopleBook.M179, org)) { r.AddToCounts(ch, -el.Number, false, -el.WoundedNumber); _dFinishMen += el.Number; }
+                        if (v != null && ClanBudget.ToVillagePop(v, ch, el.Number, PeopleBook.M179, org, mp)) { r.AddToCounts(ch, -el.Number, false, -el.WoundedNumber); _dFinishMen += el.Number; }   // E4/10 (W1): czesc moze stanac w karczmie
                         else { try { PeopleBook.Untake(r, org, PeopleBook.FGentry179); } catch { } _dFinishLost += el.Number; }
                     }
                 _dFinishPris += mp.PrisonRoster != null ? mp.PrisonRoster.TotalRegulars : 0;

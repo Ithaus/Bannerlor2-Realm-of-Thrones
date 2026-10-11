@@ -675,6 +675,7 @@ namespace Armoury
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MaterialOrders.OnPartyDestroyed);   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, PeopleBook.OnPartyDestroyed);   // E4/3 (R18): tabor albo lodz rozwiazane przez gre bez bitwy - sklad do swojej wsi (zdarzenie przed RemoveParty)
+            CampaignEvents.MercenaryNumberChangedInTown.AddNonSerializedListener(this, Veterans.OnTavernNumber);   // E4/10 (167): ubytek karczmy nie przez nas = najem weterana z puli (AI, karawany, gracz)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, ArmyClothing.OnPartyDestroyed);   // 150
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)

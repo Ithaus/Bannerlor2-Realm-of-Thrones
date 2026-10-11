@@ -663,7 +663,7 @@ namespace Armoury
             var pos = me.Position.ToVec2();
             var region = NearestNode(pos);
             LosersFlee.BeginBattle();
-            int pool = 0, bk = 0, village = 0, template = 0, homeless = 0, routed = 0, undead = 0;
+            int pool = 0, bk = 0, village = 0, template = 0, homeless = 0, routed = 0, undead = 0, tavern = 0;
             foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
             {
                 if (side == null) continue;
@@ -703,6 +703,10 @@ namespace Armoury
                             }
                             int rest = n - Math.Max(0, toPool);
                             if (rest <= 0) continue;
+                            // E4/10 (W2, R16): z rozbitych wracajacych do domu 1/3 uprawnionych (od tieru VeteranMinTier) staje w karczmie najblizszego miasta (nie rzuca)
+                            int vt = PeopleBook.VetDivert(mp, e.Character, rest, pos, PeopleBook.VH3, slice);
+                            if (vt > 0) { rest -= vt; tavern += vt; }
+                            if (rest <= 0) continue;
                             int cat;
                             int got = LosersFlee.SendHome(mp, e.Character, rest, pos, fac, LosersFlee.SrcRouted, out cat, slice);
                             if (got > 0)
@@ -723,7 +727,8 @@ namespace Armoury
             _inRouted += pool + (law && region != null ? homeless : 0);
             LosersFlee.NoteHomeless(homeless, law && region != null);
             LosersFlee.NoteUndead(undead);
-            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead);
+            LosersFlee.NoteTavern(tavern, LosersFlee.SrcRouted);         // E4/10: rozbici do karczmy (kontrola: rozbici = pula + domy + bez domu + do karczmy)
+            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead, tavern);
         }
 
         internal static void OnVillageLooted(Village v)
