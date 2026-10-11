@@ -85,6 +85,7 @@ namespace Armoury
         private static double _hRaid, _hMisery, _hReturn, _hSeed;
         // E4/3: pula wyrzutkow - naplyw i odplyw wedlug przyczyny do linii "Pula wyrzutkow (E4/3)"; kazdy doplyw idzie przez Add, kazdy odplyw ma licznik
         private static double _pAdd, _pSeed, _pBirth, _pRecruit, _pHomeSold, _pHomeSoldWant, _pHomeGuard, _pHomePlain, _pHomeUndead, _pFrac, _pTrim, _pLast = -1;
+        private static double _pFloor;      // E4/4 (R17): z puli do wsi, ktorej podloga 10 hearth dopisala ludzi (TakeForFloor)
         // E4/3 wyposrodkowanie z wojna (Jeff 11.10): rozbici i dezerterzy, ktorzy wrocili z regionow w wojnie / w pokoju, i liczba regionow z pula w kazdym stanie
         private static double _pRoutedWar, _pRoutedPeace;
         private static int _pRegWar, _pRegPeace;
@@ -137,6 +138,7 @@ namespace Armoury
         {
             _pAdd = _pSeed = _pBirth = _pRecruit = _pHomeSold = _pHomeSoldWant = _pHomeGuard = _pHomePlain = _pHomeUndead = _pFrac = _pTrim = 0;
             _pRoutedWar = _pRoutedPeace = 0; _pRegWar = _pRegPeace = 0;
+            _pFloor = 0;
         }
 
         private static void FenceNewDay()
@@ -353,6 +355,33 @@ namespace Armoury
             var v = vs.OrderBy(x => x.Hearth).First();
             placed = true;
             return PeopleBook.Move(v, from, PeopleBook.ADom, men, cause, Math.Max(0.01f, Settings.Current.OutlawHearthPerMan));
+        }
+
+        /// <summary>
+        /// E4/4 (R17, U15d): podloga 10 hearth dopisala wsi regionu `men` ludzi - schodza z puli TEGO regionu (wracaja do domu; hearth juz dopisala gra):
+        /// najpierw prosci (stamtad ich wzieto), potem pozostali zywi (bez kluczy starych wightow - W4b). Ulamki dozwolone (pula liczy w float).
+        /// Zwraca, ilu zeszlo; reszte PeopleBook liczy jako "podloga z niczego". Prawo wyrzutkow wylaczone - 0 (puli nikt nie prowadzi).
+        /// </summary>
+        internal static float TakeForFloor(Settlement region, float men)
+        {
+            if (!On || region == null || !(men > 0f) || float.IsInfinity(men)) return 0f;
+            Dictionary<string, float> d;
+            if (!_pool.TryGetValue(region.StringId, out d) || d.Count == 0) return 0f;
+            float got = 0f;
+            var keys = new List<string>();
+            if (d.ContainsKey(Commoner)) keys.Add(Commoner);
+            keys.AddRange(d.Keys.Where(k => k != Commoner && !SkipUndeadKey(k)).OrderByDescending(k => d[k]));
+            foreach (var key in keys)
+            {
+                if (got >= men) break;
+                float have = d[key];
+                float t = Math.Min(have, men - got);
+                if (!(t > 0f)) continue;
+                d[key] = have - t; got += t;
+                if (d[key] < 0.01f) { _pTrim += d[key]; d.Remove(key); }
+            }
+            _pFloor += got;
+            return got;
         }
 
         private static void Seed()
@@ -722,14 +751,21 @@ namespace Armoury
             bool w;
             if (_warHome.TryGetValue(f, out w)) return w;
             w = false;
-            try
-            {
-                if (!EternalWarSide(f))
-                    foreach (var k in Kingdom.All) if (k != f && !k.IsEliminated && !EternalWarSide(k) && f.IsAtWarWith(k)) { w = true; break; }
-            }
+            try { w = WarWithoutEternal(f); }
             catch { }
             _warHome[f] = w;
             return w;
+        }
+
+        /// <summary>
+        /// Jedna regula "region w wojnie" bez wiecznych wojen fabularnych (Wolni Ludzie, Inni): frakcja w wojnie z jakimkolwiek krolestwem, ktore nie jest strona
+        /// wiecznej wojny. Wolaja: AtWarForHome (powrot rozbitych, E4/3) i przyrost naturalny wsi (PopulationLaw, E4/4 - skladowa wojny w U). Bez pamieci; moze rzucic.
+        /// </summary>
+        internal static bool WarWithoutEternal(IFaction f)
+        {
+            if (f == null || EternalWarSide(f)) return false;
+            foreach (var k in Kingdom.All) if (k != f && !k.IsEliminated && !EternalWarSide(k) && f.IsAtWarWith(k)) return true;
+            return false;
         }
 
         private static bool EternalWarSide(IFaction f)
@@ -1027,7 +1063,7 @@ namespace Armoury
             var ci = CultureInfo.InvariantCulture;
             double named = _inDesert + _inRouted + _inRaid + _inMisery + _inDisband + _pSeed;
             double home = _pHomeSold + _pHomeGuard + _pHomePlain + _pHomeUndead;
-            double outs = _pBirth + _pRecruit + home + _pFrac;
+            double outs = _pBirth + _pRecruit + home + _pFrac + _pFloor;
             var sb = new StringBuilder(900);
             sb.Append("Pula wyrzutkow (E4/3): dzien ").Append((int)CampaignTime.Now.ToDays).Append(" | stan ").Append(now.ToString("0", ci));
             if (_pLast < 0) sb.Append(" (pierwsza doba sesji - zmiana od nastepnej)");
@@ -1046,7 +1082,8 @@ namespace Armoury
               .Append(", straz karawan z szablonu ").Append(_pHomeGuard.ToString("0.0", ci)).Append(RoutedTempoSegment(s, ci))
               .Append("; prosci i bandyci do wsi ").Append(_pHomePlain.ToString("0.0", ci)).Append(" - tempo pokoju i dobrobytu; stare wighty do niczego ").Append(_pHomeUndead.ToString("0.0", ci)).Append(')')
               .Append(", narodziny band ").Append(_pBirth.ToString("0", ci)).Append(", werbunek band ").Append(_pRecruit.ToString("0", ci))
-              .Append(_pFrac > 0 ? ", reszty ponizej 1 czlowieka (zamkniete klucze) " + _pFrac.ToString("0.00", ci) : "");
+              .Append(_pFrac > 0 ? ", reszty ponizej 1 czlowieka (zamkniete klucze) " + _pFrac.ToString("0.00", ci) : "")
+              .Append(_pFloor > 0 ? ", do wsi podniesionych podloga 10 hearth (E4/4 R17) " + _pFloor.ToString("0.0", ci) : "");
             sb.Append(" | srednio w puli ").Append(outs > 0 ? (now / outs).ToString("0", ci) + " dob" : "-").Append(" (stan / odplyw dzienny).");
             return sb.ToString();
         }

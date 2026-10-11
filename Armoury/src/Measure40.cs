@@ -106,6 +106,11 @@ namespace Armoury
         // W1 tick wsi
         private static int _vTickN, _vFloorN, _vOddN;
         private static double _vTick, _vBase, _vBaseMul, _vModel, _vScar, _vFloor, _vOdd, _milV, _milT, _milC;
+        // E4/4 (109n): przyrost naturalny i powrot uchodzcow w ticku wsi (rachunek PopulationLaw.GrowthPostfix tej odpowiedzi modelu); _vExpl - czesc wyniku
+        // modelu wyjasniona w ticku (przyrost + powrot, a przy wylaczonym przyroscie stala gry z mnoznikami) - reszta modelu = wynik - _vExpl - blizna
+        private static int _vGrowN;
+        private static double _vNat, _vRef, _vExpl;
+        private static int _dupV; private static string _dupTxt;   // wsie powtorzone w Settlement.All (migawka liczy kazda raz) - z ostatniej linii Hearth
         private static long _modelTicks;
         // W2 tick warowni
         private static double _pTown, _pCastle, _pTownPeople;
@@ -147,12 +152,14 @@ namespace Armoury
                 _diseaseByCulture.Clear(); Array.Clear(_diseaseByGroup, 0, _diseaseByGroup.Length); _diseaseDead = _diseaseUnhit = 0;
                 _prisLastP = _prisLastL = -1; _food0 = -1;
                 _stumbles = _stumblesSess = 0; _stumbleAt.Clear(); _errSites.Clear(); _startLogged = false;
+                _dupV = 0; _dupTxt = null;
             }
         }
 
         private static void ZeroDay()
         {
             _vTickN = _vFloorN = _vOddN = 0; _vTick = _vBase = _vBaseMul = _vModel = _vScar = _vFloor = _vOdd = 0; _milV = _milT = _milC = 0; _modelTicks = 0;
+            _vGrowN = 0; _vNat = _vRef = _vExpl = 0;
             _pTown = _pCastle = _pTownPeople = 0;
             _cartNewN = _cartRefN = _cartNewMen = _cartRefMen = _fishNewN = _fishRefN = _fishNewMen = _fishRefMen = _raidSteps = _decreeN = 0;
             _cartNewH = _cartRefH = _fishNewH = _fishRefH = _raidH = _decreeH = 0; _raidGoldAi = _raidGoldPlayer = 0; _raidVill.Clear();
@@ -226,7 +233,7 @@ namespace Armoury
         }
 
         // ============================================================ W1: tick wsi gry
-        internal sealed class VState { public Village V; public float H, Mil, Result, Base, BaseMul; }
+        internal sealed class VState { public Village V; public float H, Mil, Result, Base, BaseMul, Nat, Ref; public bool Grow; }
 
         public static void VillagePre(Village __instance, out VState __state)
         {
@@ -241,6 +248,8 @@ namespace Armoury
                 var en = Campaign.Current.Models.SettlementProsperityModel.CalculateHearthChange(__instance, false);   // czysty rachunek - InVillageTick jeszcze false
                 long dt = Stopwatch.GetTimestamp() - t0;
                 w.Result = en.ResultNumber;
+                // E4/4: rozklad tej odpowiedzi na przyrost naturalny i powrot uchodzcow (tylko odczyt pamieci postfiksu przyrostu z tego samego pytania)
+                try { float nat, rf; w.Grow = PopulationLaw.TakeLast(__instance, out nat, out rf); w.Nat = nat; w.Ref = rf; } catch { w.Grow = false; }
                 var vs = __instance.VillageState;
                 w.Base = vs == Village.VillageStates.Normal ? (w.H < 300f ? 4f : (w.H < 600f ? 1.2f : 0.2f)) : (vs == Village.VillageStates.Looted ? -1f : 0f);
                 w.BaseMul = w.Base * (1f + en.SumOfFactors);
@@ -265,6 +274,8 @@ namespace Armoury
                 lock (Gate)
                 {
                     _vTickN++; _vTick += dH; _vBase += __state.Base; _vBaseMul += __state.BaseMul; _vModel += __state.Result;
+                    if (__state.Grow) { _vGrowN++; _vNat += __state.Nat; _vRef += __state.Ref; _vExpl += __state.Nat + __state.Ref; }
+                    else _vExpl += __state.BaseMul;
                     if (rest > 0.0001f) { _vFloor += rest; _vFloorN++; }
                     else if (rest < -0.0001f) { _vOdd += rest; _vOddN++; }
                     _milV += dMil;
@@ -793,12 +804,24 @@ namespace Armoury
             bool first = _hLast.Count == 0;
             var regDH = new Dictionary<Settlement, float>();
             var hNow = new Dictionary<Village, float>(); var kNow = new Dictionary<Village, float>();
+            // E4/4: kazda wies RAZ. Wedlug logu testu A zbioru 30 Settlement.All podaje w ROT dwie wsie dwa razy (571 wpisow, 569 wsi w regionach; suma migawki
+            // = suma hearth regionow z CSV co do 0.3): H liczyl je podwojnie, a migawka (slownik po wsi) raz - "zmiana od wczoraj" zawierala co dobe ich caly hearth
+            // (ok. +705 -> +940), czyli RESZTE +624..+677/d pomiaru E4/0. Linia nazywa te wsie (do potwierdzenia w nastepnym tescie).
+            int dup = 0; var dupList = new List<string>(); var firstOf = new Dictionary<Village, Settlement>();
             foreach (var st in Settlement.All)
             {
                 try
                 {
                     if (st == null || !st.IsVillage || st.Village == null) continue;
                     var v = st.Village;
+                    Settlement s0;
+                    if (firstOf.TryGetValue(v, out s0))
+                    {
+                        dup++;
+                        if (dupList.Count < 6) dupList.Add((st.Name != null ? st.Name.ToString() : "?") + " [" + st.StringId + (ReferenceEquals(s0, st) ? ", ta sama osada" : " = wies osady " + s0.StringId) + "]");
+                        continue;
+                    }
+                    firstOf[v] = st;
                     float h = v.Hearth, k = KOf(st, false);
                     nv++; H += h; peopleNow += (double)Math.Max(0f, h) * k;
                     if (h < 200f) low++; else if (h < 600f) mid++; else high++;
@@ -816,6 +839,8 @@ namespace Armoury
                 catch (Exception e) { Stumble("HearthLine(wies)", e); }
             }
             double Hlast = 0; foreach (var kv in _hLast) Hlast += kv.Value;
+            _dupV = dup;
+            _dupTxt = dup > 0 ? string.Join("; ", dupList.ToArray()) + (dup > dupList.Count ? "; ..." : "") : null;
             // budzet regionow do CSV ksiegi ludzi
             lock (Gate)
             {
@@ -840,15 +865,22 @@ namespace Armoury
             double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 - (seedInside ? seedH : 0);
             double dH = H - Hlast;
             double rest = dH - named;
-            double restModel = _vModel - _vBaseMul - _vScar;
-            var sb = new StringBuilder(2000);
+            double restModel = _vModel - _vExpl - _vScar;
+            var sb = new StringBuilder(2200);
             sb.Append("Hearth (E4/0): dzien ").Append(day).Append(" | wsie ").Append(nv).Append(", hearth ").Append(H.ToString("0.0", Inv));
             if (first) sb.Append(" - pierwsza doba sesji: migawka wsi, bilans od nastepnej doby (liczniki tej doby pominiete)");
             else
             {
-                sb.Append(" (zmiana od wczoraj ").Append(S(dH)).Append(") = tick wsi ").Append(S(_vTick)).Append(" w ").Append(_vTickN).Append(" wsiach [stala gry: baza ").Append(S(_vBase))
-                  .Append(", z mnoznikami ").Append(S(_vBaseMul)).Append(", blizna i uchodzcy ScorchedEarth ").Append(S(_vScar))
-                  .Append(", reszta modelu (perki, budynki, polityki, BK, BKROT, zadania) ").Append(S(restModel))
+                sb.Append(" (zmiana od wczoraj ").Append(S(dH)).Append(") = tick wsi ").Append(S(_vTick)).Append(" w ").Append(_vTickN).Append(" wsiach [");
+                // E4/4: przy czynnym przyroscie tick to przyrost naturalny + powrot uchodzcow; stala gry tylko pokazana (nie wchodzi). "stala gry: baza" zostaje w linii (narzedzie T3)
+                if (_vGrowN > 0)
+                    sb.Append("przyrost naturalny (E4/4) ").Append(S(_vNat)).Append(", powrot uchodzcow (+0.5 ponizej ").Append(Settings.Current != null ? Math.Max(1, Settings.Current.RefugeeFloorHearth) : 40)
+                      .Append(", do E4/5) ").Append(S(_vRef)).Append(" w ").Append(_vGrowN).Append(" tickach z przyrostem; stala gry: baza ").Append(S(_vBase))
+                      .Append(" (zastapiona przez E4/4 - nie wchodzi do ticku), z mnoznikami ").Append(S(_vBaseMul));
+                else
+                    sb.Append("stala gry: baza ").Append(S(_vBase)).Append(", z mnoznikami ").Append(S(_vBaseMul));
+                sb.Append(", blizna i uchodzcy ScorchedEarth ").Append(S(_vScar))
+                  .Append(", reszta modelu (perki, budynki, polityki, BK, BKROT, zadania; przy E4/4 limity korytarza) ").Append(S(restModel))
                   .Append(", podloga 10 +").Append(F2(_vFloor)).Append(" w ").Append(_vFloorN).Append(" wsiach, niezgodnosc ticku z modelem ").Append(S(_vOdd)).Append(" w ").Append(_vOddN).Append(" wsiach]")
                   .Append(" + dekret Growth BK ").Append(S(_decreeH)).Append(" (").Append(_decreeN).Append(" wsi)")
                   .Append(" - tabory wsi -").Append(F2(cartsH)).Append(" (nowe ").Append(_cartNewN).Append(", uzupelnienia ").Append(_cartRefN).Append("; ludzi ").Append(_cartNewMen + _cartRefMen)
@@ -866,6 +898,7 @@ namespace Armoury
             sb.Append(" | zmiana kultury osad: ").Append(cultN).Append(" (").Append(cultTxt).Append("), ludzie tabeli ").Append(S0(cultPeople)).Append(" (U3)");
             if (!first)
                 sb.Append(" | RESZTA ").Append(S(rest)).Append(" (inwestycje BEE, konsola, inne mody; od E4/3 zadania, pobor wymuszony i incydenty gracza nazwane w \"nasze\")");
+            if (dup > 0) sb.Append(" | wsie powtorzone w Settlement.All - liczone raz (E4/4): ").Append(dup).Append(_dupTxt != null ? " (" + _dupTxt + ")" : "");
             sb.Append(" | wsie wedlug progow 200/600: ").Append(low).Append(" / ").Append(mid).Append(" / ").Append(high);
             if (!first && PopulationLaw.Calibrated)
             {
@@ -916,6 +949,7 @@ namespace Armoury
                 sb.Append(" (").Append(S(dP)).Append(") = tick ").Append(S(_pTown)).Append(", reszta ").Append(S(dP - _pTown)).Append(" (RBL ekspansja i glod; zdobycie; zdarzenia)")
                   .Append(" | w ludziach tabeli (dobrobyt x k): ludzie miast ").Append(people.ToString("0", Inv)).Append(" (").Append(S0(dPeople)).Append(" = tick ").Append(S0(_pTownPeople))
                   .Append(", reszta ").Append(S0(dPeople - _pTownPeople)).Append(')')
+                  .Append(PopulationLaw.TownsFrozen ? " [E4/4: ludzie miast ksiegi to stan (" + PeopleBook.TownSum.ToString("0", Inv) + ") - liczba wyzej to tylko dobrobyt x k, bez wplywu na ksiege]" : "")
                   .Append(" | zamki ").Append(nc).Append(": dobrobyt ").Append(Q.ToString("0", Inv)).Append(" (").Append(S(dQ)).Append(") = tick ").Append(S(_pCastle)).Append(", reszta ").Append(S(dQ - _pCastle)).Append('.');
             }
             sb.Length--; sb.Append(" | czas ").Append(Ms(t0)).Append(" ms.");

@@ -1304,11 +1304,11 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int ForageFloor { get; set; } = 25;
 
-        [SettingPropertyInteger("Scar Threshold Hearth", 0, 600, "0", HintText = "below this many hearths a village counts as scarred and heals slowly")]
+        [SettingPropertyInteger("Scar Threshold Hearth", 0, 600, "0", HintText = "below this many hearths a village counts as scarred and heals slowly; works only with Natural Growth Enabled off - natural growth has no fast regrowth left to slow")]
         [SettingPropertyGroup("The marching column")]
         public int ScarThresholdHearth { get; set; } = 150;
 
-        [SettingPropertyInteger("Scar Regen Percent", 0, 100, "0", HintText = "share of normal hearth growth a scarred village keeps (vanilla springs back at +4/day)")]
+        [SettingPropertyInteger("Scar Regen Percent", 0, 100, "0", HintText = "share of normal hearth growth a scarred village keeps (vanilla springs back at +4/day); works only with Natural Growth Enabled off")]
         [SettingPropertyGroup("The marching column")]
         public int ScarRegenPercent { get; set; } = 25;
 
@@ -2367,6 +2367,42 @@ namespace Armoury
         [SettingPropertyBool("Disbanded Villagers Go Home", HintText = "a village caravan or fishing crew the game breaks up without a fight (no healthy men left, a lost party, too many boats) goes back to its village, the wounded too, instead of vanishing")]
         [SettingPropertyGroup("Iron Bank")]
         public bool DisbandedVillagersGoHome { get; set; } = true;
+
+        [SettingPropertyBool("Natural Growth Enabled", HintText = "villages grow as medieval lands did: each village's people change by a yearly rate (births over deaths, better in a prosperous land, worse in war, raids and lawlessness) instead of the game's flat +4 / +1.2 / +0.2 hearths a day, which grew the world's people by over half in a year. A burnt or raided village does not grow. Hearth perks, buildings and laws no longer add hearths - they scale the growth. When the game lifts a nearly empty village back to 10 hearths, those people come from the outlaws of its land. Off = the game's hearth growth as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool NaturalGrowthEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Growth Base Percent", 0.00f, 2.00f, "0.00", HintText = "yearly natural growth of a village's people, in percent, in an average land at peace (medieval England grew 0.2-0.8 percent a year before 1300)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthBasePercent { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Growth Prosperity Weight", 0.00f, 2.40f, "0.00", HintText = "percent a year added or taken by prosperity: the village's town or castle is compared with the middle one of its kind in the same land; half as rich or half again as rich moves growth by half of this")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthProsperityWeight { get; set; } = 0.6f;
+
+        [SettingPropertyFloatingInteger("Growth Danger Weight", 0.00f, 2.40f, "0.00", HintText = "percent a year lost in the worst danger; danger is made of lawlessness of the town or castle (low security), the land's realm being at war with another realm (the endless wars with the Free Folk and the Others do not count), and the share of the region's villages burnt or under raid")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthDangerWeight { get; set; } = 0.6f;
+
+        [SettingPropertyBool("Growth Hunger Enabled", HintText = "hunger slows natural growth: a village whose harvest winter cuts loses growth by Growth Hunger Weight. Off until the district granaries come (the daily line shows what it would do)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool GrowthHungerEnabled { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Growth Hunger Weight", 0.00f, 6.00f, "0.00", HintText = "percent a year lost by a village whose whole harvest is gone (winter takes a part of it, more in the north); works only with Growth Hunger Enabled")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthHungerWeight { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Growth Max Percent", 0.00f, 3.20f, "0.00", HintText = "the most a village's people can grow in a year, in percent, after all bonuses (the best medieval decades)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthMaxPercent { get; set; } = 0.8f;
+
+        [SettingPropertyFloatingInteger("Growth Max Decline Percent", 0.00f, 5.20f, "0.00", HintText = "the most a village's people can shrink in a year from natural causes, in percent (the Great Famine of 1315-17)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float GrowthMaxDeclinePercent { get; set; } = 1.3f;
+
+        [SettingPropertyBool("Town People Frozen", HintText = "a town's people are counted once and kept: until towns get their own births, deaths and migrants, the number of townsfolk (used for rents, the people ledger and the craftsmen's hands) no longer follows the town's prosperity up and down every day. Off = townsfolk are prosperity times the town's people per prosperity point, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownPeopleFrozen { get; set; } = true;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4703,6 +4739,15 @@ namespace Armoury
             s.OutlawRoutedHomeDays = OutlawRoutedHomeDays;
             s.OutlawRoutedHomeDaysWar = OutlawRoutedHomeDaysWar;
             s.DisbandedVillagersGoHome = DisbandedVillagersGoHome;
+            s.NaturalGrowthEnabled = NaturalGrowthEnabled;
+            s.GrowthBasePercent = GrowthBasePercent;
+            s.GrowthProsperityWeight = GrowthProsperityWeight;
+            s.GrowthDangerWeight = GrowthDangerWeight;
+            s.GrowthHungerEnabled = GrowthHungerEnabled;
+            s.GrowthHungerWeight = GrowthHungerWeight;
+            s.GrowthMaxPercent = GrowthMaxPercent;
+            s.GrowthMaxDeclinePercent = GrowthMaxDeclinePercent;
+            s.TownPeopleFrozen = TownPeopleFrozen;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

@@ -23,6 +23,9 @@ namespace Armoury
     /// TABOR (tabory wsi i lodzie - zdjete z DOM przez gre) i SLUZBA (partie, zalogi, milicje, bandy - konto od E4/7) oraz jedyna droga zmiany
     /// hearth za ludzi: Move (PeopleUnit.Shift wola tylko Move). k_v na osade z dnia kalibracji ("v:" w "arm_people", U3) - zmiana kultury osady
     /// nie zmienia ani liczby ludzi, ani wagi czlowieka. Trzy punkty powrotu do DOM (U2): LosersFlee.SendHome, ClanBudget.ToVillage, OutlawLaw.ReturnHome.
+    /// E4/4 (109n): DOM miast jako STAN ("t:" w "arm_people" - ludzie miasta zakladani raz: nowa kampania przy kalibracji, stary zapis pierwszej doby
+    /// z dobrobytu x k_v tej chwili; zmienia go dopiero E4/8 - migracja) i podloga 10 hearth bez ludzi z niczego (R17): to, co podloga gry/BK dopisze
+    /// wsi, schodzi z puli wyrzutkow regionu (od E4/5 najpierw z UCHODZCOW tej wsi); brak - licznik "podloga z niczego".
     /// Kolejne konta (SLUZBA z pochodzeniem, JENCY, UCHODZCY...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
@@ -62,15 +65,16 @@ namespace Armoury
         internal const int ADom = 0, AOutlaws = 1, ACarts = 2, AService = 3, AOutside = 4;
         // przyczyny ruchu ludzi (indeksy licznikow)
         internal const int MSeed = 0, MMisery = 1, MRaidFlee = 2, MPoolHome = 3, MCart = 4, MH3Cart = 5, MDisband = 6, MCommon = 7, MSoldier = 8,
-                           M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MKinds = 15;
+                           M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15, MKinds = 16;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
             "zwolnieni 166 (ClanBudget.ToVillage)", "przepelnienie W4c (ClanBudget.ToVillage)", "rycerze 179 (ClanBudget.ToVillage)",
-            "pobor wymuszony gracza", "zadania gracza (hearth gry = 2 ludzi)", "incydenty gracza (zostaja w hearth gry)" };
+            "pobor wymuszony gracza", "zadania gracza (hearth gry = 2 ludzi)", "incydenty gracza (zostaja w hearth gry)",
+            "podloga 10 hearth z puli wyrzutkow regionu (E4/4 R17; hearth dopisala gra/BK)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
-        // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty - hearth zmienila gra (licznik)
-        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false };
+        // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik)
+        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -81,6 +85,11 @@ namespace Armoury
         private static readonly Dictionary<string, string> _cv = new Dictionary<string, string>();
         private static bool _kvSet;
         private static string _kvNote;
+        // E4/4 (9a): DOM miasta jako stan - id miasta -> ludzie (stan w zapisie, "t:"); zakladanie i porzucanie - PopulationLaw (TownPeopleFrozen)
+        private static readonly Dictionary<string, float> _town = new Dictionary<string, float>();
+        // E4/4 (R17): podloga 10 hearth - od ostatniego odczytu linii "Ludzie: przyrost naturalny" (PopulationLaw.GrowthDaily czyta i zeruje)
+        private static double _floorHearth, _floorPoolMen, _floorNothingMen, _floorNothingHearth;
+        private static int _floorN;
 
         private static void Stumble(string where, Exception e)
         {
@@ -96,9 +105,10 @@ namespace Armoury
             _deadSess = 0; _stumbles = _stumblesDay = 0; _errSites.Clear(); _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); Array.Clear(_h40, 0, MKinds); _disbandMen40 = 0; _disbandNoVillage = 0; }
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
+            lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0; _floorN = 0; }
         }
 
-        // ---------------------------------------------------------------- zapis ("v1|s:<zalozony 0/1>;<bilans otwarcia>|c:<id>=<ciala>,...|v:<id osady>=<k>;<kultura>,...")
+        // ---------------------------------------------------------------- zapis ("v1|s:<zalozony 0/1>;<bilans otwarcia>|c:<id>=<ciala>,...|v:<id osady>=<k>;<kultura>,...|t:<id miasta>=<ludzie>,...")
         internal static string Export()
         {
             var sb = new StringBuilder(64 + _bodies.Count * 24 + (_kvSet ? _kv.Count * 40 : 0));
@@ -124,6 +134,21 @@ namespace Armoury
                     sb.Append(kv.Key).Append('=').Append(kv.Value.ToString("R", Inv)).Append(';').Append(c ?? "");
                 }
             }
+            // E4/4 (9a): ludzie miast jako stan - tylko gdy zalozony (bez sekcji = stary zapis albo stan porzucony - zalozy sie od nowa z dobrobytu)
+            lock (Gate)
+            {
+                if (_town.Count > 0)
+                {
+                    sb.Append("|t:");
+                    first = true;
+                    foreach (var kv in _town)
+                    {
+                        if (!first) sb.Append(',');
+                        first = false;
+                        sb.Append(kv.Key).Append('=').Append(kv.Value.ToString("R", Inv));
+                    }
+                }
+            }
             return sb.ToString();
         }
 
@@ -131,6 +156,7 @@ namespace Armoury
         {
             _bodies.Clear(); _seeded = false; _opening = 0;
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
+            lock (Gate) _town.Clear();
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
@@ -169,9 +195,90 @@ namespace Armoury
                         }
                         _kvNote = "z zapisu: " + _kv.Count + " osad";
                     }
+                    else if (part.StartsWith("t:", StringComparison.Ordinal))
+                    {
+                        // E4/4 (9a): ludzie miast; zepsuty wpis pomijany (miasto zalozy stan od nowa z dobrobytu - bez skoku)
+                        foreach (var item in part.Substring(2).Split(','))
+                        {
+                            int eq = item.LastIndexOf('=');
+                            if (eq <= 0) continue;
+                            float p;
+                            if (!float.TryParse(item.Substring(eq + 1), NumberStyles.Float, Inv, out p) || float.IsNaN(p) || float.IsInfinity(p) || p < 0f) continue;
+                            lock (Gate) _town[item.Substring(0, eq)] = p;
+                        }
+                    }
                 }
             }
             catch (Exception e) { Stumble("Import", e); }
+        }
+
+        // ---------------------------------------------------------------- E4/4 (9a): DOM miast jako stan
+        /// <summary>Ludzie miasta ze stanu ksiegi (false = brak stanu dla tego miasta).</summary>
+        internal static bool TryTown(Settlement s, out float people)
+        {
+            people = 0f;
+            if (s == null || s.StringId == null) return false;
+            lock (Gate) return _town.TryGetValue(s.StringId, out people);
+        }
+
+        /// <summary>Zalozenie stanu miasta (PopulationLaw - raz, z dobrobytu x k_v tej chwili). Nie nadpisuje istniejacego. true = zalozono teraz.</summary>
+        internal static bool SetTownOnce(Settlement s, float people)
+        {
+            if (s == null || s.StringId == null || float.IsNaN(people) || float.IsInfinity(people) || people < 0f) return false;
+            lock (Gate)
+            {
+                if (_town.ContainsKey(s.StringId)) return false;
+                _town[s.StringId] = people;
+                return true;
+            }
+        }
+
+        internal static int TownCount { get { lock (Gate) return _town.Count; } }
+        internal static double TownSum { get { double t = 0; lock (Gate) foreach (var v in _town.Values) t += v; return t; } }
+
+        /// <summary>Porzucenie stanu miast (TownPeopleFrozen wylaczone w MCM) - ludzie miast znow z dobrobytu x k; zwraca, ilu miast stan porzucono.</summary>
+        internal static int DropTowns() { lock (Gate) { int n = _town.Count; _town.Clear(); return n; } }
+
+        // ---------------------------------------------------------------- E4/4 (R17): podloga 10 hearth bez ludzi z niczego
+        /// <summary>
+        /// Gra (Village.DailyTick) i BK (VillageDailyTicktPatch) stawiaja wsi ponizej 10 hearth z powrotem 10 - `hearth` punktow dopisanych z niczego.
+        /// Tylu ludzi (hearth x k_v) schodzi z puli wyrzutkow regionu wsi (OutlawLaw.TakeForFloor - wrocili do domu; od E4/5 najpierw uchodzcy tej wsi);
+        /// czego pula nie ma - licznik "podloga z niczego" (prog testu 0). Hearth zostaje taki, jak go postawila gra (podlogi nie cofamy - gra trzyma 10).
+        /// Wola PopulationLaw.FloorFinalizer (finalizer ticku wsi, tylko przy czynnym przyroscie naturalnym). Nie rzuca (U24).
+        /// </summary>
+        internal static void FloorFromPool(Village v, float hearth)
+        {
+            if (v == null || !(hearth > 0f) || float.IsInfinity(hearth)) return;
+            try
+            {
+                float k = v.Settlement != null ? PopulationLaw.KFor(v.Settlement) : 0f;
+                double men = k > 0f ? (double)hearth * k : 0.0;
+                double got = 0.0;
+                if (men > 0.0)
+                {
+                    var region = OutlawLaw.RegionFor(v.Settlement);
+                    got = OutlawLaw.TakeForFloor(region, (float)men);
+                }
+                if (got > 0.0) Note(got, MFloor, k > 0f ? got / k : 0.0);       // hearth dopisala gra - tu tylko ruch ludzi WYRZUTKI -> DOM
+                lock (Gate)
+                {
+                    _floorN++; _floorHearth += hearth; _floorPoolMen += got;
+                    double rest = men - got;
+                    if (rest > 0.0) { _floorNothingMen += rest; _floorNothingHearth += k > 0f ? rest / k : 0.0; }
+                    else if (!(k > 0f)) _floorNothingHearth += hearth;     // wies bez przelicznika ludzi - hearth z niczego
+                }
+            }
+            catch (Exception e) { Stumble("FloorFromPool(R17)", e); }
+        }
+
+        /// <summary>PopulationLaw.GrowthDaily: podloga 10 od ostatniego odczytu (kopiuje i zeruje).</summary>
+        internal static void TakeFloor(out int villages, out double hearth, out double poolMen, out double nothingMen, out double nothingHearth)
+        {
+            lock (Gate)
+            {
+                villages = _floorN; hearth = _floorHearth; poolMen = _floorPoolMen; nothingMen = _floorNothingMen; nothingHearth = _floorNothingHearth;
+                _floorN = 0; _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0;
+            }
         }
 
         // ---------------------------------------------------------------- E4/3: k na osade (U3)
@@ -466,16 +573,19 @@ namespace Armoury
         private static string UnitSegment()
         {
             var s = Settings.Current;
-            double vil = 0, vilH = 0, town = 0; int noK = 0, cultMoved = 0;
+            double vil = 0, vilH = 0, town = 0; int noK = 0, cultMoved = 0, dup = 0;
+            var seenV = new HashSet<Village>(); var seenS = new HashSet<Settlement>();
             foreach (var st in Settlement.All)
             {
                 try
                 {
                     if (st == null || !(st.IsVillage || st.IsTown)) continue;
+                    // E4/4: kazda osada i kazda wies raz - Settlement.All podaje w ROT dwie wsie dwa razy (pomiar E4/0: hearth +705 ponad sume regionow)
+                    if (!seenS.Add(st) || (st.IsVillage && st.Village != null && !seenV.Add(st.Village))) { dup++; continue; }
                     float k = PopulationLaw.KFor(st);
                     if (!(k > 0f)) { noK++; continue; }
                     if (st.IsVillage && st.Village != null) { float h = Math.Max(0f, st.Village.Hearth); vilH += h; vil += (double)h * k; }
-                    else if (st.IsTown && st.Town != null) town += (double)Math.Max(0f, st.Town.Prosperity) * k;
+                    else if (st.IsTown && st.Town != null) town += PopulationLaw.PeopleOf(st);     // E4/4: stan miasta (TownPeopleFrozen), inaczej dobrobyt x k osady
                     string c; if (st.StringId != null && _cv.TryGetValue(st.StringId, out c) && st.Culture != null && c != st.Culture.StringId) cultMoved++;
                 }
                 catch (Exception e) { Stumble("UnitSegment(osada)", e); }
@@ -487,14 +597,15 @@ namespace Armoury
               .Append(", wyrzutki liczone od ludnosci: ").Append(PeopleUnit.ByPeople ? "TAK" : "NIE")
               .Append(", rozwiazane tabory do wsi (R18): ").Append(s != null && s.DisbandedVillagersGoHome ? "TAK" : "NIE")
               .Append(" | konto DOM: wsie ").Append(vil.ToString("0", Inv)).Append(" ludzi (hearth ").Append(vilH.ToString("0.0", Inv)).Append(" x k osady), miasta ")
-              .Append(town.ToString("0", Inv)).Append(" (dobrobyt x k osady; stan miast od E4/4)")
+              .Append(town.ToString("0", Inv)).Append(PopulationLaw.TownsFrozen ? " (stan miast E4/4, " + TownCount + " miast w zapisie)" : " (dobrobyt x k osady - stan miast wylaczony: Town People Frozen)")
+              .Append(dup > 0 ? " [powtorzone w Settlement.All, liczone raz: " + dup + "]" : "")
               .Append(" | konto WYRZUTKI (pula OutlawLaw, linia \"Pula wyrzutkow (E4/3)\") ").Append(OutlawLaw.PoolTotal().ToString("0", Inv))
               .Append(" | ruch dzis (ludzie / hearth DOM):");
             bool any = false;
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident ? "gra " + H3d(hh[i]) : "bez hearth do E4/7"));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor ? "gra " + H3d(hh[i]) : "bez hearth do E4/7"));
                 any = true;
             }
             if (!any) sb.Append(" brak");

@@ -823,6 +823,10 @@ def etap4_main(logp, start_arg, until=120):
     if any(x.startswith("PeopleUnit (E4/3):") for x in lines):
         etap4_e43(rep, lines, start, win, hea, par, lud, until, e43_state)
 
+    # ---------------- E4/4 (109n): przyrost naturalny, miasta jako stan, podloga 10
+    if any(x.startswith("PopulationLaw: przyrost naturalny wsi (E4/4)") for x in lines):
+        etap4_e44(rep, lines, start, win, hea, lud, until)
+
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
     l300 = [x for x in l300 if x is not None]
@@ -992,6 +996,66 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until, ust):
         nb = re.search(r"bandy nowe (\d+) \((\d+) ludzi\), odmowione (\d+), puste usuniete (\d+)", first)
         rep.add("E4/3: bandy d1 - nowe (ludzi), odmowione, puste usuniete", (f"{nb.group(1)} ({nb.group(2)}), {nb.group(3)}, {nb.group(4)}") if nb else "brak",
                 f"INFO wobec bez E4/3: {E43_BASE['new1']} ({E43_BASE['newmen1']}), puste {E43_BASE['empty1']} (geografia band - 108 ryzyko 1)", None)
+
+
+def etap4_e44(rep, lines, start, win, hea, lud, until):
+    """E4/4 (109n): progi z projektu etapu 4 rozdz. 3 "E4/4" Test (U12) i decyzji Jeffa 11.10 (pokoj +0.2..+0.8%/rok, ciagla wojna do -0.5%/rok).
+    Przyrost naturalny ("Ludzie: przyrost naturalny +N ludzi") d28-until: 290-1150 ludzi/d (0.2-0.8%/rok od 52.5 mln). Netto "Ludzie:" - INFO: przed E4/5
+    rabunek gry zdejmuje hearth w nicosc (zbior 30 test A d28-120: ok. -36 tys. ludzi/d) - prog netto liczy sie w tescie razem z E4/5."""
+    stl = next((x for x in lines if x.startswith("PopulationLaw: przyrost naturalny wsi (E4/4)")), "")
+    rep.add("E4/4: linia startowa przyrostu (latka i okno podlogi)", stl[:240], "latka wpieta i \"okno na Village.DailyTick wpiete\", bez BRAK",
+            ("wpieta" in stl and "okno na Village.DailyTick wpiete" in stl and "BRAK" not in stl) if stl else False)
+    mod = next((x for x in lines if x.startswith("PopulationLaw: czynny model dobrobytu gry")), None)
+    if mod:
+        post = re.search(r"postfiksy w kolejnosci biegu: (.*?); prefiksy", mod)
+        last = post.group(1).split(" -> ")[-1] if post else ""
+        rep.add("E4/4: GrowthPostfix ostatni na CalculateHearthChange", (post.group(1)[:300] if post else "?"), "ostatni: PopulationLaw.GrowthPostfix (BK 400 -> BKROT 200 -> ScorchedEarth -> nasz)",
+                "PopulationLaw.GrowthPostfix(" in last)
+    else:
+        rep.add("E4/4: GrowthPostfix ostatni na CalculateHearthChange", "brak linii pierwszej doby", "linia \"czynny model dobrobytu gry\" w pierwszej dobie", None)
+    prz = e4_series(lines, "Ludzie: przyrost naturalny")
+    pw = [d for d in win if d in prz and run_day(d, start) >= 28]
+    off = sum(1 for d in win if d in prz and "WYLACZONY" in prz[d])
+    rep.add("E4/4: przyrost naturalny czynny (linia dobowa)", f"czynny {sum(1 for d in win if d in prz) - off} dob, WYLACZONY {off} dob", "czynny kazdej doby",
+            (off == 0 and any(d in prz for d in win)) if win else None)
+    nat = [fnum(r"^Ludzie: przyrost naturalny " + SF + r" ludzi", prz[d]) for d in pw]
+    nat = [x for x in nat if x is not None]
+    if nat:
+        m = st.mean(nat)
+        rep.add(f"E4/4: przyrost naturalny d28-{until} (ludzi/d)", f"{m:+.0f} (min {min(nat):+.0f}, max {max(nat):+.0f})", "290-1150 ludzi/d (0.2-0.8%/rok od 52.5 mln; U12)", 290 <= m <= 1150)
+    else:
+        rep.add(f"E4/4: przyrost naturalny d28-{until} (ludzi/d)", "brak linii", "290-1150 ludzi/d", None)
+    gv = [fnum(r"\(g srednio " + SF + r"% rocznie", prz[d]) for d in pw]
+    gv = [x for x in gv if x is not None]
+    rep.add("E4/4: g srednio (pkt % rocznie, wazone ludnoscia wsi)", f"{st.mean(gv):+.3f}" if gv else "-", "INFO (pokoj 0.2-0.8; wojna nizej - skladowe w linii)", None)
+    ref = [fnum(r"osobno powrot uchodzcow " + SF + r" ludzi", prz[d]) or 0 for d in pw]
+    rep.add("E4/4: powrot uchodzcow +0.5 ponizej 40 (ludzie/d, z niczego do E4/5)", f"{st.mean(ref):+.0f}" if ref else "-", "INFO - znika w E4/5 (uchodzcy z ksiegi)", None)
+    fl = [fnum(r"podloga z niczego " + F_ + r" ludzi", prz[d]) or 0 for d in win if d in prz]
+    fp = [fnum(r"z puli wyrzutkow regionu " + F_ + r" ludzi", prz[d]) or 0 for d in win if d in prz]
+    rep.add("E4/4: podloga 10 z niczego (R17, suma ludzi)", f"{sum(fl):.1f} (z puli wyrzutkow {sum(fp):.1f})" if fl else "-", "0 (oczekiwane; > 0 = nazwane, do E4/5 - uchodzcy)",
+            (sum(fl) < 0.5) if fl else None)
+    gm = [d for d in win if d in hea and "RESZTA" in hea[d]]
+    withg = sum(1 for d in gm if "przyrost naturalny (E4/4)" in hea[d])
+    rep.add("E4/4: tick wsi = przyrost naturalny (stala gry nie wchodzi) w linii Hearth", f"{withg} z {len(gm)} dob", "kazdej doby", (withg == len(gm)) if gm else None)
+    dup = [num(r"wsie powtorzone w Settlement\.All - liczone raz \(E4/4\): (\d+)", hea[d], int, 0) or 0 for d in gm]
+    dtx = next((re.search(r"liczone raz \(E4/4\): \d+ \((.*?)\)(?: \||\.$)", hea[d]) for d in gm if "liczone raz (E4/4)" in hea[d]), None)
+    rep.add("E4/4: wsie powtorzone w Settlement.All (liczone raz)", f"{max(dup) if dup else 0}" + (f" - {dtx.group(1)[:200]}" if dtx else ""), "INFO (zbior 30: 571 wpisow, 569 wsi w regionach - zrodlo dawnej RESZTY +677)", None)
+    net = [num(r"swiat: ludnosc [\d.]+ mln \(([+-]?\d+) ludzi\)", lud[d]) for d in win if d in lud and run_day(d, start) >= 28]
+    net = [x for x in net if x is not None]
+    raid = [num(r"tabory i lodzie [+-]?\d+, rabunek ([+-]?\d+), dekret", hea[d]) for d in gm if run_day(d, start) >= 28]
+    raid = [x for x in raid if x is not None]
+    if net:
+        mn = st.mean(net)
+        rm = st.mean(raid) if raid else 0.0
+        rep.add(f"E4/4: netto \"Ludzie:\" d28-{until} (ludzi/d)", f"{mn:+.0f} = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln; w tym rabunek gry {rm:+.0f}/d",
+                "INFO do E4/5 (rabunek w nicosc); prog etapu Jeffa 11.10: pokoj +0.2..+0.8%/rok, ciagla wojna >= -0.5%/rok - test razem z E4/5", None)
+        rep.add(f"E4/4: netto bez rabunku gry d28-{until} (ludzi/d)", f"{mn - rm:+.0f} = {100.0 * (mn - rm) * 364 / 52.5e6:+.2f}%/rok",
+                "INFO (przyrost naturalny - tabory do konta TABOR - wyrzutki; smierc w ksiedze od E4/7)", None)
+    tw = [x for x in lines if x.startswith("PopulationLaw: ludnosc miast zapisana jako stan (E4/4")]
+    rep.add("E4/4: ludnosc miast jako stan (zalozenie)", tw[0][:200] if tw else "brak linii", "jedna linia zalozenia na kampanie (nowa: przy kalibracji)", (len(tw) >= 1) if win else None)
+    lastp = prz.get(win[-1]) if win else None
+    drift = re.search(r"\| miasta: (.*?)(?: \||\.$)", lastp) if lastp else None
+    rep.add(f"E4/4: miasta d{until} (stan wobec dobrobytu)", drift.group(1)[:200] if drift else "-", "INFO (stan stoi; dryf dobrobytu bez wplywu na ksiege)", None)
 
 
 def main(argv):

@@ -766,7 +766,8 @@ namespace Armoury
 
         /// <summary>
         /// Rece rzemieslnikow broni, zbroi i amunicji miasta (roboczodni dziennie). 174.3 (WorkshopHandsByPeople): od ludnosci RYNKU miasta z tabeli
-        /// krain (miasto + wsie, ktore w nim handluja - TradeBound gry; PopulationLaw.TablePeopleOf, suma swiata stala) x poziom placy (TownWage.Index -
+        /// krain (miasto + wsie, ktore w nim handluja - TradeBound gry; PopulationLaw.TablePeopleOf - od E4/4 przy TownPeopleFrozen ludzie ksiegi PeopleOf, jedna
+        /// definicja; wylaczone - suma swiata stala jak dotad) x poziom placy (TownWage.Index -
         /// bogate miasto ma wiecej mistrzow; osrodki eksportowe 3-5 na 1000 mieszczan wobec 1-3 w zwyklych):
         ///   rece = max(dawny wzor, min(WorkshopHandsMaxPerTown, WorkshopHandsPer1000People x ludzie rynku / 1000 x indeks placy)).
         /// Nikt nie traci rak (max) - Zelazne Wyspy, Castle Black, Dragonstone zostaja przy dawnych. Historia [S z H]: 0.3-0.6 rzemieslnika broni, zbroi

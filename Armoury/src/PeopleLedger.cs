@@ -21,6 +21,8 @@ namespace Armoury
     ///    garnizony, milicje, bandy, karawany, tabory wsi), jency, pula wyrzutkow; zabici dzis (wszystkie starcia, wedlug rodzaju
     ///    partii), zwerbowani dzis (zdarzenia gry: od notabli, z karczmy, bez osady, gracz), dezercja; bilans partii rodow
     ///    z jawna reszta (nowe partie z szablonu, wymiana z garnizonem); odsetek mezczyzn pod bronia;
+    ///  "Ludzie: przyrost naturalny" (E4/4, PopulationLaw.GrowthDaily) - ile ludzi rodzi sie wsiom dzis i wedlug jakich skladowych, krainy, podloga 10 (R17),
+    ///    stan ludnosci miast wobec dobrobytu (bilans hearth wsi z RESZTA - jedno miejsce: linia "Hearth (E4/0)");
     ///  "Ludzie (regiony):" - 8 regionow najbardziej obciazonych: (zaloga + wyrzutki + bandy) wobec mezczyzn regionu;
     ///  plik Logs/[sesja]/ludzie-regiony.csv - wszystkie regiony, wiersz na region na dobe.
     /// Czego ksiega NIE widzi (do kroku 5): z jakiego regionu pochodzi zolnierz partii rodu; przyrost garnizonow (gra dopisuje
@@ -545,6 +547,8 @@ namespace Armoury
                 sb.Append(StockNote(order));                                         // T6 (d): zawsze NA KONCU linii - poczatek parsuje sprawdz_logi.py
                 int reported = _stumbles;
                 Log.Info(sb.ToString());
+                // E4/4 (109n): linia "Ludzie: przyrost naturalny" - zaraz po "Ludzie:" (tylko log; wlasny try - U24)
+                try { PopulationLaw.GrowthDaily(day); } catch (Exception e) { Log.Error("PeopleLedger.GrowthDaily", e); }
 
                 // 4. osiem najbardziej obciazonych regionow
                 if (ranked.Count > 0)
