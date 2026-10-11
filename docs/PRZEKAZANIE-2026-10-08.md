@@ -878,3 +878,13 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   wlasnych osadach (D rodow z siedziba zawyzone ok. 10%) - osobna paczka po tescie A (rada tak); A5 Z8 - znana gorna granica (zwrot korony ciety o zawor).
   Nastepny krok (po 23:20 UTC, nowe okno): scalenie porcji A na w-toku/zbior-e4-koniec -> w-toku/zbior-e5 + kod porcji B (B1-B6).
 - Tydzien 60% o 22:58 UTC - przy tym tempie ok. 85-90% o 10:00 UTC; etapy 7-8 prawdopodobnie poza zasiegiem.
+- (23:15 UTC) **DIAGNOZA d120 GOTOWA** (wf_28c41f10-460; SCRATCH(ae222cb7)\kopia-e4k\diagnoza-d120.json): ludnosc -1.02%/rok to w 2/3 MOBILIZACJA (narzedzie liczylo tylko DOM;
+  zywi -0.27%/rok d28-120), ale d121-151 zywi -0.74%/rok (P1-5 - czekamy na dane 728; mozliwy hamulec straty netto - decyzja Jeffa); BLAD KODU P11: _pending
+  (Dictionary<MobileParty>) gubi klucze -> ReconcileDaily przerywa sie codziennie od d3 ("bandy z niczego" ~139/d); uzgodnienie tnie slownik w trwajacej bitwie
+  (Sarnor -0.575%) i ostrzal/przebicie w oblezeniach poza ksiega (w nicosc ~91 x liczba oblezen/d); podloga poboru, Straz K4 (kolejka zerowana co dobe), VillageBook
+  G4, TownGrowth N11 (zly mianownik - udzial miast stoi 20.1 -> 20.0); reszta - progi/narzedzie (T7 skladniki, V2, G2, N7, S8, T6, koszty). B10: BK pomija 7 klas latek
+  (countChange i in.) - BK atuty wplywu/slawy nie dzialaja (stare; decyzja Jeffa); CrashScribe laczy rozne bledy w "powtorki". Otwarte do Jeffa: P1-4 limit poboru
+  z miast (dzis miasta 54% poboru notabli przy 20% ludzi), P1-5, B10b.
+- (23:15 UTC) **POPRAWKI E4 ruszyly** (wf_d9a9ccdf-5f9): A ksiega pochodzenia (e4\fixA), B Straz/wioski/miasta (e4\fixB), C narzedzie (e4\fixC), D CrashScribe klucz powtorek
+  (cs-bledy) -> scalenie do zbior-e4-koniec -> 2 recenzje -> DLL test\Armoury-e4-koncowy2.dll + CrashScribe-at-bledy.dll -> PONOWNY TEST (728 + zapis + zima).
+  Biezacy test (b2k5x628s) biegnie dalej, do gotowosci poprawek - potem zatrzymac (TaskStop + autotest.ps1 -RestoreOnly).
