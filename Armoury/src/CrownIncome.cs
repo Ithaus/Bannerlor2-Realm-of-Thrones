@@ -442,6 +442,14 @@ namespace Armoury
             return paid;
         }
 
+        /// <summary>3.5 (CouncilWages35, przed ClanTickEnd w tym samym rozliczeniu): czesc dzisiejszej splaty dlugu rodu, ktora ClanTickEnd uzna za
+        /// niezaplacona przy braku salda `gap` (ta sama regula: brak najpierw obciaza splate). Tylko odczyt.</summary>
+        internal static long DebtCutNow(Clan c, long gap)
+        {
+            if (c == null || _debtClan == null || !ReferenceEquals(_debtClan, c) || _debtPaid <= 0 || c.Kingdom == null || !On) return 0;
+            return Math.Min((long)_debtPaid, Math.Max(0L, gap));
+        }
+
         /// <summary>Recenzja C1 (OBIEG-1), SoldierPay.Settle: czesc dzisiejszego przyrostu dlugu rodu, ktorej nie zrownowazyl obciety zold - zaliczka gry z niczego.</summary>
         internal static void NoteAdvance(Clan c, long amount)
         {

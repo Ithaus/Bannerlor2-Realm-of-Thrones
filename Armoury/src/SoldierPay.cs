@@ -177,6 +177,18 @@ namespace Armoury
             return (int)((long)paid * (owed - shortfall) / owed);   // w dol - suma nigdy nie przekroczy tego, co zeszlo
         }
 
+        /// <summary>3.5 (CouncilWages35, postfiks DailyTickClan przed naszym ClanTickPostfix): brak salda biezacego rozliczenia rodu (bez dlugu ukrytego
+        /// przez gre - to zaliczka, liczona w Settle) i zold do obciecia (suma Paid) - te same liczby, ktore za chwile wezmie Settle. false - rod poza
+        /// naszym oknem albo saldo nieznane. Tylko odczyt.</summary>
+        internal static bool PeekShortfall(Clan clan, out long shortfall, out long owed)
+        {
+            shortfall = 0; owed = 0;
+            if (clan == null || !ReferenceEquals(clan, _clan) || !_haveNet) return false;
+            shortfall = Shortfall(_goldMid, _net);
+            for (int i = 0; i < _recs.Count; i++) owed += _recs[i].Paid;
+            return true;
+        }
+
         // ------------------------------------------------------------ latki
         /// <summary>ClanVariablesCampaignBehavior.DailyTickClan - poczatek dziennego rozliczenia rodu.</summary>
         public static void ClanTickPrefix(Clan __0)

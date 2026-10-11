@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
@@ -39,8 +40,9 @@ namespace Armoury
     ///    (tylko applyWithdrawals - podglad w UI i nasze miary D bez zmian). Kwota zaplacona = kwota naliczona platnikowi, co do monety, w tej samej
     ///    chwili. Radny poza swiatem: platnik dostaje zwrot (linia "Council wages" na plus), a zloto, ktore BK wlozyl zmarlemu nie-lordowi, wraca.
     /// Platnik -> odbiorca: kiesa glowy rodu (saldo rodu) -> kiesa radnego. Rodzina: pensja malzonki/dzieci zostaje w kiesach rodziny (166 "kiesa
-    /// rodziny" dopelnia z nich kiese glowy). Nic z niczego: radny dostaje tylko to, co platnik ma w saldzie; brak w kiesie platnika obcina najpierw
-    /// zold (SoldierPay.Settle - brak przypisany zoldowi), wiec pensja rady jest pokryta, dopoki brak nie przekroczy zoldu rodu (patrz linia logu).
+    /// rodziny" dopelnia z nich kiese glowy). Nic z niczego (poprawka po recenzji R1): gdy saldo platnika nie zmiesci sie w kiesie glowy, brak obciaza
+    /// najpierw zold rodu (SoldierPay.Settle) i splate dlugu wobec korony (CrownIncome.ClanTickEnd) - te same liczby co tam; reszta braku to pensje rady
+    /// bez pokrycia - przy 3.5b WL cofane z kies radnych (nie-lordow i lordow) proporcjonalnie, postfiksem DailyTickClan w oknie pomiaru rozliczenia rodu.
     /// Linia logu "Rada (3.5)" raz na dobe (po ksiedze pieniadza - to samo okno co "Pieniadz swiata (rody - przyczyny)", gdzie jest para).
     /// </summary>
     internal static class CouncilWages35
@@ -53,7 +55,7 @@ namespace Armoury
         // ------------------------------------------------------------ latki (zakladane w kampanii; zyja przez caly proces)
         private static Harmony _harmony;
         internal static void SetHarmony(Harmony h) { _harmony = h; }
-        private static bool _hooksTried, _expWired, _incWired;
+        private static bool _hooksTried, _expWired, _incWired, _tickWired;
         private static string _hookNote = "-";
 
         // ------------------------------------------------------------ BK przez refleksje (typy i metody - raz na proces; obiekty BK czytane za kazdym razem)
@@ -66,8 +68,12 @@ namespace Armoury
         private static long _charged, _toCommon, _toLeaders, _toFamily, _toOtherLords, _toGone, _refund, _roleCut;
         private static int _chargedN, _commonN, _leadersN, _familyN, _otherLordsN, _goneN, _payerClans, _roleN;
         private static long _staleGold; private static int _staleN, _staleClans;
-        private static long _shortGold, _shortWages; private static int _shortN;     // platnik z saldem ponad kiese (gorna granica pensji bez pokrycia)
-        private static Clan _curClan; private static long _curCharged;               // platnik biezacego rozliczenia (AddExpenses -> AddIncomes w tym samym wywolaniu)
+        // poprawka po recenzji (R1): pensje wyplacone w biezacym rozliczeniu platnika (BK nie-lordom, 3.5b lordom; bez glowy platnika - u niej to obieg
+        // w jednej kiesie) - postfiks DailyTickClan cofa z nich czesc bez pokrycia
+        private struct Pay { public Hero Who; public int Gold; public bool Lord; }
+        private static readonly List<Pay> _pend = new List<Pay>();
+        private static Clan _pendClan; private static CampaignTime _pendTime;
+        private static long _gapRest, _revCommon, _revLords, _revMiss, _revOff; private static int _gapClans, _revN, _blindClans;
         private static long _baseOld, _baseNew, _baseCalls, _baseRentCalls;   // Interlocked - podatek miasta bywa liczony z watkow AI
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -83,7 +89,7 @@ namespace Armoury
             _charged = _toCommon = _toLeaders = _toFamily = _toOtherLords = _toGone = _refund = _roleCut = 0;
             _chargedN = _commonN = _leadersN = _familyN = _otherLordsN = _goneN = _payerClans = _roleN = 0;
             _staleGold = 0; _staleN = 0; _staleClans = 0;
-            _shortGold = 0; _shortWages = 0; _shortN = 0; _curClan = null; _curCharged = 0;
+            _gapRest = _revCommon = _revLords = _revMiss = _revOff = 0; _gapClans = _revN = _blindClans = 0; _pend.Clear(); _pendClan = null;
             Interlocked.Exchange(ref _baseOld, 0); Interlocked.Exchange(ref _baseNew, 0);
             Interlocked.Exchange(ref _baseCalls, 0); Interlocked.Exchange(ref _baseRentCalls, 0);
             _stumbles = 0;
@@ -164,10 +170,20 @@ namespace Armoury
                     _incWired = true; wired.Add("urzad radnego (BK AddIncomes)");
                 }
                 else missing.Add("urzad radnego (BK AddIncomes)");
+                // poprawka po recenzji (R1): pokrycie pensji - postfiks DailyTickClan z priorytetem Normal: po ciele gry (saldo dopisane glowie),
+                // PRZED pomiarem ksiegi pieniadza (MoneyLedger.ClanTickPostfix, Low) i przed SoldierPay (Last, ktory czysci swoje liczby rozliczenia)
+                var tick = _expWired ? AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan") : null;
+                if (tick != null)
+                {
+                    _harmony.Patch(tick, postfix: new HarmonyMethod(typeof(CouncilWages35), nameof(ClanTickPostfix)) { priority = Priority.Normal });
+                    _tickWired = true; wired.Add("pokrycie pensji (DailyTickClan)");
+                }
+                else missing.Add("pokrycie pensji (DailyTickClan)");
             }
             catch (Exception e) { missing.Add("blad: " + e.Message); Stumble("EnsureHooks", e); }
             _hookNote = (wired.Count > 0 ? string.Join(", ", wired.ToArray()) : "-") + "; BRAK: " + (missing.Count > 0 ? string.Join(", ", missing.ToArray()) : "-");
             Log.Info("Rada (3.5): latki - " + _hookNote + "; podstawa z miast i zamkow przez PopulationLaw.TownTaxPostfix (przy RentReplacesTownTax)"
+                     + "; pokrycie z liczb SoldierPay (saldo, kiesa glowy, zold) i CrownIncome (splata dlugu)"
                      + " | podstawa realna (3.5a) " + (BaseOn ? "WL" : "WYL") + ", wyplata kazdemu radnemu (3.5b) " + (PayOn ? "WL" : "WYL") + ".");
         }
 
@@ -247,8 +263,9 @@ namespace Armoury
                 if (list == null) return;
                 bool pay = PayOn, any = false;
                 bool payLeaders = pay && _incWired;   // bez latki AddIncomes glowa dostaje przez "Councillor role" jak w BK - nie drugi raz
-                long refund = 0, mine = 0;
-                _curClan = __0; _curCharged = 0;
+                long refund = 0;
+                var head = __0.Leader;
+                if (!ReferenceEquals(_pendClan, __0) || _pendTime != CampaignTime.Now) { _pend.Clear(); _pendClan = __0; _pendTime = CampaignTime.Now; }
                 for (int i = 0; i < list.Count; i++)
                 {
                     var p = list[i];
@@ -259,7 +276,7 @@ namespace Armoury
                         int w = Wage(p);
                         if (w <= 0) continue;
                         any = true;
-                        _charged += w; _chargedN++; mine += w;
+                        _charged += w; _chargedN++;
                         bool gone = CirculationWindows.OutOfWorld(m);
                         if (gone)
                         {
@@ -271,26 +288,32 @@ namespace Armoury
                             }
                             continue;
                         }
-                        if (!m.IsLord) { _toCommon += w; _commonN++; continue; }  // BK zaplacil wprost (Member.Gold += DueWage)
+                        if (!m.IsLord)
+                        {
+                            _toCommon += w; _commonN++;                             // BK zaplacil wprost (Member.Gold += DueWage)
+                            if (m != head) _pend.Add(new Pay { Who = m, Gold = w, Lord = false });
+                            continue;
+                        }
                         bool leader = m.Clan != null && m.Clan.Leader == m;
                         if (leader) { _toLeaders += w; _leadersN++; }
                         else if (m.Clan == __0) { _toFamily += w; _familyN++; }
                         else { _toOtherLords += w; _otherLordsN++; }
-                        if (leader ? payLeaders : pay) m.ChangeHeroGold(w);       // ta sama droga co BK dla nie-lordow; w oknie rozliczenia rodu
+                        if (leader ? payLeaders : pay)
+                        {
+                            m.ChangeHeroGold(w);                                    // ta sama droga co BK dla nie-lordow; w oknie rozliczenia rodu
+                            if (m != head) _pend.Add(new Pay { Who = m, Gold = w, Lord = true });
+                        }
                     }
                     catch (Exception e) { Stumble("ExpensesPostfix(pozycja)", e); }
                 }
                 if (any) _payerClans++;
-                _curCharged = mine - refund;
                 if (refund > 0) { _refund += refund; __1.Add(refund, _txtWages); }
             }
             catch (Exception e) { Stumble("ExpensesPostfix", e); }
         }
 
         // ------------------------------------------------------------ BK AddIncomes: odbiorca-glowa rodu
-        /// <summary>3.5b: "Councillor role" glowy rodu zaplacone juz wprost u platnika - w prawdziwym rozliczeniu zdjete ta sama kwota i nazwa.
-        /// Pomiar (zawsze): AddIncomes biegnie w tym samym wywolaniu modelu tuz po AddExpenses - gdy saldo platnika nie miesci sie w kiesie glowy,
-        /// liczymy brak i pensje rady tego rodu (gorna granica pensji bez pokrycia: SoldierPay obcina najpierw zold).</summary>
+        /// <summary>3.5b: "Councillor role" glowy rodu zaplacone juz wprost u platnika - w prawdziwym rozliczeniu zdjete ta sama kwota i nazwa.</summary>
         public static void IncomesPostfix(Clan __0, ref ExplainedNumber __1, bool __2)
         {
             if (!__2 || __0 == null) return;
@@ -310,16 +333,58 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("IncomesPostfix", e); }
+        }
+
+        // ------------------------------------------------------------ poprawka po recenzji (R1): pensje bez pokrycia
+        /// <summary>ClanVariablesCampaignBehavior.DailyTickClan, postfiks (priorytet Normal): saldo rodu jest juz dopisane glowie; biegnie PRZED pomiarem
+        /// ksiegi pieniadza (MoneyLedger.ClanTickPostfix, Low - cofniecie jest w tym samym oknie rozliczenia rodu) i przed SoldierPay (Last).
+        /// Gdy saldo nie zmiescilo sie w kiesie glowy, brak obciaza najpierw zold rodu (SoldierPay.Settle) i splate dlugu wobec korony
+        /// (CrownIncome.ClanTickEnd) - te same liczby, ktore oni za chwile wezma; reszta braku to pensje rady wyplacone bez pokrycia (z niczego).
+        /// Przy 3.5b WL cofamy ja z kies radnych tego rozliczenia (nie-lordow, ktorym zaplacil BK, i lordow, ktorym zaplacilismy) proporcjonalnie -
+        /// ta sama regula co SoldierPay dla zoldu (czesc zostawiona w dol). Przy WYL tylko liczymy.</summary>
+        public static void ClanTickPostfix(Clan __0)
+        {
+            if (_pendClan == null) return;
             try
             {
-                if (ReferenceEquals(__0, _curClan) && _curCharged > 0 && leader != null)
+                if (!ReferenceEquals(_pendClan, __0) || _pendTime != CampaignTime.Now || _pend.Count == 0) return;
+                long sum = 0;
+                for (int i = 0; i < _pend.Count; i++) sum += _pend[i].Gold;
+                if (sum <= 0) return;
+                long gap, owed, rest;
+                if (SoldierPay.PeekShortfall(__0, out gap, out owed))
+                    rest = Math.Max(0L, gap - owed - CrownIncome.DebtCutNow(__0, gap));
+                else
                 {
-                    long after = (long)leader.Gold + (long)Math.Round(__1.ResultNumber);
-                    if (after < 0) { _shortN++; _shortGold += -after; _shortWages += _curCharged; }
+                    // saldo nieznane (SoldierPay poza oknem tego rodu albo bez latki salda): regula SoldierPay - pusta kiesa glowy po rozliczeniu = nic nie zaplacono
+                    var head = __0.Leader;
+                    _blindClans++;
+                    rest = head == null || head.Gold <= 0 ? sum : 0;
+                }
+                if (rest <= 0) return;
+                long cut = Math.Min(rest, sum);
+                _gapClans++; _gapRest += rest;
+                bool pay = PayOn;
+                for (int i = 0; i < _pend.Count; i++)
+                {
+                    var p = _pend[i];
+                    try
+                    {
+                        if (p.Who == null || p.Gold <= 0) continue;
+                        int take = p.Gold - (int)((long)p.Gold * (sum - cut) / sum);   // jak SoldierPay.Share: czesc zostawiona w dol - cofniete >= brak
+                        if (take <= 0) continue;
+                        if (!pay) { _revOff += take; continue; }
+                        int got = Math.Min(take, Math.Max(0, p.Who.Gold));
+                        if (got > 0) p.Who.ChangeHeroGold(-got);
+                        if (p.Lord) _revLords += got; else _revCommon += got;
+                        _revN++;
+                        if (got < take) _revMiss += take - got;
+                    }
+                    catch (Exception e) { Stumble("ClanTickPostfix(pozycja)", e); }
                 }
             }
-            catch (Exception e) { Stumble("IncomesPostfix(brak)", e); }
-            finally { if (ReferenceEquals(__0, _curClan)) { _curClan = null; _curCharged = 0; } }
+            catch (Exception e) { Stumble("ClanTickPostfix", e); }
+            finally { _pend.Clear(); _pendClan = null; }
         }
 
         // ------------------------------------------------------------ log
@@ -333,7 +398,9 @@ namespace Armoury
             long lost = pay ? 0 : _toFamily + _toOtherLords + _toGone;
             return " (3.5: naliczone platnikom -" + _charged + ", wprost do kies radnych +" + direct + " [BK nie-lordom " + _toCommon
                    + (pay ? ", 3.5b lordom " + lords : "") + "], zwrot platnikom za radnych poza swiatem +" + _refund
-                   + ", 'Councillor role' zdjete -" + _roleCut + (pay ? "" : "; WYL: w nicosc " + lost + " + glowy-radni przez 'Councillor role' " + _toLeaders) + ")";
+                   + (pay ? ", cofniete z kies radnych bez pokrycia (saldo platnika ponad kiese) -" + (_revCommon + _revLords) : "")
+                   + ", 'Councillor role' zdjete -" + _roleCut + (pay ? "" : "; WYL: w nicosc " + lost + " + glowy-radni przez 'Councillor role' " + _toLeaders
+                   + ", BK nie-lordom bez pokrycia " + _revOff) + ")";
         }
 
         internal static void Daily()
@@ -360,8 +427,14 @@ namespace Armoury
                 else
                     sb.Append(" | WYL: w nicosc ").Append(_toFamily + _toOtherLords + _toGone).Append(" (lordowie, ktorzy nie sa glowa rodu, i radni poza swiatem); glowy-radni ")
                       .Append(_toLeaders).Append(" przez 'Councillor role' w swoim rozliczeniu (kwota z chwili ich rozliczenia)");
-                sb.Append(" | platnicy z saldem ponad kiese glowy: ").Append(_shortN).Append(" rodow, brak ").Append(_shortGold).Append(", ich pensje rady ").Append(_shortWages)
-                  .Append(" (gorna granica pensji bez pokrycia - SoldierPay przypisuje brak najpierw zoldowi)");
+                sb.Append(" | bez pokrycia (saldo ponad kiese glowy po obcietym zoldzie i splacie dlugu korony)").Append(_tickWired ? "" : " NIE SPRAWDZANE - brak latki DailyTickClan")
+                  .Append(": ").Append(_gapClans).Append(" rodow, brak ").Append(_gapRest);
+                if (pay)
+                    sb.Append(", cofniete z kies radnych ").Append(_revCommon + _revLords).Append(" (nie-lordowie ").Append(_revCommon).Append(", lordowie ").Append(_revLords)
+                      .Append(", pozycji ").Append(_revN).Append(", niedobrane ").Append(_revMiss).Append(')');
+                else
+                    sb.Append(", WYL: nie cofane - BK nie-lordom z niczego ").Append(_revOff);
+                sb.Append(", rody bez salda z SoldierPay (decyduje pusta kiesa glowy) ").Append(_blindClans);
                 sb.Append(" | potkniecia ").Append(_stumbles).Append(" | latki: ").Append(_hookNote)
                   .Append(" | kontrola: naliczone=").Append(_charged).Append(" czesci=").Append(sumParts).Append(_charged == sumParts ? " OK." : " BLAD.");
                 Log.Info(sb.ToString());
