@@ -495,6 +495,32 @@ namespace Armoury
             }
         }
 
+        /// <summary>
+        /// Niebezpieczenstwo wsi U, 0..1: 0.4 x (1 - bezpieczenstwo warowni / 100) + 0.3 x [region w wojnie - OutlawLaw.WarWithoutEternal] + 0.3 x udzial spalonych
+        /// i lupionych wsi regionu. Jedna miara dla przyrostu naturalnego (czlon U, E4/4) i udzialu trafionych spustoszeniem, ktorzy ida w las (E4/5, HR 2.4).
+        /// Wydzielone z GrowthOf bez zmiany rachunku (E4/5). Wies bez warowni: bezpieczenstwo 100, bez spalonych, pokoj. Liczy w kazdym stanie wsi.
+        /// </summary>
+        internal static float Danger(Village v, out float security, out bool war, out float burnt)
+        {
+            security = 100f; burnt = 0f;
+            Settlement node = v != null ? v.Bound : null;      // region wsi: jej miasto albo zamek
+            if (node != null)
+            {
+                if (node.Town != null) { float sec = node.Town.Security; security = sec >= 0f ? Math.Min(100f, sec) : 0f; }
+                var vs = node.BoundVillages; int nv = 0, nb = 0;
+                if (vs != null)
+                    foreach (var o in vs)
+                    {
+                        if (o == null) continue;
+                        nv++;
+                        if (o.VillageState == Village.VillageStates.Looted || o.VillageState == Village.VillageStates.BeingRaided) nb++;
+                    }
+                burnt = nv > 0 ? (float)nb / nv : 0f;
+            }
+            war = AtWarToday(node != null ? node.MapFaction : null);       // frakcja wsi to frakcja jej warowni (Village.MapFaction)
+            return MBMath.ClampFloat(USecurity * (1f - security / 100f) + (war ? UWar : 0f) + UBurnt * burnt, 0f, 1f);
+        }
+
         /// <summary>Rachunek jednej wsi. `gameBase` i `gameFactors` to wynik gry z chwili wejscia postfiksu (po latkach BK i BKROT): suma dodatkow z baza pasma i suma czynnikow.</summary>
         private static Growth GrowthOf(Village v, Settings s, float gameBase, float gameFactors)
         {
@@ -508,21 +534,7 @@ namespace Armoury
 
             Settlement node = v.Bound;      // region wsi: jej miasto albo zamek
             g.W = ProsperityIndex(node);
-            if (node != null)
-            {
-                if (node.Town != null) { float sec = node.Town.Security; g.Security = sec >= 0f ? Math.Min(100f, sec) : 0f; }
-                var vs = node.BoundVillages; int nv = 0, nb = 0;
-                if (vs != null)
-                    foreach (var o in vs)
-                    {
-                        if (o == null) continue;
-                        nv++;
-                        if (o.VillageState == Village.VillageStates.Looted || o.VillageState == Village.VillageStates.BeingRaided) nb++;
-                    }
-                g.Burnt = nv > 0 ? (float)nb / nv : 0f;
-            }
-            g.War = AtWarToday(node != null ? node.MapFaction : null);       // frakcja wsi to frakcja jej warowni (Village.MapFaction)
-            g.U = MBMath.ClampFloat(USecurity * (1f - g.Security / 100f) + (g.War ? UWar : 0f) + UBurnt * g.Burnt, 0f, 1f);
+            g.U = Danger(v, out g.Security, out g.War, out g.Burnt);       // E4/5: ta sama miara dla udzialu "las" przy spustoszeniu (Devastation)
             g.H = MBMath.ClampFloat(WinterBite.VillageCut(v), 0f, 1f);
 
             g.Base = s.GrowthBasePercent;
