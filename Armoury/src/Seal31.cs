@@ -157,6 +157,7 @@ namespace Armoury
             try { UpgradePurse.ApplyAll(); } catch (Exception e) { Stumble("UpgradePurse.ApplyAll", e); }
             try { CaravanCapital.ApplyAll(); } catch (Exception e) { Stumble("CaravanCapital.ApplyAll", e); }
             try { RealPayer.ApplyAll(); } catch (Exception e) { Stumble("RealPayer.ApplyAll", e); }
+            try { CasualtyLoot.ApplyAll(); } catch (Exception e) { Stumble("CasualtyLoot.ApplyAll", e); }
             Log.Info("Szczelnosc (164a): latki przy starcie gry - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();
@@ -171,8 +172,12 @@ namespace Armoury
             _hooksTried = true;
             try { Measure31.EnsureHooks(); } catch (Exception e) { Stumble("Measure31.EnsureHooks", e); }
             try { CaravanCapital.EnsureHooks(); } catch (Exception e) { Stumble("CaravanCapital.EnsureHooks", e); }
+            var s = Settings.Current;
             Log.Info("Szczelnosc (164a): latki w kampanii - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
-                     + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
+                     + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-")
+                     + "; wylaczniki: platnik (Town Pays Rewards) " + (RealPayer.On ? "tak" : "nie") + ", awanse (Upgrade Cost To Purse) " + (UpgradePurse.On ? "tak" : "nie")
+                     + ", kapital karawan (Caravan Capital Real) " + (CaravanCapital.On ? "tak" : "nie") + ", werbunek (Recruit Gold To Seller) " + (s != null && s.RecruitGoldToSeller ? "tak" : "nie")
+                     + ", lup z cial z sakiewek (Casualty Loot From Purse) " + (CasualtyLoot.On ? "CZYNNY" : (s != null && s.CasualtyLootFromPurse ? "NIECZYNNY - wymaga Beaten Purse To Victor (3.2) i Men Purse Enabled" : "nie")) + ".");
             Wired.Clear(); Missing.Clear();
         }
 
@@ -217,6 +222,7 @@ namespace Armoury
                 Measure31.Reset();
                 CaravanCapital.Reset();
                 RealPayer.Reset();
+                CasualtyLoot.Reset();
             }
             catch { }
         }
@@ -234,6 +240,7 @@ namespace Armoury
                     var sb = new StringBuilder(2048);
                     sb.Append("Szczelnosc (164a): dzien ").Append(day);
                     sb.Append(" | platnik (164a-1): ").Append(RealPayer.Part());
+                    sb.Append(" | lup z cial (164a-2): ").Append(CasualtyLoot.Part());
                     sb.Append(" | awanse (164a-4): ").Append(UpgradePurse.Part());
                     sb.Append(" | kapital (164a-6): ").Append(CaravanCapital.Part());
                     sb.Append(" | pomiar (164a-0): ").Append(Measure31.Part());
@@ -253,6 +260,7 @@ namespace Armoury
             try { UpgradePurse.ClearDay(); } catch { }
             try { CaravanCapital.ClearDay(); } catch { }
             try { RealPayer.ClearDay(); } catch { }
+            try { CasualtyLoot.ClearDay(); } catch { }
         }
     }
 }

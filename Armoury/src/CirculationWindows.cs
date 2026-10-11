@@ -803,6 +803,7 @@ namespace Armoury
             try
             {
                 long d = (long)__state.Mp.PartyTradeGold - __state.V;
+                d -= CasualtyLoot.TakeThird();   // 3.1 (31, E3/3): 1/3 z sakiewki przegranych - przelew, nie zloto z niczego
                 AddWorld(ZLoot, d, +1);
                 if (d != 0) Hits[WLoot]++;
             }
