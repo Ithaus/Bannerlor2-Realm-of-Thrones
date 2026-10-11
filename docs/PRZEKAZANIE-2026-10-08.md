@@ -642,3 +642,16 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
 - (20:00) **3.1+3.3 PO RECENZJACH:** w-toku/e3-31m dc290b3, test\Armoury-31m.dll 6e4b5b6a (test z RC i GT z gB). Pytania do Jeffa (kierunkowe): podatek BK od warsztatow
   lordow i gracza w cudzych miastach - zniknac (dzis) czy wlasciciel placi panu miasta; doplata za podmiane rekruta ROT do sakiewki ludzi jak awanse; werdykt 3.2
   "pokonany" takze dla partii lordow. **ETAP 4:** projekt w toku (wf_77f49d09-f4f -> SCRATCH(ae222cb7)\e4\PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md).
+
+## 24. START TUTAJ (10.10 ok. 21:00; sesja ae222cb7; Jeff wraca ok. 03:20)
+
+**W grze (ZATWIERDZONE):** Armoury 6e4b5b6a (noc/wgranie-28 = w-toku/e3-31m dc290b3), RealisticCaptivity 90665425, GrandTourney bbb841d7 (noc/wgranie-27),
+CrashScribe 77b11df5. Wgrania tej nocy: 23 (pula Strazy, namioty, 183d), 24 (dezercja AI: kara BK, Inni, przepelnienie), 25 (3.2), 26 (3.4-3.7, z RC), 27 (3.8-3.10, z RC i GT),
+28 (3.1+3.3). Opisy i testy: STAN-PRAC "WGRANIE 23..28". **ETAP 2 (punkty 1, 2, 4) i ETAP 3 (3.1-3.10) - kod w grze.** Statki 3.3 w kodzie, wylaczniki OFF.
+**W TOKU:** bieg 2-letni (728 dob) na wgranym zestawie od 20:58 -> SCRATCH(ae222cb7)\test\at-728.out.txt; ocena: sprawdz_logi --grupa etap2 (+ --grupa etap3, narzedzie z
+drzewa e3\31m), dezercja AI w 2. polowie roku (dez.py w SCRATCH(ae222cb7)\d1), bandy (zloto band u pasera, kiesy band), kredyt koron 186, Straz, glowy w dobach 364/728.
+ETAP 4: projekt (wf_77f49d09-f4f -> SCRATCH(ae222cb7)\e4\PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md) -> pierwsza paczka kod w trakcie biegu -> test po biegu.
+**Drzewa (worktree klonu lancuch):** SCRATCH(ae222cb7)\e3\{32,32m,34..310,gA,gB,31,31b,33,31m}; galezie w-toku/e3-* wypchniete do repo Jeffa i GitHub.
+**Pytania do Jeffa (zbiorczo):** (1) statki 3.3: wlaczyc teraz (-8..-11% wojska do etapu 5) czy z podatkiem wojennym w etapie 5 (rada); (2) fale dezercji po wielkich
+przegranych (Recent Events -65) - zostawic czy zlagodzic; (3) kiesa bandy przylaczajacej sie do gracza (dzis znika); (4) podatek BK od warsztatow lordow/gracza w cudzych
+miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lordow; (7) napitki/drewno wojska - lord czy sakiewka ludzi; (8) wedrowcy BK z prawdziwym towarem.
