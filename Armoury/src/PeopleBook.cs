@@ -26,7 +26,10 @@ namespace Armoury
     /// E4/4 (109n): DOM miast jako STAN ("t:" w "arm_people" - ludzie miasta zakladani raz: nowa kampania przy kalibracji, stary zapis pierwszej doby
     /// z dobrobytu x k_v tej chwili; zmienia go dopiero E4/8 - migracja) i podloga 10 hearth bez ludzi z niczego (R17): to, co podloga gry/BK dopisze
     /// wsi, schodzi z puli wyrzutkow regionu (od E4/5 najpierw z UCHODZCOW tej wsi); brak - licznik "podloga z niczego".
-    /// Kolejne konta (SLUZBA z pochodzeniem, JENCY, UCHODZCY...) - kazde w swojej paczce, kazde przez te klase.
+    /// E4/5 (113n): konto UCHODZCY ("u:" w "arm_people" - wies pochodzenia -> poza domem, zabici przy spustoszeniu, zmarli na koncie) i zegar regionu ("r:" - warownia
+    /// regionu -> doba ostatniego rabunku albo zerowania z trafionymi > 0). Trafieni rabunkiem i zerowaniem armii schodza z DOM przez Move (MDevRaid, MDevForage),
+    /// konta dopisuje Devastated; powrot (MRefugeeHome) i podloga 10 (MRefugeeFloor, najpierw z uchodzcow tej wsi) schodza z konta; uchodzcy umieraja 1.3%/rok (bez narodzin).
+    /// Kolejne konta (SLUZBA z pochodzeniem, JENCY...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
     /// </summary>
@@ -62,19 +65,23 @@ namespace Armoury
 
         // ---------------------------------------------------------------- E4/3 (108n): konta ludzi i jedna droga ruchu hearth
         // konta: DOM (wsie: hearth x k_v), WYRZUTKI (pula OutlawLaw), TABOR (tabory wsi i lodzie), SLUZBA (wojsko - konto od E4/7), poza ksiega (zadania gracza)
-        internal const int ADom = 0, AOutlaws = 1, ACarts = 2, AService = 3, AOutside = 4;
+        internal const int ADom = 0, AOutlaws = 1, ACarts = 2, AService = 3, AOutside = 4, ARefugees = 5;      // UCHODZCY (E4/5): konto wsi pochodzenia
         // przyczyny ruchu ludzi (indeksy licznikow)
         internal const int MSeed = 0, MMisery = 1, MRaidFlee = 2, MPoolHome = 3, MCart = 4, MH3Cart = 5, MDisband = 6, MCommon = 7, MSoldier = 8,
-                           M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15, MKinds = 16;
+                           M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15,
+                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MKinds = 20;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
             "zwolnieni 166 (ClanBudget.ToVillage)", "przepelnienie W4c (ClanBudget.ToVillage)", "rycerze 179 (ClanBudget.ToVillage)",
             "pobor wymuszony gracza", "zadania gracza (hearth gry = 2 ludzi)", "incydenty gracza (zostaja w hearth gry)",
-            "podloga 10 hearth z puli wyrzutkow regionu (E4/4 R17; hearth dopisala gra/BK)" };
+            "podloga 10 hearth z puli wyrzutkow regionu (E4/4 R17; hearth dopisala gra/BK)",
+            "spustoszenie: rabunek (trafieni = zabici + pojmani + las + uchodzcy; E4/5)", "spustoszenie: zerowanie armii (trafieni; E4/5)",
+            "powrot uchodzcow do swojej wsi (E4/5)", "podloga 10 z uchodzcow tej wsi (E4/5; hearth dopisala gra/BK)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
-        // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik)
-        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false };
+        // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
+        // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
+        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -90,6 +97,15 @@ namespace Armoury
         // E4/4 (R17): podloga 10 hearth - od ostatniego odczytu linii "Ludzie: przyrost naturalny" (PopulationLaw.GrowthDaily czyta i zeruje)
         private static double _floorHearth, _floorPoolMen, _floorNothingMen, _floorNothingHearth;
         private static int _floorN;
+        // E4/5 (113n): konto UCHODZCY i zegar regionu - stan w zapisie ("u:", "r:"). Osobny zamek RefGate: latki modeli (GetHearthLevel, produkcja wsi) moga isc z watkow AI
+        private sealed class Ref { public double Away, Dead, Died; public string Region; }      // poza domem; zabici przy spustoszeniu; zmarli na koncie (od poczatku kampanii); region (bez zapisu)
+        private static readonly Dictionary<string, Ref> _ref = new Dictionary<string, Ref>();           // id osady wsi -> konto
+        private static readonly Dictionary<string, int> _lastStrike = new Dictionary<string, int>();   // id warowni regionu (OutlawLaw.RegionFor) -> doba ostatniego rabunku/zerowania z trafionymi > 0
+        private static volatile int _refCount;                                                          // wsie z Away > 0 - szybka sciezka latek modeli (bez zamka)
+        private static readonly object RefGate = new object();
+        private static double _dRefIn, _dRefHome, _dRefFloor, _dRefDied, _dKilled;                      // doba linii "Ludzie (ksiega)" (bez zapisu)
+        private static double _refN0 = double.NaN;                                                      // stan konta z konca poprzedniego odcinka (NaN = pierwsza doba sesji)
+        private static int _refStumbles;                                                                // potkniecia konta UCHODZCY (doba)
 
         private static void Stumble(string where, Exception e)
         {
@@ -106,6 +122,18 @@ namespace Armoury
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); Array.Clear(_h40, 0, MKinds); _disbandMen40 = 0; _disbandNoVillage = 0; }
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
             lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0; _floorN = 0; }
+            ClearRefugees();
+        }
+
+        /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
+        private static void ClearRefugees()
+        {
+            lock (RefGate)
+            {
+                _ref.Clear(); _lastStrike.Clear(); _refCount = 0;
+                _dRefIn = _dRefHome = _dRefFloor = _dRefDied = _dKilled = 0; _refN0 = double.NaN; _refStumbles = 0;
+                LastSeg = default(RefSeg);
+            }
         }
 
         // ---------------------------------------------------------------- zapis ("v1|s:<zalozony 0/1>;<bilans otwarcia>|c:<id>=<ciala>,...|v:<id osady>=<k>;<kultura>,...|t:<id miasta>=<ludzie>,...")
@@ -149,7 +177,54 @@ namespace Armoury
                     }
                 }
             }
+            // E4/5 (113n): konto UCHODZCY i zegary regionow - tylko gdy jest co zapisac (bez sekcji = brak uchodzcow, jak stary zapis)
+            try { ExportRefugees(sb); } catch (Exception e) { Stumble("Export(E4/5)", e); }
             return sb.ToString();
+        }
+
+        private static bool BadId(string id) { return string.IsNullOrEmpty(id) || id.IndexOf('|') >= 0 || id.IndexOf('=') >= 0 || id.IndexOf(',') >= 0 || id.IndexOf(';') >= 0; }
+
+        private static void ExportRefugees(StringBuilder sb)
+        {
+            List<KeyValuePair<string, Ref>> refs; List<KeyValuePair<string, int>> clocks;
+            lock (RefGate) { refs = _ref.ToList(); clocks = _lastStrike.ToList(); }
+            var withRef = new HashSet<string>();
+            bool first = true;
+            foreach (var kv in refs)
+            {
+                var r = kv.Value;
+                if (BadId(kv.Key) || !(r.Away > 0.0 || r.Dead > 0.0 || r.Died > 0.0)) continue;
+                if (r.Away > 0.0) { string reg = RegionIdOf(kv.Key, r); if (reg != null) withRef.Add(reg); }
+                sb.Append(first ? "|u:" : ",").Append(kv.Key).Append('=').Append(r.Away.ToString("R", Inv)).Append(';').Append(r.Dead.ToString("R", Inv))
+                  .Append(';').Append(r.Died.ToString("R", Inv));
+                first = false;
+            }
+            // zegar zostaje, dopoki region ma uchodzcow albo jest mlodszy niz RefugeeReturnDays (porzadek w zapisie - starszy niczego juz nie wstrzymuje)
+            int today = (int)CampaignTime.Now.ToDays;
+            int keep = 364;     // K2: RefugeeReturnDays
+            first = true;
+            foreach (var kv in clocks)
+            {
+                if (BadId(kv.Key) || (!withRef.Contains(kv.Key) && today - kv.Value >= keep)) continue;
+                sb.Append(first ? "|r:" : ",").Append(kv.Key).Append('=').Append(kv.Value.ToString(Inv));
+                first = false;
+            }
+        }
+
+        /// <summary>Region wsi konta (warownia OutlawLaw.RegionFor) - zapamietany przy Devastated, po wczytaniu ustalany raz z osady. null = brak.</summary>
+        private static string RegionIdOf(string villageId, Ref r)
+        {
+            if (r.Region != null) return r.Region.Length > 0 ? r.Region : null;
+            string reg = "";
+            try
+            {
+                var st = Settlement.Find(villageId);
+                var node = st != null ? OutlawLaw.RegionFor(st) : null;
+                if (node != null && node.StringId != null) reg = node.StringId;
+            }
+            catch (Exception e) { Stumble("RegionIdOf", e); }
+            r.Region = reg;
+            return reg.Length > 0 ? reg : null;
         }
 
         internal static void Import(string data)
@@ -157,6 +232,7 @@ namespace Armoury
             _bodies.Clear(); _seeded = false; _opening = 0;
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
             lock (Gate) _town.Clear();
+            ClearRefugees();                          // E4/5: stary zapis (bez "u:" / "r:") - brak uchodzcow i zegarow
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
@@ -207,9 +283,47 @@ namespace Armoury
                             lock (Gate) _town[item.Substring(0, eq)] = p;
                         }
                     }
+                    else if (part.StartsWith("u:", StringComparison.Ordinal))
+                    {
+                        // E4/5: konto UCHODZCY "id=poza domem;zabici;zmarli"; smieci (NaN, ujemne, nieskonczone) = 0; ta sama wies dwa razy - ostatni wpis
+                        foreach (var item in part.Substring(2).Split(','))
+                        {
+                            int eq = item.LastIndexOf('=');
+                            if (eq <= 0) continue;
+                            var nums = item.Substring(eq + 1).Split(';');
+                            double away = Num(nums, 0), dead = Num(nums, 1), died = Num(nums, 2);
+                            if (!(away > 0.0 || dead > 0.0 || died > 0.0)) continue;
+                            string id = item.Substring(0, eq);
+                            lock (RefGate)
+                            {
+                                Ref old;
+                                if (_ref.TryGetValue(id, out old) && old.Away > 0.0) _refCount--;
+                                _ref[id] = new Ref { Away = away, Dead = dead, Died = died };
+                                if (away > 0.0) _refCount++;
+                            }
+                        }
+                    }
+                    else if (part.StartsWith("r:", StringComparison.Ordinal))
+                    {
+                        // E4/5: zegary regionow "id warowni=doba"
+                        foreach (var item in part.Substring(2).Split(','))
+                        {
+                            int eq = item.LastIndexOf('=');
+                            if (eq <= 0) continue;
+                            int d; if (!int.TryParse(item.Substring(eq + 1), NumberStyles.Integer, Inv, out d)) continue;
+                            lock (RefGate) _lastStrike[item.Substring(0, eq)] = d;
+                        }
+                    }
                 }
             }
             catch (Exception e) { Stumble("Import", e); }
+        }
+
+        private static double Num(string[] a, int i)
+        {
+            double x;
+            if (a == null || i >= a.Length || !double.TryParse(a[i], NumberStyles.Float, Inv, out x)) return 0.0;
+            return double.IsNaN(x) || double.IsInfinity(x) || x < 0.0 ? 0.0 : x;
         }
 
         // ---------------------------------------------------------------- E4/4 (9a): DOM miast jako stan
@@ -279,6 +393,239 @@ namespace Armoury
                 villages = _floorN; hearth = _floorHearth; poolMen = _floorPoolMen; nothingMen = _floorNothingMen; nothingHearth = _floorNothingHearth;
                 _floorN = 0; _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0;
             }
+        }
+
+        // ---------------------------------------------------------------- E4/5 (113n): konto UCHODZCY i zegar regionu
+        private static string VillageId(Village v) { return v != null && v.Settlement != null ? v.Settlement.StringId : null; }
+
+        private static void RefStumble(string where, Exception e) { lock (RefGate) _refStumbles++; Stumble(where, e); }
+
+        /// <summary>Uchodzcy tej wsi poza domem (ludzie). 0 bez zamka, gdy nikt nie jest poza domem (szybka sciezka latek modeli). Nie rzuca.</summary>
+        internal static double RefugeesOf(Village v)
+        {
+            if (_refCount == 0) return 0.0;
+            try
+            {
+                string id = VillageId(v);
+                if (id == null) return 0.0;
+                lock (RefGate) { Ref r; return _ref.TryGetValue(id, out r) ? r.Away : 0.0; }
+            }
+            catch (Exception e) { RefStumble("RefugeesOf", e); return 0.0; }
+        }
+
+        /// <summary>Wsie z uchodzcami poza domem (0 = szybka sciezka).</summary>
+        internal static int RefugeeVillages { get { return _refCount; } }
+
+        /// <summary>Uchodzcy swiata poza domem (ludzie).</summary>
+        internal static double RefugeesWorld()
+        {
+            if (_refCount == 0) return 0.0;
+            try { lock (RefGate) { double s = 0.0; foreach (var r in _ref.Values) s += r.Away; return s; } }
+            catch (Exception e) { RefStumble("RefugeesWorld", e); return 0.0; }
+        }
+
+        /// <summary>Region (warownia + jej wsie, BoundVillages): uchodzcy poza domem i zabici przy spustoszeniu od poczatku kampanii - CSV PeopleLedger.</summary>
+        internal static void RegionRefugees(Settlement region, out double away, out double dead)
+        {
+            away = 0.0; dead = 0.0;
+            try
+            {
+                if (region == null || region.BoundVillages == null) return;
+                lock (RefGate)
+                {
+                    if (_ref.Count == 0) return;
+                    foreach (var v in region.BoundVillages)
+                    {
+                        string id = VillageId(v); Ref r;
+                        if (id != null && _ref.TryGetValue(id, out r)) { away += r.Away; dead += r.Dead; }
+                    }
+                }
+            }
+            catch (Exception e) { away = 0.0; dead = 0.0; RefStumble("RegionRefugees", e); }
+        }
+
+        /// <summary>
+        /// TYLKO z Devastation.Strike, PO PeopleBook.Move trafionych z DOM (U23, U24): na konto wsi `refugees` uchodzcow i `dead` zabitych, zegar regionu = `day`
+        /// (zegar rusza tylko przy trafionych > 0 - wolajacy wola tylko wtedy). Nie rzuca.
+        /// </summary>
+        internal static void Devastated(Village v, double refugees, double dead, Settlement region, int day)
+        {
+            try
+            {
+                string id = VillageId(v);
+                if (id == null) return;
+                if (!(refugees > 0.0) || double.IsInfinity(refugees)) refugees = 0.0;
+                if (!(dead > 0.0) || double.IsInfinity(dead)) dead = 0.0;
+                lock (RefGate)
+                {
+                    Ref r;
+                    if (!_ref.TryGetValue(id, out r)) _ref[id] = r = new Ref();
+                    bool had = r.Away > 0.0;
+                    r.Away += refugees; r.Dead += dead;
+                    if (!had && r.Away > 0.0) _refCount++;
+                    _dRefIn += refugees; _dKilled += dead;
+                    if (region != null && region.StringId != null)
+                    {
+                        r.Region = region.StringId;
+                        int old;
+                        if (!_lastStrike.TryGetValue(region.StringId, out old) || day > old) _lastStrike[region.StringId] = day;
+                    }
+                }
+            }
+            catch (Exception e) { RefStumble("Devastated", e); }
+        }
+
+        /// <summary>Doba ostatniego rabunku albo zerowania z trafionymi > 0 w regionie (warownia OutlawLaw.RegionFor). false = brak zegara.</summary>
+        internal static bool LastStrike(Settlement region, out int day)
+        {
+            day = 0;
+            try
+            {
+                if (region == null || region.StringId == null) return false;
+                lock (RefGate) return _lastStrike.TryGetValue(region.StringId, out day);
+            }
+            catch (Exception e) { RefStumble("LastStrike", e); return false; }
+        }
+
+        /// <summary>Zegary regionow w pamieci (do linii).</summary>
+        internal static int RegionClocks { get { lock (RefGate) return _lastStrike.Count; } }
+
+        /// <summary>
+        /// Uchodzcy wracaja do swojej wsi: zdejmuje min(men, poza domem) z konta. MRefugeeHome - Move UCHODZCY -> DOM (hearth +n/k); gdy Move nie przyjal
+        /// (wyjatek w Shift - zwraca 0), ludzie wracaja na konto i liczy sie potkniecie (nikt nie znika). MRefugeeFloor - podloga 10: hearth dopisala juz gra/BK,
+        /// tylko ruch ludzi w liczniku (Note). Zwraca, ilu zeszlo z konta. Nie rzuca (U24).
+        /// </summary>
+        internal static double RefugeesHome(Village v, double men, int cause, float legacy)
+        {
+            if (v == null || !(men > 0.0) || double.IsInfinity(men) || (cause != MRefugeeHome && cause != MRefugeeFloor)) return 0.0;
+            string id = VillageId(v);
+            if (id == null || _refCount == 0) return 0.0;
+            double n = 0.0;
+            Ref r = null;
+            try
+            {
+                lock (RefGate)
+                {
+                    if (!_ref.TryGetValue(id, out r) || !(r.Away > 0.0)) return 0.0;
+                    n = Math.Min(men, r.Away);
+                    r.Away -= n;
+                    if (!(r.Away > 1e-9)) { n += Math.Max(0.0, r.Away); r.Away = 0.0; _refCount--; }     // reszta ponizej 1e-9 idzie razem z nimi (kontrola konta)
+                }
+            }
+            catch (Exception e) { RefStumble("RefugeesHome(konto)", e); return 0.0; }
+            if (!(n > 0.0)) return 0.0;
+            if (cause == MRefugeeHome)
+            {
+                double h = Move(v, ARefugees, ADom, n, cause, legacy);
+                if (!(h > 0.0))
+                {
+                    // Move nie przyjal (wyjatek w Shift albo wies bez hearth) - ludzie zostaja na koncie, licznik ksiegi cofniety
+                    try
+                    {
+                        lock (RefGate) { bool had = r.Away > 0.0; r.Away += n; if (!had) _refCount++; _refStumbles++; }
+                        Count(-n, cause, 0.0);
+                    }
+                    catch (Exception e) { Stumble("RefugeesHome(zwrot)", e); }
+                    return 0.0;
+                }
+                lock (RefGate) _dRefHome += n;
+            }
+            else
+            {
+                Note(n, cause, 0.0);
+                lock (RefGate) _dRefFloor += n;
+            }
+            return n;
+        }
+
+        /// <summary>Uchodzcy umieraja w drodze (1.3%/rok, bez narodzin): zdejmuje min(men, poza domem), Died += n; hearth bez zmian (sa poza wsia). Zwraca n.</summary>
+        internal static double RefugeesDie(Village v, double men)
+        {
+            if (v == null || !(men > 0.0) || double.IsInfinity(men) || _refCount == 0) return 0.0;
+            try
+            {
+                string id = VillageId(v);
+                if (id == null) return 0.0;
+                lock (RefGate)
+                {
+                    Ref r;
+                    if (!_ref.TryGetValue(id, out r) || !(r.Away > 0.0)) return 0.0;
+                    double n = Math.Min(men, r.Away);
+                    r.Away -= n; r.Died += n; _dRefDied += n;
+                    if (!(r.Away > 1e-9)) { r.Died += r.Away; _dRefDied += r.Away; r.Away = 0.0; _refCount--; }
+                    return n;
+                }
+            }
+            catch (Exception e) { RefStumble("RefugeesDie", e); return 0.0; }
+        }
+
+        /// <summary>Migawka konta: id wsi -> poza domem (tylko > 0) - Devastation.Daily i linia doby.</summary>
+        internal static void RefugeesSnapshot(List<KeyValuePair<string, double>> dst)
+        {
+            if (dst == null) return;
+            dst.Clear();
+            if (_refCount == 0) return;
+            try { lock (RefGate) foreach (var kv in _ref) if (kv.Value.Away > 0.0) dst.Add(new KeyValuePair<string, double>(kv.Key, kv.Value.Away)); }
+            catch (Exception e) { RefStumble("RefugeesSnapshot", e); }
+        }
+
+        /// <summary>Migawka konta z zabitymi: id wsi -> (poza domem, zabici od poczatku) - linia "Ludzie (spustoszenie)".</summary>
+        internal static void RefugeesFull(List<KeyValuePair<string, double[]>> dst)
+        {
+            if (dst == null) return;
+            dst.Clear();
+            try { lock (RefGate) foreach (var kv in _ref) dst.Add(new KeyValuePair<string, double[]>(kv.Key, new[] { kv.Value.Away, kv.Value.Dead })); }
+            catch (Exception e) { RefStumble("RefugeesFull", e); }
+        }
+
+        /// <summary>Odcinek konta UCHODZCY jednej doby (zamkniety w Daily) - ta sama liczba w "Ludzie (ksiega)" i w "Ludzie (spustoszenie)" (S4).</summary>
+        internal struct RefSeg
+        {
+            public bool Has, First;                 // zamkniety; pierwsza doba sesji (kontrola od jutra)
+            public double N0, In, Home, Floor, Died, N, Killed, KilledAll;
+            public int Villages, Regions, Clocks, Stumbles;
+            public double Check { get { return First ? 0.0 : N - N0 - In + Home + Floor + Died; } }
+        }
+        internal static RefSeg LastSeg;
+
+        /// <summary>Daily: zamyka dobe konta UCHODZCY (stan, ruch, kontrola) i zeruje liczniki doby.</summary>
+        private static RefSeg CloseRefugeeDay()
+        {
+            var g = new RefSeg { Has = true };
+            List<KeyValuePair<string, Ref>> refs;
+            lock (RefGate)
+            {
+                g.In = _dRefIn; g.Home = _dRefHome; g.Floor = _dRefFloor; g.Died = _dRefDied; g.Killed = _dKilled; g.Stumbles = _refStumbles;
+                g.N0 = _refN0; g.First = double.IsNaN(_refN0); g.Clocks = _lastStrike.Count;
+                refs = _ref.ToList();
+                _dRefIn = _dRefHome = _dRefFloor = _dRefDied = _dKilled = 0; _refStumbles = 0;
+            }
+            var regions = new HashSet<string>();
+            foreach (var kv in refs)
+            {
+                g.KilledAll += kv.Value.Dead;
+                if (!(kv.Value.Away > 0.0)) continue;
+                g.N += kv.Value.Away; g.Villages++;
+                string reg = RegionIdOf(kv.Key, kv.Value);
+                if (reg != null) regions.Add(reg);
+            }
+            g.Regions = regions.Count;
+            lock (RefGate) _refN0 = g.N;
+            LastSeg = g;
+            return g;
+        }
+
+        private static string RefSegment(RefSeg g)
+        {
+            var sb = new StringBuilder(400);
+            sb.Append(" | E4/5 konto UCHODZCY: ").Append(g.N.ToString("0.#", Inv)).Append(" ludzi w ").Append(g.Villages).Append(" wsiach (").Append(g.Regions).Append(" regionow) = ");
+            if (g.First) sb.Append("pierwsza doba sesji - kontrola od jutra (nowi ").Append(M0(g.In)).Append(", powrot ").Append(M0(g.Home)).Append(", podloga 10 ").Append(M0(g.Floor))
+                           .Append(", zmarli ").Append(g.Died.ToString("0.###", Inv)).Append(')');
+            else sb.Append("wczoraj ").Append(g.N0.ToString("0.#", Inv)).Append(" + nowi ").Append(M0(g.In)).Append(" - powrot ").Append(M0(g.Home)).Append(" - podloga 10 ").Append(M0(g.Floor))
+                   .Append(" - zmarli ").Append(g.Died.ToString("0.###", Inv)).Append(" (kontrola ").Append(H3d(g.Check)).Append(')');
+            sb.Append("; zabici przy spustoszeniu dzis ").Append(M0(g.Killed)).Append(", od poczatku ").Append(g.KilledAll.ToString("0", Inv)).Append("; zegary regionow ").Append(g.Clocks);
+            if (g.Stumbles > 0) sb.Append("; potkniecia konta ").Append(g.Stumbles);
+            return sb.ToString();
         }
 
         // ---------------------------------------------------------------- E4/3: k na osade (U3)
@@ -520,6 +867,8 @@ namespace Armoury
         /// <summary>Raz na dobe (po linii "Inni z poleglych (E4/2)"): stan konta CIALA z rownaniem i polegli z rak Innych.</summary>
         internal static void Daily(int day, bool log)
         {
+            RefSeg rseg = default(RefSeg);
+            try { rseg = CloseRefugeeDay(); } catch (Exception e) { Stumble("Daily(E4/5)", e); }
             try
             {
                 EnsureOpening();
@@ -553,6 +902,7 @@ namespace Armoury
                     }
                     sb.Append(", od wczytania ").Append(_deadSess);
                     try { sb.Append(UnitSegment()); } catch (Exception e) { Stumble("Daily(E4/3)", e); }
+                    try { if (rseg.Has) sb.Append(RefSegment(rseg)); } catch (Exception e) { Stumble("Daily(E4/5 odcinek)", e); }
                     try { sb.Append(PeopleUnit.DayNote()); } catch (Exception e) { Stumble("Daily(PeopleUnit)", e); }
                     if (_stumblesDay > 0) sb.Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(", pierwszy blad kazdego miejsca w logu)");
                     sb.Append('.');
@@ -605,7 +955,7 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor ? "gra " + H3d(hh[i]) : "bez hearth do E4/7"));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : "bez hearth do E4/7"));
                 any = true;
             }
             if (!any) sb.Append(" brak");
