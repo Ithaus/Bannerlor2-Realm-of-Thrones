@@ -4012,6 +4012,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool DefeatMoraleHalf { get; set; } = true;
 
+        [SettingPropertyBool("Band Join Purse To Player", HintText = "when outlaws agree to join your party, the coin they carried is handed to you - it is not a war spoil, so the crown takes no ninth of it (off = as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool BandJoinPurseToPlayer { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5030,6 +5034,7 @@ namespace Armoury
             s.DeadHeroGoldStays = DeadHeroGoldStays;
             s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;
             s.DefeatMoraleHalf = DefeatMoraleHalf;
+            s.BandJoinPurseToPlayer = BandJoinPurseToPlayer;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

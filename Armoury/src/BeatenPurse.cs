@@ -46,13 +46,17 @@ namespace Armoury
     ///     gracza, upadek rodu - DestroyClanAction, zadania). Dlatego pkt 3 tylko dla partii POKONANYCH w bitwie: SplitPostfix zapamietuje pokonanych
     ///     (karawany i bandy, takze z bohaterem na czele, takze zasadzka przy oblezeniu), a nasluch zniszczenia przyjmuje tylko zapamietanego, gdy
     ///     niszczy go przywodca strony zwyciezcow tej samej bitwy przy jej koncu. Reszta (niszczyciel nie pokonal ich w bitwie) - poza regula jak
-    ///     rozwiazane (znika jak przed 3.2, osobny licznik; przylaczenie band do gracza - do decyzji Jeffa).
+    ///     rozwiazane (znika jak przed 3.2, osobny licznik; przylaczenie band do gracza - D11-2 nizej).
     ///  4. KORONA 1/9 (prawo trzecich 178): czesc z kies wzieta przez wodza-wasala krolestwa w wojnie (takze gracza) idzie do podstawy 1/9
     ///     (Ransom178.NoteBeatenGold - z kiesy odbiorcy nastepnego ranka, jak reszta 1/9).
     ///  5. PODDANIE GRACZOWI BEZ BITWY (recenzja 3.2 (1)): karawana albo tabor wsi oddaje graczowi kiese w rozmowie (poddanie i odjazd, wziecie
     ///     do niewoli, okup za przepuszczenie) - gra: GiveGoldAction partia -> gracz (CaravansCampaignBehavior / VillagerCampaignBehavior,
     ///     conversation_*_surrender_leave / took_prisoner / looted_leave). Prefiks/postfiks tych metod mierzy spadek kiesy: osobny licznik w linii
     ///     3.2 i 1/9 korony od gracza-wasala (jedna regula z bitwa). Kopie tych metod w BK BKCaravansBehavior sa martwe (AddDialogs BK = samo ret).
+    ///  6. D11-2 (decyzja Jeffa 11.10, wylacznik BandJoinPurseToPlayer): banda, ktora gra przylacza do gracza bez bitwy (BanditInteractionsCampaignBehavior.
+    ///     OpenRosterScreenAfterBanditEncounter: zdarzenie BanditPartyRecruited tuz przed DestroyPartyAction.Apply(MainParty, banda) - takze bandy, ktore
+    ///     dolaczylyby do spotkania), oddaje cala kiese graczowi (GiveGoldAction banda -> gracz; bez 1/9 korony - to nie lup wojenny). Dotad poza regula:
+    ///     od E3/7 kasa najblizszego miasta (CaravanCapital.RoutePurse), wczesniej znikala. Niezalezne od wylacznika 3.2.
     /// Platnik -> odbiorca: kiesa rozbitej partii -> zwyciezcy wedlug wkladu / niszczyciel / jego osada / najblizsze miasto; 1/9 -> skarbiec.
     /// Ksiega pieniadza: lup wodza to zdarzenie gry z niczego (ZRODLA "bitwy"), kiesa pokonanego maleje bez zdarzenia (NETTO "bitwy - zloto partii
     /// bez wodza") - razem przelew, ksiega zamyka sie jak dotad; "kiesy partii bez wodza, ktore zniknely z mapy" (karawany, bandy) spadaja do rozwiazanych
@@ -87,6 +91,10 @@ namespace Armoury
         private static readonly long[] _yield = new long[T];                           // pkt 5: kiesy oddane graczowi w rozmowie (tabory, karawany)
         private static readonly int[] _yieldN = new int[T];
         private static long _yieldBribe;                                               // pkt 5: z tego okup za przepuszczenie (czesc kiesy)
+        // D11-2: bandy przylaczane teraz do gracza (zdarzenie BanditPartyRecruited -> zaraz DestroyPartyAction) i ich kiesy oddane graczowi dzis
+        private static readonly HashSet<MobileParty> _joined = new HashSet<MobileParty>();
+        private static long _joinGold; private static int _joinN;
+        internal static bool JoinOn { get { var s = Settings.Current; return s != null && s.BandJoinPurseToPlayer; } }
 
         /// <summary>Ksiega pieniadza (MoneyLedger.Daily biegnie przed naszym Daily - te same granice doby): kiesy pokonanych zdjete w wyplacie gry.</summary>
         internal static long DayTaken { get { return _paid[TVill] + _paid[TBand] + _paid[TCar]; } }
@@ -110,6 +118,7 @@ namespace Armoury
             Array.Clear(_dWin, 0, T); Array.Clear(_odd, 0, T); Array.Clear(_oddN, 0, T); Array.Clear(_yield, 0, T); Array.Clear(_yieldN, 0, T);
             _yieldBribe = 0;
             _beaten.Clear();
+            _joined.Clear(); _joinGold = 0; _joinN = 0;
             _verdictParty = null; _verdictBeaten = false;
         }
 
@@ -271,6 +280,14 @@ namespace Armoury
             return p.LeaderHero != null || (mp != null && mp.IsPartyTradeActive);
         }
 
+        // ------------------------------------------------------------ 6. D11-2: banda przylacza sie do gracza
+        /// <summary>Nasluch BanditPartyRecruited: gra wola go dla kazdej bandy przylaczanej do gracza tuz przed DestroyPartyAction.Apply(MainParty, banda).</summary>
+        internal static void OnBanditRecruited(MobileParty mp)
+        {
+            try { if (mp != null) _joined.Add(mp); }
+            catch (Exception e) { Stumble("BeatenPurse.OnBanditRecruited", e); }
+        }
+
         // ------------------------------------------------------------ 3. nic w nicosc przy zniszczeniu (karawana, banda)
         /// <summary>
         /// MobilePartyDestroyed: rozbita karawana albo banda znika z mapy z tym, czego gra w bitwie nikomu nie wyplacila (pkt 2), albo z cala kiesa,
@@ -289,6 +306,23 @@ namespace Armoury
                 _verdictParty = party;
                 _verdictBeaten = known && ev != null && destroyer != null && ev.IsFinalized && ev.WinningSide != BattleSideEnum.None
                                  && ReferenceEquals(destroyer, ev.GetLeaderParty(ev.WinningSide));
+                // D11-2: banda przylaczona do gracza (bez bitwy) - cala kiesa do gracza, bez 1/9 korony; niezalezne od wylacznika 3.2
+                if (_joined.Remove(party) && JoinOn && Live && destroyer != null && destroyer.MobileParty != null && destroyer.MobileParty.IsMainParty && TypeOf(party) == TBand)
+                {
+                    int jg = party.PartyTradeGold;
+                    var me = Hero.MainHero;
+                    if (jg > 0 && me != null && me.IsAlive)
+                    {
+                        GiveGoldAction.ApplyForPartyToCharacter(party.Party, me, jg, true);   // zdarzenie gry: ksiega widzi przelew banda -> gracz
+                        int moved = jg - party.PartyTradeGold;
+                        if (moved > 0)
+                        {
+                            _joinGold += moved; _joinN++;
+                            Log.Player("The outlaws who joined you hand over the coin they carried: " + moved + " denars.");
+                        }
+                    }
+                    // reszta (nie powinna zostac) - dalej jak dotad: przy 3.2 "poza regula" (kiesa 0 - nic)
+                }
                 if (!On || !Live) return;
                 if (party.IsVillager || (party.IsLordParty && party.LeaderHero != null)) return;   // tabor wsi - 112; kiesa wodza zostaje z wodzem
                 int t = TypeOf(party);
@@ -516,7 +550,8 @@ namespace Armoury
                   .Append("), karawany ").Append(_yield[TCar]).Append(" (").Append(_yieldN[TCar]).Append("); w tym okup za przepuszczenie ").Append(_yieldBribe)
                   .Append(" | rozwiazane bez bitwy (").Append(gone7).Append("): bandy ").Append(_disb[TBand]).Append(" (").Append(_disbN[TBand])
                   .Append("), karawany ").Append(_disb[TCar]).Append(" (").Append(_disbN[TCar]).Append(")")
-                  .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula 3.2, jak rozwiazane: ").Append(gone7).Append("): bandy ")
+                  .Append(" | przylaczone do gracza (D11-2 ").Append(JoinOn ? "WL" : "WYL - poza regula jak nizej").Append("): kiesy band -> gracz ").Append(_joinGold).Append(" (").Append(_joinN).Append(" band; bez 1/9 korony)")
+                  .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza przy D11-2 wylaczonym, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula 3.2, jak rozwiazane: ").Append(gone7).Append("): bandy ")
                   .Append(_odd[TBand]).Append(" (").Append(_oddN[TBand]).Append("), karawany ").Append(_odd[TCar]).Append(" (").Append(_oddN[TCar]).Append(")")
                   .Append(" | ksiega: kiesy pokonanych zdjete bez zdarzenia ").Append(paid).Append(" (NETTO \"bitwy - zloto partii bez wodza\"), z tego wodzom zdarzeniem gry z niczego ")
                   .Append(_toLords).Append(" (ZRODLA \"bitwy\") i kiesom partii bez wodza ").Append(_toBands + _toParties).Append(" (NETTO) - przelew, nie zrodlo");
