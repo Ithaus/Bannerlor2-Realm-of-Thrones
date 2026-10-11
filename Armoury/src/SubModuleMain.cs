@@ -104,6 +104,8 @@ namespace Armoury
                 try { LosersFlee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("LosersFlee.ApplyAll", e); }   // H3: przegrani uchodza zamiast ginac (wynik bitwy AI w polu) + licznik wcielonych jencow AI
                 try { PrisonerLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PrisonerLaw.ApplyAll", e); }   // I1: prawo jenca wedlug krainy - w krainie bez niewoli jeniec do domu / na Mur, nie niewolnik BK
                 PopulationLaw.ApplyAll(_harmony);
+                // E4/3 (108n): 1 czlowiek = 1/k osady (tabory wsi, lodzie rybackie, pobor wymuszony, zadania gracza); we wlasnym try - jej wywrotka nie moze zatrzymac latek ponizej
+                try { PeopleUnit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleUnit.ApplyAll", e); }
                 MapClock.ApplyAll(_harmony);
                 Levy.ApplyAll(_harmony);
                 VolunteerKit.ApplyAll(_harmony);
@@ -133,6 +135,7 @@ namespace Armoury
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
                 ScorchedEarth.ApplyAll(_harmony);
                 try { Measure40.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Measure40.ApplyAll", e); }   // E4/0 (188): pomiar ludzi, jencow i zimy - okna wpiete zawsze (U26), licza przy PeopleMeasureEnabled; gra bez zmian
+                try { OthersRise.ApplyAll(_harmony); } catch (Exception e) { Log.Error("OthersRise.ApplyAll", e); }   // E4/2 (190): Inni tylko z poleglych za Murem / przy Murze - latki wpiete zawsze, wylaczniki na zywo; PO Measure40 (finalizer (f) High przed W10)
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);

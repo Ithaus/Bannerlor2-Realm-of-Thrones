@@ -49,7 +49,7 @@ namespace Armoury
             { "sturgia",    new Region(500000f,  0.05f) },  // Zelazne Wyspy
             { "crownlands", new Region(600000f,  0.75f) },  // Krolewska Przystan i Duskendale
             { "dragonstone",new Region(850000f,  0.05f) },  // reszta Ziem Korony
-            { "freefolk",   new Region(150000f,  0f) },
+            { "freefolk",   new Region(300000f,  0f) },     // E4/3 (Jeff 05.10, SP:361): Wolni Ludzie 300 tys. (walcza wszyscy dorosli - E4/9); dotad 150 tys.
             { "nightswatch",new Region(20000f,   0f) },
             { "skagosi",    new Region(50000f,   0f) },
             { "volantine",  new Region(5000000f, 0.25f) },
@@ -76,7 +76,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _k.Clear(); RentToday.Clear(); ZeroDay169(); _kTab.Clear(); _kTabDay = -1;
+            _k.Clear(); RentToday.Clear(); ZeroDay169(); _kTab.Clear(); _kTabDay = -1; _errCalibrate = false;
             // wpis 87 (audyt pkt 4): BK tworzy nowe PopulationManager/PolicyManager przy kazdej grze - stare referencje dawaly
             // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
             _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
@@ -86,6 +86,10 @@ namespace Armoury
         {
             if (_k.Count > 0) return;
             float scale = Math.Max(0f, Settings.Current.PopulationScale);
+            // E4/3 (projekt 4.10, "Pogodzone"): pulap gestosci wsi - zaden punkt mapy nie znaczy wiecej ludzi niz najgesciej zaludniona kraina (Qarth 629
+            // ludzi na hearth); kraina ponad pulapem (Wyspy Letnie: 3 wsie po 50 hearth = 4 500/hearth) traci nadwyzke tabeli "poza mape", udzial miast zostaje
+            float cap = Math.Max(0f, Settings.Current.PopulationMaxPerHearth);
+            var cut = new List<string>(); double offMap = 0;
             var hearth = new Dictionary<string, float>();
             var prosp = new Dictionary<string, float>();
             foreach (var s in Settlement.All)
@@ -106,10 +110,23 @@ namespace Armoury
                 if (h <= 0f) urban = p > 0f ? 1f : 0f;                      // kraina bez wsi - wszystko w miastach
                 float kv0 = h > 0f ? pop * (1f - urban) / h : 0f;
                 float kv1 = p > 0f ? pop * urban / p : 0f;
+                if (cap > 0f && kv0 > cap)
+                {
+                    float f = cap / kv0;
+                    cut.Add(kv.Key + " " + (int)kv0 + " -> " + (int)cap + " ludzi na hearth (" + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M -> "
+                            + (pop * f / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M)");
+                    offMap += (double)pop * (1f - f);
+                    kv0 = cap; kv1 *= f; pop *= f;
+                }
                 _k[kv.Key] = new[] { kv0, kv1 };
                 parts.Add(kv.Key + " " + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M (wies " + (int)kv0 + "/hearth, miasto " + (int)kv1 + "/dobrobyt)");
             }
-            Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray()) + ".");
+            Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray())
+                     + (cut.Count > 0 ? " | obcieto (pulap " + (int)cap + " ludzi na punkt hearth wsi, E4/3): " + string.Join(", ", cut.ToArray()) + "; poza mapa razem "
+                                        + (offMap / 1e6).ToString("0.00", CultureInfo.InvariantCulture) + " mln"
+                                      : " | pulap gestosci wsi (E4/3): " + (cap > 0f ? (int)cap + " ludzi na hearth - bez obciec" : "wylaczony")) + ".");
+            // E4/3 (U3): k na osade z dnia kalibracji - do ksiegi ludzi (PeopleBook "v:"); zapis z "v:" zostaje
+            try { PeopleBook.SetUnitsFromCalibration(); } catch (Exception e) { Log.Error("PopulationLaw.Calibrate(k na osade)", e); }
         }
 
         // ------------------------------------------------------------ 174.3: ludnosc z tabeli krain (suma swiata stala)
@@ -178,13 +195,92 @@ namespace Armoury
 
         internal static float PeopleOf(Settlement s)
         {
-            if (s == null || s.Culture == null) return 0f;
+            if (s == null) return 0f;
             Calibrate();
-            float[] k;
-            if (!_k.TryGetValue(s.Culture.StringId, out k)) return 0f;
-            if (s.IsVillage && s.Village != null) return Math.Max(0f, s.Village.Hearth) * k[0];
-            if (s.IsTown && s.Town != null) return Math.Max(0f, s.Town.Prosperity) * k[1];
+            float k = KFor(s);
+            if (!(k > 0f)) return 0f;
+            if (s.IsVillage && s.Village != null) return Math.Max(0f, s.Village.Hearth) * k;
+            if (s.IsTown && s.Town != null) return Math.Max(0f, s.Town.Prosperity) * k;
             return 0f;
+        }
+
+        // ------------------------------------------------------------ E4/3 (108n): jednostka ludzi i k na osade
+        // klucz w `_k`, ktory nie jest id kultury: srednio ludzi wsi na punkt hearth na calym swiecie (podstawa wyrzutkow liczonych od ludnosci)
+        private const string WorldKey = "*";
+        private static bool _errCalibrate;
+
+        /// <summary>
+        /// E4/3 (U3): ludzi na punkt hearth wsi / dobrobytu miasta TEJ osady. Przy czynnej jednostce (PeopleUnitEnabled) - k_v z dnia kalibracji
+        /// z ksiegi ludzi (zmiana kultury osady - asymilacja BK, przejecie przez Innych - nie zmienia ani liczby ludzi, ani wagi czlowieka; kultura spoza
+        /// tabeli, np. whitewalker, nie zeruje juz ludzi osady); przy wylaczonej albo bez k_v - k biezacej kultury osady, jak dotad. 0 = brak przelicznika
+        /// (zamek, kultura spoza tabeli, przed kalibracja). Kalibracji sami nie wolamy.
+        /// </summary>
+        internal static float KFor(Settlement s)
+        {
+            if (s == null || !(s.IsVillage || s.IsTown)) return 0f;
+            float kv;
+            if (PeopleUnit.On && PeopleBook.TryUnit(s, out kv)) return kv;
+            float[] k;
+            if (s.Culture == null || !_k.TryGetValue(s.Culture.StringId, out k) || k == null || k.Length < 2) return 0f;
+            return s.IsVillage ? k[0] : k[1];
+        }
+
+        /// <summary>
+        /// Kalibracja na zadanie. Jednostka ludzi wola ja PRZED pierwszym zdjeciem hearth (siew puli wyrzutkow, pierwszy tabor):
+        /// dotad kalibracja szla dopiero przy pierwszych rentach, po siewie, i rozkladala ludnosc krain na hearth juz pomniejszony.
+        /// </summary>
+        internal static void EnsureCalibrated()
+        {
+            try { Calibrate(); }
+            catch (Exception e) { if (!_errCalibrate) { _errCalibrate = true; Log.Error("PopulationLaw.EnsureCalibrated", e); } }
+        }
+
+        /// <summary>
+        /// Ile punktow hearth wsi to jeden jej czlowiek: 1/k_v osady (ta sama liczba, przez ktora PeopleOf mnozy hearth). 0 = brak przelicznika
+        /// (kultura spoza tabeli w dniu kalibracji, kraina bez wsi, PopulationScale 0) - wolajacy zostaje wtedy przy stawce dotychczasowej; bez dzielenia przez zero.
+        /// </summary>
+        internal static float HearthPerMan(Village v)
+        {
+            if (v == null || v.Settlement == null) return 0f;
+            EnsureCalibrated();
+            float kv = KFor(v.Settlement);
+            if (!(kv > 0f) || float.IsInfinity(kv)) return 0f;       // takze NaN
+            float per = 1f / kv;
+            return per > 0f ? per : 0f;
+        }
+
+        /// <summary>
+        /// Srednio ludzi wsi na punkt hearth na swiecie (ok. 191). Liczone raz - z ludnosci i hearth wsi w chwili pierwszego pytania (w nowej kampanii:
+        /// przy siewie puli wyrzutkow, zaraz po kalibracji) - i trzymane w `_k` pod kluczem "*", wiec idzie do zapisu razem z reszta kalibracji;
+        /// zapis sprzed tej wersji dostaje je przy pierwszym pytaniu. 0 = brak danych (zadna wies nie ma przelicznika).
+        /// </summary>
+        internal static float WorldPeoplePerHearth()
+        {
+            EnsureCalibrated();
+            float[] w;
+            if (_k.TryGetValue(WorldKey, out w) && w != null && w.Length > 0 && w[0] > 0f) return w[0];
+            double people = 0.0, hearth = 0.0;
+            try
+            {
+                foreach (var s in Settlement.All)
+                {
+                    if (s == null || !s.IsVillage || s.Village == null) continue;
+                    float k = KFor(s);
+                    if (!(k > 0f)) continue;
+                    double h = Math.Max(0f, s.Village.Hearth);
+                    people += h * k; hearth += h;
+                }
+            }
+            catch (Exception e)
+            {
+                if (!_errCalibrate) { _errCalibrate = true; Log.Error("PopulationLaw.WorldPeoplePerHearth", e); }
+                return 0f;      // wolajacy liczy wtedy od hearth, jak dotad
+            }
+            float kw = hearth > 0.0 ? (float)(people / hearth) : 0f;
+            if (!(kw > 0f) || float.IsInfinity(kw)) return 0f;
+            _k[WorldKey] = new[] { kw, 0f };
+            Log.Info("PopulationLaw: srednia swiata " + kw.ToString("0.0", CultureInfo.InvariantCulture) + " ludzi wsi na punkt hearth (podstawa liczenia wyrzutkow od ludnosci, E4/3).");
+            return kw;
         }
 
         private static float DailyRent(float people)
@@ -371,9 +467,10 @@ namespace Armoury
                 foreach (var st in Settlement.All)
                 {
                     if (st == null || st.Culture == null || !(st.IsVillage || st.IsTown)) continue;
+                    string c = st.Culture.StringId;
+                    if (!Table.ContainsKey(c)) continue;    // E4/3: osada kultury spoza tabeli (whitewalker) ma juz ludzi (k na osade), ale renty - jak dotad (etap 4 nie rusza zlota)
                     float p = PeopleOf(st);
                     if (p <= 0f) continue;
-                    string c = st.Culture.StringId;
                     float v; pop.TryGetValue(c, out v); pop[c] = v + p;
                     float rent = DailyRent(p);
                     due.TryGetValue(c, out v); due[c] = v + rent;

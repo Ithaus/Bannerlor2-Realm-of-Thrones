@@ -63,7 +63,8 @@ namespace Armoury
         private const float PBase = 0.15f, WC = 0.35f, WT = 0.15f, WO = 0.15f, WQ = 0.20f, WF = 0.10f, PMin = 0.05f, PMax = 0.65f;
         // promien sprawdzania terenu: srodek + po 4 punkty na kole 1 i 2 jednostek mapy (jedna stala na promien - prog 10-30% bitew z T = 1)
         private const float TerrainR1 = 1f, TerrainR2 = 2f;
-        // tabor wsi wraca do swojej wsi dokladnie tak, jak go zdjeto: VillagerCampaignBehavior.cs:179, 187 - Hearth -= (n + 1) / 2
+        // tabor wsi wraca do swojej wsi dokladnie tak, jak go zdjeto: VillagerCampaignBehavior.cs:179, 187 - Hearth -= (n + 1) / 2; od E4/3 (108n) stawka
+        // dotychczasowa tylko przy wylaczonej jednostce - przy czynnej gra zdejmuje taborowi n/k osady (PeopleUnit) i tyle wraca (PeopleBook.Move)
         private const float VillagerHearthPerMan = 0.5f;
         private const int VeteranTier = 4;
         // kultury z niewolnictwem wedlug Martina (decyzja Jeffa 07.10 pkt 5 i 6a; bez Pentos i Lorath) - jedna lista, ktora ma przejac
@@ -147,10 +148,7 @@ namespace Armoury
         private static int _oddApplyTypes, _oddApplyMen, _oddPostTypes, _oddPostMen;
         private static int _freed, _freedOutside;
         private static int _toBk, _asSerfs, _asNobles, _toVillageMen, _toCommon, _template, _templateGarr, _templateBandit, _homeless, _vanished, _bkOddCalls, _bkOddDiff;
-        private static float _toVillageHearth, _toCommonHearth, _templateFloat;
-        // E4/0 (pomiar, tylko odczyt): zywe liczniki hearth od ostatniego ClearDay - Measure40 dopelnia nimi dobe "od zerowania do migawki"
-        internal static float ToVillageHearthNow { get { return _toVillageHearth; } }
-        internal static float ToCommonHearthNow { get { return _toCommonHearth; } }
+        private static float _toVillageHearth, _toCommonHearth, _templateFloat;   // E4/3: hearth faktycznie dopisany przez PeopleBook.Move (linia "Hearth (E4/0)" czyta ksiege wprost)
         // domy wedlug zrodla (SrcRouted / SrcFreed / SrcPool / SrcLaw): ludnosc BK, wies (tabory + prosci + bandyci), z szablonu
         private static readonly int[] _bkBy = new int[Srcs], _hearthBy = new int[Srcs], _tplBy = new int[Srcs];
         // Inni (wighty): rozbici pominieci w RoutedH3 i wighty, ktore doszly do SendHome inna droga - z niczego, do niczego
@@ -405,15 +403,15 @@ namespace Armoury
                 // I1: jeniec sprzedany / wypuszczony daleko od domu wraca do SWOJEJ krainy - punkt = najblizsza miejscu osada z danymi BK
                 // jego kultury (brak takiej osady, np. kultura bandycka - region miejsca); dalej te same reguly co dla rozbitych
                 if (src == SrcLaw && troop.Culture != null) pos = LawHomePos(pos, troop.Culture);
-                // 1. tabor wsi i rybacy -> hearth wlasnej wsi (dokladna odwrotnosc zdjecia przy wysylaniu taboru); ludnosci BK nie dopisujemy
+                // 1. tabor wsi i rybacy -> DOM wlasnej wsi (dokladna odwrotnosc zdjecia przy wysylaniu taboru: E4/3 - 1/k osady przez PeopleBook.Move,
+                // pierwszy punkt powrotu R0); ludnosci BK nie dopisujemy
                 if (party != null && party.IsVillager)
                 {
                     Village v = null;
                     try { v = party.HomeSettlement != null ? party.HomeSettlement.Village : null; } catch { }
                     if (v != null)
                     {
-                        float h = VillagerHearthPerMan * n;
-                        v.Hearth += h;
+                        float h = (float)PeopleBook.Move(v, PeopleBook.ACarts, PeopleBook.ADom, n, PeopleBook.MH3Cart, VillagerHearthPerMan);
                         _toVillageMen += n; _toVillageHearth += h; _hearthBy[src] += n;
                         var row = Row(OutlawLaw.RegionFor(v.Settlement)); row.VillageMen += n; row.VillageHearth += h;
                         return n;
@@ -456,8 +454,10 @@ namespace Armoury
         {
             var region = OutlawLaw.HearthRegionAt(pos);
             if (region == null) return 0;
-            OutlawLaw.ReturnHome(region, n);
-            float h = n * Settings.Current.OutlawHearthPerMan;
+            // E4/3: trzeci punkt powrotu (OutlawLaw.ReturnHome -> PeopleBook.Move, 1/k osady); tabor bez znanej wsi - z konta TABOR, reszta (prosci, bandyci) - SLUZBA
+            bool placed;
+            float h = (float)OutlawLaw.ReturnHome(region, n, villager ? PeopleBook.ACarts : PeopleBook.AService, villager ? PeopleBook.MH3Cart : PeopleBook.MCommon, out placed);
+            if (!placed) return 0;
             if (villager) { _toVillageMen += n; _toVillageHearth += h; } else { _toCommon += n; _toCommonHearth += h; }
             _hearthBy[src] += n;
             var row = Row(region); row.VillageMen += n; row.VillageHearth += h;
@@ -485,7 +485,10 @@ namespace Armoury
             }
             var home = FindHome(pos, fac, troop.Culture, cache, where);
             if (home == null) return 0;
-            return AddBk(home, troop, n, src);
+            int got = AddBk(home, troop, n, src);
+            // E4/3: pierwszy punkt powrotu (R0) - zolnierz wraca do ludnosci BK; w ksiedze SLUZBA -> DOM tylko liczona (werbunek zdejmie rekruta z DOM dopiero w E4/7)
+            if (got > 0) PeopleBook.Note(got, PeopleBook.MSoldier, 0.0);
+            return got;
         }
 
         /// <summary>n ludzi typu troop do ludnosci BK osady home (werbunek BK na odwrot; zastepczo chlopi) - wspolne dla ToBk i ToWall.</summary>
@@ -1477,8 +1480,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("LosersFlee.Daily", e); }
             finally
             {
-                try { Measure40.TakeFlee(_toVillageHearth, _toCommonHearth); } catch { }   // E4/0: przekazanie licznikow hearth tuz przed zerowaniem (tylko pomiar)
-                ClearDay();
+                ClearDay();   // E4/3: hearth powrotow czyta linia "Hearth (E4/0)" wprost z ksiegi ludzi (PeopleBook) - dawne przekazanie TakeFlee zdjete
             }
         }
 

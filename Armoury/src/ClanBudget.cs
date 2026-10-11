@@ -739,7 +739,7 @@ namespace Armoury
                 int n = (int)Math.Min(el.Number, Math.Ceiling((amount - done) / w));
                 if (n <= 0) continue;
                 int wounded = el.WoundedNumber > 0 ? Math.Min(el.WoundedNumber, (int)Math.Round(n * (double)el.WoundedNumber / el.Number)) : 0;
-                if (!ToVillage(village, ch, n)) { _dNoVillage++; continue; }
+                if (!ToVillage(village, ch, n, PeopleBook.M166)) { _dNoVillage++; continue; }
                 r.AddToCounts(ch, -n, false, -wounded);
                 done += (double)n * w; gone += n;
             }
@@ -791,22 +791,26 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>179 (GentryService.FinishPrefix): ludzie do ludnosci BK wsi (tylko wies z danymi BK); false - nikt nie przeszedl.</summary>
-        internal static bool ToVillagePop(Settlement v, CharacterObject ch, int n)
+        /// <summary>179 (GentryService.FinishPrefix) i W4c (OverflowHome.SendHome): ludzie do ludnosci BK wsi (tylko wies z danymi BK); false - nikt nie przeszedl.
+        /// cause - przyczyna w ksiedze ludzi (PeopleBook.M179 / MW4c).</summary>
+        internal static bool ToVillagePop(Settlement v, CharacterObject ch, int n, int cause)
         {
-            return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n);
+            return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n, cause);
         }
 
-        private static bool ToVillage(Settlement v, CharacterObject ch, int n)
+        /// <summary>Drugi punkt powrotu do DOM (R0, U2): zwolnieni 166, przepelnienie W4c, rycerze 179 - do ludnosci BK wsi (sklad BK) i do ksiegi ludzi
+        /// (PeopleBook: SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje rekruta z DOM, wiec hearth bylby ludzmi z niczego).</summary>
+        private static bool ToVillage(Settlement v, CharacterObject ch, int n, int cause)
         {
             try
             {
                 var pd = _getPopData.Invoke(_popMgr, new object[] { v });
                 if (pd == null) return false;
                 _fromSoldiers.Invoke(pd, new object[] { ch, n });
-                return true;
             }
             catch (Exception e) { Stumble("ToVillage", e); return false; }
+            PeopleBook.Note(n, cause, 0.0);      // E4/3: wlasny try w ksiedze (U24) - po dopisaniu, nie miedzy zdjeciem a dopisaniem
+            return true;
         }
 
         /// <summary>W4c (OverflowHome): wies domowa ludzi, ktorzy odchodza z przepelnionej partii albo zalogi - ta sama regula co zwolnieni 166

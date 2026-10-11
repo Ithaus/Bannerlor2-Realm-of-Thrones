@@ -29,11 +29,13 @@ namespace Armoury
     ///  W10 jency po bitwie (MapEvent.LootDefeatedPartyPrisoners / CaptureDefeatedPartyMembers): odbici i wcieleni do skladu zwyciezcy, wzieci do niewoli;
     ///  W11 jency z rabunku BK (BKRaidCaptureBehavior.ExecuteCapture) - trzecie okno void na tej metodzie.
     /// Okna wpinane ZAWSZE (U26), licza tylko przy On (LogEnabled + PeopleMeasureEnabled). Liczniki modulow sa CZYTANE (U8), nie liczone drugi raz:
-    /// TakeOutlaw (OutlawLaw - tuz przed zerowaniem), TakeFlee (LosersFlee - w finally przed ClearDay), TakeSeed (siew puli); do tego dopelnienie
-    /// "od zerowania do migawki" (odczyt zywych licznikow w Daily), zeby zmiana hearth i licznik trafily do tej samej doby. Zapisy tylko tam, gdzie
-    /// licznika nie ma: NoteHearth (zerowanie armii ScorchedEarth), NoteScar (blizna w ticku wsi), NoteDisease (zaraza CampFever - roster przed/po),
-    /// NoteReturnNoVillage (powrot z puli w regionie bez wsi). Kazde Take/Note we wlasnym try z licznikiem potkniec (U24); zadne wywolanie nie stoi
-    /// miedzy zdjeciem a dopisaniem ludzi. Bez zapisu w grze - liczniki sesji (po wczytaniu pierwsza doba = migawka).
+    /// od E4/3 (108n) kazdy ruch hearth za ludzi naszych modulow (wyrzutki, powroty z puli i z bitew, rozwiazane tabory, pobor i zadania gracza, siew)
+    /// idzie przez ksiege ludzi (PeopleBook.Move) - linia "Hearth" czyta jej hearth wedlug przyczyny (PeopleBook.TakeHearth40) w chwili migawki wsi, wiec
+    /// zmiana hearth i licznik sa zawsze w tej samej dobie (dawne TakeOutlaw/TakeFlee/TakeSeed z dopelnieniem "od zerowania do migawki" zdjete). Tabory
+    /// i lodzie gry mierza okna W3-W5 (wynik po przeliczeniu 1/k). Zapisy tylko tam, gdzie licznika nie ma: NoteHearth (zerowanie armii ScorchedEarth),
+    /// NoteScar (blizna w ticku wsi), NoteDisease (zaraza CampFever - roster przed/po), NoteReturnNoVillage (powrot z puli bez regionu z wsiami).
+    /// Kazde Note we wlasnym try z licznikiem potkniec (U24); zadne wywolanie nie stoi miedzy zdjeciem a dopisaniem ludzi. Bez zapisu w grze - liczniki
+    /// sesji (po wczytaniu pierwsza doba = migawka).
     /// Linie raz na dobe (przed ksiega ludzi): "Hearth (E4/0)", "Dobrobyt (E4/0)", "Jency (E4/0)", "Zima (E4/0)"; linia startowa "Pomiar ludzi (E4/0)".
     /// "Partie (E4/0)", "Krainy (4.15)", "Straz i Wolni Ludzie (4.15)" pisze PeopleLedger (jego nasluchy), milicje - linia "Zalogi (169c)", Innych - "Wzrost Innych (169c)".
     /// </summary>
@@ -117,15 +119,14 @@ namespace Armoury
         private static readonly Dictionary<Settlement, float[]> _regDay = new Dictionary<Settlement, float[]>();
         private static readonly double[] _peopleDay = new double[BKinds];
         private static readonly Dictionary<string, float[]> _regOut = new Dictionary<string, float[]>();
-        // przekazania z modulow (U8) + dopelnienie od zerowania do migawki
-        private static float _pendFleeV, _pendFleeC, _advFleeV, _advFleeC;
-        private static float _pendMis, _pendRaid, _pendBack, _advMis, _advRaid, _advBack;
-        private static float _noVillage, _forage, _seedMen; private static int _forageN; private static bool _seedIn, _seedSeen;
+        // przekazania z modulow (U8): od E4/3 hearth ruchow ludzi z ksiegi (PeopleBook.TakeHearth40 w Daily)
+        private static float _noVillage, _forage; private static int _forageN;
         // W10 / W11 / zaraza
         private const int PLord = 0, PGarrison = 1, PMilitia = 2, PBandit = 3, POthers = 4, PPlayer = 5, POther = 6, PKinds = 7;
         private static readonly string[] PName = { "partie rodow", "zalogi", "milicje", "bandy", "Inni", "gracz", "inne" };
         private static readonly int[] _taken = new int[PKinds], _rescued = new int[PKinds];
         private static int _lootRemoved, _lootBattles, _capBattles, _bkRaidPris, _bkRaidPlayer, _bkRaidN;
+        private static int _rescueFallen;   // E4/2 (f): odbici przez Innych - zdjeci ze skladu bandy jako polegli PRZED finalizerem W10 (OthersRise.RescueFin)
         private static readonly Dictionary<string, int> _diseaseByCulture = new Dictionary<string, int>();
         private static readonly int[] _diseaseByGroup = new int[PeopleLedger.Groups];
         private static int _diseaseDead, _diseaseUnhit;
@@ -143,9 +144,6 @@ namespace Armoury
             {
                 ZeroDay();
                 _hLast.Clear(); _kLast.Clear(); _pLast.Clear(); _cultLast.Clear(); _cultStart.Clear(); _regOut.Clear();
-                _pendFleeV = _pendFleeC = _advFleeV = _advFleeC = 0f;
-                _pendMis = _pendRaid = _pendBack = _advMis = _advRaid = _advBack = 0f;
-                _seedMen = 0f; _seedIn = false; _seedSeen = false;
                 _diseaseByCulture.Clear(); Array.Clear(_diseaseByGroup, 0, _diseaseByGroup.Length); _diseaseDead = _diseaseUnhit = 0;
                 _prisLastP = _prisLastL = -1; _food0 = -1;
                 _stumbles = _stumblesSess = 0; _stumbleAt.Clear(); _errSites.Clear(); _startLogged = false;
@@ -160,7 +158,7 @@ namespace Armoury
             _cartNewH = _cartRefH = _fishNewH = _fishRefH = _raidH = _decreeH = 0; _raidGoldAi = _raidGoldPlayer = 0; _raidVill.Clear();
             _regDay.Clear(); Array.Clear(_peopleDay, 0, BKinds);
             _noVillage = 0f; _forage = 0f; _forageN = 0;
-            Array.Clear(_taken, 0, PKinds); Array.Clear(_rescued, 0, PKinds); _lootRemoved = _lootBattles = _capBattles = _bkRaidPris = _bkRaidPlayer = _bkRaidN = 0;
+            Array.Clear(_taken, 0, PKinds); Array.Clear(_rescued, 0, PKinds); _lootRemoved = _lootBattles = _capBattles = _bkRaidPris = _bkRaidPlayer = _bkRaidN = 0; _rescueFallen = 0;
         }
 
         // ------------------------------------------------------------ pomocnicze (tylko odczyt)
@@ -168,9 +166,10 @@ namespace Armoury
         private static string S0(double v) { return (v >= 0 ? "+" : "") + v.ToString("0", Inv); }
         private static string F2(double v) { return v.ToString("0.00", Inv); }
 
+        /// <summary>Ludzi tabeli na punkt hearth wsi / dobrobytu miasta tej osady - od E4/3 k na osade (PopulationLaw.KFor; przy wylaczonej jednostce k kultury, jak dotad).</summary>
         private static float KOf(Settlement st, bool town)
         {
-            try { return st != null && st.Culture != null ? PopulationLaw.KOf(st.Culture.StringId, town) : 0f; } catch { return 0f; }
+            try { return st != null ? PopulationLaw.KFor(st) : 0f; } catch { return 0f; }
         }
 
         /// <summary>Kultura osady z pierwszej doby sesji (U3) - migawka przy pierwszym odczycie w kampanii; bez migawki biezaca.</summary>
@@ -498,7 +497,9 @@ namespace Armoury
                     if (!mep.IsNpcParty) continue;      // gracz: PlayerEncounter tworzy te rostery leniwie (pole w zapisie) - nie dotykamy; jego jency ida przez ekran lupu, poza oknem
                     var r = prisoners ? mep.RosterToReceiveLootPrisoners : mep.RosterToReceiveLootMembers;
                     if (r == null || Has(w.R, r)) continue;
-                    w.R.Add(r); w.Kind.Add(KindOf(mep.Party)); w.Before.Add(r.TotalRegulars);
+                    int kind = KindOf(mep.Party);
+                    // E4/2 (f): u band Innych "odbici wcieleni" to tylko ZYWI (wighty z odbitych dopisuje OthersRise przed tym finalizerem - sa w linii E4/2)
+                    w.R.Add(r); w.Kind.Add(kind); w.Before.Add(kind == POthers && !prisoners ? OthersRise.LivingRegulars(r) : r.TotalRegulars);
                 }
                 catch (Exception e) { Stumble("W10(odbiorca)", e); }
             }
@@ -536,7 +537,8 @@ namespace Armoury
                     _lootBattles++; _lootRemoved += __state.DefBefore - after;
                     for (int i = 0; i < __state.R.Count; i++)
                     {
-                        int d = __state.R[i].TotalRegulars - __state.Before[i];
+                        int now = __state.Kind[i] == POthers ? OthersRise.LivingRegulars(__state.R[i]) : __state.R[i].TotalRegulars;   // E4/2: Inni - zywi
+                        int d = now - __state.Before[i];
                         if (d > 0) _rescued[__state.Kind[i]] += d;
                     }
                 }
@@ -580,6 +582,8 @@ namespace Armoury
 
         /// <summary>Wzrost Innych (169c): odbici jency wcieleni do band Innych w tej dobie (zywi ludzie - dzis w "reszcie" linii 169c; U6).</summary>
         internal static int RescuedToOthers { get { lock (Gate) return _rescued[POthers]; } }
+        /// <summary>E4/2 (f): odbici jency zdjeci ze skladu bandy Innych jako polegli (OthersRise) - w linii Jency osobno, nie w "bez odbiorcy".</summary>
+        internal static void NoteRescuedFallen(int n) { try { if (!On || n <= 0) return; lock (Gate) _rescueFallen += n; } catch (Exception e) { Stumble("NoteRescuedFallen", e); } }
         internal static int TakenByOthers { get { lock (Gate) return _taken[POthers]; } }
 
         // ============================================================ W11: jency z rabunku BK
@@ -617,42 +621,7 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteHearth", e); }
         }
 
-        /// <summary>OutlawLaw.Daily - tuz przed zerowaniem: ludzie z biedy, z rabunku (w las) i powrot z puli do hearth od ostatniego zerowania.</summary>
-        internal static void TakeOutlaw(float raid, float misery, float back, float per)
-        {
-            try
-            {
-                lock (Gate)
-                {
-                    _pendRaid += raid - _advRaid; _pendMis += misery - _advMis; _pendBack += back - _advBack;
-                    _advRaid = _advMis = _advBack = 0f;
-                }
-            }
-            catch (Exception e) { Stumble("TakeOutlaw", e); }
-        }
-
-        /// <summary>LosersFlee.Daily (finally, przed ClearDay): hearth dopisany taborom (do swojej wsi) i prostym/bandytom (ToCommon) od ostatniego zerowania.</summary>
-        internal static void TakeFlee(float toVillageH, float toCommonH)
-        {
-            try
-            {
-                lock (Gate)
-                {
-                    _pendFleeV += toVillageH - _advFleeV; _pendFleeC += toCommonH - _advFleeC;
-                    _advFleeV = _advFleeC = 0f;
-                }
-            }
-            catch (Exception e) { Stumble("TakeFlee", e); }
-        }
-
-        /// <summary>OutlawLaw.Seed: siew puli wyrzutkow (zabrani z wsi) - osobno, poza RESZTA (U10).</summary>
-        internal static void TakeSeed(float men)
-        {
-            try { lock (Gate) { _seedMen += men; _seedIn = _hLast.Count > 0; _seedSeen = true; } }
-            catch (Exception e) { Stumble("TakeSeed", e); }
-        }
-
-        /// <summary>OutlawLaw.Daily: powrot z puli w regionie bez wsi - ludzie zeszli z puli, ReturnHome nic nie dopisal (licznik "powrot do wsi" ich liczy).</summary>
+        /// <summary>OutlawLaw.Daily: powrot z puli bez regionu z wsiami - ludzie zeszli z puli, ReturnHome nic nie dopisal (od E4/3 region bez wsi oddaje do najblizszego z wsiami).</summary>
         internal static void NoteReturnNoVillage(float men)
         {
             try { if (men > 0f) lock (Gate) _noVillage += men; }
@@ -714,23 +683,14 @@ namespace Armoury
         {
             long t0 = Stopwatch.GetTimestamp();
             if (Campaign.Current == null) return;
-            // dopelnienie "od zerowania do migawki": zywe liczniki modulow (zawsze - bez tego wlaczenie klucza w trakcie dawaloby zla dobe)
-            float liveFleeV = 0f, liveFleeC = 0f, liveRaid = 0f, liveMis = 0f, liveBack = 0f;
-            try { liveFleeV = LosersFlee.ToVillageHearthNow; liveFleeC = LosersFlee.ToCommonHearthNow; } catch (Exception e) { Stumble("Daily(LosersFlee)", e); }
-            try { liveRaid = OutlawLaw.RaidMenNow; liveMis = OutlawLaw.MiseryMenNow; liveBack = OutlawLaw.ReturnMenNow; } catch (Exception e) { Stumble("Daily(OutlawLaw)", e); }
-            float dFleeV, dFleeC, dRaid, dMis, dBack;
-            lock (Gate)
-            {
-                dFleeV = _pendFleeV + liveFleeV - _advFleeV; dFleeC = _pendFleeC + liveFleeC - _advFleeC;
-                dRaid = _pendRaid + liveRaid - _advRaid; dMis = _pendMis + liveMis - _advMis; dBack = _pendBack + liveBack - _advBack;
-                _advFleeV = liveFleeV; _advFleeC = liveFleeC; _advRaid = liveRaid; _advMis = liveMis; _advBack = liveBack;
-                _pendFleeV = _pendFleeC = _pendRaid = _pendMis = _pendBack = 0f;
-            }
+            // E4/3: hearth ruchow ludzi z ksiegi od ostatniej migawki (zawsze - bez tego wlaczenie klucza w trakcie dawaloby zla dobe)
+            var mv = new double[PeopleBook.MKinds];
+            try { PeopleBook.TakeHearth40(mv); } catch (Exception e) { Stumble("Daily(PeopleBook)", e); }
             if (!On)
             {
                 lock (Gate)
                 {
-                    ZeroDay(); _hLast.Clear(); _kLast.Clear(); _pLast.Clear(); _cultLast.Clear(); _regOut.Clear(); _seedMen = 0f; _seedSeen = false;
+                    ZeroDay(); _hLast.Clear(); _kLast.Clear(); _pLast.Clear(); _cultLast.Clear(); _regOut.Clear();
                     _diseaseByCulture.Clear(); Array.Clear(_diseaseByGroup, 0, _diseaseByGroup.Length); _diseaseDead = _diseaseUnhit = 0;
                     _milV = _milT = _milC = 0; _prisLastP = _prisLastL = -1;
                 }
@@ -741,7 +701,7 @@ namespace Armoury
             try { EnsureCultures(); } catch (Exception e) { Stumble("EnsureCultures", e); }
             string cultTxt = "-"; double cultPeople = 0; int cultN = 0;
             try { cultTxt = CultureChanges(out cultN, out cultPeople); } catch (Exception e) { Stumble("CultureChanges", e); }
-            try { Log.Info(HearthLine(day, dFleeV, dFleeC, dRaid, dMis, dBack, cultN, cultTxt, cultPeople, t0)); } catch (Exception e) { Stumble("HearthLine", e); }
+            try { Log.Info(HearthLine(day, mv, cultN, cultTxt, cultPeople, t0)); } catch (Exception e) { Stumble("HearthLine", e); }
             try { Log.Info(ProsperityLine(day)); } catch (Exception e) { Stumble("ProsperityLine", e); }
             try { Log.Info(PrisonersLine(day)); } catch (Exception e) { Stumble("PrisonersLine", e); }
             try { Log.Info(WinterLine(day)); } catch (Exception e) { Stumble("WinterLine", e); }
@@ -787,7 +747,7 @@ namespace Armoury
             var s = Settings.Current;
             bool d169 = s != null && s.ClanIncomeBookEnabled && s.ClanIncomeBookStableD;
             sb.Append(" | dane 169c (niewolni BK w \"Krainy\", Inni w \"Wzrost Innych\", milicja w \"Zalogi\"): ").Append(d169 ? "TAK" : "BRAK").Append(" - ClanIncomeBookEnabled + StableD")
-              .Append(" | przekazania licznikow: OutlawLaw (bieda, rabunek, powrot, siew), LosersFlee (tabory i prosci do wsi), ScorchedEarth (zerowanie, blizna), CampFever (zaraza)")
+              .Append(" | przekazania licznikow: ksiega ludzi PeopleBook (E4/3: wyrzutki, powroty z puli i z bitew, rozwiazane tabory, pobor i zadania gracza, siew), ScorchedEarth (zerowanie, blizna), CampFever (zaraza)")
               .Append(" | linie raz na dobe przy LogEnabled + PeopleMeasureEnabled (teraz: ").Append(On ? "TAK" : "NIE").Append(").");
             return sb.ToString();
         }
@@ -798,6 +758,7 @@ namespace Armoury
             n = 0; people = 0;
             var list = new List<string>();
             bool first = _cultLast.Count == 0;
+            bool frozen = PeopleUnit.On;      // E4/3 (U3): k na osade - zmiana kultury nie zmienia ludzi
             foreach (var st in Settlement.All)
             {
                 try
@@ -809,23 +770,24 @@ namespace Armoury
                     {
                         n++;
                         if (list.Count < 12) list.Add((st.Name != null ? st.Name.ToString() : st.StringId) + " " + old + " -> " + c);
-                        float kOld = st.IsVillage ? PopulationLaw.KOf(old, false) : (st.IsTown ? PopulationLaw.KOf(old, true) : 0f);
-                        float kNew = st.IsVillage ? PopulationLaw.KOf(c, false) : (st.IsTown ? PopulationLaw.KOf(c, true) : 0f);
-                        float units = st.IsVillage && st.Village != null ? Math.Max(0f, st.Village.Hearth) : (st.IsTown && st.Town != null ? Math.Max(0f, st.Town.Prosperity) : 0f);
-                        people += (double)units * (kNew - kOld);
+                        if (!frozen)
+                        {
+                            float kOld = st.IsVillage ? PopulationLaw.KOf(old, false) : (st.IsTown ? PopulationLaw.KOf(old, true) : 0f);
+                            float kNew = st.IsVillage ? PopulationLaw.KOf(c, false) : (st.IsTown ? PopulationLaw.KOf(c, true) : 0f);
+                            float units = st.IsVillage && st.Village != null ? Math.Max(0f, st.Village.Hearth) : (st.IsTown && st.Town != null ? Math.Max(0f, st.Town.Prosperity) : 0f);
+                            people += (double)units * (kNew - kOld);
+                        }
                     }
                     _cultLast[st] = c;
                 }
                 catch (Exception e) { Stumble("CultureChanges(osada)", e); }
             }
             if (first) return "pierwsza doba sesji";
-            return n == 0 ? "-" : string.Join("; ", list.ToArray()) + (n > list.Count ? "; ..." : "");
+            return (n == 0 ? "-" : string.Join("; ", list.ToArray()) + (n > list.Count ? "; ..." : "")) + (frozen && n > 0 ? "; k na osade (E4/3) - ludzie bez zmian" : "");
         }
 
-        private static string HearthLine(int day, float fleeV, float fleeC, float raidMen, float misMen, float backMen, int cultN, string cultTxt, double cultPeople, long t0)
+        private static string HearthLine(int day, double[] mv, int cultN, string cultTxt, double cultPeople, long t0)
         {
-            var s = Settings.Current;
-            float perRaw = s != null ? s.OutlawHearthPerMan : 0.5f, perMax = Math.Max(0.01f, perRaw);
             // migawka wsi
             double H = 0, peopleNow = 0, dPeople = 0, dHRegions = 0; int nv = 0, low = 0, mid = 0, high = 0;
             bool first = _hLast.Count == 0;
@@ -870,10 +832,12 @@ namespace Armoury
             _kLast.Clear(); foreach (var kv in kNow) _kLast[kv.Key] = kv.Value;
 
             double cartsH = _cartNewH + _cartRefH, fishH = _fishNewH + _fishRefH;
-            double o1 = misMen * perMax, o2 = raidMen * perMax, o3 = (backMen - _noVillage) * perRaw + fleeC, o4 = fleeV, o5 = _forage;
-            double seedH = _seedMen * perMax;
-            bool seedInside = _seedSeen && _seedIn;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 - (seedInside ? seedH : 0);
+            // E4/3: nasze ruchy hearth za ludzi wprost z ksiegi (PeopleBook.Move; znak: + gdy wies zyskuje). Tabory i lodzie gry (MCart) mierza okna W3-W5 - nie drugi raz.
+            double o1 = -mv[PeopleBook.MMisery], o2 = -mv[PeopleBook.MRaidFlee], o3 = mv[PeopleBook.MPoolHome] + mv[PeopleBook.MCommon], o4 = mv[PeopleBook.MH3Cart], o5 = _forage;
+            double o6 = mv[PeopleBook.MDisband], o7 = mv[PeopleBook.MPress] + mv[PeopleBook.MQuest] + mv[PeopleBook.MIncident];
+            double seedH = -mv[PeopleBook.MSeed];
+            bool seedInside = !first && seedH != 0;
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 - (seedInside ? seedH : 0);
             double dH = H - Hlast;
             double rest = dH - named;
             double restModel = _vModel - _vBaseMul - _vScar;
@@ -887,19 +851,21 @@ namespace Armoury
                   .Append(", reszta modelu (perki, budynki, polityki, BK, BKROT, zadania) ").Append(S(restModel))
                   .Append(", podloga 10 +").Append(F2(_vFloor)).Append(" w ").Append(_vFloorN).Append(" wsiach, niezgodnosc ticku z modelem ").Append(S(_vOdd)).Append(" w ").Append(_vOddN).Append(" wsiach]")
                   .Append(" + dekret Growth BK ").Append(S(_decreeH)).Append(" (").Append(_decreeN).Append(" wsi)")
-                  .Append(" - tabory wsi -").Append(F2(cartsH)).Append(" (nowe ").Append(_cartNewN).Append(", uzupelnienia ").Append(_cartRefN).Append("; ludzi ").Append(_cartNewMen + _cartRefMen).Append("; gra: (n+1)/2)")
+                  .Append(" - tabory wsi -").Append(F2(cartsH)).Append(" (nowe ").Append(_cartNewN).Append(", uzupelnienia ").Append(_cartRefN).Append("; ludzi ").Append(_cartNewMen + _cartRefMen)
+                  .Append(PeopleUnit.On ? "; od E4/3: n/k osady, gra: (n+1)/2)" : "; gra: (n+1)/2)")
                   .Append(" - lodzie rybackie -").Append(F2(fishH)).Append(" (nowe ").Append(_fishNewN).Append(", uzupelnienia ").Append(_fishRefN).Append("; ludzi ").Append(_fishNewMen + _fishRefMen).Append(')')
                   .Append(" - rabunek gry -").Append(F2(_raidH)).Append(" (krokow ").Append(_raidSteps).Append(", wsi ").Append(_raidVill.Count).Append("; lup z niczego ").Append(_raidGoldAi + _raidGoldPlayer)
                   .Append(" zl, w tym gracz ").Append(_raidGoldPlayer).Append(')')
-                  .Append(" + nasze (z licznikow modulow): wyrzutki w las (bieda) -").Append(F2(o1)).Append(", spalona wies w las -").Append(F2(o2))
+                  .Append(" + nasze (ksiega ludzi PeopleBook.Move, E4/3): wyrzutki w las (bieda) -").Append(F2(o1)).Append(", spalona wies w las -").Append(F2(o2))
                   .Append(", powrot do wsi (OutlawLaw z puli + LosersFlee ToCommon) +").Append(F2(o3)).Append(", rozbite tabory do swojej wsi +").Append(F2(o4))
+                  .Append(", rozwiazane tabory i lodzie do swojej wsi (R18) +").Append(F2(o6)).Append(", gracz (pobor wymuszony, zadania, incydenty) ").Append(S(o7))
                   .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)");
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
-            if (_seedSeen) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");
+            if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");
             sb.Append(" | zmiana kultury osad: ").Append(cultN).Append(" (").Append(cultTxt).Append("), ludzie tabeli ").Append(S0(cultPeople)).Append(" (U3)");
             if (!first)
-                sb.Append(" | RESZTA ").Append(S(rest)).Append(" (zadania, pobor wymuszony i incydenty gracza, inwestycje BEE, konsola, inne mody)");
+                sb.Append(" | RESZTA ").Append(S(rest)).Append(" (inwestycje BEE, konsola, inne mody; od E4/3 zadania, pobor wymuszony i incydenty gracza nazwane w \"nasze\")");
             sb.Append(" | wsie wedlug progow 200/600: ").Append(low).Append(" / ").Append(mid).Append(" / ").Append(high);
             if (!first && PopulationLaw.Calibrated)
             {
@@ -912,7 +878,6 @@ namespace Armoury
             sb.Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * f).ToString("0.0", Inv)).Append(" ms (linia Hearth; model hearth w oknie ticku wsi ").Append((_modelTicks * f).ToString("0.0", Inv)).Append(" ms)");
             if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles);
             sb.Append('.');
-            if (_seedSeen) { _seedMen = 0f; _seedSeen = false; }
             return sb.ToString();
         }
 
@@ -984,7 +949,8 @@ namespace Armoury
             sb.Append("; zaloga i milicja oddaja do lochu osady; Inni - skasowani przez ROT w linii \"Wzrost Innych\"; gracz - ekran lupu, poza oknem)")
               .Append(" | z niewoli pokonanych zabrano ").Append(_lootRemoved).Append(" w ").Append(_lootBattles).Append(" bitwach: odbici i wcieleni do skladu zwyciezcy -").Append(rescued).Append(" (");
             for (int i = 0; i < PKinds; i++) { if (i == PPlayer) continue; sb.Append(i > 0 ? ", " : "").Append("do " + PName[i]).Append(' ').Append(_rescued[i]); }
-            sb.Append("), bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued))
+            sb.Append("), odbici przez Innych - polegli (E4/2) ").Append(_rescueFallen)
+              .Append(", bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued - _rescueFallen))
               .Append(" | z rabunku BK +").Append(_bkRaidPris).Append(" w ").Append(_bkRaidN).Append(" rabunkach (z niczego; gracz ").Append(_bkRaidPlayer).Append(')')
               .Append(" | wypuszczeni, sprzedani, na Mur, straceni - linia \"Prawo jenca (I1)\"; uwolnieni bez odbiorcy w bitwach H3 - linia \"Przegrani (H3)\"; jency rozwiazanych partii - linia \"Partie (E4/0)\"");
             sb.Append(" | czas ").Append(Ms(t0)).Append(" ms.");

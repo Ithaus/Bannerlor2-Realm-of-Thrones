@@ -140,6 +140,21 @@ namespace Armoury
             catch { _e40Stumbles++; }
         }
 
+        /// <summary>E4/2: sklad nowej partii zmieniony jeszcze w zdarzeniu utworzenia (banda Innych przycieta do puli cial w postfiksie nasluchu ROT) -
+        /// jesli nasz nasluch juz ja policzyl (kolejnosc nasluchow zalezy od kolejnosci zachowan), poprawka o roznice; jesli nie - policzy juz sklad po przycieciu.</summary>
+        internal static void FixCreatedMen(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || !Measure40.On) return;
+                int was; if (!_pCreatedMen.TryGetValue(mp, out was)) return;
+                int now = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0, d = now - was;
+                if (d == 0) return;
+                _nNewMen[NKindOf(mp)] += d; _pCreatedMen[mp] = now; _gNewMen[GroupOf(mp.MapFaction, mp)] += d;
+            }
+            catch { _e40Stumbles++; }
+        }
+
         /// <summary>E4/0: partia zniszczona (z niszczycielem = w bitwie - ostatni stan dobowy) albo rozwiazana (sklad przy rozwiazaniu - gra czysci go po zdarzeniu).</summary>
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
@@ -202,6 +217,7 @@ namespace Armoury
             _goneBattleN = _goneBattleMen = _goneDisbN = _goneDisbHealthy = _goneDisbWounded = _goneDisbPris = _goneBandN = _goneBandMen = _goneWights = 0;
             _goneGameN = _goneGameHealthy = _goneGameWounded = _goneRemovedN = _goneRemovedMen = _e40Stumbles = 0;
             _pCreatedMen.Clear(); _pDestroyed.Clear();
+            try { PeopleBook.ZeroDisband40(); } catch { }   // E4/3 (R18): ludzie rozwiazanych taborow, ktorzy wrocili do wsi - to samo okno co liczniki linii Partie
         }
 
         private static int KindOf(MobileParty mp)
@@ -631,8 +647,10 @@ namespace Armoury
             sb.Append(" | zniknely: rozbite w bitwie ").Append(_goneBattleN).Append(" (ostatni stan ").Append(_goneBattleMen).Append(" ludzi)")
               .Append(", rozwiazane ").Append(_goneDisbN).Append(" (przy rozwiazaniu zdrowi ").Append(_goneDisbHealthy).Append(", ranni ").Append(_goneDisbWounded)
               .Append(", jency ").Append(_goneDisbPris).Append(" - znikaja z partia; w tym tabory i lodzie rozwiazane przez gre bez bitwy ").Append(_goneGameN)
-              .Append(", zdrowi ").Append(_goneGameHealthy).Append(", ranni ").Append(_goneGameWounded).Append(" - R18)")
-              .Append(", bandy rozwiazane do puli wyrzutkow ").Append(_goneBandN).Append(" (ludzi ").Append(_goneBandMen).Append("; w tym wighty z rozwiazanych band do puli ").Append(_goneWights).Append(')')
+              .Append(", zdrowi ").Append(_goneGameHealthy).Append(", ranni ").Append(_goneGameWounded).Append(" - R18; wrocili do swojej wsi (E4/3) ").Append(PeopleBook.Disband40)
+              .Append(", kontrola zdrowi + ranni - wrocili = ").Append(_goneGameHealthy + _goneGameWounded - PeopleBook.Disband40).Append(")")
+              .Append(", bandy rozwiazane do puli wyrzutkow ").Append(_goneBandN).Append(" (ludzi ").Append(_goneBandMen).Append("; w tym wighty z rozwiazanych band do puli ").Append(_goneWights)
+              .Append(Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen ? " - przy E4/2 do niczego, OutlawLaw ich nie dopisuje)" : ")")
               .Append(", usuniete bez zniszczenia ").Append(_goneRemovedN).Append(" (ostatni stan ").Append(_goneRemovedMen).Append(" ludzi)")
               .Append(" | partii na mapie ").Append(snap.Count);
             if (_e40Stumbles > 0) sb.Append(" | potkniecia ").Append(_e40Stumbles);

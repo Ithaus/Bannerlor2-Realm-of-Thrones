@@ -141,7 +141,7 @@ namespace Armoury
                     int n = Math.Min(kv.Value, roster.GetTroopCount(ch));
                     if (n <= 0) continue;
                     if (Undead.Character(ch)) continue;          // wight w partii ludzi (ROT occupation="Soldier") - nie do ludnosci BK, niezaleznie od W4b
-                    if (village != null && ClanBudget.ToVillagePop(village, ch, n))
+                    if (village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c))
                     {
                         if (sent == null) sent = new Dictionary<CharacterObject, int>();
                         int v; sent.TryGetValue(ch, out v); sent[ch] = v + n;
