@@ -1139,3 +1139,8 @@ ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841
 - (5) Kiesa bandy przylaczajacej sie do gracza - do gracza (TAK); podatek BK od warsztatow lordow/gracza w cudzych miastach - placi wlasciciel panu miasta (TAK);
   napitki i drewno wojska - placi WOJSKO (sakiewki zolnierzy, jak odziez 150); wedrowcy BK z prawdziwym towarem - TAK; doplata podmiany rekruta ROT i werdykt
   "pokonany" dla druzyn lordow - Jeff prosi o wyjasnienie.
+- (02:50) (2) Kara morale za przegrana bitwe - O POLOWE (Jeff: "zmniejsz kare o polowe"; fala po klesce ma zabierac ok. 1/8-1/6 skladu zamiast 1/4-1/3);
+  (5) doplata za podmiane rekruta ROT - do sakiewki zolnierzy tej druzyny (jak awanse E3/5) - TAK; sakiewka zniszczonej druzyny lorda tylko dla prawdziwego zwyciezcy bitwy
+  (werdykt 3.2 takze dla druzyn lordow; bez zwyciezcy - kasa najblizszego miasta) - TAK.
+  Paczka "D11" (decyzje 11.10): kara za przegrana /2, kiesa bandy przylaczajacej sie -> gracz, podatek warsztatow lordow/gracza placi wlasciciel panu miasta, napitki i
+  drewno wojska z sakiewek zolnierzy, doplata ROT do sakiewek, werdykt dla lordow. Osobno pozniej: wedrowcy BK z prawdziwym towarem (wiekszy krok).
