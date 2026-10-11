@@ -393,8 +393,11 @@ def baseline_of(lines, rows=None, start=None, balp=None):
 
 def etap3_main(logp, start_arg):
     """3.1 (31, E3/0): progi fali 1 etapu 3 (projekt PROJEKT-ETAP3-SZCZELNOSC-STATKI, rozdz. 5) i kontrolki "prog 0" kawalkow fali 2 tego drzewa.
-    Fala 1: |R| srednia 28 dob < 10 000 (w dobie 40 i na koncu), RB3 |srednia| < 500, ARYTMETYKA OK, linia "Szczelnosc (164a)" codziennie, potkniecia 0,
-    bledy 0; pomiar statkow, U8r i Innych - liczby (INFO). Fala 2 (gdy kawalki w logu): "bez platnika", "miasto ponizej zapasu kupcow", "bez odbiorcy" = 0."""
+    Fala 1: |R| srednia 28 dob < 10 000 (w dobie 40 i na koncu), RB3 |srednia| < 500, probki swiata wokol okien "rozjazd 0", linia "Szczelnosc (164a)"
+    codziennie, potkniecia 0, bledy 0; pomiar statkow, U8r i Innych - liczby (INFO). Fala 2 (gdy kawalki w logu): "bez platnika", "miasto ponizej zapasu
+    kupcow", "bez odbiorcy" = 0.
+    Poprawka po recenzji 3.1+3.3: "ARYTMETYKA OK" to tozsamosc algebraiczna (R jest zdefiniowane z tych samych sum, ar1 = ar2 = 0 zawsze) - nie wykryje
+    bledu znaku ani pominiecia pozycji (S31/U31/N31); zostaje jako INFO. Dowod szczelnosci: R, RB i probki swiata (zmiana swiata wobec pozycji nazwanych)."""
     lines = read(logp)
     rep = Report()
     cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
@@ -427,7 +430,12 @@ def etap3_main(logp, start_arg):
         m = st.mean(rb3)
         rep.add("RB3 (od budow do korony) - srednia 28 dob", f"{m:.0f}", "|sr.| < 500 (portfele wezwan nazwane)", abs(m) < 500)
     bad = [d for d in days if "ARYTMETYKA OK" not in cau[d]]
-    rep.add("arytmetyka linii przyczyn", f"bledy w {len(bad)} z {len(days)} dob", "0", len(bad) == 0 if days else None)
+    rep.add("arytmetyka linii przyczyn (tozsamosc - bez mocy dowodowej)", f"bledy w {len(bad)} z {len(days)} dob", "INFO (dowod: R, RB, probki)", None)
+    # prawdziwa kontrola pozycji nazwanych (takze S31/U31/N31 - Seal31.AddWorld idzie do NamedRun): probki swiata wokol okien, rozjazd 0
+    win = by_day(lines, "Obieg: okna (kontrolka): dzien")
+    prb = [num(r"probki swiata wokol okien \[P\]: \d+ \(zgodne \d+; rozjazd (\d+)", win[d]) for d in sorted(win)]
+    prb = [x for x in prb if x is not None]
+    rep.add("probki swiata wokol okien - rozjazd (suma dob)", sum(prb) if prb else "brak probek", "0", (sum(prb) == 0) if prb else None)
     # linia 164a codziennie, potkniecia 0
     miss = [d for d in days if d not in sea]
     rep.add("linia Szczelnosc (164a) codziennie", f"brak w {len(miss)} z {len(days)} dob", "0", len(miss) == 0 if days else None)

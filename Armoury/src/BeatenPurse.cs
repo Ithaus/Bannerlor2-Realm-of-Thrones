@@ -110,6 +110,20 @@ namespace Armoury
             Array.Clear(_dWin, 0, T); Array.Clear(_odd, 0, T); Array.Clear(_oddN, 0, T); Array.Clear(_yield, 0, T); Array.Clear(_yieldN, 0, T);
             _yieldBribe = 0;
             _beaten.Clear();
+            _verdictParty = null; _verdictBeaten = false;
+        }
+
+        // 3.1 (poprawka po recenzji 3.1+3.3, W13 - jedna regula kiesa/sakiewka): werdykt "pokonana w tej bitwie przez przywodce zwyciezcow" dla partii
+        // niszczonej TERAZ - nasluch MenPurse.OnPartyDestroyed biegnie po naszym (dopisany wczesniej; gra wola nasluchy od ostatniego) i bierze ten sam werdykt
+        // dla sakiewki ludzi karawany (Seal31B.PurseOfBeaten). Tylko odczyt, bez zlota.
+        private static MobileParty _verdictParty;
+        private static bool _verdictBeaten;
+
+        /// <summary>true = 3.2 czynne, partia niszczona teraz to karawana z niszczycielem, ktorej 3.2 NIE uznala za pokonana w bitwie przez przywodce
+        /// zwyciezcow (przypadek "poza regula": zwycieska strona bez ludzi, przylaczenie, zadania, upadek rodu).</summary>
+        internal static bool CaravanNotBeatenNow(MobileParty mp)
+        {
+            return On && mp != null && mp.IsCaravan && ReferenceEquals(_verdictParty, mp) && !_verdictBeaten;
         }
 
         /// <summary>Wyjatek przy jednym zdarzeniu: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -271,6 +285,10 @@ namespace Armoury
                 MapEvent ev = null;
                 bool known = _beaten.TryGetValue(party, out ev);
                 if (known) _beaten.Remove(party);
+                // werdykt dla sakiewki (MenPurse - po nas): to samo wyrazenie co "beaten" nizej
+                _verdictParty = party;
+                _verdictBeaten = known && ev != null && destroyer != null && ev.IsFinalized && ev.WinningSide != BattleSideEnum.None
+                                 && ReferenceEquals(destroyer, ev.GetLeaderParty(ev.WinningSide));
                 if (!On || !Live) return;
                 if (party.IsVillager || (party.IsLordParty && party.LeaderHero != null)) return;   // tabor wsi - 112; kiesa wodza zostaje z wodzem
                 int t = TypeOf(party);
@@ -473,6 +491,10 @@ namespace Armoury
                 long cartLords = VillageTakings.CartToLords, cartBands = VillageTakings.CartToBands;
                 long toBandsAll = _toBands + _dBands + cartBands;
                 var sb = new StringBuilder(1024);
+                // poprawka po recenzji 3.1+3.3: od E3/7 kiesy rozwiazanych i "poza regula" nie znikaja (gdy Caravan Capital Real wlaczone)
+                string gone7 = CaravanCapital.On
+                    ? "E3/7: kiesa do glowy rodu wlasciciela (karawana notabla - notabl), bez glowy i bandy - do kasy najblizszego miasta; linia Szczelnosc (164a), kapital (164a-6)"
+                    : "Caravan Capital Real wylaczone - jak dotad znika, w \"kiesy partii bez wodza, ktore zniknely\"";
                 sb.Append("Kiesy rozbitych (3.2): dzien ").Append(day);
                 if (!On) sb.Append(" | WYLACZONE (Beaten Purse To Victor) - lup z kies jak w grze (10% taboru i karawany, 50% bandy), reszta znika z partia");
                 sb.Append(" | zloto rozbitych do zwyciezcow: tabory ").Append(_paid[TVill] + cartLords + cartBands).Append(", bandy ").Append(_paid[TBand] + _dWin[TBand])
@@ -492,9 +514,9 @@ namespace Armoury
                   .Append(", najblizszemu miastu ").Append(_dTown).Append(", zniklo ").Append(_dLost)
                   .Append(" | poddane graczowi bez bitwy (kiesa oddana w rozmowie, korona 1/9 jak z bitwy): tabory ").Append(_yield[TVill]).Append(" (").Append(_yieldN[TVill])
                   .Append("), karawany ").Append(_yield[TCar]).Append(" (").Append(_yieldN[TCar]).Append("); w tym okup za przepuszczenie ").Append(_yieldBribe)
-                  .Append(" | rozwiazane bez bitwy (poza regula - jak dotad w \"kiesy partii bez wodza, ktore zniknely\"): bandy ").Append(_disb[TBand]).Append(" (").Append(_disbN[TBand])
+                  .Append(" | rozwiazane bez bitwy (").Append(gone7).Append("): bandy ").Append(_disb[TBand]).Append(" (").Append(_disbN[TBand])
                   .Append("), karawany ").Append(_disb[TCar]).Append(" (").Append(_disbN[TCar]).Append(")")
-                  .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula jak rozwiazane, znika): bandy ")
+                  .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula 3.2, jak rozwiazane: ").Append(gone7).Append("): bandy ")
                   .Append(_odd[TBand]).Append(" (").Append(_oddN[TBand]).Append("), karawany ").Append(_odd[TCar]).Append(" (").Append(_oddN[TCar]).Append(")")
                   .Append(" | ksiega: kiesy pokonanych zdjete bez zdarzenia ").Append(paid).Append(" (NETTO \"bitwy - zloto partii bez wodza\"), z tego wodzom zdarzeniem gry z niczego ")
                   .Append(_toLords).Append(" (ZRODLA \"bitwy\") i kiesom partii bez wodza ").Append(_toBands + _toParties).Append(" (NETTO) - przelew, nie zrodlo");

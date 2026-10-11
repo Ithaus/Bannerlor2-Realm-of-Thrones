@@ -228,8 +228,11 @@ namespace Armoury
                 // zostaje to, co ktos naprawde placi: podatek od cudzych warsztatow (BK pobiera go od wlascicieli), dochod
                 // kopalni i koszt materialow budow - inaczej te pieniadze znikaly w nicosc, a pan nie placil za budowy
                 float kept = KeptTownLines(__0);
-                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept - Seal31B.NotableTaxLines(__0), __1, _txtRent);   // 3.1/3.3 (31b) E3/8a: warsztaty notabli placa panu przelewem (BkWorkshopTaxToLord) - bez linii z niczego
-                CouncilWages35.TownBase(__0, kept);   // 3.5a: pensje rady BK od tego podatku i renty, nie od zastapionego podatku klas ludnosci (wlasny try)
+                // 3.1 poprawka po recenzji (E3/8a, BkWorkshopTaxToLord): wpis 51 zakladal, ze BK pobiera podatek od cudzych warsztatow od wlascicieli - od lordow
+                // i gracza nie pobiera (czynny model warsztatow gry to nie BKWorkshopModel) - te linie byly z niczego; zdjete bez przelewu, takze z podstawy rady
+                float unpaid = Seal31B.UnpaidOwnerTaxLines(__0);
+                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept - unpaid - Seal31B.NotableTaxLines(__0), __1, _txtRent);   // 3.1/3.3 (31b) E3/8a: warsztaty notabli placa panu przelewem (BkWorkshopTaxToLord) - bez linii z niczego
+                CouncilWages35.TownBase(__0, kept - unpaid);   // 3.5a: pensje rady BK od tego podatku i renty, nie od zastapionego podatku klas ludnosci (wlasny try); bez linii, ktorych nikt nie placi
             }
             catch { }
         }

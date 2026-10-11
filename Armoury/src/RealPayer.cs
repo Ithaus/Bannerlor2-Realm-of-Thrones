@@ -19,13 +19,16 @@ namespace Armoury
     /// E3/1 (paczka 164a-1) - PRAWDZIWY PLATNIK I KASY OSAD (projekt etapu 3, rozdz. 2 R2/R3, rozdz. 3 E3/1). Wylacznik TownPaysRewards.
     /// Wspolny mechanizm: prefiks (priorytet Low; okien ksiegi na tej metodzie nie ma) na GiveGoldAction.ApplyInternal. Gdy otwarty kontekst (stos do 4)
     /// i zdarzenie jest "z niczego" (dajacy bohater i partia null) do oczekiwanego odbiorcy - dajacy = osada (albo partia) platnika, kwota = najwyzej
-    /// NADWYZKA platnika (Seal31.Spare: miasto - kasa ponad zapas kupcow minus tarcze minus wydane dzis; zamek - CastlePurse.Spendable minus wydane
-    /// dzis). Gra obcina kwote do CALEJ kasy dajacego (GiveGoldAction.cs:21-25), wiec nadwyzke liczymy sami; zdarzenie idzie z prawdziwym platnikiem -
+    /// NADWYZKA platnika (Seal31.Spare z zywej kasy: miasto - kasa ponad zapas kupcow minus tarcze; zamek - CastlePurse.Spendable; wyplata obniza kase,
+    /// wiec i nadwyzke - poprawka po recenzji: "wydane dzis" nie jest odejmowane drugi raz). Gra obcina kwote do CALEJ kasy dajacego (GiveGoldAction.cs:21-25), wiec nadwyzke liczymy sami; zdarzenie idzie z prawdziwym platnikiem -
     /// ksiega widzi przelew osada -> bohater ("Przeplywy osad" juz je licza). Bez kontekstu: wyjscie w pierwszej linii.
     /// Zastosowania (prefiks otwiera kontekst, finalizer zamyka - takze po wyjatku):
     ///  - jency (SellPrisonersAction.ApplyInternal): platnik = osada kupujaca (buyerParty.Settlement), przy kupujacym null (gracz u posrednika,
     ///    "sprzedaj wszystkich") - Settlement.CurrentSettlement (krytyka W1); placi tylko za ZOLNIERZY (wartosc z tych samych wywolan modelu co gra);
-    ///    czesc za bohaterow zostaje jak dzis (z niczego - u gracza rownowazy ja 178), wyplacona w finalizerze osobnym zdarzeniem jeszcze w oknie O09.
+    ///    czesc za bohaterow zostaje jak dzis (z niczego - u gracza rownowazy ja 178), wyplacona osobnym zdarzeniem w POSTFIKSIE Priority.First
+    ///    (poprawka po recenzji: postfiksy Harmony biegna przed finalizerami - wyplata w finalizerze przychodzila PO postfiksie 178 (Last), ktory
+    ///    liczy zwrot gracza z jego kiesy; biedny gracz u posrednika dostawal zloto z niczego i do tego roszczenie); finalizer tylko awaryjnie
+    ///    (wyjatek w metodzie gry - postfiks nie biegl). Oba jeszcze w oknie O09 (jego finalizer ma nizszy priorytet).
     ///    Twierdza sprzedaje sama (kupujacy null) - placi kupujacy, brak kupujacego - 0 (jency wypuszczeni). Gracz dostal mniej - komunikat.
     ///  - lup z oblezenia (SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied): platnik = zdobyta osada (kazda wyplata z tej samej nadwyzki);
     ///  - nagroda turnieju AI (TournamentManager.GivePrizeToWinner): platnik = miasto-gospodarz;
@@ -56,7 +59,7 @@ namespace Armoury
         private static readonly long[] _due = new long[Kinds], _paid = new long[Kinds];
         private static readonly int[] _n = new int[Kinds], _noSpare = new int[Kinds];
         private static long _heroRepay, _plDue, _plPaid, _tollShort;
-        private static int _strays, _noPayer, _belowReserve, _tollNotSeen, _overflow;
+        private static int _strays, _noPayer, _belowReserve, _tollNotSeen, _overflow, _heroLate;
 
         private static bool Push(Ctx c) { if (_depth >= _stack.Length) { _overflow++; return false; } _stack[_depth++] = c; return true; }
 
@@ -188,7 +191,33 @@ namespace Armoury
             catch (Exception e) { __state = null; Seal31.Stumble("RealPayer.RaidPre", e); }
         }
 
-        /// <summary>Wspolny finalizer (wyzszy priorytet niz okna ksiegi - biegnie, gdy okno O09 jeszcze otwarte): czesc za bohaterow jak w grze, komunikat gracza.</summary>
+        /// <summary>Postfiks jencow (Priority.First): czesc za bohaterow jak w grze - PRZED postfiksem 178 (Ransom178.SalePostfix, Priority.Last), ktory
+        /// liczy zwrot gracza z jego kiesy (musi widziec w niej zloto za lorda, jak przed 3.1), i przed finalizerem okna O09 (okno widzi wyplate).
+        /// Kontekst zdejmowany przed wyplata - jej zdarzenie nie trafia do naszego prefiksu (finalizer zdejmuje drugi raz bez skutku).</summary>
+        public static void PrisPost(Ctx __state)
+        {
+            if (__state == null) return;
+            Pop(__state);
+            PayHeroes(__state);
+        }
+
+        /// <summary>Czesc za bohaterow (z niczego, jak w grze) - raz: kwota zerowana przed wyplata (postfiks albo awaryjnie finalizer).</summary>
+        private static void PayHeroes(Ctx c)
+        {
+            try
+            {
+                if (c == null || c.HeroRepay <= 0) return;
+                int h = (int)Math.Min(int.MaxValue, c.HeroRepay);
+                c.HeroRepay = 0;
+                if (c.RecHero != null) GiveGoldAction.ApplyBetweenCharacters(null, c.RecHero, h, c.RecHero != Hero.MainHero);   // graczowi - komunikat gry jak dotad
+                else if (c.RecParty != null && c.RecParty.IsSettlement) GiveGoldAction.ApplyForPartyToSettlement(null, c.RecParty.Settlement, h, true);
+                _heroRepay += h;
+            }
+            catch (Exception e) { Seal31.Stumble("RealPayer.PayHeroes", e); }
+        }
+
+        /// <summary>Wspolny finalizer (wyzszy priorytet niz okna ksiegi - biegnie, gdy okno O09 jeszcze otwarte): zdjecie kontekstu, czesc za bohaterow
+        /// tylko awaryjnie (postfiks nie biegl - wyjatek w metodzie gry), komunikat gracza.</summary>
         public static void CtxFin(Ctx __state)
         {
             if (__state == null) return;
@@ -196,13 +225,7 @@ namespace Armoury
             try
             {
                 var c = __state;
-                if (c.HeroRepay > 0)
-                {
-                    int h = (int)Math.Min(int.MaxValue, c.HeroRepay);
-                    if (c.RecHero != null) GiveGoldAction.ApplyBetweenCharacters(null, c.RecHero, h, c.RecHero != Hero.MainHero);   // graczowi - komunikat gry jak dotad
-                    else if (c.RecParty != null && c.RecParty.IsSettlement) GiveGoldAction.ApplyForPartyToSettlement(null, c.RecParty.Settlement, h, true);
-                    _heroRepay += h;
-                }
+                if (c.HeroRepay > 0) { _heroLate++; PayHeroes(c); }
                 if (c.PlDue > c.PlPaid)
                 {
                     string town = c.Payer != null ? c.Payer.Name.ToString() : "The town";
@@ -258,7 +281,7 @@ namespace Armoury
         {
             var give = AccessTools.Method(typeof(GiveGoldAction), "ApplyInternal");
             Seal31.Patch("platnik: GiveGoldAction.ApplyInternal", give, typeof(RealPayer), nameof(GivePrefix), null, null, Priority.Low);
-            Seal31.Patch("platnik: jency (SellPrisonersAction.ApplyInternal)", AccessTools.Method(typeof(SellPrisonersAction), "ApplyInternal"), typeof(RealPayer), nameof(PrisPre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
+            Seal31.Patch("platnik: jency (SellPrisonersAction.ApplyInternal)", AccessTools.Method(typeof(SellPrisonersAction), "ApplyInternal"), typeof(RealPayer), nameof(PrisPre), nameof(PrisPost), nameof(CtxFin), Priority.Low, Priority.First, Priority.High);   // postfiks First - przed 178 (Last)
             Seal31.Patch("platnik: lup z oblezenia (OnSiegeAftermathApplied)", AccessTools.Method(typeof(SiegeAftermathCampaignBehavior), "OnSiegeAftermathApplied"), typeof(RealPayer), nameof(SiegePre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
             Seal31.Patch("platnik: nagroda turnieju (GivePrizeToWinner)", AccessTools.Method(typeof(TournamentManager), "GivePrizeToWinner"), typeof(RealPayer), nameof(TourneyPre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
             const string bkRaid = "BannerKings.Behaviours.Raids.BKRaidCaptureBehavior", bkCar = "BannerKings.Behaviours.BKCaravansBehavior";
@@ -290,7 +313,10 @@ namespace Armoury
                 sb.Append(KName[k]).Append(": gra chciala ").Append(_due[k]).Append(", zaplacili ").Append(_paid[k]).Append(", uciete ").Append(_due[k] - _paid[k])
                   .Append(" (").Append(_n[k]).Append(" wyplat, platnik bez nadwyzki ").Append(_noSpare[k]).Append(')');
             }
-            sb.Append(" | czesc za bohaterow jak w grze (z niczego) ").Append(_heroRepay).Append(" | gracz u posrednika i w miescie: wycena ").Append(_plDue).Append(", zaplacone ").Append(_plPaid)
+            long spent; int spentN; Seal31.SpentToday(out spent, out spentN);
+            sb.Append(" | kasy osad wydaly dzis ").Append(spent).Append(" w ").Append(spentN).Append(" osadach (nadwyzka z zywej kasy - wyplata juz ja obnizyla)");
+            sb.Append(" | czesc za bohaterow jak w grze (z niczego) ").Append(_heroRepay).Append(" (w tym awaryjnie w finalizerze - postfiks nie biegl ").Append(_heroLate).Append(')')
+              .Append(" | gracz u posrednika i w miescie: wycena ").Append(_plDue).Append(", zaplacone ").Append(_plPaid)
               .Append(" | myto: karawana nie miala ").Append(_tollShort).Append(" (licznik oddal), gra nie dopisala ").Append(_tollNotSeen)
               .Append(" | kontrola (prog 0): bez platnika ").Append(_noPayer).Append(", miasto ponizej zapasu kupcow przez nasza wyplate ").Append(_belowReserve)
               .Append(", zdarzenia z niczego w kontekscie niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow);
@@ -300,7 +326,7 @@ namespace Armoury
         internal static void ClearDay()
         {
             Array.Clear(_due, 0, Kinds); Array.Clear(_paid, 0, Kinds); Array.Clear(_n, 0, Kinds); Array.Clear(_noSpare, 0, Kinds);
-            _heroRepay = _plDue = _plPaid = _tollShort = 0; _strays = _noPayer = _belowReserve = _tollNotSeen = _overflow = 0;
+            _heroRepay = _plDue = _plPaid = _tollShort = 0; _strays = _noPayer = _belowReserve = _tollNotSeen = _overflow = _heroLate = 0;
         }
 
         internal static void Reset() { ClearDay(); Array.Clear(_stack, 0, _stack.Length); _depth = 0; }

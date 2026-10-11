@@ -3984,7 +3984,7 @@ namespace Armoury
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool CaravanWageToPurse { get; set; } = true;
 
-        [SettingPropertyBool("Bk Workshop Tax To Lord", HintText = "the Banner Kings tax on a notable's workshop is really paid by the notable to the lord of the town (the town keeps its autonomy share), instead of vanishing on one side and being created from nothing on the other. Needs town rents (Population Rent Enabled, Rent Replaces Town Tax) - otherwise as before (off = as before)")]
+        [SettingPropertyBool("Bk Workshop Tax To Lord", HintText = "the Banner Kings tax on a notable's workshop is really paid by the notable to the lord of the town (the town keeps its autonomy share), instead of vanishing on one side and being created from nothing on the other. A workshop tax nobody pays (a lord's or your workshop in another lord's town - Banner Kings does not charge it here) is no longer paid to the town's lord either. Needs town rents (Population Rent Enabled, Rent Replaces Town Tax) - otherwise as before (off = as before)")]
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool BkWorkshopTaxToLord { get; set; } = true;
 

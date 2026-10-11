@@ -206,37 +206,15 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ nadwyzka portu (rozdz. 2 projektu)
-        private static FieldInfo _courtF;
-        private static bool _courtTried;
-
-        /// <summary>Znacznik tarczy dworu (162m) w kasie miasta - pole prywatne SoldierPay (tylko odczyt, bez zmiany pliku SoldierPay).</summary>
-        private static long CourtOf(Settlement st)
-        {
-            try
-            {
-                if (!_courtTried) { _courtTried = true; _courtF = AccessTools.Field(typeof(SoldierPay), "_court"); }
-                var d = _courtF != null ? _courtF.GetValue(null) as Dictionary<string, float> : null;
-                float v;
-                return d != null && st.StringId != null && d.TryGetValue(st.StringId, out v) ? (long)v : 0;
-            }
-            catch { return 0; }
-        }
-
         /// <summary>
-        /// Nadwyzka portu (miasta): kasa - zapas kupcow (10 000 + 12 x dobrobyt, cel regulatora gry) - tarcza zoldu - tarcza dworu; nie mniej niz 0.
-        /// Wyplaty 181 obnizaja kase, wiec obnizaja tez nadwyzke (licznik "wydane dzis" sluzy tylko logowi - odjety drugi raz liczylby wyplate podwojnie;
-        /// tak liczy symulacja projektu P3, py\pula_wariant.py). Po scaleniu z E3/1 - jedna funkcja (RealPayer.Spare).
+        /// Nadwyzka portu = jedna funkcja nadwyzki osady E3/1 (Seal31.Spare - poprawka po recenzji 3.1+3.3: dotad osobna formula z tarcza dworu czytana
+        /// refleksja): kasa - zapas kupcow (10 000 + 12 x dobrobyt) - tarcza zoldu - tarcza dworu (SoldierPay.CourtOf), z zywej kasy, nie mniej niz 0.
+        /// Wyplaty 181 i E3/1 obnizaja kase, wiec obnizaja tez nadwyzke (licznik "wydane dzis" tylko w logu). Porty sa miastami - zamek i wies: 0.
         /// </summary>
         internal static long Spare(Settlement st)
         {
-            try
-            {
-                if (st == null || !st.IsTown || st.Town == null) return 0;
-                var t = st.Town;
-                long v = (long)t.Gold - (10000L + (long)(12f * t.Prosperity)) - SoldierPay.HeldOf(st) - CourtOf(st);
-                return v > 0 ? v : 0;
-            }
-            catch { return 0; }
+            if (st == null || !st.IsTown || st.Town == null) return 0;
+            return Seal31.Spare(st);
         }
 
         private static long SpareFor(Town t, bool sim)

@@ -19,9 +19,11 @@ namespace Armoury
     ///  - WLASNE POZYCJE KSIEGI PIENIADZA (Sum): bez ruszania stalych CirculationWindows; kazda pozycja idzie do CW.NamedRun (probki swiata)
     ///    i w naszym ticku do CW.BlockNamed (RB) - ta sama droga co CW.AddWorld; w rozliczeniu rodu nic (D7 - siedzi w roznicy stanu).
     ///    Linia "Pieniadz swiata (bilans - przyczyny)" dopisuje je w ZRODLACH (K - korekta zrodel), UJSCIACH (U, M - minus oddane) i NETTO (N).
-    ///  - NADWYZKA OSADY (rozdz. 2 projektu, jedna definicja): miasto - kasa ponad zapas kupcow (10 000 + 12 x dobrobyt, cel regulatora gry)
-    ///    minus tarcze (zold i dwor w drodze do pana) minus to, co osada juz dzis wydala na nasze wyplaty; zamek - CastlePurse.Spendable minus
-    ///    wydane dzis. Jeden licznik "wydane dzis" na osade, czyszczony co dobe.
+    ///  - NADWYZKA OSADY (rozdz. 2 projektu, jedna definicja dla E3/1 i 181): miasto - kasa ponad zapas kupcow (10 000 + 12 x dobrobyt, cel
+    ///    regulatora gry) minus tarcze (zold i dwor w drodze do pana); zamek - CastlePurse.Spendable. Liczona z ZYWEJ kasy: kazda nasza wyplata
+    ///    (GiveGoldAction z dajacym = osada) juz obnizyla kase, wiec obnizyla nadwyzke - "wydane dzis" (rozdz. 2) jest w niej raz. Poprawka po recenzji
+    ///    3.1+3.3: licznik "wydane dzis" nie jest odejmowany drugi raz (dotad kazda wyplata zmniejszala nadwyzke 2x - druga wyplata dnia dostawala 0);
+    ///    zostaje tylko do logu (linia platnika). ShipsToPort181 wola te sama funkcje.
     ///  - Linia dzienna "Szczelnosc (164a): dzien N | ..." - czesci kawalkow; potkniecia liczone, pierwszy wyjatek z miejsca do logu.
     /// </summary>
     internal static class Seal31
@@ -94,7 +96,8 @@ namespace Armoury
         /// <summary>Zapas kupcow miasta = cel regulatora gry (10 000 + 12 x dobrobyt).</summary>
         internal static long TownReserve(Town t) { return t == null ? 0 : 10000L + (long)(12f * t.Prosperity); }
 
-        /// <summary>Nadwyzka osady na nasze wyplaty (miasto: kasa - zapas kupcow - tarcze - wydane dzis; zamek: CastlePurse.Spendable - wydane dzis). Wies i inne - 0.</summary>
+        /// <summary>Nadwyzka osady na nasze wyplaty, z zywej kasy (miasto: kasa - zapas kupcow - tarcza zoldu - tarcza dworu; zamek: CastlePurse.Spendable).
+        /// Wies i inne - 0. Wyplaty juz obnizyly kase - "wydane dzis" NIE jest odejmowane drugi raz (poprawka po recenzji).</summary>
         internal static long Spare(Settlement st)
         {
             try
@@ -104,16 +107,23 @@ namespace Armoury
                 long free;
                 if (st.IsTown) free = (long)t.Gold - TownReserve(t) - SoldierPay.HeldOf(st) - SoldierPay.CourtOf(st);
                 else free = CastlePurse.Spendable(t);
-                long sp; _spent.TryGetValue(st, out sp);
-                return Math.Max(0L, free - sp);
+                return Math.Max(0L, free);
             }
             catch (Exception e) { Stumble("Spare", e); return 0; }
         }
 
+        /// <summary>Licznik "wydane dzis" (tylko log: linia platnika 164a-1) - nadwyzki nie zmienia.</summary>
         internal static void NoteSpent(Settlement st, long x)
         {
             if (st == null || x <= 0) return;
             long v; _spent.TryGetValue(st, out v); _spent[st] = v + x;
+        }
+
+        /// <summary>Do logu: ile kasy osad wydaly dzis na wyplaty E3/1 i w ilu osadach.</summary>
+        internal static void SpentToday(out long sum, out int n)
+        {
+            sum = 0; n = 0;
+            foreach (var v in _spent.Values) { if (v <= 0) continue; sum += v; n++; }
         }
 
         // ------------------------------------------------------------ wspolni pomocnicy
