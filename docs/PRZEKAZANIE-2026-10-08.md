@@ -638,3 +638,7 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
 - (19:05) **3.1+3.3 KOD SCALONY:** w-toku/e3-31m a939cd5 (drzewo e3\31m; = gB + e3-31 (E3/0,1,3,5,6,7) + e3-31b (E3/2,4,8a-c,9) + e3-33 (statki, OFF); E3/8d odlozony).
   Dwie recenzje + poprawki w toku (wf_9ec2f5e7-61e) -> test\Armoury-31m.dll. Narzedzie progow etapu 3: tools/sprawdz_logi.py --grupa etap3 (w drzewie 31m).
   Pytania z kodu: doplata za podmiane rekruta ROT (RotLeaks37) dalej w nicosc - zamknac z awansami?; napitki i drewno wojska (3.4) placi lord czy sakiewka ludzi?
+- (19:26) **WGRANIE 26: Armoury d38f1e69 + RC cea72cca** (3.4-3.7). Test grupy B (3.8-3.10, test\gB\ Armoury + RC + GrandTourney) w toku.
+- (20:00) **3.1+3.3 PO RECENZJACH:** w-toku/e3-31m dc290b3, test\Armoury-31m.dll 6e4b5b6a (test z RC i GT z gB). Pytania do Jeffa (kierunkowe): podatek BK od warsztatow
+  lordow i gracza w cudzych miastach - zniknac (dzis) czy wlasciciel placi panu miasta; doplata za podmiane rekruta ROT do sakiewki ludzi jak awanse; werdykt 3.2
+  "pokonany" takze dla partii lordow. **ETAP 4:** projekt w toku (wf_77f49d09-f4f -> SCRATCH(ae222cb7)\e4\PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md).
