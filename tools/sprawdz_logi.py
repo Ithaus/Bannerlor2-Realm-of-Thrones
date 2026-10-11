@@ -2002,7 +2002,10 @@ def etap5_a4(rep, lines, start, until, obl, bud):
     (z definicji: pobor = min(nalezne, kasa - prog); zamki - prog B-4 max(20 000, zapas kupcow), miasta - zapas kupcow od A1).
     Linia "Oblezone (E5/A4): dzien N" (dzien gry; obl ma klucz = dzien ksiegi): liczniki od poprzedniej linii - renta miast z naszego bloku doby,
     polityki korony z dziennego ticku rodu krola w grze (tylko prawdziwe rozliczenie, bez prognozy ekranu). Zloto nie rusza - mniej przelewow;
-    reszta ksiegi - wiersze A3-14 / A1-T13 / --grupa etap3. Doby oczekiwane - z linii "Budzet rodow (166)" (bud, ten sam klucz), a bez niej - z samej linii A4."""
+    reszta ksiegi - wiersze A3-14 / A1-T13 / --grupa etap3. Doby oczekiwane - z linii "Budzet rodow (166)" (bud, ten sam klucz), a bez niej - z samej linii A4.
+    Recenzja A4: wstrzymanie tylko przy kasie prawdziwym pieniadzem (miasta - A1, zamki - 110), inaczej osada placi jak dotad (licznik "kasa pod
+    regulatorem gry"); A4-3 czyta KONTROLE niezalezna od bramki (co naprawde zeszlo z kas oblezonych: renta, zawor 110, danina, polityki) -
+    "bez wyjasnienia" (ponad to, co bramka jawnie przepuscila) = 0 w kazdej dobie, przy kazdym stanie klucza."""
     win = sorted(set(d for d in obl if 1 <= run_day(d, start) <= until) | set(d for d in bud if 1 <= run_day(d, start) <= until))
     kinds = ("renta miast", "Crown Duty", "War Tax", "Road Tolls")
 
@@ -2031,25 +2034,48 @@ def etap5_a4(rep, lines, start, until, obl, bud):
         if "| Besieged Pay Nothing: nie" in s:
             off.append(d)
         h = part(s, "| wstrzymane (oblezona osada nie placi - zostaje w jej kasie): ")
-        p = part(s, "| zaplacone mimo oblezenia (prog 0 przy wlaczonym): ")
+        p = part(s, "| zaplacone mimo oblezenia - wylacznik wylaczony: ")
+        g = part(s, "| zaplacone mimo oblezenia - kasa pod regulatorem gry (miasta bez A1, zamki bez 110): ")
         m = re.search(r"oblezone teraz: miasta (\d+), zamki (\d+); wsie w rabunku lub spladrowane (\d+)", s)
         f = re.search(r"ponad zapasem kupcow \(D4\): (\d+) z (\d+) zamkow", s)
-        if h and p and m and f:
-            rows[d] = {"held": h, "paid": p, "towns": int(m.group(1)), "castles": int(m.group(2)), "vill": int(m.group(3)),
-                       "floor": int(f.group(1)), "castleN": int(f.group(2)), "stum": num(r"potkniecia (\d+)", s, int, 0) or 0}
+        c = re.search(r"kontrola \(niezalezna od bramki[^)]*\): renta (\d+), zawor 110 (\d+), danina (\d+), polityki (\d+); razem (\d+) z (\d+) osad"
+                      r"; w tym zaplacone jawnie \(wyzej\) (\d+); bez wyjasnienia (\d+) z (\d+) osad", s)
+        r = re.search(r"kasa prawdziwym pieniadzem \(wstrzymanie tylko tam\): miasta \(A1\) (tak|nie), zamki \(110\) (tak|nie)", s)
+        if h and p and g and m and f and c and r:
+            rows[d] = {"held": h, "paid": p, "reg": g, "towns": int(m.group(1)), "castles": int(m.group(2)), "vill": int(m.group(3)),
+                       "floor": int(f.group(1)), "castleN": int(f.group(2)), "stum": num(r"potkniecia (\d+)", s, int, 0) or 0,
+                       "ctl": [int(c.group(i)) for i in range(1, 10)], "townReal": r.group(1) == "tak", "castleReal": r.group(2) == "tak"}
     miss = [d for d in win if d not in rows]
     rep.add("E5/A4 A4-1: linia Oblezone (E5/A4) codziennie", f"brak/nieczytelna w {len(miss)} z {len(win)} dob" + (f", wylacznik wylaczony w {len(off)}" if off else ""),
             "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if win else None)
     on = [d for d in win if d in rows and d not in off]
     if off:
         rep.add("E5/A4 A4-2: wylacznik Besieged Pay Nothing", f"wylaczony w {len(off)} z {len(win)} dob", "wlaczony caly bieg zbioru A (wylaczony - A4-3 INFO)", None)
-    # A4-3: wplaty z oblezonych osad = 0 (kazdy rodzaj, przy wlaczonym kluczu)
+    # A4-3 (recenzja): kontrola niezalezna od bramki - co naprawde zeszlo z kas oblezonych osad ponad to, co bramka jawnie przepuscila (kasa pod
+    # regulatorem gry) = 0 w kazdej dobie z wlaczonym kluczem (zgubiona bramka po scaleniu, nowa droga poboru bez Holds, zawor 110 / Levies bez
+    # warunku oblezenia). Doby z kluczem wylaczonym - INFO: zawor A1 (po scaleniu) placi panu dekretem BK (High 1.3) od czesci pana, wiec w miescie
+    # bez krolestwa czesc pana moze przekroczyc kwote bramki (pay) - "bez wyjasnienia" do 30% renty bez bledu.
     if on:
-        paid = [sum(rows[d]["paid"][0][i][0] for d in on) for i in range(len(kinds))]
-        paidn = [sum(rows[d]["paid"][0][i][1] for d in on) for i in range(len(kinds))]
-        rep.add("E5/A4 A4-3: zaplacone mimo oblezenia (suma dob z wlaczonym kluczem)",
-                ", ".join(f"{kinds[i]} {paid[i]} ({paidn[i]})" for i in range(len(kinds))),
-                "0 / 0 / 0 / 0 (projekt Test A4: wplaty z oblezonych osad 0)", sum(paid) == 0 and sum(paidn) == 0)
+        cs = [sum(rows[d]["ctl"][i] for d in on) for i in range(9)]
+        bad = [d for d in on if rows[d]["ctl"][7] > 0]
+        rep.add("E5/A4 A4-3: kontrola - zeszlo z kas oblezonych bez wyjasnienia (suma dob z wlaczonym kluczem; niezalezne od bramki)",
+                f"bez wyjasnienia {cs[7]} zl (osado-dni {cs[8]}; dob z > 0: {len(bad)}" + (f", pierwsza {bad[0]}" if bad else "") + ")"
+                + f" | zeszlo razem {cs[4]} (renta {cs[0]}, zawor 110 {cs[1]}, danina {cs[2]}, polityki {cs[3]}), w tym jawnie przez bramke {cs[6]}",
+                "0 (projekt Test A4: wplaty z oblezonych osad 0 - poza jawnie przepuszczonymi przy kasie pod regulatorem gry)", cs[7] == 0 and cs[8] == 0)
+    if off:
+        ofr = [d for d in off if d in rows]
+        co = [sum(rows[d]["ctl"][i] for d in ofr) for i in range(9)]
+        rep.add("E5/A4 INFO: kontrola w dobach z wylaczonym kluczem", f"zeszlo {co[4]}, w tym jawnie {co[6]}, bez wyjasnienia {co[7]} (osado-dni {co[8]})",
+                "INFO - wszystko placi jak przed paczka; > 0 = zawor 110 / Levies bez warunku oblezenia albo dekret High w miescie bez krolestwa (A1)", None)
+    if rows:
+        ds = [d for d in win if d in rows]
+        rg = [sum(rows[d]["reg"][0][i][0] for d in ds) for i in range(len(kinds))]
+        rgn = [sum(rows[d]["reg"][0][i][1] for d in ds) for i in range(len(kinds))]
+        tr = len([d for d in ds if rows[d]["townReal"]]); cr = len([d for d in ds if rows[d]["castleReal"]])
+        rep.add("E5/A4 A4-3b: zaplacone mimo oblezenia - kasa pod regulatorem gry (suma okna)",
+                ", ".join(f"{kinds[i]} {rg[i]} ({rgn[i]})" for i in range(len(kinds)))
+                + f" | kasa prawdziwym pieniadzem: miasta (A1) w {tr} z {len(ds)} dob, zamki (110) w {cr} z {len(ds)} dob",
+                "INFO - bez A1 oblezone miasta placa jak dotad (regulator gry skasowalby wstrzymane); zbior A po scaleniu z A1 (A1 i 110 czynne): 0", None)
     if off:
         pz = sum(rows[d]["paid"][1] for d in off if d in rows)
         rep.add("E5/A4 INFO: zaplacone mimo oblezenia w dobach z wylaczonym kluczem", f"{pz} zl w {len([d for d in off if d in rows])} dobach",
@@ -2073,7 +2099,7 @@ def etap5_a4(rep, lines, start, until, obl, bud):
         ac = [x for x in ac if x is not None]
         rep.add("E5/A4 A4-5: zawor zamkow (110) i zawor kas miast (A1) - oblezone pominiete (suma okna)",
                 (f"zamki {sum(zc)} w {len(zc)} dobach" if zc else "zamki: brak liczby w linii 110") + "; "
-                + (f"miasta (A1) {sum(ac)} w {len(ac)} dobach" if ac else "miasta: brak dopisku E5/A1 (A1 nie w logu - renta miast przez bramke A4)"),
+                + (f"miasta (A1) {sum(ac)} w {len(ac)} dobach" if ac else "miasta: brak dopisku E5/A1 (A1 nie w logu - oblezone miasta placa jak dotad, A4-3b)"),
                 "INFO (regula od dawna, bez wylacznika A4; danina i clo - KingdomTreasury.Levies)", None)
         # A4-6: "10 miast bez placenia" - z definicji A1 (prog A1-T9); tu tylko gdy dopisek A1 jest w logu
         v9 = [num(r"miast z nadwyzka bez zaworu \(10 miast\) (\d+)", k169[d], int) for d in win if d in k169]
@@ -2081,6 +2107,15 @@ def etap5_a4(rep, lines, start, until, obl, bud):
         rep.add("E5/A4 A4-6: miasta z zywym panem i nadwyzka bez zaworu (\"10 miast\")",
                 (f"niezerowe w {len([x for x in v9 if x])} z {len(v9)} dob" + (f" (najwiecej {max(v9)})" if any(v9) else "")) if v9 else "brak dopisku E5/A1 w logu",
                 "0 (z definicji A1 - zawor od nadwyzki, bez filtra ludnosci; prog A1-T9)", (not any(v9)) if v9 else None)
+        # A4-9 (recenzja R1-2, krok scalania 2): zawor A1 przez bramke R22 - bez kroku 2 zawor A1 pomija oblezone przed bramka (nic nie wyplywa,
+        # wiec A4-3 tego nie widzi): oblezone w zaworze A1 (_vSiege) > 0, a "wstrzymane: renta miast" 0 w dobach z kluczem i A1
+        dd = [d for d in win if d in rows and d in k169 and d not in off and rows[d]["townReal"]]
+        if dd:
+            vs = sum(num(r"bez poboru: kasa nie ponad zapasem \d+, oblezone (\d+)", k169[d], int, 0) or 0 for d in dd)
+            hn = sum(rows[d]["held"][0][0][1] for d in dd)
+            rep.add("E5/A4 A4-9: zawor kas miast A1 przez bramke R22 (krok scalania 2)",
+                    f"oblezone w zaworze A1 {vs}, wstrzymana renta miast {hn} miasto-dni (w {len(dd)} dobach z kluczem i A1)",
+                    "> 0, gdy oblezone > 0 (0 = zawor A1 pomija oblezone przed bramka - krok scalania 2 nie zrobiony)", (hn > 0) if vs > 0 else None)
         last = rows[ds[-1]]
         fl = [rows[d]["floor"] for d in ds]
         rep.add("E5/A4 A4-7: prog podatkow korony zamkow ponad zapasem kupcow (D4)",
@@ -2091,8 +2126,8 @@ def etap5_a4(rep, lines, start, until, obl, bud):
     stm = max([rows[d]["stum"] for d in rows] + [0])
     rep.add("E5/A4 A4-8: bledy BesiegedPay, potkniecia", f"bledy {len(errs)}, potkniecia {stm}", "0 / 0", len(errs) == 0 and stm == 0)
     st0 = [s for s in lines if s.startswith("Oblezone (E5/A4): start")]
-    rep.add("E5/A4 INFO: linia startowa", st0[0][st0[0].find("| wylacznik"):][:220] if st0 else "brak linii",
-            "wylacznik tak; Population Rent Enabled tak; Policy Income Conserved tak", None)
+    rep.add("E5/A4 INFO: linia startowa", st0[0][st0[0].find("| wylacznik"):][:420] if st0 else "brak linii",
+            "wylacznik tak; Population Rent Enabled tak; Policy Income Conserved tak; kasy miast A1 tak (zbior A), Castle Purse Enabled tak, latka regulatora 110 wpieta", None)
 
 
 def main(argv):

@@ -467,6 +467,7 @@ namespace Armoury
                 if (s == null || !s.PolicyIncomeConserved || clan == null || clan.Kingdom == null) return;
                 var k = clan.Kingdom;
                 var pol = k.ActivePolicies;
+                BesiegedPay.PolicyOpen(k, applyWithdrawals);   // E5/A4 (recenzja, kontrola niezalezna od bramki): kasa oblezonych twierdz przed poborem (tylko odczyt, wlasny try)
                 float smooth = 5f;
                 try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
                 float vanilla = 0f, real = 0f;
@@ -538,6 +539,7 @@ namespace Armoury
                     if (n6 > 0) vanilla += n6;
                     if (n7 > 0) vanilla += n7;
                 }
+                BesiegedPay.PolicyClose();   // E5/A4 (recenzja): ile naprawde zeszlo z kas oblezonych twierdz (tylko licznik)
                 float delta = real - vanilla;
                 if (Math.Abs(delta) > 0.5f) goldChange.Add(delta, _txtPolicy);
             }
