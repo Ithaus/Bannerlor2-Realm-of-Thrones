@@ -151,8 +151,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return;
                 float realm = WinterRealm.OfParty(party);
-                int why, riders, herd; float need;
-                float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out riders, out herd);
+                int why, riders, herd; float need, bk;
+                float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out bk, out riders, out herd);   // na pustyni / w sniegu przy paszy BK - tylko roznica
                 if (horse > 0f) __result.Add(-horse, _txtHorses);
                 float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);

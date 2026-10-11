@@ -33,12 +33,17 @@ namespace Armoury
     /// (BKPartyConsumptionModel: kon 0.25, kon bojowy 0.5, juczny 0.15, krowa 0.175, swinia 0.1, owca 0.05 na dobe) czytane refleksja z modelu BK
     /// z listy modeli gry, bez BK - te same liczby z kodu. NIE z BK CalculateAnimalFoodNeed: ta liczy JEDNEGO konia na TYP oddzialu (num += 1
     /// na element rosteru), konnych jencow jak konie, a zwyklego konia w taborze stawka ptaka (0.025). Pol paszy konia = 0.125 = 2.5 x czlowiek (1/20).
-    /// Bez doplaty: partia na stepie (TerrainType.Steppe - wypas zimowy; regula wedlug terenu, nie kultury) i - TYLKO gdy regula paszy BK naprawde
-    /// biegnie (BK CalculateDailyFoodConsumptionf w aktywnym lancuchu modelu jedzenia) - pustynia (BK: pelna pasza) i snieg/zamiec (BK: pol).
+    /// Bez doplaty: partia na stepie (TerrainType.Steppe - wypas zimowy; regula wedlug terenu, nie kultury).
+    /// PASZA BK: gdy regula paszy BK naprawde biegnie (BK CalculateDailyFoodConsumptionf w aktywnym lancuchu modelu jedzenia), BK sam karmi
+    /// swoja formula na pustyni (pelna pasza, caly rok) i w sniegu/zamieci (pol). Tam E4/1 doplaca w zimie TYLKO ROZNICE: swoja pasza minus
+    /// to, co naliczy BK (CalculateAnimalFoodNeed obiektu BK z aktywnego lancucha: pustynia x1 bez wielbladow, snieg/zamiec x0.5 - te same
+    /// warunki terenu i pogody co BK), najmniej 0. W zimie pasza = wieksza z dwoch (E4/1 albo BK) - bez podwojnej paszy i bez dziury tam, gdzie
+    /// zima najostrzejsza (poprawka po recenzji E4/6a: wczesniej E4/1 nie doplacal tam wcale, a formula BK daje np. w sniegu ok. 6x mniej);
+    /// poza zima pasze na pustyni i w sniegu liczy sam BK (jego regula - Jeff 11.10 "reguly BK dokladaja sie").
     /// U Jeffa aktywnym modelem jest RBL RealisticFoodConsumptionModel (RBL laduje sie po ROT, dziedziczy po Default i nie wola modelu
-    /// wewnetrznego) - BK nie karmi wtedy nigdzie, wiec doplata obejmuje tez pustynie i snieg. Od E4/6a (FoodChain, FoodModelChain) RBL oddaje
-    /// swoje metody lancuchowi pod soba (ROT -> NavalDLC -> BEE -> BK) - regula paszy BK biegnie i doplata pomija pustynie i snieg (bez podwojnej
-    /// paszy); FeedInfo idzie wtedy przez RBL w glab (FoodChain.Chains). Lancuch ustalany raz na kampanie (FeedInfo):
+    /// wewnetrznego) - bez E4/6a BK nie karmi nigdzie, wiec doplata jest pelna takze na pustyni i w sniegu. Od E4/6a (FoodChain, FoodModelChain)
+    /// RBL oddaje swoje metody lancuchowi pod soba (ROT -> NavalDLC -> BEE -> BK) - regula paszy BK biegnie; FeedInfo idzie wtedy przez RBL
+    /// w glab (FoodChain.Chains). Lancuch ustalany raz na kampanie (FeedInfo):
     /// od aktywnego modelu w glab przez owijki (typ wprost po abstrakcyjnym MobilePartyFoodConsumptionModel - ROT _previousModel, BEE _baseModel,
     /// NavalDLC BaseModel); typ po klasie konkretnej (RBL po Default) konczy lancuch - ten sam test, ktorym ROT sprawdza modele (ValidateGameModel).
     /// Doplata wchodzi do bazy jedzenia (WinterBite.FoodPostfix na DefaultMobilePartyFoodConsumptionModel.CalculateDailyBaseFoodConsumptionf -
@@ -67,6 +72,7 @@ namespace Armoury
             public string Active = "?";          // typ aktywnego modelu (Campaign.Current.Models.MobilePartyFoodConsumptionModel)
             public string Chain = "?";           // lancuch od aktywnego modelu w glab
             public bool BkFeeds;                 // BK CalculateDailyFoodConsumptionf w aktywnym lancuchu - BK sam karmi na pustyni i w sniegu
+            public Func<MobileParty, bool, float> BkNeed;   // BK CalculateAnimalFoodNeed obiektu BK z aktywnego lancucha (doplata roznicy E4/1 - BK)
             public float Horse = 0.25f, Warhorse = 0.5f, Mule = 0.15f, Cattle = 0.175f, Pig = 0.1f, Sheep = 0.05f;   // stawki BK (domyslne = liczby z BK)
             public string RatesFrom = "domyslne (liczby BK z kodu)";
             public bool Logged;
@@ -76,7 +82,8 @@ namespace Armoury
         private static int _stumbles, _stumblesDay;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>();
 
-        internal const int WhyOff = 0, WhyFed = 1, WhySteppe = 2, WhyDesert = 3, WhySnow = 4, WhyNoRealm = 5, WhyNoAnimals = 6;
+        internal const int WhyOff = 0, WhyFed = 1, WhySteppe = 2, WhyDesert = 3, WhySnow = 4, WhyNoRealm = 5, WhyNoAnimals = 6,
+                           WhyTopDesert = 7, WhyTopSnow = 8, WhyCount = 9;   // Desert/Snow = pasza BK nie mniejsza (bez doplaty), Top* = doplata roznicy
 
         private static bool On { get { var s = Settings.Current; return s != null && s.WinterByRealm; } }
 
@@ -217,7 +224,18 @@ namespace Armoury
                         var t = m.GetType();
                         sb.Append(i > 0 ? " -> " : "").Append(t.Name);
                         var calc = t.GetMethod("CalculateDailyFoodConsumptionf", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
-                        if (calc != null && calc.DeclaringType != null && calc.DeclaringType.FullName == BkModel) { f.BkFeeds = true; break; }
+                        if (calc != null && calc.DeclaringType != null && calc.DeclaringType.FullName == BkModel)
+                        {
+                            f.BkFeeds = true;
+                            try   // pasza BK tego samego obiektu, ktory karmi w lancuchu - do doplaty roznicy E4/1 na pustyni i w sniegu
+                            {
+                                var an = AccessTools.Method(t, "CalculateAnimalFoodNeed", new[] { typeof(MobileParty), typeof(bool) });
+                                if (an != null && !an.IsStatic && an.ReturnType == typeof(float))
+                                    f.BkNeed = (Func<MobileParty, bool, float>)Delegate.CreateDelegate(typeof(Func<MobileParty, bool, float>), m, an);
+                            }
+                            catch (Exception e) { Stumble("FeedInfo(pasza BK)", e); f.BkNeed = null; }
+                            break;
+                        }
                         // E4/6a: RBL z naprawionym lancuchem (FoodChain) oddaje metody swojemu BaseModel - idziemy dalej w glab (pole BaseModel gry)
                         if (t.BaseType != typeof(MobilePartyFoodConsumptionModel) && !FoodChain.Chains(m)) { sb.Append(" (konczy lancuch - nie wola modelu wewnetrznego)"); break; }
                         if (t.BaseType != typeof(MobilePartyFoodConsumptionModel)) sb.Append(" (lancuch E4/6a)");
@@ -287,10 +305,12 @@ namespace Armoury
         }
 
         /// <summary>Doplata paszy koni w zimie (dodatnia liczba jedzenia na dobe; 0 = bez doplaty, powod w why) - jedna regula dla
-        /// WinterBite.FoodPostfix i linii dobowej. Wolac tylko w zimie. need = pelna pasza zwierzat partii (przed udzialem i kraina).</summary>
-        internal static float HorseFeed(MobileParty party, float realm, out int why, out float need, out int riders, out int herd)
+        /// WinterBite.FoodPostfix i linii dobowej. Wolac tylko w zimie. need = pelna pasza zwierzat partii (przed udzialem i kraina);
+        /// bk = pasza, ktora w tym miejscu nalicza sam BK (pustynia / snieg przy regule paszy BK w lancuchu; gdzie indziej 0) - doplata to wtedy
+        /// tylko roznica ponad nia (w zimie pasza = wieksza z E4/1 i BK).</summary>
+        internal static float HorseFeed(MobileParty party, float realm, out int why, out float need, out float bk, out int riders, out int herd)
         {
-            why = WhyOff; need = 0f; riders = 0; herd = 0;
+            why = WhyOff; need = 0f; bk = 0f; riders = 0; herd = 0;
             var s = Settings.Current;
             if (s == null || !s.WinterHorsesEat || party == null) return 0f;
             float share = MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f);
@@ -301,18 +321,31 @@ namespace Armoury
                 var f = FeedInfo();
                 var terrain = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(party.CurrentNavigationFace);
                 if (terrain == TerrainType.Steppe) { why = WhySteppe; return 0f; }
-                if (f.BkFeeds)   // regula paszy BK biegnie - tam, gdzie BK karmi, bez doplaty (ten sam warunek co BK: teren pod partia, pogoda w miejscu partii)
+                int bkAt = 0;    // regula paszy BK biegnie: 1 = pustynia (BK pelna pasza), 2 = snieg/zamiec (BK pol) - ten sam warunek co BK
+                if (f.BkFeeds)   // (najpierw teren pod partia, potem pogoda w miejscu partii)
                 {
-                    if (terrain == TerrainType.Desert) { why = WhyDesert; return 0f; }
-                    var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
-                    if (w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard) { why = WhySnow; return 0f; }
+                    if (terrain == TerrainType.Desert) bkAt = 1;
+                    else
+                    {
+                        var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
+                        if (w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard) bkAt = 2;
+                    }
                 }
                 need = AnimalNeed(party, f, out riders, out herd);
                 if (need <= 0f) { why = WhyNoAnimals; return 0f; }
-                why = WhyFed;
-                return need * share * realm;
+                float own = need * share * realm;
+                if (bkAt == 0) { why = WhyFed; return own; }
+                // tam karmi BK swoja formula (w CalculateDailyFoodConsumptionf, ta sama ExplainedNumber co nasza baza) - doplacamy tylko roznice;
+                // pasza BK nieczytelna - jak przed poprawka: bez doplaty (bez ryzyka podwojnej paszy)
+                if (f.BkNeed == null) { why = bkAt == 1 ? WhyDesert : WhySnow; return 0f; }
+                bk = bkAt == 1 ? f.BkNeed(party, true) : f.BkNeed(party, false) / 2f;
+                if (!(bk > 0f)) bk = 0f;
+                float top = own - bk;
+                if (top <= 0f) { why = bkAt == 1 ? WhyDesert : WhySnow; return 0f; }
+                why = bkAt == 1 ? WhyTopDesert : WhyTopSnow;
+                return top;
             }
-            catch (Exception e) { Stumble("HorseFeed", e); why = WhyOff; need = 0f; riders = 0; herd = 0; return 0f; }
+            catch (Exception e) { Stumble("HorseFeed", e); why = WhyOff; need = 0f; bk = 0f; riders = 0; herd = 0; return 0f; }
         }
 
         /// <summary>Linia startowa (WinterBite.ApplyAll): stan kluczy E4/1.</summary>
@@ -323,8 +356,8 @@ namespace Armoury
             return "zima wedlug krain (E4/1): " + (s.WinterByRealm ? "TAK - Wyspy Letnie x0, cieple (Dorne, Qarth, Zatoka, Lys, Tyrosh, Myr, Volantis, Valyria) x"
                        + MBMath.ClampFloat(s.WinterWarmRealmFactor, 0f, 1f).ToString("0.00", Inv) + ", reszta x1 (kultura regionu z pierwszej doby sesji)" : "NIE (ta sama zima wszedzie)")
                  + "; konie jedza zima: " + (s.WinterHorsesEat ? "TAK - " + MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f).ToString("0.00", Inv)
-                       + " pelnej paszy (stawki BK, konni po glowie bez jencow, zwierzeta taboru) x kraina, bez doplaty na stepie; pustynia i snieg bez doplaty tylko,"
-                       + " gdy regula paszy BK jest w aktywnym modelu jedzenia (linia 'pasza koni zima - model jedzenia' w pierwszej dobie)" : "NIE");
+                       + " pelnej paszy (stawki BK, konni po glowie bez jencow, zwierzeta taboru) x kraina, bez doplaty na stepie; na pustyni i w sniegu,"
+                       + " gdy regula paszy BK jest w aktywnym modelu jedzenia, tylko roznica ponad pasze BK (linia 'pasza koni zima - model jedzenia' w pierwszej dobie)" : "NIE");
         }
 
         /// <summary>Raz na dobe (WinterBite.OnDaily, po WesterosClimate.Daily): pamiec doby od nowa; raz na kampanie linia modelu jedzenia;
@@ -351,7 +384,10 @@ namespace Armoury
         private static string FeedText(Feed f)
         {
             return "Zima wedlug krain (E4/1): pasza koni zima - model jedzenia partii aktywny: " + f.Active + " | lancuch: " + f.Chain
-                 + " | regula paszy BK (pustynia pelna, snieg/zamiec pol): " + (f.BkFeeds ? "BIEGNIE - tam bez doplaty zimowej" : "NIE BIEGNIE (BK poza aktywnym lancuchem) - doplata zimowa takze na pustyni i w sniegu")
+                 + " | regula paszy BK (pustynia pelna, snieg/zamiec pol): " + (f.BkFeeds
+                       ? (f.BkNeed != null ? "BIEGNIE - tam w zimie doplata E4/1 tylko roznicy ponad pasze BK (pasza = wieksza z E4/1 i BK; poza zima sam BK)"
+                                           : "BIEGNIE - pasza BK nieczytelna (CalculateAnimalFoodNeed), tam bez doplaty zimowej")
+                       : "NIE BIEGNIE (BK poza aktywnym lancuchem) - doplata zimowa pelna takze na pustyni i w sniegu")
                  + " | stawki paszy (" + f.RatesFrom + "): kon " + f.Horse.ToString("0.###", Inv) + ", kon bojowy " + f.Warhorse.ToString("0.###", Inv)
                  + ", juczny " + f.Mule.ToString("0.###", Inv) + ", krowa " + f.Cattle.ToString("0.###", Inv) + ", swinia " + f.Pig.ToString("0.###", Inv)
                  + ", owca " + f.Sheep.ToString("0.###", Inv) + "; konni po glowie (sklad partii, bez jencow) x kon, zwierzeta taboru x stawka.";
@@ -398,8 +434,8 @@ namespace Armoury
             var f = FeedInfo();
             var fm = Campaign.Current.Models.MobilePartyFoodConsumptionModel;
             int eat = 0, fed = 0, fedDesert = 0, fedSnow = 0; long riders = 0, herd = 0;
-            double feed = 0, needFed = 0, men = 0, bonus = 0;
-            var why = new int[7];
+            double feed = 0, needFed = 0, men = 0, bonus = 0, bkTop = 0;
+            var why = new int[WhyCount];
             foreach (var mp in MobileParty.All)
             {
                 try
@@ -409,11 +445,12 @@ namespace Armoury
                     float realm = OfParty(mp);
                     int n = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
                     men += n; bonus += n * WinterBite.PartyFoodBonus(mp);
-                    int w, r, h; float need;
-                    float x = HorseFeed(mp, realm, out w, out need, out r, out h);
+                    int w, r, h; float need, bkp;
+                    float x = HorseFeed(mp, realm, out w, out need, out bkp, out r, out h);
                     why[w]++;
                     if (x <= 0f) continue;
                     fed++; feed += x; needFed += need; riders += r; herd += h;
+                    if (w == WhyTopDesert || w == WhyTopSnow) bkTop += bkp;
                     if (!f.BkFeeds)
                     {
                         var terrain = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace);
@@ -432,7 +469,10 @@ namespace Armoury
               .Append(" partii (konnych ").Append(riders).Append(", zwierzat w taborach ").Append(herd).Append("), +").Append(feed.ToString("0.0", Inv))
               .Append(" jedzenia/d razem przed mnoznikami (pelna pasza tych partii ").Append(needFed.ToString("0.0", Inv)).Append("/d)");
             if (!f.BkFeeds) sb.Append("; w tym na pustyni ").Append(fedDesert).Append(", w sniegu/zamieci ").Append(fedSnow).Append(" (BK tam nie karmi)");
-            sb.Append("; bez doplaty: step ").Append(why[WhySteppe]).Append(", pustynia (BK) ").Append(why[WhyDesert]).Append(", snieg/zamiec (BK) ").Append(why[WhySnow])
+            else sb.Append("; w tym doplata roznicy ponad pasze BK: pustynia ").Append(why[WhyTopDesert]).Append(", snieg/zamiec ").Append(why[WhyTopSnow])
+                   .Append(" (pasza BK tych partii ").Append(bkTop.ToString("0.0", Inv)).Append("/d - liczy ja BK)");
+            sb.Append("; bez doplaty: step ").Append(why[WhySteppe]).Append(", pustynia (pasza BK nie mniejsza) ").Append(why[WhyDesert])
+              .Append(", snieg/zamiec (pasza BK nie mniejsza) ").Append(why[WhySnow])
               .Append(", kraina bez zimy ").Append(why[WhyNoRealm]).Append(", bez zwierzat ").Append(why[WhyNoAnimals]);
             sb.Append(" | model jedzenia: ").Append(f.Active).Append(", regula paszy BK ").Append(f.BkFeeds ? "BIEGNIE" : "NIE BIEGNIE");
             sb.Append(" | potkniecia dzis ").Append(Volatile.Read(ref _stumblesDay)).Append(", od startu sesji ").Append(Volatile.Read(ref _stumbles));

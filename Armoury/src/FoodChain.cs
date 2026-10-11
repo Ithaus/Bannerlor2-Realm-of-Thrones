@@ -51,7 +51,8 @@ namespace Armoury
     ///    biegnie w najglebszym modelu (BK dziedziczy te metode), a na zewnetrznym poziomie RBL (wynik z lancucha) pomija sie (BaseFromChain;
     ///    znacznik watku ustawiany tylko, gdy prefiks naprawde oddal wynik lancucha).
     ///  - PASZA KONI E4/1: WinterRealm.FeedInfo idzie przez RBL w glab, gdy lancuch jest naprawiony (Chains) - widzi BK, wiec regula paszy BK
-    ///    "BIEGNIE" i E4/1 nie doplaca na pustyni i w sniegu (tam karmi BK) - bez podwojnej paszy.
+    ///    "BIEGNIE"; na pustyni i w sniegu (tam karmi BK) E4/1 doplaca w zimie tylko roznice ponad pasze BK (po recenzji: pasza = wieksza
+    ///    z E4/1 i BK) - bez podwojnej paszy i bez dziury, gdzie zima najostrzejsza.
     ///  - RATIONS -40%: licznik zagniezdzenia (Rations._depth) tnie raz, na zewnatrz (RBL), choc latka siedzi na kazdym modelu lancucha.
     ///  - NumberOfMenOnMapToEatOneFood NIE przepiety (getter jednej instrukcji - latka bez potrzeby: u Jeffa BK SlowerParties 0, wiec 20 = 20);
     ///    linia kampanii pokazuje obie liczby i ostrzega, gdyby sie rozjechaly.
@@ -272,15 +273,16 @@ namespace Armoury
         {
             try
             {
-                if (!Settings.Current.FoodModelChain) { _start = "wylaczony (FoodModelChain)"; Log.Info("FoodChain (E4/6a): wylaczony (FoodModelChain) - model jedzenia partii jak dotad."); return; }
+                // typ RBL i getter BaseModel takze przy wylaczniku - tylko do linii kampanii (RBL rozpoznany, lancuch pod nim widoczny); bez _patched nic nie biegnie
                 _rbl = AccessTools.TypeByName(RblModel);
+                _baseModelGetter = AccessTools.PropertyGetter(typeof(MBGameModel<MobilePartyFoodConsumptionModel>), "BaseModel");
+                if (!Settings.Current.FoodModelChain) { _start = "wylaczony (FoodModelChain)"; Log.Info("FoodChain (E4/6a): wylaczony (FoodModelChain) - model jedzenia partii jak dotad."); return; }
                 if (_rbl == null) { _start = "brak RealisticBannerlord"; Log.Info("FoodChain (E4/6a): brak RealisticBannerlord - nic do naprawy."); return; }
                 var def = typeof(DefaultMobilePartyFoodConsumptionModel);
                 var mDaily = AccessTools.Method(def, "CalculateDailyFoodConsumptionf", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
                 var mBase = AccessTools.Method(def, "CalculateDailyBaseFoodConsumptionf", new[] { typeof(MobileParty), typeof(bool) });
                 var mEats = AccessTools.Method(def, "DoesPartyConsumeFood", new[] { typeof(MobileParty) });
                 var mRbl = AccessTools.DeclaredMethod(_rbl, "CalculateDailyFoodConsumptionf", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
-                _baseModelGetter = AccessTools.PropertyGetter(typeof(MBGameModel<MobilePartyFoodConsumptionModel>), "BaseModel");
                 var miss = new List<string>();
                 if (mDaily == null) miss.Add("Default.CalculateDailyFoodConsumptionf");
                 if (mBase == null) miss.Add("Default.CalculateDailyBaseFoodConsumptionf");
@@ -433,7 +435,7 @@ namespace Armoury
             bool bk = types.Exists(x => x.FullName == "BannerKings.Models.Vanilla.BKPartyConsumptionModel");
             var s = Settings.Current;
             sb.Append(" | zima Armoury (WinterBite +").Append(s.WinterPartyFoodBonusPercent).Append("%, pasza koni E4/1): raz, w bazie najglebszego modelu");
-            sb.Append("; regula paszy BK ").Append(bk ? "w lancuchu - E4/1 bez doplaty na pustyni i w sniegu (tam karmi BK)" : "poza lancuchem - E4/1 doplaca takze na pustyni i w sniegu");
+            sb.Append("; regula paszy BK ").Append(bk ? "w lancuchu - na pustyni i w sniegu (tam karmi BK) E4/1 doplaca w zimie tylko roznice ponad pasze BK" : "poza lancuchem - E4/1 doplaca pelna pasze takze na pustyni i w sniegu");
             sb.Append(" | Rations -").Append(Math.Max(0, Math.Min(90, s.FoodConsumptionCutPercent))).Append("% raz, na zewnatrz (licznik zagniezdzenia)");
 
             // partie: kto je wedlug aktywnego modelu
