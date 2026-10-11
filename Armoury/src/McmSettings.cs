@@ -512,6 +512,10 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int FoodConsumptionCutPercent { get; set; } = 40;
 
+        [SettingPropertyBool("Food Model Chain", HintText = "one chain of party food rules: Realistic Bannerlord keeps its seasons and weather, and beneath it the rules of the other mods run again - the Others do not eat (Realm of Thrones), parties eat 20% less at sea (War Sails), Banner Kings perks and animal feed in desert and snow count, and Banner Kings' own parties (travellers, estates, free companies, retinues) do not eat, as Banner Kings intends - each rule counted once, winter and rations once. Restart the game after changing it (off = Realistic Bannerlord alone, as before)")]
+        [SettingPropertyGroup("The lean quartermasters")]
+        public bool FoodModelChain { get; set; } = true;
+
         [SettingPropertyBool("Crossing Law Enabled", HintText = "fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea")]
         [SettingPropertyGroup("The crossing law")]
         public bool CrossingLawEnabled { get; set; } = true;
@@ -4239,6 +4243,7 @@ namespace Armoury
             s.BkSupplyMoraleByDays = BkSupplyMoraleByDays;
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
             s.FoodConsumptionCutPercent = FoodConsumptionCutPercent;
+            s.FoodModelChain = FoodModelChain;
             s.CrossingLawEnabled = CrossingLawEnabled;
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;

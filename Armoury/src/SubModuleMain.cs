@@ -134,6 +134,7 @@ namespace Armoury
                 VillageWoodlot.ApplyAll(_harmony); // paczka 126: las wsi - drewno kazdej wsi bez drwali zamiast dosypki RBL (PO FreeSupplies: RblFeeds)
                 PopulationLaw.ApplyTownTax(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
+                try { FoodChain.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodChain.ApplyAll", e); }   // E4/6a: RBL liczy pory roku na wyniku lancucha ROT -> NavalDLC -> BEE -> BK (jeden lancuch modelu jedzenia)
                 ScorchedEarth.ApplyAll(_harmony);
                 try { Measure40.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Measure40.ApplyAll", e); }   // E4/0 (188): pomiar ludzi, jencow i zimy - okna wpiete zawsze (U26), licza przy PeopleMeasureEnabled; gra bez zmian
                 try { OthersRise.ApplyAll(_harmony); } catch (Exception e) { Log.Error("OthersRise.ApplyAll", e); }   // E4/2 (190): Inni tylko z poleglych za Murem / przy Murze - latki wpiete zawsze, wylaczniki na zywo; PO Measure40 (finalizer (f) High przed W10)

@@ -1428,6 +1428,7 @@ namespace Armoury
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); }
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); }
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku
+            try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); }   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }

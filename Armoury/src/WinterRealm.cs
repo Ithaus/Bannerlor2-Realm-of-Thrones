@@ -36,7 +36,9 @@ namespace Armoury
     /// Bez doplaty: partia na stepie (TerrainType.Steppe - wypas zimowy; regula wedlug terenu, nie kultury) i - TYLKO gdy regula paszy BK naprawde
     /// biegnie (BK CalculateDailyFoodConsumptionf w aktywnym lancuchu modelu jedzenia) - pustynia (BK: pelna pasza) i snieg/zamiec (BK: pol).
     /// U Jeffa aktywnym modelem jest RBL RealisticFoodConsumptionModel (RBL laduje sie po ROT, dziedziczy po Default i nie wola modelu
-    /// wewnetrznego) - BK nie karmi wtedy nigdzie, wiec doplata obejmuje tez pustynie i snieg. Lancuch ustalany raz na kampanie (FeedInfo):
+    /// wewnetrznego) - BK nie karmi wtedy nigdzie, wiec doplata obejmuje tez pustynie i snieg. Od E4/6a (FoodChain, FoodModelChain) RBL oddaje
+    /// swoje metody lancuchowi pod soba (ROT -> NavalDLC -> BEE -> BK) - regula paszy BK biegnie i doplata pomija pustynie i snieg (bez podwojnej
+    /// paszy); FeedInfo idzie wtedy przez RBL w glab (FoodChain.Chains). Lancuch ustalany raz na kampanie (FeedInfo):
     /// od aktywnego modelu w glab przez owijki (typ wprost po abstrakcyjnym MobilePartyFoodConsumptionModel - ROT _previousModel, BEE _baseModel,
     /// NavalDLC BaseModel); typ po klasie konkretnej (RBL po Default) konczy lancuch - ten sam test, ktorym ROT sprawdza modele (ValidateGameModel).
     /// Doplata wchodzi do bazy jedzenia (WinterBite.FoodPostfix na DefaultMobilePartyFoodConsumptionModel.CalculateDailyBaseFoodConsumptionf -
@@ -216,7 +218,9 @@ namespace Armoury
                         sb.Append(i > 0 ? " -> " : "").Append(t.Name);
                         var calc = t.GetMethod("CalculateDailyFoodConsumptionf", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
                         if (calc != null && calc.DeclaringType != null && calc.DeclaringType.FullName == BkModel) { f.BkFeeds = true; break; }
-                        if (t.BaseType != typeof(MobilePartyFoodConsumptionModel)) { sb.Append(" (konczy lancuch - nie wola modelu wewnetrznego)"); break; }
+                        // E4/6a: RBL z naprawionym lancuchem (FoodChain) oddaje metody swojemu BaseModel - idziemy dalej w glab (pole BaseModel gry)
+                        if (t.BaseType != typeof(MobilePartyFoodConsumptionModel) && !FoodChain.Chains(m)) { sb.Append(" (konczy lancuch - nie wola modelu wewnetrznego)"); break; }
+                        if (t.BaseType != typeof(MobilePartyFoodConsumptionModel)) sb.Append(" (lancuch E4/6a)");
                         m = Inner(m, t);
                     }
                     f.Chain = sb.ToString();

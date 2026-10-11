@@ -148,6 +148,8 @@ namespace Armoury
 
         public bool AiStarvingBuysAnyPrice = true;         // a STARVING AI party buys the cheapest food it can afford at ANY price - hunger does not haggle (vanilla and Banner Kings refuse anything above 120 denars, so lords starve on a full market in wartime)
         public int FoodConsumptionCutPercent = 40;         // a party eats this much LESS per day, player and AI alike (0 = vanilla). The world marches slower now (world pace, long year), so the same road costs more days - rations must stretch to match
+        // E4/6a lancuch modelu jedzenia partii (Jeff 11.10 "tak naprawic"; FoodChain.cs) - stan ustalany raz na kampanie
+        public bool FoodModelChain = true;                 // one chain of party food rules: Realistic Bannerlord keeps its seasons and weather, and beneath it the rules of the other mods run again - the Others do not eat (Realm of Thrones), parties eat 20% less at sea (War Sails), Banner Kings perks and animal feed in desert and snow count, and Banner Kings' own parties (travellers, estates, free companies, retinues) do not eat, as Banner Kings intends - each rule counted once, winter and rations once. Restart the game after changing it (off = Realistic Bannerlord alone, as before)
 
         // --- The crossing law ---
         public bool CrossingLawEnabled = true;             // fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea
