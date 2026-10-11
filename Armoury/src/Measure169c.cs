@@ -756,14 +756,22 @@ namespace Armoury
         /// <summary>0 za Murem, 1 przy Murze, 2 Westeros, 3 Essos; -1 = wyjatek (potkniecie liczone, nekromancja tej bitwy poza "razem" - kontrola T4 pokaze roznice).</summary>
         private static int PlaceOf(MapEvent me)
         {
+            try { return PlaceAt(me.Position.ToVec2()); }
+            catch (Exception e) { Stumble("PlaceOf", e); return -1; }
+        }
+
+        /// <summary>E4/2: jedna definicja miejsca dla pomiaru (W8) i dla reguly Innych (OthersRise, R13: wight tylko "za Murem" albo "przy Murze").
+        /// Bez metody ROT IsBeyondTheWall region kultury freefolk liczy sie jako "za Murem" (RK 4.2 "Teren") - inaczej Inni nie mieliby gdzie wstawac.</summary>
+        internal static int PlaceAt(TaleWorlds.Library.Vec2 pos)
+        {
             try
             {
-                var pos = me.Position.ToVec2();
                 var mb = Beyond();
                 if (mb != null && Convert.ToBoolean(mb.Invoke(null, new object[] { pos }))) return 0;
                 var reg = OutlawLaw.RegionAt(pos);
                 string c = reg != null ? Measure40.CultureAtStart(reg) : "?";
                 if (c == "nightswatch") return 1;
+                if (mb == null && c == "freefolk") return 0;
                 return PopulationLaw.WesterosCultures.Contains(c) ? 2 : 3;
             }
             catch (Exception e) { Stumble("PlaceOf", e); return -1; }

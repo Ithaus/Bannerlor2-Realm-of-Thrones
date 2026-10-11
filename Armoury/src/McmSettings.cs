@@ -3652,6 +3652,22 @@ namespace Armoury
         [SettingPropertyGroup("The Others and Valyrian steel (175c)")]
         public int OthersCastleSteelPercent { get; set; } = 50;
 
+        [SettingPropertyBool("Others Rise Only From Fallen", HintText = "As in the books, the dead rise only where the Others walk: after a battle the Others won beyond the Wall or at the Wall, the slain of the beaten side (by each host's part in the fight) and the captives the Others take rise as wights, up to the room in the host - the rest wait as bodies for new hosts; anywhere else the fallen and the captives are burnt and nobody rises. A beaten host of the Others raises nobody. Living militia of a settlement taken by the Others fall too and rise only beyond or at the Wall, and the wights of a disbanded band no longer join the outlaws. Off = Realm of Thrones as before: the healthy men of every beaten side rise wherever the battle was")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersRiseOnlyFromFallen { get; set; } = true;
+
+        [SettingPropertyBool("Others Raid Wights", HintText = "a village raided by the Others gives them wights out of thin air (half its hearths, as Realm of Thrones does). Off (default) = a raid raises nobody - until the raided villagers themselves are counted. Works only with Others Rise Only From Fallen on; with it off, raids work as in Realm of Thrones")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersRaidWights { get; set; } = false;
+
+        [SettingPropertyBool("Others Band From Corpse Pool", HintText = "a new host of the Others is raised from the bodies waiting beyond and at the Wall (a new campaign starts with 616 of the old dead): its 53 wights (and the hundred of the first days) come only from that store, nearest first, and with no bodies left the Walker rides out alone. Off = new hosts appear with their wights out of thin air, as before")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersBandFromCorpsePool { get; set; } = true;
+
+        [SettingPropertyBool("Others Rescued Are Fallen", HintText = "captives the Others free from a beaten party do not join the host as living men: each one is slain - he rises as a wight beyond or at the Wall (up to the room in the host, the rest wait as bodies), elsewhere he is burnt. Off = freed captives march with the Others alive, as before")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersRescuedAreFallen { get; set; } = true;
+
         [SettingPropertyBool("Same Race Only", HintText = "giants wed and bear children only with giants, men only with men (likewise wights and the Others): no marriage and no child across races. Mixed couples wed before the war stay married, but no child is born to them - a pregnancy across races ends without a birth")]
         [SettingPropertyGroup("Blood and race")]
         public bool SameRaceOnly { get; set; } = true;
@@ -4932,6 +4948,10 @@ namespace Armoury
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;
+            s.OthersRiseOnlyFromFallen = OthersRiseOnlyFromFallen;
+            s.OthersRaidWights = OthersRaidWights;
+            s.OthersBandFromCorpsePool = OthersBandFromCorpsePool;
+            s.OthersRescuedAreFallen = OthersRescuedAreFallen;
             s.SameRaceOnly = SameRaceOnly;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;

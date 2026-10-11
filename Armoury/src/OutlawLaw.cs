@@ -84,8 +84,11 @@ namespace Armoury
         internal static float RaidMenNow { get { return _inRaid; } }
         internal static float MiseryMenNow { get { return _inMisery; } }
         internal static float ReturnMenNow { get { return _outReturn; } }
+        /// <summary>E4/2 (e): wighty rozwiazanych band pominiete od ostatniego odczytu (OthersRise.Daily czyta i zeruje).</summary>
+        internal static long TakeDisbandUndead() { long v = _disbandUndead; _disbandUndead = 0; return v; }
         private static int _bornBands, _bornMen, _refused, _emptyRemoved, _bandRecruit, _prisonerJoin, _upLoot, _upFence, _upBlocked, _fenceGold;
         private static int _desUndead;      // W4b: dezerterzy Innych (partia Innych albo wight) - do niczego, nie do puli
+        private static long _disbandUndead; // E4/2 (e): wighty rozwiazanych band - do niczego, nie do puli (linia "Inni z poleglych (E4/2)")
 
         // paser - skup lupu band (licznik dnia)
         private static int _sellBands, _sellFenced, _sellBeyond, _sellSellers, _sellSpareBands, _sellUnits, _sellIron, _sellWood, _sellFood, _sellAnimals, _sellStumbles;
@@ -119,6 +122,7 @@ namespace Armoury
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
             _hearthRegion.Clear(); H3NewDay(); _errH3 = false;        // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii
             _desUndead = 0; OverflowHome.Reset();                      // W4b/W4c: liczniki dopisku linii "Wyrzutki:" i notatki przepelnienia tylko z tej kampanii
+            _disbandUndead = 0;                                        // E4/2 (e)
         }
 
         private static void FenceNewDay()
@@ -249,13 +253,14 @@ namespace Armoury
             float v; d.TryGetValue(key, out v); d[key] = v + n;
         }
 
-        private static void AddRoster(Settlement region, TroopRoster roster, float share, ref float counter)
+        private static void AddRoster(Settlement region, TroopRoster roster, float share, ref float counter, bool skipUndead = false)
         {
             if (region == null || roster == null || share <= 0f) return;
             for (int i = 0; i < roster.Count; i++)
             {
                 var e = roster.GetElementCopyAtIndex(i);
                 if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                if (skipUndead && Undead.Character(e.Character)) { _disbandUndead += e.Number; continue; }   // E4/2 (e): wight nie idzie do lasu
                 float n = e.Number * share;
                 Add(region, e.Character.StringId, n);
                 counter += n;
@@ -591,8 +596,10 @@ namespace Armoury
                 }
                 if (destroyer != null) return;
                 var region = NearestNode(party.Position.ToVec2());
-                AddRoster(region, party.MemberRoster, 1f, ref _inDisband);
-                AddRoster(region, party.PrisonRoster, 1f, ref _inDisband);      // jency rozwiazanej bandy tez zostaja w lesie
+                // E4/2 (e): druga droga wightow do puli zamknieta (jak W4b dla dezercji) - przy OthersRiseOnlyFromFallen wighty skladu i lochu do niczego
+                bool noDead = Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen;
+                AddRoster(region, party.MemberRoster, 1f, ref _inDisband, noDead);
+                AddRoster(region, party.PrisonRoster, 1f, ref _inDisband, noDead);      // jency rozwiazanej bandy tez zostaja w lesie
             }
             catch (Exception e) { Log.Error("OutlawLaw.PartyDestroyed", e); }
         }

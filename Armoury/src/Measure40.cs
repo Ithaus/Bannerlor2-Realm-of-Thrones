@@ -126,6 +126,7 @@ namespace Armoury
         private static readonly string[] PName = { "partie rodow", "zalogi", "milicje", "bandy", "Inni", "gracz", "inne" };
         private static readonly int[] _taken = new int[PKinds], _rescued = new int[PKinds];
         private static int _lootRemoved, _lootBattles, _capBattles, _bkRaidPris, _bkRaidPlayer, _bkRaidN;
+        private static int _rescueFallen;   // E4/2 (f): odbici przez Innych - zdjeci ze skladu bandy jako polegli PRZED finalizerem W10 (OthersRise.RescueFin)
         private static readonly Dictionary<string, int> _diseaseByCulture = new Dictionary<string, int>();
         private static readonly int[] _diseaseByGroup = new int[PeopleLedger.Groups];
         private static int _diseaseDead, _diseaseUnhit;
@@ -160,7 +161,7 @@ namespace Armoury
             _cartNewH = _cartRefH = _fishNewH = _fishRefH = _raidH = _decreeH = 0; _raidGoldAi = _raidGoldPlayer = 0; _raidVill.Clear();
             _regDay.Clear(); Array.Clear(_peopleDay, 0, BKinds);
             _noVillage = 0f; _forage = 0f; _forageN = 0;
-            Array.Clear(_taken, 0, PKinds); Array.Clear(_rescued, 0, PKinds); _lootRemoved = _lootBattles = _capBattles = _bkRaidPris = _bkRaidPlayer = _bkRaidN = 0;
+            Array.Clear(_taken, 0, PKinds); Array.Clear(_rescued, 0, PKinds); _lootRemoved = _lootBattles = _capBattles = _bkRaidPris = _bkRaidPlayer = _bkRaidN = 0; _rescueFallen = 0;
         }
 
         // ------------------------------------------------------------ pomocnicze (tylko odczyt)
@@ -498,7 +499,9 @@ namespace Armoury
                     if (!mep.IsNpcParty) continue;      // gracz: PlayerEncounter tworzy te rostery leniwie (pole w zapisie) - nie dotykamy; jego jency ida przez ekran lupu, poza oknem
                     var r = prisoners ? mep.RosterToReceiveLootPrisoners : mep.RosterToReceiveLootMembers;
                     if (r == null || Has(w.R, r)) continue;
-                    w.R.Add(r); w.Kind.Add(KindOf(mep.Party)); w.Before.Add(r.TotalRegulars);
+                    int kind = KindOf(mep.Party);
+                    // E4/2 (f): u band Innych "odbici wcieleni" to tylko ZYWI (wighty z odbitych dopisuje OthersRise przed tym finalizerem - sa w linii E4/2)
+                    w.R.Add(r); w.Kind.Add(kind); w.Before.Add(kind == POthers && !prisoners ? OthersRise.LivingRegulars(r) : r.TotalRegulars);
                 }
                 catch (Exception e) { Stumble("W10(odbiorca)", e); }
             }
@@ -536,7 +539,8 @@ namespace Armoury
                     _lootBattles++; _lootRemoved += __state.DefBefore - after;
                     for (int i = 0; i < __state.R.Count; i++)
                     {
-                        int d = __state.R[i].TotalRegulars - __state.Before[i];
+                        int now = __state.Kind[i] == POthers ? OthersRise.LivingRegulars(__state.R[i]) : __state.R[i].TotalRegulars;   // E4/2: Inni - zywi
+                        int d = now - __state.Before[i];
                         if (d > 0) _rescued[__state.Kind[i]] += d;
                     }
                 }
@@ -580,6 +584,8 @@ namespace Armoury
 
         /// <summary>Wzrost Innych (169c): odbici jency wcieleni do band Innych w tej dobie (zywi ludzie - dzis w "reszcie" linii 169c; U6).</summary>
         internal static int RescuedToOthers { get { lock (Gate) return _rescued[POthers]; } }
+        /// <summary>E4/2 (f): odbici jency zdjeci ze skladu bandy Innych jako polegli (OthersRise) - w linii Jency osobno, nie w "bez odbiorcy".</summary>
+        internal static void NoteRescuedFallen(int n) { try { if (!On || n <= 0) return; lock (Gate) _rescueFallen += n; } catch (Exception e) { Stumble("NoteRescuedFallen", e); } }
         internal static int TakenByOthers { get { lock (Gate) return _taken[POthers]; } }
 
         // ============================================================ W11: jency z rabunku BK
@@ -984,7 +990,8 @@ namespace Armoury
             sb.Append("; zaloga i milicja oddaja do lochu osady; Inni - skasowani przez ROT w linii \"Wzrost Innych\"; gracz - ekran lupu, poza oknem)")
               .Append(" | z niewoli pokonanych zabrano ").Append(_lootRemoved).Append(" w ").Append(_lootBattles).Append(" bitwach: odbici i wcieleni do skladu zwyciezcy -").Append(rescued).Append(" (");
             for (int i = 0; i < PKinds; i++) { if (i == PPlayer) continue; sb.Append(i > 0 ? ", " : "").Append("do " + PName[i]).Append(' ').Append(_rescued[i]); }
-            sb.Append("), bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued))
+            sb.Append("), odbici przez Innych - polegli (E4/2) ").Append(_rescueFallen)
+              .Append(", bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued - _rescueFallen))
               .Append(" | z rabunku BK +").Append(_bkRaidPris).Append(" w ").Append(_bkRaidN).Append(" rabunkach (z niczego; gracz ").Append(_bkRaidPlayer).Append(')')
               .Append(" | wypuszczeni, sprzedani, na Mur, straceni - linia \"Prawo jenca (I1)\"; uwolnieni bez odbiorcy w bitwach H3 - linia \"Przegrani (H3)\"; jency rozwiazanych partii - linia \"Partie (E4/0)\"");
             sb.Append(" | czas ").Append(Ms(t0)).Append(" ms.");

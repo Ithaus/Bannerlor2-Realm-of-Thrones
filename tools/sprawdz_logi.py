@@ -535,6 +535,7 @@ def etap4_main(logp, start_arg, until=120):
     lud = e4_series(lines, "Ludzie: dzien")
     zal = e4_series(lines, "Zalogi: przyrost bez werbunku (169c): dzien")
     inn = e4_series(lines, "Wzrost Innych (169c): dzien")
+    e42 = e4_series(lines, "Inni z poleglych (E4/2): dzien")       # E4/2: wighty z odbitych (poza oknem W8), milicja przejetej osady
     wyr = e4_series(lines, "Wyrzutki: dzien", 1)
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
@@ -698,6 +699,7 @@ def etap4_main(logp, start_arg, until=120):
             "milicja z modelu": L(d, r"milicja \(E4/0\): z modelu w ticku " + SF, zal),
             "nowe partie (rody, karawany, konwoje, Inni, inne)": sum(newp.get(k, 0) for k in ("partie rodow", "karawany", "konwoje BK", "Inni", "inne")),
             "Inni: nekromancja i rajd": L(d, r"nekromancja ROT w oknie OnMapEventEnded " + SF, inn) + L(d, r"rajd ROT \(Hearth/2 z niczego\) " + SF, inn),
+            "Inni E4/2: wighty z odbitych, zywi z odbicia osady": L(d, r"\(f\) odbici jency: .*?-> wstalo (\d+)", e42) + L(d, r"odbicie osady \(ROT: [^)]*\) \d+ \(\+(\d+) zywych", e42),
             "tabory i lodzie z hearth": L(d, r"- tabory wsi -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea) + L(d, r"- lodzie rybackie -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea),
             "pula z hearth (rabunki, bieda)": L(d, r"rabunki (\d+), bieda/wojna", wyr) + L(d, r"bieda/wojna " + F_, wyr),
             "jency z rabunku BK": L(d, r"z rabunku BK \+(\d+)", jen),
@@ -715,6 +717,8 @@ def etap4_main(logp, start_arg, until=120):
             "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
                                                           + L(d, r"ranni \d+, jency (\d+) - znikaja", par) + L(d, r"usuniete bez zniszczenia \d+ \(ostatni stan (\d+)", par),
             "jency bez odbiorcy (gra) i skasowani przez ROT": L(d, r"bez odbiorcy \(gra usuwa[^)]*\) (\d+)", jen) + L(d, r"jency Innych skasowani przez ROT (\d+)", inn),
+            "E4/2: odbici przez Innych (polegli), spalona milicja, wighty rozwiazanych band": L(d, r"odbici przez Innych - polegli \(E4/2\) (\d+)", jen) + L(d, r"\(d\) przejecie osady: .*?, spalone (\d+);", e42)
+                                                          + L(d, r"\(e\) wighty rozwiazanych band - do niczego, nie do puli wyrzutkow (\d+)", e42),
         }
         res = dS - (sum(src.values()) - sum(snk.values()))
         t7.append(res)
