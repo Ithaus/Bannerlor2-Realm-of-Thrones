@@ -675,3 +675,19 @@ miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lo
 - (02:56) **Test informacyjny E4/2 (120 dob, test\Armoury-e4-2.dll 6c01c450, kopia SCRATCH(ae222cb7)\kopia-e42-120):** 0 bledow; Inni d119 1687 (bez E4/2: 2014), szczyt
   2409 (2383); wstalo z poleglych 5544 wobec wzoru ROT 5781 (-4%); pula CIALA na koniec 2497 (obawa recenzji o braku odnawiania sie nie sprawdzila). Rada: wgrac (z D11) -
   czeka na "tak" Jeffa. DLL w grze po tescie zatwierdzone (809a603a / 77b11df5). Paczka D11 w toku (wf_72f90ad9-edc, drzewo e4\d11, galaz w-toku/d11).
+
+## 25. STAN 11.10 ok. 03:20 (po powrocie Jeffa) - PRACE W TOKU, ZASADA TESTOW ZBIORCZYCH
+
+**W grze:** Armoury 809a603a (WGRANIE 29), RC 90665425, GT bbb841d7, CS 77b11df5. Decyzje Jeffa 11.10 - STAN-PRAC "DECYZJE JEFFA 11.10" (statki z etapem 5; etap 4:
+Sarnor 100 tys./tak/tak/tak; kiesa bandy do gracza; podatek warsztatow placi wlasciciel; napitki/drewno placi wojsko; wedrowcy BK z towarem; kara za przegrana /2;
+doplata ROT do sakiewek; werdykt "pokonany" dla lordow; E4/2 WGRAC; proba zimy - wariant (b) tryb autotestu z plikiem-przelacznikiem, bez ruszania Armoury.json).
+**ZASADA (Jeff 03:05):** kod kilku paczek -> jedna galaz -> JEDEN test 120 dob + zapis 9 dob -> jedno wgranie (pamiec testy-zbiorcze.md).
+**W toku (worktree klonu lancuch, SCRATCH(ae222cb7)\e4\...):**
+- D11 (decyzje 11.10, 6 zmian): workflow wf_72f90ad9-edc, drzewo e4\d11, galaz w-toku/d11 od 7aa4a6e -> test\Armoury-d11.dll.
+- E4/2 gotowe: w-toku/e4-2 3e10b11 (od 2a71008) - do scalenia.
+- E4/3 (punkty powrotu + powrot wyrzutkow do domu): workflow wf_dedf899d-56d, drzewo e4\43, galaz w-toku/e4-3 od 3e10b11 -> test\Armoury-e4-3.dll.
+- E4/1 (zima wedlug krain) + PROBNA ZIMA (tryb autotestu, plik-przelacznik): do zrobienia (drzewo e4\41, galaz w-toku/e4-1 od 7aa4a6e).
+- Wedrowcy BK z prawdziwym towarem (decyzja 11.10): do zrobienia (drzewo e3\36b, galaz w-toku/e3-36b od 7aa4a6e).
+**Plan:** po kodzie - scalic d11 + e4-2 + e4-3 + e4-1 + 36b (+ E4/4 od e4-3, jesli zdazy) na galaz w-toku/zbior30 (unia konfliktow: SCRATCH(ae222cb7)\d1\union.py, potem
+python tools/gen_mcm.py), build -> test 120 dob nowej kampanii + bieg 120 dob z proba zimy (plik-przelacznik) + zapis 9 dob -> WGRANIE 30. Progi: sprawdz_logi --grupa etap2,
+etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
