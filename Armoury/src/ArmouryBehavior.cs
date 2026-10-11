@@ -434,6 +434,11 @@ namespace Armoury
             // 177-3: zlecenia u mistrzow Qohoru (klingi wejscia zyja tylko w tym napisie az do wydania) - wlasny try
             try { string qo = dataStore.IsSaving ? QohorMasters.Export() : null; SaveText.Sync(dataStore, "arm_qohor_orders", ref qo); if (dataStore.IsLoading) QohorMasters.Import(qo); }
             catch (Exception e) { Log.Error("SyncData.arm_qohor_orders", e); }
+            // E4/2 (190): ksiega ludzi - konto CIALA (pula Innych wedlug regionu) i flaga bilansu otwarcia; stary zapis bez klucza = pula od 0.
+            // Osobny try PRZED glownym blokiem (recenzja E4/2 pkt 3, wzor arm_startstock/arm_castlepurse): wyjatek innego klucza nie moze zgubic
+            // flagi - zgubiona flaga i wczytanie w pierwszych 2 dobach kampanii to drugi bilans otwarcia (616 cial z niczego)
+            try { string people = dataStore.IsSaving ? PeopleBook.Export() : null; SaveText.Sync(dataStore, "arm_people", ref people); if (dataStore.IsLoading) PeopleBook.Import(people); }
+            catch (Exception e) { Log.Error("SyncData.arm_people", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -470,9 +475,6 @@ namespace Armoury
                 string outlaws = OutlawLaw.Export();
                 SaveText.Sync(dataStore, "arm_outlaws", ref outlaws);
                 if (dataStore.IsLoading) OutlawLaw.Import(outlaws);
-                // E4/2 (190): ksiega ludzi - konto CIALA (pula Innych wedlug regionu); stary zapis bez klucza = pula od 0
-                try { string people = dataStore.IsSaving ? PeopleBook.Export() : null; SaveText.Sync(dataStore, "arm_people", ref people); if (dataStore.IsLoading) PeopleBook.Import(people); }
-                catch (Exception e) { Log.Error("SyncData.arm_people", e); }
                 // klimat Westeros: historia por roku (Jeff 04.10)
                 // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62)
                 // dorobek stuleci: zbrojownie i zapas kupiecki raz na kampanie (wpis 79)

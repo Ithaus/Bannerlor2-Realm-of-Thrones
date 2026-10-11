@@ -264,6 +264,10 @@ namespace Armoury
             var wp = me.PartiesOnSide(win);
             if (wp != null) for (int i = 0; i < wp.Count; i++) { var x = wp[i]; if (x != null) winContrib += x.ContributionToBattle; }
             float mult = NecroMult();
+            // loch liczony raz (recenzja E4/2 pkt 1): zaloga i milicja osady dostaja od gry ten sam loch osady (MapEventParty.RosterToReceiveLootPrisoners:
+            // IsMilitia/IsGarrison -> HomeSettlement.Party.PrisonRoster) - druga partia z tym samym rosterem: Pris 0, bez Clear (jedno Clear wystarczy, jak u ROT);
+            // ten sam test ReferenceEquals co okno W8 (Measure169c.OthersPris), wiec linia E4/2 i W8 licza tych samych jencow
+            var seenPris = new List<TroopRoster>(2);
             for (int k = 0; k < items.Count; k++)
             {
                 var item = items[k]; var mp = item.Party.MobileParty;
@@ -277,7 +281,13 @@ namespace Armoury
                     int space = 0; try { space = (int)((1f - mp.PartySizeRatio) * (float)item.Party.PartySizeLimit); } catch { }
                     p.RotWould = Math.Max(0L, Math.Min(rv, (long)space));
                 }
-                if (!mp.IsMainParty) { p.Clear = item.RosterToReceiveLootPrisoners; p.Pris = LivingRegulars(p.Clear); }
+                if (!mp.IsMainParty)
+                {
+                    var pr = item.RosterToReceiveLootPrisoners;
+                    bool had = false;
+                    if (pr != null) foreach (var x in seenPris) if (ReferenceEquals(x, pr)) { had = true; break; }
+                    if (pr != null && !had) { seenPris.Add(pr); p.Clear = pr; p.Pris = LivingRegulars(pr); }
+                }
                 plan.Add(p);
             }
             {
