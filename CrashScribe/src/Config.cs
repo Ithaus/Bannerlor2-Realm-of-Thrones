@@ -73,7 +73,7 @@ namespace CrashScribe
         // --- Oblezenie Harrenhal: czekanie na Roose'a i sprzatanie po wydarzeniu (B6b; patrz Mends.HarrenhalWait, HarrenhalEnd, HarrenhalOldSaveCheck) ---
         public static bool HarrenhalWaitForRoose = true;     // Roose w bitwie albo w cudzym oblezeniu: proba odlozona (co godzine), zastepca dopiero po HarrenhalWaitHours; false = zastepca od razu (po staremu)
         public static int HarrenhalWaitHours = 72;           // limit czekania w godzinach gry (doba = 24 h niezaleznie od kalendarza Armoury); <= 0 = nie czekamy
-        public static bool HarrenhalReleaseCommander = true; // koniec wydarzenia (postfiks CompleteEvent) i zmiana dowodcy w naszym porcie: armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
+        public static bool HarrenhalReleaseCommander = true; // koniec wydarzenia (postfiks CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Roose'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
         public static bool HarrenhalOldSaveFix = true;       // po wczytaniu: wydarzenie skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Polnocy tylko w logu)
 
         internal static void Load(string moduleDataDir)

@@ -170,7 +170,7 @@
        in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only releases the
        North's lords if Roose Bolton's own army was the siege army - a stand-in commander stayed frozen for good, and
        the game keeps that in the save. With this on, when the event ends the siege army of its commander is disbanded
-       and the commander is released; when a stand-in is replaced by another one, the previous one is released at once.
+       and the commander is released; when the commander changes (to another stand-in or back to Roose), the previous one is released at once.
        A party held by a quest, by a party disbanding, or by another active Realm of Thrones siege event is left alone.
        Set HarrenhalReleaseCommander to false to leave it to Realm of Thrones (old behaviour). -->
   <HarrenhalReleaseCommander>true</HarrenhalReleaseCommander>

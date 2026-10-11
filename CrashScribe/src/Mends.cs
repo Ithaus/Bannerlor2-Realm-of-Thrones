@@ -192,6 +192,9 @@ namespace CrashScribe
                 // Polnoc i jemu nie da armii - z zastepca
                 if (why == null && !_harrenhalRotFailed)
                 {
+                    // B6b-p: ROT ustawi SiegeLeaderParty = partia Roose'a (:325) - poprzedni dowodca z naszego portu (zamrozony)
+                    // wypadlby z pamieci ROT (np. po wczytaniu zapisu z zastepca i SetupSiegeArmy=true); odmrazamy jak przy zmianie w porcie
+                    HarrenhalReleasePrev(__instance, roose.PartyBelongedTo, harrenhal);
                     // B6: BK (CreateArmyPatch) odmawia armii Roose'owi bez tytulu - przepuszczamy TYLKO to jedno
                     // skryptowe TheNorth.CreateArmy(Roose); flage zeruje finalizer HarrenhalSafe
                     if (_bkArmyPassInstalled) _scriptedArmyLeader = roose;
@@ -220,8 +223,9 @@ namespace CrashScribe
                     _harrenhalWaitSince = -1;
                     return false;
                 }
-                // B6b: Roose nigdy nie jest "zastepca" samego siebie (11.10 04:36: jego proba padla, wybor dal znow jego - zastoj)
-                var sub = HarrenhalPickSubstitute(north, robb, Config.HarrenhalWaitForRoose ? roose : null);
+                // B6b: Roose nigdy nie jest "zastepca" samego siebie (11.10 04:36: jego proba padla, wybor dal znow jego - zastoj).
+                // B6b-p: zawsze, niezaleznie od wylacznika czekania - wybor Roose'a tutaj to zawsze powtorka proby, ktora wlasnie padla
+                var sub = HarrenhalPickSubstitute(north, robb, roose);
                 if (sub == null) { HarrenhalPostponed(why + "; zaden lord Polnocy nie jest wolny"); return false; }
                 if (HarrenhalSetupWith(__instance, sub, north, harrenhal, robb, why)) _harrenhalWaitSince = -1;
                 return false;
@@ -273,7 +277,7 @@ namespace CrashScribe
         }
 
         /// <summary>Najsilniejsza wolna partia lorda Polnocy. B6b: <paramref name="roose"/> != null - Roose wykluczony
-        /// (jego wlasna proba juz padla albo jest zajety; null = po staremu, wylacznik HarrenhalWaitForRoose).</summary>
+        /// (jego wlasna proba juz padla albo jest zajety; B6b-p: wolajacy podaje go zawsze).</summary>
         private static MobileParty HarrenhalPickSubstitute(Kingdom north, Hero robb, Hero roose)
         {
             MobileParty best = null; float bestStr = -1f;
@@ -300,23 +304,9 @@ namespace CrashScribe
         private static bool HarrenhalSetupWith(object ev, MobileParty sub, Kingdom north, Settlement harrenhal, Hero robb, string why)
         {
             var tr = Traverse.Create(ev);
-            MobileParty prev = null;
-            try { prev = tr.Field("SiegeLeaderParty").GetValue() as MobileParty; } catch { }
+            HarrenhalReleasePrev(ev, sub, harrenhal);   // B6b: przed zmiana pola (patrz HarrenhalReleasePrev)
             tr.Field("SetupSiegeArmy").SetValue(false);
             tr.Field("SiegeLeaderParty").SetValue(sub);
-            // B6b: poprzedni dowodca (zamrozony przez nasz port albo TickEvent ROT :234) wypada z pamieci ROT (bh.SiegeLeaderParty)
-            // i nic by go juz nie odmrozilo - odmrazamy od razu; dzieki temu zamrozony przez nas jest zawsze najwyzej
-            // biezacy SiegeLeaderParty, ktorego ROT zapisuje w sejwie (pamiec do sprzatania odtwarzalna po wczytaniu)
-            if (prev != null && prev != sub && Config.HarrenhalReleaseCommander)
-            {
-                try
-                {
-                    if (prev.IsActive && prev.Ai.DoNotMakeNewDecisions)
-                        Scribe.Line("Mends: oblezenie Harrenhal - zmiana dowodcy na " + (sub.LeaderHero != null ? sub.LeaderHero.Name : sub.Name) + ": poprzedni "
-                                    + HarrenhalRelease(prev, null, harrenhal, false) + ".");
-                }
-                catch (Exception e) { HarrenhalStumble("zmiana dowodcy", e); }
-            }
             if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
             bool fresh = sub.SiegeEvent == null || sub.SiegeEvent != harrenhal.SiegeEvent;
             if (fresh)
@@ -584,6 +574,23 @@ namespace CrashScribe
             if (other != null) return s + ", zamrozony, ale " + other + " - zostawiony";
             mp.Ai.SetDoNotMakeNewDecisions(false);
             return s + ", odmrozony";
+        }
+
+        /// <summary>B6b: zmiana dowodcy (nasz port albo oddanie sterow ROT, ktory ustawi partie Roose'a) - poprzedni dowodca
+        /// (zamrozony przez nasz port albo TickEvent ROT :234) wypada z pamieci ROT (bh.SiegeLeaderParty) i nic by go juz nie
+        /// odmrozilo (ROT :455-471 tylko partie bez armii) - odmrazamy od razu, bez rozwiazywania armii. Dzieki temu zamrozony
+        /// przez nas jest zawsze najwyzej biezacy SiegeLeaderParty, ktorego ROT zapisuje w sejwie. Wolac PRZED zmiana pola.</summary>
+        private static void HarrenhalReleasePrev(object ev, MobileParty next, Settlement harrenhal)
+        {
+            if (!Config.HarrenhalReleaseCommander) return;
+            try
+            {
+                var prev = Traverse.Create(ev).Field("SiegeLeaderParty").GetValue() as MobileParty;
+                if (prev == null || prev == next || !prev.IsActive || !prev.Ai.DoNotMakeNewDecisions) return;
+                string who = next == null ? "?" : (next.LeaderHero != null ? next.LeaderHero.Name.ToString() : next.Name.ToString());
+                Scribe.Line("Mends: oblezenie Harrenhal - zmiana dowodcy na " + who + ": poprzedni " + HarrenhalRelease(prev, null, harrenhal, false) + ".");
+            }
+            catch (Exception e) { HarrenhalStumble("zmiana dowodcy", e); }
         }
 
         /// <summary>Postfiks na ROT HarrenhalSiegeEvent.CompleteEvent - biegnie PO ResetDefenderParties/ResetAttackerParties ROT.</summary>
