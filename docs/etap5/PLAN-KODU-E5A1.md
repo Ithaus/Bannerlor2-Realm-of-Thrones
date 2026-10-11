@@ -1,10 +1,14 @@
-# PLAN KODU - paczka E5/A1 (111'): kasy miast - bez "zakupow" z niczego, regulator tryb 1, jedna nadwyzka D4, zawor 7% pan 2/3 : korona 1/3, dar startowy, BK rynek, bez tarcz
+# PLAN KODU - paczka E5/A1 (111'): kasy miast - bez "zakupow" z niczego, regulator bez dosypki (tryb 2, miasta i zamki), jedna nadwyzka D4, zawor 7% pan 2/3 : korona 1/3, dar startowy, BK rynek, bez tarcz
 
 Status: SAM PLAN (11.10.2026). Kod, gra, ustawienia, zapisy nietkniete; nic nie budowane. Jedyny zapis poza tym plikiem: wpis-rezerwacja indeksow
 MoneyLedger na gorze `CHANGELOG.md` w drzewie A1 (rozdz. 8.4).
 Wiazace: `docs\etap5\PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` v2 (dalej **P**; A1 = P rozdz. 3 "E5/A1", reguly R1-R7, D4 w rozdz. 2, tabela 5.1,
 progi rozdz. 4), `docs\etap5\KRYTYKA-E5.md` (E5K1-03, E5K1-08, K3, K6, W1, W3), rozpoznania `docs\etap5\rozpoznanie-B-kod.md` (**RB** 0.1, 2 "5.1", 3, 4, 5.4),
-decyzje Jeffa `docs\STAN-PRAC.md` (E 09.10 04:25 - wyrownanie panow zamkow takze u gracza; 11.10 03:05 - testy zbiorcze; A1 nie ma pytania do Jeffa).
+decyzje Jeffa `docs\STAN-PRAC.md` (E 09.10 04:25 - wyrownanie panow zamkow takze u gracza; 11.10 03:05 - testy zbiorcze; 15:50 - test zbioru A osobno)
+i **DECYZJE JEFFA 11.10 ok. 16:10 (P rozdz. 6, wiazace, zmieniaja v2):** (1) **A1 bez dosypki od razu - `TownPurseRegulator` domyslnie 2** (regulator gry nic
+nie kasuje i nic nie dosypuje), **miasta i zamki ta sama regula** (CastlePurse), tryb 1 jako opcja MCM; C1 (5.8) przechodzi do A1; w tescie A liczyc zaulki
+(kasy ponizej zapasu / ponizej 1 000 / 0, ile dni z rzedu, czego nie kupily z braku zlota - towar wsi, ktory nie zszedl); (2) udzial zysku kupcow zabierany
+przez pana i korone - wzor E5/0, "ten sam wzor po A1 w linii Kasy miast" (rozdz. 7.3).
 
 Skroty miejsc (SCR = `C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad`):
 - **K:** = `SCR\e5\a1\Armoury\src\` (galaz `w-toku/e5-a1` = 392c519 = zbior 31 + E4/6 + E4/7 scalone) - wszystkie linie Armoury z tego drzewa (P cytuje
@@ -26,8 +30,10 @@ Skroty miejsc (SCR = `C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bann
 3. **R1 "zakupy" mieszczan:** migawka kasy przed konsumpcja (postfiks `DeleteOverproducedItems`) i po (postfiks `MakeConsumption`, First) - przyrost cofniety
    (`ChangeGold(-made)`); towar schodzi z polki jak dotad ("zjedzone bez zaplaty" - do B1). Czynne takze przy tworzeniu swiata (W3: dwa ticki przed
    `GameStarted`, nieliczone w linii) - inaczej "zakupy" z tworzenia zostalyby ponad darem startowym i zawor oddalby je panom.
-4. **R2 regulator tryb 1:** wynik ujemny = 0 (nic w nicosc), dodatni (dosypka) tylko do zapasu kupcow (liczona - jedyne zrodlo z niczego kas miast); tryb 2 =
-   regulator nic (opcja w MCM; domyslne C1 to osobny klucz `TownPurseNoTopUp` - K3, nie w A1). Przed `GameStarted` regulator miasta = 0 w obie strony.
+4. **R2 regulator - domyslnie tryb 2 (Jeff 16:10):** wynik gry = 0 w obie strony (nic w nicosc, nic z niczego) - **dla miast (TownPurse) i zamkow
+   (CastlePurse, ta sama wartosc klucza; zamki tylko przy `CastlePurseEnabled`)**. Tryb 1 (opcja MCM, powrot "gdyby kasy wysychaly"): ujemny = 0, dodatni
+   tylko do zapasu kupcow (liczony). Klucz `TownPurseRegulator` jest NOWY (nie ma go w `Armoury.json` Jeffa), wiec domyslna 2 nie wpada w pulapke MCM -
+   osobny klucz `TownPurseNoTopUp` z P (K3, C1) zbedny. Przed `GameStarted` regulator miasta = 0 w obie strony w kazdym trybie.
 5. **R3 / D4 - jedna nadwyzka:** `TownPurse.Reserve(town)` = max(`TownPurseFloorGold` + `TownPurseFloorPerProsperity` x dobrobyt, 10 000 + 12 x dobrobyt
    = cel regulatora gry). Trzy odczyty, jedna liczba:
    - `TownPurse.Spare(town)` = max(0, kasa - Reserve) - RealPayer E3/1 i porty 181 przez `Seal31.Spare` (K:Seal31.cs:108 - jedna linia; ShipsToPort181
@@ -76,11 +82,13 @@ Skroty miejsc (SCR = `C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bann
     w zaworze (`TownPurse.LordShare`) przy czynnym zaworze; inaczej jak dzis.
 14. **Ksiega:** dwie nowe migawki MoneyLedger **M12 `MTownTrim`** (dar startowy kas miast - ujscie w nicosc, raz) i **M13 `MTownCrown`** (udzial korony
     z zaworu kas miast); `Marks` 12 -> 14. Rezerwacja: A1 12-16, drzewo A2-A5 od 17 (rozdz. 8.4). Czesc pana z zaworu zostaje w "renty" (MRent) jak dzis.
-15. **Linie logu:** bez nowej linii dziennej (P) - rozszerzona "Kasy miast (169c)" (K:Measure169c.cs:370-374); linia startowa `TownPurse (E5/A1):`; dwie
+15. **Linie logu:** bez nowej linii dziennej (P) - rozszerzona "Kasy miast (169c)" (K:Measure169c.cs:370-374; z zaulkami i udzialem zysku kupcow - Jeff 16:10,
+    rozdz. 7.3); linia startowa `TownPurse (E5/A1):`; dwie
     linie jednorazowe (dar startowy, porzucone tarcze); dopiski w "Pieniadz swiata (bilans)", "(bilans - przyczyny)", "Obieg", "Korona: wplywy dnia (165)".
 16. **Poza A1 (nie dopisywac "przy okazji" - CLAUDE.md 8 pkt 3):** placi lud / kiesa W/R/P i 5% zaworu dla P (B1), 1/2 : 1/2 (B3), oblezone wsie/184/polityki
     (A4), dwor 80/20 i sprzet niewydany (A2; `HoldCourt` jest no-op przy A1, A2 nie musi ruszac K:ClanBudget.cs:623), notable i karawany notabli (A3;
-    `CaravanCapital` bez zmian), regulator bez dosypki (C1), napis K:MoneyLedger.Obieg.cs:654 (robi E5/0 - ta sama linia w dwoch drzewach = konflikt).
+    `CaravanCapital` bez zmian), lup wodza (A6 - Jeff 16:20 w porcji A, drzewo A2-A5), napis K:MoneyLedger.Obieg.cs:654 (robi E5/0 - ta sama linia w dwoch
+    drzewach = konflikt). **C1 (regulator bez dosypki) wchodzi do A1** (Jeff 16:10) - w C zostaje tylko kontrola.
 
 ---
 
@@ -88,7 +96,7 @@ Skroty miejsc (SCR = `C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bann
 
 | # | Kto | Co | Gdzie (K:) | Skutek A1 |
 |---|---|---|---|---|
-| S1 | 110 CastlePurse | trzy latki konsumpcji/regulatora, `Spendable`, `PayFloor`, `Dues`, `StartGiftCut`, `Reset` | CastlePurse.cs:123, :202, :225, :236, :251, :272, :288-327, :377-411 | host wpiec miast; zamki bez zmian (galaz zamku nietknieta) |
+| S1 | 110 CastlePurse | trzy latki konsumpcji/regulatora, `Spendable`, `PayFloor`, `Dues`, `StartGiftCut`, `Reset` | CastlePurse.cs:123, :202, :225, :236, :251, :272, :288-327, :377-411 | host wpiec miast; zamki: jedyna zmiana - tryb 2 regulatora (dosypka zamkow 0, rozdz. 3.4) i tekst linii "Zawor zamkow (110)" :662 |
 | S2 | 114 ValveSplit | podzial pan/korona | ValveSplit.cs:13-28 | wspolny pomocnik ("dla 111' i KL" - komentarz :6-8) |
 | S3 | PopulationLaw renty | `On` (PopulationRentEnabled), `RentToday`, `DayTownRent`, `_rentBy`/`RentOf`, `TaxDecree`, petla `Daily` | PopulationLaw.cs:37, :1004-1019, :1097-1120, :1152-1219 | miasta przez zawor A1; wsie jak dzis (B1) |
 | S4 | 166 / 169c / 3.5 | czytaja `RentToday` (BuildFunding.cs:156, KingdomTreasury.cs:87, ClanIncomeBook.cs:340) i `RentOf` (ClanIncomeBook.StableD.cs:344, CouncilWages35.cs:205, Measure169c.cs:354, SoldierPay.cs:787) | - | widza czesc pana (2/3) - te same pola, bez zmian w czytajacych |
@@ -121,6 +129,11 @@ internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastBkS
 internal static int  LastRegDownN, LastRegUpN, LastConsN, LastConsHit, LastBkSkipTowns, LastBkSkipCastles, LastBuyAsk, LastBuyZero, LastPayers, LastKingdoms,
                      LastBelow, LastSiege, LastNoLord, LastTiny, LastExempt, LastNoCrown, LastUnpaid, LastPlayerPaid, LastStumbles;
 internal static readonly Dictionary<Kingdom, long> CrownToday;   // 165 (jak CastlePurse.CrownToday :120); czyszczony na poczatku ValveDay
+// Jeff 16:10 (rozdz. 7.3): zaulki i udzial zysku kupcow - pamiec sesji (bez zapisu; po wczytaniu serie i pierscien od zera - opis w linii)
+static readonly Dictionary<Town, int> _streak;                  // doby z rzedu ponizej zapasu
+static readonly Dictionary<Town, long> _goldAtBlock, _takeWin;  // migawka kasy na poczatku BeforeRents; pobrane w oknie blok-blok (NoteTake + zawor)
+static long _trimWin; static readonly long[] _ringTake = new long[28], _ringNet = new long[28]; static int _ringHead, _ringFilled;
+internal static long LastTake, LastNet, LastTake28, LastNet28; internal static int LastBelowN, LastBelow1000, LastAtZero, LastStreakMax, LastStreak7, LastStreak28; internal static string LastStreakName;
 ```
 Dlaczego zamkniecie licznikow w `BeforeRents`: ticki miast gry ida przez cala dobe poza naszym blokiem; `BeforeRents` biegnie zawsze (takze przy
 `PopulationRentEnabled` off, gdy `PopulationLaw.Daily` wraca przed zaworem :1157), wiec okno "doba" jest to samo co w ksiedze pieniadza.
@@ -171,7 +184,7 @@ Postfiksy Harmony biegna zawsze (takze po prefiksie BK z `return false`) - zasad
 ### 3.4 `GetTownGoldChange(Town)` kazdej deklaracji modelu - regulator (R2)
 | Latka | Priorytet | Co |
 |---|---|---|
-| `CastlePurse.RegulatorPostfix` | First, wszystkie deklaracje (K:CastlePurse.cs:308-324) | **A1:** na poczatku (po `if (__0 == null) return;`): `if (__0.IsTown) { TownPurse.OnRegulator(__0, ref __result); return; }` |
+| `CastlePurse.RegulatorPostfix` | First, wszystkie deklaracje (K:CastlePurse.cs:308-324) | **A1:** na poczatku (po `if (__0 == null) return;`): `if (__0.IsTown) { TownPurse.OnRegulator(__0, ref __result); return; }`; w galezi zamku (:280) obok `if (wanted < 0) __result = 0;` dopisac `else if (TownPurse.NoTopUp) __result = 0;` + licznik `_dRegUpCut` (zamiast `_dRegUp`) - tryb 2 dla zamkow (Jeff 16:10) |
 | `SoldierPay.RegulatorPostfix` | First, leniwie w kampanii (K:SoldierPay.cs:664-690) | **A1:** `if (TownPurse.On) return;` na poczatku (tarcze martwe) |
 | `MoneyLedger.RegulatorPostfix` | Normal | widzi wynik po nas (`regIn` = dosypka, `regOut` = 0); `Measure169c.NoteRegulator` przez ksiege |
 `TownPurse.OnRegulator(town, ref result)` (wzor stara 111 + CastlePurse :272-286): `mode = Mode; if (mode == 0 || Campaign.Current == null) return;`
@@ -180,9 +193,11 @@ Postfiksy Harmony biegna zawsze (takze po prefiksie BK z `return false`) - zasad
 `else { room = max(0, Reserve(town) - town.Gold); if (wanted > room) { cut = wanted - room; result = room; } }`
 `if (!due) return; _regDue = null; if (creating) return;` liczniki: `wanted < 0` -> `_dRegDown -= wanted, _dRegDownN++`; `result > 0` -> `_dRegUp, _dRegUpN`;
 `cut > 0` -> `_dRegUpCut, _dRegUpCutN`. Pytania z ekranow i drugi poziom modelu dostaja ten sam wynik, do licznikow nie wchodza (regula 110).
-Przy modelu gry (cel = 10 000 + 12 x dobrobyt, G:...\DefaultSettlementEconomyModel.cs:75-79) dosypka 0.25 x (cel - kasa) nigdy nie przekracza `room`
-(Reserve >= cel) - ciecie `room` dziala tylko przy innym modelu (BK `GetMerchantIncome` - zawsze dosypuje). Kolejnosc dwoch First (CastlePurse wpiety
-w menu glownym, SoldierPay leniwie w kampanii) bez znaczenia - SoldierPay przy A1 nic nie robi.
+Domyslnie (tryb 2) kazdy dodatni wynik idzie do `cut` ("dosypka zablokowana") - zrodlo z niczego kas miast i zamkow = 0. W trybie 1 przy modelu gry
+(cel = 10 000 + 12 x dobrobyt, G:...\DefaultSettlementEconomyModel.cs:75-79) dosypka 0.25 x (cel - kasa) nigdy nie przekracza `room` (Reserve >= cel) -
+ciecie `room` dziala tylko przy innym modelu (BK `GetMerchantIncome` - zawsze dosypuje). Kolejnosc dwoch First (CastlePurse wpiety w menu glownym,
+SoldierPay leniwie w kampanii) bez znaczenia - SoldierPay przy A1 nic nie robi. Zamek (galaz CastlePurse): `TownPurse.NoTopUp` = `On && Mode == 2`;
+`CastlePurse.Daily` (:662) drukuje "dosypka zablokowana (tryb 2, E5/A1) X" zamiast "dosypka do zapasu (tryb 1, zostaje do etapu 3)" gdy `NoTopUp`.
 
 ### 3.5 BK `BKSettlementBehavior.HandleMarketGold(Settlement)` - R6 (jedyna nowa latka)
 - Cel: `private void HandleMarketGold(Settlement)` (BK:BannerKings.Behaviours\BKSettlementBehavior.cs:463-490), wolany z lambdy `RunStep("HandleMarketGold", ...)`
@@ -208,8 +223,9 @@ Korona: `ChangeGold` + `KingdomBudgetWallet` bez zdarzenia gry (jak danina K:Kin
 
 | Funkcja | Wynik |
 |---|---|
-| `int Mode` | `TownPurseRegulator` obciety do 0..2 |
+| `int Mode` | `TownPurseRegulator` obciety do 0..2 (domyslnie 2) |
 | `bool On` | `Mode > 0 && CastlePurse.HookedModels > 0 && CastlePurse.HookedConsumption` - dwa nowe pola ustawiane w `CastlePurse.ApplyAll` (:300, :320) |
+| `bool NoTopUp` | `On && Mode == 2` - regulator bez dosypki dla miast i zamkow |
 | `bool NoMint` | `On && TownFolkBuyWithoutMinting` |
 | `bool ValveLive` | `On && PopulationLaw.On && Unit(TownRentShare) > 0` |
 | `int Reserve(Town)` | max(`TownPurseFloorGold` + `TownPurseFloorPerProsperity` x p, 10 000 + 12 x p), p = dobrobyt (NaN/ujemny = 0) |
@@ -220,7 +236,8 @@ Korona: `ChangeGold` + `KingdomBudgetWallet` bez zdarzenia gry (jak danina K:Kin
 | `float LordShare(Kingdom k)` | k zywe ? Unit(`TownRentLordShare`) : 1 |
 | `bool Valve(Settlement st, float decree, out int lordPay, out int lordBase, out int crown, out long spare)` | jedno miasto (rozdz. 0 pkt 9); wlasny try, potkniecie - false |
 | `void ValveDay(long crownSum, ...)` | konczy dobe zaworu: `MoneyLedger.SplitTownMark(MRent, MTownCrown, crownSum)`, Last* |
-| `void BeforeRents()` | zamyka liczniki doby -> Last*; `TrimStartGift` (przy `On`); R7 raz na sesje |
+| `void BeforeRents()` | migawka kas miast i zamkniecie okna udzialu zysku (7.3); zamyka liczniki doby -> Last*; `TrimStartGift` (przy `On`); R7 raz na sesje |
+| `void NoteTake(Settlement st, int x)` | licznik pobran z kasy miasta (7.3) - tylko liczba |
 | `string LineSegment()` | dopisek do "Kasy miast (169c)" (rozdz. 7.2) |
 
 Zmiany w istniejacych funkcjach (K:):
@@ -289,7 +306,7 @@ potem `python tools/gen_mcm.py`; RANGES: `TownPurseRegulator` (0, 2, "0"), `Town
 sprawdzone 11.10 grep - zadnego z kluczy ponizej NIE MA, domyslne zadzialaja)
 | Klucz | Typ / domyslna | Podpowiedz MCM (EN) |
 |---|---|---|
-| `TownPurseRegulator` | int 1 (0..2) | 0 = the game's daily town-purse regulator as before; 1 = it never deletes coin from a town purse and tops it up only up to the merchants' working coin, counted in the log; 2 = it does nothing. With 1 or 2 a town purse is real coin: the goods the townsfolk use up no longer pay gold into it from nowhere, its lord and the crown draw the dues from what lies above the working coin, and the wage and court shields are no longer needed |
+| `TownPurseRegulator` | int **2** (0..2; Jeff 16:10) | 0 = the game's daily town-purse regulator as before; 1 = it never deletes coin from a town or castle purse and tops it up only up to the merchants' working coin, counted in the log; 2 = it does nothing at all - no coin is deleted and none comes from nowhere, in towns and castles alike (castles with Castle Purse Enabled). With 1 or 2 a town purse is real coin: the goods the townsfolk use up no longer pay gold into it from nowhere, its lord and the crown draw the dues from what lies above the working coin, and the wage and court shields are no longer needed. Use 1 if town purses run dry |
 | `TownPurseFloorGold` | int 10000 | working coin the merchants of a town keep before any dues or taxes are drawn and below which the town buys nothing for us - the fixed part (the game's own target is 10 000 plus 12 a point of prosperity); never below that target, so these settings can only raise it |
 | `TownPurseFloorPerProsperity` | float 12 | ... and the part of the working coin that grows with the town's prosperity, in coins a point |
 | `TownFolkBuyWithoutMinting` | bool true | the goods the townsfolk use up still leave the market, but no longer pay their price into the town purse from nowhere (off with the regulator on: that gold stays and the dues hand it to the lords - for tests only) |
@@ -311,16 +328,31 @@ Bez klucza `CrownRefundSkipsHomeGarrisons` (K6). `TownFolkMode`/`TownFolkLive` t
 - **Raz (dar startowy)**, wzor K:CastlePurse.cs:528-536: `TownPurse (E5/A1): poczatek kampanii (doba 1.00) - dar startowy w kasach miast (gra 20000 + BK 40 x dobrobyt) przyciety do zapasu kupcow: miast 97, kasy A -> B (zdjeto C w n miastach, najwiecej M - Nazwa; zapas razem R). ... Flaga zapisze sie w sejwie (arm_townpurse).` (+ warianty: stary zapis, wylaczone, wiek ujemny, wieku brak).
 - **Raz (tarcze)**: `TownPurse (E5/A1): tarcze zoldu i dworu porzucone - znaczniki zoldu S1 w n1 miastach, dworu S2 w n2 (liczby, zlota nie rusza; nic juz nie kasuje kas miast).`
 - **Dziennie - dopisek w "Kasy miast (169c)"** zamiast ` | dwor -, do korony - (162m, 111')` (K:Measure169c.cs:373; `TownPurse.LineSegment()`):
-  A1 czynne: ` | E5/A1: tryb regulatora 1 | zawor: zeszlo D = panom L (przed dekretem LB; z nP miast; rod gracza G) + koronie K (nK krolestw); renta nalezna od ludzi (dawny pulap, tylko liczba) R; bez poboru: kasa nie ponad zapasem a, oblezone b, bez zywego pana c, nadwyzka za mala d, zwolnione dekretem (tylko korona) e; bez krolestwa (calosc panu) f; miast z nadwyzka bez zaworu (10 miast) u | regulator: kasowanie zablokowane X (xn tickow), dosypka do zapasu (tryb 1) Y (yn miast ponizej zapasu), dosypka ponad zapas zablokowana Z | "zakupy" mieszczan: zloto z niczego cofniete C (w h z t tickow; towar zjedzony jak dotad) | zapas kupcow Rs, ponad zapasem Sp | zakupy dla nas z nadwyzki: zapytan q, przy zapasie (0) z | BK rynek osady: gorna galaz pominieta w bt miastach i bc zamkach (BK skasowalby ok. Q) | dar startowy dzis T | potkniecia P`.
+  A1 czynne: ` | E5/A1: tryb regulatora 2 | zawor: zeszlo D = panom L (przed dekretem LB; z nP miast; rod gracza G) + koronie K (nK krolestw); renta nalezna od ludzi (dawny pulap, tylko liczba) R; bez poboru: kasa nie ponad zapasem a, oblezone b, bez zywego pana c, nadwyzka za mala d, zwolnione dekretem (tylko korona) e; bez krolestwa (calosc panu) f; miast z nadwyzka bez zaworu (10 miast) u | regulator: kasowanie zablokowane X (xn tickow), dosypka do zapasu (tryb 1) Y (yn miast), dosypka zablokowana (tryb 2 albo ponad zapas) Z (zn tickow) | "zakupy" mieszczan: zloto z niczego cofniete C (w h z t tickow; towar zjedzony jak dotad) | zapas kupcow Rs, ponad zapasem Sp | zaulki: kas ponizej zapasu nb, ponizej 1000 n1, przy 0 n0; najdluzej ponizej zapasu dd dob z rzedu (Nazwa), miast >= 7 dob w7, >= 28 dob w28; towar wsi niesprzedany w miastach (brak zlota w kasie) us szt. w uv wizytach | udzial zysku kupcow zabierany przez pana i korone: dzis U% (pobrano Pb z doplywu netto Dn), srednia 28 dob U28% (odniesienie historyczne ok. 10%, INFO) | zakupy dla nas z nadwyzki: zapytan q, przy zapasie (0) z | BK rynek osady: gorna galaz pominieta w bt miastach i bc zamkach (BK skasowalby ok. Q) | dar startowy dzis T | potkniecia P`.
   Zawor nieczynny przy rentach wylaczonych: `zawor: NIE DZIALA (Population Rent Enabled wylaczone) - kasy miast tylko rosna`. A1 wylaczone:
   ` | E5/A1: WYLACZONE (Town Purse Regulator 0) - regulator gry, "zakupy" z niczego, renta z pulapem i tarcze jak dotad`.
-  `kasy-miast.csv` (:337): dwie kolumny NA KONCU `zapas_kupcow;do_korony` (stare kolumny bez zmian - nikt ich nie parsuje, grep tools/).
+  `kasy-miast.csv` (:337): kolumny NA KONCU `zapas_kupcow;do_korony;pobrane;doplyw_netto;dni_ponizej_zapasu` (stare kolumny bez zmian - nikt ich nie parsuje, grep tools/).
   Linia biegnie tylko przy `Measure169c.On` (LogEnabled + ClanIncomeBook*, K:Measure169c.cs:32; domyslnie tak) - inaczej progi A1 = "brak linii" (INFO).
 - **Ksiega** (bez nowych linii): "Przeplywy osad (kasy miast)" - "zakupy" +0, regulator "(dosypal Y, skasowal 0)", w "Armoury tick dobowy" pozycje
   M12/M13; "Pieniadz swiata (bilans)" (K:MoneyLedger.cs:801) i "(bilans - przyczyny)" (K:MoneyLedger.Obieg.cs:342): `, dar startowy kas miast przyciety (E5/A1) T`;
   "Obieg" (:569, :572): `do korony K` zamiast `do korony -`, `(tryb N)` zamiast `(tryb 1 -)`; "Korona: wplywy dnia (165)" (K:CrownIncome.cs:320):
   "1/3 zaworu zamkow" -> "1/3 zaworu zamkow i miast".
 - `SoldierPay.CourtNote` (:618) i linia "Zold:" - przy A1 dopisek "tarcze zbedne (E5/A1)" zamiast liczb znacznikow.
+
+### 7.3 Zaulki i udzial zysku kupcow (Jeff 16:10) - definicje do dopisku
+- **Zaulki** (w `TownPurse.Valve`, raz na miasto i dobe): `Gold < Reserve` -> `_streak[town]++`, inaczej 0 (slownik sesji - po wczytaniu od 0, opis w linii);
+  liczniki: ponizej zapasu, ponizej 1 000, przy 0, najdluzsza seria (nazwa miasta), serii >= 7 i >= 28 dob.
+- **Czego nie kupily:** towar wsi niesprzedany w miastach - licznik ksiegi `_vUnsold[CTown]` / `_vUnsoldVisits[CTown]` (K:MoneyLedger.cs:120; okno wizyty taboru
+  BK `SellGoodsPatch` - kupuje tyle, ile ma kasa) przez nowy getter `MoneyLedger.TownUnsoldToday(out szt, out wizyt)` (czytany w `Measure169c.Daily` - przed
+  `MoneyLedger.Daily`, ktore zeruje licznik; ta sama doba co "Obieg" "towar niesprzedany").
+- **Udzial zysku kupcow** (P rozdz. 6 pkt 2; wzor E5/0 - przy scaleniu jedna funkcja, wlasciciel E5/0, A1 tylko wola): okno blok-blok (migawka kas miast na
+  POCZATKU `BeforeRents`, przed przycieciem); `pobrane` = zawor panu + zawor koronie (TownPurse) + danina z kasy miasta + clo z kasy (gdy nie `CrownCustomsSingleTake`)
+  + mennica + Crown Duty + War Tax + Road Tolls z kasy miasta; `doplyw netto` = (kasa teraz - kasa w poprzedniej migawce) + `pobrane` + przyciecie daru w oknie
+  (dosypka i "zakupy" z niczego = 0 przy trybie 2; przy trybie 1 odjac dosypke); udzial = pobrane / doplyw netto (doplyw <= 0 -> "-"); srednia 28 dob = suma
+  pobranych / suma doplywow z pierscienia 28 dob (nie srednia ilorazow). Swiat w dopisku, miasto po miescie w `kasy-miast.csv`.
+  Liczniki pobran: `TownPurse.NoteTake(Settlement st, int x)` (tylko `st.IsTown`, x > 0) w K:KingdomTreasury.cs:399 (danina - obok `TownLevyToday`), :422 (clo
+  z kasy), :431 (mennica), :485 (Crown Duty, przy `applyWithdrawals`), :513 (War Tax, jw.), :529 (Road Tolls, jw.); zawor - w `Valve`. Monopole (:441 - kapital
+  warsztatow) i Land Tax (:498 - wsie) poza wzorem.
 
 ---
 
@@ -339,7 +371,7 @@ Bez klucza `CrownRefundSkipsHomeGarrisons` (K6). `TownFolkMode`/`TownFolkLive` t
 - `ClearLast169` (Obieg :86-101): `try { TownPurse.ZeroLast(); } catch ...`.
 
 ### 8.3 Co ksiega zobaczy (oczekiwane)
-"zakupy" kas miast 0 (dzis 425 318 d120, L:31722); regulator kas miast skasowal 0 (dzis 248 065), dosypal Y (dzis 20 220); "BK rynek osady" w ujsciach
+"zakupy" kas miast 0 (dzis 425 318 d120, L:31722); regulator kas miast skasowal 0 (dzis 248 065), dosypal 0 w trybie 2 (dzis 20 220; zamki tez 0); "BK rynek osady" w ujsciach
 ok. 0 (dzis -34 610, L:31718 - z miast i zamkow); ujscie jednorazowe "dar startowy kas miast" w d1; posiadacze bez zmian (zawor = przelew kasy -> glowa / skarbiec).
 
 ### 8.4 Rezerwacja indeksow (wpis w CHANGELOG drzewa A1)
@@ -354,7 +386,8 @@ projektu nie dodaje pozycji MoneyLedger; gdyby musial - poza 12-21 (do uzgodnien
 Zbior A (P rozdz. 4, decyzja Jeffa 11.10 03:05; wariant (a) - osobny test zaraz po tescie koncowym E4): autotest nowa kampania 40 dob + zapis z doby 362
 (9 dob) + 120 dob, A1-A5 razem; progi A1 ponizej + progi etapow 2-4 (glowy < 5 000 najwyzej 10; 0 bankructw; wojsko lordow w wojnie 95-115 tys., podloga 85;
 reszta ksiegi < 10 tys./d; etap 4). Nie przechodzi -> wylaczamy kawalek w `Armoury.json` autotestu w kolejnosci: `TownPaysFromSurplus`, `TownPurseNoBkSkim`,
-`TownPurseRegulator` 0 (cale A1) - i powtarzamy (jedna zmiana naraz). Wojsko ponizej 95 tys. - naprawa przeplywem, nie wojskiem (P rozdz. 4).
+`TownPurseRegulator` 1 (zaulki / plon - opcja z decyzji Jeffa 16:10, raport dla Jeffa), `TownPurseRegulator` 0 (cale A1) - i powtarzamy (jedna zmiana naraz).
+Wojsko ponizej 95 tys. - naprawa przeplywem, nie wojskiem (P rozdz. 4).
 
 ### 9.1 Blok parsera `etap5_a1(rep, lines, start, win)` w `tools/sprawdz_logi.py`
 Grupe `--grupa etap5` (`etap5_main`, dyspozytor w `main` K:..\tools\sprawdz_logi.py:1668-1671) zaklada E5/0. A1 dopisuje TYLKO funkcje bloku (rusza, gdy jest
@@ -365,11 +398,11 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
 |---|---|---|---|---|
 | A1-T1 | bledy i potkniecia | `ERROR in TownPurse` = 0; `potkniecia (\d+)` w dopisku 169c | 0 bledow; potkniecia <= 5 w biegu | standard |
 | A1-T2 | linia startowa | `TownPurse (E5/A1):` z `BRAK: -`, modele >= 1, konsumpcja `tak` | wszystko wpiete | - |
-| A1-T3 | A1 czynne | dopisek `E5/A1: tryb regulatora (\d)` kazdej doby okna | 1 kazdej doby (0 caly bieg = bieg porownawczy - progi INFO; zmiana w biegu = NIE) | - |
+| A1-T3 | A1 czynne | dopisek `E5/A1: tryb regulatora (\d)` kazdej doby okna | 2 kazdej doby (Jeff 16:10; 1 = bieg awaryjny - progi T6/T7 wedlug trybu 1; 0 caly bieg = bieg porownawczy - progi INFO; zmiana w biegu = NIE) | - |
 | A1-T4 | "zakupy" w kasach miast | "Przeplywy osad (kasy miast)": `"zakupy" mieszkancow ([+-]?\d+)` | 0 kazdej doby okna | dzis 425 318 (L:31722) |
 | A1-T5 | kasowanie regulatora | tamze `regulator kasy [+-]?\d+ \[P\] \(dosypal (\d+), skasowal (\d+)` | skasowal = 0 kazdej doby | dzis 248 065 (L:31686) |
-| A1-T6 | dosypka kas miast (tryb 1) | jw. `dosypal`, sr28 | <= 35 000/d (2 x dzis); wiecej - DECYZJA (zaulki; nazwane zrodlo, zamyka C1 - A1 nie wylaczamy) | sr28 17 057 (P rozdz. 1) |
-| A1-T7 | dosypka tylko do zapasu | dopisek `dosypka ponad zapas zablokowana (\d+)` | INFO (0 przy modelu gry - rozdz. 3.4) | - |
+| A1-T6 | dosypka kas miast | jw. `dosypal` | tryb 2: 0 kazdej doby okna (tryb 1: sr28 <= 35 000/d = 2 x dzis, wiecej - DECYZJA) | sr28 17 057 (P rozdz. 1) |
+| A1-T7 | dosypka kas zamkow | "Przeplywy osad (kasy zamkow)" `dosypal (\d+), skasowal` i "Zawor zamkow (110)" `dosypka zablokowana \(tryb 2` | tryb 2: dosypal 0 kazdej doby; linia 110 z "tryb 2" | dzis ok. 1 tys./d (P rozdz. 6) |
 | A1-T8 | zawor: suma i podzial | dopisek `zeszlo (\d+) = panom (\d+) \(przed dekretem (\d+);.*\+ koronie (\d+)` | D = L + K kazdej doby; sr28 K / (LB + K) w 0.32-0.34 | 1/3 (klucz) |
 | A1-T9 | "10 miast bez placenia" | dopisek `miast z nadwyzka bez zaworu \(10 miast\) (\d+)` | 0 kazdej doby | 10 (RB 5.4) |
 | A1-T10 | tarcze | "Kasy miast (169c)" `pod tarcza zoldu .*? (\d+)` od doby 2; "Budzet rodow (166)" bez znacznika dworu | 0 | dzis 2 863 805 (L:31686) |
@@ -379,9 +412,11 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
 | A1-T14 | nasze zakupy z pasa ponizej zapasu | linia E5/0 "Nadwyzka kas (E5/0)" `nasze sciezki (\d+)`, gdy jest; inaczej dopisek `zapytan q, przy zapasie z` | 0 (z linii E5/0); bez E5/0 - INFO (z budowy: `BuyFloor`) | - |
 | A1-T15 | stan ustalony kas | dopisek `ponad zapasem (\d+)` wobec sr28 zaworu / 0.07 | INFO (stosunek ok. 1 = stan ustalony; P111) | dzis kasy 12.56 mln wobec 7.22 mln celu |
 | A1-T16 | korona i K3 | "Korona: wplywy dnia (165)" `nasze: ... (\d+)` wobec biegu bazowego; `LastOwnCut` (zwrot przyciety K3) | INFO (wplywy korony w wojnie >= bieg bazowy - prog B2, tu tylko odczyt) | 165: 256 287 / d (P) |
-| A1-T17 | zawor razem | sr28 D | INFO 250-550 tys./d (rachunek P: ok. 398 tys. = panom 265 + koronie 133) | renta dzis 487 312 |
+| A1-T17 | zawor razem | sr28 D | INFO 250-550 tys./d (rachunek P: ok. 398 tys.; przy trybie 2 ok. 381 = panom 254 + koronie 127) | renta dzis 487 312 |
 | A1-T18 | rody | D staly / "Budzet rodow (166)" - glowy, bankruci, wojsko | progi etapu 2 (osobno `--grupa etap2`); P [S]: rody ok. -89 tys./d (-8.6% D stalego) bez A3 | - |
 | A1-T19 | zakup plonu | "Przeplywy osad": towar niesprzedany po wizycie | ponizej 0.1% (kazdy zbior) | dzis 0 szt. |
+| A1-T21 | zaulki (Jeff 16:10) | dopisek `zaulki: kas ponizej zapasu (\d+), ponizej 1000 (\d+), przy 0 (\d+); najdluzej ponizej zapasu (\d+) dob` i `towar wsi niesprzedany w miastach .*? (\d+) szt.` | kasy przy 0: 0 kazdej doby; towar wsi niesprzedany <= 0.1% sztuk sprzedanych w miastach (prog "zakup plonu >= 98%" z zapasem) i 0 dob z rzedu > 7 w tym samym miescie z towarem niesprzedanym; przekroczenie -> bieg z `TownPurseRegulator` 1 (opcja Jeffa) i raport | dzis: 15 z 97 ponizej celu (L:31686), towar niesprzedany 0 |
+| A1-T22 | udzial zysku kupcow (P rozdz. 6 pkt 2) | dopisek `udzial zysku kupcow .*? dzis (-|[\d.]+)%.*?srednia 28 dob (-|[\d.]+)%` | INFO (odniesienie historyczne ok. 10%; decyzja Jeffa po tescie) | dzis (przed A1): renta 487 tys. + danina ok. 90 tys. wobec doplywu - liczy E5/0 |
 | A1-T20 | zakupy dla nas - towar zostaje u sprzedajacych | linie paser band (OutlawLaw "Wyrzutki"), "Kontrakty surowca (174)", "Karawany bez amunicji (172b)", CaravanBulk, "Wedrowcy BK - prawdziwy towar (36b)" - liczniki "brak kasy miasta" | INFO wobec biegu bazowego; skok x3 -> wylaczyc `TownPaysFromSurplus` i powtorzyc | - |
 
 ---
@@ -404,9 +439,15 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
 5. **Zakupy dla nas ponizej zapasu ustaja:** 15 z 97 miast ponizej celu w d120 (L:31686) - tam paser, karawany (surowce, amunicja, kontrakty), wedrowcy 36b,
    nadwyzki zalog/lordow/ludzi gracza i zlom z musztry nie sprzedadza; towar zostaje u sprzedajacego (bandy z lupem, karawany z ladunkiem - nic nie znika).
    Prog A1-T20, wylacznik `TownPaysFromSurplus`. Zamki w tych samych sciezkach - cala kasa jak dzis (niespojnosc z B-2 odnotowana, nie zmieniana).
-6. **Zaulki i dosypka:** miasta, ktorych prawdziwy doplyw netto < 0 (placa za plon wsi przez BK `SellGoodsPatch` cala kasa), stoja przy zapasie na dosypce trybu 1 -
-   zrodlo nazwane (A1-T6), zamyka C1 z progiem P. Ich czesc zakupow plonu ponizej zapasu (sciezki gry/BK) liczy E5/0 ("dosypka finansujaca zakupy").
-7. **Rody i korona:** zawor panom 2/3 (dzis 100%) i od nadwyzki ponad zapas (dzis ponad 20 000) - P [S]: panom ok. 265 tys./d zamiast 487 tys. (rody ok. -89 tys./d),
+6. **Zaulki bez dosypki (glowne ryzyko A1 po decyzji 16:10):** miasta, ktorych prawdziwy doplyw netto < 0 (placa za plon wsi przez BK `SellGoodsPatch` cala kasa,
+   BK:BannerKings.Patches\EconomyPatches.cs:816-871), nie dostaja juz dosypki - kasa schodzi ponizej zapasu (zawor i podatki stoja, bo biora tylko z nadwyzki), az do 0;
+   wtedy miasto nie kupuje plonu (towar zostaje na wozie - zatkane magazyny wsi, prog etapu 4 <= 5.6%) i nic dla nas (BuyFloor). Kasa < 20 000 to tez kara BK
+   "Merchants wealth" dla dobrobytu (BK BKProsperityModel.cs:88-91) - nizszy dobrobyt obniza zapas (10 000 + 12 x dobrobyt), ale i popyt. Dzis 15 z 97 miast
+   ponizej celu (L:31686). Pomiar: A1-T21 (Jeff: ponizej zapasu / 1 000 / 0, dni z rzedu, towar wsi niesprzedany), wyjscie awaryjne - tryb 1 (MCM, bez kodu).
+   Rachunek P [S] (zawor = doplyw netto ok. 398 tys./d) mowi, ze kasy miast jako calosc rosna - ryzyko dotyczy pojedynczych miast, nie swiata.
+7. **Rody i korona:** zawor panom 2/3 (dzis 100%) i od nadwyzki ponad zapas (dzis ponad 20 000) - P [S]: panom ok. 265 tys./d zamiast 487 tys. (rody ok. -89 tys./d;
+   przy trybie 2 doplyw netto mniejszy jeszcze o dosypke 17 tys./d - zawor ok. 381 tys. = panom ok. 254 + koronie ok. 127 [S]; zloto swiata od samego A1 ok. -110 tys./d
+   mniej przyrostu: "zakupy" -422, kasowanie +295, dosypka miast i zamkow -18, BK rynek +35 [S]),
    koronie ok. 133 tys./d; danina wojenna od zapasu kupcow (mediana celu ok. 67 tys., RB 3) zamiast 20 000 - na poczatku nizsza. Powinnosci (KingdomTreasury.cs:87),
    budowy (BuildFunding.cs:156), rada 3.5, D staly 166 licza od mniejszej renty miast - zamierzone (P R4). Wojsko - prog etapu 2; A3 (markietani) oddaje kasom
    wiecej, niz A1 zabiera (P rozdz. E5/A3) - dlatego test zbiorczy A1-A5.
@@ -422,7 +463,8 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
      jedna linie na poczatku try, niezaleznie od flag E5/0); `MoneyLedger.Obieg.cs` - A1: :86-101, :275-342, :569-572, E5/0: linia "Gotowka wsi" i :654 (A1 :654 nie rusza);
      `tools/sprawdz_logi.py` - dyspozytor `etap5` (rozdz. 9.1); `Settings.cs` - grupa "The townsfolk's purse" E5/0 i "The town's purse" A1 - obie zostaja.
    - A2-A5 (`SCR\e5\a25`): MoneyLedger od M17 (rozdz. 8.4); A2 `ClanBudget.cs:623` (`HoldCourt` no-op przy A1); A3 `CaravanCapital.cs`, markietani do kas miast i do K3;
-     A4 `KingdomTreasury.RulingIncomePostfix` (A1 zmienia :528 - Road Tolls; A4 dopisuje oblezone - sasiednie linie, scalac recznie).
+     A4 `KingdomTreasury.Levies`/`RulingIncomePostfix` (A1 zmienia :391, :528 i dopisuje `NoteTake` przy :399, :422, :431, :485, :513, :529; A4 dopisuje oblezone -
+     sasiednie linie, scalac recznie); A6 (lup wodza, Jeff 16:20) - `MapEvent`/`BeatenPurse`, bez wspolnych plikow z A1.
 10. **Pulapka MCM (CLAUDE.md 7):** nowe klucze nie istnieja w `Armoury.json` Jeffa (grep 11.10). Przy wgraniu powtorzyc grep (szczegolnie `TownRentLordShare` -
     B3 zmieni domyslna 0.67 -> 0.5; jesli ktos zapisze MCM po A1, wartosc przyszpili sie w pliku). Linia dzienna podaje tryb czynny (nie startowa).
 11. **Wyjatki:** kazde miasto w zaworze i przyciecie - wlasny try + licznik potkniec (bez globalnych wylacznikow; pierwszy wyjatek do logu - wzor
@@ -439,7 +481,7 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
 
 - **Nowa kampania:** pelny skutek - dar startowy przyciety w d1 (ok. 14 mln [S]); "zakupy" przy tworzeniu swiata cofniete od pierwszego ticku.
 - **Stary zapis (Jeffa, zapis testowy z doby 362):** przyciecie ok. 0 (0.75^wiek), znaczniki tarcz porzucone (linia), od nastepnej doby regulator nie kasuje,
-  "zakupy" cofniete, 10 miast zaczyna placic. Nadwyzka kas ponad zapas (d120 z31-A: 12.56 mln wobec 7.22 mln = ok. 5.3 mln, w tym 2.86 mln dzis "pod tarcza")
+  "zakupy" cofniete, regulator nie dosypuje (tryb 2 - miasta i zamki ponizej zapasu zostaja tam, az przyjdzie prawdziwy doplyw), 10 miast zaczyna placic. Nadwyzka kas ponad zapas (d120 z31-A: 12.56 mln wobec 7.22 mln = ok. 5.3 mln, w tym 2.86 mln dzis "pod tarcza")
   splywa zaworem 7%/d - jednorazowo ok. 0.37 mln/d na start, malejaco (2/3 panom, 1/3 koronom). Bez osobnego rozruchu (to prawdziwe zloto miast, dzis oddawane
   wolniej renta z pulapem albo kasowane).
 
@@ -447,7 +489,8 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
 
 ## 12. Pytania
 
-Do Jeffa - **brak** (A1 nie zmienia nic, co wymagaloby decyzji: reguly R1-R7 przyjete w projekcie v2, udzial 2/3 jak zamek - klucz 114, decyzja E 09.10).
+Do Jeffa - **brak** (reguly R1-R7 przyjete w projekcie v2, udzial 2/3 jak zamek - klucz 114, decyzja E 09.10; tryb 2 bez dosypki i liczenie zaulkow/udzialu
+zysku kupcow - decyzja 11.10 16:10). Po tescie A - raport dla Jeffa: zaulki (A1-T21) i udzial zysku kupcow wobec ok. 10% (A1-T22).
 Rozstrzygniete w planie (do recenzji, nie do Jeffa):
 1. `TownPaysFromSurplus` + 8 sciezek zakupu spoza listy P (rozdz. 0 pkt 7) - TAK, bo regula E5K1-03 ("jedno dno zakupow") i prog P "nasze zakupy ponizej zapasu = 0";
    RecruitKit - NIE (likwidacja dobytku, nie zakup).
@@ -459,15 +502,15 @@ Rozstrzygniete w planie (do recenzji, nie do Jeffa):
 
 ## 13. Kolejnosc kodowania (galaz `w-toku/e5-a1`; kazdy krok: build Release kod 0 - `cd` do katalogu projektu przed `dotnet build`; osobny commit; jeden test na koncu)
 
-1. **K1 rdzen bez skutku przy kluczu 0:** `TownPurse.cs` (2.1, 4, 3.2-3.4, 6), wpiecia w `CastlePurse` (3 latki, `HookedModels/HookedConsumption`, `Reset`,
-   `Spendable`, `PayFloor`), `Seal31.Spare`, klucze (7.1) + `python tools/gen_mcm.py`. Linia startowa.
-2. **K2 zawor:** `PopulationLaw` (skip + `ValveTowns`), `TownPurse.Valve/ValveDay`, `KingdomTreasury` (:391, :528, :232), `CrownIncome` (:178, :320),
-   `ArmouryBehavior` (`BeforeRents` :1460, `arm_townpurse` :418).
-3. **K3 ksiega i linie:** `MoneyLedger` (8.1-8.2), `Measure169c` dopisek i CSV, "Obieg", `SoldierPay` (R7: `Hold`, `HoldCourt`, `RegulatorPostfix`, `Decay*`, `HeldOf`,
-   `CourtOf`, `DropShields`, `CourtNote`).
+1. **K1 rdzen bez skutku przy kluczu 0:** `TownPurse.cs` (2.1, 4, 3.2-3.4, 6), wpiecia w `CastlePurse` (3 latki, galaz zamku trybu 2, tekst :662,
+   `HookedModels/HookedConsumption`, `Reset`, `Spendable`, `PayFloor`), `Seal31.Spare`, klucze (7.1) + `python tools/gen_mcm.py`. Linia startowa.
+2. **K2 zawor:** `PopulationLaw` (skip + `ValveTowns`), `TownPurse.Valve/ValveDay`, `KingdomTreasury` (:391, :528, :232 i `NoteTake` :399, :422, :431, :485, :513,
+   :529), `CrownIncome` (:178, :320), `ArmouryBehavior` (`BeforeRents` :1460, `arm_townpurse` :418).
+3. **K3 ksiega i linie:** `MoneyLedger` (8.1-8.2, getter `TownUnsoldToday`), `Measure169c` dopisek (z zaulkami i udzialem zysku kupcow - 7.3) i CSV, "Obieg",
+   `SoldierPay` (R7: `Hold`, `HoldCourt`, `RegulatorPostfix`, `Decay*`, `HeldOf`, `CourtOf`, `DropShields`, `CourtNote`).
 4. **K4 R6 i zakupy:** `BkSkimPrefix` + `ApplyAll`; 8 sciezek zakupu (rozdz. 4 ostatni punkt).
 5. **K5 narzedzie i wpis:** `tools/sprawdz_logi.py` blok A1 (9.1), sprawdzenie na syntetycznych liniach; CHANGELOG (Problem z liczbami: "zakupy" 421 538/d sr28 i 425 318
-   d120 L:31722, kasowanie 295 208/d sr28 i 248 065 d120 L:31686, renta 100% panu 487 312/d sr28, pod tarcza 2.86 mln L:31686, BK rynek -34 610 L:31718, dar startowy
+   d120 L:31722, kasowanie 295 208/d sr28 i 248 065 d120 L:31686, dosypka 17 057/d sr28 (20 220 d120) i zamki ok. 1 tys./d - tryb 2 (Jeff 16:10), renta 100% panu 487 312/d sr28, pod tarcza 2.86 mln L:31686, BK rynek -34 610 L:31718, dar startowy
    17.4 mln wobec 6.5 mln L:505, "10 miast bez placenia" K:PopulationLaw.cs:1172/:1174; Przyczyna: BK EconomyPatches.cs:555, G DefaultSettlementEconomyModel.cs:75-79,
    K:PopulationLaw.cs:1192-1201, BK BKSettlementBehavior.cs:463-490, K:SoldierPay.cs:576-800; Odstepstwa: rozdz. 0 pkt 6-8, `TownPaysFromSurplus`, `Reset` przez
    CastlePurse; Ryzyko = rozdz. 10; Status: DO SPRAWDZENIA - test zbioru A po tescie koncowym etapu 4), dwie recenzje diffu (ekonomia/szczelnosc; kod i kolizje).
