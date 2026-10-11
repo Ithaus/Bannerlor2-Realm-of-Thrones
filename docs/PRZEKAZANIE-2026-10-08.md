@@ -672,3 +672,6 @@ miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lo
   **NASTEPNE (dla kolejnego konta):** odpowiedzi Jeffa na pytania z raportu (rozdz. 4) -> statki 3.3 / E4/2 wedlug decyzji; etap 4 dalej: E4/1 (zima wedlug krain - wymaga
   proby zimy, pliki danych w grze = pytac Jeffa o zgode), E4/3 (punkty powrotu - wyrzutki wracaja do domu, odpowiedz na bandy +57% w roku 2), E4/4 (przyrost ludnosci,
   T2 +624 hearth/d). Projekt: docs/etap4/PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md. Drzewa: SCRATCH(ae222cb7)\e4\{40,42}.
+- (02:56) **Test informacyjny E4/2 (120 dob, test\Armoury-e4-2.dll 6c01c450, kopia SCRATCH(ae222cb7)\kopia-e42-120):** 0 bledow; Inni d119 1687 (bez E4/2: 2014), szczyt
+  2409 (2383); wstalo z poleglych 5544 wobec wzoru ROT 5781 (-4%); pula CIALA na koniec 2497 (obawa recenzji o braku odnawiania sie nie sprawdzila). Rada: wgrac (z D11) -
+  czeka na "tak" Jeffa. DLL w grze po tescie zatwierdzone (809a603a / 77b11df5). Paczka D11 w toku (wf_72f90ad9-edc, drzewo e4\d11, galaz w-toku/d11).
