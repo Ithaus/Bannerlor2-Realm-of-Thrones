@@ -1,6 +1,6 @@
-# Jak dziala gra po etapach 1-3 (stan 11.10.2026, wgranie 29)
+# Jak dziala gra po etapach 1-3 i czesci 4 (stan 11.10.2026, wgranie 31)
 
-W grze: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
+W grze: Armoury cf40fefa, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
 
 ## Etap 1 - wojsko zbrojone z prawdziwej produkcji (wgrania 9-13, 09.10)
 
@@ -47,7 +47,17 @@ W grze: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841d7, Cr
 - **Wynik:** zloto "znikajace bez nazwy" spadlo z ok. 19 tys. zl dziennie do ok. 1 tys. (cel < 10 tys.).
 - **Statki (3.3):** w kodzie, WYLACZONE do etapu 5 (decyzja Jeffa 11.10).
 
-## Etap 4 - zaczety
+## Etap 4 - ksiega ludzi i zima (w toku; wgrania 29-31)
 
-- W grze: **pomiar ludzi** (bez zmian w grze) - pokazal, ze ludnosc wsi rosnie z niczego (+624 domow dziennie) i zalogi z milicjami dostaja ok. 1 000 ludzi dziennie z niczego.
-- Gotowe do wspolnego testu: Inni tylko z poleglych (E4/2), paczka D11 (decyzje 11.10), w toku: E4/3 (wyrzutki wracaja do domu).
+- **Pomiar ludzi** (E4/0): ksiega liczy ludzi, jencow i zime co dobe.
+- **Kara za przegrana bitwe o polowe** (D11): pobita druzyna traci ok. 1/8-1/6 skladu zamiast 1/4-1/3. Kiesa bandy przylaczajacej sie trafia do Ciebie; napitki i drewno
+  wojska placa zolnierze ze swoich sakiewek; sakiewka zniszczonej druzyny lorda tylko dla prawdziwego zwyciezcy.
+- **Inni tylko z poleglych** (E4/2): nowe trupy wstaja z ludzi, ktorzy padli za Murem, nie z niczego.
+- **Wyrzutki wracaja do domu** (E4/3): rozbici i dezerterzy w lesie z czasem wracaja do wsi - w wojnie wolno (bandy rosna z wojna), w pokoju szybko.
+  Bandy po 120 dniach ok. 12.7 tys. ludzi (wczesniej puchly do 25 tys.).
+- **Zima wedlug krain** (E4/1): Wyspy Letnie bez zimy, cieple krainy (Dorne, Volantis, ...) slabsza, reszta pelna; zima tnie plon wsi; konie jedza zima wiecej.
+- **Przyrost naturalny** (E4/4): ludzi na wsi przybywa ok. 0.5% rocznie (bogata i bezpieczna wies szybciej, w wojnie wolniej) - koniec ludzi "z niczego".
+- **Spustoszenie** (E4/5): najazd zabija czesc ludzi wsi i wypedza reszte - uchodzcy wracaja rok po ostatnim najezdzie.
+- **Jedzenie i pasza:** naprawiony lancuch jedzenia (RBL nie wylacza juz zasad ROT, NavalDLC, BEE i BK); kazdy kon je swoja pasze przez caly rok.
+- **W toku (test na koniec etapu):** E4/6 spichlerz i glod, E4/7 pochodzenie zolnierzy i pobor z wolnych rak wsi, E4/8 zalogi i milicje z ludzi,
+  E4/9 Nocna Straz i niewola, E4/10 weterani w karczmach, E4/11 wioski poboczne.
