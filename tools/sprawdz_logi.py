@@ -29,6 +29,20 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E5/A1 (111', kasy miast) A1-T1..T22 - dopisek " | E5/A1:" w linii "Kasy miast (169c)",
                     "Przeplywy osad (kasy miast/zamkow)", "Zawor zamkow (110)", przyczyny bilansu, linia startowa i przyciecia "TownPurse (E5/A1)";
                     okno doby kampanii 2-120 (--do-doby N). Wolany z etap5_main E5/0 (scalenie porcji A).
+                    Bloki E5/A2 (162, dwor pelny) A2-1..A2-11 - linia sprzetu niewydanego w "Budzet rodow (166)",
+                    przelew do dworu w dobach 31-120 (--do-doby N), zgodnosc 166 = Obieg, reszta ksiegi, glowy < 5 000, hak B1 = 0, gracz bez dworu,
+                    bledy; A2-10/A2-11 zapas "wlasnego" (sprzet do wlasnej siedziby wraca jako wlasne, nie ziemia - linia D staly);
+                    panowie zamkow (budzet-rodow.csv) - INFO. E5/A3 (163 + 164c) A3-1..A3-14 - linie "Markietani (E5/A3)" i "Notable (E5/A3)":
+                    sakiewki <= 15 dni zoldu (Obieg), markietani > 0 i podzial 85/15, koszt, pasmo notabli i nowi notable bez zlota z niczego / w nicosc
+                    (Obieg), kapital karawan notabli = korekta zrodel bilansu, kontrolki prog 0, karawany notabli d40/d120 (INFO), bledy, reszta ksiegi.
+                    E5/A4 (196, R22) A4-1..A4-8 - linia "Oblezone (E5/A4)": zaplacone mimo oblezenia = 0 (renta miast, Crown Duty, War Tax, Road Tolls),
+                    wstrzymane i oblezenia (INFO), zawor zamkow i zawor A1 bez oblezonych (INFO), "10 miast bez placenia" (gdy A1 w logu), prog podatkow
+                    zamkow ponad zapasem kupcow (INFO), bledy.
+                    E5/A5 (197, R23) A5-1..A5-7 - BetterEconomy: prefiksy Try* wplaty wpiete (linia startowa BEE 170), dopisek E5/A5 w linii
+                    kampanii BEE (wylacznik, okno kwot 2/2, opcje daru 2/2), kasy prawdziwym pieniadzem (INFO), linie "BEE (E5/A5) wplata|dar" -
+                    gracz traci tyle, ile dostaje kasa osady / notable (ROZNICA 0; autotest nie klika menu - linie z recznego testu Jeffa), A5-4b
+                    wplata do zapasu "wlasnego" (cala; w liniach "D staly" tyle, ile wplat przed nimi), odmowy (INFO), bledy BeeGifts i potkniecia 0.
+                    Wolane z etap5_main E5/0 (scalenie porcji A).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2553,6 +2567,42 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("blok etap5_a1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     else:
         rep.add("E5/A1: linia startowa TownPurse (E5/A1)", "brak w logu", "jest od wgrania E5/A1", None)
+    # E5/A2-A5 (scalenie porcji A): bloki z wlasnymi liniami; kazdy we wlasnym try (narzedzie nigdy nie przerywa raportu)
+    bud = e4_series(lines, "Budzet rodow (166): dzien", 1)   # dzien gry - 1 = dzien linii ksiegi ("Obieg", "Pieniadz swiata") tej samej doby
+    try:
+        if any("-> dwor (E5/A2):" in s for s in bud.values()):
+            etap5_a2(rep, lines, start, until, logp, bud)
+        else:
+            rep.add("E5/A2: linia sprzetu niewydanego (Budzet rodow 166)", "brak w logu", "jest od wgrania E5/A2 (LogEnabled, ClanBudgetEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_a2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A3 (163 + 164c): markietani (linia z dniem gry - klucz = dzien ksiegi, jak 166) i notable (dzien ksiegi)
+    mar = e4_series(lines, "Markietani (E5/A3): dzien", 1)
+    nob = by_day(lines, "Notable (E5/A3): dzien")
+    try:
+        if mar or nob:
+            etap5_a3(rep, lines, start, until, mar, nob)
+        else:
+            rep.add("E5/A3: linie Markietani / Notable (E5/A3)", "brak w logu", "sa od wgrania E5/A3 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_a3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A4 (196): osada oblezona nie placi nic (linia z dniem gry - klucz = dzien ksiegi, jak 166)
+    obl = e4_series(lines, "Oblezone (E5/A4): dzien", 1)
+    try:
+        if obl:
+            etap5_a4(rep, lines, start, until, obl, bud)
+        else:
+            rep.add("E5/A4: linia Oblezone (E5/A4)", "brak w logu", "jest od wgrania E5/A4 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_a4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A5 (197): BetterEconomy - prawdziwa wplata gracza i dar dla notabli (dopisek linii kampanii BEE 170 i linie akcji gracza)
+    try:
+        if any(x.startswith("BEE domkniecie (170)") for x in lines):
+            etap5_a5(rep, lines)
+        else:
+            rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3091,6 +3141,586 @@ def etap5_a1(rep, lines, start, until, logp):
     rep.add("E5/A1 A1-T20: zakupy dla nas - towar u sprzedajacych", f"linie: {', '.join(have) if have else '-'}; BuyFloor: zapytan {sum(q.values())}, przy zapasie (0) {sum(z.values())}"
             + (f"; warsztaty zbrojne - brak zlota/kupca sr {st.mean(wsk.values()):.1f}/d (baza z31-A 0 kazdej doby)" if wsk else ""),
             "INFO wobec biegu bazowego (liczniki \"brak kasy miasta\"); skok x3 -> wylaczyc Town Pays From Surplus i powtorzyc", None)
+def etap5_a2(rep, lines, start, until, logp, bud):
+    """E5/A2 (162, PLAN 5.2 - dwor pelny, R8): projekt rozdz. 3 "E5/A2" Test: dwor rosnie o przelew ze sprzetu, nic w nicosc, gracz bez dworu,
+    D staly bez zmian definicji; ryzyko (rozdz. 3): wiecej zlota do kas siedzib - udzial panow zamkow (prog B3) jako INFO. Przelew zaczyna sie
+    po AiGearDaysCap (30) dobach od startu kampanii (przydzial musi dojsc do pulapu) - progi przelewu w dobach 31-until.
+    Recenzja A2 (uwaga 1): A2-10/A2-11 - sprzet wplacony do kasy WLASNEJ siedziby wraca jako "wlasne" (zapas w dopisku linii "D staly (169c)")."""
+    obg = by_day(lines, "Obieg: dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    win = [d for d in sorted(bud) if 1 <= run_day(d, start) <= until]
+    late = [d for d in win if run_day(d, start) >= 31]
+    a2re = re.compile(r"-> dwor \(E5/A2\): przeterminowane dzis (\d+) u (\d+) rodow, wplacone do kas siedzib (\d+) u (\d+) rodow \(miasta (\d+) / zamki (\d+)\)"
+                      r"; zostalo w kiesie glowy: ponizej rezerwy rodu \(wojna R, pokoj \d+ D\) (\d+), ustapilo zoldowi (\d+), kiesa glowy \(zold dnia, podloga\) (\d+)"
+                      r", dluznicy \(polowa\) (\d+), najemnicy bez dworu (\d+), bez siedziby (\d+); udzial ludu \(hak B1\) (\d+)%")
+    obre = re.compile(r"dwor \(166/162m\) do kas siedzib (\d+) \(w tym miasta pod tarcza dworu (\d+), zamki (\d+); w tym sprzet niewydany -> dwor \(E5/A2\) (\d+)"
+                      r": miasta (\d+) / zamki (\d+)\)")
+    rows = {}
+    for d in win:
+        m = a2re.search(bud[d])
+        if m:
+            rows[d] = [int(x) for x in m.groups()]
+    off = [d for d in win if "-> dwor (E5/A2): wylaczone" in bud[d]]
+    miss = [d for d in win if d not in rows and d not in off]
+    rep.add("E5/A2 A2-1: linia sprzetu niewydanego codziennie", f"brak/nieczytelna w {len(miss)} z {len(win)} dob" + (f", wylaczone w {len(off)}" if off else ""),
+            "0 (dopisek linii Budzet rodow (166))", len(miss) == 0 if win else None)
+    if off:
+        rep.add("E5/A2 A2-2: paczka czynna", f"wylaczone w {len(off)} dobach (Court Gets Lapsed Arms Share / Household Minimal)", "czynna w biegu zbioru A - progi przelewu INFO", None)
+
+    def mean_late(i):
+        v = [rows[d][i] for d in late if d in rows]
+        return st.mean(v) if v else None
+    paid = mean_late(2)
+    rep.add("E5/A2 A2-3: sprzet niewydany -> dwor (srednia dob 31-%d)" % until,
+            f"{paid:.0f}/d (przeterminowane {mean_late(0):.0f}/d u {mean_late(1):.0f} rodow; miasta {mean_late(4):.0f} / zamki {mean_late(5):.0f})" if paid is not None else "brak dob >= 31",
+            "> 0 (bieg z31-A: przydzial 516 615 wobec 35 155 wydanych w d120 - oczekiwane ok. 300-480 tys./d [S])", (paid > 0) if (paid is not None and not off) else None)
+    # A2-4: dwor rosnie o przelew - ta sama liczba w linii 166 i w Obiegu tej doby; dwor razem >= sprzet; miasta + zamki = sprzet
+    bad, noobg = [], 0
+    for d in win:
+        if d not in rows:
+            continue
+        if d not in obg:   # pierwsza doba sesji: ksiega pisze sam stan, bez linii "Obieg"
+            noobg += 1
+            continue
+        r = rows[d]
+        tot = num(r"dwor \(162m\): wplacone do kas siedzib (\d+)", bud[d])
+        o = obre.search(obg[d])
+        ok = (tot is not None and tot >= r[2] and r[4] + r[5] == r[2] and o is not None and int(o.group(4)) == r[2] and int(o.group(1)) == tot
+              and int(o.group(5)) == r[4] and int(o.group(6)) == r[5])
+        if not ok:
+            bad.append(run_day(d, start))
+    rep.add("E5/A2 A2-4: dwor rosnie o przelew ze sprzetu (166 = Obieg, dwor >= sprzet, miasta + zamki)",
+            f"niezgodne {len(bad)} z {len(rows) - noobg} dob" + (f" (doby {bad[:6]})" if bad else "") + (f"; bez linii Obieg {noobg} (pierwsza doba sesji)" if noobg else ""),
+            "0", (len(bad) == 0) if len(rows) > noobg else None)
+    # A2-5: nic w nicosc - reszta ksiegi pieniadza (przelew glowa -> kasa siedziby w naszym ticku, pozycja MBudget)
+    cd = [d for d in sorted(cau) if 1 <= run_day(d, start) <= until]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
+    rep.add("E5/A2 A2-5: nic w nicosc - reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii", "|R| < 10 000 (prog etapu 3; --grupa etap3)",
+            (abs(rv) < 10000) if rv is not None else None)
+    # A2-6: glowy rodow < 5 000 (przelew z kiesy glowy najwyzej do podlogi rodziny) - warunek etapu 2
+    heads = [num(r"glowy < 5000 \(rody z budzetem\): (\d+)", bud[d]) for d in win]
+    heads = [x for x in heads if x is not None]
+    rep.add("E5/A2 A2-6: glowy rodow < 5 000 (najwiecej w oknie)", f"{max(heads)}" if heads else "brak linii", "<= 10 (warunek etapu 2)", (max(heads) <= 10) if heads else None)
+    # A2-7: hak B1 = 0 do kiesy ludu; A2-8: gracz bez dworu (Eligible - gracz bez budzetu; linia 166 to wypisuje)
+    folk = [rows[d][12] for d in rows]
+    rep.add("E5/A2 A2-7: udzial ludu w dworze (hak B1)", f"najwiecej {max(folk)}%" if folk else "brak", "0% do B1 (TownFolkLive)", (max(folk) == 0) if folk else None)
+    pl = sum(1 for d in win if "gracz - bez budzetu" in bud[d])
+    rep.add("E5/A2 A2-8: gracz bez dworu", f"linia 'gracz - bez budzetu' w {pl} z {len(win)} dob", "kazda doba ([D] 08.10)", (pl == len(win)) if win else None)
+    # A2-9: bledy i potkniecia paczki (licznik potkniec - na sesje)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "CourtFull" in s]
+    stum = max([num(r"potkniecia E5/A2 (\d+)", bud[d], int, 0) or 0 for d in win] or [0])
+    rep.add("E5/A2 A2-9: bledy CourtFull / potkniecia E5/A2", f"bledy {len(errs)}, potkniecia {stum}", "0 / 0", len(errs) == 0 and stum == 0)
+    # A2-10 / A2-11 (recenzja A2, uwaga 1): sprzet wplacony do kasy WLASNEJ siedziby wraca zaworem jako "wlasne", nie "ziemia" (zapas CourtFull.Own/OwnBack,
+    # dopisek linii "D staly (169c)"): zapas zamyka sie z doby na dobe (zapas = wczoraj zapas + wczoraj wplacone - wrocilo - korona i danina - ponad zawor
+    # - przyciete - utracone) i po zbudowaniu zapasu (doby 45-until) wraca > 0 jako "wlasne". Recenzja E5/A5: wplaty gracza do kasy wlasnej osady
+    # (akcja z menu, poza blokiem doby) wchodza do zapasu przy najblizszej dobie - linia tej doby podaje je osobno ("wplaty gracza ... od wczorajszej linii")
+    sdl = by_day(lines, "D staly (169c): dzien")
+    owre = re.compile(r"\[E5/A2 zapas wlasny[^\]]*?: wrocilo dzis (\d+), do korony i daniny (\d+), ponad zawor dnia (\d+), przyciete \(osada wydala\) (\d+)"
+                      r", utracone \(nowy pan\) (\d+), zapas (\d+) w (\d+) osadach, wplacone dzis (\d+)")
+    owlate = re.compile(r"wplaty gracza do kasy wlasnej osady \(E5/A5\) od wczorajszej linii (\d+)")
+    ow = {}
+    for d in sorted(sdl):
+        if 1 <= run_day(d, start) <= until:
+            m = owre.search(sdl[d])
+            if m:
+                ow[d] = [int(x) for x in m.groups()] + [num(owlate, sdl[d], int, 0) or 0]
+    if not ow:
+        rep.add("E5/A2 A2-10: zapas wlasny (sprzet do wlasnej siedziby) w linii D staly (169c)", "brak dopisku",
+                "jest przy czynnej paczce i D stalym (Clan Income Book Stable D)", False if (rows and not off and sdl) else None)
+    else:
+        bad, pairs, resets = [], 0, 0
+        for d in sorted(ow):
+            if d - 1 not in ow:
+                continue
+            y0, r = ow[d - 1], ow[d]
+            outs = r[0] + r[1] + r[2] + r[3] + r[4]
+            late = r[8]   # recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis)
+            exp = y0[5] + y0[7] + late - outs
+            # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera (najwyzej wplaty gracza po wczytaniu, przed doba)
+            if abs(r[5] + outs - late) <= 5 and (y0[5] > 0 or y0[7] > 0) and abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):
+                resets += 1
+                continue
+            pairs += 1
+            if abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):   # zaokraglenia 7 liczb linii + reszta < 1 zl kazdej osady, ktora wyszla z zapasu
+                bad.append(run_day(d, start))
+        rep.add("E5/A2 A2-10: zapas wlasny zamyka sie z doby na dobe (zapas = wczoraj zapas + wplacone - wrocilo - korona - ponad zawor - przyciete - utracone)",
+                f"niezgodne {len(bad)} z {pairs} par dob" + (f" (doby {bad[:6]})" if bad else "") + (f"; wczytania (zapas od zera) {resets}" if resets else ""),
+                "0 (tolerancja 5 zl + 1 zl na osade, ktora wyszla z zapasu)", (len(bad) == 0) if pairs else None)
+        lw = [d for d in ow if run_day(d, start) >= 45]
+        if lw:
+            back = st.mean(ow[d][0] for d in lw); inn = st.mean(ow[d][7] for d in lw)
+            stock = ow[max(lw)][5]
+            rep.add("E5/A2 A2-11: sprzet do wlasnych siedzib wraca jako wlasne (srednia dob 45-%d)" % until,
+                    f"wrocilo jako wlasne {back:.0f}/d, wplacone do wlasnych siedzib {inn:.0f}/d, zapas na koncu {stock} w {ow[max(lw)][6]} osadach",
+                    "> 0, gdy wplacone > 0 (inaczej zwrot wlasnego zlota szedlby do D stalego jako ziemia)", (back > 0) if inn > 0 else None)
+            crown = st.mean(ow[d][1] for d in lw); cap = st.mean(ow[d][2] for d in lw); trim = st.mean(ow[d][3] for d in lw); lost = st.mean(ow[d][4] for d in lw)
+            share = (100.0 * inn / paid) if paid else 0.0
+            rep.add("E5/A2 INFO: zapas wlasny - odplywy poza wlasne i udzial wlasnych siedzib w przelewie (srednia dob 45-%d)" % until,
+                    f"korona i danina {crown:.0f}, ponad zawor dnia {cap:.0f}, przyciete {trim:.0f}, utracone {lost:.0f}; do wlasnych siedzib {share:.0f}% przelewu sprzetu",
+                    "INFO (recenzja A2: ok. 93% przelewu do wlasnych siedzib - budzet-rodow.csv z31-A d120; zamek 1/3 do korony)", None)
+    # INFO: co zostalo w kiesie glowy i dwor bez sprzetu (srednie dob 31-until)
+    if late and rows and paid is not None:
+        rep.add("E5/A2 INFO: zostalo w kiesie glowy (srednia dob 31-%d)" % until,
+                f"ponizej rezerwy {mean_late(6):.0f}, ustapilo zoldowi {mean_late(7):.0f}, kiesa glowy (zold dnia) {mean_late(8):.0f}, dluznicy {mean_late(9):.0f}"
+                f", najemnicy {mean_late(10):.0f}, bez siedziby {mean_late(11):.0f}",
+                "INFO (regula R8: rezerwa rodu, zold w wojnie, zold dnia w kiesie glowy)", None)
+        cv = [num(r"dwor \(162m\): wplacone do kas siedzib (\d+)", bud[d]) for d in late]
+        cv = [x for x in cv if x is not None]
+        if cv:
+            rep.add("E5/A2 INFO: dwor razem / sam dwor (srednia dob 31-%d)" % until, f"{st.mean(cv):.0f} / {st.mean(cv) - paid:.0f}",
+                    "INFO (bieg z31-A bez A2: dwor 175-190 tys./d w dobach 31-120, L:31679)", None)
+    # INFO (ryzyko - prog B3): udzial panow samych zamkow w D stalym i mediana kies ich glow (budzet-rodow.csv, rodzaj=zamek; wzor e5A/csv.py)
+    rws = read_csv(csv_path_of(logp))
+    if rws:
+        byd = {}
+        for x in rws:
+            try:
+                dz = int(x["dzien"])
+            except (ValueError, KeyError, TypeError):
+                continue
+            if 1 <= run_day(dz, start) <= until:
+                byd.setdefault(dz, []).append(x)
+        ser = []
+        for dz in sorted(byd):
+            tot = zam = 0.0
+            kies = []
+            for x in byd[dz]:
+                try:
+                    v = float(x.get("d_staly") or "nan")
+                except ValueError:
+                    continue
+                if v != v:
+                    continue
+                tot += v
+                if x.get("rodzaj") == "zamek":
+                    zam += v
+                    try:
+                        kies.append(float(x.get("kiesa_glowy")))
+                    except (TypeError, ValueError):
+                        pass
+            ser.append((dz, zam / tot if tot else 0.0, st.median(kies) if kies else 0.0))
+        w = ser[-28:]
+        if w:
+            ch = (w[-1][2] / w[0][2] - 1) * 100 if w[0][2] else 0.0
+            rep.add("E5/A2 INFO: panowie samych zamkow - udzial w d_staly, mediana kiesy glowy (ostatnie 28 dob okna)",
+                    f"{st.mean(x[1] for x in w) * 100:.1f}%; mediana {w[0][2]:.0f} -> {w[-1][2]:.0f} ({ch:+.1f}%)",
+                    "INFO - ryzyko A2 (wiekszy zawor kas siedzib); prog w B3; bieg z31-A d93-120: 24.3%, -2.5%", None)
+    else:
+        rep.add("E5/A2 INFO: panowie samych zamkow (budzet-rodow.csv)", "brak pliku CSV", "INFO", None)
+
+
+def etap5_a3(rep, lines, start, until, mar, nob):
+    """E5/A3 (163 + 164c, PLAN 5.3 - markietani R9, notable R10): projekt rozdz. 3 "E5/A3" Test i rozdz. 4 (sakiewki <= 15 dni zoldu).
+    Linie: "Markietani (E5/A3): dzien N" (dzien gry - jak 166; mar ma klucz = dzien ksiegi), "Notable (E5/A3): dzien N" (dzien ksiegi), "Obieg: dzien"
+    (sakiewki, zold), "Obieg: notable i karawany" (pasmo, nowi notable, karawany), "Pieniadz swiata (bilans - przyczyny)" (korekta zrodel E5/A3).
+    Doba 1 kampanii to sam stan ksiegi (bez Obiegu) - progi przeplywow od doby 2."""
+    obg = by_day(lines, "Obieg: dzien")
+    onk = by_day(lines, "Obieg: notable i karawany: dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    mwin = [d for d in sorted(mar) if 1 <= run_day(d, start) <= until]
+    mre = re.compile(r"stawka ([\d.]+)% \(pelna ([\d.]+)%; ([^)]*)\) \| w polu (\d+) partii, wydaly (\d+): z sakiewek (\d+) \(gracz (\d+)\) -> kasy miast (\d+) w (\d+) miastach"
+                     r" \(([\d.]+)%\), kiesy wsi (\d+) w (\d+) wsiach \| we wlasnych miastach rodow \(K3\) (\d+) \| bez niewrogiego miasta -> najblizsze miasto (\d+) partii \((\d+)\)"
+                     r" \| bez niewrogiej wsi w stanie Normal -> miasto (\d+) partii \((\d+)\)")
+    rows, off = {}, []
+    for d in mwin:
+        s = mar[d]
+        if "| wylaczone (Sutlers Enabled" in s:
+            off.append(d)
+            continue
+        m = mre.search(s)
+        if m:
+            g = m.groups()
+            rows[d] = {"rate": float(g[0]), "full": float(g[1]), "ramp": g[2], "n": int(g[3]), "paid": int(g[4]), "tot": int(g[5]), "pl": int(g[6]),
+                       "town": int(g[7]), "towns": int(g[8]), "vill": int(g[10]), "vills": int(g[11]), "k3": int(g[12]), "nt": int(g[13]), "ntg": int(g[14]),
+                       "nv": int(g[15]), "nvg": int(g[16]), "ms": num(r"koszt ([\d.]+) ms", s, float, 0.0) or 0.0,
+                       "days": num(r"sakiewki partii rodow \d+ = ([\d.]+) dni zoldu", s, float),
+                       "kdays": num(r"w tym oszczednosci K1 \d+ = ([\d.]+) dni", s, float)}
+    miss = [d for d in mwin if d not in rows and d not in off]
+    rep.add("E5/A3 A3-1: linia Markietani (E5/A3) codziennie", f"brak/nieczytelna w {len(miss)} z {len(mwin)} dob" + (f", wylaczone w {len(off)}" if off else ""),
+            "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if mwin else None)
+    # A3-2 (rozdz. 4): sakiewki zolnierzy <= 15 dni zoldu - "Obieg": stan sakiewek / (zold partii + zold zalog) naliczony tej doby; ostatnia doba okna
+    od = [d for d in sorted(obg) if 2 <= run_day(d, start) <= until]
+    sd = None
+    if od:
+        o = obg[od[-1]]
+        purse, zp, zz = num(r"sakiewki ludzi \[P\]: stan (\d+)", o), num(r"zold partii (\d+)", o), num(r"zold zalog (\d+)", o)
+        if purse is not None and zp and zz is not None:
+            sd = purse / float(zp + zz)
+    ramp_on = any(r["ramp"].startswith("rozruch") for r in rows.values())
+    lastm = rows[mwin[-1]] if mwin and mwin[-1] in rows else None
+    rep.add("E5/A3 A3-2: sakiewki <= 15 dni zoldu (Obieg: stan / zold partii i zalog, ostatnia doba okna)",
+            (f"{sd:.1f} dni" if sd is not None else "brak linii Obieg") + (f"; partie rodow (linia markietanow) {lastm['days']:.1f} dni" if lastm and lastm["days"] is not None else "")
+            + (f", w tym oszczednosci K1 {lastm['kdays']:.1f} dni (markietani ich nie ruszaja)" if lastm and lastm["kdays"] is not None else "")
+            + ("; rozruch w biegu (stary zapis)" if ramp_on else ""),
+            "<= 15 (oczekiwane 5-12 [S]; bieg z31-A bez A3: d40 12.8, d120 29.3)", (sd <= 15.0) if (sd is not None and rows and not off) else None)
+    late = [d for d in mwin if d in rows and run_day(d, start) >= 2]
+    if late:
+        tot = sum(rows[d]["tot"] for d in late) / len(late)
+        town = sum(rows[d]["town"] for d in late)
+        vill = sum(rows[d]["vill"] for d in late)
+        share = 100.0 * town / (town + vill) if (town + vill) else 0.0
+        rep.add("E5/A3 A3-3: markietani wydaja w polu (srednia dob 2-%d)" % until,
+                f"{tot:.0f}/d (do kas miast {town / len(late):.0f}, do kies wsi {vill / len(late):.0f}; partii w polu {st.mean(rows[d]['n'] for d in late):.0f}"
+                f", wydalo {st.mean(rows[d]['paid'] for d in late):.0f})",
+                "> 0 (rachunek [S]: ok. 100-190 tys./d, ile dzis przybywa sakiewkom)", tot > 0)
+        full = rows[late[-1]]["full"]
+        rep.add("E5/A3 A3-4: podzial miasto / wies (Sutler Town Share)", f"miasta {share:.1f}% (czesc wsi bez odbiorcy -> miasto: {sum(rows[d]['nvg'] for d in late)})",
+                "85% (+- 1 pp; wyzej tylko o czesc bez niewrogiej wsi w stanie Normal)", (84.0 <= share <= 100.0) if (town + vill) else None)
+        rep.add("E5/A3 A3-5: markietani bez niewrogiego miasta -> najblizsze miasto (licznik)",
+                f"partii {sum(rows[d]['nt'] for d in late)}, zl {sum(rows[d]['ntg'] for d in late)} w {len(late)} dobach",
+                "INFO (regula R9: brak odbiorcy - kasa najblizszego miasta, licznik)", None)
+        rep.add("E5/A3 A3-6: K3 - markietani we wlasnych miastach rodow (srednia)", f"{st.mean(rows[d]['k3'] for d in late):.0f}/d; gracz razem {sum(rows[d]['pl'] for d in late)}",
+                "INFO (ten sam licznik co OnLeft: CrownIncome.NoteOwnSpend; gracz = AI)", None)
+        ms = [rows[d]["ms"] for d in late]
+        rep.add("E5/A3 A3-7: koszt petli markietanow (srednia / najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms", "<= 20 ms/dobe (projekt rozdz. 5.2 pkt 3 [S])",
+                st.mean(ms) <= 20.0)
+        rr = [d for d in late if rows[d]["ramp"].startswith("rozruch")]
+        rep.add("E5/A3 INFO: stawka i rozruch", f"stawka pelna {full:.1f}%; doby rozruchu w oknie {len(rr)}"
+                + (f" (stawka {rows[rr[0]]['rate']:.1f}% -> {rows[rr[-1]]['rate']:.1f}%)" if rr else ""),
+                "INFO (rozruch tylko w zapisie z sakiewkami > 15 dni zoldu: od 1% do pelnej w Sutler Ramp Days)", None)
+    ru = [s for s in lines if s.startswith("Markietani (E5/A3): rozruch")]
+    rep.add("E5/A3 INFO: decyzja rozruchu (raz na kampanie)", ru[-1][:200] if ru else "brak linii", "INFO (nowa kampania: bez rozruchu)", None)
+    # notable (164c): pasmo i nowi notable bez zlota z niczego / w nicosc, kapital karawan z kies i kas (= korekta zrodel), kontrolki prog 0
+    nwin = [d for d in sorted(nob) if 2 <= run_day(d, start) <= until]
+    kwin = [d for d in sorted(onk) if 2 <= run_day(d, start) <= until]
+    if kwin:
+        bo = sum(abs(num(r"pasmo 4500-10500: nadwyzka w nicosc ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        bi = sum(abs(num(r"dosypka z niczego ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        nn = sum(abs(num(r"nowi notable ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        rep.add("E5/A3 A3-8: pasmo notabli - w nicosc / z niczego (Obieg, doby 2-%d)" % until, f"{bo} / {bi}",
+                "0 / 0 (bieg z31-A bez A3: ok. -107 tys. / +69 tys. na dobe)", (bo == 0 and bi == 0) if nwin else None)
+        rep.add("E5/A3 A3-9: nowi notable z niczego (Obieg, doby 2-%d)" % until, f"{nn}", "0 (po starcie gry; tworzenie swiata - bilans otwarcia)",
+                (nn == 0) if nwin else None)
+    nre = re.compile(r"nadwyzka do kas (\d+) \(notable miast (\d+) / wsi (\d+); zdarzen (\d+)\), brak z kas (\d+) \(notable miast (\d+) / wsi (\d+); zdarzen (\d+), nalezne (\d+)\)"
+                     r", uciete (\d+) \(kasa bez nadwyzki u (\d+) notabli - sila nie zeszla (\d+) pkt")
+    cre = re.compile(r"kapital karawan notabli[^:]*: (\d+) karawan, gra dalaby (\d+), z kies notabli (\d+), z kas miast startu (\d+), uciete ([-\d]+) \(bez kapitalu (\d+)\)")
+    kre = re.compile(r"bez kasy handlu - jak w grze \(prog 0\): zdarzen (\d+), w nicosc (\d+), z niczego (\d+) \| kontrola \(prog 0\): zdarzenia w kontekscie niedopasowane (\d+)"
+                     r", stos przepelniony (\d+), karawana bez odczytu modelu (\d+)")
+    nb, cb, kb, bad_corr, nofix = [], [], [], [], 0
+    for d in nwin:
+        s = nob[d]
+        m, c, k = nre.search(s), cre.search(s), kre.search(s)
+        if m:
+            nb.append([int(x) for x in m.groups()])
+        if c:
+            cv = [int(x) for x in c.groups()]
+            cb.append(cv)
+            corr = num(r"minus kapital karawan notabli z kies notabli i kas miast startu \(E5/A3\) (\d+)", cau.get(d, ""))
+            if corr is None:
+                nofix += 1
+            elif corr != cv[2] + cv[3]:
+                bad_corr.append(run_day(d, start))
+        if k:
+            kb.append([int(x) for x in k.groups()])
+    if not nwin:
+        rep.add("E5/A3: linia Notable (E5/A3)", "brak w logu", "jest od wgrania E5/A3 (LogEnabled)", None)
+    else:
+        if nb:
+            rep.add("E5/A3 INFO: pasmo przez kasy miast handlu (suma dob 2-%d)" % until,
+                    f"do kas {sum(x[0] for x in nb)} (notable miast {sum(x[1] for x in nb)} / wsi {sum(x[2] for x in nb)}), z kas {sum(x[4] for x in nb)}"
+                    f" (miast {sum(x[5] for x in nb)} / wsi {sum(x[6] for x in nb)}), nalezne {sum(x[8] for x in nb)}, uciete {sum(x[9] for x in nb)}"
+                    f" (notabli ponizej pasma z sila: najwiecej {max(x[10] for x in nb)} na dobe)",
+                    "INFO (miasta i wsie osobno - projekt Test A3; uciete = kasa bez nadwyzki, sila nie schodzi)", None)
+        # scalenie porcji A (recenzja A3 R2-1 b): przelewy pasma z kasa osady w linii "Notable (E5/0)" = pasmo przez kasy w linii A3 (ta sama doba, +-1 zl;
+        # miasta + wsie razem - podzial miasto/wies liczony w obu liniach inaczej: E5/0 wedlug osady notabla, A3 wedlug kasy handlu)
+        nt0 = by_day(lines, "Notable (E5/0): dzien")
+        ncmp, nbad = 0, []
+        for d in nwin:
+            m, s0 = nre.search(nob[d]), nt0.get(d)
+            if not m or not s0:
+                continue
+            ko = (num(r"do kasy osady (\d+) /", s0, int, 0) or 0) + (num(r"do kasy osady targowej (\d+) /", s0, int, 0) or 0)
+            ki = (num(r"/ z kasy osady (\d+)", s0, int, 0) or 0) + (num(r"/ z kasy osady targowej (\d+)", s0, int, 0) or 0)
+            ncmp += 1
+            if abs(ko - int(m.group(1))) > 1 or abs(ki - int(m.group(5))) > 1:
+                nbad.append(run_day(d, start))
+        if ncmp:
+            rep.add("E5/A3 + E5/0: pasmo przez kasy - E5/0 \"do kasy / z kasy osady\" = A3 \"do kas / z kas\" (kazda doba)",
+                    f"niezgodne {len(nbad)} z {ncmp} dob" + (f" (doby {nbad[:6]})" if nbad else ""), "0 (+-1 zl)", len(nbad) == 0)
+        else:
+            rep.add("E5/A3 + E5/0: pasmo przez kasy - E5/0 wobec A3", "brak linii Notable (E5/0) w dobach linii A3", "INFO (E5/0 wylaczone - Town Folk Mode 0)", None)
+        if cb:
+            rep.add("E5/A3 A3-10: kapital karawan notabli z kies i kas = korekta zrodel bilansu (kazda doba)",
+                    f"niezgodne {len(bad_corr)} z {len(cb)} dob" + (f" (doby {bad_corr[:6]})" if bad_corr else "") + (f"; bez linii bilansu {nofix}" if nofix else "")
+                    + f"; razem karawan {sum(x[0] for x in cb)}, gra dalaby {sum(x[1] for x in cb)}, z kies {sum(x[2] for x in cb)}, z kas {sum(x[3] for x in cb)}"
+                    + f", bez kapitalu {sum(x[5] for x in cb)}",
+                    "0 (kapital z niczego 0: O17 widzi go jako nadany, korekta zrodel zdejmuje go w calosci)", len(bad_corr) == 0)
+        if kb:
+            nt = sum(x[0] for x in kb)
+            ctrl = sum(x[3] + x[4] + x[5] for x in kb)
+            rep.add("E5/A3 A3-11: notable bez kasy handlu (jak w grze) / kontrolki",
+                    f"zdarzen {nt} (w nicosc {sum(x[1] for x in kb)}, z niczego {sum(x[2] for x in kb)}); kontrolki {ctrl}", "0 / 0 (prog 0)", nt == 0 and ctrl == 0)
+    if kwin:
+        def cars(rd):
+            ds = [d for d in kwin if run_day(d, start) <= rd]
+            return num(r"karawany notabli \[P\]: (\d+) karawan", onk[ds[-1]]) if ds else None
+        rep.add("E5/A3 A3-12: karawany notabli (d40 / ostatnia doba okna)", f"{cars(40)} / {cars(until)}",
+                ">= 90% biegu bez A3 (z31-A: d40 750, d120 914 - bez bazy tylko odczyt; test po scaleniu z E4/8)", None)
+    st0 = [s for s in lines if s.startswith("Notable (E5/A3): start")]
+    rep.add("E5/A3 INFO: bilans otwarcia i latki (linia startowa)", st0[0][st0[0].find("| latki"):][:260] if st0 else "brak linii",
+            "nowa kampania: notable n > 0 (zloto gry), karawany startowe m > 0; latki BRAK: -", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and ("Sutlers" in s or "NotableGold" in s)]
+    stm = max([num(r"potkniecia (\d+)", mar[d], int, 0) or 0 for d in mwin] + [num(r"potkniecia (\d+)", nob[d], int, 0) or 0 for d in nwin] + [0])
+    rep.add("E5/A3 A3-13: bledy Sutlers / NotableGold, potkniecia", f"bledy {len(errs)}, potkniecia {stm}", "0 / 0", len(errs) == 0 and stm == 0)
+    cd = [d for d in sorted(cau) if 1 <= run_day(d, start) <= until]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
+    rep.add("E5/A3 A3-14: nic w nicosc - reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii",
+            "|R| < 10 000 (prog etapu 3; --grupa etap3)", (abs(rv) < 10000) if rv is not None else None)
+
+
+def etap5_a4(rep, lines, start, until, obl, bud):
+    """E5/A4 (196, PLAN 5.4 - osada oblezona nie placi nic, R22): projekt rozdz. 3 "E5/A4" Test - wplaty z oblezonych osad 0; miasta z zywym panem
+    i nadwyzka > 0 bez zaworu 0 ("10 miast" - z definicji A1, prog A1-T9; tu tylko odczyt, gdy dopisek A1 jest w logu); wplaty z kas ponizej zapasu 0
+    (z definicji: pobor = min(nalezne, kasa - prog); zamki - prog B-4 max(20 000, zapas kupcow), miasta - zapas kupcow od A1).
+    Linia "Oblezone (E5/A4): dzien N" (dzien gry; obl ma klucz = dzien ksiegi): liczniki od poprzedniej linii - renta miast z naszego bloku doby,
+    polityki korony z dziennego ticku rodu krola w grze (tylko prawdziwe rozliczenie, bez prognozy ekranu). Zloto nie rusza - mniej przelewow;
+    reszta ksiegi - wiersze A3-14 / A1-T13 / --grupa etap3. Doby oczekiwane - z linii "Budzet rodow (166)" (bud, ten sam klucz), a bez niej - z samej linii A4.
+    Recenzja A4: wstrzymanie tylko przy kasie prawdziwym pieniadzem (miasta - A1, zamki - 110), inaczej osada placi jak dotad (licznik "kasa pod
+    regulatorem gry"); A4-3 czyta KONTROLE niezalezna od bramki (co naprawde zeszlo z kas oblezonych: renta, zawor 110, danina, polityki) -
+    "bez wyjasnienia" (ponad to, co bramka jawnie przepuscila) = 0 w kazdej dobie, przy kazdym stanie klucza."""
+    win = sorted(set(d for d in obl if 1 <= run_day(d, start) <= until) | set(d for d in bud if 1 <= run_day(d, start) <= until))
+    kinds = ("renta miast", "Crown Duty", "War Tax", "Road Tolls")
+
+    def part(s, head):
+        i = s.find(head)
+        if i < 0:
+            return None
+        seg = s[i + len(head):]
+        j = seg.find(" | ")
+        seg = seg if j < 0 else seg[:j]
+        out = []
+        for k in kinds:
+            m = re.search(re.escape(k) + r" (\d+) \((\d+)\)", seg)
+            if not m:
+                return None
+            out.append((int(m.group(1)), int(m.group(2))))
+        m = re.search(r"razem (\d+) z (\d+) osad", seg)
+        if not m:
+            return None
+        return out, int(m.group(1)), int(m.group(2))
+    rows, off = {}, []
+    for d in win:
+        s = obl.get(d)
+        if s is None:
+            continue
+        if "| Besieged Pay Nothing: nie" in s:
+            off.append(d)
+        h = part(s, "| wstrzymane (oblezona osada nie placi - zostaje w jej kasie): ")
+        p = part(s, "| zaplacone mimo oblezenia - wylacznik wylaczony: ")
+        g = part(s, "| zaplacone mimo oblezenia - kasa pod regulatorem gry (miasta bez A1, zamki bez 110): ")
+        m = re.search(r"oblezone teraz: miasta (\d+), zamki (\d+); wsie w rabunku lub spladrowane (\d+)", s)
+        f = re.search(r"ponad zapasem kupcow \(D4\): (\d+) z (\d+) zamkow", s)
+        c = re.search(r"kontrola \(niezalezna od bramki[^)]*\): renta (\d+), zawor 110 (\d+), danina (\d+), polityki (\d+); razem (\d+) z (\d+) osad"
+                      r"; w tym zaplacone jawnie \(wyzej\) (\d+); bez wyjasnienia (\d+) z (\d+) osad", s)
+        r = re.search(r"kasa prawdziwym pieniadzem \(wstrzymanie tylko tam\): miasta \(A1\) (tak|nie), zamki \(110\) (tak|nie)", s)
+        if h and p and g and m and f and c and r:
+            rows[d] = {"held": h, "paid": p, "reg": g, "towns": int(m.group(1)), "castles": int(m.group(2)), "vill": int(m.group(3)),
+                       "floor": int(f.group(1)), "castleN": int(f.group(2)), "stum": num(r"potkniecia (\d+)", s, int, 0) or 0,
+                       "ctl": [int(c.group(i)) for i in range(1, 10)], "townReal": r.group(1) == "tak", "castleReal": r.group(2) == "tak"}
+    miss = [d for d in win if d not in rows]
+    rep.add("E5/A4 A4-1: linia Oblezone (E5/A4) codziennie", f"brak/nieczytelna w {len(miss)} z {len(win)} dob" + (f", wylacznik wylaczony w {len(off)}" if off else ""),
+            "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if win else None)
+    on = [d for d in win if d in rows and d not in off]
+    if off:
+        rep.add("E5/A4 A4-2: wylacznik Besieged Pay Nothing", f"wylaczony w {len(off)} z {len(win)} dob", "wlaczony caly bieg zbioru A (wylaczony - A4-3 INFO)", None)
+    # A4-3 (recenzja): kontrola niezalezna od bramki - co naprawde zeszlo z kas oblezonych osad ponad to, co bramka jawnie przepuscila (kasa pod
+    # regulatorem gry) = 0 w kazdej dobie z wlaczonym kluczem (zgubiona bramka po scaleniu, nowa droga poboru bez Holds, zawor 110 / Levies bez
+    # warunku oblezenia). Doby z kluczem wylaczonym - INFO: zawor A1 (po scaleniu) placi panu dekretem BK (High 1.3) od czesci pana, wiec w miescie
+    # bez krolestwa czesc pana moze przekroczyc kwote bramki (pay) - "bez wyjasnienia" do 30% renty bez bledu.
+    if on:
+        cs = [sum(rows[d]["ctl"][i] for d in on) for i in range(9)]
+        bad = [d for d in on if rows[d]["ctl"][7] > 0]
+        rep.add("E5/A4 A4-3: kontrola - zeszlo z kas oblezonych bez wyjasnienia (suma dob z wlaczonym kluczem; niezalezne od bramki)",
+                f"bez wyjasnienia {cs[7]} zl (osado-dni {cs[8]}; dob z > 0: {len(bad)}" + (f", pierwsza {bad[0]}" if bad else "") + ")"
+                + f" | zeszlo razem {cs[4]} (renta {cs[0]}, zawor 110 {cs[1]}, danina {cs[2]}, polityki {cs[3]}), w tym jawnie przez bramke {cs[6]}",
+                "0 (projekt Test A4: wplaty z oblezonych osad 0 - poza jawnie przepuszczonymi przy kasie pod regulatorem gry)", cs[7] == 0 and cs[8] == 0)
+    if off:
+        ofr = [d for d in off if d in rows]
+        co = [sum(rows[d]["ctl"][i] for d in ofr) for i in range(9)]
+        rep.add("E5/A4 INFO: kontrola w dobach z wylaczonym kluczem", f"zeszlo {co[4]}, w tym jawnie {co[6]}, bez wyjasnienia {co[7]} (osado-dni {co[8]})",
+                "INFO - wszystko placi jak przed paczka; > 0 = zawor 110 / Levies bez warunku oblezenia albo dekret High w miescie bez krolestwa (A1)", None)
+    if rows:
+        ds = [d for d in win if d in rows]
+        rg = [sum(rows[d]["reg"][0][i][0] for d in ds) for i in range(len(kinds))]
+        rgn = [sum(rows[d]["reg"][0][i][1] for d in ds) for i in range(len(kinds))]
+        tr = len([d for d in ds if rows[d]["townReal"]]); cr = len([d for d in ds if rows[d]["castleReal"]])
+        rep.add("E5/A4 A4-3b: zaplacone mimo oblezenia - kasa pod regulatorem gry (suma okna)",
+                ", ".join(f"{kinds[i]} {rg[i]} ({rgn[i]})" for i in range(len(kinds)))
+                + f" | kasa prawdziwym pieniadzem: miasta (A1) w {tr} z {len(ds)} dob, zamki (110) w {cr} z {len(ds)} dob",
+                "INFO - bez A1 oblezone miasta placa jak dotad (regulator gry skasowalby wstrzymane); zbior A po scaleniu z A1 (A1 i 110 czynne): 0", None)
+    if off:
+        pz = sum(rows[d]["paid"][1] for d in off if d in rows)
+        rep.add("E5/A4 INFO: zaplacone mimo oblezenia w dobach z wylaczonym kluczem", f"{pz} zl w {len([d for d in off if d in rows])} dobach",
+                "INFO - stan sprzed paczki (renta miast i polityki korony z oblezonych)", None)
+    if rows:
+        ds = [d for d in win if d in rows]
+        held = [sum(rows[d]["held"][0][i][0] for d in ds) for i in range(len(kinds))]
+        heldn = [sum(rows[d]["held"][0][i][1] for d in ds) for i in range(len(kinds))]
+        tw, cs = [rows[d]["towns"] for d in ds], [rows[d]["castles"] for d in ds]
+        rep.add("E5/A4 A4-4: wstrzymane - oblezona osada nie placi (suma okna; zostaje w jej kasie)",
+                ", ".join(f"{kinds[i]} {held[i]} ({heldn[i]})" for i in range(len(kinds)))
+                + f"; razem {sum(held)} = {sum(held) / len(ds):.0f}/d; osado-dni ze wstrzymaniem {sum(rows[d]['held'][2] for d in ds)}"
+                + f" | oblezone przy linii: miasta srednio {st.mean(tw):.2f} (najwiecej {max(tw)}), zamki {st.mean(cs):.2f} (najwiecej {max(cs)})",
+                "INFO ([S] z31-A: ok. 1.3 oblezonego miasta na dobe w d93-120 x ok. 5 tys. renty = ok. 6.5 tys./d renty; polityki - tylko krolestwa z nimi)", None)
+        # A4-5: drogi "od dawna" - zawor zamkow 110 i zawor A1 pomijaja oblezone (odczyt liczby z ich linii)
+        z110 = e4_series(lines, "Zawor zamkow (110): dzien", 1)
+        k169 = e4_series(lines, "Kasy miast (169c): dzien", 1)
+        zc = [num(r"oblezone (\d+), bez pana", z110[d], int) for d in win if d in z110]
+        zc = [x for x in zc if x is not None]
+        ac = [num(r"bez poboru: kasa nie ponad zapasem \d+, oblezone (\d+)", k169[d], int) for d in win if d in k169]
+        ac = [x for x in ac if x is not None]
+        rep.add("E5/A4 A4-5: zawor zamkow (110) i zawor kas miast (A1) - oblezone pominiete (suma okna)",
+                (f"zamki {sum(zc)} w {len(zc)} dobach" if zc else "zamki: brak liczby w linii 110") + "; "
+                + (f"miasta (A1) {sum(ac)} w {len(ac)} dobach" if ac else "miasta: brak dopisku E5/A1 (A1 nie w logu - oblezone miasta placa jak dotad, A4-3b)"),
+                "INFO (regula od dawna, bez wylacznika A4; danina i clo - KingdomTreasury.Levies)", None)
+        # A4-6: "10 miast bez placenia" - z definicji A1 (prog A1-T9); tu tylko gdy dopisek A1 jest w logu
+        v9 = [num(r"miast z nadwyzka bez zaworu \(10 miast\) (\d+)", k169[d], int) for d in win if d in k169]
+        v9 = [x for x in v9 if x is not None]
+        rep.add("E5/A4 A4-6: miasta z zywym panem i nadwyzka bez zaworu (\"10 miast\")",
+                (f"niezerowe w {len([x for x in v9 if x])} z {len(v9)} dob" + (f" (najwiecej {max(v9)})" if any(v9) else "")) if v9 else "brak dopisku E5/A1 w logu",
+                "0 (z definicji A1 - zawor od nadwyzki, bez filtra ludnosci; prog A1-T9)", (not any(v9)) if v9 else None)
+        # A4-9 (recenzja R1-2, krok scalania 2): zawor A1 przez bramke R22 - bez kroku 2 zawor A1 pomija oblezone przed bramka (nic nie wyplywa,
+        # wiec A4-3 tego nie widzi): oblezone w zaworze A1 (_vSiege) > 0, a "wstrzymane: renta miast" 0 w dobach z kluczem i A1
+        dd = [d for d in win if d in rows and d in k169 and d not in off and rows[d]["townReal"]]
+        if dd:
+            vs = sum(num(r"bez poboru: kasa nie ponad zapasem \d+, oblezone (\d+)", k169[d], int, 0) or 0 for d in dd)
+            hn = sum(rows[d]["held"][0][0][1] for d in dd)
+            rep.add("E5/A4 A4-9: zawor kas miast A1 przez bramke R22 (krok scalania 2)",
+                    f"oblezone w zaworze A1 {vs}, wstrzymana renta miast {hn} miasto-dni (w {len(dd)} dobach z kluczem i A1)",
+                    "> 0, gdy oblezone > 0 (0 = zawor A1 pomija oblezone przed bramka - krok scalania 2 nie zrobiony)", (hn > 0) if vs > 0 else None)
+        last = rows[ds[-1]]
+        fl = [rows[d]["floor"] for d in ds]
+        rep.add("E5/A4 A4-7: prog podatkow korony zamkow ponad zapasem kupcow (D4)",
+                f"ostatnia doba {last['floor']} z {last['castleN']} zamkow (najwiecej {max(fl)})",
+                "INFO - B-4 PayFloor = max(20 000, zapas kupcow): zamki z zapasem < 20 000 placa Crown Duty / War Tax od 20 000, nie od D4"
+                " (decyzja po tescie A; wplaty z kas ponizej progu - 0 z definicji)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "BesiegedPay" in s]
+    stm = max([rows[d]["stum"] for d in rows] + [0])
+    rep.add("E5/A4 A4-8: bledy BesiegedPay, potkniecia", f"bledy {len(errs)}, potkniecia {stm}", "0 / 0", len(errs) == 0 and stm == 0)
+    st0 = [s for s in lines if s.startswith("Oblezone (E5/A4): start")]
+    rep.add("E5/A4 INFO: linia startowa", st0[0][st0[0].find("| wylacznik"):][:420] if st0 else "brak linii",
+            "wylacznik tak; Population Rent Enabled tak; Policy Income Conserved tak; kasy miast A1 tak (zbior A), Castle Purse Enabled tak, latka regulatora 110 wpieta", None)
+
+
+def etap5_a5(rep, lines):
+    """E5/A5 (197, R23 - BetterEconomy: prawdziwa wplata gracza do kasy osady i dar dla notabli): projekt rozdz. 3 "E5/A5" Test - zbior A + reczne
+    sprawdzenie Jeffa (autotest nie klika menu): przelew w ksiedze, nic z niczego. Linia startowa BEE (170) - prefiksy Try* wpiete; linia kampanii
+    BEE (170) - dopisek "E5/A5 (prawdziwa wplata i dar dla notabli)"; kazda akcja gracza - linia "BEE (E5/A5) wplata|wplata odmowiona|dar: dzien N | ..."
+    ze zlotem gracza i odbiorcy przed i po (gracz traci dokladnie tyle, ile dostaje kasa osady / notable - inaczej dopisek ROZNICA)."""
+    st = [x for x in lines if x.startswith("BEE domkniecie (170): BetterEconomy")]
+    camp = [x for x in lines if x.startswith("BEE domkniecie (170): kampania")]
+    pays = [x for x in lines if x.startswith("BEE (E5/A5) wplata: dzien")]
+    refs = [x for x in lines if x.startswith("BEE (E5/A5) wplata odmowiona: dzien")]
+    gifts = [x for x in lines if x.startswith("BEE (E5/A5) dar: dzien")]
+    labels = ("prawdziwa wplata do kasy miasta (E5/A5)", "prawdziwa wplata do kasy zamku (E5/A5)")
+    # A5-1: prefiksy Try* wpiete (linia startowa BEE 170; bez BEE albo inna wersja - INFO)
+    if not st:
+        rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)", "brak linii startowej BEE", "jest przy BetterEconomy w grze", None)
+    else:
+        x = st[-1]
+        if "nieobecny" in x or "NIC nie wpiete" in x:
+            rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)", x[:200], "BetterEconomy v1.4.5 obecny (inaczej paczka nieczynna - INFO)", None)
+        else:
+            m = re.search(r"wpiete (\d+)/(\d+)", x)
+            head = x.split(" | BRAK:")[0]
+            ok = all(l in head for l in labels)
+            rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)",
+                    (f"wpiete {m.group(1)}/{m.group(2)}" if m else "?") + "; " + ", ".join(("tak" if l in head else "NIE") + " - " + l for l in labels)
+                    + (" | BRAK: " + x.split(" | BRAK:")[1][:200] if " | BRAK:" in x else ""),
+                    "oba wpiete (18/18 przy pelnym 170)", ok)
+    # A5-2: dopisek linii kampanii (kazda sesja: start / wczytanie)
+    rows = []
+    for x in camp:
+        i = x.find("E5/A5 (prawdziwa wplata i dar dla notabli): ")
+        rows.append(x[i:] if i >= 0 else None)
+    if not camp:
+        rep.add("E5/A5 A5-2: linia kampanii BEE (170) - dopisek E5/A5", "brak linii kampanii", "jest w kazdej sesji", None)
+    else:
+        bad, off = [], 0
+        for r in rows:
+            if r is None:
+                bad.append("brak dopisku")
+                continue
+            if "wylacznik wylaczony" in r:
+                off += 1
+                continue
+            if not ("prefiksy Try*: miasto tak, zamek tak" in r and "okno kwot przy opcjach wplaty 2/2" in r and "opcje daru dla notabli 2/2" in r):
+                bad.append(r[:160])
+        last = rows[-1] or "brak dopisku"
+        rep.add("E5/A5 A5-2: linia kampanii BEE (170) - dopisek E5/A5 (sesje)",
+                f"sesji {len(camp)}, niepelnych {len(bad)}" + (f", wylacznik wylaczony w {off}" if off else "") + " | ostatnia: " + last[:300],
+                "kazda sesja: wylacznik wlaczony, prefiksy Try* tak/tak, okno kwot 2/2, opcje daru 2/2", len(bad) == 0 and off == 0)
+        m = re.search(r"kasa prawdziwym pieniadzem: miasta \(A1\) (tak|nie).*?, zamki \(110\) (tak|nie)", last)
+        rep.add("E5/A5 A5-3: kasa osady prawdziwym pieniadzem (wplata otwarta tylko tam)",
+                (f"miasta (A1) {m.group(1)}, zamki (110) {m.group(2)}" if m else "brak w dopisku") + " | przerwa po darze: "
+                + (re.search(r"przerwa po darze: ([^;]+)", last).group(1)[:90] if re.search(r"przerwa po darze: ([^;]+)", last) else "?"),
+                "INFO - zbior A po scaleniu z A1: miasta tak, zamki tak (bez A1 wplata do miast zamknieta z powodem - regulator gry)", None)
+    # A5-4: wplaty - gracz traci tyle, ile dostaje kasa osady
+    if pays:
+        diff = [x for x in pays if "| ROZNICA" in x]
+        tot = sum(num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0 for x in pays)
+        got = sum(num(r"\| kasa osady \d+ -> \d+ \(\+(-?\d+)\)", x, int, 0) or 0 for x in pays)
+        tw = len([x for x in pays if "(miasto)" in x]); cs = len([x for x in pays if "(zamek)" in x])
+        rep.add("E5/A5 A5-4: wplaty gracza do kasy osady - gracz traci tyle, ile dostaje kasa",
+                f"wplat {len(pays)} (miasta {tw}, zamki {cs}), gracz -{tot}, kasy +{got}, linii z ROZNICA {len(diff)}" + (f" (pierwsza: {diff[0][:160]})" if diff else ""),
+                "ROZNICA 0 i suma gracza = suma kas (nic z niczego, nic w nicosc)", len(diff) == 0 and tot == got)
+    else:
+        rep.add("E5/A5 A5-4: wplaty gracza do kasy osady", "brak linii wplat", "INFO - autotest nie klika menu; reczny test Jeffa: wplata do wlasnego zamku/miasta -> linia z ROZNICA 0", None)
+    # A5-4b (recenzja A5): wplata to pieniadze rodu gracza w kasie WLASNEJ osady - cala do zapasu "wlasnego" (CourtFull.OwnPlayer; wraca zaworem jako wlasne
+    # D stalego, nie ziemia - inaczej zawyza StableLand gracza: powinnosci 165, limit Banku 168); linia "D staly" doby po wplacie podaje ja w zapasie
+    if pays:
+        own_re = re.compile(r"\| do zapasu wlasnego (\d+)")
+        late_re = re.compile(r"wplaty gracza do kasy wlasnej osady \(E5/A5\) od wczorajszej linii (\d+)")
+        bad, off, tot_on, own_on, pend, before, late_sum, sdn = [], 0, 0, 0, 0, 0, 0, 0
+        for x in lines:
+            if x.startswith("BEE (E5/A5) wplata: dzien"):
+                o = num(own_re, x, int, None)
+                pd = num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0
+                if o is None:
+                    bad.append("brak pola: " + x[:120])
+                    continue
+                pend += o
+                if "(D staly wylaczony)" in x:
+                    off += 1
+                    continue
+                tot_on += pd; own_on += o
+                if o != pd:
+                    bad.append(x[:160])
+            elif x.startswith("D staly (169c): dzien"):
+                sdn += 1
+                late_sum += num(late_re, x, int, 0) or 0
+                before += pend; pend = 0
+        close = (late_sum == before) if sdn else None
+        rep.add("E5/A5 A5-4b: wplaty do zapasu wlasnego (wraca zaworem jako wlasne, nie ziemia D stalego)",
+                f"wplaty {tot_on} -> do zapasu {own_on}, niezgodnych linii {len(bad)}" + (f" (pierwsza: {bad[0]})" if bad else "")
+                + (f", przy D stalym wylaczonym {off}" if off else "")
+                + (f"; w liniach D staly weszlo do zapasu {late_sum} z {before} wplaconych przed nimi" if sdn else "; brak linii D staly")
+                + (f" (po ostatniej linii jeszcze {pend})" if pend else ""),
+                "do zapasu = wplata w kazdej linii; w liniach D staly = suma wplat przed nimi (wyjatek: wczytanie zapisu miedzy wplata a doba - ta wplata wypada z zapasu)",
+                len(bad) == 0 and close is not False)
+    # A5-5: dary - gracz traci tyle, ile dostaja notable
+    if gifts:
+        diff = [x for x in gifts if "| ROZNICA" in x]
+        tot = sum(num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0 for x in gifts)
+        got = sum(num(r"\| notable razem \+(-?\d+)", x, int, 0) or 0 for x in gifts)
+        rel = sum(num(r"\| relacja razem \+(-?\d+)", x, int, 0) or 0 for x in gifts)
+        nn = sum(num(r"\| notabli (\d+)", x, int, 0) or 0 for x in gifts)
+        rep.add("E5/A5 A5-5: dary dla notabli - gracz traci tyle, ile dostaja notable",
+                f"darow {len(gifts)}, notabli razem {nn}, gracz -{tot}, notable +{got}, relacja razem +{rel}, linii z ROZNICA {len(diff)}" + (f" (pierwsza: {diff[0][:160]})" if diff else ""),
+                "ROZNICA 0 i suma gracza = suma notabli; relacja jak nadplata w barterze (najwyzej ok. +3 na notabla)", len(diff) == 0 and tot == got)
+    else:
+        rep.add("E5/A5 A5-5: dary dla notabli", "brak linii darow", "INFO - autotest nie klika menu; reczny test Jeffa: dar w miescie i we wsi -> linia z ROZNICA 0", None)
+    # A5-6: odmowy (ekrany BK, konsola, menu) - INFO
+    why = {}
+    for x in refs:
+        k = x.split("| powod: ", 1)[1][:70] if "| powod: " in x else "?"
+        why[k] = why.get(k, 0) + 1
+    rep.add("E5/A5 A5-6: odmowy wplaty (powody)", (f"{len(refs)}: " + "; ".join(f"{k} x{v}" for k, v in sorted(why.items(), key=lambda t: -t[1])[:5])) if refs else "0",
+            "INFO - zloto nie schodzi przy odmowie; \"Closed for now\" = kasa pod regulatorem gry (miasta bez A1)", None)
+    # A5-7: bledy i potkniecia
+    errs = [x for x in lines if x.startswith("ERROR in BeeGifts")]
+    stm = max([num(r"potkniecia (\d+)", x, int, 0) or 0 for x in pays + gifts] + [num(r"E5/A5 \(prawdziwa.*?potkniecia (\d+)", x, int, 0) or 0 for x in camp] + [0])
+    rep.add("E5/A5 A5-7: bledy BeeGifts, potkniecia", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
 
 
 def main(argv):

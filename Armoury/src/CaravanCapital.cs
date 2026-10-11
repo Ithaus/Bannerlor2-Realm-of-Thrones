@@ -29,6 +29,8 @@ namespace Armoury
     ///     przez kogos, kto ich nie pokonal): kiesa partii bez wodza -> glowa rodu wlasciciela (karawana notabla - sam notabl), brak - kasa
     ///     najblizszego miasta (GiveGoldAction - ksiega widzi przelew). Sakiewka ludzi partii usunietej (sierota) -> kasa najblizszego miasta;
     ///     rozwiazanej - jak dotad MenPurse.OnPartyDestroyed (najblizsze miasto). Tabory wsi - 112 (VillageTakings).
+    ///  5. E5/A3 (164c): NOWA KARAWANA NOTABLA (bez kontekstu 1-3, po starcie gry, bez isInitialSpawn) - kapital z kiesy notabla ponad 4 500 i z nadwyzki
+    ///     kasy miasta startu (NotableGold.CarOpen/CarCap/CarClose wolane z CreatePre, CapPostfix i CreateFin; wylacznik NotableCaravanCapitalReal).
     /// </summary>
     internal static class CaravanCapital
     {
@@ -127,9 +129,9 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ CreateCaravanParty i kapital z modelu
-        public struct CreateState { public bool PrevSeen; public bool On; }
+        public struct CreateState { public bool PrevSeen; public bool On; public NotableGold.Car Nb; }   // Nb: E5/A3 (164c) kontekst karawany notabla
 
-        public static void CreatePre(Hero __0, out CreateState __state)
+        public static void CreatePre(Hero __0, Settlement __1, bool __3, out CreateState __state)
         {
             __state = new CreateState { PrevSeen = _createSeen, On = true };
             _createDepth++; _createSeen = false;
@@ -137,6 +139,7 @@ namespace Armoury
             {
                 var c = Top();
                 if (c != null && c.Kind == KBk && !c.Done && c.Price < 0 && ReferenceEquals(c.Buyer, __0)) c.Price = Math.Max(0L, (long)c.G0 - __0.Gold);
+                if (c == null) __state.Nb = NotableGold.CarOpen(__0, __1, __3, _createDepth);   // E5/A3 (164c): karawana notabla bez kontekstu E3/7 - kapital z kiesy notabla i kasy miasta startu
             }
             catch (Exception e) { Seal31.Stumble("CaravanCapital.CreatePre", e); }
         }
@@ -145,6 +148,7 @@ namespace Armoury
         {
             if (!__state.On) return;
             _createDepth = Math.Max(0, _createDepth - 1); _createSeen = __state.PrevSeen;
+            if (__state.Nb != null) NotableGold.CarClose(__state.Nb, __result);   // E5/A3 (164c): wlasny try
             try
             {
                 var c = Top();
@@ -177,7 +181,8 @@ namespace Armoury
             {
                 if (_createDepth == 0 || _createSeen) return;
                 var c = Top();
-                if (c == null || c.Done) return;
+                if (c == null) { if (NotableGold.CarCap(_createDepth, ref __result)) _createSeen = true; return; }   // E5/A3 (164c): karawana notabla (wlasny try)
+                if (c.Done) return;
                 _createSeen = true;
                 if (c.Kind == KDte) { _dteN++; _dteCap += Math.Max(0, __result); __result = 0; }
                 else if (c.Kind == KBk && c.Price >= 0) { c.K = Math.Max(0, __result); c.Cap = Math.Min(c.K, c.Price); __result = (int)c.Cap; }

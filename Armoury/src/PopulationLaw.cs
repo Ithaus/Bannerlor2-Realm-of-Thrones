@@ -1257,6 +1257,7 @@ namespace Armoury
                         float decree = TaxDecree(st);
                         int pay = (int)Math.Min(rent * decree, gold * takeShare * decree);
                         if (pay <= 0) continue;
+                        if (st.IsTown && BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) continue;   // E5/A4 (R22): oblezone miasto nie placi renty - zostaje w kasie, gdy kasa miasta jest prawdziwym pieniadzem (A1; inaczej placi i liczy; wies: rabunek wyzej)
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         _rentBy[st] = new long[] { pay, gold };   // 169c (tylko licznik)
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }

@@ -592,6 +592,22 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int MenGearSaveDays { get; set; } = 30;
 
+        [SettingPropertyBool("Sutlers Enabled", HintText = "soldiers in the field spend a tenth of their purses each day with the sutlers: most of it reaches the nearest friendly town, the rest the nearest village - you and the AI alike. Only what is left after the coin kept for mending, for worn-out clothes and the savings for better kit; a party in a town spends as before when it leaves. In a save where the purses hold more than 15 days of pay the share starts at 1% and rises to the full share over Sutler Ramp Days. Needs Men Purse Enabled. Off = the men spend only when they leave a town, as before")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SutlersEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sutler Daily Share", 0.00f, 1.00f, "0.00", HintText = "share of the men's free purse (after mending, clothes and savings) they spend each day in the field")]
+        [SettingPropertyGroup("The finished piece")]
+        public float SutlerDailyShare { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Sutler Town Share", 0.00f, 1.00f, "0.00", HintText = "of what the men spend with the sutlers, this share reaches the purse of the nearest town not at war with them; the rest goes to the nearest such village that is not being raided or looted (none - to the town too)")]
+        [SettingPropertyGroup("The finished piece")]
+        public float SutlerTownShare { get; set; } = 0.85f;
+
+        [SettingPropertyInteger("Sutler Ramp Days", 0, 112, "0", HintText = "when the sutlers first come to a save whose parties hold more than 15 days of pay in their purses, their share rises from 1% to the full share over this many days (0 = the full share at once)")]
+        [SettingPropertyGroup("The finished piece")]
+        public int SutlerRampDays { get; set; } = 28;
+
         [SettingPropertyInteger("Men Upgrade Min Gain Percent", 0, 40, "0", HintText = "a new piece must be at least this much stronger than the old one (or of a higher tier) before the men pay for it")]
         [SettingPropertyGroup("The finished piece")]
         public int MenUpgradeMinGainPercent { get; set; } = 10;
@@ -816,6 +832,10 @@ namespace Armoury
         [SettingPropertyGroup("The living economy")]
         public bool LivingEconomySealed { get; set; } = true;
 
+        [SettingPropertyBool("Bee Player Gifts Real", HintText = "your payments into a town's or castle's treasury in BetterEconomy (Living Economy) become real: the gold goes into the settlement's own purse - the coin its merchants trade with and from which its lord's rent or dues are paid - and conjures no prosperity, goods or readiness out of nothing; a town takes such payments only once its purse holds real coin (Town Purse Regulator), a castle with Castle Purse Enabled. The Living Economy menu of every town and village also gets 'Give gifts to the notables': your gold goes to the notables, shared by their power, and each warms to you as after a generous barter (a few points at most, the dearer the better they already like you; once every few days per notable; not where the place is at war with you). Off = both treasury payments stay closed as with Living Economy Sealed, and there is no gift option")]
+        [SettingPropertyGroup("The living economy")]
+        public bool BeePlayerGiftsReal { get; set; } = true;
+
         [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
         [SettingPropertyGroup("Plague shield")]
         public bool PlagueSparesYourMen { get; set; } = true;
@@ -911,6 +931,14 @@ namespace Armoury
         [SettingPropertyBool("Caravan Capital Real", HintText = "a caravan bought by a lord (Banner Kings) or by you starts with capital taken out of the payment - the rest stays with the town that sold the beasts and carts; supply convoys that do not trade (Dynamic Troop Equipment) start with none. A party disbanded or removed without a battle hands its purse to the head of its owner's house (a notable's caravan - to the notable), else to the nearest town, and its men's purse to the nearest town (off = capital out of thin air, and such purses vanish, as before)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool CaravanCapitalReal { get; set; } = true;
+
+        [SettingPropertyBool("Notable Gold Real", HintText = "a notable's gold above or below what the game keeps him at goes to or comes from the purse of the town he trades in - his own town, or his village's market town - instead of vanishing or appearing; a new notable is set up from that purse. Only the town's spare money above its merchants' reserve is paid out: a town without it pays less, and the notable keeps the power he would have sold. The notables of a new world keep the game's starting gold. Off = out of thin air and into nothing, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool NotableGoldReal { get; set; } = true;
+
+        [SettingPropertyBool("Notable Caravan Capital Real", HintText = "a notable's new caravan starts with capital out of his own purse above 4,500 and the rest from the spare money of the town it starts from (its merchants invest) - less if they have less. The caravans of a new world keep the game's starting capital. Off = capital out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool NotableCaravanCapitalReal { get; set; } = true;
 
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
@@ -2864,6 +2892,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float DebasementShare { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Besieged Pay Nothing", HintText = "a besieged town, castle or village pays no rents, dues or war taxes while the siege lasts: its lord's rent and the crown's Crown Duty, War Tax and Road Tolls stay in its purse - but only where the purse holds real coin (a town with Town Purse Regulator 1 or 2, a castle with Castle Purse Enabled); elsewhere the game's daily regulator would delete most of what stays, so such a place pays as before (the war subsidy, the customs and a castle's dues were never taken during a siege, and a village being raided or looted pays nothing - as before). You and the AI alike. Off = a besieged town keeps paying its lord's rent and a besieged town or castle the crown's policy dues, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BesiegedPayNothing { get; set; } = true;
+
         [SettingPropertyBool("No Rot Clan Bailout", HintText = "Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt")]
         [SettingPropertyGroup("Iron Bank")]
         public bool NoRotClanBailout { get; set; } = true;
@@ -3199,6 +3231,14 @@ namespace Armoury
         [SettingPropertyBool("War Court Yields To Wages", HintText = "at war the court gives way to the army: a house may also spend its court share (less the parties' own food) on wages, and its court gets only what the wages leave of that share. A house with room under its ceiling pays its court in full, as before. Needs Household Minimal. Off = the court takes its full share at war too")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool WarCourtYieldsToWages { get; set; } = true;
+
+        [SettingPropertyBool("Court Gets Lapsed Arms Share", HintText = "arms money a lord's house has not spent within the cap of days goes to its court - the kitchens, stables and servants of its seat - instead of lying idle: each day the arms share older than AI Gear Days Cap days is paid with the court into the purse of the seat (town or castle). Only from the family's gold above the house's reserve (at war its war reserve, in peace Reserve Days Peace days of its steady income), at war only what the wages leave, half for a house in debt; the head always keeps the day's wages in his purse (and at least Family Purse Floor); none for mercenaries. Needs Household Minimal. Off = the unspent arms money stays in the head's purse, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CourtGetsLapsedArmsShare { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Court Folk Share", 0.00f, 1.00f, "0.00", HintText = "the share of the court's money that goes to the townsfolk of the seat (servants, cooks, grooms) rather than to its merchants - takes effect only once the townsfolk's purse is live (stage 5); until then the whole court money goes into the seat's purse")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CourtFolkShare { get; set; } = 0.2f;
 
         [SettingPropertyBool("Party Limits Share Free Room", HintText = "the party wage limits of a budgeted house share out what the house has not yet spent: each party may grow by its share of the free room (the head's party 1.5, the others 1) on top of its own wages, so no party is held back while the house has room; a house over its party ceiling has every party limit cut in proportion to its wages. Off = the ceiling is split once, head 1.5 : others 1")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -4595,6 +4635,10 @@ namespace Armoury
             s.MenUpgradeGear = MenUpgradeGear;
             s.MenGearSavePercent = MenGearSavePercent;
             s.MenGearSaveDays = MenGearSaveDays;
+            s.SutlersEnabled = SutlersEnabled;
+            s.SutlerDailyShare = SutlerDailyShare;
+            s.SutlerTownShare = SutlerTownShare;
+            s.SutlerRampDays = SutlerRampDays;
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;
             s.MenUpgradeMaxPerVisit = MenUpgradeMaxPerVisit;
             s.MenUpgradeOneTierUp = MenUpgradeOneTierUp;
@@ -4651,6 +4695,7 @@ namespace Armoury
             s.DonationXpOff = DonationXpOff;
             s.SpoilsCancelKeeps = SpoilsCancelKeeps;
             s.LivingEconomySealed = LivingEconomySealed;
+            s.BeePlayerGiftsReal = BeePlayerGiftsReal;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;
@@ -4675,6 +4720,8 @@ namespace Armoury
             s.CasualtyLootFromPurse = CasualtyLootFromPurse;
             s.UpgradeCostToPurse = UpgradeCostToPurse;
             s.CaravanCapitalReal = CaravanCapitalReal;
+            s.NotableGoldReal = NotableGoldReal;
+            s.NotableCaravanCapitalReal = NotableCaravanCapitalReal;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
@@ -5163,6 +5210,7 @@ namespace Armoury
             s.CrownCustomsDutyMultiplier = CrownCustomsDutyMultiplier;
             s.PolicyIncomeConserved = PolicyIncomeConserved;
             s.DebasementShare = DebasementShare;
+            s.BesiegedPayNothing = BesiegedPayNothing;
             s.NoRotClanBailout = NoRotClanBailout;
             s.NoFreeKingdomGold = NoFreeKingdomGold;
             s.IronBankMinDaysToLend = IronBankMinDaysToLend;
@@ -5247,6 +5295,8 @@ namespace Armoury
             s.HouseholdMinimal = HouseholdMinimal;
             s.HouseholdShield = HouseholdShield;
             s.WarCourtYieldsToWages = WarCourtYieldsToWages;
+            s.CourtGetsLapsedArmsShare = CourtGetsLapsedArmsShare;
+            s.CourtFolkShare = CourtFolkShare;
             s.PartyLimitsShareFreeRoom = PartyLimitsShareFreeRoom;
             s.MercContractEnabled = MercContractEnabled;
             s.MercContractFactor = MercContractFactor;

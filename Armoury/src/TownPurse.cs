@@ -371,8 +371,8 @@ namespace Armoury
                 var clan = st.OwnerClan;
                 var lord = clan != null ? clan.Leader : null;
                 if (lord == null || !lord.IsAlive) { _vNoLord++; return true; }   // martwy / brak pana - nic nie schodzi (czeka)
-                if (st.IsUnderSiege) { _vSiege++; return true; }                 // oblezone - nic (jak zamek 110)
                 int pay = CastlePurse.Dues(gold, reserve, ValveSplit.Unit(s.TownRentShare));
+                if (BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) { _vSiege++; return true; }   // oblezone - nic (E5/A4 R22: bramka z kluczem i licznikiem; scalenie porcji A)
                 if (pay <= 0) { _vTiny++; return true; }
                 var k = clan.Kingdom;
                 bool crownTakes = k != null && !k.IsEliminated;
@@ -765,6 +765,13 @@ namespace Armoury
               .Append(" | dar startowy dzis ").Append(LastTrim)
               .Append(" | potkniecia ").Append(stum);
             return sb.ToString();
+        }
+
+        /// <summary>Scalenie porcji A (A2 "Przy scaleniu"): udzial korony z zaworu tego miasta dzis (poza RentOf - CourtFull.OwnBack zdejmuje go z zapasu
+        /// "wlasnego" jak czesc korony zamku 114). Wazne od zaworu do BeforeRents nastepnej doby. Tylko odczyt.</summary>
+        internal static int CrownOf(Settlement st)
+        {
+            int c; return st != null && st.Town != null && _crownBy.TryGetValue(st.Town, out c) ? Math.Max(0, c) : 0;
         }
 
         internal const string CsvColumns = ";zapas_kupcow;do_korony;pobrane;doplyw_netto;dni_ponizej_zapasu";

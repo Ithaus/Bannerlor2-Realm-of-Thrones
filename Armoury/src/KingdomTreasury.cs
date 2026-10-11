@@ -474,6 +474,7 @@ namespace Armoury
                 if (s == null || !s.PolicyIncomeConserved || clan == null || clan.Kingdom == null) return;
                 var k = clan.Kingdom;
                 var pol = k.ActivePolicies;
+                BesiegedPay.PolicyOpen(k, applyWithdrawals);   // E5/A4 (recenzja, kontrola niezalezna od bramki): kasa oblezonych twierdz przed poborem (tylko odczyt, wlasny try)
                 float smooth = 5f;
                 try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
                 float vanilla = 0f, real = 0f;
@@ -487,6 +488,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 95% dawnej wartosci: dawna x 5% = obecna x 5/95
                         int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
                         vanilla += due;
+                        // E5/A4 (R22): oblezona twierdza nie placi - 5% licznika, ktore gra dala krolowi z niczego, jest juz w vanilla (odejmie sie w delta); z kasy nic nie schodzi
+                        if (BesiegedPay.Holds(f.Settlement, BesiegedPay.KCrownDuty, Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG))), applyWithdrawals)) continue;
                         // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor - ta sama regula co Spendable); miasto ponad prog jak dotad
                         int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // E5/A1: miasto ponad zapas kupcow (PayFloor -> TownPurse.TaxFloor)
                         if (applyWithdrawals && x > 0) { f.ChangeGold(-x); TownPurse.NoteTake(f.Settlement, x); }   // E5/A1: licznik (tylko miasta)
@@ -517,6 +520,7 @@ namespace Armoury
                         if (f == null) continue;
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
                         int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // wpis 90: prog kasy miasta; B-4: zamek ponad zapas kupcow
+                        if (x > 0 && BesiegedPay.Holds(f.Settlement, BesiegedPay.KWarTax, x, applyWithdrawals)) continue;   // E5/A4 (R22): oblezona twierdza nie placi (5% gry juz w vanilla - odejmie sie w delta)
                         if (x <= 0) continue;
                         if (applyWithdrawals) { f.ChangeGold(-x); TownPurse.NoteTake(f.Settlement, x); }   // E5/A1: licznik (tylko miasta)
                         try { if (applyWithdrawals && f.IsTown) TownFolk.NoteTake(f.Settlement, x, TownFolk.TWarTax); } catch { }   // E5/0 (195): War Tax z kasy miasta (tylko licznik)
@@ -534,6 +538,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
                         int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
                         n6 += r;
+                        // E5/A4 (R22): oblezone miasto nie placi myta - n6 (gra dala je z niczego) juz policzone, odejmie sie w delta; prog przez PayFloor (miasto: floorG jak nizej; po scaleniu z A1 - TaxFloor)
+                        if (BesiegedPay.Holds(st, BesiegedPay.KRoadTolls, Math.Min(r, Math.Max(0, st.Town.Gold - CastlePurse.PayFloor(st.Town, (int)floorG))), applyWithdrawals)) r = 0;
                         int x = Math.Min(r, Math.Max(0, st.Town.Gold - TownPurse.TaxFloor(st.Town, (int)floorG)));   // wpis 90: prog kasy miasta; E5/A1 (D4): zapas kupcow
                         if (applyWithdrawals && x > 0) { st.Town.ChangeGold(-x); TownPurse.NoteTake(st, x); }   // E5/A1: licznik
                         try { if (applyWithdrawals && x > 0) TownFolk.NoteTake(st, x, TownFolk.TTolls); } catch { }   // E5/0 (195): Road Tolls z kasy miasta (tylko licznik)
@@ -543,6 +549,7 @@ namespace Armoury
                     if (n6 > 0) vanilla += n6;
                     if (n7 > 0) vanilla += n7;
                 }
+                BesiegedPay.PolicyClose();   // E5/A4 (recenzja): ile naprawde zeszlo z kas oblezonych twierdz (tylko licznik)
                 float delta = real - vanilla;
                 if (Math.Abs(delta) > 0.5f) goldChange.Add(delta, _txtPolicy);
             }

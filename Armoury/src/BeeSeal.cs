@@ -39,6 +39,10 @@ namespace Armoury
     /// zostaja klikalne; okno pyta o cene albo kwote, odmowa z powodem pada po zatwierdzeniu, zloto nie schodzi.
     /// Nasz kod NIGDY nie pisze stanu BEE (jedyny zapis do obiektu BEE: RowVM.OnClick - obiekt ekranu); zero kluczy zapisu.
     /// Wylacznik MCM LivingEconomySealed (domyslnie wlaczony): wylaczony = BEE dokladnie jak dawniej.
+    /// E5/A5 (paczka 197, R23 - logika w BeeGifts.cs): +2 prefiksy na TryPlayerContributeTreasury (miasto, zamek; razem 18 zaczepow) - przy wylaczniku
+    /// BeePlayerGiftsReal wplata gracza do skarbca idzie przelewem do kasy osady (BEE nie dostaje nic, stan BEE nietkniety); postfiksy Can* wplaty licza
+    /// wtedy warunki przelewu (tylko przy wpietym prefiksie tej osady - inaczej zamkniecie jak dotad), opcje wplaty w menu sa czynne z oknem kwot BeeGifts,
+    /// a w menu BEE miasta i wsi jest dar dla notabli (SessionPost -> BeeGifts.OnSession).
     /// Log: linia startowa (co wpiete), linia kampanii (menu, wylacznik, tryb zgodnosci BK w BEE, 19 wartosci pliku BEE, user.cfg),
     /// linia doby tylko wtedy, gdy prefiksy cos zablokowaly. Wyjatki: licznik potkniec, latka dziala dalej.
     /// </summary>
@@ -59,10 +63,12 @@ namespace Armoury
 
         private const string L_WEALTH = "zdejmowanie zlota panom";   // etykieta celu B5 (linia kampanii sprawdza, czy wpiety)
         private const string L_MARKET = "oplata za dostep do targu";  // etykieta celu B4 (linia kampanii: wstrzymana przy otwartych K4/K5)
-        private const int HookCount = 16;                            // 15 domykajacych + 1 tylko do logu (dokonczenie starej sesji szkolenia)
+        private const int HookCount = 18;                            // 15 domykajacych + 1 tylko do logu (dokonczenie starej sesji szkolenia) + 2 prefiksy E5/A5
+        private const string L_PAY_TOWN = "prawdziwa wplata do kasy miasta (E5/A5)", L_PAY_CASTLE = "prawdziwa wplata do kasy zamku (E5/A5)";
 
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
         private static bool _wealthWired;   // B5 wpiety - tylko wtedy zamykamy przelacznik w ksiedze (inaczej ksiega jak w BEE)
+        private static bool _payTown, _payCastle;   // E5/A5: prefiks Try* wpiety - tylko wtedy Can* wplaty otwieramy jako prawdziwy przelew
 
         // pola i wlasciwosci BEE czytane przez refleksje (pobierane raz w ApplyAll; brak = licznik / raport "?", latka dziala)
         private static FieldInfo _fArmoryLevel, _fSecondItem, _fAllRows, _fOnClick, _fBkMode, _fRtLordWealth;
@@ -91,12 +97,13 @@ namespace Armoury
         {
             public readonly string Menu, Option, Why;
             public readonly int Kind, Group;
-            public MenuSpec(string menu, string option, int kind, int group, string why) { Menu = menu; Option = option; Kind = kind; Group = group; Why = why; }
+            public readonly bool Real;   // E5/A5: wplata do skarbca - przy czynnej paczce prawdziwy przelew (BeeGifts.PayCondition)
+            public MenuSpec(string menu, string option, int kind, int group, string why, bool real = false) { Menu = menu; Option = option; Kind = kind; Group = group; Why = why; Real = real; }
         }
 
         private static readonly MenuSpec[] Menus =
         {
-            new MenuSpec("bee_town_menu", "bee_town_treasury_contribute", 0, 0, T_TREASURY),
+            new MenuSpec("bee_town_menu", "bee_town_treasury_contribute", 0, 0, T_TREASURY, true),
             new MenuSpec("bee_town_menu", "bee_town_armory", 0, 0, T_ARMORY),
             new MenuSpec("bee_town_menu", "bee_town_invest_10k", 1, 0, T_TOWN_INVEST),
             new MenuSpec("bee_town_menu", "bee_town_invest_50k", 1, 0, T_TOWN_INVEST),
@@ -105,7 +112,7 @@ namespace Armoury
             new MenuSpec("bee_village_menu", "bee_village_invest_5k", 2, 1, T_VILLAGE_INVEST),
             new MenuSpec("bee_village_menu", "bee_village_invest_15k", 2, 1, T_VILLAGE_INVEST),
             new MenuSpec("bee_village_menu", "bee_village_invest_30k", 2, 1, T_VILLAGE_INVEST),
-            new MenuSpec("bee_castle_menu", "bee_castle_treasury_contribute", 0, 2, T_TREASURY),
+            new MenuSpec("bee_castle_menu", "bee_castle_treasury_contribute", 0, 2, T_TREASURY, true),
             new MenuSpec("bee_castle_menu", "bee_castle_training_camp", 0, 2, T_CAMP),
             new MenuSpec("bee_castle_menu", "bee_castle_train_troops", 0, 2, T_TRAIN),
         };
@@ -118,10 +125,11 @@ namespace Armoury
             private readonly int _kind;
             private readonly TextObject _why;
             private readonly string _id;
+            private readonly bool _real, _castle;   // E5/A5: opcja wplaty (zamek)
 
-            internal MenuGate(GameMenuOption.OnConditionDelegate orig, int kind, TextObject why, string id)
+            internal MenuGate(GameMenuOption.OnConditionDelegate orig, int kind, TextObject why, string id, bool real = false, bool castle = false)
             {
-                _orig = orig; _kind = kind; _why = why; _id = id;
+                _orig = orig; _kind = kind; _why = why; _id = id; _real = real; _castle = castle;
             }
 
             internal bool Condition(MenuCallbackArgs args)
@@ -132,6 +140,7 @@ namespace Armoury
                 if (!On) return vis;
                 try
                 {
+                    if (_real && BeeGifts.RealOn) return BeeGifts.PayCondition(args, vis, _castle);   // E5/A5: wplata czynna jako prawdziwy przelew
                     if (!vis) vis = Visible(_kind);
                     if (vis && args != null) { args.IsEnabled = false; args.Tooltip = _why; }
                 }
@@ -167,7 +176,7 @@ namespace Armoury
 
         internal static void ApplyAll(Harmony h)
         {
-            _wired.Clear(); _missing.Clear(); _wealthWired = false;
+            _wired.Clear(); _missing.Clear(); _wealthWired = false; _payTown = _payCastle = false;
             var tSub = QuartermasterLaw.FindType("BetterEconomy.BetterEconomySubModule");
             if (tSub == null) { Log.Info("BEE domkniecie (170): BetterEconomy nieobecny - nie ma czego domykac."); return; }
 
@@ -229,7 +238,7 @@ namespace Armoury
             Type RS = typeof(string).MakeByRefType(), RI = typeof(int).MakeByRefType();
 
             // 8 akcji gracza - postfiksy Can* (Priority.Last)
-            Wire(h, tCastle, "CanPlayerContributeTreasury", new[] { S, H, I, RS }, null, "TreasuryPost", true, "wplata do skarbca zamku");
+            Wire(h, tCastle, "CanPlayerContributeTreasury", new[] { S, H, I, RS }, null, "CastleTreasuryPost", true, "wplata do skarbca zamku");
             Wire(h, tTown, "CanPlayerContributeTreasury", new[] { S, H, I, RS }, null, "TreasuryPost", true, "wplata do skarbca miasta");
             Wire(h, tTown, "CanPlayerBuildOrUpgradeArmory", new[] { S, H, RS }, null, "ArmoryPost", true, "zbrojownia gracza");
             Wire(h, tTown, "CanPlayerInvest", new[] { S, H, I, RS }, null, "TownInvestPost", true, "inwestycja w miasto");
@@ -249,6 +258,11 @@ namespace Armoury
             Wire(h, tVDev, "ApplyMarketAccess", new[] { S, H, B }, "MarketPre", null, true, L_MARKET);
             Wire(h, tWealth, "TryRemoveHeroGold", new[] { H, I }, "WealthPre", null, true, L_WEALTH);
             _wealthWired = _wired.Contains(L_WEALTH);
+
+            // E5/A5 (197): prawdziwa wplata gracza do kasy osady - prefiksy Try* (Priority.Last; pomijaja oryginal przy czynnej paczce)
+            Wire(h, tTown, "TryPlayerContributeTreasury", new[] { S, H, I, RS }, "TownTryPre", null, true, L_PAY_TOWN);
+            Wire(h, tCastle, "TryPlayerContributeTreasury", new[] { S, H, I, RS }, "CastleTryPre", null, true, L_PAY_CASTLE);
+            _payTown = _wired.Contains(L_PAY_TOWN); _payCastle = _wired.Contains(L_PAY_CASTLE);
 
             // tylko log (D9 - nie blokujemy): dokonczenie sesji szkolenia oplaconej w starym zapisie (XP z niczego, Castle:474 -> :879)
             Wire(h, tCastle, "CompletePlayerTrainingSession", new[] { S, tCastleState, RI, RI, RI, RI }, null, "TrainDonePost", false,
@@ -289,7 +303,17 @@ namespace Armoury
             catch (Exception e) { Stumble("Can*", e); }
         }
 
-        private static void TreasuryPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TREASURY); }
+        // E5/A5 (197): przy czynnej paczce i wpietym prefiksie Try* tej osady Can* = warunki prawdziwego przelewu (BeeGifts.CanPay), inaczej zamkniecie 170
+        private static void TreasuryPost(ref bool __result, ref string reason, Settlement __0, Hero __1, int __2)
+        {
+            if (On && _payTown && BeeGifts.RealOn) { BeeGifts.CanPost(false, ref __result, ref reason, __0, __1, __2); return; }
+            Close(ref __result, ref reason, T_TREASURY);
+        }
+        private static void CastleTreasuryPost(ref bool __result, ref string reason, Settlement __0, Hero __1, int __2)
+        {
+            if (On && _payCastle && BeeGifts.RealOn) { BeeGifts.CanPost(true, ref __result, ref reason, __0, __1, __2); return; }
+            Close(ref __result, ref reason, T_TREASURY);
+        }
         private static void ArmoryPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_ARMORY); }
         private static void TownInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TOWN_INVEST); }
         private static void VillageInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_VILLAGE_INVEST); }
@@ -297,9 +321,13 @@ namespace Armoury
         private static void CampPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_CAMP); }
         private static void TrainPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TRAIN); }
 
+        // E5/A5 (197): prefiksy Try* wplaty do skarbca - logika w BeeGifts.TryPre (przelew do kasy osady, oryginal BEE pominiety)
+        private static bool TownTryPre(ref bool __result, Settlement __0, Hero __1, int __2, ref string reason) { return BeeGifts.TryPre(false, ref __result, __0, __1, __2, ref reason); }
+        private static bool CastleTryPre(ref bool __result, Settlement __0, Hero __1, int __2, ref string reason) { return BeeGifts.TryPre(true, ref __result, __0, __1, __2, ref reason); }
+
         // ---------------------------------------------------------------- menu BEE: owiniecie po dodaniu opcji (start / wczytanie kampanii)
 
-        private static void SessionPost()
+        private static void SessionPost(CampaignGameStarter __0)
         {
             try
             {
@@ -319,11 +347,13 @@ namespace Armoury
                         if (opt == null) { miss.Add(spec.Option); continue; }
                         // ochrona przed podwojnym owinieciem
                         if (!(opt.OnCondition != null && opt.OnCondition.Target is MenuGate))
-                            opt.OnCondition = new GameMenuOption.OnConditionDelegate(new MenuGate(opt.OnCondition, spec.Kind, new TextObject(spec.Why), spec.Option).Condition);
+                            opt.OnCondition = new GameMenuOption.OnConditionDelegate(new MenuGate(opt.OnCondition, spec.Kind, new TextObject(spec.Why), spec.Option, spec.Real, spec.Group == 2).Condition);
                         per[spec.Group]++;
                     }
                     catch (Exception e) { miss.Add(spec.Option + " (" + e.Message + ")"); Stumble("menu " + spec.Option, e); }
                 }
+                try { BeeGifts.OnSession(__0, mgr); }   // E5/A5: okno kwot wplaty i dar dla notabli w menu BEE (wlasne try w srodku)
+                catch (Exception e) { Stumble("menu E5/A5", e); }
                 Log.Info(CampaignLine(per, miss));
             }
             catch (Exception e) { Stumble("menu BEE", e); }
@@ -616,6 +646,7 @@ namespace Armoury
             sb.Append("; klucze pliku BEE: ").Append(KeysText());
             if (_wired.Contains(L_MARKET) && !DiversionClosed())
                 sb.Append("; B4 WSTRZYMANA - K4/K5 otwarte: oplata AI 5 000 za dostep do targu PRZEPUSZCZANA (zloto w nicosc), bo bez K4/K5 tylko ona tlumi odplyw towaru wsi z niczego - naprawa: skrypt kluczy, nie kod");
+            sb.Append("; ").Append(BeeGifts.CampaignText(_payTown, _payCastle));   // E5/A5 (197)
             sb.Append("; user.cfg LordWealthRealism=").Append(WealthCfgText());
             if (!_wealthWired) sb.Append(" (latka 170 na zdejmowanie zlota NIEWPIETA - przy 1 BEE zdejmuje zloto panom w nicosc; przelacznik w ksiedze BEE zostaje jak w BEE)");
             else if (!On) sb.Append(" (latka 170 wylaczona wylacznikiem - przy 1 BEE zdejmuje zloto panom w nicosc)");

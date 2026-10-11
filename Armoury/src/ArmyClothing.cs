@@ -159,6 +159,22 @@ namespace Armoury
             catch (Exception e) { Stumble("ArmyClothing.OnPartyDestroyed", e); }
         }
 
+        /// <summary>E5/A3 (163, markietani): wartosc odziezy czekajacej na zakup partii (cale sztuki x wartosc sztuki z gry) - rezerwa sakiewki w polu,
+        /// zeby markietani nie wydali pieniedzy, za ktore ludzie kupia odziez przy wyjezdzie z miasta (ta sama kolejnosc co MenPurse.OnLeft). Tylko odczyt.</summary>
+        internal static int PendingCost(MobileParty mp)
+        {
+            try
+            {
+                if (!On || mp == null || mp.StringId == null || !Items()) return 0;
+                float[] need;
+                if (!_need.TryGetValue(mp.StringId, out need) || need == null) return 0;
+                double v = 0;
+                for (int g = 0; g < Goods; g++) if (need[g] >= 1f && _items[g] != null) v += Math.Floor(need[g]) * Math.Max(1, _items[g].Value);
+                return (int)Math.Min(int.MaxValue, v);
+            }
+            catch (Exception e) { Stumble("ArmyClothing.PendingCost", e); return 0; }
+        }
+
         /// <summary>
         /// MenPurse.OnLeft: partia wyjezdza z miasta - kupuje cale sztuki potrzeby z polki miasta po cenie targu, z sakiewki ludzi,
         /// najwyzej `budget` (sakiewka ponad rezerwe na naprawy). Zwraca wydane zloto (juz zdjete z sakiewki i wplacone kasie miasta).

@@ -392,7 +392,10 @@ namespace Armoury
                 long dl = (long)__0.Gold - __state;
                 long outK = ReferenceEquals(_ntHero, __0) ? _ntCurOutK : 0, inK = ReferenceEquals(_ntHero, __0) ? _ntCurInK : 0;
                 long rest = dl + outK - inK;   // zmiana kiesy bez przelewow z kasa osady (A3) = "z niczego / w nicosc" (jak okno O03 ksiegi)
-                if (dl != 0 || outK != 0 || inK != 0)
+                // scalenie porcji A (recenzja A3 R2-1 c): przy A3 "z niczego" ok. 0 - popyt "kasa miasta mogla dac" z kwoty naleznej A3 (zaplacone + uciete)
+                long dueA3 = 0; try { if (NotableGold.On) dueA3 = NotableGold.BandDueNow(__0); } catch { }
+                long want = Math.Max(0L, rest) + dueA3;
+                if (dl != 0 || outK != 0 || inK != 0 || dueA3 > 0)
                 {
                     var st = __0.CurrentSettlement ?? __0.HomeSettlement;
                     bool vill = st != null && st.IsVillage;
@@ -400,15 +403,13 @@ namespace Armoury
                     if (vill) { var v = st.Village; market = v != null ? (v.TradeBound ?? v.Bound) : null; }
                     if (vill) { _ntVillOutK += outK; _ntVillInK += inK; } else { _ntTownOutK += outK; _ntTownInK += inK; }
                     if (rest < 0) { if (vill) _ntVillOut += -rest; else _ntTownOut += -rest; }
-                    else if (rest > 0)
+                    else if (rest > 0) { if (vill) _ntVillIn += rest; else _ntTownIn += rest; }
+                    if (want > 0 && market != null && market.Town != null)
                     {
-                        if (vill) _ntVillIn += rest; else _ntTownIn += rest;
-                        if (market != null && market.Town != null)
-                        {
-                            double[] dm;
-                            if (!_ntDemand.TryGetValue(market, out dm)) { dm = new double[2]; _ntDemand[market] = dm; }
-                            dm[vill ? 1 : 0] += rest;
-                        }
+                        double[] dm;
+                        if (!_ntDemand.TryGetValue(market, out dm)) { dm = new double[3]; _ntDemand[market] = dm; }
+                        dm[vill ? 1 : 0] += want;
+                        if (dueA3 > 0) dm[2] += inK;   // A3 juz zaplacil z tej kasy - wraca do "mogla dac" (kasa przed przelewem)
                     }
                     if (vill && market != null && market.IsCastle && (rest > 0 || inK > 0)) _ntCastleMarket++;
                 }
@@ -858,7 +859,7 @@ namespace Armoury
                 var st = kv.Key; var dm = kv.Value;
                 if (st == null || st.Town == null) continue;
                 long g = st.Town.Gold, r = st.IsTown ? Seal31.TownReserve(st.Town) : CastlePurse.Reserve(st.Town);
-                double spare = Math.Max(0, g - r), want = dm[0] + dm[1];
+                double spare = Math.Max(0, g - r) + dm[2], want = dm[0] + dm[1];   // scalenie porcji A: + to, co A3 juz zaplacil z tej kasy dzis
                 if (want <= 0) continue;
                 double cover = Math.Min(spare, want);
                 b1 += cover * dm[0] / want; e += cover * dm[1] / want;

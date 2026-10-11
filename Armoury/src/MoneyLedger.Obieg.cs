@@ -555,6 +555,7 @@ namespace Armoury
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor (166/162m) do kas siedzib ").Append(ClanBudget.LastCourt).Append(" (w tym miasta pod tarcza dworu ").Append(ClanBudget.LastCourtTown)
+              .Append(CourtFull.ObiegNote())   // E5/A2: zamki; sprzet niewydany -> dwor (miasta / zamki)
               .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", zold rycerzy (179) pan -> rycerz ").Append(GentryService.LastPaid).Append(", sprzet i werbunek -")
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
@@ -569,7 +570,7 @@ namespace Armoury
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
-              .Append("), markietani -, ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
+              .Append("), markietani ").Append(Sutlers.ObiegNote()).Append(", ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
               .Append(TownFolk.On ? ", = " + (lordAcc + garAcc > 0 ? ((double)now[HPurses] / (lordAcc + garAcc)).ToString("0.0", Inv) : "-") + " dni zoldu naliczonego (partie i zalogi; E5/0)" : "")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
@@ -672,6 +673,7 @@ namespace Armoury
               .Append(" | pasmo 4500-10500: nadwyzka w nicosc ").Append(WvNeg(bandOut, CW.WNotableBand)).Append(", dosypka z niczego ").Append(WvS(bandIn, CW.WNotableBand))
               .Append(" (okien ").Append(CW.Calls[CW.WNotableBand]).Append(')')
               .Append(" | nowi notable ").Append(WvS(fresh, CW.WNotableNew))
+              .Append(NotableGold.ObiegPart())   // E5/A3 (164c): pasmo, nowi notable i kapital karawan notabli przez kase miasta handlu
               .Append(" | majatki z niczego (do wlascicieli - notabli i lordow): BK dochod z produkcji ").Append(WvS(CW.In[CW.KBkEstates], CW.WBkEstates))
               .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBk], CW.WBkEstates)).Append("), BetterEconomy renta majatkow ").Append(WvS(CW.In[CW.KBeeEstateRent], CW.WBeeEstates))
               .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBee], CW.WBeeEstates)).Append(')')

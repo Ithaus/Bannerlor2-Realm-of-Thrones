@@ -41,6 +41,7 @@ namespace Armoury
     ///  - 162m DWOR: glowa -> kasa siedziby raz na dobe (udzial "dwor i wyzywienie" minus jedzenie partii - szacunek: zuzycie dnia x cena zboza);
     ///    siedziba = Clan.HomeSettlement (wies -> jej miasto albo zamek; bez - najblizsze miasto krolestwa). Kasa MIASTA: znacznik tarczy dworu
     ///    (SoldierPay.HoldCourt) - regulator gry go nie kasuje, schodzi tylko z zaworem renty i dania wojenna, nigdy ponad nadwyzke kasy.
+    ///  - E5/A2 (162) DWOR PELNY: przydzial sprzetu niewydany przez AiGearDaysCap dni dochodzi do wplaty dworu (CourtFull - regula i ciecia tam).
     /// Platnik -> odbiorca: glowa -> kasa siedziby (dwor); czlonek -> glowa (kiesa rodziny); sakiewka zwolnionych -> kiesa wsi; ludzie -> ludnosc BK wsi.
     /// </summary>
     internal static class ClanBudget
@@ -60,6 +61,7 @@ namespace Armoury
             public double CapBase, CourtRoom, Food; public Settlement Seat;
             // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
+            public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -101,6 +103,7 @@ namespace Armoury
         internal static void Reset()
         {
             _b.Clear(); _saved.Clear(); _warGar.Clear(); _garTarget.Clear(); _day = -1; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
+            CourtFull.Reset();   // E5/A2 (recenzja): potkniecia, bledy i zapas "wlasnego" miedzy kampaniami
             ZeroLast(); ClearDay();
             // recenzja C1 (C1-G4): uchwyty BK i obiekty poprzedniej sesji (jak LosersFlee.Reset, PopulationLaw.Reset "wpis 87") - BK tworzy przy kazdym
             // wczytaniu nowy PopulationManager kluczowany obiektami Settlement; stary menedzer nie zna nowych osad, wiec po wczytaniu innego zapisu w tym
@@ -127,6 +130,7 @@ namespace Armoury
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
             _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
+            CourtFull.ClearDay();   // E5/A2: liczniki doby sprzetu niewydanego -> dwor (takze Reset miedzy kampaniami)
         }
 
         private static void Stumble(string where, Exception e)
@@ -393,6 +397,7 @@ namespace Armoury
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
+                        CourtFull.Lapse(b, s, merc);   // E5/A2 (R8): przydzial przeterminowany dzis -> dwor (b.Lapsed; wlasny try, GearLeft bez zmian)
                         b.GearLeft = Math.Min(b.GearLeft + b.Gear, Math.Max(1f, s.AiGearDaysCap) * b.Gear);
                         _dGear += (long)b.Gear; _dBuild += (long)b.Build;
                         _dClans++; if (b.War) _dWar++; else _dPeace++;
@@ -620,15 +625,18 @@ namespace Armoury
                 double used = Math.Min(share, Math.Max(0, wageNow - b.CapBase));
                 if (used > 0) { share -= used; _dCourtYield += (long)used; _dCourtYieldN++; }
             }
+            double court = share;                                  // E5/A2: sam dwor (po ustapieniu zoldowi) - placony pierwszy
+            share += CourtFull.Take(b, s, court, head.Gold);       // E5/A2 (R8): przydzial sprzetu przeterminowany dzis -> dwor (w wojnie ustepuje zoldowi po dworze)
             long x = (long)share;
             x = Math.Min(x, Math.Max(0, head.Gold - Math.Max(0, s.FamilyPurseFloor)));   // dwor nie oproznia kiesy glowy ponizej podlogi rodziny
+            long lp = CourtFull.Paid(b, seat, x, court);           // E5/A2: liczniki - sprzet z reszty wplaty po dworze (podloga tnie sprzet)
             _dFood += (long)food;
             if (x <= 0) return;
             int ix = (int)Math.Min(int.MaxValue, x);
             head.ChangeHeroGold(-ix);
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
             seat.Town.ChangeGold(ix);                              // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
-            ClanIncomeBook.NoteOwnPaid(seat, c, ix);               // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik)
+            ClanIncomeBook.NoteOwnPaid(seat, c, ix - CourtFull.Own(seat, c, lp));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
             _dCourt += ix;
@@ -1174,6 +1182,7 @@ namespace Armoury
               .Append(", ").Append(SoldierPay.CourtNote())
               .Append(" | kiesa rodziny do glow: ").Append(_dFamily).Append(" zl w ").Append(_dFamilyN).Append(" przelewach; glowy < 5000 (rody z budzetem): ").Append(_dPoor)
               .Append(" | sprzet: przydzial dnia ").Append(_dGear).Append(", wydane przez panow od wczoraj ").Append(_dGearSpent)
+              .Append(CourtFull.Note(s))   // E5/A2: sprzet niewydany -> dwor
               .Append(" | budowy: przydzial dnia ").Append(_dBuild)
               .Append(" | Straz w ludziach ").Append(_dWatchMen).Append(" / pulap w ludziach ").Append(_dWatchCap < 0 ? "-" : _dWatchCap.ToString(Inv))
               .Append(" (werbunek wstrzymany ").Append(_dRecruitBlock).Append(", przyrost zalog wstrzymany ").Append(_dGarBlock)

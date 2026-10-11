@@ -91,16 +91,19 @@ namespace Armoury
         internal const int MCastleCrown = 9;                                                                    // 114: udzial korony z zaworu kas zamkow
         internal const int MTrade = 10;                                                                         // B-2: wywoz kupcow (PodazPopyt, SupplyDemand.DailyTrade) - dotad w "pozostale moduly ticku"
         internal const int MBudget = 11;                                                                        // 166/162m: budzet rodow - dwor do kas siedzib, sakiewki zwolnionych do kies wsi
-        // E5/A1 (111'): M12-M13 zajete, M14-M16 rezerwa A1; drzewo A2-A5 bierze od M17 (wpis-rezerwacja w CHANGELOG 5052053)
+        // E5/A1 (111'): M12-M13 zajete, M14-M16 rezerwa A1; drzewo A2-A5 bierze od M17 (scalenie porcji A: MSutlers 17) (wpis-rezerwacja w CHANGELOG 5052053)
         internal const int MTownTrim = 12;                                                                      // E5/A1: dar startowy kas miast przyciety (raz na kampanie, w nicosc)
         internal const int MTownCrown = 13;                                                                     // E5/A1: udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)
-        private const int Marks = 14;
+        internal const int MSutlers = 17;                                                                       // E5/A3 (163): markietani - sakiewki ludzi w polu -> kasy miast i kiesy wsi
+        private const int Marks = 18;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
                                                    "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
                                                    "budzet rodow (166): dwor do kas siedzib, sakiewki zwolnionych do kies wsi",
                                                    "dar startowy kas miast przyciety (raz na kampanie, w nicosc, E5/A1)",
-                                                   "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)" };
+                                                   "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)",
+                                                   "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)",   // 14-16: rezerwa A1 (nieuzywane, drukowane tylko != 0)
+                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
