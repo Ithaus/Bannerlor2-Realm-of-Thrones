@@ -28,7 +28,7 @@
 - **Narzedzie:** A5-1/A5-2 daja NIE na logu bez A5 (linia BEE 170 jest, dopisku nie) - w tescie A oczekiwane TAK. A6 liczy teraz tylko doby kampanii 1-until (dotad caly log).
 - **Pulapka MCM:** 19 nowych kluczy (A1 8, A2-A5 10, A6 1) - przy wgraniu grep w `Armoury.json` Jeffa i autotestu (szczegolnie `TownPurseRegulator`, `TownRentLordShare`, `BattlePlunderFromLoserOnly`).
 
-**Status:** DO SPRAWDZENIA - test A (osobno, decyzja Jeffa 11.10): autotest NK 40 dob + zapis + 120 dob, `--grupa etap5` (bloki A1-A6, E5/0) + progi etapow 2-4. DLL: `SCR\e5\zbior\Armoury\bin\Release\Armoury.dll` = `SCR\test\Armoury-e5a.dll` (nie wgrany, gra nie uruchamiana).
+**Status:** DO SPRAWDZENIA - test A (osobno, decyzja Jeffa 11.10): autotest NK 40 dob + zapis + 120 dob, `--grupa etap5` (bloki A1-A6, E5/0) + progi etapow 2-4. DLL: `SCR\e5\zbior\Armoury\bin\Release\Armoury.dll` = `SCR\test\Armoury-e5a.dll` - zbudowany z e59ff8b (wersja DLL 1.0.0+e59ff8b), md5 527c115fc1e8f4b56f2e9705405de94e (nie wgrany, gra nie uruchamiana).
 
 ## 2026-10-11 (etap 4, Scalenie koncowe etapu 4 (E4/9 + E5/0 + R6/W5) w `w-toku/zbior-e4-koniec`) - KRAINY KANONU E4/9 I POMIAR ETAPU 5 "NA SUCHO" W ZBIORZE; PARTIA KONCZACA SIE BEZ BITWY (R6) TA SAMA DROGA CO ROZWIAZANA PARTIA - WETERANI E4/10 (1/3 OD TIERU 3 DO KARCZMY), RESZTA DO DOMU
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e4-koniec` (od caef965 = zbior 31 + E4/6, E4/7, E4/7b, E4/8 + K8, E4/10, E4/11, NightRest) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/e4-9` (72a4976, od caef965) -> 299d49a, `w-toku/e5-0` (a1f9a87, od 392c519) -> fab76bc; ujednolicenie R6/W5 - ten commit | **Pliki (R6/W5):** `PeopleBook.Arms.cs`, `ArmsFromPeople.cs`, `tools/sprawdz_logi.py`, `CHANGELOG.md`
