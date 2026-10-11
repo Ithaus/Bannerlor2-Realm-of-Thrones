@@ -888,6 +888,22 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool DteScrapKeep { get; set; } = true;
 
+        [SettingPropertyBool("Town Pays Rewards", HintText = "prisoners sold in a town (also yours at the ransom broker), tournament prizes, siege loot and the captives Banner Kings raiders sell are paid from the town's (a castle's: the lord's) spare money above its merchants' reserve instead of out of thin air - a poor town pays less and you are told how much; the ransom for captive heroes stays as it was. Toll fees (Tollgates perk) come out of the entering caravan's purse (off = all of it out of thin air, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool TownPaysRewards { get; set; } = true;
+
+        [SettingPropertyBool("Casualty Loot From Purse", HintText = "the gold an AI victor takes from the bodies of the fallen comes out of the purse of the beaten men - a third to the lord (or the caravan), the rest to his men - not out of thin air; an empty purse (bandits) gives nothing, and the Others take no coin. When your men lose, the victors strip their purse. Works only with Beaten Purse To Victor and Men Purse Enabled on (off = out of thin air, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool CasualtyLootFromPurse { get; set; } = true;
+
+        [SettingPropertyBool("Upgrade Cost To Purse", HintText = "the gold paid to upgrade troops (by you on the party screen or by the AI) goes to the purse of the party's men - they buy the kit of their new rank in town - not into thin air; a garrison keeps no more than its purse limit (Men Gear Save Days of pay), the rest goes to its town's or castle's coffers; bandits and the Others pay into the coffers of the nearest town (off = into thin air, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool UpgradeCostToPurse { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Capital Real", HintText = "a caravan bought by a lord (Banner Kings) or by you starts with capital taken out of the payment - the rest stays with the town that sold the beasts and carts; supply convoys that do not trade (Dynamic Troop Equipment) start with none. A party disbanded or removed without a battle hands its purse to the head of its owner's house (a notable's caravan - to the notable), else to the nearest town, and its men's purse to the nearest town (off = capital out of thin air, and such purses vanish, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool CaravanCapitalReal { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -4181,6 +4197,10 @@ namespace Armoury
             s.LordThirdOnTotal = LordThirdOnTotal;
             s.SpoilsBanditsToBand = SpoilsBanditsToBand;
             s.DteScrapKeep = DteScrapKeep;
+            s.TownPaysRewards = TownPaysRewards;
+            s.CasualtyLootFromPurse = CasualtyLootFromPurse;
+            s.UpgradeCostToPurse = UpgradeCostToPurse;
+            s.CaravanCapitalReal = CaravanCapitalReal;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
