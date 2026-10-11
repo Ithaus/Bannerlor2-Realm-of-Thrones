@@ -1171,6 +1171,8 @@ namespace Armoury
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercContract.EnsureHooks(); } catch (Exception e) { Log.Error("MercContract.EnsureHooks", e); }   // 185: kontrakt gry i "za tier" AI = 0 (latki modelu finansow - w kampanii)   // 166: limity partii i zalog, dezercja z limitu, nowe partie, werbunek Strazy (latki w kampanii)   // 165: splata dlugu wobec korony do skarbca (latka modelu finansow - w kampanii)   // 169c: okna pomiaru etapu 2 (okupy, zalogi, rycerze, dezercja, konsumpcja, Inni) - latki w kampanii, tylko log
             try { CouncilWages35.EnsureHooks(); } catch (Exception e) { Log.Error("CouncilWages35.EnsureHooks", e); }   // 3.5: rada BK - platnik i urzad radnego (latki BK w kampanii), liczniki od zera
+            try { EstateIncome187.EnsureHooks(); } catch (Exception e) { Log.Error("EstateIncome187.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
+            try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
             try { CaravanAmmo.SessionStart(); } catch (Exception e) { Log.Error("CaravanAmmo.SessionStart", e); }   // paczka 172b: kategorie amunicji i stan latek (linia startowa)
@@ -1433,6 +1435,7 @@ namespace Armoury
             try { Seal31.BlockOpen(); } catch { }   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
+            try { Seal31B.RentMerge(); } catch (Exception e) { Log.Error("Seal31B.RentMerge", e); }   // 3.1/3.3 (31b) E3/8a: podatek warsztatow notabli przelany panom od wczoraj -> RentToday (po czyszczeniu w PopulationLaw.Daily)
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
             // 110 (projekt etapu 2 krok B): zawor kasy zamku - 7% nadwyzki ponad zapas kupcow do pana zamku, linia "Zawor zamkow (110)";
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
@@ -1524,6 +1527,8 @@ namespace Armoury
             try { Seal31.Daily(); } catch (Exception e) { Log.Error("Seal31.Daily", e); }   // 3.1 (31): linia "Szczelnosc (164a)" i zerowanie pozycji - PO ksiedze pieniadza, ktora je czyta
             try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
             try { CouncilWages35.Daily(); } catch (Exception e) { Log.Error("CouncilWages35.Daily", e); }   // 3.5: linia "Rada (3.5)" i zerowanie licznikow - PO ksiedze pieniadza (to samo okno rozliczen rodow)
+            try { EstateIncome187.Daily(); } catch (Exception e) { Log.Error("EstateIncome187.Daily", e); }   // 3.1/3.3 (31b) E3/2: linia "Majatki BK (187)" i zerowanie licznikow
+            try { Seal31B.Daily(); } catch (Exception e) { Log.Error("Seal31B.Daily", e); }   // 3.1/3.3 (31b): linia "Szczelnosc (164a/31b)" i zerowanie licznikow - PO ksiedze pieniadza
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); }   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
             try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
             try { MarketGlut.DailyDigest(); }

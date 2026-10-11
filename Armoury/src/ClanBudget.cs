@@ -550,7 +550,7 @@ namespace Armoury
         // ------------------------------------------------------------ 162m dwor: glowa -> kasa siedziby
         private static ItemObject _grain; private static bool _grainTried;
 
-        private static Settlement Seat(Clan c)
+        internal static Settlement Seat(Clan c)   // 3.1/3.3 (31b) E3/8b: internal - kasa siedziby dla oplat dworu BK
         {
             var st = c.HomeSettlement;
             if (st != null && st.IsVillage && st.Village != null) st = st.Village.Bound;

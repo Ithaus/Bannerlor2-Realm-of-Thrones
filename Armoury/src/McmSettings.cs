@@ -3976,6 +3976,30 @@ namespace Armoury
         [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
         public bool RebelPurseFromTown { get; set; } = true;
 
+        [SettingPropertyBool("Bk Estate Income From Sales Only", HintText = "Banner Kings estates no longer pay a daily production income out of thin air; an estate earns only its share of the harvest the village carts sell in town (paid by the town). The estate window shows the 28-day average of that share (off = Banner Kings as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool BkEstateIncomeFromSalesOnly { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Wage To Purse", HintText = "the daily wages of caravan guards (notables' and lords' caravans) go to the purse of those men, who spend all of it in the next town they leave - not into thin air. A beaten party's men's purse goes to a victor with a hero as before (a third to him, the rest to his men); a victor without a hero that carries coin (bandits) takes it, otherwise the destroyer's settlement (off = as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool CaravanWageToPurse { get; set; } = true;
+
+        [SettingPropertyBool("Bk Workshop Tax To Lord", HintText = "the Banner Kings tax on a notable's workshop is really paid by the notable to the lord of the town (the town keeps its autonomy share), instead of vanishing on one side and being created from nothing on the other. Needs town rents (Population Rent Enabled, Rent Replaces Town Tax) - otherwise as before (off = as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool BkWorkshopTaxToLord { get; set; } = true;
+
+        [SettingPropertyBool("Bk Lord Fees Have Recipients", HintText = "gold Banner Kings takes from lords goes somewhere: title claims, grants, revocations, usurpations and dilemma levers to the realm's treasury (no realm - the nearest town), court cost changes to the seat's purse, moving the court to the new seat's purse, a new knight's endowment to the knight's new house (off = as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool BkLordFeesHaveRecipients { get; set; } = true;
+
+        [SettingPropertyBool("Dead Hero Gold Stays", HintText = "when nobody inherits a dead hero's gold (a notable, a wanderer, the last of a house), it goes to the purse of his settlement - or the settlement he was in, or the nearest town - instead of vanishing (off = as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool DeadHeroGoldStays { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Profit In Realm Town", HintText = "a lord's caravan (Banner Kings realistic caravan income) deposits its profit above 10,000 with its owner in any town of the owner's realm, not only at his seat or his own fiefs - the same deposit, just sooner (off = as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool CaravanProfitInRealmTown { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4969,6 +4993,12 @@ namespace Armoury
             s.BkKnightKitPaidToTown = BkKnightKitPaidToTown;
             s.RotSwapNoGold = RotSwapNoGold;
             s.RebelPurseFromTown = RebelPurseFromTown;
+            s.BkEstateIncomeFromSalesOnly = BkEstateIncomeFromSalesOnly;
+            s.CaravanWageToPurse = CaravanWageToPurse;
+            s.BkWorkshopTaxToLord = BkWorkshopTaxToLord;
+            s.BkLordFeesHaveRecipients = BkLordFeesHaveRecipients;
+            s.DeadHeroGoldStays = DeadHeroGoldStays;
+            s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;
         }
 
         internal static void Apply()

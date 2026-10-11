@@ -97,6 +97,7 @@ namespace Armoury
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 Take(mp, purse);
+                if (Seal31B.PurseOfBeaten(mp, destroyer, purse)) return;   // 3.1/3.3 (31b) E3/4 (W13): zwyciezca bez bohatera z kiesa (banda) albo osada niszczyciela
                 var win = destroyer != null ? destroyer.MobileParty : null;
                 if (win != null && win.LeaderHero != null && win.LeaderHero.IsAlive)
                 {
@@ -262,6 +263,7 @@ namespace Armoury
                 if (mp.IsMainParty) TroopSelfMend.LeftTown();
                 int purse = Get(mp);
                 if (purse <= 0) return;
+                if (Seal31B.CaravanSpends(mp, st, purse)) return;   // 3.1/3.3 (31b) E3/4: karawana - cala sakiewka "na zycie", bez oszczednosci, odziezy i tarczy zoldu
                 int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost(st) : AiWear.OutstandingCost(mp, st);   // przy naprawach z materialem: z szacunkiem materialu z polki tego miasta
                 // 150: odziez, buty i plotno wojska - z polki miasta po cenie targu, z tej samej sakiewki PRZED wydatkiem "na zycie"
                 // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
