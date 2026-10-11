@@ -4468,6 +4468,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool LordPurseOnlyToVictor { get; set; } = true;
 
+        [SettingPropertyBool("Battle Plunder From Loser Only", HintText = "the coin the victors of a battle share out comes only from what the beaten really lose. A beaten lord - or you - hands over his share of it (the game's 5% of his coin, at most 10,000) even when he is taken captive or flees, and the victors never get more than the beaten pay; a beaten leader with no coin gives nothing. What a captor already took from a captive's purse when he was taken (Realistic Captivity going through your baggage) counts toward his share - he is not robbed twice. The Others take no coin (with Beaten Purse To Victor on). In war the crown takes its ninth of what a vassal wins from a beaten lord's purse, as of any plunder (Crown Thirds). The same for you and the AI. Sunk ships at sea are not changed here (off = as before: the victors get the beaten lord's share out of thin air and he keeps his coin)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool BattlePlunderFromLoserOnly { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5604,6 +5608,7 @@ namespace Armoury
             s.BkSupplyFromMenPurse = BkSupplyFromMenPurse;
             s.RotSwapPayToPurse = RotSwapPayToPurse;
             s.LordPurseOnlyToVictor = LordPurseOnlyToVictor;
+            s.BattlePlunderFromLoserOnly = BattlePlunderFromLoserOnly;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;
