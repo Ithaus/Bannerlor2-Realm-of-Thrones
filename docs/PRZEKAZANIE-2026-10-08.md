@@ -777,3 +777,13 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   Devastation.Daily, zgony z glodu vs NoteCivilDead, arm_people) + recenzja scalenia, potem E4/8 (e4\48) i E4/10 (e4\410) rownolegle od czubka scalenia.
 - (11:30) **Workflow wf_16c71a8d-809: projekt etapu 5** (rozpoznanie logi/kod/dokumenty/styki z E4 -> projekt -> 2 krytyki -> v2) -> docs/etap5/. Jeff 11:20 pyta
   "czy mozesz zaczac etap 5 czy dopiero po etapie 4" - odpowiedz: projekt teraz, kod porcji niezaleznych rownolegle po projekcie, porcje z jedzeniem/karczma po E4.
+- (12:30) **9 BLEDOW - WYNIK (wf_d88e99ab-fe8, kazdy werdykt potwierdzony przez niezaleznego sceptyka):** B1 TournamentsXPanded - nic (klasa pomocnicza, TXP laduje sie
+  normalnie); B2 BKROTPatch DynamicPartySize - nic (mod "Dynamic Party Size" nie jest zainstalowany; latka i tak martwa); B3 BKROTPatch Rebellions - nic (mod Rebellions
+  and Demographics nie zainstalowany); B4 BannerKings edukacja gracza - nic (BKROTPatch nie inicjuje jezyka Nord; wpis gracza odtwarza sie w 0.2 s z tym samym jezykiem;
+  obalona stara hipoteza, ze blokuje RunStartOption); B5 DTE/UIExtenderEx mixin - nic (pierwsza szansa w AccessTools2, droga zapasowa dziala); B7 Armoury klimat - nic;
+  **B6 ROT Harrenhal - PSUJE:** BK (BKArmyManagementModel.CanCreateArmy) odmawia Roose'owi armii -> NRE w ROT -> nasz port z zastepca: Roose nigdy nie dowodzi (8 z 9
+  biegow), raz zastoj fabuly (doby 117-120, Roose teleportowany co godzine), zastepca moze zostac zamrozony na stale (DoNotMakeNewDecisions w sejwie). POPRAWIONE:
+  B6 w-toku/cs-bledy cd6c22d (przepustka BK dla skryptowego dowodcy; wylacznik HarrenhalBkArmyPass), w toku B6b (wf_7a16d181-a5a: odkladanie, gdy Roose w bitwie;
+  sprzatanie i odmrozenie zastepcy na koncu wydarzenia; naprawa starych zapisow). B8 NightRest (Jeff: do koncowej paczki) - w-toku/e4-bledy 457f73e (__0, wylacznik
+  NightRestEveryModel; test poza gra: morale 50 -> 37.5 w obu wariantach). DLL: test\Armoury-bledy.dll 198fe4dd, CrashScribe-bledy.dll / CrashScribe-at-bledy.dll
+  (po B6b nowe md5). Galezie w repo i na GitHub. Do scalenia w w-toku/zbior-e4-koniec (Armoury) + CS do testu koncowego (CS-at z at1-cs.diff).
