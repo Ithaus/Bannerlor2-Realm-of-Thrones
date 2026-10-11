@@ -716,3 +716,7 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (05:45) Rownolegle (Jeff: "czy cos jeszcze z E4 mozna robic"): workflow wf_16064079-10e - (1) naprawa lancucha modelu jedzenia RBL (drzewo e4\jedz, galaz
   w-toku/e4-jedzenie od c02c80f -> test\Armoury-jedzenie.dll), (2) plany kodu E4/5 i E4/7 bez kodu (SCRATCH(ae222cb7)\e4\PLAN-KODU-E45.md, PLAN-KODU-E47.md).
   Nastepny test zbiorczy: E4/4 + jedzenie (+ E4/5, jesli zdazy) -> WGRANIE 31.
+- (06:15) **WGRANIE 30: Armoury 9d314ea6** (zbior 30; opis STAN-PRAC). **Jedzenie RBL GOTOWE:** w-toku/e4-jedzenie b6c2139 (FoodChain.cs; test\Armoury-jedzenie.dll 748c06d8):
+  jeden lancuch RBL -> ROT -> NavalDLC -> BEE -> BK. Pytanie do Jeffa: pasza koni na pustyni/sniegu - (a) tylko E4/1 (rada) / (b) dzis: zima max(E4/1, BK), poza zima formula
+  BK (zla). **Plany kodu:** SCRATCH(ae222cb7)\e4\PLAN-KODU-E45.md (spustoszenie, 7 commitow, 14 kluczy, 21 progow; spalona wies w grze nie produkuje - latka TickProductions)
+  i PLAN-KODU-E47.md. E4/4 kod w toku (wf_4d6430c3-d4f). Nastepny test zbiorczy: E4/4 + jedzenie (+E4/5) -> WGRANIE 31.
