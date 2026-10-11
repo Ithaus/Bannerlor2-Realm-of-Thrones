@@ -634,3 +634,7 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
   **ETAP 3 - stan:** 3.2 = w-toku/e3-32m f37d032; 3.4-3.7 scalone = w-toku/e3-gA f205ba0 (drzewo e3\gA); 3.8-3.10 na gA = w-toku/e3-gB b052638 (drzewo e3\gB; Armoury,
   RC, GT kod 0). 3.1+3.3 kod w toku (workflow wf_09986c42-a8f; drzewa e3\31 (E3/0,1,3,5,6,7), e3\31b (E3/2,4,8,9), e3\33 (statki E3/10-12, wylaczniki OFF do decyzji
   Jeffa - wariant (b) projektu v2)). Kolejka gry: test 3.2 (test\Armoury-32m.dll) -> WGRANIE 25 -> gA -> WGRANIE 26 -> gB -> WGRANIE 27 -> 3.1+3.3 -> WGRANIE 28 -> bieg 2-letni.
+- (18:40) **WGRANIE 25: Armoury 1211d984** (3.2, opis w STAN-PRAC). Test grupy A (3.4-3.7, test\gA\Armoury.dll + RealisticCaptivity.dll) w toku.
+- (19:05) **3.1+3.3 KOD SCALONY:** w-toku/e3-31m a939cd5 (drzewo e3\31m; = gB + e3-31 (E3/0,1,3,5,6,7) + e3-31b (E3/2,4,8a-c,9) + e3-33 (statki, OFF); E3/8d odlozony).
+  Dwie recenzje + poprawki w toku (wf_9ec2f5e7-61e) -> test\Armoury-31m.dll. Narzedzie progow etapu 3: tools/sprawdz_logi.py --grupa etap3 (w drzewie 31m).
+  Pytania z kodu: doplata za podmiane rekruta ROT (RotLeaks37) dalej w nicosc - zamknac z awansami?; napitki i drewno wojska (3.4) placi lord czy sakiewka ludzi?
