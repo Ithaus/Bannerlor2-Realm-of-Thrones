@@ -601,7 +601,8 @@ namespace Armoury
         {
             d.Castles++;
             double idx = f.Idx > 0 && !double.IsNaN(f.Idx) ? f.Idx : 1.0;
-            double gar = f.Win[KGarrison], court = f.Win[KCourt], build = f.Win[KBuildLabour];
+            // zold zalogi i zycie zolnierzy, ludzi karawan i band wydane w zamku - 25% do podzamcza, 75% kupcom (jedzenie) jak w miescie
+            double gar = f.Win[KGarrison] + f.Win[KLife] + f.Win[KLifeCaravan] + f.Win[KLifeBand], court = f.Win[KCourt], build = f.Win[KBuildLabour];
             // 15% zaworu kasy zamku (KL; hak CastleDuesSuburbShare) - zawor dzisiejszego CastlePurse.Daily z nadwyzki przed zaworem (CastlePurse.DuesOf)
             double valve = 0;
             if (castleOn)
