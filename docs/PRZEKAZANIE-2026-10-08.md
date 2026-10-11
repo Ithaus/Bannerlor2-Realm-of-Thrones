@@ -788,3 +788,8 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   NightRestEveryModel; test poza gra: morale 50 -> 37.5 w obu wariantach). DLL: test\Armoury-bledy.dll 198fe4dd, CrashScribe-bledy.dll / CrashScribe-at-bledy.dll
   (po B6b nowe md5). Galezie w repo i na GitHub. Do scalenia w w-toku/zbior-e4-koniec (Armoury) + CS do testu koncowego (CS-at z at1-cs.diff).
 - (12:40) **Jeff: E4/6-E4/7 "tak x3"** (STAN-PRAC). Pkt 3 (niewzieci z poboru wymuszonego -> DOM wsi) = zmiana kodu E4/7 - workflow na w-toku/e4-7 (e4\47).
+- (13:30) **PLAN KODU E4/11 GOTOWY + KRYTYKA** (docs/etap4/PLAN-KODU-E411.md, rozdz. 14 krytyka K1-K9 przyjete): wioski poboczne z pliku arm_map_villages.tsv (2446 wiosek
+  w 425 okregach), ludzie wiosek = podzial konta DOM i uchodzcow okregu (bez nowych ludzi), palenie proporcja trafionych E4/5 (Burn - potem uzyje 7.11), odbudowa w rok
+  razem z kontem uchodzcow, jedyna nowa latka ekonomii: zywnosc warowni od wsi wedlug ludzi w domu (wlasny wylacznik), menu rozszerza "People of this land", zapis
+  arm_district, progi G1-G14 + G-ETAP (bieg 728 dob). Koordynacja Z11 z E4/9 (pojmani przez konto uchodzcow). Pytania kierunku: wyglad spalonej wioski - w 7.10 (rada);
+  niebezpieczenstwo z pustych osad - pozniej (rada); ryby/mlyny wiosek - nie teraz (rada). Kod po scaleniu E4/6+E4/7 (zalezy od E4/5, E4/6, E4/7).
