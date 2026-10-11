@@ -83,7 +83,7 @@ namespace Armoury
             // dekret podatkowy zawsze Standard i pomijaly autonomie po wczytaniu drugiego save'a bez restartu
             _bkResolved = false; _popMgr = null; _popData = null; _polResolved = false; _policyMgr = null; _getPolicy = null;
             // E4/4 (109n): pamiec doby przyrostu i liczniki (stan miast trzyma PeopleBook - czyszczony tam; latki zostaja wpiete - _growthPatched nie jest stanem kampanii)
-            _townSeeded = 0; _errTowns = false;
+            _townSeeded = 0; _errTowns = false; _townStumbles = 0;
             lock (_gLock) { _gDay = int.MinValue; _gW.Clear(); _gWar.Clear(); }
             _gStumbles = 0; _floorStumbles = 0; _errGrowth = false; _errGrowthLog = false; _errFloor = false; _modelLogged = false;
         }
@@ -150,8 +150,14 @@ namespace Armoury
         {
             if (s == null || s.Culture == null) return 0f;
             // E4/4 ("Pogodzone", rozdz. 2 projektu): JEDNA definicja ludzi osady - przy stanie miast (TownPeopleFrozen) ludzie ksiegi (PeopleOf: wies hearth x k_v,
-            // miasto stan); suma swiata nie jest juz stala, tylko idzie za przyrostem naturalnym i ruchem ludzi. WorkshopLaw.TownHands bierze max(dawny wzor, z ludzi),
-            // wiec nikt nie traci rak w dniu przejscia. Wylaczone - dawny wzor tabeli (wspolczynnik z dzisiejszych sum kultury), jak dotad. Przed kalibracja tez dawny
+            // miasto stan); suma swiata nie jest juz stala, tylko idzie za przyrostem naturalnym i ruchem ludzi. WorkshopLaw.TownHands bierze max(dawny wzor rak
+            // z dobrobytu - LegacyTownHands, z ludzi rynku), wiec rece nie spadna ponizej wzoru sprzed 174.3 - ALE wobec wczoraj (ten wzor tabeli, suma swiata stala)
+            // zmienia sie suma i podzial ludnosci rynku (poprawka po recenzji E4/4): w nowej kampanii w dniu kalibracji oba wzory daja to samo; w STARYM zapisie
+            // hearth napuchniety stala gry zostaje (projekt: bez przeliczania wstecz), wiec ludnosc rynku pierwszej sesji skacze do ludzi ksiegi (test A zbioru 30:
+            // 69.1 mln wobec 52.5 mln tabeli - rynki srednio ok. +30%, rece swiata wedlug szacunku recenzji ok. 5950 -> ok. 7800 roboczodni; za nimi czytelnicy
+            // TownHands: TownCrafts, TownFletchers, SmithHours, CaravanBulk.UseNow, a cel zapasu CaravanBulk i ColdStart tylko przy wylaczonych *LegacyHands),
+            // a miasta krain z hearth ponizej kalibracji (rabunki) maja mniej ludzi rynku niz wczoraj
+            // (rece w strone dawnego wzoru). Wylaczone - dawny wzor tabeli (wspolczynnik z dzisiejszych sum kultury), jak dotad. Przed kalibracja tez dawny
             // wzor: ta droga (WorkshopLaw przy starcie sesji) nie moze przesunac chwili kalibracji (E4/3: kalibracja przed pula wyrzutkow, z hearth startu).
             if (TownsFrozen && Calibrated) return PeopleOf(s);
             int day = (int)CampaignTime.Now.ToDays;
@@ -223,6 +229,7 @@ namespace Armoury
         // miasta jest STANEM: zaklada sie raz - w nowej kampanii przy kalibracji (dokladnie udzial miejski krainy z tabeli), w starym zapisie pierwszej doby po
         // wczytaniu, z dobrobytu x k_v tej chwili (zadnego skoku) - i idzie do zapisu (PeopleBook, "arm_people" sekcja "t:"). Zmieni go dopiero E4/8 (migracja).
         private static int _townSeeded;            // miasta zalozone od ostatniej linii logu
+        private static int _townStumbles;          // potkniecia na pojedynczym miescie (zalozenie stanu, linia dobowa) - do "potkniecia" linii "Ludzie: przyrost naturalny"
         private static bool _errTowns;
 
         internal static bool TownsFrozen { get { var s = Settings.Current; return s != null && s.TownPeopleFrozen; } }
@@ -245,16 +252,28 @@ namespace Armoury
             try
             {
                 if (!TownsFrozen || _k.Count == 0) return;
+                int bad = 0;
                 foreach (var s in Settlement.All)
                 {
-                    if (s == null || !s.IsTown || s.Town == null) continue;
-                    float k = KFor(s);
-                    if (!(k > 0f)) continue;
-                    TownPeople(s, k);
+                    // wyjatek na jednym miescie (poprawka po recenzji E4/4): licznik, reszta miast dostaje stan w tej samej chwili; to miasto zalozy sie leniwie
+                    // przy pierwszym PeopleOf, gdy przestanie rzucac
+                    try
+                    {
+                        if (s == null || !s.IsTown || s.Town == null) continue;
+                        float k = KFor(s);
+                        if (!(k > 0f)) continue;
+                        TownPeople(s, k);
+                    }
+                    catch (Exception e)
+                    {
+                        bad++; _townStumbles++;
+                        if (!_errTowns) { _errTowns = true; Log.Error("PopulationLaw.SeedTowns(" + (s != null ? s.StringId : "?") + ")", e); }
+                    }
                 }
                 if (_townSeeded <= 0) return;
                 Log.Info("PopulationLaw: ludnosc miast zapisana jako stan (E4/4, " + when + ") - zalozono " + _townSeeded + " miast, razem " + PeopleBook.TownCount
-                         + " miast i " + (PeopleBook.TownSum / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln ludzi (dobrobyt x k osady z tej chwili); odtad liczba ludzi miasta nie idzie za dobrobytem.");
+                         + " miast i " + (PeopleBook.TownSum / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln ludzi (dobrobyt x k osady z tej chwili); odtad liczba ludzi miasta nie idzie za dobrobytem"
+                         + (bad > 0 ? "; " + bad + " miast z wyjatkiem - bez stanu (zaloza sie przy pierwszym pytaniu)" : "") + ".");
                 _townSeeded = 0;
             }
             catch (Exception e) { if (!_errTowns) { _errTowns = true; Log.Error("PopulationLaw.SeedTowns", e); } }
@@ -725,6 +744,18 @@ namespace Armoury
 
         private sealed class RealmGrowth { public double People, Rate, Gain; public int Villages; }
 
+        // poprawka po recenzji E4/4: wsie regionow w pokoju i w wojnie osobno - prog Jeffa 11.10 (pokoj +0.2..+0.8%/rok) mierzy sie na wsiach w pokoju
+        private sealed class WarSide { public double Weight, Rate, People, Gain; public int Villages, Blocked; }
+
+        private static void AppendSide(StringBuilder sb, string name, WarSide w, int days)
+        {
+            sb.Append(name).Append(": ");
+            if (w.Villages == 0) { sb.Append("brak wsi"); return; }
+            sb.Append("g ").Append(Sg(w.Weight > 0 ? w.Rate / w.Weight : 0.0, "0.###")).Append("% rocznie, przyrost ").Append(Sg(w.Gain, "0")).Append(" ludzi (")
+              .Append(Sg(w.People > 0 ? w.Gain * days * 100.0 / w.People : 0.0, "0.###")).Append("% rocznie) z ").Append((w.People / 1e6).ToString("0.000", CultureInfo.InvariantCulture))
+              .Append(" mln ludzi w ").Append(w.Villages).Append(" wsiach (w tym ").Append(w.Blocked).Append(" spalonych, lupionych albo pod przymusem)");
+        }
+
         /// <summary>
         /// Raz na dobe, z ksiegi "Ludzie:" (PeopleLedger, zaraz po linii "Ludzie:"): pyta czynny model gry o zmiane hearth kazdej wsi (kazdej raz) - to samo, co dopisze
         /// jej dobowy tick - i pisze linie "Ludzie: przyrost naturalny". Bilans hearth wsi (zmiana od wczoraj z RESZTA) jest w JEDNYM miejscu - linii "Hearth (E4/0)"
@@ -765,6 +796,7 @@ namespace Armoury
                 var rates = new List<float>();
                 var levels = new int[3];
                 var realms = new Dictionary<string, RealmGrowth>();
+                var peaceS = new WarSide(); var warS = new WarSide();
                 var seen = new HashSet<Village>();
                 float gh = Math.Max(0f, s.GrowthHungerWeight);
                 foreach (var st in Settlement.All)
@@ -800,6 +832,13 @@ namespace Armoury
                         rg.Villages++; rg.People += weight; rg.Rate += weight * rate; rg.Gain += gain - backGain;
                         if (!g.Set) continue;                                       // przyrost wylaczony: tylko suma wyniku gry
                         rates.Add(g.G); wRate += weight * g.G;
+                        // pokoj / wojna (ta sama regula wojny co g); wies spalona, lupiona albo pod przymusem (g 0) - wedle wojny swojego regionu
+                        // (GrowthOf jej wojny nie liczy; AtWarToday - pamiec doby)
+                        bool atWar = g.Blocked ? AtWarToday(v.Bound != null ? v.Bound.MapFaction : null) : g.War;
+                        var side = atWar ? warS : peaceS;
+                        side.Villages++; side.Weight += weight; side.Rate += weight * g.G;
+                        if (k > 0f) { side.People += weight; side.Gain += gain - backGain; }
+                        if (g.Blocked) side.Blocked++;
                         if (g.Blocked) { blocked++; continue; }
                         weightLive += weight;
                         if (g.War) war++;
@@ -831,13 +870,21 @@ namespace Armoury
                 var seenT = new HashSet<Settlement>();
                 foreach (var st in Settlement.All)
                 {
-                    if (st == null || !st.IsTown || st.Town == null || !seenT.Add(st)) continue;
-                    float k = KFor(st);
-                    if (!(k > 0f)) continue;
-                    float live = Math.Max(0f, st.Town.Prosperity) * k, p;
-                    if (float.IsNaN(live) || float.IsInfinity(live)) live = 0f;
-                    towns++; townLive += live;
-                    townState += PeopleBook.TryTown(st, out p) ? p : live;
+                    try        // poprawka po recenzji E4/4: wyjatek na jednym miescie - licznik, linia dobowa zostaje
+                    {
+                        if (st == null || !st.IsTown || st.Town == null || !seenT.Add(st)) continue;
+                        float k = KFor(st);
+                        if (!(k > 0f)) continue;
+                        float live = Math.Max(0f, st.Town.Prosperity) * k, p;
+                        if (float.IsNaN(live) || float.IsInfinity(live)) live = 0f;
+                        float state = PeopleBook.TryTown(st, out p) ? p : live;
+                        towns++; townLive += live; townState += state;
+                    }
+                    catch (Exception e)
+                    {
+                        _townStumbles++;
+                        if (!_errTowns) { _errTowns = true; Log.Error("PopulationLaw.GrowthDaily(miasto " + (st != null ? st.StringId : "?") + ")", e); }
+                    }
                 }
                 string townNote = !Calibrated ? "ludnosc nieskalibrowana"
                     : TownsFrozen ? (townState / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln w " + towns + " miastach - stan (E4/4, bez narodzin i migracji do E4/8); z dzisiejszego dobrobytu byloby "
@@ -860,6 +907,13 @@ namespace Armoury
                       .Append(day).Append("; ").Append(Sg(natHearth, "0.####")).Append(" hearth na ").Append(n).Append(" wsi, w rok ok. ").Append(Sg(natPeople * days, "0")).Append(" ludzi)");
                     sb.Append("; osobno powrot uchodzcow ").Append(Sg(backPeople, "0")).Append(" ludzi (").Append(Sg(backHearth, "0.#")).Append(" hearth w ").Append(refugees)
                       .Append(" wsiach ponizej ").Append(Math.Max(1, s.RefugeeFloorHearth)).Append(" hearth - regula ScorchedEarth do E4/5, ludzie z niczego, nie przyrost)");
+                    // poprawka po recenzji E4/4: przyrost naturalny wzgledem ludzi WSI (miasta stoja), pokoj i wojna osobno - prog Jeffa 11.10 na wsiach w pokoju
+                    double natSides = peaceS.Gain + warS.Gain, pplSides = peaceS.People + warS.People;
+                    sb.Append(" | pokoj i wojna (regula wojny E4/3, bez wiecznych wojen): razem ").Append(Sg(pplSides > 0 ? natSides * days * 100.0 / pplSides : 0.0, "0.###"))
+                      .Append("% rocznie z ").Append((pplSides / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append(" mln ludzi wsi; ");
+                    AppendSide(sb, "pokoj", peaceS, days);
+                    sb.Append("; ");
+                    AppendSide(sb, "wojna", warS, days);
                     rates.Sort();
                     sb.Append(" | wsie: rosnie ").Append(up).Append(", kurczy sie ").Append(down).Append(", bez zmiany ").Append(flat).Append(" (spalone, lupione albo pod przymusem ").Append(blocked).Append(')');
                     if (rates.Count > 0)
@@ -898,8 +952,9 @@ namespace Armoury
                 sb.Append(" | miasta: ").Append(townNote);
                 if (noK > 0) sb.Append(" | wsi bez przelicznika ludzi: ").Append(noK);
                 if (dup > 0) sb.Append(" | wsie powtorzone w Settlement.All (liczone raz): ").Append(dup);
-                int st0 = _gStumbles, sf = _floorStumbles; _gStumbles = 0; _floorStumbles = 0;
-                if (st0 + stumbles + sf > 0) sb.Append(" | potkniecia: rachunek wsi ").Append(st0).Append(", linia dobowa ").Append(stumbles).Append(", podloga ").Append(sf);
+                int st0 = _gStumbles, sf = _floorStumbles, stT = _townStumbles; _gStumbles = 0; _floorStumbles = 0; _townStumbles = 0;
+                if (st0 + stumbles + sf + stT > 0)
+                    sb.Append(" | potkniecia: rachunek wsi ").Append(st0).Append(", linia dobowa ").Append(stumbles).Append(", podloga ").Append(sf).Append(", miasta ").Append(stT);
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

@@ -1000,8 +1000,12 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until, ust):
 
 def etap4_e44(rep, lines, start, win, hea, lud, until):
     """E4/4 (109n): progi z projektu etapu 4 rozdz. 3 "E4/4" Test (U12) i decyzji Jeffa 11.10 (pokoj +0.2..+0.8%/rok, ciagla wojna do -0.5%/rok).
-    Przyrost naturalny ("Ludzie: przyrost naturalny +N ludzi") d28-until: 290-1150 ludzi/d (0.2-0.8%/rok od 52.5 mln). Netto "Ludzie:" - INFO: przed E4/5
-    rabunek gry zdejmuje hearth w nicosc (zbior 30 test A d28-120: ok. -36 tys. ludzi/d) - prog netto liczy sie w tescie razem z E4/5."""
+    Poprawka po recenzji E4/4: przyrost naturalny dotyczy tylko ludzi WSI (miasta stoja - stan do E4/8), a decyzja Jeffa 11.10 mowi o pokoju - prog
+    0.2-0.8%/rok sprawdzany na wsiach regionow w POKOJU (segment "pokoj: g ...% rocznie, przyrost +N ludzi (+R% rocznie) z P mln ludzi" linii
+    "Ludzie: przyrost naturalny"; R = przyrost doby x 364 / P - w ludziach/d to P x 0.2..0.8% / 364). Dawny prog 290-1150 ludzi/d od 52.5 mln calej
+    ludnosci (U12) - gorna granica nieosiagalna (wsie 41.7 mln x 0.8% / 364 = 916), dolna mieszala pokoj z wojna. Przyrost razem i wojna - INFO.
+    Netto "Ludzie:" - INFO: przed E4/5 rabunek gry zdejmuje hearth w nicosc (zbior 30 test A d28-120: ok. -36 tys. ludzi/d) - prog netto (pokoj
+    +0.2..+0.8, ciagla wojna >= -0.5%/rok) liczy sie w tescie razem z E4/5."""
     stl = next((x for x in lines if x.startswith("PopulationLaw: przyrost naturalny wsi (E4/4)")), "")
     rep.add("E4/4: linia startowa przyrostu (latka i okno podlogi)", stl[:240], "latka wpieta i \"okno na Village.DailyTick wpiete\", bez BRAK",
             ("wpieta" in stl and "okno na Village.DailyTick wpiete" in stl and "BRAK" not in stl) if stl else False)
@@ -1020,14 +1024,45 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
             (off == 0 and any(d in prz for d in win)) if win else None)
     nat = [fnum(r"^Ludzie: przyrost naturalny " + SF + r" ludzi", prz[d]) for d in pw]
     nat = [x for x in nat if x is not None]
+    tot = [re.search(r"pokoj i wojna \(.*?\): razem " + SF + r"% rocznie z " + F_ + r" mln ludzi wsi", prz[d]) for d in pw]
+    tot = [(float(t.group(1)), float(t.group(2))) for t in tot if t]
     if nat:
         m = st.mean(nat)
-        rep.add(f"E4/4: przyrost naturalny d28-{until} (ludzi/d)", f"{m:+.0f} (min {min(nat):+.0f}, max {max(nat):+.0f})", "290-1150 ludzi/d (0.2-0.8%/rok od 52.5 mln; U12)", 290 <= m <= 1150)
+        rest = (f" = {st.mean(r for r, _ in tot):+.3f}%/rok z {st.mean(p for _, p in tot):.2f} mln ludzi wsi" if tot else " (brak segmentu \"pokoj i wojna\")")
+        rep.add(f"E4/4: przyrost naturalny razem d28-{until} (ludzi/d)", f"{m:+.0f} (min {min(nat):+.0f}, max {max(nat):+.0f}){rest}",
+                "INFO (wsie w pokoju i w wojnie razem, miasta stoja; prog Jeffa 11.10 - wiersz \"w POKOJU\")", None)
     else:
-        rep.add(f"E4/4: przyrost naturalny d28-{until} (ludzi/d)", "brak linii", "290-1150 ludzi/d", None)
+        rep.add(f"E4/4: przyrost naturalny razem d28-{until} (ludzi/d)", "brak linii", "INFO", None)
+
+    def side(name):
+        """[(g, ludzi/d, % rocznie, mln ludzi, wsi)] z segmentu pokoj/wojna dob d28-until (doby bez wsi tej strony pominiete)."""
+        out = []
+        for d in pw:
+            mm = re.search(name + r": g " + SF + r"% rocznie, przyrost " + SF + r" ludzi \(" + SF + r"% rocznie\) z " + F_ + r" mln ludzi w (\d+) wsiach", prz[d])
+            if mm:
+                out.append((float(mm.group(1)), float(mm.group(2)), float(mm.group(3)), float(mm.group(4)), int(mm.group(5))))
+        return out
+
+    ps = side("pokoj")
+    if ps:
+        rp, gp, mp, pp = st.mean(x[2] for x in ps), st.mean(x[0] for x in ps), st.mean(x[1] for x in ps), st.mean(x[3] for x in ps)
+        rep.add(f"E4/4: przyrost naturalny wsi w POKOJU d28-{until} (% rocznie)",
+                f"{rp:+.3f}%/rok (g {gp:+.3f}); {mp:+.0f} ludzi/d z {pp:.2f} mln (prog {pp * 1e6 * 0.002 / 364:.0f}-{pp * 1e6 * 0.008 / 364:.0f}/d); "
+                f"wsi {min(x[4] for x in ps)}-{max(x[4] for x in ps)}, dob {len(ps)}",
+                "0.2-0.8%/rok (decyzja Jeffa 11.10: w pokoju rosnie 0.2-0.8%/rok; tu przyrost naturalny - netto w pokoju w tescie razem z E4/5)", 0.2 <= rp <= 0.8)
+    else:
+        rep.add(f"E4/4: przyrost naturalny wsi w POKOJU d28-{until} (% rocznie)", "brak segmentu albo brak wsi w pokoju", "0.2-0.8%/rok", None)
+    ws = side("wojna")
+    rep.add(f"E4/4: przyrost naturalny wsi w WOJNIE d28-{until} (% rocznie)",
+            (f"{st.mean(x[2] for x in ws):+.3f}%/rok (g {st.mean(x[0] for x in ws):+.3f}); {st.mean(x[1] for x in ws):+.0f} ludzi/d z {st.mean(x[3] for x in ws):.2f} mln; "
+             f"wsi {min(x[4] for x in ws)}-{max(x[4] for x in ws)}, dob {len(ws)}") if ws else "-",
+            "INFO (nizej niz pokoj: wojna U +0.3 -> g -0.18; prog wojny - netto >= -0.5%/rok - w tescie razem z E4/5)", None)
     gv = [fnum(r"\(g srednio " + SF + r"% rocznie", prz[d]) for d in pw]
     gv = [x for x in gv if x is not None]
-    rep.add("E4/4: g srednio (pkt % rocznie, wazone ludnoscia wsi)", f"{st.mean(gv):+.3f}" if gv else "-", "INFO (pokoj 0.2-0.8; wojna nizej - skladowe w linii)", None)
+    rep.add("E4/4: g srednio (pkt % rocznie, wazone ludnoscia wsi)", f"{st.mean(gv):+.3f}" if gv else "-", "INFO (pokoj i wojna razem - prog na wierszu \"w POKOJU\")", None)
+    stb = [re.search(r"\| potkniecia: rachunek wsi (\d+), linia dobowa (\d+), podloga (\d+)(?:, miasta (\d+))?", prz[d]) for d in win if d in prz]
+    stb = [sum(int(g or 0) for g in x.groups()) for x in stb if x]
+    rep.add("E4/4: potkniecia przyrostu (rachunek wsi, linia dobowa, podloga, miasta)", f"{sum(stb)} w {len(stb)} dobach", "0", (sum(stb) == 0) if win else None)
     ref = [fnum(r"osobno powrot uchodzcow " + SF + r" ludzi", prz[d]) or 0 for d in pw]
     rep.add("E4/4: powrot uchodzcow +0.5 ponizej 40 (ludzie/d, z niczego do E4/5)", f"{st.mean(ref):+.0f}" if ref else "-", "INFO - znika w E4/5 (uchodzcy z ksiegi)", None)
     fl = [fnum(r"podloga z niczego " + F_ + r" ludzi", prz[d]) or 0 for d in win if d in prz]

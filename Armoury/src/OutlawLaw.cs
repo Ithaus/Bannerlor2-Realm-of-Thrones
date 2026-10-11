@@ -359,8 +359,11 @@ namespace Armoury
 
         /// <summary>
         /// E4/4 (R17, U15d): podloga 10 hearth dopisala wsi regionu `men` ludzi - schodza z puli TEGO regionu (wracaja do domu; hearth juz dopisala gra):
-        /// najpierw prosci (stamtad ich wzieto), potem pozostali zywi (bez kluczy starych wightow - W4b). Ulamki dozwolone (pula liczy w float).
-        /// Zwraca, ilu zeszlo; reszte PeopleBook liczy jako "podloga z niczego". Prawo wyrzutkow wylaczone - 0 (puli nikt nie prowadzi).
+        /// najpierw prosci (stamtad ich wzieto), potem pozostali, ktorych powrot z puli (Daily) tez oddaje do hearth. Przy H3 (LosersFlee.On) to tylko klucze
+        /// prostych i bandytow: zolnierz wraca do ludnosci BK bez hearth (MSoldier - werbunek nie zdjal go z DOM), straz karawan "z szablonu" do niczego,
+        /// wight do niczego - oplacenie nimi hearth podlogi byloby czlowiekiem liczonym drugi raz (poprawka po recenzji E4/4); zostaja w puli, brak idzie
+        /// uczciwie do licznika "podloga z niczego". Bez H3 - wszyscy zywi jak w powrocie z puli (bez kluczy starych wightow - W4b). Ulamki dozwolone (pula
+        /// liczy w float). Zwraca, ilu zeszlo; reszte PeopleBook liczy jako "podloga z niczego". Prawo wyrzutkow wylaczone - 0 (puli nikt nie prowadzi).
         /// </summary>
         internal static float TakeForFloor(Settlement region, float men)
         {
@@ -368,9 +371,10 @@ namespace Armoury
             Dictionary<string, float> d;
             if (!_pool.TryGetValue(region.StringId, out d) || d.Count == 0) return 0f;
             float got = 0f;
+            bool h3 = LosersFlee.On;        // ta sama flaga co powrot z puli w Daily
             var keys = new List<string>();
             if (d.ContainsKey(Commoner)) keys.Add(Commoner);
-            keys.AddRange(d.Keys.Where(k => k != Commoner && !SkipUndeadKey(k)).OrderByDescending(k => d[k]));
+            keys.AddRange(d.Keys.Where(k => k != Commoner && (h3 ? ToHearthUnderH3(k) : !SkipUndeadKey(k))).OrderByDescending(k => d[k]));
             foreach (var key in keys)
             {
                 if (got >= men) break;
@@ -382,6 +386,13 @@ namespace Armoury
             }
             _pFloor += got;
             return got;
+        }
+
+        /// <summary>Czy klucz puli wraca przy H3 do hearth (Daily: prosci i bandyci - tak; zolnierze, straz karawan, wighty - nie).</summary>
+        private static bool ToHearthUnderH3(string key)
+        {
+            int kk = key == Commoner ? LosersFlee.KeyCommon : LosersFlee.KeyKind(key);
+            return kk == LosersFlee.KeyCommon || kk == LosersFlee.KeyBandit;
         }
 
         private static void Seed()

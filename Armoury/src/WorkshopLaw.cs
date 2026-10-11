@@ -770,7 +770,10 @@ namespace Armoury
         /// definicja; wylaczone - suma swiata stala jak dotad) x poziom placy (TownWage.Index -
         /// bogate miasto ma wiecej mistrzow; osrodki eksportowe 3-5 na 1000 mieszczan wobec 1-3 w zwyklych):
         ///   rece = max(dawny wzor, min(WorkshopHandsMaxPerTown, WorkshopHandsPer1000People x ludzie rynku / 1000 x indeks placy)).
-        /// Nikt nie traci rak (max) - Zelazne Wyspy, Castle Black, Dragonstone zostaja przy dawnych. Historia [S z H]: 0.3-0.6 rzemieslnika broni, zbroi
+        /// Nikt nie schodzi ponizej dawnego wzoru z dobrobytu (max) - Zelazne Wyspy, Castle Black, Dragonstone zostaja przy dawnych. Od E4/4 (jedna definicja)
+        /// ludnosc rynku to ludzie ksiegi: w starym zapisie (hearth napuchniety stala gry) pierwsza sesja zmienia sume i podzial rynkow wobec wzoru tabeli -
+        /// rece wiekszosci miast rosna, miasta krain spustoszonych traca czesc rak wobec wczoraj (nie ponizej dawnego wzoru); szczegoly w PopulationLaw.TablePeopleOf.
+        /// Historia [S z H]: 0.3-0.6 rzemieslnika broni, zbroi
         /// i amunicji na 1000 mieszkancow kraju; 0.10 (ze strzelarzami ok. 0.15) to krok 1 - polowa minimum, razem z kopalniami x1.5 i lasem wsi x1.6.
         /// </summary>
         internal static float TownHands(Town town)
