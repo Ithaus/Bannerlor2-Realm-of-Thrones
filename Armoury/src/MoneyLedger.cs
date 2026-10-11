@@ -78,14 +78,11 @@ namespace Armoury
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
         internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5, NCloth = 6;
         internal const int NBkSupply = 7;   // D11-4: zaopatrzenie BK z sakiewek ludzi -> kasy osad (bez zdarzenia gry)
-        private const int Notes = 8;
+        internal const int NTravel = 8;     // 36b: wedrowcy BK - kasa celu placi za towar, utarg do kasy pochodzenia
+        private const int Notes = 9;
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
                                                    "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
-                                                   "zaopatrzenie BK z sakiewek ludzi (D11-4)" };
-        internal const int NTravel = 7;                                                                          // 36b: wedrowcy BK - kasa celu placi za towar, utarg do kasy pochodzenia
-        private const int Notes = 8;
-        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
-                                                   "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
+                                                   "zaopatrzenie BK z sakiewek ludzi (D11-4)",
                                                    "wedrowcy BK (36b): towar u celu, utarg do kasy pochodzenia" };
 
         // nasz tick dobowy (Mark)
