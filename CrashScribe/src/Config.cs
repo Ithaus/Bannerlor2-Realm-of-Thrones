@@ -75,6 +75,9 @@ namespace CrashScribe
         public static int HarrenhalWaitHours = 72;           // limit czekania w godzinach gry (doba = 24 h niezaleznie od kalendarza Armoury); <= 0 = nie czekamy
         public static bool HarrenhalReleaseCommander = true; // koniec wydarzenia (postfiks CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Roose'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
         public static bool HarrenhalOldSaveFix = true;       // po wczytaniu: wydarzenie skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Polnocy tylko w logu)
+        // --- Oblezenie Muru: sprzatanie dowodcy po wydarzeniu (B6c; patrz Mends.WallEnd, WallReleasePrev, WallOldSaveCheck) ---
+        public static bool WallReleaseCommander = true;      // koniec wydarzenia (postfiks WallSiegeEvent.CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Mance'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
+        public static bool WallOldSaveFix = true;            // po wczytaniu: oblezenie Muru skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Wolnych Ludzi tylko w logu)
 
         internal static void Load(string moduleDataDir)
         {
@@ -137,6 +140,8 @@ namespace CrashScribe
                         case "HarrenhalWaitHours": HarrenhalWaitHours = I(v, HarrenhalWaitHours); break;
                         case "HarrenhalReleaseCommander": HarrenhalReleaseCommander = B(v); break;
                         case "HarrenhalOldSaveFix": HarrenhalOldSaveFix = B(v); break;
+                        case "WallReleaseCommander": WallReleaseCommander = B(v); break;
+                        case "WallOldSaveFix": WallOldSaveFix = B(v); break;
                     }
                 }
             }

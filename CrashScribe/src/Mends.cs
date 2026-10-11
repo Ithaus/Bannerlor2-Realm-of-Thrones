@@ -441,9 +441,12 @@ namespace CrashScribe
         private static bool _harrenhalFixPending;         // naprawa starych zapisow: raz po starcie gry, na pierwszej godzinie
         private static int _harrenhalStumbles;            // potkniecia B6b w sesji (per wywolanie, bez globalnego wylacznika)
         private static Type _rotHarrenhalSiege;           // ROT.Events.HarrenhalSiegeEvent
-        private static Type[] _rotOtherSieges;            // Blackwater/Wall/Bastards SiegeEvent - ich dowodcy i obroncy tez bywaja zamrozeni
-        private static readonly string[][] _rotOtherDefenders =
+        // B6c: wszystkie 4 wydarzenia oblezenia ROT (dotad 3 "inne" niz Harrenhal) - SiegeOtherFreezer pomija leadera
+        // wydarzenia, ktore wlasnie sprzatamy (self), reszte i obroncow sprawdza jak dotad
+        private static Type[] _rotSieges;                 // Harrenhal/Blackwater/Wall/Bastards SiegeEvent - ich dowodcy i obroncy bywaja zamrozeni
+        private static readonly string[][] _rotSiegeDefenders =
         {
+            new[] { "AmoryLorch", "Polliver" },                            // HarrenhalSiegeEvent.HandleDoneButton -> DefendSiegeTarget
             new[] { "JoffreyBaratheon", "LancelLannister" },               // BlackwaterSiegeEvent.HandleDoneButton -> DefendSiegeTarget
             new[] { "AlliserThorne", "JonSnow" },                          // WallSiegeEvent.HandleDoneButton
             new[] { "RamsaySnow", "SmalljonUmber", "HaroldKarstark" },     // BastardsSiegeEvent.HandleDoneButton
@@ -461,12 +464,18 @@ namespace CrashScribe
 
         private static void HarrenhalStumble(string where, Exception e)
         {
-            _harrenhalStumbles++;
+            SiegeStumble(ref _harrenhalStumbles, "oblezenie Harrenhal", "Mends.Harrenhal", "B6b", where, e);
+        }
+
+        /// <summary>B6b/B6c: potkniecie per wywolanie - licznik w sesji, raport do 3, linia w logu; bez globalnego wylacznika.</summary>
+        private static void SiegeStumble(ref int counter, string label, string reportName, string tag, string where, Exception e)
+        {
+            counter++;
             try
             {
-                if (_harrenhalStumbles <= 3) Scribe.Report("CrashScribe", e, "Mends.Harrenhal (" + where + ")", null);
-                Scribe.Line("Mends: oblezenie Harrenhal - " + where + ": wyjatek " + e.GetType().Name
-                            + " polkniety (potkniec B6b w sesji " + _harrenhalStumbles + ").");
+                if (counter <= 3) Scribe.Report("CrashScribe", e, reportName + " (" + where + ")", null);
+                Scribe.Line("Mends: " + label + " - " + where + ": wyjatek " + e.GetType().Name
+                            + " polkniety (potkniec " + tag + " w sesji " + counter + ").");
             }
             catch { }
         }
@@ -515,17 +524,21 @@ namespace CrashScribe
         }
 
         /// <summary>Kto INNY moze trzymac partie zamrozona (DoNotMakeNewDecisions): zadanie, rozwiazywanie partii (gra),
-        /// trwajace inne wydarzenie oblezenia ROT (dowodca albo obronca z HandleDoneButton). null = nikt znany.
+        /// trwajace wydarzenie oblezenia ROT (dowodca albo obronca z HandleDoneButton). null = nikt znany.
+        /// B6c: wspolne dla Harrenhal i Muru. <paramref name="self"/> = wydarzenie, ktorego dowodce wlasnie sprzatamy -
+        /// jego dowodca sie nie liczy (to ta sama partia), jego obroncy tak (ROT zamraza ich celowo; po CompleteEvent
+        /// wydarzenie ma IsActive=false i jest pomijane w calosci). Dla Harrenhal wynik jak w B6b (Amory Lorch i Polliver
+        /// nigdy nie prowadza partii Polnocy).
         /// Inne zrodla true w grze i modach (grep 37 modow): zadania gry (partie zadan), DisbandPartyCampaignBehavior
-        /// (karawany gracza), DTE i Armoury (karawany) - lordow Polnocy nie dotycza.</summary>
-        private static string HarrenhalOtherFreezer(MobileParty mp)
+        /// (karawany gracza), DTE i Armoury (karawany) - lordow Polnocy ani Wolnych Ludzi nie dotycza.</summary>
+        private static string SiegeOtherFreezer(MobileParty mp, Type self)
         {
             if (mp.IsCurrentlyUsedByAQuest) return "uzywa jej zadanie (quest)";
             if (mp.IsDisbanding) return "partia sie rozwiazuje";
-            if (_rotOtherSieges == null) return null;
-            for (int i = 0; i < _rotOtherSieges.Length && i < _rotOtherDefenders.Length; i++)
+            if (_rotSieges == null) return null;
+            for (int i = 0; i < _rotSieges.Length && i < _rotSiegeDefenders.Length; i++)
             {
-                var t = _rotOtherSieges[i];
+                var t = _rotSieges[i];
                 if (t == null) continue;
                 object inst = null;
                 try { var f = AccessTools.Field(t, "Instance"); inst = f != null ? f.GetValue(null) : null; } catch { }
@@ -534,10 +547,13 @@ namespace CrashScribe
                 try { active = (bool)Traverse.Create(inst).Property("IsActive").GetValue(); }
                 catch { return "stanu wydarzenia ROT " + t.Name + " nie da sie odczytac"; }   // ostroznie: nie ruszamy
                 if (!active) continue;
-                MobileParty lead = null;
-                try { lead = Traverse.Create(inst).Field("SiegeLeaderParty").GetValue() as MobileParty; } catch { }
-                if (lead == mp) return "dowodzi trwajacym wydarzeniem ROT " + t.Name;
-                foreach (var name in _rotOtherDefenders[i])
+                if (t != self)
+                {
+                    MobileParty lead = null;
+                    try { lead = Traverse.Create(inst).Field("SiegeLeaderParty").GetValue() as MobileParty; } catch { }
+                    if (lead == mp) return "dowodzi trwajacym wydarzeniem ROT " + t.Name;
+                }
+                foreach (var name in _rotSiegeDefenders[i])
                 {
                     Hero h = null;
                     try { h = _rotLords != null ? Traverse.Create(_rotLords).Property(name).GetValue() as Hero : null; } catch { }
@@ -547,9 +563,10 @@ namespace CrashScribe
             return null;
         }
 
-        /// <summary>Sprzata dowodce oblezenia: (disband) jego armie, jesli to armia oblezenia (SiegeArmy albo cel Harrenhal),
-        /// potem zdejmuje DoNotMakeNewDecisions, chyba ze trzyma go inne zrodlo. Zwraca opis do logu. Wyjatki - u wolajacego.</summary>
-        private static string HarrenhalRelease(MobileParty mp, Army siegeArmy, Settlement harrenhal, bool disband)
+        /// <summary>Sprzata dowodce oblezenia: (disband) jego armie, jesli to armia oblezenia (SiegeArmy albo cel wydarzenia),
+        /// potem zdejmuje DoNotMakeNewDecisions, chyba ze trzyma go inne zrodlo. Zwraca opis do logu. Wyjatki - u wolajacego.
+        /// B6c: wspolne dla Harrenhal (target = Harrenhal) i Muru (target = The Wall); self - patrz SiegeOtherFreezer.</summary>
+        private static string SiegeRelease(MobileParty mp, Army siegeArmy, Settlement target, bool disband, Type self)
         {
             if (mp == null) return "brak (ROT nie zapamietal partii dowodcy)";
             string s = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : (mp.Name != null ? mp.Name.ToString() : "?");
@@ -557,10 +574,10 @@ namespace CrashScribe
             if (disband)
             {
                 var a = mp.Army;
-                if (a != null && a.LeaderParty == mp && (a == siegeArmy || (harrenhal != null && ReferenceEquals(a.AiBehaviorObject, harrenhal))))
+                if (a != null && a.LeaderParty == mp && (a == siegeArmy || (target != null && ReferenceEquals(a.AiBehaviorObject, target))))
                 {
                     int n = a.Parties.Count;
-                    if (mp.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(mp);   // jak ROT ResetAttackerParties (:449-453)
+                    if (mp.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(mp);   // jak ROT ResetAttackerParties (Harrenhal :449-453, Mur :434-438)
                     DisbandArmyAction.ApplyByObjectiveFinished(a);
                     s += ": armia oblezenia rozwiazana (" + n + " partii)";
                 }
@@ -570,7 +587,7 @@ namespace CrashScribe
                 else s += ": bez armii";
             }
             if (!mp.Ai.DoNotMakeNewDecisions) return s + ", nie byl zamrozony";
-            string other = HarrenhalOtherFreezer(mp);
+            string other = SiegeOtherFreezer(mp, self);
             if (other != null) return s + ", zamrozony, ale " + other + " - zostawiony";
             mp.Ai.SetDoNotMakeNewDecisions(false);
             return s + ", odmrozony";
@@ -585,12 +602,20 @@ namespace CrashScribe
             if (!Config.HarrenhalReleaseCommander) return;
             try
             {
-                var prev = Traverse.Create(ev).Field("SiegeLeaderParty").GetValue() as MobileParty;
-                if (prev == null || prev == next || !prev.IsActive || !prev.Ai.DoNotMakeNewDecisions) return;
-                string who = next == null ? "?" : (next.LeaderHero != null ? next.LeaderHero.Name.ToString() : next.Name.ToString());
-                Scribe.Line("Mends: oblezenie Harrenhal - zmiana dowodcy na " + who + ": poprzedni " + HarrenhalRelease(prev, null, harrenhal, false) + ".");
+                string res = SiegeReleasePrev(ev, next, harrenhal, _rotHarrenhalSiege);
+                if (res != null) Scribe.Line("Mends: oblezenie Harrenhal - " + res);
             }
             catch (Exception e) { HarrenhalStumble("zmiana dowodcy", e); }
+        }
+
+        /// <summary>B6b/B6c: rdzen odmrozenia poprzedniego dowodcy (pole SiegeLeaderParty wydarzenia <paramref name="ev"/>,
+        /// jeszcze przed zmiana) - bez rozwiazywania armii. Zwraca tekst do logu albo null (nic do zrobienia). Wyjatki - u wolajacego.</summary>
+        private static string SiegeReleasePrev(object ev, MobileParty next, Settlement target, Type self)
+        {
+            var prev = Traverse.Create(ev).Field("SiegeLeaderParty").GetValue() as MobileParty;
+            if (prev == null || prev == next || !prev.IsActive || !prev.Ai.DoNotMakeNewDecisions) return null;
+            string who = next == null ? "?" : (next.LeaderHero != null ? next.LeaderHero.Name.ToString() : next.Name.ToString());
+            return "zmiana dowodcy na " + who + ": poprzedni " + SiegeRelease(prev, null, target, false, self) + ".";
         }
 
         /// <summary>Postfiks na ROT HarrenhalSiegeEvent.CompleteEvent - biegnie PO ResetDefenderParties/ResetAttackerParties ROT.</summary>
@@ -606,7 +631,7 @@ namespace CrashScribe
                 Hero roose = null;
                 try { roose = _rotLords != null ? Traverse.Create(_rotLords).Property("RooseBolton").GetValue() as Hero : null; } catch { }
                 string role = leader == null ? "" : (leader.LeaderHero != null && leader.LeaderHero == roose ? " [Roose]" : " [zastepca z naszego portu]");
-                string res = HarrenhalRelease(leader, army, harrenhal, true);
+                string res = SiegeRelease(leader, army, harrenhal, true, _rotHarrenhalSiege);
                 Scribe.Line("Mends: oblezenie Harrenhal - koniec: dowodca " + res + role + "; Harrenhal ma "
                             + (harrenhal != null && harrenhal.OwnerClan != null ? harrenhal.OwnerClan.Name.ToString() : "?") + ".");
             }
@@ -623,44 +648,53 @@ namespace CrashScribe
             if (!Config.HarrenhalOldSaveFix || _rotHarrenhalSiege == null) return;
             try
             {
-                var fInst = AccessTools.Field(_rotHarrenhalSiege, "Instance");
-                object inst = fInst != null ? fInst.GetValue(null) : null;
-                if (inst == null) return;
-                var tr = Traverse.Create(inst);
-                if ((bool)tr.Property("IsActive").GetValue() || (int)tr.Property("TotalEvents").GetValue() <= 0) return;   // trwa (sprzata HarrenhalEnd) albo jeszcze nie bylo
-                var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
-                var army = tr.Field("SiegeArmy").GetValue() as Army;
                 Settlement harrenhal = null;
                 try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
                 Kingdom north = null;
                 try { north = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("TheNorth").GetValue() as Kingdom : null; } catch { }
-                string fixedLine = null;
-                if (leader != null && leader.IsActive && leader.Ai.DoNotMakeNewDecisions)
-                    fixedLine = HarrenhalRelease(leader, army, harrenhal, true);
-                var sus = new System.Collections.Generic.List<string>();
-                if (north != null)
-                {
-                    foreach (var clan in north.Clans)
-                    {
-                        if (clan == null || clan.WarPartyComponents == null) continue;
-                        foreach (var wpc in clan.WarPartyComponents)
-                        {
-                            var mp = wpc != null ? wpc.MobileParty : null;
-                            if (mp == null || mp == leader || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty || !mp.Ai.DoNotMakeNewDecisions) continue;
-                            string other = HarrenhalOtherFreezer(mp);
-                            sus.Add((mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString())
-                                    + (other != null ? " (" + other + ")" : "")
-                                    + (mp.Army != null ? " [w armii " + (mp.Army.LeaderParty != null ? mp.Army.LeaderParty.Name.ToString() : "?") + "]" : ""));
-                        }
-                    }
-                }
-                Scribe.Line("Mends: oblezenie Harrenhal - naprawa zapisu (wydarzenie skonczone): "
-                            + (fixedLine != null ? "dowodca " + fixedLine
-                                                 : "dowodca " + (leader != null && leader.LeaderHero != null ? leader.LeaderHero.Name.ToString() : "brak") + " nie zamrozony - nic do naprawy")
-                            + (sus.Count > 0 ? "; inni zamrozeni lordowie Polnocy (" + sus.Count + ", BEZ zmian - powodu nie da sie ustalic na pewno): " + string.Join(", ", sus) : "")
-                            + ".");
+                string res = SiegeOldSaveScan(_rotHarrenhalSiege, harrenhal, north, "Polnocy");
+                if (res != null) Scribe.Line("Mends: oblezenie Harrenhal - naprawa zapisu (wydarzenie skonczone): " + res);
             }
             catch (Exception e) { HarrenhalStumble("naprawa zapisu", e); }
+        }
+
+        /// <summary>B6b/B6c: rdzen naprawy starych zapisow dla wydarzenia <paramref name="evType"/>: skonczone (IsActive=false,
+        /// TotalEvents>0), a dowodca zapamietany przez ROT (SiegeLeaderParty, w sejwie) dalej zamrozony - SiegeRelease z
+        /// rozwiazaniem armii oblezenia. Inni zamrozeni lordowie krolestwa <paramref name="kingdom"/> - tylko lista. Zwraca tekst
+        /// do logu albo null (brak wydarzenia, trwa - sprzata postfiks konca - albo jeszcze nie bylo). Wyjatki - u wolajacego.</summary>
+        private static string SiegeOldSaveScan(Type evType, Settlement target, Kingdom kingdom, string kingdomLabel)
+        {
+            var fInst = AccessTools.Field(evType, "Instance");
+            object inst = fInst != null ? fInst.GetValue(null) : null;
+            if (inst == null) return null;
+            var tr = Traverse.Create(inst);
+            if ((bool)tr.Property("IsActive").GetValue() || (int)tr.Property("TotalEvents").GetValue() <= 0) return null;   // trwa (sprzata postfiks konca) albo jeszcze nie bylo
+            var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
+            var army = tr.Field("SiegeArmy").GetValue() as Army;
+            string fixedLine = null;
+            if (leader != null && leader.IsActive && leader.Ai.DoNotMakeNewDecisions)
+                fixedLine = SiegeRelease(leader, army, target, true, evType);
+            var sus = new System.Collections.Generic.List<string>();
+            if (kingdom != null)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    if (clan == null || clan.WarPartyComponents == null) continue;
+                    foreach (var wpc in clan.WarPartyComponents)
+                    {
+                        var mp = wpc != null ? wpc.MobileParty : null;
+                        if (mp == null || mp == leader || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty || !mp.Ai.DoNotMakeNewDecisions) continue;
+                        string other = SiegeOtherFreezer(mp, evType);
+                        sus.Add((mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString())
+                                + (other != null ? " (" + other + ")" : "")
+                                + (mp.Army != null ? " [w armii " + (mp.Army.LeaderParty != null ? mp.Army.LeaderParty.Name.ToString() : "?") + "]" : ""));
+                    }
+                }
+            }
+            return (fixedLine != null ? "dowodca " + fixedLine
+                                      : "dowodca " + (leader != null && leader.LeaderHero != null ? leader.LeaderHero.Name.ToString() : "brak") + " nie zamrozony - nic do naprawy")
+                   + (sus.Count > 0 ? "; inni zamrozeni lordowie " + kingdomLabel + " (" + sus.Count + ", BEZ zmian - powodu nie da sie ustalic na pewno): " + string.Join(", ", sus) : "")
+                   + ".";
         }
 
         // ===== BK ZADANIE PRETENDENTA = CRASH (bieg 2-letni 10.10, doba 457) =====
@@ -728,7 +762,13 @@ namespace CrashScribe
                     + (mance.Clan != null ? mance.Clan.Name.ToString() : "?") + ")";
                 else if (freeFolk != null && mance.Clan.Kingdom != freeFolk) why = "Mance Rayder sluzy " + mance.Clan.Kingdom.Name + ", nie Wolnym Ludziom";
                 else if (mance.PartyBelongedTo.MapEvent != null) why = "Mance Rayder w bitwie";
-                if (why == null && !_wallRotFailed) return true;   // Mance zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null && !_wallRotFailed)
+                {
+                    // B6c: ROT ustawi SiegeLeaderParty = partia Mance'a (:314) - poprzedni dowodca z naszego portu (zamrozony)
+                    // wypadlby z pamieci ROT (np. armia zastepcy zniknela -> TickEvent :221-224 -> SetupSiegeArmy=true); odmrazamy
+                    WallReleasePrev(__instance, mance.PartyBelongedTo, wall);
+                    return true;   // Mance zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                }
                 if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Mance'em (wyjatek w SetupSiegeAttackers)";
 
                 if (freeFolk == null || wall == null)
@@ -788,6 +828,7 @@ namespace CrashScribe
         private static bool WallSetupWith(object ev, MobileParty sub, Kingdom freeFolk, Settlement wall, string why)
         {
             var tr = Traverse.Create(ev);
+            WallReleasePrev(ev, sub, wall);   // B6c: przed zmiana pola (patrz WallReleasePrev)
             tr.Field("SetupSiegeArmy").SetValue(false);
             tr.Field("SiegeLeaderParty").SetValue(sub);
             if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
@@ -872,6 +913,83 @@ namespace CrashScribe
             }
             catch { }
             return null;
+        }
+
+        // ===== B6c: KONIEC WYDARZENIA MURU = SPRZATANIE DOWODCY (decyzja Jeffa 11.10: "tak, napraw") =====
+        // ROT WallSiegeEvent.CompleteEvent (:402-408) -> ResetAttackerParties (:428-458): rozwiazuje tylko armie, w ktorej
+        // jest MANCE (:430-439), i odmraza tylko partie lordow Wolnych Ludzi z Army == null (:440-457). Dowodca-zastepca
+        // z WallSetupWith (SetDoNotMakeNewDecisions(true) + Hold; ROT TickEvent :230 co tick przed szturmem) prowadzi
+        // WLASNA armie, gdy Mance do niej nie wszedl (w bitwie, martwy) - zostawal zamrozony na stale (flaga w sejwie).
+        // Te same funkcje co B6b (SiegeRelease, SiegeReleasePrev, SiegeOldSaveScan); pamiec dowodcy = w.SiegeLeaderParty ROT
+        // (ROTEventBehavior :1071 zapis, :1130 odczyt), bez SyncData. Czekania na Mance'a NIE dodajemy (CHANGELOG B6c).
+        private static Type _rotWallSiege;           // ROT.Events.WallSiegeEvent (ustawiane przy wpinaniu straznika Muru)
+        private static bool _wallFixPending;         // naprawa starych zapisow: raz po starcie gry, na pierwszej godzinie
+        private static int _wallStumbles;            // potkniecia B6c w sesji (per wywolanie, bez globalnego wylacznika)
+
+        /// <summary>Stan sesji - wolane z konstruktora MendsBehavior (OnGameStart, przy kazdej nowej grze i wczytaniu).</summary>
+        internal static void WallResetSession()
+        {
+            _wallFixPending = true;
+            _wallStumbles = 0;
+        }
+
+        private static void WallStumble(string where, Exception e)
+        {
+            SiegeStumble(ref _wallStumbles, "Mur", "Mends.Wall", "B6c", where, e);
+        }
+
+        /// <summary>B6c: zmiana dowodcy Muru (nasz port albo oddanie sterow ROT, ktory ustawi partie Mance'a) - poprzedni
+        /// dowodca (zamrozony) wypada z w.SiegeLeaderParty; ROT odmrozi go na koncu tylko, gdy jest bez armii i dalej
+        /// u Wolnych Ludzi - odmrazamy od razu, bez rozwiazywania armii. Wolac PRZED zmiana pola.</summary>
+        private static void WallReleasePrev(object ev, MobileParty next, Settlement wall)
+        {
+            if (!Config.WallReleaseCommander) return;
+            try
+            {
+                string res = SiegeReleasePrev(ev, next, wall, _rotWallSiege);
+                if (res != null) Scribe.Line("Mends: Mur - " + res);
+            }
+            catch (Exception e) { WallStumble("zmiana dowodcy", e); }
+        }
+
+        /// <summary>Postfiks na ROT WallSiegeEvent.CompleteEvent - biegnie PO ResetDefenderParties/ResetAttackerParties ROT.</summary>
+        public static void WallEnd(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
+                var army = tr.Field("SiegeArmy").GetValue() as Army;
+                Settlement wall = null;
+                try { wall = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("TheWall").GetValue() as Settlement : null; } catch { }
+                Hero mance = null;
+                try { mance = _rotLords != null ? Traverse.Create(_rotLords).Property("ManceRayder").GetValue() as Hero : null; } catch { }
+                string role = leader == null ? "" : (leader.LeaderHero != null && leader.LeaderHero == mance ? " [Mance]" : " [zastepca z naszego portu]");
+                string res = SiegeRelease(leader, army, wall, true, _rotWallSiege);
+                Scribe.Line("Mends: Mur - koniec: dowodca " + res + role + "; Mur ma "
+                            + (wall != null && wall.OwnerClan != null ? wall.OwnerClan.Name.ToString() : "?") + ".");
+            }
+            catch (Exception e) { WallStumble("koniec", e); }
+        }
+
+        /// <summary>NAPRAWA STARYCH ZAPISOW (raz po starcie gry, pierwsza godzina): oblezenie Muru skonczone, a dowodca
+        /// zapamietany przez ROT (w.SiegeLeaderParty) dalej zamrozony bez innego zrodla - sprzatamy go. Pozostali zamrozeni
+        /// lordowie Wolnych Ludzi - tylko lista w logu, bez zmian.</summary>
+        internal static void WallOldSaveCheck()
+        {
+            if (!_wallFixPending) return;
+            _wallFixPending = false;
+            if (!Config.WallOldSaveFix || _rotWallSiege == null) return;
+            try
+            {
+                Settlement wall = null;
+                try { wall = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("TheWall").GetValue() as Settlement : null; } catch { }
+                Kingdom freeFolk = null;
+                try { freeFolk = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("FreeFolk").GetValue() as Kingdom : null; } catch { }
+                string res = SiegeOldSaveScan(_rotWallSiege, wall, freeFolk, "Wolnych Ludzi");
+                if (res != null) Scribe.Line("Mends: Mur - naprawa zapisu (wydarzenie skonczone): " + res);
+            }
+            catch (Exception e) { WallStumble("naprawa zapisu", e); }
         }
 
         public static void GoodsUnlooted(TaleWorlds.CampaignSystem.Roster.ItemRoster __result)
@@ -3608,14 +3726,14 @@ namespace CrashScribe
                         if (tLords == null) tLords = asm.GetType("ROT.Misc.ROTLords");
                         if (tKing == null) tKing = asm.GetType("ROT.Misc.ROTKingdoms");
                         if (tSet == null) tSet = asm.GetType("ROT.Misc.ROTSettlements");
-                        if (tBw == null) tBw = asm.GetType("ROT.Events.BlackwaterSiegeEvent");      // B6b: inne zrodla zamrozenia (HarrenhalOtherFreezer)
+                        if (tBw == null) tBw = asm.GetType("ROT.Events.BlackwaterSiegeEvent");      // B6b: inne zrodla zamrozenia (SiegeOtherFreezer)
                         if (tWallS == null) tWallS = asm.GetType("ROT.Events.WallSiegeEvent");
                         if (tBast == null) tBast = asm.GetType("ROT.Events.BastardsSiegeEvent");
                     }
                     catch { }
                 }
                 _rotLords = tLords; _rotKingdoms = tKing; _rotSettlements = tSet;
-                _rotHarrenhalSiege = tHar; _rotOtherSieges = new[] { tBw, tWallS, tBast };   // kolejnosc = _rotOtherDefenders
+                _rotHarrenhalSiege = tHar; _rotSieges = new[] { tHar, tBw, tWallS, tBast };   // kolejnosc = _rotSiegeDefenders (B6c: z Harrenhal)
                 var mSetup = tHar != null ? AccessTools.Method(tHar, "SetupSiegeAttackers") : null;
                 if (mSetup != null)
                 {
@@ -3694,9 +3812,28 @@ namespace CrashScribe
                 var mWall = tWall != null ? AccessTools.Method(tWall, "SetupSiegeAttackers") : null;
                 if (mWall != null)
                 {
+                    _rotWallSiege = tWall;   // B6c: typ wydarzenia dla SiegeOtherFreezer/SiegeOldSaveScan (przed wpieciem straznika)
                     harmony.Patch(mWall, prefix: new HarmonyMethod(typeof(Mends), "WallGuard"),
                                          finalizer: new HarmonyMethod(typeof(Mends), "WallSafe"));
                     Scribe.Line("Mends: oblezenie Muru (ROT) zabezpieczone - bez zdolnego Mance'a Raydera proba jest odkladana albo dowodzi zastepca, nie wywala gry.");
+                    // B6c: sprzatanie dowodcy na koncu wydarzenia (patrz WallEnd); osobny try - wywrotka nie rusza straznika
+                    try
+                    {
+                        if (Config.WallReleaseCommander)
+                        {
+                            var mEnd = AccessTools.DeclaredMethod(tWall, "CompleteEvent");
+                            if (mEnd != null)
+                            {
+                                harmony.Patch(mEnd, postfix: new HarmonyMethod(typeof(Mends), "WallEnd"));
+                                Scribe.Line("Mends: Mur - B6c: koniec oblezenia Muru (WallSiegeEvent.CompleteEvent) sprzata dowodce: armia oblezenia"
+                                            + " rozwiazana, dowodca odmrozony (takze poprzedni przy zmianie dowodcy) - wpiete.");
+                            }
+                            else Scribe.Line("Mends: Mur - B6c: WallSiegeEvent.CompleteEvent nieznaleziony - BRAK sprzatania dowodcy na koncu wydarzenia.");
+                        }
+                        else Scribe.Line("Mends: Mur - B6c: sprzatanie dowodcy oblezenia Muru wylaczone (WallReleaseCommander=false).");
+                        Scribe.Line("Mends: Mur - B6c: naprawa starych zapisow: " + (Config.WallOldSaveFix ? "wlaczona" : "wylaczona") + ".");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(wall-b6c)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: ROT WallSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Muru bez straznika.");
             }
@@ -5594,8 +5731,8 @@ namespace CrashScribe
     /// wstanie - obiekty jednostek istnieja dopiero po starcie sesji.</summary>
     internal sealed class MendsBehavior : CampaignBehaviorBase
     {
-        // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart)
-        public MendsBehavior() { Mends.HarrenhalResetSession(); }
+        // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart); B6c: tak samo Mur
+        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); }
 
         public override void RegisterEvents()
         {
@@ -5622,7 +5759,7 @@ namespace CrashScribe
                     Mends.HeroSinewAll("dzien");   // Z16: przeglad bohaterow AI (drogi omijajace gardlo; normalnie 0)
                 });
             // Z16: bohaterowie AI ubrani z szablonu od ostatniej godziny - umiejetnosc do nowego zestawu
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { Mends.HeroSinewQueue(); Mends.HarrenhalOldSaveCheck(); });   // B6b: naprawa zapisu raz, na pierwszej godzinie
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { Mends.HeroSinewQueue(); Mends.HarrenhalOldSaveCheck(); Mends.WallOldSaveCheck(); });   // B6b/B6c: naprawa zapisu raz, na pierwszej godzinie
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.Party.MobileParty mp) { Army175.OnPartyCreated(mp); });
         }

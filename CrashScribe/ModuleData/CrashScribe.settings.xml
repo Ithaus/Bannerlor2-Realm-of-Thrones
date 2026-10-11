@@ -181,4 +181,22 @@
        party is released. Other frozen lords of the North are only listed in the CrashScribe log, never changed.
        Set HarrenhalOldSaveFix to false to switch the repair off. -->
   <HarrenhalOldSaveFix>true</HarrenhalOldSaveFix>
+
+  <!-- Releasing the commander of the Free Folk attack on the Wall (needs Realm of Thrones). The commander of the attack
+       is held in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only
+       disbands the army Mance Rayder is in and only releases Free Folk lords who are not in any army - a stand-in
+       commander who led his own army (Mance was fighting a battle or dead when the siege was set up) stayed frozen
+       for good, and the game keeps that in the save. With this on, when the event ends the siege army of its commander
+       is disbanded and the commander is released; when the commander changes (to another stand-in or back to Mance),
+       the previous one is released at once. A party held by a quest, by a party disbanding, or by another active
+       Realm of Thrones siege event (Harrenhal, Blackwater, the Bastards) is left alone.
+       Set WallReleaseCommander to false to leave it to Realm of Thrones (old behaviour). -->
+  <WallReleaseCommander>true</WallReleaseCommander>
+
+  <!-- Repair of older saves, the Wall (needs Realm of Thrones). Once after loading: if the Free Folk attack on the Wall
+       is already over, but the party that commanded it is still frozen (no decisions of its own) and nothing else holds
+       it (a quest, a party disbanding, another active Realm of Thrones siege event), its leftover siege army is disbanded
+       and the party is released. Other frozen Free Folk lords are only listed in the CrashScribe log, never changed.
+       Set WallOldSaveFix to false to switch the repair off. -->
+  <WallOldSaveFix>true</WallOldSaveFix>
 </CrashScribe>
