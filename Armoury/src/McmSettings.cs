@@ -2596,6 +2596,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int TownMigrationRefillDays { get; set; } = 364;
 
+        [SettingPropertyBool("Veterans Enabled", HintText = "a tavern's hirelings are real men: soldiers who left service - released by their lord, routed from a lost battle, freed from captivity or sent off when their company was disbanded - and stopped at the nearest town to sell their sword. No hireling appears from nowhere; at the start the taverns hold the old soldiers already there. Off = taverns as in the game (veterans already waiting still go home in time)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool VeteransEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Veteran Share To Tavern", 0.00f, 1.00f, "0.00", HintText = "share of soldiers leaving service alive who stop at the tavern of the nearest town instead of going straight home")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float VeteranShareToTavern { get; set; } = 0.33f;
+
+        [SettingPropertyInteger("Veteran Wait Days", 1, 1092, "0", HintText = "days a veteran waits in a tavern for a master before he gives up and goes home")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int VeteranWaitDays { get; set; } = 120;
+
+        [SettingPropertyInteger("Veteran Min Tier", 1, 7, "0", HintText = "only a soldier of at least this tier stops at a tavern - a green levy would stand there as a seasoned sellsword he never was; lower ranks always go home")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int VeteranMinTier { get; set; } = 3;
+
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
         public int OutlawMinBand { get; set; } = 6;
@@ -4988,6 +5004,10 @@ namespace Armoury
             s.TownGrowthEnabled = TownGrowthEnabled;
             s.TownGrowthPenaltyPercent = TownGrowthPenaltyPercent;
             s.TownMigrationRefillDays = TownMigrationRefillDays;
+            s.VeteransEnabled = VeteransEnabled;
+            s.VeteranShareToTavern = VeteranShareToTavern;
+            s.VeteranWaitDays = VeteranWaitDays;
+            s.VeteranMinTier = VeteranMinTier;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

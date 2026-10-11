@@ -14,6 +14,8 @@ Uzycie (Python 3, tylko odczyt):
                     progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
                     tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy). S10/S11 (E4/5) pomijaja
                     wiersze region-doba z konto_e46 = 1 w spichlerze-regiony.csv (E4/6 zmienil konto uchodzcow regionu tej doby).
+                    Gdy jest linia startowa "Weterani (E4/10): wpiete" - takze progi E4/10 V1-V18 (karczma tylko z puli weteranow; plan kodu E4/10
+                    rozdz. 9; V8, V12-V14, V17, V18 - INFO; V10 i V11 - wiersze E4/7 T3/T2/T6 z ta sama linia, tu tylko karczma E4/7 = 0).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -727,8 +729,12 @@ def etap4_main(logp, start_arg, until=120):
             "H3 domy (BK, wies, szablon, wighty)": L(d, r"domy: do domu BK (\d+)", h3) + L(d, r"do wsi \(tabory\) (\d+) ludzi", h3) + L(d, r"do wsi \(prosci i bandyci\) (\d+) ludzi", h3)
                                                    + L(d, r"hearth, z szablonu (\d+) \(garnizony", h3) + L(d, r"nigdy do BK ani wsi\): rozbici (\d+)", h3) + L(d, r"nigdy do BK ani wsi\): rozbici \d+, inna droga (\d+)", h3),
             "pula do hearth i z szablonu": L(d, r"\| powrot do wsi " + F_, wyr) + L(d, r"powrot z puli:.*?z szablonu " + F_, wyr) + L(d, r"powrot z puli:.*?wighty do niczego " + F_, wyr),
-            "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), Inni", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
+            # E4/10: w linii I1 po "znikneli N" stoi teraz ", do karczmy (E4/10)" - wzorzec przyjmuje oba uklady (stary log bez E4/10 tez)
+            "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
                                                           + L(d, r"krainy z niewola: niewolnikow (\d+)", i1),
+            # E4/10 (recenzja R1-2/R2-1): rozbici H3 + uwolnieni jency (suma w linii H3) i I1, ktorzy staneli w karczmie - zeszli ze stanu (sklad, loch), nie ma ich w domach;
+            # zwolnieni 166 i rozwiazane partie juz w calosci ("zwolnieni: do wsi", "rozwiazane ... zdrowi"), najem z karczmy - w "zwerbowani"
+            "E4/10: do karczmy (H3 rozbici + uwolnieni, I1)": L(d, r", do karczmy \(E4/10\) (\d+) \(rozbici", h3) + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1),
             "dezercja poza pula": max(0.0, L(d, r"dezercja (\d+) \(partie rodow", lud) - L(d, r"naplyw: dezercja (\d+)", wyr)),
             "zwolnieni 166 (do wsi i zniklo)": L(d, r"zwolnieni: do wsi (\d+) ludzi", bud) + L(d, r"zwolnieni: do wsi \d+ ludzi \([^)]*\), zniklo (\d+)", bud),
             "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
@@ -750,8 +756,9 @@ def etap4_main(logp, start_arg, until=120):
         if jd is not None:
             jin = L(d, r"wzieci do niewoli \+(\d+)", jen) + L(d, r"z rabunku BK \+(\d+)", jen)
             jout = (L(d, r"z niewoli pokonanych zabrano (\d+)", jen) + L(d, r"uwolnieni jency bez odbiorcy (\d+)", h3)
-                    + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), Inni", i1)
+                    + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1)
                     + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1) + L(d, r"krainy z niewola: niewolnikow (\d+)", i1)
+                    + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1)      # E4/10: I1 do karczmy (uwolnieni H3 do karczmy juz w "uwolnieni jency bez odbiorcy")
                     + L(d, r"wcieleni jency AI \(partie rodow\) (\d+)", h3) + L(d, r"werbunek: z puli \d+, jency (\d+)", wyr)
                     + L(d, r"jency Innych skasowani przez ROT (\d+)", inn) + L(d, r"ranni \d+, jency (\d+) - znikaja", par))
             t7j.append((jd - (jin - jout), jin + jout))
@@ -847,6 +854,9 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- E4/8 (164b-2): zalogi bez modelu, milicja z wolnych rak, nowe druzyny i karawany z ludzi, wedrowcy BK, miasta R2
     if any(x.startswith(E48_START) for x in lines):
         etap4_e48(rep, lines, start, win, hea, until)
+    # ---------------- E4/10 (167): weterani - karczma tylko z puli zolnierzy, ktorzy odeszli ze sluzby zywi
+    if any(x.startswith("Weterani (E4/10): wpiete") for x in lines):
+        etap4_e410(rep, lines, start, win, lud, until)
 
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
@@ -1351,6 +1361,176 @@ def etap4_e48(rep, lines, start, win, hea, until):
     if a5:
         rep.add("E4/8 A5: twierdze z werbunkiem / ludzi / limit dzienny / bez ochotnikow / zold (srednio)",
                 " / ".join(f"{st.mean(x[i] for x in a5):.0f}" for i in (0, 2, 3, 4, 5)), "INFO - dowod do K8 (limit dzienny wiaze -> A5 do 2/dobe, gdy N4 nie przejdzie)", None)
+
+
+def etap4_e410(rep, lines, start, win, lud, until):
+    """E4/10 (167): progi V1-V18 z planu kodu docs/etap4/PLAN-KODU-E410.md rozdz. 9 (stan z linii dziennych "Weterani (E4/10): dzien", nie startowej).
+    Linie: "Weterani (E4/10)" (pula, wejscia wedlug strumienia, uprawnieni i udzial, najeci, powroty, karczmy, kontrola, czas), linia siewu / wczytania,
+    "Ludzie:" (z karczmy - PeopleLedger.OnTroopRecruited), "Pochodzenie (E4/7)" (karczmy AI / karczma gracza = 0 przy czynnych weteranach),
+    "Ludzie (ksiega)" (rownanie krain z kontem WETERANI), "Przegrani (H3)" / "Prawo jenca (I1)" / "Budzet rodow (166)" (do karczmy - te same ludzie co wejscia),
+    "Komplet rekruta" (konie konnych weteranow z karczmy)."""
+    stl = next((x for x in lines if x.startswith("Weterani (E4/10): wpiete")), "")
+    brak = re.search(r"; BRAK: (.*?); wlasciciele", stl)
+    rep.add("E4/10 V1: linia startowa (latki karczmy)", stl[:240], "\"BRAK: -\" (L1 bez dosypki, okno AI, okna gracza 2/2)",
+            (brak is not None and brak.group(1).strip() == "-" and "okno najmu gracza 2/2" in stl) if stl else False)
+    vet = e4_series(lines, "Weterani (E4/10): dzien")
+    vdays = [d for d in sorted(vet) if 1 <= run_day(d, start) <= until]
+    live = [d for d in vdays if "| pula " in vet[d]]
+    if not live:
+        rep.add("E4/10: linie dzienne \"Weterani (E4/10)\" po siewie", f"brak ({vet[vdays[-1]][:160] if vdays else 'brak linii'})", "kazdej doby po siewie", False)
+        return
+    wait = num(r"\| powroty \d+ po (\d+) dobach", vet[live[-1]], int, 120) or 120
+    mint = num(r"ponizej tieru (\d+) do domu", vet[live[-1]], int, 3) or 3      # stan gry z linii dziennej (linia startowa - przed MCM)
+    stum = [num(r"\| potkniecia (\d+) \(razem", vet[d], int, 0) or 0 for d in vdays]
+    rep.add("E4/10 V1: potkniecia E4/10 (suma dob)", sum(stum), "<= 5 (z nazwa miejsca w ERROR PeopleBook.E4/10.*)", sum(stum) <= 5)
+    tl = next((x for x in lines if x.startswith("Weterani (E4/10): siew dnia") or (x.startswith("Weterani (E4/10): z zapisu"))), "")
+    zap = re.search(r"zapas wspolny: piesi tiery (\d+)-(\d+), konni tiery (\d+|brak)", tl)
+    if zap:
+        lo = min(int(zap.group(1)), int(zap.group(3)) if zap.group(3).isdigit() else 99)
+        rep.add("E4/10 V1: najnizszy tier zapasu najemnikow (linia siewu/wczytania)", f"{lo} (piesi {zap.group(1)}-{zap.group(2)}, konni od {zap.group(3)})",
+                f"= Veteran Min Tier ({mint})", lo == mint)
+    else:
+        rep.add("E4/10 V1: typy najemnikow", "brak linii siewu/wczytania", f"najnizszy tier zapasu = {mint}", None)
+    # V2 - siew w d1-d2
+    sd = [d for d in live if "[siew dnia" in vet[d]]
+    if sd:
+        sl = vet[sd[0]]
+        m = re.search(r"starzy zolnierze z karczm (\d+) w (\d+) miastach.*?ze stanu ludzi miast \(E4/4\) (\d+), bez zdjecia \([^)]*\) (\d+)", sl)
+        if m:
+            n, tw, n1, n2 = (int(x) for x in m.groups())
+            rep.add("E4/10 V2: siew (doba kampanii, ludzie, miasta, ze stanu miast, bez zdjecia)", f"d{run_day(sd[0], start)}: {n} w {tw} miastach, ze stanu {n1}, bez zdjecia {n2}",
+                    "d1-d2, N > 0 w >= 90 miastach, bez zdjecia 0 (przy E4/4 i E4/7)", run_day(sd[0], start) <= 2 and n > 0 and tw >= 90 and n2 == 0)
+    else:
+        ld = next((x for x in lines if x.startswith("Weterani (E4/10): z zapisu")), None)
+        rep.add("E4/10 V2: siew", "w logu tylko wczytanie" if ld else "brak linii siewu", "d1-d2 nowej kampanii", None)
+    # V3 - kontrola puli
+    ctl = [num(r"\(roznica (-?\d+)\)", vet[d], int) for d in live]
+    ctl = [x for x in ctl if x is not None]
+    rep.add("E4/10 V3: kontrola puli (najwieksza |roznica|)", f"{max(abs(x) for x in ctl)} ({len(ctl)} dob)" if ctl else "-", "0 kazdej doby", (max(abs(x) for x in ctl) == 0) if ctl else None)
+    # V4 - udzial do karczmy
+    U = sum(num(r"\| uprawnieni (\d+), do karczmy", vet[d], int, 0) or 0 for d in live)
+    W = sum(num(r"\| uprawnieni \d+, do karczmy (\d+)", vet[d], int, 0) or 0 for d in live)
+    tgt = fnum(r"\(cel " + F_ + r"%\)", vet[live[-1]])
+    if U and tgt is not None:
+        rep.add("E4/10 V4: udzial do karczmy (suma W / suma U)", f"{W} / {U} = {100.0 * W / U:.2f}% (cel {tgt:.1f}%)", "cel +- 1 pkt proc.", abs(100.0 * W / U - tgt) <= 1.0)
+    else:
+        rep.add("E4/10 V4: udzial do karczmy", f"uprawnionych {U}", "cel +- 1 pkt proc.", None)
+    # V5 - najem bez okna / ponad pule / przyrost obcy
+    nw = sum(num(r"najem bez okna (\d+)", vet[d], int, 0) or 0 for d in live)
+    ov = sum(num(r"najem ponad pule (\d+)", vet[d], int, 0) or 0 for d in live)
+    fo = sum(num(r"przyrost obcy (\d+)", vet[d], int, 0) or 0 for d in live)
+    rep.add("E4/10 V5: najem bez okna / ponad pule / przyrost obcy (suma)", f"{nw} / {ov} / {fo}", "0 / 0 / 0", nw == 0 and ov == 0 and fo == 0)
+    # V6 - najdluzej czeka
+    old = [num(r"najdluzej czeka (\d+) dob", vet[d], int, 0) or 0 for d in live]
+    rep.add("E4/10 V6: najdluzej czeka (najwiecej, poza oblezonymi)", max(old), f"<= {wait} (Veteran Wait Days)", max(old) <= wait)
+    # V7 - z karczmy tylko z puli. Recenzja R1-1: bez doby siewu (liczniki najmu linii Weterani obejmuja 24 h przed siewem, gdy paczka byla nieczynna, a "z karczmy"
+    # w Ludzie: liczy najem z karczm gry tych samych 24 h) i bez dob z paczka nieczynna/wylaczona (najem nie zdejmuje z puli - jak V11)
+    def vet_on(d):
+        return "[siew dnia" not in vet[d] and " - NIECZYNNE" not in vet[d] and "WYLACZONE" not in vet[d]
+    diffs = []
+    skip7 = sum(1 for d in live if not vet_on(d))
+    for d in live:
+        if not vet_on(d):
+            continue
+        x = lud.get(d)
+        if not x:
+            continue
+        zk = num(r", z karczmy (\d+)", x)
+        h1 = num(r"najeci \d+: lordowie (\d+)", vet[d], int, 0) or 0
+        h2 = num(r"karawany (\d+), gracz", vet[d], int, 0) or 0
+        ho = num(r"inne partie (\d+);", vet[d], int, 0) or 0
+        if zk is not None:
+            diffs.append((d, zk, h1 + h2 + ho))
+    if diffs:
+        worst = max(diffs, key=lambda t: abs(t[1] - t[2]))
+        rep.add("E4/10 V7: \"z karczmy\" (Ludzie:) = najeci z puli (lordowie + karawany + inne)", f"najgorsza doba d{run_day(worst[0], start)}: {worst[1]} wobec {worst[2]} ({len(diffs)} dob; pominiete: siew / nieczynne {skip7})",
+                "|roznica| <= 1 kazdej doby", abs(worst[1] - worst[2]) <= 1)
+    else:
+        rep.add("E4/10 V7: z karczmy tylko z puli", "brak linii Ludzie:", "|roznica| <= 1", None)
+    # V8 - INFO najem/d
+    h28 = [num(r"\| najeci (\d+):", vet[d], int, 0) or 0 for d in live if 28 <= run_day(d, start) <= until]
+    hk = [num(r"; konni (\d+); tier karczmy", vet[d], int, 0) or 0 for d in live if 28 <= run_day(d, start) <= until]
+    rep.add(f"E4/10 V8: najem z karczmy d28-{until} (srednio na dobe, w tym konni)", f"{st.mean(h28):.0f}/d (konni {st.mean(hk):.0f}/d)" if h28 else "brak dob 28+",
+            "INFO (z30A 200/d, konni 81/d; plan [S] 30-60/d przy progu tieru 3)", None)
+    # V9 - konni najeci <= konni weterani (siew + wejscia konne); konie z karczmy w Komplet rekruta
+    seedh = num(r"\[siew dnia \d+ - starzy zolnierze z karczm \d+ w \d+ miastach \(konni (\d+)", vet[sd[0]], int, 0) if sd else 0
+    inh = sum(num(r"\(konni (\d+)\) \| uprawnieni", vet[d], int, 0) or 0 for d in live)
+    hh = sum(num(r"; konni (\d+); tier karczmy", vet[d], int, 0) or 0 for d in live)
+    rep.add("E4/10 V9: konni najeci (suma) wobec konnych weteranow (siew + wejscia konne)", f"{hh} wobec {(seedh or 0) + inh}", "najeci <= konni weterani (typ konny tylko z konnego weterana; kon przy najmie dalej z wzorca, kon zwolnionego w zbrojowni pana - krok sprzetu)",
+            hh <= (seedh or 0) + inh)
+    kom = [s for s in lines if s.startswith("Komplet rekruta: dzien")]
+    kh = sum(num(r"konie konnych weteranow z karczmy \(167\) (\d+)", s, int, 0) or 0 for s in kom)
+    kold = sum(num(r"konie i rzedy najemnikow z wzorca \(160\) (\d+)", s, int, 0) or 0 for s in kom)
+    rep.add("E4/10 V9: Komplet rekruta - konie konnych weteranow z karczmy (167) / po staremu (160)", f"{kh} / {kold}", "INFO (przy czynnych weteranach etykieta 167; 160 tylko przed siewem)", None)
+    # V10 - rownanie krain z WETERANI (ta sama liczba co E4/7 T3)
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    rq = [re.search(r"rownanie krain: najgorsza kraina (\S+) reszta " + SF + r" \(" + SF + r"% ludzi krainy\)", kb[d]) for d in live if d in kb]
+    rq = [(m.group(1), float(m.group(3))) for m in rq if m]
+    if rq:
+        w = max(rq, key=lambda x: abs(x[1]))
+        rep.add("E4/10 V10: rownanie krain z kontem WETERANI (najgorsza kraina)", f"{w[0]} {w[1]:+.3f}%", "<= 0.1% kazdej doby (przy RESZCIE hearth != 0 - INFO jak E4/7 T3)", abs(w[1]) <= 0.1)
+    # V11 - karczma E4/7 milknie przy czynnych weteranach
+    poc = e4_series(lines, "Pochodzenie (E4/7): dzien")
+    # recenzja R1-1: bez doby siewu (np. Veterans Enabled wlaczone w kampanii z juz zasianym E4/7 - karczmy E4/7 liczyly 24 h przed siewem)
+    ta = [fnum(r"karczmy AI " + F_ + r", A5", poc[d]) or 0 for d in live if d in poc and vet_on(d)]
+    tp = [fnum(r"karczma gracza " + F_, poc[d]) or 0 for d in live if d in poc and vet_on(d)]
+    vh = [fnum(r"z karczmy \(WETERANI, E4/10\) " + F_, poc[d]) or 0 for d in live if d in poc]
+    if ta or tp:
+        rep.add("E4/10 V11: Pochodzenie - karczmy AI / karczma gracza (E4/7) przy czynnych weteranach; z karczmy (WETERANI)", f"{sum(ta):.0f} / {sum(tp):.0f}; {sum(vh):.0f}",
+                "0 / 0 (Z8 - bez drugiego zdjecia stanu miasta); T2 i T6 - wiersze E4/7", sum(ta) == 0 and sum(tp) == 0)
+    # krzyzowe: do karczmy w liniach wolajacych = wejscia wedlug strumienia (sumy okna; linie z dniem gry - shift 1)
+    def ssum(pref, pat, shift):
+        ser = e4_series(lines, pref, shift)
+        return sum(num(pat, ser[d], int, 0) or 0 for d in ser if 1 <= run_day(d, start) <= until)
+    h3t = ssum("Przegrani (H3): dzien", r", do karczmy \(E4/10\) (\d+) \(rozbici", 1)
+    i1t = ssum("Prawo jenca (I1): dzien", r", do karczmy \(E4/10\) (\d+) \(w tym", 1)
+    b6t = ssum("Budzet rodow (166): dzien", r"z tego do karczmy \(E4/10\) (\d+)", 1)
+    def vsum(name):
+        return sum(num(re.escape(name) + r" (\d+)", vet[d], int, 0) or 0 for d in live)
+    vh3 = vsum("rozbici H3") + vsum("uwolnieni jency")
+    vi1 = vsum("prawo jenca I1") + vsum("zostawieni po bitwie gracza")
+    v166 = vsum("zwolnieni 166")
+    ok = all(abs(a - b) <= max(5, 0.01 * max(a, b)) for a, b in ((h3t, vh3), (i1t, vi1), (b6t, v166)))
+    rep.add("E4/10: do karczmy w liniach H3 / I1 / 166 wobec wejsc linii Weterani (sumy okna)", f"H3 {h3t} vs {vh3}, I1 {i1t} vs {vi1}, 166 {b6t} vs {v166}",
+            "|roznica| <= max(5, 1%) (krawedzie okna)", ok)
+    # wejscia wedlug strumienia (INFO)
+    names = ["zwolnieni 166", "przepelnienie W4c", "rycerze 179", "rozbici H3", "uwolnieni jency", "prawo jenca I1", "zostawieni po bitwie gracza", "rozwiazane partie"]
+    rep.add("E4/10: wejscia do puli wedlug strumienia (suma okna)", ", ".join(f"{n} {vsum(n)}" for n in names), "INFO (plan 0 pkt 14: do domu ok. 515/d, z progiem tieru 3 do karczm 30-60/d)", None)
+    bel = sum(num(r"ponizej tieru \d+ do domu (\d+)", vet[d], int, 0) or 0 for d in live)
+    nt = sum(num(r", bez miasta (\d+)", vet[d], int, 0) or 0 for d in live)
+    rep.add("E4/10: ponizej tieru do domu / bez miasta (suma okna)", f"{bel} / {nt}", "INFO (bez miasta oczekiwane ~0)", None)
+    bk = [num(r"powroty (\d+) po", vet[d], int, 0) or 0 for d in live]
+    pool = [num(r"\| pula (\d+) w", vet[d], int, 0) or 0 for d in live]
+    rep.add("E4/10: pula (pierwsza / ostatnia doba / najwiecej), powroty (suma)", f"{pool[0]} / {pool[-1]} / {max(pool)}, powroty {sum(bk)}", "INFO (plan [S] ok. 1-3 tys.)", None)
+    # V12, V13, V14 - INFO (wiersze E4/7 T9, T10, --grupa etap3)
+    rep.add("E4/10 V12/V13: wojsko lordow d90-120, Ludnosc BK (169c)", "wiersze E4/7 T9 i T10 w tym raporcie", "95-115 tys. (V12); <= +2%/rok (V13)", None)
+    rep.add("E4/10 V14: zloto najmu do miast, progi etapu 3", "--grupa etap3 na tym samym logu (najemnicy z karczmy w ksiedze pieniadza)", "INFO (z30A 43.9 tys. zl/d)", None)
+    # V15 - koszt
+    ms = [fnum(r"\| czas " + F_ + r" ms\.", vet[d]) for d in live]
+    ms = [x for x in ms if x is not None]
+    rep.add("E4/10 V15: koszt (siew, powroty, Sync) srednio / najwiecej", f"{st.mean(ms):.2f} / {max(ms):.2f} ms" if ms else "-", "<= 3 ms/dobe (srednio)", (st.mean(ms) <= 3.0) if ms else None)
+    # V16 - zapis i wczytanie
+    ld = [i for i, x in enumerate(lines) if x.startswith("Weterani (E4/10): z zapisu")]
+    sv = [x for x in lines if x.startswith("Weterani (E4/10): zapis arm_people")]
+    if ld:
+        i = ld[-1]
+        x = lines[i]
+        n = num(r"z zapisu (\d+) ludzi", x)
+        unk = num(r"nieznane miasta (\d+)", x)
+        prev = next((num(r"\| pula (\d+) w", lines[j]) for j in range(i - 1, -1, -1) if lines[j].startswith("Weterani (E4/10): dzien") and "| pula " in lines[j]), None)
+        rep.add("E4/10 V16: wczytanie - pula z zapisu / ostatnia linia przed / nieznane miasta", f"{n} / {prev if prev is not None else '-'} / {unk}",
+                "pula z zapisu = ostatnia linia przed zapisem (gdy w tym samym logu), nieznane miasta 0", unk == 0 and (prev is None or n == prev))
+    else:
+        rep.add("E4/10 V16: wczytanie", "brak linii wczytania (bieg bez zapisu)", "0 bledow, nieznane miasta 0", None)
+    if sv:
+        sz = [num(r"sekcje E4/10 (\d+) znakow", x, int) for x in sv]
+        sz = [x for x in sz if x is not None]
+        rep.add("E4/10 V16: rozmiar sekcji E4/10 w arm_people (pierwszy -> ostatni zapis)", f"{sz[0]} -> {sz[-1]} znakow" if sz else "-", "INFO (plan ok. 65 KB)", None)
+    # V17 - INFO rody najemne
+    hm = sum(num(r"w tym rody najemne (\d+)", vet[d], int, 0) or 0 for d in live)
+    rep.add("E4/10 V17: najem rodow najemnych (suma okna)", hm, "INFO (185 kontrakt, Spoils - linie wlasne)", None)
+    rep.add("E4/10 V18: menu \"People of this land\" - weterani", "proba reczna Jeffa (miasto: In this town's tavern ...)", "INFO - liczba = pula tego miasta", None)
+
 
 def etap4_e44(rep, lines, start, win, hea, lud, until):
     """E4/4 (109n): progi z projektu etapu 4 rozdz. 3 "E4/4" Test (U12) i decyzji Jeffa 11.10 (pokoj +0.2..+0.8%/rok, ciagla wojna do -0.5%/rok).

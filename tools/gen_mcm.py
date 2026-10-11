@@ -89,6 +89,10 @@ RANGES = {
     # E4/8 (164b-2): kara miasta wobec stopy wsi (pkt rocznie) i dni dopelnienia miasta ze wsi (0 = tylko ubytek naturalny)
     'TownGrowthPenaltyPercent': (0.0, 3.0, "0.0"),
     'TownMigrationRefillDays': (0, 1456, "0"),
+    # E4/10 (167): weterani - udzial przycinany w kodzie do 0..1, czekanie od 1 doby (do 3 lat dlugiego roku), tier 1..7
+    'VeteranShareToTavern': (0.0, 1.0, "0.00"),
+    'VeteranWaitDays': (1, 1092, "0"),
+    'VeteranMinTier': (1, 7, "0"),
 }
 
 def gen(module_dir, ns, display):

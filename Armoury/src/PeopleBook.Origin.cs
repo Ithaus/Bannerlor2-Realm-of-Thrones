@@ -39,12 +39,15 @@ namespace Armoury
             FDieBattle = 25, FDiePlague = 26, FDieExec = 27, FDieOthers = 28,
             FRouted = 29, FDesert = 30, FFreed = 31, FRelease166 = 32, FGentry179 = 33, FSold = 34, FReleased = 35, FPatrolPris = 36, FDisband = 37,
             FBandDisband = 38, FCaptureLost = 39, FLootLost = 40, FGone = 41,
-            // E4/8 (164b-2): numery 42-55 (E4/10 zostawia za nimi 10 numerow przerwy). Wejscia (Give): milicja, nowa druzyna, karawany, konwoje morskie, wedrowcy BK,
+            // E4/8 (164b-2): numery 42-55. Wejscia (Give): milicja, nowa druzyna, karawany, konwoje morskie, wedrowcy BK,
             // Straz (do E4/9), ulamek czlowieka bez DOM; przenosiny: milicja z rozwiazanej partii (Give - Take robi E4/7 FDisband), zaloga -> nowa druzyna;
             // wyjscia (Take): milicja bez walki do domu, wedrowcy/konwoje u celu, rozwiazane bez bitwy do domu (R6)
             FMilitiaLevy = 42, FMilitiaDisband = 43, FSpawnLevy = 44, FSpawnGarrison = 45, FCaravan = 46, FCaravanRefill = 47, FRoadOut = 48, FRoadNone = 49,
             FSlavesBk = 50, FWatchArms = 51, FArmsFloor = 52, FMilitiaHome = 53, FRoadEnd = 54, FDisbandHome = 55,
-            FKinds = 56;
+            // E4/10 (167): wejscie z karczmy - najem weterana z puli WETERANI (udzialy pochodzenia z puli; Veterans.OnTavernNumber).
+            // Scalenie calosci etapu 4: w paczce E4/10 bylo 52 (FKinds 53) - przeniesione za E4/8; poza zakresami Part(...) E4/8 (FMilitiaLevy..FArmsFloor, FMilitiaHome..FDisbandHome)
+            FVetHire = 56,
+            FKinds = 57;
         private static readonly string[] FName =
         {
             "wsie", "miasta", "zamki", "karczmy AI", "A5", "gracz", "karczma gracza", "pobor wymuszony",
@@ -56,7 +59,8 @@ namespace Armoury
             "rozwiazane bandy", "wzieci bez odbiorcy", "odbici bez odbiorcy", "przy zniknieciu partii",
             "milicja z wolnych rak", "milicja z rozwiazanej partii we wsi", "nowa druzyna z wolnych rak", "nowa druzyna z zalogi siedziby", "karawany z ludzi osady startu",
             "konwoje morskie z ludzi miasta", "wedrowcy i eskorta BK z DOM", "wedrowcy BK bez pochodzenia", "niewolnicy w konwojach BK (E4/9)", "Straz E4/8 (do E4/9)",
-            "ulamek czlowieka bez DOM (E4/8)", "milicja bez walki do domu", "wedrowcy i konwoje BK u celu", "rozwiazane bez bitwy do domu (R6)"
+            "ulamek czlowieka bez DOM (E4/8)", "milicja bez walki do domu", "wedrowcy i konwoje BK u celu", "rozwiazane bez bitwy do domu (R6)",
+            "z karczmy (WETERANI, E4/10)"
         };
 
         // rodzaj rosteru (nazwy "bez pochodzenia" / "z niczego" / "w nicosc")
@@ -158,6 +162,8 @@ namespace Armoury
         private static Shares _press;                                       // R1-5: pobrani przez pobor wymuszony gracza - czekaja na ekran lupu (do konca doby)
         private static int _deduceCalls, _deduceOutside, _deduceNoWin, _floorCalls;
         private static double _deduceMen, _floorMen;
+        private static int _deduceVetCalls;                                 // E4/10 (Z8): najem z karczmy AI przy VetLive - BK DeduceManpower bez zdjecia z DOM (udzialy z puli)
+        private static double _deduceVetMen, _vDestTake;                    // E4/10: ludzie tych najmow; udzialy zdjete ze SLUZBY (Take wolajacego) do puli WETERANI
         private static int _oStumbles, _oStumblesDay, _badIds, _resolveMissing, _resolveFound;
         private static string _sowNote, _resolveNote;
         private static double _state0 = double.NaN;                         // stan kont (SLUZBA + JENCY) z konca poprzedniej doby (NaN = pierwsza doba sesji)
@@ -202,6 +208,7 @@ namespace Armoury
             Array.Clear(_zBy, 0, KKinds); Array.Clear(_qBy, 0, KKinds); Array.Clear(_deadBy, 0, FKinds);
             _gAll = _tAll = _zAll = _qAll = _gone = _deadCarts = _pendIn = _pendLost = _homeNoVillage = 0;
             _deduceCalls = _deduceOutside = _deduceNoWin = _floorCalls = 0; _deduceMen = _floorMen = 0; _a5Bk = _a5BkFail = 0;
+            _deduceVetCalls = 0; _deduceVetMen = 0; _vDestTake = 0;    // E4/10
             _homeTown = 0; _foldKeys = 0; _foldMen = 0; _pressIn = _pressLost = 0;
             _oStumblesDay = 0;
             _kind.Clear();          // rodzaj partii raz na dobe (Straz, rod - moga sie zmienic)
@@ -1285,6 +1292,7 @@ namespace Armoury
         {
             public double Dom, S, J, Wy, U, Carts;
             public double Road;     // E4/8 (Z9): wedrowcy i eskorta konwojow BK w drodze (slowniki KRoad) - poza S, w rownaniu regionu jak TABOR
+            public double Vet;      // E4/10: WETERANI w karczmach wedlug regionu pochodzenia (konto poza DOM i poza SLUZBA - nie liczy sie do S w R5)
         }
 
         private static Dictionary<string, RegionNum> RegionNow()
@@ -1321,6 +1329,14 @@ namespace Armoury
             sum(_mem, false); sum(_pris, true);
             foreach (var d in _poolOrg.Values)
                 foreach (var kv in d) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Wy += kv.Value; now[kv.Key] = x; }
+            // E4/10 (Z10): konto WETERANI w rownaniu regionu (wejscie SLUZBA -> WETERANI, siew DOM miasta -> WETERANI, powrot WETERANI -> DOM, najem WETERANI -> SLUZBA)
+            try
+            {
+                var vet = new Dictionary<string, double>();
+                VetByRegion(vet);
+                foreach (var kv in vet) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Vet += kv.Value; now[kv.Key] = x; }
+            }
+            catch (Exception e) { OStumble("RegionNow(weterani)", e); }
             try
             {
                 foreach (var mp in MobileParty.AllVillagerParties)
@@ -1340,6 +1356,7 @@ namespace Armoury
         {
             public string Id; public Settlement Node; public string Realm;
             public double Dom, S, J, Wy, U, Carts, DomRef, LRef, Fallen, FallenMen, Civil, Born, Enslaved, ToWall, Rest;
+            public double Vet;      // E4/10: weterani tej krainy czekajacy w karczmach (menu, rownanie)
             public int Villages; public double VillagePeople, TownPeople;
             public double Road, MigIn, MigOut;     // E4/8: w drodze (wedrowcy i konwoje BK), migracja od siewu
         }
@@ -1370,7 +1387,7 @@ namespace Armoury
                 var v = new RegionView
                 {
                     Id = kv.Key, Node = node, Realm = FreeHands.RealmOf(node),
-                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road
+                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road, Vet = x.Vet
                 };
                 if (r != null)
                 {
@@ -1379,7 +1396,8 @@ namespace Armoury
                     // rownanie regionu (5): stan - stan siewu - narodziny + polegli + cywile + niewola + Mur = reszta (ludzie z niczego / w nicosc w regionie)
                     // recenzja E4/7 R2-3: minus Drift (ludzie przeniesieni do/z regionu przy przycieciu kluczy - ksiegowanie, nie ruch ludzi)
                     // E4/8 (10.5): + w drodze (wedrowcy BK; w dniu siewu bez pochodzenia - 0) + MigOut - MigIn (wedrowcy u celu w innym regionie)
-                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef) - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall - r.Drift
+                    // E4/10 (Z10): + WETERANI (bez stanu w dniu siewu E4/7: pula zaklada sie po nim, a przed siewem E4/7 ma tylko udzialy "" - poza regionami)
+                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef) - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall - r.Drift
                              + r.MigOut - r.MigIn;
                 }
                 try
@@ -1447,6 +1465,7 @@ namespace Armoury
             double back = 0, backH = 0;
             for (int i = MBackH3; i <= MBackDisband; i++) { back += men[i]; backH += hh[i]; }
             back += men[MBackTown];                                         // R1-1: do stanu miasta (bez hearth)
+            back += men[MBackVeteran]; backH += hh[MBackVeteran];          // E4/10: weterani po czasie czekania (czesc do stanu miasta jest w MBackTown)
             // rownanie krain (suma regionow kultury regionu)
             var realms = new Dictionary<string, double[]>();
             double world = 0;
@@ -1454,7 +1473,7 @@ namespace Armoury
             {
                 double[] a; string rk = v.Realm ?? "?";
                 if (!realms.TryGetValue(rk, out a)) { a = new double[2]; realms[rk] = a; }
-                a[0] += v.Rest; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road;
+                a[0] += v.Rest; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet;
                 world += v.Rest;
             }
             string worst = "-"; double worstRest = 0, worstPc = 0;
@@ -1500,7 +1519,8 @@ namespace Armoury
             if (_sowNote != null && _sowDay == day) sb.Append(" [").Append(_sowNote).Append(']');
             sb.Append(" | wejscia: pobor z DOM ").Append(M0(Sum(_fIn, FLevyVillage, FPress))).Append(" (").Append(Part(_fIn, FLevyVillage, FPress)).Append(")")
               .Append(", z puli do band ").Append(M0(_fIn[FPoolBand])).Append(" (w tym narodziny band z oczekujacych ").Append(M0(_pendIn)).Append(")")
-              .Append(", bez pochodzenia ").Append(M0(Sum(_fIn, FNoneMap, FNoneOff))).Append(" (").Append(Part(_fIn, FNoneMap, FNoneOff)).Append(")");
+              .Append(", bez pochodzenia ").Append(M0(Sum(_fIn, FNoneMap, FNoneOff))).Append(" (").Append(Part(_fIn, FNoneMap, FNoneOff)).Append(")")
+              .Append(", z karczmy (WETERANI, E4/10) ").Append(M0(_fIn[FVetHire]));
             if (_pressIn > 0 || _pressLost > 0)
                 sb.Append(", pobor wymuszony gracza: zdjeci z DOM ").Append(M0(_pressIn)).Append(", wzieci z ekranu lupu ").Append(M0(_fIn[FPress])).Append(", niewzieci (poza rosterem) ").Append(M0(_pressLost));
             sb.Append(" | przenosiny: ").Append(Part(_fIn, FToGarrison, FPrisRecruit));
@@ -1515,7 +1535,8 @@ namespace Armoury
               .Append(", bez pochodzenia do BK/szablonu/nicosci ").Append(M0(_dest[OHomeLegacy]))
               .Append(", do puli ").Append(M0(_dest[OPool])).Append(", na Mur ").Append(M0(_dest[OWall])).Append(", do niewoli ").Append(M0(_dest[OSlave]))
               .Append(", w nicosc nazwana (rozbici bez puli, bez domu) ").Append(M0(_dest[OLost]))
-              .Append(", do rosterow bez ksiegi (tabory, Inni, konwoje BK, lup gracza - P2) ").Append(M0(_dest[ODrop]));
+              .Append(", do rosterow bez ksiegi (tabory, Inni, konwoje BK, lup gracza - P2) ").Append(M0(_dest[ODrop]))
+              .Append(", do karczmy (WETERANI, E4/10) ").Append(M0(_vDestTake));
             sb.Append(" | bez nazwy: z niczego +").Append(M0(_zAll)).Append(" (");
             f = true;
             for (int k = 0; k < KKinds; k++) { if (_zBy[k] <= 0) continue; sb.Append(f ? "" : ", ").Append(KName[k]).Append(' ').Append(M0(_zBy[k])); f = false; }
@@ -1537,6 +1558,7 @@ namespace Armoury
             sb.Append(" | DeduceManpower: wywolan ").Append(_deduceCalls).Append(" (ludzi ").Append(M0(_deduceMen)).Append("), poza oknem ").Append(_deduceOutside).Append(", gracz bez okna ").Append(_deduceNoWin)
               .Append(", pobor na podlodze ").Append(_floorCalls).Append(" (ludzi ").Append(M0(_floorMen)).Append(")")
               .Append(", A5 z klasa BK (DeduceManpower) ").Append(_a5Bk).Append(_a5BkFail > 0 ? " (bledy " + _a5BkFail + ")" : "")
+              .Append(", karczma AI z puli weteranow (E4/10 - bez zdjecia z DOM) ").Append(_deduceVetCalls).Append(" (ludzi ").Append(M0(_deduceVetMen)).Append(")")
               .Append(" | pobor z DOM LevyLive: ").Append(LevyLive ? "TAK" : "NIE (ksiega pochodzenia bez zdejmowania)");
             if (_resolveNote != null) { sb.Append(" | wczytanie: ").Append(_resolveNote); _resolveNote = null; }
             if (_badIds > 0) sb.Append(" | nie zapisane (znaki w id) ").Append(_badIds);

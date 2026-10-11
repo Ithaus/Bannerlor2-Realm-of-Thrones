@@ -142,7 +142,7 @@ namespace Armoury
                     if (n <= 0) continue;
                     if (Undead.Character(ch)) continue;          // wight w partii ludzi (ROT occupation="Soldier") - nie do ludnosci BK, niezaleznie od W4b
                     PeopleBook.Shares cut = org != null ? org.Cut(n) : null;      // E4/7: udzial pochodzenia tych n (nieprzyjeci - z powrotem do org, do puli)
-                    bool ok = village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c, cut);
+                    bool ok = village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c, cut, party);     // E4/10 (W1): partia - uprawnienie weterana
                     if (!ok && cut != null) org.AddAll(cut);
                     if (ok)
                     {

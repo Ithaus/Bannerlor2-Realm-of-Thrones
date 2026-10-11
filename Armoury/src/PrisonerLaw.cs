@@ -67,6 +67,7 @@ namespace Armoury
         // liczniki doby
         private static readonly int[] _in = new int[Ss];
         private static int _westeros, _freeOther, _home, _homeBk, _homeVillage, _homeTpl, _wall, _wallMissing, _pool, _vanished, _undead, _executed;
+        private static int _tavern, _tavernLoot;            // E4/10 (W4): do karczmy zamiast do domu (prawo jenca I1; z tego zostawieni po bitwie gracza)
         // I1b: _slavePlayer - sprzedaz gracza w krainie z niewola, niewolnicy osady (wliczeni w _slaves); _slaveFree - w krainie z niewola
         // wolni (wypuszczeni przez gracza, zostawieni po jego bitwie, sprzedaz przy Forgiveness, sprzedaz gracza bez Enslavement), do domu
         // przez Route; _slaveOther - sprzedaz AI w krainie z niewola przy nieodczytanej polityce (BK jak dotad); _executed - Execution (AI i gracz)
@@ -103,6 +104,7 @@ namespace Armoury
         {
             Array.Clear(_in, 0, Ss);
             _westeros = _freeOther = _home = _homeBk = _homeVillage = _homeTpl = _wall = _wallMissing = _pool = _vanished = _undead = _executed = 0;
+            _tavern = _tavernLoot = 0;
             _slaves = _slavesPatrol = _slaveOther = _slavePlayer = _slaveFree = _stumbles = 0;
             _woundedOnce = _slavesBkOld = _slavesBkOldWounded = _lootRelSkipped = 0;
             _wallBy.Clear(); _slavesBy.Clear();
@@ -197,6 +199,10 @@ namespace Armoury
                     if (n <= 0) return;
                     _wallMissing += n;                                           // Muru nie ma / BK nie przyjal - do domu jak reszta
                 }
+                // E4/10 (W4, R16): po Murze (przestepcy tam pierwsi - R14) 1/3 uprawnionych do karczmy najblizszego miejscu sprzedazy/bitwy miasta (pos przed LawHomePos)
+                int vt = PeopleBook.VetDivert(null, troop, n, pos, src == SLoot ? PeopleBook.VLootFree : PeopleBook.VLaw, sh);
+                if (vt > 0) { _tavern += vt; if (src == SLoot) _tavernLoot += vt; n -= vt; }
+                if (n <= 0) return;
                 int cat;
                 int got = LosersFlee.SendHome(null, troop, n, pos, null, LosersFlee.SrcLaw, out cat, sh);
                 if (got > 0)
@@ -473,6 +479,10 @@ namespace Armoury
             {
                 _in[SLootFreed] += n;
                 if (Undead.Character(troop)) { _undead += n; return; }
+                // E4/10 (W4): wolny zostawiony po bitwie gracza - 1/3 uprawnionych do karczmy najblizszego miasta (bez konia - jeniec; bez udzialow - "")
+                int vt = PeopleBook.VetDivert(null, troop, n, pos, PeopleBook.VLootFree, null);
+                if (vt > 0) { _tavern += vt; _tavernLoot += vt; n -= vt; }
+                if (n <= 0) return;
                 int cat;
                 int got = LosersFlee.SendHome(null, troop, n, pos, null, LosersFlee.SrcLaw, out cat);
                 if (got > 0)
@@ -521,6 +531,7 @@ namespace Armoury
                   .Append(", z szablonu ").Append(_homeTpl).Append("), na Mur ").Append(_wall).Append(" (").Append(Join(_wallBy)).Append(')')
                   .Append(", przestepcy bez Muru (do domu) ").Append(_wallMissing)
                   .Append(", bez domu: do puli wyrzutkow ").Append(_pool).Append(", znikneli ").Append(_vanished)
+                  .Append(", do karczmy (E4/10) ").Append(_tavern).Append(" (w tym zostawieni po bitwie gracza ").Append(_tavernLoot).Append(')')
                   .Append(", Inni (wighty - do niczego) ").Append(_undead).Append(", straceni (polityka Execution osady - wybor gracza; sprzedaz AI i gracza, kazda kraina) ").Append(_executed);
                 sb.Append(" | wedlug zrodla:");
                 for (int i = 0; i < Ss; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(_in[i]);

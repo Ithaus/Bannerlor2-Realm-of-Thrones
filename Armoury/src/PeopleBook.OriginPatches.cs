@@ -108,6 +108,9 @@ namespace Armoury
                 }
                 NoteDeduce(__1, party == null, noWin);
                 if (party == null || st == null) return;
+                // E4/10 (Z8a): najem z karczmy AI przy czynnych weteranach - najemnik to weteran z puli WETERANI (udzialy pochodzenia daje Veterans.OnTavernNumber przez
+                // Give FVetHire), nie czlowiek z DOM miasta; bez tego stan miasta schodzilby drugi raz i SLUZBA dostalaby go podwojnie. BK zdejmuje swoja klase sam (sklad).
+                if (!player && __3 == null && st.IsTown && Veterans.InTavernHire && VetLive) { _deduceVetCalls++; _deduceVetMen += __1; return; }
                 var roster = party.MemberRoster;
                 if (CrownGifts.IsWatchParty(party) || (st.Culture != null && st.Culture.StringId == "nightswatch")) { GiveNone(roster, __1, FNoneWatch); return; }
                 if (!LevyLive) { GiveNone(roster, __1, FNoneOff); return; }
@@ -197,7 +200,8 @@ namespace Armoury
         }
 
         // ================================================================ karczma gracza (3.5) - wlasny dialog gry, bez BK
-        public static void TavernPre(out int __state) { __state = OriginLive && MobileParty.MainParty != null ? Men(MobileParty.MainParty.MemberRoster) : -1; }
+        // E4/10 (Z8b): przy czynnych weteranach karczma gracza milknie - najemnik to weteran z puli (Veterans.OnTavernNumber - Give FVetHire), bez "stan miasta -1" i GiveNew
+        public static void TavernPre(out int __state) { __state = OriginLive && !VetLive && MobileParty.MainParty != null ? Men(MobileParty.MainParty.MemberRoster) : -1; }
 
         public static void TavernPost(int __state)
         {
@@ -378,7 +382,8 @@ namespace Armoury
         }
 
         // ================================================================ rozwiazanie partii (4.3) - zdarzenie gry przed zniszczeniem partii
-        public struct DisbandState { public bool On; public int M, P, G; public MobileParty Gar; public int Mil; public MobileParty MilParty; }
+        // Types: E4/10 (Z7) - sklad wedlug typu; Mil/MilParty: E4/8 (5.6) - milicja wsi przed rozwiazaniem
+        public struct DisbandState { public bool On; public int M, P, G; public MobileParty Gar; public int Mil; public MobileParty MilParty; public List<KeyValuePair<CharacterObject, int>> Types; }
 
         public static void DisbandPre(MobileParty __0, Settlement __1, out DisbandState __state)
         {
@@ -389,7 +394,7 @@ namespace Armoury
                 int kd = KindOf(__0);
                 if (kd < 0 || kd == KRoad) return;     // tabor/lodz (R18 - PeopleBook.OnPartyDestroyed), konwoj BK (E4/8 - ArmsPartyGone), Inni - bez slownika skladu; bez drugiego powrotu
                 var g = __1 != null && __1.Town != null ? __1.Town.GarrisonParty : null;
-                __state = new DisbandState { On = true, M = Men(__0.MemberRoster), P = Men(__0.PrisonRoster), Gar = g, G = g != null ? Men(g.MemberRoster) : 0, Mil = -1 };
+                __state = new DisbandState { On = true, M = Men(__0.MemberRoster), P = Men(__0.PrisonRoster), Gar = g, G = g != null ? Men(g.MemberRoster) : 0, Mil = -1, Types = VetTypes(__0.MemberRoster) };
                 // E4/8 (5.6): rozwiazana we wsi - gra dopisuje milicji 0.5 x sklad (MergeDisbandPartyToVillage); szeregowi milicji przed
                 if (__1 != null && __1.IsVillage && ArmsFromPeople.MilitiaOn)
                 {
@@ -429,7 +434,11 @@ namespace Armoury
                         }
                         catch (Exception e) { OStumble("DisbandPost(E4/8 milicja)", e); mil = 0.0; }
                     }
-                    HomeOrNote(org, gone - mil, MBackDisband, -1);
+                    // E4/10 (W5, R16): rozwiazani wedlug typu - 1/3 uprawnionych (od tieru VeteranMinTier) do karczmy najblizszego miasta, reszta do DOM jak dotad.
+                    // Scalenie calosci: z tych, ktorzy nie zostali w milicji wsi (gone - mil) - typy proporcjonalnie (VetDisband dzieli want = gone - mil wedlug skladu M)
+                    double vet = 0;
+                    try { vet = VetDisband(__0, __state.Types, __state.M, gone - mil, org); } catch (Exception e) { OStumble("DisbandPost(E4/10)", e); vet = 0; }
+                    if (gone - mil - vet > Eps) HomeOrNote(org, gone - mil - vet, MBackDisband, -1);
                 }
                 // loch we wsi wyczyszczony (P2: "jency w nicosc - rozwiazane we wsi"); w warowni - okno sprzedazy (SellPrisonersAction)
                 double pSum = OrgSum(__0.PrisonRoster);

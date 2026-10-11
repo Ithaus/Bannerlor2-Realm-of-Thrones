@@ -878,9 +878,12 @@ namespace Armoury
             double e8Car = mv[PeopleBook.MCaravanOut] + mv[PeopleBook.MCaravanRefill], e8RoadOut = mv[PeopleBook.MRoadOut], e8RoadIn = mv[PeopleBook.MRoadIn] + mv[PeopleBook.MRoadBack];
             double e8Mig = mv[PeopleBook.MTownMigrate];        // rozwiazane bez bitwy do domu (R6) - MBackDisband, w o11
             double o13 = e8Mil + e8MilHome + e8Spawn + e8Car + e8RoadOut + e8RoadIn + e8Mig;
+            // E4/10: weterani niewynajeci po czasie czekania wracaja do DOM regionu pochodzenia (z hearth, jak MBack*) - inaczej RESZTA hearth wchlonie te powroty
+            // (scalenie calosci etapu 4: w paczce E4/10 bylo o13 - o13 zajal E4/8)
+            double o14 = mv[PeopleBook.MBackVeteran];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 + o14 - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -917,7 +920,8 @@ namespace Armoury
                   .Append(", glod (E4/6: zmarli i uciekli z glodu) ").Append(S(o12))
                   .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11))
                   .Append(", nasze (E4/8): milicja z wolnych rak ").Append(S(e8Mil)).Append(", milicja do domu ").Append(S(e8MilHome)).Append(", nowe druzyny ").Append(S(e8Spawn))
-                  .Append(", karawany ").Append(S(e8Car)).Append(", wedrowcy BK ").Append(S(e8RoadOut)).Append("/").Append(S(e8RoadIn)).Append(", migracja do miast ").Append(S(e8Mig));
+                  .Append(", karawany ").Append(S(e8Car)).Append(", wedrowcy BK ").Append(S(e8RoadOut)).Append("/").Append(S(e8RoadIn)).Append(", migracja do miast ").Append(S(e8Mig))
+                  .Append(", powroty weteranow (E4/10) +").Append(F2(o14));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

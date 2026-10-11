@@ -84,10 +84,14 @@ namespace Armoury
                            // MBackH3..MBackDisband musza zostac kolejno (petle w Measure40 i OriginSegment)
                            MLevyVillage = 23, MLevyA5 = 24, MBackH3 = 25, MBack166 = 26, MBackW4c = 27, MBack179 = 28, MBackPool = 29, MBackFreed = 30, MBackDisband = 31,
                            MLevyTown = 32, MBackTown = 33,
-                           // E4/8 (164b-2): numery 34-45 (pierwsze wolne po scaleniu E4/6 + E4/7; E4/10 zostawia za nimi 10 numerow przerwy) - wojsko z ludzi
+                           // E4/8 (164b-2): numery 34-45 (pierwsze wolne po scaleniu E4/6 + E4/7) - wojsko z ludzi
                            // (milicja, nowe druzyny, karawany, konwoje morskie), wedrowcy i konwoje BK (R19), miasta (R2) - PeopleBook.Arms.cs, ArmsFromPeople.cs, TownGrowth.cs
                            MLevyMilitia = 34, MBackMilitia = 35, MBackMilitiaNone = 36, MLevySpawn = 37, MCaravanOut = 38, MCaravanRefill = 39,
-                           MRoadOut = 40, MRoadIn = 41, MRoadBack = 42, MRoadNone = 43, MTownMigrate = 44, MTownNatural = 45, MKinds = 46;
+                           MRoadOut = 40, MRoadIn = 41, MRoadBack = 42, MRoadNone = 43, MTownMigrate = 44, MTownNatural = 45,
+                           // E4/10 (167): weterani niewynajeci po 120 dobach do DOM regionu pochodzenia (z hearth, jak MBack*) i starzy zolnierze z karczm w dniu siewu
+                           // (ze stanu ludzi miasta E4/4 - stan miasta, bez hearth). Wejscie SLUZBA -> WETERANI i najem WETERANI -> SLUZBA to nie ruchy DOM (liczniki E4/10).
+                           // Scalenie calosci etapu 4: w paczce E4/10 bylo 44/45 (MKinds 46) - przeniesione za E4/8
+                           MBackVeteran = 46, MVetStart = 47, MKinds = 48;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -105,7 +109,8 @@ namespace Armoury
             "milicja z wolnych rak (E4/8)", "milicja bez walki do domu (E4/8)", "milicja bez pochodzenia do domu (E4/8 - bez hearth)",
             "nowa druzyna z wolnych rak regionu siedziby (E4/8)", "karawana z ludzi osady startu (E4/8)", "konwoj morski uzupelniony z miasta (E4/8)",
             "wedrowcy i eskorta BK - wyjazd (R19)", "wedrowcy BK u celu (R19)", "wedrowcy i eskorta BK z powrotem w domu (R19)", "wedrowcy BK bez pochodzenia (R19 - bez hearth)",
-            "migracja ze wsi do miasta (R2)", "narodziny i zgony miast (R2 - stan miasta)" };
+            "migracja ze wsi do miasta (R2)", "narodziny i zgony miast (R2 - stan miasta)",
+            "weterani niewynajeci po czasie czekania do domu (E4/10)", "starzy zolnierze z ludzi miast do karczm (siew E4/10, stan miasta E4/4)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
@@ -115,7 +120,8 @@ namespace Armoury
                                                    true, true, false,
                                                    true, true, true, true, true, true, true, true, true, false, false,
                                                    // E4/8: wies ruszana (miasto - stan miasta przez TownShift, bez hearth); "bez pochodzenia" i narodziny miast - tylko licznik
-                                                   true, true, false, true, true, true, true, true, true, false, true, false };
+                                                   true, true, false, true, true, true, true, true, true, false, true, false,
+                                                   true, false };                                                            // E4/10: MBackVeteran (hearth), MVetStart (stan miasta)
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -160,6 +166,7 @@ namespace Armoury
             try { Famine.Reset(); } catch (Exception e) { Stumble("Reset(E4/6)", e); }      // E4/6: spichlerze - stan tej samej sekcji zapisu
             try { ResetOrigin(); } catch (Exception e) { Stumble("Reset(E4/7)", e); }     // E4/7: konta SLUZBA/JENCY z pochodzeniem, rg:, siew - nowa kampania od zera
             try { ResetArms(); } catch (Exception e) { Stumble("Reset(E4/8)", e); }       // E4/8: odniesienia miast tr:, liczniki ruchow stanu miast
+            try { ResetVeterans(); } catch (Exception e) { Stumble("Reset(E4/10)", e); }  // E4/10: konto WETERANI (pula karczm), siew, akumulatory - nowa kampania od zera
         }
 
         /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
@@ -222,6 +229,8 @@ namespace Armoury
             try { ExportOrigin(sb); } catch (Exception e) { Stumble("Export(E4/7)", e); }
             // E4/8 (R2): odniesienia miast "tr:" - tylko gdy zalozone (bez sekcji = stary zapis, odniesienie zalozy sie w pierwszej dobie)
             try { ExportArms(sb); } catch (Exception e) { Stumble("Export(E4/8)", e); }
+            // E4/10 (167): konto WETERANI (vs: vt: vh:) - tylko po siewie (bez sekcji = siew przy pierwszej dobie)
+            try { ExportVeterans(sb); } catch (Exception e) { Stumble("Export(E4/10)", e); }
             return sb.ToString();
         }
 
@@ -280,6 +289,7 @@ namespace Armoury
             try { Famine.Clear(); } catch (Exception e) { Stumble("Import(E4/6 czyszczenie)", e); }   // E4/6: zapis bez "f:" - spichlerze zaloza sie przy pierwszej dobie
             try { ResetOrigin(); } catch (Exception e) { Stumble("Import(E4/7 reset)", e); }   // E4/7: stary zapis bez sekcji - siew przy pierwszej dobie
             try { ResetArms(); } catch (Exception e) { Stumble("Import(E4/8 reset)", e); }     // E4/8: zapis bez "tr:" - odniesienia miast zaloza sie w pierwszej dobie
+            try { ResetVeterans(); } catch (Exception e) { Stumble("Import(E4/10 reset)", e); }   // E4/10: stary zapis bez vs: - siew przy pierwszej dobie
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
@@ -287,6 +297,8 @@ namespace Armoury
                 {
                     // E4/7: dwuliterowe przedrostki (sw: so: jo: wo: rg:) - nie koliduja z "s:" konta CIALA; czytane pierwsze
                     if (part.Length > 3 && part[2] == ':' && ImportOriginPart(part)) continue;
+                    // E4/10: vs: vt: vh: (drugi znak inny niz ':' - "v:" k na osade ich nie lapie)
+                    if (part.Length > 3 && part[2] == ':' && ImportVeteransPart(part)) continue;
                     if (part.StartsWith("s:", StringComparison.Ordinal))
                     {
                         var a = part.Substring(2).Split(';');
@@ -376,6 +388,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Import", e); }
+            try { VetAfterImport(); } catch (Exception e) { Stumble("Import(E4/10)", e); }      // E4/10: pula z zapisu - stan do kontroli pierwszej doby
         }
 
         private static double Num(string[] a, int i)
@@ -997,6 +1010,8 @@ namespace Armoury
             // E4/7 (164b-1): siew, uzgodnienie doby, cache wolnych rak - PRZED linia "Ludzie (ksiega)" (jej odcinek E4/7 czyta wynik); linie E4/7 po niej
             long tOrigin = System.Diagnostics.Stopwatch.GetTimestamp();
             try { OriginDaily(day); } catch (Exception e) { Stumble("Daily(E4/7)", e); }
+            // E4/10 (167): siew puli weteranow (po siewie E4/7), powroty po czasie czekania, synchronizacja karczm - PO uzgodnieniu E4/7, PRZED linia "Ludzie (ksiega)"
+            try { VetDaily(day); } catch (Exception e) { Stumble("Daily(E4/10)", e); }
             try
             {
                 EnsureOpening();
@@ -1033,6 +1048,7 @@ namespace Armoury
                     try { if (rseg.Has) sb.Append(RefSegment(rseg)); } catch (Exception e) { Stumble("Daily(E4/5 odcinek)", e); }
                     try { sb.Append(PeopleUnit.DayNote()); } catch (Exception e) { Stumble("Daily(PeopleUnit)", e); }
                     try { sb.Append(OriginSegment()); } catch (Exception e) { Stumble("Daily(E4/7 odcinek)", e); }
+                    try { sb.Append(VetSegment()); } catch (Exception e) { Stumble("Daily(E4/10 odcinek)", e); }
                     if (_stumblesDay > 0) sb.Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(", pierwszy blad kazdego miejsca w logu)");
                     sb.Append('.');
                     Log.Info(sb.ToString());
@@ -1040,8 +1056,10 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             try { if (log) OriginLines(day, tOrigin); } catch (Exception e) { Stumble("Daily(E4/7 linie)", e); }
+            try { if (log) VetLine(day); } catch (Exception e) { Stumble("Daily(E4/10 linia)", e); }       // E4/10: "Weterani (E4/10)" zaraz po "Pochodzenie (E4/7)"
             try { OriginEndDay(); } catch (Exception e) { Stumble("Daily(E4/7 koniec doby)", e); }
             try { ArmsCloseDay(); } catch (Exception e) { Stumble("Daily(E4/8 koniec doby)", e); }   // E4/8: ruch DOM przyczynami E4/8 tej doby - do kontroli linii "Wojsko z ludzi (E4/8)"
+            try { VetEndDay(); } catch (Exception e) { Stumble("Daily(E4/10 koniec doby)", e); }
             Array.Clear(_in, 0, CKinds); Array.Clear(_out, 0, CKinds); Array.Clear(_dead, 0, _dead.Length);
             _stumblesDay = 0; _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); _disbandNoVillage = 0; }
@@ -1087,7 +1105,7 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown || i == MTownNatural ? "stan miasta" : "bez hearth (bez pochodzenia)")));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown || i == MTownNatural || i == MVetStart ? "stan miasta" : "bez hearth (bez pochodzenia)")));
                 any = true;
             }
             if (!any) sb.Append(" brak");
@@ -1102,7 +1120,8 @@ namespace Armoury
               .Append("), ClanBudget.ToVillage ").Append(M0(men[M166] + men[MW4c] + men[M179])).Append(" (166 ").Append(M0(men[M166])).Append(", W4c ").Append(M0(men[MW4c]))
               .Append(", 179 ").Append(M0(men[M179])).Append("; SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje z DOM), OutlawLaw.ReturnHome ")
               .Append(M0(men[MPoolHome])).Append(" (tylko z puli; prosci i bandyci z LosersFlee policzeni w punkcie LosersFlee.SendHome)")
-              .Append("; E4/7 z pochodzeniem (hearth regionu pochodzenia) ").Append(M0(backE47)).Append(men[MBackTown] > 0 ? " (w tym do stanu miasta " + M0(men[MBackTown]) + ")" : "");
+              .Append("; E4/7 z pochodzeniem (hearth regionu pochodzenia) ").Append(M0(backE47)).Append(men[MBackTown] > 0 ? " (w tym do stanu miasta " + M0(men[MBackTown]) + ")" : "")
+              .Append(men[MBackVeteran] > 0 || men[MVetStart] > 0 ? "; E4/10 weterani: po czasie czekania do DOM regionu pochodzenia (hearth) " + M0(men[MBackVeteran]) + ", siew z ludzi miast do karczm " + M0(men[MVetStart]) : "");
             if (noVil > 0) sb.Append(" | rozwiazane tabory bez wsi domowej (znikneli) ").Append(noVil);
             sb.Append(" | k na osade: ").Append(_kvSet ? (_kvNote ?? (_kv.Count + " osad")) : "jeszcze nie zalozone (przed kalibracja)")
               .Append(", osad z kultura inna niz w dniu kalibracji ").Append(cultMoved).Append(" (ludzie bez zmian - U3), osad bez przelicznika ").Append(noK);

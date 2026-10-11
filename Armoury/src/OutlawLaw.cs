@@ -601,6 +601,7 @@ namespace Armoury
         private static float _h3BackCommon, _h3BackBandit, _h3BackTemplate;
         // poprawki po przegladzie: wighty Innych (rozbici - do niczego; klucze puli - wygasaja do niczego), reszty kluczy zolnierzy ponizej 1 czlowieka
         private static int _h3Undead, _h3FracKeys, _h3FracSent;
+        private static int _h3Tavern;           // E4/10 (W2, recenzja R1-3/R2-2): rozbici, ktorzy staneli w karczmie - w kontroli kodu "rozbici = las + domy + bez domu + karczma + Inni"
         private static float _h3BackUndead, _h3FracMass;
         private static bool _errH3;
         private static readonly Dictionary<string, Settlement> _hearthRegion = new Dictionary<string, Settlement>();
@@ -609,7 +610,7 @@ namespace Armoury
         {
             _h3Routed = _h3Pool = _h3PoolArmy = _h3PoolBand = _h3PoolGarr = _h3HomeBk = _h3HomeVillage = _h3HomeTemplate = _h3Homeless = _h3Vanished = _h3Stumbles = 0;
             _h3BackBk = 0; _h3BackCommon = _h3BackBandit = _h3BackTemplate = 0f;
-            _h3Undead = _h3FracKeys = _h3FracSent = 0; _h3BackUndead = _h3FracMass = 0f;
+            _h3Undead = _h3FracKeys = _h3FracSent = _h3Tavern = 0; _h3BackUndead = _h3FracMass = 0f;
         }
 
         /// <summary>H3: n ludzi do puli regionu w swoim typie (liczby calkowite; "bez domu" i uwolnieni jency bez odbiorcy).</summary>
@@ -663,7 +664,7 @@ namespace Armoury
             var pos = me.Position.ToVec2();
             var region = NearestNode(pos);
             LosersFlee.BeginBattle();
-            int pool = 0, bk = 0, village = 0, template = 0, homeless = 0, routed = 0, undead = 0;
+            int pool = 0, bk = 0, village = 0, template = 0, homeless = 0, routed = 0, undead = 0, tavern = 0;
             foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
             {
                 if (side == null) continue;
@@ -703,6 +704,10 @@ namespace Armoury
                             }
                             int rest = n - Math.Max(0, toPool);
                             if (rest <= 0) continue;
+                            // E4/10 (W2, R16): z rozbitych wracajacych do domu 1/3 uprawnionych (od tieru VeteranMinTier) staje w karczmie najblizszego miasta (nie rzuca)
+                            int vt = PeopleBook.VetDivert(mp, e.Character, rest, pos, PeopleBook.VH3, slice);
+                            if (vt > 0) { rest -= vt; tavern += vt; }
+                            if (rest <= 0) continue;
                             int cat;
                             int got = LosersFlee.SendHome(mp, e.Character, rest, pos, fac, LosersFlee.SrcRouted, out cat, slice);
                             if (got > 0)
@@ -719,11 +724,12 @@ namespace Armoury
                     catch (Exception ex) { _h3Stumbles++; if (!_errH3) { _errH3 = true; Log.Error("OutlawLaw.RoutedH3", ex); } }
                 }
             }
-            _h3Routed += routed; _h3Pool += pool; _h3HomeBk += bk; _h3HomeVillage += village; _h3HomeTemplate += template; _h3Homeless += homeless; _h3Undead += undead;
+            _h3Routed += routed; _h3Pool += pool; _h3HomeBk += bk; _h3HomeVillage += village; _h3HomeTemplate += template; _h3Homeless += homeless; _h3Undead += undead; _h3Tavern += tavern;
             _inRouted += pool + (law && region != null ? homeless : 0);
             LosersFlee.NoteHomeless(homeless, law && region != null);
             LosersFlee.NoteUndead(undead);
-            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead);
+            LosersFlee.NoteTavern(tavern, LosersFlee.SrcRouted);         // E4/10: rozbici do karczmy (kontrola: rozbici = pula + domy + bez domu + do karczmy)
+            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead, tavern);
         }
 
         internal static void OnVillageLooted(Village v)
@@ -1224,13 +1230,14 @@ namespace Armoury
                         else plain += kv.Value;
                     }
                 // kontrola kodu (nie niezalezne sprawdzenie - liczy sie z tych samych licznikow; wychwyci tylko wyjatek w srodku elementu)
-                int diff = _h3Routed - (_h3Pool + _h3HomeBk + _h3HomeVillage + _h3HomeTemplate + _h3Homeless + _h3Undead);
+                int diff = _h3Routed - (_h3Pool + _h3HomeBk + _h3HomeVillage + _h3HomeTemplate + _h3Homeless + _h3Tavern + _h3Undead);
                 var ci = CultureInfo.InvariantCulture;
                 return " H3 (przegrani uchodza): sklad puli wedlug zawodu - zolnierze " + (int)sold + ", bandyci " + (int)band + ", prosci " + (int)plain + ", straz karawan " + (int)guard
                        + ", Inni (wighty, stare) " + undead.ToString("0.0", ci)
                        + " | rozbici z bitew dzis " + _h3Routed + " = w las " + _h3Pool + " (wojsko " + _h3PoolArmy + ", bandy " + _h3PoolBand + ", zalogi " + _h3PoolGarr + ")"
                        + " + do domu " + (_h3HomeBk + _h3HomeVillage + _h3HomeTemplate) + " (ludnosc BK " + _h3HomeBk + ", do wsi " + _h3HomeVillage + ", z szablonu " + _h3HomeTemplate + ")"
                        + " + bez domu (do puli) " + (_h3Homeless - _h3Vanished) + (_h3Vanished > 0 ? ", znikneli " + _h3Vanished : "")
+                       + " + do karczmy (E4/10) " + _h3Tavern
                        + " + Inni (wighty - do niczego) " + _h3Undead + "; kontrola kodu - roznica " + diff
                        + " | powrot z puli: do hearth " + (_h3BackCommon + _h3BackBandit).ToString("0.0", ci) + " (prosci " + _h3BackCommon.ToString("0.0", ci) + ", bandyci " + _h3BackBandit.ToString("0.0", ci) + ")"
                        + ", do ludnosci BK " + _h3BackBk + " (w tym z reszt ponizej 1 czlowieka " + _h3FracSent + ": zamkniete klucze " + _h3FracKeys + ", ulamki razem " + _h3FracMass.ToString("0.00", ci) + ")"
