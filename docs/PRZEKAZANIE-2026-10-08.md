@@ -889,3 +889,10 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   (cs-bledy) -> scalenie do zbior-e4-koniec -> 2 recenzje -> DLL test\Armoury-e4-koncowy2.dll + CrashScribe-at-bledy.dll -> PONOWNY TEST (728 + zapis + zima).
   Biezacy test (b2k5x628s) biegnie dalej, do gotowosci poprawek - potem zatrzymac (TaskStop + autotest.ps1 -RestoreOnly).
 - (23:25 UTC) Okno 5h odnowione (do 04:20 UTC), tydzien 63%. **Audyt zlota wznowiony** (wf_326d453d-473, wyniki przeszukan z pamieci). **Etap 5: scalenie A + kod B** (wf_c77320aa-959): w-toku/zbior-e5 (e5\zbior, od 7658247; po poprawkach E4 dosc. w-toku/zbior-e4-koniec) + B1 (plan/kod/2 rec), B2+B3+B5 (e5\b235), B4+B6 (e5\b46). Test A po wgraniu E4; B - test roczny po A (raczej po 10:00 UTC).
+- (23:45 UTC) **PROJEKT ETAPU 6 GOTOWY v2** (docs/etap6/PROJEKT-ETAP6-RZEMIOSLO-SUROWCE-KONIE-2026-10-12.md + KRYTYKA-E6.md - 31 uwag przyjetych; rozpoznania A-D):
+  18 paczek. Teraz (na zbiorze A etapu 5): E6/0 pomiar (ksiega uzbrojenia 6.6, ksiega koni, "co kuje kazda kraina"; jedzie w tescie zbioru A), K0 (licznik koni
+  gry u zrodla, stan koni raz na dobe), CS strawa Polnocy, M2 (bramka x0.01, wielblady tylko Qarth); potem M1 = 6.19 (zbroje wedlug kultury krainy: wlasna ->
+  pokrewna -> region lore -> nic; zbroje rodow tylko wlasna kraina; stroje bandytow nikt; Dothrakowie/Wolni bez stali; Wolne Miasta tylko wzory ROT), W2 (ryby);
+  po A: K1->K2->K5, R1 wytop (D, NK), R3; po B1: W1, N1, W3, K4, K3 (rycerz z koniem - cel z szablonow 175); warunkowo R2, W4, R4. Test: jeden, po wgraniu
+  zbioru B etapu 5 (120 dob + zima). Pytania (ide z rada): zakaz unikatow tylko dla kowali miast i AI, nie dla kuzni Jeffa; konie kupowane przez mieszczan
+  tylko robocze w miejsce padlych ze starosci; udzial jazdy krainy z szablonow 175 (jedna liczba; 12-15% w 120 dobach, ok. 20% po roku).
