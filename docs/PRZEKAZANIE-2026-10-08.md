@@ -843,3 +843,4 @@ logu w trakcie; G-ETAP odbudowy w d728) + zima 120 + zapis 9 dob, CrashScribe-at
 wgranie; C po roku testu B. (3) E6: projekt (rozpoznanie, projekt, krytyka) w czasie testow, kod, test 120, wgranie. (4) E7/E8 jesli czas. Limity: okno 5h - przy 85%
 bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPORT-NOCNY-2026-10-12.md + czat ok. 12:00.
 - (17:30) **Jeff etap 6:** 6.1 i 6.14 TAK; NOWE 6.19 - kowale kuja zbroje wedlug kultury krainy, bez unikatow (lore). PLAN-DO-KONCA zaktualizowany.
+- (17:30) **Audyt zlota z niczego ZATRZYMANY** (okno 5h: +6% w 8 min przy 5 przebiegach; chronie sciezke E4/9 -> test E4). Wznowic po 23:20: Workflow({scriptPath: ...\workflows\scripts\audyt-zloto-z-niczego-wf_326d453d-473.js, resumeFromRunId: 'wf_326d453d-473'}).
