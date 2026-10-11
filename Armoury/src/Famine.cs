@@ -21,7 +21,8 @@ namespace Armoury
     ///  - PLON dnia = FamineYieldPerPerson (1.2) x L x q: L = ludzie okregu (w domu + jego uchodzcy), q = zywnosc wsi z modelu gry dzis / (poziom + 1)
     ///    (GL 2.2 i 3: model CalculateDailyFoodProductionAmount z latkami - zima E4/1 wedlug krainy, mnoznik rak spustoszenia E4/5, stan wsi (spladrowana:
     ///    zero albo Normal x udzial ludzi w domu - LootedProducesByPeople), zadania "pol produkcji"); dzielnik usuwa skok progow 200/600. Zwykly rok (lato,
-    ///    wies Normal, bez uchodzcow) = 1.2 x potrzeby; zima, spustoszenie, brak rak i stan wsi obnizaja plon same - przez model gry;
+    ///    wies Normal, bez uchodzcow) = 1.2 x potrzeby; zima, spustoszenie, brak rak i stan wsi obnizaja plon same - przez model gry; czynnik rak E4/7 w q
+    ///    bez czlonow zmarlych cywilow i narodzin (FreeHands.FamineFix - plon i tak idzie za liczba ludzi; przeglad scalenia E4/6 + E4/7);
     ///  - JEDZA: najpierw gospodarze (ludzie w domu) ze swojego spichlerza i plonu, potem uchodzcy obecni w regionie (warownia + jej wsie) z tego,
     ///    co zostalo we wszystkich spichlerzach regionu (GL 2.2 pkt 3, 2.3); przednowek: spichlerz ponizej FamineRationDays dni i plon nie starcza -
     ///    wszyscy jedza 90% (nikt nie umiera, przyrost zwalnia); nadwyzka ponad sufit (FamineBarnYears lat potrzeby) to towar na wozy, jak dotad;
@@ -364,7 +365,7 @@ namespace Armoury
             var model = Campaign.Current != null ? Campaign.Current.Models.VillageProductionCalculatorModel : null;
             if (model == null || v == null) return 0.0;
             int level = v.GetHearthLevel();
-            double q = level >= 0 ? Devastation.FoodToday(model, v) / (level + 1) : 0.0;
+            double q = level >= 0 ? Devastation.FoodToday(model, v) / (level + 1) * FreeHands.FamineFix(v) : 0.0;     // jak w Daily (przeglad scalenia E4/6 + E4/7)
             if (double.IsNaN(q) || double.IsInfinity(q) || q < 0.0) q = 0.0;
             double yf = Math.Max(1e-3, Devastation.YieldFactor(v));
             return Math.Max(0f, s.FamineYieldPerPerson) * Math.Min(QMax, q) / yf;
@@ -497,7 +498,8 @@ namespace Armoury
                     x.L = x.Home + x.Away;
                     int level = v.GetHearthLevel();
                     double f = model != null ? Devastation.FoodToday(model, v) : 0.0;
-                    double q = level >= 0 ? f / (level + 1) : 0.0;
+                    // przeglad scalenia E4/6 + E4/7: plon idzie za ludzmi (x.L), wiec w q czynnik rak E4/7 bez zmarlych cywilow i narodzin (FreeHands.FamineFix)
+                    double q = level >= 0 ? f / (level + 1) * FreeHands.FamineFix(v) : 0.0;
                     x.Q = double.IsNaN(q) || double.IsInfinity(q) || q < 0.0 ? 0.0 : Math.Min(QMax, q);
                     x.Harvest = yield * x.L * x.Q;
                     x.Feed = yield * x.Q / Math.Max(1e-3, Devastation.YieldFactor(v));    // plon na gospodarza (bramka powrotu)

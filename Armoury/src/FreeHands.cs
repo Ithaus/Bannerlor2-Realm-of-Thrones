@@ -22,6 +22,9 @@ namespace Armoury
     /// czynnika spustoszenia E4/5) i zywnosc wsi (FoodPostfix). Hamulec (Jeff 11.10): przy a &gt;= f puste miejsce u notabla sie nie wypelnia (Levy.ProbabilityPostfix).
     /// Chec (Levy.Willingness): nadwyzka rak z ksiegi max(0, f - a) x min(1, dom / dom w dniu siewu) zamiast BK WorkforceExcess.
     /// Cache doby podmieniany jedna referencja (odczyt z watkow modeli bez zamka). Przed siewem / wylaczone - wszystko 1 i bez hamulca.
+    /// Poprawka po przegladzie scalenia E4/6 + E4/7: plon spichlerza E4/6 (Famine: 1.2 x ludzie x q, q z modelu zywnosci wsi - z FoodPostfix) idzie juz za liczba
+    /// ludzi, wiec tam L liczy sie bez czlonow 0.27 x zmarli cywile i 0.27 x narodziny (LPeople, FamineFix). Model gry (poziom hearth + 1, progi 200/600) liczby
+    /// ludzi nie widzi - towary i zywnosc wsi gry dalej z pelnym K_m (R9 b, "smierc bez skutku" dotad).
     /// </summary>
     internal static class FreeHands
     {
@@ -32,12 +35,13 @@ namespace Armoury
         internal sealed class Cell
         {
             public string Id, Realm; public Settlement Node;
-            public double S, Km, A, F, L, Excess, LRef, Dom, DomRef, FallenMen, Civil, Born, Enslaved, ToWall;
+            public double S, Km, A, F, L, LPeople, Excess, LRef, Dom, DomRef, FallenMen, Civil, Born, Enslaved, ToWall;
             public bool Brake, BrakeLand, YieldOnly;
         }
 
         private static volatile Dictionary<string, Cell> _cells = new Dictionary<string, Cell>();
         private static volatile bool _harvest;
+        private static volatile bool _foodOn;      // FoodPostfix wpiety (ApplyFood, raz na proces - nie zerowane w Reset)
         private static double _ironF = 0.2; private static long _ironSlaves = -1;
         private static int _over;
         private static readonly Dictionary<Settlement, string> _realm = new Dictionary<Settlement, string>();
@@ -152,6 +156,12 @@ namespace Armoury
                     if (f >= 0.999 || e <= 0.0 || c.A <= f || men <= 0.0) c.L = 1.0;
                     else c.L = Math.Max(0.5, Math.Pow((1.0 - Math.Min(c.A, 0.9)) / (1.0 - f), e));
                     if (double.IsNaN(c.L) || double.IsInfinity(c.L)) c.L = 1.0;
+                    // przeglad scalenia E4/6 + E4/7: L plonu spichlerza (Famine) - zmarli cywile i narodziny zmieniaja juz liczbe ludzi w plonie (1.2 x ludzie x q),
+                    // tu zostaje tylko ubytek rak bez zmiany liczby gab w domu: sluzba i jency (S), polegli, niewola, Mur
+                    double aP = men > 0.0 ? (c.S + Math.Max(0.0, v.FallenMen + v.Enslaved + v.ToWall)) / men : 0.0;
+                    if (f >= 0.999 || e <= 0.0 || aP <= f || men <= 0.0) c.LPeople = 1.0;
+                    else c.LPeople = Math.Max(0.5, Math.Pow((1.0 - Math.Min(aP, 0.9)) / (1.0 - f), e));
+                    if (double.IsNaN(c.LPeople) || double.IsInfinity(c.LPeople)) c.LPeople = 1.0;
                     c.Brake = brake && men > 0.0 && c.A >= f;
                     if (c.A > f && f < 0.999 && men > 0.0 && !yieldOnly) over++;
                     double home = v.DomRef > 0.0 ? Math.Min(1.0, v.Dom / v.DomRef) : 1.0;
@@ -183,6 +193,23 @@ namespace Armoury
                 return c == null || c.L >= 1.0 ? 1f : (float)c.L;
             }
             catch (Exception e) { Stumble("YieldFactor", e); return 1f; }
+        }
+
+        /// <summary>Przeglad scalenia E4/6 + E4/7: mnoznik q plonu spichlerza (Famine.Daily, Famine.FeedNow) = LPeople / L, ktore wlasnie pomnozyl FoodPostfix
+        /// (ten sam cache, ten sam watek glowny) - w plonie spichlerza zmarli cywile i narodziny dzialaja tylko przez liczbe ludzi. 1 = bez zmiany (brak latki
+        /// zywnosci, brak komorki, przed siewem). Nie rzuca.</summary>
+        internal static double FamineFix(Village v)
+        {
+            if (!_foodOn || v == null || v.Settlement == null) return 1.0;
+            try
+            {
+                var c = CellOf(v.Settlement);
+                if (c == null) return 1.0;
+                double used = c.L >= 1.0 ? 1.0 : (double)(float)c.L;     // dokladnie to, co dal YieldFactor do FoodPostfix
+                double r = c.LPeople / Math.Max(1e-3, used);
+                return double.IsNaN(r) || double.IsInfinity(r) || r <= 0.0 ? 1.0 : r;
+            }
+            catch (Exception e) { Stumble("FamineFix", e); return 1.0; }
         }
 
         /// <summary>Hamulec: kraina bez wolnych rak nie wystawia nowego wojska (a &gt;= f; Wolni Ludzie i Dar bez hamulca). Klucz FreeHandsBrake.</summary>
@@ -321,7 +348,7 @@ namespace Armoury
                   .Append(" + Mur ").Append(c.ToWall.ToString("0", ci)).Append(" + 0.27 x cywile ").Append(c.Civil.ToString("0", ci))
                   .Append(" - 0.27 x narodziny ").Append(c.Born.ToString("0", ci)).Append(" = ").Append(c.Km.ToString("0", ci)).Append(", L_ref ").Append(c.LRef.ToString("0", ci))
                   .Append("], prog ").Append((100 * c.F).ToString("0.#", ci)).Append("%").Append(c.YieldOnly ? " (tylko plon)" : (c.BrakeLand ? "" : " (bez hamulca)"))
-                  .Append(", L ").Append(c.L.ToString("0.000", ci)).Append(c.Brake ? ", HAMULEC" : "");
+                  .Append(", L ").Append(c.L.ToString("0.000", ci)).Append(" (spichlerz ").Append(c.LPeople.ToString("0.000", ci)).Append(')').Append(c.Brake ? ", HAMULEC" : "");
             }
             double lref = 0; foreach (var c in list) lref += c.LRef;
             sb.Append(" | siew dzien ").Append(PeopleBook.SowDay).Append(", L_ref swiata ").Append((lref / 1e6).ToString("0.000", ci)).Append(" mln");
@@ -352,6 +379,7 @@ namespace Armoury
                 var food = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultVillageProductionCalculatorModel), "CalculateDailyFoodProductionAmount", new[] { typeof(Village) });
                 if (food == null || food.ReturnType != typeof(float)) return false;
                 h.Patch(food, postfix: new HarmonyMethod(typeof(FreeHands), nameof(FoodPostfix)));
+                _foodOn = true;
                 return true;
             }
             catch (Exception e) { Log.Error("FreeHands.ApplyFood", e); return false; }
