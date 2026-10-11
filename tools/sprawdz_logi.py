@@ -558,6 +558,7 @@ def etap4_main(logp, start_arg, until=120):
     e42 = e4_series(lines, "Inni z poleglych (E4/2): dzien")       # E4/2: wighty z odbitych (poza oknem W8), milicja przejetej osady
     wyr = e4_series(lines, "Wyrzutki: dzien", 1)
     pwl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien", 1)     # recenzja E4/9 R1-4: odplyw puli do Strazy (T7)
+    poc = e4_series(lines, "Pochodzenie (E4/7): dzien")           # fixA (P1-2): polegli od ostrzalu w oblezeniu poza bitwa (T7 - nie ma ich w "zabici" linii Ludzie)
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
     bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
@@ -742,6 +743,8 @@ def etap4_main(logp, start_arg, until=120):
         }
         snk = {
             "zabici": L(d, r"dzis: zabici (\d+)", lud),
+            # fixA (P1-2): ostrzal oblezniczy zabija poza bitwa (SiegeEventCampaignBehavior.KillRandomTroopsOfEnemy) - poza DiedInBattle i poza "zabici"
+            "polegli od ostrzalu w oblezeniu (fixA)": L(d, r"ostrzal w oblezeniu \(poza bitwa\): wywolan z ubytkiem \d+, polegli " + F_, poc),
             "zaraza": L(d, r"zaraza razem dzis (\d+)", kra),
             "H3 domy (BK, wies, szablon, wighty)": L(d, r"domy: do domu BK (\d+)", h3) + L(d, r"do wsi \(tabory\) (\d+) ludzi", h3) + L(d, r"do wsi \(prosci i bandyci\) (\d+) ludzi", h3)
                                                    + L(d, r"hearth, z szablonu (\d+) \(garnizony", h3) + L(d, r"nigdy do BK ani wsi\): rozbici (\d+)", h3) + L(d, r"nigdy do BK ani wsi\): rozbici \d+, inna droga (\d+)", h3),
@@ -780,7 +783,8 @@ def etap4_main(logp, start_arg, until=120):
                     + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1) + L(d, r"krainy z niewola: niewolnikow (\d+)", i1)
                     + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1)      # E4/10: I1 do karczmy (uwolnieni H3 do karczmy juz w "uwolnieni jency bez odbiorcy")
                     + L(d, r"wcieleni jency AI \(partie rodow\) (\d+)", h3) + L(d, r"werbunek: z puli \d+, jency (\d+)", wyr)
-                    + L(d, r"jency Innych skasowani przez ROT (\d+)", inn) + L(d, r"ranni \d+, jency (\d+) - znikaja", par))
+                    + L(d, r"jency Innych skasowani przez ROT (\d+)", inn) + L(d, r"ranni \d+, jency (\d+) - znikaja", par)
+                    + L(d, r"uciekli ponad limit lochu (\d+)", jen))      # fixA (P2-T4-lochy): ucieczki ponad limit lochu partii (gra - bez zdarzenia)
             t7j.append((jd - (jin - jout), jin + jout))
     if t7:
         m = st.mean(t7)
@@ -1223,6 +1227,33 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     rep.add("E4/7 R2-1: ekran druzyny bez stanu przed (_initialData)", sum(sn), "0", sum(sn) == 0)
     rep.add("E4/7 T14: menu \"People of this land\"", "proba reczna Jeffa (wies, miasto, zamek)", "INFO - liczby = linia dzienna regionu", None)
     rep.add("E4/7 T15: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
+    # ---------------- poprawki E4 po tescie koncowym (fixA): P11, T3, P1-2, T6, P2-T4 - wiersze INFO (oczekiwania w CHANGELOG)
+    pin_ = [fnum(r"w tym narodziny band z oczekujacych " + F_, poc[d]) or 0 for d in pdays]
+    pbz = [fnum(r"z puli do band " + F_, poc[d]) or 0 for d in pdays]
+    plo_ = [fnum(r"oczekujace udzialy band porzucone " + F_, poc[d]) or 0 for d in pdays]
+    zb = [fnum(r"z niczego \+[\d.]+ \([^)]*?bandy " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("fixA P11: narodziny band z oczekujacych / z puli do band / porzucone / z niczego bandy (srednio na dobe)",
+            f"{st.mean(pin_):.1f} / {st.mean(pbz):.1f} / {st.mean(plo_):.1f} / {st.mean(zb):.1f}", "INFO (przed fixA: 0 / - / - / ok. 140; po: narodziny ok. 100-145, z niczego bandy wyraznie w dol)", None)
+    dp = [num(r"uzgodnienie odlozone \(bitwa w toku\) (\d+) partii", poc[d], int, 0) or 0 for d in pdays]
+    dm_ = [fnum(r"uzgodnienie odlozone \(bitwa w toku\) \d+ partii \(roznica " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("fixA T3: uzgodnienie odlozone - bitwa w toku (srednio na dobe: partii / roznica ludzi)", f"{st.mean(dp):.1f} / {st.mean(dm_):.1f}", "INFO (roznica = dawne q partii w bitwie)", None)
+    sd = [fnum(r"ostrzal w oblezeniu \(poza bitwa\): wywolan z ubytkiem \d+, polegli " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("fixA P1-2: polegli od ostrzalu w oblezeniu (srednio na dobe, suma)", f"{st.mean(sd):.1f}/d, {sum(sd):.0f}", "INFO (sceptyk: ok. 45 na oblezenie na dobe)", None)
+    vt_ = [fnum(r"odwrot wsi do stanu miasta regionu \(fixA T6\) " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("fixA T6: odwrot wsi na podlodze do stanu miasta regionu (suma)", f"{sum(vt_):.0f}", "INFO (T6 pobor na podlodze -> 0)", None)
+    cuts = {}
+    for d in pdays:
+        m = re.search(r"niedobor skladow wedlug stanu partii \(diagnostyka P2-T4\): (.*?); najwiekszy", poc[d])
+        if m:
+            for nm, v in re.findall(r"([a-z ]+?) (-?\d+(?:\.\d+)?)(?:,|$)", m.group(1)):
+                cuts[nm.strip()] = cuts.get(nm.strip(), 0.0) + float(v)
+    rep.add("fixA P2-T4-sklady: niedobor skladow wedlug stanu partii (suma okna)", ", ".join(f"{k} {v:.0f}" for k, v in sorted(cuts.items(), key=lambda x: -x[1])) or "-",
+            "INFO (diagnostyka - decyzja o oknie po tescie)", None)
+    wy = e4_series(lines, "Wyrzutki: dzien", 1)
+    emp = [num(r"puste usuniete \d+ \(w zbiorze pustych (\d+)\)", wy[d], int) for d in sorted(wy) if 1 <= run_day(d, start) <= until]
+    emp = [x for x in emp if x is not None]
+    rep.add("fixA P11-empty-set: zbior pustych band OutlawLaw (ostatnia doba / najwiecej)", f"{emp[-1]} / {max(emp)}" if emp else "brak (log sprzed fixA)",
+            "INFO (oczekiwane: kilkadziesiat, nie rosnie o ok. 40/d)", None)
 
 
 # E4/8 (164b-2): baza zalog d120 - bieg A zbioru 31 (WGRANIE 31, SCRATCH kopia-z31-A: zalogi 81.2 tys.); prog N4 >= 85% (bez modelu [S] ok. 67.6 tys. - prog graniczny)
