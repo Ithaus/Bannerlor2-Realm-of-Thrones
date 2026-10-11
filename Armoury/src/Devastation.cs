@@ -42,7 +42,7 @@ namespace Armoury
         private const int Top = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private static bool _raidPatched, _endPatched;   // latki wpiete (raz na proces)
+        private static bool _raidPatched, _endPatched, _levelPatched, _foodPatched;   // latki wpiete (raz na proces)
 
         /// <summary>Spustoszenie czynne: klucz, obie latki rabunku, jednostka ludzi (E4/3) i przyrost naturalny (E4/4).</summary>
         internal static bool On
@@ -430,6 +430,63 @@ namespace Armoury
             lock (_lock) { RaidState rs; return _raids.TryGetValue(r, out rs) ? rs.CapWould : 0.0; }
         }
 
+        // ------------------------------------------------------------ plon (R9a, K4): mnoznik rak, progi produkcji, zywnosc wsi
+        /// <summary>
+        /// Mnoznik plonu wsi od ubytku rak (R9a): (ludzie w domu / (ludzie w domu + uchodzcy)) ^ elastycznosc, dno (1 - pulap) ^ e. Dokladnie 1, gdy spustoszenie
+        /// jest wylaczone albo wies nie ma uchodzcow. Z latek modeli (moga isc z watkow AI): bez kalibracji, k z PopulationLaw.KFor; nie rzuca.
+        /// </summary>
+        internal static float YieldFactor(Village v)
+        {
+            if (PeopleBook.RefugeeVillages == 0 || v == null) return 1f;
+            try
+            {
+                if (!CoversQuiet(v)) return 1f;
+                double away = PeopleBook.RefugeesOf(v);
+                if (!(away > 0.0)) return 1f;
+                float k = PopulationLaw.KFor(v.Settlement);
+                if (!(k > 0f) || float.IsInfinity(k)) return 1f;
+                var s = Settings.Current;
+                double home = (double)Math.Max(0f, v.Hearth) * k;
+                double e = Math.Max(0f, Math.Min(2f, s.DevastationYieldElasticity));
+                double m = Math.Pow(home / (home + away), e);
+                if (double.IsNaN(m) || double.IsInfinity(m)) return 1f;
+                // dno z pulapu: okreg spustoszony do pulapu daje (1 - pulap) ^ e; nizej nie schodzimy nawet po zmianie pulapu w MCM
+                double lo = Math.Pow(Math.Max(0.05, 1.0 - MaxShare(s)), e);
+                if (m < lo) m = lo;
+                return m >= 1.0 ? 1f : (float)m;
+            }
+            catch (Exception ex) { Stumble("Devastation.YieldFactor", ex); return 1f; }
+        }
+
+        /// <summary>
+        /// Village.GetHearthLevel(): progi 200 / 600 hearth licza sie od ludzi razem z uchodzcami (hearth + uchodzcy / k) - ubytek rak dziala tylko przez ciagly
+        /// mnoznik (YieldFactor), wies nie spada o poziom (-50% plonu) od jednego rabunku. Poziom tylko podnosimy.
+        /// </summary>
+        public static void LevelPostfix(Village __instance, ref int __result)
+        {
+            if (PeopleBook.RefugeeVillages == 0 || __result >= 2 || __instance == null) return;
+            try
+            {
+                if (!CoversQuiet(__instance)) return;
+                double away = PeopleBook.RefugeesOf(__instance);
+                if (!(away > 0.0)) return;
+                float k = PopulationLaw.KFor(__instance.Settlement);
+                if (!(k > 0f) || float.IsInfinity(k)) return;
+                double before = __instance.Hearth + away / k;
+                int level = before >= 600.0 ? 2 : (before >= 200.0 ? 1 : 0);
+                if (level > __result) __result = level;
+            }
+            catch (Exception e) { Stumble("Devastation.LevelPostfix", e); }
+        }
+
+        /// <summary>DefaultVillageProductionCalculatorModel.CalculateDailyFoodProductionAmount: zywnosc wsi x mnoznik rak (obok zimy WinterBite - mnoza sie).</summary>
+        public static void FoodPostfix(Village __0, ref float __result)
+        {
+            if (PeopleBook.RefugeeVillages == 0 || !(__result > 0f)) return;
+            float m = YieldFactor(__0);
+            if (m != 1f) __result *= m;
+        }
+
         // ------------------------------------------------------------ odczyty dla innych linii
         /// <summary>Okno W6 (linia "Hearth (E4/0)"): kroki rabunku gry pod spustoszeniem i lup z niczego od ostatniej linii doby (bez zerowania - zeruje DayLine).</summary>
         internal static void StepsToday(out int steps, out long lootAi, out long lootPlayer)
@@ -594,6 +651,28 @@ namespace Armoury
                 else _missing.Add("RaidEventComponent.OnBeforeFinalize");
             }
             catch (Exception e) { _missing.Add("RaidEventComponent.OnBeforeFinalize (" + e.GetType().Name + ")"); Log.Error("Devastation.ApplyAll(OnBeforeFinalize)", e); }
+            try
+            {
+                var lvl = AccessTools.Method(typeof(Village), "GetHearthLevel");
+                if (lvl != null && lvl.ReturnType == typeof(int) && lvl.GetParameters().Length == 0)
+                {
+                    h.Patch(lvl, postfix: new HarmonyMethod(typeof(Devastation), nameof(LevelPostfix)));
+                    _levelPatched = true; _wired.Add("progi produkcji");
+                }
+                else _missing.Add("Village.GetHearthLevel");
+            }
+            catch (Exception e) { _missing.Add("Village.GetHearthLevel (" + e.GetType().Name + ")"); Log.Error("Devastation.ApplyAll(GetHearthLevel)", e); }
+            try
+            {
+                var food = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultVillageProductionCalculatorModel), "CalculateDailyFoodProductionAmount", new[] { typeof(Village) });
+                if (food != null && food.ReturnType == typeof(float))
+                {
+                    h.Patch(food, postfix: new HarmonyMethod(typeof(Devastation), nameof(FoodPostfix)));
+                    _foodPatched = true; _wired.Add("zywnosc wsi");
+                }
+                else _missing.Add("DefaultVillageProductionCalculatorModel.CalculateDailyFoodProductionAmount");
+            }
+            catch (Exception e) { _missing.Add("CalculateDailyFoodProductionAmount (" + e.GetType().Name + ")"); Log.Error("Devastation.ApplyAll(zywnosc)", e); }
             StartLine();
         }
 
@@ -616,7 +695,8 @@ namespace Armoury
                   .Append(", wsie spladrowane produkuja: ").Append(s.LootedProducesByPeople ? "TAK" : "NIE");
             }
             sb.Append("; wpiete: ").Append(_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "nic")
-              .Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-").Append('.');
+              .Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
+              .Append(_levelPatched && _foodPatched ? "" : " (bez latki progow albo zywnosci mnoznik plonu dziala tylko w produkcji towarow)").Append('.');
             Log.Info(sb.ToString());
         }
     }
