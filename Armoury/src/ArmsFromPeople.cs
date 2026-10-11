@@ -23,7 +23,8 @@ namespace Armoury
     /// szablon albo model gry, schodzi z DOM swojego regionu przez PeopleBook.TakeLevy (E4/7: wies -1/k, miasto -1 stanu, zamek - jego wsie, podloga 50 hearth),
     /// a jego udzial pochodzenia idzie do rosteru (GiveNew). Czego DOM nie da - tego czlowieka nie ma (zdejmowany z rosteru, ktory gra przed chwila napelnila):
     ///  - ZALOGI (K1): przyrost z modelu zalogi gry = 0 (prefiks bool na TickGarrisonChangeForTown) - zaloga rosnie tylko z platnego werbunku od notabli (A5 - zdejmuje
-    ///    E4/7), z partii i z patroli BK; A5 tylko mierzony (limit dzienny / bez ochotnikow / zold albo miejsce) - dowod do warunkowego K8. Straz - do E4/9;
+    ///    E4/7), z partii i z patroli BK; A5 mierzony (limit dzienny / bez ochotnikow / zold albo miejsce); K8 (Jeff 11.10 16:55): limit dzienny A5 do
+    ///    GarrisonAutoRecruitPerDay (2; gra 1) - zold i miejsce pilnuje gra, ludzie przez E4/7 A5Post; bez K8 Straz, Inni, ksiega bez poboru, hamulec. Straz - do E4/9;
     ///  - MILICJA (K2): przyrost w ticku wsi i warowni, po odbudowie wsi i po obronie oblezenia - ochotnicy z wolnych rak regionu; kraina z hamulcem (FreeHands.Braked)
     ///    i osady Innych nie dostaja nowej milicji; ubytek bez walki (BK "Over supported limit") wraca do DOM tej osady; rozwiazana partia we wsi - w oknie E4/7;
     ///  - NOWE DRUZYNY LORDOW (K3, PLAN 4.9, Jeff P3): szablon klanu oplacony z wolnych rak regionu siedziby, potem z zalogi siedziby (zaloga zostawia 50 w miescie /
@@ -48,6 +49,8 @@ namespace Armoury
         internal static bool GrainOn { get { var s = S; return s != null && s.NewPartyGrainFromSeat; } }
         internal static bool CaravansOn { get { var s = S; return s != null && s.CaravansFromPeople; } }
         internal static bool TravellersOn { get { var s = S; return s != null && s.TravellersFromPeople; } }
+        // K8: limit dzienny A5 (1..5 - jak suwak MCM; 1 = gra)
+        internal static int K8Limit { get { var s = S; return s == null ? 1 : Math.Max(1, Math.Min(5, s.GarrisonAutoRecruitPerDay)); } }
 
         // ---------------------------------------------------------------- wpiecie
         private static bool _applied, _startLogged;
@@ -62,6 +65,8 @@ namespace Armoury
             public long zBlocked; public int zTowns; public long zWatch; public int zWatchTowns;
             // A5 (pomiar)
             public int a5Towns, a5With, a5Daily, a5NoVol, a5Wage; public long a5Men;
+            // K8: dobrani ponad limit gry (k8Game) i odmowy (twierdze ponizej limitu K8)
+            public int k8Game = 1, k8Towns, k8Wage, k8NoVol, k8Brake, k8Out; public long k8Extra;
             // milicja
             public long mUp, m1v, m1t, m1c, m1k, m1h, m1o, m2; public double m1, mFrac;
             public long r1, r2, r3; public readonly HashSet<string> r1Reg = new HashSet<string>(); public readonly Dictionary<string, int> r1Realm = new Dictionary<string, int>();
@@ -100,7 +105,7 @@ namespace Armoury
         internal static void Reset()
         {
             D = new Day(); _stumbles = _stumblesDay = 0; _stumbleAt.Clear(); _errSites.Clear(); _startLogged = false; _bkTop = null;
-            _tickV = null; _tickDH = 0.0;
+            _tickV = null; _tickDH = 0.0; _k8Town = null;
         }
 
         // ---------------------------------------------------------------- pomocnicze
@@ -293,8 +298,61 @@ namespace Armoury
                 else if (!(bas > 0f)) d.a5NoVol++;
                 else if (res >= daily && bas > res) d.a5Daily++;
                 else if (res < bas) d.a5Wage++;
+                // K8: wolanie wyzej przeszlo przez K8Postfix (zewnetrzny poziom) - stan tej twierdzy: limit gry i powod
+                if (ReferenceEquals(_k8Town, __0) && _k8Why != K8Off)
+                {
+                    int g = _k8Game; d.k8Game = g;
+                    if (_k8Why == K8Out) d.k8Out++;
+                    else if (_k8Why == K8Brake) { if (budget > 0 && bas > res && res >= g) d.k8Brake++; }   // hamulec zatrzymal ochotnika ponad limit gry
+                    else
+                    {
+                        long got = (long)Math.Ceiling(res);                    // gra bierze ceil(Result) ochotnikow (petla i < Result)
+                        if (got > g) { d.k8Extra += got - g; d.k8Towns++; }
+                        if (res < daily)
+                        {
+                            if (budget <= 0) d.k8Wage++;
+                            else if (bas < daily && !(res < bas)) d.k8NoVol++;
+                            else d.k8Wage++;                                   // zold albo miejsce w zalodze
+                        }
+                    }
+                }
             }
             catch (Exception e) { Stumble("A5LimitPostfix", e); }
+        }
+
+        // ================================================================ K8 (Jeff 11.10 16:55, plan rozdz. 18 pkt 8): A5 do GarrisonAutoRecruitPerDay na dobe (2; 1 = gra)
+        // Lancuch modeli zalogi: ROT ROTSettlementGarrisonModel (_previousModel) albo NavalDLC (BaseModel) -> BK BKGarrisonModel (dziedziczy Default, tej metody nie
+        // nadpisuje) -> DefaultSettlementGarrisonModel (stala 1). Kolejnosc ladowania modulow nie jest znana przy starcie - latka na KAZDEJ zadeklarowanej metodzie,
+        // a dziala tylko na zewnetrznym poziomie (licznik zagniezdzenia jak SpeedDepth; max() i tak idempotentny). Zold pilnuje sama gra: "Wage Limit"
+        // (GetAvailableWageBudget zalogi = limit zoldu 166 - zold - 5, tansi ochotnicy pierwsi) i "Party Size Limit" wchodza w ten sam ExplainedNumber PRZED limitem
+        // dziennym (G GarrisonRecruitmentCampaignBehavior :172-200). Ludzie: gra oproznia slot notabla przy kazdym rekrucie, E4/7 A5Post zdejmuje kazdy oprozniony
+        // slot osobno (TakeLevy z DOM) - drugi rekrut tej samej doby tez. Jedna regula dla zalog AI i gracza (gra wola A5 dla kazdej twierdzy z wlaczonym autowerbunkiem).
+        // Bez K8 (limit gry): Straz i osady Innych (A5 tam "" - do E4/9), ksiega bez poboru (!LevyLive - A5 "" jak dotad), kraina z hamulcem wolnych rak.
+        private const int K8Off = 0, K8On = 1, K8Brake = 2, K8Out = 3;
+        [ThreadStatic] private static int _k8Depth;
+        [ThreadStatic] private static Town _k8Town;
+        [ThreadStatic] private static int _k8Game, _k8Why;
+
+        public static void K8DepthPre() { _k8Depth++; }
+
+        public static Exception K8DepthFin(Exception __exception) { if (_k8Depth > 0) _k8Depth--; return __exception; }
+
+        public static void K8Postfix(Town __0, ref int __result)
+        {
+            if (_k8Depth > 1) return;                                          // model wewnetrzny lancucha - tylko zewnetrzny
+            try
+            {
+                int game = __result, why = K8Off, lim = K8Limit;
+                if (lim > game && __0 != null && __0.Settlement != null && Campaign.Current != null)
+                {
+                    var st = __0.Settlement;
+                    if (!PeopleBook.LevyLive || CrownGifts.IsWatch(st.MapFaction) || OthersAt(st)) why = K8Out;
+                    else if (FreeHands.Braked(st)) why = K8Brake;
+                    else { why = K8On; __result = lim; }
+                }
+                _k8Town = __0; _k8Game = game; _k8Why = why;
+            }
+            catch (Exception e) { Stumble("K8Postfix", e); }
         }
 
         // ================================================================ K2: milicja (5.2, 5.3)
@@ -842,6 +900,34 @@ namespace Armoury
             Wire(h, "przyrost zalog z modelu (TickGarrisonChangeForTown)", AccessTools.Method(grc, "TickGarrisonChangeForTown", new[] { typeof(Town) }), PP(nameof(GarrisonGrowthPrefix), Priority.Low), null, P(nameof(GarrisonGrowthFin)));
             Wire(h, "A5 - okno pomiaru (TickAutoRecruitmentGarrisonChange)", AccessTools.Method(grc, "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }), P(nameof(A5MeasurePre)), null, P(nameof(A5MeasureFin)));
             Wire(h, "A5 - limity (GetAutoRecruitmentGarrisonChangeExplainedNumber)", AccessTools.Method(grc, "GetAutoRecruitmentGarrisonChangeExplainedNumber", new[] { typeof(Town) }), null, P(nameof(A5LimitPostfix)), null);
+            // K8: kazda zadeklarowana GetMaximumDailyAutoRecruitmentCount(Town) modeli zalogi (gra, BK, ROT, NavalDLC) - licznik zagniezdzenia + postfiks
+            var k8 = new List<MethodInfo>();
+            try
+            {
+                var gm = typeof(TaleWorlds.CampaignSystem.ComponentInterfaces.SettlementGarrisonModel);
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = asm.GetTypes(); }
+                    catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                    catch { continue; }
+                    if (types == null) continue;
+                    foreach (var t in types)
+                    {
+                        try
+                        {
+                            if (t == null || t.IsAbstract || !gm.IsAssignableFrom(t)) continue;
+                            var m = t.GetMethod("GetMaximumDailyAutoRecruitmentCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly, null, new[] { typeof(Town) }, null);
+                            if (m != null && !m.IsAbstract && !k8.Contains(m)) k8.Add(m);
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("ApplyAll(K8 modele)", e); }
+            if (k8.Count == 0) Wire(h, "K8 - limit dzienny A5 (GetMaximumDailyAutoRecruitmentCount)", null, null, null, null);
+            foreach (var m in k8)
+                Wire(h, "K8 - limit dzienny A5 (" + m.DeclaringType.Name + ".GetMaximumDailyAutoRecruitmentCount)", m, PP(nameof(K8DepthPre), Priority.First), P(nameof(K8Postfix)), P(nameof(K8DepthFin)));
             Wire(h, "milicja - tick wsi (Village.DailyTick)", AccessTools.Method(typeof(Village), "DailyTick"), PP(nameof(MilVillagePre), Priority.First), P(nameof(MilVillagePost)), null);
             Wire(h, "milicja - tick warowni (Town.DailyTick)", AccessTools.Method(typeof(Town), "DailyTick"), PP(nameof(MilTownPre), Priority.First), P(nameof(MilTownPost)), null);
             Wire(h, "milicja po odbudowie wsi (IncreaseSettlementHealthAction.ApplyInternal)", AccessTools.Method(typeof(IncreaseSettlementHealthAction), "ApplyInternal", new[] { typeof(Settlement), typeof(float) }), P(nameof(MilHealPre)), P(nameof(MilHealPost)), null);
@@ -936,7 +1022,10 @@ namespace Armoury
             sb.Append(" | ZALOGI: przyrost z modelu zablokowany -").Append(d.zBlocked).Append(" w ").Append(d.zTowns).Append(" twierdzach (gorna granica - model bez limitow gry), Straz zostawiona do E4/9 +")
               .Append(d.zWatch).Append(" w ").Append(d.zWatchTowns).Append(" twierdzach");
             sb.Append(" | A5: twierdz z werbunkiem ").Append(d.a5With).Append(" z ").Append(d.a5Towns).Append(" (ludzi ").Append(d.a5Men).Append("), limit dzienny ").Append(d.a5Daily)
-              .Append(", bez ochotnikow ").Append(d.a5NoVol).Append(", zold albo miejsce ").Append(d.a5Wage);
+              .Append(", bez ochotnikow ").Append(d.a5NoVol).Append(", zold albo miejsce ").Append(d.a5Wage)
+              .Append("; K8: limit ").Append(K8Limit).Append("/d, dobrano ").Append(d.k8Extra).Append(" (ponad ").Append(d.k8Game).Append("/d, w ").Append(d.k8Towns)
+              .Append(" twierdzach), odmowy: zold albo miejsce ").Append(d.k8Wage).Append(" / brak ochotnikow ").Append(d.k8NoVol).Append(" / hamulec ").Append(d.k8Brake)
+              .Append(", poza K8 (Straz, Inni, bez poboru) ").Append(d.k8Out);
             // milicja
             long m1 = d.m1v + d.m1t + d.m1c;
             long refused = d.r1 + d.r2 + d.r3;

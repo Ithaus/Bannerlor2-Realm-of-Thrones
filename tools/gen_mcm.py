@@ -89,6 +89,8 @@ RANGES = {
     # E4/8 (164b-2): kara miasta wobec stopy wsi (pkt rocznie) i dni dopelnienia miasta ze wsi (0 = tylko ubytek naturalny)
     'TownGrowthPenaltyPercent': (0.0, 3.0, "0.0"),
     'TownMigrationRefillDays': (0, 1456, "0"),
+    # E4/8 K8: limit dzienny A5 zalogi (kod przycina do 1..5; 1 = gra)
+    'GarrisonAutoRecruitPerDay': (1, 5, "0"),
 }
 
 def gen(module_dir, ns, display):

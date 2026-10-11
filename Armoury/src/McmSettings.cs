@@ -2560,6 +2560,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool GarrisonGrowthOnlyRecruits { get; set; } = true;
 
+        [SettingPropertyInteger("Garrison Auto Recruit Per Day", 1, 5, "0", HintText = "a garrison may take up to this many paid recruits a day from the notables of its town and villages (the game allows 1) - only within its wage limit and free room, only men of that land, and not while the land has no free hands left; the Night's Watch keeps 1 (1 = as in the game)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int GarrisonAutoRecruitPerDay { get; set; } = 2;
+
         [SettingPropertyBool("Militia From Free Hands", HintText = "militia grows only from the free hands of its own land: each new militiaman leaves his village (1/k of a hearth) or town, a land with no free hands left raises no new militia, and militia that shrinks without a fight goes back home")]
         [SettingPropertyGroup("Iron Bank")]
         public bool MilitiaFromFreeHands { get; set; } = true;
@@ -4979,6 +4983,7 @@ namespace Armoury
             s.FreeHandsBrake = FreeHandsBrake;
             s.PeopleMenuEntry = PeopleMenuEntry;
             s.GarrisonGrowthOnlyRecruits = GarrisonGrowthOnlyRecruits;
+            s.GarrisonAutoRecruitPerDay = GarrisonAutoRecruitPerDay;
             s.MilitiaFromFreeHands = MilitiaFromFreeHands;
             s.NewPartyFromPeople = NewPartyFromPeople;
             s.NewPartyFromSeatGarrison = NewPartyFromSeatGarrison;
