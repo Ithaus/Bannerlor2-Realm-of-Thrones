@@ -728,3 +728,5 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   polegli trwale; plan docs/etap4/PLAN-KODU-E47.md) rownolegle -> E4/8 (zalogi/milicje z ludzi; po E4/7) i E4/10 (weterani; po E4/7) -> E4/9 (Straz, Wolni Ludzie, niewola;
   po E4/7+E4/8) -> E4/11 (wioski poboczne; po E4/5+E4/6). Kazda paczka: kod + recenzja (+ poprawki), osobna galaz, scalanie na biezaco w w-toku/zbior-e4-koniec. Na koniec
   JEDEN test (rok 364 dob nowej kampanii + zima 120 + zapis 9; projekt rozdz. 4 "Koniec etapu" mowi tez o 728 dobach dla "spalona wioska wraca po roku") -> poprawki -> wgranie.
+- (07:10) Pasza koni wariant (a) GOTOWA: w-toku/e4-jedzenie 4c54fe8 (postfiks na BK CalculateAnimalFoodNeed -> AnimalNeed po glowie, warunki terenu BK zostaja, wylacznik
+  BkAnimalFeedPerHead). Do sprawdzenia w tescie zbioru 31: glod i zakupy AI w Dorne (pustynia caly rok) i na polnocy (snieg). Czekam na E4/5 (wf_3ee22640-ded).
