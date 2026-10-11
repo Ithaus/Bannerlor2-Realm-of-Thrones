@@ -1511,6 +1511,7 @@ namespace Armoury
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
             try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); }
+            try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); }   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
             try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
             try { MarketGlut.DailyDigest(); }

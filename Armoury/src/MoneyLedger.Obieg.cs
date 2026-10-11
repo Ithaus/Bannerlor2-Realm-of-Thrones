@@ -675,6 +675,7 @@ namespace Armoury
               .Append(S(C[CCastle, CW.LMarket])).Append(", wsie ").Append(S(C[CVill, CW.LMarket])).Append("; notable ").Append(S(mn)).Append(')')
               .Append(", rynek wsi ").Append(WvS(vv + vt, CW.WVillageMarket)).Append(" (wsie ").Append(S(vv)).Append(", miasta i zamki ").Append(S(vt)).Append(')')
               .Append(", sprzedaz niewolnikow ").Append(Wv(Sm[CW.ZSlaves], CW.WSlaves))
+              .Append(BkSeal34.ObiegPart())   // 3.4: przelewy w parze zamiast z niczego / w nicosc
               .Append(" | lordowie BK [P] (w nicosc): tytuly ").Append(Wv(titles, CW.WTitles)).Append(" (roszczenia ").Append(Sm[CW.ULordClaim]).Append(", nadania ").Append(Sm[CW.ULordCreate])
               .Append(", odebrania ").Append(Sm[CW.ULordRevoke]).Append(", uzurpacje ").Append(Sm[CW.ULordUsurp]).Append(')')
               .Append(", pasowanie z nowym rodem ").Append(Wv(Sm[CW.ULordKnightClan], CW.WKnight)).Append(", koszty laski dworu ").Append(Wv(Sm[CW.ULordCourt], CW.WCourt))

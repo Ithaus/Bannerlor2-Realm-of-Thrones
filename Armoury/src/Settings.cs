@@ -1145,6 +1145,13 @@ namespace Armoury
         public int ShopKeepPieces = 1;                     // how many such pieces stay on the stall (0-3)
         public bool PlayerWorkshopsSameRule = true;        // your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game
 
+        // --- Banner Kings coin (stage 3) ---
+        // 3.4 BK: zaopatrzenie partii, rynek wsi, sprzedaz niewolnikow, wyposazenie rycerza - kazda moneta ma platnika i odbiorce (BkSupplyMarket.cs, BkSeal34.cs)
+        public bool BkSupplyBuyByPartyStock = true;        // Banner Kings party supplies (drink, timber, animal products, tools) are bought by what the PARTY carries, not by what the town holds: once a day while a lord's party stays in a town, castle or village, and again on entering a town or castle, its quartermaster tops each supply up to its need - at most Bk Supply Max Pieces pieces - from that settlement's stall at the stall's price, and the coin goes to that settlement's purse. Banner Kings bought nothing whenever the town held enough, and its coin left the world. On the way into a town an AI lord skips the goods the game makes him sell right there - anything that is not food, such as timber, tools and wine (off = Banner Kings as before)
+        public bool BkVillageMarketPaysWhatItHas = true;   // a village with a Banner Kings marketplace buys a surplus good from its town only while it has the coin for it, and the town gets exactly what the village paid (Banner Kings let the village pay more than it had and gave the town the full price out of nothing; off = as before)
+        public bool BkSlaveSalePaidByTown = true;          // surplus slaves sold off by a settlement's owner (Banner Kings decision to sell surplus slaves) are paid for by the merchants of that town or castle - at most what its purse may spend - instead of with coin out of nothing; the slaves they cannot pay for stay in the settlement (off = as before)
+        public bool BkKnightKitPaidToTown = true;          // when an AI lord raises a new household knight (Banner Kings with the ROT patch), the price of the knight's arms and armour goes to the market of the knight's village instead of vanishing (off = as before)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");
