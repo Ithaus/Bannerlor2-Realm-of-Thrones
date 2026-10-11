@@ -3372,6 +3372,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightRestEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Night Rest Every Model", HintText = "the sleep penalties (speed and morale) also work in party models that name the party differently in their code (today: the War Sails morale model, left out before with an error at game start) - still counted once per party; off = those models skip the penalty, as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool NightRestEveryModel { get; set; } = true;
+
         [SettingPropertyInteger("Camp Background", 0, 10, "0", HintText = "picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like")]
         [SettingPropertyGroup("A night's rest")]
         public int CampBackground { get; set; } = 1;
@@ -5054,6 +5058,7 @@ namespace Armoury
             s.MarketGlutMinPercent = MarketGlutMinPercent;
             s.MarketGlutRecoverPerDay = MarketGlutRecoverPerDay;
             s.NightRestEnabled = NightRestEnabled;
+            s.NightRestEveryModel = NightRestEveryModel;
             s.CampBackground = CampBackground;
             s.MapClockEnabled = MapClockEnabled;
             s.FastForwardMultiplier = FastForwardMultiplier;

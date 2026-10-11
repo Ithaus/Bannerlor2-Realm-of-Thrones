@@ -1218,10 +1218,16 @@ namespace Armoury
             return _ai.TryGetValue(mp, out e) && e != null ? e.DawnDebt : 0;
         }
 
-        internal static void SpeedPostfix(MobileParty mobileParty, ref ExplainedNumber __result)
+        /// <summary>
+        /// E4 bledy (11.10): partia PO POZYCJI (__0), nie po nazwie - nadpisania w modach nazywaja ja roznie (NavalDLCPartyMoraleModel: "party"),
+        /// a Harmony przy nazwie bez pary rzucal "Parameter mobileParty not found" i model zostawal bez latki (jak MarchPace / TerrainEase).
+        /// PatchModels wpina tylko metody z MobileParty na pozycji 0, wiec __0 to zawsze partia.
+        /// </summary>
+        internal static void SpeedPostfix(MobileParty __0, ref ExplainedNumber __result)
         {
             try
             {
+                var mobileParty = __0;
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 int d = DebtFor(mobileParty);
@@ -1241,10 +1247,12 @@ namespace Armoury
             catch { }
         }
 
-        internal static void MoralePostfix(MobileParty mobileParty, ref ExplainedNumber __result)
+        /// <summary>E4 bledy (11.10): partia po pozycji (__0) - jak SpeedPostfix.</summary>
+        internal static void MoralePostfix(MobileParty __0, ref ExplainedNumber __result)
         {
             try
             {
+                var mobileParty = __0;
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 int d = DebtFor(mobileParty);
@@ -1259,6 +1267,25 @@ namespace Armoury
                 __result.AddFactor(f > 0.01f ? -pct * f : -pct, _txtSleepless);
             }
             catch { }
+        }
+
+        /// <summary>
+        /// E4 bledy (11.10): postfiksy dla modeli, ktore nazywaja partie inaczej niz "mobileParty" (dzis: morale NavalDLC) - dawna latka po nazwie
+        /// ich nie obejmowala. Wylacznik NightRestEveryModel (czytany przy kazdym wywolaniu, bo MCM wchodzi dopiero przy starcie kampanii):
+        /// wylaczony = te modele wpiete, ale bez kary, jak przed poprawka. Kara dalej raz na partie (SpeedDepth - licznik na wszystkich modelach).
+        /// </summary>
+        internal static void SpeedPostfixOtherName(MobileParty __0, ref ExplainedNumber __result)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.NightRestEveryModel) return;
+            SpeedPostfix(__0, ref __result);
+        }
+
+        internal static void MoralePostfixOtherName(MobileParty __0, ref ExplainedNumber __result)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.NightRestEveryModel) return;
+            MoralePostfix(__0, ref __result);
         }
 
         private static readonly TextObject _txtSleepless = new TextObject("{=!}Sleepless nights");
@@ -1748,8 +1775,9 @@ namespace Armoury
         {
             try
             {
-                int spd = PatchModels(harmony, typeof(PartySpeedModel), "CalculateFinalSpeed", "SpeedPostfix");
-                int mor = PatchModels(harmony, typeof(PartyMoraleModel), "GetEffectivePartyMorale", "MoralePostfix");
+                var fails = new System.Collections.Generic.List<string>();   // E4 bledy: potkniecia per model (dotad catch {} bez sladu)
+                int spd = PatchModels(harmony, typeof(PartySpeedModel), "CalculateFinalSpeed", "SpeedPostfix", "SpeedPostfixOtherName", fails);
+                int mor = PatchModels(harmony, typeof(PartyMoraleModel), "GetEffectivePartyMorale", "MoralePostfix", "MoralePostfixOtherName", fails);
 
                 // CampaignEvents.TickEvent staje razem z pauza - a gracz w miejscu
                 // to pauza wlasnie. Dopinamy sie do klatki ekranu mapy (chodzi zawsze).
@@ -1761,14 +1789,25 @@ namespace Armoury
 
                 Log.Info("Nocleg: kary snu wpiete (predkosc w " + spd + ", morale w " + mor + " modelach), "
                          + "klawisz O na klatce mapy: " + (mTick != null) + ".");
+                if (fails.Count > 0)
+                    Log.Info("Nocleg: kary snu NIE wpiete w " + fails.Count + " modelach: " + string.Join("; ", fails.ToArray()) + ".");
             }
             catch (Exception e) { Log.Error("NightRest.ApplyAll", e); }
         }
 
-        private static int PatchModels(Harmony harmony, Type baseType, string method, string postfixName)
+        /// <summary>
+        /// Postfiks kary snu na kazda zadeklarowana metode modelu (pochodne w zaladowanych modach). E4 bledy (11.10): partia po pozycji (__0),
+        /// wiec wpinamy tylko metody z MobileParty na pozycji 0; modele z partia nazwana inaczej niz "mobileParty" (dawna latka po nazwie ich nie
+        /// obejmowala) dostaja postfiks *OtherName (wylacznik NightRestEveryModel). Potkniecie jednego modelu nie gasi reszty - trafia do "fails".
+        /// </summary>
+        private static int PatchModels(Harmony harmony, Type baseType, string method, string postfixName, string otherNamePostfixName,
+                                       System.Collections.Generic.List<string> fails)
         {
             var post = new HarmonyMethod(typeof(NightRest).GetMethod(
                 postfixName, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public))
+            { priority = Priority.Last };
+            var postOther = new HarmonyMethod(typeof(NightRest).GetMethod(
+                otherNamePostfixName, BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public))
             { priority = Priority.Last };
             int done = 0;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -1785,10 +1824,16 @@ namespace Armoury
                         var m = t.GetMethod(method, BindingFlags.Public | BindingFlags.NonPublic |
                                                     BindingFlags.Instance | BindingFlags.DeclaredOnly);
                         if (m == null || m.IsAbstract) continue;
-                        harmony.Patch(m, postfix: post);
+                        var ps = m.GetParameters();
+                        if (ps.Length < 1 || ps[0].ParameterType != typeof(MobileParty))
+                        {
+                            fails.Add(t.Name + "." + method + " (bez MobileParty na pozycji 0)");
+                            continue;
+                        }
+                        harmony.Patch(m, postfix: ps[0].Name == "mobileParty" ? post : postOther);
                         done++;
                     }
-                    catch { }
+                    catch (Exception e) { fails.Add(t.Name + "." + method + " (" + e.Message + ")"); }
                 }
             }
             return done;
