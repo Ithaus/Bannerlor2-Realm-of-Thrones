@@ -1080,3 +1080,12 @@ graczowi; BeatenPurse.cs, wylacznik BeatenPurseToVictor). RC 5f98df70, CS 77b11d
 pasera +11% przy limicie +20%, kiesy band +38% - skutek decyzji D), dezercja AI 10/d, wojsko lordow w wojnie 100.8 tys., glowy < 5000 = 0, bankruci 0, reszta ksiegi -2.1 tys./d,
 kiesy rozbitych karawan i taborow znikajace z mapy 0; zapis 9 dob OK (0 bledow, 26.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-10-przed-noc25 + D:\...\2026-10-10-noc25-przed.
 Pytanie (drobne) do Jeffa: kiesa bandy, ktora przylacza sie do gracza - dzis znika (jak przed 3.2). ZATWIERDZONE: Armoury 1211d984, RC 5f98df70, CS 77b11df5.
+
+**WGRANIE 26 (10.10 ok. 19:26 zegara komp.):** Armoury d38f1e69 + **RealisticCaptivity cea72cca** (galaz noc/wgranie-26 = w-toku/e3-gA f205ba0 = WGRANIE 25 + ETAP 3.4-3.7:
+3.4 BK bez zlota z niczego/w nicosc (zaopatrzenie partii wedlug zapasu partii placone kasie osady, rynek wsi placi tylko co ma, niewolnikow placi kasa osady, rynsztunek
+rycerza BKROT do kasy targu; BkSupplyMarket.cs, BkSeal34.cs), 3.5 rada BK - pensje od dochodu, ktory pan ma, do kazdego radnego (CouncilWages35.cs), 3.6 wedrowcy BK bez
+towaru z niczego (TravellerGoods36.cs), 3.7 ROT: podmiana rekruta bez zwrotu z niczego, 50 000 przywodcy rebelii z kasy osady, lord w lupie zaciagu wedlug ceny gry
+(RotLeaks37.cs + RC)). CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow Armoury i RC, wojsko lordow w wojnie 101.1 tys., dezercja AI 14/d, glowy < 5000 = 2, bankruci 0,
+bandy -12%, reszta ksiegi wobec bazy -9.2 tys. (TAK; bezwzglednie -20.8 tys./d - do domkniecia przez E3/0); zapis 9 dob OK (0 bledow, 31.4 s/dobe). Kopie: *.bak-2026-10-10-przed-noc26
+(Armoury i RC) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc26-przed. Pytania (kierunkowe, bez pilnosci): napitki i drewno wojska placi lord (tak dzis) czy sakiewka ludzi?;
+wedrowcy BK kiedys z prawdziwym towarem?. ZATWIERDZONE: Armoury d38f1e69, RealisticCaptivity cea72cca, CrashScribe 77b11df5. GrandTourney 1337433c.
