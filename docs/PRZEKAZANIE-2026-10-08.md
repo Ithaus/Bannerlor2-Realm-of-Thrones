@@ -711,3 +711,5 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   bankruci 0, dezercja AI 6/d (baza 49), bandy -18%/-16%; etap 4: NIE tylko znane dziury pomiaru (T2 hearth +677/d -> E4/4, T6, T7 -> E4/7-9) + pula wyrzutkow d60/90/120
   1.7/3.0/4.0 tys. (rosnie w wojnie przy 1/120 - plateau dopiero po roku). TEST B (proba zimy, plik-przelacznik polozony 05:16; skrypt usuwa go po tescie) w toku ->
   test\at-z30-B.out.txt; potem zapis 9 dob -> WGRANIE 30.
+- (05:35) Jeff: "po wgraniu 30 rob dalej E4/4". E4/4 (przyrost naturalny, miasta jako stan, podloga 10) KOD W TOKU: workflow wf_4d6430c3-d4f, drzewo SCRATCH(ae222cb7)\e4\44,
+  galaz w-toku/e4-4 od c02c80f (zbior 30) -> test\Armoury-e4-4.dll. Test E4/4 razem z nastepna paczka (E4/5 spustoszenie - zalezy od E4/4) wedlug zasady testow zbiorczych.
