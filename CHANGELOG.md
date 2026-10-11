@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 (etap 5, E5/A1 = 111' kasy miast) - PLAN KODU I REZERWACJA INDEKSOW MONEYLEDGER (bez kodu)
+**Mod:** Armoury | **Galaz:** `w-toku/e5-a1` (od 392c519 = zbior 31 + E4/6 + E4/7) | **Pliki:** tylko ten wpis; plan `docs\etap5\PLAN-KODU-E5A1.md` (repo glowne)
+
+**Problem:** E5/A1 (kasy miast) i drzewo A2-A5 (`w-toku/e5-a2-5`) wychodza z tej samej bazy i oba moga dopisac pozycje ksiegi pieniadza (MoneyLedger) - ten sam numer w dwoch drzewach = blad przy scaleniu (jak przyczyny ksiegi ludzi E4/6 + E4/7, wpis scalenia ponizej).
+
+**Zmiana (rezerwacja, kodu nie ma):**
+- MoneyLedger migawki ticku (M, `Marks` dzis 12, K:MoneyLedger.cs:89-94): **E5/A1 zajmuje M12 `MTownTrim`** (dar startowy kas miast przyciety - ujscie raz na kampanie) **i M13 `MTownCrown`** (udzial korony z zaworu kas miast); M14-M16 rezerwa A1. `Marks` w A1 = 14 (tablica `MName` musi miec tyle samo pozycji).
+- **Drzewo A2-A5 bierze od pierwszego wolnego + 5:** migawki od **M17**, Notes (N, dzis 0-8) od **N14**, Holders (H, dzis 0-21) od **H27**; w swoim drzewie zaslepki `MName[12..16]` = "(zarezerwowane E5/A1)" (i `NName`/posiadacze analogicznie, jesli bierze), przy scaleniu zaslepki 12-13 zastapic nazwami A1.
+- E5/A1 nie dodaje Notes, Holders, N169 ani rodzajow okien CirculationWindows. E5/0 (drzewo `e5\0`) wg projektu nie dodaje pozycji MoneyLedger - gdyby musial, poza 12-21 (uzgodnic w jego planie).
+
+**Ryzyko / co sprawdzic:** przy scaleniu A1 + A2-A5 + E5/0: `Marks`/`Notes`/`Holders` = najwyzszy uzyty + 1, dlugosci `MName`/`NName` rowne, petla linii kas (K:MoneyLedger.cs:929) bez wyjatku; `SegMarks` (K:MoneyLedger.Obieg.cs:106) bez zmian.
+
+**Status:** PLAN (kod A1 w toku; test - zbior A po tescie koncowym etapu 4).
+
 ## 2026-10-11 (etap 4, SCALENIE E4/6 + E4/7 w `w-toku/zbior-e4-koniec`) - SPICHLERZ I GLOD RAZEM Z POCHODZENIEM I POBOREM Z WSI: PRZENUMEROWANE PRZYCZYNY KSIEGI, ZGONY Z GLODU JAKO CYWILE REGIONU
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e4-koniec` (od dfb12df = zbior 31) | **Scalone:** `w-toku/e4-6` (0cd60f1) potem `w-toku/e4-7` (61f75d7) | **Pliki (rozwiazane):** `PeopleBook.cs`, `Measure40.cs`, `Settings.cs`, `McmSettings.cs` (gen_mcm, Armoury 1072 = 1050 + 13 E4/6 + 9 E4/7), `tools/gen_mcm.py`, `tools/sprawdz_logi.py`, `CHANGELOG.md`; poprawki semantyczne: `Famine.cs`, `PeopleBook.cs`, `PeopleBook.Origin.cs` (opis); po przegladzie: `FreeHands.cs`, `Famine.cs` (FamineFix)
 
