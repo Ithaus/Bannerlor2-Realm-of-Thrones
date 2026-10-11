@@ -2243,246 +2243,246 @@ def e411_g13(rep, lines, kw, on, off, start, logp):
                     "w kazdej dobie biegu z kluczem false (korekta 0)", True if len(tf) == len(on) else None)
         else:
             rep.add("E4/11 G13: wylacznik zywnosci warowni (Town Food By Village People = false)", "klucz wlaczony w calym biegu", "autotest z kluczem false", None)
-
-# E4/9 (192): linia startowa; baza Strazy d120 - bieg A zbioru 31 (z31A, przed E4/9: zapas Strazy 8 691 - plan kodu E4/9 rozdz. 11 K7); kultury z niewola (LosersFlee)
-E49_START = "Krainy kanonu (E4/9): wpiete"
-E49_WATCH_BASE = 8691
-E49_SLAVE = {"ghiscari", "volantine", "lyseni", "myrish", "tyroshi", "qohorik", "norvos", "valyrian", "khuzait", "sturgia", "qartheen", "?"}
-# udzial krain w ludziach Westeros (tabela PopulationLaw, mln): K4 - 3 najwieksze krainy rozkladu "z ludnosci" w +-2 pkt
-E49_WESTEROS = {"reach": 8.0, "vlandia": 4.0, "river": 3.5, "battania": 3.0, "vale": 3.0, "stormlands": 2.5, "aserai": 1.5, "dragonstone": 0.85, "crownlands": 0.6, "sturgia": 0.5}
-
-
-def etap4_e49(rep, lines, start, win, until):
-    """E4/9 (192): progi K1-K25 z planu kodu docs/etap4/PLAN-KODU-E49.md rozdz. 11 (stan z linii dziennych, nie startowej). Linie: "Straz z Westeros (E4/9): dzien",
-    "Niewolni (E4/9): dzien", "Ludzie (spustoszenie)" (odcinek "pojmani (E4/9)"), "Jency (E4/0)" (odcinek "pojmani z wsi (E4/9)"), "Dlugi (168)" (odcinek "DLUG 4 (E4/9)"),
-    "Wolne rece (E4/7)" (prog Zelaznych), "Pula wyrzutkow (E4/3)" ("do Strazy"), "Straz i Wolni Ludzie (4.15)", "Ludzie (ksiega)" (rownanie krain), kalibracja PopulationLaw."""
-    stl = next((x for x in lines if x.startswith(E49_START)), "")
-    wl = e4_series(lines, "Straz z Westeros (E4/9): dzien")
-    nw = e4_series(lines, "Niewolni (E4/9): dzien")
-    dev = e4_series(lines, "Ludzie (spustoszenie): dzien")
-    jen = e4_series(lines, "Jency (E4/0): dzien")
-    dl = e4_series(lines, "Dlugi (168): dzien")
-    fh = e4_series(lines, "Wolne rece (E4/7): dzien")
-    swl = e4_series(lines, "Straz i Wolni Ludzie (4.15): dzien")
-    kb = e4_series(lines, "Ludzie (ksiega): dzien")
-    wdays = [d for d in sorted(wl) if 1 <= run_day(d, start) <= until]
-    ndays = [d for d in sorted(nw) if 1 <= run_day(d, start) <= until]
-    # K1 bledy, linia startowa, potkniecia
-    brak = re.search(r"; BRAK: (.*?); wlasciciele", stl)
-    rep.add("E4/9 K1: linia startowa (latki ExecuteCapture i AiHourlyTick)", stl[:300], "\"BRAK: -\"", (brak is not None and brak.group(1).strip() == "-") if stl else False)
-    errs = [x for x in lines if x.startswith("ERROR in WatchLaw") or x.startswith("ERROR in ThrallLaw") or ("(E4/9" in x and x.startswith("ERROR in "))
-            or x.startswith("ERROR in PeopleBook.E4/7.WallTake") or x.startswith("ERROR in PeopleBook.E4/7.ThrallsDaily") or x.startswith("ERROR in PeopleBook.E4/7.SeedThralls")
-            or x.startswith("ERROR in PeopleBook.E4/7.CanonEndDay") or x.startswith("ERROR in PeopleBook.E4/7.ImportCanonPart") or x.startswith("ERROR in PeopleBook.RefugeesToCaptives")
-            or x.startswith("ERROR in Devastation.TakeCaptives")]
-    stw = [num(r"\| potkniecia (\d+)", wl[d], int, 0) or 0 for d in wdays]
-    stn = [num(r"\| potkniecia (\d+)\.", nw[d], int, 0) or 0 for d in ndays]
-    rep.add("E4/9 K1: bledy i potkniecia E4/9", f"bledy {len(errs)}, potkniecia Straz {sum(stw)}, Niewolni {sum(stn)}" + (f" (pierwszy: {errs[0][:140]})" if errs else ""),
-            "0 bledow; potkniecia <= 5 z nazwa miejsca", len(errs) == 0 and sum(stw) + sum(stn) <= 5)
-    if not wdays:
-        rep.add("E4/9: linie dzienne \"Straz z Westeros (E4/9)\"", "brak", "kazdej doby (LogEnabled)", False)
-        return
-    live = [d for d in wdays if "| prawo CZYNNE" in wl[d]]
-    rep.add("E4/9: doby z czynnym prawem Strazy (WatchLaw + ksiega pochodzenia)", f"{len(live)} z {len(wdays)}", "INFO (przed siewem E4/7 - nieczynne)", None)
-    rx = re.compile(r"przybylo " + F_ + r" = z Muru " + F_ + r" \+ z pul wyrzutkow " + F_ + r" \(zolnierze " + F_ + r", prosci " + F_ + r"; budzet (\d+)%: " + F_
-                    + r" w (\d+) regionach, wykorzystano " + F_ + r"%\) \+ z ludnosci " + F_ + r" \(.*?\) \+ bez pokrycia " + F_)
-    rows = []
-    for d in live:
-        m = rx.search(wl[d])
-        if m:
-            v = [float(x) for x in m.groups()]
-            rows.append((d, v))
-    # K2 przybylo = Mur + pule + ludnosc + bez pokrycia; bez pokrycia <= 1% (28 dob)
-    bad2 = [(run_day(d, start), v[0], v[1] + v[2] + v[9] + v[10]) for d, v in rows if abs(v[0] - (v[1] + v[2] + v[9] + v[10])) > 0.3]
-    last = rows[-28:]
-    nsum, zsum = sum(v[0] for _, v in last), sum(v[10] for _, v in last)
-    rep.add("E4/9 K2: przybylo = Mur + pule + ludnosc + bez pokrycia (kazdej doby)", f"{len(rows) - len(bad2)} z {len(rows)} dob" + (f"; roznice {bad2[:3]}" if bad2 else ""),
-            "kazdej doby (+-0.3 - zaokraglenie linii)", (len(bad2) == 0) if rows else None)
-    rep.add("E4/9 K2: bez pokrycia / przybylo (ostatnie 28 dob)", f"{zsum:.1f} / {nsum:.1f} = " + (f"{100 * zsum / nsum:.2f}%" if nsum > 0 else "-"), "<= 1% (podloga 50 hearth w calym Westeros)",
-            (zsum <= 0.01 * nsum) if nsum > 0 else None)
-    # K3 pule: wykorzystano <= 100%; z pul > 0 w d2-d120
-    over = [(run_day(d, start), v[8]) for d, v in rows if v[8] > 100.05]
-    pool2 = [v[2] for d, v in rows if run_day(d, start) >= 2]
-    rep.add("E4/9 K3: budzet pul - wykorzystano <= 100% kazdej doby", f"przekroczen {len(over)}" + (f" ({over[:3]})" if over else "") + f"; budzet srednio {st.mean([v[6] for _, v in rows]):.1f}/d w {st.mean([v[7] for _, v in rows]):.0f} regionach" if rows else "-",
-            "<= 100%", (len(over) == 0) if rows else None)
-    rep.add("E4/9 K3: z pul wyrzutkow w d2-d" + str(until), f"razem {sum(pool2):.0f} ({sum(1 for x in pool2 if x > 0)} z {len(pool2)} dob > 0; zolnierze {sum(v[3] for _, v in rows):.0f}, prosci {sum(v[4] for _, v in rows):.0f})",
-            "> 0 (RK 1.2: X = 3%)", (sum(pool2) > 0) if pool2 else None)
-    # K4 rozklad "z ludnosci" od wczytania (ostatnia linia) - 3 najwieksze krainy w +-2 pkt od udzialu w ludziach Westeros
-    ml = re.search(r"\(rozklad: ([^)]*)\)", wl[live[-1]]) if live else None
-    tot = sum(E49_WESTEROS.values())
-    if ml and ml.group(1).strip() != "-":
-        got = {k: float(v) for k, v in re.findall(r"([a-z_]+) ([\d.]+)%", ml.group(1))}
-        top3 = sorted(E49_WESTEROS, key=lambda k: -E49_WESTEROS[k])[:3]
-        diffs = [(k, got.get(k, 0.0), 100.0 * E49_WESTEROS[k] / tot) for k in top3]
-        rep.add("E4/9 K4: rozklad z ludnosci od wczytania - 3 najwieksze krainy (log / tabela)", ", ".join(f"{k} {a:.1f}/{b:.1f}%" for k, a, b in diffs), "+-2 pkt (RK:215)",
-                all(abs(a - b) <= 2.0 for _, a, b in diffs))
-    else:
-        rep.add("E4/9 K4: rozklad z ludnosci", "brak poboru z ludnosci (Mur i pule pokryly)" if live else "-", "+-2 pkt - INFO bez poboru", None)
-    # K5 zwolnieni 166 do domu = 0 i do domu z hearth = 0
-    rel = [num(r"zwolnieni 166 do domu (\d+)", wl[d], int, 0) or 0 for d in live]
-    hh = [fnum(r"do domu z hearth " + F_, wl[d]) or 0 for d in live]
-    rep.add("E4/9 K5: bracia - zwolnieni 166 do domu / do domu z hearth (suma)", f"{sum(rel)} / {sum(hh):.1f}", "0 / 0 kazdej doby (tylko na Mur - U5)", sum(rel) == 0 and sum(hh) == 0)
-    # K6 rabunki Strazy = 0 od d2; bezpiecznik 0
-    rr = [(run_day(d, start), num(r"rabunki Strazy dzis (\d+)", wl[d], int, 0) or 0) for d in wdays]
-    fz = sum(num(r"bezpiecznik (\d+)", wl[d], int, 0) or 0 for d in wdays)
-    rj = sum(num(r"odrzucone opcje rabunku (\d+)", wl[d], int, 0) or 0 for d in wdays)
-    late = [x for x in rr if x[0] >= 2 and x[1] > 0]
-    rep.add("E4/9 K6: H1 - rabunki Strazy od d2 / bezpiecznik", f"{sum(x[1] for x in late)} / {fz} (odrzucone opcje rabunku razem {rj})" + (f"; doby {late[:4]}" if late else ""),
-            "0 / 0 (RK 0.1.2: 10 rabunkow w 28 dobach przed H1)", len(late) == 0 and fz == 0)
-    # K7 Straz w d120 >= 85% biegu bazy
-    sd = [d for d in sorted(swl) if 1 <= run_day(d, start) <= until]
-    ws = num(r"Nocna Straz: stan (\d+)", swl[sd[-1]]) if sd else None
-    if ws is not None and run_day(sd[-1], start) >= 120:
-        rep.add(f"E4/9 K7: Straz w d{run_day(sd[-1], start)}", f"{ws} wobec bazy z31A {E49_WATCH_BASE}", f">= {int(0.85 * E49_WATCH_BASE)} (85%)", ws >= 0.85 * E49_WATCH_BASE)
-    else:
-        rep.add("E4/9 K7: Straz w d120", f"{ws} (d{run_day(sd[-1], start) if sd else '-'})" if ws is not None else "brak linii", "INFO - wymaga biegu 120 dob", None)
-    # K8 kontrola linii |.| <= 1 kazdej doby; w nicosc (q + znikniecie) <= 10% obrotu (28 dob)
-    kc = [(run_day(d, start), fnum(r"\) = " + SF + r" \| potkniecia", wl[d])) for d in live]
-    kc = [x for x in kc if x[1] is not None]
-    badk = [x for x in kc if abs(x[1]) > 1.0]
-    rep.add("E4/9 K8: kontrola linii Straz z Westeros", f"max |kontrola| {max((abs(x[1]) for x in kc), default=0):.2f} w {len(kc)} dobach" + (f"; ponad 1: {badk[:4]}" if badk else ""),
-            "|.| <= 1 czlowiek kazdej doby", (len(badk) == 0) if kc else None)
-    tq = []
-    for d in live[-28:]:
-        m = re.search(r"\(wejscia " + F_ + r" - wyjscia " + F_ + r" - w nicosc " + F_ + r" - przy zniknieciu partii " + F_ + r"\)", wl[d])
-        if m:
-            a, b, q, g = (float(x) for x in m.groups())
-            tq.append((q + g, a + b))
-    if tq:
-        q_, t_ = sum(x[0] for x in tq), sum(x[1] for x in tq)
-        rep.add("E4/9 K8: w nicosc (niedobor slownika + resztka przy zniknieciu) / obrot (28 dob)", f"{q_:.1f} / {t_:.1f} = " + (f"{100 * q_ / t_:.1f}%" if t_ > 0 else "-"),
-                "<= 10% obrotu (dzis T6: 60-67% ruchu bez nazwy)", (q_ <= 0.10 * t_) if t_ > 0 else None)
-    # K9 dezercja i do lasu: 100% do regionow Polnocy
-    wn = sum(fnum(r"do lasu: pula Polnocy " + F_, wl[d]) or 0 for d in live)
-    wo = sum(fnum(r"inne regiony " + F_ + r" \| zwolnieni", wl[d]) or 0 for d in live)
-    rep.add("E4/9 K9: dezerterzy i rozbici Strazy do lasu - pula Polnocy / inne", f"{wn:.1f} / {wo:.1f}", "100% Polnoc (inne 0)", (wo <= 0.05) if wn + wo > 0 else None)
-    # K10 pula i bandy - INFO; "do Strazy" z linii puli
-    pl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien")
-    tw = [fnum(r"do Strazy \(E4/9\) " + F_, pl[d]) or 0 for d in sorted(pl) if 1 <= run_day(d, start) <= until]
-    wy = e4_series(lines, "Wyrzutki: dzien", 1)
-    wyd = [d for d in sorted(wy) if 1 <= run_day(d, start) <= until]
-    band = [(num(r"\| band (\d+), ludzi (\d+)", wy[d]), num(r"\| band \d+, ludzi (\d+)", wy[d])) for d in wyd]
-    rep.add("E4/9 K10: pula wyrzutkow - do Strazy (srednio/d) i bandy (d1 -> ostatnia: band, ludzi)", f"{st.mean(tw):.1f}/d" if tw else "-" + "",
-            "INFO wobec bazy (RK 1.2: 3% - bandy ok. -17..-19%); prog band E4/3 (plateau w wojnie <= 1.5 x pokoj) - wiersze E4/3", None)
-    if band:
-        rep.add("E4/9 K10: bandy d1 -> ostatnia", f"{band[0][0]}/{band[0][1]} -> {band[-1][0]}/{band[-1][1]}", "INFO", None)
-    # K11 nowa kampania d1: niewolni Zelaznych = 27 000 x PopulationScale (+-1); kalibracja "sturgia ...M (...) + niewolni N"
-    op = next((x for x in lines if x.startswith("Niewolni (E4/9): bilans otwarcia nowej kampanii")), None)
-    cal = next((x for x in lines if x.startswith("PopulationLaw: kalibracja ludnosci")), "")
-    mc = re.search(r"sturgia ([\d.]+)M \([^)]*\) \+ niewolni (\d+)", cal)
-    if op:
-        mo = re.search(r"Zelazne Wyspy (\d+) \(czesc tabeli (\d+)", op)
-        n, tab = (int(mo.group(1)), int(mo.group(2))) if mo else (None, None)
-        exp = 27000.0 * tab / 500000.0 if tab else None
-        rep.add("E4/9 K11: bilans otwarcia niewolnych Zelaznych (NK)", f"{n} (oczekiwane {exp:.0f}); kalibracja: " + (f"sturgia {mc.group(1)}M + niewolni {mc.group(2)}" if mc else "brak dopisku"),
-                "27 000 x PopulationScale +-1 i dopisek w kalibracji", (n is not None and exp is not None and abs(n - exp) <= 1 and mc is not None))
-    else:
-        rep.add("E4/9 K11: bilans otwarcia niewolnych Zelaznych", "brak (stary zapis albo bieg nie od nowej kampanii)", "INFO - tylko nowa kampania", None)
-    # K12 kontrola "Niewolni" |.| <= 0.01; K13 smierc 5%/rok; K14 tylko krainy z niewola
-    nck = [(run_day(d, start), fnum(r"kontrola: T - Twczoraj - \(s \+ b \+ bilans - d\) = " + SF, nw[d])) for d in ndays]
-    nck = [x for x in nck if x[1] is not None]
-    badn = [x for x in nck if abs(x[1]) > 0.01]
-    rep.add("E4/9 K12: kontrola linii Niewolni", f"max |kontrola| {max((abs(x[1]) for x in nck), default=0):.3f} w {len(nck)} dobach" + (f"; {badn[:4]}" if badn else ""),
-            "|.| <= 0.01 kazdej doby", (len(badn) == 0) if nck else None)
-    yr = []
-    for d in ndays:
-        t = num(r"\| stan (\d+) \(bilans", nw[d]); dd = fnum(r"smierc -" + F_, nw[d]); pc = fnum(r"smierc -[\d.]+ \(" + F_ + r"%/rok", nw[d])
-        if t is not None and dd is not None and pc is not None and t + dd >= 1000 and dd > 0:
-            yr.append((100.0 * dd / (t + dd) * 364.0, pc))
-    if yr:
-        m_ = st.mean(x[0] for x in yr)
-        rep.add("E4/9 K13: smierc niewolnych (d / T x 364)", f"{m_:.2f}%/rok ({len(yr)} dob; ustawienie {yr[-1][1]:.0f}%)", "ustawienie +-0.1 pkt (5%)", abs(m_ - yr[-1][1]) <= 0.1)
-    else:
-        rep.add("E4/9 K13: smierc niewolnych", "za malo niewolnych w biegu (T < 1000)", "INFO", None)
-    held = {}
-    for d in ndays:
-        mh = re.search(r"\) w krainach: (.*?) \| dzis", nw[d])
-        if mh and mh.group(1).strip() != "-":
-            for k, v in re.findall(r"([a-z_?]+) (\d+)", re.sub(r"\([^)]*\)", "", mh.group(1))):
-                held[k] = max(held.get(k, 0), int(v))
-    outside = [k for k, v in held.items() if v > 0 and k not in E49_SLAVE]
-    i1 = any(x.startswith("Prawo jenca (I1)") for x in lines)
-    po = sum(fnum(r"poza kanonem \(prawo wylaczone albo osada bez niewoli\) " + F_, nw[d]) or 0 for d in ndays)
-    rep.add("E4/9 K14: niewolni tylko w krainach kanonu / poza kanonem (suma)", f"krainy trzymania {sorted(held)}; spoza listy {outside}; poza kanonem {po:.1f}",
-            "spoza listy 0; poza kanonem 0 przy I1" + ("" if i1 else " (I1 nieaktywne - INFO)"), (len(outside) == 0 and (po <= 0.5 or not i1)) if ndays else None)
-    # K15 prog wolnych rak Zelaznych w d1 NK 39-40% (zrodlo ksiega)
-    fd = [d for d in sorted(fh) if 1 <= run_day(d, start) <= until]
-    if op and fd:
-        mf = re.search(r"Zelazne Wyspy ([\d.]+)% \(niewolni ksiegi ([\d-]+) / BK [^-]*- zrodlo: ([a-z]+)", fh[fd[0]])
-        ok = mf is not None and 39.0 <= float(mf.group(1)) <= 40.05 and mf.group(3) == "ksiega"
-        rep.add(f"E4/9 K15: prog wolnych rak Zelaznych d{run_day(fd[0], start)} (NK)", f"{mf.group(1)}% (niewolni ksiegi {mf.group(2)}, zrodlo {mf.group(3)})" if mf else "brak odczytu",
-                "39-40% ze zrodla ksiega (z31A: 30.5% z BK)", ok)
-    else:
-        rep.add("E4/9 K15: prog wolnych rak Zelaznych", "brak NK albo linii Wolne rece", "INFO - tylko nowa kampania", None)
-    # K16 pojmani w linii spustoszenia = pojmani w linii Jency; z niczego (BK) = 0 przy czynnym prawie
-    k16, bk0 = [], []
-    for d in sorted(dev):
-        if not (1 <= run_day(d, start) <= until):
-            continue
-        md = re.search(r"pojmani \(E4/9\): rabunkow wygranych z pojmanymi (\d+), z uchodzcow wsi do lochu najezdzcy \+(\d+)", dev[d])
-        if not md:
-            continue
-        mj = re.search(r"pojmani z wsi \(E4/9\) \+(\d+) w (\d+) rabunkach", jen.get(d, ""))
-        if mj:
-            k16.append((run_day(d, start), int(md.group(2)), int(mj.group(1))))
-        b = num(r"z rabunku BK \+(\d+)", jen.get(d, ""))
-        if b is not None:
-            bk0.append((run_day(d, start), b))
-    badj = [x for x in k16 if x[1] != x[2]]
-    rep.add("E4/9 K16: pojmani - linia spustoszenia = linia Jency (kazdej doby)", f"{len(k16) - len(badj)} z {len(k16)} dob; razem {sum(x[1] for x in k16)}" + (f"; roznice {badj[:3]}" if badj else ""),
-            "kontrola 0 kazdej doby", (len(badj) == 0) if k16 else None)
-    rep.add("E4/9 K16: jency z rabunku BK z niczego przy czynnym prawie (suma)", f"{sum(x[1] for x in bk0)} w {len(bk0)} dobach", "0 kazdej doby (z31A: BK 18.5/d)", (sum(x[1] for x in bk0) == 0) if bk0 else None)
-    # K17 pojmani tylko u najezdzcow z niewola; J <= plan + 0.5 na wolanie
-    ns, jp = 0, []
-    for d in sorted(dev):
-        if not (1 <= run_day(d, start) <= until):
-            continue
-        m = re.search(r"z uchodzcow wsi do lochu najezdzcy \+(\d+) \(wyliczone \d+% trafionych przy niewoli " + F_ + r";.*?nie z niewola (\d+), gracz \d+, wolan BK (\d+)\)", dev[d])
-        if m:
-            ns += int(m.group(3))
-            jp.append((run_day(d, start), int(m.group(1)), float(m.group(2)), int(m.group(4))))
-    badp = [x for x in jp if x[1] > x[2] + 0.5 * max(1, x[3])]
-    rep.add("E4/9 K17: pojmani tylko z niewola / J <= plan + 0.5 na rabunek", f"nie z niewola {ns}; ponad plan {len(badp)} dob" + (f" {badp[:3]}" if badp else ""), "0 / 0", (ns == 0 and len(badp) == 0) if jp else None)
-    # K18 E4/5 S3 i kontrola konta UCHODZCY z czlonem pojmanych - wiersze E4/5 S3/S4 (kod liczy kontrole z pojmanymi)
-    withp = sum(1 for d in dev if "- pojmani " in dev[d] and "konto UCHODZCY: wczoraj" in dev[d])
-    rep.add("E4/9 K18: konto UCHODZCY z czlonem pojmanych", f"doby z czlonem w linii spustoszenia {withp}", "kontrola |.| <= 0.01 - wiersz E4/5 S4; pojmani przy uderzeniu 0 - E4/5 S3", None)
-    # K19 rownanie krain z T i W
-    rk = [fnum(r"rownanie krain: najgorsza kraina \S+ reszta \S+ \(" + SF + r"% ludzi krainy\)", kb[d]) for d in sorted(kb) if 1 <= run_day(d, start) <= until]
-    rk = [x for x in rk if x is not None][-28:]
-    seg = sum(1 for d in kb if "| E4/9: NIEWOLNI" in kb[d])
-    rep.add("E4/9 K19: rownanie krain z T i W (najgorsza kraina, 28 dob)", f"max |reszta| {max((abs(x) for x in rk), default=0):.3f}% ludzi krainy; odcinek E4/9 w {seg} dobach",
-            "<= 0.1% (przy RESZTA hearth != 0 - INFO, wiersze E4/7)", (max((abs(x) for x in rk), default=0) <= 0.1) if rk else None)
-    # K20 DLUG 4
-    rx4 = re.compile(r"DLUG 4 \(E4/9\): rodow w zajeciu (\d+), z odchodzacymi do domu (\d+), odeszli do domu (\d+) \(limit zoldu (\d+), zalegly zold (\d+); bez wsi z danymi BK - do lasu (\d+)\)")
-    sz, home, woods = 0, 0, 0
-    for d in sorted(dl):
-        if not (1 <= run_day(d, start) <= until):
-            continue
-        m = rx4.search(dl[d])
-        if m:
-            sz += int(m.group(1)); home += int(m.group(3)); woods += int(m.group(6))
-    if sz > 0 and home + woods > 0:
-        rep.add("E4/9 K20: DLUG 4 - do lasu / odchodzacy (rody w zajeciu)", f"{woods} / {home + woods} (rodo-dni zajec {sz})", "do lasu <= 5%, do domu > 0", woods <= 0.05 * (home + woods) and home > 0)
-    else:
-        rep.add("E4/9 K20: DLUG 4", f"rodo-dni zajec {sz}, odchodzacych {home + woods}", "INFO - brak zajec albo odchodzacych w biegu (b728: zajecia w 554 dobach)", None)
-    # K21 rownanie jencow - wiersz T7 (parser z czlonem pojmanych)
-    rep.add("E4/9 K21: rownanie jencow E4/0 z czlonem pojmanych", "wiersz T7: rownanie jencow (jin + pojmani z wsi E4/9)", "jak dotad (<= 10% obrotu)", None)
-    # K22 koszt
-    tm = [fnum(r"\| czas " + F_ + r" ms \(Levy", wl[d]) for d in wdays]
-    tm = [x for x in tm if x is not None]
-    rep.add("E4/9 K22: czas Levy i linii Strazy (srednio)", f"{st.mean(tm):.2f} ms/d (max {max(tm):.1f})" if tm else "-", "<= 3 ms/dobe; s/dobe <= +2% wobec biegu bez E4/9 (autotest)", (st.mean(tm) <= 3.0) if tm else None)
-    # K23 zapis - linia "z zapisu"
-    ld = next((x for x in lines if x.startswith("Krainy kanonu (E4/9): z zapisu")), None)
-    rep.add("E4/9 K23: zapis z doby 362 (9 dob)", ld[:200] if ld else "brak linii \"z zapisu\" w tym biegu", "autotest zapisu: 0 bledow, niewolni i Mur = stan doby zapisu", None)
-    rep.add("E4/9 K24: progi etapow 1-3, wojsko lordow w wojnie 95-115 tys.", "--grupa etap2 / etap3 na tym samym logu", "bez zmian", None)
-    # K25 Wolni Ludzie
-    mfree = re.search(r"freefolk ([\d.]+)M", cal)
-    fr = [fnum(r"Wolni Ludzie: stan " + F_, swl[d]) for d in sd]
-    fr = [x for x in fr if x is not None]
-    fb = sum(1 for d in fd if re.search(r"\(freefolk\)[^;]*HAMULEC", fh[d]))
-    f100 = all("Wolni Ludzie 100%" in fh[d] for d in fd) if fd else False
-    rep.add("E4/9 K25: Wolni Ludzie - kalibracja / prog 100% / hamulec w top 8", f"{mfree.group(1) if mfree else '?'}M / {'TAK' if f100 else 'NIE'} / {fb} dob",
-            "0.30M / TAK / 0", (mfree is not None and abs(float(mfree.group(1)) - 0.30) < 0.005 and f100 and fb == 0) if (mfree and fd) else None)
-    rep.add("E4/9 K25: Wolni Ludzie - stan d1 -> ostatnia", f"{fr[0]:.0f} -> {fr[-1]:.0f}" if fr else "-", "INFO", None)
+
+# E4/9 (192): linia startowa; baza Strazy d120 - bieg A zbioru 31 (z31A, przed E4/9: zapas Strazy 8 691 - plan kodu E4/9 rozdz. 11 K7); kultury z niewola (LosersFlee)
+E49_START = "Krainy kanonu (E4/9): wpiete"
+E49_WATCH_BASE = 8691
+E49_SLAVE = {"ghiscari", "volantine", "lyseni", "myrish", "tyroshi", "qohorik", "norvos", "valyrian", "khuzait", "sturgia", "qartheen", "?"}
+# udzial krain w ludziach Westeros (tabela PopulationLaw, mln): K4 - 3 najwieksze krainy rozkladu "z ludnosci" w +-2 pkt
+E49_WESTEROS = {"reach": 8.0, "vlandia": 4.0, "river": 3.5, "battania": 3.0, "vale": 3.0, "stormlands": 2.5, "aserai": 1.5, "dragonstone": 0.85, "crownlands": 0.6, "sturgia": 0.5}
+
+
+def etap4_e49(rep, lines, start, win, until):
+    """E4/9 (192): progi K1-K25 z planu kodu docs/etap4/PLAN-KODU-E49.md rozdz. 11 (stan z linii dziennych, nie startowej). Linie: "Straz z Westeros (E4/9): dzien",
+    "Niewolni (E4/9): dzien", "Ludzie (spustoszenie)" (odcinek "pojmani (E4/9)"), "Jency (E4/0)" (odcinek "pojmani z wsi (E4/9)"), "Dlugi (168)" (odcinek "DLUG 4 (E4/9)"),
+    "Wolne rece (E4/7)" (prog Zelaznych), "Pula wyrzutkow (E4/3)" ("do Strazy"), "Straz i Wolni Ludzie (4.15)", "Ludzie (ksiega)" (rownanie krain), kalibracja PopulationLaw."""
+    stl = next((x for x in lines if x.startswith(E49_START)), "")
+    wl = e4_series(lines, "Straz z Westeros (E4/9): dzien")
+    nw = e4_series(lines, "Niewolni (E4/9): dzien")
+    dev = e4_series(lines, "Ludzie (spustoszenie): dzien")
+    jen = e4_series(lines, "Jency (E4/0): dzien")
+    dl = e4_series(lines, "Dlugi (168): dzien")
+    fh = e4_series(lines, "Wolne rece (E4/7): dzien")
+    swl = e4_series(lines, "Straz i Wolni Ludzie (4.15): dzien")
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    wdays = [d for d in sorted(wl) if 1 <= run_day(d, start) <= until]
+    ndays = [d for d in sorted(nw) if 1 <= run_day(d, start) <= until]
+    # K1 bledy, linia startowa, potkniecia
+    brak = re.search(r"; BRAK: (.*?); wlasciciele", stl)
+    rep.add("E4/9 K1: linia startowa (latki ExecuteCapture i AiHourlyTick)", stl[:300], "\"BRAK: -\"", (brak is not None and brak.group(1).strip() == "-") if stl else False)
+    errs = [x for x in lines if x.startswith("ERROR in WatchLaw") or x.startswith("ERROR in ThrallLaw") or ("(E4/9" in x and x.startswith("ERROR in "))
+            or x.startswith("ERROR in PeopleBook.E4/7.WallTake") or x.startswith("ERROR in PeopleBook.E4/7.ThrallsDaily") or x.startswith("ERROR in PeopleBook.E4/7.SeedThralls")
+            or x.startswith("ERROR in PeopleBook.E4/7.CanonEndDay") or x.startswith("ERROR in PeopleBook.E4/7.ImportCanonPart") or x.startswith("ERROR in PeopleBook.RefugeesToCaptives")
+            or x.startswith("ERROR in Devastation.TakeCaptives")]
+    stw = [num(r"\| potkniecia (\d+)", wl[d], int, 0) or 0 for d in wdays]
+    stn = [num(r"\| potkniecia (\d+)\.", nw[d], int, 0) or 0 for d in ndays]
+    rep.add("E4/9 K1: bledy i potkniecia E4/9", f"bledy {len(errs)}, potkniecia Straz {sum(stw)}, Niewolni {sum(stn)}" + (f" (pierwszy: {errs[0][:140]})" if errs else ""),
+            "0 bledow; potkniecia <= 5 z nazwa miejsca", len(errs) == 0 and sum(stw) + sum(stn) <= 5)
+    if not wdays:
+        rep.add("E4/9: linie dzienne \"Straz z Westeros (E4/9)\"", "brak", "kazdej doby (LogEnabled)", False)
+        return
+    live = [d for d in wdays if "| prawo CZYNNE" in wl[d]]
+    rep.add("E4/9: doby z czynnym prawem Strazy (WatchLaw + ksiega pochodzenia)", f"{len(live)} z {len(wdays)}", "INFO (przed siewem E4/7 - nieczynne)", None)
+    rx = re.compile(r"przybylo " + F_ + r" = z Muru " + F_ + r" \+ z pul wyrzutkow " + F_ + r" \(zolnierze " + F_ + r", prosci " + F_ + r"; budzet (\d+)%: " + F_
+                    + r" w (\d+) regionach, wykorzystano " + F_ + r"%\) \+ z ludnosci " + F_ + r" \(.*?\) \+ bez pokrycia " + F_)
+    rows = []
+    for d in live:
+        m = rx.search(wl[d])
+        if m:
+            v = [float(x) for x in m.groups()]
+            rows.append((d, v))
+    # K2 przybylo = Mur + pule + ludnosc + bez pokrycia; bez pokrycia <= 1% (28 dob)
+    bad2 = [(run_day(d, start), v[0], v[1] + v[2] + v[9] + v[10]) for d, v in rows if abs(v[0] - (v[1] + v[2] + v[9] + v[10])) > 0.3]
+    last = rows[-28:]
+    nsum, zsum = sum(v[0] for _, v in last), sum(v[10] for _, v in last)
+    rep.add("E4/9 K2: przybylo = Mur + pule + ludnosc + bez pokrycia (kazdej doby)", f"{len(rows) - len(bad2)} z {len(rows)} dob" + (f"; roznice {bad2[:3]}" if bad2 else ""),
+            "kazdej doby (+-0.3 - zaokraglenie linii)", (len(bad2) == 0) if rows else None)
+    rep.add("E4/9 K2: bez pokrycia / przybylo (ostatnie 28 dob)", f"{zsum:.1f} / {nsum:.1f} = " + (f"{100 * zsum / nsum:.2f}%" if nsum > 0 else "-"), "<= 1% (podloga 50 hearth w calym Westeros)",
+            (zsum <= 0.01 * nsum) if nsum > 0 else None)
+    # K3 pule: wykorzystano <= 100%; z pul > 0 w d2-d120
+    over = [(run_day(d, start), v[8]) for d, v in rows if v[8] > 100.05]
+    pool2 = [v[2] for d, v in rows if run_day(d, start) >= 2]
+    rep.add("E4/9 K3: budzet pul - wykorzystano <= 100% kazdej doby", f"przekroczen {len(over)}" + (f" ({over[:3]})" if over else "") + f"; budzet srednio {st.mean([v[6] for _, v in rows]):.1f}/d w {st.mean([v[7] for _, v in rows]):.0f} regionach" if rows else "-",
+            "<= 100%", (len(over) == 0) if rows else None)
+    rep.add("E4/9 K3: z pul wyrzutkow w d2-d" + str(until), f"razem {sum(pool2):.0f} ({sum(1 for x in pool2 if x > 0)} z {len(pool2)} dob > 0; zolnierze {sum(v[3] for _, v in rows):.0f}, prosci {sum(v[4] for _, v in rows):.0f})",
+            "> 0 (RK 1.2: X = 3%)", (sum(pool2) > 0) if pool2 else None)
+    # K4 rozklad "z ludnosci" od wczytania (ostatnia linia) - 3 najwieksze krainy w +-2 pkt od udzialu w ludziach Westeros
+    ml = re.search(r"\(rozklad: ([^)]*)\)", wl[live[-1]]) if live else None
+    tot = sum(E49_WESTEROS.values())
+    if ml and ml.group(1).strip() != "-":
+        got = {k: float(v) for k, v in re.findall(r"([a-z_]+) ([\d.]+)%", ml.group(1))}
+        top3 = sorted(E49_WESTEROS, key=lambda k: -E49_WESTEROS[k])[:3]
+        diffs = [(k, got.get(k, 0.0), 100.0 * E49_WESTEROS[k] / tot) for k in top3]
+        rep.add("E4/9 K4: rozklad z ludnosci od wczytania - 3 najwieksze krainy (log / tabela)", ", ".join(f"{k} {a:.1f}/{b:.1f}%" for k, a, b in diffs), "+-2 pkt (RK:215)",
+                all(abs(a - b) <= 2.0 for _, a, b in diffs))
+    else:
+        rep.add("E4/9 K4: rozklad z ludnosci", "brak poboru z ludnosci (Mur i pule pokryly)" if live else "-", "+-2 pkt - INFO bez poboru", None)
+    # K5 zwolnieni 166 do domu = 0 i do domu z hearth = 0
+    rel = [num(r"zwolnieni 166 do domu (\d+)", wl[d], int, 0) or 0 for d in live]
+    hh = [fnum(r"do domu z hearth " + F_, wl[d]) or 0 for d in live]
+    rep.add("E4/9 K5: bracia - zwolnieni 166 do domu / do domu z hearth (suma)", f"{sum(rel)} / {sum(hh):.1f}", "0 / 0 kazdej doby (tylko na Mur - U5)", sum(rel) == 0 and sum(hh) == 0)
+    # K6 rabunki Strazy = 0 od d2; bezpiecznik 0
+    rr = [(run_day(d, start), num(r"rabunki Strazy dzis (\d+)", wl[d], int, 0) or 0) for d in wdays]
+    fz = sum(num(r"bezpiecznik (\d+)", wl[d], int, 0) or 0 for d in wdays)
+    rj = sum(num(r"odrzucone opcje rabunku (\d+)", wl[d], int, 0) or 0 for d in wdays)
+    late = [x for x in rr if x[0] >= 2 and x[1] > 0]
+    rep.add("E4/9 K6: H1 - rabunki Strazy od d2 / bezpiecznik", f"{sum(x[1] for x in late)} / {fz} (odrzucone opcje rabunku razem {rj})" + (f"; doby {late[:4]}" if late else ""),
+            "0 / 0 (RK 0.1.2: 10 rabunkow w 28 dobach przed H1)", len(late) == 0 and fz == 0)
+    # K7 Straz w d120 >= 85% biegu bazy
+    sd = [d for d in sorted(swl) if 1 <= run_day(d, start) <= until]
+    ws = num(r"Nocna Straz: stan (\d+)", swl[sd[-1]]) if sd else None
+    if ws is not None and run_day(sd[-1], start) >= 120:
+        rep.add(f"E4/9 K7: Straz w d{run_day(sd[-1], start)}", f"{ws} wobec bazy z31A {E49_WATCH_BASE}", f">= {int(0.85 * E49_WATCH_BASE)} (85%)", ws >= 0.85 * E49_WATCH_BASE)
+    else:
+        rep.add("E4/9 K7: Straz w d120", f"{ws} (d{run_day(sd[-1], start) if sd else '-'})" if ws is not None else "brak linii", "INFO - wymaga biegu 120 dob", None)
+    # K8 kontrola linii |.| <= 1 kazdej doby; w nicosc (q + znikniecie) <= 10% obrotu (28 dob)
+    kc = [(run_day(d, start), fnum(r"\) = " + SF + r" \| potkniecia", wl[d])) for d in live]
+    kc = [x for x in kc if x[1] is not None]
+    badk = [x for x in kc if abs(x[1]) > 1.0]
+    rep.add("E4/9 K8: kontrola linii Straz z Westeros", f"max |kontrola| {max((abs(x[1]) for x in kc), default=0):.2f} w {len(kc)} dobach" + (f"; ponad 1: {badk[:4]}" if badk else ""),
+            "|.| <= 1 czlowiek kazdej doby", (len(badk) == 0) if kc else None)
+    tq = []
+    for d in live[-28:]:
+        m = re.search(r"\(wejscia " + F_ + r" - wyjscia " + F_ + r" - w nicosc " + F_ + r" - przy zniknieciu partii " + F_ + r"\)", wl[d])
+        if m:
+            a, b, q, g = (float(x) for x in m.groups())
+            tq.append((q + g, a + b))
+    if tq:
+        q_, t_ = sum(x[0] for x in tq), sum(x[1] for x in tq)
+        rep.add("E4/9 K8: w nicosc (niedobor slownika + resztka przy zniknieciu) / obrot (28 dob)", f"{q_:.1f} / {t_:.1f} = " + (f"{100 * q_ / t_:.1f}%" if t_ > 0 else "-"),
+                "<= 10% obrotu (dzis T6: 60-67% ruchu bez nazwy)", (q_ <= 0.10 * t_) if t_ > 0 else None)
+    # K9 dezercja i do lasu: 100% do regionow Polnocy
+    wn = sum(fnum(r"do lasu: pula Polnocy " + F_, wl[d]) or 0 for d in live)
+    wo = sum(fnum(r"inne regiony " + F_ + r" \| zwolnieni", wl[d]) or 0 for d in live)
+    rep.add("E4/9 K9: dezerterzy i rozbici Strazy do lasu - pula Polnocy / inne", f"{wn:.1f} / {wo:.1f}", "100% Polnoc (inne 0)", (wo <= 0.05) if wn + wo > 0 else None)
+    # K10 pula i bandy - INFO; "do Strazy" z linii puli
+    pl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien")
+    tw = [fnum(r"do Strazy \(E4/9\) " + F_, pl[d]) or 0 for d in sorted(pl) if 1 <= run_day(d, start) <= until]
+    wy = e4_series(lines, "Wyrzutki: dzien", 1)
+    wyd = [d for d in sorted(wy) if 1 <= run_day(d, start) <= until]
+    band = [(num(r"\| band (\d+), ludzi (\d+)", wy[d]), num(r"\| band \d+, ludzi (\d+)", wy[d])) for d in wyd]
+    rep.add("E4/9 K10: pula wyrzutkow - do Strazy (srednio/d) i bandy (d1 -> ostatnia: band, ludzi)", f"{st.mean(tw):.1f}/d" if tw else "-" + "",
+            "INFO wobec bazy (RK 1.2: 3% - bandy ok. -17..-19%); prog band E4/3 (plateau w wojnie <= 1.5 x pokoj) - wiersze E4/3", None)
+    if band:
+        rep.add("E4/9 K10: bandy d1 -> ostatnia", f"{band[0][0]}/{band[0][1]} -> {band[-1][0]}/{band[-1][1]}", "INFO", None)
+    # K11 nowa kampania d1: niewolni Zelaznych = 27 000 x PopulationScale (+-1); kalibracja "sturgia ...M (...) + niewolni N"
+    op = next((x for x in lines if x.startswith("Niewolni (E4/9): bilans otwarcia nowej kampanii")), None)
+    cal = next((x for x in lines if x.startswith("PopulationLaw: kalibracja ludnosci")), "")
+    mc = re.search(r"sturgia ([\d.]+)M \([^)]*\) \+ niewolni (\d+)", cal)
+    if op:
+        mo = re.search(r"Zelazne Wyspy (\d+) \(czesc tabeli (\d+)", op)
+        n, tab = (int(mo.group(1)), int(mo.group(2))) if mo else (None, None)
+        exp = 27000.0 * tab / 500000.0 if tab else None
+        rep.add("E4/9 K11: bilans otwarcia niewolnych Zelaznych (NK)", f"{n} (oczekiwane {exp:.0f}); kalibracja: " + (f"sturgia {mc.group(1)}M + niewolni {mc.group(2)}" if mc else "brak dopisku"),
+                "27 000 x PopulationScale +-1 i dopisek w kalibracji", (n is not None and exp is not None and abs(n - exp) <= 1 and mc is not None))
+    else:
+        rep.add("E4/9 K11: bilans otwarcia niewolnych Zelaznych", "brak (stary zapis albo bieg nie od nowej kampanii)", "INFO - tylko nowa kampania", None)
+    # K12 kontrola "Niewolni" |.| <= 0.01; K13 smierc 5%/rok; K14 tylko krainy z niewola
+    nck = [(run_day(d, start), fnum(r"kontrola: T - Twczoraj - \(s \+ b \+ bilans - d\) = " + SF, nw[d])) for d in ndays]
+    nck = [x for x in nck if x[1] is not None]
+    badn = [x for x in nck if abs(x[1]) > 0.01]
+    rep.add("E4/9 K12: kontrola linii Niewolni", f"max |kontrola| {max((abs(x[1]) for x in nck), default=0):.3f} w {len(nck)} dobach" + (f"; {badn[:4]}" if badn else ""),
+            "|.| <= 0.01 kazdej doby", (len(badn) == 0) if nck else None)
+    yr = []
+    for d in ndays:
+        t = num(r"\| stan (\d+) \(bilans", nw[d]); dd = fnum(r"smierc -" + F_, nw[d]); pc = fnum(r"smierc -[\d.]+ \(" + F_ + r"%/rok", nw[d])
+        if t is not None and dd is not None and pc is not None and t + dd >= 1000 and dd > 0:
+            yr.append((100.0 * dd / (t + dd) * 364.0, pc))
+    if yr:
+        m_ = st.mean(x[0] for x in yr)
+        rep.add("E4/9 K13: smierc niewolnych (d / T x 364)", f"{m_:.2f}%/rok ({len(yr)} dob; ustawienie {yr[-1][1]:.0f}%)", "ustawienie +-0.1 pkt (5%)", abs(m_ - yr[-1][1]) <= 0.1)
+    else:
+        rep.add("E4/9 K13: smierc niewolnych", "za malo niewolnych w biegu (T < 1000)", "INFO", None)
+    held = {}
+    for d in ndays:
+        mh = re.search(r"\) w krainach: (.*?) \| dzis", nw[d])
+        if mh and mh.group(1).strip() != "-":
+            for k, v in re.findall(r"([a-z_?]+) (\d+)", re.sub(r"\([^)]*\)", "", mh.group(1))):
+                held[k] = max(held.get(k, 0), int(v))
+    outside = [k for k, v in held.items() if v > 0 and k not in E49_SLAVE]
+    i1 = any(x.startswith("Prawo jenca (I1)") for x in lines)
+    po = sum(fnum(r"poza kanonem \(prawo wylaczone albo osada bez niewoli\) " + F_, nw[d]) or 0 for d in ndays)
+    rep.add("E4/9 K14: niewolni tylko w krainach kanonu / poza kanonem (suma)", f"krainy trzymania {sorted(held)}; spoza listy {outside}; poza kanonem {po:.1f}",
+            "spoza listy 0; poza kanonem 0 przy I1" + ("" if i1 else " (I1 nieaktywne - INFO)"), (len(outside) == 0 and (po <= 0.5 or not i1)) if ndays else None)
+    # K15 prog wolnych rak Zelaznych w d1 NK 39-40% (zrodlo ksiega)
+    fd = [d for d in sorted(fh) if 1 <= run_day(d, start) <= until]
+    if op and fd:
+        mf = re.search(r"Zelazne Wyspy ([\d.]+)% \(niewolni ksiegi ([\d-]+) / BK [^-]*- zrodlo: ([a-z]+)", fh[fd[0]])
+        ok = mf is not None and 39.0 <= float(mf.group(1)) <= 40.05 and mf.group(3) == "ksiega"
+        rep.add(f"E4/9 K15: prog wolnych rak Zelaznych d{run_day(fd[0], start)} (NK)", f"{mf.group(1)}% (niewolni ksiegi {mf.group(2)}, zrodlo {mf.group(3)})" if mf else "brak odczytu",
+                "39-40% ze zrodla ksiega (z31A: 30.5% z BK)", ok)
+    else:
+        rep.add("E4/9 K15: prog wolnych rak Zelaznych", "brak NK albo linii Wolne rece", "INFO - tylko nowa kampania", None)
+    # K16 pojmani w linii spustoszenia = pojmani w linii Jency; z niczego (BK) = 0 przy czynnym prawie
+    k16, bk0 = [], []
+    for d in sorted(dev):
+        if not (1 <= run_day(d, start) <= until):
+            continue
+        md = re.search(r"pojmani \(E4/9\): rabunkow wygranych z pojmanymi (\d+), z uchodzcow wsi do lochu najezdzcy \+(\d+)", dev[d])
+        if not md:
+            continue
+        mj = re.search(r"pojmani z wsi \(E4/9\) \+(\d+) w (\d+) rabunkach", jen.get(d, ""))
+        if mj:
+            k16.append((run_day(d, start), int(md.group(2)), int(mj.group(1))))
+        b = num(r"z rabunku BK \+(\d+)", jen.get(d, ""))
+        if b is not None:
+            bk0.append((run_day(d, start), b))
+    badj = [x for x in k16 if x[1] != x[2]]
+    rep.add("E4/9 K16: pojmani - linia spustoszenia = linia Jency (kazdej doby)", f"{len(k16) - len(badj)} z {len(k16)} dob; razem {sum(x[1] for x in k16)}" + (f"; roznice {badj[:3]}" if badj else ""),
+            "kontrola 0 kazdej doby", (len(badj) == 0) if k16 else None)
+    rep.add("E4/9 K16: jency z rabunku BK z niczego przy czynnym prawie (suma)", f"{sum(x[1] for x in bk0)} w {len(bk0)} dobach", "0 kazdej doby (z31A: BK 18.5/d)", (sum(x[1] for x in bk0) == 0) if bk0 else None)
+    # K17 pojmani tylko u najezdzcow z niewola; J <= plan + 0.5 na wolanie
+    ns, jp = 0, []
+    for d in sorted(dev):
+        if not (1 <= run_day(d, start) <= until):
+            continue
+        m = re.search(r"z uchodzcow wsi do lochu najezdzcy \+(\d+) \(wyliczone \d+% trafionych przy niewoli " + F_ + r";.*?nie z niewola (\d+), gracz \d+, wolan BK (\d+)\)", dev[d])
+        if m:
+            ns += int(m.group(3))
+            jp.append((run_day(d, start), int(m.group(1)), float(m.group(2)), int(m.group(4))))
+    badp = [x for x in jp if x[1] > x[2] + 0.5 * max(1, x[3])]
+    rep.add("E4/9 K17: pojmani tylko z niewola / J <= plan + 0.5 na rabunek", f"nie z niewola {ns}; ponad plan {len(badp)} dob" + (f" {badp[:3]}" if badp else ""), "0 / 0", (ns == 0 and len(badp) == 0) if jp else None)
+    # K18 E4/5 S3 i kontrola konta UCHODZCY z czlonem pojmanych - wiersze E4/5 S3/S4 (kod liczy kontrole z pojmanymi)
+    withp = sum(1 for d in dev if "- pojmani " in dev[d] and "konto UCHODZCY: wczoraj" in dev[d])
+    rep.add("E4/9 K18: konto UCHODZCY z czlonem pojmanych", f"doby z czlonem w linii spustoszenia {withp}", "kontrola |.| <= 0.01 - wiersz E4/5 S4; pojmani przy uderzeniu 0 - E4/5 S3", None)
+    # K19 rownanie krain z T i W
+    rk = [fnum(r"rownanie krain: najgorsza kraina \S+ reszta \S+ \(" + SF + r"% ludzi krainy\)", kb[d]) for d in sorted(kb) if 1 <= run_day(d, start) <= until]
+    rk = [x for x in rk if x is not None][-28:]
+    seg = sum(1 for d in kb if "| E4/9: NIEWOLNI" in kb[d])
+    rep.add("E4/9 K19: rownanie krain z T i W (najgorsza kraina, 28 dob)", f"max |reszta| {max((abs(x) for x in rk), default=0):.3f}% ludzi krainy; odcinek E4/9 w {seg} dobach",
+            "<= 0.1% (przy RESZTA hearth != 0 - INFO, wiersze E4/7)", (max((abs(x) for x in rk), default=0) <= 0.1) if rk else None)
+    # K20 DLUG 4
+    rx4 = re.compile(r"DLUG 4 \(E4/9\): rodow w zajeciu (\d+), z odchodzacymi do domu (\d+), odeszli do domu (\d+) \(limit zoldu (\d+), zalegly zold (\d+); bez wsi z danymi BK - do lasu (\d+)\)")
+    sz, home, woods = 0, 0, 0
+    for d in sorted(dl):
+        if not (1 <= run_day(d, start) <= until):
+            continue
+        m = rx4.search(dl[d])
+        if m:
+            sz += int(m.group(1)); home += int(m.group(3)); woods += int(m.group(6))
+    if sz > 0 and home + woods > 0:
+        rep.add("E4/9 K20: DLUG 4 - do lasu / odchodzacy (rody w zajeciu)", f"{woods} / {home + woods} (rodo-dni zajec {sz})", "do lasu <= 5%, do domu > 0", woods <= 0.05 * (home + woods) and home > 0)
+    else:
+        rep.add("E4/9 K20: DLUG 4", f"rodo-dni zajec {sz}, odchodzacych {home + woods}", "INFO - brak zajec albo odchodzacych w biegu (b728: zajecia w 554 dobach)", None)
+    # K21 rownanie jencow - wiersz T7 (parser z czlonem pojmanych)
+    rep.add("E4/9 K21: rownanie jencow E4/0 z czlonem pojmanych", "wiersz T7: rownanie jencow (jin + pojmani z wsi E4/9)", "jak dotad (<= 10% obrotu)", None)
+    # K22 koszt
+    tm = [fnum(r"\| czas " + F_ + r" ms \(Levy", wl[d]) for d in wdays]
+    tm = [x for x in tm if x is not None]
+    rep.add("E4/9 K22: czas Levy i linii Strazy (srednio)", f"{st.mean(tm):.2f} ms/d (max {max(tm):.1f})" if tm else "-", "<= 3 ms/dobe; s/dobe <= +2% wobec biegu bez E4/9 (autotest)", (st.mean(tm) <= 3.0) if tm else None)
+    # K23 zapis - linia "z zapisu"
+    ld = next((x for x in lines if x.startswith("Krainy kanonu (E4/9): z zapisu")), None)
+    rep.add("E4/9 K23: zapis z doby 362 (9 dob)", ld[:200] if ld else "brak linii \"z zapisu\" w tym biegu", "autotest zapisu: 0 bledow, niewolni i Mur = stan doby zapisu", None)
+    rep.add("E4/9 K24: progi etapow 1-3, wojsko lordow w wojnie 95-115 tys.", "--grupa etap2 / etap3 na tym samym logu", "bez zmian", None)
+    # K25 Wolni Ludzie
+    mfree = re.search(r"freefolk ([\d.]+)M", cal)
+    fr = [fnum(r"Wolni Ludzie: stan " + F_, swl[d]) for d in sd]
+    fr = [x for x in fr if x is not None]
+    fb = sum(1 for d in fd if re.search(r"\(freefolk\)[^;]*HAMULEC", fh[d]))
+    f100 = all("Wolni Ludzie 100%" in fh[d] for d in fd) if fd else False
+    rep.add("E4/9 K25: Wolni Ludzie - kalibracja / prog 100% / hamulec w top 8", f"{mfree.group(1) if mfree else '?'}M / {'TAK' if f100 else 'NIE'} / {fb} dob",
+            "0.30M / TAK / 0", (mfree is not None and abs(float(mfree.group(1)) - 0.30) < 0.005 and f100 and fb == 0) if (mfree and fd) else None)
+    rep.add("E4/9 K25: Wolni Ludzie - stan d1 -> ostatnia", f"{fr[0]:.0f} -> {fr[-1]:.0f}" if fr else "-", "INFO", None)
 
 
 def main(argv):
