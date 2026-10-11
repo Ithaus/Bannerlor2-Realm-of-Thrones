@@ -26,6 +26,11 @@ Uzycie (Python 3, tylko odczyt):
                     z budzet-rodow.csv, sakiewki w dniach zoldu, zloto swiata, magazyny wsi, wojsko) + blok E5/0 (progi E50-T1..T10 - kiesa ludu na sucho,
                     kontrola zamknieta, koszt, bitwy wobec ksiegi i decyzja A6, wydatek z petli BK wobec ConsumedValue, notable, gotowka wsi wedlug
                     polityki, odczyty do kalibracji B) w oknie dob kampanii 1-120 (--do-doby N). Kolejne paczki dopisuja wlasne bloki etap5_<paczka>.
+--crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
+                    metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
+                    logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
+                    Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
+                    T11b a <= f), T7 ze zrodlem wedrowcow i konwojow BK (E4/8), progi kosztu linii paczek 30 ms (E5/0 50 ms) i wiersz zbiorczy etapow 4+5 <= 1% doby.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -539,7 +544,217 @@ def e4_campfever_by_krainy(lines):
     return out
 
 
-def etap4_main(logp, start_arg, until=120):
+# poprawki po tescie koncowym etapu 4 (P11-progi-T1, sceptyk SCRIBE-POLYKA pkt 4): CrashScribe (Net.ModFinalizer przy SwallowModErrors) polyka wyjatek na granicy
+# kazdej metody Armoury - nie trafia on ani do potkniec, ani do "ERROR in" w Armoury.log, tylko do logu sesji CrashScribe ("# ERROR IN A MOD", WHERE "[Armoury] ...").
+# Log sesji dobierany po starcie: naglowek "=== Armoury M/D/RRRR GG:MM:SS ===" (albo nazwa Armoury-RRRR-MM-DD_GG-MM-SS.log) wobec nazwy session-RRRR-MM-DD_GG-MM-SS.log,
+# +-5 s; najpierw katalog logu (kopia testu), potem Dokumenty\Mount and Blade II Bannerlord\CrashScribe (KeepSessions rotuje - kopiowac razem z logiem testu).
+CS_TOL_S = 5
+
+
+def armoury_start_times(logp):
+    """Mozliwe chwile startu logu Armoury (naglowek pierwszej linii - dwa uklady daty M/D i D/M, nazwa pliku) -> lista datetime."""
+    import datetime as dt
+    out = []
+    try:
+        with open(logp, encoding="utf-8-sig", errors="replace") as f:
+            head = f.readline().strip()
+    except OSError:
+        head = ""
+    m = re.match(r"=== Armoury (\d{1,2})[./-](\d{1,2})[./-](\d{4}) (\d{1,2}):(\d\d):(\d\d)", head)
+    if m:
+        a, b, y, hh, mi, ss = (int(x) for x in m.groups())
+        for mo, dd in ((a, b), (b, a)):
+            try:
+                out.append(dt.datetime(y, mo, dd, hh, mi, ss))
+            except ValueError:
+                pass
+    m = re.match(r"=== Armoury (\d{4})-(\d\d)-(\d\d) (\d{1,2}):(\d\d):(\d\d)", head)
+    if m:
+        try:
+            out.append(dt.datetime(*(int(x) for x in m.groups())))
+        except ValueError:
+            pass
+    m = re.search(r"Armoury-(\d{4})-(\d\d)-(\d\d)_(\d\d)-(\d\d)-(\d\d)\.log$", os.path.basename(logp))
+    if m:
+        try:
+            out.append(dt.datetime(*(int(x) for x in m.groups())))
+        except ValueError:
+            pass
+    return out
+
+
+def crashscribe_session_of(logp, explicit=None):
+    """Log sesji CrashScribe z tego samego startu co log Armoury -> (sciezka albo None, opis doboru)."""
+    import datetime as dt
+    if explicit:
+        return (explicit, "--crashscribe") if os.path.isfile(explicit) else (None, f"brak pliku {explicit} (--crashscribe)")
+    starts = armoury_start_times(logp)
+    if not starts:
+        return None, "brak chwili startu logu Armoury (naglowek, nazwa pliku) - podaj --crashscribe P"
+    dirs = [os.path.dirname(os.path.abspath(logp)),
+            os.path.join(os.path.expanduser("~"), "Documents", "Mount and Blade II Bannerlord", "CrashScribe")]
+    for dd in dirs:
+        try:
+            names = sorted(os.listdir(dd))
+        except OSError:
+            continue
+        for nm in names:
+            m = re.match(r"session-(\d{4})-(\d\d)-(\d\d)_(\d\d)-(\d\d)-(\d\d)\.log$", nm)
+            if not m:
+                continue
+            try:
+                t = dt.datetime(*(int(x) for x in m.groups()))
+            except ValueError:
+                continue
+            if any(abs((t - s).total_seconds()) <= CS_TOL_S for s in starts):
+                return os.path.join(dd, nm), f"ten sam start +-{CS_TOL_S} s"
+    return None, f"brak session-*.log z tego startu ({starts[0]:%Y-%m-%d %H:%M:%S} +-{CS_TOL_S} s) w katalogu logu ani w Dokumentach - podaj --crashscribe P"
+
+
+def crashscribe_mod_errors(path, mod="Armoury"):
+    """Log sesji CrashScribe -> (WHERE blokow "# ERROR IN A MOD" moda - bez "ERROR CAUGHT FURTHER UP", numery powtorek przypisanych do moda, numery powtorek
+    bez przypisania). Powtorki sa probkowane (#5, #25, #251, ...), a w starym ukladzie "(powtorka #N of the same error)" nie mowia, ktorego bledu dotycza -
+    przypisane tylko w ukladzie z opisem po dwukropku (nazwa moda w opisie, bez bledow pierwszej szansy / zlapanych wyzej)."""
+    blocks, rep_mod, rep_unk = [], [], []
+    kind = None
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        for ln in f:
+            s = ln.strip()
+            m = TS.match(s)
+            if m:
+                s = m.group(2).strip()
+            if s.startswith("# ERROR IN A MOD"):
+                kind = "mod"
+                continue
+            if s.startswith("# ERROR"):
+                kind = None
+                continue
+            if kind == "mod" and s.startswith("WHERE"):
+                w = s.split(":", 1)[1].strip() if ":" in s else ""
+                if w.startswith("[" + mod + "]"):
+                    blocks.append(w)
+                kind = None
+                continue
+            mp = re.match(r"\(powtorka #(\d+)(.*)\)$", s)
+            if mp:
+                n, rest = int(mp.group(1)), mp.group(2)
+                if not rest.startswith(":"):
+                    rep_unk.append(n)
+                elif mod in rest and "CAUGHT" not in rest.upper() and "FIRSTCHANCE" not in rest.upper():
+                    rep_mod.append(n)
+    return blocks, rep_mod, rep_unk
+
+
+def crashscribe_t1_row(rep, name, logp, csp, where_filter=None):
+    """Wiersz T1 (E4/0) / E50-T1 (E5/0): bloki "# ERROR IN A MOD" [Armoury] w logu sesji CrashScribe tego startu (cala sesja; where_filter - fragment WHERE)."""
+    path, how = crashscribe_session_of(logp, csp)
+    if not path:
+        rep.add(name, how, "0 blokow [Armoury] (bez logu sesji - INFO)", None)
+        return
+    blk, pm, pu = crashscribe_mod_errors(path)
+    if where_filter:
+        blk = [w for w in blk if where_filter in w]
+        pm = []     # powtorki bez nazwy metody - przypisane tylko do calego moda (wiersz T1 E4/0)
+    sites = {}
+    for w in blk:
+        k = w[len("[Armoury] "):] if w.startswith("[Armoury] ") else w
+        sites[k] = sites.get(k, 0) + 1
+    top = ", ".join(f"{k} x{v}" for k, v in sorted(sites.items(), key=lambda kv: -kv[1])[:4])
+    val = (f"bloki ERROR IN A MOD {len(blk)}" + (f" ({top})" if top else "")
+           + (f"; powtorki [Armoury] {len(pm)}" + (f" (najwyzszy #{max(pm)})" if pm else "") if not where_filter else "")
+           + f"; powtorki bez przypisania (uklad CrashScribe bez opisu) {len(pu)}" + (f" (najwyzszy #{max(pu)})" if pu else "")
+           + f" | {os.path.basename(path)} ({how})")
+    rule = (f"0 blokow [Armoury] z WHERE {where_filter} w calej sesji" if where_filter else
+            "0 blokow i 0 powtorek [Armoury] w calej sesji (powtorki probkowane #5/#25/#251 - liczba bledow to dolna granica)")
+    rep.add(name, val, rule, len(blk) == 0 and len(pm) == 0)
+
+
+# poprawki po tescie koncowym etapu 4 (P1-1): ludzie ZYWI z linii "Ludzie (ksiega)" - kazdy zolnierz jest czlowiekiem (E4/7, E4/8): DOM (wsie + miasta) + UCHODZCY (E4/5)
+# + SLUZBA i JENCY z pochodzeniem (E4/7; "" bez pochodzenia - z niczego - poza) + w drodze z pochodzeniem (E4/8 R19) + pula wyrzutkow (E4/3) + WETERANI z pochodzeniem (E4/10)
+# + NIEWOLNI (E4/9) + Mur (E4/9). Mobilizacja (DOM -> SLUZBA) zywych nie zmienia; zmieniaja ich narodziny, polegli, cywile zabici i ubytek bez nazwy (reszta rownania krain).
+E4_ZYWI = (("DOM wsie", r"konto DOM: wsie (\d+) ludzi"), ("DOM miasta", r"konto DOM: wsie \d+ ludzi \([^)]*\), miasta (\d+)"),
+           ("UCHODZCY", r"E4/5 konto UCHODZCY: " + F_ + r" ludzi"), ("SLUZBA", r"E4/7: konto SLUZBA (\d+)"), ("JENCY", r"E4/7: konto SLUZBA \d+ [^,]*, JENCY (\d+)"),
+           ("w drodze", r"w drodze teraz z pochodzeniem " + F_), ("pula", r'linia "Pula wyrzutkow \(E4/3\)"\) (\d+)'),
+           ("WETERANI", r"konto WETERANI \d+ \(z pochodzeniem (\d+)"), ("NIEWOLNI", r"E4/9: NIEWOLNI (\d+)"), ("Mur", r"\bMur (\d+) \(dnia"))
+E4_ZYWI_FLOW = (("POLEGLI", r"POLEGLI od siewu (\d+)"), ("cywile", r"cywile od siewu (\d+)"), ("narodziny", r"narodziny netto od siewu (-?\d+)"),
+                ("reszta", r"rownanie krain: najgorsza kraina \S+ reszta \S+ \([^)]*\), swiat " + SF))
+E4_ZYWI_MIN, E4_ZYWI_MAX = -721.0, 1150.0     # Jeff 11.10 (4): w ciaglej wojnie do -0.5%/rok; gora - pas E4/4
+
+
+def e4_zywi(lines, start, win, d0=28):
+    """P1-1: netto ludzi zywych i DOM (+ uchodzcy) od pierwszej doby okna >= d0 do ostatniej doby okna z linia "Ludzie (ksiega)" - (stan b - stan a) / doby.
+    -> slownik albo None (brak dwoch dob albo log bez konta SLUZBA E4/7 - wtedy ludnosc = ludzie w domu, stara miara)."""
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    days = [d for d in win if d in kb and run_day(d, start) >= d0 and fnum(E4_ZYWI[0][1], kb[d]) is not None and fnum(E4_ZYWI[3][1], kb[d]) is not None]
+    if len(days) < 2:
+        return None
+    a, b = days[0], days[-1]
+    n = run_day(b, start) - run_day(a, start)
+    va = {k: fnum(p, kb[a]) or 0.0 for k, p in E4_ZYWI + E4_ZYWI_FLOW}
+    vb = {k: fnum(p, kb[b]) or 0.0 for k, p in E4_ZYWI + E4_ZYWI_FLOW}
+
+    def dd(*ks):
+        return sum(vb[k] - va[k] for k in ks) / n
+    zyw_a = sum(va[k] for k, _ in E4_ZYWI)
+    zyw_b = sum(vb[k] for k, _ in E4_ZYWI)
+    r = {"a": run_day(a, start), "b": run_day(b, start), "n": n, "zyw_a": zyw_a, "zyw_b": zyw_b, "z": (zyw_b - zyw_a) / n,
+         "dom": dd("DOM wsie", "DOM miasta", "UCHODZCY"), "mob": dd("SLUZBA", "JENCY", "w drodze"), "pol": dd("POLEGLI"), "niew": dd("NIEWOLNI"),
+         "inne": dd("pula", "WETERANI", "Mur"), "cyw": dd("cywile"), "nar": dd("narodziny"), "res": dd("reszta")}
+    r["other"] = r["dom"] - (r["nar"] - r["mob"] - r["pol"] - r["niew"] - r["inne"] - r["cyw"] + r["res"])
+    r["pct"] = 100.0 * r["z"] * 364.0 / zyw_a if zyw_a > 0 else 0.0
+    return r
+
+
+def e4_zywi_text(z):
+    return (f"zywi {z['z']:+.0f}/d = {z['pct']:+.2f}%/rok od {z['zyw_a'] / 1e6:.2f} mln (d{z['a']} -> d{z['b']}); DOM + uchodzcy {z['dom']:+.0f}/d"
+            " (zywi = DOM + uchodzcy + SLUZBA i JENCY z pochodzeniem + w drodze + pula + WETERANI + NIEWOLNI + Mur)")
+
+
+def etap45_cost(rep, lines, start, win):
+    """Poprawki po tescie koncowym etapu 4 (P5-PROGI-E4): wiersz zbiorczy - suma czasow wszystkich linii etapow 4 i 5 (E4/0 calosc jak T8, E4/5 S18, E4/6 F10,
+    E4/7 T12, E4/8 N15, E4/9 K22, E4/10 V15, E4/11 G10, E5/0 latki + doba) wobec sredniej doby (zegar) z linii "Koszt 171-174 (doba)" - <= 1% doby.
+    Srednie okna (linia Koszt ma dzien nastepnej doby - przesuniecie o dobe w sredniej 120 dob pomijalne)."""
+    parts = (("E4/0", "Hearth (E4/0): dzien", r"\| czas " + F_ + r" ms \(linia Hearth"),
+             ("E4/0", "Hearth (E4/0): dzien", r"model hearth w oknie ticku wsi " + F_ + " ms"),
+             ("E4/0", "Partie (E4/0): dzien", r"czas E4/0 w ksiedze ludzi " + F_ + " ms"),
+             ("E4/0", "Jency (E4/0): dzien", r"\| czas " + F_ + r" ms\."),
+             ("E4/0", "Dobrobyt (E4/0): dzien", r"\| czas " + F_ + r" ms\."),
+             ("E4/0", "Zima (E4/0): dzien", r"\| czas " + F_ + r" ms\."),
+             ("E4/0", "Straz i Wolni Ludzie (4.15): dzien", r"czas linii Krainy i Straz " + F_ + " ms"),
+             ("E4/5", "Ludzie (spustoszenie): dzien", r"\| czas " + F_ + r" ms\.$"),
+             ("E4/6", "Spichlerze (E4/6): dzien", r"\| czas " + F_ + r" ms\.$"),
+             ("E4/7", "Pochodzenie (E4/7): dzien", r"\| czas " + F_ + r" ms \(uzgodnienie"),
+             ("E4/8", "Wojsko z ludzi (E4/8): dzien", r"\| czas " + F_ + r" ms\."),
+             ("E4/9", "Straz z Westeros (E4/9): dzien", r"\| czas " + F_ + r" ms \(Levy"),
+             ("E4/10", "Weterani (E4/10): dzien", r"\| czas " + F_ + r" ms\."),
+             ("E4/11", "Ksiega wiosek (E4/11): dzien", r"\| czas " + F_ + r" ms\.$"),
+             ("E5/0", "Kiesa ludu (na sucho): dzien", r"czas: latki " + F_ + " ms"),
+             ("E5/0", "Kiesa ludu (na sucho): dzien", r"czas: latki [\d.]+ ms, doba " + F_ + " ms"))
+    ser = {}
+    for _, pref, _ in parts:
+        if pref not in ser:
+            ser[pref] = e4_series(lines, pref)
+    kos = e4_series(lines, "Koszt 171-174 (doba): dzien")
+    days = [d for d in win if d in kos and fnum(r" - doba " + F_ + r" ms \(zegar\)", kos[d]) is not None]
+    if not days:
+        rep.add("czas linii etapow 4+5 wobec doby", "brak linii \"Koszt 171-174 (doba)\"", "<= 1% sredniej doby", None)
+        return
+    doba = st.mean(fnum(r" - doba " + F_ + r" ms \(zegar\)", kos[d]) for d in days)
+    by = {}
+    for d in days:
+        day = {}
+        for nm, pref, pat in parts:
+            day[nm] = day.get(nm, 0.0) + (fnum(pat, ser[pref].get(d)) or 0.0)     # kilka czesci jednej paczki - suma w dobie
+        for nm, v in day.items():
+            by.setdefault(nm, []).append(v)
+    tot = sum(st.mean(v) for v in by.values())
+    pct = 100.0 * tot / doba if doba > 0 else 0.0
+    rep.add("czas linii etapow 4+5 (suma linii z czasem) wobec sredniej doby",
+            f"{tot:.1f} ms/d = {pct:.2f}% doby {doba:.0f} ms ({len(days)} dob; " + ", ".join(f"{k} {st.mean(v):.1f}" for k, v in sorted(by.items(), key=lambda kv: -st.mean(kv[1]))) + ")",
+            "<= 1% sredniej doby (zegar, linia Koszt 171-174); progi linii paczek <= 30 ms (zasada kosztu paczki)", pct <= 1.0)
+
+
+def etap4_main(logp, start_arg, until=120, csp=None):
     """E4/0 (188): progi T1-T10 z projektu etapu 4 (rozdz. 3 "E4/0" Test) mierzalne w biegu 120 dob (okno: doby kampanii 1-until, domyslnie 120).
     T9 (bieg zimowy B) i baza konca etapu (wojsko lordow d300-364, zalogi d364) wymagaja innego biegu / 364 dob - INFO.
     Doba kampanii linii E4/0 = dzien z linii - start + 1 (linie z dniem gry - Wyrzutki, H3, I1, Budzet - normalizowane o -1)."""
@@ -561,6 +776,7 @@ def etap4_main(logp, start_arg, until=120):
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
     bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    poc = e4_series(lines, "Pochodzenie (E4/7): dzien")     # P2-T7: wedrowcy i konwoje BK (E4/8) - zrodlo T7 i jencow
     start = start_arg
     if start is None:
         for s in lines:
@@ -583,6 +799,8 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- T1: bledy, linia startowa, potkniecia
     errs = [s for s in lines if s.startswith("ERROR in ")]
     rep.add("T1: bledy naszych modow (ERROR in)", len(errs), "0", len(errs) == 0)
+    # P11-progi-T1: wyjatek polkniety przez CrashScribe na granicy metody Armoury nie trafia do "ERROR in" ani do potkniec - log sesji tego startu
+    crashscribe_t1_row(rep, "T1: bledy [Armoury] polkniete przez CrashScribe (log sesji)", logp, csp)
     stl = next((s for s in lines if s.startswith("Pomiar ludzi (E4/0): okna wpiete:")), None)
     if stl is None:
         rep.add("T1: linia startowa Pomiar ludzi (E4/0)", "brak linii", "jest, BRAK: -, wlasciciele 11 celow", False)
@@ -704,6 +922,13 @@ def etap4_main(logp, start_arg, until=120):
                 rows.append((abs(v[9]), v[4] + v[5] + v[6] + v[7] + v[8]))
         if rows:
             r_, t_ = st.mean(x[0] for x in rows), st.mean(x[1] for x in rows)
+            if g == "Wolni Ludzie":
+                # poprawka po tescie koncowym etapu 4 (E4/0 T6): E4/9 swiadomie nie nazywal ruchu Wolnych Ludzi (PLAN-KODU-E49 :40, :361, :440; luka juz w z31A 49.9%) -
+                # linia 4.15 nazywa tylko zwerbowanych, zabitych, zaraze, dezercje i nowe partie; prog wroci po paczce nazywajacej (osobno, nie przy okazji)
+                rep.add(f"T6: {g} - reszta / obrot (28 dob)", f"{r_:.1f} / {t_:.1f} = " + (f"{100 * r_ / t_:.1f}%" if t_ > 0 else "-"),
+                        "INFO - nienazwane w linii: jency wzieci/uwolnieni, rozbici (RoutedInBattle), rozwiazane (R6, E4/10 do karczmy), A5 i ruch zalog, najem z karczmy E4/10"
+                        " - paczka nazywajaca (liczniki GFree w PeopleLedger), potem <= 10%", None)
+                continue
             rep.add(f"T6: {g} - reszta / obrot (28 dob)", f"{r_:.1f} / {t_:.1f} = " + (f"{100 * r_ / t_:.1f}%" if t_ > 0 else "-"), "<= 10% (albo nazwana w linii)",
                     (r_ <= 0.10 * t_) if t_ > 0 else None)
         else:
@@ -739,6 +964,10 @@ def etap4_main(logp, start_arg, until=120):
             "pula z hearth (rabunki, bieda)": L(d, r"rabunki (\d+), bieda/wojna", wyr) + L(d, r"bieda/wojna " + F_, wyr),
             "jency z rabunku BK": L(d, r"z rabunku BK \+(\d+)", jen),
             "pojmani z wsi (E4/9, z konta UCHODZCY)": L(d, r"pojmani z wsi \(E4/9\) \+(\d+)", jen),
+            # poprawka po tescie koncowym etapu 4 (P2-T7-wedrowcy): konwoje i wedrowcy BK powstaja z 0 ludzi ("konwoje BK N (0)" w "nowe partie"), sklad dopisuja
+            # BK / E4/8 po utworzeniu - zrodlo z linii Pochodzenie (E4/8); ujscie u celu juz w "partie rozwiazane" (bez drugiego liczenia "u celu"); log bez E4/8 - 0
+            "E4/8: wedrowcy i eskorta BK + niewolnicy konwojow BK (Pochodzenie)": L(d, r"wedrowcy i eskorta BK z DOM " + F_, poc) + L(d, r"wedrowcy BK bez pochodzenia " + F_, poc)
+                                                                             + L(d, r"niewolnicy w konwojach BK \(klasa BK\) " + F_, poc),
         }
         snk = {
             "zabici": L(d, r"dzis: zabici (\d+)", lud),
@@ -775,6 +1004,8 @@ def etap4_main(logp, start_arg, until=120):
         jd = num(r"\(zmiana ([+-]\d+)\)", j)
         if jd is not None:
             jin = L(d, r"wzieci do niewoli \+(\d+)", jen) + L(d, r"z rabunku BK \+(\d+)", jen) + L(d, r"pojmani z wsi \(E4/9\) \+(\d+)", jen)   # E4/9: nasze J nie sa juz w "z rabunku BK"
+            # P2-T7-jency: niewolnicy BK w konwojach (PrisonRoster konwoju = "jency w partiach"); wyjscie u celu juz w jout ("jency M - znikaja z partia")
+            jin += L(d, r"niewolnicy w konwojach BK \(klasa BK\) " + F_, poc)
             jout = (L(d, r"z niewoli pokonanych zabrano (\d+)", jen) + L(d, r"uwolnieni jency bez odbiorcy (\d+)", h3)
                     + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1)
                     + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1) + L(d, r"krainy z niewola: niewolnikow (\d+)", i1)
@@ -883,6 +1114,9 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- E4/9 (192): Straz z Westeros i dozywotnio, H1, niewola w kanonie, jency z rabunku z ludzi wsi, DLUG 4, Wolni Ludzie
     if any(x.startswith(E49_START) for x in lines):
         etap4_e49(rep, lines, start, win, until)
+    # ---------------- poprawki po tescie koncowym etapu 4 (P5-PROGI-E4): wiersz zbiorczy czasu linii etapow 4+5 wobec doby (gdy jest linia E4/7)
+    if any(x.startswith("Pochodzenie (E4/7): wpiete") for x in lines):
+        etap45_cost(rep, lines, start, measured)
 
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
@@ -1172,11 +1406,40 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
             v = num(r"ludnosc [\d.]+ mln \(([+-]?\d+) ludzi\)", x)
         if v is not None:
             net.append(v)
-    rep.add(f"E4/7 T11: ludnosc netto d28-{until} (ludzi/d)", f"{st.mean(net):+.0f}/d" if net else "brak", "od -720/d (-0.5%/rok, Jeff 11.10) do +1150/d", (-721 <= st.mean(net) <= 1154) if net else None)
-    # T12 - koszt
+    # poprawka po tescie koncowym etapu 4 (P1-1): "razem z nimi" to tylko DOM + UCHODZCY - w nowej kampanii armie rosna z ludzi (E4/7, E4/8: kazdy zolnierz jest
+    # czlowiekiem), wiec mobilizacja wygladala jak ubytek. Prog Jeffa liczy ludzi ZYWYCH (konta ksiegi); DOM - INFO z rozbiciem; mobilizacja pilnowana osobno (T11b: a <= f).
+    # Log bez konta SLUZBA (przed E4/7) - stara miara (zolnierz nie byl czlowiekiem).
+    zy = e4_zywi(lines, start, win)
+    if zy:
+        rep.add(f"E4/7 T11: ludzie zywi netto d28-{until} (ludzi/d)", e4_zywi_text(zy),
+                "od -721/d (-0.5%/rok, Jeff 11.10: w ciaglej wojnie) do +1150/d (gora pasa E4/4)", E4_ZYWI_MIN <= zy["z"] <= E4_ZYWI_MAX)
+        rep.add(f"E4/7 T11: DOM + uchodzcy netto d28-{until} - rozbicie (ludzi/d)",
+                f"{zy['dom']:+.0f} = narodziny {zy['nar']:+.0f} - mobilizacja (SLUZBA, JENCY, w drodze) {zy['mob']:.0f} - polegli {zy['pol']:.0f} - niewola {zy['niew']:.0f}"
+                f" - pula/weterani/Mur {zy['inne']:.0f} - cywile {zy['cyw']:.0f} + reszta rownania krain (bez nazwy) {zy['res']:+.0f} + inne (przyciecie kluczy, zaokraglenia) {zy['other']:+.0f}"
+                + (f"; srednia dobowa \"razem z nimi\" (linia Ludzie:) {st.mean(net):+.0f}/d" if net else ""),
+                "INFO (Jeff: decyzja, czy \"ludnosc\" z 11.10 to ludzie zywi - rada: tak); mobilizacja - wiersz T11b", None)
+    else:
+        rep.add(f"E4/7 T11: ludnosc netto d28-{until} (ludzi/d)", f"{st.mean(net):+.0f}/d (log bez konta SLUZBA E4/7 - ludzie w domu)" if net else "brak dob 28+",
+                "od -720/d (-0.5%/rok, Jeff 11.10) do +1150/d", (-721 <= st.mean(net) <= 1154) if net else None)
+    # T11b (P1-1 pkt 4) - mobilizacja: a swiata z linii "Wolne rece" <= prog f (zwykly) kazdej doby okna
+    af = []
+    for d in wdays:
+        a_ = fnum(r"\| swiat: a srednio " + F_ + r"% mezczyzn", wr[d])
+        f_ = fnum(r"prog: zwykly " + F_ + r"%", wr[d])
+        if a_ is not None and f_ is not None:
+            af.append((run_day(d, start), a_, f_))
+    if af:
+        wa = max(af, key=lambda t: t[1] - t[2])
+        rep.add("E4/7 T11b: mobilizacja - a swiata (Wolne rece) wobec progu f (najblizej progu w oknie)",
+                f"a {wa[1]:.2f}% wobec f {wa[2]:.0f}% (d{wa[0]}); ostatnia doba d{af[-1][0]}: {af[-1][1]:.2f}% ({len(af)} dob)",
+                "a <= f kazdej doby (miara zywych nie moze chowac odplywu z domu do wojska bez konca)", all(x[1] <= x[2] for x in af))
+    else:
+        rep.add("E4/7 T11b: mobilizacja - a swiata wobec f", "brak \"a srednio\" w linii Wolne rece", "a <= f", None)
+    # T12 - koszt (poprawka po tescie koncowym etapu 4, P5-PROGI-E4: 15 ms z prognozy planu -> zasada kosztu paczki 30 ms jak T8/F10; wiersz zbiorczy etapow 4+5)
     ms = [fnum(r"\| czas " + F_ + r" ms \(uzgodnienie", poc[d]) for d in pdays]
     ms = [x for x in ms if x is not None]
-    rep.add("E4/7 T12: koszt linii E4/7 i uzgodnienia (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-", "<= 15 ms/dobe (srednio)", (st.mean(ms) <= 15.0) if ms else None)
+    rep.add("E4/7 T12: koszt linii E4/7 i uzgodnienia (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-",
+            "<= 30 ms/dobe srednio (zasada kosztu paczki); najwiecej - INFO", (st.mean(ms) <= 30.0) if ms else None)
     # T13 - zapis i wczytanie
     ld = [x for x in lines if x.startswith("Pochodzenie (E4/7): wczytanie")]
     sv = [x for x in lines if x.startswith("Pochodzenie (E4/7): zapis arm_people")]
@@ -1320,16 +1583,25 @@ def etap4_e48(rep, lines, start, win, hea, until):
     rep.add("E4/8 N6: kontrola linii Miasta (najwieksza |roznica|)", f"{max(abs(x) for x in mc):.2f} ({len(mc)} dob)" if mc else "brak (pierwsza doba sesji / brak linii)",
             "<= 1 czlowiek kazdej doby", (max(abs(x) for x in mc) <= 1.0) if mc else None)
     # N7 - milicja: tick netto po korekcie E4/8 = "milicja (E4/0): z modelu w ticku" (169c; okna W1/W2 widza stan po korekcie)
-    dif = []
+    # poprawka po tescie koncowym etapu 4 (N7): doba "pierwsza doba sesji" 169c (bez reszty) poza progiem - okna E4/8 czekaja na siew E4/7 (LevyLive), a 169c liczy
+    # caly tick; d1-d7 - stan przejsciowy ulamkow _readyMilitia (E4/8 liczy calych ludzi rosteru, 169c float Settlement.Militia) - suma INFO, srednia od d8
+    dif, skip1 = [], 0
     for d in adays:
         if d not in zal:
+            continue
+        if "pierwsza doba sesji" in zal[d]:
+            skip1 += 1
             continue
         ours = num(r"tick netto \(po korekcie\) ([+-]?\d+)", arm[d])
         theirs = num(r"milicja \(E4/0\): z modelu w ticku ([+-]?\d+)", zal[d])
         if ours is not None and theirs is not None and ("milicja T" in arm[d]):
-            dif.append(ours - theirs)
-    rep.add("E4/8 N7: milicja - tick E4/8 wobec 169c (srednia roznica, najwieksza)", f"{st.mean(dif):+.2f}/d, max |{max(abs(x) for x in dif)}|" if dif else "brak (milicja wylaczona albo pomiar E4/0 wylaczony)",
-            "|srednia| <= 2/d (ulamki _readyMilitia - szum dzienny INFO)", (abs(st.mean(dif)) <= 2.0) if dif else None)
+            dif.append((run_day(d, start), ours - theirs))
+    d8 = [x for n_, x in dif if n_ >= 8]
+    d17 = [x for n_, x in dif if n_ < 8]
+    rep.add("E4/8 N7: milicja - tick E4/8 wobec 169c od d8 (srednia roznica, najwieksza)",
+            (f"{st.mean(d8):+.2f}/d, max |{max(abs(x) for x in d8)}| ({len(d8)} dob); d1-7 suma {sum(d17):+d} (INFO); pominiete pierwsze doby sesji {skip1}") if d8
+            else f"brak dob od d8 (milicja wylaczona albo pomiar E4/0 wylaczony; d1-7 suma {sum(d17):+d})",
+            "|srednia od d8| <= 2/d (ulamki _readyMilitia - szum dzienny INFO); d1-7 - stan przejsciowy (INFO)", (abs(st.mean(d8)) <= 2.0) if d8 else None)
     mil = [num(r"\| milicja (\d+)", zal[d]) for d in zd] if zd else []
     mil = [x for x in mil if x is not None]
     if mil:
@@ -1381,10 +1653,28 @@ def etap4_e48(rep, lines, start, win, hea, until):
     else:
         rep.add("E4/8 N11: miasta R2", "brak dob 28+ z linia \"Miasta (E4/8 R2)\"", "-100..-250/d", None)
     if mdays:
+        # poprawka po tescie koncowym etapu 4 (P1-3): udzial swiata ma w mianowniku WSZYSTKIE wsie (z wsiami zamkow), odniesienie tr: - tylko wsie miast (blad planu E48:436) -
+        # prog na polu "miasta wobec wlasnych wsi dzis X% (start Y%, miast M), luka do udzialu L ludzi (Z% celu)" (obie strony z jednej petli po tych samych miastach);
+        # udzial swiata - INFO; log bez pola - INFO (regex odporny na brak pola i pol po nim)
         lm = mia[mdays[-1]]
+        dn = run_day(mdays[-1], start)
         u = fnum(r"udzial miejski swiata dzis " + F_ + r"%", lm)
-        u0 = fnum(r"\(odniesienie " + F_ + r"%", lm)
-        rep.add(f"E4/8 N11: udzial miejski swiata d{run_day(mdays[-1], start)} wobec odniesienia", f"{u}% wobec {u0}%" if u is not None else "-", "+-2 pkt", (abs(u - u0) <= 2.0) if (u is not None and u0 is not None) else None)
+        u0 = fnum(r"udzial miejski swiata dzis [\d.]+% \(odniesienie " + F_ + r"%", lm)
+        mo = re.search(r"miasta wobec wlasnych wsi dzis " + F_ + r"% \(start " + F_ + r"%(?:, miast (\d+))?\)", lm)
+        mg = re.search(r"luka do udzialu " + F_ + r" ludzi \(" + F_ + r"% celu\)", lm)
+        if mo:
+            x_, y_ = float(mo.group(1)), float(mo.group(2))
+            rep.add(f"E4/8 N11: udzial miast wobec ich wsi d{dn} wobec startu", f"{x_:.2f}% wobec {y_:.2f}% ({x_ - y_:+.2f} pkt" + (f", miast {mo.group(3)}" if mo.group(3) else "") + ")",
+                    "+-2 pkt (ten sam zbior miast po obu stronach)", abs(x_ - y_) <= 2.0)
+            if mg:
+                rep.add(f"E4/8 N11: luka do udzialu miast d{dn} (migracja R2)", f"{float(mg.group(1)):.0f} ludzi = {float(mg.group(2)):.2f}% celu",
+                        "<= 5% celu (sceptyk P1-3; d728 szac. ok. 2.6% od poboru miejskiego)", float(mg.group(2)) <= 5.0)
+            rep.add(f"E4/8 N11: udzial miejski swiata d{dn} (INFO)", f"{u}% (odniesienie tr: {u0}% - inny mianownik: same wsie miast)" if u is not None else "-",
+                    "INFO - swiat liczy tez wsie zamkow (pobor i straty wojny bez winy R2)", None)
+        else:
+            rep.add(f"E4/8 N11: udzial miejski swiata d{dn} wobec odniesienia", (f"{u}% wobec {u0}%" if u is not None else "-")
+                    + " - brak pola \"miasta wobec wlasnych wsi\" (log sprzed poprawki P1-3); rozne mianowniki (swiat: wszystkie wsie, odniesienie: wsie miast)",
+                    "INFO bez pola; z polem +-2 pkt miasta wobec wlasnych wsi", None)
     # N12 - rownanie krain z migracja (E4/7 T3)
     rep.add("E4/8 N12: rownanie krain z MigIn/MigOut", "patrz E4/7 T3 (odcinek E4/7 \"Ludzie (ksiega)\" z czlonem migracji E4/8)", "<= 0.1% ludzi krainy", None)
     # N13 - RESZTA linii Hearth
@@ -1396,7 +1686,9 @@ def etap4_e48(rep, lines, start, win, hea, until):
     # N15 - koszt
     ms = [fnum(r"\| czas " + F_ + r" ms\.", arm[d]) for d in adays]
     ms = [x for x in ms if x is not None]
-    rep.add("E4/8 N15: koszt latek i linii E4/8 (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-", "<= 5 ms/dobe (srednio)", (st.mean(ms) <= 5.0) if ms else None)
+    # poprawka po tescie koncowym etapu 4 (P5-PROGI-E4): 5 ms z prognozy planu -> zasada kosztu paczki 30 ms (jak T8/F10); wiersz zbiorczy etapow 4+5
+    rep.add("E4/8 N15: koszt latek i linii E4/8 (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-",
+            "<= 30 ms/dobe srednio (zasada kosztu paczki); najwiecej - INFO", (st.mean(ms) <= 30.0) if ms else None)
     # N16 - zapis: odniesienia tr: po wczytaniu = miasta ze stanem
     if mdays:
         lm = mia[mdays[-1]]
@@ -1448,8 +1740,17 @@ def etap4_e410(rep, lines, start, win, lud, until):
         m = re.search(r"starzy zolnierze z karczm (\d+) w (\d+) miastach.*?ze stanu ludzi miast \(E4/4\) (\d+), bez zdjecia \([^)]*\) (\d+)", sl)
         if m:
             n, tw, n1, n2 = (int(x) for x in m.groups())
-            rep.add("E4/10 V2: siew (doba kampanii, ludzie, miasta, ze stanu miast, bez zdjecia)", f"d{run_day(sd[0], start)}: {n} w {tw} miastach, ze stanu {n1}, bez zdjecia {n2}",
-                    "d1-d2, N > 0 w >= 90 miastach, bez zdjecia 0 (przy E4/4 i E4/7)", run_day(sd[0], start) <= 2 and n > 0 and tw >= 90 and n2 == 0)
+            # poprawka po tescie koncowym etapu 4 (V2): pula = to, co stoi w karczmach w dniu siewu (siew czeka na siew E4/7, w d0 AI najmuje po staremu) -
+            # prog miast z linii dziennej ("pula N w M z T miast"): >= 40% miast; "bez zdjecia" = "bez pochodzenia" siewu (tylko miasta bez stanu: koczowiska
+            # Dothrakow, obozy Wolnych Ludzi, Castle Black, Skagos, Elyria - przelicznik ludzi 0)
+            mt = re.search(r"\| pula \d+ w (\d+) z (\d+) miast", sl)
+            tm, tt = (int(mt.group(1)), int(mt.group(2))) if mt else (tw, 0)
+            nb = num(r"z pochodzeniem \d+ w \d+ regionach, bez pochodzenia (\d+)", sl)
+            sh = tm / tt if tt else None
+            ok2 = (run_day(sd[0], start) <= 2 and n > 0 and (sh >= 0.40 if sh is not None else tw >= 40) and n1 + n2 == n and nb is not None and n2 == nb)
+            rep.add("E4/10 V2: siew (doba kampanii, ludzie, miasta, ze stanu miast, bez zdjecia = bez pochodzenia)",
+                    f"d{run_day(sd[0], start)}: {n} w {tm}" + (f" z {tt} miast ({100.0 * sh:.0f}%)" if sh is not None else " miastach") + f", ze stanu {n1}, bez zdjecia {n2}, bez pochodzenia {nb if nb is not None else '?'}",
+                    "d1-d2, N > 0 w >= 40% miast (linia dzienna), ze stanu + bez zdjecia = N, bez zdjecia = bez pochodzenia (tylko miasta bez stanu)", ok2)
     else:
         ld = next((x for x in lines if x.startswith("Weterani (E4/10): z zapisu")), None)
         rep.add("E4/10 V2: siew", "w logu tylko wczytanie" if ld else "brak linii siewu", "d1-d2 nowej kampanii", None)
@@ -1754,14 +2055,23 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else ""),
             "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo",
             (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh else None)
-    # S8
-    fh = [fnum(r"\| zerowanie: partii \d+, osobodni [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in d31]
-    if fh:
-        m = st.mean(fh)
-        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)", f"{m:.0f}/d", "50-450/d (szacunek 150); > 1150/d = Devastation Per Forager Day w dol (decyzja, nie blad)",
-                50 <= m <= 450, decide=m > 1150)
+    # S8 (poprawka po tescie koncowym etapu 4): pasmo 50-450/d to szacunek planu z liczby partii w polu (z30 4.2/d) - INFO z partiami/d; wiaze rachunek
+    # kazdej doby: trafieni <= osobodni x stawka (Devastation Per Forager Day; tolerancja zaokraglen linii)
+    rx8 = re.compile(r"\| zerowanie: partii (\d+), osobodni " + F_ + r" x " + F_ + r" -> trafieni " + F_)
+    z8 = [(d, rx8.search(dev[d])) for d in on]
+    z8 = [(d, int(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4))) for d, m in z8 if m]
+    z8w = [x for x in z8 if run_day(x[0], start) >= 31]
+    if z8w:
+        m = st.mean(x[4] for x in z8w)
+        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)",
+                f"{m:.0f}/d; partii {st.mean(x[1] for x in z8w):.2f}/d (z31A 1.94/d), osobodni {st.mean(x[2] for x in z8w):.0f}/d",
+                "INFO - szacunek planu 150/d przy 4.2 partii/d (z30); > 1150/d = Devastation Per Forager Day w dol (decyzja, nie blad)",
+                False if m > 1150 else None, decide=m > 1150)
+        bad8 = [(run_day(d, start), h, o * r_) for d, _, o, r_, h in z8 if h > o * r_ + 0.5 * r_ + 0.05]
+        rep.add("E4/5 S8: trafieni <= osobodni x stawka (kazda doba z zerowaniem)", f"doby poza {len(bad8)} z {len(z8)}" + (f" (np. d{bad8[0][0]}: {bad8[0][1]:.1f} > {bad8[0][2]:.1f})" if bad8 else ""),
+                "0 dob (tolerancja zaokraglen linii: 0.5 osobodnia x stawka + 0.05)", len(bad8) == 0)
     else:
-        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)", "-", "50-450/d", None)
+        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)", "-", "INFO (szacunek 150/d)", None)
     # S9
     tot = [re.search(r"\| trafieni " + F_ + r" = zabici " + F_ + r" \+ pojmani " + F_ + r" \+ las " + F_ + r" \+ uchodzcy " + F_, dev[d]) for d in on]
     tot = [tuple(float(g) for g in x.groups()) for x in tot if x]
@@ -1878,7 +2188,16 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     # E4/6: zmarli z glodu (gospodarze, mieszczanie; uchodzcy sa juz w "zmarli" konta) obnizaja dolna granice jak zabici
     fam = e4_series(lines, "Spichlerze (E4/6): dzien")
     starv = [(fnum(r"zmarli z glodu: gospodarze " + F_, fam.get(d)) or 0) + (fnum(r", mieszczanie " + F_, fam.get(d)) or 0) for d in on if run_day(d, start) >= 28]
-    if net:
+    # poprawka po tescie koncowym etapu 4 (P1-1): przy kontach E4/7 (zolnierz jest czlowiekiem) ludnosc w progu = ludzie ZYWI (ta sama liczba co E4/7 T11);
+    # dolny pas "290 - zabici - las - ..." powstal przed E4/7 (nie zna poleglych, niewoli ani mobilizacji) - zostaje granica Jeffa -721/d i gora pasa E4/4
+    zy = e4_zywi(lines, start, win)
+    if net and zy:
+        mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
+        ms = st.mean(starv) if starv else 0
+        rep.add(f"E4/5 S15: ludzie zywi netto d28-{until} (ludzi/d)",
+                e4_zywi_text(zy) + f"; srednio dobowo \"razem z nimi\" {st.mean(net):+.0f}/d (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d)",
+                "od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4) - jak E4/7 T11", E4_ZYWI_MIN <= zy["z"] <= E4_ZYWI_MAX)
+    elif net:
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
         ms = st.mean(starv) if starv else 0
         mn = st.mean(net); lo = 290 - mk - mf - md - ms
@@ -2073,19 +2392,24 @@ def etap4_e411(rep, lines, start, win, until, logp):
     rep.add("E4/11 G2: linia startowa (latka zywnosci warowni)", f"BRAK: {brak.group(1) if brak else '?'}; wlasciciele: {own.group(1)[:200] if own else '?'}",
             "BRAK: - (wpiete: zywnosc warowni od ludzi)", brak is not None and brak.group(1).strip() == "-")
     fd = next((x for x in lines if x.startswith("Ksiega wiosek (E4/11): uklad")), None)
+    # poprawka po tescie koncowym etapu 4 (G2): prog 2446/425/571 liczony z XML ROT; w grze ROT_town40_village2/3 (Kurbok, Thupak - ROT-Map settlements.xml) maja
+    # wspolny komponent Village z town39_village2/3 (Guntak, Volug), wiec unikalnych Village 569, a ich 5 wiosek w 2 okregach TSV - "brak" (blad danych ROT, nie Armoury)
+    g2_rule = ("wiosek 2441 w 423 okregach, odrzucone 0, wsi gry brak 5 wiosek w 2 okregach (ROT_town40_village2/3 - wspolny Village z town39 w ROT-Map), okregi 569,"
+               " n dla wszystkich (TSV b742f307; poprawiony XML ROT = 2446/425/0/0, 571)")
     if fd is None:
-        rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", "brak linii pierwszej doby", "wiosek 2446 w 425 okregach, odrzucone 0, wsi gry brak 0, okregi 571, n dla wszystkich", False)
+        rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", "brak linii pierwszej doby", g2_rule, False)
     else:
         m = re.search(r"wiosek (\d+) w (\d+) okregach \(odrzucone (\d+), wsi gry brak (\d+)", fd)
+        mb = num(r"wsi gry brak \d+ wiosek w (\d+) okregach", fd, int, 0) or 0
         ok_n = re.search(r"\| okregi (\d+):", fd)
         saved = num(r"z zapisu (\d+) okregow, nowe", fd, int, 0) or 0
         new = num(r", nowe (\d+)", fd, int, 0) or 0
         tot = int(ok_n.group(1)) if ok_n else 0
         shr = num(r"pomniejszonymi (\d+)", fd, int, 0)
         vals = tuple(int(g) for g in m.groups()) if m else None
-        ok = vals is not None and vals[0] == 2446 and vals[1] == 425 and vals[2] == 0 and vals[3] == 0 and tot == 571 and saved + new == tot
-        rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", f"wiosek/okregi/odrzucone/brak wsi {vals}; okregi {tot}, n z zapisu {saved} + nowe {new}; pomniejszone {shr} (INFO)",
-                "wiosek 2446 w 425 okregach, odrzucone 0, wsi gry brak 0, okregi 571, n dla wszystkich (TSV b742f307)", ok)
+        ok = vals == (2441, 423, 0, 5) and mb == 2 and tot == 569 and saved + new == tot
+        rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", f"wiosek/okregi/odrzucone/brak wsi {vals} (brak w {mb} okregach); okregi {tot}, n z zapisu {saved} + nowe {new}; pomniejszone {shr} (INFO)",
+                g2_rule, ok)
     # poprawka po recenzji (R1-3): bieg z ksiega wylaczona (G13) - wiersz CZYNNA jako INFO, G13 oceniany przed wyjsciem z bloku
     if off and not on:
         rep.add("E4/11: linia dzienna CZYNNA", f"czynna 0 dob, WYLACZONA {len(off)} dob z {len(win)} - bieg z ksiega wylaczona (patrz G13)", "czynna w kazdej dobie z ruchem (bieg zwykly)", None)
@@ -2175,8 +2499,9 @@ def etap4_e411(rep, lines, start, win, until, logp):
     rs = [x for x in lines if x.startswith("Ksiega wiosek (E4/11): start sesji")]
     pl = [fnum(r"czas: plik " + F_ + r" ms", x) for x in rs]
     pl = [x for x in pl if x is not None]
+    # poprawka po tescie koncowym etapu 4 (P5-PROGI-E4): linia 3 ms z prognozy planu -> zasada kosztu paczki 30 ms (jak T8/F10); wczytanie pliku bez zmian
     rep.add("E4/11 G10: czas linii i wczytania pliku", f"linia {st.mean(tm):.2f} ms/d (max {max(tm):.1f}); plik ukladu po stronie kampanii {max(pl, default=0):.1f} ms" if tm else "-",
-            "<= 3 ms/d srednio; wczytanie pliku <= 50 ms", (st.mean(tm) <= 3.0 and max(pl, default=0) <= 50.0) if tm else None)
+            "linia <= 30 ms/d srednio (zasada kosztu paczki); wczytanie pliku <= 50 ms", (st.mean(tm) <= 30.0 and max(pl, default=0) <= 50.0) if tm else None)
     # G11 zapis (wczytanie z kluczem)
     ld = [x for x in rs if "z zapisu: n " in x]
     if ld:
@@ -2512,7 +2837,7 @@ def _grp(pat, s, g=0, default="-"):
     return m.group(g) if m else default
 
 
-def etap5_main(logp, start_arg, until=120, csvp=None):
+def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
     """E5/0 (195): grupa --grupa etap5 (projekt etapu 5 rozdz. 4; plan kodu E5/0 rozdz. 8). Okno: doby kampanii 1-until (--do-doby), start kampanii
     jak etap4_main (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki
     (etap5_<paczka>(rep, lines, start, win, **kw)); kazdy blok rusza tylko przy swojej linii startowej - brak linii = wiersz INFO "brak linii startowej",
@@ -2539,7 +2864,7 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
     # kolejne paczki dopisuja tu swoje bloki (A1: etap5_a1(rep, lines, start, win)); bieg B - kontrola wartosci czynnych K3 w bloku B1
     for blk in (etap5_e50,):
         try:
-            blk(rep, lines, start, win, until=until, logp=logp)
+            blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
         except Exception as e:
             rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
@@ -2644,6 +2969,9 @@ def etap5_e50(rep, lines, start, win, **kw):
             f"ERROR in TownFolk {len(errs)}" + (f" ({', '.join(sites[:6])})" if sites else "") + f"; BRAK: {brak.group(1) if brak else '?'}; potkniecia {stum}; linii sesji {len(sess)}",
             "0 bledow; BRAK: -; potkniecia <= 5 w biegu; linia sesji jest", ok1)
     rep.add("E50-T1: wlasciciele latek celow (linia startowa)", _grp(r"wlasciciele latek celow: (.*?); tryb przy starcie", stl, 1)[:400], "lista (INFO)", None)
+    # poprawki po tescie koncowym etapu 4 (sceptyk SCRIBE-POLYKA pkt 4): wyjatek TownFolk polkniety przez CrashScribe nie trafia do "ERROR in TownFolk" - log sesji tego startu
+    if kw.get("logp"):
+        crashscribe_t1_row(rep, "E50-T1: bledy TownFolk polkniete przez CrashScribe (log sesji)", kw["logp"], kw.get("csp"), where_filter="TownFolk")
     if not full:
         rep.add("E5/0: linia Kiesa ludu (na sucho)", f"pelnych dob {len(full)} z {len(win)}", "kazda doba po kalibracji", False if win else None)
         return
@@ -2659,8 +2987,10 @@ def etap5_e50(rep, lines, start, win, **kw):
     if cost:
         m = sum(c for c, _ in cost) / len(cost)
         mx = max(cost)
-        rep.add("E50-T2: koszt (latki + doba) srednio", f"{m:.1f} ms/dobe ({len(cost)} dob)", "<= 15 ms", m <= 15)
-        rep.add("E50-T2: koszt najwiekszy", f"{mx[0]:.1f} ms (d{mx[1]})", "<= 50 ms (INFO)", None)
+        # poprawka po tescie koncowym etapu 4 (P5-E50-T2): 15 ms z prognozy planu (PLAN-KODU-E50 :466-469) -> 50 ms (ok. 0.3% doby); paczka pomiarowa do B1;
+        # wiersz zbiorczy czasu linii etapow 4+5 (<= 1% doby) w --grupa etap4
+        rep.add("E50-T2: koszt (latki + doba) srednio", f"{m:.1f} ms/dobe ({len(cost)} dob)", "<= 50 ms srednio (ok. 0.3% doby; zbiorczo etapy 4+5 <= 1% doby - --grupa etap4)", m <= 50)
+        rep.add("E50-T2: koszt najwiekszy", f"{mx[0]:.1f} ms (d{mx[1]})", "INFO", None)
     # ---- T3 kontrola na sucho
     bad3 = []
     for d in full:
@@ -2709,18 +3039,39 @@ def etap5_e50(rep, lines, start, win, **kw):
         rep.add("E50-T4: A6 - z niczego netto na ladzie sr28", f"{em:.0f}/d", "<= 5 000/d - inaczej A6 POTRZEBNE (Jeff 11.10 16:20: A6 i tak w porcji A)",
                 em <= 5000, decide=em > 5000)
     # ---- T5 wydatek z petli BK wobec ConsumedValue
-    bad5, nob, lfn, lfc = [], [], [], 0
+    # poprawka po tescie koncowym etapu 4 (E50-T5): BK zdejmuje z budzetu ilosc ULAMKOWA x cena, a do ConsumedValue zapisuje MBRandom.RoundRandomized(ilosc) x cena -
+    # wartosc oczekiwana rowna, ale kazda doba ma rozrzut kilku procent (d1-120: odchylenie ok. 7%). Prog na sumie 28 dob +-2% (K1: budzet raz na kategorie, nawias
+    # nie gubi wierszy - stale obciazenie), dzien - INFO z progiem bezpieczenstwa |r| <= 25% (bledny nawias = rzad wielkosci), sumy calego okna - INFO
+    bad5, nob, lfn, lfc, r5 = [], [], [], 0, []
+    rx5 = re.compile(r"wydatek z petli BK (\d+) wobec ConsumedValue (\d+) \(roznica (-?[\d.]+)%\)")
     for d in full:
         q = fnum(r"\(roznica (-?[\d.]+)%\)", kie[d])
         if q is not None and abs(q) > 2.0:
             bad5.append((run_day(d, start), q))
+        m5 = rx5.search(kie[d])
+        if m5:
+            r5.append((d, int(m5.group(1)), int(m5.group(2)), float(m5.group(3))))
         nob.append(num(r"osad z konsumpcja bez BK (\d+)", kie[d], int, 0) or 0)
         # recenzja E5/0 (2-1): dokup jedzenia BK (zapas <= 10%) - nadwyzka petli nad ConsumedValue zdjeta z wydatku jedzenia przed porownaniem
         lfn.append(num(r"dokup jedzenia BK \(zapas <= 10%\): osad (\d+)", kie[d], int, 0) or 0)
         if d in w28:
             lfc += num(r"petla ponad ConsumedValue zdjeta z wydatku jedzenia (\d+)", kie[d], int, 0) or 0
-    rep.add("E50-T5: wydatek z petli BK wobec ConsumedValue", f"poza progiem {len(bad5)} z {len(full)} dob" + (f" (np. d{bad5[0][0]}: {bad5[0][1]}%)" if bad5 else ""),
-            "+-2% kazdej doby (K1: budzet raz na kategorie)", len(bad5) == 0)
+    if r5:
+        s28 = [x for x in r5 if x[0] in w28]
+        w5, c5 = sum(x[1] for x in s28), sum(x[2] for x in s28)
+        q28 = 100.0 * (w5 / c5 - 1.0) if c5 else None
+        rep.add("E50-T5: wydatek z petli BK wobec ConsumedValue - suma 28 dob", (f"{q28:+.2f}% (wydatek {w5} wobec CV {c5}, {len(s28)} dob)" if q28 is not None else "-"),
+                "|suma wydatku / suma CV - 1| <= 2% (K1: budzet raz na kategorie; dzien rozrzuca RoundRandomized BK)", (abs(q28) <= 2.0) if q28 is not None else None)
+        wa, ca = sum(x[1] for x in r5), sum(x[2] for x in r5)
+        qs = [x[3] for x in r5]
+        worst5 = max(r5, key=lambda x: abs(x[3]))
+        rep.add("E50-T5: wydatek wobec ConsumedValue dziennie (rozklad) i suma okna",
+                f"srednia {st.mean(qs):+.2f}%, odchylenie {st.pstdev(qs):.2f}%, najwieksze |r| {abs(worst5[3]):.2f}% (d{run_day(worst5[0], start)}); poza +-2%: {len(bad5)} z {len(full)} dob (INFO);"
+                f" suma okna {100.0 * (wa / ca - 1.0) if ca else 0:+.2f}% ({len(r5)} dob)",
+                "kazda doba |r| <= 25% (prog bezpieczenstwa - bledny nawias dalby rzad wielkosci); +-2% dziennie i suma okna - INFO", all(abs(x) <= 25.0 for x in qs))
+    else:
+        rep.add("E50-T5: wydatek z petli BK wobec ConsumedValue", f"brak pola \"wydatek z petli BK ... wobec ConsumedValue\"; poza +-2%: {len(bad5)} z {len(full)} dob",
+                "suma 28 dob +-2%", None)
     rep.add("E50-T5: osad z konsumpcja bez BK (INFO)", f"najwiecej {max(nob) if nob else '-'}", "INFO (d120 zbioru 31: 0)", None)
     rep.add("E50-T5: dokup jedzenia BK - osad (najwiecej na dobe), zdjete z wydatku jedzenia (sr28; INFO)",
             f"osad najwiecej {max(lfn) if lfn else '-'}; zdjete {lfc / max(len(w28), 1):.0f}/d", "INFO (oblezenia, glod - zapas warowni <= 10%)", None)
@@ -2805,6 +3156,7 @@ def etap5_e50(rep, lines, start, win, **kw):
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
+    csp = None      # poprawki po tescie koncowym etapu 4 (P11-progi-T1): log sesji CrashScribe do T1 / E50-T1
     until_arg = 120
     final = False
     i = 0
@@ -2824,13 +3176,15 @@ def main(argv):
             start_arg = int(args[i + 1]); i += 2; continue
         if a == "--do-doby":
             until_arg = int(args[i + 1]); i += 2; continue
+        if a == "--crashscribe":
+            csp = args[i + 1]; i += 2; continue
         logp = a; i += 1
     if group == "etap3" and logp:
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:
-        return etap4_main(logp, start_arg, until_arg)   # E4/0 (188)
+        return etap4_main(logp, start_arg, until_arg, csp)   # E4/0 (188)
     if group == "etap5" and logp:
-        return etap5_main(logp, start_arg, until_arg, csvp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
+        return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
