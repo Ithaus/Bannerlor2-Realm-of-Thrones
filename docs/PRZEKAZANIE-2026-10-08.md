@@ -760,3 +760,7 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   27 tys. Zelaznych tylko NK); jency z rabunku - 10% napadnietych z uchodzcow wsi przy koncu udanego rabunku (odstepstwo od szkicu E4/5 - bez gubienia przy zapisie
   w polowie rabunku); DLUG 4 - dezercja z braku zoldu rodu w zajeciu do domu. UWAGA scalanie: numery przyczyn E4/6 i E4/7 sie pokrywaja. Pytania kierunku do Jeffa:
   (1) zalogi Strazy dalej rosna same, ale z prawdziwych ludzi Westeros - rada tak; (2) rozbici bracia wracaja na Mur, uciekinierzy do wyrzutkow Polnocy - rada tak.
+- (10:45) **ZBIOR 31 TEST B (proba zimy) OK:** 120/120, bledy 9 = te same, Armoury.log 0 ERROR; zima od 8. doby; ciecie plonu: Wyspy Letnie 0% / cieple 15.7% /
+  reszta 48.6% (jak z30); lordowie AI w glodzie 20 (z30: 29), bez jedzenia 16 (z30: 26); "partii jedzacych" w zimie 673 (z30: 1974) - skutek naprawy lancucha jedzenia
+  (BK: partie BK nie jedza, ROT: Inni nie jedza - reguly wrocily), nie blad. Progi etap4 NIE 7: jak test A + T8 koszt 30.4 ms/d (prog 30; Zima 14.9, model hearth W1 10.6;
+  z30 21.8) - marginalnie, sprawdzic w tescie koncowym. Kopie: SCRATCH(ae222cb7)\kopia-z31-B. Test zapisu 9 dob w toku.
