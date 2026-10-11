@@ -914,6 +914,8 @@ namespace Armoury
         ///    miastem i tylko gdy CZYNNYM modelem warsztatow gry jest BKWorkshopModel. U Jeffa czynny jest NavalDLCWorkshopModel
         ///    (BK swojego nie rejestruje), wiec gracz i lordowie podatku od warsztatow nie placa wcale - autor liczyl graczowi 40%
         ///    (cena o 40% za niska, a rozmowa obiecywala podatek, ktorego nie bedzie).
+        ///  - D11-3 (WorkshopOwnerPaysTownTax): lord albo gracz z warsztatem w miescie INNEGO rodu placi ten podatek panu miasta (Seal31B.OwnerTaxDaily -
+        ///    GetWorkshopTaxes = stawka x zysk, ta sama co u glowy rodu przy BKWorkshopModel) - wtedy ta sama czesc co wyzej (Seal31B.OwnerPaysTax).
         /// Bez BK: 0.
         /// </summary>
         internal static float TaxShare(Settlement st, Hero payer)
@@ -921,7 +923,7 @@ namespace Armoury
             try
             {
                 if (st == null || payer == null) return 0f;
-                if (!payer.IsNotable)
+                if (!payer.IsNotable && !Seal31B.OwnerPaysTax(st, payer))   // D11-3: wlasciciel w cudzym miescie placi panu miasta - podatek jak u glowy rodu przy BKWorkshopModel
                 {
                     var clan = payer.Clan;
                     if (clan == null || clan.Leader != payer || st.OwnerClan == clan) return 0f;

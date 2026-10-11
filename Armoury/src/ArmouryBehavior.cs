@@ -1442,6 +1442,7 @@ namespace Armoury
             try { Seal31.BlockOpen(); } catch { }   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
+            try { Seal31B.OwnerTaxDaily(); } catch (Exception e) { Log.Error("Seal31B.OwnerTaxDaily", e); }   // D11-3: podatek BK warsztatow lordow i gracza w cudzych miastach - wlasciciel -> pan miasta (renta, RentMerge nizej) i kasa miasta (autonomia)
             try { Seal31B.RentMerge(); } catch (Exception e) { Log.Error("Seal31B.RentMerge", e); }   // 3.1/3.3 (31b) E3/8a: podatek warsztatow notabli przelany panom od wczoraj -> RentToday (po czyszczeniu w PopulationLaw.Daily)
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
             // 110 (projekt etapu 2 krok B): zawor kasy zamku - 7% nadwyzki ponad zapas kupcow do pana zamku, linia "Zawor zamkow (110)";

@@ -4016,6 +4016,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool BandJoinPurseToPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Owner Pays Town Tax", HintText = "a lord's or your own workshop in a town of another house pays the Banner Kings workshop tax (the sum shown as 'Taxes from' in the town's taxes) once a day from its owner's purse to the town's lord - the town keeps its autonomy share; an owner with too little coin pays what he has and owes nothing more. Needs BK Workshop Tax To Lord and town rents (off = nobody pays it and the town's lord does not get it, as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool WorkshopOwnerPaysTownTax { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5035,6 +5039,7 @@ namespace Armoury
             s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;
             s.DefeatMoraleHalf = DefeatMoraleHalf;
             s.BandJoinPurseToPlayer = BandJoinPurseToPlayer;
+            s.WorkshopOwnerPaysTownTax = WorkshopOwnerPaysTownTax;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;
