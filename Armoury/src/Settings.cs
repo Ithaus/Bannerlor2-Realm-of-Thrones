@@ -1036,6 +1036,7 @@ namespace Armoury
 
         // --- A night's rest ---
         public bool NightRestEnabled = true;               // the men must sleep: quiet night hours in camp or under a roof, or the column grows weary
+        public bool NightRestEveryModel = true;            // the sleep penalties (speed and morale) also work in party models that name the party differently in their code (today: the War Sails morale model, left out before with an error at game start) - still counted once per party; off = those models skip the penalty, as before
         public int CampBackground = 1;                     // picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like
         public bool MapClockEnabled = true;                // the hour of the day next to the date on the map bar ("Day 12 of Summer, 299 AC - 14:30")
         public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock
