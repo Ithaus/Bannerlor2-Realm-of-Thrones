@@ -3880,6 +3880,22 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool PlayerWorkshopsSameRule { get; set; } = true;
 
+        [SettingPropertyBool("Bk Supply Buy By Party Stock", HintText = "Banner Kings party supplies (drink, timber, animal products, tools) are bought by what the PARTY carries, not by what the town holds: once a day, while a lord's party stays in a town, castle or village, its quartermaster tops each supply up to its need - at most Bk Supply Max Pieces pieces - from that settlement's stall at the stall's price, and the coin goes to that settlement's purse. Banner Kings bought nothing whenever the town held enough, and its coin left the world. Nothing is bought on the way in: the game's lords sell every non-food good the moment they enter a town (off = Banner Kings as before)")]
+        [SettingPropertyGroup("Banner Kings coin (stage 3)")]
+        public bool BkSupplyBuyByPartyStock { get; set; } = true;
+
+        [SettingPropertyBool("Bk Village Market Pays What It Has", HintText = "a village with a Banner Kings marketplace buys a surplus good from its town only while it has the coin for it, and the town gets exactly what the village paid (Banner Kings let the village pay more than it had and gave the town the full price out of nothing; off = as before)")]
+        [SettingPropertyGroup("Banner Kings coin (stage 3)")]
+        public bool BkVillageMarketPaysWhatItHas { get; set; } = true;
+
+        [SettingPropertyBool("Bk Slave Sale Paid By Town", HintText = "surplus slaves sold off by a settlement's owner (Banner Kings decision to sell surplus slaves) are paid for by the merchants of that town or castle - at most what its purse may spend - instead of with coin out of nothing (off = as before)")]
+        [SettingPropertyGroup("Banner Kings coin (stage 3)")]
+        public bool BkSlaveSalePaidByTown { get; set; } = true;
+
+        [SettingPropertyBool("Bk Knight Kit Paid To Town", HintText = "when an AI lord raises a new household knight (Banner Kings with the ROT patch), the price of the knight's arms and armour goes to the market of the knight's village instead of vanishing (off = as before)")]
+        [SettingPropertyGroup("Banner Kings coin (stage 3)")]
+        public bool BkKnightKitPaidToTown { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4849,6 +4865,10 @@ namespace Armoury
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
             s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
+            s.BkSupplyBuyByPartyStock = BkSupplyBuyByPartyStock;
+            s.BkVillageMarketPaysWhatItHas = BkVillageMarketPaysWhatItHas;
+            s.BkSlaveSalePaidByTown = BkSlaveSalePaidByTown;
+            s.BkKnightKitPaidToTown = BkKnightKitPaidToTown;
         }
 
         internal static void Apply()
