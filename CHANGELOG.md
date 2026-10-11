@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 ok. 02:20 - STATUSY WPISOW NOCY 10/11.10 (sesja ae222cb7)
+**Status:** WGRANE (kazde po tescie 120 dob nowej kampanii + zapis 9 dob, z kopia .bak + D:\Backup-Bannerlord\wgrane):
+- WGRANIE 23 (Armoury ba2e13e8): 183d diagnoza morale, 4 namioty, 2 + 2-r pula Strazy.
+- WGRANIE 24 (Armoury f5be1156): W1 kara zaopatrzenia BK, W4 Inni i przepelnienie.
+- WGRANIE 25 (Armoury 1211d984): 3.2 cala kiesa rozbitych dla zwyciezcow.
+- WGRANIE 26 (Armoury d38f1e69 + RC cea72cca): 3.4-3.7.
+- WGRANIE 27 (Armoury 5e02c741 + RC 90665425 + GT bbb841d7): 3.8-3.10.
+- WGRANIE 28 (Armoury 6e4b5b6a): 3.1 + 3.3 (statki: wylaczniki OFF do decyzji Jeffa).
+- WGRANIE 29 (Armoury 809a603a): E4/0 pomiar (gra bez zmian) + 2-n Straz bez zwolnien.
+Bieg 2-letni na WGRANIU 28: 728/728 dob, 0 bledow, etap 3 20/20 TAK. Szczegoly: docs/STAN-PRAC.md, docs/RAPORT-NOCNY-2026-10-11.md (repo glowne).
+NIEWGRANE: E4/2 (w-toku/e4-2 3e10b11) - czeka na decyzje Jeffa (fabula Innych).
+
 ## 2026-10-11 (noc, po biegu 2-letnim) - 2-n: NOCNA STRAZ BEZ ZWOLNIEN (pokoj z Wolnymi Ludzmi nie rozpuszcza Muru)
 **Mod:** Armoury | **Galaz:** `w-toku/e4-0` | **Pliki:** `ClanBudget.cs` (Releases), `Settings.cs` + MCM (`WatchNoReleases` = true)
 
