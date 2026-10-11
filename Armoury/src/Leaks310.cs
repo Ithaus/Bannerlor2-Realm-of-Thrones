@@ -22,7 +22,9 @@ namespace Armoury
     ///  B. HERSZT KRYJOWKI (gra, BanditSpawnCampaignBehavior.CheckForSpawningBanditBoss): przy wejsciu bandy do wypatrzonej kryjowki gra
     ///     dopisuje partii herszta jednego BanditBoss z niczego, gdy go tam nie ma (sklad partii herszta idzie z puli wyrzutkow
     ///     OutlawLaw, a w puli herszta nie ma). Teraz hersztem zostaje najlepszy z jej wlasnych ludzi (jeden mniej z najwyzszego tieru);
-    ///     partia bez ludzi herszta nie dostaje (zostaje pusta - OutlawLaw usuwa ja w ciagu godziny).
+    ///     partia bez ludzi herszta nie dostaje (zostaje pusta - OutlawLaw usuwa ja w ciagu godziny). Gdy partii herszta jeszcze nie ma,
+    ///     a pula wyrzutkow regionu i sasiadow nie da nikogo (OutlawLaw.CanMan), gra jej nie zaklada - bez pustej partii, ktora co
+    ///     godzine rodzilaby sie i ginela (poprawka po recenzji).
     ///  C. ZOLD ZACIAGU ROT (ROT.Models.ROTClanFinanceModel.CalculateClanGoldChange): w sluzbie lorda ROT dopisywal rodowi gracza
     ///     zold GRACZA za kazdego bohatera w jego partii (n x zold gracza) - z niczego, nikt nie placil. Teraz ten wpis jest zdejmowany
     ///     z rozliczenia rodu, a raz na dobe pan, u ktorego sluzysz, placi ze swojej kiesy kazdemu bohaterowi jego WLASNY zold
@@ -39,7 +41,7 @@ namespace Armoury
 
         // liczniki doby (zerowane po linii logu)
         private static int _fParties, _fWant, _fGrain, _fOther, _fShort, _fStumbles;
-        private static int _bPromoted, _bNoMen, _bStumbles;
+        private static int _bPromoted, _bNoMen, _bSkipped, _bStumbles;
         private static long _pRemoved; private static int _pRemovedN;
         private static long _pDue, _pPaid; private static int _pHeroes; private static string _pLord; private static int _pStumbles;
         private static bool _errF, _errB, _errP;
@@ -93,22 +95,37 @@ namespace Armoury
         // ------------------------------------------------------------ B. herszt kryjowki z wlasnych ludzi
         public struct BossState { public MobileParty Party; public CharacterObject Boss; public bool Had; }
 
-        /// <summary>Prefiks CheckForSpawningBanditBoss: partia herszta w tej kryjowce i czy herszt juz w niej jest.</summary>
-        public static void BossPrefix(Settlement __0, out BossState __state)
+        /// <summary>Prefiks CheckForSpawningBanditBoss: partia herszta w tej kryjowce i czy herszt juz w niej jest. Partii jeszcze nie ma,
+        /// a pula wyrzutkow regionu i sasiadow nie da nikogo - gra jej nie zaklada (return false): pusta partia herszta nie rodzi sie
+        /// i nie ginie co godzine (bez wlasnych ludzi herszt bylby zdjety, a OutlawLaw.Hourly usuwa pusta bande).</summary>
+        public static bool BossPrefix(Settlement __0, out BossState __state)
         {
             __state = default(BossState);
             try
             {
                 var s = S;
-                if (s == null || !s.HideoutBossFromOwnMen || __0 == null || !__0.IsHideout || __0.Culture == null) return;
+                if (s == null || !s.HideoutBossFromOwnMen || __0 == null || !__0.IsHideout || __0.Culture == null) return true;
                 var boss = __0.Culture.BanditBoss;
-                if (boss == null) return;
-                MobileParty bp = null;
-                foreach (var p in __0.Parties) if (p != null && p.IsBanditBossParty) { bp = p; break; }
-                if (bp == null || bp.MemberRoster == null) return;   // partii jeszcze nie ma: gra ja tworzy, herszta dopisuje wywolanie zagniezdzone
+                if (boss == null) return true;
+                MobileParty bp = null; bool band = false;
+                foreach (var p in __0.Parties)
+                {
+                    if (p == null) continue;
+                    if (p.IsBanditBossParty) { bp = p; break; }
+                    if (p.IsBandit) band = true;
+                }
+                if (bp == null)
+                {
+                    // te same warunki, przy ktorych gra wola AddBossParty (wypatrzona kryjowka, banda w srodku, szablon partii herszta)
+                    if (band && __0.Hideout != null && __0.Hideout.IsSpotted && __0.Culture.BanditBossPartyTemplate != null && !OutlawLaw.CanMan(__0))
+                    { _bSkipped++; return false; }
+                    return true;   // partia powstanie: sklad z puli, herszta dopisuje wywolanie zagniezdzone (tam awans z wlasnych ludzi)
+                }
+                if (bp.MemberRoster == null) return true;
                 __state.Party = bp; __state.Boss = boss; __state.Had = bp.MemberRoster.Contains(boss);
             }
             catch (Exception e) { BossStumble(e); }
+            return true;
         }
 
         /// <summary>Postfiks: gra dopisala herszta z niczego - zdejmujemy jednego z jej wlasnych ludzi (najwyzszy tier), ten zostaje hersztem.</summary>
@@ -304,7 +321,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _fParties = _fWant = _fGrain = _fOther = _fShort = _fStumbles = 0;
-            _bPromoted = _bNoMen = _bStumbles = 0;
+            _bPromoted = _bNoMen = _bSkipped = _bStumbles = 0;
             _pRemoved = 0; _pRemovedN = 0; _pDue = 0; _pPaid = 0; _pHeroes = 0; _pLord = null; _pStumbles = 0;
         }
 
@@ -323,7 +340,8 @@ namespace Armoury
                       .Append(": partii ").Append(_fParties).Append(", chcialy ").Append(_fWant).Append(" szt., wziely ").Append(_fGrain + _fOther)
                       .Append(" (zboze ").Append(_fGrain).Append(", inna zywnosc ").Append(_fOther).Append("), zabraklo ").Append(_fShort).Append(" (wies bez zywnosci)");
                     sb.Append(" | herszt kryjowki z wlasnych ludzi").Append(s.HideoutBossFromOwnMen ? "" : " (wylaczony)")
-                      .Append(": awansowanych ").Append(_bPromoted).Append(", bez ludzi do awansu ").Append(_bNoMen).Append(" (herszt zdjety)");
+                      .Append(": awansowanych ").Append(_bPromoted).Append(", bez ludzi do awansu ").Append(_bNoMen).Append(" (herszt zdjety)")
+                      .Append(", partii herszta nie zalozonych ").Append(_bSkipped).Append(" (pula wyrzutkow pusta)");
                     sb.Append(" | zold zaciagu ROT").Append(s.EnlistedPayFromLord ? "" : " (wylaczony - ROT placi z niczego)");
                     if (_pLord != null || _pRemovedN > 0)
                         sb.Append(": w sluzbie u ").Append(_pLord ?? "?").Append(" - bohaterow ").Append(_pHeroes)

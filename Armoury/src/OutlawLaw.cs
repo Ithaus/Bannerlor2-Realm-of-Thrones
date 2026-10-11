@@ -199,6 +199,24 @@ namespace Armoury
         internal static Settlement RegionAt(Vec2 p) { return NearestNode(p); }
         internal static float PoolIn(Settlement region) { return region != null ? Count(region) : 0f; }
 
+        /// <summary>3.10 (Leaks310, partia herszta kryjowki): czy RosterPostfix da nowej bandzie z `home` choc jednego czlowieka - ten sam
+        /// region co RosterPostfix i te same regiony co Draw (region + sasiedzi), pozycja puli >= 1. Prawo wyrzutkow wylaczone = tak.</summary>
+        internal static bool CanMan(Settlement home)
+        {
+            if (!On) return true;
+            Seed();
+            var region = RegionOf(home);
+            if (region == null) region = Nodes().OrderByDescending(Avail).FirstOrDefault();
+            if (region == null) return false;
+            foreach (var r in Near(region))
+            {
+                Dictionary<string, float> d;
+                if (!_pool.TryGetValue(r.StringId, out d)) continue;
+                foreach (var v in d.Values) if (v >= 1f) return true;
+            }
+            return false;
+        }
+
         private static void Add(Settlement region, string key, float n)
         {
             if (region == null || n <= 0f || string.IsNullOrEmpty(key)) return;
