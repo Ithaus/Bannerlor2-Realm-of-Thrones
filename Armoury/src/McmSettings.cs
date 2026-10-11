@@ -3924,6 +3924,14 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkKnightKitPaidToTown { get; set; } = true;
 
+        [SettingPropertyBool("Rot Swap No Gold", HintText = "when Realm of Thrones turns an AI lord's soldier into a cheaper man of the lord's house, the lord no longer gets the difference in recruit cost out of thin air: it is the same man, and the kit he lacks is bought on the market as usual. A swap into a dearer man still costs the lord the difference, just as a troop upgrade does (off = Realm of Thrones also pays the lord the difference out of nowhere)")]
+        [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
+        public bool RotSwapNoGold { get; set; } = true;
+
+        [SettingPropertyBool("Rebel Purse From Town", HintText = "the 50,000 gold a rebel leader gets when a town or castle rebels come out of that settlement's own coffers, as much as they hold - not out of thin air (off = the game's gift from nowhere)")]
+        [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
+        public bool RebelPurseFromTown { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4904,6 +4912,8 @@ namespace Armoury
             s.BkVillageMarketPaysWhatItHas = BkVillageMarketPaysWhatItHas;
             s.BkSlaveSalePaidByTown = BkSlaveSalePaidByTown;
             s.BkKnightKitPaidToTown = BkKnightKitPaidToTown;
+            s.RotSwapNoGold = RotSwapNoGold;
+            s.RebelPurseFromTown = RebelPurseFromTown;
         }
 
         internal static void Apply()
