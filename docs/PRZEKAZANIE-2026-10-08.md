@@ -663,3 +663,7 @@ miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lo
   Bieg 2-letni (podglad doby 276): dezercja AI d168-195 198/d (lordowie z morale 131 - fale po kleskach), zalogi z przepelnienia (do domu) 22-34/d; bandy 14.9 -> 23.2 tys.
   - pule wyrzutkow zasilaja glownie rozbici z bitew "w las" (H3, do 1100/d w dniu wielkiej bitwy) i fale dezercji; powrot z puli do wsi 2-3/d -> naturalne miejsce E4/3
   (punkty powrotu). Straz 6.8 tys. / pulap 20 tys.
+- (00:00) **E4/2 KOD GOTOWY** (w-toku/e4-2 3e10b11, test\Armoury-e4-2.dll 6c01c450; OthersRise.cs + PeopleBook.cs konto CIALA, 4 wylaczniki "The Others rise from the
+  fallen"). NIE WGRYWAC bez Jeffa: recenzja - przed doba 728 pula CIALA prawie sie nie odnawia (ROT +3 do limitu band Innych na dobe), odrodzone bandy Innych = sam wodz ->
+  Inni moga slabnac szybciej (fabula Nocnego Krola). Pytanie do Jeffa: czy tak ma byc (Inni rosna tylko z poleglych, nawet jesli slabna), czy pula startowa/odnawianie.
+  Znana droga z niczego: pojedynek z Nocnym Krolem (ROT odtwarza sklad bandy) - nastepna paczka.
