@@ -816,3 +816,8 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   tylko lordow Wolnych z Army == null), bez dowodu w logach - wydarzenie Muru wypada ok. doby 1157 (rok 4), test 364 dob pokaze tylko linie startowe. Czekanie na
   Mance'a (jak 72 h Roose'a) NIE dodane - brak dowodu (decyzja Jeffa opisana w CHANGELOG, rada: nie). ROT_AIInfluence_Compat tez lata CompleteEvent (tylko log) -
   nieszkodliwe; poprawione zdanie B6b. DLL: test\CrashScribe-bledy.dll af47adf7, CrashScribe-at-bledy.dll 9f92b4aa.
+- (15:40) **PROJEKT ETAPU 5 GOTOWY v2** (docs/etap5/PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md + KRYTYKA-E5.md 21 uwag: 17 przyjetych, 4 inaczej, +W1-W3;
+  rozpoznania A-D w docs/etap5/). Paczki: E5/0 pomiar (D; jedzie w tescie koncowym E4 - nic nie zmienia w grze); A: A1 kasy miast (D), A2 dwor (S), A3 markietani
+  i notable (M), A4 drobne kas (M), A5 BEE (S), A6 lup wodza (S, tylko jesli E5/0 pokaze) - KOD TERAZ; B: B1 kiesa ludu (D), B2 podatek wojenny (S; dochodzi do daniny),
+  B3 wyrownanie zamkow (M), B5 statki (M) - po scaleniu E4/7b; B4 targ przy zamku po E4/11, B6 weterani po E4/10; C po roku testu B. Testy: E5/0 w tescie E4, zbior A
+  osobno zaraz po tescie E4 (pytanie do Jeffa, rada (a)), potem B, potem C. Kod E5/0 + A1-A5 rusza od 392c519 (workflow nizej).
