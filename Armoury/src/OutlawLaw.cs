@@ -86,6 +86,8 @@ namespace Armoury
         // E4/3: pula wyrzutkow - naplyw i odplyw wedlug przyczyny do linii "Pula wyrzutkow (E4/3)"; kazdy doplyw idzie przez Add, kazdy odplyw ma licznik
         private static double _pAdd, _pSeed, _pBirth, _pRecruit, _pHomeSold, _pHomeSoldWant, _pHomeGuard, _pHomePlain, _pHomeUndead, _pFrac, _pTrim, _pLast = -1;
         private static double _pFloor;      // E4/4 (R17): z puli do wsi, ktorej podloga 10 hearth dopisala ludzi (TakeForFloor)
+        private static double _pWatch;      // E4/9 (4.2): z puli do Strazy (WatchLaw.Levy - "przywdzial czern"; TakeForWatch)
+        private static readonly Dictionary<string, bool> _watchKey = new Dictionary<string, bool>();   // E4/9: klucz puli = postac kultury Strazy (dezerter nie wraca na Mur)
         // E4/3 wyposrodkowanie z wojna (Jeff 11.10): rozbici i dezerterzy, ktorzy wrocili z regionow w wojnie / w pokoju, i liczba regionow z pula w kazdym stanie
         private static double _pRoutedWar, _pRoutedPeace;
         private static int _pRegWar, _pRegPeace;
@@ -132,6 +134,7 @@ namespace Armoury
             _hRaid = _hMisery = _hReturn = _hSeed = 0;
             PoolNewDay(); _pLast = -1;
             _warHome.Clear();
+            _watchKey.Clear();                                         // E4/9: pamiec kluczy puli Strazy
         }
 
         private static void PoolNewDay()
@@ -139,6 +142,7 @@ namespace Armoury
             _pAdd = _pSeed = _pBirth = _pRecruit = _pHomeSold = _pHomeSoldWant = _pHomeGuard = _pHomePlain = _pHomeUndead = _pFrac = _pTrim = 0;
             _pRoutedWar = _pRoutedPeace = 0; _pRegWar = _pRegPeace = 0;
             _pFloor = 0;
+            _pWatch = 0;
         }
 
         private static void FenceNewDay()
@@ -421,6 +425,62 @@ namespace Armoury
             return got;
         }
 
+        /// <summary>E4/9: klucz puli to postac kultury Strazy (nightswatch) - dezerter Strazy nie wraca na Mur jako rekrut z puli (RK:249-250). Pamiec na klucz.</summary>
+        private static bool WatchKey(string key)
+        {
+            if (key == null || key == Commoner) return false;
+            bool w;
+            if (_watchKey.TryGetValue(key, out w)) return w;
+            w = false;
+            try { var ch = MBObjectManager.Instance.GetObject<CharacterObject>(key); w = ch != null && ch.Culture != null && ch.Culture.StringId == CrownGifts.WatchId; } catch { w = false; }
+            _watchKey[key] = w;
+            return w;
+        }
+
+        /// <summary>E4/9 (4.2): ludzie puli regionu, ktorych Straz moze wziac (bez kluczy starych wightow i postaci Strazy) - podstawa budzetu doby WatchLaw.</summary>
+        internal static float PoolForWatch(Settlement region)
+        {
+            Dictionary<string, float> d;
+            if (!On || region == null || region.StringId == null || !_pool.TryGetValue(region.StringId, out d)) return 0f;
+            float n = 0f;
+            foreach (var kv in d) if (!SkipUndeadKey(kv.Key) && !WatchKey(kv.Key)) n += kv.Value;
+            return n;
+        }
+
+        /// <summary>
+        /// E4/9 (4.2, wzor TakeForFloor): do `men` ludzi z puli TEGO regionu do Strazy ("przywdzial czern") - najpierw zolnierze (klucze oddzialow, od najliczniejszego),
+        /// potem prosci; bez kluczy starych wightow i postaci Strazy. Udzialy pochodzenia do `org`: zolnierz - udzial znanych w puli (PeopleBook.PoolTake, mianownik =
+        /// zolnierze puli PRZED zdjeciem), prosty - region puli. Ulamki dozwolone (pula liczy w float). Zwraca, ilu zeszlo; troops - ilu z nich to zolnierze.
+        /// </summary>
+        internal static float TakeForWatch(Settlement region, float men, PeopleBook.Shares org, out float troops)
+        {
+            troops = 0f;
+            if (!On || region == null || region.StringId == null || !(men > 0f) || float.IsInfinity(men)) return 0f;
+            Dictionary<string, float> d;
+            if (!_pool.TryGetValue(region.StringId, out d) || d.Count == 0) return 0f;
+            float got = 0f;
+            foreach (var key in d.Keys.Where(k => k != Commoner && !SkipUndeadKey(k) && !WatchKey(k)).OrderByDescending(k => d[k]).ToList())
+            {
+                if (got >= men) break;
+                float have = d[key];
+                float t = Math.Min(have, men - got);
+                if (!(t > 0f)) continue;
+                if (org != null) { try { org.AddAll(PeopleBook.PoolTake(region, t, PoolTroopsOf(d))); } catch { } }     // E4/7: przed zdjeciem (mianownik = zolnierze puli przed)
+                d[key] = have - t; got += t; troops += t;
+                if (d[key] < 0.01f) { _pTrim += d[key]; d.Remove(key); }
+            }
+            float cm;
+            if (got < men && d.TryGetValue(Commoner, out cm) && cm > 0f)
+            {
+                float t = Math.Min(cm, men - got);
+                d[Commoner] = cm - t; got += t;
+                if (org != null) org.Add(region.StringId, t);                  // prosci - pochodzenie = region puli
+                if (d[Commoner] < 0.01f) { _pTrim += d[Commoner]; d.Remove(Commoner); }
+            }
+            _pWatch += got;
+            return got;
+        }
+
         /// <summary>Czy klucz puli wraca przy H3 do hearth (Daily: prosci i bandyci - tak; zolnierze, straz karawan, wighty - nie).</summary>
         private static bool ToHearthUnderH3(string key)
         {
@@ -540,7 +600,8 @@ namespace Armoury
                 PeopleBook.Shares org = null;
                 try { if (PeopleBook.OriginLive && !undeadParty) org = PeopleBook.Take(party.MemberRoster, PeopleBook.Men(roster), PeopleBook.FDesert); } catch { org = null; }
                 var home = OverflowHome.SendHome(party, roster, org);     // Inni: OverflowHome nie robi im notatki i nie wysyla wightow do wsi
-                var region = On ? NearestNode(party.Position.ToVec2()) : null;
+                // E4/9 (4.5): dezerter Strazy - do puli najblizszego regionu Polnocy (Jeff 11.10), reszta - region miejsca jak dotad
+                var region = On ? (WatchLaw.DeserterRegion(party) ?? NearestNode(party.Position.ToVec2())) : null;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var e = roster.GetElementCopyAtIndex(i);
@@ -575,7 +636,9 @@ namespace Armoury
                     foreach (var mep in side.Parties)
                     {
                         if (mep == null) continue;
-                        AddRoster(region, mep.RoutedInBattle, share, ref _inRouted);
+                        // E4/9 (4.5): rozbici Strazy "do lasu" - pula Polnocy (region na partie)
+                        var preg = (mep.Party != null && mep.Party.MobileParty != null ? WatchLaw.DeserterRegion(mep.Party.MobileParty) : null) ?? region;
+                        AddRoster(preg, mep.RoutedInBattle, share, ref _inRouted);
                         // E4/7: udzial pochodzenia rozbitych - czesc do puli (jak AddRoster), reszta znika (dzis tez) - nicosc nazwana
                         try
                         {
@@ -583,7 +646,7 @@ namespace Armoury
                             {
                                 int rn = PeopleBook.Men(mep.RoutedInBattle);
                                 var org = PeopleBook.Take(mep.Party.MemberRoster, rn, PeopleBook.FRouted);
-                                PeopleBook.PoolShares(region, org.Cut(rn * share));
+                                PeopleBook.PoolShares(preg, org.Cut(rn * share));
                                 PeopleBook.Lost(org);
                             }
                         }
@@ -680,6 +743,8 @@ namespace Armoury
                         try { fac = mp != null ? mp.MapFaction : (mep.Party != null ? mep.Party.MapFaction : null); } catch { }
                         float sh = kind == LosersFlee.KBand ? bandShare : (kind == LosersFlee.KVillager || kind == LosersFlee.KCaravan) ? 0f : share;
                         var roster = mep.RoutedInBattle;
+                        // E4/9 (4.5): rozbici Strazy "do lasu" i bez domu - pula najblizszego regionu Polnocy (region liczony na partie; reszta - region bitwy jak dotad)
+                        var preg = (region != null ? WatchLaw.DeserterRegion(mp) : null) ?? region;
                         // E4/7 (4.7): udzialy pochodzenia rozbitych - rozbici zeszli z rosteru w bitwie, slownik jeszcze ich ma (tabor: region wsi z definicji)
                         PeopleBook.Shares org = null;
                         try { if (PeopleBook.OriginLive && !undeadParty && mep.Party != null) org = PeopleBook.Take(mep.Party.MemberRoster, PeopleBook.Men(roster), PeopleBook.FRouted); } catch { org = null; }
@@ -693,14 +758,14 @@ namespace Armoury
                             if (undeadParty || Undead.Character(e.Character)) { undead += n; continue; }
                             PeopleBook.Shares slice = null;
                             try { if (org != null) slice = org.Cut(n); } catch { slice = null; }
-                            int toPool = sh > 0f && region != null ? Math.Min(n, MBRandom.RoundRandomized(n * sh)) : 0;
+                            int toPool = sh > 0f && preg != null ? Math.Min(n, MBRandom.RoundRandomized(n * sh)) : 0;
                             if (toPool > 0)
                             {
-                                Add(region, e.Character.StringId, toPool);
+                                Add(preg, e.Character.StringId, toPool);
                                 pool += toPool;
                                 if (kind == LosersFlee.KBand) _h3PoolBand += toPool; else if (kind == LosersFlee.KGarrison) _h3PoolGarr += toPool; else _h3PoolArmy += toPool;
-                                LosersFlee.NoteWoods(region, toPool);
-                                if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(region, slice.Cut(toPool)); } catch { } }
+                                LosersFlee.NoteWoods(preg, toPool);
+                                if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(preg, slice.Cut(toPool)); } catch { } }
                             }
                             int rest = n - Math.Max(0, toPool);
                             if (rest <= 0) continue;
@@ -717,7 +782,7 @@ namespace Armoury
                             int left = rest - got;
                             if (left <= 0) continue;
                             homeless += left;
-                            if (law && region != null) { Add(region, e.Character.StringId, left); LosersFlee.NoteWoods(region, left); if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(region, slice); } catch { } } }
+                            if (law && preg != null) { Add(preg, e.Character.StringId, left); LosersFlee.NoteWoods(preg, left); if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(preg, slice); } catch { } } }
                             else { _h3Vanished += left; if (slice != null) { try { PeopleBook.Lost(slice); } catch { } } }
                         }
                     }
@@ -1174,7 +1239,7 @@ namespace Armoury
             var ci = CultureInfo.InvariantCulture;
             double named = _inDesert + _inRouted + _inRaid + _inMisery + _inDisband + _pSeed;
             double home = _pHomeSold + _pHomeGuard + _pHomePlain + _pHomeUndead;
-            double outs = _pBirth + _pRecruit + home + _pFrac + _pFloor;
+            double outs = _pBirth + _pRecruit + home + _pFrac + _pFloor + _pWatch;     // E4/9: do Strazy (bez tego kontrola linii przestaje byc 0)
             var sb = new StringBuilder(900);
             sb.Append("Pula wyrzutkow (E4/3): dzien ").Append((int)CampaignTime.Now.ToDays).Append(" | stan ").Append(now.ToString("0", ci));
             if (_pLast < 0) sb.Append(" (pierwsza doba sesji - zmiana od nastepnej)");
@@ -1194,7 +1259,8 @@ namespace Armoury
               .Append("; prosci i bandyci do wsi ").Append(_pHomePlain.ToString("0.0", ci)).Append(" - tempo pokoju i dobrobytu; stare wighty do niczego ").Append(_pHomeUndead.ToString("0.0", ci)).Append(')')
               .Append(", narodziny band ").Append(_pBirth.ToString("0", ci)).Append(", werbunek band ").Append(_pRecruit.ToString("0", ci))
               .Append(_pFrac > 0 ? ", reszty ponizej 1 czlowieka (zamkniete klucze) " + _pFrac.ToString("0.00", ci) : "")
-              .Append(_pFloor > 0 ? ", do wsi podniesionych podloga 10 hearth (E4/4 R17) " + _pFloor.ToString("0.0", ci) : "");
+              .Append(_pFloor > 0 ? ", do wsi podniesionych podloga 10 hearth (E4/4 R17) " + _pFloor.ToString("0.0", ci) : "")
+              .Append(", do Strazy (E4/9) ").Append(_pWatch.ToString("0.0", ci));
             sb.Append(" | srednio w puli ").Append(outs > 0 ? (now / outs).ToString("0", ci) + " dob" : "-").Append(" (stan / odplyw dzienny).");
             return sb.ToString();
         }

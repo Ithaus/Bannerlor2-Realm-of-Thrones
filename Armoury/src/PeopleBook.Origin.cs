@@ -47,20 +47,24 @@ namespace Armoury
             // E4/10 (167): wejscie z karczmy - najem weterana z puli WETERANI (udzialy pochodzenia z puli; Veterans.OnTavernNumber).
             // Scalenie calosci etapu 4: w paczce E4/10 bylo 52 (FKinds 53) - przeniesione za E4/8; poza zakresami Part(...) E4/8 (FMilitiaLevy..FArmsFloor, FMilitiaHome..FDisbandHome)
             FVetHire = 56,
-            FKinds = 57;
+            // E4/9 (192): wejscia (Give) - rekrut Strazy z Westeros (WatchLaw.Levy): z konta MUR, z pul wyrzutkow Westeros, z ludnosci Westeros, reszta bez pokrycia;
+            // jency z rabunku - pojmani z konta UCHODZCY napadnietej wsi do lochu najezdzcy (ThrallLaw.CapturePrefix). Pierwsze wolne numery po E4/10
+            FWatchWall = 57, FWatchPool = 58, FWatchLevy = 59, FNoneWatchLeft = 60, FCapturedRaid = 61,
+            FKinds = 62;
         private static readonly string[] FName =
         {
             "wsie", "miasta", "zamki", "karczmy AI", "A5", "gracz", "karczma gracza", "pobor wymuszony",
-            "z puli do band", "ochotnik z mapy", "Straz (do E4/9)", "pobor na podlodze", "najemnik z karczmy przy hamulcu (obcy)", "ksiega wylaczona (LevyLive)",
+            "z puli do band", "ochotnik z mapy", "Straz (WatchLaw wylaczone; obca partia w osadzie Daru)", "pobor na podlodze", "najemnik z karczmy przy hamulcu (obcy)", "ksiega wylaczona (LevyLive)",
             "partia->zaloga", "zaloga->partia", "ekran druzyny", "nowa partia rodu", "rozwiazane do zalog", "patrole BK wyjscie", "patrole BK powrot",
             "jency po bitwie wzieci", "odbici jency", "przekazani jency", "wcieleni jency",
             "polegli w bitwie", "zaraza", "straceni", "Inni",
             "rozbici", "dezercja", "uwolnieni bez odbiorcy (H3)", "zwolnieni 166", "rycerze 179", "sprzedani jency", "wypuszczeni przez gracza", "jency patroli BK", "rozwiazane partie",
             "rozwiazane bandy", "wzieci bez odbiorcy", "odbici bez odbiorcy", "przy zniknieciu partii",
             "milicja z wolnych rak", "milicja z rozwiazanej partii we wsi", "nowa druzyna z wolnych rak", "nowa druzyna z zalogi siedziby", "karawany z ludzi osady startu",
-            "konwoje morskie z ludzi miasta", "wedrowcy i eskorta BK z DOM", "wedrowcy BK bez pochodzenia", "niewolnicy w konwojach BK (E4/9)", "Straz E4/8 (do E4/9)",
+            "konwoje morskie z ludzi miasta", "wedrowcy i eskorta BK z DOM", "wedrowcy BK bez pochodzenia", "niewolnicy w konwojach BK (klasa BK)", "Straz E4/8 (WatchLaw wylaczone; osada Daru poza Straza)",
             "ulamek czlowieka bez DOM (E4/8)", "milicja bez walki do domu", "wedrowcy i konwoje BK u celu", "rozwiazane bez bitwy do domu (R6)",
-            "z karczmy (WETERANI, E4/10)"
+            "z karczmy (WETERANI, E4/10)",
+            "Straz z Muru (E4/9)", "Straz z pul wyrzutkow Westeros (E4/9)", "Straz z ludnosci Westeros (E4/9)", "Straz bez pokrycia (podloga, E4/9)", "pojmani z rabunku (E4/9)"
         };
 
         // rodzaj rosteru (nazwy "bez pochodzenia" / "z niczego" / "w nicosc")
@@ -85,6 +89,9 @@ namespace Armoury
         {
             internal readonly Dictionary<string, double> M = new Dictionary<string, double>(4);
             internal double Total;
+            /// <summary>E4/9 (U5, R14 "sluzba dozywotnia"): ilu z tych ludzi zdjeto ze sluzby Strazy (Take z rosteru Strazy - WatchServes). HomeKnown/ArriveAt
+            /// oddaja te czesc do konta MUR zamiast do DOM. Cut dzieli proporcjonalnie, AddAll sumuje (mieszana grupa - tylko czesc Strazy na Mur).</summary>
+            internal double W;
             internal double Unknown { get { double v; return M.TryGetValue("", out v) ? v : 0.0; } }
             internal double Known { get { return Math.Max(0.0, Total - Unknown); } }
 
@@ -95,11 +102,11 @@ namespace Armoury
                 double v; M.TryGetValue(k, out v); M[k] = v + n; Total += n;
             }
 
-            internal void AddAll(Shares s) { if (s != null) foreach (var kv in s.M) Add(kv.Key, kv.Value); }
+            internal void AddAll(Shares s) { if (s != null) { foreach (var kv in s.M) Add(kv.Key, kv.Value); if (s.W > 0.0) W = Math.Min(Total, W + s.W); } }
 
             internal static Shares None(double n) { var s = new Shares(); s.Add("", n); return s; }
 
-            /// <summary>Wycina n ludzi proporcjonalnie (zdejmuje z tego obiektu); brak - reszta jako "" (bez pochodzenia).</summary>
+            /// <summary>Wycina n ludzi proporcjonalnie (zdejmuje z tego obiektu); brak - reszta jako "" (bez pochodzenia). E4/9: czesc Strazy (W) - proporcjonalnie.</summary>
             internal Shares Cut(double n)
             {
                 var r = new Shares();
@@ -109,6 +116,7 @@ namespace Armoury
                 if (f >= 1.0 - 1e-12)
                 {
                     foreach (var kv in M) r.Add(kv.Key, kv.Value);
+                    r.W = W; W = 0.0;
                     M.Clear(); Total = 0.0;
                 }
                 else
@@ -121,6 +129,7 @@ namespace Armoury
                         if (left > Eps) M[k] = left; else M.Remove(k);
                     }
                     Total = 0.0; foreach (var v in M.Values) Total += v;
+                    if (W > 0.0) { r.W = Math.Min(r.Total, W * f); W = Math.Max(0.0, Math.Min(Total, W - r.W)); }
                 }
                 if (n - take > Eps) r.Add("", n - take);
                 return r;
@@ -138,6 +147,8 @@ namespace Armoury
             public double Drift;
             // E4/8 (R19, 10.5): migracja miedzy regionami od siewu (wedrowcy BK u celu w innym regionie) - rownanie regionu: + MigOut - MigIn
             public double MigIn, MigOut;
+            // E4/9 (Z10): niewolni z regionu (wedlug pochodzenia) i konto MUR z regionu w dniu siewu, zmarli niewolni z regionu od siewu - rownanie regionu
+            public double TRef, WRef, TDead;
         }
 
         // ================================================================ stan w zapisie
@@ -293,7 +304,8 @@ namespace Armoury
                   .Append(N3(r.Fallen)).Append(';').Append(N3(r.FallenMen)).Append(';').Append(N3(r.Civil)).Append(';').Append(N3(r.Born)).Append(';')
                   .Append(N3(r.Enslaved)).Append(';').Append(N3(r.ToWall)).Append(';').Append(N3(r.PoolRef)).Append(';').Append(N3(r.RefRef)).Append(';').Append(N3(r.CartRef))
                   .Append(';').Append(N3(r.TownOut)).Append(';').Append(N3(r.VillOut)).Append(';').Append(N3(r.TownBack)).Append(';').Append(N3(r.Drift))
-                  .Append(';').Append(N3(r.MigIn)).Append(';').Append(N3(r.MigOut));       // E4/8 (pola 17, 18; zapis bez nich - 0)
+                  .Append(';').Append(N3(r.MigIn)).Append(';').Append(N3(r.MigOut))        // E4/8 (pola 17, 18; zapis bez nich - 0)
+                  .Append(';').Append(N3(r.TRef)).Append(';').Append(N3(r.WRef)).Append(';').Append(N3(r.TDead));     // E4/9 (pola 19-21; zapis bez nich - 0)
                 first = false;
             }
         }
@@ -342,7 +354,8 @@ namespace Armoury
                             DomRef = Num(a, 0), SRef = Num(a, 1), JRef = Num(a, 2), LRef = Num(a, 3), Fallen = Num(a, 4), FallenMen = Num(a, 5), Civil = Num(a, 6),
                             Born = SNum(a, 7), Enslaved = Num(a, 8), ToWall = Num(a, 9), PoolRef = Num(a, 10), RefRef = Num(a, 11), CartRef = Num(a, 12),
                             TownOut = Num(a, 13), VillOut = Num(a, 14), TownBack = Num(a, 15), Drift = SNum(a, 16),     // recenzja E4/7 (R1-1, R2-3); zapis bez nich - 0
-                            MigIn = Num(a, 17), MigOut = Num(a, 18)                                                    // E4/8 (R19); zapis E4/7 bez nich - 0
+                            MigIn = Num(a, 17), MigOut = Num(a, 18),                                                   // E4/8 (R19); zapis E4/7 bez nich - 0
+                            TRef = Num(a, 19), WRef = Num(a, 20), TDead = Num(a, 21)                                   // E4/9 (Z10); zapis bez nich - 0 (Num poza dlugoscia - 0)
                         };
                         _rg[item.Substring(0, eq)] = r;
                     }
@@ -564,10 +577,12 @@ namespace Armoury
                         var s = new Shares(); s.Add(RegKey(home != null ? OutlawLaw.RegionFor(home) : null), n);
                         return s;
                     }
-                    return Shares.None(n);
+                    var none = Shares.None(n);
+                    if (WatchServes(owner, kind)) none.W = n;      // E4/9: roster Strazy bez slownika (nowa partia przed uzgodnieniem) - tez sluzba dozywotnia
+                    return none;
                 }
                 var res = new Shares();
-                if (o.Sum <= Eps) { res.Add("", n); return res; }
+                if (o.Sum <= Eps) { res.Add("", n); if (WatchServes(owner, kind)) res.W = n; return res; }
                 double take = Math.Min(n, o.Sum), f = take / o.Sum;
                 if (f >= 1.0 - 1e-12)
                 {
@@ -588,6 +603,13 @@ namespace Armoury
                 if (cause >= 0 && cause < FKinds) _fOut[cause] += take;
                 _tAll += take;
                 if (n - take > Eps) res.Add("", n - take);       // ponad slownik (nowa partia przed uzgodnieniem) - bez pochodzenia, poza stanem
+                // E4/9 (4.4, U5): ludzie zdjeci ze sluzby Strazy (partia, zaloga, gracz w Strazy, milicja osady Strazy - WatchServes) - znacznik dozywotniej sluzby
+                try
+                {
+                    if (WatchServes(owner, kind)) res.W = res.Total;
+                    if (kind == KWatch) WatchOut(take, cause);
+                }
+                catch (Exception e) { OStumble("Take(E4/9)", e); }
                 return res;
             }
             catch (Exception e) { OStumble("Take", e); return Shares.None(n); }
@@ -599,12 +621,13 @@ namespace Armoury
             if (s == null || !(s.Total > Eps) || !OriginLive) return;
             try
             {
-                PartyBase owner; int kind;
+                PartyBase owner; int kind = KOther;
                 var o = r != null ? OrgOf(r, true, out owner, out kind) : null;
                 if (o == null) { _dest[ODrop] += s.Total; return; }
                 foreach (var kv in s.M) if (kv.Value > 0.0) OrgAdd(o, kv.Key, kv.Value);
                 if (cause >= 0 && cause < FKinds) _fIn[cause] += s.Total;
                 _gAll += s.Total;
+                if (kind == KWatch) _wIn += s.Total;             // E4/9: kontrola linii "Straz z Westeros" (stan slownikow Strazy)
             }
             catch (Exception e) { OStumble("Give", e); }
         }
@@ -698,13 +721,14 @@ namespace Armoury
             if (s == null || !(s.Total > Eps) || !OriginLive) return;
             try
             {
-                PartyBase owner; int kind;
+                PartyBase owner; int kind = KOther;
                 var o = r != null ? OrgOf(r, true, out owner, out kind) : null;
                 if (o == null) return;
                 double known = 0.0;
                 foreach (var kv in s.M) if (kv.Value > 0.0) { OrgAdd(o, kv.Key, kv.Value); known += kv.Value; }
                 if (cause >= 0 && cause < FKinds) _fOut[cause] = Math.Max(0.0, _fOut[cause] - known);
                 _tAll -= known;
+                if (kind == KWatch) WatchOut(-known, cause);     // E4/9: cofniecie zdjecia ze slownika Strazy
             }
             catch (Exception e) { OStumble("Untake", e); }
         }
@@ -739,6 +763,7 @@ namespace Armoury
                 }
                 _dest[ODead] += s.Total;
                 if (cause >= 0 && cause < FKinds) _deadBy[cause] += s.Total;
+                if (s.W > Eps) WatchDied(s);                     // E4/9: polegli bracia (Westeros / bez pochodzenia) - linia "Straz z Westeros"
             }
             catch (Exception e) { OStumble("DieShares", e); }
         }
@@ -760,10 +785,20 @@ namespace Armoury
         /// od siewu (TownOut / (TownOut + VillOut)), nie wiecej niz dlug miasta (TownOut - TownBack); reszta do wsi jak dotad. Bez tego pobor z miasta byl
         /// jednokierunkowy (zrodlo miasto, ujscie wies) - stan miasta tylko malal.
         /// Zwraca, ilu umiescil. Gdy !LevyLive - 0 (wolajacy liczy jak w E4/3: Note bez hearth).
+        /// E4/9 (4.4, U5 - sluzba dozywotnia): czesc zdjeta ze sluzby Strazy (s.W) przy czynnym WatchLaw idzie najpierw na konto MUR (z "" wlacznie, bez hearth) -
+        /// wliczona w zwracanych "umieszczonych"; reszta jak dotad.
         /// </summary>
         internal static double HomeKnown(Shares s, int cause)
         {
-            if (s == null || !(s.Known > Eps) || !LevyLive || cause < 0 || cause >= MKinds) return 0.0;
+            if (s == null || cause < 0 || cause >= MKinds) return 0.0;
+            double wall = 0.0;
+            if (s.W > Eps) { try { wall = WatchHome(s, cause, false); } catch (Exception e) { OStumble("HomeKnown(Mur)", e); } }
+            if (!(s.Known > Eps) || !LevyLive) return wall;
+            return wall + HomeKnownBody(s, cause);
+        }
+
+        private static double HomeKnownBody(Shares s, int cause)
+        {
             double placed = 0.0;
             try
             {
@@ -830,6 +865,7 @@ namespace Armoury
             try
             {
                 _dest[OPool] += s.Total;
+                if (s.W > Eps) WatchToWoods(poolRegion, s.W);    // E4/9 (4.5): dezerter i rozbity "do lasu" ze Strazy - kontrola: pula Polnocy
                 if (poolRegion == null || poolRegion.StringId == null || !(s.Known > Eps)) return;
                 Dictionary<string, double> d;
                 if (!_poolOrg.TryGetValue(poolRegion.StringId, out d)) { d = new Dictionary<string, double>(); _poolOrg[poolRegion.StringId] = d; }
@@ -867,19 +903,35 @@ namespace Armoury
             return res;
         }
 
-        /// <summary>Jency do niewoli (BK niewolnicy/dzierzawcy osady, I1 Enslavement) - licznik regionu do E4/9 (konto NIEWOLNI).</summary>
-        internal static void EnslaveShares(Shares s)
+        /// <summary>
+        /// Jency do niewoli (BK niewolnicy/dzierzawcy osady, I1 Enslavement, patrol BK). E4/9 (R15, Z6): osada niewoli `hold` w krainie z niewola (biezaca kultura osady -
+        /// LosersFlee.SlaveCulture, jak I1b) przy czynnym ThrallLaw - konto NIEWOLNI (region trzymania x region pochodzenia, z "" wlacznie); inaczej (prawo wylaczone,
+        /// osada poza kanonem przy wylaczonym I1, brak osady) - jak w E4/7: licznik regionu Enslaved (odplyw). via: 0 = sprzedaz jencow, 1 = patrol BK.
+        /// </summary>
+        internal static void EnslaveShares(Shares s, Settlement hold, int via)
         {
             if (s == null || !(s.Total > Eps) || !OriginLive) return;
-            try { foreach (var kv in s.M) if (kv.Key.Length > 0 && kv.Value > 0.0) Rg(kv.Key).Enslaved += kv.Value; _dest[OSlave] += s.Total; }
+            try
+            {
+                _dest[OSlave] += s.Total;
+                if (ThrallLaw.On && hold != null && LosersFlee.SlaveCulture(hold.Culture)) { EnslaveAt(OutlawLaw.RegionFor(hold), s, via); return; }
+                foreach (var kv in s.M) if (kv.Key.Length > 0 && kv.Value > 0.0) Rg(kv.Key).Enslaved += kv.Value;
+                ThrallOutside(s.Total);
+            }
             catch (Exception e) { OStumble("EnslaveShares", e); }
         }
 
-        /// <summary>Jency na Mur (I1, migracja do Strazy) - licznik regionu.</summary>
+        /// <summary>Jency na Mur (I1, migracja do Strazy). E4/9 (4.3): przy czynnym WatchLaw - konto MUR ("przestepcy przyjmowani zawsze", z "" wlacznie, stan regionu
+        /// pochodzenia - pierwsi w kolejce Levy); inaczej jak w E4/7 - licznik regionu ToWall (odplyw).</summary>
         internal static void WallShares(Shares s)
         {
             if (s == null || !(s.Total > Eps) || !OriginLive) return;
-            try { foreach (var kv in s.M) if (kv.Key.Length > 0 && kv.Value > 0.0) Rg(kv.Key).ToWall += kv.Value; _dest[OWall] += s.Total; }
+            try
+            {
+                _dest[OWall] += s.Total;
+                if (WatchLaw.Live) { WallAdd(s); _wConvicts += s.Total; return; }
+                foreach (var kv in s.M) if (kv.Key.Length > 0 && kv.Value > 0.0) Rg(kv.Key).ToWall += kv.Value;
+            }
             catch (Exception e) { OStumble("WallShares", e); }
         }
 
@@ -1065,7 +1117,11 @@ namespace Armoury
         {
             if (pb == null) return;
             Org o;
-            if (_mem.TryGetValue(pb, out o)) { _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _mem.Remove(pb); }
+            if (_mem.TryGetValue(pb, out o))
+            {
+                _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _mem.Remove(pb);
+                try { if (pb.IsMobile && pb.MobileParty != null && KindOf(pb.MobileParty) == KWatch) _wGone += o.Sum; } catch (Exception e) { OStumble("OriginPartyGone(E4/9)", e); }
+            }
             if (_pris.TryGetValue(pb, out o)) { _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _pris.Remove(pb); }
             var mp = pb.MobileParty;
             Shares p;
@@ -1188,6 +1244,7 @@ namespace Armoury
                 {
                     var r = Rg(kv.Key); var x = kv.Value;
                     r.DomRef = x.Dom; r.SRef = x.S; r.JRef = x.J; r.LRef = x.Dom + x.S + x.J; r.PoolRef = x.Wy; r.RefRef = x.U; r.CartRef = x.Carts;
+                    r.TRef = x.T; r.WRef = x.W;          // E4/9 (Z12): NK - bilans otwarcia niewolnych Zelaznych (SeedThralls w Calibrate - przed siewem)
                     lref += r.LRef;
                 }
                 _sowNote = "siew dnia " + _sowDay + " - partii " + parties + " (ludzi " + N0(withOrg + none) + ": z pochodzeniem " + N0(withOrg) + " w " + regs.Count + " regionach, bez pochodzenia "
@@ -1252,6 +1309,11 @@ namespace Armoury
                     add -= known;
                     if (!(p.Total > Eps)) _pending.Remove(mp);
                 }
+                // E4/9 (Z9): nadwyzka rosteru Strazy (kanaly bez okna) - rekrut z Westeros przez WatchLaw.Levy (Mur, pule, ludnosc; reszta "" nazwana), nie "z niczego"
+                if (add > Eps && kind == KWatch && WatchLaw.Live)
+                {
+                    try { add -= ReconcileWatch(o, add); } catch (Exception e) { OStumble("Reconcile(E4/9 Straz)", e); }
+                }
                 if (add > Eps) { OrgAdd(o, "", add); _zAll += add; _zBy[kind] += add; }
             }
             else if (n < sum - Eps && o != null)
@@ -1265,6 +1327,7 @@ namespace Armoury
                 }
                 o.Sum = 0.0; foreach (var v in o.M.Values) o.Sum += v;
                 _qAll += cut; _qBy[kind] += cut;
+                if (kind == KWatch) _wQ += cut;                  // E4/9: niedobor slownika Strazy - w nicosc (linia "Straz z Westeros")
             }
             if (o != null && o.M.Count > 1) { try { Fold(o.M); } catch (Exception e) { OStumble("Fold(roster)", e); } }     // R2-3 (suma bez zmian)
             if (o != null && n == 0 && o.Sum <= Eps) dict.Remove(pb);
@@ -1334,6 +1397,7 @@ namespace Armoury
             public double Dom, S, J, Wy, U, Carts;
             public double Road;     // E4/8 (Z9): wedrowcy i eskorta konwojow BK w drodze (slowniki KRoad) - poza S, w rownaniu regionu jak TABOR
             public double Vet;      // E4/10: WETERANI w karczmach wedlug regionu pochodzenia (konto poza DOM i poza SLUZBA - nie liczy sie do S w R5)
+            public double T, W;     // E4/9 (Z11): NIEWOLNI wedlug regionu pochodzenia (wszedzie) i konto MUR wedlug regionu pochodzenia
         }
 
         private static Dictionary<string, RegionNum> RegionNow()
@@ -1378,6 +1442,8 @@ namespace Armoury
                 foreach (var kv in vet) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Vet += kv.Value; now[kv.Key] = x; }
             }
             catch (Exception e) { OStumble("RegionNow(weterani)", e); }
+            // E4/9 (Z11): konta NIEWOLNI (wedlug pochodzenia) i MUR w rownaniu regionu pochodzenia
+            try { CanonByRegion(now); } catch (Exception e) { OStumble("RegionNow(E4/9)", e); }
             try
             {
                 foreach (var mp in MobileParty.AllVillagerParties)
@@ -1400,6 +1466,10 @@ namespace Armoury
             public double Vet;      // E4/10: weterani tej krainy czekajacy w karczmach (menu, rownanie)
             public int Villages; public double VillagePeople, TownPeople;
             public double Road, MigIn, MigOut;     // E4/8: w drodze (wedrowcy i konwoje BK), migracja od siewu
+            // E4/9: NIEWOLNI z regionu (wedlug pochodzenia) i MUR z regionu; stan dnia siewu i zmarli niewolni od siewu; niewolni TRZYMANI w regionie (menu, krainy)
+            public double T, W, TRef, WRef, TDead, THeld;
+            /// <summary>E4/9 (R5, recenzja E4/7 R1-2): niewolni z regionu od siewu (zywi + zmarli - stan dnia siewu) - ubytek rak jak polegli (bilans otwarcia NK nie wchodzi).</summary>
+            public double TSince { get { return Math.Max(0.0, T + TDead - TRef); } }
         }
         private static volatile Dictionary<string, RegionView> _view = new Dictionary<string, RegionView>();
 
@@ -1428,18 +1498,21 @@ namespace Armoury
                 var v = new RegionView
                 {
                     Id = kv.Key, Node = node, Realm = FreeHands.RealmOf(node),
-                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road, Vet = x.Vet
+                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road, Vet = x.Vet, T = x.T, W = x.W
                 };
+                try { v.THeld = ThrallsHeldIn(kv.Key); } catch (Exception e) { OStumble("BuildViews(E4/9)", e); }
                 if (r != null)
                 {
                     v.DomRef = r.DomRef; v.LRef = r.LRef; v.Fallen = r.Fallen; v.FallenMen = r.FallenMen; v.Civil = r.Civil; v.Born = r.Born; v.Enslaved = r.Enslaved; v.ToWall = r.ToWall;
                     v.MigIn = r.MigIn; v.MigOut = r.MigOut;
+                    v.TRef = r.TRef; v.WRef = r.WRef; v.TDead = r.TDead;
                     // rownanie regionu (5): stan - stan siewu - narodziny + polegli + cywile + niewola + Mur = reszta (ludzie z niczego / w nicosc w regionie)
                     // recenzja E4/7 R2-3: minus Drift (ludzie przeniesieni do/z regionu przy przycieciu kluczy - ksiegowanie, nie ruch ludzi)
                     // E4/8 (10.5): + w drodze (wedrowcy BK; w dniu siewu bez pochodzenia - 0) + MigOut - MigIn (wedrowcy u celu w innym regionie)
                     // E4/10 (Z10): + WETERANI (bez stanu w dniu siewu E4/7: pula zaklada sie po nim, a przed siewem E4/7 ma tylko udzialy "" - poza regionami)
-                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef) - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall - r.Drift
-                             + r.MigOut - r.MigIn;
+                    // E4/9 (4.7): + NIEWOLNI i MUR z regionu (stan) - ich stan dnia siewu + zmarli niewolni od siewu; liczniki Enslaved/ToWall rosna juz tylko przy wylaczonych prawach
+                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet + x.T + x.W) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef + r.TRef + r.WRef)
+                             - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn;
                 }
                 try
                 {
@@ -1515,7 +1588,7 @@ namespace Armoury
             {
                 double[] a; string rk = v.Realm ?? "?";
                 if (!realms.TryGetValue(rk, out a)) { a = new double[2]; realms[rk] = a; }
-                a[0] += v.Rest; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet;
+                a[0] += v.Rest; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W;
                 world += v.Rest;
             }
             string worst = "-"; double worstRest = 0, worstPc = 0;
@@ -1532,6 +1605,7 @@ namespace Armoury
               .Append(", powroty z pochodzeniem +").Append(N0(back)).Append(" ludzi / ").Append(H3d(backH)).Append(" hearth (w tym do stanu miast ").Append(N0(men[MBackTown])).Append(")")
               .Append(" | rownanie krain: najgorsza kraina ").Append(worst).Append(" reszta ").Append(H3d(worstRest)).Append(" (").Append(worstPc.ToString("0.###", Inv)).Append("% ludzi krainy), swiat ").Append(H3d(world));
             try { sb.Append(ArmsSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/8)", e); }     // E4/8 (10.5): migracja R19 od siewu, w drodze
+            try { sb.Append(CanonSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/9)", e); }    // E4/9: NIEWOLNI, MUR, rownanie z T i W
             return sb.ToString();
         }
 
@@ -1562,7 +1636,9 @@ namespace Armoury
             sb.Append(" | wejscia: pobor z DOM ").Append(M0(Sum(_fIn, FLevyVillage, FPress))).Append(" (").Append(Part(_fIn, FLevyVillage, FPress)).Append(")")
               .Append(", z puli do band ").Append(M0(_fIn[FPoolBand])).Append(" (w tym narodziny band z oczekujacych ").Append(M0(_pendIn)).Append(")")
               .Append(", bez pochodzenia ").Append(M0(Sum(_fIn, FNoneMap, FNoneOff))).Append(" (").Append(Part(_fIn, FNoneMap, FNoneOff)).Append(")")
-              .Append(", z karczmy (WETERANI, E4/10) ").Append(M0(_fIn[FVetHire]));
+              .Append(", z karczmy (WETERANI, E4/10) ").Append(M0(_fIn[FVetHire]))
+              .Append(", Straz z Westeros (E4/9) ").Append(M0(Sum(_fIn, FWatchWall, FNoneWatchLeft))).Append(" (").Append(Part(_fIn, FWatchWall, FNoneWatchLeft)).Append(")")
+              .Append(", pojmani z rabunku (E4/9) ").Append(M0(_fIn[FCapturedRaid]));
             if (_pressIn > 0 || _pressLost > 0 || _pressHome > 0)
             {
                 // E4/7b: zdjeci z DOM = wzieci + wrocili do domu (+ bez powrotu tylko przy wylaczonym Press Untaken Go Home)

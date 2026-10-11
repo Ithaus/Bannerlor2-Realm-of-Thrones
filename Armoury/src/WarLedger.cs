@@ -129,6 +129,7 @@ namespace Armoury
                         {
                             var reg = OutlawLaw.RegionAt(mp.Position.ToVec2());
                             float before = OutlawLaw.PoolIn(reg);
+                            OverflowHome.NoteAll(mp, left);          // E4/9 DLUG 4: rod w zajeciu - odchodzacy z zaleglego zoldu do domu (notatka rosteru), nie do lasu
                             OutlawLaw.OnTroopsDeserted(mp, left);
                             added = OutlawLaw.PoolIn(reg) - before;
                             if (reg != null) where = reg.StringId;

@@ -84,6 +84,12 @@ namespace Armoury
                     if (v.Carts > 0) sb.Append("On the roads with the village carts and boats: ").Append(N(v.Carts)).Append('\n');
                     if (v.Road >= 1.0) sb.Append("Travelling with Banner Kings travellers and convoys: ").Append(N(v.Road)).Append('\n');     // E4/8 (R19)
                     if (v.U > 0 || Devastation.On) sb.Append("Refugees: ").Append(N(v.U)).Append('\n');
+                    // E4/9 (5.6): niewolni trzymani w tej krainie i ludzie stad w niewoli (konto NIEWOLNI ksiegi)
+                    if (ThrallLaw.On)
+                    {
+                        if (v.THeld >= 1.0) sb.Append("Slaves held in this land: ").Append(N(v.THeld)).Append(v.Realm == "sturgia" ? " (they work the fields, so more free men can go reaving)" : "").Append('\n');
+                        if (v.T >= 1.0) sb.Append("Taken from this land into slavery: ").Append(N(v.T)).Append('\n');
+                    }
                     sb.Append("Fallen since the reckoning began: ").Append(N(v.Fallen)).Append('\n');
                     if (v.Enslaved + v.ToWall >= 1.0) sb.Append("Sold into slavery or sent to the Wall since the reckoning began: ").Append(N(v.Enslaved + v.ToWall)).Append('\n');
                     if (Math.Abs(v.Born) >= 1.0) sb.Append(v.Born >= 0 ? "Born since the reckoning began (net): " : "Lost to hard years since the reckoning began (net): ").Append(N(Math.Abs(v.Born))).Append('\n');

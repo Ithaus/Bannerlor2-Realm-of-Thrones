@@ -35,6 +35,9 @@ namespace Armoury
     /// Miasta (R2) - TownGrowth.cs. Latki wpiete zawsze (U26), licza przy kluczach i LevyLive (przed siewem E4/7 wszystko jak dotad). Korekty rosteru PO oryginale
     /// (postfiks/finalizer), na kopii skladu; kazde cialo we wlasnym try, potkniecia liczone per miejsce (bez globalnych wylacznikow - CLAUDE.md 7).
     /// Straz (Nocna) - "Straz - do E4/9": zaloga rosnie po staremu, milicja/druzyny/karawany/wedrowcy Strazy - koszyk "" (bez zdjecia z DOM).
+    /// E4/9 (192, Y1-Y5): zaloga Strazy dalej rosnie z modelu (Jeff 11.10 TAK), ale kazdy przybysz - i kazdy nowy czlowiek milicji, szablonu i karawany osad frakcji Strazy -
+    /// jest prawdziwym czlowiekiem z Westeros (WatchLaw.GiveLevy: Mur, pule wyrzutkow, ludnosc); osada Daru poza frakcja Strazy - "" jak dotad; wedrowcy BK z Daru -
+    /// zwykla regula R19 (migracja rodzin z DOM osady, nie sluzba). Przy wylaczonym WatchLaw - "" jak w E4/8.
     /// </summary>
     internal static class ArmsFromPeople
     {
@@ -268,7 +271,17 @@ namespace Armoury
         public static Exception GarrisonGrowthFin(Exception __exception, Town __0, int __state)
         {
             if (__state <= 0) return __exception;
-            try { int d = GarMen(__0) - (__state - 1); if (d > 0) { D.zWatch += d; D.zWatchTowns++; } }
+            try
+            {
+                int d = GarMen(__0) - (__state - 1);
+                if (d > 0)
+                {
+                    D.zWatch += d; D.zWatchTowns++;
+                    // E4/9 (Y1): przybysze zalogi Strazy z modelu - prawdziwi ludzie Westeros (Levy); bez prawa - jak dotad (uzgodnienie doby nazwie ich "z niczego - Straz")
+                    var g = __0 != null ? __0.GarrisonParty : null;
+                    if (g != null && WatchLaw.Live) WatchLaw.GiveLevy(g.MemberRoster, d, WatchLaw.KGarrison, -1);
+                }
+            }
             catch (Exception e) { Stumble("GarrisonGrowthFin", e); }
             return __exception;
         }
@@ -462,7 +475,13 @@ namespace Armoury
                 {
                     var r = mp.MemberRoster;
                     day.mUp += d; if (src == SrcTick) day.mTickUp += d;
-                    if (WatchAt(s)) { PeopleBook.GiveNone(r, d, PeopleBook.FWatchArms); day.m2 += d; return; }     // Straz - do E4/9 (dawny przyrost, koszyk "")
+                    if (WatchAt(s))
+                    {
+                        // E4/9 (Y2): milicja osady frakcji Strazy - z Westeros (Levy); osada Daru poza Straza - "" jak dotad (Dar - tylko do plonu, P R5)
+                        if (CrownGifts.IsWatch(s.MapFaction)) WatchLaw.GiveLevy(r, d, WatchLaw.KMilitia, PeopleBook.FWatchArms);
+                        else PeopleBook.GiveNone(r, d, PeopleBook.FWatchArms);
+                        day.m2 += d; return;
+                    }
                     if (FreeHands.Braked(s))
                     {
                         int st = StripMost(r, d); day.r1 += st;
@@ -530,7 +549,7 @@ namespace Armoury
                 int n = 0; foreach (var v in AddedOf(__state.Before, r).Values) n += v;
                 if (n <= 0) return;
                 day.n += n;
-                if (CrownGifts.IsWatch(__1.MapFaction)) { day.p1++; PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms); day.a4 += n; return; }   // Straz - do E4/9
+                if (CrownGifts.IsWatch(__1.MapFaction)) { day.p1++; WatchLaw.GiveLevy(r, n, WatchLaw.KSpawn, PeopleBook.FWatchArms); day.a4 += n; return; }   // E4/9 (Y3): szablon Strazy z Westeros (pulap - SpawnPrefix)
                 if (!SpawnOn || !PeopleBook.LevyLive) { day.nOff += n; return; }      // jak dotad (uzgodnienie E4/7 nazwie "z niczego - partie rodow")
                 bool foreign;
                 var seat = SeatOf(__1, __0, out foreign);
@@ -694,7 +713,13 @@ namespace Armoury
                 if (n <= 0) return;
                 var day = D;
                 day.k++; day.kMen += n;
-                if (WatchAt(__1)) { PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms); day.cWatch += n; return; }     // Straz - do E4/9
+                if (WatchAt(__1))
+                {
+                    // E4/9 (Y4): karawana z osady frakcji Strazy - z Westeros (Levy); osada Daru poza Straza - "" jak dotad
+                    if (CrownGifts.IsWatch(__1.MapFaction)) WatchLaw.GiveLevy(r, n, WatchLaw.KCaravan, PeopleBook.FWatchArms);
+                    else PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms);
+                    day.cWatch += n; return;
+                }
                 Settlement reg;
                 double got = PeopleBook.TakeLevy(__1, n, PeopleBook.MCaravanOut, out reg, PeopleBook.MCaravanOut);      // bez hamulca wolnych rak (Jeff P1)
                 int keep = Math.Min(n, Ceil(got));
@@ -746,7 +771,13 @@ namespace Armoury
                 var day = D;
                 day.c3N++;
                 var st = __0.CurrentSettlement;
-                if (st == null || WatchAt(st)) { PeopleBook.GiveNone(r, d, PeopleBook.FWatchArms); day.cWatch += d; return; }     // Straz - do E4/9 (i konwoj poza miastem)
+                if (st == null || WatchAt(st))
+                {
+                    // E4/9 (Y4): konwoj uzupelniony w osadzie frakcji Strazy - z Westeros (Levy); poza miastem albo osada Daru poza Straza - "" jak dotad
+                    if (st != null && CrownGifts.IsWatch(st.MapFaction)) WatchLaw.GiveLevy(r, d, WatchLaw.KCaravan, PeopleBook.FWatchArms);
+                    else PeopleBook.GiveNone(r, d, PeopleBook.FWatchArms);
+                    day.cWatch += d; return;
+                }
                 Settlement reg;
                 double got = PeopleBook.TakeLevy(st, d, PeopleBook.MCaravanRefill, out reg, PeopleBook.MCaravanRefill);
                 int keep = Math.Min(d, Ceil(got));
@@ -837,7 +868,8 @@ namespace Armoury
             day.w++; if (cargo) day.wCargo++;
             if (n > 0)
             {
-                if (origin == null || WatchAt(origin)) { PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms); day.n3 += n; }     // Straz - do E4/9 (wedrowcy z Daru)
+                // E4/9 (Y5): wedrowcy i konwoje BK z Daru - zwykla regula R19 (migracja rodzin z DOM osady, nie sluzba Strazy); bez osady pochodzenia - "" jak dotad
+                if (origin == null || (WatchAt(origin) && !WatchLaw.Live)) { PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms); day.n3 += n; }
                 else
                 {
                     Settlement reg;
@@ -1020,7 +1052,8 @@ namespace Armoury
               .Append(" (z zalogi ").Append(TN(SpawnGarrisonOn)).Append(", zboze ").Append(TN(GrainOn)).Append("), karawany ").Append(TN(CaravansOn)).Append(", wedrowcy BK ").Append(TN(TravellersOn))
               .Append("; ksiega pochodzenia: ").Append(book);
             // zalogi
-            sb.Append(" | ZALOGI: przyrost z modelu zablokowany -").Append(d.zBlocked).Append(" w ").Append(d.zTowns).Append(" twierdzach (gorna granica - model bez limitow gry), Straz zostawiona do E4/9 +")
+            sb.Append(" | ZALOGI: przyrost z modelu zablokowany -").Append(d.zBlocked).Append(" w ").Append(d.zTowns).Append(" twierdzach (gorna granica - model bez limitow gry), ")
+              .Append(WatchLaw.Live ? "Straz: przybysze z Westeros (E4/9) +" : "Straz zostawiona do E4/9 +")
               .Append(d.zWatch).Append(" w ").Append(d.zWatchTowns).Append(" twierdzach");
             sb.Append(" | A5: twierdz z werbunkiem ").Append(d.a5With).Append(" z ").Append(d.a5Towns).Append(" (ludzi ").Append(d.a5Men).Append("), limit dzienny ").Append(d.a5Daily)
               .Append(", bez ochotnikow ").Append(d.a5NoVol).Append(", zold albo miejsce ").Append(d.a5Wage)

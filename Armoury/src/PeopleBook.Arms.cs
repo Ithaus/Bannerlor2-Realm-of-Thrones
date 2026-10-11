@@ -223,7 +223,7 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- powrot do DOM osady (10.3)
-        internal struct Arrive { public double Here, Other, None, Mig; }
+        internal struct Arrive { public double Here, Other, None, Mig, Wall; }     // Wall - E4/9: bracia Strazy na Mur (sluzba dozywotnia), nie do domu
 
         /// <summary>
         /// Udzialy `sh` (juz zdjete ze slownika rosteru) do DOM: czesc regionu osady s (albo wszystkie znane przy migrate) - do s; inne regiony - HomeKnown (E4/7);
@@ -234,6 +234,9 @@ namespace Armoury
         {
             var a = new Arrive();
             if (sh == null || !(sh.Total > Eps)) return a;
+            // E4/9 (Y6, 4.4): czesc zdjeta ze sluzby Strazy (milicja Strazy bez walki, partia Strazy rozwiazana bez bitwy) - na Mur, zanim reszta pojdzie do DOM osady
+            if (sh.W > Eps) { try { a.Wall = WatchHome(sh, causeKnown, true); } catch (Exception e) { OStumble("ArriveAt(Mur)", e); } }
+            if (!(sh.Total > Eps)) return a;
             try
             {
                 if (!LevyLive || s == null)

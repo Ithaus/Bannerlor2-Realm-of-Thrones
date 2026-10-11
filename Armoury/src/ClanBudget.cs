@@ -71,6 +71,11 @@ namespace Armoury
         // liczniki doby (linia "Budzet rodow (166)" i "Obieg")
         internal static long LastCourt, LastCourtTown, LastFood, LastFamily, LastReleasedPurse, LastBuildShare, LastGearShare;
         internal static int LastReleasedMen, LastReleasedPar, LastReleasedGar, LastNoVillage, LastFamilyN;
+        // E4/9: zwolnieni 166 z partii i zalog Strazy (oczekiwane 0 - WatchNoReleases) i rodow w zajeciu (DLUG 4 - linia "Dlugi (168)") - doba
+        internal static int LastReleasedWatch, LastReleasedSeized;
+        private static int _dRelWatch, _dRelSeized;
+        /// <summary>E4/9: pulap 166 calej Strazy w ludziach (linia "Straz z Westeros"); -1 - brak.</summary>
+        internal static int WatchPoolCap { get { return _watchPoolCap; } }
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
@@ -110,6 +115,7 @@ namespace Armoury
         {
             LastCourt = LastCourtTown = LastFood = LastFamily = LastReleasedPurse = LastBuildShare = LastGearShare = 0;
             LastReleasedMen = LastReleasedPar = LastReleasedGar = LastNoVillage = LastFamilyN = 0;
+            LastReleasedWatch = LastReleasedSeized = 0; _dRelWatch = _dRelSeized = 0;
             LastKwLent = LastKwRoom = 0; LastKwLentN = LastKwRoomN = 0;
         }
 
@@ -429,6 +435,7 @@ namespace Armoury
             {
                 LastCourt = _dCourt; LastCourtTown = _dCourtTown; LastFood = _dFood; LastFamily = _dFamily; LastReleasedPurse = _dRelPurse;
                 LastBuildShare = _dBuild; LastGearShare = _dGear; LastReleasedMen = _dRelMen; LastReleasedPar = _dRelPar; LastReleasedGar = _dRelGar;
+                LastReleasedWatch = _dRelWatch; LastReleasedSeized = _dRelSeized; _dRelWatch = _dRelSeized = 0;
                 LastNoVillage = _dNoVillage; LastFamilyN = _dFamilyN;
                 LastKwLent = _dKwLent; LastKwLentN = _dKwLentN; LastKwRoom = _dKwRoom; LastKwRoomN = _dKwRoomN;
             }
@@ -750,6 +757,7 @@ namespace Armoury
             }
             if (gone <= 0) return 0;
             _dRelMen += gone; if (garrison) _dRelGar += gone; else _dRelPar += gone;
+            try { if (CrownGifts.IsWatchParty(mp)) _dRelWatch += gone; if (DebtLadder.IsSeized(c)) _dRelSeized += gone; } catch { }    // E4/9: liczniki (bez zmiany reguly)
             // czesc sakiewki partii z odchodzacymi (proporcjonalnie do ludzi) - do kiesy wsi, do ktorej wracaja
             try
             {
@@ -824,7 +832,8 @@ namespace Armoury
             // E4/10 (W1, R16): plan weteranow PRZED ludnoscia BK wsi (bez zapisu stanu): t z n stanie w karczmie najblizszego miasta (1/3 uprawnionych od tieru
             // VeteranMinTier), wies dostaje n - t. BK wsi zawiedzie - false PRZED zapisem weteranow (nikt nie zszedl, ReleaseFrom nie zdejmuje - jak dotad).
             PeopleBook.VetTicket vt = null;
-            int vsrc = cause == PeopleBook.M166 ? PeopleBook.V166 : cause == PeopleBook.MW4c ? PeopleBook.VW4c : cause == PeopleBook.M179 ? PeopleBook.V179 : -1;
+            // E4/9 (DLUG 4): odchodzacy z rodu w zajeciu z braku pieniedzy - ta sama droga co przepelnienie W4c (VetDivert jak W4c - E410 :91)
+            int vsrc = cause == PeopleBook.M166 ? PeopleBook.V166 : (cause == PeopleBook.MW4c || cause == PeopleBook.MDebt) ? PeopleBook.VW4c : cause == PeopleBook.M179 ? PeopleBook.V179 : -1;
             try { if (vsrc >= 0 && PeopleBook.VetLive && v != null) vt = PeopleBook.VetPlan(party, ch, n, v.GetPosition2D, vsrc); } catch { vt = null; }
             int t = vt != null && vt.Reason == PeopleBook.VROk ? vt.T : 0;
             if (n - t > 0)
@@ -855,7 +864,8 @@ namespace Armoury
             // (MBack166/MBackW4c/MBack179), reszta - jak w E4/3 (tylko liczona); ludnosc BK dostaje ich tam, gdzie dotad
             if (org != null)
             {
-                int known = cause == PeopleBook.M166 ? PeopleBook.MBack166 : cause == PeopleBook.MW4c ? PeopleBook.MBackW4c : cause == PeopleBook.M179 ? PeopleBook.MBack179 : -1;
+                int known = cause == PeopleBook.M166 ? PeopleBook.MBack166 : cause == PeopleBook.MW4c ? PeopleBook.MBackW4c : cause == PeopleBook.M179 ? PeopleBook.MBack179
+                            : cause == PeopleBook.MDebt ? PeopleBook.MBackDebt : -1;     // E4/9 (DLUG 4): dluznicy do domu - z pochodzeniem z hearth
                 if (known >= 0) PeopleBook.HomeOrNote(org, home, known, cause); else PeopleBook.Note(home, cause, 0.0);
             }
             else PeopleBook.Note(home, cause, 0.0);

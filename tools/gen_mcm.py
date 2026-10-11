@@ -97,6 +97,10 @@ RANGES = {
     'VeteranMinTier': (1, 7, "0"),
     # E4/8 K8: limit dzienny A5 zalogi (kod przycina do 1..5; 1 = gra)
     'GarrisonAutoRecruitPerDay': (1, 5, "0"),
+    # E4/9 (192): budzet pul Strazy (kod przycina 0..100 - suwak 0..12), niewolni Zelaznych na start (x PopulationScale), smierc niewolnych (kod przycina 0..100 - suwak 0..20)
+    'WatchPoolSharePercent': (0, 12, "0"),
+    'IronIslandsStartThralls': (0, 108000, "0"),
+    'ThrallYearlyLossPercent': (0, 20, "0"),
 }
 
 def gen(module_dir, ns, display):

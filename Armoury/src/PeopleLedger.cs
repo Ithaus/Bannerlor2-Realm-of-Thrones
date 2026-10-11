@@ -713,6 +713,10 @@ namespace Armoury
             var keys = new List<string>(kr.Keys);
             keys.Sort((a, b) => kr[b][0].CompareTo(kr[a][0]));
             bool slavesData = Measure169c.LinesOn;
+            // E4/9: niewolni ksiegi trzymani w krainie (kraina regionu trzymania z dnia kalibracji) - obok niewolnych BK (169c)
+            var thrHeld = new Dictionary<string, double>();
+            bool thrOn = ThrallLaw.On;
+            if (thrOn) { try { double u; PeopleBook.ThrallsByRealm(thrHeld, null, out u); } catch { _e40Stumbles++; } }
             var kb = new StringBuilder(4000);
             kb.Append("Krainy (4.15): dzien ").Append(day).Append(" | kraina = kultura regionu z pierwszej doby sesji; obciazenie ")
               .Append(r5 ? "R5 (E4/7, jedna definicja z ksiegi pochodzenia): (sluzba i jency z regionu + polegli netto) / mezczyzni w dniu siewu, prog wedlug krain"
@@ -730,6 +734,7 @@ namespace Armoury
                   .Append(" [prog ").Append(r5 && a[5] > 0 ? (c == "nightswatch" ? "- (Dar: " + (100.0 * a[6]).ToString("0", ci) + " tylko plon)" : (100.0 * a[6]).ToString("0.#", ci)) : ProgOf(c)).Append(']')
                   .Append(" / partie rodow ").Append(lords).Append(" / wyrzutki ").Append(a[2].ToString("0", ci))
                   .Append(" / niewolni BK ").Append(hasSl ? sl.ToString(ci) : "brak danych 169c")
+                  .Append(" / niewolni (ksiega E4/9) ").Append(thrOn ? (thrHeld.ContainsKey(c) ? thrHeld[c].ToString("0", ci) : "0") : "-")
                   .Append(" / zabici dzis ").Append(a[3].ToString("0", ci)).Append(" / zmarli z zarazy dzis ").Append(dis);
             }
             kb.Append(" | zaraza razem dzis ").Append(disDead).Append(" (z rosteru), nietrafione HitRandom ").Append(disUnhit).Append(" (CampFever zadal ").Append(disDead + disUnhit).Append(")");
@@ -763,6 +768,10 @@ namespace Armoury
             }
             _gHaveLast = true;
             wb.Append(" | Inni (dla porownania): zabici ").Append(_gKilled[GOthers]).Append(", zwerbowani ").Append(_gRecruited[GOthers]).Append(", nowe partie ").Append(_gNewMen[GOthers]);
+            // E4/9: skad bracia (WatchLaw.Daily - migawka tej doby; linia biegnie po niej)
+            wb.Append(" | Straz z Westeros (E4/9): ").Append(WatchLaw.Live ? "" : "prawo nieczynne; ").Append("z Muru ").Append(WatchLaw.LastWall.ToString("0", ci)).Append(", z pul ").Append(WatchLaw.LastPool.ToString("0", ci))
+              .Append(", z ludnosci ").Append(WatchLaw.LastPeople.ToString("0", ci)).Append(", bez pokrycia ").Append(WatchLaw.LastNone.ToString("0", ci))
+              .Append("; zwolnieni 166: ").Append(WatchLaw.LastReleased).Append("; rabunki Strazy: ").Append(WatchLaw.LastRaids);
             wb.Append(" | czas linii Krainy i Straz ").Append(((System.Diagnostics.Stopwatch.GetTimestamp() - t1) * f).ToString("0.0", ci)).Append(" ms.");
             Log.Info(wb.ToString());
         }

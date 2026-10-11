@@ -14,8 +14,11 @@ namespace Armoury
     /// E4/7 (164b-1, PLAN 4.17 prog; plan kodu docs/etap4/PLAN-KODU-E47.md rozdz. 6): WOLNE RECE w mezczyznach (R5, U4, U19) - jedna definicja dla linii, hamulca
     /// poboru, plonu, menu osady i PeopleLedger. Na region (warownia OutlawLaw): a = (S + K_m) / (0.27 x L_ref), S = sluzba i jency z regionu (konta SLUZBA/JENCY ksiegi
     /// pochodzenia, bez taborow i bez ""), K_m = max(0, polegli mezczyzni + w niewoli BK + na Murze + 0.27 x zmarli cywile - 0.27 x narodziny netto) od siewu
-    /// (niewola i Mur - recenzja E4/7 R1-2, do konta NIEWOLNI E4/9: jeniec z regionu wypadal z S i nie trafial do K_m), L_ref = ludzie regionu w dniu siewu
-    /// (dom + sluzba + jency). Prog f wedlug krainy (kultura regionu z dnia kalibracji): zwykla 20% (FreeHandsShare), Zelazne Wyspy (sturgia) 20% + niewolni BK do +20%,
+    /// (niewola i Mur - recenzja E4/7 R1-2: jeniec z regionu wypadal z S i nie trafial do K_m), L_ref = ludzie regionu w dniu siewu
+    /// (dom + sluzba + jency). E4/9 (192): konta NIEWOLNI i MUR przejmuja te droge - liczniki E4/7 Enslaved/ToWall rosna juz tylko przy wylaczonych prawach (stary
+    /// zapis - to, co naliczyly, zostaje w K_m), niewolni z regionu od siewu (zywi + zmarli - stan dnia siewu; bilans otwarcia NK nie wchodzi) - w K_m jak polegli,
+    /// MUR z regionu - w S (zywi, poza domem, jak sluzba). Prog f wedlug krainy (kultura regionu z dnia kalibracji): zwykla 20% (FreeHandsShare), Zelazne Wyspy (sturgia)
+    /// 20% + niewolni do +20% (E4/9: niewolni ksiegi trzymani w krainie, gdy prawo czynne i byl bilans otwarcia; inaczej niewolni BK z 169c jak dotad),
     /// Wolni Ludzie 100% (bez hamulca i bez spadku plonu), Dar Nocnej Strazy 20% tylko do plonu (Straz bierze rekruta z calego Westeros - bez hamulca); okno zniw
     /// (dni 196-252 roku 364-dniowego, lato albo jesien Westeros) - f x FreeHandsHarvestFactor.
     /// Plon (R9 b): L = 1 przy a &lt;= f, inaczej max(0.5, ((1 - min(a, 0.9)) / (1 - f)) ^ FreeHandsElasticity) - mnozy towary wsi (MaterialLaw.ProdPostfix, obok
@@ -43,6 +46,10 @@ namespace Armoury
         private static volatile bool _harvest;
         private static volatile bool _foodOn;      // FoodPostfix wpiety (ApplyFood, raz na proces - nie zerowane w Reset)
         private static double _ironF = 0.2; private static long _ironSlaves = -1;
+        private static double _ironBook = -1;      // E4/9: niewolni ksiegi trzymani na Zelaznych Wyspach (-1 = zrodlo BK 169c)
+        /// <summary>E4/9: prog wolnych rak Zelaznych Wysp tej doby i jego zrodlo (linia "Niewolni (E4/9)").</summary>
+        internal static double IronF { get { return Math.Min(1.0, _ironF); } }
+        internal static bool IronFromBook { get { return _ironBook >= 0; } }
         private static int _over;
         private static readonly Dictionary<Settlement, string> _realm = new Dictionary<Settlement, string>();
 
@@ -63,7 +70,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _cells = new Dictionary<string, Cell>(); _harvest = false; _ironF = 0.2; _ironSlaves = -1; _over = 0;
+            _cells = new Dictionary<string, Cell>(); _harvest = false; _ironF = 0.2; _ironSlaves = -1; _ironBook = -1; _over = 0;
             _realm.Clear();
             lock (Gate) { _refused = _bkZero = _exN = 0; _exSum = 0; _refusedBy.Clear(); _bkZeroBy.Clear(); _refusedReg.Clear(); _bkZeroReg.Clear(); _stumbles = 0; _err.Clear(); }
         }
@@ -128,28 +135,35 @@ namespace Armoury
             bool harvest = HarvestWindow();
             double hf = Math.Max(0.0, Math.Min(1.0, s.FreeHandsHarvestFactor));
             double e = Math.Max(0.0, Math.Min(2.0, s.FreeHandsElasticity));
-            // Zelazne Wyspy: f = 0.20 + min(0.20, niewolni / (0.27 x ludzie krainy)) - niewolni BK z 169c tej doby (do E4/9)
+            // Zelazne Wyspy: f = 0.20 + min(0.20, niewolni / (0.27 x ludzie krainy)) - E4/9 (5.3): niewolni ksiegi trzymani w krainie (prawo czynne i bilans otwarcia NK);
+            // inaczej (prawo wylaczone, stary zapis bez bilansu - ksiega od 0 dalaby prog 20% zamiast dzisiejszego) niewolni BK z 169c tej doby jak dotad
             double share = Math.Max(0.0, Math.Min(1.0, s.FreeHandsShare));
             double ironPeople = 0; foreach (var v in views.Values) if (v.Realm == "sturgia") ironPeople += v.Dom;
             long sl = 0; bool hasSl = false;
             try { hasSl = Measure169c.LinesOn && Measure169c.SlavesOf("sturgia", (int)CampaignTime.Now.ToDays, out sl); } catch (Exception ex) { Stumble("Update(169c)", ex); }
             _ironSlaves = hasSl ? sl : -1;
-            _ironF = share + (hasSl && ironPeople > 0 ? Math.Min(Math.Max(0.0, s.FreeHandsIronIslandsExtraMax), sl / (PeopleBook.MenShare * ironPeople)) : 0.0);
+            _ironBook = -1;
+            try { if (ThrallLaw.On && PeopleBook.ThrallsSeeded) _ironBook = PeopleBook.ThrallsHeldInRealm("sturgia"); } catch (Exception ex) { _ironBook = -1; Stumble("Update(E4/9)", ex); }
+            double slaves = _ironBook >= 0 ? _ironBook : (hasSl ? sl : 0.0);
+            bool anySl = _ironBook >= 0 || hasSl;
+            _ironF = share + (anySl && ironPeople > 0 ? Math.Min(Math.Max(0.0, s.FreeHandsIronIslandsExtraMax), slaves / (PeopleBook.MenShare * ironPeople)) : 0.0);
             var cells = new Dictionary<string, Cell>();
             int over = 0;
             foreach (var v in views.Values)
             {
                 try
                 {
-                    var c = new Cell { Id = v.Id, Node = v.Node, Realm = v.Realm, S = v.S + v.J, LRef = v.LRef, Dom = v.Dom, DomRef = v.DomRef, FallenMen = v.FallenMen, Civil = v.Civil, Born = v.Born,
-                                       Enslaved = v.Enslaved, ToWall = v.ToWall };
+                    // E4/9: S = sluzba + jency + MUR z regionu (zywi poza domem); niewola = licznik E4/7 (prawo wylaczone, stary zapis) + NIEWOLNI z regionu od siewu (TSince)
+                    var c = new Cell { Id = v.Id, Node = v.Node, Realm = v.Realm, S = v.S + v.J + v.W, LRef = v.LRef, Dom = v.Dom, DomRef = v.DomRef, FallenMen = v.FallenMen, Civil = v.Civil, Born = v.Born,
+                                       Enslaved = v.Enslaved + v.TSince, ToWall = v.ToWall };
                     bool brake, yieldOnly;
                     double f = FOf(v.Realm, out brake, out yieldOnly);
                     if (harvest && f < 0.999) f *= hf;
                     c.F = f; c.BrakeLand = brake; c.YieldOnly = yieldOnly;
-                    // recenzja E4/7 R1-2 (luka wzoru P R5 do E4/9): jency z regionu sprzedani w niewole BK i wyslani na Mur nie wroca do DOM - jak polegli (wszyscy jency to mezczyzni);
-                    // bez tego sprzedaz jencow krainy "oddawala" jej wolne rece i zdejmowala hamulec. E4/9 (konto NIEWOLNI w S) musi stad niewole zdjac.
-                    c.Km = Math.Max(0.0, v.FallenMen + v.Enslaved + v.ToWall + PeopleBook.MenShare * v.Civil - PeopleBook.MenShare * v.Born);
+                    // recenzja E4/7 R1-2: jency z regionu sprzedani w niewole i wyslani na Mur nie wroca do DOM - jak polegli (wszyscy jency to mezczyzni); bez tego sprzedaz
+                    // jencow krainy "oddawala" jej wolne rece i zdejmowala hamulec. E4/9 (konta NIEWOLNI i MUR): liczniki Enslaved/ToWall nie rosna przy czynnych prawach -
+                    // niewola od siewu z konta (c.Enslaved = licznik + TSince, raz), MUR w S (wyzej) - zadna droga nie liczy czlowieka drugi raz
+                    c.Km = Math.Max(0.0, v.FallenMen + c.Enslaved + c.ToWall + PeopleBook.MenShare * v.Civil - PeopleBook.MenShare * v.Born);
                     double men = PeopleBook.MenShare * v.LRef;
                     c.A = men > 0.0 ? (c.S + c.Km) / men : 0.0;
                     // plon (R9 b)
@@ -158,7 +172,7 @@ namespace Armoury
                     if (double.IsNaN(c.L) || double.IsInfinity(c.L)) c.L = 1.0;
                     // przeglad scalenia E4/6 + E4/7: L plonu spichlerza (Famine) - zmarli cywile i narodziny zmieniaja juz liczbe ludzi w plonie (1.2 x ludzie x q),
                     // tu zostaje tylko ubytek rak bez zmiany liczby gab w domu: sluzba i jency (S), polegli, niewola, Mur
-                    double aP = men > 0.0 ? (c.S + Math.Max(0.0, v.FallenMen + v.Enslaved + v.ToWall)) / men : 0.0;
+                    double aP = men > 0.0 ? (c.S + Math.Max(0.0, v.FallenMen + c.Enslaved + c.ToWall)) / men : 0.0;
                     if (f >= 0.999 || e <= 0.0 || aP <= f || men <= 0.0) c.LPeople = 1.0;
                     else c.LPeople = Math.Max(0.5, Math.Pow((1.0 - Math.Min(aP, 0.9)) / (1.0 - f), e));
                     if (double.IsNaN(c.LPeople) || double.IsInfinity(c.LPeople)) c.LPeople = 1.0;
@@ -322,7 +336,9 @@ namespace Armoury
             double share = Math.Max(0.0, Math.Min(1.0, s.FreeHandsShare));
             var sb = new StringBuilder(2500);
             sb.Append("Wolne rece (E4/7): dzien ").Append(day).Append(" | prog: zwykly ").Append((share * 100).ToString("0", ci)).Append("%, Zelazne Wyspy ").Append((Math.Min(1.0, _ironF) * 100).ToString("0.#", ci))
-              .Append("% (niewolni BK ").Append(_ironSlaves >= 0 ? _ironSlaves.ToString(ci) : "brak danych 169c").Append("), Wolni Ludzie 100%, Straz bez progu (Dar - tylko plon)")
+              .Append("% (niewolni ksiegi ").Append(_ironBook >= 0 ? _ironBook.ToString("0", ci) : "-").Append(" / BK ").Append(_ironSlaves >= 0 ? _ironSlaves.ToString(ci) : "brak danych 169c")
+              .Append(" - zrodlo: ").Append(_ironBook >= 0 ? "ksiega (E4/9)" : "BK").Append("), Wolni Ludzie 100%, Straz bez progu (Dar - tylko plon)")
+              .Append("; E4/9: S = sluzba + jency + Mur, niewola w K_m = licznik E4/7 + NIEWOLNI od siewu")
               .Append("; okno zniw (dni ").Append(HarvestFrom).Append('-').Append(HarvestTo).Append(", lato/jesien): ").Append(_harvest ? "TAK - prog x" + s.FreeHandsHarvestFactor.ToString("0.##", ci) : "NIE");
             double aw = 0, lw = 0, minL = 1.0; string minLName = "-"; int lowL = 0, brake = 0;
             var list = new List<Cell>();

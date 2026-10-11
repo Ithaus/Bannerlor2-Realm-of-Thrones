@@ -716,7 +716,7 @@ namespace Armoury
 
         /// <summary>
         /// E4/9 Z11 (krytyka K7): punkt wpiecia dla ThrallLaw po PeopleBook.RefugeesToCaptives (wlasny try, po kontach) - pojmani schodza z konta UCHODZCY,
-        /// ale nie wracaja do domu: tylko oczekiwane konto w dol, puste osady bez zmian (pojmani jak zabici - sa w osadach spalonych). Do E4/9 nikt tego nie wola.
+        /// ale nie wracaja do domu: tylko oczekiwane konto w dol, puste osady bez zmian (pojmani jak zabici - sa w osadach spalonych). Wola ThrallLaw.CapturePrefix (E4/9).
         /// </summary>
         internal static void OnRefugeesTaken(Village v, double taken)
         {
