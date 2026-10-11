@@ -810,3 +810,9 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   progi G1-G14 + G-ETAP; bez nowych przyczyn PeopleBook. DLL test\Armoury-e4-11.dll. Z11 (E4/9) - OnRefugeesTaken gotowe, bez wywolania. UWAGA scalanie: kolizja
   numerow przyczyn E4/8 x E4/10 (M 44-45, F 52) - przesunac E4/10 (MBackVeteran 46, MVetStart 47, FVetHire 56; numery nie ida do zapisu); konflikty
   ArmouryBehavior/Settings/McmSettings (gen_mcm)/sprawdz_logi/CHANGELOG/PeopleMenu (E4/10)/SubModuleMain (E4/8).
+- (15:20) **B6c GOTOWE (recenzja bez uwag):** w-toku/cs-bledy 9be7bf0 - port Muru: odmrazanie poprzedniego dowodcy przy zmianie (WallReleasePrev), postfiks WallEnd
+  na WallSiegeEvent.CompleteEvent, naprawa starych zapisow (tylko dowodca z pamieci ROT); funkcje B6b uogolnione (SiegeOtherFreezer - 4 wydarzenia oblezen ROT,
+  SiegeRelease, SiegeReleasePrev, SiegeOldSaveScan). Wylaczniki WallReleaseCommander, WallOldSaveFix. Blad potwierdzony w kodzie (ROT ResetAttackerParties odmraza
+  tylko lordow Wolnych z Army == null), bez dowodu w logach - wydarzenie Muru wypada ok. doby 1157 (rok 4), test 364 dob pokaze tylko linie startowe. Czekanie na
+  Mance'a (jak 72 h Roose'a) NIE dodane - brak dowodu (decyzja Jeffa opisana w CHANGELOG, rada: nie). ROT_AIInfluence_Compat tez lata CompleteEvent (tylko log) -
+  nieszkodliwe; poprawione zdanie B6b. DLL: test\CrashScribe-bledy.dll af47adf7, CrashScribe-at-bledy.dll 9f92b4aa.
