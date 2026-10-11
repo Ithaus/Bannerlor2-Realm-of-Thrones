@@ -25,8 +25,8 @@ Uzycie (Python 3, tylko odczyt):
                     zamkow ponad zapasem kupcow (INFO), bledy.
                     E5/A5 (197, R23) A5-1..A5-7 - BetterEconomy: prefiksy Try* wplaty wpiete (linia startowa BEE 170), dopisek E5/A5 w linii
                     kampanii BEE (wylacznik, okno kwot 2/2, opcje daru 2/2), kasy prawdziwym pieniadzem (INFO), linie "BEE (E5/A5) wplata|dar" -
-                    gracz traci tyle, ile dostaje kasa osady / notable (ROZNICA 0; autotest nie klika menu - linie z recznego testu Jeffa), odmowy
-                    (INFO), bledy BeeGifts i potkniecia 0.
+                    gracz traci tyle, ile dostaje kasa osady / notable (ROZNICA 0; autotest nie klika menu - linie z recznego testu Jeffa), A5-4b
+                    wplata do zapasu "wlasnego" (cala; w liniach "D staly" tyle, ile wplat przed nimi), odmowy (INFO), bledy BeeGifts i potkniecia 0.
                     Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
@@ -1771,16 +1771,18 @@ def etap5_a2(rep, lines, start, until, logp, bud):
     rep.add("E5/A2 A2-9: bledy CourtFull / potkniecia E5/A2", f"bledy {len(errs)}, potkniecia {stum}", "0 / 0", len(errs) == 0 and stum == 0)
     # A2-10 / A2-11 (recenzja A2, uwaga 1): sprzet wplacony do kasy WLASNEJ siedziby wraca zaworem jako "wlasne", nie "ziemia" (zapas CourtFull.Own/OwnBack,
     # dopisek linii "D staly (169c)"): zapas zamyka sie z doby na dobe (zapas = wczoraj zapas + wczoraj wplacone - wrocilo - korona i danina - ponad zawor
-    # - przyciete - utracone) i po zbudowaniu zapasu (doby 45-until) wraca > 0 jako "wlasne"
+    # - przyciete - utracone) i po zbudowaniu zapasu (doby 45-until) wraca > 0 jako "wlasne". Recenzja E5/A5: wplaty gracza do kasy wlasnej osady
+    # (akcja z menu, poza blokiem doby) wchodza do zapasu przy najblizszej dobie - linia tej doby podaje je osobno ("wplaty gracza ... od wczorajszej linii")
     sdl = by_day(lines, "D staly (169c): dzien")
     owre = re.compile(r"\[E5/A2 zapas wlasny[^\]]*?: wrocilo dzis (\d+), do korony i daniny (\d+), ponad zawor dnia (\d+), przyciete \(osada wydala\) (\d+)"
                       r", utracone \(nowy pan\) (\d+), zapas (\d+) w (\d+) osadach, wplacone dzis (\d+)")
+    owlate = re.compile(r"wplaty gracza do kasy wlasnej osady \(E5/A5\) od wczorajszej linii (\d+)")
     ow = {}
     for d in sorted(sdl):
         if 1 <= run_day(d, start) <= until:
             m = owre.search(sdl[d])
             if m:
-                ow[d] = [int(x) for x in m.groups()]
+                ow[d] = [int(x) for x in m.groups()] + [num(owlate, sdl[d], int, 0) or 0]
     if not ow:
         rep.add("E5/A2 A2-10: zapas wlasny (sprzet do wlasnej siedziby) w linii D staly (169c)", "brak dopisku",
                 "jest przy czynnej paczce i D stalym (Clan Income Book Stable D)", False if (rows and not off and sdl) else None)
@@ -1791,11 +1793,13 @@ def etap5_a2(rep, lines, start, until, logp, bud):
                 continue
             y0, r = ow[d - 1], ow[d]
             outs = r[0] + r[1] + r[2] + r[3] + r[4]
-            if r[5] == 0 and r[6] == 0 and outs == 0 and (y0[5] > 0 or y0[7] > 0):   # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera
+            late = r[8]   # recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis)
+            exp = y0[5] + y0[7] + late - outs
+            # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera (najwyzej wplaty gracza po wczytaniu, przed doba)
+            if abs(r[5] + outs - late) <= 5 and (y0[5] > 0 or y0[7] > 0) and abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):
                 resets += 1
                 continue
             pairs += 1
-            exp = y0[5] + y0[7] - outs
             if abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):   # zaokraglenia 7 liczb linii + reszta < 1 zl kazdej osady, ktora wyszla z zapasu
                 bad.append(run_day(d, start))
         rep.add("E5/A2 A2-10: zapas wlasny zamyka sie z doby na dobe (zapas = wczoraj zapas + wplacone - wrocilo - korona - ponad zawor - przyciete - utracone)",
@@ -2203,6 +2207,38 @@ def etap5_a5(rep, lines):
                 "ROZNICA 0 i suma gracza = suma kas (nic z niczego, nic w nicosc)", len(diff) == 0 and tot == got)
     else:
         rep.add("E5/A5 A5-4: wplaty gracza do kasy osady", "brak linii wplat", "INFO - autotest nie klika menu; reczny test Jeffa: wplata do wlasnego zamku/miasta -> linia z ROZNICA 0", None)
+    # A5-4b (recenzja A5): wplata to pieniadze rodu gracza w kasie WLASNEJ osady - cala do zapasu "wlasnego" (CourtFull.OwnPlayer; wraca zaworem jako wlasne
+    # D stalego, nie ziemia - inaczej zawyza StableLand gracza: powinnosci 165, limit Banku 168); linia "D staly" doby po wplacie podaje ja w zapasie
+    if pays:
+        own_re = re.compile(r"\| do zapasu wlasnego (\d+)")
+        late_re = re.compile(r"wplaty gracza do kasy wlasnej osady \(E5/A5\) od wczorajszej linii (\d+)")
+        bad, off, tot_on, own_on, pend, before, late_sum, sdn = [], 0, 0, 0, 0, 0, 0, 0
+        for x in lines:
+            if x.startswith("BEE (E5/A5) wplata: dzien"):
+                o = num(own_re, x, int, None)
+                pd = num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0
+                if o is None:
+                    bad.append("brak pola: " + x[:120])
+                    continue
+                pend += o
+                if "(D staly wylaczony)" in x:
+                    off += 1
+                    continue
+                tot_on += pd; own_on += o
+                if o != pd:
+                    bad.append(x[:160])
+            elif x.startswith("D staly (169c): dzien"):
+                sdn += 1
+                late_sum += num(late_re, x, int, 0) or 0
+                before += pend; pend = 0
+        close = (late_sum == before) if sdn else None
+        rep.add("E5/A5 A5-4b: wplaty do zapasu wlasnego (wraca zaworem jako wlasne, nie ziemia D stalego)",
+                f"wplaty {tot_on} -> do zapasu {own_on}, niezgodnych linii {len(bad)}" + (f" (pierwsza: {bad[0]})" if bad else "")
+                + (f", przy D stalym wylaczonym {off}" if off else "")
+                + (f"; w liniach D staly weszlo do zapasu {late_sum} z {before} wplaconych przed nimi" if sdn else "; brak linii D staly")
+                + (f" (po ostatniej linii jeszcze {pend})" if pend else ""),
+                "do zapasu = wplata w kazdej linii; w liniach D staly = suma wplat przed nimi (wyjatek: wczytanie zapisu miedzy wplata a doba - ta wplata wypada z zapasu)",
+                len(bad) == 0 and close is not False)
     # A5-5: dary - gracz traci tyle, ile dostaja notable
     if gifts:
         diff = [x for x in gifts if "| ROZNICA" in x]

@@ -44,6 +44,10 @@ namespace Armoury
     /// StableLand). Dlatego czesc E5/A2 przelewu do wlasnej siedziby nie idzie do ClanIncomeBook.NoteOwnPaid, tylko do zapasu osady (Own); od nastepnej
     /// doby StableBegin pyta OwnBack: zapas x (zawor dnia / kasa ponad prog) wraca jako "wlasne", az zapas sie wyczerpie. Sam dwor 162m - bez zmian
     /// (NoteOwnPaid jak dotad; rozszerzenie na caly przelew dworu - decyzja Jeffa).
+    /// Recenzja E5/A5: ten sam zapas bierze wplate gracza z wlasnego zlota do kasy WLASNEJ osady (BeeGifts.Pay -> OwnPlayer, akcja z menu poza blokiem
+    /// dobowym) - wraca zaworem jako "wlasne", nie "ziemia" (inaczej StableLand gracza rosl o jego wlasne zloto: podstawa powinnosci 165, limit Banku 168).
+    /// Taka wplata wchodzi do zapasu przy najblizszym ClearDay (RollOwn), a linia "D staly" tej doby podaje ja osobno ("wplaty gracza ... od wczorajszej
+    /// linii") - "wplacone dzis" liczy tylko wplaty z bloku dobowego (ClearDay zeruje je przed linia), bez tego bilans zapasu z doby na dobe sie rozjezdza.
     /// Stan: liczniki doby (ClanBudget.ClearDay) i zapas "wlasnego" w pamieci sesji (jak pierscienie D stalego - bez zapisu); Reset (ClanBudget.Reset,
     /// konstruktor ArmouryBehavior - nowa kampania i kazde wczytanie) czysci wszystko, takze licznik potkniec i zapamietane bledy.
     /// </summary>
@@ -71,6 +75,7 @@ namespace Armoury
         private static readonly Dictionary<Settlement, OwnStock> _ownToday = new Dictionary<Settlement, OwnStock>();   // wplaty dnia - do zapasu od jutra
         private static double _dOwnBack, _dOwnCrown, _dOwnCap, _dOwnTrim, _dOwnLost;
         private static long _dOwnIn;
+        private static long _lateIn, _dLateIn;   // recenzja E5/A5: wplaty gracza do kasy wlasnej osady od ostatniego ClearDay / weszly do zapasu przy dzisiejszym
 
         /// <summary>Sprzet niewydany -> dwor dzis (zl, wplacone do kas siedzib) - linia "Obieg".</summary>
         internal static long LastPaid { get { return _dPaid; } }
@@ -78,7 +83,7 @@ namespace Armoury
         /// <summary>Recenzja A2 (uwaga 2): ClanBudget.Reset (miedzy kampaniami i po wczytaniu) - licznik potkniec, zapamietane bledy, zapas "wlasnego", liczniki doby.</summary>
         internal static void Reset()
         {
-            _stumbles = 0; _err.Clear(); _own.Clear(); _ownToday.Clear();
+            _stumbles = 0; _err.Clear(); _own.Clear(); _ownToday.Clear(); _lateIn = 0;
             ClearDay();
         }
 
@@ -87,6 +92,7 @@ namespace Armoury
             _dGross = _dMerc = _dNoSeat = _dDebtor = _dReserve = _dYield = _dFloor = 0;
             _dPaid = _dPaidTown = _dPaidCastle = 0; _dGrossN = _dPaidN = 0;
             _dOwnBack = _dOwnCrown = _dOwnCap = _dOwnTrim = _dOwnLost = 0; _dOwnIn = 0;
+            _dLateIn = _lateIn; _lateIn = 0;   // recenzja E5/A5: wplaty gracza od wczoraj wchodza do zapasu teraz (RollOwn nizej) - do linii "D staly" tej doby
             // recenzja A2 (uwaga 1): wczorajsze wplaty do wlasnych siedzib wchodza do zapasu - dzisiejszy zawor (PopulationLaw.Daily, CastlePurse.Daily)
             // biegl juz po nich, przed ClanBudget.Daily (ClearDay na jego poczatku); dzisiejsze wplaty zawor zobaczy jutro
             try { RollOwn(); } catch (Exception e) { Stumble("RollOwn", e); }
@@ -207,6 +213,16 @@ namespace Armoury
             catch (Exception e) { Stumble("Own", e); return 0; }
         }
 
+        /// <summary>Recenzja E5/A5 - BeeGifts.Pay, po przelewie: wplata gracza z wlasnego zlota do kasy WLASNEJ osady do zapasu "wlasnego" (jak sprzet E5/A2 -
+        /// Own). Akcja z menu, poza blokiem dobowym: liczona osobno (linia "D staly" nastepnej doby), nie w "wplacone dzis". Zwraca kwote wzieta do zapasu
+        /// (0: osada nie jest rodu platnika albo D staly wylaczony).</summary>
+        internal static int OwnPlayer(Settlement st, Clan c, long amount)
+        {
+            int x = Own(st, c, amount);
+            if (x > 0) { _dOwnIn -= x; _lateIn += x; }
+            return x;
+        }
+
         /// <summary>Recenzja A2 (uwaga 1) - ClanIncomeBook.StableBegin (169c), dla kazdego miasta i zamku, po "wlasnych" z wplat od ostatniej doby
         /// (NoteOwnPaid): ile zaworu tej doby to zwrot zapasu (pieniadze rodu, nie ziemia). pay - czesc pana z zaworu dnia (miasto PopulationLaw.RentOf,
         /// zamek CastlePurse.DuesOf), avail - kasa ponad prog przed zaworem, room - czesc zaworu dnia, ktora nie jest jeszcze "wlasne". Zapas schodzi o caly
@@ -255,11 +271,12 @@ namespace Armoury
         /// <summary>Dopisek do linii "D staly (169c)" (po "zawor zamkow X (wlasne Y)" - te "wlasne" juz zawieraja zwrot zapasu): zapas "wlasnego" E5/A2.</summary>
         internal static string OwnNote()
         {
-            if (!On && _own.Count == 0 && _ownToday.Count == 0 && _dOwnLost <= 0) return "";
+            if (!On && _own.Count == 0 && _ownToday.Count == 0 && _dOwnLost <= 0 && _dLateIn <= 0) return "";
             double v = 0; foreach (var o in _own.Values) v += o.V;
             return " [E5/A2 zapas wlasny (sprzet wplacony do kasy wlasnej siedziby - wraca zaworem jako wlasne, nie ziemia): wrocilo dzis " + R(_dOwnBack)
                    + ", do korony i daniny " + R(_dOwnCrown) + ", ponad zawor dnia " + R(_dOwnCap) + ", przyciete (osada wydala) " + R(_dOwnTrim)
-                   + ", utracone (nowy pan) " + R(_dOwnLost) + ", zapas " + R(v) + " w " + _own.Count + " osadach, wplacone dzis " + _dOwnIn + " (do zapasu od jutra)]";
+                   + ", utracone (nowy pan) " + R(_dOwnLost) + ", zapas " + R(v) + " w " + _own.Count + " osadach, wplacone dzis " + _dOwnIn + " (do zapasu od jutra)"
+                   + (_dLateIn > 0 ? "; wplaty gracza do kasy wlasnej osady (E5/A5) od wczorajszej linii " + _dLateIn + " (w zapasie od dzis)" : "") + "]";
         }
 
         /// <summary>Dopisek do linii "Budzet rodow (166)" (po "sprzet: przydzial dnia ...").</summary>

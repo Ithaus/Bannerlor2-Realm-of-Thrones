@@ -42,6 +42,11 @@ namespace Armoury
     ///    w przerwie nie dostaje nic. Osada wroga - opcja nieaktywna z powodem. Dalej zloto notabla zyje wedlug istniejacych regul (pasmo 4 500-10 500 - E5/A3).
     /// Zamknieta ekonomia: oba przelewy maja platnika (gracz) i odbiorce (kasa osady / notabl) - zdarzenie gry HeroOrPartyTradedGold; ksiega pieniadza liczy
     /// wplate w "przelewach gry - gracz" kas miast/zamkow, dar - przelew miedzy bohaterami (suma swiata bez zmian). MoneyLedger bez nowych pozycji.
+    /// Recenzja A5: wplata trafia zawsze do kasy WLASNEJ osady (CanPay), wiec to pieniadze rodu gracza - po przelewie idzie do zapasu "wlasnego"
+    /// (CourtFull.OwnPlayer, ten sam co sprzet E5/A2 do wlasnej siedziby): zawor (zamek 110, miasto A1) oddaje ja panu jako "wlasne" D stalego, nie "ziemia".
+    /// Bez tego wracalaby jako ziemia i zawyzala StableLand gracza - podstawe powinnosci wobec korony (165, CrownDuesFromLand) i limit Banku Zelaznego (168).
+    /// Znana gorna granica (jak place budow BuildFunding i sprzet E5/A2): w wojnie ciecie Z8 zwrotu korony od zoldu zalog (SoldierPay.TakePaid) bierze
+    /// caly zawor pana (LordDuesToday), takze zwrot tej wplaty - najwyzej zold zalog zamkow gracza od poprzedniego rozliczenia.
     /// Log: kazda wplata, odmowa przelewu (ekrany BK, konsola, menu) i dar - jedna linia "BEE (E5/A5) ..." ze zlotem gracza i odbiorcy przed i po (akcje gracza
     /// - rzadkie); stan paczki - dopisek linii kampanii BEE (170). Wylacznik wylaczony = stan sprzed paczki (wplata zamknieta jak w 170, brak opcji daru).
     /// LivingEconomySealed wylaczony = BEE jak dawniej (wplata do wirtualnego skarbca), dar dla notabli zostaje (to nie akcja BEE). Wyjatki: licznik potkniec
@@ -116,12 +121,18 @@ namespace Armoury
             int g0 = hero.Gold, p0 = st.SettlementComponent.Gold;
             GiveGoldAction.ApplyForCharacterToSettlement(hero, st, amount, true);
             int g1 = hero.Gold, p1 = st.SettlementComponent.Gold;
+            // recenzja A5: pieniadze rodu w kasie wlasnej osady - do zapasu "wlasnego" (wraca zaworem jako wlasne D stalego, nie ziemia; opis klasy)
+            int own = 0;
+            try { int x = Math.Min(g0 - g1, p1 - p0); if (x > 0) own = CourtFull.OwnPlayer(st, hero.Clan, x); }
+            catch (Exception e) { Stumble("zapas wlasny", e); }
             try
             {
                 int paid = g0 - g1, got = p1 - p0;
                 Log.Info("BEE (E5/A5) wplata: dzien " + Day() + " | " + Name(st) + " (" + (st.IsCastle ? "zamek" : "miasto") + ") | zrodlo " + via + " | kwota " + amount
                          + " | gracz " + g0 + " -> " + g1 + " (-" + paid + ") | kasa osady " + p0 + " -> " + p1 + " (+" + got + ")"
-                         + (paid != got ? " | ROZNICA " + (paid - got) : "") + (_stumbles > 0 ? " | potkniecia " + _stumbles : ""));
+                         + (paid != got ? " | ROZNICA " + (paid - got) : "")
+                         + " | do zapasu wlasnego " + own + (own == 0 && paid > 0 && !ClanIncomeBook.StableDOn ? " (D staly wylaczony)" : "")
+                         + (_stumbles > 0 ? " | potkniecia " + _stumbles : ""));
                 if (paid > 0)
                     Log.Player("You pay " + paid + " gold into the purse of " + Name(st) + ". " + (st.IsCastle ? T_CASTLE_TIP : T_TOWN_TIP));
                 return paid;
