@@ -630,3 +630,7 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
   JEDNO PYTANIE DO JEFFA: statki (181) zabieraja lordom ok. 330 tys./d zlota z powietrza -> wojsko w wojnie po roku ok. 92 zamiast 99 tys. (-7%), do etapu 5 (podatek
   wojenny). (a) wgrac teraz (rada) / (b) razem z etapem 5. Plan: kod statkow w tescie, przy wgraniu wylaczniki ShipsToPort/ShipTradeThroughPort/ShipPrizesToPort = false
   do odpowiedzi Jeffa. Drzewo do kodu 3.1: SCRATCH(ae222cb7)\e3\31 (w-toku/e3-31 od f37d032). Okno 5h 28% o 17:10 - start kodu 3.1 po potokach 3.4-3.10.
+- (17:55) **WGRANIE 24: Armoury f5be1156** (punkt 1 dezercja: W1 + W4; opis w STAN-PRAC). Etap 2 (punkty 1, 2, 4 z rozdz. 22) ZAMKNIETY poza biegiem 2-letnim.
+  **ETAP 3 - stan:** 3.2 = w-toku/e3-32m f37d032; 3.4-3.7 scalone = w-toku/e3-gA f205ba0 (drzewo e3\gA); 3.8-3.10 na gA = w-toku/e3-gB b052638 (drzewo e3\gB; Armoury,
+  RC, GT kod 0). 3.1+3.3 kod w toku (workflow wf_09986c42-a8f; drzewa e3\31 (E3/0,1,3,5,6,7), e3\31b (E3/2,4,8,9), e3\33 (statki E3/10-12, wylaczniki OFF do decyzji
+  Jeffa - wariant (b) projektu v2)). Kolejka gry: test 3.2 (test\Armoury-32m.dll) -> WGRANIE 25 -> gA -> WGRANIE 26 -> gB -> WGRANIE 27 -> 3.1+3.3 -> WGRANIE 28 -> bieg 2-letni.

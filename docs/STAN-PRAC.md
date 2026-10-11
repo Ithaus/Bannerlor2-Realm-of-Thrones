@@ -1065,3 +1065,11 @@ wojny") / 3 DECYZJA (te same co w WGRANIU 20: Dothraki/Iron Islands biedni z lor
 narzedziu miala 5 NIE. Straz 1.9 -> 5.0-5.4 tys. (pulap 5-6.8 tys., werbunek wstrzymany 0; dotad 1.5-2 tys.), glowy < 5000 = 1, bankruci 0, wojsko lordow w wojnie 104 tys.,
 dezercja AI 23/d (baza 49); zapis 9 dob na wersji po recenzji (ba2e13e8) OK - 0 bledow, 29.1 s/dobe. Kopie: Armoury.dll.bak-2026-10-10-przed-noc23 +
 D:\Backup-Bannerlord\wgrane\2026-10-10-noc23-przed. ZATWIERDZONE: Armoury ba2e13e8, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.
+
+**WGRANIE 24 (10.10 ok. 17:55 zegara komp.):** Armoury f5be1156 (galaz noc/wgranie-24 = w-toku/e2c b9d6a12 = WGRANIE 23 + (1) dezercja AI: W1 kara zaopatrzenia BK
+liczy dni braku (max 20/30/20; dotad w osadzie i w malej partii cala narosla potrzeba, nasza czapka 3/d zawyzala u duzych), W4a Inni osobno w 169c/183, W4b Inni
+dezerterzy do niczego (nie do puli wyrzutkow -> band), W4c przepelnienie partii i zalog do domu (OverflowHome)). RC 5f98df70 i CS 77b11df5 bez zmian. Testy: bieg z zapisu
+d180 (40 dob) wobec bazy - d180-207 80/d (baza 127), kar zaopatrzenia BK brak w skladnikach morale, przepelnienie do domu 25-32/d, do puli -10%; fala po jednej wielkiej
+przegranej (Recent Events -65) zostaje - mechanika gry; 120 dob nowej kampanii - 0 bledow Armoury, dezercja AI 49 (baza 49), wojsko lordow w wojnie 99.2 tys., bandy -14%,
+glowy < 5000 = 3, bankruci 0, reszta ksiegi -6.2 tys.; NIE tylko te co w WGRANIU 20 (wahania); zapis 9 dob OK (0 bledow, 28.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-10-przed-noc24
++ D:\Backup-Bannerlord\wgrane\2026-10-10-noc24-przed. ZATWIERDZONE: Armoury f5be1156, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.
