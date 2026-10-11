@@ -324,7 +324,8 @@ namespace Armoury
         // Lancuch modeli zalogi: ROT ROTSettlementGarrisonModel (_previousModel) albo NavalDLC (BaseModel) -> BK BKGarrisonModel (dziedziczy Default, tej metody nie
         // nadpisuje) -> DefaultSettlementGarrisonModel (stala 1). Kolejnosc ladowania modulow nie jest znana przy starcie - latka na KAZDEJ zadeklarowanej metodzie,
         // a dziala tylko na zewnetrznym poziomie (licznik zagniezdzenia jak SpeedDepth; max() i tak idempotentny). Zold pilnuje sama gra: "Wage Limit"
-        // (GetAvailableWageBudget zalogi = limit zoldu 166 - zold - 5, tansi ochotnicy pierwsi) i "Party Size Limit" wchodza w ten sam ExplainedNumber PRZED limitem
+        // (GetAvailableWageBudget zalogi = Settlement.GarrisonWagePaymentLimit - zold - 5; limit: w pokoju cel 166 ClanBudget, w wojnie limit gry - GarrisonWarFull, BK wlacza
+        // autowerbunek AI tylko w wojnie -, u gracza jego limit; tansi ochotnicy pierwsi) i "Party Size Limit" wchodza w ten sam ExplainedNumber PRZED limitem
         // dziennym (G GarrisonRecruitmentCampaignBehavior :172-200). Ludzie: gra oproznia slot notabla przy kazdym rekrucie, E4/7 A5Post zdejmuje kazdy oprozniony
         // slot osobno (TakeLevy z DOM) - drugi rekrut tej samej doby tez. Jedna regula dla zalog AI i gracza (gra wola A5 dla kazdej twierdzy z wlaczonym autowerbunkiem).
         // Bez K8 (limit gry): Straz i osady Innych (A5 tam "" - do E4/9), ksiega bez poboru (!LevyLive - A5 "" jak dotad), kraina z hamulcem wolnych rak.
