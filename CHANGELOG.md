@@ -1,5 +1,39 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 (etap 4, SCALENIE CALOSCI ETAPU 4 (bez E4/9) w `w-toku/zbior-e4-koniec`) - E4/8 + E4/10 + E4/11 + E4/7b + BLEDY NA ZBIORZE 31 + E4/6 + E4/7: PRZENUMEROWANE PRZYCZYNY KSIEGI LUDZI (E4/10 ZA E4/8, MBackPress NA KONCU), HEARTH o14, ROZWIAZANA PARTIA: MILICJA E4/8 + WETERANI E4/10
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e4-koniec` (od 392c519 = zbior 31 + E4/6 + E4/7 + poprawka) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/e4-8` (19d76ac) -> f90f1ba, `w-toku/e4-10` (7b6bea3) -> 7280a62, `w-toku/e4-11` (d6dd664) -> d7e986e, `w-toku/e4-7` (doszedl tylko ba3a07c = E4/7b) -> 22cb4e5, `w-toku/e4-bledy` (457f73e) -> 61ead67 | **Pliki (rozwiazane):** `PeopleBook.cs`, `PeopleBook.Origin.cs`, `PeopleBook.OriginPatches.cs`, `Measure40.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `PeopleMenu.cs`, `Settings.cs`, `McmSettings.cs` (tylko `python tools/gen_mcm.py` po kazdym scaleniu: Armoury 1072 -> 1082 -> 1086 -> 1089 -> 1090 -> 1091), `tools/gen_mcm.py`, `tools/sprawdz_logi.py`, `CHANGELOG.md`; poprawki logiki: `PeopleBook.Veterans.cs`, `TownGrowth.cs`
+
+**Problem:** piec paczek etapu 4 wyszlo rownolegle (E4/8, E4/10, E4/11 od 392c519; E4/7b od 61f75d7 - E4/7 sprzed scalenia z E4/6; bledy od dfb12df). E4/8 i E4/10 zajely te same numery przyczyn ruchu ludzi (E4/8: M 34-45, F 42-55; E4/10: M 44-45, F 52 z "rezerwa 10 numerow", ktorej E4/8 nie dotrzymal) i ta sama nazwe `o13` w linii "Hearth (E4/0)"; E4/7b mial `MBackPress = 31` w starej numeracji E4/7 (dzis 31 = MBackDisband). Obie paczki E4/8 i E4/10 zmienialy tez rozwiazanie partii (DisbandPre/DisbandPost) i rownanie regionu. Dowod: tylko kod (gra nie uruchamiana - test na koniec etapu 4).
+
+**Przenumerowania (stare -> nowe; numery nie ida do zapisu - liczniki doby, wszystkie uzycia przez nazwy):**
+- E4/8 bez zmian: M 34-45 (MLevyMilitia..MTownNatural), F 42-55 (FMilitiaLevy..FDisbandHome), KRoad 12 (KKinds 13), ARoad 7, Hearth `o13` ("nasze (E4/8)").
+- E4/10: `MBackVeteran` 44 -> **46**, `MVetStart` 45 -> **47**; `FVetHire` 52 -> **56** (FKinds 53 -> 57, poza zakresami `Part(...)` E4/8); Hearth `o13` -> **`o14`** ("powroty weteranow (E4/10) +"); wpisy "(wolne NN - E4/8)" w MName/FName/MHearth usuniete (zastapione przyczynami E4/8).
+- E4/7b: `MBackPress` 31 -> **48** (MKinds 32 -> **49**), MHearth = true, poza ciagiem MBackH3..MBackDisband - dopisany osobno w `Measure40` (o11), `OriginSegment` ("powroty z pochodzeniem"), `backE47` ("Ludzie (ksiega)").
+- Stan koncowy: MKinds 49, FKinds 57, KKinds 13; MName 49, MHearth 49, FName 57, KName 13 (sprawdzone skryptem: stale unikalne, 0..Kinds-1 bez dziur, konta A* 0-7 bez duplikatow). E4/11, bledy - bez nowych przyczyn.
+
+**Konflikty i rozwiazania:**
+- E4/8: bez konfliktow (baza = czubek). gen_mcm bez zmian (1082).
+- E4/10: `PeopleBook.cs` 8 blokow (stale, MName, MHearth, Reset/Export/Import - `ResetArms`+`ResetVeterans`, `ExportArms`+`ExportVeterans`, koniec doby `ArmsCloseDay`+`VetEndDay`, etykieta "stan miasta" dla MTownNatural i MVetStart); `PeopleBook.Origin.cs` 6 (FKinds/FName, `RegionNum.Road`+`Vet`, `Rest` = ... + Road + Vet ... + MigOut - MigIn, ludzie krainy z Road i Vet); `PeopleBook.OriginPatches.cs` 3; `Measure40.cs` 2 + `named` (+ o13 + o14); `Settings.cs`, `gen_mcm.py`, `sprawdz_logi.py` (wywolania i funkcje E4/8 + E4/10), `CHANGELOG.md`. Import: "tr:" (E4/8) nie jest lapany przez `ImportVeteransPart` (tylko vs/vt/vh) ani `ImportOriginPart` - sprawdzone.
+- E4/11 (wskazowki z jego CHANGELOG R2-2): `ArmouryBehavior` - konstruktor `ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset();`; `SubModuleMain` - `ArmsFromPeople.ApplyAll` i `VillageBook.ApplyAll` obie; `PeopleMenu` - naglowek E4/10 + E4/11, dopiski E4/10 do `sb` przed `string body = sb.TrimEnd`, potem sekcja okregu E4/11 (scalilo sie samo w tej kolejnosci); `Settings.cs`, `sprawdz_logi.py` (docstring + wywolanie E4/11), `CHANGELOG.md`.
+- E4/7b: `PeopleBook.cs` 3 (stale, MName, MHearth), `PeopleBook.Origin.cs` 3 (`_pressHome` w zerowaniu doby obok licznikow E4/10, `back` z MBackVeteran i MBackPress, linia Pochodzenie: "z karczmy (WETERANI, E4/10)" + blok poboru wymuszonego E4/7b), `Measure40.cs` 1 (`o11 += MBackPress` zaraz po petli), `CHANGELOG.md`. `PeopleUnit.cs`, `Settings.cs`, `sprawdz_logi.py` (wiersz E4/7b) - scalone samo.
+- Bledy (NightRest): konflikt tylko `CHANGELOG.md`.
+
+**Poprawki logiki przy scaleniu (zasada 0 - kontrola calosci):**
+1. **Rozwiazana partia (E4/8 5.6 + E4/10 W5):** `DisbandState` niesie oba stany (`Mil`/`MilParty` E4/8 i `Types` E4/10). `DisbandPost`: najpierw milicja wsi E4/8 (`mil` z `org`, FMilitiaDisband), potem weterani E4/10 z reszty - `VetDisband(__0, Types, M, gone - mil, org)` (typy proporcjonalnie do `gone - mil`), do DOM `gone - mil - vet` (MBackDisband). Bez tego albo milicja dostawalaby ludzi drugi raz w karczmie, albo W5 znikal.
+2. **Siew weteranow w ruchu stanu miast:** `VetTakeTown` (E4/10) zmienial `_town` bez `_townMv` (E4/8) - kontrola linii "Miasta (E4/8 R2)" (`X - Y - (wszystkie ruchy + zalozenie)`) w dobie siewu pokazalaby -siew (prog N6 <= 1 czlowiek). Teraz `_townMv[MVetStart] -= t` pod tym samym zamkiem; w linii Miasta nazwany odcinek ", siew weteranow (E4/10) X" (tylko gdy != 0, przed "inne powroty (R6)" - wzorce narzedzia bez zmian).
+3. **Hearth (E4/0):** `named` = ... + o11 (z MBackPress) + o12 + o13 (E4/8) + o14 (E4/10). Wszystkie przyczyny z MHearth = true sa czytane w Measure40 (poza MCart - mierzony oknami W3-W5 od E4/3, jak dotad) - sprawdzone skryptem.
+4. **Rownanie regionu/krain (OriginSegment, menu):** `Rest` i ludzie krainy z W DRODZE (E4/8) i WETERANAMI (E4/10) naraz; "powroty z pochodzeniem" w linii = MBackH3..MBackDisband + MBackTown + MBackVeteran + MBackPress.
+
+**Ryzyko / co sprawdzic:**
+- **Kolizja do decyzji (bez zmiany kodu - zasada 3):** E4/8 R6 (`ArmsPartyGone` - partia zniszczona bez bitwy albo usunieta `RemoveParty`, np. konwoje DTE) oddaje zolnierzy prosto do DOM (MBackDisband), a E4/10 R16 dziala tylko w `DisbandPost` (W5). Zolnierze partii lordow konczacych sie bez bitwy i bez `DisbandPartyAction` nie trafiaja wiec do karczm (1/3). To nie ludzie z niczego (ksiega zamknieta), tylko druga regula na to samo zjawisko - do decyzji Jeffa przy E4/9 (dluznik rozpuszcza poczet ma i tak wolac `VetDivert`).
+- Rozbita eskorta konwoju BK (od E4/8 slownik KRoad) jest uprawniona do karczmy jak kazdy zolnierz - `VetEligible` wyklucza milicje, tabory, karawany, Straz i Innych, nie `PopulationPartyComponent`. Wedrowcy (nie Soldier/Mercenary) i tak nie wchodza.
+- Siew E4/10 dopisuje `TownOut` bez `VillOut` - podzial powrotow regionu miasto/wsie (`BackToTown`) przesuwa sie ku miastu do splaty tego dlugu (jak w paczce E4/10; migracja R2 E4/8 splaca dlug przez `RepayTownDebt` - spojne).
+- Narzedzie: `sprawdz_logi.py --grupa etap4` wola bloki E4/3..E4/7 (z wierszem E4/7b), E4/8, E4/10, E4/11; py_compile OK, bez zdublowanych `def`; przebieg na starych logach (a2calc, e45 synt) i na syntetycznym z liniami startowymi E4/8/E4/10/E4/11 - 0 wyjatkow.
+- Sprawdzone skryptem: kazda linia dodana w kazdej paczce jest w drzewie albo zastapiona swiadomie (stale, tablice, polaczone linie wyzej).
+- Build Release: kod 0 po kazdym scaleniu (1 stare ostrzezenie CS0169). DLL: `scratchpad\test\Armoury-e4-calosc.dll`.
+
+**Status:** DO SPRAWDZENIA - test koncowy etapu 4 (zbiorczy 120 dob + zapis z doby 362); E4/9 poza tym zbiorem.
+
 ## 2026-10-11 (etap 4, bledy z testu 120 dob - decyzja Jeffa 11.10 "dorzuc do koncowej paczki E4") - NOCLEG: KARA SNU WPINANA PO POZYCJI ARGUMENTU (__0), KONIEC BLEDU HARMONY "Parameter mobileParty not found" NA MODELU MORALE NAVALDLC
 **Mod:** Armoury | **Galaz:** `w-toku/e4-bledy` (od dfb12df = zbior 31) | **Pliki:** `NightRest.cs` (SpeedPostfix, MoralePostfix, NOWE SpeedPostfixOtherName / MoralePostfixOtherName, ApplyAll, PatchModels), `Settings.cs` (klucz `NightRestEveryModel`), `McmSettings.cs` (gen_mcm)
 
