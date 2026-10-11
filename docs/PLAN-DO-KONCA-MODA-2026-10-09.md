@@ -174,7 +174,7 @@ Cel: zbroi starczy dla armii (po 174 ok. 120-190 zbroi na tulow dziennie przy po
 
 | # | Co | Status | Wiel. | Zalezy od |
 |---|---|---|---|---|
-| 6.1 | Wytop przy kopalni (zelazo zamiast rudy); przetop | Ty | D, NK | 1.2 |
+| 6.1 | Wytop przy kopalni (zelazo zamiast rudy); przetop | zdecyd. (Jeff 11.10: tak) | D, NK | 1.2 |
 | 6.2 | Wiecej rak i kopaln | zdecyd. | D | 6.1 |
 | 6.3 | Wsie x1.3 lnu, welny, skor; wsad wedlug wartosci | zdecyd. | S | 1.2 |
 | 6.4 | Mniej towaru bez zbytu zamiast kasowania przez BK | zdecyd. | S | - |
@@ -187,11 +187,12 @@ Cel: zbroi starczy dla armii (po 174 ok. 120-190 zbroi na tulow dziennie przy po
 | 6.11 | Konie: linia w logu; ginie tylko zabity, ocalaly to lup zwyciezcy | zdecyd. | S | - |
 | 6.12 | Hodowla wedlug popytu + przeglad 71 stadnin | zdecyd. | S, NK | 6.11 |
 | 6.13 | Konie po poleglych jezdzcach ze zbrojowni AI na targ | zdecyd. | M | 1.4, 6.11 |
-| 6.14 | Rycerz z wlasnym koniem / wiecej jazdy u AI (dzis ok. 8%, w ksiazkach 20-35%) - po tescie 1.4 | Ty | S | 1.4 |
+| 6.14 | Rycerz z wlasnym koniem / wiecej jazdy u AI (dzis ok. 8%, w ksiazkach 20-35%; cel ok. 20%, Dothrakowie konni, Zelazne Wyspy malo) - po tescie 1.4 | zdecyd. (Jeff 11.10: tak) | S | 1.4 |
 | 6.15 | Konie z lupu i zbrojowni nie niosa piechura | blad | M | - |
 | 6.16 | Juczne konie z targu; zapasowe konie lordow; udzwig | zdecyd. | S | - |
 | 6.17 | Naprawy: material wedlug rodzaju, Twoje rece ta sama regula; AI naprawia tylko to, co nosi | zdecyd. | S | 1.2 |
 | 6.18 | Wioski poboczne wedlug rodzaju: rybacka daje ryby, mlyn zboze (mieszanka okregu z obrazkow - A02 A4); razem z 6.3 i 6.9 (Jeff 11.10) | zdecyd. | S | 4.6, 6.3 |
+| 6.19 | Kowale i rzemieslnicy kuja pancerze (i bron) WEDLUG KULTURY SWOJEJ KRAINY - Polnoc nie kuje zbroi Lannisterow, nikt nie kuje unikatow (np. helm Ramsaya); kazda kraina swoj rodzaj zbroi, zgodnie z lore (Jeff 11.10 17:30) | zdecyd. | M | 1.2, 6.9 |
 
 **Skonczone, gdy** (120 dob): cos na tulowiu ma co najmniej 75% zolnierzy AI; skor i plotna w swiecie nie ubywa szybciej niz 10 dziennie, zapas lnu i welny nie rosnie 3 miesiace z rzedu; w linii "Konie" kazdy znikajacy kon ma przyczyne.
 
