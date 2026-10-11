@@ -730,3 +730,6 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   JEDEN test (rok 364 dob nowej kampanii + zima 120 + zapis 9; projekt rozdz. 4 "Koniec etapu" mowi tez o 728 dobach dla "spalona wioska wraca po roku") -> poprawki -> wgranie.
 - (07:10) Pasza koni wariant (a) GOTOWA: w-toku/e4-jedzenie 4c54fe8 (postfiks na BK CalculateAnimalFoodNeed -> AnimalNeed po glowie, warunki terenu BK zostaja, wylacznik
   BkAnimalFeedPerHead). Do sprawdzenia w tescie zbioru 31: glod i zakupy AI w Dorne (pustynia caly rok) i na polnocy (snieg). Czekam na E4/5 (wf_3ee22640-ded).
+- (07:45) **ZBIOR 31 SCALONY:** w-toku/zbior31 dfb12df (drzewo e4\z31 = e4-5 51af386 (z e4-4) + e4-jedzenie 4c54fe8), build kod 0, test\Armoury-z31.dll cf40fefa.
+  TEST A (120 dob) w toku -> test\at-z31-A.out.txt; potem TEST B z plikiem armoury-proba-zimy.flag (polozyc, 120 dob, usunac - skrypt jak w zbiorze 30), zapis 9 dob ->
+  WGRANIE 31. ROWNOLEGLE (bez testow, Jeff): E4/6 (drzewo e4\46, w-toku/e4-6 od dfb12df) i E4/7 (drzewo e4\47, w-toku/e4-7 od dfb12df, plan docs/etap4/PLAN-KODU-E47.md).
