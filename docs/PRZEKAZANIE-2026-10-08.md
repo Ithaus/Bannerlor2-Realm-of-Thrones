@@ -755,3 +755,8 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   (rozpoznanie 7 bledow w dekompilacji + sceptyk na kazdy werdykt -> poprawki TYLKO tego, co psuje, + NightRest -> recenzja). Drzewa: SCRATCH(ae222cb7)\e4\bledy
   (w-toku/e4-bledy od dfb12df, Armoury) i e4\csbledy (w-toku/cs-bledy od 37535a7 = CS w grze 77b11df5); DLL probne test\Armoury-bledy.dll, CrashScribe-bledy.dll,
   CrashScribe-at-bledy.dll (z at1-cs.diff). Scalic do w-toku/zbior-e4-koniec; test na koncu etapu 4 razem z reszta.
+- (10:35) **PLAN KODU E4/9 GOTOWY** (docs/etap4/PLAN-KODU-E49.md; sam plan, kod po E4/7 i E4/8). Straz: tyle ludzi, ile dzis daja kanaly gry, zmienia sie zrodlo
+  (konto Mur -> 3% puli wyrzutkow Westeros -> ludnosc); WatchNoReleases juz jest (bez nowego WatchLifelong); NIEWOLNI = nowe konto z pochodzeniem (bez dzieci, -5%/rok,
+  27 tys. Zelaznych tylko NK); jency z rabunku - 10% napadnietych z uchodzcow wsi przy koncu udanego rabunku (odstepstwo od szkicu E4/5 - bez gubienia przy zapisie
+  w polowie rabunku); DLUG 4 - dezercja z braku zoldu rodu w zajeciu do domu. UWAGA scalanie: numery przyczyn E4/6 i E4/7 sie pokrywaja. Pytania kierunku do Jeffa:
+  (1) zalogi Strazy dalej rosna same, ale z prawdziwych ludzi Westeros - rada tak; (2) rozbici bracia wracaja na Mur, uciekinierzy do wyrzutkow Polnocy - rada tak.
