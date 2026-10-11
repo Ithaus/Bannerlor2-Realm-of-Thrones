@@ -871,3 +871,10 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   T7 reszta zolnierzy +1056/d i T4 w nicosc 310/d (3%), rownanie krain Sarnor -0.575%, pobor na podlodze 131, weterani w 53 miastach (prog 90), 5 wiosek brak,
   Straz z ludnosci reach 41% (tabela 29%), milicja N7, koszty T12/N15/G10. Test biegnie dalej do ok. d370 (potem zatrzymac - po poprawkach pelny 728 + zima + zapis).
   Diagnoza: workflow wf_28c41f10-460 (5 badaczy + sceptycy) - bez zmian kodu.
+- (22:58 UTC) **ETAP 5 PORCJA A - KOD GOTOWY (kazda paczka: kod + recenzje + poprawki; bez testu w grze):** w-toku/e5-0 a1f9a87 (pomiar; 6/6 uwag), w-toku/e5-a1 e8868d2
+  (kasy miast, regulator tryb 2, zawor 2/3:1/3, warsztaty zbrojne kupuja tylko z nadwyzki; 4/4), w-toku/e5-a2-5 (A2 dwor db96c4e, A3 markietani/notable dfb933e,
+  A4 drobne kas bfda2cc - ZASLEPKA TownPurseA4Stub.cs do usuniecia przy scaleniu z A1, A5 BEE 7e03a6c), w-toku/e5-a6 c71aa64 (lup). Pytania kierunku (ide z rada):
+  A1 - ubogie miasta ponizej zapasu nie kupia zbroi z warsztatow (zostawic, ocenic w tescie A); A2 - zapas "wlasnego" takze dla dworu 162m i zoldu zalog we
+  wlasnych osadach (D rodow z siedziba zawyzone ok. 10%) - osobna paczka po tescie A (rada tak); A5 Z8 - znana gorna granica (zwrot korony ciety o zawor).
+  Nastepny krok (po 23:20 UTC, nowe okno): scalenie porcji A na w-toku/zbior-e4-koniec -> w-toku/zbior-e5 + kod porcji B (B1-B6).
+- Tydzien 60% o 22:58 UTC - przy tym tempie ok. 85-90% o 10:00 UTC; etapy 7-8 prawdopodobnie poza zasiegiem.
