@@ -733,3 +733,12 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (07:45) **ZBIOR 31 SCALONY:** w-toku/zbior31 dfb12df (drzewo e4\z31 = e4-5 51af386 (z e4-4) + e4-jedzenie 4c54fe8), build kod 0, test\Armoury-z31.dll cf40fefa.
   TEST A (120 dob) w toku -> test\at-z31-A.out.txt; potem TEST B z plikiem armoury-proba-zimy.flag (polozyc, 120 dob, usunac - skrypt jak w zbiorze 30), zapis 9 dob ->
   WGRANIE 31. ROWNOLEGLE (bez testow, Jeff): E4/6 (drzewo e4\46, w-toku/e4-6 od dfb12df) i E4/7 (drzewo e4\47, w-toku/e4-7 od dfb12df, plan docs/etap4/PLAN-KODU-E47.md).
+- (09:00) **ZBIOR 31 TEST A OK:** 120/120 dob, bledy 9 = te same co w kazdym tescie (cudze + znane pierwsze-szanse przy starcie: WesterosClimate CreateDelegate,
+  NavalDLC "mobileParty" - sa w kazdym logu od 01:24), 0 nowych. Progi: etap2 NIE 2 (D staly zamkow 1697 = jak z30 1678 po kroku B; 2.14 kurier harness - zawsze),
+  etap3 20/20, etap4 NIE 6: T6 Straz/Wolni, T7 reszta +1048/d i jency 17% (okna E4/7/E4/8), pula wyrzutkow 1452/2138/2902 (ponizej bazy 3053, ale rosnie d90->d120
+  - obserwowac w biegu 364), "E4/4 przyrost WYLACZONY" = FALSZYWY ALARM narzedzia (lapie "glod WYLACZONY do E4/6"; przyrost czynny +570/d, +0.5%/rok) - poprawic
+  regex w sprawdz_logi.py przy E4/6. RESZTA hearth T2 naprawiona (z30 +677/d). Wojsko lordow d120 110.4 tys., zalogi 81.2 tys., bandy 12.7 tys. Kopia logow:
+  SCRATCH(ae222cb7)\kopia-z31-A. Teraz test B (zima, flaga) + zapis 9 dob w tle (b8gtpd7zz).
+- (09:00) **PLANY KODU E4/8 i E4/10 GOTOWE** (docs/etap4/PLAN-KODU-E48.md, PLAN-KODU-E410.md; sam plan, kod po E4/7). Pytania kierunku do Jeffa: E4/8 P1-P3
+  (straz karawan bez hamulca rak; miasta dopelniane ze wsi do udzialu; nowa druzyna: wolne rece -> zaloga siedziby -> mniejsza) - rada tak; E4/10: rekrut tier 1-2
+  zawsze do domu (prog VeteranMinTier 3, rada), zwolniony zabiera komplet ze zbrojowni - osobno po etapie 4.
