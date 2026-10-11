@@ -34,8 +34,8 @@ namespace Armoury
         /// <summary>Prawo czynne: klucz i ksiega pochodzenia po siewie (konto z udzialami pochodzenia).</summary>
         internal static bool On { get { return KeyOn && PeopleBook.OriginLive; } }
 
-        internal static bool Patched;
-        internal static string MissingNote;
+        internal static bool Patched, PreviewPatched;
+        internal static string MissingNote, PreviewMissing;
         internal static MethodBase Target;
         private static int _stumbles, _stumblesDay;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -89,8 +89,28 @@ namespace Armoury
                 { MissingNote = "BKRaidCaptureBehavior.ExecuteCapture (inne parametry)"; return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(ThrallLaw), nameof(CapturePrefix)) { priority = Priority.First });
                 Patched = true;
+                // recenzja E4/9 R2-3: opcja menu BK "Estimated captives: ~N" (PreviewCondition, z model.ProjectedCaptives) nie ma zwiazku z nasza regula - ukryta przy
+                // czynnym prawie; przelacznik "Captives: Take/Leave" zostaje. Wlasny try - brak latki podgladu nie rusza jencow z rabunku.
+                try
+                {
+                    var pc = AccessTools.Method(t, "PreviewCondition");
+                    if (pc == null || pc.ReturnType != typeof(bool)) PreviewMissing = "BKRaidCaptureBehavior.PreviewCondition";
+                    else
+                    {
+                        h.Patch(pc, postfix: new HarmonyMethod(typeof(ThrallLaw), nameof(PreviewPostfix)) { priority = Priority.Low });
+                        PreviewPatched = true;
+                    }
+                }
+                catch (Exception e) { PreviewMissing = "BKRaidCaptureBehavior.PreviewCondition (" + e.GetType().Name + ")"; Log.Error("ThrallLaw.ApplyAll(podglad)", e); }
             }
             catch (Exception e) { MissingNote = "BKRaidCaptureBehavior.ExecuteCapture (" + e.GetType().Name + ")"; Log.Error("ThrallLaw.ApplyAll", e); }
+        }
+
+        /// <summary>Postfiks na BK PreviewCondition (warunek opcji "Estimated captives"): przy czynnym prawie opcja ukryta - prognoza BK nie zgadza sie z pojmanymi E4/9.</summary>
+        public static void PreviewPostfix(ref bool __result)
+        {
+            try { if (__result && Patched && Devastation.CaptivesLive) __result = false; }
+            catch (Exception e) { Stumble("PreviewPostfix", e); }
         }
 
         /// <summary>BK RaidCapturePolicyManager.Get(clan).Mode == Leave (przelacznik gracza "Captives: Take/Leave"); blad odczytu - Take (domyslny BK).</summary>

@@ -88,7 +88,8 @@ namespace Armoury
                     if (ThrallLaw.On)
                     {
                         if (v.THeld >= 1.0) sb.Append("Slaves held in this land: ").Append(N(v.THeld)).Append(v.Realm == "sturgia" ? " (they work the fields, so more free men can go reaving)" : "").Append('\n');
-                        if (v.T >= 1.0) sb.Append("Taken from this land into slavery: ").Append(N(v.T)).Append('\n');
+                        // recenzja E4/9 R1-3: od siewu (TSince = zywi + zmarli - stan dnia siewu) - bilans otwarcia NK (komorka wysp, pochodzenie = wyspy) nie jest "zabrany"
+                        if (v.TSince >= 1.0) sb.Append("Taken from this land into slavery since the reckoning began: ").Append(N(v.TSince)).Append('\n');
                     }
                     sb.Append("Fallen since the reckoning began: ").Append(N(v.Fallen)).Append('\n');
                     if (v.Enslaved + v.ToWall >= 1.0) sb.Append("Sold into slavery or sent to the Wall since the reckoning began: ").Append(N(v.Enslaved + v.ToWall)).Append('\n');

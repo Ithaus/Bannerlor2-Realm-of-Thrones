@@ -553,6 +553,7 @@ def etap4_main(logp, start_arg, until=120):
     inn = e4_series(lines, "Wzrost Innych (169c): dzien")
     e42 = e4_series(lines, "Inni z poleglych (E4/2): dzien")       # E4/2: wighty z odbitych (poza oknem W8), milicja przejetej osady
     wyr = e4_series(lines, "Wyrzutki: dzien", 1)
+    pwl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien", 1)     # recenzja E4/9 R1-4: odplyw puli do Strazy (T7)
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
     bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
@@ -741,6 +742,9 @@ def etap4_main(logp, start_arg, until=120):
             "H3 domy (BK, wies, szablon, wighty)": L(d, r"domy: do domu BK (\d+)", h3) + L(d, r"do wsi \(tabory\) (\d+) ludzi", h3) + L(d, r"do wsi \(prosci i bandyci\) (\d+) ludzi", h3)
                                                    + L(d, r"hearth, z szablonu (\d+) \(garnizony", h3) + L(d, r"nigdy do BK ani wsi\): rozbici (\d+)", h3) + L(d, r"nigdy do BK ani wsi\): rozbici \d+, inna droga (\d+)", h3),
             "pula do hearth i z szablonu": L(d, r"\| powrot do wsi " + F_, wyr) + L(d, r"powrot z puli:.*?z szablonu " + F_, wyr) + L(d, r"powrot z puli:.*?wighty do niczego " + F_, wyr),
+            # recenzja E4/9 R1-4: brat Strazy z puli (WatchLaw.Levy krok 2, OutlawLaw._pWatch) - wchodzi do zrodel jako rekrut (zwerbowani, zalogi/milicja z modelu,
+            # nowe partie), a stan sie nie zmienia (partia +1, pula -1); bez tego odplywu kazdy taki brat daje reszcie T7 -1
+            "pula do Strazy (E4/9)": L(d, r"do Strazy \(E4/9\) " + F_, pwl),
             # E4/10: w linii I1 po "znikneli N" stoi teraz ", do karczmy (E4/10)" - wzorzec przyjmuje oba uklady (stary log bez E4/10 tez)
             "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
                                                           + L(d, r"krainy z niewola: niewolnikow (\d+)", i1),
@@ -2356,7 +2360,7 @@ def etap4_e49(rep, lines, start, win, until):
     wo = sum(fnum(r"inne regiony " + F_ + r" \| zwolnieni", wl[d]) or 0 for d in live)
     rep.add("E4/9 K9: dezerterzy i rozbici Strazy do lasu - pula Polnocy / inne", f"{wn:.1f} / {wo:.1f}", "100% Polnoc (inne 0)", (wo <= 0.05) if wn + wo > 0 else None)
     # K10 pula i bandy - INFO; "do Strazy" z linii puli
-    pl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien")
+    pl = e4_series(lines, "Pula wyrzutkow (E4/3): dzien", 1)     # dzien gry (jak "Wyrzutki") - shift 1
     tw = [fnum(r"do Strazy \(E4/9\) " + F_, pl[d]) or 0 for d in sorted(pl) if 1 <= run_day(d, start) <= until]
     wy = e4_series(lines, "Wyrzutki: dzien", 1)
     wyd = [d for d in sorted(wy) if 1 <= run_day(d, start) <= until]

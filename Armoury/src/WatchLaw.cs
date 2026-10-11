@@ -172,13 +172,15 @@ namespace Armoury
         /// <summary>
         /// n ludzi do sluzby Strazy: Mur -> pule wyrzutkow Westeros (budzet doby) -> ludnosc Westeros -> reszta "" (bez pokrycia). Udzialy wedlug zrodla; suma = n.
         /// Wolajacy dopisuje je do rosteru (GiveLevy / ReconcileWatch). Nie rzuca; wyjatek w kroku - reszta idzie dalej (bez pokrycia), potkniecie z nazwa miejsca.
+        /// Karawana (KCaravan) bez kroku Mur (recenzja E4/9 R1-2): roster karawany nie ma znacznika sluzby dozywotniej (PeopleBook.WatchServes), wiec brat z Muru po
+        /// rozbiciu karawany szedlby do domu z hearth - karawana bierze od pul Westeros.
         /// </summary>
         internal static Levied Levy(double n, int kanal)
         {
             var res = new Levied { Wall = new PeopleBook.Shares(), Pool = new PeopleBook.Shares(), People = new PeopleBook.Shares(), None = new PeopleBook.Shares() };
             if (!(n > Eps) || double.IsInfinity(n) || double.IsNaN(n)) return res;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            try { res.Wall = PeopleBook.WallTake(n); } catch (Exception e) { Stumble("Levy(Mur)", e); res.Wall = new PeopleBook.Shares(); }
+            if (kanal != KCaravan) { try { res.Wall = PeopleBook.WallTake(n); } catch (Exception e) { Stumble("Levy(Mur)", e); res.Wall = new PeopleBook.Shares(); } }
             double rest = n - res.Wall.Total;
             if (rest > Eps && OutlawLaw.On) { try { FromPools(rest, res.Pool); } catch (Exception e) { Stumble("Levy(pule)", e); } }
             rest = n - res.Wall.Total - res.Pool.Total;
@@ -386,8 +388,10 @@ namespace Armoury
             var miss = new List<string>();
             if (!_h1Patched) miss.Add(_h1Missing ?? "CampaignEventDispatcher.AiHourlyTick");
             if (!ThrallLaw.Patched) miss.Add(ThrallLaw.MissingNote ?? "BKRaidCaptureBehavior.ExecuteCapture");
+            else if (!ThrallLaw.PreviewPatched) miss.Add(ThrallLaw.PreviewMissing ?? "BKRaidCaptureBehavior.PreviewCondition");
             var sb = new StringBuilder(1400);
             sb.Append("Krainy kanonu (E4/9): wpiete: jency z rabunku BK (BKRaidCaptureBehavior.ExecuteCapture - prefiks bool First) ").Append(ThrallLaw.Patched ? "TAK" : "BRAK")
+              .Append(", podglad BK \"Estimated captives\" ukryty (BKRaidCaptureBehavior.PreviewCondition - postfiks Low) ").Append(ThrallLaw.PreviewPatched ? "TAK" : "BRAK")
               .Append(", Straz nie pali wsi (CampaignEventDispatcher.AiHourlyTick - postfiks Low) ").Append(_h1Patched ? "TAK" : "BRAK")
               .Append("; BRAK: ").Append(miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-")
               .Append("; wlasciciele latek celow: ExecuteCapture: ").Append(Owners(ThrallLaw.Target)).Append("; AiHourlyTick: ").Append(Owners(_h1Target))

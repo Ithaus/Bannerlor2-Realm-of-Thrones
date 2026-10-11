@@ -604,10 +604,18 @@ namespace Armoury
         internal static int TakenByOthers { get { lock (Gate) return _taken[POthers]; } }
 
         // ============================================================ W11: jency z rabunku BK
+        // Recenzja E4/9 (R1-1 = R2-1): prefiks W11 i ThrallLaw.CapturePrefix maja Priority.First, a W11 jest wpiety wczesniej (nizszy indeks) - Harmony 2.4.2 uruchamia
+        // go PIERWSZEGO, wiec migawka lochu bylaby sprzed naszych pojmanych i finalizer policzylby ich drugi raz jako "z rabunku BK". Przy czynnym prawie (nasz prefiks
+        // zawsze zwraca false - BK nie dopisuje nikogo) okno nie liczy nic; pojmanych liczy tylko odcinek "pojmani z wsi (E4/9)". Kolejnosci NIE odwracac: prefiks void
+        // z parametrem typu referencyjnego po false jest pomijany (MethodCreatorTools.AffectsOriginal), __state zostalby 0 i finalizer wzialby caly loch najezdzcy.
         public static void BkCapPre(MobileParty __0, out int __state)
         {
             __state = -1;
-            try { if (On && __0 != null && __0.PrisonRoster != null) __state = __0.PrisonRoster.TotalRegulars; }
+            try
+            {
+                if (ThrallLaw.Patched && Devastation.CaptivesLive) return;
+                if (On && __0 != null && __0.PrisonRoster != null) __state = __0.PrisonRoster.TotalRegulars;
+            }
             catch (Exception e) { __state = -1; Stumble("BkCapPre", e); }
         }
 
@@ -1026,8 +1034,8 @@ namespace Armoury
             return sb.ToString();
         }
 
-        /// <summary>E4/9 (W11): pojmani z wsi (ThrallLaw.CapturePrefix - z konta UCHODZCY do lochu najezdzcy) od ostatniej linii; nasz prefiks First biegnie przed oknem W11,
-        /// wiec "z rabunku BK" (z niczego) jest 0 przy czynnym prawie. Liczniki Devastation czytane przed jej DayLine (zeruje).</summary>
+        /// <summary>E4/9 (W11): pojmani z wsi (ThrallLaw.CapturePrefix - z konta UCHODZCY do lochu najezdzcy) od ostatniej linii; przy czynnym prawie okno W11 nie liczy
+        /// (BkCapPre - recenzja E4/9 R1-1/R2-1: prefiks W11 biegnie PRZED naszym), wiec "z rabunku BK" (z niczego) jest 0. Liczniki Devastation czytane przed jej DayLine (zeruje).</summary>
         private static string CapturedSegment()
         {
             try

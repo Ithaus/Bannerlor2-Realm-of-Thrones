@@ -73,7 +73,7 @@ namespace Armoury
             // milicja
             public long mUp, m1v, m1t, m1c, m1k, m1h, m1o, m2; public double m1, mFrac;
             public long r1, r2, r3; public readonly HashSet<string> r1Reg = new HashSet<string>(); public readonly Dictionary<string, int> r1Realm = new Dictionary<string, int>();
-            public long hAll; public double h1, h2, h3; public double j;
+            public long hAll; public double h1, h2, h3, h4; public double j;     // h4 - E4/9 (recenzja R2-4): milicja osady Strazy na Mur
             public long mTickUp, mTickDown;      // tylko okno ticku (N7 - porownanie z "milicja (E4/0): z modelu w ticku")
             // nowe druzyny
             public int p, p1, p2, p3; public long n, nOff; public double a1, aFrac; public long a2, a3h, a3g, a3f, a4;
@@ -85,7 +85,7 @@ namespace Armoury
             public int w, wCargo; public double n1w, n1e, n3; public long s;
             public int b1N, b2N, b3N, b4N, b5N; public double b1, b2, b3, b4, b5, bNone, bOther; public double sEnd;
             // rozwiazane bez bitwy (R6)
-            public int q, qRemoved; public double qHere, qOther, qNone; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
+            public int q, qRemoved; public double qHere, qOther, qNone, qWall; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
             public long ticks;
         }
         private static Day D = new Day();
@@ -512,7 +512,7 @@ namespace Armoury
                     day.hAll += n; if (src == SrcTick) day.mTickDown += n;
                     var sh = PeopleBook.Take(mp != null ? mp.MemberRoster : null, n, PeopleBook.FMilitiaHome);
                     var a = PeopleBook.ArriveAt(s, sh, PeopleBook.AService, PeopleBook.MBackMilitia, PeopleBook.MBackMilitiaNone, false);
-                    day.h1 += a.Here; day.h2 += a.Other; day.h3 += a.None;
+                    day.h1 += a.Here; day.h2 += a.Other; day.h3 += a.None; day.h4 += a.Wall;
                 }
             }
             catch (Exception e) { Stumble("MilitiaDelta", e); }
@@ -905,7 +905,7 @@ namespace Armoury
         internal static void NoteDisbandHome(int kind, PeopleBook.Arrive a, bool removed)
         {
             var d = D;
-            d.q++; d.qHere += a.Here; d.qOther += a.Other; d.qNone += a.None;
+            d.q++; d.qHere += a.Here; d.qOther += a.Other; d.qNone += a.None; d.qWall += a.Wall;
             if (removed) d.qRemoved++;
             int v; d.qKind.TryGetValue(kind, out v); d.qKind[kind] = v + 1;
         }
@@ -1069,7 +1069,7 @@ namespace Armoury
               .Append(", obrona oblezenia ").Append(d.m1o).Append(") + Straz \"\" ").Append(d.m2)
               .Append("; odmowione -").Append(refused).Append(" (bez wolnych rak ").Append(d.r1).Append(" w ").Append(d.r1Reg.Count).Append(" regionach [krainy: ").Append(realms)
               .Append("], osady Innych ").Append(d.r2).Append(", podloga ").Append(d.r3).Append(")")
-              .Append("; ubytek bez walki do domu -").Append(d.hAll).Append(" (do tej osady ").Append(F1(d.h1)).Append(", inne regiony ").Append(F1(d.h2)).Append(", bez pochodzenia ").Append(F1(d.h3)).Append(")")
+              .Append("; ubytek bez walki do domu -").Append(d.hAll).Append(" (do tej osady ").Append(F1(d.h1)).Append(", inne regiony ").Append(F1(d.h2)).Append(", bez pochodzenia ").Append(F1(d.h3)).Append(", na Mur (E4/9) ").Append(F1(d.h4)).Append(")")
               .Append("; z rozwiazanych partii we wsi +").Append(F1(d.j))
               .Append("; tick netto (po korekcie) ").Append(d.mTickUp - d.mTickDown >= 0 ? "+" : "").Append(d.mTickUp - d.mTickDown);
             // nowe druzyny
@@ -1096,7 +1096,7 @@ namespace Armoury
             // R6
             string qk = d.qKind.Count > 0 ? string.Join(", ", d.qKind.OrderByDescending(kv => kv.Value).Select(kv => KindName(kv.Key) + " " + kv.Value).ToArray()) : "-";
             sb.Append(" | ROZWIAZANE BEZ BITWY (R6): partii ").Append(d.q).Append(" [").Append(qk).Append("; w tym usuniete bez zniszczenia - np. konwoje DTE ").Append(d.qRemoved).Append("], do domu ").Append(F1(d.qHere + d.qOther)).Append(" (inne regiony ").Append(F1(d.qOther))
-              .Append("), bez pochodzenia ").Append(F1(d.qNone));
+              .Append("), bez pochodzenia ").Append(F1(d.qNone)).Append(", na Mur (E4/9) ").Append(F1(d.qWall));
             // kontrola kodu: ruch DOM przyczynami E4/8 w ksiedze (PeopleBook.ArmsDayMen) = to, co linia zdjela
             var bm = PeopleBook.ArmsDayMen;
             double bookOut = bm[PeopleBook.MLevyMilitia] + bm[PeopleBook.MLevySpawn] + bm[PeopleBook.MCaravanOut] + bm[PeopleBook.MCaravanRefill] + bm[PeopleBook.MRoadOut];
