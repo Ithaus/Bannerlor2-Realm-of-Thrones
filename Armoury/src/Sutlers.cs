@@ -18,7 +18,7 @@ namespace Armoury
     /// sakiewki 22.5 mln = ok. 29 dni zoldu (L:31726, L:31673), przybywa ok. 100-190 tys./d. Regula (OB :171): kazdego dnia ludzie partii rodow (takze
     /// gracza - jedna regula) POZA osada wydaja u markietanow SutlerDailyShare (10%) wolnej sakiewki - po tych samych rezerwach co OnLeft: zalegle naprawy
     /// (AiWear / TroopSelfMend.OutstandingCost bez szacunku materialu - jak zaopatrzenie BK D11-4), odziez czekajaca na zakup (150, ArmyClothing.PendingCost),
-    /// oszczednosci K1 juz odlozone (MenPurse - nowe odklada sie dalej tylko przy wyjezdzie z miasta). Rozdzial (MenPurse.CampSpend zdejmuje, tu odbiorcy):
+    /// oszczednosci K1 juz odlozone (MenPurse - nowe odklada sie dalej tylko przy wyjezdzie z miasta). Rozdzial (MenPurse.CampPlan liczy, CampTake zdejmuje, tu odbiorcy):
     /// SutlerTownShare (85%) - kasa najblizszego miasta niebedacego w wojnie z partia (zamek nie: podzamcze dostanie swoje od B1), reszta - kiesa
     /// najblizszej takiej wsi w stanie Normal (nie rabowanej, nie spladrowanej). Brak takiego miasta - najblizsze miasto w ogole (licznik); brak takiej wsi -
     /// czesc wsi do tego samego miasta (licznik). Te same liczniki co OnLeft: "wlasne" D stalego (ClanIncomeBook.NoteOwnPaid), K3 zwrotu korony we wlasnym
@@ -27,7 +27,7 @@ namespace Armoury
     /// Rozruch (flaga zapisu arm_sutlers): przy pierwszej dobie z wlaczona paczka - gdy sakiewki partii rodow maja wiecej niz 15 dni ich zoldu (stary
     /// zapis Jeffa, zapis testowy z doby 362), stawka rosnie od 1% do SutlerDailyShare w SutlerRampDays (28) dob; inaczej (nowa kampania) od razu pelna.
     /// Bez rozruchu pierwsza doba zabralaby ok. 2 mln naraz, a pierwszy tydzien ok. 10-15 mln (projekt rozdz. 3 E5/A3).
-    /// Hak B1 (KL 1.3: uslugi 75% kupcy / 25% lud) - czesc miejska idzie dzis cala do kasy miasta; B1 dzieli ja w tym samym miejscu (Pay).
+    /// Hak B1 (KL 1.3: uslugi 75% kupcy / 25% lud) - czesc miejska idzie dzis cala do kasy miasta; B1 dzieli ja w tym samym miejscu (One, przy wplacie do kasy miasta).
     /// Zloto nie powstaje i nie znika: sakiewka ludzi -> kasa miasta / kiesa wsi (posiadacze "Pieniadz swiata"). Wyjatek per partia - licznik potkniec.
     /// </summary>
     internal static class Sutlers
@@ -112,8 +112,9 @@ namespace Armoury
                 if (main != null) parties.Add(main);   // gracz - jedna regula (tez wtedy, gdy gra nie liczy jego partii do AllLordParties)
                 foreach (var mp in parties)
                 {
-                    try { int pu = Math.Max(0, MenPurse.Get(mp)); _dLordPurse += pu; _dLordSaved += Math.Min(pu, Math.Max(0, MenPurse.SavedFor(mp))); }
-                    catch { }
+                    // oszczednosci K1 wedlug tej samej reguly co markietani (MenPurse.KeptFor - limit OnLeft od zoldu TERAZ; recenzja E5/A3 1-1), tylko do linii
+                    try { int pu = Math.Max(0, MenPurse.Get(mp)); _dLordPurse += pu; if (s.LogEnabled && pu > 0) _dLordSaved += Math.Min(pu, Math.Max(0, MenPurse.KeptFor(mp))); }
+                    catch (Exception e) { Stumble("Daily.Read", e); }
                 }
                 _dLordWage = SoldierPay.LastLordAcc;   // zold partii rodow naliczony tej doby (SoldierPay.Daily biegnie przed nami w bloku)
                 if (_dLordWage <= 0) foreach (var mp in parties) { try { if (mp.IsActive) _dLordWage += Math.Max(0, mp.TotalWage); } catch { } }
@@ -179,7 +180,9 @@ namespace Armoury
             return Math.Min(full, RampFrom + (full - RampFrom) * k / rd);
         }
 
-        /// <summary>Jedna partia: warunki, zdjecie z sakiewki (MenPurse.CampSpend - rezerwy jak OnLeft), odbiorcy i liczniki.</summary>
+        /// <summary>Jedna partia: warunki, kwota (MenPurse.CampPlan - rezerwy jak OnLeft), odbiorcy, zdjecie z sakiewki (CampTake), przelew i liczniki.
+        /// Recenzja E5/A3 2-2: odbiorcy (miasto, wies) wyznaczeni PRZED zdjeciem, a od zdjecia do obu wplat nie biegnie nic, co moze rzucic - wyjatek
+        /// (potkniecie) nie gubi zlota, ktore juz zeszlo z sakiewki.</summary>
         private static void One(MobileParty mp, float rate, float townShare)
         {
             if (!mp.IsActive || mp.IsDisbanding) { _dInactive++; return; }
@@ -194,30 +197,35 @@ namespace Armoury
             if (town == null) { town = NearestTown(p, null); noTown = town != null; }
             if (town == null || town.Town == null) { _dEmpty++; return; }   // swiat bez miast - nic nie schodzi
             int reserve, kept;
-            int x = MenPurse.CampSpend(mp, rate, out reserve, out kept);
+            int want = MenPurse.CampPlan(mp, rate, out reserve, out kept);
             _dParties++; _dReserve += reserve; _dKept += kept;
+            if (want <= 0) return;
+            bool wantVill = (int)(want * (double)(1f - townShare)) > 0;
+            var vill = wantVill ? NearestVillage(p, f) : null;              // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie)
+            if (vill != null && vill.SettlementComponent == null) vill = null;
+            // ---- od zdjecia do obu wplat tylko arytmetyka i ChangeGold
+            int x = MenPurse.CampTake(mp, want);
             if (x <= 0) return;
             int villPart = (int)(x * (double)(1f - townShare));
-            var vill = villPart > 0 ? NearestVillage(p, f) : null;          // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie)
-            if (vill == null || vill.SettlementComponent == null)
-            {
-                if (villPart > 0) { _dNoVill++; _dNoVillGold += villPart; }
-                vill = null; villPart = 0;
-            }
+            if (vill == null) villPart = 0;
             int townPart = x - villPart;
-            Pay(mp, town, vill, townPart, villPart);
+            if (townPart > 0) town.Town.ChangeGold(townPart);
+            if (villPart > 0) vill.SettlementComponent.ChangeGold(villPart);   // kiesa wsi (posiadacz "Pieniadz swiata")
+            // ---- liczniki (zloto juz na miejscu)
             _dTaken += x; _dPaidN++;
+            if (wantVill && vill == null) { int vp = (int)(x * (double)(1f - townShare)); if (vp > 0) { _dNoVill++; _dNoVillGold += vp; } }
             if (noTown) { _dNoTown++; _dNoTownGold += x; }
             if (mp.IsMainParty) _dPlayer += x;
+            Pay(mp, town, vill, townPart, villPart);
         }
 
-        /// <summary>Przelew sakiewka -> kasa miasta / kiesa wsi (zloto juz zdjete z sakiewki w CampSpend) i te same liczniki co MenPurse.OnLeft.
-        /// Hak B1: tu B1 podzieli czesc miejska 75% kupcy / 25% lud (TownFolk.Earn).</summary>
+        /// <summary>Liczniki przelewu sakiewka -> kasa miasta / kiesa wsi (zloto juz zdjete z sakiewki w CampTake i wplacone w One) - te same co MenPurse.OnLeft.
+        /// Hak B1: B1 podzieli czesc miejska 75% kupcy / 25% lud (TownFolk.Earn) przy wplacie w One - tu liczniki od tego, co trafilo do kasy.</summary>
         private static void Pay(MobileParty mp, Settlement town, Settlement vill, int townPart, int villPart)
         {
             if (townPart > 0)
             {
-                town.Town.ChangeGold(townPart);
+                _dTown += townPart; _towns.Add(town);
                 var clan = mp.ActualClan;
                 ClanIncomeBook.NoteOwnPaid(town, clan, townPart);                  // 169c: "wlasne" D stalego - wydatki ludzi rodu w jego miescie (tylko licznik)
                 if (clan != null && ReferenceEquals(town.OwnerClan, clan))
@@ -226,11 +234,9 @@ namespace Armoury
                     _dOwnK3 += townPart;
                 }
                 SoldierPay.Hold(town, townPart);                                   // tarcza zoldu (gdy wlaczona, A1 wylaczone) - jak "zycie" przy wyjezdzie
-                _dTown += townPart; _towns.Add(town);
             }
             if (villPart > 0)
             {
-                vill.SettlementComponent.ChangeGold(villPart);                     // kiesa wsi (posiadacz "Pieniadz swiata")
                 _dVill += villPart; _vills.Add(vill);
             }
         }

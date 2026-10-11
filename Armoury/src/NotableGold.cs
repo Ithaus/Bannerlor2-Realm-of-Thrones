@@ -299,7 +299,14 @@ namespace Armoury
                 {
                     for (int i = _carDepth - 1; i >= 0; i--) if (ReferenceEquals(_car[i], c)) { for (int j = i; j < _carDepth - 1; j++) _car[j] = _car[j + 1]; _car[--_carDepth] = null; _strays++; break; }
                 }
-                if (!c.Seen && created != null && !c.Opening) _carNoModel++;   // latka modelu niewpieta - kapital z niczego jak dotad (prog 0)
+                if (!c.Seen && created != null)
+                {
+                    // recenzja E5/A3 1-2: latka modelu (CapPostfix) wpina sie w OnSessionLaunched (Seal31.EnsureHooks), a gra tworzy karawany startowe wczesniej
+                    // (OnNewGameCreated -> CaravansCampaignBehavior.cs:342-350) - w swiezym procesie bilans otwarcia liczy sie tu: kapital = kiesa karawany
+                    // zaraz po utworzeniu (przed startem gry wejscie do miasta nie handluje - CaravansCampaignBehavior.cs:694). Gdy latka juz jest, Seen = true.
+                    if (c.Opening) { _openCarN++; _openCarGold += Math.Max(0, created.PartyTradeGold); }
+                    else _carNoModel++;                                         // latka modelu niewpieta - kapital z niczego jak dotad (prog 0)
+                }
             }
             catch (Exception e) { Stumble("CarClose", e); }
         }

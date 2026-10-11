@@ -27,7 +27,7 @@ namespace Armoury
     /// K1 (Jeff 09.10, docs/paczki/K1-dozbrajanie.md): przy wyjezdzie czesc odkladaja na lepszy sprzet (A3, limit dni zoldu); w miescie
     /// nadwyzki -> naprawy -> braki -> lepsze (MenUpgrade); nadwyzki i braki liczone po DOPASOWANIU (skill), nie po liczbie sztuk;
     /// zalogi maja wlasna sakiewke (czesc zoldu - SoldierPay) w tym samym slowniku i tym samym zapisie "arm_menpurse".
-    /// E5/A3 (163, markietani): w POLU ludzie partii rodow wydaja co dobe czesc wolnej sakiewki (CampSpend - te same rezerwy co OnLeft; odbiorcy w Sutlers).
+    /// E5/A3 (163, markietani): w POLU ludzie partii rodow wydaja co dobe czesc wolnej sakiewki (CampPlan/CampTake - te same rezerwy co OnLeft; odbiorcy w Sutlers).
     /// </summary>
     internal static class MenPurse
     {
@@ -42,7 +42,7 @@ namespace Armoury
         private static long _dayWage;          // zold wplacony do sakiewek (SoldierPay)
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
-        private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampSpend; odbiorcy w Sutlers)
+        private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampTake; odbiorcy w Sutlers)
 
         internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; }
 
@@ -84,8 +84,17 @@ namespace Armoury
         }
 
         private static int SavedOf(MobileParty mp) { int v; var k = Key(mp); return k != null && _saved.TryGetValue(k, out v) ? v : 0; }
-        /// <summary>E5/A3 (163): oszczednosci K1 partii - tylko odczyt (linia markietanow: ile sakiewek to odlozone na lepszy sprzet).</summary>
-        internal static int SavedFor(MobileParty mp) { return SavedOf(mp); }
+        /// <summary>E5/A3 (163): oszczednosci K1, ktore markietani chronia dzis w sakiewce partii - ta sama regula co CampPlan (limit OnLeft: MenGearSaveDays
+        /// x zold TERAZ minus zalegle naprawy). Tylko odczyt (linia markietanow: "w tym oszczednosci K1"). Bez wlasnego catch - wyjatek liczy Sutlers.</summary>
+        internal static int KeptFor(MobileParty mp)
+        {
+            if (mp == null) return 0;
+            int purse = Get(mp);
+            if (purse <= 0) return 0;
+            long res; int kept;
+            CampReserve(mp, purse, out res, out kept);
+            return kept;
+        }
         private static void SetSaved(MobileParty mp, int v) { var k = Key(mp); if (k == null) return; if (v > 0) _saved[k] = v; else _saved.Remove(k); }
 
         private static string Key(MobileParty mp) { return mp != null ? mp.StringId : null; }
@@ -319,25 +328,50 @@ namespace Armoury
         /// <summary>
         /// E5/A3 (paczka 163, R9) - markietani: doba partii w POLU. Ta sama kolejnosc rezerw co OnLeft - zalegle naprawy (robocizna, bez szacunku materialu:
         /// poza miastem nie ma polki - jak zaopatrzenie BK D11-4), odziez czekajaca na zakup (150) i oszczednosci K1 juz odlozone zostaja w sakiewce;
-        /// z reszty ludzie wydaja `rate` (nowe oszczednosci odkladaja dalej tylko przy wyjezdzie z miasta). Zdejmuje z sakiewki i zwraca kwote - odbiorcow
-        /// (kasa miasta, kiesa wsi) i liczniki daje Sutlers. Bez wlasnego catch - wyjatek liczy Sutlers (potkniecie na partie).
+        /// z reszty ludzie wydaja `rate` (nowe oszczednosci odkladaja dalej tylko przy wyjezdzie z miasta). Tylko liczy kwote - zdejmuje CampTake, odbiorcow
+        /// (kasa miasta, kiesa wsi) i liczniki daje Sutlers (recenzja E5/A3 2-2: odbiorcy wyznaczeni PRZED zdjeciem, zeby wyjatek nie gubil zlota).
+        /// Bez wlasnego catch - wyjatek liczy Sutlers (potkniecie na partie).
         /// </summary>
-        internal static int CampSpend(MobileParty mp, float rate, out int reserve, out int kept)
+        internal static int CampPlan(MobileParty mp, float rate, out int reserve, out int kept)
         {
             reserve = 0; kept = 0;
             if (!On || mp == null || rate <= 0f) return 0;
-            Day();
             int purse = Get(mp);
             if (purse <= 0) return 0;
-            long res = (long)Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null)) + Math.Max(0, ArmyClothing.PendingCost(mp));
+            long res;
+            CampReserve(mp, purse, out res, out kept);
             reserve = (int)Math.Min(int.MaxValue, res);
             int avail = (int)Math.Max(0L, purse - res);
-            if (MenUpgrade.On) kept = Math.Min(SavedOf(mp), avail);
-            int spend = (int)((avail - kept) * (double)Math.Min(1f, rate));
-            if (spend <= 0) return 0;
-            int t = Take(mp, spend);
+            return Math.Max(0, (int)((avail - kept) * (double)Math.Min(1f, rate)));
+        }
+
+        /// <summary>E5/A3: zdjecie kwoty z CampPlan z sakiewki (licznik linii "Sakiewka ludzi"); zwraca zdjete.</summary>
+        internal static int CampTake(MobileParty mp, int n)
+        {
+            if (!On || mp == null || n <= 0) return 0;
+            Day();
+            int t = Take(mp, n);
             _dayCamp += t;
             return t;
+        }
+
+        /// <summary>
+        /// E5/A3: rezerwy markietanow. res = zalegle naprawy (robocizna) + odziez czekajaca na zakup; kept = oszczednosci K1 chronione TAK JAK w OnLeft
+        /// (recenzja E5/A3 1-1): nie wiecej niz sakiewka po rezerwach i niz limit MenGearSaveDays x zold partii TERAZ minus zalegle naprawy. Etykieta _saved
+        /// zostaje (przycina ja OnLeft przy wyjezdzie) - po stratach w polu (mniejszy zold) albo przy rosnacych naprawach markietani nie chronia nadwyzki
+        /// ponad limit. Odziez nie zmniejsza limitu - w OnLeft kupowana jest przed odlozeniem, a limit liczy sie od samej rezerwy napraw.
+        /// </summary>
+        private static void CampReserve(MobileParty mp, int purse, out long res, out int kept)
+        {
+            long mend = Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null));
+            res = mend + Math.Max(0, ArmyClothing.PendingCost(mp));
+            kept = 0;
+            var s = Settings.Current;
+            if (!MenUpgrade.On || s == null) return;
+            int avail = (int)Math.Max(0L, purse - res);
+            long cap = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, Wage(mp));
+            int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - mend));
+            kept = Math.Min(Math.Min(SavedOf(mp), avail), room);
         }
 
         // ------------------------------------------------------------ gracz: nadwyzki na targ
