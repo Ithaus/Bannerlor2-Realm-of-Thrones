@@ -1029,6 +1029,7 @@ namespace Armoury
               .Append(", bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued - _rescueFallen))
               .Append(" | z rabunku BK +").Append(_bkRaidPris).Append(" w ").Append(_bkRaidN).Append(" rabunkach (z niczego; gracz ").Append(_bkRaidPlayer).Append(')')
               .Append(CapturedSegment())
+              .Append(PeopleBook.EscapeSegment())       // poprawki E4 po tescie koncowym (fixA, P2-T4-lochy): ucieczki ponad limit lochu partii (jout rownania jencow)
               .Append(" | wypuszczeni, sprzedani, na Mur, straceni - linia \"Prawo jenca (I1)\"; uwolnieni bez odbiorcy w bitwach H3 - linia \"Przegrani (H3)\"; jency rozwiazanych partii - linia \"Partie (E4/0)\"");
             sb.Append(" | czas ").Append(Ms(t0)).Append(" ms.");
             return sb.ToString();
