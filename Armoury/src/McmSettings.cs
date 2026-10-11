@@ -3960,6 +3960,22 @@ namespace Armoury
         [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
         public bool RebelPurseFromTown { get; set; } = true;
 
+        [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public bool ShipsToPort { get; set; } = false;
+
+        [SettingPropertyInteger("Ship Sale Ports Tried", 0, 12, "0", HintText = "how many nearest ports (first of the realm, then of realms at peace with the house) are asked for the full price of a lost or prize ship before the port with the most spare money pays what it can (0 counts as 1)")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public int ShipSalePortsTried { get; set; } = 3;
+
+        [SettingPropertyBool("Ship Trade Through Port", HintText = "Off until the war tax of stage 5 - see docs. Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public bool ShipTradeThroughPort { get; set; } = false;
+
+        [SettingPropertyBool("Ship Prizes To Port", HintText = "Off until the war tax of stage 5 - see docs. After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public bool ShipPrizesToPort { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4949,6 +4965,10 @@ namespace Armoury
             s.BkKnightKitPaidToTown = BkKnightKitPaidToTown;
             s.RotSwapNoGold = RotSwapNoGold;
             s.RebelPurseFromTown = RebelPurseFromTown;
+            s.ShipsToPort = ShipsToPort;
+            s.ShipSalePortsTried = ShipSalePortsTried;
+            s.ShipTradeThroughPort = ShipTradeThroughPort;
+            s.ShipPrizesToPort = ShipPrizesToPort;
         }
 
         internal static void Apply()

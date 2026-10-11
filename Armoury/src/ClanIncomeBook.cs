@@ -41,6 +41,7 @@ namespace Armoury
             public long TodayContract;                                 // 185: kontrakt najemnika od korony (w Today; czesc "kontrakt" D stalego, nie jednorazowe)
             public long TodayRent;                                     // 180: renta korony (w Today; czesc "korona" D stalego, nie jednorazowe)
             public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
+            public long TodayShips;                                    // 3.1/3.3 (33) 181: wyplaty portow za statki (czesc TodayEvtSettl) - poza limitem KW (E2 R16 "limit bez statkow")
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -145,6 +146,7 @@ namespace Armoury
                 if (!On || c == null || c.StringId == null || !_book.TryGetValue(c.StringId, out r)) return false;
                 all = Math.Max(0L, r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent - r.TodayEstates);
                 real = Math.Max(0L, Math.Min(all, r.TodayEvtSettl + r.TodayEvtOther + r.TodayThird + r.TodayRansom));
+                real = Math.Max(0L, real - r.TodayShips);   // 3.1/3.3 (33) 181: statki sprzedane portom (E3/10-E3/12) nie wchodza do limitu KW - jak dotad, gdy szly z niczego
                 return true;
             }
             catch { return false; }
@@ -165,6 +167,7 @@ namespace Armoury
                 if (gNone) { r.TodayEvtNone += a; DayEvtNone += a; if (estate) { r.TodayEstates += a; DayEstates += a; } }   // 169c: majatek BK (podwojne)
                 else if (gh == null && gp != null && gp.IsSettlement) { r.TodayEvtSettl += a; DayEvtSettl += a; }
                 else { r.TodayEvtOther += a; DayEvtOther += a; }
+                if (ShipsToPort181.InPortPay && gh == null && gp != null && gp.IsSettlement) r.TodayShips += a;   // 3.1/3.3 (33) 181: wyplata portu za statek (licznik do OnceToday)
             }
             catch (Exception e) { Stumble("OnEvent", e); }
         }
@@ -344,6 +347,7 @@ namespace Armoury
                         if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
                         r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = r.TodayRent = 0;
                         r.TodayRansom = 0;   // 178
+                        r.TodayShips = 0;   // 3.1/3.3 (33) 181
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);

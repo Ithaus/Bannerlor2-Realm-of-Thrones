@@ -1169,6 +1169,7 @@ namespace Armoury
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercContract.EnsureHooks(); } catch (Exception e) { Log.Error("MercContract.EnsureHooks", e); }   // 185: kontrakt gry i "za tier" AI = 0 (latki modelu finansow - w kampanii)   // 166: limity partii i zalog, dezercja z limitu, nowe partie, werbunek Strazy (latki w kampanii)   // 165: splata dlugu wobec korony do skarbca (latka modelu finansow - w kampanii)   // 169c: okna pomiaru etapu 2 (okupy, zalogi, rycerze, dezercja, konsumpcja, Inni) - latki w kampanii, tylko log
             try { CouncilWages35.EnsureHooks(); } catch (Exception e) { Log.Error("CouncilWages35.EnsureHooks", e); }   // 3.5: rada BK - platnik i urzad radnego (latki BK w kampanii), liczniki od zera
+            try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
             try { CaravanAmmo.SessionStart(); } catch (Exception e) { Log.Error("CaravanAmmo.SessionStart", e); }   // paczka 172b: kategorie amunicji i stan latek (linia startowa)
@@ -1518,6 +1519,7 @@ namespace Armoury
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
             try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); }
+            try { ShipsToPort181.Daily(); } catch (Exception e) { Log.Error("ShipsToPort181.Daily", e); }   // 3.1/3.3 (33) 181: linia "Statki (181)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
             try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
             try { CouncilWages35.Daily(); } catch (Exception e) { Log.Error("CouncilWages35.Daily", e); }   // 3.5: linia "Rada (3.5)" i zerowanie licznikow - PO ksiedze pieniadza (to samo okno rozliczen rodow)
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); }   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
