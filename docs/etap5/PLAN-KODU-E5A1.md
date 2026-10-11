@@ -459,8 +459,9 @@ Okno: doby kampanii 2-120 (doba 1 = przyciecie i pierwsze ticki); "sr28" = ostat
      (A1 :836); `GarrisonArmory.cs` :79 (A1 :336). Tekstowo bez konfliktu poza `McmSettings.cs`/`gen_mcm.py` (zawsze `python tools/gen_mcm.py` po scaleniu).
    - E4/10 (`SCR\e4\410`): `OutlawLaw.cs` hunki :601-1237 (A1 :1936), `Settings.cs` :745, `SubModuleMain.cs` :145 - bez konfliktu.
    - E4/11 (`w-toku/e4-11`): `ArmouryBehavior.cs` :395, :439-441, :1155, :1446 (A1: :418 nowy try, :1460 nowa linia - 14 linii od :1446, osobne hunki), `Settings.cs` :745.
-   - E5/0 (`SCR\e5\0`): jesli nawias konsumpcji E5/0 siedzi w `CastlePurse.ShelfPostfix/ConsumePostfix` - te same dwie metody co A1 (scalac recznie; A1 dopisuje
-     jedna linie na poczatku try, niezaleznie od flag E5/0); `MoneyLedger.Obieg.cs` - A1: :86-101, :275-342, :569-572, E5/0: linia "Gotowka wsi" i :654 (A1 :654 nie rusza);
+   - E5/0 (`SCR\e5\0`, plan `docs\etap5\PLAN-KODU-E50.md`): nie dodaje pozycji MoneyLedger (jego rozdz. 0) i ma wlasny postfiks konsumpcji (nie w `CastlePurse`);
+     wspolne pliki: `MoneyLedger.cs` (E5/0 :245-260, :303, :391, :1017; A1 :89-99, :514-522, :758, :774, :801 - rozne hunki), `MoneyLedger.Obieg.cs` (E5/0 :190, :565
+     "Obieg" dopisek, :654; A1 :86-101, :275-342, :569-572 - **:565 i :569-572 w jednym hunku linii "Obieg" - scalac recznie**; A1 :654 nie rusza);
      `tools/sprawdz_logi.py` - dyspozytor `etap5` (rozdz. 9.1); `Settings.cs` - grupa "The townsfolk's purse" E5/0 i "The town's purse" A1 - obie zostaja.
    - A2-A5 (`SCR\e5\a25`): MoneyLedger od M17 (rozdz. 8.4); A2 `ClanBudget.cs:623` (`HoldCourt` no-op przy A1); A3 `CaravanCapital.cs`, markietani do kas miast i do K3;
      A4 `KingdomTreasury.Levies`/`RulingIncomePostfix` (A1 zmienia :391, :528 i dopisuje `NoteTake` przy :399, :422, :431, :485, :513, :529; A4 dopisuje oblezone -
