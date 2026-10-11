@@ -69,6 +69,7 @@ namespace Armoury
                     if (v.Carts > 0) sb.Append("On the roads with the village carts and boats: ").Append(N(v.Carts)).Append('\n');
                     if (v.U > 0 || Devastation.On) sb.Append("Refugees: ").Append(N(v.U)).Append('\n');
                     sb.Append("Fallen since the reckoning began: ").Append(N(v.Fallen)).Append('\n');
+                    if (v.Enslaved + v.ToWall >= 1.0) sb.Append("Sold into slavery or sent to the Wall since the reckoning began: ").Append(N(v.Enslaved + v.ToWall)).Append('\n');
                     if (Math.Abs(v.Born) >= 1.0) sb.Append(v.Born >= 0 ? "Born since the reckoning began (net): " : "Lost to hard years since the reckoning began (net): ").Append(N(Math.Abs(v.Born))).Append('\n');
                     if (v.Civil >= 1.0) sb.Append("Common folk who died of war and want: ").Append(N(v.Civil)).Append('\n');
                     var c = FreeHands.Of(region);
@@ -76,7 +77,9 @@ namespace Armoury
                     else if (c != null)
                     {
                         sb.Append("Free hands used: ").Append(P(c.A)).Append(" of ").Append(c.F >= 0.999 ? "all" : P(c.F)).Append(" of the men");
-                        if (FreeHands.HarvestNow && c.F < 0.999) sb.Append(" (harvest: the share is halved)");
+                        // recenzja E4/7 R2-4: rzeczywisty czynnik okna zniw z MCM (Free Hands Harvest Factor), nie stale "halved"
+                        if (FreeHands.HarvestNow && c.F < 0.999 && Settings.Current != null)
+                            sb.Append(" (harvest: only ").Append(P(Math.Max(0.0, Math.Min(1.0, Settings.Current.FreeHandsHarvestFactor)))).Append(" of the usual share is free)");
                         sb.Append('\n');
                         if (c.Brake && Settings.Current != null && Settings.Current.FreeHandsBrake) sb.Append("No new levies: this land has no free hands left.\n");
                     }

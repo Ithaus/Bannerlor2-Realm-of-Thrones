@@ -112,6 +112,9 @@ namespace Armoury
                 if (CrownGifts.IsWatchParty(party) || (st.Culture != null && st.Culture.StringId == "nightswatch")) { GiveNone(roster, __1, FNoneWatch); return; }
                 if (!LevyLive) { GiveNone(roster, __1, FNoneOff); return; }
                 int cause = player ? FLevyPlayer : st.IsVillage ? FLevyVillage : st.IsCastle ? FLevyCastle : (__3 == null ? FTavernAi : FLevyTown);
+                // recenzja E4/7 R1-3: najemnik z karczmy (BK bez notabla) w krainie bez wolnych rak - obcy (gra odnawia najemnikow z niczego), nie z DOM tej krainy;
+                // hamulec u notabla (Levy) dziala tylko na puste miejsce - bez tego karczma dalej brala ludzi krainy z hamulcem (decyzja Jeffa 11.10)
+                if (cause == FTavernAi && FreeHands.Braked(st)) { GiveNone(roster, __1, FNoneBrake); return; }
                 Settlement region;
                 double got = TakeLevy(st, __1, MLevyVillage, out region);
                 if (got > Eps) GiveNew(roster, region, got, cause);
@@ -207,6 +210,7 @@ namespace Armoury
                 Settlement town = main.CurrentSettlement;
                 try { if (town == null && PlayerEncounter.EncounterSettlement != null) town = PlayerEncounter.EncounterSettlement; } catch { }
                 if (!LevyLive || town == null) { GiveNone(main.MemberRoster, gain, FNoneOff); return; }
+                if (FreeHands.Braked(town)) { GiveNone(main.MemberRoster, gain, FNoneBrake); return; }      // R1-3: kraina z hamulcem - najemnik obcy
                 Settlement region;
                 double got = TakeLevy(town, gain, MLevyVillage, out region);
                 if (got > Eps) GiveNew(main.MemberRoster, region, got, FTavernPlayer);
@@ -246,7 +250,22 @@ namespace Armoury
 
         // ================================================================ ekran druzyny gracza (4.2)
         public sealed class ScreenState { public TroopRoster LM, LP, RM, RP; public int LM0, LP0, RM0, RP0; public PartyBase L, R; }
+        private static FieldInfo _fScreenInit;
+        private static int _screenNoInit;
 
+        /// <summary>PartyScreenLogic._initialData - kopie rosterow z otwarcia ekranu (albo z ostatniego Done). Rostery ekranu sa ZYWE (komendy ekranu zmieniaja
+        /// partie od razu; Cancel cofa z _initialData), wiec stan "przed" jest tylko tam (wzor GarrisonArmory.ScreenDonePrefix).</summary>
+        private static PartyScreenData ScreenInit(PartyScreenLogic l)
+        {
+            try { return _fScreenInit != null && l != null ? _fScreenInit.GetValue(l) as PartyScreenData : null; } catch { return null; }
+        }
+
+        /// <summary>
+        /// Recenzja E4/7 R2-1: stan "przed" prawej strony (druzyna gracza) i zywej lewej (partia, zaloga, loch osady) z _initialData - w prefiksie DoneLogic
+        /// zywe rostery maja juz stan PO zmianach (delty wychodzily 0 i pochodzenie przenoszonych ginelo w uzgodnieniu). "Donate troops/prisoners" (lewa strona
+        /// to pusta kopia): zaloga i loch osady dostaja ludzi dopiero w procedurze zatwierdzenia (wewnatrz DoneLogic) - ich stan z chwili prefiksu jest stanem "przed".
+        /// Bez _initialData - bez okna (roznice bierze uzgodnienie, nazwane wedlug rodzaju).
+        /// </summary>
         public static void ScreenPre(PartyScreenLogic __instance, out ScreenState __state)
         {
             __state = null;
@@ -256,22 +275,30 @@ namespace Armoury
             {
                 var main = MobileParty.MainParty;
                 if (main == null || __instance.RightOwnerParty != PartyBase.MainParty) return;
+                var init = ScreenInit(__instance);
+                if (init == null || init.RightMemberRoster == null || init.RightPrisonerRoster == null) { _screenNoInit++; return; }
                 var left = __instance.LeftOwnerParty;
                 TroopRoster lm = null, lp = null;
-                if (left != null) { lm = left.MemberRoster; lp = left.PrisonRoster; }
+                int lm0 = 0, lp0 = 0;
+                if (left != null)
+                {
+                    lm = left.MemberRoster; lp = left.PrisonRoster;
+                    lm0 = Men(init.LeftMemberRoster); lp0 = Men(init.LeftPrisonerRoster);
+                }
                 else
                 {
-                    // "Donate troops" - lewa strona pusta, zaloga osady (wzor GarrisonArmory.ScreenDonePrefix)
+                    // "Donate troops" - lewa strona pusta, zaloga osady (wzor GarrisonArmory.ScreenDonePrefix); zaloga i loch zywe, ale zmieniane dopiero w zatwierdzeniu
                     var gsm = TaleWorlds.Core.Game.Current != null ? TaleWorlds.Core.Game.Current.GameStateManager : null;
                     var ps = gsm != null ? gsm.ActiveState as TaleWorlds.CampaignSystem.GameState.PartyState : null;
                     var cur = Settlement.CurrentSettlement;
                     if (ps != null && ps.IsDonating && cur != null && cur.Town != null && cur.Town.GarrisonParty != null) { lm = cur.Town.GarrisonParty.MemberRoster; left = cur.Town.GarrisonParty.Party; }
                     if (cur != null && cur.Party != null) lp = cur.Party.PrisonRoster;
+                    lm0 = Men(lm); lp0 = Men(lp);
                 }
                 __state = new ScreenState
                 {
                     L = left, R = PartyBase.MainParty, LM = lm, LP = lp, RM = main.MemberRoster, RP = main.PrisonRoster,
-                    LM0 = Men(lm), LP0 = Men(lp), RM0 = Men(main.MemberRoster), RP0 = Men(main.PrisonRoster)
+                    LM0 = lm0, LP0 = lp0, RM0 = Men(init.RightMemberRoster), RP0 = Men(init.RightPrisonerRoster)
                 };
             }
             catch (Exception e) { __state = null; OStumble("ScreenPre", e); }
@@ -287,6 +314,8 @@ namespace Armoury
                 var w = __state;
                 // delty po poprawce o wcielonych (loch -> sklad gracza, zdarzenie w DoneLogic) i wypuszczonych (PrisonerLaw.OnReleased)
                 int dLM = Men(w.LM) - w.LM0, dRM = Men(w.RM) - w.RM0 - rec, dLP = Men(w.LP) - w.LP0, dRP = Men(w.RP) - w.RP0 + rec + rel;
+                // R1-5: pobor wymuszony gracza - ekran lupu (lewa strona bez wlasciciela); wzieci z niego dostaja region wsi, reszta - niewzieci
+                if (_press != null) { int used = (int)Math.Round(PressTake(w.RM, w.LM == null ? dRM : 0)); dRM -= used; }
                 if (w.LM != null)
                 {
                     if (dLM > 0 && dRM < 0) Give(w.LM, Take(w.RM, Math.Min(dLM, -dRM), FScreen), FScreen);
@@ -623,6 +652,8 @@ namespace Armoury
             // przenosiny
             wire(AccessTools.Method(typeof(GarrisonTroopsCampaignBehavior), "LeaveTroopsToGarrison", new[] { typeof(MobileParty), typeof(Settlement), typeof(int), typeof(bool) }), "partia -> zaloga", P(nameof(GarPre)), P(nameof(LeavePost)), null);
             wire(AccessTools.Method(typeof(GarrisonTroopsCampaignBehavior), "TakeTroopsFromGarrison", new[] { typeof(MobileParty), typeof(Settlement), typeof(int), typeof(bool) }), "zaloga -> partia", P(nameof(GarPre)), P(nameof(TakePost)), null);
+            try { _fScreenInit = AccessTools.Field(typeof(PartyScreenLogic), "_initialData"); } catch { _fScreenInit = null; }
+            if (_fScreenInit == null) miss.Add("ekran druzyny: PartyScreenLogic._initialData (stan przed - bez okna, roznice w uzgodnieniu)");
             wire(AccessTools.Method(typeof(PartyScreenLogic), "DoneLogic", new[] { typeof(bool) }), "ekran druzyny", PP(nameof(ScreenPre), Priority.First), P(nameof(ScreenPost)), null);
             wire(AccessTools.Method(typeof(Helpers.PartyScreenHelper), "OpenScreenAsCreateClanPartyForHeroPartyScreenClosed"), "nowa partia rodu", P(nameof(NewPartyPre)), P(nameof(NewPartyPost)), null);
             wire(AccessTools.Method(typeof(DisbandPartyCampaignBehavior), "OnPartyDisbanded", new[] { typeof(MobileParty), typeof(Settlement) }), "rozwiazanie partii", P(nameof(DisbandPre)), P(nameof(DisbandPost)), null);

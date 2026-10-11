@@ -1139,7 +1139,34 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
         rep.add("E4/7 T13: wczytanie - nie znaleziono partii", ld[-1][:220], "0-2%", (pc <= 2.0) if pc is not None else None)
     else:
         rep.add("E4/7 T13: wczytanie", "brak linii wczytania (bieg bez zapisu)", "0-2% nie znalezionych", None)
-    rep.add("E4/7 T13: rozmiar zapisu arm_people (ostatni)", sv[-1][37:200] if sv else "brak zapisu w biegu", "INFO (SaveText w kawalkach)", None)
+    # recenzja E4/7 R2-3: przyciecie kluczy slownikow - rozmiar nie rosnie z dlugoscia kampanii (plan ok. 150 KB; najwyzej 16 regionow na slownik)
+    szs = [num(r"sekcje E4/7 (\d+) znakow", x, int) for x in sv]
+    szs = [x for x in szs if x is not None]
+    rep.add("E4/7 T13: rozmiar zapisu arm_people - sekcje E4/7 (pierwszy -> ostatni zapis)", f"{szs[0]} -> {szs[-1]} znakow ({len(szs)} zapisow)" if szs else "brak zapisu w biegu",
+            "<= 800 000 znakow (przyciecie kluczy R2-3; SaveText w kawalkach po 8000)", (szs[-1] <= 800000) if szs else None)
+    # ---------------- poprawki po recenzji E4/7 (R1-1, R1-3, R1-5, R2-1, R2-3)
+    tl = [fnum(r"\(w tym ze stanu miast " + F_ + r"\)", kb[d]) or 0 for d in pdays if d in kb]
+    tb = [fnum(r"\(w tym do stanu miast " + F_ + r"\)", kb[d]) or 0 for d in pdays if d in kb]
+    al = [fnum(r"\| pobor z DOM dzis " + F_ + r" ludzi", kb[d]) or 0 for d in pdays if d in kb]
+    ab = [fnum(r", powroty z pochodzeniem \+" + F_ + r" ludzi", kb[d]) or 0 for d in pdays if d in kb]
+    if tl:
+        rt = sum(tb) / sum(tl) if sum(tl) else 0.0
+        ra = sum(ab) / sum(al) if sum(al) else 0.0
+        rep.add("E4/7 R1-1: stan miast - pobor ze stanu miast / powroty do stanu miast (suma okna)", f"{sum(tl):.0f} / {sum(tb):.0f} (powrot {100 * rt:.0f}% wobec calego poboru: {100 * ra:.0f}%)",
+                "powroty > 0 przy poborze > 0 (pobor z miasta nie jednokierunkowy); udzial INFO", (sum(tb) > 0) if sum(tl) > 0 else None)
+    fk = [num(r"przyciecie kluczy \(ponizej [\d.]+ czlowieka albo spoza \d+ najwiekszych\): (\d+) kluczy", poc[d], int, 0) or 0 for d in pdays]
+    fm = [fnum(r"najwiekszych\): \d+ kluczy, " + F_ + r" ludzi", poc[d]) or 0 for d in pdays]
+    rep.add("E4/7 R2-3: przyciecie kluczy slownikow (srednio na dobe)", f"{st.mean(fk):.0f} kluczy, {st.mean(fm):.1f} ludzi do glownego regionu slownika" if fk else "-",
+            "INFO (suma bez zmian; rownanie krain odejmuje Drift - T3)", None)
+    nb = [fnum(r"najemnik z karczmy przy hamulcu \(obcy\) " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("E4/7 R1-3: najemnicy z karczmy w krainach z hamulcem (obcy, bez zdjecia z DOM)", f"{sum(nb):.0f} (srednio {st.mean(nb):.1f}/d)" if nb else "-", "INFO", None)
+    pw = [l for d in pdays for l in [poc[d]] if "pobor wymuszony gracza: zdjeci z DOM" in l]
+    if pw:
+        pin = sum(fnum(r"pobor wymuszony gracza: zdjeci z DOM " + F_, l) or 0 for l in pw)
+        plo = sum(fnum(r"niewzieci \(poza rosterem\) " + F_, l) or 0 for l in pw)
+        rep.add("E4/7 R1-5: pobor wymuszony gracza - zdjeci z DOM / niewzieci z ekranu lupu", f"{pin:.0f} / {plo:.0f}", "INFO (proba reczna gracza)", None)
+    sn = [num(r"ekran druzyny bez stanu przed \(_initialData\) (\d+)", poc[d], int, 0) or 0 for d in pdays]
+    rep.add("E4/7 R2-1: ekran druzyny bez stanu przed (_initialData)", sum(sn), "0", sum(sn) == 0)
     rep.add("E4/7 T14: menu \"People of this land\"", "proba reczna Jeffa (wies, miasto, zamek)", "INFO - liczby = linia dzienna regionu", None)
     rep.add("E4/7 T15: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
 

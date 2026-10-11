@@ -34,10 +34,10 @@ namespace Armoury
         private static MethodInfo _getPopData;
         private static PropertyInfo _landData, _excess, _available, _military, _manpower;
         private static readonly Dictionary<Settlement, KeyValuePair<int, float>> _cache = new Dictionary<Settlement, KeyValuePair<int, float>>();
-        private static int _dayStamp = -1, _calls;
+        private static int _dayStamp = -1, _calls, _braked;
         private static float _sumW;
 
-        internal static void Reset() { _cache.Clear(); _popMgr = null; _dayStamp = -1; _calls = 0; _sumW = 0f; }
+        internal static void Reset() { _cache.Clear(); _popMgr = null; _dayStamp = -1; _calls = 0; _braked = 0; _sumW = 0f; }
 
         private static bool Resolve()
         {
@@ -116,20 +116,23 @@ namespace Armoury
         {
             try
             {
-                if (!On || __2 == null) return;
+                if (__2 == null) return;
                 // Jeff 04.10: "zaciag tez daje wyzszy tier" - ta sama szansa gry steruje zapelnieniem PUSTEGO miejsca i
                 // awansem ochotnika, ktory juz stoi. Chec do sluzby (nadwyzka rak + nedza) dotyczy tylko pustego miejsca;
                 // awans zostaje przy szansie BK i mocy notabla, a sprzet do niego notabl musi kupic (VolunteerKit).
                 try { var vt = __0 != null ? __0.VolunteerTypes : null; if (vt != null && __1 >= 0 && __1 < vt.Length && vt[__1] != null) return; } catch { }
-                // E4/7 hamulec (Jeff 11.10): kraina bez wolnych rak nie wystawia nowego wojska do odrobienia strat - puste miejsce sie nie wypelnia (stojacy ochotnicy zostaja)
+                // E4/7 hamulec (Jeff 11.10): kraina bez wolnych rak nie wystawia nowego wojska do odrobienia strat - puste miejsce sie nie wypelnia (stojacy ochotnicy zostaja).
+                // Recenzja E4/7 R1-4: hamulec PRZED wylacznikiem checi (Levy Enabled) - ma wlasny klucz (Free Hands Brake); wylaczenie checi go nie gasi.
                 if (FreeHands.Braked(__2))
                 {
                     int day0 = (int)CampaignTime.Now.ToDays;
                     if (_dayStamp != day0) { Flush(); _dayStamp = day0; }
                     FreeHands.NoteRefused(__2);
+                    _braked++;
                     __result = 0f;
                     return;
                 }
+                if (!On) return;                                       // Levy Enabled wylacza tylko mnoznik checi
                 float w = Willingness(__2);
                 __result *= w;
                 _calls++; _sumW += w;
@@ -139,12 +142,15 @@ namespace Armoury
 
         private static void Flush()
         {
-            if (_dayStamp < 0 || _calls == 0) return;
+            if (_dayStamp < 0 || (_calls == 0 && _braked == 0)) return;
             string e47 = "";
             try { e47 = FreeHands.LevySegment(); } catch { }
-            Log.Info("Pobor: dzien " + _dayStamp + " - chec do sluzby srednio x" + (_sumW / _calls).ToString("0.00")
-                     + " szansy BK (" + _calls + " losowan miejsc u notabli; nadwyzka rak + nedza regionu)." + e47);
-            _calls = 0; _sumW = 0f;
+            // R1-4: przy wylaczonej checi (albo samych odmowach hamulca) linia zostaje - dopisek E4/7 z licznikami hamulca nie ginie
+            string head = _calls > 0
+                ? "chec do sluzby srednio x" + (_sumW / _calls).ToString("0.00") + " szansy BK (" + _calls + " losowan miejsc u notabli; nadwyzka rak + nedza regionu)."
+                : "chec do sluzby: " + (On ? "bez losowan" : "WYLACZONA (Levy Enabled)") + " (0 losowan miejsc u notabli; odmowione przez hamulec " + _braked + ").";
+            Log.Info("Pobor: dzien " + _dayStamp + " - " + head + e47);
+            _calls = 0; _braked = 0; _sumW = 0f;
         }
 
         internal static void ApplyAll(Harmony h)

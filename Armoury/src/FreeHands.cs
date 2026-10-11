@@ -13,7 +13,8 @@ namespace Armoury
     /// <summary>
     /// E4/7 (164b-1, PLAN 4.17 prog; plan kodu docs/etap4/PLAN-KODU-E47.md rozdz. 6): WOLNE RECE w mezczyznach (R5, U4, U19) - jedna definicja dla linii, hamulca
     /// poboru, plonu, menu osady i PeopleLedger. Na region (warownia OutlawLaw): a = (S + K_m) / (0.27 x L_ref), S = sluzba i jency z regionu (konta SLUZBA/JENCY ksiegi
-    /// pochodzenia, bez taborow i bez ""), K_m = max(0, polegli mezczyzni + 0.27 x zmarli cywile - 0.27 x narodziny netto) od siewu, L_ref = ludzie regionu w dniu siewu
+    /// pochodzenia, bez taborow i bez ""), K_m = max(0, polegli mezczyzni + w niewoli BK + na Murze + 0.27 x zmarli cywile - 0.27 x narodziny netto) od siewu
+    /// (niewola i Mur - recenzja E4/7 R1-2, do konta NIEWOLNI E4/9: jeniec z regionu wypadal z S i nie trafial do K_m), L_ref = ludzie regionu w dniu siewu
     /// (dom + sluzba + jency). Prog f wedlug krainy (kultura regionu z dnia kalibracji): zwykla 20% (FreeHandsShare), Zelazne Wyspy (sturgia) 20% + niewolni BK do +20%,
     /// Wolni Ludzie 100% (bez hamulca i bez spadku plonu), Dar Nocnej Strazy 20% tylko do plonu (Straz bierze rekruta z calego Westeros - bez hamulca); okno zniw
     /// (dni 196-252 roku 364-dniowego, lato albo jesien Westeros) - f x FreeHandsHarvestFactor.
@@ -31,7 +32,7 @@ namespace Armoury
         internal sealed class Cell
         {
             public string Id, Realm; public Settlement Node;
-            public double S, Km, A, F, L, Excess, LRef, Dom, DomRef, FallenMen, Civil, Born;
+            public double S, Km, A, F, L, Excess, LRef, Dom, DomRef, FallenMen, Civil, Born, Enslaved, ToWall;
             public bool Brake, BrakeLand, YieldOnly;
         }
 
@@ -136,12 +137,15 @@ namespace Armoury
             {
                 try
                 {
-                    var c = new Cell { Id = v.Id, Node = v.Node, Realm = v.Realm, S = v.S + v.J, LRef = v.LRef, Dom = v.Dom, DomRef = v.DomRef, FallenMen = v.FallenMen, Civil = v.Civil, Born = v.Born };
+                    var c = new Cell { Id = v.Id, Node = v.Node, Realm = v.Realm, S = v.S + v.J, LRef = v.LRef, Dom = v.Dom, DomRef = v.DomRef, FallenMen = v.FallenMen, Civil = v.Civil, Born = v.Born,
+                                       Enslaved = v.Enslaved, ToWall = v.ToWall };
                     bool brake, yieldOnly;
                     double f = FOf(v.Realm, out brake, out yieldOnly);
                     if (harvest && f < 0.999) f *= hf;
                     c.F = f; c.BrakeLand = brake; c.YieldOnly = yieldOnly;
-                    c.Km = Math.Max(0.0, v.FallenMen + PeopleBook.MenShare * v.Civil - PeopleBook.MenShare * v.Born);
+                    // recenzja E4/7 R1-2 (luka wzoru P R5 do E4/9): jency z regionu sprzedani w niewole BK i wyslani na Mur nie wroca do DOM - jak polegli (wszyscy jency to mezczyzni);
+                    // bez tego sprzedaz jencow krainy "oddawala" jej wolne rece i zdejmowala hamulec. E4/9 (konto NIEWOLNI w S) musi stad niewole zdjac.
+                    c.Km = Math.Max(0.0, v.FallenMen + v.Enslaved + v.ToWall + PeopleBook.MenShare * v.Civil - PeopleBook.MenShare * v.Born);
                     double men = PeopleBook.MenShare * v.LRef;
                     c.A = men > 0.0 ? (c.S + c.Km) / men : 0.0;
                     // plon (R9 b)
@@ -313,7 +317,8 @@ namespace Armoury
             {
                 var c = list[i];
                 sb.Append(i > 0 ? ";" : "").Append(' ').Append(Name(c.Node)).Append(" (").Append(c.Realm).Append(") a = (S + K_m) / (0.27 x L_ref) = ").Append((100 * c.A).ToString("0.00", ci))
-                  .Append("% [S ").Append(c.S.ToString("0", ci)).Append(", K_m = polegli ").Append(c.FallenMen.ToString("0", ci)).Append(" + 0.27 x cywile ").Append(c.Civil.ToString("0", ci))
+                  .Append("% [S ").Append(c.S.ToString("0", ci)).Append(", K_m = polegli ").Append(c.FallenMen.ToString("0", ci)).Append(" + niewola ").Append(c.Enslaved.ToString("0", ci))
+                  .Append(" + Mur ").Append(c.ToWall.ToString("0", ci)).Append(" + 0.27 x cywile ").Append(c.Civil.ToString("0", ci))
                   .Append(" - 0.27 x narodziny ").Append(c.Born.ToString("0", ci)).Append(" = ").Append(c.Km.ToString("0", ci)).Append(", L_ref ").Append(c.LRef.ToString("0", ci))
                   .Append("], prog ").Append((100 * c.F).ToString("0.#", ci)).Append("%").Append(c.YieldOnly ? " (tylko plon)" : (c.BrakeLand ? "" : " (bez hamulca)"))
                   .Append(", L ").Append(c.L.ToString("0.000", ci)).Append(c.Brake ? ", HAMULEC" : "");
