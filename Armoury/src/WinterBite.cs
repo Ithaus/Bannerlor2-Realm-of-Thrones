@@ -140,16 +140,19 @@ namespace Armoury
 
         /// <summary>Konsumpcja partii zima: +50% razy gradient polnocy razy czynnik krainy pod partia (E4/1); konie doplacaja pasze (E4/1,
         /// WinterRealm.HorseFeed - w bazie, wiec mnozniki zimy, perkow i Rations obejmuja ja jak ludzi). Pasze liczy WinterRealm sam (konni po
-        /// glowie, zwierzeta taboru, stawki BK) - niezaleznie od tego, ktory model jedzenia jest aktywny (u Jeffa RBL, nie BK).</summary>
-        public static void FoodPostfix(MobileParty party, ref ExplainedNumber __result)
+        /// glowie, zwierzeta taboru, stawki BK) - niezaleznie od tego, ktory model jedzenia jest aktywny (u Jeffa RBL, nie BK).
+        /// E4/6a (FoodChain): gdy RBL oddaje baze lancuchowi, ta metoda biegnie dwa razy - w najglebszym modelu (BK dziedziczy ja z Default)
+        /// i na zewnatrz (RBL, wynik juz z lancucha); zima liczy sie tylko w najglebszym, zewnetrzny poziom pomijamy (FoodChain.BaseFromChain).</summary>
+        public static void FoodPostfix(DefaultMobilePartyFoodConsumptionModel __instance, MobileParty party, ref ExplainedNumber __result)
         {
             try
             {
+                if (FoodChain.BaseFromChain(__instance)) return;
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return;
                 float realm = WinterRealm.OfParty(party);
-                int why, riders, herd; float need;
-                float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out riders, out herd);
+                int why, riders, herd; float need, bk;
+                float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out bk, out riders, out herd);   // na pustyni / w sniegu przy paszy BK - tylko roznica
                 if (horse > 0f) __result.Add(-horse, _txtHorses);
                 float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);
