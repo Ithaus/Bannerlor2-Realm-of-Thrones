@@ -205,7 +205,9 @@ namespace Armoury
                 if (v.VillageState != Village.VillageStates.Normal) { if (!__1) _notNormal++; return; }
                 var wood = Wood();
                 if (wood == null) return;
-                int n = MBRandom.RoundRandomized(PiecesPerDay(wood, v));
+                float hands = 1f;
+                try { hands = Devastation.YieldFactor(v); } catch { hands = 1f; }   // E4/5 (R9a): las wsi to tez praca rak - x udzial ludzi w domu (1 bez uchodzcow)
+                int n = MBRandom.RoundRandomized(PiecesPerDay(wood, v) * hands);
                 if (!__1) { int c = ClassOf(v); _clsVil[c]++; if (n > 0) _clsLoads[c] += n; }   // T8: licznik doby wedlug klasy klimatu (takze wies z 0 sztuk dzis)
                 if (n <= 0) return;
                 if (__1)

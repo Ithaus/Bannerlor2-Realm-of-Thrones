@@ -1019,7 +1019,7 @@ namespace Armoury
                 {
                     if (st == null || !st.IsVillage || st.Village == null) continue;
                     nv++;
-                    if (model != null) food += model.CalculateDailyFoodProductionAmount(st.Village);
+                    if (model != null) food += Devastation.FoodToday(model, st.Village);   // E4/5: wies spladrowana z ta sama podmiana stanu co w TickProductions (produkuje)
                     if (!winter) continue;
                     float cut = WinterBite.VillageCut(st.Village);
                     cutSum += cut;

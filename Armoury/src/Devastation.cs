@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -42,7 +44,7 @@ namespace Armoury
         private const int Top = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private static bool _raidPatched, _endPatched, _levelPatched, _foodPatched;   // latki wpiete (raz na proces)
+        private static bool _raidPatched, _endPatched, _levelPatched, _foodPatched, _lootedPatched;   // latki wpiete (raz na proces)
 
         /// <summary>Spustoszenie czynne: klucz, obie latki rabunku, jednostka ludzi (E4/3) i przyrost naturalny (E4/4).</summary>
         internal static bool On
@@ -52,6 +54,12 @@ namespace Armoury
                 var s = Settings.Current;
                 return s != null && s.DevastationEnabled && _raidPatched && _endPatched && PeopleUnit.On && PopulationLaw.GrowthOn;
             }
+        }
+
+        /// <summary>Wies spladrowana (Looted) produkuje jak Normal x udzial ludzi w domu (K5): spustoszenie czynne, latka TickProductions wpieta, klucz.</summary>
+        internal static bool LootedOn
+        {
+            get { var s = Settings.Current; return On && _lootedPatched && s != null && s.LootedProducesByPeople; }
         }
 
         /// <summary>E4/9 podmieni na klucz RaidCaptivesFromVillage; do tego czasu pojmani = 0 (U14 - BK dalej daje swoich jencow z niczego).</summary>
@@ -82,6 +90,9 @@ namespace Armoury
         private static int _dSteps, _dRaids, _dRaidsFull, _dRaidMen, _dResumed, _dForagers, _dNoK, _dMoveFail, _dForeign;
         private static int _stumbles, _stumblesAll;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        // K5: wies spladrowana produkuje (doba)
+        private static int _dLootedOn, _dLootedMade, _dLootedChanged;
+        private static long _dLootedPieces;
         // K3: powrot, smierc, wstrzymania (doba)
         private static double _dBack, _dDied, _dLinErr;
         private static int _dBackVillages, _dStopQuiet, _dStopSiege, _dNoClock, _dNoVillage, _dAbandonLeft;
@@ -106,6 +117,7 @@ namespace Armoury
             _dBack = _dDied = _dLinErr = 0.0;
             _dBackVillages = _dStopQuiet = _dStopSiege = _dNoClock = _dNoVillage = _dAbandonLeft = 0;
             _dBackRegions.Clear();
+            _dLootedOn = _dLootedMade = _dLootedChanged = 0; _dLootedPieces = 0;
             _stumbles = 0;
         }
 
@@ -487,6 +499,79 @@ namespace Armoury
             if (m != 1f) __result *= m;
         }
 
+        // ------------------------------------------------------------ wies spladrowana produkuje (K5; P :430, SP:459-460)
+        // Gra w TickProductions produkuje tylko dla !village.IsDeserted (IsDeserted = stan Looted - G VillageGoodProductionCampaignBehavior.cs:141, Village.cs:81),
+        // a model Default i tak daje 0 poza Normal. Na czas jednego wywolania TickProductions wies Looted ma stan Normal (POLE - setter rozsyla OnVillageBecomeNormal,
+        // tego nie chcemy; tylko watek glowny, przywracane w finalizerze takze przy wyjatku): bramka magazynu 1.5 W, BK TickGoodProduction -> modele (zima, BK,
+        // MaterialLaw z czynnikiem rak), TickFoodProduction -> zywnosc (zima, FoodPostfix), las wsi VillageWoodlot, ramki GoodsLedger - widza Normal.
+        // Po wyjsciu - Looted (postoj 8-17 dob i blokada ponownego rabunku bez zmian). Inne wywolania modelu (dymek, rozmiar taboru) dalej widza 0.
+        private static AccessTools.FieldRef<Village, Village.VillageStates> _stateRef;
+        private static int _mainThread = -1;    // ManagedThreadId z ApplyAll (menu glowne = watek glowny)
+
+        internal sealed class LootedTick { public Village V; public int Before; }
+
+        private static int Pieces(Village v)
+        {
+            var o = v != null ? v.Owner : null;
+            var r = o != null ? o.ItemRoster : null;
+            if (r == null) return 0;
+            int n = 0;
+            for (int i = 0; i < r.Count; i++) n += r[i].Amount;
+            return n;
+        }
+
+        private static bool SwapLooted(Village v)
+        {
+            return v != null && _stateRef != null && LootedOn && _stateRef(v) == Village.VillageStates.Looted
+                   && System.Threading.Thread.CurrentThread.ManagedThreadId == _mainThread && CoversQuiet(v);
+        }
+
+        /// <summary>Prefiks Priority.First na VillageGoodProductionCampaignBehavior.TickProductions(Settlement, bool): wies Looted -> Normal na czas wywolania.</summary>
+        public static void LootedPrefix(Settlement __0, bool __1, out LootedTick __state)
+        {
+            __state = null;
+            try
+            {
+                var v = __0 != null ? __0.Village : null;
+                if (__1 || !SwapLooted(v)) return;           // rozdanie startowe nowej kampanii - bez zmian
+                var t = new LootedTick { V = v, Before = Pieces(v) };
+                __state = t;
+                _stateRef(v) = Village.VillageStates.Normal;
+                _dLootedOn++;
+            }
+            catch (Exception e) { Stumble("Devastation.LootedPrefix", e); }
+        }
+
+        public static Exception LootedFinalizer(LootedTick __state, Exception __exception)
+        {
+            if (__state == null) return __exception;
+            try
+            {
+                if (_stateRef(__state.V) == Village.VillageStates.Normal) _stateRef(__state.V) = Village.VillageStates.Looted;
+                else _dLootedChanged++;                      // ktos zmienil stan w srodku (nie powinno sie zdarzyc) - zostawiamy jego zmiane
+                int d = Pieces(__state.V) - __state.Before;
+                if (d > 0) { _dLootedMade++; _dLootedPieces += d; }
+            }
+            catch (Exception e) { Stumble("Devastation.LootedFinalizer", e); }
+            return __exception;
+        }
+
+        /// <summary>Measure40 (linia "Zima (E4/0)", pomiar zywnosci wsi swiata): model gry z ta sama podmiana stanu dla wsi Looted, co w TickProductions (rozdz. 15 pkt 4).</summary>
+        internal static float FoodToday(VillageProductionCalculatorModel model, Village v)
+        {
+            if (model == null || v == null) return 0f;
+            bool swapped = false;
+            try
+            {
+                if (SwapLooted(v)) { _stateRef(v) = Village.VillageStates.Normal; swapped = true; }
+                return model.CalculateDailyFoodProductionAmount(v);
+            }
+            finally
+            {
+                if (swapped && _stateRef(v) == Village.VillageStates.Normal) _stateRef(v) = Village.VillageStates.Looted;
+            }
+        }
+
         // ------------------------------------------------------------ odczyty dla innych linii
         /// <summary>Okno W6 (linia "Hearth (E4/0)"): kroki rabunku gry pod spustoszeniem i lup z niczego od ostatniej linii doby (bez zerowania - zeruje DayLine).</summary>
         internal static void StepsToday(out int steps, out long lootAi, out long lootPlayer)
@@ -673,6 +758,20 @@ namespace Armoury
                 else _missing.Add("DefaultVillageProductionCalculatorModel.CalculateDailyFoodProductionAmount");
             }
             catch (Exception e) { _missing.Add("CalculateDailyFoodProductionAmount (" + e.GetType().Name + ")"); Log.Error("Devastation.ApplyAll(zywnosc)", e); }
+            try
+            {
+                _mainThread = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                var tp = AccessTools.Method(typeof(VillageGoodProductionCampaignBehavior), "TickProductions", new[] { typeof(Settlement), typeof(bool) });
+                if (tp != null)
+                {
+                    _stateRef = AccessTools.FieldRefAccess<Village, Village.VillageStates>("_villageState");
+                    h.Patch(tp, prefix: new HarmonyMethod(typeof(Devastation), nameof(LootedPrefix)) { priority = Priority.First },
+                                finalizer: new HarmonyMethod(typeof(Devastation), nameof(LootedFinalizer)));
+                    _lootedPatched = true; _wired.Add("produkcja wsi spladrowanej");
+                }
+                else _missing.Add("VillageGoodProductionCampaignBehavior.TickProductions");
+            }
+            catch (Exception e) { _stateRef = null; _missing.Add("TickProductions (" + e.GetType().Name + ")"); Log.Error("Devastation.ApplyAll(TickProductions)", e); }
             StartLine();
         }
 
