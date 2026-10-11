@@ -27,17 +27,25 @@ namespace Armoury
     /// zaloga - wsie jej twierdzy, partia - najblizsza wies rodu, potem krolestwa), reszte do puli jak dotad. Bez wsi z danymi BK - do puli (licznik).
     /// Tylko partie lordow (takze gracz - jedna regula) i zalogi; karawany jak dotad. Inni - do niczego (OutlawLaw, W4b). Sakiewki ludzi bez zmian
     /// (dezerterzy do puli tez nic nie biora; ReleaseFrom daje wsi czesc sakiewki - roznica do decyzji Jeffa). Zloto: zero.
+    /// E4/9 DLUG 4 (RK R13, D5; DebtorDisbandsHome): rod w zajeciu (DebtLadder.IsSeized) - KAZDY, kto odchodzi z braku pieniedzy (limit zoldu i zalegly zold zalogi
+    /// w tej metodzie gry, zalegly zold WarLedger - NoteAll), idzie do domu ta sama droga (przyczyna MDebt -> z pochodzeniem MBackDebt, DOM regionu pochodzenia),
+    /// nie do lasu ("D5 ma zastapic dezercje dla dluznikow, nie dzialac obok" RK:869). Bez nowego prawa zwalniania (jedna regula 166). Dezercja z morale - jak dotad.
     /// </summary>
     internal static class OverflowHome
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.OverflowGoesHome; } }
 
-        private sealed class Snap { public int Over; public List<KeyValuePair<CharacterObject, int>> Before; }
-        private sealed class Note { public readonly List<KeyValuePair<CharacterObject, int>> Stacks = new List<KeyValuePair<CharacterObject, int>>(); public int Men; }
+        private sealed class Snap { public int Over; public bool Debt; public List<KeyValuePair<CharacterObject, int>> Before; }
+        private sealed class Note { public readonly List<KeyValuePair<CharacterObject, int>> Stacks = new List<KeyValuePair<CharacterObject, int>>(); public int Men; public bool Debt, Arrears; }
         private static ConditionalWeakTable<TroopRoster, Note> _notes = new ConditionalWeakTable<TroopRoster, Note>();
 
         // liczniki doby - dopisek do linii "Wyrzutki:" (OutlawLaw.Daily)
         private static int _homeGar, _homePar, _homePlayer, _noVillage, _stumbles;
+        // E4/9 DLUG 4: dluznicy do domu - z limitu zoldu (model gry), z zaleglego zoldu (WarLedger), bez wsi z danymi BK (do lasu); migawka doby dla "Dlugi (168)"
+        private static int _debtLimit, _debtArrears, _debtNoVillage;
+        private static readonly HashSet<Clan> _debtClans = new HashSet<Clan>();
+        internal static int LastDebtLimit, LastDebtArrears, LastDebtNoVillage, LastDebtClans;
+        private static bool DebtOn { get { var s = Settings.Current; return s != null && s.DebtorDisbandsHome; } }
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         private static Harmony _harmony;
@@ -45,9 +53,14 @@ namespace Armoury
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
 
-        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); _err.Clear(); }
+        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); LastDebtLimit = LastDebtArrears = LastDebtNoVillage = LastDebtClans = 0; _err.Clear(); }
 
-        internal static void NewDay() { _homeGar = _homePar = _homePlayer = _noVillage = _stumbles = 0; }
+        internal static void NewDay()
+        {
+            LastDebtLimit = _debtLimit; LastDebtArrears = _debtArrears; LastDebtNoVillage = _debtNoVillage; LastDebtClans = _debtClans.Count;
+            _homeGar = _homePar = _homePlayer = _noVillage = _stumbles = 0;
+            _debtLimit = _debtArrears = _debtNoVillage = 0; _debtClans.Clear();
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -80,17 +93,21 @@ namespace Armoury
             __state = null;
             try
             {
-                if (!On || __0 == null || __1 == null || __0.Party == null) return;
+                if (__0 == null || __1 == null || __0.Party == null) return;
                 if (!(__0.IsLordParty || __0.IsGarrison) || Undead.Party(__0)) return;   // Inni nie maja domu (OutlawLaw W4b)
+                // E4/9 DLUG 4: rod w zajeciu - wszyscy dopisani w tej metodzie (limit zoldu, zalegly zold zalogi, przepelnienie) do domu, takze bez przepelnienia
+                bool debt = false;
+                try { debt = DebtOn && DebtLadder.IsSeized(__0.ActualClan); } catch { debt = false; }
+                if (!On && !debt) return;
                 int over = __0.Party.NumberOfAllMembers - __1.TotalManCount - __0.Party.PartySizeLimit;
-                if (over <= 0) return;
+                if (over <= 0 && !debt) return;
                 var before = new List<KeyValuePair<CharacterObject, int>>(__1.Count);
                 for (int i = 0; i < __1.Count; i++)
                 {
                     var e = __1.GetElementCopyAtIndex(i);
                     if (e.Character != null && e.Number > 0) before.Add(new KeyValuePair<CharacterObject, int>(e.Character, e.Number));
                 }
-                __state = new Snap { Over = Math.Max(1, (int)((float)over * 0.25f)), Before = before };
+                __state = new Snap { Over = debt ? int.MaxValue : Math.Max(1, (int)((float)over * 0.25f)), Debt = debt, Before = before };
             }
             catch (Exception e) { __state = null; Stumble("OverPre", e); }
         }
@@ -102,7 +119,7 @@ namespace Armoury
             if (snap == null || __1 == null) return;
             try
             {
-                var note = new Note();
+                var note = new Note { Debt = snap.Debt };
                 int left = snap.Over;
                 for (int i = 0; i < __1.Count && left > 0; i++)
                 {
@@ -122,6 +139,29 @@ namespace Armoury
             catch (Exception e) { Stumble("OverPost", e); }
         }
 
+        /// <summary>
+        /// E4/9 DLUG 4 (WarLedger, przed OutlawLaw.OnTroopsDeserted): rod w zajeciu - caly roster odchodzacych z zaleglego zoldu do domu (notatka na obiekcie rosteru,
+        /// jak przepelnienie). Rod bez zajecia albo klucz wylaczony - nic (do lasu jak dotad).
+        /// </summary>
+        internal static void NoteAll(MobileParty party, TroopRoster r)
+        {
+            try
+            {
+                if (party == null || r == null || !DebtOn || Undead.Party(party) || !(party.IsLordParty || party.IsGarrison) || !DebtLadder.IsSeized(party.ActualClan)) return;
+                var note = new Note { Debt = true, Arrears = true };
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var e = r.GetElementCopyAtIndex(i);
+                    if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
+                    note.Stacks.Add(new KeyValuePair<CharacterObject, int>(e.Character, e.Number));
+                    note.Men += e.Number;
+                }
+                _notes.Remove(r);
+                if (note.Men > 0) _notes.Add(r, note);
+            }
+            catch (Exception e) { Stumble("NoteAll", e); }
+        }
+
         /// <summary>Z OutlawLaw.OnTroopsDeserted: ludzie z przepelnienia TEGO rosteru do ludnosci BK wsi. Zwraca, ilu kazdego typu wies przyjela
         /// (null - nikt albo roster bez notatki: limit zoldu, zalegly zold, WarLedger, karawany, Inni). Wight nigdy do ludnosci BK (wybiera OutlawLaw).</summary>
         internal static Dictionary<CharacterObject, int> SendHome(MobileParty party, TroopRoster roster, PeopleBook.Shares org = null)
@@ -129,7 +169,10 @@ namespace Armoury
             Note note;
             if (roster == null || !_notes.TryGetValue(roster, out note)) return null;
             _notes.Remove(roster);
-            if (!On || party == null || note == null || note.Men <= 0) return null;
+            if (party == null || note == null || note.Men <= 0) return null;
+            if (!(On || (note.Debt && DebtOn))) return null;               // E4/9 DLUG 4: dluznik do domu takze przy wylaczonym W4c
+            int cause = note.Debt ? PeopleBook.MDebt : PeopleBook.MW4c;
+            if (note.Debt) { try { if (party.ActualClan != null) _debtClans.Add(party.ActualClan); } catch { } }
             Dictionary<CharacterObject, int> sent = null;
             try
             {
@@ -142,15 +185,20 @@ namespace Armoury
                     if (n <= 0) continue;
                     if (Undead.Character(ch)) continue;          // wight w partii ludzi (ROT occupation="Soldier") - nie do ludnosci BK, niezaleznie od W4b
                     PeopleBook.Shares cut = org != null ? org.Cut(n) : null;      // E4/7: udzial pochodzenia tych n (nieprzyjeci - z powrotem do org, do puli)
-                    bool ok = village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c, cut, party);     // E4/10 (W1): partia - uprawnienie weterana
+                    bool ok = village != null && ClanBudget.ToVillagePop(village, ch, n, cause, cut, party);     // E4/10 (W1): partia - uprawnienie weterana
                     if (!ok && cut != null) org.AddAll(cut);
                     if (ok)
                     {
                         if (sent == null) sent = new Dictionary<CharacterObject, int>();
                         int v; sent.TryGetValue(ch, out v); sent[ch] = v + n;
-                        if (party.IsGarrison) _homeGar += n; else _homePar += n;
-                        if (party.IsMainParty) _homePlayer += n;
+                        if (note.Debt) { if (note.Arrears) _debtArrears += n; else _debtLimit += n; }
+                        else
+                        {
+                            if (party.IsGarrison) _homeGar += n; else _homePar += n;
+                            if (party.IsMainParty) _homePlayer += n;
+                        }
                     }
+                    else if (note.Debt) _debtNoVillage += n;
                     else _noVillage += n;
                 }
             }
@@ -164,6 +212,7 @@ namespace Armoury
             return "przepelnienie - do domu " + (_homeGar + _homePar) + " (zalogi " + _homeGar + ", partie " + _homePar + (_homePlayer > 0 ? ", w tym gracz " + _homePlayer : "") + ")"
                    + ", bez wsi z danymi BK (jak dezerterzy) " + _noVillage
                    + (On ? "" : " [Overflow Goes Home wylaczone]") + (_hooked ? "" : " [okno nie wpiete]")
+                   + "; dluznicy do domu (E4/9 DLUG 4) " + (_debtLimit + _debtArrears) + " (bez wsi z danymi BK " + _debtNoVillage + ")"
                    + (_stumbles > 0 ? ", potkniecia " + _stumbles : "");
         }
     }

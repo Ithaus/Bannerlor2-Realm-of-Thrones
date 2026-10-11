@@ -22,7 +22,8 @@ namespace Armoury
     ///    DevastationPerForagerDay (0.2) na dobe postoju wrogiej armii; okregu nie da sie spustoszyc ponad DevastationMaxPercent (90%):
     ///    trafieni = (pulap - juz poza domem) x (1 - e^(-R x osobodni / pulap)), nie ponizej 11 hearth;
     ///  - trafieni NIE znikaja (zamknieta ksiega ludzi): zabici 2% (5% gdy najezdzca z kultury z niewola, nie wiecej niz 1 na zbrojnego na dobe), pojmani 10% przy
-    ///    niewoli - CZYNNI DOPIERO Z E4/9 (do tego czasu 0 - zostaja uchodzcami; BK daje swoich jencow z rabunku z niczego, U14), las (2 + 3 x niebezpieczenstwo)% do puli
+    ///    niewoli - E4/9: przy uderzeniu zostaja uchodzcami, przy koncu wygranego rabunku przechodza z konta UCHODZCY do lochu najezdzcy (ThrallLaw.CapturePrefix,
+    ///    TakeCaptives - plan CapWould); BK nie daje juz jencow z niczego (U14, U22), las (2 + 3 x niebezpieczenstwo)% do puli
     ///    wyrzutkow regionu, reszta UCHODZCY - konto wsi w ksiedze ludzi (PeopleBook "u:"). Jedyny ruch hearth - PeopleBook.Move (MDevRaid, MDevForage; U23);
     ///  - POWROT: nikt nie wraca, dopoki w regionie (warownia + jej wsie) byl rabunek albo zerowanie z trafionymi w ostatnich RefugeeReturnQuietDays (30) dobach (zegar
     ///    regionu PeopleBook "r:"); potem liniowo - wszyscy zywi w domu najpozniej RefugeeReturnDays (364 = rok Armoury) dob po ostatnim najezdzie; oblezona warownia
@@ -62,8 +63,9 @@ namespace Armoury
             get { var s = Settings.Current; return On && _lootedPatched && s != null && s.LootedProducesByPeople; }
         }
 
-        /// <summary>E4/9 podmieni na klucz RaidCaptivesFromVillage; do tego czasu pojmani = 0 (U14 - BK dalej daje swoich jencow z niczego).</summary>
-        internal static bool CaptivesLive { get { return false; } }
+        /// <summary>E4/9 (6.3): jency z rabunku z ludzi napadnietej wsi - spustoszenie czynne i klucz RaidCaptivesFromVillage (ThrallLaw.CapturePrefix, linie). Pojmani
+        /// przechodza z konta UCHODZCY do lochu najezdzcy przy koncu wygranego rabunku; przy uderzeniu (Strike) zostaja uchodzcami.</summary>
+        internal static bool CaptivesLive { get { var s = Settings.Current; return On && s != null && s.RaidCaptivesFromVillage; } }
 
         // ------------------------------------------------------------ rabunek w toku (bez zapisu)
         private sealed class RaidState
@@ -73,6 +75,7 @@ namespace Armoury
             public float Virt; public bool HasVirt;     // hearth, jaki wies mialaby w grze po dotychczasowych krokach rabunku
             public int Steps, MaxMen;
             public bool Slaver;                         // najezdzca z kultury z niewola (LosersFlee.SlaveCulture - ta sama regula co H3)
+            public bool CapTaken;                       // E4/9: pojmani tego rabunku juz wzieci (ThrallLaw.CapturePrefix - drugie wolanie BK = 0)
             public RaidEventComponent Comp;             // E4/11 (Z2, krytyka K2): klucz sesji ksiegi wiosek = ten sam obiekt, co MapEvent.Component widoku
         }
         private static readonly object _lock = new object();
@@ -97,6 +100,10 @@ namespace Armoury
         // K3: powrot, smierc, wstrzymania (doba)
         private static double _dBack, _dDied, _dLinErr;
         private static int _dBackVillages, _dStopQuiet, _dStopSiege, _dNoClock, _dNoVillage, _dAbandonLeft;
+        // E4/9 (6.2): jency z rabunku - rabunki z pojmanymi, pojmani, plan (10% trafionych przy niewoli), nie wzieci: gracz Leave, bez stanu rabunku, za malo uchodzcow,
+        // brak postaci; pojmani u najezdzcy bez niewoli (kontrola - 0); gracz
+        private static int _dCapRaids, _dCapCalls, _dCapNoState, _dCapNoChar, _dCapNotSlaver;
+        private static double _dCapJ, _dCapPlan, _dCapLeave, _dCapFew, _dCapPlayer;
         private static int _dStopHunger;                                    // E4/6: powrot wstrzymany - wies nie przyjmuje (Famine.ReturnGate: glod gospodarzy, a konto w innym regionie - takze pole nie karmi i spichlerz ponizej FamineReturnMinDays) albo czesc z glodu czeka na odzyskanie wsi
         private static readonly HashSet<string> _dBackRegions = new HashSet<string>();
         private static bool _abandonLogged;
@@ -125,6 +132,7 @@ namespace Armoury
             _dBack = _dDied = _dLinErr = 0.0;
             _dBackVillages = _dStopQuiet = _dStopSiege = _dNoClock = _dNoVillage = _dAbandonLeft = 0;
             _dStopHunger = 0;
+            _dCapRaids = _dCapCalls = _dCapNoState = _dCapNoChar = _dCapNotSlaver = 0; _dCapJ = _dCapPlan = _dCapLeave = _dCapFew = _dCapPlayer = 0.0;
             _dBackRegions.Clear();
             _dLootedOn = _dLootedMade = _dLootedChanged = _dLootedGate = 0; _dLootedPieces = 0;
             _stumbles = 0;
@@ -237,8 +245,10 @@ namespace Armoury
             if (hit > open) hit = open;
             if (!(hit > 0.0) || double.IsNaN(hit) || double.IsInfinity(hit)) return 0.0;
             double kill = Clamp01((slaver ? s.DevastationKilledSlaverPercent : s.DevastationKilledPercent) / 100.0);
-            double capW = slaver ? Clamp01(s.DevastationCaptivesPercent / 100.0) : 0.0;   // "byloby" - log, E4/9
-            double cap = CaptivesLive ? capW : 0.0;
+            double capW = slaver ? Clamp01(s.DevastationCaptivesPercent / 100.0) : 0.0;   // pojmani calego rabunku (R8) - E4/9: plan ThrallLaw.CapturePrefix
+            // E4/9 (6.3): pojmani przy uderzeniu zostaja uchodzcami - przechodza do lochu najezdzcy dopiero przy koncu WYGRANEGO rabunku (ThrallLaw.CapturePrefix,
+            // z konta UCHODZCY); bez stanu "w drodze" (nie gina przy zapisie w polowie rabunku), przegrany rabunek albo gracz "Leave" - zostaja uchodzcami
+            double cap = 0.0;
             double flee = 0.0;
             if (OutlawLaw.On)                                 // bez prawa wyrzutkow puli nikt nie prowadzi - zostaja uchodzcami
                 flee = Clamp01((Math.Max(0, s.DevastationOutlawBasePercent) + Math.Max(0, s.DevastationOutlawDangerPercent) * DangerOf(v)) / 100.0);
@@ -261,7 +271,7 @@ namespace Armoury
             // E4/11 (Z1, U24): trafieni na spalone osady wiosek pobocznych - po kontach, wlasny try (OnStrike nie rzuca); rabunek - klucz sesji, zerowanie - oboz armii
             try { VillageBook.OnStrike(v, hit * f, refugees * f, kind == KRaid, rs != null ? rs.Comp : null, src, lBefore); }
             catch (Exception e) { Stumble("Devastation.Strike(E4/11)", e); }
-            // pojmani (od E4/9): capt * f -> konto JENCY; w E4/5 capt == 0
+            // pojmani przy uderzeniu = 0 na stale (E4/9: z konta UCHODZCY przy koncu rabunku); CapWould - plan pojmanych calego rabunku
             double h = hit * f;
             if (rs != null) { rs.Hit += h; rs.Dead += dead * f; rs.CapWould += h * capW; }
             _dHit[kind] += h; _dDead += dead * f; _dFled += fled * f; _dAway += refugees * f; _dCapWould += h * capW;
@@ -448,6 +458,50 @@ namespace Armoury
         {
             if (r == null) return 0.0;
             lock (_lock) { RaidState rs; return _raids.TryGetValue(r, out rs) ? rs.Dead : 0.0; }
+        }
+
+        /// <summary>
+        /// E4/9 (6.2 pkt 2): stan rabunku wsi v (koniec rabunku - BK ExecuteCapture biegnie w OnBeforeFinalize, PRZED EndFinalizer, ktory usuwa stan) - plan pojmanych
+        /// calego rabunku (CapWould: 10% trafionych przy najezdzcy z niewola) i znacznik "wzieci" (drugie wolanie = 0). false - brak stanu (konsola BK, wies bez przelicznika).
+        /// </summary>
+        internal static bool TakeCaptives(Village v, out double planned, out bool slaver)
+        {
+            planned = 0.0; slaver = false;
+            if (v == null || v.Settlement == null) return false;
+            try
+            {
+                lock (_lock)
+                {
+                    foreach (var kv in _raids)
+                    {
+                        var comp = kv.Key; var rs = kv.Value;
+                        if (comp == null || rs == null || comp.MapEventSettlement != v.Settlement) continue;
+                        slaver = rs.Slaver;
+                        if (!rs.CapTaken) { rs.CapTaken = true; planned = rs.CapWould; }
+                        return true;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("Devastation.TakeCaptives", e); }
+            return false;
+        }
+
+        /// <summary>E4/9: liczniki jencow z rabunku (ThrallLaw.CapturePrefix) - linia "Ludzie (spustoszenie)" i odcinek "Jency (E4/0)" (Measure40 czyta przed DayLine).</summary>
+        internal static void NoteCapture(bool found, double plan, int taken, bool leave, bool noChar, int few, bool slaver, bool player)
+        {
+            _dCapCalls++;
+            if (!found) { _dCapNoState++; return; }
+            _dCapPlan += plan;
+            if (leave) _dCapLeave += plan;
+            if (noChar) _dCapNoChar++;
+            _dCapFew += few;
+            if (taken > 0) { _dCapRaids++; _dCapJ += taken; if (!slaver) _dCapNotSlaver++; if (player) _dCapPlayer += taken; }
+        }
+
+        /// <summary>E4/9: pojmani z wsi od ostatniej linii doby (bez zerowania - zeruje DayLine): rabunki z pojmanymi, pojmani, gracz.</summary>
+        internal static void CaptivesToday(out int raids, out double taken, out double player)
+        {
+            raids = _dCapRaids; taken = _dCapJ; player = _dCapPlayer;
         }
 
         /// <summary>Pojmani tego rabunku (E4/9: BK ExecuteCapture = dokladnie te osoby); w E4/5 zawsze 0.</summary>
@@ -868,7 +922,7 @@ namespace Armoury
                 foreach (var key in _spiral.Keys.ToList()) if (!spiralSeen.Contains(key)) _spiral.Remove(key);
                 var top = rows.Values.Where(r => r.Away > 0.0).OrderByDescending(r => r.Away / Math.Max(1.0, r.Home + r.Away)).Take(Top).ToList();
 
-                double cap = 0.0;      // pojmani: 0 do E4/9 (CaptivesLive)
+                double cap = 0.0;      // pojmani przy uderzeniu: 0 (E4/9 - pojmani z konta UCHODZCY przy koncu rabunku, odcinek "pojmani (E4/9)")
                 double check = hitAll - _dDead - cap - _dFled - _dAway;
                 var sb = new StringBuilder(3000);
                 sb.Append("Ludzie (spustoszenie): dzien ").Append(day).Append(" | CZYNNE");
@@ -884,6 +938,13 @@ namespace Armoury
                   .Append(" + las ").Append(F(_dFled, "0.##")).Append(" + uchodzcy ").Append(F(_dAway, "0.##")).Append(" (kontrola ").Append(Sg(check, "0.000")).Append(')')
                   .Append(" [najezdzcy z niewola: trafieni ").Append(F(_dSlaverHit, "0.#")).Append(", zabici ").Append(F(_dSlaverDead, "0.#")).Append(", pojmani byloby ").Append(F(_dCapWould, "0.#")).Append(']')
                   .Append(" w ").Append(_dVillages[KRaid].Count).Append(" wsiach rabunku i ").Append(_dVillages[KForage].Count).Append(" zerowania");
+                if (CaptivesLive)
+                    sb.Append(" | pojmani (E4/9): rabunkow wygranych z pojmanymi ").Append(_dCapRaids).Append(", z uchodzcow wsi do lochu najezdzcy +").Append(F(_dCapJ, "0"))
+                      .Append(" (wyliczone ").Append(Math.Max(0, Math.Min(100, s.DevastationCaptivesPercent))).Append("% trafionych przy niewoli ").Append(F(_dCapPlan, "0.#"))
+                      .Append("; nie wzieci - zostaja uchodzcami: gracz zostaw ").Append(F(_dCapLeave, "0.#")).Append(", bez stanu rabunku ").Append(_dCapNoState)
+                      .Append(", za malo uchodzcow ").Append(F(_dCapFew, "0")).Append(", bez postaci ").Append(_dCapNoChar).Append("; nie z niewola ").Append(_dCapNotSlaver)
+                      .Append(", gracz ").Append(F(_dCapPlayer, "0")).Append(", wolan BK ").Append(_dCapCalls).Append("); zerowanie armii bez pojmanych");
+                else sb.Append(" | pojmani (E4/9): WYLACZONE (Raid Captives From Village) - jency z rabunku BK z niczego jak dotad");
                 sb.Append(" | powrot: ludzi ").Append(F(_dBack, "0.#")).Append(" do ").Append(_dBackVillages).Append(" wsi, regionow w fazie powrotu ").Append(_dBackRegions.Count)
                   .Append("; wstrzymany: ").Append(Q).Append(" dob spokoju ").Append(_dStopQuiet).Append(" wsi, oblezenie ").Append(_dStopSiege).Append(" wsi")
                   .Append(", wies nie przyjmuje - glod gospodarzy, a konto w innym regionie takze pole nie karmi i spichlerz ponizej ").Append(Math.Max(0, s.FamineReturnMinDays)).Append(" dni dla gospodarzy, albo czesc z glodu czeka na odzyskanie wsi (E4/6) ").Append(_dStopHunger).Append(" wsi")
@@ -893,9 +954,9 @@ namespace Armoury
                 {
                     sb.Append(" | konto UCHODZCY: ");
                     if (seg.First) sb.Append("pierwsza doba sesji (kontrola od jutra): nowi ").Append(F(seg.In, "0.#")).Append(" - powrot ").Append(F(seg.Home, "0.#"))
-                                     .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" = ").Append(F(seg.N, "0.#"));
+                                     .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" - pojmani ").Append(F(seg.Capt, "0.#")).Append(" = ").Append(F(seg.N, "0.#"));
                     else sb.Append("wczoraj ").Append(F(seg.N0, "0.#")).Append(" + nowi ").Append(F(seg.In, "0.#")).Append(" - powrot ").Append(F(seg.Home, "0.#"))
-                           .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" = ").Append(F(seg.N, "0.#"))
+                           .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" - pojmani ").Append(F(seg.Capt, "0.#")).Append(" = ").Append(F(seg.N, "0.#"))
                            .Append(" (kontrola ").Append(Sg(seg.Check, "0.000")).Append(')');
                     sb.Append(" w ").Append(seg.Villages).Append(" wsiach (smierc ").Append(F(Math.Max(0f, s.RefugeeYearlyLossPercent), "0.##")).Append("%/rok, zmarli dzis w tej linii ").Append(F(_dDied, "0.###")).Append(')');
                 }
@@ -1017,7 +1078,7 @@ namespace Armoury
                 sb.Append(" - rabunek ").Append(F(Math.Max(0f, s.DevastationPerRaiderDay), "0.##")).Append(" i zerowanie ").Append(F(Math.Max(0f, s.DevastationPerForagerDay), "0.##"))
                   .Append(" czlowieka na zbrojnego na dobe, pulap ").Append(Math.Max(0, Math.Min(95, s.DevastationMaxPercent))).Append("%, zabici ").Append(s.DevastationKilledPercent)
                   .Append("% (przy niewoli ").Append(s.DevastationKilledSlaverPercent).Append("%), las ").Append(s.DevastationOutlawBasePercent).Append("% + ").Append(s.DevastationOutlawDangerPercent)
-                  .Append("% x niebezpieczenstwo, pojmani 0 (od E4/9; przy niewoli byloby ").Append(s.DevastationCaptivesPercent).Append("%), powrot po ").Append(s.RefugeeReturnQuietDays)
+                  .Append("% x niebezpieczenstwo, pojmani przy uderzeniu 0 (E4/9: przy koncu wygranego rabunku ").Append(s.DevastationCaptivesPercent).Append("% trafionych przy niewoli z uchodzcow wsi do lochu najezdzcy - Raid Captives From Village ").Append(s.RaidCaptivesFromVillage ? "TAK" : "NIE").Append("), powrot po ").Append(s.RefugeeReturnQuietDays)
                   .Append(" dobach spokoju liniowo do ").Append(s.RefugeeReturnDays).Append(" dob od ostatniego najazdu w regionie (oblezenie wstrzymuje), smierc uchodzcow ")
                   .Append(F(Math.Max(0f, s.RefugeeYearlyLossPercent), "0.##")).Append("%/rok, plon ^").Append(F(Math.Max(0f, Math.Min(2f, s.DevastationYieldElasticity)), "0.##"))
                   .Append(", wsie spladrowane produkuja: ").Append(s.LootedProducesByPeople ? "TAK" : "NIE");

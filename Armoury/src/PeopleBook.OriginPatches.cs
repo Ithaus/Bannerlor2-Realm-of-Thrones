@@ -112,7 +112,10 @@ namespace Armoury
                 // Give FVetHire), nie czlowiek z DOM miasta; bez tego stan miasta schodzilby drugi raz i SLUZBA dostalaby go podwojnie. BK zdejmuje swoja klase sam (sklad).
                 if (!player && __3 == null && st.IsTown && Veterans.InTavernHire && VetLive) { _deduceVetCalls++; _deduceVetMen += __1; return; }
                 var roster = party.MemberRoster;
-                if (CrownGifts.IsWatchParty(party) || (st.Culture != null && st.Culture.StringId == "nightswatch")) { GiveNone(roster, __1, FNoneWatch); return; }
+                // E4/9 (Z8, R14): rekrut partii Strazy (takze gracza w Strazy) - z Westeros przez WatchLaw.Levy (Mur, pule wyrzutkow, ludnosc; przy wylaczonym prawie "" jak dotad);
+                // obca partia w osadzie Daru - "" jak dotad (Dar - tylko do plonu, P R5)
+                if (CrownGifts.IsWatchParty(party)) { WatchLaw.GiveLevy(roster, __1, WatchLaw.KDeduce, FNoneWatch); return; }
+                if (st.Culture != null && st.Culture.StringId == "nightswatch") { GiveNone(roster, __1, FNoneWatch); return; }
                 if (!LevyLive) { GiveNone(roster, __1, FNoneOff); return; }
                 int cause = player ? FLevyPlayer : st.IsVillage ? FLevyVillage : st.IsCastle ? FLevyCastle : (__3 == null ? FTavernAi : FLevyTown);
                 // recenzja E4/7 R1-3: najemnik z karczmy (BK bez notabla) w krainie bez wolnych rak - obcy (gra odnawia najemnikow z niczego), nie z DOM tej krainy;
@@ -167,7 +170,7 @@ namespace Armoury
                         if (troop == null || now[i] != null || IsWight(troop)) continue;
                         var st = h.CurrentSettlement ?? __state.T.Settlement;
                         if (bk) DeduceBk(st, troop, h);                      // klasa BK (P: A5 zdejmuje tez BK DeduceManpower) - bez naszego postfiksu (flaga)
-                        if (watch) { GiveNone(gar.MemberRoster, 1, FNoneWatch); continue; }
+                        if (watch) { WatchLaw.GiveLevy(gar.MemberRoster, 1, WatchLaw.KA5, FNoneWatch); continue; }     // E4/9 (Z8): zaloga Strazy - rekrut z Westeros
                         if (!LevyLive) { GiveNone(gar.MemberRoster, 1, FNoneOff); continue; }
                         Settlement region;
                         double got = TakeLevy(st, 1, MLevyA5, out region);
@@ -481,7 +484,7 @@ namespace Armoury
                 int m = Men(__0.MemberRoster);
                 if (m > 0) Give(__1.Town.GarrisonParty.MemberRoster, Take(__0.MemberRoster, m, FPatrolIn), FPatrolIn);
                 int p = Men(__0.PrisonRoster);
-                if (p > 0) EnslaveShares(Take(__0.PrisonRoster, p, FPatrolPris));
+                if (p > 0) EnslaveShares(Take(__0.PrisonRoster, p, FPatrolPris), __1, 1);      // E4/9 (Z6): osada niewoli = cel patrolu (warownia patrolu)
             }
             catch (Exception e) { OStumble("PatrolInPre", e); }
         }
@@ -590,14 +593,17 @@ namespace Armoury
             try { if (OriginLive && __0 != null) { __state.P0 = Men(__0.PrisonRoster); __state.On = true; } } catch (Exception e) { OStumble("SalePre", e); }
         }
 
-        public static Exception SaleFin(Exception __exception, PartyBase __0, SaleState __state)
+        public static Exception SaleFin(Exception __exception, PartyBase __0, PartyBase __1, SaleState __state)
         {
             try
             {
                 if (__state.On && __0 != null && OriginLive)
                 {
                     double rest = __state.P0 - Men(__0.PrisonRoster) - _saleTaken;
-                    if (rest > Eps) EnslaveShares(Take(__0.PrisonRoster, rest, FSold));   // BK (niewolnicy/dzierzawcy osady) albo sprzedaz bez I1
+                    // E4/9 (Z7): osada niewoli - ta sama co gra (SellPrisonersAction: sprzedajacy-osada albo kupujacy-osada), gracz u posrednika - osada, w ktorej stoi
+                    Settlement hold = null;
+                    try { hold = __0.Settlement ?? (__1 != null ? __1.Settlement : null) ?? (__0.MobileParty != null ? __0.MobileParty.CurrentSettlement : null); } catch { hold = null; }
+                    if (rest > Eps) EnslaveShares(Take(__0.PrisonRoster, rest, FSold), hold, 0);   // BK (niewolnicy/dzierzawcy osady) albo sprzedaz bez I1
                 }
             }
             catch (Exception e) { OStumble("SaleFin", e); }

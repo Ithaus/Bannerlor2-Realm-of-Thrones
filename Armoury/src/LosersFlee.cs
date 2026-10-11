@@ -461,7 +461,8 @@ namespace Armoury
                 }
                 // 4. bandyci, chlopi i reszta -> hearth regionu (symetrycznie do TakeCommoners, skad bandyta w wiekszosci pochodzi);
                 // E4/7: czesc znana pochodzeniem - do wsi regionu pochodzenia (z hearth, MBack*), reszta - region miejsca jak dotad
-                if (org != null && org.Known > 0.0 && PeopleBook.LevyLive)
+                // E4/9 (4.4): czesc ze sluzby Strazy (org.W) idzie na Mur takze bez pochodzenia - ta sama droga (HomeKnown)
+                if (org != null && ((org.Known > 0.0 && PeopleBook.LevyLive) || (org.W > 0.0 && WatchLaw.Live)))
                 {
                     var part = org.Cut(n);
                     double placed = PeopleBook.HomeKnown(part, KnownCause(src));

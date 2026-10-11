@@ -604,10 +604,18 @@ namespace Armoury
         internal static int TakenByOthers { get { lock (Gate) return _taken[POthers]; } }
 
         // ============================================================ W11: jency z rabunku BK
+        // Recenzja E4/9 (R1-1 = R2-1): prefiks W11 i ThrallLaw.CapturePrefix maja Priority.First, a W11 jest wpiety wczesniej (nizszy indeks) - Harmony 2.4.2 uruchamia
+        // go PIERWSZEGO, wiec migawka lochu bylaby sprzed naszych pojmanych i finalizer policzylby ich drugi raz jako "z rabunku BK". Przy czynnym prawie (nasz prefiks
+        // zawsze zwraca false - BK nie dopisuje nikogo) okno nie liczy nic; pojmanych liczy tylko odcinek "pojmani z wsi (E4/9)". Kolejnosci NIE odwracac: prefiks void
+        // z parametrem typu referencyjnego po false jest pomijany (MethodCreatorTools.AffectsOriginal), __state zostalby 0 i finalizer wzialby caly loch najezdzcy.
         public static void BkCapPre(MobileParty __0, out int __state)
         {
             __state = -1;
-            try { if (On && __0 != null && __0.PrisonRoster != null) __state = __0.PrisonRoster.TotalRegulars; }
+            try
+            {
+                if (ThrallLaw.Patched && Devastation.CaptivesLive) return;
+                if (On && __0 != null && __0.PrisonRoster != null) __state = __0.PrisonRoster.TotalRegulars;
+            }
             catch (Exception e) { __state = -1; Stumble("BkCapPre", e); }
         }
 
@@ -882,9 +890,11 @@ namespace Armoury
             // E4/10: weterani niewynajeci po czasie czekania wracaja do DOM regionu pochodzenia (z hearth, jak MBack*) - inaczej RESZTA hearth wchlonie te powroty
             // (scalenie calosci etapu 4: w paczce E4/10 bylo o13 - o13 zajal E4/8)
             double o14 = mv[PeopleBook.MBackVeteran];
+            // E4/9: pobor do Strazy z ludnosci Westeros (ujemne, -1/k) i dluznicy do domu z pochodzeniem (dodatnie) - hearth z ksiegi (inaczej RESZTA wchlonie je)
+            double o15w = mv[PeopleBook.MWatchLevy], o15d = mv[PeopleBook.MBackDebt];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 + o14 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 + o14 + o15w + o15d - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -922,7 +932,8 @@ namespace Armoury
                   .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11))
                   .Append(", nasze (E4/8): milicja z wolnych rak ").Append(S(e8Mil)).Append(", milicja do domu ").Append(S(e8MilHome)).Append(", nowe druzyny ").Append(S(e8Spawn))
                   .Append(", karawany ").Append(S(e8Car)).Append(", wedrowcy BK ").Append(S(e8RoadOut)).Append("/").Append(S(e8RoadIn)).Append(", migracja do miast ").Append(S(e8Mig))
-                  .Append(", powroty weteranow (E4/10) +").Append(F2(o14));
+                  .Append(", powroty weteranow (E4/10) +").Append(F2(o14))
+                  .Append(", pobor do Strazy z ludnosci Westeros (E4/9) ").Append(S(o15w)).Append(", dluznicy do domu (E4/9) +").Append(F2(o15d));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");
@@ -1017,9 +1028,24 @@ namespace Armoury
             sb.Append("), odbici przez Innych - polegli (E4/2) ").Append(_rescueFallen)
               .Append(", bez odbiorcy (gra usuwa; w bitwach gracza - ekran lupu) ").Append(Math.Max(0, _lootRemoved - rescued - _rescueFallen))
               .Append(" | z rabunku BK +").Append(_bkRaidPris).Append(" w ").Append(_bkRaidN).Append(" rabunkach (z niczego; gracz ").Append(_bkRaidPlayer).Append(')')
+              .Append(CapturedSegment())
               .Append(" | wypuszczeni, sprzedani, na Mur, straceni - linia \"Prawo jenca (I1)\"; uwolnieni bez odbiorcy w bitwach H3 - linia \"Przegrani (H3)\"; jency rozwiazanych partii - linia \"Partie (E4/0)\"");
             sb.Append(" | czas ").Append(Ms(t0)).Append(" ms.");
             return sb.ToString();
+        }
+
+        /// <summary>E4/9 (W11): pojmani z wsi (ThrallLaw.CapturePrefix - z konta UCHODZCY do lochu najezdzcy) od ostatniej linii; przy czynnym prawie okno W11 nie liczy
+        /// (BkCapPre - recenzja E4/9 R1-1/R2-1: prefiks W11 biegnie PRZED naszym), wiec "z rabunku BK" (z niczego) jest 0. Liczniki Devastation czytane przed jej DayLine (zeruje).</summary>
+        private static string CapturedSegment()
+        {
+            try
+            {
+                int r; double j, pl;
+                Devastation.CaptivesToday(out r, out j, out pl);
+                return " | pojmani z wsi (E4/9) +" + j.ToString("0", Inv) + " w " + r + " rabunkach (z konta UCHODZCY napadnietych wsi do lochu najezdzcy; gracz " + pl.ToString("0", Inv)
+                       + (Devastation.CaptivesLive ? "; BK bez jencow z niczego)" : "; prawo WYLACZONE - BK z niczego jak dotad)");
+            }
+            catch (Exception e) { Stumble("CapturedSegment", e); return ""; }
         }
 
         private static string WinterLine(int day)

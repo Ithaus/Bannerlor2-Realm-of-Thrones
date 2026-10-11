@@ -107,11 +107,17 @@ namespace Armoury
                 else if (s.IsTown && s.Town != null) { float v; prosp.TryGetValue(c, out v); prosp[c] = v + Math.Max(1f, s.Town.Prosperity); }
             }
             var parts = new List<string>();
+            float thrOpening = 0f;
             foreach (var kv in Table)
             {
                 float h, p;
                 hearth.TryGetValue(kv.Key, out h); prosp.TryGetValue(kv.Key, out p);
                 float pop = kv.Value.Pop * scale;
+                // E4/9 (5.4, U15b): nowa kampania - niewolni Zelaznych Wysp to CZESC ludzi tabeli krainy (nie dodatek): k wsi i miast wysp liczone z reszty, niewolni
+                // na konto NIEWOLNI ksiegi ludzi ponizej (SeedThralls - to samo wywolanie, ten sam warunek: nigdy odjete z DOM bez konta albo odwrotnie)
+                float thr = 0f;
+                try { thr = ThrallLaw.OpeningFor(kv.Key, pop, h > 0f); } catch (Exception e) { thr = 0f; Log.Error("PopulationLaw.Calibrate(E4/9)", e); }
+                if (thr > 0f) { pop -= thr; thrOpening += thr; }
                 float urban = p > 0f ? kv.Value.Urban : 0f;
                 if (h <= 0f) urban = p > 0f ? 1f : 0f;                      // kraina bez wsi - wszystko w miastach
                 float kv0 = h > 0f ? pop * (1f - urban) / h : 0f;
@@ -125,7 +131,8 @@ namespace Armoury
                     kv0 = cap; kv1 *= f; pop *= f;
                 }
                 _k[kv.Key] = new[] { kv0, kv1 };
-                parts.Add(kv.Key + " " + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M (wies " + (int)kv0 + "/hearth, miasto " + (int)kv1 + "/dobrobyt)");
+                parts.Add(kv.Key + " " + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M (wies " + (int)kv0 + "/hearth, miasto " + (int)kv1 + "/dobrobyt)"
+                          + (thr > 0f ? " + niewolni " + thr.ToString("0", CultureInfo.InvariantCulture) + " (czesc tabeli " + (kv.Value.Pop * scale / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M, E4/9)" : ""));
             }
             Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray())
                      + (cut.Count > 0 ? " | obcieto (pulap " + (int)cap + " ludzi na punkt hearth wsi, E4/3): " + string.Join(", ", cut.ToArray()) + "; poza mapa razem "
@@ -135,6 +142,8 @@ namespace Armoury
             try { PeopleBook.SetUnitsFromCalibration(); } catch (Exception e) { Log.Error("PopulationLaw.Calibrate(k na osade)", e); }
             // E4/4 (9a): ludzie miast zapisani jako stan od razu, z dobrobytu tej samej chwili co kalibracja - suma miast krainy to jej udzial miejski z tabeli
             SeedTowns("przy kalibracji");
+            // E4/9 (5.4): bilans otwarcia niewolnych - konto NIEWOLNI regionow wysp wedlug ich ludzi (po k i stanie miast); wlasny try (SeedThralls nie rzuca)
+            if (thrOpening > 0f) { try { PeopleBook.SeedThralls(thrOpening); } catch (Exception e) { Log.Error("PopulationLaw.Calibrate(E4/9 SeedThralls)", e); } }
         }
 
         // ------------------------------------------------------------ 174.3: ludnosc z tabeli krain (suma swiata stala)

@@ -2444,7 +2444,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int DevastationOutlawDangerPercent { get; set; } = 3;
 
-        [SettingPropertyInteger("Devastation Captives Percent", 0, 100, "0", HintText = "percent of the people struck carried off as captives by raiders whose realm keeps slaves - works only together with raid captives taken from the village (a later package); until then they stay refugees")]
+        [SettingPropertyInteger("Devastation Captives Percent", 0, 100, "0", HintText = "percent of the people struck carried off as captives by raiders whose realm keeps slaves - taken from the village's refugees when the raid is won, only together with Raid Captives From Village; otherwise they stay refugees")]
         [SettingPropertyGroup("Iron Bank")]
         public int DevastationCaptivesPercent { get; set; } = 10;
 
@@ -2631,6 +2631,38 @@ namespace Armoury
         [SettingPropertyBool("Town Food By Village People", HintText = "the food a town or castle gets from each of its villages follows the people at home and at work there, as the village's own harvest does: villagers away cut it, and a plundered village keeps feeding its castle with the people who stayed instead of nothing. Off = as in the game")]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownFoodByVillagePeople { get; set; } = true;
+
+        [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WatchLawEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Watch Pool Share Percent", 0, 12, "0", HintText = "percent of a land's outlaws who may take the black in a single day")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int WatchPoolSharePercent { get; set; } = 3;
+
+        [SettingPropertyBool("Watch Does Not Raid", HintText = "the Night's Watch holds the Wall: its rangers fight beyond it but never burn villages")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WatchDoesNotRaid { get; set; } = true;
+
+        [SettingPropertyBool("Thrall Law Enabled", HintText = "captives sold where slavery is the custom (the Iron Islands, Slaver's Bay, the Free Cities that keep slaves, Qarth) become slaves of that land: they bear no children and some die each year; the thralls of the ironborn let more free men go reaving")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ThrallLawEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Thrall Yearly Loss Percent", 0, 20, "0", HintText = "slaves who die each year")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int ThrallYearlyLossPercent { get; set; } = 5;
+
+        [SettingPropertyInteger("Iron Islands Start Thralls", 0, 108000, "0", HintText = "thralls already working the Iron Islands when a new campaign begins - counted out of the islands' people, not added to them. Takes effect only in a new campaign")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int IronIslandsStartThralls { get; set; } = 27000;
+
+        [SettingPropertyBool("Raid Captives From Village", HintText = "captives carried off in a raid are villagers taken from the plundered village - a tenth of those the raid struck - and only raiders whose realm keeps slaves take them; the Banner Kings captives out of thin air end (your own Take or Leave choice stays)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RaidCaptivesFromVillage { get; set; } = true;
+
+        [SettingPropertyBool("Debtor Disbands Home", HintText = "a house whose creditors hold its villages sends the men it can no longer pay home to their own lands instead of letting them desert to the woods")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool DebtorDisbandsHome { get; set; } = true;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
@@ -5037,6 +5069,14 @@ namespace Armoury
             s.VillageBookEnabled = VillageBookEnabled;
             s.DistrictSettlementPeople = DistrictSettlementPeople;
             s.TownFoodByVillagePeople = TownFoodByVillagePeople;
+            s.WatchLawEnabled = WatchLawEnabled;
+            s.WatchPoolSharePercent = WatchPoolSharePercent;
+            s.WatchDoesNotRaid = WatchDoesNotRaid;
+            s.ThrallLawEnabled = ThrallLawEnabled;
+            s.ThrallYearlyLossPercent = ThrallYearlyLossPercent;
+            s.IronIslandsStartThralls = IronIslandsStartThralls;
+            s.RaidCaptivesFromVillage = RaidCaptivesFromVillage;
+            s.DebtorDisbandsHome = DebtorDisbandsHome;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;
