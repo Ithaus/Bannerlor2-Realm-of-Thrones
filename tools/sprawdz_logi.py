@@ -710,7 +710,8 @@ def etap4_main(logp, start_arg, until=120):
             "zalogi z modelu": L(d, r"przyrost z modelu zalogi gry \(bez werbunku i bez zlota\) " + SF, zal),
             "milicja z modelu": L(d, r"milicja \(E4/0\): z modelu w ticku " + SF, zal),
             "nowe partie (rody, karawany, konwoje, Inni, inne)": sum(newp.get(k, 0) for k in ("partie rodow", "karawany", "konwoje BK", "Inni", "inne")),
-            "Inni: nekromancja i rajd": L(d, r"nekromancja ROT w oknie OnMapEventEnded " + SF, inn) + L(d, r"rajd ROT \(Hearth/2 z niczego\) " + SF, inn),
+            "Inni: nekromancja i rajd": L(d, r"nekromancja ROT w oknie OnMapEventEnded " + SF, inn) + L(d, r"rajd ROT \(Hearth/2 z niczego\) " + SF, inn)
+                                        + L(d, r"wstali zabici przy spustoszeniu \(E4/5, K7 - nie z niczego\) " + SF, inn),   # E4/5 po recenzji: K7 osobno w oknie W9
             "Inni E4/2: wighty z odbitych, zywi z odbicia osady": L(d, r"\(f\) odbici jency: .*?-> wstalo (\d+)", e42) + L(d, r"odbicie osady \(ROT: [^)]*\) \d+ \(\+(\d+) zywych", e42),
             "tabory i lodzie z hearth": L(d, r"- tabory wsi -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea) + L(d, r"- lodzie rybackie -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea),
             "pula z hearth (rabunki, bieda)": L(d, r"rabunki (\d+), bieda/wojna", wyr) + L(d, r"bieda/wojna " + F_, wyr),
@@ -1259,27 +1260,35 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
         rep.add("E4/5 S12: plon - brak wsi z >= 1/3 uchodzcow w oknie", (f"kontrola wzoru: max |mnoznik - (1 - udzial)| {err:.5f} w {len(lw)} dobach") if err is not None else "brak wsi z uchodzcami",
                 "INFO; wzor +-1e-3 (elastycznosc 1)", (err <= 1e-3) if err is not None else None)
     # S13
-    lt = [re.search(r"Looted dzis (\d+), produkowaly (\d+) \(sztuk (\d+)", dev[d]) for d in on]
+    # poprawka po recenzji E4/5 (R2): woz wsi rusza tylko ze wsi Normal (gra TickVillageThink), a TickProductions staje przy zapasie >= 1.5 W - wies Looted
+    # produkuje ok. 7.5 doby, potem stoi z towarem w magazynie. Prog liczony na podmianach z OTWARTA bramka; udzial dob z zamknieta bramka - INFO
+    lt = [re.search(r"Looted dzis (\d+), produkowaly (\d+) \(sztuk (\d+); podmian stanu (\d+), bramka magazynu 1\.5 W zamknieta (\d+)", dev[d]) for d in on]
     lt = [tuple(int(g) for g in x.groups()) for x in lt if x]
-    lt = [x for x in lt if x[0] > 0]
+    lt = [x for x in lt if x[3] > 0]
     if lt:
-        Ls = sum(x[0] for x in lt); Ps = sum(x[1] for x in lt)
-        rep.add("E4/5 S13: wsie Looted produkuja", f"produkowaly {Ps} z {Ls} wsio-dni Looted ({100.0 * Ps / Ls:.0f}%), sztuk {sum(x[2] for x in lt)} w {len(lt)} dobach",
-                ">= 80% (reszta - magazyn pelny 1.5 W)", Ps >= 0.8 * Ls)
+        Ls = sum(x[0] for x in lt); Ps = sum(x[1] for x in lt); Ws = sum(x[3] for x in lt); Gs = sum(x[4] for x in lt); Os = Ws - Gs
+        rep.add("E4/5 S13: wsie Looted produkuja (podmiany z otwarta bramka 1.5 W)",
+                (f"produkowaly {Ps} z {Os} ({100.0 * Ps / Os:.0f}%)" if Os > 0 else f"produkowaly {Ps}, otwartych 0") + f"; sztuk {sum(x[2] for x in lt)}, podmian {Ws}, Looted dzis razem {Ls} w {len(lt)} dobach",
+                ">= 80% podmian z otwarta bramka", (Ps >= 0.8 * Os) if Os > 0 else None)
+        rep.add("E4/5 S13: bramka magazynu 1.5 W zamknieta we wsiach Looted (INFO)", f"{Gs} z {Ws} podmian ({100.0 * Gs / Ws:.0f}%)",
+                "INFO - towar wsi Looted czeka w magazynie na powrot do Normal (woz rusza tylko ze wsi Normal)", None)
     else:
-        rep.add("E4/5 S13: wsie Looted produkuja", "brak dob z wsiami Looted", ">= 80%", None)
+        rep.add("E4/5 S13: wsie Looted produkuja", "brak dob z podmiana stanu wsi Looted", ">= 80% podmian z otwarta bramka", None)
     rep.add("E4/5 S14: Ruda/Drewno/Towary d1 wobec biegu E4/4", "porownac linie \"Towary\"/OreLedger d1 z biegiem E4/4", "+-3% (w d1 brak uchodzcow, mnoznik 1)", None)
     # S15 - ludnosc z uchodzcami (decyzja Jeffa 11.10 (4): w ciaglej wojnie moze spadac do -0.5%/rok)
     net = [num(r"razem z nimi [\d.]+ mln \(([+-]?\d+) ludzi\)", lud[d]) for d in win if d in lud and run_day(d, start) >= 28]
     net = [x for x in net if x is not None]
     kill = [fnum(r"\| trafieni [\d.]+ = zabici " + F_, dev[d]) or 0 for d in on if run_day(d, start) >= 28]
+    # poprawka po recenzji E4/5 (R1): "las" (2-5% trafionych, OutlawLaw.AddFled) zyje w puli wyrzutkow - nie ma go ani w ludnosci, ani w uchodzcach
+    fled = [fnum(r"\| trafieni [\d.]+ = zabici [\d.]+ \+ pojmani [\d.]+ \+ las " + F_, dev[d]) or 0 for d in on if run_day(d, start) >= 28]
     died = [fnum(r" - zmarli " + F_ + r" =", dev[d]) or 0 for d in on if run_day(d, start) >= 28]
     if net:
-        mn = st.mean(net); lo = 290 - (st.mean(kill) if kill else 0) - (st.mean(died) if died else 0)
+        mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
+        mn = st.mean(net); lo = 290 - mk - mf - md
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until} (ludzi/d)",
-                f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {st.mean(kill) if kill else 0:.0f}/d, zmarli uchodzcy {st.mean(died) if died else 0:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
-                f"pas E4/4 290-1150/d albo nizej tylko o zabitych i zmarlych uchodzcow (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
-                lo <= mn <= 1150 or (mn >= -721 and mn >= lo))
+                f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
+                f"pas E4/4 290-1150/d albo nizej tylko o zabitych, las i zmarlych uchodzcow (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
+                (lo <= mn <= 1150) and mn >= -721)
     else:
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until}", "brak \"razem z nimi\" w linii Ludzie:", "290-1150/d", None)
     # S16 - lup z niczego na krok (co do monety jak w grze)

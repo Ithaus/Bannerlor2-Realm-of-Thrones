@@ -59,7 +59,7 @@ namespace Armoury
             _budget.Clear();
             _marN = _marPoorRich = 0; _marDowry = 0;
             _travLast.Clear(); _othersLast.Clear(); _othersBattle = 0;
-            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0; _slavesByCult.Clear(); _slavesDay = -1;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = _rotRaidK7 = _rotRaidK7N = 0; _slavesByCult.Clear(); _slavesDay = -1;
             _twinsEnter.Clear(); _twins = null; _twinsLooked = false; _ratioStart = -1;
             _errSites.Clear(); _stumbles = 0;
             RansomFlows.Reset();
@@ -714,7 +714,7 @@ namespace Armoury
         internal sealed class OthersState { public int Men, Pris; public List<TroopRoster> Rosters; }
         private static readonly long[] _othersPlace = new long[4];
         private static readonly string[] PlaceName = { "za Murem", "przy Murze", "Westeros", "Essos" };
-        private static long _othersPlaceN, _othersPlaceErr, _othersPrisCleared, _rotRaidMen, _rotRaidN;   // _othersPlaceErr: nekromancja bitew, w ktorych miejsce rzucilo wyjatek (poza "razem" - kontrola T4 != 0)
+        private static long _othersPlaceN, _othersPlaceErr, _othersPrisCleared, _rotRaidMen, _rotRaidN, _rotRaidK7, _rotRaidK7N;   // _othersPlaceErr: nekromancja bitew, w ktorych miejsce rzucilo wyjatek (poza "razem" - kontrola T4 != 0)
         private static MethodInfo _mBeyond; private static bool _beyondTried;
 
         /// <summary>ROT.Misc.ROTUtilities.IsBeyondTheWall(Vec2) - szukana raz na proces (wzor CrashScribe NightKingCall); blad szukania = potkniecie
@@ -811,7 +811,9 @@ namespace Armoury
         }
 
         // E4/0 (W9): rajd Innych - ROT dopisuje bandzie wighty Hearth/2 x mnoznik (z niczego)
-        internal sealed class RotRaidState { public MobileParty P; public int Men; }
+        // E4/5 (K7, poprawka po recenzji): w tym samym wywolaniu OthersRise.RaidPrefix dopisuje bandzie wighty z wiesniakow zabitych przy spustoszeniu (nie
+        // z niczego) - odejmowane od "Hearth/2 z niczego" (licznik OthersRise.RaidRisenAll w oknie) i pokazywane osobno
+        internal sealed class RotRaidState { public MobileParty P; public int Men; public long K7; }
 
         public static void RotRaidPre(RaidEventComponent __1, out RotRaidState __state)
         {
@@ -821,7 +823,7 @@ namespace Armoury
                 if (!On || !Measure40.On || __1 == null || __1.AttackerSide == null || __1.AttackerSide.LeaderParty == null) return;
                 var mp = __1.AttackerSide.LeaderParty.MobileParty;
                 if (mp == null || mp.MemberRoster == null || !IsOthers(mp)) return;
-                __state = new RotRaidState { P = mp, Men = mp.MemberRoster.TotalManCount };
+                __state = new RotRaidState { P = mp, Men = mp.MemberRoster.TotalManCount, K7 = OthersRise.RaidRisenAll };
             }
             catch (Exception e) { __state = null; Stumble("RotRaidPre", e); }
         }
@@ -831,7 +833,9 @@ namespace Armoury
             try
             {
                 if (__state == null || __state.P.MemberRoster == null) return __exception;
-                int d = __state.P.MemberRoster.TotalManCount - __state.Men;
+                long k7 = OthersRise.RaidRisenAll - __state.K7;
+                if (k7 > 0) { _rotRaidK7 += k7; _rotRaidK7N++; }
+                long d = __state.P.MemberRoster.TotalManCount - __state.Men - Math.Max(0L, k7);
                 if (d > 0) { _rotRaidMen += d; _rotRaidN++; }
             }
             catch (Exception e) { Stumble("RotRaidFin", e); }
@@ -870,14 +874,15 @@ namespace Armoury
                     x.Append(" (razem ").Append(S(placed)).Append(", miejsce nieznane - wyjatek ").Append(S(_othersPlaceErr)).Append(", kontrola z oknem: razem - nekromancja = ").Append(placed - _othersBattle).Append(')')
                      .Append(" | jency Innych skasowani przez ROT ").Append(_othersPrisCleared).Append(" (w nicosc; wzieci przez Innych w oknie jencow E4/0 ").Append(Measure40.TakenByOthers).Append(')')
                      .Append(" | odbici jency wcieleni do band Innych ").Append(S(Measure40.RescuedToOthers)).Append(" (zywi ludzie - w reszcie wyzej; U6)")
-                     .Append(" | rajd ROT (Hearth/2 z niczego) ").Append(S(_rotRaidMen)).Append(" w ").Append(_rotRaidN).Append(" rajdach");
+                     .Append(" | rajd ROT (Hearth/2 z niczego) ").Append(S(_rotRaidMen)).Append(" w ").Append(_rotRaidN).Append(" rajdach")
+                     .Append("; wstali zabici przy spustoszeniu (E4/5, K7 - nie z niczego) ").Append(S(_rotRaidK7)).Append(" w ").Append(_rotRaidK7N).Append(" rajdach");
                     s += x.ToString();
                 }
             }
             catch (Exception e) { Stumble("OthersLine(E4/0)", e); }
             s += ".";
             _othersBattle = 0;
-            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = _rotRaidK7 = _rotRaidK7N = 0;
             return s;
         }
 

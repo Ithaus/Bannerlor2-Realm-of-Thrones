@@ -91,7 +91,7 @@ namespace Armoury
         private static int _stumbles, _stumblesAll;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         // K5: wies spladrowana produkuje (doba)
-        private static int _dLootedOn, _dLootedMade, _dLootedChanged;
+        private static int _dLootedOn, _dLootedMade, _dLootedChanged, _dLootedGate;
         private static long _dLootedPieces;
         // K3: powrot, smierc, wstrzymania (doba)
         private static double _dBack, _dDied, _dLinErr;
@@ -118,7 +118,7 @@ namespace Armoury
             _dBack = _dDied = _dLinErr = 0.0;
             _dBackVillages = _dStopQuiet = _dStopSiege = _dNoClock = _dNoVillage = _dAbandonLeft = 0;
             _dBackRegions.Clear();
-            _dLootedOn = _dLootedMade = _dLootedChanged = 0; _dLootedPieces = 0;
+            _dLootedOn = _dLootedMade = _dLootedChanged = _dLootedGate = 0; _dLootedPieces = 0;
             _stumbles = 0;
         }
 
@@ -539,6 +539,11 @@ namespace Armoury
                 __state = t;
                 _stateRef(v) = Village.VillageStates.Normal;
                 _dLootedOn++;
+                // poprawka po recenzji E4/5 (R2): bramka gry 1.5 W (TickProductions, VGP.cs:148-149) liczona tu po podmianie - pojemnosc jak dla Normal, ta sama
+                // liczba, ktora gra sprawdzi za chwile. Woz wsi rusza tylko ze wsi Normal (VillagerCampaignBehavior.TickVillageThink :125), wiec wies Looted
+                // produkuje do 1.5 W (ok. 7.5 doby produkcji), potem stoi z towarem w magazynie do powrotu do Normal - to nie blad produkcji (S13 bez tych dob)
+                try { if ((float)t.Before >= (float)v.GetWarehouseCapacity() * 1.5f) _dLootedGate++; }
+                catch (Exception e) { Stumble("Devastation.LootedPrefix(bramka)", e); }
             }
             catch (Exception e) { Stumble("Devastation.LootedPrefix", e); }
         }
@@ -661,7 +666,8 @@ namespace Armoury
 
         /// <summary>
         /// Spustoszenie wylaczone (MCM albo brak jednostki ludzi / przyrostu naturalnego / latek rabunku), a w ksiedze sa uchodzcy: wracaja do swoich wsi od razu
-        /// (PeopleBook.RefugeesHome - ta sama stawka 1/k, z ktora ich zdjeto) - ludzie nie moga utknac na koncie, ktorego nikt nie obsluguje. Zabici zostaja w liczniku.
+        /// (PeopleBook.RefugeesHome - ta sama stawka min(1/k_v, 0.5), z ktora ich zdjeto; k_v z dnia kalibracji wprost z ksiegi - PeopleBook.TryUnit, takze przy
+        /// wylaczonej jednostce ludzi) - ludzie nie moga utknac na koncie, ktorego nikt nie obsluguje. Zabici zostaja w liczniku.
         /// </summary>
         private static void Abandon()
         {
@@ -670,12 +676,17 @@ namespace Armoury
             PeopleBook.RefugeesSnapshot(list);
             var map = ById();
             double people = 0.0, hearth = 0.0; int villages = 0, left = 0;
+            PopulationLaw.EnsureCalibrated();           // jak dotad przez HearthPerMan (TryUnit sam nie kalibruje)
             foreach (var kv in list)
             {
                 try
                 {
-                    Village v;
-                    float per = map.TryGetValue(kv.Key, out v) && v != null ? PopulationLaw.HearthPerMan(v) : 0f;
+                    // poprawka po recenzji E4/5 (R1): k_v z dnia kalibracji wprost z ksiegi (TryUnit nie zalezy od People Unit Enabled). HearthPerMan przy
+                    // wylaczonej jednostce bierze k BIEZACEJ kultury osady (asymilacja BK, przejecie przez Innych) - powrot po innej stawce niz zdjecie = hearth
+                    // z niczego albo w nicosc, a kultura spoza tabeli (whitewalker) = 0 i uchodzcy na koncie na zawsze
+                    Village v; float k;
+                    float per = map.TryGetValue(kv.Key, out v) && v != null && v.Settlement != null && PeopleBook.TryUnit(v.Settlement, out k) && k > 0f && !float.IsInfinity(k)
+                                ? 1f / k : 0f;
                     if (!(per > 0f) || float.IsInfinity(per)) { left++; continue; }
                     per = Math.Min(per, PeopleUnit.GamePerMan);           // ta sama stawka, z ktora Strike ich zdjal (k ponizej 2: 0.5)
                     double got = PeopleBook.RefugeesHome(v, kv.Value, PeopleBook.MRefugeeHome, per);
@@ -845,7 +856,8 @@ namespace Armoury
                   .Append(", udzial uchodzcow ").Append(worstShare.ToString("0.####", Inv)).Append("), wsi z >= 1/3 uchodzcow ").Append(third);
                 if (third > 0) sb.Append(" (najwyzszy mnoznik wsrod nich ").Append(thirdBest.ToString("0.####", Inv)).Append(')');
                 sb.Append(" | wsie spladrowane: Looted dzis ").Append(looted).Append(", produkowaly ").Append(_dLootedMade).Append(" (sztuk ").Append(_dLootedPieces)
-                  .Append("; podmian stanu ").Append(_dLootedOn).Append(", bez sztuk - magazyn pelny albo 0 z modelu ").Append(_dLootedOn - _dLootedMade).Append(')')
+                  .Append("; podmian stanu ").Append(_dLootedOn).Append(", bramka magazynu 1.5 W zamknieta ").Append(_dLootedGate)
+                  .Append(" (towar czeka na woz - woz rusza tylko ze wsi Normal), bez sztuk przy otwartej bramce ").Append(Math.Max(0, _dLootedOn - _dLootedGate - _dLootedMade)).Append(')')
                   .Append(LootedOn ? "" : " [produkcja wsi spladrowanej wylaczona: " + (!_lootedPatched ? "latka nie wpieta" : "Looted Produces By People") + "]");
                 if (_dLootedChanged > 0) sb.Append(", stan zmieniony w srodku ").Append(_dLootedChanged);
                 if (top.Count > 0)

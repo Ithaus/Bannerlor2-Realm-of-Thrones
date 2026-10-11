@@ -73,6 +73,10 @@ namespace Armoury
         private static readonly long[] _rPlace = new long[PKinds];
         private static int _raidN; private static long _raidWould;
         private static long _raidDead, _raidRisen, _raidPooled, _raidBurnt;     // E4/5 (K7): zabici przy spustoszeniu rajdow Innych i co z nich
+        private static long _raidRisenAll;     // wstali z rajdu od startu procesu (bez zerowania) - okno W9 Measure169c odejmuje ich od "Hearth/2 z niczego"
+
+        /// <summary>Okno W9 (Measure169c, rajd ROT): ilu zabitych przy spustoszeniu wstalo do band Innych od startu procesu (licznik rosnacy, roznica w oknie).</summary>
+        internal static long RaidRisenAll { get { return _raidRisenAll; } }
         private static int _milN, _milRevertN; private static long _milDead, _milRisen, _milBurnt, _milRevertLiving;
         private static int _bN, _bLeaderOnly, _bOtherN; private static long _bTemplate, _bFromPool, _bOtherMen;
 
@@ -323,7 +327,7 @@ namespace Armoury
                     var region = OutlawLaw.RegionFor(st);
                     long risen, pooled, burnt;
                     Raise(mp, dead, region, place, PeopleBook.CRaid, out risen, out pooled, out burnt);
-                    _raidDead += dead; _raidRisen += risen; _raidPooled += pooled; _raidBurnt += burnt;
+                    _raidDead += dead; _raidRisen += risen; _raidPooled += pooled; _raidBurnt += burnt; _raidRisenAll += risen;
                 }
                 return false;                                                              // metoda ROT robi tylko AddToCounts(_wight, Hearth/2)
             }
