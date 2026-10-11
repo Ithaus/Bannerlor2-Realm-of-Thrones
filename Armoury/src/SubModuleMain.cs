@@ -113,6 +113,7 @@ namespace Armoury
                 try { SoldierPay.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SoldierPay.ApplyAll", e); }   // zold do obiegu: sakiewki ludzi, kasy osad, zwrot ze skarbca
                 WearKeep.ApplyAll(_harmony);
                 HistoricalPrices.ApplyAll(_harmony);
+                try { FixedSums38.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FixedSums38.ApplyAll", e); }   // 3.8: okna wartosci w starej monecie (nagroda turnieju gry i TXP)
                 RawPrice.ApplyAll(_harmony);     // cena surowcow od niedoboru: stala wzoru ceny w nowej monecie, popyt z prawdziwego zuzycia miasta
                 AmmoRecovery.ApplyAll(_harmony);
                 RecruitCost.ApplyAll(_harmony);
