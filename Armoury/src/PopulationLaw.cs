@@ -1236,6 +1236,9 @@ namespace Armoury
                     {
                         // hak kiesy ludu (112, KL etap 5): renta wsi ustepuje stalym oplatom 173 - do etapu 5 false (renta jak dotad)
                         if (st.IsVillage && VillageTakings.VillageRentYieldsToFees) continue;
+                        // E5/A1 (R4): przy czynnym zaworze kas miast miasto placi przez ValveTowns nizej (7% nadwyzki ponad zapas kupcow, pan 2/3 : korona 1/3,
+                        // bez pulapu naleznej) - "nalezne" wyzej policzone jak dotad
+                        if (st.IsTown && TownPurse.ValveLive) continue;
                         if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) continue;
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
@@ -1264,6 +1267,7 @@ namespace Armoury
                     }
                     catch { }
                 }
+                if (TownPurse.ValveLive) ValveTowns(pop, paid, ref totalPaid);   // E5/A1 (R4): zawor WSZYSTKICH miast (takze kultur spoza tabeli - "10 miast bez placenia")
                 var parts = pop.OrderByDescending(kv => kv.Value).Select(kv =>
                 {
                     float pd; paid.TryGetValue(kv.Key, out pd);
@@ -1273,6 +1277,36 @@ namespace Armoury
                          + " mln | renty zaplacone " + totalPaid + " z naleznych " + totalDue + " zl (z kasy osad) | kraina ludnosc zaplacone/nalezne: " + string.Join(", ", parts.ToArray()) + ".");
             }
             catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }
+        }
+
+        /// <summary>
+        /// E5/A1 (R4, plan kodu rozdz. 5): zawor kas miast - kazde miasto (Settlement.All, takze kultury spoza tabeli i bez ludzi) przez TownPurse.Valve;
+        /// zapisy rent (RentToday, _rentBy, DayTownRent, "renty zaplacone") robi PopulationLaw jak dotad - jeden wlasciciel tych pol (czesc pana; czesc
+        /// korony idzie do skarbca i TownPurse.CrownToday). Renta "nalezna od ludzi" (dawny pulap) - tylko liczba do linii "Kasy miast (169c)".
+        /// Kazde miasto we wlasnym try w Valve (licznik potkniec).
+        /// </summary>
+        private static void ValveTowns(Dictionary<string, float> pop, Dictionary<string, float> paid, ref long totalPaid)
+        {
+            long crownSum = 0;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !st.IsTown || st.Town == null) continue;
+                long due = 0;
+                string c = st.Culture != null ? st.Culture.StringId : null;
+                try { if (c != null && Table.ContainsKey(c)) { float p = PeopleOf(st); if (p > 0f) due = (long)DailyRent(p); } } catch { }
+                float decree = TaxDecree(st);
+                int lp, lb, cr; long spare;
+                if (!TownPurse.Valve(st, decree, due, out lp, out lb, out cr, out spare)) continue;
+                crownSum += cr;
+                if (lp > 0 || spare > 0) _rentBy[st] = new long[] { lp, Math.Max(0L, spare) };   // 169c i rada 3.5: czesc pana i nadwyzka, z ktorej ja wzieto
+                if (lp <= 0) continue;
+                var clan = st.OwnerClan;
+                if (clan != null) { int r0; RentToday.TryGetValue(clan, out r0); RentToday[clan] = r0 + lp; }
+                DayTownRent += lp;
+                totalPaid += lp;
+                if (c != null && pop.ContainsKey(c)) { float v; paid.TryGetValue(c, out v); paid[c] = v + lp; }
+            }
+            TownPurse.ValveDay(crownSum);
         }
 
         internal static string Export()

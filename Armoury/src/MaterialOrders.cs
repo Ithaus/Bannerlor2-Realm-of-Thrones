@@ -797,7 +797,7 @@ namespace Armoury
                     if (at < 0) break;
                     var el = pack.GetElementCopyAtIndex(at);
                     if (el.Amount <= 0) break;
-                    int spare = town.Gold - reserve;
+                    int spare = town.Gold - TownPurse.BuyFloor(town, reserve);   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow (TownPaysFromSurplus)
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                     int n = Math.Min(Math.Min(10, carried - sold), Math.Min(el.Amount, spare / price));
                     if (n <= 0) break;                                                    // miasto bez kasy ponad rezerwe - reszta zostaje karawanie

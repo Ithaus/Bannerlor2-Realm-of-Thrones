@@ -362,7 +362,7 @@ namespace Armoury
                     for (int k = 0; k < p.Sell; k++)
                     {
                         int unit = SellPrice(el, st, main);
-                        if (unit <= 0 || st.Town.Gold < unit) break;
+                        if (unit <= 0 || st.Town.Gold - TownPurse.BuyFloor(st.Town, 0) < unit) break;   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                         armory.AddToCounts(el, -1);
                         st.ItemRoster.AddToCounts(el, 1);
                         st.Town.ChangeGold(-unit);

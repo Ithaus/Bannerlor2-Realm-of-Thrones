@@ -416,6 +416,15 @@ namespace Armoury
                 if (dataStore.IsLoading) CastlePurse.Import(castlePurse);
             }
             catch (Exception e) { Log.Error("SyncData.CastlePurse", e); }
+            // E5/A1 (111'): dar startowy w kasach miast rozliczony raz na kampanie (arm_townpurse: "done" | "on:<wiek>" | ""); brak klucza = stary zapis
+            // (o przycieciu decyduje wiek kampanii). Osobny try PRZED glownym blokiem - zgubiona flaga to drugie przyciecie prawdziwego doplywu kas miast
+            try
+            {
+                string townPurse = TownPurse.Export();
+                SaveText.Sync(dataStore, "arm_townpurse", ref townPurse);
+                if (dataStore.IsLoading) TownPurse.Import(townPurse);
+            }
+            catch (Exception e) { Log.Error("SyncData.TownPurse", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try
@@ -1467,6 +1476,7 @@ namespace Armoury
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
             try { Seal31.BlockOpen(); } catch { }   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
+            try { TownPurse.BeforeRents(); } catch (Exception e) { Log.Error("TownPurse.BeforeRents", e); }   // E5/A1: liczniki doby kas miast, dar startowy (raz, migawka M12), zaulki - PRZED rentami i zaworem miast
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { Seal31B.OwnerTaxDaily(); } catch (Exception e) { Log.Error("Seal31B.OwnerTaxDaily", e); }   // D11-3: podatek BK warsztatow lordow i gracza w cudzych miastach - wlasciciel -> pan miasta (renta, RentMerge nizej) i kasa miasta (autonomia)
             try { Seal31B.RentMerge(); } catch (Exception e) { Log.Error("Seal31B.RentMerge", e); }   // 3.1/3.3 (31b) E3/8a: podatek warsztatow notabli przelany panom od wczoraj -> RentToday (po czyszczeniu w PopulationLaw.Daily)

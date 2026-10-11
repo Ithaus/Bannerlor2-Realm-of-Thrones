@@ -607,6 +607,7 @@ namespace Armoury
             try
             {
                 if (amount <= 0 || st == null || !st.IsTown || st.StringId == null || !CourtOn) return;
+                if (TownPurse.On) return;                              // E5/A1 (R7): kasa miasta nic nie kasuje - tarcza dworu zbedna, bez znacznika
                 if (!EnsureShieldHook()) return;
                 float v; _court.TryGetValue(st.StringId, out v);
                 _court[st.StringId] = v + amount;
@@ -618,6 +619,7 @@ namespace Armoury
         /// <summary>Dopisek do linii "Budzet rodow (166)": tarcza dworu dzis (liczniki zerowane po odczycie).</summary>
         internal static string CourtNote()
         {
+            if (TownPurse.On) { _dCourtIn = _dCourtKept = _dCourtOut = _dCourtTrim = _dCourtDel = 0; return "tarcza dworu: tarcze zbedne (E5/A1)"; }
             float sum = 0f; foreach (var v in _court.Values) sum += v;
             string t = "tarcza dworu " + (CourtOn ? "wlaczona: znacznik " + (long)sum + " w " + _court.Count + " miastach, regulator nie skasowal " + _dCourtKept
                                                + ", zeszlo z zaworem i danina " + _dCourtOut + ", miasto wydalo (znacznik przyciety do nadwyzki) " + _dCourtTrim
@@ -651,6 +653,7 @@ namespace Armoury
             try
             {
                 if (amount <= 0 || st == null || !ShieldOn || !st.IsTown || st.StringId == null) return;
+                if (TownPurse.On) return;                              // E5/A1 (R7): regulator kas miast nic nie kasuje - tarcza zoldu zbedna, bez znacznika
                 if (!EnsureShieldHook()) return;                       // bez latki na regulatorze znacznik nic by nie chronil
                 float v; _held.TryGetValue(st.StringId, out v);
                 _held[st.StringId] = v + amount;
@@ -695,6 +698,7 @@ namespace Armoury
         public static void RegulatorPostfix(object __instance, MethodBase __originalMethod, Town __0, ref int __result)
         {
             if (_held.Count == 0 && _court.Count == 0) return;          // tarcze wylaczone albo nic nie wplacono - bez zmian
+            if (TownPurse.On) return;                                   // E5/A1 (R7): kasy miast prowadzi TownPurse (tryb 1/2 regulatora) - tarcze martwe
             try
             {
                 if (__0 == null || !Live) return;
@@ -752,6 +756,7 @@ namespace Armoury
         /// <summary>Raz na dobe: znacznik wygasa w tempie zaworu renty (i daniny wojennej); przy wylaczonej tarczy znika caly.</summary>
         private static void DecayHeld()
         {
+            if (TownPurse.On) { _held.Clear(); _court.Clear(); return; }   // E5/A1 (R7): znaczniki porzucone (linia raz - TownPurse.BeforeRents)
             DecayCourt();
             if (_held.Count == 0) return;
             var s = Settings.Current;
@@ -777,7 +782,7 @@ namespace Armoury
         private static void DecayCourt()
         {
             if (_court.Count == 0) return;
-            if (!CourtOn) { _court.Clear(); return; }
+            if (!CourtOn || TownPurse.On) { _court.Clear(); return; }   // E5/A1 (R7): tarcza dworu zbedna
             EnsureShieldHook();                                         // znaczniki z zapisu gry: latka takze bez nowej wplaty
             foreach (var id in new List<string>(_court.Keys))
             {
@@ -803,13 +808,23 @@ namespace Armoury
         /// <summary>169c (tylko odczyt): znacznik tarczy zoldu w kasie miasta (zl "w drodze do pana").</summary>
         internal static long HeldOf(Settlement st)
         {
-            try { float v; return st != null && st.StringId != null && _held.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }
+            try { float v; return !TownPurse.On && st != null && st.StringId != null && _held.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }   // E5/A1: 0
         }
 
         /// <summary>3.1 (31, tylko odczyt): znacznik tarczy dworu w kasie miasta (zl dworu w drodze do pana) - nadwyzka osady (Seal31.Spare).</summary>
         internal static long CourtOf(Settlement st)
         {
-            try { float v; return st != null && st.StringId != null && _court.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }
+            try { float v; return !TownPurse.On && st != null && st.StringId != null && _court.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }   // E5/A1: 0
+        }
+
+        /// <summary>E5/A1 (R7): znaczniki tarcz zoldu i dworu porzucone (stary zapis) - liczby do linii raz na sesje; zlota nie rusza (znaczniki to liczby).</summary>
+        internal static void DropShields(out long heldSum, out int heldN, out long courtSum, out int courtN)
+        {
+            heldSum = 0; courtSum = 0;
+            foreach (var v in _held.Values) heldSum += (long)v;
+            foreach (var v in _court.Values) courtSum += (long)v;
+            heldN = _held.Count; courtN = _court.Count;
+            _held.Clear(); _court.Clear();
         }
 
         internal static string ExportHeld()
@@ -859,7 +874,7 @@ namespace Armoury
                              + _dBlind + " (" + _dBlindGold + ")"
                              + " | sakiewki ludzi: razem " + total + " w " + count + " partiach, najwieksza " + max + (maxKey != null ? " (" + maxKey + ")" : "")
                              + ", po partiach, ktorych juz nie ma: " + orphanGold + " (" + orphans + ")"
-                             + " | tarcza zoldu w kasach miast: " + (ShieldOn ? "wlaczona, znacznik " + (long)heldSum + " w " + heldTowns + " miastach, regulator nie skasowal dzis "
+                             + " | tarcza zoldu w kasach miast: " + (TownPurse.On ? "tarcze zbedne (E5/A1)" : ShieldOn ? "wlaczona, znacznik " + (long)heldSum + " w " + heldTowns + " miastach, regulator nie skasowal dzis "
                                                                               + _dShielded + " (" + _dShieldTicks + " tickow miast)" : "wylaczona")
                              + (_dDupes + _stumbles > 0 ? " | potkniecia: powtorzone wyplaty " + _dDupes + ", wyjatki " + _stumbles : "") + ".");
                 }

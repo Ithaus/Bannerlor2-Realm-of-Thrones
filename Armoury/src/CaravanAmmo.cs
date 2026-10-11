@@ -294,7 +294,7 @@ namespace Armoury
             bool poor = false;                                            // ta wizyta zostawila amunicje z braku kasy miasta (licznik raz na wizyte)
             foreach (var (what, _) in ammo)
             {
-                int spare = town.Gold - reserve;
+                int spare = town.Gold - TownPurse.BuyFloor(town, reserve);   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                 if (spare <= 0) { poor = true; break; }                   // miasto bez zlota ponad rezerwe nie kupuje - reszta w nastepnym miescie
                 int at = pack.FindIndexOfElement(what);
                 if (at < 0) continue;

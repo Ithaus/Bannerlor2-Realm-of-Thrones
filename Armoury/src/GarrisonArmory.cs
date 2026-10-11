@@ -344,7 +344,7 @@ namespace Armoury
                         var el = wornBook ? new EquipmentElement(it, AiWear.TakeCondition(mp, it, !synced)) : new EquipmentElement(it);
                         synced = true;   // spis zbrojowni raz na sprzedaz (nie przy kazdej sztuce)
                         int unit = Math.Max(1, market.Town.MarketData.GetPrice(el, mp, true, market.Party));
-                        if (market.Town.Gold < unit)
+                        if (market.Town.Gold - TownPurse.BuyFloor(market.Town, 0) < unit)   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow (zamek - cala kasa jak dotad)
                         {
                             if (wornBook) { try { AiWear.NoteBought(mp, el, 1); } catch { } }   // sztuka zostaje - jej stan wraca do zapisu
                             broke = true; break;

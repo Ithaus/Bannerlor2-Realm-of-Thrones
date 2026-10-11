@@ -245,12 +245,14 @@ namespace Armoury
                     if (c.IsUnderMercenaryService) { merc += kv.Value; continue; }
                     int v = kv.Value;
                     long own;
-                    if (cur && cutShare > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
+                    // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownRentLordShare) - tyle tniemy; korona swojej czesci nie oddaje drugi raz
+                    float cs = TownPurse.ValveLive ? cutShare * TownPurse.LordShare(k) : cutShare;
+                    if (cur && cs > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
                     {
                         // K3 (Z8): zold, ktory ludzie partii wydali we wlasnym miescie rodu, wrocil rodowi zaworem miasta - nie jest podstawa zwrotu
-                        long cut = Math.Min((long)v, (long)(own * cutShare));
+                        long cut = Math.Min((long)v, (long)(own * cs));
                         v -= (int)cut; ownCut += cut;
-                        ownSpend[c] = own - (long)Math.Ceiling(cut / Math.Max(0.0001, (double)cutShare));
+                        ownSpend[c] = own - (long)Math.Ceiling(cut / Math.Max(0.0001, (double)cs));
                         if (v <= 0) continue;
                     }
                     List<KeyValuePair<Hero, int>> list;
@@ -388,7 +390,7 @@ namespace Armoury
                         if (!town && !st.IsVillage) continue;
                         if (st.IsUnderSiege || (st.IsVillage && st.Village.VillageState != Village.VillageStates.Normal)) continue;
                         int gold = st.SettlementComponent.Gold;
-                        int spare = town ? Math.Max(0, gold - (int)floor) : Math.Max(0, gold);
+                        int spare = town ? Math.Max(0, gold - TownPurse.TaxFloor(st.Town, (int)floor)) : Math.Max(0, gold);   // E5/A1 (D4): miasto ponad zapas kupcow
                         // danina wojenna (lay subsidy)
                         if (s.LaySubsidyEnabled && war && spare > 0)
                         {
@@ -399,6 +401,7 @@ namespace Armoury
                                 st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x;
                                 long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + x;   // 165: wplyw dnia krolestwa
                                 if (town) TownLevyToday[st] = x;                                       // 162m: zloto wyszlo z kasy miasta (tarcza dworu)
+                                if (town) TownPurse.NoteTake(st, x);                                   // E5/A1: udzial zysku kupcow (tylko licznik)
                                 if (town) { try { TownFolk.NoteTake(st, x, TownFolk.TLevy); } catch { } }   // E5/0 (195): pobor z kasy miasta - udzial zysku kupcow, pas ponizej zapasu (tylko licznik)
                             }
                         }
@@ -421,6 +424,7 @@ namespace Armoury
                             else if (paid > 0)
                             {
                                 st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid;
+                                TownPurse.NoteTake(st, paid);                                          // E5/A1: udzial zysku kupcow (tylko licznik)
                                 long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + paid;   // 165: wplyw dnia (gdy 165 wylaczone - tylko licznik)
                                 try { TownFolk.NoteTake(st, paid, TownFolk.TCustoms); } catch { }   // E5/0 (195): clo z kasy miasta (tylko licznik)
                             }
@@ -430,7 +434,7 @@ namespace Armoury
                         if (debase && spare > 0)
                         {
                             int x = (int)(spare * Math.Max(0f, s.DebasementShare));
-                            if (x > 0) { st.SettlementComponent.ChangeGold(-x); ruler.ChangeHeroGold(x); deb += x; spare -= x; }
+                            if (x > 0) { st.SettlementComponent.ChangeGold(-x); ruler.ChangeHeroGold(x); deb += x; spare -= x; TownPurse.NoteTake(st, x); }   // E5/A1: licznik
                             try { if (x > 0) TownFolk.NoteTake(st, x, TownFolk.TMint); } catch { }   // E5/0 (195): mennica z kasy miasta (tylko licznik)
                             if (x > 0) CirculationWindows.NoteHeroGold(ruler, x);   // paczka 169b (tylko licznik)
                             if (x > 0) ClanIncomeBook.NoteInflow(ruler, x, ClanIncomeBook.KCrownLevies);   // paczka 169: D rodu (tylko licznik)
@@ -484,8 +488,8 @@ namespace Armoury
                         int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
                         vanilla += due;
                         // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor - ta sama regula co Spendable); miasto ponad prog jak dotad
-                        int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));
-                        if (applyWithdrawals && x > 0) f.ChangeGold(-x);
+                        int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // E5/A1: miasto ponad zapas kupcow (PayFloor -> TownPurse.TaxFloor)
+                        if (applyWithdrawals && x > 0) { f.ChangeGold(-x); TownPurse.NoteTake(f.Settlement, x); }   // E5/A1: licznik (tylko miasta)
                         try { if (applyWithdrawals && x > 0 && f.IsTown) TownFolk.NoteTake(f.Settlement, x, TownFolk.TDuty); } catch { }   // E5/0 (195): Crown Duty z kasy miasta (tylko licznik)
                         real += x;
                     }
@@ -514,7 +518,7 @@ namespace Armoury
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
                         int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // wpis 90: prog kasy miasta; B-4: zamek ponad zapas kupcow
                         if (x <= 0) continue;
-                        if (applyWithdrawals) f.ChangeGold(-x);
+                        if (applyWithdrawals) { f.ChangeGold(-x); TownPurse.NoteTake(f.Settlement, x); }   // E5/A1: licznik (tylko miasta)
                         try { if (applyWithdrawals && f.IsTown) TownFolk.NoteTake(f.Settlement, x, TownFolk.TWarTax); } catch { }   // E5/0 (195): War Tax z kasy miasta (tylko licznik)
                         real += x;
                     }
@@ -530,8 +534,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
                         int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
                         n6 += r;
-                        int x = Math.Min(r, Math.Max(0, st.Town.Gold - (int)floorG));   // wpis 90: prog kasy miasta
-                        if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
+                        int x = Math.Min(r, Math.Max(0, st.Town.Gold - TownPurse.TaxFloor(st.Town, (int)floorG)));   // wpis 90: prog kasy miasta; E5/A1 (D4): zapas kupcow
+                        if (applyWithdrawals && x > 0) { st.Town.ChangeGold(-x); TownPurse.NoteTake(st, x); }   // E5/A1: licznik
                         try { if (applyWithdrawals && x > 0) TownFolk.NoteTake(st, x, TownFolk.TTolls); } catch { }   // E5/0 (195): Road Tolls z kasy miasta (tylko licznik)
                         real += x;
                     }

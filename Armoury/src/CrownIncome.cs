@@ -176,8 +176,9 @@ namespace Armoury
                         long dues; KingdomTreasury.DuesToday.TryGetValue(k, out dues);
                         long lev; KingdomTreasury.LeviesToday.TryGetValue(k, out lev);
                         long cas; CastlePurse.CrownToday.TryGetValue(k, out cas);
+                        long tow; TownPurse.CrownToday.TryGetValue(k, out tow);   // E5/A1: udzial korony z zaworu kas miast (ta sama doba, PopulationLaw.Daily)
                         long thirds = Ransom178.ThirdsOf(k);   // 178: 1/9 z licznikow doby (prawo trzecich) - wplacone przed Begin
-                        d.Own = dues + lev + cas + thirds;
+                        d.Own = dues + lev + cas + tow + thirds;
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
@@ -317,7 +318,7 @@ namespace Armoury
                 {
                     var sb = new StringBuilder(2048);
                     sb.Append("Korona: wplywy dnia (165): dzien ").Append(today)
-                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow, 1/9 prawa trzecich (178) ").Append(own)
+                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow i miast, 1/9 prawa trzecich (178) ").Append(own)
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)
                       .Append(" = do wydania ").Append(spend)

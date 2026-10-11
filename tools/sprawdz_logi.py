@@ -26,6 +26,9 @@ Uzycie (Python 3, tylko odczyt):
                     z budzet-rodow.csv, sakiewki w dniach zoldu, zloto swiata, magazyny wsi, wojsko) + blok E5/0 (progi E50-T1..T10 - kiesa ludu na sucho,
                     kontrola zamknieta, koszt, bitwy wobec ksiegi i decyzja A6, wydatek z petli BK wobec ConsumedValue, notable, gotowka wsi wedlug
                     polityki, odczyty do kalibracji B) w oknie dob kampanii 1-120 (--do-doby N). Kolejne paczki dopisuja wlasne bloki etap5_<paczka>.
+                    Blok E5/A1 (111', kasy miast) A1-T1..T22 - dopisek " | E5/A1:" w linii "Kasy miast (169c)",
+                    "Przeplywy osad (kasy miast/zamkow)", "Zawor zamkow (110)", przyczyny bilansu, linia startowa i przyciecia "TownPurse (E5/A1)";
+                    okno doby kampanii 2-120 (--do-doby N). Wolany z etap5_main E5/0 (scalenie porcji A).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2542,6 +2545,14 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             blk(rep, lines, start, win, until=until, logp=logp)
         except Exception as e:
             rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A1 (111', kasy miast): blok A1 z wlasnym oknem (doby kampanii 2-until) - wolany z etap5_main E5/0 (scalenie porcji A)
+    if any(s.startswith("TownPurse (E5/A1):") for s in lines):
+        try:
+            etap5_a1(rep, lines, start, until, logp)
+        except Exception as e:
+            rep.add("blok etap5_a1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    else:
+        rep.add("E5/A1: linia startowa TownPurse (E5/A1)", "brak w logu", "jest od wgrania E5/A1", None)
     rep.show()
     return 0
 
@@ -2800,6 +2811,286 @@ def etap5_e50(rep, lines, start, win, **kw):
     else:
         rep.add("E50-T10: zapis (9 dob)", "bieg nowej kampanii - prog z biegu z zapisu", "INFO", None)
 
+def etap5_a1(rep, lines, start, until, logp):
+    """E5/A1 (111', kasy miast; plan kodu docs/etap5/PLAN-KODU-E5A1.md rozdz. 9.1, progi A1-T1..T22). Stan A1 - z dopisku dziennego w linii
+    "Kasy miast (169c)" (" | E5/A1: ..."), nie z linii startowej (ta powstaje przed MCM). Okno: doby kampanii 2-until (doba 1 = dar startowy
+    i pierwsze ticki); sr28 = ostatnie 28 dob okna. Dzien linii ksiegi (169c, Przeplywy, Zawor zamkow, przyczyny, Towary) = dzien gry - 1;
+    linie z dniem gry (Korona 165, Budzet rodow 166) przesuniete o 1."""
+    k169 = by_day(lines, "Kasy miast (169c): dzien")
+    pt = by_day(lines, "Przeplywy osad (kasy miast): dzien")
+    pz = by_day(lines, "Przeplywy osad (kasy zamkow): dzien")
+    pv = by_day(lines, "Przeplywy osad: dzien")
+    zz = by_day(lines, "Zawor zamkow (110): dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    tow = by_day(lines, "Towary (utarg wozow): dzien")
+    e50 = by_day(lines, "Nadwyzka kas (E5/0): dzien")
+    kor = e4_series(lines, "Korona: wplywy dnia (165): dzien", 1)
+    bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    win = [d for d in sorted(k169) if 2 <= run_day(d, start) <= until]
+    last28 = win[-28:]
+    seg = {}
+    for d in win:
+        s = k169[d]
+        i = s.find(" | E5/A1:")
+        seg[d] = s[i:] if i >= 0 else None
+
+    def vals(src, days, pat, cast=int):
+        out = {}
+        for d in days:
+            s = src.get(d)
+            if s is None:
+                continue
+            v = num(pat, s, cast)
+            if v is not None:
+                out[d] = v
+        return out
+
+    # ---------------- A1-T1: bledy i potkniecia
+    errs = [s for s in lines if s.startswith("ERROR in ") and "TownPurse" in s]
+    stum = vals(seg, win, r"\| potkniecia (\d+)")
+    rep.add("E5/A1 A1-T1: bledy TownPurse (ERROR in) / potkniecia w biegu", f"{len(errs)} / {sum(stum.values())}", "0 bledow; potkniecia <= 5",
+            len(errs) == 0 and sum(stum.values()) <= 5)
+
+    # ---------------- A1-T2: linia startowa
+    stl = next((s for s in lines if s.startswith("TownPurse (E5/A1): kasy miast jako")), None)
+    if stl is None:
+        rep.add("E5/A1 A1-T2: linia startowa", "brak", "jest, BRAK: -, modele >= 1, konsumpcja: tak", False)
+    else:
+        mod = num(r"w (\d+) modelach", stl, int, 0) or 0
+        ok2 = "BRAK: -" in stl and mod >= 1 and "konsumpcja: tak" in stl
+        rep.add("E5/A1 A1-T2: linia startowa", f"modele {mod}, konsumpcja {'tak' if 'konsumpcja: tak' in stl else 'BRAK'}, "
+                + ("BRAK: -" if "BRAK: -" in stl else "BRAK: " + (re.search(r"BRAK: ([^|]*)", stl).group(1).strip() if re.search(r"BRAK: ([^|]*)", stl) else "?")),
+                "BRAK: -, modele >= 1, konsumpcja: tak", ok2)
+
+    # ---------------- A1-T3: tryb czynny kazdej doby
+    modes = {}
+    for d in win:
+        s = seg.get(d)
+        if s is None:
+            continue
+        m = num(r"E5/A1: tryb regulatora (\d)", s)
+        if m is None:
+            m = 0 if "E5/A1: WYLACZONE" in s else (-1 if "E5/A1: NIECZYNNE" in s else None)
+        if m is not None:
+            modes[d] = m
+    miss3 = [d for d in win if d not in modes]
+    mset = sorted(set(modes.values()))
+    mode = mset[0] if len(mset) == 1 else (2 if 2 in mset else (mset[0] if mset else None))
+    if not win:
+        rep.add("E5/A1 A1-T3: tryb regulatora kazdej doby", "brak dob w oknie", "2 kazdej doby", None)
+    elif len(mset) > 1 or miss3:
+        rep.add("E5/A1 A1-T3: tryb regulatora kazdej doby", f"tryby {mset}, bez dopisku {len(miss3)} z {len(win)} dob", "jeden tryb caly bieg (2; zmiana w biegu = NIE)", False)
+    elif mset == [2]:
+        rep.add("E5/A1 A1-T3: tryb regulatora kazdej doby", f"2 w {len(win)} dobach", "2 kazdej doby (Jeff 16:10)", True)
+    elif mset == [1]:
+        rep.add("E5/A1 A1-T3: tryb regulatora kazdej doby", f"1 w {len(win)} dobach - bieg awaryjny", "2 (1 = bieg awaryjny: T6/T7 wedlug trybu 1)", None)
+    else:
+        rep.add("E5/A1 A1-T3: tryb regulatora kazdej doby", f"{mset[0]} w {len(win)} dobach ({'WYLACZONE' if mset[0] == 0 else 'NIECZYNNE - latki 110 BRAK'})",
+                "2 (0 caly bieg = bieg porownawczy - progi INFO)", None if mset[0] == 0 else False)
+    live = mode in (1, 2)
+
+    def zero_each(name, src, pat, base, rule="0 kazdej doby okna"):
+        v = vals(src, win, pat)
+        bad = [d for d, x in v.items() if x != 0]
+        if not v:
+            rep.add(name, "brak linii", rule, None)
+            return v
+        rep.add(name, f"niezerowe w {len(bad)} z {len(v)} dob" + (f" (najwiecej {max(abs(v[d]) for d in bad)}, doba {run_day(bad[0], start)})" if bad else "") + f"; dzis (baza) {base}",
+                rule, (len(bad) == 0) if live else None)
+        return v
+
+    # ---------------- A1-T4/T5/T6: kasy miast - "zakupy", kasowanie, dosypka
+    zero_each("E5/A1 A1-T4: \"zakupy\" w kasach miast", pt, r'"zakupy" mieszkancow ([+-]?\d+)', "425 318 (L:31722)")
+    zero_each("E5/A1 A1-T5: regulator kas miast - skasowal", pt, r"regulator kasy [+-]?\d+ \[P\] \(dosypal \d+, skasowal (\d+)", "248 065 (L:31686)")
+    if mode == 1:
+        dos = vals(pt, last28, r"regulator kasy [+-]?\d+ \[P\] \(dosypal (\d+), skasowal")
+        m6 = st.mean(dos.values()) if dos else None
+        rep.add("E5/A1 A1-T6: dosypka kas miast (tryb 1, sr28)", f"{m6:.0f}/d" if m6 is not None else "brak linii", "<= 35 000/d (2 x dzis 17 057); wiecej - DECYZJA",
+                (m6 <= 35000) if m6 is not None else None, decide=True)
+    else:
+        zero_each("E5/A1 A1-T6: dosypka kas miast (tryb 2)", pt, r"regulator kasy [+-]?\d+ \[P\] \(dosypal (\d+), skasowal", "sr28 17 057")
+
+    # ---------------- A1-T7: dosypka kas zamkow i linia 110 z "tryb 2"
+    dz = vals(pz, win, r"dosypal (\d+), skasowal")
+    zt2 = [d for d in win if d in zz and "dosypka zablokowana (tryb 2" in zz[d]]
+    if not zz:
+        rep.add("E5/A1 A1-T7: dosypka kas zamkow (tryb 2)", "brak linii Zawor zamkow (110) - Castle Purse Enabled wylaczone?", "tryb 2: dosypal 0, linia 110 z \"tryb 2\"", None)
+    elif mode == 2:
+        badz = [d for d, x in dz.items() if x != 0]
+        rep.add("E5/A1 A1-T7: dosypka kas zamkow (tryb 2)", f"dosypal != 0 w {len(badz)} z {len(dz)} dob; linia 110 z \"tryb 2\" w {len(zt2)} z {len([d for d in win if d in zz])} dob",
+                "dosypal 0 kazdej doby; linia 110 z \"dosypka zablokowana (tryb 2\"", len(badz) == 0 and len(zt2) == len([d for d in win if d in zz]))
+    else:
+        m7 = st.mean([dz[d] for d in last28 if d in dz]) if any(d in dz for d in last28) else None
+        rep.add("E5/A1 A1-T7: dosypka kas zamkow", f"sr28 {m7:.0f}/d (tryb {mode})" if m7 is not None else "brak linii", "INFO poza trybem 2 (dzis ok. 1 tys./d)", None)
+
+    # ---------------- A1-T8: zawor - suma i podzial
+    vre = re.compile(r"zeszlo (\d+) = panom (\d+) \(przed dekretem (\d+); w krolestwach przed dekretem (\d+);.*?\+ koronie (\d+)")
+    vz = {}
+    for d in win:
+        s = seg.get(d)
+        m = vre.search(s) if s else None
+        if m:
+            vz[d] = [int(x) for x in m.groups()]
+    off8 = [d for d in win if seg.get(d) and "zawor: NIE DZIALA" in seg[d]]
+    if vz:
+        badsum = [d for d, v in vz.items() if v[0] != v[1] + v[4]]
+        k28 = sum(vz[d][4] for d in last28 if d in vz)
+        lbk28 = sum(vz[d][3] for d in last28 if d in vz)
+        ratio = k28 / (lbk28 + k28) if lbk28 + k28 > 0 else None
+        rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony sr28 K / (LBk + K)",
+                f"D != L + K w {len(badsum)} z {len(vz)} dob; udzial korony " + (f"{ratio:.3f}" if ratio is not None else "-") + (f"; NIE DZIALA w {len(off8)} dobach" if off8 else ""),
+                "0 dob; 0.32-0.34 (1/3 - klucz 0.67)", len(badsum) == 0 and ratio is not None and 0.32 <= ratio <= 0.34 if live else None)
+    else:
+        rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony", "brak liczb zaworu" + (f" (NIE DZIALA w {len(off8)} dobach - Population Rent Enabled?)" if off8 else ""),
+                "zawor czynny w biegu A", None if not live else False)
+
+    # ---------------- A1-T9: "10 miast bez placenia"
+    v9 = vals(seg, win, r"miast z nadwyzka bez zaworu \(10 miast\) (\d+)")
+    bad9 = [d for d, x in v9.items() if x != 0]
+    rep.add("E5/A1 A1-T9: \"10 miast bez placenia\"", f"niezerowe w {len(bad9)} z {len(v9)} dob" + (f" (najwiecej {max(v9[d] for d in bad9)})" if bad9 else "") if v9 else "brak liczb",
+            "0 kazdej doby (dzis 10, RB 5.4)", (len(bad9) == 0) if (v9 and live) else None)
+
+    # ---------------- A1-T10: tarcze
+    held = vals(k169, win, r"pod tarcza zoldu \(zold i wydatki ludzi w drodze do pana\) (\d+)")
+    badh = [d for d, x in held.items() if x != 0]
+    court = [d for d in win if d in bud and (num(r"tarcza dworu wlaczona: znacznik (\d+)", bud[d], int, 0) or 0) > 0]
+    rep.add("E5/A1 A1-T10: tarcze 107b/162m", f"znacznik zoldu != 0 w {len(badh)} z {len(held)} dob; znacznik dworu w 166 w {len(court)} dobach",
+            "0 (dzis pod tarcza 2 863 805, L:31686)", (len(badh) == 0 and len(court) == 0) if live else None)
+
+    # ---------------- A1-T11: BK rynek osady
+    bk = vals(cau, last28, r"BK rynek osady ([+-]?\d+)")
+    m11 = st.mean(bk.values()) if bk else None
+    rep.add("E5/A1 A1-T11: BK rynek osady (sr28)", f"{m11:.0f}/d" if m11 is not None else "brak linii", "|x| <= 2 000/d (dzis -34 610 L:31718, sr28 -30 495)",
+            (abs(m11) <= 2000) if (m11 is not None and live) else None)
+
+    # ---------------- A1-T12: dar startowy (linia raz; dzien = najblizsza linia 169c po niej - ten sam blok)
+    trims = []
+    for i, s in enumerate(lines):
+        if s.startswith("TownPurse (E5/A1):") and "dar startowy w kasach miast" in s and "zdjeto" in s:
+            day = None
+            for s2 in lines[i + 1:i + 4000]:
+                if s2.startswith("Kasy miast (169c): dzien"):
+                    day = num(r"dzien (\d+)", s2)
+                    break
+            trims.append((s, day))
+    if not trims:
+        rep.add("E5/A1 A1-T12: dar startowy", "brak linii przyciecia", "nowa kampania: 1 linia, zdjeto 8-20 mln; zapis z doby 362: przyciecie 0", None)
+    else:
+        for s, day in trims:
+            cut = num(r"zdjeto (\d+)", s, int, 0) or 0
+            old = "zapis z" in s or "przyciecie wlaczone" in s
+            sink = num(r"dar startowy kas miast przyciety \(E5/A1\) (\d+)", cau.get(day, "")) if day is not None else None
+            if old:
+                rep.add("E5/A1 A1-T12: dar startowy (stary zapis)", f"zdjeto {cut}", "0 (0.75^wiek)", cut == 0)
+            else:
+                okc = 8000000 <= cut <= 20000000
+                if sink is None:
+                    rep.add("E5/A1 A1-T12: dar startowy (nowa kampania)", f"zdjeto {cut}; ujscie w przyczynach: brak (pierwsza doba ksiegi bez linii)",
+                            "zdjeto 8-20 mln ([S] ok. 14 mln); ujscie = zdjeto +-1", okc)
+                else:
+                    rep.add("E5/A1 A1-T12: dar startowy (nowa kampania)", f"zdjeto {cut}, ujscie {sink}", "zdjeto 8-20 mln ([S] ok. 14 mln); ujscie = zdjeto +-1",
+                            okc and abs(sink - cut) <= 1)
+        if len(trims) > 1:
+            rep.add("E5/A1 A1-T12: linie przyciecia w logu", len(trims), "1 na kampanie (kolejne sesje: flaga arm_townpurse)", None)
+
+    # ---------------- A1-T13: reszta ksiegi
+    r28 = vals(cau, win, r"srednia 28 dob ([+-]?\d+)")
+    if r28:
+        dl = sorted(r28)[-1]
+        rep.add("E5/A1 A1-T13: reszta ksiegi R (srednia 28 dob, ostatnia doba)", f"{r28[dl]} (doba {run_day(dl, start)})", "|R| < 10 000 (etap 3; dzis sr28 -1 302)", abs(r28[dl]) < 10000)
+    else:
+        rep.add("E5/A1 A1-T13: reszta ksiegi R", "brak linii", "|R| < 10 000", None)
+
+    # ---------------- A1-T14: nasze zakupy z pasa ponizej zapasu
+    # poprawka po recenzji: E5/0 liczy jako "nasze sciezki" kazda ujemna kwote kasy miasta z MoneyLedger.Note/Note169 - takze sciezki swiadomie
+    # bez BuyFloor (likwidacja RecruitKit, zwrot 171 GarrisonCarts, zwrot dokupu BK CaravanBulk, wedrowcy 36b). Prog 0 (NIE) tylko, gdy linia E5/0
+    # podaje je osobno ("zwroty i likwidacje" - do dopisania przy scaleniu, CHANGELOG A1 "Scalanie"); bez rozbicia - INFO
+    v14 = vals(e50, win, r"nasze sciezki (\d+)")
+    if v14:
+        b14 = [d for d, x in v14.items() if x != 0]
+        split14 = any("zwroty i likwidacje" in (e50.get(d) or "") for d in v14)
+        if split14:
+            rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu (E5/0, bez zwrotow i likwidacji)", f"niezerowe w {len(b14)} z {len(v14)} dob", "0 (BuyFloor)",
+                    (len(b14) == 0) if live else None)
+        else:
+            rep.add("E5/A1 A1-T14: nasze sciezki kas miast ponizej zapasu (E5/0 bez rozbicia)", f"niezerowe w {len(b14)} z {len(v14)} dob, suma {sum(v14.values())}",
+                    "INFO - E5/0 liczy tu tez sciezki bez BuyFloor (RecruitKit, zwrot 171, zwrot CaravanBulk, wedrowcy 36b); 0 (NIE) po rozbiciu przy scaleniu", None)
+    else:
+        q = vals(seg, win, r"zapytan (\d+), przy zapasie \(0\)")
+        z = vals(seg, win, r"zapytan \d+, przy zapasie \(0\) (\d+)")
+        rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu", f"bez linii E5/0; zapytan {sum(q.values())}, przy zapasie (0) {sum(z.values())}",
+                "INFO (z budowy: BuyFloor) - 0 z linii E5/0 po scaleniu", None)
+
+    # ---------------- A1-T15/T17: stan ustalony kas i zawor razem
+    sp = vals(seg, last28, r"\| zapas kupcow \d+, ponad zapasem (\d+)")
+    d28 = [vz[d][0] for d in last28 if d in vz]
+    if sp and d28:
+        m15 = st.mean(sp.values()); m17 = st.mean(d28)
+        rep.add("E5/A1 A1-T15: kasy ponad zapasem wobec zawor / 0.07 (sr28)", f"{m15:.0f} wobec {m17 / 0.07:.0f} (stosunek {m15 / (m17 / 0.07):.2f})" if m17 > 0 else f"{m15:.0f}",
+                "INFO (ok. 1 = stan ustalony; P111)", None)
+        rep.add("E5/A1 A1-T17: zawor razem (sr28)", f"{m17:.0f}/d", "INFO 250-550 tys./d ([S] ok. 381 tys. = panom 254 + koronie 127; renta dzis 487 312)", None)
+    else:
+        rep.add("E5/A1 A1-T15/T17: stan kas i zawor (sr28)", "brak liczb", "INFO", None)
+
+    # ---------------- A1-T16: korona (165)
+    k16 = vals(kor, last28, r"prawa trzecich \(178\) (\d+)")
+    rep.add("E5/A1 A1-T16: korona - wplywy \"nasze\" (165, sr28)", f"{st.mean(k16.values()):.0f}/d" if k16 else "brak linii",
+            "INFO (w wojnie >= bieg bazowy - prog B2; dzis 256 287/d)", None)
+
+    # ---------------- A1-T18: rody
+    rep.add("E5/A1 A1-T18: rody (glowy, bankruci, wojsko)", "--grupa etap2 na tym samym logu", "progi etapu 2 ([S] rody ok. -89 tys./d bez A3)", None)
+
+    # ---------------- A1-T19/T21: zakup plonu i zaulki (Jeff 16:10)
+    uns = vals(pv, win, r"towar niesprzedany po wizycie: w miastach (\d+) szt")
+    sold = vals(tow, win, r"za (\d+) szt\.")
+    su, ss = sum(uns.values()), sum(sold.values())
+    share = (100.0 * su / ss) if ss > 0 else None
+    rep.add("E5/A1 A1-T19: towar wsi niesprzedany w miastach", f"{su} szt. wobec sprzedanych {ss} ({share:.3f}%)" if share is not None else f"{su} szt. (brak linii Towary (utarg wozow))",
+            "< 0.1% (dzis 0 szt.)", (share < 0.1) if (share is not None and live) else None)
+    zre = re.compile(r"zaulki: kas ponizej zapasu (\d+), ponizej 1000 (\d+), przy 0 (\d+); najdluzej ponizej zapasu (\d+) dob")
+    zl = {}
+    for d in win:
+        s = seg.get(d)
+        m = zre.search(s) if s else None
+        if m:
+            zl[d] = [int(x) for x in m.groups()]
+    w7 = vals(seg, win, r"miast >= 7 dob (\d+)")
+    if zl:
+        zero_days = [d for d, v in zl.items() if v[2] > 0]
+        dl = sorted(zl)[-1]
+        ok21 = len(zero_days) == 0 and (share is None or share <= 0.1)
+        rep.add("E5/A1 A1-T21: zaulki (Jeff 16:10)", f"kasy przy 0 w {len(zero_days)} dobach; ostatnia doba: ponizej zapasu {zl[dl][0]}, ponizej 1000 {zl[dl][1]}, przy 0 {zl[dl][2]},"
+                f" najdluzsza seria {max(v[3] for v in zl.values())} dob, miast >= 7 dob {w7.get(dl, '-')}; towar niesprzedany " + (f"{share:.3f}%" if share is not None else "-"),
+                "kasy przy 0: 0 kazdej doby; towar wsi niesprzedany <= 0.1% (serie > 7 dob z towarem niesprzedanym w tym samym miescie - bez licznika na miasto, INFO);"
+                " przekroczenie -> bieg z Town Purse Regulator 1 i raport dla Jeffa (dzis 15 z 97 ponizej celu)", ok21 if live else None)
+    else:
+        rep.add("E5/A1 A1-T21: zaulki", "brak liczb", "jw.", None)
+
+    # ---------------- A1-T22: udzial zysku kupcow (INFO)
+    u = {}
+    for d in win:
+        s = seg.get(d)
+        m = re.search(r"udzial zysku kupcow .*? dzis (-|[\d.]+)%.*?srednia 28 dob (-|[\d.]+)%", s) if s else None
+        if m:
+            u[d] = m.groups()
+    if u:
+        dl = sorted(u)[-1]
+        dv = [float(x[0]) for x in u.values() if x[0] != "-"]
+        rep.add("E5/A1 A1-T22: udzial zysku kupcow zabierany przez pana i korone", f"srednia 28 dob {u[dl][1]}% (ostatnia doba); srednia dziennych {st.mean(dv):.1f}%" if dv else f"srednia 28 dob {u[dl][1]}%",
+                "INFO (odniesienie historyczne ok. 10%; decyzja Jeffa po tescie)", None)
+    else:
+        rep.add("E5/A1 A1-T22: udzial zysku kupcow", "brak liczb", "INFO", None)
+
+    # ---------------- A1-T20: zakupy dla nas - towar zostaje u sprzedajacych (INFO wobec biegu bazowego)
+    # poprawka po recenzji: wedrowcy 36b bez BuyFloor (reszta ladunku szlaby na polke celu bez zaplaty); doszly warsztaty zbrojne (WorkshopLaw - "brak zlota/kupca")
+    names = ("Paser: dzien", "Kontrakty surowca (174): dzien", "Karawany bez amunicji (172b): dzien", "Warsztaty: dzien")
+    have = [n.split(":")[0] for n in names if any(s.startswith(n) for s in lines)]
+    q = vals(seg, win, r"zapytan (\d+), przy zapasie \(0\)")
+    z = vals(seg, win, r"zapytan \d+, przy zapasie \(0\) (\d+)")
+    wsk = vals(by_day(lines, "Warsztaty: dzien"), win, r"brak zlota/kupca (\d+)")
+    rep.add("E5/A1 A1-T20: zakupy dla nas - towar u sprzedajacych", f"linie: {', '.join(have) if have else '-'}; BuyFloor: zapytan {sum(q.values())}, przy zapasie (0) {sum(z.values())}"
+            + (f"; warsztaty zbrojne - brak zlota/kupca sr {st.mean(wsk.values()):.1f}/d (baza z31-A 0 kazdej doby)" if wsk else ""),
+            "INFO wobec biegu bazowego (liczniki \"brak kasy miasta\"); skok x3 -> wylaczyc Town Pays From Surplus i powtorzyc", None)
 
 
 def main(argv):
