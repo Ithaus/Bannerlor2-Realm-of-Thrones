@@ -864,3 +864,10 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (21:52 UTC) **TEST KONCOWY E4 ruszyl** (b2k5x628s): 728 dob nowej kampanii -> zapis 9 dob z zapisu konca biegu (stan E4 w zapisie) -> zima 120 (flaga).
   Wyjscia: test\at-e4k-728.out.txt, at-e4k-zapis.out.txt, at-e4k-zima.out.txt. Progi w trakcie z czesci logu (d120, d364).
 - (21:55 UTC) **Projekt etapu 6 ruszyl** (wf_bb091727-a6b -> docs/etap6/; rozpoznanie logi/kod/dokumenty/styki -> projekt -> 2 krytyki -> v2; z 6.1, 6.14, 6.19 Jeffa).
+- (22:45 UTC) **TEST KONCOWY E4 - wyniki czesciowe d120** (czesc logu SCRATCH(ae222cb7)\kopia-e4k\czesc-d120.log, progi progi-d120-*.txt): 0 ERROR Armoury; CrashScribe:
+  stare bledy + 2 "nowe": BK TroopRosterSafetyPatch "countChange" (stary, dotad ukryty jako "powtorka" bledu NightRest - CrashScribe laczy rozne bledy po kluczu bez
+  komunikatu) i KeyNotFound pierwszej szansy w PeopleBook.ReconcileDaily (~1/dobe, lapane gleboko, bez OStumble). Progi: etap3 12/12 TAK; etap2 NIE 2 (jak zawsze);
+  etap5 (E5/0) NIE 2 (koszt, T5); etap4 NIE 20 - najwazniejsze: ludnosc netto -1.02%/rok (prog -0.5%), udzial miejski 20% wobec 32.7% (pobor z miast 507/d > wsie 460/d),
+  T7 reszta zolnierzy +1056/d i T4 w nicosc 310/d (3%), rownanie krain Sarnor -0.575%, pobor na podlodze 131, weterani w 53 miastach (prog 90), 5 wiosek brak,
+  Straz z ludnosci reach 41% (tabela 29%), milicja N7, koszty T12/N15/G10. Test biegnie dalej do ok. d370 (potem zatrzymac - po poprawkach pelny 728 + zima + zapis).
+  Diagnoza: workflow wf_28c41f10-460 (5 badaczy + sceptycy) - bez zmian kodu.
