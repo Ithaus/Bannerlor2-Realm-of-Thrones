@@ -119,12 +119,14 @@ namespace Armoury
         /// <summary>
         /// E4/4 (109n): ile hearth dziennie wraca do wsi przy samym dnie ("uchodzcy wracaja", +0.5 ponizej RefugeeFloorHearth). Te sama regule stosuje blizna nizej;
         /// przy czynnym przyroscie naturalnym (PopulationLaw.GrowthPostfix) blizna nie biegnie, a przyrost pyta o powrot tutaj - jedna regula, jedno miejsce.
-        /// Wies poza stanem Normal (spalona, lupiona, pod przymusem): 0. Zostaje do E4/5 (uchodzcy z ksiegi); w logu osobno, jako ludzie z niczego.
+        /// Wies poza stanem Normal (spalona, lupiona, pod przymusem): 0. W logu osobno, jako ludzie z niczego.
+        /// E4/5: wies objeta spustoszeniem (Devastation) - 0: wracaja uchodzcy z jej konta w ksiedze ludzi, a nie pol punktu hearth z niczego (wies Reach: +222 ludzi dziennie).
         /// </summary>
         internal static float RefugeeReturn(Village village)
         {
             var s = Settings.Current;
             if (s == null || !s.ScorchedEarthEnabled || village == null) return 0f;
+            if (Devastation.CoversQuiet(village)) return 0f;
             if (village.VillageState != Village.VillageStates.Normal) return 0f;
             return village.Hearth < Math.Max(1, s.RefugeeFloorHearth) ? 0.5f : 0f;
         }

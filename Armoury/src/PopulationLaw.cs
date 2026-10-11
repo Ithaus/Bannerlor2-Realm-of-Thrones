@@ -385,7 +385,7 @@ namespace Armoury
         // Premie hearth gry, BK i BKROT (perki, budynki, polityki, laski bogow, podatki, prawa) nie dopisuja hearth, tylko mnoza DODATNIE g:
         // (1 + dodatki / 1.2) x (1 + czynniki), obciete do [0.5; 2]; pulap +0.8 dopiero PO mnozeniu. Rosnie tylko wies w stanie Normal (jak w grze, ktora baze pasma
         // daje tylko jej); spalona, lupiona i pod przymusem: 0 (vanillowe -1 hearth w spalonej wsi znika). Powrot uchodzcow +0.5 hearth ponizej RefugeeFloorHearth
-        // (ScorchedEarth.RefugeeReturn) zostaje do E4/5 - w logu osobno. k osady sie skraca, wiec rachunek idzie wprost na hearth; ludzi (hearth x k_v) pokazuja dymek i log.
+        // (ScorchedEarth.RefugeeReturn) - od E4/5 tylko wsie bez spustoszenia (objete: uchodzcy z konta w ksiedze, Devastation.Daily); w logu osobno. k osady sie skraca, wiec rachunek idzie wprost na hearth; ludzi (hearth x k_v) pokazuja dymek i log.
         // Ludzie z narodzin to jedyne (obok bilansu otwarcia) nazwane zrodlo ludzi ksiegi (R0): "przyrost naturalny" w linii "Ludzie: przyrost naturalny" i w "Hearth (E4/0)".
         private const float BonusUnit = 1.2f;          // hearth dziennie premii gry, ktore podwajaja przyrost (baza srodkowego pasma gry)
         private const float BonusMin = 0.5f, BonusMax = 2f;
@@ -918,7 +918,8 @@ namespace Armoury
                     sb.Append("Ludzie: przyrost naturalny ").Append(Sg(natPeople, "0")).Append(" ludzi (g srednio ").Append(Sg(gAvg, "0.###")).Append("% rocznie, wazone ludnoscia wsi; dzien ")
                       .Append(day).Append("; ").Append(Sg(natHearth, "0.####")).Append(" hearth na ").Append(n).Append(" wsi, w rok ok. ").Append(Sg(natPeople * days, "0")).Append(" ludzi)");
                     sb.Append("; osobno powrot uchodzcow ").Append(Sg(backPeople, "0")).Append(" ludzi (").Append(Sg(backHearth, "0.#")).Append(" hearth w ").Append(refugees)
-                      .Append(" wsiach ponizej ").Append(Math.Max(1, s.RefugeeFloorHearth)).Append(" hearth - regula ScorchedEarth do E4/5, ludzie z niczego, nie przyrost)");
+                      .Append(" wsiach ponizej ").Append(Math.Max(1, s.RefugeeFloorHearth)).Append(" hearth - regula ScorchedEarth, ludzie z niczego, nie przyrost")
+                      .Append(Devastation.On ? "; tylko wsie bez spustoszenia E4/5 - uchodzcy z konta w linii \"Ludzie (spustoszenie)\")" : "; spustoszenie E4/5 wylaczone)");
                     // poprawka po recenzji E4/4: przyrost naturalny wzgledem ludzi WSI (miasta stoja), pokoj i wojna osobno - prog Jeffa 11.10 na wsiach w pokoju
                     double natSides = peaceS.Gain + warS.Gain, pplSides = peaceS.People + warS.People;
                     sb.Append(" | pokoj i wojna (regula wojny E4/3, bez wiecznych wojen): razem ").Append(Sg(pplSides > 0 ? natSides * days * 100.0 / pplSides : 0.0, "0.###"))
@@ -952,9 +953,10 @@ namespace Armoury
                     sb.Append(" | krainy (kultura z dnia kalibracji) g rocznie (ludzi dzis): ").Append(string.Join(", ", parts.ToArray()));
                 }
                 // R17: podloga 10 od ostatniej linii
-                int fN; double fH, fPool, fNothing, fNothingH;
-                PeopleBook.TakeFloor(out fN, out fH, out fPool, out fNothing, out fNothingH);
-                sb.Append(" | podloga 10 hearth (R17): ").Append(fN).Append(" razy, +").Append(fH.ToString("0.###", CultureInfo.InvariantCulture)).Append(" hearth - z puli wyrzutkow regionu ")
+                int fN; double fH, fPool, fNothing, fNothingH, fRef;
+                PeopleBook.TakeFloor(out fN, out fH, out fPool, out fNothing, out fNothingH, out fRef);
+                sb.Append(" | podloga 10 hearth (R17): ").Append(fN).Append(" razy, +").Append(fH.ToString("0.###", CultureInfo.InvariantCulture))
+                  .Append(" hearth - z uchodzcow tej wsi (E4/5) ").Append(fRef.ToString("0.#", CultureInfo.InvariantCulture)).Append(" ludzi, z puli wyrzutkow regionu ")
                   .Append(fPool.ToString("0.#", CultureInfo.InvariantCulture)).Append(" ludzi, podloga z niczego ").Append(fNothing.ToString("0.#", CultureInfo.InvariantCulture))
                   .Append(" ludzi (").Append(fNothingH.ToString("0.###", CultureInfo.InvariantCulture)).Append(" hearth)").Append(_floorPatched ? "" : " [okno podlogi nie wpiete]");
                 sb.Append(" | hearth wsi swiata ").Append(F(hearthAll)).Append(" (bilans doby z RESZTA - linia \"Hearth (E4/0)\")");

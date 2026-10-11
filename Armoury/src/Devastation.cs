@@ -82,12 +82,17 @@ namespace Armoury
         private static int _dSteps, _dRaids, _dRaidsFull, _dRaidMen, _dResumed, _dForagers, _dNoK, _dMoveFail, _dForeign;
         private static int _stumbles, _stumblesAll;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        // K3: powrot, smierc, wstrzymania (doba)
+        private static double _dBack, _dDied, _dLinErr;
+        private static int _dBackVillages, _dStopQuiet, _dStopSiege, _dNoClock, _dNoVillage, _dAbandonLeft;
+        private static readonly HashSet<string> _dBackRegions = new HashSet<string>();
+        private static bool _abandonLogged;
 
         internal static void Reset()
         {
             lock (_lock) { _raids.Clear(); _byId = null; }
             lock (_errSites) _errSites.Clear();
-            _stumblesAll = 0;
+            _stumblesAll = 0; _abandonLogged = false;
             NewDay();
         }
 
@@ -98,6 +103,9 @@ namespace Armoury
             _dDead = _dFled = _dAway = _dCapWould = _dSlaverHit = _dSlaverDead = _dGameHearth = _dGamePeople = 0.0;
             _dLootAi = _dLootPlayer = 0;
             _dSteps = _dRaids = _dRaidsFull = _dRaidMen = _dResumed = _dForagers = _dNoK = _dMoveFail = _dForeign = 0;
+            _dBack = _dDied = _dLinErr = 0.0;
+            _dBackVillages = _dStopQuiet = _dStopSiege = _dNoClock = _dNoVillage = _dAbandonLeft = 0;
+            _dBackRegions.Clear();
             _stumbles = 0;
         }
 
@@ -438,6 +446,112 @@ namespace Armoury
                 if (st != null && st.IsVillage && st.Village != null && st.StringId != null) map[st.StringId] = st.Village;
             _byId = map;
             return map;
+        }
+
+        // ------------------------------------------------------------ doba: smierc, powrot, oblezenie (K3)
+        private static int Clamp(int x, int lo, int hi) { return x < lo ? lo : (x > hi ? hi : x); }
+
+        /// <summary>Dzienne ryzyko smierci uchodzcy: 1 - (1 - L%)^(1/dni roku) (1.3%/rok przy 364 = 3.595e-5/d).</summary>
+        private static double DailyLoss(Settings s)
+        {
+            double y = Clamp01(s.RefugeeYearlyLossPercent / 100.0);
+            return 1.0 - Math.Pow(1.0 - y, 1.0 / Math.Max(28, CampaignTime.DaysInYear));
+        }
+
+        /// <summary>
+        /// Raz na dobe (ArmouryBehavior.OnDailyTick, zaraz po ScorchedEarth.OnDaily - zegar widzi dzisiejsze zerowanie): uchodzcy umieraja (bez narodzin),
+        /// potem wracaja - nikt, dopoki w regionie byl rabunek albo zerowanie z trafionymi w ostatnich Q dobach; potem dziennie reszta / (D - d), d = dni od ostatniego
+        /// najazdu w regionie - liniowo, wszyscy zywi w domu w dobie D; ostatni czlowiek wraca caly; oblezona warownia regionu wstrzymuje (wzor dogania - "rok" trzyma).
+        /// Bez czynnika niebezpieczenstwa w tempie (lamalby "rok" - U13). Wylaczone - wszyscy do domu od razu (Abandon).
+        /// </summary>
+        internal static void Daily()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || Campaign.Current == null) return;
+                if (!On) { Abandon(); return; }
+                _abandonLogged = false;
+                if (PeopleBook.RefugeeVillages == 0) return;
+                int today = (int)CampaignTime.Now.ToDays;
+                int Q = Clamp(s.RefugeeReturnQuietDays, 0, 360);
+                int D = Clamp(s.RefugeeReturnDays, Q + 1, 3640);
+                double q = DailyLoss(s);
+                var list = new List<KeyValuePair<string, double>>();
+                PeopleBook.RefugeesSnapshot(list);
+                var map = ById();
+                foreach (var kv in list)
+                {
+                    try
+                    {
+                        Village v;
+                        if (!map.TryGetValue(kv.Key, out v) || v == null || v.Settlement == null) { _dNoVillage++; continue; }
+                        double away = kv.Value;
+                        if (q > 0.0)
+                        {
+                            double died = PeopleBook.RefugeesDie(v, away * q);
+                            _dDied += died; away -= died;
+                        }
+                        if (!(away > 0.0)) continue;
+                        var region = OutlawLaw.RegionFor(v.Settlement);
+                        int last;
+                        if (!PeopleBook.LastStrike(region, out last)) { last = today - Q; _dNoClock++; }    // nie powinno sie zdarzyc (zegar rusza razem z kontem)
+                        int d = today - last;
+                        if (d < Q) { _dStopQuiet++; continue; }
+                        if (region != null && region.IsUnderSiege) { _dStopSiege++; continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
+                        double back = away / Math.Max(1, D - d);
+                        if (away - back < 1.0) back = away;                                            // ostatni czlowiek wraca caly
+                        double got = PeopleBook.RefugeesHome(v, back, PeopleBook.MRefugeeHome, PeopleUnit.GamePerMan);
+                        double err = Math.Abs(got - back) / Math.Max(1.0, back);                       // kontrola liniowosci: 0 poza dnem konta
+                        if (err > _dLinErr) _dLinErr = err;
+                        if (got > 0.0)
+                        {
+                            _dBack += got; _dBackVillages++;
+                            if (region != null && region.StringId != null) _dBackRegions.Add(region.StringId);
+                        }
+                    }
+                    catch (Exception e) { Stumble("Devastation.Daily(wies)", e); }
+                }
+            }
+            catch (Exception e) { Stumble("Devastation.Daily", e); }
+        }
+
+        /// <summary>
+        /// Spustoszenie wylaczone (MCM albo brak jednostki ludzi / przyrostu naturalnego / latek rabunku), a w ksiedze sa uchodzcy: wracaja do swoich wsi od razu
+        /// (PeopleBook.RefugeesHome - ta sama stawka 1/k, z ktora ich zdjeto) - ludzie nie moga utknac na koncie, ktorego nikt nie obsluguje. Zabici zostaja w liczniku.
+        /// </summary>
+        private static void Abandon()
+        {
+            if (PeopleBook.RefugeeVillages == 0) return;
+            var list = new List<KeyValuePair<string, double>>();
+            PeopleBook.RefugeesSnapshot(list);
+            var map = ById();
+            double people = 0.0, hearth = 0.0; int villages = 0, left = 0;
+            foreach (var kv in list)
+            {
+                try
+                {
+                    Village v;
+                    float per = map.TryGetValue(kv.Key, out v) && v != null ? PopulationLaw.HearthPerMan(v) : 0f;
+                    if (!(per > 0f) || float.IsInfinity(per)) { left++; continue; }
+                    per = Math.Min(per, PeopleUnit.GamePerMan);           // ta sama stawka, z ktora Strike ich zdjal (k ponizej 2: 0.5)
+                    double got = PeopleBook.RefugeesHome(v, kv.Value, PeopleBook.MRefugeeHome, per);
+                    if (!(got > 0.0)) { left++; continue; }
+                    people += got; hearth += got * per; villages++;
+                    _dBack += got; _dBackVillages++;
+                }
+                catch (Exception e) { left++; Stumble("Devastation.Abandon", e); }
+            }
+            _dAbandonLeft = left;
+            if (villages > 0 || (left > 0 && !_abandonLogged))
+            {
+                _abandonLogged = true;
+                var s = Settings.Current;
+                Log.Info("Ludzie (spustoszenie): WYLACZONE (" + (s != null && !s.DevastationEnabled ? "Devastation Enabled w MCM" : "wymaga People Unit Enabled i Natural Growth Enabled oraz wpietych latek rabunku")
+                         + ") - " + F0(people) + " uchodzcow z " + villages + " wsi wrocilo do domu od razu (+" + F(hearth, "0.###") + " hearth)"
+                         + (left > 0 ? "; " + left + " wsi bez przelicznika ludzi zostaje na koncie" : "")
+                         + ". Odtad jak przed E4/5: rabunek gry, zerowanie armii w hearth, +0.5 hearth dziennie ponizej progu.");
+            }
         }
 
         private static string F(double v, string fmt) { return v.ToString(fmt, Inv); }

@@ -95,7 +95,7 @@ namespace Armoury
         // E4/4 (9a): DOM miasta jako stan - id miasta -> ludzie (stan w zapisie, "t:"); zakladanie i porzucanie - PopulationLaw (TownPeopleFrozen)
         private static readonly Dictionary<string, float> _town = new Dictionary<string, float>();
         // E4/4 (R17): podloga 10 hearth - od ostatniego odczytu linii "Ludzie: przyrost naturalny" (PopulationLaw.GrowthDaily czyta i zeruje)
-        private static double _floorHearth, _floorPoolMen, _floorNothingMen, _floorNothingHearth;
+        private static double _floorHearth, _floorPoolMen, _floorNothingMen, _floorNothingHearth, _floorRefMen;
         private static int _floorN;
         // E4/5 (113n): konto UCHODZCY i zegar regionu - stan w zapisie ("u:", "r:"). Osobny zamek RefGate: latki modeli (GetHearthLevel, produkcja wsi) moga isc z watkow AI
         private sealed class Ref { public double Away, Dead, Died; public string Region; }      // poza domem; zabici przy spustoszeniu; zmarli na koncie (od poczatku kampanii); region (bez zapisu)
@@ -121,7 +121,7 @@ namespace Armoury
             _deadSess = 0; _stumbles = _stumblesDay = 0; _errSites.Clear(); _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); Array.Clear(_h40, 0, MKinds); _disbandMen40 = 0; _disbandNoVillage = 0; }
             _kv.Clear(); _cv.Clear(); _kvSet = false; _kvNote = null;
-            lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0; _floorN = 0; }
+            lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = _floorRefMen = 0; _floorN = 0; }
             ClearRefugees();
         }
 
@@ -357,7 +357,8 @@ namespace Armoury
         // ---------------------------------------------------------------- E4/4 (R17): podloga 10 hearth bez ludzi z niczego
         /// <summary>
         /// Gra (Village.DailyTick) i BK (VillageDailyTicktPatch) stawiaja wsi ponizej 10 hearth z powrotem 10 - `hearth` punktow dopisanych z niczego.
-        /// Tylu ludzi (hearth x k_v) schodzi z puli wyrzutkow regionu wsi (OutlawLaw.TakeForFloor - wrocili do domu; od E4/5 najpierw uchodzcy tej wsi);
+        /// Tylu ludzi (hearth x k_v) schodzi najpierw z konta UCHODZCY tej wsi (E4/5: RefugeesHome MRefugeeFloor), potem z puli wyrzutkow regionu wsi
+        /// (OutlawLaw.TakeForFloor - wrocili do domu);
         /// czego pula nie ma - licznik "podloga z niczego" (prog testu 0). Hearth zostaje taki, jak go postawila gra (podlogi nie cofamy - gra trzyma 10).
         /// Wola PopulationLaw.FloorFinalizer (finalizer ticku wsi, tylko przy czynnym przyroscie naturalnym). Nie rzuca (U24).
         /// </summary>
@@ -368,17 +369,23 @@ namespace Armoury
             {
                 float k = v.Settlement != null ? PopulationLaw.KFor(v.Settlement) : 0f;
                 double men = k > 0f ? (double)hearth * k : 0.0;
-                double got = 0.0;
+                double got = 0.0, fromRef = 0.0;
                 if (men > 0.0)
                 {
-                    var region = OutlawLaw.RegionFor(v.Settlement);
-                    got = OutlawLaw.TakeForFloor(region, (float)men);
+                    // E4/5: najpierw uchodzcy tej wsi (ruch UCHODZCY -> DOM bez hearth - dopisala go gra), potem wyrzutki regionu
+                    fromRef = RefugeesHome(v, men, MRefugeeFloor, 1f / k);
+                    double left = men - fromRef;
+                    if (left > 1e-9)
+                    {
+                        var region = OutlawLaw.RegionFor(v.Settlement);
+                        got = OutlawLaw.TakeForFloor(region, (float)left);
+                    }
                 }
                 if (got > 0.0) Note(got, MFloor, k > 0f ? got / k : 0.0);       // hearth dopisala gra - tu tylko ruch ludzi WYRZUTKI -> DOM
                 lock (Gate)
                 {
-                    _floorN++; _floorHearth += hearth; _floorPoolMen += got;
-                    double rest = men - got;
+                    _floorN++; _floorHearth += hearth; _floorPoolMen += got; _floorRefMen += fromRef;
+                    double rest = men - fromRef - got;
                     if (rest > 0.0) { _floorNothingMen += rest; _floorNothingHearth += k > 0f ? rest / k : 0.0; }
                     else if (!(k > 0f)) _floorNothingHearth += hearth;     // wies bez przelicznika ludzi - hearth z niczego
                 }
@@ -387,12 +394,12 @@ namespace Armoury
         }
 
         /// <summary>PopulationLaw.GrowthDaily: podloga 10 od ostatniego odczytu (kopiuje i zeruje).</summary>
-        internal static void TakeFloor(out int villages, out double hearth, out double poolMen, out double nothingMen, out double nothingHearth)
+        internal static void TakeFloor(out int villages, out double hearth, out double poolMen, out double nothingMen, out double nothingHearth, out double refMen)
         {
             lock (Gate)
             {
-                villages = _floorN; hearth = _floorHearth; poolMen = _floorPoolMen; nothingMen = _floorNothingMen; nothingHearth = _floorNothingHearth;
-                _floorN = 0; _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = 0;
+                villages = _floorN; hearth = _floorHearth; poolMen = _floorPoolMen; nothingMen = _floorNothingMen; nothingHearth = _floorNothingHearth; refMen = _floorRefMen;
+                _floorN = 0; _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = _floorRefMen = 0;
             }
         }
 
@@ -533,7 +540,7 @@ namespace Armoury
             }
             else
             {
-                Note(n, cause, 0.0);
+                Note(n, cause, legacy > 0f ? n * legacy : 0.0);      // podloga: hearth dopisala gra (legacy = 1/k osady - tylko do linii)
                 lock (RefGate) _dRefFloor += n;
             }
             return n;
