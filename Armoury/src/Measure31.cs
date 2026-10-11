@@ -470,7 +470,7 @@ namespace Armoury
                 long rest = change - _udModel - _udBattle - _udNothing - _udFrom + _udOut - _udLoot - block;
                 return "rodow " + _udClans.Count + ", kiesy " + now + " (zmiana " + Sg(change) + ") = rozliczenie rodu (model, z zoldem) " + Sg(_udModel) + " (" + _udModelN + " rozliczen)"
                        + " + bitwy (zdarzenia z niczego) " + _udBattle + " + lup z cial " + _udLoot + " + inne zdarzenia z niczego " + _udNothing + " + od innych posiadaczy " + _udFrom
-                       + " - oddali innym " + _udOut + " + nasz tick dobowy (zwrot korony, Bank, budzet) " + Sg(block) + " + reszta " + Sg(rest);
+                       + " - oddali innym i w nicosc " + _udOut + " + nasz tick dobowy (zwrot korony, Bank, budzet) " + Sg(block) + " + reszta " + Sg(rest);
             }
             catch (Exception e) { Seal31.Stumble("Measure31.UndeadPart", e); return "blad odczytu"; }
         }
