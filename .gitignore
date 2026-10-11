@@ -6,3 +6,5 @@ libs/*.pdb
 *.user
 *.suo
 .vs/
+__pycache__/
+*.pyc
