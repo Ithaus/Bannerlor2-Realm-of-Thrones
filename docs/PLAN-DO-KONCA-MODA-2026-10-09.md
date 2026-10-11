@@ -142,6 +142,7 @@ Cel: kazdy czlowiek policzony; plon z pracy ludzi; rabunek, pobor i smierc zabie
 | 4.17 | Wolni Ludzie 300 tys., walcza wszyscy dorosli; niewola tylko w kulturach kanonu (Zelazne Wyspy 27 tys.) | zdecyd. | S, NK | 4.15 |
 | 4.18 | Inni tylko z poleglych za Murem i przy nim; jency Innych wstaja; sprawdzic inne drogi trupow z niczego | zdecyd. | S | 4.1 |
 | 4.19 | Po poborze: Straz z ludnosci, jency z rabunku od BK, dluznik rozpuszcza poczet | zdecyd. | D | 4.8 |
+| 4.20 | Niebezpieczenstwo okolicy z udzialu pustych osad (wioski poboczne E4/11) zamiast stanu "spladrowana" gry - decyzja po liczbach z testu koncowego etapu 4, w poprawkach po tescie (Jeff 11.10) | Ty | S | 4.5, 4.6 |
 
 **Skonczone, gdy:** ludnosc rosnie 0.2-0.8% rocznie (w pomiarze BK najwyzej 2%); wies, z ktorej uciekla 1/3 ludzi, daje mniej plonu; spalona wioska (takze poboczna) wraca po roku; przyrost zalog bez werbunku = 0; test z zima od poczatku 120 dob: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu co najmniej rok.
 
@@ -190,6 +191,7 @@ Cel: zbroi starczy dla armii (po 174 ok. 120-190 zbroi na tulow dziennie przy po
 | 6.15 | Konie z lupu i zbrojowni nie niosa piechura | blad | M | - |
 | 6.16 | Juczne konie z targu; zapasowe konie lordow; udzwig | zdecyd. | S | - |
 | 6.17 | Naprawy: material wedlug rodzaju, Twoje rece ta sama regula; AI naprawia tylko to, co nosi | zdecyd. | S | 1.2 |
+| 6.18 | Wioski poboczne wedlug rodzaju: rybacka daje ryby, mlyn zboze (mieszanka okregu z obrazkow - A02 A4); razem z 6.3 i 6.9 (Jeff 11.10) | zdecyd. | S | 4.6, 6.3 |
 
 **Skonczone, gdy** (120 dob): cos na tulowiu ma co najmniej 75% zolnierzy AI; skor i plotna w swiecie nie ubywa szybciej niz 10 dziennie, zapas lnu i welny nie rosnie 3 miesiace z rzedu; w linii "Konie" kazdy znikajacy kon ma przyczyne.
 

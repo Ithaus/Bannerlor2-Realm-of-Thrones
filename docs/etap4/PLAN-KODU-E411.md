@@ -385,7 +385,7 @@ Nie przechodzi -> wylaczamy w `Armoury.json` autotestu `TownFoodByVillagePeople`
 
 ## 13. Pytania otwarte (tylko kierunek; reszte decyduje plan)
 
-**Jeff 11.10 ok. 13:50:** (1) wyglad spalonej wioski i komunikat - ETAP 7 (7.10) - ROZSTRZYGNIETE; (2) i (3) - Jeff prosi o wyjasnienie / termin (propozycja w czacie: (2) w poprawkach po tescie koncowym etapu 4, jesli pomiar pokaze potrzebe; (3) etap 6 razem z 6.3/6.9).
+**Jeff 11.10 ok. 13:50:** (1) wyglad spalonej wioski i komunikat - ETAP 7 (7.10) - ROZSTRZYGNIETE; (2) po liczbach z testu koncowego etapu 4, w poprawkach po tescie (PLAN-DO-KONCA 4.20) - ROZSTRZYGNIETE; (3) etap 6 razem z 6.3/6.9 (PLAN-DO-KONCA 6.18) - ROZSTRZYGNIETE.
 
 1. **Wyglad spalonej wioski (zgliszcza, ciemne domy) i komunikat "X has been burned" - teraz czy z 7.10?** Rada: z 7.10 (zmiany wizerunkow mapy to osobna proba ze zdjeciami;
    E4/11 = ksiega, ogien na wlasciwej wiosce, dymek ze stanem, menu). Bez odpowiedzi - 7.10.
