@@ -620,6 +620,7 @@ namespace Armoury
         public bool PopulationRentEnabled = true;          // a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)
         public float PopulationRentPerHead = 40f;          // rents and dues a lord draws from each subject a year, in coins (about 40 pence a head in the medieval estimate)
         public float PopulationScale = 1f;                 // scale on every land's population (Westeros ~30 million, Essos with its hinterlands ~30 million)
+        public bool PeopleMeasureEnabled = true;           // log only: daily lines accounting for every hearth, prosperity point and militia man gained or lost and why, prisoners taken, freed and changing sides, the realms' free hands, the Night's Watch and the Free Folk, the Others by place, and the bite of winter by realm - changes nothing in the game
         public float PopulationRentMaxShare = 0.2f;        // a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)
         public float RentTaxLow = 0.7f;                    // the fief's tax decree (Banner Kings) sets the rent: Low takes this share of the usual rent
         public float RentTaxHigh = 1.3f;                   // High tax takes this much of the usual rent (and Banner Kings costs loyalty for it)

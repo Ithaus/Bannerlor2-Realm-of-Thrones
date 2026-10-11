@@ -242,6 +242,22 @@ namespace Armoury
         /// <summary>Do uzytku w Armoury (WinterBite).</summary>
         internal static CampaignTime.Seasons Now() { var t = CampaignTime.Now; return EconSeason(ref t); }
 
+        /// <summary>E4/0 (pomiar, tylko odczyt): pora kalendarza Westeros teraz, dzien pory (od 1) i jej dlugosc w dniach; false - klimat bez stanu
+        /// (niczego nie inicjuje - Ready() wola tylko Daily).</summary>
+        internal static bool SeasonInfo(out int season, out int day, out int len)
+        {
+            season = 0; day = 0; len = 0;
+            try
+            {
+                if (_segs.Count == 0) return false;
+                double now = NowDays();
+                var g = SegAt(now);
+                season = g.Season; day = (int)Math.Floor(now - g.Start) + 1; len = (int)Math.Round(g.Len);
+                return true;
+            }
+            catch { return false; }
+        }
+
         // ------------------------------------------------------------ data
         public static bool ToStringPrefix(ref CampaignTime __instance, ref string __result)
         {

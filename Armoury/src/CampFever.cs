@@ -84,7 +84,9 @@ namespace Armoury
                     var mp = pb != null ? pb.MobileParty : null;
                     if (mp == null) continue;
                     int sick, dead;
+                    int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
                     Strike(s, mp, ramp, 1f, out sick, out dead);
+                    try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
                     attSick += sick; attDead += dead;
                     Shout(mp, sick, dead, st, mainAttacks || mainDefends);
                 }
@@ -106,7 +108,9 @@ namespace Armoury
             foreach (var mp in defenders)
             {
                 int sick, dead;
+                int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
                 Strike(s, mp, ramp, defMul, out sick, out dead);
+                try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
                 defSick += sick; defDead += dead;
                 Shout(mp, sick, dead, st, mainAttacks || mainDefends);
             }

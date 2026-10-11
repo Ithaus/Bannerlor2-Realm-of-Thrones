@@ -167,6 +167,15 @@ namespace Armoury
         /// <summary>Czy ludnosc jest juz skalibrowana (ksiega "Ludzie:" czyta PeopleOf tylko wtedy - sama kalibracji nie wywoluje).</summary>
         internal static bool Calibrated { get { return _k.Count > 0; } }
 
+        /// <summary>E4/0 (pomiar, tylko odczyt): ilu ludzi tabeli na punkt hearth wsi (town = false) albo dobrobytu miasta (town = true) tej kultury;
+        /// 0 przed kalibracja i dla kultury spoza tabeli - kalibracji sami nie wolamy (jak ksiega "Ludzie:").</summary>
+        internal static float KOf(string culture, bool town)
+        {
+            float[] k;
+            if (culture == null || _k.Count == 0 || !_k.TryGetValue(culture, out k)) return 0f;
+            return town ? k[1] : k[0];
+        }
+
         internal static float PeopleOf(Settlement s)
         {
             if (s == null || s.Culture == null) return 0f;

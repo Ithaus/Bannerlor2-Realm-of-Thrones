@@ -80,6 +80,10 @@ namespace Armoury
 
         // licznik dnia
         private static float _inDesert, _inRouted, _inRaid, _inMisery, _inDisband, _outReturn;
+        // E4/0 (pomiar, tylko odczyt): zywe liczniki od ostatniego zerowania (w ludziach) - Measure40 dopelnia nimi dobe "od zerowania do migawki"
+        internal static float RaidMenNow { get { return _inRaid; } }
+        internal static float MiseryMenNow { get { return _inMisery; } }
+        internal static float ReturnMenNow { get { return _outReturn; } }
         private static int _bornBands, _bornMen, _refused, _emptyRemoved, _bandRecruit, _prisonerJoin, _upLoot, _upFence, _upBlocked, _fenceGold;
         private static int _desUndead;      // W4b: dezerterzy Innych (partia Innych albo wight) - do niczego, nie do puli
 
@@ -304,6 +308,7 @@ namespace Armoury
                     sum += TakeCommoners(r, h * per);
                 }
                 Log.Info("Wyrzutki: pula poczatkowa " + (int)sum + " ludzi w " + Nodes().Count + " regionach (" + per.ToString("0.000", CultureInfo.InvariantCulture) + " na hearth, zabrani z wsi).");
+                try { Measure40.TakeSeed(sum); } catch { }   // E4/0: siew osobno, poza RESZTA budzetu hearth (U10; tylko pomiar)
             }
             catch (Exception e) { Log.Error("OutlawLaw.Seed", e); }
         }
@@ -776,6 +781,7 @@ namespace Armoury
                             }
                             ReturnHome(r, back);
                             _outReturn += back;
+                            if (back > 0f && (r.BoundVillages == null || r.BoundVillages.Count == 0)) { try { Measure40.NoteReturnNoVillage(back); } catch { } }   // E4/0: region bez wsi - ReturnHome nic nie dopisal (tylko pomiar)
                         }
                     }
                     catch { }
@@ -879,6 +885,7 @@ namespace Armoury
                 FenceLog(s, _upFence, _fenceGold);
                 H3NewDay();
                 _desUndead = 0; OverflowHome.NewDay();
+                try { Measure40.TakeOutlaw(_inRaid, _inMisery, _outReturn, Settings.Current.OutlawHearthPerMan); } catch { }   // E4/0: przekazanie tuz przed zerowaniem (tylko pomiar)
                 _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;
                 _bornBands = _bornMen = _refused = _emptyRemoved = _bandRecruit = _prisonerJoin = _upLoot = _upFence = _upBlocked = _fenceGold = 0;
             }

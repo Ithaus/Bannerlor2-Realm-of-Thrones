@@ -148,6 +148,9 @@ namespace Armoury
         private static int _freed, _freedOutside;
         private static int _toBk, _asSerfs, _asNobles, _toVillageMen, _toCommon, _template, _templateGarr, _templateBandit, _homeless, _vanished, _bkOddCalls, _bkOddDiff;
         private static float _toVillageHearth, _toCommonHearth, _templateFloat;
+        // E4/0 (pomiar, tylko odczyt): zywe liczniki hearth od ostatniego ClearDay - Measure40 dopelnia nimi dobe "od zerowania do migawki"
+        internal static float ToVillageHearthNow { get { return _toVillageHearth; } }
+        internal static float ToCommonHearthNow { get { return _toCommonHearth; } }
         // domy wedlug zrodla (SrcRouted / SrcFreed / SrcPool / SrcLaw): ludnosc BK, wies (tabory + prosci + bandyci), z szablonu
         private static readonly int[] _bkBy = new int[Srcs], _hearthBy = new int[Srcs], _tplBy = new int[Srcs];
         // Inni (wighty): rozbici pominieci w RoutedH3 i wighty, ktore doszly do SendHome inna droga - z niczego, do niczego
@@ -1472,7 +1475,11 @@ namespace Armoury
                 WriteCsv(day - 1);
             }
             catch (Exception e) { Log.Error("LosersFlee.Daily", e); }
-            finally { ClearDay(); }
+            finally
+            {
+                try { Measure40.TakeFlee(_toVillageHearth, _toCommonHearth); } catch { }   // E4/0: przekazanie licznikow hearth tuz przed zerowaniem (tylko pomiar)
+                ClearDay();
+            }
         }
 
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }

@@ -71,7 +71,9 @@ namespace Armoury
                         if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
 
                         float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
+                        float h0 = v.Hearth;
                         v.Hearth = Math.Max(floor, v.Hearth - drain);
+                        try { Measure40.NoteHearth(Measure40.SrcForage, v.Hearth - h0, v.Settlement); } catch { }   // E4/0: zerowanie armii (tu licznika nie ma; tylko pomiar)
                         if (grain != null && mp.ItemRoster != null)
                         {
                             int want = 1 + mp.MemberRoster.TotalManCount / 250;
@@ -101,13 +103,17 @@ namespace Armoury
                 if (__result.ResultNumber <= 0f) return;
                 if (village.Hearth < Math.Max(1, s.RefugeeFloorHearth))
                 {
+                    float r0 = __result.ResultNumber;
                     __result.Add(0.5f, _txtScar);      // uchodzcy wracaja - dno nie jest grobem
+                    if (Measure40.InVillageTick) Measure40.NoteScar(__result.ResultNumber - r0);   // E4/0: tylko w ticku wsi gry (tylko pomiar)
                     return;
                 }
                 if (village.Hearth < Math.Max(1, s.ScarThresholdHearth))
                 {
                     float keep = MBMath.ClampFloat(Math.Max(1, s.ScarRegenPercent) / 100f, 0.05f, 1f);
+                    float r0 = __result.ResultNumber;
                     __result.AddFactor(keep - 1f, _txtScar);
+                    if (Measure40.InVillageTick) Measure40.NoteScar(__result.ResultNumber - r0);   // E4/0: tylko w ticku wsi gry (tylko pomiar)
                 }
             }
             catch { }

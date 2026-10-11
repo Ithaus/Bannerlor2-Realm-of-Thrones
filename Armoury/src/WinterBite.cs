@@ -89,6 +89,33 @@ namespace Armoury
             return cap;
         }
 
+        /// <summary>E4/0 (pomiar, tylko odczyt): ciecie plonu wsi dzis - ten sam rachunek co VillageProdPostfix / VillageFoodPostfix (0 poza zima).
+        /// Uwaga dla E4/4 (109 dodawal identyczna metode): NIE dublowac - po E4/1 ten sam czynnik regionu.</summary>
+        internal static float VillageCut(Village village)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !WinterNow() || village == null || village.Settlement == null) return 0f;
+                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
+                          * Northness(village.Settlement.GetPosition2D.Y);
+                return MBMath.ClampFloat(cut, 0f, 0.95f);
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>E4/0 (pomiar, tylko odczyt): dodatek jedzenia partii zima - ten sam rachunek co FoodPostfix (0 poza zima).</summary>
+        internal static float PartyFoodBonus(MobileParty party)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !WinterNow() || party == null) return 0f;
+                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y));
+            }
+            catch { return 0f; }
+        }
+
         // ---- patche ----
 
         /// <summary>Konsumpcja partii zima: +50% razy gradient polnocy.</summary>

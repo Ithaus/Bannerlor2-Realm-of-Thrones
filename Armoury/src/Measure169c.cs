@@ -30,6 +30,7 @@ namespace Armoury
     internal static class Measure169c
     {
         private static bool On { get { var s = Settings.Current; return s != null && s.LogEnabled && s.ClanIncomeBookEnabled && s.ClanIncomeBookStableD; } }
+        internal static bool LinesOn { get { return On; } }   // E4/0: czy linie 169c biegna (milicja w "Zalogi", niewolni BK w "Krainy")
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static Harmony _harmony;
         private static readonly HashSet<MethodBase> _hooked = new HashSet<MethodBase>();
@@ -58,6 +59,7 @@ namespace Armoury
             _budget.Clear();
             _marN = _marPoorRich = 0; _marDowry = 0;
             _travLast.Clear(); _othersLast.Clear(); _othersBattle = 0;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0; _slavesByCult.Clear(); _slavesDay = -1;
             _twinsEnter.Clear(); _twins = null; _twinsLooked = false; _ratioStart = -1;
             _errSites.Clear(); _stumbles = 0;
             RansomFlows.Reset();
@@ -103,6 +105,7 @@ namespace Armoury
                 Wire("budzet konsumpcji miast", AccessTools.Method(typeof(ItemConsumptionBehavior), "MakeConsumption", new[] { typeof(Town), typeof(Dictionary<ItemCategory, float>), typeof(Dictionary<ItemCategory, int>) }), nameof(ConsPre), null);
                 var rot = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTOthersCampaignBehavior");
                 Wire("Inni: nekromancja ROT", rot != null ? AccessTools.Method(rot, "OnMapEventEnded") : null, nameof(OthersPre), nameof(OthersFin));
+                Wire("Inni: rajd ROT", rot != null ? AccessTools.Method(rot, "OnRaidCompleted") : null, nameof(RotRaidPre), nameof(RotRaidFin));   // E4/0 W9: wighty z rajdu (Hearth/2 z niczego)
             }
             // przeglad 169c: doba startu kampanii w logu - narzedzie progow liczy doby 120/364/728 i rok 1/2 od niej, takze w logu kontynuacji z zapisu
             string start = "-";
@@ -294,7 +297,21 @@ namespace Armoury
               .Append(" | werbunek gry od notabli ").Append(S(_gNotables)).Append(" | przyrost z modelu zalogi gry (bez werbunku i bez zlota) ").Append(S(_gModel))
               .Append(" | z partii do zalogi ").Append(S(_gFromParty)).Append(", z zalogi do partii ").Append(S(-_gToParty)).Append(" | patrole BK wracajace do zalogi ").Append(S(_gBkPatrol))
               .Append(" | reszta (bitwy, oblezenia, zmiana wlasciciela, dezercja, jency, ROT, nasze moduly) ").Append(first ? "-" : S(dGar - named))
-              .Append(" | milicja ").Append(mil).Append(first ? "" : " (" + S(dMil) + ")").Append('.');
+              .Append(" | milicja ").Append(mil).Append(first ? "" : " (" + S(dMil) + ")");
+            // E4/0 (U8 - bez osobnej linii Milicja): przyrost milicji z modelu w tickach osad gry (okna W1/W2 Measure40), zabici z ksiegi ludzi
+            try
+            {
+                if (Measure40.On)
+                {
+                    double mv, mt, mc; Measure40.TakeMilitia(out mv, out mt, out mc);
+                    long model = (long)Math.Round(mv + mt + mc); int killed = PeopleLedger.KilledMilitiaToday;
+                    sb.Append(" | milicja (E4/0): z modelu w ticku ").Append(S(model)).Append(" (wsie ").Append(mv.ToString("0", Inv)).Append(", miasta ").Append(mt.ToString("0", Inv))
+                      .Append(", zamki ").Append(mc.ToString("0", Inv)).Append(") - zabici ").Append(killed).Append(" (ksiega ludzi) + reszta ").Append(first ? "-" : S(dMil - model + killed))
+                      .Append(" (powrot wsi do Normal, przejecie osady, po oblezeniu, ROT, jency)");
+                }
+            }
+            catch (Exception e) { Stumble("GarrisonLine(milicja E4/0)", e); }
+            sb.Append('.');
             _garLast = gar; _milLast = mil;
             _gNotables = _gModel = _gFromParty = _gToParty = _gBkPatrol = 0;
             return sb.ToString();
@@ -531,6 +548,8 @@ namespace Armoury
             var csv = new StringBuilder(65536);
             var cls = new long[6]; long total = 0, consumed = 0, budget = 0; double table = 0; int n = 0, miss = 0;
             var byK = new Dictionary<string, long[]>();   // krolestwo -> [ludnosc BK, zuzycie, budzet, ludnosc tabeli]
+            bool e40 = Measure40.On;                      // E4/0: niewolni BK wedlug krainy (kultura regionu z pierwszej doby sesji) do linii "Krainy (4.15)"
+            _slavesByCult.Clear(); _slavesDay = e40 ? day : -1;
             object[] types = null;
             if (_popType != null) { types = new object[6]; for (int i = 0; i < 6; i++) { try { types[i] = Enum.ToObject(_popType, i); } catch { types[i] = null; } } }
             foreach (var st in Settlement.All)
@@ -557,6 +576,11 @@ namespace Armoury
                     long bud = 0; if (st.Town != null) _budget.TryGetValue(st.Town, out bud);
                     n++; total += tot; consumed += cons; budget += bud;
                     for (int i = 0; i < 6; i++) cls[i] += c[i];
+                    if (e40 && c[3] > 0)
+                    {
+                        try { string ck = Measure40.CultureAtStart(OutlawLaw.RegionFor(st)); long sv; _slavesByCult.TryGetValue(ck, out sv); _slavesByCult[ck] = sv + c[3]; }
+                        catch (Exception e) { Stumble("PopulationLine(niewolni E4/0)", e); }
+                    }
                     var k = st.OwnerClan != null && st.OwnerClan.Kingdom != null ? st.OwnerClan.Kingdom.Name.ToString() : "(bez krolestwa)";
                     long[] kv; if (!byK.TryGetValue(k, out kv)) { kv = new long[4]; byK[k] = kv; }
                     kv[0] += tot; kv[1] += cons; kv[2] += bud; kv[3] += (long)tp;
@@ -580,6 +604,17 @@ namespace Armoury
                    + ", " + ClassName[2] + " " + cls[2] + ", " + ClassName[3] + " " + cls[3] + ", " + ClassName[5] + " " + cls[5] + "; ludnosc tabeli PopulationLaw " + table.ToString("0", Inv)
                    + " | zuzycie BK (ConsumedValue) razem " + consumed + ", budzet konsumpcji gry (suma popytu kategorii) razem " + budget
                    + " | wedlug krolestw: " + string.Join("; ", parts.ToArray()) + " | wartosc wyrobow warsztatow i karawany w miastach - (w ksiegach 147/148/WorkshopLaw i 174b) | plik ludnosc-bk.csv.";
+        }
+
+        // E4/0: niewolni BK wedlug krainy z tej doby (linia "Krainy (4.15)" ksiegi ludzi biegnie pozniej w tej samej dobie)
+        private static readonly Dictionary<string, long> _slavesByCult = new Dictionary<string, long>();
+        private static int _slavesDay = -1;
+        internal static bool SlavesOf(string culture, int day, out long n)
+        {
+            n = 0;
+            if (_slavesDay != day || culture == null) return false;
+            _slavesByCult.TryGetValue(culture, out n);
+            return true;
         }
 
         // ============================================================ SLUBY AI
@@ -675,8 +710,114 @@ namespace Armoury
             return s;
         }
 
-        public static void OthersPre(MapEvent __0, out int __state) { __state = 0; try { if (On) __state = OthersMen(__0); } catch { } }
-        public static Exception OthersFin(Exception __exception, MapEvent __0, int __state) { try { if (On) _othersBattle += OthersMen(__0) - __state; } catch (Exception e) { Stumble("OthersFin", e); } return __exception; }
+        // E4/0 (W8): nekromancja wedlug miejsca bitwy (za Murem, przy Murze, Westeros, Essos) i jency Innych kasowani przez ROT (RosterToReceiveLootPrisoners.Clear)
+        internal sealed class OthersState { public int Men, Pris; public List<TroopRoster> Rosters; }
+        private static readonly long[] _othersPlace = new long[4];
+        private static readonly string[] PlaceName = { "za Murem", "przy Murze", "Westeros", "Essos" };
+        private static long _othersPlaceN, _othersPrisCleared, _rotRaidMen, _rotRaidN;
+        private static MethodInfo _mBeyond; private static bool _beyondTried;
+
+        private static int OthersPris(MapEvent me, List<TroopRoster> seen)
+        {
+            int s = 0;
+            foreach (var side in new[] { BattleSideEnum.Attacker, BattleSideEnum.Defender })
+            {
+                var ps = me.PartiesOnSide(side);
+                if (ps == null) continue;
+                for (int i = 0; i < ps.Count; i++)
+                {
+                    var mep = ps[i]; var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                    if (mp == null || mp.IsMainParty || !IsOthers(mp)) continue;
+                    var r = mep.RosterToReceiveLootPrisoners;
+                    if (r == null) continue;
+                    bool had = false; foreach (var x in seen) if (ReferenceEquals(x, r)) { had = true; break; }
+                    if (had) continue;
+                    seen.Add(r); s += r.TotalRegulars;
+                }
+            }
+            return s;
+        }
+
+        private static int PlaceOf(MapEvent me)
+        {
+            try
+            {
+                var pos = me.Position.ToVec2();
+                if (!_beyondTried)
+                {
+                    _beyondTried = true;
+                    var t = AccessTools.TypeByName("ROT.Misc.ROTUtilities");
+                    _mBeyond = t != null ? AccessTools.Method(t, "IsBeyondTheWall") : null;   // wzor CrashScribe NightKingCall
+                }
+                if (_mBeyond != null && Convert.ToBoolean(_mBeyond.Invoke(null, new object[] { pos }))) return 0;
+                var reg = OutlawLaw.RegionAt(pos);
+                string c = reg != null ? Measure40.CultureAtStart(reg) : "?";
+                if (c == "nightswatch") return 1;
+                return PopulationLaw.WesterosCultures.Contains(c) ? 2 : 3;
+            }
+            catch { return 3; }
+        }
+
+        public static void OthersPre(MapEvent __0, out OthersState __state)
+        {
+            __state = null;
+            try
+            {
+                if (!On || __0 == null) return;
+                var w = new OthersState { Men = OthersMen(__0) };
+                if (Measure40.On) { w.Rosters = new List<TroopRoster>(2); w.Pris = OthersPris(__0, w.Rosters); }
+                __state = w;
+            }
+            catch { __state = null; }
+        }
+
+        public static Exception OthersFin(Exception __exception, MapEvent __0, OthersState __state)
+        {
+            try
+            {
+                if (On && __state != null)
+                {
+                    int d = OthersMen(__0) - __state.Men;
+                    _othersBattle += d;
+                    if (__state.Rosters != null)
+                    {
+                        if (d != 0) { _othersPlace[PlaceOf(__0)] += d; _othersPlaceN++; }
+                        int after = 0; foreach (var r in __state.Rosters) after += r.TotalRegulars;
+                        if (__state.Pris > after) _othersPrisCleared += __state.Pris - after;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("OthersFin", e); }
+            return __exception;
+        }
+
+        // E4/0 (W9): rajd Innych - ROT dopisuje bandzie wighty Hearth/2 x mnoznik (z niczego)
+        internal sealed class RotRaidState { public MobileParty P; public int Men; }
+
+        public static void RotRaidPre(RaidEventComponent __1, out RotRaidState __state)
+        {
+            __state = null;
+            try
+            {
+                if (!On || !Measure40.On || __1 == null || __1.AttackerSide == null || __1.AttackerSide.LeaderParty == null) return;
+                var mp = __1.AttackerSide.LeaderParty.MobileParty;
+                if (mp == null || mp.MemberRoster == null || !IsOthers(mp)) return;
+                __state = new RotRaidState { P = mp, Men = mp.MemberRoster.TotalManCount };
+            }
+            catch { __state = null; }
+        }
+
+        public static Exception RotRaidFin(Exception __exception, RotRaidState __state)
+        {
+            try
+            {
+                if (__state == null || __state.P.MemberRoster == null) return __exception;
+                int d = __state.P.MemberRoster.TotalManCount - __state.Men;
+                if (d > 0) { _rotRaidMen += d; _rotRaidN++; }
+            }
+            catch (Exception e) { Stumble("RotRaidFin", e); }
+            return __exception;
+        }
 
         private static string OthersLine(int day)
         {
@@ -697,8 +838,27 @@ namespace Armoury
                        + (first ? " - pierwsza doba sesji" : " | zmiana w starych partiach " + S(grown) + " (w tym po bitwach - nekromancja ROT w oknie OnMapEventEnded " + S(_othersBattle)
                                                             + ", reszta: dosypki ROT, ochotnicy z mapy, straty " + S(grown - _othersBattle) + "), nowe partie " + newN + " z " + newMen
                                                             + " ludzi (narodziny band), zniknely " + goneN + " z " + goneMen + " ludzi")
-                       + " | blokady dosypek z niczego - linia CrashScribe \"Inni\" (T2b).";
+                       + " | blokady dosypek z niczego - linia CrashScribe \"Inni\" (T2b)";
+            // E4/0 (W8, W9, W10): nekromancja wedlug miejsca, jency Innych skasowani, odbici jency wcieleni do band (dzis w "reszcie" wyzej - U6), rajd ROT
+            try
+            {
+                if (Measure40.On && !first)
+                {
+                    long placed = _othersPlace[0] + _othersPlace[1] + _othersPlace[2] + _othersPlace[3];
+                    var x = new StringBuilder(400);
+                    x.Append(" | E4/0: nekromancja ROT wedlug miejsca bitwy (bitew ").Append(_othersPlaceN).Append("): ");
+                    for (int i = 0; i < 4; i++) x.Append(i > 0 ? ", " : "").Append(PlaceName[i]).Append(' ').Append(S(_othersPlace[i]));
+                    x.Append(" (razem ").Append(S(placed)).Append(", kontrola z oknem: razem - nekromancja = ").Append(placed - _othersBattle).Append(')')
+                     .Append(" | jency Innych skasowani przez ROT ").Append(_othersPrisCleared).Append(" (w nicosc; wzieci przez Innych w oknie jencow E4/0 ").Append(Measure40.TakenByOthers).Append(')')
+                     .Append(" | odbici jency wcieleni do band Innych ").Append(S(Measure40.RescuedToOthers)).Append(" (zywi ludzie - w reszcie wyzej; U6)")
+                     .Append(" | rajd ROT (Hearth/2 z niczego) ").Append(S(_rotRaidMen)).Append(" w ").Append(_rotRaidN).Append(" rajdach");
+                    s += x.ToString();
+                }
+            }
+            catch (Exception e) { Stumble("OthersLine(E4/0)", e); }
+            s += ".";
             _othersBattle = 0;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0;
             return s;
         }
 

@@ -4,6 +4,8 @@ Uzycie (Python 3, tylko odczyt):
     python -I tools/sprawdz_logi.py --grupa etap2 <Armoury-*.log> [--baza baza.json] [--zapisz-baze baza.json] [--csv budzet-rodow.csv] [--start-kampanii N]
 --grupa etap2     : progi etapu 2.
 --grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
+--grupa etap4     : (E4/0, paczka 188) progi T1-T10 pomiaru ludzi, jencow i zimy (projekt etapu 4, rozdz. 3 "E4/0" Test) w oknie dob kampanii 1-120
+                    (--do-doby N zmienia okno); T9 (bieg zimowy) i baza konca etapu (d300-364) - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -470,9 +472,331 @@ def etap3_main(logp, start_arg):
     return 0
 
 
+# ------------------------------------------------------------ E4/0 (188): progi paczki pomiaru ludzi, jencow i zimy (projekt etapu 4, rozdz. 3 "E4/0" Test)
+E4_KINDS = ["partie rodow", "garnizony", "milicje", "bandy", "karawany", "tabory wsi", "inne"]
+F_ = r"(-?\d+(?:\.\d+)?)"
+SF = r"([+-]?\d+(?:\.\d+)?)"
+
+
+def e4_series(lines, prefix, shift=0):
+    """{dzien wedlug ksiegi ludzi (dzien gry - 1): linia} - shift=1 dla linii z dniem gry (Wyrzutki, Przegrani (H3), Prawo jenca (I1), Budzet rodow (166))."""
+    d = {}
+    for s in lines:
+        if s.startswith(prefix):
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                d[k - shift] = s
+    return d
+
+
+def fnum(pat, s, default=None):
+    if s is None:
+        return default
+    m = re.search(pat, s)
+    if not m:
+        return default
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return default
+
+
+def e4_campfever_by_krainy(lines):
+    """Zmarli z zarazy z linii "CampFever:" (dzien w tej linii to doba oblezenia) przypisani do najblizszej NASTEPNEJ linii "Krainy (4.15)" (CampFever
+    biegnie na poczatku ticku dobowego, ksiega ludzi na koncu) -> {dzien Krainy: zmarli}."""
+    out, acc = {}, 0
+    rx = re.compile(r"^CampFever: \S+ dzien \d+ - oblegajacy \d+ chorych/(\d+) zmarlych, obroncy \d+/(\d+)")
+    for s in lines:
+        m = rx.match(s)
+        if m:
+            acc += int(m.group(1)) + int(m.group(2))
+            continue
+        if s.startswith("Krainy (4.15): dzien"):
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                out[k] = acc
+            acc = 0
+    return out
+
+
+def etap4_main(logp, start_arg, until=120):
+    """E4/0 (188): progi T1-T10 z projektu etapu 4 (rozdz. 3 "E4/0" Test) mierzalne w biegu 120 dob (okno: doby kampanii 1-until, domyslnie 120).
+    T9 (bieg zimowy B) i baza konca etapu (wojsko lordow d300-364, zalogi d364) wymagaja innego biegu / 364 dob - INFO.
+    Doba kampanii linii E4/0 = dzien z linii - start + 1 (linie z dniem gry - Wyrzutki, H3, I1, Budzet - normalizowane o -1)."""
+    lines = read(logp)
+    rep = Report()
+    hea = e4_series(lines, "Hearth (E4/0): dzien")
+    pro = e4_series(lines, "Dobrobyt (E4/0): dzien")
+    par = e4_series(lines, "Partie (E4/0): dzien")
+    jen = e4_series(lines, "Jency (E4/0): dzien")
+    kra = e4_series(lines, "Krainy (4.15): dzien")
+    swl = e4_series(lines, "Straz i Wolni Ludzie (4.15): dzien")
+    zim = e4_series(lines, "Zima (E4/0): dzien")
+    lud = e4_series(lines, "Ludzie: dzien")
+    zal = e4_series(lines, "Zalogi: przyrost bez werbunku (169c): dzien")
+    inn = e4_series(lines, "Wzrost Innych (169c): dzien")
+    wyr = e4_series(lines, "Wyrzutki: dzien", 1)
+    h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
+    i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
+    bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(hea)
+    if start is None:
+        start = alld[0] if alld else 0
+    win = [d for d in alld if 1 <= run_day(d, start) <= until]
+    print(f"plik: {logp} | doby z linia Hearth (E4/0): {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
+    if not alld:
+        rep.add("linia Hearth (E4/0)", "brak linii", "codziennie (PeopleMeasureEnabled + LogEnabled)", False)
+        rep.show()
+        return 0
+    measured = [d for d in win if "RESZTA" in hea[d]]          # bez pierwszej doby sesji (migawka)
+
+    # ---------------- T1: bledy, linia startowa, potkniecia
+    errs = [s for s in lines if s.startswith("ERROR in ")]
+    rep.add("T1: bledy naszych modow (ERROR in)", len(errs), "0", len(errs) == 0)
+    stl = next((s for s in lines if s.startswith("Pomiar ludzi (E4/0): okna wpiete:")), None)
+    if stl is None:
+        rep.add("T1: linia startowa Pomiar ludzi (E4/0)", "brak linii", "jest, BRAK: -, wlasciciele 11 celow", False)
+    else:
+        brak = re.search(r"; BRAK: (.*?); wlasciciele", stl)
+        ncel = num(r"wlasciciele latek na (\d+) celach", stl)
+        ok = brak is not None and brak.group(1).strip() == "-" and ncel == 11
+        rep.add("T1: linia startowa Pomiar ludzi (E4/0)", f"BRAK: {brak.group(1) if brak else '?'}; celow {ncel}", "BRAK: - i wlasciciele 11 celow", ok)
+        own = re.search(r"wlasciciele latek na \d+ celach: (.*?) \| dane 169c", stl)
+        rep.add("T1: wlasciciele latek 11 celow (U25)", own.group(1)[:400] if own else "?", "lista (obce latki na celach pomiaru)", None)
+    stum_days = [s for s in lines if s.startswith("Pomiar ludzi (E4/0): potkniecia dzis")]
+    stum = sum(num(r"potkniecia dzis (\d+)", s, int, 0) or 0 for s in stum_days)
+    stum += sum(num(r"\| potkniecia (\d+)", par[d], int, 0) or 0 for d in win if d in par)
+    sites = []
+    for s in stum_days:
+        m = re.search(r"\(sesja \d+; (.*)\) - pierwszy blad", s)
+        if m:
+            for part in m.group(1).split(", "):
+                nm = part.rsplit(" ", 1)[0]
+                if nm not in sites:
+                    sites.append(nm)
+    rep.add("T1: potkniecia E4/0 (okno)", f"{stum}" + (f" (miejsca: {', '.join(sites[:8])})" if sites else ""), "0 (najwyzej 5 w biegu, z nazwa miejsca)", stum <= 5)
+    for name, src in (("Hearth", hea), ("Dobrobyt", pro), ("Partie", par), ("Jency", jen), ("Krainy", kra), ("Straz i Wolni Ludzie", swl), ("Zima", zim)):
+        miss = [d for d in win if d not in src]
+        rep.add(f"linia {name} codziennie", f"brak w {len(miss)} z {len(win)} dob", "0", len(miss) == 0)
+
+    # ---------------- T2: budzet hearth zamkniety
+    rest = [fnum(r"RESZTA " + SF, hea[d]) for d in measured]
+    rest = [x for x in rest if x is not None]
+    if rest:
+        share = sum(1 for x in rest if abs(x) <= 1.0) / len(rest)
+        mean = st.mean(rest)
+        mabs = st.mean(abs(x) for x in rest)
+        worst = sorted(((abs(fnum(r"RESZTA " + SF, hea[d]) or 0), run_day(d, start)) for d in measured), reverse=True)[:3]
+        rep.add("T2: |RESZTA| <= 1 hearth/d", f"{100 * share:.1f}% dob ({len(rest)} dob; najgorsze: " + ", ".join(f"d{w[1]} {w[0]:.2f}" for w in worst) + ")",
+                ">= 95% dob", share >= 0.95)
+        rep.add("T2: RESZTA srednio", f"{mean:+.3f} hearth/d (srednia |RESZTA| {mabs:.3f})", "|srednia| <= 0.2 hearth/d (siew poza RESZTA - U10)", abs(mean) <= 0.2)
+    else:
+        rep.add("T2: RESZTA", "brak dob z bilansem (tylko pierwsza doba sesji?)", "|RESZTA| <= 1 w >= 95% dob", None)
+    nov = [fnum(r"powrot z puli w regionie bez wsi \(zeszli z puli, hearth bez zmian\) " + F_, hea[d]) or 0 for d in measured]
+    rep.add("powrot z puli w regionie bez wsi (srednio, ludzie/d)", f"{st.mean(nov):.2f}" if nov else "-", "INFO - ludzie znikaja z puli bez hearth (do E4/3)", None)
+
+    # ---------------- T3: rzad wielkosci zrodel hearth (3x od szacunku projektu = blad okna albo przyczyna do opisania)
+    def mean_pat(pat, days):
+        v = [fnum(pat, hea[d]) for d in days]
+        v = [x for x in v if x is not None]
+        return st.mean(v) if v else None
+    d30 = [d for d in measured if run_day(d, start) <= 30]
+    for name, pat, days, exp in (("T3: stala gry - baza (d1-30)", r"stala gry: baza " + SF, d30, 720.0),
+                                 ("T3: tabory wsi (hearth/d)", r"- tabory wsi -" + F_, measured, 220.0),
+                                 ("T3: rozbite tabory do swojej wsi (H3, hearth/d)", r"rozbite tabory do swojej wsi \+" + F_, measured, 165.0),
+                                 ("T3: wyrzutki w las - bieda (hearth/d)", r"wyrzutki w las \(bieda\) -" + F_, measured, 13.0)):
+        m = mean_pat(pat, days)
+        rep.add(name, f"{m:.1f}" if m is not None else "brak linii", f"ok. {exp:.0f} (od {exp / 3:.0f} do {exp * 3:.0f})",
+                (exp / 3 <= abs(m) <= exp * 3) if m is not None else None)
+    dec = [fnum(r"dekret Growth BK " + SF, hea[d]) or 0 for d in measured]
+    rep.add("T3: dekret Growth BK (suma)", f"{sum(dec):.2f}" if dec else "-", "0 (dekret tylko z konsoli)", (abs(sum(dec)) < 0.01) if dec else None)
+    flo = [(fnum(r"podloga 10 \+" + F_, hea[d]) or 0, num(r"podloga 10 \+[\d.]+ w (\d+) wsiach", hea[d], int, 0) or 0) for d in measured]
+    rep.add("T3/T10: podloga 10 (hearth, wsio-dni)", f"{sum(x[0] for x in flo):.2f} hearth w {sum(x[1] for x in flo)} wsio-dniach" if flo else "-", "INFO - pojedyncze wsie (R17)", None)
+    odd = [fnum(r"niezgodnosc ticku z modelem " + SF, hea[d]) or 0 for d in measured]
+    rep.add("T3: niezgodnosc ticku wsi z modelem (suma)", f"{sum(odd):.2f}" if odd else "-", "0 (inny prefiks na Village.DailyTick?)", (abs(sum(odd)) < 0.5) if odd else None)
+
+    # ---------------- T4: Inni - miejsca = nekromancja, skasowani = wzieci przez Innych
+    ctl = [num(r"kontrola z oknem: razem - nekromancja = (-?\d+)", inn[d]) for d in win if d in inn]
+    ctl = [x for x in ctl if x is not None]
+    rep.add("T4: nekromancja wedlug miejsca - kontrola (suma |roznic|)", sum(abs(x) for x in ctl) if ctl else "brak linii (169c wylaczone?)", "0", (sum(abs(x) for x in ctl) == 0) if ctl else None)
+    cl = [re.search(r"jency Innych skasowani przez ROT (\d+) \(w nicosc; wzieci przez Innych w oknie jencow E4/0 (\d+)\)", inn[d]) for d in win if d in inn]
+    cl = [(int(m.group(1)), int(m.group(2))) for m in cl if m]
+    if cl:
+        a, b = sum(x[0] for x in cl), sum(x[1] for x in cl)
+        rep.add("T4: jency Innych skasowani przez ROT = wzieci przez Innych (W8 = W10)", f"skasowani {a}, wzieci {b}", "roznica 0", a == b)
+    else:
+        rep.add("T4: jency Innych skasowani / wzieci", "brak linii", "roznica 0", None)
+
+    # ---------------- T5: zaraza - Krainy (z rosteru + nietrafione) = linie CampFever
+    cf = e4_campfever_by_krainy(lines)
+    t5 = []
+    for d in win:
+        if d not in kra:
+            continue
+        m = re.search(r"zaraza razem dzis (\d+) \(z rosteru\), nietrafione HitRandom (\d+)", kra[d])
+        if m:
+            t5.append((int(m.group(1)), int(m.group(2)), cf.get(d, 0)))
+    if t5:
+        dead, unhit, camp = sum(x[0] for x in t5), sum(x[1] for x in t5), sum(x[2] for x in t5)
+        bad = sum(1 for x in t5 if x[0] + x[1] != x[2])
+        rep.add("T5: zmarli z zarazy (Krainy) + nietrafione = CampFever", f"{dead} + {unhit} = {dead + unhit} wobec CampFever {camp} (dob niezgodnych {bad})", "kontrola 0", dead + unhit == camp and bad == 0)
+    else:
+        rep.add("T5: zaraza", "brak linii Krainy", "kontrola 0", None)
+
+    # ---------------- T6: Straz i Wolni Ludzie - reszta rownania <= 10% obrotu (28 dob)
+    for g in ("Nocna Straz", "Wolni Ludzie"):
+        rx = re.compile(re.escape(g) + r": stan (\d+) \(partie (\d+), zalogi (\d+)\), zmiana ([+-]\d+) = zwerbowani (\d+) - zabici (\d+) - zmarli z zarazy (\d+) - dezercja (\d+) \+ nowe partie (\d+) \+ reszta ([+-]\d+)")
+        rows = []
+        for d in last_window([x for x in win if x in swl]):
+            m = rx.search(swl[d])
+            if m:
+                v = [int(x) for x in m.groups()]
+                rows.append((abs(v[9]), v[4] + v[5] + v[6] + v[7] + v[8]))
+        if rows:
+            r_, t_ = st.mean(x[0] for x in rows), st.mean(x[1] for x in rows)
+            rep.add(f"T6: {g} - reszta / obrot (28 dob)", f"{r_:.1f} / {t_:.1f} = " + (f"{100 * r_ / t_:.1f}%" if t_ > 0 else "-"), "<= 10% (albo nazwana w linii)",
+                    (r_ <= 0.10 * t_) if t_ > 0 else None)
+        else:
+            rep.add(f"T6: {g}", "brak linii", "<= 10%", None)
+
+    # ---------------- T7: ksiega ludzi pod bronia + pula + jency (metoda C 4) i rownanie jencow
+    def L(d, pat, src):
+        return fnum(pat, src.get(d)) or 0.0
+    t7, comp, t7j = [], {}, []
+    for d in [x for x in win if x in lud and (x - 1) in lud and x in hea and "RESZTA" in hea[x]]:
+        def state(dd):
+            s = lud[dd]
+            sold = sum(fnum(re.escape(k) + r" (\d+) \(\d+ partii", s) or 0 for k in E4_KINDS)
+            m = re.search(r"jency w partiach (\d+), w lochach osad (\d+) \| wyrzutki w puli (\d+)", s)
+            return sold + (sum(int(x) for x in m.groups()) if m else 0)
+        dS = state(d) - state(d - 1)
+        s_lud = lud[d]
+        newp = {}
+        mp = re.search(r"nowe \(ludzie przy utworzeniu\): (.*?) \| zniknely", par.get(d, ""))
+        if mp:
+            for nm, n_, men in re.findall(r"([a-zA-Z ]+?) (\d+) \((-?\d+)\)", mp.group(1)):
+                newp[nm.strip()] = int(men)
+        src = {
+            "werbunek (bez wcielonych jencow AI)": L(d, r"zwerbowani (\d+) \(", lud) - L(d, r"wcieleni jency AI \(partie rodow\) (\d+)", h3),
+            "zalogi od notabli (bez podwojnych z Ludzie)": max(0.0, L(d, r"werbunek gry od notabli " + SF, zal) - L(d, r"od notabli bez wodza - garnizony, karawany (\d+)", lud)),
+            "zalogi z modelu": L(d, r"przyrost z modelu zalogi gry \(bez werbunku i bez zlota\) " + SF, zal),
+            "milicja z modelu": L(d, r"milicja \(E4/0\): z modelu w ticku " + SF, zal),
+            "nowe partie (rody, karawany, konwoje, Inni, inne)": sum(newp.get(k, 0) for k in ("partie rodow", "karawany", "konwoje BK", "Inni", "inne")),
+            "Inni: nekromancja i rajd": L(d, r"nekromancja ROT w oknie OnMapEventEnded " + SF, inn) + L(d, r"rajd ROT \(Hearth/2 z niczego\) " + SF, inn),
+            "tabory i lodzie z hearth": L(d, r"- tabory wsi -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea) + L(d, r"- lodzie rybackie -[\d.-]+ \(nowe \d+, uzupelnienia \d+; ludzi (-?\d+)", hea),
+            "pula z hearth (rabunki, bieda)": L(d, r"rabunki (\d+), bieda/wojna", wyr) + L(d, r"bieda/wojna " + F_, wyr),
+            "jency z rabunku BK": L(d, r"z rabunku BK \+(\d+)", jen),
+        }
+        snk = {
+            "zabici": L(d, r"dzis: zabici (\d+)", lud),
+            "zaraza": L(d, r"zaraza razem dzis (\d+)", kra),
+            "H3 domy (BK, wies, szablon, wighty)": L(d, r"domy: do domu BK (\d+)", h3) + L(d, r"do wsi \(tabory\) (\d+) ludzi", h3) + L(d, r"do wsi \(prosci i bandyci\) (\d+) ludzi", h3)
+                                                   + L(d, r"hearth, z szablonu (\d+) \(garnizony", h3) + L(d, r"nigdy do BK ani wsi\): rozbici (\d+)", h3) + L(d, r"nigdy do BK ani wsi\): rozbici \d+, inna droga (\d+)", h3),
+            "pula do hearth i z szablonu": L(d, r"\| powrot do wsi " + F_, wyr) + L(d, r"powrot z puli:.*?z szablonu " + F_, wyr) + L(d, r"powrot z puli:.*?wighty do niczego " + F_, wyr),
+            "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), Inni", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
+                                                          + L(d, r"krainy z niewola: niewolnikow (\d+)", i1),
+            "dezercja poza pula": max(0.0, L(d, r"dezercja (\d+) \(partie rodow", lud) - L(d, r"naplyw: dezercja (\d+)", wyr)),
+            "zwolnieni 166 (do wsi i zniklo)": L(d, r"zwolnieni: do wsi (\d+) ludzi", bud) + L(d, r"zwolnieni: do wsi \d+ ludzi \([^)]*\), zniklo (\d+)", bud),
+            "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
+                                                          + L(d, r"ranni \d+, jency (\d+) - znikaja", par) + L(d, r"usuniete bez zniszczenia \d+ \(ostatni stan (\d+)", par),
+            "jency bez odbiorcy (gra) i skasowani przez ROT": L(d, r"bez odbiorcy \(gra usuwa[^)]*\) (\d+)", jen) + L(d, r"jency Innych skasowani przez ROT (\d+)", inn),
+        }
+        res = dS - (sum(src.values()) - sum(snk.values()))
+        t7.append(res)
+        for k, v in src.items():
+            comp.setdefault("+ " + k, []).append(v)
+        for k, v in snk.items():
+            comp.setdefault("- " + k, []).append(v)
+        comp.setdefault("= zmiana stanu", []).append(dS)
+        # rownanie jencow (szeregowi): zmiana = wzieci + z rabunku BK - zabrani z niewoli pokonanych - uwolnieni H3 - I1 - wcieleni - skasowani ROT - jency rozwiazanych
+        j = jen.get(d, "")
+        jd = num(r"\(zmiana ([+-]\d+)\)", j)
+        if jd is not None:
+            jin = L(d, r"wzieci do niewoli \+(\d+)", jen) + L(d, r"z rabunku BK \+(\d+)", jen)
+            jout = (L(d, r"z niewoli pokonanych zabrano (\d+)", jen) + L(d, r"uwolnieni jency bez odbiorcy (\d+)", h3)
+                    + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), Inni", i1)
+                    + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1) + L(d, r"krainy z niewola: niewolnikow (\d+)", i1)
+                    + L(d, r"wcieleni jency AI \(partie rodow\) (\d+)", h3) + L(d, r"werbunek: z puli \d+, jency (\d+)", wyr)
+                    + L(d, r"jency Innych skasowani przez ROT (\d+)", inn) + L(d, r"ranni \d+, jency (\d+) - znikaja", par))
+            t7j.append((jd - (jin - jout), jin + jout))
+    if t7:
+        m = st.mean(t7)
+        rep.add("T7: reszta ksiegi ludzi pod bronia z kontem JENCY (srednio)", f"{m:+.1f} ludzi/d ({len(t7)} dob)", "|srednia| < 100/d (dzis ok. +283; inaczej okno przed E4/7)", abs(m) < 100)
+        for k in sorted(comp):
+            rep.add("T7 skladnik: " + k, f"{st.mean(comp[k]):.1f}/d", "INFO (srednia okna)", None)
+    else:
+        rep.add("T7: ksiega ludzi pod bronia", "brak kolejnych dob linii Ludzie + Hearth", "|srednia| < 100/d", None)
+    if t7j:
+        r_, t_ = st.mean(abs(x[0]) for x in t7j), st.mean(x[1] for x in t7j)
+        rep.add("T7: rownanie jencow - reszta / obrot", f"{r_:.1f} / {t_:.1f} = " + (f"{100 * r_ / t_:.1f}%" if t_ > 0 else "-") + f" (srednia reszta {st.mean(x[0] for x in t7j):+.1f})",
+                "<= 10% obrotu (inaczej okno przed E4/7: wymiana partia-zaloga, patrole BK, ucieczki, okupy)", (r_ <= 0.10 * t_) if t_ > 0 else None)
+    else:
+        rep.add("T7: rownanie jencow", "brak linii Jency", "<= 10% obrotu", None)
+
+    # ---------------- T8: czas
+    tt = []
+    for d in measured:
+        a = fnum(r"\| czas " + F_ + r" ms \(linia Hearth", hea[d])
+        b = fnum(r"czas E4/0 w ksiedze ludzi " + F_ + " ms", par.get(d))
+        c = fnum(r"\| czas " + F_ + " ms\\.", jen.get(d))
+        if a is not None:
+            tt.append(a + (b or 0) + (c or 0))
+    rep.add("T8: czas linii Hearth + Partie + Jency (srednio)", f"{st.mean(tt):.1f} ms/d (max {max(tt):.1f})" if tt else "brak", "<= 30 ms/dobe", (st.mean(tt) <= 30) if tt else None)
+    oth = [(fnum(r"\| czas " + F_ + " ms\\.", pro.get(d)) or 0) + (fnum(r"\| czas " + F_ + " ms\\.", zim.get(d)) or 0) for d in measured]
+    rep.add("T8: czas linii Dobrobyt + Zima (srednio)", f"{st.mean(oth):.1f} ms/d" if oth else "-", "INFO (poza progiem T8)", None)
+    rep.add("T8: sekundy doby wobec ostatniego biegu 120 dob", "wymaga biegu bazowego tego drzewa", "<= +3% - INFO", None)
+
+    # ---------------- T9: zima (bieg B) - bez progu, dane do E4/1 i E4/6
+    wint = [s for s in lines if s.startswith("Klimat: dzien") and "nowa pora Winter" in s]
+    wd = num(r"Klimat: dzien (\d+)", wint[0]) if wint else None
+    rep.add("T9: Klimat - nowa pora Winter", f"doba kampanii {run_day(wd, start)}" if wd is not None else "brak zimy w biegu (bieg A - proba zimy pominieta)",
+            "bieg B: najpozniej 10. doba - INFO", None)
+    wdays = [d for d in win if d in zim and "ciecie plonu wsi dzis" in zim[d]]
+    if wdays:
+        cut = [fnum(r"swiat srednio " + F_ + "%", zim[d]) for d in wdays]
+        cut = [x for x in cut if x is not None]
+        rep.add("T9: ciecie plonu wsi zima (swiat, srednio)", f"{st.mean(cut):.1f}% w {len(wdays)} dobach zimy" if cut else "-", "INFO", None)
+    food = [(run_day(d, start), fnum(r", " + SF + r"%\) \| warownie", zim[d])) for d in win if d in zim]
+    food = [x for x in food if x[1] is not None]
+    if food:
+        rep.add("T9: zywnosc wsi swiata wobec pierwszej doby (d30/d60/d120)", ", ".join(f"d{n}: {v:+.1f}%" for n, v in food if n in (30, 60, 120)) or f"ostatnia d{food[-1][0]}: {food[-1][1]:+.1f}%",
+                "INFO (dane do E4/1, E4/6)", None)
+    rep.add("T9: zapas warowni AI (mediana, minimum) d30/d60/d120", "z ludzie-regiony.csv (zywnosc, bilans_zywnosci, gracz) - narzedzie biegu B", "INFO (U27: jedna definicja)", None)
+
+    # ---------------- T10: odczyty bez progu (dane do E4/3, E4/4, E4/8)
+    cul = sum(num(r"zmiana kultury osad: (\d+)", hea[d], int, 0) or 0 for d in measured)
+    rep.add("T10: zmiany kultury osad (suma)", cul, "INFO - oczekiwane 0; > 0 = dowod do E4/3", None)
+    conv = [re.search(r"konwoje BK (\d+) \((-?\d+)\)", par[d]) for d in win if d in par]
+    conv = [(int(m.group(1)), int(m.group(2))) for m in conv if m]
+    rep.add("T10: konwoje BK nowe (partie, ludzie)", f"{sum(x[0] for x in conv)}, {sum(x[1] for x in conv)}" if conv else "-", "INFO (R19, E4/8)", None)
+    game = [re.search(r"rozwiazane przez gre bez bitwy (\d+), zdrowi (\d+), ranni (\d+)", par[d]) for d in win if d in par]
+    game = [tuple(int(x) for x in m.groups()) for m in game if m]
+    rep.add("T10: tabory i lodzie rozwiazane przez gre (partie, zdrowi, ranni)", f"{sum(x[0] for x in game)}, {sum(x[1] for x in game)}, {sum(x[2] for x in game)}" if game else "-", "INFO (R18, E4/3)", None)
+    wig = [num(r"w tym wighty z rozwiazanych band do puli (\d+)", par[d], int, 0) or 0 for d in win if d in par]
+    rep.add("T10: wighty z rozwiazanych band do puli (suma)", sum(wig) if wig else "-", "INFO (druga droga wightow, C 8)", None)
+
+    # ---------------- baza konca etapu (364 doby) - INFO
+    l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
+    l300 = [x for x in l300 if x is not None]
+    rep.add("baza konca etapu: wojsko lordow srednio d300-364", f"{st.mean(l300):.0f}" if l300 else "wymaga biegu 364 dob", "INFO (U20; prog etapu 95-115 tys.)", None)
+    z364 = [num(r"\| zalogi (\d+) ludzi", zal[d]) for d in zal if run_day(d, start) == 364]
+    rep.add("baza konca etapu: zalogi w d364", z364[0] if z364 and z364[0] is not None else "wymaga biegu 364 dob", "INFO (U20; prog etapu >= 85% biegu A)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
+    until_arg = 120
     final = False
     i = 0
     while i < len(args):
@@ -489,9 +813,13 @@ def main(argv):
             csvp = args[i + 1]; i += 2; continue
         if a == "--start-kampanii":
             start_arg = int(args[i + 1]); i += 2; continue
+        if a == "--do-doby":
+            until_arg = int(args[i + 1]); i += 2; continue
         logp = a; i += 1
     if group == "etap3" and logp:
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
+    if group == "etap4" and logp:
+        return etap4_main(logp, start_arg, until_arg)   # E4/0 (188)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

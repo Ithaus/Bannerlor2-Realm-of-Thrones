@@ -466,7 +466,9 @@ namespace Armoury
                 var sell = AccessTools.Method(typeof(SellItemsAction), "ApplyInternal");
                 var tick = AccessTools.Method(typeof(Village), "DailyTick");
                 var ti = tick != null ? Harmony.GetPatchInfo(tick) : null;
-                bool capOff = ti != null && ti.Prefixes.Count > 0;
+                // E4/0 (U25): liczymy tylko prefiksy spoza naszych modow - okno pomiaru E4/0 (Measure40, prefiks void) nie zdejmuje sufitu kiesy
+                bool capOff = false;
+                if (ti != null) foreach (var p in ti.Prefixes) if (p.owner == null || !p.owner.StartsWith("com.jeff.", StringComparison.Ordinal)) { capOff = true; break; }
                 var m = Campaign.Current.Models.SettlementTaxModel;
                 return "Utarg wsi (112) - latki: powrot taboru - " + Patches(enter) + "; sprzedaz z magazynu wsi - " + Patches(sell)
                        + "; model podatku " + (m != null ? m.GetType().FullName : "brak")

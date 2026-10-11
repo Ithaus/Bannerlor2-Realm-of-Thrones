@@ -2148,6 +2148,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float PopulationScale { get; set; } = 1f;
 
+        [SettingPropertyBool("People Measure Enabled", HintText = "log only: daily lines accounting for every hearth, prosperity point and militia man gained or lost and why, prisoners taken, freed and changing sides, the realms' free hands, the Night's Watch and the Free Folk, the Others by place, and the bite of winter by realm - changes nothing in the game")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PeopleMeasureEnabled { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 1.00f, "0.00", HintText = "a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)")]
         [SettingPropertyGroup("Iron Bank")]
         public float PopulationRentMaxShare { get; set; } = 0.2f;
@@ -4552,6 +4556,7 @@ namespace Armoury
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
+            s.PeopleMeasureEnabled = PeopleMeasureEnabled;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
             s.RentTaxLow = RentTaxLow;
             s.RentTaxHigh = RentTaxHigh;
