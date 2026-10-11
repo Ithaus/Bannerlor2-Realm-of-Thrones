@@ -86,6 +86,10 @@ RANGES = {
     'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
     'FreeHandsElasticity': (0.0, 2.0, "0.00"),
     'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
+    # E5/A3 (163): markietani - udzialy przycinane w kodzie do 0..1 (Sutlers); doby rozruchu 0..112
+    'SutlerDailyShare': (0.0, 1.0, "0.00"),
+    'SutlerTownShare': (0.0, 1.0, "0.00"),
+    'SutlerRampDays': (0, 112, "0"),
 }
 
 def gen(module_dir, ns, display):

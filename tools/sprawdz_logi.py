@@ -17,7 +17,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa etap5     : (etap 5) bloki paczek obecne w logu: E5/A2 (162, dwor pelny) A2-1..A2-11 - linia sprzetu niewydanego w "Budzet rodow (166)",
                     przelew do dworu w dobach 31-120 (--do-doby N), zgodnosc 166 = Obieg, reszta ksiegi, glowy < 5 000, hak B1 = 0, gracz bez dworu,
                     bledy; A2-10/A2-11 zapas "wlasnego" (sprzet do wlasnej siedziby wraca jako wlasne, nie ziemia - linia D staly);
-                    panowie zamkow (budzet-rodow.csv) - INFO. Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
+                    panowie zamkow (budzet-rodow.csv) - INFO. E5/A3 (163 + 164c) A3-1..A3-14 - linie "Markietani (E5/A3)" i "Notable (E5/A3)":
+                    sakiewki <= 15 dni zoldu (Obieg), markietani > 0 i podzial 85/15, koszt, pasmo notabli i nowi notable bez zlota z niczego / w nicosc
+                    (Obieg), kapital karawan notabli = korekta zrodel bilansu, kontrolki prog 0, karawany notabli d40/d120 (INFO), bledy, reszta ksiegi.
+                    Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -1668,6 +1671,13 @@ def etap5_main(logp, start_arg, until=120):
         etap5_a2(rep, lines, start, until, logp, bud)
     else:
         rep.add("E5/A2: linia sprzetu niewydanego (Budzet rodow 166)", "brak w logu", "jest od wgrania E5/A2 (LogEnabled, ClanBudgetEnabled)", None)
+    # E5/A3 (163 + 164c): markietani (linia z dniem gry - klucz = dzien ksiegi, jak 166) i notable (dzien ksiegi)
+    mar = e4_series(lines, "Markietani (E5/A3): dzien", 1)
+    nob = by_day(lines, "Notable (E5/A3): dzien")
+    if mar or nob:
+        etap5_a3(rep, lines, start, until, mar, nob)
+    else:
+        rep.add("E5/A3: linie Markietani / Notable (E5/A3)", "brak w logu", "sa od wgrania E5/A3 (LogEnabled)", None)
     rep.show()
     return 0
 
@@ -1834,6 +1844,147 @@ def etap5_a2(rep, lines, start, until, logp, bud):
                     "INFO - ryzyko A2 (wiekszy zawor kas siedzib); prog w B3; bieg z31-A d93-120: 24.3%, -2.5%", None)
     else:
         rep.add("E5/A2 INFO: panowie samych zamkow (budzet-rodow.csv)", "brak pliku CSV", "INFO", None)
+
+
+def etap5_a3(rep, lines, start, until, mar, nob):
+    """E5/A3 (163 + 164c, PLAN 5.3 - markietani R9, notable R10): projekt rozdz. 3 "E5/A3" Test i rozdz. 4 (sakiewki <= 15 dni zoldu).
+    Linie: "Markietani (E5/A3): dzien N" (dzien gry - jak 166; mar ma klucz = dzien ksiegi), "Notable (E5/A3): dzien N" (dzien ksiegi), "Obieg: dzien"
+    (sakiewki, zold), "Obieg: notable i karawany" (pasmo, nowi notable, karawany), "Pieniadz swiata (bilans - przyczyny)" (korekta zrodel E5/A3).
+    Doba 1 kampanii to sam stan ksiegi (bez Obiegu) - progi przeplywow od doby 2."""
+    obg = by_day(lines, "Obieg: dzien")
+    onk = by_day(lines, "Obieg: notable i karawany: dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    mwin = [d for d in sorted(mar) if 1 <= run_day(d, start) <= until]
+    mre = re.compile(r"stawka ([\d.]+)% \(pelna ([\d.]+)%; ([^)]*)\) \| w polu (\d+) partii, wydaly (\d+): z sakiewek (\d+) \(gracz (\d+)\) -> kasy miast (\d+) w (\d+) miastach"
+                     r" \(([\d.]+)%\), kiesy wsi (\d+) w (\d+) wsiach \| we wlasnych miastach rodow \(K3\) (\d+) \| bez niewrogiego miasta -> najblizsze miasto (\d+) partii \((\d+)\)"
+                     r" \| bez niewrogiej wsi w stanie Normal -> miasto (\d+) partii \((\d+)\)")
+    rows, off = {}, []
+    for d in mwin:
+        s = mar[d]
+        if "| wylaczone (Sutlers Enabled" in s:
+            off.append(d)
+            continue
+        m = mre.search(s)
+        if m:
+            g = m.groups()
+            rows[d] = {"rate": float(g[0]), "full": float(g[1]), "ramp": g[2], "n": int(g[3]), "paid": int(g[4]), "tot": int(g[5]), "pl": int(g[6]),
+                       "town": int(g[7]), "towns": int(g[8]), "vill": int(g[10]), "vills": int(g[11]), "k3": int(g[12]), "nt": int(g[13]), "ntg": int(g[14]),
+                       "nv": int(g[15]), "nvg": int(g[16]), "ms": num(r"koszt ([\d.]+) ms", s, float, 0.0) or 0.0,
+                       "days": num(r"sakiewki partii rodow \d+ = ([\d.]+) dni zoldu", s, float),
+                       "kdays": num(r"w tym oszczednosci K1 \d+ = ([\d.]+) dni", s, float)}
+    miss = [d for d in mwin if d not in rows and d not in off]
+    rep.add("E5/A3 A3-1: linia Markietani (E5/A3) codziennie", f"brak/nieczytelna w {len(miss)} z {len(mwin)} dob" + (f", wylaczone w {len(off)}" if off else ""),
+            "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if mwin else None)
+    # A3-2 (rozdz. 4): sakiewki zolnierzy <= 15 dni zoldu - "Obieg": stan sakiewek / (zold partii + zold zalog) naliczony tej doby; ostatnia doba okna
+    od = [d for d in sorted(obg) if 2 <= run_day(d, start) <= until]
+    sd = None
+    if od:
+        o = obg[od[-1]]
+        purse, zp, zz = num(r"sakiewki ludzi \[P\]: stan (\d+)", o), num(r"zold partii (\d+)", o), num(r"zold zalog (\d+)", o)
+        if purse is not None and zp and zz is not None:
+            sd = purse / float(zp + zz)
+    ramp_on = any(r["ramp"].startswith("rozruch") for r in rows.values())
+    lastm = rows[mwin[-1]] if mwin and mwin[-1] in rows else None
+    rep.add("E5/A3 A3-2: sakiewki <= 15 dni zoldu (Obieg: stan / zold partii i zalog, ostatnia doba okna)",
+            (f"{sd:.1f} dni" if sd is not None else "brak linii Obieg") + (f"; partie rodow (linia markietanow) {lastm['days']:.1f} dni" if lastm and lastm["days"] is not None else "")
+            + (f", w tym oszczednosci K1 {lastm['kdays']:.1f} dni (markietani ich nie ruszaja)" if lastm and lastm["kdays"] is not None else "")
+            + ("; rozruch w biegu (stary zapis)" if ramp_on else ""),
+            "<= 15 (oczekiwane 5-12 [S]; bieg z31-A bez A3: d40 12.8, d120 29.3)", (sd <= 15.0) if (sd is not None and rows and not off) else None)
+    late = [d for d in mwin if d in rows and run_day(d, start) >= 2]
+    if late:
+        tot = sum(rows[d]["tot"] for d in late) / len(late)
+        town = sum(rows[d]["town"] for d in late)
+        vill = sum(rows[d]["vill"] for d in late)
+        share = 100.0 * town / (town + vill) if (town + vill) else 0.0
+        rep.add("E5/A3 A3-3: markietani wydaja w polu (srednia dob 2-%d)" % until,
+                f"{tot:.0f}/d (do kas miast {town / len(late):.0f}, do kies wsi {vill / len(late):.0f}; partii w polu {st.mean(rows[d]['n'] for d in late):.0f}"
+                f", wydalo {st.mean(rows[d]['paid'] for d in late):.0f})",
+                "> 0 (rachunek [S]: ok. 100-190 tys./d, ile dzis przybywa sakiewkom)", tot > 0)
+        full = rows[late[-1]]["full"]
+        rep.add("E5/A3 A3-4: podzial miasto / wies (Sutler Town Share)", f"miasta {share:.1f}% (czesc wsi bez odbiorcy -> miasto: {sum(rows[d]['nvg'] for d in late)})",
+                "85% (+- 1 pp; wyzej tylko o czesc bez niewrogiej wsi w stanie Normal)", (84.0 <= share <= 100.0) if (town + vill) else None)
+        rep.add("E5/A3 A3-5: markietani bez niewrogiego miasta -> najblizsze miasto (licznik)",
+                f"partii {sum(rows[d]['nt'] for d in late)}, zl {sum(rows[d]['ntg'] for d in late)} w {len(late)} dobach",
+                "INFO (regula R9: brak odbiorcy - kasa najblizszego miasta, licznik)", None)
+        rep.add("E5/A3 A3-6: K3 - markietani we wlasnych miastach rodow (srednia)", f"{st.mean(rows[d]['k3'] for d in late):.0f}/d; gracz razem {sum(rows[d]['pl'] for d in late)}",
+                "INFO (ten sam licznik co OnLeft: CrownIncome.NoteOwnSpend; gracz = AI)", None)
+        ms = [rows[d]["ms"] for d in late]
+        rep.add("E5/A3 A3-7: koszt petli markietanow (srednia / najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms", "<= 20 ms/dobe (projekt rozdz. 5.2 pkt 3 [S])",
+                st.mean(ms) <= 20.0)
+        rr = [d for d in late if rows[d]["ramp"].startswith("rozruch")]
+        rep.add("E5/A3 INFO: stawka i rozruch", f"stawka pelna {full:.1f}%; doby rozruchu w oknie {len(rr)}"
+                + (f" (stawka {rows[rr[0]]['rate']:.1f}% -> {rows[rr[-1]]['rate']:.1f}%)" if rr else ""),
+                "INFO (rozruch tylko w zapisie z sakiewkami > 15 dni zoldu: od 1% do pelnej w Sutler Ramp Days)", None)
+    ru = [s for s in lines if s.startswith("Markietani (E5/A3): rozruch")]
+    rep.add("E5/A3 INFO: decyzja rozruchu (raz na kampanie)", ru[-1][:200] if ru else "brak linii", "INFO (nowa kampania: bez rozruchu)", None)
+    # notable (164c): pasmo i nowi notable bez zlota z niczego / w nicosc, kapital karawan z kies i kas (= korekta zrodel), kontrolki prog 0
+    nwin = [d for d in sorted(nob) if 2 <= run_day(d, start) <= until]
+    kwin = [d for d in sorted(onk) if 2 <= run_day(d, start) <= until]
+    if kwin:
+        bo = sum(abs(num(r"pasmo 4500-10500: nadwyzka w nicosc ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        bi = sum(abs(num(r"dosypka z niczego ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        nn = sum(abs(num(r"nowi notable ([-+]?\d+)", onk[d], int, 0) or 0) for d in kwin)
+        rep.add("E5/A3 A3-8: pasmo notabli - w nicosc / z niczego (Obieg, doby 2-%d)" % until, f"{bo} / {bi}",
+                "0 / 0 (bieg z31-A bez A3: ok. -107 tys. / +69 tys. na dobe)", (bo == 0 and bi == 0) if nwin else None)
+        rep.add("E5/A3 A3-9: nowi notable z niczego (Obieg, doby 2-%d)" % until, f"{nn}", "0 (po starcie gry; tworzenie swiata - bilans otwarcia)",
+                (nn == 0) if nwin else None)
+    nre = re.compile(r"nadwyzka do kas (\d+) \(notable miast (\d+) / wsi (\d+); zdarzen (\d+)\), brak z kas (\d+) \(notable miast (\d+) / wsi (\d+); zdarzen (\d+), nalezne (\d+)\)"
+                     r", uciete (\d+) \(kasa bez nadwyzki u (\d+) notabli - sila nie zeszla (\d+) pkt")
+    cre = re.compile(r"kapital karawan notabli[^:]*: (\d+) karawan, gra dalaby (\d+), z kies notabli (\d+), z kas miast startu (\d+), uciete ([-\d]+) \(bez kapitalu (\d+)\)")
+    kre = re.compile(r"bez kasy handlu - jak w grze \(prog 0\): zdarzen (\d+), w nicosc (\d+), z niczego (\d+) \| kontrola \(prog 0\): zdarzenia w kontekscie niedopasowane (\d+)"
+                     r", stos przepelniony (\d+), karawana bez odczytu modelu (\d+)")
+    nb, cb, kb, bad_corr, nofix = [], [], [], [], 0
+    for d in nwin:
+        s = nob[d]
+        m, c, k = nre.search(s), cre.search(s), kre.search(s)
+        if m:
+            nb.append([int(x) for x in m.groups()])
+        if c:
+            cv = [int(x) for x in c.groups()]
+            cb.append(cv)
+            corr = num(r"minus kapital karawan notabli z kies notabli i kas miast startu \(E5/A3\) (\d+)", cau.get(d, ""))
+            if corr is None:
+                nofix += 1
+            elif corr != cv[2] + cv[3]:
+                bad_corr.append(run_day(d, start))
+        if k:
+            kb.append([int(x) for x in k.groups()])
+    if not nwin:
+        rep.add("E5/A3: linia Notable (E5/A3)", "brak w logu", "jest od wgrania E5/A3 (LogEnabled)", None)
+    else:
+        if nb:
+            rep.add("E5/A3 INFO: pasmo przez kasy miast handlu (suma dob 2-%d)" % until,
+                    f"do kas {sum(x[0] for x in nb)} (notable miast {sum(x[1] for x in nb)} / wsi {sum(x[2] for x in nb)}), z kas {sum(x[4] for x in nb)}"
+                    f" (miast {sum(x[5] for x in nb)} / wsi {sum(x[6] for x in nb)}), nalezne {sum(x[8] for x in nb)}, uciete {sum(x[9] for x in nb)}"
+                    f" (notabli ponizej pasma z sila: najwiecej {max(x[10] for x in nb)} na dobe)",
+                    "INFO (miasta i wsie osobno - projekt Test A3; uciete = kasa bez nadwyzki, sila nie schodzi)", None)
+        if cb:
+            rep.add("E5/A3 A3-10: kapital karawan notabli z kies i kas = korekta zrodel bilansu (kazda doba)",
+                    f"niezgodne {len(bad_corr)} z {len(cb)} dob" + (f" (doby {bad_corr[:6]})" if bad_corr else "") + (f"; bez linii bilansu {nofix}" if nofix else "")
+                    + f"; razem karawan {sum(x[0] for x in cb)}, gra dalaby {sum(x[1] for x in cb)}, z kies {sum(x[2] for x in cb)}, z kas {sum(x[3] for x in cb)}"
+                    + f", bez kapitalu {sum(x[5] for x in cb)}",
+                    "0 (kapital z niczego 0: O17 widzi go jako nadany, korekta zrodel zdejmuje go w calosci)", len(bad_corr) == 0)
+        if kb:
+            nt = sum(x[0] for x in kb)
+            ctrl = sum(x[3] + x[4] + x[5] for x in kb)
+            rep.add("E5/A3 A3-11: notable bez kasy handlu (jak w grze) / kontrolki",
+                    f"zdarzen {nt} (w nicosc {sum(x[1] for x in kb)}, z niczego {sum(x[2] for x in kb)}); kontrolki {ctrl}", "0 / 0 (prog 0)", nt == 0 and ctrl == 0)
+    if kwin:
+        def cars(rd):
+            ds = [d for d in kwin if run_day(d, start) <= rd]
+            return num(r"karawany notabli \[P\]: (\d+) karawan", onk[ds[-1]]) if ds else None
+        rep.add("E5/A3 A3-12: karawany notabli (d40 / ostatnia doba okna)", f"{cars(40)} / {cars(until)}",
+                ">= 90% biegu bez A3 (z31-A: d40 750, d120 914 - bez bazy tylko odczyt; test po scaleniu z E4/8)", None)
+    st0 = [s for s in lines if s.startswith("Notable (E5/A3): start")]
+    rep.add("E5/A3 INFO: bilans otwarcia i latki (linia startowa)", st0[0][st0[0].find("| latki"):][:260] if st0 else "brak linii",
+            "nowa kampania: notable n > 0 (zloto gry), karawany startowe m > 0; latki BRAK: -", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and ("Sutlers" in s or "NotableGold" in s)]
+    stm = max([num(r"potkniecia (\d+)", mar[d], int, 0) or 0 for d in mwin] + [num(r"potkniecia (\d+)", nob[d], int, 0) or 0 for d in nwin] + [0])
+    rep.add("E5/A3 A3-13: bledy Sutlers / NotableGold, potkniecia", f"bledy {len(errs)}, potkniecia {stm}", "0 / 0", len(errs) == 0 and stm == 0)
+    cd = [d for d in sorted(cau) if 1 <= run_day(d, start) <= until]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
+    rep.add("E5/A3 A3-14: nic w nicosc - reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii",
+            "|R| < 10 000 (prog etapu 3; --grupa etap3)", (abs(rv) < 10000) if rv is not None else None)
 
 
 def main(argv):

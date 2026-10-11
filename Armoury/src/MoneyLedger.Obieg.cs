@@ -565,7 +565,7 @@ namespace Armoury
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
-              .Append("), markietani -, ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
+              .Append("), markietani ").Append(Sutlers.ObiegNote()).Append(", ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony -")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
@@ -643,6 +643,7 @@ namespace Armoury
               .Append(" | pasmo 4500-10500: nadwyzka w nicosc ").Append(WvNeg(bandOut, CW.WNotableBand)).Append(", dosypka z niczego ").Append(WvS(bandIn, CW.WNotableBand))
               .Append(" (okien ").Append(CW.Calls[CW.WNotableBand]).Append(')')
               .Append(" | nowi notable ").Append(WvS(fresh, CW.WNotableNew))
+              .Append(NotableGold.ObiegPart())   // E5/A3 (164c): pasmo, nowi notable i kapital karawan notabli przez kase miasta handlu
               .Append(" | majatki z niczego (do wlascicieli - notabli i lordow): BK dochod z produkcji ").Append(WvS(CW.In[CW.KBkEstates], CW.WBkEstates))
               .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBk], CW.WBkEstates)).Append("), BetterEconomy renta majatkow ").Append(WvS(CW.In[CW.KBeeEstateRent], CW.WBeeEstates))
               .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBee], CW.WBeeEstates)).Append(')')

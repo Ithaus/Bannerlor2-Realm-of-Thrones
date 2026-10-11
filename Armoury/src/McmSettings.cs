@@ -592,6 +592,22 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int MenGearSaveDays { get; set; } = 30;
 
+        [SettingPropertyBool("Sutlers Enabled", HintText = "soldiers in the field spend a tenth of their purses each day with the sutlers: most of it reaches the nearest friendly town, the rest the nearest village - you and the AI alike. Only what is left after the coin kept for mending, for worn-out clothes and the savings for better kit; a party in a town spends as before when it leaves. In a save where the purses hold more than 15 days of pay the share starts at 1% and rises to the full share over Sutler Ramp Days. Needs Men Purse Enabled. Off = the men spend only when they leave a town, as before")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SutlersEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sutler Daily Share", 0.00f, 1.00f, "0.00", HintText = "share of the men's free purse (after mending, clothes and savings) they spend each day in the field")]
+        [SettingPropertyGroup("The finished piece")]
+        public float SutlerDailyShare { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Sutler Town Share", 0.00f, 1.00f, "0.00", HintText = "of what the men spend with the sutlers, this share reaches the purse of the nearest town not at war with them; the rest goes to the nearest such village that is not being raided or looted (none - to the town too)")]
+        [SettingPropertyGroup("The finished piece")]
+        public float SutlerTownShare { get; set; } = 0.85f;
+
+        [SettingPropertyInteger("Sutler Ramp Days", 0, 112, "0", HintText = "when the sutlers first come to a save whose parties hold more than 15 days of pay in their purses, their share rises from 1% to the full share over this many days (0 = the full share at once)")]
+        [SettingPropertyGroup("The finished piece")]
+        public int SutlerRampDays { get; set; } = 28;
+
         [SettingPropertyInteger("Men Upgrade Min Gain Percent", 0, 40, "0", HintText = "a new piece must be at least this much stronger than the old one (or of a higher tier) before the men pay for it")]
         [SettingPropertyGroup("The finished piece")]
         public int MenUpgradeMinGainPercent { get; set; } = 10;
@@ -911,6 +927,14 @@ namespace Armoury
         [SettingPropertyBool("Caravan Capital Real", HintText = "a caravan bought by a lord (Banner Kings) or by you starts with capital taken out of the payment - the rest stays with the town that sold the beasts and carts; supply convoys that do not trade (Dynamic Troop Equipment) start with none. A party disbanded or removed without a battle hands its purse to the head of its owner's house (a notable's caravan - to the notable), else to the nearest town, and its men's purse to the nearest town (off = capital out of thin air, and such purses vanish, as before)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool CaravanCapitalReal { get; set; } = true;
+
+        [SettingPropertyBool("Notable Gold Real", HintText = "a notable's gold above or below what the game keeps him at goes to or comes from the purse of the town he trades in - his own town, or his village's market town - instead of vanishing or appearing; a new notable is set up from that purse. Only the town's spare money above its merchants' reserve is paid out: a town without it pays less, and the notable keeps the power he would have sold. The notables of a new world keep the game's starting gold. Off = out of thin air and into nothing, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool NotableGoldReal { get; set; } = true;
+
+        [SettingPropertyBool("Notable Caravan Capital Real", HintText = "a notable's new caravan starts with capital out of his own purse above 4,500 and the rest from the spare money of the town it starts from (its merchants invest) - less if they have less. The caravans of a new world keep the game's starting capital. Off = capital out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool NotableCaravanCapitalReal { get; set; } = true;
 
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
@@ -4455,6 +4479,10 @@ namespace Armoury
             s.MenUpgradeGear = MenUpgradeGear;
             s.MenGearSavePercent = MenGearSavePercent;
             s.MenGearSaveDays = MenGearSaveDays;
+            s.SutlersEnabled = SutlersEnabled;
+            s.SutlerDailyShare = SutlerDailyShare;
+            s.SutlerTownShare = SutlerTownShare;
+            s.SutlerRampDays = SutlerRampDays;
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;
             s.MenUpgradeMaxPerVisit = MenUpgradeMaxPerVisit;
             s.MenUpgradeOneTierUp = MenUpgradeOneTierUp;
@@ -4535,6 +4563,8 @@ namespace Armoury
             s.CasualtyLootFromPurse = CasualtyLootFromPurse;
             s.UpgradeCostToPurse = UpgradeCostToPurse;
             s.CaravanCapitalReal = CaravanCapitalReal;
+            s.NotableGoldReal = NotableGoldReal;
+            s.NotableCaravanCapitalReal = NotableCaravanCapitalReal;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;

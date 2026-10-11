@@ -27,6 +27,7 @@ namespace Armoury
     /// K1 (Jeff 09.10, docs/paczki/K1-dozbrajanie.md): przy wyjezdzie czesc odkladaja na lepszy sprzet (A3, limit dni zoldu); w miescie
     /// nadwyzki -> naprawy -> braki -> lepsze (MenUpgrade); nadwyzki i braki liczone po DOPASOWANIU (skill), nie po liczbie sztuk;
     /// zalogi maja wlasna sakiewke (czesc zoldu - SoldierPay) w tym samym slowniku i tym samym zapisie "arm_menpurse".
+    /// E5/A3 (163, markietani): w POLU ludzie partii rodow wydaja co dobe czesc wolnej sakiewki (CampSpend - te same rezerwy co OnLeft; odbiorcy w Sutlers).
     /// </summary>
     internal static class MenPurse
     {
@@ -41,8 +42,9 @@ namespace Armoury
         private static long _dayWage;          // zold wplacony do sakiewek (SoldierPay)
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
+        private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampSpend; odbiorcy w Sutlers)
 
-        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = -1; }
+        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; }
 
         internal static string Export()
         {
@@ -82,6 +84,8 @@ namespace Armoury
         }
 
         private static int SavedOf(MobileParty mp) { int v; var k = Key(mp); return k != null && _saved.TryGetValue(k, out v) ? v : 0; }
+        /// <summary>E5/A3 (163): oszczednosci K1 partii - tylko odczyt (linia markietanow: ile sakiewek to odlozone na lepszy sprzet).</summary>
+        internal static int SavedFor(MobileParty mp) { return SavedOf(mp); }
         private static void SetSaved(MobileParty mp, int v) { var k = Key(mp); if (k == null) return; if (v > 0) _saved[k] = v; else _saved.Remove(k); }
 
         private static string Key(MobileParty mp) { return mp != null ? mp.StringId : null; }
@@ -162,12 +166,12 @@ namespace Armoury
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == d) return;
-            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut + _daySaved) > 0)
+            if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut + _daySaved + _dayCamp) > 0)
                 Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord + Drobne39.ThirdNote()
-                         + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", na odziez wojska (150) " + _dayCloth
+                         + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", u markietanow w polu (E5/A3) " + _dayCamp + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki), wyszlo " + _dayOut
-                         + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
-            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
+                         + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, markietani, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
+            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = d;
         }
 
         /// <summary>Cena skupu sztuki (w tym stanie) w miescie; poza miastem - najblizsze miasto.</summary>
@@ -311,6 +315,30 @@ namespace Armoury
         }
 
         private static int Wage(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
+
+        /// <summary>
+        /// E5/A3 (paczka 163, R9) - markietani: doba partii w POLU. Ta sama kolejnosc rezerw co OnLeft - zalegle naprawy (robocizna, bez szacunku materialu:
+        /// poza miastem nie ma polki - jak zaopatrzenie BK D11-4), odziez czekajaca na zakup (150) i oszczednosci K1 juz odlozone zostaja w sakiewce;
+        /// z reszty ludzie wydaja `rate` (nowe oszczednosci odkladaja dalej tylko przy wyjezdzie z miasta). Zdejmuje z sakiewki i zwraca kwote - odbiorcow
+        /// (kasa miasta, kiesa wsi) i liczniki daje Sutlers. Bez wlasnego catch - wyjatek liczy Sutlers (potkniecie na partie).
+        /// </summary>
+        internal static int CampSpend(MobileParty mp, float rate, out int reserve, out int kept)
+        {
+            reserve = 0; kept = 0;
+            if (!On || mp == null || rate <= 0f) return 0;
+            Day();
+            int purse = Get(mp);
+            if (purse <= 0) return 0;
+            long res = (long)Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null)) + Math.Max(0, ArmyClothing.PendingCost(mp));
+            reserve = (int)Math.Min(int.MaxValue, res);
+            int avail = (int)Math.Max(0L, purse - res);
+            if (MenUpgrade.On) kept = Math.Min(SavedOf(mp), avail);
+            int spend = (int)((avail - kept) * (double)Math.Min(1f, rate));
+            if (spend <= 0) return 0;
+            int t = Take(mp, spend);
+            _dayCamp += t;
+            return t;
+        }
 
         // ------------------------------------------------------------ gracz: nadwyzki na targ
         // K1 (A9): po DOPASOWANIU, nie po liczbie sztuk - najpierw sztuki LUDZI, ktorych nikt nie udzwignie, potem najgorsze uzyteczne
