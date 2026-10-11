@@ -35,6 +35,7 @@ namespace RealisticCaptivity
                     EnlistedWounds.Install(harmony);
                     MountedGetaway.ApplyAll(harmony);
                     FairRansomPatch.ApplyAll(harmony);
+                    RotEnlistLoot37.ApplyAll(harmony);   // 3.7: lord w lupie zaciagu ROT wyceniany cena gry (okup bez platnika)
 
                     // zakladka Klan -> Other: grupa "Houses" (mixin + prefab inserty)
                     var extender = Bannerlord.UIExtenderEx.UIExtender.Create("RealisticCaptivity");

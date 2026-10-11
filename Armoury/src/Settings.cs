@@ -1137,6 +1137,11 @@ namespace Armoury
         public int ShopKeepPieces = 1;                     // how many such pieces stay on the stall (0-3)
         public bool PlayerWorkshopsSameRule = true;        // your own workshops follow the same rules as everyone else's: they make no armour and no arrows out of nothing (the Banner Kings armorsmithy and fletcher lines without any input stay idle), and when a town lacks arrows their iron ore goes to whoever earns more on it - your workshop or the town's fletchers. Off: your workshops as in the game
 
+        // --- Realm of Thrones without gold from nowhere (3.7) ---
+        // 3.7 ROT: podmiana rekruta ROT i rebelia bez zlota z niczego / w nicosc (RotLeaks37.cs)
+        public bool RotSwapNoGold = true;                  // when Realm of Thrones turns an AI lord's soldier into a man of the lord's house of another tier, no gold appears from thin air and none vanishes: it is the same man, and the kit he lacks is bought on the market as usual (off = Realm of Thrones pays the lord, or takes from him, the difference in recruit cost - out of nowhere and into nowhere)
+        public bool RebelPurseFromTown = true;             // the 50,000 gold a rebel leader gets when a town or castle rebels come out of that settlement's own coffers, as much as they hold - not out of thin air (off = the game's gift from nowhere)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

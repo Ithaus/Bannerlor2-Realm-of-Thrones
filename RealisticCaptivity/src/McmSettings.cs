@@ -424,6 +424,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("In the lord's service")]
         public int EnlistedDailyCareHp { get; set; } = 15;
 
+        [SettingPropertyBool("Rot Enlist Loot Game Price", HintText = "while you serve enlisted under a lord, a captured lord in your share of the loot is valued at the game's ransom price, not at the ransom his house would pay - nobody pays that ransom here, the value only turns into goods for you (off = valued at the full ransom)")]
+        [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
+        public bool RotEnlistLootGamePrice { get; set; } = true;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder")]
         [SettingPropertyGroup("Other")]
         public bool LogEnabled { get; set; } = true;
@@ -533,6 +537,7 @@ namespace RealisticCaptivity
             s.EnlistedHonestWounds = EnlistedHonestWounds;
             s.EnlistedPostBattleHealHp = EnlistedPostBattleHealHp;
             s.EnlistedDailyCareHp = EnlistedDailyCareHp;
+            s.RotEnlistLootGamePrice = RotEnlistLootGamePrice;
             s.LogEnabled = LogEnabled;
         }
 
