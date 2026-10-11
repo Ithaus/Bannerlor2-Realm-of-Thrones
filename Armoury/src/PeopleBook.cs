@@ -869,7 +869,7 @@ namespace Armoury
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
             // E4/8 (10.4, R19, R6): wedrowcy i konwoje BK u celu albo w domu, partia rozwiazana bez bitwy -> DOM pochodzenia; PRZED "resztka w nicosc" E4/7 (slownik jeszcze jest)
-            try { ArmsPartyGone(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/8)", e); }
+            try { ArmsPartyGone(mp, destroyer, false); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/8)", e); }
             try { OriginPartyGone(mp != null ? mp.Party : null, destroyer != null); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/7)", e); }   // E4/7 (4.12): slownik partii - resztka w nicosc (nazwana)
             try
             {

@@ -1238,6 +1238,16 @@ def etap4_e48(rep, lines, start, win, hea, until):
         thr = int(0.85 * E48_GARRISON_BASE)
         rep.add(f"E4/8 N4: zalogi d{run_day(zd[-1], start)}", f"{z} wobec bazy {E48_GARRISON_BASE} (z31 A d120)", f">= {thr} (85% bazy; wiaze tylko przy d120)",
                 (z >= thr) if (z is not None and run_day(zd[-1], start) >= 120) else None)
+    # N4 (recenzja E4/8 R1-2): drugi odplyw z zalog - nowe druzyny z zalogi siedziby (a2) - do oceny progu N4 i decyzji K8
+    a2 = [num(r"\+ z zalogi siedziby (\d+)", arm[d], int, 0) or 0 for d in adays]
+    rep.add("E4/8 N4: odplyw z zalog do nowych druzyn (a2, suma okna / srednio)", f"{sum(a2)} / {st.mean(a2):.1f} na dobe",
+            "INFO - szacunek d120 bez modelu (ok. 67.6 tys.) go nie obejmuje; razem z wierszem A5 dowod do K8", None)
+    # R6 (recenzja E4/8 R1-1/R2-5): rozwiazane bez bitwy do DOM, w tym usuniete bez zniszczenia (RemoveParty - konwoje DTE)
+    r6 = [re.search(r"ROZWIAZANE BEZ BITWY \(R6\): partii (\d+) \[.*?w tym usuniete bez zniszczenia - np\. konwoje DTE (\d+)\], do domu " + F_, arm[d]) for d in adays]
+    r6 = [(int(m.group(1)), int(m.group(2)), float(m.group(3))) for m in r6 if m]
+    if r6:
+        rep.add("E4/8 R6: rozwiazane bez bitwy do domu - partii / w tym usuniete bez zniszczenia / ludzi (suma okna)",
+                f"{sum(x[0] for x in r6)} / {sum(x[1] for x in r6)} / {sum(x[2] for x in r6):.0f}", "INFO (z31A: ok. 147 partii usunietych bez zniszczenia w 120 dob)", None)
     # N5 - wojsko lordow (jak E4/7 T9)
     rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
     # N6 - kontrole

@@ -41,10 +41,14 @@ namespace Armoury
         // ---------------------------------------------------------------- doba (kontrola linii E4/8): ruch DOM przyczynami E4/8 z konca doby ksiegi
         internal static readonly double[] ArmsDayMen = new double[MKinds];
 
+        // ---------------------------------------------------------------- sklad partii przed MobileParty.RemoveParty (bez zapisu; recenzja R1-1/R2-5 + R1-3)
+        private static readonly Dictionary<PartyBase, int> _removing = new Dictionary<PartyBase, int>();
+
         private static void ResetArms()
         {
             lock (Gate) { Array.Clear(_townMv, 0, MKinds); _townSet = 0; _townZero = 0; _townZeroMen = 0; _tr.Clear(); }
             Array.Clear(ArmsDayMen, 0, MKinds);
+            _removing.Clear();
         }
 
         /// <summary>PeopleBook.Daily, przed zerowaniem licznikow doby: ruch DOM przyczynami E4/8 (ludzie) - linia "Wojsko z ludzi (E4/8)" porownuje go ze swoimi licznikami.</summary>
@@ -268,8 +272,8 @@ namespace Armoury
             return a;
         }
 
-        /// <summary>m ludzi do DOM osady s: wies - Move (+m/k), miasto ze stanem - TownShift (i splata dlugu poboru z miasta, TownBack E4/7), zamek i reszta -
-        /// najslabsza wies regionu (OutlawLaw.WeakestVillage, jak HomeKnown). Zwraca umieszczonych.</summary>
+        /// <summary>m ludzi do DOM osady s: wies - Move (+m/k), miasto ze stanem - TownShift (powrot rozwiazanych R6 splaca tez dlug poboru E4/7 z miasta, TownBack),
+        /// zamek i reszta - najslabsza wies regionu (OutlawLaw.WeakestVillage, jak HomeKnown). Zwraca umieszczonych.</summary>
         private static double PlaceAt(Settlement s, Settlement reg, double m, int from, int cause)
         {
             if (s == null || !(m > Eps)) return 0.0;
@@ -284,11 +288,9 @@ namespace Armoury
                 if (TryTown(s, out p))
                 {
                     double t = TownShift(s, m, cause, true);
-                    if (t > 0.0 && reg != null && reg.StringId != null)
-                    {
-                        RegRef r;
-                        if (_rg.TryGetValue(reg.StringId, out r)) { double owed = r.TownOut - r.TownBack; if (owed > Eps) r.TownBack += Math.Min(owed, t); }
-                    }
+                    // recenzja R2-1: dlug miasta (TownOut - TownBack, E4/7 R1-1) to tylko pobor E4/7 - splaca go powrot rozwiazanych (R6: wsrod nich zwerbowani w E4/7),
+                    // nie wedrowcy, milicja ani migranci (ich wyjscie nie podnosi TownOut, powrot ma wlasny TownShift)
+                    if (t > 0.0 && cause == MBackDisband) RepayTownDebt(reg, t);
                     if (t > 0.0) return t;
                 }
             }
@@ -298,13 +300,31 @@ namespace Armoury
             return m;
         }
 
+        /// <summary>Splata dlugu poboru E4/7 z miasta regionu (TownBack += min(TownOut - TownBack, men)) - powrot rozwiazanych R6 do stanu miasta i migracja R2
+        /// (recenzja R1-6: migracja dopelnia te sama luke - bez splaty powracajacy zolnierze E4/7 dopelnialiby miasto drugi raz, a wsie migrantow nie dostawaly swoich).</summary>
+        internal static void RepayTownDebt(Settlement region, double men)
+        {
+            if (region == null || region.StringId == null || !(men > Eps) || double.IsInfinity(men)) return;
+            try
+            {
+                RegRef r;
+                if (_rg.TryGetValue(region.StringId, out r)) { double owed = r.TownOut - r.TownBack; if (owed > Eps) r.TownBack += Math.Min(owed, men); }
+            }
+            catch (Exception e) { OStumble("RepayTownDebt", e); }
+        }
+
         // ---------------------------------------------------------------- koniec partii bez bitwy (10.4, 8.3)
         /// <summary>
-        /// MobilePartyDestroyed (z OnPartyDestroyed, PRZED OriginPartyGone - slownik jest): (2) wedrowcy BK - u celu do DOM osady wejscia (migracja miedzy regionami),
-        /// zniszczeni w drodze bez bitwy - do domu; konwoje BK - eskorta do domu, niewolnicy w lochu - licznik (E4/9); (3) partia ze slownikiem rozwiazana bez bitwy
-        /// (bez niszczyciela, bez bitwy i oblezenia) - DOM pochodzenia (R6; bez band - pula OutlawLaw, bez gracza). Bitwa - okna E4/7 (slownik od wyjazdu). Nie rzuca.
+        /// MobilePartyDestroyed (z OnPartyDestroyed, PRZED OriginPartyGone - slownik jest) albo samo OnPartyRemoved (removed = true: MobileParty.RemoveParty bez
+        /// DestroyPartyAction - konwoje DTE CutTheirSupplyBehavior.CleanupCaravan; recenzja R1-1/R2-5): (2) wedrowcy BK - u celu do DOM osady wejscia (migracja miedzy
+        /// regionami), zniszczeni w drodze bez bitwy - do domu; konwoje BK - eskorta do domu, niewolnicy w lochu - licznik (E4/9); (3) partia ze slownikiem rozwiazana
+        /// bez bitwy (bez niszczyciela, bez bitwy i oblezenia) - DOM pochodzenia (R6; bez band - pula OutlawLaw, bez gracza). Bitwa - okna E4/7 (slownik od wyjazdu).
+        /// Ilu ludzi (ArmsMen): jedna regula min(slownik, sklad) - przy MobilePartyDestroyed sklad jeszcze jest (recenzja R1-3: roster wyczyszczony bez okna, np. bunt
+        /// Militia = 0 - reszta slownika do OriginPartyGone, nie ludzie z niczego); przy OnPartyRemoved RemoveParty juz wyczyscil sklad - sklad sprzed wyczyszczenia
+        /// z prefiksu na RemoveParty (RemovingPre; partia oprozniona przez cudzy kod przed RemoveParty nie oddaje ludzi drugi raz), bez prefiksu - caly slownik.
+        /// Po MobilePartyDestroyed slownik jest usuniety (OriginPartyGone), wiec OnPartyRemoved tej samej partii nic nie podwaja. Nie rzuca.
         /// </summary>
-        private static void ArmsPartyGone(MobileParty mp, PartyBase destroyer)
+        private static void ArmsPartyGone(MobileParty mp, PartyBase destroyer, bool removed)
         {
             if (mp == null || mp.Party == null || !OriginLive) return;
             int kind = KindOf(mp);
@@ -320,7 +340,9 @@ namespace Armoury
                 if (!has || destroyer != null || mp.MapEvent != null) return;      // bitwa: polegli/jency/rozbici - okna E4/7; resztka - OriginPartyGone
                 bool cargo = ArmsFromPeople.IsBkCargo(mp);
                 var cur = mp.CurrentSettlement; var home = mp.HomeSettlement;
-                var sh = Take(mp.MemberRoster, o.Sum, FRoadEnd);
+                double nr = ArmsMen(mp, o, removed);
+                if (!(nr > Eps)) return;
+                var sh = Take(mp.MemberRoster, nr, FRoadEnd);
                 if (!cargo && cur != null)
                 {
                     var a = ArriveAt(cur, sh, ARoad, cur == home ? MRoadBack : MRoadIn, MRoadNone, true);
@@ -334,12 +356,42 @@ namespace Armoury
                 return;
             }
             if (!has || kind < 0 || kind == KBand || kind == KPlayer || destroyer != null || mp.MapEvent != null || mp.SiegeEvent != null) return;
-            if (!ArmsFromPeople.CaravansOn) return;          // R6 dla rozwiazanych bez bitwy - razem z karawanami (K4); wylaczone: resztka w nicosc jak w E4/7
+            // recenzja R1-4: R6 bez klucza karawan - ta sama symetria LevyLive co pobor E4/7/E4/8 (ArriveAt: !LevyLive - Note bez hearth); ludzi z DOM w partiach
+            // daja tez pobor E4/7, milicja i nowe druzyny, wiec wylaczenie Caravans From People nie moze gasic ich powrotu
+            double n2 = ArmsMen(mp, o, removed);
+            if (!(n2 > Eps)) return;
             var home2 = mp.HomeSettlement;
             if (home2 == null) { try { home2 = OutlawLaw.RegionAt(mp.Position.ToVec2()); } catch { home2 = null; } }
-            var sh2 = Take(mp.MemberRoster, o.Sum, FDisbandHome);
+            var sh2 = Take(mp.MemberRoster, n2, FDisbandHome);
             var a2 = ArriveAt(home2, sh2, AService, MBackDisband, MSoldier, false);
-            ArmsFromPeople.NoteDisbandHome(kind, a2);
+            ArmsFromPeople.NoteDisbandHome(kind, a2, removed);
+        }
+
+        /// <summary>Ilu ludzi slownika wraca: min(slownik, sklad) - sklad teraz (MobilePartyDestroyed) albo sprzed RemoveParty (OnPartyRemoved; brak zapisu - caly slownik).</summary>
+        private static double ArmsMen(MobileParty mp, Org o, bool removed)
+        {
+            if (!removed) return Math.Min(o.Sum, Men(mp.MemberRoster));
+            int men;
+            return _removing.TryGetValue(mp.Party, out men) ? Math.Min(o.Sum, men) : o.Sum;
+        }
+
+        /// <summary>Prefiks MobileParty.RemoveParty (ArmsFromPeople.RemovePre): sklad partii ze slownikiem przed wyczyszczeniem (RemoveParty czysci roster PRZED
+        /// OnPartyRemoved). Po MobilePartyDestroyed slownika juz nie ma - nic nie zapisuje. true = zapisane (finalizer zdejmuje wpis).</summary>
+        internal static bool RemovingPre(MobileParty mp)
+        {
+            if (mp == null || mp.Party == null || !OriginLive || !_mem.ContainsKey(mp.Party)) return false;
+            _removing[mp.Party] = Men(mp.MemberRoster);
+            return true;
+        }
+
+        internal static void RemovingDone(MobileParty mp) { if (mp != null && mp.Party != null) _removing.Remove(mp.Party); }
+
+        /// <summary>OnPartyRemoved (przed OriginPartyGone): partia usunieta bez MobilePartyDestroyed (RemoveParty wolane wprost, np. konwoje DTE) - ta sama galaz konca
+        /// co przy zniszczeniu bez bitwy (recenzja R1-1/R2-5: ich straz zdjeta z DOM miasta zrodlowego przez CaravanPost szla "w nicosc"). Nie rzuca.</summary>
+        internal static void ArmsPartyRemoved(PartyBase pb)
+        {
+            try { if (pb != null && pb.IsMobile && pb.MobileParty != null) ArmsPartyGone(pb.MobileParty, null, true); }
+            catch (Exception e) { OStumble("ArmsPartyRemoved", e); }
         }
 
         /// <summary>Partia ma slownik skladu KRoad (wedrowcy/konwoj BK z ksiega) - ArmsFromPeople przed zdjeciem z DOM.</summary>

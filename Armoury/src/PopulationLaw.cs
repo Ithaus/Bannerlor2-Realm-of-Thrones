@@ -726,6 +726,8 @@ namespace Armoury
             try
             {
                 float add = __state.V.Hearth - (__state.H0 + __state.R);
+                // E4/8 (recenzja R1-5/R2-6): hearth przesuniety przez ksiege w postfiksie milicji tej wsi (powrot milicji do DOM +m/k, pobor milicji -m/k) to nie podloga gry
+                try { add -= (float)ArmsFromPeople.PeekTickHearth(__state.V); } catch { }
                 if (add > 0.0001f && !float.IsInfinity(add)) PeopleBook.FloorFromPool(__state.V, add);
             }
             catch (Exception e)

@@ -892,8 +892,10 @@ namespace Armoury
             catch (Exception e) { OStumble("TakeLevy", e); }
             try
             {
-                // R1-1: pobor regionu od siewu - ze stanu miasta (dlug miasta; powrot - BackToTown) i z wsi (mianownik podzialu powrotu miasto/wsie)
-                if (region != null && region.StringId != null && got > Eps)
+                // R1-1: pobor regionu od siewu - ze stanu miasta (dlug miasta; powrot - BackToTown) i z wsi (mianownik podzialu powrotu miasto/wsie).
+                // Recenzja E4/8 R2-1: tylko pobor E4/7 (MLevyVillage, MLevyA5) - wyjscia E4/8 (milicja, druzyny, karawany, wedrowcy) maja wlasny powrot przez TownShift;
+                // liczone tutaj zawyzalyby udzial miasta w powrotach i dlug miasta
+                if (region != null && region.StringId != null && got > Eps && (causeM == MLevyVillage || causeM == MLevyA5))
                 {
                     var rr = Rg(region.StringId);
                     rr.TownOut += fromTown;
@@ -1022,7 +1024,12 @@ namespace Armoury
             if (mp != null && _pending.TryGetValue(mp, out p)) { _pendLost += p.Total; _pending.Remove(mp); }
         }
 
-        internal static void OnPartyRemoved(PartyBase pb) { try { OriginPartyGone(pb, false); } catch (Exception e) { OStumble("OnPartyRemoved", e); } }
+        internal static void OnPartyRemoved(PartyBase pb)
+        {
+            // E4/8 (recenzja R1-1/R2-5): partia usunieta bez MobilePartyDestroyed (RemoveParty wprost - konwoje DTE) - koniec bez bitwy do DOM, PRZED resztka w nicosc
+            try { ArmsPartyRemoved(pb); } catch (Exception e) { OStumble("OnPartyRemoved(E4/8)", e); }
+            try { OriginPartyGone(pb, false); } catch (Exception e) { OStumble("OnPartyRemoved", e); }
+        }
 
         // ================================================================ siew (raz na kampanie; NK "siew przy wlaczeniu")
         private static double DomOf(Settlement region)

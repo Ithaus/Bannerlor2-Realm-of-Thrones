@@ -77,7 +77,7 @@ namespace Armoury
             public int w, wCargo; public double n1w, n1e, n3; public long s;
             public int b1N, b2N, b3N, b4N, b5N; public double b1, b2, b3, b4, b5, bNone, bOther; public double sEnd;
             // rozwiazane bez bitwy (R6)
-            public int q; public double qHere, qOther, qNone; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
+            public int q, qRemoved; public double qHere, qOther, qNone; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
             public long ticks;
         }
         private static Day D = new Day();
@@ -109,14 +109,17 @@ namespace Armoury
         private static int Ceil(double x) { return x <= Eps ? 0 : (int)Math.Ceiling(x - 1e-6); }
 
         /// <summary>Szeregowi rosteru wedlug typu (bez bohaterow i wightow) - kopia do porownan.</summary>
-        private static Dictionary<CharacterObject, int> Regulars(TroopRoster r)
+        private static Dictionary<CharacterObject, int> Regulars(TroopRoster r) { return Regulars(r, false); }
+
+        /// <summary>Szeregowi wedlug typu; wights = true - razem z wightami (milicja osad Innych - recenzja R2-4).</summary>
+        private static Dictionary<CharacterObject, int> Regulars(TroopRoster r, bool wights)
         {
             var d = new Dictionary<CharacterObject, int>();
             if (r == null) return d;
             for (int i = 0; i < r.Count; i++)
             {
                 var c = r.GetCharacterAtIndex(i);
-                if (c == null || c.IsHero || PeopleBook.IsWight(c)) continue;
+                if (c == null || c.IsHero || (!wights && PeopleBook.IsWight(c))) continue;
                 int k = r.GetElementNumber(i);
                 if (k <= 0) continue;
                 int v; d.TryGetValue(c, out v); d[c] = v + k;
@@ -181,11 +184,12 @@ namespace Armoury
             return done;
         }
 
-        /// <summary>5.2: zdejmuje n szeregowych (bez bohaterow i wightow) od najliczniejszego typu, zdrowi przed rannymi (milicja - bez stanu "przed" w pamieci).</summary>
-        private static int StripMost(TroopRoster r, int n)
+        /// <summary>5.2: zdejmuje n szeregowych (bez bohaterow i wightow; wights = true - razem z wightami) od najliczniejszego typu, zdrowi przed rannymi
+        /// (milicja - bez stanu "przed" w pamieci).</summary>
+        private static int StripMost(TroopRoster r, int n, bool wights = false)
         {
             if (r == null || n <= 0) return 0;
-            var list = Regulars(r).OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
+            var list = Regulars(r, wights).OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
             int done = 0;
             for (int pass = 0; pass < 2 && done < n; pass++)
                 foreach (var c in list)
@@ -237,6 +241,8 @@ namespace Armoury
         // ================================================================ K1: zalogi (4.1) - przyrost z modelu = 0
         private static int GarMen(Town t) { var g = t != null ? t.GarrisonParty : null; return g != null ? Men(g.MemberRoster) : 0; }
 
+        // __state: -1 = nic (klucz wylaczony, nie Straz), ludzie zalogi + 1 = Straz (stan przed); 0 = nasz prefiks POMINIETY - wczesniejszy prefiks bool
+        // (ClanBudget.GarRecruitPrefix Strazy przy pulapie puli) zwrocil false, a Harmony nie wola wtedy dalszych prefiksow bool (recenzja R2-7)
         public static bool GarrisonGrowthPrefix(Town __0, out int __state)
         {
             __state = -1;
@@ -244,7 +250,7 @@ namespace Armoury
             {
                 if (!GarrisonOn || __0 == null || __0.Settlement == null || Campaign.Current == null) return true;
                 var st = __0.Settlement;
-                if (CrownGifts.IsWatch(st.MapFaction)) { __state = GarMen(__0); return true; }     // Straz - do E4/9 (dawny przyrost)
+                if (CrownGifts.IsWatch(st.MapFaction)) { __state = GarMen(__0) + 1; return true; }     // Straz - do E4/9 (dawny przyrost)
                 int would = 0;
                 try { would = (int)Campaign.Current.Models.SettlementGarrisonModel.CalculateBaseGarrisonChange(st, false).ResultNumber; }
                 catch (Exception e) { Stumble("GarrisonGrowthPrefix(model)", e); }
@@ -256,8 +262,8 @@ namespace Armoury
 
         public static Exception GarrisonGrowthFin(Exception __exception, Town __0, int __state)
         {
-            if (__state < 0) return __exception;
-            try { int d = GarMen(__0) - __state; if (d > 0) { D.zWatch += d; D.zWatchTowns++; } }
+            if (__state <= 0) return __exception;
+            try { int d = GarMen(__0) - (__state - 1); if (d > 0) { D.zWatch += d; D.zWatchTowns++; } }
             catch (Exception e) { Stumble("GarrisonGrowthFin", e); }
             return __exception;
         }
@@ -277,10 +283,14 @@ namespace Armoury
                 float bas = __result.BaseNumber, res = __result.ResultNumber;
                 int daily = 1;
                 try { daily = Campaign.Current.Models.SettlementGarrisonModel.GetMaximumDailyAutoRecruitmentCount(__0); } catch { }
+                // recenzja R2-8: gra dodaje liczbe ochotnikow (BaseNumber) tylko przy dodatnim budzecie zoldu zalogi - bez budzetu BaseNumber = 0, a wiaze zold
+                int budget = 1;
+                try { var gp = __0.GarrisonParty; budget = gp != null ? gp.GetAvailableWageBudget() : (__0.Settlement != null ? __0.Settlement.GarrisonWagePaymentLimit : 1); } catch { }
                 var d = D;
                 d.a5Towns++;
                 if (res > 0f) { d.a5With++; d.a5Men += (long)Math.Ceiling(res); }
-                if (!(bas > 0f)) d.a5NoVol++;
+                if (budget <= 0) d.a5Wage++;
+                else if (!(bas > 0f)) d.a5NoVol++;
                 else if (res >= daily && bas > res) d.a5Daily++;
                 else if (res < bas) d.a5Wage++;
             }
@@ -289,16 +299,17 @@ namespace Armoury
 
         // ================================================================ K2: milicja (5.2, 5.3)
         private const int SrcTick = 0, SrcHeal = 1, SrcSiege = 2;
-        // okno W1 Measure40 mierzy hearth wsi przed/po ticku - hearth, ktory ksiega przesunela w naszym postfiksie TEJ wsi, jest juz w linii "Hearth" (o13) - W1 go odejmuje
+        // okno W1 Measure40 i podloga E4/4 (PopulationLaw.FloorFinalizer) mierza hearth wsi przed/po ticku - hearth, ktory ksiega przesunela w naszym postfiksie TEJ wsi,
+        // jest juz w linii "Hearth" (o13) i nie jest podloga gry - oba finalizery go odejmuja (recenzja R1-5/R2-6: odczyt bez zerowania, kolejnosc finalizerow niepewna;
+        // zerowanie tylko w MilVillagePre na poczatku ticku kazdej wsi)
         [ThreadStatic] private static Village _tickV;
         [ThreadStatic] private static double _tickDH;
 
-        /// <summary>Measure40.VillageFin: hearth wsi przesuniety przez ksiege w postfiksie milicji E4/8 w tym ticku (kopiuje i zeruje).</summary>
-        internal static double TakeTickHearth(Village v)
+        /// <summary>Finalizery ticku wsi (Measure40.VillageFin, PopulationLaw.FloorFinalizer): hearth wsi przesuniety przez ksiege w postfiksie milicji E4/8 w tym ticku (bez zerowania).</summary>
+        internal static double PeekTickHearth(Village v)
         {
             if (v == null || !ReferenceEquals(_tickV, v)) return 0.0;
-            double h = _tickDH; _tickV = null; _tickDH = 0.0;
-            return h;
+            return _tickDH;
         }
 
         private static MobileParty MilParty(Settlement s)
@@ -307,10 +318,32 @@ namespace Armoury
             return mc != null ? mc.MobileParty : null;
         }
 
+        /// <summary>Szeregowi razem z wightami (milicja osady Innych - gra dopisuje ja z kultury osady, ROT ustawia osadzie kulture Innych: wighty).</summary>
+        private static int AllMen(TroopRoster r)
+        {
+            int n = 0;
+            if (r == null) return 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var c = r.GetCharacterAtIndex(i);
+                if (c == null || c.IsHero) continue;
+                int k = r.GetElementNumber(i);
+                if (k > 0) n += k;
+            }
+            return n;
+        }
+
+        /// <summary>Miara milicji okna: ludzie (Men), w osadzie Innych - razem z wightami (recenzja R2-4: Men() pomija wighty, wiec przyrost wightow dawal d = 0).</summary>
+        private static int MilMen(Settlement s, MobileParty mp, bool others)
+        {
+            if (mp == null) return 0;
+            return others ? AllMen(mp.MemberRoster) : Men(mp.MemberRoster);
+        }
+
         private static int MilPre(Settlement s)
         {
             if (s == null || !MilitiaOn || !PeopleBook.LevyLive) return -1;
-            try { var mp = MilParty(s); return mp != null ? Men(mp.MemberRoster) : 0; }
+            try { return MilMen(s, MilParty(s), OthersAt(s)); }
             catch (Exception e) { Stumble("MilPre", e); return -1; }
         }
 
@@ -348,22 +381,29 @@ namespace Armoury
             try
             {
                 var mp = MilParty(s);
-                int men1 = mp != null ? Men(mp.MemberRoster) : 0;
+                bool others = OthersAt(s);
+                int men1 = MilMen(s, mp, others);
                 int d = men1 - men0;
                 if (d == 0) return;
                 var day = D;
+                if (others)
+                {
+                    // osada Innych (recenzja R2-4; przed Straza - dawna osada Strazy przejeta przez Innych ma kulture Daru z kalibracji): wight z niczego nie powstaje -
+                    // przyrost (wighty razem z ludzmi) zdjety; ubytek - partia Innych bez slownika skladu (KUndead), wighty to nie ludzie: tylko licznik ticku (N7)
+                    if (d > 0)
+                    {
+                        day.mUp += d; if (src == SrcTick) day.mTickUp += d;
+                        int st = StripMost(mp.MemberRoster, d, true); day.r2 += st;
+                        if (src == SrcTick) day.mTickUp -= st;
+                    }
+                    else if (src == SrcTick) day.mTickDown += -d;
+                    return;
+                }
                 if (d > 0)
                 {
                     var r = mp.MemberRoster;
                     day.mUp += d; if (src == SrcTick) day.mTickUp += d;
                     if (WatchAt(s)) { PeopleBook.GiveNone(r, d, PeopleBook.FWatchArms); day.m2 += d; return; }     // Straz - do E4/9 (dawny przyrost, koszyk "")
-                    if (OthersAt(s))
-                    {
-                        int st = StripMost(r, d); day.r2 += st;
-                        if (src == SrcTick) day.mTickUp -= st;
-                        if (d - st > 0) PeopleBook.GiveNone(r, d - st, PeopleBook.FArmsFloor);
-                        return;
-                    }
                     if (FreeHands.Braked(s))
                     {
                         int st = StripMost(r, d); day.r1 += st;
@@ -433,7 +473,8 @@ namespace Armoury
                 day.n += n;
                 if (CrownGifts.IsWatch(__1.MapFaction)) { day.p1++; PeopleBook.GiveNone(r, n, PeopleBook.FWatchArms); day.a4 += n; return; }   // Straz - do E4/9
                 if (!SpawnOn || !PeopleBook.LevyLive) { day.nOff += n; return; }      // jak dotad (uzgodnienie E4/7 nazwie "z niczego - partie rodow")
-                var seat = SeatOf(__1, __0);
+                bool foreign;
+                var seat = SeatOf(__1, __0, out foreign);
                 bool braked = FreeHands.Braked(seat);
                 double a1 = 0.0; Settlement reg = null;
                 if (!braked && seat != null) a1 = PeopleBook.TakeLevy(seat, n, PeopleBook.MLevySpawn, out reg, PeopleBook.MLevySpawn);
@@ -441,34 +482,60 @@ namespace Armoury
                 if (a1 > Eps) PeopleBook.GiveNew(r, reg, a1, PeopleBook.FSpawnLevy);
                 if (keep - a1 > Eps) { PeopleBook.GiveNone(r, keep - a1, PeopleBook.FArmsFloor); day.aFrac += keep - a1; }
                 day.a1 += a1;
-                int rest = n - keep, t = 0; bool tried = false;
-                if (rest > 0 && SpawnGarrisonOn)
+                int rest = n - keep;
+                if (rest > 0)
                 {
-                    try { t = FromSeatGarrison(__0, __1, seat, __state.Before, rest, out tried); }
-                    catch (Exception e) { Stumble("SpawnPost(zaloga)", e); }
-                }
-                day.a2 += t;
-                int r2 = rest - t;
-                if (r2 > 0)
-                {
-                    int st = StripAdded(r, __state.Before, r2);
-                    if (r2 - st > 0) { PeopleBook.GiveNone(r, r2 - st, PeopleBook.FArmsFloor); day.aFrac += r2 - st; }
-                    if (tried) day.a3g += st; else if (braked) day.a3h += st; else day.a3f += st;
+                    // recenzja R2-2: najpierw zdjeci WSZYSCY ludzie szablonu, ktorych DOM nie dal (ksztalt szablonu, 6.3), dopiero potem dopisani ludzie zalogi
+                    // (bez dalszego zdejmowania) - koncowe zdjecie liczone od stanu sprzed szablonu bralo tez weteranow zalogi
+                    int st = StripAdded(r, __state.Before, rest);
+                    if (rest - st > 0) { PeopleBook.GiveNone(r, rest - st, PeopleBook.FArmsFloor); day.aFrac += rest - st; }
+                    int t = 0; bool tried = false;
+                    if (st > 0 && SpawnGarrisonOn && !foreign)
+                    {
+                        try { t = FromSeatGarrison(__0, __1, seat, st, out tried); }
+                        catch (Exception e) { Stumble("SpawnPost(zaloga)", e); }
+                    }
+                    day.a2 += t;
+                    int miss = st - t;
+                    if (miss > 0) { if (tried) day.a3g += miss; else if (braked) day.a3h += miss; else day.a3f += miss; }
                 }
             }
             catch (Exception e) { Stumble("SpawnPost", e); }
             finally { D.ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
-        private static Settlement SeatOf(Hero h, MobileParty mp)
+        /// <summary>
+        /// Siedziba lorda jako zrodlo poboru szablonu (i zalogi): HomeSettlement (wies, miasto, zamek) nie w wojnie z frakcja lorda i nieoblegana; recenzja R1-7: siedziba
+        /// wroga (rod, ktory stracil lenno - dom w krolestwie, z ktorym walczy) albo oblezona - pobor z regionu pozycji partii (gra stawia nowa druzyne przy osadzie swojej
+        /// frakcji bez bitwy, SettlementHelper.GetBestSettlementToSpawnAround), zaloga siedziby nie (foreign = true). Siedziba neutralna zostaje (niezalezne mniejsze rody
+        /// bez lenna maja dom w cudzym krolestwie - przy scislej rownosci frakcji ich zboze szloby z niczego, prog N9). Zaloga i tak tylko tej samej frakcji (FromSeatGarrison).
+        /// Brak siedziby - region pozycji jak dotad.
+        /// </summary>
+        private static Settlement SeatOf(Hero h, MobileParty mp, out bool foreign)
         {
+            foreign = false;
             var s = h != null ? h.HomeSettlement : null;
-            if (s != null && (s.IsVillage || s.IsTown || s.IsCastle)) return s;
+            if (s != null && (s.IsVillage || s.IsTown || s.IsCastle))
+            {
+                if (SeatUsable(s, h)) return s;
+                foreign = true;
+            }
             try { return mp != null ? OutlawLaw.RegionAt(mp.Position.ToVec2()) : null; } catch { return null; }
         }
 
-        /// <summary>6.2 (b): t zdrowych ludzi zalogi siedziby (tej samej frakcji) zamiast t ludzi szablonu; zaloga zostawia 50 w miescie / 25 w zamku (rezerwa gry).</summary>
-        private static int FromSeatGarrison(MobileParty party, Hero hero, Settlement seat, Dictionary<CharacterObject, int> before, int want, out bool tried)
+        /// <summary>Siedziba nie w wojnie z frakcja lorda i nieoblegana (wies - jej warownia).</summary>
+        private static bool SeatUsable(Settlement s, Hero h)
+        {
+            if (s == null || h == null) return false;
+            var f = h.MapFaction; var sf = s.MapFaction;
+            if (f != null && sf != null && sf != f && FactionManager.IsAtWarAgainstFaction(f, sf)) return false;
+            var fort = s.IsVillage && s.Village != null ? s.Village.Bound : s;
+            return fort == null || !fort.IsUnderSiege;
+        }
+
+        /// <summary>6.2 (b): do `want` zdrowych ludzi zalogi siedziby (tej samej frakcji) do druzyny - ludzi szablonu zdjal juz wolajacy (recenzja R2-2); zaloga zostawia
+        /// 50 w miescie / 25 w zamku (rezerwa gry). Zaloga w bitwie albo oblezeniu - niedostepna (recenzja R2-3, jak ClanBudget przeglad C1 uwaga 5).</summary>
+        private static int FromSeatGarrison(MobileParty party, Hero hero, Settlement seat, int want, out bool tried)
         {
             tried = false;
             var gs = seat != null && seat.IsVillage && seat.Village != null ? seat.Village.Bound : seat;
@@ -476,6 +543,7 @@ namespace Armoury
             var g = gs.Town.GarrisonParty;
             if (g == null || g == party) return 0;
             tried = true;
+            if (!g.IsActive || g.MapEvent != null || gs.IsUnderSiege || (gs.Party != null && gs.Party.MapEvent != null)) return 0;     // lista MapEventParty i straty bitwy - roster nietykalny
             var gr = g.MemberRoster;
             var healthy = new Dictionary<CharacterObject, int>();
             int hs = 0;
@@ -489,8 +557,6 @@ namespace Armoury
             }
             int t = Math.Min(want, hs - (gs.IsTown ? 50 : 25));
             if (t <= 0) return 0;
-            t = StripAdded(party.MemberRoster, before, t);
-            if (t <= 0) return 0;
             var moved = Split(healthy, t);
             int m = 0;
             foreach (var kv in moved) { gr.AddToCounts(kv.Key, -kv.Value); party.MemberRoster.AddToCounts(kv.Key, kv.Value); m += kv.Value; }
@@ -500,7 +566,8 @@ namespace Armoury
         }
 
         /// <summary>6.2 pkt 6: zboze, ktore gra dala z niczego (15-30), schodzi z zapasu siedziby (Town.FoodStocks; 1 jednostka = 1 sztuka zboza), inaczej najblizszej
-        /// warowni tej samej frakcji z zapasem 2g; brak - zostaje (z niczego, licznik). Tylko po starcie kampanii (nowa gra - jak dotad).</summary>
+        /// warowni tej samej frakcji; brak - zostaje (z niczego, licznik). Recenzja R1-7: siedziba nie wroga i nieoblegana (SeatUsable), kazda warownia (siedziba tez)
+        /// z zapasem co najmniej 2g (nie schodzi do zera - glod E4/6), oblezone pomijane. Tylko po starcie kampanii (nowa gra - jak dotad).</summary>
         private static void SpawnGrain(MobileParty mp, Hero h, int grain0)
         {
             if (!GrainOn || Campaign.Current == null || !Campaign.Current.GameStarted) return;
@@ -510,13 +577,13 @@ namespace Armoury
             day.g += g; day.gN++;
             var seat = h.HomeSettlement;
             var home = seat != null && seat.IsVillage && seat.Village != null ? seat.Village.Bound : seat;
-            if (home != null && home.Town != null && home.Town.FoodStocks >= g) { home.Town.FoodStocks -= g; day.g1 += g; return; }
+            var f = h.MapFaction;
+            if (home != null && home.Town != null && SeatUsable(home, h) && home.Town.FoodStocks >= 2f * g) { home.Town.FoodStocks -= g; day.g1 += g; return; }
             Settlement best = null; float bd = float.MaxValue;
             var pos = mp.Position.ToVec2();
-            var f = h.MapFaction;
             foreach (var t in Town.AllFiefs)
             {
-                if (t == null || t.Settlement == null || t.Settlement.MapFaction != f || t.FoodStocks < 2f * g) continue;
+                if (t == null || t.Settlement == null || t.Settlement.MapFaction != f || t.Settlement.IsUnderSiege || t.FoodStocks < 2f * g) continue;
                 float dd = pos.DistanceSquared(t.Settlement.GetPosition2D);
                 if (dd < bd) { bd = dd; best = t.Settlement; }
             }
@@ -638,6 +705,19 @@ namespace Armoury
             finally { D.ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
+        // ================================================================ koniec partii bez zniszczenia (recenzja R1-1/R2-5): sklad przed MobileParty.RemoveParty
+        public static void RemovePre(MobileParty __instance, out bool __state)
+        {
+            __state = false;
+            try { __state = PeopleBook.RemovingPre(__instance); } catch (Exception e) { Stumble("RemovePre", e); }
+        }
+
+        public static Exception RemoveFin(Exception __exception, MobileParty __instance, bool __state)
+        {
+            if (__state) { try { PeopleBook.RemovingDone(__instance); } catch (Exception e) { Stumble("RemoveFin", e); } }
+            return __exception;
+        }
+
         // ================================================================ K5: wedrowcy i konwoje BK (8.2) - ramka tworzenia
         public sealed class BkFrame { public Settlement Origin; public BkFrame Prev; public readonly List<MobileParty> Parties = new List<MobileParty>(1); }
         [ThreadStatic] private static BkFrame _bkTop;
@@ -731,10 +811,11 @@ namespace Armoury
 
         internal static void NoteSlavesEnd(double n) { if (n > 0.0) D.sEnd += n; }
 
-        internal static void NoteDisbandHome(int kind, PeopleBook.Arrive a)
+        internal static void NoteDisbandHome(int kind, PeopleBook.Arrive a, bool removed)
         {
             var d = D;
             d.q++; d.qHere += a.Here; d.qOther += a.Other; d.qNone += a.None;
+            if (removed) d.qRemoved++;
             int v; d.qKind.TryGetValue(kind, out v); d.qKind[kind] = v + 1;
         }
 
@@ -769,6 +850,7 @@ namespace Armoury
                  PP(nameof(SpawnPre), Priority.First), PP(nameof(SpawnPost), Priority.Low), null);
             Wire(h, "dary startowe druzyny - pomiar (GiveInitialItemsToParty)", AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "GiveInitialItemsToParty", new[] { typeof(MobileParty) }), P(nameof(GiftsPre)), null, P(nameof(GiftsFin)));
             Wire(h, "karawany (CreateCaravanParty)", AccessTools.Method(typeof(CaravanPartyComponent), "CreateCaravanParty"), P(nameof(CaravanPre)), PP(nameof(CaravanPost), Priority.Low), P(nameof(CaravanFin)));
+            Wire(h, "koniec partii bez zniszczenia - sklad przed (MobileParty.RemoveParty)", AccessTools.Method(typeof(MobileParty), "RemoveParty", Type.EmptyTypes), PP(nameof(RemovePre), Priority.First), null, P(nameof(RemoveFin)));
             Wire(h, "konwoje morskie (RefillConvoyTroops)", AccessTools.Method(typeof(CaravansCampaignBehavior), "RefillConvoyTroops", new[] { typeof(MobileParty) }), P(nameof(RefillPre)), P(nameof(RefillPost)), null);
             var ppc = AccessTools.TypeByName("BannerKings.Components.PopulationPartyComponent");
             MethodInfo trav = null, food = null, slave = null;
@@ -871,7 +953,7 @@ namespace Armoury
             long a3 = d.a3h + d.a3g + d.a3f;
             sb.Append(" | NOWE DRUZYNY: ").Append(d.p).Append(" partii (Straz ").Append(d.p1).Append(", Inni ").Append(d.p2).Append(", rod gracza ").Append(d.p3).Append(")")
               .Append(", szablon ").Append(d.n).Append(" = z wolnych rak ").Append(F1(d.a1)).Append(" + ulamki bez DOM ").Append(F1(d.aFrac)).Append(" + z zalogi siedziby ").Append(d.a2)
-              .Append(" + nie wystawieni ").Append(a3).Append(" (bez wolnych rak ").Append(d.a3h).Append(", zaloga ponizej rezerwy ").Append(d.a3g).Append(", podloga ").Append(d.a3f).Append(")")
+              .Append(" + nie wystawieni ").Append(a3).Append(" (bez wolnych rak ").Append(d.a3h).Append(", zaloga ponizej rezerwy albo w bitwie/oblezeniu ").Append(d.a3g).Append(", podloga ").Append(d.a3f).Append(")")
               .Append(" + Straz \"\" ").Append(d.a4).Append(" + ksiega bez poboru ").Append(d.nOff)
               .Append("; zboze ").Append(d.g).Append(" szt. (").Append(d.gN).Append(" partii): z zapasu siedziby ").Append(d.g1).Append(", z innej warowni ").Append(d.g2).Append(", z niczego (brak zapasu) ").Append(d.g3)
               .Append("; dary startowe gry (poza E4/8 - etap 6): ").Append(d.gifts).Append(" szt. za ").Append(d.giftsValue).Append(" zl");
@@ -890,7 +972,7 @@ namespace Armoury
               .Append("; w drodze teraz ").Append(F1(rAll)).Append(" w ").Append(rParties).Append(" partiach (z pochodzeniem ").Append(F1(rKnown)).Append(")");
             // R6
             string qk = d.qKind.Count > 0 ? string.Join(", ", d.qKind.OrderByDescending(kv => kv.Value).Select(kv => KindName(kv.Key) + " " + kv.Value).ToArray()) : "-";
-            sb.Append(" | ROZWIAZANE BEZ BITWY (R6): partii ").Append(d.q).Append(" [").Append(qk).Append("], do domu ").Append(F1(d.qHere + d.qOther)).Append(" (inne regiony ").Append(F1(d.qOther))
+            sb.Append(" | ROZWIAZANE BEZ BITWY (R6): partii ").Append(d.q).Append(" [").Append(qk).Append("; w tym usuniete bez zniszczenia - np. konwoje DTE ").Append(d.qRemoved).Append("], do domu ").Append(F1(d.qHere + d.qOther)).Append(" (inne regiony ").Append(F1(d.qOther))
               .Append("), bez pochodzenia ").Append(F1(d.qNone));
             // kontrola kodu: ruch DOM przyczynami E4/8 w ksiedze (PeopleBook.ArmsDayMen) = to, co linia zdjela
             var bm = PeopleBook.ArmsDayMen;

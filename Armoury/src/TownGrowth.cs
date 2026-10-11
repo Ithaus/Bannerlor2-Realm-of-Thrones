@@ -122,7 +122,13 @@ namespace Armoury
                 {
                     got = PeopleBook.TakeFromRegionVillages(st, want, PeopleBook.MTownMigrate);
                     if (got > 0.0) got = PeopleBook.TownShift(st, got, PeopleBook.MTownMigrate, false);     // ruch liczony raz - po stronie wsi (Move)
-                    if (got > Eps) { _migTowns++; _mig += got; double a = Math.Min(got, loss); _mig1 += a; _mig2 += got - a; }
+                    if (got > Eps)
+                    {
+                        _migTowns++; _mig += got; double a = Math.Min(got, loss); _mig1 += a; _mig2 += got - a;
+                        // recenzja R1-6: czesc "do udzialu miejskiego" dopelnia luke po poborze E4/7 - splaca dlug miasta (TownBack), zeby powracajacy zolnierze E4/7
+                        // szli do wsi, ktore daly migrantow (czesc na ubytek naturalny zastepuje zmarlych mieszczan - nie dlug)
+                        if (got - a > Eps) PeopleBook.RepayTownDebt(OutlawLaw.RegionFor(st), got - a);
+                    }
                     if (want - got > 1e-3) { _hShort++; _shortMen += want - got; }
                 }
             }

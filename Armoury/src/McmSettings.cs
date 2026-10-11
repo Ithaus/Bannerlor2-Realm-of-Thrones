@@ -2576,7 +2576,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool NewPartyGrainFromSeat { get; set; } = true;
 
-        [SettingPropertyBool("Caravans From People", HintText = "a new caravan's guards and drivers are people of the town it sets out from (villagers, if it starts from a village), and a sea convoy fills its ranks from the town it reaches; a caravan or party broken up without a fight sends its men back home")]
+        [SettingPropertyBool("Caravans From People", HintText = "a new caravan's guards and drivers are people of the town it sets out from (villagers, if it starts from a village), and a sea convoy fills its ranks from the town it reaches")]
         [SettingPropertyGroup("Iron Bank")]
         public bool CaravansFromPeople { get; set; } = true;
 

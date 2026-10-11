@@ -269,7 +269,8 @@ namespace Armoury
                 var v = __state.V;
                 float dH = v.Hearth - __state.H;
                 // E4/8: hearth przesuniety przez ksiege w postfiksie milicji TEJ wsi (pobor milicji, powrot milicji do domu) - jest w "nasze" (o13), nie w ticku gry
-                try { dH -= (float)ArmsFromPeople.TakeTickHearth(v); } catch { }
+                // (odczyt bez zerowania - ten sam odczyt robi podloga E4/4 w FloorFinalizer; recenzja E4/8 R1-5/R2-6)
+                try { dH -= (float)ArmsFromPeople.PeekTickHearth(v); } catch { }
                 float rest = dH - __state.Result;                 // podloga 10 (dodatnia) albo niezgodnosc z wynikiem modelu
                 var st = v.Settlement;
                 float dMil = st != null ? st.Militia - __state.Mil : 0f;
