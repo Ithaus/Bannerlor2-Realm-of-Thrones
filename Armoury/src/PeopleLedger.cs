@@ -217,6 +217,7 @@ namespace Armoury
             _goneBattleN = _goneBattleMen = _goneDisbN = _goneDisbHealthy = _goneDisbWounded = _goneDisbPris = _goneBandN = _goneBandMen = _goneWights = 0;
             _goneGameN = _goneGameHealthy = _goneGameWounded = _goneRemovedN = _goneRemovedMen = _e40Stumbles = 0;
             _pCreatedMen.Clear(); _pDestroyed.Clear();
+            try { PeopleBook.ZeroDisband40(); } catch { }   // E4/3 (R18): ludzie rozwiazanych taborow, ktorzy wrocili do wsi - to samo okno co liczniki linii Partie
         }
 
         private static int KindOf(MobileParty mp)
@@ -646,7 +647,8 @@ namespace Armoury
             sb.Append(" | zniknely: rozbite w bitwie ").Append(_goneBattleN).Append(" (ostatni stan ").Append(_goneBattleMen).Append(" ludzi)")
               .Append(", rozwiazane ").Append(_goneDisbN).Append(" (przy rozwiazaniu zdrowi ").Append(_goneDisbHealthy).Append(", ranni ").Append(_goneDisbWounded)
               .Append(", jency ").Append(_goneDisbPris).Append(" - znikaja z partia; w tym tabory i lodzie rozwiazane przez gre bez bitwy ").Append(_goneGameN)
-              .Append(", zdrowi ").Append(_goneGameHealthy).Append(", ranni ").Append(_goneGameWounded).Append(" - R18)")
+              .Append(", zdrowi ").Append(_goneGameHealthy).Append(", ranni ").Append(_goneGameWounded).Append(" - R18; wrocili do swojej wsi (E4/3) ").Append(PeopleBook.Disband40)
+              .Append(", kontrola zdrowi + ranni - wrocili = ").Append(_goneGameHealthy + _goneGameWounded - PeopleBook.Disband40).Append(")")
               .Append(", bandy rozwiazane do puli wyrzutkow ").Append(_goneBandN).Append(" (ludzi ").Append(_goneBandMen).Append("; w tym wighty z rozwiazanych band do puli ").Append(_goneWights)
               .Append(Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen ? " - przy E4/2 do niczego, OutlawLaw ich nie dopisuje)" : ")")
               .Append(", usuniete bez zniszczenia ").Append(_goneRemovedN).Append(" (ostatni stan ").Append(_goneRemovedMen).Append(" ludzi)")

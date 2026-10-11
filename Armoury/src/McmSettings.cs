@@ -2148,6 +2148,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float PopulationScale { get; set; } = 1f;
 
+        [SettingPropertyFloatingInteger("Population Max Per Hearth", 0.00f, 2600.00f, "0.00", HintText = "no village on the map stands for more people per hearth than this (650: a little above the most crowded land, Qarth with 629). A land above it - the Summer Isles, whose three small villages had to carry 4,500 people a hearth - keeps only what its villages can hold and the rest of its table population lies off the map (0.75 million -> about 0.11 million); its towns keep the same share. Takes effect in a new campaign; 0 = no cap")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float PopulationMaxPerHearth { get; set; } = 650f;
+
         [SettingPropertyBool("People Measure Enabled", HintText = "log only: daily lines accounting for every hearth, prosperity point and militia man gained or lost and why, prisoners taken, freed and changing sides, the realms' free hands, the Night's Watch and the Free Folk, the Others by place, and the bite of winter by realm - changes nothing in the game")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleMeasureEnabled { get; set; } = true;
@@ -2316,9 +2320,25 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawRaidFleePercent { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Outlaw Hearth Per Man", 0.00f, 2.00f, "0.00", HintText = "hearths a village loses for each man who becomes an outlaw (and regains when he returns)")]
+        [SettingPropertyFloatingInteger("Outlaw Hearth Per Man", 0.00f, 2.00f, "0.00", HintText = "hearths a village loses for each man who becomes an outlaw (and regains when he returns); with People Unit Enabled this is only the most a man can cost in lands with very few people to a hearth")]
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawHearthPerMan { get; set; } = 0.5f;
+
+        [SettingPropertyBool("People Unit Enabled", HintText = "one man is one man: a village on the map stands for a whole countryside, so each of its people who leaves or comes back is worth 1/k of a hearth (k = people one hearth of that village stood for when the campaign began: about 444 in the Reach, 132 in the North, 4 at the Wall) instead of the game's half a hearth - for outlaws, village caravans and fishing crews, routed villagers going home, men pressed by the player, and the hearths the player's village quests give or take. A village whose culture later changes keeps its people. Off = the game's rates as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PeopleUnitEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Outlaws Counted By People", HintText = "outlaws are counted from a land's people, not from its number of villages: every village sends the same share of its people to the woods (at the start of a campaign, each day by misery, and when it is burnt), so the Reach has many outlaws and the Wall almost none. The per-hearth outlaw settings then mean hearths of the world's average village and the world's total stays the same. Works only with People Unit Enabled")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OutlawsCountedByPeople { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Routed Home Days", 0.00f, 112.00f, "0.00", HintText = "soldiers routed from a battle and deserters hiding in the woods make their way home on average after this many days - a few weeks, as after medieval battles - unless a band takes them in first; villagers driven off by want or fire still go home with peace and prosperity. 0 = the old slow rate (half a percent a day in war)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawRoutedHomeDays { get; set; } = 28f;
+
+        [SettingPropertyBool("Disbanded Villagers Go Home", HintText = "a village caravan or fishing crew the game breaks up without a fight (no healthy men left, a lost party, too many boats) goes back to its village, the wounded too, instead of vanishing")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool DisbandedVillagersGoHome { get; set; } = true;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4572,6 +4592,7 @@ namespace Armoury
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
+            s.PopulationMaxPerHearth = PopulationMaxPerHearth;
             s.PeopleMeasureEnabled = PeopleMeasureEnabled;
             s.PopulationRentMaxShare = PopulationRentMaxShare;
             s.RentTaxLow = RentTaxLow;
@@ -4615,6 +4636,10 @@ namespace Armoury
             s.OutlawBandRoutedShare = OutlawBandRoutedShare;
             s.OutlawRaidFleePercent = OutlawRaidFleePercent;
             s.OutlawHearthPerMan = OutlawHearthPerMan;
+            s.PeopleUnitEnabled = PeopleUnitEnabled;
+            s.OutlawsCountedByPeople = OutlawsCountedByPeople;
+            s.OutlawRoutedHomeDays = OutlawRoutedHomeDays;
+            s.DisbandedVillagersGoHome = DisbandedVillagersGoHome;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;
