@@ -63,13 +63,13 @@ namespace Armoury
         private static int _dRegDownN, _dRegUpN, _dRegUpCutN, _dConsN, _dConsHit, _dBkSkipTowns, _dBkSkipCastles, _dBuyAsk, _dBuyZero;
 
         // ------------------------------------------------------------ zawor dnia (zeruje BeforeRents, zamyka ValveDay)
-        private static long _vLord, _vLordBase, _vCrown, _vDue, _vPlayer;
+        private static long _vLord, _vLordBase, _vLordBaseK, _vCrown, _vDue, _vPlayer;
         private static int _vPayers, _vBelow, _vSiege, _vNoLord, _vTiny, _vExempt, _vNoCrown, _vUnpaid;
         private static readonly HashSet<Kingdom> _vKingdoms = new HashSet<Kingdom>();
         private static readonly Dictionary<Town, int> _crownBy = new Dictionary<Town, int>();   // do kasy-miast.csv
 
         // ------------------------------------------------------------ odczyty dnia (zeruje MoneyLedger.ClearLast169 w BlockOpen; ustawia BeforeRents i ValveDay)
-        internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastConsKept, LastBkSkipGold, LastLordPaid, LastLordBase, LastCrownPaid, LastDue, LastPlayerPaid, LastTrim;
+        internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastConsKept, LastBkSkipGold, LastLordPaid, LastLordBase, LastLordBaseK, LastCrownPaid, LastDue, LastPlayerPaid, LastTrim;
         internal static int LastRegDownN, LastRegUpN, LastRegUpCutN, LastConsN, LastConsHit, LastBkSkipTowns, LastBkSkipCastles, LastBuyAsk, LastBuyZero, LastPayers, LastKingdoms,
                             LastBelow, LastSiege, LastNoLord, LastTiny, LastExempt, LastNoCrown, LastUnpaid;
         /// <summary>165: udzial korony z zaworu kas miast dzis, na krolestwo (jak CastlePurse.CrownToday) - czyszczony w BeforeRents.</summary>
@@ -107,7 +107,7 @@ namespace Armoury
         /// <summary>MoneyLedger.ClearLast169 (pierwsza instrukcja BlockOpen): liczby dnia zerowane w jednym miejscu.</summary>
         internal static void ZeroLast()
         {
-            LastRegDown = LastRegUp = LastRegUpCut = LastConsBack = LastConsKept = LastBkSkipGold = LastLordPaid = LastLordBase = LastCrownPaid = LastDue = LastPlayerPaid = LastTrim = 0;
+            LastRegDown = LastRegUp = LastRegUpCut = LastConsBack = LastConsKept = LastBkSkipGold = LastLordPaid = LastLordBase = LastLordBaseK = LastCrownPaid = LastDue = LastPlayerPaid = LastTrim = 0;
             LastRegDownN = LastRegUpN = LastRegUpCutN = LastConsN = LastConsHit = LastBkSkipTowns = LastBkSkipCastles = LastBuyAsk = LastBuyZero = LastPayers = LastKingdoms = 0;
             LastBelow = LastSiege = LastNoLord = LastTiny = LastExempt = LastNoCrown = LastUnpaid = 0;
             LastTake = LastNet = LastTake28 = LastNet28 = 0; LastShareOk = false;
@@ -122,7 +122,7 @@ namespace Armoury
 
         private static void ClearValve()
         {
-            _vLord = _vLordBase = _vCrown = _vDue = _vPlayer = 0;
+            _vLord = _vLordBase = _vLordBaseK = _vCrown = _vDue = _vPlayer = 0;
             _vPayers = _vBelow = _vSiege = _vNoLord = _vTiny = _vExempt = _vNoCrown = _vUnpaid = 0;
             _vKingdoms.Clear(); _crownBy.Clear();
         }
@@ -380,6 +380,7 @@ namespace Armoury
                 int lb, cr;
                 ValveSplit.Split(pay, crownTakes ? LordShare(k) : 1f, out lb, out cr);
                 lordBase = lb; _vLordBase += lb;
+                if (crownTakes) _vLordBaseK += lb;           // podstawa udzialu korony (prog A1-T8): tylko miasta w krolestwach
                 double d = float.IsNaN(decree) || float.IsInfinity(decree) || decree < 0f ? 0.0 : decree;
                 long lp = (long)(lb * d);
                 if (lp > spare - cr) lp = spare - cr;            // razem nigdy ponad nadwyzke
@@ -424,7 +425,7 @@ namespace Armoury
         internal static void ValveDay(long crownSum)
         {
             if (crownSum > 0) MoneyLedger.SplitTownMark(MoneyLedger.MRent, MoneyLedger.MTownCrown, crownSum);   // tylko licznik; wlasny try w srodku
-            LastLordPaid = _vLord; LastLordBase = _vLordBase; LastCrownPaid = _vCrown; LastDue = _vDue; LastPlayerPaid = _vPlayer;
+            LastLordPaid = _vLord; LastLordBase = _vLordBase; LastLordBaseK = _vLordBaseK; LastCrownPaid = _vCrown; LastDue = _vDue; LastPlayerPaid = _vPlayer;
             LastPayers = _vPayers; LastKingdoms = _vKingdoms.Count; LastBelow = _vBelow; LastSiege = _vSiege; LastNoLord = _vNoLord;
             LastTiny = _vTiny; LastExempt = _vExempt; LastNoCrown = _vNoCrown; LastUnpaid = _vUnpaid;
         }
@@ -736,7 +737,7 @@ namespace Armoury
             sb.Append(" | E5/A1: tryb regulatora ").Append(mode);
             if (ValveLive)
                 sb.Append(" | zawor: zeszlo ").Append(LastLordPaid + LastCrownPaid).Append(" = panom ").Append(LastLordPaid).Append(" (przed dekretem ").Append(LastLordBase)
-                  .Append("; z ").Append(LastPayers).Append(" miast; rod gracza ").Append(LastPlayerPaid).Append(") + koronie ").Append(LastCrownPaid).Append(" (").Append(LastKingdoms).Append(" krolestw)")
+                  .Append("; w krolestwach przed dekretem ").Append(LastLordBaseK).Append("; z ").Append(LastPayers).Append(" miast; rod gracza ").Append(LastPlayerPaid).Append(") + koronie ").Append(LastCrownPaid).Append(" (").Append(LastKingdoms).Append(" krolestw)")
                   .Append("; renta nalezna od ludzi (dawny pulap, tylko liczba) ").Append(LastDue)
                   .Append("; bez poboru: kasa nie ponad zapasem ").Append(LastBelow).Append(", oblezone ").Append(LastSiege).Append(", bez zywego pana ").Append(LastNoLord)
                   .Append(", nadwyzka za mala ").Append(LastTiny).Append(", zwolnione dekretem (tylko korona) ").Append(LastExempt)

@@ -674,9 +674,8 @@ namespace Armoury
                     Log.Info("Zawor zamkow (110): dzien " + day + " | stan " + gold + " w " + castles + " zamkach: zapas kupcow " + reserveSum + ", ponad zapasem " + spareSum
                              + ", do zapasu brakuje " + shortSum + "; najwieksza nadwyzka " + maxSpare + (maxName != null ? " (" + maxName + ")" : "")
                              + "; zamki ponad limitem kasy BK (" + BkLimitBase + " + " + BkLimitPerProsperity.ToString("0", CultureInfo.InvariantCulture) + " x dobrobyt - BK kasuje tam 1% dziennie): " + overBk
-                             + " | regulator gry: kasowanie nadwyzki zablokowane " + _dRegDown + " (" + _dRegDownN + " tickow zamkow), "
-                             + (TownPurse.NoTopUp || _dRegUpCutN > 0 ? "dosypka zablokowana (tryb 2, E5/A1) " + _dRegUpCut + " (" + _dRegUpCutN + " tickow), dosypka do zapasu " + _dRegUp + " (" + _dRegUpN + " tickow)"
-                                                                     : "dosypka do zapasu (tryb 1, zostaje do etapu 3) " + _dRegUp + " (" + _dRegUpN + " tickow)")
+                             + " | regulator gry: kasowanie nadwyzki zablokowane " + _dRegDown + " (" + _dRegDownN + " tickow zamkow), dosypka do zapasu (tryb 1, zostaje do etapu 3) " + _dRegUp + " (" + _dRegUpN + " tickow)"
+                             + (TownPurse.NoTopUp || _dRegUpCutN > 0 ? ", dosypka zablokowana (tryb 2, E5/A1) " + _dRegUpCut + " (" + _dRegUpCutN + " tickow)" : "")   // E5/A1: tekst etapu 2 bez zmian (parser etap2)
                              + " | \"zakupy\" ludnosci zamkow: zloto z niczego cofniete " + _dConsBack + " (w " + _dConsHit + " z " + _dConsN + " tickow; towar zjedzony jak dotad)"
                              + " | zawor: " + paid + " do panow z " + payers + " zamkow (" + (share * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% nadwyzki ponad zapas"
                              + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + (suburbKept > 0 ? "; czesc podzamcza zostala w kasach " + suburbKept : "")
