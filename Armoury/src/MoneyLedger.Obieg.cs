@@ -188,11 +188,11 @@ namespace Armoury
         // ------------------------------------------------------------ nasze przeplywy kas bez licznika (D13) - tylko liczniki
         /// <summary>Nasz modul zmienil kase osady poza tickiem dobowym, bez licznika starej ksiegi (kwota ze znakiem jak ChangeGold).
         /// Wlasna tablica - stara linia "Przeplywy osad (kasy miast)" bez zmian; pokazuje to linia "Przeplywy osad (przyczyny)".</summary>
-        internal static void Note169(int kind, Settlement st, int amount)
+        internal static void Note169(int kind, Settlement st, int amount, int src = TownFolk.BOurs)
         {
             try
             {
-                TownFolk.OnTownCoin(st, amount, TownFolk.BOurs);   // E5/0 (195): nasze sciezki zakupu kas miast - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
+                TownFolk.OnTownCoin(st, amount, src);   // E5/0 (195): nasze sciezki zakupu kas miast (src: BOurs, zwroty i likwidacje - BBack) - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
                 if (_inBlock || amount == 0 || kind < 0 || kind >= N169 || !CW.On) return;
                 int c = ClassOf(st);
                 if (c < 0) return;

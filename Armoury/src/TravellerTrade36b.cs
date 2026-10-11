@@ -480,7 +480,7 @@ namespace Armoury
                 if (paid > 0 && !same)
                 {
                     home.Town.ChangeGold((int)paid);
-                    MoneyLedger.Note(MoneyLedger.NTravel, st, (int)-paid);
+                    MoneyLedger.Note(MoneyLedger.NTravel, st, (int)-paid, TownFolk.BBack);   // E5/0: wedrowcy 36b z calej kasy (BBack)
                     MoneyLedger.Note(MoneyLedger.NTravel, home, (int)paid);
                     _dPaid += paid;
                 }

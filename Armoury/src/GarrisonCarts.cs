@@ -269,7 +269,7 @@ namespace Armoury
             if (rp > 0 && toPurse) { MenPurse.Add(g, rp); _dPurseRefund += rp; }
             else if (rp > 0) { castleTown.ChangeGold(rp); MoneyLedger.Note(MoneyLedger.NGear, o.Castle, rp); _dPurseToCastle += rp; }
             if (rl > 0) leader.ChangeHeroGold(rl);
-            MoneyLedger.Note(MoneyLedger.NGear, o.Market, -(rp + rl));
+            MoneyLedger.Note(MoneyLedger.NGear, o.Market, -(rp + rl), TownFolk.BBack);   // E5/0: zwrot z calej kasy (BBack)
             _dRefund += rp + rl;
         }
 

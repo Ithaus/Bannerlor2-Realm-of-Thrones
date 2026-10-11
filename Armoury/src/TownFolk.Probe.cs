@@ -799,7 +799,7 @@ namespace Armoury
               .Append(" | z pasa ponizej zapasu (miasta): renta ").Append(_rentBelow).Append(" z ").Append(_rentPaid);
             for (int k = 1; k < Takes; k++) sb.Append(", ").Append(TakeName[k]).Append(' ').Append(_takeBelow[k]).Append(" z ").Append(_take[k]);
             sb.Append(", RealPayer i porty 0 z definicji (Seal31.Spare)")
-              .Append(" | zakupy kas miast z pasa ponizej zapasu: nasze sciezki ").Append(_bBelow[BOurs]).Append(" z ").Append(_bPaid[BOurs]).Append(" (po A1 = 0)")
+              .Append(" | zakupy kas miast z pasa ponizej zapasu: nasze sciezki ").Append(_bBelow[BOurs]).Append(" z ").Append(_bPaid[BOurs]).Append(" (po A1 = 0)").Append(", zwroty i likwidacje (bez reguly A1) ").Append(_bBelow[BBack]).Append(" z ").Append(_bPaid[BBack])
               .Append(", gry/BK ").Append(_bBelow[BCarts] + _bBelow[BCaravans]).Append(" (tabory ").Append(_bBelow[BCarts]).Append(" z ").Append(_bPaid[BCarts])
               .Append(", karawany ").Append(_bBelow[BCaravans]).Append(" z ").Append(_bPaid[BCaravans]).Append(")")
               .Append(", inne przelewy poza naszym tickiem ").Append(_bBelow[BOther]).Append(" z ").Append(_bPaid[BOther]);

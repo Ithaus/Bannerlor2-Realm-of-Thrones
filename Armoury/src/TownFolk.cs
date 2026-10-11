@@ -38,8 +38,8 @@ namespace Armoury
         private const int Mixes = 5;
         private static readonly double[][] MixOf = { new[] { 0.0, 1.0, 0.0 }, new[] { 0.0, 1.0, 0.0 }, new[] { 0.0, 0.0, 1.0 }, new[] { 0.0, 1.0, 0.0 }, new[] { 1.0, 0.0, 0.0 } };
         // zrodla platnosci kas miast z pasa ponizej zapasu kupcow (OnTownCoin / NoteCartPaid / OnGold)
-        internal const int BOurs = 0, BCarts = 1, BCaravans = 2, BOther = 3;
-        private const int BSrc = 4;
+        internal const int BOurs = 0, BCarts = 1, BCaravans = 2, BOther = 3, BBack = 4;   // BBack: nasze zwroty i likwidacje z calej kasy (bez reguly A1 - RecruitKit, tabory zalog, zwrot 171, wedrowcy 36b; scalenie porcji A)
+        private const int BSrc = 5;
         // pobory z kas miast (NoteTake) - udzial zysku kupcow zabierany przez pana i korone (Jeff 11.10 16:10, projekt rozdz. 6 pkt 2)
         internal const int TRent = 0, TLevy = 1, TCustoms = 2, TMint = 3, TDuty = 4, TWarTax = 5, TTolls = 6;
         private const int Takes = 7;

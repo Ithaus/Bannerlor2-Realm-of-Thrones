@@ -391,7 +391,7 @@ namespace Armoury
                 market.ItemRoster.AddToCounts(e, 1);
                 if (n == null || market.Town.Gold < price) { _daySoldFree++; continue; }
                 market.Town.ChangeGold(-price);
-                MoneyLedger.Note169(MoneyLedger.N169Other, market, -price);   // paczka 169: linia kas (tylko licznik)
+                MoneyLedger.Note169(MoneyLedger.N169Other, market, -price, TownFolk.BBack);   // paczka 169: linia kas (tylko licznik); E5/0: likwidacja z calej kasy (BBack)
                 n.ChangeHeroGold(price);
                 _daySold++;
                 sold++;
