@@ -150,6 +150,9 @@ namespace Armoury
                 // skompiluje sie przed latka (113 ryzyko 13); we wlasnym try
                 try { Devastation.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Devastation.ApplyAll", e); }
                 try { Famine.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Famine.ApplyAll", e); }   // E4/6 (191): spichlerze okregow i glod - postfiks spichlerza warowni (schronieni w murach oblezonej warowni)
+                // E4/8 (164b-2): wojsko z ludzi - zalogi bez przyrostu z modelu, milicja z wolnych rak, nowe druzyny i karawany z ludzi, wedrowcy BK; PO PeopleBook.ApplyOrigin
+                // (E4/7 - ksiega pochodzenia) i PO Measure40 (okna W1/W2 - nasz postfiks milicji biegnie przed ich finalizerami); latki wpiete zawsze (U26), licza przy kluczach
+                try { ArmsFromPeople.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsFromPeople.ApplyAll", e); }
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);

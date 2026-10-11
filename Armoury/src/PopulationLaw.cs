@@ -504,8 +504,13 @@ namespace Armoury
         /// </summary>
         internal static float Danger(Village v, out float security, out bool war, out float burnt)
         {
+            return DangerOf(v != null ? v.Bound : null, out security, out war, out burnt);      // region wsi: jej miasto albo zamek
+        }
+
+        /// <summary>E4/8 (R2): niebezpieczenstwo U warowni `node` (miasto liczy je jak swoje wsie) - wydzielone z Danger(Village) BEZ zmiany rachunku (wzor E4/5).</summary>
+        internal static float DangerOf(Settlement node, out float security, out bool war, out float burnt)
+        {
             security = 100f; burnt = 0f;
-            Settlement node = v != null ? v.Bound : null;      // region wsi: jej miasto albo zamek
             if (node != null)
             {
                 if (node.Town != null) { float sec = node.Town.Security; security = sec >= 0f ? Math.Min(100f, sec) : 0f; }
@@ -521,6 +526,43 @@ namespace Armoury
             }
             war = AtWarToday(node != null ? node.MapFaction : null);       // frakcja wsi to frakcja jej warowni (Village.MapFaction)
             return MBMath.ClampFloat(USecurity * (1f - security / 100f) + (war ? UWar : 0f) + UBurnt * burnt, 0f, 1f);
+        }
+
+        /// <summary>E4/8 (R2): skladowe stopy miasta (punkty procentowe rocznie).</summary>
+        internal struct TownRateParts
+        {
+            public float W, U, H;           // dobrobyt warowni wobec mediany krainy; niebezpieczenstwo; glod (srednia wsi miasta)
+            public bool War, Starving;
+            public float Raw;               // stopa wsi regionu przed korytarzem (bez premii gry - mnoznik z modelu hearth wsi; miasto go nie ma)
+            public float Village;           // po korytarzu wsi
+            public float Penalty;           // TownGrowthPenaltyPercent
+            public float G;                 // stopa miasta = Village - Penalty
+        }
+
+        /// <summary>
+        /// E4/8 (R2, DOK:524): przyrost naturalny miasta = stopa wsi jego regionu (R1: te same W i U, H - srednia glodu wsi miasta, w glodzie bez dodatniego przyrostu,
+        /// ten sam korytarz, BEZ premii gry) minus TownGrowthPenaltyPercent (1 pkt - miasto grzebalo wiecej, niz chrzcilo). Nie rzuca (wyjatek - 0, potkniecie TownGrowth).
+        /// </summary>
+        internal static float TownRate(Settlement town, out TownRateParts p)
+        {
+            p = default(TownRateParts);
+            var s = Settings.Current;
+            if (s == null || town == null) return 0f;
+            p.W = ProsperityIndex(town);
+            float sec, burnt; bool war;
+            p.U = DangerOf(town, out sec, out war, out burnt); p.War = war;
+            float h = 0f; int n = 0;
+            if (town.BoundVillages != null) foreach (var v in town.BoundVillages) { if (v == null) continue; h += Famine.HungerOf(v); n++; }
+            p.H = n > 0 ? MBMath.ClampFloat(h / n, 0f, 1f) : 0f;
+            float raw = s.GrowthBasePercent + Math.Max(0f, s.GrowthProsperityWeight) * p.W - Math.Max(0f, s.GrowthDangerWeight) * p.U
+                        - (s.GrowthHungerEnabled ? Math.Max(0f, s.GrowthHungerWeight) * p.H : 0f);
+            if (raw > 0f && s.GrowthHungerEnabled && p.H > Famine.ThresholdNow) { raw = 0f; p.Starving = true; }      // GL 2.10, jak wies
+            if (float.IsNaN(raw)) raw = 0f;
+            p.Raw = raw;
+            p.Village = MBMath.ClampFloat(raw, -Math.Max(0f, s.GrowthMaxDeclinePercent), Math.Max(0f, s.GrowthMaxPercent));
+            p.Penalty = Math.Max(0f, s.TownGrowthPenaltyPercent);
+            p.G = p.Village - p.Penalty;
+            return p.G;
         }
 
         /// <summary>Rachunek jednej wsi. `gameBase` i `gameFactors` to wynik gry z chwili wejscia postfiksu (po latkach BK i BKROT): suma dodatkow z baza pasma i suma czynnikow.</summary>
@@ -905,7 +947,8 @@ namespace Armoury
                     }
                 }
                 string townNote = !Calibrated ? "ludnosc nieskalibrowana"
-                    : TownsFrozen ? (townState / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln w " + towns + " miastach - stan (E4/4, bez narodzin i migracji do E4/8); z dzisiejszego dobrobytu byloby "
+                    : TownsFrozen ? (townState / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln w " + towns + " miastach - stan (E4/4, "
+                                    + (TownGrowth.Active ? "narodziny, zgony i migracja: linia Miasta (E4/8 R2)" : "bez narodzin i migracji - Town Growth Enabled / Natural Growth Enabled wylaczone") + "); z dzisiejszego dobrobytu byloby "
                                     + (townLive / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln (" + Sg(townLive - townState, "0") + " ludzi dryfu od zalozenia stanu)"
                                   : (townLive / 1e6).ToString("0.000", CultureInfo.InvariantCulture) + " mln w " + towns + " miastach - dobrobyt x k (stan wylaczony w MCM)";
 
@@ -1154,6 +1197,8 @@ namespace Armoury
             RentToday.Clear();   // wpis 86 (audyt pkt 7): przy wylaczonych rentach nie zostaja stare kwoty w dochodzie
             ZeroDay169();        // paczka 169 (tylko log)
             if (Calibrated) TownsDaily();   // E4/4 (9a): stan ludzi miast PRZED rentami (takze przy wylaczonych rentach - czyta go ksiega ludzi); bez kalibracji nic do zalozenia
+            // E4/8 (R2): narodziny i zgony miast, migracja ze wsi regionu - zaraz po zalozeniu stanu, PRZED rentami (renty czytaja stan miasta)
+            if (Calibrated) { try { TownGrowth.Daily(); } catch (Exception e) { Log.Error("TownGrowth.Daily", e); } }
             if (!On) return;
             try
             {

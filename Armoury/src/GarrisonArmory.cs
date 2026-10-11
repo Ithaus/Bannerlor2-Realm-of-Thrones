@@ -79,6 +79,17 @@ namespace Armoury
 
         private static bool KitMoves { get { var s = Settings.Current; return s != null && s.KitMovesWithMen && AiGear.On && AiGear.Armories() != null; } }
 
+        /// <summary>E4/8 (6.2 b): nowa druzyna lorda wziela ludzi z zalogi siedziby (ArmsFromPeople.SpawnPost) - sprzet idzie z ludzmi (ta sama regula co TakePostfix:
+        /// komplety wedlug typow, potrzeba patroli BK zostaje w zbrojowni zalogi). Zwraca sztuki; 0 przy wylaczonym KitMovesWithMen.</summary>
+        internal static int KitsWithMen(MobileParty garrison, MobileParty to, Settlement st, Dictionary<CharacterObject, int> moved)
+        {
+            if (garrison == null || to == null || moved == null || moved.Count == 0 || !KitMoves) return 0;
+            int pcs = MoveKits(garrison, to, moved, "nowa druzyna (E4/8)", PatrolNeed(st));
+            foreach (var v in moved.Values) _dTakenMen += v;
+            _dTakenPcs += pcs;
+            return pcs;
+        }
+
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
 
         private static Dictionary<ItemObject, int> ArmoryOf(MobileParty mp)
