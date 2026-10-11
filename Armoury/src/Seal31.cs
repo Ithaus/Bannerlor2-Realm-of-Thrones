@@ -154,6 +154,7 @@ namespace Armoury
         {
             H = h;
             try { Measure31.ApplyAll(); } catch (Exception e) { Stumble("Measure31.ApplyAll", e); }
+            try { UpgradePurse.ApplyAll(); } catch (Exception e) { Stumble("UpgradePurse.ApplyAll", e); }
             Log.Info("Szczelnosc (164a): latki przy starcie gry - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();
@@ -226,6 +227,7 @@ namespace Armoury
                     int day = (int)CampaignTime.Now.ToDays - 1;
                     var sb = new StringBuilder(2048);
                     sb.Append("Szczelnosc (164a): dzien ").Append(day);
+                    sb.Append(" | awanse (164a-4): ").Append(UpgradePurse.Part());
                     sb.Append(" | pomiar (164a-0): ").Append(Measure31.Part());
                     if (Stumbles > 0) sb.Append(" | potkniecia ").Append(Stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                     sb.Append('.');
@@ -240,6 +242,7 @@ namespace Armoury
         {
             try { Array.Clear(Sum, 0, Items); _spent.Clear(); Stumbles = 0; } catch { }
             try { Measure31.ClearDay(); } catch { }
+            try { UpgradePurse.ClearDay(); } catch { }
         }
     }
 }
