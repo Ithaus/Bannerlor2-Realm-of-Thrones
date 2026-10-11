@@ -648,6 +648,7 @@ bilans otwarcia nie dotyczy (regula od nastepnej doby).
 2. **E5/0: udzial zysku kupcow zabierany przez pana i korone** - jedna liczba dziennie (i srednia 28 dob) na swiat i dla kazdego miasta: (zawor panu + zawor koronie + danina
    wojenna z kasy miasta + podatki polityk/Road Tolls z kasy miasta) / (czysty doplyw do kasy kupcow przed tymi poborami: sprzedaz - zakupy - koszty, bez przelewow z niczego).
    W linii obok wartosc odniesienia: obciazenie historyczne miast ok. 10% (INFO, bez progu - decyzja Jeffa po tescie). Ten sam wzor po A1 w linii "Kasy miast".
+3. **A6 (lup wodza tylko z kiesy pokonanego) BEZWARUNKOWO w porcji A** (Jeff 11.10 ok. 16:20: "tak, zrob od razu w porcji A") - zloto "bitwy" z niczego (ok. 86 tys./d, L "Pieniadz swiata" d120) do zera; osobne drzewo w-toku/e5-a6.
 
 
 1. **Test porcji A (kasy miast, dwor, markietani, notable, BetterEconomy): osobno czy w tescie koncowym etapu 4?**

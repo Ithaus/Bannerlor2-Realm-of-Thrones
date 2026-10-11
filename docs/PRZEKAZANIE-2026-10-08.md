@@ -824,3 +824,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (15:45) **Kod etapu 5 ruszyl** (wf_dd61bf05-db6, baza 392c519): E5/0 (e5\0, w-toku/e5-0) i A1 kasy miast (e5\a1, w-toku/e5-a1) - plan kodu (docs/etap5/PLAN-KODU-E50.md, PLAN-KODU-E5A1.md) -> kod -> 2 recenzje -> poprawki; A2-A5 po kolei w e5\a25 (w-toku/e5-a2-5). Indeksy MoneyLedger: A1 od pierwszego wolnego, A2-A5 od +5. Pytanie do Jeffa: test zbioru A osobno zaraz po tescie koncowym E4 (rada a).
 - (15:50) **Jeff: etap 5 - test zbioru A osobno, "rob dalej".**
 - (16:10) **Jeff: A1 bez dosypki od razu (regulator tryb 2) + E5/0 udzial zysku kupcow dla pana i korony** - wpisane do projektu E5 rozdz. 6 (wiazace) i STAN-PRAC; po workflow wf_dd61bf05-db6 sprawdzic, czy kod A1/E5/0 to ma - jesli nie, osobny krok na w-toku/e5-a1 i w-toku/e5-0.
+- (16:20) **Jeff: A6 bezwarunkowo w porcji A** - kod w osobnym drzewie e5\a6 (w-toku/e5-a6 od 392c519).
