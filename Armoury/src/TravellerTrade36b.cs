@@ -451,7 +451,9 @@ namespace Armoury
                         while (k < n)
                         {
                             int p = town.GetItemPrice(el.EquipmentElement, mp, true);
-                            if (p <= 0 || town.Gold - TownPurse.BuyFloor(town, 0) - itemPaid < p) break;   // kasa placi tylko, co ma; E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
+                            // E5/A1 (poprawka po recenzji): bez BuyFloor - czego kasa celu nie oplaci, idzie nizej na polke celu BEZ zaplaty (_dUnpaid),
+                            // wiec prog zapasu zrobilby z tego wiecej towaru bez zaplaty (ten sam powod co RecruitKit); cala kasa jak przed A1
+                            if (p <= 0 || town.Gold - itemPaid < p) break;   // kasa placi tylko, co ma
                             r.AddToCounts(el.EquipmentElement, -1);
                             shelf.AddToCounts(el.EquipmentElement, 1);
                             itemPaid += p; k++;

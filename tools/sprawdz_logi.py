@@ -1862,10 +1862,19 @@ def etap5_a1(rep, lines, start, until, logp):
         rep.add("E5/A1 A1-T13: reszta ksiegi R", "brak linii", "|R| < 10 000", None)
 
     # ---------------- A1-T14: nasze zakupy z pasa ponizej zapasu
+    # poprawka po recenzji: E5/0 liczy jako "nasze sciezki" kazda ujemna kwote kasy miasta z MoneyLedger.Note/Note169 - takze sciezki swiadomie
+    # bez BuyFloor (likwidacja RecruitKit, zwrot 171 GarrisonCarts, zwrot dokupu BK CaravanBulk, wedrowcy 36b). Prog 0 (NIE) tylko, gdy linia E5/0
+    # podaje je osobno ("zwroty i likwidacje" - do dopisania przy scaleniu, CHANGELOG A1 "Scalanie"); bez rozbicia - INFO
     v14 = vals(e50, win, r"nasze sciezki (\d+)")
     if v14:
         b14 = [d for d, x in v14.items() if x != 0]
-        rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu (E5/0)", f"niezerowe w {len(b14)} z {len(v14)} dob", "0 (BuyFloor)", (len(b14) == 0) if live else None)
+        split14 = any("zwroty i likwidacje" in (e50.get(d) or "") for d in v14)
+        if split14:
+            rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu (E5/0, bez zwrotow i likwidacji)", f"niezerowe w {len(b14)} z {len(v14)} dob", "0 (BuyFloor)",
+                    (len(b14) == 0) if live else None)
+        else:
+            rep.add("E5/A1 A1-T14: nasze sciezki kas miast ponizej zapasu (E5/0 bez rozbicia)", f"niezerowe w {len(b14)} z {len(v14)} dob, suma {sum(v14.values())}",
+                    "INFO - E5/0 liczy tu tez sciezki bez BuyFloor (RecruitKit, zwrot 171, zwrot CaravanBulk, wedrowcy 36b); 0 (NIE) po rozbiciu przy scaleniu", None)
     else:
         q = vals(seg, win, r"zapytan (\d+), przy zapasie \(0\)")
         z = vals(seg, win, r"zapytan \d+, przy zapasie \(0\) (\d+)")
@@ -1933,11 +1942,14 @@ def etap5_a1(rep, lines, start, until, logp):
         rep.add("E5/A1 A1-T22: udzial zysku kupcow", "brak liczb", "INFO", None)
 
     # ---------------- A1-T20: zakupy dla nas - towar zostaje u sprzedajacych (INFO wobec biegu bazowego)
-    names = ("Paser: dzien", "Kontrakty surowca (174): dzien", "Karawany bez amunicji (172b): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien")
+    # poprawka po recenzji: wedrowcy 36b bez BuyFloor (reszta ladunku szlaby na polke celu bez zaplaty); doszly warsztaty zbrojne (WorkshopLaw - "brak zlota/kupca")
+    names = ("Paser: dzien", "Kontrakty surowca (174): dzien", "Karawany bez amunicji (172b): dzien", "Warsztaty: dzien")
     have = [n.split(":")[0] for n in names if any(s.startswith(n) for s in lines)]
     q = vals(seg, win, r"zapytan (\d+), przy zapasie \(0\)")
     z = vals(seg, win, r"zapytan \d+, przy zapasie \(0\) (\d+)")
-    rep.add("E5/A1 A1-T20: zakupy dla nas - towar u sprzedajacych", f"linie: {', '.join(have) if have else '-'}; BuyFloor: zapytan {sum(q.values())}, przy zapasie (0) {sum(z.values())}",
+    wsk = vals(by_day(lines, "Warsztaty: dzien"), win, r"brak zlota/kupca (\d+)")
+    rep.add("E5/A1 A1-T20: zakupy dla nas - towar u sprzedajacych", f"linie: {', '.join(have) if have else '-'}; BuyFloor: zapytan {sum(q.values())}, przy zapasie (0) {sum(z.values())}"
+            + (f"; warsztaty zbrojne - brak zlota/kupca sr {st.mean(wsk.values()):.1f}/d (baza z31-A 0 kazdej doby)" if wsk else ""),
             "INFO wobec biegu bazowego (liczniki \"brak kasy miasta\"); skok x3 -> wylaczyc Town Pays From Surplus i powtorzyc", None)
 
 

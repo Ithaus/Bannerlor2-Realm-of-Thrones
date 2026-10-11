@@ -587,6 +587,7 @@ namespace Armoury
               .Append(", bez odbiorcy (prog 0) ").Append(VillageTakings.Unrouted)
               .Append(" | korona [P]: wplywy - powinnosci ").Append(KingdomTreasury.LastDues).Append(", danina wojenna ").Append(KingdomTreasury.LastSubsidy)
               .Append(", udzial z zaworu zamkow (114) ").Append(CastlePurse.LastCrownPaid)
+              .Append(", udzial z zaworu kas miast (E5/A1) ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")
               .Append(KingdomTreasury.LastCustoms).Append(" z kas miast (przelew), podatek BK ").Append(ml ? (-M[CW.MBkTax]).ToString(Inv) : "-")
               .Append(", trybut przyjety ").Append(ml ? M[CW.MTributeIn].ToString(Inv) : "-")

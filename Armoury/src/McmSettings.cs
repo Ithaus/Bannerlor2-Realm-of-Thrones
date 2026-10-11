@@ -2924,7 +2924,7 @@ namespace Armoury
         [SettingPropertyGroup("The town's purse")]
         public bool TownPurseNoBkSkim { get; set; } = true;
 
-        [SettingPropertyBool("Town Pays From Surplus", HintText = "a town purse buys for us only with the coin it holds above the working coin: loot from outlaws, contract and bulk goods and arrows from caravans, spare kit of garrisons, lords and your men, drill scrap, the travellers' goods - as castles do. Below the working coin the game topped a purse up from nowhere, so whatever was bought from it was in truth paid from nowhere. Needs Town Purse Regulator. Off = the whole purse, as before")]
+        [SettingPropertyBool("Town Pays From Surplus", HintText = "a town purse buys for us only with the coin it holds above the working coin: loot from outlaws, contract and bulk goods and arrows from caravans, spare kit of garrisons, lords and your men, drill scrap, the armourers' finished wares - as castles do. Below the working coin the game topped a purse up from nowhere, so whatever was bought from it was in truth paid from nowhere. Needs Town Purse Regulator. Off = the whole purse, as before")]
         [SettingPropertyGroup("The town's purse")]
         public bool TownPaysFromSurplus { get; set; } = true;
 

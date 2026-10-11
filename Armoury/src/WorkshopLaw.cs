@@ -314,7 +314,9 @@ namespace Armoury
                     if (w.Labor < w.Days) { _skipLabor++; break; }      // sztuka w robocie
                     int wagesI = MBRandom.RoundRandomized(w.Days * DayWage(w.Item, town));
                     int rev = MBRandom.RoundRandomized(Revenue(town, w.Item));
-                    if (town.Gold < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
+                    // E5/A1 (poprawka po recenzji): miasto kupuje wyrob tylko z nadwyzki ponad zapas kupcow (TownPurse.BuyFloor; wylaczone A1 / TownPaysFromSurplus - 0, cala kasa jak dotad);
+                    // gotowa sztuka czeka u warsztatu (w.Item zostaje), place nie ida - towar zostaje u sprzedajacego, jak w pozostalych sciezkach
+                    if (town.Gold - TownPurse.BuyFloor(town, 0) < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
                     workshop.ChangeGold(-wagesI);
