@@ -3800,7 +3800,7 @@ namespace Armoury
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRiseOnlyFromFallen { get; set; } = true;
 
-        [SettingPropertyBool("Others Raid Wights", HintText = "a village raided by the Others gives them wights out of thin air (half its hearths, as Realm of Thrones does). Off (default) = a raid raises nobody - until the raided villagers themselves are counted. Works only with Others Rise Only From Fallen on; with it off, raids work as in Realm of Thrones")]
+        [SettingPropertyBool("Others Raid Wights", HintText = "a village raided by the Others gives them wights out of thin air (half its hearths, as Realm of Thrones does). Off (default) = a raid raises only the villagers killed in it, and only beyond the Wall or at it (needs Devastation Enabled; without it nobody rises). Works only with Others Rise Only From Fallen on; with it off, raids work as in Realm of Thrones")]
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRaidWights { get; set; } = false;
 

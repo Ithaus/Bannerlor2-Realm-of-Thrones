@@ -24,7 +24,8 @@ namespace Armoury
     ///      kasuje (kazdy = polegly R3); wstaja tylko w bitwie za Murem / przy Murze (Measure169c.PlaceAt - ta sama definicja co pomiar W8), x mnoznik ROT
     ///      najwyzej 1, do miejsca w bandzie, nadwyzka do puli CIALA (PeopleBook); reszta spalona. Jedyna inna czynnosc metody ROT - Clear lochu bandy
     ///      (razem z bohaterami, jak ROT) - powtorzona wiernie. Okno pomiaru 169c W8 (void First) biegnie mimo naszego false.
-    ///  (b) rajd: prefiks bool na ROT OnRaidCompleted - Hearth/2 trupow z niczego nie wchodzi do bandy (do E4/5; potem zabici przy spustoszeniu);
+    ///  (b) rajd: prefiks bool na ROT OnRaidCompleted - Hearth/2 trupow z niczego nie wchodzi do bandy; od E4/5 (K7) wstaja zabici przy spustoszeniu calego
+    ///      rabunku (Devastation.RaidDead - rozliczeni w EndPrefix przed RaidCompleted), ta sama regula ciala (Raise: tylko za Murem / przy Murze), bez R3 drugi raz;
     ///      wlacznik OthersRaidWights (domyslnie false = zablokowane).
     ///  (c) nowa banda: postfiks na ROT OnMobilePartyCreated (biegnie po ROT i po prefiksie CrashScribe, takze gdy ten pominal +100) - szeregowi
     ///      szablonu (53, w bilansie otwarcia +100) tylko z puli CIALA, przycieci proporcjonalnie; pusta pula = sam wodz.
@@ -71,6 +72,7 @@ namespace Armoury
         private static long _rLiving, _rRisen, _rPooled, _rBurntMult;
         private static readonly long[] _rPlace = new long[PKinds];
         private static int _raidN; private static long _raidWould;
+        private static long _raidDead, _raidRisen, _raidPooled, _raidBurnt;     // E4/5 (K7): zabici przy spustoszeniu rajdow Innych i co z nich
         private static int _milN, _milRevertN; private static long _milDead, _milRisen, _milBurnt, _milRevertLiving;
         private static int _bN, _bLeaderOnly, _bOtherN; private static long _bTemplate, _bFromPool, _bOtherMen;
 
@@ -85,7 +87,7 @@ namespace Armoury
         {
             _nBattles = _nBattlesR13 = _nParties = 0; _nFallen = _nPris = _nRisen = _nPooled = _nBurntMult = _nRotWould = 0; Array.Clear(_nBurntPlace, 0, PKinds);
             _rBattles = 0; _rLiving = _rRisen = _rPooled = _rBurntMult = 0; Array.Clear(_rPlace, 0, PKinds);
-            _raidN = 0; _raidWould = 0;
+            _raidN = 0; _raidWould = 0; _raidDead = _raidRisen = _raidPooled = _raidBurnt = 0;
             _milN = _milRevertN = 0; _milDead = _milRisen = _milBurnt = _milRevertLiving = 0;
             _bN = _bLeaderOnly = _bOtherN = 0; _bTemplate = _bFromPool = _bOtherMen = 0;
             _stumblesDay = 0;
@@ -310,6 +312,19 @@ namespace Armoury
                 var st = __1.MapEventSettlement;
                 if (st != null && st.Village != null) _raidWould += (long)(st.Village.Hearth / 2f * NecroMult());
                 _raidN++;
+                // E4/5 (K7, P E4/2 (b)): wstaja tylko wiesniacy zabici przy spustoszeniu calego rabunku (0 przy wylaczonym spustoszeniu - nikt), ta sama regula ciala
+                // co nekromancja: tylko za Murem / przy Murze, do miejsca w bandzie, nadwyzka do puli CIALA, reszta spalona. BEZ PeopleBook.Die - ci zmarli sa juz
+                // w koncie Devastation (zabici wsi), inaczej R3 liczylby ich drugi raz
+                long dead = 0;
+                try { dead = (long)Math.Round(Devastation.RaidDead(__1)); } catch (Exception e) { dead = 0; Stumble("Raid(zabici)", e); }
+                if (dead > 0 && st != null)
+                {
+                    int place = Place(st.GetPosition2D);
+                    var region = OutlawLaw.RegionFor(st);
+                    long risen, pooled, burnt;
+                    Raise(mp, dead, region, place, PeopleBook.CRaid, out risen, out pooled, out burnt);
+                    _raidDead += dead; _raidRisen += risen; _raidPooled += pooled; _raidBurnt += burnt;
+                }
                 return false;                                                              // metoda ROT robi tylko AddToCounts(_wight, Hearth/2)
             }
             catch (Exception e) { Stumble("Raid", e); return true; }
@@ -559,7 +574,9 @@ namespace Armoury
                     for (int i = 0; i < PKinds; i++) sb.Append(i > 0 ? ", " : "").Append(PlaceName[i]).Append(' ').Append(_rPlace[i]);
                     sb.Append(") -> wstalo ").Append(_rRisen).Append(", do puli ").Append(_rPooled).Append(", spalone ").Append(_rLiving - _rRisen - _rPooled)
                       .Append(" (w tym ponad mnoznik ROT ").Append(_rBurntMult).Append(')');
-                    sb.Append(" | (b) rajd: zablokowane ").Append(_raidN).Append(" (ROT dalby ").Append(_raidWould).Append(" wightow z niczego)");
+                    sb.Append(" | (b) rajd: zablokowane ").Append(_raidN).Append(" (ROT dalby ").Append(_raidWould).Append(" wightow z niczego)")
+                      .Append(" -> zabici przy spustoszeniu ").Append(_raidDead).Append(", wstalo ").Append(_raidRisen).Append(", do puli ").Append(_raidPooled)
+                      .Append(", spalone ").Append(_raidBurnt).Append(" (kontrola ").Append(_raidDead - _raidRisen - _raidPooled - _raidBurnt).Append(')');
                     sb.Append(" | (c) narodziny band: ").Append(_bN).Append(", szablon ").Append(_bTemplate).Append(" -> z puli cial ").Append(_bFromPool)
                       .Append(", przycieto ").Append(_bTemplate - _bFromPool).Append(", sam wodz ").Append(_bLeaderOnly)
                       .Append("; inne nowe partie klanu Innych (bez zmian, z niczego) ").Append(_bOtherN).Append(" (").Append(_bOtherMen).Append(" ludzi)");

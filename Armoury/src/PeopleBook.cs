@@ -38,8 +38,9 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         // przyczyny ruchu na koncie CIALA (indeksy licznikow doby)
-        internal const int COpening = 0, CNecro = 1, CRescued = 2, CMilitia = 3, CBirth = 4, CKinds = 5;
-        private static readonly string[] CName = { "bilans otwarcia", "nadwyzka nekromancji (polegli i jency)", "odbici jency", "milicja przejetej osady", "narodziny band" };
+        internal const int COpening = 0, CNecro = 1, CRescued = 2, CMilitia = 3, CBirth = 4, CRaid = 5, CKinds = 6;
+        private static readonly string[] CName = { "bilans otwarcia", "nadwyzka nekromancji (polegli i jency)", "odbici jency", "milicja przejetej osady", "narodziny band",
+            "rajd Innych: zabici przy spustoszeniu (E4/5)" };
 
         // przyczyny smierci (R3) z rak Innych
         internal const int DCaptives = 0, DRescued = 1, DMilitia = 2, DKinds = 3;
