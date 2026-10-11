@@ -1112,3 +1112,11 @@ etap 5: 5.1); zapis 9 dob OK (0 bledow, 28.6 s/dobe). Kopie: Armoury.dll.bak-202
 Pytania do Jeffa (3.1): podatek BK od warsztatow lordow/gracza w cudzych miastach - zniknac (dzis) czy wlasciciel placi; doplata podmiany rekruta ROT do sakiewki ludzi;
 werdykt 3.2 "pokonany" takze dla partii lordow. ZATWIERDZONE: Armoury 6e4b5b6a, RC 90665425, GT bbb841d7, CS 77b11df5.
 **BIEG 2-LETNI (728 dob, -TimeoutMin 480) start ok. 20:58** na wgranym zestawie -> SCRATCH(ae222cb7)\test\at-728.out.txt (koniec ok. 01:30-02:00).
+
+**BIEG 2-LETNI (10/11.10, 20:58-01:23, WGRANIE 28):** 728/728 dob, 0 bledow Armoury (CS: 2 bledy BKROTPatch - GetCouncil AmbiguousMatch, zlapane). Etap 3: 20/20 TAK, reszta
+niewyjasniona ksiegi d728 -0.7 tys./d. Glowy < 5000: d120 0, d364 6, d728 3; bankrut 1 (K39 d225); Bank min 2.65 mln; dezercja AI ost. 28 dob 15/d (baza 49) - w oknach
+28 dob 40-200/d (fale po wielkich przegranych); wojsko lordow w wojnie rok 1 ok. 100 tys., rok 2 mniej wojen (145 rodow w pokoju d560) - 72 tys. razem, na krolestwo w wojnie
+jak w bazie; zalogi swiata -23% (pokoj). BANDY +36% liczby, +57% ludzi (25 tys., plateau od d550) - zrodlo: rozbici z bitew "w las" (H3) i fale dezercji, powrot z puli
+do wsi 2-3/d -> E4/3. STRAZ: ok. d590 pokoj z Wolnymi Ludzmi -> pulap 20 tys. -> 1.4 tys., zwolnienia 166 odeslaly 5 tys. (7.2 -> 1.2 tys.) -> poprawka 2-n (Straz bez
+zwolnien, w-toku/e4-0 f41402a). Logi: SCRATCH(ae222cb7)\kopia-728\ (progi2.txt, progi3.txt).
+**Raport dla Jeffa:** docs/RAPORT-NOCNY-2026-10-11.md. Projekty: docs/etap3/, docs/etap4/.
