@@ -420,7 +420,7 @@ namespace Armoury
               .Append(", dochod za tier (z niczego) ").Append(ml ? S(M[CW.MTier]) : "-").Append(" (").Append(M[CW.MTierN]).Append(" rodow, w tym najemnicy ").Append(M[CW.MTierMerc]).Append(')')
               .Append(", zapomoga ze skarbca ").Append(ml ? S(M[CW.MSupport]) : "-").Append(" (oczekiwane 0 - BK ja wylacza)")
               .Append(", podatek BK od bogatych do skarbcow ").Append(ml ? S(M[CW.MBkTax]) : "-").Append(" (przelew)")
-              .Append(", rada: place ").Append(ml ? S(M[CW.MCouncilPay]) : "-").Append(" / urzad radnego ").Append(ml ? S(M[CW.MCouncilGet]) : "-").Append(" [P]")
+              .Append(", rada: place ").Append(ml ? S(M[CW.MCouncilPay]) : "-").Append(" / urzad radnego ").Append(ml ? S(M[CW.MCouncilGet]) : "-").Append(" [P]").Append(CouncilWages35.LedgerNote())
               .Append(" (nazwy linii modelu: ").Append(CW.LineNamesFound).Append(" z 11; kwoty naliczone - z pustej kiesy schodzi mniej)")
               .Append(" | dlug wobec korony w trakcie rozliczen: nowy +").Append(_debtNew).Append(" (").Append(_debtNewN).Append(" rodow), splacony ").Append(Neg(_debtPaid))
               .Append(" (").Append(_debtPaidN).Append(" rodow), razem u ").Append(debtClans).Append(" rodow ").Append(debtAll)
