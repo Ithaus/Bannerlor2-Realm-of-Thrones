@@ -20,10 +20,54 @@ namespace Armoury
     internal static class LevyGold
     {
         private static int _toNotables, _toTowns, _skippedKits, _dayStamp = -1;
+        // 3.1 (31, E3/6 - paczka 164a-5): zwrot = dokladnie to, co gra zdjela z kiesy wodza (zdarzenie GiveGoldAction wodz -> nic, po obcieciu do kiesy),
+        // nie koszt liczony od nowa po werbunku (gra liczy go PRZED dodaniem rekruta - RecruitmentCampaignBehavior.cs:608 - i obcina do kiesy :625);
+        // notabl brak/zmarly - kasa osady; ochotnik z mapy - kiesa najblizszej wsi
+        private static long _toSettl, _toVillages, _unrouted, _oldWay, _newWay;
+        private static bool _rcOpen;
+        private static Hero _rcLeader;
+        private static long _rcTaken;
 
-        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _dayStamp = -1; }
+        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _dayStamp = -1; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _rcOpen = false; _rcLeader = null; _rcTaken = 0; }
 
-        public static void ApplyInternalPostfix(MobileParty __0, Settlement __1, Hero __2, CharacterObject __3, int __4, object __6)
+        public struct RcState { public bool Prev; public Hero PrevLeader; public long PrevTaken; public int Car0; }
+
+        /// <summary>3.1 (E3/6): okno werbunku - wodz platnik i kasa karawany przed (gra placi z niej bez zdarzenia).</summary>
+        public static void ApplyInternalPrefix(MobileParty __0, out RcState __state)
+        {
+            __state = new RcState { Prev = _rcOpen, PrevLeader = _rcLeader, PrevTaken = _rcTaken };
+            try
+            {
+                _rcOpen = true; _rcLeader = __0 != null ? __0.LeaderHero : null; _rcTaken = 0;
+                __state.Car0 = __0 != null && __0.IsCaravan ? __0.PartyTradeGold : 0;
+            }
+            catch { }
+        }
+
+        /// <summary>3.1 (E3/6): okno zamkniete takze po wyjatku w metodzie gry (poprzednie przywrocone - zagniezdzenie).</summary>
+        public static void ApplyInternalFinalizer(RcState __state) { _rcOpen = __state.Prev; _rcLeader = __state.PrevLeader; _rcTaken = __state.PrevTaken; }
+
+        /// <summary>3.1 (E3/6): nasluch zdarzen zlota (Seal31) - w oknie werbunku kwota, ktora gra naprawde zdjela wodzowi (wodz -> nic).</summary>
+        internal static void OnGold(Hero gh, PartyBase gp, Hero rh, PartyBase rp, int a)
+        {
+            if (!_rcOpen || _rcLeader == null || a <= 0) return;
+            if (ReferenceEquals(gh, _rcLeader) && gp == null && rh == null && rp == null) _rcTaken += a;
+        }
+
+        private static Settlement NearestVillage(MobileParty mp)
+        {
+            Settlement best = null; float bd = float.MaxValue;
+            var p = mp.GetPosition2D;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !st.IsVillage || st.SettlementComponent == null) continue;
+                float d = p.DistanceSquared(st.GetPosition2D);
+                if (d < bd) { bd = d; best = st; }
+            }
+            return best;
+        }
+
+        public static void ApplyInternalPostfix(MobileParty __0, Settlement __1, Hero __2, CharacterObject __3, int __4, object __6, RcState __state)
         {
             try
             {
@@ -33,13 +77,37 @@ namespace Armoury
                 string detail = __6 != null ? __6.ToString() : "";
                 var model = Campaign.Current.Models.PartyWageModel;
                 int cost = model.GetTroopRecruitmentCost(__3, __0.LeaderHero).RoundedResultNumber;
-                if (cost <= 0) return;
+                if (detail == "VolunteerFromMap")
+                {
+                    // 3.1 (E3/6): ochotnik z mapy (dzis zablokowany latka CS T2b) - zaplata do kiesy najblizszej wsi (regula na 100% przypadkow)
+                    if (__0 == MobileParty.MainParty || _rcTaken <= 0) return;
+                    int tk = (int)Math.Min(int.MaxValue, _rcTaken);
+                    var v = NearestVillage(__0);
+                    if (v == null) { _unrouted += tk; return; }
+                    v.SettlementComponent.ChangeGold(tk);
+                    MoneyLedger.Note169(MoneyLedger.N169Other, v, tk);   // kiesa wsi poza GiveGoldAction (tylko licznik)
+                    MoneyLedger.NoteLevyBack(tk);
+                    _toVillages += tk;
+                    return;
+                }
+                if (cost <= 0 && detail != "VolunteerFromIndividual") return;
                 if (detail == "VolunteerFromIndividual")
                 {
-                    if (__0 == MobileParty.MainParty || __2 == null || !__2.IsAlive) return;   // gracz: BK juz placi notablowi
-                    __2.ChangeHeroGold(cost);
-                    _toNotables += cost;
-                    if (__0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost);   // ksiega pieniadza (tylko licznik): gra skasowala te zaplate przez GiveGoldAction
+                    if (__0 == MobileParty.MainParty) return;   // gracz: BK juz placi notablowi
+                    // 3.1 (E3/6): dokladnie to, co zeszlo z kiesy wodza; notabl brak/zmarly - kasa osady (dotad: koszt od nowa i notabl martwy - w nicosc)
+                    int taken = (int)Math.Min(int.MaxValue, Math.Max(0L, _rcTaken));
+                    if (cost > 0) _oldWay += cost;
+                    _newWay += taken;
+                    if (taken <= 0) return;
+                    if (__2 != null && __2.IsAlive) { __2.ChangeHeroGold(taken); _toNotables += taken; }
+                    else if (__1 != null && __1.SettlementComponent != null)
+                    {
+                        __1.SettlementComponent.ChangeGold(taken);
+                        MoneyLedger.Note169(MoneyLedger.N169Other, __1, taken);   // kasa osady poza GiveGoldAction (tylko licznik)
+                        _toSettl += taken;
+                    }
+                    else { _unrouted += taken; return; }
+                    MoneyLedger.NoteLevyBack(taken);   // ksiega pieniadza (tylko licznik): gra skasowala te zaplate przez GiveGoldAction
                     try
                     {
                         if (__3.IsMounted && RecruitCost.OwnHorseOn) RecruitCost.NoteOwnHorse(false, __1, 1);   // paczka 160: ochotnik z wlasnym koniem - w koszcie konia nie ma (tylko licznik)
@@ -73,17 +141,21 @@ namespace Armoury
                         RecruitCost.NoteMercHorses(__1, took, n - took, per, refund, market == null || market.Town == null, false);
                     }
                     else if (__3.IsMounted && RecruitCost.OwnHorseOn) RecruitCost.NoteOwnHorse(true, __1, n);   // paczka 160: najemnik z wlasnym koniem - w koszcie konia nie ma, z polki nic nie schodzi (tylko licznik)
+                    // 3.1 (E3/6): rozdzielamy to, co naprawde zeszlo (wodz: zdarzenie gry po obcieciu do kiesy; karawana: spadek kasy - gra odejmuje bez
+                    // zdarzenia i nie schodzi ponizej 0), nie koszt x liczba - przy pustej kiesie miasto dostawalo zloto, ktorego nikt nie zaplacil
+                    long gross = __0.IsCaravan ? Math.Min((long)cost * n, Math.Max(0L, (long)__state.Car0 - __0.PartyTradeGold)) : Math.Max(0L, _rcTaken);
+                    if (refund > gross) refund = (int)gross;
                     if (refund > 0)
                     {
                         if (__0.IsCaravan) __0.PartyTradeGold += refund;
                         else if (__0.LeaderHero != null) __0.LeaderHero.ChangeHeroGold(refund);
                     }
-                    int toTown = cost * n - refund;
-                    __1.SettlementComponent.ChangeGold(toTown);
+                    int toTown = (int)Math.Min(int.MaxValue, gross - refund);
+                    if (toTown > 0) __1.SettlementComponent.ChangeGold(toTown);
                     _toTowns += toTown;
                     MoneyLedger.Note(MoneyLedger.NMerc, __1, toTown);   // ksiega przeplywow osad (tylko licznik)
                     // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza (miastu + zwrot = cala zaplata)
-                    if (!__0.IsCaravan && __0.LeaderHero != null) MoneyLedger.NoteLevyBack(cost * n);
+                    if (!__0.IsCaravan && __0.LeaderHero != null && gross > 0) MoneyLedger.NoteLevyBack((int)Math.Min(int.MaxValue, gross));
                 }
             }
             catch { }
@@ -108,10 +180,13 @@ namespace Armoury
         {
             int day = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == day) return;
-            if (_dayStamp >= 0 && _toNotables + _toTowns + _skippedKits > 0)
+            if (_dayStamp >= 0 && _toNotables + _toTowns + _skippedKits + _toSettl + _toVillages + _unrouted > 0)
                 Log.Info("Werbunek: dzien " + _dayStamp + " - zloto AI za ochotnikow do notabli " + _toNotables + ", za najemnikow do miast " + _toTowns
-                         + "; nowe partie AI bez darmowego kompletu DTE: " + _skippedKits + ".");
-            _toNotables = _toTowns = _skippedKits = 0;
+                         + "; nowe partie AI bez darmowego kompletu DTE: " + _skippedKits + "."
+                         // 3.1 (E3/6): zwrot = dokladnie zdjete z kiesy; rozjazd z kosztem liczonym od nowa (stara regula) - informacja
+                         + " 3.1 (E3/6): notabl brak/zmarly - do kas osad " + _toSettl + ", ochotnicy z mapy - do kies wsi " + _toVillages + ", bez odbiorcy (prog 0) " + _unrouted
+                         + "; ochotnicy od notabli: zdjete z kies wodzow " + _newWay + " (koszt liczony od nowa po werbunku dalby " + _oldWay + ").");
+            _toNotables = _toTowns = _skippedKits = 0; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0;
             _dayStamp = day;
         }
 
@@ -121,7 +196,13 @@ namespace Armoury
             try
             {
                 var m = AccessTools.Method(typeof(RecruitmentCampaignBehavior), "ApplyInternal");
-                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(LevyGold), nameof(ApplyInternalPostfix))); a = "wpiete"; }
+                if (m != null)
+                {
+                    // 3.1 (E3/6): prefiks (okno werbunku) i finalizer (zamkniecie okna) - zwrot dokladnie tego, co zeszlo z kiesy
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(LevyGold), nameof(ApplyInternalPrefix)), postfix: new HarmonyMethod(typeof(LevyGold), nameof(ApplyInternalPostfix)),
+                            finalizer: new HarmonyMethod(typeof(LevyGold), nameof(ApplyInternalFinalizer)));
+                    a = "wpiete (3.1 E3/6: zwrot = dokladnie zdjete z kiesy)";
+                }
             }
             catch (Exception e) { Log.Error("LevyGold.ApplyInternal", e); }
             try

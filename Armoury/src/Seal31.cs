@@ -195,6 +195,7 @@ namespace Armoury
         private static void OnGoldTraded((Hero, PartyBase) giver, (Hero, PartyBase) recipient, (int, string) amount, bool show)
         {
             try { Measure31.OnGold(giver.Item1, giver.Item2, recipient.Item1, recipient.Item2, amount.Item1); } catch (Exception e) { Stumble("Measure31.OnGold", e); }
+            try { LevyGold.OnGold(giver.Item1, giver.Item2, recipient.Item1, recipient.Item2, amount.Item1); } catch (Exception e) { Stumble("LevyGold.OnGold", e); }   // E3/6
         }
 
         /// <summary>ArmouryBehavior - tuz przed MoneyLedger.BlockOpen (poczatek naszego rozliczenia doby).</summary>
