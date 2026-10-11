@@ -263,7 +263,10 @@ namespace Armoury
             long n4 = Sm[CW.NBattleNoEvent], n5 = Sm[CW.NDeadTransfers], n6 = Sm[CW.NKingdomGone], n7 = Sm[CW.NWorkshopBuyCap];
             long n8 = Sm[CW.NReparations], n9 = Sm[CW.NBeeDeliver];   // 169b: odszkodowania Diplomacy (skarbce), dostawy kontraktow karawan BEE
             long zs = z1 + z2 + z3 + z4 + z5, us = u1 + u2 + u3 + u4 + u5 + u6 + u7 + u8 + u9 + u10;
+            long s31 = Seal31.SrcNow(), u31 = Seal31.SinkNow(), n31 = Seal31.NetNow();   // 3.1 (31): wlasne pozycje etapu 3 (portfele wezwan, U8r, oddane przez 164a)
+            zs += s31; us += u31;
             long sTot = s0 - k1 + zs, uTot = u0 + us, nTot = n1 + n2 + n3 + n4 + n5 + n6 + n7 + n8 + n9;
+            nTot += n31;
             long R = z - sTot + uTot - nTot;
             long ar1 = z - sTot + uTot - nTot - R, ar2 = (r0 - R) - (zs - us + nTot - k1);
             // reszta w naszym ticku (RB): dwa odczyty calego swiata wokol bloku minus pozycje nazwane w bloku (clo z licznika cel - w bloku)
@@ -315,7 +318,8 @@ namespace Armoury
               .Append(Sm[CW.ICaravanNewN]).Append(" karawan)")
               .Append(", BK sprzedaz niewolnikow ").Append(Wv(z3, CW.WSlaves))
               .Append(", zloto bohaterow, ktorzy wrocili do swiata ").Append(Wv(z4, CW.WHeroState))
-              .Append(", myto (perk Tollgates zarzadcow) ").Append(Wv(z5, CW.WTolls));
+              .Append(", myto (perk Tollgates zarzadcow) ").Append(Wv(z5, CW.WTolls))
+              .Append(Seal31.SrcText());   // 3.1 (31)
             // UJSCIA
             sb.Append(" | UJSCIA w nicosc ").Append(uTot).Append(" [P]: rozliczenia rodow na minus ").Append(_clanDown).Append(", regulator kas skasowal ").Append(regOut)
               .Append(", z utargu wsi zniklo ").Append(vanished).Append(", zloto zabrane przez gre w nicosc poza rozliczeniami rodow ").Append(to).Append(" (w tym: ");
@@ -350,7 +354,8 @@ namespace Armoury
               .Append(", clo zdjete z licznika cel ").Append(u9).Append(" (cala kwota; skarbce dostaly ").Append(KingdomTreasury.LastCustoms).Append(" z kas miast - to przelew)")
               .Append(", karawany BetterEconomy (kasa karawany bez odbiorcy) ").Append(CW.Wired[CW.WBeeEscort] || CW.Wired[CW.WBeeDanger] ? u10.ToString(Inv) : "-")
               .Append(" (najem eskorty ").Append(u10e).Append(" w ").Append(Sm[CW.IBeeEscortN]).Append(" karawanach, awanse zalogi ").Append(u10p)
-              .Append(", straty na niebezpiecznych drogach ").Append(u10d).Append(" w ").Append(Sm[CW.IBeeDangerN]).Append(" karawanach)");
+              .Append(", straty na niebezpiecznych drogach ").Append(u10d).Append(" w ").Append(Sm[CW.IBeeDangerN]).Append(" karawanach)")
+              .Append(Seal31.SinkText());   // 3.1 (31)
             // NETTO
             sb.Append(" | NETTO (zmiana swiata) ").Append(S(nTot)).Append(" [P]: BK rynek osady ").Append(WvS(n1, CW.WMarket)).Append(", BK rynek wsi ").Append(WvS(n2, CW.WVillageMarket))
               .Append(", warsztaty BK bez pokrycia w kasie ").Append(Wired2(n3, CW.WWorkshopOut, CW.WWorkshopIn))
@@ -365,7 +370,8 @@ namespace Armoury
               .Append(", odszkodowania wojenne Diplomacy - skarbce krolestw bez zdarzenia ").Append(WvS(n8, CW.WReparations))
               .Append(" (do skarbcow odbiorcow +").Append(Sm[CW.IReparationsIn]).Append(", ze skarbcow placacych -").Append(Sm[CW.IReparationsOut])
               .Append("; placacym dopisany dlug trybutu ").Append(Sm[CW.IReparationsDebt]).Append(" - rody splacaja go potem w rozliczeniach jako \"trybut zaplacony\")")
-              .Append(", dostawy kontraktow karawan BetterEconomy (zloto ze skarbcow BEE) ").Append(WvS(n9, CW.WBeeDeliver)).Append(" (").Append(Sm[CW.IBeeDeliverN]).Append(" dostaw)");
+              .Append(", dostawy kontraktow karawan BetterEconomy (zloto ze skarbcow BEE) ").Append(WvS(n9, CW.WBeeDeliver)).Append(" (").Append(Sm[CW.IBeeDeliverN]).Append(" dostaw)")
+              .Append(Seal31.NetText());   // 3.1 (31)
             // RESZTA
             sb.Append(" | RESZTA ").Append(S(R)).Append(" [R] (w naszym ticku dobowym ").Append(haveRb ? S(rb) : "-")
               .Append(segTxt.Length > 0 ? " - wedlug odcinkow: " + segTxt.ToString() : "")
@@ -383,6 +389,7 @@ namespace Armoury
               .Append(" U7=").Append(u7).Append(" U8=").Append(u8).Append(" U9=").Append(u9).Append(" U10=").Append(u10)
               .Append(" N1=").Append(n1).Append(" N2=").Append(n2).Append(" N3=").Append(n3).Append(" N4=").Append(n4).Append(" N5=").Append(n5).Append(" N6=").Append(n6).Append(" N7=").Append(n7)
               .Append(" N8=").Append(n8).Append(" N9=").Append(n9)
+              .Append(Seal31.Keys())   // 3.1 (31)
               .Append(segKeys.ToString()).Append(haveRb && segSum != rb ? " RBSUMA=" + segSum : "")
               .Append(ar1 == 0 && ar2 == 0 ? " ARYTMETYKA OK." : " ARYTMETYKA BLAD " + (ar1 != 0 ? ar1 : ar2) + ".");
             return sb.ToString();

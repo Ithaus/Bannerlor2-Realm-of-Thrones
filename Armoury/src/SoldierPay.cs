@@ -804,6 +804,12 @@ namespace Armoury
             try { float v; return st != null && st.StringId != null && _held.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }
         }
 
+        /// <summary>3.1 (31, tylko odczyt): znacznik tarczy dworu w kasie miasta (zl dworu w drodze do pana) - nadwyzka osady (Seal31.Spare).</summary>
+        internal static long CourtOf(Settlement st)
+        {
+            try { float v; return st != null && st.StringId != null && _court.TryGetValue(st.StringId, out v) ? (long)v : 0; } catch { return 0; }
+        }
+
         internal static string ExportHeld()
         {
             var parts = new List<string>();

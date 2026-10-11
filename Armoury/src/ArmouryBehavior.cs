@@ -613,6 +613,7 @@ namespace Armoury
             // (112: sakwa taboru do zwyciezcy albo do wsi - VillageTakings.OnPartyDestroyed), wiec jej nasluch dopisujemy PIERWSZY - biegnie ostatni.
             // Dotad byl dopisany po VillageTakings i biegl przed nim: kazda sakwe oddana przez 112 liczyl jeszcze jako zloto, ktore zniknelo (tylko log).
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, CirculationWindows.OnPartyDestroyed);    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log) - MUSI byc pierwszym nasluchem MobilePartyDestroyed
+            Seal31.RegisterEvents(this);   // 3.1 (31): Reset stanu kampanii; nasluch MobilePartyDestroyed DRUGI (biegnie przedostatni - po 3.2 i 112, przed ksiega obiegu), OnPartyRemoved, upadek krolestw, zdarzenia zlota
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
@@ -1166,6 +1167,7 @@ namespace Armoury
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { RotLeaks37.EnsureHooks(); } catch (Exception e) { Log.Error("RotLeaks37.EnsureHooks", e); }   // 3.7: podmiana rekruta ROT i rebelia bez zlota z niczego (transpilery raz na proces)
             try { CrownCallToWar.EnsureHooks(); } catch (Exception e) { Log.Error("CrownCallToWar.EnsureHooks", e); }   // 168 dodatek: wezwanie do wojny placi korona - latki modelu finansow i sojuszy w kampanii
+            try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercContract.EnsureHooks(); } catch (Exception e) { Log.Error("MercContract.EnsureHooks", e); }   // 185: kontrakt gry i "za tier" AI = 0 (latki modelu finansow - w kampanii)   // 166: limity partii i zalog, dezercja z limitu, nowe partie, werbunek Strazy (latki w kampanii)   // 165: splata dlugu wobec korony do skarbca (latka modelu finansow - w kampanii)   // 169c: okna pomiaru etapu 2 (okupy, zalogi, rycerze, dezercja, konsumpcja, Inni) - latki w kampanii, tylko log
             try { CouncilWages35.EnsureHooks(); } catch (Exception e) { Log.Error("CouncilWages35.EnsureHooks", e); }   // 3.5: rada BK - platnik i urzad radnego (latki BK w kampanii), liczniki od zera
@@ -1428,6 +1430,7 @@ namespace Armoury
             try { PrisonerLaw.Daily(); } catch (Exception e) { Log.Error("PrisonerLaw.Daily", e); }   // I1: linia "Prawo jenca (I1):" - do domu, na Mur, niewolnicy (ta sama doba co H3 "prawo jenca I1")
             try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); }
             try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
+            try { Seal31.BlockOpen(); } catch { }   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
             try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
             try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
@@ -1518,6 +1521,7 @@ namespace Armoury
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
             try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); }
+            try { Seal31.Daily(); } catch (Exception e) { Log.Error("Seal31.Daily", e); }   // 3.1 (31): linia "Szczelnosc (164a)" i zerowanie pozycji - PO ksiedze pieniadza, ktora je czyta
             try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
             try { CouncilWages35.Daily(); } catch (Exception e) { Log.Error("CouncilWages35.Daily", e); }   // 3.5: linia "Rada (3.5)" i zerowanie licznikow - PO ksiedze pieniadza (to samo okno rozliczen rodow)
             try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); }   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta

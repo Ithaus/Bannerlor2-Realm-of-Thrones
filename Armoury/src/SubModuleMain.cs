@@ -170,6 +170,7 @@ namespace Armoury
                 // paczka 169: ksiega obiegu (tylko log) - okna pomiaru zlota; PO naszych latkach na te same metody (BuildFunding, WorkshopTrade,
                 // MoneyLedger), PRZED ksiega towarow, ktora musi byc ostatnia; kazde okno wpinane we wlasnym try
                 try { CirculationWindows.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CirculationWindows.ApplyAll", e); }
+                try { Seal31.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Seal31.ApplyAll", e); }   // 3.1 (31): szczelnosc etapu 3 - PO oknach ksiegi (prefiksy zmieniajace zloto maja nizszy priorytet niz okna First)
                 Measure169c.SetHarmony(_harmony);
                 ClanBudget.SetHarmony(_harmony);    // 166: tylko zapamietanie - latki gry wpina EnsureHooks w kampanii
                 OverflowHome.SetHarmony(_harmony);  // W4c: tylko zapamietanie - okno dezercji gry wpina EnsureHooks w kampanii

@@ -96,7 +96,9 @@ namespace Armoury
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
                           HKingdoms = 9, HWorkshops = 10, HPurses = 11, HBank = 12, HVillagers = 13, HCaravans = 14, HGarrisons = 15, HBandits = 16,
-                          HOtherParties = 17, HTownTax = 18, HVillageTax = 19, HOtherSettlements = 20, Holders = 21;
+                          HOtherParties = 17, HTownTax = 18, HVillageTax = 19, HOtherSettlements = 20,
+                          HCallToWar = 21,   // 3.1 (31, E3/0): dodatnie portfele wezwan do wojny (168) - posiadacz (gra wyplaca je rodom wezwanego)
+                          Holders = 22;
 
         // zold wedlug rodzaju partii
         private const int WLord = 0, WGarrison = 1, WCaravan = 2, WOther = 3, Wages = 4;
@@ -684,6 +686,7 @@ namespace Armoury
                 h[k] += g;
             }
             foreach (var kd in Kingdom.All) if (kd != null && !kd.IsEliminated) h[HKingdoms] += kd.KingdomBudgetWallet;
+            foreach (var kd in Kingdom.All) if (kd != null && !kd.IsEliminated && kd.CallToWarWallet > 0) h[HCallToWar] += kd.CallToWarWallet;   // 3.1 (31, E3/0)
             foreach (var t in Town.AllFiefs)
             {
                 if (t == null) continue;
@@ -726,7 +729,9 @@ namespace Armoury
                    + ", kryjowki i inne " + D(now, last, HOtherSettlements)
                    + " | bohaterowie: glowy rodow " + D(now, last, HLeaders) + ", pozostali lordowie " + D(now, last, HLords) + ", gracz " + D(now, last, HPlayer)
                    + ", notable " + D(now, last, HNotables) + ", wedrowcy " + D(now, last, HWanderers) + ", inni " + D(now, last, HOtherHeroes)
-                   + " | skarbce krolestw " + D(now, last, HKingdoms) + " | kapital warsztatow " + D(now, last, HWorkshops)
+                   + " | skarbce krolestw " + D(now, last, HKingdoms)
+                   + " | portfele wezwan do wojny (168) " + D(now, last, HCallToWar)   // 3.1 (31, E3/0)
+                   + " | kapital warsztatow " + D(now, last, HWorkshops)
                    + " | sakiewki ludzi " + D(now, last, HPurses) + " | Bank Zelazny " + D(now, last, HBank)
                    + " | partie bez wodza: tabory wsi " + D(now, last, HVillagers) + ", karawany " + D(now, last, HCaravans) + ", garnizony " + D(now, last, HGarrisons)
                    + ", bandy " + D(now, last, HBandits) + ", inne " + D(now, last, HOtherParties)

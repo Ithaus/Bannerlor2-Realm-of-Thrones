@@ -1514,6 +1514,7 @@ namespace Armoury
                 else if (mp.IsGarrison) { item = UPartyGarrison; cnt = IPartyGoneGarrisonN; }
                 else { item = UPartyOther; cnt = IPartyGoneOtherN; }
                 AddWorld(item, g, -1);
+                Measure31.NoteGone(mp, destroyer, g);   // 3.1 (31, E3/0): w U8 podzial "w tym rozwiazane (niszczyciel null)" - tylko informacja
                 Sum[cnt]++; Sum[IPartyGoneN]++;
                 Hits[WPartyGone]++;
             }

@@ -143,7 +143,7 @@ namespace Armoury
             if (!On)
             {
                 // wylaczone: porozumienia w toku wracaja do gry - wezwany dostaje niezaplacona reszte (jak przy starcie gry), rody wzywajacego splacaja portfel
-                foreach (var a in _agr) { try { var called = KingdomById(a.Called); if (called != null && a.Left > 0) { called.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dUndone += a.Left; } } catch { } }
+                foreach (var a in _agr) { try { var called = KingdomById(a.Called); if (called != null && a.Left > 0) { int ow0 = called.CallToWarWallet; called.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dUndone += a.Left; Measure31.CtwOther(called, ow0); } } catch { } }   // 3.1 (31, E3/0): Measure31.CtwOther
                 _agr.Clear();
                 return;
             }
@@ -180,8 +180,10 @@ namespace Armoury
                             long pay = Math.Min(Math.Min(a.Left, a.Daily), Math.Min(CrownIncome.LeftFor(calling), (long)Math.Max(0, calling.KingdomBudgetWallet)));
                             if (pay > 0)
                             {
+                                int lw0 = calling.CallToWarWallet;   // 3.1 (31, E3/0)
                                 calling.KingdomBudgetWallet -= (int)pay; calling.CallToWarWallet += (int)pay; a.Left -= pay;
                                 CrownIncome.Spent(calling, pay); kl.CallToWar += pay; _dLegacyPaid += pay;
+                                Measure31.CtwLegacy(calling, lw0, pay);   // 3.1 (31, E3/0): nazwane ujscie "dlug portfela sprzed paczki"
                             }
                             if (a.Left <= 0) _agr.Remove(a);
                             continue;
@@ -189,7 +191,7 @@ namespace Armoury
                         var called = KingdomById(a.Called); var against = KingdomById(a.Against);
                         if (calling == null || called == null || against == null || calling.IsEliminated || called.IsEliminated || against.IsEliminated)
                         {
-                            if (calling != null && a.Left > 0) { calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dCancelled += a.Left; }
+                            if (calling != null && a.Left > 0) { int cw0 = calling.CallToWarWallet; calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dCancelled += a.Left; Measure31.CtwOther(calling, cw0); }   // 3.1 (31, E3/0)
                             _agr.Remove(a);
                             continue;
                         }
@@ -247,6 +249,7 @@ namespace Armoury
         {
             int ix = (int)Math.Min(int.MaxValue, Math.Min(x, (long)Math.Max(0, calling.KingdomBudgetWallet)));
             if (ix <= 0) return;
+            int wc0 = calling.CallToWarWallet, wd0 = called.CallToWarWallet;   // 3.1 (31, E3/0): pole netto portfeli przed wplata (ksiega)
             calling.KingdomBudgetWallet -= ix;    // skarbiec wzywajacego
             calling.CallToWarWallet += ix;        // dlug korony za wezwanie maleje
             called.CallToWarWallet += ix;         // portfel wezwanego - gra rozdziela go na jego rody (AddIncomeFromCallToWarAgrements)
@@ -254,6 +257,7 @@ namespace Armoury
             CrownIncome.Spent(calling, ix);
             kd.CallToWar += ix;
             _dPaid += ix; _dPaidN++;
+            Measure31.CtwPay(calling, wc0, called, wd0, ix);   // 3.1 (31, E3/0): wplata do ujemnego portfela - ujscie, reszta to przelew (portfel jest posiadaczem)
         }
 
         private static void Line()
