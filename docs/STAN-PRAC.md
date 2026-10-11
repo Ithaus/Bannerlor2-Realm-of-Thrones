@@ -1089,3 +1089,11 @@ towaru z niczego (TravellerGoods36.cs), 3.7 ROT: podmiana rekruta bez zwrotu z n
 bandy -12%, reszta ksiegi wobec bazy -9.2 tys. (TAK; bezwzglednie -20.8 tys./d - do domkniecia przez E3/0); zapis 9 dob OK (0 bledow, 31.4 s/dobe). Kopie: *.bak-2026-10-10-przed-noc26
 (Armoury i RC) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc26-przed. Pytania (kierunkowe, bez pilnosci): napitki i drewno wojska placi lord (tak dzis) czy sakiewka ludzi?;
 wedrowcy BK kiedys z prawdziwym towarem?. ZATWIERDZONE: Armoury d38f1e69, RealisticCaptivity cea72cca, CrashScribe 77b11df5. GrandTourney 1337433c.
+
+**WGRANIE 27 (10.10 ok. 20:12 zegara komp.):** Armoury 5e02c741 + RealisticCaptivity 90665425 + **GrandTourney bbb841d7** (galaz noc/wgranie-27 = w-toku/e3-gB b052638 =
+WGRANIE 26 + ETAP 3.8-3.10: 3.8 ceny historyczne - spis stalych kwot (SPIS-CEN-GRY 2.0), pulap zamowien kowala i nagrody szranek GrandTourney w starej monecie, zloty smok
+= 80 zl (tylko porownania w logu); 3.9 drobne w nicosc - trzecia lorda 33% (byla ok. 10%), lapowka w niewoli do trzymajacych (parol - dopiero przy "I run"), rynsztunek
+zabrany przez bandytow do jukow bandy (nie na targ za darmo), "bandyci ukradli" w Spoils tylko z banda w zasiegu; 3.10 drobne z niczego - furaz z zapasu wsi, herszt
+kryjowki z ludzi bandy (bez wyrzutkow - bez herszta), zold zaciagu ROT od pana). CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow Armoury, RC i GT, wojsko lordow w wojnie
+101.2 tys., dezercja AI 31/d, glowy < 5000 = 1, bankruci 0, bandy -11%, reszta ksiegi wobec bazy -4.3 tys.; zapis 9 dob OK (0 bledow, 29.5 s/dobe). Kopie: *.bak-2026-10-10-przed-noc27
+(Armoury, RC, GT) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc27-przed. ZATWIERDZONE: Armoury 5e02c741, RC 90665425, GT bbb841d7, CS 77b11df5.
