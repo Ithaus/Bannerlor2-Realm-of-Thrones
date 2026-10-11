@@ -713,3 +713,6 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   test\at-z30-B.out.txt; potem zapis 9 dob -> WGRANIE 30.
 - (05:35) Jeff: "po wgraniu 30 rob dalej E4/4". E4/4 (przyrost naturalny, miasta jako stan, podloga 10) KOD W TOKU: workflow wf_4d6430c3-d4f, drzewo SCRATCH(ae222cb7)\e4\44,
   galaz w-toku/e4-4 od c02c80f (zbior 30) -> test\Armoury-e4-4.dll. Test E4/4 razem z nastepna paczka (E4/5 spustoszenie - zalezy od E4/4) wedlug zasady testow zbiorczych.
+- (05:45) Rownolegle (Jeff: "czy cos jeszcze z E4 mozna robic"): workflow wf_16064079-10e - (1) naprawa lancucha modelu jedzenia RBL (drzewo e4\jedz, galaz
+  w-toku/e4-jedzenie od c02c80f -> test\Armoury-jedzenie.dll), (2) plany kodu E4/5 i E4/7 bez kodu (SCRATCH(ae222cb7)\e4\PLAN-KODU-E45.md, PLAN-KODU-E47.md).
+  Nastepny test zbiorczy: E4/4 + jedzenie (+ E4/5, jesli zdazy) -> WGRANIE 31.
