@@ -723,3 +723,8 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (06:40) **E4/4 GOTOWE:** w-toku/e4-4 2a6ca1e (od c02c80f; test\Armoury-e4-4.dll 6c9c0104). RESZTA hearth +677/d = 2 wsie podwojnie w Settlement.All (blad pomiaru, poprawiony).
   E4/4 NIE MOZE ISC BEZ E4/5 (rabunek dzis usuwa ludzi w nicosc: w wojnie ok. -25%/rok). E4/5 KOD w toku (drzewo e4\45, galaz w-toku/e4-5 od 2a6ca1e, plan docs/etap4/PLAN-KODU-E45.md).
   Test zbiorczy po E4/5: zbior31 = e4-5 (zawiera e4-4) + e4-jedzenie (b6c2139) -> test 120 dob + zima 120 (plik-przelacznik) + zapis -> WGRANIE 31.
+- (07:00) **Jeff - ZASADA:** "po wgraniu 31 rob dalej E4/7, testy zrob jak zrobisz wszystko w E4, i na koniec dopiero test, aby poprawic". PLAN: zbior31 (e4-5 z e4-4 +
+  e4-jedzenie z pasza (a)) -> test 120 + zima 120 + zapis -> WGRANIE 31. Potem BEZ TESTOW kod: E4/6 (spichlerz, glod; od e4-5 + jedzenie) i E4/7 (pochodzenie, pobor z wsi,
+  polegli trwale; plan docs/etap4/PLAN-KODU-E47.md) rownolegle -> E4/8 (zalogi/milicje z ludzi; po E4/7) i E4/10 (weterani; po E4/7) -> E4/9 (Straz, Wolni Ludzie, niewola;
+  po E4/7+E4/8) -> E4/11 (wioski poboczne; po E4/5+E4/6). Kazda paczka: kod + recenzja (+ poprawki), osobna galaz, scalanie na biezaco w w-toku/zbior-e4-koniec. Na koniec
+  JEDEN test (rok 364 dob nowej kampanii + zima 120 + zapis 9; projekt rozdz. 4 "Koniec etapu" mowi tez o 728 dobach dla "spalona wioska wraca po roku") -> poprawki -> wgranie.
