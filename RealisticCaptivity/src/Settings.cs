@@ -56,8 +56,8 @@ namespace RealisticCaptivity
         // --- Bandit plunder ---
         public bool FenceGearWhenNoLord = true;            // bandits sell your gear at the nearest market
         // 3.9 drobne w nicosc (Drobne39.cs): lapowka i rynsztunek u bandytow maja platnika i odbiorce
-        public bool EscapeBribeToCaptor = true;            // the bribe for your escape goes into the purse of the party holding you - the guard is its man (off = the coin vanishes, as before)
-        public bool FenceGearPaid = true;                  // bandits selling your gear are paid for it by the nearest town, out of its coffers above its reserve, with the fence keeping his cut as for any band's loot; what the town will not pay for stays in the band's packs; with your captors gone you take your gear back (off = the gear lands on the market for free, as before)
+        public bool EscapeBribeToCaptor = true;            // the bribe for your escape goes into the purse of the party holding you - the guard is its man; on parole you pay only when you really run (off = the coin vanishes, as before, and is paid before you choose to keep your word)
+        public bool GearToCaptorPacks = true;              // the war gear stripped from you is your captors' plunder like any other: it goes into their packs, and with Armoury the bands' law decides its fate as for any band's loot (the fence buys only spare horses, body armour waits for promotions, the rest stays in the packs) - run them down to take it back; with your captors gone you take your gear back (off = the gear lands on the market for free, as before)
 
 
         // --- Hunger in the cells ---

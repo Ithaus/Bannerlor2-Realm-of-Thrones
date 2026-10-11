@@ -872,7 +872,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsBanditsToBand { get; set; } = true;
 
-        [SettingPropertyBool("Dte Scrap Keep", HintText = "Dynamic Troop Equipment no longer deletes the cheapest gear above its per-category cap in your army armoury (only with Commander's Greed off): the gear stays, and your men sell what they cannot use to the merchants of the next town (off = deleted, as before)")]
+        [SettingPropertyBool("Dte Scrap Keep", HintText = "Dynamic Troop Equipment no longer deletes the cheapest gear above its per-category cap in your army armoury (only with Commander's Greed off): the gear stays, and your men sell what they cannot use to the merchants of the next town - horses are not sold and stay in the armoury (off = deleted, as before)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool DteScrapKeep { get; set; } = true;
 

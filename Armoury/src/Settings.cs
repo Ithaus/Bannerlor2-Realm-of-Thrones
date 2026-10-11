@@ -265,7 +265,7 @@ namespace Armoury
         // 3.9 drobne w nicosc (Drobne39.cs): trzecia lorda od sumy wizyty, "bandyci ukradli" w Spoils do bandy, zlomowanie zbrojowni DTE zablokowane
         public bool LordThirdOnTotal = true;               // an AI lord's third (and a garrison lord's share) of his men's sale of spare kit is reckoned on the whole visit's takings, not piece by piece - a one-denar piece no longer rounds his share down to nothing (off = per piece, as before)
         public bool SpoilsBanditsToBand = true;            // Spoils of War's 'bandits raided the camp' event: the stolen piece goes into the packs of the nearest band within your sight - with no band near, nothing is stolen (off = the piece vanishes, as in Spoils of War)
-        public bool DteScrapKeep = true;                   // Dynamic Troop Equipment no longer deletes the cheapest gear above its per-category cap in your army armoury (only with Commander's Greed off): the gear stays, and your men sell what they cannot use to the merchants of the next town (off = deleted, as before)
+        public bool DteScrapKeep = true;                   // Dynamic Troop Equipment no longer deletes the cheapest gear above its per-category cap in your army armoury (only with Commander's Greed off): the gear stays, and your men sell what they cannot use to the merchants of the next town - horses are not sold and stay in the armoury (off = deleted, as before)
 
         // --- Flesh and wind ---
         public bool FieldCraftEnabled = true;              // battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off

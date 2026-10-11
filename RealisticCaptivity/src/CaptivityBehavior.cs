@@ -659,9 +659,10 @@ namespace RealisticCaptivity
         {
             try
             {
-                if (Drobne39.FenceOn)   // 3.9: miasto placi bandzie (paser jak przy lupie band), czego nie kupi - zostaje w jukach bandy
+                if (Drobne39.PacksOn)   // 3.9: rynsztunek to lup zdobywcow - do ich jukow, dalej jak kazdy lup bandy (jedna regula)
                 {
-                    if (!Drobne39.FenceGear(_storedGear, captorParty))
+                    var back = new List<string>();
+                    if (!Drobne39.GearToPacks(_storedGear, captorParty, back))
                     {
                         RestoreGear();   // zdobywcow juz nie ma - porzucony oboz, rynsztunek wraca (jak przy odbiciu sila)
                         Log.Player("Your captors are gone. You find your war gear in their abandoned camp.");
@@ -669,6 +670,7 @@ namespace RealisticCaptivity
                     }
                     _storedGear.Clear();
                     _gearBuybackPrice = 0;
+                    if (back.Count > 0) { _storedGear.AddRange(back); RestoreGear(); }   // sztuki, ktore nie weszly do jukow, wracaja do gracza
                     return;
                 }
                 Settlement best = null;

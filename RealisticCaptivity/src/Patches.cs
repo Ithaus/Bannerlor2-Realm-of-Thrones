@@ -81,6 +81,7 @@ namespace RealisticCaptivity
                     b.OnFailedEscape();
                     return false;
                 }
+                Hero paroleHelper = null; int paroleBribe = 0;   // 3.9 (recenzja): gracz na parolu placi lapowke dopiero przy "I run"
                 if (Settings.Current.EscapeNeedsHelp)
                 {
                     var helper = CaptivityExtras.FindOutsideHelper();
@@ -93,18 +94,15 @@ namespace RealisticCaptivity
                     int bribe = Settings.Current.EscapeBribeGold;
                     if (Hero.MainHero.Gold >= bribe && bribe > 0)
                     {
-                        if (Drobne39.PayBribe(bribe) > 0)   // 3.9: lapowka do kiesy partii zdobywcy (straznik jest jej czlowiekiem), nie w nicosc
-                        {
-                            Log.Info("Lapowka " + bribe + " zaplacona przez " + helper.Name);
-                            Log.Player(helper.Name + " bribed a guard for you (-" + bribe + " gold).");
-                        }
+                        if (b.OnParole && Drobne39.BribeOn) { paroleHelper = helper; paroleBribe = bribe; }   // za ucieczke, ktorej nie bylo, nikt nie placi
+                        else Bribe(helper, bribe);
                     }
                 }
 
                 if (b.OnParole)
                 {
                     Log.Info("Ucieczka mozliwa, ale gracz na parolu - pytam.");
-                    AskAboutBreakingParole();
+                    AskAboutBreakingParole(paroleHelper, paroleBribe);
                     return false;
                 }
                 Log.Info("Ucieczka udana po " + days + " dniach.");
@@ -113,7 +111,17 @@ namespace RealisticCaptivity
             catch (Exception e) { Log.Error("SwitchToMenuPatch", e); return true; }
         }
 
-        private static void AskAboutBreakingParole()
+        /// <summary>3.9: lapowka za ucieczke (Drobne39.PayBribe - do kiesy partii zdobywcy) i komunikat, gdy pobrana.</summary>
+        private static void Bribe(Hero helper, int bribe)
+        {
+            if (Drobne39.PayBribe(bribe) > 0)
+            {
+                Log.Info("Lapowka " + bribe + " zaplacona przez " + helper.Name);
+                Log.Player(helper.Name + " bribed a guard for you (-" + bribe + " gold).");
+            }
+        }
+
+        private static void AskAboutBreakingParole(Hero helper, int bribe)
         {
             try
             {
@@ -128,6 +136,9 @@ namespace RealisticCaptivity
                     {
                         try
                         {
+                            // 3.9: lapowka dopiero teraz, przed koncem niewoli (zdobywca jeszcze znany); wlasny try - blad lapowki nie zatrzymuje ucieczki
+                            try { if (helper != null && bribe > 0 && Hero.MainHero.Gold >= bribe) Bribe(helper, bribe); }
+                            catch (Exception e) { Log.Error("BreakParoleBribe", e); }
                             CaptivityBehavior.Instance.BreakParole();
                             _redirecting = true;
                             EndCaptivityAction.ApplyByEscape(Hero.MainHero);
