@@ -2208,11 +2208,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool RentReplacesTownTax { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Town Rent Share", 0.00f, 1.00f, "0.00", HintText = "share of the town purse above the merchants' floor its lord draws each day as rents, tolls and farms")]
+        [SettingPropertyFloatingInteger("Town Rent Share", 0.00f, 1.00f, "0.00", HintText = "share of the town purse above the merchants' working coin that leaves it each day as rents, tolls and farms; with Town Purse Regulator on, the lord keeps Town Rent Lord Share of it and the crown the rest")]
         [SettingPropertyGroup("Iron Bank")]
         public float TownRentShare { get; set; } = 0.07f;
 
-        [SettingPropertyFloatingInteger("Town Rent Floor Gold", 0.00f, 80000.00f, "0.00", HintText = "a town keeps this much for its merchants - below 20 000 Banner Kings takes prosperity away")]
+        [SettingPropertyFloatingInteger("Town Rent Floor Gold", 0.00f, 80000.00f, "0.00", HintText = "with Town Purse Regulator 0 only: floor of a town purse for rents and taxes, as before (below 20 000 Banner Kings takes prosperity away)")]
         [SettingPropertyGroup("Iron Bank")]
         public float TownRentFloorGold { get; set; } = 20000f;
 
@@ -2852,7 +2852,7 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool CrownWageRefundGarrisons { get; set; } = true;
 
-        [SettingPropertyBool("Town Wage Shield", HintText = "wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents")]
+        [SettingPropertyBool("Town Wage Shield", HintText = "wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents. Not needed and idle with Town Purse Regulator on - nothing deletes town coin any more")]
         [SettingPropertyGroup("The soldier's pay")]
         public bool TownWageShield { get; set; } = true;
 
@@ -2872,7 +2872,7 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public float CastleDuesShare { get; set; } = 0.07f;
 
-        [SettingPropertyBool("Castle Dues Split With Crown", HintText = "the castle's daily dues are shared with the crown: the lord keeps Castle Dues Lord Share of them (two thirds) and the rest goes to the treasury of his kingdom, which pays it back to the houses as wage refunds in war. A castle held outside any kingdom pays everything to its lord. Towns do not share their rents with the crown yet - they follow the same split with the town purse package (stage 5). Off = the lord takes all of it")]
+        [SettingPropertyBool("Castle Dues Split With Crown", HintText = "the castle's daily dues are shared with the crown: the lord keeps Castle Dues Lord Share of them (two thirds) and the rest goes to the treasury of his kingdom, which pays it back to the houses as wage refunds in war. A castle held outside any kingdom pays everything to its lord. Towns share theirs by Town Rent Lord Share when Town Purse Regulator is on (the town's purse). Off = the lord takes all of it")]
         [SettingPropertyGroup("The castle's purse")]
         public bool CastleDuesSplitWithCrown { get; set; } = true;
 
@@ -2896,6 +2896,38 @@ namespace Armoury
         [SettingPropertyGroup("The castle's purse")]
         public bool CastlePaysFromSurplus { get; set; } = true;
 
+        [SettingPropertyInteger("Town Purse Regulator", 0, 2, "0", HintText = "0 = the game's daily town-purse regulator as before; 1 = it never deletes coin from a town or castle purse and tops it up only up to the merchants' working coin, counted in the log; 2 = it does nothing at all - no coin is deleted and none comes from nowhere, in towns and castles alike (castles with Castle Purse Enabled). With 1 or 2 a town purse is real coin: the goods the townsfolk use up no longer pay gold into it from nowhere, its lord and the crown draw the dues from what lies above the working coin, and the wage and court shields are no longer needed. Use 1 if town purses run dry")]
+        [SettingPropertyGroup("The town's purse")]
+        public int TownPurseRegulator { get; set; } = 2;
+
+        [SettingPropertyInteger("Town Purse Floor Gold", 0, 40000, "0", HintText = "working coin the merchants of a town keep before any dues or taxes are drawn and below which the town buys nothing for us - the fixed part (the game's own target is 10 000 plus 12 a point of prosperity); never below that target, so these settings can only raise it")]
+        [SettingPropertyGroup("The town's purse")]
+        public int TownPurseFloorGold { get; set; } = 10000;
+
+        [SettingPropertyFloatingInteger("Town Purse Floor Per Prosperity", 0.00f, 48.00f, "0.00", HintText = "... and the part of the working coin that grows with the town's prosperity, in coins a point")]
+        [SettingPropertyGroup("The town's purse")]
+        public float TownPurseFloorPerProsperity { get; set; } = 12f;
+
+        [SettingPropertyBool("Town Folk Buy Without Minting", HintText = "the goods the townsfolk use up still leave the market, but no longer pay their price into the town purse from nowhere (off with the regulator on: that gold stays and the dues hand it to the lords - for tests only)")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool TownFolkBuyWithoutMinting { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Rent Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest - you and the AI alike (a town held outside any kingdom pays everything to its lord)")]
+        [SettingPropertyGroup("The town's purse")]
+        public float TownRentLordShare { get; set; } = 0.67f;
+
+        [SettingPropertyBool("Town Purse Trim At Start", HintText = "once per campaign, on its first day: the starting gift in every town purse (20 000 plus Banner Kings' 40 a point of prosperity) is cut down to the working coin - the game's regulator deleted that gold within two weeks anyway; an old save loses nothing")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool TownPurseTrimAtStart { get; set; } = true;
+
+        [SettingPropertyBool("Town Purse No Bk Skim", HintText = "Banner Kings no longer deletes 1% a day from a town purse above its limit (and from a castle purse, with Castle Purse Enabled); a notable still helps an empty purse with 1 000 as before")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool TownPurseNoBkSkim { get; set; } = true;
+
+        [SettingPropertyBool("Town Pays From Surplus", HintText = "a town purse buys for us only with the coin it holds above the working coin: loot from outlaws, contract and bulk goods and arrows from caravans, spare kit of garrisons, lords and your men, drill scrap, the travellers' goods - as castles do. Below the working coin the game topped a purse up from nowhere, so whatever was bought from it was in truth paid from nowhere. Needs Town Purse Regulator. Off = the whole purse, as before")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool TownPaysFromSurplus { get; set; } = true;
+
         [SettingPropertyBool("Crown Current Income", HintText = "the crown pays out of what comes in each day: the vassals' dues, the war subsidy, customs, its share of the castle dues and whatever else reaches the treasury that day, plus a slow release of the old hoard above Crown Reserve Gold (one part in Crown Reserve Release Days a day). Wage refunds, gifts to other crowns, reparation instalments and mercenary contracts come out of that, in this order; what is not there is not paid (no debt). The refund counts only the parties in the field, not garrisons (their pay comes back through the dues), less what the party's men spent in their own house's towns. Works only together with Clan Budget Enabled (a crown paying from its income without the houses keeping their armies within their means would ruin them). Off = the refund comes out of whatever lies in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownCurrentIncome { get; set; } = true;
@@ -2908,7 +2940,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownReserveReleaseDays { get; set; } = 360f;
 
-        [SettingPropertyFloatingInteger("Crown Refund Own Towns Cut", 0.00f, 1.00f, "0.00", HintText = "with Crown Current Income: the share of what a party's men spent in the towns of their own house that is taken off the wages the crown repays (1 = all of it - the coin came back to the house through its town's dues; 0 = nothing taken off)")]
+        [SettingPropertyFloatingInteger("Crown Refund Own Towns Cut", 0.00f, 1.00f, "0.00", HintText = "with Crown Current Income: the share of what a party's men spent in the towns of their own house that is taken off the wages the crown repays (1 = all of it - the coin came back to the house through its town's dues; 0 = nothing taken off); with the town purse valve on, the cut follows the lord's share of the valve")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRefundOwnTownsCut { get; set; } = 1f;
 
@@ -3052,7 +3084,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool HouseholdMinimal { get; set; } = true;
 
-        [SettingPropertyBool("Household Shield", HintText = "the court's money paid into a town purse is kept out of the game's purse regulator: it leaves only with the lord's rents and the war subsidy, and never more than the purse holds above its target")]
+        [SettingPropertyBool("Household Shield", HintText = "the court's money paid into a town purse is kept out of the game's purse regulator: it leaves only with the lord's rents and the war subsidy, and never more than the purse holds above its target. Not needed and idle with Town Purse Regulator on - nothing deletes town coin any more")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool HouseholdShield { get; set; } = true;
 
@@ -5023,6 +5055,14 @@ namespace Armoury
             s.CastlePurseTrimAtStart = CastlePurseTrimAtStart;
             s.CastleCartsNeedCoin = CastleCartsNeedCoin;
             s.CastlePaysFromSurplus = CastlePaysFromSurplus;
+            s.TownPurseRegulator = TownPurseRegulator;
+            s.TownPurseFloorGold = TownPurseFloorGold;
+            s.TownPurseFloorPerProsperity = TownPurseFloorPerProsperity;
+            s.TownFolkBuyWithoutMinting = TownFolkBuyWithoutMinting;
+            s.TownRentLordShare = TownRentLordShare;
+            s.TownPurseTrimAtStart = TownPurseTrimAtStart;
+            s.TownPurseNoBkSkim = TownPurseNoBkSkim;
+            s.TownPaysFromSurplus = TownPaysFromSurplus;
             s.CrownCurrentIncome = CrownCurrentIncome;
             s.CrownReserveGold = CrownReserveGold;
             s.CrownReserveReleaseDays = CrownReserveReleaseDays;

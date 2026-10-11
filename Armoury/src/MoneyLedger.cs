@@ -91,11 +91,16 @@ namespace Armoury
         internal const int MCastleCrown = 9;                                                                    // 114: udzial korony z zaworu kas zamkow
         internal const int MTrade = 10;                                                                         // B-2: wywoz kupcow (PodazPopyt, SupplyDemand.DailyTrade) - dotad w "pozostale moduly ticku"
         internal const int MBudget = 11;                                                                        // 166/162m: budzet rodow - dwor do kas siedzib, sakiewki zwolnionych do kies wsi
-        private const int Marks = 12;
+        // E5/A1 (111'): M12-M13 zajete, M14-M16 rezerwa A1; drzewo A2-A5 bierze od M17 (wpis-rezerwacja w CHANGELOG 5052053)
+        internal const int MTownTrim = 12;                                                                      // E5/A1: dar startowy kas miast przyciety (raz na kampanie, w nicosc)
+        internal const int MTownCrown = 13;                                                                     // E5/A1: udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)
+        private const int Marks = 14;
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
                                                    "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
-                                                   "budzet rodow (166): dwor do kas siedzib, sakiewki zwolnionych do kies wsi" };
+                                                   "budzet rodow (166): dwor do kas siedzib, sakiewki zwolnionych do kies wsi",
+                                                   "dar startowy kas miast przyciety (raz na kampanie, w nicosc, E5/A1)",
+                                                   "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -521,6 +526,21 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        /// <summary>E5/A1: to samo co SplitCastleMark dla kas MIAST - zawor miasta placi panu i koronie w jednej petli (PopulationLaw.ValveTowns),
+        /// czesc korony przenoszona z pozycji "renty" (MRent) do MTownCrown. Tylko liczniki, tylko w naszym ticku.</summary>
+        internal static void SplitTownMark(int from, int to, long gone)
+        {
+            try
+            {
+                if (!_inBlock || gone == 0 || from < 0 || from >= Marks || to < 0 || to >= Marks || from == to) return;
+                _mark[CTown, from] += gone; _mark[CTown, to] -= gone;
+            }
+            catch { _stumbles++; }
+        }
+
+        /// <summary>E5/A1 (tylko odczyt, przed Daily ksiegi, ktore zeruje liczniki): towar wsi niesprzedany po wizytach taborow w miastach dzis.</summary>
+        internal static void TownUnsoldToday(out int pieces, out int visits) { pieces = _vUnsold[CTown]; visits = _vUnsoldVisits[CTown]; }
+
         // ------------------------------------------------------------ postfiksy-liczniki (nie zmieniaja wyniku)
         /// <summary>ItemConsumptionBehavior.DeleteOverproducedItems - pierwszy krok dziennej konsumpcji osady: kasa PRZED "zakupami".</summary>
         public static void ShelfPostfix(Town __0)
@@ -757,6 +777,9 @@ namespace Armoury
         /// <summary>110: dar startowy kas zamkow przyciety przez CastlePurse w tej dobie (zloto w nicosc; zwykle pierwsza doba ksiegi, ktora przeplywow nie drukuje).</summary>
         private static long TrimNow() { long t = 0; for (int c = 0; c < Classes; c++) t -= _mark[c, MTrim]; return t; }
 
+        /// <summary>E5/A1: dar startowy kas miast przyciety przez TownPurse.BeforeRents w tej dobie (zloto w nicosc, raz na kampanie).</summary>
+        private static long TownTrimNow() { long t = 0; for (int c = 0; c < Classes; c++) t -= _mark[c, MTownTrim]; return t; }
+
         /// <summary>
         /// Paczka 169: zmiana sumy posiadaczy (z), zrodla (s0) i ujscia (u0) starej ksiegi - wydzielone z BalanceLine, wolane przez stara
         /// linie bilansu i nowa linie przyczyn (zero rozjazdu definicji; tekst starej linii bez zmian). 110: ujscia + dar startowy kas zamkow.
@@ -771,7 +794,7 @@ namespace Armoury
             long vanished = _vHanded - _vKept - _vTax - _vEstates;
             long routed = _wageToPurses + _wageToCoffers;
             s0 = cons + regIn + _clanUp + routed + from;
-            u0 = _clanDown + regOut + vanished + to - _levyBack + TrimNow();
+            u0 = _clanDown + regOut + vanished + to - _levyBack + TrimNow() + TownTrimNow();   // E5/A1: + dar startowy kas miast
         }
 
         private static string BalanceLine(int day, long[] now, long[] last)
@@ -798,7 +821,8 @@ namespace Armoury
                    + " - zmierzone ujscia w nicosc " + sinks + " [P] (rozliczenia rodow na minus " + _clanDown + " w " + _clanDownN + " rodach, regulator kas skasowal " + regOut
                    + ", z utargu wsi zniklo " + vanished
                    + ", GiveGoldAction w nicosc poza rozliczeniami rodow " + to + " minus " + _levyBack + " oddane przez LevyGold notablom i miastom"
-                   + (TrimNow() != 0 ? ", dar startowy kas zamkow przyciety przez CastlePurse (110) " + TrimNow() : "") + ")"
+                   + (TrimNow() != 0 ? ", dar startowy kas zamkow przyciety przez CastlePurse (110) " + TrimNow() : "")
+                   + (TownTrimNow() != 0 ? ", dar startowy kas miast przyciety (E5/A1) " + TownTrimNow() : "") + ")"
                    + " + reszta " + S(delta - sources + sinks) + " [R] (niezmierzone: BEE, BK poza rozliczeniami rodow, handel partii, liczniki cel rosnace przy handlu, kapital nowych karawan,"
                    + " smierc bohaterow, lupy w kryjowkach; ze znakiem minus: zysk warsztatow i karawan wyplacany notablom - gra zdejmuje go z kapitalu, a wyplate zglasza jak zloto z niczego"
                    + " (jest w zrodlach); rozliczenia rodow sa zmierzone w calosci)."

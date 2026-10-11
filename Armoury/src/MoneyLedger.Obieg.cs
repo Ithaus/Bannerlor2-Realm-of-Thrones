@@ -91,6 +91,7 @@ namespace Armoury
             try { SoldierPay.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(SoldierPay)", e); }
             try { PopulationLaw.ZeroDay169(); } catch (Exception e) { Stumble169("ClearLast169(PopulationLaw)", e); }
             try { CastlePurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CastlePurse)", e); }   // 110: zawor kas zamkow (Last*)
+            try { TownPurse.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(TownPurse)", e); }       // E5/A1: kasy miast (Last*)
             try { CrownIncome.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownIncome)", e); }   // 165: wplywy dnia korony (Last*)
             try { CrownGifts.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(CrownGifts)", e); }     // 182: dary koron (Last*)
             try { ClanBudget.ZeroLast(); } catch (Exception e) { Stumble169("ClearLast169(ClanBudget)", e); }     // 166: budzet rodow (Last*)
@@ -273,14 +274,15 @@ namespace Armoury
             bool haveRb = _blockWorld0 != long.MinValue;
             long holdSum = 0; for (int i = 0; i < Holders; i++) holdSum += now[i];
             long trim = TrimNow();                          // 110: dar startowy kas zamkow - nazwane ujscie w naszym ticku (w u0 przez OldBalance)
-            long rb = haveRb ? (holdSum - _blockWorld0) - (CW.BlockNamed - u9) + trim : 0;
+            long townTrim = TownTrimNow();                  // E5/A1: dar startowy kas miast - nazwane ujscie w naszym ticku (w u0 przez OldBalance), przed migawka rent
+            long rb = haveRb ? (holdSum - _blockWorld0) - (CW.BlockNamed - u9) + trim + townTrim : 0;
             long rp = R - rb;
             // 169b: RB wedlug odcinkow (granice Mark); odcinek bez granicy laczy sie z nastepnym; clo z licznika cel (u9) - w odcinku z korona
             var segTxt = new StringBuilder(256); var segKeys = new StringBuilder(64);
             long segSum = 0;
             if (haveRb)
             {
-                long pw = _blockWorld0, pn = 0; bool u9Done = false, trimDone = false; string merged = null;
+                long pw = _blockWorld0, pn = 0; bool u9Done = false, trimDone = false, townTrimDone = false; string merged = null;
                 for (int i = 0; i <= SegMarks.Length; i++)
                 {
                     bool atEnd = i == SegMarks.Length;
@@ -289,6 +291,7 @@ namespace Armoury
                     long seg = (w - pw) - (n - pn);
                     if (!u9Done && i >= 2) { seg += u9; u9Done = true; }
                     if (!trimDone && i >= 1) { seg += trim; trimDone = true; }   // 110: CastlePurse.Daily miedzy migawka rent a migawka budow
+                    if (!townTrimDone) { seg += townTrim; townTrimDone = true; }   // E5/A1: TownPurse.BeforeRents przed migawka rent - pierwszy liczony odcinek
                     segSum += seg;
                     if (segTxt.Length > 0) segTxt.Append(", ");
                     segTxt.Append(merged != null ? merged + " + " : "").Append(SegName[i]).Append(' ').Append(S(seg));
@@ -340,6 +343,7 @@ namespace Armoury
             for (int k = 1; k < CW.Kinds; k++) if (!Listed(OutOrder, k) && !Listed(BeeKinds, k) && CW.Out[k] != 0) sb.Append(", ").Append(CW.KindOut[k]).Append(' ').Append(CW.Out[k]);
             sb.Append(", inne ").Append(to - toW).Append(") minus zaplata za werbunek, ktora nasze rozliczenie oddalo sprzedajacym ").Append(_levyBack);
             if (trim != 0) sb.Append(", dar startowy kas zamkow przyciety (110) ").Append(trim);
+            if (townTrim != 0) sb.Append(", dar startowy kas miast przyciety (E5/A1) ").Append(townTrim);
             sb
               .Append(", zold karawan notabli ").Append(Wv(u1, CW.WCaravanWage)).Append(" (z kas karawan ").Append(u1c).Append(", z kies notabli ").Append(u1n).Append(')')
               .Append(", prowizja od sprzedazy partiom ").Append(Wv(u2, CW.WSell)).Append(" (wsie ").Append(u2v).Append(", miasta i zamki ").Append(u2t).Append(')')
@@ -566,10 +570,10 @@ namespace Armoury
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
               .Append("), markietani -, ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
-              .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony -")
+              .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
               .Append(", utarg taborow wsi zaplacony ").Append(_vPaid[CTown]).Append(" (").Append(_vVisits[CTown]).Append(" wizyt; towar niesprzedany ").Append(_vUnsold[CTown])
-              .Append(" szt.), dosypka regulatora ").Append(_regIn[CTown]).Append(" (tryb 1 -), bezpiecznik korony -")
+              .Append(" szt.), dosypka regulatora ").Append(_regIn[CTown]).Append(" (tryb ").Append(TownPurse.On ? TownPurse.Mode.ToString(Inv) : "0").Append("), bezpiecznik korony -")
               .Append(" | kasy zamkow [P]: stan ").Append(Dl(now, last, HCastles)).Append(", zold zalog do kas ").Append(SoldierPay.LastToCastles)
               .Append(", zawor do panow ").Append(CastlePurse.LastLordPaid).Append(", do skarbcow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", regulator: kasowanie zablokowane (110) ").Append(CastlePurse.LastRegDown).Append(", dosypka do zapasu (tryb 1) ").Append(CastlePurse.LastRegUp)

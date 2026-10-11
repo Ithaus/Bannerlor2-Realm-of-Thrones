@@ -105,7 +105,7 @@ namespace Armoury
                 if (st == null || st.Town == null) return 0;
                 var t = st.Town;
                 long free;
-                if (st.IsTown) free = (long)t.Gold - TownReserve(t) - SoldierPay.HeldOf(st) - SoldierPay.CourtOf(st);
+                if (st.IsTown) free = TownPurse.On ? TownPurse.Spare(t) : (long)t.Gold - TownReserve(t) - SoldierPay.HeldOf(st) - SoldierPay.CourtOf(st);   // E5/A1: jedna nadwyzka D4 (tarcze zbedne)
                 else free = CastlePurse.Spendable(t);
                 return Math.Max(0L, free);
             }

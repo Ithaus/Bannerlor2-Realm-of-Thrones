@@ -78,6 +78,7 @@ namespace Armoury
                 try { MoneyLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MoneyLedger.ApplyAll", e); }
                 // 110 (etap 2 krok B): zawor kasy zamku - regulator gry dla zamku tylko w dol, "zakupy" ludnosci zamku bez zlota z niczego (te same cele co ksiega, postfiksy First); we wlasnym try
                 try { CastlePurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastlePurse.ApplyAll", e); }
+                try { TownPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownPurse.ApplyAll", e); }   // E5/A1 (111'): kasy miast przez latki 110 (wyzej) + prefiks Last na BK HandleMarketGold; linia startowa
                 // 112 (etap 2 krok B): utarg wsi bez znikania (powrot taboru, towar kupiony we wsi) - prefiks First / postfiks Last wokol latki BK; we wlasnym try
                 try { VillageTakings.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageTakings.ApplyAll", e); }
                 // 3.2 (etap 3): cala kiesa rozbitej partii bez wodza (tabor wsi, banda, karawana) dla zwyciezcy - postfiks modelu lupu i podzialu MapEvent; we wlasnym try

@@ -86,6 +86,9 @@ RANGES = {
     'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
     'FreeHandsElasticity': (0.0, 2.0, "0.00"),
     'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
+    # E5/A1 (111'): tryb regulatora kas miast przycinany w kodzie do 0..2; udzial pana w zaworze kasy miasta do 0..1 (TownPurse.Mode, ValveSplit.Unit)
+    'TownPurseRegulator': (0, 2, "0"),
+    'TownRentLordShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

@@ -106,6 +106,8 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby (linia "Zawor zamkow (110)")
         private static long _dRegUp, _dRegDown, _dConsBack, _dCartValue;
         private static int _dRegUpN, _dRegDownN, _dConsN, _dConsHit, _dCartPaid, _dCartSent, _stumbles;
+        private static long _dRegUpCut;                      // E5/A1 (Jeff 16:10): dosypka zamkow zablokowana w trybie 2 regulatora (TownPurse.NoTopUp)
+        private static int _dRegUpCutN;
         private static int _dSpendAsk, _dSpendZero;          // B-2: zapytania o kase zamku do wydania (Spendable) i te, w ktorych kasa stala przy zapasie (0 do wydania)
         private static bool _errLogged;
 
@@ -119,6 +121,9 @@ namespace Armoury
         /// <summary>114: udzial korony z zaworu zamkow dzis, na krolestwo (wplyw skarbca - dla 165 "wplywy dnia").</summary>
         internal static readonly Dictionary<Kingdom, long> CrownToday = new Dictionary<Kingdom, long>();
         internal static int LastRegDownN, LastRegUpN;
+        // E5/A1: latki 110 wpiete (ApplyAll) - kasy miast (TownPurse) dzialaja tylko na nich (raz na proces, nie stan kampanii)
+        internal static int HookedModels;
+        internal static bool HookedConsumption;
 
         internal static void Reset()
         {
@@ -127,6 +132,7 @@ namespace Armoury
             LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
             ZeroLast();
             ClearDay();
+            TownPurse.Reset();                                   // E5/A1: stan kas miast czyszczony razem z zamkami (bez nowej linii w konstruktorze ArmouryBehavior)
         }
 
         internal static void ZeroLast()
@@ -140,6 +146,7 @@ namespace Armoury
             _dRegUp = _dRegDown = _dConsBack = _dCartValue = 0;
             _dRegUpN = _dRegDownN = _dConsN = _dConsHit = _dCartPaid = _dCartSent = _stumbles = 0;
             _dSpendAsk = _dSpendZero = 0;
+            _dRegUpCut = 0; _dRegUpCutN = 0;
         }
 
         internal static string Export()
@@ -237,6 +244,7 @@ namespace Armoury
         {
             try
             {
+                if (__0 != null && __0.IsTown) TownPurse.OnShelf(__0);   // E5/A1: miasta - kasy miast (wlasny try); jedno miejsce wpiecia latek gry
                 _consTown = null;
                 if (__0 == null || !__0.IsCastle || !On || Campaign.Current == null) return;
                 _consTown = __0; _consGold = __0.Gold;
@@ -252,6 +260,7 @@ namespace Armoury
         {
             try
             {
+                if (__0 != null && __0.IsTown) TownPurse.OnConsumed(__0);   // E5/A1: miasta - "zakupy" mieszczan bez zlota z niczego (wlasny try)
                 var t = _consTown; _consTown = null;
                 if (t == null || !ReferenceEquals(t, __0)) return;
                 _regDue = __0;                                   // zaraz potem gra pyta model o regulator tej samej osady
@@ -272,15 +281,19 @@ namespace Armoury
         public static void RegulatorPostfix(Town __0, ref int __result)
         {
             if (__0 == null) return;
+            if (__0.IsTown) { TownPurse.OnRegulator(__0, ref __result); return; }   // E5/A1: miasta - tryb 2/1 regulatora kas miast (wlasny try; tryb 0 = bez zmian)
             if (__result == 0) { if (ReferenceEquals(__0, _regDue)) _regDue = null; return; }   // gra niczego nie chciala - tick zamku rozliczony
             try
             {
                 if (!__0.IsCastle || !On || Campaign.Current == null) return;
                 long wanted = __result;
+                bool blocked = false;
                 if (wanted < 0) __result = 0;                    // kasowanie nadwyzki zablokowane; dosypka do zapasu przechodzi bez zmian
+                else if (TownPurse.NoTopUp) { __result = 0; blocked = true; }   // E5/A1 (Jeff 16:10): tryb 2 - zamki tez bez dosypki z niczego
                 if (!ReferenceEquals(__0, _regDue)) return;      // pytanie spoza dziennego ticku (ekran) albo drugi poziom modelu - nie liczymy
                 _regDue = null;
-                if (wanted > 0) { _dRegUp += wanted; _dRegUpN++; } else { _dRegDown -= wanted; _dRegDownN++; }
+                if (blocked) { _dRegUpCut += wanted; _dRegUpCutN++; }
+                else if (wanted > 0) { _dRegUp += wanted; _dRegUpN++; } else { _dRegDown -= wanted; _dRegDownN++; }
             }
             catch (Exception e) { Stumble("CastlePurse.RegulatorPostfix", e); }
         }
@@ -297,6 +310,7 @@ namespace Armoury
                 {
                     h.Patch(shelf, postfix: new HarmonyMethod(typeof(CastlePurse), nameof(ShelfPostfix)));
                     h.Patch(cons, postfix: new HarmonyMethod(typeof(CastlePurse), nameof(ConsumePostfix)) { priority = Priority.First });
+                    HookedConsumption = true;                    // E5/A1: te same latki oddaja miasta do TownPurse
                     done.Add("\"zakupy\" ludnosci zamkow bez zlota z niczego");
                 }
                 else miss.Add("\"zakupy\" ludnosci zamkow");
@@ -324,6 +338,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("CastlePurse.ApplyAll(regulator)", e); }
+            HookedModels = reg;                                  // E5/A1: liczba modeli z latka regulatora (TownPurse.On wymaga > 0)
             if (reg > 0) done.Add("regulator kasy zamku tylko w dol (kasowanie 0, dosypka do zapasu zostaje) w " + reg + " modelach"); else miss.Add("regulator kasy");
             var s = Settings.Current;
             Log.Info("CastlePurse (110): zawor kasy zamku " + (s != null && s.CastlePurseEnabled ? "CZYNNY" : "WYLACZONY w ustawieniach (latki tylko wracaja)")
@@ -380,7 +395,7 @@ namespace Armoury
             int gold = town.Gold;
             try
             {
-                if (!town.IsCastle) return gold;
+                if (!town.IsCastle) return TownPurse.SpendableTown(town);   // E5/A1 (D4, E5K1-03): miasto - nadwyzka ponad zapas kupcow przy TownPaysFromSurplus, inaczej cala kasa
                 var s = Settings.Current;
                 if (s == null || !s.CastlePurseEnabled || !s.CastlePaysFromSurplus) return gold;
                 _dSpendAsk++;
@@ -402,7 +417,7 @@ namespace Armoury
         {
             try
             {
-                if (town == null || !town.IsCastle) return townFloor;
+                if (town == null || !town.IsCastle) return TownPurse.TaxFloor(town, townFloor);   // E5/A1 (D4): miasto - zapas kupcow przy czynnym A1, inaczej townFloor
                 var s = Settings.Current;
                 if (s == null || !s.CastlePurseEnabled || !s.CastlePaysFromSurplus) return townFloor;
                 return Math.Max(townFloor, Reserve(town));
@@ -659,7 +674,9 @@ namespace Armoury
                     Log.Info("Zawor zamkow (110): dzien " + day + " | stan " + gold + " w " + castles + " zamkach: zapas kupcow " + reserveSum + ", ponad zapasem " + spareSum
                              + ", do zapasu brakuje " + shortSum + "; najwieksza nadwyzka " + maxSpare + (maxName != null ? " (" + maxName + ")" : "")
                              + "; zamki ponad limitem kasy BK (" + BkLimitBase + " + " + BkLimitPerProsperity.ToString("0", CultureInfo.InvariantCulture) + " x dobrobyt - BK kasuje tam 1% dziennie): " + overBk
-                             + " | regulator gry: kasowanie nadwyzki zablokowane " + _dRegDown + " (" + _dRegDownN + " tickow zamkow), dosypka do zapasu (tryb 1, zostaje do etapu 3) " + _dRegUp + " (" + _dRegUpN + " tickow)"
+                             + " | regulator gry: kasowanie nadwyzki zablokowane " + _dRegDown + " (" + _dRegDownN + " tickow zamkow), "
+                             + (TownPurse.NoTopUp || _dRegUpCutN > 0 ? "dosypka zablokowana (tryb 2, E5/A1) " + _dRegUpCut + " (" + _dRegUpCutN + " tickow), dosypka do zapasu " + _dRegUp + " (" + _dRegUpN + " tickow)"
+                                                                     : "dosypka do zapasu (tryb 1, zostaje do etapu 3) " + _dRegUp + " (" + _dRegUpN + " tickow)")
                              + " | \"zakupy\" ludnosci zamkow: zloto z niczego cofniete " + _dConsBack + " (w " + _dConsHit + " z " + _dConsN + " tickow; towar zjedzony jak dotad)"
                              + " | zawor: " + paid + " do panow z " + payers + " zamkow (" + (share * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% nadwyzki ponad zapas"
                              + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + (suburbKept > 0 ? "; czesc podzamcza zostala w kasach " + suburbKept : "")
