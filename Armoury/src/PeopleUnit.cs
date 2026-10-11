@@ -492,8 +492,10 @@ namespace Armoury
             catch (Exception e) { miss.Add("incydenty gracza(" + e.Message + ")"); }
             if (incidents == 2) done.Add("incydenty gracza - licznik"); else miss.Add("incydenty gracza - licznik (" + incidents + " z 2)");
 
-            // stan z ustawien startowych; MCM wchodzi przy starcie kampanii i co godzine gry - stan kazdej doby stoi w linii "Ludzie (ksiega)"
-            Log.Info("PeopleUnit (E4/3): jednostka ludzi (1 czlowiek = 1/k osady zamiast 0.5 hearth) " + (On ? "CZYNNA" : "wylaczona - same liczniki")
+            // stan z ustawien startowych (Armoury.settings.xml albo domyslne z kodu); MCM wchodzi dopiero przy starcie kampanii (OnGameStart) i co godzine gry -
+            // stan w grze kazdej doby stoi w linii "Ludzie (ksiega)" (recenzja E4/3: linia startowa nie jest dowodem, ze jednostka dziala)
+            Log.Info("PeopleUnit (E4/3): latki jednostki ludzi (1 czlowiek = 1/k osady zamiast 0.5 hearth); ustawienia startowe przed MCM (nie stan gry - ten podaje kazdej doby linia \"Ludzie (ksiega)\"): "
+                     + (On ? "wlaczona" : "wylaczona")
                      + (On ? (ByPeople ? ", wyrzutki liczone od ludnosci wsi" : ", wyrzutki liczone od hearth wsi") : "")
                      + "; wpiete: " + string.Join(", ", done.ToArray())
                      + "; BRAK: " + (miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-") + ".");

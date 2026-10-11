@@ -2324,7 +2324,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawHearthPerMan { get; set; } = 0.5f;
 
-        [SettingPropertyBool("People Unit Enabled", HintText = "one man is one man: a village on the map stands for a whole countryside, so each of its people who leaves or comes back is worth 1/k of a hearth (k = people one hearth of that village stood for when the campaign began: about 444 in the Reach, 132 in the North, 4 at the Wall) instead of the game's half a hearth - for outlaws, village caravans and fishing crews, routed villagers going home, men pressed by the player, and the hearths the player's village quests give or take. A village whose culture later changes keeps its people. Off = the game's rates as before")]
+        [SettingPropertyBool("People Unit Enabled", HintText = "one man is one man: a village on the map stands for a whole countryside, so each of its people who leaves or comes back is worth 1/k of a hearth (k = people one hearth of that village stood for when the campaign began: about 444 in the Reach, 132 in the North, 4 at the Wall) instead of the game's half a hearth - for outlaws, village caravans and fishing crews, routed villagers going home, men pressed by the player, and the hearths the player's village quests give or take. A village whose culture later changes keeps its people. Off = the game's rates as before. Change it only when you start a new campaign: people who left a village at one rate would come back at the other")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleUnitEnabled { get; set; } = true;
 

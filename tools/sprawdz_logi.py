@@ -6,7 +6,8 @@ Uzycie (Python 3, tylko odczyt):
 --grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
 --grupa etap4     : (E4/0, paczka 188) progi T1-T10 pomiaru ludzi, jencow i zimy (projekt etapu 4, rozdz. 3 "E4/0" Test) w oknie dob kampanii 1-120
                     (--do-doby N zmienia okno); T9 (bieg zimowy) i baza konca etapu (d300-364) - INFO. Gdy w logu jest linia startowa
-                    "PeopleUnit (E4/3)" - takze progi E4/3 (jednostka 1/k, punkty powrotu, tabela krain, pula wyrzutkow i bandy wobec biegu E4/2).
+                    "PeopleUnit (E4/3)" - takze progi E4/3 (jednostka 1/k, punkty powrotu, tabela krain, pula wyrzutkow i bandy wobec biegu E4/2);
+                    stan jednostki - z dziennej linii "Ludzie (ksiega)" (MCM), nie z linii startowej (ta powstaje przed MCM).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -611,16 +612,21 @@ def etap4_main(logp, start_arg, until=120):
         v = [x for x in v if x is not None]
         return st.mean(v) if v else None
     d30 = [d for d in measured if run_day(d, start) <= 30]
-    e43 = any(x.startswith("PeopleUnit (E4/3):") and "CZYNNA" in x for x in lines)
+    # recenzja E4/3: stan jednostki z dziennej linii "Ludzie (ksiega)" (MCM), nie z linii startowej (ta powstaje przed MCM)
+    e43_state = e43_unit_state(lines, win)
+    e43 = e43_state[0] in ("on", "mixed")
     for name, pat, days, exp in (("T3: stala gry - baza (d1-30)", r"stala gry: baza " + SF, d30, 720.0),
                                  ("T3: tabory wsi (hearth/d)", r"- tabory wsi -" + F_, measured, 220.0),
                                  ("T3: rozbite tabory do swojej wsi (H3, hearth/d)", r"rozbite tabory do swojej wsi \+" + F_, measured, 165.0),
                                  ("T3: wyrzutki w las - bieda (hearth/d)", r"wyrzutki w las \(bieda\) -" + F_, measured, 13.0)):
+        mixed = False
         if e43 and "stala gry" not in name:
             exp, name = exp / E43_UNIT_RATIO, name + " [E4/3: 1/k - szacunek E4/0 / 95]"
+            if e43_state[0] == "mixed":
+                mixed, name = True, name + " [jednostka wlaczana i wylaczana w biegu - INFO]"
         m = mean_pat(pat, days)
         rep.add(name, f"{m:.1f}" if m is not None else "brak linii", f"ok. {exp:.3g} (od {exp / 3:.3g} do {exp * 3:.3g})",
-                (exp / 3 <= abs(m) <= exp * 3) if m is not None else None)
+                (exp / 3 <= abs(m) <= exp * 3) if m is not None and not mixed else None)
     dec = [fnum(r"dekret Growth BK " + SF, hea[d]) or 0 for d in measured]
     rep.add("T3: dekret Growth BK (suma)", f"{sum(dec):.2f}" if dec else "-", "0 (dekret tylko z konsoli)", (abs(sum(dec)) < 0.01) if dec else None)
     flo = [(fnum(r"podloga 10 \+" + F_, hea[d]) or 0, num(r"podloga 10 \+[\d.]+ w (\d+) wsiach", hea[d], int, 0) or 0) for d in measured]
@@ -815,7 +821,7 @@ def etap4_main(logp, start_arg, until=120):
 
     # ---------------- E4/3 (108n): jednostka 1/k, punkty powrotu, tabela krain, powrot wyrzutkow do domu
     if any(x.startswith("PeopleUnit (E4/3):") for x in lines):
-        etap4_e43(rep, lines, start, win, hea, par, lud, until)
+        etap4_e43(rep, lines, start, win, hea, par, lud, until, e43_state)
 
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
@@ -829,19 +835,57 @@ def etap4_main(logp, start_arg, until=120):
 
 # E4/3: baza z biegu E4/2 120 dob bez E4/3 (scratchpad kopia-e42-120, Armoury-2026-10-11_02-17-11.log): doba 1 - bandy nowe 382 (6 231 ludzi),
 # puste usuniete 375; doba 120 - band 826, ludzi 14 328, pula 3 053; "Ludzie:" d1 -> d4 -0.8%. Stosunek jednostki: 0.5 hearth za czlowieka wobec 1/191.
+# d91-120 (linia Wyrzutki): narodziny band 224 ludzi/d (22.9 bandy), werbunek z puli 82.1/d, odmowione 0.47/d (8 z 30 dob > 0) - bandy biora z puli
+# tyle, ile chca (popyt), nie tyle, ile pula ma (recenzja 1 E4/3).
 E43_UNIT_RATIO = 95.0
-E43_BASE = {"bands120": 826, "men120": 14328, "pool120": 3053, "new1": 382, "newmen1": 6231, "empty1": 375}
+E43_BASE = {"bands120": 826, "men120": 14328, "pool120": 3053, "new1": 382, "newmen1": 6231, "empty1": 375,
+            "born90": 224.0, "recruit90": 82.1, "refused90": 0.47}
+# recenzja 1 E4/3: prog band z tolerancja szumu miedzy biegami (wojna w innym miejscu = kilka procent band wiecej bez udzialu E4/3)
+E43_BAND_TOL = 1.05
+E43_UNIT_ON = "E4/3 jednostka ludzi (1 czlowiek = 1/k osady): CZYNNA"
+E43_UNIT_OFF = "E4/3 jednostka ludzi (1 czlowiek = 1/k osady): wylaczona"
 
 
-def etap4_e43(rep, lines, start, win, hea, par, lud, until):
+def e43_unit_state(lines, win):
+    """E4/3 (recenzja 2): stan jednostki ludzi wedlug DZIENNEJ linii "Ludzie (ksiega)" (odcinek E4/3 czyta ustawienia z MCM), nie wedlug linii startowej
+    "PeopleUnit (E4/3)" - ta powstaje przy ladowaniu modulow, zanim MCM wejdzie (OnGameStart), wiec pokazuje ustawienia startowe, nie stan gry.
+    -> (stan "on" / "off" / "mixed" / "none", doby czynne, doby wylaczone, doby z R18 wylaczonym)."""
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    on = off = r18off = 0
+    for d in win:
+        x = kb.get(d)
+        if not x:
+            continue
+        if E43_UNIT_ON in x:
+            on += 1
+        elif E43_UNIT_OFF in x:
+            off += 1
+        if "rozwiazane tabory do wsi (R18): NIE" in x:
+            r18off += 1
+    state = "none" if on + off == 0 else ("on" if off == 0 else ("off" if on == 0 else "mixed"))
+    return state, on, off, r18off
+
+
+def etap4_e43(rep, lines, start, win, hea, par, lud, until, ust):
     """E4/3 (108n): progi z projektu etapu 4 rozdz. 3 "E4/3" Test i zadania 11.10 (powrot wyrzutkow do domu: bandy po 120 dobach nie wiecej niz bez E4/3,
-    pula nie rosnie bez konca). Baza - E43_BASE (bieg E4/2 120 dob)."""
+    pula nie rosnie bez konca). Baza - E43_BASE (bieg E4/2 120 dob). ust = e43_unit_state(): progi zalezne od jednostki licza sie tylko, gdy linia
+    "Ludzie (ksiega)" pokazuje CZYNNA kazdej doby; progi puli i band - tylko, gdy powrot rozbitych jest wlaczony (linia puli: "tempo 1/N dob")."""
+    state, on, off, r18off = ust
+    unit = state == "on"
+    unote = "" if unit else " [jednostka nie CZYNNA kazdej doby wedlug linii Ludzie (ksiega) - INFO]"
+
+    def ua(name, val, exp, ok):
+        rep.add(name + unote, val, exp, ok if unit else None)
+
     pul = next((x for x in lines if x.startswith("PeopleUnit (E4/3):")), "")
-    rep.add("E4/3: linia startowa PeopleUnit", pul[:220], "CZYNNA i BRAK: -", "CZYNNA" in pul and "; BRAK: -." in pul)
+    rep.add("E4/3: linia startowa PeopleUnit - latki wpiete", pul[:260], "BRAK: - (wlacznik w tej linii = ustawienia przed MCM, nie stan gry)", "; BRAK: -." in pul)
+    rep.add("E4/3: jednostka ludzi wedlug linii Ludzie (ksiega) (stan z MCM)", f"CZYNNA {on} dob, wylaczona {off} dob" if on + off else "brak odcinka E4/3 w linii Ludzie (ksiega)",
+            "CZYNNA kazdej doby (wylaczona caly bieg = bieg porownawczy, progi jednostki INFO; zmiana w trakcie kampanii = NIE - skok hearth, Ryzyko CHANGELOG)",
+            True if state == "on" else (None if state == "off" else False))
     ical = next((i for i, x in enumerate(lines) if x.startswith("PopulationLaw: kalibracja ludnosci")), None)
     iseed = next((i for i, x in enumerate(lines) if x.startswith("Wyrzutki: pula poczatkowa")), None)
-    rep.add("E4/3: kalibracja PRZED pula wyrzutkow", f"kalibracja linia {ical}, pula linia {iseed}", "kalibracja wczesniej (nowa kampania)",
-            (ical < iseed) if ical is not None and iseed is not None else None)
+    ua("E4/3: kalibracja PRZED pula wyrzutkow", f"kalibracja linia {ical}, pula linia {iseed}", "kalibracja wczesniej (nowa kampania)",
+       (ical < iseed) if ical is not None and iseed is not None else None)
     cal = lines[ical] if ical is not None else ""
     cut = re.search(r"obcieto \(pulap (\d+) ludzi na punkt hearth wsi, E4/3\): (.*?); poza mapa razem ([\d.]+) mln", cal)
     rep.add("E4/3: pulap gestosci wsi (kalibracja)", (f"pulap {cut.group(1)}: {cut.group(2)[:160]}; poza mapa {cut.group(3)} mln") if cut else ("brak obciec" if cal else "brak linii kalibracji"),
@@ -857,7 +901,7 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until):
         a, b = fnum(r"ludnosc " + F_ + " mln", lud[ld[0]]), fnum(r"ludnosc " + F_ + " mln", lud[ld[-1]])
         if a and b:
             ch = 100.0 * (b - a) / a
-            rep.add("E4/3: Ludzie d1 -> d4 (spadek na starcie)", f"{a:.3f} -> {b:.3f} mln ({ch:+.2f}%)", "bez spadku 0.6-1% (> -0.3%; bez E4/3: -0.8%)", ch > -0.3)
+            ua("E4/3: Ludzie d1 -> d4 (spadek na starcie)", f"{a:.3f} -> {b:.3f} mln ({ch:+.2f}%)", "bez spadku 0.6-1% (> -0.3%; bez E4/3: -0.8%)", ch > -0.3)
     measured = [d for d in win if d in hea and "RESZTA" in hea[d]]
     for name, pat in (("E4/3: rozwiazane tabory i lodzie do swojej wsi (R18, hearth/d)", r"rozwiazane tabory i lodzie do swojej wsi \(R18\) \+" + F_),
                       ("E4/3: gracz w Hearth - pobor, zadania, incydenty (hearth/d)", r"gracz \(pobor wymuszony, zadania, incydenty\) " + SF)):
@@ -866,9 +910,11 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until):
         rep.add(name, f"{st.mean(v):.3f}" if v else "brak", "INFO (nazwane, poza RESZTA)", None)
     ctl = [num(r"kontrola zdrowi \+ ranni - wrocili = (-?\d+)", par[d]) for d in win if d in par]
     ctl = [x for x in ctl if x is not None]
-    rep.add("E4/3: Partie R18 - zdrowi + ranni - wrocili (suma |roznic|)", sum(abs(x) for x in ctl) if ctl else "brak", "0", (sum(abs(x) for x in ctl) == 0) if ctl else None)
+    rep.add("E4/3: Partie R18 - zdrowi + ranni - wrocili (suma |roznic|)" + (f" [R18 wylaczone w {r18off} dobach - INFO]" if r18off else ""),
+            sum(abs(x) for x in ctl) if ctl else "brak", "0", (sum(abs(x) for x in ctl) == 0) if ctl and not r18off else None)
     kb = e4_series(lines, "Ludzie (ksiega): dzien")
     pts = {"LosersFlee.SendHome": [], "ClanBudget.ToVillage": [], "OutlawLaw.ReturnHome": []}
+    tot = []
     for d in win:
         x = kb.get(d)
         if not x:
@@ -877,14 +923,21 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until):
             v = fnum(re.escape(k) + r" " + F_, x)
             if v is not None:
                 pts[k].append(v)
-    rep.add("E4/3: trzy punkty powrotu do DOM (ludzie/d)", ", ".join(f"{k} {st.mean(v):.1f}" for k, v in pts.items() if v) or "brak odcinka E4/3 w Ludzie (ksiega)",
-            "INFO - widoczne wedlug punktu (166/W4c/179 w ClanBudget.ToVillage)", None)
+        v = fnum(r"trzy punkty powrotu do DOM, razem " + F_, x)
+        if v is not None:
+            tot.append(v)
+    rep.add("E4/3: trzy punkty powrotu do DOM (ludzie/d)", (", ".join(f"{k} {st.mean(v):.1f}" for k, v in pts.items() if v)
+                                                          + (f"; razem bez podwojenia {st.mean(tot):.1f}" if tot else "")) or "brak odcinka E4/3 w Ludzie (ksiega)",
+            "INFO - widoczne wedlug punktu (166/W4c/179 w ClanBudget.ToVillage; prosci i bandyci z LosersFlee tylko w LosersFlee.SendHome)", None)
     pw = e4_series(lines, "Pula wyrzutkow (E4/3): dzien", 1)
     pdays = sorted(d for d in pw if 1 <= run_day(d, start) <= until)
     pc = [fnum(r"kontrola: zmiana - \(naplyw - odplyw\) = " + SF, pw[d]) for d in pdays]
     pc = [x for x in pc if x is not None]
     rep.add("E4/3: Pula wyrzutkow - kontrola (najwieksza |roznica|)", f"{max(abs(x) for x in pc):.2f} ({len(pc)} dob)" if pc else "brak linii", "<= 1 czlowiek kazdej doby",
             (max(abs(x) for x in pc) <= 1.0) if pc else None)
+    # powrot rozbitych wylaczony (Outlaw Routed Home Days 0 -> "tempo 1/- dob") - progi puli i band nie mierza E4/3
+    toff = sum(1 for d in pdays if "tempo 1/- dob" in pw[d])
+    tnote = f" [powrot rozbitych wylaczony (Outlaw Routed Home Days 0) w {toff} dobach - INFO]" if toff else ""
     if pdays:
         def stock(dd):
             return fnum(r"\| stan " + F_, pw.get(dd))
@@ -896,17 +949,45 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until):
         home = [x for x in home if x is not None]
         dwell = [fnum(r"srednio w puli " + F_ + " dob", pw[d]) for d in pdays[-28:]]
         dwell = [x for x in dwell if x is not None]
-        rep.add("E4/3: pula wyrzutkow d60 / d90 / d" + str(until), f"{s60} / {s90} / {s120}; powrot do domu ostatnie 28 dob {st.mean(home):.1f}/d" if home else f"{s60} / {s90} / {s120}",
+        rep.add("E4/3: pula wyrzutkow d60 / d90 / d" + str(until) + tnote,
+                f"{s60} / {s90} / {s120}; powrot do domu ostatnie 28 dob {st.mean(home):.1f}/d" if home else f"{s60} / {s90} / {s120}",
                 f"d{until} <= baza bez E4/3 ({E43_BASE['pool120']}) i <= 1.25 x d90 (nie rosnie bez konca)",
-                (s120 <= E43_BASE["pool120"] and (s90 is None or s90 <= 0 or s120 <= 1.25 * s90)) if s120 is not None else None)
+                (s120 <= E43_BASE["pool120"] and (s90 is None or s90 <= 0 or s120 <= 1.25 * s90)) if s120 is not None and not toff else None)
         rep.add("E4/3: srednio w puli (stan / odplyw, ostatnie 28 dob)", f"{st.mean(dwell):.0f} dob" if dwell else "-", "INFO (rozbici wracaja w kilka tygodni)", None)
+        # recenzja 2: zolnierz schodzi z puli tylko wtedy, gdy przyjmie go BK - czy ograniczeniem jest tempo, czy przyjmowanie przez BK
+        sw = [re.search(r"zolnierze do ludnosci BK (\d+) z (\d+) chetnych", pw[d]) for d in pdays[-28:]]
+        sw = [(int(m.group(1)), int(m.group(2))) for m in sw if m]
+        if sw:
+            acc, want = sum(x[0] for x in sw), sum(x[1] for x in sw)
+            rep.add("E4/3: zolnierze z puli do ludnosci BK - przyjeci z chetnych (ostatnie 28 dob)",
+                    f"{acc / len(sw):.1f} z {want / len(sw):.1f}/d ({100.0 * acc / want:.0f}%)" if want else f"{acc / len(sw):.1f} z 0/d",
+                    "INFO (ponizej ok. 80% - pula trzyma zolnierzy, ktorych BK nie przyjmuje; nie tempo)", None)
     wyr = e4_series(lines, "Wyrzutki: dzien", 1)
     wd = sorted(d for d in wyr if 1 <= run_day(d, start) <= until)
     if wd:
         last = wyr[wd[-1]]
         b, m = num(r"\| band (\d+), ludzi (\d+)", last), num(r"\| band \d+, ludzi (\d+)", last)
-        rep.add(f"E4/3: bandy w d{run_day(wd[-1], start)} (liczba, ludzie)", f"{b}, {m}", f"nie wiecej niz bez E4/3 ({E43_BASE['bands120']}, {E43_BASE['men120']})",
-                (b <= E43_BASE["bands120"] and m <= E43_BASE["men120"]) if b is not None and m is not None and run_day(wd[-1], start) >= until else None)
+        lb, lm = round(E43_BASE["bands120"] * E43_BAND_TOL), round(E43_BASE["men120"] * E43_BAND_TOL)
+        rep.add(f"E4/3: bandy w d{run_day(wd[-1], start)} (liczba, ludzie)" + tnote, f"{b}, {m}",
+                f"nie wiecej niz bez E4/3 z tolerancja {E43_BAND_TOL:.2f} (szum miedzy biegami): baza {E43_BASE['bands120']}, {E43_BASE['men120']} -> <= {lb}, {lm}",
+                (b <= lb and m <= lm) if b is not None and m is not None and run_day(wd[-1], start) >= until and not toff else None)
+        # recenzja 1: czy powrot w ogole ogranicza bandy - narodziny i werbunek z puli oraz odmowy w ostatnich 30 dobach okna wobec bazy
+        w30 = [d for d in wd if run_day(d, start) > until - 30]
+        born, rec, ref = [], [], []
+        for d in w30:
+            nb = re.search(r"bandy nowe \d+ \((\d+) ludzi\), odmowione (\d+)", wyr[d])
+            rc = num(r"werbunek: z puli (\d+)", wyr[d])
+            if nb:
+                born.append(int(nb.group(1)))
+                ref.append(int(nb.group(2)))
+            if rc is not None:
+                rec.append(rc)
+        if born and rec:
+            a0, a1 = run_day(w30[0], start), run_day(w30[-1], start)
+            rep.add(f"E4/3: bandy biora z puli d{a0}-{a1} (ludzi/d): narodziny, werbunek; odmowione/d",
+                    f"{st.mean(born):.0f}, {st.mean(rec):.0f}; {st.mean(ref):.2f}",
+                    f"INFO wobec bez E4/3 d91-120: {E43_BASE['born90']:.0f}, {E43_BASE['recruit90']:.0f}; {E43_BASE['refused90']:.2f} "
+                    "(odmowione ok. 0 i ten sam pobor = bandy ograniczone popytem, nie pula - powrot nie zmniejszy band)", None)
         first = wyr[wd[0]]
         nb = re.search(r"bandy nowe (\d+) \((\d+) ludzi\), odmowione (\d+), puste usuniete (\d+)", first)
         rep.add("E4/3: bandy d1 - nowe (ludzi), odmowione, puste usuniete", (f"{nb.group(1)} ({nb.group(2)}), {nb.group(3)}, {nb.group(4)}") if nb else "brak",
