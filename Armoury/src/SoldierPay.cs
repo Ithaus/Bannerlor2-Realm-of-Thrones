@@ -496,6 +496,7 @@ namespace Armoury
                 if (mp.IsMainParty) _dPlayer += amt;
                 MoneyLedger.NoteWageRouted(true, amt);
             }
+            else if (Seal31B.CaravanWage(mp, amt)) { }                  // 3.1/3.3 (31b) E3/4: karawana lorda - zold do sakiewki jej ludzi (CaravanWageToPurse)
             else _dOther += amt;                                        // karawany i inne partie: bez zmian
         }
 
@@ -845,6 +846,7 @@ namespace Armoury
                              + ", Z8 rody w wojnie z zoldem zalog we wlasnych zamkach: zold do kas zamkow " + _dZ8Pay + ", zawor panom " + _dZ8Dues + ", nalezny zwrot korony od reszty " + _dZ8Refund + " (" + _dZ8N + " rodow)"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
+                             + Seal31B.ZoldNote()   // 3.1/3.3 (31b) E3/4: karawany lordow do sakiewek ludzi
                              + " | przyciete, bo saldo rodu nie zmiescilo sie w kiesie glowy: " + _dCut + " w " + _dCutClans + " rodach (w tym brak zapisany przez gre jako dlug wobec korony: "
                              + _dDebtCut + " w " + _dDebtClans + " rodach); rody z pusta kiesa i nieznanym saldem (nic nie przekazano): "
                              + _dBlind + " (" + _dBlindGold + ")"
