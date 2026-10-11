@@ -82,6 +82,8 @@ namespace Armoury
                 try { VillageTakings.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageTakings.ApplyAll", e); }
                 // 3.2 (etap 3): cala kiesa rozbitej partii bez wodza (tabor wsi, banda, karawana) dla zwyciezcy - postfiks modelu lupu i podzialu MapEvent; we wlasnym try
                 try { BeatenPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BeatenPurse.ApplyAll", e); }
+                // E5/A6 (198): lup w bitwie tylko z kiesy pokonanego - migawka po 3.2 (postfiks Last), rozliczenie przed wyplata, obciazenie wodza w oknie ksiegi; we wlasnym try
+                try { BattlePlunder.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BattlePlunder.ApplyAll", e); }
                 try { DefeatMorale.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DefeatMorale.ApplyAll", e); }   // D11-1: kara morale za przegrana bitwe i runde o polowe (postfiksy modeli Default)
                 try { ArmsLeaks.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsLeaks.ApplyAll", e); }   // paczka 174.0: kasowanie 5% stosow bez uzbrojenia (prefiks DeleteOverproducedItems; postfiks MoneyLedger biegnie dalej)
                 try { MaterialOrders.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }   // 174.2: BK ReleaseCaravanFromHold nie zmienia celu karawany z kontraktem

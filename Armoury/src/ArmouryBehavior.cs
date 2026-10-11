@@ -1551,6 +1551,7 @@ namespace Armoury
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
             try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); }
+            try { BattlePlunder.Daily(); } catch (Exception e) { Log.Error("BattlePlunder.Daily", e); }   // E5/A6 (198): linia "Lup w bitwie (A6)" i zerowanie licznikow doby - PO ksiedze pieniadza (zloto ksiegi nie rusza)
             try { Seal31.Daily(); } catch (Exception e) { Log.Error("Seal31.Daily", e); }   // 3.1 (31): linia "Szczelnosc (164a)" i zerowanie pozycji - PO ksiedze pieniadza, ktora je czyta
             try { ShipsToPort181.Daily(); } catch (Exception e) { Log.Error("ShipsToPort181.Daily", e); }   // 3.1/3.3 (33) 181: linia "Statki (181)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
             try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta

@@ -14,6 +14,9 @@ Uzycie (Python 3, tylko odczyt):
                     progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
                     tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy). S10/S11 (E4/5) pomijaja
                     wiersze region-doba z konto_e46 = 1 w spichlerze-regiony.csv (E4/6 zmienil konto uchodzcow regionu tej doby).
+--grupa etap5     : (E5/A6, paczka 198 - minimalna grupa; E5/0 zaklada pelna w drzewie w-toku/e5-0 - do scalenia) prog "bitwy z niczego netto
+                    = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
+                    bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -476,6 +479,60 @@ def etap3_main(logp, start_arg):
     rep.add("werbunek: bez odbiorcy (suma)", sum(wer) if wer else "brak linii", "0", (sum(wer) == 0) if wer else None)
     errs = [s for s in lines if s.startswith("ERROR in ")]
     rep.add("bledy Armoury (ERROR in)", len(errs), "0", len(errs) == 0)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ E5/A6 (198): minimalna grupa etap5 - lup w bitwie tylko z kiesy pokonanego
+def etap5_main(logp, start_arg):
+    """E5/A6 (198): prog "bitwy z niczego netto = 0 +- 1 tys./d" (projekt etapu 5, rozdz. 3 "E5/A6" Test). Niezalezny pomiar z ksiegi pieniadza:
+    ZRODLA "bitwy" (wyplata gry zwyciezcom - zdarzenie z niczego) - UJSCIA "bitwy" (wodzowie pokonanych - gra i A6) + N4 (kiesy partii bez wodza
+    w oknie bitew: zwyciezcy +, pokonani - 3.2) - statki zatopione wyplacone z niczego (B5 - z linii "Lup w bitwie (A6)", bo 164a-0 liczy tez
+    udzialy, ktorych gra nie wyplaca). Srednia 28 ostatnich dob. Linia A6 (wlasny rachunek paczki) i 164a-0 - INFO."""
+    lines = read(logp)
+    rep = Report()
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    a6 = by_day(lines, "Lup w bitwie (A6): dzien")
+    days = sorted(cau)
+    print(f"plik: {logp} | doby z linia przyczyn: {len(days)} | doby z linia A6: {len(a6)}")
+    land, ships164, miss, fb = {}, {}, 0, 0
+    for d in days:
+        s = cau[d]
+        src = num(r"statki NavalDLC inne \d+, bitwy (\d+),", s)
+        out = num(r"dostep do targu \d+\), bitwy (\d+), inne", s)
+        n4 = num(r"\bN4=(-?\d+)", s)
+        sh = num(r"wyplacone z niczego (\d+)", a6[d]) if d in a6 else None
+        ships164[d] = num(r"informacja 164a-0: (-?\d+)", s)
+        if sh is None and ships164[d] is not None:
+            sh = ships164[d]; fb += 1                  # log sprzed A6 (bez linii A6) - statki z 164a-0 (z udzialami bez wyplaty - zawyza statki)
+        if src is None or out is None or n4 is None or sh is None:
+            miss += 1
+            continue
+        land[d] = src - out + n4 - sh
+    win = last_window(land)
+    if win:
+        m = st.mean(land[d] for d in win)
+        worst = max(win, key=lambda d: abs(land[d]))
+        rep.add("E5/A6: bitwy z niczego netto na ladzie (ksiega; srednia 28 dob)", f"{m:+.0f}/d (najgorsza doba {land[worst]:+d}; dob {len(win)}"
+                + (f"; statki z 164a-0 w {fb} dobach - log bez linii A6" if fb else "") + ")",
+                "0 +- 1 tys./d", abs(m) <= 1000)
+    else:
+        rep.add("E5/A6: bitwy z niczego netto na ladzie (ksiega; srednia 28 dob)", f"brak linii (dob bez kompletu: {miss})", "0 +- 1 tys./d", None)
+    def mean_a6(pat):
+        vals = [num(pat, a6[d]) for d in last_window(a6)]
+        vals = [x for x in vals if x is not None]
+        return st.mean(vals) if vals else None
+    for name, pat in (("A6: netto z niczego na ladzie (wlasny rachunek)", r"netto z niczego na ladzie ([+-]?\d+)"),
+                      ("A6: bez A6 byloby z niczego", r"bez A6 byloby ([+-]?\d+)"),
+                      ("A6: wodzowie zdjeci z partii zaplacili", r"wodzowie zdjeci z partii \(A6 - niewola, ucieczka\) (\d+)"),
+                      ("A6: obciete zwyciezcom (pokonany bez zlota)", r"obciete zwyciezcom \(pokonany bez zlota albo poza swiatem\) (\d+)"),
+                      ("A6: statki zatopione wyplacone z niczego (B5)", r"wyplacone z niczego (\d+)")):
+        v = mean_a6(pat)
+        rep.add(name + " (srednia 28 dob)", f"{v:.0f}" if v is not None else "brak linii", "INFO", None)
+    s164 = [ships164[d] for d in last_window(days) if ships164.get(d) is not None]
+    rep.add("statki zatopione w bitwach (164a-0, z udzialami bez wyplaty; srednia 28 dob)", f"{st.mean(s164):.0f}" if s164 else "brak linii", "INFO", None)
+    stum = sum(num(r"wyjatki zlapane (\d+)", a6[d], int, 0) or 0 for d in a6)
+    rep.add("A6: wyjatki zlapane (suma)", stum, "INFO (0 oczekiwane)", None)
     rep.show()
     return 0
 
@@ -1669,6 +1726,8 @@ def main(argv):
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:
         return etap4_main(logp, start_arg, until_arg)   # E4/0 (188)
+    if group == "etap5" and logp:
+        return etap5_main(logp, start_arg)   # E5/A6 (198) - minimalna grupa; pelna w drzewie E5/0
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

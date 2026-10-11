@@ -113,6 +113,7 @@ namespace Armoury
         {
             _hooksLogged = false; _errSites.Clear();
             ClearDay();
+            BattlePlunder.Reset();                          // E5/A6 (198): migawki i liczniki lupu z puli - ten sam punkt nowej kampanii
         }
 
         private static void ClearDay()
