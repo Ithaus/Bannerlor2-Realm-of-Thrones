@@ -156,6 +156,7 @@ namespace Armoury
             try { Measure31.ApplyAll(); } catch (Exception e) { Stumble("Measure31.ApplyAll", e); }
             try { UpgradePurse.ApplyAll(); } catch (Exception e) { Stumble("UpgradePurse.ApplyAll", e); }
             try { CaravanCapital.ApplyAll(); } catch (Exception e) { Stumble("CaravanCapital.ApplyAll", e); }
+            try { RealPayer.ApplyAll(); } catch (Exception e) { Stumble("RealPayer.ApplyAll", e); }
             Log.Info("Szczelnosc (164a): latki przy starcie gry - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();
@@ -215,6 +216,7 @@ namespace Armoury
                 Array.Clear(Sum, 0, Items); _spent.Clear(); Stumbles = 0; _err.Clear();
                 Measure31.Reset();
                 CaravanCapital.Reset();
+                RealPayer.Reset();
             }
             catch { }
         }
@@ -231,6 +233,7 @@ namespace Armoury
                     int day = (int)CampaignTime.Now.ToDays - 1;
                     var sb = new StringBuilder(2048);
                     sb.Append("Szczelnosc (164a): dzien ").Append(day);
+                    sb.Append(" | platnik (164a-1): ").Append(RealPayer.Part());
                     sb.Append(" | awanse (164a-4): ").Append(UpgradePurse.Part());
                     sb.Append(" | kapital (164a-6): ").Append(CaravanCapital.Part());
                     sb.Append(" | pomiar (164a-0): ").Append(Measure31.Part());
@@ -249,6 +252,7 @@ namespace Armoury
             try { Measure31.ClearDay(); } catch { }
             try { UpgradePurse.ClearDay(); } catch { }
             try { CaravanCapital.ClearDay(); } catch { }
+            try { RealPayer.ClearDay(); } catch { }
         }
     }
 }
