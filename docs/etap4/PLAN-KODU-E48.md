@@ -541,6 +541,8 @@ odniesienia miast z dnia kalibracji (udzial miejski z tabeli krain).
 
 ## 17. Pytania do Jeffa (tylko kierunek) i odlozone
 
+**ROZSTRZYGNIETE (Jeff 11.10 ok. 09:30, "tak, tak, tak"): P1, P2, P3 - wszystkie TAK wedlug rady ponizej (docs/STAN-PRAC.md DECYZJE JEFFA 11.10).**
+
 **P1. Straz karawan bez hamulca wolnych rak.** Karawana bierze ludzi z miasta, z ktorego wyrusza (miasto ma ich mniej), ale nie czeka na "wolne rece" krainy - jak najemnik z karczmy, a nie jak rekrut
 z poboru. Inaczej w wyczerpanej krainie karawany ruszalyby prawie bez strazy. Zgoda? Rada: tak (bez odpowiedzi - tak).
 **P2. Miasta dopelniane ze wsi w ok. rok.** Miasto ma wiecej zgonow niz urodzen (ok. -0.5% rocznie); wsie dopelniaja ten ubytek i luke po poborze miejskim, karawanach i wedrowcach, tak zeby miasto

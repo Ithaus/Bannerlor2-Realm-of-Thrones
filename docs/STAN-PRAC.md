@@ -1170,3 +1170,7 @@ glodne druzyny lordow ok. 29 z 680; zapis 9 dob OK (0 bledow, 27.8 s/dobe). Kopi
 ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
 - (06:50) **Jeff: pasza koni - wariant (a):** jedna zasada przez caly rok - kazdy kon po glowie (funkcja AnimalNeed z E4/1); formula BK CalculateAnimalFoodNeed (1 kon na typ
   oddzialu) zastapiona nasza liczba zwierzat przy warunkach terenu BK (pustynia x1, snieg x0.5); zima E4/1 dolicza roznice. Kod w toku na w-toku/e4-jedzenie (agent w tle).
+- (09:30) **Jeff: pytania z planow E4/8 i E4/10 - "tak, tak, tak, tak" (wszystkie wedlug rady):** E4/8 P1 straz karawan bez hamulca wolnych rak (z ludzi miasta startu);
+  P2 miasta dopelniane ze wsi regionu do udzialu miejskiego w ok. rok (`TownMigrationRefillDays` 364), nie tylko o ubytek naturalny; P3 nowa druzyna lorda - najpierw wolne rece
+  krainy, potem zaloga siedziby, bez obu mniejsza; E4/10 pyt. 1 - rekrut tier 1-2 po zwolnieniu zawsze do domu, do karczmy tylko od tieru 3 (`VeteranMinTier` 3).
+  (E4/10 pyt. 2 - sprzet zwolnionego ze zbrojowni pana - osobny krok po etapie 4, bez zmian.)

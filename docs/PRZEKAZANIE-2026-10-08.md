@@ -742,3 +742,12 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (09:00) **PLANY KODU E4/8 i E4/10 GOTOWE** (docs/etap4/PLAN-KODU-E48.md, PLAN-KODU-E410.md; sam plan, kod po E4/7). Pytania kierunku do Jeffa: E4/8 P1-P3
   (straz karawan bez hamulca rak; miasta dopelniane ze wsi do udzialu; nowa druzyna: wolne rece -> zaloga siedziby -> mniejsza) - rada tak; E4/10: rekrut tier 1-2
   zawsze do domu (prog VeteranMinTier 3, rada), zwolniony zabiera komplet ze zbrojowni - osobno po etapie 4.
+- (09:35) **Jeff: "tak x4"** - pytania planow E4/8 (P1-P3) i E4/10 (pyt. 1) rozstrzygniete wedlug rady (STAN-PRAC DECYZJE 11.10, plany oznaczone ROZSTRZYGNIETE).
+- (09:35) **9 bledow testu A (zbior 31) - rozpoznane, wszystkie te same od 01:24:** 7 cudzych: TournamentsXPanded (ladowarka modulu, klasa abstrakcyjna), BKROTPatch x3
+  (DynamicPartySizePerformancePatch - brak metody celu, 2 wpisy; RebellionsGameEntityInstantiatePatch - brak celu), BannerKings EducationManager.CorrectPlayerEducation
+  (null przy tworzeniu postaci), DTE+UIExtenderEx MapArmoryReadinessMixin (AmbiguousMatch), ROT HarrenhalSiegeEvent (NRE w GatherArmy - Mends polknal i rozstawil
+  oblezenie sam). 2 nasze, NIESZKODLIWE: (a) Armoury NightRest.PatchModels - postfiks MoralePostfix(MobileParty mobileParty) nie wchodzi na
+  NavalDLCPartyMoraleModel.GetEffectivePartyMorale (parametr nazywa sie "party"), catch per typ; model aktywny = BKROTPartyMoraleModel (zewnetrzny, zalatany), NavalDLC
+  tylko owija BaseModel - kara snu dziala (log: "morale 67.2 -> 50.4 (-25%), wpis 'Sleepless nights' tak/tak"); poprawka kosmetyczna (__0 zamiast nazwy) NIE robiona
+  (CLAUDE.md 8.3). (b) Armoury WesterosClimate.ApplyAll - pierwsza szansa w MonoMod (CreateDelegate przy kompilacji detoura), lapana w MonoMod; latki wpiete
+  (data + 6 + 19 metod), 0 ERROR w Armoury.log.

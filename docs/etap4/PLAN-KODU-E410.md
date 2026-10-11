@@ -412,6 +412,8 @@ dopisuje do puli jako ostatni krok, nigdy nie rzuca; `OnTavernNumber` we wlasnym
 ---
 
 ## 12. Pytania otwarte do Jeffa (tylko kierunek; reszte decyduje plan)
+
+**ROZSTRZYGNIETE (Jeff 11.10 ok. 09:30): pytanie 1 - TAK (rekrut tier 1-2 zawsze do domu, `VeteranMinTier` 3); pytanie 2 - osobny krok po etapie 4 (bez zmian w E4/10).**
 1. **Swiezy rekrut zwolniony z wojska (tier 1-2) - zawsze do domu, czy tez co trzeci do karczmy?** W karczmie stalby jako najemnik tieru 3 (taki jest najnizszy najemnik w ROT),
    czyli dostalby umiejetnosci bez cwiczen. Plan: do karczmy tylko zolnierz od tieru 3 (`VeteranMinTier` 3) - wtedy najemnikow w karczmach ok. 70-85% mniej niz dzis; bez progu
    ok. 5-25% mniej. Rada: z progiem.
