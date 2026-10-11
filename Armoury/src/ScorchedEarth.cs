@@ -73,7 +73,11 @@ namespace Armoury
                         float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
                         v.Hearth = Math.Max(floor, v.Hearth - drain);
                         if (grain != null && mp.ItemRoster != null)
-                            mp.ItemRoster.AddToCounts(grain, 1 + mp.MemberRoster.TotalManCount / 250);
+                        {
+                            int want = 1 + mp.MemberRoster.TotalManCount / 250;
+                            if (s.ForageFromVillageStock) Leaks310.Forage(v, mp, want);   // 3.10: z zapasu tej wsi, nie z niczego
+                            else mp.ItemRoster.AddToCounts(grain, want);
+                        }
 
                         if (mp == MobileParty.MainParty && _playerForageShown != day)
                         {
