@@ -616,6 +616,7 @@ namespace Armoury
             Seal31.RegisterEvents(this);   // 3.1 (31): Reset stanu kampanii; nasluch MobilePartyDestroyed DRUGI (biegnie przedostatni - po 3.2 i 112, przed ksiega obiegu), OnPartyRemoved, upadek krolestw, zdarzenia zlota
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => WinterTrial.OnNewGame());   // E4/1 (B): proba zimy autotestu - plik-przelacznik w Documents\...\CrashScribe, tylko nowa kampania, tylko w pamieci
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
             CampaignEvents.OnItemConsumedEvent.AddNonSerializedListener(this, OreLedger.OnConsumed);   // wpis 98: wsad linii towarowych (narzedzia, deski)

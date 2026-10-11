@@ -58,6 +58,9 @@ RANGES = {
     'CrownLoanLimitDays': (0.0, 728.0, "0"),
     'CrownLoanRepayDays': (30.0, 728.0, "0"),
     'CrownLoanPoolDays': (1.0, 360.0, "0"),
+    # E4/1 (189): czynnik cieplych krain i udzial paszy - przycinane w kodzie do 0..1
+    'WinterWarmRealmFactor': (0.0, 1.0, "0.00"),
+    'WinterHorseFeedShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

@@ -1268,6 +1268,22 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int NorthGradientPercent { get; set; } = 25;
 
+        [SettingPropertyBool("Winter By Realm", HintText = "winter bites by realm: the Summer Isles know no winter, the warm south (Dorne, Qarth, Slaver's Bay, Lys, Tyrosh, Myr, Volantis, Valyria) feels it at Winter Warm Realm Factor, the rest of the world in full - harvests, granaries and the food of armies alike. A village keeps the climate of its region (a Dornish village taken by the Reach stays Dornish), an army that of the land it stands on. Off = the same winter everywhere, only the north gradient")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WinterByRealm { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Winter Warm Realm Factor", 0.00f, 1.00f, "0.00", HintText = "with Winter By Realm: how hard winter bites in the warm south compared with the rest of the world (0.4 = Dorne loses about 15% of its harvest instead of about 38%)")]
+        [SettingPropertyGroup("The marching column")]
+        public float WinterWarmRealmFactor { get; set; } = 0.4f;
+
+        [SettingPropertyBool("Winter Horses Eat", HintText = "in winter horses and pack animals cannot graze and eat fodder out of the party's food (Winter Horse Feed Share of their Banner Kings feed, times the winter of the realm) - not on the steppe, where they still graze, and not where Banner Kings already feeds them (desert, snow and blizzard)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool WinterHorsesEat { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Winter Horse Feed Share", 0.00f, 1.00f, "0.00", HintText = "with Winter Horses Eat: the share of the Banner Kings animal feed eaten in winter (0.5 = a horse eats as much as about 2.5 men)")]
+        [SettingPropertyGroup("The marching column")]
+        public float WinterHorseFeedShare { get; set; } = 0.5f;
+
         [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly")]
         [SettingPropertyGroup("The marching column")]
         public bool ScorchedEarthEnabled { get; set; } = true;
@@ -4340,6 +4356,10 @@ namespace Armoury
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
             s.AutumnStockMultiplier = AutumnStockMultiplier;
             s.NorthGradientPercent = NorthGradientPercent;
+            s.WinterByRealm = WinterByRealm;
+            s.WinterWarmRealmFactor = WinterWarmRealmFactor;
+            s.WinterHorsesEat = WinterHorsesEat;
+            s.WinterHorseFeedShare = WinterHorseFeedShare;
             s.ScorchedEarthEnabled = ScorchedEarthEnabled;
             s.ForageMinMen = ForageMinMen;
             s.ForageRadius = ForageRadius;

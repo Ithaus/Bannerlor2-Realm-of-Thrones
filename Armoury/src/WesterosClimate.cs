@@ -41,7 +41,24 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.ClimateEnabled; } }
         private static bool EconOn { get { var s = Settings.Current; return s != null && s.ClimateEnabled && s.ClimateDrivesEconomy; } }
 
-        internal static void Reset() { _segs.Clear(); _initBroken = false; }
+        // PROBA ZIMY (autotest, Jeff 11.10 wariant b - WinterTrial): dlugosc lata od startu i pierwszej jesieni na TE kampanie, tylko w pamieci
+        // (-1 = z ustawien). Nie przez Settings.Current: McmSettings.Apply przepisuje ustawienia z MCM co godzine gry, a pierwsza jesien losuje
+        // sie dopiero w ok. 1. dobie - wartosc z Settings.Current juz by wtedy nie zyla. Reset (konstruktor ArmouryBehavior) = kazda kampania od nowa.
+        private static int _trialSummerLeft = -1, _trialFirstAutumn = -1;
+
+        internal static void Reset() { _segs.Clear(); _initBroken = false; _trialSummerLeft = -1; _trialFirstAutumn = -1; }
+
+        /// <summary>WinterTrial (nowa kampania z plikiem-przelacznikiem): lato konczy sie za summerLeft dni od startu, pierwsza jesien trwa
+        /// firstAutumn dni (jak Min = Max w ustawieniach). Gdy klimat juz ruszyl w tej kampanii (samo lato startowe - ktos zapytal o pore przed
+        /// OnNewGameCreated), start klimatu od nowa z tymi wartosciami. Zwraca opis do logu.</summary>
+        internal static string Trial(int summerLeft, int firstAutumn)
+        {
+            _trialSummerLeft = Math.Max(0, summerLeft);
+            _trialFirstAutumn = Math.Max(0, firstAutumn);
+            if (_segs.Count == 1) { _segs.Clear(); _initBroken = false; return "klimat ruszyl juz przed proba (samo lato startowe) - start klimatu od nowa z wartosciami proby"; }
+            if (_segs.Count > 1) return "UWAGA: klimat ma juz " + _segs.Count + " por roku - proba za pozno, pory bez zmian";
+            return "klimat wystartuje przy pierwszym odczycie pory z wartosciami proby";
+        }
 
         // ------------------------------------------------------------ stan
         private static double NowDays()
@@ -61,10 +78,10 @@ namespace Armoury
                 var s = Settings.Current;
                 double now = NowDays();
                 double soFar = Math.Max(0, s.ClimateSummerDaysSoFar);
-                double left = Rand(s.ClimateSummerDaysLeftMin, s.ClimateSummerDaysLeftMax);
+                double left = _trialSummerLeft >= 0 ? _trialSummerLeft : Rand(s.ClimateSummerDaysLeftMin, s.ClimateSummerDaysLeftMax);
                 _segs.Add(new Seg { Start = now - soFar, Season = (int)CampaignTime.Seasons.Summer, Len = soFar + left });
                 Log.Info("Klimat: start - lato trwa juz " + (int)soFar + " dni, skonczy sie za " + (int)left
-                         + " dni (dzien kampanii " + (int)now + ").");
+                         + " dni (dzien kampanii " + (int)now + ")" + (_trialSummerLeft >= 0 ? " - PROBNA ZIMA (autotest), pierwsza jesien " + _trialFirstAutumn + " dni" : "") + ".");
                 return true;
             }
             catch (Exception e) { _initBroken = true; Log.Error("WesterosClimate.Init", e); return false; }
@@ -83,7 +100,7 @@ namespace Armoury
             double year = Math.Max(28, CampaignTime.DaysInYear);
             // index 1 = pierwsza jesien, index 2 = pierwsza zima
             if (index == 1 && season == (int)CampaignTime.Seasons.Autumn)
-                return Rand(s.ClimateFirstAutumnDaysMin, s.ClimateFirstAutumnDaysMax);
+                return _trialFirstAutumn >= 0 ? _trialFirstAutumn : Rand(s.ClimateFirstAutumnDaysMin, s.ClimateFirstAutumnDaysMax);
             if (index == 2 && season == (int)CampaignTime.Seasons.Winter)
                 return year * Rand(s.ClimateFirstWinterYearsMin, s.ClimateFirstWinterYearsMax);
             switch (season)

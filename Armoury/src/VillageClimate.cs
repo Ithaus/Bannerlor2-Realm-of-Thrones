@@ -25,6 +25,8 @@ namespace Armoury
     /// maja wode (blizsze z morza i rzeki) mediana 4.0, 75% do 6.4; 23 wsie traperow mediana 12.7. Za Murem po D.4: traperzy 5, rybacy 4,
     /// farm zboza 0 - ale NIE "bez zboza": gra daje "zboze 3" KAZDEMU typowi wsi (18 wsi x 3 = ok. 54/d wobec ok. 242/d przed D.4), a Skirling
     /// (castle_S5, flax_plant) dalej uprawia len; zdjecie "zboza 3" z wsi za Murem to osobny krok (audyt 02 C4/N3, filtr w MineralOnce).
+    /// D.5 (E4/1 = 189, PLAN 4.12): Skagos "owce i kozy zamiast zboza" - Ravikayr (village_N1_3, jedyna farma zboza wyspy) wheat_farm -> sheep_farm;
+    /// bilans liczby wsi po D.4 + D.5: zboze -5, owce +1 (wczesniej 0), traperzy +2, rybacy +4 (D.4 + Gelina i Tarth z D.1).
     /// Co daja typy (gra DefaultVillageTypes + BK PopulationManager.GetProductions): trapper = zboze 3 + futra 1.4 + miod BK 0.5 (wiecej z pasieka
     /// Skeps); fisherman = zboze 3 + ryby 28; wheat_farm = zboze 50 + krowa 0.2, owca 0.4, swinia 0.8 (gra) + jablka 2, marchew 2 i drob
     /// (kurczak 1, ges 1 - klasa Cropland) z BK; chleb BK = 10% pierwszego zboza listy (farma 5, inne 0.3). Odrzucone whaler / walrus_hunter
@@ -90,6 +92,10 @@ namespace Armoury
             new[] { "village_S7_2",          "wheat_farm", "fisherman",          "Storrold (za Murem, Hardhome, port)" },
             new[] { "village_S7_3",          "wheat_farm", "trapper",            "Ghostcreek (za Murem, Hardhome, puszcza)" },
             new[] { "village_S4_2",          "wheat_farm", "fisherman",          "Frostbank (za Murem, Frostfang's Camp, morze i rzeka)" },
+            // D.5 (E4/1 = 189, PLAN 4.12, ES:211 d "Skagos: owce i kozy zamiast zboza"): jedyna farma zboza Skagos (ROT-Map settlements.xml:15305,
+            // hearth 311, warownia town_N1) -> owce (typu "koza" gra nie ma); reszta Skagos to rybacy, wielorybnicy, morsy - bez zmian.
+            // Tekst ROT wsi mowi o zbozu - decyzja Jeffa ma pierwszenstwo. Zywnosc warowni gra liczy z ognisk, nie z typu (zmienia sie tylko targ).
+            new[] { "village_N1_3",          "wheat_farm", "sheep_farm",         "Ravikayr (Skagos, owce i kozy zamiast zboza)" },
         };
 
         // Wiersze wycofane z tabeli (byly w starszej wersji T8): typ wsi wraca z mapy sam (typ nie idzie do zapisu gry), ale klasa wsi BK

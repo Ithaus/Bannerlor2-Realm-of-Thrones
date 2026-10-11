@@ -21,6 +21,8 @@ namespace Armoury
     ///  - jesienia AI gromadzi (cap zapasow BK x2) - kto nie zdazyl, gloduje,
     ///  - GRADIENT POLNOCY: im dalej na polnoc (posY mapy), tym zima gryzie
     ///    mocniej (+-25%): pod Winterfell przednowek, w Dorne lagodnie.
+    ///  - E4/1 (189) ZIMA WEDLUG KRAIN (WinterRealm): kazdy z czterech skutkow razy czynnik krainy regionu - Wyspy Letnie 0,
+    ///    cieple poludnie (Dorne, Qarth, Zatoka, Lys, Tyrosh, Myr, Volantis, Valyria) 0.4, reszta 1; konie zima doplacaja pasze.
     /// DLUGA NOC USUNIETA (wpis 99, Jeff 05.10: "wywal dluga noc"): warunek "zywy
     /// bohater kultury whitewalker w partii" byl prawda od pierwszej doby kazdej
     /// kampanii ROT (Inni maja partie od startu), wiec caly swiat mial wieczna zime:
@@ -32,6 +34,7 @@ namespace Armoury
     internal static class WinterBite
     {
         private static readonly TextObject _txtWinter = new TextObject("{=!}Winter");
+        private static readonly TextObject _txtHorses = new TextObject("{=!}Horses eat fodder in winter");   // E4/1
         private static int _lastSeason = -1;
 
         internal static bool WinterNow()
@@ -72,6 +75,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("WinterBite.OnDaily", e); }
+            try { WinterRealm.Daily(); } catch (Exception e) { Log.Error("WinterRealm.Daily", e); }   // E4/1: pamiec doby regionu partii; w zimie linia "Zima wedlug krain (E4/1)"
         }
 
         /// <summary>Ile dni zapasow AI trzyma DZIS (jesienia gromadzi na zime).</summary>
@@ -89,58 +93,79 @@ namespace Armoury
             return cap;
         }
 
+        /// <summary>Ciecie plonu wsi zima: procent x gradient polnocy x czynnik krainy (E4/1, WinterRealm) - jeden rachunek dla produkcji wsi,
+        /// zywnosci wsi i odczytu E4/0. Wolac tylko w zimie.</summary>
+        private static float CutOf(Settings s, Village village)
+        {
+            float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
+                      * Northness(village.Settlement.GetPosition2D.Y) * WinterRealm.OfVillage(village);
+            return MBMath.ClampFloat(cut, 0f, 0.95f);
+        }
+
         /// <summary>E4/0 (pomiar, tylko odczyt): ciecie plonu wsi dzis - ten sam rachunek co VillageProdPostfix / VillageFoodPostfix (0 poza zima).
-        /// Uwaga dla E4/4 (109 dodawal identyczna metode): NIE dublowac - po E4/1 ten sam czynnik regionu.</summary>
+        /// Uwaga dla E4/4 (109 dodawal identyczna metode): NIE dublowac - od E4/1 z czynnikiem krainy (CutOf).</summary>
         internal static float VillageCut(Village village)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || village == null || village.Settlement == null) return 0f;
-                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
-                          * Northness(village.Settlement.GetPosition2D.Y);
-                return MBMath.ClampFloat(cut, 0f, 0.95f);
+                return CutOf(s, village);
             }
             catch { return 0f; }
         }
 
-        /// <summary>E4/0 (pomiar, tylko odczyt): dodatek jedzenia partii zima - ten sam rachunek co FoodPostfix (0 poza zima).</summary>
+        /// <summary>E4/0 (pomiar, tylko odczyt): dodatek jedzenia partii zima - ten sam rachunek co FoodPostfix (0 poza zima; od E4/1 z czynnikiem krainy).</summary>
         internal static float PartyFoodBonus(MobileParty party)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return 0f;
-                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y));
+                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * WinterRealm.OfParty(party));
             }
             catch { return 0f; }
         }
 
+        /// <summary>Dodatkowy ubytek spichlerza warowni zima (dodatni, 0 poza zima) - ten sam rachunek co TownFoodPostfix (od E4/1 z czynnikiem krainy).</summary>
+        internal static float TownExtra(Town town)
+        {
+            var s = Settings.Current;
+            if (s == null || !WinterNow() || town == null || town.Settlement == null) return 0f;
+            return Math.Max(0f, town.Prosperity / 1000f * Math.Max(0f, s.WinterTownAppetitePer1000)
+                                * Northness(town.Settlement.GetPosition2D.Y) * WinterRealm.OfTown(town));
+        }
+
         // ---- patche ----
 
-        /// <summary>Konsumpcja partii zima: +50% razy gradient polnocy.</summary>
-        public static void FoodPostfix(MobileParty party, ref ExplainedNumber __result)
+        /// <summary>Konsumpcja partii zima: +50% razy gradient polnocy razy czynnik krainy pod partia (E4/1); konie doplacaja pasze (E4/1,
+        /// WinterRealm.HorseFeed - w bazie, wiec mnozniki zimy, perkow i Rations obejmuja ja jak ludzi). __instance = model, na ktorym gra liczy
+        /// baze (BK BKPartyConsumptionModel dziedziczy te metode) - z niego pasza BK CalculateAnimalFoodNeed.</summary>
+        public static void FoodPostfix(object __instance, MobileParty party, ref ExplainedNumber __result)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return;
-                float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y);
+                float realm = WinterRealm.OfParty(party);
+                int why; float need;
+                float horse = WinterRealm.HorseFeed(__instance, party, realm, out why, out need);
+                if (horse > 0f) __result.Add(-horse, _txtHorses);
+                float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);
             }
             catch { }
         }
 
-        /// <summary>Produkcja wioski zima: -50% razy gradient polnocy.</summary>
+        /// <summary>Produkcja wioski zima: -50% razy gradient polnocy razy czynnik krainy (E4/1).</summary>
         public static void VillageProdPostfix(Village village, ref ExplainedNumber __result)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || !WinterNow() || village == null || __result.ResultNumber <= 0f) return;
-                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
-                          * Northness(village.Settlement.GetPosition2D.Y);
-                __result.AddFactor(-MBMath.ClampFloat(cut, 0f, 0.95f), _txtWinter);
+                if (s == null || !WinterNow() || village == null || village.Settlement == null || __result.ResultNumber <= 0f) return;
+                float cut = CutOf(s, village);
+                if (cut > 0f) __result.AddFactor(-cut, _txtWinter);
             }
             catch { }
         }
@@ -150,23 +175,18 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !WinterNow() || village == null || __result <= 0f) return;
-                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f
-                          * Northness(village.Settlement.GetPosition2D.Y);
-                __result *= 1f - MBMath.ClampFloat(cut, 0f, 0.95f);
+                if (s == null || !WinterNow() || village == null || village.Settlement == null || __result <= 0f) return;
+                __result *= 1f - CutOf(s, village);
             }
             catch { }
         }
 
-        /// <summary>Miasto zima: spichlerz topnieje szybciej (skala z prosperity).</summary>
+        /// <summary>Miasto zima: spichlerz topnieje szybciej (skala z prosperity; od E4/1 razy czynnik krainy).</summary>
         public static void TownFoodPostfix(Town town, ref ExplainedNumber __result)
         {
             try
             {
-                var s = Settings.Current;
-                if (s == null || !WinterNow() || town == null) return;
-                float extra = town.Prosperity / 1000f * Math.Max(0f, s.WinterTownAppetitePer1000)
-                            * Northness(town.Settlement.GetPosition2D.Y);
+                float extra = TownExtra(town);
                 if (extra > 0f) __result.Add(-extra, _txtWinter);
             }
             catch { }
@@ -188,7 +208,7 @@ namespace Armoury
                 if (mTown != null) h.Patch(mTown, postfix: new HarmonyMethod(typeof(WinterBite), "TownFoodPostfix"));
                 Log.Info("WinterBite: zima uzbrojona (jedzenie +" + s.WinterPartyFoodBonusPercent
                          + "%, wioski -" + s.WinterVillageOutputCutPercent + "%, gradient polnocy "
-                         + s.NorthGradientPercent + "%; tylko zima z kalendarza - Dluga Noc usunieta wpisem 99).");
+                         + s.NorthGradientPercent + "%; tylko zima z kalendarza - Dluga Noc usunieta wpisem 99; " + WinterRealm.StartText() + ").");
             }
             catch (Exception e) { Log.Error("WinterBite.ApplyAll", e); }
         }

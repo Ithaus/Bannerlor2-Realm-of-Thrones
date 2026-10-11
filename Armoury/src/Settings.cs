@@ -378,6 +378,10 @@ namespace Armoury
         public float WinterTownAppetitePer1000 = 0.5f;     // extra daily food-stock drain per 1000 town prosperity in winter
         public float AutumnStockMultiplier = 2f;           // in autumn the AI supply cap (BkSupplyDaysCap) is multiplied by this - stock up or starve
         public int NorthGradientPercent = 25;              // how much harder winter bites in the far north (and softer in Dorne)
+        public bool WinterByRealm = true;                  // winter bites by realm: the Summer Isles know no winter, the warm south (Dorne, Qarth, Slaver's Bay, Lys, Tyrosh, Myr, Volantis, Valyria) feels it at Winter Warm Realm Factor, the rest of the world in full - harvests, granaries and the food of armies alike. A village keeps the climate of its region (a Dornish village taken by the Reach stays Dornish), an army that of the land it stands on. Off = the same winter everywhere, only the north gradient
+        public float WinterWarmRealmFactor = 0.4f;         // with Winter By Realm: how hard winter bites in the warm south compared with the rest of the world (0.4 = Dorne loses about 15% of its harvest instead of about 38%)
+        public bool WinterHorsesEat = true;                // in winter horses and pack animals cannot graze and eat fodder out of the party's food (Winter Horse Feed Share of their Banner Kings feed, times the winter of the realm) - not on the steppe, where they still graze, and not where Banner Kings already feeds them (desert, snow and blizzard)
+        public float WinterHorseFeedShare = 0.5f;          // with Winter Horses Eat: the share of the Banner Kings animal feed eaten in winter (0.5 = a horse eats as much as about 2.5 men)
         public bool ScorchedEarthEnabled = true;           // war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly
         public int ForageMinMen = 100;                     // armies at least this large live off enemy land
         public float ForageRadius = 3f;                    // map range within which a passing army drains a hostile village
