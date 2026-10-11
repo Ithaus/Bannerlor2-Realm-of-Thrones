@@ -1128,3 +1128,14 @@ etap 2 jak w WGRANIU 28 (wojsko lordow w wojnie 101 tys., glowy 1, bankruci 0, b
 hearth wsi +624/d bez wyjasnienia (T2 - przyrost ludnosci z niczego -> E4/4), ludzie pod bronia +1048/d bez nazwy (T7 -> E4/7-E4/8), Straz/Wolni Ludzie 60-67% ruchu bez
 nazwy (T6); zapis 9 dob OK (0 bledow, 28.5 s/dobe). Kopie: Armoury.dll.bak-2026-10-11-przed-noc29 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc29-przed.
 ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5. NIEWGRANE: E4/2 (w-toku/e4-2 3e10b11) - decyzja Jeffa.
+
+**DECYZJE JEFFA 11.10 (ok. 02:45, odpowiedzi na raport nocny):**
+- (1) Statki 3.3 - RAZEM Z ETAPEM 5 (podatek wojenny 184): wylaczniki ShipsToPort/ShipTradeThroughPort/ShipPrizesToPort zostaja OFF do etapu 5.
+- (2) Fale dezercji po wielkich przegranych - Jeff pyta o liczby (odpowiedz w czacie: bieg 728 dob - 51/d sredniej, 46% w 68 dniach fal; najwiekszy epizod 2.9 tys. w 8 dni
+  = 2.5% wojska lordow; pobita druzyna traci ok. 1/4-1/3 skladu w 4-8 dni) - czeka na decyzje.
+- (3) Inni tylko z poleglych (E4/2) - czekamy na test informacyjny (at-e42-120).
+- (4) Etap 4: Sarnor 100 tys. (jak ROT); kraina bez wolnych rak nie wystawia nowego wojska do odrobienia strat - TAK; spalona wioska wraca rok od ostatniego najazdu - TAK;
+  ludnosc w ciaglej wojnie moze spadac (do -0.5%/rok) - TAK.
+- (5) Kiesa bandy przylaczajacej sie do gracza - do gracza (TAK); podatek BK od warsztatow lordow/gracza w cudzych miastach - placi wlasciciel panu miasta (TAK);
+  napitki i drewno wojska - placi WOJSKO (sakiewki zolnierzy, jak odziez 150); wedrowcy BK z prawdziwym towarem - TAK; doplata podmiany rekruta ROT i werdykt
+  "pokonany" dla druzyn lordow - Jeff prosi o wyjasnienie.
