@@ -147,4 +147,12 @@
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while
        the town has no food stocks. Set to false to restore RealisticBannerlord's daily attrition. -->
   <RbSiegeAttritionOnlyStarving>true</RbSiegeAttritionOnlyStarving>
+
+  <!-- Roose Bolton's army at Harrenhal (needs Banner Kings and Realm of Thrones). The storyline event "Roose Bolton
+       Besieges Harrenhal" asks the North to raise an army for Roose, but Banner Kings' army rules refuse it: Roose is not
+       the king and holds no title of his own, and the North's feudal law only lets titled lords call an army. The event then
+       breaks and a stand-in lord leads the siege, or nobody does. With this on, Banner Kings lets that one scripted army
+       through - only for the commander of that single siege setup, never for any other army. Every other army in the
+       world keeps Banner Kings' rules. Set HarrenhalBkArmyPass to false to restore the old behaviour. -->
+  <HarrenhalBkArmyPass>true</HarrenhalBkArmyPass>
 </CrashScribe>

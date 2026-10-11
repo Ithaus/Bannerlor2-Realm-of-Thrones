@@ -152,6 +152,8 @@ namespace CrashScribe
         /// </summary>
         public static bool HarrenhalGuard(object __instance)
         {
+            _scriptedArmyLeader = null;                  // B6: przepustka BK zyje tylko w jednym wywolaniu (patrz HarrenhalBkPass)
+            _bkArmyPassedNow = false;
             try
             {
                 Hero roose = null;
@@ -174,7 +176,13 @@ namespace CrashScribe
                 // w GatherArmy - Kingdom.CreateArmy nie dal armii) -> od tej chwili NIE
                 // oddajemy mu sterow: sami rozstawiamy, najpierw z Roose'em, a gdy
                 // Polnoc i jemu nie da armii - z zastepca
-                if (why == null && !_harrenhalRotFailed) return true;   // Roose zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null && !_harrenhalRotFailed)
+                {
+                    // B6: BK (CreateArmyPatch) odmawia armii Roose'owi bez tytulu - przepuszczamy TYLKO to jedno
+                    // skryptowe TheNorth.CreateArmy(Roose); flage zeruje finalizer HarrenhalSafe
+                    if (_bkArmyPassInstalled) _scriptedArmyLeader = roose;
+                    return true;   // Roose zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                }
                 if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Roose'em (NullReference w GatherArmy)";
 
                 // ZASTEPCA (Jeff 02.09: "dajemy innego dowodce, jak tamten w niewoli
@@ -212,6 +220,30 @@ namespace CrashScribe
         private static Type _rotSettlements;
         private static bool _harrenhalRotFailed;
         private static double _harrenhalSwallowLog = -1;
+
+        // ===== B6: BK NIE DAJE ARMII ROOSE'OWI = NRE W SKRYPCIE ROT (testy 10-11.10, doba 117) =====
+        // BK CreateArmyPatch (prefiks na Kingdom.CreateArmy, AIArmyFormation) pyta BKArmyManagementModel.CanCreateArmy;
+        // Roose nie jest krolem, a Polnoc (Feudal, ArmyPrivate) wymaga tytulu - duchy Dreadfort ma w BKROTPatch Ramsay.
+        // Odmowa -> armia null -> GatherArmyAction -> NullReference w GatherArmyLogEntry. Postfiks zamienia odmowe
+        // na zgode TYLKO dla bohatera z przepustki, ustawianej na czas jednego skryptowego CreateArmy (sciezka ROT
+        // z Roose'em albo nasz port HarrenhalSetupWith). Tylko odblokowuje (false -> true), nigdy nie blokuje.
+        private static Hero _scriptedArmyLeader;     // przepustka: jedyny bohater, ktoremu BK przepuszcza armie
+        private static bool _bkArmyPassedNow;        // w biezacym rozstawieniu BK odmowil i przepuscilismy
+        private static int _bkArmyPassed;            // licznik zadzialan (zamian false -> true) w sesji
+        private static bool _bkArmyPassInstalled;    // postfiks wpiety (wylacznik Config.HarrenhalBkArmyPass)
+        private static double _harrenhalBkLog = -1;
+
+        public static void HarrenhalBkPass(Hero __0, ref bool __result)
+        {
+            try
+            {
+                if (__result || _scriptedArmyLeader == null || __0 == null || __0 != _scriptedArmyLeader) return;
+                __result = true;
+                _bkArmyPassedNow = true;
+                _bkArmyPassed++;
+            }
+            catch { }
+        }
 
         private static void HarrenhalPostponed(string why)
         {
@@ -257,7 +289,18 @@ namespace CrashScribe
                 if (sub.Army != null) DisbandArmyAction.ApplyByUnknownReason(sub.Army);
                 sub.Position = harrenhal.GatePosition;
                 sub.IsCurrentlyAtSea = false;
-                north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
+                // B6: ta sama bramka BK co u Roose'a - przepustka tylko na to jedno wywolanie, zawsze zdejmowana
+                try
+                {
+                    if (_bkArmyPassInstalled) _scriptedArmyLeader = sub.LeaderHero;
+                    _bkArmyPassedNow = false;
+                    north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
+                }
+                finally { _scriptedArmyLeader = null; }
+                if (_bkArmyPassedNow && sub.Army != null)
+                    Scribe.Line("Mends: oblezenie Harrenhal - BK odmowil armii " + sub.LeaderHero.Name
+                                + ", przepuszczona dla rozstawienia (zastepczy port ROT; razem " + _bkArmyPassed + ").");
+                _bkArmyPassedNow = false;
             }
             tr.Field("SiegeArmy").SetValue(sub.Army);
             if (!fresh) return true;
@@ -310,9 +353,36 @@ namespace CrashScribe
             return true;
         }
 
-        public static Exception HarrenhalSafe(Exception __exception)
+        public static Exception HarrenhalSafe(Exception __exception, object __instance)
         {
-            if (__exception == null) return null;
+            // B6: przepustke BK zdejmujemy NA SAMYM POCZATKU - finalizer biegnie zawsze (takze po pominietym oryginale)
+            var scripted = _scriptedArmyLeader;
+            bool passed = _bkArmyPassedNow;
+            _scriptedArmyLeader = null;
+            _bkArmyPassedNow = false;
+            if (__exception == null)
+            {
+                // udana sciezka ROT sama nic nie loguje - bez tej linii test nie da dowodu, ze armia Roose'a powstala
+                if (scripted != null)
+                {
+                    try
+                    {
+                        double now = CampaignTime.Now.ToDays;
+                        if (_harrenhalBkLog < 0 || now - _harrenhalBkLog >= 1.0)
+                        {
+                            _harrenhalBkLog = now;
+                            Army army = null;
+                            try { army = Traverse.Create(__instance).Field("SiegeArmy").GetValue() as Army; } catch { }
+                            Scribe.Line("Mends: oblezenie Harrenhal - ROT rozstawil oblezenie sam, dowodzi " + scripted.Name
+                                        + (passed ? "; BK odmowil mu armii, przepuszczona dla skryptu ROT (razem " + _bkArmyPassed + ")"
+                                                  : "; BK dal mu armie bez przepustki")
+                                        + "; armia " + (army != null ? army.Parties.Count + " partii" : "BRAK") + ".");
+                        }
+                    }
+                    catch { }
+                }
+                return null;
+            }
             try
             {
                 _harrenhalRotFailed = true;              // od teraz rozstawiamy sami (patrz HarrenhalGuard)
@@ -3288,6 +3358,25 @@ namespace CrashScribe
                     harmony.Patch(mSetup, prefix: new HarmonyMethod(typeof(Mends), "HarrenhalGuard"),
                                           finalizer: new HarmonyMethod(typeof(Mends), "HarrenhalSafe"));
                     Scribe.Line("Mends: oblezenie Harrenhal (ROT) zabezpieczone - bez zdolnego Roose'a Boltona proba jest odkladana, nie wywala gry.");
+                    // B6: przepustka BK dla skryptowej armii oblezenia (patrz HarrenhalBkPass); osobny try - jej wywrotka nie rusza straznika
+                    try
+                    {
+                        if (Config.HarrenhalBkArmyPass)
+                        {
+                            var tBkArmy = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKArmyManagementModel");
+                            var mBkCan = tBkArmy != null ? AccessTools.DeclaredMethod(tBkArmy, "CanCreateArmy", new[] { typeof(Hero) }) : null;
+                            if (mBkCan != null)
+                            {
+                                harmony.Patch(mBkCan, postfix: new HarmonyMethod(typeof(Mends), "HarrenhalBkPass"));
+                                _bkArmyPassInstalled = true;
+                                Scribe.Line("Mends: B6 - BK przepuszcza armie oblezenia Harrenhal (BKArmyManagementModel.CanCreateArmy) tylko dla dowodcy"
+                                            + " z jednego skryptowego CreateArmy (Roose w sciezce ROT albo dowodca naszego portu) - wpiete.");
+                            }
+                            else Scribe.Line("Mends: B6 - BK BKArmyManagementModel.CanCreateArmy nieznaleziony - BRAK przepustki, oblezenie Harrenhal po staremu (straznik i zastepca).");
+                        }
+                        else Scribe.Line("Mends: B6 - przepustka BK dla armii oblezenia Harrenhal wylaczona (HarrenhalBkArmyPass=false).");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(harrenhal-bk)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: ROT HarrenhalSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Harrenhal bez straznika.");
             }

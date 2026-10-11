@@ -68,6 +68,9 @@ namespace CrashScribe
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
 
+        // --- Oblezenie Harrenhal: przepustka BK (B6; patrz Mends.HarrenhalBkPass) ---
+        public static bool HarrenhalBkArmyPass = true; // BK nie odmawia armii dowodcy jednego skryptowego CreateArmy oblezenia Harrenhal (Roose albo zastepca); false = po staremu (NRE polykany, zastepca)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -124,6 +127,7 @@ namespace CrashScribe
                         case "PovertyPeaceProposals": PovertyPeaceProposals = B(v); break;
                         case "PovertyPeaceArrearsMeasure": PovertyPeaceArrearsMeasure = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
+                        case "HarrenhalBkArmyPass": HarrenhalBkArmyPass = B(v); break;
                     }
                 }
             }
