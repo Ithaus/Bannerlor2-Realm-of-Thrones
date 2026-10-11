@@ -1144,3 +1144,6 @@ ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841
   (werdykt 3.2 takze dla druzyn lordow; bez zwyciezcy - kasa najblizszego miasta) - TAK.
   Paczka "D11" (decyzje 11.10): kara za przegrana /2, kiesa bandy przylaczajacej sie -> gracz, podatek warsztatow lordow/gracza placi wlasciciel panu miasta, napitki i
   drewno wojska z sakiewek zolnierzy, doplata ROT do sakiewek, werdykt dla lordow. Osobno pozniej: wedrowcy BK z prawdziwym towarem (wiekszy krok).
+- (03:00) Jeff: "wgraj" - E4/2 (Inni tylko z poleglych) WGRAC razem z D11 (wspolny test 120 + zapis -> WGRANIE 30). Kolejnosc dalej: E4/3 (punkty powrotu - bandy) ->
+  E4/4 (przyrost ludnosci) -> E4/1 zima (wymaga zgody/polecenia Jeffa na zmiane 4 kluczy klimatu w plikach gry na czas testu - w ROT jesien trwa > 400 dni, w biegu
+  2-letnim zima nie przyszla) -> E4/5..E4/11 + wedrowcy BK z prawdziwym towarem.
