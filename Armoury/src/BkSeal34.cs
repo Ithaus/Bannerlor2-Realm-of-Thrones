@@ -27,7 +27,10 @@ namespace Armoury
     ///  2. SPRZEDAZ NIEWOLNIKOW (BkSlaveSalePaidByTown). BKPartyBehavior.SellSurplusSlaves (dekret "decision_slaves_sell"): nadwyzka niewolnikow
     ///     znika z ludnosci osady, a glowa rodu wlasciciela dostaje ChangeHeroGold(+cena) z niczego. Teraz placi kasa tej osady (miasto albo zamek;
     ///     najwyzej to, co moze wydac - CastlePurse.Spendable, ta sama regula co skup od partii): zloto BK cofniete, w zamian
-    ///     GiveGoldAction osada -> wlasciciel. Kasa uboga - wlasciciel dostaje mniej (niewolnicy i tak odeszli - decyzja BK zapadla wczesniej).
+    ///     GiveGoldAction osada -> wlasciciel za tylu niewolnikow, ilu kasa moze zaplacic po cenie BK; niezaplaceni WRACAJA do ludnosci
+    ///     osady (PopulationData.UpdatePopType(Slaves, +n) - lustro odjecia BK), a gracz dostaje komunikat z faktyczna liczba i kwota.
+    ///     Kasa bez wolnego zlota - sprzedaz pominieta w calosci (prefiks false: bez zdejmowania ludzi i bez komunikatu BK o cenie).
+    ///     (Poprawka po recenzji 3.4: dotad niewolnicy znikali w calosci, a kasa placila tylko czesc albo nic.)
     ///     Bieg 457 dob: dekret nie zapadl ani razu (okno ksiegi 0 wywolan) - zmiana dla 100% przypadkow, dzis glownie gracz.
     ///  3. WYPOSAZENIE RYCERZA (BkKnightKitPaidToTown). BKROTPatch EvaluateRecruitKnightPatch.Prefix (zawsze false na BKClanBehavior.
     ///     EvaluateRecruitKnight) placi za rynsztunek nowego rycerza clan.Leader.ChangeHeroGold(-cena) - w nicosc. Cena liczona jest na targu
@@ -51,11 +54,14 @@ namespace Armoury
         private static PropertyInfo _cfgInstance, _cfgPopMgr, _popVillageData, _vbInstance, _vbMarketplace;
         private static MethodInfo _getPopData, _getProductions, _getBuildingLevel;
         private static object _marketplace;
+        // niewolnicy: PopulationData.GetTypeCount(PopType) / UpdatePopType(PopType, int, bool), PopType.Slaves
+        private static MethodInfo _getTypeCount, _updatePopType;
+        private static object _slavesType;
 
         // ------------------------------------------------------------ liczniki doby
         private static int _vBuys, _vVillages, _vSkip;
         private static long _vPaid, _vSkipValue, _vCastle;
-        private static int _sSales; private static long _sGain, _sPaid;
+        private static int _sSales, _sSkip, _sOdd; private static long _sGain, _sPaid, _sSold, _sBack;
         private static int _kKits, _kNoMarket; private static long _kPaid, _kFallback;
         private static int _stumbles;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
@@ -63,7 +69,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _vBuys = _vVillages = _vSkip = 0; _vPaid = _vSkipValue = _vCastle = 0;
-            _sSales = 0; _sGain = _sPaid = 0;
+            _sSales = _sSkip = _sOdd = 0; _sGain = _sPaid = _sSold = _sBack = 0;
             _kKits = _kNoMarket = 0; _kPaid = _kFallback = 0;
             _stumbles = 0;
             BkSupplyMarket.ClearDay();
@@ -154,34 +160,74 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ 2. sprzedaz niewolnikow
-        internal struct SlaveState { public bool On; public Hero H; public long G0; }
+        internal struct SlaveState { public bool On; public Hero H; public long G0; public object Pd; public int N0; }
 
-        public static void SlavesPre(Settlement __0, out SlaveState __state)
+        /// <summary>BannerKingsConfig.Instance.PopulationManager.GetPopData(st) (refleksja; null - osada bez danych BK).</summary>
+        private static object PopData(Settlement st)
         {
-            __state = default(SlaveState);
-            try
-            {
-                if (!SlavesOn || __0 == null || __0.Town == null || __0.OwnerClan == null) return;
-                var h = __0.OwnerClan.Leader;
-                if (h == null) return;
-                __state.H = h; __state.G0 = h.Gold; __state.On = true;
-            }
-            catch (Exception e) { Stumble("SlavesPre", e); }
+            object cfg = _cfgInstance.GetValue(null, null);
+            object pm = cfg != null ? _cfgPopMgr.GetValue(cfg, null) : null;
+            return pm != null ? _getPopData.Invoke(pm, new object[] { st }) : null;
         }
 
-        /// <summary>Postfiks (biegnie przed finalizerem okna ksiegi obiegu): przyrost kiesy wlasciciela bez zdarzenia = cena BK z niczego.</summary>
+        private static int SlaveCount(object pd)
+        {
+            return Convert.ToInt32(_getTypeCount.Invoke(pd, new[] { _slavesType }), CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>Prefiks SellSurplusSlaves: zapamietuje kiese wlasciciela i liczbe niewolnikow; kasa osady bez wolnego zlota - bez sprzedazy
+        /// (false: BK nie zdejmuje ludzi i nie pokazuje ceny, ktorej nikt by nie zaplacil). Blad odczytu - tez bez sprzedazy (nic z niczego).</summary>
+        public static bool SlavesPre(Settlement __0, out SlaveState __state)
+        {
+            __state = default(SlaveState);
+            if (!SlavesOn || __0 == null || __0.Town == null || __0.OwnerClan == null) return true;
+            try
+            {
+                var h = __0.OwnerClan.Leader;
+                if (h == null) return true;                                     // BK: brak glowy rodu - nic
+                object pd = PopData(__0);
+                if (pd == null) return true;                                    // BK: GetPopData == null - nic
+                int before = SlaveCount(pd);
+                if (before <= 0) return true;                                   // BK: brak niewolnikow - nic
+                if (CastlePurse.Spendable(__0.Town) <= 0) { _sSkip++; return false; }   // kupiec nie ma czym zaplacic - niewolnicy zostaja
+                __state.H = h; __state.G0 = h.Gold; __state.Pd = pd; __state.N0 = before; __state.On = true;
+                return true;
+            }
+            catch (Exception e) { Stumble("SlavesPre", e); return false; }
+        }
+
+        /// <summary>Postfiks (biegnie przed finalizerem okna ksiegi obiegu): przyrost kiesy wlasciciela bez zdarzenia = cena BK z niczego - cofniety;
+        /// kasa osady placi po cenie BK za tylu, ilu moze (Spendable), niezaplaceni wracaja do ludnosci osady.</summary>
         public static void SlavesPost(Settlement __0, SlaveState __state)
         {
             if (!__state.On) return;
             try
             {
                 long d = (long)__state.H.Gold - __state.G0;   // w SellSurplusSlaves jedyna zmiana kiesy to ChangeHeroGold(+cena) BK
-                if (d <= 0) return;
+                if (d <= 0) return;                            // BK nic nie sprzedal (brak nadwyzki)
                 int gain = (int)Math.Min(d, int.MaxValue);
                 __state.H.ChangeHeroGold(-gain);                // zloto z niczego cofniete
-                int pay = Math.Min(gain, Math.Max(0, CastlePurse.Spendable(__0.Town)));
+                int spend = Math.Max(0, CastlePurse.Spendable(__0.Town));
+                int sold = __state.N0 - SlaveCount(__state.Pd);  // BK: UpdatePopType(Slaves, -num4); gain = num4 x cena
+                int paid, pay, back = 0;
+                if (sold > 0 && gain % sold == 0)
+                {
+                    int price = gain / sold;
+                    paid = Math.Min(sold, spend / price);
+                    pay = paid * price;
+                    if (paid < sold)
+                    {
+                        try { _updatePopType.Invoke(__state.Pd, new object[] { _slavesType, sold - paid, false }); back = sold - paid; }
+                        catch (Exception e) { Stumble("SlavesBack", e); paid = sold; pay = Math.Min(gain, spend); }   // zwrot sie nie udal - jak przed poprawka
+                    }
+                }
+                else { _sOdd++; paid = sold; pay = Math.Min(gain, spend); }   // liczby sprzedanych nie da sie ustalic (np. GetTypeCount obciety do 50 000) - jak przed poprawka
                 if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(__0, __state.H, pay, true);   // kasa osady -> wlasciciel (zdarzenie gry)
-                _sSales++; _sGain += gain; _sPaid += pay;
+                _sSales++; _sGain += gain; _sPaid += pay; _sSold += Math.Max(0, sold); _sBack += back;
+                if (back > 0 && __state.H == Hero.MainHero)   // BK pokazal juz "Sold N ... for X denars" - sprostowanie faktycznej liczby i kwoty
+                    TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(paid > 0
+                        ? "The merchants of " + __0.Name + " could only pay for " + paid + " of those " + sold + " slaves (" + pay + " denars). The other " + back + " stay in " + __0.Name + "."
+                        : "The merchants of " + __0.Name + " could not pay for those " + sold + " slaves. They stay in " + __0.Name + ".", TaleWorlds.Library.Colors.Yellow));
             }
             catch (Exception e) { Stumble("SlavesPost", e); }
         }
@@ -246,7 +292,8 @@ namespace Armoury
                 sb.Append(" | szczelnosc BK (3.4) [P] (przelewy w parze): zaopatrzenie BK rody -> kasy osad ").Append(Flag(BkSupplyMarket.Hooked, BkSupplyMarket.On, sup))
                   .Append(", rynek wsi kiesy wsi -> kasy ").Append(Flag(VillageHooked, VillageOn, _vPaid))
                   .Append(" (pominiete bez zlota ").Append(_vSkipValue.ToString(inv)).Append(" - dawniej z niczego)")
-                  .Append(", niewolnicy kasy osad -> panowie ").Append(Flag(SlavesHooked, SlavesOn, _sPaid)).Append(" (cena BK ").Append(_sGain.ToString(inv)).Append(')')
+                  .Append(", niewolnicy kasy osad -> panowie ").Append(Flag(SlavesHooked, SlavesOn, _sPaid)).Append(" (cena BK sprzedanych ").Append(_sGain.ToString(inv))
+                  .Append(", niezaplaceni wrocili do osad: ").Append(_sBack.ToString(inv)).Append(" ludzi)")
                   .Append(", wyposazenie rycerza pan -> kasa targu ").Append(Flag(KnightHooked, KnightOn, _kPaid));
                 return sb.ToString();
             }
@@ -278,8 +325,10 @@ namespace Armoury
                 sb.Append(" | niewolnicy: ");
                 if (!SlavesHooked) sb.Append("latka nie jest wpieta (BK jak dotad)");
                 else if (!SlavesOn) sb.Append("WYLACZONE w ustawieniach (BK jak dotad)");
-                else sb.Append(_sSales).Append(" sprzedazy, cena BK ").Append(_sGain.ToString(inv)).Append(", zaplacily kasy osad ").Append(_sPaid.ToString(inv))
-                       .Append(" (niedoplata - uboga kasa ").Append((_sGain - _sPaid).ToString(inv)).Append(')');
+                else sb.Append(_sSales).Append(" sprzedazy BK: ").Append(_sSold.ToString(inv)).Append(" niewolnikow za cene BK ").Append(_sGain.ToString(inv))
+                       .Append(", zaplacily kasy osad ").Append(_sPaid.ToString(inv)).Append("; niezaplaceni wrocili do ludnosci osad ").Append(_sBack.ToString(inv))
+                       .Append("; pominiete, bo kasa nie miala wolnego zlota ").Append(_sSkip)
+                       .Append(_sOdd > 0 ? "; liczba sprzedanych nieustalona (jak przed poprawka) " + _sOdd : "");
                 sb.Append(" | wyposazenie rycerza: ");
                 if (!KnightHooked) sb.Append("latka nie jest wpieta (BKROT jak dotad; wywolan ChangeHeroGold w kodzie BKROT ").Append(_knightIlCalls).Append(')');
                 else if (!KnightOn) sb.Append("WYLACZONE w ustawieniach (BKROT jak dotad)");
@@ -328,7 +377,22 @@ namespace Armoury
             {
                 var tParty = QuartermasterLaw.FindType("BannerKings.Behaviours.BKPartyBehavior");
                 var sell = tParty != null ? AccessTools.Method(tParty, "SellSurplusSlaves", new[] { typeof(Settlement) }) : null;
+                var tCfg = QuartermasterLaw.FindType("BannerKings.BannerKingsConfig");
+                var tPm = QuartermasterLaw.FindType("BannerKings.Managers.PopulationManager");
+                if (_cfgInstance == null && tCfg != null) _cfgInstance = AccessTools.Property(tCfg, "Instance");
+                if (_cfgPopMgr == null && tCfg != null) _cfgPopMgr = AccessTools.Property(tCfg, "PopulationManager");
+                if (_getPopData == null && tPm != null) _getPopData = AccessTools.Method(tPm, "GetPopData", new[] { typeof(Settlement) });
+                var pdT = _getPopData != null ? _getPopData.ReturnType : null;
+                _updatePopType = pdT != null ? AccessTools.Method(pdT, "UpdatePopType") : null;
+                var popT = _updatePopType != null ? _updatePopType.GetParameters() : null;
+                if (popT != null && popT.Length == 3 && popT[0].ParameterType.IsEnum && popT[1].ParameterType == typeof(int) && popT[2].ParameterType == typeof(bool))
+                {
+                    _slavesType = Enum.Parse(popT[0].ParameterType, "Slaves");
+                    _getTypeCount = AccessTools.Method(pdT, "GetTypeCount", new[] { popT[0].ParameterType });
+                }
                 if (sell == null) miss.Add("niewolnicy BRAK (BKPartyBehavior.SellSurplusSlaves) - BK jak dotad");
+                else if (_cfgInstance == null || _cfgPopMgr == null || _getPopData == null || _slavesType == null || _getTypeCount == null)
+                    miss.Add("niewolnicy BRAK (PopulationData.GetTypeCount/UpdatePopType(Slaves)) - BK jak dotad");
                 else
                 {
                     h.Patch(sell, prefix: new HarmonyMethod(typeof(BkSeal34), nameof(SlavesPre)), postfix: new HarmonyMethod(typeof(BkSeal34), nameof(SlavesPost)));

@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace Armoury
@@ -31,10 +32,13 @@ namespace Armoury
     ///  - z polki osady, w ktorej partia stoi (miasto, zamek, wies), najtansze pierwsze (jak BK), kazda sztuka po swojej cenie targu
     ///    dla tej partii (ShelfBuy.Take - ceny hurtu, decyzja Jeffa 09.10), do zlota lidera (jak BK);
     ///  - zaplata GiveGoldAction lider -> osada (kasa miasta lub zamku, kiesa wsi): przelew w ksiedze pieniadza, nic w nicosc;
-    ///  - TYLKO w dobowym Tick (flaga wokol PartySupplies.Tick): wejscie do miasta nie kupuje, bo gra (PartiesSellLootCampaignBehavior,
-    ///    wejscie lorda AI do miasta) sprzedaje od razu kazdy towar niejadalny - drewno, narzedzia, wino - wiec zakup przy wejsciu
-    ///    (BK wola swoj nasluch przed nasluchem gry) wracalby zaraz na polke z utrata na cenie i 1/9 dla korony (Ransom178).
-    ///    Zuzycie (ConsumeItems) biegnie w tym samym Tick zaraz po zakupie.
+    ///  - w dobowym Tick (flaga wokol PartySupplies.Tick) i przy wejsciu do miasta albo zamku (BK: OnSettlementEntered, Town != null) ta sama
+    ///    regula, z jednym wyjatkiem przy WEJSCIU: sztuki, ktore gra zaraz odsprzeda, sie pomija. Gra (PartiesSellLootCampaignBehavior) przy
+    ///    wejsciu lorda AI (nie gracza, nie rozwiazywanej partii, nie do wroga) do MIASTA (nie zamku) sprzedaje kazdy towar niejadalny
+    ///    (IsFood false: drewno, narzedzia, wino) i kazdego konia poza wierzchowcem bez modyfikatora; nasluch BK biegnie przed nasluchem gry,
+    ///    wiec taki zakup wracalby od razu na polke ze strata na cenie i 1/9 dla korony (Ransom178). Zywnosc (piwo, mieso, ser, ryby),
+    ///    zakupy gracza i zakupy w zamku przy wejsciu ida normalnie (poprawka po recenzji 3.4: dotad wejscie nie kupowalo nic).
+    ///    Zuzycie (ConsumeItems) biegnie w dobowym Tick zaraz po zakupie.
     /// Wylaczone: BK jak dotad (w tym blad zapasu osady i zloto w nicosc).
     /// Kara morale z zaopatrzenia (wzor BK) - nietknieta (osobny krok W1, BkSupplyTemper).
     /// </summary>
@@ -50,14 +54,14 @@ namespace Armoury
         private static readonly string[] GName = { "napitki", "drewno", "produkty zwierzece", "narzedzia", "inne" };
 
         // ------------------------------------------------------------ liczniki doby (linia "Szczelnosc BK (3.4)" i czesc linii "Obieg: BK")
-        private static int _dCalls, _dBuys, _dFull, _dNoGoods, _dNoGold, _dNoLeader, _dEntry, _dStumbles;
+        private static int _dCalls, _dBuys, _dFull, _dNoGoods, _dNoGold, _dNoLeader, _dEntry, _dEntryBuys, _dStumbles;
         private static readonly long[] _dPieces = new long[Groups], _dGold = new long[Groups];
         internal static long DayTown, DayCastle, DayVillage;    // zloto rody -> kasy osad dzis
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
 
         internal static void ClearDay()
         {
-            _dCalls = _dBuys = _dFull = _dNoGoods = _dNoGold = _dNoLeader = _dEntry = 0;
+            _dCalls = _dBuys = _dFull = _dNoGoods = _dNoGold = _dNoLeader = _dEntry = _dEntryBuys = _dStumbles = 0;   // potkniecia tez z doby (poprawka po recenzji)
             Array.Clear(_dPieces, 0, Groups); Array.Clear(_dGold, 0, Groups);
             DayTown = DayCastle = DayVillage = 0;
         }
@@ -88,15 +92,14 @@ namespace Armoury
             if (!On) return true;
             try
             {
-                if (_tickDepth <= 0) { if (__0 >= 1f) _dEntry++; return false; }   // wejscie do osady - bez zakupu (patrz opis klasy)
                 var mp = _party != null ? _party.GetValue(__instance, null) as MobileParty : null;
-                if (mp != null) Buy(mp, __0, __1);
+                if (mp != null) Buy(mp, __0, __1, _tickDepth <= 0);   // poza Tick = wejscie do miasta/zamku (BKPartyNeedsBehavior.OnSettlementEntered)
             }
             catch (Exception e) { Stumble("BuyPrefix", e); }
             return false;
         }
 
-        private static void Buy(MobileParty mp, float floatCount, List<ItemCategory> cats)
+        private static void Buy(MobileParty mp, float floatCount, List<ItemCategory> cats, bool entry)
         {
             if (cats == null || cats.Count == 0) return;
             int want = (int)Math.Floor(floatCount);   // jak BK: potrzeba x dni, w dol
@@ -122,13 +125,18 @@ namespace Armoury
             if (need <= 0) { _dFull++; return; }
             var shelf = st.ItemRoster;
             var offer = new List<EquipmentElement>();
+            bool resell = entry && ResoldOnEntry(mp, st);   // zaraz po nasluchu BK gra sprzeda lordowi AI w miescie towar niejadalny
+            int withheld = 0;
             for (int i = 0; i < shelf.Count; i++)
             {
                 var e = shelf.GetElementCopyAtIndex(i);
                 var it = e.EquipmentElement.Item;
-                if (it != null && e.Amount > 0 && cats.Contains(it.ItemCategory)) offer.Add(e.EquipmentElement);
+                if (it == null || e.Amount <= 0 || !cats.Contains(it.ItemCategory)) continue;
+                if (resell && GameSellsOnEntry(e.EquipmentElement)) { withheld++; continue; }
+                offer.Add(e.EquipmentElement);
             }
-            if (offer.Count == 0) { _dNoGoods++; return; }
+            if (withheld > 0) _dEntry++;
+            if (offer.Count == 0) { if (withheld == 0) _dNoGoods++; return; }
             offer.Sort((a, b) => a.ItemValue.CompareTo(b.ItemValue));   // jak BK: najtansze pierwsze
             var comp = st.SettlementComponent;
             int got = 0;
@@ -147,7 +155,25 @@ namespace Armoury
                 _dPieces[g] += n; _dGold[g] += cost;
                 if (st.IsVillage) DayVillage += cost; else if (st.IsCastle) DayCastle += cost; else DayTown += cost;
             }
-            if (got > 0) _dBuys++; else _dNoGold++;   // towar byl, a nic nie zeszlo - cena ponad kiese lidera
+            if (got > 0) { _dBuys++; if (entry) _dEntryBuys++; } else _dNoGold++;   // towar byl, a nic nie zeszlo - cena ponad kiese lidera
+        }
+
+        /// <summary>Warunek partii i osady z PartiesSellLootCampaignBehavior.OnSettlementEntered (dekompilacja gry): gra sprzedaje przy wejsciu
+        /// tylko za lorda AI (nie gracz, partia lorda, nie rozwiazywana), tylko w miescie (nie zamek) i tylko w osadzie niewrogiej.</summary>
+        private static bool ResoldOnEntry(MobileParty mp, Settlement st)
+        {
+            if (mp.IsMainParty || !mp.IsLordParty || mp.IsDisbanding || !st.IsTown) return false;
+            return !FactionManager.IsAtWarAgainstFaction(mp.MapFaction, st.MapFaction);
+        }
+
+        /// <summary>Warunek sztuki z PartiesSellLoot: sprzedaje kazda sztuke niejadalna, a z koni - wszystko poza wierzchowcem bez modyfikatora.</summary>
+        private static bool GameSellsOnEntry(EquipmentElement el)
+        {
+            var it = el.Item;
+            if (it == null || it.IsFood) return false;
+            if (it.ItemType != ItemObject.ItemTypeEnum.Horse) return true;
+            var hc = it.HorseComponent;
+            return hc == null || !hc.IsRideable || el.ItemModifier != null || hc.IsPackAnimal;
         }
 
         private static int GroupOf(List<ItemCategory> cats)
@@ -170,7 +196,7 @@ namespace Armoury
             sb.Append("zaopatrzenie BK (wedlug zapasu partii, sufit ").Append(Settings.Current != null ? Settings.Current.BkSupplyMaxPieces : 0)
               .Append(" szt.): zakupow ").Append(_dBuys).Append(" z ").Append(_dCalls).Append(" wywolan z potrzeba >= 1 szt. (zapas pelny ").Append(_dFull)
               .Append(", bez towaru ").Append(_dNoGoods).Append(", bez zlota ").Append(_dNoGold).Append(", bez wodza ").Append(_dNoLeader)
-              .Append("; przy wejsciu do osady pominiete ").Append(_dEntry).Append(") | sztuk/zl:");
+              .Append("; przy wejsciu do miasta/zamku: zakupow ").Append(_dEntryBuys).Append(", wywolan z pominietym towarem, ktory gra zaraz odsprzedaje (lord AI w miescie, niejadalne) ").Append(_dEntry).Append(") | sztuk/zl:");
             for (int g = 0; g < Groups; g++) sb.Append(g == 0 ? " " : ", ").Append(GName[g]).Append(' ').Append(_dPieces[g]).Append('/').Append(_dGold[g].ToString(inv));
             sb.Append(" | rody -> kasy osad ").Append((DayTown + DayCastle + DayVillage).ToString(inv)).Append(" (miasta ").Append(DayTown.ToString(inv))
               .Append(", zamki ").Append(DayCastle.ToString(inv)).Append(", wsie ").Append(DayVillage.ToString(inv)).Append(')');
@@ -197,7 +223,7 @@ namespace Armoury
                 h.Patch(tick, prefix: new HarmonyMethod(typeof(BkSupplyMarket), nameof(TickPre)), finalizer: new HarmonyMethod(typeof(BkSupplyMarket), nameof(TickFin)));
                 h.Patch(buy, prefix: new HarmonyMethod(typeof(BkSupplyMarket), nameof(BuyPrefix)));
                 Hooked = true;
-                Log.Info("BkSupplyMarket (3.4): zakupy zaopatrzenia BK wedlug zapasu PARTII (sufit Bk Supply Max Pieces na kategorie), z polki osady, zaplata do kasy osady, tylko w dobowym Tick - wpiete"
+                Log.Info("BkSupplyMarket (3.4): zakupy zaopatrzenia BK wedlug zapasu PARTII (sufit Bk Supply Max Pieces na kategorie), z polki osady, zaplata do kasy osady, w dobowym Tick i przy wejsciu (bez towaru, ktory gra zaraz odsprzedaje) - wpiete"
                          + (On ? "" : " (WYLACZONE w ustawieniach - BK jak dotad)") + ".");
             }
             catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }
