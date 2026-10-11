@@ -720,3 +720,6 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   jeden lancuch RBL -> ROT -> NavalDLC -> BEE -> BK. Pytanie do Jeffa: pasza koni na pustyni/sniegu - (a) tylko E4/1 (rada) / (b) dzis: zima max(E4/1, BK), poza zima formula
   BK (zla). **Plany kodu:** SCRATCH(ae222cb7)\e4\PLAN-KODU-E45.md (spustoszenie, 7 commitow, 14 kluczy, 21 progow; spalona wies w grze nie produkuje - latka TickProductions)
   i PLAN-KODU-E47.md. E4/4 kod w toku (wf_4d6430c3-d4f). Nastepny test zbiorczy: E4/4 + jedzenie (+E4/5) -> WGRANIE 31.
+- (06:40) **E4/4 GOTOWE:** w-toku/e4-4 2a6ca1e (od c02c80f; test\Armoury-e4-4.dll 6c9c0104). RESZTA hearth +677/d = 2 wsie podwojnie w Settlement.All (blad pomiaru, poprawiony).
+  E4/4 NIE MOZE ISC BEZ E4/5 (rabunek dzis usuwa ludzi w nicosc: w wojnie ok. -25%/rok). E4/5 KOD w toku (drzewo e4\45, galaz w-toku/e4-5 od 2a6ca1e, plan docs/etap4/PLAN-KODU-E45.md).
+  Test zbiorczy po E4/5: zbior31 = e4-5 (zawiera e4-4) + e4-jedzenie (b6c2139) -> test 120 dob + zima 120 (plik-przelacznik) + zapis -> WGRANIE 31.
