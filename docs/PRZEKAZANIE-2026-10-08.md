@@ -694,3 +694,12 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (03:50) **D11 GOTOWE** (w-toku/d11: d028f29..a1fdff3 + poprawki recenzji; test\Armoury-d11.dll; grupa MCM "Defeats and payers (D11)": DefeatMoraleHalf, BandJoinPurseToPlayer,
   WorkshopOwnerPaysTownTax, BkSupplyFromMenPurse, RotSwapPayToPurse, LordPurseOnlyToVictor). Recenzja: 0 krytycznych/waznych. Czeka na scalenie i test zbiorczy.
   Etap 5 rozpisany Jeffowi w czacie (porcje A kasy miast / B kiesa ludu + podatek wojenny + wyrownanie + targ przy zamku + statki / C reszta; 2-3 noce, po etapie 4).
+- (04:20) **WSZYSTKIE PACZKI ZBIORU 30 GOTOWE (po recenzjach):** w-toku/d11 ebf7552 (od 7aa4a6e), w-toku/e4-2 3e10b11 (od 2a71008), w-toku/e4-3 81429c3 (od 3e10b11;
+  + w toku poprawka "wyposrodkowanie z wojna" - tempo powrotu wyrzutkow: wojna wolno OutlawRoutedHomeDaysWar, pokoj szybko OutlawRoutedHomeDays - agent w tle, commit na
+  w-toku/e4-3), w-toku/e4-1 9e6b218 (od 7aa4a6e; zima wedlug krain + proba zimy: plik-przelacznik
+  C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-proba-zimy.flag - polozyc przed biegiem B, usunac po), w-toku/e3-36b 0d5f2e7 (od 7aa4a6e;
+  wedrowcy BK z prawdziwym towarem). **KROKI:** worktree SCRATCH(ae222cb7)\e4\z30 z galezia w-toku/zbior30 od d11 (ebf7552) -> git merge kolejno e4-3 (zawiera e4-2), e4-1,
+  e3-36b; konflikty: CHANGELOG (python -I SCRATCH(ae222cb7)\d1\union.py CHANGELOG.md cl), McmSettings (git checkout --ours, potem python tools/gen_mcm.py), reszta union.py
+  (przejrzec wypisane konflikty!) -> build Armoury -> test A: 120 dob nowej kampanii; test B: 120 dob z plikiem-przelacznikiem; zapis 9 dob -> progi etap2/etap3/etap4
+  (narzedzie z drzewa z30) -> WGRANIE 30 (z kopia). Do zgloszenia Jeffowi (E4/1 recenzja): model jedzenia RBL przejmuje caly lancuch (nie dzialaja ROT "Inni nie jedza",
+  NavalDLC -20% na morzu, BEE, pasza/perki BK) - stan sprzed E4/1, decyzja Jeffa.
