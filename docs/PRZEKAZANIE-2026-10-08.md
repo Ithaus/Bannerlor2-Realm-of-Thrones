@@ -707,3 +707,7 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   ArmouryBehavior i pozycje ksiegi MoneyLedger (NBkSupply 7, NTravel 8, Notes 9) scalone recznie), build kod 0, test\Armoury-z30.dll 9d314ea6. TEST A (120 dob nowej
   kampanii) w toku -> test\at-z30-A.out.txt. Potem: TEST B - polozyc plik C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-proba-zimy.flag, 120 dob,
   usunac plik; potem zapis 9 dob; progi etap2/3/4 (tools z drzewa z30) -> WGRANIE 30.
+- (05:20) **ZBIOR 30 - TEST A (120 dob nowej kampanii) OK:** 0 bledow; etap 3 20/20 TAK (reszta -1.5 tys./d); etap 2: wojsko lordow w wojnie 100.6 tys., glowy 0,
+  bankruci 0, dezercja AI 6/d (baza 49), bandy -18%/-16%; etap 4: NIE tylko znane dziury pomiaru (T2 hearth +677/d -> E4/4, T6, T7 -> E4/7-9) + pula wyrzutkow d60/90/120
+  1.7/3.0/4.0 tys. (rosnie w wojnie przy 1/120 - plateau dopiero po roku). TEST B (proba zimy, plik-przelacznik polozony 05:16; skrypt usuwa go po tescie) w toku ->
+  test\at-z30-B.out.txt; potem zapis 9 dob -> WGRANIE 30.
