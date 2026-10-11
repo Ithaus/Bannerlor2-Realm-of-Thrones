@@ -36,7 +36,8 @@ namespace Armoury
     ///     bitwy, nikomu nie zabrana (kiese pokonanych i tak bierze gra). -> BLOKADA (zero). Tabor Spoils i tak wycina
     ///     BattlefieldLaw - to zabezpieczenie na wypadek wylaczenia prawa pola bitwy.
     ///  4. LootCollectionBehavior.TryTriggerRandomEvent - "ukryta skrzynia" 50-200 zl, "okup od rannego" 30-120 zl i "dodatkowy
-    ///     sprzet" (+1 sztuka z niczego). -> te trzy BLOKADA; "bandyci ukradli" (sztuka mniej) zostaje jak u Spoils.
+    ///     sprzet" (+1 sztuka z niczego). -> te trzy BLOKADA; "bandyci ukradli" (sztuka mniej) zostaje jak u Spoils
+    ///     (3.9, SpoilsBanditsToBand: sztuka do jukow bandy w zasiegu wzroku gracza, bez bandy zdarzenie nie zachodzi - Drobne39).
     ///  5. LootCollectionBehavior.ExecuteFenceSale - paser w zaulku placi graczowi z niczego, lup znika. -> PLATNIK: kasa miasta
     ///     ponad rezerwe na renty (TownRentFloorGold; B-4: zamek ponad zapas kupcow - CastlePurse.PayFloor), za sztuke najwyzej cena skupu targu (OutlawLaw.FencePrice - ta sama co dla
     ///     band), sztuka na polke miasta; czego miasto nie kupi - zostaje w sakwach. Limit pasera (CalculateGoldLimit) przyciety
@@ -176,6 +177,7 @@ namespace Armoury
         internal static void Reset()
         {
             SpoilsCompany.Reset();   // klan najemnikow Spoils (liczniki) - ten sam moment co reszta Spoils
+            Drobne39.Reset();        // 3.9: liczniki drobnych (trzecia od sumy, bandyci do bandy) - ten sam moment
             ClearDay();
             _stumbles = 0;
             _lastWait = _lastWaitMask = _lastWrecks = _lastNoSmith = 0; _lastTown = "";
@@ -382,7 +384,7 @@ namespace Armoury
             var el = loot.GetElementCopyAtIndex(MBRandom.RandomInt(loot.Count));
             var item = el.EquipmentElement.Item;
             string name = item != null && item.Name != null ? item.Name.ToString() : "item";
-            loot.AddToCounts(el.EquipmentElement, -1);
+            if (!Drobne39.Steal(loot, el.EquipmentElement)) return;   // 3.9: sztuka do jukow bandy w zasiegu wzroku (nie w nicosc); bez bandy zdarzenie nie zachodzi
             string msg = new TextObject("{=RL_Event_Bandits}Bandits raided the camp and stole: {ITEM}!").SetTextVariable("ITEM", name).ToString();
             _fEvMessage.SetValue(beh, msg);
             _evBandits++;
@@ -1096,7 +1098,7 @@ namespace Armoury
                   .Append(" zl, wyplacono z niczego ").Append(_coins[1]).Append(" zl; zloto taboru - zablokowano ").Append(_trade[0]).Append(" zl, wyplacono z niczego ").Append(_trade[1]).Append(" zl")
                   .Append("; zdarzenia przy zbieraniu - zablokowano skrzynie ").Append(_evChest).Append(" (").Append(_evChestGold).Append(" zl), okupy ").Append(_evRansom)
                   .Append(" (").Append(_evRansomGold).Append(" zl), dodatkowy sprzet ").Append(_evExtra).Append(" szt. (").Append(_evExtraValue).Append(" zl), bandyci ukradli ")
-                  .Append(_evBandits).Append(" szt. (jak u Spoils), wyplacono z niczego ").Append(_evLetGold).Append(" zl")
+                  .Append(_evBandits).Append(" szt. ").Append(Drobne39.BanditsNote()).Append(", wyplacono z niczego ").Append(_evLetGold).Append(" zl")
                   .Append("; paser: ").Append(Deal(_fence)).Append(", wyplacono z niczego ").Append(_fenceLet).Append(" zl")
                   .Append("; przetop u kwatermistrza: ").Append(Deal(_salv)).Append(", wyplacono z niczego ").Append(_salvLet).Append(" zl")
                   .Append("; dar sprzetu dla klanu najemnikow (zaplata do skarbca klanu): ").Append(Deal(_don)).Append(", wyplacono z niczego ").Append(_donLet).Append(" zl")

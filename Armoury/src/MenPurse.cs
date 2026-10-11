@@ -161,7 +161,7 @@ namespace Armoury
             int d = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == d) return;
             if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut + _daySaved) > 0)
-                Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord
+                Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord + Drobne39.ThirdNote()
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki), wyszlo " + _dayOut
                          + " (sprzet, naprawy, odziez, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
@@ -499,7 +499,7 @@ namespace Armoury
             var s = Settings.Current;
             if (roster == null) roster = mp.MemberRoster;
             float pct = garrison && !MenUpgrade.GarrisonPurseOn ? 100f : MBMath.ClampFloat(s.LordLootThirdPercent, 0f, 100f);   // bez sakiewki zalogi - wszystko panu
-            int sold = 0;
+            int sold = 0, cutSum = 0;   // 3.9: cutSum - trzecia oddana juz w tej wizycie (Drobne39.ThirdCut)
             bool stop = false;
             int meleeLeft = AiMeleeLeft(arm, roster);   // K1 A9 - jedna definicja nadwyzki (int.MaxValue = bez grupy broni bialej)
             foreach (var type in QuartermasterLaw.KitTypes)
@@ -526,14 +526,14 @@ namespace Armoury
                         Measure174b.NoteArrival(st, it, 1, garrison ? Measure174b.ArrGarrison : Measure174b.ArrPurse);   // 174b.0 M1: nowa sztuka na polce (scalenie sklad8: nadwyzki zalog ida tu - zrodlo "zalogi" jak w 174b)
                         st.Town.ChangeGold(-unit);
                         MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
-                        int cut = third != null && third.IsAlive ? (int)Math.Round(unit * pct / 100f) : 0;
+                        int cut = third != null && third.IsAlive ? Drobne39.ThirdCut(unit, gold, cutSum, pct) : 0;   // 3.9: od sumy wizyty (dotad od sztuki - przy cenie 1 zl dawalo 0)
                         if (cut > 0)
                         {
                             third.ChangeHeroGold(cut);
                             if (third != Hero.MainHero) ClanIncomeBook.NoteInflow(third, cut, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
                         }
                         Add(mp, unit - cut);
-                        sold++; gold += unit; _dayLord += cut; planned++;
+                        sold++; gold += unit; _dayLord += cut; planned++; cutSum += cut;
                         SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
                         MenUpgrade.NoteChurn(mp, it, false);                           // K1 (przeglad): kupione i sprzedane tej samej doby (autotest: 0)
                     }

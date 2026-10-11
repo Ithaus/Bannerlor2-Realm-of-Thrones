@@ -876,6 +876,18 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool EnlistedSoldierNoLooting { get; set; } = true;
 
+        [SettingPropertyBool("Lord Third On Total", HintText = "an AI lord's third (and a garrison lord's share) of his men's sale of spare kit is reckoned on the whole visit's takings, not piece by piece - a one-denar piece no longer rounds his share down to nothing (off = per piece, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LordThirdOnTotal { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Bandits To Band", HintText = "Spoils of War's 'bandits raided the camp' event: the stolen piece goes into the packs of the nearest band within your sight - with no band near, nothing is stolen (off = the piece vanishes, as in Spoils of War)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsBanditsToBand { get; set; } = true;
+
+        [SettingPropertyBool("Dte Scrap Keep", HintText = "Dynamic Troop Equipment no longer deletes the cheapest gear above its per-category cap in your army armoury (only with Commander's Greed off): the gear stays, and your men sell what they cannot use to the merchants of the next town - horses are not sold and stay in the armoury (off = deleted, as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool DteScrapKeep { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -4150,6 +4162,9 @@ namespace Armoury
             s.SellPriceByCondition = SellPriceByCondition;
             s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
+            s.LordThirdOnTotal = LordThirdOnTotal;
+            s.SpoilsBanditsToBand = SpoilsBanditsToBand;
+            s.DteScrapKeep = DteScrapKeep;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
