@@ -93,9 +93,11 @@ namespace RealisticCaptivity
                     int bribe = Settings.Current.EscapeBribeGold;
                     if (Hero.MainHero.Gold >= bribe && bribe > 0)
                     {
-                        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, bribe);
-                        Log.Info("Lapowka " + bribe + " zaplacona przez " + helper.Name);
-                        Log.Player(helper.Name + " bribed a guard for you (-" + bribe + " gold).");
+                        if (Drobne39.PayBribe(bribe) > 0)   // 3.9: lapowka do kiesy partii zdobywcy (straznik jest jej czlowiekiem), nie w nicosc
+                        {
+                            Log.Info("Lapowka " + bribe + " zaplacona przez " + helper.Name);
+                            Log.Player(helper.Name + " bribed a guard for you (-" + bribe + " gold).");
+                        }
                     }
                 }
 

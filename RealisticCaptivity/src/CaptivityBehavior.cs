@@ -649,16 +649,28 @@ namespace RealisticCaptivity
                     Log.Player("Your captors are broken, and your war gear is back on your shoulders.", true);
                 }
                 else if (HasStoredGear && Settings.Current.FenceGearWhenNoLord && (captor == null || !captor.IsAlive))
-                    FenceGear();
+                    FenceGear(party);
             }
             catch (Exception e) { Log.Error("OnHeroPrisonerReleased", e); }
         }
 
         /// <summary>Bandyci nie handluja - sprzedaja lup paserowi. Rynsztunek laduje na targu najblizszego miasta.</summary>
-        private void FenceGear()
+        private void FenceGear(PartyBase captorParty)
         {
             try
             {
+                if (Drobne39.FenceOn)   // 3.9: miasto placi bandzie (paser jak przy lupie band), czego nie kupi - zostaje w jukach bandy
+                {
+                    if (!Drobne39.FenceGear(_storedGear, captorParty))
+                    {
+                        RestoreGear();   // zdobywcow juz nie ma - porzucony oboz, rynsztunek wraca (jak przy odbiciu sila)
+                        Log.Player("Your captors are gone. You find your war gear in their abandoned camp.");
+                        return;
+                    }
+                    _storedGear.Clear();
+                    _gearBuybackPrice = 0;
+                    return;
+                }
                 Settlement best = null;
                 float bestDist = float.MaxValue;
                 var myPos = MobileParty.MainParty.GetPosition2D;

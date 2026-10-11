@@ -144,6 +144,14 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Bandit plunder")]
         public bool FenceGearWhenNoLord { get; set; } = true;
 
+        [SettingPropertyBool("Escape Bribe To Captor", HintText = "the bribe for your escape goes into the purse of the party holding you - the guard is its man (off = the coin vanishes, as before)")]
+        [SettingPropertyGroup("Bandit plunder")]
+        public bool EscapeBribeToCaptor { get; set; } = true;
+
+        [SettingPropertyBool("Fence Gear Paid", HintText = "bandits selling your gear are paid for it by the nearest town, out of its coffers above its reserve, with the fence keeping his cut as for any band's loot; what the town will not pay for stays in the band's packs; with your captors gone you take your gear back (off = the gear lands on the market for free, as before)")]
+        [SettingPropertyGroup("Bandit plunder")]
+        public bool FenceGearPaid { get; set; } = true;
+
         [SettingPropertyBool("Starvation Enabled", HintText = "poor food and cold cells wear a prisoner down")]
         [SettingPropertyGroup("Hunger in the cells")]
         public bool StarvationEnabled { get; set; } = true;
@@ -463,6 +471,8 @@ namespace RealisticCaptivity
             s.LordRansomPerTown = LordRansomPerTown;
             s.LordRansomPerCastle = LordRansomPerCastle;
             s.FenceGearWhenNoLord = FenceGearWhenNoLord;
+            s.EscapeBribeToCaptor = EscapeBribeToCaptor;
+            s.FenceGearPaid = FenceGearPaid;
             s.StarvationEnabled = StarvationEnabled;
             s.StarvationHealthPerDay = StarvationHealthPerDay;
             s.StarvationLowbornFactor = StarvationLowbornFactor;
