@@ -201,7 +201,8 @@ namespace Armoury
             }
             // zegar zostaje, dopoki region ma uchodzcow albo jest mlodszy niz RefugeeReturnDays (porzadek w zapisie - starszy niczego juz nie wstrzymuje)
             int today = (int)CampaignTime.Now.ToDays;
-            int keep = 364;     // K2: RefugeeReturnDays
+            var s = Settings.Current;
+            int keep = Math.Max(30, s != null ? s.RefugeeReturnDays : 364);
             first = true;
             foreach (var kv in clocks)
             {

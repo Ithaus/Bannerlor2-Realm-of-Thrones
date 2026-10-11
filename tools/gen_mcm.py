@@ -61,6 +61,19 @@ RANGES = {
     # E4/1 (189): czynnik cieplych krain i udzial paszy - przycinane w kodzie do 0..1
     'WinterWarmRealmFactor': (0.0, 1.0, "0.00"),
     'WinterHorseFeedShare': (0.0, 1.0, "0.00"),
+    # E4/5 (113n): spustoszenie - suwaki zgodne z przycieciem w kodzie (pulap najwyzej 95 - 113 ryzyko 11; procenty 0..100; powrot Q+1..; elastycznosc 0..2)
+    'DevastationPerRaiderDay': (0.0, 2.0, "0.00"),
+    'DevastationPerForagerDay': (0.0, 1.0, "0.00"),
+    'DevastationMaxPercent': (0, 95, "0"),
+    'DevastationKilledPercent': (0, 100, "0"),
+    'DevastationKilledSlaverPercent': (0, 100, "0"),
+    'DevastationOutlawBasePercent': (0, 100, "0"),
+    'DevastationOutlawDangerPercent': (0, 100, "0"),
+    'DevastationCaptivesPercent': (0, 100, "0"),
+    'RefugeeReturnQuietDays': (0, 120, "0"),
+    'RefugeeReturnDays': (30, 1092, "0"),
+    'RefugeeYearlyLossPercent': (0.0, 20.0, "0.0"),
+    'DevastationYieldElasticity': (0.0, 2.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

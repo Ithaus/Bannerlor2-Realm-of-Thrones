@@ -439,6 +439,9 @@ namespace Armoury
                 if (def == null || def.TroopCount > 0) return;
                 var st = me.MapEventSettlement;
                 if (st == null || !st.IsVillage || st.Village == null) return;
+                // E4/5: krok pod spustoszeniem - hearth rusza tylko ksiega (PeopleBook.Move MDevRaid), kroki i lup liczy Devastation (StepsToday). Bez tego finalizer
+                // W6 liczylby przywrocony hearth jako "rabunek gry" i ten sam ruch drugi raz z ksiegi (albo smieci, gdyby pobiegl przed finalizerem Devastation)
+                if (Devastation.CoversQuiet(st.Village)) return;
                 Hero leader = null;
                 try { var lp = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
                 __state = new RState { V = st.Village, H = st.Village.Hearth, Leader = leader, Gold = leader != null ? leader.Gold : 0 };
@@ -860,9 +863,13 @@ namespace Armoury
             // E4/3: nasze ruchy hearth za ludzi wprost z ksiegi (PeopleBook.Move; znak: + gdy wies zyskuje). Tabory i lodzie gry (MCart) mierza okna W3-W5 - nie drugi raz.
             double o1 = -mv[PeopleBook.MMisery], o2 = -mv[PeopleBook.MRaidFlee], o3 = mv[PeopleBook.MPoolHome] + mv[PeopleBook.MCommon], o4 = mv[PeopleBook.MH3Cart], o5 = _forage;
             double o6 = mv[PeopleBook.MDisband], o7 = mv[PeopleBook.MPress] + mv[PeopleBook.MQuest] + mv[PeopleBook.MIncident];
+            // E4/5: spustoszenie (rabunek i zerowanie - trafieni z DOM) i powrot uchodzcow - hearth z ksiegi; podloga 10 z uchodzcow (MRefugeeFloor) NIE - jej hearth jest w ticku W1
+            double o8 = mv[PeopleBook.MDevRaid] + mv[PeopleBook.MDevForage], o9 = mv[PeopleBook.MRefugeeHome];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 - (seedInside ? seedH : 0);
+            int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
+            try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
             double rest = dH - named;
             double restModel = _vModel - _vExpl - _vScar;
@@ -875,7 +882,7 @@ namespace Armoury
                 // E4/4: przy czynnym przyroscie tick to przyrost naturalny + powrot uchodzcow; stala gry tylko pokazana (nie wchodzi). "stala gry: baza" zostaje w linii (narzedzie T3)
                 if (_vGrowN > 0)
                     sb.Append("przyrost naturalny (E4/4) ").Append(S(_vNat)).Append(", powrot uchodzcow (+0.5 ponizej ").Append(Settings.Current != null ? Math.Max(1, Settings.Current.RefugeeFloorHearth) : 40)
-                      .Append(", do E4/5) ").Append(S(_vRef)).Append(" w ").Append(_vGrowN).Append(" tickach z przyrostem; stala gry: baza ").Append(S(_vBase))
+                      .Append(Devastation.On ? ", tylko wsie bez spustoszenia E4/5) " : ", spustoszenie E4/5 wylaczone) ").Append(S(_vRef)).Append(" w ").Append(_vGrowN).Append(" tickach z przyrostem; stala gry: baza ").Append(S(_vBase))
                       .Append(" (zastapiona przez E4/4 - nie wchodzi do ticku), z mnoznikami ").Append(S(_vBaseMul));
                 else
                     sb.Append("stala gry: baza ").Append(S(_vBase)).Append(", z mnoznikami ").Append(S(_vBaseMul));
@@ -886,12 +893,14 @@ namespace Armoury
                   .Append(" - tabory wsi -").Append(F2(cartsH)).Append(" (nowe ").Append(_cartNewN).Append(", uzupelnienia ").Append(_cartRefN).Append("; ludzi ").Append(_cartNewMen + _cartRefMen)
                   .Append(PeopleUnit.On ? "; od E4/3: n/k osady, gra: (n+1)/2)" : "; gra: (n+1)/2)")
                   .Append(" - lodzie rybackie -").Append(F2(fishH)).Append(" (nowe ").Append(_fishNewN).Append(", uzupelnienia ").Append(_fishRefN).Append("; ludzi ").Append(_fishNewMen + _fishRefMen).Append(')')
-                  .Append(" - rabunek gry -").Append(F2(_raidH)).Append(" (krokow ").Append(_raidSteps).Append(", wsi ").Append(_raidVill.Count).Append("; lup z niczego ").Append(_raidGoldAi + _raidGoldPlayer)
-                  .Append(" zl, w tym gracz ").Append(_raidGoldPlayer).Append(')')
+                  .Append(" - rabunek gry -").Append(F2(_raidH)).Append(" (krokow ").Append(_raidSteps).Append(", wsi ").Append(_raidVill.Count).Append("; lup z niczego ").Append(_raidGoldAi + _raidGoldPlayer + devLootAi + devLootPlayer)
+                  .Append(" zl, w tym gracz ").Append(_raidGoldPlayer + devLootPlayer).Append("; pod spustoszeniem E4/5 krokow ").Append(devSteps).Append(" - hearth w ksiedze, lup ")
+                  .Append(devLootAi + devLootPlayer).Append(" zl)")
                   .Append(" + nasze (ksiega ludzi PeopleBook.Move, E4/3): wyrzutki w las (bieda) -").Append(F2(o1)).Append(", spalona wies w las -").Append(F2(o2))
                   .Append(", powrot do wsi (OutlawLaw z puli + LosersFlee ToCommon) +").Append(F2(o3)).Append(", rozbite tabory do swojej wsi +").Append(F2(o4))
                   .Append(", rozwiazane tabory i lodzie do swojej wsi (R18) +").Append(F2(o6)).Append(", gracz (pobor wymuszony, zadania, incydenty) ").Append(S(o7))
-                  .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)");
+                  .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)")
+                  .Append(", spustoszenie (E4/5: rabunek, zerowanie) ").Append(S(o8)).Append(", powrot uchodzcow +").Append(F2(o9));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

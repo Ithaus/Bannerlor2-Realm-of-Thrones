@@ -672,6 +672,10 @@ namespace Armoury
             try
             {
                 if (!On || v == null || v.Settlement == null) return;
+                // E4/5: przy czynnym spustoszeniu w las idzie czesc ludzi trafionych rabunkiem (Devastation.Strike -> AddFled, takze z rabunku przerwanego
+                // i z zerowania armii) - ta regula liczylaby ich drugi raz
+                float per;
+                if (Devastation.Covers(v, out per)) return;
                 var region = RegionOf(v.Settlement);
                 // ilu ucieka: procent podstawy wsi (hearth, a przy liczeniu od ludzi - jej ludnosc w hearth sredniej wsi swiata); stawka hearth za czlowieka w TakeFrom (E4/3)
                 float men = PeopleUnit.Base(v) * Settings.Current.OutlawRaidFleePercent / 100f;
@@ -681,6 +685,17 @@ namespace Armoury
                 _inRaid += men;
             }
             catch (Exception e) { Log.Error("OutlawLaw.VillageLooted", e); }
+        }
+
+        /// <summary>
+        /// E4/5: ludzie wsi wygnani spustoszeniem, ktorzy poszli w las (Devastation.Strike): do puli regionu wsi, 1:1. Hearth zdjal juz wolajacy
+        /// (PeopleBook.Move razem z zabitymi i uchodzcami) - tu tylko pula i licznik "rabunki" linii "Wyrzutki:".
+        /// </summary>
+        internal static void AddFled(Settlement village, float men)
+        {
+            if (!On || village == null || !(men > 0f) || float.IsInfinity(men)) return;
+            Add(RegionOf(village), Commoner, men);
+            _inRaid += men;
         }
 
         internal static void OnPartyDestroyed(MobileParty party, PartyBase destroyer)
@@ -1050,7 +1065,7 @@ namespace Armoury
                          + " | band " + bands + ", ludzi " + men
                          + " | dezercja poza pula (W4): Inni dezerterzy - do niczego " + _desUndead + ", " + OverflowHome.Segment() + "."
                          + (h3 ? H3Segment() : "")
-                         + " | hearth za tych ludzi (E4/3, PeopleBook.Move): rabunki -" + _hRaid.ToString("0.###", CultureInfo.InvariantCulture)
+                         + " | hearth za tych ludzi (E4/3, PeopleBook.Move): rabunki (przy spustoszeniu E4/5 hearth w ksiedze: spustoszenie) -" + _hRaid.ToString("0.###", CultureInfo.InvariantCulture)
                          + ", bieda/wojna -" + _hMisery.ToString("0.###", CultureInfo.InvariantCulture) + ", powrot do wsi +" + _hReturn.ToString("0.###", CultureInfo.InvariantCulture) + ".");
                 try { Log.Info(PoolLine(s, tot)); } catch (Exception e) { Log.Error("OutlawLaw.PoolLine", e); }   // E4/3: naplyw i odplyw puli wedlug przyczyny
                 FenceLog(s, _upFence, _fenceGold);

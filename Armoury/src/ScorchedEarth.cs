@@ -27,12 +27,18 @@ namespace Armoury
     ///    i podatki w vanilla/BK - zadnych dodatkowych kar, zero spirali;
     ///  - UMARLI NIE ZERUJA (nie jedza) - horda NK nie drenuje marszem,
     ///    ich sprawka to konwersje ROT.
+    /// E4/5 (Devastation): przy czynnym spustoszeniu marsz nie zdejmuje hearth w skali gry, tylko pustoszy ULAMEK okregu w ludziach
+    /// (DevastationPerForagerDay na zbrojnego na dobe) - trafieni ida przez ksiege ludzi (zabici, las, uchodzcy) i wracaja w ciagu roku;
+    /// podloge hearth zastepuje pulap spustoszenia okregu, a "+0.5 ponizej 40" nie dziala dla wsi objetej (uchodzcy wracaja z konta).
     /// </summary>
     internal static class ScorchedEarth
     {
         private static readonly TextObject _txtScar = new TextObject("{=!}War scars");
         private static List<Village> _villages;
         private static int _playerForageShown = -1;
+
+        /// <summary>E4/5: stan jednej kampanii (lista wsi to obiekty tej kampanii - po wczytaniu innej gry bez restartu bylyby martwe; 113 recenzja).</summary>
+        internal static void Reset() { _villages = null; _playerForageShown = -1; }
 
         internal static void OnDaily()
         {
@@ -51,6 +57,10 @@ namespace Armoury
                 float radius = Math.Max(1f, s.ForageRadius);
                 int floor = Math.Max(0, s.ForageFloor);
                 int day = (int)CampaignTime.Now.ToDays;
+                // E4/5: marsz pustoszy ulamek okregu (ludzie -> zabici, las, uchodzcy), a nie hearth w skali gry. Pierwsza doba nowej kampanii: zerowanie biegnie
+                // przed rentami i siewem puli wyrzutkow, czyli przed kalibracja ludnosci - bez niej wies nie mialaby przelicznika i dostalaby stara regule
+                bool dev = Devastation.On;
+                if (dev) PopulationLaw.EnsureCalibrated();
 
                 foreach (var mp in MobileParty.All)
                 {
@@ -65,15 +75,28 @@ namespace Armoury
                     foreach (var v in _villages)
                     {
                         if (v == null || v.Settlement == null) continue;
-                        if (v.Hearth <= floor) continue;
+                        if (!dev && v.Hearth <= floor) continue;
                         var vf = v.Settlement.MapFaction;
                         if (vf == null || vf == f || !FactionManager.IsAtWarAgainstFaction(vf, f)) continue;
                         if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
 
-                        float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
-                        float h0 = v.Hearth;
-                        v.Hearth = Math.Max(floor, v.Hearth - drain);
-                        try { Measure40.NoteHearth(Measure40.SrcForage, v.Hearth - h0, v.Settlement); } catch { }   // E4/0: zerowanie armii (tu licznika nie ma; tylko pomiar)
+                        // E4/5: wies bez przelicznika ludzi (w ROT nie ma takiej) zostaje przy starej regule z podloga hearth
+                        float per;
+                        bool people = dev && Devastation.Covers(v, out per);
+                        if (dev && !people && v.Hearth <= floor) continue;
+                        if (people)
+                        {
+                            // okreg spustoszony do pulapu nie ma juz czego oddac - jak dawna podloga: szukamy nastepnej wsi; ruch hearth liczy ksiega (MDevForage)
+                            if (!Devastation.Open(v)) continue;
+                            Devastation.Forage(v, mp);
+                        }
+                        else
+                        {
+                            float drain = Math.Max(0.2f, s.ForageHearthPerDay * mp.MemberRoster.TotalManCount / 500f);
+                            float h0 = v.Hearth;
+                            v.Hearth = Math.Max(floor, v.Hearth - drain);
+                            try { Measure40.NoteHearth(Measure40.SrcForage, v.Hearth - h0, v.Settlement); } catch { }   // E4/0: zerowanie armii (tu licznika nie ma; tylko pomiar) - tylko stara sciezka
+                        }
                         if (grain != null && mp.ItemRoster != null)
                         {
                             int want = 1 + mp.MemberRoster.TotalManCount / 250;
@@ -145,7 +168,7 @@ namespace Armoury
                 if (m != null)
                     h.Patch(m, postfix: new HarmonyMethod(typeof(ScorchedEarth).GetMethod("HearthScarPostfix")) { priority = Priority.Last });
                 Log.Info("ScorchedEarth: foraging (podloga " + s.ForageFloor + " palenisk) i blizny wojenne (regen "
-                         + s.ScarRegenPercent + "% ponizej " + s.ScarThresholdHearth + ") uzbrojone.");
+                         + s.ScarRegenPercent + "% ponizej " + s.ScarThresholdHearth + ") uzbrojone; przy czynnym spustoszeniu (Devastation, E4/5) marsz pustoszy ulamek okregu w ludziach (podloga hearth nie dziala).");
             }
             catch (Exception e) { Log.Error("ScorchedEarth.ApplyAll", e); }
         }
