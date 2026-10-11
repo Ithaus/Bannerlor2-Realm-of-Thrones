@@ -1168,3 +1168,5 @@ z prawdziwym towarem)). RC 90665425, GT bbb841d7, CS 77b11df5 bez zmian. Testy: 
 6/d, bandy -16%; B 120 dob z proba zimy - zima od 8. doby, ciecie plonu Wyspy Letnie 0% / cieple 16% / reszta 49%, zamki z ujemnym bilansem 1 z 130, pusty spichlerz 0,
 glodne druzyny lordow ok. 29 z 680; zapis 9 dob OK (0 bledow, 27.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-11-przed-noc30 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc30-przed.
 ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
+- (06:50) **Jeff: pasza koni - wariant (a):** jedna zasada przez caly rok - kazdy kon po glowie (funkcja AnimalNeed z E4/1); formula BK CalculateAnimalFoodNeed (1 kon na typ
+  oddzialu) zastapiona nasza liczba zwierzat przy warunkach terenu BK (pustynia x1, snieg x0.5); zima E4/1 dolicza roznice. Kod w toku na w-toku/e4-jedzenie (agent w tle).
