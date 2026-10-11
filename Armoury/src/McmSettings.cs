@@ -4284,7 +4284,7 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool LordPurseOnlyToVictor { get; set; } = true;
 
-        [SettingPropertyBool("Battle Plunder From Loser Only", HintText = "the coin the victors of a battle share out comes only from what the beaten really lose. A beaten lord - or you - hands over his share of it (the game's 5% of his coin, at most 10,000) even when he is taken captive or flees, and the victors never get more than the beaten pay; a beaten leader with no coin gives nothing, and the Others take no coin. The same for you and the AI. Sunk ships at sea are not changed here (off = as before: the victors get the beaten lord's share out of thin air and he keeps his coin)")]
+        [SettingPropertyBool("Battle Plunder From Loser Only", HintText = "the coin the victors of a battle share out comes only from what the beaten really lose. A beaten lord - or you - hands over his share of it (the game's 5% of his coin, at most 10,000) even when he is taken captive or flees, and the victors never get more than the beaten pay; a beaten leader with no coin gives nothing. What a captor already took from a captive's purse when he was taken (Realistic Captivity going through your baggage) counts toward his share - he is not robbed twice. The Others take no coin (with Beaten Purse To Victor on). In war the crown takes its ninth of what a vassal wins from a beaten lord's purse, as of any plunder (Crown Thirds). The same for you and the AI. Sunk ships at sea are not changed here (off = as before: the victors get the beaten lord's share out of thin air and he keeps his coin)")]
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool BattlePlunderFromLoserOnly { get; set; } = true;
 

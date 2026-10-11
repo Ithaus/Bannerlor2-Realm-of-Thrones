@@ -526,6 +526,9 @@ def etap5_main(logp, start_arg):
                       ("A6: bez A6 byloby z niczego", r"bez A6 byloby ([+-]?\d+)"),
                       ("A6: wodzowie zdjeci z partii zaplacili", r"wodzowie zdjeci z partii \(A6 - niewola, ucieczka\) (\d+)"),
                       ("A6: obciete zwyciezcom (pokonany bez zlota)", r"obciete zwyciezcom \(pokonany bez zlota albo poza swiatem\) (\d+)"),
+                      ("A6: zaliczone wodzom - oddane przy pojmaniu (RealisticCaptivity; recenzja A6 (1))", r"przy pojmaniu - RealisticCaptivity\) (\d+)"),
+                      ("A6: w tym gracz - zaliczka z pojmania", r"przy pojmaniu - RealisticCaptivity\) \d+ \(w tym gracz (\d+)\)"),
+                      ("A6: podstawa 1/9 korony z czesci wodzow (178; recenzja A6 (2a))", r"zgloszona do podstawy (\d+)"),
                       ("A6: statki zatopione wyplacone z niczego (B5)", r"wyplacone z niczego (\d+)")):
         v = mean_a6(pat)
         rep.add(name + " (srednia 28 dob)", f"{v:.0f}" if v is not None else "brak linii", "INFO", None)

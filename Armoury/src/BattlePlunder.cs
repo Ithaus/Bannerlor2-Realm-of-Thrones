@@ -29,22 +29,35 @@ namespace Armoury
     ///  - Statki zatopione w bitwie morskiej (LootDefeatedPartyShips, MapEvent.cs:1800-1817) dopisuja PlunderedGold PO podziale puli - to paczka B5
     ///    (ShipsPrizesToPort 181), tu tylko liczone osobno.
     ///  - Inne mody: NavalDLCBattleRewardModel oddaje metody lupu modelowi bazowemu; ROT (CalculateAndCommitMapEventResults - tylko przedmioty smokow),
-    ///    BK, RBM, BEE, DTE tych metod nie lataja (skan DLL i dekompilacja 11.10).
+    ///    BK, RBM, BEE, DTE tych metod nie lataja (skan DLL i dekompilacja 11.10). Recenzja A6 (2): ROT EnlistmentPatches.patch39 - postfiks na
+    ///    GETTERZE MapEventParty.PlunderedGold (blob atrybutu: MapEventParty, "PlunderedGold", MethodType.Getter) zwraca 0 dla MainParty, gdy gracz
+    ///    jest na zaciagu; gra, 3.2 i A6 czytaja ten sam getter, wiec takiego udzialu nikt nie wyplaca i pokonani za niego nie placa (reszte
+    ///    zaokraglen 3.2 - total minus widoczne udzialy - dostaje "top" i ten udzial A6 obciaza pokonanych jak kazdy inny; rachunek zamkniety).
+    ///  - Nasz RealisticCaptivity (CaptivityBehavior.LootBaggage, nasluch HeroPrisonerTaken): pojmany GRACZ oddaje pojmujacemu LootGoldPercent
+    ///    (60 u Jeffa, ModuleData/RealisticCaptivity.settings.xml) zlota - w TakePrisonerAction wewnatrz CaptureDefeatedPartyMembers, czyli PRZED
+    ///    rozliczeniem A6 (recenzja A6 (1)). Pojmujacy bez bohatera (banda bez wodza, milicja/zaloga - gra daje jenca osadzie) - RC daje
+    ///    zloto null, czyli w nicosc (stary wyciek RC, nie A6 - do decyzji Jeffa); A6 i tak liczy je jako zaliczke (gracz nie traci drugi raz).
     ///
     /// TERAZ (jedna regula: gracz, AI, bandy; suma lupu zwyciezcow z puli = suma tego, co naprawde schodzi z pokonanych):
     ///  1. MIGAWKA (postfiks Last na CalculatePlunderedAndLostGoldAmounts - po 3.2 BeatenPurse.SplitPostfix): wodz kazdego pokonanego z GoldLost
-    ///     (zanim gra zdejmie go z partii) i udzial kazdego zwyciezcy w puli (PlunderedGold przed dopiskiem za statki).
+    ///     (zanim gra zdejmie go z partii) z jego zlotem w tej chwili i udzial kazdego zwyciezcy w puli (PlunderedGold przed dopiskiem za statki).
     ///  2. ROZLICZENIE (prefiks CommitCalculatedMapEventResults, przed kazda wyplata): zwyciezcy, ktorym gra wyplaci (wodz albo kiesa handlowa;
-    ///     Inni - nie: trup monety nie bierze, jak 3.2/112 - ich udzial z puli zdjety) maja dostac PayW. Kiesy partii bez wodza (3.2) placa, co
-    ///     gra z nich zdejmie (min(GoldLost, kiesa)); reszte PayW placa wodzowie pokonanych - proporcjonalnie do min(GoldLost, zloto wodza);
-    ///     wodz, ktory zostal w partii - gra (GoldLost = jego czesc); wodz zdjety z partii (niewola, ucieczka, gracz w niewoli) - A6 w jego
-    ///     CommitGoldChanges. Gdy pokonani nie maja tyle (wodz poza swiatem albo bez zlota - 0), udzialy zwyciezcow z puli maleja do tego, co
-    ///     naprawde zejdzie; udzialow, ktorych gra nie wyplaci (milicja, osada, partia lorda bez wodza), pokonani nie placa.
+    ///     Inni - nie, gdy wlaczone 3.2: trup monety nie bierze, jak 3.2/112 - ich udzial z puli zdjety; recenzja A6 (3): przy wylaczonym 3.2 kiesy
+    ///     placa pelne GoldLost, wiec udzialu Innych nie zdejmujemy - inaczej zszedlby z pokonanych w nicosc) maja dostac PayW. Kiesy partii bez
+    ///     wodza (3.2) placa, co gra z nich zdejmie (min(GoldLost, kiesa)); reszte PayW placa wodzowie pokonanych - proporcjonalnie do tego, co
+    ///     moga dac: min(GoldLost, zloto wodza) MINUS to, co od migawki juz zeszlo z jego zlota (recenzja A6 (1): RealisticCaptivity zabral pojmanemu
+    ///     graczowi czesc kiesy dla pojmujacego - to zaliczka na jego czesc puli, nie drugi lup za to samo; jedna regula dla wszystkich wodzow,
+    ///     u AI zwykle 0); wodz, ktory zostal w partii - gra (GoldLost = jego czesc); wodz zdjety z partii (niewola, ucieczka, gracz w niewoli) -
+    ///     A6 w jego CommitGoldChanges. Gdy pokonani nie maja tyle (wodz poza swiatem, bez zlota albo juz oddal przy pojmaniu), udzialy zwyciezcow
+    ///     z puli maleja do tego, co naprawde zejdzie; udzialow, ktorych gra nie wyplaci (milicja, osada, partia lorda bez wodza), pokonani nie placa.
+    ///     Recenzja A6 (2a): czesc udzialu wodza-zwyciezcy, ktora placa wodzowie pokonanych, idzie do podstawy 1/9 korony (Ransom178.NoteBeatenGold -
+    ///     prawo trzecich 178, decyzja Jeffa 09.10 Q3b "korona bierze 1/9 lupu wasali"; czesc z kies zglasza 3.2, statki - 181).
     ///  3. OBCIAZENIE (prefiks Normal na MapEventParty.CommitGoldChanges - po oknie ksiegi O14 "bitwy", ktore ma prefiks First): GiveGoldAction
     ///     wodz -> nic (to samo zdarzenie, ktorym gra placi GoldLost); ksiega widzi je w UJSCIACH "bitwy" obok ZRODEL "bitwy" (wyplata gry).
     ///     Gdyby partia nie doszla do swojej wyplaty - postfiks CommitCalculatedMapEventResults obciaza po wszystkim (licznik "poza oknem").
     /// Platnik -> odbiorca: zloto wodza pokonanego (i kiesa rozbitej partii - 3.2) -> zwyciezcy wedlug wkladu. Bez podwojenia: 3.2 przenosi kiesy
-    /// partii bez wodza (A6 ich nie rusza), CasualtyLoot i MenPurse - sakiewki ludzi (inny garnek), statki - B5. Linia "Lup w bitwie (A6)".
+    /// partii bez wodza (A6 ich nie rusza), CasualtyLoot i MenPurse - sakiewki ludzi (inny garnek), statki - B5, RealisticCaptivity - zaliczka
+    /// (wyzej). Wodz-wasal zwyciezcow -> skarbiec korony: 1/9 jego czesci z kies wodzow (178, nastepnego ranka). Linia "Lup w bitwie (A6)".
     /// </summary>
     internal static class BattlePlunder
     {
@@ -59,6 +72,7 @@ namespace Armoury
         {
             internal readonly List<MapEventParty> Losers = new List<MapEventParty>();
             internal readonly List<Hero> Leaders = new List<Hero>();
+            internal readonly List<int> Gold0 = new List<int>();          // zloto wodza w chwili migawki (recenzja A6 (1): zaliczka oddana przy pojmaniu)
             internal readonly List<MapEventParty> Winners = new List<MapEventParty>();
             internal readonly List<int> Pool = new List<int>();
         }
@@ -74,6 +88,7 @@ namespace Armoury
         private static long _takeGame, _takeOurs, _takePlayer, _takePurse;   // zdjete z pokonanych: gra (wodz w partii), A6 (wodz zdjety), kiesy partii bez wodza
         private static long _shipsPaid, _shipsUnpaid, _noSnapGold;   // dopisek gry za statki zatopione (po podziale puli) - B5, bez zmian: wyplacony / bez wyplaty
         private static long _cut, _undeadCut, _unpaid, _excess, _short, _noPayer, _vanilla;
+        private static long _prepaid, _prepaidPlayer, _ninth;  // recenzja A6: zaliczone wodzom (oddane przy pojmaniu - RealisticCaptivity), podstawa 1/9 korony z czesci wodzow
 
         internal static void Reset()
         {
@@ -86,6 +101,7 @@ namespace Armoury
             _battles = _snapN = _noSnap = _stumbles = _staleSnaps = _stalePending = _late = _gameTook = 0;
             _payLords = _payParties = _takeGame = _takeOurs = _takePlayer = _takePurse = _shipsPaid = _shipsUnpaid = _noSnapGold = 0;
             _cut = _undeadCut = _unpaid = _excess = _short = _noPayer = _vanilla = 0;
+            _prepaid = _prepaidPlayer = _ninth = 0;
         }
 
         /// <summary>Wyjatek przy jednej bitwie: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -109,7 +125,8 @@ namespace Armoury
                 {
                     if (d == null || d.GoldLost <= 0) continue;
                     if (sn == null) sn = new Snap();
-                    sn.Losers.Add(d); sn.Leaders.Add(d.Party != null ? d.Party.LeaderHero : null);
+                    var lh = d.Party != null ? d.Party.LeaderHero : null;
+                    sn.Losers.Add(d); sn.Leaders.Add(lh); sn.Gold0.Add(lh != null ? lh.Gold : 0);
                 }
                 if (sn == null) return;                         // bez puli - nic do wyplaty
                 foreach (var w in __0)
@@ -169,6 +186,9 @@ namespace Armoury
                 if (!CountShips(__instance, sn)) { _noSnap++; return; }   // pula bez migawki - gra bez zmian, zloto w "wyplata bez migawki"
                 if (!has) return;
                 bool on = On;
+                // recenzja A6 (3): udzial Innych zdejmujemy tylko przy wlaczonym 3.2 - wtedy kiesy pokonanych placa tylko wyplacana czesc puli (3.2 fd);
+                // przy wylaczonym 3.2 kiesy placa pelne GoldLost, wiec zdjety udzial Innych zszedlby z pokonanych w nicosc - Inni biora jak w grze
+                bool cutUndead = BeatenPurse.On;
 
                 // zwyciezcy: udzial z puli (bez dopisku za statki) i czy gra go wyplaci
                 int nw = sn.Winners.Count;
@@ -184,13 +204,14 @@ namespace Armoury
                     bool hero = p != null && p.LeaderHero != null;
                     bool trade = !hero && p != null && p.IsMobile && mp != null && mp.IsPartyTradeActive;
                     if (!hero && !trade) { _unpaid += pool[i]; continue; }            // gra nic nie wyplaci (milicja, osada, partia lorda bez wodza)
-                    if (mp != null && Undead.Party(mp)) { undead += pool[i]; continue; }   // Inni - nizej (wlaczone: udzial zdjety)
+                    if (cutUndead && mp != null && Undead.Party(mp)) { undead += pool[i]; continue; }   // Inni - nizej (wlaczone A6 i 3.2: udzial zdjety)
                     pay[i] = true; payW += pool[i];
                 }
 
                 // pokonani: co zejdzie naprawde (gra: wodz w partii i kiesa handlowa; A6: wodz zdjety z partii)
                 int nl = sn.Losers.Count;
                 var cls = new int[nl]; var cap = new long[nl]; var who = new Hero[nl];   // cls: 0 - nic, 1 - wodz (gra), 2 - wodz zdjety (A6), 3 - kiesa
+                var pre = new long[nl];                         // recenzja A6 (1): czesc puli wodza zaliczona na to, co juz oddal od migawki (pojmanie)
                 long purseReal = 0, lordCap = 0, gameCap = 0;
                 for (int i = 0; i < nl; i++)
                 {
@@ -201,7 +222,9 @@ namespace Armoury
                     Hero now = p != null ? p.LeaderHero : null;
                     if (now != null)
                     {
-                        cls[i] = 1; who[i] = now; cap[i] = Math.Min(lost, Math.Max(0, now.Gold)); lordCap += cap[i]; gameCap += cap[i];
+                        // wodz w partii: ten sam w migawce - zaliczka liczona tak samo (zwykle 0: odwrot i smierc w bitwie bez pojmania)
+                        cls[i] = 1; who[i] = now; cap[i] = LeaderCap(lost, now, sn.Leaders[i] == now ? sn.Gold0[i] : now.Gold, out pre[i]);
+                        lordCap += cap[i]; gameCap += Math.Min(lost, Math.Max(0, now.Gold));   // gra (wylaczone A6) zdjelaby pelne min(GoldLost, zloto)
                     }
                     else if (p != null && p.IsMobile && p.MobileParty != null && p.MobileParty.IsPartyTradeActive)
                     {
@@ -210,7 +233,7 @@ namespace Armoury
                     else
                     {
                         var h = sn.Leaders[i];
-                        if (h != null && !CirculationWindows.OutOfWorld(h)) { cls[i] = 2; who[i] = h; cap[i] = Math.Min(lost, Math.Max(0, h.Gold)); lordCap += cap[i]; }
+                        if (h != null && !CirculationWindows.OutOfWorld(h)) { cls[i] = 2; who[i] = h; cap[i] = LeaderCap(lost, h, sn.Gold0[i], out pre[i]); lordCap += cap[i]; }
                         else _noPayer += lost;                  // wodz poza swiatem albo partia bez wodza i bez kiesy - nikt nie zaplaci
                     }
                 }
@@ -247,6 +270,7 @@ namespace Armoury
                     d.GoldLost = (int)part[i];                  // wodz w partii: gra obciazy go ta kwota (GiveGoldAction wodz -> nic)
                     if (cls[i] == 1) _takeGame += part[i];
                     else if (part[i] > 0) _pending[d] = new Charge { H = who[i], Amount = (int)part[i] };
+                    if (pre[i] > 0) { _prepaid += pre[i]; if (who[i] == Hero.MainHero) _prepaidPlayer += pre[i]; }   // recenzja A6 (1): zaliczka z pojmania
                 }
                 _takePurse += purseReal;
 
@@ -264,8 +288,42 @@ namespace Armoury
                 }
                 else if (supply > payW) _excess += supply - payW;   // kiesy (3.2, zaokraglenia w gore) zaplacily wiecej niz pula wyplacana
                 for (int i = 0; i < nw; i++) if (pay[i]) AddPay(sn.Winners[i], fin[i]);
+
+                // recenzja A6 (2a): korona 1/9 (prawo trzecich 178; Jeff 09.10 Q3b "korona bierze 1/9 lupu wasali") - czesc udzialu wodza-zwyciezcy
+                // placona przez wodzow pokonanych (lordPay rozdzielone wedlug wyplacanych udzialow - jak 3.2 dzieli czesc z kies); wasal w wojnie
+                // sprawdza Ransom178 (Taxed), Inni - nie (jak 3.2)
+                if (lordPay > 0)
+                {
+                    var fw = new long[nw];
+                    for (int i = 0; i < nw; i++) fw[i] = pay[i] ? fin[i] : 0;
+                    var lp = Split(lordPay, fw);
+                    for (int i = 0; i < nw; i++)
+                    {
+                        if (lp[i] <= 0) continue;
+                        var p = sn.Winners[i].Party;
+                        var h = p != null ? p.LeaderHero : null;
+                        var mp = p != null ? p.MobileParty : null;
+                        if (h == null || !h.IsAlive || (mp != null && Undead.Party(mp))) continue;
+                        Ransom178.NoteBeatenGold(h, lp[i]);
+                        _ninth += lp[i];
+                    }
+                }
             }
             catch (Exception e) { Stumble("CommitPrefix", e); }
+        }
+
+        /// <summary>
+        /// Recenzja A6 (1): ile wodz pokonanych moze dac z puli - min(GoldLost, zloto teraz) minus to, co od migawki juz zeszlo z jego zlota
+        /// (zaliczka: RealisticCaptivity LootBaggage przy pojmaniu gracza oddaje czesc kiesy pojmujacemu - drugi raz za to samo nie bierzemy).
+        /// Jedna regula dla gracza i AI (u AI zwykle 0). Nic z niczego: mniejsza czesc wodza = mniejsze udzialy zwyciezcow (ciecie nizej).
+        /// </summary>
+        private static long LeaderCap(int lost, Hero h, int gold0, out long credited)
+        {
+            long g = Math.Max(0, h.Gold);
+            long full = Math.Min((long)lost, g);
+            long gone = Math.Max(0L, (long)gold0 - g);
+            credited = Math.Min(full, gone);
+            return full - credited;
         }
 
         private static bool IsUndeadPayable(MapEventParty w)
@@ -446,6 +504,9 @@ namespace Armoury
                   .Append(" | obciete zwyciezcom (pokonany bez zlota albo poza swiatem) ").Append(_cut).Append(", Innym nie wyplacono ").Append(_undeadCut)
                   .Append(", udzialy, ktorych gra nie wyplaca (milicja, osada, partia bez wodza i kiesy) - pokonani ich nie placa ").Append(_unpaid)
                   .Append(", kiesy zaplacily ponad pule (zaokraglenia 3.2) ").Append(_excess).Append(", pokonani bez platnika ").Append(_noPayer)
+                  .Append(" | zaliczone wodzom pokonanych (zloto zabrane im przy pojmaniu - RealisticCaptivity) ").Append(_prepaid).Append(" (w tym gracz ").Append(_prepaidPlayer).Append(")")
+                  .Append(" | korona 1/9 (178): czesc wodzow-zwyciezcow z kies wodzow pokonanych zgloszona do podstawy ").Append(_ninth).Append(" (liczy tylko wasal w wojnie)")
+                  .Append(BeatenPurse.On ? "" : " | 3.2 WYLACZONE - Inni biora udzial z puli jak w grze")
                   .Append(" | kontrolki: obciazenie mniejsze niz plan ").Append(_short).Append(", poza oknem ksiegi ").Append(_late).Append(", przejete przez gre ").Append(_gameTook)
                   .Append(", wyplaty przerwane ").Append(_stalePending).Append(", migawki bez wyplaty ").Append(_staleSnaps)
                   .Append(" | latki: migawka ").Append(_splitHooked ? "tak" : "NIE").Append(", rozliczenie ").Append(_commitHooked ? "tak" : "NIE").Append(", obciazenie ").Append(_chargeHooked ? "tak" : "NIE");
