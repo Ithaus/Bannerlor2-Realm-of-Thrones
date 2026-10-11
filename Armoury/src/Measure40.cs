@@ -865,9 +865,12 @@ namespace Armoury
             double o6 = mv[PeopleBook.MDisband], o7 = mv[PeopleBook.MPress] + mv[PeopleBook.MQuest] + mv[PeopleBook.MIncident];
             // E4/5: spustoszenie (rabunek i zerowanie - trafieni z DOM) i powrot uchodzcow - hearth z ksiegi; podloga 10 z uchodzcow (MRefugeeFloor) NIE - jej hearth jest w ticku W1
             double o8 = mv[PeopleBook.MDevRaid] + mv[PeopleBook.MDevForage], o9 = mv[PeopleBook.MRefugeeHome];
+            // E4/7: pobor z wsi (BK DeduceManpower, A5 - ujemne) i powroty zolnierzy ze znanym pochodzeniem do DOM regionu pochodzenia (dodatnie) - hearth z ksiegi
+            double o10 = mv[PeopleBook.MLevyVillage] + mv[PeopleBook.MLevyA5], o11 = 0;
+            for (int i = PeopleBook.MBackH3; i <= PeopleBook.MBackDisband; i++) o11 += mv[i];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -900,7 +903,8 @@ namespace Armoury
                   .Append(", powrot do wsi (OutlawLaw z puli + LosersFlee ToCommon) +").Append(F2(o3)).Append(", rozbite tabory do swojej wsi +").Append(F2(o4))
                   .Append(", rozwiazane tabory i lodzie do swojej wsi (R18) +").Append(F2(o6)).Append(", gracz (pobor wymuszony, zadania, incydenty) ").Append(S(o7))
                   .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)")
-                  .Append(", spustoszenie (E4/5: rabunek, zerowanie) ").Append(S(o8)).Append(", powrot uchodzcow +").Append(F2(o9));
+                  .Append(", spustoszenie (E4/5: rabunek, zerowanie) ").Append(S(o8)).Append(", powrot uchodzcow +").Append(F2(o9))
+                  .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

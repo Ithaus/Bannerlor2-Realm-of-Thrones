@@ -345,16 +345,49 @@ namespace Armoury
         {
             placed = false;
             if (region == null || men <= 0f) return 0.0;
+            var v = WeakestVillage(region);
+            if (v == null) return 0.0;
+            placed = true;
+            return PeopleBook.Move(v, from, PeopleBook.ADom, men, cause, Math.Max(0.01f, Settings.Current.OutlawHearthPerMan));
+        }
+
+        /// <summary>Wies powrotu do DOM regionu: najslabsza wies regionu; warownia bez wsi - najblizszy region z wsiami (ReturnHome; E4/7 PeopleBook.HomeKnown). null - brak.</summary>
+        internal static Village WeakestVillage(Settlement region)
+        {
+            if (region == null) return null;
             var vs = region.BoundVillages;
             if (vs == null || vs.Count == 0)
             {
                 var hr = HearthRegionAt(region.GetPosition2D);
                 vs = hr != null ? hr.BoundVillages : null;
-                if (vs == null || vs.Count == 0) return 0.0;
+                if (vs == null || vs.Count == 0) return null;
             }
-            var v = vs.OrderBy(x => x.Hearth).First();
-            placed = true;
-            return PeopleBook.Move(v, from, PeopleBook.ADom, men, cause, Math.Max(0.01f, Settings.Current.OutlawHearthPerMan));
+            return vs.OrderBy(x => x.Hearth).First();
+        }
+
+        /// <summary>E4/7: zolnierze (wszystkie klucze poza prostymi i starymi wightami) w puli regionu - mianownik udzialu znanych pochodzeniem (PeopleBook.PoolTake).</summary>
+        internal static float PoolTroops(Settlement region)
+        {
+            Dictionary<string, float> d;
+            if (region == null || region.StringId == null || !_pool.TryGetValue(region.StringId, out d)) return 0f;
+            float n = 0f;
+            foreach (var kv in d) if (kv.Key != Commoner && !SkipUndeadKey(kv.Key)) n += kv.Value;
+            return n;
+        }
+
+        private static float PoolTroopsOf(Dictionary<string, float> d)
+        {
+            float n = 0f;
+            if (d != null) foreach (var kv in d) if (kv.Key != Commoner && !SkipUndeadKey(kv.Key)) n += kv.Value;
+            return n;
+        }
+
+        /// <summary>E4/7: prosci w puli regionu (pochodzenie = region puli - wzieci z jego wsi) - konto WYRZUTKI regionu w rownaniu i w menu.</summary>
+        internal static float PoolCommoners(Settlement region)
+        {
+            Dictionary<string, float> d; float v;
+            if (region == null || region.StringId == null || !_pool.TryGetValue(region.StringId, out d) || !d.TryGetValue(Commoner, out v)) return 0f;
+            return v;
         }
 
         /// <summary>
@@ -445,8 +478,9 @@ namespace Armoury
             return c;
         }
 
-        /// <summary>Zabiera do `want` ludzi z regionu i sasiadow: najpierw zolnierze (dezerterzy), potem prosci.</summary>
-        private static TroopRoster Draw(Settlement home, int want, Clan clan)
+        /// <summary>Zabiera do `want` ludzi z regionu i sasiadow: najpierw zolnierze (dezerterzy), potem prosci. E4/7: org - udzialy pochodzenia zabranych (prosci = region
+        /// puli - wzieci z jego wsi; zolnierze - udzial znanych w puli, PeopleBook.PoolTake).</summary>
+        private static TroopRoster Draw(Settlement home, int want, Clan clan, PeopleBook.Shares org = null)
         {
             var roster = TroopRoster.CreateDummyTroopRoster();
             if (home == null || want <= 0) return roster;
@@ -464,6 +498,7 @@ namespace Armoury
                     if (n <= 0) continue;
                     var ch = MBObjectManager.Instance.GetObject<CharacterObject>(key);
                     if (ch == null) { _pTrim += d[key]; d.Remove(key); continue; }
+                    if (org != null) { try { org.AddAll(PeopleBook.PoolTake(r, n, PoolTroopsOf(d))); } catch { } }   // E4/7: przed zdjeciem (mianownik = zolnierze puli przed)
                     roster.AddToCounts(ch, n);
                     d[key] -= n; got += n; _pBirth += n;
                 }
@@ -473,6 +508,7 @@ namespace Armoury
                 {
                     roster.AddToCounts(commoner, nc);
                     d[Commoner] = cm - nc; got += nc; _pBirth += nc;
+                    if (org != null) org.Add(r.StringId, nc);                // E4/7: prosci - pochodzenie = region puli
                 }
                 foreach (var key in d.Keys.Where(k => d[k] < 0.01f).ToList()) { _pTrim += d[key]; d.Remove(key); }
             }
@@ -500,7 +536,10 @@ namespace Armoury
                 var s = Settings.Current;
                 bool noUndead = s != null && s.OutlawNoUndead;
                 bool undeadParty = noUndead && Undead.Party(party);
-                var home = OverflowHome.SendHome(party, roster);     // Inni: OverflowHome nie robi im notatki i nie wysyla wightow do wsi
+                // E4/7: udzialy pochodzenia dezerterow (zdarzenie gry po zdjeciu ze skladu - slownik jeszcze ich ma); W4c do domu z udzialem, reszta do puli z udzialem
+                PeopleBook.Shares org = null;
+                try { if (PeopleBook.OriginLive && !undeadParty) org = PeopleBook.Take(party.MemberRoster, PeopleBook.Men(roster), PeopleBook.FDesert); } catch { org = null; }
+                var home = OverflowHome.SendHome(party, roster, org);     // Inni: OverflowHome nie robi im notatki i nie wysyla wightow do wsi
                 var region = On ? NearestNode(party.Position.ToVec2()) : null;
                 for (int i = 0; i < roster.Count; i++)
                 {
@@ -510,9 +549,11 @@ namespace Armoury
                     if (undeadParty || (noUndead && Undead.Character(e.Character))) { _desUndead += n; continue; }
                     int h;
                     if (home != null && home.TryGetValue(e.Character, out h) && h > 0) { int k = Math.Min(h, n); n -= k; home[e.Character] = h - k; }
-                    if (n <= 0 || region == null) continue;
+                    if (n <= 0) continue;
+                    if (region == null) { if (org != null) { try { PeopleBook.Lost(org.Cut(n)); } catch { } } continue; }
                     Add(region, e.Character.StringId, n);
                     _inDesert += n;
+                    if (org != null) { try { PeopleBook.PoolShares(region, org.Cut(n)); } catch { } }
                 }
             }
             catch (Exception e) { Log.Error("OutlawLaw.Deserted", e); }
@@ -535,6 +576,18 @@ namespace Armoury
                     {
                         if (mep == null) continue;
                         AddRoster(region, mep.RoutedInBattle, share, ref _inRouted);
+                        // E4/7: udzial pochodzenia rozbitych - czesc do puli (jak AddRoster), reszta znika (dzis tez) - nicosc nazwana
+                        try
+                        {
+                            if (PeopleBook.OriginLive && mep.Party != null)
+                            {
+                                int rn = PeopleBook.Men(mep.RoutedInBattle);
+                                var org = PeopleBook.Take(mep.Party.MemberRoster, rn, PeopleBook.FRouted);
+                                PeopleBook.PoolShares(region, org.Cut(rn * share));
+                                PeopleBook.Lost(org);
+                            }
+                        }
+                        catch { }
                     }
                 }
             }
@@ -626,6 +679,9 @@ namespace Armoury
                         try { fac = mp != null ? mp.MapFaction : (mep.Party != null ? mep.Party.MapFaction : null); } catch { }
                         float sh = kind == LosersFlee.KBand ? bandShare : (kind == LosersFlee.KVillager || kind == LosersFlee.KCaravan) ? 0f : share;
                         var roster = mep.RoutedInBattle;
+                        // E4/7 (4.7): udzialy pochodzenia rozbitych - rozbici zeszli z rosteru w bitwie, slownik jeszcze ich ma (tabor: region wsi z definicji)
+                        PeopleBook.Shares org = null;
+                        try { if (PeopleBook.OriginLive && !undeadParty && mep.Party != null) org = PeopleBook.Take(mep.Party.MemberRoster, PeopleBook.Men(roster), PeopleBook.FRouted); } catch { org = null; }
                         for (int i = 0; i < roster.Count; i++)
                         {
                             var e = roster.GetElementCopyAtIndex(i);
@@ -634,6 +690,8 @@ namespace Armoury
                             routed += n;
                             // Inni: wighty powstaja z niczego (ROT) - ani w las, ani do domu; przed H3 polowa szla do puli, druga znikala
                             if (undeadParty || Undead.Character(e.Character)) { undead += n; continue; }
+                            PeopleBook.Shares slice = null;
+                            try { if (org != null) slice = org.Cut(n); } catch { slice = null; }
                             int toPool = sh > 0f && region != null ? Math.Min(n, MBRandom.RoundRandomized(n * sh)) : 0;
                             if (toPool > 0)
                             {
@@ -641,11 +699,12 @@ namespace Armoury
                                 pool += toPool;
                                 if (kind == LosersFlee.KBand) _h3PoolBand += toPool; else if (kind == LosersFlee.KGarrison) _h3PoolGarr += toPool; else _h3PoolArmy += toPool;
                                 LosersFlee.NoteWoods(region, toPool);
+                                if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(region, slice.Cut(toPool)); } catch { } }
                             }
                             int rest = n - Math.Max(0, toPool);
                             if (rest <= 0) continue;
                             int cat;
-                            int got = LosersFlee.SendHome(mp, e.Character, rest, pos, fac, LosersFlee.SrcRouted, out cat);
+                            int got = LosersFlee.SendHome(mp, e.Character, rest, pos, fac, LosersFlee.SrcRouted, out cat, slice);
                             if (got > 0)
                             {
                                 if (cat == LosersFlee.CatBk) bk += got; else if (cat == LosersFlee.CatTemplate) template += got; else village += got;
@@ -653,8 +712,8 @@ namespace Armoury
                             int left = rest - got;
                             if (left <= 0) continue;
                             homeless += left;
-                            if (law && region != null) { Add(region, e.Character.StringId, left); LosersFlee.NoteWoods(region, left); }
-                            else _h3Vanished += left;
+                            if (law && region != null) { Add(region, e.Character.StringId, left); LosersFlee.NoteWoods(region, left); if (slice != null && kind != LosersFlee.KVillager) { try { PeopleBook.PoolShares(region, slice); } catch { } } }
+                            else { _h3Vanished += left; if (slice != null) { try { PeopleBook.Lost(slice); } catch { } } }
                         }
                     }
                     catch (Exception ex) { _h3Stumbles++; if (!_errH3) { _errH3 = true; Log.Error("OutlawLaw.RoutedH3", ex); } }
@@ -718,6 +777,16 @@ namespace Armoury
                 bool noDead = Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen;
                 AddRoster(region, party.MemberRoster, 1f, ref _inDisband, noDead);
                 AddRoster(region, party.PrisonRoster, 1f, ref _inDisband, noDead);      // jency rozwiazanej bandy tez zostaja w lesie
+                // E4/7: udzialy pochodzenia skladu i lochu do puli (PRZED PeopleBook.OnPartyDestroyed - nasluch wpiety pozniej)
+                try
+                {
+                    if (PeopleBook.OriginLive)
+                    {
+                        PeopleBook.PoolShares(region, PeopleBook.Take(party.MemberRoster, PeopleBook.Men(party.MemberRoster), PeopleBook.FBandDisband));
+                        PeopleBook.PoolShares(region, PeopleBook.Take(party.PrisonRoster, PeopleBook.Men(party.PrisonRoster), PeopleBook.FBandDisband));
+                    }
+                }
+                catch { }
             }
             catch (Exception e) { Log.Error("OutlawLaw.PartyDestroyed", e); }
         }
@@ -921,7 +990,10 @@ namespace Armoury
                                                 if (one)
                                                 {
                                                     int cat1;
-                                                    got1 = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), 1, r.GetPosition2D, null, LosersFlee.SrcPool, out cat1);
+                                                    PeopleBook.Shares org1 = null;
+                                                    try { if (PeopleBook.OriginLive) org1 = PeopleBook.PoolTake(r, 1, PoolTroopsOf(d)); } catch { }   // E4/7: przed zdjeciem z puli
+                                                    got1 = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), 1, r.GetPosition2D, null, LosersFlee.SrcPool, out cat1, org1);
+                                                    if (org1 != null && org1.Total > 0) { try { PeopleBook.PoolShares(r, org1); } catch { } }   // nie przyjety - zostaje w puli
                                                 }
                                                 if (!one || got1 > 0)
                                                 {
@@ -938,7 +1010,10 @@ namespace Armoury
                                             if (n > 0)
                                             {
                                                 int cat;
-                                                int got = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), n, r.GetPosition2D, null, LosersFlee.SrcPool, out cat);
+                                                PeopleBook.Shares orgN = null;
+                                                try { if (PeopleBook.OriginLive) orgN = PeopleBook.PoolTake(r, n, PoolTroopsOf(d)); } catch { }   // E4/7: przed zdjeciem z puli
+                                                int got = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), n, r.GetPosition2D, null, LosersFlee.SrcPool, out cat, orgN);
+                                                if (orgN != null && orgN.Total > 0) { try { PeopleBook.PoolShares(r, orgN); } catch { } }   // nie przyjeci przez BK - zostaja w puli z udzialem
                                                 if (got > 0) { d[key] -= got; _h3BackBk += got; _pHomeSold += got; if (warHome) _pRoutedWar += got; else _pRoutedPeace += got; }
                                                 _pHomeSoldWant += n;
                                             }
@@ -993,6 +1068,8 @@ namespace Armoury
                                 p.PrisonRoster.AddToCounts(e.Character, -n);
                                 p.MemberRoster.AddToCounts(e.Character, n);
                                 _prisonerJoin += n;
+                                // E4/7: jeniec niesie pochodzenie do bandy (wlasny try, po przeniesieniu - Take nie patrzy na roster)
+                                try { if (!PeopleBook.IsWight(e.Character)) PeopleBook.Give(p.MemberRoster, PeopleBook.Take(p.PrisonRoster, n, PeopleBook.FPrisRecruit), PeopleBook.FPrisRecruit); } catch { }
                             }
                         }
                         if (daily > 0)
@@ -1004,8 +1081,10 @@ namespace Armoury
                                 var region = NearestNode(p.Position.ToVec2());
                                 if (CountLiving(region) >= 1f)      // W4b: DrawOnly nie bierze starych wightow
                                 {
-                                    var got = DrawOnly(region, want, p.ActualClan);
+                                    var org = PeopleBook.OriginLive ? new PeopleBook.Shares() : null;
+                                    var got = DrawOnly(region, want, p.ActualClan, org);
                                     if (got.TotalManCount > 0) { p.MemberRoster.Add(got); _bandRecruit += got.TotalManCount; }
+                                    if (org != null && org.Total > 0) { try { PeopleBook.Give(p.MemberRoster, org, PeopleBook.FPoolBand); } catch { } }   // E4/7
                                 }
                             }
                         }
@@ -1161,8 +1240,8 @@ namespace Armoury
             catch { return " H3: blad dopisku."; }
         }
 
-        /// <summary>Werbunek z jednego regionu (bez sasiadow).</summary>
-        private static TroopRoster DrawOnly(Settlement region, int want, Clan clan)
+        /// <summary>Werbunek z jednego regionu (bez sasiadow). E4/7: org - udzialy pochodzenia (jak Draw).</summary>
+        private static TroopRoster DrawOnly(Settlement region, int want, Clan clan, PeopleBook.Shares org = null)
         {
             var roster = TroopRoster.CreateDummyTroopRoster();
             Dictionary<string, float> d;
@@ -1176,6 +1255,10 @@ namespace Armoury
                 if (n <= 0) continue;
                 var ch = key == Commoner ? CommonerFor(clan) : MBObjectManager.Instance.GetObject<CharacterObject>(key);
                 if (ch == null) { _pTrim += d[key]; d.Remove(key); continue; }
+                if (org != null)
+                {
+                    try { if (key == Commoner) org.Add(region.StringId, n); else org.AddAll(PeopleBook.PoolTake(region, n, PoolTroopsOf(d))); } catch { }
+                }
                 roster.AddToCounts(ch, n);
                 d[key] -= n; got += n; _pRecruit += n;
                 if (d[key] < 0.01f) { _pTrim += d[key]; d.Remove(key); }
@@ -1202,10 +1285,12 @@ namespace Armoury
                 int want = Math.Max(1, (int)Math.Round(__result.TotalManCount * Settings.Current.OutlawBandSizeScale));
                 Clan clan = null;
                 try { clan = party.ActualClan; } catch { }
-                var got = Draw(region, want, clan);
+                var org = PeopleBook.OriginLive ? new PeopleBook.Shares() : null;
+                var got = Draw(region, want, clan, org);
                 __result = got;
                 if (got.TotalManCount == 0) _empty.Add(party);
                 else { _bornBands++; _bornMen += got.TotalManCount; }
+                if (org != null) { try { PeopleBook.Pending(party, org); } catch { } }    // E4/7: roster jeszcze nie w partii - pierwsze uzgodnienie zjada udzialy
             }
             catch (Exception e) { Log.Error("OutlawLaw.Roster", e); }
         }

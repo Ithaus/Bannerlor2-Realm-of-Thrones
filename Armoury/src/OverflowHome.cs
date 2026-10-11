@@ -124,7 +124,7 @@ namespace Armoury
 
         /// <summary>Z OutlawLaw.OnTroopsDeserted: ludzie z przepelnienia TEGO rosteru do ludnosci BK wsi. Zwraca, ilu kazdego typu wies przyjela
         /// (null - nikt albo roster bez notatki: limit zoldu, zalegly zold, WarLedger, karawany, Inni). Wight nigdy do ludnosci BK (wybiera OutlawLaw).</summary>
-        internal static Dictionary<CharacterObject, int> SendHome(MobileParty party, TroopRoster roster)
+        internal static Dictionary<CharacterObject, int> SendHome(MobileParty party, TroopRoster roster, PeopleBook.Shares org = null)
         {
             Note note;
             if (roster == null || !_notes.TryGetValue(roster, out note)) return null;
@@ -141,7 +141,10 @@ namespace Armoury
                     int n = Math.Min(kv.Value, roster.GetTroopCount(ch));
                     if (n <= 0) continue;
                     if (Undead.Character(ch)) continue;          // wight w partii ludzi (ROT occupation="Soldier") - nie do ludnosci BK, niezaleznie od W4b
-                    if (village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c))
+                    PeopleBook.Shares cut = org != null ? org.Cut(n) : null;      // E4/7: udzial pochodzenia tych n (nieprzyjeci - z powrotem do org, do puli)
+                    bool ok = village != null && ClanBudget.ToVillagePop(village, ch, n, PeopleBook.MW4c, cut);
+                    if (!ok && cut != null) org.AddAll(cut);
+                    if (ok)
                     {
                         if (sent == null) sent = new Dictionary<CharacterObject, int>();
                         int v; sent.TryGetValue(ch, out v); sent[ch] = v + n;

@@ -41,6 +41,8 @@ namespace Armoury
     /// </summary>
     internal static class OthersRise
     {
+        /// <summary>E4/7 (4.5): zywi zdjeci przez Innych w RescueFin (odbici jency) - okno lupu jencow PeopleBook.LootFin czyta i zeruje (jedno DieShares regionu pochodzenia).</summary>
+        [ThreadStatic] internal static long LastRescuedKilled;
         private static bool FallenOn { get { var s = Settings.Current; return s != null && s.OthersRiseOnlyFromFallen; } }
         private static bool RaidBlocked { get { var s = Settings.Current; return s != null && s.OthersRiseOnlyFromFallen && !s.OthersRaidWights; } }
         private static bool PoolOn { get { var s = Settings.Current; return s != null && s.OthersBandFromCorpsePool; } }
@@ -231,6 +233,9 @@ namespace Armoury
                         if (p.Pris > 0) PeopleBook.Die(region, p.Pris, PeopleBook.DCaptives, place);
                     }
                     catch (Exception e) { Stumble("Necro(banda)", e); }
+                    // E4/7 (R3): jency Innych skasowani - POLEGLI regionu pochodzenia (PeopleBook.Die zostaje licznikiem miejsca); PRZED wyczyszczeniem lochu
+                    try { if (p.Pris > 0 && p.P != null) PeopleBook.DieShares(PeopleBook.Take(p.P.PrisonRoster, p.Pris, PeopleBook.FDieOthers), PeopleBook.FDieOthers); }
+                    catch (Exception e) { Stumble("Necro(E4/7)", e); }
                     try { if (p.Clear != null) p.Clear.Clear(); } catch (Exception e) { Stumble("Necro(Clear)", e); }   // jak ROT: loch bandy (nie gracza) po bitwie pusty
                 }
             }
@@ -403,6 +408,8 @@ namespace Armoury
                 st.Region = home != null ? OutlawLaw.RegionFor(home) : OutlawLaw.RegionAt(pos);
                 _milN++; _milDead += liv;
                 if (liv > 0) PeopleBook.Die(st.Region, liv, PeopleBook.DMilitia, st.Place);
+                // E4/7 (R3): zywa milicja przejetej osady - POLEGLI regionu pochodzenia (przed zdjeciem ROT; Take nie patrzy na roster)
+                try { if (liv > 0) PeopleBook.DieShares(PeopleBook.Take(__0, liv, PeopleBook.FDieOthers), PeopleBook.FDieOthers); } catch (Exception e) { Stumble("Militia(E4/7)", e); }
                 if (IsR13(st.Place)) { __state = st; return true; }                       // za Murem / przy Murze: wstaja (zamiana ROT), liczone w postfiksie
                 // gdzie indziej: zywi gina, nikt nie wstaje (ROT i tak kasuje oddzialy spoza milicji - tu wszystkich zywych)
                 for (int i = __0.Count - 1; i >= 0; i--)
@@ -534,6 +541,7 @@ namespace Armoury
                         foreach (var a in add) { r.AddToCounts(a.Key, -a.Value); living += a.Value; }   // zywi nie wchodza do bandy Innych
                         _rLiving += living; _rPlace[place] += living;
                         PeopleBook.Die(region, living, PeopleBook.DRescued, place);
+                        LastRescuedKilled += living;                                  // E4/7: polegli regionu pochodzenia - w oknie PeopleBook.LootFin (bez drugiego DieShares)
                         try { Measure40.NoteRescuedFallen((int)living); } catch { }
                         long risen, pooled, burnt;
                         Raise(mp, living, region, place, PeopleBook.CRescued, out risen, out pooled, out burnt);

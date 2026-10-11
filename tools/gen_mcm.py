@@ -74,6 +74,11 @@ RANGES = {
     'RefugeeReturnDays': (30, 1092, "0"),
     'RefugeeYearlyLossPercent': (0.0, 20.0, "0.0"),
     'DevastationYieldElasticity': (0.0, 2.0, "0.00"),
+    # E4/7 (164b-1): wolne rece - udzialy przycinane w kodzie do 0..1, elastycznosc 0..2 (FreeHands.Update)
+    'FreeHandsShare': (0.0, 1.0, "0.00"),
+    'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
+    'FreeHandsElasticity': (0.0, 2.0, "0.00"),
+    'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

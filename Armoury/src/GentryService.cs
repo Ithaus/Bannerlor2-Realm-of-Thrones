@@ -644,8 +644,11 @@ namespace Armoury
                     {
                         var el = r.GetElementCopyAtIndex(i); var ch = el.Character;
                         if (ch == null || ch.IsHero || el.Number <= 0) continue;
-                        if (v != null && ClanBudget.ToVillagePop(v, ch, el.Number, PeopleBook.M179)) { r.AddToCounts(ch, -el.Number, false, -el.WoundedNumber); _dFinishMen += el.Number; }
-                        else _dFinishLost += el.Number;
+                        // E4/7: udzialy pochodzenia przed dopisaniem do wsi (zdjecie z rosteru po nim - U24); wies nie przyjela - cofniete
+                        PeopleBook.Shares org = null;
+                        try { if (PeopleBook.OriginLive && !PeopleBook.IsWight(ch)) org = PeopleBook.Take(r, el.Number, PeopleBook.FGentry179); } catch { org = null; }
+                        if (v != null && ClanBudget.ToVillagePop(v, ch, el.Number, PeopleBook.M179, org)) { r.AddToCounts(ch, -el.Number, false, -el.WoundedNumber); _dFinishMen += el.Number; }
+                        else { try { PeopleBook.Untake(r, org, PeopleBook.FGentry179); } catch { } _dFinishLost += el.Number; }
                     }
                 _dFinishPris += mp.PrisonRoster != null ? mp.PrisonRoster.TotalRegulars : 0;
                 try { _dFinishShips += mp.Ships != null ? mp.Ships.Count : 0; } catch { }

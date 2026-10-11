@@ -385,7 +385,19 @@ namespace Armoury
         /// Jedna funkcja pochodzenia (2.4, 3.4): rozbici z bitwy, uwolnieni jency bez odbiorcy, powrot z puli, I1 prawo jenca. Zwraca,
         /// ilu przyjeto; reszte wolajacy oddaje do puli ("bez domu"). cat - dokad trafili (BK, wies, z szablonu).
         /// </summary>
-        internal static int SendHome(MobileParty party, CharacterObject troop, int n, Vec2 pos, IFaction fac, int src, out int cat)
+        /// <summary>E4/7: przyczyna ruchu DOM dla powrotu czesci znanej pochodzeniem (hearth regionu pochodzenia) wedlug zrodla.</summary>
+        private static int KnownCause(int src)
+        {
+            return src == SrcPool ? PeopleBook.MBackPool : (src == SrcRouted ? PeopleBook.MBackH3 : PeopleBook.MBackFreed);
+        }
+
+        /// <summary>
+        /// E4/7 (4.7): org - udzialy pochodzenia tych n ludzi (null = jak dotad). Funkcja zdejmuje z org udzialy przyjetych (got); w org zostaja nieprzyjeci (wolajacy
+        /// oddaje je do puli razem z ludzmi). Czesc znana: zolnierz - do ludnosci BK jak dotad i do DOM regionu pochodzenia z hearth; "z szablonu" (zaloga, milicja,
+        /// karawana, patrol) - czesc znana do DOM pochodzenia, reszta z szablonu; prosci i bandyci - czesc znana do wsi regionu pochodzenia, reszta region miejsca (LawHomePos
+        /// tylko dla ludzi bez pochodzenia - U16).
+        /// </summary>
+        internal static int SendHome(MobileParty party, CharacterObject troop, int n, Vec2 pos, IFaction fac, int src, out int cat, PeopleBook.Shares org = null)
         {
             cat = CatVillage;
             if (troop == null || troop.IsHero || n <= 0) return 0;
@@ -398,6 +410,7 @@ namespace Armoury
                 {
                     cat = CatTemplate;
                     _undeadHome += n;
+                    if (org != null) org.Cut(n);
                     return n;
                 }
                 // I1: jeniec sprzedany / wypuszczony daleko od domu wraca do SWOJEJ krainy - punkt = najblizsza miejscu osada z danymi BK
@@ -407,6 +420,7 @@ namespace Armoury
                 // pierwszy punkt powrotu R0); ludnosci BK nie dopisujemy
                 if (party != null && party.IsVillager)
                 {
+                    if (org != null) org.Cut(n);           // TABOR: pochodzenie z definicji (wies taboru) - konto TABOR, nie SLUZBA
                     Village v = null;
                     try { v = party.HomeSettlement != null ? party.HomeSettlement.Village : null; } catch { }
                     if (v != null)
@@ -430,6 +444,8 @@ namespace Armoury
                     if (garr) _templateGarr += n;
                     if (banditTpl) _templateBandit += n;
                     Row(OutlawLaw.RegionAt(pos)).Template += n;
+                    // E4/7: czesc znana (siew zalog, milicji, karawan; rekruci A5 i notabli) - do DOM regionu pochodzenia z hearth; reszta "z szablonu" jak dotad
+                    if (org != null) { try { PeopleBook.HomeOrNote(org.Cut(n), n, KnownCause(src), -1); } catch { } }
                     return n;
                 }
                 // 3. zolnierz i najemnik -> ludnosc BK (stamtad BK go zabral przy werbunku)
@@ -437,10 +453,24 @@ namespace Armoury
                 if (occ == Occupation.Soldier || occ == Occupation.Mercenary)
                 {
                     cat = CatBk;
-                    return ToBk(troop, n, pos, fac, src);
+                    return ToBk(troop, n, pos, fac, src, org);
                 }
-                // 4. bandyci, chlopi i reszta -> hearth regionu (symetrycznie do TakeCommoners, skad bandyta w wiekszosci pochodzi)
-                return ToCommon(n, pos, false, src);
+                // 4. bandyci, chlopi i reszta -> hearth regionu (symetrycznie do TakeCommoners, skad bandyta w wiekszosci pochodzi);
+                // E4/7: czesc znana pochodzeniem - do wsi regionu pochodzenia (z hearth, MBack*), reszta - region miejsca jak dotad
+                if (org != null && org.Known > 0.0 && PeopleBook.LevyLive)
+                {
+                    var part = org.Cut(n);
+                    double placed = PeopleBook.HomeKnown(part, KnownCause(src));
+                    float restF = (float)(n - placed);
+                    float got2 = restF > 1e-4f ? ToCommonF(restF, pos, src) : 0f;
+                    if (restF - got2 > 1e-4f && part.Total > 0.0) org.AddAll(part.Cut(restF - got2));     // nieumieszczeni wracaja do wolajacego (pula)
+                    _toCommon += (int)Math.Round(placed);
+                    _hearthBy[src] += (int)Math.Round(placed);
+                    return Math.Max(0, Math.Min(n, (int)Math.Round(placed + got2)));
+                }
+                int gotC = ToCommon(n, pos, false, src);
+                if (org != null) org.Cut(gotC);
+                return gotC;
             }
             catch (Exception e)
             {
@@ -448,6 +478,19 @@ namespace Armoury
                 if (!_errHome) { _errHome = true; Log.Error("LosersFlee.SendHome", e); }
                 return 0;
             }
+        }
+
+        /// <summary>E4/7: ToCommon dla ulamka (reszta bez pochodzenia po powrocie czesci znanej). Zwraca, ilu umieszczono.</summary>
+        private static float ToCommonF(float n, Vec2 pos, int src)
+        {
+            var region = OutlawLaw.HearthRegionAt(pos);
+            if (region == null || !(n > 0f)) return 0f;
+            bool placed;
+            float h = (float)OutlawLaw.ReturnHome(region, n, PeopleBook.AService, PeopleBook.MCommon, out placed);
+            if (!placed) return 0f;
+            _toCommon += (int)Math.Round(n); _toCommonHearth += h; _hearthBy[src] += (int)Math.Round(n);
+            var row = Row(region); row.VillageMen += (int)Math.Round(n); row.VillageHearth += h;
+            return n;
         }
 
         private static int ToCommon(int n, Vec2 pos, bool villager, int src)
@@ -464,7 +507,7 @@ namespace Armoury
             return n;
         }
 
-        private static int ToBk(CharacterObject troop, int n, Vec2 pos, IFaction fac, int src)
+        private static int ToBk(CharacterObject troop, int n, Vec2 pos, IFaction fac, int src, PeopleBook.Shares org = null)
         {
             Dictionary<string, Home> cache = _battleHome;
             string where = "";
@@ -486,8 +529,13 @@ namespace Armoury
             var home = FindHome(pos, fac, troop.Culture, cache, where);
             if (home == null) return 0;
             int got = AddBk(home, troop, n, src);
-            // E4/3: pierwszy punkt powrotu (R0) - zolnierz wraca do ludnosci BK; w ksiedze SLUZBA -> DOM tylko liczona (werbunek zdejmie rekruta z DOM dopiero w E4/7)
-            if (got > 0) PeopleBook.Note(got, PeopleBook.MSoldier, 0.0);
+            // E4/3: pierwszy punkt powrotu (R0) - zolnierz wraca do ludnosci BK (sklad BK bez zmiany geografii). E4/7: czesc znana pochodzeniem - DOM regionu pochodzenia
+            // z hearth (werbunek zdjal go z DOM: MLevyVillage); czesc bez pochodzenia - jak w E4/3 (tylko liczona)
+            if (got > 0)
+            {
+                if (org != null) PeopleBook.HomeOrNote(org.Cut(got), got, KnownCause(src), PeopleBook.MSoldier);
+                else PeopleBook.Note(got, PeopleBook.MSoldier, 0.0);
+            }
             return got;
         }
 
@@ -1112,16 +1160,20 @@ namespace Armoury
                     {
                         int n = Math.Min(fp.N, fp.Roster.GetTroopCount(fp.T));
                         if (n <= 0) continue;
+                        // E4/7: udzialy pochodzenia uwolnionych - PRZED zdjeciem z lochu (nic miedzy zdjeciem a SendHome - U24)
+                        PeopleBook.Shares org = null;
+                        try { if (PeopleBook.OriginLive && !Undead.Character(fp.T)) org = PeopleBook.Take(fp.Roster, n, PeopleBook.FFreed); } catch { org = null; }
                         fp.Roster.AddToCounts(fp.T, -n);
                         _freed += n; bp.FreedN += n;
                         Row(OutlawLaw.RegionAt(pos)).Freed += n;
                         int cat;
-                        int got = SendHome(null, fp.T, n, pos, null, SrcFreed, out cat);
+                        int got = SendHome(null, fp.T, n, pos, null, SrcFreed, out cat, org);
                         int left = n - got;
                         if (left > 0)
                         {
                             if (law) { OutlawLaw.PoolAdd(region, fp.T, left); NoteWoods(region, left); }
                             NoteHomeless(left, law);
+                            if (org != null) { try { if (law) PeopleBook.PoolShares(region, org); else PeopleBook.Lost(org); } catch { } }
                         }
                     }
                     catch (Exception e)

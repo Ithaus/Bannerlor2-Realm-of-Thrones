@@ -85,8 +85,10 @@ namespace Armoury
                     if (mp == null) continue;
                     int sick, dead;
                     int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
+                    int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
                     Strike(s, mp, ramp, 1f, out sick, out dead);
                     try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
+                    try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
                     attSick += sick; attDead += dead;
                     Shout(mp, sick, dead, st, mainAttacks || mainDefends);
                 }
@@ -109,8 +111,10 @@ namespace Armoury
             {
                 int sick, dead;
                 int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
+                int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
                 Strike(s, mp, ramp, defMul, out sick, out dead);
                 try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
+                try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
                 defSick += sick; defDead += dead;
                 Shout(mp, sick, dead, st, mainAttacks || mainDefends);
             }

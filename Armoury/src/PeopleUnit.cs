@@ -298,6 +298,9 @@ namespace Armoury
                 w.V.Hearth = w.Hearth;                       // cofniecie zapisu gry (ludzie tylko przez Move)
                 double moved = PeopleBook.Move(w.V, PeopleBook.ADom, PeopleBook.AService, w.Men, PeopleBook.MPress, GamePerMan);
                 _pOurs += -moved;
+                // E4/7: zdjeci z DOM tej wsi - pochodzenie regionu wsi (wlasny try, po Move - U24)
+                try { if (MobileParty.MainParty != null) PeopleBook.GiveNew(MobileParty.MainParty.MemberRoster, OutlawLaw.RegionFor(w.V.Settlement), w.Men, PeopleBook.FPress); }
+                catch (Exception e) { Stumble("PeopleUnit.PressPostfix(E4/7)", e); }
             }
             catch (Exception e) { Stumble("PeopleUnit.PressPostfix", e); }
         }

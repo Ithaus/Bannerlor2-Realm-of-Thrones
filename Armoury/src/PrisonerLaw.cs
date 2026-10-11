@@ -170,7 +170,7 @@ namespace Armoury
         // ------------------------------------------------------------ los jednego typu jencow w krainie bez niewoli
         // (I1b: slaveLand - wolni w krainie z niewola (od gracza albo przy Forgiveness); do domu tak samo, bez Muru, osobny licznik zamiast
         // "inne krainy bez niewoli")
-        private static void Route(CharacterObject troop, int n, Vec2 pos, bool westeros, int src, bool slaveLand = false)
+        private static void Route(CharacterObject troop, int n, Vec2 pos, bool westeros, int src, bool slaveLand = false, PeopleBook.Shares org = null)
         {
             if (troop == null || troop.IsHero || n <= 0) return;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -179,6 +179,9 @@ namespace Armoury
                 _in[src] += n;
                 if (westeros) _westeros += n; else if (slaveLand) _slaveFree += n; else _freeOther += n;
                 if (Undead.Character(troop)) { _undead += n; return; }          // wight - z niczego, do niczego (jak H3)
+                // E4/7: udzial pochodzenia tych n (org wspolny dla listy - wycinany typ po typie; wighty bez udzialu)
+                PeopleBook.Shares sh = null;
+                try { if (org != null) sh = org.Cut(n); } catch { sh = null; }
                 // bandyta przy WYLACZONYM prawie wyrzutkow jest "z szablonu" gry (H3 SendHome pkt 2a) - nie dopisujemy go na Murze z niczego
                 if (westeros && Criminal(troop) && (OutlawLaw.On || troop.Occupation != Occupation.Bandit))
                 {
@@ -188,13 +191,14 @@ namespace Armoury
                     {
                         _wall += w; _totWall += w;
                         AddBy(_wallBy, wall != null && wall.Name != null ? wall.Name.ToString() : "?", w);
+                        if (sh != null) { try { PeopleBook.WallShares(sh.Cut(w)); } catch { } }
                     }
                     n -= w;
                     if (n <= 0) return;
                     _wallMissing += n;                                           // Muru nie ma / BK nie przyjal - do domu jak reszta
                 }
                 int cat;
-                int got = LosersFlee.SendHome(null, troop, n, pos, null, LosersFlee.SrcLaw, out cat);
+                int got = LosersFlee.SendHome(null, troop, n, pos, null, LosersFlee.SrcLaw, out cat, sh);
                 if (got > 0)
                 {
                     _home += got; _totHome += got;
@@ -204,8 +208,8 @@ namespace Armoury
                 if (left > 0)
                 {
                     var region = OutlawLaw.PoolRegionAt(pos);
-                    if (OutlawLaw.On && region != null) { OutlawLaw.PoolAdd(region, troop, left); _pool += left; }
-                    else _vanished += left;
+                    if (OutlawLaw.On && region != null) { OutlawLaw.PoolAdd(region, troop, left); _pool += left; if (sh != null) { try { PeopleBook.PoolShares(region, sh); } catch { } } }
+                    else { _vanished += left; if (sh != null) { try { PeopleBook.Lost(sh); } catch { } } }
                 }
             }
             catch (Exception e)
@@ -241,7 +245,13 @@ namespace Armoury
                 pol = Policy(st);
                 // I1b po przegladzie - jedna regula dla gracza i AI w kazdej krainie: Execution (wybor gracza w jego osadzie) - straceni.
                 // BK przy Execution nic nie dopisuje (u gracza osada null - tez nic), gra zdejmuje jencow z listy sprzedajacego.
-                if (pol == "Execution") { _executed += Regulars(__0); return true; }
+                if (pol == "Execution")
+                {
+                    _executed += Regulars(__0);
+                    // E4/7 (R3): straceni - POLEGLI regionu pochodzenia (loch sprzedajacego z okna PeopleBook.SalePre)
+                    try { if (PeopleBook.OriginLive) PeopleBook.DieShares(PeopleBook.SaleTake(PeopleBook.Men(__0), PeopleBook.FDieExec), PeopleBook.FDieExec); } catch { }
+                    return true;
+                }
                 if (land == LandSlave)
                 {
                     // I1b: sprzedaz gracza (BK bez osady nic nie robi - dotad ludzie znikali) idzie ta sama droga co AI: Enslavement -> niewolnicy
@@ -284,12 +294,15 @@ namespace Armoury
             var pos = st.GetPosition2D;
             bool wes = land == LandWesteros, slv = land == LandSlave;              // slv: wolni w krainie z niewola (Forgiveness, gracz - wyzej)
             int src = player ? SPlayerSale : SSale;
+            // E4/7 (4.8): udzialy pochodzenia sprzedanych (loch sprzedajacego z okna sprzedazy); Route wycina je typ po typie (Mur, dom, pula)
+            PeopleBook.Shares org = null;
+            try { if (PeopleBook.OriginLive) org = PeopleBook.SaleTake(PeopleBook.Men(__0), PeopleBook.FSold); } catch { org = null; }
             for (int i = 0; i < __0.Count; i++)
             {
                 TroopRosterElement e;
                 try { e = __0.GetElementCopyAtIndex(i); } catch { _stumbles++; continue; }
                 if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
-                Route(e.Character, e.Number, pos, wes, src, slv);
+                Route(e.Character, e.Number, pos, wes, src, slv, org);
             }
             return false;
         }
@@ -320,12 +333,15 @@ namespace Armoury
                 }
                 var pos = target.GetPosition2D;
                 bool wes = land == LandWesteros;
+                // E4/7: udzialy pochodzenia jencow patrolu (przed zdjeciem z listy; Take nie patrzy na roster)
+                PeopleBook.Shares org = null;
+                try { if (PeopleBook.OriginLive) org = PeopleBook.Take(pr, PeopleBook.Men(pr), PeopleBook.FPatrolPris); } catch { org = null; }
                 for (int i = pr.Count - 1; i >= 0; i--)
                 {
                     var e = pr.GetElementCopyAtIndex(i);
                     if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
                     pr.AddToCounts(e.Character, -e.Number, false, -e.WoundedNumber);   // najpierw z listy - blad tu = BK jak dotad, bez dubla
-                    Route(e.Character, e.Number, pos, wes, SPatrolBk);
+                    Route(e.Character, e.Number, pos, wes, SPatrolBk, false, org);
                 }
             }
             catch (Exception e)
@@ -354,10 +370,22 @@ namespace Armoury
                 if (counts.Count == 0) return;
                 // ekran Aftermath bitwy gracza: wypuszczeni tam laduja w lewej liscie jencow, ktora LootEndPrefix oddaje w calosci - tu nie (bez dubla)
                 if (EncounterLootOpen()) { _lootRelSkipped += counts.Values.Sum(); return; }
-                if (land == LandNone) return;
+                // E4/7: udzialy pochodzenia wypuszczonych z lochu gracza (ekran druzyny poprawia delty o tych ludzi - PeopleBook.WinReleased)
+                PeopleBook.Shares org = null;
+                try
+                {
+                    if (PeopleBook.OriginLive && MobileParty.MainParty != null)
+                    {
+                        int men = 0; foreach (var kv in counts) if (!PeopleBook.IsWight(kv.Key)) men += kv.Value;
+                        org = PeopleBook.Take(MobileParty.MainParty.PrisonRoster, men, PeopleBook.FReleased);
+                        PeopleBook.WinReleased += men;
+                    }
+                }
+                catch { org = null; }
+                if (land == LandNone) { if (org != null) { try { PeopleBook.Lost(org); } catch { } } return; }
                 // I1b: w krainie z niewola wypuszczony tez jest wolny - do domu (dotad znikal); bez Muru (to nie Westeros bez niewoli)
                 bool wes = land == LandWesteros, slv = land == LandSlave;
-                foreach (var kv in counts) Route(kv.Key, kv.Value, pos, wes, SRelease, slv);
+                foreach (var kv in counts) Route(kv.Key, kv.Value, pos, wes, SRelease, slv, org);
             }
             catch (Exception e)
             {

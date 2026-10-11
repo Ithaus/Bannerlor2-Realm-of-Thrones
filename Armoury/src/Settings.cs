@@ -719,6 +719,17 @@ namespace Armoury
         public float RefugeeYearlyLossPercent = 1.3f;      // percent of the refugees who die each year while away from home (no births on the road)
         public float DevastationYieldElasticity = 1f;      // how hard missing people cut a village's output: goods, ore and food are multiplied by (people at home / people of the village) to this power; 1 = output falls as fast as the people, 0 = not at all
         public bool LootedProducesByPeople = true;         // a plundered village keeps working with the people who stayed instead of producing nothing for two weeks (the harvest falls with the share of people away). Works only with Devastation Enabled
+        // E4/7 (164b-1, PLAN 4.8, 4.13, 4.17 prog; plan docs/etap4/PLAN-KODU-E47.md rozdz. 8.1): pochodzenie ludzi, pobor z wsi, polegly trwale, wolne rece, okno zniw,
+        // ksiega w menu osady - PeopleBook.Origin.cs, PeopleBook.OriginPatches.cs, FreeHands.cs, PeopleMenu.cs
+        public bool PeopleOriginEnabled = true;            // every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before
+        public bool LevyFromVillages = true;               // a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign
+        public bool GarrisonLevyFromBk = true;             // a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does
+        public float FreeHandsShare = 0.2f;                // share of a land's men who can leave the fields without the harvest suffering (counted with the fallen not yet made up by births)
+        public float FreeHandsHarvestFactor = 0.5f;        // during the harvest weeks of a summer or autumn year only this part of that share is free
+        public float FreeHandsElasticity = 0.5f;           // how much the harvest falls when more men are away than the land can spare (0.5: a tenth fewer hands, a twentieth less harvest; 0 = not at all)
+        public float FreeHandsIronIslandsExtraMax = 0.2f;  // Iron Islands: thralls work the land, so up to this much more of the men may go reaving (grows with the number of thralls)
+        public bool FreeHandsBrake = true;                 // a land with no free hands left raises no new volunteers until births make up its losses (the Free Folk and the Watch excepted)
+        public bool PeopleMenuEntry = true;                // "People of this land" in the menus of villages, towns and castles: the land's people at home, under arms, held captive, outlawed, fallen and its free hands
         public int OutlawMinBand = 6;                      // fewest men needed nearby before a new band can form
         public int OutlawNeighbourRegions = 4;             // a new band gathers men from its own region and this many nearest ones
         public float OutlawBandSizeScale = 1f;             // size of a new band against the game's usual size (still only as many as there are men)
