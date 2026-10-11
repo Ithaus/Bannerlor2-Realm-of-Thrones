@@ -4008,6 +4008,10 @@ namespace Armoury
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool CaravanProfitInRealmTown { get; set; } = true;
 
+        [SettingPropertyBool("Defeat Morale Half", HintText = "a beaten party loses half the morale the game takes for a lost battle (10 instead of 20) and for each lost round of an auto-resolved battle (1.5 instead of 3; 0.5 instead of 1 while retreating) - the same for you and the AI. Men still desert by their tier thresholds, but a defeat now drives away about half as many (off = the game's penalty)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool DefeatMoraleHalf { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5025,6 +5029,7 @@ namespace Armoury
             s.BkLordFeesHaveRecipients = BkLordFeesHaveRecipients;
             s.DeadHeroGoldStays = DeadHeroGoldStays;
             s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;
+            s.DefeatMoraleHalf = DefeatMoraleHalf;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;
