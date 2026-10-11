@@ -20,7 +20,8 @@ namespace Armoury
     /// 171 (docs/paczki/171-zbrojenie-zalog.md; Jeff 08.10 "tak potwierdzam" (2): rekrut bez kompletu przychodzi z tym, co ma):
     ///  - Kit.Own = dobytek czlowieka (z domu) osobno od Items (kupione przez notabla): dobytek idzie z nim, notabl sprzedaje tylko kupione (Z5).
     ///  - Bez zapisu: wolny czlowiek przynosi dobytek - rzeczy przodka tieru 1 jego linii, ktore jego oddzial tez nosi (regula wpisu 92, Z3);
-    ///    najemnik z karczmy dodatkowo konia i rzad (160; od E4/10 typ konny stoi w karczmie tylko z konnych weteranow - to kon tego czlowieka, 167);
+    ///    najemnik z karczmy dodatkowo konia i rzad z wzorca (160; od E4/10 typ konny stoi w karczmie tylko z konnych weteranow - mniej koni z wzorca, ale kon
+    ///    zwolnionego zostaje w zbrojowni starego pana: dalej kon z wzorca przy najmie, do kroku sprzetu po etapie 4 - recenzja E4/10 R2-4);
     ///    jeniec - nic (Z4); echo ROT - nic (ten sam czlowiek, Z1).
     ///  - HouseLevies (OnSwap): komplet X przechodzi na Y; swiezy ochotnik tieru 2+ (OnFresh): zapis z kupionymi czesciami kluczowymi;
     ///    autowerbunek zalogi (OnGarrisonTook): komplet do zbrojowni zalogi zamiast sieroty.
@@ -501,7 +502,7 @@ namespace Armoury
                     else if (settlement != null)                                                                              // 7: najemnik z karczmy
                     {
                         _dOwnMerc++;
-                        foreach (var e in TemplateItems(troop)) if (MenPurse.HorseKind(e.Item)) { items.Add(e); _dMercHorsePcs++; }   // 160: kon najemnika z wzorca; E4/10 (167): przy czynnych weteranach typ konny tylko z konnego weterana - jego kon
+                        foreach (var e in TemplateItems(troop)) if (MenPurse.HorseKind(e.Item)) { items.Add(e); _dMercHorsePcs++; }   // 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana, kon nadal z wzorca (jego kon w zbrojowni starego pana - krok sprzetu)
                     }
                     else { _dOwnNoSource++; if (troop.IsMounted) _dMountedNoHorse++; }                                        // 8: bez zrodla (ochotnik z mapy, inne mody)
                     _dOwnPcs += items.Count; _tOwn[TierIdx(troop)]++;

@@ -729,8 +729,12 @@ def etap4_main(logp, start_arg, until=120):
             "H3 domy (BK, wies, szablon, wighty)": L(d, r"domy: do domu BK (\d+)", h3) + L(d, r"do wsi \(tabory\) (\d+) ludzi", h3) + L(d, r"do wsi \(prosci i bandyci\) (\d+) ludzi", h3)
                                                    + L(d, r"hearth, z szablonu (\d+) \(garnizony", h3) + L(d, r"nigdy do BK ani wsi\): rozbici (\d+)", h3) + L(d, r"nigdy do BK ani wsi\): rozbici \d+, inna droga (\d+)", h3),
             "pula do hearth i z szablonu": L(d, r"\| powrot do wsi " + F_, wyr) + L(d, r"powrot z puli:.*?z szablonu " + F_, wyr) + L(d, r"powrot z puli:.*?wighty do niczego " + F_, wyr),
-            "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), Inni", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
+            # E4/10: w linii I1 po "znikneli N" stoi teraz ", do karczmy (E4/10)" - wzorzec przyjmuje oba uklady (stary log bez E4/10 tez)
+            "I1 (znikneli, wighty, straceni, niewolnicy)": L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1) + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1)
                                                           + L(d, r"krainy z niewola: niewolnikow (\d+)", i1),
+            # E4/10 (recenzja R1-2/R2-1): rozbici H3 + uwolnieni jency (suma w linii H3) i I1, ktorzy staneli w karczmie - zeszli ze stanu (sklad, loch), nie ma ich w domach;
+            # zwolnieni 166 i rozwiazane partie juz w calosci ("zwolnieni: do wsi", "rozwiazane ... zdrowi"), najem z karczmy - w "zwerbowani"
+            "E4/10: do karczmy (H3 rozbici + uwolnieni, I1)": L(d, r", do karczmy \(E4/10\) (\d+) \(rozbici", h3) + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1),
             "dezercja poza pula": max(0.0, L(d, r"dezercja (\d+) \(partie rodow", lud) - L(d, r"naplyw: dezercja (\d+)", wyr)),
             "zwolnieni 166 (do wsi i zniklo)": L(d, r"zwolnieni: do wsi (\d+) ludzi", bud) + L(d, r"zwolnieni: do wsi \d+ ludzi \([^)]*\), zniklo (\d+)", bud),
             "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
@@ -752,8 +756,9 @@ def etap4_main(logp, start_arg, until=120):
         if jd is not None:
             jin = L(d, r"wzieci do niewoli \+(\d+)", jen) + L(d, r"z rabunku BK \+(\d+)", jen)
             jout = (L(d, r"z niewoli pokonanych zabrano (\d+)", jen) + L(d, r"uwolnieni jency bez odbiorcy (\d+)", h3)
-                    + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), Inni", i1)
+                    + L(d, r"do domu (\d+) \(ludnosc BK", i1) + L(d, r"na Mur (\d+)", i1) + L(d, r"bez domu: do puli wyrzutkow (\d+)", i1) + L(d, r"znikneli (\d+), (?:do karczmy|Inni)", i1)
                     + L(d, r"Inni \(wighty - do niczego\) (\d+), straceni", i1) + L(d, r"straceni \([^)]*\) (\d+)", i1) + L(d, r"krainy z niewola: niewolnikow (\d+)", i1)
+                    + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1)      # E4/10: I1 do karczmy (uwolnieni H3 do karczmy juz w "uwolnieni jency bez odbiorcy")
                     + L(d, r"wcieleni jency AI \(partie rodow\) (\d+)", h3) + L(d, r"werbunek: z puli \d+, jency (\d+)", wyr)
                     + L(d, r"jency Innych skasowani przez ROT (\d+)", inn) + L(d, r"ranni \d+, jency (\d+) - znikaja", par))
             t7j.append((jd - (jin - jout), jin + jout))
@@ -1243,9 +1248,15 @@ def etap4_e410(rep, lines, start, win, lud, until):
     # V6 - najdluzej czeka
     old = [num(r"najdluzej czeka (\d+) dob", vet[d], int, 0) or 0 for d in live]
     rep.add("E4/10 V6: najdluzej czeka (najwiecej, poza oblezonymi)", max(old), f"<= {wait} (Veteran Wait Days)", max(old) <= wait)
-    # V7 - z karczmy tylko z puli
+    # V7 - z karczmy tylko z puli. Recenzja R1-1: bez doby siewu (liczniki najmu linii Weterani obejmuja 24 h przed siewem, gdy paczka byla nieczynna, a "z karczmy"
+    # w Ludzie: liczy najem z karczm gry tych samych 24 h) i bez dob z paczka nieczynna/wylaczona (najem nie zdejmuje z puli - jak V11)
+    def vet_on(d):
+        return "[siew dnia" not in vet[d] and " - NIECZYNNE" not in vet[d] and "WYLACZONE" not in vet[d]
     diffs = []
+    skip7 = sum(1 for d in live if not vet_on(d))
     for d in live:
+        if not vet_on(d):
+            continue
         x = lud.get(d)
         if not x:
             continue
@@ -1257,7 +1268,7 @@ def etap4_e410(rep, lines, start, win, lud, until):
             diffs.append((d, zk, h1 + h2 + ho))
     if diffs:
         worst = max(diffs, key=lambda t: abs(t[1] - t[2]))
-        rep.add("E4/10 V7: \"z karczmy\" (Ludzie:) = najeci z puli (lordowie + karawany + inne)", f"najgorsza doba d{run_day(worst[0], start)}: {worst[1]} wobec {worst[2]} ({len(diffs)} dob)",
+        rep.add("E4/10 V7: \"z karczmy\" (Ludzie:) = najeci z puli (lordowie + karawany + inne)", f"najgorsza doba d{run_day(worst[0], start)}: {worst[1]} wobec {worst[2]} ({len(diffs)} dob; pominiete: siew / nieczynne {skip7})",
                 "|roznica| <= 1 kazdej doby", abs(worst[1] - worst[2]) <= 1)
     else:
         rep.add("E4/10 V7: z karczmy tylko z puli", "brak linii Ludzie:", "|roznica| <= 1", None)
@@ -1270,7 +1281,7 @@ def etap4_e410(rep, lines, start, win, lud, until):
     seedh = num(r"\[siew dnia \d+ - starzy zolnierze z karczm \d+ w \d+ miastach \(konni (\d+)", vet[sd[0]], int, 0) if sd else 0
     inh = sum(num(r"\(konni (\d+)\) \| uprawnieni", vet[d], int, 0) or 0 for d in live)
     hh = sum(num(r"; konni (\d+); tier karczmy", vet[d], int, 0) or 0 for d in live)
-    rep.add("E4/10 V9: konni najeci (suma) wobec konnych weteranow (siew + wejscia konne)", f"{hh} wobec {(seedh or 0) + inh}", "najeci <= konni weterani (kon z niczego = 0)",
+    rep.add("E4/10 V9: konni najeci (suma) wobec konnych weteranow (siew + wejscia konne)", f"{hh} wobec {(seedh or 0) + inh}", "najeci <= konni weterani (typ konny tylko z konnego weterana; kon przy najmie dalej z wzorca, kon zwolnionego w zbrojowni pana - krok sprzetu)",
             hh <= (seedh or 0) + inh)
     kom = [s for s in lines if s.startswith("Komplet rekruta: dzien")]
     kh = sum(num(r"konie konnych weteranow z karczmy \(167\) (\d+)", s, int, 0) or 0 for s in kom)
@@ -1285,8 +1296,9 @@ def etap4_e410(rep, lines, start, win, lud, until):
         rep.add("E4/10 V10: rownanie krain z kontem WETERANI (najgorsza kraina)", f"{w[0]} {w[1]:+.3f}%", "<= 0.1% kazdej doby (przy RESZCIE hearth != 0 - INFO jak E4/7 T3)", abs(w[1]) <= 0.1)
     # V11 - karczma E4/7 milknie przy czynnych weteranach
     poc = e4_series(lines, "Pochodzenie (E4/7): dzien")
-    ta = [fnum(r"karczmy AI " + F_ + r", A5", poc[d]) or 0 for d in live if d in poc and " - NIECZYNNE" not in vet[d] and "WYLACZONE" not in vet[d]]
-    tp = [fnum(r"karczma gracza " + F_, poc[d]) or 0 for d in live if d in poc and " - NIECZYNNE" not in vet[d] and "WYLACZONE" not in vet[d]]
+    # recenzja R1-1: bez doby siewu (np. Veterans Enabled wlaczone w kampanii z juz zasianym E4/7 - karczmy E4/7 liczyly 24 h przed siewem)
+    ta = [fnum(r"karczmy AI " + F_ + r", A5", poc[d]) or 0 for d in live if d in poc and vet_on(d)]
+    tp = [fnum(r"karczma gracza " + F_, poc[d]) or 0 for d in live if d in poc and vet_on(d)]
     vh = [fnum(r"z karczmy \(WETERANI, E4/10\) " + F_, poc[d]) or 0 for d in live if d in poc]
     if ta or tp:
         rep.add("E4/10 V11: Pochodzenie - karczmy AI / karczma gracza (E4/7) przy czynnych weteranach; z karczmy (WETERANI)", f"{sum(ta):.0f} / {sum(tp):.0f}; {sum(vh):.0f}",

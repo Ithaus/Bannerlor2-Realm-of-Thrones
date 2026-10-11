@@ -57,7 +57,7 @@ namespace Armoury
                 var sb = new StringBuilder(800);
                 if (v == null || !PeopleBook.OriginLive)
                 {
-                    sb.Append("The people of this land have not been reckoned yet.");
+                    sb.Append("The people of this land have not been reckoned yet.\n");     // recenzja E4/10 R1-4: dalej moze isc linia karczmy miasta (TrimEnd na koncu)
                 }
                 else
                 {
