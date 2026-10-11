@@ -1266,6 +1266,17 @@ def etap4_e48(rep, lines, start, win, hea, until):
     a2 = [num(r"\+ z zalogi siedziby (\d+)", arm[d], int, 0) or 0 for d in adays]
     rep.add("E4/8 N4: odplyw z zalog do nowych druzyn (a2, suma okna / srednio)", f"{sum(a2)} / {st.mean(a2):.1f} na dobe",
             "INFO - szacunek d120 bez modelu (ok. 67.6 tys.) go nie obejmuje; razem z wierszem A5 dowod do K8", None)
+    # K8 (Jeff 11.10 16:55): A5 do GarrisonAutoRecruitPerDay na dobe - dobrani ponad limit gry i odmowy (segment "K8:" w linii A5) - przy progu N4
+    k8 = [re.search(r"K8: limit (\d+)/d, dobrano (\d+) \(ponad (\d+)/d, w (\d+) twierdzach\), odmowy: zold albo miejsce (\d+) / brak ochotnikow (\d+) / hamulec (\d+), "
+                    r"poza K8 \(Straz, Inni, bez poboru\) (\d+)", arm[d]) for d in adays]
+    k8 = [tuple(int(x) for x in m.groups()) for m in k8 if m]
+    if k8:
+        rep.add("E4/8 N4/K8: A5 ponad limit gry - limit / dobrano (suma okna, srednio) / twierdz z dobranym / odmowy: zold albo miejsce, brak ochotnikow, hamulec / poza K8 (srednio)",
+                f"{k8[-1][0]}/d (gra {k8[-1][2]}/d) / {sum(x[1] for x in k8)}, {st.mean(x[1] for x in k8):.1f}/d / "
+                + " / ".join(f"{st.mean(x[i] for x in k8):.0f}" for i in (3, 4, 5, 6, 7)),
+                "INFO - K8 dopelnia zalogi do progu N4 (szacunek d120 bez K8 ok. 83% bazy); przy czynnej ksiedze dobrano > 0", None)
+    else:
+        rep.add("E4/8 N4/K8: A5 ponad limit gry", "brak segmentu \"K8:\" w linii", "INFO (log sprzed K8)", None)
     # R6 (recenzja E4/8 R1-1/R2-5): rozwiazane bez bitwy do DOM, w tym usuniete bez zniszczenia (RemoveParty - konwoje DTE)
     r6 = [re.search(r"ROZWIAZANE BEZ BITWY \(R6\): partii (\d+) \[.*?w tym usuniete bez zniszczenia - np\. konwoje DTE (\d+)\], do domu " + F_, arm[d]) for d in adays]
     r6 = [(int(m.group(1)), int(m.group(2)), float(m.group(3))) for m in r6 if m]
@@ -1369,12 +1380,12 @@ def etap4_e48(rep, lines, start, win, hea, until):
         act = "R2 WYLACZONE" not in lm
         rep.add("E4/8 N16: odniesienia tr: = miasta ze stanem (ostatnia doba)", f"{refs} / {towns}", "rowne (przy czynnym R2)", (refs == towns) if (act and refs is not None and towns is not None) else None)
     rep.add("E4/8 N17: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
-    # A5 - dowod do warunkowego K8
+    # A5 - limity autowerbunku (od K8 "limit dzienny" = limit K8 GarrisonAutoRecruitPerDay)
     a5 = [re.search(r"A5: twierdz z werbunkiem (\d+) z (\d+) \(ludzi (\d+)\), limit dzienny (\d+), bez ochotnikow (\d+), zold albo miejsce (\d+)", arm[d]) for d in adays]
     a5 = [tuple(int(x) for x in m.groups()) for m in a5 if m]
     if a5:
         rep.add("E4/8 A5: twierdze z werbunkiem / ludzi / limit dzienny / bez ochotnikow / zold (srednio)",
-                " / ".join(f"{st.mean(x[i] for x in a5):.0f}" for i in (0, 2, 3, 4, 5)), "INFO - dowod do K8 (limit dzienny wiaze -> A5 do 2/dobe, gdy N4 nie przejdzie)", None)
+                " / ".join(f"{st.mean(x[i] for x in a5):.0f}" for i in (0, 2, 3, 4, 5)), "INFO - limit dzienny = limit K8 (wiersz N4/K8)", None)
 
 
 def etap4_e410(rep, lines, start, win, lud, until):

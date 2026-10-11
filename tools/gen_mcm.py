@@ -95,6 +95,8 @@ RANGES = {
     'VeteranShareToTavern': (0.0, 1.0, "0.00"),
     'VeteranWaitDays': (1, 1092, "0"),
     'VeteranMinTier': (1, 7, "0"),
+    # E4/8 K8: limit dzienny A5 zalogi (kod przycina do 1..5; 1 = gra)
+    'GarrisonAutoRecruitPerDay': (1, 5, "0"),
 }
 
 def gen(module_dir, ns, display):
