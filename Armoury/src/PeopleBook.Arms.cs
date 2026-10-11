@@ -43,12 +43,15 @@ namespace Armoury
 
         // ---------------------------------------------------------------- sklad partii przed MobileParty.RemoveParty (bez zapisu; recenzja R1-1/R2-5 + R1-3)
         private static readonly Dictionary<PartyBase, int> _removing = new Dictionary<PartyBase, int>();
+        // scalenie koncowe etapu 4 (R6/W5): sklad wedlug typu sprzed RemoveParty (VetTypes - null przy nieczynnych weteranach) - weterani E4/10 jak przy rozwiazaniu
+        private static readonly Dictionary<PartyBase, List<KeyValuePair<CharacterObject, int>>> _removingTypes = new Dictionary<PartyBase, List<KeyValuePair<CharacterObject, int>>>();
 
         private static void ResetArms()
         {
             lock (Gate) { Array.Clear(_townMv, 0, MKinds); _townSet = 0; _townZero = 0; _townZeroMen = 0; _tr.Clear(); }
             Array.Clear(ArmsDayMen, 0, MKinds);
             _removing.Clear();
+            _removingTypes.Clear();
         }
 
         /// <summary>PeopleBook.Daily, przed zerowaniem licznikow doby: ruch DOM przyczynami E4/8 (ludzie) - linia "Wojsko z ludzi (E4/8)" porownuje go ze swoimi licznikami.</summary>
@@ -365,9 +368,22 @@ namespace Armoury
             if (!(n2 > Eps)) return;
             var home2 = mp.HomeSettlement;
             if (home2 == null) { try { home2 = OutlawLaw.RegionAt(mp.Position.ToVec2()); } catch { home2 = null; } }
+            // scalenie koncowe etapu 4 (R6/W5, "jedna zasada na jedno zjawisko"): koniec sluzby bez bitwy ta sama droga co rozwiazana partia (DisbandPost):
+            // milicja wsi - nie dotyczy (gra dopisuje milicje tylko w MergeDisbandPartyToVillage, tu jej nie ma), weterani E4/10 (VetDisband - udzial VeteranShareToTavern
+            // od tieru VeteranMinTier do karczmy, strumien VDisband "rozwiazane partie"), reszta do DOM jak dotad. Jedno Take - kazdy czlowiek raz (VetCommit tnie sh2).
+            // Karawany (w tym konwoje DTE - CaravanPartyComponent), milicje, Straz i Inni - VetEligible = nie, wszyscy do DOM jak przed scaleniem.
+            List<KeyValuePair<CharacterObject, int>> types = null; int men = 0;
+            try
+            {
+                if (!removed) { types = VetTypes(mp.MemberRoster); men = Men(mp.MemberRoster); }
+                else if (_removingTypes.TryGetValue(mp.Party, out types)) { int rm; men = _removing.TryGetValue(mp.Party, out rm) ? rm : 0; }
+            }
+            catch (Exception e) { OStumble("ArmsPartyGone(E4/10 sklad)", e); types = null; men = 0; }
             var sh2 = Take(mp.MemberRoster, n2, FDisbandHome);
+            double vet = 0;
+            try { vet = VetDisband(mp, types, men, n2, sh2); } catch (Exception e) { OStumble("ArmsPartyGone(E4/10)", e); vet = 0; }
             var a2 = ArriveAt(home2, sh2, AService, MBackDisband, MSoldier, false);
-            ArmsFromPeople.NoteDisbandHome(kind, a2, removed);
+            ArmsFromPeople.NoteDisbandHome(kind, a2, removed, vet);
         }
 
         /// <summary>Ilu ludzi slownika wraca: min(slownik, sklad) - sklad teraz (MobilePartyDestroyed) albo sprzed RemoveParty (OnPartyRemoved; brak zapisu - caly slownik).</summary>
@@ -384,10 +400,11 @@ namespace Armoury
         {
             if (mp == null || mp.Party == null || !OriginLive || !_mem.ContainsKey(mp.Party)) return false;
             _removing[mp.Party] = Men(mp.MemberRoster);
+            try { var vt = VetTypes(mp.MemberRoster); if (vt != null) _removingTypes[mp.Party] = vt; } catch (Exception e) { OStumble("RemovingPre(E4/10)", e); }   // R6/W5
             return true;
         }
 
-        internal static void RemovingDone(MobileParty mp) { if (mp != null && mp.Party != null) _removing.Remove(mp.Party); }
+        internal static void RemovingDone(MobileParty mp) { if (mp != null && mp.Party != null) { _removing.Remove(mp.Party); _removingTypes.Remove(mp.Party); } }
 
         /// <summary>OnPartyRemoved (przed OriginPartyGone): partia usunieta bez MobilePartyDestroyed (RemoveParty wolane wprost, np. konwoje DTE) - ta sama galaz konca
         /// co przy zniszczeniu bez bitwy (recenzja R1-1/R2-5: ich straz zdjeta z DOM miasta zrodlowego przez CaravanPost szla "w nicosc"). Nie rzuca.</summary>

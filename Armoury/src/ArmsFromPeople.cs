@@ -85,7 +85,7 @@ namespace Armoury
             public int w, wCargo; public double n1w, n1e, n3; public long s;
             public int b1N, b2N, b3N, b4N, b5N; public double b1, b2, b3, b4, b5, bNone, bOther; public double sEnd;
             // rozwiazane bez bitwy (R6)
-            public int q, qRemoved; public double qHere, qOther, qNone, qWall; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
+            public int q, qRemoved; public double qHere, qOther, qNone, qWall, qVet; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
             public long ticks;
         }
         private static Day D = new Day();
@@ -902,10 +902,10 @@ namespace Armoury
 
         internal static void NoteSlavesEnd(double n) { if (n > 0.0) D.sEnd += n; }
 
-        internal static void NoteDisbandHome(int kind, PeopleBook.Arrive a, bool removed)
+        internal static void NoteDisbandHome(int kind, PeopleBook.Arrive a, bool removed, double vet)
         {
             var d = D;
-            d.q++; d.qHere += a.Here; d.qOther += a.Other; d.qNone += a.None; d.qWall += a.Wall;
+            d.q++; d.qHere += a.Here; d.qOther += a.Other; d.qNone += a.None; d.qWall += a.Wall; d.qVet += vet;   // vet: R6/W5 - do karczmy (E4/10, strumien "rozwiazane partie")
             if (removed) d.qRemoved++;
             int v; d.qKind.TryGetValue(kind, out v); d.qKind[kind] = v + 1;
         }
@@ -1096,7 +1096,8 @@ namespace Armoury
             // R6
             string qk = d.qKind.Count > 0 ? string.Join(", ", d.qKind.OrderByDescending(kv => kv.Value).Select(kv => KindName(kv.Key) + " " + kv.Value).ToArray()) : "-";
             sb.Append(" | ROZWIAZANE BEZ BITWY (R6): partii ").Append(d.q).Append(" [").Append(qk).Append("; w tym usuniete bez zniszczenia - np. konwoje DTE ").Append(d.qRemoved).Append("], do domu ").Append(F1(d.qHere + d.qOther)).Append(" (inne regiony ").Append(F1(d.qOther))
-              .Append("), bez pochodzenia ").Append(F1(d.qNone)).Append(", na Mur (E4/9) ").Append(F1(d.qWall));
+              .Append("), bez pochodzenia ").Append(F1(d.qNone)).Append(", na Mur (E4/9) ").Append(F1(d.qWall))
+              .Append(", do karczmy (E4/10 - jak rozwiazane partie) ").Append(F1(d.qVet));
             // kontrola kodu: ruch DOM przyczynami E4/8 w ksiedze (PeopleBook.ArmsDayMen) = to, co linia zdjela
             var bm = PeopleBook.ArmsDayMen;
             double bookOut = bm[PeopleBook.MLevyMilitia] + bm[PeopleBook.MLevySpawn] + bm[PeopleBook.MCaravanOut] + bm[PeopleBook.MCaravanRefill] + bm[PeopleBook.MRoadOut];

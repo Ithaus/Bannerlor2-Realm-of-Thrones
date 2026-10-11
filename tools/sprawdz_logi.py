@@ -1303,6 +1303,11 @@ def etap4_e48(rep, lines, start, win, hea, until):
     if r6:
         rep.add("E4/8 R6: rozwiazane bez bitwy do domu - partii / w tym usuniete bez zniszczenia / ludzi (suma okna)",
                 f"{sum(x[0] for x in r6)} / {sum(x[1] for x in r6)} / {sum(x[2] for x in r6):.0f}", "INFO (z31A: ok. 147 partii usunietych bez zniszczenia w 120 dob)", None)
+        # scalenie koncowe etapu 4 (R6/W5): czesc R6 do karczmy - ta sama regula i ten sam strumien co rozwiazane partie (linia Weterani: "rozwiazane partie")
+        rv = [fnum(r"ROZWIAZANE BEZ BITWY \(R6\):[^|]*?, do karczmy \(E4/10 - jak rozwiazane partie\) " + F_, arm[d]) for d in adays]
+        rv = [x for x in rv if x is not None]
+        rep.add("E4/8 R6/W5: rozwiazane bez bitwy do karczmy (E4/10, suma okna)", f"{sum(rv):.0f} ({len(rv)} dob z segmentem)" if rv else "brak segmentu (log sprzed scalenia koncowego)",
+                "INFO - karawany (konwoje DTE), milicje, Straz: 0; w strumieniu Weterani \"rozwiazane partie\"", None)
     # N5 - wojsko lordow (jak E4/7 T9)
     rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
     # N6 - kontrole
