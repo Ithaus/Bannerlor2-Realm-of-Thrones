@@ -851,3 +851,9 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   gracza; 1/9 korony z czesci wodzow (Q3b Jeffa); statki osobno (B5: ok. 59 tys./d sr28). Lad przed paczka +17 965/d sr28 (nie 86 tys. - reszta to statki i N4).
   Klucz BattlePlunderFromLoserOnly. Grupa etap5 minimalna - scalic z E5/0. Pytania: 1/9 korony z wodzow (rada zostawic - ide z rada); NOWE UJSCIE W NICOSC:
   RealisticCaptivity - 60% zlota gracza znika, gdy pojmuje banda bez wodza albo milicja -> do paczki "zamkniecie ujsc" (z AutoRecruitmentExpenses K8/H6) po audycie.
+- (19:20) **SCALENIE CALOSCI + E4/9 GOTOWE:** w-toku/zbior-e4-koniec caef965 (E4/8 + K8, E4/10 przenumerowane M46-47/F56/o14, E4/11, E4/7b MBackPress 48, NightRest;
+  recenzja: K8 doscalony, pyc z repo zdjety). w-toku/e4-9 72a4976 (Straz z Westeros - WatchLaw.Levy: Mur -> 3% pul -> ludnosc; dozywotnio; H1; NIEWOLNI; jency z
+  rabunku z ludzi wsi; DLUG 4; 7 uwag recenzji prawdziwych; przyczyny M49-51, F57-61; DLL test\Armoury-e4-9.dll). Pytania E4/9 (ide z rada): menu wyspy - zabrani
+  w niewole od siewu razem ze zmarlymi (zostawic); karawany osad Strazy biora z pul 3% (zostawic). E5/0 (a1f9a87) i A1 (e8868d2, regulator tryb 2) gotowe;
+  E5/0 ma "udzial zysku kupcow zabierany przez pana i korone". Workflow wf_05af8d5e-ebf: scalenie koncowe E4/9 + E5/0 + ujednolicenie R6/W5 -> DLL
+  test\Armoury-e4-koncowy.dll -> TEST KONCOWY E4.
