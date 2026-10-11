@@ -229,6 +229,7 @@ namespace Armoury
                 // kopalni i koszt materialow budow - inaczej te pieniadze znikaly w nicosc, a pan nie placil za budowy
                 float kept = KeptTownLines(__0);
                 __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept, __1, _txtRent);
+                CouncilWages35.TownBase(__0, kept);   // 3.5a: pensje rady BK od tego podatku i renty, nie od zastapionego podatku klas ludnosci (wlasny try)
             }
             catch { }
         }

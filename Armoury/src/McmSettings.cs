@@ -2132,6 +2132,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float TownRentFloorGold { get; set; } = 20000f;
 
+        [SettingPropertyBool("Council Wages Real Base", HintText = "Banner Kings council wages (1% to 4.5% of a fief's tax per seat) follow the income the lord really has: for a town or castle, its kept tax lines plus the day's rent (or the lord's share of the castle dues) instead of the town population tax the rents replaced; a house with no town or castle pays its council nothing. Off = Banner Kings as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CouncilWagesRealBase { get; set; } = true;
+
+        [SettingPropertyBool("Council Wages Paid To All", HintText = "every councillor receives the wage the council's lord pays, when it is paid: lords on a council (the lord's spouse and kin, kin of vassals, heads of other houses) are paid into their own purse as commoners already were - before, the wage of a lord who is not head of a house vanished; a dead councillor's wage goes back to the payer; when the lord's purse cannot cover the day's accounts even after his soldiers' pay is cut, the uncovered part of the council wages is taken back from the councillors (nothing from thin air). Off = Banner Kings as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CouncilWagesPaidToAll { get; set; } = true;
+
         [SettingPropertyBool("Workshop No Free Raw", HintText = "nothing from thin air: the hidden town artisans no longer make timber, ore, hides, meat, leather and linen without any input, and a workshop roll never yields charcoal or ingots (those only come from smelting) - raw goods come from the villages")]
         [SettingPropertyGroup("Iron Bank")]
         public bool WorkshopNoFreeRaw { get; set; } = true;
@@ -4444,6 +4452,8 @@ namespace Armoury
             s.RentReplacesTownTax = RentReplacesTownTax;
             s.TownRentShare = TownRentShare;
             s.TownRentFloorGold = TownRentFloorGold;
+            s.CouncilWagesRealBase = CouncilWagesRealBase;
+            s.CouncilWagesPaidToAll = CouncilWagesPaidToAll;
             s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
