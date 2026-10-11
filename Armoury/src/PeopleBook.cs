@@ -30,7 +30,7 @@ namespace Armoury
     /// regionu -> doba ostatniego rabunku albo zerowania z trafionymi > 0). Trafieni rabunkiem i zerowaniem armii schodza z DOM przez Move (MDevRaid, MDevForage),
     /// konta dopisuje Devastated; powrot (MRefugeeHome) i podloga 10 (MRefugeeFloor, najpierw z uchodzcow tej wsi) schodza z konta; uchodzcy umieraja 1.3%/rok (bez narodzin).
     /// E4/6 (191): smierc z glodu schodzi z DOM przez Move (konto ADead, MFamineDead - ubytek trwaly), uchodzcy z glodu - Move DOM -> UCHODZCY (MFamineFled) i FamineFled
-    /// (konto wsi bez zegara rabunku); mieszczanie przy Food 0 - TownDie (stan miasta "t:"). Stan spichlerzy (Famine.cs) w tej samej sekcji zapisu ("f:").
+    /// (konto wsi bez zegara rabunku); mieszczanie przy Food 0 - TownDie (stan miasta "t:", licznik MFamineTown). Stan spichlerzy (Famine.cs) w tej samej sekcji zapisu ("f:").
     /// Kolejne konta (SLUZBA z pochodzeniem, JENCY...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
@@ -73,7 +73,7 @@ namespace Armoury
         // przyczyny ruchu ludzi (indeksy licznikow)
         internal const int MSeed = 0, MMisery = 1, MRaidFlee = 2, MPoolHome = 3, MCart = 4, MH3Cart = 5, MDisband = 6, MCommon = 7, MSoldier = 8,
                            M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15,
-                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MFamineDead = 20, MFamineFled = 21, MKinds = 22;
+                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MFamineDead = 20, MFamineFled = 21, MFamineTown = 22, MKinds = 23;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -82,12 +82,13 @@ namespace Armoury
             "podloga 10 hearth z puli wyrzutkow regionu (E4/4 R17; hearth dopisala gra/BK)",
             "spustoszenie: rabunek (trafieni = zabici + pojmani + las + uchodzcy; E4/5)", "spustoszenie: zerowanie armii (trafieni; E4/5)",
             "powrot uchodzcow do swojej wsi (E4/5)", "podloga 10 z uchodzcow tej wsi (E4/5; hearth dopisala gra/BK)",
-            "glod: zmarli z glodu (E4/6, R10 - ubytek trwaly)", "glod: uciekli z glodu do regionu z zapasem (E4/6, konto UCHODZCY)" };
+            "glod: zmarli z glodu (E4/6, R10 - ubytek trwaly)", "glod: uciekli z glodu do regionu z zapasem (E4/6, konto UCHODZCY)",
+            "glod: zmarli mieszczanie przy Food 0 (E4/6, R10 - stan miasta)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
-        // E4/6: zmarli i uciekli z glodu ruszaja hearth (DOM -> smierc, DOM -> UCHODZCY)
-        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false, true, true };
+        // E4/6: zmarli i uciekli z glodu ruszaja hearth (DOM -> smierc, DOM -> UCHODZCY); zmarli mieszczanie - stan miasta "t:" (TownDie), bez hearth wsi
+        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false, true, true, false };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -586,11 +587,13 @@ namespace Armoury
 
         /// <summary>
         /// E4/6 (R10): mieszczanie umieraja z glodu w miescie przy Food 0 - stan miasta (E4/4 "t:") w dol o min(n, stan). Zwraca, ilu faktycznie zeszlo (float stanu);
-        /// 0 = miasto bez stanu (Town People Frozen wylaczone - ludzie miasta z dobrobytu, nie ma z czego zdjac). Nie rzuca.
+        /// 0 = miasto bez stanu (Town People Frozen wylaczone - ludzie miasta z dobrobytu, nie ma z czego zdjac). Poprawka po recenzji E4/6: zmarli w liczniku ksiegi
+        /// (MFamineTown, bez hearth wsi) - slad R3 w "Ludzie (ksiega)". Nie rzuca.
         /// </summary>
         internal static double TownDie(Settlement s, double n)
         {
             if (s == null || s.StringId == null || !(n > 0.0) || double.IsInfinity(n)) return 0.0;
+            double got = 0.0;
             try
             {
                 lock (Gate)
@@ -599,10 +602,12 @@ namespace Armoury
                     if (!_town.TryGetValue(s.StringId, out p) || !(p > 0f)) return 0.0;
                     float left = (float)Math.Max(0.0, (double)p - n);
                     _town[s.StringId] = left;
-                    return (double)p - left;
+                    got = (double)p - left;
                 }
             }
             catch (Exception e) { Stumble("TownDie", e); return 0.0; }
+            if (got > 0.0) Count(got, MFamineTown, 0.0);
+            return got;
         }
 
         /// <summary>Uchodzcy umieraja w drodze (1.3%/rok, bez narodzin): zdejmuje min(men, poza domem), Died += n; hearth bez zmian (sa poza wsia). Zwraca n.</summary>
@@ -1022,7 +1027,7 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : "bez hearth do E4/7"));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown ? "stan miasta" : "bez hearth do E4/7")));
                 any = true;
             }
             if (!any) sb.Append(" brak");

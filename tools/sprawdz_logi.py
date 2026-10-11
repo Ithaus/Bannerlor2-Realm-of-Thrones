@@ -10,9 +10,10 @@ Uzycie (Python 3, tylko odczyt):
                     stan jednostki - z dziennej linii "Ludzie (ksiega)" (MCM), nie z linii startowej (ta powstaje przed MCM).
                     Gdy jest linia startowa "Devastation (E4/5)" - takze progi E4/5 S1-S21 (plan kodu E4/5 rozdz. 11; S10/S11 z pliku
                     <katalog logu>/<znacznik>/ludzie-regiony.csv; S6, S14, S19-S21 - INFO, porownanie z biegiem E4/4 i autotesty osobno).
-                    Gdy jest linia startowa "Famine (E4/6)" - takze progi E4/6 F1-F13 (spichlerze okregow, glod, uchodzcy z glodu, H w przyroscie;
+                    Gdy jest linia startowa "Famine (E4/6)" - takze progi E4/6 F1-F13 i F9b (spichlerze okregow, glod, uchodzcy z glodu, H w przyroscie;
                     progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
-                    tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy).
+                    tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy). S10/S11 (E4/5) pomijaja
+                    wiersze region-doba z konto_e46 = 1 w spichlerze-regiony.csv (E4/6 zmienil konto uchodzcow regionu tej doby).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -1232,8 +1233,20 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
         except ValueError:
             continue
         byreg.setdefault(r.get("region_id"), {})[dd] = (uu, dd2)
+    # poprawka po recenzji E4/6 (R2-4): wiersze regionow, ktorych konto uchodzcow E4/6 zmienil tej doby (brama powrotu, czesc z glodu liczona od odzyskania wsi,
+    # zgony i ucieczki z glodu) - kolumna konto_e46 w spichlerze-regiony.csv; S10/S11 opisuja sama regule E4/5, wiec je pomijaja
+    e46_skip = set()
+    fp = os.path.join(os.path.dirname(cp), "spichlerze-regiony.csv")
+    if os.path.isfile(fp):
+        with open(fp, encoding="utf-8", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                if (r.get("konto_e46") or "").strip() == "1":
+                    try:
+                        e46_skip.add((r.get("region_id"), int(r["dzien"])))
+                    except (KeyError, ValueError):
+                        pass
     if byreg:
-        s10_bad = s10_n = 0; s11 = []
+        s10_bad = s10_n = 0; s11 = []; skipped = 0
         for reg, ser in byreg.items():
             for dd in sorted(ser):
                 if dd - 1 not in ser:
@@ -1241,13 +1254,17 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
                 u0, d0 = ser[dd - 1]; u1, d1 = ser[dd]
                 if d1 is None:
                     continue
+                if (reg, dd) in e46_skip:
+                    skipped += 1
+                    continue
                 if d1 < 30:
                     s10_n += 1
                     if u1 < u0 * (1 - E45_Q) - 0.5: s10_bad += 1
                 elif u0 >= 1000 and 30 <= d1 < 364 and d0 is not None and d1 == d0 + 1:
                     exp = u0 * (1 - E45_Q) * (1 - 1.0 / max(1, 364 - d1))
                     if exp > 0: s11.append(u1 / exp - 1)
-        rep.add("E4/5 S10: powrot w regionach z najazdem < 30 dob (CSV)", f"zlamane {s10_bad} z {s10_n} wierszy", "0 (uchodzcy(t) >= uchodzcy(t-1) x (1 - q) - 0.5)",
+        rep.add("E4/5 S10: powrot w regionach z najazdem < 30 dob (CSV)", f"zlamane {s10_bad} z {s10_n} wierszy" + (f" (pominiete - E4/6 na koncie regionu: {skipped} wierszy S10/S11)" if skipped else ""),
+                "0 (uchodzcy(t) >= uchodzcy(t-1) x (1 - q) - 0.5)",
                 (s10_bad == 0) if s10_n else None)
         out = sum(1 for x in s11 if abs(x) > 0.01)
         rep.add("E4/5 S11: liniowosc powrotu (CSV, regiony >= 1000 uchodzcow, 30 <= d < 364)", (f"{len(s11)} wierszy, poza +-1%: {out}; max |odchylka| {max((abs(x) for x in s11), default=0) * 100:.3f}%") if s11 else "brak takich regionow w oknie",
@@ -1421,6 +1438,18 @@ def etap4_e46(rep, lines, start, win, until):
         diff.append(abs(a - b))
     rep.add("E4/6 F9: zmarli z glodu (gospodarze) w ksiedze ludzi = linia spichlerzy", f"razem {dead:.1f}; max |roznica| {max(diff, default=0):.3f} w {len(diff)} dobach",
             "<= 0.1 kazdej doby (zaokraglenie ksiegi do 0.1; smierc przez PeopleBook.Move, MFamineDead)", (max(diff, default=0) <= 0.1) if diff else None)
+    # poprawka po recenzji E4/6 (R1-5, R2-3): mieszczanie przy Food 0 - w ksiedze (MFamineTown, stan miasta) jak gospodarze
+    diff_t = []
+    dead_t = 0.0
+    for d in on:
+        a = fnum(r", mieszczanie " + F_ + r" \(miast", fam[d])
+        if a is None:
+            continue
+        dead_t += a
+        b = fnum(r"glod: zmarli mieszczanie przy Food 0 \(E4/6, R10 - stan miasta\) " + F_, kb.get(d)) if d in kb else None
+        diff_t.append(abs(a - (b or 0.0)))
+    rep.add("E4/6 F9b: zmarli z glodu mieszczanie w ksiedze ludzi = linia spichlerzy", f"razem {dead_t:.1f}; max |roznica| {max(diff_t, default=0):.3f} w {len(diff_t)} dobach",
+            "<= 0.1 kazdej doby (TownDie -> licznik ksiegi MFamineTown)", (max(diff_t, default=0) <= 0.1) if diff_t else None)
     # F10 czas
     tm = [fnum(r"\| czas " + F_ + r" ms\.$", fam[d]) for d in on]
     tm = [x for x in tm if x is not None]

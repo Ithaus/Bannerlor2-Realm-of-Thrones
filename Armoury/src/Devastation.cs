@@ -96,7 +96,7 @@ namespace Armoury
         // K3: powrot, smierc, wstrzymania (doba)
         private static double _dBack, _dDied, _dLinErr;
         private static int _dBackVillages, _dStopQuiet, _dStopSiege, _dNoClock, _dNoVillage, _dAbandonLeft;
-        private static int _dStopHunger;                                    // E4/6: powrot wstrzymany - wies nie przyjmuje (Famine.ReturnGate: glod, albo pole nie karmi i spichlerz ponizej FamineReturnMinDays) albo nieodzyskana po glodzie
+        private static int _dStopHunger;                                    // E4/6: powrot wstrzymany - wies nie przyjmuje (Famine.ReturnGate: glod gospodarzy, a konto w innym regionie - takze pole nie karmi i spichlerz ponizej FamineReturnMinDays) albo czesc z glodu czeka na odzyskanie wsi
         private static readonly HashSet<string> _dBackRegions = new HashSet<string>();
         private static bool _abandonLogged;
 
@@ -648,20 +648,35 @@ namespace Armoury
                         var region = OutlawLaw.RegionFor(v.Settlement);
                         int last;
                         bool clock = PeopleBook.LastStrike(region, out last);
-                        // E4/6 (GL 2.6): nikt nie wraca do wsi z pustym spichlerzem; schronieni w murach oblezonej warowni nie wychodza; uchodzcy z glodu - rok od dnia,
-                        // w ktorym spichlerz ich wsi znow ma FamineReturnMinDays dni (famDay; bez rabunku w regionie - bez 30 dob spokoju)
-                        int famDay;
-                        int famStop = Famine.ReturnGate(v, today, out famDay);
+                        // E4/6 (GL 2.6): nikt nie wraca do wsi, ktora nie przyjmuje (Famine.ReturnGate); schronieni w murach oblezonej warowni nie wychodza.
+                        // Poprawka po recenzji E4/6 (R1-1): konto dzieli sie na czesc z glodu (famAway - rok od doby, w ktorej wies znow przyjmuje: famDay; -1 = czekaja)
+                        // i reszte (rabunek, zerowanie - rok od ostatniego najazdu w regionie, decyzja Jeffa 11.10) - glod nie przestawia zegara uchodzcom z rabunku
+                        int famDay; double famAway;
+                        int famStop = Famine.ReturnGate(v, today, away, out famDay, out famAway);
                         if (famStop == 1) { _dStopHunger++; continue; }
                         if (famStop == 2) { _dStopSiege++; continue; }
-                        if (!clock) { if (famDay >= 0) last = famDay; else { last = today - Q; _dNoClock++; } }    // bez zegara i bez glodu nie powinno sie zdarzyc (zegar rusza razem z kontem)
-                        int d = today - last;
-                        if (clock && d < Q) { _dStopQuiet++; continue; }
+                        if (clock && today - last < Q) { _dStopQuiet++; continue; }                    // 30 dob spokoju po najezdzie w regionie - dla calego konta
                         if (region != null && region.IsUnderSiege) { _dStopSiege++; continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
-                        if (famDay > last) d = today - famDay;                                         // E4/6: rok od pozniejszego zdarzenia (rabunek albo odzyskany spichlerz)
-                        double back = away / Math.Max(1, D - d);
-                        if (away - back < 1.0) back = away;                                            // ostatni czlowiek wraca caly
+                        double raidAway = Math.Max(0.0, away - famAway), backR = 0.0, backF = 0.0;
+                        if (raidAway > 0.0)
+                        {
+                            if (!clock) { last = today - Q; _dNoClock++; }                             // nie powinno sie zdarzyc (zegar rusza razem z kontem rabunku)
+                            backR = raidAway / Math.Max(1, D - (today - last));
+                            if (raidAway - backR < 1.0) backR = raidAway;                              // ostatni czlowiek wraca caly
+                        }
+                        if (famAway > 0.0)
+                        {
+                            if (famDay < 0) _dStopHunger++;                                            // wies jeszcze nie przyjmuje uchodzcow z glodu - czekaja (reszta wraca)
+                            else
+                            {
+                                backF = famAway / Math.Max(1, D - (today - famDay));
+                                if (famAway - backF < 1.0) backF = famAway;
+                            }
+                        }
+                        double back = backR + backF;
+                        if (!(back > 0.0)) continue;
                         double got = PeopleBook.RefugeesHome(v, back, PeopleBook.MRefugeeHome, PeopleUnit.GamePerMan);
+                        if (famAway > 0.0) Famine.Returned(v, famAway, got > 0.0 ? got * (backF / back) : 0.0);   // czesc z glodu po powrocie (nie rzuca)
                         double err = Math.Abs(got - back) / Math.Max(1.0, back);                       // kontrola liniowosci: 0 poza dnem konta
                         if (err > _dLinErr) _dLinErr = err;
                         if (got > 0.0)
@@ -848,7 +863,7 @@ namespace Armoury
                   .Append(" w ").Append(_dVillages[KRaid].Count).Append(" wsiach rabunku i ").Append(_dVillages[KForage].Count).Append(" zerowania");
                 sb.Append(" | powrot: ludzi ").Append(F(_dBack, "0.#")).Append(" do ").Append(_dBackVillages).Append(" wsi, regionow w fazie powrotu ").Append(_dBackRegions.Count)
                   .Append("; wstrzymany: ").Append(Q).Append(" dob spokoju ").Append(_dStopQuiet).Append(" wsi, oblezenie ").Append(_dStopSiege).Append(" wsi")
-                  .Append(", wies nie przyjmuje - glod albo pole nie karmi i spichlerz ponizej ").Append(Math.Max(0, s.FamineReturnMinDays)).Append(" dni dla gospodarzy, albo nieodzyskana po glodzie (E4/6) ").Append(_dStopHunger).Append(" wsi")
+                  .Append(", wies nie przyjmuje - glod gospodarzy, a konto w innym regionie takze pole nie karmi i spichlerz ponizej ").Append(Math.Max(0, s.FamineReturnMinDays)).Append(" dni dla gospodarzy, albo czesc z glodu czeka na odzyskanie wsi (E4/6) ").Append(_dStopHunger).Append(" wsi")
                   .Append("; kontrola liniowosci max ").Append(_dLinErr.ToString("0.######", Inv));
                 if (_dNoClock > 0) sb.Append("; bez zegara regionu ").Append(_dNoClock).Append(" wsi");
                 if (seg.Has)

@@ -2496,7 +2496,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int FamineDeathMaxPercent { get; set; } = 70;
 
-        [SettingPropertyBool("Famine Flee Enabled", HintText = "as many as die of hunger leave their village and become refugees in the nearest land of the same realm (else of a realm not at war with it) whose granaries hold more than Famine Refuge Min Days of food; with none in reach they stay and starve. They go home when their village's granary holds Famine Return Min Days again, all of the living within Refugee Return Days of that. Works only with Devastation Enabled")]
+        [SettingPropertyBool("Famine Flee Enabled", HintText = "as many as die of hunger leave their village and become refugees in the nearest land of the same realm (else of a realm not at war with it) whose granaries hold more than Famine Refuge Min Days of food; with none in reach they stay and starve. They go home once their village takes them back (see Famine Return Min Days), all of the living within Refugee Return Days of that day; refugees of a raid on the same village keep their own year from the last raid. Works only with Devastation Enabled")]
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineFleeEnabled { get; set; } = true;
 
@@ -2512,7 +2512,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int FamineMoveDays { get; set; } = 30;
 
-        [SettingPropertyInteger("Famine Return Min Days", 0, 360, "0", HintText = "no refugee goes home to a village whose granary holds less than this many days of food (nobody goes back to hunger)")]
+        [SettingPropertyInteger("Famine Return Min Days", 0, 360, "0", HintText = "nobody goes back to hunger: no refugee goes home while his village's people are starving, and refugees staying in another land do not go home in a season when the village's fields cannot feed a man (winter) unless its granary holds this many days of food for those at home. Refugees still in their own land eat from the same granaries, so only starving at home holds them back")]
         [SettingPropertyGroup("Iron Bank")]
         public int FamineReturnMinDays { get; set; } = 90;
 
