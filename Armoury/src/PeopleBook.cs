@@ -74,9 +74,10 @@ namespace Armoury
                            M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15,
                            MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19,
                            // E4/7 (164b-1): pobor z DOM (wies -1/k, A5) i powroty zolnierzy ze znanym pochodzeniem do DOM regionu pochodzenia (+1/k) - PeopleBook.Origin.cs;
-                           // MLevyTown - pobor z miasta (stan miasta E4/4, bez hearth); MBackTown (recenzja E4/7 R1-1) - powrot z pochodzeniem do stanu miasta (bez hearth)
+                           // MLevyTown - pobor z miasta (stan miasta E4/4, bez hearth); MBackTown (recenzja E4/7 R1-1) - powrot z pochodzeniem do stanu miasta (bez hearth);
+                           // MBackPress (E4/7b, decyzja Jeffa 11.10 12:40) - niewzieci z ekranu lupu poboru wymuszonego gracza wracaja do DOM wsi zdjecia (+1/k) - OSTATNIA z listy E4/7
                            MLevyVillage = 20, MLevyA5 = 21, MBackH3 = 22, MBack166 = 23, MBackW4c = 24, MBack179 = 25, MBackPool = 26, MBackFreed = 27, MBackDisband = 28,
-                           MLevyTown = 29, MBackTown = 30, MKinds = 31;
+                           MLevyTown = 29, MBackTown = 30, MBackPress = 31, MKinds = 32;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -88,13 +89,14 @@ namespace Armoury
             "pobor z wsi (E4/7, BK DeduceManpower)", "pobor A5 - autowerbunek zalogi (E4/7)", "powrot z pochodzeniem: rozbici H3 (E4/7)", "powrot z pochodzeniem: zwolnieni 166 (E4/7)",
             "powrot z pochodzeniem: przepelnienie W4c (E4/7)", "powrot z pochodzeniem: rycerze 179 (E4/7)", "powrot z pochodzeniem: z puli wyrzutkow (E4/7)",
             "powrot z pochodzeniem: jency uwolnieni i wypuszczeni (E4/7)", "powrot z pochodzeniem: rozwiazane partie (E4/7)", "pobor z miasta (E4/7, stan miasta E4/4)",
-            "powrot z pochodzeniem do miasta (E4/7, stan miasta E4/4 - dlug poboru z miasta)" };
+            "powrot z pochodzeniem do miasta (E4/7, stan miasta E4/4 - dlug poboru z miasta)",
+            "powrot z pochodzeniem: niewzieci z poboru wymuszonego gracza do swojej wsi (E4/7b)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
         // E4/7: pobor z wsi i powroty z pochodzeniem ruszaja hearth (symetria - LevyLive, PeopleBook.Origin.cs); pobor z miasta - stan miasta, nie hearth
         private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false,
-                                                   true, true, true, true, true, true, true, true, true, false, false };
+                                                   true, true, true, true, true, true, true, true, true, false, false, true };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -1000,7 +1002,8 @@ namespace Armoury
             // punkt (3) pokazuje tylko powrot z puli, a "razem" to suma bez podwojenia
             double back = men[MH3Cart] + men[MCommon] + men[MSoldier] + men[M166] + men[MW4c] + men[M179] + men[MPoolHome];
             // E4/7: powroty z pochodzeniem (z hearth) - czesc znana tych samych trzech punktow (bez podwojenia: czesc bez pochodzenia idzie dalej pod MSoldier/M166/MW4c/M179)
-            double backE47 = men[MBackH3] + men[MBack166] + men[MBackW4c] + men[MBack179] + men[MBackPool] + men[MBackFreed] + men[MBackDisband] + men[MBackTown];
+            // E4/7b: + niewzieci z poboru wymuszonego gracza wracajacy do swojej wsi (MBackPress - nie przechodza przez trzy punkty, wiec bez podwojenia)
+            double backE47 = men[MBackH3] + men[MBack166] + men[MBackW4c] + men[MBack179] + men[MBackPool] + men[MBackFreed] + men[MBackDisband] + men[MBackTown] + men[MBackPress];
             back += backE47;
             sb.Append(" | trzy punkty powrotu do DOM, razem ").Append(M0(back)).Append(" (bez podwojenia): LosersFlee.SendHome ").Append(M0(men[MH3Cart] + men[MCommon] + men[MSoldier]))
               .Append(" (rozbite tabory ").Append(M0(men[MH3Cart])).Append(", prosci i bandyci ").Append(M0(men[MCommon])).Append(" - do wsi dalej przez OutlawLaw.ReturnHome, zolnierze do ludnosci BK ").Append(M0(men[MSoldier]))

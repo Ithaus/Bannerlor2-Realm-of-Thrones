@@ -142,8 +142,10 @@ namespace Armoury
         private static readonly double[] _deadBy = new double[FKinds];
         private static double _gAll, _tAll, _zAll, _qAll, _gone, _deadCarts, _pendIn, _pendLost, _homeNoVillage;
         private static double _homeTown, _foldMen, _pressIn, _pressLost;    // recenzja E4/7: powrot do stanu miasta (R1-1), przyciecie kluczy (R2-3), pobor wymuszony (R1-5)
+        private static double _pressHome;                                   // E4/7b: niewzieci z poboru wymuszonego, ktorzy wrocili do DOM swojej wsi (doba)
         private static int _foldKeys;
         private static Shares _press;                                       // R1-5: pobrani przez pobor wymuszony gracza - czekaja na ekran lupu (do konca doby)
+        private static Dictionary<Village, double> _pressVil;               // E4/7b: te same oczekujace wedlug wsi zdjecia (do powrotu niewzietych; bez zapisu)
         private static int _deduceCalls, _deduceOutside, _deduceNoWin, _floorCalls;
         private static double _deduceMen, _floorMen;
         private static int _oStumbles, _oStumblesDay, _badIds, _resolveMissing, _resolveFound;
@@ -176,7 +178,7 @@ namespace Armoury
             _mem.Clear(); _pris.Clear(); _poolOrg.Clear(); _rg.Clear(); _sown = false; _sowDay = -1; _pendSo = _pendJo = null; _pending.Clear();
             _node.Clear(); _wight.Clear(); _kind.Clear();
             _oStumbles = 0; _badIds = 0; _resolveMissing = _resolveFound = 0; _sowNote = null; _resolveNote = null; _state0 = double.NaN;
-            _press = null;
+            _press = null; _pressVil = null;
             // recenzja E4/7 R2-2: BK tworzy przy kazdym wczytaniu i nowej kampanii nowy PopulationManager kluczowany obiektami Settlement (wzor ClanBudget.Reset) -
             // stary menedzer nie zna osad nowej kampanii (A5 z klasa BK po cichu bez zdjecia). BkResolve jest leniwe - podepnie sie do nowego.
             _bkTried = false; _popMgr = null; _getPopData = null;
@@ -190,7 +192,7 @@ namespace Armoury
             Array.Clear(_zBy, 0, KKinds); Array.Clear(_qBy, 0, KKinds); Array.Clear(_deadBy, 0, FKinds);
             _gAll = _tAll = _zAll = _qAll = _gone = _deadCarts = _pendIn = _pendLost = _homeNoVillage = 0;
             _deduceCalls = _deduceOutside = _deduceNoWin = _floorCalls = 0; _deduceMen = _floorMen = 0; _a5Bk = _a5BkFail = 0;
-            _homeTown = 0; _foldKeys = 0; _foldMen = 0; _pressIn = _pressLost = 0;
+            _homeTown = 0; _foldKeys = 0; _foldMen = 0; _pressIn = _pressLost = _pressHome = 0;
             _oStumblesDay = 0;
             _kind.Clear();          // rodzaj partii raz na dobe (Straz, rod - moga sie zmienic)
         }
@@ -602,10 +604,10 @@ namespace Armoury
         /// <summary>
         /// Recenzja E4/7 R1-5: pobor wymuszony gracza (PeopleUnit.PressPostfix, po Move z DOM wsi). Gra nie dopisuje rekrutow do druzyny, tylko otwiera ekran lupu
         /// (village_force_volunteers_ended_successfully_on_consequence -> PartyScreenHelper.OpenScreenAsLoot) - gracz bierze ilu chce. Udzialy czekaja na ScreenPost
-        /// tego ekranu (do wysokosci przyrostu skladu gracza - PressTake); reszta - "pobor wymuszony niewziety" (zdjeci z DOM, poza rosterem - jak w grze, ktora
-        /// obniza hearth niezaleznie od wyboru gracza). Nieodebrane do nastepnej doby ksiegi - tez niewzieci (OriginDaily).
+        /// tego ekranu (do wysokosci przyrostu skladu gracza - PressTake); reszta - niewzieci. Nieodebrane do nastepnej doby ksiegi - tez niewzieci (OriginDaily).
+        /// E4/7b (decyzja Jeffa 11.10 12:40, "nikt nie znika"): niewzieci wracaja do DOM wsi, z ktorej ich zdjeto (PressUntaken; dotad - nazwana nicosc poza rosterem).
         /// </summary>
-        internal static void PressPending(Settlement region, double men)
+        internal static void PressPending(Village v, Settlement region, double men)
         {
             if (!(men > 0.0) || double.IsInfinity(men) || !OriginLive) return;
             try
@@ -613,19 +615,58 @@ namespace Armoury
                 if (_press == null) _press = new Shares();
                 _press.Add(RegKey(region), men);
                 _pressIn += men;
+                if (v != null)
+                {
+                    if (_pressVil == null) _pressVil = new Dictionary<Village, double>();
+                    double was; _pressVil.TryGetValue(v, out was); _pressVil[v] = was + men;
+                }
             }
             catch (Exception e) { OStumble("PressPending", e); }
         }
 
-        /// <summary>ScreenPost: z oczekujacych udzialow poboru wymuszonego do skladu gracza najwyzej `gain` ludzi (FPress); reszta - niewzieci. Zwraca, ilu dopisano.</summary>
+        /// <summary>ScreenPost: z oczekujacych udzialow poboru wymuszonego do skladu gracza najwyzej `gain` ludzi (FPress); reszta - niewzieci (PressUntaken). Zwraca, ilu dopisano.</summary>
         private static double PressTake(TroopRoster rm, double gain)
         {
             var p = _press; _press = null;
-            if (p == null || !(p.Total > Eps)) return 0.0;
+            if (p == null || !(p.Total > Eps)) { _pressVil = null; return 0.0; }
             double use = Math.Min(Math.Max(0.0, gain), p.Total);
             if (use > Eps) Give(rm, p.Cut(use), FPress);
-            if (p.Total > Eps) _pressLost += p.Total;
+            PressUntaken(p.Total);
             return use;
+        }
+
+        /// <summary>
+        /// E4/7b (decyzja Jeffa 11.10 12:40): `rest` niewzietych z poboru wymuszonego gracza wraca do DOM wsi, z ktorych ich zdjeto - proporcjonalnie do zdjetych
+        /// z kazdej wsi (_pressVil). Ta sama droga co powrot z pochodzeniem (HomeKnown): PeopleBook.Move SLUZBA -> DOM z przyczyna MBack* (MBackPress, MHearth,
+        /// stawka GamePerMan - ta sama co przy zdjeciu w PeopleUnit.PressPostfix), ale do wsi zdjecia zamiast najslabszej wsi regionu i bez czesci do stanu
+        /// miasta (zdjeto ich z hearth tej wsi, nie ze stanu miasta). Bez warunku LevyLive - zdjecie (PressPostfix, E4/3) tez go nie ma; oczekujace sa tylko po
+        /// zdjeciu przez Move (jednostka czynna). Wylacznik Press Untaken Go Home - przy wylaczonym jak dotad: niewzieci poza rosterem (_pressLost, nazwani).
+        /// Zuzywa _pressVil. Nie rzuca (U24).
+        /// </summary>
+        private static void PressUntaken(double rest)
+        {
+            var vil = _pressVil; _pressVil = null;
+            if (!(rest > Eps)) return;
+            double home = 0.0;
+            try
+            {
+                var st = Settings.Current;
+                if (st != null && st.PressUntakenGoHome && vil != null && vil.Count > 0)
+                {
+                    double all = 0.0; foreach (var x in vil.Values) all += x;
+                    double f = all > Eps ? Math.Min(1.0, rest / all) : 0.0;
+                    foreach (var kv in vil)
+                    {
+                        double m = kv.Value * f;
+                        if (kv.Key == null || !(m > Eps)) continue;
+                        Move(kv.Key, AService, ADom, m, MBackPress, PeopleUnit.GamePerMan);
+                        home += m;
+                    }
+                }
+            }
+            catch (Exception e) { OStumble("PressUntaken", e); }
+            _pressHome += home;
+            if (rest - home > Eps) _pressLost += rest - home;
         }
 
         /// <summary>Cofniecie Take (ludzie zostali w rosterze - np. wies nie przyjela zwolnionego): bez licznika ruchu.</summary>
@@ -1366,7 +1407,7 @@ namespace Armoury
             if (_pendSo != null || _pendJo != null) ResolveOrigin("pierwsza doba (bez OnSessionLaunched)");
             EnsureSown(day);
             if (!_sown) return;
-            if (_press != null) { _pressLost += _press.Total; _press = null; }     // R1-5: ekran lupu poboru wymuszonego bez Done do konca doby - niewzieci
+            if (_press != null) { double left = _press.Total; _press = null; PressUntaken(left); }   // R1-5: ekran lupu bez Done do konca doby - niewzieci (E4/7b: do DOM swojej wsi)
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try { ReconcileDaily(); } catch (Exception e) { OStumble("ReconcileDaily", e); }
             try { BuildViews(); } catch (Exception e) { OStumble("BuildViews", e); }
@@ -1409,6 +1450,7 @@ namespace Armoury
             double back = 0, backH = 0;
             for (int i = MBackH3; i <= MBackDisband; i++) { back += men[i]; backH += hh[i]; }
             back += men[MBackTown];                                         // R1-1: do stanu miasta (bez hearth)
+            back += men[MBackPress]; backH += hh[MBackPress];               // E4/7b: niewzieci z poboru wymuszonego gracza do swojej wsi
             // rownanie krain (suma regionow kultury regionu)
             var realms = new Dictionary<string, double[]>();
             double world = 0;
@@ -1462,8 +1504,12 @@ namespace Armoury
             sb.Append(" | wejscia: pobor z DOM ").Append(M0(Sum(_fIn, FLevyVillage, FPress))).Append(" (").Append(Part(_fIn, FLevyVillage, FPress)).Append(")")
               .Append(", z puli do band ").Append(M0(_fIn[FPoolBand])).Append(" (w tym narodziny band z oczekujacych ").Append(M0(_pendIn)).Append(")")
               .Append(", bez pochodzenia ").Append(M0(Sum(_fIn, FNoneMap, FNoneOff))).Append(" (").Append(Part(_fIn, FNoneMap, FNoneOff)).Append(")");
-            if (_pressIn > 0 || _pressLost > 0)
-                sb.Append(", pobor wymuszony gracza: zdjeci z DOM ").Append(M0(_pressIn)).Append(", wzieci z ekranu lupu ").Append(M0(_fIn[FPress])).Append(", niewzieci (poza rosterem) ").Append(M0(_pressLost));
+            if (_pressIn > 0 || _pressLost > 0 || _pressHome > 0)
+            {
+                // E4/7b: zdjeci z DOM = wzieci + wrocili do domu (+ bez powrotu tylko przy wylaczonym Press Untaken Go Home)
+                sb.Append(", pobor wymuszony gracza: zdjeci z DOM ").Append(M0(_pressIn)).Append(", wzieci z ekranu lupu ").Append(M0(_fIn[FPress])).Append(", niewzieci - wrocili do domu ").Append(M0(_pressHome));
+                if (_pressLost > 0) sb.Append(", niewzieci bez powrotu (poza rosterem) ").Append(M0(_pressLost));
+            }
             sb.Append(" | przenosiny: ").Append(Part(_fIn, FToGarrison, FPrisRecruit));
             sb.Append(" | wyjscia: ").Append(Part(_fOut, FDieBattle, FGone))
               .Append(" -> dokad: polegli ").Append(M0(_dest[ODead])).Append(" (bitwa ").Append(M0(_deadBy[FDieBattle])).Append(", zaraza ").Append(M0(_deadBy[FDiePlague])).Append(", straceni ").Append(M0(_deadBy[FDieExec]))

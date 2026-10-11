@@ -868,6 +868,7 @@ namespace Armoury
             // E4/7: pobor z wsi (BK DeduceManpower, A5 - ujemne) i powroty zolnierzy ze znanym pochodzeniem do DOM regionu pochodzenia (dodatnie) - hearth z ksiegi
             double o10 = mv[PeopleBook.MLevyVillage] + mv[PeopleBook.MLevyA5], o11 = 0;
             for (int i = PeopleBook.MBackH3; i <= PeopleBook.MBackDisband; i++) o11 += mv[i];
+            o11 += mv[PeopleBook.MBackPress];                    // E4/7b: niewzieci z poboru wymuszonego gracza wracaja do DOM swojej wsi (+1/k)
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
             double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 - (seedInside ? seedH : 0);

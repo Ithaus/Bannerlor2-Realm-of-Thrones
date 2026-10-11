@@ -2476,6 +2476,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool LevyFromVillages { get; set; } = true;
 
+        [SettingPropertyBool("Press Untaken Go Home", HintText = "villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PressUntakenGoHome { get; set; } = true;
+
         [SettingPropertyBool("Garrison Levy From Bk", HintText = "a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does")]
         [SettingPropertyGroup("Iron Bank")]
         public bool GarrisonLevyFromBk { get; set; } = true;
@@ -4866,6 +4870,7 @@ namespace Armoury
             s.LootedProducesByPeople = LootedProducesByPeople;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
+            s.PressUntakenGoHome = PressUntakenGoHome;
             s.GarrisonLevyFromBk = GarrisonLevyFromBk;
             s.FreeHandsShare = FreeHandsShare;
             s.FreeHandsHarvestFactor = FreeHandsHarvestFactor;
