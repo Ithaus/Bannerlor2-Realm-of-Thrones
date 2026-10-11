@@ -655,3 +655,11 @@ ETAP 4: projekt (wf_77f49d09-f4f -> SCRATCH(ae222cb7)\e4\PROJEKT-ETAP4-KSIEGA-LU
 **Pytania do Jeffa (zbiorczo):** (1) statki 3.3: wlaczyc teraz (-8..-11% wojska do etapu 5) czy z podatkiem wojennym w etapie 5 (rada); (2) fale dezercji po wielkich
 przegranych (Recent Events -65) - zostawic czy zlagodzic; (3) kiesa bandy przylaczajacej sie do gracza (dzis znika); (4) podatek BK od warsztatow lordow/gracza w cudzych
 miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lordow; (7) napitki/drewno wojska - lord czy sakiewka ludzi; (8) wedrowcy BK z prawdziwym towarem.
+- (22:55) **ETAP 4:** projekt v2 (SCRATCH(ae222cb7)\e4\PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md, 12 paczek E4/0-E4/11, krytyka 28 uwag). E4/0 (pomiar, gra bez
+  zmian) KOD GOTOWY: w-toku/e4-0 2a71008 (drzewo e4\40), test\Armoury-e4-0.dll 35b80d6b - test 120 dob + zapis PO biegu 2-letnim; progi: tools/sprawdz_logi.py --grupa etap4.
+  E4/2 (Inni tylko z poleglych, PeopleBook konto CIALA) kod w toku (wf_c6dbaec7-ebb, drzewo e4\42, galaz w-toku/e4-2 od 2a71008). Pytania etapu 4 do Jeffa: Sarnor 100 tys.
+  (ROT) czy 20 tys. (kanon); kraina bez wolnych rak nie wystawia nowego wojska do odrobienia strat; "spalona wioska wraca po roku" od ostatniego najazdu; ludnosc w ciaglej
+  wojnie moze spadac do -0.5%/rok (a, rada) czy zawsze rosnie >= 0.2% (b).
+  Bieg 2-letni (podglad doby 276): dezercja AI d168-195 198/d (lordowie z morale 131 - fale po kleskach), zalogi z przepelnienia (do domu) 22-34/d; bandy 14.9 -> 23.2 tys.
+  - pule wyrzutkow zasilaja glownie rozbici z bitew "w las" (H3, do 1100/d w dniu wielkiej bitwy) i fale dezercji; powrot z puli do wsi 2-3/d -> naturalne miejsce E4/3
+  (punkty powrotu). Straz 6.8 tys. / pulap 20 tys.
