@@ -832,6 +832,10 @@ namespace Armoury
         [SettingPropertyGroup("The living economy")]
         public bool LivingEconomySealed { get; set; } = true;
 
+        [SettingPropertyBool("Bee Player Gifts Real", HintText = "your payments into a town's or castle's treasury in BetterEconomy (Living Economy) become real: the gold goes into the settlement's own purse - the coin its merchants trade with and from which its lord's rent or dues are paid - and conjures no prosperity, goods or readiness out of nothing; a town takes such payments only once its purse holds real coin (Town Purse Regulator), a castle with Castle Purse Enabled. The Living Economy menu of every town and village also gets 'Give gifts to the notables': your gold goes to the notables, shared by their power, and each warms to you as after a generous barter (a few points at most, the dearer the better they already like you; once every few days per notable; not where the place is at war with you). Off = both treasury payments stay closed as with Living Economy Sealed, and there is no gift option")]
+        [SettingPropertyGroup("The living economy")]
+        public bool BeePlayerGiftsReal { get; set; } = true;
+
         [SettingPropertyBool("Plague Spares Your Men", HintText = "sickness may weaken your men - it will not kill them: any troop death caused by a disease system is refused for YOUR party (the rest of the world still buries its dead)")]
         [SettingPropertyGroup("Plague shield")]
         public bool PlagueSparesYourMen { get; set; } = true;
@@ -4543,6 +4547,7 @@ namespace Armoury
             s.DonationXpOff = DonationXpOff;
             s.SpoilsCancelKeeps = SpoilsCancelKeeps;
             s.LivingEconomySealed = LivingEconomySealed;
+            s.BeePlayerGiftsReal = BeePlayerGiftsReal;
             s.PlagueSparesYourMen = PlagueSparesYourMen;
             s.PlagueShieldLogEvery = PlagueShieldLogEvery;
             s.DesertionLawEnabled = DesertionLawEnabled;

@@ -23,6 +23,10 @@ Uzycie (Python 3, tylko odczyt):
                     E5/A4 (196, R22) A4-1..A4-8 - linia "Oblezone (E5/A4)": zaplacone mimo oblezenia = 0 (renta miast, Crown Duty, War Tax, Road Tolls),
                     wstrzymane i oblezenia (INFO), zawor zamkow i zawor A1 bez oblezonych (INFO), "10 miast bez placenia" (gdy A1 w logu), prog podatkow
                     zamkow ponad zapasem kupcow (INFO), bledy.
+                    E5/A5 (197, R23) A5-1..A5-7 - BetterEconomy: prefiksy Try* wplaty wpiete (linia startowa BEE 170), dopisek E5/A5 w linii
+                    kampanii BEE (wylacznik, okno kwot 2/2, opcje daru 2/2), kasy prawdziwym pieniadzem (INFO), linie "BEE (E5/A5) wplata|dar" -
+                    gracz traci tyle, ile dostaje kasa osady / notable (ROZNICA 0; autotest nie klika menu - linie z recznego testu Jeffa), odmowy
+                    (INFO), bledy BeeGifts i potkniecia 0.
                     Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
@@ -1687,6 +1691,11 @@ def etap5_main(logp, start_arg, until=120):
         etap5_a4(rep, lines, start, until, obl, bud)
     else:
         rep.add("E5/A4: linia Oblezone (E5/A4)", "brak w logu", "jest od wgrania E5/A4 (LogEnabled)", None)
+    # E5/A5 (197): BetterEconomy - prawdziwa wplata gracza i dar dla notabli (dopisek linii kampanii BEE 170 i linie akcji gracza)
+    if any(x.startswith("BEE domkniecie (170)") for x in lines):
+        etap5_a5(rep, lines)
+    else:
+        rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
     rep.show()
     return 0
 
@@ -2128,6 +2137,95 @@ def etap5_a4(rep, lines, start, until, obl, bud):
     st0 = [s for s in lines if s.startswith("Oblezone (E5/A4): start")]
     rep.add("E5/A4 INFO: linia startowa", st0[0][st0[0].find("| wylacznik"):][:420] if st0 else "brak linii",
             "wylacznik tak; Population Rent Enabled tak; Policy Income Conserved tak; kasy miast A1 tak (zbior A), Castle Purse Enabled tak, latka regulatora 110 wpieta", None)
+
+
+def etap5_a5(rep, lines):
+    """E5/A5 (197, R23 - BetterEconomy: prawdziwa wplata gracza do kasy osady i dar dla notabli): projekt rozdz. 3 "E5/A5" Test - zbior A + reczne
+    sprawdzenie Jeffa (autotest nie klika menu): przelew w ksiedze, nic z niczego. Linia startowa BEE (170) - prefiksy Try* wpiete; linia kampanii
+    BEE (170) - dopisek "E5/A5 (prawdziwa wplata i dar dla notabli)"; kazda akcja gracza - linia "BEE (E5/A5) wplata|wplata odmowiona|dar: dzien N | ..."
+    ze zlotem gracza i odbiorcy przed i po (gracz traci dokladnie tyle, ile dostaje kasa osady / notable - inaczej dopisek ROZNICA)."""
+    st = [x for x in lines if x.startswith("BEE domkniecie (170): BetterEconomy")]
+    camp = [x for x in lines if x.startswith("BEE domkniecie (170): kampania")]
+    pays = [x for x in lines if x.startswith("BEE (E5/A5) wplata: dzien")]
+    refs = [x for x in lines if x.startswith("BEE (E5/A5) wplata odmowiona: dzien")]
+    gifts = [x for x in lines if x.startswith("BEE (E5/A5) dar: dzien")]
+    labels = ("prawdziwa wplata do kasy miasta (E5/A5)", "prawdziwa wplata do kasy zamku (E5/A5)")
+    # A5-1: prefiksy Try* wpiete (linia startowa BEE 170; bez BEE albo inna wersja - INFO)
+    if not st:
+        rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)", "brak linii startowej BEE", "jest przy BetterEconomy w grze", None)
+    else:
+        x = st[-1]
+        if "nieobecny" in x or "NIC nie wpiete" in x:
+            rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)", x[:200], "BetterEconomy v1.4.5 obecny (inaczej paczka nieczynna - INFO)", None)
+        else:
+            m = re.search(r"wpiete (\d+)/(\d+)", x)
+            head = x.split(" | BRAK:")[0]
+            ok = all(l in head for l in labels)
+            rep.add("E5/A5 A5-1: prefiksy Try* wplaty (linia startowa BEE 170)",
+                    (f"wpiete {m.group(1)}/{m.group(2)}" if m else "?") + "; " + ", ".join(("tak" if l in head else "NIE") + " - " + l for l in labels)
+                    + (" | BRAK: " + x.split(" | BRAK:")[1][:200] if " | BRAK:" in x else ""),
+                    "oba wpiete (18/18 przy pelnym 170)", ok)
+    # A5-2: dopisek linii kampanii (kazda sesja: start / wczytanie)
+    rows = []
+    for x in camp:
+        i = x.find("E5/A5 (prawdziwa wplata i dar dla notabli): ")
+        rows.append(x[i:] if i >= 0 else None)
+    if not camp:
+        rep.add("E5/A5 A5-2: linia kampanii BEE (170) - dopisek E5/A5", "brak linii kampanii", "jest w kazdej sesji", None)
+    else:
+        bad, off = [], 0
+        for r in rows:
+            if r is None:
+                bad.append("brak dopisku")
+                continue
+            if "wylacznik wylaczony" in r:
+                off += 1
+                continue
+            if not ("prefiksy Try*: miasto tak, zamek tak" in r and "okno kwot przy opcjach wplaty 2/2" in r and "opcje daru dla notabli 2/2" in r):
+                bad.append(r[:160])
+        last = rows[-1] or "brak dopisku"
+        rep.add("E5/A5 A5-2: linia kampanii BEE (170) - dopisek E5/A5 (sesje)",
+                f"sesji {len(camp)}, niepelnych {len(bad)}" + (f", wylacznik wylaczony w {off}" if off else "") + " | ostatnia: " + last[:300],
+                "kazda sesja: wylacznik wlaczony, prefiksy Try* tak/tak, okno kwot 2/2, opcje daru 2/2", len(bad) == 0 and off == 0)
+        m = re.search(r"kasa prawdziwym pieniadzem: miasta \(A1\) (tak|nie).*?, zamki \(110\) (tak|nie)", last)
+        rep.add("E5/A5 A5-3: kasa osady prawdziwym pieniadzem (wplata otwarta tylko tam)",
+                (f"miasta (A1) {m.group(1)}, zamki (110) {m.group(2)}" if m else "brak w dopisku") + " | przerwa po darze: "
+                + (re.search(r"przerwa po darze: ([^;]+)", last).group(1)[:90] if re.search(r"przerwa po darze: ([^;]+)", last) else "?"),
+                "INFO - zbior A po scaleniu z A1: miasta tak, zamki tak (bez A1 wplata do miast zamknieta z powodem - regulator gry)", None)
+    # A5-4: wplaty - gracz traci tyle, ile dostaje kasa osady
+    if pays:
+        diff = [x for x in pays if "| ROZNICA" in x]
+        tot = sum(num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0 for x in pays)
+        got = sum(num(r"\| kasa osady \d+ -> \d+ \(\+(-?\d+)\)", x, int, 0) or 0 for x in pays)
+        tw = len([x for x in pays if "(miasto)" in x]); cs = len([x for x in pays if "(zamek)" in x])
+        rep.add("E5/A5 A5-4: wplaty gracza do kasy osady - gracz traci tyle, ile dostaje kasa",
+                f"wplat {len(pays)} (miasta {tw}, zamki {cs}), gracz -{tot}, kasy +{got}, linii z ROZNICA {len(diff)}" + (f" (pierwsza: {diff[0][:160]})" if diff else ""),
+                "ROZNICA 0 i suma gracza = suma kas (nic z niczego, nic w nicosc)", len(diff) == 0 and tot == got)
+    else:
+        rep.add("E5/A5 A5-4: wplaty gracza do kasy osady", "brak linii wplat", "INFO - autotest nie klika menu; reczny test Jeffa: wplata do wlasnego zamku/miasta -> linia z ROZNICA 0", None)
+    # A5-5: dary - gracz traci tyle, ile dostaja notable
+    if gifts:
+        diff = [x for x in gifts if "| ROZNICA" in x]
+        tot = sum(num(r"\| gracz \d+ -> \d+ \(-(\d+)\)", x, int, 0) or 0 for x in gifts)
+        got = sum(num(r"\| notable razem \+(-?\d+)", x, int, 0) or 0 for x in gifts)
+        rel = sum(num(r"\| relacja razem \+(-?\d+)", x, int, 0) or 0 for x in gifts)
+        nn = sum(num(r"\| notabli (\d+)", x, int, 0) or 0 for x in gifts)
+        rep.add("E5/A5 A5-5: dary dla notabli - gracz traci tyle, ile dostaja notable",
+                f"darow {len(gifts)}, notabli razem {nn}, gracz -{tot}, notable +{got}, relacja razem +{rel}, linii z ROZNICA {len(diff)}" + (f" (pierwsza: {diff[0][:160]})" if diff else ""),
+                "ROZNICA 0 i suma gracza = suma notabli; relacja jak nadplata w barterze (najwyzej ok. +3 na notabla)", len(diff) == 0 and tot == got)
+    else:
+        rep.add("E5/A5 A5-5: dary dla notabli", "brak linii darow", "INFO - autotest nie klika menu; reczny test Jeffa: dar w miescie i we wsi -> linia z ROZNICA 0", None)
+    # A5-6: odmowy (ekrany BK, konsola, menu) - INFO
+    why = {}
+    for x in refs:
+        k = x.split("| powod: ", 1)[1][:70] if "| powod: " in x else "?"
+        why[k] = why.get(k, 0) + 1
+    rep.add("E5/A5 A5-6: odmowy wplaty (powody)", (f"{len(refs)}: " + "; ".join(f"{k} x{v}" for k, v in sorted(why.items(), key=lambda t: -t[1])[:5])) if refs else "0",
+            "INFO - zloto nie schodzi przy odmowie; \"Closed for now\" = kasa pod regulatorem gry (miasta bez A1)", None)
+    # A5-7: bledy i potkniecia
+    errs = [x for x in lines if x.startswith("ERROR in BeeGifts")]
+    stm = max([num(r"potkniecia (\d+)", x, int, 0) or 0 for x in pays + gifts] + [num(r"E5/A5 \(prawdziwa.*?potkniecia (\d+)", x, int, 0) or 0 for x in camp] + [0])
+    rep.add("E5/A5 A5-7: bledy BeeGifts, potkniecia", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
 
 
 def main(argv):

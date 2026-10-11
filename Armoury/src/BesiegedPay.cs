@@ -115,7 +115,7 @@ namespace Armoury
         /// Kasa osady jest prawdziwym pieniadzem (regulator gry nie skasuje tego, co w niej zostanie): miasto - A1 (TownPurse.On; w tym drzewie zaslepka
         /// = false), zamek - 110 (CastlePurseEnabled i latka regulatora). Inne osady - nie (pobor jak dotad; wies oblezona nie bywa).
         /// </summary>
-        private static bool PurseReal(Settlement st)
+        internal static bool PurseReal(Settlement st)   // E5/A5 (BeeGifts): ta sama regula dla prawdziwej wplaty gracza do kasy osady
         {
             if (st.IsTown) return TownPurse.On;
             if (st.IsCastle) { var s = Settings.Current; return s != null && s.CastlePurseEnabled && CastleRegHooked(); }
