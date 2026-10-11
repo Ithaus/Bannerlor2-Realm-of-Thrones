@@ -619,3 +619,14 @@ SCRATCH(ae222cb7)\e3\32 (galaz w-toku/e3-32 od 0e21ea1). SCRATCH(ae222cb7) = C:\
   biegu wywrotka silnika przy wyjsciu (0xC0000005, znana, bez kodu modow).
 - (16:45) **ETAP 3.4-3.10 W TOKU** (workflow wf_bc43cd76-2ea): kazdy krok osobna galaz od 10db68d, drzewa SCRATCH(ae222cb7)\e3\34 ... e3\310 (w-toku/e3-34, -35, -36, -37,
   -38, -39, -310) - rozpoznanie + kod + recenzja + poprawki. Plan testow: grupy (3.2) -> (3.1+3.3) -> (3.4-3.7) -> (3.8) -> (3.9+3.10), kazda grupa test 120 + zapis 9.
+- (17:10) **(1) KOD GOTOWY:** w-toku/e2c 5994414 + b9d6a12 (W1 kara zaopatrzenia BK = dni braku, max 20/30/20; W4a Inni osobno w 169c/183; W4b Inni dezerterzy do
+  niczego, bramki band bez starych wightow; W4c przepelnienie partii i zalog do domu - OverflowHome.cs), DLL test\Armoury-p1.dll f5be1156. Bieg z zapisu d180 (40 dob,
+  kopia-p1-d180) wobec bazy: d180-207 80/d (baza 127; glod 16 zamiast 58), kar zaopatrzenia BK w skladnikach brak, przepelnienie do domu 25-32/d; d208-220 fala 175/d
+  = jedna wielka przegrana bitwa (Recent Events -65 u 12-24 partii; kara gry za przegrana runde) - mechanika zamierzona, PYTANIE do Jeffa (zostawic / zlagodzic).
+  Do puli wyrzutkow -10% wobec bazy. Test 120 dob w toku (test\at-p1-120.out.txt), potem zapis 9 dob -> WGRANIE 24.
+- (17:10) **3.2 po recenzji** (w-toku/e3-32 1f9880b) scalony na e2c+p1: galaz w-toku/e3-32m f37d032 (konflikt tylko CHANGELOG), DLL test\Armoury-32m.dll 1211d984 -
+  czeka na gre po WGRANIU 24. Pytanie z 3.2 (drobne): kiesa bandy, ktora przylacza sie do gracza - dzis znika.
+- (17:10) **PROJEKT 3.1+3.3** gotowy (SCRATCH(ae222cb7)\e3\projekt31\PROJEKT-ETAP3-SZCZELNOSC-STATKI-2026-10-10.md, 13 kawalkow E3/0-E3/12, krytyka w toku).
+  JEDNO PYTANIE DO JEFFA: statki (181) zabieraja lordom ok. 330 tys./d zlota z powietrza -> wojsko w wojnie po roku ok. 92 zamiast 99 tys. (-7%), do etapu 5 (podatek
+  wojenny). (a) wgrac teraz (rada) / (b) razem z etapem 5. Plan: kod statkow w tescie, przy wgraniu wylaczniki ShipsToPort/ShipTradeThroughPort/ShipPrizesToPort = false
+  do odpowiedzi Jeffa. Drzewo do kodu 3.1: SCRATCH(ae222cb7)\e3\31 (w-toku/e3-31 od f37d032). Okno 5h 28% o 17:10 - start kodu 3.1 po potokach 3.4-3.10.
