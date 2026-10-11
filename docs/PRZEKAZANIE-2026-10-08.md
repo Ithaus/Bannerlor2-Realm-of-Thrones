@@ -797,3 +797,8 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (13:50) **Jeff E4/11:** (1) wyglad spalonej wioski - etap 7 (7.10); (2) prosi o wyjasnienie (niebezpieczenstwo z pustych osad); (3) "pozniej, czyli kiedy?" - propozycja: etap 6 (z 6.3/6.9).
 - (14:00) **Jeff: "tak, zgadzam sie"** - E4/11 pyt. 2 -> PLAN-DO-KONCA 4.20 (po tescie koncowym E4), pyt. 3 -> 6.18 (etap 6).
 - (14:20) **E4/7b GOTOWE** (Jeff pkt 3): w-toku/e4-7 ba3a07c - niewzieci z poboru wymuszonego wracaja do wsi zdjecia (PressUntaken, MBackPress, hearth 1/k, wylacznik PressUntakenGoHome; recenzja bez uwag). UWAGA SCALANIE: MBackPress = 31 w numeracji E4/7 sprzed scalenia - dolaczyc do w-toku/zbior-e4-koniec dopiero przy koncowym scaleniu (po E4/8, E4/10, E4/11), z NOWYM numerem za wszystkimi (zeby nie zderzyc sie z numerami E4/8/E4/10/E4/11); poprawic tez Measure40 o11 i backE47.
+- (14:40) **B6b GOTOWE** (w-toku/cs-bledy 3406342 + poprawki recenzji 8589e4b "B6b-p"): Harrenhal - czekamy na Roose'a do 72 h gry, gdy jest w bitwie/oblega cos
+  innego (bez teleportu co godzine), Roose zawsze wykluczony z zastepcow, przy zmianie dowodcy poprzedni odmrazany (HarrenhalReleasePrev), postfiks na CompleteEvent
+  rozwiazuje armie i odmraza dowodce, naprawa starych zapisow (tylko dowodca zapamietany przez ROT; inni zamrozeni - lista w logu). 4 wylaczniki w Config/settings.xml.
+  DLL: test\CrashScribe-bledy.dll d971bc42, CrashScribe-at-bledy.dll eac95b1c (z at1-cs.diff). OTWARTE (pytanie do Jeffa): nasz port Muru (WallSetupWith) ma ten sam
+  problem - zastepca zostaje zamrozony na koncu wydarzenia. Stare zachowanie ROT (nie nasze): armia < 75% obroncow -> ROT moze trzymac dowodce zamrozonego bez konca.
