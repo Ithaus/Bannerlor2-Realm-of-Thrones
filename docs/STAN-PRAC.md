@@ -1179,6 +1179,9 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
 - (12:40) **Jeff: pytania E4/6 i E4/7 - "tak, tak, tak":** (1) uchodzcy z glodu we wlasnym regionie wracaja zawsze, gdy gospodarze nie gloduja (odstepstwo
   od GL 2.6 - przyjete); (2) najemnik z karczmy z ludzi miasta, obcy tylko w krainie bez wolnych rak (do E4/10); (3) niewzieci z poboru wymuszonego gracza WRACAJA
   do DOM swojej wsi (zamiast znikac pod nazwa) - zmiana kodu E4/7 (commit na w-toku/e4-7, potem do zbior-e4-koniec).
+- (13:50-14:00) **Jeff E4/11:** wyglad spalonej wioski - etap 7 (7.10); niebezpieczenstwo z pustych osad - po tescie koncowym E4 (PLAN-DO-KONCA 4.20);
+  ryby/mlyny wiosek - etap 6 (6.18). (14:45) port Muru - naprawic (B6c). (15:50) **Etap 5: test zbioru A OSOBNO, zaraz po tescie koncowym etapu 4** (E5/0 pomiar
+  jedzie w tescie E4, bo nic nie zmienia w grze).
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli

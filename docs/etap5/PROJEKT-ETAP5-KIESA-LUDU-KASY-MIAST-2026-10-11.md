@@ -638,6 +638,8 @@ bilans otwarcia nie dotyczy (regula od nastepnej doby).
 
 ## 6. Pytania do Jeffa (tylko kierunek; reszte decyduje projekt)
 
+**ROZSTRZYGNIETE (Jeff 11.10 ok. 15:50): test zbioru A OSOBNO, zaraz po tescie koncowym etapu 4 (wariant a).**
+
 1. **Test porcji A (kasy miast, dwor, markietani, notable, BetterEconomy): osobno czy w tescie koncowym etapu 4?**
    (a) **osobny test zaraz po tescie koncowym etapu 4** (40 dob + zapis 9 dob + 120 dob, **v2:** ok. 50-85 min) - gdy cos nie przejdzie (wojsko, glowy rodow), wiadomo od razu, czy to etap 4 (zalogi, nowe druzyny),
    czy kasy miast; a z tego biegu ustawiamy stawki kiesy ludu (zaleza od kas miast i markietanow);
