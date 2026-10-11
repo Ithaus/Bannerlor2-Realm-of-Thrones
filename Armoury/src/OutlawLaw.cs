@@ -85,6 +85,9 @@ namespace Armoury
         private static double _hRaid, _hMisery, _hReturn, _hSeed;
         // E4/3: pula wyrzutkow - naplyw i odplyw wedlug przyczyny do linii "Pula wyrzutkow (E4/3)"; kazdy doplyw idzie przez Add, kazdy odplyw ma licznik
         private static double _pAdd, _pSeed, _pBirth, _pRecruit, _pHomeSold, _pHomeSoldWant, _pHomeGuard, _pHomePlain, _pHomeUndead, _pFrac, _pTrim, _pLast = -1;
+        // E4/3 wyposrodkowanie z wojna (Jeff 11.10): rozbici i dezerterzy, ktorzy wrocili z regionow w wojnie / w pokoju, i liczba regionow z pula w kazdym stanie
+        private static double _pRoutedWar, _pRoutedPeace;
+        private static int _pRegWar, _pRegPeace;
         /// <summary>E4/2 (e): wighty rozwiazanych band pominiete od ostatniego odczytu (OthersRise.Daily czyta i zeruje).</summary>
         internal static long TakeDisbandUndead() { long v = _disbandUndead; _disbandUndead = 0; return v; }
         private static int _bornBands, _bornMen, _refused, _emptyRemoved, _bandRecruit, _prisonerJoin, _upLoot, _upFence, _upBlocked, _fenceGold;
@@ -127,11 +130,13 @@ namespace Armoury
             _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;   // E4/3: liczniki dnia nie przechodza do nastepnej kampanii (drobiazg z 108)
             _hRaid = _hMisery = _hReturn = _hSeed = 0;
             PoolNewDay(); _pLast = -1;
+            _warHome.Clear();
         }
 
         private static void PoolNewDay()
         {
             _pAdd = _pSeed = _pBirth = _pRecruit = _pHomeSold = _pHomeSoldWant = _pHomeGuard = _pHomePlain = _pHomeUndead = _pFrac = _pTrim = 0;
+            _pRoutedWar = _pRoutedPeace = 0; _pRegWar = _pRegPeace = 0;
         }
 
         private static void FenceNewDay()
@@ -705,6 +710,41 @@ namespace Armoury
             return w;
         }
 
+        // E4/3 wyposrodkowanie z wojna (Jeff 11.10): wojna regionu dla tempa powrotu rozbitych i dezerterow - ta sama miara co AtWar (frakcja wlasciciela
+        // w wojnie z jakimkolwiek krolestwem, jak ClanBudget/KingdomTreasury), ale BEZ wiecznych wojen fabularnych ROT: z Wolnymi Ludzmi (krolestwo "freefolk",
+        // stale w wojnie z Nocna Straza - KRONIKA WOJEN od pierwszej doby) i z Innymi (frakcja kultury "whitewalker", jak PeopleLedger.GroupOf/OthersRise).
+        // Wojna, w ktorej jedna ze stron jest wieczna, nie liczy sie dla zadnej strony (region Wolnych Ludzi i Strazy - tempo pokoju, o ile nie maja innej wojny).
+        // Nedza regionu i dodatek pokoju dla prostych (AtWar) - bez zmian.
+        private static readonly Dictionary<IFaction, bool> _warHome = new Dictionary<IFaction, bool>();
+        private static bool AtWarForHome(IFaction f)
+        {
+            if (f == null) return false;
+            bool w;
+            if (_warHome.TryGetValue(f, out w)) return w;
+            w = false;
+            try
+            {
+                if (!EternalWarSide(f))
+                    foreach (var k in Kingdom.All) if (k != f && !k.IsEliminated && !EternalWarSide(k) && f.IsAtWarWith(k)) { w = true; break; }
+            }
+            catch { }
+            _warHome[f] = w;
+            return w;
+        }
+
+        private static bool EternalWarSide(IFaction f)
+        {
+            return f != null && (f.StringId == "freefolk" || (f.Culture != null && f.Culture.StringId == "whitewalker"));
+        }
+
+        /// <summary>E4/3: srednia liczba dob, po ktorej rozbity albo dezerter wraca z puli regionu do domu; 0 = powrot rozbitych wylaczony (stare tempo wszedzie).
+        /// W wojnie OutlawRoutedHomeDaysWar (0 = jak w pokoju), w pokoju OutlawRoutedHomeDays.</summary>
+        private static float RoutedHomeDays(Settings s, bool war)
+        {
+            if (s.OutlawRoutedHomeDays <= 0f) return 0f;
+            return war && s.OutlawRoutedHomeDaysWar > 0f ? s.OutlawRoutedHomeDaysWar : s.OutlawRoutedHomeDays;
+        }
+
         /// <summary>Nedza regionu (miasto/zamek z wsiami): bieda, bezprawie, wojna, spalone wsie, glod.
         /// Ta sama miara dla wyrzutkow i dla ochotnikow (Levy) - jedna prawda o regionie.</summary>
         internal static float MiseryOf(Settlement r)
@@ -751,7 +791,7 @@ namespace Armoury
                 var s = Settings.Current;
                 bool h3 = LosersFlee.On;
                 Seed();
-                _war.Clear();
+                _war.Clear(); _warHome.Clear();
                 // 1. bieda i chaos -> ludzie w las; pokoj i dobrobyt -> do domu
                 foreach (var r in Nodes())
                 {
@@ -786,7 +826,12 @@ namespace Armoury
                             // E4/3 (powrot wyrzutkow do domu): rozbity z bitwy i dezerter (zolnierz, straz karawan) wraca w ciagu kilku tygodni - srednio
                             // OutlawRoutedHomeDays dob, czyli 1/OutlawRoutedHomeDays puli dziennie (nigdy wolniej niz dotad) - chyba ze wczesniej zwerbuje go banda.
                             // Prosci (bieda, spalone wsie), bandyci i stare wighty - jak dotad (pokoj, dobrobyt, glod regionu).
-                            float routedRate = s.OutlawRoutedHomeDays > 0f ? Math.Max(rate, Math.Min(1f, 1f / s.OutlawRoutedHomeDays)) : rate;
+                            // Wyposrodkowanie z wojna (Jeff 11.10): w regionie w wojnie (bez wiecznych wojen z Wolnymi Ludzmi i Innymi) wolno - OutlawRoutedHomeDaysWar,
+                            // w pokoju szybko - OutlawRoutedHomeDays; bandy rosna z wojna do plateau i wracaja do poziomu pokoju po jej koncu.
+                            bool warHome = AtWarForHome(r.MapFaction);
+                            float homeDays = RoutedHomeDays(s, warHome);
+                            float routedRate = homeDays > 0f ? Math.Max(rate, Math.Min(1f, 1f / homeDays)) : rate;
+                            if (warHome) _pRegWar++; else _pRegPeace++;
                             float back = 0f;
                             foreach (var key in d.Keys.ToList())
                             {
@@ -821,6 +866,7 @@ namespace Armoury
                                                     d.Remove(key);
                                                     _h3FracKeys++; _h3FracMass += dk; _h3FracSent += got1; _h3BackBk += got1;
                                                     _pHomeSold += got1; _pFrac += dk - got1;
+                                                    if (warHome) _pRoutedWar += got1; else _pRoutedPeace += got1;
                                                 }
                                             }
                                         }
@@ -831,7 +877,7 @@ namespace Armoury
                                             {
                                                 int cat;
                                                 int got = LosersFlee.SendHome(null, LosersFlee.TroopOf(key), n, r.GetPosition2D, null, LosersFlee.SrcPool, out cat);
-                                                if (got > 0) { d[key] -= got; _h3BackBk += got; _pHomeSold += got; }
+                                                if (got > 0) { d[key] -= got; _h3BackBk += got; _pHomeSold += got; if (warHome) _pRoutedWar += got; else _pRoutedPeace += got; }
                                                 _pHomeSoldWant += n;
                                             }
                                             if (d[key] < 0.01f) { _pTrim += d[key]; d.Remove(key); }
@@ -842,7 +888,7 @@ namespace Armoury
                                     if (kk == LosersFlee.KeyGuard || kk == LosersFlee.KeyUndead)
                                     {
                                         d[key] -= m;
-                                        if (kk == LosersFlee.KeyGuard) { _h3BackTemplate += m; LosersFlee.NoteTemplateFloat(m); _pHomeGuard += m; } else { _h3BackUndead += m; _pHomeUndead += m; }
+                                        if (kk == LosersFlee.KeyGuard) { _h3BackTemplate += m; LosersFlee.NoteTemplateFloat(m); _pHomeGuard += m; if (warHome) _pRoutedWar += m; else _pRoutedPeace += m; } else { _h3BackUndead += m; _pHomeUndead += m; }
                                         if (d[key] < 0.01f) { _pTrim += d[key]; d.Remove(key); }
                                         LosersFlee.AddTicks(LosersFlee.TickPool, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
                                         continue;
@@ -997,12 +1043,25 @@ namespace Armoury
               .Append(", inne (uwolnieni jency bez odbiorcy H3, jency I1 bez domu) ").Append(Math.Max(0.0, _pAdd - named).ToString("0.0", ci))
               .Append(" | odplyw -").Append(outs.ToString("0.0", ci)).Append(" = powrot do domu ").Append(home.ToString("0.0", ci))
               .Append(" (rozbici i dezerterzy - zolnierze do ludnosci BK ").Append(_pHomeSold.ToString("0", ci)).Append(" z ").Append(_pHomeSoldWant.ToString("0", ci)).Append(" chetnych")
-              .Append(", straz karawan z szablonu ").Append(_pHomeGuard.ToString("0.0", ci)).Append(" - tempo 1/").Append(s.OutlawRoutedHomeDays > 0f ? s.OutlawRoutedHomeDays.ToString("0", ci) : "-").Append(" dob")
+              .Append(", straz karawan z szablonu ").Append(_pHomeGuard.ToString("0.0", ci)).Append(RoutedTempoSegment(s, ci))
               .Append("; prosci i bandyci do wsi ").Append(_pHomePlain.ToString("0.0", ci)).Append(" - tempo pokoju i dobrobytu; stare wighty do niczego ").Append(_pHomeUndead.ToString("0.0", ci)).Append(')')
               .Append(", narodziny band ").Append(_pBirth.ToString("0", ci)).Append(", werbunek band ").Append(_pRecruit.ToString("0", ci))
               .Append(_pFrac > 0 ? ", reszty ponizej 1 czlowieka (zamkniete klucze) " + _pFrac.ToString("0.00", ci) : "");
             sb.Append(" | srednio w puli ").Append(outs > 0 ? (now / outs).ToString("0", ci) + " dob" : "-").Append(" (stan / odplyw dzienny).");
             return sb.ToString();
+        }
+
+        /// <summary>E4/3 wyposrodkowanie z wojna: biezace tempa powrotu rozbitych i dezerterow (pokoj / wojna) i ilu wrocilo z regionow w wojnie / w pokoju.
+        /// Powrot rozbitych wylaczony - "tempo 1/- dob" jak dotad (parser sprawdz_logi.py rozpoznaje po tym napisie).</summary>
+        private static string RoutedTempoSegment(Settings s, CultureInfo ci)
+        {
+            if (s.OutlawRoutedHomeDays <= 0f) return " - tempo 1/- dob";
+            string peace = s.OutlawRoutedHomeDays.ToString("0", ci);
+            string tempo = s.OutlawRoutedHomeDaysWar > 0f
+                ? " - tempo 1/" + peace + " dob w pokoju, 1/" + s.OutlawRoutedHomeDaysWar.ToString("0", ci) + " dob w wojnie"
+                : " - tempo 1/" + peace + " dob w pokoju i w wojnie (tempo wojny wylaczone: Outlaw Routed Home Days War 0)";
+            return tempo + "; wrocilo z regionow w wojnie " + _pRoutedWar.ToString("0.0", ci) + " (" + _pRegWar + " reg. z pula), w pokoju " + _pRoutedPeace.ToString("0.0", ci)
+                   + " (" + _pRegPeace + " reg.; wojna regionu = krolestwo wlasciciela w wojnie z innym krolestwem, bez wiecznych wojen z Wolnymi Ludzmi i Innymi)";
         }
 
         /// <summary>H3: dopisek do linii "Wyrzutki:" (na koncu, zeby parsery czytajace dotychczasowe pola nic nie zgubily): sklad puli

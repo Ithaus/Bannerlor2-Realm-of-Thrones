@@ -2332,9 +2332,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool OutlawsCountedByPeople { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Outlaw Routed Home Days", 0.00f, 112.00f, "0.00", HintText = "soldiers routed from a battle and deserters hiding in the woods make their way home on average after this many days - a few weeks, as after medieval battles - unless a band takes them in first; villagers driven off by want or fire still go home with peace and prosperity. 0 = the old slow rate (half a percent a day in war)")]
+        [SettingPropertyFloatingInteger("Outlaw Routed Home Days", 0.00f, 120.00f, "0.00", HintText = "soldiers routed from a battle and deserters hiding in the woods of a land at peace make their way home on average after this many days - a few weeks, as after medieval battles - unless a band takes them in first; villagers driven off by want or fire still go home with peace and prosperity. 0 = the old slow rate everywhere (half a percent a day in war)")]
         [SettingPropertyGroup("Iron Bank")]
-        public float OutlawRoutedHomeDays { get; set; } = 28f;
+        public float OutlawRoutedHomeDays { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Outlaw Routed Home Days War", 0.00f, 480.00f, "0.00", HintText = "the same in a land whose realm is at war with another realm (the endless wars with the Free Folk and the Others do not count): the war goes on around them, so routed soldiers and deserters stay in the woods far longer and feed the bands while the war lasts; when peace comes they drain away and the bands shrink back. 0 = the same as in peace")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawRoutedHomeDaysWar { get; set; } = 120f;
 
         [SettingPropertyBool("Disbanded Villagers Go Home", HintText = "a village caravan or fishing crew the game breaks up without a fight (no healthy men left, a lost party, too many boats) goes back to its village, the wounded too, instead of vanishing")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4639,6 +4643,7 @@ namespace Armoury
             s.PeopleUnitEnabled = PeopleUnitEnabled;
             s.OutlawsCountedByPeople = OutlawsCountedByPeople;
             s.OutlawRoutedHomeDays = OutlawRoutedHomeDays;
+            s.OutlawRoutedHomeDaysWar = OutlawRoutedHomeDaysWar;
             s.DisbandedVillagersGoHome = DisbandedVillagersGoHome;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
