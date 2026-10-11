@@ -29,7 +29,9 @@ namespace Armoury
     /// E4/5 (113n): konto UCHODZCY ("u:" w "arm_people" - wies pochodzenia -> poza domem, zabici przy spustoszeniu, zmarli na koncie) i zegar regionu ("r:" - warownia
     /// regionu -> doba ostatniego rabunku albo zerowania z trafionymi > 0). Trafieni rabunkiem i zerowaniem armii schodza z DOM przez Move (MDevRaid, MDevForage),
     /// konta dopisuje Devastated; powrot (MRefugeeHome) i podloga 10 (MRefugeeFloor, najpierw z uchodzcow tej wsi) schodza z konta; uchodzcy umieraja 1.3%/rok (bez narodzin).
-    /// Kolejne konta (SLUZBA z pochodzeniem, JENCY...) - kazde w swojej paczce, kazde przez te klase.
+    /// E4/7 (164b-1): konta SLUZBA i JENCY z regionem pochodzenia ("sw:" "so:" "jo:" "wo:" "rg:"), pobor z DOM (MLevyVillage/MLevyA5/MLevyTown), powroty z pochodzeniem
+    /// z hearth (MBack*), POLEGLI regionu pochodzenia, wolne rece (FreeHands) - PeopleBook.Origin.cs i PeopleBook.OriginPatches.cs (ta sama klasa, partial).
+    /// Kolejne konta (NIEWOLNI, WETERANI...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
     /// </summary>
@@ -943,7 +945,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             try { if (log) OriginLines(day, tOrigin); } catch (Exception e) { Stumble("Daily(E4/7 linie)", e); }
-            try { OriginNewDay(); } catch (Exception e) { Stumble("Daily(E4/7 zerowanie)", e); }
+            try { OriginEndDay(); } catch (Exception e) { Stumble("Daily(E4/7 koniec doby)", e); }
             Array.Clear(_in, 0, CKinds); Array.Clear(_out, 0, CKinds); Array.Clear(_dead, 0, _dead.Length);
             _stumblesDay = 0; _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); _disbandNoVillage = 0; }

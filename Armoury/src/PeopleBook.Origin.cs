@@ -1377,9 +1377,20 @@ namespace Armoury
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             sb.Append(" | czas ").Append(ms.ToString("0.0", Inv)).Append(" ms (uzgodnienie i regiony ").Append(_lastMs.ToString("0.0", Inv)).Append(" ms).");
             Log.Info(sb.ToString());
-            _state0 = state;
-            _poolTrim = 0;
             try { FreeHands.Line(day); } catch (Exception e) { OStumble("FreeHands.Line", e); }
+        }
+
+        /// <summary>Koniec doby ksiegi pochodzenia (takze bez logu): stan kont do kontroli jutra, zerowanie licznikow doby.</summary>
+        private static void OriginEndDay()
+        {
+            try
+            {
+                if (_sown && OriginOn) { double s, sk, j, jk; int regs; StateNow(out s, out sk, out j, out jk, out regs, null); _state0 = s + j; }
+                else _state0 = double.NaN;
+            }
+            catch (Exception e) { _state0 = double.NaN; OStumble("OriginEndDay", e); }
+            _poolTrim = 0;
+            OriginNewDay();
         }
 
         // ================================================================ licznik DeduceManpower (latki - PeopleBook.OriginPatches.cs)
