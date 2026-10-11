@@ -32,7 +32,7 @@
 - Narzedzie: `sprawdz_logi.py --grupa etap4` wola bloki E4/3..E4/7 (z wierszem E4/7b), E4/8, E4/10, E4/11; py_compile OK, bez zdublowanych `def`; przebieg na starych logach (a2calc, e45 synt) i na syntetycznym z liniami startowymi E4/8/E4/10/E4/11 - 0 wyjatkow.
 - Po recenzji scalenia: binarny `tools/__pycache__/sprawdz_logi.cpython-312.pyc` (wszedl przypadkiem w 7280a62, nie ma go w zadnej galezi ani w 392c519) zdjety z repo (`git rm --cached`), `.gitignore` + `__pycache__/` i `*.pyc` - kazde py_compile nadpisywalo go i brudzilo drzewo, a przy scaleniu E4/9 / etapu 5 bylby konflikt pliku binarnego. py_compile odpalac z `cfile` poza repo.
 - Sprawdzone skryptem: kazda linia dodana w kazdej paczce jest w drzewie albo zastapiona swiadomie (stale, tablice, polaczone linie wyzej).
-- Build Release: kod 0 po kazdym scaleniu (1 stare ostrzezenie CS0169). DLL: `scratchpad\test\Armoury-e4-calosc.dll` - po doscaleniu K8 md5 5eb50f5e (stary f326a03c byl bez K8: A5 = 1 czlowiek na dobe, w MCM brak suwaka Garrison Auto Recruit Per Day).
+- Build Release: kod 0 po kazdym scaleniu (1 stare ostrzezenie CS0169). DLL: `scratchpad\test\Armoury-e4-calosc.dll` - po doscaleniu K8 zbudowany z f69ef58 (md5 001bac56; DLL wpisuje hash commitu w wersje 1.0.0+<hash>, wiec md5 zmienia sie z kazdym commitem - commity po f69ef58 to tylko CHANGELOG; stary f326a03c byl bez K8: A5 = 1 czlowiek na dobe, w MCM brak suwaka Garrison Auto Recruit Per Day).
 
 **Status:** DO SPRAWDZENIA - test koncowy etapu 4 (zbiorczy 120 dob + zapis z doby 362); E4/9 poza tym zbiorem.
 
