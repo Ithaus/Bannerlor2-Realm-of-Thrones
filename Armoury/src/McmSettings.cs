@@ -3060,6 +3060,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool WarCourtYieldsToWages { get; set; } = true;
 
+        [SettingPropertyBool("Court Gets Lapsed Arms Share", HintText = "arms money a lord's house has not spent within the cap of days goes to its court - the kitchens, stables and servants of its seat - instead of lying idle: each day the arms share older than AI Gear Days Cap days is paid with the court into the purse of the seat (town or castle). Only from the family's gold above the house's reserve (at war its war reserve, in peace Reserve Days Peace days of its steady income), at war only what the wages leave, half for a house in debt; the head always keeps the day's wages in his purse (and at least Family Purse Floor); none for mercenaries. Needs Household Minimal. Off = the unspent arms money stays in the head's purse, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CourtGetsLapsedArmsShare { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Court Folk Share", 0.00f, 1.00f, "0.00", HintText = "the share of the court's money that goes to the townsfolk of the seat (servants, cooks, grooms) rather than to its merchants - takes effect only once the townsfolk's purse is live (stage 5); until then the whole court money goes into the seat's purse")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float CourtFolkShare { get; set; } = 0.2f;
+
         [SettingPropertyBool("Party Limits Share Free Room", HintText = "the party wage limits of a budgeted house share out what the house has not yet spent: each party may grow by its share of the free room (the head's party 1.5, the others 1) on top of its own wages, so no party is held back while the house has room; a house over its party ceiling has every party limit cut in proportion to its wages. Off = the ceiling is split once, head 1.5 : others 1")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool PartyLimitsShareFreeRoom { get; set; } = true;
@@ -5064,6 +5072,8 @@ namespace Armoury
             s.HouseholdMinimal = HouseholdMinimal;
             s.HouseholdShield = HouseholdShield;
             s.WarCourtYieldsToWages = WarCourtYieldsToWages;
+            s.CourtGetsLapsedArmsShare = CourtGetsLapsedArmsShare;
+            s.CourtFolkShare = CourtFolkShare;
             s.PartyLimitsShareFreeRoom = PartyLimitsShareFreeRoom;
             s.MercContractEnabled = MercContractEnabled;
             s.MercContractFactor = MercContractFactor;

@@ -14,6 +14,9 @@ Uzycie (Python 3, tylko odczyt):
                     progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
                     tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy). S10/S11 (E4/5) pomijaja
                     wiersze region-doba z konto_e46 = 1 w spichlerze-regiony.csv (E4/6 zmienil konto uchodzcow regionu tej doby).
+--grupa etap5     : (etap 5) bloki paczek obecne w logu: E5/A2 (162, dwor pelny) A2-1..A2-9 - linia sprzetu niewydanego w "Budzet rodow (166)",
+                    przelew do dworu w dobach 31-120 (--do-doby N), zgodnosc 166 = Obieg, reszta ksiegi, glowy < 5 000, hak B1 = 0, gracz bez dworu,
+                    bledy; panowie zamkow (budzet-rodow.csv) - INFO. Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -1642,6 +1645,151 @@ def etap4_e46(rep, lines, start, win, until):
             "INFO - bieg zwykly: 0 poza spustoszonymi; zima: przednowek dopiero po wyczerpaniu spichlerzy (lata)", None)
 
 
+# ------------------------------------------------------------ etap 5 (docs/etap5/PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md, rozdz. 3-4)
+# Grupe "--grupa etap5" zaklada E5/0 (195, osobne drzewo w-toku/e5-0); kazda paczka dopisuje swoj blok etap5_<paczka>(rep, lines, start, until, ...).
+# E5/A2 kodowane rownolegle z E5/0: etap5_main ponizej jest zastepcza - przy scaleniu zostaje etap5_main z E5/0, ktora wola takze etap5_a2.
+def etap5_main(logp, start_arg, until=120):
+    """Etap 5: bloki paczek obecne w logu (linia kazdej paczki rozpoznaje jej blok); okno progow - doby kampanii 1-until (--do-doby)."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    bud = e4_series(lines, "Budzet rodow (166): dzien", 1)   # dzien gry - 1 = dzien linii ksiegi ("Obieg", "Pieniadz swiata") tej samej doby
+    if start is None:
+        start = min(bud) if bud else 0
+    print(f"plik: {logp} | doby z linia Budzet rodow (166): {len(bud)} | start kampanii {start} | okno progow: doby kampanii 1-{until}")
+    if any("-> dwor (E5/A2):" in s for s in bud.values()):
+        etap5_a2(rep, lines, start, until, logp, bud)
+    else:
+        rep.add("E5/A2: linia sprzetu niewydanego (Budzet rodow 166)", "brak w logu", "jest od wgrania E5/A2 (LogEnabled, ClanBudgetEnabled)", None)
+    rep.show()
+    return 0
+
+
+def etap5_a2(rep, lines, start, until, logp, bud):
+    """E5/A2 (162, PLAN 5.2 - dwor pelny, R8): projekt rozdz. 3 "E5/A2" Test: dwor rosnie o przelew ze sprzetu, nic w nicosc, gracz bez dworu,
+    D staly bez zmian definicji; ryzyko (rozdz. 3): wiecej zlota do kas siedzib - udzial panow zamkow (prog B3) jako INFO. Przelew zaczyna sie
+    po AiGearDaysCap (30) dobach od startu kampanii (przydzial musi dojsc do pulapu) - progi przelewu w dobach 31-until."""
+    obg = by_day(lines, "Obieg: dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    win = [d for d in sorted(bud) if 1 <= run_day(d, start) <= until]
+    late = [d for d in win if run_day(d, start) >= 31]
+    a2re = re.compile(r"-> dwor \(E5/A2\): przeterminowane dzis (\d+) u (\d+) rodow, wplacone do kas siedzib (\d+) u (\d+) rodow \(miasta (\d+) / zamki (\d+)\)"
+                      r"; zostalo w kiesie glowy: ponizej rezerwy rodu \(wojna R, pokoj \d+ D\) (\d+), ustapilo zoldowi (\d+), kiesa glowy \(zold dnia, podloga\) (\d+)"
+                      r", dluznicy \(polowa\) (\d+), najemnicy bez dworu (\d+), bez siedziby (\d+); udzial ludu \(hak B1\) (\d+)%")
+    obre = re.compile(r"dwor \(166/162m\) do kas siedzib (\d+) \(w tym miasta pod tarcza dworu (\d+), zamki (\d+); w tym sprzet niewydany -> dwor \(E5/A2\) (\d+)"
+                      r": miasta (\d+) / zamki (\d+)\)")
+    rows = {}
+    for d in win:
+        m = a2re.search(bud[d])
+        if m:
+            rows[d] = [int(x) for x in m.groups()]
+    off = [d for d in win if "-> dwor (E5/A2): wylaczone" in bud[d]]
+    miss = [d for d in win if d not in rows and d not in off]
+    rep.add("E5/A2 A2-1: linia sprzetu niewydanego codziennie", f"brak/nieczytelna w {len(miss)} z {len(win)} dob" + (f", wylaczone w {len(off)}" if off else ""),
+            "0 (dopisek linii Budzet rodow (166))", len(miss) == 0 if win else None)
+    if off:
+        rep.add("E5/A2 A2-2: paczka czynna", f"wylaczone w {len(off)} dobach (Court Gets Lapsed Arms Share / Household Minimal)", "czynna w biegu zbioru A - progi przelewu INFO", None)
+
+    def mean_late(i):
+        v = [rows[d][i] for d in late if d in rows]
+        return st.mean(v) if v else None
+    paid = mean_late(2)
+    rep.add("E5/A2 A2-3: sprzet niewydany -> dwor (srednia dob 31-%d)" % until,
+            f"{paid:.0f}/d (przeterminowane {mean_late(0):.0f}/d u {mean_late(1):.0f} rodow; miasta {mean_late(4):.0f} / zamki {mean_late(5):.0f})" if paid is not None else "brak dob >= 31",
+            "> 0 (bieg z31-A: przydzial 516 615 wobec 35 155 wydanych w d120 - oczekiwane ok. 300-480 tys./d [S])", (paid > 0) if (paid is not None and not off) else None)
+    # A2-4: dwor rosnie o przelew - ta sama liczba w linii 166 i w Obiegu tej doby; dwor razem >= sprzet; miasta + zamki = sprzet
+    bad, noobg = [], 0
+    for d in win:
+        if d not in rows:
+            continue
+        if d not in obg:   # pierwsza doba sesji: ksiega pisze sam stan, bez linii "Obieg"
+            noobg += 1
+            continue
+        r = rows[d]
+        tot = num(r"dwor \(162m\): wplacone do kas siedzib (\d+)", bud[d])
+        o = obre.search(obg[d])
+        ok = (tot is not None and tot >= r[2] and r[4] + r[5] == r[2] and o is not None and int(o.group(4)) == r[2] and int(o.group(1)) == tot
+              and int(o.group(5)) == r[4] and int(o.group(6)) == r[5])
+        if not ok:
+            bad.append(run_day(d, start))
+    rep.add("E5/A2 A2-4: dwor rosnie o przelew ze sprzetu (166 = Obieg, dwor >= sprzet, miasta + zamki)",
+            f"niezgodne {len(bad)} z {len(rows) - noobg} dob" + (f" (doby {bad[:6]})" if bad else "") + (f"; bez linii Obieg {noobg} (pierwsza doba sesji)" if noobg else ""),
+            "0", (len(bad) == 0) if len(rows) > noobg else None)
+    # A2-5: nic w nicosc - reszta ksiegi pieniadza (przelew glowa -> kasa siedziby w naszym ticku, pozycja MBudget)
+    cd = [d for d in sorted(cau) if 1 <= run_day(d, start) <= until]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
+    rep.add("E5/A2 A2-5: nic w nicosc - reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii", "|R| < 10 000 (prog etapu 3; --grupa etap3)",
+            (abs(rv) < 10000) if rv is not None else None)
+    # A2-6: glowy rodow < 5 000 (przelew z kiesy glowy najwyzej do podlogi rodziny) - warunek etapu 2
+    heads = [num(r"glowy < 5000 \(rody z budzetem\): (\d+)", bud[d]) for d in win]
+    heads = [x for x in heads if x is not None]
+    rep.add("E5/A2 A2-6: glowy rodow < 5 000 (najwiecej w oknie)", f"{max(heads)}" if heads else "brak linii", "<= 10 (warunek etapu 2)", (max(heads) <= 10) if heads else None)
+    # A2-7: hak B1 = 0 do kiesy ludu; A2-8: gracz bez dworu (Eligible - gracz bez budzetu; linia 166 to wypisuje)
+    folk = [rows[d][12] for d in rows]
+    rep.add("E5/A2 A2-7: udzial ludu w dworze (hak B1)", f"najwiecej {max(folk)}%" if folk else "brak", "0% do B1 (TownFolkLive)", (max(folk) == 0) if folk else None)
+    pl = sum(1 for d in win if "gracz - bez budzetu" in bud[d])
+    rep.add("E5/A2 A2-8: gracz bez dworu", f"linia 'gracz - bez budzetu' w {pl} z {len(win)} dob", "kazda doba ([D] 08.10)", (pl == len(win)) if win else None)
+    # A2-9: bledy i potkniecia paczki (licznik potkniec - na sesje)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "CourtFull" in s]
+    stum = max([num(r"potkniecia E5/A2 (\d+)", bud[d], int, 0) or 0 for d in win] or [0])
+    rep.add("E5/A2 A2-9: bledy CourtFull / potkniecia E5/A2", f"bledy {len(errs)}, potkniecia {stum}", "0 / 0", len(errs) == 0 and stum == 0)
+    # INFO: co zostalo w kiesie glowy i dwor bez sprzetu (srednie dob 31-until)
+    if late and rows and paid is not None:
+        rep.add("E5/A2 INFO: zostalo w kiesie glowy (srednia dob 31-%d)" % until,
+                f"ponizej rezerwy {mean_late(6):.0f}, ustapilo zoldowi {mean_late(7):.0f}, kiesa glowy (zold dnia) {mean_late(8):.0f}, dluznicy {mean_late(9):.0f}"
+                f", najemnicy {mean_late(10):.0f}, bez siedziby {mean_late(11):.0f}",
+                "INFO (regula R8: rezerwa rodu, zold w wojnie, zold dnia w kiesie glowy)", None)
+        cv = [num(r"dwor \(162m\): wplacone do kas siedzib (\d+)", bud[d]) for d in late]
+        cv = [x for x in cv if x is not None]
+        if cv:
+            rep.add("E5/A2 INFO: dwor razem / sam dwor (srednia dob 31-%d)" % until, f"{st.mean(cv):.0f} / {st.mean(cv) - paid:.0f}",
+                    "INFO (bieg z31-A bez A2: dwor 175-190 tys./d w dobach 31-120, L:31679)", None)
+    # INFO (ryzyko - prog B3): udzial panow samych zamkow w D stalym i mediana kies ich glow (budzet-rodow.csv, rodzaj=zamek; wzor e5A/csv.py)
+    rws = read_csv(csv_path_of(logp))
+    if rws:
+        byd = {}
+        for x in rws:
+            try:
+                dz = int(x["dzien"])
+            except (ValueError, KeyError, TypeError):
+                continue
+            if 1 <= run_day(dz, start) <= until:
+                byd.setdefault(dz, []).append(x)
+        ser = []
+        for dz in sorted(byd):
+            tot = zam = 0.0
+            kies = []
+            for x in byd[dz]:
+                try:
+                    v = float(x.get("d_staly") or "nan")
+                except ValueError:
+                    continue
+                if v != v:
+                    continue
+                tot += v
+                if x.get("rodzaj") == "zamek":
+                    zam += v
+                    try:
+                        kies.append(float(x.get("kiesa_glowy")))
+                    except (TypeError, ValueError):
+                        pass
+            ser.append((dz, zam / tot if tot else 0.0, st.median(kies) if kies else 0.0))
+        w = ser[-28:]
+        if w:
+            ch = (w[-1][2] / w[0][2] - 1) * 100 if w[0][2] else 0.0
+            rep.add("E5/A2 INFO: panowie samych zamkow - udzial w d_staly, mediana kiesy glowy (ostatnie 28 dob okna)",
+                    f"{st.mean(x[1] for x in w) * 100:.1f}%; mediana {w[0][2]:.0f} -> {w[-1][2]:.0f} ({ch:+.1f}%)",
+                    "INFO - ryzyko A2 (wiekszy zawor kas siedzib); prog w B3; bieg z31-A d93-120: 24.3%, -2.5%", None)
+    else:
+        rep.add("E5/A2 INFO: panowie samych zamkow (budzet-rodow.csv)", "brak pliku CSV", "INFO", None)
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -1669,6 +1817,8 @@ def main(argv):
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:
         return etap4_main(logp, start_arg, until_arg)   # E4/0 (188)
+    if group == "etap5" and logp:
+        return etap5_main(logp, start_arg, until_arg)   # etap 5 (E5/0 zaklada; E5/A2 - blok etap5_a2)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

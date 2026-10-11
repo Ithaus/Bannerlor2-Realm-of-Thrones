@@ -550,6 +550,7 @@ namespace Armoury
                   .Append(ledgerFromSp == _wage[WLord] ? " - zgodne" : " - roznica " + S(_wage[WLord] - ledgerFromSp)).Append(']');
             sb.Append(", zold karawan lordow ").Append(_wage[WCaravan]).Append(", powinnosci do korony ").Append(KingdomTreasury.LastDues)
               .Append(", budowy do kas osad ").Append(build).Append(", dwor (166/162m) do kas siedzib ").Append(ClanBudget.LastCourt).Append(" (w tym miasta pod tarcza dworu ").Append(ClanBudget.LastCourtTown)
+              .Append(CourtFull.ObiegNote())   // E5/A2: zamki; sprzet niewydany -> dwor (miasta / zamki)
               .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", zold rycerzy (179) pan -> rycerz ").Append(GentryService.LastPaid).Append(", sprzet i werbunek -")
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
