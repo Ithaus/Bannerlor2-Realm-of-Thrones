@@ -1158,3 +1158,13 @@ ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841
   wola modelu wewnetrznego) przejmuje caly lancuch jedzenia partii - nie dzialaja ROT "Inni nie jedza", NavalDLC -20% na morzu, BEE, pasza i perki BK. Naprawa: RBL liczy swoje
   (pory roku, racje), a reguly ROT/NavalDLC/BEE/BK dokladaja sie do wyniku (jeden lancuch). Termin: z E4/6 (spichlerz i glod) w etapie 4. Uwaga: pasze koni zima liczy dzis
   E4/1 (WinterRealm) - przy naprawie lancucha nie liczyc paszy BK drugi raz.
+
+**WGRANIE 30 (11.10 ok. 06:05 zegara komp.; pierwszy test zbiorczy wedlug zasady Jeffa):** Armoury 9d314ea6 (galaz noc/wgranie-30 = w-toku/zbior30 c02c80f = WGRANIE 29 +
+D11 (kara morale za przegrana /2, kiesa bandy przylaczajacej sie -> gracz, podatek warsztatow lordow/gracza placi wlasciciel panu miasta, zaopatrzenie BK z sakiewek
+zolnierzy, doplata podmiany ROT do sakiewek, sakiewki druzyn lordow tylko dla zwyciezcy) + E4/2 (Inni tylko z poleglych, PeopleBook CIALA) + E4/3 (jednostka 1/k na osade,
+punkty powrotu, rozwiazane tabory wracaja, tabela krain: Wyspy Letnie ~0.11 mln, Wolni Ludzie 300 tys., Sarnor 100 tys.; powrot wyrzutkow do domu - wojna 1/120, pokoj 1/30
+puli na dobe) + E4/1 (zima wedlug krain: Wyspy Letnie 0, cieple 0.4, reszta 1; konie jedza zima; tryb probnej zimy z plikiem-przelacznikiem w autotescie) + 36b (wedrowcy BK
+z prawdziwym towarem)). RC 90665425, GT bbb841d7, CS 77b11df5 bez zmian. Testy: A 120 dob - 0 bledow, etap 3 20/20, wojsko lordow 100.6 tys., glowy 0, bankruci 0, dezercja AI
+6/d, bandy -16%; B 120 dob z proba zimy - zima od 8. doby, ciecie plonu Wyspy Letnie 0% / cieple 16% / reszta 49%, zamki z ujemnym bilansem 1 z 130, pusty spichlerz 0,
+glodne druzyny lordow ok. 29 z 680; zapis 9 dob OK (0 bledow, 27.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-11-przed-noc30 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc30-przed.
+ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
