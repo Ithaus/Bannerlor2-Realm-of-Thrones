@@ -334,7 +334,8 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteRegulator", e); }
         }
 
-        private const string CsvTowns = "dzien;dzien_gry;miasto_id;miasto;rod;krolestwo;kasa;cel_regulatora;kasa_do_celu;skasowane_regulator;dosypka_regulator;pod_tarcza;zawor_do_pana;dobrobyt";
+        private const string CsvTowns = "dzien;dzien_gry;miasto_id;miasto;rod;krolestwo;kasa;cel_regulatora;kasa_do_celu;skasowane_regulator;dosypka_regulator;pod_tarcza;zawor_do_pana;dobrobyt"
+                                        + TownPurse.CsvColumns;   // E5/A1: kolumny na koncu (stare bez zmian)
 
         private static string TownsLine(int day, int gameDay)
         {
@@ -360,7 +361,7 @@ namespace Armoury
                        .Append(st.OwnerClan != null ? Clean(st.OwnerClan.Name.ToString()) : "").Append(';')
                        .Append(st.OwnerClan != null && st.OwnerClan.Kingdom != null ? Clean(st.OwnerClan.Kingdom.Name.ToString()) : "").Append(';')
                        .Append(g).Append(';').Append(z).Append(';').Append(r.ToString("0.00", Inv)).Append(';').Append(c0).Append(';').Append(a0).Append(';').Append(h).Append(';').Append(pay).Append(';')
-                       .Append(t.Prosperity.ToString("0", Inv)).Append(Environment.NewLine);
+                       .Append(t.Prosperity.ToString("0", Inv)).Append(TownPurse.CsvOf(t)).Append(Environment.NewLine);
                 }
                 catch (Exception e) { Stumble("TownsLine(miasto)", e); }
             }
@@ -370,7 +371,7 @@ namespace Armoury
             return "Kasy miast (169c): dzien " + day + " | miast " + n + ": kasy " + gold + " wobec celu regulatora gry (10 000 + 12 x dobrobyt) " + target
                    + " (kasa/cel: mediana " + (ratios.Count > 0 ? ratios[ratios.Count / 2].ToString("0.00", Inv) : "-") + ", ponad celem " + over + ", ponizej " + under + ", ponizej polowy " + half + ")"
                    + " | regulator dzis: skasowal " + cut + ", dosypal " + add + " | pod tarcza zoldu (zold i wydatki ludzi w drodze do pana) " + held
-                   + " | zawor do pana dzis " + valve + " | dwor -, do korony - (162m, 111') | plik kasy-miast.csv (miasto po miescie).";
+                   + " | zawor do pana dzis " + valve + " | dwor - (162m)" + TownPurse.LineSegment() + " | plik kasy-miast.csv (miasto po miescie).";   // E5/A1: dopisek kas miast (zamiast "do korony - (111')")
         }
 
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }
