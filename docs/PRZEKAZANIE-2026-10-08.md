@@ -691,3 +691,6 @@ doplata ROT do sakiewek; werdykt "pokonany" dla lordow; E4/2 WGRAC; proba zimy -
 **Plan:** po kodzie - scalic d11 + e4-2 + e4-3 + e4-1 + 36b (+ E4/4 od e4-3, jesli zdazy) na galaz w-toku/zbior30 (unia konfliktow: SCRATCH(ae222cb7)\d1\union.py, potem
 python tools/gen_mcm.py), build -> test 120 dob nowej kampanii + bieg 120 dob z proba zimy (plik-przelacznik) + zapis 9 dob -> WGRANIE 30. Progi: sprawdz_logi --grupa etap2,
 etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
+- (03:50) **D11 GOTOWE** (w-toku/d11: d028f29..a1fdff3 + poprawki recenzji; test\Armoury-d11.dll; grupa MCM "Defeats and payers (D11)": DefeatMoraleHalf, BandJoinPurseToPlayer,
+  WorkshopOwnerPaysTownTax, BkSupplyFromMenPurse, RotSwapPayToPurse, LordPurseOnlyToVictor). Recenzja: 0 krytycznych/waznych. Czeka na scalenie i test zbiorczy.
+  Etap 5 rozpisany Jeffowi w czacie (porcje A kasy miast / B kiesa ludu + podatek wojenny + wyrownanie + targ przy zamku + statki / C reszta; 2-3 noce, po etapie 4).
