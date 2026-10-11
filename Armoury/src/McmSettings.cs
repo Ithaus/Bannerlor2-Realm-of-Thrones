@@ -1444,6 +1444,14 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool TravellersNoGoods { get; set; } = true;
 
+        [SettingPropertyBool("Travellers Real Goods", HintText = "Banner Kings travellers carry real goods: no road food or pack animals from nowhere - they take only the food their road needs from the stalls of their home town or castle (if the stalls run short, the rest comes out of its food stores), and between two towns they carry a small load of goods (not food) bought from the home merchants, picked by the profit it fetches at the destination; the destination town pays for the goods and the takings go back to the home town's coffers (works only with Travellers No Goods on; off = Banner Kings road food and pack animals from nowhere, as before)")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool TravellersRealGoods { get; set; } = true;
+
+        [SettingPropertyInteger("Traveller Trade Per Head", 0, 40, "0", HintText = "how much the home merchants entrust to each traveller for goods to sell at the destination - the load is also capped by what the travellers can carry and by 5% of either town's coffers")]
+        [SettingPropertyGroup("Smithing materials")]
+        public int TravellerTradePerHead { get; set; } = 10;
+
         [SettingPropertyBool("Tier6 Castle Steel", HintText = "tier 6 arms and armour count castle-forged steel as their metal everywhere - your forge, town workshops, repairs and their worth (one rule for tier 6; off = workshops and prices count fine steel for tier 6 as before; takes effect after reloading the game)")]
         [SettingPropertyGroup("Smithing materials")]
         public bool Tier6CastleSteel { get; set; } = true;
@@ -4464,6 +4472,8 @@ namespace Armoury
             s.CastleSteelValue = CastleSteelValue;
             s.TravellersNoIngots = TravellersNoIngots;
             s.TravellersNoGoods = TravellersNoGoods;
+            s.TravellersRealGoods = TravellersRealGoods;
+            s.TravellerTradePerHead = TravellerTradePerHead;
             s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;

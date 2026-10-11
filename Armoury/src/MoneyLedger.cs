@@ -82,6 +82,11 @@ namespace Armoury
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
                                                    "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
                                                    "zaopatrzenie BK z sakiewek ludzi (D11-4)" };
+        internal const int NTravel = 7;                                                                          // 36b: wedrowcy BK - kasa celu placi za towar, utarg do kasy pochodzenia
+        private const int Notes = 8;
+        private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
+                                                   "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
+                                                   "wedrowcy BK (36b): towar u celu, utarg do kasy pochodzenia" };
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
