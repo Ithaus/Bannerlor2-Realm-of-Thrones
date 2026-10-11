@@ -1150,3 +1150,7 @@ ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841
 - (03:05) **Jeff - ZASADA TESTOW:** "najpierw wgrywaj wieksze paczki zmian i potem testy w grze, bo te testy zabieraja za duzo czasu; jak je uruchamiasz, to zeby testowac
   duzo zmian". Od teraz: kod kilku paczek (kazda z recenzja, wylacznikiem MCM, osobnym commitem i wpisem CHANGELOG) -> jedna galaz -> JEDEN test 120 dob + zapis -> jedno
   wgranie. Najblizszy zbiorczy test: D11 + E4/2 + E4/3 + E4/4.
+- (03:30) **Jeff o bandach (E4/3):** "maja rosnac z wojna - na tym polegaja bandy, ze jak jest wojna, jest duzo bandytow - to musi byc wyposrodkowane". Regula dla E4/3
+  (powrot wyrzutkow do domu): tempo powrotu ZALEZY OD WOJNY w regionie - w wojnie wolno (bandy rosna z rozbitymi i dezerterami), w pokoju szybko (amnestia, zniwa, praca
+  w domu) - bandy w dlugiej wojnie ok. 1.3-1.5 x poziomu pokoju (nie bez konca, plateau), po zakonczeniu wojen wracaja do poziomu pokoju w ok. pol roku (120-180 dob).
+  Prog S16 "bandy <= baza + 20%" zastapic dla E4/3: plateau w wojnie <= 1.5 x pokoj, spadek po pokoju. Poprawka po workflow E4/3 (wf_dedf899d-56d), przed testem zbiorczym.
