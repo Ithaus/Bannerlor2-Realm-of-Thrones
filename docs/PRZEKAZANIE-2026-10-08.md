@@ -803,3 +803,10 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   DLL: test\CrashScribe-bledy.dll d971bc42, CrashScribe-at-bledy.dll eac95b1c (z at1-cs.diff). OTWARTE (pytanie do Jeffa): nasz port Muru (WallSetupWith) ma ten sam
   problem - zastepca zostaje zamrozony na koncu wydarzenia. Stare zachowanie ROT (nie nasze): armia < 75% obroncow -> ROT moze trzymac dowodce zamrozonego bez konca.
 - (14:50) **Jeff: "tak, napraw i rob dalej"** - B6c port Muru (odmrazanie zastepcy na koncu wydarzenia, wzorem B6b) - workflow wf_83274572-3f7 na w-toku/cs-bledy.
+- (15:10) **E4/11 GOTOWE (kod + 2 recenzje, 8/8 uwag przyjetych):** w-toku/e4-11 d6dd664 (od 392c519): VillageBook.cs - puste osady wiosek pobocznych z kontem uchodzcow
+  (pule rabunek/glod), lancuch palenia (rabunek od strony wroga, zerowanie od obozu, glod od ubocza), rocznica we wszystkich 571 okregach, ogien/dymek z ksiegi, sekcja
+  okregu w "People of this land" (takze village_looted), zywnosc warowni od ludzi (postfiks DefaultSettlementFoodModel.CalculateTownFoodStocksChange, Looted tylko
+  z CoversQuiet), zapis arm_district (znacznik o:1 przy wylaczonej ksiedze); klucze VillageBookEnabled, DistrictSettlementPeople 250, TownFoodByVillagePeople;
+  progi G1-G14 + G-ETAP; bez nowych przyczyn PeopleBook. DLL test\Armoury-e4-11.dll. Z11 (E4/9) - OnRefugeesTaken gotowe, bez wywolania. UWAGA scalanie: kolizja
+  numerow przyczyn E4/8 x E4/10 (M 44-45, F 52) - przesunac E4/10 (MBackVeteran 46, MVetStart 47, FVetHire 56; numery nie ida do zapisu); konflikty
+  ArmouryBehavior/Settings/McmSettings (gen_mcm)/sprawdz_logi/CHANGELOG/PeopleMenu (E4/10)/SubModuleMain (E4/8).
