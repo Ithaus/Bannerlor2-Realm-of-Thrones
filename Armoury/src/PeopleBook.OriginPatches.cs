@@ -357,6 +357,7 @@ namespace Armoury
             if (!OriginLive || __0 == null) return;
             try
             {
+                if (KindOf(__0) < 0) return;           // tabor/lodz (R18 - PeopleBook.OnPartyDestroyed), konwoj BK, Inni - bez slownika skladu; bez drugiego powrotu
                 var g = __1 != null && __1.Town != null ? __1.Town.GarrisonParty : null;
                 __state = new DisbandState { On = true, M = Men(__0.MemberRoster), P = Men(__0.PrisonRoster), Gar = g, G = g != null ? Men(g.MemberRoster) : 0 };
             }
