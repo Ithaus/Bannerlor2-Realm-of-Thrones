@@ -423,7 +423,11 @@ namespace Armoury
             {
                 if (!On || __instance == null) return;
                 var me = __instance.MapEvent;
-                var st = me != null ? me.MapEventSettlement : null;
+                // Update biegnie co klatke kampanii; hearth zmienia gra tylko w fazie lupu (DefenderSide.TroopCount == 0, dec Raid.cs:162) - w walce z milicja
+                // wychodzimy przed odczytami i alokacja (ten sam czysty odczyt TroopCount gra robi zaraz potem)
+                var def = me != null ? me.DefenderSide : null;
+                if (def == null || def.TroopCount > 0) return;
+                var st = me.MapEventSettlement;
                 if (st == null || !st.IsVillage || st.Village == null) return;
                 Hero leader = null;
                 try { var lp = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }

@@ -626,7 +626,14 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- T4: Inni - miejsca = nekromancja, skasowani = wzieci przez Innych
     ctl = [num(r"kontrola z oknem: razem - nekromancja = (-?\d+)", inn[d]) for d in win if d in inn]
     ctl = [x for x in ctl if x is not None]
-    rep.add("T4: nekromancja wedlug miejsca - kontrola (suma |roznic|)", sum(abs(x) for x in ctl) if ctl else "brak linii (169c wylaczone?)", "0", (sum(abs(x) for x in ctl) == 0) if ctl else None)
+    unk = sum(abs(num(r"miejsce nieznane - wyjatek ([+-]?\d+)", inn[d], int, 0) or 0) for d in win if d in inn)
+    # kontrola != 0 tylko gdy PlaceOf rzucil wyjatek (nekromancja poza "razem") albo klucz PeopleMeasureEnabled zmieniony w trakcie doby
+    rep.add("T4: nekromancja wedlug miejsca - kontrola (suma |roznic|)", (f"{sum(abs(x) for x in ctl)} (miejsce nieznane - wyjatek: {unk})") if ctl else "brak linii (169c wylaczone?)",
+            "0", (sum(abs(x) for x in ctl) == 0) if ctl else None)
+    bey = [re.search(r"IsBeyondTheWall ROT: (TAK|BRAK)", inn[d]) for d in win if d in inn]
+    bey = [m.group(1) for m in bey if m]
+    rep.add("T4: IsBeyondTheWall ROT (miejsce \"za Murem\")", (f"TAK w {bey.count('TAK')} z {len(bey)} dob") if bey else "brak odcinka E4/0 w Wzrost Innych",
+            "TAK codziennie (BRAK = \"za Murem\" zawsze 0 - podzial do E4/2 bez wartosci)", (bey.count("TAK") == len(bey)) if bey else None)
     cl = [re.search(r"jency Innych skasowani przez ROT (\d+) \(w nicosc; wzieci przez Innych w oknie jencow E4/0 (\d+)\)", inn[d]) for d in win if d in inn]
     cl = [(int(m.group(1)), int(m.group(2))) for m in cl if m]
     if cl:
@@ -741,17 +748,32 @@ def etap4_main(logp, start_arg, until=120):
     else:
         rep.add("T7: rownanie jencow", "brak linii Jency", "<= 10% obrotu", None)
 
-    # ---------------- T8: czas
-    tt = []
+    # ---------------- T8: czas - (a) tekst projektu: linie Hearth + Partie + Jency; (b) zasada kosztu paczki (<= 30 ms/dobe): calosc mierzona -
+    # wszystkie linie E4/0 + model hearth wolany w oknie W1 (571 wywolan na dobe z postfiksami BK i BKROT). Ciala pozostalych okien (W2-W11, W8/W9,
+    # nasluchy) bez stopera - drobne odczyty na zdarzenie; ich koszt widac tylko w s/dobe (INFO nizej).
+    tt, tall, tparts = [], [], {}
     for d in measured:
         a = fnum(r"\| czas " + F_ + r" ms \(linia Hearth", hea[d])
-        b = fnum(r"czas E4/0 w ksiedze ludzi " + F_ + " ms", par.get(d))
-        c = fnum(r"\| czas " + F_ + " ms\\.", jen.get(d))
-        if a is not None:
-            tt.append(a + (b or 0) + (c or 0))
-    rep.add("T8: czas linii Hearth + Partie + Jency (srednio)", f"{st.mean(tt):.1f} ms/d (max {max(tt):.1f})" if tt else "brak", "<= 30 ms/dobe", (st.mean(tt) <= 30) if tt else None)
-    oth = [(fnum(r"\| czas " + F_ + " ms\\.", pro.get(d)) or 0) + (fnum(r"\| czas " + F_ + " ms\\.", zim.get(d)) or 0) for d in measured]
-    rep.add("T8: czas linii Dobrobyt + Zima (srednio)", f"{st.mean(oth):.1f} ms/d" if oth else "-", "INFO (poza progiem T8)", None)
+        if a is None:
+            continue
+        b = fnum(r"czas E4/0 w ksiedze ludzi " + F_ + " ms", par.get(d)) or 0
+        c = fnum(r"\| czas " + F_ + " ms\\.", jen.get(d)) or 0
+        tt.append(a + b + c)
+        comp = {"linia Hearth": a,
+                "model hearth w oknie W1": fnum(r"model hearth w oknie ticku wsi " + F_ + " ms", hea[d]) or 0,
+                "Partie (migawka partii E4/0)": b,
+                "Jency": c,
+                "Dobrobyt": fnum(r"\| czas " + F_ + " ms\\.", pro.get(d)) or 0,
+                "Zima": fnum(r"\| czas " + F_ + " ms\\.", zim.get(d)) or 0,
+                "Krainy i Straz": fnum(r"czas linii Krainy i Straz " + F_ + " ms", swl.get(d)) or 0}
+        for k, v in comp.items():
+            tparts.setdefault(k, []).append(v)
+        tall.append(sum(comp.values()))
+    rep.add("T8: czas linii Hearth + Partie + Jency (srednio)", f"{st.mean(tt):.1f} ms/d (max {max(tt):.1f})" if tt else "brak", "<= 30 ms/dobe (tekst projektu)", (st.mean(tt) <= 30) if tt else None)
+    rep.add("T8: calosc E4/0 - wszystkie linie + model hearth w oknie W1 (srednio)", f"{st.mean(tall):.1f} ms/d (max {max(tall):.1f})" if tall else "brak",
+            "<= 30 ms/dobe (zasada kosztu paczki)", (st.mean(tall) <= 30) if tall else None)
+    if tparts:
+        rep.add("T8: skladniki calosci (srednio, ms/d)", ", ".join(f"{k} {st.mean(v):.1f}" for k, v in tparts.items()), "INFO", None)
     rep.add("T8: sekundy doby wobec ostatniego biegu 120 dob", "wymaga biegu bazowego tego drzewa", "<= +3% - INFO", None)
 
     # ---------------- T9: zima (bieg B) - bez progu, dane do E4/1 i E4/6

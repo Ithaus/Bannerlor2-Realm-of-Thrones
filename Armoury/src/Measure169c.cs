@@ -59,7 +59,7 @@ namespace Armoury
             _budget.Clear();
             _marN = _marPoorRich = 0; _marDowry = 0;
             _travLast.Clear(); _othersLast.Clear(); _othersBattle = 0;
-            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0; _slavesByCult.Clear(); _slavesDay = -1;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0; _slavesByCult.Clear(); _slavesDay = -1;
             _twinsEnter.Clear(); _twins = null; _twinsLooked = false; _ratioStart = -1;
             _errSites.Clear(); _stumbles = 0;
             RansomFlows.Reset();
@@ -714,8 +714,23 @@ namespace Armoury
         internal sealed class OthersState { public int Men, Pris; public List<TroopRoster> Rosters; }
         private static readonly long[] _othersPlace = new long[4];
         private static readonly string[] PlaceName = { "za Murem", "przy Murze", "Westeros", "Essos" };
-        private static long _othersPlaceN, _othersPrisCleared, _rotRaidMen, _rotRaidN;
+        private static long _othersPlaceN, _othersPlaceErr, _othersPrisCleared, _rotRaidMen, _rotRaidN;   // _othersPlaceErr: nekromancja bitew, w ktorych miejsce rzucilo wyjatek (poza "razem" - kontrola T4 != 0)
         private static MethodInfo _mBeyond; private static bool _beyondTried;
+
+        /// <summary>ROT.Misc.ROTUtilities.IsBeyondTheWall(Vec2) - szukana raz na proces (wzor CrashScribe NightKingCall); blad szukania = potkniecie
+        /// (bez zlego podzialu tej bitwy), brak metody = "BRAK" w linii "Wzrost Innych" (wtedy "za Murem" zawsze 0 - T4).</summary>
+        private static MethodInfo Beyond()
+        {
+            if (_beyondTried) return _mBeyond;
+            _beyondTried = true;
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.Misc.ROTUtilities");
+                _mBeyond = t != null ? AccessTools.Method(t, "IsBeyondTheWall", new[] { typeof(TaleWorlds.Library.Vec2) }) : null;
+            }
+            catch (Exception e) { _mBeyond = null; Stumble("PlaceOf(IsBeyondTheWall)", e); }
+            return _mBeyond;
+        }
 
         private static int OthersPris(MapEvent me, List<TroopRoster> seen)
         {
@@ -738,24 +753,20 @@ namespace Armoury
             return s;
         }
 
+        /// <summary>0 za Murem, 1 przy Murze, 2 Westeros, 3 Essos; -1 = wyjatek (potkniecie liczone, nekromancja tej bitwy poza "razem" - kontrola T4 pokaze roznice).</summary>
         private static int PlaceOf(MapEvent me)
         {
             try
             {
                 var pos = me.Position.ToVec2();
-                if (!_beyondTried)
-                {
-                    _beyondTried = true;
-                    var t = AccessTools.TypeByName("ROT.Misc.ROTUtilities");
-                    _mBeyond = t != null ? AccessTools.Method(t, "IsBeyondTheWall") : null;   // wzor CrashScribe NightKingCall
-                }
-                if (_mBeyond != null && Convert.ToBoolean(_mBeyond.Invoke(null, new object[] { pos }))) return 0;
+                var mb = Beyond();
+                if (mb != null && Convert.ToBoolean(mb.Invoke(null, new object[] { pos }))) return 0;
                 var reg = OutlawLaw.RegionAt(pos);
                 string c = reg != null ? Measure40.CultureAtStart(reg) : "?";
                 if (c == "nightswatch") return 1;
                 return PopulationLaw.WesterosCultures.Contains(c) ? 2 : 3;
             }
-            catch { return 3; }
+            catch (Exception e) { Stumble("PlaceOf", e); return -1; }
         }
 
         public static void OthersPre(MapEvent __0, out OthersState __state)
@@ -768,7 +779,7 @@ namespace Armoury
                 if (Measure40.On) { w.Rosters = new List<TroopRoster>(2); w.Pris = OthersPris(__0, w.Rosters); }
                 __state = w;
             }
-            catch { __state = null; }
+            catch (Exception e) { __state = null; Stumble("OthersPre", e); }
         }
 
         public static Exception OthersFin(Exception __exception, MapEvent __0, OthersState __state)
@@ -781,7 +792,7 @@ namespace Armoury
                     _othersBattle += d;
                     if (__state.Rosters != null)
                     {
-                        if (d != 0) { _othersPlace[PlaceOf(__0)] += d; _othersPlaceN++; }
+                        if (d != 0) { int p = PlaceOf(__0); if (p >= 0) _othersPlace[p] += d; else _othersPlaceErr += d; _othersPlaceN++; }
                         int after = 0; foreach (var r in __state.Rosters) after += r.TotalRegulars;
                         if (__state.Pris > after) _othersPrisCleared += __state.Pris - after;
                     }
@@ -804,7 +815,7 @@ namespace Armoury
                 if (mp == null || mp.MemberRoster == null || !IsOthers(mp)) return;
                 __state = new RotRaidState { P = mp, Men = mp.MemberRoster.TotalManCount };
             }
-            catch { __state = null; }
+            catch (Exception e) { __state = null; Stumble("RotRaidPre", e); }
         }
 
         public static Exception RotRaidFin(Exception __exception, RotRaidState __state)
@@ -846,9 +857,9 @@ namespace Armoury
                 {
                     long placed = _othersPlace[0] + _othersPlace[1] + _othersPlace[2] + _othersPlace[3];
                     var x = new StringBuilder(400);
-                    x.Append(" | E4/0: nekromancja ROT wedlug miejsca bitwy (bitew ").Append(_othersPlaceN).Append("): ");
+                    x.Append(" | E4/0: nekromancja ROT wedlug miejsca bitwy (bitew ").Append(_othersPlaceN).Append("; IsBeyondTheWall ROT: ").Append(Beyond() != null ? "TAK" : "BRAK").Append("): ");
                     for (int i = 0; i < 4; i++) x.Append(i > 0 ? ", " : "").Append(PlaceName[i]).Append(' ').Append(S(_othersPlace[i]));
-                    x.Append(" (razem ").Append(S(placed)).Append(", kontrola z oknem: razem - nekromancja = ").Append(placed - _othersBattle).Append(')')
+                    x.Append(" (razem ").Append(S(placed)).Append(", miejsce nieznane - wyjatek ").Append(S(_othersPlaceErr)).Append(", kontrola z oknem: razem - nekromancja = ").Append(placed - _othersBattle).Append(')')
                      .Append(" | jency Innych skasowani przez ROT ").Append(_othersPrisCleared).Append(" (w nicosc; wzieci przez Innych w oknie jencow E4/0 ").Append(Measure40.TakenByOthers).Append(')')
                      .Append(" | odbici jency wcieleni do band Innych ").Append(S(Measure40.RescuedToOthers)).Append(" (zywi ludzie - w reszcie wyzej; U6)")
                      .Append(" | rajd ROT (Hearth/2 z niczego) ").Append(S(_rotRaidMen)).Append(" w ").Append(_rotRaidN).Append(" rajdach");
@@ -858,7 +869,7 @@ namespace Armoury
             catch (Exception e) { Stumble("OthersLine(E4/0)", e); }
             s += ".";
             _othersBattle = 0;
-            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0;
+            Array.Clear(_othersPlace, 0, _othersPlace.Length); _othersPlaceN = _othersPlaceErr = _othersPrisCleared = _rotRaidMen = _rotRaidN = 0;
             return s;
         }
 

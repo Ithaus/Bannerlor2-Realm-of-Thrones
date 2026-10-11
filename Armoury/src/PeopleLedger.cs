@@ -639,6 +639,7 @@ namespace Armoury
             double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             sb.Append(" | czas E4/0 w ksiedze ludzi ").Append(((t40 + System.Diagnostics.Stopwatch.GetTimestamp() - t0) * f).ToString("0.0", ci)).Append(" ms.");
             Log.Info(sb.ToString());
+            long t1 = System.Diagnostics.Stopwatch.GetTimestamp();   // czas linii Krainy + Straz (po linii Partie) - na koncu linii Straz (T8 calosc)
 
             // 2. Krainy - regiony po kulturze z pierwszej doby sesji
             var kr = new Dictionary<string, double[]>();   // [ludzie, zaloga + wyrzutki + bandy, wyrzutki, zabici dzis]
@@ -704,7 +705,8 @@ namespace Armoury
                 _gLast[g] = state;
             }
             _gHaveLast = true;
-            wb.Append(" | Inni (dla porownania): zabici ").Append(_gKilled[GOthers]).Append(", zwerbowani ").Append(_gRecruited[GOthers]).Append(", nowe partie ").Append(_gNewMen[GOthers]).Append('.');
+            wb.Append(" | Inni (dla porownania): zabici ").Append(_gKilled[GOthers]).Append(", zwerbowani ").Append(_gRecruited[GOthers]).Append(", nowe partie ").Append(_gNewMen[GOthers]);
+            wb.Append(" | czas linii Krainy i Straz ").Append(((System.Diagnostics.Stopwatch.GetTimestamp() - t1) * f).ToString("0.0", ci)).Append(" ms.");
             Log.Info(wb.ToString());
         }
     }
