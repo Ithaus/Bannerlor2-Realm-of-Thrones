@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using HarmonyLib;
@@ -26,14 +27,21 @@ namespace Armoury
     /// doby sesji - ta sama migawka co linia "Zima (E4/0)" (Measure40.CultureAtStart, U3/U18); do E4/3 (kultura kalibracji w zapisie) tak zostaje.
     /// Wies Dorne przejeta kulturowo przez Reach zostaje w klimacie Dorne. Partia: region liczony raz na dobe na partie (227 wezlow - pamiec doby),
     /// bo jedzenie partii gra liczy wiele razy na dobe. Czytane tylko w zimie (WinterBite.WinterNow) - poza zima zadnych odczytow.
-    /// KONIE JEDZA ZIMA (P10 Z4, ES:211 e "kon jak 2.5 czlowieka"): w zimie partia doplaca WinterHorseFeedShare (0.5) paszy BK
-    /// (BKPartyConsumptionModel.CalculateAnimalFoodNeed(party, false): kon 0.25, kon bojowy 0.5, juczny 0.15, ... na dobe) x czynnik krainy -
-    /// pol paszy konia = 0.125 = 2.5 x czlowiek (1/20). Bez doplaty, gdy BK juz liczy pasze (pustynia - pelna, snieg/zamiec - pol; ten sam
-    /// warunek co BK: teren pod partia, pogoda w miejscu partii) albo partia stoi na stepie (TerrainType.Steppe - wypas zimowy; regula wedlug
-    /// terenu, nie kultury). Doplata wchodzi do bazy jedzenia (WinterBite.FoodPostfix na DefaultMobilePartyFoodConsumptionModel - wolany
-    /// na modelu BK, ktory po nim dziedziczy; ROT/NavalDLC/BEE go owijaja), wiec obejmuja ja te same mnozniki co ludzi: zima x gradient x kraina,
-    /// perki, Rations -40% na zewnatrz (kon zostaje 2.5 x czlowiek w kazdej porze). Model bez CalculateAnimalFoodNeed (bez BK) = bez doplaty
-    /// (linia: "model paszy BRAK").
+    /// KONIE JEDZA ZIMA (P10 Z4, ES:211 e "kon jak 2.5 czlowieka"): w zimie partia doplaca WinterHorseFeedShare (0.5) pelnej paszy zwierzat
+    /// x czynnik krainy. Pasza liczona TU, po glowie (poprawka po recenzji E4/1): kazdy konny w skladzie partii (MemberRoster, Character.IsMounted,
+    /// element.Number - BEZ jencow, jency koni nie maja) x stawka konia + kazde zwierze w taborze (ItemRoster) x jego stawka. Stawki BK
+    /// (BKPartyConsumptionModel: kon 0.25, kon bojowy 0.5, juczny 0.15, krowa 0.175, swinia 0.1, owca 0.05 na dobe) czytane refleksja z modelu BK
+    /// z listy modeli gry, bez BK - te same liczby z kodu. NIE z BK CalculateAnimalFoodNeed: ta liczy JEDNEGO konia na TYP oddzialu (num += 1
+    /// na element rosteru), konnych jencow jak konie, a zwyklego konia w taborze stawka ptaka (0.025). Pol paszy konia = 0.125 = 2.5 x czlowiek (1/20).
+    /// Bez doplaty: partia na stepie (TerrainType.Steppe - wypas zimowy; regula wedlug terenu, nie kultury) i - TYLKO gdy regula paszy BK naprawde
+    /// biegnie (BK CalculateDailyFoodConsumptionf w aktywnym lancuchu modelu jedzenia) - pustynia (BK: pelna pasza) i snieg/zamiec (BK: pol).
+    /// U Jeffa aktywnym modelem jest RBL RealisticFoodConsumptionModel (RBL laduje sie po ROT, dziedziczy po Default i nie wola modelu
+    /// wewnetrznego) - BK nie karmi wtedy nigdzie, wiec doplata obejmuje tez pustynie i snieg. Lancuch ustalany raz na kampanie (FeedInfo):
+    /// od aktywnego modelu w glab przez owijki (typ wprost po abstrakcyjnym MobilePartyFoodConsumptionModel - ROT _previousModel, BEE _baseModel,
+    /// NavalDLC BaseModel); typ po klasie konkretnej (RBL po Default) konczy lancuch - ten sam test, ktorym ROT sprawdza modele (ValidateGameModel).
+    /// Doplata wchodzi do bazy jedzenia (WinterBite.FoodPostfix na DefaultMobilePartyFoodConsumptionModel.CalculateDailyBaseFoodConsumptionf -
+    /// RBL i BK jej nie nadpisuja, owijki ja wolaja), wiec obejmuja ja te same mnozniki co ludzi: zima x gradient x kraina, perki, Rations -40%
+    /// na zewnatrz (kon zostaje 2.5 x czlowiek w kazdej porze).
     /// Watki: jedzenie partii bywa liczone rownolegle - pamieci pod jedna blokada; wyjatki per obiekt liczone (potkniecia), bez wylacznikow.
     /// </summary>
     internal static class WinterRealm
@@ -42,6 +50,7 @@ namespace Armoury
         private static readonly HashSet<string> Warm = new HashSet<string>(StringComparer.Ordinal)
             { "aserai", "qartheen", "ghiscari", "lyseni", "tyroshi", "myrish", "volantine", "valyrian" };
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        private const string BkModel = "BannerKings.Models.Vanilla.BKPartyConsumptionModel";
 
         private static readonly object Gate = new object();
         private static Campaign _camp;                                    // kampania pamieci (nowa kampania / wczytanie = od zera)
@@ -49,15 +58,23 @@ namespace Armoury
         private sealed class Spot { public int Day; public string Culture; }
         private static readonly Dictionary<MobileParty, Spot> _party = new Dictionary<MobileParty, Spot>();
 
-        // pasza BK: CalculateAnimalFoodNeed modelu, na ktorym gra liczy baze jedzenia (BK), jako delegat zwiazany z instancja modelu
-        private sealed class Hook { public object Owner; public Func<MobileParty, bool, float> Need; public string Name; }
-        private static volatile Hook _hook;                               // szybka sciezka - ostatni dzialajacy (model BK kampanii)
-        private static readonly Dictionary<object, Hook> _hooks = new Dictionary<object, Hook>();
+        // pasza: lancuch modelu jedzenia i stawki - raz na kampanie
+        private sealed class Feed
+        {
+            public Campaign Camp;
+            public string Active = "?";          // typ aktywnego modelu (Campaign.Current.Models.MobilePartyFoodConsumptionModel)
+            public string Chain = "?";           // lancuch od aktywnego modelu w glab
+            public bool BkFeeds;                 // BK CalculateDailyFoodConsumptionf w aktywnym lancuchu - BK sam karmi na pustyni i w sniegu
+            public float Horse = 0.25f, Warhorse = 0.5f, Mule = 0.15f, Cattle = 0.175f, Pig = 0.1f, Sheep = 0.05f;   // stawki BK (domyslne = liczby z BK)
+            public string RatesFrom = "domyslne (liczby BK z kodu)";
+            public bool Logged;
+        }
+        private static volatile Feed _feed;
 
         private static int _stumbles, _stumblesDay;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>();
 
-        internal const int WhyOff = 0, WhyFed = 1, WhySteppe = 2, WhyDesert = 3, WhySnow = 4, WhyNoRealm = 5, WhyNoHook = 6, WhyNoAnimals = 7;
+        internal const int WhyOff = 0, WhyFed = 1, WhySteppe = 2, WhyDesert = 3, WhySnow = 4, WhyNoRealm = 5, WhyNoAnimals = 6;
 
         private static bool On { get { var s = Settings.Current; return s != null && s.WinterByRealm; } }
 
@@ -84,7 +101,7 @@ namespace Armoury
         {
             var cur = Campaign.Current;
             if (ReferenceEquals(cur, _camp)) return;
-            _camp = cur; _regionCulture.Clear(); _party.Clear(); _hooks.Clear(); _hook = null;
+            _camp = cur; _regionCulture.Clear(); _party.Clear(); _feed = null;
             _stumbles = 0; _stumblesDay = 0; _stumbleAt.Clear();
         }
 
@@ -149,38 +166,127 @@ namespace Armoury
             return c;
         }
 
-        private static Hook HookOf(object model)
+        // ------------------------------------------------------------ pasza: lancuch modelu jedzenia i stawki (raz na kampanie)
+
+        private static Feed FeedInfo()
         {
-            if (model == null) return null;
-            var h = _hook;
-            if (h != null && ReferenceEquals(h.Owner, model)) return h;
+            var cur = Campaign.Current;
+            var f = _feed;
+            if (f != null && ReferenceEquals(f.Camp, cur)) return f;
             lock (Gate)
             {
                 Fresh();
-                if (_hooks.TryGetValue(model, out h)) return h;
-                h = new Hook { Owner = model };
+                f = _feed;
+                if (f != null && ReferenceEquals(f.Camp, cur)) return f;
+                f = new Feed { Camp = cur };
+                var models = cur != null ? cur.Models : null;
+                if (models == null) return f;   // bez pamieci - modeli jeszcze nie ma, nastepny odczyt sprobuje znowu
                 try
                 {
-                    var mi = AccessTools.Method(model.GetType(), "CalculateAnimalFoodNeed", new[] { typeof(MobileParty), typeof(bool) });
-                    if (mi != null && !mi.IsStatic && mi.ReturnType == typeof(float))
+                    // stawki z modelu BK z listy modeli gry (niezaleznie od tego, czy BK jest w aktywnym lancuchu)
+                    foreach (var gm in models.GetGameModels())
                     {
-                        h.Need = (Func<MobileParty, bool, float>)Delegate.CreateDelegate(typeof(Func<MobileParty, bool, float>), model, mi);
-                        h.Name = mi.DeclaringType != null ? mi.DeclaringType.FullName : model.GetType().FullName;
+                        if (gm == null) continue;
+                        var t = gm.GetType();
+                        if (AccessTools.Method(t, "CalculateAnimalFoodNeed", new[] { typeof(MobileParty), typeof(bool) }) == null) continue;
+                        f.Horse = Rate(gm, t, "HorseFood", f.Horse);
+                        f.Warhorse = Rate(gm, t, "WarhorseFood", f.Warhorse);
+                        f.Mule = Rate(gm, t, "MuleFood", f.Mule);
+                        f.Cattle = Rate(gm, t, "CattleFood", f.Cattle);
+                        f.Pig = Rate(gm, t, "PigFood", f.Pig);
+                        f.Sheep = Rate(gm, t, "SheepFood", f.Sheep);
+                        f.RatesFrom = t.FullName;
+                        break;
                     }
-                    else h.Name = model.GetType().FullName;
                 }
-                catch (Exception e) { Stumble("HookOf", e); }
-                _hooks[model] = h;
-                if (h.Need != null) _hook = h;
-                return h;
+                catch (Exception e) { Stumble("FeedInfo(stawki)", e); }
+                try
+                {
+                    object m = models.MobilePartyFoodConsumptionModel;
+                    f.Active = m != null ? m.GetType().FullName : "BRAK";
+                    var sb = new StringBuilder();
+                    var seen = new List<object>();
+                    for (int i = 0; m != null && i < 16; i++)
+                    {
+                        bool again = false;
+                        foreach (var o in seen) if (ReferenceEquals(o, m)) { again = true; break; }
+                        if (again) { sb.Append(" (petla)"); break; }
+                        seen.Add(m);
+                        var t = m.GetType();
+                        sb.Append(i > 0 ? " -> " : "").Append(t.Name);
+                        var calc = t.GetMethod("CalculateDailyFoodConsumptionf", new[] { typeof(MobileParty), typeof(ExplainedNumber) });
+                        if (calc != null && calc.DeclaringType != null && calc.DeclaringType.FullName == BkModel) { f.BkFeeds = true; break; }
+                        if (t.BaseType != typeof(MobilePartyFoodConsumptionModel)) { sb.Append(" (konczy lancuch - nie wola modelu wewnetrznego)"); break; }
+                        m = Inner(m, t);
+                    }
+                    f.Chain = sb.ToString();
+                }
+                catch (Exception e) { Stumble("FeedInfo(lancuch)", e); }
+                _feed = f;
+                return f;
             }
         }
 
-        /// <summary>Doplata paszy koni w zimie (dodatnia liczba jedzenia na dobe; 0 = bez doplaty, powod w why) - jedna regula dla
-        /// WinterBite.FoodPostfix i linii dobowej. Wolac tylko w zimie. model = instancja modelu jedzenia, na ktorej gra liczy baze (BK).</summary>
-        internal static float HorseFeed(object model, MobileParty party, float realm, out int why, out float need)
+        private static float Rate(object model, Type t, string name, float def)
         {
-            why = WhyOff; need = 0f;
+            var p = AccessTools.Property(t, name);
+            if (p == null || p.PropertyType != typeof(float)) return def;
+            float v = (float)p.GetValue(model, null);
+            return v >= 0f && v <= 5f ? v : def;
+        }
+
+        /// <summary>Model wewnetrzny owijki: pierwsze pole typu MobilePartyFoodConsumptionModel (od typu w dol hierarchii - ROT _previousModel,
+        /// BEE _baseModel, na koncu pole wlasciwosci BaseModel gry, z ktorego korzysta NavalDLC).</summary>
+        private static object Inner(object m, Type t)
+        {
+            for (var k = t; k != null && k != typeof(object); k = k.BaseType)
+                foreach (var fi in k.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                {
+                    if (!typeof(MobilePartyFoodConsumptionModel).IsAssignableFrom(fi.FieldType)) continue;
+                    var v = fi.GetValue(m);
+                    if (v != null && !ReferenceEquals(v, m)) return v;
+                }
+            return null;
+        }
+
+        /// <summary>Pelna pasza zwierzat partii na dobe: konni w skladzie po glowie x kon + zwierzeta w taborze x ich stawka (stawki BK).</summary>
+        private static float AnimalNeed(MobileParty party, Feed f, out int riders, out int herd)
+        {
+            riders = 0; herd = 0;
+            float need = 0f;
+            var mr = party.MemberRoster;
+            if (mr != null)
+                for (int i = 0; i < mr.Count; i++)
+                {
+                    var c = mr.GetCharacterAtIndex(i);
+                    if (c != null && c.IsMounted) riders += mr.GetElementNumber(i);
+                }
+            need += riders * f.Horse;
+            var ir = party.ItemRoster;
+            if (ir != null)
+                for (int i = 0; i < ir.Count; i++)
+                {
+                    var el = ir[i];
+                    var item = el.EquipmentElement.Item;
+                    if (item == null || el.Amount <= 0 || !item.HasHorseComponent || item.HorseComponent == null) continue;
+                    float rate;
+                    if (item.HorseComponent.IsPackAnimal) rate = f.Mule;
+                    else if (item.ItemCategory == DefaultItemCategories.WarHorse) rate = f.Warhorse;
+                    else if (item.ItemCategory == DefaultItemCategories.Sheep) rate = f.Sheep;
+                    else if (item.ItemCategory == DefaultItemCategories.Hog) rate = f.Pig;
+                    else if (item.ItemCategory == DefaultItemCategories.Cow) rate = f.Cattle;
+                    else rate = f.Horse;   // kon wierzchowy, szlachetny, wielblad (BK tu bierze stawke ptaka 0.025 - u nas kon jak kon)
+                    need += el.Amount * rate;
+                    herd += el.Amount;
+                }
+            return need;
+        }
+
+        /// <summary>Doplata paszy koni w zimie (dodatnia liczba jedzenia na dobe; 0 = bez doplaty, powod w why) - jedna regula dla
+        /// WinterBite.FoodPostfix i linii dobowej. Wolac tylko w zimie. need = pelna pasza zwierzat partii (przed udzialem i kraina).</summary>
+        internal static float HorseFeed(MobileParty party, float realm, out int why, out float need, out int riders, out int herd)
+        {
+            why = WhyOff; need = 0f; riders = 0; herd = 0;
             var s = Settings.Current;
             if (s == null || !s.WinterHorsesEat || party == null) return 0f;
             float share = MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f);
@@ -188,19 +294,21 @@ namespace Armoury
             if (realm <= 0f) { why = WhyNoRealm; return 0f; }
             try
             {
-                var h = HookOf(model);
-                if (h == null || h.Need == null) { why = WhyNoHook; return 0f; }
+                var f = FeedInfo();
                 var terrain = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(party.CurrentNavigationFace);
                 if (terrain == TerrainType.Steppe) { why = WhySteppe; return 0f; }
-                if (terrain == TerrainType.Desert) { why = WhyDesert; return 0f; }        // BK: pelna pasza na pustyni
-                var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
-                if (w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard) { why = WhySnow; return 0f; }   // BK: pol paszy w sniegu
-                need = h.Need(party, false);
+                if (f.BkFeeds)   // regula paszy BK biegnie - tam, gdzie BK karmi, bez doplaty (ten sam warunek co BK: teren pod partia, pogoda w miejscu partii)
+                {
+                    if (terrain == TerrainType.Desert) { why = WhyDesert; return 0f; }
+                    var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
+                    if (w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard) { why = WhySnow; return 0f; }
+                }
+                need = AnimalNeed(party, f, out riders, out herd);
                 if (need <= 0f) { why = WhyNoAnimals; return 0f; }
                 why = WhyFed;
                 return need * share * realm;
             }
-            catch (Exception e) { Stumble("HorseFeed", e); why = WhyOff; need = 0f; return 0f; }
+            catch (Exception e) { Stumble("HorseFeed", e); why = WhyOff; need = 0f; riders = 0; herd = 0; return 0f; }
         }
 
         /// <summary>Linia startowa (WinterBite.ApplyAll): stan kluczy E4/1.</summary>
@@ -211,17 +319,38 @@ namespace Armoury
             return "zima wedlug krain (E4/1): " + (s.WinterByRealm ? "TAK - Wyspy Letnie x0, cieple (Dorne, Qarth, Zatoka, Lys, Tyrosh, Myr, Volantis, Valyria) x"
                        + MBMath.ClampFloat(s.WinterWarmRealmFactor, 0f, 1f).ToString("0.00", Inv) + ", reszta x1 (kultura regionu z pierwszej doby sesji)" : "NIE (ta sama zima wszedzie)")
                  + "; konie jedza zima: " + (s.WinterHorsesEat ? "TAK - " + MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f).ToString("0.00", Inv)
-                       + " paszy BK x kraina, bez doplaty na stepie, na pustyni i w sniegu (BK liczy)" : "NIE");
+                       + " pelnej paszy (stawki BK, konni po glowie bez jencow, zwierzeta taboru) x kraina, bez doplaty na stepie; pustynia i snieg bez doplaty tylko,"
+                       + " gdy regula paszy BK jest w aktywnym modelu jedzenia (linia 'pasza koni zima - model jedzenia' w pierwszej dobie)" : "NIE");
         }
 
-        /// <summary>Raz na dobe (WinterBite.OnDaily, po WesterosClimate.Daily): pamiec doby od nowa; w zimie linia "Zima wedlug krain (E4/1)".</summary>
+        /// <summary>Raz na dobe (WinterBite.OnDaily, po WesterosClimate.Daily): pamiec doby od nowa; raz na kampanie linia modelu jedzenia;
+        /// w zimie linia "Zima wedlug krain (E4/1)".</summary>
         internal static void Daily()
         {
             lock (Gate) { Fresh(); _party.Clear(); }   // region pod partia od nowa (i bez partii, ktore zniknely)
+            try
+            {
+                var s = Settings.Current;
+                if (s != null && s.WinterBiteEnabled && s.WinterHorsesEat)
+                {
+                    var f = FeedInfo();
+                    if (!f.Logged && f.Camp != null) { f.Logged = true; Log.Info(FeedText(f)); }
+                }
+            }
+            catch (Exception e) { Stumble("FeedText", e); }
             if (!WinterBite.WinterNow()) { Interlocked.Exchange(ref _stumblesDay, 0); return; }
             try { Log.Info(Line()); }
             catch (Exception e) { Stumble("Line", e); }
             Interlocked.Exchange(ref _stumblesDay, 0);
+        }
+
+        private static string FeedText(Feed f)
+        {
+            return "Zima wedlug krain (E4/1): pasza koni zima - model jedzenia partii aktywny: " + f.Active + " | lancuch: " + f.Chain
+                 + " | regula paszy BK (pustynia pelna, snieg/zamiec pol): " + (f.BkFeeds ? "BIEGNIE - tam bez doplaty zimowej" : "NIE BIEGNIE (BK poza aktywnym lancuchem) - doplata zimowa takze na pustyni i w sniegu")
+                 + " | stawki paszy (" + f.RatesFrom + "): kon " + f.Horse.ToString("0.###", Inv) + ", kon bojowy " + f.Warhorse.ToString("0.###", Inv)
+                 + ", juczny " + f.Mule.ToString("0.###", Inv) + ", krowa " + f.Cattle.ToString("0.###", Inv) + ", swinia " + f.Pig.ToString("0.###", Inv)
+                 + ", owca " + f.Sheep.ToString("0.###", Inv) + "; konni po glowie (sklad partii, bez jencow) x kon, zwierzeta taboru x stawka.";
         }
 
         private static string Line()
@@ -229,7 +358,7 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             var s = Settings.Current;
             int day = (int)CampaignTime.Now.ToDays - 1;   // jak linie E4/0 (Measure40)
-            var sb = new StringBuilder(700);
+            var sb = new StringBuilder(800);
             sb.Append("Zima wedlug krain (E4/1): dzien ").Append(day);
             sb.Append(" | czynnik krainy x gradient polnocy: ").Append(s.WinterByRealm ? "TAK" : "NIE (wylaczony - wszedzie 1)")
               .Append(" - Wyspy Letnie ").Append(FactorOf(SummerIsles).ToString("0.00", Inv))
@@ -261,11 +390,12 @@ namespace Armoury
             foreach (var t in Town.AllCastles) { try { townX += WinterBite.TownExtra(t); townN++; } catch (Exception e) { Stumble("Line(zamek)", e); } }
             sb.Append(" | spichlerze warowni: dodatkowy ubytek zima -").Append(townX.ToString("0.0", Inv)).Append("/d w ").Append(townN).Append(" warowniach");
 
-            // pasza koni: partie, ktore jedza (model gry), stan w chwili odczytu
-            var hook = _hook;
+            // pasza koni: partie, ktore jedza (aktywny model gry), stan w chwili odczytu
+            var f = FeedInfo();
             var fm = Campaign.Current.Models.MobilePartyFoodConsumptionModel;
-            int eat = 0, fed = 0; double feed = 0, needFed = 0, men = 0, bonus = 0;
-            var why = new int[8];
+            int eat = 0, fed = 0, fedDesert = 0, fedSnow = 0; long riders = 0, herd = 0;
+            double feed = 0, needFed = 0, men = 0, bonus = 0;
+            var why = new int[7];
             foreach (var mp in MobileParty.All)
             {
                 try
@@ -275,20 +405,32 @@ namespace Armoury
                     float realm = OfParty(mp);
                     int n = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
                     men += n; bonus += n * WinterBite.PartyFoodBonus(mp);
-                    if (hook == null) { why[WhyNoHook]++; continue; }
-                    int w; float need;
-                    float f = HorseFeed(hook.Owner, mp, realm, out w, out need);
+                    int w, r, h; float need;
+                    float x = HorseFeed(mp, realm, out w, out need, out r, out h);
                     why[w]++;
-                    if (f > 0f) { fed++; feed += f; needFed += need; }
+                    if (x <= 0f) continue;
+                    fed++; feed += x; needFed += need; riders += r; herd += h;
+                    if (!f.BkFeeds)
+                    {
+                        var terrain = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace);
+                        if (terrain == TerrainType.Desert) fedDesert++;
+                        else
+                        {
+                            var we = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(mp.GetPosition2D);
+                            if (we == MapWeatherModel.WeatherEvent.Snowy || we == MapWeatherModel.WeatherEvent.Blizzard) fedSnow++;
+                        }
+                    }
                 }
                 catch (Exception e) { Stumble("Line(partia)", e); }
             }
             sb.Append(" | jedzenie partii zima: partii jedzacych ").Append(eat).Append(", dodatek ludzi srednio +").Append(men > 0 ? (100.0 * bonus / men).ToString("0.0", Inv) : "0").Append('%');
-            sb.Append(" | pasza koni zima (").Append(s.WinterHorsesEat ? MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f).ToString("0.00", Inv) + " paszy BK x kraina" : "WYLACZONA").Append("): z doplata ").Append(fed)
-              .Append(" partii, +").Append(feed.ToString("0.0", Inv)).Append(" jedzenia/d razem przed mnoznikami (potrzeba BK tych partii ").Append(needFed.ToString("0.0", Inv)).Append("/d)")
-              .Append("; bez doplaty: step ").Append(why[WhySteppe]).Append(", pustynia (BK) ").Append(why[WhyDesert]).Append(", snieg/zamiec (BK) ").Append(why[WhySnow])
-              .Append(", kraina bez zimy ").Append(why[WhyNoRealm]).Append(", bez zwierzat ").Append(why[WhyNoAnimals]).Append(", model bez paszy ").Append(why[WhyNoHook]);
-            sb.Append(" | model paszy: ").Append(hook != null && hook.Need != null ? hook.Name : "BRAK (CalculateAnimalFoodNeed nie znaleziony albo jeszcze nie odczytany - konie bez doplaty)");
+            sb.Append(" | pasza koni zima (").Append(s.WinterHorsesEat ? MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f).ToString("0.00", Inv) + " pelnej paszy x kraina" : "WYLACZONA").Append("): z doplata ").Append(fed)
+              .Append(" partii (konnych ").Append(riders).Append(", zwierzat w taborach ").Append(herd).Append("), +").Append(feed.ToString("0.0", Inv))
+              .Append(" jedzenia/d razem przed mnoznikami (pelna pasza tych partii ").Append(needFed.ToString("0.0", Inv)).Append("/d)");
+            if (!f.BkFeeds) sb.Append("; w tym na pustyni ").Append(fedDesert).Append(", w sniegu/zamieci ").Append(fedSnow).Append(" (BK tam nie karmi)");
+            sb.Append("; bez doplaty: step ").Append(why[WhySteppe]).Append(", pustynia (BK) ").Append(why[WhyDesert]).Append(", snieg/zamiec (BK) ").Append(why[WhySnow])
+              .Append(", kraina bez zimy ").Append(why[WhyNoRealm]).Append(", bez zwierzat ").Append(why[WhyNoAnimals]);
+            sb.Append(" | model jedzenia: ").Append(f.Active).Append(", regula paszy BK ").Append(f.BkFeeds ? "BIEGNIE" : "NIE BIEGNIE");
             sb.Append(" | potkniecia dzis ").Append(Volatile.Read(ref _stumblesDay)).Append(", od startu sesji ").Append(Volatile.Read(ref _stumbles));
             lock (Gate) { if (_stumbleAt.Count > 0) { sb.Append(" ("); bool first = true; foreach (var kv in _stumbleAt) { sb.Append(first ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value); first = false; } sb.Append(')'); } }
             sb.Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");

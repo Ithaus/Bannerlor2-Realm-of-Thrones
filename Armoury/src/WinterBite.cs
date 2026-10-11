@@ -139,17 +139,17 @@ namespace Armoury
         // ---- patche ----
 
         /// <summary>Konsumpcja partii zima: +50% razy gradient polnocy razy czynnik krainy pod partia (E4/1); konie doplacaja pasze (E4/1,
-        /// WinterRealm.HorseFeed - w bazie, wiec mnozniki zimy, perkow i Rations obejmuja ja jak ludzi). __instance = model, na ktorym gra liczy
-        /// baze (BK BKPartyConsumptionModel dziedziczy te metode) - z niego pasza BK CalculateAnimalFoodNeed.</summary>
-        public static void FoodPostfix(object __instance, MobileParty party, ref ExplainedNumber __result)
+        /// WinterRealm.HorseFeed - w bazie, wiec mnozniki zimy, perkow i Rations obejmuja ja jak ludzi). Pasze liczy WinterRealm sam (konni po
+        /// glowie, zwierzeta taboru, stawki BK) - niezaleznie od tego, ktory model jedzenia jest aktywny (u Jeffa RBL, nie BK).</summary>
+        public static void FoodPostfix(MobileParty party, ref ExplainedNumber __result)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return;
                 float realm = WinterRealm.OfParty(party);
-                int why; float need;
-                float horse = WinterRealm.HorseFeed(__instance, party, realm, out why, out need);
+                int why, riders, herd; float need;
+                float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out riders, out herd);
                 if (horse > 0f) __result.Add(-horse, _txtHorses);
                 float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);

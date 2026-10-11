@@ -1276,11 +1276,11 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float WinterWarmRealmFactor { get; set; } = 0.4f;
 
-        [SettingPropertyBool("Winter Horses Eat", HintText = "in winter horses and pack animals cannot graze and eat fodder out of the party's food (Winter Horse Feed Share of their Banner Kings feed, times the winter of the realm) - not on the steppe, where they still graze, and not where Banner Kings already feeds them (desert, snow and blizzard)")]
+        [SettingPropertyBool("Winter Horses Eat", HintText = "in winter horses and pack animals cannot graze and eat fodder out of the party's food: every mounted soldier's horse and every animal in the baggage (Banner Kings feed rates, prisoners have no horses) times Winter Horse Feed Share, times the winter of the realm - not on the steppe, where they still graze; in desert, snow and blizzard only when Banner Kings' own animal feed is not already counted there (it is not when another mod replaces the party food model)")]
         [SettingPropertyGroup("The marching column")]
         public bool WinterHorsesEat { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Winter Horse Feed Share", 0.00f, 1.00f, "0.00", HintText = "with Winter Horses Eat: the share of the Banner Kings animal feed eaten in winter (0.5 = a horse eats as much as about 2.5 men)")]
+        [SettingPropertyFloatingInteger("Winter Horse Feed Share", 0.00f, 1.00f, "0.00", HintText = "with Winter Horses Eat: the share of an animal's full Banner Kings feed eaten in winter (horse 0.25, warhorse 0.5, pack animal 0.15 food a day; 0.5 = a horse eats as much as about 2.5 men)")]
         [SettingPropertyGroup("The marching column")]
         public float WinterHorseFeedShare { get; set; } = 0.5f;
 
