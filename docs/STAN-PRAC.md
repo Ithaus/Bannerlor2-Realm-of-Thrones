@@ -1120,3 +1120,11 @@ jak w bazie; zalogi swiata -23% (pokoj). BANDY +36% liczby, +57% ludzi (25 tys.,
 do wsi 2-3/d -> E4/3. STRAZ: ok. d590 pokoj z Wolnymi Ludzmi -> pulap 20 tys. -> 1.4 tys., zwolnienia 166 odeslaly 5 tys. (7.2 -> 1.2 tys.) -> poprawka 2-n (Straz bez
 zwolnien, w-toku/e4-0 f41402a). Logi: SCRATCH(ae222cb7)\kopia-728\ (progi2.txt, progi3.txt).
 **Raport dla Jeffa:** docs/RAPORT-NOCNY-2026-10-11.md. Projekty: docs/etap3/, docs/etap4/.
+
+**WGRANIE 29 (11.10 ok. 02:16 zegara komp.):** Armoury 809a603a (galaz noc/wgranie-29 = w-toku/e4-0 f41402a = WGRANIE 28 + ETAP 4 paczka E4/0 (188, pomiar ludzi, jencow
+i zimy - gra bez zmian; Measure40.cs, linie Hearth/Dobrobyt/Jency/Zima/Partie/Krainy/Straz i Wolni Ludzie; progi: tools/sprawdz_logi.py --grupa etap4) + 2-n Nocna Straz
+bez zwolnien (WatchNoReleases)). RC 90665425, GT bbb841d7, CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow, koszt pomiaru 10.7 ms/dobe, tempo 17.4 s/dobe (bez zmian),
+etap 2 jak w WGRANIU 28 (wojsko lordow w wojnie 101 tys., glowy 1, bankruci 0, bandy -10%), Straz 5.6 tys. / pulap 10.2 tys.; pomiar E4/0 pokazal dziury do etapu 4:
+hearth wsi +624/d bez wyjasnienia (T2 - przyrost ludnosci z niczego -> E4/4), ludzie pod bronia +1048/d bez nazwy (T7 -> E4/7-E4/8), Straz/Wolni Ludzie 60-67% ruchu bez
+nazwy (T6); zapis 9 dob OK (0 bledow, 28.5 s/dobe). Kopie: Armoury.dll.bak-2026-10-11-przed-noc29 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc29-przed.
+ZATWIERDZONE: Armoury 809a603a, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5. NIEWGRANE: E4/2 (w-toku/e4-2 3e10b11) - decyzja Jeffa.

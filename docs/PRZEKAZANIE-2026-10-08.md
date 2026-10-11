@@ -667,3 +667,8 @@ miastach; (5) doplata podmiany rekruta ROT; (6) werdykt "pokonany" dla partii lo
   fallen"). NIE WGRYWAC bez Jeffa: recenzja - przed doba 728 pula CIALA prawie sie nie odnawia (ROT +3 do limitu band Innych na dobe), odrodzone bandy Innych = sam wodz ->
   Inni moga slabnac szybciej (fabula Nocnego Krola). Pytanie do Jeffa: czy tak ma byc (Inni rosna tylko z poleglych, nawet jesli slabna), czy pula startowa/odnawianie.
   Znana droga z niczego: pojedynek z Nocnym Krolem (ROT odtwarza sklad bandy) - nastepna paczka.
+- (02:16) **WGRANIE 29: Armoury 809a603a** (E4/0 pomiar + Straz bez zwolnien). **W grze koncowo:** Armoury 809a603a, RC 90665425, GT bbb841d7, CS 77b11df5.
+  Bieg 2-letni: 728/728, 0 bledow, etap 3 20/20 (szczegoly STAN-PRAC "BIEG 2-LETNI"). Raport dla Jeffa: docs/RAPORT-NOCNY-2026-10-11.md.
+  **NASTEPNE (dla kolejnego konta):** odpowiedzi Jeffa na pytania z raportu (rozdz. 4) -> statki 3.3 / E4/2 wedlug decyzji; etap 4 dalej: E4/1 (zima wedlug krain - wymaga
+  proby zimy, pliki danych w grze = pytac Jeffa o zgode), E4/3 (punkty powrotu - wyrzutki wracaja do domu, odpowiedz na bandy +57% w roku 2), E4/4 (przyrost ludnosci,
+  T2 +624 hearth/d). Projekt: docs/etap4/PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md. Drzewa: SCRATCH(ae222cb7)\e4\{40,42}.

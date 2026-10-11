@@ -2,7 +2,7 @@
 
 Jeff, prosto i krotko: **etap 2 dokonczony, etap 3 caly w grze, bieg dwuletni przeszedl, etap 4 zaczety.**
 
-## 1. Co jest w grze (6 wgran tej nocy, kazde po tescie 120 dni + tescie zapisu, z kopia)
+## 1. Co jest w grze (7 wgran tej nocy, kazde po tescie 120 dni + tescie zapisu, z kopia)
 
 | Wgranie | Co zmienia w grze |
 |---|---|
@@ -12,6 +12,7 @@ Jeff, prosto i krotko: **etap 2 dokonczony, etap 3 caly w grze, bieg dwuletni pr
 | 26 | **3.4-3.7** BK bez zlota z powietrza: lordowie kupuja napitki i drewno pod to, co maja w taborze, i placa kupcom; niewolnikow placi kasa osady; rada BK placi pensje z dochodu, ktory pan ma; wedrowcy BK bez towaru z niczego; ROT: rebelia bierze zloto z kasy zbuntowanego miasta. |
 | 27 | **3.8-3.10** stale kwoty w starej monecie (zamowienia u kowala, nagrody szranek), lord dostaje pelna trzecia (33%) ze sprzedazy lupu swoich ludzi, lapowka w niewoli trafia do trzymajacych, Twoj rynsztunek zabrany przez bandytow zostaje w jukach bandy (odzyskasz go), furaz z zapasu wsi, herszt kryjowki z ludzi bandy. |
 | 28 | **3.1 Szczelnosc:** jency, lup z oblezen, turnieje i myto placi kasa miasta; majatki BK zarabiaja tylko z utargu; zloto z cial z sakiewek pokonanych; zold karawan i oplaty za awans do sakiewek ludzi; kapital karawany z zaplaty. **Statki (3.3) sa w kodzie, ale WYLACZONE - czekaja na Twoja decyzje (pytanie 1).** |
+| 29 | **E4/0** pomiar ludzi (bez zmian w grze) + **Nocna Straz nikogo nie zwalnia** (pokoj z Wolnymi Ludzmi nie rozpuszcza Muru). |
 
 **Cel etapu 3 osiagniety:** zloto, ktore "znika bez nazwy", spadlo z ok. 19 tys. zl dziennie do **-0.7 tys.** (cel: ponizej 10 tys.). Narzedzie progow etapu 3: 20 z 20 TAK - i w tescie 120 dni, i po dwoch latach.
 
@@ -27,7 +28,7 @@ Jeff, prosto i krotko: **etap 2 dokonczony, etap 3 caly w grze, bieg dwuletni pr
 ## 3. Etap 4 (ksiega ludzi i zima) - zaczety
 
 - Projekt gotowy (12 paczek, po krytyce): `docs/etap4/PROJEKT-ETAP4-KSIEGA-LUDZI-ZIMA-2026-10-10.md`.
-- **E4/0 (sam pomiar ludzi, jencow, zimy - gra bez zmian)** + poprawka Strazy: test w toku, wgranie 29, jesli przejdzie.
+- **E4/0 (sam pomiar ludzi, jencow, zimy - gra bez zmian)** + poprawka Strazy: **WGRANE (29)**. Pomiar od razu pokazal, co naprawiac dalej: ludnosci wsi przybywa ok. +624 "domow" dziennie bez wyjasnienia (stad wzrost ludnosci +72% rocznie - paczka E4/4) i ok. +1 000 ludzi pod bronia dziennie z niczego (zalogi i milicje - E4/7, E4/8).
 - **E4/2 (Inni tylko z poleglych za Murem)** - kod gotowy, ale NIE wgrany: przed dniem 728 Inni mogliby slabnac szybciej (pytanie 9).
 
 ## 4. Pytania do Ciebie (kierunek; liczby wybieram sam)
