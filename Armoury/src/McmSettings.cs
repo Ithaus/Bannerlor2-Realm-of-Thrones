@@ -2780,6 +2780,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float DebasementShare { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Besieged Pay Nothing", HintText = "a besieged town, castle or village pays no rents, dues or war taxes while the siege lasts: its lord's rent and the crown's Crown Duty, War Tax and Road Tolls stay in its purse (the war subsidy, the customs and a castle's dues were never taken during a siege, and a village being raided or looted pays nothing - as before). You and the AI alike. Off = a besieged town keeps paying its lord's rent and a besieged town or castle the crown's policy dues, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BesiegedPayNothing { get; set; } = true;
+
         [SettingPropertyBool("No Rot Clan Bailout", HintText = "Realm of Thrones no longer hands every poor AI house Tier x 5000 gold a day from thin air - a house short of money borrows from the Iron Bank or goes bankrupt")]
         [SettingPropertyGroup("Iron Bank")]
         public bool NoRotClanBailout { get; set; } = true;
@@ -5026,6 +5030,7 @@ namespace Armoury
             s.CrownCustomsDutyMultiplier = CrownCustomsDutyMultiplier;
             s.PolicyIncomeConserved = PolicyIncomeConserved;
             s.DebasementShare = DebasementShare;
+            s.BesiegedPayNothing = BesiegedPayNothing;
             s.NoRotClanBailout = NoRotClanBailout;
             s.NoFreeKingdomGold = NoFreeKingdomGold;
             s.IronBankMinDaysToLend = IronBankMinDaysToLend;

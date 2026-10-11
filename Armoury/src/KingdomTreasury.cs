@@ -480,6 +480,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 95% dawnej wartosci: dawna x 5% = obecna x 5/95
                         int due = applyWithdrawals ? (int)(f.TradeTaxAccumulated * 5f / 95f) : (int)(f.TradeTaxAccumulated * 0.05f);
                         vanilla += due;
+                        // E5/A4 (R22): oblezona twierdza nie placi - 5% licznika, ktore gra dala krolowi z niczego, jest juz w vanilla (odejmie sie w delta); z kasy nic nie schodzi
+                        if (BesiegedPay.Holds(f.Settlement, BesiegedPay.KCrownDuty, Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG))), applyWithdrawals)) continue;
                         // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor - ta sama regula co Spendable); miasto ponad prog jak dotad
                         int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));
                         if (applyWithdrawals && x > 0) f.ChangeGold(-x);
@@ -509,6 +511,7 @@ namespace Armoury
                         if (f == null) continue;
                         float t = 0f; try { t = Campaign.Current.Models.SettlementTaxModel.CalculateTownTax(f).ResultNumber; } catch { }
                         int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // wpis 90: prog kasy miasta; B-4: zamek ponad zapas kupcow
+                        if (x > 0 && BesiegedPay.Holds(f.Settlement, BesiegedPay.KWarTax, x, applyWithdrawals)) continue;   // E5/A4 (R22): oblezona twierdza nie placi (5% gry juz w vanilla - odejmie sie w delta)
                         if (x <= 0) continue;
                         if (applyWithdrawals) f.ChangeGold(-x);
                         real += x;
@@ -525,6 +528,8 @@ namespace Armoury
                         // po zdjeciu przez gre licznik ma 29/30 dawnej wartosci: dawna/30 = obecna/29
                         int r = applyWithdrawals ? st.Town.TradeTaxAccumulated / 29 : st.Town.TradeTaxAccumulated / 30;
                         n6 += r;
+                        // E5/A4 (R22): oblezone miasto nie placi myta - n6 (gra dala je z niczego) juz policzone, odejmie sie w delta; prog przez PayFloor (miasto: floorG jak nizej; po scaleniu z A1 - TaxFloor)
+                        if (BesiegedPay.Holds(st, BesiegedPay.KRoadTolls, Math.Min(r, Math.Max(0, st.Town.Gold - CastlePurse.PayFloor(st.Town, (int)floorG))), applyWithdrawals)) r = 0;
                         int x = Math.Min(r, Math.Max(0, st.Town.Gold - (int)floorG));   // wpis 90: prog kasy miasta
                         if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
                         real += x;

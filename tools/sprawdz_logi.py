@@ -20,6 +20,9 @@ Uzycie (Python 3, tylko odczyt):
                     panowie zamkow (budzet-rodow.csv) - INFO. E5/A3 (163 + 164c) A3-1..A3-14 - linie "Markietani (E5/A3)" i "Notable (E5/A3)":
                     sakiewki <= 15 dni zoldu (Obieg), markietani > 0 i podzial 85/15, koszt, pasmo notabli i nowi notable bez zlota z niczego / w nicosc
                     (Obieg), kapital karawan notabli = korekta zrodel bilansu, kontrolki prog 0, karawany notabli d40/d120 (INFO), bledy, reszta ksiegi.
+                    E5/A4 (196, R22) A4-1..A4-8 - linia "Oblezone (E5/A4)": zaplacone mimo oblezenia = 0 (renta miast, Crown Duty, War Tax, Road Tolls),
+                    wstrzymane i oblezenia (INFO), zawor zamkow i zawor A1 bez oblezonych (INFO), "10 miast bez placenia" (gdy A1 w logu), prog podatkow
+                    zamkow ponad zapasem kupcow (INFO), bledy.
                     Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
@@ -1678,6 +1681,12 @@ def etap5_main(logp, start_arg, until=120):
         etap5_a3(rep, lines, start, until, mar, nob)
     else:
         rep.add("E5/A3: linie Markietani / Notable (E5/A3)", "brak w logu", "sa od wgrania E5/A3 (LogEnabled)", None)
+    # E5/A4 (196): osada oblezona nie placi nic (linia z dniem gry - klucz = dzien ksiegi, jak 166)
+    obl = e4_series(lines, "Oblezone (E5/A4): dzien", 1)
+    if obl:
+        etap5_a4(rep, lines, start, until, obl, bud)
+    else:
+        rep.add("E5/A4: linia Oblezone (E5/A4)", "brak w logu", "jest od wgrania E5/A4 (LogEnabled)", None)
     rep.show()
     return 0
 
@@ -1985,6 +1994,105 @@ def etap5_a3(rep, lines, start, until, mar, nob):
     rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
     rep.add("E5/A3 A3-14: nic w nicosc - reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii",
             "|R| < 10 000 (prog etapu 3; --grupa etap3)", (abs(rv) < 10000) if rv is not None else None)
+
+
+def etap5_a4(rep, lines, start, until, obl, bud):
+    """E5/A4 (196, PLAN 5.4 - osada oblezona nie placi nic, R22): projekt rozdz. 3 "E5/A4" Test - wplaty z oblezonych osad 0; miasta z zywym panem
+    i nadwyzka > 0 bez zaworu 0 ("10 miast" - z definicji A1, prog A1-T9; tu tylko odczyt, gdy dopisek A1 jest w logu); wplaty z kas ponizej zapasu 0
+    (z definicji: pobor = min(nalezne, kasa - prog); zamki - prog B-4 max(20 000, zapas kupcow), miasta - zapas kupcow od A1).
+    Linia "Oblezone (E5/A4): dzien N" (dzien gry; obl ma klucz = dzien ksiegi): liczniki od poprzedniej linii - renta miast z naszego bloku doby,
+    polityki korony z dziennego ticku rodu krola w grze (tylko prawdziwe rozliczenie, bez prognozy ekranu). Zloto nie rusza - mniej przelewow;
+    reszta ksiegi - wiersze A3-14 / A1-T13 / --grupa etap3. Doby oczekiwane - z linii "Budzet rodow (166)" (bud, ten sam klucz), a bez niej - z samej linii A4."""
+    win = sorted(set(d for d in obl if 1 <= run_day(d, start) <= until) | set(d for d in bud if 1 <= run_day(d, start) <= until))
+    kinds = ("renta miast", "Crown Duty", "War Tax", "Road Tolls")
+
+    def part(s, head):
+        i = s.find(head)
+        if i < 0:
+            return None
+        seg = s[i + len(head):]
+        j = seg.find(" | ")
+        seg = seg if j < 0 else seg[:j]
+        out = []
+        for k in kinds:
+            m = re.search(re.escape(k) + r" (\d+) \((\d+)\)", seg)
+            if not m:
+                return None
+            out.append((int(m.group(1)), int(m.group(2))))
+        m = re.search(r"razem (\d+) z (\d+) osad", seg)
+        if not m:
+            return None
+        return out, int(m.group(1)), int(m.group(2))
+    rows, off = {}, []
+    for d in win:
+        s = obl.get(d)
+        if s is None:
+            continue
+        if "| Besieged Pay Nothing: nie" in s:
+            off.append(d)
+        h = part(s, "| wstrzymane (oblezona osada nie placi - zostaje w jej kasie): ")
+        p = part(s, "| zaplacone mimo oblezenia (prog 0 przy wlaczonym): ")
+        m = re.search(r"oblezone teraz: miasta (\d+), zamki (\d+); wsie w rabunku lub spladrowane (\d+)", s)
+        f = re.search(r"ponad zapasem kupcow \(D4\): (\d+) z (\d+) zamkow", s)
+        if h and p and m and f:
+            rows[d] = {"held": h, "paid": p, "towns": int(m.group(1)), "castles": int(m.group(2)), "vill": int(m.group(3)),
+                       "floor": int(f.group(1)), "castleN": int(f.group(2)), "stum": num(r"potkniecia (\d+)", s, int, 0) or 0}
+    miss = [d for d in win if d not in rows]
+    rep.add("E5/A4 A4-1: linia Oblezone (E5/A4) codziennie", f"brak/nieczytelna w {len(miss)} z {len(win)} dob" + (f", wylacznik wylaczony w {len(off)}" if off else ""),
+            "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if win else None)
+    on = [d for d in win if d in rows and d not in off]
+    if off:
+        rep.add("E5/A4 A4-2: wylacznik Besieged Pay Nothing", f"wylaczony w {len(off)} z {len(win)} dob", "wlaczony caly bieg zbioru A (wylaczony - A4-3 INFO)", None)
+    # A4-3: wplaty z oblezonych osad = 0 (kazdy rodzaj, przy wlaczonym kluczu)
+    if on:
+        paid = [sum(rows[d]["paid"][0][i][0] for d in on) for i in range(len(kinds))]
+        paidn = [sum(rows[d]["paid"][0][i][1] for d in on) for i in range(len(kinds))]
+        rep.add("E5/A4 A4-3: zaplacone mimo oblezenia (suma dob z wlaczonym kluczem)",
+                ", ".join(f"{kinds[i]} {paid[i]} ({paidn[i]})" for i in range(len(kinds))),
+                "0 / 0 / 0 / 0 (projekt Test A4: wplaty z oblezonych osad 0)", sum(paid) == 0 and sum(paidn) == 0)
+    if off:
+        pz = sum(rows[d]["paid"][1] for d in off if d in rows)
+        rep.add("E5/A4 INFO: zaplacone mimo oblezenia w dobach z wylaczonym kluczem", f"{pz} zl w {len([d for d in off if d in rows])} dobach",
+                "INFO - stan sprzed paczki (renta miast i polityki korony z oblezonych)", None)
+    if rows:
+        ds = [d for d in win if d in rows]
+        held = [sum(rows[d]["held"][0][i][0] for d in ds) for i in range(len(kinds))]
+        heldn = [sum(rows[d]["held"][0][i][1] for d in ds) for i in range(len(kinds))]
+        tw, cs = [rows[d]["towns"] for d in ds], [rows[d]["castles"] for d in ds]
+        rep.add("E5/A4 A4-4: wstrzymane - oblezona osada nie placi (suma okna; zostaje w jej kasie)",
+                ", ".join(f"{kinds[i]} {held[i]} ({heldn[i]})" for i in range(len(kinds)))
+                + f"; razem {sum(held)} = {sum(held) / len(ds):.0f}/d; osado-dni ze wstrzymaniem {sum(rows[d]['held'][2] for d in ds)}"
+                + f" | oblezone przy linii: miasta srednio {st.mean(tw):.2f} (najwiecej {max(tw)}), zamki {st.mean(cs):.2f} (najwiecej {max(cs)})",
+                "INFO ([S] z31-A: ok. 1.3 oblezonego miasta na dobe w d93-120 x ok. 5 tys. renty = ok. 6.5 tys./d renty; polityki - tylko krolestwa z nimi)", None)
+        # A4-5: drogi "od dawna" - zawor zamkow 110 i zawor A1 pomijaja oblezone (odczyt liczby z ich linii)
+        z110 = e4_series(lines, "Zawor zamkow (110): dzien", 1)
+        k169 = e4_series(lines, "Kasy miast (169c): dzien", 1)
+        zc = [num(r"oblezone (\d+), bez pana", z110[d], int) for d in win if d in z110]
+        zc = [x for x in zc if x is not None]
+        ac = [num(r"bez poboru: kasa nie ponad zapasem \d+, oblezone (\d+)", k169[d], int) for d in win if d in k169]
+        ac = [x for x in ac if x is not None]
+        rep.add("E5/A4 A4-5: zawor zamkow (110) i zawor kas miast (A1) - oblezone pominiete (suma okna)",
+                (f"zamki {sum(zc)} w {len(zc)} dobach" if zc else "zamki: brak liczby w linii 110") + "; "
+                + (f"miasta (A1) {sum(ac)} w {len(ac)} dobach" if ac else "miasta: brak dopisku E5/A1 (A1 nie w logu - renta miast przez bramke A4)"),
+                "INFO (regula od dawna, bez wylacznika A4; danina i clo - KingdomTreasury.Levies)", None)
+        # A4-6: "10 miast bez placenia" - z definicji A1 (prog A1-T9); tu tylko gdy dopisek A1 jest w logu
+        v9 = [num(r"miast z nadwyzka bez zaworu \(10 miast\) (\d+)", k169[d], int) for d in win if d in k169]
+        v9 = [x for x in v9 if x is not None]
+        rep.add("E5/A4 A4-6: miasta z zywym panem i nadwyzka bez zaworu (\"10 miast\")",
+                (f"niezerowe w {len([x for x in v9 if x])} z {len(v9)} dob" + (f" (najwiecej {max(v9)})" if any(v9) else "")) if v9 else "brak dopisku E5/A1 w logu",
+                "0 (z definicji A1 - zawor od nadwyzki, bez filtra ludnosci; prog A1-T9)", (not any(v9)) if v9 else None)
+        last = rows[ds[-1]]
+        fl = [rows[d]["floor"] for d in ds]
+        rep.add("E5/A4 A4-7: prog podatkow korony zamkow ponad zapasem kupcow (D4)",
+                f"ostatnia doba {last['floor']} z {last['castleN']} zamkow (najwiecej {max(fl)})",
+                "INFO - B-4 PayFloor = max(20 000, zapas kupcow): zamki z zapasem < 20 000 placa Crown Duty / War Tax od 20 000, nie od D4"
+                " (decyzja po tescie A; wplaty z kas ponizej progu - 0 z definicji)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "BesiegedPay" in s]
+    stm = max([rows[d]["stum"] for d in rows] + [0])
+    rep.add("E5/A4 A4-8: bledy BesiegedPay, potkniecia", f"bledy {len(errs)}, potkniecia {stm}", "0 / 0", len(errs) == 0 and stm == 0)
+    st0 = [s for s in lines if s.startswith("Oblezone (E5/A4): start")]
+    rep.add("E5/A4 INFO: linia startowa", st0[0][st0[0].find("| wylacznik"):][:220] if st0 else "brak linii",
+            "wylacznik tak; Population Rent Enabled tak; Policy Income Conserved tak", None)
 
 
 def main(argv):
