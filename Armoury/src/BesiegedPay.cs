@@ -20,6 +20,9 @@ namespace Armoury
     /// Regula R22: oblezona osada nie placi nic - jedna regula dla miasta, zamku i wsi. Ta paczka domyka dwie ostatnie drogi: renta miasta i polityki korony
     /// z kas twierdz. Czego oblezona osada nie zaplaci, zostaje w jej kasie - mniej przelewow, nic nie znika i nic nie powstaje (MoneyLedger bez nowych
     /// pozycji): pan i korona dostaja tego dnia mniej, a kasa oddaje ten pieniadz zaworem i podatkami od nadwyzki po zdjeciu oblezenia, jak zawsze.
+    /// Zalezy od A1 (projekt): bez A1 regulator gry kasuje co dobe 25% nadwyzki kasy MIASTA ponad cel (nazwane ujscie "regulator kas") - wtedy wieksza
+    /// czesc wstrzymanej renty i polityk miasta zniknelaby tam (ok. 25 / (25 + 7)), zamiast wrocic panu; z A1 (regulator nic nie kasuje) zostaje w obiegu.
+    /// Zamki - regulator nie kasuje od 110. Dlatego A4 jedzie tylko w zbiorze A razem z A1.
     /// "Ile by zaplacila" = kwota policzona tuz przed przelewem ta sama formula i od tego samego progu co wolajacy; polityki licza sie tylko przy
     /// prawdziwym rozliczeniu (applyWithdrawals), nie przy prognozie ekranu rodu.
     /// Wylacznik wylaczony = stan sprzed paczki: oblezone miasto placi rente, a twierdza polityki (licznik "zaplacone mimo oblezenia"); danina, clo,
