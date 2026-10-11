@@ -399,6 +399,7 @@ namespace Armoury
                                 st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x;
                                 long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + x;   // 165: wplyw dnia krolestwa
                                 if (town) TownLevyToday[st] = x;                                       // 162m: zloto wyszlo z kasy miasta (tarcza dworu)
+                                if (town) { try { TownFolk.NoteTake(st, x, TownFolk.TLevy); } catch { } }   // E5/0 (195): pobor z kasy miasta - udzial zysku kupcow, pas ponizej zapasu (tylko licznik)
                             }
                         }
                         if (!town) continue;
@@ -421,6 +422,7 @@ namespace Armoury
                             {
                                 st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid;
                                 long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + paid;   // 165: wplyw dnia (gdy 165 wylaczone - tylko licznik)
+                                try { TownFolk.NoteTake(st, paid, TownFolk.TCustoms); } catch { }   // E5/0 (195): clo z kasy miasta (tylko licznik)
                             }
                         }
                         if (!s.PolicyIncomeConserved || ruler == null) continue;
@@ -429,6 +431,7 @@ namespace Armoury
                         {
                             int x = (int)(spare * Math.Max(0f, s.DebasementShare));
                             if (x > 0) { st.SettlementComponent.ChangeGold(-x); ruler.ChangeHeroGold(x); deb += x; spare -= x; }
+                            try { if (x > 0) TownFolk.NoteTake(st, x, TownFolk.TMint); } catch { }   // E5/0 (195): mennica z kasy miasta (tylko licznik)
                             if (x > 0) CirculationWindows.NoteHeroGold(ruler, x);   // paczka 169b (tylko licznik)
                             if (x > 0) ClanIncomeBook.NoteInflow(ruler, x, ClanIncomeBook.KCrownLevies);   // paczka 169: D rodu (tylko licznik)
                         }
@@ -483,6 +486,7 @@ namespace Armoury
                         // B-4: zamek placi tylko ponad zapas kupcow (CastlePurse.PayFloor - ta sama regula co Spendable); miasto ponad prog jak dotad
                         int x = Math.Min(due, Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));
                         if (applyWithdrawals && x > 0) f.ChangeGold(-x);
+                        try { if (applyWithdrawals && x > 0 && f.IsTown) TownFolk.NoteTake(f.Settlement, x, TownFolk.TDuty); } catch { }   // E5/0 (195): Crown Duty z kasy miasta (tylko licznik)
                         real += x;
                     }
                 // mennica: 100 d na lenno z niczego (pobierana w Levies)
@@ -511,6 +515,7 @@ namespace Armoury
                         int x = Math.Min((int)(t * 0.05f), Math.Max(0, f.Gold - CastlePurse.PayFloor(f, (int)floorG)));   // wpis 90: prog kasy miasta; B-4: zamek ponad zapas kupcow
                         if (x <= 0) continue;
                         if (applyWithdrawals) f.ChangeGold(-x);
+                        try { if (applyWithdrawals && f.IsTown) TownFolk.NoteTake(f.Settlement, x, TownFolk.TWarTax); } catch { }   // E5/0 (195): War Tax z kasy miasta (tylko licznik)
                         real += x;
                     }
                 }
@@ -527,6 +532,7 @@ namespace Armoury
                         n6 += r;
                         int x = Math.Min(r, Math.Max(0, st.Town.Gold - (int)floorG));   // wpis 90: prog kasy miasta
                         if (applyWithdrawals && x > 0) st.Town.ChangeGold(-x);
+                        try { if (applyWithdrawals && x > 0) TownFolk.NoteTake(st, x, TownFolk.TTolls); } catch { }   // E5/0 (195): Road Tolls z kasy miasta (tylko licznik)
                         real += x;
                     }
                     if (mono) { int sum = 0; foreach (var w in st.Town.Workshops) if (w != null) sum += w.ProfitMade; n7 += (int)(sum * 0.05f); }

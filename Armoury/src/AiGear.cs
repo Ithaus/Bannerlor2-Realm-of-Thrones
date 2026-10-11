@@ -705,6 +705,7 @@ namespace Armoury
                     st.Town.ChangeGold(cost);
                     ClanIncomeBook.NoteOwnPaid(st, lord != null ? lord.Clan : null, cost);   // 169c: "wlasne" D stalego - sprzet rodu kupiony w jego osadzie (tylko licznik)
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
+                    try { TownFolk.Sale(st, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): sprzet AI - sprzedaz kupcow (tylko licznik)
                     return true;
                 };
                 long tl = Cost174.Begin(Cost174.SBuyLoop);
@@ -746,6 +747,7 @@ namespace Armoury
                                         Measure174b.NoteBuySum(Measure174b.BCastleOrder, el.Item, n, cost);   // 174b.0 M2 (tylko licznik)
                                         market.Town.ChangeGold(cost);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, cost);
+                                        try { TownFolk.Sale(market, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): zamowienia zamkow (tylko licznik)
                                         lines.Add(new GarrisonCarts.Line { El = el, N = n, Bucket = k });
                                         paid += cost; pursePaid += fromPurse;
                                         return true;

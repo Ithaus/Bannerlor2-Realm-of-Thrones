@@ -567,6 +567,7 @@ namespace Armoury
                                 Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                                 best.Town.ChangeGold(-cost);
                                 src.Town.ChangeGold(cost);
+                                try { TownFolk.OnTownCoin(best, -cost, TownFolk.BOurs); } catch { }   // E5/0 (195): zakup kasy odbiorcy - czesc ponizej zapasu kupcow (tylko licznik)
                                 got += n; paid += cost;
                             }
                             if (got <= 0) { poor.Add(best); continue; }   // biedny odbiorca - pomijamy go dzis

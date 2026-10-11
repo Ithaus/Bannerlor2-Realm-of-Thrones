@@ -101,6 +101,8 @@ RANGES = {
     'WatchPoolSharePercent': (0, 12, "0"),
     'IronIslandsStartThralls': (0, 108000, "0"),
     'ThrallYearlyLossPercent': (0, 20, "0"),
+    # E5/0: tryb kiesy ludu 0..1 (regula ogolna dalaby suwak 0..10)
+    'TownFolkMode': (0, 1, "0"),
 }
 
 def gen(module_dir, ns, display):

@@ -249,6 +249,7 @@ namespace Armoury
                     _vPaid[c] += now - _winGold; _vVisits[c]++;
                     int left = Unsold(mp);
                     if (left > 0) { _vUnsold[c] += left; _vUnsoldVisits[c]++; }
+                    TownFolk.NoteCartPaid(st, now - _winGold, left);   // E5/0 (195): kasa miasta zaplacila taborowi - czesc ponizej zapasu kupcow, towar niesprzedany (tylko licznik, wlasny try)
                 }
                 else if (st.IsVillage)
                 {
@@ -258,6 +259,7 @@ namespace Armoury
                     _vHanded += handed; _vReturns++;
                     if (home != null) { _vKept += home.Gold - _winHomeGold; _vTax += home.TradeTaxAccumulated - _winHomeTax; }
                     _vEstates += _winEstates;
+                    TownFolk.NoteVillageReturn(mp.HomeSettlement, handed, home != null ? home.Gold - _winHomeGold : 0, home != null ? home.TradeTaxAccumulated - _winHomeTax : 0, _winEstates);   // E5/0 (195): ta sama definicja utargu wsi (wlasny try)
                 }
             }
             catch { _stumbles++; }
@@ -301,6 +303,7 @@ namespace Armoury
                 if (a < 0) { var th = gh; gh = rh; rh = th; var tp = gp; gp = rp; rp = tp; a = -a; }   // gra zapisuje "osada -> bohater" ujemna kwota w druga strone
                 bool gNone = gh == null && gp == null, rNone = rh == null && rp == null;
                 if (gNone && rNone) return;
+                TownFolk.OnGold(gh, gp, rh, rp, a, gNone, rNone, _inBlock);   // E5/0 (195): karawany i gracz w handlu z miastem, przelewy wsi, platnosci kas miast ponizej zapasu (tylko licznik, wlasny try)
                 // 169c: wyplata majatku BK (okno powrotu taboru do wsi albo okno produkcji majatkow BK) - w D169 liczy sie drugi raz (podwojne)
                 bool estate = gNone && rh != null && ((_winVillage && WinOpen) || CirculationWindows.CurrentKind == CirculationWindows.KBkEstates);
                 ClanIncomeBook.OnEvent(gh, gp, rh, a, gNone, ClanOpen, _inBlock, estate);   // paczka 169: wplywy rodow spoza rodu (D) - wlasny try, tylko licznik
@@ -392,6 +395,7 @@ namespace Armoury
         {
             try
             {
+                TownFolk.OnTownCoin(st, amount, TownFolk.BOurs);   // E5/0 (195): nasze sciezki zakupu kas miast - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
                 if (_inBlock || amount == 0 || kind < 0 || kind >= Notes) return;
                 int c = ClassOf(st);
                 if (c < 0) return;
@@ -564,6 +568,7 @@ namespace Armoury
                 if (__result >= 0) _regIn[c] += __result; else _regOut[c] -= __result;
                 _regTicks[c]++;
                 Measure169c.NoteRegulator(__0, __result);   // 169c: linia "Kasy miast" na miasto (tylko licznik, wlasny try)
+                TownFolk.OnRegulator(__0, __result);         // E5/0 (195): przelew z niczego / w nicosc do udzialu zysku kupcow (tylko licznik, wlasny try)
             }
             catch { _stumbles++; }
         }
@@ -1015,6 +1020,7 @@ namespace Armoury
                         try { Log.Info(ObiegLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegLine", e); }
                         try { Log.Info(ObiegNotablesLine(day, hold, _lastHold)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegNotablesLine", e); }
                         try { Log.Info(ObiegBkLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegBkLine", e); }
+                        if (TownFolk.On) { try { Log.Info(VillageCashLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.VillageCashLine", e); } }   // E5/0 (195): linia "Gotowka wsi (E5/0)" przed ClearDay
                         t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
                         try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
                     }

@@ -22,6 +22,10 @@ Uzycie (Python 3, tylko odczyt):
                     Gdy jest linia startowa "Krainy kanonu (E4/9): wpiete" - takze progi E4/9 K1-K25 (plan kodu E4/9 rozdz. 11: Straz z Westeros i dozywotnio,
                     H1, konto NIEWOLNI i bilans otwarcia Zelaznych, jency z rabunku z ludzi wsi, DLUG 4, Wolni Ludzie; K7 wobec biegu A zbioru 31, K11/K15 - tylko
                     nowa kampania, K23/K24 - autotest zapisu i grupy etap2/etap3 osobno).
+--grupa etap5     : (E5/0, paczka 195) szkielet etapu 5 (projekt etapu 5 rozdz. 4): wiersze etapu jako INFO "stan wyjsciowy" (panowie samych zamkow
+                    z budzet-rodow.csv, sakiewki w dniach zoldu, zloto swiata, magazyny wsi, wojsko) + blok E5/0 (progi E50-T1..T10 - kiesa ludu na sucho,
+                    kontrola zamknieta, koszt, bitwy wobec ksiegi i decyzja A6, wydatek z petli BK wobec ConsumedValue, notable, gotowka wsi wedlug
+                    polityki, odczyty do kalibracji B) w oknie dob kampanii 1-120 (--do-doby N). Kolejne paczki dopisuja wlasne bloki etap5_<paczka>.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2488,6 +2492,310 @@ def etap4_e49(rep, lines, start, win, until):
             "0.30M / TAK / 0", (mfree is not None and abs(float(mfree.group(1)) - 0.30) < 0.005 and f100 and fb == 0) if (mfree and fd) else None)
     rep.add("E4/9 K25: Wolni Ludzie - stan d1 -> ostatnia", f"{fr[0]:.0f} -> {fr[-1]:.0f}" if fr else "-", "INFO", None)
 
+# ============================================================ ETAP 5 (E5/0, paczka 195): szkielet grupy etap5 + blok E5/0
+def _mean(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def _last28(days):
+    return days[-28:] if len(days) > 28 else list(days)
+
+
+def _grp(pat, s, g=0, default="-"):
+    m = re.search(pat, s) if s else None
+    return m.group(g) if m else default
+
+
+def etap5_main(logp, start_arg, until=120, csvp=None):
+    """E5/0 (195): grupa --grupa etap5 (projekt etapu 5 rozdz. 4; plan kodu E5/0 rozdz. 8). Okno: doby kampanii 1-until (--do-doby), start kampanii
+    jak etap4_main (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki
+    (etap5_<paczka>(rep, lines, start, win, **kw)); kazdy blok rusza tylko przy swojej linii startowej - brak linii = wiersz INFO "brak linii startowej",
+    nigdy wyjatek. Bieg B - kontrola wartosci czynnych K3 w bloku B1. Wiersze etapu (P rozdz. 4) - INFO "stan wyjsciowy" (wiaza paczki, ktore ich dotycza)."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    win = [d for d in alld if 1 <= run_day(d, start) <= until]
+    print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
+    try:
+        etap5_rows(rep, lines, start, win, logp, csvp)
+    except Exception as e:   # narzedzie nigdy nie przerywa raportu
+        rep.add("etap 5: wiersze etapu", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # kolejne paczki dopisuja tu swoje bloki (A1: etap5_a1(rep, lines, start, win)); bieg B - kontrola wartosci czynnych K3 w bloku B1
+    for blk in (etap5_e50,):
+        try:
+            blk(rep, lines, start, win, until=until, logp=logp)
+        except Exception as e:
+            rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
+def etap5_rows(rep, lines, start, win, logp, csvp=None):
+    """Wiersze etapu 5 (projekt rozdz. 4) w szkielecie - w E5/0 INFO "stan wyjsciowy"; paczki, ktore je wiaza, zmieniaja werdykt we wlasnym bloku."""
+    w28 = _last28(win)
+    # panowie samych zamkow (budzet-rodow.csv): udzial w D swiata i w D stalym, mediana kiesy glowy - rody z wojna >= 21 z 28 dob (wiaze B3)
+    csvp = csvp or csv_path_of(logp)
+    rows = read_csv(csvp)
+    if rows:
+        byd = {}
+        for r in rows:
+            try:
+                byd.setdefault(int(r.get("dzien") or 0), []).append(r)
+            except ValueError:
+                continue
+        cd = sorted(d for d in byd if run_day(d, start) >= 1)
+        wd = [d for d in cd if 252 <= run_day(d, start) <= 364] or cd[-28:]
+
+        def fv(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        warc = {}
+        for d in wd:
+            for r in byd[d]:
+                if r.get("rodzaj") == "zamek" and r.get("wojna") == "1":
+                    warc[r.get("rod_id")] = warc.get(r.get("rod_id"), 0) + 1
+        need = min(21, max(1, len(wd) * 3 // 4))
+        shD, shS, kies = [], [], []
+        for d in wd:
+            tD = tS = zD = zS = 0.0
+            for r in byd[d]:
+                if r.get("rodzaj") == "gracz":
+                    continue
+                D, S = fv(r.get("D")) or 0.0, fv(r.get("d_staly")) or 0.0
+                tD += D
+                tS += S
+                if r.get("rodzaj") == "zamek":
+                    zD += D
+                    zS += S
+                    if warc.get(r.get("rod_id"), 0) >= need:
+                        k = fv(r.get("kiesa_glowy"))
+                        if k is not None:
+                            kies.append(k)
+            if tD:
+                shD.append(zD / tD)
+            if tS:
+                shS.append(zS / tS)
+        kies.sort()
+        rep.add("etap 5 (B3): panowie samych zamkow - udzial w D / D stalym, mediana kiesy glowy",
+                f"D {(_mean(shD) or 0) * 100:.1f}%, D staly {(_mean(shS) or 0) * 100:.1f}%, mediana kiesy (wojna >= {need} dob okna) {kies[len(kies) // 2] if kies else '-'}"
+                f" (doby {run_day(wd[0], start) if wd else '-'}-{run_day(wd[-1], start) if wd else '-'})", "stan wyjsciowy (wiaze B3)", None)
+    else:
+        rep.add("etap 5 (B3): panowie samych zamkow", f"brak {csvp}", "stan wyjsciowy (wiaze B3)", None)
+    obg = by_day(lines, "Obieg: dzien")
+    sak = _mean([fnum(r"= ([\d.]+) dni zoldu naliczonego", obg[d]) for d in w28 if d in obg])
+    rep.add("etap 5 (A3): sakiewki zolnierzy w dniach zoldu", f"sr28 {sak:.1f}" if sak is not None else "brak dopisku (TownFolkMode 0 albo bieg sprzed E5/0)",
+            "stan wyjsciowy; <= 15 dni po A3 (dzis ok. 29)", None)
+    pw = by_day(lines, "Pieniadz swiata: dzien")
+    pd = [d for d in win if d in pw]
+    if len(pd) >= 2:
+        a = pd[-29] if len(pd) > 28 else pd[0]
+        za, zb = num(r"\| razem (\d+)", pw[a]), num(r"\| razem (\d+)", pw[pd[-1]])
+        ch = (zb - za) / za * 100 if za and zb is not None else None
+        rep.add("etap 5 (C1): zloto swiata na 28 dob", f"{ch:+.2f}% (d{run_day(a, start)} -> d{run_day(pd[-1], start)})" if ch is not None else "-",
+                "stan wyjsciowy; < 0.1% po C1", None)
+    dow = by_day(lines, "Dowoz (skutki): dzien")
+    zat = _mean([num(r"wsie zamkowe (\d+) z", dow[d]) for d in w28 if d in dow])
+    rep.add("etap 5 (B4): zatkane magazyny wsi zamkowych", f"sr28 {zat:.1f}" if zat is not None else "brak linii", "stan wyjsciowy (lato/zima osobno - wiaze B4)", None)
+    prz = by_day(lines, "Przeplywy osad: dzien")
+    uns = _mean([num(r"towar niesprzedany po wizycie: w miastach (\d+) szt", prz[d]) for d in w28 if d in prz])
+    rep.add("etap 5 (kazdy zbior): towar wsi niesprzedany w miastach", f"sr28 {uns:.0f} szt./d" if uns is not None else "brak linii",
+            "stan wyjsciowy (miasta kupuja >= 98% plonu)", None)
+    lud = by_day(lines, "Ludzie: dzien")
+    arm = _mean([num(r"partie rodow (\d+)", lud[d]) for d in w28 if d in lud])
+    rep.add("etap 5 (kazdy zbior): wojsko lordow", f"sr28 {arm:.0f}" if arm is not None else "brak linii", "stan wyjsciowy (w wojnie 95-115 tys., podloga 85)", None)
+
+
+def etap5_e50(rep, lines, start, win, **kw):
+    """E5/0 (195): progi E50-T1..T10 (plan kodu E5/0 rozdz. 8) - linie "Kiesa ludu (E5/0)", "Kiesa ludu (na sucho)", "Nadwyzka kas (E5/0)", "Bitwy (E5/0)",
+    "Notable (E5/0)", "Jedzenie z targu (E5/0)", "Zadowolenie BK (E5/0)", "Gotowka wsi (E5/0)" i dopisek "Obieg". Doby niepelne (pierwsza w sesji) - poza progami."""
+    stl = next((s for s in lines if s.startswith("Kiesa ludu (E5/0): okna wpiete:")), None)
+    if stl is None:
+        rep.add("E5/0: linia startowa Kiesa ludu (E5/0)", "brak linii startowej", "jest (paczka E5/0 w DLL)", None)
+        return
+    kie = by_day(lines, "Kiesa ludu (na sucho): dzien")
+    full = [d for d in win if d in kie and "doba niepelna" not in kie[d] and "czeka na kalibracje" not in kie[d]]
+    w28 = _last28(full)
+    # ---- T1 bledy, linia startowa, potkniecia, linia sesji
+    errs = [s for s in lines if s.startswith("ERROR in TownFolk")]
+    sites = sorted(set(s[len("ERROR in "):].split(":")[0] for s in errs))
+    brak = re.search(r"; BRAK: (.*?); wlasciciele", stl)
+    stum = sum(num(r"\| potkniecia (\d+) \(sesja", kie[d], int, 0) or 0 for d in win if d in kie)
+    sess = [s for s in lines if s.startswith("Kiesa ludu (E5/0): sesja od dnia")]
+    ok1 = len(errs) == 0 and brak is not None and brak.group(1).strip() == "-" and stum <= 5 and len(sess) > 0
+    rep.add("E50-T1: bledy, linia startowa, potkniecia, linia sesji",
+            f"ERROR in TownFolk {len(errs)}" + (f" ({', '.join(sites[:6])})" if sites else "") + f"; BRAK: {brak.group(1) if brak else '?'}; potkniecia {stum}; linii sesji {len(sess)}",
+            "0 bledow; BRAK: -; potkniecia <= 5 w biegu; linia sesji jest", ok1)
+    rep.add("E50-T1: wlasciciele latek celow (linia startowa)", _grp(r"wlasciciele latek celow: (.*?); tryb przy starcie", stl, 1)[:400], "lista (INFO)", None)
+    if not full:
+        rep.add("E5/0: linia Kiesa ludu (na sucho)", f"pelnych dob {len(full)} z {len(win)}", "kazda doba po kalibracji", False if win else None)
+        return
+    miss = [run_day(d, start) for d in win if d not in kie]
+    rep.add("E5/0: linia Kiesa ludu (na sucho) codziennie", f"brak w {len(miss)} z {len(win)} dob" + (f" (d{', d'.join(str(x) for x in miss[:5])})" if miss else ""),
+            "0", len(miss) == 0)
+    # ---- T2 koszt
+    cost = []
+    for d in full:
+        a, b = fnum(r"czas: latki ([\d.]+) ms", kie[d]), fnum(r", doba ([\d.]+) ms", kie[d])
+        if a is not None and b is not None:
+            cost.append((a + b, run_day(d, start)))
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E50-T2: koszt (latki + doba) srednio", f"{m:.1f} ms/dobe ({len(cost)} dob)", "<= 15 ms", m <= 15)
+        rep.add("E50-T2: koszt najwiekszy", f"{mx[0]:.1f} ms (d{mx[1]})", "<= 50 ms (INFO)", None)
+    # ---- T3 kontrola na sucho
+    bad3 = []
+    for d in full:
+        q = fnum(r"kontrola: r=-?[\d.]+ \(([\d.]+)% dochodu\)", kie[d])
+        if q is not None and q > 1.0:
+            bad3.append((run_day(d, start), q))
+    rep.add("E50-T3: kontrola na sucho (zamknieta)", f"poza progiem {len(bad3)} z {len(full)} dob" + (f" (np. d{bad3[0][0]}: {bad3[0][1]}%)" if bad3 else ""),
+            "|r| <= 1% dochodu kazdej pelnej doby", len(bad3) == 0)
+    # ---- T4 bitwy wobec ksiegi + A6
+    bit = by_day(lines, "Bitwy (E5/0): dzien")
+    bal = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    sc1 = sa = sx = sy = soff = noff = n3 = 0
+    es = []
+    for d in w28:
+        if d not in bit:
+            continue
+        s = bit[d]
+        sc1 += num(r"zwyciezcy dostali -?\d+ \(wodzowie (\d+)", s, int, 0) or 0
+        sa += num(r"pula z pokonanych \(zeszlo z kies\): wodzowie (\d+)", s, int, 0) or 0
+        # recenzja E5/0 (1-1): wodzowie zdjeci z partii (A6 - obciazenie w nawiasie CommitGoldChanges) i partie lordow z wodzem zdjetym
+        soff += num(r"zdjeci z partii - A6 - (\d+) w \d+", s, int, 0) or 0
+        noff += num(r"zdjeci z partii - A6 - \d+ w (\d+)", s, int, 0) or 0
+        n3 += num(r"partie lordow z wodzem zdjetym \(niewola, ucieczka\) (\d+)", s, int, 0) or 0
+        x = y = None
+        if d in bal:
+            mz = re.search(r"\| ZRODLA .*?\bbitwy (-?\d+)", bal[d])
+            mu = re.search(r"\| UJSCIA .*?\bbitwy (-?\d+)", bal[d])
+            x = int(mz.group(1)) if mz else None
+            y = int(mu.group(1)) if mu else None
+        if x is None:
+            x = num(r'zrodla "bitwy" (-?\d+)', s, int, None)
+        if y is None:
+            y = num(r"ujscia (-?\d+) \(a - y", s, int, None)
+        sx += x or 0
+        sy += y or 0
+        es.append(num(r"z niczego netto na ladzie (-?\d+)", s, int, None))
+
+    def within(v, ref, tol):
+        return abs(v - ref) <= tol * max(abs(ref), 1) if (v or ref) else True
+    rep.add("E50-T4: bitwy - wodzowie zwyciezcow (c1) wobec zrodel \"bitwy\" ksiegi (sr28)", f"c1 {sc1} wobec {sx} ({len(w28)} dob)", "+-2%", within(sc1, sx, 0.02) if w28 else None)
+    rep.add("E50-T4: bitwy - wodzowie pokonanych (a) wobec ujsc \"bitwy\" ksiegi (sr28)", f"a {sa} wobec {sy}", "+-2%", within(sa, sy, 0.02) if w28 else None)
+    rep.add("E50-T4: wodzowie zdjeci z partii - obciazenie A6 (sr28; INFO)", f"{soff} zl w {noff} obciazeniach; partii lordow z wodzem zdjetym {n3}",
+            "INFO (bez A6: 0 zl - gra ich nie obciaza; z A6 > 0, w a i w ujsciach \"bitwy\")", None)
+    em = _mean(es)
+    if em is not None:
+        rep.add("E50-T4: A6 - z niczego netto na ladzie sr28", f"{em:.0f}/d", "<= 5 000/d - inaczej A6 POTRZEBNE (Jeff 11.10 16:20: A6 i tak w porcji A)",
+                em <= 5000, decide=em > 5000)
+    # ---- T5 wydatek z petli BK wobec ConsumedValue
+    bad5, nob, lfn, lfc = [], [], [], 0
+    for d in full:
+        q = fnum(r"\(roznica (-?[\d.]+)%\)", kie[d])
+        if q is not None and abs(q) > 2.0:
+            bad5.append((run_day(d, start), q))
+        nob.append(num(r"osad z konsumpcja bez BK (\d+)", kie[d], int, 0) or 0)
+        # recenzja E5/0 (2-1): dokup jedzenia BK (zapas <= 10%) - nadwyzka petli nad ConsumedValue zdjeta z wydatku jedzenia przed porownaniem
+        lfn.append(num(r"dokup jedzenia BK \(zapas <= 10%\): osad (\d+)", kie[d], int, 0) or 0)
+        if d in w28:
+            lfc += num(r"petla ponad ConsumedValue zdjeta z wydatku jedzenia (\d+)", kie[d], int, 0) or 0
+    rep.add("E50-T5: wydatek z petli BK wobec ConsumedValue", f"poza progiem {len(bad5)} z {len(full)} dob" + (f" (np. d{bad5[0][0]}: {bad5[0][1]}%)" if bad5 else ""),
+            "+-2% kazdej doby (K1: budzet raz na kategorie)", len(bad5) == 0)
+    rep.add("E50-T5: osad z konsumpcja bez BK (INFO)", f"najwiecej {max(nob) if nob else '-'}", "INFO (d120 zbioru 31: 0)", None)
+    rep.add("E50-T5: dokup jedzenia BK - osad (najwiecej na dobe), zdjete z wydatku jedzenia (sr28; INFO)",
+            f"osad najwiecej {max(lfn) if lfn else '-'}; zdjete {lfc / max(len(w28), 1):.0f}/d", "INFO (oblezenia, glod - zapas warowni <= 10%)", None)
+    # ---- T6 notable wobec "Obieg: notable"
+    nt = by_day(lines, "Notable (E5/0): dzien")
+    obn = by_day(lines, "Obieg: notable i karawany: dzien")
+    so = si = lo = li = ko = ki = 0
+    for d in w28:
+        if d not in nt or d not in obn:
+            continue
+        s = nt[d]
+        # recenzja E5/0 (1-2): przelewy notabl <-> kasa osady (A3) osobno - do kontroli z ksiega tylko "w nicosc / z niczego"
+        ko += (num(r"do kasy osady (\d+) /", s, int, 0) or 0) + (num(r"do kasy osady targowej (\d+) /", s, int, 0) or 0)
+        ki += (num(r"/ z kasy osady (\d+)", s, int, 0) or 0) + (num(r"/ z kasy osady targowej (\d+)", s, int, 0) or 0)
+        so += (num(r"miasta: w nicosc (\d+)", s, int, 0) or 0) + (num(r"wsie: w nicosc (\d+)", s, int, 0) or 0)
+        si += (num(r"miasta: w nicosc \d+ / z niczego (\d+)", s, int, 0) or 0) + (num(r"wsie: w nicosc \d+ / z niczego (\d+)", s, int, 0) or 0)
+        lo += abs(num(r"nadwyzka w nicosc (-?\d+)", obn[d], int, 0) or 0)
+        li += num(r"dosypka z niczego \+?(-?\d+)", obn[d], int, 0) or 0
+    rep.add("E50-T6: notable - w nicosc wobec Obieg (sr28)", f"{so} wobec {lo}", "+-1%", within(so, lo, 0.01) if w28 else None)
+    rep.add("E50-T6: notable - z niczego wobec Obieg (sr28)", f"{si} wobec {li}", "+-1%", within(si, li, 0.01) if w28 else None)
+    rep.add("E50-T6: notable - przez kase osady (A3; sr28; INFO)", f"do kasy {ko}, z kasy {ki}", "INFO (bez A3: 0; z A3 - pasmo w kasach, w nicosc / z niczego ok. 0)", None)
+    # ---- T7 gotowka wsi: podzial wedlug polityki = liczby swiata
+    gw = by_day(lines, "Gotowka wsi (E5/0): dzien")
+    bad7, share = [], []
+    for d in full:
+        if d not in gw:
+            continue
+        m7 = re.search(r"kontrola podzialu: utarg (-?\d+) wobec (-?\d+), przelewy (-?\d+) wobec (-?\d+), sakiewki (-?\d+) wobec (-?\d+)", gw[d])
+        if not m7:
+            continue
+        v = [int(x) for x in m7.groups()]
+        if abs(v[0] - v[1]) > 1 or abs(v[2] - v[3]) > 1 or abs(v[4] - v[5]) > 1:
+            bad7.append(run_day(d, start))
+        g = num(r"wplynelo (-?\d+)", gw[d], int, 0) or 0
+        t, r_ = num(r"licznik podatku wsi (-?\d+)", gw[d], int, 0) or 0, num(r"\+ renta (-?\d+)\)", gw[d], int, 0) or 0
+        if d in w28 and g > 0:
+            share.append((t + r_) / g)
+    nd7 = sum(1 for d in full if d in gw)
+    rep.add("E50-T7: gotowka wsi - suma wedlug polityki = swiat", f"rozjazd w {len(bad7)} z {nd7} dob" + (f" (d{', d'.join(str(x) for x in bad7[:5])})" if bad7 else ""),
+            "+-1 zl kazdej doby (jedna definicja z Przeplywy osad)", len(bad7) == 0 if nd7 else None)
+    rep.add("E50-T7: udzial pana (licznik + renta) w gotowce wsi sr28 (INFO)", f"{(_mean(share) or 0) * 100:.1f}%" if share else "-", "INFO (rozpoznanie A: 86.2%)", None)
+    # ---- T8 gra bez zmian
+    rep.add("E50-T8: gra bez zmian (reszta ksiegi < 10 tys./d)", "--grupa etap3 na tym samym logu; recenzja diffu \"tylko odczyt\"", "INFO", None)
+    # ---- T9 odczyty do kalibracji B (sr28 i ostatnia doba)
+    last = full[-1]
+    k = kie[last]
+    mav = _mean([fnum(r"kotwica m srednio ([\d.]+)", kie[d]) for d in w28])
+    kav = _mean([fnum(r"kasy miast po B1 \(szacunek\): (-?\d+)", kie[d]) for d in w28])
+    rep.add("E50-T9: stac jedzenie W/R/P (ostatnia doba)", _grp(r"stac jedzenie W/R/P ([^,|]+)", k, 1).strip(), "INFO", None)
+    rep.add("E50-T9: pelny koszyk W/R/P; miast < 95% (ostatnia doba)", _grp(r"pelny W/R/P [^,|]+, miast ze stac jedzenie < 95%: \d+, pelny < 95%: \d+", k), "INFO", None)
+    rep.add("E50-T9: kotwica m srednio sr28; zjedzone bez zaplaty (ostatnia doba)",
+            (f"m {mav:.2f}" if mav is not None else "m -") + "; " + _grp(r"zjedzone bez zaplaty (\d+ \([^)]*\))", k, 1), "INFO", None)
+    rep.add("E50-T9: kasy miast po B1 (szacunek) sr28", f"{kav:.0f}/d" if kav is not None else "-", "INFO (rachunek przed testem B)", None)
+    nad = by_day(lines, "Nadwyzka kas (E5/0): dzien")
+    if last in nad:
+        s = nad[last]
+        rep.add("E50-T9: nadwyzka D4 i pas ponizej zapasu (ostatnia doba)", _grp(r"ponad zapasem \d+ w \d+ miastach", s) + "; "
+                + _grp(r"zakupy kas miast z pasa ponizej zapasu: [^|]+", s)[:160], "INFO", None)
+        rep.add("E50-T9: korona - potrzeba R15, K3", _grp(r"potrzeba R15 dzis: \d+ krolestw", s) + "; " + _grp(r"K3: [^|]+", s)[:140], "INFO", None)
+        rep.add("E50-T9: udzial zysku kupcow zabierany przez pana i korone (Jeff 16:10)", _grp(r"udzial zysku kupcow zabierany przez pana i korone: [^|]+", s)[:260],
+                "INFO (odniesienie historyczne ok. 10% - decyzja Jeffa po tescie)", None)
+        rep.add("E50-T9: zaulki - kasy ponizej zapasu (Jeff 16:10)", _grp(r"zaulki \(od startu sesji\): [^|]+", s)[:240], "INFO", None)
+    fo = by_day(lines, "Jedzenie z targu (E5/0): dzien")
+    if last in fo:
+        rep.add("E50-T9: zamki z polka jedzenia < 10 dni zuzycia (B4)", _grp(r"polka < 10 dni zuzycia: \d+ z \d+ \(mediana [^)]*\)", fo[last]), "INFO (stan wyjsciowy B4)", None)
+    sa_ = by_day(lines, "Zadowolenie BK (E5/0): dzien")
+    if last in sa_:
+        rep.add("E50-T9: zadowolenie BK (R14)", _grp(r"srednie Food / Industrial / General / Luxury \(0\.\.1\) [^|]+", sa_[last])[:220], "INFO", None)
+    if sess:
+        rep.add("E50-T9: modele czynne (lojalnosc BK, warstwa BK)", _grp(r"modele czynne: (.*?) \| zapasy startowe", sess[-1], 1)[:300], "INFO (RB 7 pkt 2 i 4)", None)
+    if last in gw:
+        rep.add("E50-T9: gotowka wsi wedlug polityki BK (ostatnia doba)", _grp(r"wedlug polityki BK: (.*?) \| kontrola podzialu", gw[last], 1)[:300], "INFO (wiaze B1, C3)", None)
+    # ---- T10 zapis: linia sesji po wczytaniu, kalibracja od nowa, 0 bledow
+    loads = [s for s in sess if (num(r"sesja od dnia (\d+)", s, int, None) or start) - start + 1 > 2]
+    if loads:
+        rep.add("E50-T10: zapis - linia sesji po wczytaniu, 0 bledow", f"sesji z zapisu {len(loads)}, ERROR in TownFolk {len(errs)}", "linia sesji, 0 bledow", len(errs) == 0)
+    else:
+        rep.add("E50-T10: zapis (9 dob)", "bieg nowej kampanii - prog z biegu z zapisu", "INFO", None)
+
+
 
 def main(argv):
     args = argv[1:]
@@ -2516,6 +2824,8 @@ def main(argv):
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:
         return etap4_main(logp, start_arg, until_arg)   # E4/0 (188)
+    if group == "etap5" and logp:
+        return etap5_main(logp, start_arg, until_arg, csvp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

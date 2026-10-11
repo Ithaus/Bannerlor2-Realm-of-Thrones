@@ -301,6 +301,7 @@ namespace Armoury
                 if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
                     CrownIncome.NoteOwnSpend(mp.ActualClan, life);   // 165 (K3): zold wydany we wlasnym miescie rodu wraca zaworem - bez zwrotu korony od niego (gracz tez - jedna regula)
                 MoneyLedger.Note(MoneyLedger.NLife, st, life);   // ksiega przeplywow osad (tylko licznik)
+                try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - kiesa ludu na sucho (tylko licznik)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;
                 if (mp.IsMainParty)

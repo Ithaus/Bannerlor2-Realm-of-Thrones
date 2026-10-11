@@ -1326,6 +1326,9 @@ namespace Armoury
         public int ShipSalePortsTried = 3;                 // how many nearest ports (first of the realm, then of realms at peace with the house) are asked for the full price of a lost or prize ship before the port with the most spare money pays what it can (0 counts as 1)
         public bool ShipTradeThroughPort = false;          // Off until the war tax of stage 5 - see docs. Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before
         public bool ShipPrizesToPort = false;              // Off until the war tax of stage 5 - see docs. After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before
+        // --- The townsfolk's purse ---
+        // E5/0 (195, projekt etapu 5 rozdz. 3): kiesa ludu na sucho - tylko log (klucz kiesy czynnej i wzmianka w opisie - dopiero w B1, K3; recenzja E5/0 (2-3))
+        public int TownFolkMode = 1;                       // 0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game
 
         public static void Load(string moduleDataDir)
         {

@@ -448,6 +448,7 @@ namespace Armoury
                     ClanIncomeBook.NoteOwnPaid(w.Shop, mp.ActualClan, paid);   // 169c: "wlasne" D stalego - dozbrajanie ludzi rodu w jego miescie (tylko licznik)
                     if (player) MoneyLedger.Note169(MoneyLedger.N169Kit, w.Shop, paid);   // jak braki gracza (paczka 169: linia kas)
                     else MoneyLedger.Note(MoneyLedger.NGear, w.Shop, paid);               // jak zakupy AiGear (ksiega przeplywow osad)
+                    try { TownFolk.Sale(w.Shop, paid, TownFolk.MixGear); } catch { }   // E5/0 (195): dozbrajanie - sprzedaz kupcow (tylko licznik)
                     // sklad8-p (uwaga 1): dozbrajanie to zakup z polki jak zakupy brakow - liczy sie w tych samych miarach 174/174b:
                     // popyt koszyka w miescie dla reguly zlomu (ArmsScrap - tylko AI, jak AiGear i notable; gracz nie wchodzi, jak BuyPlayerGaps)
                     // i linia M2 "ZakupyAI wedlug kupujacego" (wszyscy, z gracza - "ludzie gracza (sakiewka)"). Tylko liczniki.

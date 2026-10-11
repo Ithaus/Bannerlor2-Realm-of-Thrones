@@ -454,6 +454,7 @@ namespace Armoury
                 st.Town.ChangeGold(t);                                 // karczma, jedzenie, gra - pieniadze zostaja w miescie
                 ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, t);      // 169c: "wlasne" D stalego (tylko licznik) - jak sakiewki partii
                 MoneyLedger.Note(MoneyLedger.NLife, st, t);            // ksiega przeplywow osad (tylko licznik)
+                try { TownFolk.Note(st, t, TownFolk.KLifeCaravan); } catch { }   // E5/0 (195): zycie ludzi karawan w miescie (tylko licznik)
                 _carSpent += t; _carSpentN++;
                 return true;
             }
