@@ -1933,7 +1933,7 @@ namespace Armoury
                         {
                             if (b.Skip) continue;
                             if (b.Price <= 0) { b.Price = FencePrice(b.St, what); b.Net = b.Price * (double)b.Share; }
-                            if (b.Town.Gold - reserve < (int)Math.Ceiling(b.Due + b.Net)) { b.Skip = true; poor = true; continue; }   // tego miasta na te sztuke nie stac
+                            if (b.Town.Gold - TownPurse.BuyFloor(b.Town, reserve) < (int)Math.Ceiling(b.Due + b.Net)) { b.Skip = true; poor = true; continue; }   // tego miasta na te sztuke nie stac; E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                             if (best == null || b.Net > best.Net) best = b;
                         }
                         if (best == null) break;                            // nikt w zasiegu nie kupi - reszta stosu zostaje na pozniej

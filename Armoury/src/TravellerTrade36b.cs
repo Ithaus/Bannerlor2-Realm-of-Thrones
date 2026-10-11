@@ -451,7 +451,7 @@ namespace Armoury
                         while (k < n)
                         {
                             int p = town.GetItemPrice(el.EquipmentElement, mp, true);
-                            if (p <= 0 || town.Gold - itemPaid < p) break;   // kasa placi tylko, co ma
+                            if (p <= 0 || town.Gold - TownPurse.BuyFloor(town, 0) - itemPaid < p) break;   // kasa placi tylko, co ma; E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                             r.AddToCounts(el.EquipmentElement, -1);
                             shelf.AddToCounts(el.EquipmentElement, 1);
                             itemPaid += p; k++;

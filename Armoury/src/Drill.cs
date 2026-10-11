@@ -935,7 +935,7 @@ namespace Armoury
             if (lord == null || !lord.IsAlive) return;
             var s = Settings.Current;
             int unit = Math.Max(1, MenPurse.SellPrice(new EquipmentElement(ore), st, mp));
-            int can = Math.Max(0, st.Town.Gold) / unit;
+            int can = Math.Max(0, st.Town.Gold - TownPurse.BuyFloor(st.Town, 0)) / unit;   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
             int n = Math.Min(menU, can);
             if (n <= 0) return;
             var gf = GoodsLedger.Begin(GoodsLedger.FDrill, st.Town);

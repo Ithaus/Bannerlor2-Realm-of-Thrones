@@ -380,7 +380,7 @@ namespace Armoury
                 if (t == null || t.Owner == null || t.Owner.ItemRoster == null) continue;
                 towns++;
                 var shelf = t.Owner.ItemRoster;
-                bool pays = t.Gold > reserve;
+                bool pays = t.Gold > TownPurse.BuyFloor(t, reserve);   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                 foreach (var g in _goods)
                 {
                     int n = shelf.GetItemNumber(g.Item);
@@ -576,7 +576,7 @@ namespace Armoury
                 g.In++;
                 if (Target(town, g, s) - Math.Max(shelf.GetItemNumber(g.Item), FreeOf(g)) > 0) g.InShort++;
             }
-            foreach (var g in town.Gold > reserve ? SellOrder(mp, town, pack) : _goods)   // miasto bez kasy ponad rezerwe i tak nie kupi nic
+            foreach (var g in town.Gold > TownPurse.BuyFloor(town, reserve) ? SellOrder(mp, town, pack) : _goods)   // miasto bez kasy ponad rezerwe i tak nie kupi nic (E5/A1: ponad zapas kupcow)
             {
                 int at = pack.FindIndexOfItem(g.Item);
                 if (at < 0) continue;
@@ -586,7 +586,7 @@ namespace Armoury
                 int lack = Target(town, g, s) - held;
                 int want = Glut(g, s) ? Keep(town, g, s) - held : lack;
                 if (want <= 0) continue;
-                int spare = town.Gold - reserve;
+                int spare = town.Gold - TownPurse.BuyFloor(town, reserve);   // E5/A1: miasto tylko z nadwyzki ponad zapas kupcow
                 if (spare <= 0) { _poor++; break; }      // miasto bez zlota ponad rezerwe na renty nie kupuje niczego
                 int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                 int n = Math.Min(Math.Min(want, el.Amount), spare / price);   // cena spada z kazda sztuka - pierwsza jest gorna granica
