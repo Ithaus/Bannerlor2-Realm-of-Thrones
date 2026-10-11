@@ -1185,6 +1185,8 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
 - (16:10) **Jeff: etap 5 - (1) A1 bez dosypki kas od razu (regulator tryb 2, miasta i zamki; tryb 1 jako opcja MCM) - "usun to ostatnie zrodlo z niczego";
   (2) E5/0 liczy udzial zysku kupcow zabierany przez pana i korone (porownanie z historycznym ok. 10%).** Opis w projekcie etapu 5, rozdz. 6.
 - (16:20) **Jeff: A6 (lup z bitew tylko z kiesy pokonanego) od razu w porcji A, bezwarunkowo.**
+- (16:55) **Jeff: E4/8 K8 - szybszy platny werbunek zalog (2/d zamiast 1, w granicy zoldu, z ludzi krainy, osobny klucz) PRZED testem - TAK; E4/10 - weterani
+  z rozwiazanych partii zostaja w ludnosci BK miasta (zmienic tylko gdy V13 > +2%/rok) - TAK.**
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli

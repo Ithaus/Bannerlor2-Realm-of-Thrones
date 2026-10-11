@@ -833,3 +833,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   osobny klucz) przed testem (rada: tak); E4/10 - weterani z rozwiazanych partii zostaja w ludnosci BK miasta (rada: zostawic, zmienic tylko gdy V13 > +2%/rok).
 - (16:50) **Workflow wf_fb811d64-c25:** scalenie calosci (E4/8 + E4/10 przenumerowane + E4/11 + E4/7b + NightRest) do w-toku/zbior-e4-koniec + recenzja, potem
   E4/9 od czubka (e4\49, w-toku/e4-9) - kod, 2 recenzje, poprawki. **Workflow wf_326d453d-473:** audyt zlota z niczego (Jeff 16:30 "czy to na pewno wszystkie?").
+- (16:55) **Jeff: "tak, tak"** - K8 (zalogi 2/d) przed testem; weterani W5 zostaja w BK. K8 kod na w-toku/e4-8 (e4\48), dolaczyc przy scaleniu E4/9.
