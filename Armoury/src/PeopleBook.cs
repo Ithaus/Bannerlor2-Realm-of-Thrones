@@ -83,7 +83,11 @@ namespace Armoury
                            // Scalenie E4/6 + E4/7: E4/7 przesuniete o 3 (bylo 20..30, MKinds 31). Numery nie ida do zapisu (liczniki doby), wszystkie uzycia przez nazwy;
                            // MBackH3..MBackDisband musza zostac kolejno (petle w Measure40 i OriginSegment)
                            MLevyVillage = 23, MLevyA5 = 24, MBackH3 = 25, MBack166 = 26, MBackW4c = 27, MBack179 = 28, MBackPool = 29, MBackFreed = 30, MBackDisband = 31,
-                           MLevyTown = 32, MBackTown = 33, MKinds = 34;
+                           MLevyTown = 32, MBackTown = 33,
+                           // E4/8 (164b-2): numery 34-45 (pierwsze wolne po scaleniu E4/6 + E4/7; E4/10 zostawia za nimi 10 numerow przerwy) - wojsko z ludzi
+                           // (milicja, nowe druzyny, karawany, konwoje morskie), wedrowcy i konwoje BK (R19), miasta (R2) - PeopleBook.Arms.cs, ArmsFromPeople.cs, TownGrowth.cs
+                           MLevyMilitia = 34, MBackMilitia = 35, MBackMilitiaNone = 36, MLevySpawn = 37, MCaravanOut = 38, MCaravanRefill = 39,
+                           MRoadOut = 40, MRoadIn = 41, MRoadBack = 42, MRoadNone = 43, MTownMigrate = 44, MTownNatural = 45, MKinds = 46;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -97,7 +101,11 @@ namespace Armoury
             "pobor z wsi (E4/7, BK DeduceManpower)", "pobor A5 - autowerbunek zalogi (E4/7)", "powrot z pochodzeniem: rozbici H3 (E4/7)", "powrot z pochodzeniem: zwolnieni 166 (E4/7)",
             "powrot z pochodzeniem: przepelnienie W4c (E4/7)", "powrot z pochodzeniem: rycerze 179 (E4/7)", "powrot z pochodzeniem: z puli wyrzutkow (E4/7)",
             "powrot z pochodzeniem: jency uwolnieni i wypuszczeni (E4/7)", "powrot z pochodzeniem: rozwiazane partie (E4/7)", "pobor z miasta (E4/7, stan miasta E4/4)",
-            "powrot z pochodzeniem do miasta (E4/7, stan miasta E4/4 - dlug poboru z miasta)" };
+            "powrot z pochodzeniem do miasta (E4/7, stan miasta E4/4 - dlug poboru z miasta)",
+            "milicja z wolnych rak (E4/8)", "milicja bez walki do domu (E4/8)", "milicja bez pochodzenia do domu (E4/8 - bez hearth)",
+            "nowa druzyna z wolnych rak regionu siedziby (E4/8)", "karawana z ludzi osady startu (E4/8)", "konwoj morski uzupelniony z miasta (E4/8)",
+            "wedrowcy i eskorta BK - wyjazd (R19)", "wedrowcy BK u celu (R19)", "wedrowcy i eskorta BK z powrotem w domu (R19)", "wedrowcy BK bez pochodzenia (R19 - bez hearth)",
+            "migracja ze wsi do miasta (R2)", "narodziny i zgony miast (R2 - stan miasta)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
@@ -105,7 +113,9 @@ namespace Armoury
         // E4/7: pobor z wsi i powroty z pochodzeniem ruszaja hearth (symetria - LevyLive, PeopleBook.Origin.cs); pobor z miasta - stan miasta, nie hearth
         private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false,
                                                    true, true, false,
-                                                   true, true, true, true, true, true, true, true, true, false, false };
+                                                   true, true, true, true, true, true, true, true, true, false, false,
+                                                   // E4/8: wies ruszana (miasto - stan miasta przez TownShift, bez hearth); "bez pochodzenia" i narodziny miast - tylko licznik
+                                                   true, true, false, true, true, true, true, true, true, false, true, false };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -149,6 +159,7 @@ namespace Armoury
             ClearRefugees();
             try { Famine.Reset(); } catch (Exception e) { Stumble("Reset(E4/6)", e); }      // E4/6: spichlerze - stan tej samej sekcji zapisu
             try { ResetOrigin(); } catch (Exception e) { Stumble("Reset(E4/7)", e); }     // E4/7: konta SLUZBA/JENCY z pochodzeniem, rg:, siew - nowa kampania od zera
+            try { ResetArms(); } catch (Exception e) { Stumble("Reset(E4/8)", e); }       // E4/8: odniesienia miast tr:, liczniki ruchow stanu miast
         }
 
         /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
@@ -209,6 +220,8 @@ namespace Armoury
             try { sb.Append(Famine.Export()); } catch (Exception e) { Stumble("Export(E4/6)", e); }
             // E4/7 (164b-1): pochodzenie (sw: so: jo: wo: rg:) - tylko po siewie (bez sekcji = siew przy pierwszej dobie)
             try { ExportOrigin(sb); } catch (Exception e) { Stumble("Export(E4/7)", e); }
+            // E4/8 (R2): odniesienia miast "tr:" - tylko gdy zalozone (bez sekcji = stary zapis, odniesienie zalozy sie w pierwszej dobie)
+            try { ExportArms(sb); } catch (Exception e) { Stumble("Export(E4/8)", e); }
             return sb.ToString();
         }
 
@@ -266,6 +279,7 @@ namespace Armoury
             ClearRefugees();                          // E4/5: stary zapis (bez "u:" / "r:") - brak uchodzcow i zegarow
             try { Famine.Clear(); } catch (Exception e) { Stumble("Import(E4/6 czyszczenie)", e); }   // E4/6: zapis bez "f:" - spichlerze zaloza sie przy pierwszej dobie
             try { ResetOrigin(); } catch (Exception e) { Stumble("Import(E4/7 reset)", e); }   // E4/7: stary zapis bez sekcji - siew przy pierwszej dobie
+            try { ResetArms(); } catch (Exception e) { Stumble("Import(E4/8 reset)", e); }     // E4/8: zapis bez "tr:" - odniesienia miast zaloza sie w pierwszej dobie
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
@@ -338,6 +352,11 @@ namespace Armoury
                             }
                         }
                     }
+                    else if (part.StartsWith("tr:", StringComparison.Ordinal))
+                    {
+                        // E4/8 (R2): odniesienia miast; zepsuty wpis pomijany (zalozy sie od nowa w pierwszej dobie)
+                        try { ImportArms(part.Substring(3)); } catch (Exception e) { Stumble("Import(E4/8)", e); }
+                    }
                     else if (part.StartsWith("f:", StringComparison.Ordinal))
                     {
                         // E4/6: spichlerze okregow (Famine) - zepsuty wpis pomijany w Famine.Import
@@ -383,6 +402,7 @@ namespace Armoury
             {
                 if (_town.ContainsKey(s.StringId)) return false;
                 _town[s.StringId] = people;
+                _townSet += people;          // E4/8: kontrola linii "Miasta (E4/8 R2)" - zalozenie stanu to nie ruch ludzi
                 return true;
             }
         }
@@ -391,7 +411,7 @@ namespace Armoury
         internal static double TownSum { get { double t = 0; lock (Gate) foreach (var v in _town.Values) t += v; return t; } }
 
         /// <summary>Porzucenie stanu miast (TownPeopleFrozen wylaczone w MCM) - ludzie miast znow z dobrobytu x k; zwraca, ilu miast stan porzucono.</summary>
-        internal static int DropTowns() { lock (Gate) { int n = _town.Count; _town.Clear(); return n; } }
+        internal static int DropTowns() { lock (Gate) { int n = _town.Count; foreach (var v in _town.Values) _townSet -= v; _town.Clear(); return n; } }
 
         // ---------------------------------------------------------------- E4/4 (R17): podloga 10 hearth bez ludzi z niczego
         /// <summary>
@@ -627,6 +647,7 @@ namespace Armoury
                     float left = (float)Math.Max(0.0, (double)p - n);
                     _town[s.StringId] = left;
                     got = (double)p - left;
+                    _townMv[MFamineTown] -= got;     // E4/8: ruch stanu miasta wedlug przyczyny (linia "Miasta (E4/8 R2)")
                 }
             }
             catch (Exception e) { Stumble("TownDie", e); return 0.0; }
@@ -847,6 +868,8 @@ namespace Armoury
         /// </summary>
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
+            // E4/8 (10.4, R19, R6): wedrowcy i konwoje BK u celu albo w domu, partia rozwiazana bez bitwy -> DOM pochodzenia; PRZED "resztka w nicosc" E4/7 (slownik jeszcze jest)
+            try { ArmsPartyGone(mp, destroyer, false); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/8)", e); }
             try { OriginPartyGone(mp != null ? mp.Party : null, destroyer != null); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/7)", e); }   // E4/7 (4.12): slownik partii - resztka w nicosc (nazwana)
             try
             {
@@ -1018,6 +1041,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             try { if (log) OriginLines(day, tOrigin); } catch (Exception e) { Stumble("Daily(E4/7 linie)", e); }
             try { OriginEndDay(); } catch (Exception e) { Stumble("Daily(E4/7 koniec doby)", e); }
+            try { ArmsCloseDay(); } catch (Exception e) { Stumble("Daily(E4/8 koniec doby)", e); }   // E4/8: ruch DOM przyczynami E4/8 tej doby - do kontroli linii "Wojsko z ludzi (E4/8)"
             Array.Clear(_in, 0, CKinds); Array.Clear(_out, 0, CKinds); Array.Clear(_dead, 0, _dead.Length);
             _stumblesDay = 0; _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); _disbandNoVillage = 0; }
@@ -1063,7 +1087,7 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown ? "stan miasta" : "bez hearth (bez pochodzenia)")));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown || i == MTownNatural ? "stan miasta" : "bez hearth (bez pochodzenia)")));
                 any = true;
             }
             if (!any) sb.Append(" brak");

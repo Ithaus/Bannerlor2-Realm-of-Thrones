@@ -268,6 +268,9 @@ namespace Armoury
                 if (__state == null) return __exception;
                 var v = __state.V;
                 float dH = v.Hearth - __state.H;
+                // E4/8: hearth przesuniety przez ksiege w postfiksie milicji TEJ wsi (pobor milicji, powrot milicji do domu) - jest w "nasze" (o13), nie w ticku gry
+                // (odczyt bez zerowania - ten sam odczyt robi podloga E4/4 w FloorFinalizer; recenzja E4/8 R1-5/R2-6)
+                try { dH -= (float)ArmsFromPeople.PeekTickHearth(v); } catch { }
                 float rest = dH - __state.Result;                 // podloga 10 (dodatnia) albo niezgodnosc z wynikiem modelu
                 var st = v.Settlement;
                 float dMil = st != null ? st.Militia - __state.Mil : 0f;
@@ -870,9 +873,14 @@ namespace Armoury
             for (int i = PeopleBook.MBackH3; i <= PeopleBook.MBackDisband; i++) o11 += mv[i];
             // E4/6: glod - zmarli z glodu i uciekli z glodu (DOM -> smierc, DOM -> UCHODZCY) - hearth z ksiegi (scalenie z E4/7: o12, w paczce E4/6 bylo o10)
             double o12 = mv[PeopleBook.MFamineDead] + mv[PeopleBook.MFamineFled];
+            // E4/8: wojsko z ludzi (milicja, nowe druzyny, karawany, konwoje - ujemne), milicja do domu i wedrowcy BK u celu (dodatnie), migracja do miast (ujemne) - hearth z ksiegi
+            double e8Mil = mv[PeopleBook.MLevyMilitia], e8MilHome = mv[PeopleBook.MBackMilitia], e8Spawn = mv[PeopleBook.MLevySpawn];
+            double e8Car = mv[PeopleBook.MCaravanOut] + mv[PeopleBook.MCaravanRefill], e8RoadOut = mv[PeopleBook.MRoadOut], e8RoadIn = mv[PeopleBook.MRoadIn] + mv[PeopleBook.MRoadBack];
+            double e8Mig = mv[PeopleBook.MTownMigrate];        // rozwiazane bez bitwy do domu (R6) - MBackDisband, w o11
+            double o13 = e8Mil + e8MilHome + e8Spawn + e8Car + e8RoadOut + e8RoadIn + e8Mig;
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -907,7 +915,9 @@ namespace Armoury
                   .Append(", zerowanie armii ").Append(S(o5)).Append(" (").Append(_forageN).Append(" razy)")
                   .Append(", spustoszenie (E4/5: rabunek, zerowanie) ").Append(S(o8)).Append(", powrot uchodzcow +").Append(F2(o9))
                   .Append(", glod (E4/6: zmarli i uciekli z glodu) ").Append(S(o12))
-                  .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11));
+                  .Append(", pobor z wsi (E4/7) ").Append(S(o10)).Append(", powroty z pochodzeniem (E4/7) +").Append(F2(o11))
+                  .Append(", nasze (E4/8): milicja z wolnych rak ").Append(S(e8Mil)).Append(", milicja do domu ").Append(S(e8MilHome)).Append(", nowe druzyny ").Append(S(e8Spawn))
+                  .Append(", karawany ").Append(S(e8Car)).Append(", wedrowcy BK ").Append(S(e8RoadOut)).Append("/").Append(S(e8RoadIn)).Append(", migracja do miast ").Append(S(e8Mig));
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

@@ -378,7 +378,7 @@ namespace Armoury
         }
 
         // ================================================================ rozwiazanie partii (4.3) - zdarzenie gry przed zniszczeniem partii
-        public struct DisbandState { public bool On; public int M, P, G; public MobileParty Gar; }
+        public struct DisbandState { public bool On; public int M, P, G; public MobileParty Gar; public int Mil; public MobileParty MilParty; }
 
         public static void DisbandPre(MobileParty __0, Settlement __1, out DisbandState __state)
         {
@@ -386,9 +386,17 @@ namespace Armoury
             if (!OriginLive || __0 == null) return;
             try
             {
-                if (KindOf(__0) < 0) return;           // tabor/lodz (R18 - PeopleBook.OnPartyDestroyed), konwoj BK, Inni - bez slownika skladu; bez drugiego powrotu
+                int kd = KindOf(__0);
+                if (kd < 0 || kd == KRoad) return;     // tabor/lodz (R18 - PeopleBook.OnPartyDestroyed), konwoj BK (E4/8 - ArmsPartyGone), Inni - bez slownika skladu; bez drugiego powrotu
                 var g = __1 != null && __1.Town != null ? __1.Town.GarrisonParty : null;
-                __state = new DisbandState { On = true, M = Men(__0.MemberRoster), P = Men(__0.PrisonRoster), Gar = g, G = g != null ? Men(g.MemberRoster) : 0 };
+                __state = new DisbandState { On = true, M = Men(__0.MemberRoster), P = Men(__0.PrisonRoster), Gar = g, G = g != null ? Men(g.MemberRoster) : 0, Mil = -1 };
+                // E4/8 (5.6): rozwiazana we wsi - gra dopisuje milicji 0.5 x sklad (MergeDisbandPartyToVillage); szeregowi milicji przed
+                if (__1 != null && __1.IsVillage && ArmsFromPeople.MilitiaOn)
+                {
+                    var mc = __1.MilitiaPartyComponent;
+                    __state.MilParty = mc != null ? mc.MobileParty : null;
+                    __state.Mil = __state.MilParty != null ? Men(__state.MilParty.MemberRoster) : 0;
+                }
             }
             catch (Exception e) { OStumble("DisbandPre", e); }
         }
@@ -407,7 +415,21 @@ namespace Armoury
                 if (gone > Eps)
                 {
                     var org = Take(__0.MemberRoster, gone, FDisband);
-                    HomeOrNote(org, gone, MBackDisband, -1);
+                    // E4/8 (5.6): ci, ktorych gra dopisala do milicji wsi (0.5 x sklad), zostaja w milicji swojej wsi z udzialem pochodzenia; reszta do domu (R6)
+                    double mil = 0.0;
+                    if (__state.Mil >= 0)
+                    {
+                        try
+                        {
+                            var mc = __1.MilitiaPartyComponent;
+                            var mp = mc != null ? mc.MobileParty : null;
+                            int before = mp != null && mp == __state.MilParty ? __state.Mil : 0;   // milicja zalozona w metodzie - od 0
+                            mil = Math.Min(gone, Math.Max(0, (mp != null ? Men(mp.MemberRoster) : 0) - before));
+                            if (mil > Eps) { Give(mp.MemberRoster, org.Cut(mil), FMilitiaDisband); ArmsFromPeople.NoteMilitiaDisband(mil); }
+                        }
+                        catch (Exception e) { OStumble("DisbandPost(E4/8 milicja)", e); mil = 0.0; }
+                    }
+                    HomeOrNote(org, gone - mil, MBackDisband, -1);
                 }
                 // loch we wsi wyczyszczony (P2: "jency w nicosc - rozwiazane we wsi"); w warowni - okno sprzedazy (SellPrisonersAction)
                 double pSum = OrgSum(__0.PrisonRoster);

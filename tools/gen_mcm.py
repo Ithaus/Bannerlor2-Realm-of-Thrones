@@ -86,6 +86,9 @@ RANGES = {
     'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
     'FreeHandsElasticity': (0.0, 2.0, "0.00"),
     'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
+    # E4/8 (164b-2): kara miasta wobec stopy wsi (pkt rocznie) i dni dopelnienia miasta ze wsi (0 = tylko ubytek naturalny)
+    'TownGrowthPenaltyPercent': (0.0, 3.0, "0.0"),
+    'TownMigrationRefillDays': (0, 1456, "0"),
 }
 
 def gen(module_dir, ns, display):

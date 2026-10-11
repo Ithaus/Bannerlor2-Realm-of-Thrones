@@ -1307,7 +1307,7 @@ namespace Armoury
         private static string HoleText()
         {
             return " | dziura werbunku (partie lordow AI, ludzie bez werbunku u notabli): nowe partie z szablonu klanu " + _tplLordMen + " ludzi (" + _tplLordParties
-                   + " partii), z zalog do lordow " + _garrToLord + ", od lordow do zalog " + _lordToGarr + " (netto z zalog " + (_garrToLord - _lordToGarr) + ")";
+                   + " partii" + (ArmsFromPeople.SpawnOn ? "; od E4/8 oplaceni z ludzi albo z zalogi siedziby - linia Wojsko z ludzi (E4/8)" : "") + "), z zalog do lordow " + _garrToLord + ", od lordow do zalog " + _lordToGarr + " (netto z zalog " + (_garrToLord - _lordToGarr) + ")";
         }
 
         private static string Who(MapEventSide side)

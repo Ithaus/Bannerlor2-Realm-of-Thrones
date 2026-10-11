@@ -844,6 +844,9 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- E4/7 (164b-1): pochodzenie, pobor z wsi, polegly trwale, wolne rece, okno zniw, menu osady
     if any(x.startswith("Pochodzenie (E4/7): wpiete") for x in lines):
         etap4_e47(rep, lines, start, win, hea, lud, until)
+    # ---------------- E4/8 (164b-2): zalogi bez modelu, milicja z wolnych rak, nowe druzyny i karawany z ludzi, wedrowcy BK, miasta R2
+    if any(x.startswith(E48_START) for x in lines):
+        etap4_e48(rep, lines, start, win, hea, until)
 
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
@@ -1177,6 +1180,177 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     rep.add("E4/7 T14: menu \"People of this land\"", "proba reczna Jeffa (wies, miasto, zamek)", "INFO - liczby = linia dzienna regionu", None)
     rep.add("E4/7 T15: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
 
+
+# E4/8 (164b-2): baza zalog d120 - bieg A zbioru 31 (WGRANIE 31, SCRATCH kopia-z31-A: zalogi 81.2 tys.); prog N4 >= 85% (bez modelu [S] ok. 67.6 tys. - prog graniczny)
+E48_GARRISON_BASE = 81200
+E48_START = "Wojsko z ludzi (E4/8): wpiete"
+
+
+def etap4_e48(rep, lines, start, win, hea, until):
+    """E4/8 (164b-2): progi N1-N17 z planu kodu docs/etap4/PLAN-KODU-E48.md rozdz. 13 (stan z linii dziennych, nie startowej - poprawka R2-1 E4/3).
+    Linie: "Wojsko z ludzi (E4/8): dzien" (zalogi, A5, milicja, nowe druzyny, karawany, wedrowcy BK, R6, KONTROLA, czas), "Miasta (E4/8 R2): dzien" (naturalne,
+    migracja, kontrola, udzial miejski), "Zalogi: przyrost bez werbunku (169c)" (przyrost z modelu, milicja z modelu w ticku), "Hearth (E4/0)" (RESZTA)."""
+    stl = next((x for x in lines if x.startswith(E48_START)), "")
+    rep.add("E4/8 N1: linia startowa (latki wojska z ludzi)", stl[:260] if stl else "brak", "\"BRAK: -\"", ("BRAK: -" in stl) if stl else False)
+    arm = e4_series(lines, "Wojsko z ludzi (E4/8): dzien")
+    mia = e4_series(lines, "Miasta (E4/8 R2): dzien")
+    zal = e4_series(lines, "Zalogi: przyrost bez werbunku (169c): dzien")
+    adays = [d for d in sorted(arm) if 1 <= run_day(d, start) <= until]
+    if not adays:
+        rep.add("E4/8: linie dzienne \"Wojsko z ludzi (E4/8)\"", "brak", "kazdej doby (LogEnabled)", False)
+        return
+    stum = [num(r"\| potkniecia (\d+)", arm[d], int, 0) or 0 for d in adays]
+    rep.add("E4/8 N1: potkniecia wojska z ludzi (suma dob)", sum(stum), "<= 5 (z nazwa miejsca w linii i w ERROR)", sum(stum) <= 5)
+    live = [d for d in adays if "ksiega pochodzenia: CZYNNA" in arm[d]]
+    rep.add("E4/8: doby z czynna ksiega pochodzenia (LevyLive)", f"{len(live)} z {len(adays)}", "INFO (przed siewem E4/7 latki ludzi - no-op)", None)
+    # N2 - przyrost z modelu zalog = Straz zostawiona do E4/9, kazdej doby
+    bad, n2 = [], 0
+    for d in adays:
+        if d not in zal:
+            continue
+        mz = num(r"przyrost z modelu zalogi gry \(bez werbunku i bez zlota\) ([+-]?\d+)", zal[d])
+        sw = num(r"Straz zostawiona do E4/9 \+(\d+)", arm[d], int, 0) or 0
+        if mz is None:
+            continue
+        n2 += 1
+        if abs(mz - sw) > 0:
+            bad.append((run_day(d, start), mz, sw))
+    zb = [num(r"przyrost z modelu zablokowany -(\d+)", arm[d], int, 0) or 0 for d in adays]
+    rep.add("E4/8 N2: Zalogi (169c) przyrost z modelu - Straz zostawiona do E4/9", f"{n2 - len(bad)} z {n2} dob = 0" + (f"; pierwsze roznice {bad[:3]}" if bad else "") + f"; zablokowane srednio {st.mean(zb):.0f}/d (gorna granica)",
+            "= 0 kazdej doby (z30A +105/d)", (len(bad) == 0) if n2 else None)
+    # N3 - z niczego wedlug rodzaju (Pochodzenie E4/7) - ostatnie 28 dob
+    poc = e4_series(lines, "Pochodzenie (E4/7): dzien")
+    last = [d for d in adays if d in poc][-28:]
+    kinds = {"zalogi": [], "milicje": [], "karawany": [], "partie rodow": [], "wedrowcy i konwoje BK": []}
+    for d in last:
+        m = re.search(r"z niczego \+[\d.]+ \(([^)]*)\)", poc[d])
+        body = m.group(1) if m else ""
+        for k in kinds:
+            v = fnum(re.escape(k) + r" " + F_, body)
+            kinds[k].append(v or 0.0)
+    if last:
+        rep.add("E4/8 N3: z niczego wedlug rodzaju (Pochodzenie E4/7, srednio 28 dob)", ", ".join(f"{k} {st.mean(v):.1f}/d" for k, v in kinds.items()),
+                "INFO - oczekiwane ~0 (zalogi = Straz, milicje <= 1% ruchu; z30A partie rodow 505/d, zalogi 105/d)", None)
+    # N4 - zalogi d120
+    zd = [d for d in sorted(zal) if 1 <= run_day(d, start) <= until]
+    if zd:
+        z = num(r"\| zalogi (\d+) ludzi", zal[zd[-1]])
+        thr = int(0.85 * E48_GARRISON_BASE)
+        rep.add(f"E4/8 N4: zalogi d{run_day(zd[-1], start)}", f"{z} wobec bazy {E48_GARRISON_BASE} (z31 A d120)", f">= {thr} (85% bazy; wiaze tylko przy d120)",
+                (z >= thr) if (z is not None and run_day(zd[-1], start) >= 120) else None)
+    # N4 (recenzja E4/8 R1-2): drugi odplyw z zalog - nowe druzyny z zalogi siedziby (a2) - do oceny progu N4 i decyzji K8
+    a2 = [num(r"\+ z zalogi siedziby (\d+)", arm[d], int, 0) or 0 for d in adays]
+    rep.add("E4/8 N4: odplyw z zalog do nowych druzyn (a2, suma okna / srednio)", f"{sum(a2)} / {st.mean(a2):.1f} na dobe",
+            "INFO - szacunek d120 bez modelu (ok. 67.6 tys.) go nie obejmuje; razem z wierszem A5 dowod do K8", None)
+    # R6 (recenzja E4/8 R1-1/R2-5): rozwiazane bez bitwy do DOM, w tym usuniete bez zniszczenia (RemoveParty - konwoje DTE)
+    r6 = [re.search(r"ROZWIAZANE BEZ BITWY \(R6\): partii (\d+) \[.*?w tym usuniete bez zniszczenia - np\. konwoje DTE (\d+)\], do domu " + F_, arm[d]) for d in adays]
+    r6 = [(int(m.group(1)), int(m.group(2)), float(m.group(3))) for m in r6 if m]
+    if r6:
+        rep.add("E4/8 R6: rozwiazane bez bitwy do domu - partii / w tym usuniete bez zniszczenia / ludzi (suma okna)",
+                f"{sum(x[0] for x in r6)} / {sum(x[1] for x in r6)} / {sum(x[2] for x in r6):.0f}", "INFO (z31A: ok. 147 partii usunietych bez zniszczenia w 120 dob)", None)
+    # N5 - wojsko lordow (jak E4/7 T9)
+    rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
+    # N6 - kontrole
+    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e\) = " + SF, arm[d]) for d in adays]
+    kc = [x for x in kc if x is not None]
+    rep.add("E4/8 N6: KONTROLA linii E4/8 (najwieksza |roznica|)", f"{max(abs(x) for x in kc):.2f} ({len(kc)} dob)" if kc else "-", "<= 1 czlowiek kazdej doby", (max(abs(x) for x in kc) <= 1.0) if kc else None)
+    mdays = [d for d in sorted(mia) if 1 <= run_day(d, start) <= until]
+    mc = [fnum(r"\| kontrola: X - Y - \(wszystkie ruchy \+ zalozenie\) = " + SF, mia[d]) for d in mdays]
+    mc = [x for x in mc if x is not None]
+    rep.add("E4/8 N6: kontrola linii Miasta (najwieksza |roznica|)", f"{max(abs(x) for x in mc):.2f} ({len(mc)} dob)" if mc else "brak (pierwsza doba sesji / brak linii)",
+            "<= 1 czlowiek kazdej doby", (max(abs(x) for x in mc) <= 1.0) if mc else None)
+    # N7 - milicja: tick netto po korekcie E4/8 = "milicja (E4/0): z modelu w ticku" (169c; okna W1/W2 widza stan po korekcie)
+    dif = []
+    for d in adays:
+        if d not in zal:
+            continue
+        ours = num(r"tick netto \(po korekcie\) ([+-]?\d+)", arm[d])
+        theirs = num(r"milicja \(E4/0\): z modelu w ticku ([+-]?\d+)", zal[d])
+        if ours is not None and theirs is not None and ("milicja T" in arm[d]):
+            dif.append(ours - theirs)
+    rep.add("E4/8 N7: milicja - tick E4/8 wobec 169c (srednia roznica, najwieksza)", f"{st.mean(dif):+.2f}/d, max |{max(abs(x) for x in dif)}|" if dif else "brak (milicja wylaczona albo pomiar E4/0 wylaczony)",
+            "|srednia| <= 2/d (ulamki _readyMilitia - szum dzienny INFO)", (abs(st.mean(dif)) <= 2.0) if dif else None)
+    mil = [num(r"\| milicja (\d+)", zal[d]) for d in zd] if zd else []
+    mil = [x for x in mil if x is not None]
+    if mil:
+        rep.add("E4/8 N7: milicja swiata d1 -> ostatnia", f"{mil[0]} -> {mil[-1]}", "INFO (z30A 63 002 -> 67 283)", None)
+    ref = [num(r"odmowione -(\d+)", arm[d], int, 0) or 0 for d in adays]
+    up = [num(r"MILICJA: przyrost w oknach \+(\d+)", arm[d], int, 0) or 0 for d in adays]
+    home = [num(r"ubytek bez walki do domu -(\d+)", arm[d], int, 0) or 0 for d in adays]
+    rep.add("E4/8: milicja - przyrost / odmowione / ubytek do domu (srednio)", f"+{st.mean(up):.0f} / -{st.mean(ref):.0f} / -{st.mean(home):.0f} na dobe", "INFO (z30A model w ticku +92/d netto)", None)
+    # N8 - nowe druzyny: kontrola podzialu szablonu
+    n8bad, a3s, ns = 0, 0, 0
+    for d in adays:
+        x = arm[d]
+        m = re.search(r"szablon (\d+) = z wolnych rak " + F_ + r" \+ ulamki bez DOM " + F_ + r" \+ z zalogi siedziby (\d+) \+ nie wystawieni (\d+) .*?\+ Straz \"\" (\d+) \+ ksiega bez poboru (\d+)", x)
+        if not m:
+            continue
+        n, a1, fr, a2, a3, a4, off = int(m.group(1)), float(m.group(2)), float(m.group(3)), int(m.group(4)), int(m.group(5)), int(m.group(6)), int(m.group(7))
+        ns += n
+        a3s += a3
+        if abs(n - (a1 + fr + a2 + a3 + a4 + off)) > 1.0:
+            n8bad += 1
+    rep.add("E4/8 N8: nowe druzyny - szablon = a1 + ulamki + a2 + a3 + a4 + bez poboru", f"doby z roznica > 1: {n8bad}; nie wystawieni {a3s} z {ns} ({100.0 * a3s / ns:.1f}%)" if ns else f"doby z roznica > 1: {n8bad}",
+            "0 dob z roznica; udzial nie wystawionych INFO (oczekiwane < 20%)", n8bad == 0)
+    # N9 - zboze z niczego
+    g = sum(num(r"; zboze (\d+) szt\.", arm[d], int, 0) or 0 for d in adays)
+    g3 = sum(num(r"z niczego \(brak zapasu\) (\d+)", arm[d], int, 0) or 0 for d in adays)
+    rep.add("E4/8 N9: zboze nowych druzyn z niczego (suma okna)", f"{g3} z {g} ({100.0 * g3 / g:.1f}%)" if g else "0", "<= 5% zboza", (g3 <= 0.05 * g) if g else None)
+    # N10 - wedrowcy BK
+    w = sum(num(r"WEDROWCY BK \(R19\): wyjazdy (\d+)", arm[d], int, 0) or 0 for d in adays)
+    b1 = sum(num(r"dojscia: do domu (\d+)", arm[d], int, 0) or 0 for d in adays)
+    b2 = sum(num(r"do innej osady regionu (\d+)", arm[d], int, 0) or 0 for d in adays)
+    b3 = sum(num(r"migracja do innego regionu (\d+)", arm[d], int, 0) or 0 for d in adays)
+    b4 = sum(num(r"zniszczeni w drodze do domu (\d+)", arm[d], int, 0) or 0 for d in adays)
+    b5 = sum(num(r"eskorta konwojow do domu (\d+)", arm[d], int, 0) or 0 for d in adays)
+    road = [fnum(r"w drodze teraz " + F_, arm[d]) for d in adays]
+    road = [x for x in road if x is not None]
+    arr = b1 + b2 + b3 + b4 + b5
+    rep.add("E4/8 N10: wedrowcy i konwoje BK - wyjazdy / dojscia (do domu, region, migracja, zniszczeni, eskorta)",
+            f"{w} / {arr} ({b1}, {b2}, {b3}, {b4}, {b5}); do domu {100.0 * b1 / max(1, b1 + b2 + b3):.1f}% wedrowcow; w drodze ostatniej doby {road[-1] if road else '-'}",
+            "INFO (z30A 93.7% do domu; wyjazdy = dojscia + rozbici + w drodze - bitwy w linii Pochodzenie)", None)
+    # N11 - miasta R2
+    nat = [(run_day(d, start), fnum(r"\| naturalne " + SF, mia[d])) for d in mdays]
+    nat28 = [v for n, v in nat if v is not None and 28 <= n <= until]
+    mig = [fnum(r"\| migracja ze wsi \+" + F_, mia[d]) or 0 for d in mdays if 28 <= run_day(d, start) <= until]
+    starve = [num(r"bez migracji: glod (\d+)", mia[d], int, 0) or 0 for d in mdays]
+    if nat28:
+        rep.add(f"E4/8 N11: miasta - naturalne srednio d28-{until}", f"{st.mean(nat28):+.0f}/d", "-100..-250/d (DOK:524 ok. -144/d)", -250.0 <= st.mean(nat28) <= -100.0)
+        rep.add(f"E4/8 N11: migracja ze wsi wobec ubytku naturalnego d28-{until}", f"+{st.mean(mig):.0f}/d wobec {-st.mean(nat28):.0f}/d (miasta z glodem bez migracji - srednio {st.mean(starve):.1f})",
+                ">= ubytek naturalny (gdy w pokoju h1 = 0)", (st.mean(mig) >= -st.mean(nat28) * 0.95) if st.mean(starve) < 0.5 else None)
+    else:
+        rep.add("E4/8 N11: miasta R2", "brak dob 28+ z linia \"Miasta (E4/8 R2)\"", "-100..-250/d", None)
+    if mdays:
+        lm = mia[mdays[-1]]
+        u = fnum(r"udzial miejski swiata dzis " + F_ + r"%", lm)
+        u0 = fnum(r"\(odniesienie " + F_ + r"%", lm)
+        rep.add(f"E4/8 N11: udzial miejski swiata d{run_day(mdays[-1], start)} wobec odniesienia", f"{u}% wobec {u0}%" if u is not None else "-", "+-2 pkt", (abs(u - u0) <= 2.0) if (u is not None and u0 is not None) else None)
+    # N12 - rownanie krain z migracja (E4/7 T3)
+    rep.add("E4/8 N12: rownanie krain z MigIn/MigOut", "patrz E4/7 T3 (odcinek E4/7 \"Ludzie (ksiega)\" z czlonem migracji E4/8)", "<= 0.1% ludzi krainy", None)
+    # N13 - RESZTA linii Hearth
+    hr = [fnum(r"\| RESZTA " + SF, hea[d]) for d in adays if d in hea]
+    hr = [x for x in hr if x is not None]
+    rep.add("E4/8 N13: Hearth (E4/0) RESZTA - srednia (z o13 E4/8 w \"nasze\")", f"{st.mean(hr):+.2f}/d (|max| {max(abs(x) for x in hr):.1f})" if hr else "-", "|srednia| <= 1 hearth/d", (abs(st.mean(hr)) <= 1.0) if hr else None)
+    # N14 - netto Ludnosc (E4/7 T11)
+    rep.add("E4/8 N14: ludnosc netto d28-120", "patrz E4/7 T11 (ubytek naturalny miast w netto)", "-720..+1150/d", None)
+    # N15 - koszt
+    ms = [fnum(r"\| czas " + F_ + r" ms\.", arm[d]) for d in adays]
+    ms = [x for x in ms if x is not None]
+    rep.add("E4/8 N15: koszt latek i linii E4/8 (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-", "<= 5 ms/dobe (srednio)", (st.mean(ms) <= 5.0) if ms else None)
+    # N16 - zapis: odniesienia tr: po wczytaniu = miasta ze stanem
+    if mdays:
+        lm = mia[mdays[-1]]
+        refs = num(r"odniesien tr: (\d+)", lm)
+        towns = num(r"\| miast (\d+) ze stanem", lm)
+        act = "R2 WYLACZONE" not in lm
+        rep.add("E4/8 N16: odniesienia tr: = miasta ze stanem (ostatnia doba)", f"{refs} / {towns}", "rowne (przy czynnym R2)", (refs == towns) if (act and refs is not None and towns is not None) else None)
+    rep.add("E4/8 N17: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
+    # A5 - dowod do warunkowego K8
+    a5 = [re.search(r"A5: twierdz z werbunkiem (\d+) z (\d+) \(ludzi (\d+)\), limit dzienny (\d+), bez ochotnikow (\d+), zold albo miejsce (\d+)", arm[d]) for d in adays]
+    a5 = [tuple(int(x) for x in m.groups()) for m in a5 if m]
+    if a5:
+        rep.add("E4/8 A5: twierdze z werbunkiem / ludzi / limit dzienny / bez ochotnikow / zold (srednio)",
+                " / ".join(f"{st.mean(x[i] for x in a5):.0f}" for i in (0, 2, 3, 4, 5)), "INFO - dowod do K8 (limit dzienny wiaze -> A5 do 2/dobe, gdy N4 nie przejdzie)", None)
 
 def etap4_e44(rep, lines, start, win, hea, lud, until):
     """E4/4 (109n): progi z projektu etapu 4 rozdz. 3 "E4/4" Test (U12) i decyzji Jeffa 11.10 (pokoj +0.2..+0.8%/rok, ciagla wojna do -0.5%/rok).

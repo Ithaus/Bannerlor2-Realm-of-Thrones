@@ -2408,7 +2408,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float GrowthMaxDeclinePercent { get; set; } = 1.3f;
 
-        [SettingPropertyBool("Town People Frozen", HintText = "a town's people are counted once and kept: until towns get their own births, deaths and migrants, the number of townsfolk (used for rents, the people ledger and the craftsmen's hands) no longer follows the town's prosperity up and down every day. Off = townsfolk are prosperity times the town's people per prosperity point, as before")]
+        [SettingPropertyBool("Town People Frozen", HintText = "a town's people are counted once and kept: the number of townsfolk (used for rents, the people ledger and the craftsmen's hands) no longer follows the town's prosperity up and down every day - it changes only with real births, deaths, recruits and newcomers (Town Growth Enabled needs this). Off = townsfolk are prosperity times the town's people per prosperity point, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownPeopleFrozen { get; set; } = true;
 
@@ -2555,6 +2555,46 @@ namespace Armoury
         [SettingPropertyBool("People Menu Entry", HintText = "'People of this land' in the menus of villages, towns and castles: the land's people at home, under arms, held captive, outlawed, fallen and its free hands")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleMenuEntry { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Growth Only Recruits", HintText = "garrisons grow only from men who really join them - recruits the garrison pays for and men left by parties; the game's free daily growth (enlistment policy, rebels, quests) adds no one. The Night's Watch keeps it until it gets its own recruits from all of Westeros")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool GarrisonGrowthOnlyRecruits { get; set; } = true;
+
+        [SettingPropertyBool("Militia From Free Hands", HintText = "militia grows only from the free hands of its own land: each new militiaman leaves his village (1/k of a hearth) or town, a land with no free hands left raises no new militia, and militia that shrinks without a fight goes back home")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool MilitiaFromFreeHands { get; set; } = true;
+
+        [SettingPropertyBool("New Party From People", HintText = "a lord raising a new party takes his men from the free hands of his seat's land, not out of thin air; with no free hands and no garrison to spare he rides out with fewer men and recruits the rest")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool NewPartyFromPeople { get; set; } = true;
+
+        [SettingPropertyBool("New Party From Seat Garrison", HintText = "when the land has no free hands left, a new party takes its men from the garrison of the lord's seat (the garrison keeps at least 25 men in a castle, 50 in a town; their gear goes with them)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool NewPartyFromSeatGarrison { get; set; } = true;
+
+        [SettingPropertyBool("New Party Grain From Seat", HintText = "the grain a new lord's party sets out with comes from the food stores of his seat (or the nearest fortress of his realm), not out of thin air")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool NewPartyGrainFromSeat { get; set; } = true;
+
+        [SettingPropertyBool("Caravans From People", HintText = "a new caravan's guards and drivers are people of the town it sets out from (villagers, if it starts from a village), and a sea convoy fills its ranks from the town it reaches")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CaravansFromPeople { get; set; } = true;
+
+        [SettingPropertyBool("Travellers From People", HintText = "Banner Kings travellers and convoys are real people: they leave their home's people when they set out and join the people of the place they reach (most simply come back home); convoy escorts go back home when the convoy is done")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TravellersFromPeople { get; set; } = true;
+
+        [SettingPropertyBool("Town Growth Enabled", HintText = "towns have their own births and deaths (a medieval town buried more than it baptised) and are refilled by people from their own villages when the land is not starving. Needs Town People Frozen and Natural Growth Enabled")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownGrowthEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Growth Penalty Percent", 0.00f, 3.00f, "0.0", HintText = "how many points a year a town's natural rate stays below that of its villages (1 = London 1580-1650, about 0.87 births for each death)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float TownGrowthPenaltyPercent { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("Town Migration Refill Days", 0, 1456, "0", HintText = "villagers move to their town to cover its natural shortfall and the gap to its share of the land's people within about this many days (0 = only the natural shortfall)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int TownMigrationRefillDays { get; set; } = 364;
 
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4938,6 +4978,16 @@ namespace Armoury
             s.FreeHandsIronIslandsExtraMax = FreeHandsIronIslandsExtraMax;
             s.FreeHandsBrake = FreeHandsBrake;
             s.PeopleMenuEntry = PeopleMenuEntry;
+            s.GarrisonGrowthOnlyRecruits = GarrisonGrowthOnlyRecruits;
+            s.MilitiaFromFreeHands = MilitiaFromFreeHands;
+            s.NewPartyFromPeople = NewPartyFromPeople;
+            s.NewPartyFromSeatGarrison = NewPartyFromSeatGarrison;
+            s.NewPartyGrainFromSeat = NewPartyGrainFromSeat;
+            s.CaravansFromPeople = CaravansFromPeople;
+            s.TravellersFromPeople = TravellersFromPeople;
+            s.TownGrowthEnabled = TownGrowthEnabled;
+            s.TownGrowthPenaltyPercent = TownGrowthPenaltyPercent;
+            s.TownMigrationRefillDays = TownMigrationRefillDays;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

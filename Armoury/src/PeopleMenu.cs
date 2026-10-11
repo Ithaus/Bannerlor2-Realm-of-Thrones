@@ -63,10 +63,20 @@ namespace Armoury
                     sb.Append("At home: ").Append(N(v.Dom)).Append(" (villages ").Append(N(v.VillagePeople)).Append(" in ").Append(v.Villages).Append(v.Villages == 1 ? " village" : " villages");
                     if (v.TownPeople > 0) sb.Append(", town ").Append(N(v.TownPeople));
                     sb.Append(")\n");
+                    // E4/8 (R2, 9.6): miasto - mieszczanie i rok w dzisiejszym tempie (z liczb doby, bez nowego stanu)
+                    try
+                    {
+                        double tp, tn, tm;
+                        if (region != null && region.IsTown && TownGrowth.MenuOf(region, out tp, out tn, out tm))
+                            sb.Append("Townsfolk: ").Append(N(tp)).Append(" (a year at today's rate: births minus deaths ").Append(tn >= 0 ? "+" : "-").Append(N(Math.Abs(tn)))
+                              .Append(", newcomers from the villages ").Append(N(tm)).Append(")\n");
+                    }
+                    catch (Exception e) { Log.Error("PeopleMenu.Townsfolk", e); }
                     sb.Append("Under arms: ").Append(N(v.S)).Append(" men from this land serve in parties, garrisons, militias, caravans and bands\n");
                     sb.Append("Held captive: ").Append(N(v.J)).Append('\n');
                     sb.Append("Outlaws from this land: ").Append(N(v.Wy)).Append('\n');
                     if (v.Carts > 0) sb.Append("On the roads with the village carts and boats: ").Append(N(v.Carts)).Append('\n');
+                    if (v.Road >= 1.0) sb.Append("Travelling with Banner Kings travellers and convoys: ").Append(N(v.Road)).Append('\n');     // E4/8 (R19)
                     if (v.U > 0 || Devastation.On) sb.Append("Refugees: ").Append(N(v.U)).Append('\n');
                     sb.Append("Fallen since the reckoning began: ").Append(N(v.Fallen)).Append('\n');
                     if (v.Enslaved + v.ToWall >= 1.0) sb.Append("Sold into slavery or sent to the Wall since the reckoning began: ").Append(N(v.Enslaved + v.ToWall)).Append('\n');
