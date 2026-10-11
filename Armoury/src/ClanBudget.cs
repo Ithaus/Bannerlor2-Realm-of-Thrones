@@ -620,6 +620,7 @@ namespace Armoury
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
             seat.Town.ChangeGold(ix);                              // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
             ClanIncomeBook.NoteOwnPaid(seat, c, ix);               // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik)
+            try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
             _dCourt += ix;
         }
@@ -756,7 +757,7 @@ namespace Armoury
                 {
                     int share = (int)((long)purse * gone / menBefore);
                     int took = share > 0 ? MenPurse.Take(mp, share) : 0;
-                    if (took > 0) { village.SettlementComponent.ChangeGold(took); _dRelPurse += took; }
+                    if (took > 0) { village.SettlementComponent.ChangeGold(took); _dRelPurse += took; try { TownFolk.Note(village, took, TownFolk.KReleased); } catch { } }   // E5/0 (195): sakiewka zwolnionych do kiesy wsi (tylko licznik)
                 }
             }
             catch (Exception e) { Stumble("ReleaseFrom(sakiewka)", e); }

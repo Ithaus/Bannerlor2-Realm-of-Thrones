@@ -171,6 +171,7 @@ namespace Armoury
                         int paid = MenPurse.Take(mp, cost);                    // cost <= budget <= sakiewka - paid == cost
                         comp.ChangeGold(paid);                                  // sakiewka ludzi -> kasa osady (bez zdarzenia gry; obie strony w "Pieniadz swiata")
                         MoneyLedger.Note(MoneyLedger.NBkSupply, st, paid);      // ksiega przeplywow osad (tylko licznik)
+                        try { TownFolk.Sale(st, paid, TownFolk.MixFood); } catch { }   // E5/0 (195): zaopatrzenie BK z sakiewek (tylko licznik)
                         SoldierPay.Hold(st, paid);                              // tarcza zoldu w miescie - jak odziez wojska i "zycie"
                         _dPurseGold += paid;
                         cost = paid;

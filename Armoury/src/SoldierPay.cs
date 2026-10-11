@@ -474,6 +474,7 @@ namespace Armoury
                     ClanIncomeBook.NoteOwnPaid(st, clan, coffers);      // 169c: "wlasne" D stalego - zold zalogi rodu w kasie jego osady (tylko licznik)
                     if (st.IsTown) { _dToTowns += coffers; _dToTownsN++; Hold(st, coffers); } else { _dToCastles += coffers; _dToCastlesN++; }
                     MoneyLedger.Note(MoneyLedger.NWage, st, coffers);   // ksiega przeplywow osad (tylko licznik)
+                    try { TownFolk.Note(st, coffers, TownFolk.KGarrison); } catch { }   // E5/0 (195): zold zalogi wydany na miejscu (tylko licznik)
                     MoneyLedger.NoteWageRouted(false, coffers);
                 }
                 // 150: zaloga na zoldzie zdziera odziez - miasto z polki bez zlota, zamek placi miastu. K1: `paid` sluzy tu tylko jako czesc

@@ -328,6 +328,7 @@ namespace Armoury
                 shop.ChangeGold(-paid);
                 town.ChangeGold(paid);
                 MoneyLedger.NoteWorkshopPay(shop.Settlement, wages ? paid : 0, wages ? 0 : paid);
+                try { TownFolk.Note(shop.Settlement, paid, wages ? TownFolk.KCraftPaid : TownFolk.KShopKeep); } catch { }   // E5/0 (195): place i utrzymanie z kapitalu (tylko licznik)
                 if (wages) _dWageCap += paid; else _dKeepCap += paid;
             }
             if (paid < rest) _dUnpaid += rest - paid;
@@ -502,6 +503,7 @@ namespace Armoury
             w.ChangeGold(-n);
             town.ChangeGold(n);
             MoneyLedger.NoteWorkshopFair(w.Settlement, n);
+            try { TownFolk.Note(w.Settlement, n, TownFolk.KCraftFair); } catch { }   // E5/0 (195): nadwyzka ceny wyrobu (odczyt - jest w wartosci wyrobow)
             st.Capped++; st.Kept += n;
         }
 

@@ -86,6 +86,8 @@ RANGES = {
     'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
     'FreeHandsElasticity': (0.0, 2.0, "0.00"),
     'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
+    # E5/0: tryb kiesy ludu 0..1 (regula ogolna dalaby suwak 0..10)
+    'TownFolkMode': (0, 1, "0"),
 }
 
 def gen(module_dir, ns, display):

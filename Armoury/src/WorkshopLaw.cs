@@ -323,6 +323,7 @@ namespace Armoury
                     workshop.ChangeGold(rev);
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, wagesI);   // ksiega przeplywow osad (tylko liczniki)
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, -rev);
+                    try { TownFolk.Note(workshop.Settlement, wagesI, TownFolk.KCraftPaid); } catch { }   // E5/0 (195): place cyklu juz wyplacone - kontrola plac 35% (tylko licznik)
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);
                     CampaignEventDispatcher.Instance.OnItemProduced(w.Item, workshop.Settlement, 1);
                     Measure174b.NoteArrival(workshop.Settlement, w.Item, 1, Measure174b.ArrWorkshop);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
@@ -452,6 +453,7 @@ namespace Armoury
             workshop.ChangeGold(-st.Mc);
             town.ChangeGold(st.Mc);                   // surowce kupione od miasta
             MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, st.Mc);       // ksiega przeplywow osad (tylko licznik)
+            try { TownFolk.Sale(workshop.Settlement, st.Mc, TownFolk.MixGoods); } catch { }   // E5/0 (195): surowce kupione od kupcow (tylko licznik)
             w.Item = c.Item; w.Days = c.Days; w.MatCost = st.Mc;
             _started++;
             WipBasketAdd(town, c.Basket, +1);

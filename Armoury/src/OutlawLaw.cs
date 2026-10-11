@@ -1772,6 +1772,7 @@ namespace Armoury
                     p.PartyTradeGold = purse - spend;
                     town.Town.ChangeGold(spend);
                     MoneyLedger.Note169(MoneyLedger.N169Other, town, spend);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
+                    try { TownFolk.Note(town, spend, TownFolk.KLifeBand); } catch { }   // E5/0 (195): zycie band w miescie (tylko licznik)
                     _lifeBands += spend;
                 }
                 catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(banda)", e); } }

@@ -191,6 +191,7 @@ namespace Armoury
         {
             try
             {
+                TownFolk.OnTownCoin(st, amount, TownFolk.BOurs);   // E5/0 (195): nasze sciezki zakupu kas miast - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
                 if (_inBlock || amount == 0 || kind < 0 || kind >= N169 || !CW.On) return;
                 int c = ClassOf(st);
                 if (c < 0) return;
@@ -565,6 +566,7 @@ namespace Armoury
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
               .Append(", z rozbitych partii ").Append(_purseGoneWin + _purseGoneTown).Append(" (do zwyciezcow ").Append(_purseGoneWin).Append(", do miast ").Append(_purseGoneTown)
               .Append("), markietani -, ze zwolnionymi do kies wsi (166) ").Append(ClanBudget.LastReleasedPurse).Append(" (ludzi ").Append(ClanBudget.LastReleasedMen).Append(")")
+              .Append(TownFolk.On ? ", = " + (lordAcc + garAcc > 0 ? ((double)now[HPurses] / (lordAcc + garAcc)).ToString("0.0", Inv) : "-") + " dni zoldu naliczonego (partie i zalogi; E5/0)" : "")
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony -")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
@@ -627,6 +629,29 @@ namespace Armoury
             return sb.ToString();
         }
 
+        // ------------------------------------------------------------ E5/0 (195): "Gotowka wsi (E5/0)" - liczby tej doby ksiegi (przed ClearDay)
+        /// <summary>
+        /// Cala gotowka wplywajaca do wsi i kto ja bierze (rozpoznanie A rozdz. 4): utarg taborow przy powrocie do wsi, przelewy gry (GiveGoldAction - jak
+        /// "Przeplywy osad (kiesy wsi)"), sakiewki zwolnionych (166); pan = licznik podatku wsi + renta, majatki BK, korona z kies wsi (pozycja ticku "korona"),
+        /// wies = reszta. Podzial wedlug polityki BK z TownFolk (te same zdarzenia - jedna definicja utargu). Tylko odczyt; przy okazji TownFolk bierze z ksiegi
+        /// obiegu "bitwy" i pasmo notabli (kontrola linii Bitwy i Notable - liczniki zeruje ClearDay po tej linii).
+        /// </summary>
+        private static string VillageCashLine(int day)
+        {
+            TownFolk.TakeLedger(CW.In[CW.KBattle], CW.Out[CW.KBattle], CW.In[CW.KNotableBand], CW.Out[CW.KNotableBand]);
+            long trans = _fromNothing[CVill] - _toNothing[CVill];
+            for (int p = 0; p < Sides; p++) trans += _goldIn[CVill, p] - _goldOut[CVill, p];
+            long rel = ClanBudget.LastReleasedPurse, rent = PopulationLaw.DayVillageRent, crown = -_mark[CVill, MCrown];
+            long g = _vHanded + trans + rel, lord = _vTax + rent, rest = g - lord - _vEstates - crown;
+            long ph, pt, pr;
+            string split = TownFolk.VillagePolicySplit(out ph, out pt, out pr);
+            return "Gotowka wsi (E5/0): dzien " + day + " | wplynelo " + g + " = utarg " + _vHanded + " + przelewy gry " + trans + " + sakiewki zwolnionych " + rel
+                   + " | pan (licznik podatku wsi " + _vTax + " + renta " + rent + ") " + Pct(lord, g) + ", majatki BK " + _vEstates + " (" + Pct(_vEstates, g) + "), korona " + crown + " (" + Pct(crown, g)
+                   + "), wies (zostalo w kiesie) " + rest + " (" + Pct(rest, g) + ")"
+                   + " | wedlug polityki BK: " + split
+                   + " | kontrola podzialu: utarg " + ph + " wobec " + _vHanded + ", przelewy " + pt + " wobec " + trans + ", sakiewki " + pr + " wobec " + rel + ".";
+        }
+
         // ------------------------------------------------------------ 6.6 "Obieg: notable i karawany"
         private static string ObiegNotablesLine(int day, long[] now, long[] last)
         {
@@ -651,7 +676,7 @@ namespace Armoury
               .Append(" | karawany notabli [P]: ").Append(Sm[CW.ICaravanN]).Append(" karawan u ").Append(Sm[CW.ICaravanNotables]).Append(" notabli, zold nalezny ")
               .Append(Sm[CW.ICaravanDue]).Append(", zold w nicosc ").Append(WvNeg(u1c + u1n, CW.WCaravanWage)).Append(" (z kas karawan ").Append(Neg(u1c)).Append(", z kies notabli ")
               .Append(Neg(u1n)).Append("), niedoplata ").Append(Sm[CW.ICaravanShort]).Append(" (karawan, ktorych kasa nie starczyla na zold: ").Append(Sm[CW.ICaravanShortN])
-              .Append(" - placil notabl), doplaty notabli do 5000 ").Append(S(Sm[CW.ICaravanTopup])).Append(" (przelew); po planowanej zmianie: zold do sakiewek ludzi karawan")
+              .Append(" - placil notabl), doplaty notabli do 5000 ").Append(S(Sm[CW.ICaravanTopup])).Append(" (przelew); zold idzie do sakiewek ludzi karawan (E3/4), karawana wydaje je w miescie")
               .Append(" | karawany lordow: zold naliczony ").Append(Neg(_wage[WCaravan])).Append(" (").Append(_wageN[WCaravan]).Append(" karawan)")
               .Append(" | nowe karawany: ").Append(newN).Append(" (notable ").Append(newNot).Append(", lordowie ").Append(newN - newNot).Append(", w tym kupione przez lordow BK ")
               .Append(Sm[CW.ICaravanBuyN]).Append("), kapital nadany z niczego ").Append(Both(z2, CW.WCaravanCap, CW.WCaravanNew, true)).Append(CW.Wired[CW.WCaravanCap] && CW.Wired[CW.WCaravanNew] ? " zl" : "").Append(" (w kasach zaraz po wejsciu do osady ")

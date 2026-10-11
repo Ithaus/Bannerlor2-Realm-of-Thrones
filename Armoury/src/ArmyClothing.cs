@@ -180,6 +180,7 @@ namespace Armoury
                 int taken = MenPurse.Take(mp, spent);                            // spent <= budget <= sakiewka - taken == spent
                 st.Town.ChangeGold(taken);                                      // kupcy miasta dostaja zloto, ktore inaczej poszloby "na zycie"
                 MoneyLedger.Note(MoneyLedger.NCloth, st, taken);                // ksiega przeplywow osad (tylko licznik)
+                try { TownFolk.Sale(st, taken, TownFolk.MixCloth); } catch { }   // E5/0 (195): odziez z sakiewek (tylko licznik)
                 SoldierPay.Hold(st, taken);                                     // tarcza zoldu: jak wydatek "na zycie"
                 for (int g = 0; g < Goods; g++) _dParty[g] += got[g];
                 _dPartyGold += taken;
@@ -238,6 +239,7 @@ namespace Armoury
                 market.Town.ChangeGold(spent);                                  // ... kupcom miasta
                 MoneyLedger.Note(MoneyLedger.NCloth, st, -spent);
                 MoneyLedger.Note(MoneyLedger.NCloth, market, spent);
+                try { TownFolk.Sale(market, spent, TownFolk.MixCloth); } catch { }   // E5/0 (195): odziez zalogi zamku kupiona w miescie (tylko licznik)
                 SoldierPay.Hold(market, spent);                                 // zold zalogi wydany w miescie - jak wydatek "na zycie"
                 for (int g = 0; g < Goods; g++) _dCastle[g] += got[g];
                 _dCastleGold += spent;
