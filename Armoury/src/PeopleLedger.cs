@@ -474,7 +474,7 @@ namespace Armoury
 
                 // 3. swiat i obciazenie regionow
                 double people = 0, peopleNodes = 0, lastPeople = 0; float pool = 0f;
-                int over = 0, noPeople = 0, starving = 0, foodMinus = 0, fiefs = 0;
+                int over = 0, noPeople = 0, starving = 0, foodMinus = 0, fiefs = 0, r5 = 0;
                 var ranked = new List<Row>();
                 foreach (var r in order)
                 {
@@ -483,8 +483,15 @@ namespace Armoury
                     if (_lastPeople.TryGetValue(r.St.StringId, out last)) lastPeople += last;
                     if (r.People > 0f)
                     {
-                        r.Burden = (r.Garrison + r.Pool + r.BandMen) / (r.People * MenShare);
-                        if (r.Burden > FreeHands) over++;
+                        // E4/7 (U19): przy czynnej ksiedze pochodzenia obciazenie = a z R5 ((sluzba i jency z regionu + polegli netto) / mezczyzni w dniu siewu), prog = f krainy;
+                        // przed siewem / wylaczone - stara definicja (zaloga + wyrzutki + bandy) / mezczyzni regionu, prog 20%
+                        double a5, f5;
+                        if (Armoury.FreeHands.AF(r.St, out a5, out f5)) { r.Burden = (float)a5; r5++; if (a5 > f5 && f5 < 0.999) over++; }
+                        else
+                        {
+                            r.Burden = (r.Garrison + r.Pool + r.BandMen) / (r.People * MenShare);
+                            if (r.Burden > FreeHands) over++;
+                        }
                         ranked.Add(r);
                     }
                     else noPeople++;
@@ -553,7 +560,7 @@ namespace Armoury
                 }
                 if (calibrated && menWorld > 0)
                     sb.Append(" | pod bronia (partie rodow + garnizony): ").Append((100.0 * (men[KLord] + men[KGarrison]) / menWorld).ToString("0.00", CultureInfo.InvariantCulture))
-                      .Append("% mezczyzn swiata; regionow ponad prog 20% mezczyzn: ").Append(over).Append(" z ").Append(order.Count)
+                      .Append(r5 > 0 ? "% mezczyzn swiata; regionow ponad prog wolnych rak (R5, wedlug krain): " : "% mezczyzn swiata; regionow ponad prog 20% mezczyzn: ").Append(over).Append(" z ").Append(order.Count)
                       .Append(" (bez ludnosci w ksiedze ").Append(noPeople).Append(')');
                 sb.Append(" | warownie glodne ").Append(starving).Append(", z ujemnym bilansem zywnosci ").Append(foodMinus).Append(" z ").Append(fiefs).Append('.');
                 if (_stumbles > 0) sb.Append(" Potkniecia ksiegi: ").Append(_stumbles).Append('.');
@@ -685,26 +692,32 @@ namespace Armoury
             long t1 = System.Diagnostics.Stopwatch.GetTimestamp();   // czas linii Krainy + Straz (po linii Partie) - na koncu linii Straz (T8 calosc)
 
             // 2. Krainy - regiony po kulturze z pierwszej doby sesji
-            var kr = new Dictionary<string, double[]>();   // [ludzie, zaloga + wyrzutki + bandy, wyrzutki, zabici dzis]
+            var kr = new Dictionary<string, double[]>();   // [ludzie, zaloga + wyrzutki + bandy, wyrzutki, zabici dzis, E4/7: S + K_m, 0.27 x L_ref, prog f]
+            bool r5 = false;
             foreach (var r in order)
             {
                 try
                 {
                     string c = Measure40.CultureAtStart(r.St);
-                    double[] a; if (!kr.TryGetValue(c, out a)) { a = new double[4]; kr[c] = a; }
+                    double[] a; if (!kr.TryGetValue(c, out a)) { a = new double[7]; kr[c] = a; }
                     int kin; _killedIn.TryGetValue(r.St.StringId, out kin);
                     a[0] += r.People; a[1] += r.Garrison + r.Pool + r.BandMen; a[2] += r.Pool; a[3] += kin;
+                    // E4/7 (U19): obciazenie krainy z jednej definicji R5 - suma (S + K_m) / suma (0.27 x L_ref) jej regionow, prog f krainy
+                    var cell = Armoury.FreeHands.Of(r.St);
+                    if (cell != null && cell.LRef > 0) { a[4] += cell.S + cell.Km; a[5] += PeopleBook.MenShare * cell.LRef; a[6] = cell.F; r5 = true; }
                 }
                 catch { _e40Stumbles++; }
             }
-            foreach (var kv in lordByCult) if (!kr.ContainsKey(kv.Key)) kr[kv.Key] = new double[4];
-            foreach (var kv in disC) if (!kr.ContainsKey(kv.Key)) kr[kv.Key] = new double[4];
+            foreach (var kv in lordByCult) if (!kr.ContainsKey(kv.Key)) kr[kv.Key] = new double[7];
+            foreach (var kv in disC) if (!kr.ContainsKey(kv.Key)) kr[kv.Key] = new double[7];
             var keys = new List<string>(kr.Keys);
             keys.Sort((a, b) => kr[b][0].CompareTo(kr[a][0]));
             bool slavesData = Measure169c.LinesOn;
             var kb = new StringBuilder(4000);
-            kb.Append("Krainy (4.15): dzien ").Append(day).Append(" | kraina = kultura regionu z pierwszej doby sesji; obciazenie wedlug PeopleLedger: (zaloga + wyrzutki + bandy) / mezczyzni regionu")
-              .Append(" (od E4/7 jedna definicja R5); partie rodow wedlug Kingdom.Culture |");
+            kb.Append("Krainy (4.15): dzien ").Append(day).Append(" | kraina = kultura regionu z pierwszej doby sesji; obciazenie ")
+              .Append(r5 ? "R5 (E4/7, jedna definicja z ksiegi pochodzenia): (sluzba i jency z regionu + polegli netto) / mezczyzni w dniu siewu, prog wedlug krain"
+                         : "wedlug PeopleLedger: (zaloga + wyrzutki + bandy) / mezczyzni regionu (ksiega pochodzenia E4/7 przed siewem albo wylaczona)")
+              .Append("; partie rodow wedlug Kingdom.Culture |");
             for (int i = 0; i < keys.Count; i++)
             {
                 var c = keys[i]; var a = kr[c];
@@ -713,7 +726,8 @@ namespace Armoury
                 int dis; disC.TryGetValue(c, out dis);
                 long sl = 0; bool hasSl = slavesData && Measure169c.SlavesOf(c, day, out sl);
                 kb.Append(i > 0 ? "; " : " ").Append(c).Append(": ludzie ").Append(a[0].ToString("0", ci)).Append(" / mezczyzni ").Append(menK.ToString("0", ci))
-                  .Append(" / obciazenie ").Append(menK > 0 ? (100.0 * a[1] / menK).ToString("0.00", ci) + "%" : "-").Append(" [prog ").Append(ProgOf(c)).Append(']')
+                  .Append(" / obciazenie ").Append(r5 ? (a[5] > 0 ? (100.0 * a[4] / a[5]).ToString("0.00", ci) + "%" : "-") : (menK > 0 ? (100.0 * a[1] / menK).ToString("0.00", ci) + "%" : "-"))
+                  .Append(" [prog ").Append(r5 && a[5] > 0 ? (c == "nightswatch" ? "- (Dar: " + (100.0 * a[6]).ToString("0", ci) + " tylko plon)" : (100.0 * a[6]).ToString("0.#", ci)) : ProgOf(c)).Append(']')
                   .Append(" / partie rodow ").Append(lords).Append(" / wyrzutki ").Append(a[2].ToString("0", ci))
                   .Append(" / niewolni BK ").Append(hasSl ? sl.ToString(ci) : "brak danych 169c")
                   .Append(" / zabici dzis ").Append(a[3].ToString("0", ci)).Append(" / zmarli z zarazy dzis ").Append(dis);

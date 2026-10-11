@@ -199,6 +199,13 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((hands - 1f) * sum, _txtRuin);
                 }
+                // E4/7 (R9 b): czynnik rak L (sluzba i polegli ponad wolne rece krainy) - mnozy sie z (a) tym samym wzorem (czynnik x suma po (a)), bez progu 0.001
+                float war = FreeHands.YieldFactor(village);
+                if (war != 1f)
+                {
+                    float sum = 1f + __result.SumOfFactors;
+                    if (sum > 0f) __result.AddFactor((war - 1f) * sum, FreeHands.HandsText);
+                }
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { }

@@ -1,0 +1,93 @@
+using System;
+using System.Globalization;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+
+namespace Armoury
+{
+    /// <summary>
+    /// E4/7 (164b-1, U21; Jeff 05.10 SP:347 "ksiega ma byc do sprawdzenia ... pozycja w menu osady"): pozycja "People of this land" w menu wsi, miasta i zamku -
+    /// okno informacyjne (InformationManager.ShowInquiry) z kontami regionu osady (warownia OutlawLaw.RegionFor): w domu, pod bronia, w niewoli, wyrzutki, uchodzcy,
+    /// polegli i narodziny od poczatku ksiegi, wolne rece i plon. Liczby z cache doby (ta sama doba co linie "Pochodzenie (E4/7)" i "Wolne rece (E4/7)").
+    /// Bez GameMenu.SwitchToMenu (CLAUDE.md 7) i bez stanu. Napisy po angielsku. Wylacznik PeopleMenuEntry. E4/11 rozszerzy te sama pozycje o wioski poboczne.
+    /// </summary>
+    internal static class PeopleMenu
+    {
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        internal static void AddMenus(CampaignGameStarter starter)
+        {
+            try
+            {
+                foreach (var menu in new[] { "village", "town", "castle" })
+                    starter.AddGameMenuOption(menu, "arm_people_" + menu, "{=!}People of this land", Condition, Consequence, false, 6);
+                Log.Info("PeopleMenu (E4/7): pozycja \"People of this land\" w menu wsi, miasta i zamku wpieta (wylacznik People Menu Entry).");
+            }
+            catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }
+        }
+
+        private static bool Condition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Manage;
+                var s = Settings.Current;
+                return s != null && s.PeopleMenuEntry && Settlement.CurrentSettlement != null;
+            }
+            catch { return false; }
+        }
+
+        private static string N(double v) { return Math.Max(0.0, v).ToString("N0", Inv); }
+        private static string P(double v) { return (100.0 * v).ToString("0.#", Inv) + "%"; }
+
+        private static void Consequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                if (st == null) return;
+                var region = OutlawLaw.RegionFor(st);
+                string name = region != null && region.Name != null ? region.Name.ToString() : (st.Name != null ? st.Name.ToString() : "this land");
+                string title = "The people of " + name + (st.IsVillage ? " and its villages" : "");
+                var v = PeopleBook.ViewOf(region);
+                var sb = new StringBuilder(800);
+                if (v == null || !PeopleBook.OriginLive)
+                {
+                    sb.Append("The people of this land have not been reckoned yet.");
+                }
+                else
+                {
+                    sb.Append("At home: ").Append(N(v.Dom)).Append(" (villages ").Append(N(v.VillagePeople)).Append(" in ").Append(v.Villages).Append(v.Villages == 1 ? " village" : " villages");
+                    if (v.TownPeople > 0) sb.Append(", town ").Append(N(v.TownPeople));
+                    sb.Append(")\n");
+                    sb.Append("Under arms: ").Append(N(v.S)).Append(" men from this land serve in parties, garrisons, militias, caravans and bands\n");
+                    sb.Append("Held captive: ").Append(N(v.J)).Append('\n');
+                    sb.Append("Outlaws from this land: ").Append(N(v.Wy)).Append('\n');
+                    if (v.Carts > 0) sb.Append("On the roads with the village carts and boats: ").Append(N(v.Carts)).Append('\n');
+                    if (v.U > 0 || Devastation.On) sb.Append("Refugees: ").Append(N(v.U)).Append('\n');
+                    sb.Append("Fallen since the reckoning began: ").Append(N(v.Fallen)).Append('\n');
+                    if (v.Enslaved + v.ToWall >= 1.0) sb.Append("Sold into slavery or sent to the Wall since the reckoning began: ").Append(N(v.Enslaved + v.ToWall)).Append('\n');
+                    if (Math.Abs(v.Born) >= 1.0) sb.Append(v.Born >= 0 ? "Born since the reckoning began (net): " : "Lost to hard years since the reckoning began (net): ").Append(N(Math.Abs(v.Born))).Append('\n');
+                    if (v.Civil >= 1.0) sb.Append("Common folk who died of war and want: ").Append(N(v.Civil)).Append('\n');
+                    var c = FreeHands.Of(region);
+                    if (v.Realm == "nightswatch") sb.Append("The Watch takes men from all of Westeros - no limit here.\n");
+                    else if (c != null)
+                    {
+                        sb.Append("Free hands used: ").Append(P(c.A)).Append(" of ").Append(c.F >= 0.999 ? "all" : P(c.F)).Append(" of the men");
+                        // recenzja E4/7 R2-4: rzeczywisty czynnik okna zniw z MCM (Free Hands Harvest Factor), nie stale "halved"
+                        if (FreeHands.HarvestNow && c.F < 0.999 && Settings.Current != null)
+                            sb.Append(" (harvest: only ").Append(P(Math.Max(0.0, Math.Min(1.0, Settings.Current.FreeHandsHarvestFactor)))).Append(" of the usual share is free)");
+                        sb.Append('\n');
+                        if (c.Brake && Settings.Current != null && Settings.Current.FreeHandsBrake) sb.Append("No new levies: this land has no free hands left.\n");
+                    }
+                    if (c != null && c.L < 1.0) sb.Append("Harvest of the fields: ").Append(P(c.L)).Append('\n');
+                }
+                InformationManager.ShowInquiry(new InquiryData(title, sb.ToString().TrimEnd('\n'), true, false, "Close", null, delegate { }, null), true);
+            }
+            catch (Exception e) { Log.Error("PeopleMenu.Consequence", e); }
+        }
+    }
+}

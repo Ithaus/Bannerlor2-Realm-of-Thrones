@@ -841,6 +841,9 @@ def etap4_main(logp, start_arg, until=120):
     # ---------------- E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu, H w przyroscie
     if any(x.startswith("Famine (E4/6):") for x in lines):
         etap4_e46(rep, lines, start, win, until)
+    # ---------------- E4/7 (164b-1): pochodzenie, pobor z wsi, polegly trwale, wolne rece, okno zniw, menu osady
+    if any(x.startswith("Pochodzenie (E4/7): wpiete") for x in lines):
+        etap4_e47(rep, lines, start, win, hea, lud, until)
 
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
@@ -1011,6 +1014,168 @@ def etap4_e43(rep, lines, start, win, hea, par, lud, until, ust):
         nb = re.search(r"bandy nowe (\d+) \((\d+) ludzi\), odmowione (\d+), puste usuniete (\d+)", first)
         rep.add("E4/3: bandy d1 - nowe (ludzi), odmowione, puste usuniete", (f"{nb.group(1)} ({nb.group(2)}), {nb.group(3)}, {nb.group(4)}") if nb else "brak",
                 f"INFO wobec bez E4/3: {E43_BASE['new1']} ({E43_BASE['newmen1']}), puste {E43_BASE['empty1']} (geografia band - 108 ryzyko 1)", None)
+
+
+def etap4_e47(rep, lines, start, win, hea, lud, until):
+    """E4/7 (164b-1): progi T1-T15 z planu kodu docs/etap4/PLAN-KODU-E47.md rozdz. 9 (stan z linii dziennych, nie startowej - poprawka R2-1 E4/3).
+    Linie: "Pochodzenie (E4/7): dzien" (kontrola, wejscia/wyjscia, z niczego / w nicosc, DeduceManpower, czas), "Wolne rece (E4/7): dzien" (a, prog, L, hamulec),
+    "Ludzie (ksiega)" odcinek E4/7 (rownanie krain), "Pobor:" dopisek E4/7 (chec, odmowione przez ksiege, pula BK = 0), "Ludzie:" (wojsko lordow, ludnosc netto)."""
+    stl = next((x for x in lines if x.startswith("Pochodzenie (E4/7): wpiete")), "")
+    rep.add("E4/7 T1: linia startowa (latki ksiegi pochodzenia)", stl[:260], "\"BRAK: -\"", ("BRAK: -" in stl) if stl else False)
+    poc = e4_series(lines, "Pochodzenie (E4/7): dzien")
+    wr = e4_series(lines, "Wolne rece (E4/7): dzien")
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    pdays = [d for d in sorted(poc) if 1 <= run_day(d, start) <= until]
+    if not pdays:
+        rep.add("E4/7: linie dzienne \"Pochodzenie (E4/7)\"", "brak (przed siewem albo People Origin Enabled wylaczone)", "kazdej doby po siewie", False)
+        return
+    stum = [num(r"\| potkniecia (\d+) \(razem", poc[d], int, 0) or 0 for d in pdays]
+    fst = [num(r"\| potkniecia (\d+)\.", wr[d], int, 0) or 0 for d in sorted(wr) if 1 <= run_day(d, start) <= until]
+    rep.add("E4/7 T1: potkniecia ksiegi pochodzenia i wolnych rak (suma dob)", f"Pochodzenie {sum(stum)}, Wolne rece (najwiecej) {max(fst) if fst else 0}",
+            "<= 5 (z nazwa miejsca w ERROR)", sum(stum) + (max(fst) if fst else 0) <= 5)
+    # T2 - kontrola kodu stanu kont
+    ctl = [fnum(r"kontrola: zmiana stanu - \(wejscia - wyjscia \+ z - q\) = " + SF, poc[d]) for d in pdays]
+    ctl = [x for x in ctl if x is not None]
+    rep.add("E4/7 T2: Pochodzenie - kontrola (najwieksza |roznica|)", f"{max(abs(x) for x in ctl):.2f} ({len(ctl)} dob)" if ctl else "brak (pierwsza doba sesji)",
+            "<= 1 czlowiek kazdej doby", (max(abs(x) for x in ctl) <= 1.0) if ctl else None)
+    # T3 - rownanie krain (odcinek E4/7 w Ludzie (ksiega)); przy RESZCIE hearth != 0 (D3) - INFO
+    rq = [re.search(r"rownanie krain: najgorsza kraina (\S+) reszta " + SF + r" \(" + SF + r"% ludzi krainy\)", kb[d]) for d in pdays if d in kb]
+    rq = [(m.group(1), float(m.group(2)), float(m.group(3))) for m in rq if m]
+    hrest = [fnum(r"\| RESZTA " + SF, hea[d]) for d in pdays if d in hea]
+    hrest = [x for x in hrest if x is not None]
+    d3 = (st.mean(abs(x) for x in hrest) <= 1.0) if hrest else False
+    if rq:
+        worst = max(rq, key=lambda x: abs(x[2]))
+        rep.add("E4/7 T3: rownanie krain - najgorsza kraina (|reszta| % ludzi krainy)", f"{worst[0]} {worst[2]:+.3f}% (reszta {worst[1]:+.0f}); RESZTA hearth srednio {st.mean(abs(x) for x in hrest):.1f}/d" if hrest else f"{worst[0]} {worst[2]:+.3f}%",
+                "<= 0.1% kazdej doby; przy RESZCIE hearth != 0 (D3) - INFO", (abs(worst[2]) <= 0.1) if d3 else None)
+    else:
+        rep.add("E4/7 T3: rownanie krain", "brak odcinka E4/7 w Ludzie (ksiega)", "<= 0.1%", None)
+    # T4/T5 - w nicosc i z niczego wobec ruchu brutto (srednia ostatnich 28 dob okna)
+    last = pdays[-28:]
+    W = [fnum(r"wejscia " + F_ + r", wyjscia", poc[d]) or 0 for d in last]
+    X = [fnum(r", wyjscia " + F_ + r"\)", poc[d]) or 0 for d in last]
+    Q = [fnum(r"w nicosc -" + F_, poc[d]) or 0 for d in last]
+    Z = [fnum(r"z niczego \+" + F_, poc[d]) or 0 for d in last]
+    gross = st.mean(W) + st.mean(X) if W else 0
+    rep.add("E4/7 T4: w nicosc bez nazwy (srednia 28 dob)", f"{st.mean(Q):.0f}/d wobec ruchu brutto {gross:.0f}/d ({100.0 * st.mean(Q) / gross:.2f}%)" if gross else "-",
+            "<= 1% ruchu brutto SLUZBA + JENCY (P rozdz. 4; z30A +1072/d bez nazwy)", (st.mean(Q) <= 0.01 * gross) if gross else None)
+    zk = re.search(r"z niczego \+[\d.]+ \(([^)]*)\)", poc[last[-1]])
+    rep.add("E4/7 T5: z niczego (srednia 28 dob, wedlug rodzaju ostatniej doby)", f"{st.mean(Z):.0f}/d ({100.0 * st.mean(Z) / gross:.1f}% ruchu) [{zk.group(1)[:200] if zk else '-'}]" if gross else "-",
+            "INFO - nazwane wedlug rodzaju (szablony, model zalog, milicja, rabunek BK, gracz - zamyka E4/8/E4/9)", None)
+    # T6 - punkt zdjecia: DeduceManpower = werbunek od notabli + karczma + gracz ("Ludzie:"), poza oknem 0, pobor na podlodze 0
+    dm = [fnum(r"DeduceManpower: wywolan \d+ \(ludzi " + F_, poc[d]) or 0 for d in pdays]
+    out = [num(r"poza oknem (\d+)", poc[d], int, 0) or 0 for d in pdays]
+    flo = [fnum(r"pobor na podlodze \d+ \(ludzi " + F_, poc[d]) or 0 for d in pdays]
+    a5 = [fnum(r"\(wsie [\d.]+, miasta [\d.]+, zamki [\d.]+, karczmy AI [\d.]+, A5 " + F_, poc[d]) or 0 for d in pdays]
+    rec = []
+    for d in pdays:
+        x = lud.get(d)
+        if not x:
+            continue
+        m = re.search(r"od notabli do partii rodow (\d+), od notabli bez wodza - garnizony, karawany (\d+), z karczmy (\d+), bez osady - jency albo ochotnicy z mapy \d+, gracz (\d+)", x)
+        if m:
+            rec.append(sum(int(g) for g in m.groups()))
+    sdm, srec = sum(dm), sum(rec)
+    rep.add("E4/7 T6: DeduceManpower (ludzie) wobec werbunku od notabli + karczma + gracz (Ludzie:)", f"{sdm:.0f} wobec {srec} ({100.0 * (sdm - srec) / srec:+.2f}%); A5 {st.mean(a5):.0f}/d" if srec else f"{sdm:.0f} wobec -",
+            "|roznica| <= 2% (A5 osobno - bez zdarzenia gry)", (abs(sdm - srec) <= 0.02 * srec) if srec else None)
+    rep.add("E4/7 T6: DeduceManpower poza oknem (suma)", sum(out), "0", sum(out) == 0)
+    rep.add("E4/7 T6: pobor na podlodze (suma ludzi)", f"{sum(flo):.0f}", "0 (wies ponizej 50 hearth / bez przelicznika - rekrut bez pochodzenia)", sum(flo) == 0)
+    # T7 - pierwsza doba po siewie: regiony ponad progiem
+    wdays = [d for d in sorted(wr) if 1 <= run_day(d, start) <= until]
+    if wdays:
+        w1 = wr[wdays[0]]
+        ov = num(r"regionow ponad progiem (\d+) z (\d+)", w1)
+        top = re.search(r"\| top 8:(.*?)\| siew", w1)
+        rep.add("E4/7 T7: pierwsza doba wolnych rak - regiony ponad progiem", f"{ov} (top: {top.group(1)[:220].strip() if top else '-'})", "<= 5 (Straz poza lista; L = 1.00 przy a <= f z definicji)",
+                (ov <= 5) if ov is not None else None)
+        lmin = [fnum(r"L: min " + F_, wr[d]) for d in wdays]
+        lmin = [x for x in lmin if x is not None]
+        lo = [num(r"regionow z L < 1 (\d+)", wr[d], int, 0) or 0 for d in wdays]
+        brk = [num(r"hamulec - bez nowych ochotnikow: (\d+)", wr[d], int, 0) or 0 for d in wdays]
+        rep.add("E4/7: wolne rece - L min (cale okno) / regiony z L < 1 / z hamulcem (ostatnia doba)", f"{min(lmin) if lmin else '-'} / {lo[-1]} / {brk[-1]}", "INFO (L >= 0.5 z definicji)", None)
+    else:
+        rep.add("E4/7 T7: wolne rece", "brak linii \"Wolne rece (E4/7)\"", "<= 5 regionow ponad progiem w d1", None)
+    # T8 - Pobor: chec x0.25-0.45 (d28-d120); hamulec ksiegi i BK osobno
+    pob = [s for s in lines if s.startswith("Pobor: dzien")]
+    pk = [(num(r"Pobor: dzien (\d+)", s), s) for s in pob]
+    pk = [(d, s) for d, s in pk if d is not None and 28 <= run_day(d, start) <= until]
+    ch = [fnum(r"chec do sluzby srednio x" + F_, s) for d, s in pk]
+    ch = [x for x in ch if x is not None]
+    rep.add(f"E4/7 T8: Pobor - chec srednio d28-{until}", f"x{st.mean(ch):.2f}" if ch else "brak linii", "x0.25-0.45 (z30A x0.30-0.32; P x0.3-0.4)", (0.25 <= st.mean(ch) <= 0.45) if ch else None)
+    rf = [(num(r"\((\d+) losowan miejsc", s, int, 0) or 0, num(r"odmowione przez ksiege \(a >= f\) (\d+) losowan", s, int, 0) or 0, num(r"pula BK = 0 przy wolnych rekach (\d+) osad", s, int, 0) or 0) for d, s in pk]
+    if rf:
+        n_all = sum(x[0] for x in rf) + sum(x[1] for x in rf)
+        rep.add("E4/7 T8: hamulec ksiegi / pula BK = 0 przy wolnych rekach", f"ksiega {sum(x[1] for x in rf)} z {n_all} losowan ({100.0 * sum(x[1] for x in rf) / n_all:.1f}%), BK = 0: {st.mean(x[2] for x in rf):.0f} osad/d" if n_all else "-",
+                "INFO; hamulec BK > 30% losowan -> zapis do STAN-PRAC (odlozone dopasowanie BEE, P rozdz. 7)", None)
+    # T9 - wojsko lordow d90-d120
+    l90 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 90 <= run_day(d, start) <= min(120, until)]
+    l90 = [x for x in l90 if x is not None]
+    rep.add("E4/7 T9: wojsko lordow srednio d90-d120", f"{st.mean(l90):.0f}" if l90 else "brak dob 90-120", "95-115 tys. (podloga 85 tys.; z30A 107 tys.)", (95000 <= st.mean(l90) <= 115000) if l90 else None)
+    # T10 - Ludnosc BK (169c) d1 -> ostatnia, na rok
+    bk = e4_series(lines, "Ludnosc BK (169c): dzien")
+    bd = [d for d in sorted(bk) if 1 <= run_day(d, start) <= until]
+    if len(bd) >= 2:
+        a, b = num(r"\| ludnosc BK (\d+)", bk[bd[0]]), num(r"\| ludnosc BK (\d+)", bk[bd[-1]])
+        days = max(1, run_day(bd[-1], start) - run_day(bd[0], start))
+        if a and b:
+            yr = (b / a - 1.0) * 364.0 / days * 100.0
+            rep.add("E4/7 T10: Ludnosc BK (169c) na rok", f"{a} -> {b} ({yr:+.2f}%/rok w {days} dobach)", "<= +2%/rok (INFO trendu - A5 z BK)", yr <= 2.0)
+    else:
+        rep.add("E4/7 T10: Ludnosc BK (169c)", "brak linii", "<= +2%/rok", None)
+    # T11 - netto Ludzie: d28-d120 (razem z uchodzcami, gdy jest)
+    net = []
+    for d in win:
+        if d not in lud or run_day(d, start) < 28:
+            continue
+        x = lud[d]
+        v = num(r"razem z nimi [\d.]+ mln \(([+-]?\d+) ludzi\)", x)
+        if v is None:
+            v = num(r"ludnosc [\d.]+ mln \(([+-]?\d+) ludzi\)", x)
+        if v is not None:
+            net.append(v)
+    rep.add(f"E4/7 T11: ludnosc netto d28-{until} (ludzi/d)", f"{st.mean(net):+.0f}/d" if net else "brak", "od -720/d (-0.5%/rok, Jeff 11.10) do +1150/d", (-721 <= st.mean(net) <= 1154) if net else None)
+    # T12 - koszt
+    ms = [fnum(r"\| czas " + F_ + r" ms \(uzgodnienie", poc[d]) for d in pdays]
+    ms = [x for x in ms if x is not None]
+    rep.add("E4/7 T12: koszt linii E4/7 i uzgodnienia (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-", "<= 15 ms/dobe (srednio)", (st.mean(ms) <= 15.0) if ms else None)
+    # T13 - zapis i wczytanie
+    ld = [x for x in lines if x.startswith("Pochodzenie (E4/7): wczytanie")]
+    sv = [x for x in lines if x.startswith("Pochodzenie (E4/7): zapis arm_people")]
+    if ld:
+        pc = fnum(r"nie znaleziono \d+ \(" + F_ + r"%", ld[-1])
+        rep.add("E4/7 T13: wczytanie - nie znaleziono partii", ld[-1][:220], "0-2%", (pc <= 2.0) if pc is not None else None)
+    else:
+        rep.add("E4/7 T13: wczytanie", "brak linii wczytania (bieg bez zapisu)", "0-2% nie znalezionych", None)
+    # recenzja E4/7 R2-3: przyciecie kluczy slownikow - rozmiar nie rosnie z dlugoscia kampanii (plan ok. 150 KB; najwyzej 16 regionow na slownik)
+    szs = [num(r"sekcje E4/7 (\d+) znakow", x, int) for x in sv]
+    szs = [x for x in szs if x is not None]
+    rep.add("E4/7 T13: rozmiar zapisu arm_people - sekcje E4/7 (pierwszy -> ostatni zapis)", f"{szs[0]} -> {szs[-1]} znakow ({len(szs)} zapisow)" if szs else "brak zapisu w biegu",
+            "<= 800 000 znakow (przyciecie kluczy R2-3; SaveText w kawalkach po 8000)", (szs[-1] <= 800000) if szs else None)
+    # ---------------- poprawki po recenzji E4/7 (R1-1, R1-3, R1-5, R2-1, R2-3)
+    tl = [fnum(r"\(w tym ze stanu miast " + F_ + r"\)", kb[d]) or 0 for d in pdays if d in kb]
+    tb = [fnum(r"\(w tym do stanu miast " + F_ + r"\)", kb[d]) or 0 for d in pdays if d in kb]
+    al = [fnum(r"\| pobor z DOM dzis " + F_ + r" ludzi", kb[d]) or 0 for d in pdays if d in kb]
+    ab = [fnum(r", powroty z pochodzeniem \+" + F_ + r" ludzi", kb[d]) or 0 for d in pdays if d in kb]
+    if tl:
+        rt = sum(tb) / sum(tl) if sum(tl) else 0.0
+        ra = sum(ab) / sum(al) if sum(al) else 0.0
+        rep.add("E4/7 R1-1: stan miast - pobor ze stanu miast / powroty do stanu miast (suma okna)", f"{sum(tl):.0f} / {sum(tb):.0f} (powrot {100 * rt:.0f}% wobec calego poboru: {100 * ra:.0f}%)",
+                "powroty > 0 przy poborze > 0 (pobor z miasta nie jednokierunkowy); udzial INFO", (sum(tb) > 0) if sum(tl) > 0 else None)
+    fk = [num(r"przyciecie kluczy \(ponizej [\d.]+ czlowieka albo spoza \d+ najwiekszych\): (\d+) kluczy", poc[d], int, 0) or 0 for d in pdays]
+    fm = [fnum(r"najwiekszych\): \d+ kluczy, " + F_ + r" ludzi", poc[d]) or 0 for d in pdays]
+    rep.add("E4/7 R2-3: przyciecie kluczy slownikow (srednio na dobe)", f"{st.mean(fk):.0f} kluczy, {st.mean(fm):.1f} ludzi do glownego regionu slownika" if fk else "-",
+            "INFO (suma bez zmian; rownanie krain odejmuje Drift - T3)", None)
+    nb = [fnum(r"najemnik z karczmy przy hamulcu \(obcy\) " + F_, poc[d]) or 0 for d in pdays]
+    rep.add("E4/7 R1-3: najemnicy z karczmy w krainach z hamulcem (obcy, bez zdjecia z DOM)", f"{sum(nb):.0f} (srednio {st.mean(nb):.1f}/d)" if nb else "-", "INFO", None)
+    pw = [l for d in pdays for l in [poc[d]] if "pobor wymuszony gracza: zdjeci z DOM" in l]
+    if pw:
+        pin = sum(fnum(r"pobor wymuszony gracza: zdjeci z DOM " + F_, l) or 0 for l in pw)
+        plo = sum(fnum(r"niewzieci \(poza rosterem\) " + F_, l) or 0 for l in pw)
+        rep.add("E4/7 R1-5: pobor wymuszony gracza - zdjeci z DOM / niewzieci z ekranu lupu", f"{pin:.0f} / {plo:.0f}", "INFO (proba reczna gracza)", None)
+    sn = [num(r"ekran druzyny bez stanu przed \(_initialData\) (\d+)", poc[d], int, 0) or 0 for d in pdays]
+    rep.add("E4/7 R2-1: ekran druzyny bez stanu przed (_initialData)", sum(sn), "0", sum(sn) == 0)
+    rep.add("E4/7 T14: menu \"People of this land\"", "proba reczna Jeffa (wies, miasto, zamek)", "INFO - liczby = linia dzienna regionu", None)
+    rep.add("E4/7 T15: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "INFO", None)
 
 
 def etap4_e44(rep, lines, start, win, hea, lud, until):

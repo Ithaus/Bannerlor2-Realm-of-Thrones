@@ -31,11 +31,13 @@ namespace Armoury
     /// konta dopisuje Devastated; powrot (MRefugeeHome) i podloga 10 (MRefugeeFloor, najpierw z uchodzcow tej wsi) schodza z konta; uchodzcy umieraja 1.3%/rok (bez narodzin).
     /// E4/6 (191): smierc z glodu schodzi z DOM przez Move (konto ADead, MFamineDead - ubytek trwaly), uchodzcy z glodu - Move DOM -> UCHODZCY (MFamineFled) i FamineFled
     /// (konto wsi bez zegara rabunku); mieszczanie przy Food 0 - TownDie (stan miasta "t:", licznik MFamineTown). Stan spichlerzy (Famine.cs) w tej samej sekcji zapisu ("f:").
-    /// Kolejne konta (SLUZBA z pochodzeniem, JENCY...) - kazde w swojej paczce, kazde przez te klase.
+    /// E4/7 (164b-1): konta SLUZBA i JENCY z regionem pochodzenia ("sw:" "so:" "jo:" "wo:" "rg:"), pobor z DOM (MLevyVillage/MLevyA5/MLevyTown), powroty z pochodzeniem
+    /// z hearth (MBack*), POLEGLI regionu pochodzenia, wolne rece (FreeHands) - PeopleBook.Origin.cs i PeopleBook.OriginPatches.cs (ta sama klasa, partial).
+    /// Kolejne konta (NIEWOLNI, WETERANI...) - kazde w swojej paczce, kazde przez te klase.
     /// Zapis tylko przez SaveText.Sync (napis w kawalkach). Stary zapis bez klucza: pula od 0 (bez bilansu otwarcia - bandy w polu zostaja);
     /// zapis bez "v:" - k_v z kultury osady w dniu pierwszego wczytania tej wersji (bez skoku).
     /// </summary>
-    internal static class PeopleBook
+    internal static partial class PeopleBook
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -73,7 +75,15 @@ namespace Armoury
         // przyczyny ruchu ludzi (indeksy licznikow)
         internal const int MSeed = 0, MMisery = 1, MRaidFlee = 2, MPoolHome = 3, MCart = 4, MH3Cart = 5, MDisband = 6, MCommon = 7, MSoldier = 8,
                            M166 = 9, MW4c = 10, M179 = 11, MPress = 12, MQuest = 13, MIncident = 14, MFloor = 15,
-                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19, MFamineDead = 20, MFamineFled = 21, MFamineTown = 22, MKinds = 23;
+                           MDevRaid = 16, MDevForage = 17, MRefugeeHome = 18, MRefugeeFloor = 19,
+                           // E4/6 (191): glod - zmarli z glodu (DOM -> smierc), uciekli z glodu (DOM -> UCHODZCY), zmarli mieszczanie przy Food 0 (stan miasta)
+                           MFamineDead = 20, MFamineFled = 21, MFamineTown = 22,
+                           // E4/7 (164b-1): pobor z DOM (wies -1/k, A5) i powroty zolnierzy ze znanym pochodzeniem do DOM regionu pochodzenia (+1/k) - PeopleBook.Origin.cs;
+                           // MLevyTown - pobor z miasta (stan miasta E4/4, bez hearth); MBackTown (recenzja E4/7 R1-1) - powrot z pochodzeniem do stanu miasta (bez hearth).
+                           // Scalenie E4/6 + E4/7: E4/7 przesuniete o 3 (bylo 20..30, MKinds 31). Numery nie ida do zapisu (liczniki doby), wszystkie uzycia przez nazwy;
+                           // MBackH3..MBackDisband musza zostac kolejno (petle w Measure40 i OriginSegment)
+                           MLevyVillage = 23, MLevyA5 = 24, MBackH3 = 25, MBack166 = 26, MBackW4c = 27, MBack179 = 28, MBackPool = 29, MBackFreed = 30, MBackDisband = 31,
+                           MLevyTown = 32, MBackTown = 33, MKinds = 34;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -83,12 +93,19 @@ namespace Armoury
             "spustoszenie: rabunek (trafieni = zabici + pojmani + las + uchodzcy; E4/5)", "spustoszenie: zerowanie armii (trafieni; E4/5)",
             "powrot uchodzcow do swojej wsi (E4/5)", "podloga 10 z uchodzcow tej wsi (E4/5; hearth dopisala gra/BK)",
             "glod: zmarli z glodu (E4/6, R10 - ubytek trwaly)", "glod: uciekli z glodu do regionu z zapasem (E4/6, konto UCHODZCY)",
-            "glod: zmarli mieszczanie przy Food 0 (E4/6, R10 - stan miasta)" };
+            "glod: zmarli mieszczanie przy Food 0 (E4/6, R10 - stan miasta)",
+            "pobor z wsi (E4/7, BK DeduceManpower)", "pobor A5 - autowerbunek zalogi (E4/7)", "powrot z pochodzeniem: rozbici H3 (E4/7)", "powrot z pochodzeniem: zwolnieni 166 (E4/7)",
+            "powrot z pochodzeniem: przepelnienie W4c (E4/7)", "powrot z pochodzeniem: rycerze 179 (E4/7)", "powrot z pochodzeniem: z puli wyrzutkow (E4/7)",
+            "powrot z pochodzeniem: jency uwolnieni i wypuszczeni (E4/7)", "powrot z pochodzeniem: rozwiazane partie (E4/7)", "pobor z miasta (E4/7, stan miasta E4/4)",
+            "powrot z pochodzeniem do miasta (E4/7, stan miasta E4/4 - dlug poboru z miasta)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
         // E4/6: zmarli i uciekli z glodu ruszaja hearth (DOM -> smierc, DOM -> UCHODZCY); zmarli mieszczanie - stan miasta "t:" (TownDie), bez hearth wsi
-        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false, true, true, false };
+        // E4/7: pobor z wsi i powroty z pochodzeniem ruszaja hearth (symetria - LevyLive, PeopleBook.Origin.cs); pobor z miasta - stan miasta, nie hearth
+        private static readonly bool[] MHearth = { true, true, true, true, true, true, true, true, false, false, false, false, true, true, false, false, true, true, true, false,
+                                                   true, true, false,
+                                                   true, true, true, true, true, true, true, true, true, false, false };
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -131,6 +148,7 @@ namespace Armoury
             lock (Gate) { _town.Clear(); _floorHearth = _floorPoolMen = _floorNothingMen = _floorNothingHearth = _floorRefMen = 0; _floorN = 0; }
             ClearRefugees();
             try { Famine.Reset(); } catch (Exception e) { Stumble("Reset(E4/6)", e); }      // E4/6: spichlerze - stan tej samej sekcji zapisu
+            try { ResetOrigin(); } catch (Exception e) { Stumble("Reset(E4/7)", e); }     // E4/7: konta SLUZBA/JENCY z pochodzeniem, rg:, siew - nowa kampania od zera
         }
 
         /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
@@ -189,6 +207,8 @@ namespace Armoury
             try { ExportRefugees(sb); } catch (Exception e) { Stumble("Export(E4/5)", e); }
             // E4/6 (191): spichlerze okregow i miejsca pobytu kont ("f:") - tylko gdy zalozone (bez sekcji = stary zapis, spichlerze zaloza sie przy pierwszej dobie)
             try { sb.Append(Famine.Export()); } catch (Exception e) { Stumble("Export(E4/6)", e); }
+            // E4/7 (164b-1): pochodzenie (sw: so: jo: wo: rg:) - tylko po siewie (bez sekcji = siew przy pierwszej dobie)
+            try { ExportOrigin(sb); } catch (Exception e) { Stumble("Export(E4/7)", e); }
             return sb.ToString();
         }
 
@@ -245,11 +265,14 @@ namespace Armoury
             lock (Gate) _town.Clear();
             ClearRefugees();                          // E4/5: stary zapis (bez "u:" / "r:") - brak uchodzcow i zegarow
             try { Famine.Clear(); } catch (Exception e) { Stumble("Import(E4/6 czyszczenie)", e); }   // E4/6: zapis bez "f:" - spichlerze zaloza sie przy pierwszej dobie
+            try { ResetOrigin(); } catch (Exception e) { Stumble("Import(E4/7 reset)", e); }   // E4/7: stary zapis bez sekcji - siew przy pierwszej dobie
             if (string.IsNullOrEmpty(data)) return;   // stary zapis - bilans otwarcia przy pierwszym uzyciu (po dwoch dobach kampanii: od 0)
             try
             {
                 foreach (var part in data.Split('|'))
                 {
+                    // E4/7: dwuliterowe przedrostki (sw: so: jo: wo: rg:) - nie koliduja z "s:" konta CIALA; czytane pierwsze
+                    if (part.Length > 3 && part[2] == ':' && ImportOriginPart(part)) continue;
                     if (part.StartsWith("s:", StringComparison.Ordinal))
                     {
                         var a = part.Substring(2).Split(';');
@@ -488,6 +511,7 @@ namespace Armoury
                     r.Away += refugees; r.Dead += dead;
                     if (!had && r.Away > 0.0) _refCount++;
                     _dRefIn += refugees; _dKilled += dead;
+                    if (dead > 0.0) NoteCivilDead(region, dead);      // E4/7 (R5, D7): zabici cywile regionu - K_m wolnych rak (0.27 x cywile)
                     if (region != null && region.StringId != null)
                     {
                         r.Region = region.StringId;
@@ -607,6 +631,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("TownDie", e); return 0.0; }
             if (got > 0.0) Count(got, MFamineTown, 0.0);
+            if (got > 0.0) NoteCivilDead(s, got);     // scalenie E4/6 + E4/7: stan miasta liczy sie do DOM regionu (DomOf) - zmarli to cywile regionu (rownanie krain)
             return got;
         }
 
@@ -624,7 +649,11 @@ namespace Armoury
                     if (!_ref.TryGetValue(id, out r) || !(r.Away > 0.0)) return 0.0;
                     double n = Math.Min(men, r.Away);
                     r.Away -= n; r.Died += n; _dRefDied += n;
-                    if (!(r.Away > 1e-9)) { r.Died += r.Away; _dRefDied += r.Away; r.Away = 0.0; _refCount--; }
+                    double rest = 0.0;
+                    if (!(r.Away > 1e-9)) { rest = r.Away; r.Died += r.Away; _dRefDied += r.Away; r.Away = 0.0; _refCount--; }
+                    // E4/7 (R5): zmarli uchodzcy - cywile regionu; scalenie z E4/6: region przez RegionIdOf (konto z glodu - FamineFled - i konto po wczytaniu nie maja Region)
+                    string reg = RegionIdOf(id, r);
+                    if (reg != null) NoteCivilDeadId(reg, n + rest);
                     return n;
                 }
             }
@@ -818,6 +847,7 @@ namespace Armoury
         /// </summary>
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
+            try { OriginPartyGone(mp != null ? mp.Party : null, destroyer != null); } catch (Exception e) { Stumble("OnPartyDestroyed(E4/7)", e); }   // E4/7 (4.12): slownik partii - resztka w nicosc (nazwana)
             try
             {
                 if (mp == null || destroyer != null || !mp.IsVillager) return;
@@ -941,6 +971,9 @@ namespace Armoury
         {
             RefSeg rseg = default(RefSeg);
             try { rseg = CloseRefugeeDay(); } catch (Exception e) { Stumble("Daily(E4/5)", e); }
+            // E4/7 (164b-1): siew, uzgodnienie doby, cache wolnych rak - PRZED linia "Ludzie (ksiega)" (jej odcinek E4/7 czyta wynik); linie E4/7 po niej
+            long tOrigin = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { OriginDaily(day); } catch (Exception e) { Stumble("Daily(E4/7)", e); }
             try
             {
                 EnsureOpening();
@@ -976,12 +1009,15 @@ namespace Armoury
                     try { sb.Append(UnitSegment()); } catch (Exception e) { Stumble("Daily(E4/3)", e); }
                     try { if (rseg.Has) sb.Append(RefSegment(rseg)); } catch (Exception e) { Stumble("Daily(E4/5 odcinek)", e); }
                     try { sb.Append(PeopleUnit.DayNote()); } catch (Exception e) { Stumble("Daily(PeopleUnit)", e); }
+                    try { sb.Append(OriginSegment()); } catch (Exception e) { Stumble("Daily(E4/7 odcinek)", e); }
                     if (_stumblesDay > 0) sb.Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(", pierwszy blad kazdego miejsca w logu)");
                     sb.Append('.');
                     Log.Info(sb.ToString());
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { if (log) OriginLines(day, tOrigin); } catch (Exception e) { Stumble("Daily(E4/7 linie)", e); }
+            try { OriginEndDay(); } catch (Exception e) { Stumble("Daily(E4/7 koniec doby)", e); }
             Array.Clear(_in, 0, CKinds); Array.Clear(_out, 0, CKinds); Array.Clear(_dead, 0, _dead.Length);
             _stumblesDay = 0; _openingNote = null;
             lock (Gate) { Array.Clear(_mMen, 0, MKinds); Array.Clear(_mHearth, 0, MKinds); _disbandNoVillage = 0; }
@@ -1027,18 +1063,22 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown ? "stan miasta" : "bez hearth do E4/7")));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown ? "stan miasta" : "bez hearth (bez pochodzenia)")));
                 any = true;
             }
             if (!any) sb.Append(" brak");
             // recenzja E4/3: prosci i bandyci z LosersFlee (MCommon) przechodza przez OutlawLaw.ReturnHome, ale licza sie raz - pod punktem (1);
             // punkt (3) pokazuje tylko powrot z puli, a "razem" to suma bez podwojenia
             double back = men[MH3Cart] + men[MCommon] + men[MSoldier] + men[M166] + men[MW4c] + men[M179] + men[MPoolHome];
+            // E4/7: powroty z pochodzeniem (z hearth) - czesc znana tych samych trzech punktow (bez podwojenia: czesc bez pochodzenia idzie dalej pod MSoldier/M166/MW4c/M179)
+            double backE47 = men[MBackH3] + men[MBack166] + men[MBackW4c] + men[MBack179] + men[MBackPool] + men[MBackFreed] + men[MBackDisband] + men[MBackTown];
+            back += backE47;
             sb.Append(" | trzy punkty powrotu do DOM, razem ").Append(M0(back)).Append(" (bez podwojenia): LosersFlee.SendHome ").Append(M0(men[MH3Cart] + men[MCommon] + men[MSoldier]))
               .Append(" (rozbite tabory ").Append(M0(men[MH3Cart])).Append(", prosci i bandyci ").Append(M0(men[MCommon])).Append(" - do wsi dalej przez OutlawLaw.ReturnHome, zolnierze do ludnosci BK ").Append(M0(men[MSoldier]))
               .Append("), ClanBudget.ToVillage ").Append(M0(men[M166] + men[MW4c] + men[M179])).Append(" (166 ").Append(M0(men[M166])).Append(", W4c ").Append(M0(men[MW4c]))
               .Append(", 179 ").Append(M0(men[M179])).Append("; SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje z DOM), OutlawLaw.ReturnHome ")
-              .Append(M0(men[MPoolHome])).Append(" (tylko z puli; prosci i bandyci z LosersFlee policzeni w punkcie LosersFlee.SendHome)");
+              .Append(M0(men[MPoolHome])).Append(" (tylko z puli; prosci i bandyci z LosersFlee policzeni w punkcie LosersFlee.SendHome)")
+              .Append("; E4/7 z pochodzeniem (hearth regionu pochodzenia) ").Append(M0(backE47)).Append(men[MBackTown] > 0 ? " (w tym do stanu miasta " + M0(men[MBackTown]) + ")" : "");
             if (noVil > 0) sb.Append(" | rozwiazane tabory bez wsi domowej (znikneli) ").Append(noVil);
             sb.Append(" | k na osade: ").Append(_kvSet ? (_kvNote ?? (_kv.Count + " osad")) : "jeszcze nie zalozone (przed kalibracja)")
               .Append(", osad z kultura inna niz w dniu kalibracji ").Append(cultMoved).Append(" (ludzie bez zmian - U3), osad bez przelicznika ").Append(noK);

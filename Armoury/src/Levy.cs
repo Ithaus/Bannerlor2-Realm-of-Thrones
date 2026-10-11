@@ -32,12 +32,12 @@ namespace Armoury
 
         private static object _popMgr;
         private static MethodInfo _getPopData;
-        private static PropertyInfo _landData, _excess, _available;
+        private static PropertyInfo _landData, _excess, _available, _military, _manpower;
         private static readonly Dictionary<Settlement, KeyValuePair<int, float>> _cache = new Dictionary<Settlement, KeyValuePair<int, float>>();
-        private static int _dayStamp = -1, _calls;
+        private static int _dayStamp = -1, _calls, _braked;
         private static float _sumW;
 
-        internal static void Reset() { _cache.Clear(); _popMgr = null; _dayStamp = -1; _calls = 0; _sumW = 0f; }
+        internal static void Reset() { _cache.Clear(); _popMgr = null; _dayStamp = -1; _calls = 0; _braked = 0; _sumW = 0f; }
 
         private static bool Resolve()
         {
@@ -75,6 +75,26 @@ namespace Armoury
             catch { return -1f; }
         }
 
+        /// <summary>E4/7 (U17, drugi hamulec): pula BK osady (MilitaryData.Manpower; BK CanHaveRecruits - przy 0 notabl pomijany przez gre); false - brak danych BK.</summary>
+        internal static bool BkManpower(Settlement st, out float manpower)
+        {
+            manpower = 0f;
+            try
+            {
+                if (st == null || !Resolve()) return false;
+                var data = _getPopData.Invoke(_popMgr, new object[] { st });
+                if (data == null) return false;
+                if (_military == null) _military = AccessTools.Property(data.GetType(), "MilitaryData");
+                var md = _military != null ? _military.GetValue(data, null) : null;
+                if (md == null) return false;
+                if (_manpower == null) _manpower = AccessTools.Property(md.GetType(), "Manpower");
+                if (_manpower == null) return false;
+                manpower = Convert.ToSingle(_manpower.GetValue(md, null));
+                return true;
+            }
+            catch { return false; }
+        }
+
         internal static float Willingness(Settlement st)
         {
             var s = Settings.Current;
@@ -82,7 +102,9 @@ namespace Armoury
             if (_dayStamp != day) { Flush(); _dayStamp = day; }
             KeyValuePair<int, float> c;
             if (_cache.TryGetValue(st, out c) && c.Key == day) return c.Value;
-            float ex = ExcessShare(st);
+            // E4/7 (DOK krok 7 + krytyk): nadwyzka rak z ksiegi ludzi - max(0, f - a) x min(1, dom / dom w dniu siewu); przed siewem / bez danych - BK WorkforceExcess jak dotad
+            float ex;
+            if (!FreeHands.Excess(st, out ex)) ex = ExcessShare(st);
             if (ex < 0f) ex = 0.2f;                                    // brak danych BK - przecietnie
             float w = s.RecruitBaseWilling + ex * s.RecruitExcessWeight + OutlawLaw.MiseryOf(st) * s.RecruitMiseryWeight;
             w = MBMath.ClampFloat(w, 0f, Math.Max(0f, s.RecruitWillingMax));
@@ -94,11 +116,23 @@ namespace Armoury
         {
             try
             {
-                if (!On || __2 == null) return;
+                if (__2 == null) return;
                 // Jeff 04.10: "zaciag tez daje wyzszy tier" - ta sama szansa gry steruje zapelnieniem PUSTEGO miejsca i
                 // awansem ochotnika, ktory juz stoi. Chec do sluzby (nadwyzka rak + nedza) dotyczy tylko pustego miejsca;
                 // awans zostaje przy szansie BK i mocy notabla, a sprzet do niego notabl musi kupic (VolunteerKit).
                 try { var vt = __0 != null ? __0.VolunteerTypes : null; if (vt != null && __1 >= 0 && __1 < vt.Length && vt[__1] != null) return; } catch { }
+                // E4/7 hamulec (Jeff 11.10): kraina bez wolnych rak nie wystawia nowego wojska do odrobienia strat - puste miejsce sie nie wypelnia (stojacy ochotnicy zostaja).
+                // Recenzja E4/7 R1-4: hamulec PRZED wylacznikiem checi (Levy Enabled) - ma wlasny klucz (Free Hands Brake); wylaczenie checi go nie gasi.
+                if (FreeHands.Braked(__2))
+                {
+                    int day0 = (int)CampaignTime.Now.ToDays;
+                    if (_dayStamp != day0) { Flush(); _dayStamp = day0; }
+                    FreeHands.NoteRefused(__2);
+                    _braked++;
+                    __result = 0f;
+                    return;
+                }
+                if (!On) return;                                       // Levy Enabled wylacza tylko mnoznik checi
                 float w = Willingness(__2);
                 __result *= w;
                 _calls++; _sumW += w;
@@ -108,10 +142,15 @@ namespace Armoury
 
         private static void Flush()
         {
-            if (_dayStamp < 0 || _calls == 0) return;
-            Log.Info("Pobor: dzien " + _dayStamp + " - chec do sluzby srednio x" + (_sumW / _calls).ToString("0.00")
-                     + " szansy BK (" + _calls + " losowan miejsc u notabli; nadwyzka rak + nedza regionu).");
-            _calls = 0; _sumW = 0f;
+            if (_dayStamp < 0 || (_calls == 0 && _braked == 0)) return;
+            string e47 = "";
+            try { e47 = FreeHands.LevySegment(); } catch { }
+            // R1-4: przy wylaczonej checi (albo samych odmowach hamulca) linia zostaje - dopisek E4/7 z licznikami hamulca nie ginie
+            string head = _calls > 0
+                ? "chec do sluzby srednio x" + (_sumW / _calls).ToString("0.00") + " szansy BK (" + _calls + " losowan miejsc u notabli; nadwyzka rak + nedza regionu)."
+                : "chec do sluzby: " + (On ? "bez losowan" : "WYLACZONA (Levy Enabled)") + " (0 losowan miejsc u notabli; odmowione przez hamulec " + _braked + ").";
+            Log.Info("Pobor: dzien " + _dayStamp + " - " + head + e47);
+            _calls = 0; _braked = 0; _sumW = 0f;
         }
 
         internal static void ApplyAll(Harmony h)

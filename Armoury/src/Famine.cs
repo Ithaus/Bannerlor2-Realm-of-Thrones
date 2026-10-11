@@ -628,6 +628,9 @@ namespace Armoury
                     double h = -PeopleBook.Move(x.V, PeopleBook.ADom, PeopleBook.ADead, d, PeopleBook.MFamineDead, PeopleUnit.GamePerMan);
                     if (!(h > 0.0)) { moveFail++; continue; }
                     deadHosts += d;
+                    // scalenie E4/6 + E4/7: zgon z glodu zdjety z DOM przez Move poza modelem hearth (jak zabici MDevRaid) - cywile regionu (K_m, rownanie krain);
+                    // czlon H przyrostu (NoteBorn) to inna liczba - bez podwojenia
+                    if (x.Node != null && !x.Node.IsVillage) PeopleBook.NoteCivilDead(x.Node, d);
                     lock (Gate) x.B.Starved += d;
                     regs[x.Node].Dead += d;
                     if (fleeOn && TryFlee(x, d, today, regs, nodeById, s, ref moves, ref noRefuge, ref blocked, ref moveFail)) { fled += d; fledV++; regs[x.Node].Fled += d; Touch(e46, x); }

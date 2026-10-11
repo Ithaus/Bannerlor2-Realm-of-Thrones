@@ -702,6 +702,11 @@ namespace Armoury
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, PeopleLedger.OnPartyCreated);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, PeopleLedger.OnPartyDestroyed);
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, PeopleLedger.OnPartyRemoved);
+            // E4/7 (164b-1): polegli wedlug pochodzenia (zdarzenie przed usunieciem partii - slowniki jeszcze sa; kolejnosc nasluchow bez znaczenia - Take proporcjonalne),
+            // koniec partii bez zniszczenia, wcieleni jency gracza (DoneLogic ekranu druzyny)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, PeopleBook.OnMapEventEnded);
+            CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, PeopleBook.OnPartyRemoved);
+            CampaignEvents.OnMainPartyPrisonerRecruitedEvent.AddNonSerializedListener(this, PeopleBook.OnMainPartyPrisonerRecruited);
             CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
@@ -1146,6 +1151,7 @@ namespace Armoury
         {
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             try { RecruitKit.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("RecruitKit.ResolvePending", e); }   // 161: komplety rekrutow dopiero teraz (w SyncData bohaterow nie ma)
+            try { PeopleBook.ResolveOrigin("wczytanie"); } catch (Exception e) { Log.Error("PeopleBook.ResolveOrigin", e); }     // E4/7: slowniki pochodzenia partii z zapisu (w SyncData partii nie ma)
             // 171: zamowienia zamkow w drodze; zbrojownie zalog z zapisu (DTE skonczyl OnGameLoaded) albo jednorazowe odtworzenie po starym zapisie - PRZED ColdStart.Run;
             // echo ROT, gdy typu nie bylo przy starcie; cwiczenia wlasna bronia - latki modeli w kampanii (modele BK czytaja singletony BK)
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
@@ -1209,6 +1215,7 @@ namespace Armoury
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
+            try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }

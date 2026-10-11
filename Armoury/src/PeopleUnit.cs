@@ -298,6 +298,10 @@ namespace Armoury
                 w.V.Hearth = w.Hearth;                       // cofniecie zapisu gry (ludzie tylko przez Move)
                 double moved = PeopleBook.Move(w.V, PeopleBook.ADom, PeopleBook.AService, w.Men, PeopleBook.MPress, GamePerMan);
                 _pOurs += -moved;
+                // E4/7: zdjeci z DOM tej wsi - pochodzenie regionu wsi (wlasny try, po Move - U24). Recenzja E4/7 R1-5: gra otwiera ekran lupu (gracz bierze ilu chce),
+                // wiec udzialy czekaja na zatwierdzenie tego ekranu (PeopleBook.ScreenPost -> PressTake) zamiast trafiac do druzyny od razu
+                try { PeopleBook.PressPending(OutlawLaw.RegionFor(w.V.Settlement), w.Men); }
+                catch (Exception e) { Stumble("PeopleUnit.PressPostfix(E4/7)", e); }
             }
             catch (Exception e) { Stumble("PeopleUnit.PressPostfix", e); }
         }

@@ -81,6 +81,11 @@ RANGES = {
     'FamineBarnYears': (0.05, 8.0, "0.00"),
     'FamineYieldPerPerson': (0.5, 3.0, "0.00"),
     'FamineRefugeRadius': (0.0, 1000.0, "0"),
+    # E4/7 (164b-1): wolne rece - udzialy przycinane w kodzie do 0..1, elastycznosc 0..2 (FreeHands.Update)
+    'FreeHandsShare': (0.0, 1.0, "0.00"),
+    'FreeHandsHarvestFactor': (0.0, 1.0, "0.00"),
+    'FreeHandsElasticity': (0.0, 2.0, "0.00"),
+    'FreeHandsIronIslandsExtraMax': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

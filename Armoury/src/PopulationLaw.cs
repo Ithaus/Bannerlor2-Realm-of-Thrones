@@ -846,6 +846,7 @@ namespace Armoury
                         RealmGrowth rg; string c = PeopleBook.CultureAtCalibration(st);
                         if (!realms.TryGetValue(c, out rg)) realms[c] = rg = new RealmGrowth();
                         rg.Villages++; rg.People += weight; rg.Rate += weight * rate; rg.Gain += gain - backGain;
+                        if (g.Set && k > 0f) PeopleBook.NoteBorn(v, gain - backGain);      // E4/7 (D2): przyrost naturalny netto wedlug regionu od siewu - K_m wolnych rak (nie rzuca)
                         if (!g.Set) continue;                                       // przyrost wylaczony: tylko suma wyniku gry
                         rates.Add(g.G); wRate += weight * g.G;
                         // pokoj / wojna (ta sama regula wojny co g); wies spalona, lupiona albo pod przymusem (g 0) - wedle wojny swojego regionu

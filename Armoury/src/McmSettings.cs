@@ -2520,6 +2520,42 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineSiegeShelter { get; set; } = true;
 
+        [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PeopleOriginEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Levy From Villages", HintText = "a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool LevyFromVillages { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Levy From Bk", HintText = "a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool GarrisonLevyFromBk { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Free Hands Share", 0.00f, 1.00f, "0.00", HintText = "share of a land's men who can leave the fields without the harvest suffering (counted with the fallen not yet made up by births)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FreeHandsShare { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Free Hands Harvest Factor", 0.00f, 1.00f, "0.00", HintText = "during the harvest weeks of a summer or autumn year only this part of that share is free")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FreeHandsHarvestFactor { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Free Hands Elasticity", 0.00f, 2.00f, "0.00", HintText = "how much the harvest falls when more men are away than the land can spare (0.5: a tenth fewer hands, a twentieth less harvest; 0 = not at all)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FreeHandsElasticity { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Free Hands Iron Islands Extra Max", 0.00f, 1.00f, "0.00", HintText = "Iron Islands: thralls work the land, so up to this much more of the men may go reaving (grows with the number of thralls)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FreeHandsIronIslandsExtraMax { get; set; } = 0.2f;
+
+        [SettingPropertyBool("Free Hands Brake", HintText = "a land with no free hands left raises no new volunteers until births make up its losses (the Free Folk and the Watch excepted)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FreeHandsBrake { get; set; } = true;
+
+        [SettingPropertyBool("People Menu Entry", HintText = "'People of this land' in the menus of villages, towns and castles: the land's people at home, under arms, held captive, outlawed, fallen and its free hands")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PeopleMenuEntry { get; set; } = true;
+
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
         public int OutlawMinBand { get; set; } = 6;
@@ -4893,6 +4929,15 @@ namespace Armoury
             s.FamineMoveDays = FamineMoveDays;
             s.FamineReturnMinDays = FamineReturnMinDays;
             s.FamineSiegeShelter = FamineSiegeShelter;
+            s.PeopleOriginEnabled = PeopleOriginEnabled;
+            s.LevyFromVillages = LevyFromVillages;
+            s.GarrisonLevyFromBk = GarrisonLevyFromBk;
+            s.FreeHandsShare = FreeHandsShare;
+            s.FreeHandsHarvestFactor = FreeHandsHarvestFactor;
+            s.FreeHandsElasticity = FreeHandsElasticity;
+            s.FreeHandsIronIslandsExtraMax = FreeHandsIronIslandsExtraMax;
+            s.FreeHandsBrake = FreeHandsBrake;
+            s.PeopleMenuEntry = PeopleMenuEntry;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;
