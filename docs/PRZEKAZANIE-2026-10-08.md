@@ -703,3 +703,7 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   (przejrzec wypisane konflikty!) -> build Armoury -> test A: 120 dob nowej kampanii; test B: 120 dob z plikiem-przelacznikiem; zapis 9 dob -> progi etap2/etap3/etap4
   (narzedzie z drzewa z30) -> WGRANIE 30 (z kopia). Do zgloszenia Jeffowi (E4/1 recenzja): model jedzenia RBL przejmuje caly lancuch (nie dzialaja ROT "Inni nie jedza",
   NavalDLC -20% na morzu, BEE, pasza/perki BK) - stan sprzed E4/1, decyzja Jeffa.
+- (04:45) **ZBIOR 30 SCALONY:** w-toku/zbior30 c02c80f (drzewo SCRATCH(ae222cb7)\e4\z30; = d11 + e4-3 (z e4-2 i wyposrodkowaniem cc40e0e) + e4-1 + e3-36b; konstruktor
+  ArmouryBehavior i pozycje ksiegi MoneyLedger (NBkSupply 7, NTravel 8, Notes 9) scalone recznie), build kod 0, test\Armoury-z30.dll 9d314ea6. TEST A (120 dob nowej
+  kampanii) w toku -> test\at-z30-A.out.txt. Potem: TEST B - polozyc plik C:\Users\GAME\Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-proba-zimy.flag, 120 dob,
+  usunac plik; potem zapis 9 dob; progi etap2/3/4 (tools z drzewa z30) -> WGRANIE 30.
