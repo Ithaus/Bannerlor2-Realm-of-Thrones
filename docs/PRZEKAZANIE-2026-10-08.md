@@ -834,3 +834,11 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (16:50) **Workflow wf_fb811d64-c25:** scalenie calosci (E4/8 + E4/10 przenumerowane + E4/11 + E4/7b + NightRest) do w-toku/zbior-e4-koniec + recenzja, potem
   E4/9 od czubka (e4\49, w-toku/e4-9) - kod, 2 recenzje, poprawki. **Workflow wf_326d453d-473:** audyt zlota z niczego (Jeff 16:30 "czy to na pewno wszystkie?").
 - (16:55) **Jeff: "tak, tak"** - K8 (zalogi 2/d) przed testem; weterani W5 zostaja w BK. K8 kod na w-toku/e4-8 (e4\48), dolaczyc przy scaleniu E4/9.
+
+### PRACA NOCNA 11/12.10 (Jeff 17:20: "ide spac ... dokoncz etap 4, 5 i 6, pracuj do 12.00 ... testy dopiero jak zakonczysz caly etap, puszczasz testy w grze i poprawiasz;
+### to samo etap 5 i 6; jesli starczy czasu etap 7 i 8; za 13 godzin raport - co udalo sie zrobic, na czym stanelismy")
+Plan: (1) E4: dokonczyc E4/9 + K8 -> scalenie koncowe (z E5/0 - pomiar jedzie w tescie E4) -> TEST KONCOWY E4: bieg 728 dob nowej kampanii (progi d120/d364 z czesci
+logu w trakcie; G-ETAP odbudowy w d728) + zima 120 + zapis 9 dob, CrashScribe-at-bledy.dll (B6/B6b/B6c) -> poprawki -> wgranie (Armoury + CrashScribe, kopie).
+(2) E5: porcja A (A1-A6) test 120 osobno po wgraniu E4 -> poprawki -> wgranie; porcja B kod w czasie testow E4 (od scalenia koncowego), stawki z E5/0 -> test (rok) ->
+wgranie; C po roku testu B. (3) E6: projekt (rozpoznanie, projekt, krytyka) w czasie testow, kod, test 120, wgranie. (4) E7/E8 jesli czas. Limity: okno 5h - przy 85%
+bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPORT-NOCNY-2026-10-12.md + czat ok. 12:00.
