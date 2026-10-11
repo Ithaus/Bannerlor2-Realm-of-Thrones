@@ -863,3 +863,4 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   DLL test\Armoury-e4-koncowy.dll 82bb2d8f; CS test\CrashScribe-at-bledy.dll 9f92b4aa (B6/B6b/B6c + autotest; zwykly CrashScribe-bledy.dll af47adf7 do wgrania).
 - (21:52 UTC) **TEST KONCOWY E4 ruszyl** (b2k5x628s): 728 dob nowej kampanii -> zapis 9 dob z zapisu konca biegu (stan E4 w zapisie) -> zima 120 (flaga).
   Wyjscia: test\at-e4k-728.out.txt, at-e4k-zapis.out.txt, at-e4k-zima.out.txt. Progi w trakcie z czesci logu (d120, d364).
+- (21:55 UTC) **Projekt etapu 6 ruszyl** (wf_bb091727-a6b -> docs/etap6/; rozpoznanie logi/kod/dokumenty/styki -> projekt -> 2 krytyki -> v2; z 6.1, 6.14, 6.19 Jeffa).
