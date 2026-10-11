@@ -91,7 +91,11 @@ namespace Armoury
                            // E4/10 (167): weterani niewynajeci po 120 dobach do DOM regionu pochodzenia (z hearth, jak MBack*) i starzy zolnierze z karczm w dniu siewu
                            // (ze stanu ludzi miasta E4/4 - stan miasta, bez hearth). Wejscie SLUZBA -> WETERANI i najem WETERANI -> SLUZBA to nie ruchy DOM (liczniki E4/10).
                            // Scalenie calosci etapu 4: w paczce E4/10 bylo 44/45 (MKinds 46) - przeniesione za E4/8
-                           MBackVeteran = 46, MVetStart = 47, MKinds = 48;
+                           MBackVeteran = 46, MVetStart = 47,
+                           // MBackPress (E4/7b, decyzja Jeffa 11.10 12:40) - niewzieci z ekranu lupu poboru wymuszonego gracza wracaja do DOM wsi zdjecia (+1/k).
+                           // Scalenie calosci etapu 4: w E4/7b bylo 31 (stara numeracja E4/7 sprzed scalenia z E4/6, MKinds 32) - pierwszy wolny numer za wszystkimi;
+                           // poza ciagiem MBackH3..MBackDisband - dopisany osobno w Measure40 (o11), OriginSegment ("powroty z pochodzeniem") i backE47
+                           MBackPress = 48, MKinds = 49;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -110,7 +114,8 @@ namespace Armoury
             "nowa druzyna z wolnych rak regionu siedziby (E4/8)", "karawana z ludzi osady startu (E4/8)", "konwoj morski uzupelniony z miasta (E4/8)",
             "wedrowcy i eskorta BK - wyjazd (R19)", "wedrowcy BK u celu (R19)", "wedrowcy i eskorta BK z powrotem w domu (R19)", "wedrowcy BK bez pochodzenia (R19 - bez hearth)",
             "migracja ze wsi do miasta (R2)", "narodziny i zgony miast (R2 - stan miasta)",
-            "weterani niewynajeci po czasie czekania do domu (E4/10)", "starzy zolnierze z ludzi miast do karczm (siew E4/10, stan miasta E4/4)" };
+            "weterani niewynajeci po czasie czekania do domu (E4/10)", "starzy zolnierze z ludzi miast do karczm (siew E4/10, stan miasta E4/4)",
+            "powrot z pochodzeniem: niewzieci z poboru wymuszonego gracza do swojej wsi (E4/7b)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
@@ -121,7 +126,8 @@ namespace Armoury
                                                    true, true, true, true, true, true, true, true, true, false, false,
                                                    // E4/8: wies ruszana (miasto - stan miasta przez TownShift, bez hearth); "bez pochodzenia" i narodziny miast - tylko licznik
                                                    true, true, false, true, true, true, true, true, true, false, true, false,
-                                                   true, false };                                                            // E4/10: MBackVeteran (hearth), MVetStart (stan miasta)
+                                                   true, false,                                                              // E4/10: MBackVeteran (hearth), MVetStart (stan miasta)
+                                                   true };                                                                   // E4/7b: MBackPress (hearth wsi zdjecia)
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -1113,7 +1119,8 @@ namespace Armoury
             // punkt (3) pokazuje tylko powrot z puli, a "razem" to suma bez podwojenia
             double back = men[MH3Cart] + men[MCommon] + men[MSoldier] + men[M166] + men[MW4c] + men[M179] + men[MPoolHome];
             // E4/7: powroty z pochodzeniem (z hearth) - czesc znana tych samych trzech punktow (bez podwojenia: czesc bez pochodzenia idzie dalej pod MSoldier/M166/MW4c/M179)
-            double backE47 = men[MBackH3] + men[MBack166] + men[MBackW4c] + men[MBack179] + men[MBackPool] + men[MBackFreed] + men[MBackDisband] + men[MBackTown];
+            // E4/7b: + niewzieci z poboru wymuszonego gracza wracajacy do swojej wsi (MBackPress - nie przechodza przez trzy punkty, wiec bez podwojenia)
+            double backE47 = men[MBackH3] + men[MBack166] + men[MBackW4c] + men[MBack179] + men[MBackPool] + men[MBackFreed] + men[MBackDisband] + men[MBackTown] + men[MBackPress];
             back += backE47;
             sb.Append(" | trzy punkty powrotu do DOM, razem ").Append(M0(back)).Append(" (bez podwojenia): LosersFlee.SendHome ").Append(M0(men[MH3Cart] + men[MCommon] + men[MSoldier]))
               .Append(" (rozbite tabory ").Append(M0(men[MH3Cart])).Append(", prosci i bandyci ").Append(M0(men[MCommon])).Append(" - do wsi dalej przez OutlawLaw.ReturnHome, zolnierze do ludnosci BK ").Append(M0(men[MSoldier]))

@@ -1189,8 +1189,16 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     pw = [l for d in pdays for l in [poc[d]] if "pobor wymuszony gracza: zdjeci z DOM" in l]
     if pw:
         pin = sum(fnum(r"pobor wymuszony gracza: zdjeci z DOM " + F_, l) or 0 for l in pw)
-        plo = sum(fnum(r"niewzieci \(poza rosterem\) " + F_, l) or 0 for l in pw)
-        rep.add("E4/7 R1-5: pobor wymuszony gracza - zdjeci z DOM / niewzieci z ekranu lupu", f"{pin:.0f} / {plo:.0f}", "INFO (proba reczna gracza)", None)
+        ptk = sum(fnum(r"wzieci z ekranu lupu " + F_, l) or 0 for l in pw)
+        # E4/7b (decyzja Jeffa 11.10 12:40): niewzieci wracaja do DOM swojej wsi; "bez powrotu (poza rosterem)" - tylko przy wylaczonym Press Untaken Go Home
+        # (stary log sprzed E4/7b: "niewzieci (poza rosterem) N" - liczony jako bez powrotu)
+        phm = sum(fnum(r"niewzieci - wrocili do domu " + F_, l) or 0 for l in pw)
+        plo = sum((fnum(r"niewzieci bez powrotu \(poza rosterem\) " + F_, l) or 0) + (fnum(r"niewzieci \(poza rosterem\) " + F_, l) or 0) for l in pw)
+        dif = pin - (ptk + phm + plo)
+        rep.add("E4/7 R1-5: pobor wymuszony gracza - zdjeci z DOM / wzieci z ekranu lupu / niewzieci wrocili do domu / bez powrotu", f"{pin:.0f} / {ptk:.0f} / {phm:.0f} / {plo:.0f}",
+                "INFO (proba reczna gracza); bez powrotu 0 przy Press Untaken Go Home", None)
+        rep.add("E4/7b: pobor wymuszony gracza - zdjeci z DOM = wzieci + wrocili do domu + bez powrotu (suma okna)", f"roznica {dif:+.1f} ({len(pw)} dob)",
+                "|roznica| <= 0.5 + 0.2/dobe (zaokraglenie linii)", abs(dif) <= 0.5 + 0.2 * len(pw))
     sn = [num(r"ekran druzyny bez stanu przed \(_initialData\) (\d+)", poc[d], int, 0) or 0 for d in pdays]
     rep.add("E4/7 R2-1: ekran druzyny bez stanu przed (_initialData)", sum(sn), "0", sum(sn) == 0)
     rep.add("E4/7 T14: menu \"People of this land\"", "proba reczna Jeffa (wies, miasto, zamek)", "INFO - liczby = linia dzienna regionu", None)

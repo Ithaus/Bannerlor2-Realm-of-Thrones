@@ -871,6 +871,7 @@ namespace Armoury
             // E4/7: pobor z wsi (BK DeduceManpower, A5 - ujemne) i powroty zolnierzy ze znanym pochodzeniem do DOM regionu pochodzenia (dodatnie) - hearth z ksiegi
             double o10 = mv[PeopleBook.MLevyVillage] + mv[PeopleBook.MLevyA5], o11 = 0;
             for (int i = PeopleBook.MBackH3; i <= PeopleBook.MBackDisband; i++) o11 += mv[i];
+            o11 += mv[PeopleBook.MBackPress];                    // E4/7b: niewzieci z poboru wymuszonego gracza wracaja do DOM swojej wsi (+1/k)
             // E4/6: glod - zmarli z glodu i uciekli z glodu (DOM -> smierc, DOM -> UCHODZCY) - hearth z ksiegi (scalenie z E4/7: o12, w paczce E4/6 bylo o10)
             double o12 = mv[PeopleBook.MFamineDead] + mv[PeopleBook.MFamineFled];
             // E4/8: wojsko z ludzi (milicja, nowe druzyny, karawany, konwoje - ujemne), milicja do domu i wedrowcy BK u celu (dodatnie), migracja do miast (ujemne) - hearth z ksiegi

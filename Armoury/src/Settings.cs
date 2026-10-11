@@ -738,6 +738,8 @@ namespace Armoury
         // ksiega w menu osady - PeopleBook.Origin.cs, PeopleBook.OriginPatches.cs, FreeHands.cs, PeopleMenu.cs
         public bool PeopleOriginEnabled = true;            // every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before
         public bool LevyFromVillages = true;               // a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign
+        // E4/7b (decyzja Jeffa 11.10 12:40): niewzieci z ekranu lupu poboru wymuszonego wracaja do DOM swojej wsi - PeopleBook.PressUntaken
+        public bool PressUntakenGoHome = true;             // villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it
         public bool GarrisonLevyFromBk = true;             // a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does
         public float FreeHandsShare = 0.2f;                // share of a land's men who can leave the fields without the harvest suffering (counted with the fallen not yet made up by births)
         public float FreeHandsHarvestFactor = 0.5f;        // during the harvest weeks of a summer or autumn year only this part of that share is free
