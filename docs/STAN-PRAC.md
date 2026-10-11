@@ -1174,3 +1174,13 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   P2 miasta dopelniane ze wsi regionu do udzialu miejskiego w ok. rok (`TownMigrationRefillDays` 364), nie tylko o ubytek naturalny; P3 nowa druzyna lorda - najpierw wolne rece
   krainy, potem zaloga siedziby, bez obu mniejsza; E4/10 pyt. 1 - rekrut tier 1-2 po zwolnieniu zawsze do domu, do karczmy tylko od tieru 3 (`VeteranMinTier` 3).
   (E4/10 pyt. 2 - sprzet zwolnionego ze zbrojowni pana - osobny krok po etapie 4, bez zmian.)
+
+**WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
+E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli
+wyrzutkow; poprawka podwojnych wsi w Settlement.All - koniec RESZTY +677 hearth/d) + E4/5 (spustoszenie: najazd zabija/wypedza ludzi wsi do konta uchodzcow, powrot rok od
+ostatniego najazdu, plon od uchodzcow) + lancuch jedzenia (RBL nie przejmuje calego lancucha - ROT "Inni nie jedza", NavalDLC, BEE, BK znow dzialaja) + pasza koni po glowie
+(wariant a)). RC 90665425, GT bbb841d7, CS 77b11df5 bez zmian. Testy: A 120 dob nowej kampanii - bledy 9 = te same co zawsze (7 cudzych, 2 nasze nieszkodliwe -
+PRZEKAZANIE 09:35), Armoury.log 0 ERROR, etap3 20/20, wojsko lordow d120 110.4 tys., zalogi 81.2 tys., bandy 12.7 tys., przyrost +0.5%/rok; B 120 dob z proba zimy -
+zima od 8. doby, lordowie w glodzie 20 (z30 29), bez jedzenia 16 (z30 26); zapis 9 dob (autotest-161-kawalki) - Armoury 0 ERROR, 30.6 s/dobe. Kopie logow
+SCRATCH(ae222cb7)\kopia-z31-A, -B, -zapis. Kopie DLL: Armoury.dll.bak-2026-10-11-przed-noc31 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc31-przed (9d314ea6).
+ZATWIERDZONE: Armoury cf40fefa, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.

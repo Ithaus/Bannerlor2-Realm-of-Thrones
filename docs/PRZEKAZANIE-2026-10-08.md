@@ -764,3 +764,6 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   reszta 48.6% (jak z30); lordowie AI w glodzie 20 (z30: 29), bez jedzenia 16 (z30: 26); "partii jedzacych" w zimie 673 (z30: 1974) - skutek naprawy lancucha jedzenia
   (BK: partie BK nie jedza, ROT: Inni nie jedza - reguly wrocily), nie blad. Progi etap4 NIE 7: jak test A + T8 koszt 30.4 ms/d (prog 30; Zima 14.9, model hearth W1 10.6;
   z30 21.8) - marginalnie, sprawdzic w tescie koncowym. Kopie: SCRATCH(ae222cb7)\kopia-z31-B. Test zapisu 9 dob w toku.
+- (10:55) **WGRANIE 31** (Armoury cf40fefa = w-toku/zbior31 dfb12df, galaz noc/wgranie-31; kopia .bak-2026-10-11-przed-noc31 + D:\...\2026-10-11-noc31-przed) - po
+  testach A, B (zima) i zapisie 9 dob (0 ERROR Armoury; flaga zimy po tescie B usunieta przez skrypt - gra jej nie kasuje). Opis w STAN-PRAC "WGRANIE 31".
+  Dalej (zasada Jeffa): reszta E4 bez testow po drodze -> jeden test koncowy etapu -> poprawki -> wgranie.
