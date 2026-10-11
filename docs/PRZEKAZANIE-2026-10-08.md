@@ -845,3 +845,9 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (17:30) **Jeff etap 6:** 6.1 i 6.14 TAK; NOWE 6.19 - kowale kuja zbroje wedlug kultury krainy, bez unikatow (lore). PLAN-DO-KONCA zaktualizowany.
 - (17:30) **Audyt zlota z niczego ZATRZYMANY** (okno 5h: +6% w 8 min przy 5 przebiegach; chronie sciezke E4/9 -> test E4). Wznowic po 23:20: Workflow({scriptPath: ...\workflows\scripts\audyt-zloto-z-niczego-wf_326d453d-473.js, resumeFromRunId: 'wf_326d453d-473'}).
 - (17:55) **K8 GOTOWE** (w-toku/e4-8 7e1320e + bfa2966 dok.): GarrisonAutoRecruitPerDay=2 (postfiks z licznikiem glebokosci na GetMaximumDailyAutoRecruitmentCount Default/ROT/NavalDLC; zold i miejsce pilnuje gra; kazdy slot przez TakeLevy E4/7; bez K8: Straz, Inni, bez poboru, hamulec). UWAGA (do etapu 5 / audytu): AutoRecruitmentExpenses zalog idzie W NICOSC (znany wyciek AUDYT-PELNY-WERBUNEK H6) - K8 go zwieksza; dolaczyc do zamkniecia ujsc. K8 dolaczyc do zbior-e4-koniec razem z E4/9.
+- (18:05) **E5/A6 GOTOWE** (w-toku/e5-a6 f568ad8 + c71aa64 poprawki; DLL test\Armoury-e5-a6.dll 55e38075): BattlePlunder.cs - gra zdejmuje wodza pokonanego
+  (MapEvent.cs:1979-1982) PRZED CommitGoldChanges (MapEventParty.cs:499-524), wiec GoldLost nie schodzi, a zwyciezca dostaje udzial z niczego (5% zlota wodza, max
+  10 000); teraz zwyciezcy tylko to, co naprawde schodzi z pokonanych (migawka wodza, rozliczenie proporcjonalne, wodz bez zlota = 0); zaliczka RC 60% przy pojmaniu
+  gracza; 1/9 korony z czesci wodzow (Q3b Jeffa); statki osobno (B5: ok. 59 tys./d sr28). Lad przed paczka +17 965/d sr28 (nie 86 tys. - reszta to statki i N4).
+  Klucz BattlePlunderFromLoserOnly. Grupa etap5 minimalna - scalic z E5/0. Pytania: 1/9 korony z wodzow (rada zostawic - ide z rada); NOWE UJSCIE W NICOSC:
+  RealisticCaptivity - 60% zlota gracza znika, gdy pojmuje banda bez wodza albo milicja -> do paczki "zamkniecie ujsc" (z AutoRecruitmentExpenses K8/H6) po audycie.
