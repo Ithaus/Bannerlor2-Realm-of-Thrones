@@ -794,3 +794,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   arm_district, progi G1-G14 + G-ETAP (bieg 728 dob). Koordynacja Z11 z E4/9 (pojmani przez konto uchodzcow). Pytania kierunku: wyglad spalonej wioski - w 7.10 (rada);
   niebezpieczenstwo z pustych osad - pozniej (rada); ryby/mlyny wiosek - nie teraz (rada). Kod po scaleniu E4/6+E4/7 (zalezy od E4/5, E4/6, E4/7).
 - (13:40) **SCALENIE E4/6 + E4/7 GOTOWE:** w-toku/zbior-e4-koniec 392c519 (497c8c4 E4/6, 4d05aa3 E4/7, 392c519 poprawka przegladu - plon spichlerza bez drugiego liczenia zmarlych cywilow i narodzin przez czynnik rak L); DLL test\Armoury-e4-67.dll; repo i GitHub. E4/8 i E4/10 ruszaja od niego (wf_549a838c-5d8). **E4/11 kod ruszyl** od 392c519 (wf_76ab5532-625, drzewo e4\411, galaz w-toku/e4-11).
+- (13:50) **Jeff E4/11:** (1) wyglad spalonej wioski - etap 7 (7.10); (2) prosi o wyjasnienie (niebezpieczenstwo z pustych osad); (3) "pozniej, czyli kiedy?" - propozycja: etap 6 (z 6.3/6.9).
