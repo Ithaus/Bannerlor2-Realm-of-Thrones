@@ -2036,7 +2036,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistAmmoLaborMultiplier { get; set; } = 8f;
 
-        [SettingPropertyFloatingInteger("Hist Tournament Scale", 0.00f, 16.00f, "0.00", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece)")]
+        [SettingPropertyFloatingInteger("Hist Tournament Scale", 0.00f, 16.00f, "0.00", HintText = "the game seeks tournament prizes worth 1600-5000; with historical prices the range is divided by this (400-1250 pence: a fine sword, a good harness piece). Used only while Hist Worth Windows Old Coin is off (or cannot reach the game's prize list): with it on, the range is compared with a piece's worth before the repricing and is not divided")]
         [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
@@ -3932,6 +3932,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool PlayerWorkshopsSameRule { get; set; } = true;
 
+        [SettingPropertyBool("Hist Worth Windows Old Coin", HintText = "tournament prizes (the game's own and Tournaments XPanded's), the modest local prize of Grand Tourney and the cap on lords' armour orders are reckoned from fixed sums of the old coin (a prize worth 1600 to 5000, an order piece worth at most 12000). With historical prices they are compared with what a piece was worth before the repricing, so prizes and orders are again the kinds of goods their makers meant - good swords, helmets, mail and horses, not only the heaviest plate and warhorses - while the piece keeps its historical worth on the market. With RBM's tournament module on, RBM itself picks the main prize by the town's culture and your tier, and the game's and Tournaments XPanded's ranges serve only when its list is empty (needs Historical Prices; off = compared with today's worth, the game's prize range divided by Hist Tournament Scale)")]
+        [SettingPropertyGroup("Worth windows in the old coin (3.8)")]
+        public bool HistWorthWindowsOldCoin { get; set; } = true;
+
         [SettingPropertyBool("Bk Supply Buy By Party Stock", HintText = "Banner Kings party supplies (drink, timber, animal products, tools) are bought by what the PARTY carries, not by what the town holds: once a day while a lord's party stays in a town, castle or village, and again on entering a town or castle, its quartermaster tops each supply up to its need - at most Bk Supply Max Pieces pieces - from that settlement's stall at the stall's price, and the coin goes to that settlement's purse. Banner Kings bought nothing whenever the town held enough, and its coin left the world. On the way into a town an AI lord skips the goods the game makes him sell right there - anything that is not food, such as timber, tools and wine (off = Banner Kings as before)")]
         [SettingPropertyGroup("Banner Kings coin (stage 3)")]
         public bool BkSupplyBuyByPartyStock { get; set; } = true;
@@ -4938,6 +4942,7 @@ namespace Armoury
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
             s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
+            s.HistWorthWindowsOldCoin = HistWorthWindowsOldCoin;
             s.BkSupplyBuyByPartyStock = BkSupplyBuyByPartyStock;
             s.BkVillageMarketPaysWhatItHas = BkVillageMarketPaysWhatItHas;
             s.BkSlaveSalePaidByTown = BkSlaveSalePaidByTown;
