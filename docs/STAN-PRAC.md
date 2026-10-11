@@ -1073,3 +1073,10 @@ d180 (40 dob) wobec bazy - d180-207 80/d (baza 127), kar zaopatrzenia BK brak w 
 przegranej (Recent Events -65) zostaje - mechanika gry; 120 dob nowej kampanii - 0 bledow Armoury, dezercja AI 49 (baza 49), wojsko lordow w wojnie 99.2 tys., bandy -14%,
 glowy < 5000 = 3, bankruci 0, reszta ksiegi -6.2 tys.; NIE tylko te co w WGRANIU 20 (wahania); zapis 9 dob OK (0 bledow, 28.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-10-przed-noc24
 + D:\Backup-Bannerlord\wgrane\2026-10-10-noc24-przed. ZATWIERDZONE: Armoury f5be1156, RealisticCaptivity 5f98df70, CrashScribe 77b11df5.
+
+**WGRANIE 25 (10.10 ok. 18:40 zegara komp.):** Armoury 1211d984 (galaz noc/wgranie-25 = w-toku/e3-32m f37d032 = WGRANIE 24 + ETAP 3.2: cala kiesa rozbitego taboru wsi,
+karawany i bandy dla zwyciezcow wedlug wkladu (dotad gra 10% / 50%, reszta w nicosc), jedna regula gracz/AI/bandy, korona 1/9 od wodzow-wasali, takze poddanie karawany
+graczowi; BeatenPurse.cs, wylacznik BeatenPurseToVictor). RC 5f98df70, CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow, bandy w normie (liczba -16%, ludzie -13%, zloto u
+pasera +11% przy limicie +20%, kiesy band +38% - skutek decyzji D), dezercja AI 10/d, wojsko lordow w wojnie 100.8 tys., glowy < 5000 = 0, bankruci 0, reszta ksiegi -2.1 tys./d,
+kiesy rozbitych karawan i taborow znikajace z mapy 0; zapis 9 dob OK (0 bledow, 26.8 s/dobe). Kopie: Armoury.dll.bak-2026-10-10-przed-noc25 + D:\...\2026-10-10-noc25-przed.
+Pytanie (drobne) do Jeffa: kiesa bandy, ktora przylacza sie do gracza - dzis znika (jak przed 3.2). ZATWIERDZONE: Armoury 1211d984, RC 5f98df70, CS 77b11df5.
