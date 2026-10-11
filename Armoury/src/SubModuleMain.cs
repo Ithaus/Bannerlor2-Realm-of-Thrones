@@ -59,6 +59,7 @@ namespace Armoury
                 ChargeTemperPatch.ApplyAll(_harmony);
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
                 CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
+                TravellerTrade36b.ApplyAll(_harmony);   // 36b: wedrowcy BK z prawdziwym towarem - zywnosc drogi z polki pochodzenia, bez jucznych z niczego, towar w komis miasto -> miasto
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 try { GarrisonKit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonKit.ApplyAll", e); }   // K1 (A10): zaloga w bitwie gracza walczy sprzetem ze swojej zbrojowni (latka DTE)

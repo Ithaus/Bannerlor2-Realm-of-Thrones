@@ -1458,6 +1458,7 @@ namespace Armoury
             try { RawNoRot.Daily(); } catch (Exception e) { Log.Error("RawNoRot.Daily", e); }   // 174.3: linia "BK gnicie surowcow (174.3)" (tylko log)
             try { CastleSteel.Daily(); } catch (Exception e) { Log.Error("CastleSteel.Daily", e); }   // 177-1: linia "Wedrowcy BK" - sztaby i wegiel zdjete z ladunku wedrowcow
             try { TravellerGoods36.Daily(); } catch (Exception e) { Log.Error("TravellerGoods36.Daily", e); }   // 3.6: linia "Wedrowcy BK - towar (3.6)"
+            try { TravellerTrade36b.Daily(); } catch (Exception e) { Log.Error("TravellerTrade36b.Daily", e); }   // 36b: linia "Wedrowcy BK - prawdziwy towar (36b)"
             try { QohorMasters.Daily(); } catch (Exception e) { Log.Error("QohorMasters.Daily", e); }   // 177-3: dzien pracy mistrzow Qohoru (rece kowali, wegiel z polki)
             try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); }   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
             try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); }   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
