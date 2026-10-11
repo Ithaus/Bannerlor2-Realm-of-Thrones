@@ -245,6 +245,36 @@ namespace Armoury
             catch (Exception e) { Stumble("Famine.HungerOf", e); return 0f; }
         }
 
+        /// <summary>E4/11 (Z5): czesc konta uchodzcow wsi z glodu przy koncie `away` (ta sama FamPart, z ktorej licza powrot i ReturnGate); 0 bez uchodzcow
+        /// z glodu. Moze isc z menu i widoku - pod zamkiem. Nie rzuca.</summary>
+        internal static double FamPartOf(Village v, double away)
+        {
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null || !(away > 0.0)) return 0.0;
+            try { lock (Gate) { Barn b; return _barns.TryGetValue(v.Settlement.StringId, out b) && b.FamOut ? FamPart(b, away) : 0.0; } }
+            catch (Exception e) { Stumble("Famine.FamPartOf", e); return 0.0; }
+        }
+
+        /// <summary>E4/11 (Z5, menu okregu): dni spichlerza okregu dla gospodarzy (racje / ludzie w domu). false - wylaczone, spichlerz nie zalozony albo brak ludzi.
+        /// Nie rzuca.</summary>
+        internal static bool DaysOf(Village v, out double days)
+        {
+            days = 0.0;
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null) return false;
+            try
+            {
+                if (!On) return false;
+                double food;
+                lock (Gate) { Barn b; if (!_barns.TryGetValue(v.Settlement.StringId, out b)) return false; food = b.Food; }
+                if (double.IsNaN(food) || double.IsInfinity(food)) return false;
+                float k = PopulationLaw.KFor(v.Settlement);
+                double home = k > 0f ? (double)Math.Max(0f, v.Hearth) * k : 0.0;
+                if (!(home > 0.0)) return false;
+                days = Math.Max(0.0, food) / home;
+                return true;
+            }
+            catch (Exception e) { Stumble("Famine.DaysOf", e); return false; }
+        }
+
         /// <summary>
         /// Devastation.Strike (rabunek i zerowanie armii), PO ruchu ludzi i kontach: spichlerz okregu traci ten sam ulamek, jaki trafil ludzi (GL 2.2 pkt 6).
         /// Spichlerz jeszcze nie zalozony - nic (zalozy sie od ludzi, ktorzy zostali). Nie rzuca (U24).
@@ -872,6 +902,8 @@ namespace Armoury
                 SyncFam(b, f + n, away + n);
                 b.Recovered = -1; b.Fled += n;
             }
+            // E4/11 (Z4, krytyka K8): opuszczone osady wiosek pobocznych - na koncu udanej sciezki, po kontach i FamN (U24); wlasny try, nie rzuca
+            try { VillageBook.OnFamineFled(x.V, n); } catch (Exception e) { Stumble("Famine.TryFlee(E4/11)", e); }
             return true;
         }
 

@@ -2612,6 +2612,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int VeteranMinTier { get; set; } = 3;
 
+        [SettingPropertyBool("Village Book Enabled", HintText = "every map village keeps its own people and its share of the district's harvest: raids and foraging armies empty its settlements (the side facing the raiders burns first), famine leaves them abandoned, and they stand again as their people come home - within a year of the last raid in the land. Shown in 'People of this land' and in the map village tooltip. Needs Devastation Enabled to burn anything. Off = all map villages stand, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool VillageBookEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("District Settlement People", 50, 1000, "0", HintText = "people of one settlement (a village with its fields) when a district is first reckoned; a district's villages share its settlements. Change it only when you start a new campaign")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int DistrictSettlementPeople { get; set; } = 250;
+
+        [SettingPropertyBool("Town Food By Village People", HintText = "the food a town or castle gets from each of its villages follows the people at home and at work there, as the village's own harvest does: villagers away cut it, and a plundered village keeps feeding its castle with the people who stayed instead of nothing. Off = as in the game")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownFoodByVillagePeople { get; set; } = true;
+
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
         public int OutlawMinBand { get; set; } = 6;
@@ -5008,6 +5020,9 @@ namespace Armoury
             s.VeteranShareToTavern = VeteranShareToTavern;
             s.VeteranWaitDays = VeteranWaitDays;
             s.VeteranMinTier = VeteranMinTier;
+            s.VillageBookEnabled = VillageBookEnabled;
+            s.DistrictSettlementPeople = DistrictSettlementPeople;
+            s.TownFoodByVillagePeople = TownFoodByVillagePeople;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;

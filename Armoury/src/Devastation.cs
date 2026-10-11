@@ -73,6 +73,7 @@ namespace Armoury
             public float Virt; public bool HasVirt;     // hearth, jaki wies mialaby w grze po dotychczasowych krokach rabunku
             public int Steps, MaxMen;
             public bool Slaver;                         // najezdzca z kultury z niewola (LosersFlee.SlaveCulture - ta sama regula co H3)
+            public RaidEventComponent Comp;             // E4/11 (Z2, krytyka K2): klucz sesji ksiegi wiosek = ten sam obiekt, co MapEvent.Component widoku
         }
         private static readonly object _lock = new object();
         private static readonly Dictionary<RaidEventComponent, RaidState> _raids = new Dictionary<RaidEventComponent, RaidState>();
@@ -99,6 +100,10 @@ namespace Armoury
         private static int _dStopHunger;                                    // E4/6: powrot wstrzymany - wies nie przyjmuje (Famine.ReturnGate: glod gospodarzy, a konto w innym regionie - takze pole nie karmi i spichlerz ponizej FamineReturnMinDays) albo czesc z glodu czeka na odzyskanie wsi
         private static readonly HashSet<string> _dBackRegions = new HashSet<string>();
         private static bool _abandonLogged;
+        // E4/11 (Z3, krytyka K5): powod wstrzymania powrotu konta wsi w DZISIEJSZYM Daily - czyszczony na poczatku Daily, wypelniany w tych samych continue
+        // (logika i liczby powrotu bez zmian); bez wpisu = 0 (nic nie wstrzymalo albo konto puste)
+        internal const int StopQuiet = 1, StopSiege = 2, StopGate = 3, StopStay = 4, StopFamWait = 5;
+        private static readonly Dictionary<string, int> _stopOf = new Dictionary<string, int>();
 
         internal static void Reset()
         {
@@ -106,6 +111,7 @@ namespace Armoury
             _spiral.Clear();
             lock (_errSites) _errSites.Clear();
             _stumblesAll = 0; _abandonLogged = false;
+            _stopOf.Clear();
             NewDay();
         }
 
@@ -133,7 +139,8 @@ namespace Armoury
         }
 
         private static double Clamp01(double x) { return double.IsNaN(x) ? 0.0 : (x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x)); }
-        private static double MaxShare(Settings s) { return Math.Max(0, Math.Min(95, s.DevastationMaxPercent)) / 100.0; }
+        /// <summary>Pulap spustoszenia okregu 0..0.95 (Room; E4/11: pulap pustych osad wioski - ten sam).</summary>
+        internal static double MaxShare(Settings s) { return Math.Max(0, Math.Min(95, s.DevastationMaxPercent)) / 100.0; }
 
         // ------------------------------------------------------------ czy spustoszenie obejmuje wies
         /// <summary>
@@ -215,7 +222,7 @@ namespace Armoury
         /// (1/k za czlowieka) i dziela sie: zabici (konto wsi, smierc R3 - licznik do E4/7), pojmani (0 do E4/9), las (pula wyrzutkow regionu 1:1),
         /// uchodzcy (konto wsi). Miedzy Move a kontami nic nie rzuca (U24). Zwraca liczbe trafionych; trafieni = suma udzialow co do ulamka czlowieka.
         /// </summary>
-        private static double Strike(Village v, double personDays, double perDay, int kind, bool slaver, RaidState rs)
+        private static double Strike(Village v, double personDays, double perDay, int kind, bool slaver, RaidState rs, MobileParty src = null)
         {
             var s = Settings.Current;
             if (s == null || v == null || !(personDays > 0.0) || !(perDay > 0.0)) return 0.0;
@@ -251,6 +258,9 @@ namespace Armoury
             PeopleBook.Devastated(v, refugees * f, dead * f, region, day);
             if (fled > 0.0) OutlawLaw.AddFled(v.Settlement, (float)(fled * f));   // pula regionu 1:1, bez hearth (zdjal Move)
             if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
+            // E4/11 (Z1, U24): trafieni na spalone osady wiosek pobocznych - po kontach, wlasny try (OnStrike nie rzuca); rabunek - klucz sesji, zerowanie - oboz armii
+            try { VillageBook.OnStrike(v, hit * f, refugees * f, kind == KRaid, rs != null ? rs.Comp : null, src, lBefore); }
+            catch (Exception e) { Stumble("Devastation.Strike(E4/11)", e); }
             // pojmani (od E4/9): capt * f -> konto JENCY; w E4/5 capt == 0
             double h = hit * f;
             if (rs != null) { rs.Hit += h; rs.Dead += dead * f; rs.CapWould += h * capW; }
@@ -270,7 +280,7 @@ namespace Armoury
                 int men = mp.MemberRoster.TotalManCount;
                 if (men <= 0) return;
                 _dForagers++; _dDays[KForage] += men;
-                Strike(v, men, Math.Max(0f, s.DevastationPerForagerDay), KForage, SlaverOf(mp.MapFaction), null);
+                Strike(v, men, Math.Max(0f, s.DevastationPerForagerDay), KForage, SlaverOf(mp.MapFaction), null, mp);
             }
             catch (Exception e) { Stumble("Devastation.Forage", e); }
         }
@@ -293,7 +303,7 @@ namespace Armoury
             lock (_lock)
             {
                 if (_raids.TryGetValue(raid, out rs) || !create) return rs;
-                rs = new RaidState();
+                rs = new RaidState { Comp = raid };
                 float done = raid.RaidDamage;
                 if (done > 0f && v.Hearth > 0f)
                 {
@@ -618,6 +628,7 @@ namespace Armoury
         /// </summary>
         internal static void Daily()
         {
+            _stopOf.Clear();
             try
             {
                 var s = Settings.Current;
@@ -653,10 +664,10 @@ namespace Armoury
                         // i reszte (rabunek, zerowanie - rok od ostatniego najazdu w regionie, decyzja Jeffa 11.10) - glod nie przestawia zegara uchodzcom z rabunku
                         int famDay; double famAway;
                         int famStop = Famine.ReturnGate(v, today, away, out famDay, out famAway);
-                        if (famStop == 1) { _dStopHunger++; continue; }
-                        if (famStop == 2) { _dStopSiege++; continue; }
-                        if (clock && today - last < Q) { _dStopQuiet++; continue; }                    // 30 dob spokoju po najezdzie w regionie - dla calego konta
-                        if (region != null && region.IsUnderSiege) { _dStopSiege++; continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
+                        if (famStop == 1) { _dStopHunger++; NoteStop(kv.Key, StopGate); continue; }
+                        if (famStop == 2) { _dStopSiege++; NoteStop(kv.Key, StopStay); continue; }
+                        if (clock && today - last < Q) { _dStopQuiet++; NoteStop(kv.Key, StopQuiet); continue; }                    // 30 dob spokoju po najezdzie w regionie - dla calego konta
+                        if (region != null && region.IsUnderSiege) { _dStopSiege++; NoteStop(kv.Key, StopSiege); continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
                         double raidAway = Math.Max(0.0, away - famAway), backR = 0.0, backF = 0.0;
                         if (raidAway > 0.0)
                         {
@@ -666,7 +677,7 @@ namespace Armoury
                         }
                         if (famAway > 0.0)
                         {
-                            if (famDay < 0) _dStopHunger++;                                            // wies jeszcze nie przyjmuje uchodzcow z glodu - czekaja (reszta wraca)
+                            if (famDay < 0) { _dStopHunger++; NoteStop(kv.Key, StopFamWait); }         // wies jeszcze nie przyjmuje uchodzcow z glodu - czekaja (reszta wraca)
                             else
                             {
                                 backF = famAway / Math.Max(1, D - (today - famDay));
@@ -690,6 +701,18 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Devastation.Daily", e); }
         }
+
+        private static void NoteStop(string id, int code) { if (id != null) _stopOf[id] = code; }
+
+        /// <summary>E4/11 (Z3, krytyka K5): powod wstrzymania powrotu konta tej wsi w dzisiejszym Daily (StopQuiet..StopFamWait), 0 - brak. Watek glowny (doba).</summary>
+        internal static int StopOf(Village v)
+        {
+            int c;
+            return v != null && v.Settlement != null && v.Settlement.StringId != null && _stopOf.TryGetValue(v.Settlement.StringId, out c) ? c : 0;
+        }
+
+        /// <summary>E4/11 (G5): trafieni rabunkiem i zerowaniem od ostatniej linii doby (zeruje DayLine; VillageBook.Daily czyta przed nia - to samo okno).</summary>
+        internal static double HitToday { get { return _dHit[KRaid] + _dHit[KForage]; } }
 
         /// <summary>
         /// Spustoszenie wylaczone (MCM albo brak jednostki ludzi / przyrostu naturalnego / latek rabunku), a w ksiedze sa uchodzcy: wracaja do swoich wsi od razu
