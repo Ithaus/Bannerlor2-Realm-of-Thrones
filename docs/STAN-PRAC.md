@@ -1097,3 +1097,18 @@ zabrany przez bandytow do jukow bandy (nie na targ za darmo), "bandyci ukradli" 
 kryjowki z ludzi bandy (bez wyrzutkow - bez herszta), zold zaciagu ROT od pana). CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow Armoury, RC i GT, wojsko lordow w wojnie
 101.2 tys., dezercja AI 31/d, glowy < 5000 = 1, bankruci 0, bandy -11%, reszta ksiegi wobec bazy -4.3 tys.; zapis 9 dob OK (0 bledow, 29.5 s/dobe). Kopie: *.bak-2026-10-10-przed-noc27
 (Armoury, RC, GT) + D:\Backup-Bannerlord\wgrane\2026-10-10-noc27-przed. ZATWIERDZONE: Armoury 5e02c741, RC 90665425, GT bbb841d7, CS 77b11df5.
+
+**WGRANIE 28 (10.10 ok. 20:58 zegara komp.):** Armoury 6e4b5b6a (galaz noc/wgranie-28 = w-toku/e3-31m dc290b3 = WGRANIE 27 + ETAP 3.1 + 3.3 wedlug projektu
+SCRATCH(ae222cb7)\e3\projekt31\PROJEKT-ETAP3-SZCZELNOSC-STATKI-2026-10-10.md (v2 po krytyce, 2 recenzje kodu): E3/0 pomiar (portfele wezwan, U8r, statki, Inni),
+E3/1 prawdziwy platnik (jency, lup z oblezenia, turnieje, myto - kasa osady z nadwyzki), E3/2 majatki BK tylko z utargu, E3/3 lup z cial z sakiewek pokonanych,
+E3/4 zold karawan do sakiewek ich ludzi, E3/5 awanse do sakiewki, E3/6 werbunek - dokladny zwrot, E3/7 kapital karawan z zaplaty (DTE 0), E3/8a-c podatek warsztatow
+notabli do pana, oplaty BK do odbiorcow, zloto zmarlych w osadzie, E3/9 zysk karawany pana w kazdym miescie krolestwa; 3.3 statki (E3/10-12) w kodzie, WYLACZNIKI OFF
+(ShipsToPort, ShipTradeThroughPort, ShipPrizesToPort) do decyzji Jeffa - wariant (b): razem z podatkiem wojennym etapu 5; E3/8d (Inni bez zoldu) odlozony). RC 90665425,
+GT bbb841d7, CS 77b11df5 bez zmian. Testy: 120 dob - 0 bledow; PROGI ETAPU 3 20/20 TAK: reszta niewyjasniona ksiegi (srednia 28 dob) -2.6 tys. w dobie 40 i +0.3 tys.
+w dobie 120 (cel < 10 tys.; WGRANIE 21: ok. -19 tys.), platnik/awanse/kapital/werbunek bez odbiorcy 0, miasto ponizej zapasu 0; etap 2: wojsko lordow w wojnie 99.8 tys.,
+glowy < 5000 = 2, bankruci 0, dezercja AI 46/d, bandy -13% (liczba -14%, awanse u pasera -25%, rozbite tabory -29%; zloto band u pasera +35% - NIE wobec progu +20%,
+kiesy band +60% - skutek decyzji D i lupu z cial; obserwowac w biegu 2-letnim); regulator kas miast kasuje +160 tys./d wiecej (miasta dostaja zloto, ktore dotad znikalo -
+etap 5: 5.1); zapis 9 dob OK (0 bledow, 28.6 s/dobe). Kopie: Armoury.dll.bak-2026-10-10-przed-noc28 + D:\...\2026-10-10-noc28-przed.
+Pytania do Jeffa (3.1): podatek BK od warsztatow lordow/gracza w cudzych miastach - zniknac (dzis) czy wlasciciel placi; doplata podmiany rekruta ROT do sakiewki ludzi;
+werdykt 3.2 "pokonany" takze dla partii lordow. ZATWIERDZONE: Armoury 6e4b5b6a, RC 90665425, GT bbb841d7, CS 77b11df5.
+**BIEG 2-LETNI (728 dob, -TimeoutMin 480) start ok. 20:58** na wgranym zestawie -> SCRATCH(ae222cb7)\test\at-728.out.txt (koniec ok. 01:30-02:00).
