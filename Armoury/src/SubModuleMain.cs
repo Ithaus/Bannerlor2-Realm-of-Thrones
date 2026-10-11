@@ -150,6 +150,7 @@ namespace Armoury
                 // skompiluje sie przed latka (113 ryzyko 13); we wlasnym try
                 try { Devastation.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Devastation.ApplyAll", e); }
                 try { Famine.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Famine.ApplyAll", e); }   // E4/6 (191): spichlerze okregow i glod - postfiks spichlerza warowni (schronieni w murach oblezonej warowni)
+                try { VillageBook.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageBook.ApplyAll", e); }   // E4/11 (193): zywnosc warowni od ludzi (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu (U26)
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
                 MarchPace.ApplyAll(_harmony);

@@ -86,6 +86,7 @@ namespace Armoury
         public int Model;                 // v4: rodzaj obrazka (MapVillageData.ModelVillage / Mill / Windmill / Farm / Granary / Fishing)
         public bool ModelUnknown;         // v4: w kolumnie "model" nieznana wartosc (obrazek village, liczone w logu)
         public int Line;                  // numer wiersza w pliku (do logu)
+        public float RoadDist = -1f;      // E4/11 (krytyka K1): odleglosc drogi od wsi gry z kolumny road_dist (opcjonalna; -1 = brak - linia prosta); widok jej nie czyta
     }
 
     /// <summary>Wynik wczytania pliku: wiersze, naglowek, odrzucone wiersze z powodami.</summary>
@@ -246,12 +247,28 @@ namespace Armoury
             if (Num(Get(c, col, "road_deg"), out v)) r.RoadDeg = v;
             if (Num(Get(c, col, "half_len"), out v) && v > 0.05f && v < 20f) r.HalfLen = v;
             if (Num(Get(c, col, "half_wid"), out v) && v > 0.05f && v < 20f) r.HalfWid = v;
+            if (Num(Get(c, col, "road_dist"), out v) && v >= 0f) r.RoadDist = v;   // E4/11: kolumna opcjonalna - wiersz bez niej NIE odrzucany
             r.Kind = Get(c, col, "kind") ?? "";
             r.Class = Get(c, col, "class") ?? "";
             r.Model = ParseModel(Get(c, col, "model"), out r.ModelUnknown);   // v4; brak kolumny = village
             string uid = Get(c, col, "uid");
             r.Uid = string.IsNullOrEmpty(uid) || uid == "-" ? r.VillageId + "#" + r.Id.ToString(CultureInfo.InvariantCulture) : uid;
             return null;
+        }
+
+        /// <summary>Sciezka pliku w module (Modules\Armoury\ModuleData). E4/11: przeniesione z widoku - ten sam plik czyta ksiega wiosek po stronie kampanii.</summary>
+        internal static string DataPath()
+        {
+            try
+            {
+                string dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);   // Modules\Armoury\bin\Win64_Shipping_Client
+                string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", ".."));
+                string p = System.IO.Path.Combine(root, "ModuleData", FileName);
+                if (System.IO.File.Exists(p)) return p;
+            }
+            catch { }
+            try { return System.IO.Path.Combine(BasePath.Name, "Modules", "Armoury", "ModuleData", FileName); }
+            catch { return null; }
         }
 
         /// <summary>CRC sceny: plik bez naglowka CRC - bez sprawdzenia; zgodny; niezgodny (wioski wylaczone).</summary>
@@ -1498,6 +1515,7 @@ namespace Armoury
         private uint _maskCivil, _maskL1, _maskL2, _maskL3, _maskLooted, _maskSiege;
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<District> _districts = new List<District>();
+        private readonly Dictionary<string, Slot> _slotByUid = new Dictionary<string, Slot>(StringComparer.Ordinal);   // E4/11: uid wioski -> slot (ogien z ksiegi wiosek)
         private readonly Dictionary<long, List<Slot>> _grid = new Dictionary<long, List<Slot>>();
         private readonly List<Slot> _shown = new List<Slot>();
         private readonly SortedDictionary<string, int> _skip = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -1586,24 +1604,10 @@ namespace Armoury
             catch (Exception e) { _active = false; Log.Error("MapVillagesView.Load - wioski na mapie wylaczone do nastepnego wczytania", e); }
         }
 
-        private static string DataPath()
-        {
-            try
-            {
-                string dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);   // Modules\Armoury\bin\Win64_Shipping_Client
-                string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", ".."));
-                string p = System.IO.Path.Combine(root, "ModuleData", MapVillageData.FileName);
-                if (System.IO.File.Exists(p)) return p;
-            }
-            catch { }
-            try { return System.IO.Path.Combine(BasePath.Name, "Modules", "Armoury", "ModuleData", MapVillageData.FileName); }
-            catch { return null; }
-        }
-
         private void Load(System.Diagnostics.Stopwatch sw)
         {
             _stHeld = 0;   // T7 poprawka: pole statyczne - potkniecia linii pana liczone od nowa dla kazdej mapy / wczytania
-            string path = DataPath();
+            string path = MapVillageData.DataPath();
             if (path == null || !System.IO.File.Exists(path))
             {
                 Log.Info("Wioski: brak pliku " + (path ?? MapVillageData.FileName) + " - wioski na mapie nie beda pokazane (gra bez zmian).");
@@ -1651,6 +1655,7 @@ namespace Armoury
                     var s = new Slot { R = r, D = d };
                     d.ByOrder.Add(s);
                     _slots.Add(s);
+                    if (!string.IsNullOrEmpty(r.Uid)) _slotByUid[r.Uid] = s;
                     if (why != null)
                     {
                         Fail(s, why);
@@ -1729,7 +1734,7 @@ namespace Armoury
                              + "; " + sum);
             }
             catch (Exception e) { Log.Error("MapVillagesView.OnFinalize", e); }
-            _slots.Clear(); _districts.Clear(); _grid.Clear(); _shown.Clear();
+            _slots.Clear(); _districts.Clear(); _grid.Clear(); _shown.Clear(); _slotByUid.Clear();
             _active = false;
             _screen = null;
             base.OnFinalize();
@@ -1876,15 +1881,27 @@ namespace Armoury
                 {
                     int want = d.S.IsUnderRaid ? FxFire : d.S.IsRaided ? FxSmoke : FxNone;
                     Slot target = null;
+                    bool book = false;
                     if (want != FxNone)
-                        target = d.FxSlot != null && !d.FxSlot.Failed ? d.FxSlot : FirstUsable(d);
+                    {
+                        // E4/11 (krytyka K2): ogien na wiosce, ktora naprawde plonie wedlug ksiegi wiosek (sesja otwierana tu albo przy pierwszym Strike - ta sama funkcja);
+                        // uid null = plonie sama wies gry (lancuch doszedl do niej). Ksiega nieczynna / bez n / wyjatek odczytu - po staremu (pierwsza wioska lancucha gry)
+                        string uid;
+                        if (VillageBook.FxUid(d.Id, want == FxFire, out uid))
+                        {
+                            book = true;
+                            Slot bs;
+                            target = uid != null && _slotByUid.TryGetValue(uid, out bs) && !bs.Failed ? bs : null;
+                        }
+                        else target = d.FxSlot != null && !d.FxSlot.Failed ? d.FxSlot : FirstUsable(d);
+                    }
                     if (want == d.Fx && ReferenceEquals(target, d.FxSlot)) continue;
                     if (d.FxSlot != null && !ReferenceEquals(d.FxSlot, target)) { d.FxSlot.FxWanted = FxNone; ApplyFx(d.FxSlot); }
                     if (target != null) { target.FxWanted = want; ApplyFx(target); }
                     if (want == FxFire && d.Fx != FxFire && target != null)
                     {
                         _fires++;
-                        Log.Info("Wioski: ogien nad " + target.R.Name + " (okreg " + d.S.Name + ", kolejnosc " + target.R.Order + ") - rabuje " + RaiderName(d.S) + ".");
+                        Log.Info("Wioski: ogien nad " + target.R.Name + " (okreg " + d.S.Name + ", kolejnosc " + target.R.Order + ") - rabuje " + RaiderName(d.S) + (book ? " (ksiega)." : " (lancuch gry)."));
                     }
                     else if (d.Fx == FxFire && want != FxFire && d.FxSlot != null)
                     {
@@ -4593,9 +4610,15 @@ namespace Armoury
                     TextObject district = _s.D.S != null ? _s.D.S.Name : new TextObject(_s.D.Id);
                     string held = Settings.Current.VillageTipHeldBy ? HeldLineSafe(_s.D) : null;   // T7 (W-2); null = stary tekst
                     list.Add(new TooltipProperty("", held ?? VillageTexts.Make(VillageTexts.VilTipDistrict, "DISTRICT", district).ToString(), 0));
-                    int people = _s.R.Settlements * 250;   // osada = ok. 250 ludzi (PROJEKT-RABUNEK pkt 1)
+                    // E4/11: ludzie i stan z ksiegi wiosek (w domu + poza domem); ksiega nieczynna - stary wzor osady x 250 (PROJEKT-RABUNEK pkt 1)
+                    VillageBook.VState vs;
+                    bool book = VillageBook.StateOf(_s.R.Uid, out vs);
+                    int people = book ? (int)Math.Round(vs.Home + vs.Away) : _s.R.Settlements * 250;
+                    int setl = book ? Math.Max(1, (int)Math.Round(vs.Settlements)) : _s.R.Settlements;
                     list.Add(new TooltipProperty("", VillageTexts.Make(VillageTexts.VilTipPeople, "PEOPLE", people.ToString("N0", CultureInfo.InvariantCulture),
-                        "SETTLEMENTS", _s.R.Settlements).ToString(), 0));
+                        "SETTLEMENTS", setl).ToString(), 0));
+                    string state = book ? StateLine(vs) : null;
+                    if (state != null) list.Add(new TooltipProperty("", state, 0));
                     if (_s.FxWanted == FxFire && _s.D.S != null)
                     {
                         string raider = RaiderName(_s.D.S);
@@ -4613,6 +4636,29 @@ namespace Armoury
             }
 
             private static int _stTip;   // licznik bledow dymka (najechanie co chwila = bez zalewu logu)
+
+            /// <summary>E4/11: linia stanu wioski z ksiegi (istniejace teksty + "odbudowana po N dobach"); plonaca - linia ognia nizej (jak dotad).</summary>
+            private string StateLine(VillageBook.VState vs)
+            {
+                var ci = CultureInfo.InvariantCulture;
+                switch (vs.State)
+                {
+                    case VillageBook.SBurned:
+                        return VillageTexts.Make(VillageTexts.VilTipBurned, "DAYS", (vs.EvDay >= 0 ? vs.Today - vs.EvDay : 0).ToString(ci),
+                            "RETURNED", Math.Round(vs.Home).ToString("N0", ci), "PEOPLE", Math.Round(vs.Home + vs.Away).ToString("N0", ci)).ToString();
+                    case VillageBook.SAbandoned:
+                        return VillageTexts.Make(VillageTexts.VilAbandoned, "VILLAGE", _s.R.Name).ToString();
+                    case VillageBook.SRebuilding:
+                        return VillageTexts.Make(VillageTexts.VilRebuilding, "VILLAGE", _s.R.Name).ToString();
+                    case VillageBook.SDamaged:
+                        return VillageTexts.Make(VillageTexts.VilTipEmptied, "EMPTY", Math.Max(1.0, Math.Round(vs.Empty)).ToString("0", ci),
+                            "SETTLEMENTS", Math.Max(1.0, Math.Round(vs.Settlements)).ToString("0", ci), "FLED", Math.Round(vs.Away).ToString("N0", ci)).ToString();
+                    case VillageBook.SStanding:
+                        return vs.RebuiltDay >= 0 && vs.EvDay >= 0 && vs.RebuiltDay >= vs.EvDay
+                            ? VillageTexts.Make(VillageTexts.VilTipRebuiltDays, "DAYS", (vs.RebuiltDay - vs.EvDay).ToString(ci)).ToString() : null;
+                    default: return null;
+                }
+            }
         }
     }
 }

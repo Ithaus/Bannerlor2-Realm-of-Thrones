@@ -62,6 +62,8 @@ RANGES = {
     'WinterWarmRealmFactor': (0.0, 1.0, "0.00"),
     'WinterHorseFeedShare': (0.0, 1.0, "0.00"),
     # E4/5 (113n): spustoszenie - suwaki zgodne z przycieciem w kodzie (pulap najwyzej 95 - 113 ryzyko 11; procenty 0..100; powrot Q+1..; elastycznosc 0..2)
+    # E4/11 (193): ludzi na osade - przycinane w kodzie do 50..5000 (VillageBook.EnsureN); suwak 50..1000
+    'DistrictSettlementPeople': (50, 1000, "0"),
     'DevastationPerRaiderDay': (0.0, 2.0, "0.00"),
     'DevastationPerForagerDay': (0.0, 1.0, "0.00"),
     'DevastationMaxPercent': (0, 95, "0"),

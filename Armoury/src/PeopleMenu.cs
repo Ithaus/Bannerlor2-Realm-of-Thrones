@@ -12,7 +12,9 @@ namespace Armoury
     /// E4/7 (164b-1, U21; Jeff 05.10 SP:347 "ksiega ma byc do sprawdzenia ... pozycja w menu osady"): pozycja "People of this land" w menu wsi, miasta i zamku -
     /// okno informacyjne (InformationManager.ShowInquiry) z kontami regionu osady (warownia OutlawLaw.RegionFor): w domu, pod bronia, w niewoli, wyrzutki, uchodzcy,
     /// polegli i narodziny od poczatku ksiegi, wolne rece i plon. Liczby z cache doby (ta sama doba co linie "Pochodzenie (E4/7)" i "Wolne rece (E4/7)").
-    /// Bez GameMenu.SwitchToMenu (CLAUDE.md 7) i bez stanu. Napisy po angielsku. Wylacznik PeopleMenuEntry. E4/11 rozszerzy te sama pozycje o wioski poboczne.
+    /// Bez GameMenu.SwitchToMenu (CLAUDE.md 7) i bez stanu. Napisy po angielsku. Wylacznik PeopleMenuEntry.
+    /// E4/11 (193, plan rozdz. 6): pod tekstem E4/7 sekcja okregu z ksiegi wiosek (VillageBook.MenuSection - wies: lista wiosek, miasto i zamek: wiersz na okreg);
+    /// ta sama pozycja takze w menu village_looted (gracz we wsi spladrowanej trafia do niego zamiast do "village"), index 0 - nad "Leave...".
     /// </summary>
     internal static class PeopleMenu
     {
@@ -24,7 +26,9 @@ namespace Armoury
             {
                 foreach (var menu in new[] { "village", "town", "castle" })
                     starter.AddGameMenuOption(menu, "arm_people_" + menu, "{=!}People of this land", Condition, Consequence, false, 6);
-                Log.Info("PeopleMenu (E4/7): pozycja \"People of this land\" w menu wsi, miasta i zamku wpieta (wylacznik People Menu Entry).");
+                // E4/11 (5.3, RB K9): wies Looted - gra przelacza na village_looted (jedyna opcja "Leave..." isLeave); AddGameMenuOption wstawia na index 0 (nad nia)
+                starter.AddGameMenuOption("village_looted", "arm_people_village_looted", "{=!}People of this land", Condition, Consequence, false, 0);
+                Log.Info("PeopleMenu (E4/7): pozycja \"People of this land\" w menu wsi, miasta i zamku wpieta (wylacznik People Menu Entry); E4/11: takze we wsi spladrowanej (village_looted) i z sekcja okregu (ksiega wiosek).");
             }
             catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }
         }
@@ -85,7 +89,11 @@ namespace Armoury
                     }
                     if (c != null && c.L < 1.0) sb.Append("Harvest of the fields: ").Append(P(c.L)).Append('\n');
                 }
-                InformationManager.ShowInquiry(new InquiryData(title, sb.ToString().TrimEnd('\n'), true, false, "Close", null, delegate { }, null), true);
+                string body = sb.ToString().TrimEnd('\n');
+                // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu
+                try { string dist = VillageBook.MenuSection(st); if (!string.IsNullOrEmpty(dist)) body += "\n\n" + dist; }
+                catch (Exception e) { Log.Error("PeopleMenu.Consequence(E4/11)", e); }
+                InformationManager.ShowInquiry(new InquiryData(title, body, true, false, "Close", null, delegate { }, null), true);
             }
             catch (Exception e) { Log.Error("PeopleMenu.Consequence", e); }
         }
