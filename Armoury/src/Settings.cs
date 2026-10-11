@@ -740,6 +740,10 @@ namespace Armoury
         public bool LevyFromVillages = true;               // a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign
         // E4/7b (decyzja Jeffa 11.10 12:40): niewzieci z ekranu lupu poboru wymuszonego wracaja do DOM swojej wsi - PeopleBook.PressUntaken
         public bool PressUntakenGoHome = true;             // villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it
+        // poprawki E4 po tescie koncowym (fixA, T6): pobor wsi, ktorej region ma wszystkie wsie na podlodze 50 hearth, bierze reszte ze stanu miasta regionu - PeopleBook.TakeLevy
+        public bool LevyVillageFromTown = true;            // when every village of a land is down to its last 50 hearths, a man recruited there comes from the people of the land's town instead of from nowhere
+        // poprawki E4 po tescie koncowym (fixA, P2-T4-lochy): jency zbiegli z przepelnionego lochu partii ida jak uwolnieni jency (karczma / dom / las) - PeopleBook.EscapePost
+        public bool PrisonEscapeGoHome = true;             // captives who slip away from an overfull party prison make their way home like freed captives (or to the woods, or to a tavern) instead of vanishing
         public bool GarrisonLevyFromBk = true;             // a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does
         public float FreeHandsShare = 0.2f;                // share of a land's men who can leave the fields without the harvest suffering (counted with the fallen not yet made up by births)
         public float FreeHandsHarvestFactor = 0.5f;        // during the harvest weeks of a summer or autumn year only this part of that share is free

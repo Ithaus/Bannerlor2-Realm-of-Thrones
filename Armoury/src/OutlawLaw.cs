@@ -76,7 +76,9 @@ namespace Armoury
         private static readonly Dictionary<string, List<Settlement>> _near = new Dictionary<string, List<Settlement>>();
         private static readonly Dictionary<string, Settlement> _regionOf = new Dictionary<string, Settlement>();
         private static readonly Dictionary<Clan, CharacterObject> _commonerOf = new Dictionary<Clan, CharacterObject>();
-        private static readonly HashSet<MobileParty> _empty = new HashSet<MobileParty>();
+        // fixA (P11-empty-set): banda pusta przy narodzinach trafia tu w RosterPostfix PRZED nadaniem Id partii (AddMobileParty) - porownanie po referencji
+        // (PeopleBook.RefEq), inaczej kazde Remove chybialo i zbior rosl o kazda pusta bande (wyciek + coraz dluzsza petla Hourly). Typ pola bez zmian (Leaks310 - refleksja)
+        private static readonly HashSet<MobileParty> _empty = new HashSet<MobileParty>(PeopleBook.RefEq.I);
 
         // licznik dnia
         private static float _inDesert, _inRouted, _inRaid, _inMisery, _inDisband, _outReturn;
@@ -1209,7 +1211,7 @@ namespace Armoury
                          + " | naplyw: dezercja " + (int)_inDesert + ", rozbitkowie " + (int)_inRouted + ", rabunki " + (int)_inRaid
                          + ", bieda/wojna " + _inMisery.ToString("0.0", CultureInfo.InvariantCulture) + ", rozwiazane bandy " + (int)_inDisband
                          + " | powrot do wsi " + _outReturn.ToString("0.0", CultureInfo.InvariantCulture)
-                         + " | bandy nowe " + _bornBands + " (" + _bornMen + " ludzi), odmowione " + _refused + ", puste usuniete " + _emptyRemoved
+                         + " | bandy nowe " + _bornBands + " (" + _bornMen + " ludzi), odmowione " + _refused + ", puste usuniete " + _emptyRemoved + " (w zbiorze pustych " + _empty.Count + ")"     // fixA (P11-empty-set): rozmiar zbioru - kontrola wycieku
                          + " | werbunek: z puli " + _bandRecruit + ", jency " + _prisonerJoin
                          + " | awanse: z lupu " + _upLoot + ", od pasera " + _upFence + " (" + _fenceGold + " zl), bez sprzetu " + _upBlocked
                          + " | band " + bands + ", ludzi " + men
