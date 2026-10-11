@@ -102,6 +102,7 @@ namespace Armoury
         internal static void Reset()
         {
             lock (_lock) { _raids.Clear(); _byId = null; }
+            _spiral.Clear();
             lock (_errSites) _errSites.Clear();
             _stumblesAll = 0; _abandonLogged = false;
             NewDay();
@@ -699,11 +700,176 @@ namespace Armoury
         private static string F(double v, string fmt) { return v.ToString(fmt, Inv); }
         private static string F0(double v) { return Math.Round(v).ToString("0", Inv); }
 
-        // ------------------------------------------------------------ linia doby
-        /// <summary>ArmouryBehavior.OnDailyTick po PeopleLedger.Daily: linia "Ludzie (spustoszenie)" i zerowanie licznikow doby.</summary>
+        // ------------------------------------------------------------ linia doby (K6)
+        private sealed class RegionRow { public Settlement Node; public double Away, Dead, Home; public float Worst = 1f; }
+        private static readonly Dictionary<string, int> _spiral = new Dictionary<string, int>();   // region -> kolejne doby: > 25% uchodzcow i najazd < Q dob (bez zapisu; rozdz. 12 pkt 18)
+
+        private static string NameOf(Settlement st)
+        {
+            if (st == null) return "?";
+            try { var n = st.Name; if (n != null) return n.ToString(); } catch { }
+            return st.StringId ?? "?";
+        }
+
+        private static string Sg(double v, string fmt) { return (v >= 0.0 ? "+" : "") + v.ToString(fmt, Inv); }
+
+        /// <summary>
+        /// ArmouryBehavior.OnDailyTick po PeopleLedger.Daily: linia "Ludzie (spustoszenie)" (pisana, gdy czynne i cokolwiek sie dzialo albo konto niepuste;
+        /// parsuje sprawdz_logi.py etap4_e45) i zerowanie licznikow doby. Konto UCHODZCY - odcinek zamkniety w PeopleBook.Daily tej samej doby (ta sama liczba, S4).
+        /// </summary>
         internal static void DayLine()
         {
-            try { }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.LogEnabled || Campaign.Current == null) return;
+                int day = (int)CampaignTime.Now.ToDays - 1;
+                var seg = PeopleBook.LastSeg;
+                if (!On)
+                {
+                    double left = PeopleBook.RefugeesWorld();
+                    Log.Info("Ludzie (spustoszenie): dzien " + day + " | spustoszenie WYLACZONE (" + (!s.DevastationEnabled ? "Devastation Enabled w MCM"
+                             : "wymaga People Unit Enabled, Natural Growth Enabled i obu latek rabunku") + ") - rabunek i zerowanie jak przed E4/5"
+                             + "; wrocilo dzis " + F(_dBack, "0.#") + " ludzi z " + _dBackVillages + " wsi"
+                             + (left > 0.0 ? "; na koncie jeszcze " + F0(left) + " uchodzcow (wroca jutro" + (_dAbandonLeft > 0 ? "; " + _dAbandonLeft + " wsi bez przelicznika" : "") + ")" : "; konto UCHODZCY puste") + ".");
+                    return;
+                }
+                double hitAll = _dHit[KRaid] + _dHit[KForage];
+                bool any = _dRaids > 0 || _dForagers > 0 || _dSteps > 0 || hitAll > 0.0 || _dBack > 0.0 || PeopleBook.RefugeeVillages > 0 || (seg.Has && (seg.N > 0.0 || seg.N0 > 0.0));
+                if (!any) return;
+
+                int today = (int)CampaignTime.Now.ToDays;
+                int Q = Clamp(s.RefugeeReturnQuietDays, 0, 360);
+                var map = ById();
+                // konto wsi -> regiony, plon
+                var full = new List<KeyValuePair<string, double[]>>();
+                PeopleBook.RefugeesFull(full);
+                var rows = new Dictionary<Settlement, RegionRow>();
+                int refV = 0, third = 0; float worst = 1f, thirdBest = 0f; string worstName = "-"; double worstShare = 0.0;
+                foreach (var kv in full)
+                {
+                    try
+                    {
+                        Village v;
+                        if (!map.TryGetValue(kv.Key, out v) || v == null || v.Settlement == null) continue;
+                        var node = OutlawLaw.RegionFor(v.Settlement) ?? v.Settlement;
+                        RegionRow r;
+                        if (!rows.TryGetValue(node, out r)) rows[node] = r = new RegionRow { Node = node };
+                        r.Away += kv.Value[0]; r.Dead += kv.Value[1];
+                        if (!(kv.Value[0] > 0.0)) continue;
+                        refV++;
+                        float m = YieldFactor(v);
+                        float k = PopulationLaw.KFor(v.Settlement);
+                        double home = (double)Math.Max(0f, v.Hearth) * (k > 0f ? k : 0f);
+                        double share = home + kv.Value[0] > 0.0 ? kv.Value[0] / (home + kv.Value[0]) : 0.0;
+                        if (m < r.Worst) r.Worst = m;
+                        if (worstName == "-" || m < worst) { worst = m; worstName = NameOf(v.Settlement); worstShare = share; }
+                        if (share >= 1.0 / 3.0) { third++; if (m > thirdBest) thirdBest = m; }
+                    }
+                    catch (Exception e) { Stumble("Devastation.DayLine(wies)", e); }
+                }
+                // ludnosc wsi w domu (kazda wies raz - Settlement.All podaje w ROT dwie wsie dwa razy), wsie Looted, ludzie wsi regionow z uchodzcami
+                double homeAll = 0.0; int looted = 0;
+                var seen = new HashSet<Village>();
+                foreach (var st in Settlement.All)
+                {
+                    try
+                    {
+                        if (st == null || !st.IsVillage || st.Village == null || !seen.Add(st.Village)) continue;
+                        var v = st.Village;
+                        if (v.VillageState == Village.VillageStates.Looted) looted++;
+                        float k = PopulationLaw.KFor(st);
+                        if (!(k > 0f)) continue;
+                        double h = (double)Math.Max(0f, v.Hearth) * k;
+                        homeAll += h;
+                        var node = OutlawLaw.RegionFor(st) ?? st;
+                        RegionRow r;
+                        if (rows.TryGetValue(node, out r)) r.Home += h;
+                    }
+                    catch (Exception e) { Stumble("Devastation.DayLine(ludnosc)", e); }
+                }
+                // spirala na pograniczu: region > 25% uchodzcow i najazd mlodszy niz Q dob - kolejne doby (INFO)
+                int spiralNow = 0, spiral90 = 0;
+                var spiralSeen = new HashSet<string>();
+                foreach (var r in rows.Values)
+                {
+                    if (r.Node == null || r.Node.StringId == null) continue;
+                    int last; bool clock = PeopleBook.LastStrike(r.Node, out last);
+                    double share = r.Away / Math.Max(1.0, r.Home + r.Away);
+                    if (share > 0.25 && clock && today - last < Q)
+                    {
+                        int sd; _spiral.TryGetValue(r.Node.StringId, out sd); _spiral[r.Node.StringId] = ++sd;
+                        spiralSeen.Add(r.Node.StringId); spiralNow++;
+                        if (sd > 90) spiral90++;
+                    }
+                }
+                foreach (var key in _spiral.Keys.ToList()) if (!spiralSeen.Contains(key)) _spiral.Remove(key);
+                var top = rows.Values.Where(r => r.Away > 0.0).OrderByDescending(r => r.Away / Math.Max(1.0, r.Home + r.Away)).Take(Top).ToList();
+
+                double cap = 0.0;      // pojmani: 0 do E4/9 (CaptivesLive)
+                double check = hitAll - _dDead - cap - _dFled - _dAway;
+                var sb = new StringBuilder(3000);
+                sb.Append("Ludzie (spustoszenie): dzien ").Append(day).Append(" | CZYNNE");
+                sb.Append(" | rabunki zakonczone ").Append(_dRaids).Append(" (spalone ").Append(_dRaidsFull).Append(", przerwane ").Append(_dRaids - _dRaidsFull).Append(')')
+                  .Append(", napastnikow srednio ").Append(_dRaids > 0 ? F((double)_dRaidMen / _dRaids, "0") : "-").Append(", krokow gry ").Append(_dSteps)
+                  .Append("; osobodni lupienia ").Append(F(_dDays[KRaid], "0.#")).Append(" x ").Append(F(Math.Max(0f, s.DevastationPerRaiderDay), "0.##"))
+                  .Append(" -> trafieni ").Append(F(_dHit[KRaid], "0.#")).Append("; gra zdjelaby ").Append(F(_dGameHearth, "0.##")).Append(" hearth = ").Append(F0(_dGamePeople))
+                  .Append(" ludzi ksiegi; lup z niczego ").Append(_dLootAi + _dLootPlayer).Append(" zl (gracz ").Append(_dLootPlayer).Append(')');
+                sb.Append(" | zerowanie: partii ").Append(_dForagers).Append(", osobodni ").Append(F(_dDays[KForage], "0")).Append(" x ").Append(F(Math.Max(0f, s.DevastationPerForagerDay), "0.##"))
+                  .Append(" -> trafieni ").Append(F(_dHit[KForage], "0.#"));
+                sb.Append(" | okreg nasycony ").Append(_dFull[KRaid] + _dFull[KForage]).Append(" razy (pulap ").Append(Math.Max(0, Math.Min(95, s.DevastationMaxPercent))).Append("% albo dno 11 hearth)");
+                sb.Append(" | trafieni ").Append(F(hitAll, "0.##")).Append(" = zabici ").Append(F(_dDead, "0.##")).Append(" + pojmani ").Append(F(cap, "0"))
+                  .Append(" + las ").Append(F(_dFled, "0.##")).Append(" + uchodzcy ").Append(F(_dAway, "0.##")).Append(" (kontrola ").Append(Sg(check, "0.000")).Append(')')
+                  .Append(" [najezdzcy z niewola: trafieni ").Append(F(_dSlaverHit, "0.#")).Append(", zabici ").Append(F(_dSlaverDead, "0.#")).Append(", pojmani byloby ").Append(F(_dCapWould, "0.#")).Append(']')
+                  .Append(" w ").Append(_dVillages[KRaid].Count).Append(" wsiach rabunku i ").Append(_dVillages[KForage].Count).Append(" zerowania");
+                sb.Append(" | powrot: ludzi ").Append(F(_dBack, "0.#")).Append(" do ").Append(_dBackVillages).Append(" wsi, regionow w fazie powrotu ").Append(_dBackRegions.Count)
+                  .Append("; wstrzymany: ").Append(Q).Append(" dob spokoju ").Append(_dStopQuiet).Append(" wsi, oblezenie ").Append(_dStopSiege).Append(" wsi")
+                  .Append("; kontrola liniowosci max ").Append(_dLinErr.ToString("0.######", Inv));
+                if (_dNoClock > 0) sb.Append("; bez zegara regionu ").Append(_dNoClock).Append(" wsi");
+                if (seg.Has)
+                {
+                    sb.Append(" | konto UCHODZCY: ");
+                    if (seg.First) sb.Append("pierwsza doba sesji (kontrola od jutra): nowi ").Append(F(seg.In, "0.#")).Append(" - powrot ").Append(F(seg.Home, "0.#"))
+                                     .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" = ").Append(F(seg.N, "0.#"));
+                    else sb.Append("wczoraj ").Append(F(seg.N0, "0.#")).Append(" + nowi ").Append(F(seg.In, "0.#")).Append(" - powrot ").Append(F(seg.Home, "0.#"))
+                           .Append(" - podloga 10 ").Append(F(seg.Floor, "0.#")).Append(" - zmarli ").Append(F(seg.Died, "0.###")).Append(" = ").Append(F(seg.N, "0.#"))
+                           .Append(" (kontrola ").Append(Sg(seg.Check, "0.000")).Append(')');
+                    sb.Append(" w ").Append(seg.Villages).Append(" wsiach (smierc ").Append(F(Math.Max(0f, s.RefugeeYearlyLossPercent), "0.##")).Append("%/rok, zmarli dzis w tej linii ").Append(F(_dDied, "0.###")).Append(')');
+                }
+                else sb.Append(" | konto UCHODZCY: brak odcinka doby (PeopleBook.Daily nie zamknal doby)");
+                double n = seg.Has ? seg.N : PeopleBook.RefugeesWorld();
+                sb.Append(" | ludnosc wsi w domu ").Append((homeAll / 1e6).ToString("0.000", Inv)).Append(" + uchodzcy ").Append(F0(n)).Append(" = razem ")
+                  .Append(((homeAll + n) / 1e6).ToString("0.000", Inv)).Append(" mln");
+                sb.Append(" | plon: wsi z uchodzcami ").Append(refV).Append(", najnizszy mnoznik ").Append(worst.ToString("0.####", Inv)).Append(" (").Append(worstName)
+                  .Append(", udzial uchodzcow ").Append(worstShare.ToString("0.####", Inv)).Append("), wsi z >= 1/3 uchodzcow ").Append(third);
+                if (third > 0) sb.Append(" (najwyzszy mnoznik wsrod nich ").Append(thirdBest.ToString("0.####", Inv)).Append(')');
+                sb.Append(" | wsie spladrowane: Looted dzis ").Append(looted).Append(", produkowaly ").Append(_dLootedMade).Append(" (sztuk ").Append(_dLootedPieces)
+                  .Append("; podmian stanu ").Append(_dLootedOn).Append(", bez sztuk - magazyn pelny albo 0 z modelu ").Append(_dLootedOn - _dLootedMade).Append(')')
+                  .Append(LootedOn ? "" : " [produkcja wsi spladrowanej wylaczona: " + (!_lootedPatched ? "latka nie wpieta" : "Looted Produces By People") + "]");
+                if (_dLootedChanged > 0) sb.Append(", stan zmieniony w srodku ").Append(_dLootedChanged);
+                if (top.Count > 0)
+                {
+                    var parts = new List<string>();
+                    foreach (var r in top)
+                    {
+                        int last; bool clock = PeopleBook.LastStrike(r.Node, out last);
+                        parts.Add(NameOf(r.Node) + " [" + (r.Node.IsTown ? "miasto" : (r.Node.IsCastle ? "zamek" : "wies")) + ", " + PeopleBook.CultureAtCalibration(r.Node) + "] uchodzcy "
+                                  + F0(r.Away) + " z " + F0(r.Home + r.Away) + " (" + F(100.0 * r.Away / Math.Max(1.0, r.Home + r.Away), "0.##") + "%), dni od najazdu "
+                                  + (clock ? (today - last).ToString(Inv) : "-") + ", plon x" + r.Worst.ToString("0.####", Inv) + ", zabici od poczatku " + F0(r.Dead));
+                    }
+                    sb.Append(" | regiony najbardziej spustoszone (").Append(top.Count).Append("): ").Append(string.Join("; ", parts.ToArray()));
+                }
+                sb.Append(" | spirala na pograniczu (> 25% uchodzcow i najazd < ").Append(Q).Append(" dob): regionow dzis ").Append(spiralNow).Append(", od ponad 90 dob ").Append(spiral90);
+                sb.Append(" | bez przelicznika ").Append(_dNoK).Append(" | hearth dopisany przez kogos w srodku kroku rabunku ").Append(_dForeign)
+                  .Append(" | rabunki podjete po wczytaniu ").Append(_dResumed);
+                if (_dMoveFail > 0) sb.Append(" | Move nie przyjal ").Append(_dMoveFail);
+                if (_dNoVillage > 0) sb.Append(" | konto bez wsi na mapie ").Append(_dNoVillage);
+                sb.Append(" | potkniecia ").Append(_stumbles).Append(" (razem ").Append(_stumblesAll).Append(')');
+                sb.Append(" | czas ").Append(((System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("Devastation.DayLine", e); }
             finally { NewDay(); }
         }
 

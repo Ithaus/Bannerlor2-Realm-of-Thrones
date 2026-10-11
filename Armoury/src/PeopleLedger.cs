@@ -21,6 +21,8 @@ namespace Armoury
     ///    garnizony, milicje, bandy, karawany, tabory wsi), jency, pula wyrzutkow; zabici dzis (wszystkie starcia, wedlug rodzaju
     ///    partii), zwerbowani dzis (zdarzenia gry: od notabli, z karczmy, bez osady, gracz), dezercja; bilans partii rodow
     ///    z jawna reszta (nowe partie z szablonu, wymiana z garnizonem); odsetek mezczyzn pod bronia;
+    ///  E4/5: w "Ludzie:" uchodzcy poza domem i ludnosc razem z nimi; w CSV regionow uchodzcy, udzial spustoszenia, zabici przy spustoszeniu, dni od najazdu
+    ///    (linia "Ludzie (spustoszenie)" - Devastation.DayLine, zaraz po tej ksiedze);
     ///  "Ludzie: przyrost naturalny" (E4/4, PopulationLaw.GrowthDaily) - ile ludzi rodzi sie wsiom dzis i wedlug jakich skladowych, krainy, podloga 10 (R17),
     ///    stan ludnosci miast wobec dobrobytu (bilans hearth wsi z RESZTA - jedno miejsce: linia "Hearth (E4/0)");
     ///  "Ludzie (regiony):" - 8 regionow najbardziej obciazonych: (zaloga + wyrzutki + bandy) wobec mezczyzn regionu;
@@ -41,7 +43,8 @@ namespace Armoury
         private const string CsvName = "ludzie-regiony.csv";
         private const string CsvHeader = "dzien;region_id;region;rodzaj;kultura;krolestwo;rod;wsie;wsie_spalone;ludzie;ludzie_zmiana;ludzie_osada;ludzie_wsie;hearth;dobrobyt;"
                                          + "zaloga;milicja;wyrzutki;bandy_partie;bandy_ludzie;zabici_dzis;zwerbowani_dzis;obciazenie_proc_mezczyzn;bezpieczenstwo;zywnosc;"
-                                         + "bilans_zywnosci;glod;wojna;hearth_tick;hearth_tabory;hearth_rabunek;hearth_inne;gracz;kultura_start";
+                                         + "bilans_zywnosci;glod;wojna;hearth_tick;hearth_tabory;hearth_rabunek;hearth_inne;gracz;kultura_start;"
+                                         + "uchodzcy;spustoszenie_proc;zabici_spustoszenie;dni_od_spustoszenia";      // E4/5: konto UCHODZCY regionu (PeopleBook)
 
         // rodzaje partii
         private const int KLord = 0, KGarrison = 1, KMilitia = 2, KBandit = 3, KCaravan = 4, KVillager = 5, KOther = 6, Kinds = 7;
@@ -61,6 +64,7 @@ namespace Armoury
         private static readonly Dictionary<string, float> _lastPeople = new Dictionary<string, float>();
         private static readonly int[] _lastMen = new int[Kinds];
         private static bool _haveLast;
+        private static double _lastAway;           // E4/5: uchodzcy swiata poza domem wczoraj (konto UCHODZCY)
         private static string _csvPath;
 
         // liczniki doby
@@ -196,7 +200,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _lastPeople.Clear(); Array.Clear(_lastMen, 0, Kinds); _haveLast = false; _csvPath = null;
+            _lastPeople.Clear(); Array.Clear(_lastMen, 0, Kinds); _haveLast = false; _lastAway = 0.0; _csvPath = null;
             Array.Clear(_gSessIn, 0, Groups); Array.Clear(_gSessDead, 0, Groups); Array.Clear(_gSessDes, 0, Groups); Array.Clear(_gLast, 0, Groups); _gHaveLast = false;
             _pLast.Clear();
             ClearDay();
@@ -499,6 +503,8 @@ namespace Armoury
                 }
                 ranked.Sort((a, b) => b.Burden.CompareTo(a.Burden));
                 double menWorld = people * MenShare;
+                double away = 0.0;
+                try { away = PeopleBook.RefugeesWorld(); } catch { _stumbles++; }       // E4/5: uchodzcy zeszli z hearth wsi, ale zyja
                 int killed = 0; foreach (var k in _killed) killed += k;
                 int recruited = _rNotableParty + _rNotableOther + _rTavern + _rNoPlace + _rPlayer;
                 var sb = new StringBuilder();
@@ -510,6 +516,13 @@ namespace Armoury
                     sb.Append(" [PopulationLaw: wsie ").Append(((people - peopleNodes) / 1e6).ToString("0.000", CultureInfo.InvariantCulture))
                       .Append(", miasta ").Append((peopleNodes / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append("], mezczyzn 16-60 ok. ")
                       .Append((menWorld / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append(" mln (27%)");
+                    // E4/5: ludnosc z uchodzcami (konto UCHODZCY ksiegi ludzi) - prog ludnosci E4/4 liczy sie z "razem z nimi" (S15), nie z samej ludnosci w domu
+                    if (Devastation.On || away > 0.0 || _lastAway > 0.0)
+                    {
+                        sb.Append("; uchodzcy poza domem ").Append(((long)Math.Round(away)).ToString(CultureInfo.InvariantCulture)).Append(", razem z nimi ")
+                          .Append(((people + away) / 1e6).ToString("0.000", CultureInfo.InvariantCulture)).Append(" mln");
+                        if (_haveLast && lastPeople > 0) sb.Append(" (").Append(Sg((long)Math.Round(people + away - lastPeople - _lastAway))).Append(" ludzi)");
+                    }
                 }
                 else sb.Append("ludnosc nieskalibrowana (PopulationLaw wylaczone albo przed pierwszym rozliczeniem rent)");
                 sb.Append(" | zolnierze: ");
@@ -603,7 +616,14 @@ namespace Armoury
                         // E4/0: budzet hearth regionu (Measure40: tick, tabory i lodzie, rabunek, inne = zmiana - okna), warownia rodu gracza (U27), kultura z pierwszej doby sesji (U3)
                         var bud = Measure40.RegionBudget(st);
                         for (int bi = 0; bi < 4; bi++) csv.Append(';').Append(bud != null ? F(bud[bi], "0.###") : "");
-                        csv.Append(';').Append(clan != null && clan == Clan.PlayerClan ? 1 : 0).Append(';').Append(Measure40.CultureAtStart(st))
+                        csv.Append(';').Append(clan != null && clan == Clan.PlayerClan ? 1 : 0).Append(';').Append(Measure40.CultureAtStart(st));
+                        // E4/5: uchodzcy wsi regionu poza domem, ich udzial w ludziach wsi regionu (dom + uchodzcy), zabici przy spustoszeniu od poczatku, dni od ostatniego najazdu
+                        double rAway, rDead; PeopleBook.RegionRefugees(st, out rAway, out rDead);
+                        int lastStrike; bool clock = PeopleBook.LastStrike(st, out lastStrike);
+                        csv.Append(';').Append(rAway.ToString("0.##", CultureInfo.InvariantCulture)).Append(';')
+                           .Append(calibrated && r.PeopleVillages + rAway > 0.0 ? (100.0 * rAway / (r.PeopleVillages + rAway)).ToString("0.####", CultureInfo.InvariantCulture) : "").Append(';')
+                           .Append(rDead.ToString("0.##", CultureInfo.InvariantCulture)).Append(';')
+                           .Append(clock ? ((int)CampaignTime.Now.ToDays - lastStrike).ToString(CultureInfo.InvariantCulture) : "")
                            .Append(Environment.NewLine);
                     }
                     catch { csv.Length = rowStart; _stumbles++; }      // niepelny wiersz nie trafia do pliku
@@ -627,6 +647,7 @@ namespace Armoury
                 _lastPeople.Clear();
                 if (calibrated) foreach (var r in order) _lastPeople[r.St.StringId] = r.People;
                 Array.Copy(men, _lastMen, Kinds);
+                _lastAway = away;
                 _haveLast = true;
             }
             catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }

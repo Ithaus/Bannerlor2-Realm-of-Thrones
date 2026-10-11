@@ -8,6 +8,8 @@ Uzycie (Python 3, tylko odczyt):
                     (--do-doby N zmienia okno); T9 (bieg zimowy) i baza konca etapu (d300-364) - INFO. Gdy w logu jest linia startowa
                     "PeopleUnit (E4/3)" - takze progi E4/3 (jednostka 1/k, punkty powrotu, tabela krain, pula wyrzutkow i bandy wobec biegu E4/2);
                     stan jednostki - z dziennej linii "Ludzie (ksiega)" (MCM), nie z linii startowej (ta powstaje przed MCM).
+                    Gdy jest linia startowa "Devastation (E4/5)" - takze progi E4/5 S1-S21 (plan kodu E4/5 rozdz. 11; S10/S11 z pliku
+                    <katalog logu>/<znacznik>/ludzie-regiony.csv; S6, S14, S19-S21 - INFO, porownanie z biegiem E4/4 i autotesty osobno).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -827,6 +829,10 @@ def etap4_main(logp, start_arg, until=120):
     if any(x.startswith("PopulationLaw: przyrost naturalny wsi (E4/4)") for x in lines):
         etap4_e44(rep, lines, start, win, hea, lud, until)
 
+    # ---------------- E4/5 (113n): spustoszenie, konto UCHODZCY, powrot do roku, plon, wsie spladrowane produkuja
+    if any(x.startswith("Devastation (E4/5):") for x in lines):
+        etap4_e45(rep, lines, start, win, hea, lud, until, logp)
+
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
     l300 = [x for x in l300 if x is not None]
@@ -1091,6 +1097,220 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
     lastp = prz.get(win[-1]) if win else None
     drift = re.search(r"\| miasta: (.*?)(?: \||\.$)", lastp) if lastp else None
     rep.add(f"E4/4: miasta d{until} (stan wobec dobrobytu)", drift.group(1)[:200] if drift else "-", "INFO (stan stoi; dryf dobrobytu bez wplywu na ksiege)", None)
+
+
+# E4/5: szacunki planu (docs/etap4/PLAN-KODU-E45.md rozdz. 11, z LOG-A zbioru 30): rabunek ok. 150 trafionych/d, zerowanie ok. 150/d, lup gry ok. 30 zl na krok
+E45_Q = 1.0 - (1.0 - 0.013) ** (1.0 / 364.0)     # dzienna smierc uchodzcow przy 1.3%/rok i roku 364 dob
+
+
+def ludzie_csv_of(logp):
+    """<katalog>/Armoury-<znacznik>.log -> <katalog>/<znacznik>/ludzie-regiony.csv (Log.Csv: katalog tematyczny sesji)."""
+    d, f = os.path.split(logp)
+    stem = os.path.splitext(f)[0].replace("Armoury-", "")
+    return os.path.join(d, stem, "ludzie-regiony.csv")
+
+
+def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
+    """E4/5 (113n): progi S1-S21 z planu kodu E4/5 (rozdz. 11) mierzalne w jednym biegu 120 dob. S6/S14 (porownanie z biegiem E4/4 bez E4/5),
+    S19 (zapis 9 dob), S20 (grupy etap2/etap3) i S21 (bieg z DevastationEnabled=false) - INFO z opisem. Linia dzienna "Ludzie (spustoszenie)",
+    odcinek "E4/5 konto UCHODZCY" w "Ludzie (ksiega)", "Hearth (E4/0)", "Ludzie:" (razem z uchodzcami), CSV ludzie-regiony.csv (4 kolumny E4/5)."""
+    dev = e4_series(lines, "Ludzie (spustoszenie): dzien")
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    e42 = e4_series(lines, "Inni z poleglych (E4/2): dzien")
+    on = [d for d in win if d in dev and "| CZYNNE" in dev[d]]
+    off = [d for d in win if d in dev and "WYLACZONE" in dev[d]]
+    d31 = [d for d in on if run_day(d, start) >= 31]
+    # S1
+    errs = [s for s in lines if s.startswith("ERROR in Devastation")]
+    stb = [num(r"\| potkniecia (\d+) \(razem", dev[d], int, 0) or 0 for d in on]
+    rep.add("E4/5 S1: bledy i potkniecia Devastation", f"bledy {len(errs)}, potkniecia {sum(stb)} w {sum(1 for x in stb if x)} dobach",
+            "0 bledow; potkniecia 0 (najwyzej 5 w biegu, z nazwa miejsca)", len(errs) == 0 and sum(stb) <= 5)
+    # S2
+    stl = next((s for s in lines if s.startswith("Devastation (E4/5):")), "")
+    brak = re.search(r"; BRAK: (.*?)(?: \(bez latki|\.$)", stl)
+    wired = re.search(r"; wpiete: (.*?); BRAK", stl)
+    nw = len(wired.group(1).split(", ")) if wired else 0
+    rep.add("E4/5 S2: linia startowa (stan, 5 celow)", f"{'CZYNNE' if ' CZYNNE' in stl else stl[34:80]}; wpiete {nw}; BRAK: {brak.group(1) if brak else '?'}",
+            "CZYNNE, wpiete 5, BRAK: -", " CZYNNE" in stl and nw == 5 and brak is not None and brak.group(1).strip() == "-")
+    rep.add("E4/5: linia dzienna CZYNNE", f"czynne {len(on)} dob, WYLACZONE {len(off)} dob z {len(win)}", "czynne kazdej doby z ruchem (bieg zwykly)",
+            (len(off) == 0 and len(on) > 0) if win else None)
+    # S3
+    chk = [fnum(r"uchodzcy [\d.]+ \(kontrola " + SF + r"\)", dev[d]) for d in on]
+    chk = [x for x in chk if x is not None]
+    cap = [fnum(r"\+ pojmani " + F_ + r" \+ las", dev[d]) or 0 for d in on]
+    rep.add("E4/5 S3: kontrola trafionych (= zabici + pojmani + las + uchodzcy)", f"max |kontrola| {max((abs(x) for x in chk), default=0):.4f} w {len(chk)} dobach; pojmani razem {sum(cap):.1f}",
+            "|kontrola| <= 0.01 czl. kazdej doby; pojmani 0 (do E4/9)", (max((abs(x) for x in chk), default=0) <= 0.01 and sum(cap) == 0) if chk else None)
+    # S4
+    c1 = [fnum(r"konto UCHODZCY: wczoraj .*?\(kontrola " + SF + r"\)", dev[d]) for d in on]
+    c1 = [x for x in c1 if x is not None]
+    c2 = [fnum(r"E4/5 konto UCHODZCY: .*?\(kontrola " + SF + r"\)", kb[d]) for d in win if d in kb]
+    c2 = [x for x in c2 if x is not None]
+    same = 0; diff = 0
+    for d in on:
+        a = fnum(r"konto UCHODZCY: .*?= " + F_ + r"(?: \(kontrola [^)]*\))? w \d+ wsiach", dev[d])
+        b = fnum(r"E4/5 konto UCHODZCY: " + F_ + r" ludzi", kb.get(d))
+        if a is None or b is None:
+            continue
+        if abs(a - b) <= 0.1: same += 1
+        else: diff += 1
+    m1 = max((abs(x) for x in c1), default=0); m2 = max((abs(x) for x in c2), default=0)
+    rep.add("E4/5 S4: kontrola konta UCHODZCY (obie linie)", f"max |kontrola| spustoszenie {m1:.4f} ({len(c1)} dob), ksiega {m2:.4f} ({len(c2)} dob); ta sama liczba {same}, rozna {diff}",
+            "|kontrola| <= 0.01 kazdej doby i ta sama liczba w obu liniach", (m1 <= 0.01 and m2 <= 0.01 and diff == 0) if (c1 or c2) else None)
+    # S5
+    gm = [d for d in win if d in hea and "RESZTA" in hea[d]]
+    rg = [(d, fnum(r" - rabunek gry -" + F_, hea[d]) or 0.0, num(r"pod spustoszeniem E4/5 krokow (\d+)", hea[d], int, 0) or 0) for d in gm if d in on]
+    bad = [run_day(d, start) for d, h, _ in rg if abs(h) >= 0.005]
+    steps = sum(x[2] for x in rg)
+    rep.add("E4/5 S5: \"rabunek gry\" w Hearth (E4/0) przy CZYNNYM", f"niezerowy w {len(bad)} dobach" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else "") + f"; krokow pod spustoszeniem {steps}",
+            "0.00 hearth kazdej doby; krokow pod spustoszeniem > 0 w dobach z rabunkami", (len(bad) == 0 and steps > 0) if rg else None)
+    # S6 / S14 (porownanie z biegiem E4/4)
+    rest = [fnum(r"RESZTA " + SF, hea[d]) for d in gm]
+    rest = [x for x in rest if x is not None]
+    rep.add("E4/5 S6: RESZTA Hearth (E4/0) srednio (porownac z biegiem E4/4)", f"{st.mean(rest):+.3f} hearth/d, |RESZTA| <= 1 w {100.0 * sum(1 for x in rest if abs(x) <= 1) / len(rest):.1f}% dob" if rest else "-",
+            "roznica do biegu E4/4 <= 0.2 hearth/d (bieg bazowy E4/4 osobno - T2 wyzej)", None)
+    # S7
+    rh = [fnum(r"osobodni lupienia [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in d31]
+    rs = [num(r"krokow gry (\d+)", dev[d], int, 0) or 0 for d in on]
+    rall = [fnum(r"osobodni lupienia [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in on]
+    per_raid = (sum(rall) / (sum(rs) / 20.0)) if sum(rs) > 0 else None
+    rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else ""),
+            "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo",
+            (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh else None)
+    # S8
+    fh = [fnum(r"\| zerowanie: partii \d+, osobodni [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in d31]
+    if fh:
+        m = st.mean(fh)
+        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)", f"{m:.0f}/d", "50-450/d (szacunek 150); > 1150/d = Devastation Per Forager Day w dol (decyzja, nie blad)",
+                50 <= m <= 450, decide=m > 1150)
+    else:
+        rep.add(f"E4/5 S8: trafieni z zerowania d31-{until} (ludzi/d)", "-", "50-450/d", None)
+    # S9
+    tot = [re.search(r"\| trafieni " + F_ + r" = zabici " + F_ + r" \+ pojmani " + F_ + r" \+ las " + F_ + r" \+ uchodzcy " + F_, dev[d]) for d in on]
+    tot = [tuple(float(g) for g in x.groups()) for x in tot if x]
+    sl = [re.search(r"najezdzcy z niewola: trafieni " + F_ + r", zabici " + F_, dev[d]) for d in on]
+    sl = [tuple(float(g) for g in x.groups()) for x in sl if x]
+    if tot and sum(t[0] for t in tot) > 0:
+        T = sum(t[0] for t in tot); K = sum(t[1] for t in tot); O = sum(t[3] for t in tot)
+        ST = sum(x[0] for x in sl); SK = sum(x[1] for x in sl)
+        outlaw = any(x.startswith("Pula wyrzutkow (E4/3)") for x in lines)
+        rep.add("E4/5 S9: zabici / trafieni (okno)", f"{100 * K / T:.2f}% ({K:.0f} z {T:.0f})" + (f"; najezdzcy z niewola {100 * SK / ST:.2f}% ({SK:.0f} z {ST:.0f})" if ST > 0 else ""),
+                "1.5-5% (najezdzcy z niewola ok. 5%)", 1.5 <= 100 * K / T <= 5.0)
+        rep.add("E4/5 S9: las / trafieni (okno)", f"{100 * O / T:.2f}%", "2-5% przy prawie wyrzutkow" + ("" if outlaw else " (prawo wyrzutkow wylaczone - 0)"),
+                (2.0 <= 100 * O / T <= 5.0) if outlaw else (O == 0))
+    else:
+        rep.add("E4/5 S9: zabici / las wobec trafionych", "brak trafionych", "zabici 1.5-5%, las 2-5%", None)
+    # S10 / S11 (CSV)
+    lin = [fnum(r"kontrola liniowosci max " + F_, dev[d]) for d in on]
+    lin = [x for x in lin if x is not None]
+    rep.add("E4/5 S11: kontrola liniowosci w linii (max)", f"{max(lin, default=0):.2e}", "<= 1e-6", (max(lin, default=0) <= 1e-6) if lin else None)
+    cp = ludzie_csv_of(logp)
+    rows = []
+    if os.path.isfile(cp):
+        with open(cp, encoding="utf-8", errors="replace", newline="") as f:
+            rows = [r for r in csv.DictReader(f, delimiter=";")]
+    byreg = {}
+    for r in rows:
+        try:
+            dd = int(r["dzien"])
+        except (KeyError, ValueError):
+            continue
+        if not (1 <= run_day(dd, start) <= until):
+            continue
+        u = r.get("uchodzcy"); dn = r.get("dni_od_spustoszenia")
+        if u is None:
+            continue
+        try:
+            uu = float(u or 0); dd2 = int(dn) if dn not in (None, "") else None
+        except ValueError:
+            continue
+        byreg.setdefault(r.get("region_id"), {})[dd] = (uu, dd2)
+    if byreg:
+        s10_bad = s10_n = 0; s11 = []
+        for reg, ser in byreg.items():
+            for dd in sorted(ser):
+                if dd - 1 not in ser:
+                    continue
+                u0, d0 = ser[dd - 1]; u1, d1 = ser[dd]
+                if d1 is None:
+                    continue
+                if d1 < 30:
+                    s10_n += 1
+                    if u1 < u0 * (1 - E45_Q) - 0.5: s10_bad += 1
+                elif u0 >= 1000 and 30 <= d1 < 364 and d0 is not None and d1 == d0 + 1:
+                    exp = u0 * (1 - E45_Q) * (1 - 1.0 / max(1, 364 - d1))
+                    if exp > 0: s11.append(u1 / exp - 1)
+        rep.add("E4/5 S10: powrot w regionach z najazdem < 30 dob (CSV)", f"zlamane {s10_bad} z {s10_n} wierszy", "0 (uchodzcy(t) >= uchodzcy(t-1) x (1 - q) - 0.5)",
+                (s10_bad == 0) if s10_n else None)
+        out = sum(1 for x in s11 if abs(x) > 0.01)
+        rep.add("E4/5 S11: liniowosc powrotu (CSV, regiony >= 1000 uchodzcow, 30 <= d < 364)", (f"{len(s11)} wierszy, poza +-1%: {out}; max |odchylka| {max((abs(x) for x in s11), default=0) * 100:.3f}%") if s11 else "brak takich regionow w oknie",
+                "+-1% kazdy wiersz", (out == 0) if s11 else None)
+    else:
+        rep.add("E4/5 S10/S11: CSV ludzie-regiony.csv", f"brak pliku albo kolumn E4/5 ({cp})", "plik z kolumnami uchodzcy, dni_od_spustoszenia", None)
+    # S12
+    th = [(num(r"wsi z >= 1/3 uchodzcow (\d+)", dev[d], int, 0) or 0, fnum(r"najwyzszy mnoznik wsrod nich " + F_, dev[d])) for d in on]
+    withth = [x for x in th if x[0] > 0]
+    if withth:
+        mk = max(x[1] for x in withth if x[1] is not None)
+        rep.add("E4/5 S12: plon wsi z >= 1/3 uchodzcow (najwyzszy mnoznik)", f"{mk:.4f} w {len(withth)} dobach (max {max(x[0] for x in withth)} wsi)", "<= 0.67", mk <= 0.67)
+    else:
+        lw = [re.search(r"najnizszy mnoznik " + F_ + r" \(.*?, udzial uchodzcow " + F_ + r"\)", dev[d]) for d in on]
+        lw = [(float(x.group(1)), float(x.group(2))) for x in lw if x and float(x.group(2)) > 0]
+        err = max((abs(m - (1 - u)) for m, u in lw), default=None)
+        rep.add("E4/5 S12: plon - brak wsi z >= 1/3 uchodzcow w oknie", (f"kontrola wzoru: max |mnoznik - (1 - udzial)| {err:.5f} w {len(lw)} dobach") if err is not None else "brak wsi z uchodzcami",
+                "INFO; wzor +-1e-3 (elastycznosc 1)", (err <= 1e-3) if err is not None else None)
+    # S13
+    lt = [re.search(r"Looted dzis (\d+), produkowaly (\d+) \(sztuk (\d+)", dev[d]) for d in on]
+    lt = [tuple(int(g) for g in x.groups()) for x in lt if x]
+    lt = [x for x in lt if x[0] > 0]
+    if lt:
+        Ls = sum(x[0] for x in lt); Ps = sum(x[1] for x in lt)
+        rep.add("E4/5 S13: wsie Looted produkuja", f"produkowaly {Ps} z {Ls} wsio-dni Looted ({100.0 * Ps / Ls:.0f}%), sztuk {sum(x[2] for x in lt)} w {len(lt)} dobach",
+                ">= 80% (reszta - magazyn pelny 1.5 W)", Ps >= 0.8 * Ls)
+    else:
+        rep.add("E4/5 S13: wsie Looted produkuja", "brak dob z wsiami Looted", ">= 80%", None)
+    rep.add("E4/5 S14: Ruda/Drewno/Towary d1 wobec biegu E4/4", "porownac linie \"Towary\"/OreLedger d1 z biegiem E4/4", "+-3% (w d1 brak uchodzcow, mnoznik 1)", None)
+    # S15 - ludnosc z uchodzcami (decyzja Jeffa 11.10 (4): w ciaglej wojnie moze spadac do -0.5%/rok)
+    net = [num(r"razem z nimi [\d.]+ mln \(([+-]?\d+) ludzi\)", lud[d]) for d in win if d in lud and run_day(d, start) >= 28]
+    net = [x for x in net if x is not None]
+    kill = [fnum(r"\| trafieni [\d.]+ = zabici " + F_, dev[d]) or 0 for d in on if run_day(d, start) >= 28]
+    died = [fnum(r" - zmarli " + F_ + r" =", dev[d]) or 0 for d in on if run_day(d, start) >= 28]
+    if net:
+        mn = st.mean(net); lo = 290 - (st.mean(kill) if kill else 0) - (st.mean(died) if died else 0)
+        rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until} (ludzi/d)",
+                f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {st.mean(kill) if kill else 0:.0f}/d, zmarli uchodzcy {st.mean(died) if died else 0:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
+                f"pas E4/4 290-1150/d albo nizej tylko o zabitych i zmarlych uchodzcow (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
+                lo <= mn <= 1150 or (mn >= -721 and mn >= lo))
+    else:
+        rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until}", "brak \"razem z nimi\" w linii Ludzie:", "290-1150/d", None)
+    # S16 - lup z niczego na krok (co do monety jak w grze)
+    lp = [(num(r"lup z niczego (\d+) zl", hea[d], int, 0) or 0, (num(r" - rabunek gry -[\d.]+ \(krokow (\d+)", hea[d], int, 0) or 0) + (num(r"pod spustoszeniem E4/5 krokow (\d+)", hea[d], int, 0) or 0)) for d in gm]
+    G = sum(x[0] for x in lp); S = sum(x[1] for x in lp)
+    rep.add("E4/5 S16: lup z niczego na krok rabunku (Hearth E4/0, W6 + spustoszenie)", f"{G / S:.1f} zl/krok ({G} zl, {S} krokow)" if S else "-", "+-30% wobec LOG-A ok. 30 zl/krok (21-39)",
+            (21 <= G / S <= 39) if S else None)
+    # S17 - K7 rajd Innych
+    rb = [re.search(r"\(b\) rajd: .*?zabici przy spustoszeniu (\d+), wstalo (\d+), do puli (\d+), spalone (\d+)", e42[d]) for d in win if d in e42]
+    rb = [tuple(int(g) for g in x.groups()) for x in rb if x]
+    if rb:
+        D_ = sum(x[0] for x in rb); R_ = sum(x[1] for x in rb); P_ = sum(x[2] for x in rb); B_ = sum(x[3] for x in rb)
+        rep.add("E4/5 S17: rajd Innych - zabici = wstalo + pula + spalone", f"zabici {D_} = wstalo {R_} + pula {P_} + spalone {B_} (kontrola {D_ - R_ - P_ - B_})", "kontrola 0; poza Murem wstalo 0", D_ - R_ - P_ - B_ == 0)
+    else:
+        rep.add("E4/5 S17: rajd Innych (K7)", "brak odcinka (b) z zabitymi", "kontrola 0", None)
+    # S18 - czas
+    tm = [fnum(r"\| czas " + F_ + r" ms\.$", dev[d]) for d in on]
+    tm = [x for x in tm if x is not None]
+    rep.add("E4/5 S18: czas linii Ludzie (spustoszenie)", f"{st.mean(tm):.2f} ms/d (max {max(tm):.1f})" if tm else "-", "<= 3 ms/d srednio; s/dobe biegu <= +3% wobec E4/4 (autotest)", (st.mean(tm) <= 3.0) if tm else None)
+    # S19-S21 i informacje
+    zz = [num(r"zegary regionow (\d+)", kb[d], int, 0) or 0 for d in win if d in kb]
+    rep.add("E4/5 S19: zapis 9 dob (konto i zegary po wczytaniu)", f"zegary regionow w ksiedze: ostatnio {zz[-1] if zz else '-'}", "autotest zapisu: konto UCHODZCY po wczytaniu = stan doby zapisu (+- ruch doby)", None)
+    rep.add("E4/5 S20: progi etapow 1-3", "--grupa etap2 / etap3 na tym samym logu", "bez zmian", None)
+    rep.add("E4/5 S21: wylacznik (bieg 40 dob z DevastationEnabled=false)", f"doby WYLACZONE w tym biegu: {len(off)}", "osobny autotest: pierwsza doba jedna linia WYLACZONE ... wrocilo N, potem rabunek gry, konto 0", None)
+    rb2 = [(fnum(r"powrot: ludzi " + F_, dev[d]) or 0) for d in on]
+    acc = [fnum(r"konto UCHODZCY: .*?= " + F_ + r"(?: \(kontrola [^)]*\))? w", dev[d]) for d in on]
+    acc = [x for x in acc if x is not None]
+    rep.add("E4/5: uchodzcy - konto i powrot (INFO)", (f"konto d{run_day(on[-1], start)} {acc[-1]:.0f} (max {max(acc):.0f}); powrot razem {sum(rb2):.0f} ludzi") if acc else "-",
+            "INFO (powrot rusza po 30 dobach spokoju; w biegu 728 dob: wsie spalone w d1-364 bez kolejnego najazdu - >= 95% w domu)", None)
+    sp = [num(r"od ponad 90 dob (\d+)", dev[d], int, 0) or 0 for d in on]
+    rep.add("E4/5: spirala na pograniczu (regiony > 25% uchodzcow i najazd < 30 dob od > 90 dob)", f"max {max(sp, default=0)}", "INFO - decyzja Jeffa dopiero z liczbami (rozdz. 12 pkt 18)", None)
 
 
 def main(argv):
