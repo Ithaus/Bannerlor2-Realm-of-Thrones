@@ -155,6 +155,7 @@ namespace Armoury
             H = h;
             try { Measure31.ApplyAll(); } catch (Exception e) { Stumble("Measure31.ApplyAll", e); }
             try { UpgradePurse.ApplyAll(); } catch (Exception e) { Stumble("UpgradePurse.ApplyAll", e); }
+            try { CaravanCapital.ApplyAll(); } catch (Exception e) { Stumble("CaravanCapital.ApplyAll", e); }
             Log.Info("Szczelnosc (164a): latki przy starcie gry - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();
@@ -168,6 +169,7 @@ namespace Armoury
             if (_hooksTried || H == null || Campaign.Current == null) return;
             _hooksTried = true;
             try { Measure31.EnsureHooks(); } catch (Exception e) { Stumble("Measure31.EnsureHooks", e); }
+            try { CaravanCapital.EnsureHooks(); } catch (Exception e) { Stumble("CaravanCapital.EnsureHooks", e); }
             Log.Info("Szczelnosc (164a): latki w kampanii - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();
@@ -186,6 +188,7 @@ namespace Armoury
         private static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
             try { Measure31.MarkDestroyed(mp); } catch (Exception e) { Stumble("MarkDestroyed", e); }
+            try { if (destroyer == null) CaravanCapital.RoutePurse(mp, 0); } catch (Exception e) { Stumble("CaravanCapital.RoutePurse", e); }   // E3/7: rozwiazana - kiesa do glowy rodu
         }
 
         private static void OnPartyRemoved(PartyBase party)
@@ -211,6 +214,7 @@ namespace Armoury
             {
                 Array.Clear(Sum, 0, Items); _spent.Clear(); Stumbles = 0; _err.Clear();
                 Measure31.Reset();
+                CaravanCapital.Reset();
             }
             catch { }
         }
@@ -228,6 +232,7 @@ namespace Armoury
                     var sb = new StringBuilder(2048);
                     sb.Append("Szczelnosc (164a): dzien ").Append(day);
                     sb.Append(" | awanse (164a-4): ").Append(UpgradePurse.Part());
+                    sb.Append(" | kapital (164a-6): ").Append(CaravanCapital.Part());
                     sb.Append(" | pomiar (164a-0): ").Append(Measure31.Part());
                     if (Stumbles > 0) sb.Append(" | potkniecia ").Append(Stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                     sb.Append('.');
@@ -243,6 +248,7 @@ namespace Armoury
             try { Array.Clear(Sum, 0, Items); _spent.Clear(); Stumbles = 0; } catch { }
             try { Measure31.ClearDay(); } catch { }
             try { UpgradePurse.ClearDay(); } catch { }
+            try { CaravanCapital.ClearDay(); } catch { }
         }
     }
 }

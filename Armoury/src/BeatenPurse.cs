@@ -284,7 +284,7 @@ namespace Armoury
                 // - poza regula jak rozwiazana: znika jak przed 3.2, bez 1/9, osobny licznik
                 bool beaten = known && ev != null && ev.IsFinalized && ev.WinningSide != BattleSideEnum.None
                               && ReferenceEquals(destroyer, ev.GetLeaderParty(ev.WinningSide));
-                if (!beaten) { _odd[t] += g; _oddN[t]++; return; }
+                if (!beaten) { _odd[t] += g; _oddN[t]++; CaravanCapital.RoutePurse(party, 2); return; }   // 3.1 (31, E3/7): poza regula 3.2 - kiesa do glowy rodu wlasciciela, brak - najblizsze miasto
                 _gone[t] += g; _goneN[t]++;
                 var win = destroyer.MobileParty;
                 if (win != null && !ReferenceEquals(win, party) && win.IsActive && !Undead.Party(win))

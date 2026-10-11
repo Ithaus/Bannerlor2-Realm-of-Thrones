@@ -179,6 +179,7 @@ namespace Armoury
             var mp = party != null && party.IsMobile ? party.MobileParty : null;
             if (mp == null) return;
             if (_destroyed.Contains(mp)) { _remSeen++; return; }   // widziane przez MobilePartyDestroyed - liczy U8
+            CaravanCapital.OnRemoved(mp);                             // E3/7: kiesa do glowy rodu, sakiewka do miasta - U8r liczy reszte
             if (mp.IsLordParty && mp.LeaderHero != null) return;      // kiesa wodza zostaje z wodzem
             int g = mp.PartyTradeGold;
             if (g <= 0) return;
