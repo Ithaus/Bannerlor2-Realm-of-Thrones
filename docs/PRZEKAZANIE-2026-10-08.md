@@ -858,3 +858,8 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   E5/0 ma "udzial zysku kupcow zabierany przez pana i korone". Workflow wf_05af8d5e-ebf: scalenie koncowe E4/9 + E5/0 + ujednolicenie R6/W5 -> DLL
   test\Armoury-e4-koncowy.dll -> TEST KONCOWY E4.
 - (UWAGA ZEGAR) Komputer chodzi w PDT (UTC-7); Jeff w CEST (UTC+2). Godziny w nawiasach z 11.10 po poludniu to szacunki - od teraz podaje UTC. Teraz 21:27 UTC (23:27 CEST). Termin raportu Jeffa: 12:00 CEST = 10:00 UTC. Okno 5h odnawia sie 23:20 UTC (57% o 21:27 UTC); tydzien 56%.
+- (21:50 UTC) **SCALENIE KONCOWE ETAPU 4 GOTOWE** (recenzja bez uwag): w-toku/zbior-e4-koniec 7658247 = zbior 31 + E4/6, E4/7, E4/7b, E4/8 + K8, E4/9, E4/10, E4/11,
+  NightRest, E5/0 (pomiar, tylko czyta) + R6/W5 (partia bez bitwy - ta sama regula weteranow). Przyczyny M0-51 (MKinds 52), F0-61; Armoury 1101 ustawien.
+  DLL test\Armoury-e4-koncowy.dll 82bb2d8f; CS test\CrashScribe-at-bledy.dll 9f92b4aa (B6/B6b/B6c + autotest; zwykly CrashScribe-bledy.dll af47adf7 do wgrania).
+- (21:52 UTC) **TEST KONCOWY E4 ruszyl** (b2k5x628s): 728 dob nowej kampanii -> zapis 9 dob z zapisu konca biegu (stan E4 w zapisie) -> zima 120 (flaga).
+  Wyjscia: test\at-e4k-728.out.txt, at-e4k-zapis.out.txt, at-e4k-zima.out.txt. Progi w trakcie z czesci logu (d120, d364).
