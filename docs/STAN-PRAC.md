@@ -1176,6 +1176,9 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   (E4/10 pyt. 2 - sprzet zwolnionego ze zbrojowni pana - osobny krok po etapie 4, bez zmian.)
 - (11:05) **Jeff: pytania planu E4/9 - "tak, tak":** zalogi Strazy dalej rosna same, ale z prawdziwych ludzi Westeros (Mur nie slabnie); rozbici bracia wracaja
   na Mur, uciekinierzy do puli wyrzutkow Polnocy.
+- (12:40) **Jeff: pytania E4/6 i E4/7 - "tak, tak, tak":** (1) uchodzcy z glodu we wlasnym regionie wracaja zawsze, gdy gospodarze nie gloduja (odstepstwo
+  od GL 2.6 - przyjete); (2) najemnik z karczmy z ludzi miasta, obcy tylko w krainie bez wolnych rak (do E4/10); (3) niewzieci z poboru wymuszonego gracza WRACAJA
+  do DOM swojej wsi (zamiast znikac pod nazwa) - zmiana kodu E4/7 (commit na w-toku/e4-7, potem do zbior-e4-koniec).
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli

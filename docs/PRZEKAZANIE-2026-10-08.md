@@ -787,3 +787,4 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   sprzatanie i odmrozenie zastepcy na koncu wydarzenia; naprawa starych zapisow). B8 NightRest (Jeff: do koncowej paczki) - w-toku/e4-bledy 457f73e (__0, wylacznik
   NightRestEveryModel; test poza gra: morale 50 -> 37.5 w obu wariantach). DLL: test\Armoury-bledy.dll 198fe4dd, CrashScribe-bledy.dll / CrashScribe-at-bledy.dll
   (po B6b nowe md5). Galezie w repo i na GitHub. Do scalenia w w-toku/zbior-e4-koniec (Armoury) + CS do testu koncowego (CS-at z at1-cs.diff).
+- (12:40) **Jeff: E4/6-E4/7 "tak x3"** (STAN-PRAC). Pkt 3 (niewzieci z poboru wymuszonego -> DOM wsi) = zmiana kodu E4/7 - workflow na w-toku/e4-7 (e4\47).
