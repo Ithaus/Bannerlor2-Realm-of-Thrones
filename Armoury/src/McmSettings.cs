@@ -4028,6 +4028,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool RotSwapPayToPurse { get; set; } = true;
 
+        [SettingPropertyBool("Lord Purse Only To Victor", HintText = "the men's purse of a destroyed lord's party goes only to the leader of the side that beat it in that battle (as before: a third to him, the rest to his men). The game sometimes names the leader of the LOSING side as the destroyer (a party of the winning side left without men) or destroys a party outside battle - then the purse goes to the nearest town's purse instead (off = whoever the game names as destroyer takes it, as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool LordPurseOnlyToVictor { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5050,6 +5054,7 @@ namespace Armoury
             s.WorkshopOwnerPaysTownTax = WorkshopOwnerPaysTownTax;
             s.BkSupplyFromMenPurse = BkSupplyFromMenPurse;
             s.RotSwapPayToPurse = RotSwapPayToPurse;
+            s.LordPurseOnlyToVictor = LordPurseOnlyToVictor;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

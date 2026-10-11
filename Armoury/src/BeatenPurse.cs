@@ -57,6 +57,11 @@ namespace Armoury
     ///     OpenRosterScreenAfterBanditEncounter: zdarzenie BanditPartyRecruited tuz przed DestroyPartyAction.Apply(MainParty, banda) - takze bandy, ktore
     ///     dolaczylyby do spotkania), oddaje cala kiese graczowi (GiveGoldAction banda -> gracz; bez 1/9 korony - to nie lup wojenny). Dotad poza regula:
     ///     od E3/7 kasa najblizszego miasta (CaravanCapital.RoutePurse), wczesniej znikala. Niezalezne od wylacznika 3.2.
+    ///  7. D11-6 (decyzja Jeffa 11.10, wylacznik LordPurseOnlyToVictor): werdykt pkt 3 takze dla DRUZYN LORDOW - SplitPostfix zapamietuje druzyny lordow
+    ///     strony pokonanej (niezaleznie od wylacznika 3.2), a sakiewke ludzi zniszczonej druzyny lorda (MenPurse.OnPartyDestroyed - biegnie po nas) bierze
+    ///     tylko przywodca zwyciezcow tej bitwy (dalej jak dotad: wodz 1/3 + 2/3 jego ludziom, gracz - jego ludziom, banda, osada); niszczyciel, ktory
+    ///     jej nie pokonal (gra niszczy tez druzyne ZWYCIESKIEJ strony bez ludzi z niszczycielem = przywodca przegranych; DestroyPartyAction bez bitwy) -
+    ///     sakiewka do kasy najblizszego miasta (LordPurseToTown). Kiesa wodza zostaje z wodzem (bez zmian).
     /// Platnik -> odbiorca: kiesa rozbitej partii -> zwyciezcy wedlug wkladu / niszczyciel / jego osada / najblizsze miasto; 1/9 -> skarbiec.
     /// Ksiega pieniadza: lup wodza to zdarzenie gry z niczego (ZRODLA "bitwy"), kiesa pokonanego maleje bez zdarzenia (NETTO "bitwy - zloto partii
     /// bez wodza") - razem przelew, ksiega zamyka sie jak dotad; "kiesy partii bez wodza, ktore zniknely z mapy" (karawany, bandy) spadaja do rozwiazanych
@@ -95,6 +100,9 @@ namespace Armoury
         private static readonly HashSet<MobileParty> _joined = new HashSet<MobileParty>();
         private static long _joinGold; private static int _joinN;
         internal static bool JoinOn { get { var s = Settings.Current; return s != null && s.BandJoinPurseToPlayer; } }
+        // D11-6: sakiewki ludzi zniszczonych druzyn lordow - pokonanych przez przywodce zwyciezcow (dalej jak dotad) i niepokonanych (-> najblizsze miasto)
+        internal static bool LordVerdictOn { get { var s = Settings.Current; return s != null && s.LordPurseOnlyToVictor; } }
+        private static long _lpWin, _lpTown; private static int _lpWinN, _lpTownN;
 
         /// <summary>Ksiega pieniadza (MoneyLedger.Daily biegnie przed naszym Daily - te same granice doby): kiesy pokonanych zdjete w wyplacie gry.</summary>
         internal static long DayTaken { get { return _paid[TVill] + _paid[TBand] + _paid[TCar]; } }
@@ -119,6 +127,7 @@ namespace Armoury
             _yieldBribe = 0;
             _beaten.Clear();
             _joined.Clear(); _joinGold = 0; _joinN = 0;
+            _lpWin = _lpTown = 0; _lpWinN = _lpTownN = 0;
             _verdictParty = null; _verdictBeaten = false;
         }
 
@@ -133,6 +142,28 @@ namespace Armoury
         internal static bool CaravanNotBeatenNow(MobileParty mp)
         {
             return On && mp != null && mp.IsCaravan && ReferenceEquals(_verdictParty, mp) && !_verdictBeaten;
+        }
+
+        /// <summary>
+        /// D11-6, MenPurse.OnPartyDestroyed (sakiewka juz zdjeta): druzyna lorda niszczona TERAZ z niszczycielem - gdy werdykt NIE uznal jej za pokonana w tej
+        /// bitwie przez przywodce zwyciezcow, sakiewka ludzi -> kasa najblizszego miasta (true = obsluzone). Pokonana - false (dalej jak dotad: zwyciezca),
+        /// tylko licznik. Bez niszczyciela (rozwiazana) - false (jak dotad: najblizsze miasto).
+        /// </summary>
+        internal static bool LordPurseToTown(MobileParty mp, PartyBase destroyer, int purse)
+        {
+            try
+            {
+                if (!LordVerdictOn || mp == null || !mp.IsLordParty || destroyer == null || purse <= 0 || !ReferenceEquals(_verdictParty, mp)) return false;
+                if (_verdictBeaten) { _lpWin += purse; _lpWinN++; return false; }
+                var nt = VillageTakings.NearestTown(mp);
+                if (nt == null || nt.Town == null) return false;                            // bez miasta - jak dotad (nie gubimy zlota)
+                nt.Town.ChangeGold(purse);
+                MoneyLedger.NotePurseGone(purse, true);                                      // paczka 169: linia "Obieg" (tylko licznik)
+                MoneyLedger.Note169(MoneyLedger.N169PurseGone, nt, purse);
+                _lpTown += purse; _lpTownN++;
+                return true;
+            }
+            catch (Exception e) { Stumble("BeatenPurse.LordPurseToTown", e); return false; }
         }
 
         /// <summary>Wyjatek przy jednym zdarzeniu: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -185,15 +216,19 @@ namespace Armoury
         {
             try
             {
-                if (!On || !Live || __instance == null || __0 == null || __1 == null) return;
+                bool lords = LordVerdictOn;                     // D11-6: werdykt dla druzyn lordow - niezalezny od wylacznika 3.2
+                if ((!On && !lords) || !Live || __instance == null || __0 == null || __1 == null) return;
                 // pkt 3 (recenzja 3.2): pokonani tej bitwy - karawany i bandy, takze z bohaterem na czele (gra bierze im tylko 5% zlota wodza) i takze
-                // w zasadzce przy oblezeniu; tylko ich reszte przy zniszczeniu bierze zwyciezca (nie partie zwycieskiej strony bez ludzi)
+                // w zasadzce przy oblezeniu; tylko ich reszte przy zniszczeniu bierze zwyciezca (nie partie zwycieskiej strony bez ludzi);
+                // D11-6: takze druzyny lordow (sakiewka ludzi - MenPurse)
                 foreach (var d in __1)
                 {
                     var dmp = d != null && d.Party != null ? d.Party.MobileParty : null;
+                    if (dmp == null) continue;
                     int dt = TypeOf(dmp);
-                    if (dt == TBand || dt == TCar) _beaten[dmp] = __instance;
+                    if ((On && (dt == TBand || dt == TCar)) || (lords && dmp.IsLordParty)) _beaten[dmp] = __instance;
                 }
+                if (!On) return;                                // lup z kies (pkt 1-2) - tylko przy 3.2
                 if (__instance.IsSiegeAmbush) return;          // gra nie liczy tu lupu - kiesa zostaje, przy zniszczeniu bierze ja niszczyciel (pkt 3)
                 long total = 0, purse = 0;
                 foreach (var d in __1)
@@ -550,6 +585,8 @@ namespace Armoury
                   .Append("), karawany ").Append(_yield[TCar]).Append(" (").Append(_yieldN[TCar]).Append("); w tym okup za przepuszczenie ").Append(_yieldBribe)
                   .Append(" | rozwiazane bez bitwy (").Append(gone7).Append("): bandy ").Append(_disb[TBand]).Append(" (").Append(_disbN[TBand])
                   .Append("), karawany ").Append(_disb[TCar]).Append(" (").Append(_disbN[TCar]).Append(")")
+                  .Append(" | sakiewki ludzi zniszczonych druzyn lordow (D11-6 ").Append(LordVerdictOn ? "WL" : "WYL - niszczyciel bierze jak dotad").Append("): pokonane w bitwie przez przywodce zwyciezcow - do zwyciezcy jak dotad ")
+                  .Append(_lpWin).Append(" (").Append(_lpWinN).Append("), niszczyciel ich nie pokonal (zwycieska strona bez ludzi, bez bitwy) -> najblizsze miasto ").Append(_lpTown).Append(" (").Append(_lpTownN).Append(")")
                   .Append(" | przylaczone do gracza (D11-2 ").Append(JoinOn ? "WL" : "WYL - poza regula jak nizej").Append("): kiesy band -> gracz ").Append(_joinGold).Append(" (").Append(_joinN).Append(" band; bez 1/9 korony)")
                   .Append(" | zniszczone przez kogos, kto ich nie pokonal w bitwie (przylaczenie do gracza przy D11-2 wylaczonym, upadek rodu, zadania, zwycieska strona bez ludzi - poza regula 3.2, jak rozwiazane: ").Append(gone7).Append("): bandy ")
                   .Append(_odd[TBand]).Append(" (").Append(_oddN[TBand]).Append("), karawany ").Append(_odd[TCar]).Append(" (").Append(_oddN[TCar]).Append(")")

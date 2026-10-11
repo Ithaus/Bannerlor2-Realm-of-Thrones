@@ -97,6 +97,7 @@ namespace Armoury
                 int purse = Get(mp);
                 if (purse <= 0) return;
                 Take(mp, purse);
+                if (BeatenPurse.LordPurseToTown(mp, destroyer, purse)) return;   // D11-6: druzyna lorda niepokonana w bitwie przez przywodce zwyciezcow - najblizsze miasto
                 if (Seal31B.PurseOfBeaten(mp, destroyer, purse)) return;   // 3.1/3.3 (31b) E3/4 (W13): zwyciezca bez bohatera z kiesa (banda) albo osada niszczyciela
                 var win = destroyer != null ? destroyer.MobileParty : null;
                 if (win != null && win.LeaderHero != null && win.LeaderHero.IsAlive)
