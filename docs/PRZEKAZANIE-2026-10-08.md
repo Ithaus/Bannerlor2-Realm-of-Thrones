@@ -896,3 +896,6 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   po A: K1->K2->K5, R1 wytop (D, NK), R3; po B1: W1, N1, W3, K4, K3 (rycerz z koniem - cel z szablonow 175); warunkowo R2, W4, R4. Test: jeden, po wgraniu
   zbioru B etapu 5 (120 dob + zima). Pytania (ide z rada): zakaz unikatow tylko dla kowali miast i AI, nie dla kuzni Jeffa; konie kupowane przez mieszczan
   tylko robocze w miejsce padlych ze starosci; udzial jazdy krainy z szablonow 175 (jedna liczba; 12-15% w 120 dobach, ok. 20% po roku).
+- (00:00 UTC) **Jeff E6: "tak, tak, ok"** (unikaty - tylko kowale miast i AI; konie mieszczan robocze; jazda z szablonow 175). **TEST E4 d364 (czesc logu):** 0 ERROR Armoury;
+  wojsko lordow sr. d300-364 116.8 tys. (prog 95-115 - lekko ponad, "wojska nie zmniejszamy"), zalogi d364 87.8 tys. (= 99.6% biegu A 88.1 tys., prog >= 85%),
+  pula wyrzutkow d60/90/120 828/2143/2106 (TAK - plateau), uchodzcy d120 17.2 tys. Progi (okno d1-120) NIE 8. Kopia: kopia-e4k\czesc-d364.log, progi-d364-etap4.txt.

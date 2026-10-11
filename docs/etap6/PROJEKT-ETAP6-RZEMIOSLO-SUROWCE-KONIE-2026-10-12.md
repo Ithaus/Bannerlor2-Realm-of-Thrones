@@ -817,7 +817,9 @@ nie zdejmuje przerwy zakupow - bisekcja nie wlacza pompy). K4: krok i przesuniec
 
 ---
 
-## 6. Pytania do Jeffa (tylko kierunek; liczby wybiera projekt)
+## 6. Pytania do Jeffa (tylko kierunek; liczby wybiera projekt)
+
+**ROZSTRZYGNIETE (Jeff 12.10 ok. 00:00 UTC): (1) zakaz unikatow tylko kowale miast i AI, nie kuznia gracza - TAK; (2) mieszczanie tylko konie robocze w miejsce padlych ze starosci - TAK; (3) udzial jazdy z szablonow 175 - OK.**
 
 1. **"Nikt nie kuje unikatow" - takze Twoja kuznia?** 30.08 pozwoliles sobie nauczyc sie unikatu przez przetop i kuc go bez limitu po opanowaniu (CH:10520-10523, :10567-10570).
    **Rada:** zakaz tylko dla kowali miast i AI; Twoja kuznia bez zmian (kujesz, co znasz, bez filtra kultury - "zostawic filtr", 09.10). Alternatywa: zakaz tez dla Ciebie (wtedy

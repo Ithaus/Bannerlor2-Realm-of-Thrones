@@ -1190,6 +1190,8 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
 - (17:30) **Jeff etap 6: 6.1 wytop przy kopalni + przetop - TAK; 6.14 rycerz z wlasnym koniem, jazda AI ok. 20% (Dothrakowie konni, Zelazne Wyspy malo) - TAK;
   NOWE 6.19: kowale i rzemieslnicy kuja pancerze wedlug kultury swojej krainy (Polnoc nie kuje zbroi Lannisterow, nikt nie kuje unikatow typu helm Ramsaya; kazda kraina
   swoj rodzaj zbroi - lore). Uwaga: kultury ROT (battania = Polnoc itd. - CLAUDE.md 2).**
+- (00:00 UTC 12.10) **Jeff etap 6 (pytania projektu v2): (1) zakaz kucia unikatow tylko dla kowali miast i AI, NIE dla kuzni gracza - TAK; (2) mieszczanie kupuja tylko
+  konie robocze w miejsce padlych ze starosci - TAK; (3) udzial jazdy krainy z szablonow armii 175 (jedna liczba; 12-15% w 120 dobach, ok. 20% po roku) - OK.**
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli
