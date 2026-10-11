@@ -768,3 +768,12 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   testach A, B (zima) i zapisie 9 dob (0 ERROR Armoury; flaga zimy po tescie B usunieta przez skrypt - gra jej nie kasuje). Opis w STAN-PRAC "WGRANIE 31".
   Dalej (zasada Jeffa): reszta E4 bez testow po drodze -> jeden test koncowy etapu -> poprawki -> wgranie.
 - (11:05) **Jeff: E4/9 "tak, tak"** (zalogi Strazy rosna z ludzi Westeros; rozbici bracia na Mur, uciekinierzy do wyrzutkow Polnocy) + "rob dalej".
+- (11:30) **E4/6 i E4/7 GOTOWE (kod + 2 recenzje + poprawki, bez testu w grze):** w-toku/e4-6 0cd60f1 (Famine.cs - spichlerz okregu, glod, uchodzcy z glodu z osobna
+  czescia konta FamN, mieszczanie przy Food 0 MFamineTown; DLL test\Armoury-e4-6.dll 587ffbaa) i w-toku/e4-7 61f75d7 (pochodzenie, DeduceManpower, powroty z hearth,
+  polegli trwale, wolne rece i hamulec, menu "People of this land", Fold/Drift slownikow; DLL test\Armoury-e4-7.dll ca10319e) - repo i GitHub. Pytania kierunku do
+  Jeffa: E4/6 - uchodzcy we wlasnym regionie wracaja zawsze, gdy gospodarze nie gloduja (odstepstwo od GL 2.6; rada tak); E4/7 - najemnik z karczmy z ludzi miasta, obcy
+  tylko bez wolnych rak (do E4/10; rada tak), niewzieci z poboru wymuszonego gracza wracaja do DOM wsi (rada - zamknieta ksiega).
+- (11:30) **Workflow wf_549a838c-5d8:** scalenie E4/6 + E4/7 -> w-toku/zbior-e4-koniec (drzewo SCRATCH(ae222cb7)\e4\koniec; kolizje: numery przyczyn PeopleBook,
+  Devastation.Daily, zgony z glodu vs NoteCivilDead, arm_people) + recenzja scalenia, potem E4/8 (e4\48) i E4/10 (e4\410) rownolegle od czubka scalenia.
+- (11:30) **Workflow wf_16c71a8d-809: projekt etapu 5** (rozpoznanie logi/kod/dokumenty/styki z E4 -> projekt -> 2 krytyki -> v2) -> docs/etap5/. Jeff 11:20 pyta
+  "czy mozesz zaczac etap 5 czy dopiero po etapie 4" - odpowiedz: projekt teraz, kod porcji niezaleznych rownolegle po projekcie, porcje z jedzeniem/karczma po E4.
