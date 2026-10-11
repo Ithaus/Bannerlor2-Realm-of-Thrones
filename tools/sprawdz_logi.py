@@ -10,6 +10,9 @@ Uzycie (Python 3, tylko odczyt):
                     stan jednostki - z dziennej linii "Ludzie (ksiega)" (MCM), nie z linii startowej (ta powstaje przed MCM).
                     Gdy jest linia startowa "Devastation (E4/5)" - takze progi E4/5 S1-S21 (plan kodu E4/5 rozdz. 11; S10/S11 z pliku
                     <katalog logu>/<znacznik>/ludzie-regiony.csv; S6, S14, S19-S21 - INFO, porownanie z biegiem E4/4 i autotesty osobno).
+                    Gdy jest linia startowa "Famine (E4/6)" - takze progi E4/6 F1-F13 (spichlerze okregow, glod, uchodzcy z glodu, H w przyroscie;
+                    progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
+                    tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -834,6 +837,10 @@ def etap4_main(logp, start_arg, until=120):
     if any(x.startswith("Devastation (E4/5):") for x in lines):
         etap4_e45(rep, lines, start, win, hea, lud, until, logp)
 
+    # ---------------- E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu, H w przyroscie
+    if any(x.startswith("Famine (E4/6):") for x in lines):
+        etap4_e46(rep, lines, start, win, until)
+
     # ---------------- baza konca etapu (364 doby) - INFO
     l300 = [num(r"partie rodow (\d+) \(\d+ partii", lud[d]) for d in lud if 300 <= run_day(d, start) <= 364]
     l300 = [x for x in l300 if x is not None]
@@ -1026,7 +1033,7 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
         rep.add("E4/4: GrowthPostfix ostatni na CalculateHearthChange", "brak linii pierwszej doby", "linia \"czynny model dobrobytu gry\" w pierwszej dobie", None)
     prz = e4_series(lines, "Ludzie: przyrost naturalny")
     pw = [d for d in win if d in prz and run_day(d, start) >= 28]
-    off = sum(1 for d in win if d in prz and "WYLACZONY" in prz[d])
+    off = sum(1 for d in win if d in prz and prz[d].startswith("Ludzie: przyrost naturalny WYLACZONY"))   # E4/6: tylko poczatek linii (odcinek glodu)
     rep.add("E4/4: przyrost naturalny czynny (linia dobowa)", f"czynny {sum(1 for d in win if d in prz) - off} dob, WYLACZONY {off} dob", "czynny kazdej doby",
             (off == 0 and any(d in prz for d in win)) if win else None)
     nat = [fnum(r"^Ludzie: przyrost naturalny " + SF + r" ludzi", prz[d]) for d in pw]
@@ -1282,12 +1289,16 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     # poprawka po recenzji E4/5 (R1): "las" (2-5% trafionych, OutlawLaw.AddFled) zyje w puli wyrzutkow - nie ma go ani w ludnosci, ani w uchodzcach
     fled = [fnum(r"\| trafieni [\d.]+ = zabici [\d.]+ \+ pojmani [\d.]+ \+ las " + F_, dev[d]) or 0 for d in on if run_day(d, start) >= 28]
     died = [fnum(r" - zmarli " + F_ + r" =", dev[d]) or 0 for d in on if run_day(d, start) >= 28]
+    # E4/6: zmarli z glodu (gospodarze, mieszczanie; uchodzcy sa juz w "zmarli" konta) obnizaja dolna granice jak zabici
+    fam = e4_series(lines, "Spichlerze (E4/6): dzien")
+    starv = [(fnum(r"zmarli z glodu: gospodarze " + F_, fam.get(d)) or 0) + (fnum(r", mieszczanie " + F_, fam.get(d)) or 0) for d in on if run_day(d, start) >= 28]
     if net:
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
-        mn = st.mean(net); lo = 290 - mk - mf - md
+        ms = st.mean(starv) if starv else 0
+        mn = st.mean(net); lo = 290 - mk - mf - md - ms
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until} (ludzi/d)",
-                f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
-                f"pas E4/4 290-1150/d albo nizej tylko o zabitych, las i zmarlych uchodzcow (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
+                f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
+                f"pas E4/4 290-1150/d albo nizej tylko o zabitych, las, zmarlych uchodzcow i zmarlych z glodu (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
                 (lo <= mn <= 1150) and mn >= -721)
     else:
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until}", "brak \"razem z nimi\" w linii Ludzie:", "290-1150/d", None)
@@ -1320,6 +1331,121 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
             "INFO (powrot rusza po 30 dobach spokoju; w biegu 728 dob: wsie spalone w d1-364 bez kolejnego najazdu - >= 95% w domu)", None)
     sp = [num(r"od ponad 90 dob (\d+)", dev[d], int, 0) or 0 for d in on]
     rep.add("E4/5: spirala na pograniczu (regiony > 25% uchodzcow i najazd < 30 dob od > 90 dob)", f"max {max(sp, default=0)}", "INFO - decyzja Jeffa dopiero z liczbami (rozdz. 12 pkt 18)", None)
+
+
+def etap4_e46(rep, lines, start, win, until):
+    """E4/6 (191): progi z projektu etapu 4 rozdz. 3 "E4/6" Test i rozdz. 4 (prog konca etapu dla zimy) - linia dzienna "Spichlerze (E4/6)", linia startowa
+    "Famine (E4/6)", odcinek "glod: zmarli z glodu" w "Ludzie (ksiega)", "Ludzie: przyrost naturalny" (H). F6/F7 (zima) wiaza tylko w biegu z zima
+    (dzienne "zima: TAK"); w biegu zwyklym - INFO. F8 (glodne okregi tylko spustoszone/oblezone) - doby bez zimy."""
+    fam = e4_series(lines, "Spichlerze (E4/6): dzien")
+    kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    prz = e4_series(lines, "Ludzie: przyrost naturalny")
+    on = [d for d in win if d in fam and "| CZYNNE" in fam[d]]
+    off = [d for d in win if d in fam and "| WYLACZONE" in fam[d]]
+    # F1 bledy i potkniecia
+    errs = [x for x in lines if x.startswith("ERROR in Famine")]
+    stb = [num(r"\| potkniecia (\d+) \(razem", fam[d], int, 0) or 0 for d in on]
+    rep.add("E4/6 F1: bledy i potkniecia Famine", f"bledy {len(errs)}, potkniecia {sum(stb)} w {sum(1 for x in stb if x)} dobach",
+            "0 bledow; potkniecia 0 (najwyzej 5 w biegu, z nazwa miejsca)", len(errs) == 0 and sum(stb) <= 5)
+    # F2 linia startowa
+    stl = next((x for x in lines if x.startswith("Famine (E4/6):")), "")
+    brak = re.search(r"; BRAK: (.*?)\.$", stl)
+    rep.add("E4/6 F2: linia startowa (stan, latka spichlerza warowni)", f"{'CZYNNE' if ' CZYNNE' in stl else stl[40:90]}; BRAK: {brak.group(1) if brak else '?'}",
+            "CZYNNE, wpiete: spichlerz warowni, BRAK: -", " CZYNNE" in stl and "wpiete: spichlerz warowni" in stl and brak is not None and brak.group(1).strip() == "-")
+    # F3 linia dzienna
+    rep.add("E4/6 F3: linia dzienna CZYNNE", f"czynne {len(on)} dob, WYLACZONE {len(off)} dob z {len(win)}", "czynne kazdej doby", (len(off) == 0 and len(on) == len(win)) if win else None)
+    if not on:
+        return
+    # F4 kontrola spichlerzy (racje: stan = wczoraj + plon - zjedli - nadwyzka)
+    bad = []
+    for d in on:
+        c = fnum(r"kontrola spichlerzy " + SF, fam[d])
+        tot = fnum(r"spichlerze swiata " + F_ + r" mln racji", fam[d])
+        if c is None or tot is None:
+            continue
+        if abs(c) > max(1.0, 1e-9 * tot * 1e6):
+            bad.append(run_day(d, start))
+    rep.add("E4/6 F4: kontrola spichlerzy", f"poza tolerancja {len(bad)} dob" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else ""), "|kontrola| <= max(1, 1e-9 stanu) kazdej doby", len(bad) == 0)
+    # F5 zalozenie spichlerzy
+    first = on[0]
+    sd = num(r"zalozone dzis (\d+)", fam[first], int, 0) or 0
+    wn = num(r"\| wsie (\d+) \(bez przelicznika", fam[first], int, 0) or 0
+    days0 = fnum(r"mln racji = " + F_ + r" dni potrzeby", fam[first])
+    rep.add("E4/6 F5: spichlerze zalozone w pierwszej dobie (INFO)", f"zalozone {sd} z {wn} wsi; dni potrzeby swiata d{run_day(first, start)} {days0}",
+            "INFO - nowa kampania: wszystkie wsie, start Famine Start Share sufitu (1 = 728 dni)", None)
+    # F6/F7 zima
+    wdays = [d for d in on if "zima: TAK" in fam[d]]
+    starve = None
+    for d in wdays:
+        m = re.search(r"pierwsza doba glodu warowni AI w tej zimie: (\d+)", fam[d])
+        if m:
+            starve = int(m.group(1))
+            break
+    if wdays:
+        rep.add("E4/6 F6: pierwsza doba glodu warowni AI w zimie (prog etapu)", f"{starve if starve is not None else '-'} (zima w {len(wdays)} dobach okna)",
+                "> 30 albo brak (zadna warownia AI nie glodzi przed 30. doba zimy)", starve is None or starve > 30)
+    else:
+        rep.add("E4/6 F6: pierwsza doba glodu warowni AI w zimie (prog etapu)", "brak zimy w biegu", "bieg zimowy 120 dob (proba zimy) - INFO tutaj", None)
+    med = [(run_day(d, start), fnum(r"\): mediana " + F_ + r" dni, minimum", fam[d]), fnum(r" dni, minimum " + F_, fam[d])) for d in (wdays or on)]
+    med = [x for x in med if x[1] is not None]
+    if med:
+        worst = min(med, key=lambda x: x[1])
+        pts = ", ".join(f"d{n}: {m:.0f}" for n, m, _ in med if n in (30, 60, 120)) or f"ostatnia d{med[-1][0]}: {med[-1][1]:.0f}"
+        rep.add("E4/6 F7: mediana zapasu warowni AI wedlug U27 (prog etapu)" + ("" if wdays else " - bieg bez zimy"),
+                f"najnizsza {worst[1]:.0f} dni (d{worst[0]}); {pts}; minimum warowni najnizsze {min(x[2] for x in med if x[2] is not None):.0f}",
+                ">= 364 kazdej doby zimy (U27: (Food x Q + spichlerze) / ubytek, bez ubytku = 364)", (worst[1] >= 364) if wdays else None)
+    else:
+        rep.add("E4/6 F7: mediana zapasu warowni AI wedlug U27", "brak odcinka zapasu w linii", ">= 364 w zimie", None)
+    # F8 glodne okregi tylko spustoszone albo oblezone (doby bez zimy)
+    nw = [d for d in on if "zima: NIE" in fam[d]]
+    rx = re.compile(r"okregi glodne (\d+): oblezone (\d+), spustoszone (\d+), tylko zima (\d+), bez przyczyny (\d+)")
+    rows = [rx.search(fam[d]) for d in nw]
+    rows = [tuple(int(g) for g in m.groups()) for m in rows if m]
+    if rows:
+        none_ = sum(r[4] + r[3] for r in rows)
+        rep.add("E4/6 F8: glodne okregi bez zimy - tylko spustoszone albo oblezone", f"okrego-dni glodnych {sum(r[0] for r in rows)} (oblezone {sum(r[1] for r in rows)}, spustoszone {sum(r[2] for r in rows)}), bez przyczyny {none_}",
+                "bez przyczyny 0 (bieg zwykly 120 dob)", none_ == 0)
+    else:
+        rep.add("E4/6 F8: glodne okregi bez zimy", "brak dob bez zimy w oknie", "bez przyczyny 0", None)
+    # F9 zgony z glodu w ksiedze (R3) = linia spichlerzy
+    diff = []
+    dead = 0.0
+    for d in on:
+        a = fnum(r"zmarli z glodu: gospodarze " + F_, fam[d])
+        if a is None:
+            continue
+        dead += a
+        b = fnum(r"glod: zmarli z glodu \(E4/6, R10 - ubytek trwaly\) " + F_, kb.get(d)) if d in kb else None
+        if b is None:
+            b = 0.0
+        diff.append(abs(a - b))
+    rep.add("E4/6 F9: zmarli z glodu (gospodarze) w ksiedze ludzi = linia spichlerzy", f"razem {dead:.1f}; max |roznica| {max(diff, default=0):.3f} w {len(diff)} dobach",
+            "<= 0.1 kazdej doby (zaokraglenie ksiegi do 0.1; smierc przez PeopleBook.Move, MFamineDead)", (max(diff, default=0) <= 0.1) if diff else None)
+    # F10 czas
+    tm = [fnum(r"\| czas " + F_ + r" ms\.$", fam[d]) for d in on]
+    tm = [x for x in tm if x is not None]
+    rep.add("E4/6 F10: czas linii Spichlerze (E4/6)", f"{st.mean(tm):.1f} ms/d (max {max(tm):.1f})" if tm else "-", "<= 30 ms/d srednio (zasada kosztu paczki)", (st.mean(tm) <= 30.0) if tm else None)
+    # F11 uchodzcy z glodu, przeprowadzki, miejsca pobytu (INFO)
+    fl = sum(fnum(r"\| uciekli z glodu " + F_, fam[d]) or 0 for d in on)
+    mv = sum(num(r"przeprowadzki kont (\d+)", fam[d], int, 0) or 0 for d in on)
+    nr = sum(num(r"bez regionu z zapasem w zasiegu (\d+)", fam[d], int, 0) or 0 for d in on)
+    last = fam[on[-1]]
+    pl = re.search(r"miejsca pobytu poza swoim regionem \((\d+)\): (.*?) \|", last)
+    rep.add("E4/6 F11: uchodzcy z glodu (INFO)", f"uciekli {fl:.0f}, przeprowadzki kont {mv}, bez regionu z zapasem {nr}; miejsca pobytu d{run_day(on[-1], start)}: {pl.group(2)[:200] if pl else '-'}",
+            "INFO - miejsce pobytu w linii (GL 2.6)", None)
+    # F12 zmarli z glodu wedlug grupy i warownie przy Food 0 (INFO)
+    hz = sum(fnum(r"zmarli z glodu: gospodarze " + F_, fam[d]) or 0 for d in on)
+    rz = sum(fnum(r", uchodzcy " + F_ + r", mieszczanie", fam[d]) or 0 for d in on)
+    tz = sum(fnum(r", mieszczanie " + F_, fam[d]) or 0 for d in on)
+    sz = sum(fnum(r"schronieni w murach " + F_, fam[d]) or 0 for d in on)
+    fz = max((num(r"warownie przy Food 0: (\d+)", fam[d], int, 0) or 0 for d in on), default=0)
+    rep.add("E4/6 F12: zmarli z glodu i warownie przy Food 0 (INFO)", f"gospodarze {hz:.0f}, uchodzcy {rz:.0f}, mieszczanie {tz:.0f}, schronieni {sz:.0f}; warowni przy Food 0 najwiecej {fz}",
+            "INFO (R3 - ubytek trwaly; mieszczanie ze stanu miasta E4/4)", None)
+    # F13 glod w przyroscie (H) i przednowek (INFO)
+    hw = [num(r"wsi z brakiem jedzenia (\d+)", prz[d], int, 0) or 0 for d in on if d in prz]
+    rn = [num(r"przednowek \(90%\): wsi (\d+)", fam[d], int, 0) or 0 for d in on]
+    rep.add("E4/6 F13: glod w przyroscie (H) i przednowek (INFO)", f"wsi z brakiem jedzenia (H > 0) najwiecej {max(hw, default=0)}; przednowek najwiecej {max(rn, default=0)} wsi",
+            "INFO - bieg zwykly: 0 poza spustoszonymi; zima: przednowek dopiero po wyczerpaniu spichlerzy (lata)", None)
 
 
 def main(argv):
