@@ -516,6 +516,10 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public bool FoodModelChain { get; set; } = true;
 
+        [SettingPropertyBool("Bk Animal Feed Per Head", HintText = "Banner Kings animal feed (in desert full, in snow and blizzard half) counts every animal: every mounted soldier's horse (prisoners have no horses) and every animal in the baggage at its Banner Kings rate - a riding horse, noble horse or camel in the baggage at the horse rate - the same count as Winter Horses Eat, one rule all year. Banner Kings alone counts one horse per troop type, mounted prisoners as horses and a baggage horse like a bird. Where and how much stays Banner Kings' rule (no feed for camels in the desert); winter feed only adds what is missing above it (off = Banner Kings' own count)")]
+        [SettingPropertyGroup("The lean quartermasters")]
+        public bool BkAnimalFeedPerHead { get; set; } = true;
+
         [SettingPropertyBool("Crossing Law Enabled", HintText = "fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea")]
         [SettingPropertyGroup("The crossing law")]
         public bool CrossingLawEnabled { get; set; } = true;
@@ -4244,6 +4248,7 @@ namespace Armoury
             s.AiStarvingBuysAnyPrice = AiStarvingBuysAnyPrice;
             s.FoodConsumptionCutPercent = FoodConsumptionCutPercent;
             s.FoodModelChain = FoodModelChain;
+            s.BkAnimalFeedPerHead = BkAnimalFeedPerHead;
             s.CrossingLawEnabled = CrossingLawEnabled;
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;

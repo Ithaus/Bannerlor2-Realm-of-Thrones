@@ -52,7 +52,8 @@ namespace Armoury
     ///    znacznik watku ustawiany tylko, gdy prefiks naprawde oddal wynik lancucha).
     ///  - PASZA KONI E4/1: WinterRealm.FeedInfo idzie przez RBL w glab, gdy lancuch jest naprawiony (Chains) - widzi BK, wiec regula paszy BK
     ///    "BIEGNIE"; na pustyni i w sniegu (tam karmi BK) E4/1 doplaca w zimie tylko roznice ponad pasze BK (po recenzji: pasza = wieksza
-    ///    z E4/1 i BK) - bez podwojnej paszy i bez dziury, gdzie zima najostrzejsza.
+    ///    z E4/1 i BK) - bez podwojnej paszy i bez dziury, gdzie zima najostrzejsza. Wariant (a) Jeffa 11.10 (WinterRealm.BkAnimalPostfix,
+    ///    BkAnimalFeedPerHead): BK liczy zwierzeta po glowie ta sama funkcja co E4/1 - warunki terenu BK bez zmian.
     ///  - RATIONS -40%: licznik zagniezdzenia (Rations._depth) tnie raz, na zewnatrz (RBL), choc latka siedzi na kazdym modelu lancucha.
     ///  - NumberOfMenOnMapToEatOneFood NIE przepiety (getter jednej instrukcji - latka bez potrzeby: u Jeffa BK SlowerParties 0, wiec 20 = 20);
     ///    linia kampanii pokazuje obie liczby i ostrzega, gdyby sie rozjechaly.
@@ -360,7 +361,8 @@ namespace Armoury
                 case "ROT.Models.ROTMobilePartyFoodConsumptionModel": return "ROT - Inni nie jedza (baza 0, zuzycie 0), zaciagniety gracz baza 0";
                 case "NavalDLC.GameComponents.NavalDLCMobilePartyFoodConsumptionModel": return "NavalDLC - -20% na morzu (+ perk Smooth Operator)";
                 case "BetterEconomy.Models.BEE_MobilePartyFoodConsumptionModel": return "BEE - oslona wyjatkow (bez wlasnej reguly)";
-                case "BannerKings.Models.Vanilla.BKPartyConsumptionModel": return "BK - perki vanilli (kopia BK) i BK (Kheshig Raider, Siege Overseer, Jawwal), pasza zwierzat na pustyni pelna i w sniegu/zamieci pol, partie BK nie jedza";
+                case "BannerKings.Models.Vanilla.BKPartyConsumptionModel": return "BK - perki vanilli (kopia BK) i BK (Kheshig Raider, Siege Overseer, Jawwal), pasza zwierzat na pustyni pelna i w sniegu/zamieci pol"
+                                                                                  + (WinterRealm.BkPerHeadNow ? " (zwierzeta po glowie - wariant a)" : " (zwierzeta formula BK)") + ", partie BK nie jedza";
                 case "TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyFoodConsumptionModel": return "Default - perki vanilli";
                 default: return t.Name + " - nieznany model";
             }
@@ -436,6 +438,7 @@ namespace Armoury
             var s = Settings.Current;
             sb.Append(" | zima Armoury (WinterBite +").Append(s.WinterPartyFoodBonusPercent).Append("%, pasza koni E4/1): raz, w bazie najglebszego modelu");
             sb.Append("; regula paszy BK ").Append(bk ? "w lancuchu - na pustyni i w sniegu (tam karmi BK) E4/1 doplaca w zimie tylko roznice ponad pasze BK" : "poza lancuchem - E4/1 doplaca pelna pasze takze na pustyni i w sniegu");
+            try { sb.Append(" | ").Append(WinterRealm.BkFeedText()); } catch (Exception e) { Stumble("linia(pasza BK)", e); }
             sb.Append(" | Rations -").Append(Math.Max(0, Math.Min(90, s.FoodConsumptionCutPercent))).Append("% raz, na zewnatrz (licznik zagniezdzenia)");
 
             // partie: kto je wedlug aktywnego modelu

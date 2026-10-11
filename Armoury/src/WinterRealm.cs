@@ -40,6 +40,13 @@ namespace Armoury
     /// warunki terenu i pogody co BK), najmniej 0. W zimie pasza = wieksza z dwoch (E4/1 albo BK) - bez podwojnej paszy i bez dziury tam, gdzie
     /// zima najostrzejsza (poprawka po recenzji E4/6a: wczesniej E4/1 nie doplacal tam wcale, a formula BK daje np. w sniegu ok. 6x mniej);
     /// poza zima pasze na pustyni i w sniegu liczy sam BK (jego regula - Jeff 11.10 "reguly BK dokladaja sie").
+    /// PASZA BK PO GLOWIE (wariant (a) Jeffa 11.10, wylacznik BkAnimalFeedPerHead, na zywo): pasze koni liczy JEDNA zasada przez caly rok -
+    /// postfiks na BK CalculateAnimalFoodNeed (BkAnimalPostfix) oddaje zamiast formuly BK nasza liczbe zwierzat (AnimalNeed - ta sama co
+    /// pasza zimowa E4/1: konni po glowie bez jencow x kon, zwierzeta taboru x stawka, kon/wielblad w taborze stawka konia). Warunki i mnozniki
+    /// terenu zostaja BK (BK CalculateDailyFoodConsumptionf: pustynia - pelna, bez wielbladow, ignoreCamels true - ten sam test StringId
+    /// "camel"; poza pustynia snieg/zamiec - pol). BK wola CalculateAnimalFoodNeed tylko tam (dekompilacja 11.10; zaden inny modul jej nie wola
+    /// ani nie latuje - skan DLL), a E4/1 czyta ja przez BkNeed - wiec zimowa doplata roznicy liczy sie juz wzgledem paszy po glowie
+    /// (przy udziale 0.5: pustynia - BK pelna >= E4/1 0.5 x kraina, doplata tylko za wielblady; snieg - BK pol >= E4/1 0.5 x kraina, bez doplaty).
     /// U Jeffa aktywnym modelem jest RBL RealisticFoodConsumptionModel (RBL laduje sie po ROT, dziedziczy po Default i nie wola modelu
     /// wewnetrznego) - bez E4/6a BK nie karmi nigdzie, wiec doplata jest pelna takze na pustyni i w sniegu. Od E4/6a (FoodChain, FoodModelChain)
     /// RBL oddaje swoje metody lancuchowi pod soba (ROT -> NavalDLC -> BEE -> BK) - regula paszy BK biegnie; FeedInfo idzie wtedy przez RBL
@@ -81,6 +88,12 @@ namespace Armoury
 
         private static int _stumbles, _stumblesDay;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>();
+
+        // wariant (a) Jeffa 11.10: pasza BK po glowie (postfiks na BK CalculateAnimalFoodNeed)
+        private static bool _bkFeedHooked;
+        private static string _bkFeedStart = "nie wpieta";
+        [ThreadStatic] private static float _bkOrig;     // wynik formuly BK sprzed podmiany (ostatnie wywolanie w tym watku) - do linii "przed"
+        [ThreadStatic] private static bool _bkOrigSet;
 
         internal const int WhyOff = 0, WhyFed = 1, WhySteppe = 2, WhyDesert = 3, WhySnow = 4, WhyNoRealm = 5, WhyNoAnimals = 6,
                            WhyTopDesert = 7, WhyTopSnow = 8, WhyCount = 9;   // Desert/Snow = pasza BK nie mniejsza (bez doplaty), Top* = doplata roznicy
@@ -271,8 +284,10 @@ namespace Armoury
             return null;
         }
 
-        /// <summary>Pelna pasza zwierzat partii na dobe: konni w skladzie po glowie x kon + zwierzeta w taborze x ich stawka (stawki BK).</summary>
-        private static float AnimalNeed(MobileParty party, Feed f, out int riders, out int herd)
+        /// <summary>Pelna pasza zwierzat partii na dobe: konni w skladzie po glowie x kon + zwierzeta w taborze x ich stawka (stawki BK).
+        /// ignoreCamels - warunek terenu BK (pustynia): wielblady w taborze bez paszy (ten sam test co BK: StringId zawiera "camel").
+        /// Jedna liczba zwierzat dla zimy E4/1 (HorseFeed, ignoreCamels false) i dla paszy BK (BkAnimalPostfix, wariant (a)).</summary>
+        private static float AnimalNeed(MobileParty party, Feed f, bool ignoreCamels, out int riders, out int herd)
         {
             riders = 0; herd = 0;
             float need = 0f;
@@ -291,6 +306,7 @@ namespace Armoury
                     var el = ir[i];
                     var item = el.EquipmentElement.Item;
                     if (item == null || el.Amount <= 0 || !item.HasHorseComponent || item.HorseComponent == null) continue;
+                    if (ignoreCamels && item.StringId != null && item.StringId.Contains("camel")) continue;
                     float rate;
                     if (item.HorseComponent.IsPackAnimal) rate = f.Mule;
                     else if (item.ItemCategory == DefaultItemCategories.WarHorse) rate = f.Warhorse;
@@ -302,6 +318,15 @@ namespace Armoury
                     herd += el.Amount;
                 }
             return need;
+        }
+
+        /// <summary>Gdzie BK karmi zwierzeta (BK CalculateDailyFoodConsumptionf): 1 = teren pod partia pustynia (pelna pasza, bez wielbladow),
+        /// 2 = poza pustynia snieg/zamiec w miejscu partii (pol paszy), 0 = BK nie karmi.</summary>
+        private static int BkFeedAt(MobileParty party, TerrainType terrain)
+        {
+            if (terrain == TerrainType.Desert) return 1;
+            var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
+            return w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard ? 2 : 0;
         }
 
         /// <summary>Doplata paszy koni w zimie (dodatnia liczba jedzenia na dobe; 0 = bez doplaty, powod w why) - jedna regula dla
@@ -321,21 +346,14 @@ namespace Armoury
                 var f = FeedInfo();
                 var terrain = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(party.CurrentNavigationFace);
                 if (terrain == TerrainType.Steppe) { why = WhySteppe; return 0f; }
-                int bkAt = 0;    // regula paszy BK biegnie: 1 = pustynia (BK pelna pasza), 2 = snieg/zamiec (BK pol) - ten sam warunek co BK
-                if (f.BkFeeds)   // (najpierw teren pod partia, potem pogoda w miejscu partii)
-                {
-                    if (terrain == TerrainType.Desert) bkAt = 1;
-                    else
-                    {
-                        var w = Campaign.Current.Models.MapWeatherModel.GetWeatherEventInPosition(party.GetPosition2D);
-                        if (w == MapWeatherModel.WeatherEvent.Snowy || w == MapWeatherModel.WeatherEvent.Blizzard) bkAt = 2;
-                    }
-                }
-                need = AnimalNeed(party, f, out riders, out herd);
+                // regula paszy BK biegnie: 1 = pustynia (BK pelna pasza), 2 = snieg/zamiec (BK pol) - ten sam warunek co BK
+                int bkAt = f.BkFeeds ? BkFeedAt(party, terrain) : 0;   // (najpierw teren pod partia, potem pogoda w miejscu partii)
+                need = AnimalNeed(party, f, false, out riders, out herd);
                 if (need <= 0f) { why = WhyNoAnimals; return 0f; }
                 float own = need * share * realm;
                 if (bkAt == 0) { why = WhyFed; return own; }
-                // tam karmi BK swoja formula (w CalculateDailyFoodConsumptionf, ta sama ExplainedNumber co nasza baza) - doplacamy tylko roznice;
+                // tam karmi BK (w CalculateDailyFoodConsumptionf, ta sama ExplainedNumber co nasza baza) - doplacamy tylko roznice;
+                // BkNeed idzie przez BkAnimalPostfix - przy BkAnimalFeedPerHead to juz pasza po glowie (wariant (a)), bez podwojnej paszy;
                 // pasza BK nieczytelna - jak przed poprawka: bez doplaty (bez ryzyka podwojnej paszy)
                 if (f.BkNeed == null) { why = bkAt == 1 ? WhyDesert : WhySnow; return 0f; }
                 bk = bkAt == 1 ? f.BkNeed(party, true) : f.BkNeed(party, false) / 2f;
@@ -346,6 +364,87 @@ namespace Armoury
                 return top;
             }
             catch (Exception e) { Stumble("HorseFeed", e); why = WhyOff; need = 0f; bk = 0f; riders = 0; herd = 0; return 0f; }
+        }
+
+        // ------------------------------------------------------------ wariant (a) Jeffa 11.10: pasza BK po glowie
+
+        /// <summary>Czy pasza BK liczy sie teraz po glowie (latka stoi i wylacznik wlaczony) - do opisow w liniach.</summary>
+        internal static bool BkPerHeadNow { get { var s = Settings.Current; return _bkFeedHooked && s != null && s.BkAnimalFeedPerHead; } }
+
+        /// <summary>Start (SubModuleMain, obok FoodChain.ApplyAll): postfiks na BK CalculateAnimalFoodNeed - wpiety zawsze, gdy BK jest;
+        /// wylacznik BkAnimalFeedPerHead czytany przy kazdym wywolaniu (na zywo).</summary>
+        internal static void ApplyBkFeed(Harmony h)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName(BkModel);
+                var m = t != null ? AccessTools.DeclaredMethod(t, "CalculateAnimalFoodNeed", new[] { typeof(MobileParty), typeof(bool) }) : null;
+                if (m == null || m.IsStatic || m.ReturnType != typeof(float))
+                {
+                    _bkFeedStart = t == null ? "brak BannerKings" : "brak BK CalculateAnimalFoodNeed(MobileParty, bool)";
+                    Log.Info("WinterRealm: pasza BK po glowie (wariant a) NIE wpieta - " + _bkFeedStart + "; pasza BK jak dotad.");
+                    return;
+                }
+                h.Patch(m, postfix: new HarmonyMethod(typeof(WinterRealm), nameof(BkAnimalPostfix)) { priority = Priority.Last });
+                _bkFeedHooked = true;
+                _bkFeedStart = "wpieta";
+                Log.Info("WinterRealm: pasza BK po glowie (wariant a Jeffa 11.10) - wpieta na BKPartyConsumptionModel.CalculateAnimalFoodNeed: konni po glowie"
+                         + " (bez jencow) x kon, zwierzeta taboru x stawka BK (kon i wielblad w taborze stawka konia); warunki terenu BK bez zmian (pustynia pelna"
+                         + " bez wielbladow, snieg/zamiec pol); wylacznik BkAnimalFeedPerHead (na zywo) teraz " + (Settings.Current.BkAnimalFeedPerHead ? "TAK" : "NIE") + ".");
+            }
+            catch (Exception e) { _bkFeedHooked = false; _bkFeedStart = "wyjatek przy wpinaniu " + e.GetType().Name; Log.Error("WinterRealm.ApplyBkFeed", e); }
+        }
+
+        /// <summary>BK CalculateAnimalFoodNeed: zamiast formuly BK (1 kon na typ oddzialu, konni jency, kon w taborze stawka ptaka) nasza liczba
+        /// zwierzat po glowie - ta sama AnimalNeed co pasza zimowa E4/1; ignoreCamels BK (pustynia) zachowane. Wynik BK zapamietany w watku
+        /// (linia "przed"). Wylacznik wylaczony / wyjatek - wynik BK jak dotad (wyjatek liczony jako potkniecie, bez wylacznika).</summary>
+        public static void BkAnimalPostfix(MobileParty __0, bool __1, ref float __result)
+        {
+            _bkOrig = __result; _bkOrigSet = true;
+            var s = Settings.Current;
+            if (s == null || !s.BkAnimalFeedPerHead || __0 == null) return;
+            try
+            {
+                int riders, herd;
+                __result = AnimalNeed(__0, FeedInfo(), __1, out riders, out herd);
+            }
+            catch (Exception e) { Stumble("BkAnimal", e); __result = _bkOrig; }
+        }
+
+        /// <summary>Do linii zimy (codziennie w zimie) i linii lancucha E4/6a (raz na kampanie): partie, ktore BK karmi teraz (te same warunki
+        /// co BK), pasza formula BK (przed) i po glowie (po) - na dobe, przed mnoznikami (zima, perki, Rations).</summary>
+        internal static string BkFeedText()
+        {
+            var s = Settings.Current;
+            var sb = new StringBuilder(300);
+            sb.Append("pasza BK po glowie (wariant a, BkAnimalFeedPerHead): ").Append(s != null && s.BkAnimalFeedPerHead ? "TAK" : "NIE - formula BK");
+            if (!_bkFeedHooked) return sb.Append(" - latka nie stoi (").Append(_bkFeedStart).Append("), liczy formula BK").ToString();
+            var f = FeedInfo();
+            if (!f.BkFeeds || f.BkNeed == null)
+                return sb.Append(" - regula paszy BK poza aktywnym lancuchem modelu jedzenia (BK nigdzie nie karmi), poprawiac nie ma czego").ToString();
+            var fm = Campaign.Current.Models.MobilePartyFoodConsumptionModel;
+            int n = 0, nDesert = 0, nSnow = 0, fixedN = 0; double before = 0, after = 0;
+            foreach (var mp in MobileParty.All)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || fm == null || !fm.DoesPartyConsumeFood(mp)) continue;
+                    int at = BkFeedAt(mp, Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace));
+                    if (at == 0) continue;
+                    _bkOrigSet = false;
+                    float now = f.BkNeed(mp, at == 1);           // przez BkAnimalPostfix: po glowie (albo formula BK przy wylaczniku)
+                    float was = _bkOrigSet ? _bkOrig : now;      // formula BK sprzed podmiany
+                    if (at == 2) { now /= 2f; was /= 2f; }
+                    n++; if (at == 1) nDesert++; else nSnow++;
+                    before += was; after += now;
+                    if (Math.Abs(now - was) > 0.0005f) fixedN++;
+                }
+                catch (Exception e) { Stumble("BkFeedText(partia)", e); }
+            }
+            sb.Append(" - partii, ktore BK karmi teraz: ").Append(n).Append(" (pustynia ").Append(nDesert).Append(", snieg/zamiec ").Append(nSnow)
+              .Append("), poprawionych po glowie ").Append(fixedN).Append(" | pasza tych partii: formula BK ").Append(before.ToString("0.0", Inv))
+              .Append("/d -> po glowie ").Append(after.ToString("0.0", Inv)).Append("/d (przed mnoznikami)");
+            return sb.ToString();
         }
 
         /// <summary>Linia startowa (WinterBite.ApplyAll): stan kluczy E4/1.</summary>
@@ -388,6 +487,7 @@ namespace Armoury
                        ? (f.BkNeed != null ? "BIEGNIE - tam w zimie doplata E4/1 tylko roznicy ponad pasze BK (pasza = wieksza z E4/1 i BK; poza zima sam BK)"
                                            : "BIEGNIE - pasza BK nieczytelna (CalculateAnimalFoodNeed), tam bez doplaty zimowej")
                        : "NIE BIEGNIE (BK poza aktywnym lancuchem) - doplata zimowa pelna takze na pustyni i w sniegu")
+                 + " | zwierzeta w paszy BK: " + (BkPerHeadNow ? "po glowie (wariant a - ta sama liczba co zima E4/1)" : "formula BK (1 kon na typ oddzialu; " + (_bkFeedHooked ? "wylacznik BkAnimalFeedPerHead" : "latka " + _bkFeedStart) + ")")
                  + " | stawki paszy (" + f.RatesFrom + "): kon " + f.Horse.ToString("0.###", Inv) + ", kon bojowy " + f.Warhorse.ToString("0.###", Inv)
                  + ", juczny " + f.Mule.ToString("0.###", Inv) + ", krowa " + f.Cattle.ToString("0.###", Inv) + ", swinia " + f.Pig.ToString("0.###", Inv)
                  + ", owca " + f.Sheep.ToString("0.###", Inv) + "; konni po glowie (sklad partii, bez jencow) x kon, zwierzeta taboru x stawka.";
@@ -475,6 +575,7 @@ namespace Armoury
               .Append(", snieg/zamiec (pasza BK nie mniejsza) ").Append(why[WhySnow])
               .Append(", kraina bez zimy ").Append(why[WhyNoRealm]).Append(", bez zwierzat ").Append(why[WhyNoAnimals]);
             sb.Append(" | model jedzenia: ").Append(f.Active).Append(", regula paszy BK ").Append(f.BkFeeds ? "BIEGNIE" : "NIE BIEGNIE");
+            try { sb.Append(" | ").Append(BkFeedText()); } catch (Exception e) { Stumble("Line(pasza BK)", e); }
             sb.Append(" | potkniecia dzis ").Append(Volatile.Read(ref _stumblesDay)).Append(", od startu sesji ").Append(Volatile.Read(ref _stumbles));
             lock (Gate) { if (_stumbleAt.Count > 0) { sb.Append(" ("); bool first = true; foreach (var kv in _stumbleAt) { sb.Append(first ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value); first = false; } sb.Append(')'); } }
             sb.Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");
