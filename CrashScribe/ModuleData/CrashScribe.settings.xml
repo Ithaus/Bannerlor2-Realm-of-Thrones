@@ -29,6 +29,12 @@
   <MaxReportsPerSession>300</MaxReportsPerSession>
   <KeepSessions>15</KeepSessions>
 
+  <!-- What counts as "the same error" for the repeat counter. true: the same type and place AND the same message
+       (numbers and hex addresses ignored), and for errors caught further up also the same calling method - so
+       different errors get their own report, and every "repeat" line says which error it is about.
+       false: type and first stack frame only (old behaviour - different errors could be counted as one). -->
+  <RepeatKeyByMessage>true</RepeatKeyByMessage>
+
   <!-- The Night King's Call: the Others' bands pool their wights into the strongest band until it
        reaches ROT's siege threshold (500 healthy), and the horde's party size bonus is kept so that
        band sits at NightKingCallFullness of its limit (ROT besieges at 80%+). Everything else -

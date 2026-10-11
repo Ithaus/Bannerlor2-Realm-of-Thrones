@@ -16,6 +16,7 @@ namespace CrashScribe
         public static bool ShowInGame = true;          // krotka czerwona notka na ekranie, ze cos poszlo nie tak
         public static int MaxReportsPerSession = 300;
         public static int KeepSessions = 15;
+        public static bool RepeatKeyByMessage = true;  // SCRIBE-KLUCZ-POWTOREK (11.10): powtorka = ten sam komunikat (cyfry/hex na '#') i, przy FirstChance, ten sam wolajacy z zywego stosu; linia powtorki z opisem; false = po staremu (typ + pierwsza ramka sladu)
 
         // mody objete siecia; puste = wszystkie spoza Native
         public static string WrapModules = "RealisticCaptivity,GrandTourney,Armoury";
@@ -104,6 +105,7 @@ namespace CrashScribe
                         case "ShowInGame": ShowInGame = B(v); break;
                         case "MaxReportsPerSession": MaxReportsPerSession = I(v, MaxReportsPerSession); break;
                         case "KeepSessions": KeepSessions = I(v, KeepSessions); break;
+                        case "RepeatKeyByMessage": RepeatKeyByMessage = B(v); break;
                         case "WrapModules": WrapModules = v; break;
                         case "LocalRecruits": LocalRecruits = B(v); break;
                         case "FabulaPacerEnabled": FabulaPacerEnabled = B(v); break;
