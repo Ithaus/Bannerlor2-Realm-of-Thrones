@@ -165,7 +165,7 @@ namespace Armoury
                 Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord + Drobne39.ThirdNote()
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki), wyszlo " + _dayOut
-                         + " (sprzet, naprawy, odziez, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
+                         + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
             _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayStamp = d;
         }
 

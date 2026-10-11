@@ -289,7 +289,7 @@ namespace Armoury
                 var inv = CultureInfo.InvariantCulture;
                 long sup = BkSupplyMarket.DayTown + BkSupplyMarket.DayCastle + BkSupplyMarket.DayVillage;
                 var sb = new StringBuilder(256);
-                sb.Append(" | szczelnosc BK (3.4) [P] (przelewy w parze): zaopatrzenie BK rody -> kasy osad ").Append(Flag(BkSupplyMarket.Hooked, BkSupplyMarket.On, sup))
+                sb.Append(" | szczelnosc BK (3.4) [P] (przelewy w parze): zaopatrzenie BK ").Append(BkSupplyMarket.PayerText).Append(" -> kasy osad ").Append(Flag(BkSupplyMarket.Hooked, BkSupplyMarket.On, sup))
                   .Append(", rynek wsi kiesy wsi -> kasy ").Append(Flag(VillageHooked, VillageOn, _vPaid))
                   .Append(" (pominiete bez zlota ").Append(_vSkipValue.ToString(inv)).Append(" - dawniej z niczego)")
                   .Append(", niewolnicy kasy osad -> panowie ").Append(Flag(SlavesHooked, SlavesOn, _sPaid)).Append(" (cena BK sprzedanych ").Append(_sGain.ToString(inv))

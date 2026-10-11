@@ -4020,6 +4020,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool WorkshopOwnerPaysTownTax { get; set; } = true;
 
+        [SettingPropertyBool("Bk Supply From Men Purse", HintText = "the Banner Kings party supplies (drink, timber, animal products, tools) are paid for by the soldiers out of their own purse, like their clothes - after what they keep for outstanding repairs; when the purse runs short they buy only what they can afford and the lord does not top it up. The same for your party if your quartermaster buys supplies. Needs Men Purse Enabled (off = the party's leader pays, as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool BkSupplyFromMenPurse { get; set; } = true;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5040,6 +5044,7 @@ namespace Armoury
             s.DefeatMoraleHalf = DefeatMoraleHalf;
             s.BandJoinPurseToPlayer = BandJoinPurseToPlayer;
             s.WorkshopOwnerPaysTownTax = WorkshopOwnerPaysTownTax;
+            s.BkSupplyFromMenPurse = BkSupplyFromMenPurse;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

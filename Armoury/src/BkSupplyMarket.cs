@@ -39,12 +39,20 @@ namespace Armoury
     ///    wiec taki zakup wracalby od razu na polke ze strata na cenie i 1/9 dla korony (Ransom178). Zywnosc (piwo, mieso, ser, ryby),
     ///    zakupy gracza i zakupy w zamku przy wejsciu ida normalnie (poprawka po recenzji 3.4: dotad wejscie nie kupowalo nic).
     ///    Zuzycie (ConsumeItems) biegnie w dobowym Tick zaraz po zakupie.
+    /// D11-4 (decyzja Jeffa 11.10 "napitki i drewno wojska placi WOJSKO", wylacznik BkSupplyFromMenPurse, przy wlaczonej sakiewce ludzi MenPurseEnabled):
+    ///  platnikiem jest sakiewka ludzi tej partii (MenPurse - jak odziez wojska 150), nie lider: budzet = sakiewka minus rezerwa na zalegle naprawy
+    ///  (robocizna - AiWear / TroopSelfMend.OutstandingCost bez szacunku materialu; naprawy maja pierwszenstwo jak od wpisu 84), zaplata MenPurse.Take ->
+    ///  kasa osady (miasto, zamek, kiesa wsi) bez zdarzenia gry, licznik ksiegi przeplywow osad (MoneyLedger.NBkSupply) i tarcza zoldu w miescie
+    ///  (SoldierPay.Hold - jak odziez i "zycie": to zloto z zoldu). Sakiewki nie starcza - kupuja tyle, na ile ich stac; lider nie doplaca. Gracz ta sama
+    ///  regula (gdy wlaczy autozakupy kwatermistrza BK). Wylaczone albo sakiewki wylaczone - placi lider jak w 3.4.
     /// Wylaczone: BK jak dotad (w tym blad zapasu osady i zloto w nicosc).
     /// Kara morale z zaopatrzenia (wzor BK) - nietknieta (osobny krok W1, BkSupplyTemper).
     /// </summary>
     internal static class BkSupplyMarket
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.BkSupplyBuyByPartyStock; } }
+        /// <summary>D11-4: placi sakiewka ludzi partii (wylacznik i sakiewki ludzi wlaczone).</summary>
+        internal static bool PurseOn { get { var s = Settings.Current; return s != null && s.BkSupplyFromMenPurse && MenPurse.On; } }
         internal static bool Hooked;                       // prefiks BuyItems(float, List) i flaga Tick wpiete
 
         private static PropertyInfo _party;                // PartySupplies.Party
@@ -56,7 +64,10 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby (linia "Szczelnosc BK (3.4)" i czesc linii "Obieg: BK")
         private static int _dCalls, _dBuys, _dFull, _dNoGoods, _dNoGold, _dNoLeader, _dEntry, _dEntryBuys, _dStumbles;
         private static readonly long[] _dPieces = new long[Groups], _dGold = new long[Groups];
-        internal static long DayTown, DayCastle, DayVillage;    // zloto rody -> kasy osad dzis
+        internal static long DayTown, DayCastle, DayVillage;    // zloto platnika (lider albo od D11-4 sakiewka ludzi) -> kasy osad dzis
+        // D11-4: zakupy z sakiewek ludzi - zakupow, zloto, wywolan bez budzetu (sakiewka <= rezerwa na naprawy), zloto lidera (D11-4 wylaczone)
+        private static int _dPurseBuys, _dPurseBroke;
+        private static long _dPurseGold, _dLeaderGold;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
 
         internal static void ClearDay()
@@ -64,6 +75,7 @@ namespace Armoury
             _dCalls = _dBuys = _dFull = _dNoGoods = _dNoGold = _dNoLeader = _dEntry = _dEntryBuys = _dStumbles = 0;   // potkniecia tez z doby (poprawka po recenzji)
             Array.Clear(_dPieces, 0, Groups); Array.Clear(_dGold, 0, Groups);
             DayTown = DayCastle = DayVillage = 0;
+            _dPurseBuys = _dPurseBroke = 0; _dPurseGold = _dLeaderGold = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -139,24 +151,49 @@ namespace Armoury
             if (offer.Count == 0) { if (withheld == 0) _dNoGoods++; return; }
             offer.Sort((a, b) => a.ItemValue.CompareTo(b.ItemValue));   // jak BK: najtansze pierwsze
             var comp = st.SettlementComponent;
+            bool purse = PurseOn;                                       // D11-4: placi sakiewka ludzi
+            int reserve = purse ? Reserve(mp) : 0;
             int got = 0;
             foreach (var el0 in offer)
             {
                 if (need <= 0) break;
-                int budget = leader.Gold;
+                int budget = purse ? MenPurse.Get(mp) - reserve : leader.Gold;
                 if (budget <= 0) break;
                 var el = el0;
                 int cost, first, last;
                 int n = ShelfBuy.Take(shelf, el, need, budget, () => comp.GetItemPrice(el, mp, false), out cost, out first, out last, 0, false);
                 if (n <= 0) continue;
                 bag.AddToCounts(el, n);
-                if (cost > 0) GiveGoldAction.ApplyForCharacterToSettlement(leader, st, cost, true);   // przelew lider -> osada (zdarzenie gry - ksiega pieniadza)
+                if (cost > 0)
+                {
+                    if (purse)
+                    {
+                        int paid = MenPurse.Take(mp, cost);                    // cost <= budget <= sakiewka - paid == cost
+                        comp.ChangeGold(paid);                                  // sakiewka ludzi -> kasa osady (bez zdarzenia gry; obie strony w "Pieniadz swiata")
+                        MoneyLedger.Note(MoneyLedger.NBkSupply, st, paid);      // ksiega przeplywow osad (tylko licznik)
+                        SoldierPay.Hold(st, paid);                              // tarcza zoldu w miescie - jak odziez wojska i "zycie"
+                        _dPurseGold += paid;
+                        cost = paid;
+                    }
+                    else { GiveGoldAction.ApplyForCharacterToSettlement(leader, st, cost, true); _dLeaderGold += cost; }   // przelew lider -> osada (zdarzenie gry - ksiega pieniadza)
+                }
                 got += n; need -= n;
                 _dPieces[g] += n; _dGold[g] += cost;
                 if (st.IsVillage) DayVillage += cost; else if (st.IsCastle) DayCastle += cost; else DayTown += cost;
             }
-            if (got > 0) { _dBuys++; if (entry) _dEntryBuys++; } else _dNoGold++;   // towar byl, a nic nie zeszlo - cena ponad kiese lidera
+            if (got > 0) { _dBuys++; if (entry) _dEntryBuys++; if (purse) _dPurseBuys++; }
+            else { _dNoGold++; if (purse && MenPurse.Get(mp) - reserve <= 0) _dPurseBroke++; }   // towar byl, a nic nie zeszlo - cena ponad kiese platnika
         }
+
+        /// <summary>D11-4: rezerwa sakiewki na zalegle naprawy (robocizna; bez szacunku materialu - zakup BK biegnie tez w zamkach i wsiach, a co dobe).</summary>
+        private static int Reserve(MobileParty mp)
+        {
+            try { return Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null)); }
+            catch (Exception e) { Stumble("Reserve", e); return 0; }
+        }
+
+        /// <summary>D11-4: kto placi za zaopatrzenie BK (do linii "Obieg: BK" i "Szczelnosc BK (3.4)").</summary>
+        internal static string PayerText { get { return PurseOn ? "sakiewki ludzi (D11-4)" : "rody (lider; D11-4 wylaczone)"; } }
 
         /// <summary>Warunek partii i osady z PartiesSellLootCampaignBehavior.OnSettlementEntered (dekompilacja gry): gra sprzedaje przy wejsciu
         /// tylko za lorda AI (nie gracz, partia lorda, nie rozwiazywana), tylko w miescie (nie zamek) i tylko w osadzie niewrogiej.</summary>
@@ -196,9 +233,11 @@ namespace Armoury
             sb.Append("zaopatrzenie BK (wedlug zapasu partii, sufit ").Append(Settings.Current != null ? Settings.Current.BkSupplyMaxPieces : 0)
               .Append(" szt.): zakupow ").Append(_dBuys).Append(" z ").Append(_dCalls).Append(" wywolan z potrzeba >= 1 szt. (zapas pelny ").Append(_dFull)
               .Append(", bez towaru ").Append(_dNoGoods).Append(", bez zlota ").Append(_dNoGold).Append(", bez wodza ").Append(_dNoLeader)
-              .Append("; przy wejsciu do miasta/zamku: zakupow ").Append(_dEntryBuys).Append(", wywolan z pominietym towarem, ktory gra zaraz odsprzedaje (lord AI w miescie, niejadalne) ").Append(_dEntry).Append(") | sztuk/zl:");
+              .Append("; przy wejsciu do miasta/zamku: zakupow ").Append(_dEntryBuys).Append(", wywolan z pominietym towarem, ktory gra zaraz odsprzedaje (lord AI w miescie, niejadalne) ").Append(_dEntry).Append(")")
+              .Append(" | platnik: ").Append(PayerText).Append(" - z sakiewek ludzi ").Append(_dPurseGold.ToString(inv)).Append(" (").Append(_dPurseBuys).Append(" zakupow; wywolan bez budzetu - sakiewka <= rezerwa na naprawy, lider nie doplaca: ")
+              .Append(_dPurseBroke).Append("), z kies liderow ").Append(_dLeaderGold.ToString(inv)).Append(" | sztuk/zl:");
             for (int g = 0; g < Groups; g++) sb.Append(g == 0 ? " " : ", ").Append(GName[g]).Append(' ').Append(_dPieces[g]).Append('/').Append(_dGold[g].ToString(inv));
-            sb.Append(" | rody -> kasy osad ").Append((DayTown + DayCastle + DayVillage).ToString(inv)).Append(" (miasta ").Append(DayTown.ToString(inv))
+            sb.Append(" | ").Append(PayerText).Append(" -> kasy osad ").Append((DayTown + DayCastle + DayVillage).ToString(inv)).Append(" (miasta ").Append(DayTown.ToString(inv))
               .Append(", zamki ").Append(DayCastle.ToString(inv)).Append(", wsie ").Append(DayVillage.ToString(inv)).Append(')');
             if (_dStumbles > 0) sb.Append(" | potkniecia ").Append(_dStumbles);
             return sb.ToString();

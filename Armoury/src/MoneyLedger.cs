@@ -77,9 +77,11 @@ namespace Armoury
 
         // nasze moduly liczone wprost, poza tickiem dobowym (Note)
         internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5, NCloth = 6;
-        private const int Notes = 7;
+        internal const int NBkSupply = 7;   // D11-4: zaopatrzenie BK z sakiewek ludzi -> kasy osad (bez zdarzenia gry)
+        private const int Notes = 8;
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
-                                                   "odziez wojska" };   // 150: sakiewki ludzi i kasy zamkow -> kasy miast
+                                                   "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
+                                                   "zaopatrzenie BK z sakiewek ludzi (D11-4)" };
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
