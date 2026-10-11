@@ -888,3 +888,4 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (23:15 UTC) **POPRAWKI E4 ruszyly** (wf_d9a9ccdf-5f9): A ksiega pochodzenia (e4\fixA), B Straz/wioski/miasta (e4\fixB), C narzedzie (e4\fixC), D CrashScribe klucz powtorek
   (cs-bledy) -> scalenie do zbior-e4-koniec -> 2 recenzje -> DLL test\Armoury-e4-koncowy2.dll + CrashScribe-at-bledy.dll -> PONOWNY TEST (728 + zapis + zima).
   Biezacy test (b2k5x628s) biegnie dalej, do gotowosci poprawek - potem zatrzymac (TaskStop + autotest.ps1 -RestoreOnly).
+- (23:25 UTC) Okno 5h odnowione (do 04:20 UTC), tydzien 63%. **Audyt zlota wznowiony** (wf_326d453d-473, wyniki przeszukan z pamieci). **Etap 5: scalenie A + kod B** (wf_c77320aa-959): w-toku/zbior-e5 (e5\zbior, od 7658247; po poprawkach E4 dosc. w-toku/zbior-e4-koniec) + B1 (plan/kod/2 rec), B2+B3+B5 (e5\b235), B4+B6 (e5\b46). Test A po wgraniu E4; B - test roczny po A (raczej po 10:00 UTC).
