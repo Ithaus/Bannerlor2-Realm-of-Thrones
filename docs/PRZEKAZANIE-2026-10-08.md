@@ -825,3 +825,11 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
 - (15:50) **Jeff: etap 5 - test zbioru A osobno, "rob dalej".**
 - (16:10) **Jeff: A1 bez dosypki od razu (regulator tryb 2) + E5/0 udzial zysku kupcow dla pana i korony** - wpisane do projektu E5 rozdz. 6 (wiazace) i STAN-PRAC; po workflow wf_dd61bf05-db6 sprawdzic, czy kod A1/E5/0 to ma - jesli nie, osobny krok na w-toku/e5-a1 i w-toku/e5-0.
 - (16:20) **Jeff: A6 bezwarunkowo w porcji A** - kod w osobnym drzewie e5\a6 (w-toku/e5-a6 od 392c519).
+- (16:50) **E4/8 i E4/10 GOTOWE (kod + 2 recenzje + poprawki):** w-toku/e4-8 19d76ac (13 uwag prawdziwych, 12 poprawione - konwoje DTE usuwane bez zniszczenia wracaja
+  do domu (RemoveParty), rozwiazane partie najwyzej tylu ilu maja, podloga hearth bez powrotu milicji, dlug miasta tylko z poboru E4/7, nowa druzyna: wroga/oblezona
+  siedziba nic, zapas zboza 2g, rekruci nie weterani; milicja Innych z wightami; DLL test\Armoury-e4-8.dll eebb11f8; przyczyny M34-45, F42-55) i w-toku/e4-10 7b6bea3
+  (8 uwag prawdziwych; T7/T7j, kontrola H3 _h3Tavern, regex I1; DLL test\Armoury-e4-10.dll 13487a3d; przyczyny M44-45/F52 - KOLIZJA z E4/8, przenumerowac przy scaleniu).
+  Pytania do Jeffa: E4/8 R1-2 - zalogi d120 ok. 83% bazy przy progu 85% -> dopisac szybszy platny werbunek zalog (2/d zamiast 1, w granicy zoldu, z ludzi krainy,
+  osobny klucz) przed testem (rada: tak); E4/10 - weterani z rozwiazanych partii zostaja w ludnosci BK miasta (rada: zostawic, zmienic tylko gdy V13 > +2%/rok).
+- (16:50) **Workflow wf_fb811d64-c25:** scalenie calosci (E4/8 + E4/10 przenumerowane + E4/11 + E4/7b + NightRest) do w-toku/zbior-e4-koniec + recenzja, potem
+  E4/9 od czubka (e4\49, w-toku/e4-9) - kod, 2 recenzje, poprawki. **Workflow wf_326d453d-473:** audyt zlota z niczego (Jeff 16:30 "czy to na pewno wszystkie?").
