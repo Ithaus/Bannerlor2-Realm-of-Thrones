@@ -1688,7 +1688,12 @@ def etap4_e411(rep, lines, start, win, until, logp):
         ok = vals is not None and vals[0] == 2446 and vals[1] == 425 and vals[2] == 0 and vals[3] == 0 and tot == 571 and saved + new == tot
         rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", f"wiosek/okregi/odrzucone/brak wsi {vals}; okregi {tot}, n z zapisu {saved} + nowe {new}; pomniejszone {shr} (INFO)",
                 "wiosek 2446 w 425 okregach, odrzucone 0, wsi gry brak 0, okregi 571, n dla wszystkich (TSV b742f307)", ok)
-    rep.add("E4/11: linia dzienna CZYNNA", f"czynna {len(on)} dob, WYLACZONA {len(off)} dob z {len(win)}", "czynna w kazdej dobie z ruchem (bieg zwykly)", (len(off) == 0 and len(on) > 0) if win else None)
+    # poprawka po recenzji (R1-3): bieg z ksiega wylaczona (G13) - wiersz CZYNNA jako INFO, G13 oceniany przed wyjsciem z bloku
+    if off and not on:
+        rep.add("E4/11: linia dzienna CZYNNA", f"czynna 0 dob, WYLACZONA {len(off)} dob z {len(win)} - bieg z ksiega wylaczona (patrz G13)", "czynna w kazdej dobie z ruchem (bieg zwykly)", None)
+    else:
+        rep.add("E4/11: linia dzienna CZYNNA", f"czynna {len(on)} dob, WYLACZONA {len(off)} dob z {len(win)}", "czynna w kazdej dobie z ruchem (bieg zwykly)", (len(off) == 0 and len(on) > 0) if win else None)
+    e411_g13(rep, lines, kw, on, off, start, logp)
     if not on:
         return
     # G3 kontrola ksiegi
@@ -1698,15 +1703,17 @@ def etap4_e411(rep, lines, start, win, until, logp):
     rep.add("E4/11 G3: kontrola ksiegi wiosek (w domu - DOM, poza domem - konto)", f"max |r1| {max(r1, default=0):.6f}, max |r2| {max(r2, default=0):.6f} w {len(r1)} dobach",
             "<= 0.01 czlowieka kazdej doby (z definicji)", (max(r1, default=0) <= 0.01 and max(r2, default=0) <= 0.01) if r1 else None)
     # G4 k1/k2/k3 i d0
-    badk = []; d0 = 0
+    badk = []; d0 = 0; kp = 0; late = 0
     for d in on:
         x = kw[d]
         k = [num(r"k1 (\d+)", x, int, 0) or 0, num(r"k2 (\d+)", x, int, 0) or 0, num(r"k3 (\d+)", x, int, 0) or 0]
         zast = fnum(r"zastepczy \+" + F_, x) or 0.0
         d0 += num(r"doplyw bez zrodla d0 (\d+)", x, int, 0) or 0
+        kp += num(r"\(okreg na pulapie\) kp (\d+)", x, int, 0) or 0          # poprawka po recenzji (R1-4): nazwany nadmiar - INFO
+        late += num(r"konto znane po zwolnieniu pulapu (\d+)", x, int, 0) or 0
         if sum(k) > 0 and zast <= 0.0:
             badk.append((run_day(d, start), k))
-    rep.add("E4/11 G4: k1 = k2 = k3 = 0, doplyw bez zrodla d0 = 0", f"doby z k > 0 (bez przydzialu zastepczego) {len(badk)}" + (f" {badk[:5]}" if badk else "") + f"; d0 razem {d0}",
+    rep.add("E4/11 G4: k1 = k2 = k3 = 0, doplyw bez zrodla d0 = 0", f"doby z k > 0 (bez przydzialu zastepczego) {len(badk)}" + (f" {badk[:5]}" if badk else "") + f"; d0 razem {d0}; INFO: konto bez miejsca kp {kp} okrego-dni, umieszczone po zwolnieniu pulapu {late}",
             "0 kazdej doby (poza doba przydzialu zastepczego); d0 = 0", len(badk) == 0 and d0 == 0)
     # G5 osady x S - trafieni
     bad5 = []; over = 0.0; hits = 0.0
@@ -1745,15 +1752,22 @@ def etap4_e411(rep, lines, start, win, until, logp):
     rep.add("E4/11 G7: wioski spalone / opuszczone / odbudowane / czesciowo puste (INFO)", f"spalone {sp}, opuszczone {ab}, odbudowane {rb} w biegu; d{run_day(on[-1], start)}: spalone {sp_now}, czesciowo puste {cz}",
             "INFO (z31A: czesciowo pustych ok. 50-80, spalonych 0-20 w 120 dob)", None)
     # G8 zywnosc warowni
-    rx8 = re.compile(r"zywnosc warowni od ludzi: warowni (\d+), Food swiata " + SF + r"/d \(spladrowane \+" + F_ + r" w (\d+) wsiach, uchodzcy i rece -" + F_ + r" w (\d+)\)")
-    r8 = [rx8.search(kw[d]) for d in on]
-    r8 = [m for m in r8 if m]
+    # poprawka po recenzji (R1-1): dotad G8 porownywal korekte z liczba wsi z korekta > 0 (tautologia) - teraz wsie z korekta > 0 (g1) wobec wsi Looted pod korekta
+    # (LootedOn i przelicznik ludzi; kazda ma ludzi w domu albo dno YieldFactor > 0, wiec powinna dac > 0); przy LootedOn false - INFO z nazwana przyczyna
+    rx8 = re.compile(r"zywnosc warowni od ludzi: warowni (\d+), Food swiata " + SF + r"/d \(spladrowane \+" + F_ + r" w (\d+) wsiach z (\d+) pod korekta, Looted razem (\d+), uchodzcy i rece -"
+                     + F_ + r" w (\d+)\)( \[wies spladrowana bez korekty: (.*?)\])?")
+    r8 = [(d, rx8.search(kw[d])) for d in on]
+    r8 = [(d, m) for d, m in r8 if m]
     if r8:
-        f_all = [float(m.group(2)) for m in r8]
-        loot = [(float(m.group(3)), int(m.group(4))) for m in r8]
-        bad8 = sum(1 for f1, g1 in loot if g1 > 0 and not f1 > 0.0)
-        rep.add("E4/11 G8: zywnosc warowni od ludzi", f"Food swiata srednio {st.mean(f_all):+.2f}/d (min {min(f_all):+.2f}, max {max(f_all):+.2f}); doby z wsia Looted bez korekty > 0: {bad8}",
-                "warownie z wsia Looted z ludzmi w domu dostaja > 0 (INFO: +f/d swiata)", bad8 == 0)
+        f_all = [float(m.group(2)) for _, m in r8]
+        offr = sorted({m.group(10) for _, m in r8 if m.group(10)})
+        lexp = sum(int(m.group(5)) for _, m in r8 if not m.group(10))
+        lall = sum(int(m.group(6)) for _, m in r8)
+        bad8 = [run_day(d, start) for d, m in r8 if not m.group(10) and int(m.group(4)) < int(m.group(5))]
+        txt = (f"Food swiata srednio {st.mean(f_all):+.2f}/d (min {min(f_all):+.2f}, max {max(f_all):+.2f}); wsio-dni Looted {lall}, pod korekta {lexp}; doby z wsia pod korekta bez korekty > 0: {len(bad8)}"
+               + (f" (d{', d'.join(str(x) for x in bad8[:6])})" if bad8 else "") + (f"; korekta Looted wylaczona: {', '.join(offr)}" if offr else ""))
+        ok8 = None if (offr and lexp == 0) or lall == 0 else len(bad8) == 0
+        rep.add("E4/11 G8: zywnosc warowni od ludzi", txt, "kazda wies Looted pod korekta (LootedOn, przelicznik ludzi) daje warowni > 0 (INFO: brak wsi Looted albo LootedOn false z przyczyna)", ok8)
     else:
         rep.add("E4/11 G8: zywnosc warowni od ludzi", "odcinek WYLACZONA albo brak" if any("zywnosc warowni od ludzi: WYLACZONA" in kw[d] for d in on) else "brak odcinka", "korekta = suma (nasze - gra)", None)
     rep.add("E4/11 G9: bieg zimowy - progi E4/6 F6/F7", "patrz wiersze E4/6 F6/F7 tego biegu", "nie gorzej niz bieg E4/6 bez E4/11", None)
@@ -1774,7 +1788,6 @@ def etap4_e411(rep, lines, start, win, until, logp):
     else:
         rep.add("E4/11 G11: wczytanie zapisu (arm_district)", "brak wczytania z kluczem w tym logu", "autotest zapisu 9 dob", None)
     rep.add("E4/11 G12: menu okregu (People of this land, takze village_looted)", "reczna proba Jeffa", "liczby = linia/CSV tego okregu", None)
-    rep.add("E4/11 G13: wylaczniki", f"doby WYLACZONA w tym biegu: {len(off)}", "autotest 40 dob: VillageBookEnabled=false -> b = 0 jedna linia, dymek x 250, ogien (lancuch gry); TownFoodByVillagePeople=false -> korekta 0", None)
     rep.add("E4/11 G14: progi etapow 1-3 i E4/5 / E4/6", "patrz wiersze E4/5 S, E4/6 F oraz --grupa etap2 / etap3", "bez zmian (E4/11 nie rusza ludzi ani hearth)", None)
     # G-ETAP: spalona wioska wraca rok po ostatnim najezdzie (wioski-okregi.csv, rok = 1, najazd w d1-d364)
     cp = session_file_of(logp, "wioski-okregi.csv")
@@ -1799,9 +1812,10 @@ def etap4_e411(rep, lines, start, win, until, logp):
                 "bieg 728 dob: 100% wierszy TAK poza nazwanymi (INFO w krotszym biegu)", None)
         return
     named_siege = [r for r in sel if r["wynik_rok"] in ("NIE-oblezenie", "NIE-pobyt-oblezony")]
-    named_info = [r for r in sel if r["wynik_rok"] in ("NIE-brama-E46", "NIE-glod")]
+    # poprawka po recenzji (R1-2): czesc konta z glodu nie wstrzymuje powrotu czesci z rabunku - "NIE-glod" (logi sprzed poprawki) liczone jak NIE
+    named_info = [r for r in sel if r["wynik_rok"] == "NIE-brama-E46"]
     tak = [r for r in sel if r["wynik_rok"] == "TAK"]
-    bad = [r for r in sel if r["wynik_rok"] == "NIE"]
+    bad = [r for r in sel if r["wynik_rok"] in ("NIE", "NIE-glod")]
     badtak = []
     for r in tak:
         try:
@@ -1812,11 +1826,38 @@ def etap4_e411(rep, lines, start, win, until, logp):
         if kr >= 1.0 or pr > 0.01 * n or sp_ > 0 or (od > 0 and not fam):
             badtak.append(r["okreg"])
     rated = len(sel) - len(named_siege) - len(named_info)
-    rep.add("E4/11 G-ETAP: spalona wioska (takze poboczna) wraca po roku", f"wierszy {len(sel)}: TAK {len(tak)}, NIE bez przyczyny {len(bad)}, nazwane: oblezenie/pobyt {len(named_siege)} (pominiete), brama E4/6 / glod {len(named_info)} (INFO)"
+    rep.add("E4/11 G-ETAP: spalona wioska (takze poboczna) wraca po roku", f"wierszy {len(sel)}: TAK {len(tak)}, NIE bez przyczyny {len(bad)}, nazwane: oblezenie/pobyt {len(named_siege)} (pominiete), brama E4/6 {len(named_info)} (INFO)"
             + (f"; TAK z resztkami: {', '.join(badtak[:5])}" if badtak else "") + (f"; NIE: {', '.join(r['okreg'] for r in bad[:5])}" if bad else ""),
             "100% wierszy ocenianych TAK (konto_r < 1, puste_r = 0, spalone = 0, odbudowa = 0)", rated > 0 and len(bad) == 0 and len(badtak) == 0 and len(tak) == rated)
     burnt = [x for d in on for x in re.findall(r"\| spalone dzis \d+: (.*?) \|", kw[d])]
     rep.add("E4/11 G-ETAP: wioski spalone w biegu (INFO)", "; ".join(burnt)[:400] if burnt else "brak list spalonych w linii", "INFO - lista z doba spalenia i odbudowy (linia dzienna)", None)
+
+
+def e411_g13(rep, lines, kw, on, off, start, logp):
+    """E4/11 G13 (poprawka po recenzji R1-3): wylaczniki. VillageBookEnabled=false - linia WYLACZONA jest, puste osady wyzerowane tylko w pierwszej linii sesji
+    (dalsze linie z liczba okregow > 0 = ksiega pisala przy wylaczonym kluczu), ogien widoku bez "(ksiega)". TownFoodByVillagePeople=false - odcinek
+    "zywnosc warowni od ludzi: WYLACZONA (Town Food By Village People)" w kazdej dobie CZYNNA (korekta 0 z definicji - postfiks wychodzi przy kluczu)."""
+    if off:
+        offl = [kw[d] for d in off]
+        sess = sum(1 for x in lines if x.startswith("Ksiega wiosek (E4/11): start sesji"))
+        nz = [num(r"puste osady wyzerowane w (\d+) okregach", x, int, 0) or 0 for x in offl]
+        late = sum(1 for i, x in enumerate(nz) if x > 0 and i > 0)
+        fires = []
+        wl = session_file_of(logp, "wioski.log")
+        if os.path.exists(wl) and not on:
+            fires = [x for x in read(wl) if x.startswith("Wioski: ogien nad") and x.endswith("(ksiega).")]
+        ok = late <= max(0, sess - 1) and not fires
+        rep.add("E4/11 G13: wylacznik ksiegi (Village Book Enabled = false)", f"linie WYLACZONA {len(offl)} (sesji {sess}); linie z zerowaniem > 0 po pierwszej: {late}; ognie '(ksiega)' przy wylaczonej: {len(fires)}",
+                "pierwsza linia zeruje puste osady, dalej 0 (najwyzej jedna linia z zerowaniem na wczytanie); ogien tylko '(lancuch gry)'", ok)
+    else:
+        rep.add("E4/11 G13: wylacznik ksiegi (Village Book Enabled = false)", "brak dob WYLACZONA (bieg zwykly)", "autotest 40 dob z kluczem false", None)
+    if on:
+        tf = [d for d in on if "zywnosc warowni od ludzi: WYLACZONA (Town Food By Village People)" in kw[d]]
+        if tf:
+            rep.add("E4/11 G13: wylacznik zywnosci warowni (Town Food By Village People = false)", f"doby z odcinkiem WYLACZONA {len(tf)} z {len(on)} dob CZYNNA",
+                    "w kazdej dobie biegu z kluczem false (korekta 0)", True if len(tf) == len(on) else None)
+        else:
+            rep.add("E4/11 G13: wylacznik zywnosci warowni (Town Food By Village People = false)", "klucz wlaczony w calym biegu", "autotest z kluczem false", None)
 
 
 def main(argv):

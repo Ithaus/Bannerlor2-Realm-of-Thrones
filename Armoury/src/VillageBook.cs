@@ -108,7 +108,7 @@ namespace Armoury
 
         // liczniki doby (bez zapisu; zeruje Daily)
         private static double _dRaidW, _dRaidMain, _dForW, _dForMain, _dFam, _dUp, _dZast, _dOver, _dOverPeople, _dSetS, _dHitSkip;
-        private static int _dStrikes, _dD0, _dSess, _dFamSkip;
+        private static int _dStrikes, _dD0, _dSess, _dFamSkip, _dLate;       // _dLate - konto znane umieszczone po zwolnieniu pulapu (R1-4)
         private static readonly int[] _dZastWhy = new int[4];
         private static readonly List<string> _dBurnedList = new List<string>(), _dRebuiltList = new List<string>();
         private static int _dBurnedN, _dRebuiltN, _dAbandonedN;
@@ -164,7 +164,7 @@ namespace Armoury
         private static void NewDay()
         {
             _dRaidW = _dRaidMain = _dForW = _dForMain = _dFam = _dUp = _dZast = _dOver = _dOverPeople = _dSetS = _dHitSkip = 0.0;
-            _dStrikes = _dD0 = _dSess = _dFamSkip = 0;
+            _dStrikes = _dD0 = _dSess = _dFamSkip = _dLate = 0;
             Array.Clear(_dZastWhy, 0, _dZastWhy.Length);
             _dBurnedList.Clear(); _dRebuiltList.Clear();
             _dBurnedN = _dRebuiltN = _dAbandonedN = 0;
@@ -294,6 +294,8 @@ namespace Armoury
 
         // zapis: "v1|L:<crc ukladu hex>|P:<ludzi na osade>|n:<id>=<N>;...|w:<id>=<br>/<bf>,...;...|x:<id>=<i>:<flaga>:<doba zdarzenia>:<doba odbudowy>,...;...|y:<id>=<ARexp>/<AFexp>;..."
         // (zarezerwowane, nie pisane w E4/11: r: sesje rabunku, c: czujnosc, u: uprowadzeni - etap 7.11)
+        // poprawka po recenzji (R1-5): "|o:1" - ksiega byla wylaczona przy zapisie (OffDay wyzerowal puste osady i konto oczekiwane) - po wczytaniu przydzial zastepczy
+        // z powodem "wlaczenie" (dotad liczony jako doplyw bez zrodla d0); starsze DLL te sekcje pomijaja
         private static void ApplyPending()
         {
             string data = _pending;
@@ -310,7 +312,7 @@ namespace Armoury
                 _resolveNote = "z zapisu: nieznana wersja klucza arm_district - jak stary zapis";
                 return;
             }
-            uint crc = 0; bool hasCrc = false; string sn = null, sw = null, sx = null, sy = null;
+            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null;
             foreach (var p in parts)
             {
                 if (p.Length < 2 || p[1] != ':') continue;
@@ -323,6 +325,7 @@ namespace Armoury
                     case 'w': sw = body; break;
                     case 'x': sx = body; break;
                     case 'y': sy = body; break;
+                    case 'o': wasOff = body == "1"; break;
                 }
             }
             _layoutSame = hasCrc && _file != null && crc == _layoutCrc;
@@ -408,13 +411,15 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("VillageBook.Import(y)", e); }
                 }
+            if (wasOff) foreach (var d in _d.Values) d.Z = ZEnable;          // R1-5 (zepsute wpisy nizej nadpisuja na "inny uklad")
             foreach (var d in bad)
             {
                 Array.Clear(d.Br, 0, d.Br.Length); Array.Clear(d.Bf, 0, d.Bf.Length);
                 for (int i = 0; i <= d.W; i++) { d.Flag[i] = 0; d.EvDay[i] = -1; d.RebuiltDay[i] = -1; }
                 d.ARexp = d.AFexp = 0.0; d.Z = ZLayout; _savedBad++;
             }
-            _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady " + _savedB + " okregow, uklad zgodny" + (_savedBad > 0 ? ", zepsute wpisy " + _savedBad + " (przydzial zastepczy)" : "");
+            _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady " + _savedB + " okregow, uklad zgodny" + (_savedBad > 0 ? ", zepsute wpisy " + _savedBad + " (przydzial zastepczy)" : "")
+                           + (wasOff ? ", ksiega wylaczona przy zapisie (przydzial zastepczy - wlaczenie)" : "");
         }
 
         /// <summary>SyncData (zapis). Ksiega nierozwiazana (zapis przed startem sesji) - napis z wczytania bez zmian.</summary>
@@ -423,6 +428,7 @@ namespace Armoury
             if (!_resolved) return _pending ?? "";
             var sb = new StringBuilder(32 * 1024);
             sb.Append("v1|L:").Append(_layoutCrc.ToString("X8")).Append("|P:").Append(_p.ToString(Inv));
+            if (_offSeen) sb.Append("|o:1");                                // R1-5: stan wyzerowany przez OffDay, wlaczenie jeszcze nie przeszlo doby
             lock (Gate)
             {
                 sb.Append("|n:");
@@ -769,8 +775,19 @@ namespace Armoury
             return x - Math.Max(0.0, left);
         }
 
-        /// <summary>Przydzial zastepczy (3.7): nadwyzka konta bez zrodla w ksiedze (stary zapis, inny uklad, wlaczenie klucza, doplyw nieznany).</summary>
-        private static double Fallback(Dist d, double surplus, bool raidPart, Snap sn, Settings s, int today)
+        /// <summary>Wolne miejsce okregu do pulapu (suma dodatnich Room po wszystkich wioskach i wsi gry).</summary>
+        private static double FreeRoom(Dist d)
+        {
+            double r = 0.0;
+            for (int w = 0; w <= d.W; w++) { double x = Room(d, w); if (x > 0.0) r += x; }
+            return r;
+        }
+
+        /// <summary>
+        /// Przydzial zastepczy (3.7): nadwyzka konta bez zrodla w ksiedze (stary zapis, inny uklad, wlaczenie klucza, doplyw nieznany) albo konto znane umieszczone
+        /// pozniej (doplyw przyszedl, gdy okreg byl na pulapie). countOver false - reszta ponad pulap byla juz policzona w nadmiarze w dobie doplywu.
+        /// </summary>
+        private static double Fallback(Dist d, double surplus, bool raidPart, Snap sn, Settings s, int today, bool countOver)
         {
             double l = sn.Dom + sn.A;
             if (!(surplus > 0.0) || !(l > 0.0)) return 0.0;
@@ -789,12 +806,12 @@ namespace Armoury
                     d.Br[w] += put; left -= put;
                     CheckUp(d, w, ev, "przydzial zastepczy", false);
                 }
-                _dOver += left;
+                if (countOver) _dOver += left;
                 return dB - left;
             }
             dB = surplus * d.N / l;
             double rest = FillFamine(d, dB, today, false);
-            _dOver += rest;
+            if (countOver) _dOver += rest;
             return dB - rest;
         }
 
@@ -815,7 +832,7 @@ namespace Armoury
         private static void Reconcile(Dist d, Settings s, int today)
         {
             var sn = SnapOf(d);
-            bool zast = false;
+            bool zast = false, unk = false;
             // czesc z rabunku i zerowania
             double sbr = sn.Sbr;
             if (sn.Ar <= 1e-6)
@@ -829,9 +846,17 @@ namespace Armoury
                 double tol = Math.Max(0.5, 1e-3 * d.ARexp);
                 if (sbr <= Eps || sn.Ar > d.ARexp + tol)
                 {
-                    double surplus = sbr <= Eps ? sn.Ar : sn.Ar - d.ARexp;
-                    double got = Fallback(d, surplus, true, sn, s, today);
-                    _dZast += got; d.Event = true; zast = true;
+                    // poprawka po recenzji (R1-4): pula pusta przy koncie w granicach oczekiwanego (known) = doplyw z OnStrike, ktory nie znalazl miejsca (okreg na
+                    // pulapie, nadmiar policzony w dobie doplywu) - to nazwany nadmiar (K9), nie doplyw bez zrodla: bez miejsca nic nie robimy, po zwolnieniu pulapu
+                    // umieszczamy bez d0 i bez drugiego nadmiaru
+                    bool known = d.Z == ZNone && d.ARexp > Eps && sn.Ar <= d.ARexp + tol;
+                    if (!(known && FreeRoom(d) <= Eps))
+                    {
+                        double surplus = sbr <= Eps ? sn.Ar : sn.Ar - d.ARexp;
+                        double got = Fallback(d, surplus, true, sn, s, today, !known);
+                        _dZast += got; d.Event = true; zast = true;
+                        if (!known) unk = true;
+                    }
                 }
                 else if (sn.Ar < d.ARexp)
                 {
@@ -852,9 +877,14 @@ namespace Armoury
                 double tol = Math.Max(0.5, 1e-3 * d.AFexp);
                 if (sbf <= Eps || sn.Af > d.AFexp + tol)
                 {
-                    double surplus = sbf <= Eps ? sn.Af : sn.Af - d.AFexp;
-                    double got = Fallback(d, surplus, false, SnapOf(d), s, today);
-                    _dZast += got; d.Event = true; zast = true;
+                    bool known = d.Z == ZNone && d.AFexp > Eps && sn.Af <= d.AFexp + tol;     // R1-4 jak wyzej (OnFamineFled bez miejsca)
+                    if (!(known && FreeRoom(d) <= Eps))
+                    {
+                        double surplus = sbf <= Eps ? sn.Af : sn.Af - d.AFexp;
+                        double got = Fallback(d, surplus, false, SnapOf(d), s, today, !known);
+                        _dZast += got; d.Event = true; zast = true;
+                        if (!known) unk = true;
+                    }
                 }
                 else if (sn.Af < d.AFexp)
                 {
@@ -864,7 +894,8 @@ namespace Armoury
                 d.AFexp = sn.Af;
             }
             // przydzial zastepczy oczekiwany (stary zapis, inny uklad, wlaczenie) albo doplyw bez zrodla (d0 - oczekiwane 0) - liczone na okreg
-            if (zast) { if (d.Z != ZNone) _dZastWhy[d.Z]++; else _dD0++; }
+            // R1-4: konto znane umieszczone dopiero po zwolnieniu pulapu - osobny licznik (nie d0)
+            if (zast) { if (d.Z != ZNone) _dZastWhy[d.Z]++; else if (unk) _dD0++; else _dLate++; }
         }
 
         // ------------------------------------------------------------ odczyty (3.6) - pod Gate, nie rzucaja
@@ -975,7 +1006,7 @@ namespace Armoury
                 int D = Math.Max(Q + 1, Math.Min(3640, s.RefugeeReturnDays));
                 int distB = 0, wTouched = 0, nBurning = 0, nBurned = 0, nAband = 0, nRebuild = 0, nDamaged = 0;
                 double sumBr = 0.0, sumBf = 0.0, maxR1 = 0.0, maxR2 = 0.0;
-                int k1 = 0, k2 = 0, k3 = 0, yearN = 0, yearYes = 0, ySiege = 0, yStay = 0, yGate = 0, yFam = 0, yNone = 0;
+                int k1 = 0, k2 = 0, k3 = 0, kFull = 0, yearN = 0, yearYes = 0, ySiege = 0, yStay = 0, yGate = 0, yFam = 0, yNone = 0;
                 bool any = false, first = _firstDay; int noK = 0;
                 var csv = new StringBuilder(4096);
                 lock (Gate)
@@ -1034,7 +1065,8 @@ namespace Armoury
                                 maxR2 = Math.Max(maxR2, Math.Abs(awaySum - sn.A));
                             }
                             if ((sn.Ar <= 1e-6 && sn.Sbr > 0.0) || (sn.Af <= 1e-6 && sn.Sbf > 0.0)) k1++;
-                            if ((sn.Ar > 1e-6 && sn.Sbr <= Eps) || (sn.Af > 1e-6 && sn.Sbf <= Eps)) k2++;
+                            // R1-4: konto bez pustych osad w okregu na pulapie (brak miejsca) - nazwany nadmiar kp, nie k2
+                            if ((sn.Ar > 1e-6 && sn.Sbr <= Eps) || (sn.Af > 1e-6 && sn.Sbf <= Eps)) { if (FreeRoom(d) <= Eps) kFull++; else k2++; }
                             if (sn.B > 0.0) { distB++; sumBr += sn.Sbr; sumBf += sn.Sbf; }
                             // rocznica: doba last + D w regionie (wszystkie okregi, takze bez pustych osad i konta - krytyka K4)
                             string yr = "";
@@ -1050,8 +1082,13 @@ namespace Armoury
                                     if (stop == Devastation.StopSiege) { yr = "NIE-oblezenie"; ySiege++; }
                                     else if (stop == Devastation.StopStay) { yr = "NIE-pobyt-oblezony"; yStay++; }
                                     else if (stop == Devastation.StopGate) { yr = "NIE-brama-E46"; yGate++; }
-                                    else if (stop == Devastation.StopFamWait || sn.Af > 0.0) { yr = "NIE-glod"; yFam++; }
-                                    else { yr = "NIE"; yNone++; }
+                                    else
+                                    {
+                                        // poprawka po recenzji (R1-2): czesc konta z glodu (StopFamWait, Af > 0) NIE wstrzymuje powrotu czesci z rabunku (Devastation.Daily:
+                                        // backR liczy sie niezaleznie od famDay, w dobie last + D wraca cala) - takie NIE to porazka reguly, nie przyczyna nazwana
+                                        yr = "NIE"; yNone++;
+                                        if (stop == Devastation.StopFamWait || sn.Af > 0.0) yFam++;
+                                    }
                                 }
                             }
                             if (sn.B > 0.0 || sn.A > 0.0 || d.Event || year)
@@ -1065,9 +1102,9 @@ namespace Armoury
                     }
                 }
                 // zywnosc warowni od ludzi (ta sama funkcja co postfiks)
-                int towns = 0, g1 = 0, g2 = 0; double fAll = 0.0, f1 = 0.0, f2 = 0.0;
+                int towns = 0, g1 = 0, g2 = 0, lootAll = 0, lootExp = 0; double fAll = 0.0, f1 = 0.0, f2 = 0.0;
                 bool foodOn = s.TownFoodByVillagePeople && _townPatched;
-                if (foodOn) TownFoodToday(out towns, out fAll, out f1, out g1, out f2, out g2);
+                if (foodOn) TownFoodToday(out towns, out fAll, out f1, out g1, out f2, out g2, out lootAll, out lootExp);
                 double hitDev = Devastation.HitToday;
                 double r3 = _dSetS - hitDev;
                 bool firstLine = first;
@@ -1085,22 +1122,31 @@ namespace Armoury
                   .Append(F(_dRaidW, "0.###")).Append(" / wsiach gry ").Append(F(_dRaidMain, "0.###")).Append(", zerowanie ").Append(F(_dForW + _dForMain, "0.###")).Append(" w wioskach ").Append(F(_dForW, "0.###"))
                   .Append(" / wsiach gry ").Append(F(_dForMain, "0.###")).Append("; uderzen ").Append(_dStrikes).Append(", sesji rabunku ").Append(_dSess).Append(')')
                   .Append(", opuszczone z glodu +").Append(F(_dFam, "0.###")).Append(", wstalo -").Append(F(_dUp, "0.###")).Append(", zastepczy +").Append(F(_dZast, "0.###"))
-                  .Append(" (stary zapis ").Append(_dZastWhy[ZOld]).Append(" / inny uklad ").Append(_dZastWhy[ZLayout]).Append(" / wlaczenie ").Append(_dZastWhy[ZEnable]).Append(" okregow)")
+                  .Append(" (stary zapis ").Append(_dZastWhy[ZOld]).Append(" / inny uklad ").Append(_dZastWhy[ZLayout]).Append(" / wlaczenie ").Append(_dZastWhy[ZEnable]).Append(" okregow")
+                  .Append("; konto znane po zwolnieniu pulapu ").Append(_dLate).Append(" okregow)")
                   .Append(", nadmiar ponad pulap ").Append(F(_dOver, "0.###"));
                 sb.Append(" | spalone dzis ").Append(_dBurnedN).Append(_dBurnedList.Count > 0 ? ": " + string.Join("; ", _dBurnedList.ToArray()) : "")
                   .Append(" | opuszczone dzis ").Append(_dAbandonedN)
                   .Append(" | odbudowane dzis ").Append(_dRebuiltN).Append(_dRebuiltList.Count > 0 ? ": " + string.Join("; ", _dRebuiltList.ToArray()) : "");
                 sb.Append(" | kontrola: w domu wiosek - DOM max |r1| ").Append(F(maxR1, "0.######")).Append(", poza domem wiosek - konto max |r2| ").Append(F(maxR2, "0.######"))
                   .Append(", puste osady przy pustym koncie k1 ").Append(k1).Append(", konto bez pustych osad k2 ").Append(k2).Append(", ponad pulap k3 ").Append(k3)
+                  .Append(", konto bez miejsca (okreg na pulapie) kp ").Append(kFull)
                   .Append(", osady dzis x S - trafieni dzis r3 ").Append(F(r3, "0.####")).Append(" (trafieni ").Append(F(hitDev, "0.##")).Append(", nadmiar ludzi ").Append(F(_dOverPeople, "0.##"))
                   .Append(", bez ksiegi ").Append(F(_dHitSkip, "0.##")).Append("), doplyw bez zrodla d0 ").Append(_dD0);
                 if (_dFamSkip > 0) sb.Append(", ucieczki z glodu bez okregu ").Append(_dFamSkip);
                 sb.Append(" | rok po najezdzie (").Append(D).Append(" dob): okregow ").Append(yearN).Append(" (TAK ").Append(yearYes).Append(", NIE ").Append(yearN - yearYes)
-                  .Append(": oblezenie regionu ").Append(ySiege).Append(", pobyt oblezony ").Append(yStay).Append(", brama E4/6 ").Append(yGate).Append(", glod ").Append(yFam)
-                  .Append(", bez przyczyny ").Append(yNone).Append(')');
+                  .Append(": oblezenie regionu ").Append(ySiege).Append(", pobyt oblezony ").Append(yStay).Append(", brama E4/6 ").Append(yGate)
+                  .Append(", bez przyczyny ").Append(yNone).Append(" (w tym z czescia konta z glodu ").Append(yFam).Append("))");
                 if (foodOn)
+                {
+                    // poprawka po recenzji (R1-1, G8): "z N pod korekta" = wsie Looted z LootedOn i przelicznikiem ludzi (kazda powinna dac > 0), "Looted razem" - wszystkie
+                    // wsie Looted warowni nieoblezonych (bez Innych); przy LootedOn false nazwana przyczyna w nawiasie kwadratowym
                     sb.Append(" | zywnosc warowni od ludzi: warowni ").Append(towns).Append(", Food swiata ").Append(fAll >= 0 ? "+" : "").Append(F(fAll, "0.##")).Append("/d (spladrowane +")
-                      .Append(F(f1, "0.##")).Append(" w ").Append(g1).Append(" wsiach, uchodzcy i rece -").Append(F(f2, "0.##")).Append(" w ").Append(g2).Append(')');
+                      .Append(F(f1, "0.##")).Append(" w ").Append(g1).Append(" wsiach z ").Append(lootExp).Append(" pod korekta, Looted razem ").Append(lootAll)
+                      .Append(", uchodzcy i rece -").Append(F(f2, "0.##")).Append(" w ").Append(g2).Append(')');
+                    if (!Devastation.LootedOn)
+                        sb.Append(" [wies spladrowana bez korekty: ").Append(!s.LootedProducesByPeople ? "Looted Produces By People" : (!Devastation.On ? "spustoszenie nieczynne" : "latka produkcji Looted nie wpieta")).Append(']');
+                }
                 else sb.Append(" | zywnosc warowni od ludzi: WYLACZONA (").Append(!s.TownFoodByVillagePeople ? "Town Food By Village People" : "latka nie wpieta").Append(')');
                 if (noK > 0) sb.Append(" | okregi bez przelicznika ludzi (n czeka) ").Append(noK);
                 sb.Append(" | potkniecia ").Append(_stumbles).Append(" (razem ").Append(_stumblesAll).Append(')');
@@ -1220,7 +1266,9 @@ namespace Armoury
             if (v == null) return false;
             var state = v.VillageState;
             bool normal = state == Village.VillageStates.Normal;
-            bool looted = state == Village.VillageStates.Looted && Devastation.LootedOn;
+            // poprawka po recenzji (R2-1): ta sama bramka co produkcja wsi Looted (Devastation.SwapLooted - CoversQuiet); wies bez przelicznika ludzi (KFor = 0) ma
+            // YieldFactor 1 i dawalaby warowni pelne (poziom + 1) x 6 z wsi, ktora sama nic nie produkuje (zywnosc z niczego)
+            bool looted = state == Village.VillageStates.Looted && Devastation.LootedOn && Devastation.CoversQuiet(v);
             if (!normal && !looted) return false;
             double unit = (v.GetHearthLevel() + 1) * 6.0;           // poziom z postfiksem progow E4/5 - ten sam, co w grze
             if (normal) game = unit;
@@ -1230,9 +1278,13 @@ namespace Armoury
             return true;
         }
 
-        private static void TownFoodToday(out int towns, out double all, out double plus, out int plusN, out double minus, out int minusN)
+        /// <summary>
+        /// Linia doby (ta sama funkcja co postfiks). Poprawka po recenzji (R1-1, G8): osobno wsie Looted warowni liczonych (lootAll) i te z nasza korekta
+        /// (lootExp: LootedOn i przelicznik ludzi - TownVillageTerm true) - plusN (korekta > 0) porownany z lootExp w narzedziu (dotad G8 byl tautologia).
+        /// </summary>
+        private static void TownFoodToday(out int towns, out double all, out double plus, out int plusN, out double minus, out int minusN, out int lootAll, out int lootExp)
         {
-            towns = 0; all = 0.0; plus = 0.0; plusN = 0; minus = 0.0; minusN = 0;
+            towns = 0; all = 0.0; plus = 0.0; plusN = 0; minus = 0.0; minusN = 0; lootAll = 0; lootExp = 0;
             var seen = new HashSet<Settlement>();
             foreach (var st in Settlement.All)
             {
@@ -1246,7 +1298,10 @@ namespace Armoury
                     for (int i = 0; i < bv.Count; i++)
                     {
                         double g, o;
+                        bool isLooted = bv[i] != null && bv[i].VillageState == Village.VillageStates.Looted;
+                        if (isLooted) lootAll++;
                         if (!TownVillageTerm(bv[i], out g, out o)) continue;
+                        if (isLooted) lootExp++;
                         double x = o - g;
                         if (x > 0.001) { plus += x; plusN++; }
                         else if (x < -0.001) { minus -= x; minusN++; }
