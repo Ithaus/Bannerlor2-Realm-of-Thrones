@@ -751,3 +751,7 @@ etap3, etap4 (narzedzie z drzewa e4\40 lub nowszego).
   tylko owija BaseModel - kara snu dziala (log: "morale 67.2 -> 50.4 (-25%), wpis 'Sleepless nights' tak/tak"); poprawka kosmetyczna (__0 zamiast nazwy) NIE robiona
   (CLAUDE.md 8.3). (b) Armoury WesterosClimate.ApplyAll - pierwsza szansa w MonoMod (CreateDelegate przy kompilacji detoura), lapana w MonoMod; latki wpiete
   (data + 6 + 19 metod), 0 ERROR w Armoury.log.
+- (09:50) **Jeff: "dorzuc do koncowej paczki E4" (poprawka NightRest __0) + "te 9 bledow - mozemy je naprawic, czy cos psuja?"** -> workflow wf_d88e99ab-fe8
+  (rozpoznanie 7 bledow w dekompilacji + sceptyk na kazdy werdykt -> poprawki TYLKO tego, co psuje, + NightRest -> recenzja). Drzewa: SCRATCH(ae222cb7)\e4\bledy
+  (w-toku/e4-bledy od dfb12df, Armoury) i e4\csbledy (w-toku/cs-bledy od 37535a7 = CS w grze 77b11df5); DLL probne test\Armoury-bledy.dll, CrashScribe-bledy.dll,
+  CrashScribe-at-bledy.dll (z at1-cs.diff). Scalic do w-toku/zbior-e4-koniec; test na koncu etapu 4 razem z reszta.
