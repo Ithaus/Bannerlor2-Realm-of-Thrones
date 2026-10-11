@@ -4300,7 +4300,7 @@ namespace Armoury
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipPrizesToPort { get; set; } = false;
 
-        [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log; it changes nothing in the game unless Town Folk Live is on")]
+        [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownFolkMode { get; set; } = 1;
 

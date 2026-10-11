@@ -22,8 +22,10 @@ namespace Armoury
     ///  - nawias konsumpcji (K1/E5K1-09 - budzet i wydatek raz na osade i kategorie): postfiks na ItemConsumptionBehavior.UpdateDemandShift (nikt go nie lata)
     ///    otwiera, postfiks Priority.Last na BK EconomyPatches.CalculateBudget (po HistoricalPrices.BudgetPostfix) sledzi reszte budzetu wiersz po wierszu,
     ///    postfiks Priority.Last + finalizer na MakeConsumption zamyka. Wywolania CalculateBudget refleksja z RawPrice.HouseBudget sa poza nawiasem.
-    ///  - bitwy: prefiks + postfiks (odczyt) na MapEventParty.CommitGoldChanges - rzeczywista zmiana kies wodzow i partii (okno O14 bez zmian);
-    ///  - notable: prefiks + postfiks (odczyt) na NotablePowerManagementBehavior.BalanceGoldAndPowerOfNotable.
+    ///  - bitwy: prefiks HigherThanNormal + postfiks + finalizer (odczyt) na MapEventParty.CommitGoldChanges - rzeczywista zmiana kies wodzow i partii (okno O14
+    ///    bez zmian) i w nawiasie zdarzenia innych bohaterow (A6: obciazenie wodza zdjetego z partii - recenzja E5/0 (1-1));
+    ///  - notable: prefiks + postfiks + finalizer (odczyt) na NotablePowerManagementBehavior.BalanceGoldAndPowerOfNotable - przelewy z kasa osady (A3) osobno
+    ///    od "z niczego / w nicosc" (recenzja E5/0 (1-2)).
     /// Zakazane w calej paczce: ChangeGold, GiveGoldAction, AddToCounts, SetSoldItems, UpdateSatisfaction, PeopleOf przed kalibracja, GetPopData bez
     /// IsSettlementPopulated, GetPolicy dla osady bez polityk BK, CastlePurse.Spendable, Seal31.Spare, Town.FoodChange, zapis do Satisfactions.
     /// </summary>
@@ -44,14 +46,19 @@ namespace Armoury
         private static int _poolN;
         private static Town _brTown; private static bool _brOpen; private static int _brGold0;
         private static int _brUnclosed, _brMismatch, _brAborted;
+        // recenzja E5/0 (2-1): dokup jedzenia BK (zapas warowni <= 10% gornej granicy w chwili otwarcia nawiasu - ten sam warunek co BK :532)
+        private static bool _brLowFood; private static int _lowFoodN; private static double _lowFoodCut;
         private static readonly Dictionary<ItemCategory, int> _grp = new Dictionary<ItemCategory, int>();
         private static long _foodTown, _foodCastle;
         private static readonly double[] _satPlus = new double[4], _satMinus = new double[4];
-        // bitwy
-        private static int _btN, _btN1, _btN2;
-        private static long _btA, _btB, _btC1, _btC2, _btC3;
-        // notable
+        // bitwy (recenzja E5/0 (1-1): nawias CommitGoldChanges - zdarzenia bohaterow innych niz wodz partii, np. obciazenie A6 wodza zdjetego z partii)
+        private static int _btN, _btN1, _btN2, _btN3, _btOffN;
+        private static long _btA, _btB, _btC1, _btC2, _btC3, _btAOff, _btC1Off;
+        private static bool _btOpen; private static Hero _btLead;
+        // notable (recenzja E5/0 (1-2): przelewy notabl <-> kasa osady w nawiasie pasma - A3 - osobno od "z niczego / w nicosc")
         private static long _ntTownOut, _ntTownIn, _ntVillOut, _ntVillIn; private static int _ntAll, _ntVill, _ntCastleMarket;
+        private static long _ntTownOutK, _ntTownInK, _ntVillOutK, _ntVillInK;
+        private static Hero _ntHero; private static long _ntCurOutK, _ntCurInK;
         private static readonly Dictionary<Settlement, double[]> _ntDemand = new Dictionary<Settlement, double[]>();
         // ksiega pieniadza (MoneyLedger.VillageCashLine - przed jej ClearDay): "bitwy" i pasmo notabli w ksiedze obiegu
         private static bool _ledOk; private static long _ledBattleIn, _ledBattleOut, _ledBandIn, _ledBandOut;
@@ -69,9 +76,11 @@ namespace Armoury
             Array.Clear(_bPaid, 0, BSrc); Array.Clear(_bBelow, 0, BSrc); _unsold = 0; _unsoldVisits = 0;
             Array.Clear(_take, 0, Takes); Array.Clear(_takeBelow, 0, Takes); _rentPaid = _rentBelow = 0; _noBkCons = 0;
             _brTrack.Clear(); _pool.Clear(); _poolN = 0; _brTown = null; _brOpen = false; _brUnclosed = _brMismatch = _brAborted = 0;
+            _brLowFood = false; _lowFoodN = 0; _lowFoodCut = 0;
             _grp.Clear(); _foodTown = _foodCastle = 0; Array.Clear(_satPlus, 0, 4); Array.Clear(_satMinus, 0, 4);
-            _btN = _btN1 = _btN2 = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = 0;
+            _btN = _btN1 = _btN2 = _btN3 = _btOffN = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = _btAOff = _btC1Off = 0; _btOpen = false; _btLead = null;
             _ntTownOut = _ntTownIn = _ntVillOut = _ntVillIn = 0; _ntAll = _ntVill = _ntCastleMarket = 0; _ntDemand.Clear();
+            _ntTownOutK = _ntTownInK = _ntVillOutK = _ntVillInK = 0; _ntHero = null; _ntCurOutK = _ntCurInK = 0;
             _ledOk = false; _ledBattleIn = _ledBattleOut = _ledBandIn = _ledBandOut = 0;
             _crown.Clear(); _cpOk = false;
             _streakMax = 0; _streakName = null; _campStart = int.MinValue;
@@ -86,12 +95,12 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId;
             var done = new List<string>(); var miss = new List<string>(); var targets = new List<MethodBase>(); var names = new List<string>();
-            void Wire(string name, MethodBase m, string pre, string post, string fin, int postPrio)
+            void Wire(string name, MethodBase m, string pre, string post, string fin, int postPrio, int prePrio = Priority.Normal)
             {
                 try
                 {
                     if (m == null) { miss.Add(name); return; }
-                    h.Patch(m, prefix: pre != null ? new HarmonyMethod(typeof(TownFolk), pre) : null,
+                    h.Patch(m, prefix: pre != null ? new HarmonyMethod(typeof(TownFolk), pre) { priority = prePrio } : null,
                                postfix: post != null ? new HarmonyMethod(typeof(TownFolk), post) { priority = postPrio } : null,
                                finalizer: fin != null ? new HarmonyMethod(typeof(TownFolk), fin) : null);
                     done.Add(name); targets.Add(m); names.Add(name);
@@ -106,9 +115,12 @@ namespace Armoury
                      null, nameof(BudgetPostfix), null, Priority.Last);
                 Wire("konsumpcja (MakeConsumption 2/2)", AccessTools.Method(typeof(ItemConsumptionBehavior), "MakeConsumption",
                      new[] { typeof(Town), typeof(Dictionary<ItemCategory, float>), typeof(Dictionary<ItemCategory, int>) }), null, nameof(ConsumePostfix), nameof(ConsumeFinalizer), Priority.Last);
-                Wire("bitwy (CommitGoldChanges 2/2)", AccessTools.Method(typeof(MapEventParty), "CommitGoldChanges"), nameof(BattlePre), nameof(BattlePost), null, Priority.Normal);
-                Wire("pasmo notabli (BalanceGoldAndPowerOfNotable 2/2)", AccessTools.Method(typeof(NotablePowerManagementBehavior), "BalanceGoldAndPowerOfNotable", new[] { typeof(Hero) }),
-                     nameof(NotablePre), nameof(NotablePost), null, Priority.Normal);
+                // recenzja E5/0 (1-1): prefiks HigherThanNormal - nawias otwarty przed prefiksami Normal (A6 BattlePlunder.ChargePrefix obciaza tam wodza
+                // zdjetego z partii; A6 jest rejestrowane wczesniej, wiec przy rownym priorytecie biegloby przed nami), po oknie O14 (First); finalizer zamyka nawias
+                Wire("bitwy (CommitGoldChanges 3/3)", AccessTools.Method(typeof(MapEventParty), "CommitGoldChanges"), nameof(BattlePre), nameof(BattlePost), nameof(BattleFin),
+                     Priority.Normal, Priority.HigherThanNormal);
+                Wire("pasmo notabli (BalanceGoldAndPowerOfNotable 3/3)", AccessTools.Method(typeof(NotablePowerManagementBehavior), "BalanceGoldAndPowerOfNotable", new[] { typeof(Hero) }),
+                     nameof(NotablePre), nameof(NotablePost), nameof(NotableFin), Priority.Normal);
             }
             catch (Exception e) { miss.Add("ApplyAll (" + e.Message + ")"); }
             _wiredText = done.Count > 0 ? string.Join(", ", done.ToArray()) : "-";
@@ -147,6 +159,9 @@ namespace Armoury
                 long t = Stopwatch.GetTimestamp();
                 if (_brOpen) _brUnclosed++;
                 _brTown = __0; _brOpen = true; _brTrack.Clear(); _poolN = 0; _brGold0 = __0.Gold;
+                // recenzja E5/0 (2-1): warunek dokupu jedzenia BK (EconomyPatches :532) - zapas sie w petli nie zmienia (polka i kasa tak; FoodStocksUpperLimit to odczyt modelu)
+                _brLowFood = false;
+                try { _brLowFood = __0.FoodStocks <= __0.FoodStocksUpperLimit() * 0.1f; } catch (Exception e) { Stumble("DemandPostfix(zapas)", e); }
                 var f = Get(__0.Settlement);
                 if (f != null)
                 {
@@ -185,7 +200,9 @@ namespace Armoury
                 }
                 if (!double.IsNaN(tr.Pending)) tr.Spent += tr.Pending - __1;   // reszta po poprzednim wierszu = wejscie tego
                 tr.Rows++;
-                tr.Add += __result - __1;                                    // dodatek BK w petli (dobrobyt, indeks) - przy kazdym wierszu
+                // zmiana budzetu w petli (BK dobrobyt/indeks razem z mnoznikami HistoricalPrices) - tylko na wierszach, ktore BK przetwarza (recenzja E5/0 (2-2):
+                // wiersz z budzetem 0 - np. ArmsLeaks.ZeroTownBudget - nie zmienia slownika i nie wchodzi do wydatku, wiec nie wchodzi i tu)
+                if (__result > 0.01f) tr.Add += __result - __1;
                 tr.Pending = __result > 0.01f ? __result : double.NaN;       // BK przetwarza wiersz tylko przy budzecie > 0.01
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
@@ -204,6 +221,7 @@ namespace Armoury
                 var f = Get(__0.Settlement);
                 if (f == null) return;
                 double spent = 0, add = 0; int rows = 0;
+                var grp = new double[3];
                 foreach (var kv in _brTrack)
                 {
                     var tr = kv.Value;
@@ -214,27 +232,37 @@ namespace Armoury
                         tr.Pending = double.NaN;
                     }
                     spent += tr.Spent; add += tr.Add; rows += tr.Rows;
-                    f.Grp[GroupOf(kv.Key)] += tr.Spent;
-                    if (GroupOf(kv.Key) == 0) f.SpendFood += tr.Spent;
+                    grp[GroupOf(kv.Key)] += tr.Spent;
                 }
-                f.SpendGame += spent; f.G1 += add; f.Rows += rows;
                 f.ConsGold += __0.Gold - _brGold0;
+                double cv = double.NaN;
                 var econ = EconOf(f);
                 if (econ == null) _noBkCons++;
                 else
                 {
-                    try { f.ConsumedBk += Convert.ToDouble(_pConsumed.GetValue(econ, null)); } catch { }
+                    try { cv = Convert.ToDouble(_pConsumed.GetValue(econ, null)); f.ConsumedBk += cv; } catch (Exception e) { cv = double.NaN; Stumble("ConsumedValue", e); }
                     var sat = Sats(f);
                     if (sat != null && sat.Length >= 4 && f.Sat0Ok)
                         for (int i = 0; i < 4; i++) { double dl = sat[i] - f.Sat0[i]; if (dl > 0) _satPlus[i] += dl; else _satMinus[i] -= dl; }
                 }
+                // recenzja E5/0 (2-1): dokup jedzenia BK (zapas <= 10%, EconomyPatches :532-552) - petla zdejmuje z budzetu num3 x cena razem z dokupem,
+                // a towar, zloto i ConsumedValue to num5 x cena obciete do polki; nadwyzka petli nad ConsumedValue tej osady zdjeta z wydatku jedzenia
+                // (kotwica W, Grp, SpendFood bez "zjedzonego ponad polke"); ConsumedValue BK zeruje sie na poczatku kazdego wywolania - para tej osady
+                if (_brLowFood && !double.IsNaN(cv))
+                {
+                    _lowFoodN++;
+                    double ex = spent - cv;
+                    if (ex > 0) { double cut = Math.Min(ex, grp[0]); grp[0] -= cut; spent -= cut; _lowFoodCut += cut; }
+                }
+                f.Grp[0] += grp[0]; f.Grp[1] += grp[1]; f.Grp[2] += grp[2]; f.SpendFood += grp[0];
+                f.SpendGame += spent; f.G1 += add; f.Rows += rows;
                 int food = 0;
                 if (__2 != null) foreach (var kv in __2) if (kv.Key != null && kv.Value > 0 && GroupOf(kv.Key) == 0) food += kv.Value;
                 if (__0.IsTown) _foodTown += food; else { _foodCastle += food; f.FoodSold += food; }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("ConsumePostfix", e); }
-            finally { _brOpen = false; _brTown = null; }
+            finally { _brOpen = false; _brTown = null; _brLowFood = false; }
         }
 
         /// <summary>Wyjatek w cudzym kodzie konsumpcji - nawias zamkniety od razu (void: wyjatek leci dalej bez zmian).</summary>
@@ -267,6 +295,8 @@ namespace Armoury
                 long t = Stopwatch.GetTimestamp();
                 __state.Pl = __instance.PlunderedGold; __state.Lost = __instance.GoldLost;
                 var party = __instance.Party;
+                // nawias (recenzja E5/0 (1-1)): zdarzenia "z niczego / w nicosc" bohaterow innych niz wodz tej partii licza sie w OnGold (A6: wodz zdjety z partii)
+                _btOpen = true; _btLead = party != null ? party.LeaderHero : null;
                 if (party != null && (__state.Pl != 0 || __state.Lost != 0))
                 {
                     var hero = party.LeaderHero;
@@ -293,18 +323,48 @@ namespace Armoury
                 }
                 else
                 {
-                    _btN2++;
                     var mp = __state.Mp;
                     if (mp != null && mp.IsPartyTradeActive)
                     {
+                        _btN2++;
                         long dl = (long)mp.PartyTradeGold - __state.G0;
                         if (dl < 0) _btB += -dl; else _btC2 += dl;
                     }
-                    else if (__state.Pl > 0) _btC3 += __state.Pl;   // partia bez kiesy handlowej - udzial przepada
+                    else
+                    {
+                        // partia lorda bez wodza (gra zdjela go w CaptureDefeatedPartyMembers - niewola, ucieczka) osobno od band i milicji (recenzja E5/0 (1-1))
+                        if (mp != null && mp.IsLordParty) _btN3++; else _btN2++;
+                        if (__state.Pl > 0) _btC3 += __state.Pl;   // partia bez kiesy handlowej - udzial przepada
+                    }
                 }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("BattlePost", e); }
+        }
+
+        /// <summary>Finalizer CommitGoldChanges: zamkniecie nawiasu bitwy (takze po wyjatku w metodzie gry; void - wyjatek leci dalej bez zmian).</summary>
+        public static void BattleFin(Exception __exception)
+        {
+            _btOpen = false; _btLead = null;
+        }
+
+        /// <summary>
+        /// Z TownFolk.OnGold (zdarzenie gry PO przelewie): w nawiasie bitwy - przelew "z niczego / w nicosc" bohatera innego niz wodz partii w chwili wyplaty
+        /// (A6: wodz pokonanej partii zdjety z partii placi swoja czesc puli - GiveGoldAction wodz -> nic; wodz w partii liczony z roznicy kiesy, bez drugiego razu);
+        /// w nawiasie pasma - przelew notabl <-> kasa osady (A3).
+        /// </summary>
+        private static void NoteBracketGold(Hero gh, Hero rh, Settlement gs, Settlement rs, int a, bool gNone, bool rNone)
+        {
+            if (_btOpen)
+            {
+                if (rNone && gh != null && !ReferenceEquals(gh, _btLead)) { _btAOff += a; _btOffN++; }
+                else if (gNone && rh != null && !ReferenceEquals(rh, _btLead)) _btC1Off += a;
+            }
+            if (_ntHero != null)
+            {
+                if (ReferenceEquals(gh, _ntHero) && rs != null) _ntCurOutK += a;        // notabl -> kasa osady
+                else if (ReferenceEquals(rh, _ntHero) && gs != null) _ntCurInK += a;    // kasa osady -> notabl
+            }
         }
 
         // ------------------------------------------------------------ 4.5 notable: pasmo 4 500 - 10 500
@@ -315,6 +375,7 @@ namespace Armoury
             {
                 if (__0 == null || !Live || OffMain()) return;
                 __state = __0.Gold;
+                _ntHero = __0; _ntCurOutK = _ntCurInK = 0;   // nawias pasma (recenzja E5/0 (1-2)): przelewy z kasa osady licza sie w OnGold
                 _ntAll++;
                 var st = __0.CurrentSettlement ?? __0.HomeSettlement;
                 if (st != null && st.IsVillage) _ntVill++;
@@ -329,28 +390,37 @@ namespace Armoury
                 if (__state == int.MinValue || __0 == null) return;
                 long t = Stopwatch.GetTimestamp();
                 long dl = (long)__0.Gold - __state;
-                if (dl != 0)
+                long outK = ReferenceEquals(_ntHero, __0) ? _ntCurOutK : 0, inK = ReferenceEquals(_ntHero, __0) ? _ntCurInK : 0;
+                long rest = dl + outK - inK;   // zmiana kiesy bez przelewow z kasa osady (A3) = "z niczego / w nicosc" (jak okno O03 ksiegi)
+                if (dl != 0 || outK != 0 || inK != 0)
                 {
                     var st = __0.CurrentSettlement ?? __0.HomeSettlement;
                     bool vill = st != null && st.IsVillage;
                     Settlement market = st;
                     if (vill) { var v = st.Village; market = v != null ? (v.TradeBound ?? v.Bound) : null; }
-                    if (dl < 0) { if (vill) _ntVillOut += -dl; else _ntTownOut += -dl; }
-                    else
+                    if (vill) { _ntVillOutK += outK; _ntVillInK += inK; } else { _ntTownOutK += outK; _ntTownInK += inK; }
+                    if (rest < 0) { if (vill) _ntVillOut += -rest; else _ntTownOut += -rest; }
+                    else if (rest > 0)
                     {
-                        if (vill) _ntVillIn += dl; else _ntTownIn += dl;
-                        if (vill && market != null && market.IsCastle) _ntCastleMarket++;
+                        if (vill) _ntVillIn += rest; else _ntTownIn += rest;
                         if (market != null && market.Town != null)
                         {
                             double[] dm;
                             if (!_ntDemand.TryGetValue(market, out dm)) { dm = new double[2]; _ntDemand[market] = dm; }
-                            dm[vill ? 1 : 0] += dl;
+                            dm[vill ? 1 : 0] += rest;
                         }
                     }
+                    if (vill && market != null && market.IsCastle && (rest > 0 || inK > 0)) _ntCastleMarket++;
                 }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("NotablePost", e); }
+        }
+
+        /// <summary>Finalizer BalanceGoldAndPowerOfNotable: zamkniecie nawiasu pasma (takze po wyjatku; void - wyjatek leci dalej bez zmian).</summary>
+        public static void NotableFin(Exception __exception)
+        {
+            _ntHero = null; _ntCurOutK = _ntCurInK = 0;
         }
 
         /// <summary>MoneyLedger.VillageCashLine (przed ClearDay ksiegi): "bitwy" i pasmo notabli w ksiedze obiegu - kontrola linii Bitwy i Notable.</summary>
@@ -412,7 +482,7 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays;
             if (f.EconDay == today) return null;   // brak danych BK - najwyzej jedna proba na dobe
             f.EconDay = today;
-            try { var pd = PopData(f.St); f.Econ = pd != null && _pEcon != null ? _pEcon.GetValue(pd, null) : null; } catch { f.Econ = null; }
+            try { var pd = PopData(f.St); f.Econ = pd != null && _pEcon != null ? _pEcon.GetValue(pd, null) : null; } catch (Exception e) { f.Econ = null; Stumble("EconOf", e); }
             return f.Econ;
         }
 
@@ -420,7 +490,7 @@ namespace Armoury
         {
             var e = EconOf(f);
             if (e == null || _pSat == null) return null;
-            try { return _pSat.GetValue(e, null) as float[]; } catch { return null; }
+            try { return _pSat.GetValue(e, null) as float[]; } catch (Exception x) { Stumble("Sats", x); return null; }
         }
 
         /// <summary>Polityka podatkowa BK osady - tylko dla osady, ktora ma juz polityki (GetPolicy dla osady bez polityk tworzy je w BK).</summary>
@@ -444,7 +514,7 @@ namespace Armoury
                         string n = type != null ? type.ToString() : null;
                         f.Policy = n == "Low" ? 0 : n == "Standard" ? 1 : n == "High" ? 2 : n == "Exemption" ? 3 : 4;
                     }
-                    catch { f.Policy = 4; }
+                    catch (Exception e) { f.Policy = 4; Stumble("RefreshPolicies(wies)", e); }
                 }
             }
             catch (Exception e) { Stumble("RefreshPolicies", e); }
@@ -479,9 +549,9 @@ namespace Armoury
                     f.PeopleCal = f.Kind == 1 ? 0 : PopulationLaw.PeopleOf(st);
                     long[] c = new long[6];
                     object pd = null;
-                    try { pd = PopData(st); } catch { pd = null; }
+                    try { pd = PopData(st); } catch (Exception e) { pd = null; Stumble("Calibrate(PopData)", e); }
                     if (pd != null && types != null && _mTypeCount != null)
-                        for (int i = 0; i < 6; i++) { if (i == 4 || types[i] == null) continue; try { c[i] = Convert.ToInt64(_mTypeCount.Invoke(pd, new[] { types[i] })); } catch { } }
+                        for (int i = 0; i < 6; i++) { if (i == 4 || types[i] == null) continue; try { c[i] = Convert.ToInt64(_mTypeCount.Invoke(pd, new[] { types[i] })); } catch (Exception e) { Stumble("Calibrate(GetTypeCount)", e); } }
                     long tot = c[0] + c[1] + c[2] + c[3] + c[5];
                     if (pd == null || tot <= 0) { f.NoBk = true; noData.Add(f); f.Cal = true; noBk++; continue; }
                     withBk++;
@@ -683,8 +753,9 @@ namespace Armoury
             Array.Clear(_bPaid, 0, BSrc); Array.Clear(_bBelow, 0, BSrc); _unsold = 0; _unsoldVisits = 0;
             Array.Clear(_take, 0, Takes); Array.Clear(_takeBelow, 0, Takes); _rentPaid = _rentBelow = 0;
             _foodTown = _foodCastle = 0; Array.Clear(_satPlus, 0, 4); Array.Clear(_satMinus, 0, 4);
-            _btN = _btN1 = _btN2 = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = 0;
+            _btN = _btN1 = _btN2 = _btN3 = _btOffN = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = _btAOff = _btC1Off = 0;
             _ntTownOut = _ntTownIn = _ntVillOut = _ntVillIn = 0; _ntAll = _ntVill = _ntCastleMarket = 0; _ntDemand.Clear();
+            _ntTownOutK = _ntTownInK = _ntVillOutK = _ntVillInK = 0;
             _ledOk = false; _cpOk = false;
             ClearVillageCash();
         }
@@ -762,15 +833,19 @@ namespace Armoury
 
         private static string BattleLine(int day)
         {
-            long c = _btC1 + _btC2, d = Measure31.DayShipBattleGold, e = c - _btA - _btB - d;
-            var sb = new StringBuilder(512);
-            sb.Append("Bitwy (E5/0): dzien ").Append(day).Append(" | partii ").Append(_btN).Append(" (wodzowie ").Append(_btN1).Append(", bez wodza ").Append(_btN2).Append(")")
-              .Append(" | pula z pokonanych (zeszlo z kies): wodzowie ").Append(_btA).Append(", partie bez wodza ").Append(_btB)
-              .Append(" | zwyciezcy dostali ").Append(c).Append(" (wodzowie ").Append(_btC1).Append(", partie z kiesa ").Append(_btC2).Append("), przepadlo ").Append(_btC3)
+            // a i c1: wodz w partii z roznicy kiesy + zdarzenia innych bohaterow w nawiasie (A6: wodz zdjety z partii placi swoja czesc puli)
+            long a = _btA + _btAOff, c1 = _btC1 + _btC1Off;
+            long c = c1 + _btC2, d = Measure31.DayShipBattleGold, e = c - a - _btB - d;
+            var sb = new StringBuilder(640);
+            sb.Append("Bitwy (E5/0): dzien ").Append(day).Append(" | partii ").Append(_btN).Append(" (wodzowie ").Append(_btN1).Append(", partie lordow z wodzem zdjetym (niewola, ucieczka) ").Append(_btN3)
+              .Append(", bez wodza ").Append(_btN2).Append(")")
+              .Append(" | pula z pokonanych (zeszlo z kies): wodzowie ").Append(a).Append(" (w partii ").Append(_btA).Append(", zdjeci z partii - A6 - ").Append(_btAOff).Append(" w ").Append(_btOffN)
+              .Append("), partie bez wodza ").Append(_btB)
+              .Append(" | zwyciezcy dostali ").Append(c).Append(" (wodzowie ").Append(c1).Append(", partie z kiesa ").Append(_btC2).Append("), przepadlo ").Append(_btC3)
               .Append(" | statki zatopione ").Append(d)
               .Append(" | z niczego netto na ladzie ").Append(e).Append(" = c - a - b - d (morze ").Append(d).Append(" osobno)")
               .Append(" | kontrola z ksiega: ");
-            if (_ledOk) sb.Append("zrodla \"bitwy\" ").Append(_ledBattleIn).Append(" (c1 - x = ").Append(_btC1 - _ledBattleIn).Append("), ujscia ").Append(_ledBattleOut).Append(" (a - y = ").Append(_btA - _ledBattleOut).Append(")");
+            if (_ledOk) sb.Append("zrodla \"bitwy\" ").Append(_ledBattleIn).Append(" (c1 - x = ").Append(c1 - _ledBattleIn).Append("), ujscia ").Append(_ledBattleOut).Append(" (a - y = ").Append(a - _ledBattleOut).Append(")");
             else sb.Append("- (ksiega obiegu nie wypisala linii)");
             return sb.Append('.').ToString();
         }
@@ -789,11 +864,14 @@ namespace Armoury
                 b1 += cover * dm[0] / want; e += cover * dm[1] / want;
             }
             var sb = new StringBuilder(512);
+            // recenzja E5/0 (1-2): "w nicosc / z niczego" = zmiana kiesy notabla bez przelewow z kasa osady; przelewy z kasa (A3) osobno
             sb.Append("Notable (E5/0): dzien ").Append(day).Append(" | pasmo 4 500-10 500 - miasta: w nicosc ").Append(_ntTownOut).Append(" / z niczego ").Append(_ntTownIn)
+              .Append(", do kasy osady ").Append(_ntTownOutK).Append(" / z kasy osady ").Append(_ntTownInK)
               .Append(" (kasa miasta mogla dac ").Append(N0(b1)).Append("); wsie: w nicosc ").Append(_ntVillOut).Append(" / z niczego ").Append(_ntVillIn)
+              .Append(", do kasy osady targowej ").Append(_ntVillOutK).Append(" / z kasy osady targowej ").Append(_ntVillInK)
               .Append(" (kasa miasta targowego mogla dac ").Append(N0(e)).Append("; targ - zamek: ").Append(_ntCastleMarket).Append(" notabli)")
               .Append(" | notable wiejscy ").Append(_ntVill).Append(" z ").Append(_ntAll)
-              .Append(" | kontrola z ksiega (Obieg: notable): ");
+              .Append(" | kontrola z ksiega (Obieg: notable - tylko z niczego / w nicosc): ");
             if (_ledOk) sb.Append("w nicosc ").Append(_ntTownOut + _ntVillOut).Append(" wobec ").Append(_ledBandOut).Append(", z niczego ").Append(_ntTownIn + _ntVillIn).Append(" wobec ").Append(_ledBandIn);
             else sb.Append("- (ksiega obiegu nie wypisala linii)");
             return sb.Append('.').ToString();
@@ -821,7 +899,7 @@ namespace Armoury
                         if (it != null && el.Amount > 0 && it.ItemCategory != null && GroupOf(it.ItemCategory) == 0) n += el.Amount;
                     }
                 }
-                catch { }
+                catch (Exception e) { Stumble("FoodLine(polka)", e); }
                 shelf += n;
                 Folk f; double avg = 0;
                 if (_f.TryGetValue(st, out f) && f.Food7Fill > 0) { long sum = 0; for (int i = 0; i < f.Food7Fill; i++) sum += f.Food7[i]; avg = (double)sum / f.Food7Fill; }

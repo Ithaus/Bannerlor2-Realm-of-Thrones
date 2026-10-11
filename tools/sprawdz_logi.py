@@ -1821,7 +1821,7 @@ def etap5_e50(rep, lines, start, win, **kw):
     # ---- T4 bitwy wobec ksiegi + A6
     bit = by_day(lines, "Bitwy (E5/0): dzien")
     bal = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
-    sc1 = sa = sx = sy = 0
+    sc1 = sa = sx = sy = soff = noff = n3 = 0
     es = []
     for d in w28:
         if d not in bit:
@@ -1829,6 +1829,10 @@ def etap5_e50(rep, lines, start, win, **kw):
         s = bit[d]
         sc1 += num(r"zwyciezcy dostali -?\d+ \(wodzowie (\d+)", s, int, 0) or 0
         sa += num(r"pula z pokonanych \(zeszlo z kies\): wodzowie (\d+)", s, int, 0) or 0
+        # recenzja E5/0 (1-1): wodzowie zdjeci z partii (A6 - obciazenie w nawiasie CommitGoldChanges) i partie lordow z wodzem zdjetym
+        soff += num(r"zdjeci z partii - A6 - (\d+) w \d+", s, int, 0) or 0
+        noff += num(r"zdjeci z partii - A6 - \d+ w (\d+)", s, int, 0) or 0
+        n3 += num(r"partie lordow z wodzem zdjetym \(niewola, ucieczka\) (\d+)", s, int, 0) or 0
         x = y = None
         if d in bal:
             mz = re.search(r"\| ZRODLA .*?\bbitwy (-?\d+)", bal[d])
@@ -1847,34 +1851,46 @@ def etap5_e50(rep, lines, start, win, **kw):
         return abs(v - ref) <= tol * max(abs(ref), 1) if (v or ref) else True
     rep.add("E50-T4: bitwy - wodzowie zwyciezcow (c1) wobec zrodel \"bitwy\" ksiegi (sr28)", f"c1 {sc1} wobec {sx} ({len(w28)} dob)", "+-2%", within(sc1, sx, 0.02) if w28 else None)
     rep.add("E50-T4: bitwy - wodzowie pokonanych (a) wobec ujsc \"bitwy\" ksiegi (sr28)", f"a {sa} wobec {sy}", "+-2%", within(sa, sy, 0.02) if w28 else None)
+    rep.add("E50-T4: wodzowie zdjeci z partii - obciazenie A6 (sr28; INFO)", f"{soff} zl w {noff} obciazeniach; partii lordow z wodzem zdjetym {n3}",
+            "INFO (bez A6: 0 zl - gra ich nie obciaza; z A6 > 0, w a i w ujsciach \"bitwy\")", None)
     em = _mean(es)
     if em is not None:
         rep.add("E50-T4: A6 - z niczego netto na ladzie sr28", f"{em:.0f}/d", "<= 5 000/d - inaczej A6 POTRZEBNE (Jeff 11.10 16:20: A6 i tak w porcji A)",
                 em <= 5000, decide=em > 5000)
     # ---- T5 wydatek z petli BK wobec ConsumedValue
-    bad5, nob = [], []
+    bad5, nob, lfn, lfc = [], [], [], 0
     for d in full:
         q = fnum(r"\(roznica (-?[\d.]+)%\)", kie[d])
         if q is not None and abs(q) > 2.0:
             bad5.append((run_day(d, start), q))
         nob.append(num(r"osad z konsumpcja bez BK (\d+)", kie[d], int, 0) or 0)
+        # recenzja E5/0 (2-1): dokup jedzenia BK (zapas <= 10%) - nadwyzka petli nad ConsumedValue zdjeta z wydatku jedzenia przed porownaniem
+        lfn.append(num(r"dokup jedzenia BK \(zapas <= 10%\): osad (\d+)", kie[d], int, 0) or 0)
+        if d in w28:
+            lfc += num(r"petla ponad ConsumedValue zdjeta z wydatku jedzenia (\d+)", kie[d], int, 0) or 0
     rep.add("E50-T5: wydatek z petli BK wobec ConsumedValue", f"poza progiem {len(bad5)} z {len(full)} dob" + (f" (np. d{bad5[0][0]}: {bad5[0][1]}%)" if bad5 else ""),
             "+-2% kazdej doby (K1: budzet raz na kategorie)", len(bad5) == 0)
     rep.add("E50-T5: osad z konsumpcja bez BK (INFO)", f"najwiecej {max(nob) if nob else '-'}", "INFO (d120 zbioru 31: 0)", None)
+    rep.add("E50-T5: dokup jedzenia BK - osad (najwiecej na dobe), zdjete z wydatku jedzenia (sr28; INFO)",
+            f"osad najwiecej {max(lfn) if lfn else '-'}; zdjete {lfc / max(len(w28), 1):.0f}/d", "INFO (oblezenia, glod - zapas warowni <= 10%)", None)
     # ---- T6 notable wobec "Obieg: notable"
     nt = by_day(lines, "Notable (E5/0): dzien")
     obn = by_day(lines, "Obieg: notable i karawany: dzien")
-    so = si = lo = li = 0
+    so = si = lo = li = ko = ki = 0
     for d in w28:
         if d not in nt or d not in obn:
             continue
         s = nt[d]
+        # recenzja E5/0 (1-2): przelewy notabl <-> kasa osady (A3) osobno - do kontroli z ksiega tylko "w nicosc / z niczego"
+        ko += (num(r"do kasy osady (\d+) /", s, int, 0) or 0) + (num(r"do kasy osady targowej (\d+) /", s, int, 0) or 0)
+        ki += (num(r"/ z kasy osady (\d+)", s, int, 0) or 0) + (num(r"/ z kasy osady targowej (\d+)", s, int, 0) or 0)
         so += (num(r"miasta: w nicosc (\d+)", s, int, 0) or 0) + (num(r"wsie: w nicosc (\d+)", s, int, 0) or 0)
         si += (num(r"miasta: w nicosc \d+ / z niczego (\d+)", s, int, 0) or 0) + (num(r"wsie: w nicosc \d+ / z niczego (\d+)", s, int, 0) or 0)
         lo += abs(num(r"nadwyzka w nicosc (-?\d+)", obn[d], int, 0) or 0)
         li += num(r"dosypka z niczego \+?(-?\d+)", obn[d], int, 0) or 0
     rep.add("E50-T6: notable - w nicosc wobec Obieg (sr28)", f"{so} wobec {lo}", "+-1%", within(so, lo, 0.01) if w28 else None)
     rep.add("E50-T6: notable - z niczego wobec Obieg (sr28)", f"{si} wobec {li}", "+-1%", within(si, li, 0.01) if w28 else None)
+    rep.add("E50-T6: notable - przez kase osady (A3; sr28; INFO)", f"do kasy {ko}, z kasy {ki}", "INFO (bez A3: 0; z A3 - pasmo w kasach, w nicosc / z niczego ok. 0)", None)
     # ---- T7 gotowka wsi: podzial wedlug polityki = liczby swiata
     gw = by_day(lines, "Gotowka wsi (E5/0): dzien")
     bad7, share = [], []

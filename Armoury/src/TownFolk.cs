@@ -205,7 +205,7 @@ namespace Armoury
         /// <summary>
         /// Z MoneyLedger.OnGoldTraded (po normalizacji kierunku; zdarzenie gra wysyla PO przelewie): (a) karawana albo gracz w handlu z miastem
         /// poza oknem flagowym, (b) przelewy gry do/z kiesy wsi (poza naszym tickiem - definicja ksiegi), (c) czesc platnosci kasy miasta ponizej
-        /// zapasu kupcow (poza naszym tickiem - pobory bloku licza sie osobno).
+        /// zapasu kupcow (poza naszym tickiem - pobory bloku licza sie osobno), (d) w nawiasach bitwy i pasma notabli - NoteBracketGold.
         /// </summary>
         internal static void OnGold(Hero gh, PartyBase gp, Hero rh, PartyBase rp, int a, bool gNone, bool rNone, bool inBlock)
         {
@@ -215,6 +215,7 @@ namespace Armoury
                 long t = Stopwatch.GetTimestamp();
                 Settlement gs = gh == null && gp != null && gp.IsSettlement ? gp.Settlement : null;
                 Settlement rs = rh == null && rp != null && rp.IsSettlement ? rp.Settlement : null;
+                if (_btOpen || _ntHero != null) NoteBracketGold(gh, rh, gs, rs, a, gNone, rNone);   // nawiasy bitwy i pasma notabli (recenzja E5/0 (1-1), (1-2))
                 if (!inBlock)
                 {
                     if (rs != null && rs.IsVillage) VillTrans(rs, a);
@@ -388,7 +389,7 @@ namespace Armoury
         {
             if (f.Kind == 1 || !(f.PeopleCal > 0)) return 1.0;
             double p = 0;
-            try { p = PopulationLaw.PeopleOf(f.St); } catch { p = 0; }
+            try { p = PopulationLaw.PeopleOf(f.St); } catch (Exception e) { p = 0; Stumble("Scale", e); }   // recenzja E5/0 (1-3): osada wypada z koszyka na te dobe - liczone
             return Math.Max(0.0, p / f.PeopleCal);
         }
 
@@ -671,7 +672,7 @@ namespace Armoury
                 if (t == null || !t.IsTown) return null;
                 Folk f; return _f.TryGetValue(t, out f) && f.Cal ? f : null;
             }
-            catch { return null; }
+            catch (Exception e) { Stumble("TradeTown", e); return null; }
         }
 
         // ------------------------------------------------------------ udzial zysku kupcow (Jeff 11.10 16:10)
@@ -726,7 +727,7 @@ namespace Armoury
               .Append(" | miasta ").Append(d.Towns).Append(": ludzie ksiegi ").Append(N0(d.People)).Append(" (BK z kalibracji x ksiega: W ").Append(N0(d.HW)).Append(" / R ").Append(N0(d.HR))
               .Append(" / P ").Append(N0(d.HP)).Append(d.HS > 0 ? " / niewolni utrzymywani " + N0(d.HS) : "").Append(")")
               .Append(", koszyk ludu ").Append(N0(d.B)).Append(", wydatek gry ").Append(N0(d.Wg)).Append(" (jedzenie ").Append(N0(d.Wf)).Append(")")
-              .Append(", budzet gry ").Append(N0(d.G0)).Append(" (dodatek BK w petli ").Append(N0(d.G1)).Append(")")
+              .Append(", budzet gry ").Append(N0(d.G0)).Append(" (zmiana w petli BK na wierszach z budzetem ").Append(N0(d.G1)).Append(" - dobrobyt/indeks BK z mnoznikami HistoricalPrices)")
               .Append(", kotwica m srednio ").Append(d.MN > 0 ? F2(d.MSum / d.MN) : "-").Append(" (min ").Append(F2(d.MMin)).Append(", miast z m < 1: ").Append(d.MLow).Append(")")
               .Append(" | dochod ").Append(N0(d.Y)).Append(": wojsko ").Append(N0(d.Y1a + d.Y1b + d.Y1c + d.Y1d)).Append(" (zycie ").Append(N0(d.Y1a)).Append(", karawany ").Append(N0(d.Y1b))
               .Append(", bandy ").Append(N0(d.Y1c)).Append(", zalogi ").Append(N0(d.Y1d)).Append("), dwor ").Append(N0(d.Y2))
@@ -763,8 +764,9 @@ namespace Armoury
               .Append(" | kontrola: r=").Append(F1(rr)).Append(" (").Append(d.Y + d.CInc + d.VInc > 0 ? (100.0 * Math.Abs(rr) / (d.Y + d.CInc + d.VInc)).ToString("0.000", Inv) : "-").Append("% dochodu)")
               .Append(" | konsumpcja: wydatek z petli BK ").Append(N0(sp)).Append(" wobec ConsumedValue ").Append(N0(cv))
               .Append(" (roznica ").Append(cv > 0 ? (100.0 * (sp - cv) / cv).ToString("0.00", Inv) + "%" : "-").Append(")")
+              .Append(", dokup jedzenia BK (zapas <= 10%): osad ").Append(_lowFoodN).Append(", petla ponad ConsumedValue zdjeta z wydatku jedzenia ").Append(N0(_lowFoodCut))
               .Append(", osad z konsumpcja bez BK ").Append(_noBkCons);
-            _noBkCons = 0;
+            _noBkCons = 0; _lowFoodN = 0; _lowFoodCut = 0;
             return sb.ToString();
         }
 
