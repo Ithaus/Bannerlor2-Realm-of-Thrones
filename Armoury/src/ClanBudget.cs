@@ -97,6 +97,7 @@ namespace Armoury
         internal static void Reset()
         {
             _b.Clear(); _saved.Clear(); _warGar.Clear(); _garTarget.Clear(); _day = -1; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
+            CourtFull.Reset();   // E5/A2 (recenzja): potkniecia, bledy i zapas "wlasnego" miedzy kampaniami
             ZeroLast(); ClearDay();
             // recenzja C1 (C1-G4): uchwyty BK i obiekty poprzedniej sesji (jak LosersFlee.Reset, PopulationLaw.Reset "wpis 87") - BK tworzy przy kazdym
             // wczytaniu nowy PopulationManager kluczowany obiektami Settlement; stary menedzer nie zna nowych osad, wiec po wczytaniu innego zapisu w tym
@@ -619,14 +620,14 @@ namespace Armoury
             share += CourtFull.Take(b, s, court, head.Gold);       // E5/A2 (R8): przydzial sprzetu przeterminowany dzis -> dwor (w wojnie ustepuje zoldowi po dworze)
             long x = (long)share;
             x = Math.Min(x, Math.Max(0, head.Gold - Math.Max(0, s.FamilyPurseFloor)));   // dwor nie oproznia kiesy glowy ponizej podlogi rodziny
-            CourtFull.Paid(b, seat, x, court);                     // E5/A2: liczniki - sprzet z reszty wplaty po dworze (podloga tnie sprzet)
+            long lp = CourtFull.Paid(b, seat, x, court);           // E5/A2: liczniki - sprzet z reszty wplaty po dworze (podloga tnie sprzet)
             _dFood += (long)food;
             if (x <= 0) return;
             int ix = (int)Math.Min(int.MaxValue, x);
             head.ChangeHeroGold(-ix);
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
             seat.Town.ChangeGold(ix);                              // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
-            ClanIncomeBook.NoteOwnPaid(seat, c, ix);               // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik)
+            ClanIncomeBook.NoteOwnPaid(seat, c, ix - CourtFull.Own(seat, c, lp));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
             _dCourt += ix;
         }

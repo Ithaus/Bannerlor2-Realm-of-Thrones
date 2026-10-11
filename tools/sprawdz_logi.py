@@ -14,9 +14,10 @@ Uzycie (Python 3, tylko odczyt):
                     progi konca etapu dla zimy F6/F7: zadna warownia AI nie glodzi przed 30. doba zimy, mediana zapasu U27 >= 364 dni - wiaza
                     tylko w biegu z zima, w biegu zwyklym INFO; F8 "glodne okregi tylko spustoszone/oblezone" - doby bez zimy). S10/S11 (E4/5) pomijaja
                     wiersze region-doba z konto_e46 = 1 w spichlerze-regiony.csv (E4/6 zmienil konto uchodzcow regionu tej doby).
---grupa etap5     : (etap 5) bloki paczek obecne w logu: E5/A2 (162, dwor pelny) A2-1..A2-9 - linia sprzetu niewydanego w "Budzet rodow (166)",
+--grupa etap5     : (etap 5) bloki paczek obecne w logu: E5/A2 (162, dwor pelny) A2-1..A2-11 - linia sprzetu niewydanego w "Budzet rodow (166)",
                     przelew do dworu w dobach 31-120 (--do-doby N), zgodnosc 166 = Obieg, reszta ksiegi, glowy < 5 000, hak B1 = 0, gracz bez dworu,
-                    bledy; panowie zamkow (budzet-rodow.csv) - INFO. Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
+                    bledy; A2-10/A2-11 zapas "wlasnego" (sprzet do wlasnej siedziby wraca jako wlasne, nie ziemia - linia D staly);
+                    panowie zamkow (budzet-rodow.csv) - INFO. Grupe zaklada E5/0 - przy scaleniu jedna etap5_main.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -1674,7 +1675,8 @@ def etap5_main(logp, start_arg, until=120):
 def etap5_a2(rep, lines, start, until, logp, bud):
     """E5/A2 (162, PLAN 5.2 - dwor pelny, R8): projekt rozdz. 3 "E5/A2" Test: dwor rosnie o przelew ze sprzetu, nic w nicosc, gracz bez dworu,
     D staly bez zmian definicji; ryzyko (rozdz. 3): wiecej zlota do kas siedzib - udzial panow zamkow (prog B3) jako INFO. Przelew zaczyna sie
-    po AiGearDaysCap (30) dobach od startu kampanii (przydzial musi dojsc do pulapu) - progi przelewu w dobach 31-until."""
+    po AiGearDaysCap (30) dobach od startu kampanii (przydzial musi dojsc do pulapu) - progi przelewu w dobach 31-until.
+    Recenzja A2 (uwaga 1): A2-10/A2-11 - sprzet wplacony do kasy WLASNEJ siedziby wraca jako "wlasne" (zapas w dopisku linii "D staly (169c)")."""
     obg = by_day(lines, "Obieg: dzien")
     cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
     win = [d for d in sorted(bud) if 1 <= run_day(d, start) <= until]
@@ -1739,6 +1741,50 @@ def etap5_a2(rep, lines, start, until, logp, bud):
     errs = [s for s in lines if s.startswith("ERROR in ") and "CourtFull" in s]
     stum = max([num(r"potkniecia E5/A2 (\d+)", bud[d], int, 0) or 0 for d in win] or [0])
     rep.add("E5/A2 A2-9: bledy CourtFull / potkniecia E5/A2", f"bledy {len(errs)}, potkniecia {stum}", "0 / 0", len(errs) == 0 and stum == 0)
+    # A2-10 / A2-11 (recenzja A2, uwaga 1): sprzet wplacony do kasy WLASNEJ siedziby wraca zaworem jako "wlasne", nie "ziemia" (zapas CourtFull.Own/OwnBack,
+    # dopisek linii "D staly (169c)"): zapas zamyka sie z doby na dobe (zapas = wczoraj zapas + wczoraj wplacone - wrocilo - korona i danina - ponad zawor
+    # - przyciete - utracone) i po zbudowaniu zapasu (doby 45-until) wraca > 0 jako "wlasne"
+    sdl = by_day(lines, "D staly (169c): dzien")
+    owre = re.compile(r"\[E5/A2 zapas wlasny[^\]]*?: wrocilo dzis (\d+), do korony i daniny (\d+), ponad zawor dnia (\d+), przyciete \(osada wydala\) (\d+)"
+                      r", utracone \(nowy pan\) (\d+), zapas (\d+) w (\d+) osadach, wplacone dzis (\d+)")
+    ow = {}
+    for d in sorted(sdl):
+        if 1 <= run_day(d, start) <= until:
+            m = owre.search(sdl[d])
+            if m:
+                ow[d] = [int(x) for x in m.groups()]
+    if not ow:
+        rep.add("E5/A2 A2-10: zapas wlasny (sprzet do wlasnej siedziby) w linii D staly (169c)", "brak dopisku",
+                "jest przy czynnej paczce i D stalym (Clan Income Book Stable D)", False if (rows and not off and sdl) else None)
+    else:
+        bad, pairs, resets = [], 0, 0
+        for d in sorted(ow):
+            if d - 1 not in ow:
+                continue
+            y0, r = ow[d - 1], ow[d]
+            outs = r[0] + r[1] + r[2] + r[3] + r[4]
+            if r[5] == 0 and r[6] == 0 and outs == 0 and (y0[5] > 0 or y0[7] > 0):   # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera
+                resets += 1
+                continue
+            pairs += 1
+            exp = y0[5] + y0[7] - outs
+            if abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):   # zaokraglenia 7 liczb linii + reszta < 1 zl kazdej osady, ktora wyszla z zapasu
+                bad.append(run_day(d, start))
+        rep.add("E5/A2 A2-10: zapas wlasny zamyka sie z doby na dobe (zapas = wczoraj zapas + wplacone - wrocilo - korona - ponad zawor - przyciete - utracone)",
+                f"niezgodne {len(bad)} z {pairs} par dob" + (f" (doby {bad[:6]})" if bad else "") + (f"; wczytania (zapas od zera) {resets}" if resets else ""),
+                "0 (tolerancja 5 zl + 1 zl na osade, ktora wyszla z zapasu)", (len(bad) == 0) if pairs else None)
+        lw = [d for d in ow if run_day(d, start) >= 45]
+        if lw:
+            back = st.mean(ow[d][0] for d in lw); inn = st.mean(ow[d][7] for d in lw)
+            stock = ow[max(lw)][5]
+            rep.add("E5/A2 A2-11: sprzet do wlasnych siedzib wraca jako wlasne (srednia dob 45-%d)" % until,
+                    f"wrocilo jako wlasne {back:.0f}/d, wplacone do wlasnych siedzib {inn:.0f}/d, zapas na koncu {stock} w {ow[max(lw)][6]} osadach",
+                    "> 0, gdy wplacone > 0 (inaczej zwrot wlasnego zlota szedlby do D stalego jako ziemia)", (back > 0) if inn > 0 else None)
+            crown = st.mean(ow[d][1] for d in lw); cap = st.mean(ow[d][2] for d in lw); trim = st.mean(ow[d][3] for d in lw); lost = st.mean(ow[d][4] for d in lw)
+            share = (100.0 * inn / paid) if paid else 0.0
+            rep.add("E5/A2 INFO: zapas wlasny - odplywy poza wlasne i udzial wlasnych siedzib w przelewie (srednia dob 45-%d)" % until,
+                    f"korona i danina {crown:.0f}, ponad zawor dnia {cap:.0f}, przyciete {trim:.0f}, utracone {lost:.0f}; do wlasnych siedzib {share:.0f}% przelewu sprzetu",
+                    "INFO (recenzja A2: ok. 93% przelewu do wlasnych siedzib - budzet-rodow.csv z31-A d120; zamek 1/3 do korony)", None)
     # INFO: co zostalo w kiesie glowy i dwor bez sprzetu (srednie dob 31-until)
     if late and rows and paid is not None:
         rep.add("E5/A2 INFO: zostalo w kiesie glowy (srednia dob 31-%d)" % until,

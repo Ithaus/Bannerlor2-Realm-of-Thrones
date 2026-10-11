@@ -335,6 +335,7 @@ namespace Armoury
                         CastlePurse.DuesOf(st, out cpay, out cspare);
                         if (_ownPaid.TryGetValue(st, out cpaid) && cpaid > 0 && cpay > 0 && cspare > 0)
                             cown = Math.Min(cpay, (long)(cpaid * Math.Min(1.0, (double)cpay / cspare)));
+                        cown += CourtFull.OwnBack(st, cpay, cspare, cpay - cown);   // E5/A2 (recenzja): zwrot zapasu sprzetu wplaconego do wlasnego zamku - wlasne, nie ziemia
                         if (cown > 0 && st.OwnerClan != null) { long o0; _ownCastleByClan.TryGetValue(st.OwnerClan, out o0); _ownCastleByClan[st.OwnerClan] = o0 + cown; }
                         RingOf(_rCastle, st).Push(cpay - cown);
                         continue;
@@ -346,6 +347,7 @@ namespace Armoury
                     long paid;
                     if (st.IsTown && _ownPaid.TryGetValue(st, out paid) && paid > 0 && pay > 0 && avail > 0)
                         own = Math.Min(pay, (long)(paid * Math.Min(1.0, (double)pay / avail)));
+                    if (st.IsTown) own += CourtFull.OwnBack(st, pay, avail, pay - own);   // E5/A2 (recenzja): to samo dla wlasnego miasta
                     if (own > 0 && st.OwnerClan != null) { long o0; _ownByClan.TryGetValue(st.OwnerClan, out o0); _ownByClan[st.OwnerClan] = o0 + own; }
                     RingOf(_rRent, st).Push(pay - own);
                 }
@@ -655,7 +657,7 @@ namespace Armoury
               .Append(" | dzis (swiat): linie modelu - podatek wsi ").Append(_dVd).Append(" (wedlug wsi BK ").Append(_dVdCalc).Append(", roznica u ").Append(_dVdOff).Append(" rodow), cla i podatek miast ").Append(_dWd)
               .Append(", polityki krolow ").Append(_dPol).Append(", zapomoga ").Append(_dSup).Append(", kontrakt ").Append(_dMerc).Append(", warsztaty ").Append(_dShop).Append(", karawany i partie ").Append(_dCarPar)
               .Append(" (w tym przelewy w rodzie ").Append(_dFamily).Append("), inne ").Append(_dOther).Append("; renta wsi ").Append(_dRentV).Append(", zawor miast ").Append(_dRentT).Append(" (wlasne ").Append(_dOwn).Append(')')
-              .Append(", zawor zamkow ").Append(_dRentC).Append(" (wlasne ").Append(_dOwnC).Append(')')
+              .Append(", zawor zamkow ").Append(_dRentC).Append(" (wlasne ").Append(_dOwnC).Append(')').Append(CourtFull.OwnNote())   // E5/A2 (recenzja): zapas "wlasnego"
               .Append(", zwrot korony ").Append(_dRefund).Append(", renty korony (180) ").Append(_dCrownRent).Append(", mennica i monopole ").Append(_dMint).Append(", jednorazowe ").Append(_dOnce).Append(" (podwojne ").Append(_dDouble).Append("), ziemia bez osady u ").Append(_dLooseN).Append(" rodow")
               .Append(" | inne z modelu dzis: znane linie (majatki BK, rada BK, podatki od wasali BK, sluzba u lorda BK, trybut, wezwanie do wojny, umowy handlowe, perk, zaulki) ").Append(_dKnown)
               .Append(", wplyw bez opisu (m.in. 'za tier' gry) ").Append(_dUnlisted)

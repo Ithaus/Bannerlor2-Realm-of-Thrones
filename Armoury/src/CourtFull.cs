@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Armoury
@@ -15,7 +16,8 @@ namespace Armoury
     /// w kiesie glowy (bieg z31-A d120: przydzial dnia 516 615 wobec 35 155 wydanych przez panow, L:31679; kiesy glow rodow +585 227/d, L:31716).
     /// Teraz przydzial, ktorego pan nie wydal przez AiGearDaysCap dni, przechodzi na DWOR (OB :277 "pieniadz ma krazyc, nie lezec"): dochodzi do
     /// wplaty dworu w ClanBudget.Court - jeden przelew glowa -> kasa siedziby (miasto albo zamek), ta sama tarcza dworu przy A1 wylaczonym
-    /// (SoldierPay.HoldCourt), ten sam licznik "wlasne" D stalego (ClanIncomeBook.NoteOwnPaid), ta sama pozycja ksiegi (MoneyLedger.MBudget).
+    /// (SoldierPay.HoldCourt), "wlasne" D stalego (dwor - ClanIncomeBook.NoteOwnPaid; sprzet do WLASNEJ siedziby - zapas Own/OwnBack, nizej), ta sama
+    /// pozycja ksiegi (MoneyLedger.MBudget).
     ///
     /// Regula (jedna dla dworu, kolejnosc ciec):
     ///  1. przeterminowany jest najwyzej jeden przydzial dnia (ten sprzed AiGearDaysCap dni); reszta nadwyzki ponad pulap (pulap maleje przy spadku D,
@@ -34,7 +36,16 @@ namespace Armoury
     ///
     /// Hak B1 (KL 1.3: dwor 80% kupcy / 20% lud): CourtFolkShare dziala dopiero z czynna kiesa ludu (klucz TownFolkLive powstaje w B1) - do tego
     /// czasu FolkShare = 0 i cala wplata dworu (z przeterminowanym sprzetem) idzie do kasy siedziby. B1 dzieli przelew w ClanBudget.Court.
-    /// Stan: tylko liczniki doby (zerowane w ClanBudget.ClearDay - takze w Reset miedzy kampaniami); nic do zapisu.
+    ///
+    /// Zapas "wlasnego" (recenzja A2, uwaga 1): sprzet wplacony do kasy WLASNEJ siedziby (siedziba nalezy do rodu-platnika) to pieniadze rodu - wracaja
+    /// zaworem przez wiele dob (miasto: renta PopulationLaw ok. 7% nadwyzki dziennie; zamek: zawor 110, 2/3 pan, 1/3 korona). 169c uznaje za "wlasne"
+    /// tylko ulamek zaworu jednej doby (wplata x zawor / kasa ponad prog, ClanIncomeBook.StableD.cs:336-349; _ownPaid czyszczone co dobe) - reszta
+    /// wracalaby jako "ziemia" i D staly rodu rosl o zawrot jego wlasnego niewydanego przydzialu (sprzezenie 166: dwor, sprzet, pulap zoldu; 165 od
+    /// StableLand). Dlatego czesc E5/A2 przelewu do wlasnej siedziby nie idzie do ClanIncomeBook.NoteOwnPaid, tylko do zapasu osady (Own); od nastepnej
+    /// doby StableBegin pyta OwnBack: zapas x (zawor dnia / kasa ponad prog) wraca jako "wlasne", az zapas sie wyczerpie. Sam dwor 162m - bez zmian
+    /// (NoteOwnPaid jak dotad; rozszerzenie na caly przelew dworu - decyzja Jeffa).
+    /// Stan: liczniki doby (ClanBudget.ClearDay) i zapas "wlasnego" w pamieci sesji (jak pierscienie D stalego - bez zapisu); Reset (ClanBudget.Reset,
+    /// konstruktor ArmouryBehavior - nowa kampania i kazde wczytanie) czysci wszystko, takze licznik potkniec i zapamietane bledy.
     /// </summary>
     internal static class CourtFull
     {
@@ -54,13 +65,46 @@ namespace Armoury
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
+        // recenzja A2 (uwaga 1): zapas "wlasnego" - sprzet wplacony do kasy WLASNEJ siedziby, ktory nie wrocil jeszcze zaworem (opis klasy, Own, OwnBack)
+        private sealed class OwnStock { public Clan C; public double V; }
+        private static readonly Dictionary<Settlement, OwnStock> _own = new Dictionary<Settlement, OwnStock>();        // zapas z dob poprzednich (zawor go widzi)
+        private static readonly Dictionary<Settlement, OwnStock> _ownToday = new Dictionary<Settlement, OwnStock>();   // wplaty dnia - do zapasu od jutra
+        private static double _dOwnBack, _dOwnCrown, _dOwnCap, _dOwnTrim, _dOwnLost;
+        private static long _dOwnIn;
+
         /// <summary>Sprzet niewydany -> dwor dzis (zl, wplacone do kas siedzib) - linia "Obieg".</summary>
         internal static long LastPaid { get { return _dPaid; } }
+
+        /// <summary>Recenzja A2 (uwaga 2): ClanBudget.Reset (miedzy kampaniami i po wczytaniu) - licznik potkniec, zapamietane bledy, zapas "wlasnego", liczniki doby.</summary>
+        internal static void Reset()
+        {
+            _stumbles = 0; _err.Clear(); _own.Clear(); _ownToday.Clear();
+            ClearDay();
+        }
 
         internal static void ClearDay()
         {
             _dGross = _dMerc = _dNoSeat = _dDebtor = _dReserve = _dYield = _dFloor = 0;
             _dPaid = _dPaidTown = _dPaidCastle = 0; _dGrossN = _dPaidN = 0;
+            _dOwnBack = _dOwnCrown = _dOwnCap = _dOwnTrim = _dOwnLost = 0; _dOwnIn = 0;
+            // recenzja A2 (uwaga 1): wczorajsze wplaty do wlasnych siedzib wchodza do zapasu - dzisiejszy zawor (PopulationLaw.Daily, CastlePurse.Daily)
+            // biegl juz po nich, przed ClanBudget.Daily (ClearDay na jego poczatku); dzisiejsze wplaty zawor zobaczy jutro
+            try { RollOwn(); } catch (Exception e) { Stumble("RollOwn", e); }
+        }
+
+        private static void RollOwn()
+        {
+            try
+            {
+                foreach (var kv in _ownToday)
+                {
+                    OwnStock o;
+                    if (_own.TryGetValue(kv.Key, out o) && ReferenceEquals(o.C, kv.Value.C)) { o.V += kv.Value.V; continue; }
+                    if (o != null) _dOwnLost += o.V;   // osada zmienila pana miedzy wplatami - stary zapas to juz nie pieniadze nowego pana
+                    _own[kv.Key] = kv.Value;
+                }
+            }
+            finally { _ownToday.Clear(); }   // po wyjatku w polowie - bez drugiego dodania tych samych wplat jutro
         }
 
         private static void Stumble(string where, Exception e)
@@ -127,22 +171,95 @@ namespace Armoury
         }
 
         /// <summary>ClanBudget.Court, po podlodze kiesy glowy: x - cala wplata dworu dzis (moze byc 0), court - udzial samego dworu (po ustapieniu zoldowi).
-        /// Dwor placony pierwszy, przeterminowany sprzet z reszty (podloga 162m). Tylko liczniki - zloto przelewa Court.</summary>
-        internal static void Paid(ClanBudget.B b, Settlement seat, long x, double court)
+        /// Dwor placony pierwszy, przeterminowany sprzet z reszty (podloga 162m). Tylko liczniki - zloto przelewa Court. Zwraca czesc sprzetu w wplacie x
+        /// (do zapasu "wlasnego" - Own).</summary>
+        internal static long Paid(ClanBudget.B b, Settlement seat, long x, double court)
         {
             try
             {
-                if (b == null || !(b.Lapsed > 0)) return;
+                if (b == null || !(b.Lapsed > 0)) return 0;
                 double want = b.Lapsed;
                 b.Lapsed = 0;
                 long courtPaid = Math.Min(Math.Max(0, x), (long)Math.Max(0, court));   // dwor pierwszy - tyle, ile 162m wplacilby bez sprzetu
                 long paid = Math.Min(Math.Max(0, x - courtPaid), (long)Math.Ceiling(want));
                 if (want > paid) _dFloor += want - paid;
-                if (paid <= 0) return;
+                if (paid <= 0) return 0;
                 _dPaid += paid; _dPaidN++;
                 if (seat != null && seat.IsTown) _dPaidTown += paid; else _dPaidCastle += paid;
+                return paid;
             }
-            catch (Exception e) { Stumble("Paid", e); }
+            catch (Exception e) { Stumble("Paid", e); return 0; }
+        }
+
+        /// <summary>Recenzja A2 (uwaga 1) - ClanBudget.Court, przy przelewie: czesc sprzetu lp wplacona do kasy WLASNEJ siedziby idzie do zapasu "wlasnego"
+        /// (wraca jako "wlasne" przez OwnBack az do zwrotu) zamiast do ClanIncomeBook.NoteOwnPaid. Zwraca kwote wzieta do zapasu - wolajacy odejmuje ja od
+        /// NoteOwnPaid (jedno liczenie). 0: siedziba nie jest rodu (zawor cudzej osady to renta jej pana - dochod z ziemi) albo D staly wylaczony.</summary>
+        internal static int Own(Settlement seat, Clan c, long lp)
+        {
+            try
+            {
+                if (lp <= 0 || seat == null || c == null || !ReferenceEquals(seat.OwnerClan, c) || !ClanIncomeBook.StableDOn) return 0;
+                OwnStock o;
+                if (!_ownToday.TryGetValue(seat, out o) || !ReferenceEquals(o.C, c)) { o = new OwnStock { C = c }; _ownToday[seat] = o; }
+                o.V += lp; _dOwnIn += lp;
+                return (int)Math.Min(int.MaxValue, lp);
+            }
+            catch (Exception e) { Stumble("Own", e); return 0; }
+        }
+
+        /// <summary>Recenzja A2 (uwaga 1) - ClanIncomeBook.StableBegin (169c), dla kazdego miasta i zamku, po "wlasnych" z wplat od ostatniej doby
+        /// (NoteOwnPaid): ile zaworu tej doby to zwrot zapasu (pieniadze rodu, nie ziemia). pay - czesc pana z zaworu dnia (miasto PopulationLaw.RentOf,
+        /// zamek CastlePurse.DuesOf), avail - kasa ponad prog przed zaworem, room - czesc zaworu dnia, ktora nie jest jeszcze "wlasne". Zapas schodzi o caly
+        /// zawor na swoja czesc (zapas / kasa ponad prog - jak tarcza dworu SoldierPay.DecayCourt): czesc pana -> "wlasne", obok niej zamek - czesc korony
+        /// (114), miasto - danina wojenna (KingdomTreasury.TownLevyToday); zapas przyciety do kasy ponad prog (osada wydala), znika przy zmianie pana.
+        /// Bez zaworu tej doby (oblezenie, kasa pod progiem, pan martwy - RentOf/DuesOf 0) zapas czeka. Tylko liczniki - zlota nie rusza.</summary>
+        internal static long OwnBack(Settlement st, long pay, long avail, long room)
+        {
+            try
+            {
+                OwnStock o;
+                if (st == null || !_own.TryGetValue(st, out o)) return 0;
+                if (!ReferenceEquals(st.OwnerClan, o.C)) { _dOwnLost += o.V; _own.Remove(st); return 0; }   // nowy pan - jego zawor to juz nie pieniadze platnika
+                if (pay <= 0 || avail <= 0) return 0;
+                double v = o.V;
+                if (v > avail) { _dOwnTrim += v - avail; v = avail; }   // kasa ponad prog mniejsza niz zapas - osada wydala reszte (towar, budowy)
+                double part = v / avail;
+                double lord = pay * part;
+                double other = (st.IsCastle ? CastleCrownOf(st, pay) : TownLevyOf(st)) * part;
+                if (lord + other > v) { double k = v / (lord + other); lord *= k; other *= k; }
+                long back = (long)Math.Min(Math.Max(0, room), lord);
+                _dOwnBack += back; _dOwnCap += lord - back; _dOwnCrown += other;
+                v -= lord + other;
+                if (v < 1) _own.Remove(st); else o.V = v;
+                return back;
+            }
+            catch (Exception e) { Stumble("OwnBack", e); return 0; }
+        }
+
+        // zamek: czesc korony obok czesci pana (CastlePurse.Daily 114: podzial ValveSplit przy CastleDuesSplitWithCrown i krolestwie rodu; korona = pan x (1 - u) / u)
+        private static double CastleCrownOf(Settlement st, long lordPay)
+        {
+            var s = Settings.Current;
+            var k = st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
+            if (s == null || !s.CastleDuesSplitWithCrown || k == null || k.IsEliminated) return 0;
+            double u = CastlePurse.LordShare(s);
+            return u > 0 && u < 1 ? lordPay * (1 - u) / u : 0;
+        }
+
+        // miasto: danina wojenna tej doby z kasy miasta (KingdomTreasury.Levies - przed ClanBudget.Daily)
+        private static double TownLevyOf(Settlement st)
+        {
+            int x; return KingdomTreasury.TownLevyToday.TryGetValue(st, out x) ? Math.Max(0, x) : 0;
+        }
+
+        /// <summary>Dopisek do linii "D staly (169c)" (po "zawor zamkow X (wlasne Y)" - te "wlasne" juz zawieraja zwrot zapasu): zapas "wlasnego" E5/A2.</summary>
+        internal static string OwnNote()
+        {
+            if (!On && _own.Count == 0 && _ownToday.Count == 0 && _dOwnLost <= 0) return "";
+            double v = 0; foreach (var o in _own.Values) v += o.V;
+            return " [E5/A2 zapas wlasny (sprzet wplacony do kasy wlasnej siedziby - wraca zaworem jako wlasne, nie ziemia): wrocilo dzis " + R(_dOwnBack)
+                   + ", do korony i daniny " + R(_dOwnCrown) + ", ponad zawor dnia " + R(_dOwnCap) + ", przyciete (osada wydala) " + R(_dOwnTrim)
+                   + ", utracone (nowy pan) " + R(_dOwnLost) + ", zapas " + R(v) + " w " + _own.Count + " osadach, wplacone dzis " + _dOwnIn + " (do zapasu od jutra)]";
         }
 
         /// <summary>Dopisek do linii "Budzet rodow (166)" (po "sprzet: przydzial dnia ...").</summary>
