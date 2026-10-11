@@ -32,8 +32,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ wlasne pozycje ksiegi (znak jak CW.AddWorld: +1 zrodlo/netto/minus-ujscie, -1 ujscie/korekta zrodel)
         internal const int UCtwLegacy = 0, UCtwBelow = 1, UPartyRemoved = 2, MUpgradeAi = 3, MUpgradePlayer = 4, MLordBuyPaid = 5, KCapFromPrice = 6, NCtwNet = 7,
-                           IU8Disb = 8, Items = 9;
-        private static readonly int[] Sign = { -1, -1, -1, +1, +1, +1, -1, +1, 0 };
+                           IU8Disb = 8, MRotSwapPurse = 9, Items = 10;   // D11-5: doplata podmiany ROT oddana do sakiewek ludzi / kas miast (RotLeaks37)
+        private static readonly int[] Sign = { -1, -1, -1, +1, +1, +1, -1, +1, 0, +1 };
         internal static readonly long[] Sum = new long[Items];
 
         internal static int Stumbles;
@@ -64,7 +64,7 @@ namespace Armoury
         /// <summary>Do sumy ZRODEL ksiegi (korekta: minus kapital nowych karawan z ceny kupna).</summary>
         internal static long SrcNow() { return -Sum[KCapFromPrice]; }
         /// <summary>Do sumy UJSC ksiegi (nowe ujscia minus zloto oddane odbiorcom przez 164a).</summary>
-        internal static long SinkNow() { return Sum[UCtwLegacy] + Sum[UCtwBelow] + Sum[UPartyRemoved] - Sum[MUpgradeAi] - Sum[MUpgradePlayer] - Sum[MLordBuyPaid]; }
+        internal static long SinkNow() { return Sum[UCtwLegacy] + Sum[UCtwBelow] + Sum[UPartyRemoved] - Sum[MUpgradeAi] - Sum[MUpgradePlayer] - Sum[MLordBuyPaid] - Sum[MRotSwapPurse]; }
         /// <summary>Do NETTO ksiegi (zmiana pola netto portfeli wezwan bez platnika).</summary>
         internal static long NetNow() { return Sum[NCtwNet]; }
 
@@ -81,9 +81,9 @@ namespace Armoury
             return ", portfele wezwan do wojny (168): dlug portfela sprzed paczki ze skarbcow " + Sum[UCtwLegacy] + ", wplaty do ujemnego portfela wezwanego " + Sum[UCtwBelow]
                    + ", kiesy partii usunietych bez zniszczenia (U8r) " + Sum[UPartyRemoved] + " (" + Measure31.RemovedText() + ")"
                    + "; w U8 rozwiazane (niszczyciel null) " + Sum[IU8Disb]
-                   + ", minus zloto oddane odbiorcom przez 164a " + (Sum[MUpgradeAi] + Sum[MUpgradePlayer] + Sum[MLordBuyPaid])
+                   + ", minus zloto oddane odbiorcom przez 164a " + (Sum[MUpgradeAi] + Sum[MUpgradePlayer] + Sum[MLordBuyPaid] + Sum[MRotSwapPurse])
                    + " (awanse AI do sakiewek i kas " + Sum[MUpgradeAi] + ", awanse gracza do sakiewki jego ludzi " + Sum[MUpgradePlayer]
-                   + ", kupno karawan BK - kapital i kasa miasta " + Sum[MLordBuyPaid] + ")";
+                   + ", kupno karawan BK - kapital i kasa miasta " + Sum[MLordBuyPaid] + ", doplata podmiany ROT do sakiewek i kas (D11-5) " + Sum[MRotSwapPurse] + ")";
         }
 
         internal static string NetText() { return ", portfele wezwan - zmiana pola netto bez platnika (168) " + Sg(Sum[NCtwNet]); }

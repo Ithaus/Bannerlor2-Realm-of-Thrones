@@ -22,8 +22,8 @@ namespace Armoury
     ///    przywracana przy Reset/anulowaniu razem z danymi ekranu), postfiks: przy zatwierdzeniu bez DoNotApplyGoldTransactions do sakiewki jego
     ///    ludzi min(koszt awansow, spadek kiesy gracza).
     /// Ksiega: zdarzenie gry w nicosc zostaje (okno O05 / "inne"), a obok nazwana pozycja "minus zloto oddane odbiorcom przez 164a" - netto 0.
-    /// Bez zmian: Stables (kon za awans), OutlawLaw (awanse band u pasera), MenUpgrade (dozbrajanie z sakiewki), RotLeaks37 (doplata przy
-    /// podmianie ROT - zostaje w nicosc, poza projektem E3/5).
+    /// Bez zmian: Stables (kon za awans), OutlawLaw (awanse band u pasera), MenUpgrade (dozbrajanie z sakiewki). Doplata przy podmianie ROT - od D11-5
+    /// ta sama regula w RotLeaks37 (do sakiewki ludzi druzyny, wlasna pozycja ksiegi Seal31.MRotSwapPurse).
     /// </summary>
     internal static class UpgradePurse
     {

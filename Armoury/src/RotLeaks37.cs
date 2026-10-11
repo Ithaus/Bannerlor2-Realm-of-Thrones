@@ -25,7 +25,11 @@ namespace Armoury
     ///    bez zdarzenia - siedzi w reszcie ksiegi pieniadza). Rebelie wola gra (miasta, DailyTickSettlement) i BK (zamki, BKSettlementBehavior.CheckRebellion),
     ///    obie przez StartRebellionEvent. Transpiler (asercja: dokladnie 1 ChangeHeroGold w metodzie): ta sama kwota z kasy zbuntowanej osady, najwyzej tyle,
     ///    ile w niej jest (GiveGoldAction osada -> przywodca; brak w kasie - nie dosypujemy).
-    /// Platnik -> odbiorca: kasa osady -> przywodca rebelii; zwrot podmiany ROT - bez przeplywu; doplata za drozszego - jak awans gry (pan -> nicosc, 3.1).
+    ///  - D11-5 (decyzja Jeffa 11.10, wylacznik RotSwapPayToPurse): doplata za drozszego zamiennika (to, co naprawde zeszlo z kiesy pana - migawka przed/po)
+    ///    idzie do sakiewki ludzi TEJ druzyny (owner.PartyBelongedTo - ROT zamienia tylko w druzynie pana; zalogi bez doplaty), jak oplata za awans E3/5
+    ///    (UpgradePurse): zolnierz kupi w miescie sprzet swojego stopnia. Banda, Inni albo sakiewki wylaczone - kasa najblizszego miasta. Ksiega: zdarzenie gry
+    ///    w nicosc zostaje, obok pozycja Seal31.MRotSwapPurse "minus zloto oddane odbiorcom" - netto 0 (wzor E3/5).
+    /// Platnik -> odbiorca: kasa osady -> przywodca rebelii; zwrot podmiany ROT - bez przeplywu; doplata za drozszego - pan -> sakiewka ludzi jego druzyny (D11-5).
     /// Wpiecie raz na proces (OnSessionLaunched - typ ROT juz wczytany).
     /// Wyjatki per wywolanie liczone (potkniecia), pierwszy na miejsce do logu; nic nie gasimy. Stan tylko licznikowy (doba i sesja), zerowany w EnsureHooks.
     /// </summary>
@@ -40,9 +44,12 @@ namespace Armoury
         // liczniki doby i sesji: [0] doba, [1] sesja
         private static readonly int[] _fromN = new int[2], _toN = new int[2], _rebelN = new int[2];
         private static readonly long[] _from = new long[2], _to = new long[2], _rebelPaid = new long[2], _rebelShort = new long[2];
+        // D11-5: doplata za drozszego -> sakiewka ludzi druzyny / kasa najblizszego miasta / bez odbiorcy (w nicosc jak w grze)
+        private static readonly long[] _toPurse = new long[2], _toTown = new long[2], _toLost = new long[2];
 
         private static bool SwapOn { get { var s = Settings.Current; return s != null && s.RotSwapNoGold; } }
         private static bool RebelOn { get { var s = Settings.Current; return s != null && s.RebelPurseFromTown; } }
+        private static bool PurseOn { get { var s = Settings.Current; return s != null && s.RotSwapPayToPurse; } }
 
         private static void Stumble(string where, Exception e)
         {
@@ -59,17 +66,17 @@ namespace Armoury
             try
             {
                 // tylko przypadek ROT: brak dajacego; bez odbiorcy (zaloga, owner null) gra i tak nic nie robi
-                if (SwapOn && giver == null)
+                if (giver == null)
                 {
-                    if (amount > 0)
+                    if (amount > 0 && SwapOn)
                     {
                         // zwrot za tanszego zamiennika - z niczego: blokujemy
                         skip = true;
                         if (recipient != null) for (int i = 0; i < 2; i++) { _fromN[i]++; _from[i] += amount; }
                     }
-                    else if (amount < 0 && recipient != null)
+                    else if (amount < 0 && recipient != null && (SwapOn || PurseOn))
                     {
-                        // doplata za drozszego (awans) - jak w grze, tylko liczymy faktycznie zdjete (kiesa nie schodzi ponizej 0)
+                        // doplata za drozszego (awans) - zdejmuje gra, liczymy faktycznie zdjete (kiesa nie schodzi ponizej 0); D11-5: zdjete -> sakiewka ludzi
                         countPaid = true;
                         before = recipient.Gold;
                     }
@@ -82,9 +89,40 @@ namespace Armoury
             try
             {
                 long paid = (long)before - recipient.Gold;
-                if (paid > 0) for (int i = 0; i < 2; i++) { _toN[i]++; _to[i] += paid; }
+                if (paid > 0)
+                {
+                    for (int i = 0; i < 2; i++) { _toN[i]++; _to[i] += paid; }
+                    if (PurseOn) RoutePaid(recipient, (int)Math.Min(int.MaxValue, paid));
+                }
             }
             catch (Exception e) { Stumble("SwapGold.licznik", e); }
+        }
+
+        /// <summary>D11-5: doplata zdjeta panu przez gre (w nicosc) -> sakiewka ludzi jego druzyny (jak awans E3/5); banda, Inni, sakiewki wylaczone - kasa
+        /// najblizszego miasta; bez druzyny - zostaje w nicosc jak w grze (licznik). Pozycja ksiegi Seal31.MRotSwapPurse zamyka pare.</summary>
+        private static void RoutePaid(Hero owner, int paid)
+        {
+            try
+            {
+                var mp = owner != null ? owner.PartyBelongedTo : null;
+                if (paid <= 0) return;
+                if (mp == null) { for (int i = 0; i < 2; i++) _toLost[i] += paid; return; }
+                bool noPurse = !MenPurse.On || mp.IsBandit || OutlawLaw.IsOutlawParty(mp) || Undead.Party(mp);
+                if (!noPurse)
+                {
+                    MenPurse.Add(mp, paid);
+                    Seal31.AddWorld(Seal31.MRotSwapPurse, paid);
+                    for (int i = 0; i < 2; i++) _toPurse[i] += paid;
+                    return;
+                }
+                var st = VillageTakings.NearestTown(mp);
+                if (st == null || st.SettlementComponent == null) { for (int i = 0; i < 2; i++) _toLost[i] += paid; return; }
+                st.SettlementComponent.ChangeGold(paid);
+                MoneyLedger.Note169(MoneyLedger.N169Other, st, paid);       // ksiega przeplywow osad (tylko licznik) - jak awanse band E3/5
+                Seal31.AddWorld(Seal31.MRotSwapPurse, paid);
+                for (int i = 0; i < 2; i++) _toTown[i] += paid;
+            }
+            catch (Exception e) { Stumble("RoutePaid", e); }
         }
 
         public static IEnumerable<CodeInstruction> SwapTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -152,7 +190,7 @@ namespace Armoury
         /// <summary>Z OnSessionLaunched: raz na proces wpina oba transpilery (typ ROT juz wczytany); zeruje liczniki sesji.</summary>
         internal static void EnsureHooks()
         {
-            for (int i = 0; i < 2; i++) { _fromN[i] = _toN[i] = _rebelN[i] = 0; _from[i] = _to[i] = _rebelPaid[i] = _rebelShort[i] = 0; }
+            for (int i = 0; i < 2; i++) { _fromN[i] = _toN[i] = _rebelN[i] = 0; _from[i] = _to[i] = _rebelPaid[i] = _rebelShort[i] = 0; _toPurse[i] = _toTown[i] = _toLost[i] = 0; }
             if (_tried) { Log.Info(StatusLine("przy starcie kampanii")); return; }
             _tried = true;
             try { if (_h == null) _h = new Harmony("com.jeff.armoury.rotleaks37"); } catch (Exception e) { Stumble("Harmony", e); return; }
@@ -182,7 +220,7 @@ namespace Armoury
 
         private static string StatusLine(string when)
         {
-            return "ROT szczelnosc (3.7) " + when + ": podmiana rekruta ROT bez zwrotu z niczego (doplata za drozszego jak awans gry) "
+            return "ROT szczelnosc (3.7) " + when + ": podmiana rekruta ROT bez zwrotu z niczego (doplata za drozszego " + (PurseOn ? "do sakiewki ludzi druzyny - D11-5" : "jak awans gry, w nicosc - D11-5 wyl.") + ") "
                    + (_swapHooked ? "wpieta" : "BRAK (ROTTroopRecruiter.ExchangeClanTroops: wywolan GiveGoldAction " + _swapCalls + ", oczekiwane 1)")
                    + " (wylacznik Rot Swap No Gold " + (SwapOn ? "wl." : "wyl.") + "); 50 000 przywodcy rebelii z kasy osady "
                    + (_rebelHooked ? "wpiete" : "BRAK (CreateRebelPartyAndClan: wywolan ChangeHeroGold " + _rebelCalls + ", oczekiwane 1)")
@@ -196,15 +234,16 @@ namespace Armoury
             {
                 if (_fromN[0] + _toN[0] + _rebelN[0] == 0 && _stumbles == _stumblesShown) return;
                 _stumblesShown = _stumbles;
-                Log.Info("ROT szczelnosc (3.7): dzien | podmiana ROT: zwrotow z niczego zablokowanych " + _fromN[0] + " (" + _from[0] + " zl; ten sam czlowiek, bez przeplywu), doplat za drozszego jak w grze "
-                         + _toN[0] + " (" + _to[0] + " zl w nicosc, jak oplata za awans - do zamkniecia razem z awansami, 3.1) | rebelie " + _rebelN[0] + ": z kas osad do przywodcow " + _rebelPaid[0]
-                         + " zl, brak w kasie (nie dosypany) " + _rebelShort[0] + " zl | sesja: podmiana - zwroty zablokowane " + _from[1] + " zl w " + _fromN[1] + " porcjach, doplaty jak w grze " + _to[1] + " zl w " + _toN[1]
-                         + " porcjach, rebelie " + _rebelN[1] + " (" + _rebelPaid[1] + " zl z kas) | potkniecia " + _stumbles + ".");
+                Log.Info("ROT szczelnosc (3.7): dzien | podmiana ROT: zwrotow z niczego zablokowanych " + _fromN[0] + " (" + _from[0] + " zl; ten sam czlowiek, bez przeplywu), doplat za drozszego "
+                         + _toN[0] + " (" + _to[0] + " zl zdjete panom -> D11-5 " + (PurseOn ? "WL" : "WYL - w nicosc jak w grze") + ": do sakiewek ludzi druzyny " + _toPurse[0] + ", do kas najblizszych miast (banda, Inni, bez sakiewek) "
+                         + _toTown[0] + ", bez odbiorcy (w nicosc) " + _toLost[0] + ") | rebelie " + _rebelN[0] + ": z kas osad do przywodcow " + _rebelPaid[0]
+                         + " zl, brak w kasie (nie dosypany) " + _rebelShort[0] + " zl | sesja: podmiana - zwroty zablokowane " + _from[1] + " zl w " + _fromN[1] + " porcjach, doplaty " + _to[1] + " zl w " + _toN[1]
+                         + " porcjach (do sakiewek " + _toPurse[1] + ", do kas miast " + _toTown[1] + "), rebelie " + _rebelN[1] + " (" + _rebelPaid[1] + " zl z kas) | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally
             {
-                _fromN[0] = _toN[0] = _rebelN[0] = 0; _from[0] = _to[0] = _rebelPaid[0] = _rebelShort[0] = 0;
+                _fromN[0] = _toN[0] = _rebelN[0] = 0; _from[0] = _to[0] = _rebelPaid[0] = _rebelShort[0] = 0; _toPurse[0] = _toTown[0] = _toLost[0] = 0;
             }
         }
     }
