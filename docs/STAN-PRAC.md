@@ -1349,3 +1349,13 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   partii - nie w etapie 8.
 - (19:40 UTC 12.10) **KONIEC KONTA ae222cb7 - przejscie na drugie konto (Jeff).** Pelny stan i kolejnosc: `docs/PRZEKAZANIE-2026-10-08.md` rozdz. 27 (+ 26b sciezki i sprzatanie).
   zbior-5-8 f01f47a (do E7/R1 wlacznie), a8-gentry0 bc5e3ef, e8-a 8a8df38 (E8/0), e8-b bf66298 (E8/M); recenzje E8/0 i E8/M dokanczane (wf_7d02158c-a00). W grze WGRANIE 33.
+- (20:15 UTC 12.10) **DRUGIE KONTO (sesja dbc3d3d1, limit 0%) - START.** Drzewa poprzedniego konta czyste, galezie zgodne z GitHub (zbior-5-8 f01f47a, a8-gentry0 bc5e3ef, e8-a 8a8df38,
+  e8-b 9237d23), gra zamknieta, w grze WGRANIE 33. **W TOKU: workflow wf_1db23a93-783** (skrypt `docs/przekazanie/wf-e8-dwa-drzewa-i-zbior.js`; wznowienie tylko w sesji dbc3d3d1),
+  trzy watki, przed kazda paczka bramka limitu konta (5 h >= 82% - czeka na odnowienie; tydzien >= 97% - watek staje), po kazdej recenzji push galezi (repo + GitHub):
+  (1) `w-toku/zbior-5-8` (zb\58): E7/R2, W4 (autor + recenzent), przeglad calosci ekonomia, przeglad calosci kod, scalenie `w-toku/a8-gentry0`;
+  (2) `w-toku/e8-a` (e8\a): recenzja E8/0, potem P1, P2, X, W, A, Z, L, C, R, B, O1, O2, O3, O5, O6;
+  (3) `w-toku/e8-b` (e8\b): E8/RC, potem NOWE drzewo `w-toku/e8-c` (e8\c, od e8-a po E8/0): P3, S, Q, G1, G2, T, E, K, D1, D2.
+  **Zmiana wobec wf-e8-kod.js:** watek Armoury podzielony na dwa drzewa (A = sprzet/lup/ceny/optymalizacja, C = stan/karawany/start/zadania - pliki rozlaczne wedlug projektu 5.1;
+  wzor: e7-a/e7-b), zeby skrocic czas o ok. 6 h; **E8/H (jezdziec = kon + uprzaz) dopiero PO scaleniu** (dotyka plikow obu drzew), O4 po tescie.
+  **DALEJ:** scalenie zbior-5-8 + e8-a + e8-c + e8-b (weryfikacja mechaniczna "nic nie zginelo"), E8/H, przeglad kolizji etapu 8, pelny audyt (kilka niezaleznych przegladow +
+  sprawdzenie znalezisk), autotest z plikami danych e7-b, test zbiorczy (120 dob + zapis 9 dob + bieg dlugi + zdjecia proby drog; zima - gdy Jeff zdecyduje), poprawki, wgranie.
