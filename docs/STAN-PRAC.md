@@ -1280,3 +1280,12 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   (1) odchylki cennika (rzad konski z prawdziwej wagi, helmy t4-6, luki wojenne t3-6; opcjonalnie konie wedlug kategorii) - **TAK, etap 8 (8.5)**; (2) dochody gracza
   (nagrody zadan, turnieje, okupy) przeliczone do nowych cen, nagroda z kiesy zleceniodawcy liczona w dniach zoldu druzyny, bez zlota z niczego - **TAK, etap 8 (nowe 8.18)**;
   (3) drogi ser/drewno/plotno/srednie zbroje to niedobor produkcji, nie cennik - **OK** (czesc robi etap 6: W1, W3).
+- (12:00 UTC 12.10) **Etap 7: projekt v2 gotowy** (`docs/etap7/PROJEKT-ETAP7-MAPA-DROGI-WIOSKI-2026-10-12.md`, krytyka 23 uwagi - wszystkie przyjete; commit 7bc5db6). Paczki: E7/0, T, K, C, O1, O2,
+  L, B, W1, W2, W3, R1 (NK, po E5/A7 i W1), R2 (NK), W4, W5, D0 (proba drog - przeniesienie z w-toku/p2-drogi-proba 95f05be, domyslnie wylaczona); D1/D2 po tescie i decyzji Jeffa.
+  Ustalenia: Myr-Tyrosh pokoj i wojna po 3 dniach to nasze wezwanie do wojny 168 (cena wezwania 5 tys. -> 200 tys.) - do obserwacji; CampBattlePropsEnabled nadal false mimo
+  "wlaczyc" Jeffa 09.10 (w kodzie i w Armoury.json :302) - robi E7/O2; CrossingLaw (petla AI martwa) do etapu 8. **Pytania do Jeffa (rozdz. 6):** (1) premia +15% po drodze -
+  rada NIE (drogi tylko do patrzenia, MCM 0); (2) ile drog - po zdjeciach, rada trakty + droga do kazdej wioski; (3) plik ustawien Diplomacy Jeffa przeliczyc na rok 364 -
+  rada TAK (gra zamknieta, kopia .bak; plik w folderze gry/Documents - polecenie dla Jeffa albo jego zgoda); (4) myto na Bliznakach w ogole - rada: najpierw kierunek.
+- W TOKU (12:00 UTC): workflow wf_17813d40-8ac - etap 7 kod w dwoch drzewach od w-toku/e5-wsie: `w-toku/e7-a` (SCRATCH\e7\a: E7/0, O1, T, C, K, O2) i `w-toku/e7-b`
+  (SCRATCH\e7\b: L, B, W1, W2, W3, W5, D0); galezie wypychane co 15 min. Rownolegle nadal wf_aa159ecf-f65 (etap 6 porcja 3, `w-toku/e6-p3`). Potem: scalenie e6-p3 + e7-a + e7-b
+  (+ etap 5 reszta: porcja C, E5/A7 lup z rabunku i male zrodla), E7/R1, R2, W4, projekt i kod etapu 8, pelny audyt, test zbiorczy.
