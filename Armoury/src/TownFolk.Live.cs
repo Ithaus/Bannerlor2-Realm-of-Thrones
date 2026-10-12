@@ -36,8 +36,6 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje zarobku poza oknem Note (podzial klas KL 1.3)
         internal const int ELabour = 11, ETurn = 12, ETopUp = 13, EValve = 14, EPublic = 15;
         private const int EKinds = 16;
-        private static readonly string[] EName = { "zycie zolnierzy", "ludzie karawan", "bandy", "zalogi", "dwor", "place budow", "kopalnie", "place warsztatow",
-                                                   "-", "-", "-", "robocizna handlu", "obrot P", "doplata do 35%", "5% zaworu", "roboty gminy" };
         // kategorie "lepsze" (budzet nadwyzki) i zakupy wsi - lista sprawdzana przy pierwszym uzyciu z ItemCategories.All (linia stanu podaje znalezione)
         private static readonly string[] BetterIds = { "meat", "beer", "wine", "linen", "velvet", "pottery", "cheese", "oil" };
         private static readonly string[] VillIds = { "salt", "tools", "linen", "pottery", "beer" };
@@ -743,7 +741,13 @@ namespace Armoury
             var st = f.St; var town = st.Town;
             if (town == null) return;
             d.Castles++;
-            if (!CastleLive) return;
+            if (!CastleLive)
+            {
+                // zawor zamku 110 wylaczony przy kiesie czynnej: kiesa podzamcza wraca do kasy zamku (stan sprzed B1 dla zamkow), kredyt dworu 0; ponowne wlaczenie - z nadwyzki
+                if (f.KW > 0) { town.ChangeGold((int)Math.Min(int.MaxValue, f.KW)); _ctlOut += f.KW; f.KW = 0; _seedC = 0; }
+                f.CourtCr = 0; Array.Clear(f.EarnWin, 0, 3); f.Offer[0] = 0; f.FacOk = false;
+                return;
+            }
             // ---- 1. pan 3% od zarobku okna
             long tax = (long)Math.Round(f.EarnWin[0] * TaxC);
             d.CInc += f.EarnWin[0];
@@ -1169,7 +1173,7 @@ namespace Armoury
                         var st = Settlement.Find(a[0]);
                         long kw = L(a[9]), kr = L(a[10]), kp = L(a[11]), kg = L(a[12]), cc = L(a[13]);
                         var f = st != null ? Get(st) : null;
-                        if (f == null || f.Kind > 1 || f.Kind.ToString(Inv) != a[1])
+                        if (f == null || f.Kind.ToString(Inv) != a[1] || (f.Kind == 2 && kw + kr + kp + kg != 0))
                         {
                             // osada nieznana albo innego rodzaju: kiesy do kasy osady (gdy jest miastem/zamkiem) albo do najblizszej doby - nic w nicosc
                             long x = Math.Max(0, kw) + Math.Max(0, kr) + Math.Max(0, kp) + Math.Max(0, kg);
