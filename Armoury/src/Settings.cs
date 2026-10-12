@@ -1473,6 +1473,12 @@ namespace Armoury
         // E7/T (225, PLAN 7.4, R2): kary terenu dokladnie jak gra - zwrot = netto kary gry (ForestKin zwiadowcy, cecha lasu, cecha pustyni), nasza plaska kara
         // w tym samym ulamku (TerrainEase.SpeedPostfix); off = pelny zwrot kary gry jak dotad (Polnoc w lesie i Dorne na pustyni szybciej niz po rowninie)
         public bool TerrainEaseExact = true;               // a culture or a scout that halves the game's forest or desert penalty halves ours too - the penalty shrinks, it never turns into a bonus (off = the whole game penalty is given back, as before)
+        // E7/K (226, PLAN 7.7, R8): turnieje co 3. tydzien caly rok - formula gry, tydzien = (int)ToWeeks % 3 zamiast tygodnia pory (WorldTime7.TournamentPrefix);
+        // off = gra: tylko tygodnie pory 0-2 z 13
+        public bool TournamentsAllSeason = true;           // towns hold tournaments in every week of the season, each town every third week - as often per day as in the short calendar (off = only in the first three weeks of each season, as in the game)
+        // E7/K (226, PLAN 7.7, R8, krytyka K1-06): stale kalendarza gry x rok/84 - sojusz 84 -> 364, wezwanie do wojny 42 -> 182 (postfiksy getterow DefaultAllianceModel),
+        // przerwa po pokoju przed propozycja wojny gry 20 -> ok. 87 dni (postfiks GetRandomWarDecision, Priority.Low - po BK); off = dni gry 84 / 42 / 20
+        public bool DiplomacyYearLong = true;              // alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)
 
         public static void Load(string moduleDataDir)
         {

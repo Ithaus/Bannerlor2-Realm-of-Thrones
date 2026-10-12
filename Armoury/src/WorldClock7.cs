@@ -298,6 +298,8 @@ namespace Armoury
 
         internal static void Daily()
         {
+            string k7 = null;   // E7/K (226): propozycje wojny gry wstrzymane rozejmem od poprzedniej linii - odczyt zeruje licznik doby takze przy wylaczonym pomiarze
+            try { k7 = WorldTime7.TakeDaySegment(); } catch { k7 = null; }
             if (!On) { ZeroDay(); return; }
             var sw = Stopwatch.StartNew();
             // dzien linii = doba ksiegi (dzien gry - 1, jak "Pieniadz swiata"): tick dobowy biegnie na poczatku doby, liczniki sa z doby, ktora minela
@@ -310,6 +312,7 @@ namespace Armoury
                   .Append(_dOtherCauses.Count > 0 ? " (" + Join(_dOtherCauses) + ")" : "").Append(", krolestw zniszczonych ").Append(_dDestroyed)
                   .Append(" | par z nowa wojna < ").Append(QuickWarDays).Append(" dni po pokoju: ").Append(_dQuick)
                   .Append(_dQuickList.Count > 0 ? " (" + string.Join("; ", _dQuickList) + ")" : "").Append(", od startu sesji ").Append(_sQuick)
+                  .Append(k7 != null ? " | " + k7 : "")
                   .Append(" | potkniecia ").Append(_stumbles);
                 Log.Info(sb.ToString());
             }

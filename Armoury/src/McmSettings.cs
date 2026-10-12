@@ -4752,6 +4752,14 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool TerrainEaseExact { get; set; } = true;
 
+        [SettingPropertyBool("Tournaments All Season", HintText = "towns hold tournaments in every week of the season, each town every third week - as often per day as in the short calendar (off = only in the first three weeks of each season, as in the game)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool TournamentsAllSeason { get; set; } = true;
+
+        [SettingPropertyBool("Diplomacy Year Long", HintText = "alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool DiplomacyYearLong { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5939,6 +5947,8 @@ namespace Armoury
             s.Stage7MeasureLog = Stage7MeasureLog;
             s.SleepersHoldOrders = SleepersHoldOrders;
             s.TerrainEaseExact = TerrainEaseExact;
+            s.TournamentsAllSeason = TournamentsAllSeason;
+            s.DiplomacyYearLong = DiplomacyYearLong;
         }
 
         internal static void Apply()

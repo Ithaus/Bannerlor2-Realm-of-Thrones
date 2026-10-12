@@ -105,6 +105,11 @@ Uzycie (Python 3, tylko odczyt):
                     += realDt, akumulator dt poza misja) tylko na liscie wyjatkow bloku (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8),
                     T2 tekst MCM World Pace Percent (Settings.cs i McmSettings.cs) bez "168" i "month"; linia startowa "Jedna skala czasu (E7/C)" i T3 odnowien
                     pogoni na dobe gry (dopisek "E7/C:" linii konca pogoni HideoutPurge) - INFO.
+                    Blok E7/K (226) - linia startowa "Czas swiata (E7/K)": T8 postfiks rozejmu wpiety (po BK), prefiks turniejow wpiety i trafia,
+                    postfiksy sojuszy wpiete; T1 najdluzsze okno bez startu turnieju gry < 14 dob, T2 starty w kazdym tygodniu pory 0-12, T3 nowe
+                    porozumienia wezwan 168 "przez N dob" = wezwanie z linii startowej (182), T4 KRONIKA (CS) wojen naraz w d61-until >= 7, T7 nowa
+                    wojna z decyzji krolestwa po pokoju krocej niz rozejm gry (87 dni) 0, T0 bledy WorldTime7 i potkniecia 0; wstrzymane propozycje,
+                    T5 nagrody turniejow (Szczelnosc 164a), T6 GrandTourney - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -6474,6 +6479,159 @@ def etap7_c(rep, lines, start, until, logp=None, csp=None):
         rep.add("E7/C T3: odnowien pogoni odwetu na dobe gry", "brak pogoni w logu", "INFO (odwet rusza po przeszukaniu kryjowki z bandami w poblizu)", None)
 
 
+E7K_START = "Czas swiata (E7/K):"
+E7K_CTW = re.compile(r"^Wezwania do wojny \(168\): .+ wzywa .+ przez (\d+) dob")
+
+
+def etap7_k(rep, lines, start, until, logp=None, csp=None):
+    """E7/K (226): turnieje, sojusze i rozejm w roku 364 (projekt etapu 7 v2 rozdz. 3 "E7/K" Test, PLAN 7.7, R8). T8 linia startowa "Czas swiata (E7/K)":
+    prefiks turniejow wpiety i trafia (metoda na koncu lancucha modeli z DefaultTournamentModel), postfiksy sojuszy wpiete, postfiks rozejmu wpiety i po BK;
+    T1 najdluzsze okno bez startu turnieju gry < 14 dob, T2 starty w kazdym tygodniu pory (okno >= tyle tygodni, ile ma pora), T3 nowe porozumienia wezwan
+    168 "przez N dob" = wezwanie z linii startowej (182 przy roku 364; caly log po linii startowej), T4 KRONIKA WOJEN (CS) - wojen naraz w kazdej linii dob
+    kampanii 61-until >= 7, T7 nowa wojna z decyzji krolestwa (przyczyna CausedByKingdomDecision) po pokoju tej pary krocej niz rozejm z linii startowej
+    (cale dni linii, -1 na zaokraglenie dnia) - 0, T0 bledy WorldTime7 i potkniecia E7/K 0. Wstrzymane propozycje, T5 nagrody turniejow (Szczelnosc 164a),
+    T6 GrandTourney - INFO. Wylacznik off w linii startowej - progi tej czesci INFO."""
+    st_ = [s for s in lines if s.startswith(E7K_START)]
+    if not st_:
+        rep.add("E7/K: linia startowa Czas swiata (E7/K)", "brak w logu", "jest od wgrania E7/K (log sprzed E7/K?)", None)
+        return
+    s0 = st_[-1]
+    tour_on = "turnieje co 3. tydzien" in s0
+    diplo_on = "DiplomacyYearLong off" not in s0
+    part = num(r"wezwanie (\d+)", s0)
+    truce = num(r"rozejm gry (\d+) dni", s0)
+    bad = []
+    if tour_on and ("prefiks wpiety" not in s0 or "(trafia)" not in s0):
+        bad.append("prefiks turniejow niewpiety albo nie trafia")
+    if "postfiksy wpiete" not in s0:
+        bad.append("postfiksy sojuszy niewpiete")
+    if "(postfiks wpiety" not in s0:
+        bad.append("postfiks rozejmu niewpiety")
+    if "po BK NIE" in s0:
+        bad.append("rozejm przed BK")
+    if "| BRAK:" in s0:
+        bad.append("BRAK")
+    rep.add("E7/K T8: linia startowa - latki wpiete (rozejm po BK, prefiks turniejow trafia)", s0[:400] + (f" | {'; '.join(bad)}" if bad else ""),
+            "postfiks rozejmu wpiety, bez BRAK i NIE", not bad)
+    # ---- T0 bledy i potkniecia
+    errs = [s for s in lines if s.startswith("ERROR in WorldTime7")]
+    wd = {}
+    for s in lines:
+        if s.startswith("Wojna i pokoj (E7/0): dzien") and "| od poprzedniej linii:" in s:
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                wd[k] = s
+    win_w = [d for d in sorted(wd) if 1 <= run_day(d, start) <= until]
+    stum = max([num(r"E7/K potkniecia (\d+)", wd[d], default=0) or 0 for d in win_w] or [0])
+    rep.add("E7/K T0: bledy WorldTime7 i potkniecia E7/K", f"ERROR in WorldTime7 {len(errs)}; potkniecia (najwiecej w linii dobowej) {stum}"
+            + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 i 0", len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/K T0: bledy WorldTime7 polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="WorldTime7")
+    held = [num(r"wstrzymane rozejmem: (\d+)", wd[d]) for d in win_w]
+    held = [h for h in held if h is not None]
+    rep.add("E7/K: propozycje wojny gry wstrzymane rozejmem (okno)",
+            f"{sum(held)} w {len(held)} dobach z liczba" if held else "brak liczby w linii dobowej (pomiar E7/0 wylaczony albo DiplomacyYearLong off)",
+            "INFO (gra losuje znow przy nastepnej probie)", None)
+    # ---- T1/T2 turnieje
+    tu = by_day(lines, "Turnieje (E7/0): dzien")
+    win = [d for d in sorted(tu) if 1 <= run_day(d, start) <= until]
+    if not win:
+        rep.add("E7/K T1/T2: turnieje gry", "brak linii Turnieje (E7/0) w oknie", "linia E7/0 (Stage7MeasureLog)", None)
+    else:
+        started = {d: (num(r"rozpoczete od poprzedniej linii (\d+)", tu[d], default=0) or 0) for d in win}
+        gap, best, best_end, weeks = 0, 0, None, {}
+        for d in win:
+            if started[d] > 0:
+                gap = 0
+                w = num(r"tydzien pory (\d+)", tu[d])
+                if w is not None:
+                    weeks[w] = weeks.get(w, 0) + started[d]
+            else:
+                gap += 1
+                if gap > best:
+                    best, best_end = gap, d
+        rep.add("E7/K T1: najdluzsze okno bez startu turnieju gry", f"{best} dob" + (f" (do d{run_day(best_end, start)})" if best_end is not None else "")
+                + f"; startow {sum(started.values())} w {len(win)} dobach", "< 14 dob" if tour_on else "INFO (TournamentsAllSeason off)",
+                (best < 14) if tour_on else None)
+        wmax = num(r"tydzien pory \d+ \(0-(\d+)", tu[win[-1]])
+        nweeks = (wmax if wmax is not None else 12) + 1
+        empty = [w for w in range(nweeks) if w not in weeks]
+        enough = len(win) >= 7 * nweeks
+        rep.add("E7/K T2: starty turniejow w kazdym tygodniu pory", f"tygodnie bez startu {empty if empty else '-'} (z 0-{nweeks - 1}; okno {len(win)} dob)",
+                "brak pustych tygodni" if tour_on and enough else "INFO (okno krotsze niz pora albo TournamentsAllSeason off)",
+                (not empty) if tour_on and enough else None)
+    # ---- T3 porozumienia wezwan 168 (caly log po pierwszej linii startowej E7/K)
+    i0 = lines.index(st_[0])
+    durs = []
+    for s in lines[i0:]:
+        m = E7K_CTW.match(s)
+        if m:
+            durs.append(int(m.group(1)))
+    if not durs:
+        rep.add("E7/K T3: nowe porozumienia wezwan (168) - przez N dob", "brak nowych porozumien po linii startowej", f"INFO (oczekiwane {part} dob)", None)
+    else:
+        other = sorted({x for x in durs if x != part})
+        rep.add("E7/K T3: nowe porozumienia wezwan (168) - przez N dob", f"{len(durs)} porozumien, inne niz {part}: {other if other else '-'}",
+                f"wszystkie {part} dob (wezwanie z linii startowej)", (not other) if part is not None else None)
+    # ---- T4 KRONIKA (CS): wojen naraz w dobach kampanii 61-until (chwile z zegara obu logow, jak E7/0 T1)
+    name4 = f"E7/K T4: KRONIKA WOJEN (CS) - wojen naraz w dobach kampanii 61-{until}"
+    if until < 61:
+        rep.add(name4, f"okno do d{until}", ">= 7 (od doby 61)", None)
+    elif not logp:
+        rep.add(name4, "bez logu", ">= 7", None)
+    else:
+        path, how = crashscribe_session_of(logp, csp)
+        a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+        c0 = _start_dt_of(path) if path else None
+        if not path or a0 is None or c0 is None:
+            rep.add(name4, how if not path else "brak chwili startu logu Armoury albo CS", ">= 7 (bez logu sesji - INFO)", None)
+        else:
+            days = {d for d in tu if 61 <= run_day(d, start) <= until}
+            times = [t for t, s in _abs_lines(logp, a0) if s.startswith("Turnieje (E7/0): dzien") and num(r"dzien (\d+)", s) in days]
+            if not times:
+                rep.add(name4, "brak linii Turnieje (E7/0) w dobach 61-until", ">= 7", None)
+            else:
+                lo, hi = min(times), max(times)
+                cnt = []
+                for t, s in _abs_lines(path, c0):
+                    m = E7_KRON.match(s)
+                    if m and m.group(1) == "dzien" and lo <= t <= hi:
+                        cnt.append(len(_kron_set(m.group(2))))
+                if not cnt:
+                    rep.add(name4, f"brak linii KRONIKI (dzien) w czasie dob 61-until ({os.path.basename(path)})", ">= 7", None)
+                else:
+                    rep.add(name4, f"najmniej {min(cnt)}, srednio {sum(cnt) / len(cnt):.1f}, najwiecej {max(cnt)} ({len(cnt)} linii; {os.path.basename(path)})",
+                            ">= 7 w kazdej linii (polowa 14-17 z 11.10)", min(cnt) >= 7)
+    # ---- T7 nowa wojna z decyzji krolestwa przed koncem rozejmu gry
+    lim = (truce - 1) if truce is not None else None
+    viol, n_kd = [], 0
+    for s in lines:
+        m = E7_WAR.match(s)
+        if not m or m.group(4) != "WOJNA" or not m.group(5).startswith("CausedByKingdomDecision") or not (1 <= run_day(int(m.group(1)), start) <= until):
+            continue
+        n_kd += 1
+        dd = num(r"tej pary (\d+) \(POKOJ\)", s)
+        if dd is not None and lim is not None and dd < lim:
+            viol.append(f"{m.group(2)} - {m.group(3)} {dd} d (d{run_day(int(m.group(1)), start)})")
+    val7 = f"{len(viol)} z {n_kd} wojen z decyzji krolestwa" + (f": {'; '.join(viol[:5])}" if viol else "")
+    rep.add("E7/K T7: nowa wojna z decyzji krolestwa krocej niz rozejm gry po pokoju tej pary", val7,
+            f"0 (rozejm {truce} dni, prog {lim} cale dni; decyzje gracza i Diplomacy - pytanie 3 - recznie)" if diplo_on else "INFO (DiplomacyYearLong off)",
+            (not viol) if diplo_on and lim is not None else None)
+    # ---- T5 nagrody turniejow (Szczelnosc 164a), T6 GrandTourney
+    sea = by_day(lines, "Szczelnosc (164a): dzien")
+    want = paid = cut = 0
+    for d in sea:
+        if 1 <= run_day(d, start) <= until:
+            m = re.search(r"nagrody turniejow: gra chciala (\d+), zaplacili (\d+), uciete (\d+)", sea[d])
+            if m:
+                want += int(m.group(1))
+                paid += int(m.group(2))
+                cut += int(m.group(3))
+    rep.add("E7/K T5: nagrody turniejow AI (Szczelnosc 164a, okno)", f"gra chciala {want}, zaplacili {paid}, uciete {cut}" + (f" ({100.0 * cut / want:.1f}%)" if want else ""),
+            "INFO (platnik - miasto-gospodarz z nadwyzka)", None)
+    rep.add("E7/K T6: GrandTourney - zjazdy lordow na sezon", "poza blokiem (log GrandTourney - skopiowac przed biegiem zapisu)", "INFO (ok. 4x wiecej turniejow na rok)", None)
+
+
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
@@ -6492,7 +6650,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
         start = alld[0] if alld else 0
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
