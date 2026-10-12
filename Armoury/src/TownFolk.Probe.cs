@@ -48,6 +48,7 @@ namespace Armoury
         private static int _brUnclosed, _brMismatch, _brAborted;
         // recenzja E5/0 (2-1): dokup jedzenia BK (zapas warowni <= 10% gornej granicy w chwili otwarcia nawiasu - ten sam warunek co BK :532)
         private static bool _brLowFood; private static int _lowFoodN; private static double _lowFoodCut;
+        private static int _brGoldMark; private static ItemCategory _brGoldCat; private static long _brFoodGold;   // recenzja B1 (1-5): zloto wierszy jedzenia w nawiasie (gmina w PayForGoods)
         private static readonly Dictionary<ItemCategory, int> _grp = new Dictionary<ItemCategory, int>();
         private static long _foodTown, _foodCastle;
         private static readonly double[] _satPlus = new double[4], _satMinus = new double[4];
@@ -76,7 +77,7 @@ namespace Armoury
             Array.Clear(_bPaid, 0, BSrc); Array.Clear(_bBelow, 0, BSrc); _unsold = 0; _unsoldVisits = 0;
             Array.Clear(_take, 0, Takes); Array.Clear(_takeBelow, 0, Takes); _rentPaid = _rentBelow = 0; _noBkCons = 0;
             _brTrack.Clear(); _pool.Clear(); _poolN = 0; _brTown = null; _brOpen = false; _brUnclosed = _brMismatch = _brAborted = 0;
-            _brLowFood = false; _lowFoodN = 0; _lowFoodCut = 0;
+            _brLowFood = false; _lowFoodN = 0; _lowFoodCut = 0; _brGoldMark = 0; _brGoldCat = null; _brFoodGold = 0;
             _grp.Clear(); _foodTown = _foodCastle = 0; Array.Clear(_satPlus, 0, 4); Array.Clear(_satMinus, 0, 4);
             _btN = _btN1 = _btN2 = _btN3 = _btOffN = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = _btAOff = _btC1Off = 0; _btOpen = false; _btLead = null;
             _ntTownOut = _ntTownIn = _ntVillOut = _ntVillIn = 0; _ntAll = _ntVill = _ntCastleMarket = 0; _ntDemand.Clear();
@@ -175,6 +176,7 @@ namespace Armoury
                 long t = Stopwatch.GetTimestamp();
                 if (_brOpen) _brUnclosed++;
                 _brTown = __0; _brOpen = true; _brTrack.Clear(); _poolN = 0; _brGold0 = __0.Gold;
+                _brGoldMark = __0.Gold; _brGoldCat = null; _brFoodGold = 0;   // recenzja B1 (1-5): zloto wierszy jedzenia od zera
                 _brAnchor = false; _brFacFood = _brFacRest = 1;   // E5/B1: czynniki kotwicy tego nawiasu (AnchorDict nizej)
                 // recenzja E5/0 (2-1): warunek dokupu jedzenia BK (EconomyPatches :532) - zapas sie w petli nie zmienia (polka i kasa tak; FoodStocksUpperLimit to odczyt modelu)
                 _brLowFood = false;
@@ -209,6 +211,10 @@ namespace Armoury
             {
                 if (!_brOpen || __2 == null || !ReferenceEquals(__0, _brTown)) return;
                 long t = Stopwatch.GetTimestamp();
+                // recenzja B1 (1-5): zloto wiersza = przyrost kasy miedzy kolejnymi wierszami (BK ChangeGold(num6) idzie po CalculateBudget tego wiersza) - czesc jedzenia dla gminy
+                int g = __0.Gold;
+                if (_brGoldCat != null && GroupOf(_brGoldCat) == 0) _brFoodGold += g - _brGoldMark;
+                _brGoldMark = g; _brGoldCat = __2;
                 Track tr;
                 if (!_brTrack.TryGetValue(__2, out tr))
                 {
@@ -288,6 +294,16 @@ namespace Armoury
         public static void ConsumeFinalizer(Exception __exception)
         {
             try { if (__exception != null && _brOpen) { _brAborted++; _brOpen = false; _brTown = null; _brAnchor = false; } } catch { }
+        }
+
+        /// <summary>Recenzja B1 (1-5): zloto jedzenia w otwartym nawiasie konsumpcji tej osady (przyrosty kasy po wierszach jedzenia, z ostatnim wierszem) - dla PayForGoods
+        /// (CastlePurse First, przed zamknieciem nawiasu). -1 - nawias nie tej osady.</summary>
+        internal static long BracketFoodGold(Town town)
+        {
+            if (!_brOpen || town == null || !ReferenceEquals(town, _brTown)) return -1;
+            long x = _brFoodGold;
+            if (_brGoldCat != null && GroupOf(_brGoldCat) == 0) x += town.Gold - _brGoldMark;
+            return Math.Max(0, x);
         }
 
         private static int GroupOf(ItemCategory c)

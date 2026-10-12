@@ -1258,13 +1258,17 @@ namespace Armoury
                         float decree = TaxDecree(st);
                         float rentNow = fee ? TownFolk.VillageFeeToday(st) : rent;
                         int pay = (int)Math.Min(rentNow * decree, gold * takeShare * decree);
+                        if (fee && pay > gold) pay = gold;   // recenzja B1 (1-2): oplata stala (udzial 1) przy dekrecie High nie wieksza niz kiesa wsi - gra wyplaca panu cale pay, a kiese obcina do 0 (zloto z niczego)
                         if (pay <= 0) continue;
                         if (st.IsTown && BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) continue;   // E5/A4 (R22): oblezone miasto nie placi renty - zostaje w kasie, gdy kasa miasta jest prawdziwym pieniadzem (A1; inaczej placi i liczy; wies: rabunek wyzej)
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         _rentBy[st] = new long[] { pay, gold };   // 169c (tylko licznik)
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }
-                        if (st.IsVillage) { DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay; }   // paczka 169 (tylko licznik)
-                        if (fee) TownFolk.NoteVillageFee(pay);   // E5/B1: linia "Prawa panskie" (tylko licznik)
+                        if (st.IsVillage)
+                        {
+                            DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay;   // paczka 169 (tylko licznik)
+                            if (fee) TownFolk.NoteVillageFee(pay);   // E5/B1: linia "Prawa panskie" (tylko licznik); recenzja B1 (1-1): w bloku wsi - "else" nizej znow nalezy do IsVillage
+                        }
                         else DayTownRent += pay;
                         paid.TryGetValue(c, out v); paid[c] = v + pay;
                         totalPaid += pay;

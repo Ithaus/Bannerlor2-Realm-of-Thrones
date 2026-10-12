@@ -2735,9 +2735,22 @@ def etap5_b1(rep, lines, start, until, logp):
     rep.add("B1-T7: miast ze stac jedzenie < 95% (sr28, max, trend wobec d40)",
             (f"sr28 {n28:.1f}, max {max(n7)}" if n7 and n28 is not None else "-") + (f", d27-40 {t40:.1f}" if t40 is not None else ""),
             "prog projektu 0 kazdej doby - spodziewane NIE (rozklad dochodu miast, plan rozdz. 7.3) - raport dla Jeffa", (max(n7) == 0) if n7 else None, decide=True)
-    # ---- B1-T8 pelny koszyk swiata
+    # ---- B1-T8 pelny koszyk swiata (projekt rozdz. 4: swiat >= 98% i miast z pelnym < 95% najwyzej 5%; recenzja B1 (1-6) - obie czesci progu)
     pw = _mean([fnum(r"pelny W/R/P ([\d.]+)%", kie[d]) for d in w28])
-    rep.add("B1-T8: pelny koszyk W (waga potrzeb, sr28)", f"W {pw:.1f}%" if pw is not None else "-", ">= 98% (P) - spodziewane NIE (plan 7.1), raport", (pw >= 98) if pw is not None else None, decide=True)
+    pr8 = _mean([fnum(r"pelny W/R/P [\d.]+% / ([\d.]+)%", kie[d]) for d in w28])
+    pp8 = _mean([fnum(r"pelny W/R/P [\d.]+% / [\d.]+% / ([\d.]+)%", kie[d]) for d in w28])
+    ps8 = _mean([fnum(r"pelny W/R/P [^,|]*\(swiat ([\d.]+)%\)", kie[d]) for d in w28])
+    q8 = []
+    for d in w28:
+        t8, n8 = num(r"\| miasta (\d+): ludzie ksiegi", kie[d], int), num(r"pelny < 95%: (\d+)", kie[d], int)
+        if t8 and n8 is not None:
+            q8.append(n8 * 100.0 / t8)
+    q8 = _mean(q8)
+    rep.add("B1-T8: pelny koszyk swiat (waga potrzeb) i miast z pelnym < 95% (sr28)",
+            (f"swiat {ps8:.1f}%" if ps8 is not None else "swiat - (linia bez wagi swiata)") + (f" (W {pw:.1f}% / R {pr8:.1f}% / P {pp8:.1f}%)" if None not in (pw, pr8, pp8) else "")
+            + (f"; miast z pelnym < 95% {q8:.1f}%" if q8 is not None else ""),
+            "swiat >= 98% i miast z pelnym < 95% najwyzej 5% (P rozdz. 4) - spodziewane NIE (plan 7.1), raport",
+            (ps8 >= 98 and q8 <= 5) if (ps8 is not None and q8 is not None) else None, decide=True)
     # ---- B1-T9 podzamcze
     c9 = _mean([fnum(r"\| podzamcze \d+: .*?stac ([\d.]+)%", kie[d]) for d in w28])
     nc = _mean([num(r"zamkow bez kredytu (\d+)", kie[d], int) for d in w28])
@@ -2774,6 +2787,19 @@ def etap5_b1(rep, lines, start, until, logp):
         tot = [int(t) for t in re.findall(r"\) = (\d+) \(miast", sl[0])]
         rep.add("B1-T14: zapasy startowe (linia jednorazowa)", f"linii {len(sl)}; razem {sum(tot)}; " + _grp(r"zapasy startowe ([^-]+)", sl[0], 1).strip()[:120],
                 "nowa kampania: 5-10 mln z daru; zapis z d362: \"z nadwyzki\"", (5e6 <= sum(tot) <= 10e6) if "z daru" in sl[0] else None)
+        # recenzja B1 (1-6): S = M20 w ksiedze +-1 (plan rozdz. 11) - przelew kas do kies W/R/P i podzamczy; zapas wsi to przelew kasa miasta -> kiesa wsi (w ksiedze netto 0)
+        exp14, parts14 = 0, 0
+        for x in sl:
+            for mm in re.finditer(r"wsie (\d+) \(\d+ wsi\) = (\d+) \(miast", x):
+                exp14 -= int(mm.group(2)) - int(mm.group(1))
+                parts14 += 1
+        m20 = [int(v) for x in lines if x.startswith("Przeplywy osad (")
+               for v in re.findall(r"zapasy startowe kies ludu \(E5/B1, raz\): z daru kas albo z nadwyzki \(stary zapis\) ([+-]\d+)", x)]
+        if m20 and parts14:
+            rep.add("B1-T14b: zapasy startowe = M20 w ksiedze (+-1 na klase)", f"M20 {sum(m20)} (wpisow {len(m20)}), z linii zapasow {exp14} ({parts14} czesci)",
+                    "rowne +-1 na klase", abs(sum(m20) - exp14) <= 3 * parts14)
+        else:
+            rep.add("B1-T14b: zapasy startowe = M20 w ksiedze", "brak M20 w liniach Przeplywy osad" if parts14 else "linia zapasow bez sumy", "M20 w dobie zapasow (ksiega obiegu wlaczona)", None)
     else:
         rep.add("B1-T14: zapasy startowe", "brak linii", "1 linia (nowa kampania albo stary zapis)", False)
     # ---- B1-T15 R14

@@ -206,7 +206,7 @@ namespace Armoury
                 if (got <= 0) return;
                 _win.FromTown += got;
                 if (kind >= 0 && kind < EKinds) _win.Earn[kind] += got;
-                MoneyLedger.Note(MoneyLedger.NFolk, st, -(int)got);
+                MoneyLedger.Note(MoneyLedger.NFolk, st, -(int)got, -1);   // recenzja B1 (1-4): src -1 - przelew przechodni (kiesa gracza -> kasa -> lud), nie zakup kasy; poza "nasze sciezki" (OnTownCoin pomija src < 0)
             }
             catch (Exception e) { Stumble("EarnFromTown", e); }
         }
@@ -444,7 +444,14 @@ namespace Armoury
                     long paid = p0 + p1 + p2;
                     excise = (long)Math.Round(paid * (double)Math.Max(0f, Math.Min(0.2f, s.TownFolkExcise)));
                     long rest = made - paid;
-                    if (rest > 0 && _brLowFood && ReferenceEquals(_brTown, town)) fromG = Math.Min(rest, Math.Max(0, f.KG + excise));
+                    // dokup jedzenia BK (zapas <= 10%) niezaplacony przez lud - z gminy (plan 4.2, R1); recenzja B1 (1-5): tylko czesc jedzenia niezaplaconej reszty
+                    // (reszta rozlozona na towar wedlug zlota grup w nawiasie) - sukno, zbytki i towar ogolny bez zaplaty zostaja "zjedzone bez zaplaty"
+                    if (rest > 0 && _brLowFood && ReferenceEquals(_brTown, town))
+                    {
+                        long fg = Math.Min((long)made, BracketFoodGold(town));
+                        long restFood = fg > 0 ? (long)(rest * (double)fg / made) : 0;
+                        fromG = Math.Min(restFood, Math.Max(0, f.KG + excise));
+                    }
                     keep = paid - excise + fromG;
                     unpaid = made - paid - fromG;
                 }
@@ -1276,6 +1283,7 @@ namespace Armoury
               .Append(", lokata (kiesa W ponad zapas dni) ").Append(N0(d.Lokata)).Append(", oferta nadwyzki na jutro ").Append(d.OffT)
               .Append(" | stac jedzenie W/R/P ").Append(Pct(d.AFW, d.NFW)).Append(" / ").Append(Pct(d.AFR, d.NFR)).Append(" / ").Append(Pct(d.AFP, d.NFP))
               .Append(", pelny W/R/P ").Append(Pct(d.AW, d.NW)).Append(" / ").Append(Pct(d.AR, d.NR)).Append(" / ").Append(Pct(d.AP, d.NP))
+              .Append(" (swiat ").Append(Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP)).Append(")")   // recenzja B1 (1-6): prog B1-T8 "swiat >= 98%" (waga potrzeb)
               .Append(", miast ze stac jedzenie < 95%: ").Append(d.NFood).Append(", pelny < 95%: ").Append(d.NFull)
               .Append(" | podzamcze ").Append(d.Castles).Append(": ludzie ").Append(N0(d.CHeads)).Append(", kiesa ").Append(d.KC).Append(", dochod ").Append(w.EarnC)
               .Append(" (15% zaworu ").Append(w.ValveC).Append("), robocizna z kas zamkow ").Append(d.LabC).Append(", zaplacone ").Append(w.PaidC).Append(" (pokryte dworem ").Append(w.Court)

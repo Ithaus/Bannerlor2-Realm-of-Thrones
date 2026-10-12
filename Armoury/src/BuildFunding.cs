@@ -95,7 +95,7 @@ namespace Armoury
         }
         public static void MineRevenuePostfix(Town town, int revenue)
         {
-            try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) { int folk = TownFolk.Earn(town.Settlement, revenue, TownFolk.KMine); town.ChangeGold(revenue - folk); } } catch { }   // E5/B1: place gornikow do kiesy ludu (W), bez kiesy - do kasy jak dotad
+            try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) { int folk = TownFolk.Earn(town.Settlement, revenue, TownFolk.KMine); town.ChangeGold(revenue - folk); CirculationWindows.NoteMineFolk(folk); } } catch { }   // E5/B1: place gornikow do kiesy ludu (W), bez kiesy - do kasy jak dotad; recenzja B1 (1-3): czesc ludu do okna O20 (wlasny try)
             try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) CirculationWindows.NoteMineWages(revenue); } catch { }   // paczka 169: okno O20 (tylko licznik)
             try { if (town != null && revenue > 0 && Settings.Current.MineWagesStayInTown) TownFolk.Note(town.Settlement, revenue, TownFolk.KMine); } catch { }   // E5/0 (195): place gornikow (tylko licznik)
         }
