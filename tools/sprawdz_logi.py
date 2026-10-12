@@ -185,7 +185,8 @@ Uzycie (Python 3, tylko odczyt):
                     Blok etap8_x (E8/X, paczka 248): doswiadczenie za skutek - linia doby "Doswiadczenie (E8/X)" (gra / po zmianie w tym samym biegu):
                     X-1 XP ze strzalu poza bitwa (arena, turniej, cwiczenia) = 0 i ksiega P1 "strzal RBM" gracza <= zaplacone w bitwach (bieg bez misji:
                     INFO - sprawdza Jeff), X-2 Steward z jedzenia partii lordow AI 300+ po/gra 0.4-0.6, X-3 Scouting z marszu partii lordow AI 300+
-                    po/gra 0.4-0.6, X-4 "latki wpiete 6/6" przy kazdym starcie (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0;
+                    po/gra 0.4-0.6, X-4 "latki wpiete 6/6" przy kazdym starcie (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0
+                    i prefiksy naprawde biegna (okno >= 3 doby ze stanem [wl]: jedzenie > 0 partii, zwiad > 0 godzin, ksiega P1 "marsz premia AI" lordow = 0);
                     INFO jedzenie i zwiad wedlug partii, rodzaje jedzenia gra / po, zima, postoj, paser, samonaprawa, RBL, koszt wlasny, ksiega P1 po zmianie.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
@@ -8610,7 +8611,9 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     X-1 strzal poza bitwa (arena, turniej, cwiczenia): po = 0, a ksiega E8/P1 nie pokazuje u gracza wiecej XP "strzal RBM" niz zaplacono w bitwach
     (bieg bez misji - autotest - nie ma strzalow: INFO, sprawdza Jeff w grze, 8.16); X-2 Steward z jedzenia partii lordow AI 300+: po/gra 0.4-0.6;
     X-3 Scouting z marszu partii lordow AI 300+: po/gra 0.4-0.6 (gra = marsz + premia tylko-AI); X-4 kazdy start sesji "latki wpiete 6/6"
-    (strzal RBM, jedzenie, zwiad 2, RBL 2 - RBL potwierdzony w dekompilacji), wyplaty RBL 3/3, bez "nie znaleziono", potkniecia 0.
+    (strzal RBM, jedzenie, zwiad 2, RBL 2 - RBL potwierdzony w dekompilacji), wyplaty RBL 3/3, bez "nie znaleziono", potkniecia 0; do tego
+    (recenzja E8/X) dowod, ze prefiksy BIEGNA, nie tylko sa wpiete: przy stanie [wl] w calym oknie (>= 3 doby) jedzenie ma > 0 partii, zwiad > 0 godzin,
+    a ksiega E8/P1 nie pokazuje u lordow AI zrodla "marsz premia AI" (prefiks OnAIPartiesTravel je zdejmuje) - inaczej NIE z dopiskiem "prefiksy nie biegna".
     INFO: jedzenie i zwiad wedlug partii (gra -> po na dobe), rodzaje jedzenia liczone gra / po, zima, postoj, strzaly, paser, samonaprawa, RBL,
     koszt wlasny, ksiega E8/P1 w tym samym oknie (jedzenie, marsz, marsz premia AI - po zmianie)."""
     xl = {d: s for d, s in by_day(lines, E8_X_LINE).items() if 1 <= run_day(d, start) <= until}
@@ -8715,11 +8718,23 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     stum = max([num(r"\| potkniecia (\d+)", xl[d], default=0) for d in days] + [0])
     bad = [f"{a}/{b}" for a, b in wired if a is None or b is None or a != b or b != 6]
     bad_rbl = [f"{a}/{b}" for a, b in rbl if a != b]
+    # recenzja E8/X: "wpiete" to nie dowod dzialania - bez tego bieg z martwymi prefiksami dawal X-1..X-3 INFO ("brak ...") i X-4 TAK
+    dead = []
+    if len(days) >= 3:
+        if states.get("jedzenie") == {"wl"} and sum(food[r][0] for r in E8_X_ROWS) == 0:
+            dead.append("jedzenie 0 partii w oknie")
+        if states.get("zwiad") == {"wl"}:
+            if sum(scout[r][0] for r in E8_X_ROWS) == 0:
+                dead.append("zwiad 0 godzin marszu w oknie")
+            if p1_l.get("marsz premia AI", 0) > 0:
+                dead.append(f"ksiega P1: marsz premia AI lordow {p1_l['marsz premia AI']} XP (ma byc 0)")
     rep.add("X-4: latki E8/X wpiete przy kazdym starcie sesji, potkniecia 0",
             (f"starty {len(st)}, wpiete " + (", ".join(sorted(set(f"{a}/{b}" for a, b in wired))) if wired else "-")
              + ", wyplaty RBL " + (", ".join(sorted(set(f"{a}/{b}" for a, b in rbl))) if rbl else "-") + f", potkniecia {stum}"
-             + (f" | wylaczone: {', '.join(offs)}" if offs else "") + (f" | nie znaleziono: {nf[-1][:220]}" if nf else "")),
-            "6/6 (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0", (len(st) > 0 and not bad and not bad_rbl and not nf and stum == 0))
+             + (f" | wylaczone: {', '.join(offs)}" if offs else "") + (f" | nie znaleziono: {nf[-1][:220]}" if nf else "")
+             + (f" | prefiksy nie biegna: {'; '.join(dead)}" if dead else "")),
+            "6/6 (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0, prefiksy jedzenia i zwiadu wywolywane",
+            (len(st) > 0 and not bad and not bad_rbl and not nf and stum == 0 and not dead))
     # INFO
     inner = win[1:-1] if len(win) > 2 else []
     miss = [run_day(d, start) for d in inner if d not in xl]
