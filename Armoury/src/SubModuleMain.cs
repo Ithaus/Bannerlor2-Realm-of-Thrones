@@ -193,6 +193,9 @@ namespace Armoury
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze
                 NightRest.ApplyAll(_harmony);
+                // E7/O1 (228): sen do switu - prefiksy First na 10 MobileParty.SetMove* (spiacy w obozie / snem dlugu nie dostaje rozkazu ruchu; rozkaz czeka
+                // na swit albo koniec snu dlugu); w menu glownym jak Wayfinder (przed JIT wolajacych), wpiete zawsze, dziala przy SleepersHoldOrders; we wlasnym try
+                try { NightRest.ApplySleepGate(_harmony); } catch (Exception e) { Log.Error("NightRest.ApplySleepGate", e); }
                 FletchForge.ApplyAll(_harmony);
                 ForgeClock.ApplyAll(_harmony);   // wpis 83: jeden zegar kuzni
                 ArmourQuality.ApplyAll(_harmony); // zbroja z zakladki CRAFT jak bron: prog, pekniecie i jakosc z kowalstwa (PO FletchForge i ForgeClock)
@@ -234,6 +237,7 @@ namespace Armoury
                 GentryService.SetHarmony(_harmony); // 179: tylko zapamietanie - latki BK (wezwanie rycerza, partia rycerza, majatki) w kampanii
                 Ransom178.SetHarmony(_harmony);      // 178: tylko zapamietanie - latki okupow i 1/9 w kampanii
                 CrownCallToWar.SetHarmony(_harmony); // 168 dodatek: tylko zapamietanie - latki w kampanii
+                WorldTime7.SetHarmony(_harmony);     // E7/K (226): tylko zapamietanie - latki turniejow, sojuszy i rozejmu gry w kampanii
                 DebtLadder.SetHarmony(_harmony);    // 168: tylko zapamietanie - latki modelu finansow (portfele) i BK (B5) w kampanii
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii

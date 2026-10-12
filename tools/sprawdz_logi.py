@@ -108,7 +108,32 @@ Uzycie (Python 3, tylko odczyt):
                     w d91-until i nie spada wobec d61-90 (-0.3 pp), Dothrakowie (khuzait) >= 60%, Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel
                     szablonow + 3 pp, czeka na konia swojej kategorii nie rosnie w d91-until (5 ostatnich <= 1.05 x 5 pierwszych dob), przerwa "zostaje (K3 bez K2)" 0
                     przy czynnej sprzedazy K2(b), potkniecia 0; awanse przy rozwidleniu i konie rycerzy od rodu - INFO.
---crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
+--grupa etap7     : (E7/0, paczka 224) szkielet etapu 7 (projekt etapu 7 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok E7/0: T0 bledy
+                    WorldClock7 i potkniecia 0 (takze w logu sesji CS), koszt linii dobowych <= 1 ms/dobe, T1 kazda zmiana KRONIKI WOJEN (CS) ma linie
+                    "Wojna i pokoj (E7/0)" tej pary i rodzaju (pokoj - takze upadek krolestwa) +-1 doba (zegar obu logow tego samego startu; --crashscribe P),
+                    T2 linia "Zbiorka (E7/0)" w kazdej nocy (brak najwyzej 1), T3 linie "Turnieje (E7/0)" i dobowa wojny co dobe; INFO - przyczyny, przerwy
+                    pokoj -> wojna (< 21 dni), sen czlonkow armii w drodze, okna bez startu turnieju i tygodnie pory bez startu (progi wynikowe - E7/K, E7/O1).
+                    Blok E7/O1 (228) - dopisek "E7/O1" linii "AiNightCamp" / "NightRest swit", noc zamyka linia switu: T1 obudzeni cudza reka <= 10 na noc
+                    (lordowie <= 3), T2 zjazd sr. <= 0.15, T3 lordowie w ruchu bez wpisu powodu <= 3 na noc (wyjazd z osady <= 1), T4 AI spiacych lordow
+                    wstalo przed switem 0 w kazdej nocy (doby kampanii 31-until), T6 bledy/potkniecia 0 i dluznicy obudzeni o 6:00 = 0, T7 zbiorka >= 95%,
+                    T9 koszt bramki <= 5 ms na noc; rozkazy zatrzymane, zwolnienia BK, odnowienia AI, swit, oddane dluznikom - INFO.
+                    Blok E7/T (225) - linia "Kary terenu (E7/T)": T1 z rozpiski gry zwrot > kary gry 0 i kara Jeffa poza ulamkiem gry 0, maks. |netto| <= 0.001
+                    (klucz TerrainEaseExact on), T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej DECYZJA), T3 ponizej sufitu MarchPace (karawany, wozy wsi,
+                    d31-until): Polnoc las < rownina, Dorne pustynia <= rownina, T4 koszt probki <= 20 ms/dobe, bledy/potkniecia 0, T6 towar wsi niesprzedany w miastach
+                    <= 2%; rody, zwrot ponad netto starej reguly, udzial probek na suficie - INFO; T5 tempo marszu poza blokiem (marsz.py).
+                    Blok E7/C (227) - jedna skala czasu: T1 grep kodu Armoury/src obok narzedzia (zegar realny DateTime.Now/UtcNow, TickCount, ApplicationTime,
+                    += realDt, akumulator dt poza misja) tylko na liscie wyjatkow bloku (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8),
+                    T2 tekst MCM World Pace Percent (Settings.cs i McmSettings.cs) bez "168" i "month"; linia startowa "Jedna skala czasu (E7/C)" i T3 odnowien
+                    pogoni na dobe gry (dopisek "E7/C:" linii konca pogoni HideoutPurge) - INFO.
+                    Blok E7/K (226) - linia startowa "Czas swiata (E7/K)": T8 postfiks rozejmu wpiety (po BK), prefiks turniejow wpiety i trafia,
+                    postfiksy sojuszy wpiete; T1 najdluzsze okno bez startu turnieju gry < 14 dob, T2 starty w kazdym tygodniu pory 0-12, T3 nowe
+                    porozumienia wezwan 168 "przez N dob" = wezwanie z linii startowej (182), T4 KRONIKA (CS) wojen naraz w d61-until >= 7, T7 nowa
+                    wojna z decyzji krolestwa po pokoju krocej niz rozejm gry (87 dni) 0, T0 bledy WorldTime7 i potkniecia 0; wstrzymane propozycje,
+                    T5 nagrody turniejow (Szczelnosc 164a), T6 GrandTourney - INFO.
+                    Blok E7/O2 (229) - linia startowa "CampScene (E7/O2): prefaby dostepne": T1 kazdy element (namioty, ogniska, pochodnie, plot) >= 1
+                    i bez bledow PrefabExists (brak linii = NIE: klucz CampBattlePropsEnabled), T0 bledy CampScene 0; bitwy w obozie gracza ze scenografia
+                    ("CampScene: postawiono") - INFO (T2 test Jeffa: wojsko nie grzeznie w scenografii bez fizyki).
+--crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
@@ -6479,6 +6504,795 @@ def etap5_b6(rep, lines, start, win, bud):
             + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
     rep.add("E5/B6 B6-14: reszta ksiegi pieniadza < 10 tys./d (nowy posiadacz H37)", "--grupa etap3 na tym samym logu", "INFO", None)
 
+E7_WAR = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?) - (.+?): (WOJNA|POKOJ) \(przyczyna (.*?)\) \| dni od poprzedniego zdarzenia tej pary (\S+)")
+E7_FALL = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?): KROLESTWO ZNISZCZONE")
+E7_KRON = re.compile(r"^KRONIKA WOJEN \((dzien|po wczytaniu), [^)]*\): (.*)$")
+
+
+def _start_dt_of(path, fallback=None):
+    """Chwila startu pliku z nazwy (Armoury-/session-RRRR-MM-DD_GG-MM-SS.log); bez niej - fallback."""
+    import datetime as dt
+    m = re.search(r"(\d{4})-(\d\d)-(\d\d)_(\d\d)-(\d\d)-(\d\d)", os.path.basename(path))
+    if m:
+        try:
+            return dt.datetime(*(int(x) for x in m.groups()))
+        except ValueError:
+            pass
+    return fallback
+
+
+def _abs_lines(path, start_dt):
+    """E7/0: linie logu z chwila bezwzgledna (data startu pliku + [gg:mm:ss], przejscie przez polnoc = spadek godziny o > 1 h) -> [(datetime, tekst)]."""
+    import datetime as dt
+    out, day, prev = [], 0, None
+    base = dt.datetime(start_dt.year, start_dt.month, start_dt.day)
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.strip())
+            if not m:
+                continue
+            hh, mi, ss = (int(x) for x in m.group(1).split(":"))
+            t = hh * 3600 + mi * 60 + ss
+            if prev is not None and t < prev - 3600:
+                day += 1
+            prev = t
+            out.append((base + dt.timedelta(days=day, seconds=t), m.group(2)))
+    return out
+
+
+def _kron_set(body):
+    if body.startswith("POKOJ WSZEDZIE"):
+        return set()
+    out = set()
+    for part in body.split("; "):
+        if " vs " in part:
+            a, b = part.split(" vs ", 1)
+            out.add(frozenset((a.strip(), b.strip())))
+    return out
+
+
+def etap7_t1(rep, logp, csp, t_lo, t_hi):
+    """E7/0 T1: kazda zmiana KRONIKI WOJEN (CrashScribe, raz na dobe) ma linie zdarzenia E7/0 tej pary i rodzaju (pokoj - takze upadek krolestwa)
+    w oknie +-1 doba (od linii KRONIKI przed poprzednia do linii po nastepnej; chwile z zegara obu logow tego samego startu). Przejscie do linii
+    "po wczytaniu" pomijane (inny zapis). Tylko zmiany w czasie okna dob linii E7/0 (t_lo..t_hi)."""
+    import datetime as dt
+    name = "E7/0 T1: kazda zmiana KRONIKI WOJEN (CS) ma linie E7/0 z przyczyna (+-1 doba)"
+    path, how = crashscribe_session_of(logp, csp)
+    if not path:
+        rep.add(name, how, "100% zmian (bez logu sesji - INFO)", None)
+        return
+    a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+    c0 = _start_dt_of(path)
+    if a0 is None or c0 is None:
+        rep.add(name, "brak chwili startu logu Armoury albo CS (nazwa pliku)", "100% zmian", None)
+        return
+    kr = []
+    for t, s in _abs_lines(path, c0):
+        m = E7_KRON.match(s)
+        if m:
+            kr.append((t, m.group(1), _kron_set(m.group(2))))
+    ev, fall = [], []
+    for t, s in _abs_lines(logp, a0):
+        m = E7_WAR.match(s)
+        if m:
+            ev.append((t, frozenset((m.group(2), m.group(3))), m.group(4)))
+            continue
+        m = E7_FALL.match(s)
+        if m:
+            fall.append((t, m.group(2)))
+    day = dt.timedelta(days=1)
+    total, miss = 0, []
+    for i in range(1, len(kr)):
+        t, kind, now = kr[i]
+        if kind != "dzien" or t_lo is None or not (t_lo <= t <= t_hi):
+            continue
+        prev = kr[i - 1][2]
+        lo = kr[i - 2][0] if i >= 2 else kr[i - 1][0] - day
+        hi = kr[i + 1][0] if i + 1 < len(kr) else t + day
+        for p, want in [(p, "WOJNA") for p in now - prev] + [(p, "POKOJ") for p in prev - now]:
+            total += 1
+            ok = any(e[1] == p and e[2] == want and lo <= e[0] <= hi for e in ev)
+            if not ok and want == "POKOJ":
+                ok = any(f[1] in p and lo <= f[0] <= hi for f in fall)
+            if not ok:
+                miss.append(f"{' - '.join(sorted(p))} {want} ({t:%H:%M:%S})")
+    val = (f"zmian KRONIKI {total}, z linia E7/0 {total - len(miss)}" + (f"; bez linii: {', '.join(miss[:5])}" + (" ..." if len(miss) > 5 else "") if miss else "")
+           + f" | {os.path.basename(path)} ({how}); linii KRONIKI {len(kr)}, zdarzen E7/0 {len(ev)}, upadkow {len(fall)}")
+    rep.add(name, val, "100% zmian w oknie (zmiana bez linii = NIE)", (len(miss) == 0) if total else None)
+
+
+def etap7_0(rep, lines, start, until, logp=None, csp=None):
+    """E7/0 (224): pomiar etapu 7 - tylko log (projekt etapu 7 v2 rozdz. 3 "E7/0" Test). Okno: doby kampanii 1-until (dzien linii = doba ksiegi, jak
+    "Pieniadz swiata"). T0 bledy i potkniecia, koszt <= 1 ms/dobe, T1 KRONIKA (CS), T2 linia zbiorki co noc, T3 linia turniejow i linia dobowa wojny
+    co dobe; przyczyny wojen i pokojow, pary z nowa wojna < 21 dni po pokoju, sen czlonkow armii, okna bez startu turnieju i tygodnie pory - INFO
+    (progi wynikowe maja E7/K i E7/O1)."""
+    # linia dobowa (z "od poprzedniej linii") - by_day wzialby ostatnia linie doby, a linie zdarzen tej samej doby moga ja przykryc
+    wd = {}
+    for s in lines:
+        if s.startswith("Wojna i pokoj (E7/0): dzien") and "| od poprzedniej linii:" in s:
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                wd[k] = s
+    tu = by_day(lines, "Turnieje (E7/0): dzien")
+    zb = {}
+    for s in lines:
+        if s.startswith("Zbiorka (E7/0): noc"):
+            k = num(r"noc (\d+)", s)
+            if k is not None:
+                zb[k] = s
+    if not wd and not tu:
+        rep.add("E7/0: linie Wojna i pokoj / Turnieje (E7/0)", "brak w logu", "sa od wgrania E7/0 (Stage7MeasureLog)", None)
+        return
+    win = [d for d in sorted(set(wd) | set(tu)) if 1 <= run_day(d, start) <= until]
+    base = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    # ---- T0 bledy, potkniecia, koszt
+    errs = [s for s in lines if s.startswith("ERROR in WorldClock7")]
+    stum = max([num(r"\| potkniecia (\d+)", wd[d], default=0) for d in win if d in wd] or [0])
+    rep.add("E7/0 T0: bledy WorldClock7 i potkniecia", f"ERROR in WorldClock7 {len(errs)}; potkniecia (najwiecej w linii dobowej) {stum}", "0 i 0", len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/0 T0: bledy WorldClock7 polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="WorldClock7")
+    cost = [(fnum(r"koszt E7/0 ([0-9.]+) ms/dobe", tu[d]), d) for d in win if d in tu]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E7/0 koszt linii dobowych", f"srednio {m:.3f} ms/dobe, najwiecej {mx[0]:.3f} ms (d{run_day(mx[1], start)}) - {len(cost)} dob", "<= 1 ms/dobe srednio", m <= 1.0)
+    else:
+        rep.add("E7/0 koszt linii dobowych", "brak liczby kosztu w linii Turnieje (E7/0)", "<= 1 ms/dobe", None)
+    # ---- T1 KRONIKA (CS)
+    t_lo = t_hi = None
+    if logp and win:
+        a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+        if a0 is not None:
+            times = [t for t, s in _abs_lines(logp, a0) if s.startswith("Turnieje (E7/0): dzien") and num(r"dzien (\d+)", s) in set(win)]
+            if times:
+                t_lo, t_hi = min(times), max(times)
+    if logp:
+        etap7_t1(rep, logp, csp, t_lo, t_hi)
+    # ---- T2 zbiorka co noc
+    nights = [d for d in win if d in zb]
+    lead = [d for d in nights if (num(r"wodzowie armii obozuja \d+/(\d+)", zb[d], default=0) or 0) > 0]
+    missing = [run_day(d, start) for d in win if d not in zb]
+    rep.add("E7/0 T2: linia Zbiorka (E7/0) w kazdej nocy okna", f"noce z linia {len(nights)} z {len(win)} dob (z wodzem armii w polu {len(lead)})"
+            + (f"; bez linii doby kampanii {missing[:8]}" if missing else ""),
+            "brakuje najwyzej 1 nocy (ostatnia doba logu; bez obozu swiata AiCampsAtNight - brak linii)", len(missing) <= 1 if win else None)
+    off = sum(1 for d in nights if "regula powodow T10 wylaczona" in zb[d])
+    a = sum(num(r"partio-godzin (\d+)", zb[d], default=0) or 0 for d in nights)
+    b = sum(num(r", spia (\d+) \(", zb[d], default=0) or 0 for d in nights)
+    c = sum(num(r"ida z powodem (\d+)", zb[d], default=0) or 0 for d in nights)
+    g = sum(num(r"\), alarm (\d+)", zb[d], default=0) or 0 for d in nights)
+    nr = sum(num(r"ida bez powodu (\d+)", zb[d], default=0) or 0 for d in nights)
+    wk = sum(num(r"w tym uspieni (\d+)", zb[d], default=0) or 0 for d in nights)
+    le = sum(num(r"wodzowie armii obozuja (\d+)/", zb[d], default=0) or 0 for d in nights)
+    lf = sum(num(r"wodzowie armii obozuja \d+/(\d+)", zb[d], default=0) or 0 for d in nights)
+    rep.add("E7/0 zbiorka: czlonkowie armii w drodze w oknie obozu (suma okna)",
+            (f"partio-godzin {a}, spia {b} ({100.0 * b / a:.1f}%), ida z powodem {c}, alarm {g}, ida bez powodu {nr} (w tym uspieni {wk}); "
+             if a else "partio-godzin 0; ") + f"wodzowie armii obozuja {le}/{lf}" + (f"; noce z regula T10 wylaczona {off}" if off else ""),
+            "INFO (prog >= 95% snu - E7/O1 T7)", None)
+    # ---- T3 linie dobowe co dobe
+    rep.add("E7/0 T3: linia Turnieje (E7/0) co dobe", f"{sum(1 for d in base if d in tu)} z {len(base)} dob z linia Pieniadz swiata (okno 1-{until})",
+            f"{len(base)}/{len(base)}", (all(d in tu for d in base)) if base else None)
+    rep.add("E7/0 T3b: linia dobowa Wojna i pokoj (E7/0) co dobe", f"{sum(1 for d in base if d in wd)} z {len(base)} dob",
+            f"{len(base)}/{len(base)}", (all(d in wd for d in base)) if base else None)
+    # ---- INFO: przyczyny, szybkie wojny, przerwy pokoj -> wojna
+    causes, quick, gaps, n_ev = {}, [], [], 0
+    for s in lines:
+        m = E7_WAR.match(s)
+        if not m or not (1 <= run_day(int(m.group(1)), start) <= until):
+            continue
+        n_ev += 1
+        k = m.group(4) + " " + m.group(5).split(",")[0]
+        causes[k] = causes.get(k, 0) + 1
+        if m.group(4) == "WOJNA" and "(POKOJ)" in s:
+            dd = num(r"tej pary (\d+) \(POKOJ\)", s)
+            if dd is not None:
+                gaps.append(dd)
+                if dd < 21:
+                    quick.append(f"{m.group(2)} - {m.group(3)} {dd} d ({m.group(5).split(',')[0]})")
+    top = ", ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1])[:8])
+    rep.add("E7/0 wojny i pokoje krolestw wedlug przyczyny (okno)", f"zdarzen {n_ev}" + (f": {top}" if top else ""), "INFO (kazde z przyczyna - T1)", None)
+    rep.add("E7/0 przerwy pokoj -> wojna tej samej pary (pamiec sesji)",
+            (f"{len(gaps)} przerw, najkrotsza {min(gaps)} d, mediana {st.median(gaps):.0f} d; < 21 dni: {len(quick)}" + (f" ({'; '.join(quick[:5])})" if quick else ""))
+            if gaps else "brak par z pokojem i nowa wojna w oknie", "INFO (prog >= 87/90 dni - E7/K)", None)
+    # ---- INFO: turnieje - okna bez startu, tygodnie pory
+    started = {d: (num(r"rozpoczete od poprzedniej linii (\d+)", tu[d], default=0) or 0) for d in win if d in tu}
+    gap, best, best_end, weeks = 0, 0, None, {}
+    for d in sorted(started):
+        if started[d] > 0:
+            gap = 0
+            w = num(r"tydzien pory (\d+)", tu[d])
+            if w is not None:
+                weeks[w] = weeks.get(w, 0) + started[d]
+        else:
+            gap += 1
+            if gap > best:
+                best, best_end = gap, d
+    wmax = num(r"tydzien pory \d+ \(0-(\d+)", tu[win[-1]]) if win and win[-1] in tu else None
+    empty = [w for w in range(0, (wmax if wmax is not None else 12) + 1) if w not in weeks]
+    rep.add("E7/0 turnieje: starty w oknie, najdluzsze okno bez startu, tygodnie pory bez startu",
+            f"startow {sum(started.values())}, najdluzej bez startu {best} dob" + (f" (do d{run_day(best_end, start)})" if best_end is not None else "")
+            + f"; tygodnie pory bez startu {empty if empty else '-'}", "INFO (prog: okno < 14 dob, starty w kazdym tygodniu 0-12 - E7/K)", None)
+
+
+E7O1_GATE = re.compile(r"\| E7/O1 \(SleepersHoldOrders (on|off)\): obudzeni cudza reka: lordowie (\d+), karawany (\d+) \| rozkazy zatrzymane u spiacych: "
+                       r"lordowie (\d+) \(GoToSettlement (\d+), GoToPoint (\d+), Engage (\d+), inne (-?\d+)\), karawany (\d+) \(zwolnienie z Hold przez BK (\d+), "
+                       r"inne (-?\d+)\), inne partie (\d+); do snu dlugu (\d+) \(nowych dluznikow (\d+)\), oddane przy koncu snu dlugu (\d+) \| AI odnowione (\d+) "
+                       r"\(oboz (\d+)/dlug (\d+)/osada (\d+)\) \| AI wstalo przed switem: lordowie (\d+), karawany (\d+), inne (\d+) \| SleepGate (\d+) x, "
+                       r"sr\. ([\d.]+) us, razem ([\d.]+) ms, potkniecia w sesji (\d+)")
+E7O1_DAWN = re.compile(r"E7/O1 swit: AI wlaczone o swicie (\d+) \(oboz (\d+)/osada (\d+)\), rozkazy zatrzymane i oddane o swicie (\d+), dluznicy obudzeni o 6:00 (\d+)")
+E7O1_MOVE = re.compile(r"^AiNightCamp: ruch .*BEZ WPISU POWODU (\d+):.*wyjazd z osady / po bitwie (\d+)")
+E7O1_KEYS = ("wl", "wc", "gl", "gls", "glp", "gle", "glo", "gc", "gcb", "gco", "go", "gd", "gdn", "gdv", "rn", "rnc", "rnd", "rnt", "awl", "awc", "awo",
+             "gn", "gus", "gms", "gst")
+
+
+def etap7_o1(rep, lines, start, until, logp=None, csp=None):
+    """E7/O1 (228): sen do switu (projekt etapu 7 v2 rozdz. 3 "E7/O1" Test, rozdz. 4 (7.6)). Noc = linie "AiNightCamp: H:00 - spi" i "AiNightCamp: ruch"
+    zamkniete linia "NightRest swit"; doba nocy = ostatnia linia "Pieniadz swiata: dzien N" przed switem. Okno progow T1-T4: doby kampanii 31-until.
+    T1 obudzonych cudza reka <= 10 na noc (srednio), lordowie <= 3; T2 zjazd sr. <= 0.15 jedn.; T3 lordowie w ruchu bez wpisu powodu <= 3 na noc, w tym
+    wyjazd z osady / po bitwie <= 1; T4 AI spiacych lordow wstalo przed switem = 0 w kazdej nocy; T6 bledy/potkniecia SleepGate i straznikow 0, dluznicy
+    obudzeni o 6:00 = 0; T7 zbiorka (E7/0) >= 95% partio-godzin snu; T9 koszt bramki <= 5 ms/dobe; reszta (rozkazy zatrzymane, zwolnienia BK, odnowienia,
+    oddane dluznikom) - INFO. T5 (dlug 3) i T8 (KRONIKA, Miara: marsz) - poza blokiem (grupa etap6/T10 i marsz.py)."""
+    nights, cur, day, klucz = [], None, None, set()
+
+    def new():
+        return {"woken": 0, "drift_sum": 0.0, "nr": 0, "exit": 0, "dawn": None, "lines": 0, **{k: 0 for k in E7O1_KEYS}}
+
+    for s in lines:
+        if s.startswith("Pieniadz swiata: dzien"):
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                day = k
+            continue
+        hourly = s.startswith("AiNightCamp: ") and " - spi " in s[:40]
+        dawn = s.startswith("NightRest swit ")
+        mv = E7O1_MOVE.match(s) if s.startswith("AiNightCamp: ruch") else None
+        if not (hourly or dawn or mv):
+            continue
+        if cur is None:
+            cur = new()
+        if mv:
+            cur["nr"] += int(mv.group(1))
+            cur["exit"] += int(mv.group(2))
+            continue
+        cur["lines"] += 1
+        w = num(r"obudzonych cudza reka od poprzedniej godziny: (\d+)", s, default=0) or 0
+        cur["woken"] += w
+        dr = fnum(r"Zjazd obudzonych: sr\. ([\d.]+)", s)
+        if dr is not None:
+            cur["drift_sum"] += dr * w
+        m = E7O1_GATE.search(s)
+        if m:
+            klucz.add(m.group(1))
+            vals = m.groups()[1:]
+            for k, v in zip(E7O1_KEYS, vals):
+                if k in ("gus",):
+                    continue
+                if k == "gms":
+                    cur[k] += float(v)
+                elif k == "gst":
+                    cur[k] = max(cur[k], int(v))
+                else:
+                    cur[k] += int(v)
+        if dawn:
+            md = E7O1_DAWN.search(s)
+            if md:
+                cur["dawn"] = tuple(int(x) for x in md.groups())
+            cur["day"] = day
+            nights.append(cur)
+            cur = None
+    have = [n for n in nights if n.get("day") is not None]
+    if not have or not klucz:
+        rep.add("E7/O1: linie AiNightCamp / NightRest swit z dopiskiem E7/O1", "brak w logu" if not klucz else "brak nocy z doba",
+                "sa od wgrania E7/O1 (SleepersHoldOrders)", None)
+        return
+    if "off" in klucz:
+        rep.add("E7/O1: klucz SleepersHoldOrders", "off w " + ("czesci" if "on" in klucz else "wszystkich") + " linii", "on (progi T1-T4 dotycza klucza on)", None)
+    win = [n for n in have if 31 <= run_day(n["day"], start) <= until]
+    allw = [n for n in have if 1 <= run_day(n["day"], start) <= until]
+    nw = len(win)
+    # ---- T1 obudzeni cudza reka
+    if nw:
+        avg = sum(n["woken"] for n in win) / nw
+        avl = sum(n["wl"] for n in win) / nw
+        avc = sum(n["wc"] for n in win) / nw
+        worst = max(win, key=lambda n: n["woken"])
+        rep.add("E7/O1 T1: obudzeni cudza reka na noc (d31-okno, srednio)", f"{avg:.1f} na noc (lordowie {avl:.1f}, karawany {avc:.1f}); najwiecej {worst['woken']} "
+                f"(d{run_day(worst['day'], start)}) - {nw} nocy", "<= 10 na noc, lordowie <= 3 (dzis 91, 79% karawan)", avg <= 10 and avl <= 3)
+        tw = sum(n["woken"] for n in win)
+        drift = sum(n["drift_sum"] for n in win) / tw if tw else 0.0
+        rep.add("E7/O1 T2: zjazd obudzonych srednio (d31-okno)", f"{drift:.2f} jedn. ({tw} obudzonych)", "<= 0.15 jedn. (dzis 0.40)", drift <= 0.15)
+        anr = sum(n["nr"] for n in win) / nw
+        aex = sum(n["exit"] for n in win) / nw
+        rep.add("E7/O1 T3: lordowie w ruchu bez wpisu powodu w oknie obozu (d31-okno, srednio)", f"{anr:.1f} na noc, w tym wyjazd z osady / po bitwie {aex:.1f}",
+                "<= 3 na noc, wyjazd z osady <= 1 (dzis ok. 20)", anr <= 3 and aex <= 1)
+        bad = [run_day(n["day"], start) for n in win if n["awl"] > 0]
+        rep.add("E7/O1 T4: AI spiacych lordow wstalo przed switem (d31-okno)", f"noce z wstaniem {len(bad)} z {nw}" + (f" (doby {bad[:8]})" if bad else "")
+                + f"; razem lordowie {sum(n['awl'] for n in win)}, karawany {sum(n['awc'] for n in win)} (odczyt), inne {sum(n['awo'] for n in win)}",
+                "lordowie 0 w kazdej nocy (dowod fazy)", not bad)
+    else:
+        rep.add("E7/O1 T1-T4: noce d31-okno", f"brak (nocy w logu {len(have)})", "noce d31-120", None)
+    # ---- T6 bledy, potkniecia, dluznicy o 6:00
+    errs = [s for s in lines if s.startswith("ERROR in SleepGate") or s.startswith("ERROR in HoldSleepers") or s.startswith("ERROR in KeepTownAsleep")
+            or s.startswith("ERROR in DawnWake") or s.startswith("ERROR in HoldDebtSleepers")]
+    gst = max([n["gst"] for n in have] or [0])
+    gs = max([num(r"Potkniecia straznikow w sesji: (\d+)", s, default=0) or 0 for s in lines if s.startswith("AiNightCamp: ") or s.startswith("NightRest swit")] or [0])
+    rep.add("E7/O1 T6: bledy i potkniecia SleepGate / straznikow snu", f"ERROR {len(errs)}; potkniecia bramki w sesji {gst}, straznikow w sesji {gs}"
+            + (f" (pierwszy: {errs[0][:140]})" if errs else ""), "0 / 0 / 0", len(errs) == 0 and gst == 0 and gs == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/O1 T6: bledy NightRest polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="NightRest")
+    dd = [n["dawn"] for n in allw if n["dawn"] is not None]
+    deb = sum(x[4] for x in dd)
+    rep.add("E7/O1 T6b: dluznicy obudzeni o 6:00 (galaz switu)", f"{deb} w {len(dd)} switach", "0", deb == 0 if dd else None)
+    gdn = sum(n["gdn"] for n in allw)
+    gdv = sum(n["gdv"] for n in allw)
+    rep.add("E7/O1 T6c: rozkazy zatrzymane dluznikom - nowi dluznicy z rozkazem / oddane przy koncu snu dlugu (okno)",
+            f"zatrzyman {sum(n['gd'] for n in allw)}, dluznikow z rozkazem {gdn}, oddanych przy ReleaseDebt {gdv}",
+            "INFO (oddane ~ dluznicy z rozkazem; roznica = alarm, cudza blokada, zniszczona partia)", None)
+    # ---- rozkazy zatrzymane, zwolnienia BK, odnowienia, swit - INFO
+    if allw:
+        n_ = len(allw)
+        rep.add("E7/O1 rozkazy zatrzymane u spiacych (okno, na noc)",
+                f"lordowie {sum(n['gl'] for n in allw) / n_:.1f} (GoToSettlement {sum(n['gls'] for n in allw) / n_:.1f}, GoToPoint {sum(n['glp'] for n in allw) / n_:.1f}, "
+                f"Engage {sum(n['gle'] for n in allw) / n_:.1f}), karawany {sum(n['gc'] for n in allw) / n_:.1f} (zwolnienie z Hold przez BK "
+                f"{sum(n['gcb'] for n in allw) / n_:.1f}), inne partie {sum(n['go'] for n in allw) / n_:.1f}", "INFO (zwolnien BK zatrzymanych - odczyt, ryzyko 5)", None)
+        rep.add("E7/O1 faza snu: AI odnowione (okno, na noc)",
+                f"{sum(n['rn'] for n in allw) / n_:.1f} (oboz {sum(n['rnc'] for n in allw) / n_:.1f} / dlug {sum(n['rnd'] for n in allw) / n_:.1f} / osada "
+                f"{sum(n['rnt'] for n in allw) / n_:.1f})", "INFO", None)
+        if dd:
+            rep.add("E7/O1 swit: AI wlaczone o swicie / rozkazy zatrzymane oddane o swicie (srednio)",
+                    f"AI {sum(x[0] for x in dd) / len(dd):.1f} (oboz {sum(x[1] for x in dd) / len(dd):.1f} / osada {sum(x[2] for x in dd) / len(dd):.1f}), "
+                    f"rozkazy {sum(x[3] for x in dd) / len(dd):.1f}", "INFO", None)
+        # ---- T9 koszt bramki
+        ms = [n["gms"] for n in allw]
+        mx = max(allw, key=lambda n: n["gms"])
+        calls = sum(n["gn"] for n in allw)
+        rep.add("E7/O1 T9: koszt SleepGate na noc (okno)", f"srednio {sum(ms) / len(ms):.3f} ms, najwiecej {mx['gms']:.3f} ms (d{run_day(mx['day'], start)}); wywolan {calls}",
+                "<= 5 ms/dobe (odnawianie - stoper HoldSleepers w tej samej linii)", sum(ms) / len(ms) <= 5.0)
+    # ---- T7 zbiorka (linia E7/0)
+    a = b = 0
+    for s in lines:
+        if s.startswith("Zbiorka (E7/0): noc"):
+            k = num(r"noc (\d+)", s)
+            if k is None or not (31 <= run_day(k, start) <= until):
+                continue
+            a += num(r"partio-godzin (\d+)", s, default=0) or 0
+            b += num(r", spia (\d+) \(", s, default=0) or 0
+    rep.add("E7/O1 T7: czlonkowie armii w drodze do wodza spia (linia Zbiorka E7/0, d31-okno)", f"{100.0 * b / a:.1f}% ({b}/{a} partio-godzin)" if a else "brak partio-godzin",
+            ">= 95%", (b >= 0.95 * a) if a else None)
+    rep.add("E7/O1 T5/T8: dlug 3 AI i kara, KRONIKA i Miara: marsz", "poza blokiem", "dlug 3 = 0 (linie T10), wojny i tempo bez zmian (marsz.py, rozdz. 4)", None)
+
+
+E7T_PAIR = r"{} ([0-9.]+|-)/([0-9.]+|-) \(n (\d+)/(\d+)\)"
+
+
+def _e7t_pair(s, label):
+    """E7/T: "<label> a/b (n x/y)" -> (a, b, x, y); srednia '-' = None."""
+    m = re.search(E7T_PAIR.format(re.escape(label)), s)
+    if not m:
+        return None
+    a, b = (None if v == "-" else float(v) for v in m.groups()[:2])
+    return a, b, int(m.group(3)), int(m.group(4))
+
+
+def etap7_t(rep, lines, start, until, logp=None, csp=None):
+    """E7/T (225): kary terenu dokladnie jak gra (projekt etapu 7 v2 rozdz. 3 "E7/T" Test, PLAN 7.4). Linia "Kary terenu (E7/T): dzien N" (doba ksiegi).
+    T1 z rozpiski gry (wpisy GRY przed naszym zwrotem i zmiany od zwrotu i kary w tej samej liczbie): zwrot > kary gry = 0 i kara Jeffa poza ulamkiem
+    gry = 0 w kazdej dobie, maks. |netto| <= 0.001 jedn. (klucz on; off - INFO, stara regula); T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej
+    DECYZJA - prog nieczytelny); T3 ponizej sufitu MarchPace (karawany i wozy wsi; d31-until, srednie wazone): Polnoc las < rownina, Dorne pustynia
+    <= rownina; T4 koszt probki <= 20 ms/dobe (srednio), bledy TerrainEase i potkniecia 0; T6 regresja E5: towar wsi niesprzedany w miastach <= 2%
+    sprzedanego (miasta kupuja >= 98% plonu, d31-until). Rody (na suficie i nie), zwrot ponad netto starej reguly, udzial probek na suficie - INFO;
+    T5 tempo marszu - poza blokiem (marsz.py, rozdz. 4). Probki pkt 6 bez "Marching column" nie wchodza do T3: sa tylko w lesie/na pustyni, bez
+    pary na rowninie (srednia bylaby stronnicza) - T3 liczy karawany i wozy wsi, ktorych MarchPace nigdy nie tnie."""
+    kt = by_day(lines, "Kary terenu (E7/T): dzien")
+    if not kt:
+        rep.add("E7/T: linia Kary terenu (E7/T)", "brak w logu", "jest od wgrania E7/T (Stage7MeasureLog)", None)
+        return
+    win = [d for d in sorted(kt) if 1 <= run_day(d, start) <= until]
+    w31 = [d for d in win if run_day(d, start) >= 31]
+    if not win:
+        rep.add("E7/T: linia Kary terenu (E7/T) w oknie", "brak dob w oknie", f"doby kampanii 1-{until}", None)
+        return
+    keys = {m.group(1) for d in win for m in [re.search(r"TerrainEaseExact (on|off)", kt[d])] if m}
+    on = keys == {"on"}
+    # ---- T1 z rozpiski gry
+    rn = sum(num(r"z rozpiski gry: probek (\d+)", kt[d], default=0) or 0 for d in win)
+    rf = sum(num(r"z cecha/perkiem (\d+)\)", kt[d], default=0) or 0 for d in win)
+    viol = sum(num(r"zwrot > kary gry (\d+)", kt[d], default=0) or 0 for d in win)
+    mis = sum(num(r"kara Jeffa poza ulamkiem gry (\d+)", kt[d], default=0) or 0 for d in win)
+    umax = max([fnum(r"maks\. \|u\| ([0-9.]+)", kt[d], default=0.0) or 0.0 for d in win] or [0.0])
+    rep.add("E7/T T1: netto lasu/pustyni po naszym postfiksie z rozpiski gry (okno)",
+            f"klucz {'/'.join(sorted(keys)) or '-'}; probek {rn} (z cecha/perkiem {rf}), zwrot > kary gry {viol}, kara Jeffa poza ulamkiem gry {mis}, maks. |netto| {umax:.4f} jedn.",
+            "zwrot > kary gry 0, kara Jeffa poza ulamkiem 0, maks. |netto| <= 0.001 (klucz on; bez probek z cecha/perkiem czesc 'przy cesze' niesprawdzona - INFO)",
+            None if not (on and rn > 0) else (False if (viol or mis or umax > 0.001) else (True if rf > 0 else None)))
+    # ---- T2 probek las z cecha lasu
+    ff = sum(num(r"\(cecha lasu (\d+)", kt[d], default=0) or 0 for d in win)
+    fa = sum(num(r"partio-godziny\): las (\d+)", kt[d], default=0) or 0 for d in win)
+    fk = sum(num(r"ForestKin (\d+)\)", kt[d], default=0) or 0 for d in win)
+    dd = sum(num(r"\), pustynia (\d+)", kt[d], default=0) or 0 for d in win)
+    df = sum(num(r"\(cecha pustyni (\d+)\)", kt[d], default=0) or 0 for d in win)
+    rep.add("E7/T T2: partio-godziny AI w lesie z cecha lasu (okno)", f"{ff} (las razem {fa}, ForestKin {fk}; pustynia {dd}, z cecha pustyni {df})",
+            ">= 50 (inaczej prog T3 nieczytelny - zglosic, nie zaliczac)", ff >= 50, decide=True)
+    # ---- T3 ponizej sufitu (karawany, wozy wsi), d31-until, srednie wazone
+    def wavg(label, days):
+        sa = sb_ = 0.0
+        na = nb = 0
+        for d in days:
+            seg = kt[d].split("| ponizej sufitu", 1)
+            if label.startswith("ponizej:"):
+                if len(seg) < 2:
+                    continue
+                p = _e7t_pair(seg[1], label.split(":", 1)[1])
+            else:
+                p = _e7t_pair(seg[0], label)
+            if not p:
+                continue
+            a, b, x, y = p
+            if a is not None and x:
+                sa += a * x; na += x
+            if b is not None and y:
+                sb_ += b * y; nb += y
+        return (sa / na if na else None), (sb_ / nb if nb else None), na, nb
+
+    nf, npl, n1, n2 = wavg("ponizej:Polnoc las/rownina", w31)
+    df_, dpl, n3, n4 = wavg("ponizej:Dorne pustynia/rownina", w31)
+    f3 = lambda v: f"{v:.3f}" if v is not None else "-"
+    ok3 = None
+    near3 = False
+    if nf is not None and npl is not None and df_ is not None and dpl is not None:
+        ok3 = (nf < npl) and (df_ <= dpl)
+        # recenzja E7/T: przy kluczu on Dorne z cecha ma na pustyni te sama predkosc co na rowninie (oczekiwana roznica 0), Polnoc w lesie ok. -1.5%;
+        # srednie z roznych partii i godzin (ladunek, pogoda, pora) rozjezdzaja sie o 1-2% w obie strony, wiec scisly prog bylby rzutem moneta.
+        # Chybienie w granicy 2% = DECYZJA (ocenic z T1), nie NIE; stara regula daje +12% / +5%, wiec ta granica nadal ja odroznia
+        near3 = (not ok3) and nf <= npl * 1.02 and df_ <= dpl * 1.02
+    rep.add("E7/T T3: ponizej sufitu MarchPace - karawany i wozy wsi (d31-okno, srednie wazone)",
+            f"Polnoc las/rownina {f3(nf)}/{f3(npl)} (n {n1}/{n2}), Dorne pustynia/rownina {f3(df_)}/{f3(dpl)} (n {n3}/{n4})",
+            "Polnoc las < rownina, Dorne pustynia <= rownina (klucz on; off - spodziewane odwrotnie; chybienie do 2% - DECYZJA: rozrzut skladu probek, ocenic z T1)",
+            ok3 if on else None, decide=near3)
+    lf, lpl, m1, m2 = wavg("Polnoc las/rownina", w31)
+    ld, ldp, m3, m4 = wavg("Dorne pustynia/rownina", w31)
+    caps = [fnum(r"na suficie MarchPace ([0-9.]+)%", kt[d]) for d in w31]
+    caps = [c for c in caps if c is not None]
+    capt = f"sr. {sum(caps) / len(caps):.1f}%" if caps else "-"
+    rep.add("E7/T: rody (na suficie i nie) - odczyt (d31-okno)",
+            f"Polnoc las/rownina {f3(lf)}/{f3(lpl)} (n {m1}/{m2}), Dorne pustynia/rownina {f3(ld)}/{f3(ldp)} (n {m3}/{m4}); probek rozpiski na suficie MarchPace {capt}",
+            "INFO (kolumny piesze na suficie - zmiana 0-2%)", None)
+    xo = [fnum(r"stara regula ([0-9.]+) jedn\.", kt[d]) for d in win]
+    xn = [fnum(r"jedn\., teraz ([0-9.]+) jedn\.", kt[d]) for d in win]
+    xo = [x for x in xo if x is not None]
+    xn = [x for x in xn if x is not None]
+    rep.add("E7/T: zwrot ponad netto gry (ok., na partio-godzine w lesie/na pustyni)",
+            f"stara regula sr. {sum(xo) / len(xo):.4f} jedn., teraz sr. {sum(xn) / len(xn):.4f} jedn." if xo and xn else "brak",
+            "INFO (teraz 0 przy kluczu on)", None)
+    # ---- T4 koszt, bledy, potkniecia
+    cost = [(fnum(r"\| koszt ([0-9.]+) ms", kt[d]), d) for d in win]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E7/T T4: koszt probki (godzinna + rozpiska gry)", f"srednio {m:.3f} ms/dobe, najwiecej {mx[0]:.3f} ms (d{run_day(mx[1], start)}) - {len(cost)} dob",
+                "<= 20 ms/dobe srednio", m <= 20.0)
+    errs = [s for s in lines if s.startswith("ERROR in TerrainEase")]
+    stum = max([num(r"\| potkniecia (\d+)", kt[d], default=0) or 0 for d in win] or [0])
+    rep.add("E7/T T4: bledy TerrainEase i potkniecia probki", f"ERROR in TerrainEase {len(errs)}; potkniecia (najwiecej w linii) {stum}", "0 i 0",
+            len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/T T4: bledy TerrainEase polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="TerrainEase")
+    # ---- T6 regresja E5: miasta kupuja >= 98% plonu (wozy wsi Polnocy w lesie wolniej)
+    pv = by_day(lines, "Przeplywy osad: dzien")
+    tw = by_day(lines, "Towary (utarg wozow): dzien")
+    days6 = [d for d in sorted(set(pv) | set(tw)) if 31 <= run_day(d, start) <= until]
+    su = sum(num(r"towar niesprzedany po wizycie: w miastach (\d+) szt", pv[d], default=0) or 0 for d in days6 if d in pv)
+    ss = sum(num(r"za (\d+) szt\.", tw[d], default=0) or 0 for d in days6 if d in tw)
+    share = (100.0 * su / (su + ss)) if (su + ss) > 0 else None
+    rep.add("E7/T T6: regresja E5 - towar wsi niesprzedany w miastach (d31-okno)",
+            f"{su} szt. wobec sprzedanych {ss} ({share:.3f}% plonu)" if share is not None else "brak linii Przeplywy osad / Towary (utarg wozow)",
+            "<= 2% (miasta kupuja >= 98% plonu)", (share <= 2.0) if share is not None else None)
+    rep.add("E7/T T5: tempo marszu", "poza blokiem", "Miara: marsz (marsz.py, rozdz. 4) w progu 124-138 km/dobe", None)
+
+
+# E7/C (227): wyjatki od R4 "kazda decyzja gry na zegarze gry" - plik -> (dozwolonych trafien, powod). Liczba to gorna granica: nowe trafienie w pliku = NIE
+_E7C_ALLOWED = {
+    "Log.cs": (4, "znaczniki czasu logu"),
+    "GoodsLedger.cs": (1, "godzina w linii logu"),
+    "NightRest.cs": (4, "widok: namiot gracza (ReassertPlayerTent, co 5 s) i namioty mijanych obozow (co 2 s)"),
+    "Wayfinder.cs": (2, "dlawienie komunikatu drogi"),
+    "QuartermasterLaw.cs": (4, "dlawienie okrzyku kwatermistrza"),
+    "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
+    "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
+    "HideoutPurge.cs": (2, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne"),
+}
+_E7C_PAT = re.compile(r"DateTime\.(?:Now|UtcNow)\b|Environment\.TickCount|ApplicationTime|\+=\s*realDt\b")
+_E7C_ACC = re.compile(r"\b_acc\w*\s*\+=\s*dt\b")
+_E7C_ONLY_IN = {"HideoutPurge.cs": "bool PursuitDue()"}   # wylacznik: zegar realny tylko w galezi klucza 0 tej metody
+
+
+def etap7_c(rep, lines, start, until, logp=None, csp=None):
+    """E7/C (227): jedna skala czasu (projekt etapu 7 v2 rozdz. 3 "E7/C" Test, PLAN 7.1, R4). T1 grep kodu Armoury/src (katalog obok tools/): zegar realny
+    (DateTime.Now/UtcNow, Environment.TickCount, ApplicationTime, += realDt) i akumulator dt (_acc += dt) poza plikami misji (OnMissionTick - zegar misji
+    to zegar gry w bitwie) tylko w plikach z _E7C_ALLOWED i najwyzej w ich liczbie; brak zrodel obok narzedzia - INFO. T2 podpowiedz World Pace Percent
+    (Settings.cs i McmSettings.cs) bez "168" i "month". Linia startowa i T3 odnowien pogoni na dobe gry (dopisek "E7/C:" linii konca pogoni) - INFO."""
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Armoury", "src")
+    if not os.path.isdir(src):
+        rep.add("E7/C T1: zegar realny i akumulatory klatek w logice gry (grep kodu)", f"brak zrodel ({src})", "uruchomic z drzewa repo", None)
+        rep.add("E7/C T2: tekst MCM World Pace Percent bez 168", "brak zrodel", "uruchomic z drzewa repo", None)
+    else:
+        hits, over = {}, []
+        for fn in sorted(os.listdir(src)):
+            if not fn.endswith(".cs"):
+                continue
+            try:
+                with open(os.path.join(src, fn), encoding="utf-8", errors="replace") as f:
+                    txt = f.read()
+            except OSError:
+                continue
+            mission = "OnMissionTick" in txt
+            # plik z wyjatkiem w jednej metodzie (wylacznik): trafienia poza jej cialem sa zawsze NIE (stara regula w OnTick dawala tyle samo trafien)
+            only_in = _E7C_ONLY_IN.get(fn)
+            span = None
+            if only_in:
+                a = txt.find(only_in)
+                b = txt.find("\n        }", a) if a >= 0 else -1
+                span = (txt.count("\n", 0, a), txt.count("\n", 0, b)) if a >= 0 and b >= 0 else (-1, -1)
+            n = 0
+            outside = 0
+            for i, ln in enumerate(txt.splitlines()):
+                code = ln.split("//", 1)[0]
+                k = len(_E7C_PAT.findall(code)) + (0 if mission else len(_E7C_ACC.findall(code)))
+                n += k
+                if span is not None and k and not (span[0] <= i <= span[1]):
+                    outside += k
+            if n:
+                hits[fn] = n
+                lim = _E7C_ALLOWED.get(fn, (0, ""))[0]
+                if n > lim or outside:
+                    over.append(f"{fn} {n}/{lim}" + (f" (poza {only_in}: {outside})" if outside else ""))
+        hp = hits.get("HideoutPurge.cs", 0)
+        rep.add("E7/C T1: zegar realny i akumulatory klatek w logice gry (grep kodu Armoury/src)",
+                f"poza lista wyjatkow: {', '.join(over) if over else '0'}; w wyjatkach: "
+                + ", ".join(f"{k} {v}" for k, v in sorted(hits.items()) if k in _E7C_ALLOWED) + f" (HideoutPurge {hp} - tylko wylacznik)",
+                "0 poza lista (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8)", not over)
+        bad = []
+        for fn in ("Settings.cs", "McmSettings.cs"):
+            try:
+                with open(os.path.join(src, fn), encoding="utf-8", errors="replace") as f:
+                    row = [ln for ln in f if ("WorldPacePercent =" in ln and "//" in ln) or ('"World Pace Percent"' in ln and "HintText" in ln)]
+            except OSError:
+                row = []
+            if not row:
+                bad.append(f"{fn}: brak wiersza")
+            for ln in row:
+                if "168" in ln or "month" in ln.lower():
+                    bad.append(fn)
+        rep.add("E7/C T2: tekst MCM World Pace Percent bez 168 i obietnicy miesiaca", "; ".join(bad) if bad else "czysty (Settings.cs, McmSettings.cs)",
+                "bez '168' i 'month'", not bad)
+    st_ = [s for s in lines if s.startswith("Jedna skala czasu (E7/C)")]
+    rep.add("E7/C: linia startowa", st_[-1] if st_ else "brak (log sprzed E7/C?)", "INFO (co ile godzin gry odwet odnawia pogon)", None)
+    rr = [s for s in lines if s.startswith("HideoutPurge: pogon") and "(E7/C:" in s]
+    if rr:
+        ren = sum(num(r"odnowien (\d+) w", s, default=0) or 0 for s in rr)
+        hrs = sum(fnum(r" w ([0-9.]+) h gry =", s, default=0.0) or 0.0 for s in rr)
+        steps = sorted({m.group(1) for s in rr for m in [re.search(r"; (co [^)]+)\)", s)] if m})
+        rate = f"{ren * 24.0 / hrs:.1f}" if hrs > 0.01 else "-"
+        rep.add("E7/C T3: odnowien pogoni odwetu na dobe gry (caly log)", f"{len(rr)} pogoni, odnowien {ren} w {hrs:.1f} h gry = {rate} na dobe ({'; '.join(steps)})",
+                "INFO (klucz 0.5 h - ok. 48 na dobe przy kazdej predkosci gry)", None)
+    else:
+        rep.add("E7/C T3: odnowien pogoni odwetu na dobe gry", "brak pogoni w logu", "INFO (odwet rusza po przeszukaniu kryjowki z bandami w poblizu)", None)
+
+
+E7K_START = "Czas swiata (E7/K):"
+E7K_CTW = re.compile(r"^Wezwania do wojny \(168\): .+ wzywa .+ przez (\d+) dob")
+
+
+def etap7_k(rep, lines, start, until, logp=None, csp=None):
+    """E7/K (226): turnieje, sojusze i rozejm w roku 364 (projekt etapu 7 v2 rozdz. 3 "E7/K" Test, PLAN 7.7, R8). T8 linia startowa "Czas swiata (E7/K)":
+    prefiks turniejow wpiety i trafia (metoda na koncu lancucha modeli z DefaultTournamentModel), postfiksy sojuszy wpiete, postfiks rozejmu wpiety i po BK;
+    T1 najdluzsze okno bez startu turnieju gry < 14 dob, T2 starty w kazdym tygodniu pory (okno >= tyle tygodni, ile ma pora), T3 nowe porozumienia wezwan
+    168 "przez N dob" = wezwanie z linii startowej (182 przy roku 364; caly log po linii startowej), T4 KRONIKA WOJEN (CS) - wojen naraz w kazdej linii dob
+    kampanii 61-until >= 7, T7 nowa wojna z decyzji krolestwa (przyczyna CausedByKingdomDecision) po pokoju tej pary krocej niz rozejm z linii startowej
+    (cale dni linii, -1 na zaokraglenie dnia) - 0, T0 bledy WorldTime7 i potkniecia E7/K 0. Wstrzymane propozycje, T5 nagrody turniejow (Szczelnosc 164a),
+    T6 GrandTourney - INFO. Wylacznik off w linii startowej - progi tej czesci INFO."""
+    st_ = [s for s in lines if s.startswith(E7K_START)]
+    if not st_:
+        rep.add("E7/K: linia startowa Czas swiata (E7/K)", "brak w logu", "jest od wgrania E7/K (log sprzed E7/K?)", None)
+        return
+    s0 = st_[-1]
+    tour_on = "turnieje co 3. tydzien" in s0
+    diplo_on = "DiplomacyYearLong off" not in s0
+    part = num(r"wezwanie (\d+)", s0)
+    truce = num(r"rozejm gry (\d+) dni", s0)
+    bad = []
+    if tour_on and ("prefiks wpiety" not in s0 or "(trafia)" not in s0):
+        bad.append("prefiks turniejow niewpiety albo nie trafia")
+    if "postfiksy wpiete" not in s0:
+        bad.append("postfiksy sojuszy niewpiete")
+    if "(postfiks wpiety" not in s0:
+        bad.append("postfiks rozejmu niewpiety")
+    if "po BK NIE" in s0:
+        bad.append("rozejm przed BK")
+    if "| BRAK:" in s0:
+        bad.append("BRAK")
+    rep.add("E7/K T8: linia startowa - latki wpiete (rozejm po BK, prefiks turniejow trafia)", s0[:400] + (f" | {'; '.join(bad)}" if bad else ""),
+            "postfiks rozejmu wpiety, bez BRAK i NIE", not bad)
+    # ---- T0 bledy i potkniecia
+    errs = [s for s in lines if s.startswith("ERROR in WorldTime7")]
+    wd = {}
+    for s in lines:
+        if s.startswith("Wojna i pokoj (E7/0): dzien") and "| od poprzedniej linii:" in s:
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                wd[k] = s
+    win_w = [d for d in sorted(wd) if 1 <= run_day(d, start) <= until]
+    stum = max([num(r"E7/K potkniecia (\d+)", wd[d], default=0) or 0 for d in win_w] or [0])
+    rep.add("E7/K T0: bledy WorldTime7 i potkniecia E7/K", f"ERROR in WorldTime7 {len(errs)}; potkniecia (najwiecej w linii dobowej) {stum}"
+            + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 i 0", len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/K T0: bledy WorldTime7 polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="WorldTime7")
+    held = [num(r"wstrzymane rozejmem: (\d+)", wd[d]) for d in win_w]
+    held = [h for h in held if h is not None]
+    rep.add("E7/K: propozycje wojny gry wstrzymane rozejmem (okno)",
+            f"{sum(held)} w {len(held)} dobach z liczba" if held else "brak liczby w linii dobowej (pomiar E7/0 wylaczony albo DiplomacyYearLong off)",
+            "INFO (gra losuje znow przy nastepnej probie)", None)
+    # ---- T1/T2 turnieje
+    tu = by_day(lines, "Turnieje (E7/0): dzien")
+    win = [d for d in sorted(tu) if 1 <= run_day(d, start) <= until]
+    if not win:
+        rep.add("E7/K T1/T2: turnieje gry", "brak linii Turnieje (E7/0) w oknie", "linia E7/0 (Stage7MeasureLog)", None)
+    else:
+        started = {d: (num(r"rozpoczete od poprzedniej linii (\d+)", tu[d], default=0) or 0) for d in win}
+        gap, best, best_end, weeks = 0, 0, None, {}
+        for d in win:
+            if started[d] > 0:
+                gap = 0
+                w = num(r"tydzien pory (\d+)", tu[d])
+                if w is not None:
+                    weeks[w] = weeks.get(w, 0) + started[d]
+            else:
+                gap += 1
+                if gap > best:
+                    best, best_end = gap, d
+        rep.add("E7/K T1: najdluzsze okno bez startu turnieju gry", f"{best} dob" + (f" (do d{run_day(best_end, start)})" if best_end is not None else "")
+                + f"; startow {sum(started.values())} w {len(win)} dobach", "< 14 dob" if tour_on else "INFO (TournamentsAllSeason off)",
+                (best < 14) if tour_on else None)
+        wmax = num(r"tydzien pory \d+ \(0-(\d+)", tu[win[-1]])
+        nweeks = (wmax if wmax is not None else 12) + 1
+        empty = [w for w in range(nweeks) if w not in weeks]
+        enough = len(win) >= 7 * nweeks
+        rep.add("E7/K T2: starty turniejow w kazdym tygodniu pory", f"tygodnie bez startu {empty if empty else '-'} (z 0-{nweeks - 1}; okno {len(win)} dob)",
+                "brak pustych tygodni" if tour_on and enough else "INFO (okno krotsze niz pora albo TournamentsAllSeason off)",
+                (not empty) if tour_on and enough else None)
+    # ---- T3 porozumienia wezwan 168 (caly log po pierwszej linii startowej E7/K)
+    i0 = lines.index(st_[0])
+    durs = []
+    for s in lines[i0:]:
+        m = E7K_CTW.match(s)
+        if m:
+            durs.append(int(m.group(1)))
+    if not durs:
+        rep.add("E7/K T3: nowe porozumienia wezwan (168) - przez N dob", "brak nowych porozumien po linii startowej", f"INFO (oczekiwane {part} dob)", None)
+    else:
+        other = sorted({x for x in durs if x != part})
+        rep.add("E7/K T3: nowe porozumienia wezwan (168) - przez N dob", f"{len(durs)} porozumien, inne niz {part}: {other if other else '-'}",
+                f"wszystkie {part} dob (wezwanie z linii startowej)", (not other) if part is not None else None)
+    # ---- T4 KRONIKA (CS): wojen naraz w dobach kampanii 61-until (chwile z zegara obu logow, jak E7/0 T1)
+    name4 = f"E7/K T4: KRONIKA WOJEN (CS) - wojen naraz w dobach kampanii 61-{until}"
+    if until < 61:
+        rep.add(name4, f"okno do d{until}", ">= 7 (od doby 61)", None)
+    elif not logp:
+        rep.add(name4, "bez logu", ">= 7", None)
+    else:
+        path, how = crashscribe_session_of(logp, csp)
+        a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+        c0 = _start_dt_of(path) if path else None
+        if not path or a0 is None or c0 is None:
+            rep.add(name4, how if not path else "brak chwili startu logu Armoury albo CS", ">= 7 (bez logu sesji - INFO)", None)
+        else:
+            days = {d for d in tu if 61 <= run_day(d, start) <= until}
+            times = [t for t, s in _abs_lines(logp, a0) if s.startswith("Turnieje (E7/0): dzien") and num(r"dzien (\d+)", s) in days]
+            if not times:
+                rep.add(name4, "brak linii Turnieje (E7/0) w dobach 61-until", ">= 7", None)
+            else:
+                lo, hi = min(times), max(times)
+                cnt = []
+                for t, s in _abs_lines(path, c0):
+                    m = E7_KRON.match(s)
+                    if m and m.group(1) == "dzien" and lo <= t <= hi:
+                        cnt.append(len(_kron_set(m.group(2))))
+                if not cnt:
+                    rep.add(name4, f"brak linii KRONIKI (dzien) w czasie dob 61-until ({os.path.basename(path)})", ">= 7", None)
+                else:
+                    rep.add(name4, f"najmniej {min(cnt)}, srednio {sum(cnt) / len(cnt):.1f}, najwiecej {max(cnt)} ({len(cnt)} linii; {os.path.basename(path)})",
+                            ">= 7 w kazdej linii (polowa 14-17 z 11.10)", min(cnt) >= 7)
+    # ---- T7 nowa wojna z decyzji krolestwa przed koncem rozejmu gry
+    lim = (truce - 1) if truce is not None else None
+    viol, n_kd = [], 0
+    for s in lines:
+        m = E7_WAR.match(s)
+        if not m or m.group(4) != "WOJNA" or not m.group(5).startswith("CausedByKingdomDecision") or not (1 <= run_day(int(m.group(1)), start) <= until):
+            continue
+        n_kd += 1
+        dd = num(r"tej pary (\d+) \(POKOJ\)", s)
+        if dd is not None and lim is not None and dd < lim:
+            viol.append(f"{m.group(2)} - {m.group(3)} {dd} d (d{run_day(int(m.group(1)), start)})")
+    val7 = f"{len(viol)} z {n_kd} wojen z decyzji krolestwa" + (f": {'; '.join(viol[:5])}" if viol else "")
+    rep.add("E7/K T7: nowa wojna z decyzji krolestwa krocej niz rozejm gry po pokoju tej pary", val7,
+            f"0 (rozejm {truce} dni, prog {lim} cale dni; decyzje gracza i Diplomacy - pytanie 3 - recznie)" if diplo_on else "INFO (DiplomacyYearLong off)",
+            (not viol) if diplo_on and lim is not None else None)
+    # ---- T5 nagrody turniejow (Szczelnosc 164a), T6 GrandTourney
+    sea = by_day(lines, "Szczelnosc (164a): dzien")
+    want = paid = cut = 0
+    for d in sea:
+        if 1 <= run_day(d, start) <= until:
+            m = re.search(r"nagrody turniejow: gra chciala (\d+), zaplacili (\d+), uciete (\d+)", sea[d])
+            if m:
+                want += int(m.group(1))
+                paid += int(m.group(2))
+                cut += int(m.group(3))
+    rep.add("E7/K T5: nagrody turniejow AI (Szczelnosc 164a, okno)", f"gra chciala {want}, zaplacili {paid}, uciete {cut}" + (f" ({100.0 * cut / want:.1f}%)" if want else ""),
+            "INFO (platnik - miasto-gospodarz z nadwyzka)", None)
+    rep.add("E7/K T6: GrandTourney - zjazdy lordow na sezon", "poza blokiem (log GrandTourney - skopiowac przed biegiem zapisu)", "INFO (ok. 4x wiecej turniejow na rok)", None)
+
+
+E7O2_START = "CampScene (E7/O2): prefaby dostepne"
+
+
+def etap7_o2(rep, lines, start, until, logp=None, csp=None):
+    """E7/O2 (229): namioty i ogniska przy napadzie na oboz gracza (projekt etapu 7 v2 rozdz. 3 "E7/O2", R18). T1 linia startowa "CampScene (E7/O2):
+    prefaby dostepne - namioty x/5, ogniska y/3, pochodnie z/2, plot w/2 (bez fizyki)" (co sesje przy kluczu CampBattlePropsEnabled): kazdy element >= 1
+    (wszyscy kandydaci sa w Native 1.4.8), bez bledow PrefabExists; T0 bledy CampScene (ERROR in CampScene...) 0; postawione w misjach - INFO
+    (T2 test Jeffa: napad na jego oboz, wojsko nie grzeznie - autotest nie gra bitew w obozie gracza)."""
+    st_ = [s for s in lines if s.startswith(E7O2_START)]
+    if not st_:
+        rep.add("E7/O2 T1: linia startowa CampScene (prefaby obozu)", "brak",
+                "linia w kazdej sesji (klucz CampBattlePropsEnabled = true - wpis Armoury.json Jeffa poprawiony przy wgraniu)", False)
+    else:
+        bad = set()
+        for s in st_:
+            for lab in ("namioty", "ogniska", "pochodnie", "plot"):
+                if (num(lab + r" (\d+)/\d+", s, default=0) or 0) < 1:
+                    bad.add(lab)
+            if "bledy PrefabExists" in s:
+                bad.add("bledy PrefabExists")
+        rep.add("E7/O2 T1: linia startowa CampScene (prefaby obozu)", f"{len(st_)} sesji; ostatnia: {st_[-1][len('CampScene (E7/O2): '):]}"
+                + (f"; braki: {', '.join(sorted(bad))}" if bad else ""), "kazdy element >= 1, bez bledow PrefabExists", not bad)
+    errs = [s for s in lines if s.startswith("ERROR in CampScene")]
+    rep.add("E7/O2 T0: bledy CampScene (ERROR in CampScene)", len(errs), "0", len(errs) == 0)
+    pl = [s for s in lines if s.startswith("CampScene: postawiono")]
+    if pl:
+        n = [num(r"postawiono (\d+)", s, default=0) or 0 for s in pl]
+        fr = sorted({m.group(1) for s in pl for m in [re.search(r"front: ([^,]+),", s)] if m})
+        rep.add("E7/O2: bitwy w obozie gracza ze scenografia", f"{len(pl)} bitew, elementow {sum(n)} (min {min(n)}, maks {max(n)} z 10); front: {', '.join(fr) or '-'}",
+                "INFO (T2 - test Jeffa: wojsko nie grzeznie)", None)
+    else:
+        rep.add("E7/O2: bitwy w obozie gracza ze scenografia", "brak w logu", "INFO (autotest nie gra bitew w obozie gracza; T2 - test Jeffa)", None)
+
+
+def etap7_main(logp, start_arg, until=120, csp=None):
+    """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
+    (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
+    start, until, ...); kazdy blok rusza tylko przy swojej linii - brak linii = wiersz INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
+    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+        try:
+            blk(rep, lines, start, until, logp=logp, csp=csp)
+        except Exception as e:   # narzedzie nigdy nie przerywa raportu
+            rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -6514,6 +7328,8 @@ def main(argv):
         return etap4_main(logp, start_arg, until_arg, csp, bdp)   # E4/0 (188)
     if group == "etap5" and logp:
         return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
+    if group == "etap7" and logp:
+        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224): szkielet etapu 7 + blok E7/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

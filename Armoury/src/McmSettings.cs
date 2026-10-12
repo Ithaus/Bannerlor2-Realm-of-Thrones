@@ -748,6 +748,10 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutReprisalHours { get; set; } = 48f;
 
+        [SettingPropertyFloatingInteger("Hideout Pursuit Hours", 0.00f, 2.00f, "0.00", HintText = "a reprisal band renews its chase every this many game hours, whatever the game speed (0 = the old every three real seconds)")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutPursuitHours { get; set; } = 0.5f;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -1200,7 +1204,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar")]
+        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party as a percent of the game's own (100 or more = unchanged, it never speeds the world up) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it")]
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 
@@ -3828,9 +3832,9 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float ArmorOutlierTolerance { get; set; } = 1.30f;
 
-        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
+        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "attacked while encamped, the field battle gets your camp dressed on it once your men are deployed - tents, a campfire and a fence behind you, torches around you; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged")]
         [SettingPropertyGroup("A night's rest")]
-        public bool CampBattlePropsEnabled { get; set; } = false;
+        public bool CampBattlePropsEnabled { get; set; } = true;
 
         [SettingPropertyBool("Hideout Alarm Enabled", HintText = "a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away")]
         [SettingPropertyGroup("A night's rest")]
@@ -4804,6 +4808,26 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float KnightHorseMarketShare { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Stage7 Measure Log", HintText = "counts wars and peaces with their cause, army members riding to the muster at night and tournaments by week of the season - written to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool Stage7MeasureLog { get; set; } = true;
+
+        [SettingPropertyBool("Sleepers Hold Orders", HintText = "a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool SleepersHoldOrders { get; set; } = true;
+
+        [SettingPropertyBool("Terrain Ease Exact", HintText = "a culture or a scout that halves the game's forest or desert penalty halves ours too - the penalty shrinks, it never turns into a bonus (off = the whole game penalty is given back, as before)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool TerrainEaseExact { get; set; } = true;
+
+        [SettingPropertyBool("Tournaments All Season", HintText = "towns hold tournaments in every week of the season, each town every third week - as often per day as in the short calendar (off = only in the first three weeks of each season, as in the game)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool TournamentsAllSeason { get; set; } = true;
+
+        [SettingPropertyBool("Diplomacy Year Long", HintText = "alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool DiplomacyYearLong { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -4990,6 +5014,7 @@ namespace Armoury
             s.HideoutReprisalRadius = HideoutReprisalRadius;
             s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;
             s.HideoutReprisalHours = HideoutReprisalHours;
+            s.HideoutPursuitHours = HideoutPursuitHours;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;
@@ -6004,6 +6029,11 @@ namespace Armoury
             s.CavalryShareByTemplate = CavalryShareByTemplate;
             s.KnightHorseFromHouse = KnightHorseFromHouse;
             s.KnightHorseMarketShare = KnightHorseMarketShare;
+            s.Stage7MeasureLog = Stage7MeasureLog;
+            s.SleepersHoldOrders = SleepersHoldOrders;
+            s.TerrainEaseExact = TerrainEaseExact;
+            s.TournamentsAllSeason = TournamentsAllSeason;
+            s.DiplomacyYearLong = DiplomacyYearLong;
         }
 
         internal static void Apply()

@@ -219,7 +219,9 @@ namespace Armoury
                             Kingdom other;
                             if (called.IsAtWarWith(against) && !beh.IsAtWarByCallToWarAgreement(called, against, out other))
                             {
-                                try { MakePeaceAction.Apply(called, against); peace = true; _dPeaceN++; } catch (Exception e) { Stumble("MakePeace", e); }
+                                // E7/0 (224): para znaczona na czas Apply - linia "Wojna i pokoj (E7/0)" podaje przyczyne "wezwanie 168 zerwane" zamiast Default
+                                try { WorldClock7.Mark168(called, against); MakePeaceAction.Apply(called, against); peace = true; _dPeaceN++; } catch (Exception e) { Stumble("MakePeace", e); }
+                                finally { WorldClock7.Clear168(); }
                             }
                             Log.Info("Wezwania do wojny (168): skarbiec " + calling.Name + " nie ma z wplywow dnia " + due + " zl (zostalo " + avail + ") - porozumienie z " + called.Name
                                      + " przeciw " + against.Name + " zerwane, reszta ceny " + left + " skreslona" + (peace ? ", " + called.Name + " wychodzi z wojny (pokoj)" : ", wojna trwa z innych powodow") + ".");

@@ -228,6 +228,8 @@ namespace Armoury
         public float HideoutReprisalRadius = 40f;          // map-distance within which bandit parties join the reprisal
         public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away
         public float HideoutReprisalHours = 48f;           // the horde hunts you this long - then gives up and drifts back to its old ways
+        // E7/C (227, PLAN 7.1, R4): jedna skala czasu - rozkaz pogoni odwetu odnawiany na zegarze gry (HideoutPurge.PursuitDue), nie co 3 s realne
+        public float HideoutPursuitHours = 0.5f;           // a reprisal band renews its chase every this many game hours, whatever the game speed (0 = the old every three real seconds)
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used
@@ -367,7 +369,7 @@ namespace Armoury
 
         // --- The marching column ---
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
-        public int WorldPacePercent = 50;                  // base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar
+        public int WorldPacePercent = 50;                  // base map speed of EVERY party as a percent of the game's own (100 or more = unchanged, it never speeds the world up) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it
         public bool TerrainEaseEnabled = true;             // replace the game's percentage terrain and night penalties with the flat map-speed penalties below (the vanilla share is shown undone in the tooltip, then ours applied)
         public float ForestSpeedPenalty = 0.10f;           // flat speed lost in forest (vanilla: 30% of your speed)
         public float DesertSpeedPenalty = 0.20f;           // flat speed lost in desert and dunes (vanilla: 10%)
@@ -1137,7 +1139,7 @@ namespace Armoury
         public bool ArmorSanityEnabled = true;             // Armour Sense Law: outliers get levelled to the norm of their type and tier - no more 4 kg chaps outarmouring plate; the world's balance stays put
         public float ArmorOutlierPercentile = 75f;         // Armour Sense Law: the norm is this percentile of total protection within (type, tier)
         public float ArmorOutlierTolerance = 1.30f;        // Armour Sense Law: pieces above norm x this get trimmed down to it
-        public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
+        public bool CampBattlePropsEnabled = true;         // attacked while encamped, the field battle gets your camp dressed on it once your men are deployed - tents, a campfire and a fence behind you, torches around you; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged
         public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
         public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on
         public float HideoutAlarmWitnessRadius = 12f;      // a CLEAN one-blow kill alarms only enemies this close to the body - no witnesses, no alarm
@@ -1503,6 +1505,22 @@ namespace Armoury
         public bool CavalryShareByTemplate = true;         // an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)
         public bool KnightHorseFromHouse = true;           // a knight's horse is bought by his house - from the herds of its villages by the place where he stops first, then at the market - and goes into his own armoury; the house pays from its arms budget, and lords with men waiting for a horse no longer wait days between purchases while the game does not sell their horses. Works only with Ai Sells Spare Horses on (off = knights' horses are bought like any other)
         public float KnightHorseMarketShare = 0.5f;        // the share of the horses on a town's shelf a house may buy for its knights in one visit (other horses: Ai Mount Market Share Percent); the last few always stay on the shelf
+
+        // --- Roads, camps and villages (stage 7) ---
+        // E7/0 (224, projekt etapu 7 v2 rozdz. 3): pomiar etapu 7 - tylko log (wojna i pokoj z przyczyna, zbiorka armii w nocy, turnieje wedlug tygodnia pory)
+        public bool Stage7MeasureLog = true;               // counts wars and peaces with their cause, army members riding to the muster at night and tournaments by week of the season - written to the log only, changes nothing in the game
+        // E7/O1 (228, PLAN 7.6, R5): sen do switu - faza snu (AI spiacego w obozie, snem dlugu i w osadzie odnawiane przed terminem, wlaczane o swicie)
+        // i bramka rozkazow (SleepGate: prefiksy First na 10 MobileParty.SetMove*; rozkaz zapisany tam, gdzie trzyma go sen); off = straznik po fakcie jak dotad
+        public bool SleepersHoldOrders = true;             // a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before
+        // E7/T (225, PLAN 7.4, R2): kary terenu dokladnie jak gra - zwrot = netto kary gry (ForestKin zwiadowcy, cecha lasu, cecha pustyni), nasza plaska kara
+        // w tym samym ulamku (TerrainEase.SpeedPostfix); off = pelny zwrot kary gry jak dotad (Polnoc w lesie i Dorne na pustyni szybciej niz po rowninie)
+        public bool TerrainEaseExact = true;               // a culture or a scout that halves the game's forest or desert penalty halves ours too - the penalty shrinks, it never turns into a bonus (off = the whole game penalty is given back, as before)
+        // E7/K (226, PLAN 7.7, R8): turnieje co 3. tydzien caly rok - formula gry, tydzien = (int)ToWeeks % 3 zamiast tygodnia pory (WorldTime7.TournamentPrefix);
+        // off = gra: tylko tygodnie pory 0-2 z 13
+        public bool TournamentsAllSeason = true;           // towns hold tournaments in every week of the season, each town every third week - as often per day as in the short calendar (off = only in the first three weeks of each season, as in the game)
+        // E7/K (226, PLAN 7.7, R8, krytyka K1-06): stale kalendarza gry x rok/84 - sojusz 84 -> 364, wezwanie do wojny 42 -> 182 (postfiksy getterow DefaultAllianceModel),
+        // przerwa po pokoju przed propozycja wojny gry 20 -> ok. 87 dni (postfiks GetRandomWarDecision, Priority.Low - po BK); off = dni gry 84 / 42 / 20
+        public bool DiplomacyYearLong = true;              // alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)
 
         public static void Load(string moduleDataDir)
         {

@@ -267,6 +267,7 @@ namespace Armoury
                 Debt = 0; DawnDebt = 0; _restTonight = 0f; _credited = false;
                 ResetHourCounters();
                 ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
+                ResetGate(); // E7/O1 (228): zegar przegladu osad
             }
             catch { }
         }
@@ -277,6 +278,7 @@ namespace Armoury
             _tentDropsHour = 0; _tentDropMax = 0f;
             _holdCalls = 0; _dropCalls = 0; _holdMsSum = 0; _holdMsMax = 0; _dropMsSum = 0; _dropMsMax = 0;
             _holdDhMax = 0; _dropDhMax = 0;
+            ResetGateHour();   // E7/O1 (228): liczniki bramki i fazy snu - razem z wypisaniem linii
         }
 
         /// <summary>Potkniecie na jednej partii w straznikach: liczymy, log pierwsze 3 i co setne (bez gaszenia straznika).</summary>
@@ -414,6 +416,7 @@ namespace Armoury
         private static void HoldSleepers()
         {
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool phase = GateOn(Settings.Current);   // E7/O1 (228): faza snu - AI spiacego odnawiane przed terminem
             try
             {
                 for (int i = _camping.Count - 1; i >= 0; i--)
@@ -421,8 +424,10 @@ namespace Armoury
                     var mp = _camping[i];
                     try
                     {
-                        if (mp == null || !mp.IsActive) { _camping.RemoveAt(i); continue; }
+                        // E7/O1 (228, O1-magazyn): legowisko wypada razem z obozem - inaczej SleepKind uznalby za spiacego partie, ktorej nikt nie pilnuje
+                        if (mp == null || !mp.IsActive) { _camping.RemoveAt(i); if (mp != null) _bedPos.Remove(mp); continue; }
                         if (mp.MapEvent != null || mp.CurrentSettlement != null) continue;   // bitwa/osada - nie nasza sprawa
+                        if (phase) KeepAsleep(mp, SkCamp);
                         Vec2 bed;
                         if (!_bedPos.TryGetValue(mp, out bed)) { bed = mp.GetPosition2D; _bedPos[mp] = bed; }
                         float drift = mp.GetPosition2D.Distance(bed);
@@ -440,6 +445,7 @@ namespace Armoury
                         else if (_orders.TryGetValue(mp, out mine) && mine != null && mine.Behavior == mp.DefaultBehavior
                                  && mine.Settlement == mp.TargetSettlement && mine.Party == mp.TargetParty) _wokenOurOrder++;
                         else _wokenOther++;
+                        if (mp.IsLordParty) _wokenLord++; else if (mp.IsCaravan) _wokenCar++;   // E7/O1 (228): rodzaj obudzonych (tylko licznik)
                         _wokenDriftSum += drift; if (drift > _wokenDriftMax) _wokenDriftMax = drift;
                         mp.Ai.DisableForHours(1);
                         mp.SetMoveModeHold();
@@ -456,7 +462,7 @@ namespace Armoury
                     {
                         // jedna partia nie urywa przegladu; zepsuta wypada z listy (noc odnowi ja o pelnej godzinie)
                         GuardStumble("HoldSleepers", mp, e);
-                        try { if (i < _camping.Count && _camping[i] == mp) _camping.RemoveAt(i); } catch { }
+                        try { if (i < _camping.Count && _camping[i] == mp) { _camping.RemoveAt(i); if (mp != null) _bedPos.Remove(mp); } } catch { }   // E7/O1: legowisko razem z obozem
                     }
                 }
             }
@@ -585,6 +591,13 @@ namespace Armoury
             public TaleWorlds.CampaignSystem.Settlements.Settlement Settlement;
             public MobileParty Party;
             public bool Wake;   // poprawka 174b (recenzja): zamiast rozkazu - pobudka przez WakeHandler (karawana, ktorej kontrakt zwolniono w nocy)
+            // E7/O1 (228): droga, port i punkt rozkazu zatrzymanego bramka (SleepGate) - ApplyOrder oddaje go ta sama droga; wpisy z RememberOrder
+            // maja wartosci domyslne (Default, bez portu, bez punktu) - zachowanie jak dotad (zapamietywanie drogi przy zasnieciu - etap 8)
+            public MobileParty.NavigationType Nav = MobileParty.NavigationType.Default;
+            public bool Port;
+            public CampaignVec2 Point;
+            public bool HasPoint;
+            public bool Gated;  // rozkaz zatrzymany bramka (nie zapamietany przy zasnieciu) - tylko liczniki
         }
 
         /// <summary>Poprawka 174b (recenzja): pobudka partii ze znacznikiem Wake (MaterialOrders.WakeAtDawn - decyzja BK ReleaseCaravanFromHold).</summary>
@@ -654,14 +667,18 @@ namespace Armoury
         /// w osadzie - dluznik zwolniony w osadzie, gdy rozkaz zapamietano w polu).</summary>
         private static void ApplyOrder(MobileParty mp, NightOrder o, bool inSettlement)
         {
+            bool pass = _gatePass;
             try
             {
                 if (mp == null || o == null) return;
                 if (!mp.IsActive || mp.MapEvent != null || (mp.CurrentSettlement != null && !inSettlement)) return;
+                _gatePass = true;   // E7/O1 (228): nasze oddanie rozkazu - bramka SleepGate przepuszcza (takze decyzje BK z WakeHandler)
                 // poprawka 174b: kontrakt surowca zwolniony w nocy - decyzja BK (WakeHandler) zamiast rozkazu; scalenie sklad8: w ApplyOrder, wiec kazda
                 // droga oddania rozkazu (swit, alarm, wylacznik, T10) budzi karawane tak samo
                 if (o.Wake) { var wh = WakeHandler; if (wh != null) wh(mp); return; }
-                var nav = MobileParty.NavigationType.Default;
+                // E7/O1 (228): droga i port z rozkazu zatrzymanego bramka (wpisy z RememberOrder: Default, bez portu - jak dotad)
+                var nav = o.Nav;
+                bool port = o.Port;
                 var st = o.Settlement; var tp = o.Party;
                 // T10 poprawka recenzji: rozkaz sprzed snu (do ok. 29 h przy snie dlugu) moze byc juz niewazny - pokoj, osada przeszla na nasza
                 // strone, cel juz nie wrog. Gra nie sprawdza wojny przy wejsciu w oblezenie (EncounterManager.StartSettlementEncounter), wiec
@@ -671,25 +688,31 @@ namespace Armoury
                 switch (o.Behavior)
                 {
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoToSettlement:
-                        if (st != null) mp.SetMoveGoToSettlement(st, nav, false); break;
+                        if (st != null) mp.SetMoveGoToSettlement(st, nav, port); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.BesiegeSettlement:
                         if (st != null && stWar) mp.SetMoveBesiegeSettlement(st, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.RaidSettlement:
-                        if (st != null && stWar) mp.SetMoveRaidSettlement(st, nav, false); break;
+                        if (st != null && stWar) mp.SetMoveRaidSettlement(st, nav, port); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.DefendSettlement:
-                        if (st != null && st.MapFaction == mf) mp.SetMoveDefendSettlement(st, false, nav); break;
+                        if (st != null && st.MapFaction == mf) mp.SetMoveDefendSettlement(st, port, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.PatrolAroundPoint:
-                        if (st != null) mp.SetMovePatrolAroundSettlement(st, nav, false); break;
+                        if (st != null) mp.SetMovePatrolAroundSettlement(st, nav, port);
+                        else if (o.HasPoint) mp.SetMovePatrolAroundPoint(o.Point, nav);   // E7/O1: patrol wokol punktu (tylko rozkaz zatrzymany bramka)
+                        break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EngageParty:
                         if (tp != null && tp.IsActive && Hostile(mp, tp)) mp.SetMoveEngageParty(tp, nav); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.EscortParty:
-                        if (tp != null && tp.IsActive) mp.SetMoveEscortParty(tp, nav, false); break;
+                        // E7/O1: eskorta do portu tylko, gdy eskortowany nadal stoi w osadzie (gra bierze jego CurrentSettlement)
+                        if (tp != null && tp.IsActive) mp.SetMoveEscortParty(tp, nav, port && tp.CurrentSettlement != null); break;
                     case TaleWorlds.CampaignSystem.Party.AiBehavior.GoAroundParty:
                         if (tp != null && tp.IsActive) mp.SetMoveGoAroundParty(tp, nav); break;
+                    case TaleWorlds.CampaignSystem.Party.AiBehavior.GoToPoint:
+                        if (o.HasPoint) mp.SetMoveGoToPoint(o.Point, nav); break;   // E7/O1: tylko rozkaz zatrzymany bramka (zapamietany przy zasnieciu nie ma punktu - jak dotad AI)
                     default: break;   // Hold/None i reszta - niech AI zdecyduje na swiezo
                 }
             }
             catch (Exception e) { AiStumble("ApplyOrder", mp, e); }   // T10 poprawka recenzji: liczone, nie polykane
+            finally { _gatePass = pass; }
         }
 
         /// <summary>
@@ -708,11 +731,14 @@ namespace Armoury
                 bool night = InCamp(h);   // T1: ticki 0..5 -> spia 0:00-6:00, o 6:00 pobudka
                 if (!s.AiCampsAtNight || !night)
                 {
+                    // E7/O1 (228): swit - AI obozu i osady wlaczone (nasz termin), liczniki oddawanych rozkazow - PRZED linia i czyszczeniem _camping
+                    try { DawnWake(s); } catch (Exception ex) { Log.Error("SleepGate.DawnWake", ex); }
+                    bool dawnAny = _dawnAiCamp + _dawnAiTown + _dawnGated + _dawnDebtors > 0;
                     // T1: obudzenia z ostatniej godziny obozu (np. 5-6) - osobna linia, nie "AiNightCamp";
                     // poprawka recenzji: takze gdy byly same przeglady (stoper ostatniej godziny w logu)
-                    if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0)
-                        Log.Info("NightRest swit " + h + ":00: obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText());
-                    if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0) ResetHourCounters();
+                    if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0 || dawnAny)
+                        Log.Info("NightRest swit " + h + ":00: obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText() + GateText() + DawnText());
+                    if (_wokenHour > 0 || _tentDropsHour > 0 || _holdCalls > 0 || _dropCalls > 0 || dawnAny) ResetHourCounters();
                     _tentPos.Clear();
                     if (_tented.Count > 0)
                     {
@@ -773,6 +799,7 @@ namespace Armoury
                     if (mp.IsLordParty && _debtSleep.ContainsKey(mp))
                     {
                         tally.DebtField++;
+                        if (byReason) WorldClock7.MusterDebt(mp);   // E7/0 (224): czlonek albo wodz armii w polu spi snem dlugu (tylko licznik)
                         if (e != null) Mark(e, StDebt);
                         continue;
                     }
@@ -823,6 +850,9 @@ namespace Armoury
                             _camping.Remove(mp);
                             _bedPos.Remove(mp);
                             GiveOrderBack(mp);          // alarm w nocy - rozkaz wraca od reki
+                            // E7/O1 recenzja: faza snu odnawia termin AI przed czasem (zostaje do ok. 1 h) - bez tego obudzony przez wroga (karawana przed banda)
+                            // szedlby do celu z wylaczonym AI (bez oceny ucieczki); dotad termin mijal wlasnie o tej pelnej godzinie. Tylko nasz termin (<= 1.0 h).
+                            if (GateOn(s)) { try { WakeOurs(mp); } catch (Exception ex) { GuardStumble("DangerWake", mp, ex); } }
                             cause = "wrog";             // wrog blisko - zwijaja sie i ida
                         }
                     }
@@ -853,7 +883,7 @@ namespace Armoury
                 }
                 Log.Info("AiNightCamp: " + h + ":00 - spi " + _camping.Count + " (lordow " + lords
                          + ", karawan " + caravans + ", band " + bandits + ", w tym wodzow armii " + armies
-                         + "); obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText());
+                         + "); obudzonych cudza reka od poprzedniej godziny: " + _wokenHour + "." + HourCountersText() + GateText());
                 ResetHourCounters();   // T1: wszystkie liczniki godziny (byl sam _wokenHour)
                 try { LogNightTally(h, byReason, tally); } catch (Exception e2) { Log.Error("AiNightCamp.T10", e2); }
             }
@@ -1336,6 +1366,10 @@ namespace Armoury
                     int hs = CampaignTime.Now.GetHourOfDay;
                     if (InCamp(hs)) HoldSleepers();
                 }
+
+                // E7/O1 (228): faza snu lordow wstrzymanych w osadzie (_townHold, tylko godziny obozu - swit czysci) - AI odnawiane przed terminem co 0.1 h GRY
+                if (_townHold.Count > 0 && Campaign.Current != null && GateOn(s) && s.AiCampsAtNight && ByReason(s) && GuardDue(ref _lastTownSweep, ref _townDhMax))
+                    KeepTownAsleep();
 
                 // T1: namioty z kolumn, ktore ruszyly, schodza co 0.1 h GRY
                 if (s.AiCampsAtNight && s.CampTentIcon && Campaign.Current != null && _tented.Count > 0
