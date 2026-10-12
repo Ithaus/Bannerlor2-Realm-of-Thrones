@@ -1514,6 +1514,7 @@ namespace Armoury
             _debtSleep.Remove(mp);
             LeaveAcc(e);
             EnableAi(mp);
+            if (ds != null && ds.Order != null && ds.Order.Gated) _gGivenDebt++;   // E7/O1 (228): rozkaz zatrzymany bramka oddany przy koncu snu dlugu (licznik)
             if (ds != null) ApplyOrder(mp, ds.Order, true);
             _day.Released++;
         }
@@ -1539,12 +1540,18 @@ namespace Armoury
         private static void HoldDebtSleepers()
         {
             var list = new List<KeyValuePair<MobileParty, DebtSleeper>>(_debtSleep);
+            bool phase = GateOn(Settings.Current);   // E7/O1 (228): faza snu dluznika
             foreach (var kv in list)
             {
                 var mp = kv.Key; var ds = kv.Value;
                 try
                 {
                     if (mp == null || !mp.IsActive) { if (mp != null) _debtSleep.Remove(mp); continue; }
+                    // E7/O1 (228): AI dluznika odnawiane przed terminem - takze w osadzie (gra nie wypusci partii z wylaczonym AI); nie przy warunkach,
+                    // przy ktorych AiDebtCamp i tak zwolni go o pelnej godzinie (bitwa, doczepiony, oboz oblezenia, morze, oblezona osada)
+                    if (phase && mp.MapEvent == null && mp.AttachedTo == null && mp.BesiegerCamp == null && !mp.IsCurrentlyAtSea
+                        && (mp.CurrentSettlement == null || mp.CurrentSettlement.SiegeEvent == null))
+                        KeepAsleep(mp, SkDebt);
                     if (mp.MapEvent != null || mp.CurrentSettlement != null) continue;   // bitwa/osada - nie nasza sprawa
                     float drift = mp.GetPosition2D.Distance(ds.Bed);
                     bool ordered = mp.DefaultBehavior != AiBehavior.Hold || mp.TargetSettlement != null || mp.TargetParty != null;

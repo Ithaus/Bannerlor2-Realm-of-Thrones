@@ -4740,6 +4740,10 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool Stage7MeasureLog { get; set; } = true;
 
+        [SettingPropertyBool("Sleepers Hold Orders", HintText = "a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool SleepersHoldOrders { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5924,6 +5928,7 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.Stage7MeasureLog = Stage7MeasureLog;
+            s.SleepersHoldOrders = SleepersHoldOrders;
         }
 
         internal static void Apply()

@@ -1465,6 +1465,9 @@ namespace Armoury
         // --- Roads, camps and villages (stage 7) ---
         // E7/0 (224, projekt etapu 7 v2 rozdz. 3): pomiar etapu 7 - tylko log (wojna i pokoj z przyczyna, zbiorka armii w nocy, turnieje wedlug tygodnia pory)
         public bool Stage7MeasureLog = true;               // counts wars and peaces with their cause, army members riding to the muster at night and tournaments by week of the season - written to the log only, changes nothing in the game
+        // E7/O1 (228, PLAN 7.6, R5): sen do switu - faza snu (AI spiacego w obozie, snem dlugu i w osadzie odnawiane przed terminem, wlaczane o swicie)
+        // i bramka rozkazow (SleepGate: prefiksy First na 10 MobileParty.SetMove*; rozkaz zapisany tam, gdzie trzyma go sen); off = straznik po fakcie jak dotad
+        public bool SleepersHoldOrders = true;             // a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before
 
         public static void Load(string moduleDataDir)
         {

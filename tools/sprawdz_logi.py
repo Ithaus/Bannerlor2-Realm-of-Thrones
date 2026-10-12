@@ -93,6 +93,10 @@ Uzycie (Python 3, tylko odczyt):
                     "Wojna i pokoj (E7/0)" tej pary i rodzaju (pokoj - takze upadek krolestwa) +-1 doba (zegar obu logow tego samego startu; --crashscribe P),
                     T2 linia "Zbiorka (E7/0)" w kazdej nocy (brak najwyzej 1), T3 linie "Turnieje (E7/0)" i dobowa wojny co dobe; INFO - przyczyny, przerwy
                     pokoj -> wojna (< 21 dni), sen czlonkow armii w drodze, okna bez startu turnieju i tygodnie pory bez startu (progi wynikowe - E7/K, E7/O1).
+                    Blok E7/O1 (228) - dopisek "E7/O1" linii "AiNightCamp" / "NightRest swit", noc zamyka linia switu: T1 obudzeni cudza reka <= 10 na noc
+                    (lordowie <= 3), T2 zjazd sr. <= 0.15, T3 lordowie w ruchu bez wpisu powodu <= 3 na noc (wyjazd z osady <= 1), T4 AI spiacych lordow
+                    wstalo przed switem 0 w kazdej nocy (doby kampanii 31-until), T6 bledy/potkniecia 0 i dluznicy obudzeni o 6:00 = 0, T7 zbiorka >= 95%,
+                    T9 koszt bramki <= 5 ms na noc; rozkazy zatrzymane, zwolnienia BK, odnowienia AI, swit, oddane dluznikom - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -6097,6 +6101,154 @@ def etap7_0(rep, lines, start, until, logp=None, csp=None):
             + f"; tygodnie pory bez startu {empty if empty else '-'}", "INFO (prog: okno < 14 dob, starty w kazdym tygodniu 0-12 - E7/K)", None)
 
 
+E7O1_GATE = re.compile(r"\| E7/O1 \(SleepersHoldOrders (on|off)\): obudzeni cudza reka: lordowie (\d+), karawany (\d+) \| rozkazy zatrzymane u spiacych: "
+                       r"lordowie (\d+) \(GoToSettlement (\d+), GoToPoint (\d+), Engage (\d+), inne (-?\d+)\), karawany (\d+) \(zwolnienie z Hold przez BK (\d+), "
+                       r"inne (-?\d+)\), inne partie (\d+); do snu dlugu (\d+) \(nowych dluznikow (\d+)\), oddane przy koncu snu dlugu (\d+) \| AI odnowione (\d+) "
+                       r"\(oboz (\d+)/dlug (\d+)/osada (\d+)\) \| AI wstalo przed switem: lordowie (\d+), karawany (\d+), inne (\d+) \| SleepGate (\d+) x, "
+                       r"sr\. ([\d.]+) us, razem ([\d.]+) ms, potkniecia w sesji (\d+)")
+E7O1_DAWN = re.compile(r"E7/O1 swit: AI wlaczone o swicie (\d+) \(oboz (\d+)/osada (\d+)\), rozkazy zatrzymane i oddane o swicie (\d+), dluznicy obudzeni o 6:00 (\d+)")
+E7O1_MOVE = re.compile(r"^AiNightCamp: ruch .*BEZ WPISU POWODU (\d+):.*wyjazd z osady / po bitwie (\d+)")
+E7O1_KEYS = ("wl", "wc", "gl", "gls", "glp", "gle", "glo", "gc", "gcb", "gco", "go", "gd", "gdn", "gdv", "rn", "rnc", "rnd", "rnt", "awl", "awc", "awo",
+             "gn", "gus", "gms", "gst")
+
+
+def etap7_o1(rep, lines, start, until, logp=None, csp=None):
+    """E7/O1 (228): sen do switu (projekt etapu 7 v2 rozdz. 3 "E7/O1" Test, rozdz. 4 (7.6)). Noc = linie "AiNightCamp: H:00 - spi" i "AiNightCamp: ruch"
+    zamkniete linia "NightRest swit"; doba nocy = ostatnia linia "Pieniadz swiata: dzien N" przed switem. Okno progow T1-T4: doby kampanii 31-until.
+    T1 obudzonych cudza reka <= 10 na noc (srednio), lordowie <= 3; T2 zjazd sr. <= 0.15 jedn.; T3 lordowie w ruchu bez wpisu powodu <= 3 na noc, w tym
+    wyjazd z osady / po bitwie <= 1; T4 AI spiacych lordow wstalo przed switem = 0 w kazdej nocy; T6 bledy/potkniecia SleepGate i straznikow 0, dluznicy
+    obudzeni o 6:00 = 0; T7 zbiorka (E7/0) >= 95% partio-godzin snu; T9 koszt bramki <= 5 ms/dobe; reszta (rozkazy zatrzymane, zwolnienia BK, odnowienia,
+    oddane dluznikom) - INFO. T5 (dlug 3) i T8 (KRONIKA, Miara: marsz) - poza blokiem (grupa etap6/T10 i marsz.py)."""
+    nights, cur, day, klucz = [], None, None, set()
+
+    def new():
+        return {"woken": 0, "drift_sum": 0.0, "nr": 0, "exit": 0, "dawn": None, "lines": 0, **{k: 0 for k in E7O1_KEYS}}
+
+    for s in lines:
+        if s.startswith("Pieniadz swiata: dzien"):
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                day = k
+            continue
+        hourly = s.startswith("AiNightCamp: ") and " - spi " in s[:40]
+        dawn = s.startswith("NightRest swit ")
+        mv = E7O1_MOVE.match(s) if s.startswith("AiNightCamp: ruch") else None
+        if not (hourly or dawn or mv):
+            continue
+        if cur is None:
+            cur = new()
+        if mv:
+            cur["nr"] += int(mv.group(1))
+            cur["exit"] += int(mv.group(2))
+            continue
+        cur["lines"] += 1
+        w = num(r"obudzonych cudza reka od poprzedniej godziny: (\d+)", s, default=0) or 0
+        cur["woken"] += w
+        dr = fnum(r"Zjazd obudzonych: sr\. ([\d.]+)", s)
+        if dr is not None:
+            cur["drift_sum"] += dr * w
+        m = E7O1_GATE.search(s)
+        if m:
+            klucz.add(m.group(1))
+            vals = m.groups()[1:]
+            for k, v in zip(E7O1_KEYS, vals):
+                if k in ("gus",):
+                    continue
+                if k == "gms":
+                    cur[k] += float(v)
+                elif k == "gst":
+                    cur[k] = max(cur[k], int(v))
+                else:
+                    cur[k] += int(v)
+        if dawn:
+            md = E7O1_DAWN.search(s)
+            if md:
+                cur["dawn"] = tuple(int(x) for x in md.groups())
+            cur["day"] = day
+            nights.append(cur)
+            cur = None
+    have = [n for n in nights if n.get("day") is not None]
+    if not have or not klucz:
+        rep.add("E7/O1: linie AiNightCamp / NightRest swit z dopiskiem E7/O1", "brak w logu" if not klucz else "brak nocy z doba",
+                "sa od wgrania E7/O1 (SleepersHoldOrders)", None)
+        return
+    if "off" in klucz:
+        rep.add("E7/O1: klucz SleepersHoldOrders", "off w " + ("czesci" if "on" in klucz else "wszystkich") + " linii", "on (progi T1-T4 dotycza klucza on)", None)
+    win = [n for n in have if 31 <= run_day(n["day"], start) <= until]
+    allw = [n for n in have if 1 <= run_day(n["day"], start) <= until]
+    nw = len(win)
+    # ---- T1 obudzeni cudza reka
+    if nw:
+        avg = sum(n["woken"] for n in win) / nw
+        avl = sum(n["wl"] for n in win) / nw
+        avc = sum(n["wc"] for n in win) / nw
+        worst = max(win, key=lambda n: n["woken"])
+        rep.add("E7/O1 T1: obudzeni cudza reka na noc (d31-okno, srednio)", f"{avg:.1f} na noc (lordowie {avl:.1f}, karawany {avc:.1f}); najwiecej {worst['woken']} "
+                f"(d{run_day(worst['day'], start)}) - {nw} nocy", "<= 10 na noc, lordowie <= 3 (dzis 91, 79% karawan)", avg <= 10 and avl <= 3)
+        tw = sum(n["woken"] for n in win)
+        drift = sum(n["drift_sum"] for n in win) / tw if tw else 0.0
+        rep.add("E7/O1 T2: zjazd obudzonych srednio (d31-okno)", f"{drift:.2f} jedn. ({tw} obudzonych)", "<= 0.15 jedn. (dzis 0.40)", drift <= 0.15)
+        anr = sum(n["nr"] for n in win) / nw
+        aex = sum(n["exit"] for n in win) / nw
+        rep.add("E7/O1 T3: lordowie w ruchu bez wpisu powodu w oknie obozu (d31-okno, srednio)", f"{anr:.1f} na noc, w tym wyjazd z osady / po bitwie {aex:.1f}",
+                "<= 3 na noc, wyjazd z osady <= 1 (dzis ok. 20)", anr <= 3 and aex <= 1)
+        bad = [run_day(n["day"], start) for n in win if n["awl"] > 0]
+        rep.add("E7/O1 T4: AI spiacych lordow wstalo przed switem (d31-okno)", f"noce z wstaniem {len(bad)} z {nw}" + (f" (doby {bad[:8]})" if bad else "")
+                + f"; razem lordowie {sum(n['awl'] for n in win)}, karawany {sum(n['awc'] for n in win)} (odczyt), inne {sum(n['awo'] for n in win)}",
+                "lordowie 0 w kazdej nocy (dowod fazy)", not bad)
+    else:
+        rep.add("E7/O1 T1-T4: noce d31-okno", f"brak (nocy w logu {len(have)})", "noce d31-120", None)
+    # ---- T6 bledy, potkniecia, dluznicy o 6:00
+    errs = [s for s in lines if s.startswith("ERROR in SleepGate") or s.startswith("ERROR in HoldSleepers") or s.startswith("ERROR in KeepTownAsleep")
+            or s.startswith("ERROR in DawnWake") or s.startswith("ERROR in HoldDebtSleepers")]
+    gst = max([n["gst"] for n in have] or [0])
+    gs = max([num(r"Potkniecia straznikow w sesji: (\d+)", s, default=0) or 0 for s in lines if s.startswith("AiNightCamp: ") or s.startswith("NightRest swit")] or [0])
+    rep.add("E7/O1 T6: bledy i potkniecia SleepGate / straznikow snu", f"ERROR {len(errs)}; potkniecia bramki w sesji {gst}, straznikow w sesji {gs}"
+            + (f" (pierwszy: {errs[0][:140]})" if errs else ""), "0 / 0 / 0", len(errs) == 0 and gst == 0 and gs == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/O1 T6: bledy NightRest polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="NightRest")
+    dd = [n["dawn"] for n in allw if n["dawn"] is not None]
+    deb = sum(x[4] for x in dd)
+    rep.add("E7/O1 T6b: dluznicy obudzeni o 6:00 (galaz switu)", f"{deb} w {len(dd)} switach", "0", deb == 0 if dd else None)
+    gdn = sum(n["gdn"] for n in allw)
+    gdv = sum(n["gdv"] for n in allw)
+    rep.add("E7/O1 T6c: rozkazy zatrzymane dluznikom - nowi dluznicy z rozkazem / oddane przy koncu snu dlugu (okno)",
+            f"zatrzyman {sum(n['gd'] for n in allw)}, dluznikow z rozkazem {gdn}, oddanych przy ReleaseDebt {gdv}",
+            "INFO (oddane ~ dluznicy z rozkazem; roznica = alarm, cudza blokada, zniszczona partia)", None)
+    # ---- rozkazy zatrzymane, zwolnienia BK, odnowienia, swit - INFO
+    if allw:
+        n_ = len(allw)
+        rep.add("E7/O1 rozkazy zatrzymane u spiacych (okno, na noc)",
+                f"lordowie {sum(n['gl'] for n in allw) / n_:.1f} (GoToSettlement {sum(n['gls'] for n in allw) / n_:.1f}, GoToPoint {sum(n['glp'] for n in allw) / n_:.1f}, "
+                f"Engage {sum(n['gle'] for n in allw) / n_:.1f}), karawany {sum(n['gc'] for n in allw) / n_:.1f} (zwolnienie z Hold przez BK "
+                f"{sum(n['gcb'] for n in allw) / n_:.1f}), inne partie {sum(n['go'] for n in allw) / n_:.1f}", "INFO (zwolnien BK zatrzymanych - odczyt, ryzyko 5)", None)
+        rep.add("E7/O1 faza snu: AI odnowione (okno, na noc)",
+                f"{sum(n['rn'] for n in allw) / n_:.1f} (oboz {sum(n['rnc'] for n in allw) / n_:.1f} / dlug {sum(n['rnd'] for n in allw) / n_:.1f} / osada "
+                f"{sum(n['rnt'] for n in allw) / n_:.1f})", "INFO", None)
+        if dd:
+            rep.add("E7/O1 swit: AI wlaczone o swicie / rozkazy zatrzymane oddane o swicie (srednio)",
+                    f"AI {sum(x[0] for x in dd) / len(dd):.1f} (oboz {sum(x[1] for x in dd) / len(dd):.1f} / osada {sum(x[2] for x in dd) / len(dd):.1f}), "
+                    f"rozkazy {sum(x[3] for x in dd) / len(dd):.1f}", "INFO", None)
+        # ---- T9 koszt bramki
+        ms = [n["gms"] for n in allw]
+        mx = max(allw, key=lambda n: n["gms"])
+        calls = sum(n["gn"] for n in allw)
+        rep.add("E7/O1 T9: koszt SleepGate na noc (okno)", f"srednio {sum(ms) / len(ms):.3f} ms, najwiecej {mx['gms']:.3f} ms (d{run_day(mx['day'], start)}); wywolan {calls}",
+                "<= 5 ms/dobe (odnawianie - stoper HoldSleepers w tej samej linii)", sum(ms) / len(ms) <= 5.0)
+    # ---- T7 zbiorka (linia E7/0)
+    a = b = 0
+    for s in lines:
+        if s.startswith("Zbiorka (E7/0): noc"):
+            k = num(r"noc (\d+)", s)
+            if k is None or not (31 <= run_day(k, start) <= until):
+                continue
+            a += num(r"partio-godzin (\d+)", s, default=0) or 0
+            b += num(r", spia (\d+) \(", s, default=0) or 0
+    rep.add("E7/O1 T7: czlonkowie armii w drodze do wodza spia (linia Zbiorka E7/0, d31-okno)", f"{100.0 * b / a:.1f}% ({b}/{a} partio-godzin)" if a else "brak partio-godzin",
+            ">= 95%", (b >= 0.95 * a) if a else None)
+    rep.add("E7/O1 T5/T8: dlug 3 AI i kara, KRONIKA i Miara: marsz", "poza blokiem", "dlug 3 = 0 (linie T10), wojny i tempo bez zmian (marsz.py, rozdz. 4)", None)
+
+
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
@@ -6115,7 +6267,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
         start = alld[0] if alld else 0
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0,):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_0, etap7_o1):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
