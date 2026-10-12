@@ -825,6 +825,9 @@ namespace Armoury
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
             // T6 (noc 08/09.10): miara marszu - pozycje partii lordow co godzine (tylko log, wylacznik WorldMeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("WorldMeasure.Hourly", delegate { try { WorldMeasure.Hourly(); } catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); } }));
+            // E8/P3 (245): postoj karawan AI w miastach - godzina wjazdu i wyjazdu (tylko pamiec i licznik, wylacznik Stage8WorldLog; kolejnosc wobec innych nasluchow bez znaczenia)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Stage8World.OnEntered", Stage8World.OnEntered));
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, Stage8World.OnLeft);
             // E7/T (225): probka kar terenu - partie AI w ruchu w lesie / na pustyni / na rowninie i do 8 rozpisek gry na godzine (tylko log, Stage7MeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TerrainEase.Hourly", delegate { try { TerrainEase.Hourly(); } catch (Exception e) { Log.Error("TerrainEase.Hourly", e); } }));
             // E7/B (231): licznik przejsc przez Bliznaki - lokator mapy wokol bramy raz na godzine (tylko log, wylacznik TwinsCrossingCount)
@@ -1521,6 +1524,7 @@ namespace Armoury
             // wchodzilo o poziom glebiej i rozpiska pokazywala gole liczby vanilli
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); } DayProfile.Lap("TerrainEase.DailyAudit");
             try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); } DayProfile.Lap("WorldMeasure.Daily");   // T6: linia "Miara: marsz" (tylko log)
+            try { Stage8World.Daily(); } catch (Exception e) { Log.Error("Stage8World.Daily", e); } DayProfile.Lap("Stage8World.Daily");   // E8/P3 (245): linie pomiarow swiata (owce, postoj karawan, najemnicy BK, rozkazy morskie; raz na sesje model produkcji wsi) - tylko log
             try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");

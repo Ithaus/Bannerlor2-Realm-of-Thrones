@@ -1559,6 +1559,10 @@ namespace Armoury
         // E8/0 (242, PLAN 8.17 pomiar): linia "Profil doby (E8/0)" raz na dobe - takt doby (top 15 wywolan Daily), sluchacze godzinowe, zdarzenia (probka 1/16),
         // podzialy CyclePrefix / musztry / cen wedlug wolajacego, pamiec polki, zapis logu, GC (DayProfile.cs); opakowania zdarzen zakladane przy wczytaniu tylko przy wlaczonym kluczu
         public bool Stage8ProfileLog = true;               // Writes one daily line with the time each part of the mod takes (diagnostics only).
+        // E8/P3 (245, PLAN 8.15, 8.12c; stan "przed" dla E8/G1 i E8/G2): pomiary swiata w logu (Stage8World.cs) - model produkcji wsi pod NavalDLC (raz na sesje),
+        // kara DTE "Underequipped" po bitwie gracza, owce (stada, welna, utarg wozow wsi owczych), postoj karawan AI w miastach, zamiana BK u klanow najemnikow,
+        // zrodla i ujscia BK bez platnika (dopisek do linii "BK i Diplomacy (E5/A8)"), wsie Normal bez wozu ponad 7 dob, rozkazy partii ze statkami po switcie; gra bez zmian
+        public bool Stage8WorldLog = true;                 // Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).
 
         public static void Load(string moduleDataDir)
         {

@@ -647,6 +647,7 @@ namespace Armoury
                     Settlement = mp.TargetSettlement,
                     Party = mp.TargetParty
                 };
+                Stage8World.NoteSleepOrder(mp);   // E8/P3 (245): tylko licznik - partia ze statkami, ktorej rozkaz przed snem mial inna droge albo port niz ten oddawany o swicie
             }
             catch { }
         }

@@ -4900,6 +4900,10 @@ namespace Armoury
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8ProfileLog { get; set; } = true;
 
+        [SettingPropertyBool("Stage8 World Log", HintText = "Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).")]
+        [SettingPropertyGroup("Diagnostics (stage 8)")]
+        public bool Stage8WorldLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6124,6 +6128,7 @@ namespace Armoury
             s.VillagePennants = VillagePennants;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.Stage8ProfileLog = Stage8ProfileLog;
+            s.Stage8WorldLog = Stage8WorldLog;
         }
 
         internal static void Apply()

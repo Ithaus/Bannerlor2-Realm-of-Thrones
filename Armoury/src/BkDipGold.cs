@@ -450,6 +450,7 @@ namespace Armoury
                 if (_kOffN > 0) sb.Append("; w nicosc jak dotad ").Append(_kOff).Append(" (").Append(_kOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
+                Stage8World.BkSegment(sb);   // E8/P3 (245): dopisek pomiaru - zywnosc BK dla band hersztow i ujscia BK bez odbiorcy (tylko log; klucz Stage8WorldLog wylaczony = linia jak dotad)
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

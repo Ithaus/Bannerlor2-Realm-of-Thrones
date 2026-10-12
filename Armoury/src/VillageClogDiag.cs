@@ -196,6 +196,9 @@ namespace Armoury
             int entered = 0, enRoad = 0, enNone = 0, enHome = 0, enOther = 0, left = 0, leftCart = 0, leftW = 0;
             // recenzja: zatkane Normal mimo wyjazdu wozu w ciagu 7.5 doby (wbrew fundamentowi: 3f / 3g / 3h) i woz zatkanej wsi w drodze (3b / 3e)
             int freshClog = 0, freshClog1 = 0;
+            // E8/P3 (245, zamyka 8.12c): wsie Normal bez wozu ponad 7 dob - zatkane (prog P3-2) i wszystkie (tlo); tylko liczniki do linii "Wsie bez wozu (E8/P3)"
+            int p3Clog7 = 0, p3Clog7Low = 0, p3All7 = 0;
+            double p3Clog7Max = 0.0;
             int gTownN = 0, gHomeN = 0, gIdleN = 0, gOtherN = 0, gHomeDistN = 0, gIdleDistN = 0, gMovedN = 0;
             double gTownD = 0, gTownMax = 0, gHomeD = 0, gHomeMax = 0, gIdleD = 0, gIdleMax = 0, gOtherD = 0, gHomeDist = 0, gIdleDist = 0, gMoved = 0;
             int gCloser = 0, gNotCloser = 0, gRetarget = 0, gNew = 0, gNoTarget = 0, gFlee = 0, gMulti = 0, gCargoN = 0;
@@ -246,6 +249,7 @@ namespace Armoury
                             _noCart[v] = since0;
                         }
                         noCartDays = Math.Max(0.0, now - since0);
+                        if (v.VillageState == Village.VillageStates.Normal && noCartDays > Stage8World.CartDaysLimit) p3All7++;   // E8/P3: tlo (takze niezatkane)
                     }
                     else { _noCart.Remove(v); _lost.Remove(v); }
                     bool still = false, hadSeen = false;
@@ -338,6 +342,11 @@ namespace Armoury
                             none++; noneD += noCartDays; if (noCartDays > noneMax) noneMax = noCartDays;
                             bool low = v.Hearth <= minMen;
                             if (low) noneLowHearth++;
+                            if (state == Village.VillageStates.Normal && noCartDays > Stage8World.CartDaysLimit)   // E8/P3: prog P3-2
+                            {
+                                p3Clog7++; if (low) p3Clog7Low++;
+                                if (noCartDays > p3Clog7Max) p3Clog7Max = noCartDays;
+                            }
                             cartText = "brak wozu od " + F1(noCartDays) + " doby" + (_lost.ContainsKey(v) ? " (rozbity)" : " (od wczytania / pierwszej obserwacji)")
                                      + (low ? ", hearth " + F1(v.Hearth) + " <= " + minMen + " - gra nie wystawi nowego" : ", hearth " + F1(v.Hearth));
                             break;
@@ -524,6 +533,7 @@ namespace Armoury
                 double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
                 sb.Append("; koszt ").Append(ms.ToString("0.0", inv)).Append(" ms; potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
+                Stage8World.CartLine(day, clog, normalClog, none, p3Clog7, p3Clog7Low, p3Clog7Max, aNone, p3All7, minMen);   // E8/P3 (245): linia "Wsie bez wozu (E8/P3)" - tylko log
 
                 // recenzja: druga linia - woz zatkanej wsi w drodze: daleki kurs do miasta (3b) czy woz, ktory nie wraca (3e) i dlaczego
                 var sr = new StringBuilder();

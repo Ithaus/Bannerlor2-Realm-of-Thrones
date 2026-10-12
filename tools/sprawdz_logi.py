@@ -173,6 +173,12 @@ Uzycie (Python 3, tylko odczyt):
                     CorrectPlayerEducation 0 (zamyka E8/M); blok etap8_0: E80-1 linia "Profil doby (E8/0)" w kazdej dobie okna (bez pierwszej i ostatniej),
                     E80-2 "nasze razem" >= 80% sumy Koszt 171-174 (nasze 171-174b + ceny) srednio, E80-3 koszt profilu <= 1 ms/dobe, E80-4 INFO takt doby
                     (mediana, maks.) i gen2 w szczytach; INFO nasze mody s/dobe, najdrozsze wywolania taktu, zapis logu, linia "Profil CS (E8/0)" (CS).
+                    Blok etap8_p3 (E8/P3, paczka 245 - pomiary swiata, Stage8World.cs): P3-0 latki pomiaru wpiete N/N; P3-1 linie obecne - "Owce", "Postoj karawan",
+                    "Najemnicy BK", "Rozkazy morskie", "Wsie bez wozu", "Pomiary swiata" (E8/P3) w kazdej dobie okna, dopisek "pomiar E8/P3" w linii
+                    "BK i Diplomacy (E5/A8)", linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob = 0 (zamyka 8.12c);
+                    P3-3 INFO: lancuch modeli produkcji wsi i iloraz czynny / pod nim, sredni postoj karawan AI w miastach (stan przed E8/G1), zamiana BK
+                    u klanow najemnikow (przed E8/G2), zrodla i ujscia BK bez platnika, owce, rozkazy partii ze statkami po switcie, kara Underequipped
+                    po bitwach gracza, koszt; P3-K potkniecia i linie "ERROR in Stage8World.*" 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8283,6 +8289,143 @@ def etap8_0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         rep.add("E8/0: CrashScribe - bledy pierwszej szansy i czas Blame.Culprits (srednio na dobe)", val, "INFO", None)
 
 
+# E8/P3 (245): blok etap8_p3 - pomiary swiata (Stage8World.cs)
+E8_P3 = (("owce", "Owce (E8/P3): dzien"), ("postoj karawan", "Postoj karawan (E8/P3): dzien"), ("najemnicy BK", "Najemnicy BK (E8/P3): dzien"),
+         ("rozkazy morskie", "Rozkazy morskie (E8/P3): dzien"), ("wsie bez wozu", "Wsie bez wozu (E8/P3): dzien"), ("koszt", "Pomiary swiata (E8/P3): dzien"))
+
+
+def etap8_p3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/P3 (245, projekt etapu 8 v2 rozdz. 3 "E8/P3" Test): pomiary swiata (Stage8World.cs) - sam log, stan "przed" dla E8/G1 i E8/G2.
+    P3-0 latki pomiaru wpiete N/N (R11); P3-1 linie obecne: szesc linii doby w kazdej dobie okna (bez pierwszej i ostatniej), dopisek "pomiar E8/P3" w linii
+    "BK i Diplomacy (E5/A8)" i linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob = 0 w kazdej dobie okna
+    (zamyka 8.12c); P3-3 INFO - pozostale liczby (model pod NavalDLC, postoj karawan, zamiana BK najemnikow, zrodla i ujscia BK, owce, rozkazy morskie,
+    kara Underequipped po bitwach gracza, koszt); P3-K potkniecia i linie "ERROR in Stage8World.*" 0."""
+    books = {k: {d: s for d, s in by_day(lines, p).items() if 1 <= run_day(d, start) <= until} for k, p in E8_P3}
+    wire = [x for x in lines if x.startswith("Pomiary swiata (E8/P3): latki przy starcie gry")]
+    model = [x for x in lines if x.startswith("Produkcja wsi - model (E8/P3): dzien")]
+    if not wire and not model and not any(books.values()):
+        rep.add("E8/P3: linie pomiarow swiata (E8/P3)", "brak w logu", "sa od wgrania E8/P3 (Stage8WorldLog)", None)
+        return
+    # ---------------- P3-0: latki
+    if wire:
+        w = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w), num(r"wpiete \d+/(\d+)", w)
+        rep.add("P3-0: latki pomiaru (DTE wystawiony z przydzialem i koniec misji; BK GiveFood, FinancialCompromise, DrainGold, BuyGoods)", w[:200],
+                "wpiete N/N, BRAK: -", a is not None and b is not None and a == b and "; BRAK: - |" in w)
+    else:
+        rep.add("P3-0: latki pomiaru", "brak linii startowej", "wpiete N/N", False)
+    # ---------------- P3-1: linie obecne
+    inner = win[1:-1] if len(win) > 2 else []
+    gaps = []
+    for k, _ in E8_P3:
+        miss = [run_day(d, start) for d in inner if d not in books[k]]
+        if miss:
+            gaps.append(f"{k} brak w {len(miss)} (doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") + ")")
+    a8 = by_day(lines, "BK i Diplomacy (E5/A8): dzien")
+    seg = {d: s[s.find("| pomiar E8/P3"):] for d, s in a8.items() if "| pomiar E8/P3" in s and 1 <= run_day(d, start) <= until}
+    miss_seg = [run_day(d, start) for d in inner if d not in seg]
+    if miss_seg:
+        gaps.append(f"dopisek w linii BK i Diplomacy brak w {len(miss_seg)}" + (" (brak samej linii BK i Diplomacy)" if not a8 else ""))
+    if not model:
+        gaps.append("brak linii Produkcja wsi - model")
+    rep.add("P3-1: linie pomiarow obecne (6 linii doby, dopisek BK i Diplomacy, model produkcji wsi raz na sesje)",
+            (f"dob okna {len(inner)}: " + ("komplet" if not gaps else "; ".join(gaps))) + f"; linii modelu {len(model)}, dob z dopiskiem BK {len(seg)}",
+            "komplet w kazdej dobie okna (bez pierwszej i ostatniej)", (not gaps) if inner else None)
+    # ---------------- P3-2: zatkane wsie Normal bez wozu ponad 7 dob
+    cart = books["wsie bez wozu"]
+    if cart:
+        vals = [(num(r"zatkane Normal bez wozu > 7 dob: (\d+)", cart[d], int, 0) or 0, d) for d in sorted(cart)]
+        mx = max(vals)
+        low = max(num(r"gra nie wystawi nowego: (\d+)", cart[d], int, 0) or 0 for d in cart)
+        last = cart[max(cart)]
+        a_none = num(r"wszystkie wsie bez wozu (\d+)", last, int, 0)
+        a_norm = num(r"gra wystawia woz dopiero przy pelnym magazynie\) (\d+)", last, int, 0)
+        rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob (zamyka 8.12c)",
+                f"najwiecej {mx[0]} (d{run_day(mx[1], start)}), dob z > 0: {sum(1 for v, _ in vals if v > 0)} z {len(vals)}; w tym hearth ponizej progu wozu najwyzej {low}"
+                f"; ostatnia doba: wszystkie wsie bez wozu {a_none}, Normal > 7 dob (tez niezatkane) {a_norm}",
+                "0 w kazdej dobie okna", mx[0] == 0)
+    else:
+        rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob", "brak linii Wsie bez wozu (E8/P3) - diagnoza zatkanych wsi wylaczona?", "0", None)
+
+    # ---------------- P3-3: INFO
+    def tot(book, rx):
+        return sum(num(rx, s, int, 0) or 0 for s in book.values())
+
+    def lastn(book, rx):
+        return num(rx, book[max(book)], int, 0)
+    if model:
+        m = model[-1]
+        ch = re.search(r"lancuch modeli \(czynny -> pod nim\): (.*?) \| pod czynnym", m)
+        r_avg, r_n = fnum(r"iloraz sredni ([0-9.]+)", m), num(r"iloraz sredni [0-9.-]+ z (\d+) typow", m)
+        rep.add("P3-3: produkcja wsi - lancuch modeli i iloraz czynny / pod nim (10 typow wsi, bez mnoznikow Armoury)",
+                (ch.group(1) if ch else "?") + f"; iloraz sredni {r_avg} z {r_n} typow", "INFO (1.00 = czynny model nic nie doklada ponad model pod nim)", None)
+    car = books["postoj karawan"]
+    if car:
+        n = len(car)
+        left = tot(car, r"wyjazdy z miast tej doby (\d+):")
+        hrs = sum((num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0) * (fnum(r"postoj srednio ([0-9.]+) h", s) or 0.0) for s in car.values())
+        rep.add("P3-3: postoj karawan AI w miastach (stan przed E8/G1)",
+                (f"sredni postoj {hrs / left:.1f} h z {left} wyjazdow" if left else "brak wyjazdow z wjazdem w pamieci"), "INFO (prog G1-2 po E8/G1: <= 12 h)", None)
+        enter, long7, unk = tot(car, r"wjazdy do miast tej doby (\d+)"), tot(car, r", 7\+ dob (\d+) \|"), tot(car, r"nowa karawana\) (\d+)")
+        c_town, c_all, c_idle = lastn(car, r"w miastach teraz (\d+)"), lastn(car, r"karawany AI swiata (\d+)"), lastn(car, r"h, 7\+ dob (\d+)\)")
+        rep.add("P3-3: karawany AI - wyjazdy i stojace",
+                f"wyjazdy {left / n:.1f}/dobe, wjazdy {enter / n:.1f}/dobe; wyjazdy po 7+ dobach {long7}; ostatnia doba: w miastach "
+                f"{c_town} z {c_all}, stoja 7+ dob {c_idle}; wyjazdy bez wjazdu w pamieci {unk}", "INFO (Z33: 29 karawan bez statkow 7+ dob w tym samym miescie)", None)
+    mer = books["najemnicy BK"]
+    if mer:
+        n = len(mer)
+        h, a = tot(mer, r"bohaterow zamienionych na zolnierza z niczego (\d+)"), tot(mer, r"ludzi dosypanych z niczego (\d+)")
+        calls = tot(mer, r"wywolan (\d+) \(w sluzbie")
+        wired = "wpieta" if "prefiks SpoilsCompany): wpieta" in mer[max(mer)] else "BRAK"
+        m_cl, m_in, m_men = lastn(mer, r"bez klanu Spoils\) (\d+)"), lastn(mer, r"w sluzbie krolestwa (\d+)"), lastn(mer, r"druzyn \d+, ludzi (\d+)")
+        rep.add("P3-3: zamiana BK u klanow najemnikow (stan przed E8/G2)",
+                f"bohaterow zamienionych {h} ({h / n:.2f}/dobe), ludzi dosypanych {a} ({a / n:.2f}/dobe), wywolan {calls / n:.1f}/dobe; ostatnia doba: klanow "
+                f"{m_cl} (w sluzbie {m_in}), ludzi {m_men}; latka {wired}", "INFO (prog G2-1 po E8/G2: 0 i 0)", None)
+    if seg:
+        n = len(seg)
+        fu, fv = tot(seg, r"razy, (\d+) szt\. zywnosci"), tot(seg, r"zywnosci wartej (\d+)")
+        fc, dr, bg = tot(seg, r"\(FinancialCompromise\) \d+ razy / (\d+) zl"), tot(seg, r"\(DrainGold\) \d+ razy / (\d+) zl"), tot(seg, r"\(BuyGoods\) \d+ razy / (\d+) zl")
+        fn = tot(seg, r"\(GiveFood\) (\d+) razy")
+        rep.add("P3-3: zrodla i ujscia BK bez platnika (suma okna; na dobe)",
+                f"zywnosc band hersztow {fn} razy / {fu} szt. warte {fv} ({fv / n:.0f}/d); ugoda z grupa interesu {fc} zl"
+                f"; zloto dworzan {dr} zl ({dr / n:.0f}/d); zakupy laski dworu {bg} zl ({bg / n:.0f}/d)", "INFO (kod po liczbach - decyzja po tescie)", None)
+    sh = books["owce"]
+    if sh:
+        n = len(sh)
+        wool = sum(fnum(r"szt\./d, welna ([0-9.]+) szt\./d", s) or 0.0 for s in sh.values()) / n
+        gw, uw = tot(sh, r"welna \d+ szt\. / (\d+) zl"), tot(sh, r"zl; welna (\d+) szt\.")
+        gs, gm, go = tot(sh, r"owce \d+ szt\. / (\d+) zl"), tot(sh, r"mieso \d+ szt\. / (\d+) zl"), tot(sh, r"inne towary \d+ szt\. / (\d+) zl")
+        s_vil, s_herd, s_wool = lastn(sh, r"wsi owczych \(sheep_farm\) (\d+)"), lastn(sh, r"owiec w magazynach wsi (\d+)"), lastn(sh, r"welna: w magazynach wsi (\d+)")
+        rep.add("P3-3: owce - wsie owcze, stada, welna, utarg wozow",
+                f"wsi {s_vil}, owiec w magazynach {s_herd}, welny w magazynach "
+                f"{s_wool} (ostatnia doba); welna wedlug modelu {wool:.1f} szt./d; utarg wozow na dobe: welna {gw / n:.0f} zl"
+                f" ({uw / n:.1f} szt.), owce {gs / n:.0f} zl, mieso {gm / n:.0f} zl, inne {go / n:.0f} zl", "INFO (stan przed welna z uboju E8/B)", None)
+    od = books["rozkazy morskie"]
+    if od:
+        g, dif = tot(od, r"rozkaz oddawany o swicie (\d+)"), tot(od, r"INNA niz przed snem (\d+)")
+        rep.add("P3-3: rozkazy partii ze statkami - po switcie inna droga niz przed snem (RememberOrder bez drogi i portu)",
+                (f"{dif} z {g} oddawanych ({100.0 * dif / g:.1f}%)" if g else "brak rozkazow partii ze statkami"), "INFO (kod tylko przy rozjezdzie)", None)
+    ue = [x for x in lines if x.startswith("Underequipped (E8/P3): dzien")]
+    if ue:
+        def us(rx):
+            return sum(num(rx, s, int, 0) or 0 for s in ue)
+        p0, p1, p2 = us(r"druzyna gracza [^|]*kara 0: (\d+)"), us(r"druzyna gracza [^|]*2-10: (\d+)"), us(r"druzyna gracza [^|]*12-20: (\d+)")
+        e0, e1, e2 = us(r"przeciwnik [^|]*kara 0: (\d+)"), us(r"przeciwnik [^|]*2-10: (\d+)"), us(r"przeciwnik [^|]*12-20: (\d+)")
+        rep.add("P3-3: kara Underequipped DTE po bitwach gracza (kara 0 / 2-10 / 12-20)",
+                f"misji {len(ue)}: druzyna gracza {p0} / {p1} / {p2}; przeciwnik (tylko oznaczeni) {e0} / {e1} / {e2}", "INFO (8.16 - bitwa gracza)", None)
+    else:
+        rep.add("P3-3: kara Underequipped DTE po bitwach gracza", "brak linii (autotest nie gra bitew gracza)", "INFO (8.16 - bitwa gracza)", None)
+    ks = books["koszt"]
+    if ks:
+        cs = [fnum(r"koszt linii ([0-9.]+) ms", s) for s in ks.values()]
+        cs = [c for c in cs if c is not None]
+        if cs:
+            rep.add("P3-3: koszt linii pomiarow swiata", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO (cel projektu < 10 ms/dobe)", None)
+        sm = tot(ks, r"potkniecia dzis (\d+)")
+        errs = sum(1 for x in lines if x.startswith("ERROR in Stage8World."))
+        rep.add("P3-K: kontrola (potkniecia pomiarow, linie ERROR in Stage8World.*)", f"{sm} / {errs}", "0 / 0", sm == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8302,7 +8445,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    blocks = [etap8_t0, etap8_0]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
+    blocks = [etap8_t0, etap8_0, etap8_p3]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

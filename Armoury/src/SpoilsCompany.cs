@@ -413,7 +413,8 @@ namespace Armoury
             __state = -1;
             try
             {
-                if (__0 == null || !IsSpoilsClan(__0)) return true;
+                if (__0 == null) return true;
+                if (!IsSpoilsClan(__0)) { Stage8World.MercBefore(__0); return true; }   // E8/P3 (245): pozostale klany najemnikow - tylko pomiar (stan druzyn przed zamiana BK), BK jak dotad
                 if (On) { _bkSkipped++; return false; }
                 __state = HeroesInParties(__0);
             }
@@ -424,9 +425,15 @@ namespace Armoury
         /// <summary>Postfiks (tylko wlacznik NIE): ilu bohaterow BK wyrzucil z druzyn klanu Spoils (kazdy zastapiony zolnierzem z niczego).</summary>
         public static void BkConvertPostfix(Clan __0, int __state)
         {
-            if (__state < 0) return;
+            if (__state < 0) { Stage8World.MercAfter(__0); return; }   // E8/P3 (245): licznik zamiany BK u pozostalych klanow najemnikow (bohaterowie zamienieni, ludzie dosypani)
             try { _bkLet++; _bkHeroesOut += Math.Max(0, __state - HeroesInParties(__0)); }
             catch (Exception e) { Stumble("SpoilsCompany.BkConvert", e); }
+        }
+
+        /// <summary>E8/P3 (245): czy prefiks na BK ConvertTroopsMercenaries jest wpiety (linia "Najemnicy BK (E8/P3)" - bez niego licznik stoi).</summary>
+        internal static bool BkConvertWired
+        {
+            get { foreach (var w in _wired) if (w != null && w.StartsWith("zamiana BK", StringComparison.Ordinal)) return true; return false; }
         }
 
         private static int HeroesInParties(Clan c)

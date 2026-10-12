@@ -54,7 +54,11 @@ namespace Armoury
         private static int _jumps, _stumbles;      // liczniki doby
         private static long _hourTicks, _hourMax;  // koszt godzinnych tikow doby (Stopwatch: suma i maksimum)
 
-        internal static void Reset() { _t.Clear(); _stamp = 0; _jumps = 0; _stumbles = 0; _hourTicks = 0; _hourMax = 0; }
+        internal static void Reset()
+        {
+            _t.Clear(); _stamp = 0; _jumps = 0; _stumbles = 0; _hourTicks = 0; _hourMax = 0;
+            Stage8World.Reset();   // E8/P3 (245): pomiary swiata etapu 8 - ta sama chwila (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie)
+        }
 
         private static bool On() { var s = Settings.Current; return s != null && s.WorldMeasureLog; }
 

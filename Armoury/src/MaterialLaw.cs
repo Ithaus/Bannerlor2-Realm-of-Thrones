@@ -166,6 +166,10 @@ namespace Armoury
         [ThreadStatic] private static int _depth;
         public static void ProdPrefix() { _depth++; }
         public static Exception ProdFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+        /// <summary>E8/P3 (245): pomiar lancucha modeli produkcji wsi (Stage8World.ModelLine) - miedzy ProbeBegin a ProbeEnd ProdPostfix nie biegnie (jak przy
+        /// wywolaniu wewnetrznym, _depth > 1), wiec pytanie modelu nie rusza pamieci W2 (zboze / ryby wiosek pobocznych), ksiegi rudy ani licznikow. Ten sam watek.</summary>
+        internal static void ProbeBegin() { _depth++; }
+        internal static void ProbeEnd() { if (_depth > 0) _depth--; }
         public static void ProdPostfix(Village village, ItemObject item, ref ExplainedNumber __result)
         {
             if (_depth > 1) return;                    // BK/BEE woluja model bazowy - mnozymy raz
