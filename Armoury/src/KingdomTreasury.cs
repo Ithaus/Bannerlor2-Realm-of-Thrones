@@ -18,7 +18,7 @@ namespace Armoury
     /// (DefaultClanFinanceModel), BK swoje wplaty; zapomogi dla biednych rodow placi skarbiec z tego,
     /// co w nim faktycznie jest. Startowe 2 mln na poczatek kampanii zostaja.
     /// </summary>
-    internal static class KingdomTreasury
+    internal static partial class KingdomTreasury   // E5/B2 (184): podatek wojenny ludu - KingdomTreasury.WarTax.cs
     {
         private static int _swapped;
 

@@ -4472,6 +4472,26 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool BattlePlunderFromLoserOnly { get; set; } = true;
 
+        [SettingPropertyBool("War Tax From Folk", HintText = "in war the crown also taxes the townsfolk's and castle folk's earnings, on top of the war subsidy from the merchants' and villages' spare coin - up to 3%, up to 6% under the War Tax policy, raised each week while the crown has to borrow or spend its old hoard to repay the war wages, lowered when it no longer has to; the higher it is, the less the people buy and the slower prosperity grows. Labourers pay half the rate, craftsmen the full rate, patricians one and a half; a besieged town or castle pays nothing. In peace nothing is taken and the rate falls back to nothing within four weeks. Only while the townsfolk's purse is live and the crown pays from its current income. You and the AI alike. Off = no war tax on the people, as before")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public bool WarTaxFromFolk { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("War Tax Max", 0.000f, 0.100f, "0.000", HintText = "highest war tax on the people's earnings while the realm has no War Tax policy (0.03 = 3%)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxMax { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("War Tax Max With Policy", 0.000f, 0.200f, "0.000", HintText = "highest war tax on the people's earnings while the realm has the War Tax policy (0.06 = 6%)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxMaxWithPolicy { get; set; } = 0.06f;
+
+        [SettingPropertyFloatingInteger("War Tax Step", 0.000f, 0.020f, "0.000", HintText = "how much the war tax rises, or falls, at each weekly reckoning of the crown's need (0.005 = half a point)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxStep { get; set; } = 0.005f;
+
+        [SettingPropertyInteger("War Tax Reserve Days", 0, 364, "0", HintText = "the crown's war reserve is this many days of the wage refunds it has owed over the last 28 days (at least Crown Reserve Gold): a treasury below it raises the war tax, one twice above it - with no loan and no need to dip into the hoard for a week - lets it fall")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public int WarTaxReserveDays { get; set; } = 60;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5609,6 +5629,11 @@ namespace Armoury
             s.RotSwapPayToPurse = RotSwapPayToPurse;
             s.LordPurseOnlyToVictor = LordPurseOnlyToVictor;
             s.BattlePlunderFromLoserOnly = BattlePlunderFromLoserOnly;
+            s.WarTaxFromFolk = WarTaxFromFolk;
+            s.WarTaxMax = WarTaxMax;
+            s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
+            s.WarTaxStep = WarTaxStep;
+            s.WarTaxReserveDays = WarTaxReserveDays;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

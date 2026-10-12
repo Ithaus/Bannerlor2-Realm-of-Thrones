@@ -58,6 +58,11 @@ RANGES = {
     'CrownLoanLimitDays': (0.0, 728.0, "0"),
     'CrownLoanRepayDays': (30.0, 728.0, "0"),
     'CrownLoanPoolDays': (1.0, 360.0, "0"),
+    # E5/B2 (184): podatek wojenny ludu - pulapy przycinane w kodzie do 0..0.2, krok do 0..0.05, doby zapasu wojny do 0..728 (KingdomTreasury.WarTax)
+    'WarTaxMax': (0.0, 0.1, "0.000"),
+    'WarTaxMaxWithPolicy': (0.0, 0.2, "0.000"),
+    'WarTaxStep': (0.0, 0.02, "0.000"),
+    'WarTaxReserveDays': (0, 364, "0"),
     # E4/1 (189): czynnik cieplych krain i udzial paszy - przycinane w kodzie do 0..1
     'WinterWarmRealmFactor': (0.0, 1.0, "0.00"),
     'WinterHorseFeedShare': (0.0, 1.0, "0.00"),

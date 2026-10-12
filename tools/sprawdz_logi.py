@@ -47,6 +47,10 @@ Uzycie (Python 3, tylko odczyt):
                     = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
                     bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
+                    Blok E5/B2 (184, podatek wojenny ludu) B2-1..B2-14 - linia "Korona: podatek wojenny ludu (184)": codziennie i czytelna, wylacznik
+                    i 165 wlaczone, s nie ponad pulap, krok tygodnia zgodny z regula potrzeby (potrzeba -> w gore, luz i pokoj -> w dol), dlug 186
+                    d364 <= d182 (bieg roczny), zaleglosc 186 przy s < pulapu = 0, zwrot zoldu >= 70% naleznego (165), pobor czynny (> 0 przy s > 0
+                    w wojnie - kiesa ludu B1), Obieg = linia 184, bledy; wielkosc 184, wstrzymane w oblezeniu, wplywy korony - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2661,6 +2665,15 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
+    wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
+    try:
+        if wtx:
+            etap5_b2(rep, lines, start, until, wtx)
+        else:
+            rep.add("E5/B2: linia Korona: podatek wojenny ludu (184)", "brak w logu", "jest od wgrania E5/B2 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3781,6 +3794,162 @@ def etap5_a5(rep, lines):
     errs = [x for x in lines if x.startswith("ERROR in BeeGifts")]
     stm = max([num(r"potkniecia (\d+)", x, int, 0) or 0 for x in pays + gifts] + [num(r"E5/A5 \(prawdziwa.*?potkniecia (\d+)", x, int, 0) or 0 for x in camp] + [0])
     rep.add("E5/A5 A5-7: bledy BeeGifts, potkniecia", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
+
+
+def etap5_b2(rep, lines, start, until, wt):
+    """E5/B2 (184, PLAN 5.6 - podatek wojenny korony od zarobku ludu, R15 (b), NA WIERZCH daniny): projekt rozdz. 3 "E5/B2" Test (zbior B, z kiesa ludu B1).
+    Linia "Korona: podatek wojenny ludu (184): dzien N" (dzien gry; wt ma klucz = dzien ksiegi, jak 165) - po rentach 180, przed CrownIncome.End; na krolestwo
+    (oddzielone " ; "): s, pulap, wojna/pokoj, potrzeba K (kredyt 186 w 7 dobach) / Z (zwrot ponad wplywy dnia bez 1/360) / S (skarbiec < zapas wojny), luz,
+    krok tygodnia (doby gry podzielne przez 7), skarbiec, zapas wojny, dlug 186, ZALEGLOSC. Wiersze B2-1..B2-14 (progi projektu: s rosnie przy potrzebie,
+    dlug 186 d364 <= d182, bez zaleglosci przy s < pulapu, zwrot >= 70% naleznego w wojnie; wielkosc 184 - odczyt)."""
+    win = sorted(d for d in wt if 1 <= run_day(d, start) <= until)
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    kre = re.compile(r"^(.*?): s ([\d.]+)% / pulap ([\d.]+)%, (wojna|pokoj)(?:, potrzeba ([KZS]+))?(, luz)?(?:, krok ([+-]?[\d.]+) pkt)?, skarbiec (-?\d+) / zapas wojny (\d+)"
+                     r"(?:, dlug 186 (\d+))?(, ZALEGLOSC)?")
+    rows = {}
+    for d in win:
+        s = wt[d]
+        cap = re.search(r"\| pulap ([\d.]+)% \(z polityka War Tax ([\d.]+)%\), krok ([\d.]+) pkt", s)
+        sv = re.search(r"s krolestw w wojnie \(srednia, max\): ([\d.]+)%, ([\d.]+)% - krolestw w wojnie (\d+), z s > 0 (\d+), na pulapie (\d+); s > 0 w pokoju \(spada, bez poboru\) (\d+)", s)
+        tk = re.search(r"\| pobrano (\d+) zl \(ludzie miast (\d+): W (\d+), R (\d+), P (\d+); podzamcza (\d+)\), wolan poboru (\d+)", s)
+        hd = re.search(r"wstrzymane w oblezeniu (\d+) \((\d+)\)", s)
+        nd = re.search(r"potrzeba \(7 dob, krolestwa w wojnie\): kredyt 186 (\d+) krolestw, zwrot ponad wplywy (\d+), skarbiec < zapas wojny (\d+)", s)
+        if not (cap and sv and tk and hd and nd):
+            continue
+        ks = []
+        i = s.find("| na krolestwo: ")
+        if i >= 0:
+            seg = s[i + len("| na krolestwo: "):]
+            j = seg.rfind(" | potkniecia ")
+            seg = seg[:j] if j >= 0 else seg
+            if seg != "-":
+                for part in seg.split(" ; "):
+                    m = kre.match(part)
+                    if m:
+                        ks.append({"name": m.group(1), "s": float(m.group(2)), "cap": float(m.group(3)), "war": m.group(4) == "wojna", "need": m.group(5) or "",
+                                   "luz": bool(m.group(6)), "krok": float(m.group(7)) if m.group(7) is not None else None, "wallet": int(m.group(8)),
+                                   "reserve": int(m.group(9)), "debt": int(m.group(10)) if m.group(10) else 0, "arr": bool(m.group(11))})
+                    else:
+                        ks.append({"bad": part[:80]})
+        rows[d] = {"on": "wylacznik War Tax From Folk tak" in s, "inc": "165 Crown Current Income tak" in s,
+                   "cap": float(cap.group(1)), "capP": float(cap.group(2)), "step": float(cap.group(3)),
+                   "avg": float(sv.group(1)), "max": float(sv.group(2)), "warK": int(sv.group(3)), "posK": int(sv.group(4)), "capK": int(sv.group(5)),
+                   "taken": int(tk.group(1)), "town": int(tk.group(2)), "castle": int(tk.group(6)), "calls": int(tk.group(7)),
+                   "held": int(hd.group(1)), "heldN": int(hd.group(2)), "nLoan": int(nd.group(1)), "nOver": int(nd.group(2)), "nLow": int(nd.group(3)),
+                   "stepDay": "krok tygodnia: dzis" in s, "ks": ks, "stum": num(r"\| potkniecia (\d+)\.", s, int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    bad = sum(1 for d in rows for k in rows[d]["ks"] if "bad" in k)
+    rep.add("E5/B2 B2-1: linia Korona: podatek wojenny ludu (184) codziennie (czytelna)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob; nieczytelnych wpisow krolestw {bad}",
+            "0 / 0 (LogEnabled)", (len(miss) == 0 and bad == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    off = [d for d in ds if not (rows[d]["on"] and rows[d]["inc"])]
+    rep.add("E5/B2 B2-2: wylacznik War Tax From Folk i 165 (Crown Current Income) wlaczone", f"wylaczone w {len(off)} z {len(ds)} dob" + (f" (pierwsza {off[0]})" if off else ""),
+            "wlaczone caly bieg zbioru B (wylaczone - s = 0 i pobor 0, jak przed paczka)", len(off) == 0)
+    # B2-3: s nigdy ponad pulap krolestwa
+    over = [(d, k["name"]) for d in ds for k in rows[d]["ks"] if "bad" not in k and k["s"] > k["cap"] + 1e-6]
+    mx = max(rows[d]["max"] for d in ds)
+    rep.add("E5/B2 B2-3: s krolestwa nie ponad pulap (3% / 6% z War Tax)", f"przekroczen {len(over)}" + (f" (pierwsze {over[0]})" if over else "") + f"; s max w biegu {mx:.2f}%",
+            "0", len(over) == 0)
+    # B2-4: krok tygodnia zgodny z regula potrzeby (wojna i 165: potrzeba -> w gore az do pulapu; luz -> w dol; pokoj albo bez 165 -> w dol az do 0)
+    steps = [d for d in ds if rows[d]["stepDay"] and rows[d]["on"]]
+    n_up = n_up_bad = n_down = n_down_bad = n_peace = n_peace_bad = 0
+    first_bad = None
+    for d in steps:
+        inc = rows[d]["inc"]
+        for k in rows[d]["ks"]:
+            if "bad" in k or k["krok"] is None:
+                continue
+            s0 = k["s"] - k["krok"]
+            if k["war"] and inc and k["need"]:
+                if s0 < k["cap"] - 1e-6:
+                    n_up += 1
+                    if not k["krok"] > 0:
+                        n_up_bad += 1
+                        first_bad = first_bad or (d, k["name"], "potrzeba bez wzrostu")
+            elif k["war"] and inc and k["luz"]:
+                if s0 > 1e-9:
+                    n_down += 1
+                    if not k["krok"] < 0:
+                        n_down_bad += 1
+                        first_bad = first_bad or (d, k["name"], "luz bez spadku")
+            elif (not k["war"] or not inc) and s0 > 1e-9:
+                n_peace += 1
+                if not k["krok"] < 0:
+                    n_peace_bad += 1
+                    first_bad = first_bad or (d, k["name"], "pokoj bez spadku")
+    rep.add("E5/B2 B2-4: s rosnie tydzien po potrzebie (K kredyt 186 / Z zwrot ponad wplywy / S skarbiec < zapas wojny), spada przy luzie i w pokoju",
+            f"krokow tygodnia {len(steps)}: potrzeba ponizej pulapu {n_up} (bez wzrostu {n_up_bad}), luz {n_down} (bez spadku {n_down_bad}), pokoj z s > 0 {n_peace} (bez spadku {n_peace_bad})"
+            + (f"; pierwsze odstepstwo {first_bad}" if first_bad else ""),
+            "0 odstepstw (projekt Test B2: kredyt 186 w tygodniu -> s tydzien pozniej wyzsze, az do pulapu)", (n_up_bad + n_down_bad + n_peace_bad == 0) if steps else None)
+    # B2-5: dlug 186 w drugim polroczu nie rosnie (d364 <= d182 na krolestwo w wojnie obu dob) - bieg roczny
+    rd = {run_day(d, start): d for d in ds}
+    if 182 in rd and 364 in rd:
+        a = {k["name"]: k for k in rows[rd[182]]["ks"] if "bad" not in k}
+        b = {k["name"]: k for k in rows[rd[364]]["ks"] if "bad" not in k}
+        both = [n for n in b if n in a and a[n]["war"] and b[n]["war"]]
+        up = [n for n in both if b[n]["debt"] > a[n]["debt"]]
+        rep.add("E5/B2 B2-5: dlug 186 d364 <= d182 (krolestwa w wojnie obu dob)", f"krolestw {len(both)}, dlug wzrosl u {len(up)}" + (f": {', '.join(up[:5])}" if up else ""),
+                "0 (bieg roczny zbioru B)", (len(up) == 0) if both else None)
+    else:
+        rep.add("E5/B2 B2-5: dlug 186 d364 <= d182", f"bieg do doby {max(rd) if rd else '-'}", "INFO - prog tylko w biegu rocznym (364 doby)", None)
+    # B2-6: brak zaleglosci 186 u krolestw w wojnie z s ponizej pulapu
+    arr = [(d, k["name"], k["s"], k["cap"]) for d in ds for k in rows[d]["ks"] if "bad" not in k and k["arr"] and k["war"] and k["s"] < k["cap"] - 1e-6]
+    narr = len(set(x[1] for x in arr))
+    rep.add("E5/B2 B2-6: zaleglosc 186 u krolestw w wojnie z s < pulapu (krolestwo-dni)", f"{len(arr)} (krolestw {narr})" + (f"; pierwsza {arr[0]}" if arr else ""),
+            "0 (inaczej s nie nadaza za potrzeba - krok albo pulap za maly)", len(arr) == 0)
+    # B2-7, B2-8: korona (165) - wplywy "nasze" i zwrot zoldu w wojnie
+    kor = e4_series(lines, "Korona: wplywy dnia (165): dzien", 1)
+    kd = [d for d in ds if d in kor]
+    w84 = [num(r"w tym podatek wojenny ludu \(184\) (\d+)", kor[d]) for d in kd]
+    o28 = [num(r"prawa trzecich \(178\) (\d+)", kor[d]) for d in _last28(kd)]
+    o28 = [x for x in o28 if x is not None]
+    rep.add("E5/B2 B2-7: korona - wplywy \"nasze\" 165 (sr28) i w tym podatek wojenny ludu",
+            (f"{st.mean(o28):.0f}/d" if o28 else "brak linii 165") + f"; 184 w liniach 165 razem {sum(x for x in w84 if x is not None)} (w liniach 184 razem {sum(rows[d]['taken'] for d in ds)})",
+            "INFO - prog: wplywy korony w wojnie po B >= bieg A (danina + 1/2 zaworu + 184 wobec danina + 1/3 zaworu) - porownanie z biegiem A", None)
+    gv = dv = 0
+    for d in kd:
+        m = re.search(r"zwrot zoldu (\d+) \(nalezny (\d+)", kor[d])
+        if m:
+            gv += int(m.group(1))
+            dv += int(m.group(2))
+    rep.add("E5/B2 B2-8: zwrot zoldu w wojnie / nalezny (okno, 165)", f"{gv} / {dv} = {100.0 * gv / dv:.1f}%" if dv else "brak naleznego (bez wojny)",
+            ">= 70%", (gv >= 0.7 * dv) if dv else None)
+    rep.add("E5/B2 B2-9: \"stac pelny\" przy s na pulapie (6%)", "doby z krolestwami na pulapie: " + str(len([d for d in ds if rows[d]["capK"] > 0])),
+            "INFO - prog projektu >= 95% swiat (z linii kiesy ludu B1 w tych dobach)", None)
+    # B2-10: pobor przy zarobku ludu czynny (kiesa ludu B1 wpieta) - w dobach z krolestwami w wojnie i s > 0
+    pd = [d for d in ds if rows[d]["posK"] > 0 and rows[d]["on"] and rows[d]["inc"]]
+    tk = sum(rows[d]["taken"] for d in pd)
+    cl = sum(rows[d]["calls"] for d in pd)
+    rep.add("E5/B2 B2-10: pobor 184 czynny (doby z krolestwami w wojnie i s > 0)", f"dob {len(pd)}, pobrano {tk} zl, wolan poboru {cl}",
+            "> 0 (0 = kiesa ludu nieczynna albo pobor niewpiety w TownFolk.Earn - po scaleniu B1 musi byc > 0)", (tk > 0) if pd else None)
+    t28 = _last28(ds)
+    rep.add("E5/B2 B2-11: wielkosc 184 (sr28): pobrano / ludzie miast / podzamcza",
+            f"{st.mean(rows[d]['taken'] for d in t28):.0f} / {st.mean(rows[d]['town'] for d in t28):.0f} / {st.mean(rows[d]['castle'] for d in t28):.0f} zl/d"
+            + f"; s srednia {st.mean(rows[d]['avg'] for d in t28):.2f}%, max {max(rows[d]['max'] for d in t28):.2f}%"
+            + f"; potrzeba (sr28 krolestw): K {st.mean(rows[d]['nLoan'] for d in t28):.1f}, Z {st.mean(rows[d]['nOver'] for d in t28):.1f}, S {st.mean(rows[d]['nLow'] for d in t28):.1f}",
+            "INFO - odczyt, nie prog (wynika z potrzeby; [S] 30-60 tys./d)", None)
+    rep.add("E5/B2 B2-12: wstrzymane w oblezeniu (R22, suma okna)", f"{sum(rows[d]['held'] for d in ds)} zl ({sum(rows[d]['heldN'] for d in ds)} poborow)",
+            "INFO - oblezona osada nie placi (bramka BesiegedPay, rodzaj 184)", None)
+    # B2-13: Obieg (korona) = linia 184 tej samej doby (LastFolkWarTax)
+    obg = by_day(lines, "Obieg: dzien")
+    ncmp, diff = 0, []
+    for d in ds:
+        if d in obg:
+            v = num(r"podatek wojenny ludu \(184\) kiesy ludu -> skarbce (\d+)", obg[d])
+            if v is None:
+                continue
+            ncmp += 1
+            if v != rows[d]["taken"]:
+                diff.append(d)
+    rep.add("E5/B2 B2-13: Obieg (korona) = pobrano w linii 184 tej doby", f"porownanych dob {ncmp}, roznych {len(diff)}" + (f" (pierwsza {diff[0]})" if diff else ""),
+            "0 roznych", (len(diff) == 0) if ncmp else None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "KingdomTreasury.WarTax" in s]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B2 B2-14: bledy KingdomTreasury.WarTax, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
 
 
 def main(argv):

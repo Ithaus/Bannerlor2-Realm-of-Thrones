@@ -47,6 +47,7 @@ namespace Armoury
             public long Rent, RentHeld;   // 180: renty do glow rodow i udzialy wstrzymane (rody bez warunku, zaokraglenia - zostaja w skarbcu)
             public long CallToWar;        // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny (skarbiec -> portfel wezwanego)
             public long LoanIn, LoanOut;  // 186: kredyt Banku na zwrot zoldu (kapital -> skarbiec) i rata (skarbiec -> kapital, pierwszy wydatek dnia)
+            public long WarTax;           // E5/B2 (184): podatek wojenny ludu od wczorajszego zamkniecia korony (kiesy ludu -> skarbiec) - w Own
             public bool Snap;
         }
 
@@ -91,6 +92,7 @@ namespace Armoury
             _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
+            KingdomTreasury.WarTaxReset();   // E5/B2 (184): stawki podatku wojennego ludu - zapisane w szostym polu tego klucza, czyszczone razem z nim
         }
 
         internal static void ZeroLast()
@@ -178,7 +180,9 @@ namespace Armoury
                         long cas; CastlePurse.CrownToday.TryGetValue(k, out cas);
                         long tow; TownPurse.CrownToday.TryGetValue(k, out tow);   // E5/A1: udzial korony z zaworu kas miast (ta sama doba, PopulationLaw.Daily)
                         long thirds = Ransom178.ThirdsOf(k);   // 178: 1/9 z licznikow doby (prawo trzecich) - wplacone przed Begin
-                        d.Own = dues + lev + cas + tow + thirds;
+                        long wt = KingdomTreasury.FolkWarTaxWindow(k);   // E5/B2 (184): podatek wojenny ludu pobrany przy zarobku od wczorajszego End
+                        d.WarTax = wt;
+                        d.Own = dues + lev + cas + tow + thirds + wt;
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
@@ -288,20 +292,22 @@ namespace Armoury
                 _wEnd.Clear();
                 foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated && k.StringId != null) _wEnd[k.StringId] = k.KingdomBudgetWallet;
                 _wEndDay = today;
+                KingdomTreasury.FolkWarTaxWindowClear();   // E5/B2 (184): okno wplywow dnia zamkniete razem z migawka (pobor po Begin jest juz w migawce - zapas)
                 LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
                 LastKingRansomPaid = _dKingRansomPaid; _dKingRansomPaid = 0;   // 178: raty okupu krola ze skarbca (licznik doby)
                 if (!_open) { LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0; return; }
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0, loanIn = 0, loanOut = 0; int noSnap = 0;
+                long wtax = 0;   // E5/B2 (184)
                 var parts = new List<KeyValuePair<long, string>>();
                 foreach (var kv in _day)
                 {
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax;
                     if (!d.Snap) noSnap++;
                     if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0) continue;
-                    parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release
+                    parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "")
                               + (d.LoanOut > 0 ? " rata186 -" + d.LoanOut : "") + (d.LoanIn > 0 ? " kredyt186 +" + d.LoanIn : "")
                               + (d.GiftOut > 0 ? " dar -" + d.GiftOut : "") + (d.GiftIn > 0 ? " dar +" + d.GiftIn : "") + (d.RepOut > 0 ? " rata -" + d.RepOut : "") + (d.RepIn > 0 ? " rata +" + d.RepIn : "")
                               + (d.Contract > 0 ? " kontr. " + d.Contract : "") + (d.CallToWar > 0 ? " wezw. " + d.CallToWar : "") + (d.RefundDue > 0 ? " zwrot " + d.RefundGiven + "/" + d.RefundDue : "")
@@ -318,7 +324,8 @@ namespace Armoury
                 {
                     var sb = new StringBuilder(2048);
                     sb.Append("Korona: wplywy dnia (165): dzien ").Append(today)
-                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow i miast, 1/9 prawa trzecich (178) ").Append(own)
+                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, podatek wojenny ludu (184), clo, 1/3 zaworu zamkow i miast, 1/9 prawa trzecich (178) ").Append(own)
+                      .Append(", w tym podatek wojenny ludu (184) ").Append(wtax)
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)
                       .Append(" = do wydania ").Append(spend)
@@ -543,8 +550,8 @@ namespace Armoury
         private static bool _debtTried;
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_crown165")
-        /// <summary>"v1|doba migawki|id=skarbiec;...|placacy>odbiorca>reszta>calosc>doba;...|idRodu=zaliczka gry;..." (piate pole - recenzja C1, OBIEG-1;
-        /// zapis bez niego wczytuje sie jak dotad, starsza wersja moda piate pole pomija)</summary>
+        /// <summary>"v1|doba migawki|id=skarbiec;...|placacy>odbiorca>reszta>calosc>doba;...|idRodu=zaliczka gry;...|podatek wojenny ludu 184" (piate pole - recenzja C1, OBIEG-1;
+        /// szoste - E5/B2, format KingdomTreasury.WarTaxExport; zapis bez nich wczytuje sie jak dotad, starsza wersja moda pomija pola ponad swoje)</summary>
         internal static string Export()
         {
             try
@@ -582,6 +589,7 @@ namespace Armoury
                         sb.Append(kv.Key).Append('=').Append(Math.Min(kv.Value, (long)debt).ToString(Inv));
                     }
                 }
+                sb.Append('|').Append(KingdomTreasury.WarTaxExport());   // E5/B2 (184): szoste pole - stawki i pierscienie potrzeby podatku wojennego ludu (starsza wersja moda je pomija)
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -591,6 +599,7 @@ namespace Armoury
         internal static void Import(string data)
         {
             _wEnd.Clear(); _wEndDay = -1; _debts.Clear(); _advance.Clear(); _importN = 0; _importBad = 0;
+            KingdomTreasury.WarTaxImport(null);   // E5/B2 (184): zapis bez szostego pola - s = 0 u wszystkich krolestw
             try
             {
                 if (string.IsNullOrEmpty(data)) return;
@@ -619,6 +628,7 @@ namespace Armoury
                         if (kv.Length == 2 && kv[0].Length > 0 && long.TryParse(kv[1], NumberStyles.Integer, Inv, out v) && v > 0) _advance[kv[0]] = v;
                         else _importBad++;
                     }
+                if (f.Length >= 6) KingdomTreasury.WarTaxImport(f[5]);   // E5/B2 (184): stawki podatku wojennego ludu (zapis sprzed paczki - brak pola, s = 0)
             }
             catch (Exception e) { Stumble("Import", e); }
         }

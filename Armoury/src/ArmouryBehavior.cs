@@ -1531,6 +1531,7 @@ namespace Armoury
             try { Ransom178.CrownStep(); } catch (Exception e) { Log.Error("Ransom178.CrownStep", e); }                // 178: nagroda za wielkiego jenca ze skarbca (wplywy dnia, potem zapas ponad rezerwe), srednia wplywow korony              // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny ze skarbca (linia "Wezwania do wojny (168)")
             try { KingdomTreasury.WageRefund(); } catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); }  // zwrot zoldu w wojnie (i linia niedoplaty 169c)
             try { CrownRents.Daily(); } catch (Exception e) { Log.Error("CrownRents.Daily", e); }                    // 180: reszta wplywow dnia do rodow wedlug lenn, za sluzbe (linia "Renty korony (180)")
+            try { KingdomTreasury.WarTaxDaily(); } catch (Exception e) { Log.Error("KingdomTreasury.WarTaxDaily", e); }   // E5/B2 (184): potrzeba korony z tej doby (kredyt 186, zwrot ponad wplywy, zapas wojny), krok stawki co 7 dob, linia - przed CrownIncome.End (DayOf czynne)
             try { TownFolk.CrownProbe(); } catch (Exception e) { Log.Error("TownFolk.CrownProbe", e); }   // E5/0 (195): sonda korony - CrownIncome.DayOf czynne tylko do End (tylko odczyt)
             try { CrownIncome.End(); } catch (Exception e) { Log.Error("CrownIncome.End", e); }                        // migawka skarbcow i linia "Korona: wplywy dnia (165)"
             try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); }                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
