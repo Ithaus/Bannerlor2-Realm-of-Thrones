@@ -82,6 +82,9 @@ namespace CrashScribe
         // --- Atuty BK z nagrody za bitwe (decyzja Jeffa 4, 12.10; patrz Mends.BkRewardPerks) ---
         public static bool BkBattleRewardPerks = true;       // latka BK BKBattleRewardTweakPatches nie wchodzi w 1.4.8 (nazwy parametrow) - nasze postfiksy z ta sama logika (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), kazdy tylko gdy BK go nie ma; false = bez tych atutow
 
+        // --- E8/M (247): edukacja BK gracza (patrz Quiet.KnownBkEducation, Mends.BkEducationCheck) ---
+        public static bool QuietBkEducation = true;          // znany wyjatek BK CorrectPlayerEducation (finalizer BKROT go polyka): jedna linia zamiast bloku ERROR + raz na gre linia jezyka gracza w BK; false = blok ERROR jak dotad, bez linii
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -147,6 +150,7 @@ namespace CrashScribe
                         case "WallReleaseCommander": WallReleaseCommander = B(v); break;
                         case "WallOldSaveFix": WallOldSaveFix = B(v); break;
                         case "BkBattleRewardPerks": BkBattleRewardPerks = B(v); break;
+                        case "QuietBkEducation": QuietBkEducation = B(v); break;
                     }
                 }
             }

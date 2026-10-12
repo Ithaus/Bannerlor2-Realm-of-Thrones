@@ -24,8 +24,25 @@ namespace CrashScribe
     /// </summary>
     internal static class Mends
     {
-        /// <summary>Prefix usypiajacy odswiezanie martwego widgetu DTE (A6).</summary>
-        internal static bool SkipDteMapWidget() { return false; }
+        // ---- E8/M (247): odczyt ustawien innego moda - jedna linia przy pierwszym odczycie (raz na proces) ----
+        // Klucz = literal (nazwa odczytu albo pola), bez skladania napisow przed sprawdzeniem - ArmouryFloat
+        // bywa wolane czesto (HeroReqOn), a linia ma kosztowac tylko lock i HashSet.
+        private static readonly System.Collections.Generic.HashSet<string> _linkSaid = new System.Collections.Generic.HashSet<string>();
+
+        private static bool LinkFirst(string key)
+        {
+            lock (_linkSaid) { return _linkSaid.Add(key); }
+        }
+
+        private static void LinkLine(string link, bool ok, string field, string fallback)
+        {
+            try
+            {
+                if (!LinkFirst(link)) return;
+                Scribe.Line("Mends: " + link + ": " + (ok ? "PODPIETY (" + field + ")" : "BRAK (" + field + ") - zostaje " + fallback));
+            }
+            catch { }
+        }
 
         /// <summary>
         /// UMARLI NIE ZNAJA STRACHU (Jeff 30.08). ROT nie rusza morale
@@ -1388,6 +1405,7 @@ namespace CrashScribe
                 // MNIEJSZYM niz prog (2 = tylko T1 za darmo, 5 = stan z 30.08,
                 // 7 = brama praktycznie otwarta). Dziala od zaladowania sesji.
                 int prog = 2;
+                bool linked = false;
                 try
                 {
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -1397,11 +1415,12 @@ namespace CrashScribe
                         var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
                         var so = cur != null ? cur.GetValue(null) : null;
                         var fld = so != null ? so.GetType().GetField("ForgePartsFreeBelowTier") : null;
-                        if (fld != null) prog = (int)fld.GetValue(so);
+                        if (fld != null) { prog = (int)fld.GetValue(so); linked = true; }
                         break;
                     }
                 }
                 catch { }
+                LinkLine("brama kucia", linked, "Armoury.Settings.ForgePartsFreeBelowTier", "prog 2");   // E8/M (247)
                 if (prog < 2 || prog > 7) prog = 2;
 
                 var tpls = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>();
@@ -2328,6 +2347,9 @@ namespace CrashScribe
         /// - wspolny wzorzec dla praw kuzni.</summary>
         internal static float ArmouryFloat(string field, float def)
         {
+            // E8/M (247): wynik bez zmian (pierwsze trafienie albo domyslna); dochodzi tylko linia PODPIETY/BRAK
+            // przy pierwszym odczycie kazdego pola (klucz = nazwa pola, napis skladany tylko raz)
+            float res = def; bool ok = false;
             try
             {
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -2340,15 +2362,22 @@ namespace CrashScribe
                     if (fld != null)
                     {
                         var v = fld.GetValue(so);
-                        if (v is float f) return f;
-                        if (v is bool b) return b ? 1f : 0f;
-                        if (v is int n) return n;
+                        if (v is float f) { res = f; ok = true; }
+                        else if (v is bool b) { res = b ? 1f : 0f; ok = true; }
+                        else if (v is int n) { res = n; ok = true; }
                     }
                     break;
                 }
             }
             catch { }
-            return def;
+            try
+            {
+                if (field != null && LinkFirst(field))
+                    Scribe.Line("Mends: ustawienia Armoury: " + (ok ? "PODPIETY (Armoury.Settings." + field + ")"
+                                : "BRAK (Armoury.Settings." + field + ") - zostaje domyslna " + def.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            catch { }
+            return res;
         }
 
         /// <summary>
@@ -2554,6 +2583,7 @@ namespace CrashScribe
                 // wspolczynnik z suwaka MCM Armoury (KgPerAthleticsPoint,
                 // dom. 0.25) - Jeff stroi bez rebuildu; dziala od startu sesji
                 float kg = 0.333f;   // 09.10 (Jeff: wszystko wedlug wagi): 50 kg plyty = 150 Atletyki
+                bool kgLinked = false;
                 try
                 {
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -2563,11 +2593,12 @@ namespace CrashScribe
                         var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
                         var so = cur != null ? cur.GetValue(null) : null;
                         var fld = so != null ? so.GetType().GetField("ArmourKgPerAthletics") : null;
-                        if (fld != null) kg = (float)fld.GetValue(so);
+                        if (fld != null) { kg = (float)fld.GetValue(so); kgLinked = true; }
                         break;
                     }
                 }
                 catch { }
+                LinkLine("prawo wagi", kgLinked, "Armoury.Settings.ArmourKgPerAthletics", "0.333 kg/pkt");   // E8/M (247)
                 if (kg < 0.05f || kg > 2f) kg = 0.333f;
                 int raised = 0, lowered = 0;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
@@ -3593,26 +3624,100 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewAll", null); } catch { } }
         }
 
+        // ---- E8/M (247): JEZYK GRACZA W BK - sprawdzenie zamiast latki ----
+        // Korekta BK CorrectPlayerEducation pada przy tworzeniu postaci (Quiet.KnownBkEducation), ale wpis
+        // gracza tworzy BK sam przy pierwszym GetHeroEducation (dobowy UpdateHeroData). Raz na sesje, tylko
+        // odczyt slownika Educations pod tym samym lockiem co BK (CacheLock) - bez GetHeroEducation, ktore
+        // samo tworzy wpis. Do 3 dob czekania na wpis (kolejnosc sluchaczy doby), potem linia BRAK.
+        private static bool _eduDone;
+        private static int _eduTries;
+
+        internal static void ResetBkEducationCheck() { _eduDone = false; _eduTries = 0; }
+
+        internal static void BkEducationCheck()
+        {
+            if (_eduDone || !Config.QuietBkEducation) return;
+            try
+            {
+                var hero = Hero.MainHero;
+                if (hero == null) return;
+                var tCfg = Type.GetType("BannerKings.BannerKingsConfig, BannerKings");
+                var pInst = tCfg != null ? AccessTools.Property(tCfg, "Instance") : null;
+                var cfg = pInst != null ? pInst.GetValue(null, null) : null;
+                var pEm = cfg != null ? AccessTools.Property(tCfg, "EducationManager") : null;
+                var em = pEm != null ? pEm.GetValue(cfg, null) : null;
+                var pEdu = em != null ? AccessTools.Property(em.GetType(), "Educations") : null;
+                if (pEdu == null)
+                {
+                    _eduDone = true;
+                    Scribe.Line("Mends: edukacja BK gracza (E8/M) - BannerKings/EducationManager.Educations nieobecne, nic do sprawdzenia.");
+                    return;
+                }
+                var pLock = AccessTools.Property(em.GetType(), "CacheLock");
+                var lk = pLock != null ? pLock.GetValue(em, null) : null;
+                object data = null;
+                var dict = pEdu.GetValue(em, null) as System.Collections.IDictionary;
+                if (dict != null)
+                {
+                    if (lk != null) { lock (lk) { if (dict.Contains(hero)) data = dict[hero]; } }
+                    else if (dict.Contains(hero)) data = dict[hero];
+                }
+                string cult = hero.Culture != null ? hero.Culture.StringId : "?";
+                if (data == null)
+                {
+                    if (++_eduTries < 3) return;
+                    _eduDone = true;
+                    Scribe.Line("Mends: edukacja BK gracza (E8/M) - BRAK wpisu gracza po 3 dobach (kultura " + cult
+                                + ", znany wyjatek CorrectPlayerEducation: " + Quiet.BkEducationHits + ") - jezyk gracza nieznany BK.");
+                    return;
+                }
+                var parts = new System.Collections.Generic.List<string>();
+                var langs = Traverse.Create(data).Property("Languages").GetValue() as System.Collections.IEnumerable;
+                if (langs != null)
+                    foreach (var kv in langs)
+                    {
+                        if (kv == null || parts.Count >= 6) continue;
+                        var tk = Traverse.Create(kv);
+                        var lang = tk.Property("Key").GetValue();
+                        var name = lang != null ? Traverse.Create(lang).Property("Name").GetValue() : null;
+                        var val = tk.Property("Value").GetValue();
+                        parts.Add((name != null ? name.ToString() : "?") + " "
+                                  + (val is float fl ? fl.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "?"));
+                    }
+                _eduDone = true;
+                Scribe.Line("Mends: edukacja BK gracza (E8/M) - wpis jest, jezyki: " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "(pusto)")
+                            + " | kultura " + cult + " | bez latki - znany wyjatek CorrectPlayerEducation odfiltrowany: " + Quiet.BkEducationHits + ".");
+            }
+            catch (Exception e) { _eduDone = true; try { Scribe.Report("CrashScribe", e, "Mends.BkEducationCheck", null); } catch { } }
+        }
+
         internal static void Install(Harmony harmony)
         {
             _lateHarmony = harmony;   // decyzja 4 (12.10): do latek wpinanych dopiero po starcie sesji (BkRewardPerks)
             try
             {
-                // ===== A6: MARTWY WIDGET DTE NA PASKU MAPY =====
-                // MapArmoryReadinessMixin (wskaznik gotowosci zbrojowni przy
-                // zegarze mapy) pada na 1.4.8 w inicjalizacji swojej bazy
-                // (AmbiguousMatch w UIExtenderEx) i KAZDE odswiezenie paska
-                // rzuca od nowa - 604 wyjatki w sesji 29.08, a wskaznika
-                // i tak nie widac. Usypiamy samo odswiezanie; przycisk
-                // otwierania zbrojowni ma osobna droge i zostaje.
-                var tMix = QuietType("MapArmoryReadinessMixin");
-                var mRef = tMix != null ? AccessTools.Method(tMix, "OnRefresh") : null;
-                if (mRef != null)
+                // ===== A6: PASEK GOTOWOSCI ZBROJOWNI DTE (MapArmoryReadinessMixin) =====
+                // E8/M (247), decyzja Jeffa 12.10 (pytanie 9): paska NIE usypiamy - dzis 1 wyjatek
+                // na sesje (bylo 604 w sesji 29.08). Dawny mend szukal mixina przez QuietType, a ta
+                // przeszukuje tylko assembly BannerKings (i zwraca typeof(object)) - stad falszywe
+                // "nieobecny" (CS 12.10 :240), choc mixin DTE zyl i rzucal (:1568). Latka nigdy sie
+                // nie wpiela; zostaje sama prawdziwa linia - typ po pelnej nazwie w assembly DTE (plik
+                // DynamicTroopEquipmentReupload.v1.4.7.dll, wiec nazwa po prefiksie; bez skanu wszystkich typow).
+                Type tMix = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    harmony.Patch(mRef, prefix: new HarmonyMethod(typeof(Mends), "SkipDteMapWidget"));
-                    Scribe.Line("Mends: martwy wskaznik gotowosci DTE na pasku mapy uspiony (bylo 604 wyjatki/sesje).");
+                    try
+                    {
+                        var an = asm.GetName().Name;
+                        if (an == null || !an.StartsWith("DynamicTroopEquipmentReupload", StringComparison.Ordinal)) continue;
+                        tMix = asm.GetType("DynamicTroopEquipmentReupload.GUIExtensions.MapArmoryReadinessMixin", false);
+                        if (tMix != null) break;
+                    }
+                    catch { }
                 }
-                else Scribe.Line("Mends: MapArmoryReadinessMixin nieobecny - nic do usypiania.");
+                Scribe.Line(tMix != null
+                    ? "Mends: pasek gotowosci zbrojowni DTE (MapArmoryReadinessMixin) obecny - zostaje wlaczony (decyzja Jeffa 12.10; znany 1 wyjatek AmbiguousMatch na sesje, ERRORS A6)."
+                    : "Mends: pasek gotowosci zbrojowni DTE (MapArmoryReadinessMixin) nieobecny - nic do sprawdzania.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dteWidget)", null); } catch { } }
 
@@ -5891,7 +5996,7 @@ namespace CrashScribe
     internal sealed class MendsBehavior : CampaignBehaviorBase
     {
         // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart); B6c: tak samo Mur
-        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); }
+        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); }   // E8/M: linia jezyka gracza raz na gre
 
         public override void RegisterEvents()
         {
@@ -5909,6 +6014,7 @@ namespace CrashScribe
                 delegate
                 {
                     Mends.DragonPurge(false);
+                    Mends.BkEducationCheck();   // E8/M (247): jezyk gracza w BK, raz na gre (tylko odczyt)
                     Army175.DailyCatchUp();   // 175: zamiana wedlug tieru, gdy przy wczytaniu zestawy byly puste
                     if (!Mends.SinewApplied) Mends.SkillSinew();
                     if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); }   // raz (znacznik), potem nic

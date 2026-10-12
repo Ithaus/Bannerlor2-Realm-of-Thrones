@@ -57,6 +57,7 @@ namespace CrashScribe
                         try
                         {
                             if (e.Exception == null) return;
+                            if (Config.QuietBkEducation && Quiet.KnownBkEducation(e.Exception)) return;   // E8/M (247)
                             if (Config.OnlyModdedFirstChance && Blame.Culprits(e.Exception).Count == 0) return;
                             Scribe.Report("ERROR CAUGHT FURTHER UP", e.Exception, "FirstChanceException", null);
                         }

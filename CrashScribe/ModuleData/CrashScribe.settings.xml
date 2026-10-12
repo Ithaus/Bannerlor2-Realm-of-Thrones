@@ -213,4 +213,11 @@
        for the player and for AI lords alike, and only where Banner Kings has not applied them itself (so they are
        never counted twice). Set BkBattleRewardPerks to false to leave these perks without effect (old behaviour). -->
   <BkBattleRewardPerks>true</BkBattleRewardPerks>
+
+  <!-- Banner Kings player education: BK's CorrectPlayerEducation throws once at character creation
+       (a BK language without cultures); BKROTPatch already swallows it and BK gives the player the
+       language of their culture on the first daily tick. With this on, that one known error becomes a
+       single line instead of an error block, and once per game the log states the player's BK languages.
+       Set QuietBkEducation to false to get the full error block back (old behaviour). -->
+  <QuietBkEducation>true</QuietBkEducation>
 </CrashScribe>

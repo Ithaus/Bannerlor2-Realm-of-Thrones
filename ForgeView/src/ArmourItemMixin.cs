@@ -39,6 +39,9 @@ namespace ForgeView
                         var t = asm.GetType("Armoury.RangedLore", false);
                         if (t != null) { _knownOf = t.GetMethod("KnownOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static); break; }
                     }
+                    // E8/M (247): jedna linia przy pierwszym odczycie; fallback bez zmian
+                    Log.Info("Armoury RangedLore (kafelek wzoru): " + (_knownOf != null ? "PODPIETY (Armoury.RangedLore.KnownOf)"
+                             : "BRAK (Armoury.RangedLore.KnownOf) - zostaje: kazdy wzor odblokowany"));
                 }
                 if (_knownOf == null || item == null) return true;
                 return _knownOf.Invoke(null, new object[] { item }) is bool b && b;

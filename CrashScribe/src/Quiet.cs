@@ -93,5 +93,33 @@ namespace CrashScribe
             }
             catch { return true; }
         }
+
+        // ---- E8/M (247): znany wyjatek BK przy tworzeniu postaci ----
+        // BK EducationManager.CorrectPlayerEducation: najpierw Educations.Remove(gracz), potem
+        // All.FirstOrDefault(x => x.Cultures.Any(...)) - BKROT DefaultLanguagesInitializePatch nie
+        // inicjuje NordLanguage (Cultures == null), wiec Any rzuca ArgumentNullException. Finalizer
+        // BKROT go polyka, OnCharacterCreationIsOver biegnie dalej, a wpis gracza tworzy BK sam przy
+        // pierwszym GetHeroEducation (dobowy UpdateHeroData -> InitHeroEducation; latka BKROT na lambdzie
+        // pomija jezyk bez kultur) - jezyk kultury gracza, jak w korekcie. Dlatego bez latki: zamiast bloku
+        // ERROR jedna linia z licznikiem (jezyk gracza - linia "Mends: edukacja BK gracza").
+        private static int _bkEduHits;
+        internal static int BkEducationHits { get { return _bkEduHits; } }
+
+        internal static bool KnownBkEducation(Exception ex)
+        {
+            try
+            {
+                if (!(ex is ArgumentNullException)) return false;
+                var ts = ex.TargetSite;
+                if (ts == null || ts.Name != "Any") return false;
+                var live = Environment.StackTrace;
+                if (live == null || live.IndexOf("EducationManager.CorrectPlayerEducation", StringComparison.Ordinal) < 0) return false;
+                int n = System.Threading.Interlocked.Increment(ref _bkEduHits);
+                if (n == 1 || n % 50 == 0)
+                    Scribe.Line("Quiet (E8/M): znany wyjatek BK CorrectPlayerEducation (ArgumentNullException w Any - jezyk BK bez kultur, finalizer BKROT go polyka) odfiltrowany, razem " + n + ".");
+                return true;
+            }
+            catch { return false; }
+        }
     }
 }
