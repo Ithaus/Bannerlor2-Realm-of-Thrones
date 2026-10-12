@@ -1342,3 +1342,8 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   **Pytania do Jeffa (rozdz. 6; 1-5 blokuja kod):** (1) trzecia kapitana z kazdej zdobyczy - rada TAK; (2) konie wedlug kategorii - TAK; (3) karawany BK w miescie co godzine - TAK;
   (4) klany najemnikow ROT bez ludzi z niczego - TAK; (5) welna z uboju 0.15 szt.; (6) milicja z daru Spoils - wyciac; (7) "kon bez uprzezy" = start postaci - tak; (8) kuznia - zostaje
   filtr ForgeView; (9) pasek DTE - nie wylaczac; (10) lzejsze logi - nie teraz; (11) liczba partii - nie w etapie 8 (pomiar po tescie).
+- (19:15 UTC 12.10) **Jeff - odpowiedzi do etapu 8 (wpisane w projekt rozdz. 6):** (1) NIE rozszerzac trzeciej kapitana - "to, co ja zabilem, idzie do mnie" (wlasne zabojstwa gracza 100%
+  graczowi - sprawdzic w kodzie); (2) konie wedlug kategorii TAK; (3) karawany BK co godzine TAK; (4) koniec ludzi z niczego u najemnikow ROT TAK; (5) welna 0.15 z owcy - przez pamiec
+  ulamkow (jak N1b); (6) milicja z daru Spoils - wyciac; (7) INACZEJ: jezdziec = kon + UPRZAZ (sam kon nie wystarczy, zeby stworzyc jezdzca) - sprawdzic dzisiejsza regule awansu/
+  dosadzenia i dodac wymog uprzezy (AI i gracz, jedna regula), pomiar skutku dla jazdy; (8) kuznia - zostaje jak jest; (9) pasek DTE - nie wylaczac; (10) lzejsze logi - nie; (11) liczba
+  partii - nie w etapie 8.

@@ -783,6 +783,19 @@ _g1, _g2, _q, _t, _o1, _o2, _o3, _o5, _o6 (progi w paczkach).
 
 ## 6. Pytania do Jeffa (tylko kierunek; liczby wybiera projekt)
 
+**ODPOWIEDZI JEFFA (12.10 ok. 19:15 UTC) - WIAZACE:**
+1. **NIE** rozszerzac trzeciej kapitana. "To, co ja zabilem, idzie do mnie": lup z wrogow zabitych przez gracza osobiscie - w calosci graczowi; reszta zasad lupu bez zmian (sprawdzic w kodzie, ze wlasne zabojstwa gracza daja 100% - jesli nie, to jest blad do poprawki w E8/W lub E8/A).
+2. **TAK** - konie wedlug kategorii.
+3. **TAK** - karawany BK w miescie co godzine.
+4. **TAK** - koniec ludzi z niczego u klanow najemnikow ROT i wyrzucania wodza.
+5. **0.15 sztuki welny z owcy** - Jeff mysli, ze gra nie przyjmie ulamka; robimy to przez PAMIEC ULAMKOW (jak N1b): 0.15 na owce dopisywane do licznika osady, pelna sztuka welny, gdy licznik >= 1 (zapis, Reset).
+6. **TAK** - wyciac milicje z daru "Donate to town" (Spoils); sztuki do zalogi.
+7. **INACZEJ niz rada:** Jeffowi chodzilo o to, ze "sam kon nie wystarczy - musi miec tez uprzaz (siodlo), zeby wojsko na nim jezdzilo i mozna bylo stworzyc jezdzca". Regula: jezdziec = kon + uprzaz (HorseHarness). Do kodu (E8/T albo osobna paczka): sprawdzic, czy dzis awans na jezdzca / dosadzenie (Stables, Remount, AiMount, K3, DTE, zbrojownie zalog, gracz) wymaga uprzezy; jesli nie - dodac wymog (AI i gracz, jedna regula), uprzaz z prawdziwej produkcji (siodlarze, R3), pomiar skutku dla udzialu jazdy (K3 ~20%). StartKit (kon niepasujacy do uprzezy przy starcie postaci) - tylko jesli wynika z tej samej reguly.
+8. **Zostaje jak jest** (filtr ForgeView).
+9. **TAK** - nie wylaczac paska DTE, poprawic tylko falszywa linie logu.
+10. **NIE** - lzejsze logi nie teraz.
+11. **OK** - liczba partii nie w etapie 8; pomiar -Profile po tescie.
+
 1. **Trzecia kapitana z kazdej zdobyczy?** Dzis wraki i cala zdobyta zbrojownia oraz tabor pokonanych ida w 100% do Ciebie, a trzecia (33%) obejmuje tylko sprzet z cial powalonych przez Twoich ludzi.
    Rada: **TAK** - wraki wedlug zabojcy, a zbrojownia i tabor pokonanych z ta sama trzecia (zolnierz oddaje kapitanowi trzecia czesc kazdej zdobyczy).
 2. **Konie wedlug kategorii?** Zwykly kon t3 x0.4 (rouncey 160-480 zamiast ok. 1 000), rumak t4 x1.5 (kon zbrojnego). Bilans zakupow lordow ok. 0. Rada: **TAK**.
