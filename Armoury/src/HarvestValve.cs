@@ -29,7 +29,7 @@ namespace Armoury
     ///    liczony raz na 28 dob (na granicy kubelka), nie co dobe;
     ///  - zuzycie okna = produkcja wsi - skasowane - (stos teraz - stos 56 dob temu), najmniej 0 - to, co swiat zuzyl ponad inne zrodla (warsztaty).
     /// Decyzja co 28 dob na oknie 56 dob (dwa kubelki), pierwsza 56 dob po starcie pomiaru (nowa kampania - d56); wczesniej mnozniki 1 i gnicie 174.3:
-    ///  - w dol: zuzycie < 90% produkcji i stos > ValveStockDaysHigh (60) dni zuzycia -> mnoznik x 0.95 x zuzycie/produkcja (cel ponizej zuzycia -
+    ///  - w dol: zuzycie < 90% produkcji i stos > ValveStockDaysHigh (60) dni zuzycia -> mnoznik = 0.95 x zuzycie/produkcja bazowa okna (przy mnozniku 1; cel ponizej zuzycia -
     ///    stos maleje), najwyzej x0.5 na decyzje, podloga 0.1; towar bez odbiorcy - prog w dniach produkcji zamiast zuzycia (schodzi do podlogi);
     ///  - w gore: zuzycie >= 98% produkcji i stos < ValveStockDaysLow (30) dni zuzycia -> x1.3, najpierw najwyzej do 1 (po cieciu), potem najwyzej
     ///    VillageOutputStep (1.3) ponad baze - tylko produkcja, bez mnoznika popytu (D6-4);
@@ -50,6 +50,7 @@ namespace Armoury
             public string Id;
             public ItemObject Item;
             public float M = 1f;                   // mnoznik produkcji wsi (1 = jak model)
+            public float MA = 1f;                  // mnoznik, przy ktorym powstala produkcja kubelka starszego (P0); biezacy P1 powstal przy M
             public double P0, P1;                  // produkcja wsi: kubelek starszy / biezacy (szt.)
             public double D0, D1;                  // skasowane przez RawNoRot: kubelek starszy / biezacy (szt.)
             public long SA = -1, SB = -1;          // stos swiata na poczatku kubelka starszego / biezacego (-1 = nieznany)
@@ -326,6 +327,7 @@ namespace Armoury
             foreach (var id in ids)
             {
                 var g = _goods[id];
+                float mBucket = g.M;                        // mnoznik kubelka biezacego (P1) - po przesunieciu kubelek starszy
                 long now = 0;
                 if (g.Item != null) c.TryGetValue(g.Item, out now);
                 if (decide && g.SA >= 0 && g.Item != null)
@@ -341,7 +343,10 @@ namespace Armoury
                             int dir = 0;
                             if (P > 0.0 && C < CutBelow * P && (cDay > 0.0 ? now > high * cDay : now > high * pDay))
                             {
-                                float target = (float)(m0 * CutTarget * C / P);
+                                // recenzja 221: cel = 0.95 x zuzycie / produkcja BAZOWA okna (przy mnozniku 1) - kubelek starszy powstal przy MA, biezacy przy m0;
+                                // m0 x C / P przy oknie z dwoma mnoznikami (po cieciu) cial drugi raz towar juz ustawiony na 0.95 x zuzycia (np. 0.57 -> 0.41)
+                                double baseP = (g.MA > 0f ? g.P0 / g.MA : g.P0) + (m0 > 0f ? g.P1 / m0 : g.P1);
+                                float target = (float)(CutTarget * C / (baseP > 0.0 ? baseP : P));
                                 m1 = Math.Max(Floor, Math.Max(target, m0 * CutMaxStep));
                                 if (m1 < m0 - 1e-4f) dir = -1; else m1 = m0;
                             }
@@ -363,7 +368,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Decide", e); }
                 }
-                g.P0 = g.P1; g.P1 = 0.0; g.D0 = g.D1; g.D1 = 0.0; g.SA = g.SB; g.SB = now;
+                g.P0 = g.P1; g.P1 = 0.0; g.D0 = g.D1; g.D1 = 0.0; g.SA = g.SB; g.SB = now; g.MA = mBucket;
                 if (g.Item != null && g.M != 1f) f[g.Item] = g.M;
             }
             _factors = f.Count > 0 ? f : null;
@@ -397,7 +402,7 @@ namespace Armoury
             {
                 sb.Append('|').Append(g.Id).Append(',').Append(g.M.ToString("R", inv)).Append(',').Append(g.P0.ToString("R", inv)).Append(',').Append(g.P1.ToString("R", inv))
                   .Append(',').Append(g.D0.ToString("R", inv)).Append(',').Append(g.D1.ToString("R", inv)).Append(',').Append(g.SA).Append(',').Append(g.SB)
-                  .Append(',').Append(g.Dir).Append(',').Append(g.Flips);
+                  .Append(',').Append(g.Dir).Append(',').Append(g.Flips).Append(',').Append(g.MA.ToString("R", inv));
             }
             return sb.ToString();
         }
@@ -425,6 +430,8 @@ namespace Armoury
                         Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
                     };
                     if (!(g.M > 0f) || g.M > 2f) g.M = 1f;
+                    g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
+                    if (!(g.MA > 0f) || g.MA > 2f) g.MA = g.M;
                     _goods[g.Id] = g;
                 }
                 Rebuild();
