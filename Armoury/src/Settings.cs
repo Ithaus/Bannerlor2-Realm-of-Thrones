@@ -1139,7 +1139,7 @@ namespace Armoury
         public bool ArmorSanityEnabled = true;             // Armour Sense Law: outliers get levelled to the norm of their type and tier - no more 4 kg chaps outarmouring plate; the world's balance stays put
         public float ArmorOutlierPercentile = 75f;         // Armour Sense Law: the norm is this percentile of total protection within (type, tier)
         public float ArmorOutlierTolerance = 1.30f;        // Armour Sense Law: pieces above norm x this get trimmed down to it
-        public bool CampBattlePropsEnabled = false;        // EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)
+        public bool CampBattlePropsEnabled = true;         // attacked while encamped, the field battle gets your camp dressed on it - tents, a campfire, torches and a fence behind your line, set up once your men are deployed; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged
         public bool HideoutAlarmEnabled = true;            // a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away
         public float HideoutAlarmScreamRadius = 40f;       // a wounded man's cry and the ring of steel carry this many meters - bandits inside come at you, further ones sleep on
         public float HideoutAlarmWitnessRadius = 12f;      // a CLEAN one-blow kill alarms only enemies this close to the body - no witnesses, no alarm

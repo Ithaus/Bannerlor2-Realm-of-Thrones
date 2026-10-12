@@ -110,6 +110,9 @@ Uzycie (Python 3, tylko odczyt):
                     porozumienia wezwan 168 "przez N dob" = wezwanie z linii startowej (182), T4 KRONIKA (CS) wojen naraz w d61-until >= 7, T7 nowa
                     wojna z decyzji krolestwa po pokoju krocej niz rozejm gry (87 dni) 0, T0 bledy WorldTime7 i potkniecia 0; wstrzymane propozycje,
                     T5 nagrody turniejow (Szczelnosc 164a), T6 GrandTourney - INFO.
+                    Blok E7/O2 (229) - linia startowa "CampScene (E7/O2): prefaby dostepne": T1 kazdy element (namioty, ogniska, pochodnie, plot) >= 1
+                    i bez bledow PrefabExists (brak linii = NIE: klucz CampBattlePropsEnabled), T0 bledy CampScene 0; bitwy w obozie gracza ze scenografia
+                    ("CampScene: postawiono") - INFO (T2 test Jeffa: wojsko nie grzeznie w scenografii bez fizyki).
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -6632,6 +6635,40 @@ def etap7_k(rep, lines, start, until, logp=None, csp=None):
     rep.add("E7/K T6: GrandTourney - zjazdy lordow na sezon", "poza blokiem (log GrandTourney - skopiowac przed biegiem zapisu)", "INFO (ok. 4x wiecej turniejow na rok)", None)
 
 
+E7O2_START = "CampScene (E7/O2): prefaby dostepne"
+
+
+def etap7_o2(rep, lines, start, until, logp=None, csp=None):
+    """E7/O2 (229): namioty i ogniska przy napadzie na oboz gracza (projekt etapu 7 v2 rozdz. 3 "E7/O2", R18). T1 linia startowa "CampScene (E7/O2):
+    prefaby dostepne - namioty x/5, ogniska y/3, pochodnie z/2, plot w/2 (bez fizyki)" (co sesje przy kluczu CampBattlePropsEnabled): kazdy element >= 1
+    (wszyscy kandydaci sa w Native 1.4.8), bez bledow PrefabExists; T0 bledy CampScene (ERROR in CampScene...) 0; postawione w misjach - INFO
+    (T2 test Jeffa: napad na jego oboz, wojsko nie grzeznie - autotest nie gra bitew w obozie gracza)."""
+    st_ = [s for s in lines if s.startswith(E7O2_START)]
+    if not st_:
+        rep.add("E7/O2 T1: linia startowa CampScene (prefaby obozu)", "brak",
+                "linia w kazdej sesji (klucz CampBattlePropsEnabled = true - wpis Armoury.json Jeffa poprawiony przy wgraniu)", False)
+    else:
+        bad = set()
+        for s in st_:
+            for lab in ("namioty", "ogniska", "pochodnie", "plot"):
+                if (num(lab + r" (\d+)/\d+", s, default=0) or 0) < 1:
+                    bad.add(lab)
+            if "bledy PrefabExists" in s:
+                bad.add("bledy PrefabExists")
+        rep.add("E7/O2 T1: linia startowa CampScene (prefaby obozu)", f"{len(st_)} sesji; ostatnia: {st_[-1][len('CampScene (E7/O2): '):]}"
+                + (f"; braki: {', '.join(sorted(bad))}" if bad else ""), "kazdy element >= 1, bez bledow PrefabExists", not bad)
+    errs = [s for s in lines if s.startswith("ERROR in CampScene")]
+    rep.add("E7/O2 T0: bledy CampScene (ERROR in CampScene)", len(errs), "0", len(errs) == 0)
+    pl = [s for s in lines if s.startswith("CampScene: postawiono")]
+    if pl:
+        n = [num(r"postawiono (\d+)", s, default=0) or 0 for s in pl]
+        fr = sorted({m.group(1) for s in pl for m in [re.search(r"front: ([^,]+),", s)] if m})
+        rep.add("E7/O2: bitwy w obozie gracza ze scenografia", f"{len(pl)} bitew, elementow {sum(n)} (min {min(n)}, maks {max(n)} z 10); front: {', '.join(fr) or '-'}",
+                "INFO (T2 - test Jeffa: wojsko nie grzeznie)", None)
+    else:
+        rep.add("E7/O2: bitwy w obozie gracza ze scenografia", "brak w logu", "INFO (autotest nie gra bitew w obozie gracza; T2 - test Jeffa)", None)
+
+
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
@@ -6650,7 +6687,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
         start = alld[0] if alld else 0
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu

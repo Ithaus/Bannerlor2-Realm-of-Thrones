@@ -3832,9 +3832,9 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float ArmorOutlierTolerance { get; set; } = 1.30f;
 
-        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "EXPERIMENTAL: attacked while encamped, the field battle gets your camp dressed on it - tents, fire, torches around your line (unknown prefabs are skipped and logged)")]
+        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "attacked while encamped, the field battle gets your camp dressed on it - tents, a campfire, torches and a fence behind your line, set up once your men are deployed; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged")]
         [SettingPropertyGroup("A night's rest")]
-        public bool CampBattlePropsEnabled { get; set; } = false;
+        public bool CampBattlePropsEnabled { get; set; } = true;
 
         [SettingPropertyBool("Hideout Alarm Enabled", HintText = "a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away")]
         [SettingPropertyGroup("A night's rest")]
