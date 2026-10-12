@@ -94,7 +94,8 @@ Uzycie (Python 3, tylko odczyt):
                     (<= +2%), cykle "brak surowca [ruda" <= 584/d (srednio d31-until, linia "Warsztaty"), potkniecia 0; las okregu, targ, zloto, braki - INFO.
                     Blok E6/W1 (216, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W1-1..W1-8 - linia startowa "Receptury (216)" i linie ksiegi "Towary:":
                     WLACZONE, zadna linia z mniejszym wsadem niz gra, linie z welny, lnu i skor zmienione, potkniecia 0; len i welna - co najmniej jeden z miesiecy
-                    2-4 bez wzrostu zapasu (gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92); kolejka odziezy wojska - INFO.
+                    2-4 bez wzrostu zapasu (gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92), kolejka odziezy wojska
+                    (czeka: skora + sukno + plotno) d90 -> until bez wzrostu (<= +2%, gdy okno siega d92).
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3759,7 +3760,8 @@ def etap5_w1(rep, lines, start, until):
     ostatniej w logu) i linie ksiegi "Towary: dzien N - <towar> (W d): zapas S" (dzien = doba gry - 1, okno doby kampanii 1-until jak etap5_main).
     Wiazace: WLACZONE, zadna linia z mniejszym wsadem niz receptura gry, dla welny, lnu i skor co najmniej jedna linia zmieniona, potkniecia 0;
     len i welna - dla kazdego co najmniej jeden z miesiecy 2-4 (d29-56, d57-84, d85-112) bez wzrostu zapasu (gdy okno siega d112, inaczej INFO);
-    skora i plotno - srednia zmiana zapasu d91-until >= -10/d (gdy okno siega d92, inaczej INFO); kolejka odziezy wojska (150) - INFO."""
+    skora i plotno - srednia zmiana zapasu d91-until >= -10/d (gdy okno siega d92, inaczej INFO); kolejka odziezy wojska (150, skora + sukno + plotno
+    "czeka") d90 -> until bez wzrostu (<= +2%, gdy okno siega d92, inaczej INFO)."""
     st = [s for s in lines if s.startswith("Receptury (216):")]
     if not st:
         rep.add("W1-1: linia startowa Receptury (216)", "brak linii startowej", "jest od wgrania E6/W1", None)
@@ -3818,8 +3820,19 @@ def etap5_w1(rep, lines, start, until):
         def wait(s):
             i = s.find("| czeka: ")
             return s[i + 9:s.find(" (", i)] if i >= 0 else "?"
+
+        def wsum(s):
+            return sum(float(v) for v in re.findall(r"(?:skora|sukno|plotno) (\d+(?:\.\d+)?)", wait(s)))
+        # recenzja 216: test projektu "odziez wojska - kolejka nie rosnie" wiazacy - okno jak W1-6 (od d90, po pierwszej decyzji kroku W3 d56),
+        # tolerancja +2% jak R1-9; okno krotsze niz d92 - INFO
         f0, f1 = min(clo), max(clo)
-        rep.add("W1-7: kolejka odziezy wojska (czeka)", f"d{f0}: {wait(clo[f0])}; d{f1}: {wait(clo[f1])}", "INFO (projekt: kolejka nie rosnie)", None)
+        wd = sorted(k for k in clo if k >= 90)
+        if len(wd) >= 2 and wd[-1] >= 92:
+            a, b2 = wsum(clo[wd[0]]), wsum(clo[wd[-1]])
+            rep.add("W1-7: kolejka odziezy wojska (czeka, d90 -> until)", f"d{wd[0]}: {wait(clo[wd[0]])}; d{wd[-1]}: {wait(clo[wd[-1]])} (razem {a:.0f} -> {b2:.0f})",
+                    "bez wzrostu (<= +2%)", b2 <= a * 1.02 + 0.5)
+        else:
+            rep.add("W1-7: kolejka odziezy wojska (czeka)", f"d{f0}: {wait(clo[f0])}; d{f1}: {wait(clo[f1])}", "bez wzrostu d90 -> until (gdy okno siega d92)", None)
     rep.add("W1-8: receptury - wszystkie linie z zakresu (ostatnia sesja)", "; ".join(f"{p[0]}: {p[3]} -> {p[4]}" for p in pairs) or "brak", "INFO", None)
 
 
