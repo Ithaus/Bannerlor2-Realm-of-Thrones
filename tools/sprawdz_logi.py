@@ -7484,6 +7484,7 @@ _E7C_ALLOWED = {
     "Wayfinder.cs": (2, "dlawienie komunikatu drogi"),
     "QuartermasterLaw.cs": (4, "dlawienie okrzyku kwatermistrza"),
     "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
+    "MapRoadsProbe.cs": (3, "widok proby drog E7/D0 (OnVisualTick realDt: czas klatki do histogramu, dlawienie 4 x na sekunde, podsumowanie; klucz MapRoadsProbeEnabled domyslnie false)"),
     "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
     "HideoutPurge.cs": (2, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne"),
 }
