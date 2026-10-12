@@ -4524,6 +4524,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownFolkMode { get; set; } = 1;
 
+        [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool Stage6MeasureLog { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Craft By Realm", HintText = "each realm's smiths make the arms and armour of their own land - their own patterns first, then a kindred realm's, then those common to their region and their side of the sea, never a great house's livery from another realm and never a unique piece; what a realm cannot make, the traders bring. The realm of a town is the one of its land, not of its current lord. Your own forge is not limited (off = town workshops make anything of the town's culture and, when they have none, any foreign pattern, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool WorkshopCraftByRealm { get; set; } = true;
+
+        [SettingPropertyBool("Workshops Follow Inputs", HintText = "a town's trade workshop is the kind its own villages feed - no wine press where no grapes grow: when the game picks the trade of a workshop (at the start of a new campaign, after a bankruptcy, when you lose a workshop) a trade whose raw goods neither grow in the town's villages nor come by a materials contract is all but never chosen, unless no trade has them. Workshops already working and your own workshops are not changed (off = the game's choice, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool WorkshopsFollowInputs { get; set; } = true;
+
+        [SettingPropertyBool("Sand Steeds In Dorne", HintText = "new campaign only: camels are bred only in Qarth - the desert studs of Dorne and of the Free Cities breed horses of the same kind (riding, war, pack) in their place, and the studs of Qarth breed camels in place of some of their horses; the same number of animals in all (off = the game's studs, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool SandSteedsInDorne { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5654,6 +5670,10 @@ namespace Armoury
             s.ShipTradeThroughPort = ShipTradeThroughPort;
             s.ShipPrizesToPort = ShipPrizesToPort;
             s.TownFolkMode = TownFolkMode;
+            s.Stage6MeasureLog = Stage6MeasureLog;
+            s.WorkshopCraftByRealm = WorkshopCraftByRealm;
+            s.WorkshopsFollowInputs = WorkshopsFollowInputs;
+            s.SandSteedsInDorne = SandSteedsInDorne;
         }
 
         internal static void Apply()

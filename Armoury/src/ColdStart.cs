@@ -145,12 +145,16 @@ namespace Armoury
             if (days <= 0f) return;
             // pula wyrobow cechow: kultura -> cech -> tier -> sztuki
             var pool = new Dictionary<string, Dictionary<string, List<ItemObject>[]>>();
+            // E6/M1 (207): dorobek startowy wedlug lancucha krainy miasta (pula "@kraina", bez neutralnej doklejki - neutralne sa w lancuchu na poziomie 4)
+            bool m1 = CraftRealm.Active;
+            var chainAll = m1 ? new List<KeyValuePair<ItemObject, string>>() : null;
             foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
             {
                 if (it == null || it.NotMerchandise || !SupplyDemand.Equipmentish(it)) continue;
                 if (ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || WorkshopLaw.Forbidden(it)) continue;
                 if (WorkshopLaw.ChooseByShortage && WorkshopLaw.CivilianOnly(it)) continue;   // 174.1: stroj mieszczan bez zolnierza (ladys_shoe) nie jest dorobkiem cechow zbrojnych
                 string g = GuildOfCategory(it); if (g == null) continue;
+                if (m1) { chainAll.Add(new KeyValuePair<ItemObject, string>(it, g)); continue; }
                 string c = it.Culture == null || it.Culture.StringId == "neutral_culture" ? "" : it.Culture.StringId;
                 Dictionary<string, List<ItemObject>[]> byG;
                 if (!pool.TryGetValue(c, out byG)) pool[c] = byG = new Dictionary<string, List<ItemObject>[]>();
@@ -169,6 +173,23 @@ namespace Armoury
                 if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null) continue;
                 float hands = Settings.Current.ColdStartLegacyHands ? WorkshopLaw.LegacyTownHands(st.Town) : WorkshopLaw.TownHands(st.Town);   // 174.3: wiecej rzemieslnikow to nie wiecej zapasu z niczego
                 string cul = st.Culture != null ? st.Culture.StringId : "";
+                if (m1)
+                {
+                    string realm = CraftRealm.RealmOfTown(st.Town);
+                    cul = "@" + realm;
+                    if (!pool.ContainsKey(cul))
+                    {
+                        var byG0 = new Dictionary<string, List<ItemObject>[]>();
+                        foreach (var kv in chainAll)
+                        {
+                            if (!CraftRealm.Allowed(realm, kv.Key)) continue;
+                            List<ItemObject>[] byT0;
+                            if (!byG0.TryGetValue(kv.Value, out byT0)) { byT0 = new List<ItemObject>[6]; for (int i = 0; i < 6; i++) byT0[i] = new List<ItemObject>(); byG0[kv.Value] = byT0; }
+                            byT0[Math.Max(0, Math.Min(5, (int)kv.Key.Tier))].Add(kv.Key);
+                        }
+                        pool[cul] = byG0;
+                    }
+                }
                 int made = 0;
                 foreach (var g in guilds)
                 {

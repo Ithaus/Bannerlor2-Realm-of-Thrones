@@ -512,6 +512,10 @@ namespace Armoury
                 var pool = new List<ItemObject>(); var foreign = new List<ItemObject>();
                 var seen = new HashSet<ItemObject>();
                 bool byShort = ChooseByShortage;
+                // E6/M1 (207): kowale krainy kuja wedlug lancucha (wlasne -> pokrewne -> region -> wspolne -> nic), bez wzorow rodowych innych krain,
+                // bez unikatow; pusta linia NIE bierze juz calej obcej puli (rece przechodza do innej linii cechu). Wylaczone - jak dotad.
+                bool m1 = CraftRealm.Active;
+                string realm = m1 ? CraftRealm.RealmOfTown(town) : null;
                 if (dict != null)
                     foreach (var p in new[] { production })
                     {
@@ -524,12 +528,13 @@ namespace Armoury
                             {
                                 if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || Forbidden(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
                                 if (byShort && CivilianOnly(it)) { _civSkipped++; continue; }   // 174.1: stroj mieszczan (ladys_shoe) - nie wyrob linii zbrojnej
-                                bool local = it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture;
+                                bool local = m1 ? CraftRealm.Allowed(realm, it) : (it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture);
                                 (local ? pool : foreign).Add(it);
                             }
                         }
                     }
-                if (pool.Count == 0) pool = foreign;
+                if (m1) CraftRealm.NoteLine(pool.Count == 0 && foreign.Count > 0);   // E6/M1: linia-doba bez wzoru krainy (licznik "cykle utracone przez M1")
+                else if (pool.Count == 0) pool = foreign;
                 // najwyzej WorkshopCandidates sztuk do rankingu (losowa probka, zeby dzien nie stal)
                 int max = Math.Max(5, Settings.Current.WorkshopCandidates);
                 while (pool.Count > max) pool.RemoveAt(MBRandom.RandomInt(pool.Count));
@@ -1477,9 +1482,11 @@ namespace Armoury
         }
 
         /// <summary>Losowanie wyrobu z kategorii: wegiel (kategoria drewna) i sztabki (kategoria zelaza)
-        /// tylko z wytopu - warsztat i kopalnia daja surowiec, nie gotowa stal (w tym valyrianska).</summary>
-        public static void RandomItemPostfix(ref EquipmentElement __result)
+        /// tylko z wytopu - warsztat i kopalnia daja surowiec, nie gotowa stal (w tym valyrianska).
+        /// E6/M1 (207): wyrob uzbrojenia wedlug lancucha krainy miasta (CraftRealm.FilterRandom - rozlaczne z zamiana wegla i sztabek).</summary>
+        public static void RandomItemPostfix(WorkshopsCampaignBehavior __instance, ItemCategory __0, Town __1, ref EquipmentElement __result)
         {
+            CraftRealm.FilterRandom(__instance, __0, __1, ref __result);
             try
             {
                 var s = Settings.Current;

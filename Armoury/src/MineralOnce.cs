@@ -60,6 +60,9 @@ namespace Armoury
         private static int _cropStumbles, _hotKnown = -1;                               // _hotKnown: ile kultur goracego poludnia zna gra (-1 = nie liczone)
         private static bool _wired;                  // postfiks wpiety (filtr klimatu dziala takze bez czesci mineralow)
 
+        /// <summary>E6/M2 (208): postfiks GetProductions wpiety - CamelLaw przerabia liste produkcji wsi tylko wtedy (inaczej mnoznik gospodarza bylby z niczego).</summary>
+        internal static bool Wired { get { return _wired; } }
+
         internal static void Reset()
         {
             lock (Gate) { _seen.Clear(); _dup.Clear(); _lists = 0; _removed = 0; _stumbles = 0; _papyrusOff.Clear(); _cropStumbles = 0; _hotKnown = -1; }
@@ -140,7 +143,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null) return;
                 bool crop = s.CropClimateFilter, mineral = _patched && s.MineralsCountedOnce;   // T8: dwie osobne bramki
-                if (!crop && !mineral) return;
+                bool camel = CamelLaw.On;                                                     // E6/M2 (208): wielblady tylko w Qarthu - trzecia bramka (nowa kampania)
+                if (!crop && !mineral && !camel) return;
                 var list = __result;
                 if (list == null) return;
                 v = VillageOf(__0);
@@ -156,6 +160,12 @@ namespace Armoury
                         if (ck <= 3) Log.Error("MineralOnce.CropFilter", cex);
                         list = __result;
                     }
+                }
+                if (camel)
+                {
+                    // E6/M2 (208): po filtrze klimatu, przed petla powtorzen; potkniecie - lista bez zmian wielbladow i bez mnoznika gospodarza
+                    try { list = CamelLaw.ListFilter(v, list); }
+                    catch (Exception mex) { CamelLaw.Forget(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.CamelLaw", mex); }
                 }
                 if (!mineral) { __result = list; return; }
                 int n = list.Count;
@@ -198,6 +208,7 @@ namespace Armoury
                 // potkniecie na jednej wsi: jej lista zostaje taka, jaka dal BK (z powtorzeniem), wiec mnoznik tej wsi musi zniknac
                 int k;
                 lock (Gate) { k = ++_stumbles; if (v != null) _dup.Remove(v); }
+                CamelLaw.Forget(v);                        // E6/M2: lista z BK (z wielbladami) - bez mnoznika gospodarza
                 if (k <= 3) Log.Error("MineralOnce.Postfix", ex);
             }
         }
