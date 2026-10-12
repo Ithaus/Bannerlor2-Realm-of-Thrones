@@ -1235,3 +1235,6 @@ PRZEKAZANIE 12.10 06:30 UTC). Kopie: *.dll.bak-2026-10-12-przed-noc32 + D:\Backu
 ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841d7, CrashScribe 842f64a4.
 
 - (09:20 UTC 12.10) **Jeff: wojsko - 1.b WYZSZY PODATEK** (danina korony od nadwyzki kies wsi LaySubsidyVillageShare 0.015 -> 0.025; korona oddaje rentami na wojsko). Bez pomostu (a). Do kodu (zmiana domyslnej, klucza nie ma w Armoury.json Jeffa) w nastepnej paczce razem z E6 porcja 2, test wspolny.
+- (09:30 UTC 12.10) **Jeff (raport, pytania 2-5):** (2) prog rownania krain "0.1% albo 200 ludzi, co wieksze" - OK; (3) pojmujacy zabiera graczowi takze CALE juki (towar,
+  jedzenie) - TAK (dzis 75% z RC); (4) zaulki w oblezonym miescie wstrzymane jak inne oplaty - TAK, jedna zasada; (5) ubogie miasta - sprawdzimy w biegu rocznym; (6) Jeff prosi
+  o wyjasnienie. Do kodu w nastepnej paczce (z E6 porcja 2 i danina wsi 2.5%).
