@@ -26,7 +26,10 @@ namespace Armoury
     ///  (1) HorsesDieOnlyKilled. MISJA: HorseFateMission (MissionLogic) pamieta konia kazdego jezdzca-szeregowego partii przy spawnie (OnAgentBuild - kon jest
     ///      juz posadzony, G Mission.SpawnAgent: SetMountAgentBeforeBuild przed OnAgentBuild jezdzca); agent konia zabity (AgentState.Killed) = zgon; po zwrotach
     ///      DTE (postfiks DynamicTroopMissionLogic.OnEndMission) ten przedmiot schodzi ze zbrojowni wlasciciela (gracz: ArmyArmory, AI: PartyArmories);
-    ///      nie ma go tam (lup DTE zabojcy, pokonany bez zwrotu) - licznik "poza zbrojownia wlasciciela". Obserwacja W: misja z zabitymi jezdzcami ->
+    ///      nie ma go tam - licznik "poza zbrojownia wlasciciela". Recenzja: jezdziec POKONANEJ strony zdjety z pola przed rozliczeniem DTE (prefiks
+    ///      FinalizeMission - ta sama regula isDefeated) - DTE nie oddaje mu rynsztunku (kon zszedl ze zbrojowni przy spawnie), a zabojca dostaje kopie
+    ///      (LootedItems, DropRate 1) - padly kon schodzi u zabojcy, bez kopii tylko zgon (dotad K1 zdejmowal pokonanemu innego, zywego konia, a padly zyl
+    ///      u zabojcy). Obserwacja W: misja z zabitymi jezdzcami ->
     ///      W = zgony koni / zgony jezdzcow (suma z zapisu, arm_horsefate). AUTOBITWA (prefiks DTE EveryoneCampaignBehavior.OnMapEventEnded - po poleglych
     ///      MapEvent, przed rozdaniem lupu; bitwa z misja pominieta): za zabitych konnych szeregowych (DiedInBattle, IsMounted) partia AI traci
     ///      zabici x W x udzial jezdzcow z koniem (Stables.Balance sprzed bitwy - zabici dopisani) koni ze zbrojowni (ulamek - losowanie; rycerz: bojowy,
@@ -68,10 +71,17 @@ namespace Armoury
         private static string _pending;
 
         // ------------------------------------------------------------ misja
-        private sealed class MDeath { public MobileParty Party; public ItemObject Item; }
+        private sealed class MDeath { public MobileParty Party; public ItemObject Item; public Agent Rider; public BattleSideEnum Side; }
         private static readonly List<MDeath> _mDeaths = new List<MDeath>();
         private static int _mRiders, _mHorses;
         private static MapEvent _missionEvent;
+        // recenzja K1: DTE FinalizeMission nie oddaje POKONANEJ stronie rynsztunku jezdzcow zdjetych z pola przed rozliczeniem (kon zszedl ze zbrojowni przy
+        // spawnie), a zabojca (strona zwycieska) dostaje kopie (LootedItems, DropRate) - padly kon zylby u zabojcy, a K1 zdejmowal pokonanemu innego, zywego konia
+        private static readonly Dictionary<Agent, MobileParty> _mRiderGone = new Dictionary<Agent, MobileParty>();   // jezdziec zdjety z pola przed rozliczeniem DTE -> zabojca (strona przeciwna) albo null
+        private static BattleSideEnum _mDefeated = BattleSideEnum.None;   // strona pokonana w rozliczeniu DTE (prefiks FinalizeMission, ten sam MissionResult)
+        private static bool _mFinalized;
+        private static System.Reflection.FieldInfo _fDteEnded, _fDteInit;
+        private static Type _tDteLogic;
 
         // ------------------------------------------------------------ migawki bitwy
         private sealed class Win { public PartyBase Party; public double W; }
@@ -81,14 +91,14 @@ namespace Armoury
         private sealed class BkSnap { public List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>> Rows; }
 
         // ------------------------------------------------------------ wpiecie
-        private static string _wMission = "nie wpieta", _wDte = "nie wpiete", _wBk = "nie wpiete", _wGift = "nie wpiete";
+        private static string _wMission = "nie wpieta", _wDte = "nie wpiete", _wBk = "nie wpiete", _wGift = "nie wpiete", _wFin = "nie wpiete";
         private static bool _endWired;
         private static System.Reflection.FieldInfo _playerArmory;
         [ThreadStatic] private static bool _giftRun;
 
         // ------------------------------------------------------------ liczniki doby
         private static readonly long[] _dDeadMission = new long[Cats], _dDeadAuto = new long[Cats];
-        private static long _dMissionOutside, _dMissionRiders, _dMissionHorses, _dObsNew, _dAutoKilled, _dAutoExp, _dAutoNoHorse, _dAutoParties;
+        private static long _dMissionOutside, _dMissionKiller, _dMissionGone, _dMissionRiders, _dMissionHorses, _dObsNew, _dAutoKilled, _dAutoExp, _dAutoNoHorse, _dAutoParties;
         private static long _dLootMoved, _dLootCopies, _dLootCopiesMissing;
         private static long _dSpWinPcs, _dSpWinHorses, _dSpShelfPcs, _dSpShelfHorses, _dSpArmHorses, _dSpOverflow, _dSpLeft, _dSpParties, _dSpNoWhere, _dSpSkip;
         private static long _dBkPcs, _dBkHorses;
@@ -102,13 +112,14 @@ namespace Armoury
         {
             _obs = _obsRiders = _obsHorses = 0; _vetPool.Clear(); _pending = null;
             _mDeaths.Clear(); _mRiders = _mHorses = 0; _missionEvent = null; _beaten.Clear();
+            _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
             ClearDay(); _stumbles = 0; _errSites.Clear(); _giftRun = false;
         }
 
         private static void ClearDay()
         {
             Array.Clear(_dDeadMission, 0, Cats); Array.Clear(_dDeadAuto, 0, Cats);
-            _dMissionOutside = _dMissionRiders = _dMissionHorses = _dObsNew = _dAutoKilled = _dAutoExp = _dAutoNoHorse = _dAutoParties = 0;
+            _dMissionOutside = _dMissionKiller = _dMissionGone = _dMissionRiders = _dMissionHorses = _dObsNew = _dAutoKilled = _dAutoExp = _dAutoNoHorse = _dAutoParties = 0;
             _dLootMoved = _dLootCopies = _dLootCopiesMissing = 0;
             _dSpWinPcs = _dSpWinHorses = _dSpShelfPcs = _dSpShelfHorses = _dSpArmHorses = _dSpOverflow = _dSpLeft = _dSpParties = _dSpNoWhere = _dSpSkip = 0;
             _dBkPcs = _dBkHorses = 0;
@@ -231,6 +242,9 @@ namespace Armoury
             if (m == null || !DieOn || Campaign.Current == null) return;
             try
             {
+                // dane poprzedniej misji bez rozliczenia (nie powinno sie zdarzyc - HorseFateMission rozlicza misje bez logiki DTE): droga wlasciciela, potem stan od nowa
+                if (_mDeaths.Count > 0 || _mRiders > 0) { _mDefeated = BattleSideEnum.None; ApplyMission(); }
+                _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
                 m.AddMissionBehavior(new HorseFateMission());
                 var me = MapEvent.PlayerMapEvent;
                 if (me != null) _missionEvent = me;
@@ -239,63 +253,117 @@ namespace Armoury
             catch (Exception e) { Stumble("OnMissionInit", e); }
         }
 
-        internal static void NoteMissionHorse(MobileParty owner, ItemObject it)
+        internal static void NoteMissionHorse(MobileParty owner, ItemObject it, Agent rider, BattleSideEnum side)
         {
             if (owner == null || it == null) return;
             _mHorses++;
-            _mDeaths.Add(new MDeath { Party = owner, Item = it });
+            _mDeaths.Add(new MDeath { Party = owner, Item = it, Rider = rider, Side = side });
         }
 
         internal static void NoteMissionRider() { _mRiders++; }
 
+        /// <summary>Jezdziec zdjety z pola (zabity, ranny, rozbity, usuniety) przed rozliczeniem DTE: zabojca ze strony przeciwnej (zabity/ranny) albo null.</summary>
+        internal static void NoteMissionRiderGone(Agent rider, MobileParty killer)
+        {
+            if (rider == null || _mFinalized) return;   // po rozliczeniu DTE rynsztunek juz wrocil (jezdziec byl czynny) - droga wlasciciela
+            _mRiderGone[rider] = killer;
+        }
+
+        /// <summary>Prefiks DTE DynamicTroopMissionLogic.FinalizeMission (prywatna; pierwsze wywolanie robi zwroty): strona pokonana wedlug tej samej reguly co DTE
+        /// (isDefeated: bitwa rozstrzygnieta, PlayerDefeated - strona gracza, PlayerVictory - strona przeciwna). Nie rzuca.</summary>
+        public static void FinalizePrefix(object __instance, MissionResult __0)
+        {
+            try
+            {
+                if (_mFinalized || __instance == null) return;
+                if (_fDteEnded != null && (bool)_fDteEnded.GetValue(__instance)) return;     // kolejne wywolanie - DTE nic juz nie oddaje
+                if (_fDteInit != null && !(bool)_fDteInit.GetValue(__instance)) return;      // rozdzielacze nie ruszyly - DTE nic nie zdjal ani nie odda (droga wlasciciela)
+                var mb = __instance as MissionBehavior;
+                var team = mb != null && mb.Mission != null ? mb.Mission.PlayerTeam : null;
+                if (team == null || Campaign.Current == null || Campaign.Current.MainParty == null) return;
+                _mFinalized = true;
+                if (__0 == null || !__0.BattleResolved) _mDefeated = BattleSideEnum.None;
+                else if (__0.PlayerDefeated) _mDefeated = team.Side;
+                else if (__0.PlayerVictory) _mDefeated = team.Side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+                else _mDefeated = BattleSideEnum.None;
+            }
+            catch (Exception e) { Stumble("FinalizePrefix", e); }
+        }
+
         /// <summary>Postfiks DTE DynamicTroopMissionLogic.OnEndMission (po zwrotach) albo koniec misji bez DTE: zgony koni schodza ze zbrojowni wlascicieli.</summary>
         public static void EndMissionPostfix() { ApplyMission(); }
 
-        internal static void MissionEnded() { if (!_endWired) ApplyMission(); }
+        /// <summary>HorseFateMission.OnEndMission: misja bez logiki DTE (albo DTE bez wpiecia) - rozliczenie od razu (DTE nie ruszal zbrojowni); z logika DTE - postfiks DTE.</summary>
+        internal static void MissionEnded(Mission m)
+        {
+            bool dte = false;
+            try
+            {
+                if (_endWired && _tDteLogic != null && m != null)
+                    foreach (var b in m.MissionBehaviors) if (b != null && _tDteLogic.IsInstanceOfType(b)) { dte = true; break; }
+            }
+            catch { dte = _endWired; }
+            if (!dte) { _mDefeated = BattleSideEnum.None; ApplyMission(); }
+        }
+
+        /// <summary>Zdejmuje jedna sztuke konia ze zbrojowni partii (gracz: ArmyArmory, AI: PartyArmories). true - zdjeta.</summary>
+        private static bool TakeOne(MobileParty p, ItemObject it, HashSet<MobileParty> touched, ref ItemRoster pa)
+        {
+            if (p == null || it == null) return false;
+            if (p == MobileParty.MainParty)
+            {
+                if (pa == null) pa = PlayerArmory();
+                if (pa == null) return false;
+                for (int i = 0; i < pa.Count; i++)
+                {
+                    var el = pa.GetElementCopyAtIndex(i);
+                    if (el.Amount <= 0 || el.EquipmentElement.Item != it) continue;
+                    pa.AddToCounts(el.EquipmentElement, -1);
+                    return true;
+                }
+                return false;
+            }
+            var arm = ArmOf(p);
+            int c;
+            if (arm == null || !arm.TryGetValue(it, out c) || c <= 0) return false;
+            if (c <= 1) arm.Remove(it); else arm[it] = c - 1;
+            touched.Add(p);
+            return true;
+        }
 
         private static void ApplyMission()
         {
-            if (_mDeaths.Count == 0 && _mRiders == 0) return;
             try
             {
+                if (_mDeaths.Count == 0 && _mRiders == 0) return;
                 var touched = new HashSet<MobileParty>();
                 ItemRoster pa = null;
                 foreach (var d in _mDeaths)
                 {
-                    bool ok = false;
+                    int cat = Cat(d.Item);
                     try
                     {
-                        if (d.Party == MobileParty.MainParty)
+                        MobileParty killer = null;
+                        bool gone = d.Rider != null && _mRiderGone.TryGetValue(d.Rider, out killer);
+                        if (gone && _mDefeated != BattleSideEnum.None && d.Side == _mDefeated)
                         {
-                            if (pa == null) pa = PlayerArmory();
-                            if (pa != null)
-                                for (int i = 0; i < pa.Count; i++)
-                                {
-                                    var el = pa.GetElementCopyAtIndex(i);
-                                    if (el.Amount <= 0 || el.EquipmentElement.Item != d.Item) continue;
-                                    pa.AddToCounts(el.EquipmentElement, -1); ok = true; break;
-                                }
+                            // pokonany: DTE nie oddal mu rynsztunku jezdzca zdjetego z pola (kon zszedl z jego zbrojowni przy spawnie); kopia konia poszla zabojcy
+                            // jako lup z ciala - padly kon schodzi u zabojcy; bez kopii (zabojca spoza bitwy, DropRate) - kon juz poza stanem, tylko zgon
+                            if (killer != null && TakeOne(killer, d.Item, touched, ref pa)) _dMissionKiller++;
+                            else _dMissionGone++;
+                            _dDeadMission[cat]++;
+                            continue;
                         }
-                        else
-                        {
-                            var arm = ArmOf(d.Party);
-                            int c;
-                            if (arm != null && arm.TryGetValue(d.Item, out c) && c > 0)
-                            {
-                                if (c <= 1) arm.Remove(d.Item); else arm[d.Item] = c - 1;
-                                ok = true; touched.Add(d.Party);
-                            }
-                        }
+                        if (TakeOne(d.Party, d.Item, touched, ref pa)) _dDeadMission[cat]++; else _dMissionOutside++;
                     }
                     catch (Exception e) { Stumble("ApplyMission(kon)", e); }
-                    if (ok) _dDeadMission[Cat(d.Item)]++; else _dMissionOutside++;
                 }
                 if (_mRiders > 0) { _obs++; _obsRiders += _mRiders; _obsHorses += _mHorses; _dObsNew++; }
                 _dMissionRiders += _mRiders; _dMissionHorses += _mHorses;
                 foreach (var mp in touched) HorseState.Refresh(mp);
             }
             catch (Exception e) { Stumble("ApplyMission", e); }
-            finally { _mDeaths.Clear(); _mRiders = _mHorses = 0; }
+            finally { _mDeaths.Clear(); _mRiders = _mHorses = 0; _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false; }
         }
 
         /// <summary>W z misji: do HorseDeathRatioMinBattles obserwacji 1.0.</summary>
@@ -932,6 +1000,7 @@ namespace Armoury
                   .Append(": konie gina zabite ").Append(yn(DieOn)).Append(", dobytek rozbitych ").Append(yn(SpoilsOn)).Append(", kon weterana ").Append(yn(VetHorseOn))
                   .Append(", dary z polki siedziby ").Append(yn(SeatOn)).Append(", zamiany ROT ").Append(yn(s != null && s.TroopSwapNeedsHorse && RotHorseGuard.AllOn))
                   .Append(" | polegle w misji (zdjete ze zbrojowni) ").Append(Row(_dDeadMission)).Append(", poza zbrojownia wlasciciela ").Append(_dMissionOutside)
+                  .Append(", pokonani bez zwrotu DTE: kopia lupu u zabojcy zdjeta ").Append(_dMissionKiller).Append(", kon zszedl juz przy wejsciu w pole ").Append(_dMissionGone)
                   .Append(" (zgony koni ").Append(_dMissionHorses).Append(" / jezdzcow ").Append(_dMissionRiders).Append(", nowych obserwacji ").Append(_dObsNew).Append(")")
                   .Append(" | polegle w autobitwie ").Append(Row(_dDeadAuto)).Append(" (zabitych jezdzcow ").Append(_dAutoKilled).Append(", bez konia ok. ").Append(_dAutoNoHorse)
                   .Append(", wylosowanych zgonow ").Append(_dAutoExp).Append(", partii ").Append(_dAutoParties).Append(")")
@@ -951,7 +1020,7 @@ namespace Armoury
                   .Append(", brak koni ").Append(_dGiftNoHorse).Append(", brak zywnosci ").Append(_dGiftNoFood).Append(", bez siedziby ").Append(_dGiftNoSeat)
                   .Append(", zloto do siedzib ").Append(_dGiftGold).Append(", z niczego 0")
                   .Append(" | zamiany ROT na konnego: z koniem ").Append(_dRotHorse).Append(", na pieszego ").Append(_dRotFoot).Append(", zostal konny bez konia ").Append(_dRotKeep)
-                  .Append(" | wpiecie: misja ").Append(_wMission).Append(", okno DTE ").Append(_wDte).Append(", BK karawany ").Append(_wBk).Append(", dary ").Append(_wGift)
+                  .Append(" | wpiecie: misja ").Append(_wMission).Append(", okno DTE ").Append(_wDte).Append(", BK karawany ").Append(_wBk).Append(", rozliczenie DTE ").Append(_wFin).Append(", dary ").Append(_wGift)
                   .Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (razem ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
             }
@@ -1049,7 +1118,14 @@ namespace Armoury
             {
                 var tLogic = AccessTools.TypeByName("DynamicTroopEquipmentReupload.DynamicTroopMissionLogic");
                 var m = tLogic != null ? AccessTools.Method(tLogic, "OnEndMission") : null;
-                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HorseFate), nameof(EndMissionPostfix))); _endWired = true; }
+                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HorseFate), nameof(EndMissionPostfix))); _endWired = true; _tDteLogic = tLogic; }
+                // recenzja K1: strona pokonana w rozliczeniu DTE (bez wpiecia - droga wlasciciela jak dotad)
+                var fin = tLogic != null ? AccessTools.Method(tLogic, "FinalizeMission") : null;
+                _fDteEnded = tLogic != null ? AccessTools.Field(tLogic, "_isMissionEnded") : null;
+                _fDteInit = tLogic != null ? AccessTools.Field(tLogic, "_areDistributorsInitialized") : null;
+                if (fin != null && _fDteEnded != null && _fDteInit != null)
+                { h.Patch(fin, prefix: new HarmonyMethod(typeof(HorseFate), nameof(FinalizePrefix)) { priority = Priority.First }); _wFin = "wpiete"; }
+                else _wFin = "BRAK (DTE FinalizeMission) - padle konie pokonanych droga wlasciciela";
             }
             catch (Exception e) { Log.Error("HorseFate.ApplyAll(DTE koniec misji)", e); }
             try
@@ -1082,7 +1158,7 @@ namespace Armoury
     /// <summary>E6/K1 (211): zgony koni w misji - kon kazdego jezdzca-szeregowego partii pamietany przy spawnie; agent konia zabity = zgon (HorseFate).</summary>
     internal sealed class HorseFateMission : MissionLogic
     {
-        private sealed class Rec { public MobileParty Party; public ItemObject Item; }
+        private sealed class Rec { public MobileParty Party; public ItemObject Item; public Agent Rider; public BattleSideEnum Side; }
         private readonly Dictionary<Agent, Rec> _mounts = new Dictionary<Agent, Rec>();
         private readonly HashSet<Agent> _riders = new HashSet<Agent>();
 
@@ -1106,7 +1182,7 @@ namespace Armoury
                 if (mp == null) return;
                 var it = agent.SpawnEquipment[EquipmentIndex.Horse].Item;
                 if (it == null) return;
-                _mounts[agent.MountAgent] = new Rec { Party = mp, Item = it };
+                _mounts[agent.MountAgent] = new Rec { Party = mp, Item = it, Rider = agent, Side = agent.Team != null ? agent.Team.Side : BattleSideEnum.None };
                 _riders.Add(agent);
             }
             catch { }
@@ -1122,19 +1198,28 @@ namespace Armoury
                     Rec r;
                     if (_mounts.TryGetValue(affectedAgent, out r))
                     {
-                        if (agentState == AgentState.Killed) HorseFate.NoteMissionHorse(r.Party, r.Item);
+                        if (agentState == AgentState.Killed) HorseFate.NoteMissionHorse(r.Party, r.Item, r.Rider, r.Side);
                         _mounts.Remove(affectedAgent);
                     }
                     return;
                 }
-                if (_riders.Remove(affectedAgent) && agentState == AgentState.Killed) HorseFate.NoteMissionRider();
+                if (_riders.Remove(affectedAgent))
+                {
+                    if (agentState == AgentState.Killed) HorseFate.NoteMissionRider();
+                    // recenzja K1: zabity/ranny jezdziec - kopie jego rynsztunku DTE daje partii zabojcy ze strony przeciwnej (LootedItems); rozbity/usuniety - bez kopii
+                    MobileParty killer = null;
+                    if ((agentState == AgentState.Killed || agentState == AgentState.Unconscious) && affectorAgent != null && affectorAgent.Team != null
+                        && affectedAgent.Team != null && affectorAgent.Team.Side != affectedAgent.Team.Side)
+                        killer = PartyOf(affectorAgent);
+                    HorseFate.NoteMissionRiderGone(affectedAgent, killer);
+                }
             }
             catch { }
         }
 
         protected override void OnEndMission()
         {
-            try { HorseFate.MissionEnded(); } catch { }
+            try { HorseFate.MissionEnded(Mission); } catch { }
             _mounts.Clear(); _riders.Clear();
             base.OnEndMission();
         }

@@ -1628,8 +1628,8 @@ namespace Armoury
             try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); }   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
             try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); }   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
             try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); }   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)
-            try { HorseState.Daily(); } catch (Exception e) { Log.Error("HorseState.Daily", e); }
-            try { HorseFate.Daily(); } catch (Exception e) { Log.Error("HorseFate.Daily", e); }   // E6/K1 (211): pula koni weteranow (nadmiar na polki), linia "Konie - smierc, lup, dobytek (E6/K1)" i zerowanie dnia - PO Stage6Measure (HorseBook czyta liczniki K1)   // E6/K0 (209): stan koni partii od nowa (po ksiegach dnia, PO Stage6Measure) i linia "Marsz - konie partii (E6/K0)"
+            try { HorseState.Daily(); } catch (Exception e) { Log.Error("HorseState.Daily", e); }   // E6/K0 (209): stan koni partii od nowa (po ksiegach dnia, PO Stage6Measure) i linia "Marsz - konie partii (E6/K0)"
+            try { HorseFate.Daily(); } catch (Exception e) { Log.Error("HorseFate.Daily", e); }   // E6/K1 (211): pula koni weteranow (nadmiar na polki), linia "Konie - smierc, lup, dobytek (E6/K1)" i zerowanie dnia - PO Stage6Measure (HorseBook czyta liczniki K1)
             try { HamletKinds.Daily(); } catch (Exception e) { Log.Error("HamletKinds.Daily", e); }   // E6/W2 (210): linia "Wioski wedlug rodzaju (210)" za dobe wczorajsza (tylko log)
             try { TownFolk.Lines(); } catch (Exception e) { Log.Error("TownFolk.Lines", e); }   // E5/0 (195): linie Kiesa ludu, Nadwyzka kas, Bitwy, Notable, Jedzenie z targu, Zadowolenie BK - po ksiedze pieniadza, przed Seal31.Daily (zeruje Measure31)
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
