@@ -1359,3 +1359,7 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   wzor: e7-a/e7-b), zeby skrocic czas o ok. 6 h; **E8/H (jezdziec = kon + uprzaz) dopiero PO scaleniu** (dotyka plikow obu drzew), O4 po tescie.
   **DALEJ:** scalenie zbior-5-8 + e8-a + e8-c + e8-b (weryfikacja mechaniczna "nic nie zginelo"), E8/H, przeglad kolizji etapu 8, pelny audyt (kilka niezaleznych przegladow +
   sprawdzenie znalezisk), autotest z plikami danych e7-b, test zbiorczy (120 dob + zapis 9 dob + bieg dlugi + zdjecia proby drog; zima - gdy Jeff zdecyduje), poprawki, wgranie.
+- (20:55 UTC 12.10) Postep wf_1db23a93-783: recenzja E8/0 ZROBIONA (`w-toku/e8-a` f7db9c5 - koszt profilu liczony raz), E8/P1 zakodowane (bb18686, recenzja w toku); E8/RC ZROBIONE z recenzja
+  (`w-toku/e8-b` bb02c3e - poprawka: licznik hanby dlugu przy braku odbiorcy); drzewo `w-toku/e8-c` zalozone od f7db9c5 (P3 w toku); `w-toku/zbior-5-8` E7/R2 zakodowane (35fb7da, recenzja w toku).
+  Autotest: `at1-autotest` 486008e - nowy parametr `-ExtraFile "cel wzgledem Modules=zrodlo;..."` (pliki danych e7-b/W4 na czas testu; plik, ktorego przed testem nie bylo, po tescie znika;
+  proba na sucho na atrapie gry OK). Rozpoznanie E8/H (jezdziec = kon + uprzaz) w toku -> `docs/etap8/rozpoznanie-H-jezdziec-uprzaz.md`. Jeff spi, raport za 12-14 h. Limit 5 h: 7% po 45 min.
