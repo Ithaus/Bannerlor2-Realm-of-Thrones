@@ -15,7 +15,7 @@
 - `--grupa etap5` na `czesc-d120.log`: kod 0, wynik IDENTYCZNY ze stara wersja (diff pusty - log testu E4 nie ma linii A4, blok A4 "brak w logu").
 - Build Release kod 0 (1 stare ostrzezenie CS0169); kod gry i `McmSettings` bez zmian - DLL rozni sie od 527c115f tylko hashem commitu w wersji.
 
-**Status:** DO SPRAWDZENIA - w tescie A (`--grupa etap5`, wiersze A4-5, A4-6, A4-9). DLL: `SCR\test\Armoury-e5a.dll` - z commitu tego wpisu (hash commitu w wersji DLL), nie wgrany, gra nie uruchamiana.
+**Status:** DO SPRAWDZENIA - w tescie A (`--grupa etap5`, wiersze A4-5, A4-6, A4-9). DLL: `SCR\e5\zbior\Armoury\bin\Release\Armoury.dll` = `SCR\test\Armoury-e5a.dll` (zastepuje 527c115f) - zbudowany z ad298a2 (wersja DLL 1.0.0+ad298a2, build z `-p:GameLibs=<repo>\libs`), md5 87324e99bf76cd623713dabbc932eace; nie wgrany, gra nie uruchamiana.
 
 ## 2026-10-11 (etap 5, Scalenie porcji A etapu 5 w `w-toku/zbior-e5`) - A1 (KASY MIAST) + A2-A5 (DWOR, MARKIETANI I NOTABLE, OBLEZONE, BEE) + A6 (LUP Z KIESY POKONANEGO) NA ZBIORZE ETAPU 4 Z E5/0; OBOWIAZKOWE KROKI SCALENIA
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e5` (od 7658247 = calosc etapu 4 + E5/0 pomiar) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/e5-a1` (e8868d2) -> 8b4009e, zadanie E5/0 (BBack) -> b0985e4, `w-toku/e5-a2-5` (7e03a6c) -> 688abf8, `w-toku/e5-a6` (c71aa64) -> ed4e52f; ten wpis | **Wiazace:** `docs\etap5\PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` v2 + decyzje Jeffa 11.10 (rozdz. 6: test A osobno, A1 tryb 2 bez dosypki, A6 bezwarunkowo)
