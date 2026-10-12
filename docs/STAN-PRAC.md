@@ -1372,3 +1372,13 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   dzis sam kon wystarcza; uprzezy ok. 7.7 tys. na 10.8 tys. jezdzcow; siodlarze stoja przez zla wage siodel ROT (naprawia E8/C); zalecany wariant A (para kon + dowolne siodlo rodziny konia).
   **PROBA STARTU (nie test zbiorczy):** 10 dob nowej kampanii na zbior-5-8 a589def (Armoury 2ce92d48, RC 468b0e66, ForgeView ca86b75b, CS-at 49670825 = a589def + at1-cs.diff, pliki danych
   przez -ExtraFile) - zeby wczesnie zlapac bledy startu etapow 5-7, ktore nigdy nie biegly w grze; wynik: SCRATCH(dbc3d3d1)\test\at-zb58-proba10.out.txt. Skrypt biegu: SCRATCH(dbc3d3d1)\bieg.ps1.
+- (23:20 UTC 12.10) **PROBA STARTU 10 dob na zbior-5-8 a589def: OK** (10/10, 13.5 s/dobe, Armoury 0 ERROR, CS 0 blokow z naszych modow, 23 wyjatki startowe cudzych modow jak we wzorcu;
+  pliki danych przez -ExtraFile przeszly zabezpieczenia; DLL i pliki przywrocone, zapisy Jeffa nietkniete). **BIEG 120 dob NOWEJ kampanii na zbior-5-8 a589def (wczesny, rownolegle z kodem
+  etapu 8 - nie zastepuje testu zbiorczego): OK 120/120, 17.6 s/dobe (W33 17.5)**, log Armoury-2026-10-12_15-33-44.log, CS session-2026-10-12_15-33-43.log, zapis autotest-2026-10-12-1610.sav.
+  Armoury ERROR 1: `ValyrianBlades.Census: Stal valyrianska: UBYTEK -1 - darksister (jest 0, rejestr 1), ostatnio: targ Vaes Diaf`. Progi (wyniki: SCRATCH(dbc3d3d1)\test\progi-zb58\ i
+  progi-w33\ dla wzorca): NOWE NIE wobec W33 - R1-7 lupy niewytopione 36% (prog 5%), R1-8 miasta bez zelaza 45 (15), R1-9 stos drewna miast +114%, R1-10 brak rudy 816/d; R3-9 polki uprzezy +10%;
+  W1-5 welna, W1-7 kolejka odziezy wojska rosnie, W3-6 sol i glina rosna; N1-2/3/6 czeka na material 2274/d (skora 1632/d); K3-3 jazda AI 8.7% (prog 12%), K3-5 Dothrakowie 41.7% (60%);
+  K2-5 pompa koni 289 (W33 84); A3-7 koszt markietanow 109.7 ms/d (W33 38.7); A1-T14 zakup ponizej zapasu w 1 dobie; E7/R1 T5 wioski spalone 0 w 120 dob; E7/O1 T2, E7/T T4 20.5 ms, E7/B T3
+  (4 przejscia dalej niz 3 jedn.), E7/B T4. BYLY JUZ W W33: K0-6, K1-3, K1-4, K5-4, A3-2, etap2 wojsko 90 tys./D staly 2254/kurier, etap4 pula wyrzutkow/T9/K22, E7/O2 T1 (klucz Jeffa).
+  **W TOKU:** zapis 9 dob (wczytanie autotest-2026-10-12-1610) -> test\at-zb58-zapis9.out.txt; workflow wf_fe34e80e-003 - rozpoznanie przyczyn w 7 obszarach (tylko odczyt) + podwazenie
+  kazdego wniosku BLAD/STROJENIE; potem poprawki na zbior-5-8 (autor + recenzent) rownolegle z kodem etapu 8 (wf_1db23a93-783: e8-a po X, e8-c po Q).
