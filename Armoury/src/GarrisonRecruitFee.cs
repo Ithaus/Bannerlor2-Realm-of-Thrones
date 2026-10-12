@@ -371,12 +371,10 @@ namespace Armoury
                 if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(TickPre)), postfix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(TickPost))); a = "wpiete"; }
             }
             catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll(werbunek)", e); }
-            try
-            {
-                var m = AccessTools.Method(typeof(DefaultClanFinanceModel), "AddExpensesForAutoRecruitment");
-                if (m != null) { h.Patch(m, prefix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(ExpPre)), postfix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(ExpPost))); b = "wpiete"; }
-            }
-            catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll(splata)", e); }
+            // splata (DefaultClanFinanceModel.AddExpensesForAutoRecruitment) - DOPIERO w kampanii (EnsureHooks): kompilacja zalatanej metody tej klasy
+            // przy starcie gry uruchamia jej konstruktor statyczny (czyta Game.Current, ktorego jeszcze nie ma) - klasa ginie na caly proces i kampania
+            // nie startuje (test zbiorczy 12.10 03:20 UTC: TypeInitializationException DefaultClanFinanceModel, gra zawieszona). Pulapka z ERRORS.md (14.09).
+            _h = h; b = "w kampanii";
             try
             {
                 var m = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan");
@@ -388,9 +386,29 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll(rozliczenie)", e); }
-            _wired = a == "wpiete" && b == "wpiete" && c == "wpiete";
+            _wiredStart = a == "wpiete" && c == "wpiete";
+            _wired = false;   // pelne dopiero po EnsureHooks (splata w kampanii)
             Log.Info("GarrisonRecruitFee (E5 decyzja 9): oplata za werbunek zalog do sprzedajacego - werbunek " + a + ", splata (AddExpensesForAutoRecruitment) " + b
-                     + ", rozliczenie rodu (DailyTickClan, Normal) " + c + (_wired ? "" : " - NIEPELNE: oplata znika jak dotad") + "; wylacznik Garrison Recruit Fee To Seller.");
+                     + ", rozliczenie rodu (DailyTickClan, Normal) " + c + (_wiredStart ? "" : " - NIEPELNE: oplata znika jak dotad") + "; wylacznik Garrison Recruit Fee To Seller.");
+        }
+
+        private static Harmony _h;
+        private static bool _wiredStart, _expTried;
+
+        /// <summary>W kampanii (OnSessionLaunched), raz na proces: latka splaty na DefaultClanFinanceModel.AddExpensesForAutoRecruitment (wzor CrownIncome.EnsureHooks).</summary>
+        internal static void EnsureHooks()
+        {
+            if (_expTried || _h == null || Campaign.Current == null) return;
+            _expTried = true;
+            string b = "BRAK";
+            try
+            {
+                var m = AccessTools.Method(typeof(DefaultClanFinanceModel), "AddExpensesForAutoRecruitment");
+                if (m != null) { _h.Patch(m, prefix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(ExpPre)), postfix: new HarmonyMethod(typeof(GarrisonRecruitFee), nameof(ExpPost))); b = "wpiete"; }
+            }
+            catch (Exception e) { Log.Error("GarrisonRecruitFee.EnsureHooks(splata)", e); }
+            _wired = _wiredStart && b == "wpiete";
+            Log.Info("GarrisonRecruitFee (E5 decyzja 9): splata (AddExpensesForAutoRecruitment) zakladana w kampanii - " + b + (_wired ? "" : " - NIEPELNE: oplata znika jak dotad") + ".");
         }
     }
 }

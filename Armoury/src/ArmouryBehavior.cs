@@ -1223,6 +1223,7 @@ namespace Armoury
             try { CirculationWindows.EnsureModelHooks(); } catch (Exception e) { Log.Error("CirculationWindows.EnsureModelHooks", e); }   // paczka 169: linie modelu finansow i kapital nowych karawan (latki w kampanii, tylko log)
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
+            try { GarrisonRecruitFee.EnsureHooks(); } catch (Exception e) { Log.Error("GarrisonRecruitFee.EnsureHooks", e); }   // E5 decyzja 9 - latka na DefaultClanFinanceModel dopiero w kampanii
             try { Leaks310.EnsureHooks(); } catch (Exception e) { Log.Error("Leaks310.EnsureHooks", e); }   // 3.10: zold zaciagu ROT od pana (latka modelu finansow ROT - w kampanii)
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)

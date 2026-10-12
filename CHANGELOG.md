@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 12.10 03:55 UTC - Poprawka testu zbiorczego: GarrisonRecruitFee - latka na DefaultClanFinanceModel dopiero w kampanii
+
+**Problem:** test zbiorczy (w-toku/zbior-final f07d38b, 12.10 03:20 UTC) nie wystartowal - "NIE DOTARL (brak-startu) - doba 0/120", gra zawieszona (hang 61 s). CrashScribe session-2026-10-11_20-20-23.log:
+TypeInitializationException "The type initializer for DefaultClanFinanceModel threw an exception" (INNER NullReferenceException w DefaultClanFinanceModel..cctor IL+0x28) przy
+WorkshopTrade.ApplyInCampaign i przy tworzeniu ekranu mapy (CalculateClanGoldChange) - model finansow rodow martwy na caly proces.
+**Przyczyna:** GarrisonRecruitFee.ApplyAll (E5 decyzja 9, nowy) zakladal latke na DefaultClanFinanceModel.AddExpensesForAutoRecruitment przy STARCIE GRY (SubModuleMain);
+kompilacja zalatanej metody uruchamia konstruktor statyczny klasy, ktory czyta Game.Current.GameTextManager (jeszcze null) - pulapka z ERRORS.md 14.09 (wzor: WorkshopTrade, CrownIncome.EnsureHooks).
+**Zmiana:** splata (b) zakladana w kampanii: GarrisonRecruitFee.EnsureHooks() z ArmouryBehavior obok CrownIncome.EnsureHooks; werbunek (a) i rozliczenie rodu (c) zostaja przy starcie
+(inne klasy). Linia startowa: "splata ... w kampanii", potem "splata ... zakladana w kampanii - wpiete". Jedyna nowa latka na DefaultClanFinanceModel od 7658247 (sprawdzone grepem diffu).
+**Ryzyko:** do pierwszego OnSessionLaunched oplata werbunku zalog idzie jak dotad (w nicosc) - w praktyce zero (rozliczenie rodu jest w dobie kampanii).
+**Status:** DO SPRAWDZENIA - ponowny test zbiorczy.
+
 ## 2026-10-12 (Recenzja scalenia koncowego czesc 2 w `w-toku/zbior-final`) - BEZ ZMIAN KODU, 4 KOMENTARZE
 **Mod:** Armoury (tylko komentarze) + RealisticCaptivity (przebudowa z tego samego commitu) | **Galaz:** `w-toku/zbior-final` | **Commit kodu:** d8fa8cc
 
