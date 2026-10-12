@@ -90,7 +90,8 @@ namespace Armoury
                 try { MaterialOrders.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }   // 174.2: BK ReleaseCaravanFromHold nie zmienia celu karawany z kontraktem
                 AiGear.ApplyAll(_harmony);       // zakupy armii AI zamiast darmowego sprzetu DTE (Jeff 04.10)
                 WorkshopLaw.ApplyAll(_harmony);  // warsztaty uzbrojenia jako firmy (Jeff 04.10)
-                try { CraftRealm.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CraftRealm.ApplyAll", e); }   // E6/M1 (207): okno kontekstu GetItemsToProduce dla lancucha krainy na drodze gry (klucz czytany na zywo)
+                try { CraftRealm.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CraftRealm.ApplyAll", e); }
+                try { WorkshopInputs.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopInputs.ApplyAll", e); }   // E6/M2 (208): bramka wsadu przy wyborze typu warsztatu (klucz czytany na zywo)   // E6/M1 (207): okno kontekstu GetItemsToProduce dla lancucha krainy na drodze gry (klucz czytany na zywo)
                 try { WorkshopTrade.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopTrade.ApplyAll", e); }   // warsztaty towarowe w nowej monecie: utrzymanie i place do kas miast, cena z zarobku
                 try { TownFletchers.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFletchers.ApplyAll", e); }   // paczka 172: strzelarze miasta po warsztatach (postfiks doby miasta) i sonda linii arrows
                 Stables.ApplyAll(_harmony);

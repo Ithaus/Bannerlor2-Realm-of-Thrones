@@ -169,6 +169,7 @@ namespace Armoury
             try
             {
                 if (item == null) return;
+                CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
@@ -182,6 +183,7 @@ namespace Armoury
                 // MineralOnce: BK mial ten mineral na liscie produkcji wsi kilka razy - zdjelismy powtorzenia, a jeden wpis liczymy
                 // tyle razy, ile ich bylo (wydobycie bez zmian; niezalezne od wlacznika MaterialLaw i od suwakow)
                 m *= MineralOnce.Times(village, item);
+                m *= CamelLaw.HostFactor(village, item);    // E6/M2 (208): kon-gospodarz przejmuje wage wielbladow poza Qarthem / oddaje ja wielbladom Qarthu (ta sama suma sztuk)
                 if (Math.Abs(m - 1f) >= 0.001f)
                 {
                     // wpis 98: mnoznik ma MNOZYC. ExplainedNumber SUMUJE czynniki (wynik = baza x (1 + suma)), wiec AddFactor(m - 1)
