@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 8, recenzja paczki E8/P2 = 244) - BEZ POPRAWEK KODU GRY; NARZEDZIE: SREDNIE NATEZENIE BITEW LICZONE NA PARTIE (DOBA BEZ BITEW NIE ZANIZA)
+**Mod:** Armoury (kod bez zmian) + narzedzie | **Galaz:** `w-toku/e8-a` (po 57dd24a) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/P2", rozdz. 6 (odpowiedzi Jeffa 12.10 - zadna nie zmienia P2; odp. 1 dostaje z tej paczki stan "przed" dla E8/L) | **Pliki:** `tools/sprawdz_logi.py`, `CHANGELOG.md`
+
+**Problem:** recenzja paczki 244 (bez gry): czy cztery linie mierza to, co mowia, czy pomiar niczego nie rusza (zloto, sztuki, losowanie) i czy progi `etap8_p2` czytaja linie w formacie z kodu.
+
+**Przyczyna:** w kodzie gry bledu nie znaleziono. W narzedziu jedna usterka: wiersz INFO "Amunicja AI" liczyl "natezenie bitew srednio" jako srednia dob z zerem za dobe bez bitew (linia ma wtedy "-") i bez wagi liczby partii - zanizalby stan "przed" dla E8/W ("share x natezenie").
+
+**Zmiana:** `sprawdz_logi.py`, blok `etap8_p2`: natezenie = srednia na partie po bitwie w oknie (wazona liczba "(N partii po bitwie)" doby), doba z "-" nie wchodzi; wiersz podaje liczbe partii i dob. Kod C# bez zmian.
+
+**Sprawdzone niezaleznie od autora (kontrola calosci, CLAUDE.md 8.0):**
+- **DTE zainstalowany (`DynamicTroopEquipmentReupload.v1.4.7.dll`, ilspycmd - te same numery linii co dekompilacja robocza):** `OnMapEventEnded` :529 -> `DistributeLootRandomly` :751 w calym oknie tylko DOPISUJE zwyciezcom (`AddItemToPartyArmory` :934 / `ArmyArmory.AddItemToArmory`; zwyciezcy bez zbrojowni ja zaklada), `GetAllLootItems` :828 czyta slownik pokonanego bez zdejmowania, zwyciezcom w oknie nic nie ubywa - "przyrost sumy zwyciezcow = dopisane" jest poprawny; `OnMobilePartyDestroyed` :510 kasuje zbrojownie rozbitej partii. Gra 1.4.8: `OnMapEventEnded` (MapEvent :2079) przed `HandleMapEventEnd` (:2158 -> `MapEventSide` :445 `DestroyPartyAction`), wszystko w jednym wywolaniu - los pokonanego jest rozstrzygniety przed nastepnym oknem i przed taktem doby.
+- **Okno DTE:** w naszym kodzie jedyna latka na tym celu to `DtePrefix` (First) / `DtePostfix` (Last); `P2LootBefore` stoi przed `AutoDeaths` i nie uzywa `MBRandom` (kolejnosc losowan bez zmian); przy wylaczonym kluczu `DtePostfix` robi to, co dawniej (`LootMove` w tych samych warunkach), `P2LootAfter` wychodzi na pierwszym warunku.
+- **AiWear:** `_dayLoot` / `_dayWorn` / `_dayMended` rosna tylko w :150, :305, :581, :639 - kazde z licznikiem zalogi / partii w tej samej instrukcji albo w `P2Mend` zaraz po, zerowanie w tym samym `Day()` - P2-2 trzyma z konstrukcji; `AiGear.NeedBuckets` zwraca NOWY slownik przy kazdym wywolaniu (petla zuzycia dostaje swoj, nietkniety); `MapEventParty.HealthyManCountAtStart` / `DiedInBattle` / `WoundedInBattle` sa w 1.4.8; `MendMaterial.Order` liczy `Wait` / `NoSmith` / `Poor` / `CutOff` w sztukach, wraki nie wchodza do zlecen (`Mendable`) - podzial powodow stania zgodny z petlami; `MenPurse.Get` i `AiGear.Armories` tylko czytaja.
+- **Cena do wartosci:** `deliver` wolany zaraz po `ShelfBuy.Take` w obu petlach (`BuyLoop` :624-627, `BuySubstitutes` :154-157), `AddToArmory` i `pay` nie wolaja `Take`; zagniezdzone `Take` z podsluchu polki dalby niezgodny slad -> srednia partii (bezpiecznik `TraceCount` / `TraceSum`). `EquipmentElement.ItemValue` = `Round(Item.Value x PriceMultiplier)` (TaleWorlds.Core) - ta sama podstawa, od ktorej `GetPrice` liczy cene. Suma "sufit zablokowalby" tylko z wierszy 0-3 (lordowie, zalogi, zamowienia zamkow).
+- **Monopole:** skan ma te same warunki co petla `Levies` (:435, :446-450), nowy wzor jak w projekcie E8/R (`ProfitMade / RevenueSmoothenFraction x 0.05`, najwyzej kapital); `Levies` nie ma wczesnego wyjscia - linia w kazdej dobie.
+- **Narzedzie:** `py_compile` poza repo OK; log zlozony z PRAWDZIWYCH linii "Zuzycie AI" i "Pieniadz swiata" z Z33 (406 dob) + linie P2 zlozone tak, jak sklada je kod (etykiety: AiWear = doba zdarzen, linie taktu doby = etykieta "Pieniadz swiata" + 1): P2-1 TAK, P2-2 TAK; wariant z brakiem jednej linii i rozjazdem jednej doby - oba NIE; wiersze z nawiasami w nazwie ("zalogi zamkow (wlasna polka)", "... - lepsze za swoje"), "brak zakupow" i natezenie "-" czytane; prawdziwy Z33 - wiersz INFO "brak w logu", zaden blok bez wyjatku. Pozostale bloki narzedzia nie lapia nowych linii (prefiksy "Zuzycie AI: dzien", "Konie - smierc, lup, dobytek (E6/K1): dzien" - bez zderzenia).
+- **Reszta:** `gen_mcm` bez rozjazdu (Armoury 1224), `Stage8MeasureLog` nie ma w `Armoury.json` Jeffa (plik tylko odczyt), `Reset` czterech klas dochodzi z konstruktora `ArmouryBehavior`, bez zapisu; hint MCM po angielsku; build Armoury kod 0. Proba scalenia (`git merge-tree`) z `w-toku/e8-c` i `w-toku/zbior-5-8`: konflikt tylko w `CHANGELOG.md` i `tools/sprawdz_logi.py` (to samo miejsce dopisku - zostawic oba bloki), plikow zrodlowych P2 tamte galezie nie ruszaja.
+
+**Odrzucone (nie blad):**
+- P2-1 a linia AiWear pisana dopiero przy pierwszym zdarzeniu nastepnej doby: okno ucina pierwsza i ostatnia dobe, etykiety zgadzaja sie z oknem (sprawdzone na etykietach Z33); log to jedna sesja, wiec wczytanie zapisu nie gubi doby w srodku pliku.
+- Pomiar ceny takze u notabli i w "lepsze za swoje" (ponad tabele projektu): po jednej linii przy istniejacym `NoteBuy`, osobne wiersze, suma "sufit" ich nie liczy - miesci sie w "wedlug kupujacego".
+- p90 = probka `(int)(0.9 n)` (dla n = 10 to maksimum): odchylka o jedna probke w gore, bez znaczenia przy setkach sztuk na dobe (dla progu Z-2 ostrozniej).
+- Bitwa bez zwyciezcy liczy obie strony w "pokonani" (udzial 1.0): zgodne z regula "zwyciezca zbiera pole" - pola nikt nie zebral.
+- Kopie liczone proporcja sum, nie przedmiot po przedmiocie: DTE `AddItemToPartyArmory` odrzuca czarna liste, wiec zbrojownie z zasady jej nie maja i proporcja jest bliska 1.
+
+**Poza zakresem (uwagi dla nastepnych paczek, nic nie zmienione):**
+- E8/L: po rozszerzeniu `LootMove` na wszystkie rodzaje u pokonanych nie zostanie nic, wiec cale "dopisane" trafi do pozycji "dopisane bez sztuk u pokonanych" (pozycja "u rozbitych (przeniesienie)" tez spadnie do 0) - prog L-1 "przeniesione = dopisane zwyciezcom" czytac z tej pozycji.
+- E8/L: droga "Send troops" (`DistributePlayerSimulationLoot` :570) tez zostawia kopie (lup z poleglych dopisany zwyciezcy, zbrojownia pokonanego bez ubytku) - poza pomiarem P2, jak w `LootSnap`.
+
+**Build:** Armoury kod 0 (C# bez zmian). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (etap 8, paczka E8/P2 - 244, PLAN 8.4a, 8.6b, 8.7a-b, 8.8a-c) - POMIARY SPRZETU AI, LUPU I KORONY: cztery linie doby "Zuzycie AI - pomiary (E8/P2)", "ZakupyAI cena do wartosci (E8/P2)", "Lup DTE - kopie (E8/P2)", "Monopole korony (E8/P2)"; klucz `Stage8MeasureLog`; blok `etap8_p2`
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e8-a` (po bb18686) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/P2" (TERAZ), rozdz. 5.1 (P2 pierwsze w `AiWear.cs`, `AiGear.cs`, `KingdomTreasury.cs`), rozdz. 6 (odpowiedzi Jeffa 12.10 19:15 - P2 nie zmieniaja; odp. 1 "to, co ja zabilem, idzie do mnie" dotyczy E8/L), `docs/etap8/rozpoznanie-A.md` 3.1, 4.2, 5.1, 5.2, 6.1-6.3 | **Pliki:** `Armoury/src/AiWear.cs`, `Armoury/src/Measure174b.cs`, `Armoury/src/ShelfBuy.cs`, `Armoury/src/AiGear.cs` (2 linie), `Armoury/src/MenUpgrade.cs` (1 linia), `Armoury/src/VolunteerKit.cs` (2 linie), `Armoury/src/HorseFate.cs`, `Armoury/src/KingdomTreasury.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen_mcm 1224), `tools/sprawdz_logi.py`
 

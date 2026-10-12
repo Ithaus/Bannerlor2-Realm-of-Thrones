@@ -8498,10 +8498,15 @@ def etap8_p2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                  f"{st[5]:.0f} partii / {st[6]:.0f} szt., material {st[7]:.0f} partii / {st[8]:.0f} szt., nie robota kowala {st[9]:.0f} szt., inne {st[10]:.0f} szt."),
                 "INFO (stan 'przed' dla E8/W: kolejka od najtanszej, continue zamiast break)", None)
         am = [avg(p) for p in (r"Amunicja AI: zeszloby ([0-9.]+) szt", r"zeszloby [0-9.]+ szt\. \(strzaly ([0-9.]+)", r"belty ([0-9.]+), miotane", r"miotane ([0-9.]+); zwyciezcy",
-                               r"zwyciezcy ([0-9.]+), pokonani", r"pokonani ([0-9.]+)\) z", r"\) z (\d+) w uzyciu", r"natezenie bitew srednio ([0-9.]+)")]
+                               r"zwyciezcy ([0-9.]+), pokonani", r"pokonani ([0-9.]+)\) z", r"\) z (\d+) w uzyciu")]
+        # recenzja E8/P2: natezenie = srednia na partie po bitwie w oknie (wazona liczba partii doby); doba bez bitew ("-") nie wchodzi do sredniej
+        iw = [(num(r"natezenie bitew srednio ([0-9.]+) \(", wear[d], cast=float), num(r"\((\d+) partii po bitwie\)", wear[d], default=0)) for d in wdays]
+        iw = [(x, n) for x, n in iw if x is not None and n > 0]
+        ipar = sum(n for x, n in iw)
+        inten = f"{sum(x * n for x, n in iw) / ipar:.2f} ({ipar} partii po bitwie w {len(iw)} dobach)" if ipar > 0 else "- (brak bitew partii z zapisem)"
         rep.add("E8/P2: Amunicja AI - zeszloby (srednio na dobe)",
                 (f"{am[0]:.1f} szt. (strzaly {am[1]:.1f}, belty {am[2]:.1f}, miotane {am[3]:.1f}; zwyciezcy {am[4]:.1f}, pokonani {am[5]:.1f}) z {am[6]:.0f} w uzyciu; "
-                 f"natezenie bitew srednio {am[7]:.2f}"),
+                 f"natezenie bitew srednio na partie {inten}"),
                 "INFO (E8/W amunicja AI W CIENIU; produkcja strzelarzy Z33 ok. 290-320 snopow strzal i 130-480 beltow na dobe)", None)
         stum = max([num(r"potkniecia \(sesja\) (\d+)", wear[d], default=0) for d in wdays] + [0])
         if stum:
