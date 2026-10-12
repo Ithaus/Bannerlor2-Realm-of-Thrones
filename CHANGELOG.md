@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 (etap 5, poprawka po recenzji E5/B2 = 184) - STAWKA s PRZYCINANA DO PULAPU CODZIENNIE; 184 TYLKO PRZY CZYNNEJ KIESIE LUDU (HAK B1 `WtFolkLive`)
+**Mod:** Armoury | **Galaz:** `w-toku/e5-b235` (od e30a00c) | **Pliki:** `Armoury/src/KingdomTreasury.WarTax.cs`, `tools/sprawdz_logi.py` (blok `etap5_b2`)
+
+**Problem:** recenzja E5/B2 (e30a00c) - nic krytycznego ani waznego, dwie uwagi drobne, obie PRAWDZIWE (sprawdzone w kodzie, gra nie uruchamiana):
+1. Stawka `w.S` zmieniala sie tylko w doby kroku (`today % 7 == 0`) albo przy wylaczonym kluczu (`WarTaxDaily` :228-239 e30a00c). Gdy pulap krolestwa spadnie miedzy krokami (krolestwo zdejmie polityke War Tax 6% -> 3%, gracz obnizy `WarTaxMax`/`WarTaxMaxWithPolicy` w MCM), `w.S` zostawalo ponad pulapem do 6 dob. Pobor byl liczony dobrze (`Math.Min(w.S, cap)` w `FolkWarTax`/`FolkWarTaxRate`), ale linia 184 drukowala surowe s obok nowego pulapu - wiersz B2-3 ("s nigdy ponad pulap") dawal NIE, licznik "na pulapie" (`w.S >= cap`) liczyl takie krolestwo. Dowod: log syntetyczny (krolestwo z War Tax na s 4.00%, polityka zdjeta w dobie bez kroku) - stara regula: B2-3 NIE "przekroczen 1 (159, Dorne)".
+2. `WtOn` = `WarTaxFromFolk && CrownIncome.On` - bez warunku czynnej kiesy ludu. `WarTaxDaily` podnosil s co tydzien takze bez kiesy, choc projekt v2 K3 (rozdz. 3 E5/B2 "czynny tylko z kiesa czynna", rozdz. 5 pkt 9 "kazda paczka wylaczona = stan sprzed paczki, takze w zaleznosciach") mowi: bez kiesy 184 nic. Zlota to nie ruszalo (bez `Earn` nie ma poboru), ale zostawal stan: po wlaczeniu kiesy w trakcie kampanii lud placilby od razu pelne 3% / 6% bez narastania o 0.5 pkt na tydzien, a bieg z kiesa wylaczona dawal B2-10 NIE (s > 0 w wojnie, pobor 0).
+
+**Przyczyna:** (1) przyciecie do pulapu tylko w kroku (`s1 = Math.Round(WtClamp(s1, 0, cap), 6)`); (2) w kodzie B2 brak warunku K3 - klucz `TownFolkLive` powstaje dopiero w B1, a lista krokow scalenia go nie wymieniala.
+
+**Zmiana:**
+1. `WarTaxDaily`: przy czynnym 184 CODZIENNIE, przed krokiem: `else if (w.S > cap + 1e-6) w.S = Math.Round(cap, 6);` (tolerancja jak zaokraglenie kroku - pulap z MCM jest `float`), krok `if (on && step)` liczy juz od przycietego s0. Linia 184 i licznik "na pulapie" pokazuja stawke faktycznie pobierana. Gdy polityka wroci, s narasta od pulapu nizszego (krok tygodnia), nie wraca samo do dawnej wartosci.
+2. **Hak B1** `private static bool WtFolkLive { get { return false; } }` (wzor `CourtFull.FolkShare`): `WtOn` = `WarTaxFromFolk && WtFolkLive && CrownIncome.On` (pobor i `FolkWarTaxRate`), w `WarTaxDaily` `on = key && folk` - kiesa nieczynna = jak wylaczony klucz: s = 0 u wszystkich, pobor 0; pierscienie potrzeby (7 i 28 dob) biegna dalej, wiec wlaczenie kiesy zaczyna od s = 0 i narasta o krok na tydzien z juz znana potrzeba. **Do scalenia B1 hak = false - 184 = stan sprzed paczki (s = 0); dotad s roslo bez kiesy.**
+3. Linia 184: po "165 Crown Current Income ..." nowe `, kiesa ludu (B1) czynna|nieczynna (s = 0, pobor 0 - K3: 184 tylko z czynna kiesa)`; "wylacznik War Tax From Folk" drukuje sam klucz; dopisek "wolan poboru" - "(0 przy s > 0 w wojnie = pobor niewpiety w TownFolk.Earn - B1)". Regexy narzedzia (`kre`, `cap`, `sv`, `tk`, `hd`, `nd`) bez zmian - sprawdzone.
+4. `sprawdz_logi.py` `etap5_b2`: pole `folk` ("kiesa ludu (B1) czynna"); B2-2 wymaga klucza, 165 i czynnej kiesy (podaje "w tym kiesa ludu nieczynna N"); B2-4 (kroki) i B2-10 (pobor) licza tylko doby z czynna kiesa - bieg z kiesa wylaczona: B2-2 NIE, B2-4/B2-10 INFO (zamiast falszywego NIE w B2-10). Opis grupy i progu B2-10 poprawione.
+
+**Kroki dla scalajacego z B1 (dopisane do listy z wpisu E5/B2 - obowiazkowe):**
+- `KingdomTreasury.WtFolkLive` zamienic na `Settings.Current.TownFolkLive && Settings.Current.TownFolkMode >= 1` (ten sam warunek co `CourtFull.FolkShare`; null-check `Settings.Current`). Bez tego 184 zostaje 0 na zawsze - B2-2 da NIE ("kiesa ludu nieczynna"), B2-10 tylko INFO.
+
+**Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
+- **Regresje:** dzis (bez B1) zmienia sie tylko linia 184 (s = 0, "kiesa ludu (B1) nieczynna") - zlota nic nie ruszalo i nie rusza (pobor 0 jak w e30a00c, `Own` 165, rata 186, renty 180 bez zmian); zapis: szoste pole dalej pisane (s = 0, pierscienie pelne). `WtOn` czytaja tylko `FolkWarTax` i `FolkWarTaxRate` (grep: brak innych wolajacych poza `CrownIncome` - okno - i `Obieg` - licznik); `WarTaxFromFolk` nie czyta nic innego.
+- **Martwy kod:** przy haku false cala stawka 184 jest martwa do B1 (s = 0); zywa po scaleniu - narasta od 0 o 0.5 pkt/tydzien, wiec skok poboru w dniu scalenia niemozliwy. Przyciecie do pulapu dziala tylko przy czynnym 184.
+- **Kolizje:** zadnych nowych latek ani zapisow `KingdomBudgetWallet`; B2-3 i licznik "na pulapie" licza teraz to samo co pobor; B2-4 pomija `s0 >= cap` przy potrzebie - przyciete s0 = pulap nie daje falszywego "bez wzrostu".
+- **Testy narzedzia (log syntetyczny `SCR\e5\b2rev\b2synth2.py`, 4 krolestwa, 69 dob, logi `SCR\e5\b2rev\logs\*.log`/`*.out`):** ok - 14 wierszy B2, NIE 0; bad (potrzeba bez wzrostu, ZALEGLOSC) - B2-4 i B2-6 NIE; capbad (stara regula bez codziennego przyciecia) - B2-3 NIE; nofolk (kiesa nieczynna, s = 0) - B2-2 NIE, B2-4 i B2-10 INFO, reszta TAK/INFO. `--grupa etap5` na `SCR\kopia-e4k\czesc-d120.log`: kod 0, blok B2 "brak w logu" (INFO).
+- Build Release kod 0 (1 stare ostrzezenie CS0169); DLL nie wgrany. `McmSettings` bez zmian (bez nowych kluczy). Gra nie uruchamiana.
+
+**Status:** DO SPRAWDZENIA - w tescie zbioru B (po scaleniu B1 i zamianie haka): B2-2 "kiesa ludu (B1) czynna" caly bieg, B2-3 0 przekroczen, B2-4, B2-10 > 0.
+
 ## 2026-10-11 (etap 5, paczka E5/B2 = 184, PLAN 5.6) - PODATEK WOJENNY KORONY OD ZAROBKU LUDU (NA WIERZCH DANINY), STAWKA WEDLUG POTRZEBY KORONY CO 7 DOB
 **Mod:** Armoury | **Galaz:** `w-toku/e5-b235` (od `w-toku/zbior-e5` c3855de; drzewo `SCR\e5\b235`, paczki B2 -> B3 -> B5 po kolei) | **Wiazace:** `docs\etap5\PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` v2 rozdz. 2 R15 (b), rozdz. 3 "E5/B2", `KRYTYKA-E5.md` E5K1-01/02, K3 | **Pliki:** NOWY `Armoury/src/KingdomTreasury.WarTax.cs`, `KingdomTreasury.cs` (tylko `partial`), `CrownIncome.cs`, `CrownBorrow.cs` (2 odczyty), `BesiegedPay.cs` (rodzaj 184), `ArmouryBehavior.cs` (1 linia), `MoneyLedger.Obieg.cs` (1 pozycja), `Settings.cs`, `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (blok `etap5_b2`)
 
@@ -23,6 +50,7 @@
 - Kiesy ludu B1 musza byc posiadaczem w `MoneyLedger.ReadHolders`/`WorldTotal` (projekt B1) - inaczej 184 wyglada w bilansie jak zloto z niczego do skarbcow.
 - B1 dodaje wlasny rodzaj w `BesiegedPay` (oplaty wsi) - konflikt na linii stalych `K*`/`KN`/`Names` (tekstowy, nie po cichu): nadac kolejne numery (184 = 4).
 - Po scaleniu B1 sprawdzic, czy `Earn` nie biegnie poza watkiem glownym (pobor zmienia `KingdomBudgetWallet` i slowniki bez blokad - jak cala korona).
+- (poprawka po recenzji B2) Hak `KingdomTreasury.WtFolkLive` (dzis `false`) zamienic na `TownFolkLive && TownFolkMode >= 1` - K3: 184 tylko przy czynnej kiesie; bez tego s = 0 i pobor 0 na zawsze (B2-2 NIE).
 
 **Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
 - **Regresje (w kodzie):** dzis pobor 0 (brak wolajacego) - `Own` 165 bez zmian liczbowo, rata 186 i renty 180 jak przed paczka; jedyne zmiany zachowania bez B1: nowa linia, piaty rodzaj w linii A4 (parser `etap5_a4` szuka czterech nazw osobno i "razem" - sprawdzone, przechodzi), szoste pole zapisu. `BesiegedPay.Holds` dla rodzajow 0-3 bez zmian (`kind == KFolkWarTax` tylko dla 4).

@@ -47,8 +47,8 @@ Uzycie (Python 3, tylko odczyt):
                     = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
                     bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
-                    Blok E5/B2 (184, podatek wojenny ludu) B2-1..B2-14 - linia "Korona: podatek wojenny ludu (184)": codziennie i czytelna, wylacznik
-                    i 165 wlaczone, s nie ponad pulap, krok tygodnia zgodny z regula potrzeby (potrzeba -> w gore, luz i pokoj -> w dol), dlug 186
+                    Blok E5/B2 (184, podatek wojenny ludu) B2-1..B2-14 - linia "Korona: podatek wojenny ludu (184)": codziennie i czytelna, wylacznik,
+                    165 i kiesa ludu (B1) czynna (K3), s nie ponad pulap, krok tygodnia zgodny z regula potrzeby (potrzeba -> w gore, luz i pokoj -> w dol), dlug 186
                     d364 <= d182 (bieg roczny), zaleglosc 186 przy s < pulapu = 0, zwrot zoldu >= 70% naleznego (165), pobor czynny (> 0 przy s > 0
                     w wojnie - kiesa ludu B1), Obieg = linia 184, bledy; wielkosc 184, wstrzymane w oblezeniu, wplywy korony - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
@@ -3831,7 +3831,7 @@ def etap5_b2(rep, lines, start, until, wt):
                                    "reserve": int(m.group(9)), "debt": int(m.group(10)) if m.group(10) else 0, "arr": bool(m.group(11))})
                     else:
                         ks.append({"bad": part[:80]})
-        rows[d] = {"on": "wylacznik War Tax From Folk tak" in s, "inc": "165 Crown Current Income tak" in s,
+        rows[d] = {"on": "wylacznik War Tax From Folk tak" in s, "inc": "165 Crown Current Income tak" in s, "folk": "kiesa ludu (B1) czynna" in s,
                    "cap": float(cap.group(1)), "capP": float(cap.group(2)), "step": float(cap.group(3)),
                    "avg": float(sv.group(1)), "max": float(sv.group(2)), "warK": int(sv.group(3)), "posK": int(sv.group(4)), "capK": int(sv.group(5)),
                    "taken": int(tk.group(1)), "town": int(tk.group(2)), "castle": int(tk.group(6)), "calls": int(tk.group(7)),
@@ -3845,16 +3845,18 @@ def etap5_b2(rep, lines, start, until, wt):
     if not rows:
         return
     ds = sorted(rows)
-    off = [d for d in ds if not (rows[d]["on"] and rows[d]["inc"])]
-    rep.add("E5/B2 B2-2: wylacznik War Tax From Folk i 165 (Crown Current Income) wlaczone", f"wylaczone w {len(off)} z {len(ds)} dob" + (f" (pierwsza {off[0]})" if off else ""),
-            "wlaczone caly bieg zbioru B (wylaczone - s = 0 i pobor 0, jak przed paczka)", len(off) == 0)
+    off = [d for d in ds if not (rows[d]["on"] and rows[d]["inc"] and rows[d]["folk"])]
+    nofolk = len([d for d in ds if not rows[d]["folk"]])
+    rep.add("E5/B2 B2-2: wylacznik War Tax From Folk, 165 (Crown Current Income) i kiesa ludu (B1) czynna", f"wylaczone w {len(off)} z {len(ds)} dob (w tym kiesa ludu nieczynna {nofolk})"
+            + (f" (pierwsza {off[0]})" if off else ""),
+            "wlaczone caly bieg zbioru B (wylaczone albo kiesa nieczynna - s = 0 i pobor 0, jak przed paczka - K3)", len(off) == 0)
     # B2-3: s nigdy ponad pulap krolestwa
     over = [(d, k["name"]) for d in ds for k in rows[d]["ks"] if "bad" not in k and k["s"] > k["cap"] + 1e-6]
     mx = max(rows[d]["max"] for d in ds)
     rep.add("E5/B2 B2-3: s krolestwa nie ponad pulap (3% / 6% z War Tax)", f"przekroczen {len(over)}" + (f" (pierwsze {over[0]})" if over else "") + f"; s max w biegu {mx:.2f}%",
             "0", len(over) == 0)
     # B2-4: krok tygodnia zgodny z regula potrzeby (wojna i 165: potrzeba -> w gore az do pulapu; luz -> w dol; pokoj albo bez 165 -> w dol az do 0)
-    steps = [d for d in ds if rows[d]["stepDay"] and rows[d]["on"]]
+    steps = [d for d in ds if rows[d]["stepDay"] and rows[d]["on"] and rows[d]["folk"]]
     n_up = n_up_bad = n_down = n_down_bad = n_peace = n_peace_bad = 0
     first_bad = None
     for d in steps:
@@ -3920,11 +3922,11 @@ def etap5_b2(rep, lines, start, until, wt):
     rep.add("E5/B2 B2-9: \"stac pelny\" przy s na pulapie (6%)", "doby z krolestwami na pulapie: " + str(len([d for d in ds if rows[d]["capK"] > 0])),
             "INFO - prog projektu >= 95% swiat (z linii kiesy ludu B1 w tych dobach)", None)
     # B2-10: pobor przy zarobku ludu czynny (kiesa ludu B1 wpieta) - w dobach z krolestwami w wojnie i s > 0
-    pd = [d for d in ds if rows[d]["posK"] > 0 and rows[d]["on"] and rows[d]["inc"]]
+    pd = [d for d in ds if rows[d]["posK"] > 0 and rows[d]["on"] and rows[d]["inc"] and rows[d]["folk"]]
     tk = sum(rows[d]["taken"] for d in pd)
     cl = sum(rows[d]["calls"] for d in pd)
     rep.add("E5/B2 B2-10: pobor 184 czynny (doby z krolestwami w wojnie i s > 0)", f"dob {len(pd)}, pobrano {tk} zl, wolan poboru {cl}",
-            "> 0 (0 = kiesa ludu nieczynna albo pobor niewpiety w TownFolk.Earn - po scaleniu B1 musi byc > 0)", (tk > 0) if pd else None)
+            "> 0 (0 = pobor niewpiety w TownFolk.Earn - po scaleniu B1 musi byc > 0; kiesa nieczynna - s = 0, wiersz INFO, B2-2 NIE)", (tk > 0) if pd else None)
     t28 = _last28(ds)
     rep.add("E5/B2 B2-11: wielkosc 184 (sr28): pobrano / ludzie miast / podzamcza",
             f"{st.mean(rows[d]['taken'] for d in t28):.0f} / {st.mean(rows[d]['town'] for d in t28):.0f} / {st.mean(rows[d]['castle'] for d in t28):.0f} zl/d"

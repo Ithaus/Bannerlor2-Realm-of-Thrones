@@ -10,12 +10,14 @@ namespace Armoury
     /// <summary>
     /// E5/B2 (paczka 184, PLAN 5.6) - PODATEK WOJENNY KORONY OD ZAROBKU LUDU (projekt etapu 5 v2 rozdz. 3 "E5/B2", regula R15 (b); decyzja Jeffa 09.10 C:
     /// "mniej wojska AI - NIE, podatek wojenny korony ze skutkami dla gospodarki"). Wylacznik WarTaxFromFolk (wylaczony = stan sprzed paczki: s = 0, pobor 0).
+    /// Dziala tylko przy czynnej kiesie ludu (v2 K3, rozdz. 5 pkt 9) - hak B1 WtFolkLive: kiesa nieczynna = jak wylaczony klucz (s = 0, pobor 0; pierscienie
+    /// potrzeby biegna dalej), wiec wlaczenie kiesy zaczyna od s = 0 i narastania o krok na tydzien. Do scalenia B1 hak = false (kiesy ludu nie ma).
     ///
     /// DOCHODZI do daniny (v2, E5K1-01): danina wojenna z nadwyzki kas kupcow i kies wsi (Levies) i War Tax 5% podatku miast (RulingIncomePostfix) zostaja jak sa;
     /// polityka War Tax dalej x2 daniny i podnosi pulap s z WarTaxMax (3%) do WarTaxMaxWithPolicy (6%).
     ///  - POBOR: przy zarobku ludu (TownFolk.Earn kiesy ludu B1) - FolkWarTax(osada, klasa, zarobek): klasa W 0.5 s, R 1.0 s, P 1.5 s, podzamcze 1.0 s.
     ///    Tylko w wojnie krolestwa wlasciciela osady (stan wojny raz na dobe), tylko z 165 (potrzeba liczona z wplywow dnia 165 i kredytu 186), rod bez krolestwa - nic.
-    ///    Osada oblezona nie placi (R22, bramka BesiegedPay.Holds - rodzaj KFolkWarTax). Bez czynnej kiesy ludu (B1) nikt tego nie wola - pobor 0 (K3).
+    ///    Osada oblezona nie placi (R22, bramka BesiegedPay.Holds - rodzaj KFolkWarTax). Bez czynnej kiesy ludu (B1) pobor 0 i s = 0 (K3, hak WtFolkLive).
     ///    Platnik -> odbiorca: kiesa klasy ludu osady (wolajacy zdejmuje zwrocone CALE zloto) -> Kingdom.KingdomBudgetWallet (to samo zloto; ulamek ponizej 1 zl
     ///    czeka w osadzie na nastepny zarobek - to nie pieniadz, tylko niezaplacona reszta). Wplyw dnia korony (CrownIncome.Begin - "nasze").
     ///  - STAWKA s krolestwa co 7 dob (doba gry podzielna przez 7) wedlug potrzeby z ostatnich 7 dob: kredyt 186 (CrownIncome.DayOf.LoanIn > 0) albo nalezny
@@ -23,7 +25,8 @@ namespace Armoury
     ///    zapas wojny = max(CrownReserveGold 500 000, WarTaxReserveDays (60) x sredni nalezny zwrot z 28 dob); skarbiec > 2 x zapas wojny, bez kredytu i bez
     ///    siegania do zapasu przez 7 dob i dlug 186 = 0 -> -WarTaxStep; inaczej bez zmian. Pokoj (albo 165 wylaczone) - s spada co tydzien o
     ///    max(krok, wiekszy pulap / 4), wiec do zera najwyzej w 4 tygodnie (krotki pokoj nie zeruje stawki; w pokoju pobor 0).
-    ///    AI krola nie decyduje osobno - regula potrzeby jest decyzja korony (gracz-krol tak samo).
+    ///    AI krola nie decyduje osobno - regula potrzeby jest decyzja korony (gracz-krol tak samo). Pulap pilnowany CODZIENNIE (recenzja B2): gdy spadnie miedzy
+    ///    krokami (krolestwo zdejmie polityke War Tax, nizszy pulap w MCM), s od razu przyciete do pulapu - linia pokazuje stawke faktycznie pobierana.
     ///  - Zapis: szoste pole klucza 165 ("arm_crown165", CrownIncome.Export/Import; starsza wersja moda je pomija).
     ///  - Linie: "Korona: podatek wojenny ludu (184)" (po rentach 180, przed CrownIncome.End), pozycja w "Korona: wplywy dnia (165)" i w "Obieg" (korona).
     /// Wyjatek per krolestwo / per pobor - licznik potkniec, bez globalnych wylacznikow (CLAUDE.md 7). MoneyLedger bez nowych pozycji (przelew miedzy
@@ -75,7 +78,11 @@ namespace Armoury
             try { if (_wtErr.Add(where)) Log.Error("KingdomTreasury.WarTax." + where, e); } catch { }
         }
 
-        private static bool WtOn { get { var s = Settings.Current; return s != null && s.WarTaxFromFolk && CrownIncome.On; } }
+        /// <summary>Hak B1 (v2 K3): kiesa ludu czynna. Do B1 zawsze false - kiesy ludu nie ma (184 = stan sprzed paczki); B1 zamienia na
+        /// "TownFolkLive i TownFolkMode >= 1" (ten sam warunek co CourtFull.FolkShare).</summary>
+        private static bool WtFolkLive { get { return false; } }
+
+        private static bool WtOn { get { var s = Settings.Current; return s != null && s.WarTaxFromFolk && WtFolkLive && CrownIncome.On; } }
 
         private static double WtClamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
@@ -110,7 +117,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Stawka 184 klasy ludu tej osady dzis (s krolestwa x waga klasy, najwyzej pulap) - 0: wylaczone, bez 165, rod bez krolestwa, pokoj, osada oblezona
+        /// Stawka 184 klasy ludu tej osady dzis (s krolestwa x waga klasy, najwyzej pulap) - 0: wylaczone, kiesa ludu nieczynna, bez 165, rod bez krolestwa, pokoj, osada oblezona
         /// przy wlaczonym BesiegedPayNothing. Tylko odczyt (bez licznikow i bez zlota) - np. do prognozy kiesy.
         /// </summary>
         internal static double FolkWarTaxRate(Settlement st, int cls)
@@ -132,7 +139,7 @@ namespace Armoury
         /// <summary>
         /// E5/B2 POBOR przy zarobku ludu (wola TownFolk.Earn kiesy ludu B1 - miasto: klasy WtW/WtR/WtP, zamek: WtCastle). Zwraca CALE zloto, ktore klasa oddaje
         /// koronie - wolajacy zdejmuje dokladnie tyle z kiesy tej klasy; skarbiec krolestwa wlasciciela osady dostaje to samo (przelew, nic z niczego).
-        /// Ulamek ponizej 1 zl zostaje jako niezaplacona reszta osady (doliczana do nastepnego poboru). 0: wylaczone, bez 165, rod bez krolestwa, pokoj,
+        /// Ulamek ponizej 1 zl zostaje jako niezaplacona reszta osady (doliczana do nastepnego poboru). 0: wylaczone, kiesa ludu nieczynna, bez 165, rod bez krolestwa, pokoj,
         /// s = 0, osada oblezona (R22 - bramka BesiegedPay.Holds liczy, ile by zaplacila). Nie rzuca (wlasny try, licznik potkniec).
         /// </summary>
         internal static int FolkWarTax(Settlement st, int cls, double earned)
@@ -188,7 +195,7 @@ namespace Armoury
             try
             {
                 int today = (int)CampaignTime.Now.ToDays;
-                bool on = s.WarTaxFromFolk, inc = CrownIncome.On, step = today % 7 == 0;
+                bool key = s.WarTaxFromFolk, folk = WtFolkLive, on = key && folk, inc = CrownIncome.On, step = today % 7 == 0;
                 _wtWar.Clear(); _wtWarDay = today;                 // stan wojny tej doby - od nowa (pobor do jutrzejszego bloku czyta te liczbe)
                 double stepV = WtClamp(s.WarTaxStep, 0, 0.05);
                 double capHi = Math.Max(WtClamp(s.WarTaxMax, 0, 0.2), WtClamp(s.WarTaxMaxWithPolicy, 0, 0.2));
@@ -225,8 +232,9 @@ namespace Armoury
                         double cap = WtCap(k, s);
                         double debt = CrownBorrow.DebtOf(k);
                         bool arrears = CrownBorrow.InArrears(k);
-                        if (!on) w.S = 0;                              // wylaczone = stan sprzed paczki (wlaczenie zaczyna od zera)
-                        else if (step)
+                        if (!on) w.S = 0;                              // wylaczone albo kiesa ludu nieczynna (K3) = stan sprzed paczki (wlaczenie zaczyna od zera)
+                        else if (w.S > cap + 1e-6) w.S = Math.Round(cap, 6);   // recenzja B2: pulap spadl miedzy krokami (zdjeta polityka War Tax, MCM) - codziennie, przed krokiem
+                        if (on && step)
                         {
                             double s0 = w.S, s1 = s0;
                             if (!war || !inc) s1 = s0 - fall;
@@ -276,8 +284,9 @@ namespace Armoury
                     var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
                     var sb = new StringBuilder(2048);
                     sb.Append("Korona: podatek wojenny ludu (184): dzien ").Append(today)
-                      .Append(" | wylacznik War Tax From Folk ").Append(on ? "tak" : "nie (s = 0, pobor 0 - jak przed paczka)")
+                      .Append(" | wylacznik War Tax From Folk ").Append(key ? "tak" : "nie (s = 0, pobor 0 - jak przed paczka)")
                       .Append(", 165 Crown Current Income ").Append(inc ? "tak" : "nie (pobor 0, s spada jak w pokoju)")
+                      .Append(", kiesa ludu (B1) ").Append(folk ? "czynna" : "nieczynna (s = 0, pobor 0 - K3: 184 tylko z czynna kiesa)")
                       .Append(" | pulap ").Append((100 * WtClamp(s.WarTaxMax, 0, 0.2)).ToString("0.0", WtInv)).Append("% (z polityka War Tax ").Append((100 * capHi).ToString("0.0", WtInv))
                       .Append("%), krok ").Append((100 * stepV).ToString("0.00", WtInv)).Append(" pkt co 7 dob, w pokoju -").Append((100 * fall).ToString("0.00", WtInv))
                       .Append(" pkt; zapas wojny max(").Append(reserveBase).Append(", ").Append(reserveDays.ToString("0", WtInv)).Append(" dob naleznego zwrotu z 28 dob); wagi W 0.5 / R 1.0 / P 1.5 / podzamcze 1.0")
@@ -285,7 +294,7 @@ namespace Armoury
                       .Append("% - krolestw w wojnie ").Append(warK).Append(", z s > 0 ").Append(posK).Append(", na pulapie ").Append(capK).Append("; s > 0 w pokoju (spada, bez poboru) ").Append(peaceK)
                       .Append(" | pobrano ").Append(taken).Append(" zl (ludzie miast ").Append(_wtCls[WtW] + _wtCls[WtR] + _wtCls[WtP]).Append(": W ").Append(_wtCls[WtW]).Append(", R ").Append(_wtCls[WtR])
                       .Append(", P ").Append(_wtCls[WtP]).Append("; podzamcza ").Append(_wtCls[WtCastle]).Append("), wolan poboru ").Append(_wtCalls)
-                      .Append(" (0 przy s > 0 w wojnie = kiesa ludu nieczynna albo pobor niewpiety w TownFolk.Earn - B1), wstrzymane w oblezeniu ").Append(_wtHeld).Append(" (").Append(_wtHeldN).Append(')')
+                      .Append(" (0 przy s > 0 w wojnie = pobor niewpiety w TownFolk.Earn - B1), wstrzymane w oblezeniu ").Append(_wtHeld).Append(" (").Append(_wtHeldN).Append(')')
                       .Append(" | potrzeba (7 dob, krolestwa w wojnie): kredyt 186 ").Append(needLoan).Append(" krolestw, zwrot ponad wplywy ").Append(needOver)
                       .Append(", skarbiec < zapas wojny ").Append(needLow).Append(" (zapas wojny razem ").Append(reserveWar).Append(')')
                       .Append(" | krok tygodnia: ").Append(step ? "dzis" : "nie (za " + (7 - today % 7) + " dob)");
