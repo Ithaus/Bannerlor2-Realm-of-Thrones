@@ -902,3 +902,7 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (00:20 UTC) **Decyzje Jeffa 1-9** po tescie E4 i z etapu 5 - STAN-PRAC (ludnosc = zywi; bez hamulca strat; pobor z miast wedlug udzialu; 3 atuty BK; A2b poprawic; A4 i A1 zostawic; banda zabiera wszystko do swojej kiesy; oplata werbunku zalog nie znika). Plan: po wf_d9a9ccdf-5f9 dopisac P1-4 + progi T11/S15 INFO + atuty BK (CS) przed ponownym testem E4; A2b i ujscia (Armoury + RealisticCaptivity) w etapie 5 przed testem A.
 - (00:25 UTC) **Jeff: 7 - tak popraw (z A2b); 9 - tylko czesc (lord nie wozi calego majatku)** -> gracz: rynsztunek + 60% (RC) do bandy; AI: A6 bez zmian; skarbiec zostaje. STAN-PRAC.
 - (00:30 UTC) **Jeff: banda zabiera graczowi CALE zloto** (i rynsztunek) -> do kiesy/jukow bandy; inni pojmujacy - % RC; AI - czesc (A6).
+- (00:35 UTC) **Jeff: lord i milicja tez zabieraja graczowi wszystko** (zloto + rynsztunek do pojmujacego; AI - czesc). **ZMIANA ZASADY TESTOW (Jeff):** najpierw caly kod
+  (E4 poprawki + E5 A/B + E6), potem jeden zestaw 120 + zima + zapis na calosci; dlugi bieg raz na koncu. **Test E4 728 ZATRZYMANY na d403** (TaskStop; gra zamknieta;
+  -RestoreOnly: Armoury cf40fefa i CrashScribe 77b11df5 przywrocone; Configs BannerlordConfig.txt, DynamicReinforcements.reputation.cfg, engine_config.txt przywrocone
+  z autotest-kopie\2026-10-11_14-45-34, wersje z testu w SCRATCH\test\configs-po-przerwaniu-12-10). Logi do d403: kopia-e4k\czesc-koniec.log + session-*.log.

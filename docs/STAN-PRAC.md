@@ -1210,6 +1210,11 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   (00:30 UTC) **Jeff: "MI banda zabiera wszystko zloto tez!"** - GRACZ pojmany przez BANDE traci CALE zloto i caly rynsztunek -> do kiesy i jukow bandy (nowy klucz,
   np. BanditsTakeAllFromPlayer = true, niezaleznie od % w RealisticCaptivity.settings.xml); inni pojmujacy (lordowie, milicja) - % z RC jak dotad, do pojmujacego/kasy osady;
   lord AI pojmany - czesc (A6). Rozbicie tej bandy oddaje zloto i rynsztunek (BeatenPurse 3.2 + juki 3.8).
+  (00:35 UTC) **Jeff: "lord i milicja tez mi wszystko zabiera"** - GRACZ pojmany przez KOGOKOLWIEK (banda, lord, milicja) traci CALE zloto i caly rynsztunek -> do pojmujacego
+  (kiesa bandy / lorda; milicja i osada bez bohatera - kasa osady). Lord AI pojmany - tylko czesc (A6, "lord nie wozi calego majatku").
+- (00:35 UTC) **Jeff: ZASADA TESTOW (zmiana): "testy roczne/2-letnie za dlugo trwaja; najpierw kod, potem testujemy, a nie co chwila testy 4-godzinne"** ->
+  kodujemy etapy 4 (poprawki) + 5 (A, B, decyzje 5/7/9) + 6 (ile sie da), potem JEDEN krotki zestaw: 120 dob nowej kampanii + zima 120 + zapis 9 na calosci;
+  poprawki; wgranie. Dlugi bieg (364/728) tylko raz na samym koncu (najlepiej, gdy Jeff nie czeka).
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli
