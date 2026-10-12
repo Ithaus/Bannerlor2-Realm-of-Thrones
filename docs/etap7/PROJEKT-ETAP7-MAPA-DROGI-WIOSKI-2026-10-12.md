@@ -871,6 +871,8 @@ JEDEN DLL: osobny krotki bieg zdjec z kluczem proby drog (E7/D0) i trybem zdjec 
 
 ## 6. Pytania do Jeffa (tylko kierunek; liczby wybiera projekt)
 
+**ODPOWIEDZI JEFFA (12.10 ok. 15:00 UTC):** (1) premia +15% po drodze - "ok" = rada: NIE (drogi tylko do patrzenia, D2 domyslnie 0); (2) ile drog - "ok" = rada: po zdjeciach proby D0, trakty + droga do kazdej wioski; (3) plik ustawien Diplomacy Jeffa przeliczyc na rok 364 - **TAK** (przy wgraniu koncowym, gra zamknieta, kopia .bak; gdy narzedzie nie pozwoli zmienic pliku - gotowe polecenie dla Jeffa); (4) myto na Bliznakach - **"chce, ale policz"**: E7/B (licznik) zostaje; stawki myta wyliczyc z licznika w tescie zbiorczym (i z lore Freyow), propozycja z liczbami do Jeffa, dopiero potem kod myta (nowa paczka po tescie, zamknieta ekonomia: myto do kiesy pana Bliznakow, placi kiesa partii).
+
 1. **Drogi a predkosc (7.5).** 09.10 powiedziales "po drodze szybciej +15% - TAK", a 12.10 "zostaw predkosc poruszania sie jak jest". Premia +15% przyspiesza swiat tam, gdzie biegnie droga:
    (v2, po krytyce K1-05 - sufit marszu dziala PO premii) kolumny piesze lordow ok. 0% (i tak jada pod sufitem marszu ok. 3.0 jedn./h), jazda i male druzyny do ok. +5% na dobe,
    karawany i wozy wsi ok. +8% (sufit ich nie dotyczy; odcinki miedzy osadami biegna po drodze w 32% / 55% - a08 3.4); AI i tak nie wybiera drog (gra liczy najkrotsza droge bez terenu).

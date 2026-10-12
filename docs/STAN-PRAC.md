@@ -1301,3 +1301,7 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   zostaje na zawsze; to nie jest ciecie ponizej x1); N1 - lekka naprawa moze nie zjesc materialu (dawniej min. 1 sztuka kazdej czesci) - skutek "jednej reguly" (rada: zostawic).
 - (14:45 UTC 12.10) Limit tygodniowy 92% (reset 17.10 03:00 UTC). Etap 5 reszta (A7, A8, C1, C2, C4, "bitwy" ok. 26 tys./d) NIE zaczeta, zeby nie zostawic dwoch przerwanych watkow -
   najpierw dokonczy sie kod etapu 7 (wf_17813d40-8ac).
+- (15:00 UTC 12.10) **Jeff: "1. ok 2. ok 3. tak 4. chce ale policz"** -> (1)(2) zgoda z radami: etap 6 K4 cofniecie kroku x1.3 -> x1 (juz w kodzie, HarvestValve.cs:753), N1 lekka naprawa
+  bez materialu zostaje; etap 7 premia drog NIE (D2 domyslnie 0), ile drog - po zdjeciach (trakty + droga do kazdej wioski). (3) plik Diplomacy Jeffa na rok 364 - TAK, przy wgraniu
+  koncowym (gra zamknieta, .bak; gdy narzedzie nie pozwoli - polecenie dla Jeffa). (4) myto na Bliznakach - CHCE, ale najpierw policzyc: stawki z licznika E7/B w tescie zbiorczym
+  (+ lore Freyow), propozycja z liczbami do Jeffa, potem osobna paczka myta (kiesa partii -> kiesa pana Bliznakow). Wpisane w projekt etapu 7 rozdz. 6.
