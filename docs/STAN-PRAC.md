@@ -1225,3 +1225,11 @@ PRZEKAZANIE 09:35), Armoury.log 0 ERROR, etap3 20/20, wojsko lordow d120 110.4 t
 zima od 8. doby, lordowie w glodzie 20 (z30 29), bez jedzenia 16 (z30 26); zapis 9 dob (autotest-161-kawalki) - Armoury 0 ERROR, 30.6 s/dobe. Kopie logow
 SCRATCH(ae222cb7)\kopia-z31-A, -B, -zapis. Kopie DLL: Armoury.dll.bak-2026-10-11-przed-noc31 + D:\Backup-Bannerlord\wgrane\2026-10-11-noc31-przed (9d314ea6).
 ZATWIERDZONE: Armoury cf40fefa, RealisticCaptivity 90665425, GrandTourney bbb841d7, CrashScribe 77b11df5.
+
+**WGRANIE 32 (12.10 ok. 06:30 UTC; noc 11/12.10 - etap 4 caly, etap 5 caly (A+B+dokonczenia+audyt S), etap 6 waski):** Armoury 29fdca1e (galaz noc/wgranie-32 =
+w-toku/zbior-final 40b975e), CrashScribe 842f64a4 (noc/wgranie-32-cs = w-toku/cs-bledy 3b33863: B6/B6b/B6c Harrenhal i Mur, klucz powtorek, 3 atuty BK, strawa Polnocy),
+RealisticCaptivity 943ea0d3 (pojmujacy zabiera graczowi cale zloto i rynsztunek do siebie). GrandTourney bbb841d7 bez zmian. Testy (autotest, ta sama paczka poza ostatnia
+kalibracja korony): 120 dob nowej kampanii - Armoury 0 ERROR, 17.3 s/dobe; zapis 9 dob z konca biegu (caly nowy stan) - OK; zima 120 - OK, spichlerze F6/F7 TAK. Wojsko lordow
+w wojnie sr28 88.4 tys. (podloga 85, cel 95; po samym E4 106 tys. - spadek z etapu 5, czesc zaakceptowana przez Jeffa: A2b "trudno"). Pozostale NIE - kalibracja (opis w
+PRZEKAZANIE 12.10 06:30 UTC). Kopie: *.dll.bak-2026-10-12-przed-noc32 + D:\Backup-Bannerlord\wgrane\2026-10-12-noc32-przed (cf40fefa, 77b11df5, 90665425).
+ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841d7, CrashScribe 842f64a4.

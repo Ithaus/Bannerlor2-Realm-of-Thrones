@@ -964,3 +964,6 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   K9 Straz (ServesWatch); N6 TownRound; narzedzie (A1-T12, pin, Z8). Szacunek wojska 85-89 tys. (podloga 85, cel 95). DO DECYZJI JEFFA (cel 95): (2) CrownReserveReleaseDays
   360 -> 180 (pomost na rok, +4-5 tys.), (4) danina wsi LaySubsidyVillageShare 0.015 -> 0.025 albo A2 (sprzet do dworu) tylko w pokoju. DLL test\Armoury-final.dll 29fdca1e.
   **TEST 120 z poprawka ruszyl** (beg8ls8fv -> test\at-fin3-120.out.txt).
+- (06:30 UTC) **TEST 120 z poprawka wojska OK** (Armoury 0 ERROR, 17.3 s/dobe; wojsko w wojnie sr28 88.4 tys., d90-120 92.1 tys., ostatnia doba 87.7 - stabilne; NIE: etap2 3 (wojsko < 95,
+  D staly zamkow, 2.14), etap3 1, etap4 3 (pula wyrzutkow 3196 > 3053, wojsko, K22 koszt), etap5 4 + DEC 2 (A3-2 sakiewki 18.3 dnia, A3-7 koszt 37 ms, B1-T6 zjedzone bez zaplaty
+  1.07%, B4-6 zatkane magazyny 6.57%; B1-T7/T8 DECYZJA)). Logi: SCRATCH(ae222cb7)\kopia-fin3. **WGRANIE 32** (STAN-PRAC): Armoury 29fdca1e, CrashScribe 842f64a4, RC 943ea0d3.
