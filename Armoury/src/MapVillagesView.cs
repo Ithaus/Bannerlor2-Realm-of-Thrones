@@ -1352,7 +1352,7 @@ namespace Armoury
     // =====================================================================================================
 
     /// <summary>Wioski na mapie (W2): obrazki, widocznosc, ogien / dym, dymek. Rejestracja: SubModuleMain.OnApplicationTick.</summary>
-    public sealed class MapVillagesView : EntityVisualManagerBase
+    public sealed partial class MapVillagesView : EntityVisualManagerBase   // E7/W5: proporczyki w MapVillagePennants.cs
     {
         // po partiach (10), osadach (40), sladach (50), pogodzie (60) i dzwieku (70): dymek tylko, gdy nikt inny nie trafil
         public override int Priority => 100;
@@ -1452,6 +1452,7 @@ namespace Armoury
             public float Deg;                 // wyglad 3: obrot obrazka w stopniach (front do wody u mlyna / rybakow; dymek wedlug niego)
             public bool Placed;               // Cx / Cy / Deg ustawione
             public string Why = "";
+            public PenState Pen;              // E7/W5: proporczyk pana (MapVillagePennants.cs); null = nigdy nie wybrany
         }
 
         // ---------- v4: wzor obrazka (okreg, model) - elementy z siatkami, bez fizyki / skryptow / czastek ----------
@@ -1728,10 +1729,12 @@ namespace Armoury
                 // innej mapie) - tylko zrzucamy odwolania, cudzej sceny nie ruszamy.
                 bool sceneAlive = _screen != null && ReferenceEquals(MapScreen.Instance, _screen);
                 string sum = _active ? SummaryText() : "";
+                string pen = _active && _penMesh != null ? PennantLine() : null;   // E7/W5: stan proporczykow przed zdjeciem
                 if (sceneAlive) removed = RemoveAll(); else DropAll();
                 if (_active)
                     Log.Info("Wioski: koniec mapy (wyjscie z kampanii albo wczytanie) - zdjete obrazki " + removed + (sceneAlive ? "" : " (scena juz nie ta - same odwolania)")
                              + "; " + sum);
+                if (pen != null) Log.Info(pen);
             }
             catch (Exception e) { Log.Error("MapVillagesView.OnFinalize", e); }
             _slots.Clear(); _districts.Clear(); _grid.Clear(); _shown.Clear(); _slotByUid.Clear();
@@ -1744,6 +1747,7 @@ namespace Armoury
         {
             // MapScreen.ClearGPUMemory: zasoby pokazanych obrazkow trzeba zaladowac od nowa przy nastepnym ticku widoku
             foreach (var s in _shown) s.NeedRes = true;
+            PennantsClearMemory();   // E7/W5: tekstury herbow zwolnione - proporczyki od nowa przy nastepnym pokazaniu
         }
 
         // ---------- praca widoku: 4 razy na sekunde, tylko przy gotowej scenie (VisualTick wola gra tylko gdy MapScreen.IsReady) ----------
@@ -1769,11 +1773,17 @@ namespace Armoury
                 if (_wasOff) { _wasOff = false; _firstFillDone = false; Log.Info("Wioski: wlaczone w MCM - obrazki wracaja przy kamerze."); }
                 PollRaids();
                 UpdateVisibility(screen);
+                PennantTick(screen);   // E7/W5: proporczyki przy wioskach z obrazkiem (wlasny try i liczniki)
                 if (_sinceSummary >= SummaryEvery)
                 {
                     _sinceSummary = 0f;
                     string sum = SummaryText();
                     if (sum != _lastSummary) { _lastSummary = sum; Log.Info("Wioski: " + sum); }
+                    if (_penMesh != null)
+                    {
+                        string pl = PennantLine();
+                        if (pl != _penLastLine) { _penLastLine = pl; Log.Info(pl); }
+                    }
                 }
             }
             catch (Exception e)
@@ -4384,6 +4394,7 @@ namespace Armoury
         private int RemoveAll()
         {
             int n = 0;
+            RemovePennants();   // E7/W5: proporczyki razem z obrazkami (wroca przy kamerze po ponownym wlaczeniu)
             foreach (var s in _slots)
             {
                 if (s.Root != null)
@@ -4408,6 +4419,7 @@ namespace Armoury
 
         private void DropAll()
         {
+            DropPennants();   // E7/W5: scena juz nie ta - same odwolania
             foreach (var s in _slots) { s.Root = null; s.V = null; s.Shown = false; s.Placed = false; }
             foreach (var d in _districts) { d.T = null; d.TemplateTried = false; d.Kits = null; }
             _shown.Clear();

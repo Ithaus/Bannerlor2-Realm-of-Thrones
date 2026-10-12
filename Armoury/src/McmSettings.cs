@@ -4756,6 +4756,10 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool DistrictMenuEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Village Pennants", HintText = "the lord's pennant flies over villages close to the camera")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillagePennants { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5944,6 +5948,7 @@ namespace Armoury
             s.VillageWarMemory = VillageWarMemory;
             s.VillageTipLore = VillageTipLore;
             s.DistrictMenuEnabled = DistrictMenuEnabled;
+            s.VillagePennants = VillagePennants;
         }
 
         internal static void Apply()

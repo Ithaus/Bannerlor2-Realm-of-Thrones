@@ -104,6 +104,10 @@ Uzycie (Python 3, tylko odczyt):
                     Blok etap7_w3 (E7/W3, paczka 234): T1 linia startowa "Menu okregu (E7/W3): start" (pierwsza doba ostatniej sesji): pozycja "Look over the
                     district" w menu village i village_looted (index bez BRAK), ksiega wiosek czynna; sasiedzi pozycji - INFO; T3 potkniecia okna (suma linii doby)
                     i linie "ERROR in DistrictMenu." / "ERROR in VillageBook.DistrictView" 0; uzycie okna i zrodla herbow - INFO; T2 zdjecie okna - poza narzedziem.
+                    Blok etap7_w5 (E7/W5, paczka 238): T1 linia startowa "Proporczyki (E7/W5): start" (ostatnia mapa): siatka campaign_flag (zapas map_banner -
+                    INFO, BRAK - NIE); W5-1 w kadrze najwiecej 1-80 (0 = kamera nie zjechala ponizej 90 - INFO); W5-2 budowa sr. < 8 ms/klatke (budzet tworzenia
+                    obrazkow wiosek na tick); W5-3 potkniecia 0 (najwiecej w linii mapy) i linie "ERROR in MapVillagesView.Pennant*" 0; przebudowy po misji,
+                    zmiany herbu - INFO; T2 spadek klatek < 5% (inaczej VillagePennants domyslnie false) - tryb zdjec, poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5919,7 +5923,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    for blk in (etap7_b, etap7_w1, etap7_w2, etap7_w3):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, win, until=until)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -6183,6 +6187,53 @@ def etap7_w3(rep, lines, start, win, until=120, **kw):
         rep.add("E7/W3 W3-3b: uzycie okna (suma okna)", f"okien {o}, Hear more {m}; herby: rod tytulu BK {hb}, rycerz z lore {hl}, pan {hp}, bez herbu {hn}",
                 "INFO (autotest bez klikniec - 0; bez herbu > 0 tylko przy wsi bez pana)", None)
     rep.add("E7/W3 T2: zdjecie okna okregu (herb w ramce 86 x 63 prefabu ROT, dymek wiersza, Hear more)", "poza narzedziem", "tryb zdjec autotestu", None)
+
+
+def etap7_w5(rep, lines, start, win, until=120, **kw):
+    """E7/W5 (238, PLAN 7.9 c, projekt etapu 7 v2 rozdz. 3 "E7/W5"): linia startowa "Proporczyki (E7/W5): start" (pierwszy tick widoku wiosek na
+    mapie - raz na mape / wczytanie) i linia stanu "Proporczyki (E7/W5): w kadrze ..." (co 2 minuty przy zmianie i na koniec mapy; liczniki od
+    wczytania mapy). Widok mapy nie ma doby - progi z calego logu. Wiazace: T1, W5-2, W5-3; T2 (spadek klatek < 5%) w trybie zdjec poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Proporczyki (E7/W5): start")]
+    rows = [s for s in lines if s.startswith("Proporczyki (E7/W5): w kadrze")]
+    if not starts and not rows:
+        rep.add("E7/W5: linie Proporczyki (E7/W5)", "brak w logu",
+                "sa od wgrania E7/W5 przy czynnych wioskach na mapie (MapVillagesEnabled, VillagePennants, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "siatka BRAK" in s:
+            rep.add("E7/W5 T1: siatka choragwi (ostatnia mapa)", body[:200], "campaign_flag (zapas map_banner)", False)
+        else:
+            rep.add("E7/W5 T1: siatka choragwi (ostatnia mapa)", body[:200], "campaign_flag z plotnem (ZAPAS map_banner - INFO)",
+                    True if "siatka campaign_flag" in s else None)
+    else:
+        rep.add("E7/W5 T1: linia startowa", "brak", "jest przy pierwszym ticku widoku z wlaczonym kluczem VillagePennants", None)
+    off = [s for s in lines if s.startswith("Proporczyki (E7/W5): wylaczone w MCM")]
+    if off:
+        rep.add("E7/W5: wylacznik VillagePennants w biegu", f"wylaczen {len(off)}", "INFO (proba wylacznika albo bisekcja)", None)
+    if not rows:
+        rep.add("E7/W5 W5-1: linia stanu", "brak", "co 2 minuty przy zmianie i na koniec mapy", None)
+        return
+    seen = max([num(r"\(najwiecej (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-1: proporczykow w kadrze naraz (najwiecej w biegu)", str(seen), "1-80 (0 = kamera nie zjechala ponizej 90 - INFO)",
+            (1 <= seen <= 80) if seen > 0 else None)
+    ms = max([num(r"budowa sr\. ([0-9.]+) ms/klatke", s, float, 0.0) or 0.0 for s in rows] or [0.0])
+    bt = max([num(r"klatek z budowa (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-2: budowa proporczykow sr. ms na klatke z budowa (najgorsza linia)", f"{ms:.3f} ms (klatek z budowa najwiecej {bt})",
+            "< 8 ms (budzet tworzenia obrazkow wiosek na tick)", ms < 8.0 if bt > 0 else None)
+    st = max([num(r"potkniecia (\d+) \(wiosek bez", s, int, 0) or 0 for s in rows] or [0])
+    fl = max([num(r"wiosek bez proporczyka (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    err = [s for s in lines if s.startswith("ERROR in MapVillagesView.Pennant")]
+    rep.add("E7/W5 W5-3: potkniecia proporczykow (najwiecej w linii mapy) i linie ERROR", f"potkniecia {st} (wiosek bez proporczyka {fl}), linii ERROR {len(err)}",
+            "0", st == 0 and not err)
+    pm = max([num(r"przebudowy po misji (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    mi = max([num(r"\(misji (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    lc = max([num(r"zmiany herbu (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-4: przebudowy po misji i zmiany herbu (najwiecej w linii mapy)", f"po misji {pm} (misji {mi}), zmiany herbu {lc}",
+            "INFO (po bitwie z proporczykami w poblizu > 0)", None)
+    rep.add("E7/W5 T2: spadek klatek przy kamerze 30 / 60 / 90 i 0 / 40 / 80 proporczykach, plotno, puste flagi po bitwie", "poza narzedziem",
+            "< 5% w trybie zdjec (inaczej VillagePennants domyslnie false)", None)
 
 def main(argv):
     args = argv[1:]

@@ -1473,6 +1473,9 @@ namespace Armoury
         // E7/W3 (234, PLAN 7.9 b, R13): pozycja "Look over the district" w menu wsi (village, village_looted) - okno wiosek okregu z herbami rycerzy (DistrictMenu);
         // "People of this land" pokazuje wtedy sam naglowek i podsumowanie okregu (off = brak pozycji, sekcja okregu z wierszami wiosek jak dotad)
         public bool DistrictMenuEnabled = true;            // "Look over the district" in a village menu lists the villages of its district with the banners of their keepers
+        // E7/W5 (238, PLAN 7.9 c, R17): proporczyk pana nad wioskami z bliska (MapVillagePennants.cs: kamera z <= 90, najblizsze 80, budowa 12 na cwierc sekundy,
+        // kod herbu raz na sekunde, przebudowa po misji); off = zdjete od razu. Prog autotestu: spadek klatek > 5% w trybie zdjec = domyslnie false
+        public bool VillagePennants = true;                // the lord's pennant flies over villages close to the camera
 
         public static void Load(string moduleDataDir)
         {
