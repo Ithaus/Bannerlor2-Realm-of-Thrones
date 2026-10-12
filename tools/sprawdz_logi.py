@@ -3284,6 +3284,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k2(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K5 (213): juczne nowych karawan z targu, udzwig luzaka pod jukami (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
+    try:
+        etap5_k5(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3525,6 +3530,46 @@ def etap5_k2(rep, lines, start, until):
     rep.add("K2-6: sprzedaz nadmiaru i kupno do zapasu (suma okna)", f"sprzedane {sold} za {gold} (ze zbrojowni {arm}; kasa miasta bez nadwyzki {nob} postojow), "
             f"kupione do zapasu zwykle/bojowe/szlachetne {'/'.join(map(str, bought))}; handel koni gry pominiety: zakupy {gb}, sprzedaze {gs} postojow",
             "INFO (projekt: sprzedaze gry 0 - pominiete)", None)
+
+
+def etap5_k5(rep, lines, start, until):
+    """E6/K5 (213, projekt etapu 6 v2 rozdz. 3 "E6/K5" Test): linia doby "Juczne (213): dzien N" (dzien = doba gry, okno doby kampanii 1-until jak etap5_main).
+    Wiazace: juczne z niczego 0 (suma okna), nowe karawany >= 90% licznika na sucho, potkniecia 0, wpiecia bez BRAK; reszta INFO."""
+    rows = {}
+    for d, s in by_day(lines, "Juczne (213): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    rep.add("K5-1: linia Juczne (213)", f"{len(rows)} dob", "codziennie od wgrania E6/K5", None)
+    hook = [s for s in lines if s.startswith("PackMarket (E6/K5, 213):")]
+    if hook:
+        rep.add("K5-2: wpiecia (InitializeCaravanOnCreation, CreateCaravanParty VeryLow, model pojemnosci)", hook[-1][:200], "bez BRAK i bez bledu wpiecia",
+                ("BRAK" not in hook[-1]) and ("blad wpiecia" not in hook[-1]))
+    if not rows:
+        return
+    days = sorted(rows)
+    off = [x for x in days if "| CZYNNE |" not in rows[x]]
+    rep.add("K5-3: E6/K5 CZYNNE w dobach okna", f"{len(days) - len(off)} z {len(days)}" + (f"; ostatnia nieczynna d{off[-1]}" if off else ""),
+            "wszystkie doby (klucz PackAnimalsFromMarket)", len(off) == 0)
+    win = [rows[x] for x in days]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in win)
+    left = tot(r", z niczego (-?\d+) \(gra dala")
+    given, removed = tot(r"\(gra dala (\d+)"), tot(r"\(gra dala \d+, zdjete (\d+)")
+    rep.add("K5-4: juczne nowych karawan z niczego (suma okna)", f"{left} (gra dala {given}, zdjete {removed})", "0", left == 0)
+    new, dry = tot(r"nowe karawany (\d+) \(na sucho"), tot(r"na sucho z jucznymi gry (\d+)")
+    rep.add("K5-5: nowe karawany wobec licznika na sucho (suma okna)", f"{new} z {dry}" + (f" ({100.0 * new / dry:.1f}%)" if dry else ""),
+            ">= 90% (zakup nie wstrzymuje tworzenia)", (new >= 0.9 * dry) if dry else None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    rep.add("K5-6: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+    bought, paid, target, short = tot(r"kupily (\d+) za"), tot(r"kupily \d+ za (\d+)"), tot(r"\(cel (\d+);"), tot(r", brak (\d+) \(")
+    zero, naval, dte = tot(r"kapital 0 przy tworzeniu - karawany gracza (\d+)"), tot(r"\| morskie (\d+)"), tot(r"\| konwoje DTE (\d+)")
+    last = rows[days[-1]]
+    under, foot = num(r"luzakow pod jukami (\d+)", last, int, 0) or 0, num(r"pod piechurem albo jencem (\d+)", last, int, 0) or 0
+    rep.add("K5-7: zakup jucznych, brak i udzwig (suma okna; udzwig - ostatnia doba)",
+            f"kupione {bought} za {paid} (cel {target}, brak {short}; kapital 0 - gracz {zero}; morskie {naval}; konwoje DTE {dte}); "
+            f"luzakow pod jukami {under}, pod piechurem albo jencem {foot} (d{days[-1]})", "INFO (utarg kupcow - linia Kupcy/obieg)", None)
 
 
 def etap5_fee(rep, lines):

@@ -59,6 +59,9 @@ namespace Armoury
 
         private static Ctx Top() { return _depth > 0 ? _stack[_depth - 1] : null; }
 
+        /// <summary>E6/K5 (213, PackMarket): wywolanie CreateCaravanParty w oknie konwoju DTE (kontekst KDte - kapital 0, konwoj nie handluje); tylko odczyt.</summary>
+        internal static bool InDteConvoy() { var c = Top(); return _createDepth > 0 && c != null && c.Kind == KDte && !c.Done; }
+
         private static bool Push(Ctx c)
         {
             if (_depth >= _stack.Length) return false;

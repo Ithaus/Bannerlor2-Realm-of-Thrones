@@ -183,6 +183,9 @@ namespace Armoury
                 // E6/K2 (212): gra nie handluje konmi lordow - kontekst PartiesBuyHorseCampaignBehavior.OnSettlementEntered, zakup BuyHorses i sprzedaz
                 // wierzchowcow przez SellItemsAction.Apply pominiete w tym kontekscie (sprzedaz towaru zostaje); dziala przy kluczu AiSellsSpareHorses
                 try { SpareHorses.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SpareHorses.ApplyAll", e); }
+                // E6/K5 (213): juczne nowych karawan z targu miasta startu (postfiks InitializeCaravanOnCreation + postfiks CreateCaravanParty VeryLow - po E4/8 Low,
+                // przed finalizerami CaravanCapital/O17) i udzwig luzaka pod jukami (postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity); dziala przy kluczach
+                try { PackMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackMarket.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc

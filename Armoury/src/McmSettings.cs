@@ -4712,6 +4712,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float AiSpareHorseShare { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Pack Animals From Market", HintText = "a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool PackAnimalsFromMarket { get; set; } = true;
+
+        [SettingPropertyInteger("Spare Horse Carry Kg", 20, 100, "0", HintText = "how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int SpareHorseCarryKg { get; set; } = 60;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5889,6 +5897,8 @@ namespace Armoury
             s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;
             s.AiSellsSpareHorses = AiSellsSpareHorses;
             s.AiSpareHorseShare = AiSpareHorseShare;
+            s.PackAnimalsFromMarket = PackAnimalsFromMarket;
+            s.SpareHorseCarryKg = SpareHorseCarryKg;
         }
 
         internal static void Apply()

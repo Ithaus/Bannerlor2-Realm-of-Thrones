@@ -1451,6 +1451,10 @@ namespace Armoury
         // galaz koni); gra nie kupuje i nie sprzedaje koni lordow (PartiesBuyHorseCampaignBehavior - zakup i sprzedaz koni pominiete, sprzedaz towaru zostaje)
         public bool AiSellsSpareHorses = true;             // a lord keeps a tenth more horses of each kind than his riders need - never fewer than Ai Mount Spare Buffer - and buys up to that; the horses of his fallen riders beyond half as many again he sells at the next market. The game no longer buys or sells lords' horses itself (off = lords buy for the men waiting to be raised to horse, as before, and the game trades their horses)
         public float AiSpareHorseShare = 0.10f;            // the spare horses an AI lord keeps of each kind, as a share of his riders of that kind (never fewer in all than Ai Mount Spare Buffer)
+        // E6/K5 (213, PLAN 6.16, R9/R13): juczne nowej karawany z targu miasta startu za jej kapital zamiast z niczego (PackMarket, postfiks CreateCaravanParty VeryLow);
+        // luzak, ktory nie niesie piechura ani jenca, niesie SpareHorseCarryKg zamiast 20 kg gry (postfiks modelu pojemnosci dopisuje roznice)
+        public bool PackAnimalsFromMarket = true;          // a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)
+        public int SpareHorseCarryKg = 60;                 // how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)
 
         public static void Load(string moduleDataDir)
         {

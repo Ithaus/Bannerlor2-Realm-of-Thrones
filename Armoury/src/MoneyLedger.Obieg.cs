@@ -690,7 +690,7 @@ namespace Armoury
               .Append(" | karawany lordow: zold naliczony ").Append(Neg(_wage[WCaravan])).Append(" (").Append(_wageN[WCaravan]).Append(" karawan)")
               .Append(" | nowe karawany: ").Append(newN).Append(" (notable ").Append(newNot).Append(", lordowie ").Append(newN - newNot).Append(", w tym kupione przez lordow BK ")
               .Append(Sm[CW.ICaravanBuyN]).Append("), kapital nadany z niczego ").Append(Both(z2, CW.WCaravanCap, CW.WCaravanNew, true)).Append(CW.Wired[CW.WCaravanCap] && CW.Wired[CW.WCaravanNew] ? " zl" : "").Append(" (w kasach zaraz po wejsciu do osady ")
-              .Append(Sm[CW.ICaravanCapAfter]).Append(" - reszta to przelewy tej samej chwili: dochod BK do wlasciciela, oplaty BK do licznika cel, werbunek,")
+              .Append(Sm[CW.ICaravanCapAfter]).Append(" - reszta to przelewy tej samej chwili: dochod BK do wlasciciela, oplaty BK do licznika cel, werbunek, juczne z targu E6/K5 (do kasy miasta),")
               .Append(" oraz najem eskorty i awanse zalogi BetterEconomy - te znikaja, pozycja ujsc)")
               .Append(" | karawany, ktore zniknely z mapy: ").Append(Sm[CW.IPartyGoneCaravanN]).Append(", ich kiesy przepadly ").Append(Neg(Sm[CW.UPartyCaravan]))
               .Append(" | zmarli notable: ").Append(Sm[CW.IHeroesLeftNotableN]).Append(", zloto przepadlo ").Append(Neg(Sm[CW.IHeroesLeftNotableGold]))
