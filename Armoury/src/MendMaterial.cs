@@ -51,6 +51,7 @@ namespace Armoury
         internal static void Reset()
         {
             _stock.Clear();
+            _frac.Clear(); _fracDay = -1; _fracTakenToday = 0;   // E6/N1b: ulamki materialu wlasnych rak - wczytanie oddaje je w SyncData (arm_mend_frac)
             _resolved = false; _ore = _wood = _leather = _linen = _wool = null;
             Array.Clear(_bars, 0, _bars.Length);
         }
@@ -206,26 +207,61 @@ namespace Armoury
         }
 
         /// <summary>E6/N1: czesci receptury kuzni na naprawe wlasnymi rekami - share dla drewna, skory i plotna, udzial metalu wedlug rodzaju dla sztab
-        /// i wegla; sztuki zaokraglone, 0 = bez tej czesci (drobna naprawa bywa bez materialu - regula SelfMendParts).</summary>
+        /// i wegla; sztuki zaokraglone, 0 = bez tej czesci (drobna naprawa bywa bez materialu - regula SelfMendParts). E6/N1b (MendFractionMemory):
+        /// sztuki z licznika ulamkow - pamiec + ulamek tej naprawy, w dol (ulamek zostaje w pamieci, zapisuje go SelfMendDone).</summary>
         private static List<Recipes.Part> SelfParts(ItemObject it, float share, float loss)
         {
             var list = new List<Recipes.Part>();
             if (it == null) return list;
             try
             {
-                share = Math.Max(0f, share);
-                float ms = loss >= 1f - LootPrices.WreckState - Eps ? -1f : MetalShare(it, loss);
-                if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - jak NeedsShare
-                var r = Recipes.For(it);
-                if (r.Parts == null) return list;
-                foreach (var p in r.Parts)
+                var exact = SelfExact(it, share, loss);
+                if (FracOn)
                 {
-                    if (p.Item == null) continue;
-                    int need = (int)Math.Round(p.Count * (ForgeMetalPart(p.Item) ? ms : share));
-                    if (need > 0) list.Add(new Recipes.Part(p.Item, need));
+                    foreach (var kv in Summed(exact))
+                    {
+                        int n = (int)Math.Floor(FracOf(kv.Key) + kv.Value + FracEps);
+                        if (n > 0) list.Add(new Recipes.Part(kv.Key, n));
+                    }
+                    return list;
+                }
+                foreach (var kv in exact)
+                {
+                    int need = (int)Math.Round(kv.Value);
+                    if (need > 0) list.Add(new Recipes.Part(kv.Key, need));
                 }
             }
             catch (Exception e) { Log.Error("MendMaterial.SelfParts", e); }
+            return list;
+        }
+
+        /// <summary>Dokladne (ulamkowe) sztuki kazdej czesci receptury przed zaokragleniem - po kolei jak w recepturze (wzor SelfParts z E6/N1).</summary>
+        private static List<KeyValuePair<ItemObject, float>> SelfExact(ItemObject it, float share, float loss)
+        {
+            var list = new List<KeyValuePair<ItemObject, float>>();
+            if (it == null) return list;
+            share = Math.Max(0f, share);
+            float ms = loss >= 1f - LootPrices.WreckState - Eps ? -1f : MetalShare(it, loss);
+            if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - jak NeedsShare
+            var r = Recipes.For(it);
+            if (r.Parts == null) return list;
+            foreach (var p in r.Parts)
+            {
+                if (p.Item == null) continue;
+                list.Add(new KeyValuePair<ItemObject, float>(p.Item, p.Count * (ForgeMetalPart(p.Item) ? ms : share)));
+            }
+            return list;
+        }
+
+        /// <summary>Ten sam przedmiot w kilku czesciach receptury - jedna pozycja (jeden licznik na przedmiot), kolejnosc pierwszego wystapienia.</summary>
+        private static List<KeyValuePair<ItemObject, float>> Summed(List<KeyValuePair<ItemObject, float>> exact)
+        {
+            var list = new List<KeyValuePair<ItemObject, float>>();
+            foreach (var kv in exact)
+            {
+                int i = list.FindIndex(x => ReferenceEquals(x.Key, kv.Key));
+                if (i < 0) list.Add(kv); else list[i] = new KeyValuePair<ItemObject, float>(kv.Key, list[i].Value + kv.Value);
+            }
             return list;
         }
 
@@ -243,6 +279,113 @@ namespace Armoury
             var s = Settings.Current;
             float loss = Math.Max(0f, Math.Min(1f, missing));
             return SelfParts(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * loss, loss);
+        }
+
+        // ------------------------------------------------------------ E6/N1b (decyzja Jeffa 12.10 15:15): ulamki materialu wlasnych rak w pamieci
+        // Jeff: "jak jest za malo do tego, aby zuzyc 1 sztuke, to nie zuzywa, liczy w pamieci i potem dopiero zuzywa, gdy sie nazbiera". Do N1b SelfParts
+        // zaokraglal kazda czesc (Math.Round): ulamek ponizej pol sztuki przepadal (lekka naprawa bez materialu), 0.5 - 1.49 zjadalo cala sztuke. Teraz ulamek
+        // kazdej naprawy idzie do licznika (zrodlo x przedmiot materialu; jedyne zrodlo wlasnych rak = sakwy gracza), sztuka schodzi z sakw, gdy licznik
+        // + ulamek >= 1 (kilka naraz, gdy wiecej). Brak w sakwach sztuk, ktore wypadaja = naprawa wstrzymana jak przy kazdym braku materialu (licznik bez zmian).
+        // Kowale miasta (Bench: lawa, kwatermistrz, ludzie gracza, AI) tego nie potrzebuja - ich zapas (arm_mendstock) juz trzyma reszty calych sztuk w kg
+        // i bierze zloto za zuzyty ulamek; drugi licznik tam liczylby material dwa razy.
+        private const string FracBag = "bag";
+        private const float FracEps = 0.0001f, FracMin = 0.001f;
+        private static readonly Dictionary<string, float> _frac = new Dictionary<string, float>();
+        private static int _fracDay = -1, _fracTakenToday;
+
+        /// <summary>Wlacznik MendFractionMemory (E6/N1b) - tylko przy jednej regule wlasnych rak (SelfRepairSameRule).</summary>
+        internal static bool FracOn { get { var s = Settings.Current; return s != null && s.SelfRepairSameRule && s.MendFractionMemory; } }
+
+        private static string FracKey(ItemObject x) { return FracBag + ":" + x.StringId; }
+        private static float FracOf(ItemObject x) { float v; return x != null && _frac.TryGetValue(FracKey(x), out v) ? v : 0f; }
+
+        private static void FracDay()
+        {
+            int d = (int)TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays;
+            if (d != _fracDay) { _fracDay = d; _fracTakenToday = 0; }
+        }
+
+        /// <summary>E6/N1b: naprawa wlasnymi rekami wykonana - po zdjeciu czesci z sakw (taken = lista z SelfPartsFor tej naprawy, Forge.SelfRepair).</summary>
+        internal static void SelfMendDoneFor(ItemObject it, float missing, List<Recipes.Part> taken)
+        {
+            var s = Settings.Current;
+            float loss = Math.Max(0f, Math.Min(1f, missing));
+            SelfMendDone(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * loss, loss, taken);
+        }
+
+        /// <summary>E6/N1b: to samo dla sztuki ze stanem w modyfikatorze ("Pick a piece" - SmithMenu.DoMendOne; taken = lista z SelfPartsOf tej sztuki).</summary>
+        internal static void SelfMendDoneOf(EquipmentElement el, List<Recipes.Part> taken)
+        {
+            float cond = ConditionScaling.ConditionOf(el.ItemModifier);
+            if (cond < 0f) cond = 0f; if (cond > 1f) cond = 1f;
+            SelfMendDone(el.Item, Share(el), 1f - cond, taken);
+        }
+
+        /// <summary>Licznik += dokladny ulamek tej naprawy - zdjete cale sztuki (zamknieta ksiega: suma licznika = zuzyte - zdjete; nic nie znika
+        /// i nic nie powstaje). Wpisy ponizej 0.001 sztuki pomijane.</summary>
+        private static void SelfMendDone(ItemObject it, float share, float loss, List<Recipes.Part> taken)
+        {
+            if (it == null || !FracOn) return;
+            try
+            {
+                FracDay();
+                var sum = Summed(SelfExact(it, share, loss));
+                if (taken != null)
+                    foreach (var p in taken)
+                        if (p.Item != null && p.Count > 0 && sum.FindIndex(x => ReferenceEquals(x.Key, p.Item)) < 0)
+                            sum.Add(new KeyValuePair<ItemObject, float>(p.Item, 0f));   // zdjete spoza receptury (nie powinno sie zdarzyc) - tez z licznika
+                foreach (var kv in sum)
+                {
+                    int n = 0;
+                    if (taken != null) foreach (var p in taken) if (ReferenceEquals(p.Item, kv.Key) && p.Count > 0) n += p.Count;
+                    _fracTakenToday += Math.Max(0, n - (int)Math.Floor(kv.Value + FracEps));   // sztuki, ktore zeszly dzieki pamieci
+                    string key = FracKey(kv.Key);
+                    float v = FracOf(kv.Key) + kv.Value - n;
+                    if (Math.Abs(v) < FracMin) _frac.Remove(key); else _frac[key] = v;
+                }
+            }
+            catch (Exception e) { Log.Error("MendMaterial.SelfMendDone", e); }
+        }
+
+        /// <summary>Dopisek do linii napraw wlasnymi rekami (log); pusty przy wylaczonym MendFractionMemory.</summary>
+        internal static string FracNote()
+        {
+            if (!FracOn) return "";
+            try { FracDay(); } catch { }
+            return " | ulamki w pamieci: " + _frac.Count + " wpisow, zdjete dzis z pamieci " + _fracTakenToday + " szt.";
+        }
+
+        /// <summary>Zapis (ArmouryBehavior.SyncData, klucz arm_mend_frac): "bag:przedmiot=ulamek;..."; tylko |ulamek| >= 0.001.</summary>
+        internal static string ExportFrac()
+        {
+            var sb = new StringBuilder();
+            foreach (var kv in _frac)
+            {
+                if (Math.Abs(kv.Value) < FracMin) continue;
+                if (sb.Length > 0) sb.Append(';');
+                sb.Append(kv.Key).Append('=').Append(kv.Value.ToString("R", CultureInfo.InvariantCulture));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Wczytanie: stary zapis bez klucza (null) = pusta pamiec; pomija obce zrodla, przedmioty, ktorych juz nie ma, i ulamki ponizej 0.001.</summary>
+        internal static void ImportFrac(string s)
+        {
+            _frac.Clear();
+            if (string.IsNullOrEmpty(s)) return;
+            var om = MBObjectManager.Instance;
+            foreach (var p in s.Split(';'))
+            {
+                var a = p.Split('=');
+                if (a.Length != 2) continue;
+                int c = a[0].IndexOf(':');
+                if (c <= 0 || a[0].Substring(0, c) != FracBag || c + 1 >= a[0].Length) continue;
+                if (om != null && om.GetObject<ItemObject>(a[0].Substring(c + 1)) == null) continue;   // przedmiot zniknal (inny zestaw modow)
+                float v;
+                if (!float.TryParse(a[1], NumberStyles.Float, CultureInfo.InvariantCulture, out v) || float.IsNaN(v) || float.IsInfinity(v)) continue;
+                if (Math.Abs(v) < FracMin) continue;
+                _frac[a[0]] = v;
+            }
         }
 
         /// <summary>Wlacznik MendPayToFolk (recenzja 217).</summary>

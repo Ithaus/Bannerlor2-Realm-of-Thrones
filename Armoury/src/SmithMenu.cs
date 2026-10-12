@@ -1091,6 +1091,7 @@ namespace Armoury
                             { Log.Player("Your materials ran short before the work was done.", true); return; }
                         foreach (var p in mats)
                             if (p.Item != null) MobileParty.MainParty.ItemRoster.AddToCounts(p.Item, -p.Count);
+                        if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                         Forge.SpendStamina(stamina);
                         Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, 30 + 20 * Recipes.Grade(ee.Item));
                     }
@@ -1098,7 +1099,7 @@ namespace Armoury
                     store.AddToCounts(new EquipmentElement(ee.Item), 1);
                     Log.Player(ee.Item.Name + " is whole again and back in the company stores." + (order != null
                         ? " " + gold + " gold into the coffers of " + TownName() + " (" + order.Labor + " for the work, " + order.MatGold + " for materials)." : ""));
-                    Log.Info("Naprawa sztuki (magazyn): " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna")
+                    Log.Info("Naprawa sztuki (magazyn): " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna" + MendMaterial.FracNote())
                              + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : ""));
                     return;
                 }
@@ -1126,6 +1127,7 @@ namespace Armoury
                         { Log.Player("Your materials ran short before the work was done.", true); return; }
                     foreach (var p in mats)
                         if (p.Item != null) roster.AddToCounts(p.Item, -p.Count);
+                    if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                     Forge.SpendStamina(stamina);
                     Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, 30 + 20 * Recipes.Grade(ee.Item));
                 }
@@ -1144,7 +1146,7 @@ namespace Armoury
                 Log.Player(ee.Item.Name + " is whole again" + (order != null
                     ? " - " + gold + " gold into the coffers of " + TownName() + " (" + order.Labor + " for the work, " + order.MatGold + " for materials)."
                     : bySmith ? " - " + gold + " gold well spent." : " - your own work."));
-                Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna")
+                Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna" + MendMaterial.FracNote())
                          + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : ""));
             }
             catch (Exception e) { Log.Error("DoMendOne", e); }

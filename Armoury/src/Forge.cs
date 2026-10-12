@@ -525,6 +525,7 @@ namespace Armoury
                     { reason = "materials: " + string.Join(", ", lack); return false; }
                     var bag = MobileParty.MainParty.ItemRoster;
                     foreach (var p in parts) Recipes.Take(bag, p.Item, p.Count);
+                    MendMaterial.SelfMendDoneFor(item, missingCondition, parts);   // E6/N1b: ulamek tej naprawy do pamieci, zdjete sztuki z pamieci
                 }
                 else
                 {

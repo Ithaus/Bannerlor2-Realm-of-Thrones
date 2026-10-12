@@ -3976,6 +3976,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendPayToFolk { get; set; } = true;
 
+        [SettingPropertyBool("Mend Fraction Memory", HintText = "with Self Repair Same Rule on: the bit of each material that a repair at your own anvil uses but that does not make a whole piece is not lost - it is tallied (one tally per material in your bags, kept in the save) and a whole piece comes off your bags once the tally reaches one (several at once if more); when the pieces due are not in your bags the repair waits, as for any missing material (off = as before: each material rounded to whole pieces per repair, a light repair may take none at all)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendFractionMemory { get; set; } = true;
+
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
@@ -5793,6 +5797,7 @@ namespace Armoury
             s.SelfRepairSameRule = SelfRepairSameRule;
             s.AiMendsWornOnly = AiMendsWornOnly;
             s.MendPayToFolk = MendPayToFolk;
+            s.MendFractionMemory = MendFractionMemory;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;

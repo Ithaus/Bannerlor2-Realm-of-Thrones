@@ -576,6 +576,9 @@ namespace Armoury
                 if (dataStore.IsLoading) MendMaterial.Import(mend);
             }
             catch (Exception e) { Log.Error("SyncData.MendStock", e); }
+            // E6/N1b: ulamki materialu napraw wlasnymi rekami (MendMaterial._frac); stary zapis bez klucza = pusta pamiec
+            try { string mf = dataStore.IsSaving ? MendMaterial.ExportFrac() : null; SaveText.Sync(dataStore, "arm_mend_frac", ref mf); if (dataStore.IsLoading) MendMaterial.ImportFrac(mf); }
+            catch (Exception e) { Log.Error("SyncData.MendFrac", e); }
             // 171: zamowienia zamkow w drodze i zbrojownie zalog (DTE ich nie zapisuje) - kazdy klucz we wlasnym try; Export tylko przy zapisie
             // sklad7 (scalenie K1): JEDEN zapis zbrojowni zalog - klucz "arm_garrisonarmory" prowadzi tylko GarrisonArmory (format v1|); K1c zapisywal
             // ten sam klucz drugi raz (GarrisonKit.ExportArmories, inny format) - usuniete; GarrisonArmory.Restore czyta tez dawny format K1c
@@ -2774,7 +2777,7 @@ namespace Armoury
                     foreach (var b in blocked) Log.Player(b, true);
                 else if (mended == 0)
                     Log.Player("Your harness is sound - nothing on you needs mending.");
-                Log.Info("Naprawa wlasnoreczna: " + mended + " szt., zablokowane: " + blocked.Count);
+                Log.Info("Naprawa wlasnoreczna: " + mended + " szt., zablokowane: " + blocked.Count + MendMaterial.FracNote());
             }
             catch (Exception e) { Log.Error("RepairAllSelf", e); }
         }
