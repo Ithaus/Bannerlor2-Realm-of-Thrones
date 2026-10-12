@@ -1245,3 +1245,5 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
 - (10:15 UTC 12.10) **Jeff: "wiesniacy najbogatsi - bzdura" -> TAK na 3 zmiany (prawdziwe przeplywy):** (1) pan bierze z utargu wsi 45% zamiast 35% (polityka zwykla; niska/wysoka
   przesuniete o +10 pkt: 35/45/55); (2) dziesiecina OD RAZU (C3 z projektu E5, R21): 5% utargu wsi + od zarobku ludu miast W 1% / R 2% / P 3% -> kaplan osady; 50% jalmuzna
   (kiesa biednych miasta / kiesa wsi), 50% budowa septow (75% place ludu, 25% material); (3) wies i lud miast szybciej wydaja nadwyzke: 15%/d zamiast 7%/d ponad zapas.
+- (10:25 UTC 12.10) **Jeff: etap 8 (drobne bledy) NIE "przy okazji"** - nie dokladamy drobnych bledow do paczek etapow 6/7 (CLAUDE.md 8.3); etap 8 jako osobny etap,
+  wlasne paczki i wlasny test. Propozycja z 12.10 ("po kilka do kazdej paczki") ODRZUCONA.
