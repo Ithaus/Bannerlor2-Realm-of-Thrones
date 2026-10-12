@@ -1192,6 +1192,18 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   swoj rodzaj zbroi - lore). Uwaga: kultury ROT (battania = Polnoc itd. - CLAUDE.md 2).**
 - (00:00 UTC 12.10) **Jeff etap 6 (pytania projektu v2): (1) zakaz kucia unikatow tylko dla kowali miast i AI, NIE dla kuzni gracza - TAK; (2) mieszczanie kupuja tylko
   konie robocze w miejsce padlych ze starosci - TAK; (3) udzial jazdy krainy z szablonow armii 175 (jedna liczba; 12-15% w 120 dobach, ok. 20% po roku) - OK.**
+- (00:20 UTC 12.10) **DECYZJE JEFFA (pytania po tescie E4 i z etapu 5):**
+  (1) "ludnosc" w decyzji 11.10 = WSZYSCY ZYWI (dom + sluzba + jency + niewolni + Mur + weterani + uchodzcy);
+  (2) BEZ sztucznego hamulca strat (P1-5 ODRZUCONE): "jak ma duze straty, to ma duze straty, ekonomia na tym cierpi - taka zasada wojny; nie robmy sztucznych praw;
+      jesli ubywa, to ubywa, jesli przybywa, to przybywa" -> prog -0.5%/rok tylko INFO (pomiar), bez zmian w grze; bez korekty smiertelnosci miast;
+  (3) pobor z miast wedlug udzialu miasta w ludnosci krainy (P1-4) - TAK;
+  (4) przywrocic 3 atuty BK (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% slawy, Cataphract +12% slawy) latka w CrashScribe - TAK;
+  (5) A2b: zwrot wlasnych pieniedzy nie jako dochod z ziemi - POPRAWIAMY, "najwyzej wojsko spadnie, trudno";
+  (6) A4: podatek korony od max(20 000, zapas) - ZOSTAWIC;
+  (7) A5 Z8 - Jeff prosi o wyjasnienie;
+  (8) A1: ubogie miasta bez zakupow zbroi - ZOSTAWIC ("tak dziala ekonomia, niech miasta stana sie bogate");
+  (9) ujscia: BANDA ZABIERA WSZYSTKO (cale zloto i rynsztunek gracza - "zostawia mnie w lachmanach") do swojej kiesy/jukow (nie w nicosc); oplata za werbunek zalog
+      NIE MOZE znikac (do sprzedajacego - notabla/osady).
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli
