@@ -1242,3 +1242,6 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
 - (09:50 UTC 12.10) **Jeff - ZASADA: "nie mamy na sile i sztucznie robic dobrze lordom - jak ich nie stac na wojne, to zaciagaja pozyczke albo wystawiaja mniejsze zaciagi"**.
   -> spadek wojska z prawdziwej ekonomii (koniec zlota z niczego) jest dopuszczalny; podloga 85 tys. z etapu 2 przestaje byc warunkiem (tylko pomiar); nie dokladamy sztucznych
   doplat (np. sprzet A2 w wojnie zostaje bez zmian); danina wsi 2.5% (decyzja 1b) zostaje - to prawdziwy podatek. Rody: drabina dlugu / Bank / mniejsze wojsko.
+- (10:15 UTC 12.10) **Jeff: "wiesniacy najbogatsi - bzdura" -> TAK na 3 zmiany (prawdziwe przeplywy):** (1) pan bierze z utargu wsi 45% zamiast 35% (polityka zwykla; niska/wysoka
+  przesuniete o +10 pkt: 35/45/55); (2) dziesiecina OD RAZU (C3 z projektu E5, R21): 5% utargu wsi + od zarobku ludu miast W 1% / R 2% / P 3% -> kaplan osady; 50% jalmuzna
+  (kiesa biednych miasta / kiesa wsi), 50% budowa septow (75% place ludu, 25% material); (3) wies i lud miast szybciej wydaja nadwyzke: 15%/d zamiast 7%/d ponad zapas.
