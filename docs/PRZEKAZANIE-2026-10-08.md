@@ -906,3 +906,8 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   (E4 poprawki + E5 A/B + E6), potem jeden zestaw 120 + zima + zapis na calosci; dlugi bieg raz na koncu. **Test E4 728 ZATRZYMANY na d403** (TaskStop; gra zamknieta;
   -RestoreOnly: Armoury cf40fefa i CrashScribe 77b11df5 przywrocone; Configs BannerlordConfig.txt, DynamicReinforcements.reputation.cfg, engine_config.txt przywrocone
   z autotest-kopie\2026-10-11_14-45-34, wersje z testu w SCRATCH\test\configs-po-przerwaniu-12-10). Logi do d403: kopia-e4k\czesc-koniec.log + session-*.log.
+- (00:45 UTC) **TYDZIEN 69%** (+6%/1h20 przy 4 przebiegach) - E6 zawezony do E6/0 + M1 (6.19) + M2 (+ strawa Polnocy w CS); reszta E6 na nastepna sesje.
+  **Workflow wf_ffb7265d-1e8 (dokonczenie kodu przed testem):** T1 e4\fix2 (w-toku/e4-fix2: pobor z miast wedlug udzialu, progi ludnosci INFO), T2 cs-bledy
+  (3 atuty BK + strawa Polnocy), T3 e5\fix (w-toku/e5-fix: A2b+Z8 wlasne pieniadze; RC - pojmujacy zabiera graczowi wszystko do siebie; oplata werbunku zalog
+  do sprzedajacego), T4 e6\w (w-toku/e6-waski: E6/0, M1, M2). Potem SCALENIE KONCOWE wszystkiego (zbior-e4-koniec po poprawkach + fix2 + zbior-e5 + B + e5-fix +
+  e6-waski; CS cs-bledy; RC) -> JEDEN test: 120 dob + zima 120 + zapis 9 -> poprawki -> wgranie (Armoury, CrashScribe, RealisticCaptivity) -> raport 10:00 UTC.
