@@ -3240,6 +3240,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CourtFolkShare { get; set; } = 0.2f;
 
+        [SettingPropertyBool("Own Payments Back As Own", HintText = "money a house pays into the coffers of its own town or castle (its court, garrison wages, its men's spending, arms, building wages) comes back through the dues as the house's own money for as many days as it takes, not as income from its land - so it no longer swells the house's steady income and the army it may keep (off = only one day's share counts as its own, the rest as land income, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool OwnPaymentsBackAsOwn { get; set; } = true;
+
+        [SettingPropertyBool("Crown Refund Ignores Own Back", HintText = "in war, the house's own money coming back through the dues of its own castles (your gifts to its coffers, the court, arms, building wages) does not cut the crown's refund of garrison wages - only the garrison wages that came back do (off = all the castle dues cut it, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRefundIgnoresOwnBack { get; set; } = true;
+
         [SettingPropertyBool("Party Limits Share Free Room", HintText = "the party wage limits of a budgeted house share out what the house has not yet spent: each party may grow by its share of the free room (the head's party 1.5, the others 1) on top of its own wages, so no party is held back while the house has room; a house over its party ceiling has every party limit cut in proportion to its wages. Off = the ceiling is split once, head 1.5 : others 1")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool PartyLimitsShareFreeRoom { get; set; } = true;
@@ -4444,6 +4452,10 @@ namespace Armoury
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool CaravanProfitInRealmTown { get; set; } = true;
 
+        [SettingPropertyBool("Garrison Recruit Fee To Seller", HintText = "the fee a house pays off for the recruits its garrisons took from the notables (a fifth of what is owed each day) goes to the notable who raised each man, or to his settlement's coffers if he is gone - it no longer vanishes; only what the house really paid that day is passed on (off = the fee vanishes, as before)")]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool GarrisonRecruitFeeToSeller { get; set; } = true;
+
         [SettingPropertyBool("Defeat Morale Half", HintText = "a beaten party loses half the morale the game takes for a lost battle (10 instead of 20) and for each lost round of an auto-resolved battle (1.5 instead of 3; 0.5 instead of 1 while retreating) - the same for you and the AI. Men still desert by their tier thresholds, but a defeat now drives away about half as many (off = the game's penalty)")]
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool DefeatMoraleHalf { get; set; } = true;
@@ -5301,6 +5313,8 @@ namespace Armoury
             s.WarCourtYieldsToWages = WarCourtYieldsToWages;
             s.CourtGetsLapsedArmsShare = CourtGetsLapsedArmsShare;
             s.CourtFolkShare = CourtFolkShare;
+            s.OwnPaymentsBackAsOwn = OwnPaymentsBackAsOwn;
+            s.CrownRefundIgnoresOwnBack = CrownRefundIgnoresOwnBack;
             s.PartyLimitsShareFreeRoom = PartyLimitsShareFreeRoom;
             s.MercContractEnabled = MercContractEnabled;
             s.MercContractFactor = MercContractFactor;
@@ -5602,6 +5616,7 @@ namespace Armoury
             s.BkLordFeesHaveRecipients = BkLordFeesHaveRecipients;
             s.DeadHeroGoldStays = DeadHeroGoldStays;
             s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;
+            s.GarrisonRecruitFeeToSeller = GarrisonRecruitFeeToSeller;
             s.DefeatMoraleHalf = DefeatMoraleHalf;
             s.BandJoinPurseToPlayer = BandJoinPurseToPlayer;
             s.WorkshopOwnerPaysTownTax = WorkshopOwnerPaysTownTax;
