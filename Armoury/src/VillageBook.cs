@@ -1636,7 +1636,9 @@ namespace Armoury
 
         private static string Tidy(string t) { return t.Replace("  ", " ").Replace(" :", ":"); }
 
-        /// <summary>PeopleMenu.Consequence (E4/7, okno ShowInquiry): sekcja okregu wsi albo lista okregow warowni. null - ksiega nieczynna.</summary>
+        /// <summary>PeopleMenu.Consequence (E4/7, okno ShowInquiry): sekcja okregu wsi albo lista okregow warowni. null - ksiega nieczynna.
+        /// E7/W3 (234, R13): przy wpietym menu okregu ("Look over the district", DistrictMenu.On) wies dostaje sam naglowek i podsumowanie okregu - wiersze
+        /// wiosek sa w oknie okregu (DistrictView, ta sama funkcja wiersza RowLine); klucz off - sekcja z wierszami jak dotad.</summary>
         internal static string MenuSection(Settlement st)
         {
             if (st == null || !Active) return null;
@@ -1649,7 +1651,7 @@ namespace Armoury
                         Dist d;
                         if (st.StringId == null || !_d.TryGetValue(st.StringId, out d)) return null;
                         if (!EnsureN(d)) return VillageTexts.Make(VillageTexts.DistNotYet).ToString();
-                        return DistrictText(d);
+                        return DistrictText(d, !DistrictMenu.On);
                     }
                     if (st.IsTown || st.IsCastle)
                     {
@@ -1677,7 +1679,9 @@ namespace Armoury
             return null;
         }
 
-        private static string DistrictText(Dist d)
+        /// <summary>Tekst okregu wsi: naglowek, podsumowanie, plon; rows - takze wiersze wiosek (najwyzej MaxLines, stojace ponad limit - jedna linia).
+        /// E7/W3: bez wierszy dla "People of this land" przy wpietym menu okregu i jako naglowek okna okregu (DistrictView).</summary>
+        private static string DistrictText(Dist d, bool rows)
         {
             var sn = SnapOf(d);
             int n = d.W + 1;
@@ -1688,7 +1692,7 @@ namespace Armoury
                 states[w] = StateAt(d, w);
                 if (states[w] == SBurning) burning++; else if (states[w] == SBurned) burned++; else if (states[w] == SAbandoned) aband++;
             }
-            var sb = new StringBuilder(1500);
+            var sb = new StringBuilder(rows ? 1500 : 500);
             sb.Append(VillageTexts.Make(VillageTexts.DistHead, "DISTRICT", d.Name, "SETTLEMENTS", N0(d.N), "VILLAGES", n.ToString(Inv)).ToString()).Append('\n');
             double days;
             string standing = (n - burned - burning - aband).ToString(Inv);
@@ -1701,45 +1705,119 @@ namespace Armoury
             if (aband > 0) sb.Append(' ').Append(VillageTexts.Make(VillageTexts.DistAbandonedNote, "ABANDONED", aband.ToString(Inv)).ToString());
             sb.Append('\n');
             if (sn.Y < 0.995) sb.Append(VillageTexts.Make(VillageTexts.DistHarvest, "PCT", (100.0 * sn.Y).ToString("0", Inv)).ToString()).Append('\n');
-            // wiersze: najpierw plonace, spalone, opuszczone, w odbudowie, czesciowo puste (wszystkie), potem stojace do limitu
-            int[] rank = { 0, 1, 4, 3, 2, 5 };     // indeks = stan (SStanding, SDamaged, SBurned, SAbandoned, SRebuilding, SBurning) -> waga kolejnosci (malejaco)
-            var order = Enumerable.Range(0, n).OrderByDescending(w => rank[states[w]]).ThenBy(w => w == d.W ? -1 : w).ToList();
-            int lines = 0, moreStanding = 0;
-            foreach (int w in order)
+            if (!rows) return sb.ToString().TrimEnd('\n');
+            int lines = 0, moreStanding = 0, today = Today();
+            foreach (int w in RowOrder(d, states))
             {
                 bool stand = states[w] == SStanding;
                 if (stand && lines >= MaxLines) { moreStanding++; continue; }
-                double home, away;
-                People(d, sn, w, out home, out away);
-                string name = d.VName[w], place = w == d.W ? "" : Place(d.Kind[w]);
-                string line;
-                int today = Today();
-                switch (states[w])
-                {
-                    case SBurning:
-                        line = VillageTexts.Make(VillageTexts.DistLineBurning, "VILLAGE", name, "RAIDER", d.S != null ? d.S.Raider : "?").ToString(); break;
-                    case SBurned:
-                        line = VillageTexts.Make(VillageTexts.DistLineBurned, "VILLAGE", name, "DAYS", (d.EvDay[w] >= 0 ? today - d.EvDay[w] : 0).ToString(Inv), "RETURNED", N0(home), "PEOPLE", N0(home + away)).ToString(); break;
-                    case SAbandoned:
-                        line = VillageTexts.Make(VillageTexts.DistLineAbandoned, "VILLAGE", name, "PLACE", place, "PEOPLE", N0(home)).ToString(); break;
-                    case SRebuilding:
-                        line = VillageTexts.Make(VillageTexts.DistLineRebuilding, "VILLAGE", name, "PEOPLE", N0(home)).ToString(); break;
-                    case SDamaged:
-                        line = VillageTexts.Make(d.Br[w] >= d.Bf[w] ? VillageTexts.DistLinePart : VillageTexts.DistLineEmptied, "VILLAGE", name, "PLACE", place,
-                            "BURNED", Math.Max(1.0, Math.Round(d.Br[w] + d.Bf[w])).ToString("0", Inv), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv),
-                            "PEOPLE", N0(home), "FLED", N0(away)).ToString(); break;
-                    default:
-                        line = w == d.W
-                            ? VillageTexts.Make(VillageTexts.DistLineMain, "VILLAGE", name, "PEOPLE", N0(home), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv)).ToString()
-                            : VillageTexts.Make(VillageTexts.DistLineWhole, "VILLAGE", name, "PEOPLE", N0(home), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv)).ToString();
-                        break;
-                }
-                double share = sn.Dom > 0.0 ? 100.0 * sn.Y * home / sn.Dom : 0.0;
-                sb.Append(Tidy(line)).Append(' ').Append(VillageTexts.Make(VillageTexts.DistShare, "SHARE", share.ToString("0.#", Inv)).ToString()).Append('\n');
+                double home;
+                string line = RowLine(d, sn, w, states[w], today, out home);
+                sb.Append(line).Append(' ').Append(ShareText(sn, home)).Append('\n');
                 lines++;
             }
             if (moreStanding > 0) sb.Append(VillageTexts.Make(VillageTexts.DistMore, "N", moreStanding.ToString(Inv)).ToString()).Append('\n');
             return sb.ToString().TrimEnd('\n');
+        }
+
+        /// <summary>Kolejnosc wierszy wiosek (menu i okno okregu E7/W3): najpierw plonace, spalone, opuszczone, w odbudowie, czesciowo puste, potem stojace;
+        /// w grupie wies gry pierwsza, reszta wedlug indeksu.</summary>
+        private static List<int> RowOrder(Dist d, int[] states)
+        {
+            int[] rank = { 0, 1, 4, 3, 2, 5 };     // indeks = stan (SStanding, SDamaged, SBurned, SAbandoned, SRebuilding, SBurning) -> waga kolejnosci (malejaco)
+            return Enumerable.Range(0, states.Length).OrderByDescending(w => rank[states[w]]).ThenBy(w => w == d.W ? -1 : w).ToList();
+        }
+
+        /// <summary>Wiersz jednej wioski z ksiegi - JEDNA funkcja dla menu "People of this land" i okna okregu (E7/W3, R13); home - ludzie w domu (do udzialu w plonie).</summary>
+        private static string RowLine(Dist d, Snap sn, int w, int state, int today, out double home)
+        {
+            double away;
+            People(d, sn, w, out home, out away);
+            string name = d.VName[w], place = w == d.W ? "" : Place(d.Kind[w]);
+            string line;
+            switch (state)
+            {
+                case SBurning:
+                    line = VillageTexts.Make(VillageTexts.DistLineBurning, "VILLAGE", name, "RAIDER", d.S != null ? d.S.Raider : "?").ToString(); break;
+                case SBurned:
+                    line = VillageTexts.Make(VillageTexts.DistLineBurned, "VILLAGE", name, "DAYS", (d.EvDay[w] >= 0 ? today - d.EvDay[w] : 0).ToString(Inv), "RETURNED", N0(home), "PEOPLE", N0(home + away)).ToString(); break;
+                case SAbandoned:
+                    line = VillageTexts.Make(VillageTexts.DistLineAbandoned, "VILLAGE", name, "PLACE", place, "PEOPLE", N0(home)).ToString(); break;
+                case SRebuilding:
+                    line = VillageTexts.Make(VillageTexts.DistLineRebuilding, "VILLAGE", name, "PEOPLE", N0(home)).ToString(); break;
+                case SDamaged:
+                    line = VillageTexts.Make(d.Br[w] >= d.Bf[w] ? VillageTexts.DistLinePart : VillageTexts.DistLineEmptied, "VILLAGE", name, "PLACE", place,
+                        "BURNED", Math.Max(1.0, Math.Round(d.Br[w] + d.Bf[w])).ToString("0", Inv), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv),
+                        "PEOPLE", N0(home), "FLED", N0(away)).ToString(); break;
+                default:
+                    line = w == d.W
+                        ? VillageTexts.Make(VillageTexts.DistLineMain, "VILLAGE", name, "PEOPLE", N0(home), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv)).ToString()
+                        : VillageTexts.Make(VillageTexts.DistLineWhole, "VILLAGE", name, "PEOPLE", N0(home), "SETTLEMENTS", Math.Max(1.0, Math.Round(d.Nw[w])).ToString("0", Inv)).ToString();
+                    break;
+            }
+            return Tidy(line);
+        }
+
+        /// <summary>"(12% of the harvest)" - udzial wioski w plonie okregu (ludzie w domu x plon / ludzie w domu okregu).</summary>
+        private static string ShareText(Snap sn, double home)
+        {
+            double share = sn.Dom > 0.0 ? 100.0 * sn.Y * home / sn.Dom : 0.0;
+            return VillageTexts.Make(VillageTexts.DistShare, "SHARE", share.ToString("0.#", Inv)).ToString();
+        }
+
+        /// <summary>E7/W3 (234, R13): jedna wioska okna okregu - krotki tytul wiersza (RowTitle: ramka wiersza okna ma 65 px, dwie linie czcionki 25),
+        /// pelny wiersz z tej samej funkcji co menu (RowLine) i udzial w plonie (dymek wiersza, opis), uid wioski (lore, pamiec wojny; wies gry - null).</summary>
+        internal sealed class DistRow { public string Uid, Name, Title, Line, Share; public int State; public bool Main; }
+
+        /// <summary>E7/W3: krotki tytul wiersza okna okregu ze stanu ksiegi (ten sam StateAt co wiersz menu): stojaca - nazwa i polozenie ("Brackenford by the river"),
+        /// inne stany - istniejace krotkie teksty stanu (VilBurning, VilBurned, VilAbandoned, VilRebuilding) i DistRowDamaged.</summary>
+        private static string RowTitle(Dist d, int w, int state)
+        {
+            string name = d.VName[w];
+            switch (state)
+            {
+                case SBurning: return VillageTexts.Make(VillageTexts.VilBurning, "VILLAGE", name).ToString();
+                case SBurned: return VillageTexts.Make(VillageTexts.VilBurned, "VILLAGE", name).ToString();
+                case SAbandoned: return VillageTexts.Make(VillageTexts.VilAbandoned, "VILLAGE", name).ToString();
+                case SRebuilding: return VillageTexts.Make(VillageTexts.VilRebuilding, "VILLAGE", name).ToString();
+                case SDamaged: return VillageTexts.Make(VillageTexts.DistRowDamaged, "VILLAGE", name).ToString();
+                default:
+                    string place = w == d.W ? "" : Place(d.Kind[w]);
+                    return place.Length > 0 ? name + " " + place : name;
+            }
+        }
+
+        /// <summary>E7/W3 (234, R13): okno okregu wsi gry ("Look over the district") - nazwa okregu, naglowek z podsumowaniem (DistrictText bez wierszy, jak
+        /// "People of this land") i WSZYSTKIE wioski okregu w kolejnosci menu (lista przewijana - bez limitu MaxLines). Sam odczyt pod Gate (EnsureN jak w menu).
+        /// false - ksiega nieczynna albo wies bez okregu; okreg bez n - naglowek DistNotYet, bez wierszy. Wyjatek liczony (Stumble), nic nie gasi.</summary>
+        internal static bool DistrictView(Settlement st, out string name, out string head, List<DistRow> rows)
+        {
+            name = head = null;
+            if (st == null || !st.IsVillage || st.Village == null || rows == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (st.StringId == null || !_d.TryGetValue(st.StringId, out d)) return false;
+                    name = d.Name;
+                    if (!EnsureN(d)) { head = VillageTexts.Make(VillageTexts.DistNotYet).ToString(); return true; }
+                    head = DistrictText(d, false);
+                    var sn = SnapOf(d);
+                    int n = d.W + 1, today = Today();
+                    var states = new int[n];
+                    for (int w = 0; w < n; w++) states[w] = StateAt(d, w);
+                    foreach (int w in RowOrder(d, states))
+                    {
+                        double home;
+                        string line = RowLine(d, sn, w, states[w], today, out home);
+                        rows.Add(new DistRow { Uid = w == d.W ? null : d.Uid[w], Name = d.VName[w], Title = RowTitle(d, w, states[w]), Line = line, Share = ShareText(sn, home),
+                                               State = states[w], Main = w == d.W });
+                    }
+                    return true;
+                }
+            }
+            catch (Exception e) { rows.Clear(); Stumble("VillageBook.DistrictView", e); return false; }
         }
 
         // ------------------------------------------------------------ latka i linia startowa

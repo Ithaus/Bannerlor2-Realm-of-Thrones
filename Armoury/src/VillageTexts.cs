@@ -84,6 +84,12 @@ namespace Armoury.Villages
         public const string VilTipTributeOwn = "{=arm_vil_tip_tribute_own}{KNIGHT} takes its tribute for you";
         public const string VilTipHolderOf = "{=arm_vil_tip_holder_of}{HERO} of {HOUSE}";
         public const string VilTipFaith = "{=arm_vil_tip_faith}Faith: {FAITH} ({SHARE}%)";
+        // E7/W3 (234, R13): okno okregu "Look over the district" - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string DistHearMore = "{=arm_dist_hear_more}Hear more";
+        public const string DistBack = "{=arm_dist_back}Back to the villages";
+        public const string DistPick = "{=arm_dist_pick}Pick a village to hear more about it.";
+        public const string DistRowDamaged = "{=arm_dist_row_damaged}{VILLAGE}, some homes empty";
+        public const string VilArms = "{=arm_vil_arms}Arms of {HOUSE}: {ARMS}.";
 
         /// <summary>TextObject z para (NAZWA, wartosc) - np. Make(VilBurning, "VILLAGE", "Brackenford").</summary>
         public static TextObject Make(string text, params object[] kv)

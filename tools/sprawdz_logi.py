@@ -101,6 +101,9 @@ Uzycie (Python 3, tylko odczyt):
                     dymek ArmMapVillageTooltip zarejestrowany, herby z lore niewazne 0; odczyty BK wiara i tytuly; W2-0 linia doby w kazdej dobie okna; T2 potkniecia
                     dymka (budowa, odswiezanie) i lore/BK 0; T4 probka wiary (pierwsza doba sesji): wiara w dymku = najwiekszy udzial BK we wszystkich wioskach probki
                     z danymi BK (>= 10); dymki pokazane, zdanie lore o swietym miejscu - INFO; T3 zdjecia - poza narzedziem.
+                    Blok etap7_w3 (E7/W3, paczka 234): T1 linia startowa "Menu okregu (E7/W3): start" (pierwsza doba ostatniej sesji): pozycja "Look over the
+                    district" w menu village i village_looted (index bez BRAK), ksiega wiosek czynna; sasiedzi pozycji - INFO; T3 potkniecia okna (suma linii doby)
+                    i linie "ERROR in DistrictMenu." / "ERROR in VillageBook.DistrictView" 0; uzycie okna i zrodla herbow - INFO; T2 zdjecie okna - poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5916,7 +5919,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    for blk in (etap7_b, etap7_w1, etap7_w2):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_b, etap7_w1, etap7_w2, etap7_w3):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, win, until=until)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -6137,6 +6140,49 @@ def etap7_w2(rep, lines, start, win, until=120, **kw):
     else:
         rep.add("E7/W2 T4: probka wiary", "brak linii", "jest w pierwszej dobie sesji (VillageTipLore)", None)
     rep.add("E7/W2 T3: zdjecia dymka (Polnoc, Reach, Dorne) - herb, rycerz, Alt", "poza narzedziem", "tryb zdjec autotestu", None)
+
+
+def etap7_w3(rep, lines, start, win, until=120, **kw):
+    """E7/W3 (234, PLAN 7.9 b, projekt etapu 7 v2 rozdz. 3 "E7/W3" Test): linia startowa "Menu okregu (E7/W3): start" (pierwsza doba sesji - index pozycji
+    po wszystkich modach) i linia doby "Menu okregu (E7/W3): dzien N" (tylko gdy okno otwarto albo bylo potkniecie). Wiazace: T1 (pozycja w obu menu),
+    T3 (0 potkniec i 0 linii ERROR okna); T2 (zdjecie okna, herb w ramce 86 x 63 prefabu ROT) poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Menu okregu (E7/W3): start")]
+    rows = {}
+    for d, s in by_day(lines, "Menu okregu (E7/W3): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = s
+    if not starts:
+        rep.add("E7/W3 T1: linia startowa Menu okregu (E7/W3)", "brak w logu", "jest w pierwszej dobie kazdej sesji od wgrania E7/W3 (LogEnabled)", None)
+    else:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "WYLACZONY" in s or "NIEWPIETA" in s:
+            rep.add("E7/W3 T1: pozycja w menu (ostatnia sesja)", body[:200], "klucz DistrictMenuEnabled wlaczony, pozycja wpieta", False)
+        else:
+            v = re.search(r"village index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            lo = re.search(r"village_looted index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            book = "ksiega wiosek czynna" in s
+            rep.add("E7/W3 T1: \"Look over the district\" w menu village i village_looted (ostatnia sesja)", body[:260],
+                    "pozycja w obu menu (bez BRAK), ksiega wiosek czynna", bool(v) and bool(lo) and book)
+            nb = []
+            if v:
+                nb.append(f"village: przed {v.group(3)}, po {v.group(4)}")
+            if lo:
+                nb.append(f"village_looted: przed {lo.group(3)}, po {lo.group(4)}")
+            rep.add("E7/W3 W3-1b: sasiedzi pozycji (BK i ROT dokladaja do village)", "; ".join(nb) or "brak",
+                    "INFO (oczekiwane: przed arm_people_village / arm_people_village_looted)", None)
+    days = sorted(rows)
+    st = sum(num(r"potkniecia dzis (\d+)", rows[x], int, 0) or 0 for x in days)
+    err = [s for s in lines if s.startswith("ERROR in DistrictMenu.") or s.startswith("ERROR in VillageBook.DistrictView")]
+    rep.add("E7/W3 T3: potkniecia okna okregu (suma okna) i linie ERROR okna", f"potkniecia {st} (dob z uzyciem {len(days)}), linii ERROR {len(err)}", "0", st == 0 and not err)
+    if days:
+        def tot(pat):
+            return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+        o, m = tot(r"okien (\d+)"), tot(r"Hear more (\d+)")
+        hb, hl, hp, hn = tot(r"rod posiadacza tytulu BK (\d+)"), tot(r"rycerz z lore (\d+)"), tot(r"pan (\d+), bez"), tot(r"bez herbu (\d+)")
+        rep.add("E7/W3 W3-3b: uzycie okna (suma okna)", f"okien {o}, Hear more {m}; herby: rod tytulu BK {hb}, rycerz z lore {hl}, pan {hp}, bez herbu {hn}",
+                "INFO (autotest bez klikniec - 0; bez herbu > 0 tylko przy wsi bez pana)", None)
+    rep.add("E7/W3 T2: zdjecie okna okregu (herb w ramce 86 x 63 prefabu ROT, dymek wiersza, Hear more)", "poza narzedziem", "tryb zdjec autotestu", None)
 
 def main(argv):
     args = argv[1:]

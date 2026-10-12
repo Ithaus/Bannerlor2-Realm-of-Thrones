@@ -4752,6 +4752,10 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageTipLore { get; set; } = true;
 
+        [SettingPropertyBool("District Menu Enabled", HintText = "'Look over the district' in a village menu lists the villages of its district with the banners of their keepers")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool DistrictMenuEnabled { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5939,6 +5943,7 @@ namespace Armoury
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;
             s.VillageTipLore = VillageTipLore;
+            s.DistrictMenuEnabled = DistrictMenuEnabled;
         }
 
         internal static void Apply()

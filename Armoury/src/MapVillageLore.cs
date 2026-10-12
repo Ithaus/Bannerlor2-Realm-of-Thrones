@@ -32,10 +32,18 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] NoIds = new string[0];
 
-        /// <summary>Jeden wiersz lore (gotowe zdania EN z E7/L). Herb rycerza (knight_banner) i godlo tekstem czyta dopiero menu okregu (E7/W3).</summary>
+        /// <summary>Jeden wiersz lore (gotowe zdania EN z E7/L). Herb rycerza (knight_banner), rod i godlo tekstem (knight_house, knight_arms) czyta menu okregu (E7/W3).</summary>
         internal sealed class Row
         {
             public string Knight = "", Livelihood = "", Faith = "", History = "", WarLore = "";
+            public string BannerCode = "", House = "", Arms = "";   // E7/W3: knight_banner (tylko kod wazny wedlug Banner.IsValidBannerCode, pusty = herb pana), knight_house, knight_arms
+            private Banner _banner;
+
+            /// <summary>E7/W3: herb rycerza z lore albo null (brak kodu - herb pana); obiekt Banner budowany raz na wiersz (plik raz na proces).</summary>
+            internal Banner KnightBanner
+            {
+                get { if (_banner == null && BannerCode.Length > 0) _banner = new Banner(BannerCode); return _banner; }
+            }
             public bool Tribute;                 // knight_form = tribute ("{knight} takes its tribute"), inaczej kept
             public string[] FaithBk = NoIds;     // id religii BK, z ktorymi zgadza sie zdanie o wierze
 
@@ -150,7 +158,9 @@ namespace Armoury
                     r.FaithBk = ids.ToArray();
                 }
                 string herb = Get(f, col, "knight_banner");
-                if (herb.Length > 0) { _herbN++; if (!Banner.IsValidBannerCode(herb)) _herbBad++; }   // kontrola kodow dla E7/W3 (linia startowa); dymek pokazuje herb pana
+                if (herb.Length > 0) { _herbN++; if (!Banner.IsValidBannerCode(herb)) _herbBad++; else r.BannerCode = herb; }   // E7/W3: herb rycerza w oknie okregu (niewazny - herb pana, licznik w linii startowej); dymek pokazuje herb pana
+                r.House = Get(f, col, "knight_house");
+                r.Arms = Get(f, col, "knight_arms");
                 _rows[uid] = r;
             }
             foreach (string u in layout) if (!_rows.ContainsKey(u)) _missing++;
@@ -250,8 +260,9 @@ namespace Armoury
             return best;
         }
 
-        /// <summary>R12: posiadacz tytulu wsi z BK, gdy zyje, nie jest glowa rodu pana i nalezy do rodu pana albo jego krolestwa; null - brak (rycerz z lore).</summary>
-        private static Hero BkHolder(Settlement v, Clan lord)
+        /// <summary>R12: posiadacz tytulu wsi z BK, gdy zyje, nie jest glowa rodu pana i nalezy do rodu pana albo jego krolestwa; null - brak (rycerz z lore).
+        /// E7/W3: okno okregu czyta go raz na otwarcie (ten sam dla wszystkich wiosek okregu - tytul jest na wies gry).</summary>
+        internal static Hero BkHolder(Settlement v, Clan lord)
         {
             ResolveBk();
             if (v == null || lord == null || !BkTitleOk) return null;
@@ -277,8 +288,13 @@ namespace Armoury
         /// z lore; null - brak obu.</summary>
         internal static string KnightLine(Row row, Settlement v, Clan lord)
         {
+            return KnightLine(row, lord, BkHolder(v, lord));
+        }
+
+        /// <summary>Ta sama linia rycerza z gotowym posiadaczem tytulu BK (h = BkHolder albo null) - E7/W3 czyta go raz na okno okregu.</summary>
+        internal static string KnightLine(Row row, Clan lord, Hero h)
+        {
             string who = null;
-            Hero h = BkHolder(v, lord);
             if (h != null && h.Name != null)
             {
                 who = h.Name.ToString();

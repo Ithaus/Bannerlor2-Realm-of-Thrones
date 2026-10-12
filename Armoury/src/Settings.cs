@@ -1470,6 +1470,9 @@ namespace Armoury
         // E7/W2 (233, PLAN 7.9 a, R11/R12): dymek wioski z herbem pana (wlasny prefab GUI\Prefabs\ArmMapVillageTooltip.xml), rycerzem (tytul wsi z BK albo lore),
         // wiara BK; po Alt zajecie, swiete miejsce, historia, pamiec wojny (MapVillageTooltip, MapVillageLore; lore = arm_map_village_lore.tsv z bramka ukladu)
         public bool VillageTipLore = true;                 // the village tooltip shows the lord's banner, the knight who keeps the village and its faith from Banner Kings; hold Alt for its trade, history and war memory
+        // E7/W3 (234, PLAN 7.9 b, R13): pozycja "Look over the district" w menu wsi (village, village_looted) - okno wiosek okregu z herbami rycerzy (DistrictMenu);
+        // "People of this land" pokazuje wtedy sam naglowek i podsumowanie okregu (off = brak pozycji, sekcja okregu z wierszami wiosek jak dotad)
+        public bool DistrictMenuEnabled = true;            // "Look over the district" in a village menu lists the villages of its district with the banners of their keepers
 
         public static void Load(string moduleDataDir)
         {
