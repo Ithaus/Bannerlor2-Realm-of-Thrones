@@ -3161,8 +3161,37 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
             rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog do sprzedajacego (GarrisonRecruitFee)
+    try:
+        etap5_fee(rep, lines)
+    except Exception as e:
+        rep.add("blok etap5_fee", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
+
+
+def etap5_fee(rep, lines):
+    """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -
+    kasa jego osady). Linia startowa "GarrisonRecruitFee (E5 decyzja 9)" i linia doby "Oplata za werbunek zalog (E5 decyzja 9): dzien N"."""
+    wire = [x for x in lines if x.startswith("GarrisonRecruitFee (E5 decyzja 9)")]
+    fee = [x for x in lines if x.startswith("Oplata za werbunek zalog (E5 decyzja 9): dzien")]
+    if not wire:
+        rep.add("E5 dec. 9: latki oplaty za werbunek zalog", "brak linii startowej", "jest od wgrania (GarrisonRecruitFee)", None)
+        return
+    rep.add("E5 dec. 9: latki oplaty za werbunek zalog", wire[-1][:180], "werbunek, splata i rozliczenie wpiete (bez NIEPELNE)", "NIEPELNE" not in wire[-1])
+    if not fee:
+        rep.add("E5 dec. 9: linia oplaty za werbunek zalog", "brak", "codziennie, gdy zalogi werbuja od notabli", None)
+        return
+    def tot(rx):
+        return sum(num(rx, x, int, 0) or 0 for x in fee)
+    acc, paid = tot(r"naliczone przy werbunku (\d+)"), tot(r"splacone przez rody (\d+)")
+    nb, ss, unc = tot(r"do notabli (\d+)"), tot(r"do kas osad \(notabl zmarly\) (\d+)"), tot(r"bez pokrycia w kiesie glowy (\d+)")
+    leg, nt, out = tot(r"w nicosc jak dotad (\d+)"), tot(r"bez odbiorcy (\d+)"), tot(r"poza rozliczeniem rodu \(nic nie oddane\) (\d+)")
+    stum = tot(r"potkniecia (\d+)")
+    rep.add("E5 dec. 9: oplata za werbunek zalog do sprzedajacych (suma dob w logu)",
+            f"naliczone {acc}, splacone przez rody {paid}: notable {nb}, kasy osad {ss}, bez pokrycia {unc}, saldo sprzed paczki {leg}, bez odbiorcy {nt}, poza rozliczeniem {out}",
+            "notable + kasy osad > 0, gdy rody splacaja; bez odbiorcy 0", (nb + ss > 0 and nt == 0) if paid > 0 else None)
+    rep.add("E5 dec. 9: potkniecia GarrisonRecruitFee", str(stum), "0", stum == 0)
 
 
 def etap5_rows(rep, lines, start, win, logp, csvp=None):
@@ -3803,12 +3832,14 @@ def etap5_a2(rep, lines, start, until, logp, bud):
     owre = re.compile(r"\[E5/A2 zapas wlasny[^\]]*?: wrocilo dzis (\d+), do korony i daniny (\d+), ponad zawor dnia (\d+), przyciete \(osada wydala\) (\d+)"
                       r", utracone \(nowy pan\) (\d+), zapas (\d+) w (\d+) osadach, wplacone dzis (\d+)")
     owlate = re.compile(r"wplaty gracza do kasy wlasnej osady \(E5/A5\) od wczorajszej linii (\d+)")
+    # E5 A2b (decyzja 5 Jeffa 12.10): wplaty rodow (NoteOwnPaid) poza blokiem doby wchodza do zapasu tak samo jak wplaty gracza
+    owlate2 = re.compile(r"wplaty rodow do kas wlasnych osad poza blokiem doby \(A2b\) od wczorajszej linii (\d+)")
     ow = {}
     for d in sorted(sdl):
         if 1 <= run_day(d, start) <= until:
             m = owre.search(sdl[d])
             if m:
-                ow[d] = [int(x) for x in m.groups()] + [num(owlate, sdl[d], int, 0) or 0]
+                ow[d] = [int(x) for x in m.groups()] + [(num(owlate, sdl[d], int, 0) or 0) + (num(owlate2, sdl[d], int, 0) or 0)]
     if not ow:
         rep.add("E5/A2 A2-10: zapas wlasny (sprzet do wlasnej siedziby) w linii D staly (169c)", "brak dopisku",
                 "jest przy czynnej paczce i D stalym (Clan Income Book Stable D)", False if (rows and not off and sdl) else None)
@@ -3819,7 +3850,7 @@ def etap5_a2(rep, lines, start, until, logp, bud):
                 continue
             y0, r = ow[d - 1], ow[d]
             outs = r[0] + r[1] + r[2] + r[3] + r[4]
-            late = r[8]   # recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis)
+            late = r[8]   # recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis); E5 A2b: + wplaty rodow spoza bloku doby
             exp = y0[5] + y0[7] + late - outs
             # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera (najwyzej wplaty gracza po wczytaniu, przed doba)
             if abs(r[5] + outs - late) <= 5 and (y0[5] > 0 or y0[7] > 0) and abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):
@@ -3843,6 +3874,20 @@ def etap5_a2(rep, lines, start, until, logp, bud):
             rep.add("E5/A2 INFO: zapas wlasny - odplywy poza wlasne i udzial wlasnych siedzib w przelewie (srednia dob 45-%d)" % until,
                     f"korona i danina {crown:.0f}, ponad zawor dnia {cap:.0f}, przyciete {trim:.0f}, utracone {lost:.0f}; do wlasnych siedzib {share:.0f}% przelewu sprzetu",
                     "INFO (recenzja A2: ok. 93% przelewu do wlasnych siedzib - budzet-rodow.csv z31-A d120; zamek 1/3 do korony)", None)
+    # E5 A2b (decyzja 5 Jeffa 12.10, "najwyzej wojsko spadnie, trudno"): skala zmiany D stalego - zwrot wplat rodu do kas wlasnych osad jako wlasne
+    # wobec starej reguly (ulamek zaworu jednej doby); roznica to tyle mniej "ziemi" na dobe (pierscienie D stalego - 28 dob)
+    a2re = re.compile(r"A2b \(Own Payments Back As Own (\w+)[^)]*\): wrocilo jako wlasne (-?\d+) \(w tym zold zalog (-?\d+)\), po staremu \(ulamek jednej doby\) (-?\d+)"
+                      r" -> ziemia dzis mniej o ok\. (-?\d+), w zapasie (-?\d+)")
+    a2 = {d: a2re.search(sdl[d]) for d in sdl if 31 <= run_day(d, start) <= until}
+    a2 = {d: m for d, m in a2.items() if m}
+    if a2:
+        on = any(m.group(1) == "on" for m in a2.values())
+        bk = st.mean(int(m.group(2)) for m in a2.values()); wg = st.mean(int(m.group(3)) for m in a2.values())
+        od = st.mean(int(m.group(4)) for m in a2.values()); dl = st.mean(int(m.group(5)) for m in a2.values())
+        last = a2[max(a2)]
+        rep.add("E5 A2b INFO: zwrot wplat rodow do kas wlasnych osad jako wlasne (srednia dob 31-%d)" % until,
+                f"{'czynne' if on else 'WYLACZONE'}: wrocilo jako wlasne {bk:.0f}/d (zold zalog {wg:.0f}), po staremu {od:.0f}/d -> ziemia mniej o {dl:.0f}/d; zapas na koncu {last.group(6)}",
+                "INFO - skala zmiany D stalego (porownaj 'ziemia' i D staly mediana z biegiem bez A2b)", None)
     # INFO: co zostalo w kiesie glowy i dwor bez sprzetu (srednie dob 31-until)
     if late and rows and paid is not None:
         rep.add("E5/A2 INFO: zostalo w kiesie glowy (srednia dob 31-%d)" % until,

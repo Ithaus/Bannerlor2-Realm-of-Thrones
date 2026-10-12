@@ -35,8 +35,9 @@ namespace Armoury
     ///    zaokraglen 3.2 - total minus widoczne udzialy - dostaje "top" i ten udzial A6 obciaza pokonanych jak kazdy inny; rachunek zamkniety).
     ///  - Nasz RealisticCaptivity (CaptivityBehavior.LootBaggage, nasluch HeroPrisonerTaken): pojmany GRACZ oddaje pojmujacemu LootGoldPercent
     ///    (60 u Jeffa, ModuleData/RealisticCaptivity.settings.xml) zlota - w TakePrisonerAction wewnatrz CaptureDefeatedPartyMembers, czyli PRZED
-    ///    rozliczeniem A6 (recenzja A6 (1)). Pojmujacy bez bohatera (banda bez wodza, milicja/zaloga - gra daje jenca osadzie) - RC daje
-    ///    zloto null, czyli w nicosc (stary wyciek RC, nie A6 - do decyzji Jeffa); A6 i tak liczy je jako zaliczke (gracz nie traci drugi raz).
+    ///    rozliczeniem A6 (recenzja A6 (1)). Pojmujacy bez bohatera (banda bez wodza, milicja/zaloga - gra daje jenca osadzie) - dotad RC dawal
+    ///    zloto null, czyli w nicosc; E5 decyzja 9 Jeffa (12.10, RC CaptorTakesAllFromPlayer): CALE zloto gracza do pojmujacego (kiesa lorda, kiesa
+    ///    bandy, kasa osady milicji/zalogi); A6 i tak liczy zabrane zloto jako zaliczke (gracz nie traci drugi raz).
     ///
     /// TERAZ (jedna regula: gracz, AI, bandy; suma lupu zwyciezcow z puli = suma tego, co naprawde schodzi z pokonanych):
     ///  1. MIGAWKA (postfiks Last na CalculatePlunderedAndLostGoldAmounts - po 3.2 BeatenPurse.SplitPostfix): wodz kazdego pokonanego z GoldLost

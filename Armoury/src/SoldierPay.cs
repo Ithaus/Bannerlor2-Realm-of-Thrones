@@ -82,7 +82,7 @@ namespace Armoury
         private static long _dGarToPurse; private static int _dGarToPurseN;   // K1 (A2): zold zalog do ich sakiewek
         private static long _dGarHome; private static int _dGarHomeN;         // 114-p / B-2 (Z8): zold zalog zamkow, ktory wrocil panu zaworem - bez zwrotu korony (rody)
         // B-4 (Z8): rody z krolestwem w wojnie (zwrot korony) i zoldem zalog we wlasnych zamkach - zold do kas tych zamkow, zawor panom, nalezny zwrot od reszty
-        private static long _dZ8Pay, _dZ8Dues, _dZ8Refund; private static int _dZ8N;
+        private static long _dZ8Pay, _dZ8Dues, _dZ8Refund, _dZ8Own; private static int _dZ8N;
         private static int _dLordN, _dGarN, _dToPurseN, _dToTownsN, _dToCastlesN, _dCutClans, _dBlind, _dDupes, _stumbles, _dDebtClans;
         private static bool _errLogged;
 
@@ -137,7 +137,7 @@ namespace Armoury
             _dUndead = _dNoTown = _dOff = _dOther = _dCut = _dBlindGold = _dDebtCut = 0;
             _dGarToPurse = 0; _dGarToPurseN = 0;
             _dGarHome = 0; _dGarHomeN = 0;
-            _dZ8Pay = _dZ8Dues = _dZ8Refund = 0; _dZ8N = 0;
+            _dZ8Pay = _dZ8Dues = _dZ8Refund = _dZ8Own = 0; _dZ8N = 0;
             _dLordN = _dGarN = _dToPurseN = _dToTownsN = _dToCastlesN = _dCutClans = _dBlind = _dDupes = _stumbles = _dDebtClans = 0;
             _dShielded = 0; _dShieldTicks = 0;
             _dToLordGold = _dFromLordGold = _dDupLordGold = _dOutLordGold = 0; _dToLordN = _dFromLordN = _dDupLordN = _dOutLordN = 0;   // 169b
@@ -471,7 +471,7 @@ namespace Armoury
                 if (coffers > 0)
                 {
                     town.ChangeGold(coffers);                           // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
-                    ClanIncomeBook.NoteOwnPaid(st, clan, coffers);      // 169c: "wlasne" D stalego - zold zalogi rodu w kasie jego osady (tylko licznik)
+                    ClanIncomeBook.NoteOwnPaid(st, clan, coffers, true);   // 169c: "wlasne" D stalego - zold zalogi rodu w kasie jego osady (tylko licznik); E5 A2b: zapas "wlasnego" jako zold zalog
                     if (st.IsTown) { _dToTowns += coffers; _dToTownsN++; Hold(st, coffers); } else { _dToCastles += coffers; _dToCastlesN++; }
                     MoneyLedger.Note(MoneyLedger.NWage, st, coffers);   // ksiega przeplywow osad (tylko licznik)
                     try { TownFolk.Note(st, coffers, TownFolk.KGarrison); } catch { }   // E5/0 (195): zold zalogi wydany na miejscu (tylko licznik)
@@ -554,9 +554,13 @@ namespace Armoury
                     if (c != null && h == c.Leader && v > 0 && _castlePay.TryGetValue(c, out pay) && pay > 0 && RefundedClan(c))
                     {
                         int dues; CastlePurse.LordDuesToday.TryGetValue(c, out dues);
-                        long cut = Math.Min(Math.Min(pay, (long)Math.Max(0, dues)), v);
+                        // E5 Z8 (decyzja 7 Jeffa 12.10): zwrot wlasnych pieniedzy spoza zoldu zalog (wplaty gracza, dwor, sprzet, budowy - zapas CourtFull) to nie
+                        // zold, ktory wrocil zaworem - nie obniza zwrotu korony; zold zalog dalej obniza (Z8 < 1). Licznik "zawor panom" - bez tej czesci
+                        long ownBack = CourtFull.Z8On ? Math.Min((long)Math.Max(0, dues), CourtFull.CastleOwnBackNotWage(c)) : 0;
+                        long duesW = Math.Max(0L, (long)Math.Max(0, dues) - ownBack);
+                        long cut = Math.Min(Math.Min(pay, duesW), v);
                         if (cut > 0) { v -= (int)cut; _dGarHome += cut; _dGarHomeN++; }
-                        _dZ8Pay += pay; _dZ8Dues += Math.Max(0, dues); _dZ8Refund += (long)((pay - Math.Max(0L, cut)) * pct); _dZ8N++;
+                        _dZ8Pay += pay; _dZ8Dues += duesW; _dZ8Refund += (long)((pay - Math.Max(0L, cut)) * pct); _dZ8N++; _dZ8Own += ownBack;
                     }
                 }
                 catch (Exception e) { Stumble("SoldierPay.TakePaid", e); }
@@ -865,7 +869,7 @@ namespace Armoury
                              + " | garnizony: naliczony " + _dGarAcc + ", z kies zeszlo " + _dGarTaken + " (" + _dGarN + " zalog) -> do kas miast " + _dToTowns + " (" + _dToTownsN
                              + "), do kas zamkow " + _dToCastles + " (" + _dToCastlesN + "), zalogi do sakiewek " + _dGarToPurse + " (" + _dGarToPurseN + ")"
                              + ", zold zalog zamkow, ktory wrocil panom zaworem - bez zwrotu korony (Z8, B-2; B-4: tylko rody w wojnie) " + _dGarHome + " (" + _dGarHomeN + " rodow)"
-                             + ", Z8 rody w wojnie z zoldem zalog we wlasnych zamkach: zold do kas zamkow " + _dZ8Pay + ", zawor panom " + _dZ8Dues + ", nalezny zwrot korony od reszty " + _dZ8Refund + " (" + _dZ8N + " rodow)"
+                             + ", Z8 rody w wojnie z zoldem zalog we wlasnych zamkach: zold do kas zamkow " + _dZ8Pay + ", zawor panom " + _dZ8Dues + ", nalezny zwrot korony od reszty " + _dZ8Refund + " (" + _dZ8N + " rodow; zawor panom bez zwrotu wlasnego spoza zoldu - decyzja 7, odjete " + _dZ8Own + ")"
                              + " | nie przekazano: nieumarli " + _dUndead + ", zaloga bez osady " + _dNoTown + ", wylaczone w ustawieniach " + _dOff
                              + "; karawany i inne partie (bez zmian) " + _dOther
                              + Seal31B.ZoldNote()   // 3.1/3.3 (31b) E3/4: karawany lordow do sakiewek ludzi

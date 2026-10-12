@@ -137,7 +137,7 @@ namespace RealisticCaptivity
                 Log.Info("Gracz pojmany przez: " + (_captorHeroId == "" ? "(bez lorda)" : _captorHeroId));
 
                 _lowborn = !HasNobleStanding();
-                if (Settings.Current.StripEquipment) StripGear();
+                if (Settings.Current.StripEquipment || Settings.Current.CaptorTakesAllFromPlayer) StripGear();   // E5 decyzja 9: caly rynsztunek
                 LootBaggage(capturer);
                 StartRescueMission();
 
@@ -492,16 +492,24 @@ namespace RealisticCaptivity
             catch (Exception e) { Log.Error("GiveRags", e); }
         }
 
-        /// <summary>Zdobywca przetrzasa juki: zabiera czesc ladunku i zlota.</summary>
+        /// <summary>Zdobywca przetrzasa juki: zabiera czesc ladunku i zlota.
+        /// E5 decyzja 9 Jeffa (12.10, CaptorTakesAllFromPlayer): pojmujacy - KAZDY (banda, lord, milicja, zaloga, osada) - bierze CALE zloto gracza, do
+        /// siebie, nie w nicosc: lord (bohater partii) - jego kiesa; milicja, zaloga i osada (bez bohatera) - kasa osady; inna partia bez bohatera (banda,
+        /// karawana) - kiesa partii (PartyTradeGold; rozbicie bandy oddaje ja zwyciezcom - Armoury BeatenPurse 3.2). Ladunek (LootPartyInventoryPercent) -
+        /// do jukow partii albo do zapasu osady; bez pojmujacego nic nie znika. Armoury A6 (BattlePlunder.LeaderCap) liczy zabrane zloto jako zaliczke -
+        /// gracz nie placi drugi raz z puli bitwy. Wylaczone - jak dotad (procent, zloto bez lorda w nicosc).</summary>
         private void LootBaggage(PartyBase capturer)
         {
             try
             {
                 var s = Settings.Current;
+                bool all = s.CaptorTakesAllFromPlayer;
                 var party = MobileParty.MainParty;
                 int itemsTaken = 0;
+                // E5 decyzja 9: ladunek do pojmujacego - partia w polu albo osada (zapas osady); bez pojmujacego nic nie zabieramy
+                ItemRoster dest = capturer != null && capturer.ItemRoster != null && (capturer.IsMobile || (all && capturer.IsSettlement)) ? capturer.ItemRoster : null;
 
-                if (party != null && party.ItemRoster != null && s.LootPartyInventoryPercent > 0)
+                if (party != null && party.ItemRoster != null && s.LootPartyInventoryPercent > 0 && (!all || dest != null))
                 {
                     var roster = party.ItemRoster;
                     for (int i = roster.Count - 1; i >= 0; i--)
@@ -511,14 +519,25 @@ namespace RealisticCaptivity
                         int amount = el.Amount * s.LootPartyInventoryPercent / 100;
                         if (amount <= 0) continue;
                         roster.AddToCounts(el.EquipmentElement, -amount);
-                        if (capturer != null && capturer.IsMobile && capturer.ItemRoster != null)
-                            capturer.ItemRoster.AddToCounts(el.EquipmentElement, amount);
+                        if (dest != null)
+                            dest.AddToCounts(el.EquipmentElement, amount);
                         itemsTaken += amount;
                     }
                 }
 
                 int goldTaken = 0;
-                if (s.LootGoldPercent > 0)
+                string to = "";
+                if (all)
+                {
+                    int g = Hero.MainHero.Gold;
+                    if (g > 0)
+                    {
+                        to = GoldToCaptor(capturer, g);
+                        goldTaken = to != null ? g - Math.Max(0, Hero.MainHero.Gold) : 0;
+                        if (to == null) to = "brak pojmujacego - nic nie zabrano";
+                    }
+                }
+                else if (s.LootGoldPercent > 0)
                 {
                     goldTaken = Hero.MainHero.Gold * s.LootGoldPercent / 100;
                     if (goldTaken > 0)
@@ -528,11 +547,42 @@ namespace RealisticCaptivity
                     }
                 }
 
-                Log.Info("Przetrzasnieto juki: " + itemsTaken + " przedmiotow, " + goldTaken + " zlota.");
-                if (itemsTaken > 0 || goldTaken > 0)
+                Log.Info("Przetrzasnieto juki: " + itemsTaken + " przedmiotow, " + goldTaken + " zlota."
+                         + (all ? " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> " + to + "; ladunek -> " + (dest != null ? (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name : "nikt (nic nie zabrano)") : ""));
+                if (all && goldTaken > 0)
+                    Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? ", and " + itemsTaken + " items from your baggage with it." : "."), true);
+                else if (itemsTaken > 0 || goldTaken > 0)
                     Log.Player("They went through your baggage: " + itemsTaken + " items and " + goldTaken + " gold are gone.", true);
             }
             catch (Exception e) { Log.Error("LootBaggage", e); }
+        }
+
+        /// <summary>E5 decyzja 9: cale zloto gracza do pojmujacego (przelew gry - GiveGoldAction, zdarzenie widza ksiegi Armoury). Zwraca opis odbiorcy do logu;
+        /// null - nie ma komu dac (nic nie zabrane).</summary>
+        private static string GoldToCaptor(PartyBase capturer, int gold)
+        {
+            if (capturer == null || gold <= 0) return null;
+            var mp = capturer.IsMobile ? capturer.MobileParty : null;
+            var lord = capturer.LeaderHero;
+            if (lord != null)
+            {
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, gold);
+                return "kiesa " + lord.Name;
+            }
+            Settlement home = null;
+            if (capturer.IsSettlement) home = capturer.Settlement;
+            else if (mp != null && (mp.IsMilitia || mp.IsGarrison)) home = mp.CurrentSettlement ?? mp.HomeSettlement;
+            if (home != null && home.SettlementComponent != null)
+            {
+                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold);
+                return "kasa osady " + home.Name + (mp != null ? " (" + (mp.IsMilitia ? "milicja" : "zaloga") + ")" : "");
+            }
+            if (mp != null)
+            {
+                GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, capturer, gold);
+                return "kiesa partii " + capturer.Name;
+            }
+            return null;
         }
 
         // ---------------------------------------------------------------- parol
@@ -659,6 +709,29 @@ namespace RealisticCaptivity
         {
             try
             {
+                // E5 decyzja 9 (CaptorTakesAllFromPlayer): trzymala gracza osada bez bohatera (milicja, zaloga, loch) - rynsztunek to jej lup i zostaje w jej
+                // zapasie (Settlement.ItemRoster); dotad GearToPacks nie widzial partii w polu i oddawal go graczowi ("porzucony oboz")
+                if (Settings.Current.CaptorTakesAllFromPlayer && captorParty != null && captorParty.IsSettlement && captorParty.ItemRoster != null)
+                {
+                    int kept = 0;
+                    foreach (var entry in _storedGear)
+                    {
+                        var parts = entry.Split('|');
+                        if (parts.Length < 2) continue;
+                        var item = MBObjectManager.Instance.GetObject<ItemObject>(parts[1]);
+                        if (item == null) continue;
+                        ItemModifier mod = null;
+                        if (parts.Length > 2 && !string.IsNullOrEmpty(parts[2]))
+                            mod = MBObjectManager.Instance.GetObject<ItemModifier>(parts[2]);
+                        captorParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), 1);
+                        kept++;
+                    }
+                    _storedGear.Clear();
+                    _gearBuybackPrice = 0;
+                    Log.Info("Rynsztunek (E5 decyzja 9): " + kept + " szt. zostaje w zapasie osady " + captorParty.Name + ", ktora trzymala gracza - jej lup, nie wraca.");
+                    Log.Player("Your war gear stays behind in " + captorParty.Name + " - it belongs to them now.", true);
+                    return;
+                }
                 if (Drobne39.PacksOn)   // 3.9: rynsztunek to lup zdobywcow - do ich jukow, dalej jak kazdy lup bandy (jedna regula)
                 {
                     var back = new List<string>();

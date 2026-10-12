@@ -59,6 +59,7 @@ namespace Armoury
         private static readonly Dictionary<Settlement, Ring> _rCastle = new Dictionary<Settlement, Ring>();  // 110: zawor zamku bez "wlasnych" (wedlug wlasciciela)
         private static readonly Dictionary<Clan, Ring> _rLoose = new Dictionary<Clan, Ring>();               // ziemia bez osady (nie do przypisania)
         private static readonly Dictionary<Settlement, long> _ownPaid = new Dictionary<Settlement, long>();  // wplaty rodu do kasy wlasnej osady od ostatniego Daily
+        private static readonly Dictionary<Settlement, long> _ownPaidOld = new Dictionary<Settlement, long>();  // E5 A2b: te same wplaty w zapasie CourtFull (tylko pomiar starej reguly)
         private static readonly Dictionary<Clan, long> _ownByClan = new Dictionary<Clan, long>();            // "wlasne" dzis (zawor oddal rodowi jego pieniadze)
         private static readonly Dictionary<Clan, long> _ownCastleByClan = new Dictionary<Clan, long>();      // 110: "wlasne" dzis z zaworu zamkow
         private static readonly Dictionary<Clan, List<Settlement>> _villagesOf = new Dictionary<Clan, List<Settlement>>();   // dzis: wsie wedlug posiadacza (BK)
@@ -96,7 +97,7 @@ namespace Armoury
 
         internal static void ResetStable()
         {
-            _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
+            _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownPaidOld.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
             _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
             LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
@@ -115,13 +116,20 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ liczniki z innych modulow (kazdy we wlasnym try)
-        /// <summary>Rod wplacil do kasy osady (zold zalogi, sprzet, wydatki swoich ludzi) - liczy sie tylko, gdy osada jest jego (czesc "wlasne").</summary>
-        internal static void NoteOwnPaid(Settlement st, Clan payer, int amount)
+        /// <summary>Rod wplacil do kasy osady (zold zalogi, sprzet, wydatki swoich ludzi) - liczy sie tylko, gdy osada jest jego (czesc "wlasne").
+        /// E5 A2b (decyzja 5 Jeffa 12.10, OwnPaymentsBackAsOwn): wplata do zapasu "wlasnego" CourtFull (wraca jako "wlasne" az do zwrotu, nie ulamek
+        /// zaworu jednej doby - reszta szla dotad w nastepnych dobach do "ziemi" D stalego); wage - zold zalogi (Z8: ta czesc dalej obniza zwrot korony).</summary>
+        internal static void NoteOwnPaid(Settlement st, Clan payer, int amount, bool wage = false)
         {
             try
             {
                 if (amount <= 0 || st == null || payer == null || !StableDOn) return;
                 if (!ReferenceEquals(st.OwnerClan, payer)) return;
+                if (CourtFull.OwnAllOn && CourtFull.OwnPaid(st, payer, amount, wage))
+                {
+                    long o; _ownPaidOld.TryGetValue(st, out o); _ownPaidOld[st] = o + amount;   // tylko pomiar: ile uznalaby stara regula (linia "D staly")
+                    return;
+                }
                 long v; _ownPaid.TryGetValue(st, out v);
                 _ownPaid[st] = v + amount;
             }
@@ -336,6 +344,8 @@ namespace Armoury
                         if (_ownPaid.TryGetValue(st, out cpaid) && cpaid > 0 && cpay > 0 && cspare > 0)
                             cown = Math.Min(cpay, (long)(cpaid * Math.Min(1.0, (double)cpay / cspare)));
                         cown += CourtFull.OwnBack(st, cpay, cspare, cpay - cown);   // E5/A2 (recenzja): zwrot zapasu sprzetu wplaconego do wlasnego zamku - wlasne, nie ziemia
+                        long cold;   // E5 A2b (tylko pomiar): co z wplat w zapasie uznalaby stara regula
+                        if (_ownPaidOld.TryGetValue(st, out cold) && cold > 0 && cpay > 0 && cspare > 0) CourtFull.NoteOldOwn(Math.Min(cpay, (long)(cold * Math.Min(1.0, (double)cpay / cspare))));
                         if (cown > 0 && st.OwnerClan != null) { long o0; _ownCastleByClan.TryGetValue(st.OwnerClan, out o0); _ownCastleByClan[st.OwnerClan] = o0 + cown; }
                         RingOf(_rCastle, st).Push(cpay - cown);
                         continue;
@@ -348,12 +358,14 @@ namespace Armoury
                     if (st.IsTown && _ownPaid.TryGetValue(st, out paid) && paid > 0 && pay > 0 && avail > 0)
                         own = Math.Min(pay, (long)(paid * Math.Min(1.0, (double)pay / avail)));
                     if (st.IsTown) own += CourtFull.OwnBack(st, pay, avail, pay - own);   // E5/A2 (recenzja): to samo dla wlasnego miasta
+                    long oldp;   // E5 A2b (tylko pomiar): stara regula dla miasta
+                    if (st.IsTown && _ownPaidOld.TryGetValue(st, out oldp) && oldp > 0 && pay > 0 && avail > 0) CourtFull.NoteOldOwn(Math.Min(pay, (long)(oldp * Math.Min(1.0, (double)pay / avail))));
                     if (own > 0 && st.OwnerClan != null) { long o0; _ownByClan.TryGetValue(st.OwnerClan, out o0); _ownByClan[st.OwnerClan] = o0 + own; }
                     RingOf(_rRent, st).Push(pay - own);
                 }
                 catch (Exception e) { Stumble("StableBegin(renty)", e); }
             }
-            _ownPaid.Clear();
+            _ownPaid.Clear(); _ownPaidOld.Clear();
         }
 
         private static Ring RingOf<K>(Dictionary<K, Ring> d, K k)
