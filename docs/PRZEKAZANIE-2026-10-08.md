@@ -970,3 +970,29 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (07:30 UTC) **RAPORT NOCNY** docs/RAPORT-NOCNY-2026-10-12.md. E6 porcja 2 (wf_78d104b0-8ef, w-toku/e6-p2): K0, W2 gotowe, K1/K2/K5 w toku - bez testu i wgrania dzis (do nastepnego wspolnego testu). Tydzien 79%.
 - (09:30 UTC 12.10) **E6 porcja 2 GOTOWA** (wf_78d104b0-8ef, w-toku/e6-p2: K0 f4ec3d1 HorseState, W2 4c3eb29+fceb06f HamletKinds, K1 82232af HorseFate, K2, K5 8843e73; kazda z recenzja). Jeff "tak" - krok 1: decyzje z rana (wf_dd26748f-522: danina wsi 2.5%, RC cale juki, zaulki w oblezeniu, prog max(0.1%,200)) -> test 120 + zapis + zima -> wgranie 33.
 - (10:05 UTC 12.10) **Decyzje z rana w kodzie** (w-toku/e6-p2 2e7465a + 9665d65: LaySubsidyVillageShare 0.025, RC CaptorTakesAllBaggage, BesiegedPay.KAlley, prog krain max(0.1%,200) + log najgorszej krainy poza progiem). DLL test\Armoury-e6p2.dll abe15b3b, test\rc-e6p2\RealisticCaptivity.dll 9cdc53ee. **TEST e6p2** (bxwwskspl): 120 + zapis + zima -> wgranie 33. Zasada Jeffa: bez sztucznych doplat dla lordow (STAN-PRAC 09:50, pamiec).
+
+## 26. START TUTAJ (12.10 ok. 14:50 UTC; sesja ae222cb7; limit tygodnia 92%, reset 17.10 03:00 UTC)
+
+**Zasada Jeffa (12.10 10:30 UTC):** caly kod etapow 5-8 najpierw (kazda paczka: autor + recenzent z poprawka, wylacznik MCM, CHANGELOG, commit), BEZ testow w grze po drodze;
+potem scalenie, pelny audyt, JEDEN dokladny test (120 dob nowej kampanii + zapis 9 dob + zima + bieg dlugi; zdjecia proby drog), poprawki, wgranie. "Rob az wyczerpiesz
+limit, zapisuj na biezaco" - po kazdym kroku push galezi (repo + GitHub) i wpis w STAN-PRAC.
+
+**W grze:** WGRANIE 33 (Armoury abe15b3b, RC 9cdc53ee, CS 842f64a4, GT bbb841d7). Jeff moze grac na tym (przetestowane).
+
+**Galezie kodu (repo lancuch = S3\lancuch, worktree w SCRATCH sesji ae222cb7; wszystkie na GitHub):**
+- `noc/wgranie-33` = `w-toku/e6-p2` 9665d65 (w grze).
+- `w-toku/e5-wsie` 396c033 (od 33): pan 45%, dziesiecina, nadwyzka 15%/d. GOTOWE.
+- `w-toku/e6-p3` 1825401 (od e5-wsie): etap 6 porcja 3 - R1, R3, W1, W3, K4, N1, K3. GOTOWE (DLL test\Armoury-e6p3.dll b2f6aa11).
+- `w-toku/e7-a` i `w-toku/e7-b` (od e5-wsie!): etap 7 w toku (wf_17813d40-8ac): A = E7/0, O1, T, C, K, O2; B = L, B, W1, W2, W3, W5, D0. Na koncu kazdego strumienia
+  przeglad kolizji i DLL test\Armoury-e7-a.dll / Armoury-e7-b.dll. Jesli przerwane: `git -C <lancuch> log w-toku/e7-a` / `e7-b` pokaze zrobione paczki; wznowienie:
+  Workflow resumeFromRunId wf_17813d40-8ac (skrypt workflows/scripts/e7-kod-dwa-strumienie-*.js) - zrobione paczki wroca z pamieci.
+
+**Kolejnosc dalej:**
+1. Dokonczyc etap 7 (wyzej). 2. Etap 5 reszta na galezi od e6-p3: E5/A7 (lup z rabunku z kiesy wsi, nowa zaloga z kiesy starej, dochod za tier, perki 5000 - AUDYT-ZLOTO
+   wiersze 12-16), E5/A8 (BK nowy rod szlachty, herszt BK, uczta, koszt paktow Diplomacy bez odbiorcy - wiersze 17-23, 194), C1 (TownPurseNoTopUp - nowy klucz), C2 (glod ma skutki),
+   C4 (napis o chlebie w oknie People), rozpoznanie ok. 26 tys./d "bitwy" z niczego. 3. Scalenie e6-p3 + e5-reszta + e7-a + e7-b (konflikty: Settings.cs, McmSettings.cs - gen_mcm,
+   CHANGELOG, sprawdz_logi.py, ArmouryBehavior). 4. E7/R1, R2, W4 (po A7 i W1). 5. Projekt etapu 8 (8.1-8.18; 8.5 + odchylki cennika, 8.18 dochody gracza w nowych cenach -
+   docs/CENY-A-DOCHODY-2026-10-12.md) i kod. 6. Pelny audyt (kilka niezaleznych przegladow), test zbiorczy, poprawki, wgranie.
+
+**Czeka na Jeffa:** etap 7 pytania 1-4 (STAN-PRAC 12:00 UTC: premia drog - rada nie; ile drog; plik Diplomacy na rok 364 - rada tak; myto na Bliznakach), etap 6 K4 (cofniecie
+kroku x1.3 - rada tak) i N1 (lekka naprawa bez materialu - rada zostawic).
