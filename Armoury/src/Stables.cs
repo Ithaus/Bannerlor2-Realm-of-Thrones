@@ -500,9 +500,10 @@ namespace Armoury
                         bag.AddToCounts(new EquipmentElement(it), k);
                         extra -= k; _dToBag += k;
                     }
+                    HorseState.Refresh(mp);   // E6/K0: stan koni partii po przesunieciu (wolne konie zbrojowni)
                     return 0;
                 }
-                int lack = riders - have;
+                int lack = riders - have, moved = 0;
                 while (lack > 0)
                 {
                     int best = -1, bestVal = int.MaxValue;
@@ -518,8 +519,9 @@ namespace Armoury
                     int take = Math.Min(lack, e.Amount);
                     if (!AiGear.AddToArmory(mp, e.EquipmentElement.Item, take)) break;   // DTE nie przyjal - zostaje w taborze
                     bag.AddToCounts(e.EquipmentElement, -take);
-                    lack -= take; _dToArm += take;
+                    lack -= take; _dToArm += take; moved += take;
                 }
+                if (moved > 0) HorseState.Refresh(mp);   // E6/K0: stan koni partii po dosadzeniu jezdzcow (bez konia mniej)
                 _dNoHorse += Math.Max(0, lack);
                 return Math.Max(0, lack);
             }
@@ -675,6 +677,7 @@ namespace Armoury
                 int lost, modNeg, modPos;
                 int banked = BankToArmory(party.MobileParty, taken, fix, true, out lost, out modNeg, out modPos);
                 HorseCensus.OnUpgradePaid(party, cat, need, fromFree, banked, lost, modNeg, modPos);
+                HorseState.AfterPay(party);   // E6/K0: stan koni partii od nowa w postfiksie UpgradeTroop (nowy jezdziec w skladzie dopiero po tym prefiksie)
                 return true;
             }
             catch (Exception e) { Log.Error("Stables.Pay", e); return true; }

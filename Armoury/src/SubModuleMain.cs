@@ -174,6 +174,9 @@ namespace Armoury
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
+                // E6/K0 (209): licznik koni gry u zrodla (postfiks ItemRoster.OnRosterUpdated - liczy dopiero przy kluczu, flaga ustawiana w kampanii),
+                // odswiezenie stanu koni partii po oplaconym awansie, pomiar koni porzuconych przez gre; PRZED MarchPace (ten czyta stan koni partii)
+                try { HorseState.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HorseState.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc

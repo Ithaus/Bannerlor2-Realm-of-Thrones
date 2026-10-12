@@ -284,20 +284,20 @@ namespace Armoury
             return null;
         }
 
-        /// <summary>Pelna pasza zwierzat partii na dobe: konni w skladzie po glowie x kon + zwierzeta w taborze x ich stawka (stawki BK).
+        /// <summary>Pelna pasza zwierzat partii na dobe: konni w skladzie po glowie x kon (E6/K0 FodderFromHorseState: konie pod jezdzcami + wolne konie
+        /// zbrojowni ze stanu koni partii - HorseState.FodderMounts) + zwierzeta w taborze x ich stawka (stawki BK).
         /// ignoreCamels - warunek terenu BK (pustynia): wielblady w taborze bez paszy (ten sam test co BK: StringId zawiera "camel").
         /// Jedna liczba zwierzat dla zimy E4/1 (HorseFeed, ignoreCamels false) i dla paszy BK (BkAnimalPostfix, wariant (a)).</summary>
         private static float AnimalNeed(MobileParty party, Feed f, bool ignoreCamels, out int riders, out int herd)
         {
             riders = 0; herd = 0;
             float need = 0f;
-            var mr = party.MemberRoster;
-            if (mr != null)
-                for (int i = 0; i < mr.Count; i++)
-                {
-                    var c = mr.GetCharacterAtIndex(i);
-                    if (c != null && c.IsMounted) riders += mr.GetElementNumber(i);
-                }
+            // E6/K0 (FodderFromHorseState): konie, ktore partia naprawde ma - pod jezdzcami (bez jezdzcow bez konia ze stanu koni partii) i wolne
+            // w zbrojowni DTE, zamiast konnych po glowie; partia bez stanu (bez zbrojowni, gracz) i wylacznik wylaczony - po glowie jak dotad
+            int heads, free, unhorsed;
+            int horses = HorseState.FodderMounts(party, out heads, out free, out unhorsed);
+            var s = Settings.Current;
+            riders = s != null && s.FodderFromHorseState ? horses : heads;
             need += riders * f.Horse;
             var ir = party.ItemRoster;
             if (ir != null)
@@ -490,7 +490,9 @@ namespace Armoury
                  + " | zwierzeta w paszy BK: " + (BkPerHeadNow ? "po glowie (wariant a - ta sama liczba co zima E4/1)" : "formula BK (1 kon na typ oddzialu; " + (_bkFeedHooked ? "wylacznik BkAnimalFeedPerHead" : "latka " + _bkFeedStart) + ")")
                  + " | stawki paszy (" + f.RatesFrom + "): kon " + f.Horse.ToString("0.###", Inv) + ", kon bojowy " + f.Warhorse.ToString("0.###", Inv)
                  + ", juczny " + f.Mule.ToString("0.###", Inv) + ", krowa " + f.Cattle.ToString("0.###", Inv) + ", swinia " + f.Pig.ToString("0.###", Inv)
-                 + ", owca " + f.Sheep.ToString("0.###", Inv) + "; konni po glowie (sklad partii, bez jencow) x kon, zwierzeta taboru x stawka.";
+                 + ", owca " + f.Sheep.ToString("0.###", Inv) + "; " + (Settings.Current != null && Settings.Current.FodderFromHorseState
+                       ? "konie partii (E6/K0: pod jezdzcami bez jezdzcow bez konia + wolne w zbrojowni DTE; partia bez zbrojowni - konni po glowie) x kon"
+                       : "konni po glowie (sklad partii, bez jencow) x kon") + ", zwierzeta taboru x stawka.";
         }
 
         private static string Line()
@@ -534,6 +536,7 @@ namespace Armoury
             var f = FeedInfo();
             var fm = Campaign.Current.Models.MobilePartyFoodConsumptionModel;
             int eat = 0, fed = 0, fedDesert = 0, fedSnow = 0; long riders = 0, herd = 0;
+            long k0Horses = 0, k0Heads = 0, k0Free = 0, k0Unhorsed = 0;   // E6/K0: pasza z konmi partii wobec konnych po glowie (partie z doplata)
             double feed = 0, needFed = 0, men = 0, bonus = 0, bkTop = 0;
             var why = new int[WhyCount];
             foreach (var mp in MobileParty.All)
@@ -550,6 +553,7 @@ namespace Armoury
                     why[w]++;
                     if (x <= 0f) continue;
                     fed++; feed += x; needFed += need; riders += r; herd += h;
+                    int kh, kf, ku; k0Horses += HorseState.FodderMounts(mp, out kh, out kf, out ku); k0Heads += kh; k0Free += kf; k0Unhorsed += ku;
                     if (w == WhyTopDesert || w == WhyTopSnow) bkTop += bkp;
                     if (!f.BkFeeds)
                     {
@@ -574,6 +578,8 @@ namespace Armoury
             sb.Append("; bez doplaty: step ").Append(why[WhySteppe]).Append(", pustynia (pasza BK nie mniejsza) ").Append(why[WhyDesert])
               .Append(", snieg/zamiec (pasza BK nie mniejsza) ").Append(why[WhySnow])
               .Append(", kraina bez zimy ").Append(why[WhyNoRealm]).Append(", bez zwierzat ").Append(why[WhyNoAnimals]);
+            sb.Append(" | pasza (E6/K0, FodderFromHorseState ").Append(s.FodderFromHorseState ? "TAK" : "NIE").Append("): konie partii ").Append(k0Horses)
+              .Append(" (dawniej po glowie ").Append(k0Heads).Append("; wolne w zbrojowni jedza ").Append(k0Free).Append(", jezdzcy bez konia nie jedza ").Append(k0Unhorsed).Append(')');
             sb.Append(" | model jedzenia: ").Append(f.Active).Append(", regula paszy BK ").Append(f.BkFeeds ? "BIEGNIE" : "NIE BIEGNIE");
             try { sb.Append(" | ").Append(BkFeedText()); } catch (Exception e) { Stumble("Line(pasza BK)", e); }
             sb.Append(" | potkniecia dzis ").Append(Volatile.Read(ref _stumblesDay)).Append(", od startu sesji ").Append(Volatile.Read(ref _stumbles));

@@ -74,6 +74,10 @@ Uzycie (Python 3, tylko odczyt):
                     gracza 2/2), linia CZYNNE kazdej doby, kontrola puli (roznica 0), sakiewki zwolnionych 166 do puli > 0 przy ludziach w karczmach i
                     zgodnosc z linia 166, oplata za najem do kas miast 0, zaplata do sakiewek najetych > 0 przy najmie (linia E4/10), pule bez weteranow 0,
                     osierocone 0, posiadacz "Pieniadz swiata" = pula, bledy i potkniecia 0; najem z puli, wydatek wobec stawki, Werbunek - INFO.
+                    Blok E6/K0 (209, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K0-1..K0-10 - linia "Marsz - konie partii (E6/K0)" i dopisek
+                    "pasza (E6/K0" w linii zimy E4/1: latka licznika gry wpieta, kontrola licznik gry = pelne przeliczenie (roznica 0 w kazdej dobie
+                    z "liczy TAK"), sufit tempa AI z K0 nizszy niz bez K0 = 0 (na sucho w tym samym wywolaniu), koszt K0 srednio <= 2 ms/dobe,
+                    potkniecia 0; luzaki, wolne konie zbrojowni, sufit wyzszy, konie porzucone przez gre i pasza (konie partii / po glowie) - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3250,9 +3254,83 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
             rep.add("E5/B6: linie VetPurse (E5/B6) / Weterani - pieniadze (E5/B6)", "brak w logu", "sa od wgrania E5/B6 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_b6", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K0 (209): licznik koni gry u zrodla, stan koni partii, pasza z tego stanu (etap 6 - grupy etap6 jeszcze nie ma; brak linii startowej - INFO)
+    try:
+        etap5_k0(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k0", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
+
+def etap5_k0(rep, lines, start, until):
+    """E6/K0 (209, projekt etapu 6 v2 rozdz. 3 "E6/K0" Test): licznik koni gry u zrodla, stan koni partii (pamiec doby), pasza z tego stanu.
+    Linia startowa "HorseState (E6/K0): licznik koni gry u zrodla (postfiks", linia doby "Marsz - konie partii (E6/K0): dzien N" (dzien = doba gry - 1,
+    okno doby kampanii 1-until jak etap5_main), dopisek "pasza (E6/K0, FodderFromHorseState" w linii "Zima wedlug krain (E4/1)"."""
+    wire = [x for x in lines if x.startswith("HorseState (E6/K0): licznik koni gry u zrodla (postfiks")]
+    if not wire:
+        rep.add("K0-1: latka licznika koni gry (ItemRoster.OnRosterUpdated)", "brak linii startowej", "jest od wgrania E6/K0", None)
+        return
+    w = wire[-1]
+    rep.add("K0-1: latka licznika koni gry (ItemRoster.OnRosterUpdated)", w[:200], "\"OnRosterUpdated) wpieta\" (bez NIE wpieta)",
+            "OnRosterUpdated) wpieta" in w)
+    dl = by_day(lines, "Marsz - konie partii (E6/K0): dzien")
+    days = sorted(d for d in dl if 1 <= run_day(d, start) <= until)
+    rep.add("K0-2: linia Marsz - konie partii (E6/K0) w oknie", f"{len(days)} dob (z {len(dl)} w logu)", "codziennie od wgrania E6/K0", None)
+    if not days:
+        return
+    rows = [dl[d] for d in days]
+    counting = [s for s in rows if "): liczy TAK" in s]
+    bad = []
+    for d in days:
+        s = dl[d]
+        if "): liczy TAK" not in s:
+            continue
+        dm = num(r"wierzchowce roznica (\d+)", s, int, 0) or 0
+        dp = num(r"\(partii \d+\), juczne (\d+)", s, int, 0) or 0
+        if dm or dp:
+            bad.append(f"d{d}: {dm}/{dp}")
+    rep.add("K0-3: licznik gry = pelne przeliczenie (CalculateCachedStats) w partiach marszu",
+            f"dob z licznikiem czynnym {len(counting)}; doby z roznica (wierzchowce/juczne) {len(bad)}" + (f" [{', '.join(bad[:6])}]" if bad else ""),
+            "roznica 0 w kazdej dobie z \"liczy TAK\"", (len(bad) == 0) if counting else None)
+    low = sum(num(r"nizszy (\d+) \(prog 0\)", s, int, 0) or 0 for s in rows)
+    high = sum(num(r"z K0 wyzszy (\d+)", s, int, 0) or 0 for s in rows)
+    calls = sum(num(r"sufit tempa AI na sucho \(to samo wywolanie\): (\d+) wywolan", s, int, 0) or 0 for s in rows)
+    rep.add("K0-4: sufit tempa AI z K0 nizszy niz bez K0 (na sucho, suma okna)", f"{low} z {calls} wywolan", "0", low == 0)
+    a0 = [num(r"srednio bez K0 ([\d.]+)", s, float) for s in rows]
+    a1 = [num(r" / z K0 ([\d.]+), z K0 wyzszy", s, float) for s in rows]
+    a0 = [x for x in a0 if x is not None]; a1 = [x for x in a1 if x is not None]
+    rep.add("K0-5: sufit tempa AI wyzszy z K0 (wolne konie zbrojowni pod piechure)",
+            f"wyzszy {high} wywolan; srednio bez K0 {sum(a0) / len(a0):.2f} / z K0 {sum(a1) / len(a1):.2f}" if a0 and a1 else f"wyzszy {high}",
+            "INFO (szybsze kolumny - styk z etapem 7)", None)
+    cost = [num(r"razem ([\d.]+) ms \(prog 2 ms/dobe\)", s, float) for s in rows]
+    cost = [x for x in cost if x is not None]
+    if cost:
+        m = sum(cost) / len(cost)
+        rep.add("K0-6: koszt K0 (OnRosterUpdated + stan doby + odswiezenia)", f"srednio {m:.2f} ms/dobe, najwiecej {max(cost):.2f} ({len(cost)} dob)",
+                "srednio <= 2 ms/dobe", m <= 2.0)
+    st = sum(num(r"potkniecia dzis (\d+)", s, int, 0) or 0 for s in rows)
+    rep.add("K0-7: potkniecia HorseState w oknie", str(st), "0", st == 0)
+    s = rows[-1]
+    pl, md, lm = num(r"bez modyfikatora (\d+)", s), num(r"ze stanem (\d+) \(w tym kulawe", s), num(r"w tym kulawe (\d+)", s)
+    fr, un = num(r"wolne w zbrojowni (\d+)", s), num(r"bez konia (\d+)\)", s)
+    rep.add("K0-8: luzaki i stan koni partii (ostatnia doba)",
+            f"bez modyfikatora {pl}, ze stanem {md} (kulawe {lm}), wolne w zbrojowni {fr}, bez konia {un}", "INFO", None)
+    herd = sum(num(r"nadmiar stada (\d+)", x, int, 0) or 0 for x in rows)
+    herdm = sum(num(r"nadmiar stada \d+ \(ze stanem (\d+)\)", x, int, 0) or 0 for x in rows)
+    wgt = sum(num(r"ponad udzwig (\d+)", x, int, 0) or 0 for x in rows)
+    wgtm = sum(num(r"ponad udzwig \d+ \(ze stanem (\d+)\)", x, int, 0) or 0 for x in rows)
+    rep.add("K0-9: konie porzucone przez gre (lordowie AI, DiscardItemsCampaignBehavior; suma okna)",
+            f"nadmiar stada {herd} (ze stanem {herdm}), ponad udzwig {wgt} (ze stanem {wgtm})", "INFO (ujscie koni bez przyczyny w ksiedze - K1)", None)
+    zw = [x for x in by_day(lines, "Zima wedlug krain (E4/1): dzien").values() if "| pasza (E6/K0, FodderFromHorseState" in x]
+    if zw:
+        hs = sum(num(r"pasza \(E6/K0, FodderFromHorseState \w+\): konie partii (\d+)", x, int, 0) or 0 for x in zw)
+        hd = sum(num(r"\(dawniej po glowie (\d+);", x, int, 0) or 0 for x in zw)
+        rep.add("K0-10: pasza zima - konie partii wobec konnych po glowie (suma dob zimy z dopiskiem)",
+                f"{hs} wobec {hd} ({len(zw)} dob" + (f", {100.0 * (hs - hd) / hd:+.1f}%" if hd else "") + ")",
+                "INFO (projekt: ok. -900 koni swiata; prog glodu lordow zima E4 przeliczyc w biegu B)", None)
+    else:
+        rep.add("K0-10: pasza zima - konie partii wobec konnych po glowie", "brak dopisku (bieg bez zimy albo log sprzed K0)", "INFO", None)
 
 def etap5_fee(rep, lines):
     """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -

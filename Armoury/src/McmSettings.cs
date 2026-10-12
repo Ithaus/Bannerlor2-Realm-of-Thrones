@@ -4668,6 +4668,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SandSteedsInDorne { get; set; } = true;
 
+        [SettingPropertyBool("Spare Horses Carry Footmen", HintText = "every spare horse in the baggage - also a worn or lame one from the spoils - and every free horse in the troops' armoury carries a footman on the march; the game counts such horses the same way everywhere")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool SpareHorsesCarryFootmen { get; set; } = true;
+
+        [SettingPropertyBool("Fodder From Horse State", HintText = "winter fodder is eaten by the horses a party really has - in the baggage, under its riders and free in the armoury - not by riders who have lost theirs")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool FodderFromHorseState { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5834,6 +5842,8 @@ namespace Armoury
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;
             s.SandSteedsInDorne = SandSteedsInDorne;
+            s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
+            s.FodderFromHorseState = FodderFromHorseState;
         }
 
         internal static void Apply()

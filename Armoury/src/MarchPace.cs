@@ -29,8 +29,9 @@ namespace Armoury
     /// </summary>
     internal static class MarchPace
     {
-        /// <summary>Zlicza kolumne: ludzi, piechote, luzaki, juczne+bydlo, jencow (z doczepionymi partiami armii).</summary>
-        private static void CountColumn(MobileParty mp, out int men, out int foot, out int mounts, out int train, out int prisoners)
+        /// <summary>Zlicza kolumne: ludzi, piechote, luzaki, juczne+bydlo, jencow (z doczepionymi partiami armii); armory - wolne konie zbrojowni DTE
+        /// ze stanu koni partii (E6/K0, pamiec doby - tylko odczyt, bez Stables.Balance w tej sciezce).</summary>
+        private static void CountColumn(MobileParty mp, out int men, out int foot, out int mounts, out int train, out int prisoners, out int armory)
         {
             men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
             foot = mp.Party != null ? mp.Party.NumberOfMenWithoutHorse : 0;
@@ -38,6 +39,7 @@ namespace Armoury
             mounts = r != null ? r.NumberOfMounts : 0;
             train = r != null ? r.NumberOfPackAnimals + r.NumberOfLivestockAnimals : 0;
             prisoners = mp.PrisonRoster != null ? mp.PrisonRoster.TotalManCount : 0;
+            armory = HorseState.FreeOf(mp);
             var attached = mp.AttachedParties;
             if (attached == null) return;
             for (int i = 0; i < attached.Count; i++)
@@ -49,7 +51,33 @@ namespace Armoury
                 var ar = ap.ItemRoster;
                 if (ar != null) { mounts += ar.NumberOfMounts; train += ar.NumberOfPackAnimals + ar.NumberOfLivestockAnimals; }
                 prisoners += ap.PrisonRoster != null ? ap.PrisonRoster.TotalManCount : 0;
+                armory += HorseState.FreeOf(ap);
             }
+        }
+
+        /// <summary>Sufit kolumny w jednostkach mapy PRZED tempem swiata. kind: 0 ktos idzie (n - idacych), 1 sami jezdzcy, 2 piechota na luzakach (n),
+        /// 3 tabor. E6/K0: wolany dwa razy w tym samym wywolaniu (z wolnymi konmi zbrojowni i bez nich - sufit na sucho do linii).</summary>
+        private static float Cap(Settings c, int men, int foot, int mounts, int train, int prisoners, out int kind, out int n)
+        {
+            // luzaki najpierw pod piechote, reszta pod jencow
+            int ridingFoot = Math.Min(foot, mounts);
+            int mountsLeft = mounts - ridingFoot;
+            int walkers = (foot - ridingFoot) + Math.Max(0, prisoners - mountsLeft);
+            if (walkers > 0) { kind = 0; n = walkers; return c.MarchFootPace; }   // ktos idzie - wszyscy ida
+            // NIKT NIE IDZIE PIESZO - ale to jeszcze nie znaczy "kawaleria".
+            // Do 13.09 kazda kolumna bez piechurow dostawala PELNY sufit jazdy,
+            // wiec banda lotrow, ktora zrabowala dosc koni, maszerowala tak
+            // szybko jak prawdziwi jezdzcy (Jeff: "widze bandytow, ktorzy maja
+            // piechote, a biegaja jak konnica"). Klasowy komentarz obiecywal
+            // polowe premii kawalerii, ale kod nigdy tego nie robil.
+            // Teraz wygrywa sufit NAJNIZSZY z pasujacych, z wlasna nazwa przyczyny:
+            // piechur w siodle jedzie wolniej niz czlowiek, ktory sie w nim urodzil.
+            float cap = c.MarchRiderPace;
+            kind = 1; n = 0;
+            if (ridingFoot > 0 && c.MarchFootRiderPace < cap) { cap = c.MarchFootRiderPace; kind = 2; n = ridingFoot; }
+            int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
+            if (train > allowance && c.MarchTrainPace < cap) { cap = c.MarchTrainPace; kind = 3; n = 0; }
+            return cap;
         }
 
         /// <summary>
@@ -58,6 +86,7 @@ namespace Armoury
         /// </summary>
         public static void SpeedPostfix(MobileParty __0, ref ExplainedNumber __result)
         {
+            long tk = 0;
             try
             {
                 var c = Settings.Current;
@@ -71,51 +100,29 @@ namespace Armoury
                 // (13.09: TerrainEase mial ten bezpiecznik od poczatku, my nie, wiec
                 // czapka zakladala sie na kazdym poziomie lancucha)
                 if (!SpeedDepth.OutermostFinal) return;
+                tk = HorseState.SpeedBegin();   // E6/K0: koszt SpeedPostfix (znacznik czasu co 16. wywolanie)
 
-                int men, foot, mounts, train, prisoners;
-                CountColumn(mp, out men, out foot, out mounts, out train, out prisoners);
+                int men, foot, mounts, train, prisoners, armory;
+                CountColumn(mp, out men, out foot, out mounts, out train, out prisoners, out armory);
                 if (men <= 0) return;
 
-                // luzaki najpierw pod piechote, reszta pod jencow
-                int ridingFoot = Math.Min(foot, mounts);
-                int mountsLeft = mounts - ridingFoot;
-                int walkers = (foot - ridingFoot) + Math.Max(0, prisoners - mountsLeft);
-
-                float cap;
-                TextObject why;
-                if (walkers > 0)
-                {
-                    cap = c.MarchFootPace;                              // ktos idzie - wszyscy ida
-                    why = new TextObject("{=!}Marching column: {N} afoot").SetTextVariable("N", walkers);
-                }
-                else
-                {
-                    // NIKT NIE IDZIE PIESZO - ale to jeszcze nie znaczy "kawaleria".
-                    // Do 13.09 kazda kolumna bez piechurow dostawala PELNY sufit jazdy,
-                    // wiec banda lotrow, ktora zrabowala dosc koni, maszerowala tak
-                    // szybko jak prawdziwi jezdzcy (Jeff: "widze bandytow, ktorzy maja
-                    // piechote, a biegaja jak konnica"). Klasowy komentarz obiecywal
-                    // polowe premii kawalerii, ale kod nigdy tego nie robil.
-                    // Teraz wygrywa sufit NAJNIZSZY z pasujacych, z wlasna nazwa przyczyny:
-                    // piechur w siodle jedzie wolniej niz czlowiek, ktory sie w nim urodzil.
-                    cap = c.MarchRiderPace;
-                    why = new TextObject("{=!}Marching column: all riders");
-                    if (ridingFoot > 0 && c.MarchFootRiderPace < cap)
-                    {
-                        cap = c.MarchFootRiderPace;
-                        why = new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", ridingFoot);
-                    }
-                    int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
-                    if (train > allowance && c.MarchTrainPace < cap)
-                    {
-                        cap = c.MarchTrainPace;
-                        why = new TextObject("{=!}Marching column: baggage train");
-                    }
-                }
+                // E6/K0 (SpareHorsesCarryFootmen): kazdy wolny kon zbrojowni DTE partii (stan koni partii z pamieci doby) niesie piechura
+                // jak luzak w taborze; luzaki w taborze (NumberOfMounts) licza juz takze konie ze stanem i kulawe (licznik gry u zrodla - HorseState)
+                bool k0 = c.SpareHorsesCarryFootmen;
+                int kind, n;
+                float cap = Cap(c, men, foot, k0 ? mounts + armory : mounts, train, prisoners, out kind, out n);
                 // sufity kolumny zyja w jednostkach mapy - przy zwolnionym
                 // swiecie (WorldPacePercent) skaluja sie tym samym mnoznikiem
                 int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
-                cap *= pace / 100f;
+                float scale = pace / 100f;
+                if (k0 && mp != MobileParty.MainParty)
+                {
+                    // sufit tempa AI bez K0 (bez wolnych koni zbrojowni) na sucho w tym samym wywolaniu - prog linii: z K0 nigdy nizszy
+                    int k2, n2;
+                    float cap0 = armory > 0 ? Cap(c, men, foot, mounts, train, prisoners, out k2, out n2) : cap;
+                    HorseState.NoteCap(cap0 * scale, cap * scale);
+                }
+                cap *= scale;
                 if (cap <= 0.25f) return;
                 // czapka WIDOCZNA w rozpisce predkosci: gole LimitMax cielo tempo
                 // bez zadnego sladu i gracz nie wiedzial, CZEMU wlecze sie 4.0
@@ -129,12 +136,17 @@ namespace Armoury
                 // docinal reszte po cichu. 13.09.
                 if (current > cap)
                 {
+                    TextObject why = kind == 0 ? new TextObject("{=!}Marching column: {N} afoot").SetTextVariable("N", n)
+                                   : kind == 2 ? new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", n)
+                                   : kind == 3 ? new TextObject("{=!}Marching column: baggage train")
+                                   : new TextObject("{=!}Marching column: all riders");
                     float f = 1f + __result.SumOfFactors;
                     __result.Add(f > 0.01f ? (cap - current) / f : (cap - current), why);
                 }
                 __result.LimitMax(cap);
             }
             catch { }
+            finally { HorseState.SpeedEnd(tk); }
         }
 
         internal static void ApplyAll(Harmony h)

@@ -1432,6 +1432,10 @@ namespace Armoury
         // E6/M2 (208, PLAN 6.9 + 6.10): warsztat towarowy wedlug wsadu z okregu (bramka x0.01) i wielblady tylko w Qarthu (nowa kampania)
         public bool WorkshopsFollowInputs = true;          // a town's trade workshop is the kind its own villages feed - no wine press where no grapes grow: when the game picks the trade of a workshop (at the start of a new campaign, after a bankruptcy, when you lose a workshop) a trade whose raw goods neither grow in the town's villages nor come by a materials contract is all but never chosen, unless no trade has them. Workshops already working and your own workshops are not changed (off = the game's choice, as before)
         public bool SandSteedsInDorne = true;              // new campaign only: camels are bred only in Qarth - the desert studs of Dorne and of the Free Cities breed horses of the same kind (riding, war, pack) in their place, and the studs of Qarth breed camels in place of some of their horses; the same number of animals in all (off = the game's studs, as before)
+        // E6/K0 (209, PLAN 6.15, R13): licznik koni gry u zrodla (wierzchowce i juczne ze stanem jak pelne przeliczenie gry) i wolne konie zbrojowni DTE pod piechure
+        // w kolumnie marszu (MarchPace, stan koni partii z pamieci doby - HorseState); FodderFromHorseState - pasza z tego samego stanu (WinterRealm.AnimalNeed)
+        public bool SpareHorsesCarryFootmen = true;        // every spare horse in the baggage - also a worn or lame one from the spoils - and every free horse in the troops' armoury carries a footman on the march; the game counts such horses the same way everywhere
+        public bool FodderFromHorseState = true;           // winter fodder is eaten by the horses a party really has - in the baggage, under its riders and free in the armoury - not by riders who have lost theirs
 
         public static void Load(string moduleDataDir)
         {
