@@ -2653,6 +2653,14 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/A4: linia Oblezone (E5/A4)", "brak w logu", "jest od wgrania E5/A4 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_a4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B1 (173): kiesa ludu czynna - blok rusza przy linii "Kiesa ludu (E5/B1): CZYNNA" (plan kodu E5/B1 rozdz. 11, progi B1-T1..T20)
+    try:
+        if any(x.startswith("Kiesa ludu (E5/B1):") for x in lines):
+            etap5_b1(rep, lines, start, until, logp)
+        else:
+            rep.add("E5/B1: linia Kiesa ludu (E5/B1)", "brak w logu", "jest od wgrania E5/B1 (bieg B bez kiesy czynnej = NIE w bloku B1)", None)
+    except Exception as e:
+        rep.add("blok etap5_b1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/A5 (197): BetterEconomy - prawdziwa wplata gracza i dar dla notabli (dopisek linii kampanii BEE 170 i linie akcji gracza)
     try:
         if any(x.startswith("BEE domkniecie (170)") for x in lines):
@@ -2663,6 +2671,128 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
         rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
+
+
+def etap5_b1(rep, lines, start, until, logp):
+    """E5/B1 (173, kiesa ludu czynna; plan kodu docs/etap5/PLAN-KODU-E5B1.md rozdz. 11, progi B1-T1..T20). Okno: doby kampanii 2-until; sr28 - ostatnie 28 dob okna.
+    Linie: "Kiesa ludu (E5/B1): CZYNNA" (stan), "Kiesa ludu: dzien" (doba), "Podstawa robocizny (E5/B1)", "Prawa panskie (E5/B1)", "Zadowolenie ludu (R14)",
+    "Kiesa ludu (E5/B1): zapasy startowe", "Gotowka wsi (E5/0)", "Przeplywy osad (kasy miast|kasy zamkow)", "Pieniadz swiata (bilans - przyczyny)"."""
+    st_on = [x for x in lines if x.startswith("Kiesa ludu (E5/B1): CZYNNA")]
+    st_off = [x for x in lines if x.startswith("Kiesa ludu (E5/B1): NIECZYNNA")]
+    stl = next((x for x in lines if x.startswith("Kiesa ludu (E5/B1): okna wpiete:")), None)
+    kie = by_day(lines, "Kiesa ludu: dzien")
+    win = sorted(d for d in kie if 2 <= run_day(d, start) <= until)
+    full = [d for d in win if "doba niepelna" not in kie[d] and "czeka na kalibracje" not in kie[d]]
+    w28 = _last28(full)
+    # ---- B1-T1 bledy i potkniecia
+    errs = [x for x in lines if x.startswith("ERROR in TownFolk")]
+    sites = sorted(set(x[len("ERROR in "):].split(":")[0] for x in errs))
+    stum = sum(num(r"\| potkniecia (\d+) \(sesja", kie[d], int, 0) or 0 for d in win)
+    brak = re.search(r"; BRAK: (.*?); klucz przy starcie", stl) if stl else None
+    rep.add("B1-T1: bledy, potkniecia, okna B1 (linia startowa)",
+            f"ERROR in TownFolk {len(errs)}" + (f" ({', '.join(sites[:6])})" if sites else "") + f"; potkniecia {stum}; BRAK: {brak.group(1) if brak else '?'}",
+            "0 bledow; <= 5 potkniec w biegu; BRAK: -", len(errs) == 0 and stum <= 5 and brak is not None and brak.group(1).strip() == "-")
+    # ---- B1-T2 czynna kazdej doby (bieg B bez kiesy czynnej - NIE, P K3)
+    a1 = bool(st_on) and all(" | A1: tak" in x for x in st_on)
+    miss = [run_day(d, start) for d in range(min(win) if win else 0, (max(win) + 1) if win else 0) if d not in kie]
+    rep.add("B1-T2: kiesa czynna kazdej doby (linia stanu CZYNNA, A1 tak, linia doby)",
+            f"linii CZYNNA {len(st_on)}, NIECZYNNA {len(st_off)}; dob z linia {len(win)} (pelnych {len(full)}), brak w {len(miss)}" + (f" (d{', d'.join(str(x) for x in miss[:5])})" if miss else ""),
+            "CZYNNA, A1 tak, linia kazdej doby 2-until; NIE, gdy bieg B bez kiesy czynnej", bool(st_on) and a1 and not st_off and len(miss) == 0 and len(win) > 0)
+    if st_on:
+        rep.add("B1-T2b: klucze B w linii stanu (P K3)", _grp(r"klucze B: ([^|]+)", st_on[-1], 1).strip()[:200], "INFO (progi w blokach B3/B5)", None)
+        rep.add("B1-T2c: stawki i przelaczniki (linia stanu)", (_grp(r"stawki: ([^|]+)", st_on[-1], 1).strip() + " | " + _grp(r"kotwica: ([^|]+)", st_on[-1], 1).strip())[:300], "INFO", None)
+        rep.add("B1-T2d: kategorie lepsze i zakupy wsi (znalezione)", _grp(r"kategorie \"lepsze\": ([^|]+)", st_on[-1], 1).strip()[:200], "INFO (BRAK = lista do poprawy)", None)
+    if not full:
+        return
+    # ---- B1-T3 kontrola zamknieta kies
+    bad3 = []
+    for d in full:
+        m = re.search(r"kontrola: zmiana kies (-?\d+) = wplywy (-?\d+) - wydatki (-?\d+), r = (-?\d+|-)", kie[d])
+        if m and m.group(4) != "-" and abs(int(m.group(4))) > 1:
+            bad3.append((run_day(d, start), int(m.group(4))))
+    rep.add("B1-T3: kontrola zamknieta kies ludu (zmiana = wplywy - wydatki)", f"poza progiem {len(bad3)} z {len(full)} dob" + (f" (np. d{bad3[0][0]}: r = {bad3[0][1]})" if bad3 else ""),
+            "|r| <= 1 zl kazdej doby", len(bad3) == 0)
+    # ---- B1-T4 reszta ksiegi (etap 3)
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    cd = [d for d in full if d in cau]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
+    rep.add("B1-T4: reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii", "|R| < 10 000 (prog etapu 3)", (abs(rv) < 10000) if rv is not None else None)
+    # ---- B1-T5 "zakupy" z niczego 0 (miasta i zamki)
+    pm, pz = by_day(lines, "Przeplywy osad (kasy miast): dzien"), by_day(lines, "Przeplywy osad (kasy zamkow): dzien")
+    nz = [run_day(d, start) for d in full if (num(r'"zakupy" mieszkancow ([+-]?\d+)', pm.get(d, ""), int, 0) or 0) != 0 or (num(r'"zakupy" mieszkancow ([+-]?\d+)', pz.get(d, ""), int, 0) or 0) != 0]
+    lf = _mean([num(r"lud za towar \(E5/B1\) ([+-]?\d+)", pm.get(d, ""), int) for d in w28])
+    rep.add("B1-T5: \"zakupy\" z niczego (kasy miast i zamkow)", f"dob != 0: {len(nz)} z {len(full)}" + (f" (d{', d'.join(str(x) for x in nz[:5])})" if nz else "") + (f"; lud za towar sr28 {lf:.0f}/d" if lf is not None else ""),
+            "0 kazdej doby (A1-T4 dalej)", len(nz) == 0)
+    # ---- B1-T6 zjedzone bez zaplaty < 1% wydatku gry
+    q6 = _mean([fnum(r"zjedzone bez zaplaty \d+ \(([\d.]+)%", kie[d]) for d in w28])
+    rep.add("B1-T6: zjedzone bez zaplaty (sr28)", f"{q6:.2f}% wydatku gry" if q6 is not None else "-", "< 1% (miasta + zamki)", (q6 < 1.0) if q6 is not None else None)
+    # ---- B1-T7 stac jedzenie - kazde miasto (prog projektu 0 - spodziewane NIE: rozklad, nie stawki - plan rozdz. 7.3, raport dla Jeffa)
+    n7 = [num(r"miast ze stac jedzenie < 95%: (\d+)", kie[d], int) for d in full]
+    n7 = [x for x in n7 if x is not None]
+    n28 = _mean([num(r"miast ze stac jedzenie < 95%: (\d+)", kie[d], int) for d in w28])
+    d40 = [d for d in full if run_day(d, start) <= 40]
+    t40 = _mean([num(r"miast ze stac jedzenie < 95%: (\d+)", kie[d], int) for d in d40[-14:]]) if d40 else None
+    rep.add("B1-T7: miast ze stac jedzenie < 95% (sr28, max, trend wobec d40)",
+            (f"sr28 {n28:.1f}, max {max(n7)}" if n7 and n28 is not None else "-") + (f", d27-40 {t40:.1f}" if t40 is not None else ""),
+            "prog projektu 0 kazdej doby - spodziewane NIE (rozklad dochodu miast, plan rozdz. 7.3) - raport dla Jeffa", (max(n7) == 0) if n7 else None, decide=True)
+    # ---- B1-T8 pelny koszyk swiata
+    pw = _mean([fnum(r"pelny W/R/P ([\d.]+)%", kie[d]) for d in w28])
+    rep.add("B1-T8: pelny koszyk W (waga potrzeb, sr28)", f"W {pw:.1f}%" if pw is not None else "-", ">= 98% (P) - spodziewane NIE (plan 7.1), raport", (pw >= 98) if pw is not None else None, decide=True)
+    # ---- B1-T9 podzamcze
+    c9 = _mean([fnum(r"\| podzamcze \d+: .*?stac ([\d.]+)%", kie[d]) for d in w28])
+    nc = _mean([num(r"zamkow bez kredytu (\d+)", kie[d], int) for d in w28])
+    rep.add("B1-T9: podzamcze - stac (sr28, z kuchnia pana)", (f"{c9:.1f}%" if c9 is not None else "-") + (f"; zamkow bez kredytu dworu sr28 {nc:.0f}" if nc is not None else ""),
+            ">= 95% (INFO, gdy NIE - liczba zamkow bez dworu)", (c9 >= 95) if c9 is not None else None)
+    # ---- B1-T10/T11 wies: pan w utargu i w gotowce (Gotowka wsi - linia przy LogEnabled i ksiedze obiegu)
+    gw = by_day(lines, "Gotowka wsi (E5/0): dzien")
+    ut, gg, worst = [], [], []
+    for d in w28:
+        x = gw.get(d)
+        if not x:
+            continue
+        for mm in re.finditer(r"(niska|zwykla|wysoka|zwolnienie): wsi \d+, G -?\d+ \([^)]*\), pan [^,]+, pan z majatkami ([\d.]+)%, w utargu: pan ([\d.]+)% / majatki ([\d.]+)%", x):
+            if mm.group(1) == "zwykla":
+                ut.append(float(mm.group(3)) + float(mm.group(4))); gg.append(float(mm.group(2)))
+            worst.append(float(mm.group(2)))
+    u10, g11 = _mean(ut), _mean(gg)
+    rep.add("B1-T10: wies - pan z majatkami w utargu (zwykla, sr28)", f"{u10:.1f}%" if u10 is not None else "brak linii Gotowka wsi", "35% +-2 pp (niska 25, wysoka 45)", (abs(u10 - 35) <= 2) if u10 is not None else None)
+    rep.add("B1-T11: wies - pan z majatkami w gotowce G (zwykla sr28; najwiecej z polityk)", (f"{g11:.1f}%" if g11 is not None else "-") + (f"; max {max(worst):.1f}%" if worst else ""),
+            "zwykla 28-45%, kazda <= 50%", (28 <= g11 <= 45 and max(worst) <= 50) if (g11 is not None and worst) else None)
+    # ---- B1-T12 renta 20% wsi zastapiona oplatami
+    pr = by_day(lines, "Prawa panskie (E5/B1): dzien")
+    fee = _mean([num(r"oplaty stale wsi (\d+)", pr[d], int) for d in w28 if d in pr])
+    rep.add("B1-T12: oplaty stale wsi (sr28; renta 20% = 0 przy kiesie czynnej)", f"{fee:.0f}/d" if fee is not None else "brak linii Prawa panskie", "5-15 tys./d [R 9.0]",
+            (5000 <= fee <= 15000) if fee is not None else None)
+    # ---- B1-T13 zakupy wsi
+    vb = [(num(r"wsie \d+: zakupy (\d+) z (\d+)", kie[d], int), num(r"wsie \d+: zakupy \d+ z (\d+)", kie[d], int)) for d in w28]
+    vb = [(a, b) for a, b in vb if a is not None and b]
+    q13 = sum(a for a, _ in vb) / sum(b for _, b in vb) * 100 if vb else None
+    rep.add("B1-T13: zakupy wsi wobec potrzeby (sr28)", f"{q13:.1f}%" if q13 is not None else "-", ">= 75% (INFO; KL 90% - wsie bez gotowki)", None)
+    # ---- B1-T14 zapasy startowe
+    sl = [x for x in lines if x.startswith("Kiesa ludu (E5/B1): zapasy startowe")]
+    if sl:
+        tot = [int(t) for t in re.findall(r"\) = (\d+) \(miast", sl[0])]
+        rep.add("B1-T14: zapasy startowe (linia jednorazowa)", f"linii {len(sl)}; razem {sum(tot)}; " + _grp(r"zapasy startowe ([^-]+)", sl[0], 1).strip()[:120],
+                "nowa kampania: 5-10 mln z daru; zapis z d362: \"z nadwyzki\"", (5e6 <= sum(tot) <= 10e6) if "z daru" in sl[0] else None)
+    else:
+        rep.add("B1-T14: zapasy startowe", "brak linii", "1 linia (nowa kampania albo stary zapis)", False)
+    # ---- B1-T15 R14
+    r14 = by_day(lines, "Zadowolenie ludu (R14): dzien")
+    k15 = _mean([num(r"korekty (\d+)", r14[d], int) for d in w28 if d in r14])
+    rep.add("B1-T15: R14 - korekty zadowolenia (sr28; tylko osady z Afford < 0.98)", f"{k15:.0f}/d" if k15 is not None else "brak linii", "INFO", None)
+    # ---- B1-T16 koszt
+    cost = [(fnum(r"czas: latki ([\d.]+) ms", kie[d]) or 0) + (fnum(r", doba ([\d.]+) ms", kie[d]) or 0) for d in full if "czas: latki" in kie[d]]
+    if cost:
+        rep.add("B1-T16: koszt (latki + doba) srednio", f"{sum(cost) / len(cost):.1f} ms/dobe (max {max(cost):.1f})", "<= 50 ms (INFO; optymalizacja na koniec - decyzja 08.10)", None)
+    # ---- B1-T17/T18/T19 odsylacze
+    rep.add("B1-T17: S4 jedzenie warowni", "--grupa etap4 (F6/F7) i linia \"Jedzenie z targu (E5/0)\"", "warownie miast glodne 0 przed 30. doba zimy", None)
+    rep.add("B1-T18: progi etapow 2-4", "--grupa etap2 / etap3 / etap4 na tym samym logu", "glowy < 5 000 najwyzej 10; 0 bankructw; wojsko lordow w wojnie 95-115 tys. (podloga 85)", None)
+    # ---- B1-T20 haki 75/25: wojsko w dochodzie ludu wobec podstawy robocizny (75%)
+    lab = by_day(lines, "Podstawa robocizny (E5/B1): dzien")
+    xa = sum(num(r"\| dochod ludu miast z zewnatrz i z kas -?\d+: wojsko (\d+)", kie[d], int, 0) or 0 for d in w28)
+    ya = sum(fnum(r"zolnierze i zalogi \(75%\) ([\d.]+)", lab.get(d, ""), 0.0) or 0.0 for d in w28)
+    q20 = xa / (xa + ya) * 100 if xa + ya > 0 else None
+    rep.add("B1-T20: haki 75/25 - czesc ludu w wydatkach zolnierzy w miastach (sr28)", f"{q20:.2f}%" if q20 is not None else "-", "25% +-1 pp", (abs(q20 - 25) <= 1) if q20 is not None else None)
 
 
 def etap5_rows(rep, lines, start, win, logp, csvp=None):
@@ -2764,7 +2894,9 @@ def etap5_e50(rep, lines, start, win, **kw):
             "0 bledow; BRAK: -; potkniecia <= 5 w biegu; linia sesji jest", ok1)
     rep.add("E50-T1: wlasciciele latek celow (linia startowa)", _grp(r"wlasciciele latek celow: (.*?); tryb przy starcie", stl, 1)[:400], "lista (INFO)", None)
     if not full:
-        rep.add("E5/0: linia Kiesa ludu (na sucho)", f"pelnych dob {len(full)} z {len(win)}", "kazda doba po kalibracji", False if win else None)
+        live = any(x.startswith("Kiesa ludu (E5/B1): CZYNNA") for x in lines)   # E5/B1: kiesa czynna - model na sucho nie biegnie (progi w bloku etap5_b1)
+        rep.add("E5/0: linia Kiesa ludu (na sucho)", f"pelnych dob {len(full)} z {len(win)}" + ("; kiesa czynna E5/B1 - progi w bloku B1" if live else ""),
+                "kazda doba po kalibracji (przy kiesie czynnej - INFO)", None if (live or not win) else False)
         return
     miss = [run_day(d, start) for d in win if d not in kie]
     rep.add("E5/0: linia Kiesa ludu (na sucho) codziennie", f"brak w {len(miss)} z {len(win)} dob" + (f" (d{', d'.join(str(x) for x in miss[:5])})" if miss else ""),
@@ -3261,7 +3393,12 @@ def etap5_a2(rep, lines, start, until, logp, bud):
     rep.add("E5/A2 A2-6: glowy rodow < 5 000 (najwiecej w oknie)", f"{max(heads)}" if heads else "brak linii", "<= 10 (warunek etapu 2)", (max(heads) <= 10) if heads else None)
     # A2-7: hak B1 = 0 do kiesy ludu; A2-8: gracz bez dworu (Eligible - gracz bez budzetu; linia 166 to wypisuje)
     folk = [rows[d][12] for d in rows]
-    rep.add("E5/A2 A2-7: udzial ludu w dworze (hak B1)", f"najwiecej {max(folk)}%" if folk else "brak", "0% do B1 (TownFolkLive)", (max(folk) == 0) if folk else None)
+    b1 = any(x.startswith("Kiesa ludu (E5/B1): CZYNNA") for x in lines)   # E5/B1: hak czynny - CourtFolkShare (20%) przy kiesie czynnej
+    if b1:
+        rep.add("E5/A2 A2-7: udzial ludu w dworze (hak B1)", f"najmniej {min(folk)}%, najwiecej {max(folk)}%" if folk else "brak",
+                "E5/B1 czynne: Court Folk Share (domyslnie 20%) w dobach kiesy czynnej (INFO - 0% w dobach przed CZYNNA)", None)
+    else:
+        rep.add("E5/A2 A2-7: udzial ludu w dworze (hak B1)", f"najwiecej {max(folk)}%" if folk else "brak", "0% do B1 (TownFolkLive)", (max(folk) == 0) if folk else None)
     pl = sum(1 for d in win if "gracz - bez budzetu" in bud[d])
     rep.add("E5/A2 A2-8: gracz bez dworu", f"linia 'gracz - bez budzetu' w {pl} z {len(win)} dob", "kazda doba ([D] 08.10)", (pl == len(win)) if win else None)
     # A2-9: bledy i potkniecia paczki (licznik potkniec - na sesje)
