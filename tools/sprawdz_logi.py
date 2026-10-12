@@ -177,6 +177,11 @@ Uzycie (Python 3, tylko odczyt):
                     pierwszej i ostatniej), P1-2 koszt ksiegi <= 30 ms/dobe srednio, P1-3 zrodlo "inne" <= 20% surowego XP lordow AI (pokrycie znacznikow),
                     P1-4 latki wpiete N/N przy kazdym starcie sesji i potkniecia 0; INFO XP lordow i gracza wedlug zrodla (stan "przed" dla E8/X), kto wola
                     "inne" (probka stosu), XP wojska wedlug zrodla, poziomy lordow (mediana) - pierwsza i ostatnia linia "Poziomy lordow (E8/P1)".
+                    Blok etap8_p2 (E8/P2, paczka 244): pomiary sprzetu AI, lupu i korony - P2-1 cztery linie w kazdej dobie okna (bez pierwszej i ostatniej):
+                    "Zuzycie AI - pomiary (E8/P2)", "ZakupyAI cena do wartosci (E8/P2)", "Lup DTE - kopie (E8/P2)", "Monopole korony (E8/P2)"; P2-2 zalogi +
+                    pozostale partie = razem = liczby linii "Zuzycie AI" tej doby (lup obity, zuzyte, naprawione); P2-3 INFO kopie lupu u ocalalych pokonanych
+                    (szt./dobe) i monopole - przyczyna 0; INFO udzial zalog, powody stania napraw, "Amunicja AI: zeszloby", cena do wartosci wedlug kupujacego,
+                    "sufit 2.0 zablokowalby", dodatnie stany kupione (stan "przed" dla E8/W, E8/Z, E8/L, E8/R).
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8409,6 +8414,174 @@ def etap8_p1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"d{run_day(a, start)} [{lvl(lv[a])}] -> d{run_day(b, start)} [{lvl(lv[b])}] ({len(lv)} linii, lordow {n_l})", "INFO", None)
 
 
+# ============================================================ ETAP 8 (E8/P2, paczka 244): pomiary sprzetu AI, lupu i korony - blok etap8_p2
+E8_P2_WEAR = "Zuzycie AI - pomiary (E8/P2): dzien"
+E8_P2_BUY = "ZakupyAI cena do wartosci (E8/P2): dzien"
+E8_P2_LOOT = "Lup DTE - kopie (E8/P2): dzien"
+E8_P2_MONO = "Monopole korony (E8/P2): dzien"
+E8_P2_ROW = re.compile(r"^(.+?): szt\. (\d+), zaplacone (\d+) zl za wartosc (\d+) zl, cena/wartosc mediana ([0-9.]+), p90 ([0-9.]+), maks\. ([0-9.]+); "
+                       r"ponad 1\.5x (\d+) szt\./(\d+) zl, ponad 2\.0x (\d+) szt\./(\d+) zl, ponad 3\.0x (\d+) szt\./(\d+) zl; dodatnie stany (\d+) szt\., doplata (\d+) zl$")
+
+
+def e8p2_three(label, s):
+    """'<label>lup obity a, zuzyte b, naprawione c' -> [a, b, c] albo None."""
+    m = re.search(label + r"lup obity (\d+), zuzyte (\d+), naprawione (\d+)", s)
+    return [int(m.group(1)), int(m.group(2)), int(m.group(3))] if m else None
+
+
+def etap8_p2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/P2 (244, projekt etapu 8 v2 rozdz. 3 "E8/P2" Test): cztery linie pomiarow - "Zuzycie AI - pomiary (E8/P2)" (AiWear.cs; etykieta = doba zdarzen,
+    jak "Zuzycie AI"), "ZakupyAI cena do wartosci (E8/P2)" (Measure174b.cs), "Lup DTE - kopie (E8/P2)" (HorseFate.cs), "Monopole korony (E8/P2)"
+    (KingdomTreasury.cs). P2-1 kazda z czterech linii w kazdej dobie okna (bez pierwszej i ostatniej); P2-2 zgodnosc: zalogi + pozostale partie = razem
+    i razem = liczby linii "Zuzycie AI" tej doby (lup obity, zuzyte, naprawione; doba bez linii "Zuzycie AI" - razem 0); P2-3 INFO: kopie lupu u ocalalych
+    pokonanych (szt./dobe, kto, jakie rodzaje), monopole - przyczyna 0 i dwie drogi (wzieto / nowy wzor wzialby). INFO dla E8/W, E8/Z, E8/L, E8/R: udzial
+    zalog, powody stania napraw, "Amunicja AI: zeszloby", cena do wartosci wedlug kupujacego, dodatnie stany, "sufit 2.0 zablokowalby"."""
+    sets = [("Zuzycie AI - pomiary", {d: s for d, s in by_day(lines, E8_P2_WEAR).items() if 1 <= run_day(d, start) <= until}),
+            ("ZakupyAI cena do wartosci", {d: s for d, s in by_day(lines, E8_P2_BUY).items() if 1 <= run_day(d, start) <= until}),
+            ("Lup DTE - kopie", {d: s for d, s in by_day(lines, E8_P2_LOOT).items() if 1 <= run_day(d, start) <= until}),
+            ("Monopole korony", {d: s for d, s in by_day(lines, E8_P2_MONO).items() if 1 <= run_day(d, start) <= until})]
+    wear, buy, loot, mono = sets[0][1], sets[1][1], sets[2][1], sets[3][1]
+    if not (wear or buy or loot or mono):
+        rep.add("E8/P2: linie pomiarow (E8/P2)", "brak w logu", "sa od wgrania E8/P2 (Stage8MeasureLog)", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    parts, bad = [], 0
+    for name, dd in sets:
+        miss = [run_day(d, start) for d in inner if d not in dd]
+        bad += len(miss)
+        parts.append(f"{name} {len(dd)} dob (brak {len(miss)}" + (f": doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") if miss else "") + ")")
+    rep.add("P2-1: cztery linie pomiarow (E8/P2) w kazdej dobie okna", "; ".join(parts) + f" z {len(inner)}",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (bad == 0) if inner else None)
+    # P2-2: zalogi + pozostale partie = razem = linia "Zuzycie AI"
+    zu = by_day(lines, "Zuzycie AI: dzien")
+    wdays = sorted(wear)
+    okd, badd, tg, tl = 0, [], [0, 0, 0], [0, 0, 0]
+    for d in wdays:
+        s = wear[d]
+        g, l, t = e8p2_three(r"w tym zalogi: ", s), e8p2_three(r"pozostale partie: ", s), e8p2_three(r"razem \(linia Zuzycie AI\): ", s)
+        if g is None or l is None or t is None:
+            badd.append(run_day(d, start))
+            continue
+        ok = all(g[i] + l[i] == t[i] for i in range(3))
+        z = zu.get(d)
+        if z is None:
+            ok = ok and sum(t) == 0   # linia "Zuzycie AI" powstaje tylko w dobie z lupem, zuzyciem, naprawa albo czekaniem na material
+        else:
+            ok = ok and t == [num(r"lup obity (\d+) szt\.", z, default=-1), num(r"zuzyte w bitwach (\d+)", z, default=-1), num(r"naprawione w miastach (\d+)", z, default=-1)]
+        if ok:
+            okd += 1
+        else:
+            badd.append(run_day(d, start))
+        for i in range(3):
+            tg[i] += g[i]
+            tl[i] += l[i]
+    if wdays:
+        rep.add("P2-2: zalogi + pozostale partie = razem = linia Zuzycie AI (lup obity, zuzyte, naprawione)",
+                f"dob zgodnych {okd} z {len(wdays)}" + (f" (niezgodne doby kampanii {badd[:8]}" + (" ..." if len(badd) > 8 else "") + ")" if badd else ""),
+                "wszystkie doby zgodne", not badd)
+        nd = max(1, len(wdays))
+
+        def avg(pat, cast=float):
+            v = [num(pat, wear[d], cast=cast, default=0) for d in wdays]
+            return sum(v) / nd
+
+        def share(i):
+            tot = tg[i] + tl[i]
+            return f"{tg[i] / nd:.0f}/d ({100.0 * tg[i] / tot:.0f}%)" if tot > 0 else "0"
+        rep.add("E8/P2: zalogi w zuzyciu AI (srednio na dobe, udzial w calosci)", f"lup obity {share(0)}, zuzyte w bitwach {share(1)}, naprawione {share(2)} ({len(wdays)} dob)",
+                "INFO (PLAN 8.7a: zalogi zuzywaja i naprawiaja - zuzyte i naprawione > 0)", None)
+        st = [avg(p) for p in (r"naprawy: zlecen (\d+)", r"sztuk do naprawy (\d+)", r"stoja - sakiewka (\d+) partii", r"stoja - sakiewka \d+ partii / (\d+) szt",
+                               r"reszta sakiewek tych partii (\d+) zl", r"godziny kowali (\d+) partii", r"godziny kowali \d+ partii / (\d+) szt", r"material (\d+) partii",
+                               r"material \d+ partii / (\d+) szt", r"nie robota kowala (\d+) szt", r"inne (\d+) szt")]
+        rep.add("E8/P2: naprawy AI - powody stania (srednio na dobe)",
+                (f"zlecen {st[0]:.0f}, sztuk do naprawy {st[1]:.0f}; stoja: sakiewka {st[2]:.0f} partii / {st[3]:.0f} szt. (reszta sakiewek {st[4]:.0f} zl), godziny kowali "
+                 f"{st[5]:.0f} partii / {st[6]:.0f} szt., material {st[7]:.0f} partii / {st[8]:.0f} szt., nie robota kowala {st[9]:.0f} szt., inne {st[10]:.0f} szt."),
+                "INFO (stan 'przed' dla E8/W: kolejka od najtanszej, continue zamiast break)", None)
+        am = [avg(p) for p in (r"Amunicja AI: zeszloby ([0-9.]+) szt", r"zeszloby [0-9.]+ szt\. \(strzaly ([0-9.]+)", r"belty ([0-9.]+), miotane", r"miotane ([0-9.]+); zwyciezcy",
+                               r"zwyciezcy ([0-9.]+), pokonani", r"pokonani ([0-9.]+)\) z", r"\) z (\d+) w uzyciu", r"natezenie bitew srednio ([0-9.]+)")]
+        rep.add("E8/P2: Amunicja AI - zeszloby (srednio na dobe)",
+                (f"{am[0]:.1f} szt. (strzaly {am[1]:.1f}, belty {am[2]:.1f}, miotane {am[3]:.1f}; zwyciezcy {am[4]:.1f}, pokonani {am[5]:.1f}) z {am[6]:.0f} w uzyciu; "
+                 f"natezenie bitew srednio {am[7]:.2f}"),
+                "INFO (E8/W amunicja AI W CIENIU; produkcja strzelarzy Z33 ok. 290-320 snopow strzal i 130-480 beltow na dobe)", None)
+        stum = max([num(r"potkniecia \(sesja\) (\d+)", wear[d], default=0) for d in wdays] + [0])
+        if stum:
+            rep.add("E8/P2: potkniecia pomiaru AiWear", f"{stum}", "0", False)
+    # ZakupyAI cena do wartosci
+    bdays = sorted(buy)
+    if bdays:
+        rows = {}
+        for d in bdays:
+            for seg in buy[d].split(" | ")[1:]:
+                m = E8_P2_ROW.match(seg.strip())
+                if not m:
+                    continue
+                r = rows.setdefault(m.group(1), {"n": 0, "paid": 0, "worth": 0, "med": [], "p90": [], "mx": 0.0, "c2n": 0, "c2g": 0, "fn": 0, "fg": 0})
+                r["n"] += int(m.group(2))
+                r["paid"] += int(m.group(3))
+                r["worth"] += int(m.group(4))
+                r["med"].append(float(m.group(5)))
+                r["p90"].append(float(m.group(6)))
+                r["mx"] = max(r["mx"], float(m.group(7)))
+                r["c2n"] += int(m.group(10))
+                r["c2g"] += int(m.group(11))
+                r["fn"] += int(m.group(14))
+                r["fg"] += int(m.group(15))
+
+        def mid(v):
+            v = sorted(v)
+            return v[(len(v) - 1) // 2] if v else 0.0
+        txt = "; ".join(f"{k}: {r['n']} szt., zaplacone/wartosc {r['paid'] / r['worth']:.2f}, mediana dob {mid(r['med']):.2f}, p90 dob {mid(r['p90']):.2f}, maks. {r['mx']:.1f}, "
+                        f"ponad 2.0x {r['c2n']} szt. ({100.0 * r['c2n'] / max(1, r['n']):.0f}%) / {r['c2g']} zl"
+                        for k, r in sorted(rows.items(), key=lambda kv: -kv[1]["n"]) if r["worth"] > 0)
+        rep.add("E8/P2: cena do wartosci sztuki ze stanem wedlug kupujacego (okno)", txt[:900] if txt else "brak zakupow w liniach", "INFO (E8/Z: wartosc AiGearMaxPriceFactor po tym pomiarze)", None)
+        c15 = [sum(num(p, buy[d], default=0) for d in bdays) for p in (r"\(sufit 1\.5: (\d+) szt\.", r"\(sufit 1\.5: \d+ szt\. / (\d+) zl")]
+        c20 = [sum(num(p, buy[d], default=0) for d in bdays) for p in (r"sufit 2\.0 zablokowalby (\d+) szt\.", r"sufit 2\.0 zablokowalby \d+ szt\. / (\d+) zl")]
+        c30 = [sum(num(p, buy[d], default=0) for d in bdays) for p in (r"; sufit 3\.0: (\d+) szt\.", r"; sufit 3\.0: \d+ szt\. / (\d+) zl")]
+        gaps = sum(r["n"] for k, r in rows.items() if "lepsze za swoje" not in k and not k.startswith("notable") and not k.startswith("ludzie gracza"))
+        rep.add("E8/P2: sufit ceny zablokowalby (zakupy brakow AiGear lordow i zalog, okno)",
+                f"2.0x: {c20[0]} szt. / {c20[1]} zl ({100.0 * c20[0] / max(1, gaps):.1f}% z {gaps} szt.); 1.5x: {c15[0]} szt. / {c15[1]} zl; 3.0x: {c30[0]} szt. / {c30[1]} zl ({len(bdays)} dob)",
+                "INFO (E8/Z sufit W CIENIU - wlaczany w fazie poprawek, prog Z-2)", None)
+        fn = sum(num(r"dodatnie stany kupione razem (\d+) szt\.", buy[d], default=0) for d in bdays)
+        fg = sum(num(r"dodatnie stany kupione razem \d+ szt\., doplata (\d+) zl", buy[d], default=0) for d in bdays)
+        rep.add("E8/P2: dodatnie stany kupione przez AI (okno)", f"{fn} szt., doplata {fg} zl ({fn / max(1, len(bdays)):.1f} szt./d, {fg / max(1, len(bdays)):.0f} zl/d)",
+                "INFO (PLAN 8.8a: stan ginie po zakupie; po E8/Z prog Z-1 = 0)", None)
+    # P2-3 INFO: kopie lupu i monopole
+    ldays = sorted(loot)
+    if ldays:
+        nd = max(1, len(ldays))
+
+        def lsum(pat):
+            return sum(num(pat, loot[d], default=0) for d in ldays)
+        kept, moved, gained = lsum(r"kopie u ocalalych pokonanych (\d+) szt\."), lsum(r"u rozbitych \(przeniesienie\) (\d+) szt\."), lsum(r"dopisane zwyciezcom \(bez koni\) (\d+) szt\.")
+        kinds = ", ".join(k + " " + str(lsum(k + r" (\d+)[,)]")) for k in ("bron", "pociski", "zbroja", "tarcze", "uprzaz i inne"))
+        wired = sorted(set((re.search(r"\| okno DTE (.*?)\.$", loot[d]) or [None, "?"])[1] for d in ldays))
+        lp = [lsum(x) for x in (r"szt\. w (\d+) partiach \(zalogi", r"partiach \(zalogi (\d+)", r"partie lordow (\d+)", r", inne (\d+);", r"bitew z lupem DTE (\d+)")]
+        rep.add("P2-3a: lup DTE - kopie u ocalalych pokonanych (bez koni)",
+                (f"{kept / nd:.0f} szt./d (okno {kept} szt. w {lp[0]} partiach: zalogi {lp[1]}, partie lordow {lp[2]}, inne {lp[3]}; {kinds}) | u rozbitych (przeniesienie) {moved} szt. "
+                 f"| dopisane zwyciezcom {gained} szt. w {lp[4]} bitwach | okno DTE: " + ", ".join(wired)),
+                "INFO (stan 'przed' dla E8/L; po E8/L prog L-1: kopie u ocalalych = 0)", None)
+    mdays = sorted(mono)
+    if mdays:
+        why = {}
+        for d in mdays:
+            m = re.search(r"\| przyczyna 0: (.*)\.$", mono[d])
+            k = m.group(1) if m else "?"
+            why[k] = why.get(k, 0) + 1
+
+        def msum(pat):
+            return sum(num(pat, mono[d], default=0) for d in mdays)
+        last = mono[mdays[-1]]
+        mp = [num(x, last, default=0) for x in (r"warsztaty w nich (\d+)", r", cudze (\d+),", r"z zyskiem \(ProfitMade > 0\) (\d+)", r"swiat: warsztatow z wlascicielem \d+, z zyskiem (\d+)",
+                                                r"swiat: warsztatow z wlascicielem (\d+)", r"swiat: warsztatow z wlascicielem \d+, z zyskiem \d+, suma ProfitMade (\d+)")]
+        took, would = msum(r"wzieto dzis (\d+) zl"), msum(r"wzialby (\d+) zl \| swiat")
+        kings = max(num(r"z polityka StateMonopolies (\d+)", mono[x], default=0) for x in mdays)
+        rep.add("P2-3b: monopole korony - przyczyna 0 i dwie drogi",
+                ("przyczyna 0: " + ", ".join(f"{k} x{v}" for k, v in sorted(why.items(), key=lambda kv: -kv[1])) + f" | okno: wzieto {took} zl, nowy wzor wzialby {would} zl"
+                 f" | krolow z polityka najwiecej {kings} | ostatnia doba: warsztaty w miastach rodu krola {mp[0]}, cudze {mp[1]}, z zyskiem {mp[2]}; swiat: z zyskiem {mp[3]} z {mp[4]},"
+                 f" suma ProfitMade {mp[5]} zl"),
+                "INFO (E8/R: nowy wzor 5% dziennej wyplaty; prog R-3)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8430,6 +8603,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     blocks = [etap8_t0, etap8_0]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
     blocks.append(etap8_p1)   # E8/P1 (243): ksiega umiejetnosci
+    blocks.append(etap8_p2)   # E8/P2 (244): pomiary sprzetu AI, lupu i korony
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

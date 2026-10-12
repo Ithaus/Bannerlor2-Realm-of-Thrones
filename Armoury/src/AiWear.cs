@@ -46,11 +46,29 @@ namespace Armoury
 
         private static bool WornOnlyOn { get { var s = Settings.Current; return s != null && s.AiMendsWornOnly; } }
 
+        // E8/P2 (244, PLAN 8.7a, 8.8c, 8.4a): pomiary doby - tylko liczniki i linia "Zuzycie AI - pomiary (E8/P2)" (Stage8MeasureLog); gra bez zmian
+        private static bool P2On { get { var s = Settings.Current; return s != null && s.Stage8MeasureLog; } }
+        private static int _p2LootG, _p2WornG, _p2MendG, _p2LootL, _p2WornL, _p2MendL;   // zalogi (G) i pozostale partie (L) liczone osobno - suma ma dac liczby linii "Zuzycie AI"
+        private static int _p2Visits, _p2Jobs, _p2PurseP, _p2PurseN, _p2HoursP, _p2HoursN, _p2MatP, _p2OtherN;   // zlecenia napraw: partie i sztuki, ktore stanely - wedlug powodu
+        private static long _p2PurseLeft;                                                  // reszta sakiewek partii, ktorych naprawy stanely na sakiewce
+        private static readonly float[] _p2AmmoGone = new float[3];                       // "zeszloby": strzaly, belty, miotane (ulamki sumowane, bez losowania)
+        private static readonly int[] _p2AmmoUse = new int[3];                            // sztuki pociskow w uzyciu u partii po bitwie
+        private static float _p2AmmoWin, _p2AmmoLose, _p2IntSum;
+        private static int _p2AmmoParties, _p2IntN, _p2Stumbles;
+
+        private static void P2Clear()
+        {
+            _p2LootG = _p2WornG = _p2MendG = _p2LootL = _p2WornL = _p2MendL = 0;
+            _p2Visits = _p2Jobs = _p2PurseP = _p2PurseN = _p2HoursP = _p2HoursN = _p2MatP = _p2OtherN = 0; _p2PurseLeft = 0;
+            Array.Clear(_p2AmmoGone, 0, 3); Array.Clear(_p2AmmoUse, 0, 3); _p2AmmoWin = _p2AmmoLose = _p2IntSum = 0f; _p2AmmoParties = _p2IntN = 0;
+        }
+
         internal static void Reset()
         {
             _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1;
             _menUsed.Clear(); _daySkipLoot = _dayFolk = _usedErr = 0;
             ClearMatDay();
+            P2Clear(); _p2Stumbles = 0;   // E8/P2
         }
 
         private static void ClearMatDay()
@@ -129,7 +147,7 @@ namespace Armoury
                     for (int k = 0; k < now - was; k++)
                     {
                         var m = ArmouryBehavior.PickWornModifier(kv.Key);
-                        if (m != null) { AddWorn(p, id, m.StringId, 1); _dayLoot++; }
+                        if (m != null) { AddWorn(p, id, m.StringId, 1); _dayLoot++; if (mp.IsGarrison) _p2LootG++; else _p2LootL++; }   // E8/P2: zalogi osobno (tylko licznik)
                     }
                 // ubytek (polegli, sprzedaz): obitych nie wiecej niz sztuk
                 int w = WornOf(p, id);
@@ -253,6 +271,7 @@ namespace Armoury
                 Day();
                 var s = Settings.Current;
                 float share = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f) / 100f;
+                bool p2 = P2On;   // E8/P2 (244): pomiar "Amunicja AI: zeszloby" (tylko licznik)
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
                 {
                     if (side == null) continue;
@@ -263,6 +282,7 @@ namespace Armoury
                         // wchodzil jako sprawny, a jej sprzet nie obijal sie w walce; taki "sprawny" lup szedl do kupca albo graczowi jako zwrot B6)
                         if (mp == null || mp.IsMainParty || !(mp.IsLordParty || mp.IsGarrison) || !mp.IsActive) continue;
                         _battleSince.Add(mp.StringId);   // przybytek do nastepnego spisu = lup (DTE doklada go w tym samym zdarzeniu)
+                        if (p2) P2Ammo(me, side, mep, mp);   // E8/P2 (244, PLAN 8.4a): ile pociskow zeszloby tej partii - nic nie zdejmuje, bez losowania
                         if (share <= 0f) continue;
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
                         var arm = Armory(mp); if (arm == null) continue;
@@ -282,13 +302,56 @@ namespace Armoury
                             for (int k = 0; k < hits; k++)
                             {
                                 var m = ArmouryBehavior.MildWornModifier(it);   // wpis 95 (pkt 5): bitwa = jeden stopien, nie loteria lupu
-                                if (m != null) { AddWorn(mp.StringId, it.StringId, m.StringId, 1); _dayWorn++; }
+                                if (m != null) { AddWorn(mp.StringId, it.StringId, m.StringId, 1); _dayWorn++; if (mp.IsGarrison) _p2WornG++; else _p2WornL++; }   // E8/P2: zalogi osobno (tylko licznik)
                             }
                         }
                     }
                 }
             }
             catch (Exception e) { Log.Error("AiWear.OnMapEventEnded", e); }
+        }
+
+        /// <summary>
+        /// E8/P2 (244, PLAN 8.4a; wzor dla E8/W "amunicja AI"): ile kolczanow, snopow beltow i wiazek broni miotanej zeszloby tej partii w tej bitwie, gdyby
+        /// AI zuzywalo pociski. Sztuki pociskow W UZYCIU (koszyki wzorcow do liczby sztuk w zbrojowni - ta sama miara co zuzycie) x natezenie bitwy tej
+        /// partii (R4, wzor gracza z autobitwy: (polegli + ranni) / zdrowi na starcie / TroopWearBaseCasualtyShare, 0.1-3) x udzial strony: pokonany 1.0,
+        /// zwyciezca 1 - odzysk (AmmoRecoverPercent + AmmoRepairPercent - regula AmmoRecovery "zwyciezca zbiera pole", domyslnie 0.35); najwyzej tyle,
+        /// ile w uzyciu. Ulamki sumowane - bez losowania (MBRandom nietkniety). Wlasny slownik potrzeb, zbrojownia tylko czytana - nic nie schodzi.
+        /// </summary>
+        private static void P2Ammo(MapEvent me, MapEventSide side, MapEventParty mep, MobileParty mp)
+        {
+            try
+            {
+                var arm = Armory(mp); if (arm == null) return;
+                var s = Settings.Current;
+                int lost = (mep.DiedInBattle != null ? mep.DiedInBattle.TotalManCount : 0) + (mep.WoundedInBattle != null ? mep.WoundedInBattle.TotalManCount : 0);
+                float intensity = MBMath.ClampFloat((lost / (float)Math.Max(1, mep.HealthyManCountAtStart)) / Math.Max(0.01f, s.TroopWearBaseCasualtyShare), 0.1f, 3f);
+                _p2IntSum += intensity; _p2IntN++;
+                bool won = me.WinningSide != BattleSideEnum.None && side.MissionSide == me.WinningSide;
+                float keep = MBMath.ClampFloat((s.AmmoRecoverPercent + s.AmmoRepairPercent) / 100f, 0f, 1f);
+                float f = Math.Min(1f, intensity * (won ? 1f - keep : 1f));
+                Dictionary<int, int> need = null;
+                bool any = false;
+                foreach (var kv in arm)
+                {
+                    var it = kv.Key;
+                    if (it == null || kv.Value <= 0) continue;
+                    int kind = it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : it.ItemType == ItemObject.ItemTypeEnum.Bolts ? 1 : it.ItemType == ItemObject.ItemTypeEnum.Thrown ? 2 : -1;
+                    if (kind < 0) continue;
+                    if (need == null) need = AiGear.NeedBuckets(mp);
+                    int bk = AiGear.Bucket(it), nd;
+                    need.TryGetValue(bk, out nd);
+                    int inUse = Math.Min(nd, kv.Value);
+                    if (inUse <= 0) continue;
+                    need[bk] = nd - inUse;
+                    float gone = inUse * f;
+                    _p2AmmoUse[kind] += inUse; _p2AmmoGone[kind] += gone;
+                    if (won) _p2AmmoWin += gone; else _p2AmmoLose += gone;
+                    any = true;
+                }
+                if (any) _p2AmmoParties++;
+            }
+            catch (Exception e) { if (++_p2Stumbles <= 3) Log.Error("AiWear.P2Ammo (potkniecie " + _p2Stumbles + ")", e); }   // per partia, bez wylacznika (CLAUDE.md 7)
         }
 
         // ------------------------------------------------------------ stan przy sprzedazy nadwyzek
@@ -516,8 +579,27 @@ namespace Armoury
                 }
                 SmithHours.Use(st.Town, done * perPiece);
                 _dayMended += done; _dayPaid += paid;
+                P2Mend(mp, jobs.Count, done, 0, 0, done < cap, done >= cap);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }
+        }
+
+        /// <summary>
+        /// E8/P2 (244, PLAN 8.7a, 8.8c): zlecenie napraw partii w tej dobie - naprawione sztuki osobno dla zalog i pozostalych partii oraz powod, dla ktorego
+        /// reszta sztuk do naprawy (jobs - done - czekajace na material - nie robota kowala) stanela: sakiewka (petla konczy sie na pierwszej sztuce, na
+        /// ktora nie stac - poor) albo godziny kowali miasta (capHit). Tylko liczniki linii "Zuzycie AI - pomiary (E8/P2)".
+        /// </summary>
+        private static void P2Mend(MobileParty mp, int jobs, int done, int wait, int noSmith, bool poor, bool capHit)
+        {
+            if (mp.IsGarrison) _p2MendG += done; else _p2MendL += done;
+            if (jobs <= 0) return;
+            _p2Visits++; _p2Jobs += jobs;
+            if (wait > 0) _p2MatP++;
+            int rest = jobs - done - wait - noSmith;
+            if (rest <= 0) return;
+            if (poor) { _p2PurseP++; _p2PurseN += rest; _p2PurseLeft += Math.Max(0, MenPurse.Get(mp)); }
+            else if (capHit) { _p2HoursP++; _p2HoursN += rest; }
+            else _p2OtherN += rest;
         }
 
         /// <summary>
@@ -557,6 +639,7 @@ namespace Armoury
             _dayMended += done; _dayPaid += paid;
             _dayWait += o.Wait; _dayWaitMask |= o.WaitMask; _dayNoSmith += o.NoSmith;
             for (int k = 0; k < MendMaterial.Kinds; k++) _dayWaitBy[k] += o.WaitBy[k];
+            P2Mend(mp, jobs.Count, done, o.Wait, o.NoSmith, o.Poor > 0, o.Pieces >= cap);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
         }
 
         private static void Day()
@@ -572,9 +655,37 @@ namespace Armoury
                          + ", robocizna do kiesy ludu " + _dayFolk + "."
                          + (MendMaterial.MenAndLordsOn ? MatDay() : ""));
             }
+            if (_dayStamp >= 0 && P2On) P2Line();   // E8/P2 (244): przed zerowaniem licznikow doby - te same doby i ta sama etykieta co linia "Zuzycie AI"
             _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = d;
             _daySkipLoot = _dayFolk = 0;
             ClearMatDay();
+            P2Clear();
+        }
+
+        /// <summary>
+        /// E8/P2 (244): linia "Zuzycie AI - pomiary (E8/P2)" - przy kazdej zmianie doby ksiegi (takze w dobie bez linii "Zuzycie AI"). Zalogi i pozostale
+        /// partie liczone osobno (suma = liczby linii "Zuzycie AI" - prog P2-2); powody stania napraw (PLAN 8.8c); "Amunicja AI: zeszloby" (PLAN 8.4a).
+        /// </summary>
+        private static void P2Line()
+        {
+            try
+            {
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                float gone = _p2AmmoGone[0] + _p2AmmoGone[1] + _p2AmmoGone[2];
+                Log.Info("Zuzycie AI - pomiary (E8/P2): dzien " + _dayStamp
+                         + " | w tym zalogi: lup obity " + _p2LootG + ", zuzyte " + _p2WornG + ", naprawione " + _p2MendG
+                         + " | pozostale partie: lup obity " + _p2LootL + ", zuzyte " + _p2WornL + ", naprawione " + _p2MendL
+                         + " | razem (linia Zuzycie AI): lup obity " + _dayLoot + ", zuzyte " + _dayWorn + ", naprawione " + _dayMended
+                         + " | naprawy: zlecen " + _p2Visits + " (partia x doba z robota), sztuk do naprawy " + _p2Jobs + "; stoja - sakiewka " + _p2PurseP + " partii / " + _p2PurseN
+                         + " szt. (reszta sakiewek tych partii " + _p2PurseLeft.ToString(ci) + " zl), godziny kowali " + _p2HoursP + " partii / " + _p2HoursN
+                         + " szt., material " + _p2MatP + " partii / " + _dayWait + " szt., nie robota kowala " + _dayNoSmith + " szt., inne " + _p2OtherN + " szt."
+                         + " | Amunicja AI: zeszloby " + gone.ToString("0.0", ci) + " szt. (strzaly " + _p2AmmoGone[0].ToString("0.0", ci) + ", belty " + _p2AmmoGone[1].ToString("0.0", ci)
+                         + ", miotane " + _p2AmmoGone[2].ToString("0.0", ci) + "; zwyciezcy " + _p2AmmoWin.ToString("0.0", ci) + ", pokonani " + _p2AmmoLose.ToString("0.0", ci)
+                         + ") z " + (_p2AmmoUse[0] + _p2AmmoUse[1] + _p2AmmoUse[2]) + " w uzyciu (strzaly " + _p2AmmoUse[0] + ", belty " + _p2AmmoUse[1] + ", miotane " + _p2AmmoUse[2]
+                         + ") w " + _p2AmmoParties + " partiach; natezenie bitew srednio " + (_p2IntN > 0 ? (_p2IntSum / _p2IntN).ToString("0.00", ci) : "-") + " (" + _p2IntN
+                         + " partii po bitwie) | potkniecia (sesja) " + _p2Stumbles + ".");
+            }
+            catch (Exception e) { if (++_p2Stumbles <= 3) Log.Error("AiWear.P2Line (potkniecie " + _p2Stumbles + ")", e); }
         }
 
         /// <summary>Dopisek linii dnia: material napraw AI (poprawka po audycie TOWARY 3).</summary>

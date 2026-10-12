@@ -1559,6 +1559,10 @@ namespace Armoury
         // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)
         public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
         // --- Diagnostics (stage 8) ---
+        // E8/P2 (244, PLAN 8.4a, 8.6b, 8.7a-b, 8.8a-c): pomiary sprzetu AI, lupu i korony - tylko log, gra bez zmian: "Zuzycie AI - pomiary (E8/P2)" (zalogi osobno,
+        // powody stania napraw, "Amunicja AI: zeszloby N" - AiWear.cs), "ZakupyAI cena do wartosci (E8/P2)" (mediana i p90 wedlug kupujacego, dodatnie stany,
+        // "sufit 2.0 zablokowalby" - Measure174b.cs z AiGear/ShelfBuy), "Lup DTE - kopie (E8/P2)" (HorseFate.cs), "Monopole korony (E8/P2)" (KingdomTreasury.cs)
+        public bool Stage8MeasureLog = true;               // Writes daily lines that measure the AI's gear for stage 8: wear and repairs of garrisons and lords' parties and why repairs wait, arrows the AI would have used up, the prices the AI pays against the worth of the piece, loot copied to victors while the beaten keep it, and the crown's workshop monopolies (diagnostics only; nothing in the game changes).
         // E8/0 (242, PLAN 8.17 pomiar): linia "Profil doby (E8/0)" raz na dobe - takt doby (top 15 wywolan Daily), sluchacze godzinowe, zdarzenia (probka 1/16),
         // podzialy CyclePrefix / musztry / cen wedlug wolajacego, pamiec polki, zapis logu, GC (DayProfile.cs); opakowania zdarzen zakladane przy wczytaniu tylko przy wlaczonym kluczu
         public bool Stage8ProfileLog = true;               // Writes one daily line with the time each part of the mod takes (diagnostics only).

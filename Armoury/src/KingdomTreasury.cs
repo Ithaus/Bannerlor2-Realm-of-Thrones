@@ -375,6 +375,7 @@ namespace Armoury
                 float floor = Math.Max(0f, s.TownRentFloorGold);
                 // 165 (D-7): clo raz - z licznika cel do skarbca, bez drugiego zdjecia z kasy miasta (licznik jest posiadaczem swiata w ksiedze)
                 bool single = CrownIncome.On && s.CrownCustomsSingleTake;
+                long[] p2 = s.Stage8MeasureLog ? P2MonopolyScan() : null;   // E8/P2 (244, PLAN 8.7b): stan warsztatow PRZED poborem (tylko odczyt)
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated) continue;
@@ -457,8 +458,90 @@ namespace Armoury
                 LastCustomsSingle = single1;                // 165 (D-7): clo z licznika cel prosto do skarbcow (w LastCustoms; w LastCustomsTaken 0 - nic nie zniklo)
                 Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - danina wojenna z kas osad " + sub + ", clo od handlu miast " + cus
                          + " (do skarbcow krolestw" + (single ? "; 165: clo raz - z licznika cel prosto do skarbca " + single1 + ", kasy miast nie placa drugi raz" : "") + "); mennica " + deb + ", monopole " + mon + " (do krolow, z kas miast i kapitalu warsztatow).");
+                if (p2 != null) P2MonopolyLine(p2, mon, s.PolicyIncomeConserved);   // E8/P2 (244): "Monopole korony (E8/P2)" (tylko log)
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }
+        }
+
+        // ------------------------------------------------------------ E8/P2 (244, PLAN 8.7b): pomiar monopoli korony (tylko log)
+        // Monopole w 120 dobach Z33 = 0 i nie wiadomo dlaczego (brak polityki czy brak zysku). Petla Levies bierze 5% w.ProfitMade - a to STAN (G Workshop.cs:
+        // ProfitMade = max(Capital - InitialCapital, 0)), nie zysk dnia; gra wyplaca wlascicielowi ProfitMade / RevenueSmoothenFraction dziennie
+        // (G DefaultClanFinanceModel.CalculateOwnerIncomeFromWorkshop). Pomiar liczy te same warsztaty co petla (miasta rodu krola z polityka StateMonopolies,
+        // nieoblezone, wlasciciel inny niz krol) i pokazuje dwie drogi w jednej linii (R10): wzieto dzis / nowy wzor E8/R wzialby (5% dziennej wyplaty, najwyzej
+        // kapital). Tylko odczyt, przed poborem tej doby.
+        private const int P2Kingdoms = 0, P2Mono = 1, P2NoRuler = 2, P2Towns = 3, P2Sieged = 4, P2Shops = 5, P2Others = 6, P2Profit = 7, P2Sum = 8, P2New = 9, P2Old = 10,
+                          P2WorldShops = 11, P2WorldProfit = 12, P2WorldSum = 13, P2Smooth100 = 14, P2Len = 15;
+
+        private static long[] P2MonopolyScan()
+        {
+            var r = new long[P2Len];
+            try
+            {
+                float smooth = 5f;
+                try { smooth = Math.Max(0.01f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
+                r[P2Smooth100] = (long)Math.Round(smooth * 100f);
+                foreach (var k in Kingdom.All)
+                {
+                    if (k == null || k.IsEliminated) continue;
+                    r[P2Kingdoms]++;
+                    if (!k.ActivePolicies.Contains(DefaultPolicies.StateMonopolies)) continue;
+                    r[P2Mono]++;
+                    var ruler = k.RulingClan != null ? k.RulingClan.Leader : null;
+                    if (ruler == null) { r[P2NoRuler]++; continue; }
+                    foreach (var st in k.Settlements)
+                    {
+                        if (st == null || !st.IsTown || st.Town == null || st.OwnerClan != k.RulingClan) continue;
+                        r[P2Towns]++;
+                        if (st.IsUnderSiege) { r[P2Sieged]++; continue; }
+                        if (st.Town.Workshops == null) continue;
+                        foreach (var w in st.Town.Workshops)
+                        {
+                            if (w == null) continue;
+                            r[P2Shops]++;
+                            if (w.Owner == null || w.Owner == ruler) continue;
+                            r[P2Others]++;
+                            int pm = w.ProfitMade;
+                            if (pm <= 0) continue;
+                            r[P2Profit]++; r[P2Sum] += pm;
+                            r[P2Old] += Math.Min((int)(pm * 0.05f), Math.Max(0, w.Capital));
+                            r[P2New] += Math.Min((int)(pm / smooth * 0.05f), Math.Max(0, w.Capital));
+                        }
+                    }
+                }
+                foreach (var t in Town.AllTowns)
+                {
+                    if (t == null || t.Workshops == null) continue;
+                    foreach (var w in t.Workshops)
+                    {
+                        if (w == null || w.Owner == null) continue;
+                        r[P2WorldShops]++;
+                        int pm = w.ProfitMade;
+                        if (pm > 0) { r[P2WorldProfit]++; r[P2WorldSum] += pm; }
+                    }
+                }
+            }
+            catch (Exception e) { if (!_p2Err) { _p2Err = true; Log.Error("KingdomTreasury.P2MonopolyScan", e); } return null; }
+            return r;
+        }
+        private static bool _p2Err;
+
+        private static void P2MonopolyLine(long[] r, long taken, bool conserved)
+        {
+            string why;
+            if (taken > 0) why = "-";
+            else if (!conserved) why = "PolicyIncomeConserved WYLACZONE";
+            else if (r[P2Mono] == 0) why = "zaden krol nie ma polityki StateMonopolies";
+            else if (r[P2Mono] == r[P2NoRuler]) why = "krolestwa z polityka bez wladcy";
+            else if (r[P2Towns] == 0) why = "rod krola z polityka nie ma miast";
+            else if (r[P2Towns] == r[P2Sieged]) why = "miasta rodu krola oblezone";
+            else if (r[P2Others] == 0) why = "w miastach rodu krola nie ma cudzych warsztatow";
+            else if (r[P2Profit] == 0) why = "cudze warsztaty w miastach rodu krola bez zysku (ProfitMade 0)";
+            else why = "5% zysku ponizej 1 zl albo kapital warsztatu 0";
+            Log.Info("Monopole korony (E8/P2): dzien " + (int)CampaignTime.Now.ToDays + " | krolestw " + r[P2Kingdoms] + ", z polityka StateMonopolies " + r[P2Mono] + " (bez wladcy " + r[P2NoRuler]
+                     + ") | miasta rodu krola " + r[P2Towns] + " (oblezone " + r[P2Sieged] + ") | warsztaty w nich " + r[P2Shops] + ", cudze " + r[P2Others] + ", z zyskiem (ProfitMade > 0) " + r[P2Profit]
+                     + ", suma ProfitMade " + r[P2Sum] + " zl | wzieto dzis " + taken + " zl (wzor dzisiejszy 5% stanu zysku dalby " + r[P2Old] + ") | nowy wzor (5% dziennej wyplaty wlascicielowi = ProfitMade / "
+                     + (r[P2Smooth100] / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " x 0.05) wzialby " + r[P2New] + " zl | swiat: warsztatow z wlascicielem " + r[P2WorldShops]
+                     + ", z zyskiem " + r[P2WorldProfit] + ", suma ProfitMade " + r[P2WorldSum] + " zl | przyczyna 0: " + why + ".");
         }
 
         // Debasement (100 d na lenno) i State Monopolies (5% zysku, nie odejmowane) w AddRulingClanIncome sa z niczego - odejmujemy je

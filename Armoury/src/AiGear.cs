@@ -801,6 +801,7 @@ namespace Armoury
                 {
                     if (!AddToArmory(mp, el.Item, n)) return false;   // K1 (przeglad): DTE odrzucil - nikt nie placi
                     Measure174b.NoteBuySum(who, el.Item, n, cost);   // 174b.0 M2 (tylko licznik); ceny hurtu: suma cen sztuk
+                    Measure174b.NoteBatch(Measure174b.PathGaps, who, el, n, cost);   // E8/P2 (244): cena do wartosci sztuki ze stanem - ceny sztuk ze sladu ShelfBuy.Take tej partii (tylko licznik)
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
                     MenUpgrade.NoteChurn(mp, el.Item, true);
                     pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
@@ -850,6 +851,7 @@ namespace Armoury
                                     {
                                         int fromPurse = pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy)
                                         Measure174b.NoteBuySum(Measure174b.BCastleOrder, el.Item, n, cost);   // 174b.0 M2 (tylko licznik)
+                                        Measure174b.NoteBatch(Measure174b.PathGaps, Measure174b.BCastleOrder, el, n, cost);   // E8/P2 (244): cena do wartosci (tylko licznik)
                                         market.Town.ChangeGold(cost);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, cost);
                                         try { TownFolk.Sale(market, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): zamowienia zamkow (tylko licznik)

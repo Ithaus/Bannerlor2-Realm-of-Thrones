@@ -454,6 +454,7 @@ namespace Armoury
                     // i linia M2 "ZakupyAI wedlug kupujacego" (wszyscy, z gracza - "ludzie gracza (sakiewka)"). Tylko liczniki.
                     if (!player) ArmsScrap.NoteBuy(w.Shop, w.El.Item, 1);
                     Measure174b.NoteBuy(BuyerOf(mp, player, w.Shop, byCart), w.El.Item, 1, paid);
+                    Measure174b.NotePiece(Measure174b.PathBetter, BuyerOf(mp, player, w.Shop, byCart), w.El, price);   // E8/P2 (244): cena do wartosci sztuki ze stanem (tylko licznik)
                     v.N++; v.Gold += paid;
                     if (c.Type == ItemObject.ItemTypeEnum.Arrows || c.Type == ItemObject.ItemTypeEnum.Bolts) { if (w.Tier > oldP.Tier) _dAmmoUp++; else _dAmmoDown++; }   // sklad8-s S4 (tylko log)
                     // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki ceny towaru tej polki w tym koszyku, w koszyku

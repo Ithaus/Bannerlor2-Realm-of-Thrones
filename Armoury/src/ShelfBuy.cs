@@ -32,6 +32,14 @@ namespace Armoury
 
         internal static void Reset() { _dBatches = _dMulti = _dPieces = _dEvals = _dBack = 0; _dCost = _dFlat = _dTicks = 0; }
 
+        // E8/P2 (244): slad cen kolejnych sztuk OSTATNIEJ partii Take (zerowany na wejsciu kazdego Take) - czyta go pomiar "ZakupyAI cena do wartosci"
+        // (Measure174b.NoteBatch) zaraz po Take; tylko zapis do tablicy, bez wplywu na partie
+        private static int[] _trace = new int[32];
+        private static int _traceN, _traceSum;
+        internal static int TraceCount { get { return _traceN; } }
+        internal static int TraceSum { get { return _traceSum; } }
+        internal static int TraceAt(int i) { return i >= 0 && i < _traceN ? _trace[i] : 0; }
+
         /// <summary>
         /// Zdejmuje z polki do maxN sztuk el, sztuka po sztuce: przed kazda cena od nowa (price - ta sama funkcja ceny, ktorej miejsce
         /// uzywalo dotad), sztuka tylko gdy cena miesci sie w reszcie budzetu. known &gt; 0 - cena pierwszej sztuki policzona przed chwila
@@ -43,6 +51,7 @@ namespace Armoury
         internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0, bool tally = true)
         {
             cost = 0; first = 0; last = 0;
+            _traceN = 0; _traceSum = 0;   // E8/P2: slad cen tej partii (tylko pomiar)
             if (shelf == null || el.Item == null || price == null || maxN <= 0 || budget <= 0) return 0;
             long t0 = Stopwatch.GetTimestamp();
             int n = 0;
@@ -73,6 +82,8 @@ namespace Armoury
                     if (!gone) break;
                     if (n == 0) first = p;
                     last = p; cost += p; n++;
+                    if (_traceN == _trace.Length) Array.Resize(ref _trace, _traceN * 2);   // E8/P2: slad cen (tylko pomiar)
+                    _trace[_traceN++] = p; _traceSum += p;
                 }
             }
             finally { if (tally) _dTicks += Stopwatch.GetTimestamp() - t0; }

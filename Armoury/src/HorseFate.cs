@@ -114,6 +114,7 @@ namespace Armoury
             _mDeaths.Clear(); _mRiders = _mHorses = 0; _missionEvent = null; _beaten.Clear();
             _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
             ClearDay(); _stumbles = 0; _errSites.Clear(); _giftRun = false;
+            _p2Event = null; _p2Win.Clear(); _p2WinBefore.Clear(); _p2Lose.Clear(); _p2Open.Clear();   // E8/P2 (244): pomiar kopii lupu - stan miedzy kampaniami
         }
 
         private static void ClearDay()
@@ -127,6 +128,8 @@ namespace Armoury
             _dGiftHorses = _dGiftFood = _dGiftNoHorse = _dGiftNoFood = _dGiftGold = _dGiftParties = _dGiftNoSeat = 0;
             _dRotHorse = _dRotFoot = _dRotKeep = 0;
             _dStumbles = 0;
+            Array.Clear(_dP2Kept, 0, P2Kinds); Array.Clear(_dP2Moved, 0, P2Kinds);   // E8/P2 (244)
+            _dP2Events = _dP2Gained = _dP2NoCopy = _dP2KeptGar = _dP2KeptLord = _dP2KeptOther = _dP2KeptParties = _dP2MovedParties = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -386,6 +389,7 @@ namespace Armoury
                 if (__0 == null) return;
                 bool mission = ReferenceEquals(__0, _missionEvent);
                 if (mission) _missionEvent = null;
+                P2LootBefore(__0);   // E8/P2 (244): sumy zbrojowni zwyciezcow (bez koni) przed rozdaniem lupu DTE - tylko pomiar, wlasny try
                 if (!DieOn) return;
                 if (!mission) AutoDeaths(__0);
                 __state = LootSnap(__0);
@@ -396,8 +400,165 @@ namespace Armoury
         public static void DtePostfix(MapEvent __0, object __state)
         {
             var sn = __state as LootSnapshot;
-            if (sn == null) return;
-            try { LootMove(sn); } catch (Exception e) { Stumble("DtePostfix", e); }
+            if (sn != null) { try { LootMove(sn); } catch (Exception e) { Stumble("DtePostfix", e); } }
+            P2LootAfter(__0);   // E8/P2 (244): po LootMove - ile sztuk innych niz konie zostalo u pokonanych jako kopia (tylko pomiar, wlasny try)
+        }
+
+        // ================================================================ E8/P2 (244, PLAN 8.6b): POMIAR - kopie lupu DTE u pokonanych, wszystkie rodzaje poza konmi
+        // DTE DistributeLootRandomly (dekompilacja v1.4.7: GetAllLootItems bierze slownik SanitizePartyArmory pokonanego - TEN SAM, bez czyszczenia) dopisuje
+        // zwyciezcom cala zbrojownie pokonanych; konie zdejmuje u pokonanych LootMove (E6/K1), reszta zostaje. Dla partii rozbitej w tej bitwie to przeniesienie
+        // (gra niszczy ja po MapEventEnded, DTE kasuje zbrojownie), kopia zostaje u pokonanego, ktory przezyl. Pomiar: suma sztuk (bez koni) zbrojowni zwyciezcow
+        // przed i po oknie DTE = dopisane; sztuki (bez koni) u pokonanych po oknie = kopie (gdy pokonani maja wiecej, niz dopisano - czarna lista DTE - proporcja);
+        // los pokonanego (ocalal / rozbity) rozstrzyga sie po rozliczeniu bitwy przez gre - sprawdzany przy nastepnym koncu bitwy albo w takcie doby.
+        // Tylko odczyt slownikow - nic nie schodzi i nic nie dochodzi; E8/L zamieni kopie na przeniesienie (wtedy "kopie u ocalalych" = 0, prog L-1).
+        private const int P2Kinds = 5;
+        private static readonly string[] P2KindNames = { "bron", "pociski", "zbroja", "tarcze", "uprzaz i inne" };
+        private sealed class P2Loser { public MobileParty Party; public long[] Pcs = new long[P2Kinds]; }
+        private static MapEvent _p2Event;
+        private static readonly List<MobileParty> _p2Win = new List<MobileParty>(), _p2Lose = new List<MobileParty>();
+        private static readonly List<long> _p2WinBefore = new List<long>();
+        private static readonly List<P2Loser> _p2Open = new List<P2Loser>();
+        private static readonly long[] _dP2Kept = new long[P2Kinds], _dP2Moved = new long[P2Kinds];
+        private static long _dP2Events, _dP2Gained, _dP2NoCopy, _dP2KeptGar, _dP2KeptLord, _dP2KeptOther, _dP2KeptParties, _dP2MovedParties;
+
+        private static bool P2On { get { var s = Settings.Current; return s != null && s.Stage8MeasureLog; } }
+
+        private static int P2Kind(ItemObject it)
+        {
+            switch (it.ItemType)
+            {
+                case ItemObject.ItemTypeEnum.OneHandedWeapon:
+                case ItemObject.ItemTypeEnum.TwoHandedWeapon:
+                case ItemObject.ItemTypeEnum.Polearm:
+                case ItemObject.ItemTypeEnum.Bow:
+                case ItemObject.ItemTypeEnum.Crossbow: return 0;
+                case ItemObject.ItemTypeEnum.Arrows:
+                case ItemObject.ItemTypeEnum.Bolts:
+                case ItemObject.ItemTypeEnum.Thrown: return 1;
+                case ItemObject.ItemTypeEnum.HeadArmor:
+                case ItemObject.ItemTypeEnum.BodyArmor:
+                case ItemObject.ItemTypeEnum.LegArmor:
+                case ItemObject.ItemTypeEnum.HandArmor:
+                case ItemObject.ItemTypeEnum.Cape: return 2;
+                case ItemObject.ItemTypeEnum.Shield: return 3;
+                default: return 4;
+            }
+        }
+
+        /// <summary>Suma sztuk zbrojowni partii bez koni (gracz: ArmyArmory DTE); byKind != null - dopisuje rozbicie na rodzaje. Tylko odczyt.</summary>
+        private static long P2Sum(MobileParty mp, long[] byKind)
+        {
+            long t = 0;
+            if (mp == MobileParty.MainParty)
+            {
+                var pa = PlayerArmory();
+                if (pa == null) return 0;
+                for (int i = 0; i < pa.Count; i++)
+                {
+                    var el = pa.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || it == null || IsHorse(it)) continue;
+                    t += el.Amount; if (byKind != null) byKind[P2Kind(it)] += el.Amount;
+                }
+                return t;
+            }
+            var arm = ArmOf(mp);
+            if (arm == null) return 0;
+            foreach (var kv in arm)
+            {
+                if (kv.Value <= 0 || kv.Key == null || IsHorse(kv.Key)) continue;
+                t += kv.Value; if (byKind != null) byKind[P2Kind(kv.Key)] += kv.Value;
+            }
+            return t;
+        }
+
+        private static void P2LootBefore(MapEvent me)
+        {
+            try
+            {
+                P2Settle();   // pokonani poprzedniej bitwy - gra juz ja rozliczyla
+                _p2Event = null; _p2Win.Clear(); _p2WinBefore.Clear(); _p2Lose.Clear();
+                if (!P2On || me.WinningSide == BattleSideEnum.None) return;
+                if (me.IsPlayerSimulation && me.WinningSide == me.PlayerSide) return;   // DTE DistributePlayerSimulationLoot - lup z poleglych, inna droga (jak LootSnap)
+                var win = me.WinningSide == BattleSideEnum.Attacker ? me.AttackerSide : me.DefenderSide;
+                var lose = me.WinningSide == BattleSideEnum.Attacker ? me.DefenderSide : me.AttackerSide;
+                if (win == null || lose == null) return;
+                foreach (var mep in lose.Parties)
+                {
+                    var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                    if (mp != null && !mp.IsMainParty && ArmOf(mp) != null) _p2Lose.Add(mp);
+                }
+                if (_p2Lose.Count == 0) return;
+                foreach (var mep in win.Parties)
+                {
+                    var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                    if (mp != null) { _p2Win.Add(mp); _p2WinBefore.Add(P2Sum(mp, null)); }
+                }
+                _p2Event = me;
+            }
+            catch (Exception e) { _p2Event = null; Stumble("P2LootBefore", e); }
+        }
+
+        private static void P2LootAfter(MapEvent me)
+        {
+            try
+            {
+                if (_p2Event == null || !ReferenceEquals(_p2Event, me)) return;
+                _p2Event = null;
+                long gained = 0;
+                for (int i = 0; i < _p2Win.Count; i++) { long d = P2Sum(_p2Win[i], null) - _p2WinBefore[i]; if (d > 0) gained += d; }
+                if (gained <= 0) return;   // DTE nie rozdal lupu (odwrot, brak waznych zwyciezcow) albo pokonani bez sprzetu
+                _dP2Events++; _dP2Gained += gained;
+                long have = 0;
+                var rows = new List<P2Loser>();
+                foreach (var mp in _p2Lose)
+                {
+                    var r = new P2Loser { Party = mp };
+                    long t = P2Sum(mp, r.Pcs);
+                    if (t > 0) { rows.Add(r); have += t; }
+                }
+                if (have <= 0) { _dP2NoCopy += gained; return; }   // u pokonanych nic nie zostalo - przeniesienie (po E8/L)
+                double scale = have > gained ? (double)gained / have : 1.0;
+                foreach (var r in rows)
+                {
+                    if (scale < 1.0) for (int k = 0; k < P2Kinds; k++) r.Pcs[k] = (long)Math.Round(r.Pcs[k] * scale);
+                    _p2Open.Add(r);
+                }
+            }
+            catch (Exception e) { Stumble("P2LootAfter", e); }
+        }
+
+        /// <summary>Los pokonanych z lupem DTE: partia czynna ze zbrojownia - kopia zostala (ocalaly); inaczej - przeniesienie (rozbita, zbrojownia skasowana).</summary>
+        private static void P2Settle()
+        {
+            if (_p2Open.Count == 0) return;
+            foreach (var r in _p2Open)
+            {
+                var mp = r.Party;
+                bool alive = mp != null && mp.IsActive && ArmOf(mp) != null;
+                long t = 0;
+                for (int k = 0; k < P2Kinds; k++) { t += r.Pcs[k]; if (alive) _dP2Kept[k] += r.Pcs[k]; else _dP2Moved[k] += r.Pcs[k]; }
+                if (!alive) { _dP2MovedParties++; continue; }
+                _dP2KeptParties++;
+                if (mp.IsGarrison) _dP2KeptGar += t; else if (mp.IsLordParty) _dP2KeptLord += t; else _dP2KeptOther += t;
+            }
+            _p2Open.Clear();
+        }
+
+        private static void P2Line(int day)
+        {
+            if (!P2On) return;
+            P2Settle();
+            long kept = 0, moved = 0;
+            for (int k = 0; k < P2Kinds; k++) { kept += _dP2Kept[k]; moved += _dP2Moved[k]; }
+            var sb = new StringBuilder();
+            sb.Append("Lup DTE - kopie (E8/P2): dzien ").Append(day).Append(" | bitew z lupem DTE ").Append(_dP2Events).Append(", dopisane zwyciezcom (bez koni) ").Append(_dP2Gained)
+              .Append(" szt. | kopie u ocalalych pokonanych ").Append(kept).Append(" szt. w ").Append(_dP2KeptParties).Append(" partiach (zalogi ").Append(_dP2KeptGar)
+              .Append(", partie lordow ").Append(_dP2KeptLord).Append(", inne ").Append(_dP2KeptOther).Append(";");
+            for (int k = 0; k < P2Kinds; k++) sb.Append(k == 0 ? " " : ", ").Append(P2KindNames[k]).Append(' ').Append(_dP2Kept[k]);
+            sb.Append(") | u rozbitych (przeniesienie) ").Append(moved).Append(" szt. w ").Append(_dP2MovedParties).Append(" partiach | dopisane bez sztuk u pokonanych ").Append(_dP2NoCopy)
+              .Append(" | konie (E6/K1): dopisane ").Append(_dLootMoved).Append(", kopie zdjete ").Append(_dLootCopies).Append(" | okno DTE ").Append(_wDte).Append('.');
+            Log.Info(sb.ToString());
         }
 
         private static void Horsed(int[] horses, int high, int low, out int hh, out int hl)
@@ -1025,6 +1186,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { P2Line((int)CampaignTime.Now.ToDays); } catch (Exception e) { Stumble("P2Line", e); }   // E8/P2 (244): "Lup DTE - kopie (E8/P2)" - przed zerowaniem dnia (tylko log)
             ClearDay();
         }
 

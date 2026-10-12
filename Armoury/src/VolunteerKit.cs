@@ -283,6 +283,7 @@ namespace Armoury
             {
                 var e = picks[pi];
                 Measure174b.NoteBuy(Measure174b.BNotable, e.Item, 1, pickPrices[pi]);   // 174b.0 M2 (tylko licznik)
+                Measure174b.NotePiece(Measure174b.PathGaps, Measure174b.BNotable, e, pickPrices[pi]);   // E8/P2 (244): cena do wartosci sztuki ze stanem (tylko licznik)
                 ArmsScrap.NoteBuy(market, e.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (e.Item != null && IsAmmoType(e.Item.ItemType)) TownFletchers.NoteNotable(e.Item.ItemType, 1);   // 172: kolczan z polki miasta (tylko licznik)
             }
@@ -324,6 +325,7 @@ namespace Armoury
                 roster.AddToCounts(pe, -1);
                 gen++;   // 174b.5 F3: polka zmieniona (kolejnosc stosow tez) - ceny od nowa
                 Measure174b.NoteBuy(Measure174b.BNotable, pe.Item, 1, bestPrice);   // 174b.0 M2 (tylko licznik)
+                Measure174b.NotePiece(Measure174b.PathGaps, Measure174b.BNotable, pe, bestPrice);   // E8/P2 (244): cena do wartosci (tylko licznik)
                 ArmsScrap.NoteBuy(market, pe.Item, 1);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
                 if (pe.Item != null && IsAmmoType(pe.Item.ItemType)) TownFletchers.NoteNotable(pe.Item.ItemType, 1);   // 172: licznik
                 _lastBought.Add(pe);

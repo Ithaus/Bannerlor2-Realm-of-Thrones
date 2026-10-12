@@ -51,6 +51,101 @@ namespace Armoury
             Array.Clear(_buyN, 0, _buyN.Length); Array.Clear(_buyG, 0, _buyG.Length); Array.Clear(_sellN, 0, Groups); Array.Clear(_sellG, 0, Groups);
             Array.Clear(_held, 0, Buyers); Array.Clear(_arr, 0, ArrKinds); _prev.Clear(); _lastNew.Clear(); _stumbles = 0; _errSites.Clear();
             _lastOwn.Clear(); _xfer.Clear();
+            P2Clear();   // E8/P2 (244)
+        }
+
+        // ------------------------------------------------------------ E8/P2 (244, PLAN 8.8a-b): cena do wartosci sztuki wedlug kupujacego (tylko log)
+        // Kazda kupiona sztuka: cena zaplacona / wartosc sztuki ZE STANEM (EquipmentElement.ItemValue = Item.Value x mnoznik stanu - ta sama podstawa, od ktorej
+        // gra liczy cene: G DefaultTradeItemPriceFactorModel.GetPrice = ItemValue x wspolczynnik). Wiersze: droga x kupujacy - droga 0 = zakupy brakow AiGear
+        // (BuyLoop, sztuki zastepcze, zamowienia zamkow; notable = VolunteerKit), droga 1 = "lepsze za swoje" (MenUpgrade). Mediana i p90 z probek doby
+        // (tablice rosna do rozmiaru doby i zostaja - bez alokacji na sztuke). "Sufit" (E8/Z, AiGearMaxPriceFactor W CIENIU): sztuki i zloto ponad 1.5x / 2.0x /
+        // 3.0x wartosci - suma "zablokowalby" tylko z drogi AiGear lordow i zalog (tam bedzie sufit). Dodatnie stany (PLAN 8.8a): sztuki z mnoznikiem stanu > 1 i
+        // doplata = cena x (1 - 1/mnoznik) - po zakupie stan ginie (zbrojownia DTE to "przedmiot: ile", AiWear.NoteBought pamieta tylko stany < 1).
+        internal const int PathGaps = 0, PathBetter = 1;
+        private const int P2Rows = 2 * Buyers;
+        private static readonly float[] P2Caps = { 1.5f, 2f, 3f };
+        private static readonly float[][] _p2Ratio = new float[P2Rows][];
+        private static readonly int[] _p2N = new int[P2Rows];
+        private static readonly long[] _p2Paid = new long[P2Rows], _p2Worth = new long[P2Rows], _p2FineN = new long[P2Rows], _p2FineExtra = new long[P2Rows];
+        private static readonly long[,] _p2CapN = new long[P2Rows, 3], _p2CapG = new long[P2Rows, 3];
+        private static long _p2NoWorth;
+        private static bool P2On { get { var s = Settings.Current; return s != null && s.Stage8MeasureLog; } }
+
+        private static void P2Clear()
+        {
+            Array.Clear(_p2N, 0, P2Rows); Array.Clear(_p2Paid, 0, P2Rows); Array.Clear(_p2Worth, 0, P2Rows); Array.Clear(_p2FineN, 0, P2Rows); Array.Clear(_p2FineExtra, 0, P2Rows);
+            Array.Clear(_p2CapN, 0, _p2CapN.Length); Array.Clear(_p2CapG, 0, _p2CapG.Length); _p2NoWorth = 0;
+        }
+
+        /// <summary>E8/P2 (244): jedna kupiona sztuka (ze stanem) po cenie price - kupujacy jak w M2, droga PathGaps / PathBetter. Tylko liczniki.</summary>
+        internal static void NotePiece(int path, int buyer, EquipmentElement el, int price)
+        {
+            try
+            {
+                if (path < 0 || path > 1 || buyer < 0 || buyer >= Buyers || el.Item == null || price <= 0 || !P2On) return;
+                int row = path * Buyers + buyer;
+                int worth = el.ItemValue;
+                if (worth <= 0) { _p2NoWorth++; return; }
+                float r = price / (float)worth;
+                var a = _p2Ratio[row];
+                if (a == null) _p2Ratio[row] = a = new float[256];
+                else if (_p2N[row] == a.Length) { Array.Resize(ref a, a.Length * 2); _p2Ratio[row] = a; }
+                a[_p2N[row]++] = r;
+                _p2Paid[row] += price; _p2Worth[row] += worth;
+                for (int c = 0; c < 3; c++) if (r > P2Caps[c]) { _p2CapN[row, c]++; _p2CapG[row, c] += price; }
+                var m = el.ItemModifier;
+                if (m != null && m.PriceMultiplier > 1f) { _p2FineN[row]++; _p2FineExtra[row] += price - (long)Math.Round(price / m.PriceMultiplier); }
+            }
+            catch (Exception e) { Stumble("NotePiece", e); }
+        }
+
+        /// <summary>E8/P2 (244): partia n sztuk kupiona przez ShelfBuy.Take - ceny kolejnych sztuk ze sladu ostatniego Take (wolac zaraz po nim, przed
+        /// nastepnym Take); gdy slad nie zgadza sie z partia (inna liczba sztuk albo suma) - kazda sztuka po sredniej cenie partii.</summary>
+        internal static void NoteBatch(int path, int buyer, EquipmentElement el, int n, int cost)
+        {
+            if (n <= 0 || !P2On) return;
+            if (ShelfBuy.TraceCount == n && ShelfBuy.TraceSum == cost) { for (int i = 0; i < n; i++) NotePiece(path, buyer, el, ShelfBuy.TraceAt(i)); return; }
+            int left = cost;
+            for (int i = 0; i < n; i++) { int p = left / (n - i); left -= p; NotePiece(path, buyer, el, p); }
+        }
+
+        private static string P2Row(int row, System.Globalization.CultureInfo ci)
+        {
+            int n = _p2N[row];
+            var a = _p2Ratio[row];
+            Array.Sort(a, 0, n);
+            var sb = new StringBuilder();
+            sb.Append("szt. ").Append(n).Append(", zaplacone ").Append(_p2Paid[row]).Append(" zl za wartosc ").Append(_p2Worth[row]).Append(" zl, cena/wartosc mediana ")
+              .Append(a[(n - 1) / 2].ToString("0.00", ci)).Append(", p90 ").Append(a[Math.Min(n - 1, (int)(0.9 * n))].ToString("0.00", ci)).Append(", maks. ").Append(a[n - 1].ToString("0.00", ci))
+              .Append("; ponad 1.5x ").Append(_p2CapN[row, 0]).Append(" szt./").Append(_p2CapG[row, 0]).Append(" zl, ponad 2.0x ").Append(_p2CapN[row, 1]).Append(" szt./").Append(_p2CapG[row, 1])
+              .Append(" zl, ponad 3.0x ").Append(_p2CapN[row, 2]).Append(" szt./").Append(_p2CapG[row, 2]).Append(" zl; dodatnie stany ").Append(_p2FineN[row]).Append(" szt., doplata ")
+              .Append(_p2FineExtra[row]).Append(" zl");
+            return sb.ToString();
+        }
+
+        /// <summary>E8/P2 (244): linia "ZakupyAI cena do wartosci (E8/P2)" - ta sama doba i etykieta co "ZakupyAI wedlug kupujacego (174b)".</summary>
+        private static void P2Line(int day)
+        {
+            if (!P2On) return;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.Append("ZakupyAI cena do wartosci (E8/P2): dzien ").Append(day).Append(" |");
+            bool any = false;
+            long capN = 0, capG = 0, cap15N = 0, cap15G = 0, cap30N = 0, cap30G = 0, fineN = 0, fineG = 0, allN = 0;
+            for (int row = 0; row < P2Rows; row++)
+            {
+                if (_p2N[row] <= 0) continue;
+                int path = row / Buyers, b = row % Buyers;
+                sb.Append(any ? " | " : " ").Append(BuyerNames[b]).Append(path == PathBetter ? " - lepsze za swoje" : "").Append(": ").Append(P2Row(row, ci));
+                any = true;
+                allN += _p2N[row]; fineN += _p2FineN[row]; fineG += _p2FineExtra[row];
+                if (path == PathGaps && b <= BCastleOrder) { cap15N += _p2CapN[row, 0]; cap15G += _p2CapG[row, 0]; capN += _p2CapN[row, 1]; capG += _p2CapG[row, 1]; cap30N += _p2CapN[row, 2]; cap30G += _p2CapG[row, 2]; }
+            }
+            if (!any) sb.Append(" brak zakupow");
+            sb.Append(" | razem sztuk ").Append(allN).Append(" | sufit 2.0 zablokowalby ").Append(capN).Append(" szt. / ").Append(capG).Append(" zl (sufit 1.5: ").Append(cap15N).Append(" szt. / ")
+              .Append(cap15G).Append(" zl; sufit 3.0: ").Append(cap30N).Append(" szt. / ").Append(cap30G).Append(" zl; zakupy brakow AiGear lordow i zalog)")
+              .Append(" | dodatnie stany kupione razem ").Append(fineN).Append(" szt., doplata ").Append(fineG).Append(" zl | sztuki bez wartosci (poza pomiarem) ").Append(_p2NoWorth).Append('.');
+            Log.Info(sb.ToString());
         }
 
         private static void Stumble(string where, Exception e)
@@ -169,6 +264,8 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             try { Census(day); } catch (Exception e) { Stumble("Census", e); }
             try { BuyLine(day); } catch (Exception e) { Stumble("BuyLine", e); }
+            try { P2Line(day); } catch (Exception e) { Stumble("P2Line", e); }   // E8/P2 (244): "ZakupyAI cena do wartosci (E8/P2)" (tylko log)
+            P2Clear();
             Array.Clear(_buyN, 0, _buyN.Length); Array.Clear(_buyG, 0, _buyG.Length); Array.Clear(_sellN, 0, Groups); Array.Clear(_sellG, 0, Groups);
             Array.Clear(_held, 0, Buyers); Array.Clear(_arr, 0, ArrKinds); _stumbles = 0;
         }

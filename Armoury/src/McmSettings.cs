@@ -4900,6 +4900,10 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Stage8 Measure Log", HintText = "Writes daily lines that measure the AI's gear for stage 8: wear and repairs of garrisons and lords' parties and why repairs wait, arrows the AI would have used up, the prices the AI pays against the worth of the piece, loot copied to victors while the beaten keep it, and the crown's workshop monopolies (diagnostics only; nothing in the game changes).")]
+        [SettingPropertyGroup("Diagnostics (stage 8)")]
+        public bool Stage8MeasureLog { get; set; } = true;
+
         [SettingPropertyBool("Stage8 Profile Log", HintText = "Writes one daily line with the time each part of the mod takes (diagnostics only).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8ProfileLog { get; set; } = true;
@@ -6128,6 +6132,7 @@ namespace Armoury
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
         }
 
