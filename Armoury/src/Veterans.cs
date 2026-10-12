@@ -74,9 +74,12 @@ namespace Armoury
                 if (newNumber > oldNumber) { PeopleBook.VetNoteForeign(newNumber - oldNumber); return; }
                 int n = oldNumber - newNumber;
                 if (n <= 0) return;
+                int vb = 0;
+                try { int vm, vo; vb = PeopleBook.VetInTown(town.Settlement, out vm, out vo); } catch { vb = 0; }   // E5/B6 (201): weterani miasta przed najmem (udzial w puli pieniedzy)
                 int key;
                 var sh = PeopleBook.VetHire(town, n, out key);
                 var party = _winOpen ? _win : null;
+                VetPurse.OnHire(town.Settlement, party, vb);   // E5/B6 (201): sakiewka idzie z czlowiekiem - udzial najetych w puli pieniedzy weteranow do sakiewki partii (nie rzuca)
                 CharacterObject type = null;
                 try { var rcb = Rcb(); type = rcb != null ? rcb.GetMercenaryData(town).TroopType : null; } catch { type = null; }
                 PeopleBook.VetNoteHire(party, n, type != null && type.IsMounted, type != null ? TierOf(type) : -1, key);

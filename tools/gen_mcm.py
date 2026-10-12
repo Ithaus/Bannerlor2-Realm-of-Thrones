@@ -131,6 +131,8 @@ RANGES = {
     'VillageLordScale': (0.0, 1.0, "0.00"),
     'VillagePurchasePerHead': (0.0, 1.0, "0.00"),
     'VillageDuesPerHeadYear': (0.0, 50.0, "0.0"),
+    # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
+    'CastleMarketFoodDays': (1.0, 30.0, "0"),
 }
 
 def gen(module_dir, ns, display):

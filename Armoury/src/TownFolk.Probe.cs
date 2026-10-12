@@ -311,11 +311,20 @@ namespace Armoury
             int g;
             if (_grp.TryGetValue(c, out g)) return g;
             string id = c.StringId ?? "";
-            if (c.Properties == ItemCategory.Property.BonusToFoodStores || id == "beer" || id == "wine") g = 0;
+            if (IsFoodCategory(c)) g = 0;
             else if (ArmsLeaks.IsArmsCategory(id) || c.IsAnimal || Array.IndexOf(LuxIds, id) >= 0) g = 2;
             else g = 1;
             _grp[c] = g;
             return g;
+        }
+
+        /// <summary>Jedzenie (grupa 0 linii "Jedzenie z targu (E5/0)"): kategoria z BonusToFoodStores albo piwo, wino. Jedna definicja dla E5/0 i E5/B4
+        /// (targ przy zamku, CastleMarket); bez stanu i bez pamieci podrecznej - bezpieczne z kazdego watku.</summary>
+        internal static bool IsFoodCategory(ItemCategory c)
+        {
+            if (c == null) return false;
+            string id = c.StringId ?? "";
+            return c.Properties == ItemCategory.Property.BonusToFoodStores || id == "beer" || id == "wine";
         }
 
         // ------------------------------------------------------------ 4.4 bitwy: rzeczywista zmiana kies przy wyplacie

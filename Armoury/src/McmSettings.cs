@@ -1940,6 +1940,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Castle Market First", HintText = "a castle's own villages sell it food for its people first - enough for ten days - and carry the rest of their load on to the town: a cart setting out for a town market calls first at the castle its village belongs to whenever that castle's market holds less of a food the cart carries than the people under its walls buy in Castle Market Food Days (each kind of food counted on its own, by what the castle folk spend on it each day); the castle buys only what is missing, at its own market price (piece by piece with Village Cart Fair Price), paid only from the coin its purse holds above the working coin (Castle Purse Enabled), and the cart goes straight on to the best town for the rest. The garrison's granary is not counted - the villages feed it as before. You and the AI alike. Off = the carts drive straight to the town market, as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CastleMarketFirst { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Castle Market Food Days", 1.00f, 30.00f, "0", HintText = "how many days of each food the castle folk buy the castle market should hold before its villages' carts stop calling there first (1-30; needs Castle Market First)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CastleMarketFoodDays { get; set; } = 10f;
+
         [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageTakingsWhole { get; set; } = true;
@@ -2667,6 +2675,10 @@ namespace Armoury
         [SettingPropertyInteger("Veteran Min Tier", 1, 7, "0", HintText = "only a soldier of at least this tier stops at a tavern - a green levy would stand there as a seasoned sellsword he never was; lower ranks always go home")]
         [SettingPropertyGroup("Iron Bank")]
         public int VeteranMinTier { get; set; } = 3;
+
+        [SettingPropertyBool("Veteran Purse Follows Man", HintText = "a soldier's coin goes where he goes: when a released soldier stops at a tavern, his share of the company purse stays with him and he spends it in that town - a tenth a day like soldiers in the field (Sutler Daily Share), the rest when the last veteran leaves; whoever hires him takes his savings into the men's purse, and the hire money itself goes into the purse of the men hired, not into the town's coffers. You and the AI alike. Needs Men Purse Enabled (the hire money also Recruit Gold To Seller). Off = released soldiers' purses go to their villages and the hire money to the town (yours vanishes), as before; coin already held by veterans is spent in their towns at once")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool VeteranPurseFollowsMan { get; set; } = true;
 
         [SettingPropertyBool("Village Book Enabled", HintText = "every map village keeps its own people and its share of the district's harvest: raids and foraging armies empty its settlements (the side facing the raiders burns first), famine leaves them abandoned, and they stand again as their people come home - within a year of the last raid in the land. Shown in 'People of this land' and in the map village tooltip. Needs Devastation Enabled to burn anything. Off = all map villages stand, as before")]
         [SettingPropertyGroup("Iron Bank")]
@@ -5132,6 +5144,8 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.CastleMarketFirst = CastleMarketFirst;
+            s.CastleMarketFoodDays = CastleMarketFoodDays;
             s.VillageTakingsWhole = VillageTakingsWhole;
             s.VillageFoodSalesKept = VillageFoodSalesKept;
             s.VillagerPurseSurvives = VillagerPurseSurvives;
@@ -5314,6 +5328,7 @@ namespace Armoury
             s.VeteranShareToTavern = VeteranShareToTavern;
             s.VeteranWaitDays = VeteranWaitDays;
             s.VeteranMinTier = VeteranMinTier;
+            s.VeteranPurseFollowsMan = VeteranPurseFollowsMan;
             s.VillageBookEnabled = VillageBookEnabled;
             s.DistrictSettlementPeople = DistrictSettlementPeople;
             s.TownFoodByVillagePeople = TownFoodByVillagePeople;

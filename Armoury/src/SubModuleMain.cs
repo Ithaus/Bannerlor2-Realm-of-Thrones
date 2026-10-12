@@ -69,6 +69,7 @@ namespace Armoury
                 MineralOnce.ApplyAll(_harmony);  // lista produkcji wsi BK bez powtorzen: mineral wsi gorniczej dopisywany raz (Jeff 05.10); MUSI isc po MaterialLaw.ApplyAll (zdjety wpis oddaje jego postfix modelu)
                 MarketRoad.ApplyAll(_harmony);   // wpis 100: wsie zamkowe woza plon na targ miasta, nie do zamku
                 MarketCarts.ApplyAll(_harmony);  // poprawka 119: cena ladunku taboru sztuka po sztuce (wybor miasta wola MarketRoad.RoutePrefix)
+                try { CastleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastleMarket.ApplyAll", e); }   // E5/B4 (199): targ przy zamku - sprzedaz w zamku (prefiks High po 119) i straz przed BK VillagersCastleTick
                 RoadMemoryFix.ApplyAll(_harmony); // paczka 131: pamiec drog mapy ROT uzupelniona po wczytaniu mapy (sciany siatki bez wpisu sciana -> wejscie) - u zrodla, dla kazdej partii
                 CartTownExit.ApplyAll(_harmony); // paczka 130: wozy wsi wyjezdzaja z osad, z ktorych straznik drog BK nie wypuszczal (bramy poza pamiecia drog ROT) - po RoadMemoryFix siatka bezpieczenstwa
                 IslandRoads.ApplyAll(_harmony);  // paczka 154: wyspy - rozkazy BK bez drogi ladowej (ocena miast karawan BK, uczta, gentry; regula w strazniku BK wpieta przez CartTownExit)
@@ -154,6 +155,9 @@ namespace Armoury
                 try { PeopleBook.ApplyOrigin(_harmony); } catch (Exception e) { Log.Error("PeopleBook.ApplyOrigin", e); }   // E4/2 (190): Inni tylko z poleglych za Murem / przy Murze - latki wpiete zawsze, wylaczniki na zywo; PO Measure40 (finalizer (f) High przed W10)
                 // E4/10 (167): karczma tylko z weteranow - L1 bez dosypki z niczego, okna najmu AI (ApplyInternal, Priority.First jak E4/7) i gracza; PO ApplyOrigin; we wlasnym try
                 try { Veterans.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Veterans.ApplyAll", e); }
+                // E5/B6 (201): zaplata gracza za najem do sakiewki najetych - prefiks First / postfiks Last na BuyMercenaries i buy_mercenaries_on_consequence
+                // (postfiks PO RecruitCost.PlayerBuyPostfix - kon z polki i zwrot doplaty, wpiety wyzej); we wlasnym try
+                try { VetPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VetPurse.ApplyAll", e); }
                 // E4/5 (113n): spustoszenie jako ulamek okregu - krok i koniec rabunku, progi produkcji, zywnosc wsi, produkcja wsi spladrowanej; wpiete zawsze (U26), PO przyroscie
                 // naturalnym (czynne tylko razem z nim) i PO Measure40/OthersRise; MUSI zostac tutaj, w menu glownym - JIT wkleja male metody (GetHearthLevel), jesli wolajacy
                 // skompiluje sie przed latka (113 ryzyko 13); we wlasnym try

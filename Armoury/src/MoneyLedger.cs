@@ -101,7 +101,9 @@ namespace Armoury
         internal const int MFolk = 18;                                                                          // E5/B1: kiesa ludu - place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu
         internal const int MFolkValve = 19;                                                                     // E5/B1: zawor dla ludu - 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu
         internal const int MFolkStart = 20;                                                                     // E5/B1: zapasy startowe kies ludu z daru (raz) albo z nadwyzki (stary zapis)
-        private const int Marks = 21;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B1 M18-M20
+        // E5/B6 (201): zasada "pierwszy wolny (M18) + 15" = M33; M21-M32 wolne (zaslepki drukowane tylko != 0; scalenie B: bez kolizji z B1 - bez przenumerowania)
+        internal const int MVetPurse = 33;                                                                      // E5/B6 (201): pula sakiewek weteranow w karczmach -> kasy miast karczm ("zycie")
+        private const int Marks = 34;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B1 M18-M20; E5/B6 M33
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
                                                    "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
@@ -112,7 +114,11 @@ namespace Armoury
                                                    "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi",
                                                    "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
                                                    "zawor dla ludu (E5/B1): 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu",
-                                                   "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)" };
+                                                   "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)",
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",   // 21-32: wolne (nieuzywane, drukowane tylko != 0)
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
+                                                   "weterani (E5/B6): pula sakiewek weteranow w karczmach -> kasy miast karczm (zycie)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
@@ -120,7 +126,9 @@ namespace Armoury
                           HOtherParties = 17, HTownTax = 18, HVillageTax = 19, HOtherSettlements = 20,
                           HCallToWar = 21,   // 3.1 (31, E3/0): dodatnie portfele wezwan do wojny (168) - posiadacz (gra wyplaca je rodom wezwanego)
                           HFolkTown = 22, HFolkCastle = 23, HGmina = 24,   // E5/B1 (173): kiesy ludu miast (W/R/P), kiesy podzamczy, gminy miast - poza SettlementComponent.Gold
-                          Holders = 25;
+                          // E5/B6 (201): "pierwszy wolny (H22) + 15" = H37 - pula sakiewek weteranow w karczmach (VetPurse); H25-H36 wolne (zera)
+                          HVetPurse = 37,
+                          Holders = 38;
 
         // zold wedlug rodzaju partii
         private const int WLord = 0, WGarrison = 1, WCaravan = 2, WOther = 3, Wages = 4;
@@ -746,6 +754,7 @@ namespace Armoury
             foreach (var v in Village.All) if (v != null) h[HVillageTax] += v.TradeTaxAccumulated;
             h[HPurses] = MenPurse.TotalNow();
             h[HFolkTown] = TownFolk.TotalTown(); h[HFolkCastle] = TownFolk.TotalCastle(); h[HGmina] = TownFolk.TotalGmina();   // E5/B1 (173)
+            h[HVetPurse] = VetPurse.TotalNow();                                 // E5/B6 (201): pula sakiewek weteranow w karczmach (z osieroconymi)
             h[HBank] = IronBank.CapitalNow;
             foreach (var mp in MobileParty.All)
             {
@@ -782,7 +791,7 @@ namespace Armoury
                    + " | skarbce krolestw " + D(now, last, HKingdoms)
                    + " | portfele wezwan do wojny (168) " + D(now, last, HCallToWar)   // 3.1 (31, E3/0)
                    + " | kapital warsztatow " + D(now, last, HWorkshops)
-                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | Bank Zelazny " + D(now, last, HBank)
+                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | sakiewki weteranow w karczmach (E5/B6) " + D(now, last, HVetPurse) + " | Bank Zelazny " + D(now, last, HBank)
                    + " | partie bez wodza: tabory wsi " + D(now, last, HVillagers) + ", karawany " + D(now, last, HCaravans) + ", garnizony " + D(now, last, HGarrisons)
                    + ", bandy " + D(now, last, HBandits) + ", inne " + D(now, last, HOtherParties)
                    + " | liczniki (zloto w drodze do panow): cla miast i zamkow " + D(now, last, HTownTax) + ", podatek wsi " + D(now, last, HVillageTax)

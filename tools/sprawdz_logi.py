@@ -65,6 +65,15 @@ Uzycie (Python 3, tylko odczyt):
                     nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob z rzedu, pozycje statkow w ksiedze ("Pieniadz swiata - przyczyny") = 0,
                     zgodnosc z A6 i pomiarami (A6, 164a, E5/0 - statki z niczego 0), bledy; wyplaty portow, zloto swiata, wraki i zakupy portow ponad
                     liczbe idealna stoczni (B5-14, decyzja Jeffa) - INFO.
+                    Blok E5/B4 (199, targ przy zamku) B4-1..B4-11 - linie "CastleMarket (E5/B4)" i "Targ przy zamku (5.11)": wpiecie (sprzedaz w zamku,
+                    straz przed BK VillagersCastleTick), linia CZYNNY kazdej doby, jedzenie sprzedane zamkom > 0, powtorne wizyty 0, zatkane magazyny wsi
+                    zamkowych lato <= 5.6% (doby bez "zima: TAK" w "Spichlerze (E4/6)") i zima (INFO wobec 6.5%), reszta ladunku do miasta (wrocone do domu
+                    z ladunkiem <= 5% wyslanych dalej), bledy i potkniecia 0; zamki z polka ponizej dni zuzycia (popyt BK i pomiar E5/0), odmowy Spendable,
+                    rozbite tabory, jedzenie okregu (danina E4/11 + woz) - INFO.
+                    Blok E5/B6 (201, pieniadze weterana i najmu) B6-1..B6-14 - linie "VetPurse (E5/B6)" i "Weterani - pieniadze (E5/B6)": wpiecie (zaplata
+                    gracza 2/2), linia CZYNNE kazdej doby, kontrola puli (roznica 0), sakiewki zwolnionych 166 do puli > 0 przy ludziach w karczmach i
+                    zgodnosc z linia 166, oplata za najem do kas miast 0, zaplata do sakiewek najetych > 0 przy najmie (linia E4/10), pule bez weteranow 0,
+                    osierocone 0, posiadacz "Pieniadz swiata" = pula, bledy i potkniecia 0; najem z puli, wydatek wobec stawki, Werbunek - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3225,6 +3234,22 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
                     "jest od wgrania E5/B5 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_b5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B4 (199): targ przy zamku (linia z dniem ksiegi = dzien gry - 1, jak "Dowoz:" - bez przesuniecia)
+    try:
+        if any(x.startswith("CastleMarket (E5/B4):") for x in lines) or any(x.startswith("Targ przy zamku (5.11): dzien") for x in lines):
+            etap5_b4(rep, lines, start, win)
+        else:
+            rep.add("E5/B4: linie CastleMarket (E5/B4) / Targ przy zamku (5.11)", "brak w logu", "sa od wgrania E5/B4 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B6 (201): pieniadze weterana i najmu (linia z dniem gry - klucz = dzien ksiegi, jak 166)
+    try:
+        if any(x.startswith("VetPurse (E5/B6):") for x in lines) or any(x.startswith("Weterani - pieniadze (E5/B6): dzien") for x in lines):
+            etap5_b6(rep, lines, start, win, bud)
+        else:
+            rep.add("E5/B6: linie VetPurse (E5/B6) / Weterani - pieniadze (E5/B6)", "brak w logu", "sa od wgrania E5/B6 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b6", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -5200,6 +5225,228 @@ def etap5_b5(rep, lines, start, until, sh):
     else:
         rep.add("E5/B5 B5-14: zakupy portow ponad liczbe idealna stoczni - INFO", "brak pola w logu (linie 181 sprzed poprawki po recenzji B5)", "INFO", None)
 
+
+def etap5_b4(rep, lines, start, win):
+    """E5/B4 (199, PLAN 5.11, R17 - targ przy zamku): projekt etapu 5 rozdz. 3 "E5/B4" Test (zbior B). Linia startowa "CastleMarket (E5/B4)" (sprzedaz w zamku
+    i straz przed BK VillagersCastleTick wpiete), dzienna "Targ przy zamku (5.11): dzien N" (dzien ksiegi = dzien gry - 1, jak "Dowoz:"). Progi: sprzedaz do dni
+    popytu > 0, powtorne wizyty 0, zatkane magazyny wsi zamkowych osobno lato (<= 5.6%) i zima (INFO wobec biegu A: 6.5%), reszta ladunku do miasta (wrocone do domu
+    z ladunkiem <= 5% wozow wyslanych dalej), bledy i potkniecia 0. Zamki z polka ponizej dni zuzycia (wobec biegu A), odmowy (Spendable), rozbite tabory - INFO."""
+    stl = [x for x in lines if x.startswith("CastleMarket (E5/B4):")]
+    tm = by_day(lines, "Targ przy zamku (5.11): dzien")
+    days = [d for d in win if d in tm]
+    # B4-1: linia startowa
+    if not stl:
+        rep.add("E5/B4 B4-1: linia startowa CastleMarket (E5/B4)", "brak linii startowej", "wpiete: sprzedaz w zamku, straz BK; BRAK: -", None)
+    else:
+        x = stl[-1]
+        brak = re.search(r"; BRAK: (.*?); wlasciciele", x)
+        ok = "sprzedaz w zamku" in x and "straz przed odeslaniem do domu" in x and brak is not None and brak.group(1).strip() == "-"
+        rep.add("E5/B4 B4-1: linia startowa CastleMarket (E5/B4)", ("BRAK: " + brak.group(1) if brak else x[:160]),
+                "wpiete: sprzedaz w zamku (prefiks High) i straz przed BK VillagersCastleTick; BRAK: -", ok)
+    # B4-2: linia dzienna w kazdej dobie okna, stan CZYNNY
+    on = [d for d in days if "| CZYNNY |" in tm[d]]
+    off = [d for d in days if "| WYLACZONY" in tm[d]]
+    dead = [d for d in days if "| NIECZYNNY" in tm[d]]
+    rep.add("E5/B4 B4-2: linia dzienna Targ przy zamku (5.11), stan CZYNNY",
+            f"dob z linia {len(days)} z {len(win)}, CZYNNY {len(on)}, WYLACZONY {len(off)}, NIECZYNNY {len(dead)}"
+            + (f" (pierwsza: {tm[dead[0]].split(' | ')[1][:120]})" if dead else ""),
+            "kazda doba okna z linia i CZYNNY (bieg zbioru B)", (len(days) == len(win) and len(on) == len(days)) if win else None)
+    if not days:
+        return
+
+    def tot(pat):
+        return sum(num(pat, tm[d], int, 0) or 0 for d in days)
+    visits, sold, gold, onward = tot(r"\| wizyt (\d+),"), tot(r"jedzenie sprzedane zamkom (\d+) szt\."), tot(r"szt\. \((\d+) zl wedlug"), tot(r"dalej do miasta (\d+) wozow")
+    empty, fall, routed = tot(r"pusty po zamku (\d+)"), tot(r"bez miasta dalej \(zamek kupil (?:reszte|caly woz) jak dotad\) (\d+)"), tot(r"skierowane do zamku (\d+) \(")
+    # B4-3: sprzedaz do dni popytu > 0
+    rep.add("E5/B4 B4-3: jedzenie sprzedane zamkom (do dni popytu podzamcza)",
+            f"skierowane {routed}, wizyt {visits}, sprzedane {sold} szt. ({gold} zl wedlug ceny pierwszej sztuki), dalej do miasta {onward}, pusty po zamku {empty}, bez miasta dalej {fall}",
+            "> 0 w oknie (zamki z brakiem jedzenia kupuja od wozow swoich wsi)", sold > 0 if on else None)
+    # B4-4: powtorne wizyty bez znacznika
+    rep_d = [run_day(d, start) for d in days if (num(r"powtorne wizyty bez znacznika: (\d+)", tm[d], int, 0) or 0) > 0]
+    rep.add("E5/B4 B4-4: powtorne wizyty bez znacznika (petla zamek-zamek)", f"dob z powtorna wizyta {len(rep_d)}" + (f" (d{', d'.join(str(x) for x in rep_d[:6])})" if rep_d else ""),
+            "0 kazdej doby", len(rep_d) == 0)
+    # B4-5: zamki z polka ponizej dni zuzycia - popyt BK (ta linia) i ten sam pomiar co E5/0 (zjedzone, srednia 7 dob) wobec biegu A
+    lowre = re.compile(r"zamki z polka < ([\d.]+) dni zuzycia podzamcza \(popyt BK\): (\d+) z (\d+) \(mediana ([\d.\-]+) dni")
+    rows = [lowre.search(tm[d]) for d in days]
+    rows = [m for m in rows if m]
+    l28 = _last28(days)
+    m28 = [lowre.search(tm[d]) for d in l28]
+    m28 = [m for m in m28 if m]
+    first7 = rows[:7]
+    fmean = _mean([int(m.group(2)) for m in first7])
+    lmean = _mean([int(m.group(2)) for m in m28])
+    e50 = by_day(lines, "Jedzenie z targu (E5/0): dzien")
+    e28 = _mean([num(r"polka < 10 dni zuzycia: (\d+) z", e50[d]) for d in l28 if d in e50])
+    rep.add("E5/B4 B4-5: zamki z polka jedzenia ponizej dni zuzycia podzamcza",
+            (f"popyt BK: d1-7 sr {fmean:.1f}, sr28 {lmean:.1f} z {m28[-1].group(3)} (mediana dni ostatniej doby {m28[-1].group(4)})" if (fmean is not None and lmean is not None and m28) else "brak odcinka")
+            + (f" | pomiar E5/0 (zjedzone, srednia 7 dob) sr28 {e28:.1f}" if e28 is not None else " | brak linii E5/0"),
+            "INFO - mniej niz w biegu A (ten sam pomiar: linia Jedzenie z targu (E5/0) biegu A; popyt BK - od d1-7 do sr28 maleje)", None)
+    # B4-6: zatkane magazyny wsi zamkowych - lato i zima osobno
+    dow = by_day(lines, "Dowoz (skutki): dzien")
+    fam = e4_series(lines, "Spichlerze (E4/6): dzien")
+    clog = re.compile(r"zatkane magazyny: wsie zamkowe (\d+) z (\d+)")
+    summer, winter = [], []
+    for d in win:
+        m = clog.search(dow.get(d, ""))
+        if not m or int(m.group(2)) <= 0:
+            continue
+        share = 100.0 * int(m.group(1)) / int(m.group(2))
+        (winter if "zima: TAK" in fam.get(d, "") else summer).append((d, share))
+    s28 = _mean([v for _, v in summer[-28:]])
+    w28 = _mean([v for _, v in winter[-28:]])
+    rep.add("E5/B4 B4-6: zatkane magazyny wsi zamkowych - lato (sr28 dob bez zimy)", f"{s28:.2f}% ({len(summer)} dob bez zimy)" if s28 is not None else "brak dob bez zimy",
+            "<= 5.6% (bieg letni)", (s28 <= 5.6) if s28 is not None else None)
+    rep.add("E5/B4 B4-6b: zatkane magazyny wsi zamkowych - zima (sr28 dob zimy)", f"{w28:.2f}% ({len(winter)} dob zimy)" if w28 is not None else "brak zimy w biegu",
+            "INFO - <= wynik zimowy biegu A (zbior 31 B: 6.5%)", None)
+    # B4-7: reszta ladunku do miasta - wrocone do domu z ladunkiem (straz BK nie zadzialala)
+    home, held = tot(r"wrocily do domu z ladunkiem po zamku (\d+)"), tot(r"BK odeslanie do domu wstrzymane (\d+)")
+    share = 100.0 * home / onward if onward > 0 else None
+    rep.add("E5/B4 B4-7: reszta ladunku do miasta (wrocone do domu z ladunkiem po zamku)",
+            f"wyslane dalej {onward}, wrocone do domu z ladunkiem {home}" + (f" ({share:.1f}%)" if share is not None else "") + f", BK odeslanie wstrzymane {held}",
+            "<= 5% wozow wyslanych dalej (wiecej - straz BK nie dziala, np. JIT wkleil VillagersCastleTick)", (share <= 5.0) if share is not None else None)
+    # B4-8: odmowy (brak Spendable) - INFO
+    nc, ncu, rnc, full = tot(r"odmowy \(brak Spendable\) (\d+) \(niekupione"), tot(r"\(niekupione (\d+) szt\.\)"), tot(r"odmowy przy wyborze \(brak Spendable\) (\d+)"), tot(r"zamek mial dosc (\d+)")
+    rep.add("E5/B4 B4-8: odmowy - kasa zamku przy zapasie kupcow (Spendable)", f"przy sprzedazy {nc} wizyt ({ncu} szt. niekupione), przy wyborze {rnc}; zamek mial dosc {full}",
+            "INFO - zamki bez nadwyzki nie kupuja (do B1 podzamcze zjada bez zaplaty - kasa zamku traci)", None)
+    # B4-9: rozbite tabory (linia Dowoz) - INFO wobec biegu A
+    dz = by_day(lines, "Dowoz: dzien")
+    lost = _mean([num(r"rozbite tabory wsi \(wszystkich\) (\d+)", dz[d]) for d in l28 if d in dz])
+    rep.add("E5/B4 B4-9: rozbite tabory wsi (sr28)", f"{lost:.1f}/d" if lost is not None else "brak linii", "INFO - nie wiecej niz +10% wobec biegu A", None)
+    # B4-10: jedzenie okregu dla zamkow (danina w naturze E4/11 + woz) - INFO
+    trib = _mean([fnum(r"danina w naturze ([\d.]+) Food/d", tm[d]) for d in l28 if d in tm])
+    cart = _mean([num(r"\+ woz (\d+) szt\.", tm[d]) for d in l28 if d in tm])
+    rep.add("E5/B4 B4-10: jedzenie okregu dla zamkow (sr28)", (f"danina w naturze {trib:.1f} Food/d + woz {cart:.1f} szt./d" if trib is not None and cart is not None else "-"),
+            "INFO - jedno zjawisko z E4/11 pkt 8 (spichlerz zalogi + polka podzamcza)", None)
+    # B4-11: bledy i potkniecia, koszt
+    errs = [x for x in lines if x.startswith("ERROR in CastleMarket")]
+    stm = tot(r"\| POTKNIECIA (\d+)")
+    ms = _mean([fnum(r"\| czas ([\d.]+) ms", tm[d]) for d in l28 if d in tm])
+    rep.add("E5/B4 B4-11: bledy CastleMarket, potkniecia (koszt linii - INFO)", f"bledy {len(errs)}, potkniecia {stm}" + (f"; czas linii sr28 {ms:.1f} ms" if ms is not None else "")
+            + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
+
+
+def etap5_b6(rep, lines, start, win, bud):
+    """E5/B6 (201, R19 - pieniadze weterana i najmu): projekt etapu 5 rozdz. 3 "E5/B6" Test (zbior B): sakiewki zwolnionych do karczmy (czesc ludzi w karczmie -
+    E4/10, od tieru 3, 1/3 uprawnionych) do puli weteranow miasta karczmy, najem do kas miast 0. Linia startowa "VetPurse (E5/B6)" (zaplata gracza 2/2), dzienna
+    "Weterani - pieniadze (E5/B6): dzien N" (dzien gry - jak 166; klucz = dzien ksiegi), dopisek "do puli weteranow w karczmach (E5/B6)" w "Budzet rodow (166)",
+    posiadacz "sakiewki weteranow w karczmach (E5/B6)" w "Pieniadz swiata", dopisek "(E5/B6: oplata za najem do sakiewek najetych)" w "Werbunek:"."""
+    stl = [x for x in lines if x.startswith("VetPurse (E5/B6):")]
+    vp = e4_series(lines, "Weterani - pieniadze (E5/B6): dzien", 1)
+    days = [d for d in win if d in vp]
+    # B6-1: linia startowa
+    if not stl:
+        rep.add("E5/B6 B6-1: linia startowa VetPurse (E5/B6)", "brak linii startowej", "wpiete: zaplata gracza 2/2; BRAK: -", None)
+    else:
+        x = stl[-1]
+        brak = re.search(r"; BRAK: (.*?); wlasciciele", x)
+        two = ") 2/2;" in x
+        ok = two and brak is not None and brak.group(1).strip() == "-"
+        rep.add("E5/B6 B6-1: linia startowa VetPurse (E5/B6)", ("BRAK: " + brak.group(1) if brak else x[:160]) + ("; zaplata gracza 2/2" if two else "; zaplata gracza NIE 2/2"),
+                "wpiete: zaplata gracza za najem (BuyMercenaries, buy_mercenaries_on_consequence) 2/2; BRAK: -", ok)
+    # B6-2: linia dzienna w kazdej dobie okna, stan CZYNNE (z zaplata za najem do sakiewek)
+    on = [d for d in days if "| CZYNNE |" in vp[d]]
+    half = [d for d in days if "| CZYNNE bez zaplaty" in vp[d]]
+    off = [d for d in days if "| WYLACZONE" in vp[d]]
+    rep.add("E5/B6 B6-2: linia dzienna Weterani - pieniadze (E5/B6), stan CZYNNE",
+            f"dob z linia {len(days)} z {len(win)}, CZYNNE {len(on)}, bez zaplaty za najem {len(half)}, WYLACZONE {len(off)}",
+            "kazda doba okna z linia i CZYNNE (bieg zbioru B)", (len(days) == len(win) and len(on) == len(days)) if win else None)
+    if not days:
+        return
+
+    def tot(pat, dd=None):
+        return sum(num(pat, vp[d], int, 0) or 0 for d in (dd if dd is not None else days))
+    # B6-3: kontrola puli (pula wczoraj + wejscia - najem - wydane = pula) - roznica 0 kazdej doby
+    bad = [run_day(d, start) for d in days if (num(r"\(roznica (-?\d+)\) \| potkniecia", vp[d], int, 0) or 0) != 0]
+    rep.add("E5/B6 B6-3: kontrola puli sakiewek weteranow (roznica)", f"dob z roznica != 0: {len(bad)}" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else ""),
+            "0 kazdej doby (pula wczoraj + wejscia - najem - wydane = pula)", len(bad) == 0)
+    # B6-4: sakiewki zwolnionych 166 do karczmy - czesc ludzi w karczmie niesie swoja czesc sakiewki do puli; zgodnosc z linia 166 tej samej doby
+    took = tot(r"sakiewki zwolnionych 166 (\d+) zl w")
+    rin = tot(r"-> do puli (\d+) = ")
+    gone = tot(r"zwolnieniach \(ludzi (\d+),")
+    tav = tot(r", w karczmach (\d+) = [\d.]+%\) -> do puli")
+    gp = 100.0 * rin / took if took else None
+    mp = 100.0 * tav / gone if gone else None
+    rep.add("E5/B6 B6-4: sakiewki zwolnionych 166 do puli weteranow (czesc ludzi w karczmie)",
+            f"sakiewki zwolnionych {took} zl (ludzi {gone}, w karczmach {tav}" + (f" = {mp:.1f}%" if mp is not None else "") + f") -> do puli {rin} zl"
+            + (f" = {gp:.1f}%" if gp is not None else "") + f", do kies wsi {took - rin}",
+            "> 0, gdy zwolnieni staneli w karczmach (E4/10: 1/3 uprawnionych od tieru 3); udzial zlota bliski udzialowi ludzi (rozjazd - rozne sakiewki partii; INFO)",
+            (rin > 0) if tav > 0 else None)
+    if bud:
+        b166 = sum(num(r"do puli weteranow w karczmach \(E5/B6\) (\d+) zl", bud[d], int, 0) or 0 for d in days if d in bud)
+        rep.add("E5/B6 B6-4b: zgodnosc z linia Budzet rodow (166) tej samej doby", f"166: {b166} zl, linia E5/B6: {rin} zl",
+                "rowne (ta sama doba, ten sam przelew)", b166 == rin)
+    # B6-5: zaplata za najem - oplata do kas miast 0 (najem do kas miast 0; za konie z polki 157 osobno)
+    ftown_bad = [(run_day(d, start), num(r"oplata do kas miast (\d+)", vp[d], int, 0) or 0) for d in on]
+    ftown_bad = [x for x in ftown_bad if x[1] > 0]
+    fee = tot(r"zaplata za najem: do sakiewek najetych (\d+) zl")
+    horse = tot(r"za konie z polki do kas miast (\d+)")
+    rep.add("E5/B6 B6-5: zaplata za najem - oplata do kas miast",
+            f"dob CZYNNE z oplata do kas miast > 0: {len(ftown_bad)}" + (f" (d{ftown_bad[0][0]}: {ftown_bad[0][1]} zl)" if ftown_bad else "")
+            + f"; do sakiewek najetych {fee} zl, za konie z polki do kas {horse} zl",
+            "0 kazdej doby CZYNNE (dzis ok. 12-44 tys./d do kas miast)", (len(ftown_bad) == 0) if on else None)
+    # B6-6: zaplata za najem do sakiewek > 0, gdy byl najem z karczmy (linia Weterani (E4/10) - najeci lordowie, karawany, gracz)
+    vet = by_day(lines, "Weterani (E4/10): dzien")
+    hired = sum(num(r"\| najeci (\d+):", vet[d], int, 0) or 0 for d in win if d in vet)
+    nfee = tot(r"zl w (\d+) najmach")
+    fl = tot(r"najmach \(lordowie (\d+)")
+    fc = tot(r"najmach \(lordowie \d+, karawany (\d+)")
+    fpl = tot(r"najmach \(lordowie \d+, karawany \d+, gracz (\d+)")
+    rep.add("E5/B6 B6-6: zaplata za najem do sakiewek najetych",
+            f"najmow z oplata {nfee}, {fee} zl (lordowie {fl}, karawany {fc}, gracz {fpl}); najetych z karczm (E4/10) {hired}",
+            "> 0, gdy najeto z karczm", (fee > 0) if (hired > 0 and on) else None)
+    # B6-7: najem z puli - udzial w puli do sakiewek najetych (INFO); zostalo w puli bez okna / sakiewki (oczekiwane 0)
+    hout = tot(r"najem z puli: do sakiewek najetych (\d+) zl")
+    hmen = tot(r"najem z puli: do sakiewek najetych \d+ zl \(ludzi (\d+);")
+    stay = tot(r"zostalo w puli \(bez okna albo sakiewki\) (\d+)")
+    rep.add("E5/B6 B6-7: najem z puli - udzial najetych do sakiewki partii", f"{hout} zl (ludzi {hmen}), zostalo w puli bez okna albo sakiewki {stay} zl",
+            "INFO - zostalo w puli oczekiwane 0 (najem bez okna 0 w linii E4/10)", None)
+    # B6-8: pule bez weteranow po dobie (zloto bez ludzi) - 0 kazdej doby
+    emp_bad = [(run_day(d, start), num(r"pule bez weteranow po dobie (\d+)", vp[d], int, 0) or 0) for d in days]
+    emp_bad = [x for x in emp_bad if x[1] > 0]
+    rep.add("E5/B6 B6-8: pule bez weteranow po dobie (zloto bez ludzi)", f"dob z pula bez weteranow: {len(emp_bad)}" + (f" (d{emp_bad[0][0]}: {emp_bad[0][1]})" if emp_bad else ""),
+            "0 kazdej doby (miasto bez weteranow - cala pula wydana tej samej doby)", len(emp_bad) == 0)
+    # B6-9: wydatek puli wobec puli z wczoraj (stawka zycia) - INFO
+    l28 = _last28(days)
+    pools = [num(r"\| pula sakiewek weteranow (\d+) zl", vp[d], int) for d in l28]
+    spent = [num(r"\(zycie, stawka [\d.]+%\) (\d+) zl", vp[d], int) for d in l28]
+    rate = num(r"\(zycie, stawka ([\d.]+)%\)", vp[l28[-1]], float)
+    share = []
+    for i in range(1, len(l28)):
+        p0, s1 = pools[i - 1], spent[i]
+        if p0 and s1 is not None:
+            share.append(100.0 * s1 / p0)
+    sm = _mean(share)
+    drn = tot(r"pule bez weteranow \(wyjazd ostatnich\) (\d+)")
+    oth = tot(r"miasto Innych -> najblizsze miasto ludzi (\d+)")
+    rep.add("E5/B6 B6-9: wydatek puli w miastach karczm (sr28)", f"pula sr28 {(_mean(pools) or 0):.0f} zl, wydane sr28 {(_mean(spent) or 0):.0f} zl/d"
+            + (f" = {sm:.1f}% puli z wczoraj" if sm is not None else "") + (f" (stawka {rate:.1f}%)" if rate is not None else "")
+            + f"; pule bez weteranow (wyjazd ostatnich) {drn} zl, miasto Innych -> miasto ludzi {oth} zl",
+            "INFO - wydane ok. stawki zycia (+ pule bez weteranow); pula = kilka dni wejsc", None)
+    # B6-10: osierocone (miasto z zapisu nie istnieje) - 0
+    orph = max([num(r"osierocone \(miasto z zapisu nie istnieje\) (\d+) zl", vp[d], int, 0) or 0 for d in days] or [0])
+    rep.add("E5/B6 B6-10: osierocone pule (miasto z zapisu nie istnieje)", f"najwiecej {orph} zl", "0", orph == 0)
+    # B6-11: posiadacz w "Pieniadz swiata" = pula w linii E5/B6 tej samej doby (jedna definicja posiadacza)
+    pw = by_day(lines, "Pieniadz swiata: dzien")
+    pairs = [(d, num(r"sakiewki weteranow w karczmach \(E5/B6\) (\d+)", pw[d], int), num(r"\| pula sakiewek weteranow (\d+) zl", vp[d], int)) for d in days if d in pw]
+    pairs = [x for x in pairs if x[1] is not None and x[2] is not None]
+    neq = [x for x in pairs if x[1] != x[2]]
+    rep.add("E5/B6 B6-11: posiadacz Pieniadz swiata = pula linii E5/B6", f"dob porownanych {len(pairs)}, rozne {len(neq)}"
+            + (f" (d{run_day(neq[0][0], start)}: {neq[0][1]} wobec {neq[0][2]})" if neq else ""),
+            "0 roznych (ta sama doba)", (len(neq) == 0) if pairs else None)
+    # B6-12: Werbunek (LevyGold) - zloto za najemnikow do miast tylko za konie z polki (INFO, okna dob przesuniete)
+    wer = by_day(lines, "Werbunek: dzien")
+    wt = sum(num(r"za najemnikow do miast (\d+)", wer[d], int, 0) or 0 for d in win if d in wer)
+    wp = sum(num(r"oplata za najem do sakiewek najetych (\d+)", wer[d], int, 0) or 0 for d in win if d in wer)
+    rep.add("E5/B6 B6-12: Werbunek (LevyGold) - do miast / do sakiewek najetych (okno)", f"do miast {wt} zl, do sakiewek najetych (AI i karawany) {wp} zl; linia E5/B6: konie z polki {horse} zl",
+            "INFO - do miast tylko konie z polki (157; przy paczce 160 - 0)", None)
+    # B6-13: bledy i potkniecia; B6-14: reszta ksiegi - grupa etap3
+    errs = [x for x in lines if x.startswith("ERROR in VetPurse")]
+    stm = tot(r"\| potkniecia (\d+) \(razem")
+    ms = _mean([num(r"\| czas ([\d.]+) ms", vp[d], float) for d in l28])
+    rep.add("E5/B6 B6-13: bledy VetPurse, potkniecia (koszt - INFO)", f"bledy {len(errs)}, potkniecia {stm}" + (f"; czas sr28 {ms:.2f} ms" if ms is not None else "")
+            + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
+    rep.add("E5/B6 B6-14: reszta ksiegi pieniadza < 10 tys./d (nowy posiadacz H37)", "--grupa etap3 na tym samym logu", "INFO", None)
 
 def main(argv):
     args = argv[1:]
