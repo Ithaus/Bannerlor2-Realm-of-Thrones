@@ -956,3 +956,11 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
 - (05:35 UTC) **TEST ZBIORCZY 2 - zapis 9 dob OK** (zapis konca biegu 120 z calym stanem E4/E5/E6 wczytany, 18.4 s/dobe, Armoury 0 ERROR) i **zima 120 OK** (0 ERROR; spichlerze
   F6/F7/F8 TAK - zadna warownia AI nie glodzi, mediana zapasu >= 1980 dni; zywi -0.19%/rok). W zimie: wojsko lordow d90-120 70.3 tys. (!), pula wyrzutkow d120 4294,
   Straz d120 7293 (baza 86xx), T8 koszt 30.8 ms. Wszystko to samo zrodlo - mniej zlota u rodow (diagnoza wf_c17ab7f0-2e7 w toku).
+- (06:20 UTC) **DIAGNOZA WOJSKA** (wf_c17ab7f0-2e7; SCRATCH(ae222cb7)\diag_wojsko): etap 4 wojska nie obnizyl (e4k 106 tys.), zrobil to etap 5: pulap budzetu 166 = 0.6 D + 0.8 (G-R)/45;
+  D swiata 538 wobec 1065 tys./d, kiesy glow 45 wobec 89 mln. Skladniki (d93-120, wojsko -27 tys.): zawor kas miast do panow 533 -> 161 tys./d (-12.6 tys. wojska; brak pompy
+  "zakupow" z niczego), statki B5 -176 tys./d (-6 tys.; B2 podatek wojenny dal tylko 3-4 tys./d zamiast 30-60 - NIE wyrownal B5), B1 wies -165 tys./d (-5.6 tys.), A2 sprzet do dworu
+  -128 tys./d (-4.3 tys.), A6 -1 tys., korona +2.4 tys.; A2b w tym (Jeff: trudno). Korona nie chomikuje (oddaje 87%). POPRAWKA (69b1c84 + 40b975e, recenzja bez uwag):
+  CrownRentHeldToServing (renta rodu bez warunku do rodow sluzacych, +58 tys./d), CrownWageRefundPercent 50 -> 70; TownPurseNoBkSkimVillages (BK kasowal 1%/d kies wsi ~107 tys./d);
+  K9 Straz (ServesWatch); N6 TownRound; narzedzie (A1-T12, pin, Z8). Szacunek wojska 85-89 tys. (podloga 85, cel 95). DO DECYZJI JEFFA (cel 95): (2) CrownReserveReleaseDays
+  360 -> 180 (pomost na rok, +4-5 tys.), (4) danina wsi LaySubsidyVillageShare 0.015 -> 0.025 albo A2 (sprzet do dworu) tylko w pokoju. DLL test\Armoury-final.dll 29fdca1e.
+  **TEST 120 z poprawka ruszyl** (beg8ls8fv -> test\at-fin3-120.out.txt).
