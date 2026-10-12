@@ -939,3 +939,7 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   w glodzie proporcjonalnie - rada zostawic; B1-T8 prawie na pewno DECYZJA - 24-32 z 97 miast < 95% - decyzja po tescie), w-toku/e5-b235 (B2 podatek wojenny c8bf89e,
   B3 wyrownanie 7079ac4, B5 statki ON d662a06 - port placi za statki, ktore stocznia kasuje: na razie pomiar B5-14), w-toku/e5-b46 (B4 targ przy zamku - stan wozow
   w zapisie arm_castlemarket; B6 weterani d642fff). Scalenie czesci 2 (wf_ad16ef5c-94d) -> test\Armoury-final.dll + rc-final -> TEST ZBIORCZY.
+- (03:20 UTC) **SCALENIE KONCOWE CZESC 2 GOTOWE** (recenzja: tylko komentarze): w-toku/zbior-final f07d38b = etap 4 (z poprawkami) + etap 5 (A, B, dokonczenia, audyt S)
+  + etap 6 waski. MCM Armoury 1162. DLL: test\Armoury-final.dll 89a27e09, test\rc-final\RealisticCaptivity.dll 943ea0d3, CS test\CrashScribe-at-bledy.dll 13168fd4
+  (do wgrania zwykly CrashScribe-bledy.dll 842f64a4). **TEST ZBIORCZY ruszyl** (bu0blzbsf): 120 dob nowej kampanii -> zapis 9 dob z konca biegu -> zima 120;
+  wyjscia test\at-fin-120.out.txt, at-fin-zapis.out.txt, at-fin-zima.out.txt.
