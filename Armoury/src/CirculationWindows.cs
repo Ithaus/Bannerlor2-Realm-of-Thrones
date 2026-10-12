@@ -1277,6 +1277,7 @@ namespace Armoury
                 if (c >= 0 && !MoneyLedger.InBlock) Cls[c, LWorkshopOut] += dK;
                 AddWorld(NWorkshopOutKasa, dK, +1); AddWorld(NWorkshopOutCap, dC, +1);
                 if (dK != 0 || dC != 0) Hits[WWorkshopOut]++;
+                if (dC > 0 && dK + dC > 0 && Gold(_woSt) <= 0) TownPurse.NoteN3(dK + dC);   // pomiar N3 (audyt 11.10): kasa skonczyla na 0, warsztat dostal wiecej (tylko licznik)
             }
             catch (Exception e) { Stumble("WorkshopOutPost", e); }
             _woW = null; _woSt = null; _woP = false;
