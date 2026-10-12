@@ -40,7 +40,8 @@ namespace Armoury
         }
 
         /// <summary>Hak B1 (v2 K3): kiesa ludu czynna. Do B1 zawsze false - kiesy ludu nie ma (wyrownanie = stan sprzed paczki); B1 zamienia na
-        /// "TownFolkLive i TownFolkMode >= 1" (ten sam warunek co CourtFull.FolkShare i KingdomTreasury.WtFolkLive).</summary>
+        /// TownFolk.Live - jeden przelacznik kiesy z PLAN-KODU-E5B1 pkt 1 (TownFolkLive i TownFolkMode >= 1 i A1 cofa zakupy, TownPurse.NoMint), NIE na
+        /// sam warunek z ustawien: bez A1 kiesy nie ma, a wyrownanie byloby czynne (K3). Ta sama funkcja w KingdomTreasury.WtFolkLive i CourtFull.FolkShare.</summary>
         private static bool FolkLive { get { return false; } }
 
         private static bool LiveIn(Settings s) { return s != null && s.CastleLordsEvenUp && FolkLive; }

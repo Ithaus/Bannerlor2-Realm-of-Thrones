@@ -59,7 +59,8 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.ClanBudgetEnabled && s.CourtGetsLapsedArmsShare && s.HouseholdMinimal; } }
 
         /// <summary>Hak B1: czesc wplaty dworu dla kiesy ludu siedziby. Do B1 zawsze 0 - kiesy ludu nie ma; B1 zamienia na
-        /// "kiesa czynna (TownFolkLive i TownFolkMode >= 1) ? ValveSplit.Unit(CourtFolkShare) : 0" i dzieli przelew dworu.</summary>
+        /// "TownFolk.Live ? ValveSplit.Unit(CourtFolkShare) : 0" (jeden przelacznik kiesy z PLAN-KODU-E5B1 pkt 1: TownFolkLive i TownFolkMode >= 1
+        /// i A1 cofa zakupy, TownPurse.NoMint - nie sam warunek z ustawien) i dzieli przelew dworu.</summary>
         internal static float FolkShare { get { return 0f; } }
 
         // liczniki doby (linie "Budzet rodow (166)" i "Obieg")

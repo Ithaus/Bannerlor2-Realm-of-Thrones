@@ -4082,8 +4082,13 @@ def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
                 continue
         cd = sorted(d for d in byd if 1 <= run_day(d, start) <= until)
         wd = [d for d in cd if 252 <= run_day(d, start) <= 364]
-        full = len(wd) >= 28
-        use = wd if full else cd[-28:]
+        # werdykt TAK/NIE tylko przy calym oknie d252-364 (113 dob CSV; luz na kilka brakujacych dob i koniec biegu tuz przed d364); okno niepelne
+        # (bieg przerwany, --do-doby < 364) = odczyt INFO z dob okna, a bez 28 dob okna - z ostatnich 28 dob biegu
+        full = len(wd) >= 100 and run_day(wd[-1], start) >= 360
+        use = wd if len(wd) >= 28 else cd[-28:]
+        short = ("" if full else
+                 (f" - okno niepelne ({len(wd)} z 113 dob d252-364; bieg przerwany albo --do-doby < 364): odczyt" if len(wd) >= 28
+                  else " - bieg krotszy niz 279 dob (--do-doby 364): odczyt ostatnich 28 dob"))
 
         def fv(v):
             try:
@@ -4107,10 +4112,10 @@ def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
         mD, mS = _mean(shD), _mean(shS)
         span = f"doby {run_day(use[0], start)}-{run_day(use[-1], start)}" if use else "-"
         rep.add("E5/B3 B3-5: udzial panow samych zamkow w D swiata (srednia d252-364) - PROG GLOWNY",
-                (f"{mD * 100:.1f}%" if mD is not None else "-") + f" ({span})" + ("" if full else " - bieg krotszy niz 252 doby (--do-doby 364): odczyt ostatnich 28 dob"),
+                (f"{mD * 100:.1f}%" if mD is not None else "-") + f" ({span})" + short,
                 ">= 30% (bieg A z31 d93-120: 30.1%)", (mD is not None and mD >= 0.30) if full else None)
         rep.add("E5/B3 B3-6: udzial panow samych zamkow w D stalym (srednia d252-364)",
-                (f"{mS * 100:.1f}%" if mS is not None else "-") + f" ({span})" + ("" if full else " - odczyt (bieg krotszy)"),
+                (f"{mS * 100:.1f}%" if mS is not None else "-") + f" ({span})" + short,
                 "30-35% (bieg A z31: 24.3%)", (mS is not None and 0.30 <= mS <= 0.35) if full else None)
         # B3-7 (odczyt, v2 E5K1-10): zmiana mediany kiesy glowy w 4 blokach po 28 dob (d252-279, 280-307, 308-335, 336-363); tylko rody, ktorych krolestwo bylo
         # w wojnie >= 21 z 28 dob bloku; srednia blokow >= -2% - przy niezdanym, a B3-5 zdanym, B3 nie jest wylaczane (rozrzut blokow dzis 16 pkt)
