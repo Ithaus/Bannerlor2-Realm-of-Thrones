@@ -92,6 +92,11 @@ Uzycie (Python 3, tylko odczyt):
                     Blok etap7_b (projekt etapu 7 v2 rozdz. 3 "E7/B" Test): os rzeki wyznaczona (bez BRAK OSI); T1 linia "Przeprawa Bliznaki (E7/B)" z licznikiem
                     w kazdej dobie okna; T2 przejsc > 0; T3 pozycje przejsc z pierwszych 3 dob sesji <= 3 jedn. od bramy (inaczej brod albo drugi most w strefie -
                     zmniejszyc promien); T4 koszt probek < 0.1 ms/dobe (srednio); potkniecia 0; przejscia wedlug rodzaju, myto gdyby bylo i wejscia do osady (169c) - INFO.
+                    Blok etap7_w1 (E7/W1, paczka 232): T0 linia "Wioski - wiesci (E7/W1)" w kazdej dobie okna; T1 zdarzen "plonie" = rabunki zakonczone z linii
+                    "Ludzie (spustoszenie)" (+-1/dobe w sumie okna; po E7/R1 + sesje R1); T2 komunikatow "by bylo" > 0 (dowod sciezki), przy braku wsi gracza w zdarzeniach
+                    pokazanych "plonie" 0; T3 bieg zapisu: wpisy pamieci przy wczytaniu = przy ostatnim zapisie (stary zapis - 0 wpisow, bez bledu); T4 potkniecia 0;
+                    T5 spalone w ksiedze = "spalone dzis" linii "Ksiega wiosek (E4/11)" w kazdej dobie, komunikatow "burned" (z "by bylo") <= spalonych;
+                    T6 zapis bez nazw (identyfikatory odrzucone przez BadId - INFO); spladrowane, pamiec wojny, przyklady - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5907,7 +5912,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    for blk in (etap7_b,):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_b, etap7_w1):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, win, until=until)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -5978,6 +5983,94 @@ def etap7_b(rep, lines, start, win, until=120, **kw):
             ent += num(r"\(e\) Bliznaki: wejscia do osady (\d+)", s, int, 0) or 0
     rep.add("E7/B B-8: wejscia do osady Bliznaki (169c (e)) obok przejsc", f"wejsc {ent}, przejsc {n}", "INFO (porownanie)", None)
 
+
+
+def etap7_w1(rep, lines, start, win, until=120, **kw):
+    """E7/W1 (232, PLAN 7.10 a, projekt etapu 7 v2 rozdz. 3 "E7/W1" Test): linia doby "Wioski - wiesci (E7/W1): dzien N" (dzien ksiegi = doba gry - 1, jak
+    "Ksiega wiosek (E4/11)" i "Ludzie (spustoszenie)"), linia zapisu "Wioski - wiesci (E7/W1): zapis - pamiec wojny N wpisow" i odcinek "pamiec wojny (E7/W1) M wpisow"
+    linii "Ksiega wiosek (E4/11): start sesji". Wiazace: T0, T1 (+-1/dobe), T2, T3 (gdy byl zapis i wczytanie), T4, T5."""
+    rows = {}
+    for d, s in by_day(lines, "Wioski - wiesci (E7/W1): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[d] = s
+    saves = [s for s in lines if s.startswith("Wioski - wiesci (E7/W1): zapis")]
+    if not rows and not saves:
+        rep.add("E7/W1: linie Wioski - wiesci (E7/W1)", "brak w logu", "sa od wgrania E7/W1 (LogEnabled)", None)
+        return
+    days = sorted(rows)
+    need = max(0, len(win) - 1)
+    rep.add("E7/W1 T0: linia Wioski - wiesci (E7/W1)", f"{len(days)} dob (dob okna {len(win)})", f">= {need} (codziennie w oknie)",
+            (len(days) >= need and need > 0) if win else None)
+
+    def tot(pat):
+        return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+    if days:
+        a = tot(r"\| plonie: zdarzen (\d+) \(")
+        dev = {}
+        for d, s in by_day(lines, "Ludzie (spustoszenie): dzien").items():
+            if d in rows:
+                dev[d] = num(r"\| rabunki zakonczone (\d+) \(", s, int, 0) or 0
+        r1 = {}
+        for d, s in by_day(lines, "Rabunek osada po osadzie (E7/R1): dzien").items():
+            if d in rows:
+                r1[d] = num(r"sesji (\d+)", s, int, 0) or 0
+        raids = sum(dev.values()) + sum(r1.values())
+        rep.add("E7/W1 T1: zdarzen plonie = rabunki zakonczone (Ludzie (spustoszenie)) + sesje E7/R1 (suma okna)",
+                f"plonie {a}, rabunki {sum(dev.values())} + R1 {sum(r1.values())} = {raids} (roznica {a - raids:+d}, dob {len(days)})",
+                "|roznica| <= liczba dob (+-1/dobe - dedup milicji, rabunek przegrany z milicja bez lupienia)", (abs(a - raids) <= len(days)) if dev else None)
+        p_shown = tot(r"\), komunikatow (\d+) \(by bylo")
+        shown = p_shown + tot(r"komunikatow \"burned\" (\d+),") + tot(r"komunikatow \"plundered\" (\d+),")
+        would = tot(r"\(by bylo (\d+)\); spladrowane") + tot(r"\"burned\" \d+, by bylo (\d+)\)") + tot(r"\"plundered\" \d+, by bylo (\d+);")
+        own = tot(r"\(wsie gracza (\d+),")
+        rep.add("E7/W1 T2: komunikaty zbudowane, a nie pokazane (by bylo - dowod sciezki)", f"by bylo {would}, pokazanych {shown} (wsie gracza w zdarzeniach plonie {own})",
+                "> 0", (would > 0) if a > 0 else None)
+        rep.add("E7/W1 T2b: pokazane plonie przy braku wsi gracza w zdarzeniach", f"{p_shown} (wsie gracza {own})", "0 gdy wsie gracza 0 (autotest bez lenna)",
+                (p_shown == 0) if own == 0 else None)
+        stu = tot(r"potkniecia dzis (\d+)")
+        rep.add("E7/W1 T4: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+        book = by_day(lines, "Ksiega wiosek (E4/11): dzien")
+        bad, tot_i, tot_b = [], 0, 0
+        for x in days:
+            i = num(r"\| spalone w ksiedze (\d+) \(", rows[x], int, 0) or 0
+            b = num(r"\| spalone dzis (\d+)", book.get(x, ""), int, 0) or 0
+            tot_i += i
+            tot_b += b
+            if i != b:
+                bad.append(f"d{x}: {i}/{b}")
+        rep.add("E7/W1 T5: spalone w ksiedze (W1) = spalone dzis (Ksiega wiosek) w kazdej dobie",
+                f"{tot_i} / {tot_b}; dob niezgodnych {len(bad)}" + (f" ({', '.join(bad[:6])})" if bad else ""), "0 dob niezgodnych", len(bad) == 0)
+        kb = tot(r"komunikatow \"burned\" (\d+),") + tot(r"\"burned\" \d+, by bylo (\d+)\)")
+        rep.add("E7/W1 T5b: komunikaty burned (z by bylo) <= spalone w ksiedze", f"{kb} <= {tot_i}", "burned tylko przy przejsciu na spalona (R10)", kb <= tot_i)
+        f, j = tot(r"; spladrowane (\d+) \("), tot(r", splondrowane bez spalenia (\d+) \(")
+        same, nob = tot(r"sesja spalila - bez drugiego (\d+)\)"), tot(r"\(bez ksiegi (\d+)\)")
+        rep.add("E7/W1 W1-7: spladrowane (Looted gry) wedlug ksiegi", f"spladrowane {f}: splondrowane bez spalenia {j}, sesja spalila {same}, bez ksiegi {nob}",
+                "INFO (f = j + sesja spalila + bez ksiegi)", None)
+        mem = num(r"\| pamiec wojny: wpisow (\d+) \(", rows[days[-1]], int, 0) or 0
+        mnew = tot(r"pamiec wojny: wpisow \d+ \(nowe (\d+),")
+        rep.add("E7/W1 W1-8: pamiec wojny (ostatnia doba okna)", f"wpisow {mem}, nowych zdarzen w oknie {mnew}", "INFO (> 0 przy VillageWarMemory)", None)
+        smp = []
+        for x in days[:20]:
+            m = re.search(r"\| przyklady: (.*)\.$", rows[x])
+            if m:
+                smp.append(m.group(1))
+        rep.add("E7/W1 W1-9: przyklady komunikatow (pierwsze doby)", (smp[0][:240] if smp else "brak"), "INFO (angielski, nazwy wiosek z ksiegi)", None)
+    # T3: wczytanie po zapisie - wpisy pamieci przy wczytaniu = ostatni zapis przed nim (stary zapis bez sekcji: 0 wpisow, bez pary)
+    pairs, mism, last_save = 0, [], None
+    for s in lines:
+        if s.startswith("Wioski - wiesci (E7/W1): zapis"):
+            last_save = num(r"pamiec wojny (\d+) wpisow", s, int)
+        elif s.startswith("Ksiega wiosek (E4/11): start sesji") and "pamiec wojny (E7/W1)" in s:
+            got = num(r"pamiec wojny \(E7/W1\) (\d+) wpisow", s, int)
+            if last_save is not None and got is not None:
+                pairs += 1
+                if got != last_save:
+                    mism.append(f"{got}/{last_save}")
+    rep.add("E7/W1 T3: pamiec wojny zapis -> wczytanie", f"par {pairs}, niezgodnych {len(mism)}" + (f" ({', '.join(mism[:5])})" if mism else ""),
+            "0 niezgodnych (bieg zapisu 9 dob)", (len(mism) == 0) if pairs else None)
+    rej = sum(num(r"odrzucone przez BadId (\d+)", s, int, 0) or 0 for s in saves)
+    rep.add("E7/W1 T6: zapis pamieci - same identyfikatory", f"zapisow {len(saves)}, identyfikatorow odrzuconych przez BadId {rej}",
+            "INFO (nazw w sekcji m: nie ma z konstrukcji)", None)
 
 def main(argv):
     args = argv[1:]

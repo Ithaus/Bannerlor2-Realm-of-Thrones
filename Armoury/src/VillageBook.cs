@@ -74,9 +74,27 @@ namespace Armoury
             public Sess S; public int SmokeIdx = -1;        // trwajacy rabunek i dym w czujnosci (bez zapisu)
             public int Z;                                   // przydzial zastepczy czeka (powod)
             public bool Event;                              // zdarzenie dzis (wiersz CSV)
+            public Mem[] M;                                 // E7/W1 (232): pamiec wojny na wioske (indeks jak Br; W = wies gry) - sekcja m: zapisu
         }
 
-        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; }
+        // E7/W1: C - napastnik sesji (identyfikatory do pamieci i komunikatu), Burned - ta sesja przeszla jakas wioske na spalona (przy Looted bez "plundered")
+        private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; }
+
+        /// <summary>
+        /// E7/W1 (232, R14): pamiec wojny wioski - ostatnie zdarzenie (rabunek albo zerowanie armii): rodzaj ('B' - przeszla na spalona w ksiedze w tym zdarzeniu,
+        /// 'P' - splondrowana bez przejscia), doba ostatniego uderzenia, StringId bohatera-wodza i rodu (nigdy wyswietlana nazwa - W1-zapis), ilu ucieklo i zginelo
+        /// (z uderzen Devastation.Strike na osady tej wioski), licznik spalen (tylko przy przejsciu na spalona). Tag - zdarzenie w toku (bez zapisu).
+        /// </summary>
+        private sealed class Mem { public char Kind = 'P'; public int Day = -1, Burns; public string Hero = "", Clan = ""; public double Fled, Dead; public object Tag; }
+
+        /// <summary>E7/W1: napastnik jednego uderzenia (sesja rabunku albo oboz armii) - identyfikatory, nazwa partii do komunikatu, ludzi na osade i udzial zabitych.</summary>
+        private sealed class Cx { public string Hero = "", Clan = "", Who = "?"; public bool Player; public object Tag; public Sess S; public double Pps, DeadFrac; }
+
+        /// <summary>E7/W1: przejscie wioski na spalona w ksiedze (CheckUp przy uderzeniu) - kolejka pod Gate, oproznia VillageNews w ticku godzinnym (nie z wnetrza Strike).</summary>
+        internal sealed class BurnNews { public Village V; public string VName, DName, Hero, Who; public bool Player; public int Day; }
+
+        /// <summary>E7/W1: pamiec wojny wioski dla dymka (W2) - same identyfikatory, nazwa na zywo u wolajacego.</summary>
+        internal struct WarMemory { public bool Burned; public int Day, Burns; public string Hero, Clan; public double Fled, Dead; }
 
         private struct Snap { public double Dom, A, Ar, Af, B, Sbr, Sbf, Y; }
 
@@ -127,6 +145,10 @@ namespace Armoury
         private static int _stumbles, _stumblesAll;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static bool _townPatched;
+        // E7/W1 (232): kolejka przejsc na spalona (pod Gate) i liczniki dla linii "Wioski - wiesci (E7/W1)" (zeruje TakeNewsCounts, nie NewDay - linia idzie po Daily ksiegi)
+        private const int NewsMax = 64;
+        private static readonly List<BurnNews> _news = new List<BurnNews>();
+        private static int _nBurned, _nNewsLost, _nMemNew, _savedM;
 
         /// <summary>Ksiega czynna: klucz VillageBookEnabled i okregi rozwiazane w tej sesji (bez pliku ukladu - kazdy okreg to sama wies gry).</summary>
         internal static bool Active { get { var s = Settings.Current; return s != null && s.VillageBookEnabled && _resolved; } }
@@ -164,7 +186,7 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: stan jednej kampanii nie przecieka do drugiej.</summary>
         internal static void Reset()
         {
-            lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); }
+            lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); _news.Clear(); _nBurned = _nNewsLost = _nMemNew = _savedM = 0; }
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
             _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _distNoVillageIds.Clear();
             _newN.Clear(); _newNames.Clear(); _csvPath = null;
@@ -228,7 +250,7 @@ namespace Armoury
             int n = w0 + 1;
             d.F = new double[n]; d.Nw = new double[n]; d.Uid = new string[n]; d.VName = new string[n]; d.Kind = new string[n]; d.Cls = new char[n]; d.Fish = new bool[n];
             d.X = new float[n]; d.Y = new float[n]; d.Rd = new float[n]; d.Order = new int[n];
-            d.Br = new double[n]; d.Bf = new double[n]; d.Flag = new byte[n]; d.EvDay = new int[n]; d.RebuiltDay = new int[n];
+            d.Br = new double[n]; d.Bf = new double[n]; d.Flag = new byte[n]; d.EvDay = new int[n]; d.RebuiltDay = new int[n]; d.M = new Mem[n];
             var p = st.GetPosition2D;
             d.X[w0] = p.x; d.Y[w0] = p.y; d.Rd[w0] = 0f; d.Cls[w0] = 'M'; d.VName[w0] = d.Name; d.Kind[w0] = ""; d.Order[w0] = int.MaxValue;
             for (int w = 0; w < w0; w++)
@@ -327,7 +349,7 @@ namespace Armoury
                 _resolveNote = "z zapisu: nieznana wersja klucza arm_district - jak stary zapis";
                 return;
             }
-            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null;
+            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null;
             foreach (var p in parts)
             {
                 if (p.Length < 2 || p[1] != ':') continue;
@@ -340,6 +362,7 @@ namespace Armoury
                     case 'w': sw = body; break;
                     case 'x': sx = body; break;
                     case 'y': sy = body; break;
+                    case 'm': sm = body; break;              // E7/W1 (232): pamiec wojny (starsze DLL te sekcje pomijaja)
                     case 'o': wasOff = body == "1"; break;
                 }
             }
@@ -360,7 +383,8 @@ namespace Armoury
             if (!_layoutSame)
             {
                 foreach (var d in _d.Values) d.Z = ZLayout;
-                _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady - uklad inny (crc zapisu " + (hasCrc ? crc.ToString("X8") : "?") + ", pliku " + _layoutCrc.ToString("X8") + ") - przydzial zastepczy";
+                _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady - uklad inny (crc zapisu " + (hasCrc ? crc.ToString("X8") : "?") + ", pliku " + _layoutCrc.ToString("X8") + ") - przydzial zastepczy"
+                               + (string.IsNullOrEmpty(sm) ? "" : "; pamiec wojny (E7/W1) pominieta - indeksy wiosek z innego ukladu");
                 return;
             }
             var bad = new HashSet<Dist>();
@@ -426,6 +450,29 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("VillageBook.Import(y)", e); }
                 }
+            // E7/W1 (232): pamiec wojny - indeksy wiosek waza tylko przy zgodnym ukladzie (wyzej return przy innym); historia, nie stan - zepsute puste osady (bad) jej nie kasuja
+            if (!string.IsNullOrEmpty(sm))
+                foreach (var item in sm.Split(';'))
+                {
+                    try
+                    {
+                        int eq = item.LastIndexOf('=');
+                        if (eq <= 0) continue;
+                        Dist d;
+                        if (!_d.TryGetValue(item.Substring(0, eq), out d)) continue;
+                        foreach (var e1 in item.Substring(eq + 1).Split(','))
+                        {
+                            var q = e1.Split(':');
+                            int i, day, burns; double fled, dead;
+                            if (q.Length != 8 || !int.TryParse(q[0], NumberStyles.Integer, Inv, out i) || i < 0 || i > d.W || q[1].Length != 1 || (q[1][0] != 'B' && q[1][0] != 'P')
+                                || !int.TryParse(q[2], NumberStyles.Integer, Inv, out day) || !double.TryParse(q[5], NumberStyles.Float, Inv, out fled) || !double.TryParse(q[6], NumberStyles.Float, Inv, out dead)
+                                || !int.TryParse(q[7], NumberStyles.Integer, Inv, out burns) || double.IsNaN(fled) || double.IsNaN(dead) || double.IsInfinity(fled) || double.IsInfinity(dead)) continue;
+                            d.M[i] = new Mem { Kind = q[1][0], Day = day, Hero = q[3], Clan = q[4], Fled = Math.Max(0.0, fled), Dead = Math.Max(0.0, dead), Burns = Math.Max(0, burns) };
+                            _savedM++;
+                        }
+                    }
+                    catch (Exception e) { Stumble("VillageBook.Import(m)", e); }
+                }
             if (wasOff) foreach (var d in _d.Values) d.Z = ZEnable;          // R1-5 (zepsute wpisy nizej nadpisuja na "inny uklad")
             foreach (var d in bad)
             {
@@ -434,7 +481,8 @@ namespace Armoury
                 d.ARexp = d.AFexp = 0.0; d.Z = ZLayout; _savedBad++;
             }
             _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady " + _savedB + " okregow, uklad zgodny" + (_savedBad > 0 ? ", zepsute wpisy " + _savedBad + " (przydzial zastepczy)" : "")
-                           + (wasOff ? ", ksiega wylaczona przy zapisie (przydzial zastepczy - wlaczenie)" : "");
+                           + (wasOff ? ", ksiega wylaczona przy zapisie (przydzial zastepczy - wlaczenie)" : "")
+                           + ", pamiec wojny (E7/W1) " + _savedM + " wpisow" + (sm == null ? " (zapis bez sekcji m:)" : "");
         }
 
         /// <summary>SyncData (zapis). Ksiega nierozwiazana (zapis przed startem sesji) - napis z wczytania bez zmian.</summary>
@@ -444,6 +492,7 @@ namespace Armoury
             var sb = new StringBuilder(32 * 1024);
             sb.Append("v1|L:").Append(_layoutCrc.ToString("X8")).Append("|P:").Append(_p.ToString(Inv));
             if (_offSeen) sb.Append("|o:1");                                // R1-5: stan wyzerowany przez OffDay, wlaczenie jeszcze nie przeszlo doby
+            int memN = 0, memBad = 0;
             lock (Gate)
             {
                 sb.Append("|n:");
@@ -485,7 +534,29 @@ namespace Armoury
                     sb.Append(d.Id).Append('=').Append(d.ARexp.ToString("0.###", Inv)).Append('/').Append(d.AFexp.ToString("0.###", Inv));
                     first = false;
                 }
+                // E7/W1 (232, W1-zapis): "|m:<id>=<i>:<B|P>:<doba>:<bohater>:<rod>:<ucieklo>:<zginelo>:<spalen>,...;..." - same StringId po BadId (nigdy wyswietlana nazwa:
+                // znak '|' w nazwie partii zepsulby Split calej ksiegi, a nazwa zostalaby zamrozona w jezyku); identyfikator odrzucony = pusty (dymek: tekst zastepczy)
+                sb.Append("|m:"); first = true;
+                foreach (var d in _d.Values)
+                {
+                    if (BadId(d.Id) || d.M == null) continue;
+                    bool any = false;
+                    for (int i = 0; i <= d.W && i < d.M.Length; i++)
+                    {
+                        var m = d.M[i];
+                        if (m == null) continue;
+                        string h = m.Hero ?? "", c = m.Clan ?? "";
+                        if (h.Length > 0 && BadId(h)) { h = ""; memBad++; }
+                        if (c.Length > 0 && BadId(c)) { c = ""; memBad++; }
+                        if (!any) { if (!first) sb.Append(';'); sb.Append(d.Id).Append('='); first = false; } else sb.Append(',');
+                        sb.Append(i.ToString(Inv)).Append(':').Append(m.Kind == 'B' ? 'B' : 'P').Append(':').Append(m.Day.ToString(Inv)).Append(':').Append(h).Append(':').Append(c)
+                          .Append(':').Append(F0(m.Fled)).Append(':').Append(F0(m.Dead)).Append(':').Append(m.Burns.ToString(Inv));
+                        any = true; memN++;
+                    }
+                }
             }
+            try { var st = Settings.Current; if (st != null && st.LogEnabled) Log.Info("Wioski - wiesci (E7/W1): zapis - pamiec wojny " + memN + " wpisow (same identyfikatory; odrzucone przez BadId " + memBad + ")."); }
+            catch { }
             return sb.ToString();
         }
 
@@ -602,6 +673,7 @@ namespace Armoury
                 if (lp != null)
                 {
                     if (lp.Name != null) s.Raider = lp.Name.ToString();
+                    s.C = CxOf(lp.MobileParty, s.Raider, s);             // E7/W1 (232): identyfikatory napastnika raz na sesje
                     // strona wroga = najblizsza wsi warownia frakcji napastnika (raz na sesje); bandy i Inni bez twierdz - bez kierunku
                     var fac = lp.MapFaction;
                     if (fac != null)
@@ -619,13 +691,54 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("VillageBook.SessionFor", e); }
+            if (s.C == null) s.C = new Cx { Who = s.Raider, Tag = s, S = s };       // E7/W1: bez wodza po stronie napastnika - pamiec bez identyfikatorow
             s.Cur = PickFirst(d, s);
             d.S = s; d.SmokeIdx = -1;
             _dSess++;
             return s;
         }
 
-        private static void CheckUp(Dist d, int w, int today, string raider, bool list)
+        /// <summary>E7/W1 (232): napastnik uderzenia - identyfikatory bohatera-wodza i rodu (StringId), gracz, nazwa partii do komunikatu; Tag = zdarzenie pamieci.</summary>
+        private static Cx CxOf(MobileParty mp, string who, Sess s)
+        {
+            var c = new Cx { Who = who ?? "?", S = s, Tag = s != null ? (object)s : mp };
+            try
+            {
+                if (mp != null)
+                {
+                    var h = mp.LeaderHero; if (h != null && h.StringId != null) c.Hero = h.StringId;
+                    var cl = mp.ActualClan; if (cl != null && cl.StringId != null) c.Clan = cl.StringId;
+                    c.Player = mp.IsMainParty;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.CxOf", e); }
+            return c;
+        }
+
+        /// <summary>
+        /// E7/W1 (232, R14): pamiec wojny wioski (indeks w) przy uderzeniu - `put` spalonych osad x ludzi na osade (ten sam udzial co ksiega: trafieni x put / dB), zabici w proporcji
+        /// uderzenia. Nowe zdarzenie: inny napastnik/sesja (Tag) albo przerwa > 1 doby (zerowanie tej samej armii po miesiacu); licznik spalen zostaje. Pod Gate, nie rzuca.
+        /// </summary>
+        private static void Remember(Dist d, int w, Cx cx, double put, int today)
+        {
+            var s = Settings.Current;
+            if (cx == null || d.M == null || s == null || !s.VillageWarMemory) return;
+            var m = d.M[w];
+            // wpis z zapisu (Tag null) tego samego napastnika z tej albo poprzedniej doby - rabunek trwal przez zapis/wczytanie (sesje bez zapisu): to samo zdarzenie
+            if (m != null && m.Tag == null && today - m.Day <= 1 && string.Equals(m.Hero, cx.Hero ?? "", StringComparison.Ordinal) && string.Equals(m.Clan, cx.Clan ?? "", StringComparison.Ordinal))
+                m.Tag = cx.Tag;
+            if (m == null || m.Tag == null || !ReferenceEquals(m.Tag, cx.Tag) || today - m.Day > 1)
+            {
+                if (m == null) { m = new Mem(); d.M[w] = m; }
+                m.Tag = cx.Tag; m.Kind = 'P'; m.Fled = m.Dead = 0.0; m.Hero = cx.Hero ?? ""; m.Clan = cx.Clan ?? "";
+                _nMemNew++;
+            }
+            double people = put * cx.Pps, dead = people * cx.DeadFrac;
+            if (people > 0.0 && !double.IsInfinity(people)) { m.Fled += people - dead; m.Dead += dead; }
+            m.Day = today;
+        }
+
+        private static void CheckUp(Dist d, int w, int today, string raider, bool list, Cx cx = null)
         {
             double nw = d.Nw[w];
             if (!(nw > Eps)) return;
@@ -633,6 +746,17 @@ namespace Armoury
             {
                 d.Flag[w] = FBurned; d.EvDay[w] = today; d.RebuiltDay[w] = -1; d.Event = true;
                 if (list) { _dBurnedN++; if (_dBurnedList.Count < TopEvents) _dBurnedList.Add(d.VName[w] + " (" + d.Name + ") - " + (raider ?? "?")); }
+                // E7/W1 (232, R10): JEDYNY punkt "burned" - przejscie na spalona w ksiedze przy uderzeniu (Burn z napastnikiem); pamiec 'B' + licznik spalen, wiadomosc do
+                // kolejki (VillageNews w ticku - nie z wnetrza Strike). Przydzial zastepczy (stary zapis, inny uklad) i glod - bez wiadomosci (list false albo bez napastnika)
+                if (list) _nBurned++;                                // = spalone dzis linii ksiegi (T5)
+                if (list && cx != null)
+                {
+                    if (cx.S != null) cx.S.Burned = true;
+                    var m = d.M != null ? d.M[w] : null;
+                    if (m != null && ReferenceEquals(m.Tag, cx.Tag) && m.Day == today) { m.Kind = 'B'; m.Burns++; }
+                    if (_news.Count < NewsMax) _news.Add(new BurnNews { V = d.V, VName = d.VName[w], DName = d.Name, Hero = cx.Hero, Who = cx.Who, Player = cx.Player, Day = today });
+                    else _nNewsLost++;
+                }
             }
             else if (d.Flag[w] == 0 && d.Br[w] < BurnShare * nw && d.Br[w] + d.Bf[w] >= BurnShare * nw - 1e-12)
             {
@@ -645,7 +769,7 @@ namespace Armoury
         /// Spalenie osad lancuchem: rabunek (sesja - od biezacej wioski sesji), zerowanie (od obozu), bez zrodla (wedlug kolejnosci). Kazda wioska do pulapu; zwraca
         /// nadmiar (wszystko pelne). Punkt wpiecia etapu 7.11: rabunek osada po osadzie wola to samo z liczba osad kroku zamiast proporcji.
         /// </summary>
-        private static double Burn(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who)
+        private static double Burn(Dist d, double dB, bool raid, Sess s, bool hasPos, float px, float py, int today, string who, Cx cx = null)
         {
             int cur;
             if (raid && s != null) cur = s.Cur >= 0 && Room(d, s.Cur) > Eps ? s.Cur : (s.Cur < 0 ? PickFirst(d, s) : NextFrom(d, s.Cur));
@@ -660,7 +784,8 @@ namespace Armoury
                     d.Br[cur] += put; left -= put;
                     if (raid) { if (s != null) s.Cur = cur; if (cur == d.W) _dRaidMain += put; else _dRaidW += put; }
                     else { if (cur == d.W) _dForMain += put; else _dForW += put; }
-                    CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true);
+                    Remember(d, cur, cx, put, today);                   // E7/W1 (232): pamiec wojny PRZED CheckUp (przejscie na spalona oznacza to samo zdarzenie 'B')
+                    CheckUp(d, cur, today, raid && s != null ? s.Raider : who, true, cx);
                 }
                 if (left <= Eps) break;
                 cur = NextFrom(d, cur);
@@ -672,8 +797,9 @@ namespace Armoury
         /// <summary>
         /// Devastation.Strike PO kontach (U24; Z1, Z2): `hit` trafionych (po f), `refugees` dopisanych na konto, `lBefore` - ludzie okregu przed ruchem. Rabunek - `comp` =
         /// RaidEventComponent (klucz sesji, ten sam co MapEvent.Component widoku - krytyka K2); zerowanie - `src` (oboz armii). Nie rzuca.
+        /// E7/W1 (232): `dead` - zabici tego uderzenia (z tego samego Strike, ktory dopisuje RaidState.Dead) - tylko do pamieci wojny wioski.
         /// </summary>
-        internal static void OnStrike(Village v, double hit, double refugees, bool raid, object comp, MobileParty src, double lBefore)
+        internal static void OnStrike(Village v, double hit, double refugees, double dead, bool raid, object comp, MobileParty src, double lBefore)
         {
             if (v == null || !(hit > 0.0) || double.IsInfinity(hit)) return;
             try
@@ -686,19 +812,29 @@ namespace Armoury
                     int today = Today();
                     double dB = hit * d.N / lBefore;
                     if (refugees > 0.0 && !double.IsInfinity(refugees)) d.ARexp += refugees;
+                    double perS = lBefore / d.N;                     // ludzi na osade przy tym uderzeniu
+                    double deadFrac = dead > 0.0 && !double.IsInfinity(dead) ? Math.Min(1.0, dead / hit) : 0.0;
                     double over;
-                    if (raid && comp != null) over = Burn(d, dB, true, SessionFor(d, comp, today), false, 0f, 0f, today, null);
+                    if (raid && comp != null)
+                    {
+                        var ss = SessionFor(d, comp, today);
+                        if (ss.C != null) { ss.C.Pps = perS; ss.C.DeadFrac = deadFrac; }   // E7/W1: liczby tego uderzenia
+                        over = Burn(d, dB, true, ss, false, 0f, 0f, today, null, ss.C);
+                    }
                     else
                     {
-                        bool hasPos = false; float x = 0f, y = 0f; string who = "zerowanie armii";
+                        bool hasPos = false; float x = 0f, y = 0f; string who = "zerowanie armii"; Cx cx = null;
                         if (src != null)
                         {
                             try { var p = src.GetPosition2D; x = p.x; y = p.y; hasPos = true; if (src.Name != null) who = "zerowanie armii (" + src.Name + ")"; }
                             catch (Exception e) { Stumble("VillageBook.OnStrike(oboz)", e); }
+                            string nm = null;
+                            try { nm = src.Name != null ? src.Name.ToString() : null; } catch { nm = null; }
+                            cx = CxOf(src, nm, null);                   // E7/W1: zdarzenie pamieci = ta armia (Tag), wodz armii w komunikacie
+                            cx.Pps = perS; cx.DeadFrac = deadFrac;
                         }
-                        over = Burn(d, dB, false, null, hasPos, x, y, today, who);
+                        over = Burn(d, dB, false, null, hasPos, x, y, today, who, cx);
                     }
-                    double perS = lBefore / d.N;                     // ludzi na osade przy tym uderzeniu
                     _dOver += over; _dOverPeople += over * perS; _dSetS += (dB - over) * perS;
                     _dStrikes++;
                 }
@@ -1021,6 +1157,104 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("VillageBook.FxUid", e); return false; }
+        }
+
+        // ------------------------------------------------------------ E7/W1 (232): wiesci i pamiec wojny (odczyty pod Gate, nie rzucaja)
+        /// <summary>VillageNews (tick godzinny): zabiera kolejke przejsc na spalona.</summary>
+        internal static void TakeNews(List<BurnNews> into)
+        {
+            try { lock (Gate) { into.AddRange(_news); _news.Clear(); } }
+            catch (Exception e) { Stumble("VillageBook.TakeNews", e); }
+        }
+
+        /// <summary>VillageNews.Daily: liczniki od poprzedniej linii (spalone w ksiedze przy uderzeniu, zgubione ponad kolejke, nowe zdarzenia pamieci) i stan pamieci; zeruje.</summary>
+        internal static void TakeNewsCounts(out int burned, out int lost, out int memNew, out int memAll, out int burnsAll)
+        {
+            burned = lost = memNew = memAll = burnsAll = 0;
+            try
+            {
+                lock (Gate)
+                {
+                    burned = _nBurned; lost = _nNewsLost; memNew = _nMemNew;
+                    _nBurned = _nNewsLost = _nMemNew = 0;
+                    foreach (var d in _d.Values)
+                    {
+                        if (d.M == null) continue;
+                        for (int i = 0; i < d.M.Length; i++) { var m = d.M[i]; if (m != null) { memAll++; burnsAll += m.Burns; } }
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.TakeNewsCounts", e); }
+        }
+
+        /// <summary>
+        /// VillageStateChanged(Looted) - gra wola go w RaidEventComponent.OnBeforeFinalize PO Devastation.EndPrefix (ostatnie uderzenie rozliczone): wioska sesji z ogniem (ta sama,
+        /// co FxUid; bez sesji - wies gry), osady spalone / osady tej wioski z ksiegi, czy ta sesja przeszla jakas wioske na spalona. false - ksiega nieczynna albo wies nieznana.
+        /// </summary>
+        internal static bool LootNews(Village v, object comp, out string vname, out string dname, out int burned, out int n, out bool sessBurned)
+        {
+            vname = dname = null; burned = n = 0; sessBurned = false;
+            if (v == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || !d.NSet) return false;
+                    var s = d.S != null && (comp == null || ReferenceEquals(d.S.Key, comp)) ? d.S : null;
+                    int w = s != null && s.Cur >= 0 && s.Cur <= d.W ? s.Cur : d.W;
+                    sessBurned = s != null && s.Burned;
+                    vname = d.VName[w]; dname = d.Name;
+                    n = Math.Max(1, (int)Math.Round(d.Nw[w]));
+                    burned = Math.Max(0, Math.Min(n, (int)Math.Round(d.Br[w])));
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.LootNews", e); return false; }
+        }
+
+        /// <summary>"Plonie" (tick godzinny, rabunek w toku): nazwa wioski z ogniem - ta sama funkcja co widok (FxUid; otwiera sesje jak PollRaids) - i nazwa okregu.</summary>
+        internal static bool FireNames(Village v, out string vname, out string dname)
+        {
+            vname = dname = null;
+            if (v == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d)) return false;
+                    dname = d.Name; vname = d.Name;
+                    string uid;
+                    KeyValuePair<Dist, int> kv;
+                    // jak PollRaids: ogien tylko przy rabunku w toku (MapEvent wsi to rabunek - inaczej FxUid wzialby komponent innej bitwy za klucz sesji)
+                    bool raid = false;
+                    try { raid = d.St != null && d.St.IsUnderRaid; } catch { raid = false; }
+                    if (raid && FxUid(d.Id, true, out uid) && uid != null && _byUid.TryGetValue(uid, out kv) && kv.Key != null) vname = kv.Key.VName[kv.Value];
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.FireNames", e); return false; }
+        }
+
+        /// <summary>Pamiec wojny wioski po uid (dymek W2). false - ksiega nieczynna, wioska nieznana albo bez pamieci.</summary>
+        internal static bool MemoryOf(string uid, out WarMemory wm)
+        {
+            wm = default(WarMemory);
+            if (uid == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    KeyValuePair<Dist, int> kv;
+                    if (!_byUid.TryGetValue(uid, out kv) || kv.Key == null || kv.Key.M == null) return false;
+                    var m = kv.Key.M[kv.Value];
+                    if (m == null || m.Day < 0) return false;
+                    wm.Burned = m.Kind == 'B'; wm.Day = m.Day; wm.Burns = m.Burns; wm.Hero = m.Hero; wm.Clan = m.Clan; wm.Fled = m.Fled; wm.Dead = m.Dead;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.MemoryOf", e); return false; }
         }
 
         // ------------------------------------------------------------ doba

@@ -4740,6 +4740,14 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
 
+        [SettingPropertyInteger("Village Raid Messages", 0, 2, "0", HintText = "who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public int VillageRaidMessages { get; set; } = 1;
+
+        [SettingPropertyBool("Village War Memory", HintText = "a village remembers who burned or plundered it, when, and how many fled and died")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageWarMemory { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5924,6 +5932,8 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.TwinsCrossingCount = TwinsCrossingCount;
+            s.VillageRaidMessages = VillageRaidMessages;
+            s.VillageWarMemory = VillageWarMemory;
         }
 
         internal static void Apply()

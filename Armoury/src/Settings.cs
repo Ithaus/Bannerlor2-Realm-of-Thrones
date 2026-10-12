@@ -1464,6 +1464,9 @@ namespace Armoury
         // --- The map and its crossings (stage 7) ---
         // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi
         public bool TwinsCrossingCount = true;             // counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything
+        // E7/W1 (232, PLAN 7.10 a, R10/R14): komunikat "plonie / spalona / splondrowana" (VillageNews) wedlug stanu ksiegi wiosek i pamiec wojny wioski (sekcja m: klucza arm_district)
+        public int VillageRaidMessages = 1;                // who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom
+        public bool VillageWarMemory = true;               // a village remembers who burned or plundered it, when, and how many fled and died
 
         public static void Load(string moduleDataDir)
         {

@@ -141,6 +141,8 @@ RANGES = {
     'AiSpareHorseShare': (0.0, 1.0, "0.00"),
     # E6/K5 (213): udzwig luzaka pod jukami w kg (20 = jak w grze - dopisek 0; PackMarket.CapPostfix)
     'SpareHorseCarryKg': (20, 100, "0"),
+    # E7/W1 (232): kto slyszy wiesci z wiosek - 0 nikt, 1 wlasne lenna, 2 cale krolestwo (VillageNews.Shows)
+    'VillageRaidMessages': (0, 2, "0"),
 }
 
 def gen(module_dir, ns, display):

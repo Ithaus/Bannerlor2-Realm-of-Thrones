@@ -71,6 +71,12 @@ namespace Armoury.Villages
         public const string RaidNext = "{=arm_raid_next}Raid the next settlement (about {DAYS} days)";
         public const string RaidEnd = "{=arm_raid_end}End the raid";
         public const string RaidSummary = "{=arm_raid_summary}{X} settlements burned in {D} days: {VILLAGES}.";
+        // E7/W1 (232, R10/R14): splondrowana bez spalenia w ksiedze i pamiec wojny (dymek W2) - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string VilLogPlundered = "{=arm_vil_log_plundered}{RAIDER} has plundered {VILLAGE} in the {DISTRICT} district: {BURNED} of {N} settlements burned.";
+        public const string VilLogPlunderedPlayer = "{=arm_vil_log_plundered_player}Your men have plundered {VILLAGE}: {BURNED} of {N} settlements burned.";
+        public const string VilMemBurned = "{=arm_vil_mem_burned}Burned by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
+        public const string VilMemPlundered = "{=arm_vil_mem_plundered}Plundered by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
+        public const string VilMemGone = "{=arm_vil_mem_gone}a raider long gone";
 
         /// <summary>TextObject z para (NAZWA, wartosc) - np. Make(VilBurning, "VILLAGE", "Brackenford").</summary>
         public static TextObject Make(string text, params object[] kv)
