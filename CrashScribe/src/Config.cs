@@ -79,6 +79,8 @@ namespace CrashScribe
         // --- Oblezenie Muru: sprzatanie dowodcy po wydarzeniu (B6c; patrz Mends.WallEnd, WallReleasePrev, WallOldSaveCheck) ---
         public static bool WallReleaseCommander = true;      // koniec wydarzenia (postfiks WallSiegeEvent.CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Mance'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
         public static bool WallOldSaveFix = true;            // po wczytaniu: oblezenie Muru skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Wolnych Ludzi tylko w logu)
+        // --- Atuty BK z nagrody za bitwe (decyzja Jeffa 4, 12.10; patrz Mends.BkRewardPerks) ---
+        public static bool BkBattleRewardPerks = true;       // latka BK BKBattleRewardTweakPatches nie wchodzi w 1.4.8 (nazwy parametrow) - nasze postfiksy z ta sama logika (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), kazdy tylko gdy BK go nie ma; false = bez tych atutow
 
         internal static void Load(string moduleDataDir)
         {
@@ -144,6 +146,7 @@ namespace CrashScribe
                         case "HarrenhalOldSaveFix": HarrenhalOldSaveFix = B(v); break;
                         case "WallReleaseCommander": WallReleaseCommander = B(v); break;
                         case "WallOldSaveFix": WallOldSaveFix = B(v); break;
+                        case "BkBattleRewardPerks": BkBattleRewardPerks = B(v); break;
                     }
                 }
             }

@@ -205,4 +205,12 @@
        and the party is released. Other frozen Free Folk lords are only listed in the CrashScribe log, never changed.
        Set WallOldSaveFix to false to switch the repair off. -->
   <WallOldSaveFix>true</WallOldSaveFix>
+
+  <!-- Battle-reward perks of Banner Kings (needs Banner Kings). Banner Kings adds three
+       battle-reward bonuses, but on this game version its own patch for them fails to load, so they do nothing:
+       the Warband perk (+25% influence from a won battle), the Famous Sellswords perk (+20% renown) and the
+       Cataphract lifestyle (+12% renown). With this on, CrashScribe adds the same three bonuses with the same rules,
+       for the player and for AI lords alike, and only where Banner Kings has not applied them itself (so they are
+       never counted twice). Set BkBattleRewardPerks to false to leave these perks without effect (old behaviour). -->
+  <BkBattleRewardPerks>true</BkBattleRewardPerks>
 </CrashScribe>

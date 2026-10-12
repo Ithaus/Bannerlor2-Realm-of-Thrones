@@ -2714,6 +2714,141 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.NorthernFare", null); } catch { } }
         }
 
+        // ===== ATUTY BK Z NAGRODY ZA BITWE (decyzja Jeffa 4, 12.10) =====
+        // BK VanillaModelTweakPatches+BKBattleRewardTweakPatches pada w 1.4.8 na nazwie parametru 'party' postfiksu
+        // CalculateInfluenceGain (gra: winnerParty, DefaultBattleRewardModel.cs:73); Harmony przerywa reszte klasy, wiec
+        // CalculateRenownGain tez nie wchodzi (docs/ERRORS.md, BK #7). Tu te same dwa postfiksy z ta sama logika co w BK
+        // (CommanderWarband +25% wplywu; MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), z pozycyjnym
+        // parametrem __0 (= winnerParty). Wpinane raz na proces, po OnGameStart BK (pierwsze OnSessionLaunched), kazdy
+        // osobno i tylko gdy na metodzie nie ma postfiksu wlasciciela "BannerKings" (po poprawce w BK bonus liczylby sie
+        // podwojnie). NIGDY CreateClassProcessor na klasie BK (podwoilby postfiks lupu). Lancuch modeli:
+        // NavalDLCBattleRewardModel -> BaseModel = DefaultBattleRewardModel, wiec latka na Default dziala. BK bez refleksji
+        // nie jest dostepny (CrashScribe nie ma referencji do BK) - skladowe BK czytane refleksja, wartosci co wywolanie
+        // (BK tez czyta Instance.CommanderWarband przy kazdym wywolaniu; atuty rejestrowane od nowa w kazdej kampanii).
+        private static Harmony _lateHarmony;          // z Install
+        private static bool _bkRewardChecked;         // raz na proces (latki BK tez raz na proces - BK Main._patchesInstalled)
+        private static PropertyInfo _bkCfgInst, _bkEduMgr, _bkEduLife, _bkPerksInst, _bkWarband, _bkSellswords, _bkLifeInst, _bkCataphract, _bkLifeName;
+        private static MethodInfo _bkGetEdu, _bkHasPerk;
+        private static int _bkRewardStumbles;         // potkniecia per wywolanie (bez globalnego wylacznika)
+
+        /// <summary>Decyzja 4: sprawdzenie latek BK na nagrodzie za bitwe i wpiecie brakujacych postfiksow (OnSessionLaunched).</summary>
+        internal static void BkRewardPerks()
+        {
+            if (_bkRewardChecked) return;
+            _bkRewardChecked = true;
+            try
+            {
+                if (!Config.BkBattleRewardPerks) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - wylaczone (BkBattleRewardPerks=false)."); return; }
+                var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                if (tCfg == null) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - BK nieobecny, nic do wpiecia."); return; }
+                var tPerks = AccessTools.TypeByName("BannerKings.Managers.Skills.BKPerks");
+                var tLifes = AccessTools.TypeByName("BannerKings.Managers.Education.Lifestyles.DefaultLifestyles");
+                _bkCfgInst = AccessTools.Property(tCfg, "Instance");
+                _bkEduMgr = AccessTools.Property(tCfg, "EducationManager");
+                _bkGetEdu = _bkEduMgr != null ? AccessTools.Method(_bkEduMgr.PropertyType, "GetHeroEducation", new[] { typeof(Hero) }) : null;
+                var tEdu = _bkGetEdu != null ? _bkGetEdu.ReturnType : null;
+                _bkHasPerk = tEdu != null ? AccessTools.Method(tEdu, "HasPerk", new[] { typeof(TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject) }) : null;
+                _bkEduLife = tEdu != null ? AccessTools.Property(tEdu, "Lifestyle") : null;
+                _bkPerksInst = tPerks != null ? AccessTools.Property(tPerks, "Instance") : null;
+                _bkWarband = tPerks != null ? AccessTools.Property(tPerks, "CommanderWarband") : null;
+                _bkSellswords = tPerks != null ? AccessTools.Property(tPerks, "MercenaryFamousSellswords") : null;
+                _bkLifeInst = tLifes != null ? AccessTools.Property(tLifes, "Instance") : null;
+                _bkCataphract = tLifes != null ? AccessTools.Property(tLifes, "Cataphract") : null;
+                _bkLifeName = _bkCataphract != null ? AccessTools.Property(_bkCataphract.PropertyType, "Name") : null;
+                var miss = new System.Collections.Generic.List<string>();
+                if (_bkCfgInst == null) miss.Add("BannerKingsConfig.Instance");
+                if (_bkGetEdu == null) miss.Add("EducationManager.GetHeroEducation");
+                if (_bkHasPerk == null) miss.Add("EducationData.HasPerk");
+                if (_bkEduLife == null) miss.Add("EducationData.Lifestyle");
+                if (_bkPerksInst == null || _bkWarband == null || _bkSellswords == null) miss.Add("BKPerks");
+                if (_bkLifeInst == null || _bkCataphract == null || _bkLifeName == null) miss.Add("DefaultLifestyles.Cataphract");
+                if (miss.Count > 0) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - brak skladowych BK (" + string.Join(", ", miss.ToArray()) + ") - NIE wpiete."); return; }
+                var tModel = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultBattleRewardModel);
+                string inf = BkRewardHook(AccessTools.DeclaredMethod(tModel, "CalculateInfluenceGain"), "BkInfluencePerk");
+                string ren = BkRewardHook(AccessTools.DeclaredMethod(tModel, "CalculateRenownGain"), "BkRenownPerks");
+                Scribe.Line("Mends: atuty BK z nagrody za bitwe (decyzja 4) - wplyw (CommanderWarband +25%): " + inf
+                            + "; slawa (MercenaryFamousSellswords +20%, styl Cataphract +12%): " + ren + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRewardPerks", null); } catch { } }
+        }
+
+        /// <summary>Wpiecie jednego postfiksu, gdy BK nie ma juz swojego na tej metodzie; zwraca stan do linii logu.</summary>
+        private static string BkRewardHook(MethodInfo m, string postfix)
+        {
+            if (m == null) return "metoda gry nieznaleziona - NIE wpiete";
+            try
+            {
+                var info = Harmony.GetPatchInfo(m);
+                if (info != null && info.Postfixes != null)
+                    foreach (var p in info.Postfixes)
+                        if (p != null && p.owner == "BannerKings") return "BK juz ma (postfiks BannerKings) - nie wpinamy";
+                if (_lateHarmony == null) return "brak Harmony CrashScribe - NIE wpiete";
+                _lateHarmony.Patch(m, postfix: new HarmonyMethod(typeof(Mends), postfix));
+                return "wpiete";
+            }
+            catch (Exception e)
+            {
+                try { Scribe.Report("CrashScribe", e, "Mends.BkRewardHook(" + postfix + ")", null); } catch { }
+                return "wyjatek " + e.GetType().Name + " - NIE wpiete";
+            }
+        }
+
+        /// <summary>Wyksztalcenie BK dowodcy partii (jak BK: party.LeaderHero -> EducationManager.GetHeroEducation); null = bez bonusu.</summary>
+        private static object BkEducation(PartyBase party)
+        {
+            var hero = party != null ? party.LeaderHero : null;
+            if (hero == null) return null;
+            var cfg = _bkCfgInst.GetValue(null, null);
+            var mgr = cfg != null ? _bkEduMgr.GetValue(cfg, null) : null;
+            return mgr != null ? _bkGetEdu.Invoke(mgr, new object[] { hero }) : null;
+        }
+
+        /// <summary>Postfiks DefaultBattleRewardModel.CalculateInfluenceGain (__0 = winnerParty) - BK CommanderWarband +25%.</summary>
+        internal static void BkInfluencePerk(PartyBase __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var edu = BkEducation(__0);
+                if (edu == null) return;
+                var perk = _bkWarband.GetValue(_bkPerksInst.GetValue(null, null), null) as TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject;
+                if (perk != null && (bool)_bkHasPerk.Invoke(edu, new object[] { perk }))
+                    __result.AddFactor(0.25f, perk.Name);
+            }
+            catch (Exception e) { BkRewardStumble("wplyw", e); }
+        }
+
+        /// <summary>Postfiks DefaultBattleRewardModel.CalculateRenownGain (__0 = winnerParty) - BK MercenaryFamousSellswords +20%, styl Cataphract +12%.</summary>
+        internal static void BkRenownPerks(PartyBase __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var edu = BkEducation(__0);
+                if (edu == null) return;
+                var perk = _bkSellswords.GetValue(_bkPerksInst.GetValue(null, null), null) as TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject;
+                if (perk != null && (bool)_bkHasPerk.Invoke(edu, new object[] { perk }))
+                    __result.AddFactor(0.2f, perk.Name);
+                var life = _bkEduLife.GetValue(edu, null);
+                if (life == null) return;
+                var cat = _bkCataphract.GetValue(_bkLifeInst.GetValue(null, null), null);
+                if (cat != null && life.Equals(cat))   // Lifestyle.Equals BK = ten sam StringId
+                    __result.AddFactor(0.12f, _bkLifeName.GetValue(cat, null) as TaleWorlds.Localization.TextObject);
+            }
+            catch (Exception e) { BkRewardStumble("slawa", e); }
+        }
+
+        /// <summary>Potkniecie postfiksu atutow BK: licznik w procesie, raport i linia do 3 (bez wylaczania latki).</summary>
+        private static void BkRewardStumble(string where, Exception e)
+        {
+            _bkRewardStumbles++;
+            if (_bkRewardStumbles > 3) return;
+            try
+            {
+                Scribe.Report("CrashScribe", e, "Mends.BkRewardPerks (" + where + ")", null);
+                Scribe.Line("Mends: atuty BK z nagrody za bitwe - " + where + ": wyjatek " + e.GetType().Name + " polkniety (potkniec " + _bkRewardStumbles + ").");
+            }
+            catch { }
+        }
+
         /// <summary>
         /// ZRZUT PRZEDMIOTOW (Jeff 02.09: "pdf z dokladnymi tabelkami: pancerz,
         /// uzbrojenie, obrazenia"). Bron ROT to CraftedItem - w XML nie ma jej
@@ -3460,6 +3595,7 @@ namespace CrashScribe
 
         internal static void Install(Harmony harmony)
         {
+            _lateHarmony = harmony;   // decyzja 4 (12.10): do latek wpinanych dopiero po starcie sesji (BkRewardPerks)
             try
             {
                 // ===== A6: MARTWY WIDGET DTE NA PASKU MAPY =====
@@ -5768,7 +5904,7 @@ namespace CrashScribe
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); });
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); });   // decyzja 4: atuty BK po OnGameStart BK
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {
