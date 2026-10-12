@@ -1,7 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
+using System.Text;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
@@ -22,9 +28,12 @@ namespace Armoury
     /// undone)") i dokladamy nasza plaska kare (Add -0.25, wpis "Forest").
     /// Liczymy sami, nie z rozpiski (GetLines) - gra liczy ruch BEZ opisow
     /// i rozpiska poza tooltipem jest pusta (pierwsza wersja 02.09 rano
-    /// dzialala tylko w dymku). Perki zwiadowcy (ForestKin, DesertBorn,
-    /// featy kulturowe) zmniejszaja kare vanilla - takim partiom oddajemy
-    /// pelny procent, wiec wychodza odrobine na plus; swiadomie. Biegnie
+    /// dzialala tylko w dymku). E7/T (225, PLAN 7.4 - dawny zapis "swiadomie na plus" to byl BLAD:
+    /// Polnoc i 7 kultur ROT z cecha lasu jechaly w lesie o ok. 12% SZYBCIEJ niz po rowninie, Dorne na
+    /// pustyni o ok. 5%): przy TerrainEaseExact oddajemy DOKLADNIE to, co gra nalozyla netto (ForestKin
+    /// zwiadowcy przy >= 75% pieszych, cecha lasu, cecha pustyni - te same warunki co gra) i kladziemy
+    /// plaska kare Jeffa w tym samym ulamku, ktory gra zostawila (cecha zmniejsza kare, nigdy nie daje
+    /// premii); DesertBorn, Pathfinder, NightRunner, DayTraveler - osobne premie gry, zostaja. Biegnie
     /// PRZED sufitem kolumny (MarchPace ma Priority.Last), czapka trzyma.
     /// Kara 0 w MCM = teren tego typu w ogole nie spowalnia.
     /// AUDYT (Jeff: "zaudytuj poruszanie sie"): raz na dzien gry pelna rozpiska
@@ -52,6 +61,8 @@ namespace Armoury
         private static readonly TextObject _aNight = new TextObject("{=!}Night");
         private static readonly TextObject _aSwamp = new TextObject("{=!}Swamp");   // vanilla nie karze bagna - nie ma _uSwamp, bo nie ma czego cofac
         private static int _lastAuditDay = -1;
+        private const float GameForestFull = 0.3f;   // G DefaultPartySpeedCalculatingModel MovingAtForestEffect (stala prywatna gry)
+        private const float GameDesertFull = 0.1f;   // G MovingInDesertEffect
 
         private static void Swap(ref ExplainedNumber r, float vanillaFactor, TextObject undo, float ours, TextObject name)
         {
@@ -74,14 +85,39 @@ namespace Armoury
                 bool atSea = mp.IsCurrentlyAtSea;
                 TerrainType tt = TerrainType.Plain;
                 try { tt = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace); } catch { }
+                bool forest = tt == TerrainType.Forest, desert = tt == TerrainType.Desert || tt == TerrainType.Dune;
 
-                if (tt == TerrainType.Forest)
-                    Swap(ref __result, 0.3f, _uForest, c.ForestSpeedPenalty, _aForest);
+                // E7/T probka z rozpiski gry (tylko w wywolaniu z Probe, watek glowny, ta jedna partia): wpisy GRY dla terenu
+                // PRZED naszym zwrotem, potem to, co nasz zwrot i nasza kara naprawde zmienily w liczbie
+                bool probe = _probeOn && !_pGot && mp == _probeParty && (forest || desert);
+                float sf0 = 0f, bn0 = 0f;
+                if (probe) { sf0 = __result.SumOfFactors; bn0 = __result.BaseNumber; _pGame = GameLinesFactor(ref __result, forest); }
+
+                if (forest)
+                {
+                    if (c.TerrainEaseExact)
+                    {
+                        // E7/T: zwrot = netto gry (przy cesze i ForestKin razem 0), nasza kara w ulamku, ktory gra zostawila
+                        bool kin, feat;
+                        float net = GameForestNet(mp, out kin, out feat);
+                        Swap(ref __result, net, _uForest, c.ForestSpeedPenalty * Math.Max(0f, net) / GameForestFull, _aForest);
+                    }
+                    else Swap(ref __result, GameForestFull, _uForest, c.ForestSpeedPenalty, _aForest);
+                }
                 else if (!atSea && (tt == TerrainType.Water || tt == TerrainType.River || tt == TerrainType.UnderBridge
                                     || tt == TerrainType.Bridge || tt == TerrainType.Fording))
                     Swap(ref __result, 0.3f, _uFord, c.FordSpeedPenalty, _aFord);
-                else if (tt == TerrainType.Desert || tt == TerrainType.Dune)
-                    Swap(ref __result, 0.1f, _uDesert, c.DesertSpeedPenalty, _aDesert);
+                else if (desert)
+                {
+                    if (c.TerrainEaseExact)
+                    {
+                        // E7/T: cecha pustyni - gra nic nie naklada, wiec ani zwrotu, ani naszej kary ("No speed penalty on desert")
+                        bool feat;
+                        float net = GameDesertNet(mp, out feat);
+                        Swap(ref __result, net, _uDesert, c.DesertSpeedPenalty * net / GameDesertFull, _aDesert);
+                    }
+                    else Swap(ref __result, GameDesertFull, _uDesert, c.DesertSpeedPenalty, _aDesert);
+                }
                 // BAGNO (Jeff 13.09: "bagna 0.3, jesli sa bagna"). Vanilla nie liczy
                 // bagnu ZADNEJ kary - w DefaultPartySpeedCalculatingModel branch terenu
                 // obsluguje tylko Forest, brody i Desert/Dune, reszta nie dostaje nic.
@@ -89,6 +125,12 @@ namespace Armoury
                 else if (tt == TerrainType.Swamp)
                 {
                     if (c.SwampSpeedPenalty > 0.0005f) __result.Add(-c.SwampSpeedPenalty, _aSwamp);
+                }
+                if (probe)
+                {
+                    _pRefund = __result.SumOfFactors - sf0;   // nasz zwrot (ulamek) - zmiana sumy wspolczynnikow
+                    _pFlat = bn0 - __result.BaseNumber;       // nasza plaska kara (jedn.) - zmiana bazy
+                    _pBase = bn0; _pForest = forest; _pGot = true;
                 }
 
                 try
@@ -152,6 +194,260 @@ namespace Armoury
             catch (Exception e) { Log.Error("TerrainEase.DailyAudit", e); }
         }
 
+        // ================================================================ E7/T (225, PLAN 7.4, projekt etapu 7 v2 rozdz. 3 "E7/T", R2)
+        // Netto kary lasu, ktora gra nalozyla (ulamek, dodatni = kara): te same warunki co G DefaultPartySpeedCalculatingModel.CalculateFinalSpeed
+        // :264-283 - ForestKin zwiadowcy (EffectiveScout) przy >= 75% pieszych w MemberRoster (ta sama arytmetyka float co gra, takze 0/0 = NaN = bez perku)
+        // i cecha BattanianForestSpeedFeat (PartyBaseHelper.HasFeat - wodz, a bez wodza kultura partii, jak gra). Liczby gry czytane w czasie gry
+        // (PrimaryBonus -0.5, EffectBonus 0.5), nie wpisane na stale: bez niczego 0.3, perk albo cecha 0.15, oba 0.
+        internal static float GameForestNet(MobileParty mp, out bool kin, out bool feat)
+        {
+            kin = false;
+            float vf = GameForestFull;
+            var scout = mp.EffectiveScout;
+            if (scout != null && scout.GetPerkValue(DefaultPerks.Scouting.ForestKin))
+            {
+                var r = mp.MemberRoster;
+                float foot = 0f;
+                for (int i = 0; i < r.Count; i++)
+                    if (!r.GetCharacterAtIndex(i).IsMounted) foot += (float)r.GetElementNumber(i);
+                if (foot / (float)r.TotalManCount >= 0.75f)
+                {
+                    vf = GameForestFull * (0f - DefaultPerks.Scouting.ForestKin.PrimaryBonus);
+                    kin = true;
+                }
+            }
+            feat = PartyBaseHelper.HasFeat(mp.Party, DefaultCulturalFeats.BattanianForestSpeedFeat);
+            return feat ? vf - DefaultCulturalFeats.BattanianForestSpeedFeat.EffectBonus * GameForestFull : vf;
+        }
+
+        // Netto kary pustyni gry: 0.1, a przy cesze AseraiDesertFeat 0 (G :291-295). DesertBorn to osobna premia gry - zostaje.
+        internal static float GameDesertNet(MobileParty mp, out bool feat)
+        {
+            feat = PartyBaseHelper.HasFeat(mp.Party, DefaultCulturalFeats.AseraiDesertFeat);
+            return feat ? 0f : GameDesertFull;
+        }
+
+        // ---- probka godzinna (tylko z Stage7MeasureLog; dziala tez przy TerrainEaseExact off = "na sucho"). Stan sesji, czyszczony w Reset.
+        private const int ProbesPerHour = 8;   // projekt pkt 6: najwyzej 8 rozpisek gry na godzine
+        // probka z rozpiski: flaga watku (CalculateFinalSpeed bywa wolane z watkow roboczych gry - tam flaga zawsze false)
+        [ThreadStatic] private static bool _probeOn;
+        private static MobileParty _probeParty;
+        private static bool _pGot, _pForest;
+        private static float _pGame, _pRefund, _pFlat, _pBase;
+        private static string _gForest, _gCulture, _gDesert;   // nazwy wpisow GRY w rozpisce (te same teksty co G :47, :55, :59)
+        private static readonly Random _rng = new Random(225);   // wlasny los - MBRandom gry zostaje nietkniety
+        private static readonly List<MobileParty> _cand = new List<MobileParty>();
+        // partio-godziny
+        private static int _hF, _hFFeat, _hFKin, _hD, _hDFeat;
+        // zwrot ponad netto gry (ok., jedn. - ulamek x LastCalculatedBaseSpeed): stara regula / biezaca
+        private static double _exOld, _exNow;
+        // predkosc partii w ruchu: 0-3 rody (Polnoc las, Polnoc rownina, Dorne pustynia, Dorne rownina), 4-7 to samo dla karawan i wozow wsi (MarchPace ich nie tnie)
+        private static readonly double[] _sSum = new double[8];
+        private static readonly int[] _sN = new int[8];
+        // rozpiska gry: probek, z cecha/perkiem, na suficie MarchPace, zwrot > kary gry, kara Jeffa poza ulamkiem gry
+        private static int _rN, _rFeat, _rCap, _rViol, _rMis;
+        private static double _rSumU, _rMaxU;
+        private static long _ticks;
+        private static int _stumbles;
+
+        internal static void Reset()
+        {
+            ZeroSample();
+            _stumbles = 0; _probeParty = null; _pGot = false; _gForest = null;
+        }
+
+        private static void ZeroSample()
+        {
+            _hF = _hFFeat = _hFKin = _hD = _hDFeat = 0;
+            _exOld = _exNow = 0;
+            for (int i = 0; i < 8; i++) { _sSum[i] = 0; _sN[i] = 0; }
+            _rN = _rFeat = _rCap = _rViol = _rMis = 0;
+            _rSumU = _rMaxU = 0;
+            _ticks = 0;
+        }
+
+        private static void Stumble(string where, Exception e)
+        {
+            // potkniecia liczone, probka dziala dalej (CLAUDE.md 7 - bez globalnego wylacznika)
+            _stumbles++;
+            if (_stumbles <= 3) Log.Error("TerrainEase." + where, e);
+        }
+
+        // suma wpisow GRY dla terenu (las: "Forest" + "Culture" cechy lasu; pustynia: "Desert") jako ulamek - wpis typu Multiply
+        // w GetLines to BaseNumber x procent (G ExplainedNumber.GetLines), wiec dzielimy przez baze
+        private static float GameLinesFactor(ref ExplainedNumber r, bool forest)
+        {
+            float b = r.BaseNumber;
+            if (Math.Abs(b) < 0.0001f) return 0f;
+            if (_gForest == null)
+            {
+                _gDesert = new TextObject("{=ecUwABe2}Desert").ToString();
+                var ct = GameTexts.FindText("str_culture");
+                _gCulture = ct != null ? ct.ToString() : "Culture";
+                _gForest = new TextObject("{=rTFaZCdY}Forest").ToString();
+            }
+            float sum = 0f;
+            foreach (var l in r.GetLines())
+            {
+                string n = l.Item1;
+                if (forest ? (n == _gForest || n == _gCulture) : n == _gDesert) sum += l.Item2;
+            }
+            return sum / b;
+        }
+
+        internal static void Hourly()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.Stage7MeasureLog || Campaign.Current == null) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                _cand.Clear();
+                Scan(MobileParty.AllLordParties, false, s);
+                Scan(MobileParty.AllCaravanParties, true, s);
+                Scan(MobileParty.AllVillagerParties, true, s);
+                int k = Math.Min(ProbesPerHour, _cand.Count);
+                for (int i = 0; i < k; i++)
+                {
+                    int j = i + _rng.Next(_cand.Count - i);   // losowo bez powtorzen
+                    var tmp = _cand[i]; _cand[i] = _cand[j]; _cand[j] = tmp;
+                    try { Probe(_cand[i], s); } catch (Exception e) { Stumble("Probe", e); }
+                }
+            }
+            catch (Exception e) { Stumble("Hourly", e); }
+            finally { _cand.Clear(); _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        // partie AI w ruchu na ladzie (bez gracza i bez doczepionych do armii - jada predkoscia wodza): teren pod partia jak postfiks
+        private static void Scan(MBReadOnlyList<MobileParty> list, bool uncapped, Settings s)
+        {
+            if (list == null) return;
+            var main = MobileParty.MainParty;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var mp = list[i];
+                try
+                {
+                    if (mp == null || mp == main || !mp.IsActive || mp.AttachedTo != null || mp.IsCurrentlyAtSea || !mp.IsMoving) continue;
+                    if (!uncapped && mp.LeaderHero == null) continue;
+                    TerrainType tt = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace);
+                    bool forest = tt == TerrainType.Forest, desert = tt == TerrainType.Desert || tt == TerrainType.Dune;
+                    if (!forest && !desert && tt != TerrainType.Plain) continue;
+                    var cul = mp.LeaderHero != null ? mp.LeaderHero.Culture : mp.Party.Culture;   // jak PartyBaseHelper.HasFeat
+                    string cid = cul != null ? cul.StringId : null;
+                    bool north = cid == "battania", dorne = cid == "aserai";   // ROT: battania = Polnoc, aserai = Dorne
+                    int g = uncapped ? 4 : 0;
+                    if (forest)
+                    {
+                        bool kin, feat;
+                        float net = GameForestNet(mp, out kin, out feat);
+                        _hF++; if (feat) _hFFeat++; if (kin) _hFKin++;
+                        Excess(mp, GameForestFull - net, s);
+                        if (north) Note(g, mp.Speed);
+                        _cand.Add(mp);
+                    }
+                    else if (desert)
+                    {
+                        bool feat;
+                        float net = GameDesertNet(mp, out feat);
+                        _hD++; if (feat) _hDFeat++;
+                        Excess(mp, GameDesertFull - net, s);
+                        if (dorne) Note(g + 2, mp.Speed);
+                        _cand.Add(mp);
+                    }
+                    else if (north) Note(g + 1, mp.Speed);
+                    else if (dorne) Note(g + 3, mp.Speed);
+                }
+                catch (Exception e) { Stumble("Scan", e); }
+            }
+        }
+
+        private static void Note(int k, float speed) { _sSum[k] += speed; _sN[k]++; }
+
+        // stara regula oddawala pelny procent gry; nadmiar ponad to, co gra nalozyla netto (ok. w jedn. - na bazie predkosci partii)
+        private static void Excess(MobileParty mp, float exFactor, Settings s)
+        {
+            if (exFactor <= 0.0005f) return;
+            double u = exFactor * mp.LastCalculatedBaseSpeed;
+            _exOld += u;
+            if (s.TerrainEaseEnabled && !s.TerrainEaseExact) _exNow += u;
+        }
+
+        // rozpiska gry na glebokosci 0 (jak DailyAudit): postfiks zapisuje wpisy gry przed zwrotem i zmiany od naszego zwrotu i kary;
+        // tu - netto (gra + zwrot) i to, czy partia stoi na suficie MarchPace (wpis "Marching column"). Model wolany wprost, NIE
+        // mp.SpeedExplained: ten zapisuje wynik i baze z opisami do pamieci partii (G MobileParty :400-410) - kazde kolejne przeliczenie
+        // predkosci tej partii budowaloby wtedy opisy (koszt) az do uniewaznienia bazy; tu pamiec partii zostaje nietknieta
+        private static void Probe(MobileParty mp, Settings s)
+        {
+            var model = Campaign.Current.Models.PartySpeedCalculatingModel;
+            if (model == null) return;
+            _probeParty = mp; _pGot = false; _probeOn = true;
+            ExplainedNumber en;
+            try { en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true)); }
+            finally { _probeOn = false; _probeParty = null; }
+            if (!_pGot) return;   // postfiks nie wpiety (TerrainEaseEnabled off przy starcie) albo wylaczony
+            _pGot = false;
+            bool cap = false;
+            foreach (var l in en.GetLines())
+                if (l.Item1 != null && l.Item1.StartsWith("Marching column", StringComparison.Ordinal)) { cap = true; break; }
+            float full = _pForest ? GameForestFull : GameDesertFull;
+            float u = (_pGame + _pRefund) * _pBase;   // netto teren gry + nasz zwrot, jedn. (> 0 = zwrot wiekszy niz kara gry)
+            _rN++;
+            if (cap) _rCap++;
+            if (-_pGame < full - 0.0005f) _rFeat++;
+            _rSumU += u;
+            if (Math.Abs(u) > _rMaxU) _rMaxU = Math.Abs(u);
+            if (u > 0.001f) _rViol++;
+            if (s.TerrainEaseEnabled && s.TerrainEaseExact)
+            {
+                float pen = _pForest ? s.ForestSpeedPenalty : s.DesertSpeedPenalty;
+                float want = pen * Math.Max(0f, -_pGame) / full;   // kara Jeffa w ulamku, ktory zostawila gra - z wpisow GRY, nie z naszego wzoru
+                if (want <= 0.0005f) want = 0f;                    // Swap nie dopisuje kary < 0.0005
+                if (Math.Abs(_pFlat - want) > 0.001f) _rMis++;
+            }
+        }
+
+        private static string Avg(int k)
+        {
+            return _sN[k] > 0 ? (_sSum[k] / _sN[k]).ToString("0.000", CultureInfo.InvariantCulture) : "-";
+        }
+
+        // linia dobowa (po ksiedze pieniadza, obok E7/0): dzien = doba ksiegi (dzien gry - 1, jak "Pieniadz swiata")
+        internal static void Stage7Daily()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.Stage7MeasureLog) { ZeroSample(); return; }
+            int day = (int)CampaignTime.Now.ToDays - 1;
+            try
+            {
+                var ci = CultureInfo.InvariantCulture;
+                int fd = _hF + _hD;
+                double ms = _ticks * 1000.0 / Stopwatch.Frequency;
+                var sb = new StringBuilder(640);
+                sb.Append("Kary terenu (E7/T): dzien ").Append(day)
+                  .Append(" (TerrainEaseExact ").Append(s.TerrainEaseExact ? "on" : "off").Append(", TerrainEaseEnabled ").Append(s.TerrainEaseEnabled ? "on" : "off").Append(')')
+                  .Append(" | probki AI (partio-godziny): las ").Append(_hF).Append(" (cecha lasu ").Append(_hFFeat).Append(", ForestKin ").Append(_hFKin)
+                  .Append("), pustynia ").Append(_hD).Append(" (cecha pustyni ").Append(_hDFeat).Append(')')
+                  .Append(" | zwrot ponad netto gry (ok., na partio-godzine w lesie/na pustyni): stara regula ").Append((fd > 0 ? _exOld / fd : 0).ToString("0.0000", ci))
+                  .Append(" jedn., teraz ").Append((fd > 0 ? _exNow / fd : 0).ToString("0.0000", ci)).Append(" jedn.")
+                  .Append(" | Polnoc las/rownina ").Append(Avg(0)).Append('/').Append(Avg(1)).Append(" (n ").Append(_sN[0]).Append('/').Append(_sN[1]).Append(')')
+                  .Append(", Dorne pustynia/rownina ").Append(Avg(2)).Append('/').Append(Avg(3)).Append(" (n ").Append(_sN[2]).Append('/').Append(_sN[3]).Append(')')
+                  .Append(" | koszt ").Append(ms.ToString("0.000", ci)).Append(" ms")
+                  .Append(" | z rozpiski gry: probek ").Append(_rN).Append(" (z cecha/perkiem ").Append(_rFeat).Append(')')
+                  .Append(", netto teren (gra + zwrot) sr. ").Append((_rN > 0 ? _rSumU / _rN : 0).ToString("0.0000", ci))
+                  .Append(" (maks. |u| ").Append(_rMaxU.ToString("0.0000", ci)).Append(')')
+                  .Append(", zwrot > kary gry ").Append(_rViol).Append(", kara Jeffa poza ulamkiem gry ").Append(_rMis)
+                  .Append(", na suficie MarchPace ").Append((_rN > 0 ? 100.0 * _rCap / _rN : 0).ToString("0.0", ci)).Append('%')
+                  .Append(" | ponizej sufitu (karawany, wozy wsi): Polnoc las/rownina ").Append(Avg(4)).Append('/').Append(Avg(5))
+                  .Append(" (n ").Append(_sN[4]).Append('/').Append(_sN[5]).Append(')')
+                  .Append(", Dorne pustynia/rownina ").Append(Avg(6)).Append('/').Append(Avg(7)).Append(" (n ").Append(_sN[6]).Append('/').Append(_sN[7]).Append(')')
+                  .Append(" | potkniecia ").Append(_stumbles);
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("Stage7Daily", e); }
+            ZeroSample();
+        }
+
         internal static void ApplyAll(Harmony h)
         {
             try
@@ -183,7 +479,8 @@ namespace Armoury
                 }
                 Log.Info("Kary terenu po naszemu: las -" + c.ForestSpeedPenalty + ", pustynia -" + c.DesertSpeedPenalty
                          + ", snieg -" + c.SnowSpeedPenalty + ", brod -" + c.FordSpeedPenalty + ", noc -" + c.NightSpeedPenalty
-                         + " (" + done + " modeli); audyt predkosci " + (c.SpeedAuditEnabled ? "raz na dzien" : "wylaczony") + ".");
+                         + " (" + done + " modeli); audyt predkosci " + (c.SpeedAuditEnabled ? "raz na dzien" : "wylaczony")
+                         + "; las i pustynia " + (c.TerrainEaseExact ? "dokladnie jak gra (E7/T: cecha kultury i ForestKin zmniejszaja tez nasza kare)" : "z pelnym zwrotem kary gry (TerrainEaseExact off)") + ".");
             }
             catch (Exception e) { Log.Error("TerrainEase.ApplyAll", e); }
         }

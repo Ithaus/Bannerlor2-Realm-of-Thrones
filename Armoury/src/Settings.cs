@@ -1468,6 +1468,9 @@ namespace Armoury
         // E7/O1 (228, PLAN 7.6, R5): sen do switu - faza snu (AI spiacego w obozie, snem dlugu i w osadzie odnawiane przed terminem, wlaczane o swicie)
         // i bramka rozkazow (SleepGate: prefiksy First na 10 MobileParty.SetMove*; rozkaz zapisany tam, gdzie trzyma go sen); off = straznik po fakcie jak dotad
         public bool SleepersHoldOrders = true;             // a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before
+        // E7/T (225, PLAN 7.4, R2): kary terenu dokladnie jak gra - zwrot = netto kary gry (ForestKin zwiadowcy, cecha lasu, cecha pustyni), nasza plaska kara
+        // w tym samym ulamku (TerrainEase.SpeedPostfix); off = pelny zwrot kary gry jak dotad (Polnoc w lesie i Dorne na pustyni szybciej niz po rowninie)
+        public bool TerrainEaseExact = true;               // a culture or a scout that halves the game's forest or desert penalty halves ours too - the penalty shrinks, it never turns into a bonus (off = the whole game penalty is given back, as before)
 
         public static void Load(string moduleDataDir)
         {

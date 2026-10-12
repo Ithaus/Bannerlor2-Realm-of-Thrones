@@ -4744,6 +4744,10 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool SleepersHoldOrders { get; set; } = true;
 
+        [SettingPropertyBool("Terrain Ease Exact", HintText = "a culture or a scout that halves the game's forest or desert penalty halves ours too - the penalty shrinks, it never turns into a bonus (off = the whole game penalty is given back, as before)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool TerrainEaseExact { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5929,6 +5933,7 @@ namespace Armoury
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.Stage7MeasureLog = Stage7MeasureLog;
             s.SleepersHoldOrders = SleepersHoldOrders;
+            s.TerrainEaseExact = TerrainEaseExact;
         }
 
         internal static void Apply()

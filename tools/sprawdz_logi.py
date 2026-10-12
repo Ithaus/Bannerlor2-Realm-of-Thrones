@@ -97,6 +97,10 @@ Uzycie (Python 3, tylko odczyt):
                     (lordowie <= 3), T2 zjazd sr. <= 0.15, T3 lordowie w ruchu bez wpisu powodu <= 3 na noc (wyjazd z osady <= 1), T4 AI spiacych lordow
                     wstalo przed switem 0 w kazdej nocy (doby kampanii 31-until), T6 bledy/potkniecia 0 i dluznicy obudzeni o 6:00 = 0, T7 zbiorka >= 95%,
                     T9 koszt bramki <= 5 ms na noc; rozkazy zatrzymane, zwolnienia BK, odnowienia AI, swit, oddane dluznikom - INFO.
+                    Blok E7/T (225) - linia "Kary terenu (E7/T)": T1 z rozpiski gry zwrot > kary gry 0 i kara Jeffa poza ulamkiem gry 0, maks. |netto| <= 0.001
+                    (klucz TerrainEaseExact on), T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej DECYZJA), T3 ponizej sufitu MarchPace (karawany, wozy wsi,
+                    d31-until): Polnoc las < rownina, Dorne pustynia <= rownina, T4 koszt probki <= 20 ms/dobe, bledy/potkniecia 0, T6 towar wsi niesprzedany w miastach
+                    <= 2%; rody, zwrot ponad netto starej reguly, udzial probek na suficie - INFO; T5 tempo marszu poza blokiem (marsz.py).
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -6249,6 +6253,128 @@ def etap7_o1(rep, lines, start, until, logp=None, csp=None):
     rep.add("E7/O1 T5/T8: dlug 3 AI i kara, KRONIKA i Miara: marsz", "poza blokiem", "dlug 3 = 0 (linie T10), wojny i tempo bez zmian (marsz.py, rozdz. 4)", None)
 
 
+E7T_PAIR = r"{} ([0-9.]+|-)/([0-9.]+|-) \(n (\d+)/(\d+)\)"
+
+
+def _e7t_pair(s, label):
+    """E7/T: "<label> a/b (n x/y)" -> (a, b, x, y); srednia '-' = None."""
+    m = re.search(E7T_PAIR.format(re.escape(label)), s)
+    if not m:
+        return None
+    a, b = (None if v == "-" else float(v) for v in m.groups()[:2])
+    return a, b, int(m.group(3)), int(m.group(4))
+
+
+def etap7_t(rep, lines, start, until, logp=None, csp=None):
+    """E7/T (225): kary terenu dokladnie jak gra (projekt etapu 7 v2 rozdz. 3 "E7/T" Test, PLAN 7.4). Linia "Kary terenu (E7/T): dzien N" (doba ksiegi).
+    T1 z rozpiski gry (wpisy GRY przed naszym zwrotem i zmiany od zwrotu i kary w tej samej liczbie): zwrot > kary gry = 0 i kara Jeffa poza ulamkiem
+    gry = 0 w kazdej dobie, maks. |netto| <= 0.001 jedn. (klucz on; off - INFO, stara regula); T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej
+    DECYZJA - prog nieczytelny); T3 ponizej sufitu MarchPace (karawany i wozy wsi; d31-until, srednie wazone): Polnoc las < rownina, Dorne pustynia
+    <= rownina; T4 koszt probki <= 20 ms/dobe (srednio), bledy TerrainEase i potkniecia 0; T6 regresja E5: towar wsi niesprzedany w miastach <= 2%
+    sprzedanego (miasta kupuja >= 98% plonu, d31-until). Rody (na suficie i nie), zwrot ponad netto starej reguly, udzial probek na suficie - INFO;
+    T5 tempo marszu - poza blokiem (marsz.py, rozdz. 4). Probki pkt 6 bez "Marching column" nie wchodza do T3: sa tylko w lesie/na pustyni, bez
+    pary na rowninie (srednia bylaby stronnicza) - T3 liczy karawany i wozy wsi, ktorych MarchPace nigdy nie tnie."""
+    kt = by_day(lines, "Kary terenu (E7/T): dzien")
+    if not kt:
+        rep.add("E7/T: linia Kary terenu (E7/T)", "brak w logu", "jest od wgrania E7/T (Stage7MeasureLog)", None)
+        return
+    win = [d for d in sorted(kt) if 1 <= run_day(d, start) <= until]
+    w31 = [d for d in win if run_day(d, start) >= 31]
+    if not win:
+        rep.add("E7/T: linia Kary terenu (E7/T) w oknie", "brak dob w oknie", f"doby kampanii 1-{until}", None)
+        return
+    keys = {m.group(1) for d in win for m in [re.search(r"TerrainEaseExact (on|off)", kt[d])] if m}
+    on = keys == {"on"}
+    # ---- T1 z rozpiski gry
+    rn = sum(num(r"z rozpiski gry: probek (\d+)", kt[d], default=0) or 0 for d in win)
+    rf = sum(num(r"z cecha/perkiem (\d+)\)", kt[d], default=0) or 0 for d in win)
+    viol = sum(num(r"zwrot > kary gry (\d+)", kt[d], default=0) or 0 for d in win)
+    mis = sum(num(r"kara Jeffa poza ulamkiem gry (\d+)", kt[d], default=0) or 0 for d in win)
+    umax = max([fnum(r"maks\. \|u\| ([0-9.]+)", kt[d], default=0.0) or 0.0 for d in win] or [0.0])
+    rep.add("E7/T T1: netto lasu/pustyni po naszym postfiksie z rozpiski gry (okno)",
+            f"klucz {'/'.join(sorted(keys)) or '-'}; probek {rn} (z cecha/perkiem {rf}), zwrot > kary gry {viol}, kara Jeffa poza ulamkiem gry {mis}, maks. |netto| {umax:.4f} jedn.",
+            "zwrot > kary gry 0, kara Jeffa poza ulamkiem 0, maks. |netto| <= 0.001 (klucz on; bez probek z cecha/perkiem czesc 'przy cesze' niesprawdzona - INFO)",
+            None if not (on and rn > 0) else (False if (viol or mis or umax > 0.001) else (True if rf > 0 else None)))
+    # ---- T2 probek las z cecha lasu
+    ff = sum(num(r"\(cecha lasu (\d+)", kt[d], default=0) or 0 for d in win)
+    fa = sum(num(r"partio-godziny\): las (\d+)", kt[d], default=0) or 0 for d in win)
+    fk = sum(num(r"ForestKin (\d+)\)", kt[d], default=0) or 0 for d in win)
+    dd = sum(num(r"\), pustynia (\d+)", kt[d], default=0) or 0 for d in win)
+    df = sum(num(r"\(cecha pustyni (\d+)\)", kt[d], default=0) or 0 for d in win)
+    rep.add("E7/T T2: partio-godziny AI w lesie z cecha lasu (okno)", f"{ff} (las razem {fa}, ForestKin {fk}; pustynia {dd}, z cecha pustyni {df})",
+            ">= 50 (inaczej prog T3 nieczytelny - zglosic, nie zaliczac)", ff >= 50, decide=True)
+    # ---- T3 ponizej sufitu (karawany, wozy wsi), d31-until, srednie wazone
+    def wavg(label, days):
+        sa = sb_ = 0.0
+        na = nb = 0
+        for d in days:
+            seg = kt[d].split("| ponizej sufitu", 1)
+            if label.startswith("ponizej:"):
+                if len(seg) < 2:
+                    continue
+                p = _e7t_pair(seg[1], label.split(":", 1)[1])
+            else:
+                p = _e7t_pair(seg[0], label)
+            if not p:
+                continue
+            a, b, x, y = p
+            if a is not None and x:
+                sa += a * x; na += x
+            if b is not None and y:
+                sb_ += b * y; nb += y
+        return (sa / na if na else None), (sb_ / nb if nb else None), na, nb
+
+    nf, npl, n1, n2 = wavg("ponizej:Polnoc las/rownina", w31)
+    df_, dpl, n3, n4 = wavg("ponizej:Dorne pustynia/rownina", w31)
+    f3 = lambda v: f"{v:.3f}" if v is not None else "-"
+    ok3 = None
+    if nf is not None and npl is not None and df_ is not None and dpl is not None:
+        ok3 = (nf < npl) and (df_ <= dpl)
+    rep.add("E7/T T3: ponizej sufitu MarchPace - karawany i wozy wsi (d31-okno, srednie wazone)",
+            f"Polnoc las/rownina {f3(nf)}/{f3(npl)} (n {n1}/{n2}), Dorne pustynia/rownina {f3(df_)}/{f3(dpl)} (n {n3}/{n4})",
+            "Polnoc las < rownina, Dorne pustynia <= rownina (klucz on; off - spodziewane odwrotnie)", ok3 if on else None)
+    lf, lpl, m1, m2 = wavg("Polnoc las/rownina", w31)
+    ld, ldp, m3, m4 = wavg("Dorne pustynia/rownina", w31)
+    caps = [fnum(r"na suficie MarchPace ([0-9.]+)%", kt[d]) for d in w31]
+    caps = [c for c in caps if c is not None]
+    capt = f"sr. {sum(caps) / len(caps):.1f}%" if caps else "-"
+    rep.add("E7/T: rody (na suficie i nie) - odczyt (d31-okno)",
+            f"Polnoc las/rownina {f3(lf)}/{f3(lpl)} (n {m1}/{m2}), Dorne pustynia/rownina {f3(ld)}/{f3(ldp)} (n {m3}/{m4}); probek rozpiski na suficie MarchPace {capt}",
+            "INFO (kolumny piesze na suficie - zmiana 0-2%)", None)
+    xo = [fnum(r"stara regula ([0-9.]+) jedn\.", kt[d]) for d in win]
+    xn = [fnum(r"jedn\., teraz ([0-9.]+) jedn\.", kt[d]) for d in win]
+    xo = [x for x in xo if x is not None]
+    xn = [x for x in xn if x is not None]
+    rep.add("E7/T: zwrot ponad netto gry (ok., na partio-godzine w lesie/na pustyni)",
+            f"stara regula sr. {sum(xo) / len(xo):.4f} jedn., teraz sr. {sum(xn) / len(xn):.4f} jedn." if xo and xn else "brak",
+            "INFO (teraz 0 przy kluczu on)", None)
+    # ---- T4 koszt, bledy, potkniecia
+    cost = [(fnum(r"\| koszt ([0-9.]+) ms", kt[d]), d) for d in win]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E7/T T4: koszt probki (godzinna + rozpiska gry)", f"srednio {m:.3f} ms/dobe, najwiecej {mx[0]:.3f} ms (d{run_day(mx[1], start)}) - {len(cost)} dob",
+                "<= 20 ms/dobe srednio", m <= 20.0)
+    errs = [s for s in lines if s.startswith("ERROR in TerrainEase")]
+    stum = max([num(r"\| potkniecia (\d+)", kt[d], default=0) or 0 for d in win] or [0])
+    rep.add("E7/T T4: bledy TerrainEase i potkniecia probki", f"ERROR in TerrainEase {len(errs)}; potkniecia (najwiecej w linii) {stum}", "0 i 0",
+            len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/T T4: bledy TerrainEase polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="TerrainEase")
+    # ---- T6 regresja E5: miasta kupuja >= 98% plonu (wozy wsi Polnocy w lesie wolniej)
+    pv = by_day(lines, "Przeplywy osad: dzien")
+    tw = by_day(lines, "Towary (utarg wozow): dzien")
+    days6 = [d for d in sorted(set(pv) | set(tw)) if 31 <= run_day(d, start) <= until]
+    su = sum(num(r"towar niesprzedany po wizycie: w miastach (\d+) szt", pv[d], default=0) or 0 for d in days6 if d in pv)
+    ss = sum(num(r"za (\d+) szt\.", tw[d], default=0) or 0 for d in days6 if d in tw)
+    share = (100.0 * su / (su + ss)) if (su + ss) > 0 else None
+    rep.add("E7/T T6: regresja E5 - towar wsi niesprzedany w miastach (d31-okno)",
+            f"{su} szt. wobec sprzedanych {ss} ({share:.3f}% plonu)" if share is not None else "brak linii Przeplywy osad / Towary (utarg wozow)",
+            "<= 2% (miasta kupuja >= 98% plonu)", (share <= 2.0) if share is not None else None)
+    rep.add("E7/T T5: tempo marszu", "poza blokiem", "Miara: marsz (marsz.py, rozdz. 4) w progu 124-138 km/dobe", None)
+
+
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
@@ -6267,7 +6393,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
         start = alld[0] if alld else 0
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0, etap7_o1):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_0, etap7_o1, etap7_t):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
