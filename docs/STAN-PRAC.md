@@ -1323,3 +1323,7 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   gry, prefab laduje sie niezaleznie od klucza); (2) u Jeffa Armoury.json "CampBattlePropsEnabled": false (:302) - bez zmiany na true O2 nie dziala (Jeff 09.10 "wlaczyc"); (3) MapVillageLore.
   SessionStart przed McmSettings.Apply - tylko linia startu sesji (poza zakresem); (4) BK latki na SetMovePatrolAroundSettlement/GoToPoint/PatrolAroundPoint nie wpinaja sie w 1.4.8 -
   etap 8; (5) AIInfluence moze miec wlasna latke SetMoveGoToSettlement (zaciemniony) - obserwowac w tescie.
+- W TOKU (16:45 UTC 12.10): workflow wf_42f8dda9-fa3 na `w-toku/zbior-5-8` (SCRATCH\zb\58, od e6-p3): scalenie e7-a + e7-b (z mechaniczna weryfikacja, ze nic nie zginelo), potem
+  etap 5 reszta: A7, A8, rozpoznanie "bitwy" 26 tys./d, C1 (TownPurseNoTopUp domyslnie true), C2, C4; potem etap 7 R1, R2, W4; na koncu dwa przeglady calosci (ekonomia, kod) i DLL
+  test\Armoury-zbior58.dll. Galaz wypychana co 15 min. Jesli przerwane (limit): `git -C <lancuch> log --oneline w-toku/e6-p3..w-toku/zbior-5-8` pokaze zrobione kroki;
+  wznowienie Workflow resumeFromRunId wf_42f8dda9-fa3. Potem: projekt i kod etapu 8, pelny audyt, autotest z plikami danych (patrz uwaga e7-b), test zbiorczy.
