@@ -1312,3 +1312,14 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   teraz licznik na material z sakw gracza (arm_mend_frac), sztuka schodzi, gdy sie nazbiera; puste sakwy - naprawa czeka, licznik bez zmian. Kowale miasta, kwatermistrz Spoils,
   ludzie gracza i AI juz liczyli w kg z zapasem kowali (arm_mendstock, zloto za zuzyty ulamek) - bez drugiego licznika. Klucz MendFractionMemory. Test reczny w kuzni (autotest nie
   cwiczy wlasnych rak). DLL test\Armoury-e6p3.dll 7627f953.
+- (16:35 UTC 12.10) **Etap 7 (bez R1/R2/W4, D1/D2) GOTOWY w kodzie** (wf_17813d40-8ac, kazda paczka autor + recenzent, przeglady kolizji bez uwag):
+  `w-toku/e7-a` be9cd4c: E7/0 pomiar (WorldClock7), O1 sen do switu (SleepGate - 10 metod SetMove*, SleepersHoldOrders), T kary terenu jak gra (TerrainEase), C jedna skala czasu
+  (odwet kryjowek na zegarze gry), K turnieje co 3. tydzien caly rok / sojusz 364 / wezwanie 182 / przerwa po pokoju, O2 namioty i ognisko przy napadzie na oboz gracza. DLL test\Armoury-e7-a.dll c618977a.
+  `w-toku/e7-b` 8e28af6: L dane lore 2 446 wiosek (arm_map_village_lore.tsv, tools\wioski-lore\l0.py; herb gry tylko u 140 wiosek - reszta pokaze herb pana), B licznik Bliznakow
+  (TwinsCrossing), W1 komunikat "plonie Twoja wioska" + pamiec wojny (sekcja m: w arm_district), W2 dymek wioski, W3 menu okregu, W5 proporczyk pana, D0 proba drog (MapRoadsProbeEnabled
+  domyslnie false). DLL test\Armoury-e7-b.dll 6d69845d.
+  **WAZNE DO TESTU I WGRANIA:** (1) e7-b potrzebuje plikow poza DLL: Armoury\ModuleData\arm_map_village_lore.tsv, Armoury\ModuleData\arm_map_roads_probe.tsv, Armoury\GUI\Prefabs\
+  ArmMapVillageTooltip.xml, Armoury\Prefabs\arm_map_roads.xml - autotest.ps1 podmienia tylko DLL, trzeba dopisac kopiowanie i przywracanie tych plikow (blad w XML prefabu = blad startu
+  gry, prefab laduje sie niezaleznie od klucza); (2) u Jeffa Armoury.json "CampBattlePropsEnabled": false (:302) - bez zmiany na true O2 nie dziala (Jeff 09.10 "wlaczyc"); (3) MapVillageLore.
+  SessionStart przed McmSettings.Apply - tylko linia startu sesji (poza zakresem); (4) BK latki na SetMovePatrolAroundSettlement/GoToPoint/PatrolAroundPoint nie wpinaja sie w 1.4.8 -
+  etap 8; (5) AIInfluence moze miec wlasna latke SetMoveGoToSettlement (zaciemniony) - obserwowac w tescie.
