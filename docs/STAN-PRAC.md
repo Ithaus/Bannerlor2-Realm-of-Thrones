@@ -1347,3 +1347,5 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   ulamkow (jak N1b); (6) milicja z daru Spoils - wyciac; (7) INACZEJ: jezdziec = kon + UPRZAZ (sam kon nie wystarczy, zeby stworzyc jezdzca) - sprawdzic dzisiejsza regule awansu/
   dosadzenia i dodac wymog uprzezy (AI i gracz, jedna regula), pomiar skutku dla jazdy; (8) kuznia - zostaje jak jest; (9) pasek DTE - nie wylaczac; (10) lzejsze logi - nie; (11) liczba
   partii - nie w etapie 8.
+- (19:40 UTC 12.10) **KONIEC KONTA ae222cb7 - przejscie na drugie konto (Jeff).** Pelny stan i kolejnosc: `docs/PRZEKAZANIE-2026-10-08.md` rozdz. 27 (+ 26b sciezki i sprzatanie).
+  zbior-5-8 f01f47a (do E7/R1 wlacznie), a8-gentry0 bc5e3ef, e8-a 8a8df38 (E8/0), e8-b bf66298 (E8/M); recenzje E8/0 i E8/M dokanczane (wf_7d02158c-a00). W grze WGRANIE 33.
