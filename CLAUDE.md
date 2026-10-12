@@ -115,6 +115,12 @@ wystawia obce wojsko — patrz `docs/ERRORS.md`.
 
 **Zawsze rob `cd` do katalogu projektu przed `dotnet build`** — inaczej MSB1003.
 
+**Latki na `DefaultClanFinanceModel` zakladaj DOPIERO w kampanii (OnSessionLaunched),
+nigdy w SubModuleMain.** Harmony kompiluje zalatana metode od razu, to uruchamia konstruktor
+statyczny klasy, a on czyta `Game.Current.GameTextManager` (przy starcie gry null) - klasa
+ginie na caly proces i kampania nie startuje (12.10: test zbiorczy zawieszony przez
+GarrisonRecruitFee). Wzor: `CrownIncome.EnsureHooks`, `WorkshopTrade.ApplyInCampaign`.
+
 **Zmiana wartosci DOMYSLNEJ w `Settings.cs` nie dziala, jesli MCM ma ja juz zapisana.**
 MCM trzyma wartosci w `Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\
 Armoury\Armoury.json` i nadpisuje nimi domyslne z kodu. Po zmianie domyslnej sprawdz ten plik
