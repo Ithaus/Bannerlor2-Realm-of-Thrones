@@ -158,7 +158,9 @@ namespace Armoury
                 {
                     if (today < c.DayDue) continue;
                     bool dstOk = c.Dst != null && c.Dst.ItemRoster != null, srcOk = c.Src != null && c.Src.ItemRoster != null;
-                    bool late = today - c.DayBought > MaxDays;
+                    // recenzja 215: 30 dob liczy sie do czekania - woz z droga dluzsza niz 30 dob (wyspa morzem, niskie tempo swiata) w dniu przyjazdu
+                    // nie zawraca od razu (dotad zawracal zawsze, nie dojezdzajac); droga do 30 dob - jak dotad
+                    bool late = today - c.DayBought > Math.Max(MaxDays, c.DayDue - c.DayBought);
                     if (!dstOk && !srcOk) { _dLost += c.Pieces; done.Add(c); continue; }   // nie ma dokad ani skad (tylko po zlym zapisie)
                     if (!dstOk || (late && srcOk)) { Back(c); done.Add(c); continue; }   // 30 dob - przed czekaniem (jak GarrisonCarts)
                     if (c.Dst.IsUnderSiege && !late) { _dWait++; continue; }
