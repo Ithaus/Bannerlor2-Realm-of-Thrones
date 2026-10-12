@@ -25,7 +25,7 @@
 - Build Release Armoury kod 0 (1 stare ostrzezenie CS0169). Narzedzie `--grupa etap2..etap5` na logu testu bez wyjatku (NIE: etap2 3, etap3 1, etap4 6, etap5 6 - bylo 8: A1-T12 TAK, wiersze INFO A2 wrocily). Gra nie uruchamiana.
 - **Co sprawdzic w ponownym tescie 120:** wojsko d93-120 (cel >= 85 tys.), linia 180 (dopisek E5/F9 > 0 w wojnie), A1-T11, K9, N6, nowe linie "Straz K8" i "Probka nowe-karawany" (przyczyny 4b/6 - krok 2 po logu), B3-8, linia "Kredyt korony (186)", stawka B2.
 
-**Status:** DO SPRAWDZENIA - ponowny test 120. DLL z 69b1c84 (`-p:GameLibs=<lancuch>\libs`, build kod 0): `SCR	est\Armoury-final.dll` md5 29fdca1e78e63b6cd7cb47da037cd091; nie wgrane, gra nie uruchamiana.
+**Status:** DO SPRAWDZENIA - ponowny test 120. DLL z 69b1c84 (`-p:GameLibs=<lancuch>\libs`, build kod 0): `SCR\test\Armoury-final.dll` md5 29fdca1e78e63b6cd7cb47da037cd091; nie wgrane, gra nie uruchamiana.
 
 ## 12.10 03:55 UTC - Poprawka testu zbiorczego: GarrisonRecruitFee - latka na DefaultClanFinanceModel dopiero w kampanii
 
