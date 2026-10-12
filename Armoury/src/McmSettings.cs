@@ -4704,6 +4704,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool TroopSwapNeedsHorse { get; set; } = true;
 
+        [SettingPropertyBool("Ai Sells Spare Horses", HintText = "a lord keeps a tenth more horses of each kind than his riders need - never fewer than Ai Mount Spare Buffer - and buys up to that; the horses of his fallen riders beyond half as many again he sells at the next market. The game no longer buys or sells lords' horses itself (off = lords buy for the men waiting to be raised to horse, as before, and the game trades their horses)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool AiSellsSpareHorses { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Spare Horse Share", 0.00f, 1.00f, "0.00", HintText = "the spare horses an AI lord keeps of each kind, as a share of his riders of that kind (never fewer in all than Ai Mount Spare Buffer)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float AiSpareHorseShare { get; set; } = 0.10f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5879,6 +5887,8 @@ namespace Armoury
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
             s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;
+            s.AiSellsSpareHorses = AiSellsSpareHorses;
+            s.AiSpareHorseShare = AiSpareHorseShare;
         }
 
         internal static void Apply()

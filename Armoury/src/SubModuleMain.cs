@@ -180,6 +180,9 @@ namespace Armoury
                 // E6/K1 (211): okno DTE OnMapEventEnded (zgony koni autobitwy przed lupem, lup koni jako przeniesienie), zgony koni misji po zwrotach DTE (OnEndMission),
                 // BK karawany (wyrzucony dobytek na polke), dary startowe nowej druzyny z polki siedziby (GiveInitialItemsToParty, Last - po pomiarze E4/8)
                 try { HorseFate.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HorseFate.ApplyAll", e); }
+                // E6/K2 (212): gra nie handluje konmi lordow - kontekst PartiesBuyHorseCampaignBehavior.OnSettlementEntered, zakup BuyHorses i sprzedaz
+                // wierzchowcow przez SellItemsAction.Apply pominiete w tym kontekscie (sprzedaz towaru zostaje); dziala przy kluczu AiSellsSpareHorses
+                try { SpareHorses.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SpareHorses.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc

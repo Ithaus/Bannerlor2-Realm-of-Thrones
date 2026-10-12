@@ -535,7 +535,7 @@ namespace Armoury
         // ------------------------------------------------------------ linia dnia i CSV
         internal static void Daily()
         {
-            if (!On) { _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; return; }
+            if (!On) { _day.Clear(); _volKhuzaitBought = _volKhuzaitReverted = _volKhuzaitStays = 0; SpareHorses.DayReset(); return; }   // E6/K2: liczniki segmentu tez zerowane
             var inv = CultureInfo.InvariantCulture;
             int day = (int)CampaignTime.Now.ToDays;
             // kazde krolestwo ma wiersz (takze bez zdarzen)
@@ -571,6 +571,7 @@ namespace Armoury
               .Append(" (notable khuzait ").Append(_volKhuzaitBought).Append("/").Append(_volKhuzaitReverted).Append("/").Append(_volKhuzaitStays).Append(")")
               .Append(" | khuzait_footman w partiach i zalogach ").Append(t[CFootmanDothrakow])
               .Append(" | konie z modyfikatorem do zbrojowni: gorsze ").Append(t[CKonModUjemny]).Append(", lepsze ").Append(t[CKonModDodatni])
+              .Append(SpareHorses.LinePart())   // E6/K2 (212): zapas koni wedlug kategorii, sprzedaz nadmiaru, handel koni gry pominiety
               .Append(" | wiersze: krolestwa (AI lordowie i zalogi), ").Append(PlayerClanKey).Append(", ").Append(OtherPartiesKey)
               .Append(" | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());

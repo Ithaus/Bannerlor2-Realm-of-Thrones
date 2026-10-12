@@ -1447,6 +1447,10 @@ namespace Armoury
         public bool VeteranKeepsHorse = true;              // a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman
         public bool NewPartyHorsesFromSeat = true;         // a new lord's party gets its first horses and food from the shelves of its seat, paid by the house - or none
         public bool TroopSwapNeedsHorse = true;              // when a realm's troop rules turn a soldier into a mounted trooper, he rides only if his party has a horse for him, as for an upgrade; otherwise he becomes a footman of the same rank from his house's list
+        // E6/K2 (212, PLAN 6.13, R11): jeden zapas koni wedlug kategorii (Stables.Reserve) dla kupna Stajni AI i sprzedazy nadmiaru koni lordow (MenPurse.SellArmorySurplus,
+        // galaz koni); gra nie kupuje i nie sprzedaje koni lordow (PartiesBuyHorseCampaignBehavior - zakup i sprzedaz koni pominiete, sprzedaz towaru zostaje)
+        public bool AiSellsSpareHorses = true;             // a lord keeps a tenth more horses of each kind than his riders need - never fewer than Ai Mount Spare Buffer - and buys up to that; the horses of his fallen riders beyond half as many again he sells at the next market. The game no longer buys or sells lords' horses itself (off = lords buy for the men waiting to be raised to horse, as before, and the game trades their horses)
+        public float AiSpareHorseShare = 0.10f;            // the spare horses an AI lord keeps of each kind, as a share of his riders of that kind (never fewer in all than Ai Mount Spare Buffer)
 
         public static void Load(string moduleDataDir)
         {

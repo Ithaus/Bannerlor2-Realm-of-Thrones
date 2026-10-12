@@ -178,7 +178,7 @@ namespace Armoury
             if (_dayStamp >= 0 && (_daySold + _dayLife + _dayGear + _dayCloth + _dayWage + _dayIn + _dayOut + _daySaved + _dayCamp) > 0)
                 Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord + Drobne39.ThirdNote()
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", u markietanow w polu (E5/A3) " + _dayCamp + ", na odziez wojska (150) " + _dayCloth
-                         + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki, zaplata za najem i udzial w puli weteranow - E5/B6), wyszlo " + _dayOut
+                         + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki, zaplata za najem i udzial w puli weteranow - E5/B6, konie lordow ponad zapas - E6/K2), wyszlo " + _dayOut
                          + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, markietani, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
             _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = d;
         }
@@ -607,8 +607,78 @@ namespace Armoury
                 }
                 if (grp) meleeLeft -= planned;
             }
+            // E6/K2 (212): osobna galaz koni (AiSurplusPlan dalej bez koni) - tylko partie lordow; konie i ich zloto poza licznikami nadwyzek sprzetu tej linii
+            // (segment E6/K2 linii "Konie AI (175)"); kasa pusta przy sprzecie - koni tez nie dzis
+            if (!garrison && !stop && SpareHorses.SellOn) SellSpareHorses(mp, st, third, pct, arm, gold, ref cutSum);
             if (sold > 0) { _daySold += sold; _dayGold += gold; if (garrison) { _dayGarSold += sold; _dayGarGold += gold; } }
             return sold;
+        }
+
+        /// <summary>
+        /// E6/K2 (212, R11): konie partii lorda ponad 1.5 x zapas kategorii (Stables.Reserve - ta sama funkcja co kupno Stajni AI) na polke miasta. Najgorsze konie
+        /// kategorii najpierw: z taboru (wartosc z modyfikatorem) albo wolne w zbrojowni DTE (najwyzej Free[k] z Balance - przydzial jezdzcom wedlug kategorii zostaje
+        /// pokryty; stan konia jak przy sprzecie - AiWear.TakeCondition). Cena skupu tej polki liczona przy kazdej sztuce, kasa miasta tylko z nadwyzki ponad zapas
+        /// kupcow (CastlePurse.Spendable); trzecia lordowi od sumy wizyty (Drobne39.ThirdCut - razem z nadwyzkami sprzetu tej wizyty), reszta do sakiewki ludzi.
+        /// Kon przechodzi z partii na polke - przeniesienie w ksiedze "Konie (E6/0)".
+        /// </summary>
+        private static void SellSpareHorses(MobileParty mp, Settlement st, Hero third, float pct, Dictionary<ItemObject, int> arm, int kitGold, ref int cutSum)
+        {
+            Stables.HorseReserve r;
+            try { r = Stables.Reserve(mp); }
+            catch (Exception e) { SpareHorses.Stumble("Reserve", e); return; }
+            var soldK = new int[3];
+            int horseGold = 0, fromArm = 0;
+            bool noBuyer = false;
+            try
+            {
+                var bag = mp.ItemRoster;
+                for (int k = 0; k < 3 && !noBuyer; k++)
+                {
+                    int over = r.Over(k), freeLeft = r.Free[k];
+                    while (over > 0)
+                    {
+                        int bi = -1, bv = int.MaxValue, av = int.MaxValue;
+                        ItemObject ai = null;
+                        if (bag != null)
+                            for (int i = 0; i < bag.Count; i++)
+                            {
+                                var e0 = bag[i];
+                                var it0 = e0.EquipmentElement.Item;
+                                if (it0 == null || e0.Amount <= 0 || !Stables.IsPlainMount(it0) || Stables.Level(it0.ItemCategory) != k) continue;
+                                int v = e0.EquipmentElement.ItemValue;
+                                if (v < bv) { bv = v; bi = i; }
+                            }
+                        if (freeLeft > 0 && arm != null)
+                            foreach (var kv in arm)
+                            {
+                                if (kv.Key == null || kv.Value <= 0 || !Stables.IsPlainMount(kv.Key) || Stables.Level(kv.Key.ItemCategory) != k) continue;
+                                if (kv.Key.Value < av) { av = kv.Key.Value; ai = kv.Key; }
+                            }
+                        if (bi < 0 && ai == null) break;
+                        bool fromBag = bi >= 0 && (ai == null || bv <= av);
+                        var el = fromBag ? bag[bi].EquipmentElement : new EquipmentElement(ai, AiWear.TakeCondition(mp, ai));
+                        int unit = SellPriceHere(el, st, mp);
+                        if (CastlePurse.Spendable(st.Town) < unit) { if (!fromBag) AiWear.PutBack(mp, ai, el.ItemModifier); noBuyer = true; break; }   // brak kupca - stan wraca
+                        if (fromBag) bag.AddToCounts(el, -1);
+                        else { int cnt = arm[ai]; if (cnt > 1) arm[ai] = cnt - 1; else arm.Remove(ai); freeLeft--; fromArm++; }
+                        st.ItemRoster.AddToCounts(el, 1);
+                        st.Town.ChangeGold(-unit);
+                        MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
+                        int cut = third != null && third.IsAlive ? Drobne39.ThirdCut(unit, kitGold + horseGold, cutSum, pct) : 0;
+                        if (cut > 0)
+                        {
+                            third.ChangeHeroGold(cut);
+                            if (third != Hero.MainHero) ClanIncomeBook.NoteInflow(third, cut, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
+                        }
+                        Add(mp, unit - cut);
+                        horseGold += unit; cutSum += cut; _dayLord += cut;
+                        soldK[k]++; over--;
+                    }
+                }
+            }
+            catch (Exception e) { SpareHorses.Stumble("SellSpareHorses", e); }
+            if (fromArm > 0) HorseState.Refresh(mp);   // E6/K0: stan koni partii po zdjeciu wolnych koni zbrojowni
+            SpareHorses.NoteVisit(mp, r, soldK, horseGold, fromArm, noBuyer);
         }
 
         /// <summary>sklad7: cena skupu na polce TEJ osady (miasto albo zamek - jego targ); bez targu - jak SellPrice (najblizsze miasto).

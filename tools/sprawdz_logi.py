@@ -85,6 +85,9 @@ Uzycie (Python 3, tylko odczyt):
                     CZYNNE w dobach okna, reszta niewyjasniona koni - kazde 7 dob d31-until: |suma| <= max(5, 1% (zrodla + ujscia)), kon najemnika z wzorca 0,
                     dobytek rozbitych bez miejsca 0, kopie lupu DTE bez pokrycia u pokonanych 0, potkniecia 0; polegle (misja/autobitwa, W), lup, dobytek,
                     pula weteranow, dary z polki siedziby, zamiany ROT - INFO.
+                    Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
+                    CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), zakup i sprzedaz tej samej
+                    kategorii w 7 dobach 0, potkniecia 0; sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3276,6 +3279,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k1(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K2 (212): jeden zapas koni wedlug kategorii, nadmiar koni AI na targ, gra nie handluje konmi lordow (etap 6 - grupy etap6 jeszcze nie ma; brak segmentu - INFO)
+    try:
+        etap5_k2(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3466,6 +3474,58 @@ def etap5_k1(rep, lines, start, until):
     st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
     rep.add("K1-10: zamiany ROT na konnego (suma okna) i potkniecia HorseFate", f"z koniem {rh}, na pieszego {rf}, konny bez konia {rk}; potkniecia {st}",
             "potkniecia 0 (zamiany - INFO)", st == 0)
+
+def etap5_k2(rep, lines, start, until):
+    """E6/K2 (212, projekt etapu 6 v2 rozdz. 3 "E6/K2" Test): segment "zapas koni wedlug kategorii (E6/K2)" w linii doby "Konie AI (175): dzien N"
+    (dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Nadwyzka ponad 1.5 x zapas po postoju w miescie liczona w d91-until (krotsze okno - cale)."""
+    tag = "zapas koni wedlug kategorii (E6/K2):"
+    seg = {}
+    for d, s in by_day(lines, "Konie AI (175): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until and tag in s:
+            seg[rd] = s.split(tag, 1)[1].split(" | ", 1)[0]
+    rep.add("K2-1: segment zapasu koni (E6/K2) w linii Konie AI (175)", f"{len(seg)} dob", "codziennie od wgrania E6/K2 (linia przy Army175Measure)", None)
+    hook = [s for s in lines if s.startswith("SpareHorses (E6/K2, 212):")]
+    if hook:
+        rep.add("K2-2: wpiecia handlu koni gry (PartiesBuyHorseCampaignBehavior)", hook[-1][:200], "bez BRAK i bez bledu wpiecia",
+                ("BRAK" not in hook[-1]) and ("blad wpiecia" not in hook[-1]))
+    if not seg:
+        return
+    days = sorted(seg)
+    off = [x for x in days if not seg[x].startswith(" CZYNNE")]
+    rep.add("K2-3: E6/K2 CZYNNE w dobach okna", f"{len(days) - len(off)} z {len(days)}" + (f"; ostatnia nieczynna d{off[-1]}" if off else ""),
+            "wszystkie doby (klucz AiSellsSpareHorses)", len(off) == 0)
+    lo = 91 if until >= 91 and any(x >= 91 for x in days) else 1
+    win = [seg[x] for x in days if x >= lo]
+    over = sum(num(r"ponad 1\.5 x zapas zostalo (\d+)", x, int, 0) or 0 for x in win)
+    riders = sum(num(r"zostalo \d+ przy (\d+) konnych", x, int, 0) or 0 for x in win)
+    vis = sum(num(r"postoje lordow w miescie (\d+)", x, int, 0) or 0 for x in win)
+    pct = 100.0 * over / riders if riders else 0.0
+    rep.add(f"K2-4: nadwyzka ponad 1.5 x zapas kategorii po postoju w miescie (d{lo}-{until})",
+            f"{over} przy {riders} konnych ({pct:.2f}%), postojow {vis}", "<= 2% konnych (kasa miasta bez nadwyzki zostawia konie - INFO w K2-6)",
+            (pct <= 2.0) if riders else None)
+    rows = [seg[x] for x in days]
+    pump = sum(num(r"zakup i sprzedaz tej samej kategorii w 7 dobach (\d+)", x, int, 0) or 0 for x in rows)
+    stu = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K2-5: pompa koni (zakup i sprzedaz tej samej kategorii w partii w 7 dobach) i potkniecia (suma okna)", f"pompa {pump}, potkniecia {stu}",
+            "pompa 0, potkniecia 0", pump == 0 and stu == 0)
+
+    def cats(pat, x):
+        m = re.search(pat, x)
+        return [int(v) for v in m.group(1).split("/")] if m else [0, 0, 0]
+
+    def add3(a, b):
+        return [a[i] + b[i] for i in range(3)]
+    sold, gold, arm, nob, gb, gs = (sum(num(p, x, int, 0) or 0 for x in rows) for p in (
+        r"sprzedane z nadwyzki (\d+)", r"sprzedane z nadwyzki \d+ za (\d+)", r"ze zbrojowni (\d+)", r"kasa miasta bez nadwyzki (\d+)",
+        r"zakupy/sprzedaze gry pominiete (\d+)", r"zakupy/sprzedaze gry pominiete \d+/(\d+)"))
+    bought = [0, 0, 0]
+    for x in rows:
+        bought = add3(bought, cats(r"kupione do zapasu ([\d/]+)", x))
+    rep.add("K2-6: sprzedaz nadmiaru i kupno do zapasu (suma okna)", f"sprzedane {sold} za {gold} (ze zbrojowni {arm}; kasa miasta bez nadwyzki {nob} postojow), "
+            f"kupione do zapasu zwykle/bojowe/szlachetne {'/'.join(map(str, bought))}; handel koni gry pominiety: zakupy {gb}, sprzedaze {gs} postojow",
+            "INFO (projekt: sprzedaze gry 0 - pominiete)", None)
+
 
 def etap5_fee(rep, lines):
     """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -

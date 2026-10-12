@@ -284,6 +284,7 @@ namespace Armoury
             public readonly int[] Horses = new int[3];   // konie pod siodlo w zbrojowni: zwykle, bojowe, szlachetne
             public readonly int[] Free = new int[3];     // wolne po przydziale jezdzcom
             public int Riders, RidersHigh, Unhorsed;     // konni szeregowi, w tym z prawem do bojowego (tier >= WarHorseFromTier), bez zadnego konia
+            public int UnhorsedHigh;                     // E6/K2: w tym bez konia z prawem do bojowego (zapas wedlug kategorii - Reserve)
             public int HorsesAll { get { return Horses[0] + Horses[1] + Horses[2]; } }
             public int FreeAll { get { return Free[0] + Free[1] + Free[2]; } }
         }
@@ -297,7 +298,7 @@ namespace Armoury
         /// Wolne = co zostaje w danej kategorii. adjust = poprawka liczby konnych wedlug typu (ujemna: jezdzcy, ktorzy wlasnie weszli
         /// i nie maja jeszcze konia - straz konia ROT; dodatnia: jezdzcy, ktorzy wlasnie odeszli - spis koni uwolnionych).
         /// </summary>
-        internal static ArmoryBalance Balance(MobileParty mp, System.Collections.Generic.Dictionary<CharacterObject, int> adjust = null)
+        internal static ArmoryBalance Balance(MobileParty mp, System.Collections.Generic.Dictionary<CharacterObject, int> adjust = null, bool plainOnly = false)
         {
             var b = new ArmoryBalance();
             if (mp == null) return b;
@@ -321,12 +322,14 @@ namespace Armoury
                     var el = r.GetElementCopyAtIndex(i);
                     var ch = el.Character;
                     if (ch == null || ch.IsHero || el.Number <= 0 || !ch.IsMounted) continue;
+                    if (plainOnly && !PlainRider(ch)) continue;   // E6/K2: tylko jezdzcy wzorca na zwyklym wierzchowcu (jak Remount - wielblady, slonie poza Stajnia)
                     int n0; men.TryGetValue(ch, out n0); men[ch] = n0 + el.Number;
                 }
                 if (adjust != null)
                     foreach (var kv in adjust)
                     {
                         if (kv.Key == null || kv.Key.IsHero || !kv.Key.IsMounted) continue;
+                        if (plainOnly && !PlainRider(kv.Key)) continue;
                         int n0; men.TryGetValue(kv.Key, out n0); men[kv.Key] = n0 + kv.Value;
                     }
                 int low = 0, high = 0;
@@ -343,10 +346,84 @@ namespace Armoury
                 for (int lv = 0; lv < 3; lv++) { t = Math.Min(rl, h[lv]); h[lv] -= t; rl -= t; }   // reszta: zwykly, bojowy, szlachetny
                 t = Math.Min(rh, h[0]); h[0] -= t; rh -= t;               // rycerz bez bojowego siada na zwyklym
                 b.Unhorsed = rh + rl;
+                b.UnhorsedHigh = rh;
                 Array.Copy(h, b.Free, 3);
             }
             catch { }
             return b;
+        }
+
+        // ------------------------------------------------------------ E6/K2 (212): jeden zapas koni wedlug kategorii
+        /// <summary>Jezdziec, ktorego wzorzec ma zwyklego wierzchowca (IsPlainMount) - ten sam warunek co Riders (Remount).</summary>
+        internal static bool PlainRider(CharacterObject ch)
+        {
+            try { var eq = ch != null ? ch.Equipment : null; return eq != null && IsPlainMount(eq[EquipmentIndex.Horse].Item); }
+            catch { return false; }
+        }
+
+        /// <summary>E6/K2: zapas koni partii AI wedlug kategorii (0 zwykly, 1 bojowy, 2 szlachetny), liczony z taboru i zbrojowni razem.</summary>
+        internal sealed class HorseReserve
+        {
+            public readonly int[] Target = new int[3];   // zapas = brak + luz
+            public readonly int[] Short = new int[3];    // brak: gotowi do awansu na jezdnego tej kategorii + jezdzcy bez konia
+            public readonly int[] Have = new int[3];     // wolne konie: tabor (IsPlainMount) + wolne w zbrojowni
+            public readonly int[] Free = new int[3];     // w tym wolne w zbrojowni (Balance)
+            public int Riders;                           // konni szeregowi (Balance)
+            /// <summary>Kupno do zapasu.</summary>
+            public int Buy(int k) { return Math.Max(0, Target[k] - Have[k]); }
+            /// <summary>Histereza: zostaje do 1.5 x zapas (w dol) - kupno do zapasu i sprzedaz ponad 1.5 x zapas nigdy sie nie spotkaja (Keep >= Target).</summary>
+            public int Keep(int k) { return (3 * Target[k]) / 2; }
+            public int Over(int k) { return Math.Max(0, Have[k] - Keep(k)); }
+        }
+
+        /// <summary>
+        /// E6/K2 (212, PLAN 6.13, R11; projekt etapu 6 v2 rozdz. 3 "E6/K2", krytyka K1-04) - JEDNA DEFINICJA ZAPASU KONI, czytana przez kupno Stajni AI
+        /// (OnSettlementEntered) i sprzedaz nadmiaru (MenPurse.SellArmorySurplus, galaz koni). Dotad trzy definicje: zakup want = NeedForUpgrades + bez konia
+        /// + AiMountSpareBuffer liczony bez kategorii (lord kupowal najtansze konie na awans t4, ktory chce bojowego), gra sprzedawala najcenniejsze konie przy
+        /// postoju, a wolne konie po poleglych lezaly. zapas_k = brak_k + luz_k: brak - gotowi do awansu na jezdnego kategorii k (NeedByCategory: t2-t3
+        /// zwykly, t4-t5 bojowy, t6 szlachetny tylko gdy partia go ma) + jezdzcy bez konia w zbrojowni (Balance; zwykli - zwykly, z prawem do bojowego - bojowy;
+        /// tylko przy TroopsFightWithOwnKitOnly - bez niego jezdziec dostaje konia ze wzorca i nikt nie przenosi koni pod jezdzcow, jak Remount);
+        /// luz_k = ceil(AiSpareHorseShare x jezdzcy kategorii) (szlachetny - bez luzu: rycerz t6 siada tez na bojowym), razem nie mniej niz
+        /// AiMountSpareBuffer (reszta do zwyklych - jak dotad "kilka luzem na straty" z najtanszych). Wolne = tabor (IsPlainMount) + wolne w zbrojowni
+        /// (Balance - ta sama regula przydzialu co stan koni partii HorseState, liczona dla jezdzcow wzorca na zwyklym wierzchowcu - plainOnly, jak Remount:
+        /// jezdziec wielblada nie czeka na konia, ktorego Remount i tak by mu nie dal). Wielblady, slonie, juczne - poza zapasem (MountLaw, K5).
+        /// </summary>
+        internal static HorseReserve Reserve(MobileParty mp)
+        {
+            var r = new HorseReserve();
+            if (mp == null || mp.Party == null) return r;
+            var c = Settings.Current;
+            var b = Balance(mp, null, true);
+            var needK = NeedByCategory(mp.Party);
+            int low = Math.Max(0, b.Riders - b.RidersHigh), high = Math.Max(0, b.RidersHigh);
+            bool own = GarrisonKit.OwnKitOn;
+            r.Riders = b.Riders;
+            r.Short[0] = needK[0] + (own ? Math.Max(0, b.Unhorsed - b.UnhorsedHigh) : 0);
+            r.Short[1] = needK[1] + (own ? Math.Max(0, b.UnhorsedHigh) : 0);
+            r.Short[2] = needK[2];
+            double share = c != null ? MBMath.ClampFloat(c.AiSpareHorseShare, 0f, 1f) : 0.1;
+            int s0 = (int)Math.Ceiling(share * low - 1e-4), s1 = (int)Math.Ceiling(share * high - 1e-4);   // -1e-4: 0.1f x 30 to 3.0000000447, nie 4
+            int floor = c != null ? Math.Max(0, c.AiMountSpareBuffer) : 2;
+            if (s0 + s1 < floor) s0 = floor - s1;
+            r.Target[0] = r.Short[0] + s0;
+            r.Target[1] = r.Short[1] + s1;
+            r.Target[2] = r.Short[2];
+            try
+            {
+                var bag = mp.ItemRoster;
+                if (bag != null)
+                    for (int i = 0; i < bag.Count; i++)
+                    {
+                        var el = bag[i];
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                        int lv = Level(it.ItemCategory);
+                        if (lv >= 0) r.Have[lv] += el.Amount;
+                    }
+            }
+            catch { }
+            for (int k = 0; k < 3; k++) { r.Free[k] = b.Free[k]; r.Have[k] += b.Free[k]; }
+            return r;
         }
 
         /// <summary>Wolne konie zbrojowni danej kategorii (Balance; cat == null - wszystkie). adjust - patrz Balance.</summary>
@@ -504,22 +581,34 @@ namespace Armoury
                     return 0;
                 }
                 int lack = riders - have, moved = 0;
+                // E6/K2 (212): przy zapasie wedlug kategorii (AiSellsSpareHorses) jezdzcy bez konia dostaja konia swojej kategorii, jak przydzial Balance:
+                // z prawem do bojowego - bojowy, szlachetny, zwykly; pozostali - zwykly, bojowy, szlachetny (najtansze w kategorii). Dotad najtanszy kon
+                // dowolnej kategorii - bojowy kupiony do zapasu rycerza zostawal w taborze, rycerz siadal na zwyklym, a sprzedaz ponad zapas na tym samym
+                // postoju zdejmowala swiezo kupionego bojowego (pompa). Bez klucza - jak dotad.
+                bool byCat = SpareHorses.On;
+                int needHigh = byCat ? Math.Min(lack, Math.Max(0, Balance(mp, null, true).UnhorsedHigh)) : 0;
                 while (lack > 0)
                 {
-                    int best = -1, bestVal = int.MaxValue;
+                    bool high = needHigh > 0;
+                    int best = -1, bestVal = int.MaxValue, bestRank = int.MaxValue;
                     for (int i = 0; i < bag.Count; i++)
                     {
                         var el = bag[i];
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
-                        if (it.Value < bestVal) { bestVal = it.Value; best = i; }
+                        int rank = 0;
+                        if (byCat) { int lv = Level(it.ItemCategory); rank = lv < 0 ? 3 : high ? (lv == 1 ? 0 : lv == 2 ? 1 : 2) : lv; }
+                        if (rank < bestRank || (rank == bestRank && it.Value < bestVal)) { bestRank = rank; bestVal = it.Value; best = i; }
                     }
                     if (best < 0) break;
                     var e = bag[best];
                     int take = Math.Min(lack, e.Amount);
+                    if (byCat) take = Math.Min(take, high ? needHigh : lack - needHigh);
+                    if (take <= 0) break;
                     if (!AiGear.AddToArmory(mp, e.EquipmentElement.Item, take)) break;   // DTE nie przyjal - zostaje w taborze
                     bag.AddToCounts(e.EquipmentElement, -take);
                     lack -= take; _dToArm += take; moved += take;
+                    if (high) needHigh -= take;
                 }
                 if (moved > 0) HorseState.Refresh(mp);   // E6/K0: stan koni partii po dosadzeniu jezdzcow (bez konia mniej)
                 _dNoHorse += Math.Max(0, lack);
@@ -737,7 +826,8 @@ namespace Armoury
                 // inaczej zwykle konie po poleglych t2-t3 blokowalyby zakupy na zawsze, a awanse t4+ odpadalyby w FilterTargets co dobe.
                 // Wizyta, w ktorej brakuje koni wlasciwej kategorii, a lord nie kupuje, bo tabor ma dosc koni INNEJ kategorii, idzie do
                 // pomiaru (blad sprzed 175 widoczny przed decyzja 4.3).
-                int want = NeedForUpgrades(party.Party) + lack;   // sklad7b-p: + jezdzcy bez konia w zbrojowni
+                int waitUp = NeedForUpgrades(party.Party);       // E6/K2: osobno do logu (dotad want - AiMountSpareBuffer - lack)
+                int want = waitUp + lack;   // sklad7b-p: + jezdzcy bez konia w zbrojowni
                 if (want <= 0) return;
                 HorseCensus.OnLordVisit(party);                  // 175.0: wizyta z potrzeba (pomiar)
                 var needK = NeedByCategory(party.Party);
@@ -751,9 +841,24 @@ namespace Armoury
                     deficit += Math.Max(0, needK[k] - hk);
                     if (bal != null) freeNeeded += bal.Free[k];
                 }
-                want += Math.Max(0, c.AiMountSpareBuffer);      // kilka luzem na straty
-                int have = CountAnyMounts(party.Party) + freeNeeded;
-                int need = want - have;
+                // E6/K2 (212): przy AiSellsSpareHorses kupno do zapasu wedlug kategorii (Reserve - ta sama funkcja co sprzedaz nadmiaru w MenPurse):
+                // brama "ktos czeka na awans albo na konia" bez zmian, ale lord kupuje tylko kategorie ponizej zapasu (quota) i najwyzej do zapasu;
+                // AiMountSpareBuffer nie jest dodawany osobno (jest minimum luzu w zapasie). Inaczej - jak dotad (bez kategorii, najtansze)
+                int[] quota = null;
+                int have, need;
+                if (SpareHorses.On)
+                {
+                    var rsv = Reserve(party);
+                    quota = new int[3];
+                    have = 0; need = 0;
+                    for (int k = 0; k < 3; k++) { quota[k] = rsv.Buy(k); need += quota[k]; have += rsv.Have[k]; }
+                }
+                else
+                {
+                    want += Math.Max(0, c.AiMountSpareBuffer);      // kilka luzem na straty
+                    have = CountAnyMounts(party.Party) + freeNeeded;
+                    need = want - have;
+                }
                 if (need <= 0) { if (deficit > 0) HorseCensus.OnLordSkipOtherCategory(party); return; }
                 int cap = Math.Max(1, c.AiMountMaxPerVisit);
                 if (need > cap) need = cap;              // jeden postoj to kilka koni, nie stado
@@ -793,6 +898,7 @@ namespace Armoury
                         var el = shelf[i];
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                        if (quota != null) { int qk = Level(it.ItemCategory); if (qk < 0 || quota[qk] <= 0) continue; }   // E6/K2: tylko kategoria ponizej zapasu
                         // KLIMAT (Jeff 30.08: "kamele w zimowym srodowisku?!"):
                         // wielblad/rydwan schodzi z targu tylko u swoich -
                         // lord Polnocy nie wsadzi jazdy na dromadery
@@ -809,8 +915,12 @@ namespace Armoury
                     // ceny hurtu (Jeff 09.10 08:00): kazdy kon po swojej cenie - po zdjeciu konia z polki nastepny wyceniany od nowa (ShelfBuy);
                     // dotad cena pierwszego x liczba koni. Pierwszy - cena z przegladu polki (ta sama polka).
                     int cost, first, lastP;
-                    int take = ShelfBuy.Take(shelf, cel, Math.Min(needMarket, chosen.Amount), budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
+                    int mk = quota != null ? Level(cel.Item.ItemCategory) : -1;
+                    int upTo = Math.Min(needMarket, chosen.Amount);
+                    if (mk >= 0) upTo = Math.Min(upTo, quota[mk]);
+                    int take = ShelfBuy.Take(shelf, cel, upTo, budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
                     if (take <= 0) break;
+                    if (mk >= 0) { quota[mk] -= take; SpareHorses.NoteBuy(party, mk, take); }
                     party.ItemRoster.AddToCounts(cel, take);
                     paid += cost; bought += take; need -= take; needMarket -= take; boughtMarket += take;
                     var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
@@ -836,10 +946,13 @@ namespace Armoury
                             var el = vr.GetElementCopyAtIndex(i);
                             var it = el.EquipmentElement.Item;
                             if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                            int vk = quota != null ? Level(it.ItemCategory) : -1;
+                            if (quota != null && (vk < 0 || quota[vk] <= 0)) continue;   // E6/K2: tylko kategoria ponizej zapasu
                             int price = BreederPrice(settlement, el.EquipmentElement, markup, byMarket);
                             int take = 0;
-                            while (take < el.Amount && need > 0 && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
+                            while (take < el.Amount && need > 0 && (vk < 0 || take < quota[vk]) && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
                             if (take <= 0) { tooDear = true; continue; }
+                            if (vk >= 0) { quota[vk] -= take; SpareHorses.NoteBuy(party, vk, take); }
                             vr.AddToCounts(el.EquipmentElement, -take);
                             party.ItemRoster.AddToCounts(el.EquipmentElement, take);
                             TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, vs, price * take);
@@ -864,9 +977,9 @@ namespace Armoury
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
-                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + (want - Math.Max(0, c.AiMountSpareBuffer) - lack)
+                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + waitUp
                          + ", jezdzcow bez konia " + lack
-                         + ", mial " + have + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
+                         + ", mial " + have + (quota != null ? " wolnych - kupno do zapasu wedlug kategorii E6/K2" : "") + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
         }
