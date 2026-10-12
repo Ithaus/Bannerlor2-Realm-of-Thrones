@@ -33,7 +33,8 @@ namespace Armoury
     /// (b) Zapasowe konie lordow = zapas Stables.Reserve z E6/K2 (osobnego klucza nie ma - to bylaby trzecia definicja zapasu); jedza jak kazdy kon (pasza K0).
     /// (c) Udzwig: gra daje 20 kg za kazdego luzaka (NumberOfMounts, "Spare Mounts", G DefaultInventoryCapacityModel.cs:78). Konie partii (luzaki + wolne konie
     ///     zbrojowni przy SpareHorsesCarryFootmen) niosa najpierw piechure, potem jencow (kolejnosc MarchPace.Cap), reszta niesie juki; udzwig w modelu gry maja tylko
-    ///     luzaki taboru, wiec luzakow pod jukami = min(luzaki, konie - piesi - jency). Postfiks modelu dopisuje (SpareHorseCarryKg - 20) za kazdego takiego
+    ///     luzaki taboru, wiec luzakow pod jukami = min(luzaki, konie - piesi - jency); w armii liczone dla calej kolumny (gra i MarchPace sadzaja piechure
+    ///     jednej partii na luzaku drugiej), partia dostaje udzial wedlug swoich luzakow. Postfiks modelu dopisuje (SpareHorseCarryKg - 20) za kazdego takiego
     ///     luzaka (60 kg ZAMIAST 20); luzak pod piechurem zostaje przy 20 kg gry. Tylko na ladzie (jak gra). Lancuch: BK VanillaModelTweakPatches dopisuje 20 kg
     ///     za juczne (perk) - inny skladnik; MarketRoad.CartPostfix - tylko tabory wsi (mnoznik wozu dziala tez na nasz dopisek - dopisek jest w bazie). Postfiks
     ///     tylko czyta (watki tiku partii): rostery, stan koni partii K0 (ConcurrentDictionary). Linia liczy luzaki raz na dobe po wszystkich partiach.
@@ -188,7 +189,11 @@ namespace Armoury
         // ------------------------------------------------------------ (c) udzwig luzaka pod jukami
 
         /// <summary>Luzaki taboru pod jukami: konie partii (luzaki + wolne konie zbrojowni przy K0) najpierw pod piechote, potem pod jencow, reszta pod juki;
-        /// udzwig gry maja tylko luzaki taboru - wynik najwyzej luzaki. mounts - luzaki taboru (licznik gry, z K0 takze ze stanem).</summary>
+        /// udzwig gry maja tylko luzaki taboru - wynik najwyzej luzaki. mounts - luzaki taboru (licznik gry, z K0 takze ze stanem).
+        /// Armia (wodz i partie doczepione do wodza): konie kolumny wspolne - gra w predkosci (G DefaultPartySpeedCalculatingModel AddCargoStats: luzaki, piesi
+        /// i jency calej armii razem) i MarchPace.CountColumn sadzaja piechure jednej partii na luzaku drugiej, wiec luzakow pod jukami liczy sie dla calej
+        /// kolumny, a partia dostaje udzial wedlug swoich luzakow (w dol - suma udzialow nie wieksza niz wynik kolumny; bez tego luzak partii A niosl
+        /// piechura partii B w predkosci i 60 kg w udzwigu A - podwojnie, krytyka K1-07). Partia armii jeszcze nie doczepiona - sama.</summary>
         internal static int UnderPacks(MobileParty mp, bool k0, out int mounts)
         {
             mounts = 0;
@@ -196,11 +201,40 @@ namespace Armoury
             if (pb == null) return 0;
             mounts = pb.NumberOfMounts;
             if (mounts <= 0) return 0;
-            int foot = pb.NumberOfMenWithoutHorse;
+            var army = mp.Army;
+            var lead = army != null ? army.LeaderParty : null;
+            if (lead != null && (lead == mp || mp.AttachedTo == lead))
+            {
+                var att = lead.AttachedParties;
+                if (att != null && att.Count > 0)
+                {
+                    long all = 0, free = 0;
+                    Column(lead, k0, ref all, ref free);
+                    for (int i = 0; i < att.Count; i++) { var ap = att[i]; if (ap != null && ap != lead) Column(ap, k0, ref all, ref free); }
+                    if (free <= 0 || all <= 0) return 0;
+                    return (int)(Math.Min(free, all) * mounts / all);
+                }
+            }
+            int f = Free(mp, k0, mounts);
+            return f <= 0 ? 0 : Math.Min(f, mounts);
+        }
+
+        /// <summary>Konie partii ponad piechote i jencow: luzaki + wolne konie zbrojowni (K0) - piesi - jency (moze byc ujemne).</summary>
+        private static int Free(MobileParty mp, bool k0, int mounts)
+        {
+            int foot = mp.Party != null ? mp.Party.NumberOfMenWithoutHorse : 0;
             int pris = mp.PrisonRoster != null ? mp.PrisonRoster.TotalManCount : 0;
             int arm = k0 ? HorseState.FreeOf(mp) : 0;
-            int free = mounts + arm - foot - pris;
-            return free <= 0 ? 0 : Math.Min(free, mounts);
+            return mounts + arm - foot - pris;
+        }
+
+        private static void Column(MobileParty p, bool k0, ref long all, ref long free)
+        {
+            var pb = p.Party;
+            if (pb == null) return;
+            int m = pb.NumberOfMounts;
+            all += m;
+            free += Free(p, k0, m);
         }
 
         /// <summary>Postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity: (SpareHorseCarryKg - 20) kg za luzaka pod jukami (tylko na ladzie; tylko odczyt).</summary>
