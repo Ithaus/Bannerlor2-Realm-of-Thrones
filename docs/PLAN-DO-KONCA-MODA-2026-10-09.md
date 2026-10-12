@@ -198,12 +198,12 @@ Cel: zbroi starczy dla armii (po 174 ok. 120-190 zbroi na tulow dziennie przy po
 
 ### Etap 7. Tempo swiata, mapa, drogi, wioski
 
-Cel: armia idzie jak w ksiazkach (Winterfell - Krolewska Przystan ok. 77 dni, dzis 21); drogi przyspieszaja; wioski maja herb i menu okregu.
+Cel: armia idzie o polowe wolniej niz dzis (Jeff 12.10; Winterfell - Krolewska Przystan ok. 42 dni, dzis 21; ksiazki ok. 77 - za wolno); drogi przyspieszaja; wioski maja herb i menu okregu.
 
 | # | Co | Status | Wiel. | Zalezy od |
 |---|---|---|---|---|
 | 7.1 | Najpierw blokady tempa; jedna skala czasu | zdecyd. | S | etap 3 |
-| 7.2 | Tempo z ksiazek (forsowny 32 km dziennie), wozy i karawany, leczenie i starzenie | zdecyd. | D | 7.1 |
+| 7.2 | Tempo marszu O POLOWE wolniej niz dzis (Jeff 12.10: nie do wartosci z ksiazek - bylo by za wolno; Winterfell - Krolewska Przystan ok. 42 dni zamiast 21); wozy i karawany tym samym tempem; leczenie i starzenie bez zmian, chyba ze test pokaze potrzebe | zdecyd. | D | 7.1 |
 | 7.3 | Po zmianie tempa przeliczyc zapas wojenny i budzet rodu, awanse i nauke, ciaze; powtorzyc progi etapow 2 i 5 | zdecyd. | D | 7.2 |
 | 7.4 | Kary terenu: zwrot kary, ktorej gra nie nalozyla | blad | M | - |
 | 7.5 | Pelne drogi, +15% po drodze, drogi do wiosek i Valyrii | zdecyd. | D | 1.13 |
@@ -239,6 +239,7 @@ Cel: kazda znana usterka zamknieta; to, czego autotest nie gra, sprawdzone przez
 | 8.14 | BetterEconomy bez losowych susz, sol i piwo jako potrzeby: my dopisujemy klucz do skryptu, Ty go uruchamiasz | zdecyd. | M | - |
 | 8.15 | Pomiary: test Innych od doby 728, produkcja wsi z dodatkiem morskim, kara "Underequipped" w Twoich bitwach, dochod owiec | zdecyd. | M | 1.4 |
 | 8.16 | Twoje testy: kuznia (Kuj przy bramie, panel, pokretlo 35, "Pick a piece"); okna Spoils (Done/Cancel); turniej; niewola; jency do domu i ekran po bitwie; sprzedaz czystej, Battered i wraku; kulawy kon; rezerwa miasta 20 000; samonaprawa; karczma | Ty | S | - |
+| 8.17 | Optymalizacja - gra ma dzialac szybciej (Jeff 12.10): profil doby (dzis nasze mody ok. 7% czasu doby, najwiecej WorkshopLaw ok. 0.8 s/dobe), najdrozsze petle, potem gra i cudze mody | zdecyd. | M | - |
 
 **Skonczone, gdy:** kazda pozycja ma dowod z logu albo z Twojej gry.
 

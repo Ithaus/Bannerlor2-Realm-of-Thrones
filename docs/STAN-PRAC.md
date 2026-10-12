@@ -1247,3 +1247,5 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
   (kiesa biednych miasta / kiesa wsi), 50% budowa septow (75% place ludu, 25% material); (3) wies i lud miast szybciej wydaja nadwyzke: 15%/d zamiast 7%/d ponad zapas.
 - (10:25 UTC 12.10) **Jeff: etap 8 (drobne bledy) NIE "przy okazji"** - nie dokladamy drobnych bledow do paczek etapow 6/7 (CLAUDE.md 8.3); etap 8 jako osobny etap,
   wlasne paczki i wlasny test. Propozycja z 12.10 ("po kilka do kazdej paczki") ODRZUCONA.
+- (10:30 UTC 12.10) **Jeff: etap 7 - tempo marszu O POLOWE wolniej niz dzis (nie do wartosci z ksiazek - za wolno); etap 8 - takze OPTYMALIZACJA (gra ma dzialac szybciej).**
+  PLAN-DO-KONCA: 7.2 zmienione, nowe 8.17.
