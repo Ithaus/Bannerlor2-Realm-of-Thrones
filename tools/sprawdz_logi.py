@@ -4848,7 +4848,7 @@ def etap5_b2(rep, lines, start, until, wt):
     tk = sum(rows[d]["taken"] for d in pd)
     cl = sum(rows[d]["calls"] for d in pd)
     rep.add("E5/B2 B2-10: pobor 184 czynny (doby z krolestwami w wojnie i s > 0)", f"dob {len(pd)}, pobrano {tk} zl, wolan poboru {cl}",
-            "> 0 (0 = pobor niewpiety w TownFolk.Earn - po scaleniu B1 musi byc > 0; kiesa nieczynna - s = 0, wiersz INFO, B2-2 NIE)", (tk > 0) if pd else None)
+            "> 0 (0 = pobor niewpiety - TownFolk.PayCrown raz na dobe, po scaleniu B1 musi byc > 0; kiesa nieczynna - s = 0, wiersz INFO, B2-2 NIE)", (tk > 0) if pd else None)
     t28 = _last28(ds)
     rep.add("E5/B2 B2-11: wielkosc 184 (sr28): pobrano / ludzie miast / podzamcza",
             f"{st.mean(rows[d]['taken'] for d in t28):.0f} / {st.mean(rows[d]['town'] for d in t28):.0f} / {st.mean(rows[d]['castle'] for d in t28):.0f} zl/d"

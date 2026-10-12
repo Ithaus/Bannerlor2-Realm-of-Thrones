@@ -297,7 +297,7 @@ namespace Armoury
                       .Append("% - krolestw w wojnie ").Append(warK).Append(", z s > 0 ").Append(posK).Append(", na pulapie ").Append(capK).Append("; s > 0 w pokoju (spada, bez poboru) ").Append(peaceK)
                       .Append(" | pobrano ").Append(taken).Append(" zl (ludzie miast ").Append(_wtCls[WtW] + _wtCls[WtR] + _wtCls[WtP]).Append(": W ").Append(_wtCls[WtW]).Append(", R ").Append(_wtCls[WtR])
                       .Append(", P ").Append(_wtCls[WtP]).Append("; podzamcza ").Append(_wtCls[WtCastle]).Append("), wolan poboru ").Append(_wtCalls)
-                      .Append(" (0 przy s > 0 w wojnie = pobor niewpiety w TownFolk.Earn - B1), wstrzymane w oblezeniu ").Append(_wtHeld).Append(" (").Append(_wtHeldN).Append(')')
+                      .Append(" (0 przy s > 0 w wojnie = pobor niewpiety - TownFolk.PayCrown, scalenie B), wstrzymane w oblezeniu ").Append(_wtHeld).Append(" (").Append(_wtHeldN).Append(')')
                       .Append(" | potrzeba (7 dob, krolestwa w wojnie): kredyt 186 ").Append(needLoan).Append(" krolestw, zwrot ponad wplywy ").Append(needOver)
                       .Append(", skarbiec < zapas wojny ").Append(needLow).Append(" (zapas wojny razem ").Append(reserveWar).Append(')')
                       .Append(" | krok tygodnia: ").Append(step ? "dzis" : "nie (za " + (7 - today % 7) + " dob)");
