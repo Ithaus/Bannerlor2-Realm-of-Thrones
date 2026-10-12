@@ -3995,6 +3995,16 @@ def etap5_a1(rep, lines, start, until, logp):
                     day = num(r"dzien (\d+)", s2)
                     break
             trims.append((s, day))
+    # diagnoza 2 (bieg zbiorczy 329f2c7): przy E5/B1 najpierw zapasy startowe kies ludu biora czesc daru (linia "Kiesa ludu (E5/B1): zapasy startowe z daru kas
+    # miast"), reszta jest przycinana - prog 8-20 mln dotyczy calego daru ("dar do podzialu"), a zdjeto + zapasy = dar +-1. Przyciecie jest przed pierwsza migawka
+    # ksiegi (bilans otwarcia) - brak ujscia w przyczynach pierwszej doby to nie blad
+    seed_b1 = None
+    for s0 in lines:
+        if s0.startswith("Kiesa ludu (E5/B1): zapasy startowe z daru kas miast"):
+            m0 = re.search(r"= (\d+) \(miast \d+, zamkow \d+; dar do podzialu (\d+)", s0)
+            if m0:
+                seed_b1 = (int(m0.group(1)), int(m0.group(2)))
+            break
     if not trims:
         rep.add("E5/A1 A1-T12: dar startowy", "brak linii przyciecia", "nowa kampania: 1 linia, zdjeto 8-20 mln; zapis z doby 362: przyciecie 0", None)
     else:
@@ -4004,6 +4014,14 @@ def etap5_a1(rep, lines, start, until, logp):
             sink = num(r"dar startowy kas miast przyciety \(E5/A1\) (\d+)", cau.get(day, "")) if day is not None else None
             if old:
                 rep.add("E5/A1 A1-T12: dar startowy (stary zapis)", f"zdjeto {cut}", "0 (0.75^wiek)", cut == 0)
+            elif seed_b1 is not None:
+                seed, dar = seed_b1
+                okc = 8000000 <= dar <= 20000000 and abs(cut + seed - dar) <= 1
+                rep.add("E5/A1 A1-T12: dar startowy (nowa kampania, z E5/B1)",
+                        f"dar do podzialu {dar} = zapasy startowe kies ludu {seed} + zdjeto {cut} (roznica {cut + seed - dar:+d})"
+                        + (f"; ujscie {sink}" if sink is not None else "; ujscie: bilans otwarcia przed pierwsza migawka ksiegi (bez linii przyczyn)"),
+                        "dar do podzialu 8-20 mln ([S] ok. 14 mln); zdjeto + zapasy = dar +-1; ujscie = zdjeto +-1 albo bilans otwarcia",
+                        okc and (sink is None or abs(sink - cut) <= 1))
             else:
                 okc = 8000000 <= cut <= 20000000
                 if sink is None:
@@ -4213,10 +4231,10 @@ def etap5_a2(rep, lines, start, until, logp, bud):
                 continue
             y0, r = ow[d - 1], ow[d]
             outs = r[0] + r[1] + r[2] + r[3] + r[4]
-            late = r[8]   # recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis); E5 A2b: + wplaty rodow spoza bloku doby
-            exp = y0[5] + y0[7] + late - outs
+            pin = r[8]   # (diagnoza 5: nie "late" - nadpisywalo liste dob mean_late) recenzja E5/A5: wplaty gracza od wczorajszej linii (w zapasie od dzis); E5 A2b: + wplaty rodow spoza bloku doby
+            exp = y0[5] + y0[7] + pin - outs
             # wczytanie zapisu w tej samej sesji (Reset) - zapas od zera (najwyzej wplaty gracza po wczytaniu, przed doba)
-            if abs(r[5] + outs - late) <= 5 and (y0[5] > 0 or y0[7] > 0) and abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):
+            if abs(r[5] + outs - pin) <= 5 and (y0[5] > 0 or y0[7] > 0) and abs(r[5] - exp) > 5 + max(0, y0[6] - r[6]):
                 resets += 1
                 continue
             pairs += 1
@@ -5991,9 +6009,14 @@ def main(argv):
         a1 = num(r"zawor: (\d+) do panow", zz[k])
         if a1 is not None:
             lv.append(a1)
+    # E5/F9: procent zwrotu z linii "Obieg" (zwrot zoldu N (P% z M)) - Crown Wage Refund Percent 70 od poprawki wojska; bez linii 50% jak dotad
+    obg_z8 = by_day(lines, "Obieg: dzien")
+    pz = [num(r"zwrot zoldu \d+ \(([\d.]+)% z", obg_z8[k], float) for k in last_window(obg_z8)] if obg_z8 else []
+    pz = [x for x in pz if x is not None]
+    pct_z8 = st.mean(pz) / 100.0 if pz else 0.5
     if hv and lv:
-        net = st.mean(lv) - 0.5 * st.mean(hv)
-        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", f"{net:+.0f} na dobe (zawor panom {st.mean(lv):.0f}, zold bez zwrotu {st.mean(hv):.0f} x 50%)"
+        net = st.mean(lv) - pct_z8 * st.mean(hv)
+        rep.add("110/Z8: zawor zamkow do panow minus utracony zwrot korony (28 dob)", f"{net:+.0f} na dobe (zawor panom {st.mean(lv):.0f}, zold bez zwrotu {st.mean(hv):.0f} x {pct_z8 * 100:.0f}%)"
                 + (("; ciecie <= zawor: " + ("tak" if st.mean(hv) <= st.mean(lv) else "NIE - blad TakePaid")) if hv_b2
                    else "; log sprzed B-2 (114-p: ciecie z przewidywania - bez kontroli zgodnosci)"),
                 "po B-2 INFO - kontrola zgodnosci (ciecie <= zawor z definicji), wiazacy Z8 - wiersz nizej; log sprzed B-2 (114-p) >= 0",

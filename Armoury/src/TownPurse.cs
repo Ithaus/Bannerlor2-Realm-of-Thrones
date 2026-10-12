@@ -53,6 +53,8 @@ namespace Armoury
         private const float GameTargetPerProsperity = 12f;
         private const int BkLimitBase = 50000;               // BK BKEconomyModel.GetSettlementMarketGoldLimit: lenno 50 000 + dobrobyt x 25 (miasto) / x 12 (zamek)
         private const float BkLimitTown = 25f, BkLimitCastle = 12f;
+        private const int BkLimitVillageBase = 10000;        // E5/A1 R6 wsie: BK GetSettlementMarketGoldLimit - wies 10 000 + hearth x 3
+        private const float BkLimitVillageHearth = 3f;
         private const double FreshAgeDays = 1.5;             // jak CastlePurse: pierwszy tick dobowy nowej kampanii w wieku ok. 1.0 doby
         private const double RegulatorKeeps = 0.75;          // regulator gry zdejmowal cwierc nadwyzki dziennie (stary zapis)
         private const int RingDays = 28;
@@ -70,8 +72,8 @@ namespace Armoury
         private static int _consGold;
 
         // ------------------------------------------------------------ liczniki tickow gry (ticki miast ida przez cala dobe) - zamyka BeforeRents
-        private static long _dRegDown, _dRegUp, _dRegUpCut, _dConsBack, _dConsKept, _dBkSkipGold, _dConsFolk;
-        private static int _dRegDownN, _dRegUpN, _dRegUpCutN, _dConsN, _dConsHit, _dBkSkipTowns, _dBkSkipCastles, _dBuyAsk, _dBuyZero;
+        private static long _dRegDown, _dRegUp, _dRegUpCut, _dConsBack, _dConsKept, _dBkSkipGold, _dConsFolk, _dBkSkipGoldV;   // E5/A1 R6 wsie: _dBkSkipGoldV
+        private static int _dRegDownN, _dRegUpN, _dRegUpCutN, _dConsN, _dConsHit, _dBkSkipTowns, _dBkSkipCastles, _dBuyAsk, _dBuyZero, _dBkSkipVillages;
         // pomiar G24 / N3 (audyt 11.10) - liczniki tickow gry, zamyka BeforeRents
         private static long _dG24, _dG24Pl, _dN3;
         private static int _dG24N, _dN3N;
@@ -86,6 +88,7 @@ namespace Armoury
         // ------------------------------------------------------------ odczyty dnia (zeruje MoneyLedger.ClearLast169 w BlockOpen; ustawia BeforeRents i ValveDay)
         internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastConsKept, LastBkSkipGold, LastLordPaid, LastLordBase, LastLordBaseK, LastCrownPaid, LastDue, LastPlayerPaid, LastTrim;
         internal static long LastG24, LastG24Pl, LastN3;                     // pomiar G24 / N3 (audyt 11.10)
+        internal static long LastBkSkipGoldV; internal static int LastBkSkipVillages;   // E5/A1 R6 wsie: gorna galaz BK pominieta we wsiach (ile BK skasowalby)
         internal static int LastG24N, LastN3N;
         internal static long LastConsFolk, LastFolkValve;   // E5/B1: lud zaplacil kasom w konsumpcji; czesc ludu z zaworu (5%)
         internal static int LastRegDownN, LastRegUpN, LastRegUpCutN, LastConsN, LastConsHit, LastBkSkipTowns, LastBkSkipCastles, LastBuyAsk, LastBuyZero, LastPayers, LastKingdoms,
@@ -127,6 +130,7 @@ namespace Armoury
         {
             LastRegDown = LastRegUp = LastRegUpCut = LastConsBack = LastConsKept = LastBkSkipGold = LastLordPaid = LastLordBase = LastLordBaseK = LastCrownPaid = LastDue = LastPlayerPaid = LastTrim = 0;
             LastConsFolk = LastFolkValve = 0;
+            LastBkSkipGoldV = 0; LastBkSkipVillages = 0;
             LastRegDownN = LastRegUpN = LastRegUpCutN = LastConsN = LastConsHit = LastBkSkipTowns = LastBkSkipCastles = LastBuyAsk = LastBuyZero = LastPayers = LastKingdoms = 0;
             LastBelow = LastSiege = LastNoLord = LastTiny = LastExempt = LastNoCrown = LastUnpaid = 0;
             LastTake = LastNet = LastTake28 = LastNet28 = 0; LastShareOk = false;
@@ -136,8 +140,8 @@ namespace Armoury
 
         private static void ClearTicks()
         {
-            _dRegDown = _dRegUp = _dRegUpCut = _dConsBack = _dConsKept = _dBkSkipGold = _dConsFolk = 0;
-            _dRegDownN = _dRegUpN = _dRegUpCutN = _dConsN = _dConsHit = _dBkSkipTowns = _dBkSkipCastles = _dBuyAsk = _dBuyZero = 0;
+            _dRegDown = _dRegUp = _dRegUpCut = _dConsBack = _dConsKept = _dBkSkipGold = _dConsFolk = _dBkSkipGoldV = 0;
+            _dRegDownN = _dRegUpN = _dRegUpCutN = _dConsN = _dConsHit = _dBkSkipTowns = _dBkSkipCastles = _dBuyAsk = _dBuyZero = _dBkSkipVillages = 0;
             _dG24 = _dG24Pl = _dN3 = 0; _dG24N = _dN3N = 0;
         }
 
@@ -495,6 +499,7 @@ namespace Armoury
             LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastRegUpCut = _dRegUpCut; LastConsBack = _dConsBack; LastConsKept = _dConsKept; LastBkSkipGold = _dBkSkipGold;
             LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN; LastRegUpCutN = _dRegUpCutN; LastConsN = _dConsN; LastConsHit = _dConsHit; LastConsFolk = _dConsFolk;
             LastBkSkipTowns = _dBkSkipTowns; LastBkSkipCastles = _dBkSkipCastles; LastBuyAsk = _dBuyAsk; LastBuyZero = _dBuyZero;
+            LastBkSkipVillages = _dBkSkipVillages; LastBkSkipGoldV = _dBkSkipGoldV;
             LastG24 = _dG24; LastG24Pl = _dG24Pl; LastG24N = _dG24N; LastN3 = _dN3; LastN3N = _dN3N;
             ClearTicks();
             var s = Settings.Current;
@@ -710,6 +715,11 @@ namespace Armoury
                 }
             }
             catch { _bkLimit = null; }      // model BK niedostepny (inna wersja, kampania w budowie) - liczymy ze stalych
+            if (st != null && st.IsVillage && st.Village != null)                  // E5/A1 R6 wsie: BK GetSettlementMarketGoldLimit - 10 000 + 3 x hearth
+            {
+                double lv = BkLimitVillageBase + st.Village.Hearth * BkLimitVillageHearth;
+                return lv >= int.MaxValue ? int.MaxValue : (int)lv;
+            }
             var town = st != null ? st.Town : null;
             if (town == null) return int.MaxValue;
             double lim = BkLimitBase + (double)Prosperity(town) * (st.IsCastle ? BkLimitCastle : BkLimitTown);
@@ -721,13 +731,28 @@ namespace Armoury
         /// przed nami, jego finalizer widzi 0 zmiany). Gdy kasa miasta (zamku - tylko przy CastlePurseEnabled) stoi ponad limitem BK, oryginal nie
         /// biegnie (jego gorna galaz: -1% kasy, potem przez blad znaku +0.5% kasy i -0.5% kiesy notabla - razem 1% w nicosc). W kazdym innym
         /// przypadku oryginal jak dotad (dolna galaz: notabl z >= 30 000 doplaca 1 000 pustej kasie - przelew). Wyjatek - oryginal biegnie.
+        /// E5/A1 R6 dla wsi (klucz TownPurseNoBkSkimVillages): to samo dla kiesy wsi ponad limitem BK wsi (10 000 + 3 x hearth) - E5/B1 zostawia wsi 65% utargu.
         /// </summary>
         public static bool BkSkimPrefix(Settlement __0)
         {
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.TownPurseNoBkSkim || __0 == null || __0.Town == null || Campaign.Current == null || !On) return true;
+                if (s == null || __0 == null || Campaign.Current == null || !On) return true;
+                if (__0.IsVillage)
+                {
+                    // E5/A1 R6 dla wsi (klucz TownPurseNoBkSkimVillages): gorna galaz BK kasuje 1% kiesy wsi ponad limitem (0.5% kiesy wsi i 0.5% od notabla) w nicosc;
+                    // dolna galaz (notabl z >= 30 000 doplaca 1 000 pustej wsi - przelew) zostaje jak dotad
+                    if (!s.TownPurseNoBkSkimVillages) return true;
+                    var vc = __0.SettlementComponent;
+                    if (vc == null) return true;
+                    int vg = vc.Gold;
+                    if (vg <= BkLimit(__0)) return true;
+                    _dBkSkipVillages++;
+                    _dBkSkipGoldV += (long)(vg * 0.01f);
+                    return false;
+                }
+                if (!s.TownPurseNoBkSkim || __0.Town == null) return true;
                 bool castle = __0.IsCastle;
                 if (castle ? !s.CastlePurseEnabled : !__0.IsTown) return true;
                 var comp = __0.SettlementComponent;
@@ -786,7 +811,7 @@ namespace Armoury
                      + "%, wylacznik Castle Lords Even Up " + (s != null && s.CastleLordsEvenUp ? "tak" : "nie") + ") i reszta skarbcowi krolestwa"
                      + ", dar startowy przycinany: " + (s != null && s.TownPurseTrimAtStart ? "tak" : "nie")
                      + ", zakupy dla nas tylko z nadwyzki: " + (s != null && s.TownPaysFromSurplus ? "tak" : "nie")
-                     + ", BK rynek pominiety: " + (s != null && s.TownPurseNoBkSkim ? "tak" : "nie") + " (zamki tylko przy Castle Purse Enabled).");
+                     + ", BK rynek pominiety: " + (s != null && s.TownPurseNoBkSkim ? "tak" : "nie") + " (zamki tylko przy Castle Purse Enabled), wsie: " + (s != null && s.TownPurseNoBkSkimVillages ? "tak" : "nie") + " (E5/A1 R6 wsie).");
         }
 
         // ------------------------------------------------------------ pomiar G24 / N3 (audyt 11.10) - tylko liczniki
@@ -878,6 +903,8 @@ namespace Armoury
             sb.Append(" | zakupy dla nas z nadwyzki: ").Append(s.TownPaysFromSurplus ? "zapytan " + LastBuyAsk + ", przy zapasie (0) " + LastBuyZero : "WYLACZONE (MCM Town Pays From Surplus) - miasto placi cala kasa")
               .Append(" | BK rynek osady: ").Append(s.TownPurseNoBkSkim ? (_bkHooked ? "gorna galaz pominieta w " + LastBkSkipTowns + " miastach i " + LastBkSkipCastles + " zamkach (BK skasowalby ok. " + LastBkSkipGold + ")" : "BRAK latki")
                                                                  : "gorna galaz zostaje (MCM Town Purse No Bk Skim wylaczone)")
+              .Append("; wsie (E5/A1 R6): ").Append(s.TownPurseNoBkSkimVillages ? (_bkHooked ? "gorna galaz pominieta w " + LastBkSkipVillages + " wsiach (BK skasowalby ok. " + LastBkSkipGoldV + ")" : "BRAK latki")
+                                                                 : "gorna galaz zostaje (MCM Town Purse No Bk Skim Villages wylaczone)")
               .Append(" | dar startowy dzis ").Append(LastTrim)
               .Append(G24Part())
               .Append(" | potkniecia ").Append(stum);

@@ -26,7 +26,9 @@ namespace Armoury
     ///       nalezy do krolestwa, z ktorym jest wojna); niewola u wroga liczy sie jako sluzba. Karawana i partia we wlasnych osadach - nie. Rod, ktory widzial
     ///       mniej niz 60 dob wojny tej korony (nowa kampania, nowy wasal, stary zapis), potrzebuje tej samej czesci dob, ktore widzial (20/60); bez zadnej doby
     ///       wojny - warunek sluzby nie obowiazuje (nie bylo wojny, w ktorej mozna sluzyc).
-    ///    Udzial rodu bez warunku zostaje w skarbcu (zapas); reszta z zaokraglen tez.
+    ///    Udzial rodu bez warunku zostaje w skarbcu (zapas); reszta z zaokraglen tez. E5/F9 (klucz CrownRentHeldToServing, diagnoza wojska biegu zbiorczego
+    ///    329f2c7: 58 tys./d wstrzymanych rent - jedyny staly przeciek korony): udzial rodu bez warunku idzie do rodow z warunkiem tego samego krolestwa
+    ///    wedlug tych samych wag lenn (renta = pula x waga / suma wag rodow z warunkiem); bez zadnego rodu z warunkiem - zostaje w skarbcu jak dotad.
     ///  - D: renta w czesci "korona" D stalego (ClanIncomeBook.KRent) - budzet 166 widzi ja od nastepnej doby; poza "jednorazowymi" (nie liczona dwa razy).
     ///  - POMIAR SLUZBY po tescie C1+C2 120 dob (C3, 94 z 215 rodow z lennem bez warunku): (a) CrownRentServiceWholeDay - bitwy, rabunki i szturmy z wrogiem
     ///    licza sie o kazdej porze doby (zdarzenia MapEventStarted/Ended, nie tylko chwila ticku), a w chwili ticku takze poscig za partia wroga i jazda na
@@ -70,7 +72,7 @@ namespace Armoury
         private static readonly Dictionary<Clan, Row> _rows = new Dictionary<Clan, Row>();
 
         // liczniki doby (linia, "Korona", "Obieg")
-        internal static long LastPool, LastPaid, LastHeld, LastHeldFail, LastRound;
+        internal static long LastPool, LastPaid, LastHeld, LastHeldFail, LastRound, LastToServing;   // E5/F9: LastToServing - udzialy rodow bez warunku oddane rodom z warunkiem
         internal static int LastClans, LastOk, LastFailGar, LastFailSvc, LastFailBoth, LastKingdoms, LastNoPool;
         private static int _stumbles, _importN = -1, _importBad;
         private static bool _importOld;   // zapis v1 (C2) - sluzba rodow od zera
@@ -164,7 +166,7 @@ namespace Armoury
 
         internal static void ZeroLast()
         {
-            LastPool = LastPaid = LastHeld = LastHeldFail = LastRound = 0;
+            LastPool = LastPaid = LastHeld = LastHeldFail = LastRound = LastToServing = 0;
             LastClans = LastOk = LastFailGar = LastFailSvc = LastFailBoth = LastKingdoms = LastNoPool = 0;
         }
 
@@ -408,7 +410,7 @@ namespace Armoury
                 var gone = new List<string>();
                 foreach (var kv in _svc) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
                 foreach (var id in gone) _svc.Remove(id);
-                // 3. renty: reszta wplywow dnia -> glowy rodow wedlug wag; udzial rodu bez warunku zostaje w skarbcu
+                // 3. renty: reszta wplywow dnia -> glowy rodow wedlug wag; udzial rodu bez warunku zostaje w skarbcu (E5/F9: przy Crown Rent Held To Serving - do rodow z warunkiem)
                 var perShare = new List<double>(); var det = new List<KeyValuePair<long, string>>();
                 long playerPaid = 0; string playerWhy = null; double playerW = 0; int playerServed = 0, playerNeed = 0; bool playerRow = false;
                 foreach (var k in Kingdom.All)
@@ -436,11 +438,14 @@ namespace Armoury
                         double normT = -1, normC = -1; Norm nn;
                         if (_norm.TryGetValue(normKey + "/T", out nn)) normT = nn.Avg();
                         if (_norm.TryGetValue(normKey + "/C", out nn)) normC = nn.Avg();
-                        long paidK = 0, heldK = 0;
+                        long paidK = 0, heldK = 0, toServK = 0;
+                        // E5/F9 (Crown Rent Held To Serving): najpierw warunki wszystkich rodow, potem podzial - udzial rodu bez warunku idzie do rodow z warunkiem
+                        // tego krolestwa wedlug tych samych wag lenn (zamiast zostac w skarbcu); bez zadnego rodu z warunkiem - zostaje w skarbcu jak dotad
+                        var rowsK = new Row[list.Count];
+                        double sumOk = 0;
                         for (int i = 0; i < list.Count; i++)
                         {
                             var c = list[i];
-                            long share = pay ? (long)(pool * wts[i] / sum) : 0;
                             var row = new Row { Counted = true };
                             try
                             {
@@ -467,8 +472,18 @@ namespace Armoury
                                 row.SvcOk = row.Served >= row.Need;
                             }
                             catch (Exception e) { row.GarOk = false; row.SvcOk = false; Stumble("Daily(warunek)", e); }   // blad przy rodzie - udzial zostaje w skarbcu
-                            int x = (int)Math.Min(int.MaxValue, Math.Max(0L, share));
+                            rowsK[i] = row;
+                            if (row.GarOk && row.SvcOk) sumOk += wts[i];
+                        }
+                        bool toServing = pay && s.CrownRentHeldToServing && sumOk > 0 && sumOk < sum - 1e-9;
+                        double div = toServing ? sumOk : sum;
+                        for (int i = 0; i < list.Count; i++)
+                        {
+                            var c = list[i];
+                            var row = rowsK[i];
                             bool ok = row.GarOk && row.SvcOk, paid = false;
+                            long share = pay ? (long)(pool * wts[i] / (ok ? div : sum)) : 0;     // rod bez warunku: udzial wedlug wszystkich wag (do linii i CSV)
+                            int x = (int)Math.Min(int.MaxValue, Math.Max(0L, share));
                             if (ok && x > 0)
                             {
                                 try
@@ -484,7 +499,12 @@ namespace Armoury
                                 }
                                 catch (Exception e) { Stumble("Daily(wyplata)", e); }
                             }
-                            if (!paid) { row.Held = x; heldK += x; }           // udzial rodu bez warunku (albo nieudana wyplata) zostaje w skarbcu
+                            if (!paid)
+                            {
+                                row.Held = x;
+                                if (!ok && toServing) toServK += x;            // E5/F9: ten udzial poszedl do rodow z warunkiem (siedzi w ich wyplatach)
+                                else heldK += x;                               // udzial rodu bez warunku (albo nieudana wyplata) zostaje w skarbcu
+                            }
                             if (!row.GarOk && !row.SvcOk) LastFailBoth++; else if (!row.GarOk) LastFailGar++; else if (!row.SvcOk) LastFailSvc++;
                             if (ok) LastOk++;
                             LastClans++;
@@ -497,9 +517,9 @@ namespace Armoury
                         }
                         if (!pay) continue;
                         CrownIncome.Spent(k, paidK);                           // renty schodza z reszty wplywow dnia; reszta (wstrzymane, zaokraglenia) zostaje w skarbcu
-                        long round = pool - paidK - heldK;
+                        long round = pool - paidK - heldK;                     // E5/F9: przy oddaniu udzialy rodow bez warunku siedza w paidK (toServK - ich wartosc wedlug wszystkich wag, poza rownaniem)
                         day.Rent += paidK; day.RentHeld += pool - paidK;
-                        LastPool += pool; LastPaid += paidK; LastHeldFail += heldK; LastRound += round; LastHeld += pool - paidK;
+                        LastPool += pool; LastPaid += paidK; LastHeldFail += heldK; LastRound += round; LastHeld += pool - paidK; LastToServing += toServK;
                         perShare.Add(pool / sum);
                         det.Add(new KeyValuePair<long, string>(pool, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + paidK + "/" + pool + " (udzial " + (pool / sum).ToString("0", Inv) + ")"));
                     }
@@ -545,6 +565,8 @@ namespace Armoury
                       .Append(" | krolestwa z renta ").Append(LastKingdoms).Append(", reszta wplywow dnia po zwrocie ").Append(LastPool)
                       .Append(" = renty ").Append(LastPaid).Append(" + wstrzymane w skarbcach ").Append(LastHeld)
                       .Append(" (udzialy rodow bez warunku ").Append(LastHeldFail).Append(", zaokraglenia ").Append(LastRound).Append(')')
+                      .Append(" | E5/F9 udzialy rodow bez warunku oddane rodom z warunkiem tego krolestwa (Crown Rent Held To Serving): ")
+                      .Append(s.CrownRentHeldToServing ? LastToServing + " (siedza w rentach)" : "wylaczone - zostaja w skarbcu")
                       .Append(" | rody z lennem ").Append(LastClans).Append(" (w krolestwach bez reszty po zwrocie - renta 0: ").Append(LastNoPool).Append("): z warunkiem ").Append(LastOk).Append(", bez warunku ").Append(LastClans - LastOk)
                       .Append(LastClans > 0 ? " (" + (100.0 * (LastClans - LastOk) / LastClans).ToString("0.0", Inv) + "%)" : "")
                       .Append(" - zaloga ").Append(LastFailGar).Append(", sluzba ").Append(LastFailSvc).Append(", oba ").Append(LastFailBoth)

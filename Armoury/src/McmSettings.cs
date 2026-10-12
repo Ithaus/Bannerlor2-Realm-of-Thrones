@@ -3016,9 +3016,9 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool CrownWageRefundEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Crown Wage Refund Percent", 0.00f, 200.00f, "0.00", HintText = "share of the day's wages the treasury of a kingdom at war repays to each of its houses (0-100)")]
+        [SettingPropertyFloatingInteger("Crown Wage Refund Percent", 0.00f, 280.00f, "0.00", HintText = "share of the day's wages the treasury of a kingdom at war repays to each of its houses (0-100)")]
         [SettingPropertyGroup("The soldier's pay")]
-        public float CrownWageRefundPercent { get; set; } = 50f;
+        public float CrownWageRefundPercent { get; set; } = 70f;
 
         [SettingPropertyBool("Crown Wage Refund Garrisons", HintText = "the refund counts garrison wages too; off = wages of the parties in the field only")]
         [SettingPropertyGroup("The soldier's pay")]
@@ -3095,6 +3095,10 @@ namespace Armoury
         [SettingPropertyBool("Town Purse No Bk Skim", HintText = "Banner Kings no longer deletes 1% a day from a town purse above its limit (and from a castle purse, with Castle Purse Enabled); a notable still helps an empty purse with 1 000 as before")]
         [SettingPropertyGroup("The town's purse")]
         public bool TownPurseNoBkSkim { get; set; } = true;
+
+        [SettingPropertyBool("Town Purse No Bk Skim Villages", HintText = "Banner Kings no longer deletes 1% a day from a village's coin above its limit (10 000 plus 3 a hearth) - half of it from the village and half from one of its notables; a notable still helps an empty village with 1 000 as before")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool TownPurseNoBkSkimVillages { get; set; } = true;
 
         [SettingPropertyBool("Town Pays From Surplus", HintText = "a town purse buys for us only with the coin it holds above the working coin: loot from outlaws, contract and bulk goods and arrows from caravans, spare kit of garrisons, lords and your men, drill scrap, the armourers' finished wares - as castles do. Below the working coin the game topped a purse up from nowhere, so whatever was bought from it was in truth paid from nowhere. Needs Town Purse Regulator. Off = the whole purse, as before")]
         [SettingPropertyGroup("The town's purse")]
@@ -3403,6 +3407,10 @@ namespace Armoury
         [SettingPropertyBool("Crown Rent War Day Needs Contact", HintText = "a day of war counts towards the service only when the realm really waged the war that day - an army of the realm in the field, a siege, raid or pressing of a village between the realm and its enemy, or a battle with lords on both sides; a war with a realm nobody can reach (across the sea) asks no service while it stays out of reach. Off = every day of a declared war counts, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
+
+        [SettingPropertyBool("Crown Rent Held To Serving", HintText = "the rent share of a house that does not serve (garrison or service days) goes to the houses of the same realm that do, by the same fief weights, instead of staying in the treasury; if no house of the realm serves, it stays in the treasury. Off = it stays in the treasury, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentHeldToServing { get; set; } = true;
 
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -5433,6 +5441,7 @@ namespace Armoury
             s.TownRentLordShare = TownRentLordShare;
             s.TownPurseTrimAtStart = TownPurseTrimAtStart;
             s.TownPurseNoBkSkim = TownPurseNoBkSkim;
+            s.TownPurseNoBkSkimVillages = TownPurseNoBkSkimVillages;
             s.TownPaysFromSurplus = TownPaysFromSurplus;
             s.CrownCurrentIncome = CrownCurrentIncome;
             s.CrownReserveGold = CrownReserveGold;
@@ -5510,6 +5519,7 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CrownBorrows = CrownBorrows;
             s.CrownLoanLimitDays = CrownLoanLimitDays;

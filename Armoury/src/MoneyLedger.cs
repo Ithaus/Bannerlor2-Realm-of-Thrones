@@ -769,6 +769,23 @@ namespace Armoury
         }
 
         /// <summary>Zloto swiata teraz: suma tych samych posiadaczy, ktorych pokazuje linia "Pieniadz swiata:" (jedna definicja - bez rozjazdu).</summary>
+        /// <summary>E5 diagnoza 6 (probka nowe-karawany): posiadacze swiata teraz (kopia, jak WorldTotal) i nazwa posiadacza do linii diagnostyki. Tylko odczyt.</summary>
+        internal static long[] HoldersNow() { return ReadHolders(Snap()); }
+        internal static string HolderName(int i)
+        {
+            switch (i)
+            {
+                case HTowns: return "kasy miast"; case HCastles: return "kasy zamkow"; case HVillages: return "kiesy wsi"; case HLeaders: return "glowy rodow";
+                case HLords: return "lordowie"; case HPlayer: return "gracz"; case HNotables: return "notable"; case HWanderers: return "wedrowcy";
+                case HOtherHeroes: return "inni bohaterowie"; case HKingdoms: return "skarbce"; case HWorkshops: return "warsztaty"; case HPurses: return "sakiewki ludzi";
+                case HBank: return "Bank"; case HVillagers: return "tabory wsi"; case HCaravans: return "karawany"; case HGarrisons: return "garnizony";
+                case HBandits: return "bandy"; case HOtherParties: return "inne partie"; case HTownTax: return "liczniki cel"; case HVillageTax: return "licznik podatku wsi";
+                case HOtherSettlements: return "kryjowki i inne"; case HCallToWar: return "portfele wezwan"; case HFolkTown: return "kiesy ludu miast";
+                case HFolkCastle: return "kiesy podzamczy"; case HGmina: return "gminy"; case HVetPurse: return "sakiewki weteranow";
+                default: return "H" + i;
+            }
+        }
+
         private static long WorldTotal()
         {
             var h = ReadHolders(Snap());

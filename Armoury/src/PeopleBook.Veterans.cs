@@ -626,10 +626,13 @@ namespace Armoury
             double t = Math.Min(n, Math.Max(0.0, p - 100.0));
             if (!(t > Eps)) return 0.0;
             // scalenie calosci etapu 4: ruch stanu miasta wedlug przyczyny (E4/8 _townMv) - bez tego kontrola linii "Miasta (E4/8 R2)" w dobie siewu = -siew
-            lock (Gate) { _town[st.StringId] = (float)(p - t); _townMv[MVetStart] -= t; }
-            Count(t, MVetStart, 0.0);
-            try { if (_sown) Rg(region.StringId).TownOut += t; } catch (Exception e) { VStumble("VetTakeTown(dlug miasta)", e); }
-            return t;
+            // E4/8 N6: ruch, licznik i dlug miasta wedlug zmiany faktycznie zapisanej w float (reszta siewu - bez zdjecia, u wolajacego)
+            double done;
+            lock (Gate) { float np = TownRound(p, -t, out done); done = -done; _town[st.StringId] = np; _townMv[MVetStart] -= done; }
+            if (!(done > 0.0)) return 0.0;
+            Count(done, MVetStart, 0.0);
+            try { if (_sown) Rg(region.StringId).TownOut += done; } catch (Exception e) { VStumble("VetTakeTown(dlug miasta)", e); }
+            return done;
         }
 
         // ================================================================ doba

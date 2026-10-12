@@ -877,10 +877,13 @@ namespace Armoury
             if (!TryTown(node, out p)) return 0.0;                          // stan miast wylaczony (Town People Frozen) - wszyscy do wsi jak dotad
             double tm = Math.Min(m * r.TownOut / all, owed);
             if (!(tm > Eps)) return 0.0;
-            lock (Gate) { _town[node.StringId] = (float)(p + tm); _townMv[MBackTown] += tm; }     // E4/8: ruch stanu miasta wedlug przyczyny
-            Count(tm, MBackTown, 0.0);
-            r.TownBack += tm;
-            return tm;
+            // E4/8 N6 (diagnoza biegu zbiorczego 329f2c7): stan miast to float - ruch i licznik wedlug zmiany faktycznie zapisanej, nie zadanej (reszta wraca do wsi u wolajacego)
+            double done;
+            lock (Gate) { float np = TownRound(p, tm, out done); _town[node.StringId] = np; _townMv[MBackTown] += done; }     // E4/8: ruch stanu miasta wedlug przyczyny
+            if (!(done > 0.0)) return 0.0;
+            Count(done, MBackTown, 0.0);
+            r.TownBack += done;
+            return done;
         }
 
         /// <summary>Znana czesc -> HomeKnown (z hearth), reszta n -> Note(causeLegacy) jak w E4/3 (causeLegacy &lt; 0 - bez Note). Udzialy `s` zuzyte.</summary>
@@ -1095,9 +1098,31 @@ namespace Armoury
             if (!TryTown(town, out p)) return 0.0;
             double t = Math.Min(n, Math.Max(0.0, p - 100.0));    // miasto nie schodzi ponizej 100 ludzi
             if (!(t > 0.0)) return 0.0;
-            lock (Gate) { _town[town.StringId] = (float)(p - t); _townMv[causeTown] -= t; }     // E4/8: ruch stanu miasta wedlug przyczyny
-            Count(t, causeTown, 0.0);
-            return t;
+            // E4/8 N6: ruch i licznik wedlug zmiany faktycznie zapisanej w float (reszta poboru idzie dalej do wsi u wolajacego)
+            double done;
+            lock (Gate) { float np = TownRound(p, -t, out done); done = -done; _town[town.StringId] = np; _townMv[causeTown] -= done; }     // E4/8: ruch stanu miasta wedlug przyczyny
+            if (!(done > 0.0)) return 0.0;
+            Count(done, causeTown, 0.0);
+            return done;
+        }
+
+        /// <summary>E4/8 N6 (diagnoza biegu zbiorczego 329f2c7, kontrola linii Miasta): nowy stan miasta (float) po zmianie o delta i zmiana faktycznie zapisana
+        /// (done, ze znakiem delta albo 0). Zaokraglenie float poza zadana kwote cofniete o jeden krok float w strone p - |done| &lt;= |delta|, wiec wolajacy nigdy nie
+        /// rozda wiecej ludzi, niz zeszlo ze stanu. Ruch mniejszy niz pol kroku float nie zmienia stanu (done 0). Stan nie spada ponizej 0.</summary>
+        internal static float TownRound(float p, double delta, out double done)
+        {
+            float np = (float)((double)p + delta);
+            if (np < 0f) np = 0f;
+            done = (double)np - p;
+            if (Math.Abs(done) > Math.Abs(delta) && np != p)
+            {
+                int b = BitConverter.ToInt32(BitConverter.GetBytes(np), 0);
+                b += np < p ? 1 : -1;                                       // dodatnie floaty: o jeden krok w strone p
+                float nb = BitConverter.ToSingle(BitConverter.GetBytes(b), 0);
+                if (nb >= 0f && !float.IsNaN(nb)) { np = nb; done = (double)np - p; }
+                if (Math.Abs(done) > Math.Abs(delta)) { np = p; done = 0.0; }    // zabezpieczenie - nic nie zapisujemy
+            }
+            return np;
         }
 
         private static double FromVillage(Village v, double n, int causeM)

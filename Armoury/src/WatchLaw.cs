@@ -315,7 +315,10 @@ namespace Armoury
         {
             try
             {
-                if (mp == null || !Live || !CrownGifts.IsWatchParty(mp)) return null;
+                if (mp == null || !Live) return null;
+                // E4/9 K9: przy czynnym pochodzeniu ten sam predykat co znacznik W (rodzaj partii z pamieci doby, milicja osady Strazy) - dezerterzy i rozbici
+                // ze znacznikiem W ida do puli Polnocy; bez pochodzenia jak dotad (biezacy CrownGifts.IsWatchParty)
+                if (!(PeopleBook.OriginLive ? PeopleBook.ServesWatch(mp) : CrownGifts.IsWatchParty(mp))) return null;
                 EnsureLists();
                 if (_north.Count == 0) return null;
                 var p = mp.Position.ToVec2();

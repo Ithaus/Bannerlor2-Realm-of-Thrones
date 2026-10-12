@@ -410,6 +410,29 @@ namespace Armoury
             return CrownGifts.IsWatch(owner.MobileParty.MapFaction);
         }
 
+        /// <summary>E4/9 K8 krok 1: wpis partii do linii diagnostyki (najwyzej 12 wpisow).</summary>
+        private static void KindNote(ref StringBuilder sb, ref int n, PartyBase pb, string what, double before, double now)
+        {
+            try
+            {
+                if (n >= 12) return;
+                if (sb == null) sb = new StringBuilder(512); else sb.Append("; ");
+                string nm = pb != null && pb.MobileParty != null && pb.MobileParty.Name != null ? pb.MobileParty.Name.ToString() : (pb != null && pb.Name != null ? pb.Name.ToString() : "?");
+                string fac = pb != null && pb.MapFaction != null && pb.MapFaction.StringId != null ? pb.MapFaction.StringId : "-";
+                sb.Append(nm).Append(" [").Append(fac).Append("] ").Append(what).Append(' ').Append(N3(before)).Append(" -> ").Append(N3(now));
+                n++;
+            }
+            catch { }
+        }
+
+        /// <summary>E4/9 K9 (diagnoza biegu zbiorczego 329f2c7): ten sam predykat co znacznik W w Take - rodzaj partii z pamieci doby (KindOf) + WatchServes, czyli
+        /// takze milicja osady Strazy i partia, ktora zmienila frakcje w trakcie doby. Dla regionu "do lasu" (WatchLaw.DeserterRegion) przy czynnym pochodzeniu.</summary>
+        internal static bool ServesWatch(MobileParty mp)
+        {
+            try { return mp != null && mp.Party != null && WatchServes(mp.Party, KindOf(mp)); }
+            catch { return false; }
+        }
+
         private static void WatchOut(double take, int cause)
         {
             _wOut += take;
@@ -466,6 +489,7 @@ namespace Armoury
         private static void CanonEndDay()
         {
             var g = new WatchDay { Has = true, Back = new double[WVia] };
+            StringBuilder kd = null; int kdN = 0, kdNew = 0; double kdNewMen = 0;   // E4/9 K8 krok 1 (diagnostyka, tylko log): partie ze zmiana rodzaju i nowe partie Strazy
             try
             {
                 if (_sown && OriginOn)
@@ -489,9 +513,20 @@ namespace Armoury
                         {
                             bool still = true;
                             try { still = pb.MobileParty != null && KindOf(pb.MobileParty) == KWatch; } catch { still = true; }
-                            if (!still) { double v; if (_wPrevAll.TryGetValue(pb, out v)) g.KindOut += v; }
+                            if (!still)
+                            {
+                                double v; if (_wPrevAll.TryGetValue(pb, out v)) g.KindOut += v;
+                                double nowV; cur.TryGetValue(pb, out nowV);
+                                KindNote(ref kd, ref kdN, pb, "wyszla ze Strazy", v, nowV);
+                            }
                         }
-                        foreach (var pb in watch) if (!_wPrevWatch.Contains(pb)) { double v; if (_wPrevAll.TryGetValue(pb, out v)) g.KindIn += v; }
+                        foreach (var pb in watch)
+                            if (!_wPrevWatch.Contains(pb))
+                            {
+                                double v, nowV; cur.TryGetValue(pb, out nowV);
+                                if (_wPrevAll.TryGetValue(pb, out v)) { g.KindIn += v; KindNote(ref kd, ref kdN, pb, "weszla do Strazy", v, nowV); }
+                                else { kdNew++; kdNewMen += nowV; if (kdN < 8) KindNote(ref kd, ref kdN, pb, "nowa (bez wczoraj)", 0.0, nowV); }
+                            }
                     }
                     _wPrevAll = cur; _wPrevWatch = watch;
                     g.S0 = _wS0; g.First = double.IsNaN(_wS0);
@@ -505,6 +540,17 @@ namespace Armoury
             g.WoodsN = _wWoodsN; g.WoodsO = _wWoodsO; g.Convicts = _wConvicts; g.WallOut = _wWallOut; g.WallNow = WallTotal; g.HomeNotWall = _wHomeNotWall;
             Array.Copy(_wBack, g.Back, WVia);
             LastWatch = g;
+            // E4/9 K8 krok 1 (diagnoza biegu zbiorczego 329f2c7: reszta kontroli Strazy 24 w jedynej dobie ze zmiana rodzaju i nowa partia naraz): przy KindIn/KindOut
+            // != 0 - partie (wczoraj / dzis w slowniku), nowe partie Strazy i reszta kontroli. Tylko log; liczby kontroli bez zmian
+            try
+            {
+                var st = Settings.Current;
+                if (kd != null && (g.KindIn != 0.0 || g.KindOut != 0.0) && st != null && st.LogEnabled)
+                    Log.Info("Straz K8 (E4/9 diagnostyka): dzien " + (int)CampaignTime.Now.ToDays + " | zmiana rodzaju: weszlo " + N3(g.KindIn) + ", wyszlo " + N3(g.KindOut)
+                             + "; wejscia doby " + N3(g.In) + ", wyjscia " + N3(g.Out) + "; nowe partie Strazy " + kdNew + " (" + N3(kdNewMen) + " ludzi w slowniku)"
+                             + "; reszta kontroli " + N3(g.Check) + " | partie (wczoraj -> dzis): " + kd.ToString());
+            }
+            catch (Exception e) { OStumble("CanonEndDay(K8)", e); }
             _wIn = _wOut = _wQ = _wGone = _wDeadAll = _wDeadKnown = _wWoodsN = _wWoodsO = _wConvicts = _wWallOut = _wHomeNotWall = 0;
             Array.Clear(_wOutBy, 0, _wOutBy.Length); Array.Clear(_wBack, 0, WVia);
         }

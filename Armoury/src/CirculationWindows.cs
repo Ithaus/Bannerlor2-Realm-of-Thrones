@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -215,6 +216,7 @@ namespace Armoury
                 ClearDay();
                 _ctx = 0; _ctxW = -1; _ctxSide = null; _sellSt = null; _sellIn = 0; _snapHero = null; _snapLeaders = false; _snapEvt = 0;
                 _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _minesFolk = 0; _repOpen = false;
+                _capH0 = null; _capDiagDone = false;   // diagnoza 6 krok 1: linia raz na sesje (od wczytania)
                 _woW = null; _wiW = null; _woSt = null; _wiSt = null; _woP = false; _wiP = false;
                 NamedRun = 0; ToCounterRun = 0; _probeOn = false;
                 for (int w = 0; w < Windows; w++) { ProbeNSess[w] = 0; ProbeBadSess[w] = 0; _probeDay[w] = -1000; }
@@ -396,8 +398,9 @@ namespace Armoury
             catch (Exception e) { _probeOn = false; Stumble("ProbeOpen", e); return false; }
         }
 
-        private static void ProbeClose(int w, long w0, long n0)
+        private static bool ProbeClose(int w, long w0, long n0)
         {
+            bool bad = false;
             try
             {
                 long t = Stopwatch.GetTimestamp();
@@ -405,11 +408,19 @@ namespace Armoury
                 ProbeTicks += Stopwatch.GetTimestamp() - t; ProbeScans++;
                 long dn = NamedRun - n0;
                 ProbeN[w]++; ProbeNSess[w]++;
-                if (dw != dn) { ProbeBad[w]++; ProbeBadSess[w]++; ProbeDiff[w] += dw - dn; }
+                if (dw != dn) { ProbeBad[w]++; ProbeBadSess[w]++; ProbeDiff[w] += dw - dn; bad = true; _probeLastDw = dw; _probeLastDn = dn; }
             }
             catch (Exception e) { Stumble("ProbeClose", e); }
             finally { _probeOn = false; }
+            return bad;
         }
+
+        // E5 diagnoza 6 krok 1 (bieg zbiorczy 329f2c7: 2 rozjazdy "+45" w oknie nowe-karawany, w dobach z karawanami E5/A3 "bez kapitalu"): migawka posiadaczy
+        // przy otwarciu probki okna nowych karawan - tylko do pierwszego rozjazdu w sesji (potem bez dodatkowego skanu); tylko log
+        private static long[] _capH0;
+        private static bool _capDiagDone, _capSeenLast;
+        private static int _capGivenLast;
+        private static long _probeLastDw, _probeLastDn;
 
         // ------------------------------------------------------------ zdarzenie gry (MoneyLedger.OnGoldTraded)
         /// <summary>Kazdy GiveGoldAction (kwota juz dodatnia, strony juz zamienione przez MoneyLedger). Rozbicie flag, prowizja, migawki, N5.</summary>
@@ -994,8 +1005,9 @@ namespace Armoury
                 _capOpen = true; _capSeen = false; _capGiven = 0;
                 __state.T0 = CostStart(WCaravanNew);
                 __state.P = ProbeOpen(WCaravanNew, out __state.W0, out __state.N0);
+                if (__state.P) _capH0 = !_capDiagDone && Settings.Current != null && Settings.Current.LogEnabled ? MoneyLedger.HoldersNow() : null;   // diagnoza 6 krok 1
             }
-            catch (Exception e) { Stumble("CapPre", e); }
+            catch (Exception e) { if (__state.P) _capH0 = null; Stumble("CapPre", e); }
         }
 
         public static void CapFin(Hero __0, MobileParty __result, CapState __state)
@@ -1004,6 +1016,7 @@ namespace Armoury
             long tf = CostResume(__state.T0);       // koszt: cialo finalizera (bez metody gry, bez probki swiata)
             try
             {
+                _capSeenLast = _capSeen; _capGivenLast = _capGiven;   // diagnoza 6 krok 1 (linia probki - przed przywroceniem stanu okna)
                 if (_capSeen)
                 {
                     bool notable = __0 != null && __0.IsNotable;
@@ -1018,7 +1031,40 @@ namespace Armoury
             catch (Exception e) { Stumble("CapFin", e); }
             _capOpen = __state.PrevOpen; _capSeen = __state.PrevSeen; _capGiven = __state.PrevGiven;
             try { CostEnd(WCaravanNew, tf); } catch { }
-            if (__state.P) ProbeClose(WCaravanNew, __state.W0, __state.N0);
+            if (__state.P)
+            {
+                long[] h0 = _capH0, h1 = null;
+                _capH0 = null;
+                try { if (h0 != null && !_capDiagDone) h1 = MoneyLedger.HoldersNow(); } catch (Exception e) { h1 = null; Stumble("CapFin(diagnoza 6)", e); }
+                bool bad = ProbeClose(WCaravanNew, __state.W0, __state.N0);
+                if (bad && h0 != null && h1 != null && !_capDiagDone)
+                {
+                    _capDiagDone = true;
+                    try
+                    {
+                        var sb = new StringBuilder(512);
+                        sb.Append("Probka nowe-karawany (E5 diagnoza 6, raz na sesje): dzien ").Append((int)CampaignTime.Now.ToDays)
+                          .Append(" | swiat ").Append(_probeLastDw >= 0 ? "+" : "").Append(_probeLastDw).Append(", nazwane ").Append(_probeLastDn)
+                          .Append(" | posiadacze (zmiana w oknie):");
+                        int n = 0;
+                        for (int i = 0; i < h0.Length && i < h1.Length; i++)
+                        {
+                            long d = h1[i] - h0[i];
+                            if (d == 0) continue;
+                            sb.Append(n++ == 0 ? " " : ", ").Append(MoneyLedger.HolderName(i)).Append(' ').Append(d >= 0 ? "+" : "").Append(d)
+                              .Append(" (").Append(h0[i]).Append(" -> ").Append(h1[i]).Append(')');
+                        }
+                        if (n == 0) sb.Append(" bez zmian");
+                        string own = __0 != null && __0.Name != null ? __0.Name.ToString() : "-";
+                        sb.Append(" | wlasciciel ").Append(own).Append(__0 != null && __0.IsNotable ? " (notabl" : " (lord").Append(", kiesa ").Append(__0 != null ? __0.Gold : 0).Append(')')
+                          .Append(", kapital z modelu ").Append(_capSeenLast ? _capGivenLast.ToString() : "-")
+                          .Append(", kiesa karawany ").Append(__result != null ? __result.PartyTradeGold : -1)
+                          .Append(", osada ").Append(__result != null && __result.CurrentSettlement != null && __result.CurrentSettlement.Name != null ? __result.CurrentSettlement.Name.ToString() : "-");
+                        Log.Info(sb.ToString());
+                    }
+                    catch (Exception e) { Stumble("CapFin(diagnoza 6 linia)", e); }
+                }
+            }
         }
 
         /// <summary>GetInitialTradeGold czynnego CaravanModel: PIERWSZY wynik w oknie CreateCaravanParty = kwota dla InitializePartyTrade.</summary>
