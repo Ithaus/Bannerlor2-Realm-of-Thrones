@@ -197,6 +197,8 @@ namespace Armoury
         private static double _siegeDead;                                   // P1-2: polegli od ostrzalu (szeregowi bez wightow - roznica rosteru)
         private static double _villTown;                                    // T6: pobor wsi na podlodze 50 hearth wziety ze stanu miasta regionu
         private static Dictionary<string, double> _villTownBy;              // T6: region -> ludzie (nazwy do linii)
+        private static double _townShareVill;                               // fix2 (P1-4): pobor E4/7 w miescie wziety z wsi regionu zamiast ze stanu miasta (udzial miasta)
+        private static double _townShareBack;                               // fix2 (P1-4): reszta znow ze stanu miasta - wsie regionu na podlodze 50 hearth
         private const int SBattle = 0, SSiege = 1, SSea = 2, SStarve = 3, SArmy = 4, STown = 5, SField = 6, SKinds = 7;
         private static readonly string[] SName = { "bitwa", "oblezenie", "morze", "glod", "armia", "w osadzie", "w polu" };
         private static readonly double[] _cutBy = new double[SKinds];      // P2-T4-sklady (diagnostyka): niedobor skladow (ciecie slownika) wedlug stanu partii
@@ -258,6 +260,7 @@ namespace Armoury
             _deduceVetCalls = 0; _deduceVetMen = 0; _vDestTake = 0;    // E4/10
             _homeTown = 0; _foldKeys = 0; _foldMen = 0; _pressIn = _pressLost = _pressHome = 0;
             _defParties = 0; _defMen = 0; _siegeCalls = 0; _siegeDead = 0; _villTown = 0; _villTownBy = null;     // fixA
+            _townShareVill = 0; _townShareBack = 0;                                                     // fix2
             Array.Clear(_cutBy, 0, SKinds); _cutTop.Clear();
             _oStumblesDay = 0;
             _kind.Clear();          // rodzaj partii raz na dobe (Straz, rod - moga sie zmienic)
@@ -1005,9 +1008,26 @@ namespace Armoury
             {
                 if (s.IsTown && s.Town != null)
                 {
-                    double t = FromTown(s, n, causeTown);
+                    // fix2 (decyzja Jeffa 12.10 nr 3, P1-4, wylacznik Town Levy By Share): pobor E4/7 (MLevyVillage, MLevyA5) bierze ze stanu miasta tylko
+                    // n x p_miasta / (p_miasta + ludzie wsi regionu), reszte z wsi regionu wedlug ludzi; wsie na podlodze 50 hearth - reszta znow ze stanu miasta
+                    // (liczba rekrutow bez zmian). Podzial dlugu miasta TownOut/VillOut nizej idzie za tym sam (BackToTown). E4/8 (milicja, druzyny, karawany,
+                    // wedrowcy) bez zmian - ich powrot idzie do osady wyjscia (ArriveAt -> TownShift), pobor z wsi i powrot do miasta bylby sztuczna migracja
+                    double nTown = n;
+                    if ((causeM == MLevyVillage || causeM == MLevyA5) && TownLevyByShareOn) nTown = n * TownShareOf(s, region);
+                    bool share = nTown < n;
+                    double t = FromTown(s, nTown, causeTown);
                     got += t; fromTown = t;
-                    if (n - got > Eps) got += FromVillages(region, n - got, causeM, false);   // stan miasta wylaczony albo miasto na podlodze - z wsi regionu
+                    if (n - got > Eps)
+                    {
+                        double v = FromVillages(region, n - got, causeM, share);   // udzial - wsie regionu wedlug ludzi; dotad (stan miasta wylaczony / miasto na podlodze) od najwiekszej
+                        got += v;
+                        if (share) _townShareVill += v;
+                    }
+                    if (share && n - got > Eps)
+                    {
+                        double t2 = FromTown(s, n - got, causeTown);           // wsie regionu na podlodze - reszta ze stanu miasta jak dotad
+                        got += t2; fromTown += t2; _townShareBack += t2;
+                    }
                 }
                 else if (s.IsVillage && s.Village != null)
                 {
@@ -1050,6 +1070,21 @@ namespace Armoury
         }
 
         private static bool LevyVillageFromTownOn { get { var s = Settings.Current; return s != null && s.LevyVillageFromTown; } }
+        private static bool TownLevyByShareOn { get { var s = Settings.Current; return s != null && s.TownLevyByShare; } }
+
+        /// <summary>fix2 (P1-4): udzial miasta w ludnosci krainy p_miasta / (p_miasta + ludzie wsi regionu) - stan miasta E4/4 i PopulationLaw.PeopleOf wsi
+        /// (jak DomOf). Brak stanu miasta albo wsi z ludzmi - 1 (pobor jak dotad).</summary>
+        private static double TownShareOf(Settlement town, Settlement region)
+        {
+            float p;
+            if (!TryTown(town, out p) || !(p > 0f)) return 1.0;
+            double vill = 0.0;
+            if (region != null && region.BoundVillages != null)
+                foreach (var v in region.BoundVillages) if (v != null && v.Settlement != null) vill += PopulationLaw.PeopleOf(v.Settlement);
+            if (!(vill > 0.0) || double.IsInfinity(vill)) return 1.0;
+            double sh = p / (p + vill);
+            return sh > 0.0 && sh < 1.0 ? sh : 1.0;
+        }
 
         /// <summary>fixA (T6): czesc poboru ze stanu miasta E4/4 (miasto nie schodzi ponizej 100 ludzi) - jedna droga dla galezi miasta i dla odwrotu wsi na podlodze.
         /// Ruch stanu miasta wedlug przyczyny (E4/8 _townMv) i licznik ruchu DOM (Count). Zwraca, ilu zdjeto (0 - stan miast wylaczony albo miasto na podlodze).</summary>
@@ -1820,6 +1855,7 @@ namespace Armoury
             sb.Append(" | DeduceManpower: wywolan ").Append(_deduceCalls).Append(" (ludzi ").Append(M0(_deduceMen)).Append("), poza oknem ").Append(_deduceOutside).Append(", gracz bez okna ").Append(_deduceNoWin)
               .Append(", pobor na podlodze ").Append(_floorCalls).Append(" (ludzi ").Append(M0(_floorMen)).Append(")")
               .Append(", odwrot wsi do stanu miasta regionu (fixA T6) ").Append(LevyVillageFromTownOn ? M0(_villTown) + " ludzi" : "WYLACZONY (Levy Village From Town)").Append(VillTownNames())
+              .Append(", pobor miast wedlug udzialu (fix2 P1-4) ").Append(TownLevyByShareOn ? "z wsi regionu " + M0(_townShareVill) + " ludzi, wsie na podlodze - znow z miasta " + M0(_townShareBack) + " ludzi" : "WYLACZONY (Town Levy By Share)")
               .Append(", A5 z klasa BK (DeduceManpower) ").Append(_a5Bk).Append(_a5BkFail > 0 ? " (bledy " + _a5BkFail + ")" : "")
               .Append(", karczma AI z puli weteranow (E4/10 - bez zdjecia z DOM) ").Append(_deduceVetCalls).Append(" (ludzi ").Append(M0(_deduceVetMen)).Append(")")
               .Append(" | pobor z DOM LevyLive: ").Append(LevyLive ? "TAK" : "NIE (ksiega pochodzenia bez zdejmowania)");

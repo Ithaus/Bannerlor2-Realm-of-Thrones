@@ -742,6 +742,8 @@ namespace Armoury
         public bool PressUntakenGoHome = true;             // villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it
         // poprawki E4 po tescie koncowym (fixA, T6): pobor wsi, ktorej region ma wszystkie wsie na podlodze 50 hearth, bierze reszte ze stanu miasta regionu - PeopleBook.TakeLevy
         public bool LevyVillageFromTown = true;            // when every village of a land is down to its last 50 hearths, a man recruited there comes from the people of the land's town instead of from nowhere
+        // E4 fix2 (decyzja Jeffa 12.10 nr 3, P1-4): pobor E4/7 w miescie bierze ze stanu miasta tylko udzial miasta w ludnosci krainy, reszta z wsi regionu - PeopleBook.TakeLevy
+        public bool TownLevyByShare = true;                // a man recruited in a town comes from the town only in proportion to the town's share of its land's people; the rest come from the land's villages. The number of recruits does not change. Off = the town gives every recruit until it is down to its last 100 people, as before
         // poprawki E4 po tescie koncowym (fixA, P2-T4-lochy): jency zbiegli z przepelnionego lochu partii ida jak uwolnieni jency (karczma / dom / las) - PeopleBook.EscapePost
         public bool PrisonEscapeGoHome = true;             // captives who slip away from an overfull party prison make their way home like freed captives (or to the woods, or to a tavern) instead of vanishing
         public bool GarrisonLevyFromBk = true;             // a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does

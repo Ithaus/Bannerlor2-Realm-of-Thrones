@@ -2536,6 +2536,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool LevyVillageFromTown { get; set; } = true;
 
+        [SettingPropertyBool("Town Levy By Share", HintText = "a man recruited in a town comes from the town only in proportion to the town's share of its land's people; the rest come from the land's villages. The number of recruits does not change. Off = the town gives every recruit until it is down to its last 100 people, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TownLevyByShare { get; set; } = true;
+
         [SettingPropertyBool("Prison Escape Go Home", HintText = "captives who slip away from an overfull party prison make their way home like freed captives (or to the woods, or to a tavern) instead of vanishing")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PrisonEscapeGoHome { get; set; } = true;
@@ -5057,6 +5061,7 @@ namespace Armoury
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;
             s.LevyVillageFromTown = LevyVillageFromTown;
+            s.TownLevyByShare = TownLevyByShare;
             s.PrisonEscapeGoHome = PrisonEscapeGoHome;
             s.GarrisonLevyFromBk = GarrisonLevyFromBk;
             s.FreeHandsShare = FreeHandsShare;
