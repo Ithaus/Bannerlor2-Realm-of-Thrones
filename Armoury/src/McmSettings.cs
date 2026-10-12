@@ -2216,7 +2216,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleMeasureEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 1.00f, "0.00", HintText = "a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days)")]
+        [SettingPropertyFloatingInteger("Population Rent Max Share", 0.00f, 1.00f, "0.00", HintText = "a village pays its lord at most this share of its purse each day (0.5 emptied the villages in a few days). Villages pay this rent only with Town Folk Live off - with the townsfolk's purse live they pay fixed dues instead (Village Dues Per Head Year)")]
         [SettingPropertyGroup("Iron Bank")]
         public float PopulationRentMaxShare { get; set; } = 0.2f;
 
@@ -3236,7 +3236,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CourtGetsLapsedArmsShare { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Court Folk Share", 0.00f, 1.00f, "0.00", HintText = "the share of the court's money that goes to the townsfolk of the seat (servants, cooks, grooms) rather than to its merchants - takes effect only once the townsfolk's purse is live (stage 5); until then the whole court money goes into the seat's purse")]
+        [SettingPropertyFloatingInteger("Court Folk Share", 0.00f, 1.00f, "0.00", HintText = "the share of the court's money that goes to the townsfolk of the seat (servants, cooks, grooms) rather than to its merchants - with Town Folk Live on (the townsfolk's purse live) it goes into their purse, at a castle into the castle folk's purse; with it off the whole court money goes into the seat's purse")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CourtFolkShare { get; set; } = 0.2f;
 
@@ -4488,9 +4488,81 @@ namespace Armoury
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipPrizesToPort { get; set; } = false;
 
-        [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game")]
+        [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game unless Town Folk Live is on (then the purse is real coin); 0 also turns the live purse off")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownFolkMode { get; set; } = 1;
+
+        [SettingPropertyBool("Town Folk Live", HintText = "the townsfolk's purse is live: townsfolk, castle folk and villages earn, pay their taxes and dues and buy their goods with their own coin; nothing the townsfolk eat appears or vanishes. Needs Town Purse Regulator (town purses as real coin) and Town Folk Mode 1. The war tax on the people and the lords' share of the town dues follow it. Off = as before stage 5 (their purses go back into the town and castle purses)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkLive { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Folk Service Share", 0.00f, 1.00f, "0.00", HintText = "of what soldiers, caravan men, outlaws and garrisons spend in a town or castle, this share goes to its people - beds, inns, washing, services - and the rest to the merchants")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkServiceShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Town Folk Labour Food", 0.00f, 1.00f, "0.00", HintText = "of every sale of food and drink by the merchants, this share is paid to the people who mill, bake, brew and carry")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkLabourFood { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Town Folk Labour Goods", 0.00f, 1.00f, "0.00", HintText = "of every sale of cloth, tools, salt and pots by the merchants, this share is paid to the people who carry, sell and finish")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkLabourGoods { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Town Folk Labour Arms", 0.00f, 1.00f, "0.00", HintText = "of every sale of arms, armour, horses and luxuries by the merchants, this share is paid to the people who carry and sell")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkLabourArms { get; set; } = 0.04f;
+
+        [SettingPropertyFloatingInteger("Town Folk Craft Wage Share", 0.00f, 1.00f, "0.00", HintText = "the people's wages in every workshop's goods - the merchants pay the rest up to this share of their worth")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkCraftWageShare { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Town Folk Merchant Draw", 0.000f, 0.200f, "0.000", HintText = "the merchant families' living out of their trade - a share of the merchants' daily sales")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkMerchantDraw { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Town Folk Merchant Profit Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day above the merchants' working coin, this share first goes to its clerks, coopers and the merchant families; the lord and the crown share the rest")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkMerchantProfitShare { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Town Folk Castle Profit Share", 0.00f, 1.00f, "0.00", HintText = "of what a castle purse gives up each day, this share goes to the castle folk under its walls")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkCastleProfitShare { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Town Folk Excise", 0.000f, 0.200f, "0.000", HintText = "the town's excise on what its people buy - it pays the town's walls, streets and clerks, and a third goes to the lord as the town's farm")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkExcise { get; set; } = 0.02f;
+
+        [SettingPropertyInteger("Town Folk Reserve Days", 1, 60, "0", HintText = "days of their needs the labourers keep in hand; above that they buy better food, ale and cloth (craftsmen keep 21, merchant families 30, castle folk 10, villages 15)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int TownFolkReserveDays { get; set; } = 10;
+
+        [SettingPropertyBool("Town Folk Anchor Basket", HintText = "the townsfolk buy at most what the people of the town need and can pay for - when they run short they buy less, cloth and luxuries first, bread last")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkAnchorBasket { get; set; } = true;
+
+        [SettingPropertyBool("Town Folk Castle Court Feeds", HintText = "the lord's kitchen feeds part of his castle folk: the court's money spent at a castle pays for the food its people eat beyond what they can pay themselves")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkCastleCourtFeeds { get; set; } = true;
+
+        [SettingPropertyBool("Town Folk Satisfaction From Basket", HintText = "the townsfolk's contentment with their goods follows what they could really buy, not the market alone")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkSatisfactionFromBasket { get; set; } = true;
+
+        [SettingPropertyBool("Town Folk Start Reserves", HintText = "in a new campaign the townsfolk, castle folk and villages start with a few days of their needs out of the towns' and castles' starting purses (in an old save - out of the merchants' spare coin, at most half)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkStartReserves { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Village Lord Scale", 0.00f, 1.00f, "0.00", HintText = "the lord takes this share of what Banner Kings would give him from a village's market takings - 35% under the usual tax policy, 25% low, 45% high; the village keeps the rest. Replaces the old daily rent of a fifth of the village purse (with Town Folk Live on)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float VillageLordScale { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Village Purchase Per Head", 0.00f, 1.00f, "0.00", HintText = "coins a day each free villager spends in the market town on salt, tools, cloth, pots and ale (with Town Folk Live on)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float VillagePurchasePerHead { get; set; } = 0.07f;
+
+        [SettingPropertyFloatingInteger("Village Dues Per Head Year", 0.00f, 50.00f, "0.0", HintText = "coins a year each free villager pays his lord in court, mill and market dues (with Town Folk Live on)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float VillageDuesPerHeadYear { get; set; } = 4f;
 
         public void ApplyTo(Settings s)
         {
@@ -5614,6 +5686,24 @@ namespace Armoury
             s.ShipTradeThroughPort = ShipTradeThroughPort;
             s.ShipPrizesToPort = ShipPrizesToPort;
             s.TownFolkMode = TownFolkMode;
+            s.TownFolkLive = TownFolkLive;
+            s.TownFolkServiceShare = TownFolkServiceShare;
+            s.TownFolkLabourFood = TownFolkLabourFood;
+            s.TownFolkLabourGoods = TownFolkLabourGoods;
+            s.TownFolkLabourArms = TownFolkLabourArms;
+            s.TownFolkCraftWageShare = TownFolkCraftWageShare;
+            s.TownFolkMerchantDraw = TownFolkMerchantDraw;
+            s.TownFolkMerchantProfitShare = TownFolkMerchantProfitShare;
+            s.TownFolkCastleProfitShare = TownFolkCastleProfitShare;
+            s.TownFolkExcise = TownFolkExcise;
+            s.TownFolkReserveDays = TownFolkReserveDays;
+            s.TownFolkAnchorBasket = TownFolkAnchorBasket;
+            s.TownFolkCastleCourtFeeds = TownFolkCastleCourtFeeds;
+            s.TownFolkSatisfactionFromBasket = TownFolkSatisfactionFromBasket;
+            s.TownFolkStartReserves = TownFolkStartReserves;
+            s.VillageLordScale = VillageLordScale;
+            s.VillagePurchasePerHead = VillagePurchasePerHead;
+            s.VillageDuesPerHeadYear = VillageDuesPerHeadYear;
         }
 
         internal static void Apply()

@@ -123,6 +123,19 @@ namespace Armoury
                      nameof(NotablePre), nameof(NotablePost), nameof(NotableFin), Priority.Normal);
             }
             catch (Exception e) { miss.Add("ApplyAll (" + e.Message + ")"); }
+            // E5/B1 (173): okna kiesy czynnej - osobne listy (linia startowa "Kiesa ludu (E5/B1)"; E5/0 bez zmian)
+            int d0 = done.Count, m0 = miss.Count;
+            try
+            {
+                Wire("kotwica budzetu wiersza (CalculateBudget, Low)", AccessTools.Method("BannerKings.Patches.EconomyPatches:CalculateBudget"), null, nameof(AnchorBudgetPostfix), null, Priority.Low);
+                var bkTax = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKTaxModel");
+                Wire("podatek wsi BK (BKTaxModel.CalculateVillageTaxFromIncome x VillageLordScale)",
+                     bkTax != null ? AccessTools.Method(bkTax, "CalculateVillageTaxFromIncome", new[] { typeof(Village), typeof(int) }) : null, null, nameof(VillageTaxPostfix), null, Priority.Normal);
+            }
+            catch (Exception e) { miss.Add("ApplyAll B1 (" + e.Message + ")"); }
+            var doneB = done.GetRange(d0, done.Count - d0); var missB = miss.GetRange(m0, miss.Count - m0);
+            done.RemoveRange(d0, done.Count - d0); miss.RemoveRange(m0, miss.Count - m0);
+            targets.RemoveRange(d0, targets.Count - d0); names.RemoveRange(d0, names.Count - d0);
             _wiredText = done.Count > 0 ? string.Join(", ", done.ToArray()) : "-";
             _missText = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
             _ownersText = Owners(targets, names);
@@ -130,6 +143,9 @@ namespace Armoury
             Log.Info("Kiesa ludu (E5/0): okna wpiete: " + _wiredText + "; nasluchy: wyroby (OnItemProduced), przelewy gry, tabory wsi, regulator kas, pobory korony - w ksiedze pieniadza i KingdomTreasury; BRAK: "
                      + _missText + "; wlasciciele latek celow: " + _ownersText + "; tryb przy starcie " + (s != null ? s.TownFolkMode : -1)
                      + " (stan gry - linia sesji). Tylko log: zadna latka nie zmienia gry.");
+            Log.Info("Kiesa ludu (E5/B1): okna wpiete: budzet dnia (UpdateDemandShift - kotwica slownika w tym samym postfiksie), konsumpcja (zaplata przez CastlePurse 110 -> TownPurse.OnConsumed)"
+                     + (doneB.Count > 0 ? ", " + string.Join(", ", doneB.ToArray()) : "") + "; BRAK: " + (missB.Count > 0 ? string.Join(", ", missB.ToArray()) : "-")
+                     + "; klucz przy starcie TownFolkLive " + (s != null && s.TownFolkLive ? 1 : 0) + " (stan czynny - linia \"Kiesa ludu (E5/B1): CZYNNA\" pierwszej doby).");
         }
 
         private static string Owners(List<MethodBase> targets, List<string> names)
@@ -155,10 +171,11 @@ namespace Armoury
         {
             try
             {
-                if (__0 == null || __1 == null || !Live || OffMain()) return;
+                if (__0 == null || __1 == null || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 if (_brOpen) _brUnclosed++;
                 _brTown = __0; _brOpen = true; _brTrack.Clear(); _poolN = 0; _brGold0 = __0.Gold;
+                _brAnchor = false; _brFacFood = _brFacRest = 1;   // E5/B1: czynniki kotwicy tego nawiasu (AnchorDict nizej)
                 // recenzja E5/0 (2-1): warunek dokupu jedzenia BK (EconomyPatches :532) - zapas sie w petli nie zmienia (polka i kasa tak; FoodStocksUpperLimit to odczyt modelu)
                 _brLowFood = false;
                 try { _brLowFood = __0.FoodStocks <= __0.FoodStocksUpperLimit() * 0.1f; } catch (Exception e) { Stumble("DemandPostfix(zapas)", e); }
@@ -177,6 +194,8 @@ namespace Armoury
                     f.Sat0Ok = false;
                     var sat = Sats(f);
                     if (sat != null && sat.Length >= 4) { for (int i = 0; i < 4; i++) f.Sat0[i] = sat[i]; f.Sat0Ok = true; }
+                    // E5/B1: kotwica raz na (osade, kategorie, dobe) - slownik x czynnik grupy i oferta nadwyzki ludu, PO pomiarze (G0, Idx, Sat0 - przed kotwica)
+                    if (LiveKey) { try { AnchorDict(f, __0, __1, sum); } catch (Exception e) { _brAnchor = false; Stumble("AnchorDict", e); } }
                 }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
@@ -262,13 +281,13 @@ namespace Armoury
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("ConsumePostfix", e); }
-            finally { _brOpen = false; _brTown = null; _brLowFood = false; }
+            finally { _brOpen = false; _brTown = null; _brLowFood = false; _brAnchor = false; }
         }
 
         /// <summary>Wyjatek w cudzym kodzie konsumpcji - nawias zamkniety od razu (void: wyjatek leci dalej bez zmian).</summary>
         public static void ConsumeFinalizer(Exception __exception)
         {
-            try { if (__exception != null && _brOpen) { _brAborted++; _brOpen = false; _brTown = null; } } catch { }
+            try { if (__exception != null && _brOpen) { _brAborted++; _brOpen = false; _brTown = null; _brAnchor = false; } } catch { }
         }
 
         private static int GroupOf(ItemCategory c)
@@ -291,7 +310,7 @@ namespace Armoury
             __state = default(BState);
             try
             {
-                if (__instance == null || !Live || OffMain()) return;
+                if (__instance == null || !Measure || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 __state.Pl = __instance.PlunderedGold; __state.Lost = __instance.GoldLost;
                 var party = __instance.Party;
@@ -373,7 +392,7 @@ namespace Armoury
             __state = int.MinValue;
             try
             {
-                if (__0 == null || !Live || OffMain()) return;
+                if (__0 == null || !Measure || OffMain()) return;
                 __state = __0.Gold;
                 _ntHero = __0; _ntCurOutK = _ntCurInK = 0;   // nawias pasma (recenzja E5/0 (1-2)): przelewy z kasa osady licza sie w OnGold
                 _ntAll++;
@@ -531,9 +550,7 @@ namespace Armoury
         // ============================================================ kalibracja D1 (pierwsza doba sesji z PopulationLaw.Calibrated)
         private static void Calibrate(int day)
         {
-            ResolveBk();
-            object[] types = null;
-            if (_popType != null) { types = new object[6]; for (int i = 0; i < 6; i++) { try { types[i] = Enum.ToObject(_popType, i); } catch { types[i] = null; } } }
+            object[] types = PopTypes();
             int withBk = 0, bkTowns = 0, bkCastles = 0, bkVills = 0, noBk = 0;
             double tW = 0, tR = 0, tP = 0, tS = 0, tBook = 0;
             var slaveHit = new List<string>();
@@ -545,26 +562,12 @@ namespace Armoury
                     if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
                     var f = Get(st);
                     if (f == null || f.Cal) continue;
-                    var k = st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
-                    f.Slave = SlaveRealm(k, slaveHit);
                     f.PeopleCal = f.Kind == 1 ? 0 : PopulationLaw.PeopleOf(st);
-                    long[] c = new long[6];
-                    object pd = null;
-                    try { pd = PopData(st); } catch (Exception e) { pd = null; Stumble("Calibrate(PopData)", e); }
-                    if (pd != null && types != null && _mTypeCount != null)
-                        for (int i = 0; i < 6; i++) { if (i == 4 || types[i] == null) continue; try { c[i] = Convert.ToInt64(_mTypeCount.Invoke(pd, new[] { types[i] })); } catch (Exception e) { Stumble("Calibrate(GetTypeCount)", e); } }
-                    long tot = c[0] + c[1] + c[2] + c[3] + c[5];
-                    if (pd == null || tot <= 0) { f.NoBk = true; noData.Add(f); f.Cal = true; noBk++; continue; }
+                    if (!ReadBk(f, types, slaveHit)) { noData.Add(f); f.Cal = true; noBk++; continue; }
                     withBk++;
-                    // indeksy BK PopType: 0 szlachta, 1 rzemieslnicy, 2 chlopi, 3 niewolni, 5 dzierzawcy (Measure169c.ClassName)
-                    if (f.Kind == 0)
-                    {
-                        bkTowns++;
-                        f.HP = c[0]; f.HR = c[1]; f.HW = c[2] + c[5] + (f.Slave ? 0 : c[3]); f.HS = f.Slave ? c[3] : 0;
-                        tW += f.HW; tR += f.HR; tP += f.HP; tS += f.HS; tBook += f.PeopleCal;
-                    }
-                    else if (f.Kind == 1) { bkCastles++; f.HW = c[1] + c[2] + c[5] + (f.Slave ? 0 : c[3]); }   // podzamcze: bez dworu pana (szlachta) i niewolnych krolestw niewolniczych
-                    else { bkVills++; f.HW = c[2] + c[5] + (f.Slave ? 0 : c[3]); f.HR = c[1]; f.HP = c[0]; }    // wies: wolni (szlachta = majatki BK)
+                    if (f.Kind == 0) { bkTowns++; tW += f.HW; tR += f.HR; tP += f.HP; tS += f.HS; tBook += f.PeopleCal; }
+                    else if (f.Kind == 1) bkCastles++;
+                    else bkVills++;
                     f.Cal = true;
                 }
                 catch (Exception e) { Stumble("Calibrate(osada)", e); }
@@ -615,22 +618,55 @@ namespace Armoury
             try { foreach (var c in ItemCategories.All) if (c != null && GroupOf(c) == 0) foods.Add(c.StringId); } catch { }
             int sTowns = 0, sCastles = 0, sVills = 0;
             foreach (var f in _f.Values) { if (!f.Cal) continue; if (f.Kind == 0) sTowns++; else if (f.Kind == 1) sCastles++; else sVills++; }
-            _lineSession = "Kiesa ludu (E5/0): sesja od dnia " + day + " - tryb na sucho (TownFolkMode " + (s != null ? s.TownFolkMode : -1) + ") | kalibracja D1: osad " + (sTowns + sCastles + sVills)
+            bool liveNow = Live;   // E5/B1: kiesa czynna - kalibracja w zapisie (arm_townfolk), tu tylko osady bez kalibracji
+            _lineSession = "Kiesa ludu (E5/0): sesja od dnia " + day + " - tryb " + (liveNow ? "kiesa czynna (E5/B1)" : "na sucho") + " (TownFolkMode " + (s != null ? s.TownFolkMode : -1) + ") | kalibracja D1: osad " + (sTowns + sCastles + sVills)
                 + " (miasta " + sTowns + ", zamki " + sCastles + ", wsie " + sVills + "), z danymi BK " + withBk + " (miasta " + bkTowns + ", zamki " + bkCastles + ", wsie " + bkVills
                 + "), bez danych " + noBk + " (mediana skali BK/ksiega) | ludzie BK miast " + N0(tW + tR + tP + tS) + " (W " + N0(tW) + " / R " + N0(tR) + " / P " + N0(tP) + " / niewolni utrzymywani " + N0(tS)
-                + "), ksiega miast " + N0(tBook) + " | krolestwa niewolnicze: dopasowane " + slaveHit.Count + " z " + SlaveRealms.Length + " (" + (slaveHit.Count > 0 ? string.Join(", ", slaveHit.ToArray()) : "-")
+                + "), ksiega miast " + N0(tBook) + " | kultury z niewola (lista I1, osady): " + slaveHit.Count + " (" + (slaveHit.Count > 0 ? string.Join(", ", slaveHit.ToArray()) : "-")
                 + ") | kategorie jedzenia: " + (foods.Count > 0 ? string.Join(", ", foods.ToArray()) : "-") + " | modele czynne: " + ActiveModels()
                 + " | zapasy startowe na sucho " + N0(sW + sR + sP + sC + sV) + " zl (W " + N0(sW) + " / R " + N0(sR) + " / P " + N0(sP) + " / podzamcze " + N0(sC) + " / wsie " + N0(sV)
-                + "; pelny koszyk bez kotwicy) | wlasciciele latek celow (sesja): " + Owners2() + " | stan tylko w pamieci sesji (bez zapisu).";
+                + "; pelny koszyk bez kotwicy) | wlasciciele latek celow (sesja): " + Owners2() + (liveNow ? " | kalibracja i kiesy w zapisie (arm_townfolk); zapasy startowe na sucho tylko liczba." : " | stan tylko w pamieci sesji (bez zapisu).");
         }
 
-        private static bool SlaveRealm(Kingdom k, List<string> hit)
+        /// <summary>
+        /// Klasy BK osady (faza a D1 - bez PeopleOf): kultura z niewola, ludzie wedlug klas BK. E5/B1: wolane tez przy zapasach startowych (R5) przed kalibracja
+        /// ksiegi ludzi. false - osada bez danych BK (NoBk). Indeksy BK PopType: 0 szlachta, 1 rzemieslnicy, 2 chlopi, 3 niewolni, 5 dzierzawcy (Measure169c.ClassName).
+        /// </summary>
+        private static bool ReadBk(Folk f, object[] types, List<string> slaveHit)
         {
-            if (k == null || k.Name == null) return false;
-            string n = k.Name.ToString();
-            foreach (var r in SlaveRealms)
-                if (n.IndexOf(r, StringComparison.OrdinalIgnoreCase) >= 0) { if (!hit.Contains(n)) hit.Add(n); return true; }
-            return false;
+            var st = f.St;
+            f.Slave = SlaveOf(st, slaveHit);
+            long[] c = new long[6];
+            object pd = null;
+            try { pd = PopData(st); } catch (Exception e) { pd = null; Stumble("Calibrate(PopData)", e); }
+            if (pd != null && types != null && _mTypeCount != null)
+                for (int i = 0; i < 6; i++) { if (i == 4 || types[i] == null) continue; try { c[i] = Convert.ToInt64(_mTypeCount.Invoke(pd, new[] { types[i] })); } catch (Exception e) { Stumble("Calibrate(GetTypeCount)", e); } }
+            long tot = c[0] + c[1] + c[2] + c[3] + c[5];
+            if (pd == null || tot <= 0) { f.NoBk = true; return false; }
+            f.NoBk = false;
+            if (f.Kind == 0) { f.HP = c[0]; f.HR = c[1]; f.HW = c[2] + c[5] + (f.Slave ? 0 : c[3]); f.HS = f.Slave ? c[3] : 0; }
+            else if (f.Kind == 1) f.HW = c[1] + c[2] + c[5] + (f.Slave ? 0 : c[3]);   // podzamcze: bez dworu pana (szlachta) i niewolnych kultur z niewola
+            else { f.HW = c[2] + c[5] + (f.Slave ? 0 : c[3]); f.HR = c[1]; f.HP = c[0]; }   // wies: wolni (szlachta = majatki BK)
+            return true;
+        }
+
+        /// <summary>Typy BK PopType (0..5) do GetTypeCount - raz na sesje.</summary>
+        private static object[] PopTypes()
+        {
+            ResolveBk();
+            if (_popType == null) return null;
+            var types = new object[6];
+            for (int i = 0; i < 6; i++) { try { types[i] = Enum.ToObject(_popType, i); } catch { types[i] = null; } }
+            return types;
+        }
+
+        /// <summary>E5/B1 (plan pkt 0.13): osada kultury z niewola (lista I1/H3, LosersFlee.SlaveCulture - kultura biezaca osady); hit - id kultur trafionych (linia sesji).</summary>
+        private static bool SlaveOf(Settlement st, List<string> hit)
+        {
+            var c = st != null ? st.Culture : null;
+            if (!LosersFlee.SlaveCulture(c)) return false;
+            if (hit != null && !hit.Contains(c.StringId)) hit.Add(c.StringId);
+            return true;
         }
 
         private static string Owners2()
@@ -727,9 +763,11 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             try
             {
-                if (!On || Campaign.Current == null) return;
+                if ((!On && !LiveKey && _stateKey == null) || Campaign.Current == null) return;
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 string l2 = null, l3 = null, l4 = null, l5 = null, l6 = null;
+                var live = TakeLiveLines();   // E5/B1: stan, zapasy startowe, zwrot, robocizna, prawa panskie, R14
+                if (!On) { foreach (var l in live) Log.Info(l); if (_lineFolk != null) Log.Info(_lineFolk + " | potkniecia " + _stumbles + " (sesja " + _stumbleSess + ")."); return; }
                 try { l2 = SurplusLine(day); } catch (Exception e) { Stumble("SurplusLine", e); }
                 try { l3 = BattleLine(day); } catch (Exception e) { Stumble("BattleLine", e); }
                 try { l4 = NotableLine(day); } catch (Exception e) { Stumble("NotableLine", e); }
@@ -741,6 +779,7 @@ namespace Armoury
                     Log.Info(_lineFolk + " | czas: latki " + Ms(_patchTicks) + " ms, doba " + Ms(_dayTicks + own) + " ms | potkniecia " + _stumbles
                              + " (sesja " + _stumbleSess + "; poza watkiem glownym " + _offThread + "; nawias konsumpcji: niezamkniete " + _brUnclosed + ", obca osada " + _brMismatch
                              + ", przerwane wyjatkiem " + _brAborted + ").");
+                foreach (var l in live) Log.Info(l);
                 foreach (var l in new[] { l2, l3, l4, l5, l6 }) if (l != null) Log.Info(l);
             }
             catch (Exception e) { Stumble("Lines", e); }

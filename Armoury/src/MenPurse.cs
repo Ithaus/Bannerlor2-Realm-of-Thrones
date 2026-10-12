@@ -309,12 +309,13 @@ namespace Armoury
                     return;
                 }
                 Take(mp, life);
-                st.Town.ChangeGold(life);           // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
+                int folk = TownFolk.EarnService(st, life, TownFolk.KLife);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca); kupcy reszte
+                st.Town.ChangeGold(life - folk);    // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
                 ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, life);   // 169c: "wlasne" D stalego - wydatki ludzi rodu w jego miescie (tylko licznik)
                 if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
                     CrownIncome.NoteOwnSpend(mp.ActualClan, life);   // 165 (K3): zold wydany we wlasnym miescie rodu wraca zaworem - bez zwrotu korony od niego (gracz tez - jedna regula)
-                MoneyLedger.Note(MoneyLedger.NLife, st, life);   // ksiega przeplywow osad (tylko licznik)
-                try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - kiesa ludu na sucho (tylko licznik)
+                MoneyLedger.Note(MoneyLedger.NLife, st, life - folk);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie (E5/B1: czesc ludu w kiesie, posiadacz H22/H23)
+                try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - okno kiesy ludu (calosc; E5/B1: podstawa robocizny 75%)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;
                 if (mp.IsMainParty)

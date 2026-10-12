@@ -635,8 +635,11 @@ namespace Armoury
             int ix = (int)Math.Min(int.MaxValue, x);
             head.ChangeHeroGold(-ix);
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
-            seat.Town.ChangeGold(ix);                              // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
-            ClanIncomeBook.NoteOwnPaid(seat, c, ix - CourtFull.Own(seat, c, lp));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
+            int folk = TownFolk.Earn(seat, (int)(ix * (double)CourtFull.FolkShare), TownFolk.KCourt);   // E5/B1 (R8, KL 1.3): 20% dworu do ludu siedziby (zamek - podzamcze); arytmetyka
+            seat.Town.ChangeGold(ix - folk);                       // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
+            if (folk > 0 && seat.IsCastle) TownFolk.CourtCredit(seat, ix - folk);   // E5/B1 (kuchnia pana): czesc kupcow dworu w kasie zamku - kredyt na jedzenie podzamcza (bez zlota)
+            long lpK = folk > 0 && ix > 0 ? lp - (long)(lp * (double)folk / ix) : lp;   // E5/B1: sprzet w kasie (CourtFull.Paid/Own od czesci w kasie)
+            ClanIncomeBook.NoteOwnPaid(seat, c, Math.Max(0, ix - folk - CourtFull.Own(seat, c, lpK)));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
             _dCourt += ix;

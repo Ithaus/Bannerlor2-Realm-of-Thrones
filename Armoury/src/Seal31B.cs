@@ -451,9 +451,10 @@ namespace Armoury
                 if (!WageOn || mp == null || !mp.IsCaravan || st == null || st.Town == null || purse <= 0) return false;   // poprawka po recenzji: wylaczony E3/4 = droga partii jak dotad
                 int t = MenPurse.Take(mp, purse);
                 if (t <= 0) return true;
-                st.Town.ChangeGold(t);                                 // karczma, jedzenie, gra - pieniadze zostaja w miescie
+                int folk = TownFolk.EarnService(st, t, TownFolk.KLifeCaravan);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca)
+                st.Town.ChangeGold(t - folk);                          // karczma, jedzenie, gra - pieniadze zostaja w miescie
                 ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, t);      // 169c: "wlasne" D stalego (tylko licznik) - jak sakiewki partii
-                MoneyLedger.Note(MoneyLedger.NLife, st, t);            // ksiega przeplywow osad (tylko licznik)
+                MoneyLedger.Note(MoneyLedger.NLife, st, t - folk);     // ksiega przeplywow osad (tylko licznik) - czesc w kasie
                 try { TownFolk.Note(st, t, TownFolk.KLifeCaravan); } catch { }   // E5/0 (195): zycie ludzi karawan w miescie (tylko licznik)
                 _carSpent += t; _carSpentN++;
                 return true;

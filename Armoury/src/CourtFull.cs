@@ -34,8 +34,8 @@ namespace Armoury
     ///     Dwor placony pierwszy (podloga 162m bez zmian - wplata samego dworu jak dotad), sprzet z reszty.   [3-5: Take w Court; licznik Paid]
     /// Gracz - bez budzetu i bez dworu ([D] 08.10). Zloto nie powstaje i nie znika: przelew glowa -> kasa siedziby; zawor kasy oddaje je panu i koronie.
     ///
-    /// Hak B1 (KL 1.3: dwor 80% kupcy / 20% lud): CourtFolkShare dziala dopiero z czynna kiesa ludu (klucz TownFolkLive powstaje w B1) - do tego
-    /// czasu FolkShare = 0 i cala wplata dworu (z przeterminowanym sprzetem) idzie do kasy siedziby. B1 dzieli przelew w ClanBudget.Court.
+    /// Hak B1 (KL 1.3: dwor 80% kupcy / 20% lud): CourtFolkShare dziala przy czynnej kiesie ludu (E5/B1, TownFolk.Live) - inaczej FolkShare = 0
+    /// i cala wplata dworu (z przeterminowanym sprzetem) idzie do kasy siedziby. B1 dzieli przelew w ClanBudget.Court (siedziba-zamek: kredyt dworu).
     ///
     /// Zapas "wlasnego" (recenzja A2, uwaga 1): sprzet wplacony do kasy WLASNEJ siedziby (siedziba nalezy do rodu-platnika) to pieniadze rodu - wracaja
     /// zaworem przez wiele dob (miasto: renta PopulationLaw ok. 7% nadwyzki dziennie; zamek: zawor 110, 2/3 pan, 1/3 korona). 169c uznaje za "wlasne"
@@ -58,9 +58,9 @@ namespace Armoury
         /// <summary>Paczka czynna: klucz i dwor 162m (bez dworu nie ma komu oddac przydzialu). Budzet rodu sprawdza wolajacy (ClanBudget.Daily).</summary>
         internal static bool On { get { var s = Settings.Current; return s != null && s.ClanBudgetEnabled && s.CourtGetsLapsedArmsShare && s.HouseholdMinimal; } }
 
-        /// <summary>Hak B1: czesc wplaty dworu dla kiesy ludu siedziby. Do B1 zawsze 0 - kiesy ludu nie ma; B1 zamienia na
-        /// "kiesa czynna (TownFolkLive i TownFolkMode >= 1) ? ValveSplit.Unit(CourtFolkShare) : 0" i dzieli przelew dworu.</summary>
-        internal static float FolkShare { get { return 0f; } }
+        /// <summary>Hak B1: czesc wplaty dworu dla kiesy ludu siedziby (KL 1.3: 80% kupcy / 20% lud). E5/B1: kiesa czynna (TownFolk.Live) - CourtFolkShare
+        /// (ClanBudget.Court dzieli przelew dworu: TownFolk.Earn KCourt); kiesa wylaczona - 0 (caly dwor do kasy siedziby, jak dotad).</summary>
+        internal static float FolkShare { get { var s = Settings.Current; return s != null && TownFolk.Live ? ValveSplit.Unit(s.CourtFolkShare) : 0f; } }
 
         // liczniki doby (linie "Budzet rodow (166)" i "Obieg")
         private static double _dGross, _dMerc, _dNoSeat, _dDebtor, _dReserve, _dYield, _dFloor;
@@ -301,7 +301,7 @@ namespace Armoury
                   .Append(", ustapilo zoldowi ").Append(R(_dYield)).Append(", kiesa glowy (zold dnia, podloga) ").Append(R(_dFloor))
                   .Append(", dluznicy (polowa) ").Append(R(_dDebtor)).Append(", najemnicy bez dworu ").Append(R(_dMerc)).Append(", bez siedziby ").Append(R(_dNoSeat))
                   .Append("; udzial ludu (hak B1) ").Append((100.0 * FolkShare).ToString("0", Inv)).Append("% (Court Folk Share ")
-                  .Append(s.CourtFolkShare.ToString("0.00", Inv)).Append(" - czynny dopiero z kiesa ludu)");
+                  .Append(s.CourtFolkShare.ToString("0.00", Inv)).Append(" - czynny przy kiesie ludu E5/B1)");
             }
             if (_stumbles > 0) sb.Append(", potkniecia E5/A2 ").Append(_stumbles);
             return sb.ToString();

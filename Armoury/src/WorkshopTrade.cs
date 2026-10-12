@@ -319,6 +319,11 @@ namespace Armoury
                 finally { DayPass.Charging = was; }
                 fromPurse = Math.Max(0, Math.Min(amount, before - owner.Gold));
                 if (fromPurse > 0) { if (wages) { _dWagePurse += fromPurse; if (rec != null) rec.Purse += fromPurse; } else _dKeepPurse += fromPurse; }
+                if (wages && fromPurse > 0)
+                {
+                    TownFolk.EarnFromTown(shop.Settlement, fromPurse, TownFolk.KCraftPaid);   // E5/B1: place z kiesy gracza (przelew gry do kasy) - z kasy do kiesy ludu (ksiega N9)
+                    try { TownFolk.Note(shop.Settlement, fromPurse, TownFolk.KCraftPaid); } catch { }   // E5/B1: place juz wyplacone (doplata do 35% nie placi ich drugi raz)
+                }
                 if (fromPurse >= amount) return amount;
             }
             int rest = amount - fromPurse;
@@ -326,8 +331,9 @@ namespace Armoury
             if (paid > 0)
             {
                 shop.ChangeGold(-paid);
-                town.ChangeGold(paid);
-                MoneyLedger.NoteWorkshopPay(shop.Settlement, wages ? paid : 0, wages ? 0 : paid);
+                int folk = wages ? TownFolk.Earn(shop.Settlement, paid, TownFolk.KCraftPaid) : 0;   // E5/B1 (R11): place z kapitalu do kiesy ludu (arytmetyka - nie rzuca); utrzymanie - kasa jak dotad
+                town.ChangeGold(paid - folk);
+                MoneyLedger.NoteWorkshopPay(shop.Settlement, wages ? paid - folk : 0, wages ? 0 : paid);
                 try { TownFolk.Note(shop.Settlement, paid, wages ? TownFolk.KCraftPaid : TownFolk.KShopKeep); } catch { }   // E5/0 (195): place i utrzymanie z kapitalu (tylko licznik)
                 if (wages) _dWageCap += paid; else _dKeepCap += paid;
             }

@@ -55,8 +55,9 @@ namespace Armoury
     /// </summary>
     internal static class VillageTakings
     {
-        /// <summary>Hak kiesy ludu (KL, etap 5): renta wsi ustepuje stalym oplatom (173). Do etapu 5 = false - PopulationLaw pobiera rente wsi jak dotad.</summary>
-        internal static readonly bool VillageRentYieldsToFees = false;
+        /// <summary>Hak kiesy ludu (KL, etap 5): renta wsi ustepuje stalym oplatom (173). E5/B1 (P K3): wlasciwosc z warunku kiesy czynnej (TownFolk.Live) - PopulationLaw
+        /// pobiera wtedy oplate stala (VillageDuesPerHeadYear na wolna glowe) zamiast 20% kiesy; kiesa wylaczona - renta jak dotad w tej samej dobie.</summary>
+        internal static bool VillageRentYieldsToFees { get { return TownFolk.Live; } }
 
         /// <summary>Stan przed latka BK: sakwa taboru, kiesa i licznik podatku wsi macierzystej (i wsi wejscia, gdy inna).</summary>
         internal sealed class Entry
@@ -434,7 +435,7 @@ namespace Armoury
                      + (miss.Count > 0 ? "; BRAK: " + string.Join(", ", miss.ToArray()) : "")
                      + "; sakwy zniszczonych taborow - z nasluchu zdarzen. Ustawienia: reszta utargu do kiesy wsi " + OnOff(s != null && s.VillageTakingsWhole)
                      + ", towar kupiony we wsi " + OnOff(s != null && s.VillageFoodSalesKept) + ", sakwa zniszczonego taboru " + OnOff(s != null && s.VillagerPurseSurvives)
-                     + "; hak kiesy ludu (etap 5) VillageRentYieldsToFees " + (VillageRentYieldsToFees ? "true" : "false") + ".");
+                     + "; hak kiesy ludu (E5/B1) VillageRentYieldsToFees = kiesa czynna (TownFolkLive " + (s != null && s.TownFolkLive ? "tak" : "nie") + "; przy starcie kampanii jeszcze nie ma).");
         }
 
         private static string OnOff(bool on) { return on ? "WLACZONE" : "wylaczone"; }

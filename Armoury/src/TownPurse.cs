@@ -59,17 +59,18 @@ namespace Armoury
         private static int _consGold;
 
         // ------------------------------------------------------------ liczniki tickow gry (ticki miast ida przez cala dobe) - zamyka BeforeRents
-        private static long _dRegDown, _dRegUp, _dRegUpCut, _dConsBack, _dConsKept, _dBkSkipGold;
+        private static long _dRegDown, _dRegUp, _dRegUpCut, _dConsBack, _dConsKept, _dBkSkipGold, _dConsFolk;
         private static int _dRegDownN, _dRegUpN, _dRegUpCutN, _dConsN, _dConsHit, _dBkSkipTowns, _dBkSkipCastles, _dBuyAsk, _dBuyZero;
 
         // ------------------------------------------------------------ zawor dnia (zeruje BeforeRents, zamyka ValveDay)
-        private static long _vLord, _vLordBase, _vLordBaseK, _vCrown, _vDue, _vPlayer;
+        private static long _vLord, _vLordBase, _vLordBaseK, _vCrown, _vDue, _vPlayer, _vFolk;
         private static int _vPayers, _vBelow, _vSiege, _vNoLord, _vTiny, _vExempt, _vNoCrown, _vUnpaid;
         private static readonly HashSet<Kingdom> _vKingdoms = new HashSet<Kingdom>();
         private static readonly Dictionary<Town, int> _crownBy = new Dictionary<Town, int>();   // do kasy-miast.csv
 
         // ------------------------------------------------------------ odczyty dnia (zeruje MoneyLedger.ClearLast169 w BlockOpen; ustawia BeforeRents i ValveDay)
         internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastConsKept, LastBkSkipGold, LastLordPaid, LastLordBase, LastLordBaseK, LastCrownPaid, LastDue, LastPlayerPaid, LastTrim;
+        internal static long LastConsFolk, LastFolkValve;   // E5/B1: lud zaplacil kasom w konsumpcji; czesc ludu z zaworu (5%)
         internal static int LastRegDownN, LastRegUpN, LastRegUpCutN, LastConsN, LastConsHit, LastBkSkipTowns, LastBkSkipCastles, LastBuyAsk, LastBuyZero, LastPayers, LastKingdoms,
                             LastBelow, LastSiege, LastNoLord, LastTiny, LastExempt, LastNoCrown, LastUnpaid;
         /// <summary>165: udzial korony z zaworu kas miast dzis, na krolestwo (jak CastlePurse.CrownToday) - czyszczony w BeforeRents.</summary>
@@ -108,6 +109,7 @@ namespace Armoury
         internal static void ZeroLast()
         {
             LastRegDown = LastRegUp = LastRegUpCut = LastConsBack = LastConsKept = LastBkSkipGold = LastLordPaid = LastLordBase = LastLordBaseK = LastCrownPaid = LastDue = LastPlayerPaid = LastTrim = 0;
+            LastConsFolk = LastFolkValve = 0;
             LastRegDownN = LastRegUpN = LastRegUpCutN = LastConsN = LastConsHit = LastBkSkipTowns = LastBkSkipCastles = LastBuyAsk = LastBuyZero = LastPayers = LastKingdoms = 0;
             LastBelow = LastSiege = LastNoLord = LastTiny = LastExempt = LastNoCrown = LastUnpaid = 0;
             LastTake = LastNet = LastTake28 = LastNet28 = 0; LastShareOk = false;
@@ -116,13 +118,13 @@ namespace Armoury
 
         private static void ClearTicks()
         {
-            _dRegDown = _dRegUp = _dRegUpCut = _dConsBack = _dConsKept = _dBkSkipGold = 0;
+            _dRegDown = _dRegUp = _dRegUpCut = _dConsBack = _dConsKept = _dBkSkipGold = _dConsFolk = 0;
             _dRegDownN = _dRegUpN = _dRegUpCutN = _dConsN = _dConsHit = _dBkSkipTowns = _dBkSkipCastles = _dBuyAsk = _dBuyZero = 0;
         }
 
         private static void ClearValve()
         {
-            _vLord = _vLordBase = _vLordBaseK = _vCrown = _vDue = _vPlayer = 0;
+            _vLord = _vLordBase = _vLordBaseK = _vCrown = _vDue = _vPlayer = _vFolk = 0;
             _vPayers = _vBelow = _vSiege = _vNoLord = _vTiny = _vExempt = _vNoCrown = _vUnpaid = 0;
             _vKingdoms.Clear(); _crownBy.Clear();
         }
@@ -169,6 +171,9 @@ namespace Armoury
         internal static bool NoTopUp { get { return Mode == 2 && On; } }
 
         private static bool NoMint { get { var s = Settings.Current; return s != null && s.TownFolkBuyWithoutMinting && On; } }
+
+        /// <summary>E5/B1: A1 cofa "zakupy" mieszczan (warunek kiesy czynnej - bez niego lud placilby za towar, za ktory BK i tak dopisuje zloto).</summary>
+        internal static bool NoMintNow { get { return NoMint; } }
 
         /// <summary>Zawor kas miast czynny: A1, renty (PopulationRentEnabled) i TownRentShare > 0. Inaczej PopulationLaw liczy rente miast jak dotad.</summary>
         internal static bool ValveLive { get { var s = Settings.Current; return s != null && On && PopulationLaw.On && ValveSplit.Unit(s.TownRentShare) > 0f; } }
@@ -306,6 +311,13 @@ namespace Armoury
                     if (live) { _dConsKept += made; Add(_mintWin, town, made); }
                     return;
                 }
+                // E5/B1 (R1): kiesa czynna - lud placi za towar (TownFolk.PayForGoods robi jedyny zapis zlota: kasa zatrzymuje zaplate ludu, reszta wraca do nicosci)
+                if (live && TownFolk.Live)
+                {
+                    int keep = TownFolk.PayForGoods(town, made);
+                    if (keep >= 0) { _dConsBack += made - keep; _dConsHit++; _dConsFolk += keep; return; }
+                    TownFolk.NoteFallback();                     // nie obsluzone (potkniecie, poza watkiem) - cofniecie A1 calosci (nic z niczego)
+                }
                 town.ChangeGold(-made);
                 if (live) { _dConsBack += made; _dConsHit++; }
             }
@@ -374,6 +386,14 @@ namespace Armoury
                 int pay = CastlePurse.Dues(gold, reserve, ValveSplit.Unit(s.TownRentShare));
                 if (BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) { _vSiege++; return true; }   // oblezone - nic (E5/A4 R22: bramka z kluczem i licznikiem; scalenie porcji A)
                 if (pay <= 0) { _vTiny++; return true; }
+                // E5/B1 (R4, KL L6): najpierw czesc ludu (TownFolkMerchantProfitShare, 5%) - kasa -> kiesy W20/R10/P70; pan i korona dziela reszte jak A1
+                int folk = 0;
+                if (TownFolk.Live)
+                {
+                    int fp = (int)(pay * (double)ValveSplit.Unit(s.TownFolkMerchantProfitShare));
+                    if (fp > 0) { folk = TownFolk.EarnValve(st, fp); pay -= folk; _vFolk += folk; }
+                    if (pay <= 0) return true;
+                }
                 var k = clan.Kingdom;
                 bool crownTakes = k != null && !k.IsEliminated;
                 if (!crownTakes) _vNoCrown++;
@@ -383,7 +403,7 @@ namespace Armoury
                 if (crownTakes) _vLordBaseK += lb;           // podstawa udzialu korony (prog A1-T8): tylko miasta w krolestwach
                 double d = float.IsNaN(decree) || float.IsInfinity(decree) || decree < 0f ? 0.0 : decree;
                 long lp = (long)(lb * d);
-                if (lp > spare - cr) lp = spare - cr;            // razem nigdy ponad nadwyzke
+                if (lp > spare - folk - cr) lp = spare - folk - cr;   // razem nigdy ponad nadwyzke (po czesci ludu E5/B1)
                 if (lp < 0) lp = 0;
                 bool exempt = lb > 0 && lp == 0;
                 if (exempt) _vExempt++;
@@ -425,6 +445,8 @@ namespace Armoury
         internal static void ValveDay(long crownSum)
         {
             if (crownSum > 0) MoneyLedger.SplitTownMark(MoneyLedger.MRent, MoneyLedger.MTownCrown, crownSum);   // tylko licznik; wlasny try w srodku
+            if (_vFolk > 0) MoneyLedger.SplitTownMark(MoneyLedger.MRent, MoneyLedger.MFolkValve, _vFolk);      // E5/B1: czesc ludu z zaworu - wlasna pozycja M19
+            LastFolkValve = _vFolk;
             LastLordPaid = _vLord; LastLordBase = _vLordBase; LastLordBaseK = _vLordBaseK; LastCrownPaid = _vCrown; LastDue = _vDue; LastPlayerPaid = _vPlayer;
             LastPayers = _vPayers; LastKingdoms = _vKingdoms.Count; LastBelow = _vBelow; LastSiege = _vSiege; LastNoLord = _vNoLord;
             LastTiny = _vTiny; LastExempt = _vExempt; LastNoCrown = _vNoCrown; LastUnpaid = _vUnpaid;
@@ -451,7 +473,7 @@ namespace Armoury
         {
             CrownToday.Clear(); ClearValve();
             LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastRegUpCut = _dRegUpCut; LastConsBack = _dConsBack; LastConsKept = _dConsKept; LastBkSkipGold = _dBkSkipGold;
-            LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN; LastRegUpCutN = _dRegUpCutN; LastConsN = _dConsN; LastConsHit = _dConsHit;
+            LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN; LastRegUpCutN = _dRegUpCutN; LastConsN = _dConsN; LastConsHit = _dConsHit; LastConsFolk = _dConsFolk;
             LastBkSkipTowns = _dBkSkipTowns; LastBkSkipCastles = _dBkSkipCastles; LastBuyAsk = _dBuyAsk; LastBuyZero = _dBuyZero;
             ClearTicks();
             var s = Settings.Current;
@@ -582,6 +604,28 @@ namespace Armoury
             float valveShare = ValveLive ? ValveSplit.Unit(s.TownRentShare) : 0f;
             double left = (regDays > 0.0 ? Math.Pow(RegulatorKeeps, regDays) : 1.0) * (valveDays > 0.0 ? Math.Pow(1.0 - valveShare, valveDays) : 1.0);
             long before = 0, after = 0, cutSum = 0, reserveSum = 0; int towns = 0, cutN = 0, maxCut = 0; string maxName = null;
+            // E5/B1 (R5, plan rozdz. 6.1): mloda kampania - najpierw zapasy startowe kies ludu (W 10, R 21, P 30 dni koszyka KL przy indeksie 1.0) i wsi tego targu
+            // (do 15 dni zakupow) z czesci daru, ktora A1 i tak zdejmie; migawka M20 (transfer), potem przyciecie reszty daru (M12 - ujscie w nicosc)
+            Dictionary<Town, int> giftLeft = null;
+            if (regDays <= 0.0 && valveDays <= 0.0 && TownFolk.SeedTownsDue)
+            {
+                giftLeft = new Dictionary<Town, int>();
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !st.IsTown || st.Town == null) continue;
+                    try
+                    {
+                        var town = st.Town;
+                        int cut0 = CastlePurse.StartGiftCut(town.Gold, Reserve(town), Prosperity(town), left);
+                        int used = TownFolk.SeedTown(st, cut0);
+                        used += TownFolk.SeedVillages(st, cut0 - used);
+                        giftLeft[town] = Math.Max(0, cut0 - used);
+                    }
+                    catch (Exception e) { Stumble("TownPurse.TrimStartGift(R5 " + st.StringId + ")", e); }
+                }
+                MoneyLedger.Mark(MoneyLedger.MFolkStart);         // tylko licznik; wlasny try w srodku
+                TownFolk.SeedDone(true);
+            }
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsTown || st.Town == null) continue;
@@ -590,7 +634,9 @@ namespace Armoury
                     var town = st.Town;
                     int gold = town.Gold, reserve = Reserve(town);
                     towns++; before += gold; reserveSum += reserve;
-                    int cut = CastlePurse.StartGiftCut(gold, reserve, Prosperity(town), left);   // ten sam dar co w zamku: gra 20 000 + BK 40 x dobrobyt
+                    int cut;
+                    if (giftLeft != null) { if (!giftLeft.TryGetValue(town, out cut)) cut = 0; cut = Math.Min(cut, Math.Max(0, gold - reserve)); }   // E5/B1: reszta daru po zapasach ludu
+                    else cut = CastlePurse.StartGiftCut(gold, reserve, Prosperity(town), left);   // ten sam dar co w zamku: gra 20 000 + BK 40 x dobrobyt
                     if (cut > 0)
                     {
                         int had = town.Gold;
@@ -747,7 +793,8 @@ namespace Armoury
             sb.Append(" | regulator: kasowanie zablokowane ").Append(LastRegDown).Append(" (").Append(LastRegDownN).Append(" tickow), dosypka do zapasu (tryb 1) ").Append(LastRegUp)
               .Append(" (").Append(LastRegUpN).Append(" miast), dosypka zablokowana (tryb 2 albo ponad zapas) ").Append(LastRegUpCut).Append(" (").Append(LastRegUpCutN).Append(" tickow)");
             if (NoMint)
-                sb.Append(" | \"zakupy\" mieszczan: zloto z niczego cofniete ").Append(LastConsBack).Append(" (w ").Append(LastConsHit).Append(" z ").Append(LastConsN).Append(" tickow; towar zjedzony jak dotad)");
+                sb.Append(" | \"zakupy\" mieszczan: zloto z niczego cofniete ").Append(LastConsBack).Append(" (w ").Append(LastConsHit).Append(" z ").Append(LastConsN).Append(" tickow; towar zjedzony jak dotad)")
+                  .Append(TownFolk.Live || LastConsFolk > 0 ? "; lud zaplacil kasom (E5/B1) " + LastConsFolk + ", czesc ludu z zaworu " + LastFolkValve : "");
             else
                 sb.Append(" | \"zakupy\" mieszczan: zloto z niczego ZOSTAJE (MCM Town Folk Buy Without Minting wylaczone) ").Append(LastConsKept).Append(" (").Append(LastConsN).Append(" tickow)");
             sb.Append(" | zapas kupcow ").Append(reserve).Append(", ponad zapasem ").Append(spare)

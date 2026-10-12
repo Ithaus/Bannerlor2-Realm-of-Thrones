@@ -853,6 +853,29 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>
+        /// E5/B1 (kotwica, K1): czlon dobrobytu w budzecie wiersza BK CalculateBudget tak, jak go zostawil BudgetPostfix - jedno zrodlo prawdy dla
+        /// TownFolk.AnchorBudgetPostfix (Priority.Low, po nas): BK dobrobyt/1000/indeks, przy HistDemandScaling / przelicznik kategorii, x czesc domowa
+        /// (TownUse; strzaly HouseUse), bron i zbroja 0 (ZeroTownBudget). Sam odczyt (bez licznikow 172). Wyjatek - 0 (kotwica nie tnie).
+        /// </summary>
+        internal static float ProsperityPart(Town town, ItemCategory category)
+        {
+            try
+            {
+                if (town == null || category == null || ArmsLeaks.ZeroTownBudget(category)) return 0f;
+                float raw = town.GetItemCategoryPriceIndex(category);
+                if (!_applied) return raw > 0f ? town.Prosperity / 1000f / raw : 0f;
+                var s = Settings.Current;
+                float extra = town.Prosperity / 1000f / Math.Max(0.01f, raw);
+                float r;
+                if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f) extra /= r;
+                if (s.TownHouseholdUse) extra *= TownUse(category.StringId);
+                else if (category.StringId == "arrows") extra *= TownFletchers.HouseUse();
+                return extra > 0f && !float.IsInfinity(extra) ? extra : 0f;
+            }
+            catch { return 0f; }
+        }
+
         private static float TownUse(string id)
         {
             var s = Settings.Current;

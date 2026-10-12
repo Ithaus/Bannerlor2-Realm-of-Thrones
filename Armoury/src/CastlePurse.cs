@@ -87,9 +87,9 @@ namespace Armoury
         private const int GameTargetGold = 10000;
         private const float GameTargetPerProsperity = 12f;
 
-        /// <summary>Hak kiesy ludu (KL, etap 5; projekt etapu 2 rozdz. 2.0b): czesc zaworu zamku dla kiesy podzamcza (KL: 15%). Do etapu 5 = 0 -
-        /// podzamcze nie ma wlasnej kiesy; czesc podzamcza zostaje w kasie zamku.</summary>
-        internal static readonly float CastleDuesSuburbShare = 0f;
+        /// <summary>Hak kiesy ludu (KL, etap 5; projekt etapu 2 rozdz. 2.0b): czesc zaworu zamku dla kiesy podzamcza (KL: 15%). E5/B1 (P K3): wlasciwosc liczona
+        /// z warunku kiesy czynnej (TownFolk.CastleLive) - TownFolkCastleProfitShare; kiesa wylaczona = 0 w tej samej dobie (stan sprzed B1).</summary>
+        internal static float CastleDuesSuburbShare { get { var s = Settings.Current; return s != null && TownFolk.CastleLive ? ValveSplit.Unit(s.TownFolkCastleProfitShare) : 0f; } }
 
         // ------------------------------------------------------------ stan kampanii
         private static bool _trimDone;                       // dar startowy rozliczony (zapis: arm_castlepurse "done")
@@ -104,7 +104,7 @@ namespace Armoury
         private static int _consGold;
 
         // ------------------------------------------------------------ liczniki doby (linia "Zawor zamkow (110)")
-        private static long _dRegUp, _dRegDown, _dConsBack, _dCartValue;
+        private static long _dRegUp, _dRegDown, _dConsBack, _dCartValue, _dConsFolk;
         private static int _dRegUpN, _dRegDownN, _dConsN, _dConsHit, _dCartPaid, _dCartSent, _stumbles;
         private static long _dRegUpCut;                      // E5/A1 (Jeff 16:10): dosypka zamkow zablokowana w trybie 2 regulatora (TownPurse.NoTopUp)
         private static int _dRegUpCutN;
@@ -143,7 +143,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRegUp = _dRegDown = _dConsBack = _dCartValue = 0;
+            _dRegUp = _dRegDown = _dConsBack = _dCartValue = _dConsFolk = 0;
             _dRegUpN = _dRegDownN = _dConsN = _dConsHit = _dCartPaid = _dCartSent = _stumbles = 0;
             _dSpendAsk = _dSpendZero = 0;
             _dRegUpCut = 0; _dRegUpCutN = 0;
@@ -267,6 +267,13 @@ namespace Armoury
                 _dConsN++;
                 int made = __0.Gold - _consGold;
                 if (made <= 0) return;
+                // E5/B1 (R12): kiesa czynna - podzamcze placi za towar, reszte pokrywa kredyt dworu (kuchnia pana); reszta przyrostu wraca do nicosci
+                if (TownFolk.CastleLive)
+                {
+                    int keep = TownFolk.PayForGoods(__0, made);
+                    if (keep >= 0) { _dConsBack += made - keep; _dConsHit++; _dConsFolk += keep; return; }
+                    TownFolk.NoteFallback();
+                }
                 __0.ChangeGold(-made);
                 _dConsBack += made; _dConsHit++;
             }
@@ -353,7 +360,8 @@ namespace Armoury
                      + ", tabor do zamku tylko gdy zamek ma czym zaplacic: " + (s != null && s.CastleCartsNeedCoin ? "tak" : "nie")
                      + ", pozostale zakupy kasy zamku (kupcy z konmi i uprzeza, odziez zalogi, skup nadwyzek zalogi) tylko z nadwyzki ponad zapas (B-2): " + (s != null && s.CastlePaysFromSurplus ? "tak" : "nie")
                      + ", zwrot korony bez zoldu zalogi zamku, ktory wrocil panu zaworem (Z8, B-2 - z tego, co wrocilo, nie z przewidywania): " + (s != null && s.CastleGarrisonPayComesHome ? "tak" : "nie")
-                     + "; hak kiesy ludu (etap 5) CastleDuesSuburbShare " + CastleDuesSuburbShare.ToString("0.##", CultureInfo.InvariantCulture) + ".");
+                     + "; hak kiesy ludu (E5/B1) CastleDuesSuburbShare przy kiesie czynnej " + (s != null ? ValveSplit.Unit(s.TownFolkCastleProfitShare).ToString("0.##", CultureInfo.InvariantCulture) : "?")
+                     + " (TownFolkLive " + (s != null && s.TownFolkLive ? "tak" : "nie") + "; czesc podzamcza z kasy zamku do kiesy podzamcza).");
         }
 
         // ------------------------------------------------------------ zwrot zoldu z korony a zaloga "u siebie" (114-p, Z8; B-2)
@@ -519,6 +527,26 @@ namespace Armoury
             float valveShare = float.IsNaN(s.CastleDuesShare) ? 0f : Math.Max(0f, Math.Min(1f, s.CastleDuesShare));
             double left = (regDays > 0.0 ? Math.Pow(RegulatorKeeps, regDays) : 1.0) * (valveDays > 0.0 ? Math.Pow(1.0 - valveShare, valveDays) : 1.0);
             long before = 0, after = 0, cutSum = 0, reserveSum = 0; int castles = 0, cutN = 0, maxCut = 0; string maxName = null;
+            // E5/B1 (R5, plan rozdz. 6.1): mloda kampania - najpierw kiesa podzamcza (10 dni x 0.18 x ludzie BK, indeks 1.0) z czesci daru, ktora i tak zejdzie;
+            // migawka M20 (transfer) PRZED M8 (przyciecie reszty daru - ujscie)
+            Dictionary<Town, int> giftLeft = null;
+            if (regDays <= 0.0 && valveDays <= 0.0 && TownFolk.SeedCastlesDue)
+            {
+                giftLeft = new Dictionary<Town, int>();
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !st.IsCastle || st.Town == null) continue;
+                    try
+                    {
+                        var town = st.Town;
+                        int cut0 = StartGiftCut(town.Gold, Reserve(town), Prosperity(town), left);
+                        giftLeft[town] = Math.Max(0, cut0 - TownFolk.SeedCastle(st, cut0));
+                    }
+                    catch (Exception e) { Stumble("CastlePurse.TrimStartGift(R5 " + st.StringId + ")", e); }
+                }
+                MoneyLedger.Mark(MoneyLedger.MFolkStart);         // tylko licznik; wlasny try w srodku
+                TownFolk.SeedDone(false);
+            }
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsCastle || st.Town == null) continue;
@@ -527,7 +555,9 @@ namespace Armoury
                     var town = st.Town;
                     int gold = town.Gold, reserve = Reserve(town);
                     castles++; before += gold; reserveSum += reserve;
-                    int cut = StartGiftCut(gold, reserve, Prosperity(town), left);
+                    int cut;
+                    if (giftLeft != null) { if (!giftLeft.TryGetValue(town, out cut)) cut = 0; cut = Math.Min(cut, Math.Max(0, gold - reserve)); }   // E5/B1: reszta daru po kiesie podzamcza
+                    else cut = StartGiftCut(gold, reserve, Prosperity(town), left);
                     if (cut > 0)
                     {
                         town.ChangeGold(-cut);
@@ -588,8 +618,9 @@ namespace Armoury
                             else if (st.IsUnderSiege) siege++;
                             else if (pay > 0)
                             {
-                                // hak KL: czesc podzamcza zostaje w kasie zamku (dzis 0)
+                                // hak KL / E5/B1 (R12): czesc podzamcza (15% przy kiesie czynnej) z kasy zamku do kiesy podzamcza; kiesa wylaczona - 0
                                 int suburb = suburbShare > 0f ? (int)Math.Min(pay, (long)(pay * (double)suburbShare)) : 0;
+                                if (suburb > 0) suburb = TownFolk.EarnCastleValve(st, suburb);
                                 suburbKept += suburb;
                                 // 114: podzial ValveSplit - korona (1 - udzial pana) do najblizszej zlotowki (B-4; dotad w dol), pan reszte; suma = pay - suburb.
                                 // Zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana
@@ -638,6 +669,7 @@ namespace Armoury
             // ksiega pieniadza: udzial korony zszedl z kas zamkow razem z czescia panow (jedna migawka MCastle zaraz po tej metodzie) - przenosimy
             // go do wlasnej pozycji (tylko licznik; wlasny try w srodku)
             if (crownPaid > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, crownPaid);
+            if (suburbKept > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MFolkValve, suburbKept);   // E5/B1: czesc podzamcza z zaworu - pozycja M19
             LastLordPaid = paid; LastCrownPaid = crownPaid; LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastConsBack = _dConsBack; LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN;
             try
             {
@@ -677,8 +709,9 @@ namespace Armoury
                              + " | regulator gry: kasowanie nadwyzki zablokowane " + _dRegDown + " (" + _dRegDownN + " tickow zamkow), dosypka do zapasu (tryb 1, zostaje do etapu 3) " + _dRegUp + " (" + _dRegUpN + " tickow)"
                              + (TownPurse.NoTopUp || _dRegUpCutN > 0 ? ", dosypka zablokowana (tryb 2, E5/A1) " + _dRegUpCut + " (" + _dRegUpCutN + " tickow)" : "")   // E5/A1: tekst etapu 2 bez zmian (parser etap2)
                              + " | \"zakupy\" ludnosci zamkow: zloto z niczego cofniete " + _dConsBack + " (w " + _dConsHit + " z " + _dConsN + " tickow; towar zjedzony jak dotad)"
+                             + (_dConsFolk > 0 || TownFolk.CastleLive ? "; podzamcze zaplacilo kasom (E5/B1) " + _dConsFolk : "")
                              + " | zawor: " + paid + " do panow z " + payers + " zamkow (" + (share * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "% nadwyzki ponad zapas"
-                             + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + (suburbKept > 0 ? "; czesc podzamcza zostala w kasach " + suburbKept : "")
+                             + (playerPaid > 0 ? "; w tym rod gracza " + playerPaid : "") + (suburbKept > 0 ? "; czesc podzamcza do kies podzamczy (E5/B1) " + suburbKept : "")
                              + (split ? "; skarbcom krolestw " + crownPaid + " z " + crownPayers + " zamkow w " + CrownToday.Count + " krolestwach (114) - podzial z korona: panu "
                                         + (lordShare * 100f).ToString("0.#", CultureInfo.InvariantCulture) + "%, reszta koronie" + (playerCrown > 0 ? ", z zamkow gracza " + playerCrown : "")
                                         + ", zamkow rodow bez krolestwa z caloscia dla pana " + noCrown

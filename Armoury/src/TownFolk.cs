@@ -63,7 +63,8 @@ namespace Armoury
         private const double RateNadW = 0.5 * RhFood + 0.5 * RhMid, RateNadRP = 0.7 * RhMid + 0.3 * RhArms, RateNotable = 0.5 * RhMid + 0.5 * RhArms;
         private const double RatePubl = RhMid, RateVill = 0.2 * RhFood + 0.8 * RhMid, RateCastle = 0.8 * RhFood + 0.2 * RhMid, RateCourt = 0.5 * RhFood + 0.2 * RhMid + 0.3 * RhArms;
         private const int YearDays = 364;
-        private static readonly string[] SlaveRealms = { "Volantis", "Lys", "Myr", "Tyrosh", "Qarth", "Norvos", "Iron Islands", "Dothraki" };
+        // E5/B1 (KL L8, plan pkt 0.13): niewolni wedlug kultury osady z jednej listy I1/H3 (LosersFlee.SlaveCulture - z Qohorem, decyzja Jeffa 09.10 05:15),
+        // zamiast nazw krolestw E5/0 (bez Qohoru); ta sama regula w trybie na sucho i w kiesie czynnej
 
         // ------------------------------------------------------------ stan osady (pamiec sesji)
         private sealed class Folk
@@ -96,9 +97,27 @@ namespace Armoury
             public int Streak;                                        // zaulki: doby z rzedu ponizej zapasu kupcow
             // liczby ostatniej doby (CSV)
             public double DB, DWg, DM = double.NaN, DInc, DOut, DAff = 1, DAffF = 1, DUnpaid, DR = 1;
+            // ---- E5/B1 (kiesa czynna, TownFolk.Live.cs): prawdziwe zloto w kiesach - long, przelewy co do zlotowki
+            public long KW, KR, KP, KG;                               // miasto: kiesy W/R/P i gmina; zamek: KW = kiesa podzamcza (zapis arm_townfolk)
+            public long CourtCr;                                      // zamek: kredyt dworu (kuchnia pana) - liczba, bez zlota (zapis)
+            public readonly long[] EarnWin = new long[3];             // zarobek okna klas - podstawa podatkow panu (zamek: [0])
+            public readonly long[] PaidG = new long[3];               // zaplacone za towar w oknie (czynsz, leczenie, sluzba - w dobie)
+            public readonly long[] Offer = new long[3];               // nadwyzka oferowana na towar jutro (nie przelew - budzet "lepszych" kategorii)
+            public long PaidKeep, VillWin, GmMatWin;                  // okno: zaplata ludu do kasy, zakupy wsi w tym miescie, material robot gminy (podstawa robocizny)
+            public readonly double[] Need = new double[3];            // potrzeba dzienna klas (towar / keep) z kotwicy - zapas dni
+            public readonly double[] Share = new double[3];           // udzialy klas w zaplacie za towar (towar x Afford + oferta)
+            public double FacFood = 1, FacRest = 1, AffFood = 1, AffRest = 1, MAnc = 1; public bool FacOk;
+            public double FacFoodUsed = 1, FacRestUsed = 1, OfferFood, OfferRest;   // nawias dnia: czynniki uzyte i oferta dopisana (przewidywanie bez kotwicy)
+            public double PredFood, PredRest;                         // przewidywany wydatek gry bez kotwicy (jedzenie / reszta)
+            public readonly double[] AffC = new double[3], AffFC = new double[3];   // stac pelny / jedzenie klasy (linia, CSV)
+            public double VFeeAcc;                                    // wies: oplata stala - reszta ulamka (bez zaokraglania w dol co dobe)
+            public bool BkCal;                                        // R5: klasy BK odczytane przed kalibracja ksiegi (faza a D1)
+            public long LDayPaid, LDayUnpaid, LDayCourt, LDayIn, LDayOut;   // ostatnia doba (CSV)
+            public double G0a;                                        // budzet gry po kotwicy i ofercie nadwyzki (okno - linia)
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();
+        private static readonly List<Folk> _fk = new List<Folk>();   // E5/B1: miasta i zamki (posiadacze kies - sumy dla ksiegi pieniadza bez przegladu wsi)
         private static bool _calDone;
         private static int _sessionDay = -1, _calDay = -1, _main = -1;
         private static string _lineSession, _lineFolk;
@@ -111,19 +130,23 @@ namespace Armoury
         private static readonly long[] _vcTrans = new long[5], _vcRel = new long[5];
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TownFolkMode >= 1 && s.LogEnabled; } }
-        private static bool Live { get { var c = Campaign.Current; return On && c != null && c.GameStarted; } }
+        /// <summary>Pomiar w logu (dawne Live E5/0): TownFolkMode >= 1, LogEnabled, po GameStarted - nawiasy bitwy i pasma notabli.</summary>
+        private static bool Measure { get { var c = Campaign.Current; return On && c != null && c.GameStarted; } }
+        /// <summary>E5/B1: okna przeplywow (Note, Sale, wyroby, karawany) i nawias konsumpcji biegna przy pomiarze ALBO kiesie czynnej (kiesa nie wymaga logu).</summary>
+        private static bool Run { get { var c = Campaign.Current; return (On || LiveKey) && c != null && c.GameStarted; } }
 
         /// <summary>Z konstruktora ArmouryBehavior: nowa sesja (stan tylko w pamieci).</summary>
         internal static void Reset()
         {
             try
             {
-                _f.Clear(); _calDone = false; _sessionDay = -1; _calDay = -1;
+                _f.Clear(); _fk.Clear(); _calDone = false; _sessionDay = -1; _calDay = -1;
                 _lineSession = null; _lineFolk = null; _lineFolkPartial = false;
                 _stumbles = _stumbleSess = _offThread = 0; _err.Clear();
                 _patchTicks = _dayTicks = 0;
                 Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length);
                 ResetProbe();
+                ResetLive();   // E5/B1: kiesy czynne, flagi zapasow startowych, liczniki (zapis wczytuje Import po konstruktorze)
             }
             catch { }
         }
@@ -150,6 +173,7 @@ namespace Armoury
             if (kind < 0 || (kind < 2 && st.Town == null) || (kind == 2 && st.Village == null)) return null;
             f = new Folk { St = st, Kind = kind };
             _f[st] = f;
+            if (kind < 2) _fk.Add(f);
             return f;
         }
 
@@ -161,7 +185,7 @@ namespace Armoury
         {
             try
             {
-                if (amount <= 0 || kind < 0 || kind >= Kinds || st == null || !Live || OffMain()) return;
+                if (amount <= 0 || kind < 0 || kind >= Kinds || st == null || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 var f = Get(st);
                 if (f != null)
@@ -179,7 +203,7 @@ namespace Armoury
         {
             try
             {
-                if (amount <= 0 || mix < 0 || mix >= Mixes || st == null || !Live || OffMain()) return;
+                if (amount <= 0 || mix < 0 || mix >= Mixes || st == null || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 var f = Get(st);
                 if (f != null && f.Kind < 2) f.Sale[mix] += amount;
@@ -193,7 +217,7 @@ namespace Armoury
         {
             try
             {
-                if (item == null || st == null || count <= 0 || !(st.IsTown || st.IsCastle) || st.Town == null || !Live || OffMain()) return;
+                if (item == null || st == null || count <= 0 || !(st.IsTown || st.IsCastle) || st.Town == null || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 var f = Get(st);
                 if (f != null) f.ProdV += (double)count * Math.Max(0, st.Town.MarketData.GetPrice(item));
@@ -211,7 +235,7 @@ namespace Armoury
         {
             try
             {
-                if (a <= 0 || !Live || OffMain()) return;
+                if (a <= 0 || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 Settlement gs = gh == null && gp != null && gp.IsSettlement ? gp.Settlement : null;
                 Settlement rs = rh == null && rp != null && rp.IsSettlement ? rp.Settlement : null;
@@ -266,7 +290,7 @@ namespace Armoury
         {
             try
             {
-                if (amount >= 0 || st == null || !st.IsTown || st.Town == null || src < 0 || src >= BSrc || !Live || OffMain()) return;
+                if (amount >= 0 || st == null || !st.IsTown || st.Town == null || src < 0 || src >= BSrc || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 _bPaid[src] += -(long)amount; _bBelow[src] += Below(st.Town, -(long)amount);
                 _patchTicks += Stopwatch.GetTimestamp() - t;
@@ -279,7 +303,7 @@ namespace Armoury
         {
             try
             {
-                if (st == null || !st.IsTown || st.Town == null || !Live || OffMain()) return;
+                if (st == null || !st.IsTown || st.Town == null || !Run || OffMain()) return;
                 if (paid > 0) { _bPaid[BCarts] += paid; _bBelow[BCarts] += Below(st.Town, paid); }
                 if (unsold > 0) { _unsold += unsold; _unsoldVisits++; }
             }
@@ -291,7 +315,7 @@ namespace Armoury
         {
             try
             {
-                if (home == null || !home.IsVillage || handed == 0 || !Live || OffMain()) return;
+                if (home == null || !home.IsVillage || handed == 0 || !Run || OffMain()) return;
                 var f = Get(home);
                 if (f == null) return;
                 f.VHanded += handed;
@@ -306,7 +330,7 @@ namespace Armoury
         {
             try
             {
-                if (x <= 0 || st == null || !st.IsTown || st.Town == null || kind < 0 || kind >= Takes || !Live || OffMain()) return;
+                if (x <= 0 || st == null || !st.IsTown || st.Town == null || kind < 0 || kind >= Takes || !Run || OffMain()) return;
                 var f = Get(st);
                 if (f != null) f.TakeWin += x;
                 _take[kind] += x; _takeBelow[kind] += Below(st.Town, x);
@@ -319,7 +343,7 @@ namespace Armoury
         {
             try
             {
-                if (t == null || !t.IsTown || result == 0 || !Live || OffMain()) return;
+                if (t == null || !t.IsTown || result == 0 || !Run || OffMain()) return;
                 var f = Get(t.Settlement);
                 if (f == null) return;
                 if (result > 0) f.RegIn += result; else f.RegOut -= result;
@@ -351,8 +375,12 @@ namespace Armoury
             _lineFolk = null; _lineFolkPartial = false;
             try
             {
-                if (!On) { ClearWindows(); return; }
                 if (Campaign.Current == null) return;
+                // E5/B1: kiesa czynna - model z prawdziwymi przelewami (TownFolk.Live.cs); wylaczenie w trakcie - zwrot kies do kas (plan rozdz. 6.3)
+                if (Live) { DailyLive(); return; }
+                if (AnyPurse()) ReturnAll();
+                LiveOffLine();
+                if (!On) { ClearWindows(); return; }
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 bool first = _sessionDay < 0;
                 if (first) _sessionDay = day;
