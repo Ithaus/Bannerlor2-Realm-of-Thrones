@@ -3972,6 +3972,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiMendsWornOnly { get; set; } = true;
 
+        [SettingPropertyBool("Mend Pay To Folk", HintText = "the work part of what your men and the lords' men pay the town smiths for mending (not the material) goes to the townsfolk's purse as craft wages, the same way as the workshop wages (needs Town Folk Live on); the material part stays in the town's coffer (off = as before: the whole payment goes to the town's coffer)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendPayToFolk { get; set; } = true;
+
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
@@ -5776,6 +5780,7 @@ namespace Armoury
             s.MendMaterialMenAndLords = MendMaterialMenAndLords;
             s.SelfRepairSameRule = SelfRepairSameRule;
             s.AiMendsWornOnly = AiMendsWornOnly;
+            s.MendPayToFolk = MendPayToFolk;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;

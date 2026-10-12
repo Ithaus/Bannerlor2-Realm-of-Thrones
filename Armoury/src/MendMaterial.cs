@@ -245,6 +245,9 @@ namespace Armoury
             return SelfParts(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * loss, loss);
         }
 
+        /// <summary>Wlacznik MendPayToFolk (recenzja 217).</summary>
+        private static bool PayToFolkOn { get { var s = Settings.Current; return s != null && s.MendPayToFolk; } }
+
         /// <summary>
         /// E6/N1 (projekt: "zaplata kowalom do kiesy ludu przez to samo TownFolk.Earn co B1 - jedno miejsce"): zaplata z sakiewki ludzi (AI, ludzie gracza)
         /// za naprawy u kowali miasta. Robocizna (labor, najwyzej paid) - place rzemiosla do kiesy ludu (TownFolk.Earn, KCraftPaid W70/R30, jak place cyklu
@@ -255,7 +258,8 @@ namespace Armoury
         internal static int PaySmiths(Settlement st, int paid, int labor)
         {
             if (paid <= 0 || st == null || st.Town == null) return 0;
-            int folk = TownFolk.Earn(st, Math.Min(paid, Math.Max(0, labor)), TownFolk.KCraftPaid);   // arytmetyka - nie rzuca (0 przy wylaczonym B1)
+            // recenzja 217: wlasny wylacznik MendPayToFolk (WYL = calosc do kasy jak przed paczka; dotad zaplate wylaczalo tylko B1)
+            int folk = PayToFolkOn ? TownFolk.Earn(st, Math.Min(paid, Math.Max(0, labor)), TownFolk.KCraftPaid) : 0;   // arytmetyka - nie rzuca (0 przy wylaczonym B1)
             if (folk < 0) folk = 0; if (folk > paid) folk = paid;
             st.Town.ChangeGold(paid - folk);
             MoneyLedger.Note169(MoneyLedger.N169Repair, st, paid - folk);   // paczka 169: linia kas (tylko licznik) - czesc w kasie
