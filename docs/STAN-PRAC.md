@@ -1238,3 +1238,4 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
 - (09:30 UTC 12.10) **Jeff (raport, pytania 2-5):** (2) prog rownania krain "0.1% albo 200 ludzi, co wieksze" - OK; (3) pojmujacy zabiera graczowi takze CALE juki (towar,
   jedzenie) - TAK (dzis 75% z RC); (4) zaulki w oblezonym miescie wstrzymane jak inne oplaty - TAK, jedna zasada; (5) ubogie miasta - sprawdzimy w biegu rocznym; (6) Jeff prosi
   o wyjasnienie. Do kodu w nastepnej paczce (z E6 porcja 2 i danina wsi 2.5%).
+- (09:35 UTC 12.10) **Jeff (6): czujnik zbyt szybkiego przyrostu ludnosci (+1150 ludzi/d) w narzedziu zostaje - TAK** (tylko kontrola w tescie, gra bez zmian).
