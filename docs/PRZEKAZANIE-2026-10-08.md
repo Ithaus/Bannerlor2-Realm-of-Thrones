@@ -911,3 +911,9 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   (3 atuty BK + strawa Polnocy), T3 e5\fix (w-toku/e5-fix: A2b+Z8 wlasne pieniadze; RC - pojmujacy zabiera graczowi wszystko do siebie; oplata werbunku zalog
   do sprzedajacego), T4 e6\w (w-toku/e6-waski: E6/0, M1, M2). Potem SCALENIE KONCOWE wszystkiego (zbior-e4-koniec po poprawkach + fix2 + zbior-e5 + B + e5-fix +
   e6-waski; CS cs-bledy; RC) -> JEDEN test: 120 dob + zima 120 + zapis 9 -> poprawki -> wgranie (Armoury, CrashScribe, RealisticCaptivity) -> raport 10:00 UTC.
+- (01:00 UTC) **POPRAWKI E4 GOTOWE** (wf_d9a9ccdf-5f9): w-toku/zbior-e4-koniec 459e74b = fixA (RefEq dla _pending/_kind/OutlawLaw._empty; bez uzgadniania skladu w bitwie;
+  ostrzal w oblezeniu -> polegli FDieSiege; podloga -> stan miasta; ucieczka ponad limit lochu -> dom FEscape; diagnostyka niedoboru), fixB (Straz K4 kolejka; VillageBook
+  _byV; TownGrowth udzial wobec wlasnych wsi), fixC (narzedzie: zywi, T7, V2, G2, N7, S8, koszty jako udzial doby, E50-T5 suma 28 dob, T1 z logu CrashScribe) +
+  poprawki recenzji (f2e5f98). Na starym logu d120: etap4 NIE 20 -> 8 (pozostale to bledy kodu poprawione - potwierdzi nowy test), etap5 0. DLL test\Armoury-e4-koncowy2.dll
+  80dfcb0a. CS: klucz powtorek z komunikatem (RepeatKeyByMessage). Klucze nowe: LevyVillageFromTown, PrescapeGoHome (PrisonEscapeGoHome). OTWARTE (raport): prog T3
+  rownania krain 0.1% nieosiagalny dla malych krain (Sarnor) - decyzja o progu.
