@@ -44,6 +44,7 @@ param(
     [string]$ArmouryDll,
     [string]$CrashScribeDll,
     [string[]]$ExtraDll = @(),
+    [string[]]$ExtraFile = @(),    # AT4: pliki poza DLL na czas testu: "Armoury\ModuleData\plik.tsv=C:\zrodlo\plik.tsv" (cel wzgledem Modules; plik, ktorego przed testem nie bylo, po tescie znika)
     [int]$Days = 40,
     [int]$TimeoutMin = 0,          # 0 = 25 s na dobe + 10 min
     [double]$Speed = 0,            # 0 = mnoznik jak w grze Jeffa (Armoury MCM)
@@ -230,8 +231,17 @@ function Restore-Manifest([string]$manifestPath, [bool]$strict) {
     $allOk = $true
     foreach ($f in @($man.files)) {
         $cur = Md5 $f.target
+        $isFile = ($f.PSObject.Properties['kind'] -and $f.kind -eq 'file')
+        if ($isFile -and -not $f.approvedMd5) {
+            # AT4: pliku przed testem nie bylo - usuwamy probny (przy strict tylko, gdy to na pewno probny)
+            if (-not $cur) { Log ("  " + $f.mod + ": brak w grze, jak przed testem"); continue }
+            if ($strict -and $cur -ne $f.trialMd5) { Log ("  " + $f.mod + ": w grze NIEZNANA wersja md5 " + $cur + " (probna " + $f.trialMd5 + ", przed testem pliku nie bylo) - NIE ruszam, sprawdz recznie"); $allOk = $false; continue }
+            try { Remove-Item -LiteralPath $f.target -Force -ErrorAction Stop; Log ("  " + $f.mod + ": probny plik USUNIETY (przed testem go nie bylo)") }
+            catch { Log ("  " + $f.mod + ": NIE DA SIE usunac probnego pliku: " + $_.Exception.Message); $allOk = $false }
+            continue
+        }
         if ($cur -eq $f.approvedMd5) { Log ("  " + $f.mod + ": w grze zatwierdzony (md5 " + $cur + ")"); continue }
-        if ($strict -and $cur -and $cur -ne $f.trialMd5 -and (Test-Pe $f.target)) {
+        if ($strict -and $cur -and $cur -ne $f.trialMd5 -and ($isFile -or (Test-Pe $f.target))) {
             Log ("  " + $f.mod + ": w grze NIEZNANA wersja md5 " + $cur + " (ani zatwierdzona " + $f.approvedMd5 + ", ani probna " + $f.trialMd5 + ") - NIE ruszam, sprawdz recznie")
             $allOk = $false
             continue
@@ -377,12 +387,26 @@ function Add-Trial([string]$mod, [string]$path) {
     $target = Join-Path $GameDir ('Modules\' + $mod + '\bin\Win64_Shipping_Client\' + $mod + '.dll')
     if (-not (Test-Path -LiteralPath $target)) { throw ("brak " + $target + " - podmieniamy tylko istniejace mody") }
     if (-not (Test-Pe $full)) { throw ("DLL probny " + $full + " nie jest plikiem PE (zera?)") }
-    $script:trials += [pscustomobject]@{ mod = $mod; trial = $full; trialMd5 = (Md5 $full); target = $target }
+    $script:trials += [pscustomobject]@{ mod = $mod; kind = 'dll'; trial = $full; trialMd5 = (Md5 $full); target = $target }
+}
+function Add-TrialFile([string]$spec) {
+    # AT4: "cel wzgledem Modules=zrodlo"; cel moze nie istniec (nowy plik moda) - wtedy po tescie jest usuwany
+    $kv = $spec -split '=', 2
+    if ($kv.Count -ne 2 -or -not $kv[0].Trim() -or -not $kv[1].Trim()) { throw ("-ExtraFile '" + $spec + "': oczekiwane cel=zrodlo") }
+    $rel = $kv[0].Trim().TrimStart('\').Replace('/', '\')
+    if ($rel.Contains('..') -or $rel.Contains(':')) { throw ("-ExtraFile '" + $spec + "': cel ma byc sciezka wzgledem Modules") }
+    if ($rel.ToLowerInvariant().EndsWith('.dll')) { throw ("-ExtraFile '" + $spec + "': DLL podaj przez -ExtraDll") }
+    $full = (Resolve-Path -LiteralPath $kv[1].Trim()).Path
+    $modDir = Join-Path $GameDir ('Modules\' + ($rel -split '\\')[0])
+    if (-not (Test-Path -LiteralPath $modDir -PathType Container)) { throw ("brak " + $modDir + " - pliki dokladamy tylko do istniejacych modow") }
+    if ((Get-Item -LiteralPath $full).Length -eq 0) { throw ("plik probny " + $full + " jest pusty") }
+    $script:trials += [pscustomobject]@{ mod = $rel; kind = 'file'; trial = $full; trialMd5 = (Md5 $full); target = (Join-Path $GameDir ('Modules\' + $rel)) }
 }
 try {
     if ($CrashScribeDll) { Add-Trial 'CrashScribe' $CrashScribeDll }
     if ($ArmouryDll) { Add-Trial 'Armoury' $ArmouryDll }
     foreach ($x in $ExtraDll) { Add-Trial ([IO.Path]::GetFileNameWithoutExtension($x)) $x }
+    foreach ($x in $ExtraFile) { foreach ($y in ($x -split ';')) { if ($y.Trim()) { Add-TrialFile $y } } }
 } catch { Log ("STOP: " + $_.Exception.Message); exit 2 }
 
 $csInGame = Join-Path $GameDir 'Modules\CrashScribe\bin\Win64_Shipping_Client\CrashScribe.dll'
@@ -503,15 +527,22 @@ try {
     $files = @()
     foreach ($tr in $trials) {
         $appr = Md5 $tr.target
-        if (-not (Test-Pe $tr.target)) { Log ("UWAGA: zatwierdzony " + $tr.target + " nie zaczyna sie od MZ (zera?) - kopiuje taki, jaki jest") }
-        $bk = Join-Path $runDir ($tr.mod + '.dll')
+        if ($tr.kind -eq 'file' -and -not $appr) {
+            # AT4: pliku przed testem nie ma - nic do kopiowania, po tescie znika
+            Log ("Plik " + $tr.mod + ": przed testem BRAK w grze - po tescie zostanie usuniety")
+            $files += [pscustomobject]@{ mod = $tr.mod; kind = 'file'; target = $tr.target; backup = $null; mirror = $null; approvedMd5 = ''; trial = $tr.trial; trialMd5 = $tr.trialMd5 }
+            continue
+        }
+        if ($tr.kind -eq 'dll' -and -not (Test-Pe $tr.target)) { Log ("UWAGA: zatwierdzony " + $tr.target + " nie zaczyna sie od MZ (zera?) - kopiuje taki, jaki jest") }
+        $bkName = $(if ($tr.kind -eq 'file') { 'pliki\' + $tr.mod } else { $tr.mod + '.dll' })
+        $bk = Join-Path $runDir $bkName
         Copy-Verified $tr.target $bk $appr
         $mi = $null
         if ($mirrorDir) {
-            try { $mi = Join-Path $mirrorDir ($tr.mod + '.dll'); Copy-Verified $tr.target $mi $appr } catch { Log ("UWAGA: lustro " + $mi + " nieudane: " + $_.Exception.Message); $mi = $null }
+            try { $mi = Join-Path $mirrorDir $bkName; Copy-Verified $tr.target $mi $appr } catch { Log ("UWAGA: lustro " + $mi + " nieudane: " + $_.Exception.Message); $mi = $null }
         }
         Log ("Kopia zatwierdzonego " + $tr.mod + ": md5 " + $appr + " -> " + $bk + $(if ($mi) { " + " + $mi } else { "" }))
-        $files += [pscustomobject]@{ mod = $tr.mod; target = $tr.target; backup = $bk; mirror = $mi; approvedMd5 = $appr; trial = $tr.trial; trialMd5 = $tr.trialMd5 }
+        $files += [pscustomobject]@{ mod = $tr.mod; kind = $tr.kind; target = $tr.target; backup = $bk; mirror = $mi; approvedMd5 = $appr; trial = $tr.trial; trialMd5 = $tr.trialMd5 }
     }
     $cfgBk = Join-Path $runDir 'Configs'
     $cfgHashes = Get-TreeHashes $configsDir
