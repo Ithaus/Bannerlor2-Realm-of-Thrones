@@ -1001,3 +1001,27 @@ kroku x1.3 - rada tak) i N1 (lekka naprawa bez materialu - rada zostawic).
   C1, C2, C4, E7/R1, R2, W4, dwa przeglady, DLL. Limit tygodnia 95% - jesli przerwie: sprawdz `git log --first-parent w-toku/e6-p3..w-toku/zbior-5-8`, wznow resumeFromRunId
   wf_42f8dda9-fa3 (ta sama sesja) albo nowym workflow od pierwszej niezrobionej paczki (opisy paczek w skrypcie workflows/scripts/zbior-5-8-*.js sesji ae222cb7). Uwagi do testu
   i wgrania: STAN-PRAC 16:35 UTC (pliki danych e7-b poza DLL, CampBattlePropsEnabled w Armoury.json Jeffa, Diplomacy na rok 364).
+
+### 26b. DLA DRUGIEGO KONTA (Jeff 12.10 ok. 17:45 UTC: "wykorzystam ten limit na maxa, potem przejde na drugie konto")
+
+Konto ae222cb7 pracuje do wyczerpania limitu tygodnia; potem Jeff przechodzi na drugie konto. **Wznowienie workflow (resumeFromRunId) dziala tylko w tej samej sesji** -
+drugie konto zaczyna NOWY workflow od pierwszej niezrobionej paczki. Skrypty wszystkich biegow sa w repo: `docs/przekazanie/wf-zbior-5-8.js` (scalenie + etap 5 reszta + E7 R1/R2/W4),
+`wf-e8-projekt.js` (projekt etapu 8), `wf-e7-kod.js`, `wf-e6-p3.js` (wzory: autor + recenzent z poprawka po kazdej paczce, przeglad kolizji na koncu).
+
+**Krok po kroku:**
+1. `git pull` (galaz claude/bannerlord-rot-setup-o75kvo), przeczytaj STAN-PRAC od wpisu "WGRANIE 33" do konca i ten rozdzial 26.
+2. Kod: repo lancuch `C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad\lancuch`
+   (biblioteki gry w `lancuch\libs`), drzewo scalone `...\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad\zb\58` (galaz `w-toku/zbior-5-8`).
+   Na innym komputerze: `git fetch` galezi `w-toku/zbior-5-8` z GitHub, biblioteki wedlug `libs/README.md`, dekompilacja wedlug CLAUDE.md 6.
+3. **Najpierw `git -C <zb\58> status`** - agent przerwany limitem mogl zostawic niezacommitowane zmiany: obejrzyj diff; jesli paczka nie jest skonczona (brak buildu/CHANGELOG) -
+   `git checkout -- .` i zrob ja od nowa. To samo w repo glownym dla `docs/etap8` (projekt etapu 8 mogl zostac w polowie - pliki rozpoznan bez commita).
+4. `git -C <zb\58> log --oneline --first-parent w-toku/e6-p3..HEAD` - zrobione paczki. Kolejnosc calosci: A7 (zrobione), A8, E5/BITWY, C1, C2, C4, E7/R1, R2, W4, dwa przeglady, DLL
+   (opisy paczek w `docs/przekazanie/wf-zbior-5-8.js`, tablice E5 i E7). Nowy workflow = ten skrypt bez krokow zrobionych (bez scalenia - drzewo juz jest).
+5. Etap 8: jesli `docs/etap8/PROJEKT-ETAP8-*.md` ma rozdzial "Krytyka - co przyjeto/odrzucono" i commit - projekt gotowy; inaczej uruchom `wf-e8-projekt.js` od nowa. Potem kod etapu 8
+   (paczki wedlug projektu, kazda autor + recenzent) na `w-toku/zbior-5-8`.
+6. Potem: pelny audyt (kilka niezaleznych przegladow), autotest (dopisac kopiowanie plikow danych e7-b - STAN-PRAC 16:35 UTC), test zbiorczy (120 dob nowej kampanii + zapis 9 dob +
+   zima + bieg dlugi; zdjecia proby drog), poprawki, wgranie (stala zgoda Jeffa: po udanym autotescie, kopie .bak + D:\Backup-Bannerlord\wgrane, md5; przy wgraniu: CampBattlePropsEnabled
+   true i ustawienia Diplomacy na rok 364 - pliki Jeffa, gra zamknieta, kopia .bak; gdy narzedzie nie pozwoli - polecenie dla Jeffa).
+
+**Zasady Jeffa (pamiec konta ae222cb7 - na tym samym komputerze w `C:\Users\GAME\.claude\projects\C--Users-GAME-Bannerlor2-Realm-of-Thrones\memory\`):** caly kod etapow 5-8, potem
+jeden test; rob do limitu, zapisuj po kazdym kroku (push + STAN-PRAC); ekonomia bez sztucznych doplat; kazda zmiana = kontrola calosci; rozmowa po polsku, prosto; napisy w grze po angielsku.
