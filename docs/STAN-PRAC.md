@@ -1289,3 +1289,15 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
 - W TOKU (12:00 UTC): workflow wf_17813d40-8ac - etap 7 kod w dwoch drzewach od w-toku/e5-wsie: `w-toku/e7-a` (SCRATCH\e7\a: E7/0, O1, T, C, K, O2) i `w-toku/e7-b`
   (SCRATCH\e7\b: L, B, W1, W2, W3, W5, D0); galezie wypychane co 15 min. Rownolegle nadal wf_aa159ecf-f65 (etap 6 porcja 3, `w-toku/e6-p3`). Potem: scalenie e6-p3 + e7-a + e7-b
   (+ etap 5 reszta: porcja C, E5/A7 lup z rabunku i male zrodla), E7/R1, R2, W4, projekt i kod etapu 8, pelny audyt, test zbiorczy.
+- (14:45 UTC 12.10) **Etap 6 porcja 3 GOTOWA (kod + recenzje, bez testu w grze):** `w-toku/e6-p3` 1825401 (od e5-wsie): R1 9e11115+247c946 (wytop: lupa "Iron Bloom" 15 kg zamiast rudy w NOWEJ
+  kampanii, flaga `arm_e6_bloom`, dymarka Bloomery.cs - 5 ladunkow drewna na lupe z lasu okregu/polki miasta; kuznie miast pala tylko wegiel), R3 96f5173+ea7ea81 (narzedzia wedlug
+  zuzycia ToolsByUse, uprzaz dla jezdzcow t4+ AiGear, hurt kupcow wozem TradeCarts `arm_tradecarts`), W1 96e2553+f98a741 (receptury wedlug wartosci WorkshopRecipes: filc 3 welny->2,
+  plotno 6 lnu->2, skora 5 skor->2), W3 d6fc75f+9157e26 (regulator wsi HarvestValve `arm_harvestvalve`: co 28 dob, nadmiar -> mniej, brak -> x1.3; RawNoRot przestaje kasowac),
+  K4 a883cab+6c54769 (hodowla wedlug popytu w HarvestValve: krok w gore i przesuniecie zwykle->bojowe czynne, ciecie na sucho; przeglad 71 stadnin - tylko log), N1 20be89f+b54762f
+  (naprawy jedna regula - Twoje rece jak kowale miasta, AI naprawia tylko noszone, zaplata kowalom do kiesy ludu - klucz MendPayToFolk), K3 16f2f56+1825401 (jazda wedlug szablonu
+  rodu 175, kon rycerza ze stada wsi rodu albo targu - Stables.KnightBuy; rod gracza bez zmian). Przeglad kolizji porcji: bez uwag. DLL SCRATCH\test\Armoury-e6p3.dll b2f6aa11.
+  **Do obserwacji w tescie:** dymarki moga brac kilka razy wiecej drewna niz ok. 100 ladunkow/d z projektu; pierwsza doba nowej kampanii 0 lup; obrzedy BKROT (20 x iron) ok. 5x drozsze
+  dla gracza; N1 - Twoich rak autotest nie sprawdzi (kuznia recznie). **Do decyzji Jeffa:** K4 - czynne cofniecie wlasnego kroku x1.3 -> x1 przy nadmiarze (rada TAK, bez tego krok
+  zostaje na zawsze; to nie jest ciecie ponizej x1); N1 - lekka naprawa moze nie zjesc materialu (dawniej min. 1 sztuka kazdej czesci) - skutek "jednej reguly" (rada: zostawic).
+- (14:45 UTC 12.10) Limit tygodniowy 92% (reset 17.10 03:00 UTC). Etap 5 reszta (A7, A8, C1, C2, C4, "bitwy" ok. 26 tys./d) NIE zaczeta, zeby nie zostawic dwoch przerwanych watkow -
+  najpierw dokonczy sie kod etapu 7 (wf_17813d40-8ac).
