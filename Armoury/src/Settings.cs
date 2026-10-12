@@ -1535,6 +1535,13 @@ namespace Armoury
         // E7/K (226, PLAN 7.7, R8, krytyka K1-06): stale kalendarza gry x rok/84 - sojusz 84 -> 364, wezwanie do wojny 42 -> 182 (postfiksy getterow DefaultAllianceModel),
         // przerwa po pokoju przed propozycja wojny gry 20 -> ok. 87 dni (postfiks GetRandomWarDecision, Priority.Low - po BK); off = dni gry 84 / 42 / 20
         public bool DiplomacyYearLong = true;              // alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)
+        // E7/R1 (235, PLAN 7.11 a, R15): rabunek osada po osadzie dla AI (DistrictRaid.cs) - prefiks First na RaidEventComponent.Update przejmuje lupienie: krok = m osad
+        // (m = min(osad w zasiegu, max(1, ludzie / RaidDetachmentMen))), czas z ludzi napastnika (DevastationPerRaiderDay), wspolny stan rabunku E4/5 (StrikePeople); lup tylko
+        // z kiesy wsi (platnik E5/A7), magazynu wsi i spichlerza; czujnosc (Looted bez leczenia) ceil(1 + 100 x d) dob, najwyzej RaidAlertMaxDays; zapis r:/c: w arm_district.
+        // NK (nowa kampania); stary zapis wczytuje sie. Off = rabunek AI jak w E4/5
+        public bool RaidBySettlementEnabled = true;        // villages are raided settlement by settlement: each takes days, and the loot comes only from what the village really has
+        public int RaidDetachmentMen = 200;                // raiders split into bands of this many men, each band burning its own settlement at the same time - a lord with 112 men burns one settlement in about four and a half days, an army of 2000 burns ten together
+        public int RaidAlertMaxDays = 17;                  // after a raid has burned its settlements the village stays looted and does not start to mend for 1 day plus 1 for each hundredth of its district's people struck, at most this many days
 
         // --- The map and its crossings (stage 7) ---
         // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi

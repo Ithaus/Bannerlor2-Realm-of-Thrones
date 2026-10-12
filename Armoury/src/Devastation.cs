@@ -41,7 +41,7 @@ namespace Armoury
         internal const float FloorHearth = 11f;
         // krok rabunku gry: co 0.05 punktow osady wies traci 0.5 x krok x hearth (RaidEventComponent.Update)
         private const float GameStep = 0.05f, GameStepKeep = 0.975f;
-        private const int KRaid = 0, KForage = 1;
+        private const int KRaid = 0, KForage = 1, KDist = 2;          // KDist: E7/R1 - rabunek osada po osadzie (DistrictRaid.StrikePeople)
         private const int Top = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -68,7 +68,7 @@ namespace Armoury
         internal static bool CaptivesLive { get { var s = Settings.Current; return On && s != null && s.RaidCaptivesFromVillage; } }
 
         // ------------------------------------------------------------ rabunek w toku (bez zapisu)
-        private sealed class RaidState
+        internal sealed class RaidState
         {
             public double PersonDays;                   // osobodni lupienia od ostatniego rozliczenia
             public double TotalDays, Hit, Dead, CapWould;   // ten rabunek razem: osobodni, trafieni, zabici, pojmani "byloby" (E4/9)
@@ -86,9 +86,9 @@ namespace Armoury
         internal struct Tick { public Village V; public float Real, Virt; public bool Swapped; public object Rs; public double K; public Hero Leader; public int Gold; public long Paid0; }
 
         // ------------------------------------------------------------ liczniki doby (zeruje DayLine)
-        private static readonly double[] _dHit = new double[2], _dDays = new double[2];
-        private static readonly int[] _dFull = new int[2];
-        private static readonly HashSet<string>[] _dVillages = { new HashSet<string>(), new HashSet<string>() };
+        private static readonly double[] _dHit = new double[3], _dDays = new double[3];
+        private static readonly int[] _dFull = new int[3];
+        private static readonly HashSet<string>[] _dVillages = { new HashSet<string>(), new HashSet<string>(), new HashSet<string>() };
         private static double _dDead, _dFled, _dAway, _dCapWould, _dSlaverHit, _dSlaverDead, _dGameHearth, _dGamePeople;
         private static long _dLootAi, _dLootPlayer;
         private static int _dSteps, _dRaids, _dRaidsFull, _dRaidMen, _dResumed, _dForagers, _dNoK, _dMoveFail, _dForeign;
@@ -115,6 +115,7 @@ namespace Armoury
         internal static void Reset()
         {
             lock (_lock) { _raids.Clear(); _byId = null; }
+            CapTakenAll = 0;
             _spiral.Clear();
             lock (_errSites) _errSites.Clear();
             _stumblesAll = 0; _abandonLogged = false;
@@ -124,8 +125,8 @@ namespace Armoury
 
         internal static void NewDay()
         {
-            Array.Clear(_dHit, 0, 2); Array.Clear(_dDays, 0, 2); Array.Clear(_dFull, 0, 2);
-            _dVillages[0].Clear(); _dVillages[1].Clear();
+            Array.Clear(_dHit, 0, 3); Array.Clear(_dDays, 0, 3); Array.Clear(_dFull, 0, 3);
+            _dVillages[0].Clear(); _dVillages[1].Clear(); _dVillages[2].Clear();
             _dDead = _dFled = _dAway = _dCapWould = _dSlaverHit = _dSlaverDead = _dGameHearth = _dGamePeople = 0.0;
             _dLootAi = _dLootPlayer = 0;
             _dSteps = _dRaids = _dRaidsFull = _dRaidMen = _dResumed = _dForagers = _dNoK = _dMoveFail = _dForeign = 0;
@@ -244,6 +245,53 @@ namespace Armoury
             double hit = (reach - away) * (1.0 - Math.Exp(-perDay * personDays / reach));
             if (hit > open) hit = open;
             if (!(hit > 0.0) || double.IsNaN(hit) || double.IsInfinity(hit)) return 0.0;
+            double d0, f0, r0;
+            return Hit(v, s, k, away, hit, personDays, kind, slaver, rs, src, out d0, out f0, out r0);
+        }
+
+        /// <summary>
+        /// E7/R1 (235, R15): wejscie rabunku osada po osadzie - `people` ludzi przeszukanej czesci kroku (bez wykladnika - jego role gra u kroku, DistrictRaid),
+        /// w granicach Room (pulap i dno 11 hearth), `personDays` osobodni tej czesci (limit zabitych: 1 na zbrojnego na dobe). Dalej TEN SAM rdzen co Strike (Hit):
+        /// PeopleBook.Move, zabici / las / uchodzcy, Famine.Burn, VillageBook.OnStrike z kluczem sesji rs.Comp, liczniki rs.Hit/Dead/CapWould. Zwraca trafionych.
+        /// </summary>
+        internal static double StrikePeople(Village v, double people, double personDays, RaidState rs, MobileParty src, out double dead, out double fled, out double refugees)
+        {
+            dead = fled = refugees = 0.0;
+            var s = Settings.Current;
+            if (s == null || v == null || !(people > 0.0) || !(personDays > 0.0)) return 0.0;
+            float per;
+            if (!Covers(v, out per)) { _dNoK++; return 0.0; }
+            double k = 1.0 / per;
+            double away, reach;
+            double open = Room(v, s, k, out away, out reach);
+            if (!(open > 0.0)) { _dFull[KDist]++; return 0.0; }
+            double hit = Math.Min(people, open);
+            if (!(hit > 0.0) || double.IsNaN(hit) || double.IsInfinity(hit)) return 0.0;
+            return Hit(v, s, k, away, hit, personDays, KDist, rs != null && rs.Slaver, rs, src, out dead, out fled, out refugees);
+        }
+
+        /// <summary>E7/R1: ludzie okregu dla kroku rabunku osada po osadzie - w domu, uchodzcy, Room (te same pulap i dno co Strike) i zasieg (pulap x ludzie okregu).</summary>
+        internal static bool DistrictPeople(Village v, out double home, out double away, out double open, out double reach)
+        {
+            home = away = open = reach = 0.0;
+            try
+            {
+                var s = Settings.Current;
+                float per;
+                if (s == null || !Covers(v, out per)) return false;
+                double k = 1.0 / per;
+                open = Room(v, s, k, out away, out reach);
+                home = (double)Math.Max(0f, v.Hearth) * k;
+                return true;
+            }
+            catch (Exception e) { Stumble("Devastation.DistrictPeople", e); return false; }
+        }
+
+        /// <summary>Wspolny rdzen Strike i StrikePeople (E7/R1, v2): od "trafionych" w dol - jedna funkcja rachunku ludzi, bez drugiej kopii.</summary>
+        private static double Hit(Village v, Settings s, double k, double away, double hit, double personDays, int kind, bool slaver, RaidState rs, MobileParty src,
+                                  out double oDead, out double oFled, out double oRef)
+        {
+            oDead = oFled = oRef = 0.0;
             double kill = Clamp01((slaver ? s.DevastationKilledSlaverPercent : s.DevastationKilledPercent) / 100.0);
             double capW = slaver ? Clamp01(s.DevastationCaptivesPercent / 100.0) : 0.0;   // pojmani calego rabunku (R8) - E4/9: plan ThrallLaw.CapturePrefix
             // E4/9 (6.3): pojmani przy uderzeniu zostaja uchodzcami - przechodza do lochu najezdzcy dopiero przy koncu WYGRANEGO rabunku (ThrallLaw.CapturePrefix,
@@ -260,7 +308,7 @@ namespace Armoury
             if (refugees < 0.0) refugees = 0.0;
             double lBefore = (double)Math.Max(0f, v.Hearth) * k + away;       // E4/6: ludzie okregu przed ruchem (ulamek spalonego spichlerza)
             // JEDYNY ruch hearth (U23): trafieni z DOM
-            double moved = -PeopleBook.Move(v, PeopleBook.ADom, PeopleBook.ARefugees, hit, kind == KRaid ? PeopleBook.MDevRaid : PeopleBook.MDevForage, PeopleUnit.GamePerMan);
+            double moved = -PeopleBook.Move(v, PeopleBook.ADom, PeopleBook.ARefugees, hit, kind != KForage ? PeopleBook.MDevRaid : PeopleBook.MDevForage, PeopleUnit.GamePerMan);
             if (!(moved > 0.0)) { _dMoveFail++; return 0.0; }         // Move nie rzuca; 0 = wyjatek w Shift - nikogo nie przenosimy
             double f = Math.Min(1.0, moved * k / hit);                  // gdyby Move przyjal mniej - wszystkie konta w tej samej proporcji
             var region = OutlawLaw.RegionFor(v.Settlement);
@@ -270,7 +318,7 @@ namespace Armoury
             if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
             // E4/11 (Z1, U24): trafieni na spalone osady wiosek pobocznych - po kontach, wlasny try (OnStrike nie rzuca); rabunek - klucz sesji, zerowanie - oboz armii
             // E7/W1 (232): + zabici tego uderzenia (pamiec wojny wioski - te same liczby, ktore nizej dopisuje rs.Dead)
-            try { VillageBook.OnStrike(v, hit * f, refugees * f, dead * f, kind == KRaid, rs != null ? rs.Comp : null, src, lBefore); }
+            try { VillageBook.OnStrike(v, hit * f, refugees * f, dead * f, kind != KForage, rs != null ? rs.Comp : null, src, lBefore); }
             catch (Exception e) { Stumble("Devastation.Strike(E4/11)", e); }
             // pojmani przy uderzeniu = 0 na stale (E4/9: z konta UCHODZCY przy koncu rabunku); CapWould - plan pojmanych calego rabunku
             double h = hit * f;
@@ -278,6 +326,7 @@ namespace Armoury
             _dHit[kind] += h; _dDead += dead * f; _dFled += fled * f; _dAway += refugees * f; _dCapWould += h * capW;
             if (slaver) { _dSlaverHit += h; _dSlaverDead += dead * f; }
             if (v.Settlement.StringId != null) _dVillages[kind].Add(v.Settlement.StringId);
+            oDead = dead * f; oFled = fled * f; oRef = refugees * f;
             return h;
         }
 
@@ -308,7 +357,7 @@ namespace Armoury
         /// Stan rabunku; nowy wpis po wczytaniu gry w polowie rabunku odtwarza hearth gry z RaidDamage (kroki po 0.05, kazdy x0.975) - przyblizenie dotyczy
         /// tylko zlota i towaru lupiezcy z pozostalych krokow, ksiegi ludzi nie dotyka.
         /// </summary>
-        private static RaidState StateOf(RaidEventComponent raid, Village v, bool create)
+        internal static RaidState StateOf(RaidEventComponent raid, Village v, bool create)   // E7/R1 (v2): ten sam stan rabunku dla rabunkow DistrictRaid
         {
             RaidState rs;
             lock (_lock)
@@ -331,7 +380,10 @@ namespace Armoury
         public static void RaidPrefix(RaidEventComponent __instance, out Tick __state)
         {
             __state = default(Tick);
-            if (__instance == null || !On) return;
+            // E7/R1 (v2, K11): rabunek prowadzi DistrictRaid (prefiks First, oryginal nie biegnie w lupieniu) - bez osobodni, StateOf i podmiany hearth tutaj;
+            // __state pusty, wiec RaidFinalizer nic nie robi. Stan rabunku zaklada i wypelnia DistrictRaid (StrikePeople) - jeden stan.
+            if (__instance == null || DistrictRaid.Owns(__instance)) return;
+            if (!On) return;
             try
             {
                 var st = __instance.MapEventSettlement;
@@ -415,12 +467,13 @@ namespace Armoury
                 if (v == null) return;
                 float per;
                 bool on = Covers(v, out per);
-                var rs = StateOf(__instance, v, on);
+                bool own = DistrictRaid.Owns(__instance);          // E7/R1 (v2): przy rabunku DistrictRaid tylko bez Settle i podmiany hearth - StateOf zostaje (jency E4/9, Inni, W1)
+                var rs = StateOf(__instance, v, on || own);
                 if (rs == null) return;
-                if (on) Settle(v, rs);
+                if (on && !own) Settle(v, rs);
                 float real = v.Hearth;
-                __state.Rs = rs; __state.Real = real; __state.Virt = on && rs.HasVirt ? rs.Virt : real; __state.V = v;
-                if (on && rs.HasVirt) { v.Hearth = rs.Virt; __state.Swapped = true; }
+                __state.Rs = rs; __state.Real = real; __state.Virt = on && !own && rs.HasVirt ? rs.Virt : real; __state.V = v;
+                if (on && !own && rs.HasVirt) { v.Hearth = rs.Virt; __state.Swapped = true; }
             }
             catch (Exception e) { __state = default(Tick); Stumble("Devastation.EndPrefix", e); }
         }
@@ -492,6 +545,7 @@ namespace Armoury
         internal static void NoteCapture(bool found, double plan, int taken, bool leave, bool noChar, int few, bool slaver, bool player)
         {
             _dCapCalls++;
+            if (taken > 0) CapTakenAll += taken;           // E7/R1: licznik narastajacy - DistrictRaid czyta roznice wokol konca rabunku (jency z rabunkow R1)
             if (!found) { _dCapNoState++; return; }
             _dCapPlan += plan;
             if (leave) _dCapLeave += plan;
@@ -499,6 +553,9 @@ namespace Armoury
             _dCapFew += few;
             if (taken > 0) { _dCapRaids++; _dCapJ += taken; if (!slaver) _dCapNotSlaver++; if (player) _dCapPlayer += taken; }
         }
+
+        /// <summary>E7/R1: pojmani z rabunkow do lochu najezdzcy od Reset (narastajaco; DistrictRaid odczytuje roznice przed i po OnBeforeFinalize).</summary>
+        internal static long CapTakenAll;
 
         /// <summary>E4/9: pojmani z wsi od ostatniej linii doby (bez zerowania - zeruje DayLine): rabunki z pojmanymi, pojmani, gracz.</summary>
         internal static void CaptivesToday(out int raids, out double taken, out double player)
@@ -768,7 +825,7 @@ namespace Armoury
         }
 
         /// <summary>E4/11 (G5): trafieni rabunkiem i zerowaniem od ostatniej linii doby (zeruje DayLine; VillageBook.Daily czyta przed nia - to samo okno).</summary>
-        internal static double HitToday { get { return _dHit[KRaid] + _dHit[KForage]; } }
+        internal static double HitToday { get { return _dHit[KRaid] + _dHit[KForage] + _dHit[KDist]; } }   // E7/R1: + rabunek osada po osadzie (ten sam VillageBook.OnStrike)
 
         /// <summary>
         /// Spustoszenie wylaczone (MCM albo brak jednostki ludzi / przyrostu naturalnego / latek rabunku), a w ksiedze sa uchodzcy: wracaja do swoich wsi od razu
@@ -852,7 +909,7 @@ namespace Armoury
                              + (left > 0.0 ? "; na koncie jeszcze " + F0(left) + " uchodzcow (wroca jutro" + (_dAbandonLeft > 0 ? "; " + _dAbandonLeft + " wsi bez przelicznika" : "") + ")" : "; konto UCHODZCY puste") + ".");
                     return;
                 }
-                double hitAll = _dHit[KRaid] + _dHit[KForage];
+                double hitAll = _dHit[KRaid] + _dHit[KForage] + _dHit[KDist];
                 bool any = _dRaids > 0 || _dForagers > 0 || _dSteps > 0 || hitAll > 0.0 || _dBack > 0.0 || PeopleBook.RefugeeVillages > 0 || (seg.Has && (seg.N > 0.0 || seg.N0 > 0.0));
                 if (!any) return;
 
@@ -935,7 +992,8 @@ namespace Armoury
                   .Append(" ludzi ksiegi; lup z niczego ").Append(_dLootAi + _dLootPlayer).Append(" zl (gracz ").Append(_dLootPlayer).Append(')');
                 sb.Append(" | zerowanie: partii ").Append(_dForagers).Append(", osobodni ").Append(F(_dDays[KForage], "0")).Append(" x ").Append(F(Math.Max(0f, s.DevastationPerForagerDay), "0.##"))
                   .Append(" -> trafieni ").Append(F(_dHit[KForage], "0.#"));
-                sb.Append(" | okreg nasycony ").Append(_dFull[KRaid] + _dFull[KForage]).Append(" razy (pulap ").Append(Math.Max(0, Math.Min(95, s.DevastationMaxPercent))).Append("% albo dno 11 hearth)");
+                sb.Append(" | rabunek osada po osadzie (E7/R1): trafieni ").Append(F(_dHit[KDist], "0.#")).Append(" w ").Append(_dVillages[KDist].Count).Append(" wsiach (sesje - linia Rabunek osada po osadzie)");
+                sb.Append(" | okreg nasycony ").Append(_dFull[KRaid] + _dFull[KForage] + _dFull[KDist]).Append(" razy (pulap ").Append(Math.Max(0, Math.Min(95, s.DevastationMaxPercent))).Append("% albo dno 11 hearth)");
                 sb.Append(" | trafieni ").Append(F(hitAll, "0.##")).Append(" = zabici ").Append(F(_dDead, "0.##")).Append(" + pojmani ").Append(F(cap, "0"))
                   .Append(" + las ").Append(F(_dFled, "0.##")).Append(" + uchodzcy ").Append(F(_dAway, "0.##")).Append(" (kontrola ").Append(Sg(check, "0.000")).Append(')')
                   .Append(" [najezdzcy z niewola: trafieni ").Append(F(_dSlaverHit, "0.#")).Append(", zabici ").Append(F(_dSlaverDead, "0.#")).Append(", pojmani byloby ").Append(F(_dCapWould, "0.#")).Append(']')

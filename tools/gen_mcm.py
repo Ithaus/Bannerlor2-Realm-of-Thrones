@@ -149,6 +149,9 @@ RANGES = {
     'KnightHorseMarketShare': (0.0, 1.0, "0.00"),
     # E7/W1 (232): kto slyszy wiesci z wiosek - 0 nikt, 1 wlasne lenna, 2 cale krolestwo (VillageNews.Shows)
     'VillageRaidMessages': (0, 2, "0"),
+    # E7/R1 (235): oddzial rabunku osada po osadzie i najdluzsza czujnosc - zgodnie z przycieciem w DistrictRaid.Start / EndFin
+    'RaidDetachmentMen': (20, 2000, "0"),
+    'RaidAlertMaxDays': (1, 60, "0"),
 }
 
 def gen(module_dir, ns, display):

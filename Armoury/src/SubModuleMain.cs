@@ -167,6 +167,9 @@ namespace Armoury
                 // naturalnym (czynne tylko razem z nim) i PO Measure40/OthersRise; MUSI zostac tutaj, w menu glownym - JIT wkleja male metody (GetHearthLevel), jesli wolajacy
                 // skompiluje sie przed latka (113 ryzyko 13); we wlasnym try
                 try { Devastation.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Devastation.ApplyAll", e); }
+                // E7/R1 (235): rabunek osada po osadzie dla AI - prefiks First na RaidEventComponent.Update (przed Devastation.RaidPrefix i oknem W6), koniec rabunku, czujnosc;
+                // PO Devastation (StrikePeople, wspolny stan rabunku); wpiete zawsze, czynne przy kluczu RaidBySettlementEnabled
+                try { DistrictRaid.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DistrictRaid.ApplyAll", e); }
                 try { Famine.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Famine.ApplyAll", e); }   // E4/6 (191): spichlerze okregow i glod - postfiks spichlerza warowni (schronieni w murach oblezonej warowni)
                 // E4/8 (164b-2): wojsko z ludzi - zalogi bez przyrostu z modelu, milicja z wolnych rak, nowe druzyny i karawany z ludzi, wedrowcy BK; PO PeopleBook.ApplyOrigin
                 // (E4/7 - ksiega pochodzenia) i PO Measure40 (okna W1/W2 - nasz postfiks milicji biegnie przed ich finalizerami); latki wpiete zawsze (U26), licza przy kluczach

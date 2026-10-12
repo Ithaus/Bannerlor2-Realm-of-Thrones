@@ -4868,6 +4868,18 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool DiplomacyYearLong { get; set; } = true;
 
+        [SettingPropertyBool("Raid By Settlement Enabled", HintText = "villages are raided settlement by settlement: each takes days, and the loot comes only from what the village really has")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidBySettlementEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Raid Detachment Men", 20, 2000, "0", HintText = "raiders split into bands of this many men, each band burning its own settlement at the same time - a lord with 112 men burns one settlement in about four and a half days, an army of 2000 burns ten together")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidDetachmentMen { get; set; } = 200;
+
+        [SettingPropertyInteger("Raid Alert Max Days", 1, 60, "0", HintText = "after a raid has burned its settlements the village stays looted and does not start to mend for 1 day plus 1 for each hundredth of its district's people struck, at most this many days")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidAlertMaxDays { get; set; } = 17;
+
         [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
@@ -6112,6 +6124,9 @@ namespace Armoury
             s.TerrainEaseExact = TerrainEaseExact;
             s.TournamentsAllSeason = TournamentsAllSeason;
             s.DiplomacyYearLong = DiplomacyYearLong;
+            s.RaidBySettlementEnabled = RaidBySettlementEnabled;
+            s.RaidDetachmentMen = RaidDetachmentMen;
+            s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.TwinsCrossingCount = TwinsCrossingCount;
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;

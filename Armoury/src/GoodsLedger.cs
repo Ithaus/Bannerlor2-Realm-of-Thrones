@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, Kinds = 28;   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, Kinds = 29;   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, Holders = 10;
@@ -73,7 +73,7 @@ namespace Armoury
                              GShopIn = "linie warsztatow", GArms = "warsztaty zbrojne", GBuild = "budowy", GTown = "mieszczanie", GCastle = "zamki",
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
-                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)";
+                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)";
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GScrap, GDrill, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
         private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
 
@@ -507,6 +507,9 @@ namespace Armoury
                     return;
                 case FBloom:       // E6/R1 (214): drewno zdjete z polki miasta na wegiel dymarek przy kopalniach (Bloomery) - ujscie
                     foreach (var i in f.Touched) Book(i, GBloom, null, f.Net[i]);
+                    return;
+                case FRaid:        // E7/R1 (235): magazyn wsi -> napastnik znosi sie do zera, reszta (-) = spalone w rabunku; zboze ze spichlerza okregu dla napastnikow (+)
+                    foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GRaid, n > 0 ? "zboze ze spichlerza okregu dla napastnikow" : "spalone w rabunku", n); }
                     return;
                 case FArmsBuy:     // 174.0: zakupy uzbrojenia Armoury (AiGear, notable) - towar ksiegi tu sie nie rusza
                     foreach (var i in f.Touched) Book(i, GRest, "zakupy uzbrojenia Armoury", f.Net[i]);

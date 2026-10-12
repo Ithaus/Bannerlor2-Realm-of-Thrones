@@ -168,6 +168,13 @@ Uzycie (Python 3, tylko odczyt):
                     przy kazdym starcie i 0 linii 'postawione'; bieg zdjec (klucz MapRoadsProbeEnabled = true w konfiguracji testu) - D0-2a plik: stempli > 0, zle wiersze 0,
                     CRC sceny zgodne; D0-2b postawione N z N (bez materialu 0, potkniecia 0); oba - D0-3 potkniecia i linie "ERROR in MapRoadsProbe*" 0;
                     czas stawiania, klatka z drogami / bez - INFO; zdjecia - poza narzedziem.
+                    Blok etap7_r1 (E7/R1, paczka 235 - rabunek osada po osadzie dla AI, NK): R1-0 linia "latki przy starcie gry - GOTOWE" (BRAK -); R1-1 linia doby
+                    "Rabunek osada po osadzie (E7/R1)" w kazdej dobie okna; T1 bilans zlota (zloto wodza - kiesa wsi) 0 w kazdej dobie i lup z niczego AI w "Ludzie (spustoszenie)"
+                    0 zl (przy sesjach oddanych grze - INFO); T2 bilans towaru (towar + spalone - magazyn) 0 i spichlerza (zjedzone - spichlerz) |x| < 0.5 w kazdej dobie;
+                    T3 kontrola trafionych |x| <= 0.01 w kazdej dobie; T4 mediana dob na osade lorda (lista z linii) <= 5 (przy >= 10 krokach lordow); T5 wioski spalone
+                    ("Ksiega wiosek (E4/11)" spalone dzis) > 0 w oknie; T6 udzial przerwanych - INFO; T7 potkniecia 0 i linie "ERROR in DistrictRaid." 0; T9 zapis -> wczytanie:
+                    sesje i czujnosc przy wczytaniu = przy ostatnim zapisie; T10 jency z rabunkow R1 > 0 (przy >= 20 sesjach); T11 zabici RaidDead = zabici R1 (+-1 na sesje);
+                    koszt prefiksu < 50 ms/dobe (srednio); lup, czujnosc, okreg wypalony, u przyciete, oddane grze - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -7748,7 +7755,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     # scalenie zbior-5-8: obie galezie etapu 7 zbudowaly szkielet grupy; jeden szkielet, dwie konwencje wywolania (opis w docstringu)
     blocks = ([(b, False) for b in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2)]
-              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0)])
+              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1)])
     for blk, by_win in blocks:   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             if by_win:
@@ -7914,6 +7921,119 @@ def etap7_w1(rep, lines, start, win, until=120, **kw):
     rep.add("E7/W1 T6: zapis pamieci - same identyfikatory", f"zapisow {len(saves)}, identyfikatorow odrzuconych przez BadId {rej}",
             "INFO (nazw w sekcji m: nie ma z konstrukcji)", None)
 
+
+def etap7_r1(rep, lines, start, win, until=120, **kw):
+    """E7/R1 (235, PLAN 7.11 a, projekt etapu 7 v2 rozdz. 3 "E7/R1" Test i rozdz. 4 (7.11)): linia startowa "Rabunek osada po osadzie (E7/R1): latki przy starcie gry",
+    linia doby "Rabunek osada po osadzie (E7/R1): dzien N" (dzien ksiegi = doba gry - 1, jak "Ludzie (spustoszenie)"), linie "zapis - sesji N, czujnosc M wsi" i
+    "wczytanie - sesji N, czujnosc M wsi". Wiazace: R1-0, R1-1, T1, T2, T3, T4 (>= 10 krokow lordow), T5, T7, T9 (gdy byl zapis i wczytanie), T10 (>= 20 sesji), T11, koszt."""
+    P = "Rabunek osada po osadzie (E7/R1): "
+    starts = [x for x in lines if x.startswith(P + "latki przy starcie gry")]
+    rows = {}
+    for d, x in by_day(lines, P + "dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = x
+    if not starts and not rows:
+        rep.add("E7/R1: linie Rabunek osada po osadzie (E7/R1)", "brak w logu", "sa od wgrania E7/R1 (LogEnabled)", None)
+        return
+    if starts:
+        a = starts[-1]
+        rep.add("E7/R1 R1-0: latki przy starcie gry", a[:240], "GOTOWE, BRAK: -", ("GOTOWE" in a) and ("BRAK: -" in a))
+    off = [x for x in rows.values() if "| WYLACZONE" in x]
+    live = sorted(d for d in rows if "| sesji " in rows[d])
+    need = max(0, len(win) - 1)
+    rep.add("E7/R1 R1-1: linia doby z sesjami", f"{len(live)} dob (wylaczone {len(off)}; dob okna {len(win)})", f">= {need} (codziennie w oknie, klucz Raid By Settlement Enabled)",
+            (len(live) >= need and need > 0) if win and not off else None)
+    if not live:
+        return
+    w = [rows[d] for d in live]
+
+    def tot(pat, cast=int):
+        return sum(num(pat, x, cast, 0) or 0 for x in w)
+    ses = tot(r"\| sesji (\d+) \(")
+    steps = tot(r", krokow (\d+) \(")
+    intr = tot(r", przerwanych (\d+) \(")
+    rel = tot(r"oddane grze \(gracz w zdarzeniu, potkniecia\) (\d+)")
+    rep.add("E7/R1 R1-2: sesje zakonczone (suma okna)", f"sesji {ses}, krokow pelnych {steps}, przerwanych {intr}, oddanych grze {rel}", "> 0 (rabunki AI pod R1)", ses > 0)
+    # T1 - bilans zlota kazdej doby i lup z niczego AI w linii spustoszenia
+    b1 = [(d, num(r"zloto wodza - kiesa wsi " + F_, rows[d], float)) for d in live]
+    bad1 = [f"d{d}: {x}" for d, x in b1 if x is None or abs(x) >= 1]
+    rep.add("E7/R1 T1: bilans zlota (zloto wodza - kiesa wsi) w kazdej dobie", f"dob niezgodnych {len(bad1)} z {len(b1)}" + (f" ({', '.join(bad1[:6])})" if bad1 else ""),
+            "0 w kazdej dobie (lup zlota tylko z kiesy wsi - jeden platnik E5/A7)", len(bad1) == 0)
+    dev = by_day(lines, "Ludzie (spustoszenie): dzien")
+    ai_free = 0
+    for d in live:
+        x = dev.get(d, "")
+        t = num(r"lup z niczego (\d+) zl \(gracz", x, int, 0) or 0
+        pl = num(r"lup z niczego \d+ zl \(gracz (\d+)\)", x, int, 0) or 0
+        ai_free += t - pl
+    rep.add("E7/R1 T1b: lup z niczego AI w rabunkach pod spustoszeniem (Ludzie (spustoszenie), suma okna)", f"{ai_free} zl (sesji oddanych grze {rel})",
+            "0 zl (AI pod R1 nie dostaje zlota gry za hearth)", (ai_free == 0) if rel == 0 else None)
+    # T2 - bilans towaru i spichlerza
+    bad2 = []
+    for d in live:
+        g = num(r"towar \+ spalone - magazyn " + F_, rows[d], float)
+        f = num(r"zjedzone - spichlerz " + F_, rows[d], float)
+        if g is None or f is None or abs(g) >= 1 or abs(f) >= 0.5:
+            bad2.append(f"d{d}: {g}/{f}")
+    rep.add("E7/R1 T2: bilans towaru (towar + spalone - magazyn) i spichlerza (zjedzone - spichlerz) w kazdej dobie", f"dob niezgodnych {len(bad2)}" + (f" ({', '.join(bad2[:6])})" if bad2 else ""),
+            "towar 0, spichlerz |x| < 0.5 (towar i jedzenie tylko z zasobow wsi)", len(bad2) == 0)
+    # T3 - kontrola trafionych
+    chk = [(d, num(r"\(kontrola " + F_ + r"; uderzen", rows[d], float)) for d in live]
+    bad3 = [f"d{d}: {x}" for d, x in chk if x is None or abs(x) > 0.01]
+    rep.add("E7/R1 T3: trafieni = zabici + las + jency + uchodzcy (kontrola) w kazdej dobie", f"dob niezgodnych {len(bad3)}" + (f" ({', '.join(bad3[:6])})" if bad3 else ""), "|kontrola| <= 0.01", len(bad3) == 0)
+    # T4 - mediana dob na osade lorda (lista z linii)
+    vals = []
+    for x in w:
+        m = re.search(r"\(lordowie \d+: ([\d./]+)\)", x)
+        if m:
+            vals += [float(v) for v in m.group(1).split("/") if v]
+    vals.sort()
+    med = (vals[len(vals) // 2] if len(vals) % 2 else 0.5 * (vals[len(vals) // 2 - 1] + vals[len(vals) // 2])) if vals else None
+    rep.add("E7/R1 T4: mediana dob na osade - lordowie (krok pelny, doby lupienia / osady kroku)", f"{med:.2f} d ({len(vals)} krokow)" if med is not None else "brak krokow lordow",
+            "<= 5 dob (lord ze 112 ludzmi ok. 4.6)", (med <= 5.0) if len(vals) >= 10 else None)
+    # T5 - wioski spalone w ksiedze
+    book = by_day(lines, "Ksiega wiosek (E4/11): dzien")
+    burnt = sum(num(r"\| spalone dzis (\d+)", book[d], int, 0) or 0 for d in win if d in book)
+    rep.add("E7/R1 T5: wioski spalone w ksiedze (Ksiega wiosek (E4/11) spalone dzis, suma okna)", f"{burnt}", "> 0 w 120 dob (przed R1: 0)", (burnt > 0) if book else None)
+    rep.add("E7/R1 T6: udzial przerwanych sesji", f"{intr} z {ses} ({100.0 * intr / ses:.0f}%)" if ses else "-", "INFO (przed R1: 233 z 308 rabunkow przerwanych)", None)
+    # T7 - potkniecia
+    stu = tot(r"\| potkniecia (\d+)\.")
+    err = [x for x in lines if x.startswith("ERROR in DistrictRaid.")]
+    rep.add("E7/R1 T7: potkniecia (suma okna) i linie ERROR in DistrictRaid.", f"potkniecia {stu}, linii ERROR {len(err)}" + (f" (pierwsza: {err[0][:120]})" if err else ""), "0", stu == 0 and not err)
+    # T10 - jency z rabunkow R1, T11 - zabici w stanie rabunku = zabici R1
+    cap = tot(r"\| jency z rabunkow R1 (\d+),")
+    rep.add("E7/R1 T10: jency z rabunkow R1 do lochu najezdzcy (suma okna)", f"{cap} (sesji {ses})", "> 0 (najezdzcy z niewola - E4/9 na wspolnym stanie rabunku)", (cap > 0) if ses >= 20 else None)
+    rd = tot(r"zabici w stanie rabunku \(RaidDead\) " + F_, float)
+    r1d = tot(r"\(zabici R1 " + F_ + r"\)", float)
+    rep.add("E7/R1 T11: zabici w stanie rabunku (RaidDead, Inni i jency) = zabici z uderzen R1 (suma okna)", f"{rd:.1f} / {r1d:.1f} (roznica {rd - r1d:+.1f}, sesji {ses})",
+            "|roznica| <= liczba sesji", abs(rd - r1d) <= max(1, ses))
+    # koszt
+    cost = [num(r"\| czas " + F_ + r" ms \|", x, float) for x in w]
+    cm = _mean([c for c in cost if c is not None])
+    rep.add("E7/R1 R1-3: koszt prefiksu rabunku (srednio)", f"{cm:.1f} ms/dobe" if cm is not None else "brak", "< 50 ms/dobe", (cm < 50.0) if cm is not None else None)
+    # INFO
+    gold, take, tval = tot(r"zloto z kiesy wsi (\d+) zl"), tot(r"towar z magazynu (\d+) szt\."), tot(r"towar z magazynu \d+ szt\. \((\d+) zl\)")
+    burn, bval, eat = tot(r"spalone w rabunku (\d+) szt\."), tot(r"spalone w rabunku \d+ szt\. \((\d+) zl\)"), tot(r"jedzenie ze spichlerza (\d+) szt\.")
+    rep.add("E7/R1 R1-4: lup (suma okna)", f"zloto z kies wsi {gold} zl, towar {take} szt. ({tval} zl), spalone {burn} szt. ({bval} zl), zboze ze spichlerza {eat} szt.",
+            "INFO (zloto gry z niczego przed R1 ok. 670 zl/d)", None)
+    alert = num(r"\| czujnosc: wsi (\d+) \(", w[-1], int, 0) or 0
+    held = tot(r"leczenie wstrzymane (\d+)\)")
+    bo, uc = tot(r"\| okreg wypalony (\d+),"), tot(r"u przyciete do [\d.]+ (\d+),")
+    rep.add("E7/R1 R1-5: czujnosc, okreg wypalony, u przyciete", f"czujnosc wsi (ostatnia doba) {alert}, leczenie wstrzymane (suma) {held}; okreg wypalony {bo}, u przyciete {uc} (sesji {ses})",
+            "INFO (u przyciete czesto = okregi prawie wypalone - sprawdzic tempo wojny)", None)
+    # T9 - zapis -> wczytanie
+    pairs, mism, last = 0, [], None
+    for x in lines:
+        if x.startswith(P + "zapis - sesji"):
+            last = (num(r"sesji (\d+)", x, int), num(r"czujnosc (\d+)", x, int))
+        elif x.startswith(P + "wczytanie - sesji"):
+            got = (num(r"sesji (\d+)", x, int), num(r"czujnosc (\d+)", x, int))
+            if last is not None:
+                pairs += 1
+                if got != last:
+                    mism.append(f"{got[0]}/{got[1]} wobec {last[0]}/{last[1]}")
+    rep.add("E7/R1 T9: sesje i czujnosc zapis -> wczytanie", f"par {pairs}, niezgodnych {len(mism)}" + (f" ({', '.join(mism[:4])})" if mism else ""),
+            "0 niezgodnych (bieg zapisu 9 dob)", (len(mism) == 0) if pairs else None)
 
 def etap7_w2(rep, lines, start, win, until=120, **kw):
     """E7/W2 (233, PLAN 7.9 a, projekt etapu 7 v2 rozdz. 3 "E7/W2" Test): linia startowa "Dymek wioski (E7/W2): start" (OnSessionLaunched), linia doby

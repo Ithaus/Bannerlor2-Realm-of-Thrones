@@ -330,7 +330,7 @@ namespace Armoury
         }
 
         // zapis: "v1|L:<crc ukladu hex>|P:<ludzi na osade>|n:<id>=<N>;...|w:<id>=<br>/<bf>,...;...|x:<id>=<i>:<flaga>:<doba zdarzenia>:<doba odbudowy>,...;...|y:<id>=<ARexp>/<AFexp>;..."
-        // (zarezerwowane, nie pisane w E4/11: r: sesje rabunku, c: czujnosc, u: uprowadzeni - etap 7.11)
+        // (zarezerwowane w E4/11: r: sesje rabunku, c: czujnosc - pisze je E7/R1 przez DistrictRaid.Export/Import; u: uprowadzeni - wolne)
         // poprawka po recenzji (R1-5): "|o:1" - ksiega byla wylaczona przy zapisie (OffDay wyzerowal puste osady i konto oczekiwane) - po wczytaniu przydzial zastepczy
         // z powodem "wlaczenie" (dotad liczony jako doplyw bez zrodla d0); starsze DLL te sekcje pomijaja
         private static void ApplyPending()
@@ -349,7 +349,7 @@ namespace Armoury
                 _resolveNote = "z zapisu: nieznana wersja klucza arm_district - jak stary zapis";
                 return;
             }
-            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null;
+            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null, sr = null, sc = null;
             foreach (var p in parts)
             {
                 if (p.Length < 2 || p[1] != ':') continue;
@@ -364,8 +364,11 @@ namespace Armoury
                     case 'y': sy = body; break;
                     case 'm': sm = body; break;              // E7/W1 (232): pamiec wojny (starsze DLL te sekcje pomijaja)
                     case 'o': wasOff = body == "1"; break;
+                    case 'r': sr = body; break;              // E7/R1 (235): sesje rabunku osada po osadzie (po id wsi gry - bez indeksow wiosek, niezalezne od ukladu)
+                    case 'c': sc = body; break;              // E7/R1 (235): czujnosc wsi (id wsi gry -> doba konca)
                 }
             }
+            try { DistrictRaid.Import(sr, sc); } catch (Exception e) { Stumble("VillageBook.Import(r/c)", e); }
             _layoutSame = hasCrc && _file != null && crc == _layoutCrc;
             if (!string.IsNullOrEmpty(sn))
                 foreach (var item in sn.Split(';'))
@@ -557,7 +560,28 @@ namespace Armoury
             }
             try { var st = Settings.Current; if (st != null && st.LogEnabled) Log.Info("Wioski - wiesci (E7/W1): zapis - pamiec wojny " + memN + " wpisow (same identyfikatory; odrzucone przez BadId " + memBad + ")."); }
             catch { }
+            // E7/R1 (235): sesje rabunku osada po osadzie (r:) i czujnosc wsi (c:) - jeden pisarz klucza arm_district (ta ksiega); starsze DLL te sekcje pomijaja
+            try { DistrictRaid.Export(sb); } catch (Exception e) { Stumble("VillageBook.Export(r/c)", e); }
             return sb.ToString();
+        }
+
+        /// <summary>E7/R1 (235): liczba osad okregu n (zamrozona w ksiedze przy pierwszym odczycie - ta sama, co menu, dymek i lancuch palenia). false - ksiega
+        /// nieczynna albo okreg nieznany (DistrictRaid liczy wtedy n z ludzi i DistrictSettlementPeople bez zamrazania). Nie rzuca.</summary>
+        internal static bool DistrictN(Village v, out double n)
+        {
+            n = 0.0;
+            if (v == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || !EnsureN(d)) return false;
+                    n = d.N;
+                    return n >= 1.0;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.DistrictN", e); return false; }
         }
 
         // ------------------------------------------------------------ n okregu i podzial na wioski (WM 3)
