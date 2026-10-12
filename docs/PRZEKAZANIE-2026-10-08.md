@@ -996,3 +996,8 @@ limit, zapisuj na biezaco" - po kazdym kroku push galezi (repo + GitHub) i wpis 
 
 **Czeka na Jeffa:** etap 7 pytania 1-4 (STAN-PRAC 12:00 UTC: premia drog - rada nie; ile drog; plik Diplomacy na rok 364 - rada tak; myto na Bliznakach), etap 6 K4 (cofniecie
 kroku x1.3 - rada tak) i N1 (lekka naprawa bez materialu - rada zostawic).
+- (17:30 UTC 12.10) **AKTUALIZACJA 26:** etap 6 porcja 3 + N1b gotowe (`w-toku/e6-p3` 6bdf1e3), etap 7 gotowy bez R1/R2/W4 (`w-toku/e7-a` be9cd4c, `w-toku/e7-b` 8e28af6). W toku
+  wf_42f8dda9-fa3 na `w-toku/zbior-5-8` (SCRATCH\zb\58): scalenie e6-p3 + e7-a + e7-b ZROBIONE (a8cf73b, 1f6f04e), E5/A7 ZROBIONE (ab97ff3 + ca9579c); dalej A8, rozpoznanie "bitwy",
+  C1, C2, C4, E7/R1, R2, W4, dwa przeglady, DLL. Limit tygodnia 95% - jesli przerwie: sprawdz `git log --first-parent w-toku/e6-p3..w-toku/zbior-5-8`, wznow resumeFromRunId
+  wf_42f8dda9-fa3 (ta sama sesja) albo nowym workflow od pierwszej niezrobionej paczki (opisy paczek w skrypcie workflows/scripts/zbior-5-8-*.js sesji ae222cb7). Uwagi do testu
+  i wgrania: STAN-PRAC 16:35 UTC (pliki danych e7-b poza DLL, CampBattlePropsEnabled w Armoury.json Jeffa, Diplomacy na rok 364).
