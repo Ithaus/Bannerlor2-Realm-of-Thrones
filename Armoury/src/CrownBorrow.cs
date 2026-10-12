@@ -153,6 +153,20 @@ namespace Armoury
             catch { return 1f; }
         }
 
+        /// <summary>E5/B2 (184): dlug korony krolestwa w Banku (0 - bez kredytu albo 186 bez wpisu). Tylko odczyt - potrzeba korony w KingdomTreasury.WarTaxDaily.</summary>
+        internal static double DebtOf(Kingdom k)
+        {
+            try { Loan l; return k != null && k.StringId != null && _loans.TryGetValue(k.StringId, out l) ? Math.Max(0, l.Principal) : 0; }
+            catch { return 0; }
+        }
+
+        /// <summary>E5/B2 (184): korona krolestwa w zaleglosci wobec Banku (linia 184 - prog "bez zaleglosci przy s ponizej pulapu"). Tylko odczyt.</summary>
+        internal static bool InArrears(Kingdom k)
+        {
+            try { Loan l; return k != null && k.StringId != null && _loans.TryGetValue(k.StringId, out l) && l.Arrears; }
+            catch { return false; }
+        }
+
         /// <summary>Dopisek do linii "Skarbce:" - dlug korony w Banku (pusty, gdy brak).</summary>
         internal static string LedgerNote(Kingdom k)
         {

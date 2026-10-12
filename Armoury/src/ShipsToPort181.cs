@@ -19,8 +19,11 @@ namespace Armoury
 {
     /// <summary>
     /// PACZKA 181 - STATKI DO PORTU (etap 3.3; projekt PROJEKT-ETAP3-SZCZELNOSC-STATKI-2026-10-10 wersja 2, kawalki E3/10, E3/11, E3/12).
-    /// DECYZJA: wariant (b) projektu - kod i linia logu pelne, ale WSZYSTKIE TRZY wylaczniki (ShipsToPort, ShipTradeThroughPort, ShipPrizesToPort)
-    /// DOMYSLNIE WYLACZONE do decyzji Jeffa (wlaczenie razem z podatkiem wojennym 184 w etapie 5). Przy wylaczonych gra dokladnie jak dotad:
+    /// DECYZJA: wariant (b) projektu - kod i linia logu pelne, wylaczniki (ShipsToPort, ShipTradeThroughPort, ShipPrizesToPort) do etapu 5 wylaczone.
+    /// E5/B5 (paczka "181 ON", projekt etapu 5 v2 rozdz. 2 R18 i rozdz. 3 "E5/B5"; decyzja Jeffa 11.10 (1) "statki razem z podatkiem wojennym 184"):
+    /// WSZYSTKIE TRZY wylaczniki DOMYSLNIE WLACZONE; porty placa z nadwyzki D4 (TownPurse.Spare przez Seal31.Spare - przy czynnym A1), wraki po
+    /// uszkodzeniu w LootDefeatedPartyShips nie sa pryzami (DestroyPrefix), linia "Statki (181)" podaje kasy portow bez nadwyzki (prog B5: <= 28 dob).
+    /// Przy wylaczonych (MCM) gra dokladnie jak dotad:
     /// latki tylko mierza (linia "Statki (181)" - ile zlota z niczego daje dzis kazda sciezka i ile zaplacilyby porty wedlug reguly 181 - symulacja
     /// na kopii licznikow, bez ruszania zlota i statkow), a podmienione wywolania GiveGoldAction (transpiler) wolaja te same metody gry co dotad.
     ///
@@ -34,19 +37,31 @@ namespace Armoury
     ///     przy naprawie) z niczego; AI sprzedaje w ConsiderSellingShips i przy wymianie w TryPurchasingShipFromTown (najpierw sprzedaz starego, potem kupno).
     ///  3. MapEvent.LootDefeatedPartyShips: statki pokonanych, ktorych zwyciezcy nie wzieli, sa niszczone (DestroyShipAction.Apply), a gdy wodz
     ///     zwyciezcow jest bohaterem i sa partie mogace lupic (flag) - zwyciezcy dostaja z niczego ich pelna wartosc w PlunderedGold (wedlug wkladu).
+    ///     E5/B5: wczesniej w tej samej metodzie gra uszkadza statki pokonanych (Ship.OnShipDamaged, 20-50% kadluba - NavalDLCBattleRewardModel);
+    ///     statek, ktoremu spadnie do 0, Ship.OnShipDamaged niszczy od razu (DestroyShipAction.Apply - w naszym kontekscie pryzy), a gra nie bierze
+    ///     go do podzialu ani za niego nie placi (MapEvent.cs:1773-1774 "HitPoints > 0f") - to wrak, nie pryz.
+    ///  Kolejnosc w bitwie (MapEvent.cs:1048-1053, :1411-1431): CalculatePlunderedAndLostGoldAmounts (pula; migawka A6) -> LootDefeatedPartyShips
+    ///     (dopisek za statki; 181) -> CaptureDefeatedPartyMembers -> CommitCalculatedMapEventResults (rozliczenie A6, wyplata). Przy WL pryzach
+    ///     dopisek jest zdjety w PrizeFin, wiec A6 (CountShips) widzi statki 0, a finalizer pomiaru 164a (Measure31.ShipsLootFin - ten sam priorytet
+    ///     Normal, wpiety pozniej, wiec biegnie po PrizeFin) liczy zloto, ktore gra naprawde wyplaci - przy WL 0.
     ///
     /// REGULA 181 (rozdz. 2 R1/R2 projektu; jedna dla gracza i AI):
     ///  - cena statku = cena sprzedazy portowi gry GetShipTradeValue(statek, sprzedajacy, port) = 0.3 x wartosc z politykami - naprawa;
-    ///  - port placi z NADWYZKI kasy: kasa - zapas kupcow (10 000 + 12 x dobrobyt, cel regulatora gry) - tarcza zoldu (SoldierPay.HeldOf) -
-    ///    tarcza dworu (162m); nigdy ponizej zapasu (ApplyForSettlementToCharacter nie obcina do kasy - krytyka D2, pilnujemy sami);
+    ///  - port placi z NADWYZKI kasy (Seal31.Spare): przy czynnym A1 (E5/A1) nadwyzka D4 = kasa - zapas kupcow TownPurse.Reserve (ta sama liczba
+    ///    co zawor, podatki i nasze zakupy; tarcze zbedne); bez A1 kasa - zapas kupcow (10 000 + 12 x dobrobyt, cel regulatora gry) - tarcza
+    ///    zoldu (SoldierPay.HeldOf) - tarcza dworu (162m); nigdy ponizej zapasu (ApplyForSettlementToCharacter nie obcina do kasy - krytyka D2, pilnujemy sami);
     ///  - wybor portu (E3/10, E3/12): miasta z portem i stocznia (poziom > 0), z miejscem do limitu stoczni, nieoblezone; (1) z ShipSalePortsTried
     ///    najblizszych portow wlasnego krolestwa pierwszy, ktory ma cala cene; (2) to samo w portach krolestw nie w wojnie z rodem; (3) inaczej port
     ///    z najwieksza nadwyzka placi, ile moze (sprzedaz z koniecznosci); (4) zaplata 0, cena <= 0 albo brak portu z miejscem - statek ginie (zlom).
+    ///    E5/B5 (recenzja 1): stocznia NavalDLC trzyma liczbe idealna (limit - 2) i nastepnej doby kasuje nadmiar (ShipProductionCampaignBehavior
+    ///    .DailyTickTown -> TryRemoveExcessShipsFromTown), a do limitu dorabia statki za darmo - zakup ponad liczbe idealna tylko mierzony w linii
+    ///    (OverIdeal); miejsce w Gather do limitu stoczni (wiazace), zmiana na liczbe idealna czeka na decyzje Jeffa.
     ///  - E3/10: statki przechodza do portu (ApplyByTransferring - ten sam wzor co DistributeShips), port placi glowie rodu; drugie wywolanie
     ///    tej samej druzyny w dobie nic nie placi (W6); zlom zostaje przy druzynie i ginie z nia (jak dzis).
     ///  - E3/11: kupno od portu - zaplata do kasy portu; sprzedaz portowi - port placi z nadwyzki; AI nie sprzedaje, gdy port nie ma calej ceny
     ///    (bramka - cala transakcja pominieta; przy wymianie odrzuconej sprzedazy pominiete tez kupno); gracz dostaje najwyzej nadwyzke (wycena
-    ///    ekranu portu obcieta do nadwyzki, port bez pieniedzy nie kupuje); premie zarzadcy - z nadwyzki tego portu.
+    ///    ekranu portu obcieta do nadwyzki, port bez pieniedzy nie kupuje); premie zarzadcy - z nadwyzki tego portu. E5/B5 (recenzja 2): ekran portu
+    ///    wykonuje kupno przed sprzedaza, a gra obcina zaplate do kiesy - gracz bez calej ceny kupna w kiesie nie kupuje (kupno pominiete, komunikat).
     ///  - E3/12: pryz, za ktory gra placi (flag), idzie do portu wzgledem rodu wodza zwyciezcow; port placi zwyciezcom wedlug wkladu (jak gra),
     ///    dopisek gry w PlunderedGold zdjety przed CommitGoldChanges; czesc wodzow do podstawy 1/9 korony (Ransom178.NoteBeatenGold, jak 3.2).
     ///  - KW 168 (E2 R16 "limit bez statkow"): kazda wyplata portu do bohatera idzie z InPortPay - ClanIncomeBook liczy ja w TodayShips i odejmuje
@@ -64,6 +79,10 @@ namespace Armoury
 
         /// <summary>KW 168 (E2 R16): trwa wyplata portu za statek - ClanIncomeBook.OnEvent dopisuje ja do TodayShips (poza limitem KW).</summary>
         internal static bool InPortPay;
+
+        /// <summary>E5/B5: suma wszystkich wyplat portow (181) od startu procesu - pomiar 164a (Measure31.RecoverFin) odejmuje roznice z jednego wywolania
+        /// RecoverGold (przy WL glowa rodu dostaje zloto z kasy portu, nie z niczego). Tylko rosnie; nikt nie czyta wartosci bezwzglednej.</summary>
+        internal static long PaidRun;
 
         // ------------------------------------------------------------ latki (linia startowa)
         private static bool _wRecover, _wDisband, _wDist, _wTrade, _wPerkTrade, _wPerkRepair, _wSwap, _wPrize, _wDestroy, _wUi, _hooksLogged;
@@ -102,8 +121,17 @@ namespace Armoury
         private static readonly long[] _perkGold = new long[2];
         private static long _perkViaPort, _perkCut;
         // 4. pryzy
-        private static int _p4Battles, _p4Sunk, _p4PaidByGameN, _p4NoPayN;
+        private static int _p4Battles, _p4Sunk, _p4PaidByGameN, _p4NoPayN, _p4Wrecks;   // _p4Wrecks (E5/B5): wraki po uszkodzeniu - gra nie placi, 181 nie rusza
+        // E5/B5: kasy portow bez nadwyzki - doby z rzedu (pamiec sesji, jak zaulki A1; czysci Reset, nie ClearDay)
+        private static readonly Dictionary<Settlement, int> _dryStreak = new Dictionary<Settlement, int>();
         private static long _p4Game, _p4GamePlayer, _p4Removed, _p4ToLeaders, _p4ToParties, _p4NoRecipient, _p4Ninth;
+        // E5/B5 (recenzja 1): zakupy portow, przy ktorych port mial juz liczbe idealna stoczni NavalDLC (limit - 2) - nadmiar, ktory stocznia kasuje (tylko pomiar)
+        private const int OvLost = 0, OvTrade = 1, OvPrize = 2, Ovs = 3;
+        private static readonly int[] _ovN = new int[Ovs], _ovSimN = new int[Ovs];
+        private static readonly long[] _ovGold = new long[Ovs], _ovSimGold = new long[Ovs];
+        // E5/B5 (recenzja 2): gracz bez calej ceny kupna w kiesie (kupno przed sprzedaza w jednym potwierdzeniu ekranu portu) - kupno pominiete
+        private static int _playerShortBuyN;
+        private static long _playerShortBuyGold;
         // razem (naprawde dzis, niezaleznie od przelaczenia w ciagu dnia) i kontrolki
         private static long _fromNothing, _toNothing;
         private static int _overSpare, _freeShips;
@@ -160,6 +188,7 @@ namespace Armoury
             try
             {
                 ClearDay();
+                _dryStreak.Clear();
                 _hooksLogged = false; _errSites.Clear();
                 _trade = null; _prize = null; _perkPort = null; _swap = false; _swapRejected = false; _disbanding = null; InPortPay = false;
             }
@@ -176,8 +205,10 @@ namespace Armoury
             _sellViaPort = _buyViaPort = _sellCut = _gateGold = _gateSimGold = _playerShortSim = _negGold = 0;
             _gateN = _gateSimN = _swapSkipN = _playerNoCoinN = _playerShortSimN = _negN = _uiCapN = 0;
             Array.Clear(_perkN, 0, 2); Array.Clear(_perkGold, 0, 2); _perkViaPort = _perkCut = 0;
-            _p4Battles = _p4Sunk = _p4PaidByGameN = _p4NoPayN = 0;
+            _p4Battles = _p4Sunk = _p4PaidByGameN = _p4NoPayN = _p4Wrecks = 0;
             _p4Game = _p4GamePlayer = _p4Removed = _p4ToLeaders = _p4ToParties = _p4NoRecipient = _p4Ninth = 0;
+            Array.Clear(_ovN, 0, Ovs); Array.Clear(_ovSimN, 0, Ovs); Array.Clear(_ovGold, 0, Ovs); Array.Clear(_ovSimGold, 0, Ovs);
+            _playerShortBuyN = 0; _playerShortBuyGold = 0;
             _fromNothing = _toNothing = 0; _overSpare = _freeShips = 0; _stumbles = 0;
             _r1Sim.Clear(); _r1Real.Clear(); _r4Sim.Clear(); _r4Real.Clear();
         }
@@ -208,7 +239,8 @@ namespace Armoury
         // ------------------------------------------------------------ nadwyzka portu (rozdz. 2 projektu)
         /// <summary>
         /// Nadwyzka portu = jedna funkcja nadwyzki osady E3/1 (Seal31.Spare - poprawka po recenzji 3.1+3.3: dotad osobna formula z tarcza dworu czytana
-        /// refleksja): kasa - zapas kupcow (10 000 + 12 x dobrobyt) - tarcza zoldu - tarcza dworu (SoldierPay.CourtOf), z zywej kasy, nie mniej niz 0.
+        /// refleksja): kasa - zapas kupcow (10 000 + 12 x dobrobyt) - tarcza zoldu - tarcza dworu (SoldierPay.CourtOf), z zywej kasy, nie mniej niz 0;
+        /// przy czynnym A1 (E5/A1, E5/B5) Seal31.Spare oddaje TownPurse.Spare - nadwyzka D4 ponad zapas kupcow TownPurse.Reserve (tarcze zbedne).
         /// Wyplaty 181 i E3/1 obnizaja kase, wiec obnizaja tez nadwyzke (licznik "wydane dzis" tylko w logu). Porty sa miastami - zamek i wies: 0.
         /// </summary>
         internal static long Spare(Settlement st)
@@ -238,6 +270,7 @@ namespace Armoury
                 else GiveGoldAction.ApplyForSettlementToParty(port, toParty, pay, false);
             }
             finally { InPortPay = false; }
+            PaidRun += pay;
             Add(_spent, port, pay);
             return pay;
         }
@@ -251,6 +284,31 @@ namespace Armoury
             var en = default(ExplainedNumber);
             t.AddEffectOfBuildings(BuildingEffectEnum.MaximumShipCount, ref en);   // ten sam limit co ShipProductionCampaignBehavior.GetMaxShipCountForTown
             return (int)en.ResultNumber;
+        }
+
+        /// <summary>
+        /// E5/B5 (recenzja 1, tylko pomiar): port ma juz co najmniej liczbe idealna stoczni NavalDLC (ShipProductionCampaignBehavior.GetIdealShipCountForTown
+        /// = max(limit - 2, 0)) - kupiony statek to nadmiar: DailyTickTown najpierw dorabia za darmo do limitu (szansa 0.5 na dobe), potem
+        /// TryRemoveExcessShipsFromTown kasuje statki ponad liczbe idealna (obce kadluby 70%, swoje 30% na statek). Miejsce w Gather zostaje do limitu
+        /// stoczni (wiazace "z miejscem do limitu stoczni") - zmiana na liczbe idealna to decyzja Jeffa (wiecej zlomu, mniej zlota dla lordow).
+        /// </summary>
+        private static bool OverIdeal(Town t, bool sim)
+        {
+            try
+            {
+                if (t == null || t.Settlement == null) return false;
+                int have = t.AvailableShips != null ? t.AvailableShips.Count : 0;
+                if (sim) { int x; if (_simShips.TryGetValue(t.Settlement, out x)) have += x; }
+                return have >= Math.Max(0, MaxShips(t) - 2);
+            }
+            catch (Exception e) { Stumble("OverIdeal", e); return false; }   // pomiar nie przerywa sprzedazy
+        }
+
+        private static void NoteOver(int path, bool sim, long gold)
+        {
+            if (gold <= 0) return;
+            if (sim) { _ovSimN[path]++; _ovSimGold[path] += gold; }
+            else { _ovN[path]++; _ovGold[path] += gold; }
         }
 
         private static int ShipyardLevel(Town t)
@@ -452,7 +510,12 @@ namespace Armoury
             {
                 var pk = Choose(ships[i], party.Party, clan, pos, true);
                 int pay = 0;
-                if (pk.Kind != PScrap) { pay = pk.Pay; Add(_simSpent, pk.T.Settlement, pay); Add(_simShips, pk.T.Settlement, 1); }
+                if (pk.Kind != PScrap)
+                {
+                    pay = pk.Pay;
+                    if (OverIdeal(pk.T, true)) NoteOver(OvLost, true, pay);   // przed dopisaniem statku do symulowanego stanu portu
+                    Add(_simSpent, pk.T.Settlement, pay); Add(_simShips, pk.T.Settlement, 1);
+                }
                 _r1Sim.Note(pk, pay);
                 _p1KindSim[kind] += pay;
             }
@@ -472,8 +535,10 @@ namespace Armoury
                 if (pk.Kind == PScrap) { _r1Real.Note(pk, 0); scrapped++; continue; }
                 var st = pk.T.Settlement;
                 if (pk.Pay > Spare(st)) _overSpare++;          // kontrolka (prog 0): Choose bierze najwyzej nadwyzke
+                bool over = OverIdeal(pk.T, false);            // pomiar (recenzja 1): stan portu przed przekazaniem
                 ChangeShipOwnerAction.ApplyByTransferring(st.Party, ship);   // ten sam wzor co DistributeShips (:82) - bezpieczny w tym zdarzeniu
                 int paid = PayFromPort(st, clan.Leader, null, pk.Pay);
+                if (over) NoteOver(OvLost, false, paid);
                 if (paid <= 0) _freeShips++;
                 _r1Real.Note(pk, paid);
                 _p1KindPaid[kind] += paid;
@@ -505,6 +570,7 @@ namespace Armoury
         internal sealed class Trade
         {
             public Trade Prev; public Settlement Port; public bool SellerPort, BuyerPort, Player; public int Who, Price, Pay;
+            public bool Over, SimOk;                        // pomiar (recenzja 1): port kupuje ponad liczbe idealna stoczni; przy WYL - port zaplacilby (bramka przepuscilaby)
         }
 
         private static Trade _trade;                        // kontekst biezacego ChangeShipOwnerAction.ApplyInternal (ApplyByTrade)
@@ -537,6 +603,8 @@ namespace Armoury
                 if (c.BuyerPort && c.Price > 0)
                 {
                     long spare = Spare(c.Port);
+                    c.Over = OverIdeal(c.Port.Town, false);
+                    c.SimOk = c.Who != WPlayer ? spare >= c.Price : spare > 0;
                     if (c.Who != WPlayer)
                     {
                         if (spare < c.Price)
@@ -552,7 +620,15 @@ namespace Armoury
                         if (!on && spare < c.Price) { _playerShortSimN++; _playerShortSim += c.Price - Math.Max(0L, spare); }
                     }
                 }
-                else if (c.SellerPort && on && _swap && _swapRejected) { _swapSkipN++; return false; }   // wymiana: sprzedaz starego odrzucona -> bez kupna (limit statkow druzyny)
+                else if (c.SellerPort && on)
+                {
+                    if (_swap && _swapRejected) { _swapSkipN++; return false; }   // wymiana: sprzedaz starego odrzucona -> bez kupna (limit statkow druzyny)
+                    // E5/B5 (recenzja 2): ekran portu wykonuje KUPNO przed SPRZEDAZA (PortScreenTradeModeHandler.OnConfirmChanges :176-186), a GetCanConfirm
+                    // sprawdza tylko saldo (kupno - sprzedaz <= zloto gracza). GiveGoldAction obcina zaplate do kiesy kupujacego (G GiveGoldAction :13),
+                    // statek i tak przechodzi - port dostalby mniej, a zaraz potem placi pelna cene sprzedazy z nadwyzki. Gracz bez calej ceny w kiesie,
+                    // z ktorej gra pobierze zaplate - kupno pominiete (statek zostaje w porcie; ten sam wzor co "port bez pieniedzy").
+                    if (c.Player && c.Price > 0 && BuyerGold(mp) < c.Price) { _playerShortBuyN++; _playerShortBuyGold += c.Price; MessageShortBuy(__1); return false; }
+                }
             }
             catch (Exception e) { Stumble("TradePrefix", e); return true; }
             _trade = c; __state = c;
@@ -567,6 +643,27 @@ namespace Armoury
         private static void MessageNoCoin(Settlement port)
         {
             try { MBInformationManager.AddQuickInformation(new TextObject("{=!}The port of " + port.Name + " has no spare coin to buy ships today.")); } catch { }
+        }
+
+        /// <summary>Kiesa, z ktorej gra pobierze cene kupna od portu (ChangeShipOwnerAction.ApplyInternal G :27-43): karawana / tabor - kiesa handlowa partii;
+        /// inaczej glowa rodu, potem wodz, na koncu kiesa handlowa.</summary>
+        private static long BuyerGold(MobileParty mp)
+        {
+            if (mp.IsCaravan || mp.IsVillager) return mp.PartyTradeGold;
+            var leader = mp.ActualClan != null ? mp.ActualClan.Leader : null;
+            if (leader != null) return leader.Gold;
+            if (mp.LeaderHero != null) return mp.LeaderHero.Gold;
+            return mp.PartyTradeGold;
+        }
+
+        private static void MessageShortBuy(Ship ship)
+        {
+            try
+            {
+                MBInformationManager.AddQuickInformation(new TextObject("{=!}You lack the coin to buy " + (ship != null && ship.Name != null ? ship.Name.ToString() : "this ship")
+                                                                        + " now - purchases are paid before sales. Sell first, then buy."));
+            }
+            catch { }
         }
 
         /// <summary>
@@ -635,6 +732,11 @@ namespace Armoury
 
         private static void NoteSell(Trade c, bool on, int amount, int paid)
         {
+            if (c.Over)
+            {
+                if (on) NoteOver(OvTrade, false, paid);
+                else if (c.SimOk) NoteOver(OvTrade, true, Math.Min(amount, c.Pay));   // WYL: port zaplacilby (bramka przepuscilaby, gracz najwyzej nadwyzke)
+            }
             _sellN[c.Who]++;
             if (!on) { _sellGold[c.Who] += amount; _fromNothing += amount; return; }
             _sellGold[c.Who] += paid; _sellViaPort += paid;
@@ -777,6 +879,7 @@ namespace Armoury
         /// <summary>
         /// Prefiks DestroyShipAction.Apply w kontekscie LootDefeatedPartyShips: statek niezabrany przez zwyciezcow. Bez zaplaty gry (flag false) - ginie
         /// jak dzis. Wylaczone - symulacja reguly. Wlaczone - statek do portu, port placi zwyciezcom wedlug wkladu; brak kupca - ginie.
+        /// Wrak (HitPoints &lt;= 0 - zniszczony uszkodzeniem po bitwie, poza podzialem gry) - ginie jak dzis, tylko licznik (E5/B5).
         /// </summary>
         public static bool DestroyPrefix(Ship __0)
         {
@@ -785,6 +888,10 @@ namespace Armoury
             bool moved = false;
             try
             {
+                // E5/B5 (sprawdzenie okien przed wlaczeniem): wrak - Ship.OnShipDamaged zniszczyl statek pokonanego przy uszkodzeniu po bitwie (MapEvent.cs:1773,
+                // Ship.cs:540-542), zanim gra zbudowala liste do podzialu (tylko HitPoints > 0f, :1774); gra za wrak nie placi - 181 go nie liczy jako pryz
+                // i nie sprzedaje (przy WL port placilby zwyciezcom ok. 0.45 wartosci, a stocznia naprawialaby go za darmo - ShipProduction OnShipOwnerChanged)
+                if (__0.HitPoints <= 0f) { _p4Wrecks++; return true; }
                 st.Sunk++; _p4Sunk++;
                 if (!st.Flag) { _p4NoPayN++; return true; }  // gra nikomu nie placi - statek ginie jak dzis (krytyka D11)
                 _p4PaidByGameN++;
@@ -793,7 +900,12 @@ namespace Armoury
                 if (!on)
                 {
                     int pay = 0;
-                    if (pk.Kind != PScrap) { pay = pk.Pay; Add(_simSpent, pk.T.Settlement, pay); Add(_simShips, pk.T.Settlement, 1); }
+                    if (pk.Kind != PScrap)
+                    {
+                        pay = pk.Pay;
+                        if (OverIdeal(pk.T, true)) NoteOver(OvPrize, true, pay);
+                        Add(_simSpent, pk.T.Settlement, pay); Add(_simShips, pk.T.Settlement, 1);
+                    }
                     _r4Sim.Note(pk, pay);
                     return true;
                 }
@@ -801,9 +913,11 @@ namespace Armoury
                 if (!AnyRecipient(st, pk.Pay)) { pk.Kind = PScrap; pk.Why = ZNoOne; _r4Real.Note(pk, 0); return true; }
                 var port = pk.T.Settlement;
                 if (pk.Pay > Spare(port)) _overSpare++;
+                bool over = OverIdeal(pk.T, false);
                 ChangeShipOwnerAction.ApplyByTransferring(port.Party, __0);
                 moved = true;
                 int paid = PayPrize(st, port, pk.Pay);
+                if (over) NoteOver(OvPrize, false, paid);
                 if (paid <= 0) _freeShips++;
                 _r4Real.Note(pk, paid);
                 return false;                               // statek zostaje w porcie
@@ -942,7 +1056,8 @@ namespace Armoury
                      + ", naprawa " + (_wPerkRepair ? _ilPerkRepair + "/1" : "NIE") + ", wymiana przy zakupie " + (_wSwap ? "tak" : "NIE") + ", wycena ekranu portu " + (_wUi ? "tak" : "NIE")
                      + ", pryzy " + (_wPrize && _wDestroy ? "tak" : "NIE") + (_miss.Count > 0 ? "; BRAK: " + string.Join("; ", _miss.ToArray()) : "")
                      + ". Wylaczniki: Ships To Port " + (s != null && s.ShipsToPort ? "WLACZONY" : "wylaczony") + ", Ship Trade Through Port " + (s != null && s.ShipTradeThroughPort ? "WLACZONY" : "wylaczony")
-                     + ", Ship Prizes To Port " + (s != null && s.ShipPrizesToPort ? "WLACZONY" : "wylaczony") + " (wylaczone = gra jak dotad, sam pomiar).");
+                     + ", Ship Prizes To Port " + (s != null && s.ShipPrizesToPort ? "WLACZONY" : "wylaczony") + " (E5/B5: domyslnie wlaczone; wylaczone = gra jak dotad, sam pomiar;"
+                     + " stan z chwili wpiecia - wartosci czynne w linii dziennej).");
         }
 
         /// <summary>Raz na sesje (pierwsza doba): stocznia NavalDLC i cudze latki na naszych metodach (inne mody - kolizje).</summary>
@@ -964,6 +1079,42 @@ namespace Armoury
             return "Statki (181) - start sesji: stocznia NavalDLC (GetShipyard) " + (_getShipyard != null ? "tak" : "NIE - poziom z limitu statkow")
                    + "; podmienione zaplaty: handel " + _ilTrade + "/8, premie " + _ilPerkTrade + "/1 + " + _ilPerkRepair + "/1; cudze latki na naszych metodach: "
                    + (others.Count > 0 ? string.Join(", ", others.ToArray()) : "brak") + ".";
+        }
+
+        /// <summary>
+        /// E5/B5 (projekt etapu 5 rozdz. 3 "E5/B5" Test: kasy portow ponizej zapasu nie dluzej niz 28 dob): miasta z portem i stocznia (poziom > 0 - te,
+        /// ktore Gather pyta o statki), nadwyzka ta sama co przy wyplacie (Spare -> Seal31.Spare; przy czynnym A1 D4 TownPurse). Serie dob bez nadwyzki -
+        /// pamiec sesji (po wczytaniu od 0, jak zaulki A1). Tylko odczyt; wyjatek przy jednym miescie - potkniecie (mechanizmu nie gasimy).
+        /// </summary>
+        private static void PortPurses(StringBuilder sb)
+        {
+            int ports = 0, dry = 0, max = 0, w7 = 0, w28 = 0; long spareAll = 0; string maxName = null;
+            var all = Town.AllTowns;
+            if (all != null)
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var t = all[i];
+                    try
+                    {
+                        if (t == null || t.Settlement == null) continue;
+                        var st = t.Settlement;
+                        if (!t.IsTown || !st.HasPort || ShipyardLevel(t) <= 0) { _dryStreak.Remove(st); continue; }
+                        ports++;
+                        long sp = Spare(st);
+                        int k; _dryStreak.TryGetValue(st, out k);
+                        if (sp <= 0) { k++; _dryStreak[st] = k; dry++; }
+                        else { k = 0; _dryStreak.Remove(st); spareAll += sp; }
+                        if (k >= 7) w7++;
+                        if (k >= 28) w28++;
+                        if (k > max) { max = k; maxName = st.Name != null ? st.Name.ToString() : st.StringId; }
+                    }
+                    catch (Exception e) { Stumble("PortPurses", e); }
+                }
+            sb.Append(" | kasy portow (miasta z portem i stocznia) ").Append(ports).Append(", nadwyzka ")
+              .Append(TownPurse.On ? "z D4 TownPurse (A1 czynne)" : "ze starej formuly (A1 nieczynne - kasa - 10 000 - 12 x dobrobyt - tarcze)")
+              .Append(": bez nadwyzki dzis ").Append(dry).Append(" (nadwyzka portow razem ").Append(spareAll).Append("), najdluzej bez nadwyzki ").Append(max)
+              .Append(" dob z rzedu (").Append(maxName ?? "-").Append("), >= 7 dob ").Append(w7).Append(", >= 28 dob ").Append(w28)
+              .Append(" (prog B5: najdluzej <= 28; pamiec sesji)");
         }
 
         // ============================================================ raz na dobe
@@ -1010,12 +1161,14 @@ namespace Armoury
                 sb.Append(" | 3. kupno statkow od portow (E3/11, dzis w nicosc").Append(t ? " - przy WL do kasy portu" : "").Append("):");
                 for (int w = 0; w < Whos; w++) sb.Append(w == 0 ? " " : ", ").Append(WhoName[w]).Append(' ').Append(_buyN[w]).Append(" / ").Append(_buyGold[w]);
                 if (_buyViaPort > 0) sb.Append("; do kas portow ").Append(_buyViaPort);
+                sb.Append("; gracz bez calej ceny w kiesie - kupno przed sprzedaza w jednym potwierdzeniu, pominiete (E5/B5) ").Append(_playerShortBuyN).Append(" / ").Append(_playerShortBuyGold);
                 sb.Append(" | premie zarzadcow portu (E3/11, dzis z niczego").Append(t ? " - przy WL z kasy portu" : "").Append("): za handel ").Append(_perkN[PkTrade]).Append(" / ").Append(_perkGold[PkTrade])
                   .Append(", za naprawe ").Append(_perkN[PkRepair]).Append(" / ").Append(_perkGold[PkRepair]);
                 if (_perkViaPort > 0 || _perkCut > 0) sb.Append("; z kas portow ").Append(_perkViaPort).Append(", niedoplacone (brak nadwyzki) ").Append(_perkCut);
                 // 4.
                 sb.Append(" | 4. pryzy z bitew morskich (E3/12): bitwy ").Append(_p4Battles).Append(", statki zatopione ").Append(_p4Sunk).Append(" (gra placi zwyciezcom za ").Append(_p4PaidByGameN)
-                  .Append(", bez placacego zwyciezcy ").Append(_p4NoPayN).Append("); zloto gry (dzis z niczego) ").Append(_p4Game).Append(" (w tym rod gracza ").Append(_p4GamePlayer).Append(')');
+                  .Append(", bez placacego zwyciezcy ").Append(_p4NoPayN).Append("), wraki po uszkodzeniu po bitwie (gra nie placi, 181 nie rusza - E5/B5) ").Append(_p4Wrecks)
+                  .Append("; zloto gry (dzis z niczego) ").Append(_p4Game).Append(" (w tym rod gracza ").Append(_p4GamePlayer).Append(')');
                 if (_p4Removed > 0) sb.Append(", zdjete z lupu zwyciezcow ").Append(_p4Removed);
                 if (_r4Sim.N > 0) sb.Append("; regula 181 - symulacja (bez zmian w grze): ").Append(_r4Sim.Text());
                 if (_r4Real.N > 0)
@@ -1025,6 +1178,17 @@ namespace Armoury
                 sb.Append(" | razem naprawde dzis: z niczego ").Append(_fromNothing).Append(", w nicosc ").Append(_toNothing).Append(", netto ").Append(_fromNothing - _toNothing)
                   .Append("; kasy portow wydaly (181) ").Append(spentAll).Append(" w ").Append(_spent.Count).Append(" portach, przyjely ").Append(_buyViaPort)
                   .Append("; wyplaty ponad nadwyzke ").Append(_overSpare).Append(" (prog 0), statki przekazane za 0 zl ").Append(_freeShips).Append(" (prog 0)");
+                // E5/B5 (recenzja 1): zakupy portow, przy ktorych port mial juz liczbe idealna stoczni (limit - 2) - nadmiar kasowany przez stocznie NavalDLC
+                sb.Append(" | zakupy portow ponad liczbe idealna stoczni (limit - 2; nadmiar kasuje NavalDLC TryRemoveExcessShipsFromTown nastepnej doby - obce 70%, swoje 30%;")
+                  .Append(" produkcja i tak dorabia do limitu za darmo): naprawde ").Append(_ovN[0] + _ovN[1] + _ovN[2]).Append(" / ").Append(_ovGold[0] + _ovGold[1] + _ovGold[2])
+                  .Append(" - rozbite druzyny ").Append(_ovN[OvLost]).Append(" / ").Append(_ovGold[OvLost]).Append(", sprzedaz portom ").Append(_ovN[OvTrade]).Append(" / ").Append(_ovGold[OvTrade])
+                  .Append(", pryzy ").Append(_ovN[OvPrize]).Append(" / ").Append(_ovGold[OvPrize]);
+                if (_ovSimN[0] + _ovSimN[1] + _ovSimN[2] > 0)
+                    sb.Append("; symulacja WYL ").Append(_ovSimN[0] + _ovSimN[1] + _ovSimN[2]).Append(" / ").Append(_ovSimGold[0] + _ovSimGold[1] + _ovSimGold[2])
+                      .Append(" - rozbite druzyny ").Append(_ovSimN[OvLost]).Append(" / ").Append(_ovSimGold[OvLost]).Append(", sprzedaz portom ").Append(_ovSimN[OvTrade]).Append(" / ").Append(_ovSimGold[OvTrade])
+                      .Append(", pryzy ").Append(_ovSimN[OvPrize]).Append(" / ").Append(_ovSimGold[OvPrize]);
+                // E5/B5: kasy portow (miasta z portem i stocznia - te, ktore Gather pyta) - bez nadwyzki dzis i serie dob z rzedu (prog projektu: <= 28 dob)
+                PortPurses(sb);
                 if (_stumbles > 0) sb.Append(" | wyjatki zlapane ").Append(_stumbles).Append(" (pierwszy z kazdego miejsca w logu jako ERROR)");
                 sb.Append('.');
                 Log.Info(sb.ToString());

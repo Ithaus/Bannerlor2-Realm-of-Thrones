@@ -274,6 +274,19 @@ namespace Armoury
             return y;
         }
 
+        /// <summary>E5/B2 (184, scalenie B - plan B1 pkt 6: korona dopisuje czlon w tej samej funkcji co podatki pana): podatek wojenny korony od zarobku okna
+        /// klasy `c` (ta sama podstawa co podatek pana) - KingdomTreasury.FolkWarTax (wojna, stawka s, bramka oblezenia KFolkWarTax, przelew do skarbca krolestwa)
+        /// najwyzej do stanu kiesy; tu zdjecie z kiesy tej klasy. Kiesa -> skarbiec (posiadacze H22/H23 -> H9), w bloku dobowym przed CrownIncome.Begin. Zwraca zaplacone.</summary>
+        private static long PayCrown(Folk f, int c, int cls, long earned)
+        {
+            if (earned <= 0) return 0;
+            int t = KingdomTreasury.FolkWarTax(f.St, cls, earned, Math.Max(0, PurseOf(f, c)));
+            if (t <= 0) return 0;
+            AddPurse(f, c, -t);
+            _ctlOut += t; f.LDayOut += t;
+            return t;
+        }
+
         /// <summary>Kiesa `c` osady -> pan osady (podatki od zarobku, farma gminy): ChangeHeroGold w try (wyjatek - nic nie schodzi), RentToday (D "ziemia",
         /// powinnosci 165, budowy). Bez zywego pana - do gminy (odbiorca zapasowy). Oblezona osada - zostaje (BesiegedPay KFolkDues). Zwraca zaplacone panu.</summary>
         private static long PayLord(Folk f, int c, long x, LDay d)
@@ -638,12 +651,14 @@ namespace Armoury
             var st = f.St; var town = st.Town;
             if (town == null) return;
             d.Towns++;
-            // ---- 1. podatki od zarobku okna: pan 1/2/3% (W/R/P), cech 1% R -> gmina (raz na dobe)
-            long tW = (long)Math.Round(f.EarnWin[0] * TaxW), tR = (long)Math.Round(f.EarnWin[1] * TaxR), tP = (long)Math.Round(f.EarnWin[2] * TaxP);
-            long guild = (long)Math.Round(f.EarnWin[1] * GuildR);
+            // ---- 1. podatki od zarobku okna: pan 1/2/3% (W/R/P), cech 1% R -> gmina (raz na dobe); E5/B2 korona 184 na wierzch (scalenie B)
+            long eW = f.EarnWin[0], eR = f.EarnWin[1], eP = f.EarnWin[2];
+            long tW = (long)Math.Round(eW * TaxW), tR = (long)Math.Round(eR * TaxR), tP = (long)Math.Round(eP * TaxP);
+            long guild = (long)Math.Round(eR * GuildR);
             Array.Clear(f.EarnWin, 0, 3);
             d.TaxW += PayLord(f, 0, tW, d); d.TaxR += PayLord(f, 1, tR, d); d.TaxP += PayLord(f, 2, tP, d);
             d.Guild += Move(f, 1, 3, guild);
+            PayCrown(f, 0, KingdomTreasury.WtW, eW); PayCrown(f, 1, KingdomTreasury.WtR, eR); PayCrown(f, 2, KingdomTreasury.WtP, eP);
             // ---- 2. z kasy do ludu (koszt sprzedazy - najwyzej stan kasy): robocizna handlu, obrot P, doplata do 35% wartosci wyrobow
             double svc = Unit(s.TownFolkServiceShare), cs = Unit(s.CourtFolkShare);
             double rf = Unit(s.TownFolkLabourFood), rg = Unit(s.TownFolkLabourGoods), ra = Unit(s.TownFolkLabourArms);
@@ -755,11 +770,13 @@ namespace Armoury
                 f.CourtCr = 0; Array.Clear(f.EarnWin, 0, 3); f.Offer[0] = 0; f.FacOk = false;
                 return;
             }
-            // ---- 1. pan 3% od zarobku okna
-            long tax = (long)Math.Round(f.EarnWin[0] * TaxC);
-            d.CInc += f.EarnWin[0];
+            // ---- 1. pan 3% od zarobku okna; E5/B2 korona 184 na wierzch (scalenie B)
+            long eC = f.EarnWin[0];
+            long tax = (long)Math.Round(eC * TaxC);
+            d.CInc += eC;
             Array.Clear(f.EarnWin, 0, 3);
             d.TaxC += PayLord(f, 0, tax, d);
+            PayCrown(f, 0, KingdomTreasury.WtCastle, eC);
             // ---- 2. robocizna z kasy zamku od sprzedazy zamku: 75% zycia i zalogi (jedzenie), 80% dworu, sprzedaz okna, towar podzamcza, zakupy wsi
             double svc = Unit(s.TownFolkServiceShare), cs = Unit(s.CourtFolkShare);
             double rf = Unit(s.TownFolkLabourFood), rg = Unit(s.TownFolkLabourGoods), ra = Unit(s.TownFolkLabourArms);
@@ -1230,8 +1247,11 @@ namespace Armoury
               .Append(", R14: ").Append(s.TownFolkSatisfactionFromBasket ? "tak" : "nie").Append(", zapasy startowe: ").Append(s.TownFolkStartReserves ? "tak" : "nie")
               .Append(" | niewolni: kultury osad z listy I1 (").Append(slaves).Append(" miast i zamkow)")
               .Append(" | kategorie \"lepsze\": ").Append(_betterText).Append(", zakupy wsi: ").Append(_villText)
-              .Append(" | klucze B: TownRentLordShare ").Append(F2(Unit(s.TownRentLordShare))).Append(", CrownRentWeight Town/Castle/Village ").Append(s.CrownRentWeightTown.ToString("0.##", Inv))
-              .Append("/").Append(s.CrownRentWeightCastle.ToString("0.##", Inv)).Append("/").Append(s.CrownRentWeightVillage.ToString("0.##", Inv))
+              // scalenie B (krok E5/B3): wartosci CZYNNE (LordsEvenUp - z wyrownaniem 0.5 i 2/1.5/0.25, bez - stare klucze), nie same klucze
+              .Append(" | klucze B: TownRentLordShare ").Append(F2(LordsEvenUp.TownLordShare(s))).Append(" (wyrownanie E5/B3 CastleLordsEvenUp ").Append(LordsEvenUp.Live ? "czynne" : s.CastleLordsEvenUp ? "nieczynne" : "wylaczone")
+              .Append("), CrownRentWeight Town/Castle/Village ").Append(LordsEvenUp.WeightTown(s).ToString("0.##", Inv))
+              .Append("/").Append(LordsEvenUp.WeightCastle(s).ToString("0.##", Inv)).Append("/").Append(LordsEvenUp.WeightVillage(s).ToString("0.##", Inv))
+              .Append(", WarTaxFromFolk (E5/B2) ").Append(s.WarTaxFromFolk ? "ON" : "OFF")
               .Append(", ShipsToPort/ShipTradeThroughPort/ShipPrizesToPort ").Append(s.ShipsToPort ? "ON" : "OFF").Append("/").Append(s.ShipTradeThroughPort ? "ON" : "OFF").Append("/").Append(s.ShipPrizesToPort ? "ON" : "OFF")
               .Append(" | zapasy startowe (flaga kampanii) miasta/zamki ").Append(_seedT).Append("/").Append(_seedC).Append(" (0 jeszcze nie, 1 z daru, 2 z nadwyzki, 3 wylaczone).");
             _lineState = sb.ToString();

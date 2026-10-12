@@ -3072,7 +3072,7 @@ namespace Armoury
         [SettingPropertyGroup("The town's purse")]
         public bool TownFolkBuyWithoutMinting { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Town Rent Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest - you and the AI alike (a town held outside any kingdom pays everything to its lord)")]
+        [SettingPropertyFloatingInteger("Town Rent Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest - you and the AI alike (a town held outside any kingdom pays everything to its lord). With Castle Lords Even Up while the townsfolk's purse is live, Town Rent Lord Share With Folk is used instead")]
         [SettingPropertyGroup("The town's purse")]
         public float TownRentLordShare { get; set; } = 0.67f;
 
@@ -3360,15 +3360,15 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRents { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Town", 0.00f, 12.00f, "0.00", HintText = "rent weight of a town (a castle 1, a village a quarter by default)")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Town", 0.00f, 12.00f, "0.00", HintText = "rent weight of a town (a castle 1, a village a quarter by default); with Castle Lords Even Up while the townsfolk's purse is live, Crown Rent Weight Town With Folk is used instead")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightTown { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Castle", 0.00f, 4.00f, "0.00", HintText = "rent weight of a castle")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Castle", 0.00f, 4.00f, "0.00", HintText = "rent weight of a castle; with Castle Lords Even Up while the townsfolk's purse is live, Crown Rent Weight Castle With Folk is used instead")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightCastle { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Village", 0.00f, 1.00f, "0.00", HintText = "rent weight of a village")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Village", 0.00f, 1.00f, "0.00", HintText = "rent weight of a village - the same with Castle Lords Even Up")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightVillage { get; set; } = 0.25f;
 
@@ -4504,21 +4504,57 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool BattlePlunderFromLoserOnly { get; set; } = true;
 
-        [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
+        [SettingPropertyBool("War Tax From Folk", HintText = "in war the crown also taxes the townsfolk's and castle folk's earnings, on top of the war subsidy from the merchants' and villages' spare coin - up to 3%, up to 6% under the War Tax policy, raised each week while the crown has to borrow or spend its old hoard to repay the war wages, lowered when it no longer has to; the higher it is, the less the people buy and the slower prosperity grows. Labourers pay half the rate, craftsmen the full rate, patricians one and a half; a besieged town or castle pays nothing. In peace nothing is taken and the rate falls back to nothing within four weeks. Only while the townsfolk's purse is live and the crown pays from its current income. You and the AI alike. Off = no war tax on the people, as before")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public bool WarTaxFromFolk { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("War Tax Max", 0.000f, 0.100f, "0.000", HintText = "highest war tax on the people's earnings while the realm has no War Tax policy (0.03 = 3%)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxMax { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("War Tax Max With Policy", 0.000f, 0.200f, "0.000", HintText = "highest war tax on the people's earnings while the realm has the War Tax policy (0.06 = 6%)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxMaxWithPolicy { get; set; } = 0.06f;
+
+        [SettingPropertyFloatingInteger("War Tax Step", 0.000f, 0.020f, "0.000", HintText = "how much the war tax rises, or falls, at each weekly reckoning of the crown's need (0.005 = half a point)")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public float WarTaxStep { get; set; } = 0.005f;
+
+        [SettingPropertyInteger("War Tax Reserve Days", 0, 364, "0", HintText = "the crown's war reserve is this many days of the wage refunds it has owed over the last 28 days (at least Crown Reserve Gold): a treasury below it raises the war tax, one twice above it - with no loan and no need to dip into the hoard for a week - lets it fall")]
+        [SettingPropertyGroup("The war tax on the people (stage 5)")]
+        public int WarTaxReserveDays { get; set; } = 60;
+
+        [SettingPropertyBool("Castle Lords Even Up", HintText = "while the townsfolk's purse is live, the crown evens up what it costs the lords of castles (the villagers then keep most of their market takings and spend them in the towns): a town's lord shares the town's daily dues half and half with the crown (Town Rent Lord Share With Folk) instead of keeping two thirds, and the crown shares out its rents by fixed fief weights that favour castles - a town 2, a castle 1.5, a village a quarter (Crown Rent Weight Town and Castle With Folk) instead of 3, 1 and a quarter. Never by the size of a garrison. You and the AI alike. Without the townsfolk's purse, or off = Town Rent Lord Share and the Crown Rent Weights, as before")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public bool CastleLordsEvenUp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Rent Lord Share With Folk", 0.00f, 1.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest (0.5 = half and half; a town held outside any kingdom pays everything to its lord)")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float TownRentLordShareWithFolk { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Town With Folk", 0.00f, 8.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: rent weight of a town (a castle Crown Rent Weight Castle With Folk, a village Crown Rent Weight Village)")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float CrownRentWeightTownWithFolk { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Castle With Folk", 0.00f, 6.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: rent weight of a castle")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float CrownRentWeightCastleWithFolk { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Ships To Port", HintText = "When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipsToPort { get; set; } = false;
+        public bool ShipsToPort { get; set; } = true;
 
         [SettingPropertyInteger("Ship Sale Ports Tried", 0, 12, "0", HintText = "how many nearest ports (first of the realm, then of realms at peace with the house) are asked for the full price of a lost or prize ship before the port with the most spare money pays what it can (0 counts as 1)")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public int ShipSalePortsTried { get; set; } = 3;
 
-        [SettingPropertyBool("Ship Trade Through Port", HintText = "Off until the war tax of stage 5 - see docs. Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before")]
+        [SettingPropertyBool("Ship Trade Through Port", HintText = "Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipTradeThroughPort { get; set; } = false;
+        public bool ShipTradeThroughPort { get; set; } = true;
 
-        [SettingPropertyBool("Ship Prizes To Port", HintText = "Off until the war tax of stage 5 - see docs. After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
+        [SettingPropertyBool("Ship Prizes To Port", HintText = "After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipPrizesToPort { get; set; } = false;
+        public bool ShipPrizesToPort { get; set; } = true;
 
         [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game unless Town Folk Live is on (then the purse is real coin); 0 also turns the live purse off")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -5737,6 +5773,15 @@ namespace Armoury
             s.RotSwapPayToPurse = RotSwapPayToPurse;
             s.LordPurseOnlyToVictor = LordPurseOnlyToVictor;
             s.BattlePlunderFromLoserOnly = BattlePlunderFromLoserOnly;
+            s.WarTaxFromFolk = WarTaxFromFolk;
+            s.WarTaxMax = WarTaxMax;
+            s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
+            s.WarTaxStep = WarTaxStep;
+            s.WarTaxReserveDays = WarTaxReserveDays;
+            s.CastleLordsEvenUp = CastleLordsEvenUp;
+            s.TownRentLordShareWithFolk = TownRentLordShareWithFolk;
+            s.CrownRentWeightTownWithFolk = CrownRentWeightTownWithFolk;
+            s.CrownRentWeightCastleWithFolk = CrownRentWeightCastleWithFolk;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

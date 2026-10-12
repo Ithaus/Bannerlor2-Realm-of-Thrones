@@ -50,6 +50,21 @@ Uzycie (Python 3, tylko odczyt):
                     Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
                     zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
                     z niczego 0 (RealPayer przed RBM; wyplaty INFO), pomiar G24/N3 (INFO; latka niewpieta = NIE).
+                    Blok E5/B2 (184, podatek wojenny ludu) B2-1..B2-14 - linia "Korona: podatek wojenny ludu (184)": codziennie i czytelna, wylacznik,
+                    165 i kiesa ludu (B1) czynna (K3), s nie ponad pulap, krok tygodnia zgodny z regula potrzeby (potrzeba -> w gore, luz i pokoj -> w dol), dlug 186
+                    d364 <= d182 (bieg roczny), zaleglosc 186 przy s < pulapu = 0, zwrot zoldu >= 70% naleznego (165), pobor czynny (> 0 przy s > 0
+                    w wojnie - kiesa ludu B1), Obieg = linia 184, bledy; wielkosc 184, wstrzymane w oblezeniu, wplywy korony - INFO.
+                    Blok E5/B3 (Z15-5, wyrownanie dla panow zamkow) B3-1..B3-10 - linia "Wyrownanie panow zamkow (E5/B3)": codziennie i czytelna,
+                    wyrownanie CZYNNE caly bieg zbioru B (wylacznik i kiesa ludu B1 - K3), zawor: udzial korony z kwot = 1 - udzial pana z linii (sr28),
+                    wartosci czynne zgodne z regula (czynne: klucze With Folk 1/2 i 2/1.5/0.25, nieczynne: klucze sprzed B3; wagi w linii "Renty korony (180)"
+                    te same), panowie samych zamkow (budzet-rodow.csv): udzial w D swiata >= 30% (prog glowny) i w D stalym 30-35% - srednia d252-364
+                    (bieg roczny, --do-doby 364; krotszy - INFO), mediana kiesy - srednia 4 blokow 28 dob (odczyt), renty dnia wedlug rodzaju rodu i gracz -
+                    INFO, bledy. A1-T8 bierze udzial pana z linii B3 tej doby (bez linii - klucz 0.67, 1/3 dla korony).
+                    Blok E5/B5 (181 ON, statki do portow) B5-1..B5-14 - linia "Statki (181)" z segmentem kas portow: codziennie i czytelna, trzy wylaczniki
+                    WL caly bieg zbioru B (WYL - pulapka MCM, K3), latki 181 w kazdej sesji, zloto z niczego / w nicosc sciezek 181 = 0, kontrolki prog 0,
+                    nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob z rzedu, pozycje statkow w ksiedze ("Pieniadz swiata - przyczyny") = 0,
+                    zgodnosc z A6 i pomiarami (A6, 164a, E5/0 - statki z niczego 0), bledy; wyplaty portow, zloto swiata, wraki i zakupy portow ponad
+                    liczbe idealna stoczni (B5-14, decyzja Jeffa) - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3182,6 +3197,34 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_aud(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_aud", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
+    wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
+    try:
+        if wtx:
+            etap5_b2(rep, lines, start, until, wtx)
+        else:
+            rep.add("E5/B2: linia Korona: podatek wojenny ludu (184)", "brak w logu", "jest od wgrania E5/B2 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B3 (Z15-5): wyrownanie dla panow zamkow - linia z dniem gry (klucz = dzien ksiegi, jak 165/180); bez linii (log sprzed B3) - INFO
+    eq = e4_series(lines, "Wyrownanie panow zamkow (E5/B3): dzien", 1)
+    try:
+        if eq:
+            etap5_b3(rep, lines, start, until, eq, logp, csvp)
+        else:
+            rep.add("E5/B3: linia Wyrownanie panow zamkow (E5/B3)", "brak w logu", "jest od wgrania E5/B3 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B5 (181 ON): statki do portow - linia "Statki (181)" (dzien ksiegi, jak "Pieniadz swiata") z segmentem kas portow E5/B5; log sprzed B5 - INFO
+    shp = by_day(lines, "Statki (181): dzien")
+    try:
+        if any("| kasy portow (miasta z portem i stocznia)" in x for x in shp.values()):
+            etap5_b5(rep, lines, start, until, shp)
+        else:
+            rep.add("E5/B5: linia Statki (181) z segmentem kas portow", "brak w logu" + (" (linie 181 sprzed B5)" if shp else ""),
+                    "jest od wgrania E5/B5 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3342,7 +3385,7 @@ def etap5_b1(rep, lines, start, until, logp):
             f"linii CZYNNA {len(st_on)}, NIECZYNNA {len(st_off)}; dob z linia {len(win)} (pelnych {len(full)}), brak w {len(miss)}" + (f" (d{', d'.join(str(x) for x in miss[:5])})" if miss else ""),
             "CZYNNA, A1 tak, linia kazdej doby 2-until; NIE, gdy bieg B bez kiesy czynnej", bool(st_on) and a1 and not st_off and len(miss) == 0 and len(win) > 0)
     if st_on:
-        rep.add("B1-T2b: klucze B w linii stanu (P K3)", _grp(r"klucze B: ([^|]+)", st_on[-1], 1).strip()[:200], "INFO (progi w blokach B3/B5)", None)
+        rep.add("B1-T2b: klucze B w linii stanu (P K3)", _grp(r"klucze B: ([^|]+)", st_on[-1], 1).strip()[:200], "INFO (wartosci czynne: przy wyrownaniu B3 0.50 i 2/1.5/0.25, bez - 0.67 i 3/1/0.25; statki B5 ON/ON/ON; progi w blokach B2/B3/B5)", None)
         rep.add("B1-T2c: stawki i przelaczniki (linia stanu)", (_grp(r"stawki: ([^|]+)", st_on[-1], 1).strip() + " | " + _grp(r"kotwica: ([^|]+)", st_on[-1], 1).strip())[:300], "INFO", None)
         rep.add("B1-T2d: kategorie lepsze i zakupy wsi (znalezione)", _grp(r"kategorie \"lepsze\": ([^|]+)", st_on[-1], 1).strip()[:200], "INFO (BRAK = lista do poprawy)", None)
     if not full:
@@ -3868,14 +3911,32 @@ def etap5_a1(rep, lines, start, until, logp):
         if m:
             vz[d] = [int(x) for x in m.groups()]
     off8 = [d for d in win if seg.get(d) and "zawor: NIE DZIALA" in seg[d]]
+    # E5/B3 (Z15-5): udzial pana czynny dzis z linii "Wyrownanie panow zamkow (E5/B3)" (dzien gry; ten sam blok dobowy co 169c) - przy wyrownaniu 1/2;
+    # doba bez linii B3 (log sprzed B3) - klucz 0.67. Oczekiwany udzial korony = srednia (1 - udzial pana) wazona podstawa LBk + K
+    b3l = e4_series(lines, "Wyrownanie panow zamkow (E5/B3): dzien", 1)
     if vz:
         badsum = [d for d, v in vz.items() if v[0] != v[1] + v[4]]
         k28 = sum(vz[d][4] for d in last28 if d in vz)
         lbk28 = sum(vz[d][3] for d in last28 if d in vz)
         ratio = k28 / (lbk28 + k28) if lbk28 + k28 > 0 else None
+        ew = en = 0.0
+        nb3 = 0
+        for d in last28:
+            if d not in vz:
+                continue
+            sh = fnum(r"\| zawor kas miast \(A1 [^)]*\): panu ([\d.]+)%", b3l.get(d))
+            if sh is not None:
+                nb3 += 1
+            base = vz[d][3] + vz[d][4]
+            ew += (1.0 - (sh / 100.0 if sh is not None else 0.67)) * base
+            en += base
+        exp8 = ew / en if en > 0 else 0.33
+        lo8, hi8 = exp8 - 0.01, exp8 + 0.01
+        rule8 = (f"0 dob; {lo8:.2f}-{hi8:.2f} (1 - udzial pana z linii E5/B3 w {nb3} dobach sr28, poza nimi klucz 0.67)" if nb3
+                 else "0 dob; 0.32-0.34 (1/3 - klucz 0.67)")
         rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony sr28 K / (LBk + K)",
                 f"D != L + K w {len(badsum)} z {len(vz)} dob; udzial korony " + (f"{ratio:.3f}" if ratio is not None else "-") + (f"; NIE DZIALA w {len(off8)} dobach" if off8 else ""),
-                "0 dob; 0.32-0.34 (1/3 - klucz 0.67)", len(badsum) == 0 and ratio is not None and 0.32 <= ratio <= 0.34 if live else None)
+                rule8, len(badsum) == 0 and ratio is not None and lo8 <= ratio <= hi8 if live else None)
     else:
         rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony", "brak liczb zaworu" + (f" (NIE DZIALA w {len(off8)} dobach - Population Rent Enabled?)" if off8 else ""),
                 "zawor czynny w biegu A", None if not live else False)
@@ -4630,6 +4691,514 @@ def etap5_a5(rep, lines):
     errs = [x for x in lines if x.startswith("ERROR in BeeGifts")]
     stm = max([num(r"potkniecia (\d+)", x, int, 0) or 0 for x in pays + gifts] + [num(r"E5/A5 \(prawdziwa.*?potkniecia (\d+)", x, int, 0) or 0 for x in camp] + [0])
     rep.add("E5/A5 A5-7: bledy BeeGifts, potkniecia", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
+
+
+def etap5_b2(rep, lines, start, until, wt):
+    """E5/B2 (184, PLAN 5.6 - podatek wojenny korony od zarobku ludu, R15 (b), NA WIERZCH daniny): projekt rozdz. 3 "E5/B2" Test (zbior B, z kiesa ludu B1).
+    Linia "Korona: podatek wojenny ludu (184): dzien N" (dzien gry; wt ma klucz = dzien ksiegi, jak 165) - po rentach 180, przed CrownIncome.End; na krolestwo
+    (oddzielone " ; "): s, pulap, wojna/pokoj, potrzeba K (kredyt 186 w 7 dobach) / Z (zwrot ponad wplywy dnia bez 1/360) / S (skarbiec < zapas wojny), luz,
+    krok tygodnia (doby gry podzielne przez 7), skarbiec, zapas wojny, dlug 186, ZALEGLOSC. Wiersze B2-1..B2-14 (progi projektu: s rosnie przy potrzebie,
+    dlug 186 d364 <= d182, bez zaleglosci przy s < pulapu, zwrot >= 70% naleznego w wojnie; wielkosc 184 - odczyt)."""
+    win = sorted(d for d in wt if 1 <= run_day(d, start) <= until)
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    kre = re.compile(r"^(.*?): s ([\d.]+)% / pulap ([\d.]+)%, (wojna|pokoj)(?:, potrzeba ([KZS]+))?(, luz)?(?:, krok ([+-]?[\d.]+) pkt)?, skarbiec (-?\d+) / zapas wojny (\d+)"
+                     r"(?:, dlug 186 (\d+))?(, ZALEGLOSC)?")
+    rows = {}
+    for d in win:
+        s = wt[d]
+        cap = re.search(r"\| pulap ([\d.]+)% \(z polityka War Tax ([\d.]+)%\), krok ([\d.]+) pkt", s)
+        sv = re.search(r"s krolestw w wojnie \(srednia, max\): ([\d.]+)%, ([\d.]+)% - krolestw w wojnie (\d+), z s > 0 (\d+), na pulapie (\d+); s > 0 w pokoju \(spada, bez poboru\) (\d+)", s)
+        tk = re.search(r"\| pobrano (\d+) zl \(ludzie miast (\d+): W (\d+), R (\d+), P (\d+); podzamcza (\d+)\), wolan poboru (\d+)", s)
+        hd = re.search(r"wstrzymane w oblezeniu (\d+) \((\d+)\)", s)
+        nd = re.search(r"potrzeba \(7 dob, krolestwa w wojnie\): kredyt 186 (\d+) krolestw, zwrot ponad wplywy (\d+), skarbiec < zapas wojny (\d+)", s)
+        if not (cap and sv and tk and hd and nd):
+            continue
+        ks = []
+        i = s.find("| na krolestwo: ")
+        if i >= 0:
+            seg = s[i + len("| na krolestwo: "):]
+            j = seg.rfind(" | potkniecia ")
+            seg = seg[:j] if j >= 0 else seg
+            if seg != "-":
+                for part in seg.split(" ; "):
+                    m = kre.match(part)
+                    if m:
+                        ks.append({"name": m.group(1), "s": float(m.group(2)), "cap": float(m.group(3)), "war": m.group(4) == "wojna", "need": m.group(5) or "",
+                                   "luz": bool(m.group(6)), "krok": float(m.group(7)) if m.group(7) is not None else None, "wallet": int(m.group(8)),
+                                   "reserve": int(m.group(9)), "debt": int(m.group(10)) if m.group(10) else 0, "arr": bool(m.group(11))})
+                    else:
+                        ks.append({"bad": part[:80]})
+        rows[d] = {"on": "wylacznik War Tax From Folk tak" in s, "inc": "165 Crown Current Income tak" in s, "folk": "kiesa ludu (B1) czynna" in s,
+                   "cap": float(cap.group(1)), "capP": float(cap.group(2)), "step": float(cap.group(3)),
+                   "avg": float(sv.group(1)), "max": float(sv.group(2)), "warK": int(sv.group(3)), "posK": int(sv.group(4)), "capK": int(sv.group(5)),
+                   "taken": int(tk.group(1)), "town": int(tk.group(2)), "castle": int(tk.group(6)), "calls": int(tk.group(7)),
+                   "held": int(hd.group(1)), "heldN": int(hd.group(2)), "nLoan": int(nd.group(1)), "nOver": int(nd.group(2)), "nLow": int(nd.group(3)),
+                   "stepDay": "krok tygodnia: dzis" in s, "ks": ks, "stum": num(r"\| potkniecia (\d+)\.", s, int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    bad = sum(1 for d in rows for k in rows[d]["ks"] if "bad" in k)
+    rep.add("E5/B2 B2-1: linia Korona: podatek wojenny ludu (184) codziennie (czytelna)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob; nieczytelnych wpisow krolestw {bad}",
+            "0 / 0 (LogEnabled)", (len(miss) == 0 and bad == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    off = [d for d in ds if not (rows[d]["on"] and rows[d]["inc"] and rows[d]["folk"])]
+    nofolk = len([d for d in ds if not rows[d]["folk"]])
+    rep.add("E5/B2 B2-2: wylacznik War Tax From Folk, 165 (Crown Current Income) i kiesa ludu (B1) czynna", f"wylaczone w {len(off)} z {len(ds)} dob (w tym kiesa ludu nieczynna {nofolk})"
+            + (f" (pierwsza {off[0]})" if off else ""),
+            "wlaczone caly bieg zbioru B (wylaczone albo kiesa nieczynna - s = 0 i pobor 0, jak przed paczka - K3)", len(off) == 0)
+    # B2-3: s nigdy ponad pulap krolestwa
+    over = [(d, k["name"]) for d in ds for k in rows[d]["ks"] if "bad" not in k and k["s"] > k["cap"] + 1e-6]
+    mx = max(rows[d]["max"] for d in ds)
+    rep.add("E5/B2 B2-3: s krolestwa nie ponad pulap (3% / 6% z War Tax)", f"przekroczen {len(over)}" + (f" (pierwsze {over[0]})" if over else "") + f"; s max w biegu {mx:.2f}%",
+            "0", len(over) == 0)
+    # B2-4: krok tygodnia zgodny z regula potrzeby (wojna i 165: potrzeba -> w gore az do pulapu; luz -> w dol; pokoj albo bez 165 -> w dol az do 0)
+    steps = [d for d in ds if rows[d]["stepDay"] and rows[d]["on"] and rows[d]["folk"]]
+    n_up = n_up_bad = n_down = n_down_bad = n_peace = n_peace_bad = 0
+    first_bad = None
+    for d in steps:
+        inc = rows[d]["inc"]
+        for k in rows[d]["ks"]:
+            if "bad" in k or k["krok"] is None:
+                continue
+            s0 = k["s"] - k["krok"]
+            if k["war"] and inc and k["need"]:
+                if s0 < k["cap"] - 1e-6:
+                    n_up += 1
+                    if not k["krok"] > 0:
+                        n_up_bad += 1
+                        first_bad = first_bad or (d, k["name"], "potrzeba bez wzrostu")
+            elif k["war"] and inc and k["luz"]:
+                if s0 > 1e-9:
+                    n_down += 1
+                    if not k["krok"] < 0:
+                        n_down_bad += 1
+                        first_bad = first_bad or (d, k["name"], "luz bez spadku")
+            elif (not k["war"] or not inc) and s0 > 1e-9:
+                n_peace += 1
+                if not k["krok"] < 0:
+                    n_peace_bad += 1
+                    first_bad = first_bad or (d, k["name"], "pokoj bez spadku")
+    rep.add("E5/B2 B2-4: s rosnie tydzien po potrzebie (K kredyt 186 / Z zwrot ponad wplywy / S skarbiec < zapas wojny), spada przy luzie i w pokoju",
+            f"krokow tygodnia {len(steps)}: potrzeba ponizej pulapu {n_up} (bez wzrostu {n_up_bad}), luz {n_down} (bez spadku {n_down_bad}), pokoj z s > 0 {n_peace} (bez spadku {n_peace_bad})"
+            + (f"; pierwsze odstepstwo {first_bad}" if first_bad else ""),
+            "0 odstepstw (projekt Test B2: kredyt 186 w tygodniu -> s tydzien pozniej wyzsze, az do pulapu)", (n_up_bad + n_down_bad + n_peace_bad == 0) if steps else None)
+    # B2-5: dlug 186 w drugim polroczu nie rosnie (d364 <= d182 na krolestwo w wojnie obu dob) - bieg roczny
+    rd = {run_day(d, start): d for d in ds}
+    if 182 in rd and 364 in rd:
+        a = {k["name"]: k for k in rows[rd[182]]["ks"] if "bad" not in k}
+        b = {k["name"]: k for k in rows[rd[364]]["ks"] if "bad" not in k}
+        both = [n for n in b if n in a and a[n]["war"] and b[n]["war"]]
+        up = [n for n in both if b[n]["debt"] > a[n]["debt"]]
+        rep.add("E5/B2 B2-5: dlug 186 d364 <= d182 (krolestwa w wojnie obu dob)", f"krolestw {len(both)}, dlug wzrosl u {len(up)}" + (f": {', '.join(up[:5])}" if up else ""),
+                "0 (bieg roczny zbioru B)", (len(up) == 0) if both else None)
+    else:
+        rep.add("E5/B2 B2-5: dlug 186 d364 <= d182", f"bieg do doby {max(rd) if rd else '-'}", "INFO - prog tylko w biegu rocznym (364 doby)", None)
+    # B2-6: brak zaleglosci 186 u krolestw w wojnie z s ponizej pulapu
+    arr = [(d, k["name"], k["s"], k["cap"]) for d in ds for k in rows[d]["ks"] if "bad" not in k and k["arr"] and k["war"] and k["s"] < k["cap"] - 1e-6]
+    narr = len(set(x[1] for x in arr))
+    rep.add("E5/B2 B2-6: zaleglosc 186 u krolestw w wojnie z s < pulapu (krolestwo-dni)", f"{len(arr)} (krolestw {narr})" + (f"; pierwsza {arr[0]}" if arr else ""),
+            "0 (inaczej s nie nadaza za potrzeba - krok albo pulap za maly)", len(arr) == 0)
+    # B2-7, B2-8: korona (165) - wplywy "nasze" i zwrot zoldu w wojnie
+    kor = e4_series(lines, "Korona: wplywy dnia (165): dzien", 1)
+    kd = [d for d in ds if d in kor]
+    w84 = [num(r"w tym podatek wojenny ludu \(184\) (\d+)", kor[d]) for d in kd]
+    o28 = [num(r"prawa trzecich \(178\) (\d+)", kor[d]) for d in _last28(kd)]
+    o28 = [x for x in o28 if x is not None]
+    rep.add("E5/B2 B2-7: korona - wplywy \"nasze\" 165 (sr28) i w tym podatek wojenny ludu",
+            (f"{st.mean(o28):.0f}/d" if o28 else "brak linii 165") + f"; 184 w liniach 165 razem {sum(x for x in w84 if x is not None)} (w liniach 184 razem {sum(rows[d]['taken'] for d in ds)})",
+            "INFO - prog: wplywy korony w wojnie po B >= bieg A (danina + 1/2 zaworu + 184 wobec danina + 1/3 zaworu) - porownanie z biegiem A", None)
+    gv = dv = 0
+    for d in kd:
+        m = re.search(r"zwrot zoldu (\d+) \(nalezny (\d+)", kor[d])
+        if m:
+            gv += int(m.group(1))
+            dv += int(m.group(2))
+    rep.add("E5/B2 B2-8: zwrot zoldu w wojnie / nalezny (okno, 165)", f"{gv} / {dv} = {100.0 * gv / dv:.1f}%" if dv else "brak naleznego (bez wojny)",
+            ">= 70%", (gv >= 0.7 * dv) if dv else None)
+    rep.add("E5/B2 B2-9: \"stac pelny\" przy s na pulapie (6%)", "doby z krolestwami na pulapie: " + str(len([d for d in ds if rows[d]["capK"] > 0])),
+            "INFO - prog projektu >= 95% swiat (z linii kiesy ludu B1 w tych dobach)", None)
+    # B2-10: pobor przy zarobku ludu czynny (kiesa ludu B1 wpieta) - w dobach z krolestwami w wojnie i s > 0
+    pd = [d for d in ds if rows[d]["posK"] > 0 and rows[d]["on"] and rows[d]["inc"] and rows[d]["folk"]]
+    tk = sum(rows[d]["taken"] for d in pd)
+    cl = sum(rows[d]["calls"] for d in pd)
+    rep.add("E5/B2 B2-10: pobor 184 czynny (doby z krolestwami w wojnie i s > 0)", f"dob {len(pd)}, pobrano {tk} zl, wolan poboru {cl}",
+            "> 0 (0 = pobor niewpiety w TownFolk.Earn - po scaleniu B1 musi byc > 0; kiesa nieczynna - s = 0, wiersz INFO, B2-2 NIE)", (tk > 0) if pd else None)
+    t28 = _last28(ds)
+    rep.add("E5/B2 B2-11: wielkosc 184 (sr28): pobrano / ludzie miast / podzamcza",
+            f"{st.mean(rows[d]['taken'] for d in t28):.0f} / {st.mean(rows[d]['town'] for d in t28):.0f} / {st.mean(rows[d]['castle'] for d in t28):.0f} zl/d"
+            + f"; s srednia {st.mean(rows[d]['avg'] for d in t28):.2f}%, max {max(rows[d]['max'] for d in t28):.2f}%"
+            + f"; potrzeba (sr28 krolestw): K {st.mean(rows[d]['nLoan'] for d in t28):.1f}, Z {st.mean(rows[d]['nOver'] for d in t28):.1f}, S {st.mean(rows[d]['nLow'] for d in t28):.1f}",
+            "INFO - odczyt, nie prog (wynika z potrzeby; [S] 30-60 tys./d)", None)
+    rep.add("E5/B2 B2-12: wstrzymane w oblezeniu (R22, suma okna)", f"{sum(rows[d]['held'] for d in ds)} zl ({sum(rows[d]['heldN'] for d in ds)} poborow)",
+            "INFO - oblezona osada nie placi (bramka BesiegedPay, rodzaj 184)", None)
+    # B2-13: Obieg (korona) = linia 184 tej samej doby (LastFolkWarTax)
+    obg = by_day(lines, "Obieg: dzien")
+    ncmp, diff = 0, []
+    for d in ds:
+        if d in obg:
+            v = num(r"podatek wojenny ludu \(184\) kiesy ludu -> skarbce (\d+)", obg[d])
+            if v is None:
+                continue
+            ncmp += 1
+            if v != rows[d]["taken"]:
+                diff.append(d)
+    rep.add("E5/B2 B2-13: Obieg (korona) = pobrano w linii 184 tej doby", f"porownanych dob {ncmp}, roznych {len(diff)}" + (f" (pierwsza {diff[0]})" if diff else ""),
+            "0 roznych", (len(diff) == 0) if ncmp else None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "KingdomTreasury.WarTax" in s]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B2 B2-14: bledy KingdomTreasury.WarTax, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
+
+
+def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
+    """E5/B3 (Z15-5, PLAN 5.7 - wyrownanie dla panow zamkow: R4 zawor kasy miasta pan 1/2 : korona 1/2, R16 renty korony wedlug wag lenn 2 / 1.5 / 0.25):
+    projekt rozdz. 3 "E5/B3" Test i rozdz. 4 (progi panow zamkow; zbior B, z kiesa ludu B1). Linia "Wyrownanie panow zamkow (E5/B3): dzien N" (dzien gry;
+    eq ma klucz = dzien ksiegi, jak 165/180) - po rentach 180. Wiersze B3-1..B3-10: linia, stan (czynne caly bieg B - K3), zawor (udzial korony z kwot =
+    1 - udzial pana z linii), wartosci czynne zgodne z regula i z linia 180, udzial panow samych zamkow w D swiata (prog glowny, srednia d252-364) i w D stalym
+    (30-35%), mediana kiesy (odczyt - srednia 4 blokow 28 dob), renty dnia wedlug rodzaju rodu, gracz, bledy."""
+    win = sorted(d for d in eq if 1 <= run_day(d, start) <= until)
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    r180 = e4_series(lines, "Renty korony (180): dzien", 1)
+    rst = re.compile(r"\| wylacznik Castle Lords Even Up (tak|nie), kiesa ludu \(B1\) (czynna|nieczynna) -> wyrownanie (CZYNNE|NIECZYNNE)")
+    rzv = re.compile(r"\| zawor kas miast \(A1 (czynny|nieczynny)[^)]*\): panu ([\d.]+)%, koronie ([\d.]+)% \(z wyrownaniem ([\d.]+)%, bez ([\d.]+)%")
+    rwg = re.compile(r"\| wagi rent korony \(180 (czynne|nieczynne)\): miasto ([\d.]+), zamek ([\d.]+), wies ([\d.]+) \(z wyrownaniem ([\d.]+) / ([\d.]+) / ([\d.]+),"
+                     r" bez ([\d.]+) / ([\d.]+) / ([\d.]+)\)")
+    rzd = re.compile(r"\| zawor dzis: panom (\d+) \(w krolestwach przed dekretem (\d+)\) \+ koronie (\d+)")
+    rrd = re.compile(r"\| renty korony dzis (\d+): rody samych zamkow (\d+) \(rodow (\d+), z renta (\d+); wag ([\d.]+)%, rent ([\d.]+)%\), rody z miastem (\d+)"
+                     r" \(rodow (\d+), z renta (\d+); wag ([\d.]+)%, rent ([\d.]+)%\), rod gracza (\d+) \(wag ([\d.]+)%\)")
+    rpl = re.compile(r"\| gracz: zawor \(czesc pana\) (\d+), renta (\d+)")
+    rows = {}
+    for d in win:
+        s = eq[d]
+        a, z, w, v, r, p = rst.search(s), rzv.search(s), rwg.search(s), rzd.search(s), rrd.search(s), rpl.search(s)
+        if not (a and z and w and v and r and p):
+            continue
+        rows[d] = {"key": a.group(1) == "tak", "folk": a.group(2) == "czynna", "live": a.group(3) == "CZYNNE",
+                   "valve": z.group(1) == "czynny", "lord": float(z.group(2)), "lordW": float(z.group(4)), "lordB": float(z.group(5)),
+                   "w": tuple(float(w.group(i)) for i in (2, 3, 4)), "wW": tuple(float(w.group(i)) for i in (5, 6, 7)), "wB": tuple(float(w.group(i)) for i in (8, 9, 10)),
+                   "rentsOn": w.group(1) == "czynne",
+                   "vLord": int(v.group(1)), "vBaseK": int(v.group(2)), "vCrown": int(v.group(3)),
+                   "rAll": int(r.group(1)), "rCastle": int(r.group(2)), "nCastle": int(r.group(3)), "pCastle": int(r.group(4)), "wCastle": float(r.group(5)),
+                   "shCastle": float(r.group(6)), "rTown": int(r.group(7)), "nTown": int(r.group(8)), "wTown": float(r.group(10)), "shTown": float(r.group(11)),
+                   "rPlayer": int(r.group(12)), "pValve": int(p.group(1)), "pRent": int(p.group(2)),
+                   "stum": num(r"\| potkniecia (\d+)\.", s, int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    rep.add("E5/B3 B3-1: linia Wyrownanie panow zamkow (E5/B3) codziennie (czytelna)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob" + (f" (pierwsza {miss[0]})" if miss else ""),
+            "0 (LogEnabled)", (len(miss) == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    # B3-2: wyrownanie czynne caly bieg zbioru B (K3: tylko z czynna kiesa ludu; nieczynne = udzial 2/3 i wagi 3/1/0.25 sprzed paczki)
+    off = [d for d in ds if not rows[d]["live"]]
+    nofolk = len([d for d in ds if not rows[d]["folk"]])
+    nokey = len([d for d in ds if not rows[d]["key"]])
+    rep.add("E5/B3 B3-2: wyrownanie CZYNNE (wylacznik Castle Lords Even Up i kiesa ludu B1 czynna)",
+            f"nieczynne w {len(off)} z {len(ds)} dob (kiesa ludu nieczynna {nofolk}, wylacznik wylaczony {nokey})" + (f" (pierwsza {off[0]})" if off else ""),
+            "czynne caly bieg zbioru B (nieczynne - zawor 2/3 i wagi 3/1/0.25 jak przed paczka - K3)", len(off) == 0)
+    # B3-3: zawor - udzial korony z kwot dnia = 1 - udzial pana z linii (doby z czynnym wyrownaniem i zaworem A1, ostatnie 28 takich dob)
+    vd = [d for d in ds if rows[d]["live"] and rows[d]["valve"] and rows[d]["vBaseK"] + rows[d]["vCrown"] > 0][-28:]
+    if vd:
+        kk = sum(rows[d]["vCrown"] for d in vd)
+        bb = sum(rows[d]["vBaseK"] + rows[d]["vCrown"] for d in vd)
+        ex = sum((1.0 - rows[d]["lord"] / 100.0) * (rows[d]["vBaseK"] + rows[d]["vCrown"]) for d in vd) / bb
+        q = kk / bb
+        rep.add("E5/B3 B3-3: zawor kas miast - udzial korony K / (LBk + K) przy wyrownaniu (sr28 dob czynnych)",
+                f"{q:.3f} wobec {ex:.3f} (1 - udzial pana z linii; {len(vd)} dob; koronie {kk}, podstawa {bb})",
+                "+-0.01 (Z15-5: 1/2 - korona 0.49-0.51 przy kluczu 0.5)", abs(q - ex) <= 0.01)
+    else:
+        rep.add("E5/B3 B3-3: zawor kas miast - udzial korony przy wyrownaniu", "brak dob z czynnym wyrownaniem i zaworem A1 (z poborem)",
+                "+-0.01 wobec 1 - udzial pana (zbior B)", None)
+    # B3-4: wartosci czynne zgodne z regula (czynne - klucze With Folk, nieczynne - klucze sprzed B3) i wagi w linii 180 te same co w linii B3
+    bad4 = []
+    n180 = 0
+    for d in ds:
+        x = rows[d]
+        want_l, want_w = (x["lordW"], x["wW"]) if x["live"] else (x["lordB"], x["wB"])
+        if abs(x["lord"] - want_l) > 0.05 or any(abs(a - b) > 1e-6 for a, b in zip(x["w"], want_w)):
+            bad4.append((d, "regula"))
+            continue
+        s180 = r180.get(d)
+        if s180:
+            m = re.search(r"\| wagi: miasto ([\d.]+), zamek ([\d.]+), wies ([\d.]+) \(E5/B3: (z wyrownaniem|bez wyrownania)\)", s180)
+            if m:
+                n180 += 1
+                if any(abs(float(m.group(i + 1)) - x["w"][i]) > 1e-6 for i in range(3)) or (m.group(4) == "z wyrownaniem") != x["live"]:
+                    bad4.append((d, "linia 180"))
+    lv = [d for d in ds if rows[d]["live"]]
+    last = rows[ds[-1]]
+    rep.add("E5/B3 B3-4: wartosci czynne zgodne z regula; wagi w linii Renty korony (180) = linia B3",
+            f"niezgodnych {len(bad4)} z {len(ds)} dob (porownanych z 180: {n180})" + (f" (pierwsza {bad4[0]})" if bad4 else "")
+            + f"; ostatnia doba: panu {last['lord']:.1f}%, wagi {last['w'][0]:g} / {last['w'][1]:g} / {last['w'][2]:g} ({'z wyrownaniem' if last['live'] else 'bez wyrownania'})",
+            "0 (czynne: 50% i 2 / 1.5 / 0.25 przy domyslnych; nieczynne: 67% i 3 / 1 / 0.25)", len(bad4) == 0)
+    # B3-5..B3-7: panowie samych zamkow (budzet-rodow.csv; rodzaj "zamek" = rod z zamkami bez miasta, gracz poza)
+    csvp = csvp or (csv_path_of(logp) if logp else None)
+    crow = read_csv(csvp) if csvp else []
+    if not crow:
+        rep.add("E5/B3 B3-5..B3-7: panowie samych zamkow (budzet-rodow.csv)", f"brak {csvp}", "udzial w D swiata >= 30% (d252-364)", None)
+    else:
+        byd = {}
+        for r in crow:
+            try:
+                byd.setdefault(int(r.get("dzien") or 0), []).append(r)
+            except ValueError:
+                continue
+        cd = sorted(d for d in byd if 1 <= run_day(d, start) <= until)
+        wd = [d for d in cd if 252 <= run_day(d, start) <= 364]
+        # werdykt TAK/NIE tylko przy calym oknie d252-364 (113 dob CSV; luz na kilka brakujacych dob i koniec biegu tuz przed d364); okno niepelne
+        # (bieg przerwany, --do-doby < 364) = odczyt INFO z dob okna, a bez 28 dob okna - z ostatnich 28 dob biegu
+        full = len(wd) >= 100 and run_day(wd[-1], start) >= 360
+        use = wd if len(wd) >= 28 else cd[-28:]
+        short = ("" if full else
+                 (f" - okno niepelne ({len(wd)} z 113 dob d252-364; bieg przerwany albo --do-doby < 364): odczyt" if len(wd) >= 28
+                  else " - bieg krotszy niz 279 dob (--do-doby 364): odczyt ostatnich 28 dob"))
+
+        def fv(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        shD, shS = [], []
+        for d in use:
+            tD = tS = zD = zS = 0.0
+            for r in byd[d]:
+                D, S = fv(r.get("D")) or 0.0, fv(r.get("d_staly")) or 0.0
+                tD += D
+                tS += S
+                if r.get("rodzaj") == "zamek":
+                    zD += D
+                    zS += S
+            if tD:
+                shD.append(zD / tD)
+            if tS:
+                shS.append(zS / tS)
+        mD, mS = _mean(shD), _mean(shS)
+        span = f"doby {run_day(use[0], start)}-{run_day(use[-1], start)}" if use else "-"
+        rep.add("E5/B3 B3-5: udzial panow samych zamkow w D swiata (srednia d252-364) - PROG GLOWNY",
+                (f"{mD * 100:.1f}%" if mD is not None else "-") + f" ({span})" + short,
+                ">= 30% (bieg A z31 d93-120: 30.1%)", (mD is not None and mD >= 0.30) if full else None)
+        rep.add("E5/B3 B3-6: udzial panow samych zamkow w D stalym (srednia d252-364)",
+                (f"{mS * 100:.1f}%" if mS is not None else "-") + f" ({span})" + short,
+                "30-35% (bieg A z31: 24.3%)", (mS is not None and 0.30 <= mS <= 0.35) if full else None)
+        # B3-7 (odczyt, v2 E5K1-10): zmiana mediany kiesy glowy w 4 blokach po 28 dob (d252-279, 280-307, 308-335, 336-363); tylko rody, ktorych krolestwo bylo
+        # w wojnie >= 21 z 28 dob bloku; srednia blokow >= -2% - przy niezdanym, a B3-5 zdanym, B3 nie jest wylaczane (rozrzut blokow dzis 16 pkt)
+        blocks = []
+        for b in range(4):
+            lo = 252 + 28 * b
+            bd = [d for d in cd if lo <= run_day(d, start) <= lo + 27]
+            if len(bd) < 21:
+                continue
+            war = {}
+            for d in bd:
+                for r in byd[d]:
+                    if r.get("rodzaj") == "zamek" and r.get("wojna") == "1":
+                        war[r.get("rod_id")] = war.get(r.get("rod_id"), 0) + 1
+            need = min(21, max(1, len(bd) * 3 // 4))
+            ids = {k for k, n in war.items() if n >= need}
+
+            def med(d):
+                ks = sorted(k for k in (fv(r.get("kiesa_glowy")) for r in byd[d] if r.get("rodzaj") == "zamek" and r.get("rod_id") in ids) if k is not None)
+                return ks[len(ks) // 2] if ks else None
+            m0, m1 = med(bd[0]), med(bd[-1])
+            if m0 and m1 is not None:
+                blocks.append((lo, (m1 / m0 - 1) * 100, len(ids)))
+        if blocks:
+            mb = _mean([x[1] for x in blocks])
+            rep.add("E5/B3 B3-7: mediana kiesy panow samych zamkow w wojnie - srednia zmiany w blokach 28 dob d252-364 (odczyt)",
+                    f"{mb:+.1f}% (bloki: " + ", ".join(f"d{x[0]} {x[1]:+.1f}% ({x[2]} rodow)" for x in blocks) + f"); >= -2%: {'tak' if mb >= -2 else 'nie'}",
+                    "INFO - odczyt >= -2% (prog glowny B3-5; z31 d93-120: -2.5%)", None)
+        else:
+            rep.add("E5/B3 B3-7: mediana kiesy panow samych zamkow (bloki 28 dob d252-364)", "brak pelnych blokow (bieg krotszy niz 279 dob)", "INFO - odczyt (bieg roczny)", None)
+    # B3-8: renty dnia wedlug rodzaju rodu (sr28) - czy wyrownanie trafia do panow samych zamkow
+    t28 = _last28(lv if lv else ds)
+    rep.add("E5/B3 B3-8: renty korony dnia - rody samych zamkow: udzial w rentach / w wagach (sr28" + (" dob z wyrownaniem" if lv else ", wyrownanie nieczynne") + ")",
+            f"renty {st.mean(rows[d]['rAll'] for d in t28):.0f}/d, rodom samych zamkow {st.mean(rows[d]['rCastle'] for d in t28):.0f}/d"
+            f" ({st.mean(rows[d]['shCastle'] for d in t28):.1f}% rent, {st.mean(rows[d]['wCastle'] for d in t28):.1f}% wag), rodom z miastem"
+            f" {st.mean(rows[d]['shTown'] for d in t28):.1f}% rent / {st.mean(rows[d]['wTown'] for d in t28):.1f}% wag",
+            "INFO - renta wedlug wag lenn za sluzbe (udzial rent < udzial wag = rody bez warunku albo krolestwa bez reszty po zwrocie)", None)
+    rep.add("E5/B3 B3-9: gracz - ta sama regula (suma okna): zawor (czesc pana) / renta",
+            f"{sum(rows[d]['pValve'] for d in ds)} / {sum(rows[d]['pRent'] for d in ds)} zl",
+            "INFO - zawor jego miast i renta jego rodu jak u AI (decyzja Jeffa 09.10 E)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "LordsEvenUp" in s]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B3 B3-10: bledy LordsEvenUp, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
+
+
+def _b5_segs(s):
+    """Linia "Statki (181)" -> {klucz segmentu: tekst}; segmenty rozdziela " | " (kod ShipsToPort181.Daily)."""
+    out = {}
+    for seg in s.split(" | ")[1:]:
+        for key, pre in (("sw", "wylaczniki:"), ("p1", "1. "), ("p2", "2. "), ("p3", "3. "), ("pk", "premie zarzadcow"), ("p4", "4. "),
+                         ("tot", "razem naprawde dzis"), ("ov", "zakupy portow ponad liczbe idealna stoczni"), ("pp", "kasy portow (miasta z portem i stocznia)"),
+                         ("err", "wyjatki zlapane")):
+            if seg.startswith(pre):
+                out[key] = seg
+                break
+    return out
+
+
+def etap5_b5(rep, lines, start, until, sh):
+    """E5/B5 (181 ON, PLAN 3.3): projekt etapu 5 rozdz. 3 "E5/B5" Test (zbior B) i rozdz. 5.2 pkt 9 (K3: bieg B ze statkami OFF = blad). Linia "Statki (181): dzien N"
+    (dzien ksiegi, jak "Pieniadz swiata") z segmentem E5/B5 "kasy portow". Wiersze B5-1..B5-14: linia, trzy wylaczniki WL caly bieg, latki, zloto z niczego / w nicosc
+    sciezek 181 = 0, kontrolki prog 0, nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob, pozycje statkow w ksiedze = 0, zgodnosc z A6 i pomiarami
+    (164a, E5/0) = 0, wyplaty portow / zloto swiata / wraki - INFO, bledy; B5-14 (po recenzji) zakupy portow ponad liczbe idealna stoczni i gracz bez ceny kupna - INFO."""
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    win = sorted(d for d in sh if 1 <= run_day(d, start) <= until)
+    rsw = re.compile(r"do portu \(Ships To Port\) (WL|WYL), handel przez kase portu \(Ship Trade Through Port\) (WL|WYL), pryzy do portu \(Ship Prizes To Port\) (WL|WYL)")
+    rtot = re.compile(r"z niczego (-?\d+), w nicosc (-?\d+), netto (-?\d+); kasy portow wydaly \(181\) (\d+) w (\d+) portach, przyjely (\d+); wyplaty ponad nadwyzke (\d+) \(prog 0\),"
+                      r" statki przekazane za 0 zl (\d+) \(prog 0\)")
+    rpp = re.compile(r"kasy portow \(miasta z portem i stocznia\) (\d+), nadwyzka (z D4 TownPurse \(A1 czynne\)|ze starej formuly[^:]*): bez nadwyzki dzis (\d+)"
+                     r" \(nadwyzka portow razem (\d+)\), najdluzej bez nadwyzki (\d+) dob z rzedu \((.*?)\), >= 7 dob (\d+), >= 28 dob (\d+)")
+    rreal = re.compile(r"regula 181 - naprawde: statkow (\d+): nalezne (\d+), zaplacone (\d+)")
+    rscrap = re.compile(r"zlom: brak portu z miejscem (\d+), brak pieniedzy (\d+)")
+    rows = {}
+    for d in win:
+        s = sh[d]
+        g = _b5_segs(s)
+        a, t, p = rsw.search(g.get("sw", "")), rtot.search(g.get("tot", "")), rpp.search(g.get("pp", ""))
+        if not (a and t and p):
+            continue
+        r1, r4 = rreal.search(g.get("p1", "")), rreal.search(g.get("p4", ""))
+        s1, s4 = rscrap.search(g.get("p1", "")), rscrap.search(g.get("p4", ""))
+        rows[d] = {"lost": a.group(1) == "WL", "trade": a.group(2) == "WL", "prize": a.group(3) == "WL",
+                   "from": int(t.group(1)), "to": int(t.group(2)), "spent": int(t.group(4)), "nports": int(t.group(5)), "took": int(t.group(6)),
+                   "over": int(t.group(7)), "free": int(t.group(8)),
+                   "ports": int(p.group(1)), "d4": p.group(2).startswith("z D4"), "dry": int(p.group(3)), "spare": int(p.group(4)), "streak": int(p.group(5)),
+                   "streakName": p.group(6), "w28": int(p.group(8)),
+                   "paid1": int(r1.group(3)) if r1 else 0, "due1": int(r1.group(2)) if r1 else 0, "paid4": int(r4.group(3)) if r4 else 0, "due4": int(r4.group(2)) if r4 else 0,
+                   "noMoney": (int(s1.group(2)) if s1 else 0) + (int(s4.group(2)) if s4 else 0),
+                   "game1": num(r"zloto gry \(dzis z niczego[^)]*\) (\d+) - wedlug", g.get("p1", ""), int, 0) or 0,
+                   "removed4": num(r"zdjete z lupu zwyciezcow (\d+)", g.get("p4", ""), int, 0) or 0,
+                   "sell2": num(r"; z kas portow (\d+)", g.get("p2", ""), int, 0) or 0,
+                   "buy3": num(r"; do kas portow (\d+)", g.get("p3", ""), int, 0) or 0,
+                   "wrecks": num(r"wraki po uszkodzeniu po bitwie \(gra nie placi, 181 nie rusza - E5/B5\) (\d+)", g.get("p4", ""), int, 0) or 0,
+                   "hasOv": "ov" in g,
+                   "ovN": num(r"\): naprawde (\d+) / \d+", g.get("ov", ""), int, 0) or 0,
+                   "ovGold": num(r"\): naprawde \d+ / (\d+)", g.get("ov", ""), int, 0) or 0,
+                   "shortBuy": num(r"kupno przed sprzedaza w jednym potwierdzeniu, pominiete \(E5/B5\) (\d+)", g.get("p3", ""), int, 0) or 0,
+                   "stum": num(r"wyjatki zlapane (\d+)", g.get("err", ""), int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    rep.add("E5/B5 B5-1: linia Statki (181) codziennie (czytelna, z segmentem kas portow E5/B5)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob" + (f" (pierwsza {miss[0]})" if miss else ""),
+            "0 (LogEnabled)", (len(miss) == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    # B5-2: trzy wylaczniki WL caly bieg zbioru B (K3: bieg B ze statkami OFF - blad)
+    off = [d for d in ds if not (rows[d]["lost"] and rows[d]["trade"] and rows[d]["prize"])]
+    rep.add("E5/B5 B5-2: wylaczniki Ships To Port, Ship Trade Through Port, Ship Prizes To Port WLACZONE",
+            f"ktorys WYL w {len(off)} z {len(ds)} dob (do portu WYL {sum(1 for d in ds if not rows[d]['lost'])}, handel WYL {sum(1 for d in ds if not rows[d]['trade'])},"
+            f" pryzy WYL {sum(1 for d in ds if not rows[d]['prize'])})" + (f" (pierwsza {off[0]})" if off else ""),
+            "WL caly bieg zbioru B (WYL = MCM/Armoury.json z wartoscia sprzed B5 - pulapka MCM)", len(off) == 0)
+    # B5-3: latki (linia startowa kazdej sesji) i cudze latki na naszych metodach
+    stl = [s for s in lines if s.startswith("Statki (181): latki - ")]
+    hk = [s for s in lines if s.startswith("Statki (181) - start sesji:")]
+    bad3 = [s for s in stl if ("BRAK" in s or " NIE" in s.split(". Wylaczniki")[0] or "podmienione zaplaty 8/8" not in s
+                               or "handel 1/1" not in s or "naprawa 1/1" not in s)]
+    foreign = sorted({_grp(r"cudze latki na naszych metodach: (.*?)\.$", s, 1) for s in hk})
+    rep.add("E5/B5 B5-3: latki 181 wpiete (linia startowa kazdej sesji: 10 latek, podmienione zaplaty 8/8 + 1/1 + 1/1)",
+            f"sesji {len(stl)}, z brakiem {len(bad3)}; cudze latki na naszych metodach: {', '.join(foreign) if foreign else '-'}",
+            "0 sesji z brakiem (BRAK/NIE = gra albo NavalDLC inne niz 1.4.8 - wylaczyc B5)", (len(bad3) == 0) if stl else None)
+    on = [d for d in ds if rows[d]["lost"] and rows[d]["trade"] and rows[d]["prize"]]
+    # B5-4: zloto z niczego / w nicosc sciezek 181 przy trzech WL = 0 (wyjatek w sprzedazy oddaje grze - licznik B5-13)
+    f4 = sum(rows[d]["from"] for d in on)
+    t4 = sum(rows[d]["to"] for d in on)
+    rep.add("E5/B5 B5-4: sciezki statkow - zloto z niczego / w nicosc przy trzech WL (suma dob WL)", f"{f4} / {t4} ({len(on)} dob)",
+            "0 / 0 (R18: rozbita druzyna, handel z portem i pryzy przez kase portu)", (f4 == 0 and t4 == 0) if on else None)
+    # B5-5: kontrolki prog 0
+    ov, fr = sum(rows[d]["over"] for d in ds), sum(rows[d]["free"] for d in ds)
+    rep.add("E5/B5 B5-5: kontrolki - wyplaty ponad nadwyzke portu / statki przekazane za 0 zl (suma)", f"{ov} / {fr}", "0 / 0", ov == 0 and fr == 0)
+    # B5-6: porty placa z nadwyzki D4 (A1) - caly bieg
+    nod4 = [d for d in ds if not rows[d]["d4"]]
+    rep.add("E5/B5 B5-6: nadwyzka portow = D4 TownPurse (A1 czynne)", f"stara formula w {len(nod4)} z {len(ds)} dob" + (f" (pierwsza {nod4[0]})" if nod4 else ""),
+            "D4 caly bieg (projekt R18: porty z TownPurse.Spare)", len(nod4) == 0)
+    # B5-7: kasy portow bez nadwyzki (kasa <= zapas kupcow) nie dluzej niz 28 dob z rzedu
+    worst = max(ds, key=lambda d: rows[d]["streak"])
+    t28 = _last28(ds)
+    rep.add("E5/B5 B5-7: kasy portow bez nadwyzki - najdluzsza seria dob z rzedu (pamiec sesji)",
+            f"{rows[worst]['streak']} dob ({rows[worst]['streakName']}, dzien {worst}); portow {rows[ds[-1]]['ports']}, bez nadwyzki sr28 {st.mean(rows[d]['dry'] for d in t28):.1f},"
+            f" >= 28 dob maks. {max(rows[d]['w28'] for d in ds)}; nadwyzka portow razem sr28 {st.mean(rows[d]['spare'] for d in t28):.0f}",
+            "<= 28 dob (projekt E5/B5 Test)", rows[worst]["streak"] <= 28)
+    # B5-8: pozycje statkow w ksiedze pieniadza (Pieniadz swiata - przyczyny) przy trzech WL = 0
+    bal = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    zs = zo = uk = uo = 0
+    nb = 0
+    for d in on:
+        s = bal.get(d)
+        if not s:
+            continue
+        segs = s.split(" | ")
+        zr = next((x for x in segs if x.startswith("ZRODLA")), "")
+        uj = next((x for x in segs if x.startswith("UJSCIA")), "")
+        zs += num(r"statki: sprzedaz osadom i premie zarzadcow (-?\d+)", zr, int, 0) or 0
+        zo += num(r"statki NavalDLC inne (-?\d+)", zr, int, 0) or 0
+        uk += num(r"statki: kupno od osad (-?\d+)", uj, int, 0) or 0
+        uo += num(r"statki NavalDLC inne (-?\d+)", uj, int, 0) or 0
+        nb += 1
+    rep.add("E5/B5 B5-8: ksiega - ZRODLA statki (sprzedaz osadom i premie; NavalDLC inne) / UJSCIA statki (kupno od osad; NavalDLC inne), doby trzech WL",
+            f"{zs} + {zo} / {uk} + {uo} ({nb} dob)", "0 / 0 (bieg E4 bez B5: ok. 0.4 mln/d z niczego)", (zs == 0 and zo == 0 and uk == 0 and uo == 0) if nb else None)
+    # B5-9: zgodnosc z A6 i pomiarami (dopisek pryzow zdjety przed rozliczeniem A6 i finalizerem 164a; zwrot 164a bez wyplat portow)
+    a6 = by_day(lines, "Lup w bitwie (A6): dzien")
+    m164 = by_day(lines, "Szczelnosc (164a): dzien")
+    b50 = by_day(lines, "Bitwy (E5/0): dzien")
+    pa6 = p164 = r164 = p50 = 0
+    n9 = 0
+    for d in ds:
+        x = rows[d]
+        if x["prize"]:
+            if d in a6:
+                pa6 += num(r"wyplacone z niczego (\d+)", a6[d], int, 0) or 0
+                n9 += 1
+            if d in m164:
+                p164 += num(r"bitwach morskich \(PlunderedGold\) (-?\d+)", m164[d], int, 0) or 0
+                n9 += 1
+            if d in b50:
+                p50 += num(r"\| statki zatopione (-?\d+)", b50[d], int, 0) or 0
+                n9 += 1
+        if x["lost"] and d in m164:
+            m = re.search(r"zwrot za statki: przy rozwiazaniu (-?\d+) \(\d+\), przy zniszczeniu na ladzie (-?\d+) \(\d+\), poza oknami (-?\d+)", m164[d])
+            if m:
+                r164 += int(m.group(1)) + int(m.group(2)) + int(m.group(3))
+                n9 += 1
+    rep.add("E5/B5 B5-9: zgodnosc z A6 i pomiarami - statki z niczego: A6 / 164a pryzy / E5/0 Bitwy / 164a zwrot (suma dob WL)",
+            f"{pa6} / {p164} / {p50} / {r164}", "0 / 0 / 0 / 0 (dopisek pryzow zdjety przed A6 i 164a; zwrot 164a bez wyplat portow)",
+            (pa6 == 0 and p164 == 0 and p50 == 0 and r164 == 0) if n9 else None)
+    # B5-10..12: INFO - wyplaty portow, zloto z niczego zastapione i zloto swiata, wraki
+    rep.add("E5/B5 B5-10: wyplaty portow sr28 (INFO): rozbite druzyny / pryzy / sprzedaz AI i graczu; kasy portow wydaly / przyjely; zlom z braku pieniedzy",
+            f"{st.mean(rows[d]['paid1'] for d in t28):.0f} (z naleznych {st.mean(rows[d]['due1'] for d in t28):.0f}) / {st.mean(rows[d]['paid4'] for d in t28):.0f}"
+            f" (z {st.mean(rows[d]['due4'] for d in t28):.0f}) / {st.mean(rows[d]['sell2'] for d in t28):.0f}; kasy portow wydaly {st.mean(rows[d]['spent'] for d in t28):.0f}"
+            f" w {st.mean(rows[d]['nports'] for d in t28):.1f} portach, przyjely {st.mean(rows[d]['took'] for d in t28):.0f}; zlom z braku pieniedzy {sum(rows[d]['noMoney'] for d in t28)} statkow",
+            "INFO (rabat AI 0.01 przy kupnie - 181d - zostaje do pomiaru, projekt rozdz. 7)", None)
+    pw = by_day(lines, "Pieniadz swiata: dzien")
+    pd = [d for d in alld if d in pw]
+    ch = "-"
+    if len(pd) >= 2:
+        a0 = pd[-29] if len(pd) > 28 else pd[0]
+        za, zb = num(r"\| razem (\d+)", pw[a0]), num(r"\| razem (\d+)", pw[pd[-1]])
+        if za and zb is not None:
+            ch = f"{(zb - za) / max(1, pd[-1] - a0):+.0f}/d ({(zb - za) / za * 100:+.2f}% d{run_day(a0, start)}-d{run_day(pd[-1], start)})"
+    rep.add("E5/B5 B5-11: zloto z niczego zastapione przez porty sr28 (zloto gry za rozbite druzyny + zdjete z lupu pryzow) i zloto swiata (INFO)",
+            f"{st.mean(rows[d]['game1'] + rows[d]['removed4'] for d in t28):.0f}/d; zloto swiata {ch}",
+            "INFO - wobec biegu bez B5 (bieg E4 bez B5: statki NavalDLC ok. 0.37-0.43 mln/d z niczego)", None)
+    rep.add("E5/B5 B5-12: wraki po uszkodzeniu po bitwie - gra nie placi, 181 nie rusza (suma, INFO)", sum(rows[d]["wrecks"] for d in ds), "INFO", None)
+    errs = [s for s in lines if s.startswith("ERROR in ShipsToPort181")]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B5 B5-13: bledy ShipsToPort181, wyjatki zlapane (suma)", f"bledy {len(errs)}, wyjatki {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
+    # B5-14 (poprawka po recenzji B5): zakupy portow, przy ktorych port mial juz liczbe idealna stoczni NavalDLC (limit - 2) - nadmiar, ktory stocznia
+    # kasuje nastepnej doby (TryRemoveExcessShipsFromTown); miejsce do limitu zostaje (wiazace) - decyzja Jeffa; gracz bez ceny kupna (kupno przed sprzedaza)
+    ovd = [d for d in ds if rows[d]["hasOv"]]
+    if ovd:
+        t28o = _last28(ovd)
+        og, spo = sum(rows[d]["ovGold"] for d in t28o), sum(rows[d]["spent"] for d in t28o)
+        rep.add("E5/B5 B5-14: zakupy portow ponad liczbe idealna stoczni (limit - 2) sr28; gracz bez ceny kupna - pominiete (suma) - INFO",
+                f"{st.mean(rows[d]['ovN'] for d in t28o):.1f} statkow / {og / len(t28o):.0f} zl na dobe = {(og / spo * 100) if spo else 0:.1f}% wydatkow portow (181);"
+                f" gracz {sum(rows[d]['shortBuy'] for d in ds)}",
+                "INFO - decyzja Jeffa: miejsce w porcie do liczby idealnej zamiast limitu stoczni (mniej odplywu z kas portow, wiecej zlomu - mniej zlota lordow)", None)
+    else:
+        rep.add("E5/B5 B5-14: zakupy portow ponad liczbe idealna stoczni - INFO", "brak pola w logu (linie 181 sprzed poprawki po recenzji B5)", "INFO", None)
 
 
 def main(argv):

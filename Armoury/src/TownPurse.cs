@@ -26,7 +26,8 @@ namespace Armoury
     ///     tryb 1 - nie kasuje, dosypuje najwyzej do zapasu kupcow (liczone). Przed GameStarted regulator miasta = 0 w kazdym trybie.
     ///  R3/D4 Jedna nadwyzka: zapas kupcow (Reserve = nie mniej niz cel regulatora gry) - jedna liczba dla zaworu, podatkow (TaxFloor), nadwyzki
     ///     RealPayer/portow (Spare przez Seal31.Spare) i naszych zakupow towaru przez kase miasta (BuyFloor, wylacznik TownPaysFromSurplus).
-    ///  R4 Zawor: co dobe TownRentShare (7%) nadwyzki ponad zapas - pan TownRentLordShare (2/3; dekret BK skaluje tylko jego czesc), korona reszte
+    ///  R4 Zawor: co dobe TownRentShare (7%) nadwyzki ponad zapas - pan TownRentLordShare (2/3; dekret BK skaluje tylko jego czesc), korona reszte;
+    ///     E5/B3 (Z15-5): przy czynnej kiesie ludu i kluczu CastleLordsEvenUp pan TownRentLordShareWithFolk (1/2) - LordShare -> LordsEvenUp.TownLordShare
     ///     (miasto rodu bez krolestwa - calosc panu; oblezone i bez zywego pana - nic). Liczony w PopulationLaw.Daily (ValveTowns -> Valve) dla
     ///     WSZYSTKICH miast - "10 miast bez placenia" znika. Bez pulapu naleznej (zostaje liczba w linii).
     ///  R5 Dar startowy (gra 20 000 + BK 40 x dobrobyt) przyciety raz na kampanie do zapasu w BeforeRents (flaga arm_townpurse) - jak zamki 110.
@@ -282,12 +283,13 @@ namespace Armoury
             return v <= 0 ? 0 : (v >= gold ? gold : (int)v);
         }
 
-        /// <summary>Udzial pana w zaworze kasy miasta rodu w krolestwie k (TownRentLordShare, 0..1); bez krolestwa - 1 (calosc panu).</summary>
+        /// <summary>Udzial pana w zaworze kasy miasta rodu w krolestwie k (0..1): TownRentLordShare, a przy wyrownaniu dla panow zamkow (E5/B3 - klucz
+        /// CastleLordsEvenUp i czynna kiesa ludu) TownRentLordShareWithFolk; bez krolestwa - 1 (calosc panu). Czytaja: zawor (Valve) i ciecie K3 zwrotu korony.</summary>
         internal static float LordShare(Kingdom k)
         {
             var s = Settings.Current;
             if (s == null || k == null || k.IsEliminated) return 1f;
-            return ValveSplit.Unit(s.TownRentLordShare);
+            return LordsEvenUp.TownLordShare(s);
         }
 
         private static long Get(Dictionary<Town, long> d, Town t) { long v; return d.TryGetValue(t, out v) ? v : 0; }
@@ -779,7 +781,9 @@ namespace Armoury
                      + ", BK HandleMarketGold - prefiks Last: " + bk + "; BRAK: " + (miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-")
                      + " | zapas kupcow " + (s != null ? s.TownPurseFloorGold.ToString(inv) + " + " + s.TownPurseFloorPerProsperity.ToString("0.##", inv) : "?") + " x dobrobyt (nie mniej niz cel gry "
                      + GameTargetGold + " + " + GameTargetPerProsperity.ToString("0", inv) + " x dobrobyt), zawor " + (s != null ? (ValveSplit.Unit(s.TownRentShare) * 100f).ToString("0.#", inv) : "?")
-                     + "% nadwyzki, panu " + (s != null ? (ValveSplit.Unit(s.TownRentLordShare) * 100f).ToString("0.#", inv) : "?") + "% i reszta skarbcowi krolestwa"
+                     + "% nadwyzki, panu " + (s != null ? (ValveSplit.Unit(s.TownRentLordShare) * 100f).ToString("0.#", inv) : "?")
+                     + "% (z wyrownaniem dla panow zamkow E5/B3 przy czynnej kiesie ludu " + (s != null ? (ValveSplit.Unit(s.TownRentLordShareWithFolk) * 100f).ToString("0.#", inv) : "?")
+                     + "%, wylacznik Castle Lords Even Up " + (s != null && s.CastleLordsEvenUp ? "tak" : "nie") + ") i reszta skarbcowi krolestwa"
                      + ", dar startowy przycinany: " + (s != null && s.TownPurseTrimAtStart ? "tak" : "nie")
                      + ", zakupy dla nas tylko z nadwyzki: " + (s != null && s.TownPaysFromSurplus ? "tak" : "nie")
                      + ", BK rynek pominiety: " + (s != null && s.TownPurseNoBkSkim ? "tak" : "nie") + " (zamki tylko przy Castle Purse Enabled).");

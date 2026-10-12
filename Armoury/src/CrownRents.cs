@@ -15,6 +15,8 @@ namespace Armoury
     ///  - Co zostalo z wplywow dnia (165: wplywy + 1/360 zapasu) po darach (182), ratach reparacji, kontraktach (185) i zwrocie zoldu, korona rozdaje TEGO SAMEGO
     ///    dnia rodom krolestwa wedlug STALYCH wag lenn (Z8 - nigdy wedlug zalogi): miasto CrownRentWeightTown (3), zamek CrownRentWeightCastle (1), wies
     ///    CrownRentWeightVillage (0.25). Rod krola tez (skarbiec to nie kiesa krola), gracz na tych samych warunkach (2.0b). Bez najemnikow (185), dworzan BK i Innych.
+    ///    E5/B3 (Z15-5): przy wyrownaniu dla panow zamkow (klucz CastleLordsEvenUp i czynna kiesa ludu) wagi miasto CrownRentWeightTownWithFolk (2), zamek
+    ///    CrownRentWeightCastleWithFolk (1.5), wies bez zmian - jedno miejsce: LordsEvenUp.WeightTown/WeightCastle/WeightVillage.
     ///  - WARUNEK SLUZBY (M4, K10), oba naraz:
     ///    1. zaloga: kazda twierdza rodu ma co najmniej CrownRentGarrisonShare (50%) STALEJ NORMY - sredniej zalogi twierdz tego rodzaju (miasto / zamek) w krolestwie
     ///       z ostatnich 28 dob (CrownRentGarrisonNormKingdom; wylaczone - norma swiata); nie wlasnej sredniej rodu. Twierdza w oblezeniu i twierdza w rekach rodu
@@ -178,8 +180,9 @@ namespace Armoury
                    && c.StringId != null && !c.StringId.StartsWith("bk_courtiers_", StringComparison.Ordinal) && !ClanIncomeBook.IsUndeadClan(c);
         }
 
-        /// <summary>Waga lenn rodu: miasto 3, zamek 1, wies 0.25 (stale - Z8; wsie wedlug wlasnosci gry, jak dar 182).</summary>
-        private static double Weight(Clan c, Settings s)
+        /// <summary>Waga lenn rodu: miasto 3, zamek 1, wies 0.25; przy wyrownaniu E5/B3 miasto 2, zamek 1.5, wies 0.25 (stale - Z8; wsie wedlug wlasnosci gry,
+        /// jak dar 182). Czyta tez linia E5/B3 (LordsEvenUp.Daily - udzial wag rodow samych zamkow).</summary>
+        internal static double Weight(Clan c, Settings s)
         {
             double w = 0;
             var sts = c.Settlements;
@@ -188,11 +191,20 @@ namespace Armoury
             {
                 var st = sts[i];
                 if (st == null) continue;
-                if (st.IsTown) w += Math.Max(0f, s.CrownRentWeightTown);
-                else if (st.IsCastle) w += Math.Max(0f, s.CrownRentWeightCastle);
-                else if (st.IsVillage) w += Math.Max(0f, s.CrownRentWeightVillage);
+                if (st.IsTown) w += LordsEvenUp.WeightTown(s);
+                else if (st.IsCastle) w += LordsEvenUp.WeightCastle(s);
+                else if (st.IsVillage) w += LordsEvenUp.WeightVillage(s);
             }
             return w;
+        }
+
+        /// <summary>E5/B3 (linia LordsEvenUp.Daily): renta rodu z dzisiejszego Daily; false - rod bez wiersza (bez lenna, najemnik, 165/180 wylaczone).
+        /// Tylko odczyt, wazne do nastepnego Daily.</summary>
+        internal static bool RowOf(Clan c, out long paid)
+        {
+            Row r;
+            if (c != null && _rows.TryGetValue(c, out r) && r.Counted) { paid = r.Paid; return true; }
+            paid = 0; return false;
         }
 
         private static int GarMen(Town f)
@@ -538,8 +550,8 @@ namespace Armoury
                       .Append(" - zaloga ").Append(LastFailGar).Append(", sluzba ").Append(LastFailSvc).Append(", oba ").Append(LastFailBoth)
                       .Append(" | renta na udzial (zl/dobe): mediana krolestw ").Append(perShare.Count > 0 ? perShare[perShare.Count / 2].ToString("0", Inv) : "-")
                       .Append(", najwyzsza ").Append(perShare.Count > 0 ? perShare[perShare.Count - 1].ToString("0", Inv) : "-")
-                      .Append(" | wagi: miasto ").Append(s.CrownRentWeightTown.ToString("0.##", Inv)).Append(", zamek ").Append(s.CrownRentWeightCastle.ToString("0.##", Inv))
-                      .Append(", wies ").Append(s.CrownRentWeightVillage.ToString("0.##", Inv))
+                      .Append(" | wagi: miasto ").Append(LordsEvenUp.WeightTown(s).ToString("0.##", Inv)).Append(", zamek ").Append(LordsEvenUp.WeightCastle(s).ToString("0.##", Inv))
+                      .Append(", wies ").Append(LordsEvenUp.WeightVillage(s).ToString("0.##", Inv)).Append(LordsEvenUp.Live ? " (E5/B3: z wyrownaniem)" : " (E5/B3: bez wyrownania)")
                       .Append("; warunek: zaloga >= ").Append((garShare * 100f).ToString("0", Inv)).Append("% normy ").Append(s.CrownRentGarrisonNormKingdom ? "krolestwa" : "swiata")
                       .Append(" (28 dob), sluzba >= ").Append(svcDays).Append(" z ostatnich ").Append(Window).Append(" dob wojny (rod, ktory widzial mniej dob wojny - ta sama czesc)")
                       .Append(" | sluzba dzis: rody w wojnie ").Append(warClans).Append(", sluzylo ").Append(srvArmy + srvSiege + srvBattle + srvLand + srvCaptive + srvGuard + srvBattleEvt)
