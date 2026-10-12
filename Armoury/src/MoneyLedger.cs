@@ -146,6 +146,10 @@ namespace Armoury
         private static readonly int[] _vVisits = new int[Classes], _vUnsold = new int[Classes], _vUnsoldVisits = new int[Classes];
         private static long _vHanded, _vKept, _vTax, _vEstates;
         private static int _vReturns;
+        // E5/C1 (kontrola kas bez dosypki, tylko licznik): plon wsi przywieziony do miast i niesprzedany w miastach-zaulkach (kasa ponizej zapasu kupcow przy wejsciu taboru)
+        private static long _vTownBrought, _vAlleyBrought, _vAlleyUnsold;
+        private static int _vAlleyVisits;
+        private static readonly HashSet<Town> _vAlleyShort = new HashSet<Town>();   // zaulki, w ktorych dzis zostal towar w taborze
         private static readonly long[] _cons = new long[Classes], _regIn = new long[Classes], _regOut = new long[Classes];
         private static readonly long[] _consFolk = new long[Classes];   // E5/B1: przyrost kasy w konsumpcji zaplacony przez lud (przelew z kiesy H22/H23/H24, nie zrodlo)
         private static readonly int[] _consTicks = new int[Classes], _regTicks = new int[Classes];
@@ -170,6 +174,8 @@ namespace Armoury
         private static bool _winVillage;                   // okno powrotu do wsi (podzial utargu) - tylko wtedy wyplaty "z niczego" to majatki BK
         private static CampaignTime _winTime;              // chwila otwarcia okna (porownanie tikow, nie ulamkow godzin)
         private static int _winGold, _winHomeGold, _winHomeTax, _winEstates, _winStale;
+        private static int _winBrought;                    // E5/C1: sztuki towaru w taborze przed sprzedaza w miescie (bez jucznych)
+        private static bool _winAlley;                     // E5/C1: kasa miasta ponizej zapasu kupcow przy wejsciu taboru (miasto-zaulek)
 
         // rozliczenie rodu (ClanVariablesCampaignBehavior.DailyTickClan): zloto swiata przed i po - pomiar stanu
         private static bool _clanHooked;                   // para na DailyTickClan zalozona (bez niej salda rodow ida do pozycji GiveGoldAction)
@@ -203,6 +209,7 @@ namespace Armoury
         {
             Array.Clear(_vPaid, 0, Classes); Array.Clear(_vVisits, 0, Classes); Array.Clear(_vUnsold, 0, Classes); Array.Clear(_vUnsoldVisits, 0, Classes);
             _vHanded = _vKept = _vTax = _vEstates = 0; _vReturns = 0;
+            _vTownBrought = _vAlleyBrought = _vAlleyUnsold = 0; _vAlleyVisits = 0; _vAlleyShort.Clear();   // E5/C1
             _clanUp = _clanDown = _netUp = _netDown = _clanClsFrom = _clanClsTo = _clanOthFrom = _clanOthTo = 0;
             _clanUpN = _clanDownN = _clanFlatN = _clanStale = _netUpN = _netDownN = 0;
             Array.Clear(_cons, 0, Classes); Array.Clear(_regIn, 0, Classes); Array.Clear(_regOut, 0, Classes); Array.Clear(_consFolk, 0, Classes);
@@ -258,6 +265,13 @@ namespace Armoury
                 _winGold = mp.PartyTradeGold; _winEstates = 0;
                 _winHomeGold = home != null ? home.Gold : 0;
                 _winHomeTax = home != null ? home.TradeTaxAccumulated : 0;
+                _winBrought = 0; _winAlley = false;
+                if (st.IsTown && st.Town != null)
+                {
+                    // E5/C1 (tylko licznik): ile towaru tabor przywiozl i czy kasa miasta jest ponizej zapasu kupcow (ta sama granica co "zaulki" A1)
+                    try { _winBrought = Unsold(mp); _winAlley = TownPurse.On && st.Town.Gold < TownPurse.Reserve(st.Town); }
+                    catch { _winBrought = 0; _winAlley = false; _stumbles++; }
+                }
             }
             catch { _stumbles++; }
         }
@@ -277,6 +291,7 @@ namespace Armoury
                     _vPaid[c] += now - _winGold; _vVisits[c]++;
                     int left = Unsold(mp);
                     if (left > 0) { _vUnsold[c] += left; _vUnsoldVisits[c]++; }
+                    if (st.IsTown) NoteAlley(st.Town, left);           // E5/C1: plon w miastach-zaulkach (tylko licznik, wlasny try)
                     TownFolk.NoteCartPaid(st, now - _winGold, left);   // E5/0 (195): kasa miasta zaplacila taborowi - czesc ponizej zapasu kupcow, towar niesprzedany (tylko licznik, wlasny try)
                 }
                 else if (st.IsVillage)
@@ -307,6 +322,25 @@ namespace Armoury
                 n += el.Amount;
             }
             return n;
+        }
+
+        /// <summary>
+        /// E5/C1 (kontrola kas miast bez dosypki - projekt etapu 5 rozdz. 3 "E5/C1" Test: zakup plonu >= 98% takze w miastach-zaulkach). Tylko licznik:
+        /// sztuki przywiezione do miasta (bez jucznych) i - gdy kasa byla przy wejsciu ponizej zapasu kupcow - ile z nich zostalo w taborze (BK SellGoodsPatch
+        /// kupuje najwyzej town.Gold / cena sztuk kazdej pozycji, wiec reszta to towar, na ktory kasy nie stac). Wiecej niz przywiozl - liczymy przywiezione.
+        /// </summary>
+        private static void NoteAlley(Town t, int left)
+        {
+            try
+            {
+                int brought = _winBrought;
+                _vTownBrought += brought;
+                if (!_winAlley || t == null) return;
+                _vAlleyBrought += brought; _vAlleyVisits++;
+                int miss = left < brought ? left : brought;
+                if (miss > 0) { _vAlleyUnsold += miss; _vAlleyShort.Add(t); }
+            }
+            catch { _stumbles++; }
         }
 
         // ------------------------------------------------------------ przelewy gry (zdarzenie GiveGoldAction)
@@ -571,6 +605,12 @@ namespace Armoury
 
         /// <summary>E5/A1 (tylko odczyt, przed Daily ksiegi, ktore zeruje liczniki): towar wsi niesprzedany po wizytach taborow w miastach dzis.</summary>
         internal static void TownUnsoldToday(out int pieces, out int visits) { pieces = _vUnsold[CTown]; visits = _vUnsoldVisits[CTown]; }
+
+        /// <summary>E5/C1: plon wsi w miastach dzis - przywiezione do wszystkich miast, do zaulkow (kasa ponizej zapasu przy wejsciu), niesprzedane w zaulkach. Tylko odczyt.</summary>
+        internal static void AlleyHarvestToday(out long brought, out long alleyBrought, out long alleyUnsold, out int alleyVisits, out int alleyShortTowns)
+        {
+            brought = _vTownBrought; alleyBrought = _vAlleyBrought; alleyUnsold = _vAlleyUnsold; alleyVisits = _vAlleyVisits; alleyShortTowns = _vAlleyShort.Count;
+        }
 
         // ------------------------------------------------------------ postfiksy-liczniki (nie zmieniaja wyniku)
         /// <summary>ItemConsumptionBehavior.DeleteOverproducedItems - pierwszy krok dziennej konsumpcji osady: kasa PRZED "zakupami".</summary>

@@ -49,6 +49,9 @@ Uzycie (Python 3, tylko odczyt):
                     E5/BITWY (rozpoznanie 12.10): BITWY-1 ta sama roznica w KAZDEJ dobie okna |doba| <= 1 tys.; BITWY-2 (INFO) rozbicie ZRODEL "bitwy"
                     brutto (wyplata gry zwyciezcom) na UJSCIA "bitwy" + kiesy partii bez wodza (-N4) + statki + netto - brutto to nie zloto z niczego.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
+                    Blok E5/C1 (202, kasy miast bez dosypki = tryb 2 Town Purse Regulator z A1 - bez osobnego klucza) C1-1..C1-4: tryb 2 i dosypka kas
+                    miast i zamkow 0, zakup plonu w miastach-zaulkach >= 98% (dopisek "plon w zaulkach (E5/C1)" w "Kasy miast (169c)"), miasta z kasa
+                    < 1 000: 0 kazdej doby, zloto swiata |zmiana| < 0.1% na ostatnie 28 dob (najgorsze okno INFO). Doby kampanii 2-until.
                     Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
                     zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
                     z niczego 0 (RealPayer przed RBM; wyplaty INFO), pomiar G24/N3 (INFO; latka niewpieta = NIE).
@@ -3337,6 +3340,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_a8(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_a8", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/C1 (202, PLAN 5.8): kasy miast bez dosypki = tryb 2 A1 - kontrola zbioru C (plon w zaulkach, kasy < 1 000, zloto swiata 28 dob); log sprzed C1 - C1-2 INFO
+    try:
+        etap5_c1(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_c1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
     wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
     try:
@@ -4543,6 +4551,88 @@ def etap5_a8(rep, lines, start, until):
     errs = sum(1 for x in lines if "ERROR" in x and "BkDipGold." in x)
     rep.add("E5/A8-7: kontrola (stos paktow, otwarte okna na koniec doby, potkniecia, ERROR BkDipGold.*)", f"{ov} / {op_} / {sm} / {errs}", "0 / 0 / 0 / 0",
             ov == 0 and op_ == 0 and sm == 0 and errs == 0)
+
+def etap5_c1(rep, lines, start, until):
+    """E5/C1 (202, PLAN 5.8 - kasy miast bez dosypki; projekt etapu 5 rozdz. 3 "E5/C1" Test). Regulator bez dosypki to tryb 2 klucza Town Purse Regulator
+    (E5/A1, decyzja Jeffa 11.10 16:10 - osobnego klucza TownPurseNoTopUp nie ma); tu kontrola zbioru C. C1-1 tryb 2 kazdej doby i dosypka kas miast
+    i zamkow 0; C1-2 zakup plonu w miastach-zaulkach >= 98% (dopisek "plon w zaulkach (E5/C1)" w linii "Kasy miast (169c)" - kasa ponizej zapasu kupcow
+    przy wejsciu taboru); C1-3 miasta z kasa < 1 000: 0 kazdej doby; C1-4 zloto swiata |zmiana| < 0.1% na 28 dob (ostatnie 28 dob okna; najgorsze okno
+    od doby 2 - INFO). Okno: doby kampanii 2-until (jak A1). Warunki "rok testu B" (reszta R < 10 tys./d - A1-T13) w bloku A1."""
+    k169 = by_day(lines, "Kasy miast (169c): dzien")
+    win = [d for d in sorted(k169) if 2 <= run_day(d, start) <= until]
+    if not win:
+        rep.add("E5/C1: linia Kasy miast (169c)", "brak w dobach 2-%d" % until, "codziennie (LogEnabled)", None)
+        return
+    seg = {}
+    for d in win:
+        s = k169[d]
+        i = s.find(" | E5/A1:")
+        seg[d] = s[i:] if i >= 0 else ""
+    # ---------------- C1-1: regulator bez dosypki (miasta i zamki)
+    zz = by_day(lines, "Zawor zamkow (110): dzien")
+    m2 = sum(1 for d in win if num(r"^ \| E5/A1: tryb regulatora (\d)", seg[d]) == 2)
+    up_t = sum(num(r"dosypka do zapasu \(tryb 1\) (\d+)", seg[d], int, 0) or 0 for d in win)
+    zd = [d for d in win if d in zz]
+    up_c = sum(num(r"dosypka do zapasu \(tryb 1, zostaje do etapu 3\) (\d+)", zz[d], int, 0) or 0 for d in zd)
+    rep.add("E5/C1-1: regulator kas bez dosypki (tryb 2 Town Purse Regulator; suma okna)",
+            f"tryb 2 w {m2} z {len(win)} dob; dosypka kas miast {up_t}, kas zamkow {up_c}"
+            + ("" if zd else " (brak linii Zawor zamkow (110) - Castle Purse Enabled wylaczone?)"),
+            "tryb 2 kazdej doby; dosypka miast 0, zamkow 0", m2 == len(win) and up_t == 0 and up_c == 0)
+    # ---------------- C1-2: zakup plonu w miastach-zaulkach
+    hre = re.compile(r"plon w zaulkach \(E5/C1\): przywiezione (\d+) szt\. w (\d+) wizytach, niesprzedane (\d+) szt\. \((\d+) miast\);"
+                     r" do wszystkich miast przywiezione (\d+) szt\.")
+    hv = {}
+    for d in win:
+        m = hre.search(seg[d])
+        if m:
+            hv[d] = [int(x) for x in m.groups()]
+    if hv:
+        ab, av, au, hb = (sum(v[k] for v in hv.values()) for k in (0, 1, 2, 4))
+        share = 100.0 * (ab - au) / ab if ab > 0 else None
+        tdays = sum(1 for v in hv.values() if v[2] > 0)
+        worst = max(hv, key=lambda d: (hv[d][2] / hv[d][0]) if hv[d][0] else 0.0)
+        val = (f"{share:.2f}% ({ab - au} z {ab} szt. w {av} wizytach, niesprzedane {au})" if share is not None
+               else f"brak wizyt taborow w zaulkach (do miast przywiezione {hb} szt.)")
+        val += (f"; doby z niesprzedanym w zaulku {tdays} z {len(hv)} (najgorsza d{run_day(worst, start)}: {hv[worst][2]} z {hv[worst][0]} szt., {hv[worst][3]} miast)"
+                + (f"; zaulki dostaly {100.0 * ab / hb:.1f}% plonu przywiezionego do miast" if hb > 0 else "")
+                + (f"; dopisek w {len(hv)} z {len(win)} dob" if len(hv) < len(win) else ""))
+        rep.add("E5/C1-2: zakup plonu w miastach-zaulkach (kasa ponizej zapasu kupcow przy wejsciu taboru; suma okna)", val,
+                ">= 98% (projekt E5/C1; ponizej - zaulek kupuje mniej: zapasowo platnik dla zaulka, pytanie do Jeffa)",
+                (share >= 98.0) if share is not None else None)
+    else:
+        rep.add("E5/C1-2: zakup plonu w miastach-zaulkach", "brak dopisku \"plon w zaulkach (E5/C1)\" (log sprzed C1 albo A1 wylaczone)", ">= 98%", None)
+    # ---------------- C1-3: miasta z kasa ponizej 1 000
+    b1k = {}
+    for d in win:
+        v = num(r"zaulki: kas ponizej zapasu \d+, ponizej 1000 (\d+)", seg[d])
+        if v is not None:
+            b1k[d] = v
+    if b1k:
+        bad = sorted(d for d, v in b1k.items() if v > 0)
+        rep.add("E5/C1-3: miasta z kasa ponizej 1 000 - kazda doba okna",
+                f"niezerowe w {len(bad)} z {len(b1k)} dob" + (f" (najwiecej {max(b1k[d] for d in bad)}, pierwsza d{run_day(bad[0], start)})" if bad else ""),
+                "0 kazdej doby (projekt E5/C1)", len(bad) == 0)
+    else:
+        rep.add("E5/C1-3: miasta z kasa ponizej 1 000", "brak liczb (dopisek zaulkow A1)", "0 kazdej doby", None)
+    # ---------------- C1-4: zloto swiata na 28 dob
+    pw = by_day(lines, "Pieniadz swiata: dzien")
+    tot = {}
+    for d in sorted(pw):
+        if 2 <= run_day(d, start) <= until:
+            v = num(r"\| razem (\d+)", pw[d])
+            if v:
+                tot[d] = v
+    pd = sorted(tot)
+    if len(pd) >= 29:
+        a, b = pd[-29], pd[-1]
+        ch = (tot[b] - tot[a]) / tot[a] * 100.0
+        wch, wd = max((((tot[pd[i]] - tot[pd[i - 28]]) / tot[pd[i - 28]] * 100.0, pd[i]) for i in range(28, len(pd))), key=lambda x: abs(x[0]))
+        rep.add("E5/C1-4: zloto swiata - zmiana na 28 dob (ostatnie 28 dob okna)",
+                f"{ch:+.3f}% (d{run_day(a, start)} -> d{run_day(b, start)}: {tot[a]} -> {tot[b]}); najgorsze okno 28 dob od doby 2: {wch:+.3f}% (do d{run_day(wd, start)})",
+                "|zmiana| < 0.1% (projekt E5/C1; najgorsze okno - INFO)", abs(ch) < 0.1)
+    else:
+        rep.add("E5/C1-4: zloto swiata - zmiana na 28 dob", f"za malo dob z linia Pieniadz swiata ({len(pd)} < 29)", "|zmiana| < 0.1%", None)
+
 
 def etap5_b1(rep, lines, start, until, logp):
     """E5/B1 (173, kiesa ludu czynna; plan kodu docs/etap5/PLAN-KODU-E5B1.md rozdz. 11, progi B1-T1..T20). Okno: doby kampanii 2-until; sr28 - ostatnie 28 dob okna.

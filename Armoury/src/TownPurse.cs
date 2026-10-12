@@ -24,6 +24,8 @@ namespace Armoury
     ///     schodzi z polki jak dotad (do B1 "zjedzone bez zaplaty"). Czynne takze przy tworzeniu swiata (dwa ticki przed GameStarted, nieliczone).
     ///  R2 Regulator gry: tryb 2 (domyslnie, Jeff 16:10) - nic nie kasuje i nic nie dosypuje, w miastach i zamkach (zamki przy CastlePurseEnabled);
     ///     tryb 1 - nie kasuje, dosypuje najwyzej do zapasu kupcow (liczone). Przed GameStarted regulator miasta = 0 w kazdym trybie.
+    ///     E5/C1 (202, PLAN 5.8 "kasy miast bez dosypki") to wlasnie tryb 2 - osobnego klucza TownPurseNoTopUp nie ma (drugi przelacznik tego samego
+    ///     zjawiska; przy trybie 1 zablokowalby wyjscie awaryjne). Z C1 zostaje kontrola: plon wsi w miastach-zaulkach (MoneyLedger.NoteAlley, tylko licznik).
     ///  R3/D4 Jedna nadwyzka: zapas kupcow (Reserve = nie mniej niz cel regulatora gry) - jedna liczba dla zaworu, podatkow (TaxFloor), nadwyzki
     ///     RealPayer/portow (Spare przez Seal31.Spare) i naszych zakupow towaru przez kase miasta (BuyFloor, wylacznik TownPaysFromSurplus).
     ///  R4 Zawor: co dobe TownRentShare (7%) nadwyzki ponad zapas - pan TownRentLordShare (2/3; dekret BK skaluje tylko jego czesc), korona reszte;
@@ -873,6 +875,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("TownPurse.LineSegment(" + st.StringId + ")", e); }
             }
             int unsold, unsoldVisits; MoneyLedger.TownUnsoldToday(out unsold, out unsoldVisits);
+            long hAll, hAlley, hShort; int hVisits, hTowns; MoneyLedger.AlleyHarvestToday(out hAll, out hAlley, out hShort, out hVisits, out hTowns);   // E5/C1 (kontrola, tylko licznik)
             var sb = new StringBuilder(1536);
             sb.Append(" | E5/A1: tryb regulatora ").Append(mode);
             if (ValveLive)
@@ -895,7 +898,9 @@ namespace Armoury
               .Append(" | zaulki: kas ponizej zapasu ").Append(LastBelowN).Append(", ponizej 1000 ").Append(LastBelow1000).Append(", przy 0 ").Append(LastAtZero)
               .Append("; najdluzej ponizej zapasu ").Append(LastStreakMax).Append(" dob z rzedu").Append(LastStreakName != null ? " (" + LastStreakName + ")" : "")
               .Append(", miast >= 7 dob ").Append(LastStreak7).Append(", >= 28 dob ").Append(LastStreak28).Append(" (serie od wczytania)")
-              .Append("; towar wsi niesprzedany w miastach (po wizycie taboru - kasa kupuje tyle, ile ma) ").Append(unsold).Append(" szt. w ").Append(unsoldVisits).Append(" wizytach");
+              .Append("; towar wsi niesprzedany w miastach (po wizycie taboru - kasa kupuje tyle, ile ma) ").Append(unsold).Append(" szt. w ").Append(unsoldVisits).Append(" wizytach")
+              .Append("; plon w zaulkach (E5/C1): przywiezione ").Append(hAlley).Append(" szt. w ").Append(hVisits).Append(" wizytach, niesprzedane ").Append(hShort)
+              .Append(" szt. (").Append(hTowns).Append(" miast); do wszystkich miast przywiezione ").Append(hAll).Append(" szt.");
             sb.Append(" | udzial zysku kupcow zabierany przez pana i korone: dzis ");
             if (LastShareOk) sb.Append(Pct(LastTake, LastNet)).Append("% (pobrano ").Append(LastTake).Append(" z doplywu netto ").Append(LastNet).Append("; okno od poprzedniego bloku)");
             else sb.Append("-% (pierwsza doba sesji - brak migawki)");
