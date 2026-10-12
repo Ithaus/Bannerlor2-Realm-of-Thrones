@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 
 namespace Armoury
@@ -635,6 +636,119 @@ namespace Armoury
             catch (Exception e) { OStumble("RecruitPrisonersAiPost", e); }
         }
 
+        // ================================================================ fixA (P1-2): ostrzal oblezniczy - polegli poza bitwa
+        /// <summary>Migawka skladow stron ostrzalu: partie strony i ich szeregowi (Men - bez bohaterow i wightow, ranni wliczeni) przed metoda.</summary>
+        public sealed class SiegeShotState { public List<PartyBase> P; public int[] M; }
+
+        /// <summary>
+        /// Prefiks SiegeEventCampaignBehavior.KillRandomTroopsOfEnemy(ISiegeEventSide, int) - prywatna metoda gry wolana przy trafieniu machiny (BombardHitEngineCasualties)
+        /// i przy zniszczeniu machiny (OnSiegeEngineDestroyed): MemberRoster.RemoveNumberOfNonHeroTroopsRandomly zabija szeregowych stron oblezenia (oblegajacy,
+        /// zaloga, milicja, obroncy) bez zdarzenia i POZA bitwa (SiegeEvent.Tick bombarduje tylko bez MapEvent oblegajacych i osady - bez podwojenia z OnMapEventEnded;
+        /// DiedInBattle tego nie zawiera). Ranni (WoundNumberOfNonHeroTroopsRandomly) nie zmieniaja liczby - roznica Men ich nie liczy. Lista z IEnumerable gry
+        /// zapisana od razu (leniwy yield BesiegerCamp).
+        /// </summary>
+        public static void SiegeShotPre(ISiegeEventSide __0, out SiegeShotState __state)
+        {
+            __state = null;
+            if (!OriginLive || __0 == null) return;
+            try
+            {
+                var l = new List<PartyBase>();
+                foreach (var pb in __0.GetInvolvedPartiesForEventType()) if (pb != null && pb.MemberRoster != null && !l.Contains(pb)) l.Add(pb);
+                if (l.Count == 0) return;
+                var m = new int[l.Count];
+                for (int i = 0; i < l.Count; i++) m[i] = Men(l[i].MemberRoster);
+                __state = new SiegeShotState { P = l, M = m };
+            }
+            catch (Exception e) { __state = null; OStumble("SiegeShotPre", e); }
+        }
+
+        /// <summary>Finalizer: ubytek szeregowych kazdej partii strony - POLEGLI regionu pochodzenia (Take + DieShares, ta sama droga co polegli z OnMapEventEnded:
+        /// Fallen, FallenMen -> K_m wolnych rak); tabor wsi - region jego wsi (DieCarts). Wyjatek gry leci dalej bez zmian.</summary>
+        public static Exception SiegeShotFin(Exception __exception, SiegeShotState __state)
+        {
+            if (__state == null || !OriginLive) return __exception;
+            try
+            {
+                bool any = false;
+                for (int i = 0; i < __state.P.Count; i++)
+                {
+                    var pb = __state.P[i];
+                    int d = __state.M[i] - Men(pb.MemberRoster);
+                    if (d <= 0) continue;
+                    any = true;
+                    _siegeDead += d;
+                    var mp = pb.MobileParty;
+                    if (mp != null && mp.IsVillager) DieCarts(mp, d);
+                    else DieShares(Take(pb.MemberRoster, d, FDieSiege), FDieSiege);
+                }
+                if (any) _siegeCalls++;
+            }
+            catch (Exception e) { OStumble("SiegeShotFin", e); }
+            return __exception;
+        }
+
+        // ================================================================ fixA (P2-T4-lochy): ucieczka jencow ponad limit lochu partii
+        /// <summary>
+        /// Prefiks PrisonerReleaseCampaignBehavior.ApplyEscapeChanceToExceededPrisoners(CharacterObject, MobileParty) - prywatna metoda gry wolana z HourlyPartyTick
+        /// raz na kazdego jenca ponad PrisonerSizeLimit (poza bitwa i oblezeniem, nie zaloga ani milicja; szansa 10%/h); szeregowy schodzi przez
+        /// PrisonRoster.AddToCounts(c, -1) bez zadnego zdarzenia - dotad q "lochy partii" w uzgodnieniu (w nicosc bez nazwy). Stan: szeregowi lochu (O(1)).
+        /// </summary>
+        public static void EscapePre(MobileParty __1, out int __state)
+        {
+            __state = -1;
+            try { if (__1 != null && __1.PrisonRoster != null) __state = __1.PrisonRoster.TotalRegulars; } catch { __state = -1; }
+        }
+
+        /// <summary>
+        /// Postfiks: szeregowy zbiegl (TotalRegulars spadl). Licznik do linii "Jency (E4/0)" zawsze; przy Prison Escape Go Home ta sama droga co uwolnieni jency bez
+        /// odbiorcy w H3 (LosersFlee.FreedHome: 1/3 uprawnionych do karczmy - VetDivert VFreed, reszta do domu wedlug pochodzenia - SendHome SrcFreed, bez domu - pula
+        /// regionu miejsca albo nazwana nicosc), z udzialami pochodzenia zdjetymi z lochu (Take FEscape; wight - bez udzialow, SendHome odsyla go "do niczego").
+        /// Przy wylaczonym - jak w grze (znika; uzgodnienie doby tnie slownik lochu). Nie rzuca.
+        /// </summary>
+        public static void EscapePost(CharacterObject __0, MobileParty __1, int __state)
+        {
+            if (__state < 0 || __0 == null || __0.IsHero || __1 == null) return;
+            try
+            {
+                int gone = __state - __1.PrisonRoster.TotalRegulars;
+                if (gone <= 0) return;
+                _escAll += gone;
+                var s = Settings.Current;
+                if (s == null || !s.PrisonEscapeGoHome) return;
+                Vec2 pos = __1.GetPosition2D;
+                var region = OutlawLaw.PoolRegionAt(pos);
+                bool law = OutlawLaw.On && region != null;
+                Shares org = null;
+                try { if (OriginLive && !IsWight(__0)) org = Take(__1.PrisonRoster, gone, FEscape); } catch { org = null; }
+                int vt, got, left;
+                // recenzja fixA (1): pamiec osad BK zolnierzy (LosersFlee._battleHome, klucz bez miejsca - "|-|kultura") jest na JEDNA bitwe; ucieczka idzie poza bitwa
+                // w dowolnym miejscu mapy - bez czyszczenia zbieg trafial do ludnosci BK osady wybranej dla ostatniej bitwy z uwolnionymi tej kultury. Czyszczenie
+                // jak w H3 (BeginBattle przed kazdym uzyciem): osada liczona od miejsca ucieczki (jeden przebieg po Homes() na ucieczke)
+                LosersFlee.BeginBattle();
+                LosersFlee.FreedHome(__0, gone, pos, region, law, org, out vt, out got, out left);
+                _escTavern += vt; _escHome += got;
+                if (left > 0) { if (law) _escPool += left; else _escLost += left; }
+            }
+            catch (Exception e) { OStumble("EscapePost", e); }
+        }
+
+        /// <summary>Odcinek linii "Jency (E4/0)" (Measure40.PrisonersLine): ucieczki ponad limit lochu od ostatniej linii - czyta i zeruje liczniki. Nie rzuca.</summary>
+        internal static string EscapeSegment()
+        {
+            try
+            {
+                var s = Settings.Current;
+                bool on = s != null && s.PrisonEscapeGoHome;
+                string r = " | uciekli ponad limit lochu " + _escAll + (on
+                    ? " (do domu " + _escHome + ", do puli " + _escPool + ", do karczmy " + _escTavern + ", znikneli " + _escLost + " - jak uwolnieni jency H3)"
+                    : " (znikaja jak w grze - Prison Escape Go Home wylaczone)");
+                _escAll = _escHome = _escPool = _escTavern = _escLost = 0;
+                return r;
+            }
+            catch { return ""; }
+        }
+
         // ================================================================ wpiecie (SubModuleMain, po OthersRise.ApplyAll; latki wpiete zawsze - U26)
         internal static void ApplyOrigin(Harmony h)
         {
@@ -704,6 +818,9 @@ namespace Armoury
             wire(AccessTools.Method(typeof(SellPrisonersAction), "ApplyForSelectedPrisoners", new[] { typeof(PartyBase), typeof(PartyBase), typeof(TroopRoster) }), "sprzedaz jencow (wybrani)", PP(nameof(SalePre), Priority.First), null, P(nameof(SaleFin)));
             wire(AccessTools.Method(typeof(TransferPrisonerAction), "ApplyInternal"), "przekazanie jenca", P(nameof(TransferPrisonerPre)), null, null);
             wire(AccessTools.Method(typeof(RecruitPrisonersCampaignBehavior), "RecruitPrisonersAi"), "wcielenie jencow AI", null, P(nameof(RecruitPrisonersAiPost)), null);
+            // poprawki E4 po tescie koncowym (fixA): ostrzal oblezniczy - polegli poza bitwa (P1-2); ucieczka jencow ponad limit lochu partii (P2-T4-lochy)
+            wire(AccessTools.Method(typeof(SiegeEventCampaignBehavior), "KillRandomTroopsOfEnemy"), "ostrzal oblezniczy (polegli poza bitwa)", P(nameof(SiegeShotPre)), null, P(nameof(SiegeShotFin)));
+            wire(AccessTools.Method(typeof(PrisonerReleaseCampaignBehavior), "ApplyEscapeChanceToExceededPrisoners"), "ucieczka jencow ponad limit lochu", P(nameof(EscapePre)), P(nameof(EscapePost)), null);
             if (FreeHands.ApplyFood(h)) done.Add("zywnosc wsi (rece)"); else miss.Add("zywnosc wsi (rece)");
             var s = Settings.Current;
             Log.Info("Pochodzenie (E4/7): wpiete " + done.Count + ": " + string.Join(", ", done.ToArray()) + " (karczma gracza " + tav + "/2); BRAK: " + (miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-")

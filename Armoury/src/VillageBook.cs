@@ -88,6 +88,17 @@ namespace Armoury
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, Dist> _d = new Dictionary<string, Dist>(StringComparer.Ordinal);
         private static readonly Dictionary<string, KeyValuePair<Dist, int>> _byUid = new Dictionary<string, KeyValuePair<Dist, int>>(StringComparer.Ordinal);
+        // E4 fixB (G4): okreg po OBIEKCIE Village dla wpiec Strike / glod / pojmani (menu warowni - nie, recenzja fixB (3)). ROT-Map settlements.xml daje dwie osady na jednym
+        // Village (Kurbok ROT_town40_village2 i Thupak ROT_town40_village3 maja komponent ROT_town39_village2/3_comp - ten sam co Guntak i Volug): v.Settlement to
+        // ostatni wlasciciel z XML (town40), a okreg (Resolve, pierwszy w Settlement.All) ma klucz town39 - szukanie po v.Settlement.StringId chybialo (d120: d0 = 26).
+        // Klucze zapisu (d.Id) i przypisanie wierszy pliku bez zmian. Porownanie po referencji (hash MBObjectBase idzie z Id - jak RefEq w GoodsLedger).
+        private static readonly Dictionary<Village, Dist> _byV = new Dictionary<Village, Dist>(new VillageRefEq());
+        private sealed class VillageRefEq : IEqualityComparer<Village>
+        {
+            public bool Equals(Village a, Village b) { return ReferenceEquals(a, b); }
+            public int GetHashCode(Village o) { return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o); }
+        }
+        private static readonly List<string> _distNoVillageIds = new List<string>();     // E4 fixB (G2, tylko log): id okregow pliku bez wsi gry (linia pierwszej doby)
         private static string _pending;                     // napis z zapisu do Resolve
         private static bool _resolved, _resolveTried, _firstDay = true, _offSeen, _offLogged, _pSet;
         private static int _p = 250;                        // ludzi na osade przy n (z zapisu albo z ustawien przy pierwszym n)
@@ -152,9 +163,9 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: stan jednej kampanii nie przecieka do drugiej.</summary>
         internal static void Reset()
         {
-            lock (Gate) { _d.Clear(); _byUid.Clear(); }
+            lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); }
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
-            _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false;
+            _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _distNoVillageIds.Clear();
             _newN.Clear(); _newNames.Clear(); _csvPath = null;
             _stumblesAll = 0;
             lock (_errSites) _errSites.Clear();
@@ -260,7 +271,7 @@ namespace Armoury
                 var byDist = _file != null ? MapVillageData.ByDistrict(_file.Records) : new Dictionary<string, List<MapVillageRecord>>(StringComparer.Ordinal);
                 lock (Gate)
                 {
-                    _d.Clear(); _byUid.Clear();
+                    _d.Clear(); _byUid.Clear(); _byV.Clear();
                     var seen = new HashSet<Village>();
                     foreach (var st in Settlement.All)
                     {
@@ -271,11 +282,13 @@ namespace Armoury
                             byDist.TryGetValue(st.StringId, out recs);
                             var d = Build(st, recs);
                             _d[st.StringId] = d;
+                            _byV[st.Village] = d;                    // E4 fixB (G4): 1:1 z _d (seen.Add wyzej)
                             for (int w = 0; w < d.W; w++) if (!string.IsNullOrEmpty(d.Uid[w])) _byUid[d.Uid[w]] = new KeyValuePair<Dist, int>(d, w);
                         }
                         catch (Exception e) { Stumble("VillageBook.Resolve(wies)", e); }
                     }
-                    foreach (var kv in byDist) if (!_d.ContainsKey(kv.Key)) { _distNoVillage++; _rowsNoVillage += kv.Value.Count; }
+                    foreach (var kv in byDist) if (!_d.ContainsKey(kv.Key)) { _distNoVillage++; _rowsNoVillage += kv.Value.Count; _distNoVillageIds.Add(kv.Key); }
+                    _distNoVillageIds.Sort(StringComparer.Ordinal);
                     ApplyPending();
                 }
                 _resolved = true;
@@ -667,7 +680,7 @@ namespace Armoury
                 lock (Gate)
                 {
                     Dist d;
-                    if (v.Settlement == null || v.Settlement.StringId == null || !_d.TryGetValue(v.Settlement.StringId, out d) || !EnsureN(d) || !(lBefore > 0.0)) { _dHitSkip += hit; return; }
+                    if (!_byV.TryGetValue(v, out d) || !EnsureN(d) || !(lBefore > 0.0)) { _dHitSkip += hit; return; }     // E4 fixB (G4): po obiekcie Village
                     int today = Today();
                     double dB = hit * d.N / lBefore;
                     if (refugees > 0.0 && !double.IsInfinity(refugees)) d.ARexp += refugees;
@@ -701,7 +714,7 @@ namespace Armoury
                 lock (Gate)
                 {
                     Dist d;
-                    if (v.Settlement == null || v.Settlement.StringId == null || !_d.TryGetValue(v.Settlement.StringId, out d) || !EnsureN(d)) { _dFamSkip++; return; }
+                    if (!_byV.TryGetValue(v, out d) || !EnsureN(d)) { _dFamSkip++; return; }     // E4 fixB (G4): po obiekcie Village
                     float k = PopulationLaw.KFor(d.St);
                     double l = (k > 0f ? (double)Math.Max(0f, v.Hearth) * k : 0.0) + PeopleBook.RefugeesOf(v);     // po ruchu (Move + FamineFled)
                     if (!(l > 0.0)) { _dFamSkip++; return; }
@@ -727,7 +740,7 @@ namespace Armoury
                 lock (Gate)
                 {
                     Dist d;
-                    if (v.Settlement == null || v.Settlement.StringId == null || !_d.TryGetValue(v.Settlement.StringId, out d)) return;
+                    if (!_byV.TryGetValue(v, out d)) return;     // E4 fixB (G4): po obiekcie Village
                     d.ARexp = Math.Max(0.0, d.ARexp - taken);
                 }
             }
@@ -1192,7 +1205,9 @@ namespace Armoury
             sb.Append("Ksiega wiosek (E4/11): uklad ");
             if (_file != null)
                 sb.Append('\'').Append(_file.Title).Append("' (crc ukladu ").Append(_layoutCrc.ToString("X8")).Append(", plik crc32 ").Append(_file.FileCrc32.ToString("X8")).Append("), wiosek ")
-                  .Append(records).Append(" w ").Append(with).Append(" okregach (odrzucone ").Append(_file.BadRows).Append(", wsi gry brak ").Append(_rowsNoVillage).Append(" wiosek w ").Append(_distNoVillage).Append(" okregach)");
+                  .Append(records).Append(" w ").Append(with).Append(" okregach (odrzucone ").Append(_file.BadRows).Append(", wsi gry brak ").Append(_rowsNoVillage).Append(" wiosek w ").Append(_distNoVillage).Append(" okregach")
+                  .Append(_distNoVillageIds.Count > 0 ? ": " + string.Join(", ", _distNoVillageIds.Take(10)) + (_distNoVillageIds.Count > 10 ? " i " + (_distNoVillageIds.Count - 10) + " innych" : "") : "")   // E4 fixB (G2): id po nazwie
+                  .Append(')');
             else sb.Append("BRAK (").Append(_fileNote).Append(") - kazdy okreg to sama wies gry");
             sb.Append(" | okregi ").Append(with + without).Append(": z wioskami ").Append(with).Append(", sama wies gry ").Append(without);
             sb.Append(" | osady (").Append(_p).Append(" ludzi na osade): z zapisu ").Append(saved).Append(" okregow, nowe ").Append(_newN.Count);
@@ -1356,6 +1371,8 @@ namespace Armoury
                         foreach (var v in bv)
                         {
                             Dist d;
+                            // recenzja fixB (3): menu warowni zostaje przy kluczu v.Settlement.StringId (jak przed G4) - wspolne Village z ROT-Map (Kurbok/Thupak) dawalo
+                            // w menu Omber okregi Guntak i Volug (d.Name z town39); zmiana menu - osobna decyzja (wariant sceptyka G4: okreg od wlasciciela Village)
                             if (v == null || v.Settlement == null || v.Settlement.StringId == null || !_d.TryGetValue(v.Settlement.StringId, out d) || !EnsureN(d)) continue;
                             var sn = SnapOf(d);
                             int standing = 0;

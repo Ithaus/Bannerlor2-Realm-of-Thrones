@@ -2560,6 +2560,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PressUntakenGoHome { get; set; } = true;
 
+        [SettingPropertyBool("Levy Village From Town", HintText = "when every village of a land is down to its last 50 hearths, a man recruited there comes from the people of the land's town instead of from nowhere")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool LevyVillageFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Prison Escape Go Home", HintText = "captives who slip away from an overfull party prison make their way home like freed captives (or to the woods, or to a tavern) instead of vanishing")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PrisonEscapeGoHome { get; set; } = true;
+
         [SettingPropertyBool("Garrison Levy From Bk", HintText = "a garrison filling its ranks from the notables of its town and villages takes the man from Banner Kings' population too, as any other recruit does")]
         [SettingPropertyGroup("Iron Bank")]
         public bool GarrisonLevyFromBk { get; set; } = true;
@@ -5131,6 +5139,8 @@ namespace Armoury
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;
+            s.LevyVillageFromTown = LevyVillageFromTown;
+            s.PrisonEscapeGoHome = PrisonEscapeGoHome;
             s.GarrisonLevyFromBk = GarrisonLevyFromBk;
             s.FreeHandsShare = FreeHandsShare;
             s.FreeHandsHarvestFactor = FreeHandsHarvestFactor;

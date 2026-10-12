@@ -190,6 +190,28 @@ namespace Armoury
                 sb.Append(" | kontrola: X - Y - (wszystkie ruchy + zalozenie) = ").Append(double.IsNaN(y) ? "-" : (x - y - all - set).ToString("0.00", Inv));
                 double u = world > 0 ? 100.0 * x / world : 0, u0 = refP + refV > 0 ? 100.0 * refP / (refP + refV) : 0;
                 sb.Append(" | udzial miejski swiata dzis ").Append(u.ToString("0.00", Inv)).Append("% (odniesienie ").Append(u0.ToString("0.00", Inv)).Append("%, odniesien tr: ").Append(refs).Append(')');
+                // E4 fixB (P1-3, tylko log): udzial swiata wyzej ma w mianowniku WSZYSTKIE wsie (z wsiami zamkow), a odniesienie tr: - tylko wsie miast (OneTown/SetTownRef),
+                // wiec tych dwoch liczb nie wolno porownywac (blad planu E48:436). Ponizej obie strony z JEDNEJ petli po tych samych miastach (stan i odniesienie tr:
+                // naraz; _tr nie jest czyszczone przy DropTowns, wiec bez TownRefSum): X = miasta / (miasta + ich wsie dzis), start = to samo z odniesienia,
+                // luka = suma max(0, cel - stan), cel jak w OneTown (refP x wsie dzis / refV). Udzial swiata zostaje jako INFO.
+                double oP = 0, oV = 0, oRP = 0, oRV = 0, oT = 0, oGap = 0; int oN = 0;
+                var oSeen = new HashSet<Settlement>();
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !st.IsTown || st.Town == null || !oSeen.Add(st)) continue;     // ROT: Settlement.All podaje duplikaty (jak Daily)
+                    try
+                    {
+                        float tp; double rP, rV;
+                        if (!PeopleBook.TryTown(st, out tp) || !PeopleBook.TownRef(st, out rP, out rV)) continue;
+                        double vi = VillagePeople(st);
+                        double goal = rV > Eps ? rP * vi / rV : rP;
+                        oP += tp; oV += vi; oRP += rP; oRV += rV; oT += goal; oGap += Math.Max(0.0, goal - tp); oN++;
+                    }
+                    catch (Exception e) { Stumble("Line(wlasne wsie)", e); }
+                }
+                double uo = oP + oV > 0 ? 100.0 * oP / (oP + oV) : 0, uo0 = oRP + oRV > 0 ? 100.0 * oRP / (oRP + oRV) : 0;
+                sb.Append(" | miasta wobec wlasnych wsi dzis ").Append(uo.ToString("0.00", Inv)).Append("% (start ").Append(uo0.ToString("0.00", Inv)).Append("%, miast ").Append(oN)
+                  .Append("), luka do udzialu ").Append(oGap.ToString("0", Inv)).Append(" ludzi (").Append((oT > 0 ? 100.0 * oGap / oT : 0).ToString("0.00", Inv)).Append("% celu)");
                 sb.Append(" | potkniecia ").Append(_stumblesDay).Append('.');
                 Log.Info(sb.ToString());
             }

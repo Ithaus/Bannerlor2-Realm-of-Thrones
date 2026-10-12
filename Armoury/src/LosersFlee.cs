@@ -485,6 +485,39 @@ namespace Armoury
             }
         }
 
+        /// <summary>
+        /// Poprawki E4 po tescie koncowym (fixA, P2-T4-lochy): jedna droga jenca, ktory schodzi z lochu bez odbiorcy - uwolnieni jency pokonanych w H3 (Apply) i jency
+        /// zbiegli z przepelnionego lochu partii (PeopleBook.EscapePost; jedna zasada na jedno zjawisko). Kroki jak dotad w H3: 1/3 uprawnionych do karczmy
+        /// (VetDivert VFreed + NoteTavern - linia H3 "do karczmy" i strumien weteranow "uwolnieni jency" zgodne), reszta do domu wedlug pochodzenia (SendHome SrcFreed),
+        /// bez domu - pula regionu miejsca przy prawie wyrzutkow, inaczej nazwana nicosc. Udzialy org zuzyte. Zwraca: vt (karczma), got (dom), left (bez domu). Nie rzuca.
+        /// </summary>
+        internal static void FreedHome(CharacterObject t, int n, Vec2 pos, Settlement region, bool law, PeopleBook.Shares org, out int vt, out int got, out int left)
+        {
+            vt = 0; got = 0; left = 0;
+            if (t == null || n <= 0) return;
+            try
+            {
+                vt = PeopleBook.VetDivert(null, t, n, pos, PeopleBook.VFreed, org);
+                if (vt > 0) NoteTavern(vt, SrcFreed);
+                int n2 = n - vt;
+                if (n2 <= 0) return;
+                int cat;
+                got = SendHome(null, t, n2, pos, null, SrcFreed, out cat, org);
+                left = n2 - got;
+                if (left > 0)
+                {
+                    if (law) { OutlawLaw.PoolAdd(region, t, left); NoteWoods(region, left); }
+                    NoteHomeless(left, law);
+                    if (org != null) { try { if (law) PeopleBook.PoolShares(region, org); else PeopleBook.Lost(org); } catch { } }
+                }
+            }
+            catch (Exception e)
+            {
+                _stumbleApply++;
+                if (!_errApply) { _errApply = true; Log.Error("LosersFlee.FreedHome", e); }
+            }
+        }
+
         /// <summary>E4/7: ToCommon dla ulamka (reszta bez pochodzenia po powrocie czesci znanej). Zwraca, ilu umieszczono.</summary>
         private static float ToCommonF(float n, Vec2 pos, int src)
         {
@@ -1171,20 +1204,10 @@ namespace Armoury
                         fp.Roster.AddToCounts(fp.T, -n);
                         _freed += n; bp.FreedN += n;
                         Row(OutlawLaw.RegionAt(pos)).Freed += n;
-                        // E4/10 (W3, R16): 1/3 uprawnionych (od tieru VeteranMinTier) do karczmy najblizszego miasta, reszta do domu jak dotad (nie rzuca)
-                        int vt = PeopleBook.VetDivert(null, fp.T, n, pos, PeopleBook.VFreed, org);
-                        if (vt > 0) NoteTavern(vt, SrcFreed);
-                        int n2 = n - vt;
-                        if (n2 <= 0) continue;
-                        int cat;
-                        int got = SendHome(null, fp.T, n2, pos, null, SrcFreed, out cat, org);
-                        int left = n2 - got;
-                        if (left > 0)
-                        {
-                            if (law) { OutlawLaw.PoolAdd(region, fp.T, left); NoteWoods(region, left); }
-                            NoteHomeless(left, law);
-                            if (org != null) { try { if (law) PeopleBook.PoolShares(region, org); else PeopleBook.Lost(org); } catch { } }
-                        }
+                        // E4/10 (W3, R16): 1/3 uprawnionych (od tieru VeteranMinTier) do karczmy najblizszego miasta, reszta do domu jak dotad (nie rzuca).
+                        // fixA (P2-T4-lochy): wydzielone do FreedHome - ta sama droga dla ucieczki jencow ponad limit lochu (PeopleBook.EscapePost)
+                        int vt, got, left;
+                        FreedHome(fp.T, n, pos, region, law, org, out vt, out got, out left);
                     }
                     catch (Exception e)
                     {
