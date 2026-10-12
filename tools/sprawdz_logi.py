@@ -133,6 +133,30 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E7/O2 (229) - linia startowa "CampScene (E7/O2): prefaby dostepne": T1 kazdy element (namioty, ogniska, pochodnie, plot) >= 1
                     i bez bledow PrefabExists (brak linii = NIE: klucz CampBattlePropsEnabled), T0 bledy CampScene 0; bitwy w obozie gracza ze scenografia
                     ("CampScene: postawiono") - INFO (T2 test Jeffa: wojsko nie grzeznie w scenografii bez fizyki).
+                    Bloki z galezi w-toku/e7-b (E7/B, paczka 231 - tam pierwotnie wlasny szkielet grupy; przy scaleniu zbior-5-8 dopisane do szkieletu E7/0, okno doby kampanii 1-120 (--do-doby N), start kampanii jak etap5):
+                    Blok etap7_b (projekt etapu 7 v2 rozdz. 3 "E7/B" Test): os rzeki wyznaczona (bez BRAK OSI); T1 linia "Przeprawa Bliznaki (E7/B)" z licznikiem
+                    w kazdej dobie okna; T2 przejsc > 0; T3 pozycje przejsc z pierwszych 3 dob sesji <= 3 jedn. od bramy (inaczej brod albo drugi most w strefie -
+                    zmniejszyc promien); T4 koszt probek < 0.1 ms/dobe (srednio); potkniecia 0; przejscia wedlug rodzaju, myto gdyby bylo i wejscia do osady (169c) - INFO.
+                    Blok etap7_w1 (E7/W1, paczka 232): T0 linia "Wioski - wiesci (E7/W1)" w kazdej dobie okna; T1 zdarzen "plonie" = rabunki zakonczone z linii
+                    "Ludzie (spustoszenie)" (+-1/dobe w sumie okna; po E7/R1 + sesje R1); T2 komunikatow "by bylo" > 0 (dowod sciezki), przy braku wsi gracza w zdarzeniach
+                    pokazanych "plonie" 0; T3 bieg zapisu: wpisy pamieci przy wczytaniu = przy ostatnim zapisie (stary zapis - 0 wpisow, bez bledu); T4 potkniecia 0;
+                    T5 spalone w ksiedze = "spalone dzis" linii "Ksiega wiosek (E4/11)" w kazdej dobie, komunikatow "burned" (z "by bylo") <= spalonych;
+                    T6 zapis bez nazw (identyfikatory odrzucone przez BadId - INFO); spladrowane, pamiec wojny, przyklady - INFO.
+                    Blok etap7_w2 (E7/W2, paczka 233): T1 linia startowa "Dymek wioski (E7/W2): start" (ostatnia sesja): lore N/N, bramka zgodna, odrzucone 0,
+                    dymek ArmMapVillageTooltip zarejestrowany, herby z lore niewazne 0; odczyty BK wiara i tytuly; W2-0 linia doby w kazdej dobie okna; T2 potkniecia
+                    dymka (budowa, odswiezanie) i lore/BK 0; T4 probka wiary (pierwsza doba sesji): wiara w dymku = najwiekszy udzial BK we wszystkich wioskach probki
+                    z danymi BK (>= 10); dymki pokazane, zdanie lore o swietym miejscu - INFO; T3 zdjecia - poza narzedziem.
+                    Blok etap7_w3 (E7/W3, paczka 234): T1 linia startowa "Menu okregu (E7/W3): start" (pierwsza doba ostatniej sesji): pozycja "Look over the
+                    district" w menu village i village_looted (index bez BRAK), ksiega wiosek czynna; sasiedzi pozycji - INFO; T3 potkniecia okna (suma linii doby)
+                    i linie "ERROR in DistrictMenu." / "ERROR in VillageBook.DistrictView" 0; uzycie okna i zrodla herbow - INFO; T2 zdjecie okna - poza narzedziem.
+                    Blok etap7_w5 (E7/W5, paczka 238): T1 linia startowa "Proporczyki (E7/W5): start" (ostatnia mapa): siatka campaign_flag (zapas map_banner -
+                    INFO, BRAK - NIE); W5-1 w kadrze najwiecej 1-80 (0 = kamera nie zjechala ponizej 90 - INFO); W5-2 budowa sr. < 8 ms/klatke (budzet tworzenia
+                    obrazkow wiosek na tick); W5-3 potkniecia 0 (najwiecej w linii mapy) i linie "ERROR in MapVillagesView.Pennant* / PickPennant* / RemovePennants" 0; przebudowy po misji,
+                    zmiany herbu - INFO; T2 spadek klatek < 5% (inaczej VillagePennants domyslnie false) - tryb zdjec, poza narzedziem.
+                    Blok etap7_d0 (E7/D0, paczka 239): tryb wedlug ostatniej linii startu sesji "MapRoadsProbe: wylaczona/wlaczona"; bieg A - D0-1 'wylaczona'
+                    przy kazdym starcie i 0 linii 'postawione'; bieg zdjec (klucz MapRoadsProbeEnabled = true w konfiguracji testu) - D0-2a plik: stempli > 0, zle wiersze 0,
+                    CRC sceny zgodne; D0-2b postawione N z N (bez materialu 0, potkniecia 0); oba - D0-3 potkniecia i linie "ERROR in MapRoadsProbe*" 0;
+                    czas stawiania, klatka z drogami / bez - INFO; zdjecia - poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -7269,7 +7293,9 @@ def etap7_o2(rep, lines, start, until, logp=None, csp=None):
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
-    start, until, ...); kazdy blok rusza tylko przy swojej linii - brak linii = wiersz INFO, nigdy wyjatek."""
+    start, until, ...); kazdy blok rusza tylko przy swojej linii - brak linii = wiersz INFO, nigdy wyjatek.
+    Scalenie zbior-5-8: bloki galezi e7-b (E7/B 231 i dalej) maja konwencje (rep, lines, start, win, until=..) - win = doby z linia "Pieniadz swiata"
+    w oknie; bloki galezi e7-a (E7/0 224 i dalej) - (rep, lines, start, until, logp=, csp=)."""
     lines = read(logp)
     rep = Report()
     start = start_arg
@@ -7282,16 +7308,394 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
     if start is None:
         start = alld[0] if alld else 0
+    win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
-          f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
+    # scalenie zbior-5-8: obie galezie etapu 7 zbudowaly szkielet grupy; jeden szkielet, dwie konwencje wywolania (opis w docstringu)
+    blocks = ([(b, False) for b in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2)]
+              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0)])
+    for blk, by_win in blocks:   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
-            blk(rep, lines, start, until, logp=logp, csp=csp)
+            if by_win:
+                blk(rep, lines, start, win, until=until)
+            else:
+                blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
             rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
+
+# ============================================================ ETAP 7 (E7/B, paczka 231): bloki galezi e7-b (szkielet grupy - etap7_main wyzej, wspolny po scaleniu)
+def etap7_b(rep, lines, start, win, until=120, **kw):
+    """E7/B (231, PLAN 7.12, projekt etapu 7 v2 rozdz. 3 "E7/B" Test): linia startowa "Przeprawa Bliznaki (E7/B): os rzeki" i linia doby
+    "Przeprawa Bliznaki (E7/B): dzien N" (dzien = doba gry, jak "Juczne (213)"; "Pieniadz swiata" nosi dzien ksiegi = doba gry - 1, stad -1 w T1).
+    Wiazace: os bez BRAK OSI, T1 linia z licznikiem w kazdej dobie okna, T2 przejsc > 0, T3 pozycje <= 3 jedn. od bramy, T4 koszt < 0.1 ms/dobe, potkniecia 0."""
+    axis = [s for s in lines if s.startswith("Przeprawa Bliznaki (E7/B): os rzeki")]
+    rows = {}
+    for d, s in by_day(lines, "Przeprawa Bliznaki (E7/B): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    if not axis and not rows:
+        rep.add("E7/B: linie Przeprawa Bliznaki (E7/B)", "brak w logu", "sa od wgrania E7/B (TwinsCrossingCount, LogEnabled)", None)
+        return
+    if axis:
+        a = axis[-1]
+        ok = ("BRAK OSI" not in a) and (" nie ma " not in a)
+        rep.add("E7/B B-0: os rzeki przy moscie (2 luki wody na okregu r 4)", a[:260], "os wyznaczona (bez BRAK OSI) - inaczej wzorce okregow r3-r6 w linii", ok)
+    else:
+        rep.add("E7/B B-0: os rzeki przy moscie", "brak linii startowej", "jest przy pierwszej godzinie gry sesji", None)
+    days = sorted(rows)
+    live = [x for x in days if "| przejsc " in rows[x]]
+    need = max(0, len(win) - 1)
+    rep.add("E7/B T1: linia Przeprawa Bliznaki z licznikiem", f"{len(live)} dob (wszystkich linii {len(days)}; dob okna {len(win)})",
+            f">= {need} (codziennie w oknie; dzien gry = dzien ksiegi + 1)", (len(live) >= need and need > 0) if win else None)
+    if not live:
+        return
+    w = [rows[x] for x in live]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = tot(r"\| przejsc (\d+) \(")
+    rep.add("E7/B T2: przejsc mostem (suma okna)", f"{n} ({n / len(w):.1f}/d)", "> 0", n > 0)
+    pos = []
+    for x in w:
+        m = re.search(r"pozycje przejsc \(x/y, odl\. od bramy\): (.*?)\.$", x)
+        if m and m.group(1) != "brak":
+            pos += [float(v) for v in re.findall(r"-?[\d.]+/-?[\d.]+ \(([\d.]+)\)", m.group(1))]
+    far = [v for v in pos if v > 3.0]
+    rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od bramy", f"{len(pos)} pozycji, dalej niz 3 jedn.: {len(far)}" + (f" (najdalej {max(pos):.1f})" if pos else ""),
+            "wszystkie <= 3 jedn. (inaczej brod albo drugi most w strefie - zmniejszyc promien)", (len(far) == 0) if pos else None)
+    cost = [num(r"koszt probek ([\d.]+) ms/dobe", x, float) for x in w]
+    cm = _mean(cost)
+    rep.add("E7/B T4: koszt probek godzinnych (srednio)", f"{cm:.3f} ms/dobe" if cm is not None else "brak", "< 0.1 ms/dobe", (cm < 0.1) if cm is not None else None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    rep.add("E7/B B-5: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+    car, vil, cown, cfor = tot(r" - karawany (\d+) \("), tot(r", wozy wsi (\d+)"), tot(r"\(krolestwo pana (\d+) /"), tot(r" / obce (\d+)\)")
+    band, oth, pl = tot(r", bandy (\d+), inne"), tot(r", inne (\d+), gracz"), tot(r", gracz TAK \((\d+)\)")
+    ns = (tot(r"\(na polnoc (\d+),"), tot(r", na poludnie (\d+)\)"))
+    ew = (tot(r"\(na wschod (\d+),"), tot(r", na zachod (\d+)\)"))
+    side = f"na polnoc {ns[0]}, na poludnie {ns[1]}" if ns != (0, 0) or ew == (0, 0) else f"na wschod {ew[0]}, na zachod {ew[1]}"
+    rep.add("E7/B B-6: przejscia wedlug rodzaju (suma okna)", f"{side}; karawany {car}, wozy wsi {vil}, rody krolestwa pana {cown} / obce {cfor}, bandy {band}, inne {oth}, gracz {pl}",
+            "INFO", None)
+    toll = tot(r"\| myto gdyby bylo (\d+) zl")
+    gold = tot(r"\(kiesy (\d+) zl")
+    rep.add("E7/B B-7: myto gdyby bylo (suma okna, 2 zl od czlowieka, 1 zl od zwierzecia, rody krolestwa pana bez myta)",
+            f"{toll} zl ({toll / len(w):.0f}/d); kiesy karawan przy przejsciu {gold} zl", "INFO (tylko do porownania - nikt nie placi; decyzja Jeffa po tescie)", None)
+    ent = 0
+    for d, s in by_day(lines, "Miara historyczna cz. 2 (169c): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            ent += num(r"\(e\) Bliznaki: wejscia do osady (\d+)", s, int, 0) or 0
+    rep.add("E7/B B-8: wejscia do osady Bliznaki (169c (e)) obok przejsc", f"wejsc {ent}, przejsc {n}", "INFO (porownanie)", None)
+
+
+
+def etap7_w1(rep, lines, start, win, until=120, **kw):
+    """E7/W1 (232, PLAN 7.10 a, projekt etapu 7 v2 rozdz. 3 "E7/W1" Test): linia doby "Wioski - wiesci (E7/W1): dzien N" (dzien ksiegi = doba gry - 1, jak
+    "Ksiega wiosek (E4/11)" i "Ludzie (spustoszenie)"), linia zapisu "Wioski - wiesci (E7/W1): zapis - pamiec wojny N wpisow" i odcinek "pamiec wojny (E7/W1) M wpisow"
+    linii "Ksiega wiosek (E4/11): start sesji". Wiazace: T0, T1 (+-1/dobe), T2, T3 (gdy byl zapis i wczytanie), T4, T5."""
+    rows = {}
+    for d, s in by_day(lines, "Wioski - wiesci (E7/W1): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[d] = s
+    saves = [s for s in lines if s.startswith("Wioski - wiesci (E7/W1): zapis")]
+    if not rows and not saves:
+        rep.add("E7/W1: linie Wioski - wiesci (E7/W1)", "brak w logu", "sa od wgrania E7/W1 (LogEnabled)", None)
+        return
+    days = sorted(rows)
+    need = max(0, len(win) - 1)
+    rep.add("E7/W1 T0: linia Wioski - wiesci (E7/W1)", f"{len(days)} dob (dob okna {len(win)})", f">= {need} (codziennie w oknie)",
+            (len(days) >= need and need > 0) if win else None)
+
+    def tot(pat):
+        return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+    if days:
+        a = tot(r"\| plonie: zdarzen (\d+) \(")
+        dev = {}
+        for d, s in by_day(lines, "Ludzie (spustoszenie): dzien").items():
+            if d in rows:
+                dev[d] = num(r"\| rabunki zakonczone (\d+) \(", s, int, 0) or 0
+        r1 = {}
+        for d, s in by_day(lines, "Rabunek osada po osadzie (E7/R1): dzien").items():
+            if d in rows:
+                r1[d] = num(r"sesji (\d+)", s, int, 0) or 0
+        raids = sum(dev.values()) + sum(r1.values())
+        rep.add("E7/W1 T1: zdarzen plonie = rabunki zakonczone (Ludzie (spustoszenie)) + sesje E7/R1 (suma okna)",
+                f"plonie {a}, rabunki {sum(dev.values())} + R1 {sum(r1.values())} = {raids} (roznica {a - raids:+d}, dob {len(days)})",
+                "|roznica| <= liczba dob (+-1/dobe - dedup milicji, rabunek przegrany z milicja bez lupienia)", (abs(a - raids) <= len(days)) if dev else None)
+        p_shown = tot(r"\), komunikatow (\d+) \(by bylo")
+        shown = p_shown + tot(r"komunikatow \"burned\" (\d+),") + tot(r"komunikatow \"plundered\" (\d+),")
+        would = tot(r"\(by bylo (\d+)\); spladrowane") + tot(r"\"burned\" \d+, by bylo (\d+)\)") + tot(r"\"plundered\" \d+, by bylo (\d+);")
+        own = tot(r"\(wsie gracza (\d+),")
+        rep.add("E7/W1 T2: komunikaty zbudowane, a nie pokazane (by bylo - dowod sciezki)", f"by bylo {would}, pokazanych {shown} (wsie gracza w zdarzeniach plonie {own})",
+                "> 0", (would > 0) if a > 0 else None)
+        rep.add("E7/W1 T2b: pokazane plonie przy braku wsi gracza w zdarzeniach", f"{p_shown} (wsie gracza {own})", "0 gdy wsie gracza 0 (autotest bez lenna)",
+                (p_shown == 0) if own == 0 else None)
+        stu = tot(r"potkniecia dzis (\d+)")
+        rep.add("E7/W1 T4: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+        book = by_day(lines, "Ksiega wiosek (E4/11): dzien")
+        bad, tot_i, tot_b = [], 0, 0
+        for x in days:
+            i = num(r"\| spalone w ksiedze (\d+) \(", rows[x], int, 0) or 0
+            b = num(r"\| spalone dzis (\d+)", book.get(x, ""), int, 0) or 0
+            tot_i += i
+            tot_b += b
+            if i != b:
+                bad.append(f"d{x}: {i}/{b}")
+        rep.add("E7/W1 T5: spalone w ksiedze (W1) = spalone dzis (Ksiega wiosek) w kazdej dobie",
+                f"{tot_i} / {tot_b}; dob niezgodnych {len(bad)}" + (f" ({', '.join(bad[:6])})" if bad else ""), "0 dob niezgodnych", len(bad) == 0)
+        kb = tot(r"komunikatow \"burned\" (\d+),") + tot(r"\"burned\" \d+, by bylo (\d+)\)")
+        rep.add("E7/W1 T5b: komunikaty burned (z by bylo) <= spalone w ksiedze", f"{kb} <= {tot_i}", "burned tylko przy przejsciu na spalona (R10)", kb <= tot_i)
+        f, j = tot(r"; spladrowane (\d+) \("), tot(r", splondrowane bez spalenia (\d+) \(")
+        same, nob = tot(r"sesja spalila - bez drugiego (\d+)[,)]"), tot(r"\(bez ksiegi (\d+)\)")
+        old = tot(r"juz spalona w ksiedze (\d+)\)")
+        rep.add("E7/W1 W1-7: spladrowane (Looted gry) wedlug ksiegi", f"spladrowane {f}: splondrowane bez spalenia {j}, sesja spalila {same}, juz spalona {old}, bez ksiegi {nob}",
+                "INFO (f = j + sesja spalila + juz spalona + bez ksiegi)", None)
+        mem = num(r"\| pamiec wojny: wpisow (\d+) \(", rows[days[-1]], int, 0) or 0
+        mnew = tot(r"pamiec wojny: wpisow \d+ \(nowe (\d+),")
+        rep.add("E7/W1 W1-8: pamiec wojny (ostatnia doba okna)", f"wpisow {mem}, nowych zdarzen w oknie {mnew}", "INFO (> 0 przy VillageWarMemory)", None)
+        smp = []
+        for x in days[:20]:
+            m = re.search(r"\| przyklady: (.*)\.$", rows[x])
+            if m:
+                smp.append(m.group(1))
+        rep.add("E7/W1 W1-9: przyklady komunikatow (pierwsze doby)", (smp[0][:240] if smp else "brak"), "INFO (angielski, nazwy wiosek z ksiegi)", None)
+    # T3: wczytanie po zapisie - wpisy pamieci przy wczytaniu = ostatni zapis przed nim (stary zapis bez sekcji: 0 wpisow, bez pary)
+    pairs, mism, last_save = 0, [], None
+    for s in lines:
+        if s.startswith("Wioski - wiesci (E7/W1): zapis"):
+            last_save = num(r"pamiec wojny (\d+) wpisow", s, int)
+        elif s.startswith("Ksiega wiosek (E4/11): start sesji") and "pamiec wojny (E7/W1)" in s:
+            got = num(r"pamiec wojny \(E7/W1\) (\d+) wpisow", s, int)
+            if last_save is not None and got is not None:
+                pairs += 1
+                if got != last_save:
+                    mism.append(f"{got}/{last_save}")
+    rep.add("E7/W1 T3: pamiec wojny zapis -> wczytanie", f"par {pairs}, niezgodnych {len(mism)}" + (f" ({', '.join(mism[:5])})" if mism else ""),
+            "0 niezgodnych (bieg zapisu 9 dob)", (len(mism) == 0) if pairs else None)
+    rej = sum(num(r"odrzucone przez BadId (\d+)", s, int, 0) or 0 for s in saves)
+    rep.add("E7/W1 T6: zapis pamieci - same identyfikatory", f"zapisow {len(saves)}, identyfikatorow odrzuconych przez BadId {rej}",
+            "INFO (nazw w sekcji m: nie ma z konstrukcji)", None)
+
+
+def etap7_w2(rep, lines, start, win, until=120, **kw):
+    """E7/W2 (233, PLAN 7.9 a, projekt etapu 7 v2 rozdz. 3 "E7/W2" Test): linia startowa "Dymek wioski (E7/W2): start" (OnSessionLaunched), linia doby
+    "Dymek wioski (E7/W2): dzien N" (dzien = doba gry) i probka wiary raz na sesje "Dymek wioski (E7/W2): probka wiary" (pierwsza doba). Wiazace: T1, T2, T4;
+    W2-0 linia doby; T3 (zdjecia dymka) poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Dymek wioski (E7/W2): start")]
+    rows = {}
+    for d, s in by_day(lines, "Dymek wioski (E7/W2): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = s
+    samples = [s for s in lines if s.startswith("Dymek wioski (E7/W2): probka wiary")]
+    if not starts and not rows:
+        rep.add("E7/W2: linie Dymek wioski (E7/W2)", "brak w logu", "sa od wgrania E7/W2 (VillageTipLore, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "WYLACZONY" in s:
+            rep.add("E7/W2 T1: linia startowa (ostatnia sesja)", body[:200], "klucz VillageTipLore wlaczony", False)
+        else:
+            m = re.search(r"lore (\d+)/(\d+) \(bramka ([0-9A-F]{8}) zgodna, odrzucone (\d+), bez lore (\d+)", s)
+            reg = "dymek ArmMapVillageTooltip zarejestrowany" in s
+            herb = num(r"herby z lore niewazne (\d+)", s, int)
+            ok = bool(m) and m.group(1) == m.group(2) and int(m.group(4)) == 0 and reg and herb == 0
+            rep.add("E7/W2 T1: lore i dymek (linia startowa, ostatnia sesja)", body[:260],
+                    "lore N/N, bramka zgodna (5A8C2735), odrzucone 0, dymek zarejestrowany, herby z lore niewazne 0", ok)
+            bk = re.search(r"BK: wiara (tak|nie), tytuly (tak|nie)", s)
+            rep.add("E7/W2 W2-1b: odczyty BK (odbicie)", bk.group(0) if bk else "brak", "wiara tak, tytuly tak (BannerKings w zestawie)",
+                    (bk.group(1) == "tak" and bk.group(2) == "tak") if bk else None)
+    else:
+        rep.add("E7/W2 T1: linia startowa", "brak", "jest przy starcie kazdej sesji (OnSessionLaunched)", None)
+    days = sorted(rows)
+    need = max(0, len(win) - 1)
+    rep.add("E7/W2 W2-0: linia doby Dymek wioski (E7/W2)", f"{len(days)} dob (dob okna {len(win)})", f">= {need} (codziennie w oknie)",
+            (len(days) >= need and need > 0) if win else None)
+    if days:
+        def tot(pat):
+            return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+
+        def most(pat):
+            return max([num(pat, rows[x], int, 0) or 0 for x in days] or [0])
+        sb, sr = tot(r"budowa (\d+), odswiezanie"), tot(r"odswiezanie (\d+) \(sesja")
+        fw, ft, fr = most(r"wiara (\d+), tytul"), most(r"tytul (\d+), wiersz"), most(r"wiersz (\d+) \(sesja\)")
+        rep.add("E7/W2 T2: potkniecia dymka (suma okna) i lore/BK (najwiecej w sesji)", f"budowa {sb}, odswiezanie {sr}; wiara {fw}, tytul {ft}, wiersz {fr}", "0",
+                sb + sr + fw + ft + fr == 0)
+        tips, fb = tot(r"dymkow z herbem (\d+)"), tot(r"zapas bez herbu (\d+)")
+        rep.add("E7/W2 W2-2b: dymki pokazane (suma okna)", f"z herbem {tips}, zapas bez herbu {fb}",
+                "INFO (bez najechan 0; zapas > 0 = brak prefabu GUI\\Prefabs albo rejestracji)", None)
+    if samples:
+        s = samples[-1]
+        a = num(r"najwiekszy udzial BK (\d+)/", s, int)
+        b = num(r"najwiekszy udzial BK \d+/(\d+)", s, int)
+        n = num(r"\(wiosek probki (\d+),", s, int)
+        rep.add("E7/W2 T4: wiara w dymku = najwiekszy udzial BK (probka 20 wiosek, ostatnia sesja)", f"{a}/{b} wiosek z danymi BK (probki {n})",
+                "wszystkie wioski probki z danymi BK, co najmniej 10", (a == b and b >= 10) if a is not None and b is not None else None)
+        m = re.search(r"zdanie lore o swietym miejscu: (\d+)/(\d+) wiosek z lore \(okreg bez danych BK (\d+)\)", s)
+        rep.add("E7/W2 W2-4b: zdanie lore o swietym miejscu (faith_bk = dominujaca wiara BK okregu, cala mapa)", m.group(0) if m else "brak", "INFO", None)
+    else:
+        rep.add("E7/W2 T4: probka wiary", "brak linii", "jest w pierwszej dobie sesji (VillageTipLore)", None)
+    rep.add("E7/W2 T3: zdjecia dymka (Polnoc, Reach, Dorne) - herb, rycerz, Alt", "poza narzedziem", "tryb zdjec autotestu", None)
+
+
+def etap7_w3(rep, lines, start, win, until=120, **kw):
+    """E7/W3 (234, PLAN 7.9 b, projekt etapu 7 v2 rozdz. 3 "E7/W3" Test): linia startowa "Menu okregu (E7/W3): start" (pierwsza doba sesji - index pozycji
+    po wszystkich modach) i linia doby "Menu okregu (E7/W3): dzien N" (tylko gdy okno otwarto albo bylo potkniecie). Wiazace: T1 (pozycja w obu menu),
+    T3 (0 potkniec i 0 linii ERROR okna); T2 (zdjecie okna, herb w ramce 86 x 63 prefabu ROT) poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Menu okregu (E7/W3): start")]
+    rows = {}
+    for d, s in by_day(lines, "Menu okregu (E7/W3): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = s
+    if not starts:
+        rep.add("E7/W3 T1: linia startowa Menu okregu (E7/W3)", "brak w logu", "jest w pierwszej dobie kazdej sesji od wgrania E7/W3 (LogEnabled)", None)
+    else:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "WYLACZONY" in s or "NIEWPIETA" in s:
+            rep.add("E7/W3 T1: pozycja w menu (ostatnia sesja)", body[:200], "klucz DistrictMenuEnabled wlaczony, pozycja wpieta", False)
+        else:
+            v = re.search(r"village index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            lo = re.search(r"village_looted index (\d+) z (\d+) \(przed: ([^,]*), po: ([^)]*)\)", s)
+            book = "ksiega wiosek czynna" in s
+            rep.add("E7/W3 T1: \"Look over the district\" w menu village i village_looted (ostatnia sesja)", body[:260],
+                    "pozycja w obu menu (bez BRAK), ksiega wiosek czynna", bool(v) and bool(lo) and book)
+            nb = []
+            if v:
+                nb.append(f"village: przed {v.group(3)}, po {v.group(4)}")
+            if lo:
+                nb.append(f"village_looted: przed {lo.group(3)}, po {lo.group(4)}")
+            rep.add("E7/W3 W3-1b: sasiedzi pozycji (BK i ROT dokladaja do village)", "; ".join(nb) or "brak",
+                    "INFO (oczekiwane: przed arm_people_village / arm_people_village_looted)", None)
+    days = sorted(rows)
+    st = sum(num(r"potkniecia dzis (\d+)", rows[x], int, 0) or 0 for x in days)
+    err = [s for s in lines if s.startswith("ERROR in DistrictMenu.") or s.startswith("ERROR in VillageBook.DistrictView")]
+    rep.add("E7/W3 T3: potkniecia okna okregu (suma okna) i linie ERROR okna", f"potkniecia {st} (dob z uzyciem {len(days)}), linii ERROR {len(err)}", "0", st == 0 and not err)
+    if days:
+        def tot(pat):
+            return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+        o, m = tot(r"okien (\d+)"), tot(r"Hear more (\d+)")
+        hb, hl, hp, hn = tot(r"rod posiadacza tytulu BK (\d+)"), tot(r"rycerz z lore (\d+)"), tot(r"pan (\d+), bez"), tot(r"bez herbu (\d+)")
+        rep.add("E7/W3 W3-3b: uzycie okna (suma okna)", f"okien {o}, Hear more {m}; herby: rod tytulu BK {hb}, rycerz z lore {hl}, pan {hp}, bez herbu {hn}",
+                "INFO (autotest bez klikniec - 0; bez herbu > 0 tylko przy wsi bez pana)", None)
+    rep.add("E7/W3 T2: zdjecie okna okregu (herb w ramce 86 x 63 prefabu ROT, dymek wiersza, Hear more)", "poza narzedziem", "tryb zdjec autotestu", None)
+
+
+def etap7_w5(rep, lines, start, win, until=120, **kw):
+    """E7/W5 (238, PLAN 7.9 c, projekt etapu 7 v2 rozdz. 3 "E7/W5"): linia startowa "Proporczyki (E7/W5): start" (pierwszy tick widoku wiosek na
+    mapie - raz na mape / wczytanie) i linia stanu "Proporczyki (E7/W5): w kadrze ..." (co 2 minuty przy zmianie i na koniec mapy; liczniki od
+    wczytania mapy). Widok mapy nie ma doby - progi z calego logu. Wiazace: T1, W5-2, W5-3; T2 (spadek klatek < 5%) w trybie zdjec poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Proporczyki (E7/W5): start")]
+    rows = [s for s in lines if s.startswith("Proporczyki (E7/W5): w kadrze")]
+    if not starts and not rows:
+        rep.add("E7/W5: linie Proporczyki (E7/W5)", "brak w logu",
+                "sa od wgrania E7/W5 przy czynnych wioskach na mapie (MapVillagesEnabled, VillagePennants, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "siatka BRAK" in s:
+            rep.add("E7/W5 T1: siatka choragwi (ostatnia mapa)", body[:200], "campaign_flag (zapas map_banner)", False)
+        else:
+            rep.add("E7/W5 T1: siatka choragwi (ostatnia mapa)", body[:200], "campaign_flag z plotnem (ZAPAS map_banner - INFO)",
+                    True if "siatka campaign_flag" in s else None)
+    else:
+        rep.add("E7/W5 T1: linia startowa", "brak", "jest przy pierwszym ticku widoku z wlaczonym kluczem VillagePennants", None)
+    off = [s for s in lines if s.startswith("Proporczyki (E7/W5): wylaczone w MCM")]
+    if off:
+        rep.add("E7/W5: wylacznik VillagePennants w biegu", f"wylaczen {len(off)}", "INFO (proba wylacznika albo bisekcja)", None)
+    if not rows:
+        rep.add("E7/W5 W5-1: linia stanu", "brak", "co 2 minuty przy zmianie i na koniec mapy", None)
+        return
+    seen = max([num(r"\(najwiecej (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-1: proporczykow w kadrze naraz (najwiecej w biegu)", str(seen), "1-80 (0 = kamera nie zjechala ponizej 90 - INFO)",
+            (1 <= seen <= 80) if seen > 0 else None)
+    ms = max([num(r"budowa sr\. ([0-9.]+) ms/klatke", s, float, 0.0) or 0.0 for s in rows] or [0.0])
+    bt = max([num(r"klatek z budowa (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-2: budowa proporczykow sr. ms na klatke z budowa (najgorsza linia)", f"{ms:.3f} ms (klatek z budowa najwiecej {bt})",
+            "< 8 ms (budzet tworzenia obrazkow wiosek na tick)", ms < 8.0 if bt > 0 else None)
+    st = max([num(r"potkniecia (\d+) \(wiosek bez", s, int, 0) or 0 for s in rows] or [0])
+    fl = max([num(r"wiosek bez proporczyka (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    # PickPennantMesh (start mapy) i RemovePennants (wylacznik, koniec mapy - po linii stanu) tez: ich potkniecia nie trafiaja do linii z konca mapy
+    err = [s for s in lines if s.startswith(("ERROR in MapVillagesView.Pennant", "ERROR in MapVillagesView.PickPennant", "ERROR in MapVillagesView.RemovePennants"))]
+    rep.add("E7/W5 W5-3: potkniecia proporczykow (najwiecej w linii mapy) i linie ERROR", f"potkniecia {st} (wiosek bez proporczyka {fl}), linii ERROR {len(err)}",
+            "0", st == 0 and not err)
+    pm = max([num(r"przebudowy po misji (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    mi = max([num(r"\(misji (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
+    lc = max([num(r"zmiany herbu (\d+)", s, int, 0) or 0 for s in rows] or [0])
+    rep.add("E7/W5 W5-4: przebudowy po misji i zmiany herbu (najwiecej w linii mapy)", f"po misji {pm} (misji {mi}), zmiany herbu {lc}",
+            "INFO (po bitwie z proporczykami w poblizu > 0)", None)
+    rep.add("E7/W5 T2: spadek klatek przy kamerze 30 / 60 / 90 i 0 / 40 / 80 proporczykach, plotno, puste flagi po bitwie", "poza narzedziem",
+            "< 5% w trybie zdjec (inaczej VillagePennants domyslnie false)", None)
+
+
+def etap7_d0(rep, lines, start, win, until=120, **kw):
+    """E7/D0 (239, PLAN 1.13 -> 7.5, projekt etapu 7 v2 rozdz. 3 "E7/D0"): proba drog P2 kluczem MapRoadsProbeEnabled (domyslnie false). Linia startu
+    sesji "MapRoadsProbe: wylaczona" / "wlaczona"; przy wlaczonej (osobny krotki bieg zdjec): "MapRoadsProbe: plik ...", "MapRoadsProbe: postawione N z M ...",
+    linia pomiaru "MapRoadsProbe: stempli N ...; klatki z drogami w kadrze: ..." (co minute przy zmianie i na koniec mapy). Widok mapy nie ma doby - progi
+    z calego logu, tryb biegu wedlug OSTATNIEJ linii startu sesji. Wiazace: bieg A - D0-1 (wylaczona, nic nie postawione); bieg zdjec - D0-2 (CRC zgodne,
+    zle wiersze 0, postawione N z N); oba - D0-3 (potkniecia i linie ERROR 0). Czas stawiania i klatki - INFO; zdjecia - poza narzedziem."""
+    ses = [s for s in lines if s.startswith(("MapRoadsProbe: wylaczona", "MapRoadsProbe: wlaczona"))]
+    files = [s for s in lines if s.startswith("MapRoadsProbe: plik")]
+    built = [s for s in lines if s.startswith("MapRoadsProbe: postawione")]
+    rows = [s for s in lines if s.startswith(("MapRoadsProbe: stempli", "MapRoadsProbe: koniec mapy"))]
+    err = [s for s in lines if s.startswith("ERROR in MapRoadsProbe")]   # MapRoadsProbe.SessionStart, "MapRoadsProbe: komponent ...", MapRoadsProbeView.*
+    if not ses and not files and not built and not rows and not err:
+        rep.add("E7/D0: linie MapRoadsProbe", "brak w logu", "sa od wgrania E7/D0 (linia startu sesji, LogEnabled)", None)
+        return
+    on = bool(ses) and ses[-1].startswith("MapRoadsProbe: wlaczona")
+    if not on:
+        off_ok = bool(ses) and all(s.startswith("MapRoadsProbe: wylaczona") for s in ses)
+        rep.add("E7/D0 D0-1: bieg A - proba drog wylaczona (klucz false)", f"linii 'wylaczona' {len(ses)} z {len(ses)} startow sesji, linii 'postawione' {len(built)}"
+                if off_ok else f"startow sesji {len(ses)} (wlaczona w ktorejs), linii 'postawione' {len(built)}",
+                "'wylaczona' przy kazdym starcie sesji, nic nie postawione", off_ok and not built)
+    else:
+        if files:
+            f = files[-1]
+            bad = num(r"zle wiersze (\d+)", f, int, -1)
+            crc_bad = "NIEZGODNE" in f
+            nst = num(r"stempli (\d+) w oknach", f, int, 0) or 0
+            rep.add("E7/D0 D0-2a: plik proby (ostatnia mapa)", f"stempli {nst}, zle wiersze {bad}, CRC sceny {'NIEZGODNE' if crc_bad else 'zgodne / brak w pliku'}",
+                    "stempli > 0, zle wiersze 0, CRC zgodne", nst > 0 and bad == 0 and not crc_bad)
+        else:
+            miss = [s for s in lines if s.startswith("MapRoadsProbe: brak pliku")]
+            rep.add("E7/D0 D0-2a: plik proby", "brak pliku (ModuleData\\arm_map_roads_probe.tsv)" if miss else "brak linii 'plik' (widok mapy sie nie zarejestrowal?)",
+                    "plik wgrany na bieg zdjec, linia 'MapRoadsProbe: plik ...'", False)
+        if built:
+            b = built[-1]
+            m = re.search(r"postawione (\d+) z (\d+) \(prefab (\d+), kod (\d+), pominiete bez materialu (\d+), potkniecia (\d+)\)", b)
+            if m:
+                made, tot, pf, cd, skip, st = (int(x) for x in m.groups())
+                rep.add("E7/D0 D0-2b: stemple postawione (ostatnia mapa)", f"{made} z {tot} (prefab {pf}, kod {cd}, bez materialu {skip}, potkniecia {st})",
+                        "N z N, N > 0, bez materialu 0, potkniecia 0 (kod zamiast prefabu - INFO: prefab nie wgrany)", tot > 0 and made == tot and skip == 0 and st == 0)
+            else:
+                rep.add("E7/D0 D0-2b: linia 'postawione'", b[:160], "format linii E7/D0", False)
+            ms = num(r"\) w ([0-9.]+) ms \(", b, float, 0.0) or 0.0
+            mx = num(r"najdluzszy tick ([0-9.]+) ms", b, float, 0.0) or 0.0
+            rep.add("E7/D0 D0-4: czas stawiania (ostatnia mapa)", f"{ms:.1f} ms w sumie, najdluzszy tick {mx:.1f} ms", "INFO (budzet ok. 8 ms na cwierc sekundy)", None)
+        else:
+            rep.add("E7/D0 D0-2b: linia 'postawione'", "brak", "jest po wejsciu na mape przy wlaczonym kluczu", False)
+        if rows:
+            r = rows[-1]
+            fr = re.search(r"klatki z drogami w kadrze: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            fb = re.search(r"; bez: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            txt = (f"z drogami w kadrze {fr.group(1)} klatek" + (f" (sr. {fr.group(2)} ms, p95 {fr.group(4)})" if fr and fr.group(2) else "") if fr else "z drogami -")
+            txt += (f"; bez {fb.group(1)}" + (f" (sr. {fb.group(2)} ms, p95 {fb.group(4)})" if fb and fb.group(2) else "") if fb else "; bez -")
+            rep.add("E7/D0 D0-5: klatka z drogami w kadrze i bez (ostatnia linia pomiaru)", txt, "INFO (do zdjec i decyzji D1; bieg A bez proby)", None)
+    st = 0
+    for s in rows:
+        m = re.search(r"potkniecia: stawianie (\d+), widocznosc (\d+), zdejmowanie (\d+), tick (\d+)", s)
+        if m:
+            st = max(st, sum(int(x) for x in m.groups()))
+    rep.add("E7/D0 D0-3: potkniecia proby (najwiecej w linii mapy) i linie ERROR in MapRoadsProbe*", f"potkniecia {st}, linii ERROR {len(err)}", "0", st == 0 and not err)
+    offm = [s for s in lines if s.startswith("MapRoadsProbe: wylaczone w MCM")]
+    if offm:
+        rep.add("E7/D0: wylacznik MapRoadsProbeEnabled w biegu", f"wylaczen {len(offm)}", "INFO (proba wylacznika)", None)
+    if on:
+        rep.add("E7/D0 D0-6: zdjecia obu okien (Fairmarket, Winterfell) z bliska i z daleka", "poza narzedziem", "dla Jeffa - pytanie 2 \"ile drog\"", None)
 
 def main(argv):
     args = argv[1:]
@@ -7329,7 +7733,7 @@ def main(argv):
     if group == "etap5" and logp:
         return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group == "etap7" and logp:
-        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224): szkielet etapu 7 + blok E7/0; kolejne paczki dopisuja bloki
+        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224) + E7/B (231): szkielet etapu 7 + bloki obu galezi; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

@@ -1,0 +1,224 @@
+# E7/L: 20 przykladowych dymkow wioski (po angielsku, jak w grze po E7/W2) - do wgladu Jeffa, nie blokuje.
+# Linia pana i liczba ludzi: przyblizenie z settlements.xml (w grze na zywo, z herbem pana); linie po 'Hold Alt' = plik lore.
+# Herb rycerza (ostatnia linia) pokaze menu okregu (E7/W3).
+
+[north | ROT_town1_village3#540a9ad5 | rod wymyslony]
+RAVENHOLLOW
+A village of the Pinestraw lands, held by House Bolton of Dreadfort
+Kept for them by Donnel Rimehill of Ravenhollow
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Crofters and herdsmen: barley, oats and turnips, a few cows and pigs.
+  Faith: the old gods. Oaths are sworn before the heart tree, and no one breaks them lightly.
+  Men from the village marched south in Robert's Rebellion; fewer came back from the Trident.
+  (arms of House Rimehill: A white elk on sky blue)
+
+[north | castle_village_B1_2#303428b3 | rod lore]
+HERMIT'S REST
+A village of the Puddle lands, held by House Stark of Moat Cailin
+Kept for them by Lady Jonelle Lightfoot of Hermit's Rest
+6,750 souls in 27 settlements
+Hold Alt for more info
+  Ploughmen and reapers: barley, oats and turnips. An inn at the crossroads, busiest before winter.
+  Faith: the old gods of the forest, nameless and countless, who watch through the weirwoods' eyes.
+  The old men still say Torrhen Stark knelt to the dragon so that their forefathers would not burn.
+  (arms of House Lightfoot: A line of white footprints in bend sinister, on dark brown)
+
+[north | village_B2_2#ac0e5b68 | rod lore]
+LONG WEIR
+A village of the Acorn Water lands, held by House Stark of Winterfell
+Kept for them by Rickard Poole of Long Weir
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Farmers and millers: barley, oats and turnips. The mill wheel turns on the Acorn Water.
+  Faith: the old gods of the forest, nameless and countless, who watch through the weirwoods' eyes.
+  The Starks have held this land since the Age of Heroes, and the village has never known another liege.
+  (arms of House Poole: A blue plate on white, with a grey tressure)
+
+[north | village_B2_4#2c7282eb | rod wymyslony]
+MILLWOOD
+A village of the White Fork lands, held by House Stark of Winterfell
+Kept for them by Rodrik Mossbeck of Millwood
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Farmers and millers: barley, oats and turnips. The mill wheel turns on the White Knife.
+  Faith: the old gods of the forest, nameless and countless, who watch through the weirwoods' eyes.
+  The Starks have held this land since the Age of Heroes, and the village has never known another liege.
+  (arms of House Mossbeck: A sky blue wolf's head on gold)
+
+[riverlands | ROT_castle39_village1#7cfbef89 | rod wymyslony]
+PENNYTON
+A village of the Mummer's Ford lands, held by House Vance of Wayfarer's Rest
+Kept for them by Ser Joseth Rushfield of Pennyton
+3,500 souls in 14 settlements
+Hold Alt for more info
+  Farmers: wheat, barley and oats. A windmill on the rise grinds for the whole district.
+  Faith: the Seven. Women pray to the Mother in the sept, men to the Warrior and the Smith.
+  Its oldest families say they were here before the Andals, and the Andals married them anyway.
+  In the last days of 298 AC men without banners burned Mummer's Ford and the villages near it.
+  (arms of House Rushfield: Two crossed white oars on brown)
+
+[riverlands | village_EW6_3#92054fab | rod wymyslony]
+PLUMTREE
+A village of the Brass Bell lands, held by House Mooton of Maidenpool
+Kept for them by Ser Joseth Ashwick of Plumtree
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Farmers: wheat, barley and oats. A smithy on the road shoes the horses of passing riders.
+  Faith: the Seven. Women pray to the Mother in the sept, men to the Warrior and the Smith.
+  Men from the village died in Harren's quarries, chained to the sledges that built Harrenhal.
+  (arms of House Ashwick: Two crossed blue oars on silver)
+
+[riverlands | village_V2_2#269f4a40 | rod lore]
+ACORNWOOD
+A village of the Riverstone lands, held by House Tully of Riverrun
+Kept for them by Ser Raymun Grey of Acornwood
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Crofters and herdsmen: wheat, barley and oats, a few cows and pigs. A smithy on the road shoes the horses of passing riders.
+  Faith: the Seven. Father, Mother, Warrior, Smith, Maiden, Crone and Stranger each have a candle in the sept.
+  The village grew along the road one alehouse at a time; carters still stop here for the night.
+  (arms of House Grey: none)
+
+[riverlands | ROT_castle39_village2#b3e16ce8 | rod wymyslony]
+WHITEWORTH
+A village of the High Heart lands, held by House Vance of Wayfarer's Rest
+Kept for them by Ser Wendel Weirmore of Whiteworth
+3,500 souls in 14 settlements
+Hold Alt for more info
+  Farmers: wheat, barley and oats. A smithy on the road shoes the horses of passing riders.
+  Faith: the Seven, though an old weirwood still stands nearby and some leave gifts there.
+  Its oldest families say they were here before the Andals, and the Andals married them anyway.
+  (arms of House Weirmore: A white kettle on grey)
+
+[reach | castle_village_V2_1#6b29e014 | rod wymyslony]
+REDBURY
+A village of the High Sunset lands, held by House Bulwer of Blackcrown
+Kept for them by Ser Osbert Goldenvale of Sweet Hives
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Farmers and beekeepers: wheat, barley and apples. A waystation on the road sells bread and ale.
+  Faith: the Seven. Father, Mother, Warrior, Smith, Maiden, Crone and Stranger each have a candle in the sept.
+  Hedge knights ride this road looking for service, and the village feeds them for their news.
+  (arms of House Goldenvale: A gold pear on purple)
+
+[reach | village_V5_2#03f11a0e | rod lore]
+SANDHAM
+A village of the Whitegrove lands, held by House Tyrell of Highgarden
+Kept for them by Ser Moribald Cockshaw of Bluevale
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Ploughmen and reapers: wheat, barley and apples. Ferrymen and eel traps on the Mander.
+  Faith: the Seven. Women pray to the Mother in the sept, men to the Warrior and the Smith.
+  Spring floods once carried off half the houses; the new ones stand on the high bank.
+  (arms of House Cockshaw: Three feathers, red, white and gold, on black)
+
+[reach | village_ES7_2#4014d397 | rod wymyslony]
+VINECROSS
+A village of the Rosewood lands, held by House Footly of Tumbleton
+Kept for them by Ser Torgen Greenworth of Vinecross
+6,750 souls in 27 settlements
+Hold Alt for more info
+  Farmers and carters: wheat, barley and apples. The great barn here holds the grain of the district.
+  Faith: the Seven. Father, Mother, Warrior, Smith, Maiden, Crone and Stranger each have a candle in the sept.
+  Its oldest families say they were here before the Andals, and the Andals married them anyway.
+  (arms of House Greenworth: A blue rose on gold)
+
+[reach | castle_village_V2_2#f9fbd6ea | rod wymyslony]
+BRIGHTPORT
+A village of the Westshore lands, held by House Bulwer of Blackcrown
+Kept for them by Ser Moribald Cloverwell of Brightport
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Olive growers: groves and an oil press. Boats drawn up on the shingle, and salt fish for the markets.
+  Faith: the Seven. Begging brothers pass through and are fed at the sept door.
+  Floods, sickness and war have each half emptied the village, and each time it filled again.
+  (arms of House Cloverwell: A blue beehive on silver)
+
+[dorne | ROT_castle25_village2#1640c3d8 | rod wymyslony]
+HIGHSPRING
+A village of the Seaspray lands, held by House Jordayne of The Tor
+Kept for them by Ser Yoren Speardell of Highspring
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Crofters and herdsmen: wheat and barley on watered land, a few cows and pigs.
+  Faith: the Seven. A small sept of sun-dried brick; a septon comes from Seaspray.
+  When Nymeria burned her ships, the Rhoynar stayed; their customs still rule inheritance here.
+  (arms of House Speardell: A silver vulture on grey)
+
+[dorne | village_A1_4#107bd736 | rod lore]
+GOATWOOD
+A village of the Water Gardens lands, held by House Martell of Sunspear
+Kept for them by Lady Myria Ladybright of Goatwood
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Date palms around a guarded well, worth more than gold. A well and a stable for the caravans on the road.
+  Faith: the Seven. A small sept of sun-dried brick; a septon comes from Water Gardens.
+  When Nymeria burned her ships, the Rhoynar stayed; their customs still rule inheritance here.
+  (arms of House Ladybright: none)
+
+[dorne | ROT_castle57_village2#774e8f71 | rod wymyslony | herb: kod]
+ORANGESTONE
+A village of the Dunesedge lands, held by House Fowler of Skyreach
+Kept for them by Lady Larra Redmont of Orangestone
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Fishers and net-makers: eels, pike and trout. Ferrymen and eel traps on the river.
+  Faith: the Seven. The sept is cool and dim inside, and the Mother's statue is veiled against the sun.
+  Andal adventurers carved out petty kingdoms here long before Nymeria; the village served three of them.
+  (arms of House Redmont: A red sand cat on white)
+
+[dorne | castle_village_A7_2#59794cde | rod wymyslony]
+GOATWELL
+A village of the Red Pass lands, held by House Wyl of Wyl
+Kept for them by Ser Arron Lemonstone of Vorhoy
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Fishers and net-makers: crabs, octopus and tuna.
+  Faith: the Seven. As everywhere in Dorne, daughters inherit as sons do, and the septon blesses both.
+  Dorne joined the realm by marriage in 187 AC, not by the sword, and the village is proud of it.
+  (arms of House Lemonstone: A red olive branch on white)
+
+[braavos | ROT_castle32_village1#e7d36975 | rod wymyslony]
+SERIS
+A village of the Totava lands, held by House Volentin of Iksa Calo
+Kept for them by Tormo Fereys of Seris
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Iron miners and smiths. A landing on the Rhoyne for barges and boats.
+  Faith: many gods. Some pray at the Moonsingers' shrine, others at the red priests' night fire.
+  Silver from the hills behind the village paid for many Braavosi ships.
+  (arms of House Fereys: Three brown tridents on silver)
+
+[braavos | ROT_town14_village1#66030cea | rod wymyslony | herb: kod]
+SECON
+A village of the Galos lands, held by House Celeris of Rhyos
+Kept for them by Roggerio Alaloys of Iksa Moneva
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Free farmers: barley, oats and cabbages. A windmill on the rise grinds for the whole district.
+  Faith: many gods. Some here honour the Father of Waters, whose temple is rebuilt for each new bride.
+  The village has never seen a dragon; the fog that hid Braavos hid it too.
+  (arms of House Alaloys: A gold cat on orange)
+
+[braavos | ROT_castle32_village2#8b2e48f3 | rod wymyslony]
+SEMAREL
+A village of the Giasos lands, held by House Volentin of Iksa Calo
+Kept for them by Bambarro Lotheys of Andarel
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Free farmers and millers: barley, oats and cabbages. The mill wheel turns on the Rhoyne.
+  Faith: many gods. Some here honour the Father of Waters, whose temple is rebuilt for each new bride.
+  Its families still keep the masks and the ten days of the Uncloaking of Uthero every year.
+  (arms of House Lotheys: Two orange crescent moons on gold)
+
+[braavos | village_EN5_2#5684a141 | rod wymyslony]
+ANDALIGO
+A village of the Orthra lands, held by House Antaryon of Braavos
+Kept for them by Sharako Paevaos of Andaligo
+4,000 souls in 16 settlements
+Hold Alt for more info
+  Fishers and net-makers: cod, herring and eels.
+  Faith: many gods. Some pray at the Moonsingers' shrine, others at the red priests' night fire.
+  Braavos was founded by slaves who fled their Valyrian masters and hid in the fog of the lagoon.
+  (arms of House Paevaos: Three white galleys on orange)

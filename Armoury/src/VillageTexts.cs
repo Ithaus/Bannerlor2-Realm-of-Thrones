@@ -71,6 +71,25 @@ namespace Armoury.Villages
         public const string RaidNext = "{=arm_raid_next}Raid the next settlement (about {DAYS} days)";
         public const string RaidEnd = "{=arm_raid_end}End the raid";
         public const string RaidSummary = "{=arm_raid_summary}{X} settlements burned in {D} days: {VILLAGES}.";
+        // E7/W1 (232, R10/R14): splondrowana bez spalenia w ksiedze i pamiec wojny (dymek W2) - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string VilLogPlundered = "{=arm_vil_log_plundered}{RAIDER} has plundered {VILLAGE} in the {DISTRICT} district: {BURNED} of {N} settlements burned.";
+        public const string VilLogPlunderedPlayer = "{=arm_vil_log_plundered_player}Your men have plundered {VILLAGE}: {BURNED} of {N} settlements burned.";
+        public const string VilMemBurned = "{=arm_vil_mem_burned}Burned by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
+        public const string VilMemPlundered = "{=arm_vil_mem_plundered}Plundered by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
+        public const string VilMemGone = "{=arm_vil_mem_gone}a raider long gone";
+        // E7/W2 (233, R11/R12): rycerz wioski (tytul wsi z BK albo dane lore, knight_form) i wiara z BK w dymku - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string VilTipKept = "{=arm_vil_tip_kept}Kept for them by {KNIGHT}";
+        public const string VilTipKeptOwn = "{=arm_vil_tip_kept_own}Kept for you by {KNIGHT}";
+        public const string VilTipTribute = "{=arm_vil_tip_tribute}{KNIGHT} takes its tribute";
+        public const string VilTipTributeOwn = "{=arm_vil_tip_tribute_own}{KNIGHT} takes its tribute for you";
+        public const string VilTipHolderOf = "{=arm_vil_tip_holder_of}{HERO} of {HOUSE}";
+        public const string VilTipFaith = "{=arm_vil_tip_faith}Faith: {FAITH} ({SHARE}%)";
+        // E7/W3 (234, R13): okno okregu "Look over the district" - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string DistHearMore = "{=arm_dist_hear_more}Hear more";
+        public const string DistBack = "{=arm_dist_back}Back to the villages";
+        public const string DistPick = "{=arm_dist_pick}Pick a village to hear more about it.";
+        public const string DistRowDamaged = "{=arm_dist_row_damaged}{VILLAGE}, some homes empty";
+        public const string VilArms = "{=arm_vil_arms}Arms of {HOUSE}: {ARMS}.";
 
         /// <summary>TextObject z para (NAZWA, wartosc) - np. Make(VilBurning, "VILLAGE", "Brackenford").</summary>
         public static TextObject Make(string text, params object[] kv)

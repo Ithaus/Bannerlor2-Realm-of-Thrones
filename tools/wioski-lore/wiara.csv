@@ -1,0 +1,148 @@
+table,key,faith,weight,cls,region,text,source
+map,region:north,old_gods,100,,,,Old_gods; Heart_tree
+map,region:gift,old_gods,70,,,,Old_gods
+map,region:gift,gift_seven,30,,,,Faith_of_the_Seven; Castle_Black
+map,region:beyond,old_gods_free,100,,,,Old_gods; Free_folk
+map,region:skagos,old_gods_skagos,100,,,,Skagos
+map,region:riverlands,seven,88,,,,Faith_of_the_Seven
+map,region:riverlands,seven_weirwood,12,,,,Raventree_Hall; High_Heart
+map,region:vale,seven,90,,,,Faith_of_the_Seven
+map,region:vale,seven_weirwood,10,,,,Vale_mountain_clans [STYL]
+map,region:westerlands,seven,100,,,,Faith_of_the_Seven
+map,region:reach,seven,100,,,,Faith_of_the_Seven; House_Gardener
+map,region:stormlands,seven,95,,,,Faith_of_the_Seven
+map,region:stormlands,seven_weirwood,5,,,,[STYL]
+map,region:crownlands,seven,100,,,,Faith_of_the_Seven
+map,region:dragonstone,seven,85,,,,Faith_of_the_Seven
+map,region:dragonstone,seven_red,15,,,,R'hllor; Dragonstone (298-299 AC)
+map,region:iron,drowned_god,100,,,,Drowned_God
+map,region:dorne,seven_dorne,100,,,,Faith_of_the_Seven; Dorne
+map,seat:White Harbor,seven_north,75,,,,White_Harbor; Sept_of_the_Snows; House_Manderly
+map,seat:White Harbor,old_gods,25,,,,White_Harbor
+map,seat:Ramsgate,seven_north,60,,,,House_Manderly
+map,seat:Ramsgate,old_gods,40,,,,House_Manderly
+map,seat:Raventree Hall,old_gods_river,60,,,,Raventree_Hall; House_Blackwood
+map,seat:Raventree Hall,seven,40,,,,Raventree_Hall
+map,seat:Acorn Hall,seven_weirwood,40,,,,High_Heart
+map,seat:Acorn Hall,seven,60,,,,Faith_of_the_Seven
+map,seat:Harrenhal,seven_weirwood,25,,,,Harrenhal (weirwood beams)
+map,seat:Harrenhal,seven,75,,,,Faith_of_the_Seven
+map,seat:Dyre Den,seven_weirwood,30,,,,Crackclaw_Point (First Men blood) [STYL]
+map,seat:Dyre Den,seven,70,,,,Crackclaw_Point
+map,river:the Greenblood@dorne,mother_rhoyne,60,,,,Mother_Rhoyne; Orphans_of_the_Greenblood
+map,river:the Greenblood@dorne,seven_dorne,40,,,,Dorne
+map,region:braavos,braavos_many,100,,,,Braavos; Isle_of_the_Gods; Temple_of_the_Moonsingers
+map,region:pentos,pentos_many,100,,,,Pentos; Prince_of_Pentos; Red_temple
+map,region:norvos,norvos_bearded,100,,,,Norvos; Bearded_priests
+map,region:qohor,qohor_goat,100,,,,Black_Goat; Qohor
+map,region:lorath,lorath_mixed,100,,,,Lorath; Boash; Mazemakers
+map,region:myr,myr_mixed,100,,,,Myr; Red_temple
+map,region:lys,lys_mixed,100,,,,Lys; Weeping_Lady_of_Lys
+map,region:tyrosh,tyrosh_mixed,100,,,,Tyrosh; Trios; Red_temple
+map,region:volantis,volantis_mixed,100,,,,Temple_of_the_Lord_of_Light; Volantis
+map,region:valyria,valyria_ruins,100,,,,Valyria; Fourteen_Flames
+map,region:ghis,ghis_gods,100,,,,Ghiscari; Temple_of_the_Graces
+map,seat:Lhazosh,lhazar_shepherd,100,,,,Great_Shepherd; Lhazareen
+map,seat:Hesh,lhazar_shepherd,100,,,,Great_Shepherd; Lhazareen
+map,region:qarth,qarth_many,100,,,,Qartheen; Temple_of_Memory
+map,region:dothraki,dothraki_horse,100,,,,Great_Stallion; Womb_of_the_World; Godsway
+map,region:sarnor,sarnor_hundred,100,,,,Sarnori; Saath
+map,region:ibben,ibben_gods,100,,,,Ibben (Thousand with priests) [STYL]
+map,region:yiti,yiti_gods,100,,,,Lion_of_Night; Maiden-Made-of-Light; God-on-Earth
+map,region:summer,summer_love,100,,,,Summer_Isles
+line,,old_gods,,H,,Faith: the old gods. A weirwood with a carved face stands on the village green.,Old_gods (godswoods in villages)
+line,,old_gods,,H,,Faith: the old gods. Weddings are made before the heart tree in the village grove.,Heart_tree
+line,,old_gods,,R,,Faith: the old gods. They pray before a heart tree in the wood above the fields.,Heart_tree
+line,,old_gods,,R,,"Faith: the old gods. The heart tree here weeps red sap, and no one cuts wood near it.",Weirwood
+line,,old_gods,,R,,"Faith: the old gods. No priests and no temple, only an old weirwood by the spring.",Old_gods (no priests)
+line,,old_gods,,F,,"Faith: the old gods. The nearest heart tree is a morning's walk away, in the lord's godswood.",Godswood
+line,,old_gods,,F,,Faith: the old gods. A carved weirwood stump marks where the village prays.,Old_gods [STYL]
+line,,seven_north,,H,,"Faith: the Seven, as in White Harbor. A sept of white stone, small but proud.",White_Harbor; Sept_of_the_Snows [STYL]
+line,,seven_north,,R,,"Faith: the Seven, brought north by the Manderlys. A few old families still keep a heart tree.",House_Manderly; White_Harbor
+line,,seven_north,,F,,"Faith: the Seven. A septon from {DISTRICT} comes twice a year, when the roads allow.",Faith_of_the_Seven (wandering septons)
+line,,old_gods_river,,*,,"Faith: the old gods, like the Blackwoods of Raventree. A weirwood stands at the village edge.",Raventree_Hall; House_Blackwood
+line,,old_gods_river,,*,,"Faith: the old gods. Ravens roost in the village weirwood, as they do at Raventree.",Godswood_of_Raventree_Hall [STYL]
+line,,gift_seven,,*,,"Faith: the Seven, for the southron settlers. The black brothers pray at the sept of Castle Black.",Castle_Black [STYL]
+line,,gift_seven,,*,,Faith: the Seven and the old gods side by side; a weirwood and a wooden sept share the green.,New_Gift [STYL]
+line,,old_gods_free,,*,,"Faith: the old gods. The free folk kneel to no king, only to the weirwoods of the haunted forest.",Free_folk; Old_gods
+line,,old_gods_free,,*,,"Faith: the old gods. They burn their dead, so that nothing walks again.",Free_folk
+line,,old_gods_skagos,,*,,Faith: the old gods. Mainlanders whisper that the stoneborn still give blood to their weirwoods.,Skagosi
+line,,old_gods_skagos,,*,,"Faith: the old gods, kept the oldest way. A weirwood grove watches the bay.",Skagos [STYL]
+line,,seven,,H,,"Faith: the Seven. A seven-sided sept of stone, with its own septon and a bell.",Faith_of_the_Seven; Sept
+line,,seven,,H,,"Faith: the Seven. A stone sept with seven windows, the pride of the village.",Sept [STYL]
+line,,seven,,H,riverlands|reach|vale,"Faith: the Seven. A septry of brown brothers nearby keeps bees, a mill and a brewhouse.",Septry (ASOS 39)
+line,,seven,,R,,Faith: the Seven. A small wooden sept; a septon from {DISTRICT} comes on holy days.,Faith_of_the_Seven
+line,,seven,,R,,Faith: the Seven. A roadside shrine bears the seven-pointed star; the sept is in {DISTRICT}.,Seven-pointed star [STYL]
+line,,seven,,R,,Faith: the Seven. Begging brothers pass through and are fed at the sept door.,Holy_brother
+line,,seven,,F,,Faith: the Seven. No septon of its own: a wandering septon comes twice a year to marry and bless.,Faith_of_the_Seven (twice a year)
+line,,seven,,F,,Faith: the Seven. The faithful walk to the sept in {DISTRICT} on holy days.,Faith_of_the_Seven
+line,,seven_weirwood,,*,,"Faith: the Seven, though an old weirwood still stands nearby and some leave gifts there.",Raventree_Hall; High_Heart
+line,,seven_weirwood,,*,,"Faith: the Seven. A few old families still pray at a weirwood in the woods, as the First Men did.",Old_gods (south of the Neck)
+line,,seven_red,,*,,"Faith: the Seven. Lately men from Dragonstone speak of a red god, and the septon frowns.",R'hllor; Melisandre at Dragonstone
+line,,drowned_god,,H,,Faith: the Drowned God. No temple: the drowned men baptise in the surf below the village.,Drowned_God (no temples)
+line,,drowned_god,,R,,"Faith: the Drowned God. When a drowned priest comes with his driftwood cudgel, he is fed and housed.",Priest_of_the_Drowned_God
+line,,drowned_god,,F,,Faith: the Drowned God. They give their dead to the sea and keep no idols.,Drowned_God
+line,,seven_dorne,,H,,Faith: the Seven. A domed sept of sandstone stands beside the village well.,Dorne [STYL]
+line,,seven_dorne,,R,,Faith: the Seven. A small sept of sun-dried brick; a septon comes from {DISTRICT}.,Faith_of_the_Seven
+line,,seven_dorne,,F,,"Faith: the Seven. A wandering septon comes with the caravans, when they come.",Faith_of_the_Seven [STYL]
+line,,mother_rhoyne,,*,,"Faith: the Seven, but the river folk still leave offerings to Mother Rhoyne.",Mother_Rhoyne; Orphans_of_the_Greenblood
+line,,mother_rhoyne,,*,,Faith: the Seven. Orphans of the Greenblood moor here and sing to Mother Rhoyne at dusk.,Orphans_of_the_Greenblood
+line,,braavos_many,,H,,"Faith: many gods, as in Braavos. A shrine of the Moonsingers, who led the founders to the lagoon.",Temple_of_the_Moonsingers
+line,,braavos_many,,R,,"Faith: many gods. Some pray at the Moonsingers' shrine, others at the red priests' night fire.",Braavos; Red_temple
+line,,braavos_many,,F,,Faith: many gods. In Braavos every god has a temple on the Isle of the Gods; here there is one shrine.,Isle_of_the_Gods
+line,,pentos_many,,*,,"Faith: the many gods of Pentos. A field shrine; when harvests fail, they say the Prince will pay for it.",Prince_of_Pentos
+line,,pentos_many,,*,,Faith: many gods. A red priest lights a night fire in {DISTRICT} for those who will listen.,Pentos; Red_temple
+line,,norvos_bearded,,H,,"Faith: the god of the bearded priests, whose name only initiates know. A bell calls the hours of prayer.",Bearded_priests; Norvos (three bells) [STYL]
+line,,norvos_bearded,,R,,Faith: the nameless god of Norvos. A bearded priest in a hair shirt comes on holy days.,Bearded_priests
+line,,norvos_bearded,,F,,"Faith: the god of the bearded priests. The village rises and rests by the bells of Norvos, as all must.",Norvos (three bells)
+line,,qohor_goat,,H,,Faith: the Black Goat of Qohor. A calf or a kid is bled on the stone altar each holy day.,Black_Goat
+line,,qohor_goat,,R,,Faith: the Black Goat. The village sends a bullock to the temple when the priests ask.,Black_Goat
+line,,qohor_goat,,F,,Faith: the Black Goat. A blackened altar stone stands at the edge of the fields.,Black_Goat [STYL]
+line,,lorath_mixed,,*,,"Faith: many gods, brought by freedmen from every land. The old maze-stones belong to none of them.",Lorath; Mazemakers
+line,,lorath_mixed,,*,,"Faith: many gods. The cult of the Blind God is long dead, but its stone maze still stands.",Boash; Blind_God
+line,,myr_mixed,,*,,"Faith: no single faith, as in Myr. Shrines to many gods line the road; a red priest comes on market days.",Myr; Red_temple
+line,,myr_mixed,,*,,Faith: many gods. The red temple of Myr takes a boy from the village now and then.,Thoros_of_Myr
+line,,lys_mixed,,*,,Faith: many gods. The old women keep a shrine to the Weeping Lady of Lys.,Weeping_Lady_of_Lys
+line,,lys_mixed,,*,,Faith: many gods. The love goddess of the Lyseni coins is honoured at every wedding.,Lys (love goddess on coinage) [STYL]
+line,,tyrosh_mixed,,*,,Faith: many gods. A shrine of three-headed Trios stands at the edge of the village.,Trios; Temple_of_Trios
+line,,tyrosh_mixed,,*,,Faith: many gods. Red priests from Tyrosh preach in the market square.,Red_temple
+line,,volantis_mixed,,*,,"Faith: many gods. The slaves turn to R'hllor, whose temple in Volantis is the greatest in the world.",Temple_of_the_Lord_of_Light
+line,,volantis_mixed,,*,,"Faith: many gods. A red priest, himself a slave of the temple, tends the night fire.",Temple_of_the_Lord_of_Light (slave priests)
+line,,valyria_ruins,,*,,Faith: many gods. Men here fear the Fourteen Flames more than any of them.,Fourteen_Flames
+line,,ghis_gods,,*,,"Faith: the gods of Ghis, whose Graces keep the temples of the cities. The slaves pray in silence.",Ghiscari; Graces
+line,,ghis_gods,,*,,Faith: the gods of Ghis. A harpy carved over the shrine door watches who comes in.,Ghiscari (harpy emblem) [STYL]
+line,,lhazar_shepherd,,H,,"Faith: the Great Shepherd. A mud-walled temple with a domed roof, sheepskins on the floor.",Great_Shepherd (temple)
+line,,lhazar_shepherd,,*,,"Faith: the Great Shepherd. All men are one flock, the godswife teaches.",Great_Shepherd; Lhazareen
+line,,qarth_many,,*,,Faith: many strange gods. Their temples crowd the waterfront of Qarth; here there is only a shrine.,Qartheen
+line,,dothraki_horse,,*,,"Faith: the horse god of the Dothraki, for the riders. The village folk keep their own gods quietly.",Great_Stallion (book: horse god)
+line,,dothraki_horse,,*,,Faith: the horse god. The riders say the first man came out of the Womb of the World.,Womb_of_the_World
+line,,sarnor_hundred,,*,,"Faith: the hundred gods of the Tall Men, honoured now only here and in Saath.",Sarnori
+line,,ibben_gods,,*,,"Faith: the gods of Ibben, whose priests sit among the Thousand.","Ibben (Shadow Council, Thousand) [STYL]"
+line,,yiti_gods,,*,,"Faith: the Lion of Night and the Maiden-Made-of-Light, parents of the God-on-Earth.",Lion_of_Night; Maiden-Made-of-Light
+line,,summer_love,,*,,"Faith: the god and goddess of love, beauty and fertility. The village keeps a temple of love.",Summer_Isles
+line,,lhazar_shepherd,,*,,"Faith: the Great Shepherd. The temple is mud-walled and dark, with a blue-veined altar stone.",Great_Shepherd (temple)
+line,,lhazar_shepherd,,R,,Faith: the Great Shepherd. A godswife tends the village temple and the sick alike.,Great_Shepherd (godswife)
+line,,seven_north,,R,,"Faith: the Seven. A small wooden sept with a white door, paid for by Manderly silver.",House_Manderly [STYL]
+line,,pentos_many,,*,,Faith: many gods. The magisters' gods have temples in Pentos; the village makes do with a roadside altar.,Pentos [STYL]
+line,,myr_mixed,,*,,"Faith: many gods. Every trader brings his own god to Myr, and some leave one behind in the village.",Myr (mixed) [WYM]
+line,,lys_mixed,,*,,Faith: many gods. A red priest and a priestess of love share the village square on feast days.,Lys; Red_temple [STYL]
+line,,tyrosh_mixed,,*,,"Faith: many gods. The first head of Trios devours the dying, the village says, and the third gives them back.",Trios
+line,,volantis_mixed,,*,,Faith: many gods. The free keep the gods of their Valyrian fathers; the slaves keep the fire.,Volantis [STYL]
+line,,ghis_gods,,*,,"Faith: the gods of Ghis. The masters' household gods sit by the door, and the slaves bow as they pass.",Ghiscari [STYL]
+line,,lorath_mixed,,*,,"Faith: many gods. Freedmen from every land each brought a god, and none of them quarrels.",Lorath (refuge) [WYM]
+line,,seven,,R,,"Faith: the Seven. A sept of timber and daub, its seven-pointed star painted fresh every spring.",Sept [STYL]
+line,,seven,,R,,"Faith: the Seven. Their septon is old and half deaf, and preaches mostly about the Stranger.",Faith_of_the_Seven [WYM]
+line,,seven,,*,,"Faith: the Seven. Father, Mother, Warrior, Smith, Maiden, Crone and Stranger each have a candle in the sept.",Faith_of_the_Seven (seven aspects)
+line,,seven,,R,,"Faith: the Seven. Women pray to the Mother in the sept, men to the Warrior and the Smith.",Faith_of_the_Seven [STYL]
+line,,old_gods,,R,,"Faith: the old gods. Oaths are sworn before the heart tree, and no one breaks them lightly.",Heart_tree [STYL]
+line,,old_gods,,*,,"Faith: the old gods of the forest, nameless and countless, who watch through the weirwoods' eyes.",Old_gods
+line,,norvos_bearded,,*,,Faith: the nameless god of Norvos. At the hour of prayer the whole village stops work and kneels.,Norvos (three bells) [STYL]
+line,,norvos_bearded,,*,,"Faith: the god of the bearded priests. Men here go clean-shaven, for only priests may wear a beard.",Bearded_priests
+line,,qohor_goat,,*,,"Faith: the Black Goat. On holy days the god is given condemned men, and the village keeps out of trouble.",Black_Goat (holy days)
+line,,qohor_goat,,*,,"Faith: the Black Goat of Qohor, who must have blood every day.",Black_Goat (daily sacrifice)
+line,,braavos_many,,*,,"Faith: many gods. Some here honour the Father of Waters, whose temple is rebuilt for each new bride.",Isle_of_the_Gods (Father of Waters)
+line,,braavos_many,,*,,Faith: many gods. A Westerosi sailor's widow keeps a little shrine of the Seven by the road.,Sept-Beyond-the-Sea [WYM]
+line,,seven_dorne,,R,,"Faith: the Seven. The sept is cool and dim inside, and the Mother's statue is veiled against the sun.",Dorne [WYM]
+line,,seven_dorne,,*,,"Faith: the Seven. As everywhere in Dorne, daughters inherit as sons do, and the septon blesses both.",Dorne (equal inheritance)
+line,,ghis_gods,,*,,Faith: the gods of Ghis. On holy days the masters ride to the temple of the Graces in the city.,Temple_of_the_Graces [STYL]
+line,,volantis_mixed,,*,,Faith: many gods. At dusk the village gathers around the red priests' night fire to hear of the Lord of Light.,Red_priest (nightfires)

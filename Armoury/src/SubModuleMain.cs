@@ -42,6 +42,9 @@ namespace Armoury
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            // E7/W2 (233): typ dymka wioski z herbem (wlasny prefab Armoury\GUI\Prefabs) - raz na proces, we wlasnym try i metodzie NoInlining (blad ladowania typow VM
+            // zostaje tutaj); niezalezny od latek ponizej - ich wywrotka nie zabiera dymka
+            try { TipRegister(); } catch (Exception e) { Log.Error("MapVillageTooltip.Register (ladowanie)", e); }
             try
             {
                 if (_modelsPatched) return;
@@ -250,6 +253,19 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void TipRegister() { MapVillageTooltip.Register(); }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void TipUnregister() { MapVillageTooltip.Unregister(); }
+
+        /// <summary>E7/W2 (233): wyrejestrowanie typu dymka wioski przy wyladowaniu modulu.</summary>
+        protected override void OnSubModuleUnloaded()
+        {
+            try { TipUnregister(); } catch { }
+            base.OnSubModuleUnloaded();
+        }
+
         private static int _mapVillagesLoadFails;
 
         /// <summary>Wioski na mapie (W2): rejestracja komponentu widoku, gdy mapa kampanii ma juz swoje menedzery (tani test co klatke).
@@ -259,6 +275,17 @@ namespace Armoury
         protected override void OnApplicationTick(float dt)
         {
             base.OnApplicationTick(dt);
+            // E7/D0 (239): proba drog (tylko bieg zdjec autotestu, klucz MapRoadsProbeEnabled domyslnie false) - osobna rejestracja przed wylacznikiem
+            // wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach proba drog nie startuje do konca sesji); przy false typ widoku sie nie laduje
+            if (_mapRoadsLoadFails < 3 && MapRoadsProbe.On)
+            {
+                try { MapRoadsTick(); }
+                catch (Exception e)
+                {
+                    _mapRoadsLoadFails++;
+                    Log.Error("MapRoadsProbe: komponent widoku nie laduje sie (proba " + _mapRoadsLoadFails + "/3)", e);
+                }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -275,6 +302,14 @@ namespace Armoury
         private static void MapVillagesTick()
         {
             MapVillagesView.EnsureRegistered();
+        }
+
+        private static int _mapRoadsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void MapRoadsTick()
+        {
+            MapRoadsProbeView.EnsureRegistered();
         }
 
         public override void OnMissionBehaviorInitialize(Mission mission)

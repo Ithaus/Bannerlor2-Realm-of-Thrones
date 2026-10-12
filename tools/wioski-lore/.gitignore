@@ -1,0 +1,11 @@
+# E7/L: wyniki posrednie l0.py (odtwarzalne jednym przebiegiem) - w repo tylko skrypty, dane wejsciowe, tabele zdan i probka
+skrypty/rycerze.tsv
+skrypty/rody_westeros.json
+skrypty/kalibracja.txt
+b-skrypty/wioski_b*.tsv
+b-skrypty/layout_crc32*.txt
+b-skrypty/siedziby.json
+b-skrypty/wsie_gry_region_typ.json
+arm_map_village_lore-B.tsv
+wioski-lore-przypis.tsv
+dymki-przyklady.txt

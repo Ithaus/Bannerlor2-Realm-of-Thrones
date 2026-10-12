@@ -1522,6 +1522,26 @@ namespace Armoury
         // przerwa po pokoju przed propozycja wojny gry 20 -> ok. 87 dni (postfiks GetRandomWarDecision, Priority.Low - po BK); off = dni gry 84 / 42 / 20
         public bool DiplomacyYearLong = true;              // alliances last a year and calls to war half a year, and after a peace the lords wait about 87 days before proposing a new war on that realm - 364, 182 and 87 days of the long calendar instead of the game's 84, 42 and 20 (off = the game's days)
 
+        // --- The map and its crossings (stage 7) ---
+        // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi
+        public bool TwinsCrossingCount = true;             // counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything
+        // E7/W1 (232, PLAN 7.10 a, R10/R14): komunikat "plonie / spalona / splondrowana" (VillageNews) wedlug stanu ksiegi wiosek i pamiec wojny wioski (sekcja m: klucza arm_district)
+        public int VillageRaidMessages = 1;                // who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom
+        public bool VillageWarMemory = true;               // a village remembers who burned or plundered it, when, and how many fled and died
+        // E7/W2 (233, PLAN 7.9 a, R11/R12): dymek wioski z herbem pana (wlasny prefab GUI\Prefabs\ArmMapVillageTooltip.xml), rycerzem (tytul wsi z BK albo lore),
+        // wiara BK; po Alt zajecie, swiete miejsce, historia, pamiec wojny (MapVillageTooltip, MapVillageLore; lore = arm_map_village_lore.tsv z bramka ukladu)
+        public bool VillageTipLore = true;                 // the village tooltip shows the lord's banner, the knight who keeps the village and its faith from Banner Kings; hold Alt for its trade, history and war memory
+        // E7/W3 (234, PLAN 7.9 b, R13): pozycja "Look over the district" w menu wsi (village, village_looted) - okno wiosek okregu z herbami rycerzy (DistrictMenu);
+        // "People of this land" pokazuje wtedy sam naglowek i podsumowanie okregu (off = brak pozycji, sekcja okregu z wierszami wiosek jak dotad)
+        public bool DistrictMenuEnabled = true;            // "Look over the district" in a village menu lists the villages of its district with the banners of their keepers
+        // E7/W5 (238, PLAN 7.9 c, R17): proporczyk pana nad wioskami z bliska (MapVillagePennants.cs: kamera z <= 90, najblizsze 80, budowa 12 na cwierc sekundy,
+        // kod herbu raz na sekunde, przebudowa po misji); off = zdjete od razu. Prog autotestu: spadek klatek > 5% w trybie zdjec = domyslnie false
+        public bool VillagePennants = true;                // the lord's pennant flies over villages close to the camera
+        // --- Map roads (test) ---
+        // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
+        // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)
+        public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

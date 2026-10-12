@@ -269,7 +269,8 @@ namespace Armoury
             if (fled > 0.0) OutlawLaw.AddFled(v.Settlement, (float)(fled * f));   // pula regionu 1:1, bez hearth (zdjal Move)
             if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
             // E4/11 (Z1, U24): trafieni na spalone osady wiosek pobocznych - po kontach, wlasny try (OnStrike nie rzuca); rabunek - klucz sesji, zerowanie - oboz armii
-            try { VillageBook.OnStrike(v, hit * f, refugees * f, kind == KRaid, rs != null ? rs.Comp : null, src, lBefore); }
+            // E7/W1 (232): + zabici tego uderzenia (pamiec wojny wioski - te same liczby, ktore nizej dopisuje rs.Dead)
+            try { VillageBook.OnStrike(v, hit * f, refugees * f, dead * f, kind == KRaid, rs != null ? rs.Comp : null, src, lBefore); }
             catch (Exception e) { Stumble("Devastation.Strike(E4/11)", e); }
             // pojmani przy uderzeniu = 0 na stale (E4/9: z konta UCHODZCY przy koncu rabunku); CapWould - plan pojmanych calego rabunku
             double h = hit * f;

@@ -4828,6 +4828,34 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool DiplomacyYearLong { get; set; } = true;
 
+        [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool TwinsCrossingCount { get; set; } = true;
+
+        [SettingPropertyInteger("Village Raid Messages", 0, 2, "0", HintText = "who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public int VillageRaidMessages { get; set; } = 1;
+
+        [SettingPropertyBool("Village War Memory", HintText = "a village remembers who burned or plundered it, when, and how many fled and died")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageWarMemory { get; set; } = true;
+
+        [SettingPropertyBool("Village Tip Lore", HintText = "the village tooltip shows the lord's banner, the knight who keeps the village and its faith from Banner Kings; hold Alt for its trade, history and war memory")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageTipLore { get; set; } = true;
+
+        [SettingPropertyBool("District Menu Enabled", HintText = "'Look over the district' in a village menu lists the villages of its district with the banners of their keepers")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool DistrictMenuEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Village Pennants", HintText = "the lord's pennant flies over villages close to the camera")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillagePennants { get; set; } = true;
+
+        [SettingPropertyBool("Map Roads Probe Enabled", HintText = "TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn")]
+        [SettingPropertyGroup("Map roads (test)")]
+        public bool MapRoadsProbeEnabled { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6034,6 +6062,13 @@ namespace Armoury
             s.TerrainEaseExact = TerrainEaseExact;
             s.TournamentsAllSeason = TournamentsAllSeason;
             s.DiplomacyYearLong = DiplomacyYearLong;
+            s.TwinsCrossingCount = TwinsCrossingCount;
+            s.VillageRaidMessages = VillageRaidMessages;
+            s.VillageWarMemory = VillageWarMemory;
+            s.VillageTipLore = VillageTipLore;
+            s.DistrictMenuEnabled = DistrictMenuEnabled;
+            s.VillagePennants = VillagePennants;
+            s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
         }
 
         internal static void Apply()
