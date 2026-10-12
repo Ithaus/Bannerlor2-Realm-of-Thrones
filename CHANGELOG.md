@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (Recenzja scalenia koncowego czesc 2 w `w-toku/zbior-final`) - BEZ ZMIAN KODU, 4 KOMENTARZE
+**Mod:** Armoury (tylko komentarze) + RealisticCaptivity (przebudowa z tego samego commitu) | **Galaz:** `w-toku/zbior-final` | **Commit kodu:** d8fa8cc
+
+**Problem:** recenzja scalenia porcji B (621a957 b1, 1c55bff b235, 455defa b46, d4e70d0). Sprawdzone: zgubione hunki (kazda linia dodana/usunieta przez e5-b1, e5-b235, e5-b46 i 184cd56 wobec bazy c3855de jest w HEAD albo swiadomie zmieniona przy scaleniu), konflikty (`git show --remerge-diff`: Settings, TownPurse, SoldierPay, ArmouryBehavior, gen_mcm, sprawdz_logi - suma obu stron), haki B na `TownFolk.Live` (LordsEvenUp.FolkLive, KingdomTreasury.WtFolkLive, CourtFull.FolkShare, 75/25 VetPurse i Sutlers), CourtFull/A2b bez podwojenia (Own(lpK) + NoteOwnPaid(ix - folk - lpK) = ix - folk), indeksy MoneyLedger M/N/H, GoodsLedger F, BesiegedPay K, Seal31 i klucze zapisu unikalne, gen_mcm bez roznic, sprawdz_logi `--grupa etap2/3/4/5` bez wyjatku.
+
+**Przyczyna:** po przeniesieniu poboru 184 z `TownFolk.Earn` do `TownFolk.PayCrown` zostaly stare opisy w komentarzach (Settings przy WarTaxFromFolk, BesiegedPay, MoneyLedger.Obieg linia "korona [P]"); opis klasy Sutlers mowil, ze czesc miejska idzie cala do kasy (hak 75/25 B1 dziala w One).
+
+**Zmiana:** tylko te 4 komentarze. Bez zmian kodu, napisow i ustawien (gen_mcm: Armoury 1162, bez roznic).
+
+**Ryzyko / co sprawdzic:** brak (komentarze). Uwagi bez zmian (decyzje paczek, nie bledy scalenia): liczniki 169c/A2b `NoteOwnPaid` przy hakach 75/25 (SoldierPay, MenPurse, Seal31B, Sutlers) od calosci wydatku, nie od czesci w kasie - zgodnie z planem B1 pkt 7 (KL 5.2 "liczy calosc"); `KFolkDues` (B1) wstrzymuje wedlug `PurseReal`, `KFolkWarTax` (B2) przy samym kluczu, i tylko 184 jest wylaczony z kontroli "co zeszlo z kas oblezonych" - przy czynnej kiesie (A1 + 110) wynik ten sam.
+
+**Status:** DO SPRAWDZENIA - test zbioru B jak we wpisie nizej. DLL z d8fa8cc (`-p:GameLibs=<lancuch>\libs`, build kod 0): `SCR\test\Armoury-final.dll` md5 89a27e09dd2ee31f8530eb0189ca63a8, `SCR\test\rc-final\RealisticCaptivity.dll` md5 943ea0d301089b3537786f21226ae253 (zastepuja 1158d596 / 67f8ec82); nie wgrane, gra nie uruchamiana.
+
 ## 2026-10-12 (Scalenie koncowe czesc 2 (porcja B) w `w-toku/zbior-final`) - KIESA LUDU B1 + PODATEK WOJENNY B2 + WYROWNANIE B3 + STATKI B5 + TARG PRZY ZAMKU B4 + PIENIADZE WETERANOW B6 W JEDNYM ZBIORZE
 **Mod:** Armoury + RealisticCaptivity (bez zmian kodu) + narzedzie | **Galaz:** `w-toku/zbior-final` (od 184cd56 = scalenie koncowe czesc 1) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/e5-b1` 1e7958b (621a957), `w-toku/e5-b235` d662a06 (1c55bff), `w-toku/e5-b46` d642fff (455defa); napisy 184/B2-10 d4e70d0
 
