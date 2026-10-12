@@ -8990,11 +8990,16 @@ def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     A-1 dwie linie startu "Misja gracza (E8/A)": latki wpiete 1/1 (DTE Global.ProcessAgentEquipment - biezacy agent) i 2/2 (DTE OnAgentRemoved - zabojca,
     PartyBattleRecord.AddLootedItem - sztuka), bez "nie znaleziono";
     A-2 linia "AmmoRecovery: po bitwie - strona gracza odzysk X z N, przeciwnik Y z M, bez rozstrzygniecia Z z K": trzy pozycje sumuja sie do linii
-    "kolczanow/stosow wrocilo / przepadlo" tej samej bitwy, latka wpieta, potkniecia 0 (udzialy odzysku wedlug stron - INFO: strona, ktora oddala pole,
-    ma odzysk 0 z agentow rozliczonych po rozstrzygnieciu);
+    "kolczanow/stosow wrocilo / przepadlo" tej samej bitwy, latka wpieta, potkniecia 0 (udzialy wedlug stron - INFO: strona, ktora oddala pole,
+    traci wszystko, co wystrzelila, ale niewystrzelona czesc zostaje - kolczan wraca z szansa "1 - wystrzelona czesc", wiec jej udzial jest
+    NIZSZY niz strony zwycieskiej, nie zerowy);
     A-3 INFO: "Zuzycie (E8/A)" - misje poza bitwa (ciosy i strzaly pominiete), ksiega wyzerowana na poczatku bitwy, po bitwie przegranej;
     A-4 "BattlefieldLaw (E8/A): lup cialo po ciele": sztuki z wlasnych zabojstw w calosci, zolnierskie x trzecia, dzialka wobec sredniej z puli;
-    potkniecia 0, a przy >= 5 wrogach powalonych przez gracza i towarzyszy sztuk z ich cial > 0 (inaczej DTE nie dopisuje lupu zabojcy-gracza)."""
+    potkniecia 0, a przy >= 5 wrogach powalonych przez gracza i towarzyszy sztuk z ich cial > 0 (inaczej DTE nie dopisuje lupu zabojcy-gracza).
+    Recenzja E8/A: wygrana bitwa z misja i dzialka DTE daje zawsze linie "BattlefieldLaw: N szt. (...) z magazynu wojska czeka na ekran lupow";
+    przy wlaczonym kluczu i dzialajacych znacznikach ma ona "cialo po ciele". Sama stara linia przy [wl] i ani jednej linii E8/A = znaczniki
+    zabojcy nie doszly (prefiks AddLootedItem nie biegnie - regula po cichu nie dziala) -> NIE; wyjatek opisany w wierszu: bitwa morska
+    (lup z losowania DTE, bez zabojcy) albo klucz wylaczony w trakcie sesji."""
     st_a = [s for s in lines if s.startswith(E8_A_ST_AMMO)]
     st_l = [s for s in lines if s.startswith(E8_A_ST_LOOT)]
     am = [s for s in lines if s.startswith(E8_A_AMMO)]
@@ -9044,7 +9049,7 @@ def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 (f"{len(am)} bitew: strona gracza {share(tot[0], tot[1])}, przeciwnik {share(tot[2], tot[3])}, bez rozstrzygniecia (w trakcie misji - stara regula) "
                  f"{share(tot[4], tot[5])} | linia 'wrocilo / przepadlo': {kept} / {gone} | stan [{states(am, 'odzysk wedlug strony (E8/A)')}], potkniecia {stum}"
                  + (f", latka NIE WPIETA w {unw} liniach" if unw else "")),
-                "trzy pozycje = linia 'wrocilo / przepadlo', latka wpieta, potkniecia 0 (strona, ktora oddala pole: odzysk 0)", ok)
+                "trzy pozycje = linia 'wrocilo / przepadlo', latka wpieta, potkniecia 0 (strona, ktora oddala pole: udzial nizszy - zostaje jej tylko niewystrzelona czesc)", ok)
     # A-3
     hits = sum(num(r"- (\d+) ciosow", s, default=0) for s in skip)
     shots = sum(num(r"i (\d+) strzalow", s, default=0) for s in skip)
@@ -9056,7 +9061,19 @@ def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             else "brak misji poza bitwa i bitew gracza z ciosami w biegu",
             "INFO (sprawdza Jeff w grze - 8.16 pkt 10: po arenie i wygranej bitwie rynsztunek bez obic z areny)", None)
     # A-4
-    if not loot:
+    # recenzja E8/A: dzialki DTE bez "cialo po ciele" (stara linia) - przy kluczu [wl] to bitwa bez znacznikow zabojcy
+    # (tylko linie PO pierwszej linii startu E8/A - log z kilku sesji moze miec dzialki sprzed paczki)
+    first = next((i for i, s in enumerate(lines) if s.startswith(E8_A_ST_LOOT)), None)
+    plain = [] if first is None else [s for s in lines[first:] if s.startswith("BattlefieldLaw: ") and "z magazynu wojska czeka na ekran lupow" in s
+                                      and "cialo po ciele" not in s]
+    key_on = "wl" in states(st_l, "w calosci").split("/")
+    if not loot and plain and key_on:
+        rep.add("A-4: lup z wlasnych zabojstw w calosci (cialo po ciele)",
+                (f"{len(plain)} wygranych bitew z dzialka DTE przy kluczu [wl], ale ani jednej linii 'lup cialo po ciele' - znaczniki zabojcy nie doszly "
+                 f"(latka AddLootedItem nie biegnie?) i dzialka liczy sie po staremu, srednia z puli; ostatnia: {plain[-1][:120]}"),
+                "kazda wygrana bitwa ladowa z dzialka DTE ma linie 'lup cialo po ciele' (wyjatek: same bitwy morskie - lup z losowania DTE - albo klucz wylaczony w trakcie sesji)",
+                False)
+    elif not loot:
         rep.add("A-4: lup z wlasnych zabojstw w calosci (cialo po ciele)", "brak wygranych bitew gracza z misja i lupem DTE w biegu",
                 "potkniecia 0; przy >= 5 powalonych przez gracza i towarzyszy sztuki z ich cial > 0 (sprawdza Jeff w grze)", None)
     else:
@@ -9069,7 +9086,8 @@ def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         stum = max([num(r"potkniecia \(sesja\) (\d+)", s, default=0) for s in loot] + [0])
         rep.add("A-4: lup z wlasnych zabojstw w calosci (cialo po ciele)",
                 (f"{len(loot)} bitew: z cial powalonych przez gracza i towarzyszy {h} szt. w calosci (powalonych wrogow {k}), przez zolnierzy {t} szt., "
-                 f"bez znanego zabojcy {u} szt. | dzialka gracza {new} szt., srednia z puli dalaby {avg} szt. | potkniecia {stum}"),
+                 f"bez znanego zabojcy {u} szt. | dzialka gracza {new} szt., srednia z puli dalaby {avg} szt. | potkniecia {stum}"
+                 + (f" | dzialki bez znacznikow zabojcy (stara linia - bitwa morska albo klucz wylaczony): {len(plain)}" if plain else "")),
                 "potkniecia 0; dzialka >= sztuki z wlasnych zabojstw; przy >= 5 powalonych przez gracza i towarzyszy sztuki z ich cial > 0",
                 stum == 0 and new >= h and not (k >= 5 and h == 0))
 
