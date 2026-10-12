@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (E6/M2 czesc CS, R8 "strawa Polnocy") - TLOCZNIA PRZESTAWIANA W MIESCIE TARGOWYM WSI, BEZ WARSZTATOW GRACZA
+**Mod:** CrashScribe | **Galaz:** `w-toku/cs-bledy` (na 05c141a SCRIBE-KLUCZ-POWTOREK) | **Pliki:** `CrashScribe/src/Mends.cs` - `NorthernFare` (:2643-2647 opis, :2670-2672 i :2678 `TradeBound` zamiast `Bound`, :2682-2687 wsad tloczni, :2691-2699 miasto z winogronami w okregu zachowuje prase, :2703 bez warsztatow gracza, :2708 licznik). Bez nowego klucza (to blad) - pod istniejacym `NorthernFareEnabled` (Armoury). Bez SyncData.
+
+**Co zobaczysz (prosto):** w miastach Polnocy, do ktorych handluja wsie zamienione z winnic (Farsfog, Olden Oak - wsie zamkowe), prasa do wina staje sie browarem, jak juz bylo w Winterfell. Twoja wlasna tlocznia nigdy nie jest przestawiana.
+
+**Problem (projekt etapu 6, E6/M2 zakres (a), R8; dowod z KODU):** `NorthernFare` brala `st.Village.Bound` - dla wsi zamkowych (Farsfog `castle_village_B1_1` -> Moat Cailin, Olden Oak `castle_village_B7_2` -> Wieza Cieni) to ZAMEK, a nie miasto targowe, wiec tlocznia w miescie, do ktorego te wsie handluja, zostawala bez winogron; petla warsztatow przestawiala tez tlocznie gracza.
+
+**Przyczyna:** gra dobiera typ warsztatu z wsi o `TradeBound == miasto` (G `WorkshopsCampaignBehavior.DecideBestWorkshopType`, `Village.All.Where(x => x.TradeBound == currentSettlement)`); `Village.TradeBound` zwraca `Bound`, gdy Bound jest miastem, a dla wsi zamkowej - miasto handlowe (`_tradeBound`, `VillageTradeBoundCampaignBehavior`). Petla :2145-2150 (stare numery) nie sprawdzala `ws.Owner`.
+
+**Zmiana:** (1) `towns.Add(st.Village.TradeBound)` w obu miejscach (dla wsi miejskich wynik jak dotad - TradeBound == Bound); TradeBound null = miasto pominiete. (2) Przed przestawieniem: jesli jakakolwiek wies o `TradeBound == miasto` nadal produkuje wsad tloczni (kategorie wejsc typu `wine_press`), prasa zostaje (linia `X: winogrona nadal z <wies> - tlocznia zostaje`) - nowy zbior miast nie moze odebrac tloczni miastu, ktore ma winogrona. (3) `ws.Owner == Hero.MainHero` - pomijane, licznik `tlocznie gracza nietkniete: g` w tej samej linii.
+Linia (jak dotad, z nowymi czlonami): `Mends: strawa Polnocy - <wies>: winnica -> ...; <miasto>: prasa do wina -> browar; [<miasto>: winogrona nadal z <wies> - tlocznia zostaje]; [tlocznie gracza nietkniete: g].`
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+REGRESJE: wsie miejskie (Queenscrown, Tumbledown) - ten sam zbior miast co dotad; nowe sa tylko miasta targowe wsi zamkowych (wczesniej zamek - bez skutku). Warsztat gracza dotad przestawiany - teraz nie (decyzja projektu v2). Idempotencja bez zmian (wies juz zamieniona tylko dopisuje miasto; tlocznia, ktora AI odbudowalo, przy nastepnym wczytaniu znow browarem - jak dotad). Nikt nie parsuje tej linii (`tools/*.py` - sprawdzone).
+KOLIZJE: Armoury E6/M2 (b) (bramka wsadu warsztatow, jednorazowe przestawienie przy wczytaniu, flaga `arm_e6_inputs`) i `VillageClimate` - inne pliki/DLL; obie strony pomijaja warsztaty gracza, browar ma wsad (zboze Polnocy), wiec bramka Armoury go nie cofnie. `at1-cs.diff` nie dotyka `Mends.cs`.
+SPOJNOSC / EKONOMIA: `ChangeWorkshopProduction` zmienia tylko typ i postep produkcji - kapital, wlasciciel i zloto bez zmian (nic z niczego, bez platnika). Jedna zasada z gra: okreg warsztatu = `TradeBound`.
+KOSZT: raz na wczytanie, najwyzej 4 miasta x petla po `Village.All`.
+CO SPRAWDZIC w tescie zbiorczym: linia `Mends: strawa Polnocy` na nowej kampanii - miasta targowe Farsfog/Olden Oak z `prasa do wina -> browar` (jesli mialy prase), zero `tlocznie gracza` na nowej kampanii; po wczytaniu - `nic do zmiany` albo tylko odbudowane prasy.
+
+**Status:** DO SPRAWDZENIA - test zbiorczy.
+
 ## 2026-10-11 (SCRIBE-KLUCZ-POWTOREK CS, poprawki po tescie koncowym E4) - KLUCZ POWTOREK CRASHSCRIBE: ROZNE BLEDY NIE SKLEJAJA SIE W JEDNA "POWTORKE", LINIA POWTORKI MOWI, KTOREGO BLEDU DOTYCZY
 **Mod:** CrashScribe | **Galaz:** `w-toku/cs-bledy` (na 9be7bf0 B6c) | **Pliki:** `CrashScribe/src/Scribe.cs` - pola klucza (:18-32), `Report` (:92-125, `finally` :201), nowe `KeyOf` (:207), `LiveFrame` (:242), `NoPatchSuffix`, `Norm` (:285), `RepeatLabel` (:340), `ThrowSite`, `Squash` (:362), `MessageOf`; `CrashScribe/src/Config.cs` (:19, :108) - `RepeatKeyByMessage` (dom. true); `CrashScribe/ModuleData/CrashScribe.settings.xml` (:31-36) - ten klucz z opisem po angielsku. Tylko logowanie: zadnej latki, zadnego stanu gry.
 

@@ -2640,6 +2640,10 @@ namespace CrashScribe
         /// Village.VillageType to pole - ustawiane refleksja; produkcja
         /// przelicza sie od nastepnego dnia. Idempotentne (juz zamienione
         /// pomija).
+        /// E6/M2 (R8, 12.10): prase przestawiamy w miescie TARGOWYM wsi
+        /// (TradeBound - stad gra bierze wsad warsztatow), nie w Bound (zamek
+        /// przy wsi zamkowej); tlocznia gracza nietknieta (licznik); miasto,
+        /// ktorego okreg nadal daje wsad tloczni, prase zachowuje.
         /// </summary>
         internal static void NorthernFare()
         {
@@ -2663,26 +2667,45 @@ namespace CrashScribe
                     var st = Settlement.Find(kv.Key);
                     if (st == null || st.Village == null) { Scribe.Line("Mends: strawa Polnocy - brak wioski " + kv.Key + " w tej kampanii."); continue; }
                     var cur = st.Village.VillageType;
-                    if (cur != null && cur.StringId == kv.Value) { if (st.Village.Bound != null) towns.Add(st.Village.Bound); continue; }
+                    // E6/M2 (R8): miasto TARGOWE wsi (TradeBound), nie Bound - gra dobiera typ warsztatu z wsi o TradeBound == miasto
+                    // (G WorkshopsCampaignBehavior.DecideBestWorkshopType); Bound wsi zamkowej to zamek, wiec tlocznia w miescie zostawala
+                    if (cur != null && cur.StringId == kv.Value) { if (st.Village.TradeBound != null) towns.Add(st.Village.TradeBound); continue; }
                     if (cur == null || cur.StringId != "vineyard") { continue; }   // ktos juz zmienil na cos innego - nie ruszamy
                     var vt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<VillageType>(kv.Value);
                     if (vt == null) { Scribe.Line("Mends: strawa Polnocy - brak typu wioski " + kv.Value + "."); continue; }
                     fld.SetValue(st.Village, vt);
                     done.Add(st.Name + ": winnica -> " + vt.ShortName);
-                    if (st.Village.Bound != null) towns.Add(st.Village.Bound);
+                    if (st.Village.TradeBound != null) towns.Add(st.Village.TradeBound);
                 }
-                int presses = 0;
+                int presses = 0, playerKept = 0;
                 var brewery = TaleWorlds.CampaignSystem.Settlements.Workshops.WorkshopType.Find("brewery");
+                // E6/M2 (R8): wsad tloczni (kategorie wejsc wine_press) - miasto, ktorego okreg nadal go daje, tloczni nie traci
+                var pressType = TaleWorlds.CampaignSystem.Settlements.Workshops.WorkshopType.Find("wine_press");
+                var pressInputs = new System.Collections.Generic.HashSet<ItemCategory>();
+                if (pressType != null)
+                    foreach (var pr in pressType.Productions)
+                        foreach (var inp in pr.Inputs) if (inp.Item1 != null) pressInputs.Add(inp.Item1);
                 foreach (var town in towns)
                 {
                     if (town == null || town.Town == null || brewery == null) continue;
+                    string grapesFrom = null;
+                    foreach (var v in Village.All)
+                    {
+                        if (v == null || v.TradeBound != town || v.VillageType == null) continue;
+                        foreach (var p in v.VillageType.Productions)
+                            if (p.Item1 != null && p.Item1.ItemCategory != null && pressInputs.Contains(p.Item1.ItemCategory)) { grapesFrom = v.Name.ToString(); break; }
+                        if (grapesFrom != null) break;
+                    }
+                    if (grapesFrom != null) { done.Add(town.Name + ": winogrona nadal z " + grapesFrom + " - tlocznia zostaje"); continue; }
                     foreach (var ws in town.Town.Workshops)
                     {
                         if (ws == null || ws.WorkshopType == null || ws.WorkshopType.StringId != "wine_press") continue;
+                        if (ws.Owner == Hero.MainHero) { playerKept++; continue; }   // E6/M2 v2: warsztatow gracza nie przestawiamy
                         try { ws.ChangeWorkshopProduction(brewery); presses++; done.Add(town.Name + ": prasa do wina -> browar"); }
                         catch (Exception e) { Scribe.Report("CrashScribe", e, "Mends.NorthernFare(workshop)", null); }
                     }
                 }
+                if (playerKept > 0) done.Add("tlocznie gracza nietkniete: " + playerKept);
                 if (done.Count > 0)
                     Scribe.Line("Mends: strawa Polnocy - " + string.Join("; ", done.ToArray()) + ".");
                 else
