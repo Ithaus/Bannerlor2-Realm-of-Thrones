@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 6, recenzja paczki 210 = E6/W2) - KONTROLA "ZBOZE ZDJETE = RYBY DODANE" LICZY PARY Z TICKU, NIE ODCZYTY MAGAZYNU WSI
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e6-p2` (po E6/W2 4c3eb29) | **Pliki:** `HamletKinds.cs` (Rec.Paired, Daily), `tools/sprawdz_logi.py` (W2-5)
+
+**Problem:** (recenzja, bez gry) wiazacy prog W2-3 (|a - b| <= 1 + 0.1% a kazdej doby) dawalby falszywe NIE: a = ostatnie zdjete zboze wsi z doby, a model zboza wola tez magazyn wsi gry - `Village.GetWarehouseCapacity` w `VillageGoodProductionCampaignBehavior.TickProductions` PRZED tickiem i co godzine w `VillagerCampaignBehavior.ThinkAboutSendingItemToTown` (G :131-148, :147). Wies z zapasem >= 1.5 W nie ma ticku produkcji (bramka gry), ale jej odczyt zboza wchodzil do a bez ryb w b; logi z 11.10 ("Zatkane wsie (diagnoza)") - 10-17 zatkanych wsi Normal na dobe, czesc w okregach rybackich -> roznica kilka sztuk.
+**Przyczyna:** kontrola sumowala `Taken` z dowolnego wywolania zboza zamiast zdjetego zboza, ktore dostalo wywolanie ryb (w ticku BK ryby ida zaraz za zbozem).
+**Zmiana:** `Rec.Paired` = zdjete zboze uzyte przez ostatnie wywolanie ryb (para z tego samego ticku); a = suma par, b = ryby dodane - tozsamosc 0 poza sufitami/zaokragleniami. Wsie z wywolaniem zboza bez ryb w dobie - osobno, INFO: `zboze bez wywolania ryb w dobie g wsi (odczyt -x ...)` (magazyn >= 1.5 W albo bez ticku - nic nie zdjeto z produkcji). `sprawdz_logi` W2-5 sumuje g (INFO); regexy W2-3/W2-4 bez zmian. Sprawdzone na sztucznym logu.
+**Ryzyko / co sprawdzic:** tylko log - produkcja (kroki `ListStep`/`Step`) bez zmian. Recenzja potwierdzila w kodzie: wagi listy bez zmian (aktywny model liczy z `VillageType.Productions`; BK tick wola model po liscie w kolejnosci, EconomyPatches.cs:958-975), postfiksy BK BetterEconomy (AddFactor, soft-cap) i WinterBite maja priorytet 400 - przed `MaterialLaw` (Priority.Last), wiec krok jest ostatni; konie, HorseCensus/HorseBook/DTE/pasza - paczka ich nie dotyka; brak stanu w zapisie (Reset przy kampanii). Uboczne (nie w poprzednim wpisie): `GetIdealVillagerPartySize` (G DefaultPartySizeLimitModel :420) tez liczy z `VillageType.Productions` - przy sumie produkcji > 10 tabor wsi rybackiej minimalnie mniejszy. W2-5: duza liczba "zboze bez wywolania ryb" przy malej liczbie zatkanych wsi = ryby nie dochodza na liste (zbadac).
+
+**Build:** kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - test 120 (razem z E6/W2).
+
 ## 2026-10-12 (etap 6, paczka 210 = E6/W2, PLAN 6.18, R7) - WIOSKI POBOCZNE WEDLUG RODZAJU: RYBY WIOSEK RYBACKICH ZAMIAST CZESCI ZBOZA (OSTATNI KROK ProdPostfix)
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e6-p2` (po E6/K0 f4ec3d1) | **Projekt:** etap 6 v2 rozdz. 3 "E6/W2"; krytyka KB W2-ryby-z-zera, K1-08 | **Pliki:** NOWY `HamletKinds.cs`, MaterialLaw, MineralOnce, VillageBook, ArmouryBehavior, Settings (+gen_mcm 1166 -> 1167), `tools/sprawdz_logi.py`
 

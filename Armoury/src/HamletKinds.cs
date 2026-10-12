@@ -40,8 +40,11 @@ namespace Armoury
             public int GetHashCode(Village o) { return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o); }
         }
 
-        // pamiec doby wsi: ostatnie wywolanie modelu dla zboza i ryb tego dnia (tick BK, magazyn wsi i okna licza to samo - nadpisujemy, nie sumujemy)
-        private sealed class Rec { public int Day = int.MinValue; public float U, Taken, Landed; public bool Grain, Fish, NoMem; }
+        // pamiec doby wsi: ostatnie wywolanie modelu dla zboza i ryb tego dnia (tick BK, magazyn wsi i okna licza to samo - nadpisujemy, nie sumujemy).
+        // Paired = zdjete zboze, ktore dostalo OSTATNIE wywolanie ryb (para z tego samego ticku) - recenzja W2: Taken nadpisuje tez magazyn wsi gry
+        // (GetWarehouseCapacity: TickProductions przed tickiem i co godzine ThinkAboutSendingItemToTown) - wies z magazynem >= 1.5 W nie ma ticku produkcji,
+        // a jej odczyt zboza wchodzil do kontroli a - b jako zdjete zboze bez ryb (falszywa roznica W2-3)
+        private sealed class Rec { public int Day = int.MinValue; public float U, Taken, Paired, Landed; public bool Grain, Fish, NoMem; }
 
         // wies -> u z OSTATNIEGO zlozenia jej listy produkcji BK (ryby za zbozem); brak wpisu = lista bez kroku, zboze bez zmian
         private static readonly Dictionary<Village, float> _u = new Dictionary<Village, float>(new VillageRefEq());
@@ -137,7 +140,7 @@ namespace Armoury
         {
             Rec r;
             if (!_rec.TryGetValue(v, out r)) { r = new Rec(); _rec[v] = r; }
-            if (r.Day != day) { r.Day = day; r.U = 0f; r.Taken = 0f; r.Landed = 0f; r.Grain = r.Fish = r.NoMem = false; }
+            if (r.Day != day) { r.Day = day; r.U = 0f; r.Taken = 0f; r.Paired = 0f; r.Landed = 0f; r.Grain = r.Fish = r.NoMem = false; }
             return r;
         }
 
@@ -189,7 +192,7 @@ namespace Armoury
                     }
                     landed = r.ResultNumber - old;
                 }
-                lock (Gate) { var rec = RecFor(v, today); rec.Landed = landed; }
+                lock (Gate) { var rec = RecFor(v, today); rec.Paired = t; rec.Landed = landed; }   // para: zdjete zboze i ryby z tego samego wywolania
             }
             catch (Exception e) { Stumble("HamletKinds.Step", e); }
         }
@@ -207,16 +210,16 @@ namespace Armoury
             else if (MaterialLaw.ProdModels <= 0) state = "NIECZYNNE - MaterialLaw poza modelami produkcji wsi";
             else if (_itemsTried && (_fish == null || _grain == null)) state = "NIECZYNNE - gra nie zna przedmiotu fish albo grain";
             else state = "CZYNNE";
-            int n = 0, c = 0, fishOnly = 0, listed;
-            double a = 0.0, b = 0.0, su = 0.0;
+            int n = 0, c = 0, fishOnly = 0, g = 0, listed;
+            double a = 0.0, b = 0.0, su = 0.0, ga = 0.0;
             int added, moved, st, stAll;
             lock (Gate)
             {
                 foreach (var r in _rec.Values)
                 {
                     if (r.Day != day) continue;
-                    if (r.Grain) { n++; a += r.Taken; su += r.U; }
-                    if (r.Fish) { b += r.Landed; if (r.NoMem) c++; if (!r.Grain) fishOnly++; }
+                    if (r.Grain) { n++; su += r.U; if (!r.Fish) { g++; ga += r.Taken; } }   // zboze bez wywolania ryb: odczyt magazynu wsi bez ticku produkcji
+                    if (r.Fish) { a += r.Paired; b += r.Landed; if (r.NoMem) c++; if (!r.Grain) fishOnly++; }
                 }
                 listed = _u.Count; added = _added; moved = _moved; st = _stumbles; stAll = _stumblesAll;
                 _added = _moved = 0; _stumbles = 0;
@@ -224,6 +227,7 @@ namespace Armoury
             Log.Info("Wioski wedlug rodzaju (210): dzien " + day + " | " + state
                      + " | okregow z rybakami " + n + " (u srednio " + (n > 0 ? (100.0 * su / n).ToString("0.0", Inv) : "0") + "%, wsi z rybami za zbozem na liscie BK " + listed + ")"
                      + ", zboza -" + a.ToString("0.0", Inv) + ", ryb +" + b.ToString("0.0", Inv) + ", kontrola a - b = " + (a - b).ToString("0.0", Inv)
+                     + "; zboze bez wywolania ryb w dobie " + g + " wsi (odczyt -" + ga.ToString("0.0", Inv) + " - magazyn wsi >= 1.5 W albo bez ticku produkcji, nic nie zdjeto)"
                      + "; wsi bez pamieci zboza " + c + " (w tym bez zboza w dobie " + fishOnly + ")"
                      + " | listy BK: ryby dopisane " + added + ", przeniesione za zboze " + moved + " wywolan | potkniecia dzis " + st + ", od wczytania " + stAll);
         }

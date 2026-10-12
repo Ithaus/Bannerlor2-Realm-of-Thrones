@@ -3377,9 +3377,11 @@ def etap5_w2(rep, lines, start, until):
     s = rows[-1]
     um = num(r"u srednio ([\d.]+)%", s, float)
     nm = sum(num(r"wsi bez pamieci zboza (\d+)", dl[d], int, 0) or 0 for d in on)
+    ng = sum(num(r"zboze bez wywolania ryb w dobie (\d+) wsi", dl[d], int, 0) or 0 for d in on)   # recenzja W2: magazyn wsi >= 1.5 W bez ticku
     nl = num(r"okregow z rybakami (\d+)", s, int, 0)
     rep.add("W2-5: okregi z rybakami i wsie bez pamieci zboza", f"okregow (ostatnia doba) {nl}, u srednio {um}%; "
-            f"wsi bez pamieci zboza (suma okna) {nm}", "INFO (ryby bez dopisku - zboze bez zmian, kontrola W2-3)", None)
+            f"wsi bez pamieci zboza (suma okna) {nm}; zboze bez wywolania ryb (wies-doby, suma okna) {ng}",
+            "INFO (ryby bez dopisku - zboze bez zmian; zboze bez ryb - odczyt magazynu wsi bez ticku produkcji; kontrola W2-3 liczy pary z ticku)", None)
     st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
     rep.add("W2-6: potkniecia HamletKinds w oknie", str(st), "0", st == 0)
 
