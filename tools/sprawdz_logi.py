@@ -193,7 +193,9 @@ Uzycie (Python 3, tylko odczyt):
                     "Karawany (E8/G1)" w kazdej dobie okna, oba klucze czynne, spis slepych zaulkow mapy <= 25% osad; G1-1 karawany bez statkow 7+ dob
                     w tym samym miescie <= 10 (Z33: 29); G1-2 sredni postoj karawan AI w miescie <= 12 h (linia E8/P3); G1-3 karawany bez drogi na koniec
                     biegu 0, ponowne i nieudane rozwiazania 0, zamiary zakupu BK widziane przez latke >= zakupy z ksiegi obiegu; G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe; G1-5 suma kas miast d120 +-10% Z33, kasy
-                    ponizej zapasu przez nasza wyplate 0, kiesy karawan d120 +-20% Z33, wizyty i zakupy INFO; G1-K potkniecia i "ERROR in CaravanFlow.*" 0.
+                    ponizej zapasu przez nasza wyplate 0, kiesy karawan d120 +-20% Z33, wizyty i zakupy INFO; G1-6 (recenzja) miasta bez rudy w dobach
+                    91-120 <= 1.25 x Z33 (dowoz kontraktami 174.2 bierze karawane stojaca w zrodle), kontrakty i "brak karawany w zrodle" INFO;
+                    G1-K potkniecia i "ERROR in CaravanFlow.*" 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8623,6 +8625,10 @@ def etap8_q(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 E8_G1_DAY = "Karawany (E8/G1): dzien"
 E8_G1_Z33_TOWNS = 10264881      # suma kas miast w dobie 120 biegu Z33 (WGRANIE 33, linia "Nadwyzka kas (E5/0)")
 E8_G1_Z33_CARAVANS = 4076294    # kiesy karawan w dobie 120 biegu Z33 (linia "Pieniadz swiata": partie bez wodza - karawany; 902 karawany notabli i 57 lordow)
+# recenzja E8/G1: dowoz surowca kontraktami (174.2) bierze przewoznika sposrod karawan STOJACYCH w miescie-zrodle - przy postoju ok. 3 h stoi ich kilkanascie razy mniej
+E8_G1_Z33_ORE_TOWNS = 25.8      # miasta bez rudy w biegu Z33, srednia probek dob 91-120 (linia "Miasta bez rudy i strzal (174b)" co 5 dob: 29, 31, 29, 19, 25, 22)
+E8_G1_Z33_CONTRACTS = 12.7      # kontrakty surowca zawarte na dobe w biegu Z33 (linia "Kontrakty surowca (174)", doby 1-120)
+E8_G1_Z33_NOCAR = 74.0          # zamowienia bez kontraktu z powodu "brak karawany w zrodle" na dobe w biegu Z33 (ta sama linia)
 
 
 def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
@@ -8636,6 +8642,9 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe (srednio; czas brutto tikow, ktore otworzylismy);
     G1-5 (prog, nie INFO): suma kas miast w dobie 120 w +-10% Z33, kasy ponizej zapasu przez nasza wyplate 0, kiesy karawan w dobie 120 w +-20% Z33
     (bieg krotszy niz 120 dob - INFO); wizyty i zakupy karawan - INFO;
+    G1-6 (recenzja - regresja dowozu surowca 174.2: przewoznikiem kontraktu jest karawana STOJACA w miescie-zrodle, a po E8/G1 stoi ich wielokrotnie mniej):
+    G1-6a miasta bez rudy, srednia probek dob 91-120 <= 1.25 x Z33 (bieg krotszy - INFO); G1-6b INFO kontrakty zawarte i "brak karawany w zrodle" na dobe
+    wobec Z33, karawany stojace w miastach;
     G1-K potkniecia i linie "ERROR in CaravanFlow.*" 0."""
     rows = {d: s for d, s in by_day(lines, E8_G1_DAY).items() if 1 <= run_day(d, start) <= until}
     wire = [x for x in lines if x.startswith("Karawany (E8/G1): latki przy starcie gry")]
@@ -8768,6 +8777,25 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         info.append(f"zakup surowcow przed wyborem celu {v_buy / len(why2):.0f} wizyt/dobe (Z33 doba 120: 115)")
     if info:
         rep.add("G1-5d: wiecej handlu karawan - wizyty i zakupy (CaravanBulk)", "; ".join(info), "INFO", None)
+    # ---------------- G1-6 (recenzja): dowoz surowca kontraktami (174.2) - przewoznik to karawana stojaca w zrodle
+    ore = {d: s for d, s in by_day(lines, "Miasta bez rudy i strzal (174b): dzien").items() if 91 <= run_day(d, start) <= until}
+    if ore:
+        ov = [num(r"miast \d+; bez rudy (\d+)", ore[d]) for d in sorted(ore)]
+        om = _mean(ov)
+        lim = 1.25 * E8_G1_Z33_ORE_TOWNS
+        rep.add("G1-6a: miasta bez rudy w dobach 91-120 (dowoz kontraktami 174.2 przy krotkim postoju karawan)",
+                (f"srednio {om:.1f} z {len([x for x in ov if x is not None])} probek {[x for x in ov if x is not None]}" if om is not None else "brak liczby w linii")
+                + f" (Z33: {E8_G1_Z33_ORE_TOWNS})", f"<= {lim:.1f} (1.25 x Z33; bieg krotszy niz 120 dob - INFO)",
+                (om <= lim) if (full and om is not None) else None)
+    mo = {d: s for d, s in by_day(lines, "Kontrakty surowca (174): dzien").items() if 1 <= run_day(d, start) <= until}
+    if mo:
+        made = sum(num(r" - zawarto (\d+) \[", s, int, 0) or 0 for s in mo.values())
+        nocar = sum(num(r"brak karawany w zrodle (\d+)", s, int, 0) or 0 for s in mo.values())
+        stand = _mean([num(r"w miastach teraz (\d+)", s) for s in p3.values()]) if p3 else None
+        rep.add("G1-6b: kontrakty surowca (174.2) - przewoznikiem jest karawana stojaca w miescie-zrodle",
+                f"zawarto {made / len(mo):.1f}/dobe (Z33: {E8_G1_Z33_CONTRACTS}), bez kontraktu z braku karawany w zrodle {nocar / len(mo):.1f}/dobe (Z33: {E8_G1_Z33_NOCAR})"
+                + (f"; karawany AI stojace w miastach srednio {stand:.0f} (Z33 doba 120: 355)" if stand is not None else ""),
+                "INFO (duzo mniej kontraktow przy G1-6a NIE = decyzja: przewoznik takze z karawan wjezdzajacych albo Caravan Town Hourly wylaczone)", None)
     # ---------------- G1-K
     stu = tot(r"potkniecia dzis (\d+)")
     errs = sum(1 for s in lines if s.startswith("ERROR in CaravanFlow."))
