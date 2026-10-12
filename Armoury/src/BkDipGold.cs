@@ -18,7 +18,8 @@ namespace Armoury
     /// 1. NOWY ROD SZLACHTY BK (GentryPurseFromTown; BK BKGentryBehavior.CreateGentryClan :485-530): poza startem kampanii BK daje glowie nowego rodu
     ///    `ChangeHeroGold(cost)` z niczego, przelewa cost `vacantEstate.Owner` - a wolny majatek to z definicji majatek bez wlasciciela (Estate.IsDisabled =>
     ///    Owner == null), wiec GiveGoldAction(glowa, null) zabiera cost w nicosc (ksiega: falszywa para R +cost / "w nicosc - inne" cost) - i na koniec
-    ///    `ChangeHeroGold(15 000)` z niczego. Teraz: (a) cena majatku = 0 (prefiks, `ref cost`) - majatek przechodzi bez ceny, jak w praktyce zawsze (BK placil
+    ///    `ChangeHeroGold(15 000)` z niczego. DECYZJA JEFFA 12.10 ok. 18:40 UTC: nowy rod startuje z 0 - punkt (b) tylko przy GentryStartFromTown (domyslnie nie).
+    ///    Teraz: (a) cena majatku = 0 (prefiks, `ref cost`) - majatek przechodzi bez ceny, jak w praktyce zawsze (BK placil
     ///    ja nikomu), falszywa para znika; gdy majatek ma juz wlasciciela (zapytanie gracza odlozone w czasie) - cena jak dotad (licznik); (b) 15 000 placi KASA
     ///    MIASTA, W KTORYM WIES MAJATKU HANDLUJE (regula R10 z E5/A3 - nowy zamozny miejscowy: Village.TradeBound, brak albo nie miasto - Bound, zamek przez
     ///    CastlePurse) z nadwyzki Seal31.Spare, najwyzej tyle, ile jej jest - brak nadwyzki = rod startuje z mniej albo z 0. Kiesa wsi nie jest strona (R10).
@@ -49,6 +50,8 @@ namespace Armoury
     internal static class BkDipGold
     {
         internal static bool GentryOn { get { var s = Settings.Current; return s != null && s.GentryPurseFromTown; } }
+        // decyzja Jeffa 12.10 ok. 18:40 UTC: nowy rod szlachty startuje z 0 - kasa miasta placi tylko przy GentryStartFromTown (domyslnie wylaczone)
+        internal static bool GentryTownPays { get { var s = Settings.Current; return s != null && s.GentryStartFromTown; } }
         internal static bool BanditOn { get { var s = Settings.Current; return s != null && s.BanditHeroPurseFromHideout; } }
         internal static bool FeastOn { get { var s = Settings.Current; return s != null && s.FeastTownGetsPaid; } }
         internal static bool PactOn { get { var s = Settings.Current; return s != null && s.PactCostToOtherRealm; } }
@@ -162,7 +165,7 @@ namespace Armoury
                 if (due <= 0) return;
                 if (__state.Off) { _gOffN++; _gOff += due; return; }
                 h.ChangeHeroGold(-(int)due);
-                var payer = TradeTownOf(__state.S);
+                var payer = GentryTownPays ? TradeTownOf(__state.S) : null;                     // domyslnie rod startuje z 0 (decyzja Jeffa 12.10)
                 long pay = payer != null && payer.SettlementComponent != null ? Math.Min(due, Seal31.Spare(payer)) : 0;
                 if (pay > 0)
                 {
@@ -425,7 +428,7 @@ namespace Armoury
                 if (!_startLogged)
                 {
                     _startLogged = true;
-                    Log.Info("BK i Diplomacy (E5/A8): start | wylaczniki: Gentry Purse From Town " + (GentryOn ? "tak" : "nie") + ", Bandit Hero Purse From Hideout " + (BanditOn ? "tak" : "nie")
+                    Log.Info("BK i Diplomacy (E5/A8): start | wylaczniki: Gentry Purse From Town " + (GentryOn ? "tak" : "nie") + " (start rodu: " + (GentryTownPays ? "z kasy miasta" : "0") + ")" + ", Bandit Hero Purse From Hideout " + (BanditOn ? "tak" : "nie")
                              + ", Feast Town Gets Paid " + (FeastOn ? "tak" : "nie") + ", Pact Cost To Other Realm " + (PactOn ? "tak" : "nie") + " | latki: " + _wiredText + "; BRAK: " + _missingText + ".");
                 }
                 var sb = new StringBuilder(900);

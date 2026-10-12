@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (decyzja Jeffa ok. 18:40 UTC do E5/A8) - NOWY ROD SZLACHTY BK STARTUJE Z 0 (zamiast 15 000 z nadwyzki kasy miasta handlu wsi)
+**Mod:** Armoury | **Galaz:** `w-toku/a8-gentry0` (od `w-toku/zbior-5-8` 2b30405 - osobne drzewo, bo w zbior-5-8 pracowal workflow; do scalenia) | **Pliki:** `Armoury/src/BkDipGold.cs` (GentryTownPays, GentryFin, linia startu), `Armoury/src/Settings.cs` (+1 klucz), `McmSettings.cs` (gen_mcm: Armoury 1221)
+
+**Problem:** E5/A8 dawal nowemu rodowi szlachty BK 15 000 z nadwyzki kasy miasta handlu wsi (regula R10). Jeff 12.10: "zawsze 0".
+**Przyczyna:** decyzja Jeffa (kierunek), nie blad.
+**Zmiana:** `GentryPurseFromTown` (wlaczony) zdejmuje 15 000 BK jak dotad, ale kasa miasta placi tylko przy NOWYM kluczu `GentryStartFromTown` (domyslnie **false**) - nowy rod startuje z 0. Cena wolnego majatku 0 bez zmian. Linia startu: "(start rodu: 0 | z kasy miasta)". Linia doby bez zmian ("z kas miast handlu wsi 0", "uciete" = cale 15 000).
+**Ryzyko / co sprawdzic:** nowy rod gentry (2 na 120 dob) bez gotowki - zyje z dochodu majatku (BK), zold i drabina dlugu jak kazdy rod; GentryService (rycerze bez lenna jada w druzynie pana, pan placi) - bez zmian. sprawdz_logi A8-1 (z kas <= BK dalby) dalej TAK przy 0. Klucz nowy - w Armoury.json Jeffa go nie ma. Build kod 0.
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8 (scalic do w-toku/zbior-5-8 po skonczeniu wf_42f8dda9-fa3).
+
 ## 2026-10-12 (etap 5 reszta, paczka E5/C2 - 203, PLAN 5.9 "glod ma skutki") - JEDNA DEFINICJA GLODU `Hunger.Of` (brak jedzenia / brak pieniedzy); GALAZ JEDZENIA R14 TYLKO PRZY GLODZIE Z BRAKU PIENIEDZY (7 dob Afford < 0.95, kampania >= 120 dob, jedzenie na polce); klucz `TownFolkHungerHurts`
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-5-8` (po recenzji E5/C1 d493556) | **Projekt:** `docs/etap5/PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` rozdz. 3 "E5/C2", R14 (v2 K2), D2, [D 09.10 A] | **Pliki:** nowy `Armoury/src/Hunger.cs`, `Armoury/src/TownFolk.Live.cs` (R14, `C2Food`, `BracketHadFood`, `MoneyHungry`, `NoteHungerDay`, `HungerLine`, zapis pola 17), `Armoury/src/TownFolk.cs` (2 pola `Folk`), `Armoury/src/PopulationLaw.cs` (`TownRate` - glod okregu z `Hunger.District`), `Armoury/src/Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 1220, RC 109 i GrandTourney 40 bez zmian), `tools/sprawdz_logi.py` (blok `etap5_c2`, opis grupy etap5)
 
