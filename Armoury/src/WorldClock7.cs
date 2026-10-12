@@ -113,17 +113,31 @@ namespace Armoury
             try
             {
                 if (!On || k == null) return;
-                int wars = 0;
-                var all = Kingdom.All;
-                for (int i = 0; i < all.Count; i++)
+                // recenzja E7/0: DestroyKingdomAction.ApplyInternal (G) zdejmuje postawy (RemoveFactionsFromCampaignWars) i znaczy krolestwo jako zniszczone
+                // PRZED tym zdarzeniem - FactionManager zwracal tu zawsze 0 wojen. Wojny z pamieci sesji: pary, ktorych ostatnie zdarzenie to WOJNA;
+                // para dostaje koniec wojny (bez linii POKOJ), zeby upadek drugiej strony nie liczyl jej drugi raz
+                int day = (int)CampaignTime.Now.ToDays;
+                string id = k.StringId ?? "";
+                var ended = new List<string>();
+                foreach (var kv in _pairs)
                 {
-                    var o = all[i];
-                    if (o == null || o == k) continue;
-                    try { if (FactionManager.IsAtWarAgainstFaction(k, o)) wars++; } catch { }
+                    if (!kv.Value.War) continue;
+                    int bar = kv.Key.IndexOf('|');
+                    if (bar < 0) continue;
+                    if (kv.Key.Substring(0, bar) == id || kv.Key.Substring(bar + 1) == id) ended.Add(kv.Key);
+                }
+                var foes = new List<string>();
+                for (int i = 0; i < ended.Count; i++)
+                {
+                    string key = ended[i];
+                    int bar = key.IndexOf('|');
+                    string other = key.Substring(0, bar) == id ? key.Substring(bar + 1) : key.Substring(0, bar);
+                    foes.Add(KingdomName(other));
+                    _pairs[key] = new PairEvent { Day = day, War = false };
                 }
                 _dDestroyed++;
-                Log.Info("Wojna i pokoj (E7/0): dzien " + (int)CampaignTime.Now.ToDays + " | " + k.Name + ": KROLESTWO ZNISZCZONE - jego wojny (" + wars
-                         + ") gra konczy bez zdarzenia pokoju, KRONIKA WOJEN (CS) traci te pary");
+                Log.Info("Wojna i pokoj (E7/0): dzien " + day + " | " + k.Name + ": KROLESTWO ZNISZCZONE - gra konczy jego wojny bez zdarzenia pokoju (znane z pamieci sesji: "
+                         + foes.Count + (foes.Count > 0 ? " [" + string.Join(", ", foes) + "]" : "") + "), KRONIKA WOJEN (CS) traci te pary");
             }
             catch (Exception e) { Stumble("OnKingdomDestroyed", e); }
         }
@@ -179,6 +193,17 @@ namespace Armoury
             }
             catch { }
             return "?";
+        }
+
+        private static string KingdomName(string id)
+        {
+            var all = Kingdom.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var o = all[i];
+                if (o != null && o.StringId == id) return o.Name != null ? o.Name.ToString() : id;
+            }
+            return id;
         }
 
         private static void Bump(Dictionary<string, int> d, string k)

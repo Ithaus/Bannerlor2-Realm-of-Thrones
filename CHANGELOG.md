@@ -25,7 +25,9 @@
 
 **Poza zakresem (zauwazone, nie ruszane - etap 8):** linia `AiNightCamp` liczy niedoczepionych czlonkow armii jako "samotnych lordow w polu" (NightMarch.cs:795) - odczyt mylacy, ale zmiana tekstu poza paczka; turnieje rozstrzygniete przez GT od razu przy PeaceOnly nie maja wlasnego licznika.
 
-**Build:** Armoury kod 0 (md5 90291c51, ostrzezenie CS0169 BattlefieldLaw sprzed paczki). gen_mcm OK (Armoury 1182 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmian). Gry nie uruchamiano.
+**Poprawka recenzji (E7/0):** (1) linia upadku krolestwa liczyla wojny przez `FactionManager.IsAtWarAgainstFaction` w sluchaczu `KingdomDestroyedEvent` - gra (G DestroyKingdomAction.ApplyInternal) najpierw `DeactivateKingdom` i `RemoveFactionsFromCampaignWars`, dopiero potem zdarzenie, wiec liczba byla zawsze 0; teraz wojny z pamieci sesji (pary z ostatnim zdarzeniem WOJNA) z nazwami przeciwnikow, para dostaje koniec wojny w pamieci (upadek drugiej strony nie liczy jej drugi raz); format poczatku linii bez zmian (regex E7_FALL - test syntetyczny T1 TAK). (2) `sprawdz_logi.py` main: komentarz galezi etap5 przeniesiony omylkowo na koniec linii etap7 - przywrocony. Przejrzane bez uwag: sygnatury zdarzen (G CampaignEvents), latki ROT na `MakePeaceAction/DeclareWarAction.ApplyInternal` (prefiksy - metoda dynamiczna bez typu w ramce, Caller ja pomija), tempo marszu nietkniete, off = stan sprzed paczki, brak zapisu (NK), koszt.
+
+**Build:** Armoury kod 0 (po recenzji md5 867b395a; ostrzezenie CS0169 BattlefieldLaw sprzed paczki). gen_mcm OK (Armoury 1182 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmian). Gry nie uruchamiano.
 
 **Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
 

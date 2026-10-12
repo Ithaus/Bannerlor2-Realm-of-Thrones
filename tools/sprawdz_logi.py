@@ -6158,9 +6158,9 @@ def main(argv):
     if group == "etap4" and logp:
         return etap4_main(logp, start_arg, until_arg, csp, bdp)   # E4/0 (188)
     if group == "etap5" and logp:
-        return etap5_main(logp, start_arg, until_arg, csvp, csp)
+        return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group == "etap7" and logp:
-        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224): szkielet etapu 7 + blok E7/0; kolejne paczki dopisuja bloki   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
+        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224): szkielet etapu 7 + blok E7/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
