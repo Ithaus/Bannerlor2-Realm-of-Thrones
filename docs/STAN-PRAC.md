@@ -1264,3 +1264,15 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   i 8 i potem testowac dokladnie i naprawiac".** -> od teraz: kod calej reszty etapow 5 (wsie nie gromadza, porcja C, male zrodla zlota), 6 (R1, K3, K4, W1, W3, N1, R3,
   warunkowe), 7 (bez tempa marszu) i 8 (drobne bledy + optymalizacja), kazda paczka z recenzja i wylacznikiem MCM; potem JEDNO scalenie, dokladny test (120 dob + zapis
   + zima + bieg dlugi) i poprawki; dopiero wtedy wgranie. Bez testow w grze po drodze (poza budowa i recenzja kodu).
+- (10:55 UTC 12.10) **Jeff: "rob az wyczerpiesz limit, tylko na biezaco zapisuj prace"** -> praca do limitu tygodniowego; po kazdym kroku push galezi + wpis tutaj.
+
+**W TOKU (stan na 12.10 ok. 11:00 UTC) - kod etapow 5-8 bez testow w grze, potem jeden test (zasada Jeffa 10:30):**
+- GOTOWE, NIEWGRANE: `w-toku/e5-wsie` 396c033 (od WGRANIA 33): pan 45% utargu wsi (VillageLordExtraShare 0.10), dziesiecina od razu (TownFolk.Tithe.cs, TempleTithe,
+  TitheVillageShare 0.05; place budowy septu wsi ida do ludu miasta targowego - wybor agenta), nadwyzka ludu i wsi 15%/d (FolkSurplusSpendShare; zamki 7%). Recenzja: poprawiony
+  wyjatek w VillageTithe (dopis do slownika w petli). DLL SCRATCH\test\Armoury-wsie.dll 76e54a0e. **Do sprawdzenia w tescie:** danina korony 2.5% liczona od stanu kiesy wsi
+  bierze ok. 139 tys./d wiecej niz w kopia-fin3 - kiesy wsi moga spadac szybko; material septow placony kupcom bez zdejmowania towaru z polki (jak roboty gminy, projekt R21).
+- W TOKU: workflow wf_aa159ecf-f65 - etap 6 porcja 3 na `w-toku/e6-p3` (od e5-wsie, drzewo SCRATCH\e6\p3): R1 wytop+przetop, R3, W1, W3, K4, N1, K3 (kazda autor + recenzent
+  z poprawka), na koncu przeglad kolizji porcji i DLL SCRATCH\test\Armoury-e6p3.dll. Galaz wypychana co 15 min (repo + GitHub). Jesli przerwane: "git -C <lancuch> log
+  w-toku/e6-p3" pokazuje, ktore paczki sa w commitach; wznowienie: Workflow resumeFromRunId wf_aa159ecf-f65 (skrypt w workflows/scripts sesji ae222cb7).
+- DALEJ (kolejnosc): etap 5 reszta (porcja C, male zrodla zlota z audytu, ok. 26 tys./d "bitwy"), etap 7 (bez tempa marszu: 7.1, 7.4-7.12), etap 8 (8.1-8.17 z optymalizacja),
+  potem scalenie, pelny audyt, jeden dokladny test (120 dob + zapis + zima + bieg dlugi), poprawki, wgranie.
