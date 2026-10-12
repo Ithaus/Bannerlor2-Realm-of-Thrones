@@ -3827,7 +3827,7 @@ def etap5_b4(rep, lines, start, win):
     def tot(pat):
         return sum(num(pat, tm[d], int, 0) or 0 for d in days)
     visits, sold, gold, onward = tot(r"\| wizyt (\d+),"), tot(r"jedzenie sprzedane zamkom (\d+) szt\."), tot(r"szt\. \((\d+) zl wedlug"), tot(r"dalej do miasta (\d+) wozow")
-    empty, fall, routed = tot(r"pusty po zamku (\d+)"), tot(r"bez miasta dalej \(zamek kupil reszte jak dotad\) (\d+)"), tot(r"skierowane do zamku (\d+) \(")
+    empty, fall, routed = tot(r"pusty po zamku (\d+)"), tot(r"bez miasta dalej \(zamek kupil (?:reszte|caly woz) jak dotad\) (\d+)"), tot(r"skierowane do zamku (\d+) \(")
     # B4-3: sprzedaz do dni popytu > 0
     rep.add("E5/B4 B4-3: jedzenie sprzedane zamkom (do dni popytu podzamcza)",
             f"skierowane {routed}, wizyt {visits}, sprzedane {sold} szt. ({gold} zl wedlug ceny pierwszej sztuki), dalej do miasta {onward}, pusty po zamku {empty}, bez miasta dalej {fall}",

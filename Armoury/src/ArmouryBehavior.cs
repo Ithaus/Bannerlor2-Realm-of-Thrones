@@ -623,6 +623,10 @@ namespace Armoury
             // E5/A3 (163): markietani - stan rozruchu (doba startu albo "bez rozruchu") - wlasny try; brak klucza (stary zapis) = rozruch rozstrzyga pierwsza doba
             try { string su = dataStore.IsSaving ? Sutlers.Export() : null; SaveText.Sync(dataStore, "arm_sutlers", ref su); if (dataStore.IsLoading) Sutlers.Import(su); }
             catch (Exception e) { Log.Error("SyncData.arm_sutlers", e); }
+            // E5/B4 (199, recenzja uwaga 1): targ przy zamku - wozy w drodze do zamku (rezerwacje jedzenia), znaczniki "byl w zamku", straz BK - wlasny try;
+            // brak klucza (zapis sprzed paczki) = stan pusty; rozwiazanie na wozy w OnSessionLaunched (w SyncData partii jeszcze nie ma)
+            try { string cm = dataStore.IsSaving ? CastleMarket.Export() : null; SaveText.Sync(dataStore, "arm_castlemarket", ref cm); if (dataStore.IsLoading) CastleMarket.Import(cm); }
+            catch (Exception e) { Log.Error("SyncData.arm_castlemarket", e); }
         }
 
         public override void RegisterEvents()
@@ -1177,6 +1181,7 @@ namespace Armoury
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
             try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
             try { MaterialOrders.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("MaterialOrders.ResolvePending", e); }   // 174.2: kontrakty surowca na karawany z zapisu
+            try { CastleMarket.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("CastleMarket.ResolvePending", e); }   // E5/B4 (199): wozy w drodze do zamku, znaczniki i straz z zapisu (arm_castlemarket)
             try { ArmsScrap.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("ArmsScrap.ResolvePending", e); }   // 174b.6: zlom - pomiar zakupow i rozgrzewka z zapisu
             try { GarrisonArmory.Restore("wczytanie"); } catch (Exception e) { Log.Error("GarrisonArmory.Restore", e); }   // sklad7: jedyne odtworzenie zbrojowni zalog (K1c GarrisonKit.RestoreArmories usuniete)
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }

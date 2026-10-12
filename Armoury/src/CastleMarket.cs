@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace Armoury
 {
@@ -37,15 +38,18 @@ namespace Armoury
     ///     w miescie), tylko ze Spendable. Zloto kasa zamku -> sakwa taboru, towar woz -> polka zamku, w oknie wjazdu taboru (ksiega pieniadza: utarg taborow
     ///     w zamkach - jak dotad; MoneyLedger bez nowych pozycji). Inny woz w zamku - jak dotad (gra).
     ///  4. Drugi odcinek: znacznik "byl w zamku" (do nastepnego wyjazdu z domu) i od razu rozkaz do miasta tym samym MarketRoad.PickTown (MarketCarts.Choose z zamku,
-    ///     bez licznikow "Dowoz:"); zadne miasto - zamek kupuje reszte jak dotad (gra, return true); nic do sprzedania - BK odsyla woz do domu.
+    ///     bez licznikow "Dowoz:"); zadne miasto - sprzedaz B4 cofnieta i zamek kupuje caly woz jak dotad (gra, return true - jedna sprzedaz na jedno
+    ///     ApplyInternal, 119 odtwarza ja co do denara); nic do sprzedania - BK odsyla woz do domu.
     ///  5. Straz: BK BKPartyBehavior.VillagersCastleTick co godzine odsyla do domu KAZDY woz stojacy w zamku; woz z rozkazem do miasta wyjezdza z osady dopiero
     ///     w nastepnej klatce (Campaign.Tick: CampaignTickCacheDataStore.Tick po tickach godzinowych, przyjazd w EncounterManager.Tick), wiec prefiks pomija BK
     ///     tylko dla wozu, ktoremu wlasnie nadalismy miasto (najwyzej HoldHours godzin, cel = miasto). Wozy wrocone mimo to do domu z ladunkiem - licznik.
     ///  6. Bez petli zamek-zamek: woz ze znacznikiem nie dostaje drugiego przystanku (licznik "powtorne wizyty bez znacznika" = 0).
     /// Jedno zjawisko z E4/11 pkt 8: danina jedzenia wsi dla spichlerza zalogi zostaje w VillageBook.TownFoodPostfix; linia podaje obie drogi jedzenia okregu
     /// (VillageBook.FortVillageFood + woz). FeedFromDistrict przyjmuje Town - ta sama funkcja pozniej dla miast (GL 2.13 krok B), dzis tylko zamki (D3).
-    /// Wylacznik CastleMarketFirst (wylaczony = woz prosto do miasta; woz juz w drodze do zamku nic tam nie sprzedaje i jedzie dalej). Stan tylko w pamieci (bez
-    /// zapisu): po wczytaniu woz w drodze do zamku sprzedaje tam jak dotad (gra). Gracz = AI. Wyjatek przy jednym wozie - licznik potkniec, nic nie gasimy.
+    /// Wylacznik CastleMarketFirst (wylaczony = woz prosto do miasta; woz juz w drodze do zamku nic tam nie sprzedaje i jedzie dalej). Stan wozow (w drodze
+    /// do zamku z rezerwacja, znacznik "byl w zamku", straz) idzie do zapisu (arm_castlemarket, recenzja B4 uwaga 1) - po wczytaniu woz w drodze do zamku
+    /// sprzedaje tam jak przed zapisem (tylko brakujace jedzenie, ze Spendable); popyt i polki liczone od nowa. Gracz = AI. Wyjatek przy jednym wozie -
+    /// licznik potkniec, nic nie gasimy.
     /// </summary>
     internal static class CastleMarket
     {
@@ -59,9 +63,10 @@ namespace Armoury
         private static MethodInfo _bkBudget;
         private static bool _bkBudgetLooked;
 
-        // ------------------------------------------------------------ stan kampanii (tylko pamiec; Reset w konstruktorze ArmouryBehavior)
+        // ------------------------------------------------------------ stan kampanii (Reset w konstruktorze ArmouryBehavior; _bound, _visited, _onward - zapis arm_castlemarket)
         private sealed class Trip { public Settlement Castle; public readonly Dictionary<ItemCategory, int> Units = new Dictionary<ItemCategory, int>(); public double Day; }
         private sealed class Onward { public Settlement Castle; public double Hour; }
+        internal struct Sale { public EquipmentElement El; public int N; public int Pay; }   // jedna pozycja sprzedazy B4 (do cofniecia w tym samym ApplyInternal)
         private static readonly Dictionary<MobileParty, Trip> _bound = new Dictionary<MobileParty, Trip>();          // woz w drodze do zamku (pierwszy przystanek)
         private static readonly Dictionary<MobileParty, Settlement> _visited = new Dictionary<MobileParty, Settlement>(); // znacznik "byl w zamku" (do wyjazdu z domu)
         private static readonly Dictionary<MobileParty, Onward> _onward = new Dictionary<MobileParty, Onward>();      // woz ruszyl z zamku do miasta (straz przed BK)
@@ -69,23 +74,24 @@ namespace Armoury
         private static List<ItemCategory> _foods;
         private static int _bkEnter = -1;                // -1 nie sprawdzone; 1 = BK sprzedaje w zamku (VillagerSettlementEnterPatch), 0 = nie
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        private static string _pending;                  // stan z zapisu (arm_castlemarket) do rozwiazania w OnSessionLaunched - w SyncData partii jeszcze nie ma
 
         // ------------------------------------------------------------ liczniki doby (linia "Targ przy zamku (5.11)")
         private static int _dAsk, _dRouted, _dFull, _dRouteNoCoin, _dVisits, _dNoNeed, _dNoCoin, _dOnward, _dFallback, _dEmpty, _dRepeat, _dWrong, _dOff;
-        private static int _dBkHeld, _dHomeLoad, _dStale, _dBudgetBk, _stumbles;
+        private static int _dBkHeld, _dHomeLoad, _dStale, _dBudgetBk, _dUndone, _stumbles;
         private static long _dRoutedUnits, _dSoldUnits, _dSoldGold, _dNoCoinUnits;
 
         internal static void Reset()
         {
             _bound.Clear(); _visited.Clear(); _onward.Clear(); _budget.Clear(); _errSites.Clear();
-            _foods = null; _bkEnter = -1;
+            _foods = null; _bkEnter = -1; _pending = null;
             ClearDay();
         }
 
         private static void ClearDay()
         {
             _dAsk = _dRouted = _dFull = _dRouteNoCoin = _dVisits = _dNoNeed = _dNoCoin = _dOnward = _dFallback = _dEmpty = _dRepeat = _dWrong = _dOff = 0;
-            _dBkHeld = _dHomeLoad = _dStale = _dBudgetBk = _stumbles = 0;
+            _dBkHeld = _dHomeLoad = _dStale = _dBudgetBk = _dUndone = _stumbles = 0;
             _dRoutedUnits = _dSoldUnits = _dSoldGold = _dNoCoinUnits = 0;
         }
 
@@ -311,7 +317,8 @@ namespace Armoury
         /// <summary>
         /// SellGoodsForTradeAction.ApplyInternal(Settlement, MobileParty, detail) - prefiks High (po GoodsLedger.WagonPre i MarketCarts.SellPrefix - First).
         /// Woz skierowany do tego zamku przez FirstStop: zamek kupuje brakujace jedzenie (FeedFromDistrict), woz dostaje znacznik i rozkaz do miasta; false = sprzedaz
-        /// gry pominieta (postfiksy biegna: zwrot nadplaty 119, ramka ksiegi towarow). Kazdy inny woz i brak miasta dalej - true (gra jak dotad).
+        /// gry pominieta (postfiksy biegna: zwrot nadplaty 119, ramka ksiegi towarow). Kazdy inny woz - true (gra jak dotad); brak miasta dalej - sprzedaz B4
+        /// cofnieta (Undo) i true: caly woz sprzedaje gra jak dotad, jedna sprzedaz na jedno ApplyInternal (recenzja B4 uwaga 2).
         /// </summary>
         public static bool SellPrefix(Settlement __0, MobileParty __1)
         {
@@ -330,19 +337,26 @@ namespace Armoury
                 _dVisits++;
                 if (_visited.ContainsKey(__1)) _dRepeat++;                   // drugi przystanek w jednym kursie - nie powinno sie zdarzyc (FirstStop pyta o znacznik)
                 _visited[__1] = __0;                                         // znacznik "byl w zamku" - do nastepnego wyjazdu z domu
+                long gold = 0; int sold = 0, shortN = 0; bool wanted = true;
+                List<Sale> sales = null;
                 if (On(s))
                 {
-                    long gold; int shortN; bool wanted;
-                    int sold = FeedFromDistrict(fort, __1, s, out gold, out shortN, out wanted);
-                    _dSoldUnits += sold; _dSoldGold += gold;
-                    if (!wanted) _dNoNeed++;
-                    if (shortN > 0) { _dNoCoin++; _dNoCoinUnits += shortN; }
+                    sales = new List<Sale>();
+                    sold = FeedFromDistrict(fort, __1, s, out gold, out shortN, out wanted, sales);
                 }
                 else _dOff++;                                                // wylaczone w drodze: nic nie sprzedaje, jedzie dalej (stan sprzed paczki)
                 // drugi odcinek: reszta ladunku do miasta - ta sama regula co wyjazd z domu (MarketRoad.PickTown -> MarketCarts.Choose z zamku), bez licznikow "Dowoz:"
-                if (!Sellable(__1)) { _dEmpty++; return false; }            // nic do sprzedania: BK odesle woz do domu (VillagersCastleTick)
+                if (!Sellable(__1)) { NoteSale(sold, gold, shortN, wanted); _dEmpty++; return false; }   // nic do sprzedania: BK odesle woz do domu (VillagersCastleTick)
                 var go = MarketRoad.PickTown(__1, home, v, s, false);
-                if (go == null || !go.IsTown) { _dFallback++; return true; }   // zadne miasto: zamek kupuje reszte jak dotad (gra, cala kasa)
+                if (go == null || !go.IsTown)
+                {
+                    // zadne miasto: JEDNA sprzedaz na jedno ApplyInternal (recenzja B4 uwaga 2) - sprzedaz B4 cofnieta co do sztuki i denara, caly woz sprzedaje
+                    // gra jak dotad (cala kasa, jak kazdy woz bez miasta); zwrot nadplaty 119 odtwarza te jedna sprzedaz z migawki (bez "niezgodne")
+                    if (sales != null && sales.Count > 0) Undo(fort, __1, sales);
+                    _dFallback++;
+                    return true;
+                }
+                NoteSale(sold, gold, shortN, wanted);
                 MarketRoad.Move(Villagers(), __1, go);
                 _onward[__1] = new Onward { Castle = __0, Hour = CampaignTime.Now.ToHours };
                 _dOnward++;
@@ -351,13 +365,44 @@ namespace Armoury
             catch (Exception e) { Stumble("CastleMarket.SellPrefix", e); return true; }   // blad: reszta jak w grze (to, co juz przeszlo, przeszlo parami zloto/towar)
         }
 
+        /// <summary>Liczniki linii dla sprzedazy B4, ktora zostaje (woz pusty albo dalej do miasta); przy cofnieciu (bez miasta dalej) nic.</summary>
+        private static void NoteSale(int sold, long gold, int shortN, bool wanted)
+        {
+            _dSoldUnits += sold; _dSoldGold += gold;
+            if (!wanted) _dNoNeed++;
+            if (shortN > 0) { _dNoCoin++; _dNoCoinUnits += shortN; }
+        }
+
+        /// <summary>
+        /// Cofniecie sprzedazy B4 w tym samym ApplyInternal (zadne miasto dalej): odwrotnie do FeedFromDistrict - towar polka -> woz, zloto sakwa taboru ->
+        /// kasa zamku, pozycje od ostatniej sprzedanej. Miedzy sprzedaza a cofnieciem nic nie rusza polki, wozu ani kas (MarketRoad.PickTown z zamku: bez
+        /// doladunku - at != home; CastlePurse.CanPayCart tylko czyta), wiec polka, dane rynku zamku, kasa i sakwa wracaja do stanu sprzed sprzedazy; ramki
+        /// ksiegi towarow i okno ksiegi pieniadza widza zero netto. Stos sprzedany do konca wraca na koniec wozu (kolejnosc pozycji gry inna niz w migawce 119 -
+        /// wazne tylko przy dwoch roznych sztukach tej samej kategorii jedzenia; wtedy 119 liczy "niezgodne" i nie zwraca nadplaty, zloto dalej parami).
+        /// </summary>
+        private static void Undo(Town fort, MobileParty cart, List<Sale> sales)
+        {
+            var r = cart.ItemRoster;
+            var shelf = fort.Settlement.ItemRoster;
+            for (int k = sales.Count - 1; k >= 0; k--)
+            {
+                var x = sales[k];
+                shelf.AddToCounts(x.El, -x.N);
+                r.AddToCounts(x.El, x.N);
+                fort.ChangeGold(x.Pay);
+                cart.PartyTradeGold -= x.Pay;
+            }
+            _dUndone++;
+        }
+
         /// <summary>
         /// Jedzenie okregu na polke warowni z wozu jej wsi: tylko brakujace do Days dni popytu ludnosci (kazda kategoria osobno), cena targu warowni wedlug reguly gry
         /// (pozycje od ostatniej, cena pierwszej sztuki przy obecnej polce - zwrot nadplaty sztuka po sztuce robi potem MarketCarts.SellPostfix), tylko z kasy ponad
         /// zapasem kupcow (CastlePurse.Spendable). Kazda pozycja parami w kolejnosci gry: zloto (kasa -> sakwa taboru), potem towar (woz -> polka). Dzis tylko zamki
-        /// (FirstStop); miasta - pozniej (GL 2.13 krok B, D3). shortN = sztuki, ktorych warownia chciala, a nie miala czym zaplacic.
+        /// (FirstStop); miasta - pozniej (GL 2.13 krok B, D3). shortN = sztuki, ktorych warownia chciala, a nie miala czym zaplacic. sales (opcja) - pozycje
+        /// sprzedazy do ewentualnego cofniecia (Undo).
         /// </summary>
-        internal static int FeedFromDistrict(Town fort, MobileParty cart, Settings s, out long gold, out int shortN, out bool wanted)
+        internal static int FeedFromDistrict(Town fort, MobileParty cart, Settings s, out long gold, out int shortN, out bool wanted, List<Sale> sales = null)
         {
             gold = 0; shortN = 0; wanted = false;
             var r = cart.ItemRoster;
@@ -395,6 +440,7 @@ namespace Armoury
                 shelf.AddToCounts(el.EquipmentElement, n);
                 r.AddToCounts(el.EquipmentElement, -n);
                 spend -= pay; gold += pay; sold += n;
+                if (sales != null) sales.Add(new Sale { El = el.EquipmentElement, N = n, Pay = pay });   // do cofniecia (SellPrefix: zadne miasto dalej)
             }
             return sold;
         }
@@ -429,6 +475,113 @@ namespace Armoury
         {
             if (p == null) return;
             _bound.Remove(p); _visited.Remove(p); _onward.Remove(p);
+        }
+
+        // ------------------------------------------------------------ zapis (arm_castlemarket; recenzja B4 uwaga 1)
+        // Bez zapisu woz skierowany do zamku przez FirstStop nie mial po wczytaniu wpisu w _bound: SellPrefix przepuszczal go do gry, a gra sprzedawala
+        // zamkowi CALY ladunek (ruda, drewno, welna) z calej kasy, z pominieciem Spendable. Rekordy (oddzielone '~', pola '|'):
+        //   b|woz|zamek|doba|kategoria:sztuk,...   - woz w drodze do zamku (rezerwacja jedzenia, liczona przez inne wozy jak towar na polce)
+        //   v|woz|zamek                            - znacznik "byl w zamku" (do nastepnego wyjazdu z domu - bez petli zamek-zamek)
+        //   o|woz|zamek|godzina                    - straz przed BK VillagersCastleTick (woz z rozkazem do miasta jeszcze w zamku)
+        // Brak klucza (zapis sprzed paczki) = stan pusty jak dotad. Starszy DLL klucza nie czyta (zapis dalej sie wczytuje).
+
+        /// <summary>Stan wozow do zapisu (napis; pusty = nic w drodze).</summary>
+        internal static string Export()
+        {
+            if (_pending != null) ResolvePending("zapis przed startem sesji");
+            var sb = new StringBuilder();
+            foreach (var kv in _bound)
+            {
+                try   // wyjatek jednego rekordu nie gubi reszty
+                {
+                    var mp = kv.Key; var t = kv.Value;
+                    if (mp == null || !mp.IsActive || string.IsNullOrEmpty(mp.StringId) || t == null || t.Castle == null) continue;
+                    sb.Append("b|").Append(mp.StringId).Append('|').Append(t.Castle.StringId).Append('|').Append(t.Day.ToString("R", Inv)).Append('|');
+                    foreach (var u in t.Units)
+                        if (u.Key != null && u.Value > 0) sb.Append(u.Key.StringId).Append(':').Append(u.Value.ToString(Inv)).Append(',');
+                    sb.Append('~');
+                }
+                catch (Exception e) { Stumble("CastleMarket.Export(b)", e); }
+            }
+            foreach (var kv in _visited)
+            {
+                var mp = kv.Key;
+                if (mp == null || !mp.IsActive || string.IsNullOrEmpty(mp.StringId) || kv.Value == null) continue;
+                sb.Append("v|").Append(mp.StringId).Append('|').Append(kv.Value.StringId).Append('~');
+            }
+            foreach (var kv in _onward)
+            {
+                var mp = kv.Key;
+                if (mp == null || !mp.IsActive || string.IsNullOrEmpty(mp.StringId) || kv.Value == null || kv.Value.Castle == null) continue;
+                sb.Append("o|").Append(mp.StringId).Append('|').Append(kv.Value.Castle.StringId).Append('|').Append(kv.Value.Hour.ToString("R", Inv)).Append('~');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Z SyncData: tylko zapamietanie (partie i osady szukamy w OnSessionLaunched - ResolvePending).</summary>
+        internal static void Import(string s)
+        {
+            _bound.Clear(); _visited.Clear(); _onward.Clear();
+            _pending = string.IsNullOrEmpty(s) ? null : s;
+        }
+
+        /// <summary>OnSessionLaunched (i awaryjnie z Export): rekordy z zapisu na wozy i zamki (po StringId); woza albo zamku juz nie ma - rekord pominiety.</summary>
+        internal static void ResolvePending(string why)
+        {
+            var s = _pending;
+            _pending = null;
+            if (string.IsNullOrEmpty(s)) return;
+            int nb = 0, nv = 0, no = 0, lost = 0;
+            try
+            {
+                var carts = new Dictionary<string, MobileParty>();
+                foreach (var p in MobileParty.AllVillagerParties) if (p != null && !string.IsNullOrEmpty(p.StringId)) carts[p.StringId] = p;
+                var cats = new Dictionary<string, ItemCategory>();
+                foreach (var c in ItemCategories.All) if (c != null && !string.IsNullOrEmpty(c.StringId)) cats[c.StringId] = c;
+                var om = MBObjectManager.Instance;
+                foreach (var rec in s.Split('~'))
+                {
+                    if (rec.Length == 0) continue;
+                    try
+                    {
+                        var a = rec.Split('|');
+                        MobileParty mp = null; Settlement castle = null;
+                        if (a.Length >= 3)
+                        {
+                            carts.TryGetValue(a[1], out mp);
+                            try { castle = om.GetObject<Settlement>(a[2]); } catch { }
+                        }
+                        if (mp == null || !mp.IsActive || castle == null || !castle.IsCastle) { lost++; continue; }
+                        if (a[0] == "b" && a.Length == 5)
+                        {
+                            double day;
+                            if (!double.TryParse(a[3], NumberStyles.Float, Inv, out day)) { lost++; continue; }
+                            var t = new Trip { Castle = castle, Day = day };
+                            foreach (var tok in a[4].Split(','))
+                            {
+                                if (tok.Length == 0) continue;
+                                var q = tok.Split(':');
+                                ItemCategory c; int n;
+                                if (q.Length != 2 || !cats.TryGetValue(q[0], out c) || !int.TryParse(q[1], NumberStyles.Integer, Inv, out n) || n <= 0) continue;
+                                int u; t.Units.TryGetValue(c, out u); t.Units[c] = u + n;
+                            }
+                            _bound[mp] = t; nb++;
+                        }
+                        else if (a[0] == "v" && a.Length == 3) { _visited[mp] = castle; nv++; }
+                        else if (a[0] == "o" && a.Length == 4)
+                        {
+                            double h;
+                            if (!double.TryParse(a[3], NumberStyles.Float, Inv, out h)) { lost++; continue; }
+                            _onward[mp] = new Onward { Castle = castle, Hour = h }; no++;
+                        }
+                        else lost++;
+                    }
+                    catch (Exception e) { Stumble("CastleMarket.ResolvePending(rekord)", e); lost++; }
+                }
+            }
+            catch (Exception e) { Stumble("CastleMarket.ResolvePending", e); }
+            Log.Info("CastleMarket (E5/B4): stan wozow z zapisu (" + why + ") - w drodze do zamku " + nb + ", znaczniki \"byl w zamku\" " + nv + ", straz BK " + no
+                     + "; pominiete (woza albo zamku juz nie ma, rekord nieczytelny) " + lost + ".");
         }
 
         // ------------------------------------------------------------ doba
@@ -519,7 +672,8 @@ namespace Armoury
                   .Append(" | wizyt ").Append(_dVisits).Append(", jedzenie sprzedane zamkom ").Append(_dSoldUnits).Append(" szt. (").Append(_dSoldGold)
                   .Append(" zl wedlug ceny pierwszej sztuki - nadplate oddaje 119), dalej do miasta ").Append(_dOnward).Append(" wozow, odmowy (brak Spendable) ").Append(_dNoCoin)
                   .Append(" (niekupione ").Append(_dNoCoinUnits).Append(" szt.); nic nie brakowalo ").Append(_dNoNeed)
-                  .Append(", bez miasta dalej (zamek kupil reszte jak dotad) ").Append(_dFallback).Append(", pusty po zamku ").Append(_dEmpty)
+                  .Append(", bez miasta dalej (zamek kupil caly woz jak dotad) ").Append(_dFallback).Append(" (cofniete sprzedaze B4 ").Append(_dUndone).Append(")")
+                  .Append(", pusty po zamku ").Append(_dEmpty)
                   .Append(", wylaczone w drodze ").Append(_dOff).Append(", inny zamek ").Append(_dWrong)
                   .Append(" | pierwszy przystanek: wozow z jedzeniem ").Append(_dAsk).Append(", skierowane do zamku ").Append(_dRouted).Append(" (").Append(_dRoutedUnits)
                   .Append(" szt.), zamek mial dosc ").Append(_dFull).Append(", odmowy przy wyborze (brak Spendable) ").Append(_dRouteNoCoin)
