@@ -3314,6 +3314,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_r1(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_r1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/R3 (215): narzedzia wedlug zuzycia, uprzaz z kupcem AI, hurt kupcow wozem (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
+    try:
+        etap5_r3(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_r3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3672,6 +3677,73 @@ def etap5_r1(rep, lines, start, until):
     rep.add("R1-12: wegiel dymarek - skad (suma okna)",
             f"las okregu {woods}, targ {bought} ladunkow za {gold} zl; braki: na polce {shelf}, zlota wsi {nogold}, bez miasta handlowego {nomk}; "
             f"kopalnie BK w miastach: lupy {tm}, drewno {tmw}, bez drewna/kapitalu {tms}", "INFO (projekt: las okregu ok. 100/d, reszta z targu)", None)
+
+
+def etap5_r3(rep, lines, start, until):
+    """E6/R3 (215, projekt etapu 6 v2 rozdz. 3 "E6/R3" Test): linie doby "Przewoz kupcow wozem (215): dzien N", "Uprzaz (215): dzien N",
+    "Narzedzia wedlug zuzycia (215): dzien N" (dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Wiazace: przewoz CZYNNY we wszystkich dobach
+    (przerzut natychmiastowy 0 - kazda sztuka hurtu idzie wozem; awaryjny przerzut tylko przy potknieciu), kontrola "w drodze" reszta 0 w kazdej dobie,
+    potkniecia 0, polki uprzezy bez wzrostu d91-until (<= +2%); reszta INFO (sredni czas drogi, zakupy uprzezy, wstrzymane cykle narzedzi)."""
+    def rows_of(prefix):
+        r = {}
+        for d, s in by_day(lines, prefix).items():
+            rd = run_day(d, start)
+            if 1 <= rd <= until:
+                r[rd] = s
+        return r
+    cart = rows_of("Przewoz kupcow wozem (215): dzien")
+    rep.add("R3-1: linia Przewoz kupcow wozem (215)", f"{len(cart)} dob", "codziennie od wgrania E6/R3", None)
+    if cart:
+        days = sorted(cart)
+        off = [x for x in days if "| CZYNNE |" not in cart[x]]
+        rep.add("R3-2: hurt kupcow wozem CZYNNY w dobach okna (przerzut natychmiastowy 0)", f"{len(days) - len(off)} z {len(days)}" + (f"; ostatnia nieczynna d{off[-1]}" if off else ""),
+                "wszystkie doby (klucz ArmsTradeByCart)", len(off) == 0)
+        chk = [x for x in days if "kontrola: w drodze wczoraj" in cart[x]]
+        bad = [x for x in chk if (num(r"= reszta (-?\d+)", cart[x], int, 0) or 0) != 0]
+        rep.add("R3-3: kupione = dowiezione + zawrocone + w drodze (reszta, kazda doba)", f"rozjazd w {len(bad)} z {len(chk)} dob" + (f"; pierwsza d{bad[0]}" if bad else ""),
+                "0 dob z rozjazdem", (len(bad) == 0) if chk else None)
+        stu = sum(num(r"potkniecia dzis (\d+)", cart[x], int, 0) or 0 for x in days)
+        rep.add("R3-4: potkniecia wozow kupcow (suma okna)", str(stu), "0", stu == 0)
+
+        def tot(pat, cast=int):
+            return sum(num(pat, cart[x], cast, 0) or 0 for x in days)
+        bought, arr, back = tot(r"\| kupione (\d+) szt\."), tot(r"\| dowiezione (\d+) szt\."), tot(r"\| zawrocone (\d+) szt\.")
+        carts, arrc = tot(r"szt\. za \d+ zl w (\d+) wozach"), tot(r"\| dowiezione \d+ szt\. w (\d+) wozach")
+        dsum = sum((num(r"wozach \(srednio ([\d.]+) dob drogi\)", cart[x], float, 0) or 0) * (num(r"szt\. za \d+ zl w (\d+) wozach", cart[x], int, 0) or 0) for x in days)
+        asum = sum((num(r"wozach \(srednio ([\d.]+) dob od zakupu\)", cart[x], float, 0) or 0) * (num(r"\| dowiezione \d+ szt\. w (\d+) wozach", cart[x], int, 0) or 0) for x in days)
+        last = cart[days[-1]]
+        road = num(r"\| w drodze (\d+) szt\.", last, int, 0) or 0
+        wait = tot(r"czeka pod oblezeniem (\d+) wozow")
+        rep.add("R3-5: hurt kupcow wozem (suma okna; w drodze - ostatnia doba)",
+                f"kupione {bought} szt. w {carts} wozach (srednio {dsum / carts if carts else 0:.1f} dob drogi), dowiezione {arr} szt. w {arrc} wozach "
+                f"(srednio {asum / arrc if arrc else 0:.1f} dob od zakupu), zawrocone {back}, czeka pod oblezeniem {wait} wozo-dob; w drodze {road} szt. (d{days[-1]})",
+                "INFO (dotad 1301 szt./d przerzutem tej samej doby)", None)
+    bard = rows_of("Uprzaz (215): dzien")
+    rep.add("R3-6: linia Uprzaz (215)", f"{len(bard)} dob", "codziennie od wgrania E6/R3", None)
+    if bard:
+        bd = sorted(bard)
+        pcs = sum(num(r"kupiona (\d+) szt\.", bard[x], int, 0) or 0 for x in bd)
+        gold = sum(num(r"kupiona \d+ szt\. za (\d+) zl", bard[x], int, 0) or 0 for x in bd)
+        short = sum(num(r"po zakupach (\d+) szt\.", bard[x], int, 0) or 0 for x in bd)
+        rep.add("R3-7: uprzaz kupiona przez lordow AI (suma okna)", f"{pcs} szt. za {gold} zl; brak po zakupach (suma dob) {short}", "INFO (dotad 0 - AI nie kupowalo uprzezy)", None)
+        stu = sum(num(r"potkniecia (\d+)\.", bard[x], int, 0) or 0 for x in bd)
+        rep.add("R3-8: potkniecia zakupow uprzezy (suma okna)", str(stu), "0", stu == 0)
+        shelf = {x: num(r"uprzaz (\d+) szt\. \|", bard[x], int) for x in bd if x >= 91}
+        sd = sorted(x for x in shelf if shelf[x] is not None)
+        if len(sd) >= 2:
+            a, b = shelf[sd[0]], shelf[sd[-1]]
+            rep.add("R3-9: polki uprzezy miast i zamkow (d91 -> until)", f"{a} -> {b} (d{sd[0]}-d{sd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%)", "bez wzrostu (<= +2%)", b <= a * 1.02)
+    tools = rows_of("Narzedzia wedlug zuzycia (215): dzien")
+    rep.add("R3-10: linia Narzedzia wedlug zuzycia (215)", f"{len(tools)} dob", "codziennie od wgrania E6/R3", None)
+    if tools:
+        td = sorted(tools)
+        run = sum(num(r"puszczone (\d+)", tools[x], int, 0) or 0 for x in td)
+        held = sum(num(r"wstrzymane (\d+)", tools[x], int, 0) or 0 for x in td)
+        inp = sum(num(r"wsad niezuzyty (\d+) szt\.", tools[x], int, 0) or 0 for x in td)
+        rep.add("R3-11: cykle linii narzedzi (suma okna)", f"puszczone {run}, wstrzymane {held} (wsad niezuzyty {inp} szt.)",
+                "INFO (projekt: ruda na narzedzia w dol z 32 ladunkow/d, stos narzedzi bez wzrostu)", None)
+        stu = sum(num(r"potkniecia dzis (\d+)", tools[x], int, 0) or 0 for x in td)
+        rep.add("R3-12: potkniecia ToolsByUse (suma okna)", str(stu), "0", stu == 0)
 
 
 def etap5_fee(rep, lines):

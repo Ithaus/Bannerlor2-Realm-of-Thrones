@@ -1465,6 +1465,12 @@ namespace Armoury
         // prawdziwe drewno (las wsi okregu, reszta z polki miasta handlowego wozem wsi na nastepna dobe), bez drewna mniej lup; kuznia miasta tylko wegiel kowalski.
         // Tylko nowa kampania (flaga w zapisie arm_e6_bloom); stary zapis - ruda jak dotad
         public bool BloomeryAtMine = true;                 // new campaigns only: the mining village smelts its ore on the spot and sends out iron blooms (15 kg) instead of 100 kg loads of ore; the bloomery burns real wood - from the woods of the district first, then bought at its market town - and without wood the mine yields less; the town forge burns only smith's charcoal, and scrap and wrecks are smelted back into blooms
+        // E6/R3 (215, PLAN 6.7, R15): dziury po 174 - linia narzedzi kuje tylko przy zapasie miasta ponizej 30 dni popytu (ToolsByUse, prefiks cyklu WorkshopLaw);
+        // lordowie AI dokupuja uprzaz jezdzcom tieru >= 4 z uprzeza we wzorcu (AiGear, koszyk HorseHarness po reszcie koszykow); hurt kupcow miedzy osadami
+        // (SupplyDemand.DailyTrade) jedzie wozem bez partii - towar schodzi z polki zrodla przy zakupie i przychodzi po czasie drogi (TradeCarts, zapis arm_tradecarts)
+        public bool ToolsByUse = true;                     // a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)
+        public bool AiBuysBarding = true;                  // AI lords buy horse harness for their mounted men of tier 4 and above whose kit includes one, after everything else they lack, from what is left of the day's budget (off = AI lords never buy harness)
+        public bool ArmsTradeByCart = true;                // the arms, harness and horses traders carry between towns leave the seller's shelf when bought and reach the buyer by cart after the days the road takes (the buyer pays at purchase; a besieged town waits, after thirty days the goods go back); off = they move the same day, as before
 
         public static void Load(string moduleDataDir)
         {

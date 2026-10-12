@@ -232,6 +232,7 @@ namespace Armoury
                 }
                 if (BulkLineSkip(production)) { __result = false; return false; }
                 if (Bloomery.TownMineBlocked(production, workshop)) { __result = false; return false; }   // E6/R1 (214): kopalnia BK w miescie/zamku - lupa tylko z drewnem z polki tego miasta
+                if (ToolsByUse.Held(production, workshop)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi przy zapasie miasta >= 30 dni popytu - cykl nie idzie (wsad zostaje)
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
                 if (workshop.Owner == Hero.MainHero) return true;          // warsztaty gracza - vanilla
                 if (!Campaign.Current.GameStarted) return true;           // start gry - vanilla zapelnia rynki
@@ -1533,6 +1534,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.PlayerWorkshopsSameRule || __1 == null || __1.Settlement == null) return true;
                 bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
+                if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
                 if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;
                 RollDay();
                 _plFree++;

@@ -173,7 +173,11 @@ namespace Armoury
                     }
             }
             catch (Exception e) { Stumble("Armories", e); }
-            long total = shelves + parties + armories;
+            // E6/R3 (215): hurt kupcow wozem - sztuki w drodze sa czescia stanu (zeszly z polki zrodla, na polke celu jeszcze nie weszly)
+            long road = 0;
+            try { TradeCarts.ForEachInTransit((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; road += n; } }); }
+            catch (Exception e) { Stumble("TradeCarts", e); }
+            long total = shelves + parties + armories + road;
             if (_prev == null)
             {
                 _prev = now;
@@ -204,7 +208,7 @@ namespace Armoury
             }
             Log.Info("Uzbrojenie wedlug zrodla (E6/0): dzien " + day + " | zrodla: warsztaty " + Sum(_src, SWorkshop) + ", strzelarze " + Sum(_src, SFletcher) + " (dorobek startowy ColdStart - w stanie wyjsciowym)"
                      + " | ujscia: zlom " + Sum(_sink, KScrap) + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
-                     + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + "), zmiana " + (total - prevTotal)
+                     + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + ", w drodze wozem (215) " + road + "), zmiana " + (total - prevTotal)
                      + " | reszta " + rest + (den > 0 ? " (" + (100.0 * rest / den).ToString("0.0", CultureInfo.InvariantCulture) + "% zrodel + ujsc)" : "")
                      + " | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"
                      + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + " | [" + string.Join("; ", kinds.ToArray()) + "].");
@@ -322,10 +326,13 @@ namespace Armoury
             var vet = new long[Cats]; var parm = new long[Cats];
             try { HorseFate.VetPoolCats(vet); } catch (Exception e) { Stumble("VetPool", e); }
             try { HorseFate.PlayerArmoryCats(parm); } catch (Exception e) { Stumble("PlayerArmory", e); }
+            // E6/R3 (215): konie hurtu kupcow w drodze wozem - czesc stanu (przeniesienie miedzy polkami)
+            var road = new long[Cats];
+            try { TradeCarts.ForEachInTransit((it, n) => { int c = Cat(it); if (c >= 0) road[c] += n; }); } catch (Exception e) { Stumble("TradeCarts", e); }
             var now = new long[Cats];
-            for (int i = 0; i < Cats; i++) now[i] = shelf[i] + vil[i] + stash[i] + party[i] + arm[i] + hero[i] + vet[i] + parm[i];
+            for (int i = 0; i < Cats; i++) now[i] = shelf[i] + vil[i] + stash[i] + party[i] + arm[i] + hero[i] + vet[i] + parm[i] + road[i];
             string state = "stan " + Row(now) + " (polki miast i zamkow " + Row(shelf) + ", magazyny wsi " + Row(vil) + ", schowki " + Row(stash) + ", tabory " + Row(party)
-                           + ", zbrojownie DTE " + Row(arm) + ", zbrojownia gracza " + Row(parm) + ", bohaterowie " + Row(hero) + ", pula weteranow " + Row(vet) + ")";
+                           + ", zbrojownie DTE " + Row(arm) + ", zbrojownia gracza " + Row(parm) + ", bohaterowie " + Row(hero) + ", pula weteranow " + Row(vet) + ", w drodze wozem (215) " + Row(road) + ")";
             if (_prev == null)
             {
                 Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " - stan wyjsciowy, reszta od nastepnej doby.");

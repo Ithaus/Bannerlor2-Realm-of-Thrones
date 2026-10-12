@@ -302,6 +302,103 @@ namespace Armoury
             ItemObject.ItemTypeEnum.HandArmor, ItemObject.ItemTypeEnum.Cape
         };
 
+        // E6/R3 (215): kolejnosc zakupu brakow = Order + uprzaz na koncu (z tego, co zostalo z budzetu). Order zostaje bez uprzezy (MenUpgrade "lepsze za swoje").
+        // Koszyki uprzezy sa w potrzebie tylko z AddBardingNeed (Deficit liczy sloty 0-9), wiec przy wylaczonym AiBuysBarding petla uprzezy nic nie robi.
+        private static readonly ItemObject.ItemTypeEnum[] BuyOrder = BuildBuyOrder();
+        private static ItemObject.ItemTypeEnum[] BuildBuyOrder()
+        {
+            var l = new List<ItemObject.ItemTypeEnum>(Order); l.Add(ItemObject.ItemTypeEnum.HorseHarness); return l.ToArray();
+        }
+
+        // ------------------------------------------------------------ E6/R3 (215, PLAN 6.7 (b)): uprzaz z kupcem AI
+        // Polki uprzezy rosly (2 450 szt. d120, L:31539) - AI nie kupowalo jej wcale (Deficit liczy sloty 0-9, bez konia i uprzezy; P174 rozdz. 9). Teraz lord AI
+        // (nie zaloga - zalogi bronia murow pieszo, a Stajnia nie daje im koni) dokupuje uprzaz jezdzcom tieru >= BardingMinTier, ktorych wzorzec ma konia
+        // i uprzaz (slot 10 i 11 - jak gracz: QuartermasterLaw.KitTypes z HorseHarness); koszyk NeedKey (typ x tier do sufitu jednostki), zapas zbrojowni
+        // pokrywa brak tak jak w Deficit (ten sam tier, potem wyzsze, potem t-1). DTE zaklada uprzaz na konia jezdzca (AssignHorseAndHarness). Uprzaz w zbrojowni
+        // AI nie jest nadwyzka (MenPurse.AiSurplusPlan - "konie i rzedy - Stajnia"), wiec bez petli kup-sprzedaj. Wylacznik AiBuysBarding.
+        internal const int BardingMinTier = 4;
+        internal static bool BardingOn { get { var s = Settings.Current; return s != null && s.AiBuysBarding; } }
+        private static int _dBardPcs, _dBardGold, _dBardParties, _dBardNeed, _dBardShort, _bardStumbles;
+
+        /// <summary>Dopisuje do need koszyki uprzezy (brak po odjeciu zbrojowni) i oddzialy koszyka do lifters; zwraca brak uprzezy przed zakupem.</summary>
+        private static int AddBardingNeed(MobileParty mp, Dictionary<ItemObject, int> armory, Dictionary<int, int> need, Dictionary<int, List<CharacterObject>> lifters)
+        {
+            try
+            {
+                var s = Settings.Current;
+                bool oneUp = s != null && s.MenUpgradeOneTierUp;
+                var bn = new Dictionary<int, int>();
+                var roster = mp.MemberRoster;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var ch = el.Character;
+                    if (ch == null || ch.IsHero || el.Number <= 0 || MenUpgrade.TroopTier(ch) < BardingMinTier) continue;
+                    Equipment eq = null;
+                    try { eq = ch.Equipment; } catch { }
+                    if (eq == null) continue;
+                    var horse = eq[EquipmentIndex.Horse]; var har = eq[EquipmentIndex.HorseHarness];
+                    if (horse.IsEmpty || horse.Item == null || har.IsEmpty || har.Item == null || har.Item.ItemType != ItemObject.ItemTypeEnum.HorseHarness) continue;
+                    int k = NeedKey(ch, har.Item, oneUp);
+                    int n; bn.TryGetValue(k, out n); bn[k] = n + el.Number;
+                    if (lifters != null)
+                    {
+                        List<CharacterObject> lt;
+                        if (!lifters.TryGetValue(k, out lt)) lifters[k] = lt = new List<CharacterObject>();
+                        if (!lt.Contains(ch)) lt.Add(ch);
+                    }
+                }
+                if (bn.Count == 0) return 0;
+                // zapas uprzezy w zbrojowni: ten sam tier, potem wyzsze, potem t-1 (jak Deficit, wpis 89)
+                var spare = new Dictionary<int, int>();
+                if (armory != null)
+                    foreach (var kv in armory)
+                    {
+                        if (kv.Key == null || kv.Value <= 0 || kv.Key.ItemType != ItemObject.ItemTypeEnum.HorseHarness) continue;
+                        int k = (int)kv.Key.ItemType * 10 + TierOf(kv.Key);
+                        int sp; spare.TryGetValue(k, out sp); spare[k] = sp + kv.Value;
+                    }
+                foreach (var k in new List<int>(bn.Keys))
+                {
+                    int sp; if (!spare.TryGetValue(k, out sp) || sp <= 0) continue;
+                    int c = Math.Min(bn[k], sp); bn[k] -= c; spare[k] = sp - c;
+                }
+                int total = 0;
+                foreach (var k in new List<int>(bn.Keys))
+                {
+                    int d = bn[k]; if (d <= 0) continue;
+                    int type = k / 10, t = k % 10;
+                    var order = new List<int>(); for (int tt = t + 1; tt <= 6; tt++) order.Add(tt); if (t > 1) order.Add(t - 1);
+                    foreach (var tt in order)
+                    {
+                        int sk = type * 10 + tt, sp; if (!spare.TryGetValue(sk, out sp) || sp <= 0) continue;
+                        int c = Math.Min(d, sp); d -= c; spare[sk] = sp - c; if (d <= 0) break;
+                    }
+                    if (d <= 0) continue;
+                    int v; need.TryGetValue(k, out v); need[k] = v + d;
+                    total += d;
+                }
+                return total;
+            }
+            catch (Exception e) { _bardStumbles++; if (_bardStumbles == 1) Log.Error("AiGear.AddBardingNeed", e); return 0; }
+        }
+
+        /// <summary>Linia doby "Uprzaz (215)" (z ArmouryBehavior po handlu kupcow): zakupy uprzezy lordow AI od poprzedniej linii i polki uprzezy miast i zamkow
+        /// (spis SupplyDemand.DailyTrade; -1 = spisu nie bylo).</summary>
+        internal static void BardingDaily()
+        {
+            try
+            {
+                int shelf = SupplyDemand.HarnessOnShelves;
+                if (!BardingOn && _dBardPcs == 0) { _bardStumbles = 0; return; }
+                Log.Info("Uprzaz (215): dzien " + (int)CampaignTime.Now.ToDays + " | " + (BardingOn ? "CZYNNE" : "WYLACZONE") + " | lordowie AI: kupiona " + _dBardPcs + " szt. za "
+                         + _dBardGold + " zl, partie z brakiem " + _dBardParties + " (brak przed zakupem " + _dBardNeed + ", po zakupach " + _dBardShort + " szt.; jezdzcy tieru >= "
+                         + BardingMinTier + " z uprzeza we wzorcu) | polki miast i zamkow: uprzaz " + (shelf >= 0 ? shelf.ToString() : "brak spisu") + " szt. | potkniecia " + _bardStumbles + ".");
+            }
+            catch (Exception e) { Log.Error("AiGear.BardingDaily", e); }
+            _dBardPcs = _dBardGold = _dBardParties = _dBardNeed = _dBardShort = _bardStumbles = 0;
+        }
+
         // wpis 79: dla ColdStart (dorobek stuleci w zbrojowniach)
         internal static Dictionary<MBGUID, Dictionary<ItemObject, int>> Armories() { return Look() ? _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>> : null; }
         internal static int Bucket(ItemObject it) { return (int)it.ItemType * 10 + TierOf(it); }
@@ -481,7 +578,7 @@ namespace Armoury
             // polki (ShelfBuy.Take, takze cofnieta PutBack) - gen++
             int[] memo = new int[shelf.Count], memoGen = new int[shelf.Count];
             int gen = 1;
-            foreach (var type in Order)
+            foreach (var type in BuyOrder)   // E6/R3 (215): Order + uprzaz na koncu (koszyki uprzezy tylko z AddBardingNeed)
             {
                 for (int t = 6; t >= 1; t--)
                 {
@@ -679,6 +776,10 @@ namespace Armoury
                 var lifters = new Dictionary<int, List<CharacterObject>>();
                 var need = Deficit(mp, armory, needOut, lifters);
                 if (castleCart) GarrisonCarts.SubtractTransit(st, need);   // 171 C5: towar w drodze - inaczej zamek co dobe zamawialby to samo
+                // E6/R3 (215): uprzaz jezdzcow t4+ lorda AI (nie zalogi) - koszyki HorseHarness dopisane do brakow, kupowane na koncu (BuyOrder); needOut bez nich
+                // (linia "Pokrycie" i zastepcze bez zmian)
+                int bardNeed = (BardingOn && !garrison) ? AddBardingNeed(mp, armory, need, lifters) : 0;
+                if (bardNeed > 0) { _dBardParties++; _dBardNeed += bardNeed; }
 
                 int pieces = 0;
                 var bought = new List<string>();
@@ -706,11 +807,14 @@ namespace Armoury
                     ClanIncomeBook.NoteOwnPaid(st, lord != null ? lord.Clan : null, cost);   // 169c: "wlasne" D stalego - sprzet rodu kupiony w jego osadzie (tylko licznik)
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
                     try { TownFolk.Sale(st, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): sprzet AI - sprzedaz kupcow (tylko licznik)
+                    if (el.Item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { _dBardPcs += n; _dBardGold += cost; }   // E6/R3 (215): linia "Uprzaz" (tylko licznik)
                     return true;
                 };
                 long tl = Cost174.Begin(Cost174.SBuyLoop);
                 int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here, who);
                 Cost174.End(Cost174.SBuyLoop, tl);
+                if (bardNeed > 0)
+                    foreach (var kv in need) if (kv.Value > 0 && kv.Key / 10 == (int)ItemObject.ItemTypeEnum.HorseHarness) _dBardShort += kv.Value;   // E6/R3: brak uprzezy po zakupach (tylko licznik)
                 // 174 pytanie 2: gorszy sprzet zamiast zadnego - tylko z polki tej osady, tylko do pokrycia "dowolnego szczebla"
                 if (SubstituteMeleeOn || SubstituteBodyOn)
                 {

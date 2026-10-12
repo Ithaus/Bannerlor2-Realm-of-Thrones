@@ -461,7 +461,20 @@ namespace Armoury
         /// jedna cena za cala partie stosu = wartosc x SupplyDemandTradePricePercent (50%) x mnoznik zawalonej polki zrodla (ustawienie usuniete).
         /// Wybor celu (arbitraz) bez zmian - i tak liczyl cene zrodla bez rabatu (srcIdx).
         /// </summary>
+        /// <summary>E6/R3 (215): uprzaz na polkach miast i zamkow ze spisu DailyTradeCore (-1 = spisu tej doby nie bylo) - linia "Uprzaz (215)".</summary>
+        internal static int HarnessOnShelves = -1;
+
+        /// <summary>E6/R3 (215): najpierw wozy w drodze (TradeCarts - dostawy przed wywozem), potem wywoz, na koncu linia wozow - takze przy wylaczonym prawie
+        /// podazy i popytu (oplacone wozy dojezdzaja). Wszystko w oknie MoneyLedger MTrade (zwroty zawroconych wozow).</summary>
         internal static void DailyTrade()
+        {
+            HarnessOnShelves = -1;
+            try { TradeCarts.Arrivals(); } catch (Exception e) { Log.Error("TradeCarts.Arrivals", e); }
+            try { DailyTradeCore(); }
+            finally { try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } }
+        }
+
+        private static void DailyTradeCore()
         {
             try
             {
@@ -470,6 +483,8 @@ namespace Armoury
                 float share = MBMath.ClampFloat(c.SupplyDemandTradePercent, 0f, 100f) / 100f;
                 if (share <= 0f) return;
                 float range = Math.Max(1f, c.SupplyDemandTradeRange);
+                bool carts = TradeCarts.On;   // E6/R3 (215): wywoz wozem - sztuki w drodze licza sie do polki celu, oblezone osady bez handlu
+                int harness = 0;
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();   // sklad8-p: czas wywozu (wyceny sztuka po sztuce) - tylko log
 
                 // stan: osada -> koszyk -> sztuk; probka przedmiotu koszyka do liczenia popytu
@@ -490,9 +505,11 @@ namespace Armoury
                         int k = (int)it.ItemType * 10 + TierOf(it);
                         int n; b.TryGetValue(k, out n); b[k] = n + el.Amount;
                         if (!sample.ContainsKey(k)) sample[k] = it;
+                        if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) harness += el.Amount;   // E6/R3 (215): spis uprzezy na polkach (linia "Uprzaz")
                     }
                     stock[st] = b;
                 }
+                HarnessOnShelves = harness;
 
                 int moved = 0, deals = 0, stuck = 0, tradeEvals = 0; long paid = 0;
                 // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
@@ -507,6 +524,7 @@ namespace Armoury
                     {
                         int have; stock[src].TryGetValue(key, out have);
                         if (have <= 0) continue;
+                        if (carts && src.IsUnderSiege) continue;   // E6/R3 (215): z oblezonej osady woz nie wyjedzie
                         float surplus = have - Demand(src, probe);
                         if (surplus <= 0f) continue;
                         int toShip = (int)Math.Ceiling(surplus * share);
@@ -520,7 +538,7 @@ namespace Armoury
                             // cena w celu (polka po dostawie x podstawa x surowce) minus cena u zrodla minus
                             // koszt drogi (TradeTransportPercentPer100 wartosci na 100 jednostek mapy);
                             // brak w celu to nie warunek, tylko powod, dla ktorego tam drozej
-                            Settlement best = null; float bestProfit = 0f; int bestCap = 0;
+                            Settlement best = null; float bestProfit = 0f; int bestCap = 0; float bestDist = 0f;
                             float elast = MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f);
                             float srcIdx = srcFactor * ArmsPricing.Multiplier(src, probe);
                             float perDist = Math.Max(0f, c.TradeTransportPercentPer100) / 100f / 100f;
@@ -528,15 +546,17 @@ namespace Armoury
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
                                 if (noCastlesHere && dst.IsCastle) continue;
+                                if (carts && dst.IsUnderSiege) continue;   // E6/R3 (215): do oblezonej osady woz nie wjedzie
                                 float dist = srcPos.Distance(dst.GetPosition2D);
                                 if (dist > range) continue;
                                 int dh; stock[dst].TryGetValue(key, out dh);
+                                if (carts) dh += TradeCarts.Incoming(dst, key);   // E6/R3 (215): towar w drodze do celu jak na jego polce (wiesc z drogi)
                                 float dd = Demand(dst, probe);
                                 float dstShelf = MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (dh + 2f), elast),
                                                                    MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), Math.Max(1f, c.SupplyDemandMaxFactor));
                                 float profit = dstShelf * ArmsPricing.Multiplier(dst, probe) - srcIdx - perDist * dist;
                                 if (profit <= bestProfit) continue;
-                                best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh);
+                                best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;
                             }
                             if (best == null) { stuck += toShip; break; }
                             // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
@@ -563,8 +583,14 @@ namespace Armoury
                                                       () => market.Town.MarketData.GetPrice(eel, null, false, market.Party), out cost, out first, out last, 0, false);
                                 if (n <= 0) break;   // odbiorcy nie stac na kolejna sztuke (jak dotad przy afford <= 0)
                                 tradeEvals += n;
-                                best.ItemRoster.AddToCounts(eel, n);
-                                Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
+                                // E6/R3 (215): sztuka zdjeta z polki zrodla (ShelfBuy.Take) jedzie wozem - na polke celu po czasie drogi (TradeCarts.Arrivals);
+                                // przy wylaczonym ArmsTradeByCart - od razu, jak dotad. Cel placi przy zakupie (bez zmian)
+                                if (carts) TradeCarts.Ship(src, best, eel, n, cost, bestDist);
+                                else
+                                {
+                                    best.ItemRoster.AddToCounts(eel, n);
+                                    Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
+                                }
                                 best.Town.ChangeGold(-cost);
                                 src.Town.ChangeGold(cost);
                                 try { TownFolk.OnTownCoin(best, -cost, TownFolk.BOurs); } catch { }   // E5/0 (195): zakup kasy odbiorcy - czesc ponizej zapasu kupcow (tylko licznik)
@@ -572,7 +598,8 @@ namespace Armoury
                             }
                             if (got <= 0) { poor.Add(best); continue; }   // biedny odbiorca - pomijamy go dzis
                             int sh; stock[src].TryGetValue(key, out sh); stock[src][key] = sh - got;
-                            int dh2; stock[best].TryGetValue(key, out dh2); stock[best][key] = dh2 + got;
+                            // E6/R3: przy wozach sztuki sa juz w TradeCarts.Incoming celu (doliczane przy wyborze) - polka celu bez zmian, inaczej liczone dwa razy
+                            if (!carts) { int dh2; stock[best].TryGetValue(key, out dh2); stock[best][key] = dh2 + got; }
                             toShip -= got; moved += got; deals++;
                         }
                     }
@@ -581,7 +608,7 @@ namespace Armoury
                     Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
                              + paid + " zlota, kazda sztuka po cenie straganu zrodla - wycen " + tradeEvals + ", czas wywozu "
                              + ((System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                             + " ms); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach.");
+                             + " ms); " + stuck + " szt. bez odbiorcy w zasiegu " + (int)range + " - zostaja na polkach" + TradeCarts.Brief() + ".");
             }
             catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }
         }

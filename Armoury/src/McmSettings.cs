@@ -4740,6 +4740,18 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryAtMine { get; set; } = true;
 
+        [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ToolsByUse { get; set; } = true;
+
+        [SettingPropertyBool("Ai Buys Barding", HintText = "AI lords buy horse harness for their mounted men of tier 4 and above whose kit includes one, after everything else they lack, from what is left of the day's budget (off = AI lords never buy harness)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool AiBuysBarding { get; set; } = true;
+
+        [SettingPropertyBool("Arms Trade By Cart", HintText = "the arms, harness and horses traders carry between towns leave the seller's shelf when bought and reach the buyer by cart after the days the road takes (the buyer pays at purchase; a besieged town waits, after thirty days the goods go back); off = they move the same day, as before")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ArmsTradeByCart { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5924,6 +5936,9 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
+            s.ToolsByUse = ToolsByUse;
+            s.AiBuysBarding = AiBuysBarding;
+            s.ArmsTradeByCart = ArmsTradeByCart;
         }
 
         internal static void Apply()
