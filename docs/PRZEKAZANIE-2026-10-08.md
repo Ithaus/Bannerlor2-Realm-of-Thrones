@@ -932,3 +932,4 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   SandSteedsInDorne (NK); recenzja c5c05cc). Pytania nowe (raport): RC - czy "wszystko" obejmuje juki z towarem/zywnoscia (dzis 75% wg xml Jeffa); rynsztunek trzymany
   przez zywego lorda bez odkupu (stare, osobny projekt).
   Autotest: RC przez -ExtraDll <sciezka>\RealisticCaptivity.dll (nazwa pliku = nazwa modulu).
+- (02:10 UTC) **Audyt S GOTOWE** (w-toku/e5-audyt 371c586, recenzja bez uwag): A3' NotableBkGiftCut (drugie 10 000 BK uciete), zaulki z kasy miasta AlleyIncomeFromTown, RealPayer TourneyPre High (przed RBM; GrandTourney tez z kasy miasta), licznik G24/N3; progi etap5_aud. Do decyzji: zaulki w oblezonym miescie tez placa (jak pasmo A3).
