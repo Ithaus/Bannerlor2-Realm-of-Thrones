@@ -269,6 +269,17 @@ namespace Armoury
         protected override void OnApplicationTick(float dt)
         {
             base.OnApplicationTick(dt);
+            // E7/D0 (239): proba drog (tylko bieg zdjec autotestu, klucz MapRoadsProbeEnabled domyslnie false) - osobna rejestracja przed wylacznikiem
+            // wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach proba drog nie startuje do konca sesji); przy false typ widoku sie nie laduje
+            if (_mapRoadsLoadFails < 3 && MapRoadsProbe.On)
+            {
+                try { MapRoadsTick(); }
+                catch (Exception e)
+                {
+                    _mapRoadsLoadFails++;
+                    Log.Error("MapRoadsProbe: komponent widoku nie laduje sie (proba " + _mapRoadsLoadFails + "/3)", e);
+                }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -285,6 +296,14 @@ namespace Armoury
         private static void MapVillagesTick()
         {
             MapVillagesView.EnsureRegistered();
+        }
+
+        private static int _mapRoadsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void MapRoadsTick()
+        {
+            MapRoadsProbeView.EnsureRegistered();
         }
 
         public override void OnMissionBehaviorInitialize(Mission mission)

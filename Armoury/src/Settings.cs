@@ -1476,6 +1476,10 @@ namespace Armoury
         // E7/W5 (238, PLAN 7.9 c, R17): proporczyk pana nad wioskami z bliska (MapVillagePennants.cs: kamera z <= 90, najblizsze 80, budowa 12 na cwierc sekundy,
         // kod herbu raz na sekunde, przebudowa po misji); off = zdjete od razu. Prog autotestu: spadek klatek > 5% w trybie zdjec = domyslnie false
         public bool VillagePennants = true;                // the lord's pennant flies over villages close to the camera
+        // --- Map roads (test) ---
+        // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
+        // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)
+        public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
 
         public static void Load(string moduleDataDir)
         {

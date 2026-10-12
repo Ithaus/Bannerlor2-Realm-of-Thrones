@@ -108,6 +108,10 @@ Uzycie (Python 3, tylko odczyt):
                     INFO, BRAK - NIE); W5-1 w kadrze najwiecej 1-80 (0 = kamera nie zjechala ponizej 90 - INFO); W5-2 budowa sr. < 8 ms/klatke (budzet tworzenia
                     obrazkow wiosek na tick); W5-3 potkniecia 0 (najwiecej w linii mapy) i linie "ERROR in MapVillagesView.Pennant* / PickPennant* / RemovePennants" 0; przebudowy po misji,
                     zmiany herbu - INFO; T2 spadek klatek < 5% (inaczej VillagePennants domyslnie false) - tryb zdjec, poza narzedziem.
+                    Blok etap7_d0 (E7/D0, paczka 239): tryb wedlug ostatniej linii startu sesji "MapRoadsProbe: wylaczona/wlaczona"; bieg A - D0-1 'wylaczona'
+                    przy kazdym starcie i 0 linii 'postawione'; bieg zdjec (klucz MapRoadsProbeEnabled = true w konfiguracji testu) - D0-2a plik: stempli > 0, zle wiersze 0,
+                    CRC sceny zgodne; D0-2b postawione N z N (bez materialu 0, potkniecia 0); oba - D0-3 potkniecia i linie "ERROR in MapRoadsProbe*" 0;
+                    czas stawiania, klatka z drogami / bez - INFO; zdjecia - poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5923,7 +5927,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    for blk in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, win, until=until)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -6235,6 +6239,72 @@ def etap7_w5(rep, lines, start, win, until=120, **kw):
             "INFO (po bitwie z proporczykami w poblizu > 0)", None)
     rep.add("E7/W5 T2: spadek klatek przy kamerze 30 / 60 / 90 i 0 / 40 / 80 proporczykach, plotno, puste flagi po bitwie", "poza narzedziem",
             "< 5% w trybie zdjec (inaczej VillagePennants domyslnie false)", None)
+
+
+def etap7_d0(rep, lines, start, win, until=120, **kw):
+    """E7/D0 (239, PLAN 1.13 -> 7.5, projekt etapu 7 v2 rozdz. 3 "E7/D0"): proba drog P2 kluczem MapRoadsProbeEnabled (domyslnie false). Linia startu
+    sesji "MapRoadsProbe: wylaczona" / "wlaczona"; przy wlaczonej (osobny krotki bieg zdjec): "MapRoadsProbe: plik ...", "MapRoadsProbe: postawione N z M ...",
+    linia pomiaru "MapRoadsProbe: stempli N ...; klatki z drogami w kadrze: ..." (co minute przy zmianie i na koniec mapy). Widok mapy nie ma doby - progi
+    z calego logu, tryb biegu wedlug OSTATNIEJ linii startu sesji. Wiazace: bieg A - D0-1 (wylaczona, nic nie postawione); bieg zdjec - D0-2 (CRC zgodne,
+    zle wiersze 0, postawione N z N); oba - D0-3 (potkniecia i linie ERROR 0). Czas stawiania i klatki - INFO; zdjecia - poza narzedziem."""
+    ses = [s for s in lines if s.startswith(("MapRoadsProbe: wylaczona", "MapRoadsProbe: wlaczona"))]
+    files = [s for s in lines if s.startswith("MapRoadsProbe: plik")]
+    built = [s for s in lines if s.startswith("MapRoadsProbe: postawione")]
+    rows = [s for s in lines if s.startswith(("MapRoadsProbe: stempli", "MapRoadsProbe: koniec mapy"))]
+    err = [s for s in lines if s.startswith("ERROR in MapRoadsProbe")]   # MapRoadsProbe.SessionStart, "MapRoadsProbe: komponent ...", MapRoadsProbeView.*
+    if not ses and not files and not built and not rows and not err:
+        rep.add("E7/D0: linie MapRoadsProbe", "brak w logu", "sa od wgrania E7/D0 (linia startu sesji, LogEnabled)", None)
+        return
+    on = bool(ses) and ses[-1].startswith("MapRoadsProbe: wlaczona")
+    if not on:
+        off_ok = bool(ses) and all(s.startswith("MapRoadsProbe: wylaczona") for s in ses)
+        rep.add("E7/D0 D0-1: bieg A - proba drog wylaczona (klucz false)", f"linii 'wylaczona' {len(ses)} z {len(ses)} startow sesji, linii 'postawione' {len(built)}"
+                if off_ok else f"startow sesji {len(ses)} (wlaczona w ktorejs), linii 'postawione' {len(built)}",
+                "'wylaczona' przy kazdym starcie sesji, nic nie postawione", off_ok and not built)
+    else:
+        if files:
+            f = files[-1]
+            bad = num(r"zle wiersze (\d+)", f, int, -1)
+            crc_bad = "NIEZGODNE" in f
+            nst = num(r"stempli (\d+) w oknach", f, int, 0) or 0
+            rep.add("E7/D0 D0-2a: plik proby (ostatnia mapa)", f"stempli {nst}, zle wiersze {bad}, CRC sceny {'NIEZGODNE' if crc_bad else 'zgodne / brak w pliku'}",
+                    "stempli > 0, zle wiersze 0, CRC zgodne", nst > 0 and bad == 0 and not crc_bad)
+        else:
+            miss = [s for s in lines if s.startswith("MapRoadsProbe: brak pliku")]
+            rep.add("E7/D0 D0-2a: plik proby", "brak pliku (ModuleData\\arm_map_roads_probe.tsv)" if miss else "brak linii 'plik' (widok mapy sie nie zarejestrowal?)",
+                    "plik wgrany na bieg zdjec, linia 'MapRoadsProbe: plik ...'", False)
+        if built:
+            b = built[-1]
+            m = re.search(r"postawione (\d+) z (\d+) \(prefab (\d+), kod (\d+), pominiete bez materialu (\d+), potkniecia (\d+)\)", b)
+            if m:
+                made, tot, pf, cd, skip, st = (int(x) for x in m.groups())
+                rep.add("E7/D0 D0-2b: stemple postawione (ostatnia mapa)", f"{made} z {tot} (prefab {pf}, kod {cd}, bez materialu {skip}, potkniecia {st})",
+                        "N z N, N > 0, bez materialu 0, potkniecia 0 (kod zamiast prefabu - INFO: prefab nie wgrany)", tot > 0 and made == tot and skip == 0 and st == 0)
+            else:
+                rep.add("E7/D0 D0-2b: linia 'postawione'", b[:160], "format linii E7/D0", False)
+            ms = num(r"\) w ([0-9.]+) ms \(", b, float, 0.0) or 0.0
+            mx = num(r"najdluzszy tick ([0-9.]+) ms", b, float, 0.0) or 0.0
+            rep.add("E7/D0 D0-4: czas stawiania (ostatnia mapa)", f"{ms:.1f} ms w sumie, najdluzszy tick {mx:.1f} ms", "INFO (budzet ok. 8 ms na cwierc sekundy)", None)
+        else:
+            rep.add("E7/D0 D0-2b: linia 'postawione'", "brak", "jest po wejsciu na mape przy wlaczonym kluczu", False)
+        if rows:
+            r = rows[-1]
+            fr = re.search(r"klatki z drogami w kadrze: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            fb = re.search(r"; bez: (\d+)(?: \(srednio ([0-9.]+) ms, mediana (\d+), p95 (\d+))?", r)
+            txt = (f"z drogami w kadrze {fr.group(1)} klatek" + (f" (sr. {fr.group(2)} ms, p95 {fr.group(4)})" if fr and fr.group(2) else "") if fr else "z drogami -")
+            txt += (f"; bez {fb.group(1)}" + (f" (sr. {fb.group(2)} ms, p95 {fb.group(4)})" if fb and fb.group(2) else "") if fb else "; bez -")
+            rep.add("E7/D0 D0-5: klatka z drogami w kadrze i bez (ostatnia linia pomiaru)", txt, "INFO (do zdjec i decyzji D1; bieg A bez proby)", None)
+    st = 0
+    for s in rows:
+        m = re.search(r"potkniecia: stawianie (\d+), widocznosc (\d+), zdejmowanie (\d+), tick (\d+)", s)
+        if m:
+            st = max(st, sum(int(x) for x in m.groups()))
+    rep.add("E7/D0 D0-3: potkniecia proby (najwiecej w linii mapy) i linie ERROR in MapRoadsProbe*", f"potkniecia {st}, linii ERROR {len(err)}", "0", st == 0 and not err)
+    offm = [s for s in lines if s.startswith("MapRoadsProbe: wylaczone w MCM")]
+    if offm:
+        rep.add("E7/D0: wylacznik MapRoadsProbeEnabled w biegu", f"wylaczen {len(offm)}", "INFO (proba wylacznika)", None)
+    if on:
+        rep.add("E7/D0 D0-6: zdjecia obu okien (Fairmarket, Winterfell) z bliska i z daleka", "poza narzedziem", "dla Jeffa - pytanie 2 \"ile drog\"", None)
 
 def main(argv):
     args = argv[1:]
