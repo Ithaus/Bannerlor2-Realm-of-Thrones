@@ -198,13 +198,13 @@ Cel: zbroi starczy dla armii (po 174 ok. 120-190 zbroi na tulow dziennie przy po
 
 ### Etap 7. Tempo swiata, mapa, drogi, wioski
 
-Cel: armia idzie o polowe wolniej niz dzis (Jeff 12.10; Winterfell - Krolewska Przystan ok. 42 dni, dzis 21; ksiazki ok. 77 - za wolno); drogi przyspieszaja; wioski maja herb i menu okregu.
+Cel: tempo marszu ZOSTAJE jak jest (Jeff 12.10 - 7.2 odrzucone); drogi przyspieszaja; drogi przyspieszaja; wioski maja herb i menu okregu.
 
 | # | Co | Status | Wiel. | Zalezy od |
 |---|---|---|---|---|
 | 7.1 | Najpierw blokady tempa; jedna skala czasu | zdecyd. | S | etap 3 |
-| 7.2 | Tempo marszu O POLOWE wolniej niz dzis (Jeff 12.10: nie do wartosci z ksiazek - bylo by za wolno; Winterfell - Krolewska Przystan ok. 42 dni zamiast 21); wozy i karawany tym samym tempem; leczenie i starzenie bez zmian, chyba ze test pokaze potrzebe | zdecyd. | D | 7.1 |
-| 7.3 | Po zmianie tempa przeliczyc zapas wojenny i budzet rodu, awanse i nauke, ciaze; powtorzyc progi etapow 2 i 5 | zdecyd. | D | 7.2 |
+| 7.2 | ~~Tempo marszu~~ - ODRZUCONE (Jeff 12.10 ok. 10:35 UTC: "olej predkosc, zostaw predkosc poruszania sie jak jest") - tempo swiata bez zmian | odrzucone | - | - |
+| 7.3 | ~~Przeliczenia po zmianie tempa~~ - niepotrzebne (7.2 odrzucone) | odrzucone | - | - |
 | 7.4 | Kary terenu: zwrot kary, ktorej gra nie nalozyla | blad | M | - |
 | 7.5 | Pelne drogi, +15% po drodze, drogi do wiosek i Valyrii | zdecyd. | D | 1.13 |
 | 7.6 | Obozy: spiacy lord dostaje rozkazy; AI placi za nieprzespana noc; zbiorka | blad | S | - |

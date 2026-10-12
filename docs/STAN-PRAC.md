@@ -1249,3 +1249,4 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
   wlasne paczki i wlasny test. Propozycja z 12.10 ("po kilka do kazdej paczki") ODRZUCONA.
 - (10:30 UTC 12.10) **Jeff: etap 7 - tempo marszu O POLOWE wolniej niz dzis (nie do wartosci z ksiazek - za wolno); etap 8 - takze OPTYMALIZACJA (gra ma dzialac szybciej).**
   PLAN-DO-KONCA: 7.2 zmienione, nowe 8.17.
+- (10:35 UTC 12.10) **Jeff: etap 7 - "olej predkosc, zostaw predkosc poruszania sie jak jest"** -> 7.2 (tempo) i 7.3 (przeliczenia) ODRZUCONE; reszta etapu 7 bez zmian.
