@@ -95,6 +95,9 @@ namespace Armoury
         private static bool _inBlock;            // od ClearDay do linii "D staly" (OwnNote) - wplata liczy sie do "wplacone dzis"
         private static long _lateA2b, _dLateA2b;
         private static double _dBackA2b, _dBackWage, _dOldA2b;   // zwrot czesci A2b jako wlasne dzis (z tego zold zalog); "po staremu" - ulamek jednej doby
+        // recenzja T3-E5: wplaty dnia (_ownToday) osady, ktora zmienila pana przed kolejna wplata nowego pana - "utracone (nowy pan)" przy najblizszym
+        // ClearDay (wtedy weszlyby do zapasu); dotad znikaly bez licznika i A2-10 (zapas z doby na dobe) rozjezdzal sie przy kazdym zdobyciu osady w dobie
+        private static double _lostToday;
 
         /// <summary>Sprzet niewydany -> dwor dzis (zl, wplacone do kas siedzib) - linia "Obieg".</summary>
         internal static long LastPaid { get { return _dPaid; } }
@@ -102,7 +105,7 @@ namespace Armoury
         /// <summary>Recenzja A2 (uwaga 2): ClanBudget.Reset (miedzy kampaniami i po wczytaniu) - licznik potkniec, zapamietane bledy, zapas "wlasnego", liczniki doby.</summary>
         internal static void Reset()
         {
-            _stumbles = 0; _err.Clear(); _own.Clear(); _ownToday.Clear(); _lateIn = 0; _lateA2b = 0;
+            _stumbles = 0; _err.Clear(); _own.Clear(); _ownToday.Clear(); _lateIn = 0; _lateA2b = 0; _lostToday = 0;
             ClearDay();
             _inBlock = false;   // E5 A2b: do pierwszego ClearDay sesji wplaty sa "poza blokiem"
         }
@@ -124,6 +127,7 @@ namespace Armoury
         {
             try
             {
+                _dOwnLost += _lostToday; _lostToday = 0;   // recenzja T3-E5: wplaty dnia osady, ktora zmienila pana (TodayOf) - utracone dzis, jak nizej
                 foreach (var kv in _ownToday)
                 {
                     OwnStock o;
@@ -227,12 +231,23 @@ namespace Armoury
             try
             {
                 if (lp <= 0 || seat == null || c == null || !ReferenceEquals(seat.OwnerClan, c) || !ClanIncomeBook.StableDOn) return 0;
-                OwnStock o;
-                if (!_ownToday.TryGetValue(seat, out o) || !ReferenceEquals(o.C, c)) { o = new OwnStock { C = c }; _ownToday[seat] = o; }
+                var o = TodayOf(seat, c);
                 o.V += lp; _dOwnIn += lp;
                 return (int)Math.Min(int.MaxValue, lp);
             }
             catch (Exception e) { Stumble("Own", e); return 0; }
+        }
+
+        /// <summary>Recenzja T3-E5: pozycja wplat dnia osady st dla rodu c. Osada zmienila pana od poprzedniej wplaty (A2b: zold zalog starego pana, potem
+        /// nowego w tej samej dobie) - wplaty starego pana to "utracone (nowy pan)" przy najblizszym ClearDay (_lostToday), nie znikaja bez licznika.</summary>
+        private static OwnStock TodayOf(Settlement st, Clan c)
+        {
+            OwnStock o;
+            if (_ownToday.TryGetValue(st, out o) && ReferenceEquals(o.C, c)) return o;
+            if (o != null) _lostToday += o.V;
+            o = new OwnStock { C = c };
+            _ownToday[st] = o;
+            return o;
         }
 
         /// <summary>Recenzja E5/A5 - BeeGifts.Pay, po przelewie: wplata gracza z wlasnego zlota do kasy WLASNEJ osady do zapasu "wlasnego" (jak sprzet E5/A2 -
@@ -255,8 +270,7 @@ namespace Armoury
             {
                 if (amount <= 0 || st == null || c == null || !ReferenceEquals(st.OwnerClan, c) || !ClanIncomeBook.StableDOn) return false;
                 if (!(st.IsTown || st.IsCastle)) return false;   // zapas oddaje tylko zawor miasta i zamku (StableBegin) - wies jak dotad (stara regula jej nie liczy)
-                OwnStock o;
-                if (!_ownToday.TryGetValue(st, out o) || !ReferenceEquals(o.C, c)) { o = new OwnStock { C = c }; _ownToday[st] = o; }
+                var o = TodayOf(st, c);
                 o.V += amount; o.N += amount;
                 if (wage) o.W += amount;
                 if (_inBlock) _dOwnIn += amount; else _lateA2b += amount;

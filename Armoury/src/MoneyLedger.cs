@@ -413,15 +413,15 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        /// <summary>E5 decyzja 9 (GarrisonRecruitFee.Give): oplata za werbunek zalog oddana notablowi albo kasie osady - w oknie rozliczenia rodu (zmiana zlota
+        /// swiata tego rozliczenia juz ja widzi, bez NoteLevyBack i bez pozycji bilansu - D7). Tylko licznik nazwy w linii "Pieniadz swiata (rody - przyczyny)".</summary>
+        internal static void NoteGarrisonFee(long amount) { if (amount > 0) _garFee += amount; }
+
         /// <summary>
         /// LevyGold oddal notablowi albo miastu zloto, ktore gra przy tym samym werbunku skasowala (GiveGoldAction wodz -> nic,
         /// policzone w "GiveGoldAction w nicosc"). Wolac TYLKO wtedy, gdy gra naprawde kasowala przez GiveGoldAction: karawana
         /// placi za najemnika z kiesy partii bez zdarzenia - jej zaplata to zwykly przelew karawana -> miasto, nie zwrot. Tylko licznik.
         /// </summary>
-        /// <summary>E5 decyzja 9 (GarrisonRecruitFee.Give): oplata za werbunek zalog oddana notablowi albo kasie osady - w oknie rozliczenia rodu (zmiana zlota
-        /// swiata tego rozliczenia juz ja widzi, bez NoteLevyBack i bez pozycji bilansu - D7). Tylko licznik nazwy w linii "Pieniadz swiata (rody - przyczyny)".</summary>
-        internal static void NoteGarrisonFee(long amount) { if (amount > 0) _garFee += amount; }
-
         internal static void NoteLevyBack(int amount)
         {
             if (amount > 0) _levyBack += amount;
