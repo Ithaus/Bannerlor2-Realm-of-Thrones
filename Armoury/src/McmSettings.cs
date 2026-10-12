@@ -2656,6 +2656,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int VeteranMinTier { get; set; } = 3;
 
+        [SettingPropertyBool("Veteran Purse Follows Man", HintText = "a soldier's coin goes where he goes: when a released soldier stops at a tavern, his share of the company purse stays with him and he spends it in that town - a tenth a day like soldiers in the field (Sutler Daily Share), the rest when the last veteran leaves; whoever hires him takes his savings into the men's purse, and the hire money itself goes into the purse of the men hired, not into the town's coffers. You and the AI alike. Needs Men Purse Enabled (the hire money also Recruit Gold To Seller). Off = released soldiers' purses go to their villages and the hire money to the town (yours vanishes), as before; coin already held by veterans is spent in their towns at once")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool VeteranPurseFollowsMan { get; set; } = true;
+
         [SettingPropertyBool("Village Book Enabled", HintText = "every map village keeps its own people and its share of the district's harvest: raids and foraging armies empty its settlements (the side facing the raiders burns first), famine leaves them abandoned, and they stand again as their people come home - within a year of the last raid in the land. Shown in 'People of this land' and in the map village tooltip. Needs Devastation Enabled to burn anything. Off = all map villages stand, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool VillageBookEnabled { get; set; } = true;
@@ -5163,6 +5167,7 @@ namespace Armoury
             s.VeteranShareToTavern = VeteranShareToTavern;
             s.VeteranWaitDays = VeteranWaitDays;
             s.VeteranMinTier = VeteranMinTier;
+            s.VeteranPurseFollowsMan = VeteranPurseFollowsMan;
             s.VillageBookEnabled = VillageBookEnabled;
             s.DistrictSettlementPeople = DistrictSettlementPeople;
             s.TownFoodByVillagePeople = TownFoodByVillagePeople;

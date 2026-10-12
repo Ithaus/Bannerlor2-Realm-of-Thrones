@@ -12,7 +12,7 @@ namespace Armoury
     /// 1. ZLOTO ZA WERBUNEK: vanilla RecruitmentCampaignBehavior.ApplyInternal placi za ochotnika
     ///    i za najemnika z karczmy `GiveGoldAction(lord, null)` - zloto znika. U gracza BK placi
     ///    notablowi. Teraz AI tez: za ochotnika - notablowi, ktory go wystawil; za najemnika z karczmy
-    ///    (i z kasy karawany) - miastu.
+    ///    (i z kasy karawany) - miastu; E5/B6 (201): przy VeteranPurseFollowsMan - do sakiewki najetych (partia, ktora najela), miastu tylko kon z polki (157).
     /// 2. DARMOWY KOMPLET NOWEJ PARTII AI: DTE EveryoneCampaignBehavior.OnMobilePartyCreated wklada do
     ///    zbrojowni kazdej nowej partii AI komplet dla calego skladu - z niczego. Po starcie gry
     ///    pomijamy to dla partii AI (gracz bez zmian); lord kupuje sprzet na targu (AiGear).
@@ -20,6 +20,7 @@ namespace Armoury
     internal static class LevyGold
     {
         private static int _toNotables, _toTowns, _skippedKits, _dayStamp = -1;
+        private static long _toPurses;      // E5/B6 (201): oplata za najem z karczmy do sakiewek najetych (lordowie AI i karawany)
         // 3.1 (31, E3/6 - paczka 164a-5): zwrot = dokladnie to, co gra zdjela z kiesy wodza (zdarzenie GiveGoldAction wodz -> nic, po obcieciu do kiesy),
         // nie koszt liczony od nowa po werbunku (gra liczy go PRZED dodaniem rekruta - RecruitmentCampaignBehavior.cs:608 - i obcina do kiesy :625);
         // notabl brak/zmarly - kasa osady; ochotnik z mapy - kiesa najblizszej wsi
@@ -28,7 +29,7 @@ namespace Armoury
         private static Hero _rcLeader;
         private static long _rcTaken;
 
-        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _dayStamp = -1; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _rcOpen = false; _rcLeader = null; _rcTaken = 0; }
+        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _dayStamp = -1; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0; _rcOpen = false; _rcLeader = null; _rcTaken = 0; }
 
         public struct RcState { public bool Prev; public Hero PrevLeader; public long PrevTaken; public int Car0; }
 
@@ -151,10 +152,16 @@ namespace Armoury
                         else if (__0.LeaderHero != null) __0.LeaderHero.ChangeHeroGold(refund);
                     }
                     int toTown = (int)Math.Min(int.MaxValue, gross - refund);
+                    // E5/B6 (201, R19): oplata za najem idzie do sakiewki najetych (partia, ktora ich najela - lord albo karawana), nie do kasy miasta: najmuje sie
+                    // prawdziwego czlowieka (weterana E4/10). Za konia z polki (157, MercShelfOn) miasto dostaje dalej to, co kupujacy za niego zaplacil.
+                    // Klucz VeteranPurseFollowsMan wylaczony albo bez sakiewki ludzi - cala kwota do kasy miasta jak dotad (HireFee zwraca 0).
+                    int horseTown = (int)Math.Min(toTown, Math.Max(0L, (long)Math.Max(0, took) * Math.Max(0, per)));
+                    int toPurse = VetPurse.HireFee(__0, toTown - horseTown, horseTown);
+                    if (toPurse > 0) { toTown -= toPurse; _toPurses += toPurse; }
                     if (toTown > 0) __1.SettlementComponent.ChangeGold(toTown);
                     _toTowns += toTown;
                     MoneyLedger.Note(MoneyLedger.NMerc, __1, toTown);   // ksiega przeplywow osad (tylko licznik)
-                    // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza (miastu + zwrot = cala zaplata)
+                    // karawana placi z kiesy partii bez GiveGoldAction (nic nie znika) - "zwrot skasowanego" liczymy tylko dla wodza (miastu + sakiewce najetych E5/B6 + zwrot = cala zaplata)
                     if (!__0.IsCaravan && __0.LeaderHero != null && gross > 0) MoneyLedger.NoteLevyBack((int)Math.Min(int.MaxValue, gross));
                 }
             }
@@ -180,13 +187,14 @@ namespace Armoury
         {
             int day = (int)CampaignTime.Now.ToDays;
             if (_dayStamp == day) return;
-            if (_dayStamp >= 0 && _toNotables + _toTowns + _skippedKits + _toSettl + _toVillages + _unrouted > 0)
+            if (_dayStamp >= 0 && _toNotables + _toTowns + _skippedKits + _toSettl + _toVillages + _unrouted + _toPurses > 0)
                 Log.Info("Werbunek: dzien " + _dayStamp + " - zloto AI za ochotnikow do notabli " + _toNotables + ", za najemnikow do miast " + _toTowns
+                         + " (E5/B6: oplata za najem do sakiewek najetych " + _toPurses + ")"
                          + "; nowe partie AI bez darmowego kompletu DTE: " + _skippedKits + "."
                          // 3.1 (E3/6): zwrot = dokladnie zdjete z kiesy; rozjazd z kosztem liczonym od nowa (stara regula) - informacja
                          + " 3.1 (E3/6): notabl brak/zmarly - do kas osad " + _toSettl + ", ochotnicy z mapy - do kies wsi " + _toVillages + ", bez odbiorcy (prog 0) " + _unrouted
                          + "; ochotnicy od notabli: zdjete z kies wodzow " + _newWay + " (koszt liczony od nowa po werbunku dalby " + _oldWay + ").");
-            _toNotables = _toTowns = _skippedKits = 0; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0;
+            _toNotables = _toTowns = _skippedKits = 0; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0;
             _dayStamp = day;
         }
 

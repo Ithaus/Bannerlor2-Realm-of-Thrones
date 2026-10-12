@@ -72,6 +72,7 @@ namespace Armoury
 
         // liczniki doby (linia "Budzet rodow (166)" i "Obieg")
         internal static long LastCourt, LastCourtTown, LastFood, LastFamily, LastReleasedPurse, LastBuildShare, LastGearShare;
+        internal static long LastReleasedPurseVet;     // E5/B6 (201): sakiewki zwolnionych 166, ktorzy staneli w karczmie - do puli weteranow (VetPurse)
         internal static int LastReleasedMen, LastReleasedPar, LastReleasedGar, LastNoVillage, LastFamilyN;
         // E4/9: zwolnieni 166 z partii i zalog Strazy (oczekiwane 0 - WatchNoReleases) i rodow w zajeciu (DLUG 4 - linia "Dlugi (168)") - doba
         internal static int LastReleasedWatch, LastReleasedSeized;
@@ -81,6 +82,10 @@ namespace Armoury
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
+        private static long _dRelPurseVet;  // E5/B6 (201): ich czesc sakiewki partii - do puli weteranow miasta karczmy (VetPurse.FromRelease)
+        // E5/B6 (201): miasta karczm i ilu zwolnionych w nich stanelo w JEDNYM ReleaseFrom (zbierane w ToVillage tylko przy _relTavOn, czytane przy sakiewce)
+        private static readonly List<KeyValuePair<Settlement, int>> _relTav = new List<KeyValuePair<Settlement, int>>();
+        private static bool _relTavOn;
         private static int _dDesertOff, _dSpawnBlock, _dRecruitBlock, _dGarBlock, _dGarLimited, _dPartyLimited, _dWatchMen, _dWatchCap = -1;
         // 2 (werbunek Strazy, 10.10): JEDEN pulap w ludziach dla calej Strazy (jeden zakon, jedna kiesa). Dotad pulap liczony osobno na rod: rody Strazy
         // bez dochodu mialy pulap ok. 0 i ich druzyny nie werbowaly (werbunek wstrzymany 50-200/d przy Strazy 1.5-2 tys. wobec pulapu calosci 3-5 tys.),
@@ -117,6 +122,7 @@ namespace Armoury
         internal static void ZeroLast()
         {
             LastCourt = LastCourtTown = LastFood = LastFamily = LastReleasedPurse = LastBuildShare = LastGearShare = 0;
+            LastReleasedPurseVet = 0;
             LastReleasedMen = LastReleasedPar = LastReleasedGar = LastNoVillage = LastFamilyN = 0;
             LastReleasedWatch = LastReleasedSeized = 0; _dRelWatch = _dRelSeized = 0;
             LastKwLent = LastKwRoom = 0; LastKwLentN = LastKwRoomN = 0;
@@ -126,7 +132,7 @@ namespace Armoury
         {
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
-            _dRelTavern = 0;
+            _dRelTavern = 0; _dRelPurseVet = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
             _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
@@ -439,6 +445,7 @@ namespace Armoury
             finally
             {
                 LastCourt = _dCourt; LastCourtTown = _dCourtTown; LastFood = _dFood; LastFamily = _dFamily; LastReleasedPurse = _dRelPurse;
+                LastReleasedPurseVet = _dRelPurseVet;
                 LastBuildShare = _dBuild; LastGearShare = _dGear; LastReleasedMen = _dRelMen; LastReleasedPar = _dRelPar; LastReleasedGar = _dRelGar;
                 LastReleasedWatch = _dRelWatch; LastReleasedSeized = _dRelSeized; _dRelWatch = _dRelSeized = 0;
                 LastNoVillage = _dNoVillage; LastFamilyN = _dFamilyN;
@@ -729,7 +736,7 @@ namespace Armoury
         }
 
         /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru; mercsOnly -
-        /// tylko najemnicy z karczmy. Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi. Zwraca zwolnione (zl albo ludzi).</summary>
+        /// tylko najemnicy z karczmy. Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi (E5/B6: czesc ludzi w karczmie - do puli weteranow). Zwraca zwolnione (zl albo ludzi).</summary>
         private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison)
         {
             var r = mp.MemberRoster;
@@ -749,25 +756,31 @@ namespace Armoury
             if (village == null) { _dNoVillage++; return 0; }   // bez wsi z danymi BK nikt nie odchodzi (nikt nie znika - Z6)
             int menBefore = r.TotalRegulars;
             double done = 0; int gone = 0;
-            foreach (var el in stacks)
+            _relTav.Clear(); _relTavOn = true;      // E5/B6 (201): ToVillage dopisuje miasta karczm tego zwolnienia
+            try
             {
-                if (done >= amount) break;
-                var ch = el.Character;
-                int w = menUnit ? 1 : Math.Max(1, wageModel.GetCharacterWage(ch));
-                int n = (int)Math.Min(el.Number, Math.Ceiling((amount - done) / w));
-                if (n <= 0) continue;
-                int wounded = el.WoundedNumber > 0 ? Math.Min(el.WoundedNumber, (int)Math.Round(n * (double)el.WoundedNumber / el.Number)) : 0;
-                // E4/7: udzialy pochodzenia zwalnianych - tuz PRZED ToVillage (zdjecie z rosteru jest po nim - Take nie stoi miedzy zdjeciem a dopisaniem, U24)
-                PeopleBook.Shares org = null;
-                try { if (PeopleBook.OriginLive) org = PeopleBook.Take(r, n, PeopleBook.FRelease166); } catch { org = null; }
-                if (!ToVillage(village, ch, n, PeopleBook.M166, org, mp)) { try { PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch { } _dNoVillage++; continue; }
-                r.AddToCounts(ch, -n, false, -wounded);
-                done += (double)n * w; gone += n;
+                foreach (var el in stacks)
+                {
+                    if (done >= amount) break;
+                    var ch = el.Character;
+                    int w = menUnit ? 1 : Math.Max(1, wageModel.GetCharacterWage(ch));
+                    int n = (int)Math.Min(el.Number, Math.Ceiling((amount - done) / w));
+                    if (n <= 0) continue;
+                    int wounded = el.WoundedNumber > 0 ? Math.Min(el.WoundedNumber, (int)Math.Round(n * (double)el.WoundedNumber / el.Number)) : 0;
+                    // E4/7: udzialy pochodzenia zwalnianych - tuz PRZED ToVillage (zdjecie z rosteru jest po nim - Take nie stoi miedzy zdjeciem a dopisaniem, U24)
+                    PeopleBook.Shares org = null;
+                    try { if (PeopleBook.OriginLive) org = PeopleBook.Take(r, n, PeopleBook.FRelease166); } catch { org = null; }
+                    if (!ToVillage(village, ch, n, PeopleBook.M166, org, mp)) { try { PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch { } _dNoVillage++; continue; }
+                    r.AddToCounts(ch, -n, false, -wounded);
+                    done += (double)n * w; gone += n;
+                }
             }
+            finally { _relTavOn = false; }
             if (gone <= 0) return 0;
             _dRelMen += gone; if (garrison) _dRelGar += gone; else _dRelPar += gone;
             try { if (CrownGifts.IsWatchParty(mp)) _dRelWatch += gone; if (DebtLadder.IsSeized(c)) _dRelSeized += gone; } catch { }    // E4/9: liczniki (bez zmiany reguly)
-            // czesc sakiewki partii z odchodzacymi (proporcjonalnie do ludzi) - do kiesy wsi, do ktorej wracaja
+            // czesc sakiewki partii z odchodzacymi (proporcjonalnie do ludzi) - do kiesy wsi, do ktorej wracaja; E5/B6 (201, R19): sakiewka idzie z czlowiekiem -
+            // czesc tych, ktorzy staneli w karczmie (E4/10), do puli weteranow miasta karczmy (VetPurse.FromRelease - nie rzuca, 0 przy wylaczonym kluczu), reszta do wsi
             try
             {
                 int purse = MenPurse.Get(mp);
@@ -775,7 +788,14 @@ namespace Armoury
                 {
                     int share = (int)((long)purse * gone / menBefore);
                     int took = share > 0 ? MenPurse.Take(mp, share) : 0;
-                    if (took > 0) { village.SettlementComponent.ChangeGold(took); _dRelPurse += took; try { TownFolk.Note(village, took, TownFolk.KReleased); } catch { } }   // E5/0 (195): sakiewka zwolnionych do kiesy wsi (tylko licznik)
+                    if (took > 0)
+                    {
+                        int vet = VetPurse.FromRelease(took, gone, _relTav);
+                        if (vet < 0) vet = 0; else if (vet > took) vet = took;
+                        int vill = took - vet;
+                        _dRelPurseVet += vet;
+                        if (vill > 0) { village.SettlementComponent.ChangeGold(vill); _dRelPurse += vill; try { TownFolk.Note(village, vill, TownFolk.KReleased); } catch { } }   // E5/0 (195): sakiewka zwolnionych do kiesy wsi (tylko licznik)
+                    }
                 }
             }
             catch (Exception e) { Stumble("ReleaseFrom(sakiewka)", e); }
@@ -860,6 +880,8 @@ namespace Armoury
             {
                 put = PeopleBook.VetCommit(vt, org);          // nie rzuca; dopisanie do puli ostatnim krokiem; org pomniejszony o put
                 if (cause == PeopleBook.M166) _dRelTavern += put;
+                // E5/B6 (201): miasto karczmy tego zwolnienia (tylko w ReleaseFrom - 179 i W4c nie niosa sakiewki)
+                try { if (_relTavOn && put > 0 && vt.Town != null && vt.Town.Settlement != null) _relTav.Add(new KeyValuePair<Settlement, int>(vt.Town.Settlement, put)); } catch { }
             }
             if (put < t)
             {
@@ -1175,6 +1197,7 @@ namespace Armoury
               .Append(" | zwolnieni: do wsi ").Append(_dRelMen).Append(" ludzi (z partii ").Append(_dRelPar).Append(", z zalog ").Append(_dRelGar).Append("), zniklo ").Append(_dVanished)
               .Append(", z tego do karczmy (E4/10) ").Append(_dRelTavern)
               .Append(", nie zwolniono - brak wsi z danymi BK ").Append(_dNoVillage).Append(", sakiewki zwolnionych do kies wsi ").Append(_dRelPurse).Append(" zl")
+              .Append(", do puli weteranow w karczmach (E5/B6) ").Append(_dRelPurseVet).Append(" zl")
               .Append(" | dezercja gry z limitu zoldu wylaczona (rody z budzetem): ").Append(_dDesertOff).Append(" wywolan")
               .Append(" | limity: partie zmienione ").Append(_dPartyLimited).Append(", zalogi przyciete do celu pokojowego ").Append(_dGarLimited)
               .Append(", nowe partie wstrzymane ").Append(_dSpawnBlock)

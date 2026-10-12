@@ -95,7 +95,10 @@ namespace Armoury
         internal const int MTownTrim = 12;                                                                      // E5/A1: dar startowy kas miast przyciety (raz na kampanie, w nicosc)
         internal const int MTownCrown = 13;                                                                     // E5/A1: udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)
         internal const int MSutlers = 17;                                                                       // E5/A3 (163): markietani - sakiewki ludzi w polu -> kasy miast i kiesy wsi
-        private const int Marks = 18;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3
+        // E5/B6 (201): zasada "pierwszy wolny (M18) + 15" = M33; M18-M20 rezerwa E5/B1 (MFolk, MFolkValve, MFolkStart), M21-M32 rezerwa rownoleglych drzew B
+        // (B2 od M28) - zaslepki drukowane tylko != 0; przy scaleniu nazwy wlasciwych paczek
+        internal const int MVetPurse = 33;                                                                      // E5/B6 (201): pula sakiewek weteranow w karczmach -> kasy miast karczm ("zycie")
+        private const int Marks = 34;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B6 M33
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
                                                    "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
@@ -103,14 +106,21 @@ namespace Armoury
                                                    "dar startowy kas miast przyciety (raz na kampanie, w nicosc, E5/A1)",
                                                    "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)",
                                                    "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)",   // 14-16: rezerwa A1 (nieuzywane, drukowane tylko != 0)
-                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi" };
+                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi",
+                                                   "(zarezerwowane E5/B1)", "(zarezerwowane E5/B1)", "(zarezerwowane E5/B1)",   // 18-20: rezerwa B1 (nieuzywane w tym drzewie, drukowane tylko != 0)
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",   // 21-32: rezerwa drzew B (B2 od M28)
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
+                                                   "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
+                                                   "weterani (E5/B6): pula sakiewek weteranow w karczmach -> kasy miast karczm (zycie)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
                           HKingdoms = 9, HWorkshops = 10, HPurses = 11, HBank = 12, HVillagers = 13, HCaravans = 14, HGarrisons = 15, HBandits = 16,
                           HOtherParties = 17, HTownTax = 18, HVillageTax = 19, HOtherSettlements = 20,
                           HCallToWar = 21,   // 3.1 (31, E3/0): dodatnie portfele wezwan do wojny (168) - posiadacz (gra wyplaca je rodom wezwanego)
-                          Holders = 22;
+                          // E5/B6 (201): "pierwszy wolny (H22) + 15" = H37 - pula sakiewek weteranow w karczmach (VetPurse); H22-H24 rezerwa E5/B1, H25-H36 rezerwa drzew B (zera)
+                          HVetPurse = 37,
+                          Holders = 38;
 
         // zold wedlug rodzaju partii
         private const int WLord = 0, WGarrison = 1, WCaravan = 2, WOther = 3, Wages = 4;
@@ -728,6 +738,7 @@ namespace Armoury
             }
             foreach (var v in Village.All) if (v != null) h[HVillageTax] += v.TradeTaxAccumulated;
             h[HPurses] = MenPurse.TotalNow();
+            h[HVetPurse] = VetPurse.TotalNow();                                 // E5/B6 (201): pula sakiewek weteranow w karczmach (z osieroconymi)
             h[HBank] = IronBank.CapitalNow;
             foreach (var mp in MobileParty.All)
             {
@@ -764,7 +775,7 @@ namespace Armoury
                    + " | skarbce krolestw " + D(now, last, HKingdoms)
                    + " | portfele wezwan do wojny (168) " + D(now, last, HCallToWar)   // 3.1 (31, E3/0)
                    + " | kapital warsztatow " + D(now, last, HWorkshops)
-                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | Bank Zelazny " + D(now, last, HBank)
+                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | sakiewki weteranow w karczmach (E5/B6) " + D(now, last, HVetPurse) + " | Bank Zelazny " + D(now, last, HBank)
                    + " | partie bez wodza: tabory wsi " + D(now, last, HVillagers) + ", karawany " + D(now, last, HCaravans) + ", garnizony " + D(now, last, HGarrisons)
                    + ", bandy " + D(now, last, HBandits) + ", inne " + D(now, last, HOtherParties)
                    + " | liczniki (zloto w drodze do panow): cla miast i zamkow " + D(now, last, HTownTax) + ", podatek wsi " + D(now, last, HVillageTax)

@@ -152,6 +152,9 @@ namespace Armoury
                 try { PeopleBook.ApplyOrigin(_harmony); } catch (Exception e) { Log.Error("PeopleBook.ApplyOrigin", e); }   // E4/2 (190): Inni tylko z poleglych za Murem / przy Murze - latki wpiete zawsze, wylaczniki na zywo; PO Measure40 (finalizer (f) High przed W10)
                 // E4/10 (167): karczma tylko z weteranow - L1 bez dosypki z niczego, okna najmu AI (ApplyInternal, Priority.First jak E4/7) i gracza; PO ApplyOrigin; we wlasnym try
                 try { Veterans.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Veterans.ApplyAll", e); }
+                // E5/B6 (201): zaplata gracza za najem do sakiewki najetych - prefiks First / postfiks Last na BuyMercenaries i buy_mercenaries_on_consequence
+                // (postfiks PO RecruitCost.PlayerBuyPostfix - kon z polki i zwrot doplaty, wpiety wyzej); we wlasnym try
+                try { VetPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VetPurse.ApplyAll", e); }
                 // E4/5 (113n): spustoszenie jako ulamek okregu - krok i koniec rabunku, progi produkcji, zywnosc wsi, produkcja wsi spladrowanej; wpiete zawsze (U26), PO przyroscie
                 // naturalnym (czynne tylko razem z nim) i PO Measure40/OthersRise; MUSI zostac tutaj, w menu glownym - JIT wkleja male metody (GetHearthLevel), jesli wolajacy
                 // skompiluje sie przed latka (113 ryzyko 13); we wlasnym try
