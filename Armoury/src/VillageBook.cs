@@ -1189,11 +1189,12 @@ namespace Armoury
 
         /// <summary>
         /// VillageStateChanged(Looted) - gra wola go w RaidEventComponent.OnBeforeFinalize PO Devastation.EndPrefix (ostatnie uderzenie rozliczone): wioska sesji z ogniem (ta sama,
-        /// co FxUid; bez sesji - wies gry), osady spalone / osady tej wioski z ksiegi, czy ta sesja przeszla jakas wioske na spalona. false - ksiega nieczynna albo wies nieznana.
+        /// co FxUid; bez sesji - wies gry), osady spalone / osady tej wioski z ksiegi, czy ta sesja przeszla jakas wioske na spalona, czy ta wioska jest juz spalona w ksiedze
+        /// (wczesniejsze zdarzenie - wioska spalona ma miejsce do pulapu DevastationMaxPercent, wiec kolejny rabunek zaczyna od niej). false - ksiega nieczynna albo wies nieznana.
         /// </summary>
-        internal static bool LootNews(Village v, object comp, out string vname, out string dname, out int burned, out int n, out bool sessBurned)
+        internal static bool LootNews(Village v, object comp, out string vname, out string dname, out int burned, out int n, out bool sessBurned, out bool wasBurned)
         {
-            vname = dname = null; burned = n = 0; sessBurned = false;
+            vname = dname = null; burned = n = 0; sessBurned = wasBurned = false;
             if (v == null || !Active) return false;
             try
             {
@@ -1204,6 +1205,7 @@ namespace Armoury
                     var s = d.S != null && (comp == null || ReferenceEquals(d.S.Key, comp)) ? d.S : null;
                     int w = s != null && s.Cur >= 0 && s.Cur <= d.W ? s.Cur : d.W;
                     sessBurned = s != null && s.Burned;
+                    wasBurned = (d.Flag[w] & FBurned) != 0;          // recenzja E7/W1: "plundered" tylko przy wiosce niespalonej w ksiedze (projekt pkt 2, R10, T5)
                     vname = d.VName[w]; dname = d.Name;
                     n = Math.Max(1, (int)Math.Round(d.Nw[w]));
                     burned = Math.Max(0, Math.Min(n, (int)Math.Round(d.Br[w])));

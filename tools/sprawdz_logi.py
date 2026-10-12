@@ -6043,9 +6043,10 @@ def etap7_w1(rep, lines, start, win, until=120, **kw):
         kb = tot(r"komunikatow \"burned\" (\d+),") + tot(r"\"burned\" \d+, by bylo (\d+)\)")
         rep.add("E7/W1 T5b: komunikaty burned (z by bylo) <= spalone w ksiedze", f"{kb} <= {tot_i}", "burned tylko przy przejsciu na spalona (R10)", kb <= tot_i)
         f, j = tot(r"; spladrowane (\d+) \("), tot(r", splondrowane bez spalenia (\d+) \(")
-        same, nob = tot(r"sesja spalila - bez drugiego (\d+)\)"), tot(r"\(bez ksiegi (\d+)\)")
-        rep.add("E7/W1 W1-7: spladrowane (Looted gry) wedlug ksiegi", f"spladrowane {f}: splondrowane bez spalenia {j}, sesja spalila {same}, bez ksiegi {nob}",
-                "INFO (f = j + sesja spalila + bez ksiegi)", None)
+        same, nob = tot(r"sesja spalila - bez drugiego (\d+)[,)]"), tot(r"\(bez ksiegi (\d+)\)")
+        old = tot(r"juz spalona w ksiedze (\d+)\)")
+        rep.add("E7/W1 W1-7: spladrowane (Looted gry) wedlug ksiegi", f"spladrowane {f}: splondrowane bez spalenia {j}, sesja spalila {same}, juz spalona {old}, bez ksiegi {nob}",
+                "INFO (f = j + sesja spalila + juz spalona + bez ksiegi)", None)
         mem = num(r"\| pamiec wojny: wpisow (\d+) \(", rows[days[-1]], int, 0) or 0
         mnew = tot(r"pamiec wojny: wpisow \d+ \(nowe (\d+),")
         rep.add("E7/W1 W1-8: pamiec wojny (ostatnia doba okna)", f"wpisow {mem}, nowych zdarzen w oknie {mnew}", "INFO (> 0 przy VillageWarMemory)", None)

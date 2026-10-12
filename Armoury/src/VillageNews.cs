@@ -20,8 +20,8 @@ namespace Armoury
     ///    napastnika w tej samej albo nastepnej dobie (po walce z milicja gra zaklada drugi rabunek - RaidEventComponent.OnFinalize) pominieta;
     ///  - przejscie wioski na spalona w ksiedze (VillageBook.CheckUp przy uderzeniu Devastation.Strike - rabunek albo zerowanie armii): kolejka ksiegi, VilLogBurned /
     ///    VilLogBurnedPlayer - JEDYNE miejsce slowa "burned";
-    ///  - Looted gry (VillageStateChanged w OnBeforeFinalize, po Devastation.EndPrefix - ostatnie uderzenie juz w ksiedze) przy sesji, ktora nic nie spalila:
-    ///    VilLogPlundered / VilLogPlunderedPlayer z liczba osad spalonych z ksiegi; gdy ta sama sesja spalila wioske - nic drugi raz.
+    ///  - Looted gry (VillageStateChanged w OnBeforeFinalize, po Devastation.EndPrefix - ostatnie uderzenie juz w ksiedze) przy sesji, ktora nic nie spalila, i wiosce
+    ///    niespalonej w ksiedze: VilLogPlundered / VilLogPlunderedPlayer z liczba osad spalonych z ksiegi; gdy ta sama sesja spalila wioske albo wioska byla juz spalona - nic.
     /// Kto slyszy (klucz VillageRaidMessages): 0 nikt, 1 wsie rodu gracza (Village.Bound.OwnerClan - jak "your fief" w dymku) i rabunki gracza, 2 takze cale krolestwo gracza.
     /// Komunikat (MBInformationManager.AddQuickInformation + Log.Player) idzie w ticku godzinnym - nie z wnetrza Strike ani prefiksu Harmony; tekst budowany dla kazdego
     /// zdarzenia (licznik "by bylo" - dowod sciezki w autotescie bez lenna). Pamiec wojny (klucz VillageWarMemory) pisze ksiega (VillageBook.Remember, sekcja m:);
@@ -43,7 +43,7 @@ namespace Armoury
         private static int _stumbles, _stumblesAll;
 
         // liczniki doby (zeruje Daily)
-        private static int _a, _b, _c, _dup, _qLost, _shown, _would, _f, _fNoBook, _same, _j, _k, _kWould, _l, _lWould;
+        private static int _a, _b, _c, _dup, _qLost, _shown, _would, _f, _fNoBook, _same, _old, _j, _k, _kWould, _l, _lWould;
 
         internal static void Reset()
         {
@@ -55,7 +55,7 @@ namespace Armoury
 
         private static void DayReset()
         {
-            _a = _b = _c = _dup = _qLost = _shown = _would = _f = _fNoBook = _same = _j = _k = _kWould = _l = _lWould = 0;
+            _a = _b = _c = _dup = _qLost = _shown = _would = _f = _fNoBook = _same = _old = _j = _k = _kWould = _l = _lWould = 0;
             _samples.Clear();
             _stumbles = 0;
         }
@@ -135,9 +135,10 @@ namespace Armoury
                     object comp = null;
                     try { var p = village.Settlement != null ? village.Settlement.Party : null; var me = p != null ? p.MapEvent : null; comp = me != null ? me.Component : null; }
                     catch { comp = null; }
-                    string vn, dn; int burned, n; bool sessBurned;
-                    if (!VillageBook.LootNews(village, comp, out vn, out dn, out burned, out n, out sessBurned)) { _fNoBook++; return; }
+                    string vn, dn; int burned, n; bool sessBurned, wasBurned;
+                    if (!VillageBook.LootNews(village, comp, out vn, out dn, out burned, out n, out sessBurned, out wasBurned)) { _fNoBook++; return; }
                     if (sessBurned) { _same++; return; }           // ta sama sesja spalila wioske - "has been burned" juz w kolejce
+                    if (wasBurned) { _old++; return; }             // recenzja: wioska spalona w ksiedze wczesniej - "plundered" tylko przy niespalonej (projekt pkt 2, R10, T5)
                     _j++;
                     if (Mode(s) == 0) return;
                     if (_q.Count >= QMax) { _qLost++; return; }
@@ -268,7 +269,7 @@ namespace Armoury
                   .Append("; spladrowane ").Append(_f).Append(" (bez ksiegi ").Append(_fNoBook).Append(')')
                   .Append(" | spalone w ksiedze ").Append(burned).Append(" (komunikatow \"burned\" ").Append(_k).Append(", by bylo ").Append(_kWould).Append(')')
                   .Append(", splondrowane bez spalenia ").Append(_j).Append(" (komunikatow \"plundered\" ").Append(_l).Append(", by bylo ").Append(_lWould)
-                  .Append("; sesja spalila - bez drugiego ").Append(_same).Append(')')
+                  .Append("; sesja spalila - bez drugiego ").Append(_same).Append(", juz spalona w ksiedze ").Append(_old).Append(')')
                   .Append(" | pamiec wojny: wpisow ").Append(memAll).Append(" (nowe ").Append(memNew).Append(", spalen razem ").Append(burnsAll).Append(')')
                   .Append(" | VillageRaidMessages ").Append(Mode(s)).Append(", VillageWarMemory ").Append(s.VillageWarMemory ? "TAK" : "NIE");
                 if (lost > 0 || _qLost > 0) sb.Append(" | zgubione ponad kolejke: spalone ").Append(lost).Append(", zdarzenia gry ").Append(_qLost);
