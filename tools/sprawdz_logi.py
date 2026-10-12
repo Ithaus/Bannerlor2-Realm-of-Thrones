@@ -173,6 +173,10 @@ Uzycie (Python 3, tylko odczyt):
                     CorrectPlayerEducation 0 (zamyka E8/M); blok etap8_0: E80-1 linia "Profil doby (E8/0)" w kazdej dobie okna (bez pierwszej i ostatniej),
                     E80-2 "nasze razem" >= 80% sumy Koszt 171-174 (nasze 171-174b + ceny) srednio, E80-3 koszt profilu <= 1 ms/dobe, E80-4 INFO takt doby
                     (mediana, maks.) i gen2 w szczytach; INFO nasze mody s/dobe, najdrozsze wywolania taktu, zapis logu, linia "Profil CS (E8/0)" (CS).
+                    Blok etap8_p1 (E8/P1, paczka 243): ksiega umiejetnosci - P1-1 linie "Umiejetnosci (E8/P1)" i "XP wojska (E8/P1)" w kazdej dobie okna (bez
+                    pierwszej i ostatniej), P1-2 koszt ksiegi <= 30 ms/dobe srednio, P1-3 zrodlo "inne" <= 20% surowego XP lordow AI (pokrycie znacznikow),
+                    P1-4 latki wpiete N/N przy kazdym starcie sesji i potkniecia 0; INFO XP lordow i gracza wedlug zrodla (stan "przed" dla E8/X), kto wola
+                    "inne" (probka stosu), XP wojska wedlug zrodla, poziomy lordow (mediana) - pierwsza i ostatnia linia "Poziomy lordow (E8/P1)".
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8283,6 +8287,128 @@ def etap8_0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         rep.add("E8/0: CrashScribe - bledy pierwszej szansy i czas Blame.Culprits (srednio na dobe)", val, "INFO", None)
 
 
+# ============================================================ ETAP 8 (E8/P1, paczka 243): ksiega umiejetnosci - blok etap8_p1
+E8_P1_UM = "Umiejetnosci (E8/P1): dzien"
+E8_P1_TR = "XP wojska (E8/P1): dzien"
+E8_P1_LV = "Poziomy lordow (E8/P1): dzien"
+E8_P1_ST = "Ksiega umiejetnosci (E8/P1): start sesji"
+E8_P1_ENT = re.compile(r"^(.+?) (-?\d+)/(\d+) \((\d+)%\)$")
+
+
+def e8p1_sources(seg):
+    """'marsz 123/45 (36%), jedzenie 10/2 (3%), inne 5/1 (1%)' -> {zrodlo: (xp, wywolan)}; wpis bez wzorca pomijany."""
+    out = {}
+    for part in (seg or "").split(", "):
+        m = E8_P1_ENT.match(part.strip())
+        if m:
+            out[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+    return out
+
+
+def etap8_p1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/P1 (243, projekt etapu 8 v2 rozdz. 3 "E8/P1" Test): linie "Umiejetnosci (E8/P1)", "XP wojska (E8/P1)", "Poziomy lordow (E8/P1)" (SkillLedger.cs).
+    P1-1 obie linie doby w kazdej dobie okna (bez pierwszej i ostatniej - linia doby N powstaje w takcie doby N+1, pierwszy takt sesji bez linii);
+    P1-2 koszt ksiegi <= 30 ms/dobe srednio (stopery probkowane 1/64 + znaczniki + probki stosu + linie); P1-3 zrodlo "inne" <= 20% surowego XP lordow AI
+    w oknie (pokrycie znacznikow; XP wprost z ChangeSkillLevel jest poza suma); P1-4 latki wpiete N/N przy kazdym starcie sesji, potkniecia 0 (R11).
+    INFO: XP lordow i gracza wedlug zrodla (stan "przed" dla E8/X: jedzenie, marsz, marsz premia AI, strzal RBM), kto wola "inne" (probka stosu),
+    XP wojska wedlug zrodla (zadane / przyjete), znaczniki zerwane, poziomy lordow - pierwsza i ostatnia linia okna."""
+    um = {d: s for d, s in by_day(lines, E8_P1_UM).items() if 1 <= run_day(d, start) <= until}
+    tr = {d: s for d, s in by_day(lines, E8_P1_TR).items() if 1 <= run_day(d, start) <= until}
+    st = [s for s in lines if s.startswith(E8_P1_ST)]
+    off = [s for s in lines if s.startswith("Ksiega umiejetnosci (E8/P1): WYLACZONA")]
+    if not um and not st:
+        rep.add("E8/P1: linia Umiejetnosci (E8/P1)", "brak w logu" + (f" (WYLACZONA x{len(off)})" if off else ""), "jest od wgrania E8/P1 (SkillLedgerLog)", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss_u = [run_day(d, start) for d in inner if d not in um]
+    miss_t = [run_day(d, start) for d in inner if d not in tr]
+    miss = sorted(set(miss_u + miss_t))
+    rep.add("P1-1: linie Umiejetnosci i XP wojska w kazdej dobie okna",
+            f"Umiejetnosci {len(um)} dob (brak {len(miss_u)}), XP wojska {len(tr)} dob (brak {len(miss_t)}) z {len(inner)}"
+            + (f" (doby kampanii bez linii {miss[:8]}" + (" ..." if len(miss) > 8 else "") + ")" if miss else ""),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+    days = sorted(um)
+    cost = [(fnum(r"\| koszt ksiegi ([0-9.]+) ms", um[d]), d) for d in days]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("P1-2: koszt ksiegi umiejetnosci", f"srednio {m:.1f} ms/dobe, najwiecej {mx[0]:.1f} ms (d{run_day(mx[1], start)}; {len(cost)} dob)", "<= 30 ms/dobe srednio", m <= 30.0)
+    else:
+        rep.add("P1-2: koszt ksiegi umiejetnosci", "brak liczby w linii", "<= 30 ms/dobe", None)
+    lords, player = {}, {}
+    for d in days:
+        ml = re.search(r"\| zrodla lordow AI: (.*?) \| zrodla gracza: (.*?) \| umiejetnosci lordow AI:", um[d])
+        if not ml:
+            continue
+        for acc, seg in ((lords, ml.group(1)), (player, ml.group(2))):
+            for k, (xp, n) in e8p1_sources(seg).items():
+                a = acc.get(k, (0, 0))
+                acc[k] = (a[0] + xp, a[1] + n)
+    tot_l = sum(v[0] for v in lords.values())
+    if tot_l > 0:
+        oth = lords.get("inne", (0, 0))[0]
+        rep.add("P1-3: zrodlo 'inne' w surowym XP lordow AI (pokrycie znacznikow)", f"{100.0 * oth / tot_l:.1f}% ({oth} z {tot_l}, {len(days)} dob)", "<= 20%", oth <= 0.20 * tot_l)
+    else:
+        rep.add("P1-3: zrodlo 'inne' w surowym XP lordow AI", "brak XP lordow w liniach okna", "<= 20%", None)
+    wired = [(num(r"latki wpiete (\d+)/\d+", s), num(r"latki wpiete \d+/(\d+)", s)) for s in st]
+    bad = [f"{a}/{b}" for a, b in wired if a is None or b is None or a != b]
+    stum = max([num(r", potkniecia (\d+)", um[d], default=0) for d in days] + [0])
+    stale = max([num(r", zerwane (\d+),", um[d], default=0) for d in days] + [0])
+    nf = [s.split(" | nie znaleziono: ", 1)[1] for s in st if " | nie znaleziono: " in s]
+    rep.add("P1-4: latki ksiegi wpiete przy kazdym starcie sesji, potkniecia 0",
+            (f"starty {len(st)}, wpiete " + (", ".join(sorted(set(f"{a}/{b}" for a, b in wired))) if wired else "-") + f", potkniecia {stum}"
+             + (f" | nie znaleziono: {nf[-1][:200]}" if nf else "") + (f" | WYLACZONA x{len(off)}" if off else "")),
+            "N/N i 0", (len(st) > 0 and not bad and stum == 0))
+    nd = max(1, len(days))
+
+    def top(acc, n=8):
+        tot = sum(v[0] for v in acc.values())
+        if tot <= 0:
+            return "-"
+        return ", ".join(f"{k} {v[0] / nd:.0f} XP/d ({100.0 * v[0] / tot:.0f}%, {v[1] / nd:.0f} wyw./d)" for k, v in sorted(acc.items(), key=lambda kv: -kv[1][0])[:n])
+    rep.add("E8/P1: surowe XP lordow AI wedlug zrodla (srednio na dobe)", top(lords), "INFO (stan 'przed' dla E8/X: jedzenie, marsz, marsz premia AI)", None)
+    rep.add("E8/P1: surowe XP gracza wedlug zrodla (srednio na dobe)", top(player), "INFO (strzal RBM - X-1)", None)
+    if days:
+        mc = re.search(r"\| inne wedlug wolajacego \(sesja, probka stosu\): (.*?) \| znaczniki", um[days[-1]])
+        rep.add("E8/P1: kto wola 'inne' (probka stosu, ostatnia doba okna)", (mc.group(1)[:420] if mc else "brak w linii"), "INFO (kolejne znaczniki przy P1-3 > 20%)", None)
+        md = re.search(r"\| XP wprost poza suma [^:]*: (.*?) \| inne wedlug", um[days[-1]])
+        rep.add("E8/P1: XP wprost poza suma (ostatnia doba okna) / znaczniki zerwane wyjatkiem w metodzie gry",
+                (md.group(1) if md else "brak w linii") + f" / zerwane {stale}", "INFO", None)
+    tdays = sorted(tr)
+    if tdays:
+        req = [num(r"\| dodane (-?\d+) \(przyjete", tr[d], default=0) for d in tdays]
+        got = [num(r"\| dodane -?\d+ \(przyjete (-?\d+)\)", tr[d], default=0) for d in tdays]
+        src = {}
+        for d in tdays:
+            mt = re.search(r"\| zrodla \(przyjete/wywolan\): (.*?) \| zdjete", tr[d])
+            if not mt:
+                continue
+            for k, (xp, n) in e8p1_sources(mt.group(1)).items():
+                a = src.get(k, (0, 0))
+                src[k] = (a[0] + xp, a[1] + n)
+        ts = sum(v[0] for v in src.values())
+        rep.add("E8/P1: XP wojska (srednio na dobe)",
+                (f"dodane {sum(req) / len(tdays):.0f}, przyjete {sum(got) / len(tdays):.0f} ({100.0 * sum(got) / sum(req):.0f}%)" if sum(req) > 0 else "dodane 0"),
+                "INFO", None)
+        rep.add("E8/P1: XP wojska wedlug zrodla (przyjete)",
+                (", ".join(f"{k} {100.0 * v[0] / ts:.0f}%" for k, v in sorted(src.items(), key=lambda kv: -kv[1][0])[:6]) if ts > 0 else "-"), "INFO", None)
+    lv = {d: s for d, s in by_day(lines, E8_P1_LV).items() if 0 <= run_day(d, start) <= until + 1}
+    if lv:
+        a, b = min(lv), max(lv)
+
+        def lvl(s):
+            out = ["suma " + str(num(r"suma poziomow mediana (\d+)", s, default=0))]
+            for k in ("Scouting", "Steward", "Leadership", "Tactics", "OneHanded"):
+                v = num(r"[ ,]" + k + r" (\d+)/\d+", s)
+                if v is not None:
+                    out.append(f"{k} {v}")
+            return ", ".join(out)
+        n_l = num(r"lordowie AI (\d+)", lv[b], default=0)
+        rep.add("E8/P1: poziomy lordow AI - mediana, pierwsza i ostatnia linia okna",
+                f"d{run_day(a, start)} [{lvl(lv[a])}] -> d{run_day(b, start)} [{lvl(lv[b])}] ({len(lv)} linii, lordow {n_l})", "INFO", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8303,6 +8429,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     blocks = [etap8_t0, etap8_0]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
+    blocks.append(etap8_p1)   # E8/P1 (243): ksiega umiejetnosci
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

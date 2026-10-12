@@ -1171,6 +1171,9 @@ namespace Armoury
         public float ArenaXpPercent = 20f;                 // practice bouts teach this share of the battle rate (vanilla 6, RBM 100)
         public float TournamentXpPercent = 50f;            // tournament bouts teach this share of the battle rate (vanilla 33, RBM 100)
         public bool BattleXpScalesWithDamage = true;       // real battles: XP follows the damage dealt and a kill pays double - not a flat fee per swing
+        // E8/P1 (243, PLAN 8.1a): ksiega umiejetnosci - tylko log (SkillLedger.cs): co dobe "Umiejetnosci (E8/P1)" (surowe XP bohaterow wedlug grupy, umiejetnosci i zrodla)
+        // i "XP wojska (E8/P1)", co 7 dob "Poziomy lordow (E8/P1)"; latki-liczniki wpinane w kampanii tylko przy wlaczonym kluczu (off od startu = zadnej latki)
+        public bool SkillLedgerLog = true;                 // Writes daily lines telling how much skill experience heroes and troops earned and from what (diagnostics only; nothing in the game changes).
 
         // --- The men's gear ---
         public bool TroopMendEnabled = true;               // the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate

@@ -3940,6 +3940,10 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool BattleXpScalesWithDamage { get; set; } = true;
 
+        [SettingPropertyBool("Skill Ledger Log", HintText = "Writes daily lines telling how much skill experience heroes and troops earned and from what (diagnostics only; nothing in the game changes).")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool SkillLedgerLog { get; set; } = true;
+
         [SettingPropertyBool("Troop Mend Enabled", HintText = "the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate")]
         [SettingPropertyGroup("The men's gear")]
         public bool TroopMendEnabled { get; set; } = true;
@@ -5884,6 +5888,7 @@ namespace Armoury
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
+            s.SkillLedgerLog = SkillLedgerLog;
             s.TroopMendEnabled = TroopMendEnabled;
             s.TroopMendWreckShare = TroopMendWreckShare;
             s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;
