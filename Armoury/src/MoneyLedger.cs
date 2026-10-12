@@ -134,6 +134,7 @@ namespace Armoury
         private static readonly long[,] _goldIn = new long[Classes, Sides], _goldOut = new long[Classes, Sides];
         private static readonly long[] _fromNothing = new long[Classes], _toNothing = new long[Classes];
         private static long _worldFromNothing, _worldToNothing, _levyBack;
+        private static long _garFee;                       // E5 decyzja 9 (GarrisonRecruitFee): oplata za werbunek zalog oddana sprzedajacym w rozliczeniach rodow
         private static readonly long[,] _noteIn = new long[Classes, Notes], _noteOut = new long[Classes, Notes];
         private static readonly long[,] _mark = new long[Classes, Marks];
         private static readonly long[] _wage = new long[Wages];
@@ -190,7 +191,7 @@ namespace Armoury
             _consMissed = 0; _regStray = 0;
             Array.Clear(_goldIn, 0, _goldIn.Length); Array.Clear(_goldOut, 0, _goldOut.Length);
             Array.Clear(_fromNothing, 0, Classes); Array.Clear(_toNothing, 0, Classes);
-            _worldFromNothing = _worldToNothing = _levyBack = 0;
+            _worldFromNothing = _worldToNothing = _levyBack = 0; _garFee = 0;
             Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes); Array.Clear(_shopFair, 0, Classes);
             Array.Clear(_artIn, 0, Classes); Array.Clear(_artBack, 0, Classes);
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
@@ -417,6 +418,10 @@ namespace Armoury
         /// policzone w "GiveGoldAction w nicosc"). Wolac TYLKO wtedy, gdy gra naprawde kasowala przez GiveGoldAction: karawana
         /// placi za najemnika z kiesy partii bez zdarzenia - jej zaplata to zwykly przelew karawana -> miasto, nie zwrot. Tylko licznik.
         /// </summary>
+        /// <summary>E5 decyzja 9 (GarrisonRecruitFee.Give): oplata za werbunek zalog oddana notablowi albo kasie osady - w oknie rozliczenia rodu (zmiana zlota
+        /// swiata tego rozliczenia juz ja widzi, bez NoteLevyBack i bez pozycji bilansu - D7). Tylko licznik nazwy w linii "Pieniadz swiata (rody - przyczyny)".</summary>
+        internal static void NoteGarrisonFee(long amount) { if (amount > 0) _garFee += amount; }
+
         internal static void NoteLevyBack(int amount)
         {
             if (amount > 0) _levyBack += amount;

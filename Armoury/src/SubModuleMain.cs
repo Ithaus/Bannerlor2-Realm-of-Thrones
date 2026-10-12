@@ -114,6 +114,7 @@ namespace Armoury
                 Levy.ApplyAll(_harmony);
                 VolunteerKit.ApplyAll(_harmony);
                 LevyGold.ApplyAll(_harmony);
+                try { GarrisonRecruitFee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll", e); }   // E5 decyzja 9: oplata za werbunek zalog do sprzedajacego
                 WinterSource.ApplyAll(_harmony);
                 KingdomTreasury.ApplyAll(_harmony);
                 try { CrownIncome.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CrownIncome.ApplyAll", e); }   // 165: reparacje Diplomacy jako dlug korona-korona, splata dlugu wobec korony do skarbca

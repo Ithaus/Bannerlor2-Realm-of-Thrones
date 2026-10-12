@@ -2661,8 +2661,37 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog do sprzedajacego (GarrisonRecruitFee)
+    try:
+        etap5_fee(rep, lines)
+    except Exception as e:
+        rep.add("blok etap5_fee", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
+
+
+def etap5_fee(rep, lines):
+    """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -
+    kasa jego osady). Linia startowa "GarrisonRecruitFee (E5 decyzja 9)" i linia doby "Oplata za werbunek zalog (E5 decyzja 9): dzien N"."""
+    wire = [x for x in lines if x.startswith("GarrisonRecruitFee (E5 decyzja 9)")]
+    fee = [x for x in lines if x.startswith("Oplata za werbunek zalog (E5 decyzja 9): dzien")]
+    if not wire:
+        rep.add("E5 dec. 9: latki oplaty za werbunek zalog", "brak linii startowej", "jest od wgrania (GarrisonRecruitFee)", None)
+        return
+    rep.add("E5 dec. 9: latki oplaty za werbunek zalog", wire[-1][:180], "werbunek, splata i rozliczenie wpiete (bez NIEPELNE)", "NIEPELNE" not in wire[-1])
+    if not fee:
+        rep.add("E5 dec. 9: linia oplaty za werbunek zalog", "brak", "codziennie, gdy zalogi werbuja od notabli", None)
+        return
+    def tot(rx):
+        return sum(num(rx, x, int, 0) or 0 for x in fee)
+    acc, paid = tot(r"naliczone przy werbunku (\d+)"), tot(r"splacone przez rody (\d+)")
+    nb, ss, unc = tot(r"do notabli (\d+)"), tot(r"do kas osad \(notabl zmarly\) (\d+)"), tot(r"bez pokrycia w kiesie glowy (\d+)")
+    leg, nt, out = tot(r"w nicosc jak dotad (\d+)"), tot(r"bez odbiorcy (\d+)"), tot(r"poza rozliczeniem rodu \(nic nie oddane\) (\d+)")
+    stum = tot(r"potkniecia (\d+)")
+    rep.add("E5 dec. 9: oplata za werbunek zalog do sprzedajacych (suma dob w logu)",
+            f"naliczone {acc}, splacone przez rody {paid}: notable {nb}, kasy osad {ss}, bez pokrycia {unc}, saldo sprzed paczki {leg}, bez odbiorcy {nt}, poza rozliczeniem {out}",
+            "notable + kasy osad > 0, gdy rody splacaja; bez odbiorcy 0", (nb + ss > 0 and nt == 0) if paid > 0 else None)
+    rep.add("E5 dec. 9: potkniecia GarrisonRecruitFee", str(stum), "0", stum == 0)
 
 
 def etap5_rows(rep, lines, start, win, logp, csvp=None):
