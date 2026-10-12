@@ -88,6 +88,10 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
                     CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), zakup i sprzedaz tej samej
                     kategorii w 7 dobach 0, potkniecia 0; sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
+--grupa etap7     : (E7/B, paczka 231 - szkielet grupy etapu 7; E7/0 dopisze swoje bloki) okno doby kampanii 1-120 (--do-doby N), start kampanii jak etap5.
+                    Blok etap7_b (projekt etapu 7 v2 rozdz. 3 "E7/B" Test): os rzeki wyznaczona (bez BRAK OSI); T1 linia "Przeprawa Bliznaki (E7/B)" z licznikiem
+                    w kazdej dobie okna; T2 przejsc > 0; T3 pozycje przejsc z pierwszych 3 dob sesji <= 3 jedn. od bramy (inaczej brod albo drugi most w strefie -
+                    zmniejszyc promien); T4 koszt probek < 0.1 ms/dobe (srednio); potkniecia 0; przejscia wedlug rodzaju, myto gdyby bylo i wejscia do osady (169c) - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5882,6 +5886,99 @@ def etap5_b6(rep, lines, start, win, bud):
             + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
     rep.add("E5/B6 B6-14: reszta ksiegi pieniadza < 10 tys./d (nowy posiadacz H37)", "--grupa etap3 na tym samym logu", "INFO", None)
 
+
+# ============================================================ ETAP 7 (E7/B, paczka 231): szkielet grupy etap7 + blok E7/B
+def etap7_main(logp, start_arg, until=120, csp=None):
+    """Grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main (linia
+    "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kazda paczka dopisuje WLASNY blok etap7_<paczka>(rep, lines, start, win, until=..);
+    blok bez swojej linii - wiersz INFO "brak linii", nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    win = [d for d in alld if 1 <= run_day(d, start) <= until]
+    print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
+    for blk in (etap7_b,):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+        try:
+            blk(rep, lines, start, win, until=until)
+        except Exception as e:   # narzedzie nigdy nie przerywa raportu
+            rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
+def etap7_b(rep, lines, start, win, until=120, **kw):
+    """E7/B (231, PLAN 7.12, projekt etapu 7 v2 rozdz. 3 "E7/B" Test): linia startowa "Przeprawa Bliznaki (E7/B): os rzeki" i linia doby
+    "Przeprawa Bliznaki (E7/B): dzien N" (dzien = doba gry, jak "Juczne (213)"; "Pieniadz swiata" nosi dzien ksiegi = doba gry - 1, stad -1 w T1).
+    Wiazace: os bez BRAK OSI, T1 linia z licznikiem w kazdej dobie okna, T2 przejsc > 0, T3 pozycje <= 3 jedn. od bramy, T4 koszt < 0.1 ms/dobe, potkniecia 0."""
+    axis = [s for s in lines if s.startswith("Przeprawa Bliznaki (E7/B): os rzeki")]
+    rows = {}
+    for d, s in by_day(lines, "Przeprawa Bliznaki (E7/B): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    if not axis and not rows:
+        rep.add("E7/B: linie Przeprawa Bliznaki (E7/B)", "brak w logu", "sa od wgrania E7/B (TwinsCrossingCount, LogEnabled)", None)
+        return
+    if axis:
+        a = axis[-1]
+        ok = ("BRAK OSI" not in a) and (" nie ma " not in a)
+        rep.add("E7/B B-0: os rzeki przy moscie (2 luki wody na okregu r 4)", a[:260], "os wyznaczona (bez BRAK OSI) - inaczej wzorce okregow r3-r6 w linii", ok)
+    else:
+        rep.add("E7/B B-0: os rzeki przy moscie", "brak linii startowej", "jest przy pierwszej godzinie gry sesji", None)
+    days = sorted(rows)
+    live = [x for x in days if "| przejsc " in rows[x]]
+    need = max(0, len(win) - 1)
+    rep.add("E7/B T1: linia Przeprawa Bliznaki z licznikiem", f"{len(live)} dob (wszystkich linii {len(days)}; dob okna {len(win)})",
+            f">= {need} (codziennie w oknie; dzien gry = dzien ksiegi + 1)", (len(live) >= need and need > 0) if win else None)
+    if not live:
+        return
+    w = [rows[x] for x in live]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = tot(r"\| przejsc (\d+) \(")
+    rep.add("E7/B T2: przejsc mostem (suma okna)", f"{n} ({n / len(w):.1f}/d)", "> 0", n > 0)
+    pos = []
+    for x in w:
+        m = re.search(r"pozycje przejsc \(x/y, odl\. od bramy\): (.*?)\.$", x)
+        if m and m.group(1) != "brak":
+            pos += [float(v) for v in re.findall(r"-?[\d.]+/-?[\d.]+ \(([\d.]+)\)", m.group(1))]
+    far = [v for v in pos if v > 3.0]
+    rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od bramy", f"{len(pos)} pozycji, dalej niz 3 jedn.: {len(far)}" + (f" (najdalej {max(pos):.1f})" if pos else ""),
+            "wszystkie <= 3 jedn. (inaczej brod albo drugi most w strefie - zmniejszyc promien)", (len(far) == 0) if pos else None)
+    cost = [num(r"koszt probek ([\d.]+) ms/dobe", x, float) for x in w]
+    cm = _mean(cost)
+    rep.add("E7/B T4: koszt probek godzinnych (srednio)", f"{cm:.3f} ms/dobe" if cm is not None else "brak", "< 0.1 ms/dobe", (cm < 0.1) if cm is not None else None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    rep.add("E7/B B-5: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+    car, vil, cown, cfor = tot(r" - karawany (\d+) \("), tot(r", wozy wsi (\d+)"), tot(r"\(krolestwo pana (\d+) /"), tot(r" / obce (\d+)\)")
+    band, oth, pl = tot(r", bandy (\d+), inne"), tot(r", inne (\d+), gracz"), tot(r", gracz TAK \((\d+)\)")
+    ns = (tot(r"\(na polnoc (\d+),"), tot(r", na poludnie (\d+)\)"))
+    ew = (tot(r"\(na wschod (\d+),"), tot(r", na zachod (\d+)\)"))
+    side = f"na polnoc {ns[0]}, na poludnie {ns[1]}" if ns != (0, 0) or ew == (0, 0) else f"na wschod {ew[0]}, na zachod {ew[1]}"
+    rep.add("E7/B B-6: przejscia wedlug rodzaju (suma okna)", f"{side}; karawany {car}, wozy wsi {vil}, rody krolestwa pana {cown} / obce {cfor}, bandy {band}, inne {oth}, gracz {pl}",
+            "INFO", None)
+    toll = tot(r"\| myto gdyby bylo (\d+) zl")
+    gold = tot(r"\(kiesy (\d+) zl")
+    rep.add("E7/B B-7: myto gdyby bylo (suma okna, 2 zl od czlowieka, 1 zl od zwierzecia, rody krolestwa pana bez myta)",
+            f"{toll} zl ({toll / len(w):.0f}/d); kiesy karawan przy przejsciu {gold} zl", "INFO (tylko do porownania - nikt nie placi; decyzja Jeffa po tescie)", None)
+    ent = 0
+    for d, s in by_day(lines, "Miara historyczna cz. 2 (169c): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            ent += num(r"\(e\) Bliznaki: wejscia do osady (\d+)", s, int, 0) or 0
+    rep.add("E7/B B-8: wejscia do osady Bliznaki (169c (e)) obok przejsc", f"wejsc {ent}, przejsc {n}", "INFO (porownanie)", None)
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -5917,6 +6014,8 @@ def main(argv):
         return etap4_main(logp, start_arg, until_arg, csp, bdp)   # E4/0 (188)
     if group == "etap5" and logp:
         return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
+    if group == "etap7" and logp:
+        return etap7_main(logp, start_arg, until_arg, csp)   # E7/B (231): szkielet etapu 7 + blok E7/B; kolejne paczki etapu 7 dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

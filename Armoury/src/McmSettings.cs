@@ -4736,6 +4736,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
 
+        [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool TwinsCrossingCount { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5919,6 +5923,7 @@ namespace Armoury
             s.AiSpareHorseShare = AiSpareHorseShare;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
+            s.TwinsCrossingCount = TwinsCrossingCount;
         }
 
         internal static void Apply()

@@ -1461,6 +1461,9 @@ namespace Armoury
         // luzak, ktory nie niesie piechura ani jenca, niesie SpareHorseCarryKg zamiast 20 kg gry (postfiks modelu pojemnosci dopisuje roznice)
         public bool PackAnimalsFromMarket = true;          // a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)
         public int SpareHorseCarryKg = 60;                 // how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)
+        // --- The map and its crossings (stage 7) ---
+        // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi
+        public bool TwinsCrossingCount = true;             // counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything
 
         public static void Load(string moduleDataDir)
         {
