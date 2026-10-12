@@ -1239,3 +1239,6 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
   jedzenie) - TAK (dzis 75% z RC); (4) zaulki w oblezonym miescie wstrzymane jak inne oplaty - TAK, jedna zasada; (5) ubogie miasta - sprawdzimy w biegu rocznym; (6) Jeff prosi
   o wyjasnienie. Do kodu w nastepnej paczce (z E6 porcja 2 i danina wsi 2.5%).
 - (09:35 UTC 12.10) **Jeff (6): czujnik zbyt szybkiego przyrostu ludnosci (+1150 ludzi/d) w narzedziu zostaje - TAK** (tylko kontrola w tescie, gra bez zmian).
+- (09:50 UTC 12.10) **Jeff - ZASADA: "nie mamy na sile i sztucznie robic dobrze lordom - jak ich nie stac na wojne, to zaciagaja pozyczke albo wystawiaja mniejsze zaciagi"**.
+  -> spadek wojska z prawdziwej ekonomii (koniec zlota z niczego) jest dopuszczalny; podloga 85 tys. z etapu 2 przestaje byc warunkiem (tylko pomiar); nie dokladamy sztucznych
+  doplat (np. sprzet A2 w wojnie zostaje bez zmian); danina wsi 2.5% (decyzja 1b) zostaje - to prawdziwy podatek. Rody: drabina dlugu / Bank / mniejsze wojsko.
