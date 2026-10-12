@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 4, poprawki po decyzjach Jeffa 12.10 - `w-toku/e4-fix2`) - POBOR Z MIASTA WEDLUG UDZIALU MIASTA W LUDNOSCI KRAINY (P1-4), PROG LUDNOSCI -0.5%/ROK TYLKO INFO (T11/S15)
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e4-fix2` (od `w-toku/zbior-e4-koniec` 47b2225) | **Commity:** b9dbe0a (kod + narzedzie + MCM), ten wpis | **Decyzje (wiazace):** `docs/STAN-PRAC.md` "(00:20 UTC 12.10) DECYZJE JEFFA" nr 1, 2, 3 | **Diagnoza:** `SCRATCH(ae222cb7)\kopia-e4k\diagnoza-d120.json` (P1-4, P1-5)
+
+**Problem (test koncowy E4, `kopia-e4k\czesc-d120.log`):** pobor z DOM d28-120 1440/d - miasta 572/d (54% poboru od notabli) przy ok. 20% ludzi (10.38 z 51.78 mln); na glowe miasta ok. 2.0%/rok, wsie ok. 0.43%/rok (4.7 raza mniej); stan miast -571/d (d28-120), migracja R2 "do udzialu" +151/d dopelnia miasta z ich wsi. Narzedzie: T11 i S15 traktowaly -0.5%/rok zywych jako twardy prog (NIE przy ciezkiej wojnie), a Jeff 12.10 (nr 2, P1-5 odrzucone): "jesli ubywa, to ubywa" - bez sztucznego hamulca strat.
+
+**Przyczyna:** `PeopleBook.TakeLevy` (galaz `s.IsTown`) zdejmowal caly pobor ze stanu miasta az do podlogi 100 ludzi, a wsie regionu tylko wtedy, gdy miasto bylo na podlodze; lordowie AI werbuja tam, gdzie staja (glownie miasta, 31% notabli przy 20% ludzi) - BK `DeduceManpower` (OriginPatches:126). `tools/sprawdz_logi.py` T11/S15: `E4_ZYWI_MIN <= z <= E4_ZYWI_MAX` jako wynik progu.
+
+**Zmiana:**
+- `PeopleBook.Origin.cs` `TakeLevy` (galaz miasta): dla poboru E4/7 (`MLevyVillage`, `MLevyA5` - notable BK, karczma gracza, A5) ze stanu miasta tylko `n x p_miasta / (p_miasta + ludzie wsi regionu)` (`TownShareOf`: stan miasta E4/4 i `PopulationLaw.PeopleOf` wsi - jak `DomOf`), reszta `FromVillages(region, reszta, causeM, weighted: true)` (wsie wedlug ludzi, potem od najwiekszej); gdy wsie regionu sa na podlodze 50 hearth - reszta znow ze stanu miasta jak dotad (liczba rekrutow bez zmian). Brak stanu miasta / wsi z ludzmi - udzial 1 (jak dotad). E4/8 (milicja, druzyny, karawany, wedrowcy) bez zmian.
+- Wylacznik **Town Levy By Share** (`TownLevyByShare = true`, grupa MCM "Iron Bank"; `McmSettings.cs` z `tools/gen_mcm.py`). Wylaczony = pobor z miasta jak dotad.
+- Linia logu "Pochodzenie (E4/7)" (czesc "DeduceManpower: wywolan ..."): `, pobor miast wedlug udzialu (fix2 P1-4) z wsi regionu N ludzi, wsie na podlodze - znow z miasta M ludzi` (albo `WYLACZONY (Town Levy By Share)`); liczniki doby `_townShareVill`, `_townShareBack` czyszczone z reszta licznikow fixA.
+- `tools/sprawdz_logi.py`: decyzja 1 (ludnosc = wszyscy zywi) byla juz w grupie C (`e4_zywi`: DOM + uchodzcy + SLUZBA i JENCY + w drodze + pula + WETERANI + NIEWOLNI + Mur) - bez zmian liczby, tylko opis wiersza rozbicia. Decyzja 2: T11 i S15 (wiersze zywych) - prog tylko gora +1150/d (najwyzszy przyrost korytarza E4/4; wiecej to ludzie z niczego), dol -721/d (-0.5%/rok) tylko INFO z dopiskiem "PONIZEJ -0.5%/rok (INFO ...)" (`e4_zywi_ok`, `E4_ZYWI_RULE`); stare miary (log bez konta SLUZBA) - tez bez progu -0.5%/rok. T11b (a <= f, pod bronia <= 20% mezczyzn) zostaje progiem. Na `czesc-d120.log`: T11 i S15 TAK (zywi -384/d = -0.27%/rok), T11b TAK.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: dlug miasta `TownOut`/`VillOut` liczony nizej z `fromTown` (razem z doborem z miasta po podlodze wsi) - podzial powrotow `BackToTown` (TownOut / (TownOut + VillOut)) i `RepayTownDebt` ida za nowym podzialem same, bez drugiego licznika. Licznik "pobor na podlodze" (T6) bez zmian znaczenia (reszta po miescie i wsiach). Odwrot wsi do miasta (fixA T6, galaz wsi) nie ruszony.
+- Kolizje: E4/8 celowo poza zmiana - ich powrot idzie do osady wyjscia (`ArriveAt` -> `TownShift`), wiec pobor z wsi i powrot do miasta bylby sztuczna migracja wies -> miasto. Siew weteranow (`VetTakeTown`) i migracja R2 (`TownGrowth`) bez zmian - migracja "do udzialu" powinna spasc blisko 0 (miasto traci mniej). Hamulec wolnych rak (`FreeHands`) liczy region (miasto + wsie) - suma bez zmian.
+- Spojnosc: kazdy rekrut raz - te same drogi `FromTown` (`Count`, `_townMv`) i `FromVillage` (`Move`, podloga 50 hearth); liczba rekrutow i wojsko bez zmian; suma swiata +-0. Szacunek diagnozy: pobor ze stanu miast 560 -> ok. 185/d, stan miast prawie stoi, wsie regionow miast netto ok. -225/d wiecej (hearth swiata ok. -3/d, wiecej wsi przy podlodze - patrz "znow z miasta" w linii).
+- W tescie zbiorczym: linia "Pochodzenie (E4/7)" - "w tym ze stanu miast" spada ok. 3 razy, "z wsi regionu" ok. 375/d, "znow z miasta" maly; E4/7 T6 (pobor na podlodze) nie rosnie; linia "Miasta (E4/8 R2)" - migracja do udzialu blisko 0; E4/8 N11 udzial miejski bez spadku; T3/T4 rownanie krain bez zmian.
+- Wylacznik w trakcie kampanii - bez skoku (zmienia tylko, skad bierze sie nastepny rekrut).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy (Armoury build kod 0; gry nie uruchamiano).
+
 ## 2026-10-11 (etap 4, Poprawki po tescie koncowym etapu 4 - scalenie grup A, B, C w `w-toku/zbior-e4-koniec`) - KSIEGA POCHODZENIA (P11, T3, OSTRZAL, POBOR WSI, UCIECZKI Z LOCHU), STRAZ Z LUDNOSCI, KSIEGA WIOSEK PO VILLAGE, UDZIAL MIAST WOBEC WLASNYCH WSI, PROGI NARZEDZIA
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e4-koniec` (od 7658247) | **Commity:** a816de9 (merge `w-toku/e4-fixA`), 609cf17 (merge `w-toku/e4-fixB`), e7c9610 (merge `w-toku/e4-fixC`), ten wpis | **Diagnoza (wiazaca):** `SCRATCH(ae222cb7)\kopia-e4k\diagnoza-d120.json` | **DLL do testu:** `SCRATCH(ae222cb7)\test\Armoury-e4-koncowy2.dll` | **Szczegoly:** trzy wpisy ponizej (grupa A, B, C)
 
