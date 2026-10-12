@@ -722,6 +722,10 @@ namespace Armoury
                 Shares org = null;
                 try { if (OriginLive && !IsWight(__0)) org = Take(__1.PrisonRoster, gone, FEscape); } catch { org = null; }
                 int vt, got, left;
+                // recenzja fixA (1): pamiec osad BK zolnierzy (LosersFlee._battleHome, klucz bez miejsca - "|-|kultura") jest na JEDNA bitwe; ucieczka idzie poza bitwa
+                // w dowolnym miejscu mapy - bez czyszczenia zbieg trafial do ludnosci BK osady wybranej dla ostatniej bitwy z uwolnionymi tej kultury. Czyszczenie
+                // jak w H3 (BeginBattle przed kazdym uzyciem): osada liczona od miejsca ucieczki (jeden przebieg po Homes() na ucieczke)
+                LosersFlee.BeginBattle();
                 LosersFlee.FreedHome(__0, gone, pos, region, law, org, out vt, out got, out left);
                 _escTavern += vt; _escHome += got;
                 if (left > 0) { if (law) _escPool += left; else _escLost += left; }

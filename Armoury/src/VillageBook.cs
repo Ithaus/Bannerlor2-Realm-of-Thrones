@@ -88,7 +88,7 @@ namespace Armoury
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, Dist> _d = new Dictionary<string, Dist>(StringComparer.Ordinal);
         private static readonly Dictionary<string, KeyValuePair<Dist, int>> _byUid = new Dictionary<string, KeyValuePair<Dist, int>>(StringComparer.Ordinal);
-        // E4 fixB (G4): okreg po OBIEKCIE Village dla wpiec Strike / glod / pojmani i wiersza okregu w menu warowni. ROT-Map settlements.xml daje dwie osady na jednym
+        // E4 fixB (G4): okreg po OBIEKCIE Village dla wpiec Strike / glod / pojmani (menu warowni - nie, recenzja fixB (3)). ROT-Map settlements.xml daje dwie osady na jednym
         // Village (Kurbok ROT_town40_village2 i Thupak ROT_town40_village3 maja komponent ROT_town39_village2/3_comp - ten sam co Guntak i Volug): v.Settlement to
         // ostatni wlasciciel z XML (town40), a okreg (Resolve, pierwszy w Settlement.All) ma klucz town39 - szukanie po v.Settlement.StringId chybialo (d120: d0 = 26).
         // Klucze zapisu (d.Id) i przypisanie wierszy pliku bez zmian. Porownanie po referencji (hash MBObjectBase idzie z Id - jak RefEq w GoodsLedger).
@@ -1371,7 +1371,9 @@ namespace Armoury
                         foreach (var v in bv)
                         {
                             Dist d;
-                            if (v == null || !_byV.TryGetValue(v, out d) || !EnsureN(d)) continue;     // E4 fixB (G4): po obiekcie Village
+                            // recenzja fixB (3): menu warowni zostaje przy kluczu v.Settlement.StringId (jak przed G4) - wspolne Village z ROT-Map (Kurbok/Thupak) dawalo
+                            // w menu Omber okregi Guntak i Volug (d.Name z town39); zmiana menu - osobna decyzja (wariant sceptyka G4: okreg od wlasciciela Village)
+                            if (v == null || v.Settlement == null || v.Settlement.StringId == null || !_d.TryGetValue(v.Settlement.StringId, out d) || !EnsureN(d)) continue;
                             var sn = SnapOf(d);
                             int standing = 0;
                             for (int w = 0; w <= d.W; w++) { int x = StateAt(d, w); if (x != SBurned && x != SAbandoned && x != SBurning) standing++; }

@@ -1362,9 +1362,11 @@ namespace Armoury
             {
                 if (o == null) { o = new Org(); dict[pb] = o; }
                 double add = n - sum;
-                if (p != null)
+                if (p != null && p.Total > Eps)
                 {
-                    var use = p.Cut(add);
+                    // recenzja fixA (2): najwyzej tyle, ile oczekuje - Cut(add) przy add > Total dokladal "" na nadwyzke i liczyl ja jako "z puli do band";
+                    // nadwyzka rosteru ponad oczekujace (przyrost bez okna przed pierwszym uzgodnieniem) idzie dalej: Straz, potem "" z niczego (_zAll, _zBy)
+                    var use = p.Cut(Math.Min(add, p.Total));
                     double known = 0;
                     foreach (var kv in use.M) { OrgAdd(o, kv.Key, kv.Value); known += kv.Value; }
                     _pendIn += known; _fIn[FPoolBand] += known; _gAll += known;
@@ -1705,13 +1707,14 @@ namespace Armoury
             back += men[MBackPress]; backH += hh[MBackPress];               // E4/7b: niewzieci z poboru wymuszonego gracza do swojej wsi
             // rownanie krain (suma regionow kultury regionu)
             var realms = new Dictionary<string, double[]>();
-            double world = 0;
+            double world = 0, alive = 0;
             foreach (var v in Views())
             {
                 double[] a; string rk = v.Realm ?? "?";
                 if (!realms.TryGetValue(rk, out a)) { a = new double[2]; realms[rk] = a; }
-                a[0] += v.Rest; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W;
-                world += v.Rest;
+                double live = v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W;
+                a[0] += v.Rest; a[1] += live;
+                world += v.Rest; alive += live;
             }
             string worst = "-"; double worstRest = 0, worstPc = 0;
             foreach (var kv in realms)
@@ -1728,6 +1731,9 @@ namespace Armoury
               .Append(" | rownanie krain: najgorsza kraina ").Append(worst).Append(" reszta ").Append(H3d(worstRest)).Append(" (").Append(worstPc.ToString("0.###", Inv)).Append("% ludzi krainy), swiat ").Append(H3d(world));
             try { sb.Append(ArmsSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/8)", e); }     // E4/8 (10.5): migracja R19 od siewu, w drodze
             try { sb.Append(CanonSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/9)", e); }    // E4/9: NIEWOLNI, MUR, rownanie z T i W
+            // recenzja fixC (1), tylko log: ludzie zywi swiata z definicji rownania krain (suma stanow regionow - te same skladniki co reszta v.Rest; SLUZBA bez
+            // wedrowcow BK, ktorzy sa w drodze; tabory; NIEWOLNI, Mur i pula tylko z pochodzeniem) - jedna liczba dla progow E4/7 T11 i E4/5 S15 narzedzia
+            sb.Append(" | ludzie zywi (rownanie krain: DOM + uchodzcy + SLUZBA + JENCY + pula + tabory + w drodze + WETERANI + NIEWOLNI + Mur, z pochodzeniem) ").Append(N0(alive));
             return sb.ToString();
         }
 

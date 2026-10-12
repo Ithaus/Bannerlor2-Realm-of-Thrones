@@ -31,6 +31,10 @@ Uzycie (Python 3, tylko odczyt):
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
                     T11b a <= f), T7 ze zrodlem wedrowcow i konwojow BK (E4/8), progi kosztu linii paczek 30 ms (E5/0 50 ms) i wiersz zbiorczy etapow 4+5 <= 1% doby.
+                    Poprawki recenzji: zywi bez podwojnych "w drodze", z taborami, z liczby "ludzie zywi (rownanie krain)" gdy jest; T11/S15/T11b - INFO (Jeff 12.10:
+                    prog tylko pomiar), T11c mobilizacja 28 dob; progi kosztu T12/N15/G10 0.2% i E50-T2 0.3% sredniej doby tych samych dob (bez linii Koszt - 30/50 ms).
+--baza-doby P     : (etap4 T8) log Armoury biegu bazowego - srednia "doba N ms (zegar)" (linia Koszt 171-174) w tych samych dobach kampanii, w parach; <= +3%
+                    z bledem sredniej. Bez niego wiersz INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -670,44 +674,149 @@ def crashscribe_t1_row(rep, name, logp, csp, where_filter=None):
 
 
 # poprawki po tescie koncowym etapu 4 (P1-1): ludzie ZYWI z linii "Ludzie (ksiega)" - kazdy zolnierz jest czlowiekiem (E4/7, E4/8): DOM (wsie + miasta) + UCHODZCY (E4/5)
-# + SLUZBA i JENCY z pochodzeniem (E4/7; "" bez pochodzenia - z niczego - poza) + w drodze z pochodzeniem (E4/8 R19) + pula wyrzutkow (E4/3) + WETERANI z pochodzeniem (E4/10)
-# + NIEWOLNI (E4/9) + Mur (E4/9). Mobilizacja (DOM -> SLUZBA) zywych nie zmienia; zmieniaja ich narodziny, polegli, cywile zabici i ubytek bez nazwy (reszta rownania krain).
+# + SLUZBA i JENCY z pochodzeniem (E4/7; "" bez pochodzenia - z niczego - poza) + pula wyrzutkow (E4/3) + WETERANI z pochodzeniem (E4/10) + NIEWOLNI (E4/9) + Mur (E4/9)
+# + tabory wsi. Mobilizacja (DOM -> SLUZBA) zywych nie zmienia; zmieniaja ich narodziny, polegli, cywile zabici i ubytek bez nazwy (reszta rownania krain).
+# Recenzja fixC (1): "konto SLUZBA N" (StateNow) sumuje CALE _mem, razem z wedrowcami i konwojami BK (KRoad), wiec "w drodze teraz z pochodzeniem" (suma v.Road - podzbior
+# SLUZBY) liczylo ich drugi raz - wypada; tabory (Carts w rownaniu regionu) z linii "Ludzie: dzien" tej samej doby. Od poprawek recenzji linia "Ludzie (ksiega)" ma
+# liczbe "ludzie zywi (rownanie krain ...) N" - suma stanow regionow z definicji rownania (NIEWOLNI, Mur i pula tylko z pochodzeniem): gdy jest w obu dobach, T11/S15
+# licza ja; inaczej suma kont nizej (przyblizenie: NIEWOLNI, Mur i pula razem z "").
 E4_ZYWI = (("DOM wsie", r"konto DOM: wsie (\d+) ludzi"), ("DOM miasta", r"konto DOM: wsie \d+ ludzi \([^)]*\), miasta (\d+)"),
            ("UCHODZCY", r"E4/5 konto UCHODZCY: " + F_ + r" ludzi"), ("SLUZBA", r"E4/7: konto SLUZBA (\d+)"), ("JENCY", r"E4/7: konto SLUZBA \d+ [^,]*, JENCY (\d+)"),
-           ("w drodze", r"w drodze teraz z pochodzeniem " + F_), ("pula", r'linia "Pula wyrzutkow \(E4/3\)"\) (\d+)'),
+           ("pula", r'linia "Pula wyrzutkow \(E4/3\)"\) (\d+)'),
            ("WETERANI", r"konto WETERANI \d+ \(z pochodzeniem (\d+)"), ("NIEWOLNI", r"E4/9: NIEWOLNI (\d+)"), ("Mur", r"\bMur (\d+) \(dnia"))
+E4_ZYWI_TABORY = r"\| zolnierze: [^|]*?tabory wsi (\d+) \("          # linia "Ludzie: dzien" (Men taborow - Carts w RegionNow)
+E4_ZYWI_KANON = r"\| ludzie zywi \(rownanie krain[^)]*\) (\d+)"     # linia "Ludzie (ksiega)" od poprawek recenzji (OriginSegment: suma a[1] krain)
 E4_ZYWI_FLOW = (("POLEGLI", r"POLEGLI od siewu (\d+)"), ("cywile", r"cywile od siewu (\d+)"), ("narodziny", r"narodziny netto od siewu (-?\d+)"),
                 ("reszta", r"rownanie krain: najgorsza kraina \S+ reszta \S+ \([^)]*\), swiat " + SF))
-E4_ZYWI_MIN, E4_ZYWI_MAX = -721.0, 1150.0     # Jeff 11.10 (4): w ciaglej wojnie do -0.5%/rok; gora - pas E4/4
+E4_ZYWI_MIN, E4_ZYWI_MAX = -721.0, 1150.0     # Jeff 11.10 (4): w ciaglej wojnie do -0.5%/rok; gora - pas E4/4. Jeff 12.10 (2): prog tylko INFO (pomiar)
 
 
 def e4_zywi(lines, start, win, d0=28):
     """P1-1: netto ludzi zywych i DOM (+ uchodzcy) od pierwszej doby okna >= d0 do ostatniej doby okna z linia "Ludzie (ksiega)" - (stan b - stan a) / doby.
+    Recenzja fixC (2): "mob28" - mobilizacja w ostatnich 28 dobach okna (zmiana SLUZBA + JENCY z pochodzeniem na dobe).
     -> slownik albo None (brak dwoch dob albo log bez konta SLUZBA E4/7 - wtedy ludnosc = ludzie w domu, stara miara)."""
     kb = e4_series(lines, "Ludzie (ksiega): dzien")
+    lud = e4_series(lines, "Ludzie: dzien")
     days = [d for d in win if d in kb and run_day(d, start) >= d0 and fnum(E4_ZYWI[0][1], kb[d]) is not None and fnum(E4_ZYWI[3][1], kb[d]) is not None]
     if len(days) < 2:
         return None
     a, b = days[0], days[-1]
     n = run_day(b, start) - run_day(a, start)
-    va = {k: fnum(p, kb[a]) or 0.0 for k, p in E4_ZYWI + E4_ZYWI_FLOW}
-    vb = {k: fnum(p, kb[b]) or 0.0 for k, p in E4_ZYWI + E4_ZYWI_FLOW}
+
+    def vals(d):
+        v = {k: fnum(p, kb[d]) or 0.0 for k, p in E4_ZYWI + E4_ZYWI_FLOW}
+        v["tabory"] = fnum(E4_ZYWI_TABORY, lud.get(d)) or 0.0
+        return v
+    va, vb = vals(a), vals(b)
 
     def dd(*ks):
         return sum(vb[k] - va[k] for k in ks) / n
-    zyw_a = sum(va[k] for k, _ in E4_ZYWI)
-    zyw_b = sum(vb[k] for k, _ in E4_ZYWI)
-    r = {"a": run_day(a, start), "b": run_day(b, start), "n": n, "zyw_a": zyw_a, "zyw_b": zyw_b, "z": (zyw_b - zyw_a) / n,
-         "dom": dd("DOM wsie", "DOM miasta", "UCHODZCY"), "mob": dd("SLUZBA", "JENCY", "w drodze"), "pol": dd("POLEGLI"), "niew": dd("NIEWOLNI"),
-         "inne": dd("pula", "WETERANI", "Mur"), "cyw": dd("cywile"), "nar": dd("narodziny"), "res": dd("reszta")}
+    ka, kz = fnum(E4_ZYWI_KANON, kb[a]), fnum(E4_ZYWI_KANON, kb[b])
+    if ka is not None and kz is not None:
+        zyw_a, zyw_b, src = ka, kz, "kanon"
+    else:
+        zyw_a = sum(va[k] for k, _ in E4_ZYWI) + va["tabory"]
+        zyw_b = sum(vb[k] for k, _ in E4_ZYWI) + vb["tabory"]
+        src = "suma"
+    r = {"a": run_day(a, start), "b": run_day(b, start), "n": n, "zyw_a": zyw_a, "zyw_b": zyw_b, "z": (zyw_b - zyw_a) / n, "src": src,
+         "dom": dd("DOM wsie", "DOM miasta", "UCHODZCY"), "mob": dd("SLUZBA", "JENCY"), "pol": dd("POLEGLI"), "niew": dd("NIEWOLNI"),
+         "inne": dd("pula", "WETERANI", "Mur", "tabory"), "cyw": dd("cywile"), "nar": dd("narodziny"), "res": dd("reszta")}
     r["other"] = r["dom"] - (r["nar"] - r["mob"] - r["pol"] - r["niew"] - r["inne"] - r["cyw"] + r["res"])
     r["pct"] = 100.0 * r["z"] * 364.0 / zyw_a if zyw_a > 0 else 0.0
+    # mobilizacja w ostatnich 28 dobach okna (od pierwszej doby >= b - 28)
+    l28 = [d for d in days if run_day(d, start) >= r["b"] - 28]
+    a28 = l28[0] if l28 and l28[0] != b else None
+    if a28 is not None:
+        v28 = vals(a28)
+        r["a28"] = run_day(a28, start)
+        r["mob28"] = (vb["SLUZBA"] + vb["JENCY"] - v28["SLUZBA"] - v28["JENCY"]) / (r["b"] - r["a28"])
     return r
+
+
+def e4_zywi_band(z):
+    """Recenzja fixC (2): pas Jeffa jako oznaczenie w wartosci (prog tylko INFO - Jeff 12.10 (2))."""
+    if z["z"] < E4_ZYWI_MIN:
+        return f"PONIZEJ {E4_ZYWI_MIN:+.0f}/d"
+    if z["z"] > E4_ZYWI_MAX:
+        return f"POWYZEJ {E4_ZYWI_MAX:+.0f}/d"
+    return "w pasie"
 
 
 def e4_zywi_text(z):
     return (f"zywi {z['z']:+.0f}/d = {z['pct']:+.2f}%/rok od {z['zyw_a'] / 1e6:.2f} mln (d{z['a']} -> d{z['b']}); DOM + uchodzcy {z['dom']:+.0f}/d"
-            " (zywi = DOM + uchodzcy + SLUZBA i JENCY z pochodzeniem + w drodze + pula + WETERANI + NIEWOLNI + Mur)")
+            + (" (zywi = liczba \"ludzie zywi (rownanie krain)\" z linii Ludzie (ksiega): DOM + uchodzcy + SLUZBA i JENCY + pula + tabory + w drodze + WETERANI + NIEWOLNI"
+               " + Mur, z pochodzeniem)" if z.get("src") == "kanon" else
+               " (zywi = DOM + uchodzcy + SLUZBA (z wedrowcami BK w drodze) i JENCY z pochodzeniem + tabory + pula + WETERANI + NIEWOLNI + Mur;"
+               " log sprzed liczby \"ludzie zywi (rownanie krain)\" - przyblizenie: NIEWOLNI, Mur i pula razem z \"\")"))
+
+
+KOSZT_DOBA = r" - doba " + F_ + r" ms \(zegar\)"
+_KOS = {}
+
+
+def kos_series(lines):
+    """Linie "Koszt 171-174 (doba)" po dniu (pamiec na liste linii - kilka wierszy kosztu czyta te sama serie)."""
+    k = id(lines)
+    if k not in _KOS:
+        _KOS.clear()
+        _KOS[k] = e4_series(lines, "Koszt 171-174 (doba): dzien")
+    return _KOS[k]
+
+
+def doba_ms(lines, days):
+    """Recenzja fixC (3): srednia doba (zegar) z linii "Koszt 171-174 (doba)" w podanych dobach (dzien z linii) -> (ms, liczba dob) albo (None, 0)."""
+    kos = kos_series(lines)
+    v = [fnum(KOSZT_DOBA, kos[d]) for d in days if d in kos]
+    v = [x for x in v if x is not None]
+    return (st.mean(v), len(v)) if v else (None, 0)
+
+
+def cost_cap(lines, days, pct, ms0):
+    """Recenzja fixC (3): prog kosztu linii paczki jako udzial sredniej doby TYCH SAMYCH dob (koszt linii rosnie z wielkoscia swiata razem z doba - stala
+    liczba ms dawala NIE w dlugim biegu bez regresji); bez linii Koszt 171-174 - stala ms0 (zasada kosztu paczki). -> (prog ms, opis progu)."""
+    doba, n = doba_ms(lines, days)
+    if doba:
+        cap = doba * pct / 100.0
+        return cap, f"<= {pct:g}% sredniej doby tych samych dob ({cap:.1f} ms przy dobie {doba:.0f} ms, {n} dob; linia Koszt 171-174)"
+    return ms0, f"<= {ms0:g} ms/dobe (brak linii Koszt 171-174 - stala zasada kosztu paczki)"
+
+
+def base_day_row(rep, name, lines, start, until, bdp):
+    """Recenzja fixC (4), drugi czlon progow kosztu z diagnozy P5-PROGI-E4: doba (zegar, linia Koszt 171-174) tego biegu wobec biegu bazowego (--baza-doby P:
+    log Armoury biegu bazowego) w tych samych dobach kampanii 1-until, w parach; blad sredniej z roznic w parach. Widzi tez ciala latek bez stopera (wiersz
+    zbiorczy sumuje tylko linie z czasem). Bez bazy - INFO."""
+    if not bdp:
+        rep.add(name, "brak biegu bazowego (podaj --baza-doby P - log Armoury biegu bazowego, np. kopia-z31-A)", "<= +3% (te same doby kampanii) - INFO", None)
+        return
+    try:
+        bl = read(bdp)
+    except OSError as e:
+        rep.add(name, f"nie da sie czytac {bdp}: {e}", "<= +3%", None)
+        return
+    bkos = e4_series(bl, "Koszt 171-174 (doba): dzien")
+    bstart = None
+    for x in bl:
+        if x.startswith("Pomiary 169c: okna"):
+            bstart = num(r"start kampanii dzien (\d+)", x)
+            if bstart is not None:
+                break
+    if bstart is None:
+        bstart = min(bkos) if bkos else 0
+    kos = kos_series(lines)
+    now = {run_day(d, start): fnum(KOSZT_DOBA, v) for d, v in kos.items()}
+    bas = {run_day(d, bstart): fnum(KOSZT_DOBA, v) for d, v in bkos.items()}
+    pairs = [(now[c], bas[c]) for c in sorted(now) if 1 <= c <= until and c in bas and now[c] is not None and bas[c] is not None]
+    if len(pairs) < 2:
+        rep.add(name, f"za malo wspolnych dob kampanii z linia Koszt 171-174 ({len(pairs)}; baza {os.path.basename(bdp)}, start {bstart})", "<= +3%", None)
+        return
+    mn = st.mean(p[0] for p in pairs)
+    mb = st.mean(p[1] for p in pairs)
+    df = [p[0] - p[1] for p in pairs]
+    se = st.stdev(df) / len(df) ** 0.5
+    pct = 100.0 * (mn / mb - 1.0) if mb > 0 else 0.0
+    rep.add(name, f"{mn:.0f} ms wobec {mb:.0f} ms = {pct:+.1f}% (roznica w parach {st.mean(df):+.0f} ms +- {se:.0f} ms bledu sredniej = {100.0 * se / mb:.1f}% doby bazy;"
+                  f" {len(pairs)} dob kampanii 1-{until}; baza {os.path.basename(bdp)}, start {bstart})",
+            "<= +3% wobec biegu bazowego (te same doby nowej kampanii; blad sredniej w nawiasie)", pct <= 3.0)
 
 
 def etap45_cost(rep, lines, start, win):
@@ -754,7 +863,7 @@ def etap45_cost(rep, lines, start, win):
             "<= 1% sredniej doby (zegar, linia Koszt 171-174); progi linii paczek <= 30 ms (zasada kosztu paczki)", pct <= 1.0)
 
 
-def etap4_main(logp, start_arg, until=120, csp=None):
+def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
     """E4/0 (188): progi T1-T10 z projektu etapu 4 (rozdz. 3 "E4/0" Test) mierzalne w biegu 120 dob (okno: doby kampanii 1-until, domyslnie 120).
     T9 (bieg zimowy B) i baza konca etapu (wojsko lordow d300-364, zalogi d364) wymagaja innego biegu / 364 dob - INFO.
     Doba kampanii linii E4/0 = dzien z linii - start + 1 (linie z dniem gry - Wyrzutki, H3, I1, Budzet - normalizowane o -1)."""
@@ -1056,7 +1165,7 @@ def etap4_main(logp, start_arg, until=120, csp=None):
             "<= 30 ms/dobe (zasada kosztu paczki)", (st.mean(tall) <= 30) if tall else None)
     if tparts:
         rep.add("T8: skladniki calosci (srednio, ms/d)", ", ".join(f"{k} {st.mean(v):.1f}" for k, v in tparts.items()), "INFO", None)
-    rep.add("T8: sekundy doby wobec ostatniego biegu 120 dob", "wymaga biegu bazowego tego drzewa", "<= +3% - INFO", None)
+    base_day_row(rep, "T8: sekundy doby wobec biegu bazowego (te same doby kampanii)", lines, start, until, bdp)     # recenzja fixC (4): --baza-doby P
 
     # ---------------- T9: zima (bieg B) - bez progu, dane do E4/1 i E4/6
     wint = [s for s in lines if s.startswith("Klimat: dzien") and "nowa pora Winter" in s]
@@ -1410,17 +1519,24 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
         if v is not None:
             net.append(v)
     # poprawka po tescie koncowym etapu 4 (P1-1): "razem z nimi" to tylko DOM + UCHODZCY - w nowej kampanii armie rosna z ludzi (E4/7, E4/8: kazdy zolnierz jest
-    # czlowiekiem), wiec mobilizacja wygladala jak ubytek. Prog Jeffa liczy ludzi ZYWYCH (konta ksiegi); DOM - INFO z rozbiciem; mobilizacja pilnowana osobno (T11b: a <= f).
+    # czlowiekiem), wiec mobilizacja wygladala jak ubytek. Prog Jeffa liczy ludzi ZYWYCH (konta ksiegi); DOM - INFO z rozbiciem.
+    # Recenzja fixC (2): Jeff 12.10 (STAN-PRAC, decyzje po tescie E4): (1) "ludnosc" = wszyscy zywi - DOM zostaje INFO (bez DECYZJA); (2) bez hamulca strat (P1-5
+    # odrzucone) - prog -0.5%/rok TYLKO INFO (pomiar), wiec T11 i S15 - INFO z oznaczeniem pasa w wartosci (nie TAK). T11b (a swiata <= f) - INFO: hamulec regionu
+    # wlacza sie przy a >= f (FreeHands), a "a srednio" to srednia swiata wazona ludnoscia - z konstrukcji nie przekroczy f; mobilizacja widoczna w T11c.
     # Log bez konta SLUZBA (przed E4/7) - stara miara (zolnierz nie byl czlowiekiem).
     zy = e4_zywi(lines, start, win)
     if zy:
-        rep.add(f"E4/7 T11: ludzie zywi netto d28-{until} (ludzi/d)", e4_zywi_text(zy),
-                "od -721/d (-0.5%/rok, Jeff 11.10: w ciaglej wojnie) do +1150/d (gora pasa E4/4)", E4_ZYWI_MIN <= zy["z"] <= E4_ZYWI_MAX)
+        rep.add(f"E4/7 T11: ludzie zywi netto d28-{until} (ludzi/d)", e4_zywi_band(zy) + "; " + e4_zywi_text(zy),
+                "INFO (Jeff 12.10 (2): prog tylko pomiar, bez hamulca strat); pas: od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4)", None)
         rep.add(f"E4/7 T11: DOM + uchodzcy netto d28-{until} - rozbicie (ludzi/d)",
-                f"{zy['dom']:+.0f} = narodziny {zy['nar']:+.0f} - mobilizacja (SLUZBA, JENCY, w drodze) {zy['mob']:.0f} - polegli {zy['pol']:.0f} - niewola {zy['niew']:.0f}"
-                f" - pula/weterani/Mur {zy['inne']:.0f} - cywile {zy['cyw']:.0f} + reszta rownania krain (bez nazwy) {zy['res']:+.0f} + inne (przyciecie kluczy, zaokraglenia) {zy['other']:+.0f}"
+                f"{zy['dom']:+.0f} = narodziny {zy['nar']:+.0f} - mobilizacja (SLUZBA z wedrowcami BK, JENCY) {zy['mob']:.0f} - polegli {zy['pol']:.0f} - niewola {zy['niew']:.0f}"
+                f" - pula/weterani/Mur/tabory {zy['inne']:.0f} - cywile {zy['cyw']:.0f} + reszta rownania krain (bez nazwy) {zy['res']:+.0f} + inne (przyciecie kluczy, zaokraglenia, \"\" w NIEWOLNYCH, Murze i puli) {zy['other']:+.0f}"
                 + (f"; srednia dobowa \"razem z nimi\" (linia Ludzie:) {st.mean(net):+.0f}/d" if net else ""),
-                "INFO (Jeff: decyzja, czy \"ludnosc\" z 11.10 to ludzie zywi - rada: tak); mobilizacja - wiersz T11b", None)
+                "INFO (Jeff 12.10 (1): \"ludnosc\" = wszyscy zywi - wiersz wyzej; DOM to tylko jego czesc)", None)
+        if "mob28" in zy:
+            rep.add(f"E4/7 T11c: mobilizacja w ostatnich 28 dobach okna (ludzi/d)",
+                    f"{zy['mob28']:+.0f}/d (zmiana SLUZBA + JENCY z pochodzeniem, d{zy['a28']} -> d{zy['b']}); w calym oknie d{zy['a']}-{zy['b']} {zy['mob']:+.0f}/d",
+                    "INFO (czy armie dalej rosna z ludzi; zastepuje T11b jako straznik mobilizacji)", None)
     else:
         rep.add(f"E4/7 T11: ludnosc netto d28-{until} (ludzi/d)", f"{st.mean(net):+.0f}/d (log bez konta SLUZBA E4/7 - ludzie w domu)" if net else "brak dob 28+",
                 "od -720/d (-0.5%/rok, Jeff 11.10) do +1150/d", (-721 <= st.mean(net) <= 1154) if net else None)
@@ -1434,15 +1550,18 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     if af:
         wa = max(af, key=lambda t: t[1] - t[2])
         rep.add("E4/7 T11b: mobilizacja - a swiata (Wolne rece) wobec progu f (najblizej progu w oknie)",
-                f"a {wa[1]:.2f}% wobec f {wa[2]:.0f}% (d{wa[0]}); ostatnia doba d{af[-1][0]}: {af[-1][1]:.2f}% ({len(af)} dob)",
-                "a <= f kazdej doby (miara zywych nie moze chowac odplywu z domu do wojska bez konca)", all(x[1] <= x[2] for x in af))
+                f"a {wa[1]:.2f}% wobec f {wa[2]:.0f}% (d{wa[0]}); ostatnia doba d{af[-1][0]}: {af[-1][1]:.2f}% ({len(af)} dob)"
+                + ("" if all(x[1] <= x[2] for x in af) else "; a > f w czesci dob"),
+                "INFO - kontrola ustawien hamulca wolnych rak (srednia swiata <= f z konstrukcji hamulca regionu; mobilizacja - T11c)", None)
     else:
         rep.add("E4/7 T11b: mobilizacja - a swiata wobec f", "brak \"a srednio\" w linii Wolne rece", "a <= f", None)
     # T12 - koszt (poprawka po tescie koncowym etapu 4, P5-PROGI-E4: 15 ms z prognozy planu -> zasada kosztu paczki 30 ms jak T8/F10; wiersz zbiorczy etapow 4+5)
     ms = [fnum(r"\| czas " + F_ + r" ms \(uzgodnienie", poc[d]) for d in pdays]
     ms = [x for x in ms if x is not None]
+    # recenzja fixC (3): prog jako udzial doby tych samych dob (0.2% = ok. 35 ms przy dobie 17.5 s; bez linii Koszt - 30 ms)
+    cap, crule = cost_cap(lines, pdays, 0.2, 30.0)
     rep.add("E4/7 T12: koszt linii E4/7 i uzgodnienia (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-",
-            "<= 30 ms/dobe srednio (zasada kosztu paczki); najwiecej - INFO", (st.mean(ms) <= 30.0) if ms else None)
+            crule + " srednio; najwiecej - INFO", (st.mean(ms) <= cap) if ms else None)
     # T13 - zapis i wczytanie
     ld = [x for x in lines if x.startswith("Pochodzenie (E4/7): wczytanie")]
     sv = [x for x in lines if x.startswith("Pochodzenie (E4/7): zapis arm_people")]
@@ -1719,8 +1838,9 @@ def etap4_e48(rep, lines, start, win, hea, until):
     ms = [fnum(r"\| czas " + F_ + r" ms\.", arm[d]) for d in adays]
     ms = [x for x in ms if x is not None]
     # poprawka po tescie koncowym etapu 4 (P5-PROGI-E4): 5 ms z prognozy planu -> zasada kosztu paczki 30 ms (jak T8/F10); wiersz zbiorczy etapow 4+5
+    cap, crule = cost_cap(lines, adays, 0.2, 30.0)     # recenzja fixC (3): udzial doby tych samych dob
     rep.add("E4/8 N15: koszt latek i linii E4/8 (srednio, najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms" if ms else "-",
-            "<= 30 ms/dobe srednio (zasada kosztu paczki); najwiecej - INFO", (st.mean(ms) <= 30.0) if ms else None)
+            crule + " srednio; najwiecej - INFO", (st.mean(ms) <= cap) if ms else None)
     # N16 - zapis: odniesienia tr: po wczytaniu = miasta ze stanem
     if mdays:
         lm = mia[mdays[-1]]
@@ -2227,8 +2347,8 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
         ms = st.mean(starv) if starv else 0
         rep.add(f"E4/5 S15: ludzie zywi netto d28-{until} (ludzi/d)",
-                e4_zywi_text(zy) + f"; srednio dobowo \"razem z nimi\" {st.mean(net):+.0f}/d (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d)",
-                "od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4) - jak E4/7 T11", E4_ZYWI_MIN <= zy["z"] <= E4_ZYWI_MAX)
+                e4_zywi_band(zy) + "; " + e4_zywi_text(zy) + f"; srednio dobowo \"razem z nimi\" {st.mean(net):+.0f}/d (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d)",
+                "INFO (Jeff 12.10 (2): prog tylko pomiar) - jak E4/7 T11; pas: od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4)", None)
     elif net:
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
         ms = st.mean(starv) if starv else 0
@@ -2532,8 +2652,9 @@ def etap4_e411(rep, lines, start, win, until, logp):
     pl = [fnum(r"czas: plik " + F_ + r" ms", x) for x in rs]
     pl = [x for x in pl if x is not None]
     # poprawka po tescie koncowym etapu 4 (P5-PROGI-E4): linia 3 ms z prognozy planu -> zasada kosztu paczki 30 ms (jak T8/F10); wczytanie pliku bez zmian
+    cap, crule = cost_cap(lines, on, 0.2, 30.0)     # recenzja fixC (3): udzial doby tych samych dob
     rep.add("E4/11 G10: czas linii i wczytania pliku", f"linia {st.mean(tm):.2f} ms/d (max {max(tm):.1f}); plik ukladu po stronie kampanii {max(pl, default=0):.1f} ms" if tm else "-",
-            "linia <= 30 ms/d srednio (zasada kosztu paczki); wczytanie pliku <= 50 ms", (st.mean(tm) <= 30.0 and max(pl, default=0) <= 50.0) if tm else None)
+            "linia " + crule + " srednio; wczytanie pliku <= 50 ms", (st.mean(tm) <= cap and max(pl, default=0) <= 50.0) if tm else None)
     # G11 zapis (wczytanie z kluczem)
     ld = [x for x in rs if "z zapisu: n " in x]
     if ld:
@@ -3021,7 +3142,8 @@ def etap5_e50(rep, lines, start, win, **kw):
         mx = max(cost)
         # poprawka po tescie koncowym etapu 4 (P5-E50-T2): 15 ms z prognozy planu (PLAN-KODU-E50 :466-469) -> 50 ms (ok. 0.3% doby); paczka pomiarowa do B1;
         # wiersz zbiorczy czasu linii etapow 4+5 (<= 1% doby) w --grupa etap4
-        rep.add("E50-T2: koszt (latki + doba) srednio", f"{m:.1f} ms/dobe ({len(cost)} dob)", "<= 50 ms srednio (ok. 0.3% doby; zbiorczo etapy 4+5 <= 1% doby - --grupa etap4)", m <= 50)
+        cap, crule = cost_cap(lines, full, 0.3, 50.0)     # recenzja fixC (3): udzial doby tych samych dob (0.3% = ok. 52 ms przy dobie 17.5 s)
+        rep.add("E50-T2: koszt (latki + doba) srednio", f"{m:.1f} ms/dobe ({len(cost)} dob)", crule + " srednio (zbiorczo etapy 4+5 <= 1% doby - --grupa etap4)", m <= cap)
         rep.add("E50-T2: koszt najwiekszy", f"{mx[0]:.1f} ms (d{mx[1]})", "INFO", None)
     # ---- T3 kontrola na sucho
     bad3 = []
@@ -3189,6 +3311,7 @@ def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
     csp = None      # poprawki po tescie koncowym etapu 4 (P11-progi-T1): log sesji CrashScribe do T1 / E50-T1
+    bdp = None      # recenzja fixC (4): log Armoury biegu bazowego do wiersza "doba wobec biegu bazowego" (T8)
     until_arg = 120
     final = False
     i = 0
@@ -3210,11 +3333,13 @@ def main(argv):
             until_arg = int(args[i + 1]); i += 2; continue
         if a == "--crashscribe":
             csp = args[i + 1]; i += 2; continue
+        if a == "--baza-doby":
+            bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
     if group == "etap3" and logp:
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:
-        return etap4_main(logp, start_arg, until_arg, csp)   # E4/0 (188)
+        return etap4_main(logp, start_arg, until_arg, csp, bdp)   # E4/0 (188)
     if group == "etap5" and logp:
         return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
