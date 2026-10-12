@@ -1028,3 +1028,34 @@ jeden test; rob do limitu, zapisuj po kazdym kroku (push + STAN-PRAC); ekonomia 
 - (18:45 UTC 12.10) DO ZROBIENIA przed testem: scalic `w-toku/a8-gentry0` (bc5e3ef - nowy rod szlachty BK startuje z 0, decyzja Jeffa) do `w-toku/zbior-5-8` (git merge --no-ff; konflikty CHANGELOG/Settings.cs - suma, McmSettings - gen_mcm; build).
 - (19:05 UTC 12.10, tydzien 98%) **STAN NA KONIEC KONTA ae222cb7:** `w-toku/zbior-5-8`: scalenie, A7, A8, BITWY (rozpoznanie - nie z niczego), C1 (bez nowego klucza), C2, C4 (0168887; recenzja C4 mogla nie skonczyc - sprawdz log) ZROBIONE; zostaje E7/R1, R2, W4 + dwa przeglady + DLL; potem scalic `w-toku/a8-gentry0`. **Etap 8: projekt v2 GOTOWY** (281723d, 29 paczek; kolejnosc i watki w rozdz. 3 i podsumowaniu krytyki) - kod czeka na odpowiedzi Jeffa 1-5 (STAN-PRAC 19:00 UTC; paczki bez tych pytan mozna kodowac od razu: E8/0 pierwsza).
 - (19:25 UTC 12.10) **Etap 8 kod RUSZYL** (wf_51fec049-41f, skrypt `docs/przekazanie/wf-e8-kod.js`): watek A `w-toku/e8-a` (SCRATCH\e8, Armoury po kolei: E8/0, P1-P3, S, X, W, A, Z, L, C, R, K, D1, D2, B, H = jezdziec kon + uprzaz (nowa, odpowiedz Jeffa 7), G1, G2, Q, T, E, O1-O3, O5, O6) i watek B `w-toku/e8-b` (SCRATCH\e8: E8/M, E8/RC), oba od zbior-5-8 (stan z C4). Drugie konto: `git log` obu galezi - zrobione paczki; `git status` w drzewach (przerwany agent); nowy workflow ze skryptu bez zrobionych paczek. Na koniec scalenie: zbior-5-8 (z R1/R2/W4) + a8-gentry0 + e8-a + e8-b, pelny audyt, test zbiorczy.
+
+## 27. KONIEC KONTA ae222cb7 (12.10 ok. 19:40 UTC; tydzien 98%) - START TUTAJ DLA DRUGIEGO KONTA
+
+Jeff: "zapisuj wszystko do przekazania, konczymy tutaj i przechodzimy na inne konto". Workflow zbior-5-8 i etap 8 ZATRZYMANE przeze mnie (TaskStop) po skonczonych paczkach -
+drzewa czyste (git status bez zmian poza build.log). Na koniec dokonczone tylko recenzje E8/M i E8/0 (wf_7d02158c-a00 - wynik nizej, jesli zdazyl).
+
+**W grze:** WGRANIE 33 (Armoury abe15b3b, RC 9cdc53ee, CS 842f64a4, GT bbb841d7) - przetestowane, Jeff moze grac.
+
+**Galezie (wszystkie na GitHub; repo kodu = lancuch, drzewa w SCRATCH sesji ae222cb7 - sciezki w 26b):**
+| Galaz | HEAD | Co | Stan |
+|---|---|---|---|
+| `w-toku/zbior-5-8` (zb\58) | f01f47a | e6-p3 + e7-a + e7-b scalone; E5/A7, A8, BITWY (rozpoznanie), C1, C2, C4; E7/R1 (+recenzja) | ZOSTAJE: E7/R2, W4, dwa przeglady calosci (ekonomia, kod), DLL |
+| `w-toku/a8-gentry0` (zb\a8g) | bc5e3ef | nowy rod szlachty BK startuje z 0 (decyzja Jeffa) | scalic do zbior-5-8 |
+| `w-toku/e8-a` (e8\a) | 8a8df38 (+ ew. recenzja) | E8/0 profil doby | ZOSTAJE: P1, P2, P3, S, X, W, A, Z, L, C, R, K, D1, D2, B, H (jezdziec = kon + uprzaz), G1, G2, Q, T, E, O1, O2, O3, O5, O6 |
+| `w-toku/e8-b` (e8\b) | bf66298 (+ ew. recenzja) | scalenie cs-bledy + E8/M (cudze mody drobne) | ZOSTAJE: E8/RC |
+| `w-toku/e6-p3`, `e7-a`, `e7-b`, `e5-wsie` | 6bdf1e3, be9cd4c, 8e28af6, 396c033 | juz w zbior-5-8 | - |
+
+**Kolejnosc dla drugiego konta:**
+1. `git pull`; przeczytaj STAN-PRAC od "WGRANIE 33" do konca, ten rozdzial i 26b (sciezki, sprzatanie).
+2. Dokonczyc zbior-5-8: E7/R2, W4 (opisy w `docs/przekazanie/wf-zbior-5-8.js`, tablica E7), potem dwa przeglady i DLL (koniec tego skryptu).
+3. Etap 8: reszta paczek watku A i B ze skryptu `docs/przekazanie/wf-e8-kod.js` (bez zrobionych: E8/0, E8/M); odpowiedzi Jeffa w projekcie etapu 8 rozdz. 6 (WIAZACE).
+4. Scalenie: zbior-5-8 + a8-gentry0 + e8-a + e8-b (konflikty: CHANGELOG, Settings.cs, McmSettings - gen_mcm, sprawdz_logi.py, ArmouryBehavior; mechaniczna weryfikacja "nic nie zginelo" jak w wf-zbior-5-8.js), build.
+5. Pelny audyt (kilka niezaleznych przegladow - zasada 0), autotest: dopisac kopiowanie/przywracanie plikow danych e7-b (ModuleData\arm_map_village_lore.tsv, arm_map_roads_probe.tsv,
+   GUI\Prefabs\ArmMapVillageTooltip.xml, Prefabs\arm_map_roads.xml); test zbiorczy: 120 dob nowej kampanii + zapis 9 dob + zima + bieg dlugi + osobny krotki bieg zdjec proby drog
+   (MapRoadsProbeEnabled); progi `tools/sprawdz_logi.py --grupa etap5/etap7/etap8` + etapy 2-4.
+6. Poprawki, wgranie (stala zgoda: kopie .bak + D:\Backup-Bannerlord\wgrane, md5, gra zamknieta); przy wgraniu: CampBattlePropsEnabled true w Armoury.json Jeffa, ustawienia Diplomacy
+   na rok 364 (decyzja Jeffa - kopia .bak; gdy narzedzie nie pozwoli - polecenie dla Jeffa). Po tescie: stawki myta na Bliznakach z licznika (Jeff "chce, ale policz") i zdjecia drog
+   do decyzji "ile drog".
+
+**Decyzje Jeffa z 12.10 (wszystkie w STAN-PRAC):** caly kod 5-8, potem jeden test; ekonomia bez doplat; pan 45% / dziesiecina / 15%/d; ceny - poziom zostaje, odchylki w 8.5, dochody
+gracza 8.18; etap 7 - predkosc bez zmian, premia drog nie, Diplomacy 364 tak, myto - policzyc; etap 6 - hodowla tak, naprawy - ulamki w pamieci; rod szlachty BK - 0; etap 8 - odpowiedzi 1-11.
