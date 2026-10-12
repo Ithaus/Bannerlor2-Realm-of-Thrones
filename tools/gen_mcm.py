@@ -141,6 +141,10 @@ RANGES = {
     'AiSpareHorseShare': (0.0, 1.0, "0.00"),
     # E6/K5 (213): udzwig luzaka pod jukami w kg (20 = jak w grze - dopisek 0; PackMarket.CapPostfix)
     'SpareHorseCarryKg': (20, 100, "0"),
+    # E6/W3 (221): regulator wsi - sufit kroku x1.3 (kod przycina do 1..2), progi stosu w dniach zuzycia (kod: niski >= 1, wysoki > niski)
+    'VillageOutputStep': (1.0, 2.0, "0.00"),
+    'ValveStockDaysLow': (7, 120, "0"),
+    'ValveStockDaysHigh': (14, 240, "0"),
 }
 
 def gen(module_dir, ns, display):

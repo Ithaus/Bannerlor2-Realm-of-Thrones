@@ -61,8 +61,8 @@ namespace Armoury
                     if (bk && !item.IsFood && !item.IsAnimal && item.IsTradeGood && !item.HasArmorComponent && !item.HasWeaponComponent && amount > 500)
                     {
                         int bkCut = (int)(amount * 0.02f);
-                        int cut = (int)(amount * Rate(item));
-                        if (cut > 0) roster.AddToCounts(el.EquipmentElement, -cut);
+                        int cut = HarvestValve.Active ? 0 : (int)(amount * Rate(item));   // E6/W3 (221): od pierwszej decyzji regulatora wsi nic w nicosc (wies robi mniej towaru bez zbytu)
+                        if (cut > 0) { roster.AddToCounts(el.EquipmentElement, -cut); HarvestValve.NoteDecay(item, cut); }   // W3: skasowane to nie zuzycie (okno regulatora)
                         _cut += cut; _spared += Math.Max(0, bkCut - cut);
                     }
                 }
@@ -76,7 +76,8 @@ namespace Armoury
         {
             if (!On && _cut == 0 && _spared == 0) return;
             Log.Info("BK gnicie surowcow (174.3): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - skasowano " + _cut + " szt. (drewno, len, welna 0.2% i inne towary 2% ze stosow > 500), oszczedzone wobec BK ok. "
-                     + _spared + " szt. (ruda, metale, narzedzia, skora, plotno 0%); potkniecia " + _stumbles + ".");
+                     + _spared + " szt. (ruda, metale, narzedzia, skora, plotno 0%); potkniecia " + _stumbles + "."
+                     + (HarvestValve.Active ? " Regulator wsi (221) CZYNNY - stawka 0 dla wszystkich towarow (wyroby gracza i sztandary jak BK)." : ""));
             _cut = _spared = 0; _stumbles = 0;
         }
 

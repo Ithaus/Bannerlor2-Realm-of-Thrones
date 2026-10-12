@@ -4756,6 +4756,22 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopRecipesByValue { get; set; } = true;
 
+        [SettingPropertyBool("Harvest Valve", HintText = "every four weeks a village makes less of a good the world does not use up and more of a good it does - instead of the stock rotting away on the stalls; the stock stays between one and two months of use (food and livestock are not touched; off = villages make what the game says and unsold stock rots as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HarvestValve { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Village Output Step", 1.00f, 2.00f, "0.00", HintText = "the most a village can make of a good the world is short of, as a multiple of its normal output (1 = never more than normal; a cut-back good first returns to normal)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float VillageOutputStep { get; set; } = 1.3f;
+
+        [SettingPropertyInteger("Valve Stock Days Low", 7, 120, "0", HintText = "a village makes more of a good once the stock across the world falls below this many days of use")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int ValveStockDaysLow { get; set; } = 30;
+
+        [SettingPropertyInteger("Valve Stock Days High", 14, 240, "0", HintText = "a village makes less of a good once the stock across the world grows beyond this many days of use")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int ValveStockDaysHigh { get; set; } = 60;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5944,6 +5960,10 @@ namespace Armoury
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;
             s.WorkshopRecipesByValue = WorkshopRecipesByValue;
+            s.HarvestValve = HarvestValve;
+            s.VillageOutputStep = VillageOutputStep;
+            s.ValveStockDaysLow = ValveStockDaysLow;
+            s.ValveStockDaysHigh = ValveStockDaysHigh;
         }
 
         internal static void Apply()

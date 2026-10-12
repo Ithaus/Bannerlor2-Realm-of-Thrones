@@ -1475,6 +1475,13 @@ namespace Armoury
         // z welny, lnu albo skor: sztuk wsadu = 60% wartosci wyrobow / wartosc wsadu (proporcja TownCrafts 148), nie mniej masy niz wyrob, nie wiecej niz
         // wydajnosc procesu, nigdy mniej niz w grze; krok x1.3 wsi robi W3
         public bool WorkshopRecipesByValue = true;         // the weavers' and tanners' workshops take as much wool, flax or raw hides as the worth of their goods calls for - 60% of the worth of the cloth or leather, never less than the goods weigh and never more than the craft can yield: about 3 sacks of wool for 2 bolts of woollen cloth, 6 of flax for 2 of linen, 5 hides for 2 leathers (the same rule as the town's own weavers and tanners), never less than the game's recipe; needs Historical Prices, takes effect at the next load (off = the game's recipes, one sack or hide for two pieces)
+        // E6/W3 (221, PLAN 6.4 + krok 6.3, R5/R6): jeden regulator wsi (HarvestValve) - okno 56 dob, decyzja co 28 dob od 56. doby pomiaru; w dol (zuzycie
+        // < 90% produkcji i stos > ValveStockDaysHigh dni zuzycia) do 0.95 x zuzycia (najwyzej x0.5 na decyzje, podloga 0.1), w gore x1.3 (zuzycie >= 98% i stos
+        // < ValveStockDaysLow dni) najpierw do 1, potem do VillageOutputStep; od pierwszej decyzji RawNoRot nie kasuje towarow; stan w zapisie arm_harvestvalve
+        public bool HarvestValve = true;                   // every four weeks a village makes less of a good the world does not use up and more of a good it does - instead of the stock rotting away on the stalls; the stock stays between one and two months of use (food and livestock are not touched; off = villages make what the game says and unsold stock rots as before)
+        public float VillageOutputStep = 1.3f;             // the most a village can make of a good the world is short of, as a multiple of its normal output (1 = never more than normal; a cut-back good first returns to normal)
+        public int ValveStockDaysLow = 30;                 // a village makes more of a good once the stock across the world falls below this many days of use
+        public int ValveStockDaysHigh = 60;                // a village makes less of a good once the stock across the world grows beyond this many days of use
 
         public static void Load(string moduleDataDir)
         {

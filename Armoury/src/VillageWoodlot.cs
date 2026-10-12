@@ -188,7 +188,7 @@ namespace Armoury
         {
             float kg = wood != null && wood.Weight > 0.05f ? wood.Weight : LoadKg;
             float d = Rate * LoadKg / kg;
-            return v != null ? d * ClimateFactor(v) : d;
+            return v != null ? d * ClimateFactor(v) * HarvestValve.Factor(wood) : d;   // E6/W3 (221): x mnoznik regulatora wsi dla drewna (tick lasu i magazyn wsi)
         }
 
         /// <summary>Postfiks VillageGoodProductionCampaignBehavior.TickGoodProduction(Village, bool): gra wola go raz na dobe dla wsi
@@ -220,7 +220,9 @@ namespace Armoury
                 }
                 // E6/R1 (214): las wsi okregu kopalni najpierw do dymarek kopalni tego okregu (TradeBound) - zdjete z wozu na targ, zanim pojedzie;
                 // do magazynu wsi (i ksiegi "las wsi") idzie reszta
-                n -= Bloomery.FromWoodlot(v, n);
+                int toBloom = Bloomery.FromWoodlot(v, n);
+                if (toBloom > 0) HarvestValve.MadeOffRoster(wood, toBloom);   // E6/W3 (221): drewno prosto do dymarki - produkcja wsi (i od razu zuzycie) w oknie regulatora
+                n -= toBloom;
                 if (n <= 0) return;
                 v.Settlement.ItemRoster.AddToCounts(wood, n);
                 OreLedger.NoteWoodlot(wood, v.Settlement, n);

@@ -211,6 +211,14 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((war - 1f) * sum, FreeHands.HandsText);
                 }
+                // E6/W3 (221): regulator wsi - mnoznik towaru (bez zywnosci i zwierzat) wedlug zuzycia swiata, decyzja co 28 dob (HarvestValve); ten sam wzor
+                // (czynnik x suma po E4), przemienny z R1/K4, PRZED W2 (ostatni krok) i sufitem dymarki R1; 1 = nic nie dopisujemy
+                float valve = HarvestValve.Factor(item);
+                if (valve != 1f)
+                {
+                    float sum = 1f + __result.SumOfFactors;
+                    if (sum > 0f) __result.AddFactor((valve - 1f) * sum, HarvestValve.Text);
+                }
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);

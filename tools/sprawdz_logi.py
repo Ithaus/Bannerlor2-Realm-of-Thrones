@@ -96,6 +96,9 @@ Uzycie (Python 3, tylko odczyt):
                     WLACZONE, zadna linia z mniejszym wsadem niz gra, linie z welny, lnu i skor zmienione, potkniecia 0; len i welna - co najmniej jeden z miesiecy
                     2-4 bez wzrostu zapasu (gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92), kolejka odziezy wojska
                     (czeka: skora + sukno + plotno) d90 -> until bez wzrostu (<= +2%, gdy okno siega d92).
+                    Blok E6/W3 (221, etap 6 - progi tutaj) W3-1..W3-8 - linie "Regulator wsi (221)", "BK gnicie surowcow (174.3)" i ksiegi "Towary:": regulator CZYNNY,
+                    pierwsza decyzja do d60 (gdy okno siega d60), kasowanie 0 w kazdej dobie po pierwszej decyzji, zaden towar nie zmienia kierunku w dwoch kolejnych
+                    decyzjach, potkniecia 0, sol i glina - zapas d90 -> until bez wzrostu (<= +2%, gdy okno siega d92); mnozniki i kierunki decyzji - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3328,6 +3331,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_w1(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_w1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/W3 (221): jeden regulator wsi - mniej towaru bez zbytu, x1.3 towaru chcianego, kasowanie 0 od pierwszej decyzji (brak linii - INFO)
+    try:
+        etap5_w3(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_w3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3834,6 +3842,83 @@ def etap5_w1(rep, lines, start, until):
         else:
             rep.add("W1-7: kolejka odziezy wojska (czeka)", f"d{f0}: {wait(clo[f0])}; d{f1}: {wait(clo[f1])}", "bez wzrostu d90 -> until (gdy okno siega d92)", None)
     rep.add("W1-8: receptury - wszystkie linie z zakresu (ostatnia sesja)", "; ".join(f"{p[0]}: {p[3]} -> {p[4]}" for p in pairs) or "brak", "INFO", None)
+
+
+def etap5_w3(rep, lines, start, until):
+    """E6/W3 (221, projekt etapu 6 v2 rozdz. 3 "E6/W3" Test): linie "Regulator wsi (221): dzien N - ..." (start pomiaru, koniec kubelka, decyzja co 28 dob,
+    stan z zapisu), "BK gnicie surowcow (174.3): dzien N - skasowano X szt." i ksiegi "Towary: dzien N - <towar> (W d): zapas S" (dzien = doba gry - 1, okno
+    doby kampanii 1-until jak etap5_main). Wiazace: regulator CZYNNY w oknie, pierwsza decyzja do d60 (nowa kampania; gdy okno siega d60), kasowanie 0
+    w kazdej dobie po dobie pierwszej decyzji, zaden towar nie zmienia kierunku w dwoch kolejnych decyzjach (gdy >= 2 decyzje), potkniecia 0; sol i glina -
+    zapas d90 -> until bez wzrostu (<= +2%, gdy okno siega d92); mnozniki ostatniej decyzji i liczba decyzji w dol / w gore - INFO."""
+    reg = {}
+    for d, s in by_day(lines, "Regulator wsi (221): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            reg[rd] = s
+    if not reg:
+        rep.add("W3-1: linie Regulator wsi (221)", "brak linii w oknie", "jest od wgrania E6/W3", None)
+        return
+    off = [rd for rd, s in reg.items() if "WYLACZONY" in s or "NIEAKTYWNY" in s]
+    rep.add("W3-1: regulator wsi CZYNNY w oknie", f"linii {len(reg)}, wylaczony/nieaktywny w {len(off)}" + (f" (np. d{min(off)})" if off else ""),
+            "CZYNNY (klucz HarvestValve)", len(off) == 0)
+    dec = {rd: s for rd, s in reg.items() if " - CZYNNY, decyzja " in s}
+    fresh = any("start pomiaru" in s for s in reg.values())
+    first = min(dec) if dec else None
+    if first is not None:
+        k = num(r"decyzja (\d+) \(", dec[first], int, 0) or 0
+        rep.add("W3-2: pierwsza decyzja regulatora", f"d{first} (decyzja {k})", "do d60 (nowa kampania: 56 dob po starcie pomiaru)",
+                (first <= 60) if fresh and k == 1 else None)
+    else:
+        rep.add("W3-2: pierwsza decyzja regulatora", "brak decyzji w oknie", "do d60 (gdy okno siega d60)",
+                (False if fresh and max(reg) >= 60 else None))
+    rot = {}
+    for d, s in by_day(lines, "BK gnicie surowcow (174.3): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rot[rd] = num(r"skasowano (\d+) szt", s, int, 0) or 0
+    if first is not None:
+        after = {rd: x for rd, x in rot.items() if rd > first}
+        bad = sorted(rd for rd, x in after.items() if x > 0)
+        pre = [x for rd, x in rot.items() if rd <= first]
+        rep.add("W3-3: kasowanie towaru po pierwszej decyzji (BK gnicie 174.3)",
+                f"dob {len(after)}, z kasowaniem > 0: {len(bad)}" + (f" (np. d{bad[0]}: {after[bad[0]]})" if bad else "")
+                + f"; przed decyzja srednio {sum(pre) / max(1, len(pre)):.0f}/d",
+                "0 w kazdej dobie (projekt: 135/d -> 0)", (len(bad) == 0) if after else None)
+    else:
+        rep.add("W3-3: kasowanie towaru po pierwszej decyzji", "brak decyzji w oknie", "0 od pierwszej decyzji", None)
+    flips = sum(num(r"zmiany kierunku w kolejnych decyzjach (\d+)", s, int, 0) or 0 for s in dec.values())
+    rep.add("W3-4: zmiany kierunku towaru w dwoch kolejnych decyzjach (suma okna)", f"{flips} w {len(dec)} decyzjach", "0 (brak kolysania)",
+            (flips == 0) if len(dec) >= 2 else None)
+    stu = max((num(r"potkniecia (\d+)\.", s, int, 0) or 0) for s in reg.values())
+    rep.add("W3-5: potkniecia regulatora wsi (najwiecej w oknie)", str(stu), "0", stu == 0)
+    ser = {}
+    for s in lines:
+        if s.startswith("Towary: dzien "):
+            m = re.match(r"Towary: dzien (\d+) - (\w+) \([^)]*\): zapas (-?\d+)", s)
+            if m and m.group(2) in ("salt", "clay"):
+                rd = run_day(int(m.group(1)), start)
+                if 1 <= rd <= until:
+                    ser.setdefault(m.group(2), {})[rd] = int(m.group(3))
+    for key, name in (("salt", "sol"), ("clay", "glina")):
+        x = ser.get(key, {})
+        ks = [d for d in x if d <= 90]
+        if not x or not ks or max(x) < 92:
+            rep.add(f"W3-6: {name} - zapas d90 -> until", "za krotkie okno albo brak linii Towary", "bez wzrostu <= +2% (gdy okno siega d92)", None)
+            continue
+        a, e = x[max(ks)], max(x)
+        rep.add(f"W3-6: {name} - zapas d90 -> until", f"d{max(ks)} {a} -> d{e} {x[e]}", "bez wzrostu (<= +2%)", x[e] <= a * 1.02 + 1)
+    if dec:
+        last = dec[max(dec)]
+        i, j = last.find(": ["), last.rfind("]; w dol")
+        body = last[i + 3:j] if i >= 0 and j > i else ""
+        moved = [p.split(",")[0] for p in body.split("; ") if " -> x" in p]
+        rep.add("W3-7: ostatnia decyzja - towary ze zmiana mnoznika", f"d{max(dec)}: " + ("; ".join(moved) or "brak"), "INFO", None)
+        dirs = []
+        for rd, s in sorted(dec.items()):
+            dn = num(r"w dol (\d+), w gore", s, int, 0)
+            upn = num(r"w gore (\d+), bez zmian", s, int, 0)
+            dirs.append(f"d{rd}: w dol {dn}, w gore {upn}")
+        rep.add("W3-8: decyzje w oknie (w dol / w gore)", "; ".join(dirs), "INFO", None)
 
 
 def etap5_fee(rep, lines):
