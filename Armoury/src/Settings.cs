@@ -853,7 +853,7 @@ namespace Armoury
         public float CrownDuesWarPercent = 3f;             // share owed while the realm is at war (aids, scutage in place of service) - the war tax itself is paid by the subjects (lay subsidy below)
         public bool LaySubsidyEnabled = true;              // in war the realm's towns and villages pay a war subsidy (the fifteenth and tenth) from their purses into the kingdom treasury
         public float LaySubsidyTownShare = 0.01f;          // share of a town's purse above the merchants' floor paid each day of war
-        public float LaySubsidyVillageShare = 0.015f;      // share of a village purse paid each day of war
+        public float LaySubsidyVillageShare = 0.025f;      // share of a village purse paid each day of war (above its 15 days of purchases)
         public float LaySubsidyWarTaxMultiplier = 2f;      // with the War Tax policy the subsidy is this many times heavier
         public bool CrownCustomsEnabled = true;            // every crown takes customs on trade: a share of each town's toll counter goes to the kingdom treasury (the wool custom of 1275)
         public float CrownCustomsShare = 0.1f;             // share of a town's daily toll counter taken as customs

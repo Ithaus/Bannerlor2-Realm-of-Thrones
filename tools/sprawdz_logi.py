@@ -622,6 +622,12 @@ def etap5_a6(rep, lines, start, win, until=120, **kw):
 E4_KINDS = ["partie rodow", "garnizony", "milicje", "bandy", "karawany", "tabory wsi", "inne"]
 F_ = r"(-?\d+(?:\.\d+)?)"
 SF = r"([+-]?\d+(?:\.\d+)?)"
+KRAIN_PC, KRAIN_MEN = 0.1, 200.0   # Jeff 12.10: prog rownania krain "0.1% albo 200 ludzi, co wieksze" (male krainy - Sarnor)
+
+
+def krain_ok(rest, pc):
+    """Rownanie krain: |reszta| <= max(0.1% ludzi krainy, 200 ludzi) - E4/7 T3, E4/10 V10, E4/9 K19."""
+    return abs(pc) <= KRAIN_PC or abs(rest) <= KRAIN_MEN
 
 
 def e4_series(lines, prefix, shift=0):
@@ -1557,11 +1563,13 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     hrest = [x for x in hrest if x is not None]
     d3 = (st.mean(abs(x) for x in hrest) <= 1.0) if hrest else False
     if rq:
-        worst = max(rq, key=lambda x: abs(x[2]))
-        rep.add("E4/7 T3: rownanie krain - najgorsza kraina (|reszta| % ludzi krainy)", f"{worst[0]} {worst[2]:+.3f}% (reszta {worst[1]:+.0f}); RESZTA hearth srednio {st.mean(abs(x) for x in hrest):.1f}/d" if hrest else f"{worst[0]} {worst[2]:+.3f}%",
-                "<= 0.1% kazdej doby; przy RESZCIE hearth != 0 (D3) - INFO", (abs(worst[2]) <= 0.1) if d3 else None)
+        bad = [x for x in rq if not krain_ok(x[1], x[2])]
+        worst = max(bad or rq, key=lambda x: abs(x[2]))
+        rep.add("E4/7 T3: rownanie krain - najgorsza kraina (|reszta| % ludzi krainy)", (f"{worst[0]} {worst[2]:+.3f}% (reszta {worst[1]:+.0f}); poza progiem {len(bad)} z {len(rq)} dob"
+                + (f"; RESZTA hearth srednio {st.mean(abs(x) for x in hrest):.1f}/d" if hrest else "")),
+                "|reszta| <= max(0.1% ludzi krainy, 200 ludzi) kazdej doby (Jeff 12.10); przy RESZCIE hearth != 0 (D3) - INFO", (len(bad) == 0) if d3 else None)
     else:
-        rep.add("E4/7 T3: rownanie krain", "brak odcinka E4/7 w Ludzie (ksiega)", "<= 0.1%", None)
+        rep.add("E4/7 T3: rownanie krain", "brak odcinka E4/7 w Ludzie (ksiega)", "|reszta| <= max(0.1%, 200 ludzi)", None)
     # T4/T5 - w nicosc i z niczego wobec ruchu brutto (srednia ostatnich 28 dob okna)
     last = pdays[-28:]
     W = [fnum(r"wejscia " + F_ + r", wyjscia", poc[d]) or 0 for d in last]
@@ -1963,7 +1971,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
                     + " - brak pola \"miasta wobec wlasnych wsi\" (log sprzed poprawki P1-3); rozne mianowniki (swiat: wszystkie wsie, odniesienie: wsie miast)",
                     "INFO bez pola; z polem +-2 pkt miasta wobec wlasnych wsi", None)
     # N12 - rownanie krain z migracja (E4/7 T3)
-    rep.add("E4/8 N12: rownanie krain z MigIn/MigOut", "patrz E4/7 T3 (odcinek E4/7 \"Ludzie (ksiega)\" z czlonem migracji E4/8)", "<= 0.1% ludzi krainy", None)
+    rep.add("E4/8 N12: rownanie krain z MigIn/MigOut", "patrz E4/7 T3 (odcinek E4/7 \"Ludzie (ksiega)\" z czlonem migracji E4/8)", "|reszta| <= max(0.1% ludzi krainy, 200 ludzi)", None)
     # N13 - RESZTA linii Hearth
     hr = [fnum(r"\| RESZTA " + SF, hea[d]) for d in adays if d in hea]
     hr = [x for x in hr if x is not None]
@@ -2104,10 +2112,12 @@ def etap4_e410(rep, lines, start, win, lud, until):
     # V10 - rownanie krain z WETERANI (ta sama liczba co E4/7 T3)
     kb = e4_series(lines, "Ludzie (ksiega): dzien")
     rq = [re.search(r"rownanie krain: najgorsza kraina (\S+) reszta " + SF + r" \(" + SF + r"% ludzi krainy\)", kb[d]) for d in live if d in kb]
-    rq = [(m.group(1), float(m.group(3))) for m in rq if m]
+    rq = [(m.group(1), float(m.group(2)), float(m.group(3))) for m in rq if m]
     if rq:
-        w = max(rq, key=lambda x: abs(x[1]))
-        rep.add("E4/10 V10: rownanie krain z kontem WETERANI (najgorsza kraina)", f"{w[0]} {w[1]:+.3f}%", "<= 0.1% kazdej doby (przy RESZCIE hearth != 0 - INFO jak E4/7 T3)", abs(w[1]) <= 0.1)
+        bad = [x for x in rq if not krain_ok(x[1], x[2])]
+        w = max(bad or rq, key=lambda x: abs(x[2]))
+        rep.add("E4/10 V10: rownanie krain z kontem WETERANI (najgorsza kraina)", f"{w[0]} {w[2]:+.3f}% (reszta {w[1]:+.0f}); poza progiem {len(bad)} z {len(rq)} dob",
+                "|reszta| <= max(0.1% ludzi krainy, 200 ludzi) kazdej doby (Jeff 12.10; przy RESZCIE hearth != 0 - INFO jak E4/7 T3)", len(bad) == 0)
     # V11 - karczma E4/7 milknie przy czynnych weteranach
     poc = e4_series(lines, "Pochodzenie (E4/7): dzien")
     # recenzja R1-1: bez doby siewu (np. Veterans Enabled wlaczone w kampanii z juz zasianym E4/7 - karczmy E4/7 liczyly 24 h przed siewem)
@@ -3075,11 +3085,12 @@ def etap4_e49(rep, lines, start, win, until):
     withp = sum(1 for d in dev if "- pojmani " in dev[d] and "konto UCHODZCY: wczoraj" in dev[d])
     rep.add("E4/9 K18: konto UCHODZCY z czlonem pojmanych", f"doby z czlonem w linii spustoszenia {withp}", "kontrola |.| <= 0.01 - wiersz E4/5 S4; pojmani przy uderzeniu 0 - E4/5 S3", None)
     # K19 rownanie krain z T i W
-    rk = [fnum(r"rownanie krain: najgorsza kraina \S+ reszta \S+ \(" + SF + r"% ludzi krainy\)", kb[d]) for d in sorted(kb) if 1 <= run_day(d, start) <= until]
-    rk = [x for x in rk if x is not None][-28:]
+    rk = [re.search(r"rownanie krain: najgorsza kraina \S+ reszta " + SF + r" \(" + SF + r"% ludzi krainy\)", kb[d]) for d in sorted(kb) if 1 <= run_day(d, start) <= until]
+    rk = [(float(m.group(1)), float(m.group(2))) for m in rk if m][-28:]
+    rkb = [x for x in rk if not krain_ok(x[0], x[1])]
     seg = sum(1 for d in kb if "| E4/9: NIEWOLNI" in kb[d])
-    rep.add("E4/9 K19: rownanie krain z T i W (najgorsza kraina, 28 dob)", f"max |reszta| {max((abs(x) for x in rk), default=0):.3f}% ludzi krainy; odcinek E4/9 w {seg} dobach",
-            "<= 0.1% (przy RESZTA hearth != 0 - INFO, wiersze E4/7)", (max((abs(x) for x in rk), default=0) <= 0.1) if rk else None)
+    rep.add("E4/9 K19: rownanie krain z T i W (najgorsza kraina, 28 dob)", f"max |reszta| {max((abs(x[1]) for x in rk), default=0):.3f}% ludzi krainy (najwiecej {max((abs(x[0]) for x in rk), default=0):.0f} ludzi); poza progiem {len(rkb)} dob; odcinek E4/9 w {seg} dobach",
+            "|reszta| <= max(0.1% ludzi krainy, 200 ludzi) (Jeff 12.10; przy RESZTA hearth != 0 - INFO, wiersze E4/7)", (len(rkb) == 0) if rk else None)
     # K20 DLUG 4
     rx4 = re.compile(r"DLUG 4 \(E4/9\): rodow w zajeciu (\d+), z odchodzacymi do domu (\d+), odeszli do domu (\d+) \(limit zoldu (\d+), zalegly zold (\d+); bez wsi z danymi BK - do lasu (\d+)\)")
     sz, home, woods = 0, 0, 0
@@ -3658,8 +3669,9 @@ def etap5_aud(rep, lines, start, until):
         rep.add("audyt Z-1: dopisek \"zaulki z kasy miasta\" w linii Notable (E5/A3)", f"brak w {len(nw)} dobach", "jest od wgrania poprawki zaulkow (audyt 11.10)", False)
     elif al:
         due = sum(v[0] for v in al.values()); paid = sum(v[2] for v in al.values()); cutz = sum(v[3] for v in al.values())
+        sgz = sum(num(r"w uciete wstrzymane w oblezonym miescie \(R22\) (\d+)", nob[d], int, 0) or 0 for d in al)   # Jeff 12.10: zaulki oblezonych miast
         rep.add("audyt Z-1: zaulki - nalezne = z kas + uciete (suma dob 2-%d)" % until,
-                f"nalezne {due} (srednio {due / len(al):.0f}/d u {st.mean(v[1] for v in al.values()):.0f} notabli), z kas {paid}, uciete {cutz}" + (f"; WYLACZONE w {aoff} dobach" if aoff else ""),
+                f"nalezne {due} (srednio {due / len(al):.0f}/d u {st.mean(v[1] for v in al.values()):.0f} notabli), z kas {paid}, uciete {cutz} (w tym oblezone miasta {sgz})" + (f"; WYLACZONE w {aoff} dobach" if aoff else ""),
                 "z kas + uciete = nalezne (+-0); bez poprawki ok. 6 600-6 900/d z niczego (audyt 1b wiersz 10)", (paid + cutz == due) if not aoff else None)
     zre = re.compile(r"zloto z niczego netto \(zaulki, majatki BK, minus podatek warsztatow BK\) ([-+]?\d+)")
     kw = win(onk)
@@ -4839,7 +4851,7 @@ def etap5_a4(rep, lines, start, until, obl, bud):
         g = part(s, "| zaplacone mimo oblezenia - kasa pod regulatorem gry (miasta bez A1, zamki bez 110): ")
         m = re.search(r"oblezone teraz: miasta (\d+), zamki (\d+); wsie w rabunku lub spladrowane (\d+)", s)
         f = re.search(r"ponad zapasem kupcow \(D4\): (\d+) z (\d+) zamkow", s)
-        c = re.search(r"kontrola \(niezalezna od bramki[^)]*\): renta (\d+), zawor 110 (\d+), danina (\d+), polityki (\d+); razem (\d+) z (\d+) osad"
+        c = re.search(r"kontrola \(niezalezna od bramki[^)]*\): renta (\d+), zawor 110 (\d+), danina (\d+), polityki (\d+)(?:, zaulki \d+)?; razem (\d+) z (\d+) osad"
                       r"; w tym zaplacone jawnie \(wyzej\) (\d+); bez wyjasnienia (\d+) z (\d+) osad", s)
         r = re.search(r"kasa prawdziwym pieniadzem \(wstrzymanie tylko tam\): miasta \(A1\) (tak|nie), zamki \(110\) (tak|nie)", s)
         if h and p and g and m and f and c and r:

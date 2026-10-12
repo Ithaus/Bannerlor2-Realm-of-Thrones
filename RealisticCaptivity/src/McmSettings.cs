@@ -36,6 +36,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllFromPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Captor Takes All Baggage", HintText = "with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before)")]
+        [SettingPropertyGroup("Gear and plunder")]
+        public bool CaptorTakesAllBaggage { get; set; } = true;
+
         [SettingPropertyBool("Buyback Enabled", HintText = "your gear can be bought back from whoever holds it")]
         [SettingPropertyGroup("Gear and plunder")]
         public bool BuybackEnabled { get; set; } = true;
@@ -452,6 +456,7 @@ namespace RealisticCaptivity
             s.LootPartyInventoryPercent = LootPartyInventoryPercent;
             s.LootGoldPercent = LootGoldPercent;
             s.CaptorTakesAllFromPlayer = CaptorTakesAllFromPlayer;
+            s.CaptorTakesAllBaggage = CaptorTakesAllBaggage;
             s.BuybackEnabled = BuybackEnabled;
             s.BuybackPriceMultiplier = BuybackPriceMultiplier;
             s.MinDaysBeforeEscape = MinDaysBeforeEscape;

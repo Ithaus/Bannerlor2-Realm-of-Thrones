@@ -2896,9 +2896,9 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float LaySubsidyTownShare { get; set; } = 0.01f;
 
-        [SettingPropertyFloatingInteger("Lay Subsidy Village Share", 0.00f, 1.00f, "0.00", HintText = "share of a village purse paid each day of war")]
+        [SettingPropertyFloatingInteger("Lay Subsidy Village Share", 0.00f, 1.00f, "0.00", HintText = "share of a village purse paid each day of war (above its 15 days of purchases)")]
         [SettingPropertyGroup("Iron Bank")]
-        public float LaySubsidyVillageShare { get; set; } = 0.015f;
+        public float LaySubsidyVillageShare { get; set; } = 0.025f;
 
         [SettingPropertyFloatingInteger("Lay Subsidy War Tax Multiplier", 0.00f, 8.00f, "0.00", HintText = "with the War Tax policy the subsidy is this many times heavier")]
         [SettingPropertyGroup("Iron Bank")]

@@ -497,7 +497,9 @@ namespace RealisticCaptivity
         /// siebie, nie w nicosc: lord (bohater partii) - jego kiesa; milicja, zaloga i osada (bez bohatera) - kasa osady; inna partia bez bohatera (banda,
         /// karawana) - kiesa partii (PartyTradeGold; rozbicie bandy oddaje ja zwyciezcom - Armoury BeatenPurse 3.2). Ladunek (LootPartyInventoryPercent) -
         /// do jukow partii albo do zapasu osady; bez pojmujacego nic nie znika. Armoury A6 (BattlePlunder.LeaderCap) liczy zabrane zloto jako zaliczke -
-        /// gracz nie placi drugi raz z puli bitwy. Wylaczone - jak dotad (procent, zloto bez lorda w nicosc).</summary>
+        /// gracz nie placi drugi raz z puli bitwy. Wylaczone - jak dotad (procent, zloto bez lorda w nicosc).
+        /// Jeff 12.10 (pytanie 3, CaptorTakesAllBaggage): przy CaptorTakesAllFromPlayer ladunek idzie CALY (100%, nie LootPartyInventoryPercent), a odbiorca
+        /// jest ten sam co zlota (CaptorHome): osada bez bohatera (milicja, zaloga, loch) - zapas osady (Settlement.ItemRoster), lord i inna partia - juki partii.</summary>
         private void LootBaggage(PartyBase capturer)
         {
             try
@@ -508,15 +510,20 @@ namespace RealisticCaptivity
                 int itemsTaken = 0;
                 // E5 decyzja 9: ladunek do pojmujacego - partia w polu albo osada (zapas osady); bez pojmujacego nic nie zabieramy
                 ItemRoster dest = capturer != null && capturer.ItemRoster != null && (capturer.IsMobile || (all && capturer.IsSettlement)) ? capturer.ItemRoster : null;
+                // Jeff 12.10 (pytanie 3): cale juki, odbiorca jak zlota - milicja i zaloga bez bohatera oddaja ladunek do zapasu swojej osady (jak zloto do jej kasy)
+                bool allBag = all && s.CaptorTakesAllBaggage;
+                Settlement bagHome = allBag ? CaptorHome(capturer) : null;
+                if (bagHome != null && bagHome.ItemRoster != null) dest = bagHome.ItemRoster;
+                int pct = allBag ? 100 : s.LootPartyInventoryPercent;
 
-                if (party != null && party.ItemRoster != null && s.LootPartyInventoryPercent > 0 && (!all || dest != null))
+                if (party != null && party.ItemRoster != null && pct > 0 && (!all || dest != null))
                 {
                     var roster = party.ItemRoster;
                     for (int i = roster.Count - 1; i >= 0; i--)
                     {
                         var el = roster[i];
                         if (el.EquipmentElement.Item == null) continue;
-                        int amount = el.Amount * s.LootPartyInventoryPercent / 100;
+                        int amount = pct >= 100 ? el.Amount : el.Amount * pct / 100;
                         if (amount <= 0) continue;
                         roster.AddToCounts(el.EquipmentElement, -amount);
                         if (dest != null)
@@ -548,9 +555,10 @@ namespace RealisticCaptivity
                 }
 
                 Log.Info("Przetrzasnieto juki: " + itemsTaken + " przedmiotow, " + goldTaken + " zlota."
-                         + (all ? " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> " + to + "; ladunek -> " + (dest != null ? (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name : "nikt (nic nie zabrano)") : ""));
+                         + (all ? " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> " + to + "; ladunek " + pct + "%" + (allBag ? " (cale juki, CaptorTakesAllBaggage)" : "") + " -> "
+                                + (dest != null ? (bagHome != null && dest == bagHome.ItemRoster ? "zapas osady " + bagHome.Name : (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name) : "nikt (nic nie zabrano)") : ""));
                 if (all && goldTaken > 0)
-                    Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? ", and " + itemsTaken + " items from your baggage with it." : "."), true);
+                    Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? (allBag ? ", and your whole baggage train with it (" + itemsTaken + " items)." : ", and " + itemsTaken + " items from your baggage with it.") : "."), true);
                 else if (itemsTaken > 0 || goldTaken > 0)
                     Log.Player("They went through your baggage: " + itemsTaken + " items and " + goldTaken + " gold are gone.", true);
             }
@@ -569,9 +577,7 @@ namespace RealisticCaptivity
                 GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, lord, gold);
                 return "kiesa " + lord.Name;
             }
-            Settlement home = null;
-            if (capturer.IsSettlement) home = capturer.Settlement;
-            else if (mp != null && (mp.IsMilitia || mp.IsGarrison)) home = mp.CurrentSettlement ?? mp.HomeSettlement;
+            Settlement home = CaptorHome(capturer);
             if (home != null && home.SettlementComponent != null)
             {
                 GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold);
@@ -582,6 +588,17 @@ namespace RealisticCaptivity
                 GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, capturer, gold);
                 return "kiesa partii " + capturer.Name;
             }
+            return null;
+        }
+
+        /// <summary>Osada pojmujacego bez bohatera: sama osada (loch) albo osada jej milicji / zalogi. Lord albo inna partia (banda, karawana) - null.
+        /// Jedna regula dla zlota (GoldToCaptor) i ladunku (LootBaggage, Jeff 12.10).</summary>
+        private static Settlement CaptorHome(PartyBase capturer)
+        {
+            if (capturer == null || capturer.LeaderHero != null) return null;
+            if (capturer.IsSettlement) return capturer.Settlement;
+            var mp = capturer.IsMobile ? capturer.MobileParty : null;
+            if (mp != null && (mp.IsMilitia || mp.IsGarrison)) return mp.CurrentSettlement ?? mp.HomeSettlement;
             return null;
         }
 

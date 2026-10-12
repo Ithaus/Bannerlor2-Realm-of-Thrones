@@ -17,6 +17,8 @@ namespace RealisticCaptivity
         public int LootGoldPercent = 60;                   // percent of the gold on your person they take
         // E5 decyzja 9 Jeffa (12.10): gracz pojmany przez kogokolwiek traci cale zloto i caly rynsztunek - do pojmujacego, nie w nicosc
         public bool CaptorTakesAllFromPlayer = true;       // whoever takes you - outlaws, a lord, a town's militia or garrison - takes every coin you carry and all your war gear: the gold goes to the lord's purse, to the band's purse, or to the coffers of the settlement whose men took you (overrides Loot Gold Percent and Strip Equipment); the baggage they seize goes to them too, never to nobody (off = Loot Gold Percent, and with no lord to take it the gold simply vanishes, as before)
+        // Jeff 12.10 (raport nocny, pytanie 3): przy CaptorTakesAllFromPlayer pojmujacy zabiera takze CALE juki (towar, zywnosc, juczne) - nie LootPartyInventoryPercent
+        public bool CaptorTakesAllBaggage = true;          // with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before)
         public bool BuybackEnabled = true;                 // your gear can be bought back from whoever holds it
         public float BuybackPriceMultiplier = 1.6f;        // times the market value they ask for it
 

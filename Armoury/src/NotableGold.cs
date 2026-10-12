@@ -52,6 +52,8 @@ namespace Armoury
     /// przelew z kapitalu warsztatow i kas karawan - K1). Prefiks Low otwiera kontekst KAlley (ta sama liczba zaulkow co gra), GivePrefix zdejmuje z wyplaty
     /// czesc za zaulki (najwyzej cala wyplate), a postfiks wyplaca ja zdarzeniem gry z kasy tego miasta (GiveGoldAction.ApplyForSettlementToCharacter - MoneyLedger
     /// widzi przelew kasa miasta -> notabl, platnik i odbiorca), najwyzej z nadwyzki (Seal31.Spare - jak pasmo A3); czego kasa nie ma - 0 (licznik).
+    /// Jeff 12.10 (pytanie 4, R22): w oblezonym miescie zaulki wstrzymane - bramka BesiegedPay.Holds (rodzaj KAlley), ta sama co renta i podatki z kasy
+    /// oblezonej osady; czesc za zaulki i tak zdjeta z wyplaty gry (nic z niczego), kasa zostaje. Licznik w "uciete" i osobno "wstrzymane w oblezonym miescie".
     /// </summary>
     internal static class NotableGold
     {
@@ -96,8 +98,8 @@ namespace Armoury
         // E5/A3' (dar BK) i zaulki - liczniki doby
         private static long _bkCut;
         private static int _bkWin, _bkCutN, _bkOffN;
-        private static long _alDue, _alPaid, _alCut;
-        private static int _alN, _alCutN, _alOffN, _alNoPay;
+        private static long _alDue, _alPaid, _alCut, _alSiege;
+        private static int _alN, _alCutN, _alOffN, _alNoPay, _alSiegeN;
         private static readonly HashSet<string> _err = new HashSet<string>();
         // bilans otwarcia (tworzenie swiata) - do linii startowej sesji
         private static long _openGold, _openCarGold, _openBkGold;
@@ -124,7 +126,7 @@ namespace Armoury
             _carK = _carF = _carT = 0; _carN = _carZero = _carNoModel = _carOff = 0;
             _noTownOut = _noTownIn = _noTownNew = _noTownCar = 0; _noTownN = _strays = _overflow = _offN = 0;
             _bkCut = 0; _bkWin = _bkCutN = _bkOffN = 0;
-            _alDue = _alPaid = _alCut = 0; _alN = _alCutN = _alOffN = _alNoPay = 0;
+            _alDue = _alPaid = _alCut = _alSiege = 0; _alN = _alCutN = _alOffN = _alNoPay = _alSiegeN = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -261,6 +263,7 @@ namespace Armoury
                 long got = (long)c.H.Gold - before;
                 c.Paid = got;
                 _alPaid += got;
+                if (got > 0) BesiegedPay.NoteAlleyOut(c.Town, got);                    // kontrola R22 (liczy tylko oblezone miasta)
                 if (got < c.Due) { _alCut += c.Due - got; _alCutN++; }
             }
             catch (Exception e) { Stumble("AlleyPost", e); }
@@ -314,6 +317,8 @@ namespace Armoury
                     long spA = c.Town != null && c.Town.SettlementComponent != null ? Seal31.Spare(c.Town) : 0;
                     c.Pend = Math.Max(0L, Math.Min(part, spA));
                     _alN++; _alDue += part;
+                    // Jeff 12.10 (R22): oblezone miasto nie placi zaulkow - ta sama bramka co renta i podatki z kasy oblezonej osady
+                    if (c.Pend > 0 && BesiegedPay.Holds(c.Town, BesiegedPay.KAlley, c.Pend, true)) { c.Pend = 0; _alCut += part; _alSiege += part; _alSiegeN++; return; }
                     if (c.Pend <= 0) { _alNoPay++; _alCut += part; _alCutN++; }
                     return;
                 }
@@ -523,7 +528,7 @@ namespace Armoury
                   .Append(" u ").Append(_bkCutN).Append(" notabli (okien CreateNotable ").Append(_bkWin).Append(')')
                   .Append(" | zaulki z kasy miasta").Append(AlleyOn ? "" : " WYLACZONE (Alley Income From Town - z niczego jak dotad, notabli " + _alOffN + ")").Append(": nalezne ").Append(_alDue)
                   .Append(" u ").Append(_alN).Append(" notabli, z kas ").Append(_alPaid).Append(", uciete ").Append(_alCut).Append(" (kasa bez nadwyzki u ").Append(_alCutN)
-                  .Append(", w tym nic ").Append(_alNoPay).Append(')')
+                  .Append(", w tym nic ").Append(_alNoPay).Append(')').Append("; w uciete wstrzymane w oblezonym miescie (R22) ").Append(_alSiege).Append(" u ").Append(_alSiegeN)
                   .Append(" | bez kasy handlu - jak w grze (prog 0): zdarzen ").Append(_noTownN).Append(", w nicosc ").Append(_noTownOut).Append(", z niczego ").Append(_noTownIn + _noTownNew + _noTownCar)
                   .Append(" | kontrola (prog 0): zdarzenia w kontekscie niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow)
                   .Append(", karawana bez odczytu modelu ").Append(_carNoModel);

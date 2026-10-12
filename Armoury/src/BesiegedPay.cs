@@ -44,6 +44,8 @@ namespace Armoury
     /// pomijana - jej bramka zostaje dla A1 wylaczonego (wtedy przepuszcza i liczy). B2 (podatek wojenny 184 - TownFolk.PayCrown) i B1 (oplaty stale wsi)
     /// wolaja te sama bramke (Holds). E5/B2: rodzaj KFolkWarTax - wstrzymanie przy samym kluczu (placi kiesa ludu, nie kasa osady - zawsze prawdziwy pieniadz),
     /// a w kontroli "co naprawde zeszlo z kas oblezonych" go nie ma (nie schodzi z kasy osady).
+    /// Jeff 12.10 (raport nocny, pytanie 4 - jedna zasada): rodzaj KAlley - zaulki (NotableGold, Alley Income From Town: 30 zl/d za zaulek z kasy miasta)
+    /// w oblezonym miescie wstrzymane ta sama bramka (przy kasie prawdziwym pieniadzem); w kontroli "co naprawde zeszlo" pozycja zaulki (NoteAlleyOut).
     /// Wyjatek - per wywolanie, licznik potkniec; bramka przy wyjatku przepuszcza (pobor jak dotad), bez globalnego wylacznika.
     /// </summary>
     internal static class BesiegedPay
@@ -51,8 +53,9 @@ namespace Armoury
         internal const int KTownRent = 0, KCrownDuty = 1, KWarTax = 2, KRoadTolls = 3;
         internal const int KFolkDues = 4;   // E5/B1 (173): podatki ludu od zarobku i farma gminy - w oblezonej osadzie zostaja w kiesie / gminie
         internal const int KFolkWarTax = 5;   // E5/B2 (184): podatek wojenny od zarobku ludu - placi kiesa ludu (nie kasa osady), wiec wstrzymanie zawsze przy wlaczonym kluczu (scalenie B: 4 -> 5, K4 zajete przez B1)
-        private const int KN = 6;
-        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls", "podatki ludu i farma gminy (E5/B1)", "podatek wojenny ludu (184)" };
+        internal const int KAlley = 6;   // Jeff 12.10: zaulki notabli z kasy miasta (NotableGold) - w oblezonym miescie wstrzymane jak inne oplaty
+        private const int KN = 7;
+        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls", "podatki ludu i farma gminy (E5/B1)", "podatek wojenny ludu (184)", "zaulki" };
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.BesiegedPayNothing; } }
 
@@ -62,6 +65,7 @@ namespace Armoury
         private static readonly HashSet<Settlement> _heldBy = new HashSet<Settlement>(), _paidBy = new HashSet<Settlement>(), _regBy = new HashSet<Settlement>();
         // kontrola (uwaga 3): zaplacone jawnie przez bramke (wylacznik / kasa pod regulatorem) i polityki, ktore naprawde zeszly z kas oblezonych twierdz
         private static readonly Dictionary<Settlement, long> _expl = new Dictionary<Settlement, long>(), _polOut = new Dictionary<Settlement, long>();
+        private static readonly Dictionary<Settlement, long> _alleyOut = new Dictionary<Settlement, long>();   // Jeff 12.10: zaulki, ktore naprawde zeszly z kas oblezonych miast
         private static readonly List<KeyValuePair<Town, int>> _snap = new List<KeyValuePair<Town, int>>();
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -81,7 +85,14 @@ namespace Armoury
             Array.Clear(_held, 0, KN); Array.Clear(_paid, 0, KN); Array.Clear(_reg, 0, KN);
             Array.Clear(_heldN, 0, KN); Array.Clear(_paidN, 0, KN); Array.Clear(_regN, 0, KN);
             _heldBy.Clear(); _paidBy.Clear(); _regBy.Clear();
-            _expl.Clear(); _polOut.Clear(); _snap.Clear();
+            _expl.Clear(); _polOut.Clear(); _snap.Clear(); _alleyOut.Clear();
+        }
+
+        /// <summary>Kontrola (Jeff 12.10): NotableGold.AlleyPost - zaulki, ktore naprawde zeszly z kasy miasta; liczy sie tylko oblezone. Zloto nie rusza.</summary>
+        internal static void NoteAlleyOut(Settlement st, long x)
+        {
+            try { if (st != null && x > 0 && st.IsUnderSiege) AddTo(_alleyOut, st, x); }
+            catch (Exception e) { Stumble("NoteAlleyOut", e); }
         }
 
         private static void Stumble(string where, Exception e)
@@ -225,6 +236,7 @@ namespace Armoury
                              + " | bramka R22: renta miast (PopulationLaw.Daily; renty Population Rent Enabled " + (PopulationLaw.On ? "tak" : "nie")
                              + "), Crown Duty / War Tax / Road Tolls z kas twierdz (KingdomTreasury.RulingIncomePostfix; Policy Income Conserved "
                              + (s.PolicyIncomeConserved ? "tak" : "nie - polityki z niczego jak w grze, kasy nic nie placa")
+                             + "), zaulki z kasy miasta (NotableGold; Alley Income From Town " + (s.AlleyIncomeFromTown ? "tak" : "nie")
                              + ") | wstrzymanie tylko przy kasie prawdziwym pieniadzem (inaczej regulator gry skasowalby wstrzymane - osada placi jak dotad): miasta - kasy miast A1 "
                              + (townReal ? "tak" : "nie") + ", zamki - Castle Purse Enabled " + (s.CastlePurseEnabled ? "tak" : "nie") + ", latka regulatora 110 " + (CastleRegHooked() ? "wpieta" : "BRAK")
                              + " | od dawna, poza wylacznikiem: danina, clo, mennica i monopole (KingdomTreasury.Levies), zawor zamkow (110), wsie w rabunku i spladrowane (renta, danina, Land Tax).");
@@ -234,7 +246,7 @@ namespace Armoury
                 int floorG = (int)Math.Max(0f, s.TownRentFloorGold);
                 // kontrola (uwaga 3): co naprawde zeszlo z kas oblezonych osad - renta i zawor 110 (nasz blok doby), danina (Levies), polityki (PolicyClose)
                 var outBy = new Dictionary<Settlement, long>();
-                long oRent = 0, oDues = 0, oLevy = 0, oPol = 0;
+                long oRent = 0, oDues = 0, oLevy = 0, oPol = 0, oAlley = 0;
                 foreach (var st in Settlement.All)
                 {
                     try
@@ -265,6 +277,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Daily(" + (st != null ? st.StringId : "?") + ")", e); }
                 }
                 foreach (var kv in _polOut) { oPol += kv.Value; AddTo(outBy, kv.Key, kv.Value); }
+                foreach (var kv in _alleyOut) { oAlley += kv.Value; AddTo(outBy, kv.Key, kv.Value); }
                 long oSum = 0, explained = 0, unexpl = 0; int oN = 0, unN = 0;
                 foreach (var kv in outBy)
                 {
@@ -287,7 +300,7 @@ namespace Armoury
                 sb.Append(" | zaplacone mimo oblezenia - kasa pod regulatorem gry (miasta bez A1, zamki bez 110): ");
                 AppendKinds(sb, _reg, _regN, _regBy.Count);
                 sb.Append(" | kontrola (niezalezna od bramki - co naprawde zeszlo z kas oblezonych): renta ").Append(oRent).Append(", zawor 110 ").Append(oDues)
-                  .Append(", danina ").Append(oLevy).Append(", polityki ").Append(oPol).Append("; razem ").Append(oSum).Append(" z ").Append(oN).Append(" osad")
+                  .Append(", danina ").Append(oLevy).Append(", polityki ").Append(oPol).Append(", zaulki ").Append(oAlley).Append("; razem ").Append(oSum).Append(" z ").Append(oN).Append(" osad")
                   .Append("; w tym zaplacone jawnie (wyzej) ").Append(explained).Append("; bez wyjasnienia ").Append(unexpl).Append(" z ").Append(unN).Append(" osad (prog 0)");
                 sb.Append(" | od dawna (poza wylacznikiem): danina i clo (Levies), zawor zamkow (110), wsie w rabunku i spladrowane - nie placa");
                 sb.Append(" | prog podatkow korony zamkow (B-4 max(").Append(floorG).Append(", zapas kupcow)) ponad zapasem kupcow (D4): ").Append(floorAbove).Append(" z ").Append(castleN).Append(" zamkow");
