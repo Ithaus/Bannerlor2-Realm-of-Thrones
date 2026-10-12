@@ -103,6 +103,50 @@ mixina DTE — kosztem widgetu na pasku (przycisk otwierania zbrojowni ma
 osobna droge). Ostroznie: ForgeView tez zyje na UIExtenderEx, mend nie moze
 dotykac cudzych mixinow.
 
+### A7. BK 1.4.8 - klasy latek pominiete przy starcie (BKROT/BK) - NIESZKODLIWE poza klasa 7 (decyzja Jeffa)
+
+Zrodlo: diagnoza testu koncowego E4 d120 (B10, B10b, sprawdzone przez sceptykow), `rgl_log_20288.txt:4408-4414`
+(14:47:01-14:47:02, BK `Main.OnGameStart`): `[BK] Skipped Harmony patches on <klasa>: HarmonyException: Patching
+exception in method ...`. Te same 7 linii jest w rgl_log_35224 i 8228 oraz w biegach z31 (rgl_log_25684, 19560) -
+stan sprzed etapu 4, NIE regresja E4. Raz na uruchomienie gry (BK `_patchesInstalled`), nie przy kazdym wczytaniu.
+CrashScribe do 11.10 pokazywal z nich tylko pierwsza (`countChange`, session-2026-10-11_14-45-58.log:253), reszte
+liczyl jako "(powtorka #5)" - patrz SCRIBE-KLUCZ-POWTOREK w CHANGELOG.
+
+Mechanizm: BK naklada latki klasa po klasie, kazda w try/catch (`BannerKings/Main.cs:64-76`,
+`CreateClassProcessor(type).Patch()`). Harmony 2.4.2 (ten sam 0Harmony.dll w Bannerlord.Harmony, RBM, BattlefieldImmersion)
+w `PatchClassProcessor.PatchWithAttributes` robi zadania klasy po kolei (kolejnosc metod w metadanych); pierwszy blad
+przerywa reszte KLASY (`ReportException` zawsze rzuca). Zadania przed bledem sa nalozone, po bledzie - nie. Nieudane
+zadanie nie zostawia smieci w stanie Harmony (PatchInfo to kopia), wiec cudze i nasze latki na tych metodach dzialaja.
+
+BKROT: dwie klasy z A5 (`DynamicPartySizePerformancePatch`, `RebellionsGameEntityInstantiatePatch`) - przy ladowaniu
+modulu, nieszkodliwe.
+
+BK (7 klas):
+
+| # | Klasa BK | Blad w 1.4.8 | Co nie dziala | Wplyw |
+|---|---|---|---|---|
+| 1 | `TroopRosterSafetyPatch` | postfiks sledzenia `AddToCounts` ma parametr `countChange`, w 1.4.8 `count` (`TroopRoster.cs:428`) | tylko postfiks sledzenia (ostatnie zadanie klasy). 3 finalizery zabezpieczajace (`RemoveTroop`, `AddToCountsAtIndex`, `GetCharacterAtIndex`: IndexOutOfRange -> null/0) SA nalozone 3/3 | brak: sledzenie i tak wylaczone (`LogRosterMutationsTrace: false` w BannerKings.json). Nasz `ManLedger.LossPrefix` na `AddToCountsAtIndex` (parametry `__0/__1`) - bez wplywu. Po aktualizacji BK sprawdzic kolejnosc metod: jesli postfiks trafi przed finalizery, finalizery przepadna |
+| 2 | `Diag.TraceMbEventClanInvoke` | `TargetMethod()` zwraca null (celowo) | diagnostyka BK | brak |
+| 3-5 | `AiDecisionTracePatches+SetMovePatrolAroundSettlementPostfix`, `+SetMoveGoToPointPostfix`, `+SetMovePatrolAroundPointPostfix` | nowe sygnatury 1.4.8: `NavigationType` (w 1.4.8 `TaleWorlds.CampaignSystem.Party.NavigationType`, BK: `MobileParty.NavigationType`), `isTargetingPort` (BK: `isTargetingThePort`), `CampaignVec2 point` (BK: `Vec2 position`) | sledzenie decyzji AI i FreezeWatchdog BK dla tych 3 metod | brak na gre: prefiks i postfiks sa w jednym zadaniu i padaja razem (Enter/Exit sie nie rozjezdzaja); straznicy `GuardSettlementMove` sa w innych, nalozonych klasach |
+| 6 | `DiplomacyPatches+DeclareWarVMPatch` | prefiks `CalculateWarSupport` z `ref int __result`, a metoda zwraca `TextObject` | cala klasa: 3 prefiksy ekranu dyplomacji gracza (`CalculateWarSupport`, `GetIsProposingWarEnabledWithReason`, `OnDeclareWar`) | tylko ekran gracza (`KingdomDiplomacyVM`): okno gry/Diplomacy zamiast okna BK (sojusz, rozejm, pakt handlowy z przycisku wojny). Uwaga: `ModCompat.DiplomacyMod` szuka Id `Diplomacy`/`DiplomacyFixes`, a u nas jest `Bannerlord.Diplomacy` - flaga jest FALSE, wiec gdyby latka weszla, BK przejalby ten ekran (nie oddalby go grze). Na AI, ekonomie i test brak wplywu |
+| 7 | `VanillaModelTweakPatches+BKBattleRewardTweakPatches` | postfiks `CalculateInfluenceGain` ma `party`, `influenceValueOfBattle`, `contributionShare`; w 1.4.8 `winnerParty`, `influenceValueOfBattleForWinnerSide`, `contributionShareOfWinnerParty` (`DefaultBattleRewardModel.cs:73`; `:48` Renown - te same nazwy) | `CalculateInfluenceGain` pada, `CalculateRenownGain` nie zostaje juz nalozony (przerwanie; padlby i tak). `GetLootedItemFromTroop` (pierwsze zadanie) DZIALA | atuty BK bez dzialania: CommanderWarband +25% wplywu z bitwy, MercenaryFamousSellswords +20% slawy, styl zycia Cataphract +12% slawy (drugie efekty tych atutow z innych klas dzialaja). Lup: `LootScale: 0.5` w BannerKings.json -> ok. 50% lupionych przedmiotow znika w calym swiecie (dziala dzis i dzialalo w z31; wniosek z kolejnosci zadan, bez bezposredniego dowodu w logu) |
+
+Decyzje i zasady:
+- **B10b - przywrocenie atutow z klasy 7: DECYZJA JEFFA, otwarte.** Zmienia ekonomie wplywu i slawy AI w calym
+  swiecie, wiec nie robic tego przy okazji.
+- Gdyby latka w CrashScribe Mends: TYLKO postfiksy na `DefaultBattleRewardModel.CalculateInfluenceGain` /
+  `CalculateRenownGain` z nazwami `winnerParty` / `contributionShareOfWinnerParty` albo pozycyjnymi `__0` / `__2`.
+  NIGDY ponowne `CreateClassProcessor` na klasie BK (podwoilby postfiks lupu: 50% -> 25%). Przed nalozeniem
+  `Harmony.GetPatchInfo` - czy nie ma juz postfiksu wlasciciela "BannerKings" (po poprawce w BK bonus liczylby sie
+  podwojnie). Lancuch modeli w grze: `NavalDLCBattleRewardModel` -> `BaseModel = DefaultBattleRewardModel`
+  (Armoury-2026-10-11_14-45-59.log l.368 i 567), wiec latka na Default zadziala. Wpis w CHANGELOG jako zmiana ekonomii.
+- Brakujacego postfiksu z klasy 1 NIE nakladamy (sledzenie wylaczone, goraca sciezka `AddToCounts`). Linia kontrolna
+  "finalizery 3/3" - dopiero przy aktualizacji BK: po `OnGameStart` BK (nie w `OnSubModuleLoad` - falszywe 0/3), cele
+  przez `AccessTools.Method` z dokladnymi typami, liczyc Finalizers z owner "BannerKings", tylko odczyt, raz na sesje.
+- Sygnal regresji po aktualizacji BK albo gry: inna liczba albo nowe nazwy linii `[BK] Skipped Harmony patches on`
+  w rgl_log (dzis 7, lista wyzej). CrashScribe od SCRIBE-KLUCZ-POWTOREK (11.10) pokazuje kazda klase osobno
+  (2 bloki: blad wewnetrzny + otoczka HarmonyException).
+
 ---
 
 ## B. Bledy NASZE, ktore juz naprawilismy (nie powtarzaj ich)

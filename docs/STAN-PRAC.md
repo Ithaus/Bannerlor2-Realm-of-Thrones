@@ -1250,3 +1250,17 @@ ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841
 - (10:30 UTC 12.10) **Jeff: etap 7 - tempo marszu O POLOWE wolniej niz dzis (nie do wartosci z ksiazek - za wolno); etap 8 - takze OPTYMALIZACJA (gra ma dzialac szybciej).**
   PLAN-DO-KONCA: 7.2 zmienione, nowe 8.17.
 - (10:35 UTC 12.10) **Jeff: etap 7 - "olej predkosc, zostaw predkosc poruszania sie jak jest"** -> 7.2 (tempo) i 7.3 (przeliczenia) ODRZUCONE; reszta etapu 7 bez zmian.
+
+**WGRANIE 33 (12.10 ok. 10:30 UTC; etap 6 porcja 2 + decyzje Jeffa 12.10 rano 1-4):** Armoury abe15b3b (galaz noc/wgranie-33 = w-toku/e6-p2 9665d65: K0 licznik koni
+u zrodla, W2 ryby z wiosek rybackich, K1 kon ginie tylko zabity, K2 jeden zapas koni na sprzedaz, K5 konie poleglych jezdzcow / luzaki pod jukami; danina wsi 0.025;
+prog krain 0.1% albo 200 ludzi; zaulki w oblezonym miescie wstrzymane), RealisticCaptivity 9cdc53ee (pojmujacy bierze tez CALE juki gracza). CrashScribe 842f64a4
+i GrandTourney bbb841d7 bez zmian. Testy (autotest): 120 dob nowej kampanii - 120/120, Armoury 0 ERROR, RC 0 ERROR (Armoury-2026-10-12_02-44-09.log); zapis 9 dob
+z konca biegu - 129/129, 18.2 s/dobe, Armoury 0 ERROR (Armoury-2026-10-12_03-21-36.log); bledy CrashScribe = zlapane wyjatki cudzych modow przy starcie (BK
+BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin cctor, Harmony przy ladowaniu) - te same co w poprzednich biegach. Zima POMINIETA
+(Jeff: "olej zime, jak wszystko wgramy, bedziemy sprawdzac zime"). Kopie: *.dll.bak-2026-10-12-przed-noc33 + D:\Backup-Bannerlord\wgrane\2026-10-12-noc33-przed
+(29fdca1e, 943ea0d3). ZATWIERDZONE: Armoury abe15b3b, RealisticCaptivity 9cdc53ee, GrandTourney bbb841d7, CrashScribe 842f64a4.
+
+- (10:30 UTC 12.10) **Jeff - NOWA KOLEJNOSC: "po co testowac teraz, skoro potem wgrywamy nowe rzeczy, ktore moga popsuc to, co dziala - wgrac wszystko z etapow 5, 6, 7
+  i 8 i potem testowac dokladnie i naprawiac".** -> od teraz: kod calej reszty etapow 5 (wsie nie gromadza, porcja C, male zrodla zlota), 6 (R1, K3, K4, W1, W3, N1, R3,
+  warunkowe), 7 (bez tempa marszu) i 8 (drobne bledy + optymalizacja), kazda paczka z recenzja i wylacznikiem MCM; potem JEDNO scalenie, dokladny test (120 dob + zapis
+  + zima + bieg dlugi) i poprawki; dopiero wtedy wgranie. Bez testow w grze po drodze (poza budowa i recenzja kodu).
