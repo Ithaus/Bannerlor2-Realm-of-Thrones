@@ -28,6 +28,8 @@ namespace Armoury
     /// Poprawka 119: ten sam prefiks najpierw pyta MarketCarts.Choose (VillageCartsBestMarket) - woz KAZDEJ wsi jedzie do miasta
     /// w zasiegu, ktore zaplaci najwiecej; gdy zadne nie wchodzi w gre, dalej regula ponizej. Woz x2 takze dla wsi miejskich
     /// (MarketCartAllVillages).
+    /// E5/B4 (199, targ przy zamku): regula wyboru miasta wyjeta do PickTown; gdy wybrane miasto, CastleMarket.FirstStop moze skierowac woz wsi zamkowej
+    /// najpierw do jej zamku (brak jedzenia podzamcza na polce), a drugi odcinek z zamku idzie przez ten sam PickTown.
     /// </summary>
     internal static class MarketRoad
     {
@@ -57,42 +59,61 @@ namespace Armoury
                 if (s == null || villagerParty == null) return true;
                 var home = villagerParty.HomeSettlement;
                 var v = home != null ? home.Village : null;
-                // poprawka 119 (MarketCarts): woz kazdej wsi do miasta w zasiegu, ktore zaplaci za ladunek najwiecej na dobe kursu;
-                // null = zadne miasto nie wchodzi w gre (albo tabor stoi w miescie) - dalej jak dotad
-                if (s.VillageCartsBestMarket && v != null && v.Bound != null)
-                {
-                    var go = MarketCarts.Choose(villagerParty, home, v, s);
-                    if (go != null)
-                    {
-                        if (v.Bound.IsCastle) _toTown++;
-                        if (_move != null) _move.Invoke(__instance, new object[] { villagerParty, go });
-                        else villagerParty.SetMoveGoToSettlement(go, MobileParty.NavigationType.Default, false);
-                        return false;       // pomija latke BK (Bound) i oryginal - cel juz nadany
-                    }
-                }
-                if (!s.CastleVillagesSellInTown) return true;
-                if (v == null || v.Bound == null || !v.Bound.IsCastle) return true;      // wsie miejskie - bez zmian (BK)
-                var tb = v.TradeBound;
-                if (tb == null || !tb.IsTown) { _noMarket++; return true; }
-                if (tb.IsUnderSiege || (tb.MapFaction != null && home.MapFaction != null && tb.MapFaction.IsAtWarWith(home.MapFaction))) { _barred++; return true; }
-                bool noRoad;
-                if (TooFar(home, tb, s, out noRoad))
-                {
-                    // 110 (CastlePurse): zamek placi prawdziwym pieniadzem - gdy ponad zapasem kupcow nie ma na caly ladunek,
-                    // tabor jedzie na daleki targ zamiast wracac z towarem (przy wylaczonym zaworze zamku: jak dotad, do zamku)
-                    if (noRoad || CastlePurse.CanPayCart(v.Bound, villagerParty)) { _tooFar++; return true; }
-                    _farMarket++;
-                }
-                else _toTown++;
-                if (_move != null) _move.Invoke(__instance, new object[] { villagerParty, tb });
-                else villagerParty.SetMoveGoToSettlement(tb, MobileParty.NavigationType.Default, false);
-                return false;       // pomija latke BK (do zamku) i oryginal - cel juz nadany
+                var go = PickTown(villagerParty, home, v, s, true);
+                if (go == null) return true;                // jak dotad: latka BK (Bound - dla wsi zamkowej zamek, ktory kupuje caly ladunek) albo gra
+                // E5/B4 (199): woz wsi zamkowej jadacy na targ miasta najpierw do swojego zamku, gdy na polce zamku brakuje jedzenia, ktore wiezie
+                // (null = prosto do miasta); drugi odcinek - CastleMarket.SellPrefix przez PickTown (count = false)
+                var stop = CastleMarket.FirstStop(villagerParty, home, v, s, go);
+                Move(__instance, villagerParty, stop ?? go);
+                return false;       // pomija latke BK (Bound) i oryginal - cel juz nadany
             }
             catch (Exception e)
             {
                 if (!_errLogged) { _errLogged = true; Log.Error("MarketRoad.RoutePrefix", e); }   // raz na sesje; BK (zamek) dziala dalej
                 return true;
             }
+        }
+
+        /// <summary>
+        /// Miasto targowe dla taboru wsi - ta sama regula co dotad w RoutePrefix (E5/B4: wyjeta, zeby drugi odcinek z zamku szedl ta sama droga).
+        /// null = zadne miasto nie wchodzi w gre: jak dotad latka BK (Bound - dla wsi zamkowej zamek) albo gra. count = false (drugi odcinek po zamku,
+        /// CastleMarket): bez licznikow linii "Dowoz:" (kurs liczony raz, przy wyjezdzie z domu); MarketCarts.Choose liczy kazdy wybor sam.
+        /// </summary>
+        internal static Settlement PickTown(MobileParty villagerParty, Settlement home, Village v, Settings s, bool count)
+        {
+            // poprawka 119 (MarketCarts): woz kazdej wsi do miasta w zasiegu, ktore zaplaci za ladunek najwiecej na dobe kursu;
+            // null = zadne miasto nie wchodzi w gre (albo tabor stoi w miescie) - dalej jak dotad
+            if (s.VillageCartsBestMarket && v != null && v.Bound != null)
+            {
+                var go = MarketCarts.Choose(villagerParty, home, v, s);
+                if (go != null)
+                {
+                    if (count && v.Bound.IsCastle) _toTown++;
+                    return go;
+                }
+            }
+            if (!s.CastleVillagesSellInTown) return null;
+            if (v == null || v.Bound == null || !v.Bound.IsCastle) return null;      // wsie miejskie - bez zmian (BK)
+            var tb = v.TradeBound;
+            if (tb == null || !tb.IsTown) { if (count) _noMarket++; return null; }
+            if (tb.IsUnderSiege || (tb.MapFaction != null && home.MapFaction != null && tb.MapFaction.IsAtWarWith(home.MapFaction))) { if (count) _barred++; return null; }
+            bool noRoad;
+            if (TooFar(home, tb, s, out noRoad))
+            {
+                // 110 (CastlePurse): zamek placi prawdziwym pieniadzem - gdy ponad zapasem kupcow nie ma na caly ladunek,
+                // tabor jedzie na daleki targ zamiast wracac z towarem (przy wylaczonym zaworze zamku: jak dotad, do zamku)
+                if (noRoad || CastlePurse.CanPayCart(v.Bound, villagerParty)) { if (count) _tooFar++; return null; }
+                if (count) _farMarket++;
+            }
+            else if (count) _toTown++;
+            return tb;
+        }
+
+        /// <summary>Rozkaz jazdy taboru trasa gry (MoveVillagersToSettlementWithBestNavigationType); bez metody gry albo instancji - trasa prosta.</summary>
+        internal static void Move(VillagerCampaignBehavior inst, MobileParty villagerParty, Settlement to)
+        {
+            if (_move != null && inst != null) _move.Invoke(inst, new object[] { villagerParty, to });
+            else villagerParty.SetMoveGoToSettlement(to, MobileParty.NavigationType.Default, false);
         }
 
         /// <summary>
@@ -130,6 +151,7 @@ namespace Armoury
             {
                 if (party == null || !party.IsVillager) return;
                 MarketCarts.Forget(party);                                   // poprawka 119: wiesc z drogi o tym wozie wygasa
+                CastleMarket.Forget(party);                                  // E5/B4: rezerwacja jedzenia w zamku, znacznik "byl w zamku" i straz wygasaja
                 _lost++;
                 if (destroyer != null && destroyer.MobileParty != null && destroyer.MobileParty.IsBandit) _lostToBandits++;
             }

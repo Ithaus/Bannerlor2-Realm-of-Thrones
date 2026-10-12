@@ -47,6 +47,11 @@ Uzycie (Python 3, tylko odczyt):
                     = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
                     bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
+                    Blok E5/B4 (199, targ przy zamku) B4-1..B4-11 - linie "CastleMarket (E5/B4)" i "Targ przy zamku (5.11)": wpiecie (sprzedaz w zamku,
+                    straz przed BK VillagersCastleTick), linia CZYNNY kazdej doby, jedzenie sprzedane zamkom > 0, powtorne wizyty 0, zatkane magazyny wsi
+                    zamkowych lato <= 5.6% (doby bez "zima: TAK" w "Spichlerze (E4/6)") i zima (INFO wobec 6.5%), reszta ladunku do miasta (wrocone do domu
+                    z ladunkiem <= 5% wyslanych dalej), bledy i potkniecia 0; zamki z polka ponizej dni zuzycia (popyt BK i pomiar E5/0), odmowy Spendable,
+                    rozbite tabory, jedzenie okregu (danina E4/11 + woz) - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2661,6 +2666,14 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/A5: linie BEE domkniecie (170)", "brak w logu", "sa przy BetterEconomy v1.4.5 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_a5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B4 (199): targ przy zamku (linia z dniem ksiegi = dzien gry - 1, jak "Dowoz:" - bez przesuniecia)
+    try:
+        if any(x.startswith("CastleMarket (E5/B4):") for x in lines) or any(x.startswith("Targ przy zamku (5.11): dzien") for x in lines):
+            etap5_b4(rep, lines, start, win)
+        else:
+            rep.add("E5/B4: linie CastleMarket (E5/B4) / Targ przy zamku (5.11)", "brak w logu", "sa od wgrania E5/B4 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3781,6 +3794,106 @@ def etap5_a5(rep, lines):
     errs = [x for x in lines if x.startswith("ERROR in BeeGifts")]
     stm = max([num(r"potkniecia (\d+)", x, int, 0) or 0 for x in pays + gifts] + [num(r"E5/A5 \(prawdziwa.*?potkniecia (\d+)", x, int, 0) or 0 for x in camp] + [0])
     rep.add("E5/A5 A5-7: bledy BeeGifts, potkniecia", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
+
+
+def etap5_b4(rep, lines, start, win):
+    """E5/B4 (199, PLAN 5.11, R17 - targ przy zamku): projekt etapu 5 rozdz. 3 "E5/B4" Test (zbior B). Linia startowa "CastleMarket (E5/B4)" (sprzedaz w zamku
+    i straz przed BK VillagersCastleTick wpiete), dzienna "Targ przy zamku (5.11): dzien N" (dzien ksiegi = dzien gry - 1, jak "Dowoz:"). Progi: sprzedaz do dni
+    popytu > 0, powtorne wizyty 0, zatkane magazyny wsi zamkowych osobno lato (<= 5.6%) i zima (INFO wobec biegu A: 6.5%), reszta ladunku do miasta (wrocone do domu
+    z ladunkiem <= 5% wozow wyslanych dalej), bledy i potkniecia 0. Zamki z polka ponizej dni zuzycia (wobec biegu A), odmowy (Spendable), rozbite tabory - INFO."""
+    stl = [x for x in lines if x.startswith("CastleMarket (E5/B4):")]
+    tm = by_day(lines, "Targ przy zamku (5.11): dzien")
+    days = [d for d in win if d in tm]
+    # B4-1: linia startowa
+    if not stl:
+        rep.add("E5/B4 B4-1: linia startowa CastleMarket (E5/B4)", "brak linii startowej", "wpiete: sprzedaz w zamku, straz BK; BRAK: -", None)
+    else:
+        x = stl[-1]
+        brak = re.search(r"; BRAK: (.*?); wlasciciele", x)
+        ok = "sprzedaz w zamku" in x and "straz przed odeslaniem do domu" in x and brak is not None and brak.group(1).strip() == "-"
+        rep.add("E5/B4 B4-1: linia startowa CastleMarket (E5/B4)", ("BRAK: " + brak.group(1) if brak else x[:160]),
+                "wpiete: sprzedaz w zamku (prefiks High) i straz przed BK VillagersCastleTick; BRAK: -", ok)
+    # B4-2: linia dzienna w kazdej dobie okna, stan CZYNNY
+    on = [d for d in days if "| CZYNNY |" in tm[d]]
+    off = [d for d in days if "| WYLACZONY" in tm[d]]
+    dead = [d for d in days if "| NIECZYNNY" in tm[d]]
+    rep.add("E5/B4 B4-2: linia dzienna Targ przy zamku (5.11), stan CZYNNY",
+            f"dob z linia {len(days)} z {len(win)}, CZYNNY {len(on)}, WYLACZONY {len(off)}, NIECZYNNY {len(dead)}"
+            + (f" (pierwsza: {tm[dead[0]].split(' | ')[1][:120]})" if dead else ""),
+            "kazda doba okna z linia i CZYNNY (bieg zbioru B)", (len(days) == len(win) and len(on) == len(days)) if win else None)
+    if not days:
+        return
+
+    def tot(pat):
+        return sum(num(pat, tm[d], int, 0) or 0 for d in days)
+    visits, sold, gold, onward = tot(r"\| wizyt (\d+),"), tot(r"jedzenie sprzedane zamkom (\d+) szt\."), tot(r"szt\. \((\d+) zl wedlug"), tot(r"dalej do miasta (\d+) wozow")
+    empty, fall, routed = tot(r"pusty po zamku (\d+)"), tot(r"bez miasta dalej \(zamek kupil reszte jak dotad\) (\d+)"), tot(r"skierowane do zamku (\d+) \(")
+    # B4-3: sprzedaz do dni popytu > 0
+    rep.add("E5/B4 B4-3: jedzenie sprzedane zamkom (do dni popytu podzamcza)",
+            f"skierowane {routed}, wizyt {visits}, sprzedane {sold} szt. ({gold} zl wedlug ceny pierwszej sztuki), dalej do miasta {onward}, pusty po zamku {empty}, bez miasta dalej {fall}",
+            "> 0 w oknie (zamki z brakiem jedzenia kupuja od wozow swoich wsi)", sold > 0 if on else None)
+    # B4-4: powtorne wizyty bez znacznika
+    rep_d = [run_day(d, start) for d in days if (num(r"powtorne wizyty bez znacznika: (\d+)", tm[d], int, 0) or 0) > 0]
+    rep.add("E5/B4 B4-4: powtorne wizyty bez znacznika (petla zamek-zamek)", f"dob z powtorna wizyta {len(rep_d)}" + (f" (d{', d'.join(str(x) for x in rep_d[:6])})" if rep_d else ""),
+            "0 kazdej doby", len(rep_d) == 0)
+    # B4-5: zamki z polka ponizej dni zuzycia - popyt BK (ta linia) i ten sam pomiar co E5/0 (zjedzone, srednia 7 dob) wobec biegu A
+    lowre = re.compile(r"zamki z polka < ([\d.]+) dni zuzycia podzamcza \(popyt BK\): (\d+) z (\d+) \(mediana ([\d.\-]+) dni")
+    rows = [lowre.search(tm[d]) for d in days]
+    rows = [m for m in rows if m]
+    l28 = _last28(days)
+    m28 = [lowre.search(tm[d]) for d in l28]
+    m28 = [m for m in m28 if m]
+    first7 = rows[:7]
+    fmean = _mean([int(m.group(2)) for m in first7])
+    lmean = _mean([int(m.group(2)) for m in m28])
+    e50 = by_day(lines, "Jedzenie z targu (E5/0): dzien")
+    e28 = _mean([num(r"polka < 10 dni zuzycia: (\d+) z", e50[d]) for d in l28 if d in e50])
+    rep.add("E5/B4 B4-5: zamki z polka jedzenia ponizej dni zuzycia podzamcza",
+            (f"popyt BK: d1-7 sr {fmean:.1f}, sr28 {lmean:.1f} z {m28[-1].group(3)} (mediana dni ostatniej doby {m28[-1].group(4)})" if (fmean is not None and lmean is not None and m28) else "brak odcinka")
+            + (f" | pomiar E5/0 (zjedzone, srednia 7 dob) sr28 {e28:.1f}" if e28 is not None else " | brak linii E5/0"),
+            "INFO - mniej niz w biegu A (ten sam pomiar: linia Jedzenie z targu (E5/0) biegu A; popyt BK - od d1-7 do sr28 maleje)", None)
+    # B4-6: zatkane magazyny wsi zamkowych - lato i zima osobno
+    dow = by_day(lines, "Dowoz (skutki): dzien")
+    fam = e4_series(lines, "Spichlerze (E4/6): dzien")
+    clog = re.compile(r"zatkane magazyny: wsie zamkowe (\d+) z (\d+)")
+    summer, winter = [], []
+    for d in win:
+        m = clog.search(dow.get(d, ""))
+        if not m or int(m.group(2)) <= 0:
+            continue
+        share = 100.0 * int(m.group(1)) / int(m.group(2))
+        (winter if "zima: TAK" in fam.get(d, "") else summer).append((d, share))
+    s28 = _mean([v for _, v in summer[-28:]])
+    w28 = _mean([v for _, v in winter[-28:]])
+    rep.add("E5/B4 B4-6: zatkane magazyny wsi zamkowych - lato (sr28 dob bez zimy)", f"{s28:.2f}% ({len(summer)} dob bez zimy)" if s28 is not None else "brak dob bez zimy",
+            "<= 5.6% (bieg letni)", (s28 <= 5.6) if s28 is not None else None)
+    rep.add("E5/B4 B4-6b: zatkane magazyny wsi zamkowych - zima (sr28 dob zimy)", f"{w28:.2f}% ({len(winter)} dob zimy)" if w28 is not None else "brak zimy w biegu",
+            "INFO - <= wynik zimowy biegu A (zbior 31 B: 6.5%)", None)
+    # B4-7: reszta ladunku do miasta - wrocone do domu z ladunkiem (straz BK nie zadzialala)
+    home, held = tot(r"wrocily do domu z ladunkiem po zamku (\d+)"), tot(r"BK odeslanie do domu wstrzymane (\d+)")
+    share = 100.0 * home / onward if onward > 0 else None
+    rep.add("E5/B4 B4-7: reszta ladunku do miasta (wrocone do domu z ladunkiem po zamku)",
+            f"wyslane dalej {onward}, wrocone do domu z ladunkiem {home}" + (f" ({share:.1f}%)" if share is not None else "") + f", BK odeslanie wstrzymane {held}",
+            "<= 5% wozow wyslanych dalej (wiecej - straz BK nie dziala, np. JIT wkleil VillagersCastleTick)", (share <= 5.0) if share is not None else None)
+    # B4-8: odmowy (brak Spendable) - INFO
+    nc, ncu, rnc, full = tot(r"odmowy \(brak Spendable\) (\d+) \(niekupione"), tot(r"\(niekupione (\d+) szt\.\)"), tot(r"odmowy przy wyborze \(brak Spendable\) (\d+)"), tot(r"zamek mial dosc (\d+)")
+    rep.add("E5/B4 B4-8: odmowy - kasa zamku przy zapasie kupcow (Spendable)", f"przy sprzedazy {nc} wizyt ({ncu} szt. niekupione), przy wyborze {rnc}; zamek mial dosc {full}",
+            "INFO - zamki bez nadwyzki nie kupuja (do B1 podzamcze zjada bez zaplaty - kasa zamku traci)", None)
+    # B4-9: rozbite tabory (linia Dowoz) - INFO wobec biegu A
+    dz = by_day(lines, "Dowoz: dzien")
+    lost = _mean([num(r"rozbite tabory wsi \(wszystkich\) (\d+)", dz[d]) for d in l28 if d in dz])
+    rep.add("E5/B4 B4-9: rozbite tabory wsi (sr28)", f"{lost:.1f}/d" if lost is not None else "brak linii", "INFO - nie wiecej niz +10% wobec biegu A", None)
+    # B4-10: jedzenie okregu dla zamkow (danina w naturze E4/11 + woz) - INFO
+    trib = _mean([fnum(r"danina w naturze ([\d.]+) Food/d", tm[d]) for d in l28 if d in tm])
+    cart = _mean([num(r"\+ woz (\d+) szt\.", tm[d]) for d in l28 if d in tm])
+    rep.add("E5/B4 B4-10: jedzenie okregu dla zamkow (sr28)", (f"danina w naturze {trib:.1f} Food/d + woz {cart:.1f} szt./d" if trib is not None and cart is not None else "-"),
+            "INFO - jedno zjawisko z E4/11 pkt 8 (spichlerz zalogi + polka podzamcza)", None)
+    # B4-11: bledy i potkniecia, koszt
+    errs = [x for x in lines if x.startswith("ERROR in CastleMarket")]
+    stm = tot(r"\| POTKNIECIA (\d+)")
+    ms = _mean([fnum(r"\| czas ([\d.]+) ms", tm[d]) for d in l28 if d in tm])
+    rep.add("E5/B4 B4-11: bledy CastleMarket, potkniecia (koszt linii - INFO)", f"bledy {len(errs)}, potkniecia {stm}" + (f"; czas linii sr28 {ms:.1f} ms" if ms is not None else "")
+            + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
 
 
 def main(argv):

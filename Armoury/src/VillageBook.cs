@@ -1313,6 +1313,21 @@ namespace Armoury
             }
         }
 
+        /// <summary>
+        /// E5/B4 (targ przy zamku, tylko odczyt - jedna liczba jedzenia okregu w linii "Targ przy zamku (5.11)"): skladnik tej wsi w zapasie jej warowni tak,
+        /// jak liczy go dzis model - z korekta E4/11 (Town Food By Village People i latka wpieta), inaczej gry ((poziom + 1) x 6 tylko Normal). Warownia
+        /// oblezona - 0 (postfiks i gra nie daja wtedy skladnika wsi). Wyjatek leci do wolajacego (on liczy potkniecia).
+        /// </summary>
+        internal static double FortVillageFood(Village v)
+        {
+            var b = v != null ? v.Bound : null;
+            if (b == null || b.IsUnderSiege) return 0.0;
+            double g, o;
+            if (!TownVillageTerm(v, out g, out o)) return 0.0;
+            var s = Settings.Current;
+            return s != null && s.TownFoodByVillagePeople && _townPatched ? o : g;
+        }
+
         // ------------------------------------------------------------ menu okregu ("People of this land", E4/7; napisy po angielsku)
         private static string Place(string kind)
         {

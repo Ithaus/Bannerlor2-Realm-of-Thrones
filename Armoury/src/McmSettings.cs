@@ -1932,6 +1932,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFairPrice { get; set; } = true;
 
+        [SettingPropertyBool("Castle Market First", HintText = "a castle's own villages sell it food for its people first - enough for ten days - and carry the rest of their load on to the town: a cart setting out for a town market calls first at the castle its village belongs to whenever that castle's market holds less of a food the cart carries than the people under its walls buy in Castle Market Food Days (each kind of food counted on its own, by what the castle folk spend on it each day); the castle buys only what is missing, at its own market price (piece by piece with Village Cart Fair Price), paid only from the coin its purse holds above the working coin (Castle Purse Enabled), and the cart goes straight on to the best town for the rest. The garrison's granary is not counted - the villages feed it as before. You and the AI alike. Off = the carts drive straight to the town market, as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CastleMarketFirst { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Castle Market Food Days", 1.00f, 30.00f, "0", HintText = "how many days of each food the castle folk buy the castle market should hold before its villages' carts stop calling there first (1-30; needs Castle Market First)")]
+        [SettingPropertyGroup("The road to market")]
+        public float CastleMarketFoodDays { get; set; } = 10f;
+
         [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageTakingsWhole { get; set; } = true;
@@ -4974,6 +4982,8 @@ namespace Armoury
             s.VillageCartWholeStore = VillageCartWholeStore;
             s.VillageCartRoadNews = VillageCartRoadNews;
             s.VillageCartFairPrice = VillageCartFairPrice;
+            s.CastleMarketFirst = CastleMarketFirst;
+            s.CastleMarketFoodDays = CastleMarketFoodDays;
             s.VillageTakingsWhole = VillageTakingsWhole;
             s.VillageFoodSalesKept = VillageFoodSalesKept;
             s.VillagerPurseSurvives = VillagerPurseSurvives;
