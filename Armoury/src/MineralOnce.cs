@@ -144,7 +144,8 @@ namespace Armoury
                 if (s == null) return;
                 bool crop = s.CropClimateFilter, mineral = _patched && s.MineralsCountedOnce;   // T8: dwie osobne bramki
                 bool camel = CamelLaw.On;                                                     // E6/M2 (208): wielblady tylko w Qarthu - trzecia bramka (nowa kampania)
-                if (!crop && !mineral && !camel) return;
+                bool hamlet = HamletKinds.On;                                                 // E6/W2 (210): ryby wiosek rybackich za zbozem - czwarta bramka (ostatni krok listy)
+                if (!crop && !mineral && !camel && !hamlet) return;                           // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
                 var list = __result;
                 if (list == null) return;
                 v = VillageOf(__0);
@@ -167,7 +168,7 @@ namespace Armoury
                     try { list = CamelLaw.ListFilter(v, list); }
                     catch (Exception mex) { CamelLaw.Forget(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.CamelLaw", mex); }
                 }
-                if (!mineral) { __result = list; return; }
+                if (!mineral) { __result = HamletKinds.ListStep(v, list); return; }         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia)
                 int n = list.Count;
                 List<(ItemObject, float)> res = null;      // nowa lista dopiero przy pierwszym powtorzeniu - zwykla wies kosztuje tylko odczyt osady (ok. 0.1 mikrosekundy)
                 Dictionary<ItemObject, int> extra = null;  // przedmiot -> ile powtorzen zdjeto w tym zlozeniu listy
@@ -201,7 +202,7 @@ namespace Armoury
                     if (extra != null) { _dup[v] = extra; _lists++; }
                     else if (_dup.Count > 0) _dup.Remove(v);
                 }
-                __result = res ?? list;                    // list = lista BK albo lista po filtrze klimatu (T8)
+                __result = HamletKinds.ListStep(v, res ?? list);   // list = lista BK albo lista po filtrze klimatu (T8); E6/W2 - ryby za zbozem PO powtorzeniach (bez mnoznika Times dla ryb)
             }
             catch (Exception ex)
             {
@@ -209,6 +210,7 @@ namespace Armoury
                 int k;
                 lock (Gate) { k = ++_stumbles; if (v != null) _dup.Remove(v); }
                 CamelLaw.Forget(v);                        // E6/M2: lista z BK (z wielbladami) - bez mnoznika gospodarza
+                HamletKinds.Forget(v);                     // E6/W2: lista z BK bez ryb za zbozem - zboze tej wsi bez zmian
                 if (k <= 3) Log.Error("MineralOnce.Postfix", ex);
             }
         }

@@ -78,6 +78,9 @@ Uzycie (Python 3, tylko odczyt):
                     "pasza (E6/K0" w linii zimy E4/1: latka licznika gry wpieta, kontrola licznik gry = pelne przeliczenie (roznica 0 w kazdej dobie
                     z "liczy TAK"), sufit tempa AI z K0 nizszy niz bez K0 = 0 (na sucho w tym samym wywolaniu), koszt K0 srednio <= 2 ms/dobe,
                     potkniecia 0; luzaki, wolne konie zbrojowni, sufit wyzszy, konie porzucone przez gre i pasza (konie partii / po glowie) - INFO.
+                    Blok E6/W2 (210, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W2-1..W2-6 - linia "Wioski wedlug rodzaju (210)": CZYNNE w dobach
+                    okna, tozsamosc zboze zdjete = ryby dodane w kazdej dobie (|a - b| <= 1 + 0.1% a), ryby > 0 przy okregach z rybakami, potkniecia 0;
+                    okregi z rybakami, u srednio i wsie bez pamieci zboza - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3259,6 +3262,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k0(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k0", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/W2 (210): wioski poboczne wedlug rodzaju - ryby wiosek rybackich zamiast czesci zboza (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
+    try:
+        etap5_w2(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_w2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3331,6 +3339,49 @@ def etap5_k0(rep, lines, start, until):
                 "INFO (projekt: ok. -900 koni swiata; prog glodu lordow zima E4 przeliczyc w biegu B)", None)
     else:
         rep.add("K0-10: pasza zima - konie partii wobec konnych po glowie", "brak dopisku (bieg bez zimy albo log sprzed K0)", "INFO", None)
+
+def etap5_w2(rep, lines, start, until):
+    """E6/W2 (210, projekt etapu 6 v2 rozdz. 3 "E6/W2" Test): tozsamosc w biegu - zboze zdjete = ryby dodane kazdej doby (kontrola 0, +-1 sztuka na zaokraglenia),
+    ryby na targach okregow rybackich > 0. Linia doby "Wioski wedlug rodzaju (210): dzien N" (dzien = doba gry - 1, okno doby kampanii 1-until jak etap5_main).
+    Glod warowni i lordow bez regresji wobec testu koncowego E4 - bloki E4/6 i E4/1 (bezwzglednie)."""
+    dl = by_day(lines, "Wioski wedlug rodzaju (210): dzien")
+    days = sorted(d for d in dl if 1 <= run_day(d, start) <= until)
+    rep.add("W2-1: linia Wioski wedlug rodzaju (210) w oknie", f"{len(days)} dob (z {len(dl)} w logu)", "codziennie od wgrania E6/W2", None)
+    if not days:
+        return
+    rows = [dl[d] for d in days]
+    on = [d for d in days if "| CZYNNE |" in dl[d]]
+    off = [d for d in days if "| CZYNNE |" not in dl[d]]
+    why = ""
+    if off:
+        m = re.search(r"\| ((?:WYLACZONE|NIECZYNNE)[^|]*)\|", dl[off[-1]])
+        why = f"; ostatnia nieczynna d{off[-1]}: {m.group(1).strip() if m else '?'}"
+    rep.add("W2-2: krok wiosek wedlug rodzaju CZYNNY w dobach okna", f"{len(on)} z {len(days)}{why}", "wszystkie doby (klucz HamletKindsInDistrict, ksiega wiosek)",
+            len(off) == 0)
+    bad = []
+    ta = tb = 0.0
+    for d in on:
+        s = dl[d]
+        a = num(r", zboza -([\d.]+)", s, float, 0.0) or 0.0
+        b = num(r", ryb \+([\d.]+)", s, float, 0.0) or 0.0
+        ta += a; tb += b
+        if abs(a - b) > 1.0 + 0.001 * a:
+            bad.append(f"d{d}: {a:.1f}/{b:.1f}")
+    rep.add("W2-3: zboze zdjete = ryby dodane (tozsamosc w kazdej dobie)",
+            f"suma okna zboza -{ta:.1f}, ryb +{tb:.1f}; doby z roznica ponad 1 + 0.1% {len(bad)}" + (f" [{', '.join(bad[:6])}]" if bad else ""),
+            "0 dob z roznica", (len(bad) == 0) if on else None)
+    nd = [num(r"okregow z rybakami (\d+)", dl[d], int, 0) or 0 for d in on]
+    with_fishers = sum(1 for x in nd if x > 0)
+    rep.add("W2-4: ryby z okregow rybackich > 0 (suma okna)", f"ryb +{tb:.1f} w {with_fishers} dobach z okregami z rybakami",
+            "> 0, gdy sa okregi z rybakami", (tb > 0.0) if with_fishers else None)
+    s = rows[-1]
+    um = num(r"u srednio ([\d.]+)%", s, float)
+    nm = sum(num(r"wsi bez pamieci zboza (\d+)", dl[d], int, 0) or 0 for d in on)
+    nl = num(r"okregow z rybakami (\d+)", s, int, 0)
+    rep.add("W2-5: okregi z rybakami i wsie bez pamieci zboza", f"okregow (ostatnia doba) {nl}, u srednio {um}%; "
+            f"wsi bez pamieci zboza (suma okna) {nm}", "INFO (ryby bez dopisku - zboze bez zmian, kontrola W2-3)", None)
+    st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("W2-6: potkniecia HamletKinds w oknie", str(st), "0", st == 0)
 
 def etap5_fee(rep, lines):
     """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -

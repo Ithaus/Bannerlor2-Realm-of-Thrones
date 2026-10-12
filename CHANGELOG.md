@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 6, paczka 210 = E6/W2, PLAN 6.18, R7) - WIOSKI POBOCZNE WEDLUG RODZAJU: RYBY WIOSEK RYBACKICH ZAMIAST CZESCI ZBOZA (OSTATNI KROK ProdPostfix)
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e6-p2` (po E6/K0 f4ec3d1) | **Projekt:** etap 6 v2 rozdz. 3 "E6/W2"; krytyka KB W2-ryby-z-zera, K1-08 | **Pliki:** NOWY `HamletKinds.cs`, MaterialLaw, MineralOnce, VillageBook, ArmouryBehavior, Settings (+gen_mcm 1166 -> 1167), `tools/sprawdz_logi.py`
+
+**Problem:** kolumna `model` pliku `arm_map_villages.tsv` (fishing 400, mill 358, windmill 98, granary 91, farm 446, village 1053) byla tylko obrazkiem - okreg z wioskami rybackimi wysylal na targ samo zboze (decyzja Jeffa 6.18: wioski poboczne wedlug rodzaju).
+**Przyczyna:** VillageBook trzymal z wiersza pliku tylko `Kind` (most/brod/droga), rodzaju (`Model`) nie czytal nikt poza widokiem; ryb nie da sie dodac czynnikiem - wies, ktorej typ nie ma ryb, dostaje z modelu gry 0 (G DefaultVillageProductionCalculatorModel.cs:22-27), a czynnik x 0 = 0.
+**Zmiana:**
+- `VillageBook.cs`: `Dist.Fish[]` z `MapVillageRecord.Model == ModelFishing` (Build; wies gry false; ksiega bierze rodzaj z pliku - zamiana obrazka bez wody w widoku jej nie dotyczy); NOWE `FishersShare(Village)` - udzial ludzi W DOMU wiosek rybackich w ludziach w domu okregu (osady - puste, jak `People`), sam odczyt pod `Gate`.
+- NOWY `HamletKinds.cs`: u = FishersShare x 0.5 [projekt]. (1) `ListStep` - ostatni krok listy produkcji BK w `MineralOnce.Postfix` (po filtrze klimatu, wielbladach i powtorzeniach - ryby nie dostaja mnoznika `Times`): przy u >= 0.0005 i zbozu na liscie ryby ZA zbozem - dopisane z waga 0 albo przeniesione z wlasna waga (typ z rybami przed zbozem); WAGI BEZ ZMIAN, bo `BKVillageProductionModel` dzieli sile robocza wedlug wag (BK BKVillageProductionModel.cs:53-65) - przeniesienie wagi zrobiloby zamiane drugi raz; u zapamietane razem z lista (stan biezacy, jak `_dup`), potkniecie listy MineralOnce -> `Forget`. (2) `Step` - OSTATNI krok `MaterialLaw.ProdPostfix` (`_depth` 1, po wydobyciu, powtorzeniach, wielbladach, E4/5, E4/7; przed `OreLedger.NoteModel`): zboze -> `AddFactor(-u x (1 + suma))` = wynik koncowy x (1 - u), zdjete T zapamietane (wies, doba); ryby -> `Add(T / (1 + suma czynnikow ryb))` = wynik + T dokladnie (czynniki zjadajace baze: zerowane, baza = dotychczasowy + T). Ryby bez pamieci zboza z tej doby (okno BK przed tickiem) - bez dopisku, licznik. Tick BK idzie po liscie w kolejnosci (BK EconomyPatches.cs:944-975) - zboze przed rybami.
+- Klucz `HamletKindsInDistrict` = true (`Settings.cs:1441`, nowy - w `Armoury.json` Jeffa go nie ma); czynny tylko przy ksiedze wiosek (`VillageBook.Active`), liscie BK (`MineralOnce.Wired`) i MaterialLaw w modelach produkcji - bez ktoregos zboze nie znika. `ArmouryBehavior.cs:395` Reset, `:1628` Daily.
+- `tools/sprawdz_logi.py --grupa etap5` blok `etap5_w2` (W2-1..W2-6; grupy etap6 jeszcze nie ma): CZYNNE w dobach okna, tozsamosc |a - b| <= 1 + 0.1% a w kazdej dobie, ryby > 0 przy okregach z rybakami, potkniecia 0 - wiazace; okregi, u, wsie bez pamieci - INFO. Sprawdzony na sztucznym logu (wykrywa roznice i dobe nieczynna).
+
+**Linia logu:** codziennie `Wioski wedlug rodzaju (210): dzien N | CZYNNE | okregow z rybakami n (u srednio x%, wsi z rybami za zbozem na liscie BK m), zboza -a, ryb +b, kontrola a - b = k; wsi bez pamieci zboza c (w tym bez zboza w dobie f) | listy BK: ryby dopisane p, przeniesione za zboze q wywolan | potkniecia dzis s, od wczytania t` (doba wczorajsza - tick wsi rozlozony po godzinach; ostatnie wywolanie modelu wsi w dobie, nie suma okien).
+
+**Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
+- Regresje: klucz wylaczony / ksiega wiosek nieczynna = stan sprzed paczki (`Step` czyta klucz przy kazdym wywolaniu - u z dawnej listy nie dziala; lista bez ryb). Wies bez wioski rybackiej, bez zboza na liscie albo z powtorzonym zbozem/rybami - bez zmian.
+- Kolizje (sprawdzone w kodzie): jedyny wywolujacy model poza tickiem w Armoury to `CamelLaw.QarthBase` (wewnetrzne, `_depth > 1` - pomijane) i `VillageClimate` (bawelna); magazyn wsi gry (`GetWarehouseCapacity`, z `VillageType.Productions`) widzi zboze x (1 - u) i ryb nie widzi - pojemnosc okregow rybackich minimalnie mniejsza; BK `BKBuildingsBehavior` (wies nie kupuje z miasta tego, co ma na liscie) - wsie z rybakami nie kupia ryb; `HandleExcessFood` BK - wagi bez zmian. E4/11 umowilo "bez trzeciego czynnika" w ProdPostfix (PLAN-KODU-E411.md:343) - swiadomie dopisany krok (nie czynnik). Spichlerz E4/6 i zywnosc warowni E4/11 (model zywnosci) - bez zmian. NavalDLC/BEE owijaja model - nasz krok na najbardziej zewnetrznym poziomie.
+- Zamknieta ekonomia: zboze zdjete = ryby dodane w kazdej wsi i dobie (ryby i zboze po 10 kg, oba jedzenie); kontrola w linii (projekt: 0, +-1 sztuka na zaokraglenia `Floor` + roznica BK).
+- Watki: slowniki pod `Gate`, `FishersShare` pod `Gate` ksiegi (lista BK moze isc z okien).
+- Do testu: ceny ryb i zboza w miastach nadmorskich; glod warowni i lordow bez regresji wobec testu koncowego E4 (bezwzglednie); W2-3 kontrola 0, W2-6 potkniecia 0.
+
+**Build:** kod 0 (`Armoury/bin/Release/Armoury.dll`; md5 zalezy od hasha commitu w wersji DLL - liczyc przy wgraniu), gen_mcm 1167 ustawien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - test 120 (zbiorczy, nowa kampania).
+
 ## 2026-10-12 (etap 6, paczka 209 = E6/K0, PLAN 6.15, R13) - LICZNIK KONI GRY NAPRAWIONY U ZRODLA; STAN KONI PARTII RAZ NA DOBE; KON ZBROJOWNI NIESIE PIECHURA; PASZA Z TEGO SAMEGO STANU
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e6-p2` (od `noc/wgranie-32` 40b975e - wgrany zbior; E6/0, M1, M2 juz w kodzie) | **Projekt:** etap 6 v2 rozdz. 3 "E6/K0"; krytyka KB K0-model-gry, KB K0-koszt, K1-12 | **Pliki:** NOWY `HorseState.cs`, MarchPace, WinterRealm, Stables, ArmouryBehavior, SubModuleMain, Settings (+gen_mcm 1164 -> 1166), `tools/sprawdz_logi.py`
 

@@ -1436,6 +1436,9 @@ namespace Armoury
         // w kolumnie marszu (MarchPace, stan koni partii z pamieci doby - HorseState); FodderFromHorseState - pasza z tego samego stanu (WinterRealm.AnimalNeed)
         public bool SpareHorsesCarryFootmen = true;        // every spare horse in the baggage - also a worn or lame one from the spoils - and every free horse in the troops' armoury carries a footman on the march; the game counts such horses the same way everywhere
         public bool FodderFromHorseState = true;           // winter fodder is eaten by the horses a party really has - in the baggage, under its riders and free in the armoury - not by riders who have lost theirs
+        // E6/W2 (210, PLAN 6.18, R7): wioski poboczne wedlug rodzaju (kolumna model arm_map_villages.tsv w VillageBook) - okreg z wioskami rybackimi: zboze x (1 - u)
+        // i ryby + tyle samo sztuk, u = udzial ludzi w domu wiosek rybackich x 0.5; ostatni krok MaterialLaw.ProdPostfix (HamletKinds), ryby za zbozem na liscie BK
+        public bool HamletKindsInDistrict = true;          // the hamlets of a district shape what it sends to market: fishing hamlets land fish in place of part of the grain (the same number of loads), mills and granaries keep it grain. Needs Village Book Enabled (off = the district sends grain as before)
 
         public static void Load(string moduleDataDir)
         {

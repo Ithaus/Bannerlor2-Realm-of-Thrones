@@ -4676,6 +4676,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool FodderFromHorseState { get; set; } = true;
 
+        [SettingPropertyBool("Hamlet Kinds In District", HintText = "the hamlets of a district shape what it sends to market: fishing hamlets land fish in place of part of the grain (the same number of loads), mills and granaries keep it grain. Needs Village Book Enabled (off = the district sends grain as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HamletKindsInDistrict { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5844,6 +5848,7 @@ namespace Armoury
             s.SandSteedsInDorne = SandSteedsInDorne;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;
+            s.HamletKindsInDistrict = HamletKindsInDistrict;
         }
 
         internal static void Apply()

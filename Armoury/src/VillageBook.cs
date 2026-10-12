@@ -67,6 +67,7 @@ namespace Armoury
             public double N; public bool NSet, Shrunk;
             public double[] F, Nw;                          // osady z pliku (wies gry 0) i po podziale n
             public string[] Uid, VName, Kind; public char[] Cls; public float[] X, Y, Rd; public int[] Order;
+            public bool[] Fish;                             // E6/W2 (210): wioska rybacka (kolumna model = fishing; wies gry false)
             public int[] FamOrder;                          // kolejnosc opuszczania z glodu: ubocze, linia, wezel (od najdalszej), wies gry na koncu
             public double[] Br, Bf; public byte[] Flag; public int[] EvDay, RebuiltDay;
             public double ARexp, AFexp;                     // konto (czesc z rabunku, czesc z glodu) z ostatniego uzgodnienia + doplyw od niego
@@ -225,7 +226,7 @@ namespace Armoury
             int w0 = recs != null ? recs.Count : 0;
             var d = new Dist { Id = st.StringId, V = st.Village, St = st, Name = NameOf(st), W = w0 };
             int n = w0 + 1;
-            d.F = new double[n]; d.Nw = new double[n]; d.Uid = new string[n]; d.VName = new string[n]; d.Kind = new string[n]; d.Cls = new char[n];
+            d.F = new double[n]; d.Nw = new double[n]; d.Uid = new string[n]; d.VName = new string[n]; d.Kind = new string[n]; d.Cls = new char[n]; d.Fish = new bool[n];
             d.X = new float[n]; d.Y = new float[n]; d.Rd = new float[n]; d.Order = new int[n];
             d.Br = new double[n]; d.Bf = new double[n]; d.Flag = new byte[n]; d.EvDay = new int[n]; d.RebuiltDay = new int[n];
             var p = st.GetPosition2D;
@@ -234,6 +235,7 @@ namespace Armoury
             {
                 var r = recs[w];
                 d.F[w] = Math.Max(1, r.Settlements); d.Uid[w] = r.Uid; d.VName[w] = r.Name; d.Kind[w] = r.Kind ?? "";
+                d.Fish[w] = r.Model == MapVillageData.ModelFishing;      // E6/W2 (210): rodzaj z pliku (widok zamienia obrazek bez wody - ksiega nie)
                 d.Cls[w] = !string.IsNullOrEmpty(r.Class) ? r.Class[0] : 'R';
                 d.X[w] = r.X; d.Y[w] = r.Y; d.Order[w] = r.Order;
                 // road_dist z pliku (krytyka K1); brak kolumny - odleglosc w linii prostej od wsi gry
@@ -955,6 +957,30 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("VillageBook.StateOf", e); return false; }
+        }
+
+        /// <summary>E6/W2 (210): udzial ludzi W DOMU wiosek rybackich w ludziach w domu okregu tej wsi gry (People: dom wioski ~ osady - puste, ten sam mianownik
+        /// dla calego okregu). 0 - ksiega nieczynna, wies nieznana, okreg bez wiosek albo bez n. Sam odczyt pod Gate, nie rzuca (lista produkcji BK).</summary>
+        internal static double FishersShare(Village v)
+        {
+            if (v == null || !Active) return 0.0;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || d.W == 0 || !d.NSet || d.Fish == null) return 0.0;
+                    double all = 0.0, fish = 0.0;
+                    for (int w = 0; w <= d.W; w++)
+                    {
+                        double h = Math.Max(0.0, d.Nw[w] - d.Br[w] - d.Bf[w]);
+                        all += h;
+                        if (d.Fish[w]) fish += h;
+                    }
+                    return all > Eps ? fish / all : 0.0;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.FishersShare", e); return 0.0; }
         }
 
         /// <summary>

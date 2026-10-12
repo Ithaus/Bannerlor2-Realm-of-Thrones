@@ -208,6 +208,9 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((war - 1f) * sum, FreeHands.HandsText);
                 }
+                // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
+                // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
+                HamletKinds.Step(village, item, ref __result);
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { }
