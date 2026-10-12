@@ -254,6 +254,7 @@ namespace Armoury
             try
             {
                 if (amount <= 0 || st == null || c == null || !ReferenceEquals(st.OwnerClan, c) || !ClanIncomeBook.StableDOn) return false;
+                if (!(st.IsTown || st.IsCastle)) return false;   // zapas oddaje tylko zawor miasta i zamku (StableBegin) - wies jak dotad (stara regula jej nie liczy)
                 OwnStock o;
                 if (!_ownToday.TryGetValue(st, out o) || !ReferenceEquals(o.C, c)) { o = new OwnStock { C = c }; _ownToday[st] = o; }
                 o.V += amount; o.N += amount;
