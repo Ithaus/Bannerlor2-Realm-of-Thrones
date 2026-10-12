@@ -4040,6 +4040,18 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendPayToFolk { get; set; } = true;
 
+        [SettingPropertyBool("Ai Wear By Intensity", HintText = "the wear of the lords' and garrisons' kit after a battle follows how hard that party fought (its dead and wounded against the men it started with - the rule for your own men in a battle fought without you): a skirmish wears a tenth of the usual share, a slaughter three times as much; the pieces hit are those the men actually wear (the fitting that decides what is spare), and a piece already battered goes one step worse, down to a wreck (off = as before: a fixed Troop Wear Percent of the pieces in use, only sound pieces are hit)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiWearByIntensity { get; set; } = true;
+
+        [SettingPropertyBool("Ai Mend Queue Continue", HintText = "the lords' men and the garrisons have the cheapest repairs done first, and a piece they cannot pay for today waits while the next is tried; buying missing kit no longer spends the coin their purse keeps back for repairs - the lord's own purse pays that part, within the budget he already had for kit; the coin kept back is reckoned at the wages of the town they stand in (off = as before: the worst pieces first, the whole day's mending stops at the first piece the purse cannot pay, purchases take the purse first)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiMendQueueContinue { get; set; } = true;
+
+        [SettingPropertyBool("Ai Ammo Use", HintText = "TEST (off by default): after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. While off the daily log only counts what would have been used up")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiAmmoUse { get; set; } = false;
+
         [SettingPropertyBool("Mend Fraction Memory", HintText = "with Self Repair Same Rule on: the bit of each material that a repair at your own anvil uses but that does not make a whole piece is not lost - it is tallied (one tally per material in your bags, kept in the save) and a whole piece comes off your bags once the tally reaches one (several at once if more); when the pieces due are not in your bags the repair waits, as for any missing material (off = as before: each material rounded to whole pieces per repair, a light repair may take none at all)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendFractionMemory { get; set; } = true;
@@ -5937,6 +5949,9 @@ namespace Armoury
             s.SelfRepairSameRule = SelfRepairSameRule;
             s.AiMendsWornOnly = AiMendsWornOnly;
             s.MendPayToFolk = MendPayToFolk;
+            s.AiWearByIntensity = AiWearByIntensity;
+            s.AiMendQueueContinue = AiMendQueueContinue;
+            s.AiAmmoUse = AiAmmoUse;
             s.MendFractionMemory = MendFractionMemory;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;

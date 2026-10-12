@@ -63,12 +63,34 @@ namespace Armoury
             Array.Clear(_p2AmmoGone, 0, 3); Array.Clear(_p2AmmoUse, 0, 3); _p2AmmoWin = _p2AmmoLose = _p2IntSum = 0f; _p2AmmoParties = _p2IntN = 0;
         }
 
+        // E8/W (249, PLAN 8.8c-d, 8.4a; LAWA 15; reguly R3-R5): zuzycie wedlug natezenia bitwy i sztuk noszonych (AiWearByIntensity), kolejka napraw
+        // bez stania i rezerwa napraw nietknieta przez zakup (AiMendQueueContinue), amunicja AI (AiAmmoUse - W CIENIU). Liczniki doby linii "Zuzycie AI (E8/W)"
+        private static bool ByIntensityOn { get { var s = Settings.Current; return s != null && s.AiWearByIntensity; } }
+        private static bool QueueOn { get { var s = Settings.Current; return s != null && s.AiMendQueueContinue; } }
+        private static bool AmmoOn { get { var s = Settings.Current; return s != null && s.AiAmmoUse; } }
+        private static int _wParties, _wLost, _wHealthy, _wUsed, _wStep, _wWreck, _wBottom, _wFallback;   // bitwy: partie z zapisem, straty, noszone sztuki, obite o stopien nizej
+        private static float _wIntSum, _wOldExp, _wNewExp;                                               // natezenie; oczekiwane zuzycie stara / nowa regula (bez losowania)
+        private static int _wPoorP, _wPoorN, _wAfterPoor;                                                // naprawy: partie i sztuki czekajace na sakiewke, naprawione po pierwszej bez pieniedzy
+        private static int _wBuys, _wBuyShiftN; private static long _wBuyShift;                          // zakupy brakow: zaplaty, ile kiesa pana zaplacila zamiast rezerwy napraw
+        private static readonly int[] _wAmmo = new int[3]; private static int _wAmmoParties;             // amunicja zdjeta (strzaly, belty, miotane)
+        private static long _wTicks; private static int _wStumbles;                                      // czas dopasowania "co nosza ludzie" po bitwie; potkniecia sesji
+
+        private static void WClear()
+        {
+            _wParties = _wLost = _wHealthy = _wUsed = _wStep = _wWreck = _wBottom = _wFallback = 0; _wIntSum = _wOldExp = _wNewExp = 0f;
+            _wPoorP = _wPoorN = _wAfterPoor = 0; _wBuys = _wBuyShiftN = 0; _wBuyShift = 0;
+            Array.Clear(_wAmmo, 0, 3); _wAmmoParties = 0; _wTicks = 0;
+        }
+
+        private static void WStumble(string where, Exception e) { if (++_wStumbles <= 3) Log.Error("AiWear." + where + " (potkniecie " + _wStumbles + ")", e); }   // per partia, bez wylacznika (CLAUDE.md 7)
+
         internal static void Reset()
         {
             _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1;
             _menUsed.Clear(); _daySkipLoot = _dayFolk = _usedErr = 0;
             ClearMatDay();
             P2Clear(); _p2Stumbles = 0;   // E8/P2
+            WClear(); _wStumbles = 0;     // E8/W
         }
 
         private static void ClearMatDay()
@@ -272,6 +294,7 @@ namespace Armoury
                 var s = Settings.Current;
                 float share = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f) / 100f;
                 bool p2 = P2On;   // E8/P2 (244): pomiar "Amunicja AI: zeszloby" (tylko licznik)
+                bool byInt = ByIntensityOn, ammo = AmmoOn;   // E8/W (249)
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
                 {
                     if (side == null) continue;
@@ -283,9 +306,15 @@ namespace Armoury
                         if (mp == null || mp.IsMainParty || !(mp.IsLordParty || mp.IsGarrison) || !mp.IsActive) continue;
                         _battleSince.Add(mp.StringId);   // przybytek do nastepnego spisu = lup (DTE doklada go w tym samym zdarzeniu)
                         if (p2) P2Ammo(me, side, mep, mp);   // E8/P2 (244, PLAN 8.4a): ile pociskow zeszloby tej partii - nic nie zdejmuje, bez losowania
+                        float intensity = WBattle(mep, mp, s);   // E8/W (249, R4): natezenie bitwy tej partii i straty do linii (tylko licznik)
+                        if (ammo) AmmoUse(me, side, mp, intensity);   // E8/W (PLAN 8.4a): pociski schodza ze zbrojowni - tylko przy AiAmmoUse (W CIENIU: domyslnie wylaczone)
                         if (share <= 0f) continue;
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
                         var arm = Armory(mp); if (arm == null) continue;
+                        // E8/W (249, R4, PLAN 8.8d): share x natezenie, obijane sztuki noszone (dopasowanie N1), obita schodzi o stopien; false = dopasowanie
+                        // sie potknelo przed jakakolwiek zmiana - ta partia stara regula ponizej (jak UsedByMen w N1)
+                        if (byInt && WearByIntensity(mp, arm, share, intensity, p2, ammo)) continue;
+                        if (!byInt && p2) WShadow(mp, arm, share, intensity, ammo);   // E8/W (R10): klucz wylaczony - obie reguly policzone w linii (tylko licznik)
                         var need = AiGear.NeedBuckets(mp);
                         // wpis 95 (audyt zuzycia pkt 4): potrzeba koszyka ROZDZIELANA miedzy przedmioty (dotad liczona od nowa dla
                         // kazdego przedmiotu w koszyku - 10 roznych zbroi t3 dawalo ~5x za duzo sztuk "w uzyciu")
@@ -293,6 +322,7 @@ namespace Armoury
                         {
                             var it = kv.Key;
                             if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) continue;
+                            if (ammo && it.ItemType == ItemObject.ItemTypeEnum.Thrown) continue;   // E8/W (R3): przy AiAmmoUse bron miotana schodzi jak pocisk - nie obija sie drugi raz
                             int bk = AiGear.Bucket(it);
                             int nd; need.TryGetValue(bk, out nd);
                             int inUse = Math.Min(nd, kv.Value);
@@ -352,6 +382,258 @@ namespace Armoury
                 if (any) _p2AmmoParties++;
             }
             catch (Exception e) { if (++_p2Stumbles <= 3) Log.Error("AiWear.P2Ammo (potkniecie " + _p2Stumbles + ")", e); }   // per partia, bez wylacznika (CLAUDE.md 7)
+        }
+
+        // ------------------------------------------------------------ E8/W (249): zuzycie wedlug natezenia bitwy, sztuki noszone, amunicja AI
+        /// <summary>
+        /// E8/W (R4 - jedna regula zuzycia): natezenie bitwy tej partii = (polegli + ranni) / zdrowi na starcie / TroopWearBaseCasualtyShare, 0.1-3 (wzor
+        /// gracza z autobitwy, ArmouryBehavior.WearTheTroops; ta sama liczba co w pomiarze P2Ammo). Partie z zapisem zbrojowni wchodza do linii doby.
+        /// </summary>
+        private static float WBattle(MapEventParty mep, MobileParty mp, Settings s)
+        {
+            float intensity = 1f;
+            try
+            {
+                int lost = (mep.DiedInBattle != null ? mep.DiedInBattle.TotalManCount : 0) + (mep.WoundedInBattle != null ? mep.WoundedInBattle.TotalManCount : 0);
+                int healthy = Math.Max(1, mep.HealthyManCountAtStart);
+                intensity = MBMath.ClampFloat((lost / (float)healthy) / Math.Max(0.01f, s.TroopWearBaseCasualtyShare), 0.1f, 3f);
+                if (Armory(mp) != null) { _wParties++; _wLost += lost; _wHealthy += healthy; _wIntSum += intensity; }
+            }
+            catch (Exception e) { WStumble("WBattle", e); }
+            return intensity;
+        }
+
+        /// <summary>E8/W: sztuka zbrojowni, ktora sie obija (jak dotad: rynsztunek bez amunicji, zwierzat i towaru); przy AiAmmoUse bron miotana schodzi jak pocisk (R3).</summary>
+        private static bool Wearable(ItemObject it, int n, bool ammo)
+        {
+            return it != null && n > 0 && SupplyDemand.Equipmentish(it) && !ArmouryBehavior.NoWear(it) && !MenPurse.HorseKind(it)
+                   && !(ammo && it.ItemType == ItemObject.ItemTypeEnum.Thrown);
+        }
+
+        /// <summary>E8/W: ile sztuk kazdego przedmiotu nosza ludzie partii TERAZ (po bitwie) - to samo dopasowanie co naprawy N1 i nadwyzki (MenPurse.AiWornByMen,
+        /// roster GarrisonArmory.FitRoster), dla wszystkich typow, ktore sie obijaja. Bez pamieci doby (_menUsed trzyma dopasowanie napraw - tylko typy z obitymi).</summary>
+        private static Dictionary<ItemObject, int> BattleUsed(MobileParty mp, Dictionary<ItemObject, int> arm, bool ammo)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                var types = new HashSet<ItemObject.ItemTypeEnum>();
+                foreach (var kv in arm) if (Wearable(kv.Key, kv.Value, ammo)) types.Add(kv.Key.ItemType);
+                if (types.Count == 0) return new Dictionary<ItemObject, int>();
+                return MenPurse.AiWornByMen(arm, GarrisonArmory.FitRoster(mp), types);
+            }
+            finally { _wTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>E8/W (R10): ile sztuk zuzylaby STARA regula (stale TroopWearPercent sztuk "w uzyciu" po koszykach wzorcow, tylko sprawne) - wartosc oczekiwana,
+        /// bez losowania; zbrojownia i ksiega tylko czytane. Wolac PRZED zmiana ksiegi w tej bitwie.</summary>
+        private static float OldRuleExpected(MobileParty mp, Dictionary<ItemObject, int> arm, float share)
+        {
+            float sum = 0f;
+            var need = AiGear.NeedBuckets(mp);
+            foreach (var kv in arm)
+            {
+                var it = kv.Key;
+                if (it == null || kv.Value <= 0 || !SupplyDemand.Equipmentish(it) || ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) continue;
+                int bk = AiGear.Bucket(it), nd;
+                need.TryGetValue(bk, out nd);
+                int inUse = Math.Min(nd, kv.Value);
+                need[bk] = Math.Max(0, nd - inUse);
+                int sound = kv.Value - WornOf(mp.StringId, it.StringId);
+                if (sound > 0 && inUse > 0) sum += Math.Min(sound, inUse * share);
+            }
+            return sum;
+        }
+
+        /// <summary>E8/W (R10): klucz AiWearByIntensity wylaczony - stara regula dziala, a linia doby dostaje obie liczby oczekiwane (stara i nowa); tylko licznik.</summary>
+        private static void WShadow(MobileParty mp, Dictionary<ItemObject, int> arm, float share, float intensity, bool ammo)
+        {
+            try
+            {
+                _wOldExp += OldRuleExpected(mp, arm, share);
+                var used = BattleUsed(mp, arm, ammo);
+                foreach (var kv in arm)
+                {
+                    int u;
+                    if (!Wearable(kv.Key, kv.Value, ammo) || !used.TryGetValue(kv.Key, out u) || u <= 0) continue;
+                    int inUse = Math.Min(u, kv.Value);
+                    _wUsed += inUse; _wNewExp += Math.Min(inUse, inUse * share * intensity);
+                }
+            }
+            catch (Exception e) { WStumble("WShadow", e); }
+        }
+
+        /// <summary>
+        /// E8/W (249, PLAN 8.8d, R4): zuzycie po bitwie wedlug natezenia tej partii - share x natezenie sztuk NOSZONYCH przez ludzi (dopasowanie N1, nie
+        /// koszyki wzorcow w kolejnosci zbrojowni); trafienie w sprawna sztuke = pierwszy stopien (jak dotad), w obita = stopien nizej (do wraku - jak
+        /// u ludzi gracza w WearTheTroops; dotad obite nie schodzily, a trafienia ponad liczbe sprawnych przepadaly). Zwraca false, gdy dopasowanie sie
+        /// potknelo PRZED jakakolwiek zmiana ksiegi (wolajacy obija te partie stara regula); potkniecie w trakcie - licznik, bez drugiego obijania.
+        /// </summary>
+        private static bool WearByIntensity(MobileParty mp, Dictionary<ItemObject, int> arm, float share, float intensity, bool shadow, bool ammo)
+        {
+            Dictionary<ItemObject, int> used;
+            try
+            {
+                used = BattleUsed(mp, arm, ammo);
+                if (shadow) _wOldExp += OldRuleExpected(mp, arm, share);   // R10: stara regula w tym samym biegu (przed zmiana ksiegi)
+            }
+            catch (Exception e) { WStumble("WearByIntensity (dopasowanie)", e); _wFallback++; return false; }
+            try
+            {
+                string p = mp.StringId;
+                foreach (var kv in arm.ToList())
+                {
+                    var it = kv.Key; int u;
+                    if (!Wearable(it, kv.Value, ammo) || !used.TryGetValue(it, out u) || u <= 0) continue;
+                    int inUse = Math.Min(u, kv.Value);
+                    float x = inUse * share * intensity;
+                    _wUsed += inUse; _wNewExp += Math.Min(inUse, x);
+                    int hits = Math.Min(inUse, (int)Math.Floor(x + MBRandom.RandomFloat));
+                    if (hits > 0) HitCarried(mp, p, it, kv.Value, inUse, hits);
+                }
+            }
+            catch (Exception e) { WStumble("WearByIntensity", e); }
+            return true;
+        }
+
+        /// <summary>
+        /// E8/W: hits trafien w sztuki przedmiotu, ktore nosza ludzie (inUse z count). Noszone = najlepsze: wolne sztuki (count - inUse) to najgorsze obite
+        /// (MenWornLots - ta sama kolejnosc co naprawy N1 i sprzedaz nadwyzek), reszta obitych i sprawne sa na ludziach. Kazda noszona sztuka ma rowna szanse
+        /// (jak u gracza): sprawna -> pierwszy stopien (licznik "zuzyte w bitwach" jak dotad), obita -> stopien nizej; wrak albo dno drabinki - bez zmiany.
+        /// </summary>
+        private static void HitCarried(MobileParty mp, string p, ItemObject it, int count, int inUse, int hits)
+        {
+            string id = it.StringId;
+            var mods = new List<string>(); var cnt = new List<int>();
+            int cw = 0;
+            Dictionary<string, Dictionary<string, int>> byItem; Dictionary<string, int> byMod;
+            if (_worn.TryGetValue(p, out byItem) && byItem.TryGetValue(id, out byMod))
+            {
+                int skipped = 0;
+                foreach (var lot in MenWornLots(byMod, Math.Max(0, count - inUse), ref skipped)) { mods.Add(lot.Key); cnt.Add(lot.Value); cw += lot.Value; }
+            }
+            int cs = Math.Max(0, inUse - cw);   // sprawne na ludziach
+            ItemModifier mild = null; bool mildAsked = false;
+            for (int h = 0; h < hits; h++)
+            {
+                if (cs + cw <= 0) break;
+                int r = MBRandom.RandomInt(cs + cw);
+                if (r < cs)
+                {
+                    if (!mildAsked) { mild = ArmouryBehavior.MildWornModifier(it); mildAsked = true; }   // wpis 95: bitwa = jeden stopien
+                    if (mild == null) { cs = 0; continue; }                                               // sztuka bez drabinki stanow - nie obija sie (jak dotad)
+                    AddWorn(p, id, mild.StringId, 1); _dayWorn++; if (mp.IsGarrison) _p2WornG++; else _p2WornL++;   // E8/P2: zalogi osobno (tylko licznik)
+                    cs--; cw++; Bump(mods, cnt, mild.StringId);
+                    continue;
+                }
+                r -= cs;
+                int i = 0;
+                while (i < cnt.Count - 1 && r >= cnt[i]) { r -= cnt[i]; i++; }
+                var cur = Mod(mods[i]);
+                var next = cur != null ? NextWorse(it, cur) : null;   // nieznany stan (usuniety mod) - bez zmiany
+                if (next == null) { _wBottom++; continue; }
+                AddWorn(p, id, mods[i], -1); AddWorn(p, id, next.StringId, 1);
+                cnt[i]--; Bump(mods, cnt, next.StringId);
+                _wStep++; if (LootPrices.IsWreck(next)) _wWreck++;
+            }
+        }
+
+        private static void Bump(List<string> mods, List<int> cnt, string mod)
+        {
+            int i = mods.IndexOf(mod);
+            if (i >= 0) cnt[i]++; else { mods.Add(mod); cnt.Add(1); }
+        }
+
+        /// <summary>E8/W: nastepny gorszy stan z drabinki przedmiotu (najblizszy nizszy mnoznik ceny - jak WearTheTroops gracza); wrak to dno (null).</summary>
+        private static ItemModifier NextWorse(ItemObject it, ItemModifier cur)
+        {
+            try
+            {
+                if (LootPrices.IsWreck(cur) || it.ItemComponent == null || it.ItemComponent.ItemModifierGroup == null) return null;
+                ItemModifier best = null;
+                foreach (var m in it.ItemComponent.ItemModifierGroup.ItemModifiers)
+                    if (m != null && m.PriceMultiplier < cur.PriceMultiplier && (best == null || m.PriceMultiplier > best.PriceMultiplier)) best = m;
+                return best;
+            }
+            catch { return null; }
+        }
+
+        private static int AmmoKind(ItemObject it)
+        {
+            return it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : it.ItemType == ItemObject.ItemTypeEnum.Bolts ? 1 : it.ItemType == ItemObject.ItemTypeEnum.Thrown ? 2 : -1;
+        }
+
+        /// <summary>
+        /// E8/W (249, PLAN 8.4a, R3) - TYLKO przy AiAmmoUse (W CIENIU: domyslnie wylaczone, "zeszloby" liczy P2Ammo): pociski partii AI schodza po bitwie ze
+        /// zbrojowni. Ten sam wzor co pomiar P2Ammo: sztuki pociskow W UZYCIU (koszyki wzorcow do liczby sztuk) x natezenie bitwy tej partii x udzial strony
+        /// (pokonany 1.0, zwyciezca 1 - odzysk: AmmoRecoverPercent + AmmoRepairPercent - regula AmmoRecovery), ulamek losowo, najwyzej tyle, ile w uzyciu.
+        /// Zuzyty pocisk nie ma odbiorcy (wystrzelony i zlamany - jak u gracza); braki dokupi AiGear (Order ma Arrows / Bolts / Thrown). Bron miotana jest
+        /// w ksiedze zuzycia - spis (Known) i zapis obitych zostaja w zgodzie ze zbrojownia.
+        /// </summary>
+        private static void AmmoUse(MapEvent me, MapEventSide side, MobileParty mp, float intensity)
+        {
+            try
+            {
+                var arm = Armory(mp); if (arm == null) return;
+                var s = Settings.Current;
+                bool won = me.WinningSide != BattleSideEnum.None && side.MissionSide == me.WinningSide;
+                float keep = MBMath.ClampFloat((s.AmmoRecoverPercent + s.AmmoRepairPercent) / 100f, 0f, 1f);
+                float f = Math.Min(1f, intensity * (won ? 1f - keep : 1f));
+                if (f <= 0f) return;
+                Dictionary<int, int> need = null;
+                List<KeyValuePair<ItemObject, int>> gone = null;
+                foreach (var kv in arm)
+                {
+                    var it = kv.Key;
+                    if (it == null || kv.Value <= 0 || AmmoKind(it) < 0) continue;
+                    if (need == null) need = AiGear.NeedBuckets(mp);
+                    int bk = AiGear.Bucket(it), nd;
+                    need.TryGetValue(bk, out nd);
+                    int inUse = Math.Min(nd, kv.Value);
+                    if (inUse <= 0) continue;
+                    need[bk] = nd - inUse;
+                    int k = Math.Min(inUse, (int)Math.Floor(inUse * f + MBRandom.RandomFloat));
+                    if (k <= 0) continue;
+                    if (gone == null) gone = new List<KeyValuePair<ItemObject, int>>();
+                    gone.Add(new KeyValuePair<ItemObject, int>(it, k));
+                }
+                if (gone == null) return;
+                string p = mp.StringId;
+                foreach (var g in gone)
+                {
+                    int have;
+                    if (!arm.TryGetValue(g.Key, out have) || have <= 0) continue;
+                    int k = Math.Min(have, g.Value), left = have - k;
+                    if (left > 0) arm[g.Key] = left; else arm.Remove(g.Key);
+                    if (!ArmouryBehavior.NoWear(g.Key))
+                    {
+                        Known(mp, g.Key, -k);
+                        int w = WornOf(p, g.Key.StringId);
+                        if (w > left) TrimWorn(p, g.Key.StringId, w - left);
+                    }
+                    _wAmmo[AmmoKind(g.Key)] += k;
+                }
+                _wAmmoParties++;
+            }
+            catch (Exception e) { WStumble("AmmoUse", e); }
+        }
+
+        /// <summary>
+        /// E8/W (249, R5 "zakup nie zjada rezerwy napraw", PLAN 8.8c): ile z ceny zakupu brakow bierze sakiewka ludzi. Budzet zakupu (AiGear.TryBuyCore) to
+        /// kiesa pana + sakiewka MINUS rezerwa na zalegle naprawy (hold - policzona raz na wizyte), ale zaplata brala dotad z sakiewki cala cene - rezerwa
+        /// znikala tego samego dnia, a przydzial pana zostawal. Teraz sakiewka placi najwyzej "sakiewka - rezerwa", reszte kiesa pana (w budzecie, ktory juz
+        /// mial; zloto nie powstaje - zmienia sie platnik). Pan nie placi (Twoja zaloga bez GarrisonBuysGearPlayer) albo klucz wylaczony - jak dotad.
+        /// </summary>
+        internal static int PurseShare(MobileParty mp, int cost, int hold, bool lordPays)
+        {
+            int have = MenPurse.Get(mp);
+            int old = Math.Min(have, Math.Max(0, cost));
+            if (!On || hold <= 0 || !lordPays) return old;
+            Day();
+            int keep = Math.Min(old, Math.Max(0, have - hold));
+            _wBuys++;
+            if (old > keep) { _wBuyShift += old - keep; _wBuyShiftN++; }
+            return QueueOn ? keep : old;
         }
 
         // ------------------------------------------------------------ stan przy sprzedazy nadwyzek
@@ -434,6 +716,9 @@ namespace Armoury
             // dotad rezerwa obejmowala tez lup ponad potrzebe, ktorego nikt nie naprawi (sakiewka trzymana na zawsze)
             var used = WornOnlyOn ? UsedByMen(mp, byItem, false) : null;
             var arm = used != null ? Armory(mp) : null;
+            // E8/W (249, LAWA 15, R5): robocizna rezerwy przy placach miasta, w ktorym partia stoi - tyle zaplaci za naprawe (UnitCost(.., st) w MendInTown);
+            // dotad zawsze poziom 1 (rezerwa za mala w bogatym miescie, za duza w biednym). Bez miasta (pole, zamek) - poziom 1 jak dotad
+            Settlement wageAt = QueueOn && st != null && st.IsTown ? st : null;
             foreach (var it in byItem)
             {
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (item == null) continue;
@@ -441,20 +726,21 @@ namespace Armoury
                 {
                     int skipped = 0;
                     foreach (var lot in MenWornLots(it.Value, FreeOf(arm, item, used), ref skipped))
-                        sum += LotCost(item, Mod(lot.Key), bench) * lot.Value;
+                        sum += LotCost(item, Mod(lot.Key), bench, wageAt) * lot.Value;
                     continue;
                 }
                 foreach (var m in it.Value)
-                    sum += LotCost(item, Mod(m.Key), bench) * m.Value;
+                    sum += LotCost(item, Mod(m.Key), bench, wageAt) * m.Value;
             }
             return sum;
         }
 
-        /// <summary>Rezerwa na jedna sztuke (wydzielone z OutstandingCost w E6/N1 - bez zmiany): robocizna + szacunek materialu z polki; 0 - nie do naprawy.</summary>
-        private static int LotCost(ItemObject item, ItemModifier mod, MendMaterial.Bench bench)
+        /// <summary>Rezerwa na jedna sztuke (wydzielone z OutstandingCost w E6/N1 - bez zmiany): robocizna + szacunek materialu z polki; 0 - nie do naprawy.
+        /// E8/W: wageAt - miasto, wedlug ktorego plac liczona jest robocizna (null = poziom 1 jak dotad).</summary>
+        private static int LotCost(ItemObject item, ItemModifier mod, MendMaterial.Bench bench, Settlement wageAt)
         {
             if (!Mendable(mod)) return 0;
-            int unit = UnitCost(item, mod, null);
+            int unit = UnitCost(item, mod, wageAt);
             if (bench != null)
             {
                 var need = MendMaterial.Needs(new EquipmentElement(item, mod));
@@ -564,22 +850,40 @@ namespace Armoury
                 else
                     foreach (var it in byItem) foreach (var m in it.Value) if (Mendable(Mod(m.Key))) for (int k = 0; k < m.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, m.Key));
                 jobs.Sort((a, b) => { var ma = Mod(a.Value); var mb = Mod(b.Value); return (ma != null ? ma.PriceMultiplier : 1f).CompareTo(mb != null ? mb.PriceMultiplier : 1f); });
-                if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
-                int done = 0, paid = 0;
+                // E8/W (249, R5, PLAN 8.8c): kolejka od najtanszej robocizny w tym miescie (przy rownej - najgorszy stan najpierw, jak dotad; sortowanie
+                // stabilne). Material (srednio ok. 1/7 zaplaty) wyceniany dopiero przy planie na lawie - nie zmienia kolejnosci
+                bool q = QueueOn;
+                if (q && jobs.Count > 1)
+                {
+                    var unitBy = new Dictionary<string, int>();
+                    foreach (var j in jobs)
+                    {
+                        string key = j.Key + "|" + j.Value;
+                        if (unitBy.ContainsKey(key)) continue;
+                        var io = MBObjectManager.Instance.GetObject<ItemObject>(j.Key);
+                        unitBy[key] = io != null ? UnitCost(io, Mod(j.Value), st) : int.MaxValue;
+                    }
+                    var cheapFirst = jobs.OrderBy(j => unitBy[j.Key + "|" + j.Value]).ToList();
+                    jobs.Clear(); jobs.AddRange(cheapFirst);
+                }
+                if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece, q); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
+                int done = 0, paid = 0, poorN = 0, afterPoor = 0;
                 foreach (var j in jobs)
                 {
                     if (done >= cap) break;
                     var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
                     int unit = UnitCost(item, Mod(j.Value), st);
-                    if (MenPurse.Get(mp) < unit) break;
+                    if (MenPurse.Get(mp) < unit) { if (!q) break; poorN++; continue; }   // E8/W (R5): sztuka, na ktora nie stac, czeka - nastepna probuje (dotad koniec na dzis)
                     MenPurse.Take(mp, unit);
                     _dayFolk += MendMaterial.PaySmiths(st, unit, unit);   // E6/N1: sama robocizna - do kiesy ludu (B1), reszta kasa; linia kas 169 w PaySmiths
                     AddWorn(mp.StringId, j.Key, j.Value, -1);
                     done++; paid += unit;
+                    if (poorN > 0) afterPoor++;
                 }
                 SmithHours.Use(st.Town, done * perPiece);
                 _dayMended += done; _dayPaid += paid;
-                P2Mend(mp, jobs.Count, done, 0, 0, done < cap, done >= cap);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+                if (q) WMend(poorN, afterPoor);   // E8/W: linia doby (tylko licznik)
+                P2Mend(mp, jobs.Count, done, 0, 0, q ? poorN > 0 : done < cap, done >= cap, q ? poorN : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
             }
             catch (Exception e) { Log.Error("AiWear.MendInTown", e); }
         }
@@ -589,7 +893,7 @@ namespace Armoury
         /// reszta sztuk do naprawy (jobs - done - czekajace na material - nie robota kowala) stanela: sakiewka (petla konczy sie na pierwszej sztuce, na
         /// ktora nie stac - poor) albo godziny kowali miasta (capHit). Tylko liczniki linii "Zuzycie AI - pomiary (E8/P2)".
         /// </summary>
-        private static void P2Mend(MobileParty mp, int jobs, int done, int wait, int noSmith, bool poor, bool capHit)
+        private static void P2Mend(MobileParty mp, int jobs, int done, int wait, int noSmith, bool poor, bool capHit, int poorN = -1)
         {
             if (mp.IsGarrison) _p2MendG += done; else _p2MendL += done;
             if (jobs <= 0) return;
@@ -597,6 +901,17 @@ namespace Armoury
             if (wait > 0) _p2MatP++;
             int rest = jobs - done - wait - noSmith;
             if (rest <= 0) return;
+            // E8/W (249): kolejka "czeka i idzie dalej" (AiMendQueueContinue) zna liczbe sztuk, ktore stanely na sakiewce (poorN >= 0) - reszta to godziny
+            // kowali albo inne; stara petla (poorN = -1) konczy sie na pierwszej takiej sztuce, wiec cala reszta idzie na jej powod (jak dotad)
+            if (poorN >= 0)
+            {
+                int pn = Math.Min(rest, poorN);
+                if (pn > 0) { _p2PurseP++; _p2PurseN += pn; _p2PurseLeft += Math.Max(0, MenPurse.Get(mp)); }
+                rest -= pn;
+                if (rest <= 0) return;
+                if (capHit) { _p2HoursP++; _p2HoursN += rest; } else _p2OtherN += rest;
+                return;
+            }
             if (poor) { _p2PurseP++; _p2PurseN += rest; _p2PurseLeft += Math.Max(0, MenPurse.Get(mp)); }
             else if (capHit) { _p2HoursP++; _p2HoursN += rest; }
             else _p2OtherN += rest;
@@ -608,22 +923,35 @@ namespace Armoury
         /// przedmiotu i stanu tez), inne ida dalej; sakiewka ludzi placi robote + material w calych pensach do kasy miasta. Najpierw plan na
         /// kopii (polka i zapas bez zmian), potem Commit, zaplata i zapis stanu - tylko dla zaplanowanych sztuk. Godziny kowali - za gotowe.
         /// </summary>
-        private static void MendWithMaterial(MobileParty mp, Settlement st, List<KeyValuePair<string, string>> jobs, int cap, float perPiece)
+        private static void MendWithMaterial(MobileParty mp, Settlement st, List<KeyValuePair<string, string>> jobs, int cap, float perPiece, bool q)
         {
             var o = new MendMaterial.Order(st);
             int purse = MenPurse.Get(mp);
             // ta sama sztuka i ten sam stan - jeden stos (kolejnosc: najgorsze najpierw, jak lista jobs); brak materialu - caly stos czeka
+            // E8/W (249, R5): przy AiMendQueueContinue (q) lista jobs jest od najtanszej robocizny, a stos, na ktory nie stac, czeka - nastepne probuja
             var order = new List<KeyValuePair<string, string>>();
             var count = new Dictionary<string, int>();
             foreach (var j in jobs) { string key = j.Key + "|" + j.Value; int c; if (!count.TryGetValue(key, out c)) order.Add(j); count[key] = c + 1; }
+            int poorPre = 0, afterPoor = 0; bool sawPoor = false;   // E8/W: stosy odlozone bez planowania materialu; sztuki naprawione po pierwszej bez pieniedzy
             foreach (var j in order)
             {
                 if (o.Pieces >= cap) break;
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
                 var mod = Mod(j.Value);
                 var ee = new EquipmentElement(item, mod);
-                o.AddLot(ee, MendMaterial.Needs(ee), UnitCost(item, mod, st), count[j.Key + "|" + j.Value], purse, cap);
-                if (o.Poor > 0) break;   // sakiewka nie starcza - jak dotad koniec na dzis
+                var need = MendMaterial.Needs(ee);
+                int unit = UnitCost(item, mod, st), n = count[j.Key + "|" + j.Value];
+                // E8/W: sama robocizna ponad reszte sakiewki - stos czeka bez planowania materialu (AddLot odrzucilby kazda sztuke tak samo: robocizna
+                // + material <= sakiewka); sztuka bez receptury kowala idzie do AddLot (licznik "nie robota kowala")
+                if (q && need != null && (long)o.Labor + unit + o.MatGold > purse) { poorPre += n; sawPoor = true; continue; }
+                int poor0 = o.Poor, pcs0 = o.Pieces; bool sawBefore = sawPoor;
+                o.AddLot(ee, need, unit, n, purse, cap);
+                if (sawBefore) afterPoor += o.Pieces - pcs0;
+                if (o.Poor > poor0)
+                {
+                    if (!q) break;   // sakiewka nie starcza - jak dotad koniec na dzis
+                    sawPoor = true;  // E8/W (R5): ta sztuka czeka, nastepny stos probuje
+                }
             }
             int done = 0, paid = 0;
             if (o.Pieces > 0)
@@ -639,7 +967,16 @@ namespace Armoury
             _dayMended += done; _dayPaid += paid;
             _dayWait += o.Wait; _dayWaitMask |= o.WaitMask; _dayNoSmith += o.NoSmith;
             for (int k = 0; k < MendMaterial.Kinds; k++) _dayWaitBy[k] += o.WaitBy[k];
-            P2Mend(mp, jobs.Count, done, o.Wait, o.NoSmith, o.Poor > 0, o.Pieces >= cap);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+            if (q) WMend(o.Poor + poorPre, afterPoor);   // E8/W: linia doby (tylko licznik)
+            P2Mend(mp, jobs.Count, done, o.Wait, o.NoSmith, o.Poor + poorPre > 0, o.Pieces >= cap, q ? o.Poor + poorPre : -1);   // E8/P2 (244): zalogi osobno i powod stania (tylko licznik)
+        }
+
+        /// <summary>E8/W (249): zlecenie napraw z kolejka "czeka i idzie dalej" - ile sztuk czekalo na sakiewke i ile naprawiono PO pierwszej takiej sztuce
+        /// (stara petla konczyla sie na niej); tylko liczniki linii "Zuzycie AI (E8/W)".</summary>
+        private static void WMend(int poor, int afterPoor)
+        {
+            if (poor > 0) { _wPoorP++; _wPoorN += poor; }
+            _wAfterPoor += afterPoor;
         }
 
         private static void Day()
@@ -656,10 +993,55 @@ namespace Armoury
                          + (MendMaterial.MenAndLordsOn ? MatDay() : ""));
             }
             if (_dayStamp >= 0 && P2On) P2Line();   // E8/P2 (244): przed zerowaniem licznikow doby - te same doby i ta sama etykieta co linia "Zuzycie AI"
+            if (_dayStamp >= 0) WLine();            // E8/W (249): jw. - stara i nowa regula w tym samym biegu
             _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = d;
             _daySkipLoot = _dayFolk = 0;
             ClearMatDay();
             P2Clear();
+            WClear();
+        }
+
+        /// <summary>
+        /// E8/W (249): linia "Zuzycie AI (E8/W)" - przy kazdej zmianie doby ksiegi (ta sama etykieta co "Zuzycie AI"). Stan kazdego z trzech kluczy
+        /// i obie drogi w tym samym biegu (R10): oczekiwane zuzycie stara regula / nowa regula (przy Stage8MeasureLog), naprawy po pierwszej sztuce bez
+        /// pieniedzy, zloto przesuniete z rezerwy napraw na kiese pana (przy wylaczonym kluczu: "zaplacilaby"), amunicja zdjeta (W CIENIU: 0 - "zeszloby"
+        /// liczy linia pomiarow E8/P2). Wraki w ksiedze: obita sztuka schodzi teraz do wraku, a wraku kowale nie naprawiaja (paczka 158).
+        /// </summary>
+        private static void WLine()
+        {
+            try
+            {
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                var s = Settings.Current;
+                bool byInt = ByIntensityOn, q = QueueOn, ammo = AmmoOn, p2 = P2On;
+                string pct = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f).ToString("0.##", ci);
+                int wrecks = 0;
+                var wreckId = new Dictionary<string, bool>();   // stan -> wrak (raz na linie; ksiega ma dziesiatki tysiecy pozycji, stanow kilkadziesiat)
+                foreach (var p in _worn.Values)
+                    foreach (var it in p.Values)
+                        foreach (var m in it)
+                        {
+                            bool w;
+                            if (!wreckId.TryGetValue(m.Key, out w)) wreckId[m.Key] = w = LootPrices.IsWreck(Mod(m.Key));
+                            if (w) wrecks += m.Value;
+                        }
+                double ms = _wTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                Log.Info("Zuzycie AI (E8/W): dzien " + _dayStamp
+                         + " | zuzycie " + (byInt ? "[WL wedlug natezenia bitwy]" : "[WYL stale " + pct + "%]") + ": partii po bitwie " + _wParties + ", straty " + _wLost
+                         + " ludzi (polegli i ranni) z " + _wHealthy + " zdrowych na starcie, natezenie srednio " + (_wParties > 0 ? (_wIntSum / _wParties).ToString("0.00", ci) : "-")
+                         + "; noszone sztuki " + (byInt || p2 ? _wUsed.ToString() : "-") + ", sprawne -> obite " + _dayWorn + ", obite o stopien nizej " + _wStep + " (w tym do wraku " + _wWreck
+                         + "), trafienia w dno drabinki " + _wBottom + ", partie na starej regule po potknieciu " + _wFallback
+                         + "; stare zuzycie " + pct + "% zuzyloby " + (p2 ? _wOldExp.ToString("0.0", ci) : "-") + " szt., nowa regula " + (byInt || p2 ? _wNewExp.ToString("0.0", ci) : "-")
+                         + " szt. (oczekiwane, bez losowania)"
+                         + " | naprawy " + (q ? "[WL od najtanszej, sztuka bez pieniedzy czeka]" : "[WYL od najgorszego stanu, koniec na pierwszej bez pieniedzy]") + ": partie z brakiem w sakiewce "
+                         + _wPoorP + ", sztuki czekajace na sakiewke " + _wPoorN + ", naprawione po pierwszej sztuce bez pieniedzy " + _wAfterPoor + " szt."
+                         + " | zakupy brakow " + (q ? "[WL rezerwa napraw zostaje]" : "[WYL sakiewka placi cala cene]") + ": zaplat z rezerwa " + _wBuys + ", kiesa pana zamiast rezerwy napraw "
+                         + (q ? "zaplacila " : "zaplacilaby ") + _wBuyShift.ToString(ci) + " zl w " + _wBuyShiftN + " zaplatach"
+                         + " | amunicja AI " + (ammo ? "[WL]" : "[CIEN - wylaczone]") + ": zeszlo " + (_wAmmo[0] + _wAmmo[1] + _wAmmo[2]) + " szt. (strzaly " + _wAmmo[0] + ", belty " + _wAmmo[1]
+                         + ", miotane " + _wAmmo[2] + ") w " + _wAmmoParties + " partiach"
+                         + " | wrakow w ksiedze " + wrecks + " | koszt dopasowania " + ms.ToString("0.0", ci) + " ms | potkniecia (sesja) " + _wStumbles + ".");
+            }
+            catch (Exception e) { WStumble("WLine", e); }
         }
 
         /// <summary>

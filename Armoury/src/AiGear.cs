@@ -763,7 +763,8 @@ namespace Armoury
                 int gearCap;
                 if (lordPays && lord != null && ClanBudget.GearCap(lord.Clan, out gearCap)) budget = Math.Min(budget, gearCap);
                 // wpis 84: ludzie dokupuja braki ze swojej sakiewki (lup), dopiero potem kiesa lorda; K1: zaloga - ze swojej sakiewki (zold)
-                int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st)) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
+                int mendHold = (!garrison || gPurse) ? AiWear.OutstandingCost(mp, st) : 0;   // E8/W (249): rezerwa napraw tej wizyty - ta sama liczba w budzecie i w zaplacie
+                int purse = (!garrison || gPurse) ? Math.Max(0, MenPurse.Get(mp) - mendHold) : 0;   // wpis 89: naprawy maja pierwszenstwo (z materialem - szacunek z polki miasta)
                 budget = Math.Max(0, budget) + purse;
                 if (budget <= 0) return;
                 if (orderDay) GarrisonCarts.MarkTried(st);   // jedno zamowienie (i jeden budzet D dob) na D dob, takze gdy proba sie nie uda
@@ -788,7 +789,9 @@ namespace Armoury
                 // zaplata: najpierw sakiewka ludzi (lord AI zawsze, zaloga przy GarrisonPurseEnabled), reszta kiesa pana; zwraca czesc z sakiewki
                 Func<int, int> pay = cost =>
                 {
-                    int fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, cost) : 0;
+                    // E8/W (249, R5): zakup nie zjada rezerwy napraw - sakiewka placi najwyzej "sakiewka - rezerwa", reszte kiesa pana w swoim budzecie
+                    // (AiWear.PurseShare; klucz AiMendQueueContinue wylaczony albo pan nie placi - cala cena z sakiewki jak dotad)
+                    int fromPurse = (!garrison || gPurse) ? MenPurse.Take(mp, AiWear.PurseShare(mp, cost, mendHold, lordPays)) : 0;
                     lord.ChangeHeroGold(-(cost - fromPurse));
                     lordPart += cost - fromPurse;
                     ClanBudget.GearSpent(lord.Clan, cost - fromPurse);   // 166: schodzi z przydzialu sprzetu rodu

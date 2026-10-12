@@ -188,6 +188,11 @@ Uzycie (Python 3, tylko odczyt):
                     po/gra 0.4-0.6, X-4 "latki wpiete 6/6" przy kazdym starcie (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0
                     i prefiksy naprawde biegna (okno >= 3 doby ze stanem [wl]: jedzenie > 0 partii, zwiad > 0 godzin, ksiega P1 "marsz premia AI" lordow = 0);
                     INFO jedzenie i zwiad wedlug partii, rodzaje jedzenia gra / po, zima, postoj, paser, samonaprawa, RBL, koszt wlasny, ksiega P1 po zmianie.
+                    Blok etap8_w (E8/W, paczka 249): zuzycie i naprawy AI - linia doby "Zuzycie AI (E8/W)" (stan trzech kluczy, stara i nowa regula
+                    w tym samym biegu): W-0 linia w kazdej dobie okna, W-1 naprawione / (zuzyte w bitwach + lup obity) w ostatnich 30 dobach okna
+                    >= 1.2 x Z33 w tych samych dobach (tabela Z33 w narzedziu), W-2 naprawy na sztuke zuzyta wedlug starej reguly ("stare zuzycie N%
+                    zuzyloby") >= Z33 i stosunek nowe / stare INFO, W-3 INFO korelacja zuzycia i strat, W-4 amunicja AI (W CIENIU: INFO; wlaczona:
+                    zeszlo > 0 i strzaly na polkach >= 50% Z33 doby 120), W-5 potkniecia 0 i koszt dopasowania INFO; INFO kolejka, zakupy, wraki.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8772,6 +8777,183 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 "INFO (marsz premia AI = 0 przy ScoutXpFair; 'przed' w biegu bez E8/X)", None)
 
 
+# ============================================================ ETAP 8 (E8/W, paczka 249): zuzycie i naprawy AI - blok etap8_w
+E8_W_LINE = "Zuzycie AI (E8/W): dzien"
+# Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log, 120 dob nowej kampanii): linia "Zuzycie AI" - doba kampanii -> (lup obity, zuzyte w bitwach,
+# naprawione w miastach). Progi W-1 / W-2 sa wzgledne wobec Z33 W TYCH SAMYCH DOBACH (projekt etapu 8 v2 rozdz. 4 pkt 5); projekt podaje dla przykladu
+# sama dobe 120: 1083 / (519 + 1636) = 0.50 i 1083 / 519 = 2.09, okno dob 91-120 daje 0.320 i 2.787.
+E8_W_Z33 = {
+    1: (0, 90, 0), 2: (0, 6, 0), 3: (0, 13, 4), 4: (0, 196, 3), 5: (33, 74, 10), 6: (75, 185, 33), 7: (146, 152, 11), 8: (18, 126, 45), 9: (509, 158, 55),
+    10: (87, 91, 178), 11: (0, 173, 63), 12: (659, 64, 243), 13: (435, 231, 375), 14: (220, 93, 126), 15: (8, 37, 110), 16: (163, 236, 196), 17: (400, 204, 367),
+    18: (267, 161, 297), 19: (60, 113, 88), 20: (402, 201, 88), 21: (1064, 310, 186), 22: (366, 147, 152), 23: (96, 234, 196), 24: (223, 253, 330),
+    25: (574, 286, 370), 26: (1753, 203, 637), 27: (688, 126, 381), 28: (304, 139, 772), 29: (734, 56, 859), 30: (1079, 213, 622), 31: (384, 191, 253),
+    32: (219, 265, 330), 33: (280, 220, 439), 34: (533, 317, 491), 35: (977, 99, 272), 36: (307, 102, 623), 37: (454, 217, 712), 38: (222, 444, 404),
+    39: (2291, 240, 730), 40: (846, 142, 747), 41: (1374, 203, 970), 42: (593, 427, 346), 43: (827, 343, 603), 44: (837, 297, 825), 45: (800, 352, 542),
+    46: (564, 179, 578), 47: (744, 223, 618), 48: (2172, 286, 680), 49: (1265, 588, 1219), 50: (904, 462, 498), 51: (1198, 291, 736), 52: (1636, 537, 796),
+    53: (1954, 399, 284), 54: (3414, 324, 1034), 55: (1007, 278, 697), 56: (2924, 148, 598), 57: (2090, 483, 599), 58: (1021, 354, 681), 59: (2739, 313, 663),
+    60: (2398, 215, 1069), 61: (471, 436, 453), 62: (4674, 765, 478), 63: (1889, 230, 1602), 64: (1071, 500, 900), 65: (1245, 567, 659), 66: (2390, 427, 645),
+    67: (2429, 227, 904), 68: (2326, 321, 841), 69: (2603, 669, 1878), 70: (2441, 287, 2145), 71: (1438, 463, 1293), 72: (2316, 565, 1749), 73: (4460, 337, 1191),
+    74: (5369, 335, 751), 75: (2752, 522, 631), 76: (608, 1073, 779), 77: (5828, 1253, 2359), 78: (3357, 564, 855), 79: (4163, 210, 1532), 80: (3551, 483, 1059),
+    81: (2094, 515, 826), 82: (4081, 531, 473), 83: (3352, 447, 973), 84: (7037, 370, 1632), 85: (3720, 751, 847), 86: (2503, 641, 747), 87: (9822, 435, 1596),
+    88: (9081, 250, 1191), 89: (5437, 338, 1771), 90: (2637, 650, 846), 91: (4468, 684, 609), 92: (7285, 484, 1013), 93: (4429, 396, 1253), 94: (5297, 780, 1731),
+    95: (4374, 449, 1665), 96: (2778, 533, 667), 97: (7860, 530, 1392), 98: (1504, 229, 896), 99: (2084, 294, 1547), 100: (2649, 390, 2275), 101: (8517, 312, 1863),
+    102: (1781, 213, 725), 103: (844, 458, 1129), 104: (5404, 715, 895), 105: (958, 299, 1402), 106: (2574, 136, 846), 107: (3300, 656, 1724),
+    108: (4371, 693, 1640), 109: (3402, 702, 1313), 110: (5224, 526, 904), 111: (2178, 381, 1453), 112: (7750, 1112, 3367), 113: (6266, 476, 1992),
+    114: (4266, 522, 1899), 115: (3711, 383, 622), 116: (3413, 582, 1340), 117: (2990, 275, 1029), 118: (377, 424, 1305), 119: (1487, 546, 1388),
+    120: (1636, 519, 1083),
+}
+E8_W_Z33_ARROWS_D120 = 2853   # "Rynek broni: na polkach ... Arrows 2853" (L:35865)
+
+
+def e8w_corr(xs, ys):
+    """Wspolczynnik korelacji Pearsona albo None (za malo dob albo brak zmiennosci)."""
+    n = len(xs)
+    if n < 5:
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sx = sum((x - mx) ** 2 for x in xs)
+    sy = sum((y - my) ** 2 for y in ys)
+    if sx <= 0 or sy <= 0:
+        return None
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / (sx * sy) ** 0.5
+
+
+def e8w_arrows(lines):
+    """Strzaly na polkach miast wedlug doby: linia "Rynek broni: na polkach ... Arrows N" (bez etykiety doby) stoi przed "Pieniadz swiata: dzien N" tej samej doby."""
+    out, pend = {}, None
+    for s in lines:
+        if s.startswith("Rynek broni: na polkach"):
+            pend = num(r"Arrows (\d+)", s)
+        elif s.startswith("Pieniadz swiata: dzien") and pend is not None:
+            d = num(r"dzien (\d+)", s)
+            if d is not None:
+                out[d] = pend
+            pend = None
+    return out
+
+
+def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/W (249, projekt etapu 8 v2 rozdz. 3 "E8/W" Test, progi wzgledne): linia "Zuzycie AI (E8/W)" (AiWear.cs; etykieta = doba zdarzen, jak "Zuzycie AI").
+    W-1 kolejka napraw: naprawione / (zuzyte w bitwach + lup obity) w ostatnich 30 dobach okna (doby 91-120) >= 1.2 x Z33 w tych samych dobach;
+    W-2 linia "stare zuzycie N% zuzyloby" w tym samym biegu: stosunek nowe / stare INFO, naprawy na sztuke zuzyta w bitwie WEDLUG STAREJ REGULY >= Z33
+    (rozdziela skutek kolejki od innej liczby obic); W-3 INFO: zuzycie a straty (korelacja dob > 0); W-4 amunicja AI: W CIENIU - INFO, po wlaczeniu
+    zeszlo > 0 i strzaly na polkach w ostatniej dobie okna >= 50% Z33 doby 120 (2 853); W-5 potkniecia 0, koszt dopasowania INFO (projekt: < 5 ms/d)."""
+    wl = {d: s for d, s in by_day(lines, E8_W_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not wl:
+        rep.add("E8/W: linia Zuzycie AI (E8/W)", "brak w logu", "jest od wgrania E8/W (AiWearEnabled)", None)
+        return
+    days = sorted(wl)
+    nd = max(1, len(days))
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in wl]
+
+    def state(tag):
+        on = sum(1 for d in days if tag in wl[d])
+        return on, len(days) - on
+    z_on, z_off = state("| zuzycie [WL")
+    q_on, q_off = state("| naprawy [WL")
+    a_on, a_off = state("| amunicja AI [WL]")
+    rep.add("W-0: linia Zuzycie AI (E8/W) w kazdej dobie okna; stan kluczy",
+            (f"{len(days)} dob (brak {len(miss)}" + (f": doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") if miss else "") + f" z {len(inner)}); "
+             f"AiWearByIntensity wl {z_on} / wyl {z_off} dob, AiMendQueueContinue wl {q_on} / wyl {q_off}, AiAmmoUse wl {a_on} / w cieniu {a_off}"),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def col(pat, cast=int):
+        return {d: num(pat, wl[d], cast=cast, default=0) for d in days}
+    sound, step, wreck, bottom = col(r"sprawne -> obite (\d+)"), col(r"obite o stopien nizej (\d+)"), col(r"w tym do wraku (\d+)"), col(r"trafienia w dno drabinki (\d+)")
+    lost, parties = col(r"straty (\d+) ludzi"), col(r"partii po bitwie (\d+)")
+    old_exp = {d: num(r"stare zuzycie [0-9.]+% zuzyloby ([0-9.]+) szt", wl[d], cast=float) for d in days}
+    # okno progow: ostatnie 30 dob okna (doby kampanii until-29 .. until), te same doby w Z33
+    lo = max(1, until - 29)
+    zu = by_day(lines, "Zuzycie AI: dzien")
+    tri = {}
+    for d, s in zu.items():
+        rd = run_day(d, start)
+        if lo <= rd <= until:
+            tri[rd] = (num(r"lup obity (\d+) szt\.", s, default=0), num(r"zuzyte w bitwach (\d+)", s, default=0), num(r"naprawione w miastach (\d+)", s, default=0))
+    both = sorted(rd for rd in tri if rd in E8_W_Z33)
+    if len(both) >= 10:
+        a = [sum(tri[rd][i] for rd in both) for i in range(3)]
+        z = [sum(E8_W_Z33[rd][i] for rd in both) for i in range(3)]
+        r1, z1 = a[2] / max(1, a[0] + a[1]), z[2] / max(1, z[0] + z[1])
+        rep.add(f"W-1: kolejka napraw - naprawione / (zuzyte w bitwach + lup obity), doby {both[0]}-{both[-1]}",
+                (f"{r1:.3f} ({a[2]} / ({a[1]} + {a[0]}), {len(both)} dob) wobec Z33 w tych samych dobach {z1:.3f} ({z[2]} / ({z[1]} + {z[0]})) = x{r1 / z1 if z1 > 0 else 0:.2f}"
+                 + ("" if q_off == 0 else f"; klucz AiMendQueueContinue wylaczony w {q_off} dobach")),
+                ">= 1.2 x Z33 w tych samych dobach (projekt podaje dla przykladu dobe 120 Z33: 0.50; Z33 jest sprzed E6/N1 - naprawial tez lup nienoszony)",
+                (r1 >= 1.2 * z1) if (q_off == 0 and z1 > 0) else None)
+        wdays = [d for d in days if run_day(d, start) in both]
+        olds = [old_exp[d] for d in wdays if old_exp[d] is not None]
+        if wdays and len(olds) == len(wdays) and sum(olds) > 0:
+            so = sum(olds)
+            sn = sum(sound[d] + step[d] for d in wdays)
+            ws = sum(sound[d] for d in wdays)
+            rn = sum(tri[run_day(d, start)][2] for d in wdays)
+            zn, zz = sum(E8_W_Z33[run_day(d, start)][2] for d in wdays), sum(E8_W_Z33[run_day(d, start)][1] for d in wdays)
+            r2, z2 = rn / so, zn / max(1, zz)
+            rep.add(f"W-2: stara regula w tym samym biegu - naprawy na sztuke zuzyta w bitwie wedlug starej reguly, doby {both[0]}-{both[-1]}",
+                    (f"{r2:.2f} ({rn} naprawionych / {so:.0f} 'stare zuzycie zuzyloby') wobec Z33 {z2:.2f} ({zn} / {zz}) | nowa regula: {sn} trafien "
+                     f"(sprawne -> obite {ws}, o stopien nizej {sn - ws}) = x{sn / so:.2f} starej; naprawy na sztuke 'sprawne -> obite' {rn / max(1, ws):.2f} ({len(wdays)} dob)"),
+                    ">= Z33 w tych samych dobach (projekt podaje dobe 120 Z33: 2.09); stosunek nowe / stare - INFO",
+                    (r2 >= z2) if q_off == 0 else None)
+        else:
+            rep.add("W-2: stara regula w tym samym biegu", "linia nie ma liczby 'stare zuzycie zuzyloby' (Stage8MeasureLog wylaczony?) albo brak bitew w oknie",
+                    "INFO (liczba oczekiwana starej reguly jest liczona tylko przy Stage8MeasureLog)", None)
+    else:
+        rep.add("W-1 / W-2: kolejka napraw wobec Z33", f"za malo dob wspolnych z Z33 w dobach {lo}-{until} ({len(both)})", "co najmniej 10 dob z linia Zuzycie AI w ostatnich 30 dobach okna", None)
+    # W-3 INFO: zuzycie a straty
+    bd = [d for d in days if parties[d] > 0]
+    c = e8w_corr([float(lost[d]) for d in bd], [float(sound[d] + step[d]) for d in bd])
+    inten = [(num(r"natezenie srednio ([0-9.]+)", wl[d], cast=float), parties[d]) for d in bd]
+    inten = [(x, n) for x, n in inten if x is not None and n > 0]
+    ip = sum(n for x, n in inten)
+    rep.add("W-3: zuzycie w bitwach a straty partii (korelacja dob)",
+            (("brak dob z bitwami" if c is None else f"r = {c:.2f} ({len(bd)} dob z bitwami)") + f"; srednio na dobe: partii po bitwie {sum(parties.values()) / nd:.0f}, straty "
+             f"{sum(lost.values()) / nd:.0f} ludzi, trafien {sum(sound[d] + step[d] for d in days) / nd:.0f}; natezenie srednio na partie "
+             + (f"{sum(x * n for x, n in inten) / ip:.2f}" if ip > 0 else "-")),
+            "INFO (korelacja > 0: wiecej strat = wiecej zuzycia)", None)
+    # W-4: amunicja AI
+    gone = col(r"amunicja AI \[[^\]]*\]: zeszlo (\d+) szt")
+    arrows = e8w_arrows(lines)
+    last_arrow = None
+    for d in reversed(win):
+        if d in arrows:
+            last_arrow = (run_day(d, start), arrows[d])
+            break
+    atxt = f"strzaly na polkach doba {last_arrow[0]}: {last_arrow[1]} (Z33 doba 120: {E8_W_Z33_ARROWS_D120})" if last_arrow else "brak linii Rynek broni"
+    if a_on == 0:
+        rep.add("W-4: amunicja AI (W CIENIU)", f"klucz AiAmmoUse wylaczony - zeszlo {sum(gone.values())} szt.; 'zeszloby' w wierszu E8/P2; {atxt}",
+                "INFO (wlaczenie w fazie poprawek; wtedy: zeszlo > 0 i strzaly na polkach >= 50% Z33)", None)
+    else:
+        tot = sum(gone.values())
+        kinds = [sum(col(p).values()) for p in (r"zeszlo \d+ szt\. \(strzaly (\d+)", r"belty (\d+), miotane \d+\) w \d+ partiach \| wrakow", r"miotane (\d+)\) w \d+ partiach \| wrakow")]
+        ok = tot > 0 and last_arrow is not None and last_arrow[1] >= 0.5 * E8_W_Z33_ARROWS_D120
+        rep.add("W-4: amunicja AI wlaczona - kolczany zuzyte i strzaly na polkach",
+                f"zeszlo {tot} szt. w oknie ({tot / nd:.0f}/d: strzaly {kinds[0]}, belty {kinds[1]}, miotane {kinds[2]}; wlaczone {a_on} z {len(days)} dob); {atxt}",
+                "zeszlo > 0 i strzaly na polkach w ostatniej dobie okna >= 50% Z33 doby 120 (1 427)", ok)
+    # W-5: potkniecia i koszt
+    stum = max([num(r"potkniecia \(sesja\) (\d+)", wl[d], default=0) for d in days] + [0])
+    fb = sum(col(r"partie na starej regule po potknieciu (\d+)").values())
+    cost = col(r"koszt dopasowania ([0-9.]+) ms", cast=float)
+    cmax = max(cost.values()) if cost else 0.0
+    rep.add("W-5: potkniecia E8/W i koszt dopasowania 'co nosza ludzie' po bitwie",
+            f"potkniecia (sesja) {stum}, partie na starej regule po potknieciu {fb}; koszt srednio {sum(cost.values()) / nd:.1f} ms/d, najwiecej {cmax:.1f} ms",
+            "potkniecia 0 (koszt - INFO; projekt: < 5 ms/d)", stum == 0 and fb == 0)
+    # INFO: kolejka, zakupy, wraki
+    pp, pn, ap = col(r"partie z brakiem w sakiewce (\d+)"), col(r"sztuki czekajace na sakiewke (\d+)"), col(r"naprawione po pierwszej sztuce bez pieniedzy (\d+) szt")
+    bn, bg, bk = col(r"zaplat z rezerwa (\d+)"), col(r"kiesa pana zamiast rezerwy napraw zaplacila(?:by)? (\d+) zl"), col(r"zl w (\d+) zaplatach")
+    wr = col(r"wrakow w ksiedze (\d+)")
+    rep.add("E8/W: kolejka napraw i zakupy brakow (srednio na dobe)",
+            (f"partie z brakiem w sakiewce {sum(pp.values()) / nd:.1f}, sztuki czekajace na sakiewke {sum(pn.values()) / nd:.0f}, naprawione po pierwszej sztuce bez pieniedzy "
+             f"{sum(ap.values()) / nd:.1f} szt. (stara petla stanelaby) | zakupy brakow: zaplat z rezerwa {sum(bn.values()) / nd:.1f}, kiesa pana zamiast rezerwy napraw "
+             f"{sum(bg.values()) / nd:.0f} zl/d w {sum(bk.values()) / nd:.1f} zaplatach (okno {sum(bg.values())} zl)"),
+            "INFO (lordowie placa wiecej - zamierzone; granica: wspolny prog rodow na minusie, projekt rozdz. 4 pkt 5)", None)
+    rep.add("E8/W: obite schodza o stopien - wraki",
+            (f"o stopien nizej {sum(step.values()) / nd:.0f}/d, w tym do wraku {sum(wreck.values()) / nd:.1f}/d (okno {sum(wreck.values())}), trafienia w dno drabinki "
+             f"{sum(bottom.values()) / nd:.1f}/d; wrakow w ksiedze: pierwsza doba {wr[days[0]]}, ostatnia {wr[days[-1]]}"),
+            "INFO (wraku kowale nie naprawiaja, a AI go nie wymienia - do decyzji po liczbach)", None)
+
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8795,6 +8977,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_p1)   # E8/P1 (243): ksiega umiejetnosci
     blocks.append(etap8_p2)   # E8/P2 (244): pomiary sprzetu AI, lupu i korony
     blocks.append(etap8_x)    # E8/X (248): doswiadczenie za skutek
+    blocks.append(etap8_w)    # E8/W (249): zuzycie i naprawy AI
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
