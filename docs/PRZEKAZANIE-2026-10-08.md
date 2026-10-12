@@ -933,3 +933,4 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   przez zywego lorda bez odkupu (stare, osobny projekt).
   Autotest: RC przez -ExtraDll <sciezka>\RealisticCaptivity.dll (nazwa pliku = nazwa modulu).
 - (02:10 UTC) **Audyt S GOTOWE** (w-toku/e5-audyt 371c586, recenzja bez uwag): A3' NotableBkGiftCut (drugie 10 000 BK uciete), zaulki z kasy miasta AlleyIncomeFromTown, RealPayer TourneyPre High (przed RBM; GrandTourney tez z kasy miasta), licznik G24/N3; progi etap5_aud. Do decyzji: zaulki w oblezonym miescie tez placa (jak pasmo A3).
+- (02:00 UTC) **Scalenie koncowe czesc 1** (wf_e6b8596a-7d5): w-toku/zbior-final (SCRATCH(ae222cb7)\final) = zbior-e5 + zbior-e4-koniec (poprawki) + e4-fix2 + e5-fix + e5-audyt + e6-waski -> recenzja -> test\Armoury-final1.dll, test\rc-final\RealisticCaptivity.dll. Czesc 2 po porcji B (e5-b1, e5-b235, e5-b46). Tydzien 76% o 01:56 UTC.
