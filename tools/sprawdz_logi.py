@@ -106,7 +106,7 @@ Uzycie (Python 3, tylko odczyt):
                     i linie "ERROR in DistrictMenu." / "ERROR in VillageBook.DistrictView" 0; uzycie okna i zrodla herbow - INFO; T2 zdjecie okna - poza narzedziem.
                     Blok etap7_w5 (E7/W5, paczka 238): T1 linia startowa "Proporczyki (E7/W5): start" (ostatnia mapa): siatka campaign_flag (zapas map_banner -
                     INFO, BRAK - NIE); W5-1 w kadrze najwiecej 1-80 (0 = kamera nie zjechala ponizej 90 - INFO); W5-2 budowa sr. < 8 ms/klatke (budzet tworzenia
-                    obrazkow wiosek na tick); W5-3 potkniecia 0 (najwiecej w linii mapy) i linie "ERROR in MapVillagesView.Pennant*" 0; przebudowy po misji,
+                    obrazkow wiosek na tick); W5-3 potkniecia 0 (najwiecej w linii mapy) i linie "ERROR in MapVillagesView.Pennant* / PickPennant* / RemovePennants" 0; przebudowy po misji,
                     zmiany herbu - INFO; T2 spadek klatek < 5% (inaczej VillagePennants domyslnie false) - tryb zdjec, poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
@@ -6224,7 +6224,8 @@ def etap7_w5(rep, lines, start, win, until=120, **kw):
             "< 8 ms (budzet tworzenia obrazkow wiosek na tick)", ms < 8.0 if bt > 0 else None)
     st = max([num(r"potkniecia (\d+) \(wiosek bez", s, int, 0) or 0 for s in rows] or [0])
     fl = max([num(r"wiosek bez proporczyka (\d+)\)", s, int, 0) or 0 for s in rows] or [0])
-    err = [s for s in lines if s.startswith("ERROR in MapVillagesView.Pennant")]
+    # PickPennantMesh (start mapy) i RemovePennants (wylacznik, koniec mapy - po linii stanu) tez: ich potkniecia nie trafiaja do linii z konca mapy
+    err = [s for s in lines if s.startswith(("ERROR in MapVillagesView.Pennant", "ERROR in MapVillagesView.PickPennant", "ERROR in MapVillagesView.RemovePennants"))]
     rep.add("E7/W5 W5-3: potkniecia proporczykow (najwiecej w linii mapy) i linie ERROR", f"potkniecia {st} (wiosek bez proporczyka {fl}), linii ERROR {len(err)}",
             "0", st == 0 and not err)
     pm = max([num(r"przebudowy po misji (\d+)", s, int, 0) or 0 for s in rows] or [0])
