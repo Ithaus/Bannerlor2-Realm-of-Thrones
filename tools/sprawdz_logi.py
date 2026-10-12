@@ -4572,12 +4572,17 @@ def etap5_c1(rep, lines, start, until):
     zz = by_day(lines, "Zawor zamkow (110): dzien")
     m2 = sum(1 for d in win if num(r"^ \| E5/A1: tryb regulatora (\d)", seg[d]) == 2)
     up_t = sum(num(r"dosypka do zapasu \(tryb 1\) (\d+)", seg[d], int, 0) or 0 for d in win)
-    zd = [d for d in win if d in zz]
+    # recenzja C1: Castle Purse Enabled wylaczone = linia "WYLACZONE" raz na sesje (czesto doba 1, poza oknem) i regulator gry dosypuje zamkom z niczego -
+    # wtedy liczba 0 nic nie dowodzi (NIE); brak linii zamkow w oknie - zamki niesprawdzone (INFO), nie TAK
+    zoff = sum(1 for s in zz.values() if "WYLACZONE" in s)
+    zd = [d for d in win if d in zz and "WYLACZONE" not in zz[d]]
     up_c = sum(num(r"dosypka do zapasu \(tryb 1, zostaje do etapu 3\) (\d+)", zz[d], int, 0) or 0 for d in zd)
+    ok11 = m2 == len(win) and up_t == 0 and up_c == 0
     rep.add("E5/C1-1: regulator kas bez dosypki (tryb 2 Town Purse Regulator; suma okna)",
             f"tryb 2 w {m2} z {len(win)} dob; dosypka kas miast {up_t}, kas zamkow {up_c}"
-            + ("" if zd else " (brak linii Zawor zamkow (110) - Castle Purse Enabled wylaczone?)"),
-            "tryb 2 kazdej doby; dosypka miast 0, zamkow 0", m2 == len(win) and up_t == 0 and up_c == 0)
+            + (" (Castle Purse Enabled WYLACZONE - zamki z dosypka gry z niczego)" if zoff else ("" if zd else " (brak linii Zawor zamkow (110) w oknie - zamki niesprawdzone)")),
+            "tryb 2 kazdej doby; dosypka miast 0, zamkow 0 (linia Zawor zamkow (110) czynna)",
+            False if zoff else (ok11 if (zd or not ok11) else None))
     # ---------------- C1-2: zakup plonu w miastach-zaulkach
     hre = re.compile(r"plon w zaulkach \(E5/C1\): przywiezione (\d+) szt\. w (\d+) wizytach, niesprzedane (\d+) szt\. \((\d+) miast\);"
                      r" do wszystkich miast przywiezione (\d+) szt\.")
