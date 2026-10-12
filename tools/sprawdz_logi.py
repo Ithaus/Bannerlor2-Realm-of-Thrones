@@ -3621,8 +3621,10 @@ def etap5_a4(rep, lines, start, until, obl, bud):
                 + f" | oblezone przy linii: miasta srednio {st.mean(tw):.2f} (najwiecej {max(tw)}), zamki {st.mean(cs):.2f} (najwiecej {max(cs)})",
                 "INFO ([S] z31-A: ok. 1.3 oblezonego miasta na dobe w d93-120 x ok. 5 tys. renty = ok. 6.5 tys./d renty; polityki - tylko krolestwa z nimi)", None)
         # A4-5: drogi "od dawna" - zawor zamkow 110 i zawor A1 pomijaja oblezone (odczyt liczby z ich linii)
-        z110 = e4_series(lines, "Zawor zamkow (110): dzien", 1)
-        k169 = e4_series(lines, "Kasy miast (169c): dzien", 1)
+        # recenzja scalenia A: linie 110 i 169c maja juz numer doby ksiegi (dzien gry - 1: CastlePurse.Daily, Measure169c.Daily) - bez przesuniecia,
+        # jak w etap5_a1; przesuniecie tylko dla linii "Oblezone (E5/A4)" (dzien gry) - inaczej A4-5/6/9 czytaly 110/169c z nastepnego bloku doby
+        z110 = by_day(lines, "Zawor zamkow (110): dzien")
+        k169 = by_day(lines, "Kasy miast (169c): dzien")
         zc = [num(r"oblezone (\d+), bez pana", z110[d], int) for d in win if d in z110]
         zc = [x for x in zc if x is not None]
         ac = [num(r"bez poboru: kasa nie ponad zapasem \d+, oblezone (\d+)", k169[d], int) for d in win if d in k169]

@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-11 (etap 5, poprawka po recenzji scalenia porcji A w `w-toku/zbior-e5`) - NARZEDZIE: E5/A4 CZYTA LINIE 110 I 169c BEZ PRZESUNIECIA DOBY
+**Mod:** Armoury (tylko narzedzie) | **Galaz:** `w-toku/zbior-e5` (od 775e7f6) | **Plik:** `tools/sprawdz_logi.py` (`etap5_a4`)
+
+**Problem:** recenzja scalenia A (jedna uwaga, drobna): `etap5_a4` czytal "Zawor zamkow (110)" i "Kasy miast (169c)" przez `e4_series(..., 1)` - klucze o jedna dobe za nisko wobec `rows` (linia "Oblezone (E5/A4)"). Dowod w logu d120 (`SCR\kopia-e4k\czesc-d120.log` L:507/515): w jednym bloku dobowym "Budzet rodow (166): dzien 108837" i "Kasy miast (169c): dzien 108836", "Zawor zamkow (110): dzien 108836" (L:380). Skutek: A4-9 (kontrola kroku scalania 2 - zawor A1 przez bramke `Holds`) bral "oblezone" w zaworze A1 z NASTEPNEGO bloku, a "wstrzymane: renta miast" z biezacego; A4-5/A4-6 liczyly doby kampanii 2..until+1 zamiast 1..until. Przy oblezeniu na granicy okna werdykt A4-9 wychodzil INFO zamiast TAK/NIE.
+
+**Przyczyna:** obie linie maja juz numer doby ksiegi = dzien gry - 1 (`CastlePurse.Daily` :560, `Measure169c.Daily` :937 -> `TownsLine(day, ...)` :952); przesuniecie 1 jest potrzebne tylko dla linii z dniem gry ("Oblezone (E5/A4)" - `BesiegedPay.Daily` :276 `CampaignTime.Now.ToDays`; "Budzet rodow (166)"). Wszystkie trzy linie pisze ten sam tick dobowy `ArmouryBehavior` (:1489 110, :1554 169c, :1591 A4). Blad przyszedl z galezi A4 (c333571), scalenie go przenioslo. Uwaga PRAWDZIWA.
+
+**Zmiana:** `etap5_a4` - `z110 = by_day(lines, "Zawor zamkow (110): dzien")`, `k169 = by_day(lines, "Kasy miast (169c): dzien")` (bez przesuniecia, jak `etap5_a1` :2927/:2931). `obl`/`bud` (dzien gry, przesuniecie 1) bez zmian. Kod gry bez zmian.
+
+**Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
+- Pozostale `e4_series(..., 1)` w narzedziu sprawdzone na logu d120: "Budzet rodow (166)", "Korona: wplywy dnia (165)" (L:470 = dzien 166 tego bloku), "Markietani (E5/A3)", "Oblezone (E5/A4)", Wyrzutki/H3/I1/pula E4/3 - wszystkie z dniem gry, przesuniecie slusznie; tylko A4 mialo linie ksiegi z przesunieciem.
+- Log syntetyczny (3 bloki, jedna doba oblezenia, pary 110/166/169c/Oblezone z tego samego bloku; skrypt w `SCR\e5\test-a4fix\t.py`, stara wersja narzedzia z 775e7f6 obok): oblezenie w 1. dobie z bramka - przed: A4-9 INFO ("oblezone w zaworze A1 0", 2 doby), po: TAK (3 doby); oblezenie w ostatniej dobie bez bramki (held 0) - po: NIE; oblezenie w srodku z bramka - TAK przed i po; A4-5/A4-6 licza teraz 3 z 3 dob (dotad 2).
+- `--grupa etap5` na `czesc-d120.log`: kod 0, wynik IDENTYCZNY ze stara wersja (diff pusty - log testu E4 nie ma linii A4, blok A4 "brak w logu").
+- Build Release kod 0 (1 stare ostrzezenie CS0169); kod gry i `McmSettings` bez zmian - DLL rozni sie od 527c115f tylko hashem commitu w wersji.
+
+**Status:** DO SPRAWDZENIA - w tescie A (`--grupa etap5`, wiersze A4-5, A4-6, A4-9). DLL: `SCR\test\Armoury-e5a.dll` - z commitu tego wpisu (hash commitu w wersji DLL), nie wgrany, gra nie uruchamiana.
+
 ## 2026-10-11 (etap 5, Scalenie porcji A etapu 5 w `w-toku/zbior-e5`) - A1 (KASY MIAST) + A2-A5 (DWOR, MARKIETANI I NOTABLE, OBLEZONE, BEE) + A6 (LUP Z KIESY POKONANEGO) NA ZBIORZE ETAPU 4 Z E5/0; OBOWIAZKOWE KROKI SCALENIA
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e5` (od 7658247 = calosc etapu 4 + E5/0 pomiar) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/e5-a1` (e8868d2) -> 8b4009e, zadanie E5/0 (BBack) -> b0985e4, `w-toku/e5-a2-5` (7e03a6c) -> 688abf8, `w-toku/e5-a6` (c71aa64) -> ed4e52f; ten wpis | **Wiazace:** `docs\etap5\PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` v2 + decyzje Jeffa 11.10 (rozdz. 6: test A osobno, A1 tryb 2 bez dosypki, A6 bezwarunkowo)
 
