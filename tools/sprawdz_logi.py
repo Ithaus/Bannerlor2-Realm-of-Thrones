@@ -183,7 +183,9 @@ Uzycie (Python 3, tylko odczyt):
                     mapa): wyglad CZYNNY, napisy CZYNNE, ksiega wiosek czynna (ksiega nieczynna - NIE); T1 w KAZDEJ linii stanu przebudowy obrazka <= zmiany stanu
                     i pokazane + schowane + bez obrazka + polaczone + czeka = zmiany stanu (0 zmian - INFO); T1b najwiecej przebudow jednej wioski <= 20; W4-2
                     ciemne obrazki maja przyciemnione encje (spalonych 0 - INFO); W4-3 napisow w kadrze 1-30 i przeliczenie pozycji < 0.3 ms/klatke (0 napisow -
-                    INFO); T4 potkniecia 0, linie "ERROR in MapVillagesView.Look* / Label*" 0, brak linii "BRAK prefabu" i "WYLACZONE do nastepnego wczytania";
+                    INFO); T4 potkniecia 0, linie "ERROR in MapVillagesView.Look* / Label*" 0, brak linii "BRAK prefabu" i "WYLACZONE do nastepnego wczytania",
+                    a takze (recenzja) potkniecia tworzenia / ognia / zdejmowania z linii "Wioski:" 0 i linie "ERROR in MapVillagesView.Create / Remove /
+                    ApplyFx / PollRaids" 0 - przebudowa obrazka, zdjecie starego i dym nad spalonymi licza potkniecia w tych starych licznikach;
                     T2 zdjecie spalonej, T3 spadek klatek < 2% - tryb zdjec (DLL zdjec -p:W4Photo=true zglasza sie w linii startowej), poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
@@ -8336,11 +8338,22 @@ def etap7_w4(rep, lines, start, win, until=120, **kw):
             (1 <= lmax <= 30 and ms < 0.3) if lmax > 0 else None)
     st = max(g(r"potkniecia: wyglad (\d+)", x) for x in rows)
     sl = max(g(r"potkniecia: wyglad \d+, napisy (\d+)", x) for x in rows)
-    err = [x for x in lines if x.startswith(("ERROR in MapVillagesView.Look", "ERROR in MapVillagesView.Label"))]
+    # recenzja E7/W4: przebudowa obrazka (TryCreate -> Create z barwa, bez detali, z nizszym poziomem), zdjecie starego obrazka (DropPicture) i dym nad
+    # spalonymi (BurnedFx -> ApplyFx) licza potkniecia w STARYCH licznikach linii "Wioski:" (tworzenie, ogien, zdejmowanie) i pisza ERROR pod starymi
+    # nazwami - bez nich T4 byl zielony takze wtedy, gdy spalona wioska nie stawala (3 potkniecia tworzenia = wioska znika z mapy do wczytania).
+    # Liczniki wspolne z W2: kazde potkniecie w nich to blad obrazkow wiosek (bieg bazowy 11-12.10: wszedzie 0).
+    wl = [x for x in lines if x.startswith("Wioski: ") and "potkniecia: tworzenie" in x]
+    sc = max([g(r"potkniecia: tworzenie (\d+)", x) for x in wl] or [0])
+    sf = max([g(r"potkniecia: tworzenie \d+, wzor \d+, ogien (\d+)", x) for x in wl] or [0])
+    sr = max([g(r"zdejmowanie (\d+), tick", x) for x in wl] or [0])
+    err = [x for x in lines if x.startswith(("ERROR in MapVillagesView.Look", "ERROR in MapVillagesView.Label", "ERROR in MapVillagesView.Create ",
+                                             "ERROR in MapVillagesView.Remove ", "ERROR in MapVillagesView.ApplyFx", "ERROR in MapVillagesView.PollRaids"))]
     lost = [x for x in lines if x.startswith("Wioski - wyglad (E7/W4):") and ("BRAK prefabu" in x or "WYLACZONE do nastepnego wczytania" in x)]
-    rep.add("E7/W4 T4: potkniecia wygladu i napisow (najwiecej w linii mapy), linie ERROR, napisy zgaszone / brak prefabu",
-            f"wyglad {st}, napisy {sl}, linii ERROR {len(err)}, napisy zgaszone albo brak prefabu {len(lost)}",
-            "0 (brak prefabu = katalog GUI\\Prefabs nie wgrany razem z DLL)", st == 0 and sl == 0 and not err and not lost)
+    rep.add("E7/W4 T4: potkniecia wygladu i napisow (najwiecej w linii mapy), tworzenia / ognia / zdejmowania obrazkow (linia Wioski), linie ERROR,"
+            " napisy zgaszone / brak prefabu",
+            f"wyglad {st}, napisy {sl}, tworzenie {sc}, ogien {sf}, zdejmowanie {sr}, linii ERROR {len(err)}, napisy zgaszone albo brak prefabu {len(lost)}",
+            "0 (brak prefabu = katalog GUI\\Prefabs nie wgrany razem z DLL; tworzenie / ogien / zdejmowanie - liczniki wspolne z W2, tedy ida przebudowa"
+            " i dym W4)", st == 0 and sl == 0 and sc == 0 and sf == 0 and sr == 0 and not err and not lost)
     rep.add("E7/W4 T2 / T3: zdjecie spalonej wioski (ciemna, bez detali, dym, napis), spadek klatek z napisami", "poza narzedziem",
             "tryb zdjec: wyglad czytelny, klik i dymek mapy pod napisem dzialaja, spadek klatek < 2%", None)
 
