@@ -101,3 +101,11 @@ Kopie poprzednich wersji: `*.dll.bak-2026-10-12-przed-noc32` obok plików i `D:\
 - **Przebieg nocy:** `docs/PRZEKAZANIE-2026-10-08.md`, ostatnie wpisy.
 - **Projekty:** `docs/etap5/`, `docs/etap6/`. Audyt złota: `docs/etap5/AUDYT-ZLOTO-Z-NICZEGO-2026-10-11.md`.
 - **Logi testów:** SCRATCH sesji ae222cb7, foldery `kopia-e4k`, `kopia-fin`, `kopia-fin3`.
+
+## 6. Odpowiedzi Jeffa z rana (12.10) i co dalej
+
+- (1) wojsko: **wyższy podatek** od nadwyżki sakiewek wsi, 2,5% zamiast 1,5% (bez pomostu ze skarbca); (2) próg „0,1% albo 200 ludzi”; (3) pojmujący zabiera też **całe juki**;
+  (4) zaułki w oblężonym mieście wstrzymane - **jedna zasada**; (5) ubogie miasta - **sprawdzimy w biegu rocznym**; (6) czujnik zbyt szybkiego przyrostu ludności zostaje.
+- **Następna paczka (do jednego testu: 120 dni + zapis + zima, potem wgranie):** etap 6, porcja 2 (licznik koni u źródła, ryby z wiosek rybackich, koń ginie
+  tylko zabity, jeden zapas koni na sprzedaż, konie poległych jeźdźców), plus decyzje 1-4 powyżej. Potem reszta etapu 6 (wytop przy kopalni, rycerz z koniem,
+  hodowla), etap 5 C po roku, małe źródła złota z audytu, na końcu długi bieg.
