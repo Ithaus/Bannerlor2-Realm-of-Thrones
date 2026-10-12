@@ -917,3 +917,10 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   poprawki recenzji (f2e5f98). Na starym logu d120: etap4 NIE 20 -> 8 (pozostale to bledy kodu poprawione - potwierdzi nowy test), etap5 0. DLL test\Armoury-e4-koncowy2.dll
   80dfcb0a. CS: klucz powtorek z komunikatem (RepeatKeyByMessage). Klucze nowe: LevyVillageFromTown, PrescapeGoHome (PrisonEscapeGoHome). OTWARTE (raport): prog T3
   rownania krain 0.1% nieosiagalny dla malych krain (Sarnor) - decyzja o progu.
+- (01:05 UTC) **AUDYT ZLOTA Z NICZEGO GOTOWY** (docs/etap5/AUDYT-ZLOTO-Z-NICZEGO-2026-10-11.md; 166 zgloszen, 89 niezmierzonych zweryfikowanych): duze zrodla znalezione
+  wszystkie i mierzone (zakupy 374-470 tys./d -> A1; statki 226-278 + pryzy 35-70 + handel 13-17 -> B5; pasmo notabli 111-146 + kapital karawan 68-91 -> A3;
+  regulator 17-18 -> A1 tryb 2; lup wodzow 12-13 -> A6). Ksiega domyka sie (reszta -1.2..-2.2 tys./d przy ok. 1.5 mln/d przeplywu). NOWE male: zaulki 30 zl/d (6.6-6.9 tys./d),
+  drugie 10 000 dla notabla od BK (do 2.3 tys./d), lup z rabunku wsi, tier rodow bez lenn, 5000 dla nowej zalogi, perki 5000, turnieje AI (RBM przed RealPayer -
+  priorytet), nowy rod szlachty BK 15 000 i herszt BK 10 000; dziury pomiaru: koszt paktow Diplomacy -2.7 tys./d bez odbiorcy, skoki reszty od rodow BK; uspione G24/N3
+  (ozyja przy A1 tryb 2). Bez rozszerzen A3 zostanie 9-11 tys./d (prog 8.5), z A3' i zaulkami ok. 2 tys./d. Robie teraz (S): A3' (uciac drugie 10 000 BK),
+  zaulki z kasy miasta, priorytet turniejow RealPayer, licznik G24/N3. Na pozniej: E5/A7 (rabunek, zaloga, tier, perki), E5/A8 (BK i Diplomacy - najpierw pomiar).
