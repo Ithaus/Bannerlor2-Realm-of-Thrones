@@ -52,8 +52,9 @@ Uzycie (Python 3, tylko odczyt):
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
                     T11b a <= f), T7 ze zrodlem wedrowcow i konwojow BK (E4/8), progi kosztu linii paczek 30 ms (E5/0 50 ms) i wiersz zbiorczy etapow 4+5 <= 1% doby.
-                    Poprawki recenzji: zywi bez podwojnych "w drodze", z taborami, z liczby "ludzie zywi (rownanie krain)" gdy jest; T11/S15/T11b - INFO (Jeff 12.10:
+                    Poprawki recenzji: zywi bez podwojnych "w drodze", z taborami, z liczby "ludzie zywi (rownanie krain)" gdy jest; T11/S15 - pas w wartosci, T11b - INFO (Jeff 12.10:
                     prog tylko pomiar), T11c mobilizacja 28 dob; progi kosztu T12/N15/G10 0.2% i E50-T2 0.3% sredniej doby tych samych dob (bez linii Koszt - 30/50 ms).
+                    E4 fix2 (Jeff 12.10 nr 1-2): ludnosc = wszyscy zywi; dol -0.5%/rok w T11 i S15 tylko INFO (bez hamulca strat), gora +1150/d - prog (T11b - INFO, recenzja fixC).
 --baza-doby P     : (etap4 T8) log Armoury biegu bazowego - srednia "doba N ms (zegar)" (linia Koszt 171-174) w tych samych dobach kampanii, w parach; <= +3%
                     z bledem sredniej. Bez niego wiersz INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
@@ -763,7 +764,17 @@ E4_ZYWI_TABORY = r"\| zolnierze: [^|]*?tabory wsi (\d+) \("          # linia "Lu
 E4_ZYWI_KANON = r"\| ludzie zywi \(rownanie krain[^)]*\) (\d+)"     # linia "Ludzie (ksiega)" od poprawek recenzji (OriginSegment: suma a[1] krain)
 E4_ZYWI_FLOW = (("POLEGLI", r"POLEGLI od siewu (\d+)"), ("cywile", r"cywile od siewu (\d+)"), ("narodziny", r"narodziny netto od siewu (-?\d+)"),
                 ("reszta", r"rownanie krain: najgorsza kraina \S+ reszta \S+ \([^)]*\), swiat " + SF))
-E4_ZYWI_MIN, E4_ZYWI_MAX = -721.0, 1150.0     # Jeff 11.10 (4): w ciaglej wojnie do -0.5%/rok; gora - pas E4/4. Jeff 12.10 (2): prog tylko INFO (pomiar)
+E4_ZYWI_MIN, E4_ZYWI_MAX = -721.0, 1150.0     # Jeff 11.10 (4): w ciaglej wojnie do -0.5%/rok; gora - pas E4/4
+# E4 fix2 (decyzja Jeffa 12.10 nr 2, P1-5 odrzucone): bez sztucznego hamulca strat - "jesli ubywa, to ubywa"; dol -0.5%/rok (E4_ZYWI_MIN) tylko INFO (pomiar).
+# Gora +1150/d (najwyzszy przyrost korytarza E4/4 - wiecej to ludzie z niczego) zostaje progiem; mobilizacja - T11c (INFO; T11b a <= f - INFO od recenzji fixC).
+
+
+def e4_zywi_ok(z):
+    """fix2: wynik progu zywych (T11, S15) - tylko gora pasa; tekst dopisku, gdy zywi spadaja szybciej niz -0.5%/rok (INFO, bez progu)."""
+    return z <= E4_ZYWI_MAX, (" - PONIZEJ -0.5%/rok (INFO, Jeff 12.10: bez hamulca strat)" if z < E4_ZYWI_MIN else "")
+
+
+E4_ZYWI_RULE = "<= +1150/d (gora pasa E4/4 - wiecej to ludzie z niczego); dol -721/d (-0.5%/rok) tylko INFO (Jeff 12.10 nr 2: jesli ubywa, to ubywa)"
 
 
 def e4_zywi(lines, start, win, d0=28):
@@ -809,7 +820,7 @@ def e4_zywi(lines, start, win, d0=28):
 
 
 def e4_zywi_band(z):
-    """Recenzja fixC (2): pas Jeffa jako oznaczenie w wartosci (prog tylko INFO - Jeff 12.10 (2))."""
+    """Recenzja fixC (2): pas Jeffa jako oznaczenie w wartosci (dol -0.5%/rok tylko INFO - Jeff 12.10 (2); gora - prog e4_zywi_ok, fix2)."""
     if z["z"] < E4_ZYWI_MIN:
         return f"PONIZEJ {E4_ZYWI_MIN:+.0f}/d"
     if z["z"] > E4_ZYWI_MAX:
@@ -1596,13 +1607,13 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     # poprawka po tescie koncowym etapu 4 (P1-1): "razem z nimi" to tylko DOM + UCHODZCY - w nowej kampanii armie rosna z ludzi (E4/7, E4/8: kazdy zolnierz jest
     # czlowiekiem), wiec mobilizacja wygladala jak ubytek. Prog Jeffa liczy ludzi ZYWYCH (konta ksiegi); DOM - INFO z rozbiciem.
     # Recenzja fixC (2): Jeff 12.10 (STAN-PRAC, decyzje po tescie E4): (1) "ludnosc" = wszyscy zywi - DOM zostaje INFO (bez DECYZJA); (2) bez hamulca strat (P1-5
-    # odrzucone) - prog -0.5%/rok TYLKO INFO (pomiar), wiec T11 i S15 - INFO z oznaczeniem pasa w wartosci (nie TAK). T11b (a swiata <= f) - INFO: hamulec regionu
+    # odrzucone) - prog -0.5%/rok TYLKO INFO (pomiar), wiec T11 i S15 - oznaczenie pasa w wartosci, wynik tylko z gory +1150/d (scalenie z fix2). T11b (a swiata <= f) - INFO: hamulec regionu
     # wlacza sie przy a >= f (FreeHands), a "a srednio" to srednia swiata wazona ludnoscia - z konstrukcji nie przekroczy f; mobilizacja widoczna w T11c.
     # Log bez konta SLUZBA (przed E4/7) - stara miara (zolnierz nie byl czlowiekiem).
     zy = e4_zywi(lines, start, win)
     if zy:
-        rep.add(f"E4/7 T11: ludzie zywi netto d28-{until} (ludzi/d)", e4_zywi_band(zy) + "; " + e4_zywi_text(zy),
-                "INFO (Jeff 12.10 (2): prog tylko pomiar, bez hamulca strat); pas: od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4)", None)
+        ok_, _below = e4_zywi_ok(zy["z"])  # scalenie koncowe: gora pasa - prog (fix2), dol -0.5%/rok - INFO; pas w wartosci (recenzja fixC)
+        rep.add(f"E4/7 T11: ludzie zywi netto d28-{until} (ludzi/d)", e4_zywi_band(zy) + "; " + e4_zywi_text(zy), E4_ZYWI_RULE, ok_)
         rep.add(f"E4/7 T11: DOM + uchodzcy netto d28-{until} - rozbicie (ludzi/d)",
                 f"{zy['dom']:+.0f} = narodziny {zy['nar']:+.0f} - mobilizacja (SLUZBA z wedrowcami BK, JENCY) {zy['mob']:.0f} - polegli {zy['pol']:.0f} - niewola {zy['niew']:.0f}"
                 f" - pula/weterani/Mur/tabory {zy['inne']:.0f} - cywile {zy['cyw']:.0f} + reszta rownania krain (bez nazwy) {zy['res']:+.0f} + inne (przyciecie kluczy, zaokraglenia, \"\" w NIEWOLNYCH, Murze i puli) {zy['other']:+.0f}"
@@ -1614,7 +1625,7 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
                     "INFO (czy armie dalej rosna z ludzi; zastepuje T11b jako straznik mobilizacji)", None)
     else:
         rep.add(f"E4/7 T11: ludnosc netto d28-{until} (ludzi/d)", f"{st.mean(net):+.0f}/d (log bez konta SLUZBA E4/7 - ludzie w domu)" if net else "brak dob 28+",
-                "od -720/d (-0.5%/rok, Jeff 11.10) do +1150/d", (-721 <= st.mean(net) <= 1154) if net else None)
+                "do +1150/d; -720/d (-0.5%/rok) tylko INFO (Jeff 12.10 nr 2)", (st.mean(net) <= 1154) if net else None)
     # T11b (P1-1 pkt 4) - mobilizacja: a swiata z linii "Wolne rece" <= prog f (zwykly) kazdej doby okna
     af = []
     for d in wdays:
@@ -1697,6 +1708,15 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     rep.add("fixA P1-2: polegli od ostrzalu w oblezeniu (srednio na dobe, suma)", f"{st.mean(sd):.1f}/d, {sum(sd):.0f}", "INFO (sceptyk: ok. 45 na oblezenie na dobe)", None)
     vt_ = [fnum(r"odwrot wsi do stanu miasta regionu \(fixA T6\) " + F_, poc[d]) or 0 for d in pdays]
     rep.add("fixA T6: odwrot wsi na podlodze do stanu miasta regionu (suma)", f"{sum(vt_):.0f}", "INFO (T6 pobor na podlodze -> 0)", None)
+    # E4 fix2 (P1-4, decyzja Jeffa 12.10 nr 3): pobor E4/7 w miescie wedlug udzialu miasta w ludnosci krainy - czesc z wsi regionu i dobor z miasta po podlodze wsi
+    sv_ = [fnum(r"pobor miast wedlug udzialu \(fix2 P1-4\) z wsi regionu " + F_, poc[d]) for d in pdays]
+    sb_ = [fnum(r"wsie na podlodze - znow z miasta " + F_, poc[d]) or 0 for d in pdays]
+    so_ = sum(1 for d in pdays if "WYLACZONY (Town Levy By Share)" in poc[d])
+    svv = [x for x in sv_ if x is not None]
+    rep.add("fix2 P1-4: pobor miast wedlug udzialu - z wsi regionu / znow z miasta (srednio na dobe, suma)",
+            (f"{st.mean(svv):.1f}/d / {st.mean(sb_):.1f}/d (suma {sum(svv):.0f} / {sum(sb_):.0f}, dob {len(svv)}" + (f", wylaczony {so_} dob" if so_ else "") + ")") if svv else
+            (f"WYLACZONY (Town Levy By Share) {so_} dob" if so_ else "brak pola (log sprzed fix2)"),
+            "INFO (CHANGELOG fix2: z wsi ok. 375/d, \"w tym ze stanu miast\" ok. 3 razy mniej, znow z miasta maly; T6 nie rosnie)", None)
     cuts = {}
     for d in pdays:
         m = re.search(r"niedobor skladow wedlug stanu partii \(diagnostyka P2-T4\): (.*?); najwiekszy", poc[d])
@@ -1908,7 +1928,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
     hr = [x for x in hr if x is not None]
     rep.add("E4/8 N13: Hearth (E4/0) RESZTA - srednia (z o13 E4/8 w \"nasze\")", f"{st.mean(hr):+.2f}/d (|max| {max(abs(x) for x in hr):.1f})" if hr else "-", "|srednia| <= 1 hearth/d", (abs(st.mean(hr)) <= 1.0) if hr else None)
     # N14 - netto Ludnosc (E4/7 T11)
-    rep.add("E4/8 N14: ludnosc netto d28-120", "patrz E4/7 T11 (ubytek naturalny miast w netto)", "-720..+1150/d", None)
+    rep.add("E4/8 N14: ludnosc netto d28-120", "patrz E4/7 T11 (ubytek naturalny miast w netto)", "INFO (prog w E4/7 T11: <= +1150/d; dol -0.5%/rok tylko INFO - Jeff 12.10 nr 2)", None)
     # N15 - koszt
     ms = [fnum(r"\| czas " + F_ + r" ms\.", arm[d]) for d in adays]
     ms = [x for x in ms if x is not None]
@@ -2168,7 +2188,7 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
     rep.add(f"E4/4: przyrost naturalny wsi w WOJNIE d28-{until} (% rocznie)",
             (f"{st.mean(x[2] for x in ws):+.3f}%/rok (g {st.mean(x[0] for x in ws):+.3f}); {st.mean(x[1] for x in ws):+.0f} ludzi/d z {st.mean(x[3] for x in ws):.2f} mln; "
              f"wsi {min(x[4] for x in ws)}-{max(x[4] for x in ws)}, dob {len(ws)}") if ws else "-",
-            "INFO (nizej niz pokoj: wojna U +0.3 -> g -0.18; prog wojny - netto >= -0.5%/rok - w tescie razem z E4/5)", None)
+            "INFO (nizej niz pokoj: wojna U +0.3 -> g -0.18; netto wojny -0.5%/rok tylko INFO - Jeff 12.10 nr 2, wiersz E4/5 S15)", None)
     gv = [fnum(r"\(g srednio " + SF + r"% rocznie", prz[d]) for d in pw]
     gv = [x for x in gv if x is not None]
     rep.add("E4/4: g srednio (pkt % rocznie, wazone ludnoscia wsi)", f"{st.mean(gv):+.3f}" if gv else "-", "INFO (pokoj i wojna razem - prog na wierszu \"w POKOJU\")", None)
@@ -2195,7 +2215,7 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
         mn = st.mean(net)
         rm = st.mean(raid) if raid else 0.0
         rep.add(f"E4/4: netto \"Ludzie:\" d28-{until} (ludzi/d)", f"{mn:+.0f} = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln; w tym rabunek gry {rm:+.0f}/d",
-                "INFO do E4/5 (rabunek w nicosc); prog etapu Jeffa 11.10: pokoj +0.2..+0.8%/rok, ciagla wojna >= -0.5%/rok - test razem z E4/5", None)
+                "INFO do E4/5 (rabunek w nicosc); Jeff 11.10: pokoj +0.2..+0.8%/rok; ciagla wojna -0.5%/rok tylko INFO (Jeff 12.10 nr 2) - wiersz E4/5 S15", None)
         rep.add(f"E4/4: netto bez rabunku gry d28-{until} (ludzi/d)", f"{mn - rm:+.0f} = {100.0 * (mn - rm) * 364 / 52.5e6:+.2f}%/rok",
                 "INFO (przyrost naturalny - tabory do konta TABOR - wyrzutki; smierc w ksiedze od E4/7)", None)
     tw = [x for x in lines if x.startswith("PopulationLaw: ludnosc miast zapisana jako stan (E4/4")]
@@ -2417,21 +2437,23 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     starv = [(fnum(r"zmarli z glodu: gospodarze " + F_, fam.get(d)) or 0) + (fnum(r", mieszczanie " + F_, fam.get(d)) or 0) for d in on if run_day(d, start) >= 28]
     # poprawka po tescie koncowym etapu 4 (P1-1): przy kontach E4/7 (zolnierz jest czlowiekiem) ludnosc w progu = ludzie ZYWI (ta sama liczba co E4/7 T11);
     # dolny pas "290 - zabici - las - ..." powstal przed E4/7 (nie zna poleglych, niewoli ani mobilizacji) - zostaje granica Jeffa -721/d i gora pasa E4/4
+    # fix2 (Jeff 12.10 nr 2): granica -721/d tylko INFO (bez hamulca strat), gora pasa E4/4 zostaje progiem - jak E4/7 T11
     zy = e4_zywi(lines, start, win)
     if net and zy:
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
         ms = st.mean(starv) if starv else 0
+        ok_, below_ = e4_zywi_ok(zy["z"])
         rep.add(f"E4/5 S15: ludzie zywi netto d28-{until} (ludzi/d)",
                 e4_zywi_band(zy) + "; " + e4_zywi_text(zy) + f"; srednio dobowo \"razem z nimi\" {st.mean(net):+.0f}/d (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d)",
-                "INFO (Jeff 12.10 (2): prog tylko pomiar) - jak E4/7 T11; pas: od -721/d (-0.5%/rok, Jeff 11.10) do +1150/d (gora pasa E4/4)", None)
+                E4_ZYWI_RULE + " - jak E4/7 T11", ok_)
     elif net:
         mk = st.mean(kill) if kill else 0; mf = st.mean(fled) if fled else 0; md = st.mean(died) if died else 0
         ms = st.mean(starv) if starv else 0
         mn = st.mean(net); lo = 290 - mk - mf - md - ms
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until} (ludzi/d)",
                 f"{mn:+.0f}/d = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln (zabici {mk:.0f}/d, las {mf:.1f}/d, zmarli uchodzcy {md:.1f}/d, zmarli z glodu E4/6 {ms:.1f}/d; dawniej rabunek gry ok. -28.8 tys./d = -20%/rok)",
-                f"pas E4/4 290-1150/d albo nizej tylko o zabitych, las, zmarlych uchodzcow i zmarlych z glodu (dolna granica {lo:.0f}); nigdy ponizej -0.5%/rok (-721/d)",
-                (lo <= mn <= 1150) and mn >= -721)
+                f"pas E4/4 290-1150/d albo nizej tylko o zabitych, las, zmarlych uchodzcow i zmarlych z glodu (dolna granica {lo:.0f}); -0.5%/rok (-721/d) tylko INFO (Jeff 12.10 nr 2)",
+                lo <= mn <= 1150)
     else:
         rep.add(f"E4/5 S15: ludnosc razem z uchodzcami d28-{until}", "brak \"razem z nimi\" w linii Ludzie:", "290-1150/d", None)
     # S16 - lup z niczego na krok (co do monety jak w grze)
