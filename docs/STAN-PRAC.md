@@ -1308,3 +1308,7 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
 - (15:15 UTC 12.10) **Jeff: hodowla - TAK (cofniecie kroku jest w kodzie); naprawy - NIE "jak jest za malo, aby zuzyc 1 sztuke, to nie zuzywa, liczy w pamieci i potem dopiero zuzywa,
   gdy sie nazbiera"** -> paczka N1b (wf_7ad424f1-19a na w-toku/e6-p3): ulamek materialu kazdej naprawy w pamieci (zrodlo x przedmiot, zapis arm_mend_frac), sztuka schodzi z tego samego
   zrodla przy >= 1; klucz MendFractionMemory.
+- (15:35 UTC 12.10) **N1b GOTOWE** (`w-toku/e6-p3` 6bdf1e3, recenzja bez uwag): ulamek materialu przepadal tylko przy naprawie WLASNYMI REKAMI (MendMaterial.SelfParts - Math.Round);
+  teraz licznik na material z sakw gracza (arm_mend_frac), sztuka schodzi, gdy sie nazbiera; puste sakwy - naprawa czeka, licznik bez zmian. Kowale miasta, kwatermistrz Spoils,
+  ludzie gracza i AI juz liczyli w kg z zapasem kowali (arm_mendstock, zloto za zuzyty ulamek) - bez drugiego licznika. Klucz MendFractionMemory. Test reczny w kuzni (autotest nie
+  cwiczy wlasnych rak). DLL test\Armoury-e6p3.dll 7627f953.
