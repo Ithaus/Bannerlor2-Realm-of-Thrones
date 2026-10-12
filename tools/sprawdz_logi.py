@@ -52,6 +52,9 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E5/C1 (202, kasy miast bez dosypki = tryb 2 Town Purse Regulator z A1 - bez osobnego klucza) C1-1..C1-4: tryb 2 i dosypka kas
                     miast i zamkow 0, zakup plonu w miastach-zaulkach >= 98% (dopisek "plon w zaulkach (E5/C1)" w "Kasy miast (169c)"), miasta z kasa
                     < 1 000: 0 kazdej doby, zloto swiata |zmiana| < 0.1% na ostatnie 28 dob (najgorsze okno INFO). Doby kampanii 2-until.
+                    Blok E5/C2 (203, glod ma skutki - Hunger.Of, linia "Glod ludu (E5/C2)") C2-1..C2-5: obie kary tej samej doby (korekta jedzenia C2
+                    i warownia z Food 0) 0 kazdej doby, korekt C2 przed 120. doba kampanii 0, korekty Food w "Zadowolenie ludu (R14)" = korekty C2,
+                    korekty C2 <= 1% osado-dob, przyczyny glodu (INFO). Doby kampanii 2-until; klucz wylaczony / log sprzed C2 - INFO.
                     Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
                     zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
                     z niczego 0 (RealPayer przed RBM; wyplaty INFO), pomiar G24/N3 (INFO; latka niewpieta = NIE).
@@ -3345,6 +3348,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_c1(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_c1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/C2 (203, PLAN 5.9): glod ma skutki - galaz jedzenia R14 tylko przy glodzie z braku pieniedzy (Hunger.Of); log sprzed C2 - INFO
+    try:
+        etap5_c2(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_c2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
     wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
     try:
@@ -4637,6 +4645,75 @@ def etap5_c1(rep, lines, start, until):
                 "|zmiana| < 0.1% (projekt E5/C1; najgorsze okno - INFO)", abs(ch) < 0.1)
     else:
         rep.add("E5/C1-4: zloto swiata - zmiana na 28 dob", f"za malo dob z linia Pieniadz swiata ({len(pd)} < 29)", "|zmiana| < 0.1%", None)
+
+
+def etap5_c2(rep, lines, start, until):
+    """E5/C2 (203, PLAN 5.9 - glod ma skutki; projekt etapu 5 rozdz. 3 "E5/C2" Test). Linia "Glod ludu (E5/C2): dzien" (kiesa czynna, LogEnabled):
+    jedna definicja glodu Hunger.Of - brak jedzenia (Food 0 warowni, glod okregu E4/6) bez kary zadowolenia (BK Food Shortage, RBL Severe Starvation, E4/6),
+    brak pieniedzy (Afford jedzenia < 0.95 przez 7 dob, kampania >= 120 dob) - galaz jedzenia R14. C2-1 obie kary tej samej doby (korekta jedzenia C2 w oknie
+    i warownia z Food 0 w chwili doby) = 0 kazdej doby; C2-2 doby z kampania < 120: korekt C2 0; C2-3 korekty Food w linii R14 = korekty C2 tej samej doby
+    (przy kluczu wlaczonym galezi jedzenia poza C2 nie ma); C2-4 korekty C2 na osade-dobe <= 1% (bieg bez oblezen i drozyzny ~0, KL: jedzenia stac 100% dob);
+    C2-5 przyczyny glodu (INFO). Okno: doby kampanii 2-until."""
+    c2 = by_day(lines, "Glod ludu (E5/C2): dzien")
+    win = [d for d in sorted(c2) if 2 <= run_day(d, start) <= until]
+    if not win:
+        rep.add("E5/C2: linia Glod ludu (E5/C2)", "brak w dobach 2-%d" % until, "codziennie przy kiesie czynnej (LogEnabled; log sprzed C2 - brak)", None)
+        return
+    on = [d for d in win if "TownFolkHungerHurts tak" in c2[d]]
+    if len(on) < len(win):
+        rep.add("E5/C2-0: klucz TownFolkHungerHurts", f"wlaczony w {len(on)} z {len(win)} dob", "wlaczony kazdej doby (wylaczony - galaz jedzenia R14 jak B1)", None if not on else False)
+    if not on:
+        return
+    hit = {d: num(r"korekty jedzenia R14 \(C2\) (\d+);", c2[d], int, 0) or 0 for d in on}
+    osad = {d: num(r", osad (\d+) \|", c2[d], int, 0) or 0 for d in on}
+    # ---------------- C2-1: obie kary tej samej doby
+    both = {d: num(r"obie kary tej samej doby (\d+)\.", c2[d]) for d in on}
+    miss = [d for d in on if both[d] is None]
+    bad = sorted(d for d in on if (both[d] or 0) > 0)
+    rep.add("E5/C2-1: obie kary tej samej doby (korekta jedzenia C2 i warownia z Food 0 - BK Food Shortage / RBL Severe Starvation)",
+            f"niezerowe w {len(bad)} z {len(on)} dob" + (f" (najwiecej {max(both[d] for d in bad)}, pierwsza d{run_day(bad[0], start)})" if bad else "")
+            + (f"; bez liczby w {len(miss)} dobach" if miss else ""),
+            "0 kazdej doby (projekt E5/C2: zadna osada nie dostaje obu kar tej samej doby)", (len(bad) == 0) if len(miss) < len(on) else None)
+    # ---------------- C2-2: nie w pierwszych 120 dobach kampanii
+    early = [d for d in on if "(kara od 120: nie)" in c2[d]]
+    if early:
+        eh = sum(hit[d] for d in early)
+        a0, a1 = num(r"kampania (\d+) dob", c2[early[0]]), num(r"kampania (\d+) dob", c2[early[-1]])
+        rep.add("E5/C2-2: korekty jedzenia C2 przed 120. doba kampanii", f"{eh} w {len(early)} dobach (kampania {a0}-{a1})",
+                "0 (projekt E5/C2 [D 09.10 A])", eh == 0)
+    else:
+        rep.add("E5/C2-2: korekty jedzenia C2 przed 120. doba kampanii", "brak dob z kampania < 120 w oknie", "0", None)
+    # ---------------- C2-3: galaz jedzenia R14 tylko z C2
+    r14 = by_day(lines, "Zadowolenie ludu (R14): dzien")
+    pair = [(d, num(r"\(Food (\d+) /", r14[d]), hit[d]) for d in on if d in r14]
+    pair = [x for x in pair if x[1] is not None]
+    if pair:
+        diff = [x for x in pair if x[1] != x[2]]
+        rep.add("E5/C2-3: korekty Food w linii R14 = korekty C2 tej samej doby",
+                f"rozne w {len(diff)} z {len(pair)} dob" + (f" (pierwsza d{run_day(diff[0][0], start)}: R14 Food {diff[0][1]}, C2 {diff[0][2]})" if diff else f"; suma {sum(x[2] for x in pair)}"),
+                "rowne kazdej doby (galaz jedzenia R14 tylko przy glodzie z braku pieniedzy)", len(diff) == 0)
+    else:
+        rep.add("E5/C2-3: korekty Food w linii R14 = korekty C2", "brak linii Zadowolenie ludu (R14) w dobach C2", "rowne kazdej doby", None)
+    # ---------------- C2-4: skala (bieg bez oblezen i drozyzny ~0)
+    sh = sum(hit.values()); so = sum(osad.values())
+    q = 100.0 * sh / so if so > 0 else None
+    wd = max(on, key=lambda d: hit[d])
+    rep.add("E5/C2-4: korekty jedzenia C2 na osade-dobe (suma okna)",
+            (f"{q:.2f}% ({sh} korekt na {so} osado-dob; najwiecej d{run_day(wd, start)}: {hit[wd]})" if q is not None else "brak osad w linii"),
+            "<= 1% (projekt E5/C2: bez oblezen i drozyzny ~0, KL: jedzenia stac 100% dob; wyzej - sprawdz drozyzne jedzenia i kiesy ludu)",
+            (q <= 1.0) if q is not None else None)
+    # ---------------- C2-5: przyczyny glodu (INFO)
+    last = on[-1]
+    def _s(pat):
+        return sum(num(pat, c2[d], int, 0) or 0 for d in on)
+    n = len(on)
+    mo, sk = _s(r"przez 7 dob\): (\d+) \("), _s(r"z licznikiem >= 1 doby (\d+)")
+    fz, dg = _s(r"Food 0 warowni (\d+)"), _s(r"glod okregu ponad prog (\d+)")
+    xf, xw, xs = _s(r"zdjete: brak jedzenia (\d+)"), _s(r"< 120 dob\) (\d+)"), _s(r"bez jedzenia na polce (\d+)")
+    rep.add("E5/C2-5: przyczyny glodu (srednio na dobe okna; INFO)",
+            f"brak pieniedzy {mo / n:.1f}, z licznikiem >= 1 doby {sk / n:.1f} | brak jedzenia: Food 0 warowni {fz / n:.1f}, glod okregu {dg / n:.1f}"
+            f" | zdjete z R14 (suma): brak jedzenia {xf}, poza glodem z braku pieniedzy {xw}, bez jedzenia na polce {xs} | ostatnia doba d{run_day(last, start)}",
+            "INFO", None)
 
 
 def etap5_b1(rep, lines, start, until, logp):

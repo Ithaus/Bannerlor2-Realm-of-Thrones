@@ -72,6 +72,7 @@ namespace Armoury
             public long PaidW, PaidR, PaidP, PaidC, Court, UnpaidT, UnpaidC, GmFood, Excise, MadeT, MadeC, FromTown, ValveT, ValveC, CourtGrant, SlaveW, VFee;
             public int Ticks, TicksC, Fallback, R14Food, R14Rest, VFeeN; public double R14Bk; public long VTaxCut, VTaxBase, VTaxAdd;
             public readonly long[] Earn = new long[EKinds]; public long EarnC;
+            public int C2Hit, C2NoFood, C2Wait, C2NoShelf;     // E5/C2: korekty jedzenia R14 i zdjete (brak jedzenia, poza glodem z braku pieniedzy, bez jedzenia na polce)
         }
         private static LWin _win = new LWin();
 
@@ -92,7 +93,7 @@ namespace Armoury
         }
         private static LDay _ld;
         private static LWin _lw;
-        private static string _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe;
+        private static string _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe, _lineC2;
         private static double _lastR = double.NaN; private static long _lastDStock, _lastIn, _lastOut;
         // zapasy startowe (linia jednorazowa)
         private static long _sW, _sR, _sP, _sC, _sV, _sGift; private static int _sTowns, _sCastles, _sVills, _sShort, _sNoBk;
@@ -104,7 +105,7 @@ namespace Armoury
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
             _ctlStock0 = long.MinValue; _ctlIn = _ctlOut = 0;
             _win = new LWin(); _ld = null; _lw = null;
-            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = null;
+            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
             _lastR = double.NaN; _lastDStock = _lastIn = _lastOut = 0;
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
             ResetTithe();
@@ -514,12 +515,14 @@ namespace Armoury
         /// <summary>
         /// R14 (K2): zadowolenie BK grupy z Afford < 0.98 = migawka sprzed konsumpcji + min(0, delta BK) - 0.0015 (obciete 0..1); Afford >= 0.98 - wynik BK.
         /// Jedzenie -> Food, reszta -> Industrial / General / Luxury (BK ConsumptionType: Luxury 0, Industrial 1, General 2, Food 3). Bez latki na UpdateSatisfaction.
+        /// E5/C2 (TownFolkHungerHurts): Food tylko przy glodzie z braku pieniedzy i jedzeniu na polce (C2Food); wylaczone - jak B1 (Afford &lt; 0.98).
         /// </summary>
         private static void R14(Folk f)
         {
             var s = Settings.Current;
             if (!s.TownFolkSatisfactionFromBasket || !f.Sat0Ok || !f.FacOk) return;
             bool food = f.AffFood < 0.98, rest = f.AffRest < 0.98;
+            if (food && s.TownFolkHungerHurts) food = C2Food(f);      // E5/C2: galaz jedzenia tylko przy glodzie z braku pieniedzy (wylaczone - jak B1)
             if (!food && !rest) return;
             var sat = Sats(f);
             if (sat == null || sat.Length < 4) return;
@@ -533,6 +536,83 @@ namespace Armoury
                 sat[i] = (float)(v < 0 ? 0 : (v > 1 ? 1 : v));
                 if (i == 3) _win.R14Food++; else _win.R14Rest++;
             }
+            if (food && s.TownFolkHungerHurts) { _win.C2Hit++; f.C2Hit = true; }
+        }
+
+        // ============================================================ E5/C2 (203, PLAN 5.9, D2) - glod ma skutki: galaz jedzenia R14
+        /// <summary>
+        /// Galaz jedzenia R14 przy TownFolkHungerHurts [D 09.10 A]: tylko glod z braku pieniedzy (Hunger.Of = NoMoney: Afford jedzenia &lt; 0.95 przez 7 dob z rzedu,
+        /// kampania &gt;= 120 dob) i tylko gdy jedzenie jest na polce (nawias tej osady przeszedl wiersz jedzenia). Brak jedzenia (Food 0 warowni, glod okregu E4/6)
+        /// karza juz BK "Food Shortage", RBL "Severe Starvation" i E4/6 - bez drugiej kary. Liczniki okna do linii "Glod ludu (E5/C2)".
+        /// </summary>
+        private static bool C2Food(Folk f)
+        {
+            var c = Hunger.Of(f.St);
+            if (c == HungerCause.NoFood) { _win.C2NoFood++; return false; }
+            if (c != HungerCause.NoMoney) { _win.C2Wait++; return false; }
+            if (!BracketHadFood(f.St.Town)) { _win.C2NoShelf++; return false; }
+            return true;
+        }
+
+        /// <summary>E5/C2 "jedzenie na polce": w otwartym nawiasie konsumpcji tej osady BK przeszedl choc jeden wiersz jedzenia (CalculateBudget idzie tylko po towarze
+        /// z polki, ktorego kategoria jest w popycie - BK EconomyPatches ItemConsumptionPatch.Prefix). Nawias nie tej osady - false (bez kary).</summary>
+        private static bool BracketHadFood(Town town)
+        {
+            if (!_brOpen || town == null || !ReferenceEquals(town, _brTown)) return false;
+            foreach (var kv in _brTrack) if (kv.Key != null && kv.Value != null && kv.Value.Rows > 0 && GroupOf(kv.Key) == 0) return true;
+            return false;
+        }
+
+        /// <summary>E5/C2 (Hunger.Of): glod z braku pieniedzy - kiesa czynna, miasto albo zamek z kotwica, Afford jedzenia na jutro &lt; 0.95 przez 7 dob z rzedu
+        /// (licznik HungerDays z doby), kampania &gt;= 120 dob. Watek glowny (slownik osad); poza nim - false.</summary>
+        internal static bool MoneyHungry(Settlement st)
+        {
+            if (st == null || !Live || OffMain()) return false;
+            if (st.IsCastle && !CastleLive) return false;
+            Folk f;
+            if (!_f.TryGetValue(st, out f) || f == null || f.Kind > 1 || !f.Cal || !f.FacOk) return false;
+            return f.HungerDays >= Hunger.MoneyDays && f.AffFood < Hunger.MoneyAfford && Hunger.CampaignAge() >= Hunger.FromDay;
+        }
+
+        /// <summary>E5/C2: potkniecie z Hunger (licznik TownFolk, bez wylacznikow).</summary>
+        internal static void StumbleOut(string where, Exception e) { Stumble(where, e); }
+
+        /// <summary>E5/C2: licznik dob glodu z braku pieniedzy - po kotwicy doby (Afford na jutro).</summary>
+        private static void NoteHungerDay(Folk f)
+        {
+            f.HungerDays = f.FacOk && f.AffFood < Hunger.MoneyAfford ? Math.Min(f.HungerDays + 1, 100000) : 0;
+        }
+
+        /// <summary>E5/C2: linia doby "Glod ludu (E5/C2)" - przyczyny glodu osad (Hunger.Of) po kotwicy doby, korekty okna i kontrola "obie kary tej samej doby"
+        /// (korekta jedzenia C2 w oknie, a warownia z Food 0 w chwili doby - warunek BK "Food Shortage" / RBL "Severe Starvation").</summary>
+        private static void HungerLine(int day, LWin w)
+        {
+            var s = Settings.Current;
+            int money = 0, moneyT = 0, moneyC = 0, streak = 0, starving = 0, district = 0, both = 0, osad = 0;
+            foreach (var f in _f.Values)
+            {
+                if (f.Kind > 1 || f.St == null) continue;
+                try
+                {
+                    if (f.Kind == 1 && !CastleLive) { f.C2Hit = false; continue; }
+                    osad++;
+                    bool st0 = Hunger.Starving(f.St);
+                    if (f.C2Hit && st0) both++;
+                    f.C2Hit = false;
+                    if (f.HungerDays > 0) streak++;
+                    var c = Hunger.Of(f.St);
+                    if (c == HungerCause.NoFood) { if (st0) starving++; else district++; }
+                    else if (c == HungerCause.NoMoney) { money++; if (f.Kind == 0) moneyT++; else moneyC++; }
+                }
+                catch (Exception e) { f.C2Hit = false; Stumble("HungerLine", e); }
+            }
+            double age = Hunger.CampaignAge();
+            _lineC2 = "Glod ludu (E5/C2): dzien " + day + " | TownFolkHungerHurts " + (s.TownFolkHungerHurts ? "tak" : "nie") + ", kampania " + ((int)age).ToString(Inv)
+                      + " dob (kara od " + ((int)Hunger.FromDay).ToString(Inv) + ": " + (age >= Hunger.FromDay ? "tak" : "nie") + "), osad " + osad
+                      + " | brak pieniedzy (Afford jedzenia < " + Hunger.MoneyAfford.ToString("0.00", Inv) + " przez " + Hunger.MoneyDays + " dob): " + money + " (miasta " + moneyT + " / zamki " + moneyC
+                      + "), z licznikiem >= 1 doby " + streak + " | brak jedzenia (bez kary zadowolenia - BK/RBL/E4/6): Food 0 warowni " + starving + ", glod okregu ponad prog " + district
+                      + " | korekty jedzenia R14 (C2) " + w.C2Hit + "; zdjete: brak jedzenia " + w.C2NoFood + ", poza glodem z braku pieniedzy (Afford >= 0.95, < 7 dob albo < 120 dob) " + w.C2Wait + ", bez jedzenia na polce " + w.C2NoShelf
+                      + " | obie kary tej samej doby " + both + ".";
         }
 
         // ============================================================ doba (TownFolk.Daily przy kiesie czynnej)
@@ -570,6 +650,7 @@ namespace Armoury
                 }
             }
             try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
+            try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             // kontrola zamknieta (kiesy miast, podzamczy, gminy): zmiana stanu = wplywy - wydatki
             long stock = TotalTown() + TotalCastle() + TotalGmina();
             if (_ctlStock0 != long.MinValue) { _lastDStock = stock - _ctlStock0; _lastIn = _ctlIn; _lastOut = _ctlOut; _lastR = _lastDStock - (_ctlIn - _ctlOut); }
@@ -748,6 +829,7 @@ namespace Armoury
             double wf, wr; Predict(f, out wf, out wr);
             double r = Scale(f); f.DR = r;
             Anchor(f, wf, wr);
+            NoteHungerDay(f);                                          // E5/C2: doby z rzedu bez chleba z braku pieniedzy
             // ---- liczby swiata
             double hW = f.HW * r, hR = f.HR * r, hP = f.HP * r, hS = f.HS * r, idx = f.Idx > 0 && !double.IsNaN(f.Idx) ? f.Idx : 1.0;
             double B = (hW * BW + hR * BR + hP * BP + (f.Slave ? hS * BS : 0)) * idx;
@@ -783,7 +865,7 @@ namespace Armoury
             {
                 // zawor zamku 110 wylaczony przy kiesie czynnej: kiesa podzamcza wraca do kasy zamku (stan sprzed B1 dla zamkow), kredyt dworu 0; ponowne wlaczenie - z nadwyzki
                 if (f.KW > 0) { town.ChangeGold((int)Math.Min(int.MaxValue, f.KW)); _ctlOut += f.KW; f.KW = 0; _seedC = 0; }
-                f.CourtCr = 0; Array.Clear(f.EarnWin, 0, 3); f.Offer[0] = 0; f.FacOk = false;
+                f.CourtCr = 0; Array.Clear(f.EarnWin, 0, 3); f.Offer[0] = 0; f.FacOk = false; f.HungerDays = 0;   // E5/C2: kiesa nieczynna - licznik glodu od zera
                 return;
             }
             // ---- 1. pan 3% od zarobku okna; E5/B2 korona 184 na wierzch (scalenie B)
@@ -809,6 +891,7 @@ namespace Armoury
             // ---- 6. kotwica (z kredytem dworu)
             double wf, wr; Predict(f, out wf, out wr);
             Anchor(f, wf, wr);
+            NoteHungerDay(f);                                          // E5/C2
             if (f.CourtCr <= 0) d.CNoCourt++;
             d.CHeads += f.HW; d.KC += f.KW; d.CCr += f.CourtCr; d.CNeed += f.Need[0]; d.CAff += f.AffC[0] * f.Need[0]; d.CWg += f.SpendGame;
             f.DB = f.HW * BC * (f.Idx > 0 ? f.Idx : 1); f.DWg = f.SpendGame; f.DM = f.MAnc; f.DAff = f.AffC[0]; f.DAffF = f.AffFC[0]; f.DR = 1;
@@ -1132,7 +1215,7 @@ namespace Armoury
             {
                 try
                 {
-                    f.CourtCr = 0; f.FacOk = false; Array.Clear(f.Offer, 0, 3); Array.Clear(f.EarnWin, 0, 3);
+                    f.CourtCr = 0; f.FacOk = false; Array.Clear(f.Offer, 0, 3); Array.Clear(f.EarnWin, 0, 3); f.HungerDays = 0;   // E5/C2: licznik glodu od zera
                     long x = f.KW + f.KR + f.KP + f.KG;
                     var t = f.St != null ? f.St.Town : null;
                     if (t == null) { f.KW = f.KR = f.KP = f.KG = 0; continue; }
@@ -1160,7 +1243,7 @@ namespace Armoury
 
         private static string D(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : v.ToString("R", Inv); }
 
-        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest" (|). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
+        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest,HungerDays" (|; pole 17 - E5/C2, starszy zapis bez niego = 0, starsze DLL je pomijaja). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
         internal static string Export()
         {
             try
@@ -1177,7 +1260,7 @@ namespace Armoury
                     sb.Append('|').Append(f.St.StringId.Replace("|", "").Replace(",", "")).Append(',').Append(f.Kind).Append(',').Append(f.Cal ? 1 : 0).Append(',')
                       .Append(D(f.HW)).Append(',').Append(D(f.HR)).Append(',').Append(D(f.HP)).Append(',').Append(D(f.HS)).Append(',').Append(D(f.PeopleCal)).Append(',').Append(f.Slave ? 1 : 0).Append(',')
                       .Append(f.KW).Append(',').Append(f.KR).Append(',').Append(f.KP).Append(',').Append(f.KG).Append(',').Append(f.CourtCr).Append(',')
-                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest));
+                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest)).Append(',').Append(f.HungerDays);
                 }
                 return sb.ToString();
             }
@@ -1225,6 +1308,7 @@ namespace Armoury
                         f.KW = kw; f.KR = kr; f.KP = kp; f.KG = kg; f.CourtCr = Math.Max(0, cc);
                         double idx = Dd(a[14]); if (idx > 0) f.Idx = idx;
                         f.PredFood = Math.Max(0, Dd(a[15])); f.PredRest = Math.Max(0, Dd(a[16]));
+                        f.HungerDays = a.Length > 17 ? (int)Math.Max(0, Math.Min(100000, L(a[17]))) : 0;   // E5/C2: zapis sprzed C2 - licznik od zera
                         f.FacOk = false;
                     }
                     catch (Exception e) { Stumble("Import(osada)", e); }
@@ -1389,8 +1473,8 @@ namespace Armoury
         private static List<string> TakeLiveLines()
         {
             var l = new List<string>();
-            foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe }) if (x != null) l.Add(x);
-            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = null;
+            foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineC2, _lineTithe }) if (x != null) l.Add(x);
+            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
             return l;
         }
     }

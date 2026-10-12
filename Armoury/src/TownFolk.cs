@@ -114,6 +114,8 @@ namespace Armoury
             public bool BkCal;                                        // R5: klasy BK odczytane przed kalibracja ksiegi (faza a D1)
             public long LDayPaid, LDayUnpaid, LDayCourt, LDayIn, LDayOut;   // ostatnia doba (CSV)
             public double G0a;                                        // budzet gry po kotwicy i ofercie nadwyzki (okno - linia)
+            public int HungerDays;                                    // E5/C2: doby z rzedu z Afford jedzenia na jutro < 0.95 (zapis arm_townfolk, pole 17)
+            public bool C2Hit;                                        // E5/C2: korekta jedzenia R14 w oknie doby (kontrola "obie kary tej samej doby")
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();

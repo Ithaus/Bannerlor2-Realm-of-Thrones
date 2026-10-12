@@ -4688,6 +4688,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkSatisfactionFromBasket { get; set; } = true;
 
+        [SettingPropertyBool("Town Folk Hunger Hurts", HintText = "when the townsfolk cannot afford their bread for a week, their contentment with food falls - not in the first 120 days of a campaign and only while there is food in the market; a town with no food at all is already punished by its empty granary, so its contentment is not cut twice. Off = as before: contentment with food follows what they could buy every day (needs Town Folk Satisfaction From Basket)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownFolkHungerHurts { get; set; } = true;
+
         [SettingPropertyBool("Town Folk Start Reserves", HintText = "in a new campaign the townsfolk, castle folk and villages start with a few days of their needs out of the towns' and castles' starting purses (in an old save - out of the merchants' spare coin, at most half)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkStartReserves { get; set; } = true;
@@ -6059,6 +6063,7 @@ namespace Armoury
             s.TownFolkAnchorBasket = TownFolkAnchorBasket;
             s.TownFolkCastleCourtFeeds = TownFolkCastleCourtFeeds;
             s.TownFolkSatisfactionFromBasket = TownFolkSatisfactionFromBasket;
+            s.TownFolkHungerHurts = TownFolkHungerHurts;
             s.TownFolkStartReserves = TownFolkStartReserves;
             s.VillageLordScale = VillageLordScale;
             s.VillagePurchasePerHead = VillagePurchasePerHead;

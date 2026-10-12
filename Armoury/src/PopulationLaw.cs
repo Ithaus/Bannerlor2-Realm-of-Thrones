@@ -560,9 +560,7 @@ namespace Armoury
             p.W = ProsperityIndex(town);
             float sec, burnt; bool war;
             p.U = DangerOf(town, out sec, out war, out burnt); p.War = war;
-            float h = 0f; int n = 0;
-            if (town.BoundVillages != null) foreach (var v in town.BoundVillages) { if (v == null) continue; h += Famine.HungerOf(v); n++; }
-            p.H = n > 0 ? MBMath.ClampFloat(h / n, 0f, 1f) : 0f;
+            p.H = Hunger.District(town);                     // E5/C2 (D2): jedna definicja glodu okregu (srednia Famine.HungerOf wsi warowni, 0..1) - ta sama w Hunger.Of
             float raw = s.GrowthBasePercent + Math.Max(0f, s.GrowthProsperityWeight) * p.W - Math.Max(0f, s.GrowthDangerWeight) * p.U
                         - (s.GrowthHungerEnabled ? Math.Max(0f, s.GrowthHungerWeight) * p.H : 0f);
             if (raw > 0f && s.GrowthHungerEnabled && p.H > Famine.ThresholdNow) { raw = 0f; p.Starving = true; }      // GL 2.10, jak wies
