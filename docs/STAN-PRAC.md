@@ -1233,3 +1233,5 @@ kalibracja korony): 120 dob nowej kampanii - Armoury 0 ERROR, 17.3 s/dobe; zapis
 w wojnie sr28 88.4 tys. (podloga 85, cel 95; po samym E4 106 tys. - spadek z etapu 5, czesc zaakceptowana przez Jeffa: A2b "trudno"). Pozostale NIE - kalibracja (opis w
 PRZEKAZANIE 12.10 06:30 UTC). Kopie: *.dll.bak-2026-10-12-przed-noc32 + D:\Backup-Bannerlord\wgrane\2026-10-12-noc32-przed (cf40fefa, 77b11df5, 90665425).
 ZATWIERDZONE: Armoury 29fdca1e, RealisticCaptivity 943ea0d3, GrandTourney bbb841d7, CrashScribe 842f64a4.
+
+- (09:20 UTC 12.10) **Jeff: wojsko - 1.b WYZSZY PODATEK** (danina korony od nadwyzki kies wsi LaySubsidyVillageShare 0.015 -> 0.025; korona oddaje rentami na wojsko). Bez pomostu (a). Do kodu (zmiana domyslnej, klucza nie ma w Armoury.json Jeffa) w nastepnej paczce razem z E6 porcja 2, test wspolny.
