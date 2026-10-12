@@ -6,6 +6,7 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Armoury
@@ -34,6 +35,15 @@ namespace Armoury
     ///  R7 Tarcze 107b/162m zbedne: SoldierPay nie dopisuje znacznikow, znaczniki z zapisu porzucone (linia raz). Bez HomePart (K6).
     /// Wyjatki per obiekt - licznik potkniec (pierwszy do logu), bez globalnych wylacznikow. Zloto: kazdy ruch ma platnika i odbiorce (pan przez
     /// GiveGoldAction, korona para ChangeGold/KingdomBudgetWallet), jedyne ujscie bez odbiorcy - dar startowy (MoneyLedger.MTownTrim, raz).
+    /// Pomiar G24 / N3 (audyt zlota z niczego 11.10, rozdz. 1b wiersze 19-20 i 5a; tylko licznik, przy LogEnabled, niczego nie zmienia): przy trybie 2 kasy
+    /// biednych miast moga zejsc nisko i ozyja dwie dziury, ktorych dzis nie widac (najnizsza kasa miasta w biegach 26,7 tys.):
+    ///  G24 - osada placi bohaterowi wiecej, niz ma w kasie: GiveGoldAction.ApplyForSettlementToCharacter idzie przez ApplyInternal(bohater, null, null, osada, -kwota),
+    ///        wiec gra nie obcina kwoty do kasy (obcina tylko dajacego bohatera/partie/osade - G GiveGoldAction.cs:11-25), a SettlementComponent.ChangeGold obcina
+    ///        kase do 0 (G SettlementComponent.cs:117-124) - bohater dostaje cala kwote, roznica z niczego (m.in. lord sprzedaje miastu konie i lup - SellItemsAction.cs:62-66).
+    ///        Prefiks Last na ApplyInternal (po wszystkich naszych zamianach strony), tylko odczyt.
+    ///  N3  - warsztat BK przy pustej kasie: BK ProduceOutputPrefix daje warsztatowi cala cene i zdejmuje ja z kasy miasta (BK EconomyPatches.cs:725-726), kasa
+    ///        spada najwyzej do 0 - niedoplata kasy = przyrost kapitalu minus spadek kasy, gdy kasa skonczyla na 0 (okno O35 ksiegi obiegu, CW.WorkshopOutPost).
+    /// Latka (obciecie kwoty do kasy) - dopiero, gdy licznik > 0 (audyt 5b "N3 / G24").
     /// </summary>
     internal static class TownPurse
     {
@@ -61,6 +71,10 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki tickow gry (ticki miast ida przez cala dobe) - zamyka BeforeRents
         private static long _dRegDown, _dRegUp, _dRegUpCut, _dConsBack, _dConsKept, _dBkSkipGold;
         private static int _dRegDownN, _dRegUpN, _dRegUpCutN, _dConsN, _dConsHit, _dBkSkipTowns, _dBkSkipCastles, _dBuyAsk, _dBuyZero;
+        // pomiar G24 / N3 (audyt 11.10) - liczniki tickow gry, zamyka BeforeRents
+        private static long _dG24, _dG24Pl, _dN3;
+        private static int _dG24N, _dN3N;
+        private static bool _g24Hooked;
 
         // ------------------------------------------------------------ zawor dnia (zeruje BeforeRents, zamyka ValveDay)
         private static long _vLord, _vLordBase, _vLordBaseK, _vCrown, _vDue, _vPlayer;
@@ -70,6 +84,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ odczyty dnia (zeruje MoneyLedger.ClearLast169 w BlockOpen; ustawia BeforeRents i ValveDay)
         internal static long LastRegDown, LastRegUp, LastRegUpCut, LastConsBack, LastConsKept, LastBkSkipGold, LastLordPaid, LastLordBase, LastLordBaseK, LastCrownPaid, LastDue, LastPlayerPaid, LastTrim;
+        internal static long LastG24, LastG24Pl, LastN3;                     // pomiar G24 / N3 (audyt 11.10)
+        internal static int LastG24N, LastN3N;
         internal static int LastRegDownN, LastRegUpN, LastRegUpCutN, LastConsN, LastConsHit, LastBkSkipTowns, LastBkSkipCastles, LastBuyAsk, LastBuyZero, LastPayers, LastKingdoms,
                             LastBelow, LastSiege, LastNoLord, LastTiny, LastExempt, LastNoCrown, LastUnpaid;
         /// <summary>165: udzial korony z zaworu kas miast dzis, na krolestwo (jak CastlePurse.CrownToday) - czyszczony w BeforeRents.</summary>
@@ -112,12 +128,14 @@ namespace Armoury
             LastBelow = LastSiege = LastNoLord = LastTiny = LastExempt = LastNoCrown = LastUnpaid = 0;
             LastTake = LastNet = LastTake28 = LastNet28 = 0; LastShareOk = false;
             LastBelowN = LastBelow1000 = LastAtZero = LastStreakMax = LastStreak7 = LastStreak28 = 0; LastStreakName = null;
+            LastG24 = LastG24Pl = LastN3 = 0; LastG24N = LastN3N = 0;
         }
 
         private static void ClearTicks()
         {
             _dRegDown = _dRegUp = _dRegUpCut = _dConsBack = _dConsKept = _dBkSkipGold = 0;
             _dRegDownN = _dRegUpN = _dRegUpCutN = _dConsN = _dConsHit = _dBkSkipTowns = _dBkSkipCastles = _dBuyAsk = _dBuyZero = 0;
+            _dG24 = _dG24Pl = _dN3 = 0; _dG24N = _dN3N = 0;
         }
 
         private static void ClearValve()
@@ -453,6 +471,7 @@ namespace Armoury
             LastRegDown = _dRegDown; LastRegUp = _dRegUp; LastRegUpCut = _dRegUpCut; LastConsBack = _dConsBack; LastConsKept = _dConsKept; LastBkSkipGold = _dBkSkipGold;
             LastRegDownN = _dRegDownN; LastRegUpN = _dRegUpN; LastRegUpCutN = _dRegUpCutN; LastConsN = _dConsN; LastConsHit = _dConsHit;
             LastBkSkipTowns = _dBkSkipTowns; LastBkSkipCastles = _dBkSkipCastles; LastBuyAsk = _dBuyAsk; LastBuyZero = _dBuyZero;
+            LastG24 = _dG24; LastG24Pl = _dG24Pl; LastG24N = _dG24N; LastN3 = _dN3; LastN3N = _dN3N;
             ClearTicks();
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
@@ -693,6 +712,18 @@ namespace Armoury
                 else miss.Add("BK HandleMarketGold (" + (t == null ? "brak typu BKSettlementBehavior" : "brak metody") + ")");
             }
             catch (Exception e) { miss.Add("BK HandleMarketGold (" + e.Message + ")"); Log.Error("TownPurse.ApplyAll(BK)", e); }
+            // pomiar G24 (audyt 11.10): prefiks Last na GiveGoldAction.ApplyInternal - po prefiksach zmieniajacych strone (RealPayer, NotableGold - Low), tylko odczyt
+            try
+            {
+                var give = AccessTools.Method(typeof(GiveGoldAction), "ApplyInternal");
+                if (give != null && !_g24Hooked)
+                {
+                    h.Patch(give, prefix: new HarmonyMethod(typeof(TownPurse), nameof(G24Prefix)) { priority = Priority.Last });
+                    _g24Hooked = true;
+                }
+                if (!_g24Hooked) miss.Add("pomiar G24 (GiveGoldAction.ApplyInternal)");
+            }
+            catch (Exception e) { miss.Add("pomiar G24 (" + e.Message + ")"); Log.Error("TownPurse.ApplyAll(G24)", e); }
             if (CastlePurse.HookedModels <= 0) miss.Add("regulator kasy (CastlePurse 110)");
             if (!CastlePurse.HookedConsumption) miss.Add("konsumpcja (CastlePurse 110)");
             var s = Settings.Current;
@@ -706,6 +737,40 @@ namespace Armoury
                      + ", dar startowy przycinany: " + (s != null && s.TownPurseTrimAtStart ? "tak" : "nie")
                      + ", zakupy dla nas tylko z nadwyzki: " + (s != null && s.TownPaysFromSurplus ? "tak" : "nie")
                      + ", BK rynek pominiety: " + (s != null && s.TownPurseNoBkSkim ? "tak" : "nie") + " (zamki tylko przy Castle Purse Enabled).");
+        }
+
+        // ------------------------------------------------------------ pomiar G24 / N3 (audyt 11.10) - tylko liczniki
+        private static bool MeasureOn { get { var s = Settings.Current; var c = Campaign.Current; return s != null && s.LogEnabled && c != null && c.GameStarted; } }
+
+        /// <summary>G24: prefiks Last na GiveGoldAction.ApplyInternal - osada (odbiorca z ujemna kwota = dajacy) placi bohaterowi wiecej, niz ma w kasie. Tylko odczyt.</summary>
+        public static void G24Prefix(Hero __0, PartyBase __1, PartyBase __3, int __4)
+        {
+            try
+            {
+                if (__4 >= 0 || __0 == null || __1 != null || __3 == null || !__3.IsSettlement || !MeasureOn) return;
+                var sc = __3.Settlement != null ? __3.Settlement.SettlementComponent : null;
+                if (sc == null) return;
+                long need = -(long)__4, have = Math.Max(0, sc.Gold);
+                if (need <= have) return;
+                _dG24 += need - have; _dG24N++;
+                if (ReferenceEquals(__0, Hero.MainHero)) _dG24Pl += need - have;
+            }
+            catch (Exception e) { Stumble("TownPurse.G24Prefix", e); }
+        }
+
+        /// <summary>N3: okno O35 (CW.WorkshopOutPost) - wyrob warsztatu BK, kasa osady skonczyla na 0, a warsztat dostal wiecej, niz kasa stracila. Tylko licznik.</summary>
+        internal static void NoteN3(long shortfall)
+        {
+            if (shortfall <= 0 || !MeasureOn) return;
+            _dN3 += shortfall; _dN3N++;
+        }
+
+        /// <summary>Dopisek linii "Kasy miast (169c)" (kazdy tryb A1): pomiar G24 / N3 tej doby.</summary>
+        private static string G24Part()
+        {
+            return " | pomiar G24/N3 (audyt 11.10, tylko licznik; ozyja przy trybie 2): osada zaplacila bohaterowi ponad kase " + LastG24 + " w " + LastG24N + " zdarzeniach (gracz " + LastG24Pl
+                   + "), warsztaty BK - niedoplata pustej kasy " + (CirculationWindows.Wired[CirculationWindows.WWorkshopOut] ? LastN3 + " w " + LastN3N + " wyrobach" : "- (okno O35 niewpiete)")
+                   + (_g24Hooked ? "" : " [G24: latka niewpieta]");
         }
 
         // ------------------------------------------------------------ linia "Kasy miast (169c)" i kasy-miast.csv (wolane z Measure169c.TownsLine)
@@ -722,9 +787,9 @@ namespace Armoury
             var s = Settings.Current;
             int mode = Mode;
             if (s == null) return "";
-            if (mode == 0) return " | E5/A1: WYLACZONE (Town Purse Regulator 0) - regulator gry, \"zakupy\" z niczego, renta z pulapem i tarcze jak dotad";
+            if (mode == 0) return " | E5/A1: WYLACZONE (Town Purse Regulator 0) - regulator gry, \"zakupy\" z niczego, renta z pulapem i tarcze jak dotad" + G24Part();
             if (!On) return " | E5/A1: NIECZYNNE - Town Purse Regulator " + mode + ", ale latki CastlePurse (110) nie sa wpiete (modele " + CastlePurse.HookedModels
-                            + ", konsumpcja " + (CastlePurse.HookedConsumption ? "tak" : "BRAK") + ") - kasy miast jak dotad";
+                            + ", konsumpcja " + (CastlePurse.HookedConsumption ? "tak" : "BRAK") + ") - kasy miast jak dotad" + G24Part();
             long reserve = 0, spare = 0;
             foreach (var st in Settlement.All)
             {
@@ -763,6 +828,7 @@ namespace Armoury
               .Append(" | BK rynek osady: ").Append(s.TownPurseNoBkSkim ? (_bkHooked ? "gorna galaz pominieta w " + LastBkSkipTowns + " miastach i " + LastBkSkipCastles + " zamkach (BK skasowalby ok. " + LastBkSkipGold + ")" : "BRAK latki")
                                                                  : "gorna galaz zostaje (MCM Town Purse No Bk Skim wylaczone)")
               .Append(" | dar startowy dzis ").Append(LastTrim)
+              .Append(G24Part())
               .Append(" | potkniecia ").Append(stum);
             return sb.ToString();
         }

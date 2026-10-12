@@ -47,6 +47,9 @@ Uzycie (Python 3, tylko odczyt):
                     = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
                     bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
+                    Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
+                    zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
+                    z niczego 0 (RealPayer przed RBM; wyplaty INFO), pomiar G24/N3 (INFO; latka niewpieta = NIE).
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3166,6 +3169,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_fee(rep, lines)
     except Exception as e:
         rep.add("blok etap5_fee", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # audyt zlota z niczego 11.10 (5a/5b): A3' dar BK, zaulki z kasy miasta, RealPayer turnieje przed RBM, pomiar G24/N3 - wlasne wiersze, wlasny try
+    try:
+        etap5_aud(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_aud", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3192,6 +3200,114 @@ def etap5_fee(rep, lines):
             f"naliczone {acc}, splacone przez rody {paid}: notable {nb}, kasy osad {ss}, bez pokrycia {unc}, saldo sprzed paczki {leg}, bez odbiorcy {nt}, poza rozliczeniem {out}",
             "notable + kasy osad > 0, gdy rody splacaja; bez odbiorcy 0", (nb + ss > 0 and nt == 0) if paid > 0 else None)
     rep.add("E5 dec. 9: potkniecia GarrisonRecruitFee", str(stum), "0", stum == 0)
+
+
+def etap5_aud(rep, lines, start, until):
+    """Audyt zlota z niczego 11.10 (docs/etap5/AUDYT-ZLOTO-Z-NICZEGO-2026-10-11.md, rozdz. 5a i 5b) - cztery male zmiany w Armoury:
+    A3' (Notable Bk Gift Cut): drugie 10 000 BK nowego notabla uciete - linia "Notable (E5/A3)" + "inne" z niczego w bilansie w dobach z nowymi notablami ~ tlo;
+    zaulki (Alley Income From Town): 30 zl/d za zaulek z nadwyzki kasy miasta - linia "Notable (E5/A3)" + "Obieg: notable i karawany" (z niczego netto ~ 0);
+    RP' (RealPayer TourneyPre High - przed RBMTournament): "nagrody turniejow" w ZRODLACH bilansu = 0, RealPayer > 0 wyplat (INFO - turnieje AI bywaja rzadko);
+    G24/N3 (pomiar, tylko licznik): dopisek linii "Kasy miast (169c)" - INFO (latka dopiero, gdy licznik > 0). Doby kampanii 2-until (doba 1 = sam stan ksiegi)."""
+    nob = by_day(lines, "Notable (E5/A3): dzien")
+    onk = by_day(lines, "Obieg: notable i karawany: dzien")
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    sea = by_day(lines, "Szczelnosc (164a): dzien")
+    k169 = by_day(lines, "Kasy miast (169c): dzien")
+    win = lambda src: [d for d in sorted(src) if 2 <= run_day(d, start) <= until]
+    # ---------------- A3': dar BK
+    bre = re.compile(r"dar BK nowych notabli \(A3'\)( WYLACZONE[^:]*)?: uciete (\d+) u (\d+) notabli \(okien CreateNotable (\d+)\)")
+    nre = re.compile(r"\| nowi notable: (\d+), z kas (\d+)")
+    ine = re.compile(r"zloto dane przez gre z niczego poza rozliczeniami rodow -?\d+ \(w tym: .*?, inne (-?\d+)\)")
+    nw = win(nob)
+    bk = {}
+    off = 0
+    for d in nw:
+        m = bre.search(nob[d])
+        if m:
+            if m.group(1):
+                off += 1
+            mn = nre.search(nob[d])
+            bk[d] = (int(m.group(2)), int(m.group(3)), int(m.group(4)), int(mn.group(1)) if mn else 0)
+    if not nw:
+        rep.add("audyt A3': linia Notable (E5/A3)", "brak w logu", "jest od wgrania E5/A3 (LogEnabled)", None)
+    elif not bk:
+        rep.add("audyt A3'-1: dopisek \"dar BK nowych notabli (A3')\" w linii Notable (E5/A3)", f"brak w {len(nw)} dobach", "jest od wgrania poprawki A3' (audyt 11.10)", False)
+    else:
+        cut = sum(v[0] for v in bk.values()); cutn = sum(v[1] for v in bk.values()); wn = sum(v[2] for v in bk.values()); newn = sum(v[3] for v in bk.values())
+        rep.add("audyt A3'-1: dar BK nowych notabli uciety (suma dob 2-%d)" % until,
+                f"uciete {cut} u {cutn} notabli; okien CreateNotable {wn}; nowi notable z kas (A3) {newn}" + (f"; WYLACZONE w {off} dobach" if off else ""),
+                "INFO (BK daje kazdemu nowemu notablowi poza wedrowcem drugie 10 000 - BK NotablePatches.cs:77-81; bez BK okna nic nie widza)", None)
+        # "inne" z niczego w dobach z dar BK uciety wobec dob bez nowych notabli (audyt 5a: test A3 - "inne w dobach z nowymi notablami ~ tlo")
+        dz = [d for d in bk if bk[d][1] > 0 and d in cau]
+        d0 = [d for d in bk if bk[d][1] == 0 and bk[d][3] == 0 and d in cau]
+        iv = {d: num(ine.pattern, cau[d]) for d in dz + d0}
+        a = [iv[d] for d in dz if iv.get(d) is not None]
+        b = [iv[d] for d in d0 if iv.get(d) is not None]
+        if a and b and not off:
+            per = (st.mean(a) - st.mean(b)) / max(1.0, st.mean(bk[d][1] for d in dz))
+            rep.add("audyt A3'-2: \"inne\" z niczego w dobach z nowymi notablami BK wobec tla (na notabla)",
+                    f"{per:+.0f} zl (srednio {st.mean(a):.0f} w {len(a)} dobach wobec {st.mean(b):.0f} w {len(b)} dobach bez nowych notabli)",
+                    "< 5 000 (bez A3': ok. +10 000 na nowego notabla - audyt 1b wiersz 11)", per < 5000)
+        else:
+            rep.add("audyt A3'-2: \"inne\" z niczego w dobach z nowymi notablami BK wobec tla", f"dob z nowymi notablami {len(a)}, tla {len(b)}" + (" (WYLACZONE)" if off else ""),
+                    "INFO (za malo dob do porownania)", None)
+    # ---------------- zaulki
+    are = re.compile(r"\| zaulki z kasy miasta( WYLACZONE[^:]*)?: nalezne (\d+) u (\d+) notabli, z kas (\d+), uciete (\d+) \(kasa bez nadwyzki u (\d+), w tym nic (\d+)\)")
+    al, aoff = {}, 0
+    for d in nw:
+        m = are.search(nob[d])
+        if m:
+            if m.group(1):
+                aoff += 1
+            al[d] = [int(x) for x in m.groups()[1:]]
+    if nw and not al:
+        rep.add("audyt Z-1: dopisek \"zaulki z kasy miasta\" w linii Notable (E5/A3)", f"brak w {len(nw)} dobach", "jest od wgrania poprawki zaulkow (audyt 11.10)", False)
+    elif al:
+        due = sum(v[0] for v in al.values()); paid = sum(v[2] for v in al.values()); cutz = sum(v[3] for v in al.values())
+        rep.add("audyt Z-1: zaulki - nalezne = z kas + uciete (suma dob 2-%d)" % until,
+                f"nalezne {due} (srednio {due / len(al):.0f}/d u {st.mean(v[1] for v in al.values()):.0f} notabli), z kas {paid}, uciete {cutz}" + (f"; WYLACZONE w {aoff} dobach" if aoff else ""),
+                "z kas + uciete = nalezne (+-0); bez poprawki ok. 6 600-6 900/d z niczego (audyt 1b wiersz 10)", (paid + cutz == due) if not aoff else None)
+    zre = re.compile(r"zloto z niczego netto \(zaulki, majatki BK, minus podatek warsztatow BK\) ([-+]?\d+)")
+    kw = win(onk)
+    zv = [num(zre.pattern, onk[d]) for d in kw]
+    zv = [v for v in zv if v is not None]
+    if zv:
+        rep.add("audyt Z-2: dochod notabli - zloto z niczego netto (Obieg, srednia dob 2-%d)" % until, f"{st.mean(zv):+.0f}/d (najwiecej {max(zv, key=abs):+d})",
+                "|srednia| <= 100 zl/d (bez poprawki = 30 x zaulki, ok. +6 600/d)", (abs(st.mean(zv)) <= 100) if (al and not aoff) else None)
+    # ---------------- RealPayer: nagrody turniejow przed RBM
+    tre = re.compile(r"nagrody turniejow: gra chciala (\d+), zaplacili (\d+), uciete (\d+) \((\d+) wyplat")
+    sw = win(sea)
+    tv = [tre.search(sea[d]) for d in sw]
+    tv = [[int(x) for x in m.groups()] for m in tv if m]
+    toff = any("WYLACZONE (Town Pays Rewards)" in sea[d] for d in sw)
+    cw = win(cau)
+    src = [num(r"\(w tym: .*?, nagrody turniejow (\d+)", cau[d]) for d in cw]
+    src = [v for v in src if v is not None]
+    if tv or src:
+        rep.add("audyt RP'-1: nagrody turniejow AI z niczego (ZRODLA bilansu, suma dob 2-%d)" % until, f"{sum(src)} w {len(src)} dobach",
+                "0 (bez poprawki RBMTournament placil przed RealPayer: ok. 80-120 zl/d)", (sum(src) == 0) if (src and not toff) else None)
+        rep.add("audyt RP'-2: RealPayer - nagrody turniejow przez kase miasta (suma)",
+                f"wyplat {sum(v[3] for v in tv)}, gra chciala {sum(v[0] for v in tv)}, zaplacili {sum(v[1] for v in tv)}, uciete {sum(v[2] for v in tv)}" + (" (WYLACZONE)" if toff else ""),
+                "INFO (> 0 wyplat, gdy w biegu byly turnieje AI; bez poprawki 0 wyplat przez caly bieg)", None)
+    else:
+        rep.add("audyt RP': linie Szczelnosc (164a) / bilans przyczyn", "brak w logu", "sa przy LogEnabled i ksiedze obiegu", None)
+    # ---------------- pomiar G24 / N3
+    gre = re.compile(r"pomiar G24/N3 \(audyt 11\.10[^)]*\): osada zaplacila bohaterowi ponad kase (\d+) w (\d+) zdarzeniach \(gracz (\d+)\), warsztaty BK - niedoplata pustej kasy (?:(\d+) w (\d+) wyrobach|-)")
+    kd = win(k169)
+    gv = [gre.search(k169[d]) for d in kd]
+    gv = [m for m in gv if m]
+    if not kd:
+        rep.add("audyt G24/N3: linia Kasy miast (169c)", "brak w logu", "jest przy LogEnabled", None)
+    elif not gv:
+        rep.add("audyt G24/N3: dopisek \"pomiar G24/N3\" w linii Kasy miast (169c)", f"brak w {len(kd)} dobach", "jest od wgrania pomiaru (audyt 11.10)", False)
+    else:
+        g = sum(int(m.group(1)) for m in gv); gn = sum(int(m.group(2)) for m in gv); gp = sum(int(m.group(3)) for m in gv)
+        n3 = sum(int(m.group(4) or 0) for m in gv); n3n = sum(int(m.group(5) or 0) for m in gv)
+        hook = any("[G24: latka niewpieta]" in k169[d] for d in kd)
+        rep.add("audyt G24: osada zaplacila bohaterowi ponad kase (suma dob 2-%d)" % until, f"{g} zl w {gn} zdarzeniach (gracz {gp}; dob z G24 {sum(1 for m in gv if int(m.group(1)) > 0)})"
+                + ("; LATKA NIEWPIETA" if hook else ""),
+                "INFO (z niczego w reszcie R; > 0 = dopisac obciecie kwoty do kasy - audyt 5b \"N3 / G24\")", False if hook else None)
+        rep.add("audyt N3: warsztaty BK - niedoplata pustej kasy (suma)", f"{n3} zl w {n3n} wyrobach", "INFO (> 0 = obciac zaplate BK ProduceOutputPrefix do kasy - audyt 5b)", None)
 
 
 def etap5_rows(rep, lines, start, win, logp, csvp=None):

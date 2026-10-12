@@ -40,6 +40,18 @@ namespace Armoury
     /// Bilans otwarcia (projekt v2, E5K1-05/K4): przed Campaign.GameStarted (tworzenie swiata: SpawnNotablesAtGameStart, ok. 26.8 mln) i dla karawan
     /// z isInitialSpawn regula gry zostaje - to zloto jest w stanie poczatkowym ksiegi (pierwsza doba = sam stan); liczba i kwota w linii startowej.
     /// Gracz = AI (notable w osadach gracza - ta sama regula). Wyjatek per zdarzenie - licznik potkniec, bez globalnego wylacznika.
+    ///
+    /// E5/A3' (audyt zlota z niczego 11.10, rozdz. 5a; wylacznik NotableBkGiftCut): BK zastepuje HeroCreator.CreateNotable wlasnym prefiksem (BK NotablePatches.cs:21-92):
+    /// CreateSpecialHero (zdarzenie HeroCreated - gra daje 10 000 w NotablesCampaignBehavior.OnHeroCreated, to lapie A3) i DRUGIE GiveGoldAction(nic, notabl, 10 000)
+    /// (BK :77-81) - z niczego (ksiega: "inne"). Prefiks First (przed prefiksem BK, ktory zwraca false) + finalizer High otwiera kontekst KBk; bohatera wiaze NewPre
+    /// (pierwsze HeroCreated w tym oknie); GivePrefix tnie pierwszy dar "nic -> ten notabl" w oknie KBk do 0 (decyzja z audytu: notabl dostaje 10 000 jak w grze,
+    /// z kasy miasta przez A3). Przy wylaczonym A3 NewPre i tak kladzie na stos bierny kontekst daru gry (Swapped) - dar gry nie zostanie wziety za dar BK.
+    /// Tworzenie swiata (przed GameStarted) - regula BK zostaje (bilans otwarcia, liczba w linii startowej). Bez BK okno KBk niczego nie widzi (licznik okien).
+    /// Zaulki (audyt rozdz. 1b wiersz 10, 5b; wylacznik AlleyIncomeFromTown): ClanVariablesCampaignBehavior.DailyTickHero wyplaca notablowi dochod z modelu jednym
+    /// GiveGoldAction(nic, notabl) - w nim 30 zl za kazdy zaulek notabla w osadzie, w ktorej jest (G DefaultClanFinanceModel.cs:897-903) - z niczego (reszta to
+    /// przelew z kapitalu warsztatow i kas karawan - K1). Prefiks Low otwiera kontekst KAlley (ta sama liczba zaulkow co gra), GivePrefix zdejmuje z wyplaty
+    /// czesc za zaulki (najwyzej cala wyplate), a postfiks wyplaca ja zdarzeniem gry z kasy tego miasta (GiveGoldAction.ApplyForSettlementToCharacter - MoneyLedger
+    /// widzi przelew kasa miasta -> notabl, platnik i odbiorca), najwyzej z nadwyzki (Seal31.Spare - jak pasmo A3); czego kasa nie ma - 0 (licznik).
     /// </summary>
     internal static class NotableGold
     {
@@ -47,16 +59,20 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.NotableGoldReal; } }
         internal static bool CapOn { get { var s = Settings.Current; return s != null && s.NotableCaravanCapitalReal; } }
+        internal static bool BkCutOn { get { var s = Settings.Current; return s != null && s.NotableBkGiftCut; } }
+        internal static bool AlleyOn { get { var s = Settings.Current; return s != null && s.AlleyIncomeFromTown; } }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private const int BandHigh = 10500, BandLow = 4500, PowerGold = 500;   // pasmo gry (G NotablePowerManagementBehavior.cs:49, :55, :51)
         private const int CaravanKeep = 4500;                                  // notabl wklada w karawane tylko zloto ponad dolna granice pasma
-        private const int KBand = 0, KNew = 1;
+        private const int KBand = 0, KNew = 1, KBk = 2, KAlley = 3;
+        private const int AlleyGold = 30;                                      // dochod za zaulek (G DefaultClanFinanceModel.cs:901)
 
         internal sealed class Ctx
         {
             public int Kind; public Hero H; public Settlement Town; public bool Village, Opening, Swapped;
             public long Due, Paid;
+            public long Pend;                                                  // zaulki: do wyplaty z kasy miasta w postfiksie DailyTickHero
         }
 
         /// <summary>Kontekst nowej karawany notabla (CaravanCapital.CreatePre - CapPostfix - CreateFin).</summary>
@@ -77,10 +93,15 @@ namespace Armoury
         private static long _noTownOut, _noTownIn, _noTownNew, _noTownCar;
         private static int _noTownN, _strays, _overflow, _offN;
         private static int _stumbles;
+        // E5/A3' (dar BK) i zaulki - liczniki doby
+        private static long _bkCut;
+        private static int _bkWin, _bkCutN, _bkOffN;
+        private static long _alDue, _alPaid, _alCut;
+        private static int _alN, _alCutN, _alOffN, _alNoPay;
         private static readonly HashSet<string> _err = new HashSet<string>();
         // bilans otwarcia (tworzenie swiata) - do linii startowej sesji
-        private static long _openGold, _openCarGold;
-        private static int _openN, _openCarN;
+        private static long _openGold, _openCarGold, _openBkGold;
+        private static int _openN, _openCarN, _openBkN;
         private static bool _startLogged;
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
         private static string _wiredText = "-", _missingText = "-", _others = "-";
@@ -90,7 +111,7 @@ namespace Armoury
         {
             Array.Clear(_stack, 0, _stack.Length); _depth = 0;
             Array.Clear(_car, 0, _car.Length); _carDepth = 0;
-            _openGold = _openCarGold = 0; _openN = _openCarN = 0; _startLogged = false;
+            _openGold = _openCarGold = _openBkGold = 0; _openN = _openCarN = _openBkN = 0; _startLogged = false;
             _stumbles = 0; _err.Clear();
             ClearDay();
         }
@@ -102,6 +123,8 @@ namespace Armoury
             _newPaid = _newDue = 0; _newN = _newCutN = 0;
             _carK = _carF = _carT = 0; _carN = _carZero = _carNoModel = _carOff = 0;
             _noTownOut = _noTownIn = _noTownNew = _noTownCar = 0; _noTownN = _strays = _overflow = _offN = 0;
+            _bkCut = 0; _bkWin = _bkCutN = _bkOffN = 0;
+            _alDue = _alPaid = _alCut = 0; _alN = _alCutN = _alOffN = _alNoPay = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -170,13 +193,77 @@ namespace Armoury
             {
                 if (__0 == null) return;
                 bool live = Live;
-                if (live && !On) return;
+                // E5/A3': pierwsze HeroCreated w oknie CreateNotable (BK: CreateSpecialHero) - to jest nowy notabl, ktoremu BK da drugie 10 000
+                var top = _depth > 0 ? _stack[_depth - 1] : null;
+                bool inBk = top != null && top.Kind == KBk && top.H == null && !top.Swapped;
+                if (inBk) top.H = __0;
+                if (live && !On)
+                {
+                    if (!inBk) return;
+                    var p = new Ctx { Kind = KNew, H = __0, Swapped = true };   // A3 wylaczone: dar gry jak dotad (z niczego) - bierny kontekst, zeby okno KBk nie wzielo go za dar BK
+                    if (Push(p)) __state = p;
+                    return;
+                }
                 bool v = false;
                 var town = live ? TradeTown(__0, out v) : null;
                 var c = new Ctx { Kind = KNew, H = __0, Opening = !live, Town = town, Village = v };
                 if (Push(c)) __state = c;
             }
             catch (Exception e) { __state = null; Stumble("NewPre", e); }
+        }
+
+        /// <summary>E5/A3': HeroCreator.CreateNotable - prefiks First (przed prefiksem BK, ktory zastepuje metode gry): kontekst daru BK; bohatera wiaze NewPre.</summary>
+        public static void BkPre(out Ctx __state)
+        {
+            __state = null;
+            try
+            {
+                bool live = Live;
+                if (live && !BkCutOn) { _bkOffN++; return; }
+                var c = new Ctx { Kind = KBk, Opening = !live };
+                if (Push(c)) { __state = c; if (live) _bkWin++; }
+            }
+            catch (Exception e) { __state = null; Stumble("BkPre", e); }
+        }
+
+        /// <summary>Zaulki: ClanVariablesCampaignBehavior.DailyTickHero(notabl) - prefiks Low: kontekst, gdy notabl ma zaulki w osadzie, w ktorej jest (te same warunki co gra).</summary>
+        public static void AlleyPre(Hero __0, out Ctx __state)
+        {
+            __state = null;
+            try
+            {
+                if (__0 == null || !Live || !__0.IsActive || !__0.IsNotable) return;
+                var st = __0.CurrentSettlement;
+                var al = st != null ? st.Alleys : null;
+                if (al == null || al.Count == 0) return;
+                int n = 0;
+                for (int i = 0; i < al.Count; i++) { var a = al[i]; if (a != null && ReferenceEquals(a.Owner, __0)) n++; }
+                if (n == 0) return;
+                if (!AlleyOn) { _alOffN++; return; }
+                var c = new Ctx { Kind = KAlley, H = __0, Town = st, Due = (long)n * AlleyGold };
+                if (Push(c)) __state = c;
+            }
+            catch (Exception e) { __state = null; Stumble("AlleyPre", e); }
+        }
+
+        /// <summary>Zaulki: postfiks DailyTickHero (przed finalizerami) - czesc za zaulki zdjeta z wyplaty gry placi kasa miasta zdarzeniem gry (przelew w ksiedze).</summary>
+        public static void AlleyPost(Ctx __state)
+        {
+            var c = __state;
+            if (c == null || c.Kind != KAlley || !c.Swapped) return;
+            try
+            {
+                long pay = c.Pend;
+                c.Pend = 0;
+                if (pay <= 0 || c.Town == null || c.Town.Party == null || c.Town.SettlementComponent == null || c.H == null) return;
+                int before = c.H.Gold;
+                GiveGoldAction.ApplyForSettlementToCharacter(c.Town, c.H, (int)pay, true);   // zdarzenie gry: kasa miasta -> notabl (kwota w nadwyzce, wiec bez obciecia kasy do 0)
+                long got = (long)c.H.Gold - before;
+                c.Paid = got;
+                _alPaid += got;
+                if (got < c.Due) { _alCut += c.Due - got; _alCutN++; }
+            }
+            catch (Exception e) { Stumble("AlleyPost", e); }
         }
 
         /// <summary>Wspolny finalizer (High - przed finalizerami okien ksiegi): zdjecie kontekstu; pasmo - punkty sily za zloto, ktorego kasa nie miala, wracaja.</summary>
@@ -203,7 +290,33 @@ namespace Armoury
             try
             {
                 var c = _stack[_depth - 1];
-                if (c == null || c.Swapped || __4 <= 0 || c.H == null) return;
+                if (c == null || c.Swapped || __4 <= 0) return;
+                if (c.Kind == KBk)
+                {
+                    // E5/A3': dar BK "nic -> nowy notabl" (BK NotablePatches.cs:80); bohater zwiazany w NewPre, bez wiazania - pierwszy dar z niczego dla notabla
+                    bool gift = __0 == null && __1 == null && __3 == null && __2 != null && (c.H != null ? ReferenceEquals(__2, c.H) : __2.IsNotable);
+                    if (!gift) { if (!c.Opening && __0 == null && __1 == null) _strays++; return; }
+                    c.Swapped = true; c.H = __2;
+                    if (c.Opening) { _openBkN++; _openBkGold += __4; return; }   // tworzenie swiata - regula BK (bilans otwarcia)
+                    _bkCutN++; _bkCut += __4;
+                    __4 = 0;                                                     // uciete - zloto nie powstaje (GiveGoldAction z 0: kiesy bez zmian, zdarzenie z 0 ksiega pomija)
+                    return;
+                }
+                if (c.H == null) return;
+                if (c.Kind == KAlley)
+                {
+                    // zaulki: tylko wyplata dochodu "nic -> ten notabl"; inne zdarzenia w dobie notabla (przelew podatku BK E3/8a) nie sa nasze
+                    if (!(__0 == null && __1 == null && ReferenceEquals(__2, c.H) && __3 == null)) return;
+                    c.Swapped = true;
+                    long part = Math.Min(c.Due, (long)__4);                     // czesc za zaulki (przy wyplacie mniejszej niz zaulki - cala wyplata)
+                    c.Due = part;
+                    __4 = (int)(__4 - part);                                     // reszta jak w grze (przelew z warsztatow i karawan - K1)
+                    long spA = c.Town != null && c.Town.SettlementComponent != null ? Seal31.Spare(c.Town) : 0;
+                    c.Pend = Math.Max(0L, Math.Min(part, spA));
+                    _alN++; _alDue += part;
+                    if (c.Pend <= 0) { _alNoPay++; _alCut += part; _alCutN++; }
+                    return;
+                }
                 bool toH = __0 == null && __1 == null && ReferenceEquals(__2, c.H) && __3 == null;                     // nic -> notabl
                 bool fromH = c.Kind == KBand && ReferenceEquals(__0, c.H) && __1 == null && __2 == null && __3 == null;  // notabl -> nic (tylko pasmo)
                 if (!toH && !fromH) { if (!c.Opening) _strays++; return; }   // tworzenie swiata: inne zdarzenia w oknie nowego bohatera - bez licznika
@@ -338,8 +451,26 @@ namespace Armoury
             var band = AccessTools.Method(typeof(NotablePowerManagementBehavior), "BalanceGoldAndPowerOfNotable", new[] { typeof(Hero) });
             var fresh = AccessTools.Method(typeof(NotablesCampaignBehavior), "OnHeroCreated", new[] { typeof(Hero), typeof(bool) });
             var give = AccessTools.Method(typeof(GiveGoldAction), "ApplyInternal");
+            var bkNew = AccessTools.Method(typeof(HeroCreator), "CreateNotable");
+            var tick = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickHero", new[] { typeof(Hero) });
             Patch(h, "pasmo notabli (BalanceGoldAndPowerOfNotable)", band, nameof(BandPre), nameof(CtxFin), Priority.Low, Priority.High);
             Patch(h, "nowy notabl (NotablesCampaignBehavior.OnHeroCreated)", fresh, nameof(NewPre), nameof(CtxFin), Priority.Low, Priority.High);
+            // E5/A3': prefiks First - przed prefiksem BK (Normal), ktory zastepuje CreateNotable i zwraca false; finalizer biegnie zawsze
+            Patch(h, "dar BK nowego notabla (HeroCreator.CreateNotable)", bkNew, nameof(BkPre), nameof(CtxFin), Priority.First, Priority.High);
+            // zaulki: prefiks Low i postfiks (wyplata z kasy miasta) - przed finalizerami okna O01 i E3/8a (Seal31B.HeroTickFin)
+            try
+            {
+                if (h == null) _missing.Add("zaulki (brak Harmony)");
+                else if (tick == null) _missing.Add("zaulki (ClanVariablesCampaignBehavior.DailyTickHero)");
+                else
+                {
+                    h.Patch(tick, prefix: new HarmonyMethod(typeof(NotableGold), nameof(AlleyPre)) { priority = Priority.Low },
+                                  postfix: new HarmonyMethod(typeof(NotableGold), nameof(AlleyPost)) { priority = Priority.Normal },
+                                  finalizer: new HarmonyMethod(typeof(NotableGold), nameof(CtxFin)) { priority = Priority.High });
+                    _wired.Add("zaulki (ClanVariablesCampaignBehavior.DailyTickHero)");
+                }
+            }
+            catch (Exception e) { _missing.Add("zaulki (blad: " + e.Message + ")"); }
             Patch(h, "strona przelewu (GiveGoldAction.ApplyInternal)", give, nameof(GivePrefix), null, Priority.Low, Priority.Normal);
             _wiredText = _wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-";
             _missingText = _missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-";
@@ -347,7 +478,7 @@ namespace Armoury
             try
             {
                 var others = new List<string>();
-                foreach (var m in new MethodBase[] { band, fresh })
+                foreach (var m in new MethodBase[] { band, fresh, bkNew })
                 {
                     var info = m != null ? Harmony.GetPatchInfo(m) : null;
                     if (info == null) continue;
@@ -356,7 +487,7 @@ namespace Armoury
                 _others = others.Count > 0 ? string.Join(", ", others.ToArray()) : "brak";
             }
             catch (Exception e) { _others = "odczyt nieudany (" + e.Message + ")"; }
-            Log.Info("Notable (E5/A3): latki przy starcie gry - wpiete: " + _wiredText + "; BRAK: " + _missingText + "; latki innych modow na pasmie i nowym notablu: " + _others
+            Log.Info("Notable (E5/A3): latki przy starcie gry - wpiete: " + _wiredText + "; BRAK: " + _missingText + "; latki innych modow na pasmie, nowym notablu i CreateNotable (BK): " + _others
                      + "; kapital karawan notabli - przez latki E3/7 (CaravanCapital: CreateCaravanParty, GetInitialTradeGold w kampanii).");
         }
 
@@ -372,8 +503,9 @@ namespace Armoury
                 {
                     _startLogged = true;
                     Log.Info("Notable (E5/A3): start | wylaczniki: Notable Gold Real " + (On ? "tak" : "nie") + ", Notable Caravan Capital Real " + (CapOn ? "tak" : "nie")
+                             + ", Notable Bk Gift Cut " + (BkCutOn ? "tak" : "nie") + ", Alley Income From Town " + (AlleyOn ? "tak" : "nie")
                              + " | latki: " + _wiredText + "; BRAK: " + _missingText + " | bilans otwarcia (tworzenie swiata - regula gry, poza E5/A3): "
-                             + (_openN + _openCarN > 0 ? "notable " + _openN + " (zloto gry " + _openGold + "), karawany startowe " + _openCarN + " (kapital gry " + _openCarGold + ")"
+                             + (_openN + _openCarN + _openBkN > 0 ? "notable " + _openN + " (zloto gry " + _openGold + "), dar BK nowych notabli " + _openBkN + " (zloto BK " + _openBkGold + "), karawany startowe " + _openCarN + " (kapital gry " + _openCarGold + ")"
                                                          : "brak w tej sesji (wczytany zapis - notable i karawany juz istnieja, regula od pierwszej doby)") + ".");
                 }
                 var sb = new StringBuilder(1200);
@@ -387,6 +519,11 @@ namespace Armoury
                   .Append(" | kapital karawan notabli").Append(CapOn ? "" : " WYLACZONE (Notable Caravan Capital Real - z niczego jak dotad, karawan " + _carOff + ")").Append(": ").Append(_carN)
                   .Append(" karawan, gra dalaby ").Append(_carK).Append(", z kies notabli ").Append(_carF).Append(", z kas miast startu ").Append(_carT).Append(", uciete ").Append(_carK - _carF - _carT)
                   .Append(" (bez kapitalu ").Append(_carZero).Append(')')
+                  .Append(" | dar BK nowych notabli (A3')").Append(BkCutOn ? "" : " WYLACZONE (Notable Bk Gift Cut - z niczego jak dotad, okien " + _bkOffN + ")").Append(": uciete ").Append(_bkCut)
+                  .Append(" u ").Append(_bkCutN).Append(" notabli (okien CreateNotable ").Append(_bkWin).Append(')')
+                  .Append(" | zaulki z kasy miasta").Append(AlleyOn ? "" : " WYLACZONE (Alley Income From Town - z niczego jak dotad, notabli " + _alOffN + ")").Append(": nalezne ").Append(_alDue)
+                  .Append(" u ").Append(_alN).Append(" notabli, z kas ").Append(_alPaid).Append(", uciete ").Append(_alCut).Append(" (kasa bez nadwyzki u ").Append(_alCutN)
+                  .Append(", w tym nic ").Append(_alNoPay).Append(')')
                   .Append(" | bez kasy handlu - jak w grze (prog 0): zdarzen ").Append(_noTownN).Append(", w nicosc ").Append(_noTownOut).Append(", z niczego ").Append(_noTownIn + _noTownNew + _noTownCar)
                   .Append(" | kontrola (prog 0): zdarzenia w kontekscie niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow)
                   .Append(", karawana bez odczytu modelu ").Append(_carNoModel);
@@ -405,7 +542,8 @@ namespace Armoury
             {
                 return " | E5/A3 przez kase miasta handlu [P]: pasmo do kas " + (_bandToTown + _bandToTownV).ToString(Inv) + ", z kas " + (_bandFromTown + _bandFromTownV).ToString(Inv)
                        + " (uciete " + _bandCut.ToString(Inv) + "), nowi notable z kas " + _newPaid.ToString(Inv) + ", kapital karawan notabli z kies notabli " + _carF.ToString(Inv)
-                       + " i kas miast " + _carT.ToString(Inv) + " (w 'kapital nadany' nizej - korekta zrodel bilansu)" + (On ? "" : " [pasmo WYLACZONE]") + (CapOn ? "" : " [kapital WYLACZONY]");
+                       + " i kas miast " + _carT.ToString(Inv) + " (w 'kapital nadany' nizej - korekta zrodel bilansu)" + (On ? "" : " [pasmo WYLACZONE]") + (CapOn ? "" : " [kapital WYLACZONY]")
+                       + ", dar BK nowych notabli uciety " + _bkCut.ToString(Inv) + (BkCutOn ? "" : " [WYLACZONE]") + ", zaulki z kas miast " + _alPaid.ToString(Inv) + " (przelew; uciete " + _alCut.ToString(Inv) + ")" + (AlleyOn ? "" : " [WYLACZONE]");
             }
             catch { return ""; }
         }
