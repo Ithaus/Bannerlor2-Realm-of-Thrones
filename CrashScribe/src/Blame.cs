@@ -114,6 +114,10 @@ namespace CrashScribe
         internal static long FcSeen, FcFiltered, FcReported, FcRepeat, CulpritCalls, CulpritTicks;
         private static int _profDay = int.MinValue;
 
+        /// <summary>Recenzja E8/0: nowa kampania albo wczytanie (EconomyAudit.RegisterEvents) - pierwszy takt doby bez linii. Bez tego wczytanie zapisu z tej samej
+        /// doby (poprzedni takt = wczoraj) dawalo linie z bledami pierwszej szansy calego wczytywania jako "doba gry" (jak DayProfile.Reset w Armoury).</summary>
+        internal static void DayReset() { _profDay = int.MinValue; }
+
         /// <summary>Linia "Profil CS (E8/0)" za okres od poprzedniego wywolania (takt doby kampanii); tylko gdy poprzednie bylo dobe wczesniej (bez okresow z wczytania).</summary>
         internal static void DayLine(int nowDay)
         {

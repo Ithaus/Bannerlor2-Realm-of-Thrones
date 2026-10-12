@@ -1,5 +1,40 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 8, recenzja paczki E8/0 = 242) - KOSZT PROFILU LICZONY RAZ (LINIA NIE DWA RAZY, KALIBRACJA PO ROZGRZEWCE, WSZYSTKIE ODCZYTY ZEGARA); LINIA CS BEZ OKRESU WCZYTYWANIA
+**Mod:** Armoury + CrashScribe | **Galaz:** `w-toku/e8-a` (po 8a8df38) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/0" (prog E80-3) | **Pliki:** `Armoury/src/DayProfile.cs`, `Armoury/src/Drill.cs`, `CrashScribe/src/Blame.cs`, `CrashScribe/src/EconomyAudit.cs`
+
+**Problem:** (recenzja, bez gry) cztery bledy samego pomiaru - gra bez zmian:
+1. "koszt profilu" liczyl kazda linie dwa razy: `lineMs` = stoper poprzedniego `TickBegin` (cala poprzednia linia z zapisem) + czas biezacej linii. Prog E80-3 to 1 ms/dobe, a opakowania zdarzen same biora ok. 0.6-0.9 ms - podwojna linia mogla dac falszywe NIE.
+2. Kalibracja (`Calibrate`, 4096 wywolan raz na sesje) mierzyla tez pierwsze wywolanie delegata - kompilacja jego metody (dziesiatki mikrosekund) dzielona przez 4096 dawala kilkanascie ns na opakowanie ponad prawde; przy ok. 100 tys. opakowan na dobe to 1-3 ms falszywego kosztu.
+3. Poza suma odczytow zegara byly stopery zuzycia i kowali w `Drill.TickPostfix` (2 odczyty na partie i dobe) i stoper zapisu logu (2 na linie).
+4. CrashScribe: `_profDay` nie byl zerowany miedzy kampaniami. Wczytanie zapisu z tej samej doby (ostatni takt poprzedniej sesji = wczoraj) dawalo linie "Profil CS (E8/0)" z bledami pierwszej szansy calego wczytywania jako "doba gry" - zawyzaloby srednia, na ktora patrzy E8/M.
+
+**Przyczyna:** `DayProfile.Line` (suma `_selfTicks` + biezaca linia; brak rozgrzewki; `reads` bez Drill i Log), `Blame.DayLine` (stan statyczny bez zerowania).
+
+**Zmiana (tylko pomiar):**
+- `DayProfile.Line`: koszt linii = stoper poprzedniego `TickBegin` (linia i zerowanie z poczatku TEGO okresu; biezaca linia nalezy do nastepnego okresu i pokaze ja nastepna linia) - napis "linia poprzedniej doby"; `reads` + odczyty Drill + 2 x zapisy logu. Regex narzedzia (`| koszt profilu X ms`) bez zmian.
+- `DayProfile.Calibrate`: 64 wywolania rozgrzewki przed pomiarem.
+- `Drill.ProfileTake` zwraca liczbe odczytow zegara stoperow 6 i 7 (`_profReads`, zerowany przy odczycie i w `Reset`).
+- `Blame.DayReset()` wolane z `EconomyAudit.RegisterEvents` (kazda kampania / wczytanie): pierwszy takt doby bez linii, liczniki zerowane jak dotad.
+
+**Recenzja reszty 8a8df38 (sprawdzone w kodzie, bez poprawek):**
+- Kolejnosc i komplet wywolan `OnDailyTick`: mechanicznie - po usunieciu 146 `DayProfile.Lap` cialo `OnDailyTickBody` rowne dawnemu `OnDailyTick` co do znaku (diff: tylko opakowanie TickBegin / try / finally TickEnd); wszystkie Lap na poziomie metody (glebokosc 1, po `}` - zaden w petli, zaden jako jedyna instrukcja `if`), bez `return` w ciele, nazwy bez powtorzen.
+- Sluchacze: te same wywolania `AddNonSerializedListener` w tej samej kolejnosci (B-1: CirculationWindows pierwszy), opakowanie w miejscu; 13 godzinowych (12 + HideoutSpotter), 4 inne doby, 9 + 14 + 8 + 5 + 2 zdarzen; bez opakowania zostaja tylko `OnDailyTick` (ma wlasny stoper) i tanie liczniki Seal31 / CrownRents / Measure169c; nazwy w obrebie rodzaju bez powtorzen (sloty po nazwie - kolejne wczytania nie przepelniaja tablic).
+- "Nasze razem" rozlaczne: z Cost174 tylko CyclePrefix, VolunteerKit.Buy, TownFletchers.Work - wszystkie trzy wola gra (`WorkshopsCampaignBehavior`, `RecruitmentCampaignBehavior`, postfiks `DailyTickTown`), zaden nasz sluchacz ich nie wola; ceny w nich nie wchodza do "gra i cudze" (CyclePrefix i VolunteerKit maja flage wolajacego; strzelarze i kowale musztry pytaja tylko o surowce - poza probka SPrice); trening musztry = latki na `MobilePartyTrainingBehavior` (gra). `Caller` [ThreadStatic] zapisywany i odtwarzany w `finally` (4 miejsca).
+- Stopery bez alokacji (tablice stale, domkniecia opakowan raz przy RegisterEvents); alokacje tylko w linii raz na dobe. `Reset` w konstruktorze `ArmouryBehavior` (pierwszy takt po wczytaniu bez linii, GC i zapis logu od zera).
+- Wylacznik `Stage8ProfileLog`: wylaczony = bez linii, bez stoperow taktu, bez opakowan (te same delegaty co przed paczka); zostaja liczniki po kilka ns (Cost174 maks., Drill kategorie i 2 stopery, Log czas zapisu, flaga wolajacego) - gra identyczna. Klucza nie ma w `Armoury.json` Jeffa (grep 0).
+- Pulapki CLAUDE.md 7: bez SwitchToMenu, wizerunkow, globalnych wylacznikow (wyjatek linii = `ERROR in DayProfile.Line`, takt biegnie), bez ozywiania martwego kodu, bez latek finansow.
+- Narzedzie: `py_compile` poza repo OK; `--grupa etap8` na Z33 (bez linii - INFO; T0: CorrectPlayerEducation 1) i na logu z dopisanymi liniami w formacie z kodu (E80-1..E80-4 i wiersze INFO czytaja wszystkie liczby); "bitwy" netto na Z33: 7504 - 4869 + N4 (-2635) = 0, regexy trafiaja w 119 ze 119 dob.
+
+**Ryzyko / co sprawdzic:**
+- E80-3 jest na granicy: ok. 115 tys. opakowan na dobe x 6-8 ns = 0.7-0.9 ms + linia ok. 0.2 ms. Jesli test da > 1 ms - wyjscie z opisu paczki (probka 1/32 albo bez opakowan doby partii), nie blad kodu.
+- Scalenie (proba `git merge-tree`, nic nie zapisane w drzewach): z `w-toku/e8-b` konflikt w `CrashScribe/src/SubModuleMain.cs` (sluchacz FirstChance: E8/0 dopisuje liczniki, E8/M linie `Quiet.KnownBkEducation`) i w `CHANGELOG.md`; `Config.cs` i `CrashScribe.settings.xml` scalaja sie same. Rozwiazanie: zostaja OBIE zmiany w kolejnosci `FcSeen++` -> filtr E8/M (wyciszony blad doliczyc do `FcFiltered` albo zostawic bez licznika - wtedy "FirstChance" > zgloszone + powtorki + odfiltrowane o liczbe wyciszonych) -> filtr bez moda -> `Scribe.Report` z licznikami. Z `w-toku/zbior-5-8` (f01f47a): `ArmouryBehavior.cs` (konstruktor, RegisterEvents, OnDailyTick - po nowych wywolaniach R1/R2/W4 dopisac `DayProfile.Lap` recznie), `tools/sprawdz_logi.py`, `CHANGELOG.md`; `McmSettings.cs` scala sie sam, ale `python tools/gen_mcm.py` trzeba uruchomic ponownie. Z `w-toku/a8-gentry0`: tylko `CHANGELOG.md`.
+- Poza zakresem (zauwazone): `Depth` w `DayProfile` nie jest [ThreadStatic] (jak liczniki Cost174 - "wolane z watku gry"); gdyby gra pytala o ceny sprzetu z watku pobocznego, podzial "nasze inne" / "gra i cudze" moze sie pomylic o pojedyncze probki (tylko log).
+
+**Build:** Armoury kod 0 (ostrzezenie CS0169 BattlefieldLaw - stare), CrashScribe kod 0. Gry nie uruchamiano. `gen_mcm` bez zmian (zadnego nowego klucza).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (etap 8, paczka E8/0 - 242, PLAN 8.17 pomiar) - PROFIL DOBY W LOGU: linia "Profil doby (E8/0)" raz na dobe (takt doby z top 15 wywolan, godzina, zdarzenia, podzialy CyclePrefix / musztry / cen, pamiec polki, zapis logu, GC); CrashScribe "Profil CS (E8/0)"; grupa `--grupa etap8`; klucz `Stage8ProfileLog`
 **Mod:** Armoury + CrashScribe + narzedzie | **Galaz:** `w-toku/e8-a` (od `w-toku/zbior-5-8` 0168887) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/0", rozdz. 6 (odpowiedzi Jeffa 12.10 19:15 - E8/0 nie dotyczy; pkt 11: pomiar -Profile po tescie), `docs/etap8/rozpoznanie-D-optymalizacja.md` rozdz. 1, 3 (K1-K9), 5 | **Pliki:** NOWY `Armoury/src/DayProfile.cs`; `ArmouryBehavior.cs` (OnDailyTick -> TickBegin / OnDailyTickBody / TickEnd, 146 x `DayProfile.Lap`, opakowania sluchaczy w RegisterEvents, Reset), `Cost174.cs` (najdluzsza probka, `EndDt`, odczyty), `Drill.cs` (zegar kosztu wedlug wejscia), `WorkshopLaw.cs`, `SupplyDemand.cs`, `VolunteerKit.cs`, `AiGear.cs`, `MenPurse.cs`, `ShelfIndex.cs`, `ShelfBuy.cs`, `Log.cs`, `HideoutSpotter.cs`, `HouseLevies.cs`, `LegendaryLaw.cs`, `UniqueLaw.cs`, `WorkshopTrade.cs`, `Settings.cs`, `McmSettings.cs` (gen_mcm, Armoury 1222); `CrashScribe/src/Blame.cs`, `SubModuleMain.cs`, `EconomyAudit.cs`, `Config.cs`, `ModuleData/CrashScribe.settings.xml`; `tools/sprawdz_logi.py`
 

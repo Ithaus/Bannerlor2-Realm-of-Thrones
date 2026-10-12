@@ -299,6 +299,9 @@ namespace Armoury
             // koszt jednego opakowania zdarzenia (licznik, maska, glebokosc, try/finally, probka 1/16) i jednego odczytu zegara - raz na sesje
             const int N = 4096;
             Action noop = () => { };
+            // recenzja E8/0: rozgrzewka poza pomiarem - pierwsze wywolanie delegata kompiluje jego metode (dziesiatki mikrosekund / 4096 = kilkanascie ns na
+            // opakowanie, czyli falszywe milisekundy w "koszt profilu" przy ok. 100 tys. opakowan na dobe)
+            for (int i = 0; i < 64; i++) { Depth++; try { noop(); } finally { Depth--; } _calSink += Stopwatch.GetTimestamp() & 1; }
             long t0 = Stopwatch.GetTimestamp();
             for (int i = 0; i < N; i++)
             {
@@ -316,7 +319,6 @@ namespace Armoury
 
         private static void Line()
         {
-            long t0 = Stopwatch.GetTimestamp();
             if (_nsWrap < 0) Calibrate();
             var inv = CultureInfo.InvariantCulture;
             var sb = new StringBuilder(2048);
@@ -379,8 +381,8 @@ namespace Armoury
             sb.Append(" | CyclePrefix z planem doby ").Append(F1(cyc0)).Append(" ms/").Append(_cCalls[0]).Append(" (probek ").Append(_cSampled[0])
               .Append("), kolejne ").Append(F1(cyc1)).Append(" ms/").Append(_cCalls[1]).Append(" (probek ").Append(_cSampled[1]).Append(')');
 
-            // musztra (Drill): 0 godziny, 1 tik treningu (z zuzyciem i kowalami w tiku), 2 kowale przy wejsciu, 3 linie, 4 zniszczone, 5 ekrany; 6 zuzycie, 7 kowale w tiku
-            Drill.ProfileTake(_drill);
+            // musztra (Drill): 0 godziny, 1 tik treningu (z zuzyciem i kowalami w tiku), 2 kowale przy wejsciu, 3 linie, 4 wolne, 5 ekrany; 6 zuzycie, 7 kowale w tiku
+            long drillReads = Drill.ProfileTake(_drill);
             double dTrain = Ms(_drill[1]), dWear = Ms(_drill[6]), dScrap = Ms(_drill[7]);
             sb.Append(" | musztra: godziny ").Append(F1(Ms(_drill[0]))).Append(", trening ").Append(F1(dTrain)).Append(" (w tym zuzycie ").Append(F1(dWear))
               .Append(", kowale w tiku ").Append(F1(dScrap)).Append("), kowale przy wejsciu ").Append(F1(Ms(_drill[2]))).Append(", linie ").Append(F1(Ms(_drill[3])))
@@ -420,12 +422,15 @@ namespace Armoury
               .Append(F1(outside)).Append("; pokrycie wobec Koszt 171-174 (nasze 171-174b + ceny ").Append(F1(refMs)).Append(" ms) ")
               .Append(refMs > 0 ? (100.0 * ours / refMs).ToString("0", inv) + "%" : "-");
 
-            // koszt profilu: poprzednia linia (stoper) + ta linia + stopery i opakowania (kalibracja)
+            // koszt profilu w TYM okresie: linia i zerowanie z poczatku okresu (stoper poprzedniego TickBegin) + stopery i opakowania (kalibracja).
+            // Recenzja E8/0: ta linia nalezy juz do nastepnego okresu (jej czas pokaze nastepna linia) - doliczana tu szla do sumy dwa razy
+            // (kazda linia w dwoch kolejnych dobach), a prog E80-3 to 1 ms/dobe. Odczyty zegara: godzina, inne sluchacze doby, MenPurse (_tsCount),
+            // odcinki i poczatek taktu, stopery zuzycia i kowali w tiku musztry (Drill), dwa na kazdy zapis logu (Log.Info / Csv / Error).
             long wraps = 0; for (int i = 0; i < _eN; i++) wraps += _eCalls[i];
-            long reads = _tsCount + _lapCount + 2;   // godzina, inne sluchacze doby, MenPurse (licznik w opakowaniach) + odcinki i poczatek taktu
+            long reads = _tsCount + _lapCount + 2 + drillReads + 2 * wl;
             double stoppers = (wraps * _nsWrap + reads * _nsTs) / 1e6;
-            double lineMs = Ms(_selfTicks + (Stopwatch.GetTimestamp() - t0));
-            sb.Append(" | koszt profilu ").Append(F2(lineMs + stoppers)).Append(" ms (linia ").Append(F2(lineMs)).Append(", stopery i opakowania ~").Append(F2(stoppers))
+            double lineMs = Ms(_selfTicks);
+            sb.Append(" | koszt profilu ").Append(F2(lineMs + stoppers)).Append(" ms (linia poprzedniej doby ").Append(F2(lineMs)).Append(", stopery i opakowania ~").Append(F2(stoppers))
               .Append(": opakowan ").Append(wraps).Append(" x ").Append(_nsWrap.ToString("0.0", inv)).Append(" ns, odczytow zegara ").Append(reads)
               .Append(" x ").Append(_nsTs.ToString("0.0", inv)).Append(" ns)");
             Log.Info(sb.ToString());

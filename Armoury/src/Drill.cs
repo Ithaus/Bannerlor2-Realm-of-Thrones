@@ -175,7 +175,7 @@ namespace Armoury
         {
             _tr.Clear(); _pendingMainMask = -1; _pendingMasks.Clear(); _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
-            _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length);   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
+            _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
         }
 
@@ -200,10 +200,13 @@ namespace Armoury
         internal const int PHour = 0, PTrain = 1, PSmith = 2, PLines = 3, PScreen = 5, PWear = 6, PScrapTick = 7;
         private static int _clkCat;
         private static readonly long[] _prof = new long[8];
-        /// <summary>E8/0: kopiuje czasy wedlug wejscia (ticki zegara) do dst[0..7] i zeruje.</summary>
-        internal static void ProfileTake(long[] dst)
+        private static long _profReads;   // recenzja E8/0: odczyty zegara stoperow zuzycia i kowali w TickPostfix - do "koszt profilu" (prog E80-3)
+        /// <summary>E8/0: kopiuje czasy wedlug wejscia (ticki zegara) do dst[0..7] i zeruje; zwraca liczbe odczytow zegara stoperow 6 i 7 od poprzedniego odczytu.</summary>
+        internal static long ProfileTake(long[] dst)
         {
             for (int i = 0; i < 8 && i < dst.Length; i++) { dst[i] = _prof[i]; _prof[i] = 0; }
+            long n = _profReads; _profReads = 0;
+            return n;
         }
 
         private static void Stumble(string where, Exception e)
@@ -769,9 +772,9 @@ namespace Armoury
                     _pr = null;
                 }
                 if (!Active(s) && _acc.Count == 0) return;           // musztra wylaczona i nic nie czeka - bez zuzycia i bez kowali
-                if (mine && c.Counted) { long w0 = Stopwatch.GetTimestamp(); try { Wear(c, s); } finally { _prof[PWear] += Stopwatch.GetTimestamp() - w0; } }   // E8/0: czas zuzycia (tylko pomiar)
+                if (mine && c.Counted) { long w0 = Stopwatch.GetTimestamp(); try { Wear(c, s); } finally { _prof[PWear] += Stopwatch.GetTimestamp() - w0; _profReads += 2; } }   // E8/0: czas zuzycia (tylko pomiar)
                 var st = mobileParty.CurrentSettlement;
-                if (st != null && st.IsTown) { long k0 = Stopwatch.GetTimestamp(); try { SellScrap(mobileParty, st); } finally { _prof[PScrapTick] += Stopwatch.GetTimestamp() - k0; } }   // E8/0: kowale w tiku (tylko pomiar)
+                if (st != null && st.IsTown) { long k0 = Stopwatch.GetTimestamp(); try { SellScrap(mobileParty, st); } finally { _prof[PScrapTick] += Stopwatch.GetTimestamp() - k0; _profReads += 2; } }   // E8/0: kowale w tiku (tylko pomiar)
             }
             catch (Exception e) { Stumble("TickPostfix", e); }
             finally { Unclk(); }
