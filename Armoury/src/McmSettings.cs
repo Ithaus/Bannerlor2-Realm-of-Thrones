@@ -980,7 +980,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool FeastTownGetsPaid { get; set; } = true;
 
-        [SettingPropertyBool("Pact Cost To Other Realm", HintText = "the gold a ruler (or you) pays in Diplomacy for a non-aggression pact or for peace goes to the treasury of the other realm in the treaty instead of vanishing; if that realm is gone, nothing is taken. Off = the gold vanishes, as before")]
+        [SettingPropertyBool("Pact Cost To Other Realm", HintText = "the gold a ruler (or you) pays in Diplomacy for a non-aggression pact or for peace goes to the treasury of the other realm in the treaty instead of vanishing; if that realm is gone or falls with this very peace, nothing is taken. Off = the gold vanishes, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PactCostToOtherRealm { get; set; } = true;
 

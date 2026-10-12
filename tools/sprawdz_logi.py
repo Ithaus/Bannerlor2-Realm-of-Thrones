@@ -4502,9 +4502,9 @@ def etap5_a8(rep, lines, start, until):
     # ---------------- 4. koszt paktu Diplomacy
     kn, kd, kp = tot(r"\| pakty Diplomacy \(nieagresja, pokoj\)[^:]*: (\d+), koszt"), tot(r"\(nieagresja, pokoj\)[^:]*: \d+, koszt (\d+)"), tot(r"do skarbcow drugiej strony (\d+)")
     kpl, knr, knrn = tot(r"drugiej strony \d+ \(w tym gracz (\d+)\)"), tot(r"bez drugiej strony nie pobrane (\d+)"), tot(r"bez drugiej strony nie pobrane \d+ \((\d+)\)")
-    koff = tot(r"; w nicosc jak dotad (\d+)")
+    koff, kfall = tot(r"; w nicosc jak dotad (\d+)"), tot(r"okna pokoju z upadkiem drugiej strony (\d+)")   # recenzja: druga strona upada z tym pokojem - nie pobrane
     rep.add("E5/A8-5: koszt paktu o nieagresji i pokoju Diplomacy do skarbca drugiej strony (suma dob 2-%d)" % until,
-            f"paktow {kn}, koszt {kd}, do skarbcow drugiej strony {kp} (gracz {kpl}); bez drugiej strony nie pobrane {knr} w {knrn}"
+            f"paktow {kn}, koszt {kd}, do skarbcow drugiej strony {kp} (gracz {kpl}); bez drugiej strony nie pobrane {knr} w {knrn} (okna pokoju z upadkiem drugiej strony {kfall})"
             + (f"; WYLACZONE - w nicosc jak dotad {koff}" if koff else ""),
             "do skarbcow <= koszt; INFO (audyt z31-A: 39 NAP + 18 pokojow, -2,66 tys./d w nicosc)", kp <= kd)
     # ---------------- reszta R w dobach ze zdarzeniami A8 (dotad skoki)

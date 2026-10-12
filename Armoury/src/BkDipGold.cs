@@ -42,7 +42,8 @@ namespace Armoury
     ///    okna (prefiks + finalizer) na FormNonAggressionPactAction.AssessCosts i KingdomPeaceAction.AcceptPeace zapamietuja DRUGA STRONE (otherKingdom),
     ///    a prefiks GoldCost.ApplyCost (tylko bez odbiorcy i tylko w oknie) przelewa kwote od dajacego (krol albo gracz; tyle, ile ma - jak gra) do SKARBCA
     ///    KROLESTWA DRUGIEJ STRONY (KingdomBudgetWallet - w sumie ksiegi "skarbce krolestw"). Druga strona wyeliminowana albo brak - nic nie pobrane (nic
-    ///    w nicosc). Koszt poslanca (tylko gracz, poza oknami) i koszty z odbiorca - bez zmian; odszkodowania (KingdomWalletCost) - CrownIncome (165).
+    ///    w nicosc). Recenzja: takze druga strona, ktora upada RAZEM z tym pokojem (EliminationOnPeace.OtherKingdom - AcceptPeace wola ApplyCost PRZED
+    ///    SoftlyDestroyKingdomAction, a skarbiec upadlego krolestwa wypada ze swiata) - nic nie pobrane. Koszt poslanca (tylko gracz, poza oknami) i koszty z odbiorca - bez zmian; odszkodowania (KingdomWalletCost) - CrownIncome (165).
     /// Wyjatek per zdarzenie - licznik potkniec, bez globalnego wylacznika. Nic do zapisu (stan doby od zera po wczytaniu).
     /// </summary>
     internal static class BkDipGold
@@ -67,6 +68,7 @@ namespace Armoury
 
         // odczyt typow BK i Diplomacy (bez referencji kompilacji)
         private static PropertyInfo _estOwner, _feastHost, _feastTown, _gcValue, _gcGiver, _gcReceiver;
+        private static FieldInfo _elimOther;        // Diplomacy EliminationOnPeace.OtherKingdom (recenzja)
 
         // liczniki doby
         private static long _gDue, _gPaid, _gCost, _gOff, _gOwnedCost;
@@ -78,7 +80,7 @@ namespace Armoury
         private static long _fHostPaid, _fTownGot, _fCut, _fOff;
         private static int _fN, _fCutN, _fOffN;
         private static long _kDue, _kPaid, _kPlayer, _kNoRecv, _kOff;
-        private static int _kN, _kNoRecvN, _kOffN;
+        private static int _kN, _kNoRecvN, _kOffN, _kFallsN;
         private static int _overflow, _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
@@ -100,7 +102,7 @@ namespace Armoury
             _hDue = _hPaid = _hOff = 0; _hN = _hShortN = _hOffN = 0;
             _pkValue = _pkOff = _pkPaid = 0; _pkLeft = _pkUnits = _pkOffN = _pkSold = _pkNoFence = 0;
             _fHostPaid = _fTownGot = _fCut = _fOff = 0; _fN = _fCutN = _fOffN = 0;
-            _kDue = _kPaid = _kPlayer = _kNoRecv = _kOff = 0; _kN = _kNoRecvN = _kOffN = 0;
+            _kDue = _kPaid = _kPlayer = _kNoRecv = _kOff = 0; _kN = _kNoRecvN = _kOffN = _kFallsN = 0;
             _overflow = 0;
         }
 
@@ -314,6 +316,19 @@ namespace Armoury
             __state = true;
         }
 
+        // okno pokoju: AcceptPeace(kingdomMakingPeace, otherKingdom, cost, tribute, fiefs, EliminationOnPeace shouldBeDestroyed) - ApplyCost biegnie PRZED
+        // SoftlyDestroyKingdomAction(otherKingdom); druga strona, ktora upada z tym pokojem, nie jest odbiorca (jej skarbiec wypada ze swiata) - jak brak strony
+        public static void PeacePre(Kingdom __1, object __5, out bool __state)
+        {
+            var k = __1;
+            try
+            {
+                if (k != null && __5 != null && _elimOther != null && PactOn && (bool)_elimOther.GetValue(__5)) { k = null; _kFallsN++; }
+            }
+            catch (Exception e) { Stumble("PeacePre", e); }
+            PactPre(k, out __state);
+        }
+
         public static void PactFin(bool __state)
         {
             if (__state && _pactDepth > 0) _pact[--_pactDepth] = null;
@@ -387,7 +402,12 @@ namespace Armoury
             bool peaceOk = peaceM != null && peaceM.GetParameters().Length >= 2 && peaceM.GetParameters()[1].ParameterType == typeof(Kingdom);
             bool gcOk = gc != null && _gcValue != null && _gcGiver != null && _gcReceiver != null;
             Patch(h, "okno paktu o nieagresji (Diplomacy FormNonAggressionPactAction.AssessCosts)", gcOk && napOk ? napM : null, nameof(PactPre), nameof(PactFin));
-            Patch(h, "okno pokoju (Diplomacy KingdomPeaceAction.AcceptPeace)", gcOk && peaceOk ? peaceM : null, nameof(PactPre), nameof(PactFin));
+            // recenzja: 6. parametr AcceptPeace - EliminationOnPeace (struktura; Harmony podaje ja jako object w pudelku), pole OtherKingdom
+            var pp = peaceOk ? peaceM.GetParameters() : null;
+            _elimOther = pp != null && pp.Length >= 6 && pp[5].ParameterType.IsValueType ? AccessTools.Field(pp[5].ParameterType, "OtherKingdom") : null;
+            if (_elimOther != null && _elimOther.FieldType != typeof(bool)) _elimOther = null;
+            Patch(h, "okno pokoju (Diplomacy KingdomPeaceAction.AcceptPeace)", gcOk && peaceOk ? peaceM : null, _elimOther != null ? nameof(PeacePre) : nameof(PactPre), nameof(PactFin));
+            if (gcOk && peaceOk && _elimOther == null) _missing.Add("upadek drugiej strony przy pokoju (Diplomacy EliminationOnPeace.OtherKingdom)");
             Patch(h, "koszt bez odbiorcy (Diplomacy GoldCost.ApplyCost)", gcOk && (napOk || peaceOk) ? AccessTools.Method(gc, "ApplyCost") : null, nameof(CostPre), null);
             _wiredText = _wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-";
             _missingText = _missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-";
@@ -426,7 +446,7 @@ namespace Armoury
                 if (_fOffN > 0) sb.Append("; z niczego jak dotad ").Append(_fOff).Append(" (").Append(_fOffN).Append(')');
                 sb.Append(" | pakty Diplomacy (nieagresja, pokoj)").Append(PactOn ? "" : " WYLACZONE (Pact Cost To Other Realm - w nicosc jak dotad)").Append(": ").Append(_kN)
                   .Append(", koszt ").Append(_kDue).Append(", do skarbcow drugiej strony ").Append(_kPaid).Append(" (w tym gracz ").Append(_kPlayer).Append("), bez drugiej strony nie pobrane ")
-                  .Append(_kNoRecv).Append(" (").Append(_kNoRecvN).Append(')');
+                  .Append(_kNoRecv).Append(" (").Append(_kNoRecvN).Append("), w tym okna pokoju z upadkiem drugiej strony ").Append(_kFallsN);
                 if (_kOffN > 0) sb.Append("; w nicosc jak dotad ").Append(_kOff).Append(" (").Append(_kOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
