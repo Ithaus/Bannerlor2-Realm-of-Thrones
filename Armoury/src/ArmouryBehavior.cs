@@ -425,6 +425,15 @@ namespace Armoury
                 if (dataStore.IsLoading) TownPurse.Import(townPurse);
             }
             catch (Exception e) { Log.Error("SyncData.TownPurse", e); }
+            // E5/B1 (173): kiesy ludu (W/R/P, gmina, podzamcze, kredyt dworu), kalibracja D1 i flagi zapasow startowych - wlasny try PRZED glownym blokiem
+            // (zgubiona kiesa = zloto znikajace z sumy swiata; starszy DLL ignoruje klucz - cofniecie DLL po B1 w trwajacej grze = utrata kies, CHANGELOG)
+            try
+            {
+                string townFolk = dataStore.IsSaving ? TownFolk.Export() : null;
+                SaveText.Sync(dataStore, "arm_townfolk", ref townFolk);
+                if (dataStore.IsLoading) TownFolk.Import(townFolk);
+            }
+            catch (Exception e) { Log.Error("SyncData.TownFolk", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try
@@ -1496,7 +1505,12 @@ namespace Armoury
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
             try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); }
             try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
-            try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }   // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; zlota nie rusza
+            // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; E5/B1 (173): przy kiesie
+            // czynnej prawdziwe przelewy (podatki panu -> RentToday przed budowami i powinnosciami, place z kas, zakupy wsi z polki - ramka ksiegi towarow F26) i migawka M18
+            var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
+            try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
+            finally { GoodsLedger.End(gfFolk); }
+            try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }

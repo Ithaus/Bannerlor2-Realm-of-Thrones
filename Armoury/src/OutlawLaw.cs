@@ -1845,8 +1845,9 @@ namespace Armoury
                     var town = ReferenceEquals(p.CurrentSettlement, null) || !p.CurrentSettlement.IsTown ? NearestOpenTown(p.Position.ToVec2()) : p.CurrentSettlement;
                     if (town == null || town.Town == null || spend <= 0) continue;
                     p.PartyTradeGold = purse - spend;
-                    town.Town.ChangeGold(spend);
-                    MoneyLedger.Note169(MoneyLedger.N169Other, town, spend);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
+                    int folk = TownFolk.EarnService(town, spend, TownFolk.KLifeBand);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca)
+                    town.Town.ChangeGold(spend - folk);
+                    MoneyLedger.Note169(MoneyLedger.N169Other, town, spend - folk);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
                     try { TownFolk.Note(town, spend, TownFolk.KLifeBand); } catch { }   // E5/0 (195): zycie band w miescie (tylko licznik)
                     _lifeBands += spend;
                 }
@@ -1867,7 +1868,9 @@ namespace Armoury
                     var town = NearestOpenTown(hs.GetPosition2D);
                     if (town == null || town.Town == null || spend <= 0) continue;
                     HoardChange(hs, -spend);
-                    town.Town.ChangeGold(spend);
+                    int folk = TownFolk.EarnService(town, spend, TownFolk.KLifeBand);   // E5/B1 (R9, 75/25): kryjowki tez (E5/0 ich nie liczyl - plan B1 rozdz. 14)
+                    town.Town.ChangeGold(spend - folk);
+                    try { TownFolk.Note(town, spend, TownFolk.KLifeBand); } catch { }   // E5/B1: okno kiesy ludu (podstawa robocizny 75%)
                     _lifeHoards += spend;
                 }
                 catch (Exception e) { _lifeStumbles++; if (!_errLife) { _errLife = true; Log.Error("OutlawLaw.LifeDay(kryjowka)", e); } }

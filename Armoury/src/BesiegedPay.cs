@@ -48,8 +48,9 @@ namespace Armoury
     internal static class BesiegedPay
     {
         internal const int KTownRent = 0, KCrownDuty = 1, KWarTax = 2, KRoadTolls = 3;
-        private const int KN = 4;
-        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls" };
+        internal const int KFolkDues = 4;   // E5/B1 (173): podatki ludu od zarobku i farma gminy - w oblezonej osadzie zostaja w kiesie / gminie
+        private const int KN = 5;
+        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls", "podatki ludu i farma gminy (E5/B1)" };
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.BesiegedPayNothing; } }
 

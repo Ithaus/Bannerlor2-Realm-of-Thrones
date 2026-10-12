@@ -209,7 +209,8 @@ namespace Armoury
             int villPart = (int)(x * (double)(1f - townShare));
             if (vill == null) villPart = 0;
             int townPart = x - villPart;
-            if (townPart > 0) town.Town.ChangeGold(townPart);
+            int folk = townPart > 0 ? TownFolk.EarnService(town, townPart, TownFolk.KLife) : 0;   // E5/B1 (R9, 75/25): arytmetyka - nie rzuca (recenzja A3 2-2 zachowana)
+            if (townPart > 0) town.Town.ChangeGold(townPart - folk);
             if (villPart > 0) vill.SettlementComponent.ChangeGold(villPart);   // kiesa wsi (posiadacz "Pieniadz swiata")
             // ---- liczniki (zloto juz na miejscu)
             _dTaken += x; _dPaidN++;
@@ -220,7 +221,7 @@ namespace Armoury
         }
 
         /// <summary>Liczniki przelewu sakiewka -> kasa miasta / kiesa wsi (zloto juz zdjete z sakiewki w CampTake i wplacone w One) - te same co MenPurse.OnLeft.
-        /// Hak B1: B1 podzieli czesc miejska 75% kupcy / 25% lud (TownFolk.Earn) przy wplacie w One - tu liczniki od tego, co trafilo do kasy.</summary>
+        /// E5/B1: czesc miejska dzielona 75% kupcy / 25% lud (TownFolk.EarnService) przy wplacie w One; liczniki K3 i 169c tu od calej czesci miejskiej (jak OnLeft, KL 5.2).</summary>
         private static void Pay(MobileParty mp, Settlement town, Settlement vill, int townPart, int villPart)
         {
             if (townPart > 0)

@@ -110,6 +110,20 @@ RANGES = {
     'SutlerDailyShare': (0.0, 1.0, "0.00"),
     'SutlerTownShare': (0.0, 1.0, "0.00"),
     'SutlerRampDays': (0, 112, "0"),
+    # E5/B1 (173): kiesa ludu czynna - udzialy przycinane w kodzie do 0..1 (TownFolk.Unit), akcyza i obrot P 0..0.2, zapas dni W 1..60, oplaty wsi 0..50 zl rocznie
+    'TownFolkServiceShare': (0.0, 1.0, "0.00"),
+    'TownFolkLabourFood': (0.0, 1.0, "0.00"),
+    'TownFolkLabourGoods': (0.0, 1.0, "0.00"),
+    'TownFolkLabourArms': (0.0, 1.0, "0.00"),
+    'TownFolkCraftWageShare': (0.0, 1.0, "0.00"),
+    'TownFolkMerchantDraw': (0.0, 0.2, "0.000"),
+    'TownFolkMerchantProfitShare': (0.0, 1.0, "0.00"),
+    'TownFolkCastleProfitShare': (0.0, 1.0, "0.00"),
+    'TownFolkExcise': (0.0, 0.2, "0.000"),
+    'TownFolkReserveDays': (1, 60, "0"),
+    'VillageLordScale': (0.0, 1.0, "0.00"),
+    'VillagePurchasePerHead': (0.0, 1.0, "0.00"),
+    'VillageDuesPerHeadYear': (0.0, 50.0, "0.0"),
 }
 
 def gen(module_dir, ns, display):

@@ -470,10 +470,11 @@ namespace Armoury
                 }
                 if (coffers > 0)
                 {
-                    town.ChangeGold(coffers);                           // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
+                    int folk = TownFolk.EarnService(st, coffers, TownFolk.KGarrison);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu / podzamcza (arytmetyka - nie rzuca)
+                    town.ChangeGold(coffers - folk);                    // zaloga wydaje zold na miejscu - kasa jej miasta albo zamku
                     ClanIncomeBook.NoteOwnPaid(st, clan, coffers, true);   // 169c: "wlasne" D stalego - zold zalogi rodu w kasie jego osady (tylko licznik); E5 A2b: zapas "wlasnego" jako zold zalog
                     if (st.IsTown) { _dToTowns += coffers; _dToTownsN++; Hold(st, coffers); } else { _dToCastles += coffers; _dToCastlesN++; }
-                    MoneyLedger.Note(MoneyLedger.NWage, st, coffers);   // ksiega przeplywow osad (tylko licznik)
+                    MoneyLedger.Note(MoneyLedger.NWage, st, coffers - folk);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie (zold oddany do obiegu: calosc nizej)
                     try { TownFolk.Note(st, coffers, TownFolk.KGarrison); } catch { }   // E5/0 (195): zold zalogi wydany na miejscu (tylko licznik)
                     MoneyLedger.NoteWageRouted(false, coffers);
                 }

@@ -320,10 +320,11 @@ namespace Armoury
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
                     workshop.ChangeGold(-wagesI);
-                    town.ChangeGold(wagesI);                    // place wydane w miescie
+                    int folk = TownFolk.Earn(workshop.Settlement, wagesI, TownFolk.KCraftPaid);   // E5/B1 (R11, KL L7): place cyklu do kiesy ludu W70/R30 (arytmetyka - nie rzuca)
+                    town.ChangeGold(wagesI - folk);             // place wydane w miescie (E5/B1: wprost do ludu)
                     town.ChangeGold(-rev);
                     workshop.ChangeGold(rev);
-                    MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, wagesI);   // ksiega przeplywow osad (tylko liczniki)
+                    MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, wagesI - folk);   // ksiega przeplywow osad (tylko liczniki) - czesc w kasie
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, -rev);
                     try { TownFolk.Note(workshop.Settlement, wagesI, TownFolk.KCraftPaid); } catch { }   // E5/0 (195): place cyklu juz wyplacone - kontrola plac 35% (tylko licznik)
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);

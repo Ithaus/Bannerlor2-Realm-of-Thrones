@@ -1234,8 +1234,9 @@ namespace Armoury
                     totalDue += (long)rent;
                     try
                     {
-                        // hak kiesy ludu (112, KL etap 5): renta wsi ustepuje stalym oplatom 173 - do etapu 5 false (renta jak dotad)
-                        if (st.IsVillage && VillageTakings.VillageRentYieldsToFees) continue;
+                        // hak kiesy ludu (112, KL etap 5): E5/B1 - przy kiesie czynnej renta 20% kiesy wsi ustepuje stalej oplacie (VillageDuesPerHeadYear na wolna glowe, D1)
+                        // ta sama sciezka (dekret, rabunek, zywy pan, przelew, RentToday, DayVillageRent) - jeden wlasciciel tych pol
+                        bool fee = st.IsVillage && VillageTakings.VillageRentYieldsToFees;
                         // E5/A1 (R4): przy czynnym zaworze kas miast miasto placi przez ValveTowns nizej (7% nadwyzki ponad zapas kupcow, pan 2/3 : korona 1/3,
                         // bez pulapu naleznej) - "nalezne" wyzej policzone jak dotad
                         if (st.IsTown && TownPurse.ValveLive) continue;
@@ -1247,7 +1248,7 @@ namespace Armoury
                         // z niczego) wylaczony (TownTaxPostfix); pan bierze z MIASTA czesc kasy ponad prog bogactwa kupcow
                         // (BK BKProsperityModel: kasa < 20 000 = do -2 dobrobytu dziennie) - miasto nie bankrutuje i nie traci dobrobytu.
                         // Wies placi czesc swojej kiesy (PopulationRentMaxShare, 0.2 - wczesniej 0.5 oproznialo wsie w kilka dni).
-                        float takeShare = share;
+                        float takeShare = fee ? 1f : share;
                         if (st.IsTown && st.Town != null)
                         {
                             gold = Math.Max(0, gold - (int)Math.Max(0f, s.TownRentFloorGold));
@@ -1255,13 +1256,19 @@ namespace Armoury
                         }
                         // wpis 54: dekret podatkowy lenna BK (Low/Standard/High/Exemption) steruje renta
                         float decree = TaxDecree(st);
-                        int pay = (int)Math.Min(rent * decree, gold * takeShare * decree);
+                        float rentNow = fee ? TownFolk.VillageFeeToday(st) : rent;
+                        int pay = (int)Math.Min(rentNow * decree, gold * takeShare * decree);
+                        if (fee && pay > gold) pay = gold;   // recenzja B1 (1-2): oplata stala (udzial 1) przy dekrecie High nie wieksza niz kiesa wsi - gra wyplaca panu cale pay, a kiese obcina do 0 (zloto z niczego)
                         if (pay <= 0) continue;
                         if (st.IsTown && BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) continue;   // E5/A4 (R22): oblezone miasto nie placi renty - zostaje w kasie, gdy kasa miasta jest prawdziwym pieniadzem (A1; inaczej placi i liczy; wies: rabunek wyzej)
                         GiveGoldAction.ApplyForSettlementToCharacter(st, lord, pay, true);
                         _rentBy[st] = new long[] { pay, gold };   // 169c (tylko licznik)
                         { int r0; RentToday.TryGetValue(st.OwnerClan, out r0); RentToday[st.OwnerClan] = r0 + pay; }
-                        if (st.IsVillage) { DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay; }   // paczka 169 (tylko licznik)
+                        if (st.IsVillage)
+                        {
+                            DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay;   // paczka 169 (tylko licznik)
+                            if (fee) TownFolk.NoteVillageFee(pay);   // E5/B1: linia "Prawa panskie" (tylko licznik); recenzja B1 (1-1): w bloku wsi - "else" nizej znow nalezy do IsVillage
+                        }
                         else DayTownRent += pay;
                         paid.TryGetValue(c, out v); paid[c] = v + pay;
                         totalPaid += pay;

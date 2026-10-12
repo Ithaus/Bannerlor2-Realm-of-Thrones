@@ -247,6 +247,7 @@ namespace Armoury
                     long own;
                     // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownRentLordShare) - tyle tniemy; korona swojej czesci nie oddaje drugi raz
                     float cs = TownPurse.ValveLive ? cutShare * TownPurse.LordShare(k) : cutShare;
+                    if (TownPurse.ValveLive && TownFolk.Live) cs *= 1f - ValveSplit.Unit(Settings.Current.TownFolkMerchantProfitShare);   // E5/B1 (R4): 5% zaworu do ludu - pan dostaje udzial z reszty
                     if (cur && cs > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
                     {
                         // K3 (Z8): zold, ktory ludzie partii wydali we wlasnym miescie rodu, wrocil rodowi zaworem miasta - nie jest podstawa zwrotu
@@ -390,7 +391,7 @@ namespace Armoury
                         if (!town && !st.IsVillage) continue;
                         if (st.IsUnderSiege || (st.IsVillage && st.Village.VillageState != Village.VillageStates.Normal)) continue;
                         int gold = st.SettlementComponent.Gold;
-                        int spare = town ? Math.Max(0, gold - TownPurse.TaxFloor(st.Town, (int)floor)) : Math.Max(0, gold);   // E5/A1 (D4): miasto ponad zapas kupcow
+                        int spare = town ? Math.Max(0, gold - TownPurse.TaxFloor(st.Town, (int)floor)) : Math.Max(0, gold - TownFolk.VillageFloor(st));   // E5/A1 (D4): miasto ponad zapas kupcow; E5/B1 (R15a): wies ponad 15 dni zakupow (0 bez kiesy)
                         // danina wojenna (lay subsidy)
                         if (s.LaySubsidyEnabled && war && spare > 0)
                         {

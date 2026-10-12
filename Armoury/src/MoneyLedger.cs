@@ -79,11 +79,13 @@ namespace Armoury
         internal const int NGear = 0, NMerc = 1, NShop = 2, NFence = 3, NWage = 4, NLife = 5, NCloth = 6;
         internal const int NBkSupply = 7;   // D11-4: zaopatrzenie BK z sakiewek ludzi -> kasy osad (bez zdarzenia gry)
         internal const int NTravel = 8;     // 36b: wedrowcy BK - kasa celu placi za towar, utarg do kasy pochodzenia
-        private const int Notes = 9;
+        internal const int NFolk = 9;       // E5/B1: kasy osad -> kiesy ludu poza tickiem dobowym (place warsztatu gracza z jego kiesy)
+        private const int Notes = 10;
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
                                                    "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
                                                    "zaopatrzenie BK z sakiewek ludzi (D11-4)",
-                                                   "wedrowcy BK (36b): towar u celu, utarg do kasy pochodzenia" };
+                                                   "wedrowcy BK (36b): towar u celu, utarg do kasy pochodzenia",
+                                                   "kiesy ludu poza tickiem dobowym (E5/B1): place warsztatu gracza z kiesy do ludu" };
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)
@@ -95,7 +97,11 @@ namespace Armoury
         internal const int MTownTrim = 12;                                                                      // E5/A1: dar startowy kas miast przyciety (raz na kampanie, w nicosc)
         internal const int MTownCrown = 13;                                                                     // E5/A1: udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)
         internal const int MSutlers = 17;                                                                       // E5/A3 (163): markietani - sakiewki ludzi w polu -> kasy miast i kiesy wsi
-        private const int Marks = 18;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3
+        // E5/B1 (173): M18-M20 (rezerwacja dla rownoleglych drzew B: B2-B6 od M21, N10, H25 - plan kodu E5/B1 rozdz. 10.1)
+        internal const int MFolk = 18;                                                                          // E5/B1: kiesa ludu - place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu
+        internal const int MFolkValve = 19;                                                                     // E5/B1: zawor dla ludu - 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu
+        internal const int MFolkStart = 20;                                                                     // E5/B1: zapasy startowe kies ludu z daru (raz) albo z nadwyzki (stary zapis)
+        private const int Marks = 21;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B1 M18-M20
         private static readonly string[] MName = { "renty", "budowy", "korona (danina, clo, mennica)", "pozostale moduly ticku", "paser band (skup lupu)", "bandy i kryjowki (zycie w miastach)", "kontrakty surowca (174)",
                                                    "zawor kas zamkow (kasy zamkow -> panowie)", "dar startowy kas zamkow przyciety (raz na kampanie, w nicosc)",
                                                    "udzial korony z zaworu kas zamkow (kasy zamkow -> skarbce krolestw, 114)", "wywoz kupcow (PodazPopyt: bron, zbroja, konie i uprzaz)",
@@ -103,14 +109,18 @@ namespace Armoury
                                                    "dar startowy kas miast przyciety (raz na kampanie, w nicosc, E5/A1)",
                                                    "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)",
                                                    "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)",   // 14-16: rezerwa A1 (nieuzywane, drukowane tylko != 0)
-                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi" };
+                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi",
+                                                   "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
+                                                   "zawor dla ludu (E5/B1): 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu",
+                                                   "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)" };
 
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
                           HKingdoms = 9, HWorkshops = 10, HPurses = 11, HBank = 12, HVillagers = 13, HCaravans = 14, HGarrisons = 15, HBandits = 16,
                           HOtherParties = 17, HTownTax = 18, HVillageTax = 19, HOtherSettlements = 20,
                           HCallToWar = 21,   // 3.1 (31, E3/0): dodatnie portfele wezwan do wojny (168) - posiadacz (gra wyplaca je rodom wezwanego)
-                          Holders = 22;
+                          HFolkTown = 22, HFolkCastle = 23, HGmina = 24,   // E5/B1 (173): kiesy ludu miast (W/R/P), kiesy podzamczy, gminy miast - poza SettlementComponent.Gold
+                          Holders = 25;
 
         // zold wedlug rodzaju partii
         private const int WLord = 0, WGarrison = 1, WCaravan = 2, WOther = 3, Wages = 4;
@@ -129,6 +139,7 @@ namespace Armoury
         private static long _vHanded, _vKept, _vTax, _vEstates;
         private static int _vReturns;
         private static readonly long[] _cons = new long[Classes], _regIn = new long[Classes], _regOut = new long[Classes];
+        private static readonly long[] _consFolk = new long[Classes];   // E5/B1: przyrost kasy w konsumpcji zaplacony przez lud (przelew z kiesy H22/H23/H24, nie zrodlo)
         private static readonly int[] _consTicks = new int[Classes], _regTicks = new int[Classes];
         private static int _consMissed, _regStray;
         private static readonly long[,] _goldIn = new long[Classes, Sides], _goldOut = new long[Classes, Sides];
@@ -186,7 +197,7 @@ namespace Armoury
             _vHanded = _vKept = _vTax = _vEstates = 0; _vReturns = 0;
             _clanUp = _clanDown = _netUp = _netDown = _clanClsFrom = _clanClsTo = _clanOthFrom = _clanOthTo = 0;
             _clanUpN = _clanDownN = _clanFlatN = _clanStale = _netUpN = _netDownN = 0;
-            Array.Clear(_cons, 0, Classes); Array.Clear(_regIn, 0, Classes); Array.Clear(_regOut, 0, Classes);
+            Array.Clear(_cons, 0, Classes); Array.Clear(_regIn, 0, Classes); Array.Clear(_regOut, 0, Classes); Array.Clear(_consFolk, 0, Classes);
             Array.Clear(_consTicks, 0, Classes); Array.Clear(_regTicks, 0, Classes);
             _consMissed = 0; _regStray = 0;
             Array.Clear(_goldIn, 0, _goldIn.Length); Array.Clear(_goldOut, 0, _goldOut.Length);
@@ -574,7 +585,8 @@ namespace Armoury
                 if (!ReferenceEquals(__0, _shelfTown)) { _consMissed++; return; }
                 _shelfTown = null;
                 int c = __0.IsTown ? CTown : CCastle;
-                _cons[c] += __0.Gold - _shelfGold; _consTicks[c]++;
+                int fp = TownFolk.TakeTickPaid(__0);         // E5/B1: zaplata ludu w tym ticku (TownFolk.PayForGoods z CastlePurse First) - przelew, nie "zakupy" z niczego
+                _cons[c] += __0.Gold - _shelfGold - fp; _consFolk[c] += fp; _consTicks[c]++;
                 _regExpect = __0;                           // zaraz po konsumpcji gra pyta model o regulator tej samej osady
             }
             catch { _stumbles++; }
@@ -733,6 +745,7 @@ namespace Armoury
             }
             foreach (var v in Village.All) if (v != null) h[HVillageTax] += v.TradeTaxAccumulated;
             h[HPurses] = MenPurse.TotalNow();
+            h[HFolkTown] = TownFolk.TotalTown(); h[HFolkCastle] = TownFolk.TotalCastle(); h[HGmina] = TownFolk.TotalGmina();   // E5/B1 (173)
             h[HBank] = IronBank.CapitalNow;
             foreach (var mp in MobileParty.All)
             {
@@ -773,6 +786,7 @@ namespace Armoury
                    + " | partie bez wodza: tabory wsi " + D(now, last, HVillagers) + ", karawany " + D(now, last, HCaravans) + ", garnizony " + D(now, last, HGarrisons)
                    + ", bandy " + D(now, last, HBandits) + ", inne " + D(now, last, HOtherParties)
                    + " | liczniki (zloto w drodze do panow): cla miast i zamkow " + D(now, last, HTownTax) + ", podatek wsi " + D(now, last, HVillageTax)
+                   + " | kiesy ludu (E5/B1): miasta " + D(now, last, HFolkTown) + ", podzamcza " + D(now, last, HFolkCastle) + ", gminy " + D(now, last, HGmina)
                    + ". Wszystko [P] - stan na koniec doby, w nawiasach zmiana dobowa.";
         }
 
@@ -922,6 +936,7 @@ namespace Armoury
                 parts.Add("zaplata taborom wsi " + S(-_vPaid[c]) + " [P]");
                 known += _cons[c];
                 parts.Add("\"zakupy\" mieszkancow " + S(_cons[c]) + " [P] (" + _consTicks[c] + " tickow osad)");
+                if (_consFolk[c] != 0) { known += _consFolk[c]; parts.Add("lud za towar (E5/B1) " + S(_consFolk[c]) + " [P]"); }   // E5/B1: zaplata z kies ludu (przelew)
                 long reg = _regIn[c] - _regOut[c];
                 known += reg;
                 parts.Add("regulator kasy " + S(reg) + " [P] (dosypal " + _regIn[c] + ", skasowal " + _regOut[c] + "; " + _regTicks[c] + " tickow)");

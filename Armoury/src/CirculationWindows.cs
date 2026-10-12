@@ -168,6 +168,7 @@ namespace Armoury
         private static bool _capOpen, _capSeen;             // okno nowej karawany (O17): otwarte / pierwszy wynik modelu odczytany
         private static int _capGiven;                       // kwota nadana (pierwszy wynik GetInitialTradeGold w oknie)
         private static bool _minesOpen;                     // okno kopalni BK (O20) - place gornikow wracajace do miasta
+        private static long _minesFolk;                     // recenzja B1 (1-3): place gornikow w oknie O20 do kiesy ludu (posiadacz H22 - w swiecie, nie w kasie)
         private static Type _popType;                       // BannerKings.Components.PopulationPartyComponent (O21)
         private static PropertyInfo _actionTaker;           // BannerKings TitleAction.ActionTaker (O24-O27)
         private static int[] _wsCap0 = new int[16];         // O45: kapital warsztatow miasta przed (bufory wielokrotnego uzytku)
@@ -213,7 +214,7 @@ namespace Armoury
             {
                 ClearDay();
                 _ctx = 0; _ctxW = -1; _ctxSide = null; _sellSt = null; _sellIn = 0; _snapHero = null; _snapLeaders = false; _snapEvt = 0;
-                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _repOpen = false;
+                _capOpen = false; _capSeen = false; _capGiven = 0; _minesOpen = false; _minesFolk = 0; _repOpen = false;
                 _woW = null; _wiW = null; _woSt = null; _wiSt = null; _woP = false; _wiP = false;
                 NamedRun = 0; ToCounterRun = 0; _probeOn = false;
                 for (int w = 0; w < Windows; w++) { ProbeNSess[w] = 0; ProbeBadSess[w] = 0; _probeDay[w] = -1000; }
@@ -349,6 +350,13 @@ namespace Armoury
         {
             try { if (_minesOpen && revenue > 0 && On) Sum[IMinesBack] += revenue; }
             catch (Exception e) { Stumble("NoteMineWages", e); }
+        }
+
+        /// <summary>Recenzja B1 (1-3): BuildFunding.MineRevenuePostfix - czesc plac gornikow poszla do kiesy ludu (TownFolk.Earn KMine), nie do kasy; okno O20 liczy swiat od kasy razem z nia.</summary>
+        internal static void NoteMineFolk(int folk)
+        {
+            try { if (_minesOpen && folk > 0 && On) _minesFolk += folk; }
+            catch (Exception e) { Stumble("NoteMineFolk", e); }
         }
 
         /// <summary>
@@ -885,7 +893,7 @@ namespace Armoury
             {
                 if (!Gate(WMines) || __0 == null || __0.Settlement == null) return;
                 __state.St = __0.Settlement; __state.V = __0.Gold;
-                _minesOpen = true;
+                _minesOpen = true; _minesFolk = 0;
                 KasaOpen(ref __state, WMines);
             }
             catch (Exception e) { Stumble("MinesPre", e); }
@@ -899,10 +907,11 @@ namespace Armoury
             try
             {
                 long dK = Gold(__state.St) - __state.V;
-                AddWorld(UMinesNet, -dK, -1);
+                long folk = _minesFolk; _minesFolk = 0;   // recenzja B1 (1-3): place gornikow w kiesie ludu zostaly w swiecie - ujscie swiata = kasa razem z kiesa
+                AddWorld(UMinesNet, -(dK + folk), -1);
                 int c = ClassOf(__state.St);
-                if (c >= 0 && !MoneyLedger.InBlock) Cls[c, LMines] += dK;
-                if (dK != 0) Hits[WMines]++;
+                if (c >= 0 && !MoneyLedger.InBlock) Cls[c, LMines] += dK;   // ksiega kas osad - sama kasa
+                if (dK != 0 || folk != 0) Hits[WMines]++;
             }
             catch (Exception e) { Stumble("MinesFin", e); }
             KasaClose(__state, WMines, tf);
