@@ -296,7 +296,7 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public float ArmorTierBonusPercent { get; set; } = 15f;
 
-        [SettingPropertyFloatingInteger("Self Repair Material Factor", 0.00f, 1.00f, "0.00", HintText = "metal needed against the full recipe")]
+        [SettingPropertyFloatingInteger("Self Repair Material Factor", 0.00f, 1.00f, "0.00", HintText = "metal needed against the full recipe - unused since stage 6 while Self Repair Same Rule is on (see Mend Material Max Share)")]
         [SettingPropertyGroup("Mending it yourself")]
         public float SelfRepairMaterialFactor { get; set; } = 0.25f;
 
@@ -3964,6 +3964,14 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendMaterialMenAndLords { get; set; } = true;
 
+        [SettingPropertyBool("Self Repair Same Rule", HintText = "mending at your own anvil takes materials by the same rule as the town smiths: Mend Material Max Share of the piece's recipe times the damage, the iron and forge coal only as much as mending that kind of piece really needs (as Mend Metal By Kind), the wood, leather and cloth by the damage; a light repair may take no material at all; wrecks still take the full share of iron (off = as before: Self Repair Material Factor of every part of the recipe times the damage, at least one of each when mending all you wear)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool SelfRepairSameRule { get; set; } = true;
+
+        [SettingPropertyBool("Ai Mends Worn Only", HintText = "the lords' men and the garrisons have the town smiths mend only the kit their men actually wear (the same fitting that decides what is spare - the men take the sound pieces first); battered loot beyond their needs is not mended - it goes to the merchants as it is when they sell their spare kit, and the money they keep for repairs covers only the kit they wear (off = as before: every battered piece in their armoury is mended)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiMendsWornOnly { get; set; } = true;
+
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
@@ -5766,6 +5774,8 @@ namespace Armoury
             s.WrecksToScrap = WrecksToScrap;
             s.MendMetalByKind = MendMetalByKind;
             s.MendMaterialMenAndLords = MendMaterialMenAndLords;
+            s.SelfRepairSameRule = SelfRepairSameRule;
+            s.AiMendsWornOnly = AiMendsWornOnly;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;

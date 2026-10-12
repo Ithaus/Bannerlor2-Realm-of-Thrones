@@ -540,20 +540,56 @@ namespace Armoury
         internal static List<SwapMath.Piece> AiSurplusPlan(Dictionary<ItemObject, int> arm, TroopRoster roster, ItemObject.ItemTypeEnum type)
         {
             var s = Settings.Current;
-            if (arm == null || roster == null || s == null || type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return null;   // konie i rzedy - Stajnia
-            var pieces = MenUpgrade.AiPieces(arm, type);
-            if (pieces.Count == 0) return null;
-            List<CharacterObject> troops; int[] men; SkillObject skill;
-            // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
-            // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
-            QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
-            var meets = QuartermasterLaw.MeetsOf(troops);
-            // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
-            // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
-            SwapMath.FitBest(men, troops.Count, meets, pieces);
+            if (s == null) return null;
+            int[] men; Func<int, SwapMath.Piece, bool> meets;
+            var pieces = AiFitted(arm, roster, type, out men, out meets);   // E6/N1: dopasowanie wydzielone (to samo czyta AiWornByMen) - bez zmiany dzialania
+            if (pieces == null) return null;
             if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) return null;
             pieces.Sort(SwapMath.WorseFirst);
             return pieces;
+        }
+
+        /// <summary>K1 A9 - dopasowanie zbrojowni AI typu (wynik w Used): ludzie nosza najlepsze, co udzwigna. null - konie i rzedy (Stajnia) albo brak sztuk.
+        /// E6/N1 (217): wydzielone z AiSurplusPlan, zeby "co nosza ludzie" (naprawy AI - AiWornByMen) i "co jest nadwyzka" byly jednym dopasowaniem.</summary>
+        private static List<SwapMath.Piece> AiFitted(Dictionary<ItemObject, int> arm, TroopRoster roster, ItemObject.ItemTypeEnum type, out int[] men, out Func<int, SwapMath.Piece, bool> meets)
+        {
+            men = null; meets = null;
+            if (arm == null || roster == null || type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return null;   // konie i rzedy - Stajnia
+            var pieces = MenUpgrade.AiPieces(arm, type);
+            if (pieces.Count == 0) return null;
+            List<CharacterObject> troops; SkillObject skill;
+            // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
+            // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
+            QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
+            meets = QuartermasterLaw.MeetsOf(troops);
+            // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
+            // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
+            SwapMath.FitBest(men, troops.Count, meets, pieces);
+            return pieces;
+        }
+
+        /// <summary>
+        /// E6/N1 (217, R16, "AI naprawia tylko to, co nosi"): ile sztuk kazdego przedmiotu zbrojowni AI nosza ludzie - to samo dopasowanie co nadwyzki
+        /// (AiFitted: Used). Tylko typy z types (null - wszystkie KitTypes; konie i rzedy pominiete). Przedmiot spoza wyniku - nikt go nie nosi.
+        /// </summary>
+        internal static Dictionary<ItemObject, int> AiWornByMen(Dictionary<ItemObject, int> arm, TroopRoster roster, ICollection<ItemObject.ItemTypeEnum> types)
+        {
+            var used = new Dictionary<ItemObject, int>();
+            if (arm == null || roster == null) return used;
+            foreach (var type in QuartermasterLaw.KitTypes)
+            {
+                if (types != null && !types.Contains(type)) continue;
+                int[] men; Func<int, SwapMath.Piece, bool> meets;
+                var pieces = AiFitted(arm, roster, type, out men, out meets);
+                if (pieces == null) continue;
+                foreach (var p in pieces)
+                {
+                    var it = QuartermasterLaw.ElOf(p).Item;
+                    if (it == null || p.Used <= 0) continue;
+                    int v; used.TryGetValue(it, out v); used[it] = v + p.Used;
+                }
+            }
+            return used;
         }
 
         private static int SellArmorySurplus(MobileParty mp, Settlement st, Hero third, bool garrison, TroopRoster roster, out int gold)

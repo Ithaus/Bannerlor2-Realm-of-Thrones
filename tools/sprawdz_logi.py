@@ -3346,6 +3346,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k4(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/N1 (217): naprawy jedna regula - AI naprawia tylko noszone, czeka na material, skora odziezy wojska (brak segmentu - INFO)
+    try:
+        etap5_n1(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_n1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -4018,6 +4023,69 @@ def etap5_k4(rep, lines, start, until):
         rep.add("K4-9: bieg roczny - konie na targu d180 -> until", f"d{min(ks)} {a0} -> d{max(st)} {e0}", "bez trendu (+-10%)", abs(e0 - a0) <= 0.10 * max(1, a0))
     else:
         rep.add("K4-9: bieg roczny - konie na targu bez trendu", "okno krotsze niz d360", "+-10% (tylko bieg roczny)", None)
+
+
+def etap5_n1(rep, lines, start, until):
+    """E6/N1 (217, projekt etapu 6 v2 rozdz. 3 "E6/N1" Test): linie doby "Zuzycie AI: dzien N - lup obity a szt., zuzyte w bitwach b, naprawione w miastach c
+    ...; pominiete (lup nienoszony) s szt., robocizna do kiesy ludu f. Material napraw z targu: ... czeka na material w szt. (metal, drewno, skora x, plotno)"
+    (dzien = doba gry - 1, okno doby kampanii 1-until jak etap5_main) i "Odziez wojska (150): dzien N ... | czeka: ..." (skora kolejki odziezy).
+    Wiazace (srednie d91-until, gdy okno siega d92; inaczej INFO): AiMendsWornOnly WLACZONE (segment "pominiete (lup nienoszony) N szt."), czeka na material
+    <= 1000 szt./d, w tym skora <= 500; naprawy noszonych bez spadku - naprawione w miastach >= 0.9 x zuzyte w bitwach (zastepczo: zuzycie walki dotyka tylko
+    sztuk w uzyciu, wiec kowale musza nadazac co najmniej za nim); skora w kolejce odziezy wojska d90 -> until bez wzrostu (<= +2%). INFO - pominiete i
+    robocizna do kiesy ludu (B1) na dobe. Wlasne rece gracza (SelfRepairSameRule) autotest nie cwiczy - test reczny."""
+    zu = {}
+    for d, s in by_day(lines, "Zuzycie AI: dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            zu[rd] = s
+    seg = {d: s for d, s in zu.items() if "pominiete (lup nienoszony)" in s}
+    if not seg:
+        rep.add("N1-1: Zuzycie AI - pominiete (lup nienoszony)", "brak segmentu w oknie" if zu else "brak linii Zuzycie AI", "jest od wgrania E6/N1", None)
+        return
+    last = seg[max(seg)]
+    on = num(r"pominiete \(lup nienoszony\) (\d+) szt\.", last) is not None
+    rep.add("N1-1: AI naprawia tylko noszone (AiMendsWornOnly)", f"d{max(seg)}: " + last[last.find("pominiete"):last.find("pominiete") + 70], "WLACZONE (\"pominiete ... N szt.\")", on)
+
+    def avg(pat):
+        ks = [d for d in seg if d >= 91]
+        vals = [num(pat, seg[d], int) for d in ks]
+        vals = [v for v in vals if v is not None]
+        return (sum(vals) / float(len(vals)), len(vals)) if vals else (None, 0)
+    full = max(seg) >= 92
+    w, nw = avg(r"czeka na material (\d+) szt\.")
+    sk, _ = avg(r"czeka na material \d+ szt\. \(metal \d+, drewno \d+, skora (\d+)")
+    if full and w is not None:
+        rep.add("N1-2: czeka na material (srednia d91-until)", f"{w:.0f} szt./d ({nw} dob)", "<= 1000 (przed N1: 2070)", w <= 1000)
+        rep.add("N1-3: czeka na material - skora (srednia d91-until)", f"{sk:.0f} szt./d" if sk is not None else "brak", "<= 500 (przed N1: 1700)",
+                (sk <= 500) if sk is not None else None)
+    else:
+        rep.add("N1-2: czeka na material (srednia d91-until)", "okno krotsze niz d92 albo brak dopisku materialu", "<= 1000, skora <= 500", None)
+    md, _ = avg(r"naprawione w miastach (\d+)")
+    bw, _ = avg(r"zuzyte w bitwach (\d+)")
+    if full and md is not None and bw is not None:
+        rep.add("N1-4: naprawy noszonych bez spadku (srednia d91-until)", f"naprawione {md:.0f}/d, zuzyte w bitwach {bw:.0f}/d", ">= 0.9 x zuzyte w bitwach",
+                md >= 0.9 * bw)
+    else:
+        rep.add("N1-4: naprawy noszonych bez spadku", "okno krotsze niz d92", "naprawione >= 0.9 x zuzyte w bitwach (d91-until)", None)
+    sp = [num(r"pominiete \(lup nienoszony\) (\d+) szt\.", s, int) or 0 for s in seg.values()]
+    fk = [num(r"robocizna do kiesy ludu (\d+)", s, int) or 0 for s in seg.values()]
+    rep.add("N1-5: pominiete (lup nienoszony) i robocizna do kiesy ludu - srednio na dobe", f"{sum(sp) / float(len(sp)):.0f} szt., {sum(fk) / float(len(fk)):.0f} zl ({len(sp)} dob)",
+            "INFO (kiesa ludu > 0 przy czynnym B1)", None)
+    clo = {}
+    for d, s in by_day(lines, "Odziez wojska (150): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            i = s.find("| czeka: ")
+            j = s.find(" (", i) if i >= 0 else -1
+            v = num(r"skora (\d+(?:\.\d+)?)", s[i + 9:j] if j > i else s[i + 9:], float) if i >= 0 else None   # jak W1-7 (wait)
+            if v is not None:
+                clo[rd] = v
+    wd = sorted(k for k in clo if k >= 90)
+    if len(wd) >= 2 and wd[-1] >= 92:
+        a, b2 = clo[wd[0]], clo[wd[-1]]
+        rep.add("N1-6: odziez wojska - skora w kolejce (d90 -> until)", f"d{wd[0]} {a:.0f} -> d{wd[-1]} {b2:.0f}", "bez wzrostu (<= +2%)", b2 <= a * 1.02 + 0.5)
+    else:
+        rep.add("N1-6: odziez wojska - skora w kolejce", "okno krotsze niz d92 albo brak linii", "bez wzrostu d90 -> until", None)
 
 
 def etap5_fee(rep, lines):

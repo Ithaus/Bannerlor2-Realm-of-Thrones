@@ -709,6 +709,7 @@ namespace Armoury
             // bierze najwyzej MendMaterialMaxShare (20%) pelnej receptury,
             // lzejsze uszkodzenia proporcjonalnie mniej. Drobna naprawa
             // potrafi nie zjesc zadnego materialu - tylko czas i pot.
+            if (MendMaterial.SelfSameRuleOn) return MendMaterial.SelfPartsOf(el);   // E6/N1 (217, R16): jedna regula z Forge.SelfRepair i kowalami miasta (metal wedlug rodzaju)
             var list = new List<Recipes.Part>();
             try
             {

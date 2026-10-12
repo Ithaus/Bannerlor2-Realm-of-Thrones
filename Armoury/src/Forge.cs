@@ -510,11 +510,30 @@ namespace Armoury
                 if (Stamina() < stam)
                 { reason = stam + " stamina (you have " + (int)Stamina() + ")"; return false; }
 
-                var missing = Recipes.MissingParts(r, s.SelfRepairMaterialFactor * missingCondition);
-                if (missing != null && missing.Count > 0)
-                { reason = "materials: " + string.Join(", ", missing); return false; }
+                if (MendMaterial.SelfSameRuleOn)
+                {
+                    // E6/N1 (217, R16): ta sama regula co kowale miasta (MendMaterial.SelfPartsFor - MendMaterialMaxShare x brak, metal wedlug rodzaju
+                    // sztuki); SelfRepairMaterialFactor nieczytany. Drobna naprawa bywa bez materialu (jak "Pick a piece" - SmithMenu.SelfMendParts)
+                    var parts = MendMaterial.SelfPartsFor(item, missingCondition);
+                    var lack = new List<string>();
+                    foreach (var p in parts)
+                    {
+                        int have = Recipes.CountInInventory(p.Item);
+                        if (have < p.Count) lack.Add((p.Count - have) + "x " + p.Item.Name);
+                    }
+                    if (lack.Count > 0)
+                    { reason = "materials: " + string.Join(", ", lack); return false; }
+                    var bag = MobileParty.MainParty.ItemRoster;
+                    foreach (var p in parts) Recipes.Take(bag, p.Item, p.Count);
+                }
+                else
+                {
+                    var missing = Recipes.MissingParts(r, s.SelfRepairMaterialFactor * missingCondition);
+                    if (missing != null && missing.Count > 0)
+                    { reason = "materials: " + string.Join(", ", missing); return false; }
 
-                Recipes.TakePartial(r, s.SelfRepairMaterialFactor * missingCondition);
+                    Recipes.TakePartial(r, s.SelfRepairMaterialFactor * missingCondition);
+                }
                 SpendStamina(stam);
                 Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.6f);
                 return true;

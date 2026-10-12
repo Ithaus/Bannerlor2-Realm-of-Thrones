@@ -183,6 +183,85 @@ namespace Armoury
             catch (Exception e) { Log.Error("MendMaterial.MetalShare", e); return -1f; }
         }
 
+        // ------------------------------------------------------------ E6/N1 (217, PLAN 6.17, R16): wlasne rece gracza - ta sama regula co kowale
+        // Do E6/N1 dwie inne reguly wlasnych rak: Forge.SelfRepair (cala uprzaz) - SelfRepairMaterialFactor 0.25 x brak, kazda czesc receptury najmniej 1;
+        // SmithMenu.SelfMendParts (sztuka z listy) - MendMaterialMaxShare x brak bez tabeli metalu T3. Teraz obie drogi ida przez SelfParts: udzial jak
+        // NeedsShare kowali miasta (share = MendMaterialMaxShare x brak; metal i wegiel kuzni - MetalShare wedlug rodzaju sztuki, nie wiecej niz share),
+        // na czesciach receptury kuzni gracza (Recipes.For: sztaby i wegiel = metal, drewno, skora, len/aksamit = share). Wrak (stan <= 10%) - metal
+        // jak stara regula (share): tabela T3 jest dla stanow do Battered, a wrakow kowale miasta nie naprawiaja - nie ma ich reguly do przejecia.
+        private static readonly CraftingMaterials[] ForgeMetalMats =
+        {
+            CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4,
+            CraftingMaterials.Iron5, CraftingMaterials.Iron6, CraftingMaterials.Charcoal
+        };
+
+        /// <summary>Wlacznik SelfRepairSameRule (E6/N1).</summary>
+        internal static bool SelfSameRuleOn { get { var s = Settings.Current; return s != null && s.SelfRepairSameRule; } }
+
+        private static bool ForgeMetalPart(ItemObject x)
+        {
+            if (x == null) return false;
+            foreach (var m in ForgeMetalMats) if (ReferenceEquals(Recipes.MaterialItem(m), x)) return true;
+            return false;
+        }
+
+        /// <summary>E6/N1: czesci receptury kuzni na naprawe wlasnymi rekami - share dla drewna, skory i plotna, udzial metalu wedlug rodzaju dla sztab
+        /// i wegla; sztuki zaokraglone, 0 = bez tej czesci (drobna naprawa bywa bez materialu - regula SelfMendParts).</summary>
+        private static List<Recipes.Part> SelfParts(ItemObject it, float share, float loss)
+        {
+            var list = new List<Recipes.Part>();
+            if (it == null) return list;
+            try
+            {
+                share = Math.Max(0f, share);
+                float ms = loss >= 1f - LootPrices.WreckState - Eps ? -1f : MetalShare(it, loss);
+                if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - jak NeedsShare
+                var r = Recipes.For(it);
+                if (r.Parts == null) return list;
+                foreach (var p in r.Parts)
+                {
+                    if (p.Item == null) continue;
+                    int need = (int)Math.Round(p.Count * (ForgeMetalPart(p.Item) ? ms : share));
+                    if (need > 0) list.Add(new Recipes.Part(p.Item, need));
+                }
+            }
+            catch (Exception e) { Log.Error("MendMaterial.SelfParts", e); }
+            return list;
+        }
+
+        /// <summary>E6/N1: sztuka ze stanem w modyfikatorze (lista "Pick a piece") - te same udzialy co Needs(el).</summary>
+        internal static List<Recipes.Part> SelfPartsOf(EquipmentElement el)
+        {
+            float cond = ConditionScaling.ConditionOf(el.ItemModifier);
+            if (cond < 0f) cond = 0f; if (cond > 1f) cond = 1f;
+            return SelfParts(el.Item, Share(el), 1f - cond);
+        }
+
+        /// <summary>E6/N1: uprzaz na grzbiecie (brak 0..1 z ksiegi stanu) - te same udzialy co NeedsFor.</summary>
+        internal static List<Recipes.Part> SelfPartsFor(ItemObject it, float missing)
+        {
+            var s = Settings.Current;
+            float loss = Math.Max(0f, Math.Min(1f, missing));
+            return SelfParts(it, Math.Max(0f, s != null ? s.MendMaterialMaxShare : 0.2f) * loss, loss);
+        }
+
+        /// <summary>
+        /// E6/N1 (projekt: "zaplata kowalom do kiesy ludu przez to samo TownFolk.Earn co B1 - jedno miejsce"): zaplata z sakiewki ludzi (AI, ludzie gracza)
+        /// za naprawy u kowali miasta. Robocizna (labor, najwyzej paid) - place rzemiosla do kiesy ludu (TownFolk.Earn, KCraftPaid W70/R30, jak place cyklu
+        /// warsztatow); material i reszta - kasa miasta (material zdjety z polki/zapasu kowali tego miasta), jak dotad. B1 wylaczone (Earn = 0) - calosc do kasy
+        /// jak dotad. Bez TownFolk.Note(KCraftPaid): okno plac warsztatow liczy place od produkcji (doplata do TownFolkCraftWageShare) - naprawa to nie wyrob.
+        /// Linia kas 169 - tylko czesc w kasie. Zwraca czesc ludu.
+        /// </summary>
+        internal static int PaySmiths(Settlement st, int paid, int labor)
+        {
+            if (paid <= 0 || st == null || st.Town == null) return 0;
+            int folk = TownFolk.Earn(st, Math.Min(paid, Math.Max(0, labor)), TownFolk.KCraftPaid);   // arytmetyka - nie rzuca (0 przy wylaczonym B1)
+            if (folk < 0) folk = 0; if (folk > paid) folk = paid;
+            st.Town.ChangeGold(paid - folk);
+            MoneyLedger.Note169(MoneyLedger.N169Repair, st, paid - folk);   // paczka 169: linia kas (tylko licznik) - czesc w kasie
+            return folk;
+        }
+
         // ------------------------------------------------------------ robota kowali miasta: dniowka historyczna x dobrobyt miasta
         // Jeff 07.10: "stawka robocizny ma byc zalezna od dobrobytu miasta ... na stawkach w naszej grze - nasze stawki sa oparte
         // o stawki historyczne - wszystko, co dotyczy placenia, musi byc spojne". Naprawa = ulamek wykonania sztuki, liczony tak samo

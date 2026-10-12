@@ -39,10 +39,17 @@ namespace Armoury
         private static float _dayKgByKind, _dayKgOldRule;   // T3: kg metalu (surowki) tych sztuk - osobno, zeby sklad napraw nie mylil testu
         private static readonly float[] _dayKg = new float[MendMaterial.Kinds];
         private static readonly int[] _dayWaitBy = new int[MendMaterial.Kinds];
+        // E6/N1 (217, R16): partia -> (doba, przedmiot -> ile sztuk nosza ludzie) - dopasowanie raz na dobe (naprawy liczone swiezo, rezerwa sakiewki z pamieci)
+        private static readonly Dictionary<string, KeyValuePair<int, Dictionary<string, int>>> _menUsed = new Dictionary<string, KeyValuePair<int, Dictionary<string, int>>>();
+        private static int _daySkipLoot, _dayFolk;   // E6/N1: obite sztuki pominiete (lup nienoszony) w zleceniach doby; robocizna do kiesy ludu (tylko log)
+        private static int _usedErr;                 // E6/N1: potkniecia dopasowania (do logu najwyzej 3; partia wraca wtedy do starej reguly - wszystkie obite)
+
+        private static bool WornOnlyOn { get { var s = Settings.Current; return s != null && s.AiMendsWornOnly; } }
 
         internal static void Reset()
         {
             _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1;
+            _menUsed.Clear(); _daySkipLoot = _dayFolk = _usedErr = 0;
             ClearMatDay();
         }
 
@@ -151,7 +158,7 @@ namespace Armoury
         internal static void Forget(MobileParty mp)
         {
             if (mp == null) return;
-            string p = mp.StringId; _worn.Remove(p); _known.Remove(p); _battleSince.Remove(p); _lastMend.Remove(p);
+            string p = mp.StringId; _worn.Remove(p); _known.Remove(p); _battleSince.Remove(p); _lastMend.Remove(p); _menUsed.Remove(p);
         }
 
         /// <summary>171 (recenzja): czy zapis zuzycia jest prowadzony - zalogi sprzedaja nadwyzke ze stanem z zapisu tylko wtedy.</summary>
@@ -360,23 +367,103 @@ namespace Armoury
             if (!_worn.TryGetValue(mp.StringId, out byItem)) return 0;
             MendMaterial.Bench bench = MendMaterial.MenAndLordsOn && st != null && st.IsTown ? new MendMaterial.Bench(st) : null;
             if (bench != null && !bench.Ok) bench = null;
+            // E6/N1 (217): rezerwa tylko na to, co kowale naprawia - przy AiMendsWornOnly obite sztuki, ktore nosza ludzie (dopasowanie z pamieci doby);
+            // dotad rezerwa obejmowala tez lup ponad potrzebe, ktorego nikt nie naprawi (sakiewka trzymana na zawsze)
+            var used = WornOnlyOn ? UsedByMen(mp, byItem, false) : null;
+            var arm = used != null ? Armory(mp) : null;
             foreach (var it in byItem)
             {
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (item == null) continue;
-                foreach (var m in it.Value)
+                if (used != null)
                 {
-                    var mod = Mod(m.Key); if (!Mendable(mod)) continue;
-                    int unit = UnitCost(item, mod, null);
-                    if (bench != null)
-                    {
-                        var need = MendMaterial.Needs(new EquipmentElement(item, mod));
-                        if (need == null) continue;
-                        unit += MendMaterial.Gold(bench.Estimate(need));
-                    }
-                    sum += unit * m.Value;
+                    int skipped = 0;
+                    foreach (var lot in MenWornLots(it.Value, FreeOf(arm, item, used), ref skipped))
+                        sum += LotCost(item, Mod(lot.Key), bench) * lot.Value;
+                    continue;
                 }
+                foreach (var m in it.Value)
+                    sum += LotCost(item, Mod(m.Key), bench) * m.Value;
             }
             return sum;
+        }
+
+        /// <summary>Rezerwa na jedna sztuke (wydzielone z OutstandingCost w E6/N1 - bez zmiany): robocizna + szacunek materialu z polki; 0 - nie do naprawy.</summary>
+        private static int LotCost(ItemObject item, ItemModifier mod, MendMaterial.Bench bench)
+        {
+            if (!Mendable(mod)) return 0;
+            int unit = UnitCost(item, mod, null);
+            if (bench != null)
+            {
+                var need = MendMaterial.Needs(new EquipmentElement(item, mod));
+                if (need == null) return 0;
+                unit += MendMaterial.Gold(bench.Estimate(need));
+            }
+            return unit;
+        }
+
+        // ------------------------------------------------------------ E6/N1 (217, PLAN 6.17, R16): AI naprawia tylko to, co nosza ludzie
+        // Zbrojownia DTE to "przedmiot: ile"; ksiega _worn mowi, ile z nich jest obitych. Ile sztuk nosza ludzie - to samo dopasowanie co nadwyzki
+        // (MenPurse.AiWornByMen = AiFitted z AiSurplusPlan: ludzie nosza najlepsze, co udzwigna). Wolne sztuki przedmiotu (ile - noszone) to najgorsze
+        // obite (ta sama kolejnosc co sprzedaz nadwyzki - TakeCondition bierze najgorsza); obite ponad wolne nosza ludzie - tylko te ida do kowala.
+        // Obity lup ponad potrzebe zostaje obity: sprzedaz nadwyzek (MenPurse.SellArmorySurplus) oddaje go kupcowi w jego stanie (wrak - zlom, paczka 158).
+
+        /// <summary>Ile sztuk kazdego przedmiotu nosza ludzie partii (id -> sztuk). fresh = false - wynik z tej samej doby, jesli jest. null - blad (jak dotad: wszystkie).
+        /// Dopasowanie tylko dla typow, w ktorych sa obite sztuki do naprawy (koszt).</summary>
+        private static Dictionary<string, int> UsedByMen(MobileParty mp, Dictionary<string, Dictionary<string, int>> byItem, bool fresh)
+        {
+            int today = (int)CampaignTime.Now.ToDays;
+            KeyValuePair<int, Dictionary<string, int>> c;
+            if (!fresh && _menUsed.TryGetValue(mp.StringId, out c) && c.Key == today) return c.Value;
+            var res = new Dictionary<string, int>();
+            try
+            {
+                var arm = Armory(mp);
+                if (arm != null)
+                {
+                    var types = new HashSet<ItemObject.ItemTypeEnum>();
+                    foreach (var it in byItem)
+                    {
+                        bool any = false;
+                        foreach (var m in it.Value) if (m.Value > 0 && Mendable(Mod(m.Key))) { any = true; break; }
+                        if (!any) continue;
+                        var io = MBObjectManager.Instance.GetObject<ItemObject>(it.Key);
+                        if (io != null) types.Add(io.ItemType);
+                    }
+                    if (types.Count > 0)
+                        foreach (var kv in MenPurse.AiWornByMen(arm, GarrisonArmory.FitRoster(mp), types)) res[kv.Key.StringId] = kv.Value;
+                }
+            }
+            catch (Exception e) { if (++_usedErr <= 3) Log.Error("AiWear.UsedByMen (potkniecie " + _usedErr + ")", e); return null; }   // per partia, bez wylacznika (CLAUDE.md 7)
+            _menUsed[mp.StringId] = new KeyValuePair<int, Dictionary<string, int>>(today, res);
+            return res;
+        }
+
+        /// <summary>Wolne sztuki przedmiotu w zbrojowni: ile jest minus ile nosza ludzie (nie mniej niz 0).</summary>
+        private static int FreeOf(Dictionary<ItemObject, int> arm, ItemObject item, Dictionary<string, int> used)
+        {
+            int cnt = 0, u;
+            if (arm != null && item != null) arm.TryGetValue(item, out cnt);
+            used.TryGetValue(item.StringId, out u);
+            return Math.Max(0, cnt - u);
+        }
+
+        /// <summary>Obite sztuki przedmiotu, ktore nosza ludzie (stan, ile): najgorsze najpierw wypelniaja wolne sztuki (free) i zostaja; skipped - ile
+        /// sztuk do naprawy (nie wrakow) tak pominieto.</summary>
+        private static List<KeyValuePair<string, int>> MenWornLots(Dictionary<string, int> byMod, int free, ref int skipped)
+        {
+            var list = new List<KeyValuePair<string, int>>();
+            var mods = new List<KeyValuePair<string, float>>();
+            foreach (var m in byMod) { if (m.Value <= 0) continue; var md = Mod(m.Key); mods.Add(new KeyValuePair<string, float>(m.Key, md != null ? md.PriceMultiplier : 1f)); }
+            mods.Sort((a, b) => a.Value.CompareTo(b.Value));   // najgorszy stan najpierw - jak TakeCondition
+            foreach (var m in mods)
+            {
+                int n = byMod[m.Key];
+                int k = Math.Min(free, n);
+                free -= k; n -= k;
+                if (k > 0 && Mendable(Mod(m.Key))) skipped += k;
+                if (n > 0) list.Add(new KeyValuePair<string, int>(m.Key, n));
+            }
+            return list;
         }
 
         /// <summary>Dzien postoju w miescie: kowale naprawiaja, ile zdaza i na ile starcza sakiewki ludzi.</summary>
@@ -397,7 +484,22 @@ namespace Armoury
                 float perPiece = Math.Max(0.05f, s.MendLootHoursPerPiece);
                 int cap = (int)(SmithHours.Available(st.Town) / perPiece);
                 var jobs = new List<KeyValuePair<string, string>>();   // przedmiot, modyfikator - najgorsze najpierw
-                foreach (var it in byItem) foreach (var m in it.Value) if (Mendable(Mod(m.Key))) for (int k = 0; k < m.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, m.Key));
+                // E6/N1 (217, R16): przy AiMendsWornOnly tylko obite sztuki, ktore nosza ludzie (dopasowanie swieze - raz na dobe na partie, pamiec dla rezerwy)
+                var used = WornOnlyOn ? UsedByMen(mp, byItem, true) : null;
+                if (used != null)
+                {
+                    var arm = Armory(mp);
+                    int skipped = 0;
+                    foreach (var it in byItem)
+                    {
+                        var io = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (io == null) continue;
+                        foreach (var lot in MenWornLots(it.Value, FreeOf(arm, io, used), ref skipped))
+                            if (Mendable(Mod(lot.Key))) for (int k = 0; k < lot.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, lot.Key));
+                    }
+                    _daySkipLoot += skipped;
+                }
+                else
+                    foreach (var it in byItem) foreach (var m in it.Value) if (Mendable(Mod(m.Key))) for (int k = 0; k < m.Value; k++) jobs.Add(new KeyValuePair<string, string>(it.Key, m.Key));
                 jobs.Sort((a, b) => { var ma = Mod(a.Value); var mb = Mod(b.Value); return (ma != null ? ma.PriceMultiplier : 1f).CompareTo(mb != null ? mb.PriceMultiplier : 1f); });
                 if (MendMaterial.MenAndLordsOn) { MendWithMaterial(mp, st, jobs, cap, perPiece); return; }   // poprawka po audycie TOWARY 3: material jak na lawie
                 int done = 0, paid = 0;
@@ -407,8 +509,8 @@ namespace Armoury
                     var item = MBObjectManager.Instance.GetObject<ItemObject>(j.Key); if (item == null) continue;
                     int unit = UnitCost(item, Mod(j.Value), st);
                     if (MenPurse.Get(mp) < unit) break;
-                    MenPurse.Take(mp, unit); st.Town.ChangeGold(unit);
-                    MoneyLedger.Note169(MoneyLedger.N169Repair, st, unit);   // paczka 169: linia kas (tylko licznik)
+                    MenPurse.Take(mp, unit);
+                    _dayFolk += MendMaterial.PaySmiths(st, unit, unit);   // E6/N1: sama robocizna - do kiesy ludu (B1), reszta kasa; linia kas 169 w PaySmiths
                     AddWorn(mp.StringId, j.Key, j.Value, -1);
                     done++; paid += unit;
                 }
@@ -447,8 +549,7 @@ namespace Armoury
                 o.Bench.Commit();
                 foreach (var job in o.Jobs) { AddWorn(mp.StringId, job.El.Item.StringId, job.El.ItemModifier.StringId, -job.N); done += job.N; MetalTally(job); }
                 paid = MenPurse.Take(mp, o.Total);
-                st.Town.ChangeGold(paid);
-                MoneyLedger.Note169(MoneyLedger.N169Repair, st, paid);   // paczka 169: linia kas (tylko licznik)
+                _dayFolk += MendMaterial.PaySmiths(st, paid, o.Labor);   // E6/N1: robocizna do kiesy ludu (B1), material do kasy miasta; linia kas 169 w PaySmiths
                 _dayMat += o.MatGold; _dayTowns++;
                 for (int k = 0; k < MendMaterial.Kinds; k++) _dayKg[k] += o.Bench.UsedKg[k];
             }
@@ -466,10 +567,13 @@ namespace Armoury
             {
                 int parties = _worn.Count, pieces = 0; foreach (var p in _worn.Values) foreach (var it in p.Values) foreach (var v in it.Values) pieces += v;
                 Log.Info("Zuzycie AI: dzien " + _dayStamp + " - lup obity " + _dayLoot + " szt., zuzyte w bitwach " + _dayWorn + ", naprawione w miastach " + _dayMended
-                         + " za " + _dayPaid + " z sakiewek ludzi; obitych razem " + pieces + " szt. w " + parties + " partiach."
+                         + " za " + _dayPaid + " z sakiewek ludzi; obitych razem " + pieces + " szt. w " + parties + " partiach"
+                         + "; pominiete (lup nienoszony) " + (WornOnlyOn ? _daySkipLoot + " szt." : "- (AiMendsWornOnly WYL)")   // E6/N1 (217)
+                         + ", robocizna do kiesy ludu " + _dayFolk + "."
                          + (MendMaterial.MenAndLordsOn ? MatDay() : ""));
             }
             _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = d;
+            _daySkipLoot = _dayFolk = 0;
             ClearMatDay();
         }
 

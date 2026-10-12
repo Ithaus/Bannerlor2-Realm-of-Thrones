@@ -542,6 +542,22 @@ namespace Armoury
             }
         }
 
+        /// <summary>E6/N1 (217): roster do dopasowania "co nosza ludzie" partii AI - zaloga razem z ludzmi jej patroli BK (jak sprzedaz nadwyzek SellWeek;
+        /// mapa patroli raz na dobe), inna partia - jej roster.</summary>
+        internal static TroopRoster FitRoster(MobileParty mp)
+        {
+            if (mp == null) return null;
+            try
+            {
+                if (!mp.IsGarrison) return mp.MemberRoster;
+                var st = mp.HomeSettlement ?? mp.CurrentSettlement;
+                List<MobileParty> pl;
+                if (st != null && PatrolsToday().TryGetValue(st, out pl) && pl.Count > 0) return WithPatrols(mp.MemberRoster, pl);
+            }
+            catch (Exception e) { Stumble("FitRoster", e); }
+            return mp.MemberRoster;
+        }
+
         /// <summary>sklad7: roster zalogi razem z ludzmi jej patroli BK (bez bohaterow) - do dopasowania nadwyzek (ich sprzet lezy w twierdzy).</summary>
         private static TroopRoster WithPatrols(TroopRoster garrison, List<MobileParty> patrols)
         {
