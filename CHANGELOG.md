@@ -27,7 +27,9 @@
 
 **Poza zakresem (zauwazone, nie ruszane - etap 8):** brak.
 
-**Build:** Armoury kod 0 (md5 3de4190f; 1 stare ostrzezenie CS0169 BattlefieldLaw). gen_mcm OK (Armoury 1187 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmiany liczby). Gry nie uruchamiano.
+**Poprawka recenzji (E7/O2):** podpowiedz MCM mowila "tents, a campfire, torches and a fence behind your line", a pochodnie stoja kolem 6 m od gracza (0/90/180/270 st. od frontu - jedna przed nim), wszystko liczone od agenta gracza, nie od szyku. Tekst: "tents, a campfire and a fence behind you, torches around you" (Settings.cs + gen_mcm). Kod bez zmian. Sprawdzone bez zmian: `InstantiateWithRestOffset(Scene, string, bool createPhysics, MatrixFrame, float, bool, string)` (Engine 1.4.8 md5 a30e70e7 = libs; wzorzec gry bez fizyki - `VisualShipFactory.CreateVisualShip` createPhysics false; stawianie propow w trakcie misji ze skryptami - `CaravanBattleMissionHandler`, `Markable`), `PrefabExists` (12 nazw - definicje najwyzszego poziomu w Native/Prefabs), skrypty prefabow `LightCycle` (w dzien zdejmuje plomien w OnInit) i `WindMill` to `ScriptComponentBehavior`, nie `MissionObject`; `Mission.Mode` / `DeploymentHandler.AfterStart` i `OnRemoveBehavior`, `IsFieldBattle`, `PlayerEnemyTeam`, `Team.ActiveAgents`; zadnych latek Harmony (brak kolizji z BK, ROT, RBM, RBL, Diplomacy, UIExtenderEx); tempo marszu i ekonomia nietkniete; klucz false = behavior niedodany i bez linii startowej (jak przed paczka); bez stanu w zapisie (statyczny tylko wynik PrefabExists - nie zalezy od kampanii); tick po zbudowaniu = jeden test `_done`; blok `etap7_o2` (py_compile poza repo) na sztucznych logach TAK / NIE / NIE (brak linii); `Armoury.json` Jeffa :302 false potwierdzone (odczyt).
+
+**Build:** Armoury kod 0 (md5 3de4190f; po recenzji f7939b0f - tylko tekst podpowiedzi; 1 stare ostrzezenie CS0169 BattlefieldLaw). gen_mcm OK (Armoury 1187 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmiany liczby). Gry nie uruchamiano.
 
 **Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8 (T2 - test Jeffa w misji).
 

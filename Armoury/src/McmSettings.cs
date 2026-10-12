@@ -3832,7 +3832,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float ArmorOutlierTolerance { get; set; } = 1.30f;
 
-        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "attacked while encamped, the field battle gets your camp dressed on it - tents, a campfire, torches and a fence behind your line, set up once your men are deployed; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged")]
+        [SettingPropertyBool("Camp Battle Props Enabled", HintText = "attacked while encamped, the field battle gets your camp dressed on it once your men are deployed - tents, a campfire and a fence behind you, torches around you; scenery only (no collision: nobody gets stuck in it, arrows fly through), nothing closer than 6 m to you; missing prefabs are skipped and logged")]
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = true;
 
