@@ -1335,3 +1335,10 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
 - (18:45 UTC 12.10) **Jeff: nowy rod szlachty BK - "zawsze 0"** (zamiast 15 000 z kasy miasta). Kod: `w-toku/a8-gentry0` bc5e3ef (od zbior-5-8 2b30405, osobne drzewo SCRATCH\zb\a8g,
   bo w zbior-5-8 pracuje workflow): nowy klucz GentryStartFromTown = false (kasa miasta tylko przy true), build 0, CHANGELOG. **DO SCALENIA** do `w-toku/zbior-5-8` po skonczeniu
   wf_42f8dda9-fa3 (konflikty spodziewane: CHANGELOG gora, Settings.cs, McmSettings.cs - gen_mcm).
+- (19:00 UTC 12.10) **Etap 8: projekt v2 gotowy** (`docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md`, krytyka 25 uwag - 23 przyjete, 2 czesciowo; commit 281723d).
+  29 paczek (242-270): E8/0 (pierwsza), P1-P3, S, M, X, W, A, Z, L, C, R, K, D1 (nagrody zadan w obie strony, kwota zamrazana przy przyjeciu - arm_e8_questpay), D2, B, RC, G1/G2
+  (po TAK Jeffa), Q, T (jedyna NK - 8.10, + PLAN 1.12 rekruci gracza t2+ bez darmowego kompletu), E (skrypt BEE), O1-O6 optymalizacja (realnie 0.3-0.7 s/dobe; nasze mody 15-18% doby;
+  najwiekszy koszt - liczba partii 2 319 -> 5 201 w 120 dob). Rownolegle: watek Armoury po kolei + watek CrashScribe/RC/ForgeView (E8/M, E8/RC). 8.16 - 29 recznych testow Jeffa.
+  **Pytania do Jeffa (rozdz. 6; 1-5 blokuja kod):** (1) trzecia kapitana z kazdej zdobyczy - rada TAK; (2) konie wedlug kategorii - TAK; (3) karawany BK w miescie co godzine - TAK;
+  (4) klany najemnikow ROT bez ludzi z niczego - TAK; (5) welna z uboju 0.15 szt.; (6) milicja z daru Spoils - wyciac; (7) "kon bez uprzezy" = start postaci - tak; (8) kuznia - zostaje
+  filtr ForgeView; (9) pasek DTE - nie wylaczac; (10) lzejsze logi - nie teraz; (11) liczba partii - nie w etapie 8 (pomiar po tescie).
