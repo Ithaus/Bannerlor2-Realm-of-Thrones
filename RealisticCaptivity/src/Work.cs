@@ -90,7 +90,58 @@ namespace RealisticCaptivity
         /// <summary>Czy osada ma z czego zaplacic pelna dniowke (przy stawkach historycznych placi kasa osady).</summary>
         private static bool CanPay(Settlement s)
         {
-            return !Settings.Current.HistoricalTownRates || CofferOf(s) >= Math.Max(1, (int)Math.Ceiling(DayWage(s)));
+            return !Settings.Current.HistoricalTownRates || Payable(s) >= Math.Max(1, (int)Math.Ceiling(DayWage(s)));
+        }
+
+        // ------------------------------------------------------------------ E8/RC (259): praca a nadwyzka miasta
+
+        private static int _e8Pays, _e8Due, _e8Paid, _e8Stops, _e8NoHire;      // liczniki sesji do linii "Praca (E8/RC)"
+        private static string _noHireKey;                                       // osada|doba - odmowa najmu w logu raz na osade i dobe
+
+        /// <summary>Stan sesji paczki E8/RC - zerowany przy kazdej kampanii (konstruktor CaptivityBehavior, regula R8).</summary>
+        internal static void ResetE8() { _e8Pays = _e8Due = _e8Paid = _e8Stops = _e8NoHire = 0; _noHireKey = null; }
+
+        /// <summary>E8/RC (WorkRespectsReserve; LAWA 7/16, 8, 10): przy stawkach historycznych placa z kasy osady patrzy na NADWYZKE miasta (regula R1 etapu 8 -
+        /// TownWageLink.SpareD4), dniowka ponizej pensa nie jest zaokraglana w gore do 1, a brak nadwyzki zatrzymuje prace w toku.</summary>
+        private static bool ReserveOn { get { var c = Settings.Current; return c.HistoricalTownRates && c.WorkRespectsReserve; } }
+
+        /// <summary>Ile osada moze wydac na place: przy WorkRespectsReserve nadwyzka (miasto - D4 z Armoury, wies - cala kasa), inaczej cala kasa (jak dotad).</summary>
+        private static int Payable(Settlement s) { return ReserveOn ? TownWageLink.SpareD4(s) : CofferOf(s); }
+
+        /// <summary>Linia wyplaty: nalezne, zaplacone, nadwyzka przed wyplata (zaplacone nigdy ponad nadwyzke - prog RC-1) i liczniki sesji.</summary>
+        private static void NotePay(string what, Settlement s, int due, int paid, int spareBefore)
+        {
+            _e8Pays++; _e8Due += due; _e8Paid += paid;
+            Log.Info("Praca (E8/RC): " + what + " w " + s.Name + " | nalezne " + due + ", zaplacone " + paid + ", nadwyzka osady przed wyplata " + spareBefore + ", kasa po " + CofferOf(s)
+                     + (s.Town == null ? " (wies - cala kasa)" : TownWageLink.SpareLinked ? " (nadwyzka D4 Armoury)" : " (rezerwa TownRentFloorGold - bez Seal31.Spare)")
+                     + " | w tej sesji: wyplat " + _e8Pays + ", nalezne " + _e8Due + ", zaplacone " + _e8Paid + ", przerwan pracy " + _e8Stops + ", odmow najmu " + _e8NoHire
+                     + ", potkniec odczytu nadwyzki " + TownWageLink.SpareStumbles);
+        }
+
+        /// <summary>Osada nie najmuje, bo nie ma nadwyzki na dniowke - linia raz na osade i dobe (warunek opcji menu liczy sie przy kazdym odswiezeniu).</summary>
+        private static void NoteNoHire(Settlement s)
+        {
+            try
+            {
+                if (!ReserveOn || s == null) return;
+                string key = s.StringId + "|" + Today;
+                if (key == _noHireKey) return;
+                _noHireKey = key; _e8NoHire++;
+                Log.Info("Praca (E8/RC): " + s.Name + " nie najmuje - nadwyzka " + TownWageLink.SpareD4(s) + " (kasa " + CofferOf(s) + ") ponizej dniowki "
+                         + DayWage(s).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "; odmow najmu w tej sesji " + _e8NoHire);
+            }
+            catch { }
+        }
+
+        /// <summary>E8/RC (LAWA 10): osada nie ma nadwyzki na kolejna wyplate - praca w toku staje. Przelaczenie z TIKU menu oczekiwania (jak StillSafe i
+        /// _stopWork - wzorzec gry); z OPCJI menu oczekiwania SwitchToMenu jest zakazane (CTD).</summary>
+        private static void StopForPurse(string what)
+        {
+            _e8Stops++;
+            Log.Info("Praca (E8/RC): " + what + " w " + Here.Name + " przerwana - osada nie ma nadwyzki na kolejna wyplate (nadwyzka " + Payable(Here) + ", kasa " + CofferOf(Here)
+                     + "); przerwan pracy w tej sesji " + _e8Stops);
+            Log.Player("There is no coin to spare for hired hands in " + Here.Name + " - the work ends here.", true);
+            GameMenu.SwitchToMenu(_cameFrom);
         }
 
         /// <summary>Komunikat dniowki: pelna, czesciowa albo zadna (pusta kasa osady).</summary>
@@ -106,7 +157,7 @@ namespace RealisticCaptivity
         {
             var sc = s != null ? s.SettlementComponent : null;
             if (sc == null) return 0;
-            int give = Math.Min(pay, Math.Max(0, sc.Gold));
+            int give = Math.Min(pay, ReserveOn ? TownWageLink.SpareD4(s) : Math.Max(0, sc.Gold));   // E8/RC: tylko z nadwyzki (R1)
             if (give > 0) GiveGoldAction.ApplyForSettlementToCharacter(s, Hero.MainHero, give, true);
             return give;
         }
@@ -115,7 +166,7 @@ namespace RealisticCaptivity
         {
             var c = Settings.Current;
             if (c.HistoricalTownRates)
-                return Math.Max(1, MBRandom.RoundRandomized(DayWage(s) * (Saturated(s) ? 0.5f : 1f)));   // w calych pensach, srednio co do ulamka
+                return Math.Max(c.WorkRespectsReserve ? 0 : 1, MBRandom.RoundRandomized(DayWage(s) * (Saturated(s) ? 0.5f : 1f)));   // w calych pensach, srednio co do ulamka; E8/RC (LAWA 8): bez podlogi 1 (przeplacala dniowki ponizej pensa i kasowala polowe placy po nasyceniu)
             float pay;
             if (s.IsVillage)
                 pay = c.WorkPayVillageBase + s.Village.Hearth / Math.Max(1f, c.WorkPayVillageHearthDiv);
@@ -128,7 +179,7 @@ namespace RealisticCaptivity
         private static int GuardPay(Settlement s)
         {
             var c = Settings.Current;
-            if (c.HistoricalTownRates) return Math.Max(1, MBRandom.RoundRandomized(DayWage(s)));   // noc na murach - dniowka robotnika
+            if (c.HistoricalTownRates) return Math.Max(c.WorkRespectsReserve ? 0 : 1, MBRandom.RoundRandomized(DayWage(s)));   // noc na murach - dniowka robotnika; E8/RC (LAWA 8): bez podlogi 1
             float pay = c.GuardPayBase + (s.Town != null ? s.Town.Prosperity : 3000f) / Math.Max(1f, c.GuardPayProsperityDiv);
             return Math.Max(1, (int)pay);
         }
@@ -244,9 +295,9 @@ namespace RealisticCaptivity
                 if (c.WorkOnlyBelowGold > 0 && Hero.MainHero.Gold >= c.WorkOnlyBelowGold)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}You are far too wealthy to be seen digging ditches. (under {MAX} gold)").SetTextVariable("MAX", c.WorkOnlyBelowGold); return true; }
                 if (!CanPay(Here))
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}No one here has the coin to hire a hand - the purse of " + Here.Name + " is empty."); return true; }
+                { NoteNoHire(Here); args.IsEnabled = false; args.Tooltip = new TextObject(ReserveOn ? "{=!}No one here has the coin to hire a hand - " + Here.Name + " has nothing to spare." : "{=!}No one here has the coin to hire a hand - the purse of " + Here.Name + " is empty."); return true; }
                 args.Tooltip = new TextObject("{=!}About {PAY} stags a day, food included. Hard graft builds Athletics.")
-                    .SetTextVariable("PAY", c.HistoricalTownRates ? Math.Max(1f, DayWage(Here) * (Saturated(Here) ? 0.5f : 1f)).ToString("0.#") : LabourPay(Here).ToString());   // poprawka po audycie TOWARY 3: ta sama polowa co LabourPay w miejscu "nasyconym"
+                    .SetTextVariable("PAY", c.HistoricalTownRates ? (ReserveOn ? (DayWage(Here) * (Saturated(Here) ? 0.5f : 1f)).ToString("0.##") : Math.Max(1f, DayWage(Here) * (Saturated(Here) ? 0.5f : 1f)).ToString("0.#")) : LabourPay(Here).ToString());   // poprawka po audycie TOWARY 3: ta sama polowa co LabourPay w miejscu "nasyconym"; E8/RC: bez podlogi 1 jak wyplata
                 return true;
             }
             catch (Exception e) { Log.Error("LabourCondition", e); return false; }
@@ -268,7 +319,7 @@ namespace RealisticCaptivity
                 if (BestWeaponSkill() < c.GuardSkillRequired)
                 { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}They want someone who can handle a weapon. (best weapon skill {MIN} needed)").SetTextVariable("MIN", c.GuardSkillRequired); return true; }
                 if (!CanPay(Here))
-                { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The merchants of " + Here.Name + " have no coin left to hire a watchman."); return true; }
+                { NoteNoHire(Here); args.IsEnabled = false; args.Tooltip = new TextObject(ReserveOn ? "{=!}The merchants of " + Here.Name + " have no coin to spare for a watchman." : "{=!}The merchants of " + Here.Name + " have no coin left to hire a watchman."); return true; }
                 args.Tooltip = new TextObject("{=!}About {PAY} stags a night. Rowdy nights may earn a bonus - or a beating.")
                     .SetTextVariable("PAY", c.HistoricalTownRates ? DayWage(Here).ToString("0.#") : GuardPay(Here).ToString());
                 return true;
@@ -309,8 +360,13 @@ namespace RealisticCaptivity
                 bool guard = args != null && args.MenuContext != null &&
                              args.MenuContext.GameMenu != null &&
                              args.MenuContext.GameMenu.StringId == "rc_work_guard";
-                int pay = Here == null ? 0 : (guard ? GuardPay(Here) : LabourPay(Here));
-                MBTextManager.SetTextVariable("RC_WORK_PAY", pay);
+                if (ReserveOn && Here != null)   // E8/RC: dniowka oczekiwana (bez podlogi 1 rzut groszy moze dac 0 - menu nie pokazuje losu)
+                    MBTextManager.SetTextVariable("RC_WORK_PAY", (DayWage(Here) * (!guard && Saturated(Here) ? 0.5f : 1f)).ToString("0.##"));
+                else
+                {
+                    int pay = Here == null ? 0 : (guard ? GuardPay(Here) : LabourPay(Here));
+                    MBTextManager.SetTextVariable("RC_WORK_PAY", pay);
+                }
                 MBTextManager.SetTextVariable("RC_WORK_EARNED", _earned);
             }
             catch { }
@@ -332,19 +388,26 @@ namespace RealisticCaptivity
 
                 var c = Settings.Current;
                 bool halfPay = Saturated(Here);
+                bool rsv = ReserveOn;                                                   // E8/RC
+                int spare = rsv ? TownWageLink.SpareD4(Here) : 0;                       // nadwyzka przed wyplata (do linii)
                 int pay = LabourPay(Here), due = pay;
                 if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);          // place daje kasa osady, nie nikt
                 else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
                 _earned += pay;
-                string thin = WageNote(pay, due, "the day's work");
+                bool unpaid = rsv && due > 0 && pay <= 0;                               // E8/RC (LAWA 10): osada nie miala z czego - dzien niezaplacony
+                string thin = rsv && due <= 0 ? null : WageNote(pay, due, "the day's work");   // due 0 = grosze ponizej pensa (los), nie pusta kasa
                 if (thin != null) { Log.Player(thin, true); Log.Info("Praca dniowkowa w " + Here.Name + ": kasa osady zaplacila " + pay + " z " + due); }
-                MarkWorked();
+                if (rsv) NotePay("dniowka", Here, due, pay, spare);
+                if (!unpaid) MarkWorked();                                              // E8/RC (LAWA 10): niezaplacony dzien nie liczy sie do nasycenia
                 Hero.MainHero.AddSkillXp(DefaultSkills.Athletics, c.WorkAthleticsXpPerDay);
                 FeedFromMastersPot();
-                Log.Player(halfPay
-                    ? "A day's wage: " + pay + " stags. (little work left here - half pay)"
-                    : "A day's wage: " + pay + " stags.");
+                if (rsv && due <= 0) Log.Player("A lean day - the wage here is under a stag, and today's share of it came to nothing.");
+                else if (!unpaid)
+                    Log.Player(halfPay
+                        ? "A day's wage: " + pay + " stags. (little work left here - half pay)"
+                        : "A day's wage: " + pay + " stags.");
                 _fedToday = false;
+                if (rsv && (unpaid || !CanPay(Here))) { StopForPurse("dniowka"); return; }   // E8/RC (LAWA 10): bez nadwyzki na kolejny dzien praca staje
                 RefreshText(args);
             }
             catch (Exception e) { Log.Error("LabourTick", e); }
@@ -363,6 +426,7 @@ namespace RealisticCaptivity
                 var c = Settings.Current;
                 var skillObj = BestMeleeSkillObject();
                 Hero.MainHero.AddSkillXp(skillObj, c.GuardWeaponXpPerDay);
+                bool rsv = ReserveOn, unpaidNight = false;                              // E8/RC
 
                 bool brawl = MBRandom.RandomFloat < c.GuardBrawlChancePercent / 100f;
                 if (brawl)
@@ -373,10 +437,12 @@ namespace RealisticCaptivity
                     {
                         int pay = GuardPay(Here) + (c.HistoricalTownRates ? MBRandom.RoundRandomized(DayWage(Here) * Math.Max(0f, c.GuardBrawlBonusDays)) : c.GuardBrawlBonus);
                         int dueB = pay;
+                        int spareB = rsv ? TownWageLink.SpareD4(Here) : 0;
                         if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
                         else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
-                        string thinB = WageNote(pay, dueB, "the night's watch");
+                        string thinB = rsv && dueB <= 0 ? null : WageNote(pay, dueB, "the night's watch");
                         if (thinB != null) Log.Player(thinB, true);
+                        if (rsv) { NotePay("warta z premia", Here, dueB, pay, spareB); unpaidNight = dueB > 0 && pay <= 0; }
                         _earned += pay;
                         Hero.MainHero.AddSkillXp(skillObj, 150f);
                         if (MBRandom.RandomFloat < 0.25f) ThankfulNotable();
@@ -392,13 +458,16 @@ namespace RealisticCaptivity
                 else
                 {
                     int pay = GuardPay(Here), dueG = pay;
+                    int spareG = rsv ? TownWageLink.SpareD4(Here) : 0;
                     if (c.HistoricalTownRates) pay = PayFromSettlement(Here, pay);
                     else GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, pay);
-                    string thinG = WageNote(pay, dueG, "the night's watch");
+                    string thinG = rsv && dueG <= 0 ? null : WageNote(pay, dueG, "the night's watch");
                     if (thinG != null) Log.Player(thinG, true);
+                    if (rsv) { NotePay("warta", Here, dueG, pay, spareG); unpaidNight = dueG > 0 && pay <= 0; }
                     _earned += pay;
-                    Log.Player("A quiet watch. " + pay + " stags for the night.");
+                    Log.Player(rsv && dueG <= 0 ? "A quiet watch - the night's share of a thin wage came to nothing." : "A quiet watch. " + pay + " stags for the night.");
                 }
+                if (rsv && (unpaidNight || !CanPay(Here))) { StopForPurse("warta"); return; }   // E8/RC (LAWA 10): bez nadwyzki na kolejna noc warta staje
                 RefreshText(args);
             }
             catch (Exception e) { Log.Error("GuardTick", e); }

@@ -284,6 +284,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Ransom debt")]
         public int DebtDefaultRenownLoss { get; set; } = 50;
 
+        [SettingPropertyBool("Debt To Captor Home", HintText = "when no living lord stands behind your captor, the daily instalment on your ransom debt and the price of buying back your war gear go to whoever holds the claim: the head of a dead captor's house, the coffers of the settlement whose militia, garrison or dungeon held you, or the purse of the band that took you; with no one left to take it nothing is taken and the debt waits (off = that coin simply vanishes, as before)")]
+        [SettingPropertyGroup("Ransom debt")]
+        public bool DebtToCaptorHome { get; set; } = true;
+
         [SettingPropertyBool("Escape Needs Help", HintText = "no one walks out of a cell alone - it takes help")]
         [SettingPropertyGroup("Escape needs help")]
         public bool EscapeNeedsHelp { get; set; } = true;
@@ -428,6 +432,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Honest work")]
         public float GuardBrawlBonusDays { get; set; } = 3f;
 
+        [SettingPropertyBool("Work Respects Reserve", HintText = "with Historical Town Rates on, day labour and the night watch are paid only out of what a town can spare above its merchants' reserve (the town surplus of Armoury; a village pays from its whole purse): with nothing to spare no one hires, work under way stops and an unpaid day does not count towards the half-pay limit; a wage under one stag is no longer rounded up to a full stag every day (off = paid down to the last coin of the coffers and never less than 1 stag a day, as before)")]
+        [SettingPropertyGroup("Honest work")]
+        public bool WorkRespectsReserve { get; set; } = true;
+
         [SettingPropertyBool("Enlisted Honest Wounds", HintText = "no miracle full-heal after enlisted battles - wounds mend with rest, as they should")]
         [SettingPropertyGroup("In the lord's service")]
         public bool EnlistedHonestWounds { get; set; } = true;
@@ -518,6 +526,7 @@ namespace RealisticCaptivity
             s.DebtDailyInstalment = DebtDailyInstalment;
             s.DebtGraceDays = DebtGraceDays;
             s.DebtDefaultRenownLoss = DebtDefaultRenownLoss;
+            s.DebtToCaptorHome = DebtToCaptorHome;
             s.EscapeNeedsHelp = EscapeNeedsHelp;
             s.EscapeBribeGold = EscapeBribeGold;
             s.RescueEnabled = RescueEnabled;
@@ -554,6 +563,7 @@ namespace RealisticCaptivity
             s.LabourerDayWage = LabourerDayWage;
             s.VillageWageShare = VillageWageShare;
             s.GuardBrawlBonusDays = GuardBrawlBonusDays;
+            s.WorkRespectsReserve = WorkRespectsReserve;
             s.EnlistedHonestWounds = EnlistedHonestWounds;
             s.EnlistedPostBattleHealHp = EnlistedPostBattleHealHp;
             s.EnlistedDailyCareHp = EnlistedDailyCareHp;
