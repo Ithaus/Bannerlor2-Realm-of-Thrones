@@ -112,7 +112,7 @@ namespace Armoury
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDay);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("UniqueLaw.OnDay", OnDay));   // E8/0: opakowanie pomiaru (tylko log)
         }
 
         public override void SyncData(IDataStore dataStore)

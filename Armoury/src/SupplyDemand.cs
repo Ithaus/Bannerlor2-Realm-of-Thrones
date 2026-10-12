@@ -445,7 +445,7 @@ namespace Armoury
                 }
             }
             catch { }
-            finally { Cost174.End(Cost174.SPrice, tc); }
+            finally { long dt = Cost174.EndDt(Cost174.SPrice, tc); if (dt > 0) DayProfile.PriceSample(dt); }   // E8/0 (242): probka ceny do wolajacego (tylko pomiar)
         }
 
         /// <summary>
@@ -470,8 +470,9 @@ namespace Armoury
         {
             HarnessOnShelves = -1;
             try { TradeCarts.Arrivals(); } catch (Exception e) { Log.Error("TradeCarts.Arrivals", e); }
+            int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CExport;   // E8/0 (242): wolajacy cen - wywoz kupcow (tylko pomiar)
             try { DailyTradeCore(); }
-            finally { try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } }
+            finally { DayProfile.Caller = pc; try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } }
         }
 
         private static void DailyTradeCore()

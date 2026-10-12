@@ -11,6 +11,8 @@
   <CatchFirstChance>true</CatchFirstChance>
   <!-- ...but only report those with a mod in the stack, or the log drowns in engine noise -->
   <OnlyModdedFirstChance>true</OnlyModdedFirstChance>
+  <!-- one daily line in the session log: how many such errors were seen, reported or filtered out, and the time spent naming the mod behind them (diagnostics only) -->
+  <Stage8ProfileLog>true</Stage8ProfileLog>
 
   <!-- a Harmony net over every method of the listed mods -->
   <WrapModMethods>true</WrapModMethods>

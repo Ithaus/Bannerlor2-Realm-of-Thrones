@@ -15,6 +15,7 @@ namespace CrashScribe
         public static bool WrapCampaignHotspots = true;// dodatkowa siec na newralgicznych miejscach gry
         public static bool ShowInGame = true;          // krotka czerwona notka na ekranie, ze cos poszlo nie tak
         public static int MaxReportsPerSession = 300;
+        public static bool Stage8ProfileLog = true;    // E8/0 (242): linia "Profil CS (E8/0)" raz na dobe - bledy pierwszej szansy i czas Blame.Culprits (tylko pomiar)
         public static int KeepSessions = 15;
 
         // mody objete siecia; puste = wszystkie spoza Native
@@ -83,6 +84,7 @@ namespace CrashScribe
                         case "WrapCampaignHotspots": WrapCampaignHotspots = B(v); break;
                         case "ShowInGame": ShowInGame = B(v); break;
                         case "MaxReportsPerSession": MaxReportsPerSession = I(v, MaxReportsPerSession); break;
+                        case "Stage8ProfileLog": Stage8ProfileLog = B(v); break;
                         case "KeepSessions": KeepSessions = I(v, KeepSessions); break;
                         case "WrapModules": WrapModules = v; break;
                         case "LocalRecruits": LocalRecruits = B(v); break;

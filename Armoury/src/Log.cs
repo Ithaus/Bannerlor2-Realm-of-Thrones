@@ -10,6 +10,14 @@ namespace Armoury
         private static string _path, _topicDir;
         private static readonly object Gate = new object();
         private const int KeepLogs = 12;      // ile ostatnich sesji trzymamy
+        // E8/0 (242): laczny czas zapisu linii (Info, Csv, Error) i liczba zapisow od ostatniej linii profilu - pod Gate (tylko pomiar)
+        private static long _wTicks, _wLines;
+
+        /// <summary>E8/0: czas zapisu (ticki zegara) i zapisow od poprzedniego odczytu; zeruje.</summary>
+        internal static void TakeWrite(out long ticks, out long lines)
+        {
+            lock (Gate) { ticks = _wTicks; lines = _wLines; _wTicks = 0; _wLines = 0; }
+        }
 
         /// <summary>
         /// PLIK NA SESJE (Jeff 13.09: "logi gina, zanim zdazysz o bledzie powiedziec").
@@ -66,7 +74,13 @@ namespace Armoury
             {
                 string topic = TopicOf(msg);
                 string file = topic != null && _topicDir != null ? Path.Combine(_topicDir, topic + ".log") : _path;
-                lock (Gate) File.AppendAllText(file, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + Environment.NewLine);
+                string text = "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + Environment.NewLine;
+                lock (Gate)
+                {
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    try { File.AppendAllText(file, text); }
+                    finally { _wTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; _wLines++; }
+                }
             }
             catch { }
         }
@@ -84,8 +98,13 @@ namespace Armoury
                 string file = Path.Combine(_topicDir, name);
                 lock (Gate)
                 {
-                    if (!File.Exists(file)) File.WriteAllText(file, header + Environment.NewLine);
-                    File.AppendAllText(file, rows);
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    try
+                    {
+                        if (!File.Exists(file)) File.WriteAllText(file, header + Environment.NewLine);
+                        File.AppendAllText(file, rows);
+                    }
+                    finally { _wTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; _wLines++; }
                 }
                 return file;
             }
@@ -117,7 +136,13 @@ namespace Armoury
             if (_path == null) return;
             try
             {
-                lock (Gate) File.AppendAllText(_path, "[" + DateTime.Now.ToString("HH:mm:ss") + "] ERROR in " + where + ": " + e + Environment.NewLine);
+                string text = "[" + DateTime.Now.ToString("HH:mm:ss") + "] ERROR in " + where + ": " + e + Environment.NewLine;
+                lock (Gate)
+                {
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    try { File.AppendAllText(_path, text); }
+                    finally { _wTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; _wLines++; }
+                }
             }
             catch { }
         }

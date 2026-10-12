@@ -62,7 +62,7 @@ namespace Armoury
                     }
                     if (p <= 0 || p > budget - cost) break;
                     bool gone = true;
-                    try { shelf.AddToCounts(el, -1); }
+                    try { shelf.AddToCounts(el, -1); ShelfIndex.NoteOwn(shelf); }   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
                     catch
                     {
                         // wyjatek w zdarzeniu albo podsluchu polki: sztuka liczy sie tylko, jesli naprawde zeszla (wolajacy ja oplaca), i partia sie konczy
@@ -89,6 +89,7 @@ namespace Armoury
         {
             if (shelf == null || n <= 0) return;
             shelf.AddToCounts(el, n);
+            ShelfIndex.NoteOwn(shelf);   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
             _dBatches--; _dPieces -= n; _dCost -= cost; _dFlat -= (long)first * n; _dBack += n;
             if (n > 1) _dMulti--;
         }

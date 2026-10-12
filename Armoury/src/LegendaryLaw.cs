@@ -60,14 +60,14 @@ namespace Armoury
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSession);
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("LegendaryLaw (czystki, ValyrianBlades)",   // E8/0: opakowanie pomiaru (tylko log)
                 delegate
                 {
                     try { SweepAiArmories("dzien"); } catch { } try { SweepMarkets("dzien"); } catch { }
                     // 177-2: spis stali valyrianskiej (straznik wedlug stanu startowego) - zaraz po czystce magazynow AI, jedno przejscie na dobe
                     try { ValyrianBlades.Daily(); } catch (Exception e) { Log.Error("ValyrianBlades.Daily", e); }
                     try { ValyrianBlades.DailyPatches(); } catch { }
-                });
+                }));
         }
 
         public override void SyncData(IDataStore dataStore)

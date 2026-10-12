@@ -175,7 +175,7 @@ namespace Armoury
         {
             _tr.Clear(); _pendingMainMask = -1; _pendingMasks.Clear(); _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
-            _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0;
+            _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length);   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
         }
 
@@ -192,8 +192,19 @@ namespace Armoury
 
         /// <summary>Zegar kosztu musztry (T1): Clk na wejsciu kazdej metody wolanej z zewnatrz (godzina, model treningu, tick partii, ekrany, miasto,
         /// linie dnia), Unclk w finally; zagniezdzone wejscia licza sie raz (licznik glebokosci, watek glowny).</summary>
-        private static void Clk() { if (_clk++ == 0) _clk0 = Stopwatch.GetTimestamp(); }
-        private static void Unclk() { if (_clk > 0 && --_clk == 0) _ticks += Stopwatch.GetTimestamp() - _clk0; }
+        private static void Clk(int cat) { if (_clk++ == 0) { _clk0 = Stopwatch.GetTimestamp(); _clkCat = cat; } }
+        private static void Unclk() { if (_clk > 0 && --_clk == 0) { long d = Stopwatch.GetTimestamp() - _clk0; _ticks += d; _prof[_clkCat] += d; } }
+
+        // E8/0 (242): ten sam zegar kosztu wedlug wejscia zewnetrznego (linia "Profil doby (E8/0)", tylko pomiar): 0 godziny ruchu, 1 tik treningu (Shape, Done,
+        // TickPrefix, TickPostfix), 2 kowale przy wejsciu do miasta, 3 linie dnia, 4 (wolne), 5 ekrany i trofea; 6 zuzycie i 7 kowale w TickPostfix (w tym w 1)
+        internal const int PHour = 0, PTrain = 1, PSmith = 2, PLines = 3, PScreen = 5, PWear = 6, PScrapTick = 7;
+        private static int _clkCat;
+        private static readonly long[] _prof = new long[8];
+        /// <summary>E8/0: kopiuje czasy wedlug wejscia (ticki zegara) do dst[0..7] i zeruje.</summary>
+        internal static void ProfileTake(long[] dst)
+        {
+            for (int i = 0; i < 8 && i < dst.Length; i++) { dst[i] = _prof[i]; _prof[i] = 0; }
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -292,7 +303,7 @@ namespace Armoury
 
         internal static void Hourly()
         {
-            Clk();
+            Clk(PHour);
             try
             {
                 if (Campaign.Current == null || !Active(Settings.Current)) return;
@@ -564,7 +575,7 @@ namespace Armoury
         internal static int Shape(MobileParty mp, TroopRosterElement el, ref ExplainedNumber res)
         {
             _e = false;
-            Clk();
+            Clk(PTrain);
             try
             {
                 var s = Settings.Current;
@@ -608,7 +619,7 @@ namespace Armoury
         {
             if (!_e) return;
             _e = false;
-            Clk();
+            Clk(PTrain);
             try
             {
                 var c = _eC;
@@ -702,7 +713,7 @@ namespace Armoury
         {
             _tick = mobileParty;
             if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
-            Clk();
+            Clk(PTrain);
             try
             {
                 _pr = null;
@@ -731,7 +742,7 @@ namespace Armoury
 
         public static void TickPostfix(MobileParty mobileParty)
         {
-            Clk();
+            Clk(PTrain);
             try
             {
                 var s = Settings.Current;
@@ -758,9 +769,9 @@ namespace Armoury
                     _pr = null;
                 }
                 if (!Active(s) && _acc.Count == 0) return;           // musztra wylaczona i nic nie czeka - bez zuzycia i bez kowali
-                if (mine && c.Counted) Wear(c, s);
+                if (mine && c.Counted) { long w0 = Stopwatch.GetTimestamp(); try { Wear(c, s); } finally { _prof[PWear] += Stopwatch.GetTimestamp() - w0; } }   // E8/0: czas zuzycia (tylko pomiar)
                 var st = mobileParty.CurrentSettlement;
-                if (st != null && st.IsTown) SellScrap(mobileParty, st);
+                if (st != null && st.IsTown) { long k0 = Stopwatch.GetTimestamp(); try { SellScrap(mobileParty, st); } finally { _prof[PScrapTick] += Stopwatch.GetTimestamp() - k0; } }   // E8/0: kowale w tiku (tylko pomiar)
             }
             catch (Exception e) { Stumble("TickPostfix", e); }
             finally { Unclk(); }
@@ -913,7 +924,7 @@ namespace Armoury
 
         internal static void OnEntered(MobileParty mp, Settlement st, Hero h)
         {
-            Clk();
+            Clk(PSmith);
             try { if (mp != null && st != null && st.IsTown) SellScrap(mp, st); }
             catch (Exception e) { Stumble("OnEntered", e); }
             finally { Unclk(); }
@@ -983,7 +994,7 @@ namespace Armoury
         /// <summary>Przyjecie do zapasu gracza: bron i zbroje z listy, najtansze najpierw, do 2 x pelny na grupe; przyjete schodza z listy.</summary>
         internal static int Accept(ItemRoster from, int src)
         {
-            Clk();
+            Clk(PScreen);
             try
             {
                 var main = MobileParty.MainParty;
@@ -1056,7 +1067,7 @@ namespace Armoury
         /// <summary>Zdarzenie gry OnItemsDiscardedByPlayer (InventoryLogic.DoneLogic): przyjecie tylko z ekranu z bialej listy - lewa lista tego ekranu.</summary>
         internal static void OnDiscarded(ItemRoster roster)
         {
-            Clk();
+            Clk(PScreen);
             try
             {
                 var logic = _screen; int kind = _screenKind;
@@ -1447,7 +1458,7 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null) return;
             long t0 = Stopwatch.GetTimestamp();
-            Clk();
+            Clk(PLines);
             int day = (int)CampaignTime.Now.ToDays;
             try
             {

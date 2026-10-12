@@ -88,6 +88,7 @@ namespace CrashScribe
         internal static List<string> Culprits(Exception ex)
         {
             var result = new List<string>();
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();   // E8/0 (242): czas przejscia stosu (tylko pomiar)
             try
             {
                 var trace = new System.Diagnostics.StackTrace(ex, false);
@@ -103,7 +104,28 @@ namespace CrashScribe
                 }
             }
             catch { }
+            System.Threading.Interlocked.Increment(ref CulpritCalls);
+            System.Threading.Interlocked.Add(ref CulpritTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
             return result;
+        }
+
+        // E8/0 (242, projekt etapu 8 v2 rozdz. 3 "E8/0", RD8 K9): bledy pierwszej szansy na dobe (wszystkie / zgloszone / powtorki pominiete przez Scribe /
+        // odfiltrowane - bez moda w sladzie) i czas Blame.Culprits; zdarzenie FirstChance przychodzi z dowolnego watku - Interlocked. Tylko pomiar.
+        internal static long FcSeen, FcFiltered, FcReported, FcRepeat, CulpritCalls, CulpritTicks;
+        private static int _profDay = int.MinValue;
+
+        /// <summary>Linia "Profil CS (E8/0)" za okres od poprzedniego wywolania (takt doby kampanii); tylko gdy poprzednie bylo dobe wczesniej (bez okresow z wczytania).</summary>
+        internal static void DayLine(int nowDay)
+        {
+            long seen = System.Threading.Interlocked.Exchange(ref FcSeen, 0), filt = System.Threading.Interlocked.Exchange(ref FcFiltered, 0);
+            long rep = System.Threading.Interlocked.Exchange(ref FcReported, 0), rpt = System.Threading.Interlocked.Exchange(ref FcRepeat, 0);
+            long calls = System.Threading.Interlocked.Exchange(ref CulpritCalls, 0), ticks = System.Threading.Interlocked.Exchange(ref CulpritTicks, 0);
+            int prev = _profDay;
+            _profDay = nowDay;
+            if (!Config.Stage8ProfileLog || prev != nowDay - 1) return;
+            Scribe.Line("Profil CS (E8/0): dzien " + prev + " | FirstChance " + seen + " (zgloszone " + rep + ", powtorki pominiete " + rpt + ", odfiltrowane bez moda " + filt
+                        + ") | Blame.Culprits " + (ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                        + " ms / " + calls + " wywolan.");
         }
 
         /// <summary>Slad stosu z dopisana nazwa moda przy kazdej ramce.</summary>

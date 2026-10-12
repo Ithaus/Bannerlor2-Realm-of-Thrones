@@ -168,7 +168,14 @@ Uzycie (Python 3, tylko odczyt):
                     przy kazdym starcie i 0 linii 'postawione'; bieg zdjec (klucz MapRoadsProbeEnabled = true w konfiguracji testu) - D0-2a plik: stempli > 0, zle wiersze 0,
                     CRC sceny zgodne; D0-2b postawione N z N (bez materialu 0, potkniecia 0); oba - D0-3 potkniecia i linie "ERROR in MapRoadsProbe*" 0;
                     czas stawiania, klatka z drogami / bez - INFO; zdjecia - poza narzedziem.
---crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
+--grupa etap8     : (E8/0, paczka 242) szkielet etapu 8 (projekt etapu 8 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok etap8_t0: T0 etapu -
+                    ERROR w logu Armoury 0, w logu sesji CS bloki "# ERROR IN A MOD" i powtorki Armoury / RealisticCaptivity / GrandTourney 0, wyjatki BK
+                    CorrectPlayerEducation 0 (zamyka E8/M); blok etap8_0: E80-1 linia "Profil doby (E8/0)" w kazdej dobie okna (bez pierwszej i ostatniej),
+                    E80-2 "nasze razem" >= 80% sumy Koszt 171-174 (nasze 171-174b + ceny) srednio, E80-3 koszt profilu <= 1 ms/dobe, E80-4 INFO takt doby
+                    (mediana, maks.) i gen2 w szczytach; INFO nasze mody s/dobe, najdrozsze wywolania taktu, zapis logu, linia "Profil CS (E8/0)" (CS).
+                    E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
+                    + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
+--crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
@@ -339,7 +346,7 @@ def merge_rebels(k):
     return m.group(1) if m else k
 
 
-# wojenne zrodla zlota z niczego, ktorych kroki etapu 2 nie dotykaja (statki NavalDLC, bitwy, jency, lupy) - ich roznica miedzy dwiema
+# wojenne zrodla zlota z niczego, ktorych kroki etapu 2 nie dotykaja (statki NavalDLC, bitwy - od E8/0 netto: ZRODLA - UJSCIA + N4, jency, lupy) - ich roznica miedzy dwiema
 # kampaniami to inne wojny (bieg 120 dob kroku B: statki +158 tys./dobe w dobach 93-120 z trzech dob bitew morskich, -75 tys. w dobach 61-92)
 WAR_KEYS = ("statki_inne", "statki_sprz", "bitwy", "jency", "jency_tw", "lup_obl")
 
@@ -359,10 +366,15 @@ def money_days(lines, start):
         g = lambda p: num(p, s, int, 0) or 0
         x = {"Z": kv["Z"], "R": kv["R"], "lup_cial": kv.get("Z1", 0),
              "statki_inne": g(r"statki NavalDLC inne (\d+)"), "statki_sprz": g(r"statki: sprzedaz osadom i premie zarzadcow (\d+)"),
-             "bitwy": g(r", bitwy (\d+), majatki"), "jency": g(r"jency sprzedani przez partie (\d+)"), "jency_tw": g(r"jency do kas twierdz (\d+)"),
+             "bitwy_brutto": g(r", bitwy (\d+), majatki"), "jency": g(r"jency sprzedani przez partie (\d+)"), "jency_tw": g(r"jency do kas twierdz (\d+)"),
              "lup_obl": g(r"lup z oblezen (\d+)"),
              "utarg_zniklo": g(r"z utargu wsi zniklo (\d+)"), "prow_wsie": g(r"prowizja od sprzedazy partiom (?:-?\d+|-) \(wsie (-?\d+)"),
              "u8_tabory": g(r"zniknely z mapy -?\d+ \(karawany -?\d+, tabory (-?\d+)")}
+        # E8/0 (242, CH E5/BITWY "poza zakresem"): ZRODLA "bitwy" to wyplata gry zwyciezcom BRUTTO - para: UJSCIA "bitwy" (wodzowie pokonanych) i N4
+        # (kiesy partii bez wodza); do wojennych zrodel z niczego idzie NETTO (jak E5/A6). Log bez UJSC albo N4 (sprzed 3.2/A6) - brutto, jak dotad.
+        b_out = num(r"dostep do targu \d+\), bitwy (\d+), inne", s)
+        b_n4 = num(r"\bN4=(-?\d+)", s)
+        x["bitwy"] = x["bitwy_brutto"] - b_out + b_n4 if b_out is not None and b_n4 is not None else x["bitwy_brutto"]
         c = cas.get(d)
         if c:
             x["zamki_zakupy"] = num(r'"zakupy" mieszkancow ([+-]?\d+)', c, int, 0) or 0
@@ -8132,6 +8144,174 @@ def etap7_d0(rep, lines, start, win, until=120, **kw):
     if on:
         rep.add("E7/D0 D0-6: zdjecia obu okien (Fairmarket, Winterfell) z bliska i z daleka", "poza narzedziem", "dla Jeffa - pytanie 2 \"ile drog\"", None)
 
+# ============================================================ ETAP 8 (E8/0, paczka 242): szkielet grupy --grupa etap8 i bloki etap8_t0, etap8_0
+E8_PROF = "Profil doby (E8/0): dzien"
+
+
+def etap8_t0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/0 (242): T0 etapu 8 (projekt etapu 8 v2 rozdz. 4 pkt 1) - 0 ERROR w logu Armoury; w logu sesji CrashScribe 0 blokow "# ERROR IN A MOD" i 0 powtorek
+    naszych modow (Armoury, RealisticCaptivity, GrandTourney); 0 wyjatkow BK CorrectPlayerEducation (blokow CS ze sladem tej metody - zamyka E8/M).
+    Logi RealisticCaptivity i GrandTourney maja wlasne pliki - poza narzedziem (wiersz INFO)."""
+    errs = [s for s in lines if s.startswith("ERROR in ")]
+    sites = {}
+    for s in errs:
+        k = s[len("ERROR in "):].split(":", 1)[0]
+        sites[k] = sites.get(k, 0) + 1
+    top = ", ".join(f"{k} x{v}" for k, v in sorted(sites.items(), key=lambda kv: -kv[1])[:5])
+    rep.add("E8 T0: ERROR w logu Armoury (cala sesja)", f"{len(errs)}" + (f" ({top})" if top else ""), "0", len(errs) == 0)
+    if not logp:
+        return
+    path, how = crashscribe_session_of(logp, csp)
+    if not path:
+        rep.add("E8 T0: bloki ERROR IN A MOD naszych modow (CS)", how, "0 (bez logu sesji - INFO)", None)
+        return
+    for mod in ("Armoury", "RealisticCaptivity", "GrandTourney"):
+        blk, pm, pu = crashscribe_mod_errors(path, mod)
+        rep.add(f"E8 T0: bloki ERROR IN A MOD [{mod}] (CS)", f"bloki {len(blk)}, powtorki {len(pm)} | {os.path.basename(path)} ({how})", "0 i 0",
+                len(blk) == 0 and len(pm) == 0)
+    n_cpe, cur = 0, []
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        for ln in f:
+            if ln.startswith("# ") and "ERROR" in ln:
+                if any("CorrectPlayerEducation" in x for x in cur):
+                    n_cpe += 1
+                cur = [ln]
+            elif cur:
+                cur.append(ln)
+    if any("CorrectPlayerEducation" in x for x in cur):
+        n_cpe += 1
+    rep.add("E8 T0: wyjatki BK CorrectPlayerEducation (bloki CS)", f"{n_cpe}", "0 (zamyka E8/M)", n_cpe == 0)
+    rep.add("E8 T0: ERROR w logach RealisticCaptivity / GrandTourney", "poza narzedziem (wlasne pliki logu)", "0 - sprawdzic recznie", None)
+
+
+def etap8_0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/0 (242, projekt etapu 8 v2 rozdz. 3 "E8/0" Test): linia "Profil doby (E8/0)" (DayProfile.cs).
+    E80-1 linia w kazdej dobie okna (bez pierwszej i ostatniej - linia doby N powstaje w takcie doby N+1); E80-2 pokrycie: "nasze razem (dolna granica)"
+    >= 80% sumy z linii "Koszt 171-174 (doba)" tej doby ("nasze 171-174b" + "ceny sprzetu (PricePostfix)" - ceny zachodza czesciowo na pozycje sumy, wiec
+    wzorzec jest raczej zawyzony) - srednio w oknie; E80-3 koszt samego profilu <= 1 ms/dobe srednio; E80-4 INFO - takt doby (mediana, maks.) i udzial dob
+    ze sprzataniem pamieci gen2 w szczytach taktu (10% najdluzszych) wobec wszystkich dob. INFO: nasze mody s/dobe, najdrozsze wywolania taktu, zapis logu,
+    linia "Profil CS (E8/0)" z logu sesji CrashScribe (bledy pierwszej szansy, czas Blame.Culprits)."""
+    prof = {d: s for d, s in by_day(lines, E8_PROF).items() if 1 <= run_day(d, start) <= until}
+    if not prof:
+        rep.add("E8/0: linia Profil doby (E8/0)", "brak w logu", "jest od wgrania E8/0 (Stage8ProfileLog)", None)
+        return
+    kos = by_day(lines, "Koszt 171-174 (doba): dzien")
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in prof]
+    rep.add("E80-1: linia Profil doby w kazdej dobie okna",
+            f"dob z linia {len(prof)}, brak w {len(miss)} z {len(inner)}" + (f" (doby kampanii {miss[:8]}" + (" ..." if len(miss) > 8 else "") + ")" if miss else ""),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (len(miss) == 0) if inner else None)
+    days = sorted(prof)
+    ours = {d: fnum(r"nasze razem \(dolna granica\) ([0-9.]+) ms", prof[d]) for d in days}
+    ratios = []
+    for d in days:
+        k = kos.get(d)
+        if k is None or ours[d] is None:
+            continue
+        a = fnum(r"nasze 171-174b ([0-9.]+) ms", k)
+        b = fnum(r"ceny sprzetu \(PricePostfix\) ([0-9.]+) ms/", k)
+        if a is None or b is None or a + b <= 0:
+            continue
+        ratios.append((ours[d] / (a + b), d))
+    if ratios:
+        m = sum(r for r, _ in ratios) / len(ratios)
+        lo = min(ratios)
+        rep.add("E80-2: pokrycie - nasze razem wobec Koszt 171-174 (nasze 171-174b + ceny)",
+                f"srednio {100 * m:.0f}% ({len(ratios)} dob), najmniej {100 * lo[0]:.0f}% (d{run_day(lo[1], start)})", ">= 80% srednio", m >= 0.80)
+    else:
+        rep.add("E80-2: pokrycie - nasze razem wobec Koszt 171-174", "brak par linii Profil / Koszt tej samej doby", ">= 80%", None)
+    cost = [(fnum(r"\| koszt profilu ([0-9.]+) ms", prof[d]), d) for d in days]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E80-3: koszt samego profilu", f"srednio {m:.2f} ms/dobe, najwiecej {mx[0]:.2f} ms (d{run_day(mx[1], start)})", "<= 1 ms/dobe srednio", m <= 1.0)
+    else:
+        rep.add("E80-3: koszt samego profilu", "brak liczby w linii", "<= 1 ms/dobe", None)
+    tick = [(fnum(r"\| takt doby ([0-9.]+) ms", prof[d]), d) for d in days]
+    tick = [(t, d) for t, d in tick if t is not None]
+    if tick:
+        ts = sorted(t for t, _ in tick)
+        med = ts[len(ts) // 2]
+        mx = max(tick)
+        gc2 = {d: num(r"GC 0/1/2 \+\d+/\+\d+/\+(\d+)", prof[d]) for d in days}
+        top = sorted(tick, reverse=True)[:max(1, len(tick) // 10)]
+        share_top = sum(1 for _, d in top if (gc2.get(d) or 0) > 0) / len(top)
+        share_all = sum(1 for _, d in tick if (gc2.get(d) or 0) > 0) / len(tick)
+        rep.add("E80-4: takt doby (jedna klatka) i sprzatanie pamieci gen2 w szczytach",
+                f"mediana {med:.0f} ms, maks. {mx[0]:.0f} ms (d{run_day(mx[1], start)}); doby z gen2 w 10% najdluzszych taktow {100 * share_top:.0f}%"
+                f" wobec {100 * share_all:.0f}% wszystkich", "INFO (prog etapu: takt doby maks. <= 1.0 s po O1-O6)", None)
+    vals = [v for v in ours.values() if v is not None]
+    if vals:
+        rep.add("E8/0: nasze mody razem (dolna granica, srednio)", f"{sum(vals) / len(vals) / 1000:.2f} s/dobe ({len(vals)} dob)", "INFO (do Jeffa: bylo X, jest Y)", None)
+    acc = {}
+    for d in days:
+        mt = re.search(r"top: (.*?)\); inne sluchacze", prof[d])
+        if not mt:
+            continue
+        for part in mt.group(1).split(", "):
+            if " " in part:
+                nm, v = part.rsplit(" ", 1)
+                try:
+                    acc[nm] = acc.get(nm, 0.0) + float(v)
+                except ValueError:
+                    pass
+    if acc:
+        nd = len(days)
+        rep.add("E8/0: najdrozsze wywolania taktu doby (srednio ms/dobe)",
+                ", ".join(f"{k} {v / nd:.1f}" for k, v in sorted(acc.items(), key=lambda kv: -kv[1])[:8]), "INFO", None)
+    lw = [fnum(r"\| log zapis ([0-9.]+) ms", prof[d]) for d in days]
+    lw = [x for x in lw if x is not None]
+    if lw:
+        rep.add("E8/0: zapis logu", f"srednio {sum(lw) / len(lw):.1f} ms/dobe", "INFO (prog etapu po O6: <= 20 ms/dobe)", None)
+    if logp:
+        path, how = crashscribe_session_of(logp, csp)
+        fc, cu = [], []
+        if path:
+            for s in read(path):
+                if s.startswith("Profil CS (E8/0): dzien"):
+                    a = num(r"FirstChance (\d+)", s)
+                    b = fnum(r"Blame\.Culprits ([0-9.]+) ms", s)
+                    if a is not None:
+                        fc.append(a)
+                    if b is not None:
+                        cu.append(b)
+        if fc:
+            val = f"FirstChance {sum(fc) / len(fc):.1f}, Culprits {(sum(cu) / len(cu)) if cu else 0:.1f} ms ({len(fc)} dob) | {os.path.basename(path)}"
+        else:
+            val = f"brak linii Profil CS (E8/0) | {os.path.basename(path)} ({how})" if path else how
+        rep.add("E8/0: CrashScribe - bledy pierwszej szansy i czas Blame.Culprits (srednio na dobe)", val, "INFO", None)
+
+
+def etap8_main(logp, start_arg, until=120, csp=None):
+    """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
+    Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
+    kazdy blok rusza tylko przy swojej linii - brak linii = wiersz INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    win = [d for d in alld if 1 <= run_day(d, start) <= until]
+    print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
+    blocks = [etap8_t0, etap8_0]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
+    for blk in blocks:
+        try:
+            blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
+        except Exception as e:   # narzedzie nigdy nie przerywa raportu
+            rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -8169,6 +8349,8 @@ def main(argv):
         return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group == "etap7" and logp:
         return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224) + E7/B (231): szkielet etapu 7 + bloki obu galezi; kolejne paczki dopisuja bloki
+    if group == "etap8" and logp:
+        return etap8_main(logp, start_arg, until_arg, csp)   # E8/0 (242): szkielet etapu 8 + bloki T0 i E8/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
@@ -8732,8 +8914,12 @@ def main(argv):
             v = mean_days(T, days, key)
             return dflt if v is None else v
 
+        # E8/0 (242): "bitwy" netto tylko, gdy oba biegi maja rozbicie (klucz bitwy_brutto - baza zapisana po E8/0); baza starsza - obie strony brutto
+        both_net = mean_days(dn, days, "bitwy_brutto") is not None and mean_days(db, days, "bitwy_brutto") is not None
+
         def war(T):
-            return sum(m(T, k) for k in WAR_KEYS) - m(T, "lup_cial")
+            b = m(T, "bitwy") if both_net else m(T, "bitwy_brutto", m(T, "bitwy"))
+            return sum(m(T, k) for k in WAR_KEYS if k != "bitwy") + b - m(T, "lup_cial")
 
         def cas_nothing(T):
             return m(T, "zamki_zakupy") + m(T, "zamki_dosypal") - m(T, "zamki_skasowal")
@@ -8757,7 +8943,7 @@ def main(argv):
             res = dz - dwar - e_cas - e_vil - dreg
             rtxt = f"regulator kas miast netto {dreg:+.0f} - baza bez rozbicia dosypka/kasowanie (zapisz baze jeszcze raz), wiersz INFO"
         rep.add("B: pieniadz swiata bez wojny - zmiana tempa wobec bazy minus zamkniete ujscia i spadek dosypki miast",
-                f"{res:+.0f} ({wtxt}: zmiana tempa {dz:+.0f}, wojenne zrodla z niczego {dwar:+.0f}, zamki - zloto z niczego netto {e_cas:+.0f}, "
+                f"{res:+.0f} ({wtxt}: zmiana tempa {dz:+.0f}, wojenne zrodla z niczego {dwar:+.0f} (bitwy {'netto' if both_net else 'brutto - baza sprzed E8/0'}), zamki - zloto z niczego netto {e_cas:+.0f}, "
                 f"wsie i tabory - zamkniete ujscia {e_vil:+.0f}, {rtxt})",
                 "+-30 tys./dobe" + ("" if binding else " (INFO - wiaze bieg 120 dob: okno dob 31+ przy biegu >= 58 dob)"),
                 (abs(res) <= 30000) if (binding and split_reg) else None)

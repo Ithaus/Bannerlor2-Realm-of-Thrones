@@ -1333,10 +1333,10 @@ namespace Armoury
     {
         public override void RegisterEvents()
         {
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, WorkshopTrade.Daily);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopTrade.Daily", WorkshopTrade.Daily));   // E8/0: opakowanie pomiaru (tylko log)
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, WorkshopTrade.OnGold);   // 123: pomiar kies notabli (tylko licznik)
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, ArtisanInputs.Daily);           // 147: linia dnia rzemieslnikow BK
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("ArtisanInputs.Daily", ArtisanInputs.Daily));           // 147: linia dnia rzemieslnikow BK
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)

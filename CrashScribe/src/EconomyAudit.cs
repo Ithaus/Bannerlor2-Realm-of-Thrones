@@ -32,6 +32,8 @@ namespace CrashScribe
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { Run("dzien"); });
+            // E8/0 (242): linia "Profil CS (E8/0)" - bledy pierwszej szansy i czas Blame.Culprits za dobe (tylko pomiar; wylacznik Stage8ProfileLog w CrashScribe.settings.xml)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { try { Blame.DayLine((int)CampaignTime.Now.ToDays); } catch { } });
             // pierwszy raz od reki po wczytaniu - na pierwszej godzinie kampanii
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate
             {

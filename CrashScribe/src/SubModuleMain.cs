@@ -57,8 +57,10 @@ namespace CrashScribe
                         try
                         {
                             if (e.Exception == null) return;
-                            if (Config.OnlyModdedFirstChance && Blame.Culprits(e.Exception).Count == 0) return;
-                            Scribe.Report("ERROR CAUGHT FURTHER UP", e.Exception, "FirstChanceException", null);
+                            System.Threading.Interlocked.Increment(ref Blame.FcSeen);   // E8/0 (242): liczniki doby (tylko pomiar)
+                            if (Config.OnlyModdedFirstChance && Blame.Culprits(e.Exception).Count == 0) { System.Threading.Interlocked.Increment(ref Blame.FcFiltered); return; }
+                            if (Scribe.Report("ERROR CAUGHT FURTHER UP", e.Exception, "FirstChanceException", null)) System.Threading.Interlocked.Increment(ref Blame.FcReported);
+                            else System.Threading.Interlocked.Increment(ref Blame.FcRepeat);
                         }
                         catch { }
                     };

@@ -26,7 +26,7 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourly);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("HideoutSpotter.OnHourly", OnHourly));   // E8/0: opakowanie pomiaru (tylko log)
             CampaignEvents.OnGameLoadedEvent.AddNonSerializedListener(this, _ => { _seeded = false; });
         }
 

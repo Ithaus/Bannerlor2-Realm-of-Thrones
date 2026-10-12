@@ -204,8 +204,9 @@ namespace Armoury
         {
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, notable);   // 174.0: ramka ksiegi "zakupy uzbrojenia Armoury" (tylko licznik)
             long tc = Cost174.Begin(Cost174.SVolunteer);                  // 174b.5 F6 (probka 1/16, tylko log)
+            int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CVolunteer;   // E8/0 (242): wolajacy cen - VolunteerKit (tylko pomiar)
             try { return BuyCore(notable, market, x, y, countWhy); }
-            finally { Cost174.End(Cost174.SVolunteer, tc); GoodsLedger.End(gf); }
+            finally { DayProfile.Caller = pc; Cost174.End(Cost174.SVolunteer, tc); GoodsLedger.End(gf); }
         }
 
         private static bool BuyCore(Hero notable, Settlement market, CharacterObject x, CharacterObject y, bool countWhy)

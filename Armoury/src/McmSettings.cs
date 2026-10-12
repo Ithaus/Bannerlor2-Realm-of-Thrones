@@ -4896,6 +4896,10 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Stage8 Profile Log", HintText = "Writes one daily line with the time each part of the mod takes (diagnostics only).")]
+        [SettingPropertyGroup("Diagnostics (stage 8)")]
+        public bool Stage8ProfileLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6119,6 +6123,7 @@ namespace Armoury
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.Stage8ProfileLog = Stage8ProfileLog;
         }
 
         internal static void Apply()

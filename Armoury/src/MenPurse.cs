@@ -224,9 +224,13 @@ namespace Armoury
                 if (mp.IsMainParty) { SettlePlayerBook(); SellPlayerSurplus(st); BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); }
                 else if (mp.IsLordParty && mp.LeaderHero != null && mp.LeaderHero.IsAlive && mp.MapEvent == null)
                 {
+                    long p0 = DayProfile.On ? DayProfile.MpBegin() : 0L;   // E8/0 (242): rozbicie wejscia lorda, probka 1/16 (tylko pomiar)
                     int g0; SellArmorySurplus(mp, st, mp.LeaderHero, false, null, out g0);
+                    long p1 = DayProfile.Now(p0);
                     AiWear.MendInTown(mp, st);
+                    long p2 = DayProfile.Now(p0);
                     AiGear.TryBuy(mp, st);   // K1: braki i lepsze PO nadwyzkach i naprawach (AiGear.OnSettlementEntered oddaje miasta tutaj)
+                    if (p0 != 0) DayProfile.MpEnd(p0, p1, p2);
                 }
             }
             catch (Exception e) { Log.Error("MenPurse.OnEntered", e); }

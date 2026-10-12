@@ -33,11 +33,11 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
-            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, st => Convert(st));
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, (party, st, hero) =>
+            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, DayProfile.TownDay("HouseLevies.Convert", st => Convert(st)));   // E8/0: opakowanie pomiaru (tylko log)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("HouseLevies.Convert", (party, st, hero) =>
             {
                 if (party != null && party == MobileParty.MainParty) Convert(st);
-            });
+            }));
         }
 
         public override void SyncData(IDataStore dataStore) { }

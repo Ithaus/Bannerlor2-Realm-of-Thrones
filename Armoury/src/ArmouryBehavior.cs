@@ -392,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); }
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -669,7 +669,7 @@ namespace Armoury
             // (paczka 169: kiesy partii bez wodza, ktore znikaja z mapy) ma zobaczyc kiese PO wszystkich naszych przelewach przy zniszczeniu partii
             // (112: sakwa taboru do zwyciezcy albo do wsi - VillageTakings.OnPartyDestroyed), wiec jej nasluch dopisujemy PIERWSZY - biegnie ostatni.
             // Dotad byl dopisany po VillageTakings i biegl przed nim: kazda sakwe oddana przez 112 liczyl jeszcze jako zloto, ktore zniknelo (tylko log).
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, CirculationWindows.OnPartyDestroyed);    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log) - MUSI byc pierwszym nasluchem MobilePartyDestroyed
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("CirculationWindows.OnPartyDestroyed", CirculationWindows.OnPartyDestroyed));    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log) - MUSI byc pierwszym nasluchem MobilePartyDestroyed
             Seal31.RegisterEvents(this);   // 3.1 (31): Reset stanu kampanii; nasluch MobilePartyDestroyed DRUGI (biegnie przedostatni - po 3.2 i 112, przed ksiega obiegu), OnPartyRemoved, upadek krolestw, zdarzenia zlota
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
@@ -688,67 +688,67 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, WorldClock7.OnMakePeace);
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, WorldClock7.OnKingdomDestroyed);
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, WorldClock7.OnTournamentStarted);
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MenPurse.OnEntered);   // wpis 84: nadwyzki ludzi PRZED zakupami
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, AiGear.OnSettlementEntered);
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanAmmo.OnEntered);   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, CaravanBulk.OnEntered);   // wpis 103: karawana sprzedaje miastu surowiec masowy, ktorego mu brakuje
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, MaterialOrders.OnEntered);   // 174.2: dostawa kontraktu surowca - dopisana PO CaravanBulk, wiec idzie PRZED nim (najpierw zamowiony ladunek)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MenPurse.OnEntered", MenPurse.OnEntered));   // wpis 84: nadwyzki ludzi PRZED zakupami
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("AiGear.OnSettlementEntered", AiGear.OnSettlementEntered));
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanAmmo.OnEntered", CaravanAmmo.OnEntered));   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanBulk.OnEntered", CaravanBulk.OnEntered));   // wpis 103: karawana sprzedaje miastu surowiec masowy, ktorego mu brakuje
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MaterialOrders.OnEntered", MaterialOrders.OnEntered));   // 174.2: dostawa kontraktu surowca - dopisana PO CaravanBulk, wiec idzie PRZED nim (najpierw zamowiony ladunek)
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TroopSelfMend.Hourly(); } catch { } });
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, AiGear.OnDailyTickParty);
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, MenPurse.OnDailyTickParty);   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, UniqueSpoils.OnDailyTickParty);
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, QohorMasters.OnDailyTickParty);   // 177-3: lord AI w Qohorze - ta sama regula przekucia (gotowe odsyla QohorMasters.Daily)
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, QohorMasters.OnEntered);           // 177-3: "Your Valyrian steel is ready" przy wejsciu do Qohoru
-            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, ArmyClothing.OnDailyTickParty);   // 150: zuzycie odziezy w partiach rodow
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TroopSelfMend.Hourly", delegate { try { TroopSelfMend.Hourly(); } catch { } }));
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("MenPurse.OnDailyTickParty", MenPurse.OnDailyTickParty));   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("UniqueSpoils.OnDailyTickParty", UniqueSpoils.OnDailyTickParty));
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("QohorMasters.OnDailyTickParty", QohorMasters.OnDailyTickParty));   // 177-3: lord AI w Qohorze - ta sama regula przekucia (gotowe odsyla QohorMasters.Daily)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("QohorMasters.OnEntered", QohorMasters.OnEntered));           // 177-3: "Your Valyrian steel is ready" przy wejsciu do Qohoru
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("ArmyClothing.OnDailyTickParty", ArmyClothing.OnDailyTickParty));   // 150: zuzycie odziezy w partiach rodow
             // musztra: sprzet wyrzucony na ekranach z bialej listy -> zapas cwiczebny; zlom z cwiczen do kowali przy wejsciu do miasta; godziny ruchu partii;
             // zlom czekajacy w rozbitej partii przepada (licznik)
             CampaignEvents.OnItemsDiscardedByPlayerEvent.AddNonSerializedListener(this, Drill.OnDiscarded);
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, Drill.OnEntered);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Drill.OnPartyDestroyed);
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { Drill.Hourly(); } catch (Exception e) { Log.Error("Drill.Hourly", e); } });
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Drill.OnEntered", Drill.OnEntered));
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("Drill.OnPartyDestroyed", Drill.OnPartyDestroyed));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Drill.Hourly", delegate { try { Drill.Hourly(); } catch (Exception e) { Log.Error("Drill.Hourly", e); } }));
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
             // World Pace Percent przestawiony w grze nie dzialal). McmSettings.Apply()
             // szlo TYLKO w OnGameStart, wiec kazda zmiana w Mod Options czekala
             // na restart. Nasze pola MCM to zwykle auto-property bez powiadomien,
             // wiec zamiast zgadywac zdarzenia MCM przepisujemy wartosci co godzine
             // gry - tanie (kilkaset przypisan), a suwak wchodzi po paru sekundach.
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
-                delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("McmSettings.Apply+AmmoTracer",
+                delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } }));
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, KingdomBalance.OnOwnerChanged);   // 175.0: twierdze zdobyte i stracone oblezeniem (tylko log)
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmoryFit.HourlyOnce", delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } }));
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { StartKit.Hourly(); } catch { } });
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { MapClock.ApplySpeed(); });   // gra wraca do x4 przy wczytaniu
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("StartKit.Hourly", delegate { try { StartKit.Hourly(); } catch { } }));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapClock.ApplySpeed", delegate { MapClock.ApplySpeed(); }));   // gra wraca do x4 przy wczytaniu
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OutlawLaw.OnMapEventEnded);
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BattleChronicle.OnMapEventEnded);
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, AiWear.OnMapEventEnded);   // wpis 85
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("OutlawLaw.OnMapEventEnded", OutlawLaw.OnMapEventEnded));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("BattleChronicle.OnMapEventEnded", BattleChronicle.OnMapEventEnded));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, UniqueSpoils.OnPartyDestroyed);   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, GoodsLedger.OnPartyDestroyed);  // paczka 146: towar, ktory przepada z partia (tylko log)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MaterialOrders.OnPartyDestroyed);   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, OutlawLaw.OnPartyDestroyed);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, PeopleBook.OnPartyDestroyed);   // E4/3 (R18): tabor albo lodz rozwiazane przez gre bez bitwy - sklad do swojej wsi (zdarzenie przed RemoveParty)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("GoodsLedger.OnPartyDestroyed", GoodsLedger.OnPartyDestroyed));  // paczka 146: towar, ktory przepada z partia (tylko log)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("MaterialOrders.OnPartyDestroyed", MaterialOrders.OnPartyDestroyed));   // 174.2: kontrakt przepada z rozbita karawana (ladunek - jak w grze)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("OutlawLaw.OnPartyDestroyed", OutlawLaw.OnPartyDestroyed));
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PeopleBook.OnPartyDestroyed", PeopleBook.OnPartyDestroyed));   // E4/3 (R18): tabor albo lodz rozwiazane przez gre bez bitwy - sklad do swojej wsi (zdarzenie przed RemoveParty)
             CampaignEvents.MercenaryNumberChangedInTown.AddNonSerializedListener(this, Veterans.OnTavernNumber);   // E4/10 (167): ubytek karczmy nie przez nas = najem weterana z puli (AI, karawany, gracz)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MenPurse.OnPartyDestroyed);   // wpis 89
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, ArmyClothing.OnPartyDestroyed);   // 150
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, MarketRoad.OnPartyDestroyed);   // wpis 100: rozbite tabory wiesniakow (log)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("MenPurse.OnPartyDestroyed", MenPurse.OnPartyDestroyed));   // wpis 89
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("ArmyClothing.OnPartyDestroyed", ArmyClothing.OnPartyDestroyed));   // 150
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("MarketRoad.OnPartyDestroyed", MarketRoad.OnPartyDestroyed));   // wpis 100: rozbite tabory wiesniakow (log)
             // 112: sakwa zniszczonego taboru wsi nie ginie z partia. B-1: biegnie PRZED ksiega obiegu, bo nasluch ksiegi (CirculationWindows.OnPartyDestroyed)
             // jest dopisany pierwszy na poczatku RegisterEvents, a gra wola nasluchy od ostatnio dopisanego
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, VillageTakings.OnPartyDestroyed);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("VillageTakings.OnPartyDestroyed", VillageTakings.OnPartyDestroyed));
             // 3.2: reszta kiesy rozbitej karawany albo bandy do niszczyciela (jego osady, najblizszego miasta) - dopisana PO VillageTakings, wiec biegnie przed nim,
             // przed OutlawLaw (licznik kies band, ktore znikaja) i przed ksiega obiegu (dopisana pierwsza)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, BeatenPurse.OnPartyDestroyed);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("BeatenPurse.OnPartyDestroyed", BeatenPurse.OnPartyDestroyed));
             CampaignEvents.BanditPartyRecruited.AddNonSerializedListener(this, BeatenPurse.OnBanditRecruited);   // D11-2: banda przylaczana do gracza (gra wola to tuz przed DestroyPartyAction.Apply(MainParty, banda))
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, VillageTakings.OnGoldTraded);       // 112: wyplaty majatkow BK w oknie powrotu taboru (tylko odczyt)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, VillageClogDiag.OnPartyDestroyed);   // diagnoza zatkanych wsi: kiedy wies stracila woz (tylko log)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("VillageClogDiag.OnPartyDestroyed", VillageClogDiag.OnPartyDestroyed));   // diagnoza zatkanych wsi: kiedy wies stracila woz (tylko log)
             // ksiega pieniadza i przeplywow osad (K1) oraz ksiega ludzi (demografia, krok 1) - same nasluchy, tylko log
             CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, MoneyLedger.OnBeforeEntered);   // tabor wsi: stan PRZED sprzedaza / podzialem utargu
             CampaignEvents.AfterSettlementEntered.AddNonSerializedListener(this, MoneyLedger.OnAfterEntered);          // ... i PO
@@ -756,29 +756,29 @@ namespace Armoury
             // paczka 169: nasluch kies partii, ktore znikaja z mapy (CirculationWindows.OnPartyDestroyed) - B-1: przeniesiony na poczatek RegisterEvents
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, CirculationWindows.OnKingdomDestroyed); // paczka 169: skarbce krolestw, ktore upadly (tylko log)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, SellByCondition.OnPlayerExchange);   // cena sprzedazy sprzetu: kazda sprzedaz gracza do handel.log (tylko log)
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, PeopleLedger.OnMapEventEnded);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("PeopleLedger.OnMapEventEnded", PeopleLedger.OnMapEventEnded));
             CampaignEvents.OnTroopRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopRecruited);
             CampaignEvents.OnUnitRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnUnitRecruited);
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopsDeserted);
             // E4/0 (188): partie tworzone, niszczone i usuwane bez zniszczenia - do ksiegi ludzi (linia "Partie (E4/0)"), bez nowej klasy (U8; tylko log)
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, PeopleLedger.OnPartyCreated);
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, ArmsFromPeople.OnPartyCreated);   // E4/8 (8.2): ramka tworzenia wedrowcow i konwojow BK (tylko przy otwartej ramce)
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, PeopleLedger.OnPartyDestroyed);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PeopleLedger.OnPartyDestroyed", PeopleLedger.OnPartyDestroyed));
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, PeopleLedger.OnPartyRemoved);
             // E4/7 (164b-1): polegli wedlug pochodzenia (zdarzenie przed usunieciem partii - slowniki jeszcze sa; kolejnosc nasluchow bez znaczenia - Take proporcjonalne),
             // koniec partii bez zniszczenia, wcieleni jency gracza (DoneLogic ekranu druzyny)
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, PeopleBook.OnMapEventEnded);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("PeopleBook.OnMapEventEnded", PeopleBook.OnMapEventEnded));
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, PeopleBook.OnPartyRemoved);
             CampaignEvents.OnMainPartyPrisonerRecruitedEvent.AddNonSerializedListener(this, PeopleBook.OnMainPartyPrisonerRecruited);
             CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, WatchLaw.OnRaidCompleted);   // E4/9 (H1): rabunki z napastnikiem frakcji Strazy - tylko licznik
             CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { OutlawLaw.Hourly(); } catch { } });
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, HorseFate.OnMapEventEnded);   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("OutlawLaw.Hourly", delegate { try { OutlawLaw.Hourly(); } catch { } }));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
-            CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } try { if (me != null && me.IsPlayerMapEvent) AmmoRecovery.AfterBattle(); } catch { } });
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("GatherFallen+WearKeep+AmmoRecovery",
+                delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } try { if (me != null && me.IsPlayerMapEvent) AmmoRecovery.AfterBattle(); } catch { } }));
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry
@@ -807,34 +807,34 @@ namespace Armoury
                 NightRest.OnTick(dt);
                 try { CrossingLaw.OnTick(dt); } catch { }
             });
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this,
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Orders+Stables+ElephantQuarantine",
                 delegate (MobileParty mp, Settlement st, Hero h)
                 {
                     try { Orders.OnSettlementEntered(mp, st); } catch { }
                     try { Stables.OnSettlementEntered(mp, st); } catch { }
                     try { if (mp == MobileParty.MainParty) ElephantQuarantine.Sweep(st); } catch { }
-                });
-            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this,
+                }));
+            CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, DayProfile.TownDay("ElephantQuarantine+TroopSelfMend.Run",
                 delegate (Settlement st)
                 {
                     try { ElephantQuarantine.Sweep(st); } catch { }
                     try { TroopSelfMend.Run(st); } catch { }
-                });
+                }));
             // menu kucia otwarte JAKAKOLWIEK droga (takze wznowione z save'a,
             // z pominieciem StartCraftingMenu) - dniowka kupuje sie od razu
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
             // T6 (noc 08/09.10): miara marszu - pozycje partii lordow co godzine (tylko log, wylacznik WorldMeasureLog)
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { WorldMeasure.Hourly(); } catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("WorldMeasure.Hourly", delegate { try { WorldMeasure.Hourly(); } catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); } }));
             // E7/T (225): probka kar terenu - partie AI w ruchu w lesie / na pustyni / na rowninie i do 8 rozpisek gry na godzine (tylko log, Stage7MeasureLog)
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TerrainEase.Hourly(); } catch (Exception e) { Log.Error("TerrainEase.Hourly", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TerrainEase.Hourly", delegate { try { TerrainEase.Hourly(); } catch (Exception e) { Log.Error("TerrainEase.Hourly", e); } }));
             // E7/B (231): licznik przejsc przez Bliznaki - lokator mapy wokol bramy raz na godzine (tylko log, wylacznik TwinsCrossingCount)
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { TwinsCrossing.Hourly(); } catch (Exception e) { Log.Error("TwinsCrossing.Hourly", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TwinsCrossing.Hourly", delegate { try { TwinsCrossing.Hourly(); } catch (Exception e) { Log.Error("TwinsCrossing.Hourly", e); } }));
             // E7/W1 (232): wiesci z wiosek - zdarzenie gry tylko kolejkuje (odczyt ksiegi), komunikaty w ticku godzinnym (wylacznik VillageRaidMessages = 0)
             CampaignEvents.VillageStateChanged.AddNonSerializedListener(this, VillageNews.OnStateChanged);
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { VillageNews.Hourly(); } catch (Exception e) { Log.Error("VillageNews.Hourly", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("VillageNews.Hourly", delegate { try { VillageNews.Hourly(); } catch (Exception e) { Log.Error("VillageNews.Hourly", e); } }));
             // pas bezpieczenstwa depozytu kwatermistrza: czas plynie = ekran
             // zbrojowni zamkniety; gdyby domkniecie nie oddalo sprzetu, oddajemy tu
-            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this,
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Kwatermistrz+projekty+MaterialOrders.Hourly",
                 delegate
                 {
                     try { QuartermasterEscrow.SafetyRelease(); } catch { }
@@ -862,7 +862,7 @@ namespace Armoury
                         }
                     }
                     catch { }
-                });
+                }));
         }
 
         private void OnGameMenuOpened(TaleWorlds.CampaignSystem.GameMenus.MenuCallbackArgs args)
@@ -1504,199 +1504,207 @@ namespace Armoury
             catch (Exception e) { Log.Error("CollectReadyProjects", e); }
         }
 
+        // E8/0 (242): profil doby - linia za poprzedni okres i stoper calego taktu (jedna klatka); odcinki DayProfile.Lap po kazdym wywolaniu (tylko pomiar)
         private void OnDailyTick()
         {
-            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); }   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
-            try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); }
-            try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); }   // 161: komplety bez ochotnika w puli (sieroty)
+            DayProfile.TickBegin();
+            try { OnDailyTickBody(); }
+            finally { DayProfile.TickEnd(); }
+        }
+
+        private void OnDailyTickBody()
+        {
+            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); } DayProfile.Lap("CampFever.OnDaily");
+            try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); } DayProfile.Lap("RecruitKit.Reconcile");   // 161: komplety bez ochotnika w puli (sieroty)
             // audyt predkosci STAD, nie z postfixa - w postfixie SpeedExplained
             // wchodzilo o poziom glebiej i rozpiska pokazywala gole liczby vanilli
-            try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); }
-            try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); }   // T6: linia "Miara: marsz" (tylko log)
-            try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); }   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
-            try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); }
-            try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); }
-            try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); }   // biale kruki: koniec pory roku
-            try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); }   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
-            try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); }
+            try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); } DayProfile.Lap("TerrainEase.DailyAudit");
+            try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); } DayProfile.Lap("WorldMeasure.Daily");   // T6: linia "Miara: marsz" (tylko log)
+            try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
+            try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
+            try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");
+            try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); } DayProfile.Lap("WesterosClimate.Daily");   // biale kruki: koniec pory roku
+            try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
+            try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
-            finally { GoodsLedger.End(gfForage); }
-            try { Devastation.Daily(); } catch (Exception e) { Log.Error("Devastation.Daily", e); }   // E4/5 (113n): smierc i powrot uchodzcow - PO zerowaniu armii (zegar regionu widzi dzisiejsze zerowanie)
-            try { Famine.Daily(); } catch (Exception e) { Log.Error("Famine.Daily", e); }   // E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu - PO spustoszeniu i powrocie uchodzcow, PRZED ksiega ludzi (PeopleBook.Daily zamyka dobe konta UCHODZCY)
-            try { VillageBook.Daily(); } catch (Exception e) { Log.Error("VillageBook.Daily", e); }   // E4/11 (193, Z6): puste osady wiosek uzgodnione z kontem PO powrotach i ucieczkach z glodu tej doby; czyta licznik trafionych Devastation PRZED DayLine
-            try { Leaks310.Daily(); } catch (Exception e) { Log.Error("Leaks310.Daily", e); }   // 3.10: zold zaciagu ROT od pana i linia "Drobne z niczego (3.10)" (furaz tej doby)
-            try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); }
-            try { DefeatMorale.Daily(); } catch (Exception e) { Log.Error("DefeatMorale.Daily", e); }   // D11-1: linia "Kara za przegrana (D11-1)" zaraz po liniach wojny (dezercja AI 183) - tylko log
-            try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); }   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
+            finally { GoodsLedger.End(gfForage); } DayProfile.Lap("ScorchedEarth.OnDaily");
+            try { Devastation.Daily(); } catch (Exception e) { Log.Error("Devastation.Daily", e); } DayProfile.Lap("Devastation.Daily");   // E4/5 (113n): smierc i powrot uchodzcow - PO zerowaniu armii (zegar regionu widzi dzisiejsze zerowanie)
+            try { Famine.Daily(); } catch (Exception e) { Log.Error("Famine.Daily", e); } DayProfile.Lap("Famine.Daily");   // E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu - PO spustoszeniu i powrocie uchodzcow, PRZED ksiega ludzi (PeopleBook.Daily zamyka dobe konta UCHODZCY)
+            try { VillageBook.Daily(); } catch (Exception e) { Log.Error("VillageBook.Daily", e); } DayProfile.Lap("VillageBook.Daily");   // E4/11 (193, Z6): puste osady wiosek uzgodnione z kontem PO powrotach i ucieczkach z glodu tej doby; czyta licznik trafionych Devastation PRZED DayLine
+            try { Leaks310.Daily(); } catch (Exception e) { Log.Error("Leaks310.Daily", e); } DayProfile.Lap("Leaks310.Daily");   // 3.10: zold zaciagu ROT od pana i linia "Drobne z niczego (3.10)" (furaz tej doby)
+            try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); } DayProfile.Lap("WarLedger.OnDaily");
+            try { DefeatMorale.Daily(); } catch (Exception e) { Log.Error("DefeatMorale.Daily", e); } DayProfile.Lap("DefeatMorale.Daily");   // D11-1: linia "Kara za przegrana (D11-1)" zaraz po liniach wojny (dezercja AI 183) - tylko log
+            try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); } DayProfile.Lap("RaceLaw.Daily");   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
             try { Orders.DailyTick(); }
-            catch (Exception e) { Log.Error("OnDailyTick", e); }
+            catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");
             // wpis 86 (audyt pkt 18): kazdy system we wlasnym try - wyjatek jednego nie zatrzymuje reszty dnia
-            try { HistoricalPrices.Recheck(); } catch (Exception e) { Log.Error("HistoricalPrices.Recheck", e); }
-            try { UniqueSpoils.Daily(); } catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); }
-            try { BattleChronicle.Daily(); } catch (Exception e) { Log.Error("BattleChronicle.Daily", e); }
-            try { LosersFlee.Daily(); } catch (Exception e) { Log.Error("LosersFlee.Daily", e); }   // H3: linia "Przegrani (H3):" zaraz po "Bitwy:" i plik h3-domy.csv (PRZED OutlawLaw.Daily)
-            try { PrisonerLaw.Daily(); } catch (Exception e) { Log.Error("PrisonerLaw.Daily", e); }   // I1: linia "Prawo jenca (I1):" - do domu, na Mur, niewolnicy (ta sama doba co H3 "prawo jenca I1")
-            try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); }
-            try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); }   // indeksy surowcow i premie wojenne PRZED handlem
-            try { Seal31.BlockOpen(); } catch { }   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
-            try { MoneyLedger.BlockOpen(); } catch { }   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
-            try { TownPurse.BeforeRents(); } catch (Exception e) { Log.Error("TownPurse.BeforeRents", e); }   // E5/A1: liczniki doby kas miast, dar startowy (raz, migawka M12), zaulki - PRZED rentami i zaworem miast
-            try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); }   // ludnosc i renty krain
-            try { Seal31B.OwnerTaxDaily(); } catch (Exception e) { Log.Error("Seal31B.OwnerTaxDaily", e); }   // D11-3: podatek BK warsztatow lordow i gracza w cudzych miastach - wlasciciel -> pan miasta (renta, RentMerge nizej) i kasa miasta (autonomia)
-            try { Seal31B.RentMerge(); } catch (Exception e) { Log.Error("Seal31B.RentMerge", e); }   // 3.1/3.3 (31b) E3/8a: podatek warsztatow notabli przelany panom od wczoraj -> RentToday (po czyszczeniu w PopulationLaw.Daily)
+            try { HistoricalPrices.Recheck(); } catch (Exception e) { Log.Error("HistoricalPrices.Recheck", e); } DayProfile.Lap("HistoricalPrices.Recheck");
+            try { UniqueSpoils.Daily(); } catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); } DayProfile.Lap("UniqueSpoils.Daily");
+            try { BattleChronicle.Daily(); } catch (Exception e) { Log.Error("BattleChronicle.Daily", e); } DayProfile.Lap("BattleChronicle.Daily");
+            try { LosersFlee.Daily(); } catch (Exception e) { Log.Error("LosersFlee.Daily", e); } DayProfile.Lap("LosersFlee.Daily");   // H3: linia "Przegrani (H3):" zaraz po "Bitwy:" i plik h3-domy.csv (PRZED OutlawLaw.Daily)
+            try { PrisonerLaw.Daily(); } catch (Exception e) { Log.Error("PrisonerLaw.Daily", e); } DayProfile.Lap("PrisonerLaw.Daily");   // I1: linia "Prawo jenca (I1):" - do domu, na Mur, niewolnicy (ta sama doba co H3 "prawo jenca I1")
+            try { SupplyDemand.DecayOrders(); } catch (Exception e) { Log.Error("SupplyDemand.DecayOrders", e); } DayProfile.Lap("SupplyDemand.DecayOrders");
+            try { ArmsPricing.Daily(); } catch (Exception e) { Log.Error("ArmsPricing.Daily", e); } DayProfile.Lap("ArmsPricing.Daily");   // indeksy surowcow i premie wojenne PRZED handlem
+            try { Seal31.BlockOpen(); } catch { } DayProfile.Lap("Seal31.BlockOpen");   // 3.1 (31, E3/0): kiesy Innych przed naszym tickiem (pomiar)
+            try { MoneyLedger.BlockOpen(); } catch { } DayProfile.Lap("MoneyLedger.BlockOpen");   // ksiega przeplywow osad (tylko log): stan kas przed naszym rozliczeniem doby
+            try { TownPurse.BeforeRents(); } catch (Exception e) { Log.Error("TownPurse.BeforeRents", e); } DayProfile.Lap("TownPurse.BeforeRents");   // E5/A1: liczniki doby kas miast, dar startowy (raz, migawka M12), zaulki - PRZED rentami i zaworem miast
+            try { PopulationLaw.Daily(); } catch (Exception e) { Log.Error("PopulationLaw.Daily", e); } DayProfile.Lap("PopulationLaw.Daily");   // ludnosc i renty krain
+            try { Seal31B.OwnerTaxDaily(); } catch (Exception e) { Log.Error("Seal31B.OwnerTaxDaily", e); } DayProfile.Lap("Seal31B.OwnerTaxDaily");   // D11-3: podatek BK warsztatow lordow i gracza w cudzych miastach - wlasciciel -> pan miasta (renta, RentMerge nizej) i kasa miasta (autonomia)
+            try { Seal31B.RentMerge(); } catch (Exception e) { Log.Error("Seal31B.RentMerge", e); } DayProfile.Lap("Seal31B.RentMerge");   // 3.1/3.3 (31b) E3/8a: podatek warsztatow notabli przelany panom od wczoraj -> RentToday (po czyszczeniu w PopulationLaw.Daily)
             try { MoneyLedger.Mark(MoneyLedger.MRent); } catch { }
             // 110 (projekt etapu 2 krok B): zawor kasy zamku - 7% nadwyzki ponad zapas kupcow do pana zamku, linia "Zawor zamkow (110)";
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
-            try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); }
+            try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); } DayProfile.Lap("CastlePurse.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
             // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; E5/B1 (173): przy kiesie
             // czynnej prawdziwe przelewy (podatki panu -> RentToday przed budowami i powinnosciami, place z kas, zakupy wsi z polki - ramka ksiegi towarow F26) i migawka M18
             var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
             try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
-            finally { GoodsLedger.End(gfFolk); }
+            finally { GoodsLedger.End(gfFolk); } DayProfile.Lap("TownFolk.Daily");
             // E6/R1 (214): woz kopalni kupuje drewno dymarki z polki miasta handlowego za zloto wsi (na nastepna dobe) - zakup wsi w miescie jak E5/B1
             // (pozycja MFolk ksiegi pieniadza, wlasna ramka ksiegi towarow FBloom), PRZED ksiega zelaza i drewna (OreLedger.Daily)
-            try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); }
+            try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
-            finally { GoodsLedger.End(gfBuild); }
+            finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
-            try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); }
-            try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); }   // wpis 94: ksiega rudy (tylko log)
-            try { GoodsLedger.Daily(); } catch (Exception e) { Log.Error("GoodsLedger.Daily", e); }   // paczka 146: ksiega towarow (tylko log) - zaraz po ksiedze rudy (kontrola tymi samymi liczbami)
-            try { FreeSupplies.Daily(); } catch (Exception e) { Log.Error("FreeSupplies.Daily", e); }   // paczka 125: dosypka RBL zablokowana / przepuszczona (tylko log)
-            try { RawNoRot.Daily(); } catch (Exception e) { Log.Error("RawNoRot.Daily", e); }   // 174.3: linia "BK gnicie surowcow (174.3)" (tylko log)
-            try { HarvestValve.Daily(); } catch (Exception e) { Log.Error("HarvestValve.Daily", e); }   // E6/W3 (221): regulator wsi - start pomiaru, co 28 dob spis stosu i decyzja, linia "Regulator wsi (221)"
-            try { CastleSteel.Daily(); } catch (Exception e) { Log.Error("CastleSteel.Daily", e); }   // 177-1: linia "Wedrowcy BK" - sztaby i wegiel zdjete z ladunku wedrowcow
-            try { TravellerGoods36.Daily(); } catch (Exception e) { Log.Error("TravellerGoods36.Daily", e); }   // 3.6: linia "Wedrowcy BK - towar (3.6)"
-            try { TravellerTrade36b.Daily(); } catch (Exception e) { Log.Error("TravellerTrade36b.Daily", e); }   // 36b: linia "Wedrowcy BK - prawdziwy towar (36b)"
-            try { QohorMasters.Daily(); } catch (Exception e) { Log.Error("QohorMasters.Daily", e); }   // 177-3: dzien pracy mistrzow Qohoru (rece kowali, wegiel z polki)
-            try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); }   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
-            try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); }   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
-            try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); }   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)
-            try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); }     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
-            try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); }   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
-            try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); }   // wpis 100: dowoz wsi zamkowych na targi (log)
-            try { VillageClogDiag.Daily(); } catch (Exception e) { Log.Error("VillageClogDiag.Daily", e); }   // diagnoza zatkanych wsi - zaraz po "Dowoz (skutki)" (tylko log)
-            try { MarketCarts.Daily(); } catch (Exception e) { Log.Error("MarketCarts.Daily", e); }   // poprawka 119: wozy wsi do najlepiej placacego miasta, cena ladunku sztuka po sztuce (log + porzadki wiesci z drogi)
-            try { CastleMarket.Daily(); } catch (Exception e) { Log.Error("CastleMarket.Daily", e); }   // E5/B4 (199): targ przy zamku - porzadki rezerwacji i strazy, linia "Targ przy zamku (5.11)" (po wozach 119)
-            try { CartTownExit.Daily(); } catch (Exception e) { Log.Error("CartTownExit.Daily", e); }   // paczka 130: bezpiecznik (woz w miescie od N dob - do domu) i linia "Wozy w miastach:"
-            try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); }   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
-            try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); }   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
+            try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
+            try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); } DayProfile.Lap("OreLedger.Daily");   // wpis 94: ksiega rudy (tylko log)
+            try { GoodsLedger.Daily(); } catch (Exception e) { Log.Error("GoodsLedger.Daily", e); } DayProfile.Lap("GoodsLedger.Daily");   // paczka 146: ksiega towarow (tylko log) - zaraz po ksiedze rudy (kontrola tymi samymi liczbami)
+            try { FreeSupplies.Daily(); } catch (Exception e) { Log.Error("FreeSupplies.Daily", e); } DayProfile.Lap("FreeSupplies.Daily");   // paczka 125: dosypka RBL zablokowana / przepuszczona (tylko log)
+            try { RawNoRot.Daily(); } catch (Exception e) { Log.Error("RawNoRot.Daily", e); } DayProfile.Lap("RawNoRot.Daily");   // 174.3: linia "BK gnicie surowcow (174.3)" (tylko log)
+            try { HarvestValve.Daily(); } catch (Exception e) { Log.Error("HarvestValve.Daily", e); } DayProfile.Lap("HarvestValve.Daily");   // E6/W3 (221): regulator wsi - start pomiaru, co 28 dob spis stosu i decyzja, linia "Regulator wsi (221)"
+            try { CastleSteel.Daily(); } catch (Exception e) { Log.Error("CastleSteel.Daily", e); } DayProfile.Lap("CastleSteel.Daily");   // 177-1: linia "Wedrowcy BK" - sztaby i wegiel zdjete z ladunku wedrowcow
+            try { TravellerGoods36.Daily(); } catch (Exception e) { Log.Error("TravellerGoods36.Daily", e); } DayProfile.Lap("TravellerGoods36.Daily");   // 3.6: linia "Wedrowcy BK - towar (3.6)"
+            try { TravellerTrade36b.Daily(); } catch (Exception e) { Log.Error("TravellerTrade36b.Daily", e); } DayProfile.Lap("TravellerTrade36b.Daily");   // 36b: linia "Wedrowcy BK - prawdziwy towar (36b)"
+            try { QohorMasters.Daily(); } catch (Exception e) { Log.Error("QohorMasters.Daily", e); } DayProfile.Lap("QohorMasters.Daily");   // 177-3: dzien pracy mistrzow Qohoru (rece kowali, wegiel z polki)
+            try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); } DayProfile.Lap("VillageWoodlot.Daily");   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
+            try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); } DayProfile.Lap("SpoilsSeal.Daily");   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
+            try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); } DayProfile.Lap("SpoilsCompany.Daily");   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)
+            try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); } DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
+            try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); } DayProfile.Lap("MineralOnce.Daily");   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
+            try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
+            try { VillageClogDiag.Daily(); } catch (Exception e) { Log.Error("VillageClogDiag.Daily", e); } DayProfile.Lap("VillageClogDiag.Daily");   // diagnoza zatkanych wsi - zaraz po "Dowoz (skutki)" (tylko log)
+            try { MarketCarts.Daily(); } catch (Exception e) { Log.Error("MarketCarts.Daily", e); } DayProfile.Lap("MarketCarts.Daily");   // poprawka 119: wozy wsi do najlepiej placacego miasta, cena ladunku sztuka po sztuce (log + porzadki wiesci z drogi)
+            try { CastleMarket.Daily(); } catch (Exception e) { Log.Error("CastleMarket.Daily", e); } DayProfile.Lap("CastleMarket.Daily");   // E5/B4 (199): targ przy zamku - porzadki rezerwacji i strazy, linia "Targ przy zamku (5.11)" (po wozach 119)
+            try { CartTownExit.Daily(); } catch (Exception e) { Log.Error("CartTownExit.Daily", e); } DayProfile.Lap("CartTownExit.Daily");   // paczka 130: bezpiecznik (woz w miescie od N dob - do domu) i linia "Wozy w miastach:"
+            try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); } DayProfile.Lap("CaravanBulk.Daily");   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
+            try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); } DayProfile.Lap("CaravanAmmo.Daily");   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
             // 179 (projekt etapu 2, krok C3): rycerze bez lenna - zold za dobe w druzynie pana (przed zwrotem korony - w jego podstawie), powroty i wezwania;
             // linia "Rycerze (179)"; przed budzetem 166 (pulap pana liczy zold rycerzy w jego druzynie)
-            try { GentryService.Daily(); } catch (Exception e) { Log.Error("GentryService.Daily", e); }
+            try { GentryService.Daily(); } catch (Exception e) { Log.Error("GentryService.Daily", e); } DayProfile.Lap("GentryService.Daily");
             // 2.6 (projekt etapu 2; zasada wpisu 86): kazdy krok korony we wlasnym try - wyjatek w jednym nie zatrzymuje reszty rozliczenia korony
-            try { KingdomTreasury.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }            // powinnosci wasali wobec korony (po rentach)
-            try { KingdomTreasury.Levies(); } catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }          // danina wojenna, clo, mennica, monopole
-            try { Ransom178.ThirdsSettle(); } catch (Exception e) { Log.Error("Ransom178.ThirdsSettle", e); }          // 178: 1/9 z licznikow doby do skarbcow koron w wojnie (prawo trzecich) - przed wplywami dnia
+            try { KingdomTreasury.Daily(); } catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); } DayProfile.Lap("KingdomTreasury.Daily");            // powinnosci wasali wobec korony (po rentach)
+            try { KingdomTreasury.Levies(); } catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); } DayProfile.Lap("KingdomTreasury.Levies");          // danina wojenna, clo, mennica, monopole
+            try { Ransom178.ThirdsSettle(); } catch (Exception e) { Log.Error("Ransom178.ThirdsSettle", e); } DayProfile.Lap("Ransom178.ThirdsSettle");          // 178: 1/9 z licznikow doby do skarbcow koron w wojnie (prawo trzecich) - przed wplywami dnia
             // 165 (projekt etapu 2, 2.0b): wplywy dnia i 1/360 zapasu -> rata kredytu w Banku (186) -> dary (182) -> raty reparacji -> kontrakty najemnikow (185) -> zwrot zoldu -> renty (180); kazdy krok we wlasnym try
-            try { CrownIncome.Begin(); } catch (Exception e) { Log.Error("CrownIncome.Begin", e); }                    // wplywy dnia krolestw (po powinnosciach, daninie, cle i 1/3 zaworu zamkow)
-            try { CrownBorrow.Instalments(); } catch (Exception e) { Log.Error("CrownBorrow.Instalments", e); }        // 186: sredni podatek, odsetki i rata kredytu korony w Banku - pierwszy wydatek z wplywow dnia
-            try { CrownGifts.Daily(); } catch (Exception e) { Log.Error("CrownGifts.Daily", e); }                      // 182: Polnoc -> Straz, Wolne Miasta -> Dothrakowie (linia "Dary koron (182)")
-            try { CrownIncome.Reparations(); } catch (Exception e) { Log.Error("CrownIncome.Reparations", e); }        // raty reparacji korona -> korona
-            try { MercContract.Daily(); } catch (Exception e) { Log.Error("MercContract.Daily", e); }                  // 185: kontrakty najemnikow AI z wplywow dnia (linia "Kontrakty najemnikow (185)")
-            try { CrownCallToWar.Daily(); } catch (Exception e) { Log.Error("CrownCallToWar.Daily", e); }
-            try { Ransom178.CrownStep(); } catch (Exception e) { Log.Error("Ransom178.CrownStep", e); }                // 178: nagroda za wielkiego jenca ze skarbca (wplywy dnia, potem zapas ponad rezerwe), srednia wplywow korony              // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny ze skarbca (linia "Wezwania do wojny (168)")
-            try { KingdomTreasury.WageRefund(); } catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); }  // zwrot zoldu w wojnie (i linia niedoplaty 169c)
-            try { CrownRents.Daily(); } catch (Exception e) { Log.Error("CrownRents.Daily", e); }                    // 180: reszta wplywow dnia do rodow wedlug lenn, za sluzbe (linia "Renty korony (180)")
-            try { LordsEvenUp.Daily(); } catch (Exception e) { Log.Error("LordsEvenUp.Daily", e); }                  // E5/B3 (Z15-5): linia "Wyrownanie panow zamkow (E5/B3)" - stan, udzial zaworu i wagi rent czynne, zawor i renty dnia wedlug rodzaju rodu (zlota nie rusza)
-            try { KingdomTreasury.WarTaxDaily(); } catch (Exception e) { Log.Error("KingdomTreasury.WarTaxDaily", e); }   // E5/B2 (184): potrzeba korony z tej doby (kredyt 186, zwrot ponad wplywy, zapas wojny), krok stawki co 7 dob, linia - przed CrownIncome.End (DayOf czynne)
-            try { TownFolk.CrownProbe(); } catch (Exception e) { Log.Error("TownFolk.CrownProbe", e); }   // E5/0 (195): sonda korony - CrownIncome.DayOf czynne tylko do End (tylko odczyt)
-            try { CrownIncome.End(); } catch (Exception e) { Log.Error("CrownIncome.End", e); }                        // migawka skarbcow i linia "Korona: wplywy dnia (165)"
-            try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); }                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
-            try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); }                // linia "Skarbce:"
+            try { CrownIncome.Begin(); } catch (Exception e) { Log.Error("CrownIncome.Begin", e); } DayProfile.Lap("CrownIncome.Begin");                    // wplywy dnia krolestw (po powinnosciach, daninie, cle i 1/3 zaworu zamkow)
+            try { CrownBorrow.Instalments(); } catch (Exception e) { Log.Error("CrownBorrow.Instalments", e); } DayProfile.Lap("CrownBorrow.Instalments");        // 186: sredni podatek, odsetki i rata kredytu korony w Banku - pierwszy wydatek z wplywow dnia
+            try { CrownGifts.Daily(); } catch (Exception e) { Log.Error("CrownGifts.Daily", e); } DayProfile.Lap("CrownGifts.Daily");                      // 182: Polnoc -> Straz, Wolne Miasta -> Dothrakowie (linia "Dary koron (182)")
+            try { CrownIncome.Reparations(); } catch (Exception e) { Log.Error("CrownIncome.Reparations", e); } DayProfile.Lap("CrownIncome.Reparations");        // raty reparacji korona -> korona
+            try { MercContract.Daily(); } catch (Exception e) { Log.Error("MercContract.Daily", e); } DayProfile.Lap("MercContract.Daily");                  // 185: kontrakty najemnikow AI z wplywow dnia (linia "Kontrakty najemnikow (185)")
+            try { CrownCallToWar.Daily(); } catch (Exception e) { Log.Error("CrownCallToWar.Daily", e); } DayProfile.Lap("CrownCallToWar.Daily");
+            try { Ransom178.CrownStep(); } catch (Exception e) { Log.Error("Ransom178.CrownStep", e); } DayProfile.Lap("Ransom178.CrownStep");                // 178: nagroda za wielkiego jenca ze skarbca (wplywy dnia, potem zapas ponad rezerwe), srednia wplywow korony              // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny ze skarbca (linia "Wezwania do wojny (168)")
+            try { KingdomTreasury.WageRefund(); } catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); } DayProfile.Lap("KingdomTreasury.WageRefund");  // zwrot zoldu w wojnie (i linia niedoplaty 169c)
+            try { CrownRents.Daily(); } catch (Exception e) { Log.Error("CrownRents.Daily", e); } DayProfile.Lap("CrownRents.Daily");                    // 180: reszta wplywow dnia do rodow wedlug lenn, za sluzbe (linia "Renty korony (180)")
+            try { LordsEvenUp.Daily(); } catch (Exception e) { Log.Error("LordsEvenUp.Daily", e); } DayProfile.Lap("LordsEvenUp.Daily");                  // E5/B3 (Z15-5): linia "Wyrownanie panow zamkow (E5/B3)" - stan, udzial zaworu i wagi rent czynne, zawor i renty dnia wedlug rodzaju rodu (zlota nie rusza)
+            try { KingdomTreasury.WarTaxDaily(); } catch (Exception e) { Log.Error("KingdomTreasury.WarTaxDaily", e); } DayProfile.Lap("KingdomTreasury.WarTaxDaily");   // E5/B2 (184): potrzeba korony z tej doby (kredyt 186, zwrot ponad wplywy, zapas wojny), krok stawki co 7 dob, linia - przed CrownIncome.End (DayOf czynne)
+            try { TownFolk.CrownProbe(); } catch (Exception e) { Log.Error("TownFolk.CrownProbe", e); } DayProfile.Lap("TownFolk.CrownProbe");   // E5/0 (195): sonda korony - CrownIncome.DayOf czynne tylko do End (tylko odczyt)
+            try { CrownIncome.End(); } catch (Exception e) { Log.Error("CrownIncome.End", e); } DayProfile.Lap("CrownIncome.End");                        // migawka skarbcow i linia "Korona: wplywy dnia (165)"
+            try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); } DayProfile.Lap("CrownBorrow.Report");                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
+            try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); } DayProfile.Lap("KingdomLedger.Daily");                // linia "Skarbce:"
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
-            try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); }   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
-            try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); }   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
-            try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); }   // wyrzutki: bieda, powroty, werbunek band
-            try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); }   // Bank Zelazny: pozyczki AI, raty, bankructwa
+            try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); } DayProfile.Lap("SoldierPay.Daily");   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
+            try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); } DayProfile.Lap("ArmyClothing.Daily");   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
+            try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band
+            try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa
             // 166 + 162m (projekt etapu 2, 2.0b): budzet rodow po Banku, przed ksiega rodow (na D z wczoraj); osobna pozycja ksiegi pieniadza (dwor do kas siedzib,
             // sakiewki zwolnionych do kies wsi) - granica MRest przed, MBudget po
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }
             // E5/A3 (163): markietani - ludzie partii rodow w polu wydaja czesc wolnej sakiewki: kasa najblizszego niewrogiego miasta i kiesa wsi; osobna pozycja ksiegi
             // (MSutlers); po zwrocie korony i Banku (K3 licznik na jutro, jak OnLeft), przed budzetem rodow (projekt etapu 5, rozdz. 5.2 pkt 6)
-            try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); }   // linia "Markietani (E5/A3)"
+            try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); } DayProfile.Lap("Sutlers.Daily");   // linia "Markietani (E5/A3)"
             try { MoneyLedger.Mark(MoneyLedger.MSutlers); } catch { }
             // E5/B6 (201): pula sakiewek weteranow wydana w miastach karczm (zycie, SutlerDailyShare; pule bez weteranow - cale); osobna pozycja ksiegi (MVetPurse);
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane
-            try { VetPurse.Daily(); } catch (Exception e) { Log.Error("VetPurse.Daily", e); }
+            try { VetPurse.Daily(); } catch (Exception e) { Log.Error("VetPurse.Daily", e); } DayProfile.Lap("VetPurse.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MVetPurse); } catch { }
-            try { ClanBudget.Daily(); } catch (Exception e) { Log.Error("ClanBudget.Daily", e); }   // linia "Budzet rodow (166)"
-            try { VetPurse.Line(); } catch (Exception e) { Log.Error("VetPurse.Line", e); }   // E5/B6 (201): linia "Weterani - pieniadze (E5/B6)" - ta sama doba co 166 (zloto nie rusza)
-            try { DebtLadder.Report(); } catch (Exception e) { Log.Error("DebtLadder.Report", e); }   // 168: linia "Dlugi (168)" - po budzecie (kredyt wojenny dnia); zloto nie rusza
+            try { ClanBudget.Daily(); } catch (Exception e) { Log.Error("ClanBudget.Daily", e); } DayProfile.Lap("ClanBudget.Daily");   // linia "Budzet rodow (166)"
+            try { VetPurse.Line(); } catch (Exception e) { Log.Error("VetPurse.Line", e); } DayProfile.Lap("VetPurse.Line");   // E5/B6 (201): linia "Weterani - pieniadze (E5/B6)" - ta sama doba co 166 (zloto nie rusza)
+            try { DebtLadder.Report(); } catch (Exception e) { Log.Error("DebtLadder.Report", e); } DayProfile.Lap("DebtLadder.Report");   // 168: linia "Dlugi (168)" - po budzecie (kredyt wojenny dnia); zloto nie rusza
             try { MoneyLedger.Mark(MoneyLedger.MBudget); } catch { }
-            try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); }   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
-            try { Measure169c.Daily(); } catch (Exception e) { Log.Error("Measure169c.Daily", e); }         // 169c: linie pomiarow etapu 2 (tylko log) - po ksiedze rodow (D staly, wplyw doby), przed ksiega pieniadza
-            try { OthersRise.Daily(); } catch (Exception e) { Log.Error("OthersRise.Daily", e); }           // E4/2 (190): linie "Inni z poleglych (E4/2)" i "Ludzie (ksiega)" - zaraz po "Wzrost Innych (169c)"
-            try { ArmsFromPeople.Daily(); } catch (Exception e) { Log.Error("ArmsFromPeople.Daily", e); }   // E4/8 (164b-2): linie "Wojsko z ludzi (E4/8)" i "Miasta (E4/8 R2)" - po ksiedze ludzi (PeopleBook.Daily w OthersRise.Daily), przed Measure40
+            try { ClanIncomeBook.Daily(); } catch (Exception e) { Log.Error("ClanIncomeBook.Daily", e); } DayProfile.Lap("ClanIncomeBook.Daily");   // paczka 169: D rodow, budzet i dlugi na sucho (tylko log) - po rentach, zwrocie, mennicy i Banku dnia
+            try { Measure169c.Daily(); } catch (Exception e) { Log.Error("Measure169c.Daily", e); } DayProfile.Lap("Measure169c.Daily");         // 169c: linie pomiarow etapu 2 (tylko log) - po ksiedze rodow (D staly, wplyw doby), przed ksiega pieniadza
+            try { OthersRise.Daily(); } catch (Exception e) { Log.Error("OthersRise.Daily", e); } DayProfile.Lap("OthersRise.Daily");           // E4/2 (190): linie "Inni z poleglych (E4/2)" i "Ludzie (ksiega)" - zaraz po "Wzrost Innych (169c)"
+            try { ArmsFromPeople.Daily(); } catch (Exception e) { Log.Error("ArmsFromPeople.Daily", e); } DayProfile.Lap("ArmsFromPeople.Daily");   // E4/8 (164b-2): linie "Wojsko z ludzi (E4/8)" i "Miasta (E4/8 R2)" - po ksiedze ludzi (PeopleBook.Daily w OthersRise.Daily), przed Measure40
             // E4/9 (192): linia "Straz z Westeros" (odcinek Strazy zamkniety w PeopleBook.Daily, zwolnienia 166 doby z ClanBudget.Daily), budzet pul na nowa dobe; potem smierc
             // niewolnych i linia "Niewolni" - PO uzgodnieniu doby i FreeHands.Update, PRZED Measure40 (W11 czyta licznik pojmanych) i PeopleLedger (czyta WatchLaw.Last*)
-            try { WatchLaw.Daily(); } catch (Exception e) { Log.Error("WatchLaw.Daily", e); }
-            try { ThrallLaw.Daily(); } catch (Exception e) { Log.Error("ThrallLaw.Daily", e); }
-            try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); }         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
-            try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); }           // 178: linia "Okupy (178)" (zloto nie rusza)
+            try { WatchLaw.Daily(); } catch (Exception e) { Log.Error("WatchLaw.Daily", e); } DayProfile.Lap("WatchLaw.Daily");
+            try { ThrallLaw.Daily(); } catch (Exception e) { Log.Error("ThrallLaw.Daily", e); } DayProfile.Lap("ThrallLaw.Daily");
+            try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
+            try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)
-            try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); }     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
-            try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); }   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
-            try { GarrisonKit.ClanFillOnce(); } catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); }   // sklad7b-p: raz na sesje - wypelnienie zbrojowni partii Twojego rodu
-            try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); }             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
-            try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); }         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
-            try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); }                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
+            try { GarrisonCarts.Daily(); } catch (Exception e) { Log.Error("GarrisonCarts.Daily", e); } DayProfile.Lap("GarrisonCarts.Daily");     // zamowienia zamkow w drodze: dostawy, zawrocenia, linia "Zaopatrzenie zamkow (171)"
+            try { GarrisonArmory.Daily(); } catch (Exception e) { Log.Error("GarrisonArmory.Daily", e); } DayProfile.Lap("GarrisonArmory.Daily");   // nadwyzki zalog raz w tygodniu, linia "Zbrojownie zalog (171): dzien"
+            try { GarrisonKit.ClanFillOnce(); } catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); } DayProfile.Lap("GarrisonKit.ClanFillOnce");   // sklad7b-p: raz na sesje - wypelnienie zbrojowni partii Twojego rodu
+            try { ArmsDrill.Daily(); } catch (Exception e) { Log.Error("ArmsDrill.Daily", e); } DayProfile.Lap("ArmsDrill.Daily");             // linie "Cwiczenia (171)" i co 5 dob "Pokrycie zbrojowni AI (171)" (tylko log)
+            try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); } DayProfile.Lap("Measure174b.Daily");         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
+            try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); } DayProfile.Lap("Drill.Daily");                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2 / B-2: kasy osad przed wywozem kupcow - pozostale moduly osobno
-            try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); }   // E6/R3 (215): w srodku wozy kupcow (TradeCarts - dostawy, wywoz, linia "Przewoz kupcow wozem")
-            try { AiGear.BardingDaily(); } catch (Exception e) { Log.Error("AiGear.BardingDaily", e); }   // E6/R3 (215): linia "Uprzaz (215)" - po spisie polek w DailyTrade (tylko log)
-            try { ToolsByUse.Daily(); } catch (Exception e) { Log.Error("ToolsByUse.Daily", e); }         // E6/R3 (215): linia "Narzedzia wedlug zuzycia (215)" (tylko log)
+            try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); } DayProfile.Lap("SupplyDemand.DailyTrade");   // E6/R3 (215): w srodku wozy kupcow (TradeCarts - dostawy, wywoz, linia "Przewoz kupcow wozem")
+            try { AiGear.BardingDaily(); } catch (Exception e) { Log.Error("AiGear.BardingDaily", e); } DayProfile.Lap("AiGear.BardingDaily");   // E6/R3 (215): linia "Uprzaz (215)" - po spisie polek w DailyTrade (tylko log)
+            try { ToolsByUse.Daily(); } catch (Exception e) { Log.Error("ToolsByUse.Daily", e); } DayProfile.Lap("ToolsByUse.Daily");         // E6/R3 (215): linia "Narzedzia wedlug zuzycia (215)" (tylko log)
             try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }  // B-2: wywoz kupcow osobna pozycja w "Przeplywy osad" (kasy zamkow placa za konie i uprzaz - tylko z nadwyzki)
-            try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); }   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"
+            try { MaterialOrders.Daily(); } catch (Exception e) { Log.Error("MaterialOrders.Daily", e); } DayProfile.Lap("MaterialOrders.Daily");   // 174.2: kontrakty surowca dla prawdziwych karawan (po handlu bronia i wozach zamkow), linia "Kontrakty surowca (174)"
             try { MoneyLedger.Mark(MoneyLedger.MOrders); } catch { }
-            try { ArmsScrap.Daily(); } catch (Exception e) { Log.Error("ArmsScrap.Daily", e); }   // 174 pytanie 4: pomiar popytu koszykow zawsze; skup na zlom tylko przy OldStockToScrap (domyslnie wylaczony)
-            try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); }   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
-            try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); }   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
-            try { RotLeaks37.Daily(); } catch (Exception e) { Log.Error("RotLeaks37.Daily", e); }   // 3.7: linia "ROT szczelnosc (3.7): dzien" (tylko gdy cos sie zdarzylo)
-            try { ShelfBuy.Daily(); } catch (Exception e) { Log.Error("ShelfBuy.Daily", e); }   // ceny hurtu (Jeff 09.10 08:00): linia "Ceny hurtu (09.10)" - pomiar petli po sztukach i doplata (tylko log)
-            try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); }   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
-            try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); }   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
-            try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); }   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
-            try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); }   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
-            try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); }     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
-            try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); }   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
-            try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); }   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
-            try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); }   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)
-            try { HorseState.Daily(); } catch (Exception e) { Log.Error("HorseState.Daily", e); }   // E6/K0 (209): stan koni partii od nowa (po ksiegach dnia, PO Stage6Measure) i linia "Marsz - konie partii (E6/K0)"
-            try { HorseFate.Daily(); } catch (Exception e) { Log.Error("HorseFate.Daily", e); }   // E6/K1 (211): pula koni weteranow (nadmiar na polki), linia "Konie - smierc, lup, dobytek (E6/K1)" i zerowanie dnia - PO Stage6Measure (HorseBook czyta liczniki K1)
-            try { PackMarket.Daily(); } catch (Exception e) { Log.Error("PackMarket.Daily", e); }   // E6/K5 (213): linia "Juczne (213)" - nowe karawany z doby i luzaki pod jukami (spis partii na ladzie)
-            try { HamletKinds.Daily(); } catch (Exception e) { Log.Error("HamletKinds.Daily", e); }   // E6/W2 (210): linia "Wioski wedlug rodzaju (210)" za dobe wczorajsza (tylko log)
-            try { WorldClock7.Daily(); } catch (Exception e) { Log.Error("WorldClock7.Daily", e); }   // E7/0 (224): linie "Wojna i pokoj (E7/0)" i "Turnieje (E7/0)" (tylko log) - po ksiedze pieniadza
-            try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); }   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
-            try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); }   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
-            try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); }   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow
-            try { MapVillageLore.Daily(); } catch (Exception e) { Log.Error("MapVillageLore.Daily", e); }   // E7/W2 (233): linia "Dymek wioski (E7/W2)" (dymki i potkniecia doby), w pierwszej dobie sesji probka wiary BK 20 wiosek (T4)
-            try { DistrictMenu.Daily(); } catch (Exception e) { Log.Error("DistrictMenu.Daily", e); }   // E7/W3 (234): w pierwszej dobie sesji linia startowa "Menu okregu (E7/W3): start" (index pozycji po wszystkich modach), potem linia doby tylko przy uzyciu
-            try { TownFolk.Lines(); } catch (Exception e) { Log.Error("TownFolk.Lines", e); }   // E5/0 (195): linie Kiesa ludu, Nadwyzka kas, Bitwy, Notable, Jedzenie z targu, Zadowolenie BK - po ksiedze pieniadza, przed Seal31.Daily (zeruje Measure31)
+            try { ArmsScrap.Daily(); } catch (Exception e) { Log.Error("ArmsScrap.Daily", e); } DayProfile.Lap("ArmsScrap.Daily");   // 174 pytanie 4: pomiar popytu koszykow zawsze; skup na zlom tylko przy OldStockToScrap (domyslnie wylaczony)
+            try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); } DayProfile.Lap("SellByCondition.Daily");   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
+            try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); } DayProfile.Lap("RecruitCost.Daily");   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
+            try { RotLeaks37.Daily(); } catch (Exception e) { Log.Error("RotLeaks37.Daily", e); } DayProfile.Lap("RotLeaks37.Daily");   // 3.7: linia "ROT szczelnosc (3.7): dzien" (tylko gdy cos sie zdarzylo)
+            try { ShelfBuy.Daily(); } catch (Exception e) { Log.Error("ShelfBuy.Daily", e); } DayProfile.Lap("ShelfBuy.Daily");   // ceny hurtu (Jeff 09.10 08:00): linia "Ceny hurtu (09.10)" - pomiar petli po sztukach i doplata (tylko log)
+            try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
+            try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
+            try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
+            try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); } DayProfile.Lap("KingdomBalance.Daily");   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
+            try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); } DayProfile.Lap("MoneyLedger.Daily");     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
+            try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); } DayProfile.Lap("Stage6Measure.Daily");   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
+            try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); } DayProfile.Lap("WorkshopInputs.Daily");   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
+            try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); } DayProfile.Lap("CamelLaw.Daily");   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)
+            try { HorseState.Daily(); } catch (Exception e) { Log.Error("HorseState.Daily", e); } DayProfile.Lap("HorseState.Daily");   // E6/K0 (209): stan koni partii od nowa (po ksiegach dnia, PO Stage6Measure) i linia "Marsz - konie partii (E6/K0)"
+            try { HorseFate.Daily(); } catch (Exception e) { Log.Error("HorseFate.Daily", e); } DayProfile.Lap("HorseFate.Daily");   // E6/K1 (211): pula koni weteranow (nadmiar na polki), linia "Konie - smierc, lup, dobytek (E6/K1)" i zerowanie dnia - PO Stage6Measure (HorseBook czyta liczniki K1)
+            try { PackMarket.Daily(); } catch (Exception e) { Log.Error("PackMarket.Daily", e); } DayProfile.Lap("PackMarket.Daily");   // E6/K5 (213): linia "Juczne (213)" - nowe karawany z doby i luzaki pod jukami (spis partii na ladzie)
+            try { HamletKinds.Daily(); } catch (Exception e) { Log.Error("HamletKinds.Daily", e); } DayProfile.Lap("HamletKinds.Daily");   // E6/W2 (210): linia "Wioski wedlug rodzaju (210)" za dobe wczorajsza (tylko log)
+            try { WorldClock7.Daily(); } catch (Exception e) { Log.Error("WorldClock7.Daily", e); } DayProfile.Lap("WorldClock7.Daily");   // E7/0 (224): linie "Wojna i pokoj (E7/0)" i "Turnieje (E7/0)" (tylko log) - po ksiedze pieniadza
+            try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
+            try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
+            try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow
+            try { MapVillageLore.Daily(); } catch (Exception e) { Log.Error("MapVillageLore.Daily", e); } DayProfile.Lap("MapVillageLore.Daily");   // E7/W2 (233): linia "Dymek wioski (E7/W2)" (dymki i potkniecia doby), w pierwszej dobie sesji probka wiary BK 20 wiosek (T4)
+            try { DistrictMenu.Daily(); } catch (Exception e) { Log.Error("DistrictMenu.Daily", e); } DayProfile.Lap("DistrictMenu.Daily");   // E7/W3 (234): w pierwszej dobie sesji linia startowa "Menu okregu (E7/W3): start" (index pozycji po wszystkich modach), potem linia doby tylko przy uzyciu
+            try { TownFolk.Lines(); } catch (Exception e) { Log.Error("TownFolk.Lines", e); } DayProfile.Lap("TownFolk.Lines");   // E5/0 (195): linie Kiesa ludu, Nadwyzka kas, Bitwy, Notable, Jedzenie z targu, Zadowolenie BK - po ksiedze pieniadza, przed Seal31.Daily (zeruje Measure31)
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
-            try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); }
-            try { BattlePlunder.Daily(); } catch (Exception e) { Log.Error("BattlePlunder.Daily", e); }   // E5/A6 (198): linia "Lup w bitwie (A6)" i zerowanie licznikow doby - PO ksiedze pieniadza (zloto ksiegi nie rusza)
-            try { Seal31.Daily(); } catch (Exception e) { Log.Error("Seal31.Daily", e); }   // 3.1 (31): linia "Szczelnosc (164a)" i zerowanie pozycji - PO ksiedze pieniadza, ktora je czyta
-            try { NotableGold.Daily(); } catch (Exception e) { Log.Error("NotableGold.Daily", e); }   // E5/A3 (164c): linia "Notable (E5/A3)" i zerowanie licznikow - PO ksiedze pieniadza (dopisek "Obieg: notable i karawany")
-            try { SmallGold.Daily(); } catch (Exception e) { Log.Error("SmallGold.Daily", e); }   // E5/A7: linia "Drobne zrodla (E5/A7)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
-            try { BkDipGold.Daily(); } catch (Exception e) { Log.Error("BkDipGold.Daily", e); }   // E5/A8: linia "BK i Diplomacy (E5/A8)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
-            try { BesiegedPay.Daily(); } catch (Exception e) { Log.Error("BesiegedPay.Daily", e); }   // E5/A4 (196): linia "Oblezone (E5/A4)" i zerowanie licznikow (renta tej doby, polityki od poprzedniej linii; zloto nie rusza)
-            try { ShipsToPort181.Daily(); } catch (Exception e) { Log.Error("ShipsToPort181.Daily", e); }   // 3.1/3.3 (33) 181: linia "Statki (181)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
-            try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); }   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
-            try { CouncilWages35.Daily(); } catch (Exception e) { Log.Error("CouncilWages35.Daily", e); }   // 3.5: linia "Rada (3.5)" i zerowanie licznikow - PO ksiedze pieniadza (to samo okno rozliczen rodow)
-            try { EstateIncome187.Daily(); } catch (Exception e) { Log.Error("EstateIncome187.Daily", e); }   // 3.1/3.3 (31b) E3/2: linia "Majatki BK (187)" i zerowanie licznikow
-            try { Seal31B.Daily(); } catch (Exception e) { Log.Error("Seal31B.Daily", e); }   // 3.1/3.3 (31b): linia "Szczelnosc (164a/31b)" i zerowanie licznikow - PO ksiedze pieniadza
-            try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); }   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
-            try { Measure40.Daily(); } catch (Exception e) { Log.Error("Measure40.Daily", e); }   // E4/0 (188): linie "Hearth", "Dobrobyt", "Jency", "Zima (E4/0)" - po 169c (milicja), przed ksiega ludzi (tylko log)
-            try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); }   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
-            try { Devastation.DayLine(); } catch (Exception e) { Log.Error("Devastation.DayLine", e); }   // E4/5 (113n): linia "Ludzie (spustoszenie)" i zerowanie licznikow doby - PO ksiedze ludzi i linii Hearth, ktore je czytaja
+            try { BeatenPurse.Daily(); } catch (Exception e) { Log.Error("BeatenPurse.Daily", e); } DayProfile.Lap("BeatenPurse.Daily");
+            try { BattlePlunder.Daily(); } catch (Exception e) { Log.Error("BattlePlunder.Daily", e); } DayProfile.Lap("BattlePlunder.Daily");   // E5/A6 (198): linia "Lup w bitwie (A6)" i zerowanie licznikow doby - PO ksiedze pieniadza (zloto ksiegi nie rusza)
+            try { Seal31.Daily(); } catch (Exception e) { Log.Error("Seal31.Daily", e); } DayProfile.Lap("Seal31.Daily");   // 3.1 (31): linia "Szczelnosc (164a)" i zerowanie pozycji - PO ksiedze pieniadza, ktora je czyta
+            try { NotableGold.Daily(); } catch (Exception e) { Log.Error("NotableGold.Daily", e); } DayProfile.Lap("NotableGold.Daily");   // E5/A3 (164c): linia "Notable (E5/A3)" i zerowanie licznikow - PO ksiedze pieniadza (dopisek "Obieg: notable i karawany")
+            try { SmallGold.Daily(); } catch (Exception e) { Log.Error("SmallGold.Daily", e); } DayProfile.Lap("SmallGold.Daily");   // E5/A7: linia "Drobne zrodla (E5/A7)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
+            try { BkDipGold.Daily(); } catch (Exception e) { Log.Error("BkDipGold.Daily", e); } DayProfile.Lap("BkDipGold.Daily");   // E5/A8: linia "BK i Diplomacy (E5/A8)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
+            try { BesiegedPay.Daily(); } catch (Exception e) { Log.Error("BesiegedPay.Daily", e); } DayProfile.Lap("BesiegedPay.Daily");   // E5/A4 (196): linia "Oblezone (E5/A4)" i zerowanie licznikow (renta tej doby, polityki od poprzedniej linii; zloto nie rusza)
+            try { ShipsToPort181.Daily(); } catch (Exception e) { Log.Error("ShipsToPort181.Daily", e); } DayProfile.Lap("ShipsToPort181.Daily");   // 3.1/3.3 (33) 181: linia "Statki (181)" i zerowanie licznikow doby (zloto ksiegi nie rusza)
+            try { BkSeal34.Daily(); } catch (Exception e) { Log.Error("BkSeal34.Daily", e); } DayProfile.Lap("BkSeal34.Daily");   // 3.4: linia "Szczelnosc BK (3.4)" i zerowanie licznikow - PO ksiedze pieniadza, ktora je czyta
+            try { CouncilWages35.Daily(); } catch (Exception e) { Log.Error("CouncilWages35.Daily", e); } DayProfile.Lap("CouncilWages35.Daily");   // 3.5: linia "Rada (3.5)" i zerowanie licznikow - PO ksiedze pieniadza (to samo okno rozliczen rodow)
+            try { EstateIncome187.Daily(); } catch (Exception e) { Log.Error("EstateIncome187.Daily", e); } DayProfile.Lap("EstateIncome187.Daily");   // 3.1/3.3 (31b) E3/2: linia "Majatki BK (187)" i zerowanie licznikow
+            try { Seal31B.Daily(); } catch (Exception e) { Log.Error("Seal31B.Daily", e); } DayProfile.Lap("Seal31B.Daily");   // 3.1/3.3 (31b): linia "Szczelnosc (164a/31b)" i zerowanie licznikow - PO ksiedze pieniadza
+            try { VillageTakings.Daily(); } catch (Exception e) { Log.Error("VillageTakings.Daily", e); } DayProfile.Lap("VillageTakings.Daily");   // 112: linia "Utarg wsi (112)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta
+            try { Measure40.Daily(); } catch (Exception e) { Log.Error("Measure40.Daily", e); } DayProfile.Lap("Measure40.Daily");   // E4/0 (188): linie "Hearth", "Dobrobyt", "Jency", "Zima (E4/0)" - po 169c (milicja), przed ksiega ludzi (tylko log)
+            try { PeopleLedger.Daily(); } catch (Exception e) { Log.Error("PeopleLedger.Daily", e); } DayProfile.Lap("PeopleLedger.Daily");   // demografia krok 1: "Ludzie:" i plik regionow (tylko log)
+            try { Devastation.DayLine(); } catch (Exception e) { Log.Error("Devastation.DayLine", e); } DayProfile.Lap("Devastation.DayLine");   // E4/5 (113n): linia "Ludzie (spustoszenie)" i zerowanie licznikow doby - PO ksiedze ludzi i linii Hearth, ktore je czytaja
             try { MarketGlut.DailyDigest(); }
-            catch (Exception e) { Log.Error("GlutDigest", e); }
+            catch (Exception e) { Log.Error("GlutDigest", e); } DayProfile.Lap("MarketGlut.DailyDigest");
             try
             {
                 // poranny meldunek: braki wykrzyczane na glos, zeby Jeff WIEDZIAL

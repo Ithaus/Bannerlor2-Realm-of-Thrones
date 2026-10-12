@@ -209,6 +209,8 @@ namespace Armoury
         {
             long tc = Cost174.Begin(Cost174.SCycle);   // 174b.5 F6 (probka 1/16, tylko log)
             MemoReset();                               // 174b.5 F4: pamiec cen i stanu surowca tylko w obrebie jednego cyklu
+            _planBuiltNow = false;                     // E8/0 (242): czy ten cykl zbudowal plan doby warsztatu (tylko pomiar)
+            int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CWorkshop;   // E8/0: wolajacy cen - warsztaty (tylko pomiar)
             try
             {
                 // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
@@ -346,7 +348,7 @@ namespace Armoury
                 return false;
             }
             catch (Exception e) { Log.Error("WorkshopLaw.Cycle", e); return true; }
-            finally { MemoReset(); Cost174.End(Cost174.SCycle, tc); }
+            finally { MemoReset(); DayProfile.Caller = pc; DayProfile.Cycle(_planBuiltNow, Cost174.EndDt(Cost174.SCycle, tc)); _planBuiltNow = false; }
         }
 
         // ------------------------------------------------------------ 174b.5 F4: pamiec cen surowca i stanu polki w jednym cyklu
@@ -923,6 +925,8 @@ namespace Armoury
         ///      ("dokoncz zaczete"), pozostale skaluja sie tak, zeby suma = rece cechu (kontrola w logu).
         /// Wylaczone klucze = dzisiejszy podzial. Plan liczony raz na warsztat na dobe.
         /// </summary>
+        private static bool _planBuiltNow;   // E8/0 (242): ustawiane w LineShare przy budowie planu doby, czytane i zerowane w CyclePrefix (tylko pomiar)
+
         private static float LineShare(WorkshopsCampaignBehavior beh, Workshop workshop, WorkshopType.Production production, Town town, int day, out float floor)
         {
             floor = 0f;
@@ -931,6 +935,7 @@ namespace Armoury
             {
                 c = new KeyValuePair<int, Dictionary<string, LinePlan>>(day, BuildPlan(beh, workshop, town, day));
                 _plans[workshop] = c;
+                _planBuiltNow = true;   // E8/0 (242): pierwszy cykl doby warsztatu (tylko pomiar)
             }
             LinePlan lp;
             if (!c.Value.TryGetValue(LineKey(production), out lp) || !lp.Active) return 0f;

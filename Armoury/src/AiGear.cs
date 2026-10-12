@@ -674,6 +674,7 @@ namespace Armoury
             bool core = WouldBuy(mp, st);
             if (!core && !MenUpgrade.On) return;
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
+            int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CAiGear;   // E8/0 (242): wolajacy cen - AiGear (braki i lepsze; tylko pomiar)
             try
             {
                 if (core)
@@ -684,7 +685,7 @@ namespace Armoury
                 }
                 MenUpgrade.ForAi(mp, st);
             }
-            finally { GoodsLedger.End(gf); }
+            finally { DayProfile.Caller = pc; GoodsLedger.End(gf); }
         }
 
         /// <summary>174b.5 F5: te same wczesne wyjscia co TryBuyCore az do stempla doby (bez stempla i bez zmian stanu) - false = TryBuyCore i tak nic nie zrobi.

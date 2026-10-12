@@ -28,6 +28,10 @@ namespace Armoury
         private static readonly ConditionalWeakTable<ItemRoster, Holder>.CreateValueCallback Make = r => new Holder();
         private static readonly int Types;
         internal static long Hits, Builds, Checks, Mismatch;
+        // E8/0 (242): przebudowy wedlug zrodla zmiany - po wlasnym ShelfBuy.Take/PutBack (wersja polki = zapamietana po naszym AddToCounts) albo reszta (gra, cudze, nasze inne)
+        internal static long BuildsOwn, BuildsRest;
+        private static ItemRoster _ownR;
+        private static int _ownVer;
         internal static long Stumbles;      // poprawka 174b (recenzja): wyjatki odczytu od startu sesji - Log.Error tylko pierwszy (goraca sciezka cen)
         private static bool _errLogged;
         private static double _sessionStart = -1.0;
@@ -48,7 +52,7 @@ namespace Armoury
         {
             _t = new ConditionalWeakTable<ItemRoster, Holder>();
             ShopReserve.Reset();   // poprawka 174b: licznik potkniec rezerwy kramu - ta sama chwila co pamiec polki
-            Hits = Builds = Checks = Mismatch = 0; _sessionStart = -1.0; _calls = 0; _mismatchLogged = false; Stumbles = 0; _errLogged = false;
+            Hits = Builds = Checks = Mismatch = 0; BuildsOwn = BuildsRest = 0; _ownR = null; _sessionStart = -1.0; _calls = 0; _mismatchLogged = false; Stumbles = 0; _errLogged = false;
         }
 
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
@@ -80,6 +84,7 @@ namespace Armoury
             x = Build(r, ver, cnt);
             h.Cur = x;
             Builds++;
+            if (ReferenceEquals(r, _ownR) && ver == _ownVer) BuildsOwn++; else BuildsRest++;   // E8/0 (tylko licznik)
             return x;
         }
 
@@ -156,6 +161,9 @@ namespace Armoury
                    + "; potkniecia od startu sesji: pamiec polki " + Stumbles + ", rezerwa kramu " + ShopReserve.Stumbles;
         }
 
-        internal static void ClearDay() { Hits = Builds = Checks = 0; }
+        internal static void ClearDay() { Hits = Builds = Checks = 0; BuildsOwn = BuildsRest = 0; }
+
+        /// <summary>E8/0 (242): ShelfBuy.Take/PutBack po wlasnym AddToCounts - zapamietana polka i jej wersja (przebudowa przy tej wersji = "wlasne"; tylko licznik).</summary>
+        internal static void NoteOwn(ItemRoster r) { if (r == null) return; _ownR = r; _ownVer = r.VersionNo; }
     }
 }
