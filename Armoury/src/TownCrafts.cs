@@ -169,10 +169,10 @@ namespace Armoury
             return _pairs;
         }
 
-        private static float Kg(ItemObject it) { return it.Weight > 0.05f ? it.Weight : 10f; }
+        internal static float Kg(ItemObject it) { return it.Weight > 0.05f ? it.Weight : 10f; }   // E6/W1 (216): ta sama masa w WorkshopRecipes
 
         /// <summary>Przedmiot kategorii (gra robi wyrob kategorii; dla tych szesciu kategorii jest jeden towar o tym samym id).</summary>
-        private static ItemObject ItemOf(ItemCategory cat)
+        internal static ItemObject ItemOf(ItemCategory cat)   // E6/W1 (216): ten sam przedmiot kategorii w WorkshopRecipes
         {
             var mgr = MBObjectManager.Instance;
             if (mgr == null) return null;

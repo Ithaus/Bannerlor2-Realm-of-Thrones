@@ -4752,6 +4752,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ArmsTradeByCart { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Recipes By Value", HintText = "the weavers' and tanners' workshops take as much wool, flax or raw hides as the worth of their goods calls for - 60% of the worth of the cloth or leather, never less than the goods weigh and never more than the craft can yield: about 3 sacks of wool for 2 bolts of woollen cloth, 6 of flax for 2 of linen, 5 hides for 2 leathers (the same rule as the town's own weavers and tanners), never less than the game's recipe; needs Historical Prices, takes effect at the next load (off = the game's recipes, one sack or hide for two pieces)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool WorkshopRecipesByValue { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5939,6 +5943,7 @@ namespace Armoury
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;
+            s.WorkshopRecipesByValue = WorkshopRecipesByValue;
         }
 
         internal static void Apply()

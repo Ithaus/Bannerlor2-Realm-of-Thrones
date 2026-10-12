@@ -1471,6 +1471,10 @@ namespace Armoury
         public bool ToolsByUse = true;                     // a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)
         public bool AiBuysBarding = true;                  // AI lords buy horse harness for their mounted men of tier 4 and above whose kit includes one, after everything else they lack, from what is left of the day's budget (off = AI lords never buy harness)
         public bool ArmsTradeByCart = true;                // the arms, harness and horses traders carry between towns leave the seller's shelf when bought and reach the buyer by cart after the days the road takes (the buyer pays at purchase; a besieged town waits, after thirty days the goods go back); off = they move the same day, as before
+        // E6/W1 (216, PLAN 6.3, R6): receptury warsztatow wedlug wartosci (WorkshopRecipes, raz na sesje po HistoricalPrices.Apply) - linie z jednym wsadem
+        // z welny, lnu albo skor: sztuk wsadu = 60% wartosci wyrobow / wartosc wsadu (proporcja TownCrafts 148), nie mniej masy niz wyrob, nie wiecej niz
+        // wydajnosc procesu, nigdy mniej niz w grze; krok x1.3 wsi robi W3
+        public bool WorkshopRecipesByValue = true;         // the weavers' and tanners' workshops take as much wool, flax or raw hides as the worth of their goods calls for - 60% of the worth of the cloth or leather, never less than the goods weigh and never more than the craft can yield: about 3 sacks of wool for 2 bolts of woollen cloth, 6 of flax for 2 of linen, 5 hides for 2 leathers (the same rule as the town's own weavers and tanners), never less than the game's recipe; needs Historical Prices, takes effect at the next load (off = the game's recipes, one sack or hide for two pieces)
 
         public static void Load(string moduleDataDir)
         {

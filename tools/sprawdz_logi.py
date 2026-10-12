@@ -92,6 +92,9 @@ Uzycie (Python 3, tylko odczyt):
                     (stary zapis / wylaczone - INFO), tick wpiety, tozsamosci kazdej doby (lupy wsi = lupy z tickow kopalni, drewno spalone = drewna na lupe x lupy),
                     lupy bez drewna 0, kopalnia bez wegla <= 5% lup (d8-until), miasta bez zelaza <= 15 (srednio d61-until), stos drewna miast d61 -> until bez wzrostu
                     (<= +2%), cykle "brak surowca [ruda" <= 584/d (srednio d31-until, linia "Warsztaty"), potkniecia 0; las okregu, targ, zloto, braki - INFO.
+                    Blok E6/W1 (216, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W1-1..W1-8 - linia startowa "Receptury (216)" i linie ksiegi "Towary:":
+                    WLACZONE, zadna linia z mniejszym wsadem niz gra, linie z welny, lnu i skor zmienione, potkniecia 0; len i welna - co najmniej jeden z miesiecy
+                    2-4 bez wzrostu zapasu (gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92); kolejka odziezy wojska - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3319,6 +3322,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_r3(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_r3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/W1 (216): receptury warsztatow wedlug wartosci - wsad z welny, lnu i skor (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
+    try:
+        etap5_w1(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_w1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3744,6 +3752,75 @@ def etap5_r3(rep, lines, start, until):
                 "INFO (projekt: ruda na narzedzia w dol z 32 ladunkow/d, stos narzedzi bez wzrostu)", None)
         stu = sum(num(r"potkniecia dzis (\d+)", tools[x], int, 0) or 0 for x in td)
         rep.add("R3-12: potkniecia ToolsByUse (suma okna)", str(stu), "0", stu == 0)
+
+
+def etap5_w1(rep, lines, start, until):
+    """E6/W1 (216, projekt etapu 6 v2 rozdz. 3 "E6/W1" Test): linia startowa sesji "Receptury (216):" (raz na sesje, po HistoricalPrices.Apply - ocena
+    ostatniej w logu) i linie ksiegi "Towary: dzien N - <towar> (W d): zapas S" (dzien = doba gry - 1, okno doby kampanii 1-until jak etap5_main).
+    Wiazace: WLACZONE, zadna linia z mniejszym wsadem niz receptura gry, dla welny, lnu i skor co najmniej jedna linia zmieniona, potkniecia 0;
+    len i welna - dla kazdego co najmniej jeden z miesiecy 2-4 (d29-56, d57-84, d85-112) bez wzrostu zapasu (gdy okno siega d112, inaczej INFO);
+    skora i plotno - srednia zmiana zapasu d91-until >= -10/d (gdy okno siega d92, inaczej INFO); kolejka odziezy wojska (150) - INFO."""
+    st = [s for s in lines if s.startswith("Receptury (216):")]
+    if not st:
+        rep.add("W1-1: linia startowa Receptury (216)", "brak linii startowej", "jest od wgrania E6/W1", None)
+        return
+    last = st[-1]
+    rep.add("W1-1: Receptury (216) WLACZONE (ostatnia sesja logu)", last[:150], "WLACZONE (klucz WorkshopRecipesByValue)", "WLACZONE" in last)
+    pairs = re.findall(r"(\w+): (\w+) -> ([^,\[\]]+), sztuk wsadu dawniej (\d+), teraz (\d+)", last)
+    less = [p for p in pairs if int(p[4]) < int(p[3])]
+    rep.add("W1-2: linie z mniejszym wsadem niz receptura gry", f"{len(less)} z {len(pairs)} linii" + (f"; np. {less[0][0]}" if less else ""), "0",
+            (len(less) == 0) if pairs else None)
+    up = {k: [p for p in pairs if p[1] == k and int(p[4]) > int(p[3])] for k in ("wool", "flax", "hides")}
+    miss = [k for k in up if not up[k]]
+    rep.add("W1-3: linie z welny, lnu i skor ze zmienionym wsadem", "; ".join(f"{p[0]}: {p[1]} -> {p[2]} {p[3]} -> {p[4]}" for k in up for p in up[k]) or "brak",
+            "kazdy z trzech surowcow (projekt: filc 3 welny -> 2, plotno 6 lnu -> 2, skora 5 skor -> 2)", len(miss) == 0)
+    stu = num(r"potkniecia (\d+)\.", last, int, 0) or 0
+    rep.add("W1-4: potkniecia Receptury (216)", str(stu), "0", stu == 0)
+    ser = {}
+    for s in lines:
+        if s.startswith("Towary: dzien "):
+            m = re.match(r"Towary: dzien (\d+) - (\w+) \([^)]*\): zapas (-?\d+)", s)
+            if m and m.group(2) in ("wool", "flax", "linen", "leather"):
+                rd = run_day(int(m.group(1)), start)
+                if 1 <= rd <= until:
+                    ser.setdefault(m.group(2), {})[rd] = int(m.group(3))
+
+    def at(x, d):
+        ks = [k for k in x if k <= d]
+        return x[max(ks)] if ks else None
+    for k, name in (("wool", "welna"), ("flax", "len")):
+        x = ser.get(k, {})
+        if not x:
+            rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", "brak linii Towary", "co najmniej jeden <= 0 (gdy okno siega d112)", None)
+            continue
+        ch = []
+        for mth in (2, 3, 4):
+            a, b2 = at(x, 28 * (mth - 1)), at(x, 28 * mth)
+            ch.append(None if a is None or b2 is None or max(x) < 28 * mth else b2 - a)
+        full = max(x) >= 112 and all(c is not None for c in ch)
+        rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", ", ".join("-" if c is None else f"{c:+d}" for c in ch) + f" (ostatnia doba d{max(x)})",
+                "co najmniej jeden <= 0 (gdy okno siega d112)", (any(c <= 0 for c in ch)) if full else None)
+    for k, name in (("leather", "skora"), ("linen", "plotno")):
+        x = ser.get(k, {})
+        a = at(x, 90) if x else None
+        if not x or a is None or max(x) < 92:
+            rep.add(f"W1-6: {name} - srednia zmiana zapasu d91-until", "za krotkie okno albo brak linii Towary", ">= -10/d (gdy okno siega d92)", None)
+            continue
+        e = max(x)
+        avg = (x[e] - a) / float(e - max(k2 for k2 in x if k2 <= 90))
+        rep.add(f"W1-6: {name} - srednia zmiana zapasu d91-until", f"{avg:+.1f}/d (zapas d90 {a} -> d{e} {x[e]})", ">= -10/d", avg >= -10)
+    clo = {}
+    for d, s in by_day(lines, "Odziez wojska (150): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            clo[rd] = s
+    if clo:
+        def wait(s):
+            i = s.find("| czeka: ")
+            return s[i + 9:s.find(" (", i)] if i >= 0 else "?"
+        f0, f1 = min(clo), max(clo)
+        rep.add("W1-7: kolejka odziezy wojska (czeka)", f"d{f0}: {wait(clo[f0])}; d{f1}: {wait(clo[f1])}", "INFO (projekt: kolejka nie rosnie)", None)
+    rep.add("W1-8: receptury - wszystkie linie z zakresu (ostatnia sesja)", "; ".join(f"{p[0]}: {p[3]} -> {p[4]}" for p in pairs) or "brak", "INFO", None)
 
 
 def etap5_fee(rep, lines):
