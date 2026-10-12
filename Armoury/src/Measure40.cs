@@ -427,7 +427,7 @@ namespace Armoury
         }
 
         // ============================================================ W6: rabunek gry (krok)
-        internal sealed class RState { public Village V; public float H; public Hero Leader; public int Gold; }
+        internal sealed class RState { public Village V; public float H; public Hero Leader; public int Gold; public long Paid0; }
 
         public static void RaidPre(RaidEventComponent __instance, out RState __state)
         {
@@ -447,7 +447,7 @@ namespace Armoury
                 if (Devastation.CoversQuiet(st.Village)) return;
                 Hero leader = null;
                 try { var lp = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
-                __state = new RState { V = st.Village, H = st.Village.Hearth, Leader = leader, Gold = leader != null ? leader.Gold : 0 };
+                __state = new RState { V = st.Village, H = st.Village.Hearth, Leader = leader, Gold = leader != null ? leader.Gold : 0, Paid0 = SmallGold.RaidPaidSum };
             }
             catch (Exception e) { __state = null; Stumble("RaidPre", e); }
         }
@@ -459,7 +459,7 @@ namespace Armoury
                 if (__state == null) return __exception;
                 float taken = __state.H - __state.V.Hearth;
                 if (Math.Abs(taken) < 0.00001f) return __exception;
-                long gold = __state.Leader != null ? __state.Leader.Gold - __state.Gold : 0;
+                long gold = __state.Leader != null ? __state.Leader.Gold - __state.Gold - (SmallGold.RaidPaidSum - __state.Paid0) : 0;   // E5/A7: bez lupu z kiesy wsi (przelew)
                 lock (Gate)
                 {
                     _raidSteps++; _raidH += taken; _raidVill.Add(__state.V);

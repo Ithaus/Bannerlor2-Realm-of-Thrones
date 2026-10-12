@@ -281,26 +281,35 @@ namespace Armoury
             catch (Exception e) { Stumble("MercIncomePrefix", e); return true; }
         }
 
-        /// <summary>Czy "za tier" tego rodu jest dzis zdejmowany (ksiega obiegu nie liczy go wtedy jako zrodla z niczego) - ten sam warunek co TierPostfix.</summary>
+        /// <summary>Czy "za tier" tego rodu jest dzis zdejmowany (ksiega obiegu nie liczy go wtedy jako zrodla z niczego) - ten sam warunek co TierPostfix
+        /// (185: najemnik AI z umowa; E5/A7: kazdy rod AI z warunkiem gry - SmallGold.CutsTier).</summary>
         internal static bool CancelsTier(Clan c)
         {
-            try { return _tierWired && c != null && c != Clan.PlayerClan && !c.IsEliminated && c.IsUnderMercenaryService && GameOff && HasDeal(c) && c.Fiefs != null && c.Fiefs.Count == 0; }
+            try
+            {
+                if (!_tierWired || c == null || c == Clan.PlayerClan || c.IsEliminated || c.Fiefs == null || c.Fiefs.Count != 0) return false;
+                return (c.IsUnderMercenaryService && GameOff && HasDeal(c)) || SmallGold.CutsTier(c);
+            }
             catch { return false; }
         }
         private static bool _tierWired;
 
-        /// <summary>Postfiks DefaultClanFinanceModel.CalculateClanIncomeInternal: "za tier" AI w sluzbie bez lenn (Tier x (80 + 40)) zdjete tym samym wpisem bez opisu.</summary>
+        /// <summary>Postfiks DefaultClanFinanceModel.CalculateClanIncomeInternal: "za tier" zdjete tym samym wpisem bez opisu - 185: AI w sluzbie z umowa bez lenn
+        /// (Tier x (80 + 40)); E5/A7 (audyt zlota z niczego, wiersz 13; wylacznik TierIncomeAiOff): kazdy rod AI z warunkiem gry (bez lenn, poza krolestwem albo
+        /// najemnik - G DefaultClanFinanceModel.cs:133-137: Tier x (80 + 40 u najemnika)). Gracz bez zmian (gra i tak go pomija).</summary>
         public static void TierPostfix(Clan __0, ref ExplainedNumber __1, bool __2)
         {
             try
             {
                 var c = __0;
-                if (c == null || c == Clan.PlayerClan || c.IsEliminated || !c.IsUnderMercenaryService || !GameOff || !HasDeal(c)) return;
+                if (c == null || c == Clan.PlayerClan || c.IsEliminated) return;
+                bool merc = c.IsUnderMercenaryService && GameOff && HasDeal(c);
+                if (!merc && !SmallGold.CutsTier(c)) { if (__2) SmallGold.NoteTierOff(c); return; }
                 if (c.Fiefs == null || c.Fiefs.Count != 0) return;   // ten sam warunek co w grze (rod bez lenn)
-                int x = c.Tier * (80 + 40);
+                int x = c.Tier * (80 + (c.IsUnderMercenaryService ? 40 : 0));
                 if (x == 0) return;
                 __1.Add(-x);
-                if (__2) _dTierOff += x;
+                if (__2) { if (merc) _dTierOff += x; else SmallGold.NoteTier(x, c.IsUnderMercenaryService); }
             }
             catch (Exception e) { Stumble("TierPostfix", e); }
         }

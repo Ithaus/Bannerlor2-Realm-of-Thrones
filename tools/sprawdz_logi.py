@@ -2579,8 +2579,12 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     # S16 - lup z niczego na krok (co do monety jak w grze)
     lp = [(num(r"lup z niczego (\d+) zl", hea[d], int, 0) or 0, (num(r" - rabunek gry -[\d.]+ \(krokow (\d+)", hea[d], int, 0) or 0) + (num(r"pod spustoszeniem E4/5 krokow (\d+)", hea[d], int, 0) or 0)) for d in gm]
     G = sum(x[0] for x in lp); S = sum(x[1] for x in lp)
-    rep.add("E4/5 S16: lup z niczego na krok rabunku (Hearth E4/0, W6 + spustoszenie)", f"{G / S:.1f} zl/krok ({G} zl, {S} krokow)" if S else "-", "+-30% wobec LOG-A ok. 30 zl/krok (21-39)",
-            (21 <= G / S <= 39) if S else None)
+    # E5/A7: lup z kiesy wsi to przelew - "lup z niczego" go nie liczy; lup gry na krok = z niczego + "gra dalaby" z linii E5/A7 (zaplacone + uciete)
+    a7 = by_day(lines, "Drobne zrodla (E5/A7): dzien")
+    A7 = sum(num(r"rabunek wsi z kiesy wsi[^:]*: gra dalaby (\d+)", a7[d], int, 0) or 0 for d in gm if d in a7)
+    rep.add("E4/5 S16: lup gry na krok rabunku (Hearth E4/0, W6 + spustoszenie; z E5/A7: z niczego + z kiesy wsi + uciete)",
+            (f"{(G + A7) / S:.1f} zl/krok ({G + A7} zl, {S} krokow" + (f"; z tego przez kiese wsi E5/A7 {A7}" if a7 else "") + ")") if S else "-", "+-30% wobec LOG-A ok. 30 zl/krok (21-39)",
+            (21 <= (G + A7) / S <= 39) if S else None)
     # S17 - K7 rajd Innych
     rb = [re.search(r"\(b\) rajd: .*?zabici przy spustoszeniu (\d+), wstalo (\d+), do puli (\d+), spalone (\d+)", e42[d]) for d in win if d in e42]
     rb = [tuple(int(g) for g in x.groups()) for x in rb if x]
@@ -3305,6 +3309,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_aud(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_aud", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A7 (audyt 11.10, wiersze 12-14, 16): rabunek z kiesy wsi, kiesa nowej zalogi, "za tier" AI, perki 5000 AI - brak linii (log sprzed A7) - INFO
+    try:
+        etap5_a7(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_a7", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
     wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
     try:
@@ -4365,6 +4374,75 @@ def etap5_aud(rep, lines, start, until):
                 + ("; LATKA NIEWPIETA" if hook else ""),
                 "INFO (z niczego w reszcie R; > 0 = dopisac obciecie kwoty do kasy - audyt 5b \"N3 / G24\")", False if hook else None)
         rep.add("audyt N3: warsztaty BK - niedoplata pustej kasy (suma)", f"{n3} zl w {n3n} wyrobach", "INFO (> 0 = obciac zaplate BK ProduceOutputPrefix do kasy - audyt 5b)", None)
+def etap5_a7(rep, lines, start, until):
+    """E5/A7 (audyt zlota z niczego 11.10, wiersze 12-14 i 16; SmallGold.cs, MercContract.TierPostfix) - drobne zrodla gry. Linie: startowa
+    "Drobne zrodla (E5/A7): latki przy starcie gry" i doby "Drobne zrodla (E5/A7): dzien N"; zamkniecie widac w "Hearth (E4/0)" (lup z niczego 0)
+    i "Pieniadz swiata (rody - przyczyny)" (dochod za tier (z niczego) 0). Doby kampanii 2-until."""
+    wire = [x for x in lines if x.startswith("Drobne zrodla (E5/A7): latki przy starcie gry")]
+    a7 = by_day(lines, "Drobne zrodla (E5/A7): dzien")
+    win = [d for d in sorted(a7) if 2 <= run_day(d, start) <= until]
+    if not wire and not a7:
+        rep.add("E5/A7: linie Drobne zrodla (E5/A7)", "brak w logu", "sa od wgrania E5/A7 (LogEnabled)", None)
+        return
+    if wire:
+        rep.add("E5/A7-0: latki (rabunek, nowa zaloga, Insurance Plans, Rapid Development, strona przelewu)", wire[-1][:220], "BRAK: - (5 wpietych)", "BRAK: -;" in wire[-1])
+    if not win:
+        rep.add("E5/A7: linia doby", "brak w dobach 2-%d" % until, "codziennie (LogEnabled)", False)
+        return
+
+    def tot(rx, days=None):
+        return sum(num(rx, a7[d], int, 0) or 0 for d in (days if days is not None else win))
+    # ---------------- 1. rabunek wsi z kiesy wsi
+    ron = [d for d in win if "rabunek wsi z kiesy wsi WYLACZONE" not in a7[d]]
+    due, paid = tot(r"rabunek wsi z kiesy wsi[^:]*: gra dalaby (\d+)"), tot(r"krokach, z kies wsi (\d+), uciete")
+    steps, short, empty = tot(r"gra dalaby \d+ w (\d+) krokach"), tot(r"kiesa wsi nie starczyla w (\d+) krokach"), tot(r"pusta w (\d+)\)")
+    duep, paidp = tot(r"gracz: gra dalaby (\d+)"), tot(r"gracz: gra dalaby \d+, z kies wsi (\d+)")
+    off = tot(r"; z niczego jak dotad (\d+) w \d+ krokach")
+    rep.add("E5/A7-1: rabunek wsi - lup z kiesy wsi (suma dob 2-%d)" % until,
+            f"gra dalaby {due} w {steps} krokach, z kies wsi {paid}, uciete {due - paid} (kiesa nie starczyla w {short}, pusta w {empty}); gracz {paidp} z {duep}"
+            + (f"; WYLACZONE w {len(win) - len(ron)} dobach (z niczego jak dotad {off})" if len(ron) < len(win) else ""),
+            "zaplacone <= nalezne; INFO (audyt: ok. 0,7 tys./d lupu z niczego, rosnie z wojna)", paid <= due)
+    hea = by_day(lines, "Hearth (E4/0): dzien")
+    hd = [d for d in ron if d in hea]
+    if hd:
+        ln = sum(num(r"lup z niczego (\d+) zl", hea[d], int, 0) or 0 for d in hd)
+        rep.add("E5/A7-2: lup z niczego w rabunku (Hearth E4/0, doby z czynnym Raid Loot From Village)", f"{ln} zl w {len(hd)} dobach", "0 (lup tylko z kies wsi)", ln == 0)
+    else:
+        rep.add("E5/A7-2: lup z niczego w rabunku (Hearth E4/0)", "brak linii Hearth (E4/0) w dobach z czynnym wylacznikiem", "0", None)
+    # ---------------- 2. nowe zalogi
+    gn, gt = tot(r"\| nowe zalogi[^:]*: (\d+), kiesa startowa"), tot(r"kiesa startowa gry (\d+) -> 0")
+    goff = tot(r"rozliczeniem zoldu\), z niczego jak dotad (\d+)")
+    op = [x for x in lines if x.startswith("Drobne zrodla (E5/A7): start")]
+    rep.add("E5/A7-3: nowe zalogi bez kiesy startowej z niczego (suma dob 2-%d)" % until,
+            f"zalog {gn}, kiesa startowa gry niepowstala {gt}" + (f" (sr. {gt / gn:.0f} na zaloge)" if gn else "") + (f"; z niczego jak dotad {goff}" if goff else "")
+            + (" | bilans otwarcia" + op[-1].split("bilans otwarcia")[-1][:100] if op else ""),
+            "INFO (audyt: 5000 na zdobycie twierdzy - reszta R +5000 w dobach zdobycia znika; kiese wypelnia rod rozliczeniem zoldu)", None)
+    # ---------------- 3. za tier
+    ton = [d for d in win if "za tier rody AI bez lenn WYLACZONE" not in a7[d]]
+    tc, tn = tot(r"za tier rody AI bez lenn[^:]*: gra dalaby (\d+)"), tot(r"za tier rody AI bez lenn[^:]*: gra dalaby \d+ u (\d+) rodow")
+    tm = tot(r"rodow \(w tym najemnicy (\d+)\), dostaly 0")
+    rep.add("E5/A7-4: za tier rodow AI bez lenn zdjete (suma dob 2-%d)" % until, f"{tc} zl w {tn} rozliczeniach (w tym najemnicy {tm})",
+            "INFO (audyt: 0,6-0,7 tys./d; najemnicy z umowa 185 - linia Kontrakty najemnikow)", None)
+    cau = by_day(lines, "Pieniadz swiata (rody - przyczyny): dzien")
+    cd = [d for d in ton if d in cau]
+    if cd:
+        tl = sum(num(r"dochod za tier \(z niczego\) ([+-]?\d+)", cau[d], int, 0) or 0 for d in cd)
+        rep.add("E5/A7-5: dochod za tier (z niczego) w ksiedze (rody - przyczyny, doby z czynnym Tier Income Ai Off)", f"{tl} w {len(cd)} dobach", "0", tl == 0)
+    else:
+        rep.add("E5/A7-5: dochod za tier (z niczego) w ksiedze", "brak linii rody - przyczyny w dobach z czynnym wylacznikiem", "0", None)
+    # ---------------- 4. perki 5000
+    pi, pin_ = tot(r"Insurance Plans uciete (\d+)"), tot(r"Insurance Plans uciete \d+ \((\d+)\)")
+    pr, prn = tot(r"Rapid Development uciete (\d+)"), tot(r"Rapid Development uciete \d+ \((\d+)\)")
+    pp = tot(r"gracz bez zmian: Insurance Plans (\d+)") + tot(r"gracz bez zmian: Insurance Plans \d+ \(\d+\), Rapid Development (\d+)")
+    rep.add("E5/A7-6: perki 5000 AI uciete (suma dob 2-%d)" % until, f"Insurance Plans {pi} ({pin_}), Rapid Development {pr} ({prn}); gracz bez zmian {pp}",
+            "kwota = 5000 x liczba; INFO (audyt: 3 / 2 / 14 paczek na bieg)", pi == 5000 * pin_ and pr == 5000 * prn)
+    # ---------------- kontrola
+    st, ov, sm = tot(r"zdarzenia w oknie rabunku niedopasowane (\d+)"), tot(r"stos przepelniony (\d+)"), tot(r"\| potkniecia (\d+)")
+    errs = sum(1 for x in lines if "ERROR" in x and "SmallGold." in x)
+    rep.add("E5/A7-7: kontrola (niedopasowane w oknie rabunku, stos, potkniecia, ERROR SmallGold.*)", f"{st} / {ov} / {sm} / {errs}", "0 / 0 / 0 / 0",
+            st == 0 and ov == 0 and sm == 0 and errs == 0)
+
+
 def etap5_b1(rep, lines, start, until, logp):
     """E5/B1 (173, kiesa ludu czynna; plan kodu docs/etap5/PLAN-KODU-E5B1.md rozdz. 11, progi B1-T1..T20). Okno: doby kampanii 2-until; sr28 - ostatnie 28 dob okna.
     Linie: "Kiesa ludu (E5/B1): CZYNNA" (stan), "Kiesa ludu: dzien" (doba), "Podstawa robocizny (E5/B1)", "Prawa panskie (E5/B1)", "Zadowolenie ludu (R14)",

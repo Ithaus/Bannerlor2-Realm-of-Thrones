@@ -83,7 +83,7 @@ namespace Armoury
         private static Dictionary<string, Village> _byId;           // id osady -> wies (raz na kampanie)
 
         /// <summary>Stan wsi miedzy prefiksem a finalizerem latek rabunku.</summary>
-        internal struct Tick { public Village V; public float Real, Virt; public bool Swapped; public object Rs; public double K; public Hero Leader; public int Gold; }
+        internal struct Tick { public Village V; public float Real, Virt; public bool Swapped; public object Rs; public double K; public Hero Leader; public int Gold; public long Paid0; }
 
         // ------------------------------------------------------------ liczniki doby (zeruje DayLine)
         private static readonly double[] _dHit = new double[2], _dDays = new double[2];
@@ -355,6 +355,7 @@ namespace Armoury
                 // lup z niczego (zloto gry za hearth) - kiesa wodza przed krokiem (pomiar przejety z okna W6 E4/0 dla wsi objetych)
                 try { var lp = att != null ? att.LeaderParty : null; __state.Leader = lp != null ? lp.LeaderHero : null; __state.Gold = __state.Leader != null ? __state.Leader.Gold : 0; }
                 catch { __state.Leader = null; }
+                __state.Paid0 = SmallGold.RaidPaidSum;                       // E5/A7: lup z kiesy wsi to przelew, nie zloto z niczego - finalizer go odejmuje
                 // gra liczy strate, zloto i towar lupiezcy od hearth, jaki wies mialaby u niej po poprzednich krokach
                 if (rs.HasVirt) { v.Hearth = rs.Virt; __state.Swapped = true; }
             }
@@ -380,7 +381,7 @@ namespace Armoury
                     _dSteps++; _dGameHearth += took; _dGamePeople += (double)took * __state.K;
                     if (__state.Leader != null)
                     {
-                        long gold = (long)__state.Leader.Gold - __state.Gold;
+                        long gold = (long)__state.Leader.Gold - __state.Gold - (SmallGold.RaidPaidSum - __state.Paid0);   // E5/A7: bez tego, co zaplacila kiesa wsi
                         if (gold > 0) { if (__state.Leader == Hero.MainHero) _dLootPlayer += gold; else _dLootAi += gold; }
                     }
                     Settle(v, rs);

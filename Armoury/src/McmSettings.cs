@@ -952,6 +952,22 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool AlleyIncomeFromTown { get; set; } = true;
 
+        [SettingPropertyBool("Raid Loot From Village", HintText = "the gold a raider takes for every house burnt in a village (you or the AI) comes out of that village's purse, as much as it holds - an empty village gives no coin; you are told when its purse runs short. Off = out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool RaidLootFromVillage { get; set; } = true;
+
+        [SettingPropertyBool("Garrison No Start Purse", HintText = "a garrison formed after the campaign has begun (a captured castle or town, a garrison set up again) no longer gets 5,000 out of thin air - it starts with an empty purse, and its owner's house fills it from its own coffers with the daily wages, as for any party. The garrisons of a new world keep the game's starting purse. Off = 5,000 out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool GarrisonNoStartPurse { get; set; } = true;
+
+        [SettingPropertyBool("Tier Income Ai Off", HintText = "AI houses without fiefs outside a realm (minor factions) and AI mercenaries no longer get gold 'for their tier' out of thin air (tier x 80 a day, mercenaries tier x 120) - they live on what they earn and on their contract. Your house is unchanged. Off = out of thin air, as before (mercenaries on a Merc Contract still lose it through Merc Game Contract Ai Off)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool TierIncomeAiOff { get; set; } = true;
+
+        [SettingPropertyBool("Trade Perk Gifts Ai Off", HintText = "the 5,000 denars an AI lord or notable got out of thin air from the Insurance Plans perk (his caravan destroyed) or the Rapid Development perk (his workshop's town taken by an enemy) are no longer paid - nobody would pay them. Your own perks are unchanged. Off = out of thin air for the AI too, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool TradePerkGiftsAiOff { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -5093,6 +5109,10 @@ namespace Armoury
             s.NotableCaravanCapitalReal = NotableCaravanCapitalReal;
             s.NotableBkGiftCut = NotableBkGiftCut;
             s.AlleyIncomeFromTown = AlleyIncomeFromTown;
+            s.RaidLootFromVillage = RaidLootFromVillage;
+            s.GarrisonNoStartPurse = GarrisonNoStartPurse;
+            s.TierIncomeAiOff = TierIncomeAiOff;
+            s.TradePerkGiftsAiOff = TradePerkGiftsAiOff;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
