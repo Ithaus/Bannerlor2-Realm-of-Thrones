@@ -175,6 +175,10 @@ Uzycie (Python 3, tylko odczyt):
                     ("Ksiega wiosek (E4/11)" spalone dzis) > 0 w oknie; T6 udzial przerwanych - INFO; T7 potkniecia 0 i linie "ERROR in DistrictRaid." 0; T9 zapis -> wczytanie:
                     sesje i czujnosc przy wczytaniu = przy ostatnim zapisie; T10 jency z rabunkow R1 > 0 (przy >= 20 sesjach); T11 zabici RaidDead = zabici R1 (+-1 na sesje);
                     koszt prefiksu < 50 ms/dobe (srednio); lup, czujnosc, okreg wypalony, u przyciete, oddane grze - INFO.
+                    Blok etap7_r2 (E7/R2, paczka 236 - okienko gracza po kazdej osadzie, NK): R2-0 linia "Okienko rabunku gracza (E7/R2): latki przy starcie gry - GOTOWE"
+                    (BRAK -); R2-1 linie "ERROR in DistrictRaid.R2" 0 i "okienko zawiodlo" 0; R2-2 sesje gracza w oknie (autotest gra AI: 0 - INFO, test Jeffa);
+                    przy sesjach gracza: R2-3 sesje gracza z linii R1 ("gracz N") = zakonczone z linii R2, R2-4 wybory z okienka <= okienka otwarte; kroki, okienka,
+                    "End Raiding", klucz zdjety - INFO. Bilans zlota, towaru i spichlerza rabunkow gracza - te same wiersze T1-T3 bloku etap7_r1 (jedna linia doby).
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -7763,7 +7767,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     # scalenie zbior-5-8: obie galezie etapu 7 zbudowaly szkielet grupy; jeden szkielet, dwie konwencje wywolania (opis w docstringu)
     blocks = ([(b, False) for b in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2)]
-              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1)])
+              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1, etap7_r2)])
     for blk, by_win in blocks:   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             if by_win:
@@ -7960,7 +7964,7 @@ def etap7_r1(rep, lines, start, win, until=120, **kw):
     ses = tot(r"\| sesji (\d+) \(")
     steps = tot(r", krokow (\d+) \(")
     intr = tot(r", przerwanych (\d+) \(")
-    rel = tot(r"oddane grze \(gracz w zdarzeniu, potkniecia\) (\d+)")
+    rel = tot(r"oddane grze \((?:gracz w zdarzeniu, )?potkniecia\) (\d+)")   # E7/R2: sama etykieta "(potkniecia)" - rabunki z graczem prowadzi ta sama regula
     rep.add("E7/R1 R1-2: sesje zakonczone (suma okna)", f"sesji {ses}, krokow pelnych {steps}, przerwanych {intr}, oddanych grze {rel}", "> 0 (rabunki AI pod R1)", ses > 0)
     # T1 - bilans zlota kazdej doby i lup z niczego AI w linii spustoszenia
     b1 = [(d, num(r"zloto wodza - kiesa wsi " + F_, rows[d], float)) for d in live]
@@ -8042,6 +8046,58 @@ def etap7_r1(rep, lines, start, win, until=120, **kw):
                     mism.append(f"{got[0]}/{got[1]} wobec {last[0]}/{last[1]}")
     rep.add("E7/R1 T9: sesje i czujnosc zapis -> wczytanie", f"par {pairs}, niezgodnych {len(mism)}" + (f" ({', '.join(mism[:4])})" if mism else ""),
             "0 niezgodnych (bieg zapisu 9 dob)", (len(mism) == 0) if pairs else None)
+
+def etap7_r2(rep, lines, start, win, until=120, **kw):
+    """E7/R2 (236, PLAN 7.11 b, projekt etapu 7 v2 rozdz. 3 "E7/R2" Test): linia startowa "Okienko rabunku gracza (E7/R2): latki przy starcie gry" i linia doby
+    "Okienko rabunku gracza (E7/R2): dzien N" (tylko w dobach z rabunkiem gracza; dzien ksiegi = doba gry - 1, jak linia R1). Autotest gra AI, wiec bez sesji
+    gracza wiaza tylko R2-0 (latki) i R2-1 (bledy); okienko, "End the raid", "End Raiding", wczytanie w stanie decyzji - test Jeffa (lista RB ryzyko 7)."""
+    P = "Okienko rabunku gracza (E7/R2): "
+    starts = [x for x in lines if x.startswith(P + "latki przy starcie gry")]
+    rows = {}
+    for d, x in by_day(lines, P + "dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = x
+    if not starts and not rows:
+        rep.add("E7/R2: linie Okienko rabunku gracza (E7/R2)", "brak w logu", "sa od wgrania E7/R2 (LogEnabled)", None)
+        return
+    if starts:
+        a = starts[-1]
+        rep.add("E7/R2 R2-0: latki okienka przy starcie gry", a[len(P):][:220], "GOTOWE, BRAK: - (tick menu raiding_village i End Raiding)", ("GOTOWE" in a) and ("BRAK: -" in a))
+    else:
+        rep.add("E7/R2 R2-0: latki okienka przy starcie gry", "brak linii startowej", "jest przy kazdym starcie gry", None)
+    w = [rows[d] for d in sorted(rows)]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    err = [x for x in lines if x.startswith("ERROR in DistrictRaid.R2")]
+    fail = tot(r"okienko zawiodlo (\d+)")
+    rep.add("E7/R2 R2-1: bledy okienka (linie ERROR in DistrictRaid.R2, okienko zawiodlo)", f"linii ERROR {len(err)}, okienko zawiodlo {fail}" + (f" (pierwsza: {err[0][:120]})" if err else ""),
+            "0", not err and fail == 0)
+    new, ended = tot(r"sesji gracza: nowych (\d+),"), tot(r", zakonczonych (\d+) \(spalone")
+    won, called, broken = tot(r"\(spalone (\d+),"), tot(r"odwolane przy 0 osadach (\d+),"), tot(r"przerwane po >= 1 osadzie (\d+)\)")
+    steps, settl = tot(r"\| krokow pelnych (\d+) \("), tot(r"\| krokow pelnych \d+ \(osad (\d+)\)")
+    shown, asks, again, nonext = tot(r"\| okienek (\d+) z "), tot(r"\| okienek \d+ z (\d+) decyzji"), tot(r"\(ponownie (\d+),"), tot(r"bez nastepnej osady (\d+)\)")
+    nxt, endp = tot(r"wybory: nastepna (\d+),"), tot(r"wybory: nastepna \d+, koniec (\d+);")
+    em, em0, auto = tot(r"End Raiding po >= 1 osadzie (\d+),"), tot(r"przy 0 osadach (\d+);"), tot(r"koniec bez okienka \(klucz zdjety w decyzji\) (\d+),")
+    off = [d for d in rows if "| okienko NIE" in rows[d]]
+    if not rows or (new == 0 and ended == 0 and steps == 0):
+        rep.add("E7/R2 R2-2: rabunki gracza w oknie", "0 sesji (autotest gra AI)", "INFO - test Jeffa: pasek 99% przy okienku, End the raid, End Raiding po 1 osadzie i przy 0, wczytanie w decyzji, armia, Escape", None)
+        return
+    rep.add("E7/R2 R2-2: rabunki gracza w oknie (suma)",
+            f"sesji nowych {new}, zakonczonych {ended} (spalone {won}, odwolane przy 0 osadach {called}, przerwane po >= 1 osadzie {broken}); krokow pelnych {steps} (osad {settl})"
+            + (f"; dob z okienkiem NIE: {len(off)}" if off else ""), "INFO", None)
+    # R2-3: sesje gracza w linii R1 = zakonczone w linii R2 (te same zdarzenia konca rabunku)
+    r1 = {}
+    for d, x in by_day(lines, "Rabunek osada po osadzie (E7/R1): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            r1[d] = x
+    r1p = sum(num(r"\(AI \d+, gracz (\d+)\)", x, int, 0) or 0 for x in r1.values())
+    rep.add("E7/R2 R2-3: sesje gracza w linii R1 (gracz N) = zakonczone w linii R2 (suma okna)", f"{r1p} / {ended}", "rowne", r1p == ended)
+    rep.add("E7/R2 R2-4: wybory z okienka <= okienka otwarte (suma okna)", f"nastepna {nxt} + koniec {endp} wobec okienek {shown} + ponownie {again} (decyzji {asks}, bez nastepnej osady {nonext})",
+            "wybory <= okienka", (nxt + endp) <= (shown + again))
+    rep.add("E7/R2 R2-5: End Raiding i koniec bez okienka (suma okna)", f"End Raiding po >= 1 osadzie {em} (rabunek spalony), przy 0 osadach {em0} (odwolany - gra); koniec bez okienka (klucz zdjety w decyzji) {auto}",
+            "INFO", None)
+
 
 def etap7_w2(rep, lines, start, win, until=120, **kw):
     """E7/W2 (233, PLAN 7.9 a, projekt etapu 7 v2 rozdz. 3 "E7/W2" Test): linia startowa "Dymek wioski (E7/W2): start" (OnSessionLaunched), linia doby

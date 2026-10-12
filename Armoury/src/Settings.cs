@@ -1542,6 +1542,10 @@ namespace Armoury
         public bool RaidBySettlementEnabled = true;        // villages are raided settlement by settlement: each takes days, and the loot comes only from what the village really has
         public int RaidDetachmentMen = 200;                // raiders split into bands of this many men, each band burning its own settlement at the same time - a lord with 112 men burns one settlement in about four and a half days, an army of 2000 burns ten together
         public int RaidAlertMaxDays = 17;                  // after a raid has burned its settlements the village stays looted and does not start to mend for 1 day plus 1 for each hundredth of its district's people struck, at most this many days
+        // E7/R2 (236, PLAN 7.11 b, R15): okienko gracza po kazdej osadzie (DistrictRaid.cs) - rabunek z graczem prowadzi ta sama regula co AI (wymaga RaidBySettlementEnabled);
+        // gdy wodzem jest gracz, po kazdym pelnym kroku pasek staje na 99% i okienko pyta: nastepna osada (ok. N dni) albo koniec; "End Raiding" po >= 1 osadzie konczy
+        // rabunek jako spalony. NK. Off = gracz jak AI (jeden krok i koniec)
+        public bool RaidPlayerStepPopup = true;            // your raid stops after each settlement and asks: raid the next one (about N days) or end the raid (off = your raid burns one settlement and ends, as the lords' raids do)
 
         // --- The map and its crossings (stage 7) ---
         // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi
