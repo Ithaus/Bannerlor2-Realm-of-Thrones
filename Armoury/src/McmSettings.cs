@@ -940,6 +940,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool NotableCaravanCapitalReal { get; set; } = true;
 
+        [SettingPropertyBool("Notable Bk Gift Cut", HintText = "the second 10,000 Banner Kings hands every new notable on top of the game's 10,000 is no longer made out of thin air - a new notable starts with the game's 10,000 only (paid by his town while Notable Gold Real is on). The notables of a new world keep it. Off = Banner Kings adds 10,000 out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool NotableBkGiftCut { get; set; } = true;
+
+        [SettingPropertyBool("Alley Income From Town", HintText = "the 30 gold a day a gang leader earns for each alley he holds in his town is paid from that town's spare money above its merchants' reserve instead of out of thin air - a town without spare money pays nothing that day. Off = out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool AlleyIncomeFromTown { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -4726,6 +4734,8 @@ namespace Armoury
             s.CaravanCapitalReal = CaravanCapitalReal;
             s.NotableGoldReal = NotableGoldReal;
             s.NotableCaravanCapitalReal = NotableCaravanCapitalReal;
+            s.NotableBkGiftCut = NotableBkGiftCut;
+            s.AlleyIncomeFromTown = AlleyIncomeFromTown;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
