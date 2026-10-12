@@ -528,7 +528,7 @@ namespace Armoury
             _fence.Deals++; _fence.Offer += (int)Math.Min(offer, (long)limit);   // Spoils placi do swojego limitu
             if (sold > 0)
             {
-                Hero.MainHero.AddSkillXp(DefaultSkills.Roguery, (float)paid * 0.05f);
+                Hero.MainHero.AddSkillXp(DefaultSkills.Roguery, XpFair.FenceXp(paid));   // E8/X (248): 25 za udana sprzedaz zamiast 5% zaplaty (SmallXpFair; wylaczony = paid x 0.05)
                 var j = _fJournal.GetValue(beh);
                 if (j != null) _mRecordFence.Invoke(j, new object[] { paid });
                 _mCrime.Invoke(beh, new object[] { inst });

@@ -1239,6 +1239,7 @@ namespace Armoury
             try { RecruitSources.ApplyLate(); } catch (Exception e) { Log.Error("RecruitSources.ApplyLate", e); }
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
             try { SkillLedger.EnsureHooks(); } catch (Exception e) { Log.Error("SkillLedger.EnsureHooks", e); }   // E8/P1 (243): ksiega umiejetnosci - latki-liczniki w kampanii (raz na proces, tylko przy SkillLedgerLog), linia startu sesji
+            try { XpFair.EnsureHooks(); } catch (Exception e) { Log.Error("XpFair.EnsureHooks", e); }   // E8/X (248): doswiadczenie za skutek - latki w kampanii (raz na proces, tylko sprawy wlaczone), linia "FairXp (E8/X): start sesji"
             try { Drill.SessionStart(); } catch (Exception e) { Log.Error("Drill.SessionStart", e); }   // musztra: zapas z zapisu, opisy perkow kwatermistrza, linia startowa
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
@@ -1657,6 +1658,7 @@ namespace Armoury
             try { Measure174b.Daily(); } catch (Exception e) { Log.Error("Measure174b.Daily", e); } DayProfile.Lap("Measure174b.Daily");         // 174b.0: linie "Zbroja na polkach (174b)" i "ZakupyAI wedlug kupujacego (174b)" (tylko log)
             try { Drill.Daily(); } catch (Exception e) { Log.Error("Drill.Daily", e); } DayProfile.Lap("Drill.Daily");                     // musztra: "Musztra (gracz)", "Musztra AI", co 5 dob "Musztra AI wedlug krolestw"; zasilenie zapasu w autotescie
             try { SkillLedger.Daily(); } catch (Exception e) { Log.Error("SkillLedger.Daily", e); } DayProfile.Lap("SkillLedger.Daily");         // E8/P1 (243): linie "Umiejetnosci (E8/P1)", "XP wojska (E8/P1)", co 7 dob "Poziomy lordow (E8/P1)" (tylko log)
+            try { XpFair.Daily(); } catch (Exception e) { Log.Error("XpFair.Daily", e); } DayProfile.Lap("XpFair.Daily");                 // E8/X (248): linia "Doswiadczenie (E8/X)" - gra / po zmianie (strzal, jedzenie, zwiad, drobne, RBL)
             try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }   // 174.2 / B-2: kasy osad przed wywozem kupcow - pozostale moduly osobno
             try { SupplyDemand.DailyTrade(); } catch (Exception e) { Log.Error("SupplyDemand.DailyTrade", e); } DayProfile.Lap("SupplyDemand.DailyTrade");   // E6/R3 (215): w srodku wozy kupcow (TradeCarts - dostawy, wywoz, linia "Przewoz kupcow wozem")
             try { AiGear.BardingDaily(); } catch (Exception e) { Log.Error("AiGear.BardingDaily", e); } DayProfile.Lap("AiGear.BardingDaily");   // E6/R3 (215): linia "Uprzaz (215)" - po spisie polek w DailyTrade (tylko log)

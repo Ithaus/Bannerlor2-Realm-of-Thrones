@@ -182,6 +182,11 @@ Uzycie (Python 3, tylko odczyt):
                     pozostale partie = razem = liczby linii "Zuzycie AI" tej doby (lup obity, zuzyte, naprawione); P2-3 INFO kopie lupu u ocalalych pokonanych
                     (szt./dobe) i monopole - przyczyna 0; INFO udzial zalog, powody stania napraw, "Amunicja AI: zeszloby", cena do wartosci wedlug kupujacego,
                     "sufit 2.0 zablokowalby", dodatnie stany kupione (stan "przed" dla E8/W, E8/Z, E8/L, E8/R).
+                    Blok etap8_x (E8/X, paczka 248): doswiadczenie za skutek - linia doby "Doswiadczenie (E8/X)" (gra / po zmianie w tym samym biegu):
+                    X-1 XP ze strzalu poza bitwa (arena, turniej, cwiczenia) = 0 i ksiega P1 "strzal RBM" gracza <= zaplacone w bitwach (bieg bez misji:
+                    INFO - sprawdza Jeff), X-2 Steward z jedzenia partii lordow AI 300+ po/gra 0.4-0.6, X-3 Scouting z marszu partii lordow AI 300+
+                    po/gra 0.4-0.6, X-4 "latki wpiete 6/6" przy kazdym starcie (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0;
+                    INFO jedzenie i zwiad wedlug partii, rodzaje jedzenia gra / po, zima, postoj, paser, samonaprawa, RBL, koszt wlasny, ksiega P1 po zmianie.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8587,6 +8592,171 @@ def etap8_p2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 "INFO (E8/R: nowy wzor 5% dziennej wyplaty; prog R-3)", None)
 
 
+# ============================================================ ETAP 8 (E8/X, paczka 248): doswiadczenie za skutek - blok etap8_x
+E8_X_LINE = "Doswiadczenie (E8/X): dzien"
+E8_X_ST = "FairXp (E8/X): start sesji"
+E8_X_ROWS = ("gracz", "lordowie AI 300+", "lordowie AI ponizej 300", "pozostale")
+
+
+def e8x_seg(s, name):
+    """Odcinek linii doby '| <name> [stan]: tresc' -> (stan, tresc); brak = (None, None)."""
+    m = re.search(r"\| " + re.escape(name) + r" \[([^\]]*)\]: (.*?)(?= \| |$)", s)
+    return (m.group(1), m.group(2)) if m else (None, None)
+
+
+def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/X (248, projekt etapu 8 v2 rozdz. 3 "E8/X" Test, regula R10): linia doby "Doswiadczenie (E8/X)" (XpFair.cs) podaje dla kazdej sprawy
+    "gra X / po Y" z tego samego biegu (gra = ile zaplacilaby regula gry / RBM / RBL dla tych samych wywolan).
+    X-1 strzal poza bitwa (arena, turniej, cwiczenia): po = 0, a ksiega E8/P1 nie pokazuje u gracza wiecej XP "strzal RBM" niz zaplacono w bitwach
+    (bieg bez misji - autotest - nie ma strzalow: INFO, sprawdza Jeff w grze, 8.16); X-2 Steward z jedzenia partii lordow AI 300+: po/gra 0.4-0.6;
+    X-3 Scouting z marszu partii lordow AI 300+: po/gra 0.4-0.6 (gra = marsz + premia tylko-AI); X-4 kazdy start sesji "latki wpiete 6/6"
+    (strzal RBM, jedzenie, zwiad 2, RBL 2 - RBL potwierdzony w dekompilacji), wyplaty RBL 3/3, bez "nie znaleziono", potkniecia 0.
+    INFO: jedzenie i zwiad wedlug partii (gra -> po na dobe), rodzaje jedzenia liczone gra / po, zima, postoj, strzaly, paser, samonaprawa, RBL,
+    koszt wlasny, ksiega E8/P1 w tym samym oknie (jedzenie, marsz, marsz premia AI - po zmianie)."""
+    xl = {d: s for d, s in by_day(lines, E8_X_LINE).items() if 1 <= run_day(d, start) <= until}
+    st = [s for s in lines if s.startswith(E8_X_ST)]
+    if not xl and not st:
+        rep.add("E8/X: linia Doswiadczenie (E8/X)", "brak w logu", "jest od wgrania E8/X (ShotXpFair, StewardFoodXpFair, ScoutXpFair, SmallXpFair, RblPaidXpFair)", None)
+        return
+    days = sorted(xl)
+    nd = max(1, len(days))
+    shot = [0, 0, 0, 0, 0, 0]                       # w bitwie: strzalow, gra, po; poza bitwa: strzalow, gra, po
+    food = {r: [0, 0, 0] for r in E8_X_ROWS}        # partii, gra, po
+    scout = {r: [0, 0, 0, 0] for r in E8_X_ROWS}    # godzin, gra (z premia AI), premia AI, po
+    small = [0, 0, 0, 0, 0, 0, 0, 0]                # paser: n, gra, po; samonaprawa: n, gra, po; RBL: n, gra
+    kinds_g, kinds_p, winter, idle, root = [], [], 0, 0, 0
+    states = {}
+    for d in days:
+        s = xl[d]
+        for name in ("strzal", "jedzenie", "zwiad", "drobne", "RBL"):
+            stt, seg = e8x_seg(s, name)
+            if stt is not None:
+                states.setdefault(name, set()).add(stt)
+            if not seg:
+                continue
+            if name == "strzal":
+                m = re.search(r"w bitwie (\d+) strzalow gra (-?\d+) / po (-?\d+), poza bitwa (\d+) strzalow gra (-?\d+) / po (-?\d+)", seg)
+                if m:
+                    for i in range(6):
+                        shot[i] += int(m.group(i + 1))
+            elif name == "jedzenie":
+                for r in E8_X_ROWS:
+                    m = re.search(r"(?:^|, )" + re.escape(r) + r" (\d+) partii gra (-?\d+) / po (-?\d+)", seg)
+                    if m:
+                        for i in range(3):
+                            food[r][i] += int(m.group(i + 1))
+                m = re.search(r"; rodzaje na partie gra ([0-9.]+) / po ([0-9.]+)", seg)
+                if m:
+                    kinds_g.append(float(m.group(1)))
+                    kinds_p.append(float(m.group(2)))
+                winter += num(r"; zima (\d+) partii", seg, default=0)
+                root += num(r"; lordowie AI 300\+ sam pierwiastek (-?\d+)", seg, default=0)
+            elif name == "zwiad":
+                for r in E8_X_ROWS:
+                    m = re.search(r"(?:^|, )" + re.escape(r) + r" (\d+) godzin gra (-?\d+) \(w tym premia AI (-?\d+)\) / po (-?\d+)", seg)
+                    if m:
+                        for i in range(4):
+                            scout[r][i] += int(m.group(i + 1))
+                idle += num(r"; stoi (\d+) godzin", seg, default=0)
+            elif name == "drobne":
+                m = re.search(r"paser (\d+) sprzedazy gra (-?\d+) / po (-?\d+), samonaprawa (\d+) sztuk gra (-?\d+) / po (-?\d+)", seg)
+                if m:
+                    for i in range(6):
+                        small[i] += int(m.group(i + 1))
+            else:
+                m = re.search(r"(\d+) wyplat gra (-?\d+) / po", seg)
+                if m:
+                    small[6] += int(m.group(1))
+                    small[7] += int(m.group(2))
+
+    def state(name):
+        v = sorted(states.get(name, ()))
+        return "" if v in ([], ["wl"]) else " [" + ", ".join(v) + "]"
+
+    # ksiega E8/P1 w tym samym oknie (po zmianie): zrodla lordow AI i gracza
+    p1 = {d: s for d, s in by_day(lines, E8_P1_UM).items() if d in xl}
+    p1_l, p1_g = {}, {}
+    for d in sorted(p1):
+        ml = re.search(r"\| zrodla lordow AI: (.*?) \| zrodla gracza: (.*?) \| umiejetnosci lordow AI:", p1[d])
+        if not ml:
+            continue
+        for acc, seg in ((p1_l, ml.group(1)), (p1_g, ml.group(2))):
+            for k, (xp, n) in e8p1_sources(seg).items():
+                acc[k] = acc.get(k, 0) + xp
+    # X-1
+    shots = shot[0] + shot[3]
+    p1_shot = p1_g.get("strzal RBM", 0)
+    if shots == 0 and p1_shot == 0:
+        rep.add("X-1: XP ze strzalu poza bitwa (arena, turniej, cwiczenia) = 0", "brak strzalow bohaterow w biegu (autotest bez misji)" + state("strzal"),
+                "po 0 poza bitwa; ksiega P1 'strzal RBM' gracza <= zaplacone w bitwach (sprawdza Jeff w grze - 8.16)", None)
+    else:
+        rep.add("X-1: XP ze strzalu poza bitwa (arena, turniej, cwiczenia) = 0",
+                (f"poza bitwa {shot[3]} strzalow gra {shot[4]} / po {shot[5]}; w bitwie {shot[0]} strzalow gra {shot[1]} / po {shot[2]}"
+                 + (f" (po/gra {shot[2] / shot[1]:.2f})" if shot[1] > 0 else "") + f"; ksiega P1 gracz 'strzal RBM' {p1_shot}" + state("strzal")),
+                "po 0 poza bitwa; ksiega P1 'strzal RBM' gracza <= zaplacone w bitwach", shot[5] == 0 and p1_shot <= shot[2] + len(days))
+    # X-2, X-3
+    big = "lordowie AI 300+"
+    fg, fp = food[big][1], food[big][2]
+    rep.add("X-2: Steward z jedzenia partii lordow AI 300+, po/gra",
+            (f"{fp / fg:.2f} (gra {fg / nd:.0f} -> po {fp / nd:.0f} XP/dobe, {food[big][0] / nd:.1f} partii/dobe, {len(days)} dob"
+             + (f"; rozklad: sam pierwiastek x{root / fg:.2f}, rodzaje od pol dnia i zima x{fp / root:.2f}" if root > 0 else "") + ")" if fg > 0
+             else f"brak partii lordow 300+ z kwatermistrzem i ponad 3 rodzajami jedzenia ({len(days)} dob)") + state("jedzenie"),
+            "0.4-0.6", (0.4 <= fp / fg <= 0.6) if fg > 0 else None)
+    sg, sp = scout[big][1], scout[big][3]
+    rep.add("X-3: Scouting z marszu partii lordow AI 300+, po/gra",
+            (f"{sp / sg:.2f} (gra {sg / nd:.0f} w tym premia AI {scout[big][2] / nd:.0f} -> po {sp / nd:.0f} XP/dobe, {scout[big][0] / nd:.0f} godzin marszu/dobe, {len(days)} dob)"
+             if sg > 0 else f"brak marszu partii lordow 300+ ({len(days)} dob)") + state("zwiad"),
+            "0.4-0.6", (0.4 <= sp / sg <= 0.6) if sg > 0 else None)
+    # X-4
+    wired = [(num(r"\| latki wpiete (\d+)/\d+", s), num(r"\| latki wpiete \d+/(\d+)", s)) for s in st]
+    rbl = [(num(r"wyplaty (\d+)/\d+", s), num(r"wyplaty \d+/(\d+)", s)) for s in st if "| RBL wpiete" in s]
+    nf = [s.split(" | nie znaleziono: ", 1)[1] for s in st if " | nie znaleziono: " in s]
+    offs = sorted(set(m for s in st for m in re.findall(r"WYLACZON[EY] \((\w+) off\)", s)))
+    stum = max([num(r"\| potkniecia (\d+)", xl[d], default=0) for d in days] + [0])
+    bad = [f"{a}/{b}" for a, b in wired if a is None or b is None or a != b or b != 6]
+    bad_rbl = [f"{a}/{b}" for a, b in rbl if a != b]
+    rep.add("X-4: latki E8/X wpiete przy kazdym starcie sesji, potkniecia 0",
+            (f"starty {len(st)}, wpiete " + (", ".join(sorted(set(f"{a}/{b}" for a, b in wired))) if wired else "-")
+             + ", wyplaty RBL " + (", ".join(sorted(set(f"{a}/{b}" for a, b in rbl))) if rbl else "-") + f", potkniecia {stum}"
+             + (f" | wylaczone: {', '.join(offs)}" if offs else "") + (f" | nie znaleziono: {nf[-1][:220]}" if nf else "")),
+            "6/6 (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0", (len(st) > 0 and not bad and not bad_rbl and not nf and stum == 0))
+    # INFO
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in xl]
+
+    def rows(acc, unit, gi, pi, extra=None):
+        out = []
+        for r in E8_X_ROWS:
+            a = acc[r]
+            if a[0] == 0 and a[gi] == 0 and a[pi] == 0:
+                continue
+            out.append(f"{r}: {a[0] / nd:.1f} {unit}, gra {a[gi] / nd:.0f} -> po {a[pi] / nd:.0f}" + (f" (x{a[pi] / a[gi]:.2f})" if a[gi] > 0 else "")
+                       + (extra(a) if extra else ""))
+        return "; ".join(out) if out else "-"
+    rep.add("E8/X: linia Doswiadczenie (E8/X) w dobach okna", f"{len(xl)} dob" + (f", brak w dobach kampanii {miss[:8]}" + (" ..." if len(miss) > 8 else "") if miss else ""),
+            "INFO (pierwszy takt sesji bez linii)", None)
+    rep.add("E8/X: Steward z jedzenia wedlug partii (XP na dobe)",
+            rows(food, "partii/d", 1, 2) + (f" | rodzaje na partie gra {sum(kinds_g) / len(kinds_g):.1f} / po {sum(kinds_p) / len(kinds_p):.1f}" if kinds_g else "")
+            + f" | zima (premia) {winter} partio-dob" + state("jedzenie"),
+            "INFO (100 ludzi bez zmian; mala druzyna wiecej, duza mniej; rodzaj od pol dnia zapasu)", None)
+    rep.add("E8/X: Scouting z marszu wedlug partii (XP na dobe)",
+            rows(scout, "godzin/d", 1, 3, lambda a: f", premia AI gry {a[2] / nd:.0f}") + f" | stoi (predkosc <= 1) {idle / nd:.0f} godzin/d" + state("zwiad"),
+            "INFO (15 / 25 na godzine marszu, karawany polowa, premia tylko-AI 0)", None)
+    rep.add("E8/X: drobne w oknie - paser, samonaprawa, RBL (gra -> po)",
+            f"paser {small[0]} sprzedazy {small[1]} -> {small[2]}; samonaprawa {small[3]} sztuk {small[4]} -> {small[5]}; RBL {small[6]} wyplat {small[7]} -> 0"
+            + state("drobne") + state("RBL"), "INFO (autotest bez gracza przy kowadle i w rozmowach - sprawdza Jeff, 8.16)", None)
+    cost = [fnum(r"\| koszt wlasny ~([0-9.]+) ms", xl[d]) for d in days]
+    cost = [c for c in cost if c is not None]
+    if cost:
+        rep.add("E8/X: koszt wlasny prefiksow jedzenia i zwiadu", f"srednio {sum(cost) / len(cost):.1f} ms/dobe, najwiecej {max(cost):.1f} ms ({len(cost)} dob; bez nauki gry)",
+                "INFO (projekt: < 5 ms/dobe)", None)
+    if p1_l:
+        npd = max(1, len(p1))
+        rep.add("E8/X: ksiega E8/P1 w tym samym oknie - lordowie AI (surowe XP na dobe, po zmianie)",
+                ", ".join(f"{k} {p1_l.get(k, 0) / npd:.0f}" for k in ("jedzenie", "marsz", "marsz premia AI", "strzal RBM")),
+                "INFO (marsz premia AI = 0 przy ScoutXpFair; 'przed' w biegu bez E8/X)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8609,6 +8779,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks = [etap8_t0, etap8_0]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
     blocks.append(etap8_p1)   # E8/P1 (243): ksiega umiejetnosci
     blocks.append(etap8_p2)   # E8/P2 (244): pomiary sprzetu AI, lupu i korony
+    blocks.append(etap8_x)    # E8/X (248): doswiadczenie za skutek
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

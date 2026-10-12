@@ -1093,7 +1093,7 @@ namespace Armoury
                             if (p.Item != null) MobileParty.MainParty.ItemRoster.AddToCounts(p.Item, -p.Count);
                         if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                         Forge.SpendStamina(stamina);
-                        Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, 30 + 20 * Recipes.Grade(ee.Item));
+                        Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, XpFair.SelfMendXp(30 + 20 * Recipes.Grade(ee.Item), XpFair.Restored(ee)));   // E8/X (248): XP x przywrocony stan, min. 25% (SmallXpFair)
                     }
                     store.AddToCounts(ee, -1);
                     store.AddToCounts(new EquipmentElement(ee.Item), 1);
@@ -1129,7 +1129,7 @@ namespace Armoury
                         if (p.Item != null) roster.AddToCounts(p.Item, -p.Count);
                     if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                     Forge.SpendStamina(stamina);
-                    Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, 30 + 20 * Recipes.Grade(ee.Item));
+                    Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, XpFair.SelfMendXp(30 + 20 * Recipes.Grade(ee.Item), XpFair.Restored(ee)));   // E8/X (248): XP x przywrocony stan, min. 25% (SmallXpFair)
                 }
                 if (slot >= 0)
                 {

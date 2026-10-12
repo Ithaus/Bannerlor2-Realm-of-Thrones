@@ -3944,6 +3944,26 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool SkillLedgerLog { get; set; } = true;
 
+        [SettingPropertyBool("Shot Xp Fair", HintText = "RBM's experience for every loosed arrow, bolt or thrown weapon is paid only in a real battle and at a third (bow 10, crossbow 20, thrown 17, sling 10); in the arena, a tournament or at practice a shot alone teaches nothing - the hit still does.")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool ShotXpFair { get; set; } = true;
+
+        [SettingPropertyBool("Steward Food Xp Fair", HintText = "Steward experience from feeding the party grows with the square root of its size, not with every mouth; a kind of food counts only from half a day's supply for the whole party; winter adds a quarter instead of a half.")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool StewardFoodXpFair { get; set; } = true;
+
+        [SettingPropertyBool("Scout Xp Fair", HintText = "Scouting experience from marching is a flat 15 an hour (25 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool ScoutXpFair { get; set; } = true;
+
+        [SettingPropertyBool("Small Xp Fair", HintText = "The fence teaches a flat 25 Roguery per deal instead of 5% of the coin paid; mending a piece with your own hands teaches in proportion to the condition you restore (at least a quarter).")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool SmallXpFair { get; set; } = true;
+
+        [SettingPropertyBool("Rbl Paid Xp Fair", HintText = "Realistic Bannerlord no longer gives Charm or Roguery experience for coin handed over (a bought council vote, a planted spy, hired saboteurs); the relation you gain still teaches Charm.")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool RblPaidXpFair { get; set; } = true;
+
         [SettingPropertyBool("Troop Mend Enabled", HintText = "the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate")]
         [SettingPropertyGroup("The men's gear")]
         public bool TroopMendEnabled { get; set; } = true;
@@ -5893,6 +5913,11 @@ namespace Armoury
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
             s.SkillLedgerLog = SkillLedgerLog;
+            s.ShotXpFair = ShotXpFair;
+            s.StewardFoodXpFair = StewardFoodXpFair;
+            s.ScoutXpFair = ScoutXpFair;
+            s.SmallXpFair = SmallXpFair;
+            s.RblPaidXpFair = RblPaidXpFair;
             s.TroopMendEnabled = TroopMendEnabled;
             s.TroopMendWreckShare = TroopMendWreckShare;
             s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;

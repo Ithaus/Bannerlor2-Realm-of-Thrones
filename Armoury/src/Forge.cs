@@ -536,7 +536,7 @@ namespace Armoury
                     Recipes.TakePartial(r, s.SelfRepairMaterialFactor * missingCondition);
                 }
                 SpendStamina(stam);
-                Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.6f);
+                Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, XpFair.SelfMendXp(ProjectXp(r, false) * 0.6f, missingCondition));   // E8/X (248): XP x przywrocony stan, min. 25% (SmallXpFair)
                 return true;
             }
             catch (Exception e) { Log.Error("SelfRepair", e); reason = "forge mishap (see log)"; return false; }

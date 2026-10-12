@@ -117,6 +117,7 @@ namespace Armoury
             Array.Clear(_cType, 0, CMax); Array.Clear(_cW, 0, 2 * CMax); _cN = 0;
             for (int i = 0; i < 2; i++) { _oSeen[i] = 0; _oStride[i] = 32; _oDay[i] = 0; _oAll[i] = 0; }
             _stale = 0; _stumbles = 0; _lastDay = -1; _had = false; _selfTicks = 0; _nsMark = -1.0;
+            XpFair.Reset();   // E8/X (248): liczniki linii "Doswiadczenie (E8/X)" - ten sam stan sesji (bez dopisku w konstruktorze ArmouryBehavior)
         }
 
         private static void ClearPeriod()
