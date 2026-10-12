@@ -548,6 +548,7 @@ namespace Armoury
                         _dWanted[m] += nd[m];
                     }
                     shelf.AddToCounts(pick, 1);
+                    ArmsBook.Source(ArmsBook.SFletcher, pick, 1);   // E6/0 (206): ksiega uzbrojenia - zrodlo "strzelarze" (tylko licznik)
                     int c; made.TryGetValue(pick, out c); made[pick] = c + 1;
                     _dMade[Kind(pick.ItemType), TierOf(pick)]++;
                     hands -= _days[pick];

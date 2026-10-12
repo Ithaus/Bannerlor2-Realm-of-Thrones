@@ -139,6 +139,7 @@ namespace Armoury
             try
             {
                 if (st == null || !st.IsTown || st.Town == null || it == null || n <= 0) return;
+                ArmsBook.Arrival(it, n, kind);   // E6/0 (206): ksiega uzbrojenia - warsztat = zrodlo, reszta = przeniesienie (tylko licznik)
                 int k = ArmourKind(it);
                 if (k < 0 || ArmsPricing.IsUnique(it)) return;
                 if (kind >= 0 && kind < ArrKinds) _arr[kind] += n;

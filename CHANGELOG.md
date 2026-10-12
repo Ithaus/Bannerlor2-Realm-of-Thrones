@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 6, paczka 206 = E6/0) - POMIAR ETAPU 6: KSIEGA UZBROJENIA, KSIEGA KONI, "CO KUJE KAZDA KRAINA" (TYLKO LOG)
+**Mod:** Armoury | **Galaz:** `w-toku/e6-waski` (od `w-toku/zbior-e5` c3855de) | **Projekt:** `docs/etap6/PROJEKT-ETAP6-RZEMIOSLO-SUROWCE-KONIE-2026-10-12.md` v2 rozdz. 3 "E6/0" + `KRYTYKA-E6.md`; decyzje Jeffa 11.10 17:30 (6.19) i 12.10 00:00 (unikaty tylko kowale miast i AI)
+
+**Problem:** progow etapu 6 nie da sie dzis zmierzyc (rozpoznanie A6 rozdz. 1): brak linii "Konie", brak ksiegi uzbrojenia wedlug zrodla, brak linii "co kuje kazda kraina". Bez tego M1 (6.19 - Polnoc kuje Lannister Sword, katane, rapier) i M2 (wielblady w Dorne) nie maja stanu wyjsciowego ani kontroli w tym samym biegu.
+
+**Przyczyna:** dotad tylko `Measure174b` (zbroja na polkach miast, 4 rodzaje) i `HorseCensus` (konie AI w partiach); warsztaty wybieraja wyrob wedlug `Item.Culture == town.Culture` z obca pula przy pustej linii (`WorkshopLaw.Candidates` :532), bez pojecia krainy wyrobu.
+
+**Zmiana (gra bez zmian - zadna latka, zadna zmiana rosteru ani zlota):**
+- NOWY `CraftRealm.cs` (tryb odczytu): kraina wyrobu tylko do produkcji (literowki XML, bron rodow bez kultury wedlug prefiksu id, nikt: unikaty/legendy/zakazane, stroje bandytow, `lion_sword`, `wildling_armor3`, `wildling_sword`, stal wanilii Dothrakow), rod wyrobu (`HouseOf` - lista z `chain.py`), wspolne strony morza (>= 4 kultury jednostek Soldier/Mercenary); lancuch na koszyk typ x tier wedlug `SCR\e6P\chain.py` v4 + lore v2 (Wolni Ludzie bez metalu poza brazem Thennow; wanilia Braavos/Lorath tylko u siebie albo jako wspolne); kraina miasta = `FreeHands.RealmOf` (kultura z dnia kalibracji - ta sama definicja co E4/7). `Allowed(kraina, wyrob)` = poziom <= 5 i najnizszy w koszyku (uzywa tylko linia pokrycia; czynne w E6/M1).
+- NOWY `ArmsBook.cs`: `Stage6Measure` (fasada: Reset, nasluch `OnItemProduced`, Daily z kosztem), `ArmsBook` (10 rodzajow x 3 pasma; stan = polki i schowki osad + tabory + zbrojownie DTE; zrodla: warsztaty, strzelarze; ujscie: zlom; przeniesienia info: przerzut kupcow, sakiewki, zalogi; reszta), `HorseBook` (5 kategorii; stan: polki, magazyny wsi, schowki, tabory, zbrojownie, bohaterowie; zrodlo: stadniny wsi; wielblady w Qarthu / poza Qarthem; co 7 dob rachunek podazy).
+- Haki (tylko liczniki): `Measure174b.cs:142` (`ArmsBook.Arrival`), `TownFletchers.cs:551` (`ArmsBook.Source`), `ArmsScrap.cs:134` (`ArmsBook.Sink`), `ArmouryBehavior.cs:395` (Reset), `:643` (nasluch), `:1585` (`Stage6Measure.Daily` po `MoneyLedger.Daily`).
+- Klucz `Stage6MeasureLog` = true (`Settings.cs:1364`, nowa grupa MCM "Crafts, raw materials and horses (stage 6)"); `McmSettings.cs` z `python tools/gen_mcm.py` (Armoury 1120 -> 1121).
+
+**Linie logu:** `CraftRealm (E6/0): krain 30, wyrobow uzbrojenia ...` i `CraftRealm (E6/0) pokrycie koszykow korpusu T, helmu H, tarczy S t1-6 ...` (raz na sesje); `Warsztaty wedlug krainy (E6/0, na sucho): dzien N | sztuk: wlasne, pokrewne, region, wspolne, OBCE, bandyckie/nikt | unikatow | najwiecej obcych: [...]`; `Uzbrojenie wedlug zrodla (E6/0): dzien N | zrodla ... | ujscia ... | przeniesienia ... | stan ... | reszta x (y%) | ... koszt pomiaru E6/0 ms`; `Konie (E6/0): dzien N | ... | wielblady wyprodukowane: w Qarthu a, poza Qarthem b | reszta niewyjasniona`; `Rachunek koni (E6/0, co 7 dob)`.
+
+**Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
+- Regresje: wszystkie wywolania w `try` albo z wlasnym `try`; `NoteArrival` - wywolanie po istniejacej bramce, przed filtrem zbroi (licznik nie zmienia sciezki); nasluch `OnItemProduced` nic nie zmienia (kolejnosc nasluchow bez znaczenia).
+- Kolizje: brak - nowe pola; `ArmsPricing.CostOf` wypelnia swoj bufor dla wszystkich wyrobow uzbrojenia (raz na sesje, po `HistoricalPrices.Apply` - `Ready` czeka na `Applied`).
+- Swiadome braki (reszta je pokazuje, kolejne okna w nastepnej sesji): zuzycie do wraku, przecieki 174, netto lupu DTE (`DteWindow`), kuznia gracza, komplety z niczego, handel gry; w koniach - polegle, mieszczanie, LegendaryLaw, rozbite partie, BK, dary startowe, zamiany ROT. Przeniesienia widziane tylko po stronie przyjazdu (kontrola netto 0 - nastepna sesja). Rozbicie mnoznikow wsi i zgony koni w misji - nastepna sesja. `sprawdz_logi --grupa etap6` - nastepna sesja.
+- Koszt: dwa przebiegi rosterow swiata raz na dobe + spis wyrobow raz na sesje; linia podaje ms (prog projektu <= 10 ms/dobe).
+- Stan czyszczony w konstruktorze `ArmouryBehavior` (`Stage6Measure.Reset`); pierwsza doba = stan wyjsciowy (bez reszty).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy (120 dob nowej kampanii): T1 reszty policzone, T2 "OBCE" > 0 w Winterfell przy wylaczonym M1, T5 rachunek koni wypisany, koszt <= 10 ms/dobe, 0 bledow `CraftRealm.`/`ArmsBook.`/`HorseBook.`.
+
 ## 2026-10-11 (etap 5, poprawka po recenzji scalenia porcji A w `w-toku/zbior-e5`) - NARZEDZIE: E5/A4 CZYTA LINIE 110 I 169c BEZ PRZESUNIECIA DOBY
 **Mod:** Armoury (tylko narzedzie) | **Galaz:** `w-toku/zbior-e5` (od 775e7f6) | **Plik:** `tools/sprawdz_logi.py` (`etap5_a4`)
 

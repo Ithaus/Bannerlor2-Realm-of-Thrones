@@ -4492,6 +4492,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownFolkMode { get; set; } = 1;
 
+        [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool Stage6MeasureLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5614,6 +5618,7 @@ namespace Armoury
             s.ShipTradeThroughPort = ShipTradeThroughPort;
             s.ShipPrizesToPort = ShipPrizesToPort;
             s.TownFolkMode = TownFolkMode;
+            s.Stage6MeasureLog = Stage6MeasureLog;
         }
 
         internal static void Apply()

@@ -1359,6 +1359,9 @@ namespace Armoury
         // --- The townsfolk's purse ---
         // E5/0 (195, projekt etapu 5 rozdz. 3): kiesa ludu na sucho - tylko log (klucz kiesy czynnej i wzmianka w opisie - dopiero w B1, K3; recenzja E5/0 (2-3))
         public int TownFolkMode = 1;                       // 0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game
+        // --- Crafts, raw materials and horses (stage 6) ---
+        // E6/0 (206, projekt etapu 6 v2 rozdz. 3): pomiar etapu 6 - tylko log (ksiega uzbrojenia, ksiega koni, co kuje kazda kraina)
+        public bool Stage6MeasureLog = true;               // counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game
 
         public static void Load(string moduleDataDir)
         {
