@@ -16,6 +16,7 @@ namespace CrashScribe
         public static bool ShowInGame = true;          // krotka czerwona notka na ekranie, ze cos poszlo nie tak
         public static int MaxReportsPerSession = 300;
         public static int KeepSessions = 15;
+        public static bool RepeatKeyByMessage = true;  // SCRIBE-KLUCZ-POWTOREK (11.10): powtorka = ten sam komunikat (cyfry/hex na '#') i, przy FirstChance, ten sam wolajacy z zywego stosu; linia powtorki z opisem; false = po staremu (typ + pierwsza ramka sladu)
 
         // mody objete siecia; puste = wszystkie spoza Native
         public static string WrapModules = "RealisticCaptivity,GrandTourney,Armoury";
@@ -48,6 +49,7 @@ namespace CrashScribe
         public static bool NightKingRespectShackles = true;  // kajdany ROT 300/400/500 x FabulaTimeScale takze dla Pochodu
         public static int NightKingWallFromDay = 2184;       // Mur od 7. roku (serial s7 ok. 304 AC)
         public static int NightKingCallFromDay = 728;        // Zew spi do pierwszego terminu
+        public static bool NightKingCalendarSiegeGate = true; // T2c (patrz NightKingGate.cs): Inni nie zaczynaja ani nie prowadza oblezenia / szturmu / rabunku zamknietego celu
 
         // --- Inni bez dosypki z niczego (T2b noc 08/09.10; patrz OthersGrowth.cs) ---
         public static bool OthersNoFreeGrowth = true;        // wylacznik calosci: Inni rosna tylko z nekromancji i odbitych jencow (+ szablon nowej bandy)
@@ -56,8 +58,29 @@ namespace CrashScribe
         public static bool OthersNoDailyWights = true;       // bez +2 trupow ROT dziennie na bande
         public static bool OthersNoMapVolunteers = true;     // bez "ochotnikow z mapy" gry (3-7 BasicTroop poza osada)
 
+        // --- Reparacje w wojnach fabularnych ROT (T9 noc 08/09.10; patrz StorylineReparations.cs) ---
+        public static bool StorylineWarNoReparations = true;  // pokoj w wojnie, ktora ROT i tak wypowiada od nowa nastepnej doby - bez reparacji Diplomacy (inne pokoje bez zmian)
+
+        // --- Pokoj z biedy (E1 noc 09/10.10; patrz PovertyPeace.cs) ---
+        public static bool PovertyPeace = true;  // krolestwo z pustym skarbcem: rzadziej wypowiada wojne (ocena BK), biedne rody chetniej glosuja za pokojem; wojny fabularne ROT bez zmian
+        public static bool PovertyPeaceProposals = true;        // E1b: krolestwo z bieda skarbca >= 0.5 raz na 7 dob sklada wniosek o pokoj z wrogiem o najgorszym wyniku wojny (wojny niefabularne); false = tylko wnioski gry i BK
+        public static bool PovertyPeaceArrearsMeasure = false;  // E1b: bieda z niedoplaty zwrotu zoldu korony (28 dob, wzgledem 25% i sredniej swiata) - wlaczyc po paczce 165; false = zapas skarbca (E1)
+
         // --- Oboz obleniczy (patrz Mends.RbSiegeCampFed) ---
         public static bool RbSiegeAttritionOnlyStarving = true; // straty obozu z RealisticBannerlord (2-5 dziennie, rosnace) tylko gdy oboz GLODUJE; garnizon - tylko gdy miasto bez zapasow // najsilniejsza banda pelna w tylu procentach limitu (ROT: oblezenie przy >= 0.8)
+
+        // --- Oblezenie Harrenhal: przepustka BK (B6; patrz Mends.HarrenhalBkPass) ---
+        public static bool HarrenhalBkArmyPass = true; // BK nie odmawia armii dowodcy jednego skryptowego CreateArmy oblezenia Harrenhal (Roose albo zastepca); false = po staremu (NRE polykany, zastepca)
+        // --- Oblezenie Harrenhal: czekanie na Roose'a i sprzatanie po wydarzeniu (B6b; patrz Mends.HarrenhalWait, HarrenhalEnd, HarrenhalOldSaveCheck) ---
+        public static bool HarrenhalWaitForRoose = true;     // Roose w bitwie albo w cudzym oblezeniu: proba odlozona (co godzine), zastepca dopiero po HarrenhalWaitHours; false = zastepca od razu (po staremu)
+        public static int HarrenhalWaitHours = 72;           // limit czekania w godzinach gry (doba = 24 h niezaleznie od kalendarza Armoury); <= 0 = nie czekamy
+        public static bool HarrenhalReleaseCommander = true; // koniec wydarzenia (postfiks CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Roose'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
+        public static bool HarrenhalOldSaveFix = true;       // po wczytaniu: wydarzenie skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Polnocy tylko w logu)
+        // --- Oblezenie Muru: sprzatanie dowodcy po wydarzeniu (B6c; patrz Mends.WallEnd, WallReleasePrev, WallOldSaveCheck) ---
+        public static bool WallReleaseCommander = true;      // koniec wydarzenia (postfiks WallSiegeEvent.CompleteEvent) i zmiana dowodcy (nasz port albo powrot sterow do ROT z Mance'em): armia oblezenia rozwiazana, dowodca odmrozony; false = jak ROT
+        public static bool WallOldSaveFix = true;            // po wczytaniu: oblezenie Muru skonczone, a jego dowodca dalej zamrozony - odmrozenie (inni zamrozeni lordowie Wolnych Ludzi tylko w logu)
+        // --- Atuty BK z nagrody za bitwe (decyzja Jeffa 4, 12.10; patrz Mends.BkRewardPerks) ---
+        public static bool BkBattleRewardPerks = true;       // latka BK BKBattleRewardTweakPatches nie wchodzi w 1.4.8 (nazwy parametrow) - nasze postfiksy z ta sama logika (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), kazdy tylko gdy BK go nie ma; false = bez tych atutow
 
         internal static void Load(string moduleDataDir)
         {
@@ -84,6 +107,7 @@ namespace CrashScribe
                         case "ShowInGame": ShowInGame = B(v); break;
                         case "MaxReportsPerSession": MaxReportsPerSession = I(v, MaxReportsPerSession); break;
                         case "KeepSessions": KeepSessions = I(v, KeepSessions); break;
+                        case "RepeatKeyByMessage": RepeatKeyByMessage = B(v); break;
                         case "WrapModules": WrapModules = v; break;
                         case "LocalRecruits": LocalRecruits = B(v); break;
                         case "FabulaPacerEnabled": FabulaPacerEnabled = B(v); break;
@@ -104,12 +128,25 @@ namespace CrashScribe
                         case "NightKingRespectShackles": NightKingRespectShackles = B(v); break;
                         case "NightKingWallFromDay": NightKingWallFromDay = I(v, NightKingWallFromDay); break;
                         case "NightKingCallFromDay": NightKingCallFromDay = I(v, NightKingCallFromDay); break;
+                        case "NightKingCalendarSiegeGate": NightKingCalendarSiegeGate = B(v); break;
                         case "OthersNoFreeGrowth": OthersNoFreeGrowth = B(v); break;
                         case "OthersStartDowryDays": OthersStartDowryDays = I(v, OthersStartDowryDays); break;
                         case "OthersNoBirthDowry": OthersNoBirthDowry = B(v); break;
                         case "OthersNoDailyWights": OthersNoDailyWights = B(v); break;
                         case "OthersNoMapVolunteers": OthersNoMapVolunteers = B(v); break;
+                        case "StorylineWarNoReparations": StorylineWarNoReparations = B(v); break;
+                        case "PovertyPeace": PovertyPeace = B(v); break;
+                        case "PovertyPeaceProposals": PovertyPeaceProposals = B(v); break;
+                        case "PovertyPeaceArrearsMeasure": PovertyPeaceArrearsMeasure = B(v); break;
                         case "RbSiegeAttritionOnlyStarving": RbSiegeAttritionOnlyStarving = B(v); break;
+                        case "HarrenhalBkArmyPass": HarrenhalBkArmyPass = B(v); break;
+                        case "HarrenhalWaitForRoose": HarrenhalWaitForRoose = B(v); break;
+                        case "HarrenhalWaitHours": HarrenhalWaitHours = I(v, HarrenhalWaitHours); break;
+                        case "HarrenhalReleaseCommander": HarrenhalReleaseCommander = B(v); break;
+                        case "HarrenhalOldSaveFix": HarrenhalOldSaveFix = B(v); break;
+                        case "WallReleaseCommander": WallReleaseCommander = B(v); break;
+                        case "WallOldSaveFix": WallOldSaveFix = B(v); break;
+                        case "BkBattleRewardPerks": BkBattleRewardPerks = B(v); break;
                     }
                 }
             }

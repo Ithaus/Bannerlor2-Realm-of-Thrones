@@ -52,6 +52,9 @@ namespace CrashScribe
         private static Settlement _theWall;
         private static bool _marchGreeted;
 
+        // T2c: liczniki blokady oblezen od zera przy kazdym starcie gry (zachowanie tworzone w OnGameStart)
+        public NightKingCall() { NightKingGate.ResetSession(); _breakPending = false; }
+
         public override void RegisterEvents()
         {
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily);
@@ -60,6 +63,7 @@ namespace CrashScribe
         }
 
         private static bool _loadCheckPending;                          // T2: TurnBack w pierwszej godzinie sesji
+        private static bool _breakPending;                              // recenzja T2c: oblezenie zamknietego celu w bitwie - TurnBack co godzine
         private static System.Reflection.PropertyInfo _pRotShackles;    // T2: ROT.ROTSettings.OthersAIShackles
         private static bool _rotShacklesLooked;
 
@@ -70,13 +74,14 @@ namespace CrashScribe
         // Pochod nie wybiera celu przed jego dniem, Zew spi do NightKingCallFromDay, banda z rozkazem oblezenia
         // na zamkniety cel dostaje patrol przy siedzibie klanu. Zadnych kluczy zapisu: dzien liczony od startu
         // kampanii (ten sam zegar co ROT i Fabula), wiec w trwajacej kampanii dziala od razu. Zdobytych osad nie ruszamy.
+        // T2c: same oblezenia ROT (OnAiHourlyTick) blokuje NightKingGate (rozkaz AI i brama osady), TurnBack przerywa trwajace.
         // Kolejnosc w kalendarzu (do linii logu): Piesc, Craster, Rogowa Stopa, Mrozny Brzeg, Thenn, Kly Mrozu, Hardhome, Mur.
         // Id z ROT.Misc/ROTSettlements.cs:120, 118, 308, 396, 136, 132, 138, 16.
         private static readonly string[] CalendarIds =
             { "castle_S6", "castle_S5", "castle_N6", "ROT_castle45", "town_S6", "town_S4", "town_S7", "ROT_castle60" };
 
         /// <summary>Dzien od startu kampanii - ten sam zegar co kajdany ROT (ROT:1068-1088) i Fabula.DayNow.</summary>
-        private static double Day()
+        internal static double Day()
         {
             try { return (CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; }
             catch { return 0.0; }   // blad = wszystko zamkniete (bezpieczniej niz otwarte)
@@ -94,7 +99,7 @@ namespace CrashScribe
         }
 
         /// <summary>Od ktorego dnia kampanii Inni moga brac te osade. Nigdy wczesniej niz NightKingSiegeFromDay.</summary>
-        private static int OpenDay(Settlement s)
+        internal static int OpenDay(Settlement s)
         {
             int floor = Math.Max(0, Config.NightKingSiegeFromDay);
             if (s == null) return floor;
@@ -115,7 +120,7 @@ namespace CrashScribe
             return Math.Max(v, floor);
         }
 
-        private static bool Closed(Settlement s, double day)
+        internal static bool Closed(Settlement s, double day)
         {
             return Config.NightKingCalendarEnabled && s != null && day < OpenDay(s);
         }
@@ -142,7 +147,9 @@ namespace CrashScribe
                             + (!Config.NightKingRespectShackles ? " (bez kajdan ROT)"
                                : RotShacklesOn() ? " (kajdany ROT x" + ShackleK().ToString("0.00") + ")"
                                : " (kajdany wylaczone w ROT - OthersAIShackles = false)")
-                            + ". Zdobytych osad nie odbieramy.");
+                            + ". Zdobytych osad nie odbieramy."
+                            + (NightKingGate.Active ? " Blokada oblezen (T2c): czynna - Inni nie zaczynaja ani nie prowadza oblezenia, szturmu ani rabunku zamknietego celu."
+                               : " Blokada oblezen (T2c): wylaczona (NightKingCalendarSiegeGate = false)."));
                 Scribe.Line(CalendarState(Day(), -1));
                 _loadCheckPending = true;   // recenzja T2: TurnBack w pierwszej godzinie po wczytaniu
             }
@@ -185,38 +192,90 @@ namespace CrashScribe
         }
 
         /// <summary>Banda z rozkazem oblezenia na zamkniety cel (wolna, nie w bitwie) dostaje patrol przy siedzibie klanu.
-        /// Oblezenie juz trwajace na zamkniety cel nie jest przerywane, ale trafia do logu i do licznika (zwracany).
-        /// Tanio: kilka band Innych raz na dobe (i raz w pierwszej godzinie po wczytaniu).</summary>
-        private static int TurnBack(Clan ww, double day)
+        /// T2c: oblezenie juz trwajace na zamkniety cel jest PRZERYWANE (gdy nie trwa bitwa): banda dostaje ten sam patrol,
+        /// a gra sama zwija jej oboz (BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave w SiegeEvent.Tick - partia z rozkazem
+        /// innym niz oblezenie odchodzi, bez ostatniej partii oblezenie sie konczy; bez strat w ludziach). Oblezenie w trakcie
+        /// bitwy (szturm, wypad) - w logu i w liczniku (zwracany), przerwane po bitwie: recenzja T2c - Daily / Hourly ustawiaja
+        /// wtedy _breakPending i TurnBack(retry) wraca co godzine (tylko przerywanie, bez linii "trwa bitwa"), az sie uda.
+        /// Rozkaz rabunku wioski zamknietego celu - jak oblezenie.
+        /// Recenzja T2c: przy blokadzie przeglad obejmuje tez kazda inna partie Innych (NightKingGate.IsOthersParty - klan
+        /// ROTclan_126 albo kultura whitewalker) z obozem oblezniczym, nie tylko bandy wojenne klanu ROTclan_126.
+        /// Przy NightKingCalendarSiegeGate = false - zachowanie T2 (oblezenia nie przerywamy).
+        /// Tanio: kilka band Innych raz na dobe (i raz w pierwszej godzinie po wczytaniu); MobileParty.All - tylko
+        /// partie z obozem oblezniczym sprawdzane dalej.</summary>
+        private static int TurnBack(Clan ww, double day, bool retry)
         {
             int early = 0, stumbles = 0;
+            bool gate = NightKingGate.Active;
             try
             {
+                var bands = new List<MobileParty>();
                 foreach (var wp in ww.WarPartyComponents)
+                {
+                    var mp = wp != null ? wp.MobileParty : null;
+                    if (mp != null) bands.Add(mp);
+                }
+                if (gate)
+                {
+                    try
+                    {
+                        foreach (var mp in MobileParty.All)
+                            if (mp != null && mp.BesiegerCamp != null && !bands.Contains(mp) && NightKingGate.IsOthersParty(mp)) bands.Add(mp);
+                    }
+                    catch (Exception e)
+                    {
+                        if (stumbles++ == 0) { try { Scribe.Report("CrashScribe", e, "NightKingCall.TurnBack.all", null); } catch { } }
+                    }
+                }
+                foreach (var mp in bands)
                 {
                     try   // per banda: jedna zla banda nie zatrzymuje reszty (licz potkniecia)
                     {
-                        var mp = wp != null ? wp.MobileParty : null;
-                        if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
+                        if (!mp.IsActive || mp.IsMainParty) continue;
                         string who = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString();
                         if (Busy(mp))
                         {
-                            // recenzja T2: oblezenie przed terminem (ROT OnAiHourlyTick bez kajdan) - widac w logu, nie przerywamy
+                            // recenzja T2: oblezenie przed terminem (ROT OnAiHourlyTick bez kajdan) - widac w logu
                             if (mp.SiegeEvent != null)
                             {
-                                var sg = mp.BesiegedSettlement ?? mp.TargetSettlement;
+                                // recenzja T2c: przerywamy tylko oblegajacego (BesiegerCamp) i tylko osade, ktora oblega;
+                                // TargetSettlement - wylacznie do linii T2 (w 1.4.8 MobileParty.SiegeEvent = BesiegerCamp?.SiegeEvent)
+                                var besieged = mp.BesiegerCamp != null ? mp.BesiegedSettlement : null;
+                                var sg = besieged ?? mp.TargetSettlement;
                                 if (sg != null && !IsOthers(sg.OwnerClan) && Closed(sg, day))
                                 {
+                                    // T2c: bez bitwy (ani partii, ani osady) - przerywamy; w bitwie nie ruszamy (bez FinalizeEvent w polowie walki)
+                                    if (gate && besieged != null && mp.MapEvent == null && mp.AttachedTo == null && (sg.Party == null || sg.Party.MapEvent == null))
+                                    {
+                                        string where = NightKingGate.Redirect(mp, sg);
+                                        NightKingGate.CountBroken();
+                                        Scribe.Line("Kalendarz Innych: " + who + " PRZERYWA oblezenie " + sg.Name + " przed terminem (otwarta od dnia "
+                                                    + OpenDay(sg) + ", dzis " + (int)day + ") - " + where + "; gra zwija oboz bez strat"
+                                                    + (retry ? " (po bitwie, przeglad godzinowy)." : "."));
+                                        continue;
+                                    }
                                     early++;
-                                    Scribe.Line("Kalendarz Innych: " + who + " OBLEZENIE " + sg.Name + " przed terminem (otwarta od dnia "
-                                                + OpenDay(sg) + ", dzis " + (int)day + ") - nie przerywamy.");
+                                    if (!retry)
+                                        Scribe.Line("Kalendarz Innych: " + who + " OBLEZENIE " + sg.Name + " przed terminem (otwarta od dnia "
+                                                    + OpenDay(sg) + ", dzis " + (int)day + ") - "
+                                                    + (gate ? "trwa bitwa, przerwiemy po niej (sprawdzane co godzine)." : "nie przerywamy (NightKingCalendarSiegeGate = false)."));
                                 }
                             }
                             continue;
                         }
-                        if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement) continue;
+                        if (retry) continue;   // przeglad godzinowy: tylko przerywanie trwajacych oblezen
+                        // T2c: takze rozkaz rabunku wioski zamknietego celu (wioska liczy sie dniem swojego zamku / miasta)
+                        bool raidOrder = gate && mp.DefaultBehavior == AiBehavior.RaidSettlement;
+                        if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement && !raidOrder) continue;
                         var tgt = mp.TargetSettlement;
-                        if (tgt == null || IsOthers(tgt.OwnerClan) || !Closed(tgt, day)) continue;
+                        if (tgt == null || IsOthers(tgt.OwnerClan) || !(raidOrder ? NightKingGate.GateClosed(tgt, day) : Closed(tgt, day))) continue;
+                        if (gate)
+                        {
+                            string where = NightKingGate.Redirect(mp, tgt);
+                            Scribe.Line("Kalendarz Innych: " + who + " zawrocony spod " + tgt.Name + (raidOrder ? " (rabunek)" : "") + " (otwarta od dnia "
+                                        + NightKingGate.OpenDayOf(tgt) + ", dzis " + (int)day + ") - " + where + ".");
+                            continue;
+                        }
                         var home = ww.HomeSettlement ?? mp.HomeSettlement;
                         if (home == null || home == tgt)
                         {
@@ -240,19 +299,27 @@ namespace CrashScribe
         }
 
         /// <summary>Recenzja T2: po wczytaniu zapisu TurnBack rusza w pierwszej godzinie, a nie dopiero przy DailyTick
-        /// (do 24 h gry, w ktorych banda z rozkazem z zapisu moglaby dojsc i zaczac oblezenie). Raz na sesje.</summary>
+        /// (do 24 h gry, w ktorych banda z rozkazem z zapisu moglaby dojsc i zaczac oblezenie). Raz na sesje.
+        /// Recenzja T2c: oblezenie zamknietego celu w bitwie (szturm, wypad) nie czeka do nastepnej doby - co godzine
+        /// TurnBack(retry), az bitwa sie skonczy i oblezenie zostanie przerwane (machiny nie ostrzeliwuja obroncow przez dobe).</summary>
         private void Hourly()
         {
-            if (!_loadCheckPending) return;
+            if (!_loadCheckPending && !_breakPending) return;
+            bool load = _loadCheckPending;
             _loadCheckPending = false;
+            _breakPending = false;
             try
             {
                 if (!Config.NightKingCalendarEnabled) return;
                 var ww = WhiteWalkers();
                 if (ww == null || ww.IsEliminated) return;
                 double day = Day();
-                int early = TurnBack(ww, day);
-                Scribe.Line("Kalendarz Innych: przeglad band po wczytaniu (dzien " + (int)day + ") - oblezen przed terminem " + early + ".");
+                int broke = NightKingGate.BrokenToday;
+                int early = TurnBack(ww, day, !load);
+                if (load)
+                    Scribe.Line("Kalendarz Innych: przeglad band po wczytaniu (dzien " + (int)day + ") - oblezen przed terminem " + early
+                                + (NightKingGate.Active ? ", przerwanych " + (NightKingGate.BrokenToday - broke) : "") + ".");
+                if (early > 0 && NightKingGate.Active) _breakPending = true;
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.Hourly", null); } catch { } }
         }
@@ -300,7 +367,7 @@ namespace CrashScribe
             catch { return null; }
         }
 
-        private static Clan WhiteWalkers()
+        internal static Clan WhiteWalkers()
         {
             try
             {
@@ -357,8 +424,27 @@ namespace CrashScribe
             catch { return false; }
         }
 
+        private static bool _beyondLooked;
+
+        /// <summary>Recenzja T2c (NightKingGate.Redirect): to samo co Beyond, ale bez czekania na Others() -
+        /// metoda ROT szukana sama, gdy jej jeszcze nie ma (brama dziala tez przed pierwsza doba sesji).</summary>
+        internal static bool BeyondWall(Settlement s)
+        {
+            if (_mBeyond == null && !_beyondLooked)
+            {
+                _beyondLooked = true;
+                try
+                {
+                    var tUtil = Type.GetType("ROT.Misc.ROTUtilities, ROT");
+                    _mBeyond = tUtil != null ? AccessTools.Method(tUtil, "IsBeyondTheWall") : null;
+                }
+                catch { }
+            }
+            return Beyond(s);
+        }
+
         /// <summary>"Inny" w ROT to KULTURA, nie id klanu (ROT.Misc/Extensions.cs:10).</summary>
-        private static bool IsOthers(Clan c)
+        internal static bool IsOthers(Clan c)
         {
             try { return c != null && c.Culture != null && c.Culture.StringId == "whitewalker"; }
             catch { return false; }
@@ -556,6 +642,7 @@ namespace CrashScribe
 
         private void Daily()
         {
+            bool gateLined = false;   // recenzja T2c: linia / zerowanie licznikow blokady zawsze raz na dobe (finally)
             try
             {
                 if (!Config.NightKingCallEnabled && !Config.NightKingCalendarEnabled) return;
@@ -569,8 +656,14 @@ namespace CrashScribe
                 if (Config.NightKingCalendarEnabled)
                 {
                     double day = Day();
-                    int early = TurnBack(ww, day);
+                    int early = TurnBack(ww, day, false);
+                    if (early > 0 && NightKingGate.Active) _breakPending = true;   // recenzja T2c: oblezenie w bitwie - co godzine do skutku
                     Scribe.Line(CalendarState(day, early));
+                    if (NightKingGate.Active)
+                    {
+                        gateLined = true;
+                        Scribe.Line(NightKingGate.DailyLine(false));   // T2c: "oblezen zablokowanych N, przerwanych M"
+                    }
                     callAsleep = day < Config.NightKingCallFromDay;
                 }
                 if (!Config.NightKingCallEnabled || callAsleep) return;
@@ -665,6 +758,15 @@ namespace CrashScribe
                 March(beh, ww, lead);   // Pochod: gotowa horda dostaje cel za Murem
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.Daily", null); } catch { } }
+            finally
+            {
+                // recenzja T2c: wczesne wyjscie (brak zachowania ROT, klan Innych wyeliminowany, blad) - liczniki dnia i _told
+                // i tak zerowane; linia tylko, gdy cos dzis zliczono
+                if (!gateLined)
+                {
+                    try { string l = NightKingGate.DailyLine(true); if (l != null) Scribe.Line(l); } catch { }
+                }
+            }
         }
     }
 }
