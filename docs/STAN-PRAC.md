@@ -1305,3 +1305,6 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   bez materialu zostaje; etap 7 premia drog NIE (D2 domyslnie 0), ile drog - po zdjeciach (trakty + droga do kazdej wioski). (3) plik Diplomacy Jeffa na rok 364 - TAK, przy wgraniu
   koncowym (gra zamknieta, .bak; gdy narzedzie nie pozwoli - polecenie dla Jeffa). (4) myto na Bliznakach - CHCE, ale najpierw policzyc: stawki z licznika E7/B w tescie zbiorczym
   (+ lore Freyow), propozycja z liczbami do Jeffa, potem osobna paczka myta (kiesa partii -> kiesa pana Bliznakow). Wpisane w projekt etapu 7 rozdz. 6.
+- (15:15 UTC 12.10) **Jeff: hodowla - TAK (cofniecie kroku jest w kodzie); naprawy - NIE "jak jest za malo, aby zuzyc 1 sztuke, to nie zuzywa, liczy w pamieci i potem dopiero zuzywa,
+  gdy sie nazbiera"** -> paczka N1b (wf_7ad424f1-19a na w-toku/e6-p3): ulamek materialu kazdej naprawy w pamieci (zrodlo x przedmiot, zapis arm_mend_frac), sztuka schodzi z tego samego
+  zrodla przy >= 1; klucz MendFractionMemory.
