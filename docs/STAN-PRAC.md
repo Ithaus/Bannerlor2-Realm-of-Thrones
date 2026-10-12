@@ -1327,3 +1327,8 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   etap 5 reszta: A7, A8, rozpoznanie "bitwy" 26 tys./d, C1 (TownPurseNoTopUp domyslnie true), C2, C4; potem etap 7 R1, R2, W4; na koncu dwa przeglady calosci (ekonomia, kod) i DLL
   test\Armoury-zbior58.dll. Galaz wypychana co 15 min. Jesli przerwane (limit): `git -C <lancuch> log --oneline w-toku/e6-p3..w-toku/zbior-5-8` pokaze zrobione kroki;
   wznowienie Workflow resumeFromRunId wf_42f8dda9-fa3. Potem: projekt i kod etapu 8, pelny audyt, autotest z plikami danych (patrz uwaga e7-b), test zbiorczy.
+- (18:20 UTC 12.10) Postep wf_42f8dda9-fa3 (`w-toku/zbior-5-8`): A8 b461cc5+da51768 (nowy rod szlachty BK - majatek bez ceny, 15 000 z nadwyzki kasy miasta; herszt BK - 10 000 z kryjowki,
+  juki przez paserow w miastach; uczta - miasto dostaje tyle, ile zaplacil gospodarz; koszt paktow Diplomacy do skarbca drugiej strony, przy pokoju z upadkiem krolestwa - nic nie pobrane);
+  E5/BITWY c07c1d8+a119682 - ROZPOZNANIE: "26 tys./d bitwy z niczego" to wyplata gry zwyciezcom BRUTTO, para z ujsciami (wodzowie pokonanych, A6) i N4 - netto 119 dob -13 zl; statki
+  z niczego 0; BEZ zmiany kodu, tylko progi BITWY-1/2; C1 a053001+d493556 - regulator bez dosypki juz jest (tryb 2 z E5/A1, decyzja Jeffa 11.10) - bez nowego klucza, tylko licznik plonu
+  w miastach-zaulkach i progi C1-1..4. Dalej C2, C4, E7/R1, R2, W4. Projekt etapu 8 (wf_c0d119d4-812): 4 rozpoznania gotowe (docs/etap8, bez commita), pisze sie projekt. Tydzien 96%.
