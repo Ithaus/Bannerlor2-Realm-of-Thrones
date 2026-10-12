@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 6, recenzja paczki 212 = E6/K2) - PREFIKS SPRZEDAZY KONI GRY TYLKO DLA SPRZEDAZY Z PARTII; KOLEJNOSC WPIEC
+**Mod:** Armoury | **Galaz:** `w-toku/e6-p2` (po E6/K2 5ca4c51) | **Pliki:** `SpareHorses.cs` (`SellPrefix`, `ApplyAll`)
+
+**Problem:** (recenzja, bez gry) przy `AiSellsSpareHorses` + `MenPurseEnabled` i WYLACZONYM kupnie Stajni AI (`AiBuysMounts` albo `CavalryNeedsMounts` = false) lordowie nie kupowaliby koni wcale: `BuyPrefix` przepuszcza `BuyHorses` gry, ale `SellPrefix` w kontekscie postoju blokowal kazde `SellItemsAction.Apply` z wierzchowcem - takze zakup gry (G `BuyHorses`: `Apply(town.Owner, partia, ...)`). U Jeffa oba klucze kupna = true (`Armoury.json`), wiec bez skutku w tescie - blad kombinacji wylacznikow.
+**Przyczyna:** G `SellItemsAction.Apply(receiverParty, payerParty, ...)` - pierwszy argument to sprzedajacy; prefiks nie sprawdzal kierunku. Druga rzecz: `Apply` to jednolinijkowe przekazanie do `ApplyInternal`, a zastepcza metoda `OnSettlementEntered` kompilowala sie przy wpieciu PRZED wpieciem `Apply` - mozliwe wklejenie (inlining) `Apply` bez prefiksu.
+**Zmiana:** `SellPrefix(PartyBase __0, ...)` blokuje tylko, gdy sprzedajacy `__0` to partia (`MobileParty != null`); zakup gry przechodzi. `ApplyAll`: najpierw `BuyHorses` i `SellItemsAction.Apply`, potem `OnSettlementEntered` (bez kontekstu prefiksy przepuszczaja wszystko).
+**Ryzyko / co sprawdzic:** przy kluczach domyslnych zachowanie bez zmian (zakup gry i tak pominiety w `BuyPrefix`). Recenzja sprawdzila tez bez zmian: zrodlo/ujscie konia (partia/zbrojownia -> polka miasta, ksiega "Konie (E6/0)" liczy stan - przeniesienie), zloto (kasa miasta `CastlePurse.Spendable` -> trzecia lorda + sakiewka ludzi `Add` = "wplynelo"), kolejnosc nasluchow (MbEvent od ostatnio dopisanego: Stables :792 przed MenPurse :673 - potwierdzone w G MbEvent), histereza (Keep = 3T/2 >= T, takze T = 1), Remount wedlug kategorii (needHigh <= lack, bo Balance.Unhorsed = max(0, jezdzcy - konie)), HorseCensus/HorseBook/WinterRealm/E4 bez podwojenia (spis stanu, nie przeplywow). Znana granica: lord bez wpisu zbrojowni DTE (pusta zbrojownia) - `SellArmorySurplus` wraca przed galezia koni, konie z taboru nie ida na targ (gra ich juz nie sprzedaje); pompa K2-5 liczy tez prawdziwe sprzedaze po stratach w 7 dobach od zakupu.
+
+**Build:** kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - test 120 (razem z E6/K2).
+
 ## 2026-10-12 (etap 6, paczka 212 = E6/K2, PLAN 6.13, R11) - JEDEN ZAPAS KONI WEDLUG KATEGORII; NADMIAR KONI AI NA TARG PRZEZ SAKIEWKE LUDZI; GRA NIE HANDLUJE KONMI LORDOW
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e6-p2` (po recenzji E6/K1 26fb1b1) | **Projekt:** etap 6 v2 rozdz. 3 "E6/K2"; krytyka K1-04, KB K2-zla-sciezka | **Pliki:** NOWY `SpareHorses.cs`, `Stables.cs` (`Reserve`, `HorseReserve`, `PlainRider`, `Balance` + `plainOnly`/`UnhorsedHigh`, `Remount`, `OnSettlementEntered`), `MenPurse.cs` (`SellSpareHorses`), `HorseCensus.cs` (segment linii), `ArmouryBehavior.cs` (Reset), `SubModuleMain.cs` (wpiecie), `Settings.cs`, `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py` (zakres), `tools/sprawdz_logi.py` (blok etap5_k2)
 

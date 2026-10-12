@@ -121,11 +121,13 @@ namespace Armoury
             return false;
         }
 
-        public static bool SellPrefix(ItemRosterElement __2)
+        // recenzja K2: tylko sprzedaz Z partii (__0 = sprzedajacy, G SellItemsAction.Apply(receiverParty, payerParty, ...)); BuyHorses gry wola Apply(town.Owner,
+        // partia) - bez tego warunku przy kluczu bez kupna Stajni AI (AiBuysMounts/CavalryNeedsMounts wylaczone) gra tez nie kupowalaby koni lordom (nikt by nie kupowal)
+        public static bool SellPrefix(PartyBase __0, ItemRosterElement __2)
         {
             try
             {
-                if (!_ctx || !SellOn) return true;
+                if (!_ctx || !SellOn || __0 == null || __0.MobileParty == null) return true;
                 var it = __2.EquipmentElement.Item;
                 if (it == null || !it.IsMountable) return true;
                 _ctxSell = true; _gameSellTries++;
@@ -146,12 +148,14 @@ namespace Armoury
                 if (ent == null) parts.Add("BRAK PartiesBuyHorseCampaignBehavior.OnSettlementEntered - gra handluje konmi lordow");
                 else
                 {
-                    h.Patch(ent, prefix: new HarmonyMethod(typeof(SpareHorses), nameof(GamePrefix)), finalizer: new HarmonyMethod(typeof(SpareHorses), nameof(GameFinalizer)));
-                    parts.Add("kontekst postoju gry wpiety");
+                    // recenzja K2: najpierw cele wolane (Apply - jednolinijkowy, BuyHorses), potem OnSettlementEntered - zastepcza metoda Harmony kompiluje sie
+                    // przy wpieciu; Apply wpiety wczesniej nie zostanie w niej wklejony (inlining) z pominieciem prefiksu. Prefiksy bez kontekstu (_ctx) przepuszczaja wszystko.
                     if (buy != null) { h.Patch(buy, prefix: new HarmonyMethod(typeof(SpareHorses), nameof(BuyPrefix))); parts.Add("zakup koni gry wpiety"); }
                     else parts.Add("BRAK BuyHorses - gra kupuje konie lordom");
                     if (sell != null) { h.Patch(sell, prefix: new HarmonyMethod(typeof(SpareHorses), nameof(SellPrefix))); parts.Add("sprzedaz koni gry wpieta"); }
                     else parts.Add("BRAK SellItemsAction.Apply - gra sprzedaje konie lordow");
+                    h.Patch(ent, prefix: new HarmonyMethod(typeof(SpareHorses), nameof(GamePrefix)), finalizer: new HarmonyMethod(typeof(SpareHorses), nameof(GameFinalizer)));
+                    parts.Add("kontekst postoju gry wpiety");
                 }
             }
             catch (Exception e) { parts.Add("blad wpiecia " + e.GetType().Name); Log.Error("SpareHorses.ApplyAll", e); }
