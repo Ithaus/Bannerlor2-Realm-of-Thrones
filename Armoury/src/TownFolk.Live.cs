@@ -1344,7 +1344,7 @@ namespace Armoury
             _lineRights = "Prawa panskie (E5/B1): dzien " + day + " | od zarobku ludu miast " + (d.TaxW + d.TaxR + d.TaxP) + " (W " + d.TaxW + " / R " + d.TaxR + " / P " + d.TaxP + "), podzamcza " + d.TaxC
                           + ", farma gmin " + d.Farm + ", oplaty stale wsi " + w.VFee + " (" + w.VFeeN + " wsi); gracz " + d.Player + "; wstrzymane w oblezeniu " + d.Held
                           + "; bez zywego pana do gminy " + d.NoLord + " (" + d.NoLordN + ") | podatek wsi BK x VillageLordScale + VillageLordExtraShare utargu: z " + w.VTaxBase + " zostalo wsiom " + w.VTaxCut
-                          + " (w tym dopisek pana z utargu " + w.VTaxAdd + ").";
+                          + " (po odjeciu dopisku pana z utargu " + w.VTaxAdd + ").";
             _lineTithe = TitheLine(day, d);
             _lineR14 = "Zadowolenie ludu (R14): dzien " + day + " | korekty " + (w.R14Food + w.R14Rest) + " (Food " + w.R14Food + " / reszta " + w.R14Rest + "), BK sam " + w.R14Bk.ToString("0.000", Inv)
                        + " (dodatnia delta BK zastapiona); osad z Afford < 0.98 na jutro: jedzenie " + CountAff(true) + ", reszta " + CountAff(false) + ".";

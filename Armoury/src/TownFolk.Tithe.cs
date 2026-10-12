@@ -156,7 +156,9 @@ namespace Armoury
                     long alms = (long)Math.Round(x * TitheAlms), build = x - alms;
                     d.TiAlmsV += alms;
                     var mk = vil.TradeBound ?? vil.Bound;
-                    Folk mf = mk != null && mk.Town != null ? Get(mk) : null;
+                    // recenzja: TryGetValue jak w Villages - Get() dopisuje do _f, a tu iterujemy _f.Values (brak wpisu targu = wyjatek MoveNext, reszta wsi bez dziesieciny)
+                    Folk mf = null;
+                    if (mk != null && mk.Town != null) _f.TryGetValue(mk, out mf);
                     if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive) || build <= 0) { d.TiNoMarket += Math.Max(0, build); continue; }
                     int had = vil.Gold;
                     vil.ChangeGold(-(int)build);
