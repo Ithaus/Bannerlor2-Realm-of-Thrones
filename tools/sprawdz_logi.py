@@ -3213,6 +3213,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
             rep.add("E5/B1: linia Kiesa ludu (E5/B1)", "brak w logu", "jest od wgrania E5/B1 (bieg B bez kiesy czynnej = NIE w bloku B1)", None)
     except Exception as e:
         rep.add("blok etap5_b1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # decyzja Jeffa 12.10 (wsie i lud nie gromadza): dziesiecina, pan w utargu, tempo nadwyzki - wlasny blok przy linii stanu z segmentem "decyzja 12.10"
+    try:
+        etap5_wsie(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_wsie", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/A5 (197): BetterEconomy - prawdziwa wplata gracza i dar dla notabli (dopisek linii kampanii BEE 170 i linie akcji gracza)
     try:
         if any(x.startswith("BEE domkniecie (170)") for x in lines):
@@ -3809,9 +3814,15 @@ def etap5_b1(rep, lines, start, until, logp):
                 ut.append(float(mm.group(3)) + float(mm.group(4))); gg.append(float(mm.group(2)))
             worst.append(float(mm.group(2)))
     u10, g11 = _mean(ut), _mean(gg)
-    rep.add("B1-T10: wies - pan z majatkami w utargu (zwykla, sr28)", f"{u10:.1f}%" if u10 is not None else "brak linii Gotowka wsi", "35% +-2 pp (niska 25, wysoka 45)", (abs(u10 - 35) <= 2) if u10 is not None else None)
+    # decyzja Jeffa 12.10 (wsie nie gromadza): dopisek pana z utargu (VillageLordExtraShare) z linii stanu - zwykla 35 + dopisek (0.10 -> 45%, niska 35, wysoka 55);
+    # log sprzed decyzji (bez segmentu) - dopisek 0 (35 / 25 / 45%); udzial w gotowce G przesuniety o 0.8 dopisku (utarg ok. 80% G), sufit kazdej polityki o caly dopisek
+    ex10 = (fnum(r"dopisek pana z utargu wsi ([\d.]+)", st_on[-1]) or 0.0) * 100 if st_on else 0.0
+    e10 = 35 + ex10
+    rep.add("B1-T10: wies - pan z majatkami w utargu (zwykla, sr28)", f"{u10:.1f}%" if u10 is not None else "brak linii Gotowka wsi",
+            f"{e10:.0f}% +-2 pp (niska {e10 - 10:.0f}, wysoka {e10 + 10:.0f}; 35 + dopisek z linii stanu)", (abs(u10 - e10) <= 2) if u10 is not None else None)
+    lo11, hi11, cap11 = 28 + 0.8 * ex10, 45 + 0.8 * ex10, 50 + ex10
     rep.add("B1-T11: wies - pan z majatkami w gotowce G (zwykla sr28; najwiecej z polityk)", (f"{g11:.1f}%" if g11 is not None else "-") + (f"; max {max(worst):.1f}%" if worst else ""),
-            "zwykla 28-45%, kazda <= 50%", (28 <= g11 <= 45 and max(worst) <= 50) if (g11 is not None and worst) else None)
+            f"zwykla {lo11:.0f}-{hi11:.0f}%, kazda <= {cap11:.0f}% (28-45 / 50 + dopisek)", (lo11 <= g11 <= hi11 and max(worst) <= cap11) if (g11 is not None and worst) else None)
     # ---- B1-T12 renta 20% wsi zastapiona oplatami
     pr = by_day(lines, "Prawa panskie (E5/B1): dzien")
     fee = _mean([num(r"oplaty stale wsi (\d+)", pr[d], int) for d in w28 if d in pr])
@@ -3860,6 +3871,81 @@ def etap5_b1(rep, lines, start, until, logp):
     ya = sum(fnum(r"zolnierze i zalogi \(75%\) ([\d.]+)", lab.get(d, ""), 0.0) or 0.0 for d in w28)
     q20 = xa / (xa + ya) * 100 if xa + ya > 0 else None
     rep.add("B1-T20: haki 75/25 - czesc ludu w wydatkach zolnierzy w miastach (sr28)", f"{q20:.2f}%" if q20 is not None else "-", "25% +-1 pp", (abs(q20 - 25) <= 1) if q20 is not None else None)
+
+
+def etap5_wsie(rep, lines, start, until):
+    """Decyzja Jeffa 12.10 10:15 (wsie i lud nie gromadza; projekt etapu 5 R11, R13, R21, C3): dziesiecina (linia "Dziesiecina (E5/C3)"), pan z majatkami
+    w utargu wszystkich wsi (linia "Utarg wsi (112)"), tempo nadwyzki (linia doby kiesy ludu), zmiana kies wsi i ludu miast ("Pieniadz swiata"). Okno: doby
+    kampanii 2-until; sr28 - ostatnie 28 pelnych dob. Wartosci czynne z linii stanu "Kiesa ludu (E5/B1): CZYNNA" (segment "decyzja 12.10")."""
+    st_on = [x for x in lines if x.startswith("Kiesa ludu (E5/B1): CZYNNA")]
+    if not st_on or "decyzja 12.10:" not in st_on[-1]:
+        rep.add("W12: linia stanu z segmentem decyzja 12.10", "brak (log sprzed decyzji)", "jest od wgrania (wsie nie gromadza)", None)
+        return
+    st = st_on[-1]
+    extra = fnum(r"dopisek pana z utargu wsi ([\d.]+)", st) or 0.0
+    tempo = fnum(r"tempo nadwyzki ([\d.]+)/d", st)
+    tithe_on = "dziesiecina tak" in st
+    share = fnum(r"dziesiecina tak \(wsie ([\d.]+) utargu", st) or 0.0
+    kie = by_day(lines, "Kiesa ludu: dzien")
+    win = sorted(d for d in kie if 2 <= run_day(d, start) <= until)
+    full = [d for d in win if "doba niepelna" not in kie[d] and "czeka na kalibracje" not in kie[d]]
+    w28 = _last28(full)
+    rep.add("W12-0: wartosci czynne (linia stanu)", _grp(r"decyzja 12.10: ([^|]+)", st, 1).strip()[:200], "INFO (dopisek 0.10, tempo 0.15, dziesiecina tak 0.05, kaplani BK odczyt ok)", None)
+    # ---- W12-1/2/3 dziesiecina
+    ti = by_day(lines, "Dziesiecina (E5/C3): dzien")
+    if tithe_on:
+        miss = [run_day(d, start) for d in full if d not in ti]
+        skip = [run_day(d, start) for d in full if d in ti and "POMINIETA" in ti[d]]
+        rep.add("W12-1: dziesiecina - linia kazdej pelnej doby, bez dob pominietych (kaplani BK)",
+                f"brak w {len(miss)}, pominieta w {len(skip)} z {len(full)} dob" + (f" (d{', d'.join(str(x) for x in (miss + skip)[:5])})" if miss or skip else "")
+                + ("; " + _grp(r"kaplani BK: ([^|]+)", st, 1).strip() if "kaplani BK:" in st else ""),
+                "0 i 0; kaplani BK: odczyt ok", len(miss) == 0 and len(skip) == 0 and "kaplani BK: odczyt ok" in st)
+        t28 = [ti[d] for d in w28 if d in ti]
+        def s28(pat):
+            return sum(num(pat, x, int, 0) or 0 for x in t28)
+        tot, tv, tt = s28(r"\| razem (\d+) ="), s28(r"= wsie (\d+) \("), s28(r"\) \+ lud miast (\d+) \(")
+        via, alms, wage, mat, nomk = s28(r"\| przez kaplanow (\d+)"), s28(r"jalmuzna (\d+)"), s28(r"place ludu (\d+)"), s28(r"material do kas miast (\d+)"), s28(r"bez miasta targowego \(zostalo w kiesie\) (\d+)")
+        nop, due = s28(r"\| bez kaplana (\d+)"), s28(r"nalezne (\d+) =")
+        n = max(1, len(t28))
+        rep.add("W12-2: dziesiecina razem (sr28)", f"{tot / n:.0f}/d = wsie {tv / n:.0f} + lud miast {tt / n:.0f}; przez kaplanow {via / n:.0f} (jalmuzna {alms / n:.0f}, place septow {wage / n:.0f}, "
+                f"material {mat / n:.0f}, wsie bez targu {nomk / n:.0f}); bez kaplana {nop / n:.0f}", "INFO (rachunek z kopia-fin3: wsie ok. 14 tys./d, lud miast ok. 10 tys./d)", None)
+        build = wage + mat
+        ok3 = via > 0 and abs(alms / via - 0.5) <= 0.005 and (build == 0 or abs(wage / build - 0.75) <= 0.005) and abs(alms + wage + mat + nomk - via) <= len(t28) * 2
+        rep.add("W12-3: podzial przez kaplanow: jalmuzna 50%, z budowy place 75% / material 25%, suma = przez kaplanow (sr28)",
+                f"jalmuzna {alms / via * 100:.2f}%, place {wage / build * 100:.2f}% budowy, rozjazd sumy {alms + wage + mat + nomk - via}" if via > 0 and build > 0 else "brak przeplywu przez kaplanow",
+                "50% +-0.5 pp, 75% +-0.5 pp, rozjazd <= 2 zl na dobe", ok3 if via > 0 else False)
+        # nalezne wsi wobec utargu okna (linia Utarg wsi (112) - ta sama doba ksiegi)
+        ut = by_day(lines, "Utarg wsi (112): dzien")
+        handed = sum(num(r"powroty taborow z utargiem \d+: oddane (\d+)", ut.get(d, ""), int, 0) or 0 for d in w28 if d in ti)
+        q4 = due / handed if handed > 0 else None
+        rep.add("W12-4: dziesiecina wsi nalezna wobec utargu taborow (sr28)", f"{q4 * 100:.2f}% (nalezne {due}, utarg {handed}; niezaplacone {due - tv})" if q4 is not None else "brak linii Utarg wsi (112)",
+                f"{share * 100:.0f}% +-0.3 pp (Tithe Village Share)", (abs(q4 - share) <= 0.003) if q4 is not None else None)
+    else:
+        rep.add("W12-1: dziesiecina", "wylaczona (Temple Tithe 0)" + (f"; linii {len(ti)}" if ti else ""), "0 linii przy wylaczonej", len(ti) == 0)
+    # ---- W12-5 pan z majatkami w utargu wszystkich wsi (mieszanka polityk; przed decyzja 35.0% w kopia-fin3)
+    ut = by_day(lines, "Utarg wsi (112): dzien")
+    hd = lt = es = 0
+    for d in w28:
+        m = re.search(r"oddane (\d+) = pan \(licznik podatku\) (\d+) .*?wlasciciele majatkow BK (\d+)", ut.get(d, ""))
+        if m:
+            hd += int(m.group(1)); lt += int(m.group(2)); es += int(m.group(3))
+    e5 = 35 + extra * 100
+    q5 = (lt + es) / hd * 100 if hd > 0 else None
+    rep.add("W12-5: pan z majatkami w utargu taborow - wszystkie wsie (sr28)", f"{q5:.1f}% (pan {lt / hd * 100:.1f}%, majatki {es / hd * 100:.1f}%)" if q5 is not None else "brak linii Utarg wsi (112)",
+            f"{e5:.0f}% +-3 pp (mieszanka polityk, gros zwykla; przed decyzja 35.0%)", (abs(q5 - e5) <= 3) if q5 is not None else None)
+    # ---- W12-6 tempo nadwyzki: oferta (W = tempo x lokata, R/P na wierzch) / lokata W
+    off = sum(num(r"oferta nadwyzki na jutro (\d+)", kie[d], int, 0) or 0 for d in w28)
+    lok = sum(fnum(r"lokata \(kiesa W ponad zapas dni\) ([\d.]+)", kie[d], 0.0) or 0.0 for d in w28)
+    q6 = off / lok if lok > 0 else None
+    rep.add("W12-6: tempo nadwyzki - oferta nadwyzki / lokata W (sr28)", f"{q6:.3f} (oferta {off / max(1, len(w28)):.0f}/d, lokata {lok / max(1, len(w28)):.0f})" if q6 is not None else "-",
+            f">= {tempo:.2f} - 0.002 (tempo z linii stanu; dotad 0.07)" if tempo is not None else ">= tempo", (q6 >= tempo - 0.002) if (q6 is not None and tempo is not None) else None)
+    # ---- W12-7 zmiana kies wsi i ludu miast (cel decyzji: wsie i lud nie gromadza; przed: wsie +57.6 tys./d, lud miast +93.0 tys./d sr28 kopia-fin3)
+    ps = by_day(lines, "Pieniadz swiata: dzien")
+    pd = [d for d in sorted(ps) if 2 <= run_day(d, start) <= until][-28:]
+    dv = _mean([num(r"kiesy wsi \d+ \(([+-]\d+)\)", ps[d], int) for d in pd])
+    dt = _mean([num(r"kiesy ludu \(E5/B1\): miasta \d+ \(([+-]\d+)\)", ps[d], int) for d in pd])
+    rep.add("W12-7: zmiana kies wsi i ludu miast (sr28)", (f"wsie {dv:+.0f}/d" if dv is not None else "wsie -") + (f", lud miast {dt:+.0f}/d" if dt is not None else ", lud miast -"),
+            "INFO dla Jeffa (przed: wsie +57.6 tys./d, lud miast +93.0 tys./d; danina wsi 2.5% z e6-p2 dziala razem)", None)
 
 
 def etap5_rows(rep, lines, start, win, logp, csvp=None):

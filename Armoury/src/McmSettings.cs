@@ -4640,7 +4640,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkStartReserves { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Village Lord Scale", 0.00f, 1.00f, "0.00", HintText = "the lord takes this share of what Banner Kings would give him from a village's market takings - 35% under the usual tax policy, 25% low, 45% high; the village keeps the rest. Replaces the old daily rent of a fifth of the village purse (with Town Folk Live on)")]
+        [SettingPropertyFloatingInteger("Village Lord Scale", 0.00f, 1.00f, "0.00", HintText = "the lord takes this share of what Banner Kings would give him from a village's market takings (70% under the usual tax policy, 50% low, 90% high), and Village Lord Extra Share of the takings on top - 45% usual, 35% low, 55% high; the village keeps the rest. Replaces the old daily rent of a fifth of the village purse (with Town Folk Live on)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float VillageLordScale { get; set; } = 0.5f;
 
@@ -4651,6 +4651,22 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Village Dues Per Head Year", 0.00f, 50.00f, "0.0", HintText = "coins a year each free villager pays his lord in court, mill and market dues (with Town Folk Live on)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float VillageDuesPerHeadYear { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Village Lord Extra Share", 0.00f, 1.00f, "0.00", HintText = "on top of Village Lord Scale the lord takes this share of a village's market takings - 45% under the usual tax policy, 35% low, 55% high; the owners of Banner Kings estates take their part out of the lord's share as before (with Town Folk Live on; 0 = 35% usual, 25% low, 45% high)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float VillageLordExtraShare { get; set; } = 0.10f;
+
+        [SettingPropertyBool("Temple Tithe", HintText = "The tithe: a village gives the priest of its village Tithe Village Share of its market takings, and townsfolk give the priest of their town 1% (labourers), 2% (craftsmen) or 3% (merchant families) of what they earn. Half goes back as alms to the poor of the same town or village, half pays for building septs - three quarters as wages to the townsfolk who build (for a village, those of its market town) and a quarter for stone and timber paid to the town's merchants. A town without a priest pays its tithe into the town's coffers, a village without one keeps it (with Town Folk Live on; off = no tithe)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TempleTithe { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Tithe Village Share", 0.00f, 0.20f, "0.00", HintText = "share of a village's market takings it gives as tithe, out of the village's own part of them (with Temple Tithe on)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TitheVillageShare { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -5882,6 +5898,10 @@ namespace Armoury
             s.VillageLordScale = VillageLordScale;
             s.VillagePurchasePerHead = VillagePurchasePerHead;
             s.VillageDuesPerHeadYear = VillageDuesPerHeadYear;
+            s.VillageLordExtraShare = VillageLordExtraShare;
+            s.TempleTithe = TempleTithe;
+            s.TitheVillageShare = TitheVillageShare;
+            s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;

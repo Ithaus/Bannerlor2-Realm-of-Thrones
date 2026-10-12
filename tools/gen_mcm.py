@@ -131,6 +131,10 @@ RANGES = {
     'VillageLordScale': (0.0, 1.0, "0.00"),
     'VillagePurchasePerHead': (0.0, 1.0, "0.00"),
     'VillageDuesPerHeadYear': (0.0, 50.0, "0.0"),
+    # E5 decyzja 12.10 (wsie nie gromadza): dopisek pana i tempo nadwyzki przycinane w kodzie do 0..1 (TownFolk.Unit), dziesiecina wsi do 0..0.2
+    'VillageLordExtraShare': (0.0, 1.0, "0.00"),
+    'TitheVillageShare': (0.0, 0.2, "0.00"),
+    'FolkSurplusSpendShare': (0.0, 1.0, "0.00"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)

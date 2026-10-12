@@ -98,7 +98,7 @@ namespace Armoury
         internal const int MTownCrown = 13;                                                                     // E5/A1: udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw)
         internal const int MSutlers = 17;                                                                       // E5/A3 (163): markietani - sakiewki ludzi w polu -> kasy miast i kiesy wsi
         // E5/B1 (173): M18-M20 (rezerwacja dla rownoleglych drzew B: B2-B6 od M21, N10, H25 - plan kodu E5/B1 rozdz. 10.1)
-        internal const int MFolk = 18;                                                                          // E5/B1: kiesa ludu - place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu
+        internal const int MFolk = 18;                                                                          // E5/B1: kiesa ludu - place, robocizna, obrot P, roboty gminy, zakupy wsi, dziesiecina (E5/C3), zwrot przy wylaczeniu
         internal const int MFolkValve = 19;                                                                     // E5/B1: zawor dla ludu - 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu
         internal const int MFolkStart = 20;                                                                     // E5/B1: zapasy startowe kies ludu z daru (raz) albo z nadwyzki (stary zapis)
         // E5/B6 (201): zasada "pierwszy wolny (M18) + 15" = M33; M21-M32 wolne (zaslepki drukowane tylko != 0; scalenie B: bez kolizji z B1 - bez przenumerowania)
@@ -112,7 +112,7 @@ namespace Armoury
                                                    "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)",
                                                    "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)",   // 14-16: rezerwa A1 (nieuzywane, drukowane tylko != 0)
                                                    "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi",
-                                                   "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
+                                                   "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, dziesiecina (E5/C3), zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
                                                    "zawor dla ludu (E5/B1): 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu",
                                                    "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)",
                                                    "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",   // 21-32: wolne (nieuzywane, drukowane tylko != 0)

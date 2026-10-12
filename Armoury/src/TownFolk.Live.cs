@@ -26,7 +26,8 @@ namespace Armoury
     ///    dobrobytu wiersza BK (CalculateBudget, Low) tym samym czynnikiem; budzet nadwyzki na kategorie "lepsze".
     ///  - Doba (TownFolk.Daily w bloku): podatki panu od zarobku okna (1/2/3% W/R/P, podzamcze 3%; cech 1% R -> gmina), przelewy z kas, czynsz/leczenie/sluzba,
     ///    gmina (farma panu, roboty), zapas i nadwyzka, zakupy wsi w miescie targowym, kotwica na jutro.
-    ///  - Wies (R13): podatek BK x VillageLordScale (112 dopisuje wsi reszte), renta 20% -> oplata stala (PopulationLaw), danina od kiesy ponad 15 dni zakupow.
+    ///  - Wies (R13): podatek BK x VillageLordScale + VillageLordExtraShare utargu (decyzja Jeffa 12.10: 35/45/55%; 112 dopisuje wsi reszte), renta 20% -> oplata
+    ///    stala (PopulationLaw), danina od kiesy ponad 15 dni zakupow. Dziesiecina (R21/C3, TownFolk.Tithe.cs) i tempo nadwyzki FolkSurplusSpendShare (lud miast i wsie).
     ///  - R14: zadowolenie BK grupy z Afford < 0.98 = migawka + min(0, delta BK) - 0.0015. R5: zapasy startowe z daru (nowa kampania) albo z nadwyzki (stary zapis).
     /// Wylacznik TownFolkLive (i TownFolkMode 1, A1 cofa "zakupy"): wylaczony = stan sprzed B1 - kiesy wracaja do kas w pierwszej dobie (ReturnAll).
     /// Kazda osada we wlasnym try, licznik potkniec, bez globalnych wylacznikow (CLAUDE.md 7). Wszystko na watku glownym (poza nim - zachowanie A1).
@@ -69,7 +70,7 @@ namespace Armoury
         private sealed class LWin
         {
             public long PaidW, PaidR, PaidP, PaidC, Court, UnpaidT, UnpaidC, GmFood, Excise, MadeT, MadeC, FromTown, ValveT, ValveC, CourtGrant, SlaveW, VFee;
-            public int Ticks, TicksC, Fallback, R14Food, R14Rest, VFeeN; public double R14Bk; public long VTaxCut, VTaxBase;
+            public int Ticks, TicksC, Fallback, R14Food, R14Rest, VFeeN; public double R14Bk; public long VTaxCut, VTaxBase, VTaxAdd;
             public readonly long[] Earn = new long[EKinds]; public long EarnC;
         }
         private static LWin _win = new LWin();
@@ -86,10 +87,12 @@ namespace Armoury
             public double CInc, CWg, CHeads;
             public long VBuy, VPieces; public double VNeed, VWant;
             public long Seed, Orphan;
+            // dziesiecina (E5/C3, TownFolk.Tithe.cs): wsie (nalezne / zaplacone), lud miast W/R/P, jalmuzna miast / wsi, place i material septow, bez kaplana, bez miasta targowego
+            public long TiVDue, TiV, TiW, TiR, TiP, TiAlmsT, TiAlmsV, TiWage, TiMat, TiNoPriestT, TiNoPriestV, TiNoMarket; public int TiPriestN, TiNoPriestN, TiVN;
         }
         private static LDay _ld;
         private static LWin _lw;
-        private static string _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14;
+        private static string _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe;
         private static double _lastR = double.NaN; private static long _lastDStock, _lastIn, _lastOut;
         // zapasy startowe (linia jednorazowa)
         private static long _sW, _sR, _sP, _sC, _sV, _sGift; private static int _sTowns, _sCastles, _sVills, _sShort, _sNoBk;
@@ -101,9 +104,10 @@ namespace Armoury
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
             _ctlStock0 = long.MinValue; _ctlIn = _ctlOut = 0;
             _win = new LWin(); _ld = null; _lw = null;
-            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = null;
+            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = null;
             _lastR = double.NaN; _lastDStock = _lastIn = _lastOut = 0;
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
+            ResetTithe();
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -412,16 +416,22 @@ namespace Armoury
             catch (Exception e) { Stumble("AnchorBudgetPostfix", e); }
         }
 
-        /// <summary>R13: postfiks na BK BKTaxModel.CalculateVillageTaxFromIncome(Village, int) - przy kiesie czynnej podatek pana x VillageLordScale (0.5: zwykla 70% -> 35%);
-        /// 112 (VillageTakings) dopisuje wsi DOKLADNIE reszte (TaxOf czyta ten sam model). Wyjatek - wynik bez zmian.</summary>
-        public static void VillageTaxPostfix(ref int __result)
+        /// <summary>R13: postfiks na BK BKTaxModel.CalculateVillageTaxFromIncome(Village, int marketIncome) - przy kiesie czynnej podatek pana x VillageLordScale
+        /// + VillageLordExtraShare x utarg (decyzja Jeffa 12.10: 0.5 x 70% + 10% = 45% zwykla, 35% niska, 55% wysoka), najwyzej caly utarg; majatki BK biora
+        /// swoj udzial z tej czesci pana jak dotad (BK AccumulateTradeTax). 112 (VillageTakings) dopisuje wsi DOKLADNIE reszte (TaxOf czyta ten sam model).
+        /// Wyjatek - wynik bez zmian.</summary>
+        public static void VillageTaxPostfix(int __1, ref int __result)
         {
             try
             {
                 if (__result <= 0 || !Live) return;
-                int v = (int)(__result * (double)Unit(Settings.Current.VillageLordScale));
-                if (!OffMain()) { _win.VTaxBase += __result; _win.VTaxCut += __result - v; }
-                __result = v;
+                var s = Settings.Current;
+                long inc = Math.Max(0, __1);
+                long add = (long)(inc * (double)Unit(s.VillageLordExtraShare));
+                long v = (long)(__result * (double)Unit(s.VillageLordScale)) + add;
+                if (v > inc) v = inc;
+                if (!OffMain()) { _win.VTaxBase += __result; _win.VTaxCut += __result - v; _win.VTaxAdd += add; }
+                __result = (int)v;
             }
             catch (Exception e) { Stumble("VillageTaxPostfix", e); }
         }
@@ -547,6 +557,9 @@ namespace Armoury
             try { SeedOld(d); } catch (Exception e) { Stumble("SeedOld", e); }
             if (_orphan > 0) { try { OrphanBack(d); } catch (Exception e) { Stumble("OrphanBack", e); } }
             var lw = CloseWin();
+            // dziesiecina (E5/C3): kaplani BK raz na dobe, potem wsie (utarg okna) - przed miastami: place i material septow wsi licza sie w miastach targowych tej doby
+            try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
+            try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var f in _f.Values)
@@ -659,6 +672,8 @@ namespace Armoury
             d.TaxW += PayLord(f, 0, tW, d); d.TaxR += PayLord(f, 1, tR, d); d.TaxP += PayLord(f, 2, tP, d);
             d.Guild += Move(f, 1, 3, guild);
             PayCrown(f, 0, KingdomTreasury.WtW, eW); PayCrown(f, 1, KingdomTreasury.WtR, eR); PayCrown(f, 2, KingdomTreasury.WtP, eP);
+            // ---- 1b. dziesiecina (E5/C3, R21; decyzja Jeffa 12.10) od tego samego zarobku okna: W 1% / R 2% / P 3% -> kaplan osady (material septow - sprzedaz kupcow przed krokiem 2)
+            TownTithe(f, town, eW, eR, eP, d);
             // ---- 2. z kasy do ludu (koszt sprzedazy - najwyzej stan kasy): robocizna handlu, obrot P, doplata do 35% wartosci wyrobow
             double svc = Unit(s.TownFolkServiceShare), cs = Unit(s.CourtFolkShare);
             double rf = Unit(s.TownFolkLabourFood), rg = Unit(s.TownFolkLabourGoods), ra = Unit(s.TownFolkLabourArms);
@@ -708,21 +723,22 @@ namespace Armoury
                     f.KG -= mat; _ctlOut += mat; d.GmMat += mat; f.GmMatWin += mat;
                 }
             }
-            // ---- 5. zapas i nadwyzka (potrzeba z wczorajszej kotwicy): W ponad TownFolkReserveDays dni - 7% na towar jutro; R ponad 21, P ponad 30 dni - 7%: 70% place, 30% towar
-            double rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays));
+            // ---- 5. zapas i nadwyzka (potrzeba z wczorajszej kotwicy): W ponad TownFolkReserveDays dni - FolkSurplusSpendShare (15%; dotad 7%) na towar jutro;
+            //         R ponad 21, P ponad 30 dni - ten sam udzial: 70% place, 30% towar (decyzja Jeffa 12.10 (3))
+            double rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays)), sr = SpendRate(s);
             f.Offer[0] = f.Offer[1] = f.Offer[2] = 0;
-            if (f.Need[0] > 0) { double ov = f.KW - rdW * f.Need[0]; if (ov > 0) f.Offer[0] = (long)(SurplusRate * ov); d.Lokata += Math.Max(0, ov); }
+            if (f.Need[0] > 0) { double ov = f.KW - rdW * f.Need[0]; if (ov > 0) f.Offer[0] = (long)(sr * ov); d.Lokata += Math.Max(0, ov); }
             if (f.Need[1] > 0)
             {
                 double ov = f.KR - RdR * f.Need[1];
-                if (ov > 0) { long lv = (long)(SurplusRate * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
+                if (ov > 0) { long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
             }
             if (f.Need[2] > 0)
             {
                 double ov = f.KP - RdP * f.Need[2];
                 if (ov > 0)
                 {
-                    long lv = (long)(SurplusRate * ov), wp = (long)(SurpWage * lv), toW = (long)(wp * 0.6);
+                    long lv = (long)(sr * ov), wp = (long)(SurpWage * lv), toW = (long)(wp * 0.6);
                     long moved = Move(f, 2, 0, toW) + Move(f, 2, 1, wp - toW);
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
                 }
@@ -822,7 +838,7 @@ namespace Armoury
                     double nv = pph * VillHeads(f, true);
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
-                    double extra = SurplusRate * Math.Max(0, gold - buy1 - RdV * nv);
+                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
                     if (want < 1) continue;
@@ -1243,6 +1259,9 @@ namespace Armoury
               .Append(F2(Unit(s.TownFolkCastleProfitShare))).Append(", akcyza ").Append(s.TownFolkExcise.ToString("0.000", Inv)).Append(", zapas W ").Append(s.TownFolkReserveDays).Append(" dni")
               .Append(", wies: pan x").Append(F2(Unit(s.VillageLordScale))).Append(", zakupy ").Append(s.VillagePurchasePerHead.ToString("0.00", Inv)).Append(" zl/glowe/d, oplaty ")
               .Append(s.VillageDuesPerHeadYear.ToString("0.0", Inv)).Append(" zl/glowe/rok")
+              .Append(" | decyzja 12.10: dopisek pana z utargu wsi ").Append(F2(Unit(s.VillageLordExtraShare))).Append(", tempo nadwyzki ").Append(F2(SpendRate(s)))
+              .Append("/d (podzamcze ").Append(F2(SurplusRate)).Append("), dziesiecina ").Append(TitheKey ? "tak (wsie " + F2(TitheVillage(s)) + " utargu, lud W/R/P 1/2/3%)" : "nie")
+              .Append(", kaplani BK: ").Append(TitheBkState())
               .Append(" | kotwica: ").Append(s.TownFolkAnchorBasket ? "tak" : "nie").Append(", kuchnia pana: ").Append(s.TownFolkCastleCourtFeeds ? "tak" : "nie")
               .Append(", R14: ").Append(s.TownFolkSatisfactionFromBasket ? "tak" : "nie").Append(", zapasy startowe: ").Append(s.TownFolkStartReserves ? "tak" : "nie")
               .Append(" | niewolni: kultury osad z listy I1 (").Append(slaves).Append(" miast i zamkow)")
@@ -1301,6 +1320,7 @@ namespace Armoury
               .Append(" | kiesy ").Append(d.KW + d.KR + d.KP).Append(" (W ").Append(d.KW).Append(" / R ").Append(d.KR).Append(" / P ").Append(d.KP).Append("), gminy ").Append(d.KG)
               .Append(", zapas dni W ").Append(F1(d.NW > 0 ? d.KW / d.NW : double.NaN)).Append(" / R ").Append(F1(d.NR > 0 ? d.KR / d.NR : double.NaN)).Append(" / P ").Append(F1(d.NP > 0 ? d.KP / d.NP : double.NaN))
               .Append(", lokata (kiesa W ponad zapas dni) ").Append(N0(d.Lokata)).Append(", oferta nadwyzki na jutro ").Append(d.OffT)
+              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)")
               .Append(" | stac jedzenie W/R/P ").Append(Pct(d.AFW, d.NFW)).Append(" / ").Append(Pct(d.AFR, d.NFR)).Append(" / ").Append(Pct(d.AFP, d.NFP))
               .Append(", pelny W/R/P ").Append(Pct(d.AW, d.NW)).Append(" / ").Append(Pct(d.AR, d.NR)).Append(" / ").Append(Pct(d.AP, d.NP))
               .Append(" (swiat ").Append(Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP)).Append(")")   // recenzja B1 (1-6): prog B1-T8 "swiat >= 98%" (waga potrzeb)
@@ -1323,7 +1343,9 @@ namespace Armoury
                        + ", doplata do 35% " + d.TopT + " | zamki: robocizna " + d.LabC + ".";
             _lineRights = "Prawa panskie (E5/B1): dzien " + day + " | od zarobku ludu miast " + (d.TaxW + d.TaxR + d.TaxP) + " (W " + d.TaxW + " / R " + d.TaxR + " / P " + d.TaxP + "), podzamcza " + d.TaxC
                           + ", farma gmin " + d.Farm + ", oplaty stale wsi " + w.VFee + " (" + w.VFeeN + " wsi); gracz " + d.Player + "; wstrzymane w oblezeniu " + d.Held
-                          + "; bez zywego pana do gminy " + d.NoLord + " (" + d.NoLordN + ") | podatek wsi BK x VillageLordScale: z " + w.VTaxBase + " zostalo wsiom " + w.VTaxCut + ".";
+                          + "; bez zywego pana do gminy " + d.NoLord + " (" + d.NoLordN + ") | podatek wsi BK x VillageLordScale + VillageLordExtraShare utargu: z " + w.VTaxBase + " zostalo wsiom " + w.VTaxCut
+                          + " (w tym dopisek pana z utargu " + w.VTaxAdd + ").";
+            _lineTithe = TitheLine(day, d);
             _lineR14 = "Zadowolenie ludu (R14): dzien " + day + " | korekty " + (w.R14Food + w.R14Rest) + " (Food " + w.R14Food + " / reszta " + w.R14Rest + "), BK sam " + w.R14Bk.ToString("0.000", Inv)
                        + " (dodatnia delta BK zastapiona); osad z Afford < 0.98 na jutro: jedzenie " + CountAff(true) + ", reszta " + CountAff(false) + ".";
             if (csvDay)
@@ -1367,8 +1389,8 @@ namespace Armoury
         private static List<string> TakeLiveLines()
         {
             var l = new List<string>();
-            foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14 }) if (x != null) l.Add(x);
-            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = null;
+            foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe }) if (x != null) l.Add(x);
+            _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = null;
             return l;
         }
     }
