@@ -1363,3 +1363,12 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   (`w-toku/e8-b` bb02c3e - poprawka: licznik hanby dlugu przy braku odbiorcy); drzewo `w-toku/e8-c` zalozone od f7db9c5 (P3 w toku); `w-toku/zbior-5-8` E7/R2 zakodowane (35fb7da, recenzja w toku).
   Autotest: `at1-autotest` 486008e - nowy parametr `-ExtraFile "cel wzgledem Modules=zrodlo;..."` (pliki danych e7-b/W4 na czas testu; plik, ktorego przed testem nie bylo, po tescie znika;
   proba na sucho na atrapie gry OK). Rozpoznanie E8/H (jezdziec = kon + uprzaz) w toku -> `docs/etap8/rozpoznanie-H-jezdziec-uprzaz.md`. Jeff spi, raport za 12-14 h. Limit 5 h: 7% po 45 min.
+- (22:40 UTC 12.10) **`w-toku/zbior-5-8` GOTOWE do a589def:** E7/R2 35fb7da (okienko gracza po kazdej osadzie, NK), E7/W4 0adf433 + recenzja 7c1bada (wyglad spalonej wioski, napisy;
+  nowy prefab GUI\Prefabs\ArmBurnedVillageLabels.xml), przeglad calosci 1 ekonomia 69e6f70 (bez zmian kodu), przeglad calosci 2 kod 1500d97 (prog E7/C T1 falszywe NIE - poprawiony),
+  scalenie a8-gentry0 bfe0f64, **scalenie e8-b a589def** (cs-bledy + E8/M + E8/RC; konflikt tylko CHANGELOG - suma, 689 naglowkow; build 5 modow kod 0).
+  Pliki poza DLL od WGRANIA 33 (do testu przez `-ExtraFile`, do wgrania recznie): Armoury\GUI\Prefabs\ArmBurnedVillageLabels.xml, ArmMapVillageTooltip.xml, Armoury\ModuleData\
+  arm_map_roads_probe.tsv, arm_map_village_lore.tsv, Armoury\Prefabs\arm_map_roads.xml, CrashScribe\ModuleData\CrashScribe.settings.xml (zmieniony). GrandTourney bez zmian.
+  Etap 8: `e8-a` do E8/X (f61193c: P1, P2, X z recenzjami), `e8-c` do E8/Q (e5420ee: P3, S z recenzjami, Q zakodowane). Rozpoznanie E8/H gotowe (docs/etap8/rozpoznanie-H-jezdziec-uprzaz.md):
+  dzis sam kon wystarcza; uprzezy ok. 7.7 tys. na 10.8 tys. jezdzcow; siodlarze stoja przez zla wage siodel ROT (naprawia E8/C); zalecany wariant A (para kon + dowolne siodlo rodziny konia).
+  **PROBA STARTU (nie test zbiorczy):** 10 dob nowej kampanii na zbior-5-8 a589def (Armoury 2ce92d48, RC 468b0e66, ForgeView ca86b75b, CS-at 49670825 = a589def + at1-cs.diff, pliki danych
+  przez -ExtraFile) - zeby wczesnie zlapac bledy startu etapow 5-7, ktore nigdy nie biegly w grze; wynik: SCRATCH(dbc3d3d1)\test\at-zb58-proba10.out.txt. Skrypt biegu: SCRATCH(dbc3d3d1)\bieg.ps1.
