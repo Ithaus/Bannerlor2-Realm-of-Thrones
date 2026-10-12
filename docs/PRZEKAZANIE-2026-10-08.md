@@ -1025,3 +1025,4 @@ drugie konto zaczyna NOWY workflow od pierwszej niezrobionej paczki. Skrypty wsz
 
 **Zasady Jeffa (pamiec konta ae222cb7 - na tym samym komputerze w `C:\Users\GAME\.claude\projects\C--Users-GAME-Bannerlor2-Realm-of-Thrones\memory\`):** caly kod etapow 5-8, potem
 jeden test; rob do limitu, zapisuj po kazdym kroku (push + STAN-PRAC); ekonomia bez sztucznych doplat; kazda zmiana = kontrola calosci; rozmowa po polsku, prosto; napisy w grze po angielsku.
+- (18:45 UTC 12.10) DO ZROBIENIA przed testem: scalic `w-toku/a8-gentry0` (bc5e3ef - nowy rod szlachty BK startuje z 0, decyzja Jeffa) do `w-toku/zbior-5-8` (git merge --no-ff; konflikty CHANGELOG/Settings.cs - suma, McmSettings - gen_mcm; build).

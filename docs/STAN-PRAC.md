@@ -1332,3 +1332,6 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   E5/BITWY c07c1d8+a119682 - ROZPOZNANIE: "26 tys./d bitwy z niczego" to wyplata gry zwyciezcom BRUTTO, para z ujsciami (wodzowie pokonanych, A6) i N4 - netto 119 dob -13 zl; statki
   z niczego 0; BEZ zmiany kodu, tylko progi BITWY-1/2; C1 a053001+d493556 - regulator bez dosypki juz jest (tryb 2 z E5/A1, decyzja Jeffa 11.10) - bez nowego klucza, tylko licznik plonu
   w miastach-zaulkach i progi C1-1..4. Dalej C2, C4, E7/R1, R2, W4. Projekt etapu 8 (wf_c0d119d4-812): 4 rozpoznania gotowe (docs/etap8, bez commita), pisze sie projekt. Tydzien 96%.
+- (18:45 UTC 12.10) **Jeff: nowy rod szlachty BK - "zawsze 0"** (zamiast 15 000 z kasy miasta). Kod: `w-toku/a8-gentry0` bc5e3ef (od zbior-5-8 2b30405, osobne drzewo SCRATCH\zb\a8g,
+  bo w zbior-5-8 pracuje workflow): nowy klucz GentryStartFromTown = false (kasa miasta tylko przy true), build 0, CHANGELOG. **DO SCALENIA** do `w-toku/zbior-5-8` po skonczeniu
+  wf_42f8dda9-fa3 (konflikty spodziewane: CHANGELOG gora, Settings.cs, McmSettings.cs - gen_mcm).
