@@ -1276,3 +1276,7 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   w-toku/e6-p3" pokazuje, ktore paczki sa w commitach; wznowienie: Workflow resumeFromRunId wf_aa159ecf-f65 (skrypt w workflows/scripts sesji ae222cb7).
 - DALEJ (kolejnosc): etap 5 reszta (porcja C, male zrodla zlota z audytu, ok. 26 tys./d "bitwy"), etap 7 (bez tempa marszu: 7.1, 7.4-7.12), etap 8 (8.1-8.17 z optymalizacja),
   potem scalenie, pelny audyt, jeden dokladny test (120 dob + zapis + zima + bieg dlugi), poprawki, wgranie.
+- (11:40 UTC 12.10) **Jeff - ceny a dochody (analiza docs/CENY-A-DOCHODY-2026-10-12.md):** ogolny poziom cen zgodny z modelem historycznym (1 d = 1 pens) i z zoldem - NIE ruszac.
+  (1) odchylki cennika (rzad konski z prawdziwej wagi, helmy t4-6, luki wojenne t3-6; opcjonalnie konie wedlug kategorii) - **TAK, etap 8 (8.5)**; (2) dochody gracza
+  (nagrody zadan, turnieje, okupy) przeliczone do nowych cen, nagroda z kiesy zleceniodawcy liczona w dniach zoldu druzyny, bez zlota z niczego - **TAK, etap 8 (nowe 8.18)**;
+  (3) drogi ser/drewno/plotno/srednie zbroje to niedobor produkcji, nie cennik - **OK** (czesc robi etap 6: W1, W3).

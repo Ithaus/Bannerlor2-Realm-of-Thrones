@@ -227,7 +227,7 @@ Cel: kazda znana usterka zamknieta; to, czego autotest nie gra, sprawdzone przez
 | 8.2 | Dary Spoils do zbrojowni zalogi; drobne doswiadczenie | zdecyd. | S | 1.2 |
 | 8.3 | Ksiazki BK po 7-10 zl; kuznia lordow i brakujace czesci broni | blad | M | - |
 | 8.4 | Amunicja: odzysk AI jak u Ciebie; oszczepy jak strzaly | blad | S | 1.2 |
-| 8.5 | Ceny: surowce a cena broni; popyt wojenny i cena konia liczone dwa razy | blad | S | - |
+| 8.5 | Ceny: surowce a cena broni; popyt wojenny i cena konia liczone dwa razy; **odchylki cennika etapu 2 (Jeff 12.10 "tak"): rzad konski z prawdziwej wagi (siodlo t0 588 zl wobec 24-60 historii, barda t6 11.5 tys. wobec 0.5-2.4 tys.), helmy t4-6 (bascinet 182 wobec 48) i luki wojenne t3-6 (63 wobec 12-18) - mniej dni pracy; opcjonalnie konie wedlug kategorii** (docs/CENY-A-DOCHODY-2026-10-12.md) | blad + zdecyd. | S | - |
 | 8.6 | Lup: wraki 100% dla Ciebie; podejrzenie dubla lupu i koni | blad | S | - |
 | 8.7 | Zalogi nie zuzywaja sprzetu; monopole korony | blad | M | - |
 | 8.8 | Zakupy, naprawy i zuzycie AI: jakosc ginie, brak sufitu ceny, naprawy staja, zuzycie zabiera nowe sztuki; Twoj sprzet na arenie | blad | S | 1.2 |
@@ -239,6 +239,7 @@ Cel: kazda znana usterka zamknieta; to, czego autotest nie gra, sprawdzone przez
 | 8.14 | BetterEconomy bez losowych susz, sol i piwo jako potrzeby: my dopisujemy klucz do skryptu, Ty go uruchamiasz | zdecyd. | M | - |
 | 8.15 | Pomiary: test Innych od doby 728, produkcja wsi z dodatkiem morskim, kara "Underequipped" w Twoich bitwach, dochod owiec | zdecyd. | M | 1.4 |
 | 8.16 | Twoje testy: kuznia (Kuj przy bramie, panel, pokretlo 35, "Pick a piece"); okna Spoils (Done/Cancel); turniej; niewola; jency do domu i ekran po bitwie; sprzedaz czystej, Battered i wraku; kulawy kon; rezerwa miasta 20 000; samonaprawa; karczma | Ty | S | - |
+| 8.18 | **Dochody gracza w nowych cenach (Jeff 12.10 "tak"):** nagrody zadan (250-5000), sakiewki turniejow (3-15 tys.) i okupy zostaly w skali gry, a sprzet potanial ok. 21x - nagroda z kiesy zleceniodawcy (bez zlota z niczego), liczona w dniach zoldu druzyny gracza; turnieje i okupy tak samo w skali (docs/CENY-A-DOCHODY-2026-10-12.md rozdz. rada 4) | zdecyd. | S | 3.8 |
 | 8.17 | Optymalizacja - gra ma dzialac szybciej (Jeff 12.10): profil doby (dzis nasze mody ok. 7% czasu doby, najwiecej WorkshopLaw ok. 0.8 s/dobe), najdrozsze petle, potem gra i cudze mody | zdecyd. | M | - |
 
 **Skonczone, gdy:** kazda pozycja ma dowod z logu albo z Twojej gry.
