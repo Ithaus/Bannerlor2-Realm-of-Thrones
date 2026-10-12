@@ -31,7 +31,7 @@ namespace Armoury
     ///    (wyjatek w metodzie gry - postfiks nie biegl). Oba jeszcze w oknie O09 (jego finalizer ma nizszy priorytet).
     ///    Twierdza sprzedaje sama (kupujacy null) - placi kupujacy, brak kupujacego - 0 (jency wypuszczeni). Gracz dostal mniej - komunikat.
     ///  - lup z oblezenia (SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied): platnik = zdobyta osada (kazda wyplata z tej samej nadwyzki);
-    ///  - nagroda turnieju AI (TournamentManager.GivePrizeToWinner): platnik = miasto-gospodarz;
+    ///  - nagroda turnieju AI (TournamentManager.GivePrizeToWinner): platnik = miasto-gospodarz; prefiks High (przed RBMTournament, ktory wyplaca sam - audyt 11.10);
     ///  - jency z rabunkow BK (BKRaidCaptureBehavior.ExecuteCapture): platnik = najblizsze miasto krolestwa najezdzcy;
     ///  - myto (perk Tollgates; CaravansCampaignBehavior i BK BKCaravansBehavior OnSettlementEntered): gra dopisuje licznikowi cel miasta z niczego -
     ///    platnik = kasa wjezdzajacej karawany (najwyzej to, co ma; reszte licznik oddaje), okno myta ksiegi (O46) widzi przelew (ToCounterRun).
@@ -283,7 +283,9 @@ namespace Armoury
             Seal31.Patch("platnik: GiveGoldAction.ApplyInternal", give, typeof(RealPayer), nameof(GivePrefix), null, null, Priority.Low);
             Seal31.Patch("platnik: jency (SellPrisonersAction.ApplyInternal)", AccessTools.Method(typeof(SellPrisonersAction), "ApplyInternal"), typeof(RealPayer), nameof(PrisPre), nameof(PrisPost), nameof(CtxFin), Priority.Low, Priority.First, Priority.High);   // postfiks First - przed 178 (Last)
             Seal31.Patch("platnik: lup z oblezenia (OnSiegeAftermathApplied)", AccessTools.Method(typeof(SiegeAftermathCampaignBehavior), "OnSiegeAftermathApplied"), typeof(RealPayer), nameof(SiegePre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
-            Seal31.Patch("platnik: nagroda turnieju (GivePrizeToWinner)", AccessTools.Method(typeof(TournamentManager), "GivePrizeToWinner"), typeof(RealPayer), nameof(TourneyPre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
+            // audyt zlota 11.10 (5a RP'): prefiks High - przed prefiksem RBMTournament (Normal, RBMTournament.cs:545), ktory sam wyplaca nagrode z niczego i zwraca false;
+            // przy Low kontekst otwieral sie po wyplacie RBM (0 wyplat przez caly bieg). Nadal ponizej okna ksiegi O11 (First); finalizer bez zmian.
+            Seal31.Patch("platnik: nagroda turnieju (GivePrizeToWinner)", AccessTools.Method(typeof(TournamentManager), "GivePrizeToWinner"), typeof(RealPayer), nameof(TourneyPre), null, nameof(CtxFin), Priority.High, Priority.Normal, Priority.High);
             const string bkRaid = "BannerKings.Behaviours.Raids.BKRaidCaptureBehavior", bkCar = "BannerKings.Behaviours.BKCaravansBehavior";
             var rt = AccessTools.TypeByName(bkRaid);
             Seal31.Patch("platnik: jency z rabunkow BK (ExecuteCapture)", rt != null ? AccessTools.Method(rt, "ExecuteCapture") : null, typeof(RealPayer), nameof(RaidPre), null, nameof(CtxFin), Priority.Low, Priority.Normal, Priority.High);
