@@ -943,3 +943,7 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   + etap 6 waski. MCM Armoury 1162. DLL: test\Armoury-final.dll 89a27e09, test\rc-final\RealisticCaptivity.dll 943ea0d3, CS test\CrashScribe-at-bledy.dll 13168fd4
   (do wgrania zwykly CrashScribe-bledy.dll 842f64a4). **TEST ZBIORCZY ruszyl** (bu0blzbsf): 120 dob nowej kampanii -> zapis 9 dob z konca biegu -> zima 120;
   wyjscia test\at-fin-120.out.txt, at-fin-zapis.out.txt, at-fin-zima.out.txt.
+- (04:05 UTC) **TEST ZBIORCZY 1 NIE WYSTARTOWAL** (brak startu kampanii, hang): GarrisonRecruitFee (E5 decyzja 9) zakladal latke na DefaultClanFinanceModel przy starcie gry ->
+  cctor (Game.Current.GameTextManager null) -> TypeInitializationException na caly proces (pulapka ERRORS.md 14.09). POPRAWIONE: splata zakladana w kampanii
+  (GarrisonRecruitFee.EnsureHooks, ArmouryBehavior obok CrownIncome.EnsureHooks) - w-toku/zbior-final 329f2c7; jedyna nowa latka na tej klasie (grep diffu od 7658247).
+  DLL test\Armoury-final.dll 101c8cfe. **TEST ZBIORCZY 2 ruszyl** (bl5mnkmtn): wyjscia test\at-fin2-120.out.txt, at-fin2-zapis.out.txt, at-fin2-zima.out.txt.
