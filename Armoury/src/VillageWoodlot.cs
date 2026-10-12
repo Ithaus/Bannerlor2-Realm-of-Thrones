@@ -218,6 +218,10 @@ namespace Armoury
                     _startPasses++; _startKg += n * (double)Math.Max(0.1f, wood.Weight);
                     return;
                 }
+                // E6/R1 (214): las wsi okregu kopalni najpierw do dymarek kopalni tego okregu (TradeBound) - zdjete z wozu na targ, zanim pojedzie;
+                // do magazynu wsi (i ksiegi "las wsi") idzie reszta
+                n -= Bloomery.FromWoodlot(v, n);
+                if (n <= 0) return;
                 v.Settlement.ItemRoster.AddToCounts(wood, n);
                 OreLedger.NoteWoodlot(wood, v.Settlement, n);
                 _made += n; _villages++;

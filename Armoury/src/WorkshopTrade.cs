@@ -253,7 +253,7 @@ namespace Armoury
                     if (om == null) return 1f;
                     _oreItem = om.GetObject<ItemObject>("iron");
                 }
-                return Math.Max(1f, HistoricalPrices.BulkScale(_oreItem));
+                return Math.Max(1f, HistoricalPrices.CountScale(_oreItem));   // E6/R1 (214): lupa liczy sie jak ladunek rudy (ten sam przelicznik co BulkLineSkip)
             }
             catch (Exception e) { Stumble("WorkshopTrade.BulkFactor", e); return 1f; }
         }

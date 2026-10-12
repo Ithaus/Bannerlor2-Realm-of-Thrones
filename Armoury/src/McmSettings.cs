@@ -4736,6 +4736,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
 
+        [SettingPropertyBool("Bloomery At Mine", HintText = "new campaigns only: the mining village smelts its ore on the spot and sends out iron blooms (15 kg) instead of 100 kg loads of ore; the bloomery burns real wood - from the woods of the district first, then bought at its market town - and without wood the mine yields less; the town forge burns only smith's charcoal, and scrap and wrecks are smelted back into blooms")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryAtMine { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5919,6 +5923,7 @@ namespace Armoury
             s.AiSpareHorseShare = AiSpareHorseShare;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
+            s.BloomeryAtMine = BloomeryAtMine;
         }
 
         internal static void Apply()

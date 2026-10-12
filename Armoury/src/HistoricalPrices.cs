@@ -146,6 +146,23 @@ namespace Armoury
             return Math.Max(0.01f, it.Weight) / w0;
         }
 
+        /// <summary>E6/R1 (214): ile starych sztuk gry (10 kg surowca) liczy JEDNA sztuka - do LICZENIA sztuk (wydobycie wsi, kopalnie BK, place cyklu,
+        /// zapas startowy, przelicznik popytu). Zwykle = BulkScale (waga / waga z gry); lupa zelaza (Bloomery) wazy 15 kg, a liczy sie jak ladunek
+        /// rudy, z ktorego ja wytopiono (100 kg) - inaczej kopalnie dawalyby 6.7 x zelaza (pulapka K13:227-229).</summary>
+        internal static float CountScale(ItemObject it)
+        {
+            return Bloomery.IsBloom(it) ? Bloomery.Scale : BulkScale(it);
+        }
+
+        /// <summary>E6/R1 (214): kilogramy surowca, za ktore liczy sie jedna sztuka w recepturach (WorkshopLaw.Needs, MendMaterial): waga sztuki;
+        /// lupa - kg rudy, z ktorej ja wytopiono (waga z gry x Bloomery.Scale = 100 kg).</summary>
+        internal static float CountKg(ItemObject it)
+        {
+            float w0;
+            if (Bloomery.IsBloom(it) && _origWeight.TryGetValue(it, out w0) && w0 > 0f) return w0 * Bloomery.Scale;
+            return it != null && it.Weight > 0.05f ? it.Weight : 10f;
+        }
+
         private static void SetWeight(ItemObject it, float w)
         {
             var f = typeof(ItemObject).GetProperty("Weight");
@@ -297,6 +314,15 @@ namespace Armoury
             return woodKg * s.HistWoodPerKg;
         }
 
+        /// <summary>E6/R1 (214): czesc FuelPerMetalKg, ktora pali dymarka (WorkshopWoodPerOre na rude, ktora daje WorkshopCrudeKgPerOre kg surowki) -
+        /// przy wytopie przy kopalni siedzi w cenie lupy (lupa = surowka + wegiel dymarki), a kuznia miasta pali juz tylko wegiel kowalski.
+        /// HistCost wyrobu liczy dalej cala FuelPerMetalKg - suma bez zmian, nic liczone dwa razy.</summary>
+        internal static float BloomeryFuelPerMetalKg()
+        {
+            var s = Settings.Current;
+            return Math.Max(0f, s.WorkshopWoodPerOre) * 10f / Math.Max(0.1f, s.WorkshopCrudeKgPerOre) * s.HistWoodPerKg;
+        }
+
         /// <summary>wpis 90 (audyt 1-43 F1): bron wykuta W TRAKCIE sesji to nowy ItemObject z cena w skali gry (DetermineValue) -
         /// Apply przy starcie go nie widzial; sprzedaz takiego miecza dawala tysiace pensow z kilku pensow sztabek.</summary>
         internal static void PriceOne(ItemObject it)
@@ -348,20 +374,30 @@ namespace Armoury
                 };
 
                 // 0. ruda i drewno w ladunkach (wpis 50)
+                // E6/R1 (214): przy wytopie przy kopalni (Bloomery.CanApply - klucz, nowa kampania, latki ticku i modelu wsi) sztuka "iron" to lupa:
+                // metal z ladunku rudy (100 kg x WorkshopCrudeKgPerOre / 10 = 15 kg surowki), liczona dalej jak ten ladunek (CountScale / CountKg)
+                bool bloom = s.HistBulkUnitFactor > 1.01f && Bloomery.CanApply();
                 if (s.HistBulkUnitFactor > 1.01f)
                     foreach (var id in new[] { "iron", "hardwood" })
                     {
                         var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                         if (it == null) continue;
                         if (!_origWeight.ContainsKey(it)) _origWeight[it] = it.Weight;
-                        SetWeight(it, _origWeight[it] * s.HistBulkUnitFactor);
+                        float w = _origWeight[it] * s.HistBulkUnitFactor;
+                        if (bloom && id == "iron")
+                        {
+                            w *= Math.Max(0.01f, s.WorkshopCrudeKgPerOre) / 10f;
+                            Bloomery.MarkApplied(it, s.HistBulkUnitFactor);
+                        }
+                        SetWeight(it, w);
                     }
+                Bloomery.StartLine(s.HistBulkUnitFactor > 1.01f);
 
                 // 1. surowce kuzni - cena za kg x WAGA (ruda i drewno 100 kg w ladunku, wegiel, sztabki 0.5 kg)
                 var raw = new List<string>();
                 foreach (var kv in new[]
                 {
-                    new KeyValuePair<string, float>("iron", s.HistIronOrePerKg),
+                    new KeyValuePair<string, float>("iron", Bloomery.On ? s.HistCrudeIronPerKg + BloomeryFuelPerMetalKg() : s.HistIronOrePerKg),   // E6/R1 (214): lupa = surowka + wegiel dymarki za kg
                     new KeyValuePair<string, float>("hardwood", s.HistWoodPerKg),
                     new KeyValuePair<string, float>("charcoal", s.HistCharcoalPerKg),
                     // test 04.10: skora i len zostaly w skali gry (23-24.5 d/kg) przy zbrojach juz w pensach - warsztaty
@@ -468,7 +504,7 @@ namespace Armoury
                     if (old <= 0) { zeroLog.Add(kv.Key.StringId + " (" + cat.StringId + ")"); continue; }
                     // 177-1 (krytyka pkt 8): sztaba 6 liczy sie do przelicznika kategorii po dawnej cenie (100 d) - tania stal zamkowa (6 d) nie
                     // przesuwa popytu miast na cala kategorie "iron" (ruda i sztaby; bez tego /23.5 -> ok. /35); CastleSteel.RatioValue = Value dla reszty
-                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(kv.Key)) * BulkScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk
+                    double l; sumLog.TryGetValue(cat, out l); sumLog[cat] = l + Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(kv.Key)) * CountScale(kv.Key));   // za kg - ladunek to tyle samo towaru co 10 starych sztuk (E6/R1: lupa - jak ladunek rudy, z ktorego ja wytopiono)
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
                 var cats = new List<string>();
@@ -596,10 +632,10 @@ namespace Armoury
                     if (cat == null || !cat.IsTradeGood || it.Value <= 0) continue;
                     int old = fromDef ? DemandBase(it, kv.Value) : kv.Value;
                     if (old <= 0) continue;
-                    double l = Math.Log((double)old / it.Value * BulkScale(it));
+                    double l = Math.Log((double)old / it.Value * CountScale(it));   // E6/R1 (214): lupa liczy sie jak ladunek rudy (CountScale)
                     own[it] = l;
                     // 177-1: srednia kategorii (moneta popytu) z tym samym skladnikiem co przelicznik w Apply - sztaba 6 po dawnej cenie; waga sztuki (own) z prawdziwej
-                    double lr = CastleSteel.RatioValue(it) != it.Value ? Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(it)) * BulkScale(it)) : l;
+                    double lr = CastleSteel.RatioValue(it) != it.Value ? Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(it)) * CountScale(it)) : l;
                     double a; sum.TryGetValue(cat, out a); sum[cat] = a + lr;
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
                 }
@@ -634,7 +670,7 @@ namespace Armoury
                         if (!own.TryGetValue(it, out l))
                         {
                             int def = fromDef ? DemandBase(it, it.Value) : it.Value;
-                            l = def > 0 ? Math.Log((double)def / it.Value * BulkScale(it)) : c;
+                            l = def > 0 ? Math.Log((double)def / it.Value * CountScale(it)) : c;
                         }
                         int w = Math.Max(1, (int)Math.Round(it.Value * Math.Exp(l - c), MidpointRounding.AwayFromZero));   // jak gra: sztuka z wartoscia wazy co najmniej 1
                         if (w == it.Value) continue;

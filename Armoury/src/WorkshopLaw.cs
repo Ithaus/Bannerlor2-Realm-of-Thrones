@@ -123,7 +123,7 @@ namespace Armoury
                     if (id != "iron" && id != "hardwood") return false;
                 }
                 Resolve();
-                float scale = HistoricalPrices.BulkScale(_ore);
+                float scale = HistoricalPrices.CountScale(_ore);   // E6/R1 (214): lupa liczy sie jak ladunek rudy (nie waga 15 kg)
                 return scale > 1.01f && MBRandom.RandomFloat > 1f / scale;
             }
             catch { return false; }
@@ -168,8 +168,10 @@ namespace Armoury
             // wpis 50: liczone w KG, potem na jednostki rynku wedle ich wagi (ladunek rudy/drewna 100 kg)
             Resolve();
             float oreKg = c.MetalKg > 0f ? c.MetalKg / crudePerOre * 10f * (float)Math.Pow(1.25, StepsOf(c.Grade)) : 0f;
-            float woodKg = c.WoodKg + oreKg * Math.Max(0f, s.WorkshopWoodPerOre) + c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
-            float ore = oreKg / UnitKg(_ore);
+            // E6/R1 (214): przy wytopie przy kopalni (Bloomery.On) dymarka jest w okregu kopalni - kuznia miasta pali tylko wegiel kowalski,
+            // a metal liczy sie w lupach (lupa = metal ze 100 kg rudy: CountKg; waga lupy 15 kg dalaby 6.7 x zelaza)
+            float woodKg = c.WoodKg + (Bloomery.On ? 0f : oreKg * Math.Max(0f, s.WorkshopWoodPerOre)) + c.MetalKg * Math.Max(0f, s.WorkshopForgeWoodPerMetalKg);
+            float ore = oreKg / HistoricalPrices.CountKg(_ore);
             float wood = woodKg / UnitKg(_wood);
             days = Math.Max(0.05f, HistoricalPrices.On ? HistoricalPrices.HistDays(it, c) : c.Days);
             return new[] { ore, wood, c.LeatherKg / UnitKg(_leather), c.LinenKg / UnitKg(_linen) };
@@ -229,6 +231,7 @@ namespace Armoury
                     return false;
                 }
                 if (BulkLineSkip(production)) { __result = false; return false; }
+                if (Bloomery.TownMineBlocked(production, workshop)) { __result = false; return false; }   // E6/R1 (214): kopalnia BK w miescie/zamku - lupa tylko z drewnem z polki tego miasta
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
                 if (workshop.Owner == Hero.MainHero) return true;          // warsztaty gracza - vanilla
                 if (!Campaign.Current.GameStarted) return true;           // start gry - vanilla zapelnia rynki

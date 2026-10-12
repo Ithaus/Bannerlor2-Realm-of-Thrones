@@ -1461,6 +1461,10 @@ namespace Armoury
         // luzak, ktory nie niesie piechura ani jenca, niesie SpareHorseCarryKg zamiast 20 kg gry (postfiks modelu pojemnosci dopisuje roznice)
         public bool PackAnimalsFromMarket = true;          // a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)
         public int SpareHorseCarryKg = 60;                 // how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)
+        // E6/R1 (214, PLAN 6.1, R1/R2): wytop przy kopalni - sztuka "iron" to lupa 15 kg (metal ze 100 kg rudy, liczba sztuk z kopalni bez zmian); dymarka pali
+        // prawdziwe drewno (las wsi okregu, reszta z polki miasta handlowego wozem wsi na nastepna dobe), bez drewna mniej lup; kuznia miasta tylko wegiel kowalski.
+        // Tylko nowa kampania (flaga w zapisie arm_e6_bloom); stary zapis - ruda jak dotad
+        public bool BloomeryAtMine = true;                 // new campaigns only: the mining village smelts its ore on the spot and sends out iron blooms (15 kg) instead of 100 kg loads of ore; the bloomery burns real wood - from the woods of the district first, then bought at its market town - and without wood the mine yields less; the town forge burns only smith's charcoal, and scrap and wrecks are smelted back into blooms
 
         public static void Load(string moduleDataDir)
         {

@@ -88,6 +88,10 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
                     CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), zakup i sprzedaz tej samej
                     kategorii w 7 dobach 0, potkniecia 0; sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
+                    Blok E6/R1 (214, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) R1-1..R1-12 - linie "Bloomery (E6/R1, 214)" i "Zelazo (lupy) (214)": CZYNNE
+                    (stary zapis / wylaczone - INFO), tick wpiety, tozsamosci kazdej doby (lupy wsi = lupy z tickow kopalni, drewno spalone = drewna na lupe x lupy),
+                    lupy bez drewna 0, kopalnia bez wegla <= 5% lup (d8-until), miasta bez zelaza <= 15 (srednio d61-until), stos drewna miast d61 -> until bez wzrostu
+                    (<= +2%), cykle "brak surowca [ruda" <= 584/d (srednio d31-until, linia "Warsztaty"), potkniecia 0; las okregu, targ, zloto, braki - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3305,6 +3309,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k5(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/R1 (214): wytop przy kopalni - lupy zamiast rudy, wegiel dymarek z prawdziwego drewna (etap 6 - grupy etap6 jeszcze nie ma; stary zapis - INFO)
+    try:
+        etap5_r1(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_r1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3586,6 +3595,83 @@ def etap5_k5(rep, lines, start, until):
     rep.add("K5-7: zakup jucznych, brak i udzwig (suma okna; udzwig - ostatnia doba)",
             f"kupione {bought} za {paid} (cel {target}, brak {short}; kapital 0 - gracz {zero}; morskie {naval}; konwoje DTE {dte}); "
             f"luzakow pod jukami {under}, pod piechurem albo jencem {foot} (d{days[-1]})", "INFO (utarg kupcow - linia Kupcy/obieg)", None)
+
+
+def etap5_r1(rep, lines, start, until):
+    """E6/R1 (214, projekt etapu 6 v2 rozdz. 3 "E6/R1" Test): linia startowa "Bloomery (E6/R1, 214):" i linia doby "Zelazo (lupy) (214): dzien N"
+    (OreLedger - dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Wiazace: tozsamosci lup i drewna w kazdej dobie, lupy bez drewna 0,
+    kopalnia bez wegla <= 5% lup (d8-until - pierwsza doba kopalni bez drewna), miasta bez zelaza <= 15 (srednio d61-until), stos drewna miast
+    bez wzrostu d61-until (linia "Drewno:", <= +2%), "brak surowca [ruda" <= 584/d srednio d31-until (linia "Warsztaty:"), potkniecia 0; reszta INFO."""
+    start_l = [x for x in lines if x.startswith("Bloomery (E6/R1, 214): ") and ("CZYNNE" in x or "NIEAKTYWNE" in x or "WYLACZONE" in x)]
+    wire = [x for x in lines if x.startswith("Bloomery (E6/R1, 214): tick produkcji") or x.startswith("Bloomery (E6/R1, 214): BRAK")]
+    if wire:
+        rep.add("R1-2: wpiecie ticku produkcji wsi (TickGoodProduction)", wire[-1][:160], "bez BRAK", "BRAK" not in wire[-1])
+    if not start_l:
+        rep.add("R1-1: linia startowa Bloomery (E6/R1, 214)", "brak", "jest od wgrania E6/R1 (HistoricalPrices.Apply)", None)
+        return
+    if "CZYNNE" not in start_l[-1]:
+        rep.add("R1-1: wytop przy kopalni", start_l[-1][:200], "CZYNNE w nowej kampanii (stary zapis / wylaczone - ruda jak dotad)", None)
+        return
+    rep.add("R1-1: wytop przy kopalni", start_l[-1][:200], "CZYNNE", True)
+    rows = {}
+    for d, s in by_day(lines, "Zelazo (lupy) (214): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    rep.add("R1-3: linia Zelazo (lupy) (214)", f"{len(rows)} dob", "codziennie od wgrania E6/R1", None)
+    if not rows:
+        return
+    days = sorted(rows)
+    bad_id = [x for x in days if (num(r"kontrola wsie - ticki = (-?\d+)", rows[x], int, 0) or 0) != 0]
+    rep.add("R1-4: lupy wsi (OnItemProduced) = lupy z tickow kopalni (kazda doba)", f"rozjazd w {len(bad_id)} z {len(days)} dob" + (f"; pierwsza d{bad_id[0]}" if bad_id else ""),
+            "0 dob z rozjazdem", len(bad_id) == 0)
+    bad_w = [x for x in days if (num(r"x lupy \(roznica (-?\d+)\)", rows[x], int, 0) or 0) != 0]
+    rep.add("R1-5: drewno spalone w dymarkach = drewna na lupe x lupy (kazda doba)", f"rozjazd w {len(bad_w)} z {len(days)} dob", "0 dob z rozjazdem", len(bad_w) == 0)
+
+    def tot(pat, ds, cast=int):
+        return sum(num(pat, rows[x], cast, 0) or 0 for x in ds)
+    over = tot(r"lupy bez drewna (\d+)", days)
+    rep.add("R1-6: lupy bez drewna w dymarce (suma okna)", str(over), "0", over == 0)
+    w8 = [x for x in days if x >= 8]
+    if w8:
+        made = tot(r"lupy z tickow kopalni (\d+)", w8)
+        unwon = tot(r"kopalnia bez wegla ([\d.]+) lup", w8, float)
+        share = 100.0 * unwon / max(1.0, made + unwon)
+        rep.add("R1-7: kopalnia bez wegla wobec lup (d8-until)", f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "<= 5%", share <= 5.0)
+    w61 = [x for x in days if x >= 61]
+    if w61:
+        empty = [num(r"miast bez towaru (\d+) z", rows[x], int, 0) or 0 for x in w61]
+        avg = sum(empty) / len(empty)
+        rep.add("R1-8: miasta bez zelaza (srednio d61-until)", f"{avg:.1f} (d{w61[0]}-d{w61[-1]})", "<= 15", avg <= 15.0)
+    wood = {}
+    for d, s in by_day(lines, "Drewno: dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            v = num(r"zapas: miasta (\d+)", s, int)
+            if v is not None:
+                wood[rd] = v
+    wd = sorted(x for x in wood if x >= 61)
+    if len(wd) >= 2:
+        a, b = wood[wd[0]], wood[wd[-1]]
+        rep.add("R1-9: stos drewna miast (d61 -> until)", f"{a} -> {b} (d{wd[0]}-d{wd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%)", "bez wzrostu (<= +2%)", b <= a * 1.02)
+    ws = {}
+    for d, s in by_day(lines, "Warsztaty: dzien").items():
+        rd = run_day(d, start)
+        if 31 <= rd <= until:
+            v = num(r"brak surowca \d+ \[ruda (\d+)", s, int)
+            if v is not None:
+                ws[rd] = v
+    if ws:
+        avg = sum(ws.values()) / len(ws)
+        rep.add("R1-10: cykle warsztatow \"brak surowca [ruda\" (srednio d31-until)", f"{avg:.0f}/d ({len(ws)} dob)", "<= 584/d (z31A)", avg <= 584.0)
+    stu = tot(r"potkniecia dzis (\d+) \(od wczytania", days)
+    rep.add("R1-11: potkniecia Bloomery (suma okna)", str(stu), "0", stu == 0)
+    woods, bought, gold = tot(r", las okregu (\d+), targ", days), tot(r", targ (\d+) za", days), tot(r", targ \d+ za (\d+) zl", days)
+    shelf, nogold, nomk = tot(r"\(brak na polce (\d+)", days), tot(r"brak zlota wsi (\d+)", days), tot(r"bez miasta handlowego (\d+)", days)
+    tm, tmw, tms = tot(r"kopalnie BK w miastach: lupy (\d+)", days), tot(r"kopalnie BK w miastach: lupy \d+, drewno (\d+)", days), tot(r"bez drewna/kapitalu (\d+)", days)
+    rep.add("R1-12: wegiel dymarek - skad (suma okna)",
+            f"las okregu {woods}, targ {bought} ladunkow za {gold} zl; braki: na polce {shelf}, zlota wsi {nogold}, bez miasta handlowego {nomk}; "
+            f"kopalnie BK w miastach: lupy {tm}, drewno {tmw}, bez drewna/kapitalu {tms}", "INFO (projekt: las okregu ok. 100/d, reszta z targu)", None)
 
 
 def etap5_fee(rep, lines):

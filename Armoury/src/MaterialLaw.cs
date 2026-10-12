@@ -119,7 +119,10 @@ namespace Armoury
                 int coalPerOre = Math.Max(1, (int)Math.Round(oW / cW));
                 int crudeFromOre = Math.Max(1, (int)Math.Round(oW * crude / iW * (ironMaker ? 1.25f : 1f)));
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 1, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, coalFromWood);
-                yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, coalPerOre, CraftingMaterials.Iron1, crudeFromOre);
+                // E6/R1 (214): lupa jest juz zelazem z dymarki przy kopalni (oW = 15 kg surowki) - kuznia gracza tylko ja przekuwa na sztaby surowki:
+                // masa lupy / masa sztaby (30), jeden wegiel na zgrzanie; bez premii IronMaker (perk dawal wiecej surowki z RUDY - z lupy metalu nie przybywa)
+                if (Bloomery.IsBloom(oi)) yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron1, Math.Max(1, (int)Math.Round(oW / iW)));
+                else yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, coalPerOre, CraftingMaterials.Iron1, crudeFromOre);
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron2, 4);
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Iron2, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron3, 4);
                 if (steel1) yield return new Crafting.RefiningFormula(CraftingMaterials.Iron3, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron4, 4);
@@ -176,7 +179,7 @@ namespace Armoury
                 if (On && id == "iron") m = s.MineOutputMultiplier * (s.MineOutputStep > 0f ? s.MineOutputStep : 1f);   // 174.3: krok wariantu B Jeffa - ruda razem z rekami
                 else if (On && id == "hardwood") m = s.LumberOutputMultiplier;
                 // wpis 87 (audyt pkt 13): dzielenie przez ladunek zawsze, gdy waga jest x10 - inaczej wylaczenie MaterialLaw = 10x kg rudy
-                m /= HistoricalPrices.BulkScale(item);      // wpis 50: ladunek 100 kg - tyle samo kg co dotad
+                m /= HistoricalPrices.CountScale(item);     // wpis 50: ladunek 100 kg - tyle samo kg co dotad; E6/R1 (214): lupa 15 kg liczy sie jak ladunek rudy (stala 100 kg rudy na lupe, nie waga lupy)
                 // suwak 0 (albo ujemny): mnoznika nie stosujemy i wynik modelu zostaje, jaki byl (znana usterka: to nie jest zero wydobycia).
                 // Powtorzenia BK liczymy takze wtedy - inaczej przy suwaku 0 wies dostawalaby polowe tego, co dotad
                 if (!(m > 0f)) m = 1f;
@@ -211,6 +214,9 @@ namespace Armoury
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);
+                // E6/R1 (214): dymarka kopalni bez drewna - w ticku produkcji tej wsi lupy najwyzej tyle, na ile starczy drewna w dymarce (sufit, nie czynnik;
+                // tylko "iron" i tylko w ticku TickGoodProduction tej wsi - podpowiedzi i magazyn wsi widza wynik bez sufitu)
+                Bloomery.Cap(village, item, ref __result);
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { }

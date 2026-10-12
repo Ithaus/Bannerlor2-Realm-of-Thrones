@@ -458,9 +458,9 @@ namespace Armoury
                 _pLea = _leather != null ? Math.Max(0f, WorkshopLaw.MatPrice(town, _leather, 2)) : 0f;
                 _pLin = _linen != null ? Math.Max(0f, WorkshopLaw.MatPrice(town, _linen, 3)) : 0f;
                 _pWool = _wool != null ? Math.Max(0f, WorkshopLaw.MatPrice(town, _wool, 3)) : 0f;
-                float oreKg = UnitKg(_ore);
+                float oreKg = HistoricalPrices.CountKg(_ore);                                                  // E6/R1 (214): lupa - kg rudy, z ktorej ja wytopiono (100)
                 _crudePerLoad = oreKg / 10f * Math.Max(0.1f, s.WorkshopCrudeKgPerOre);                       // 100 kg rudy -> 15 kg surowki
-                _smeltWood = (int)Math.Ceiling(oreKg * Math.Max(0f, s.WorkshopWoodPerOre) / UnitKg(_wood) - Eps);   // 100 kg rudy -> 5 ladunkow drewna
+                _smeltWood = Bloomery.On ? 0 : (int)Math.Ceiling(oreKg * Math.Max(0f, s.WorkshopWoodPerOre) / UnitKg(_wood) - Eps);   // 100 kg rudy -> 5 ladunkow drewna; lupa - dymarka juz spalila swoje przy kopalni
                 // sztaby z polki (surowka .. stal): kg surowki = waga x 1.25^stopien
                 for (int i = 0; i < _bars.Length; i++)
                 {

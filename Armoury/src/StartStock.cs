@@ -98,7 +98,7 @@ namespace Armoury
                 for (int k = 0; k < Ids.Length; k++)
                 {
                     try { items[k] = MBObjectManager.Instance.GetObject<ItemObject>(Ids[k]); } catch { }
-                    factors[k] = items[k] != null ? HistoricalPrices.BulkScale(items[k]) : 1f;
+                    factors[k] = items[k] != null ? HistoricalPrices.CountScale(items[k]) : 1f;   // E6/R1 (214): ruda z tickow startowych -> lupy jak ladunki (10 sztuk 10 kg = 1 lupa)
                     if (factors[k] > 1.01f) any = true;
                 }
                 if (!any)

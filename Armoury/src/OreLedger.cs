@@ -40,6 +40,7 @@ namespace Armoury
             public int Fletch;                                     // paczka 172: ruda i drewno strzelarzy miasta (TownFletchers) - osobno od warsztatow zbrojnych
             public int Scrap;                                      // 174, pytanie 4: ruda ze zlomu starego nadmiaru (ArmsScrap) - zrodlo
             public int DrillScrap;                                 // musztra: ruda ze zlomu zapasu cwiczebnego odkupiona przez kowali miasta (Drill) - zrodlo
+            public int BloomWood;                                  // E6/R1 (214): drewno zdjete z polek miast przez dymarki przy kopalniach (Bloomery) - ujscie
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
@@ -48,7 +49,7 @@ namespace Armoury
             public int[] Shown; public int ShownDay = -1;           // paczka 146: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
         }
 
@@ -174,6 +175,14 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>E6/R1 (214): drewno kupione z polki miasta handlowego przez dymarke kopalni (Bloomery.Daily) albo spalone przez kopalnie BK
+        /// w miescie (Bloomery.TownMineBlocked) - ujscie drewna. Tylko licznik.</summary>
+        internal static void NoteBloomeryWood(ItemObject item, int loads)
+        {
+            try { var b = Of(item); if (b != null && loads > 0) b.BloomWood += loads; }
+            catch { }
+        }
+
         /// <summary>Material zdjety z targu przez nasze budowy (BuildFunding.BuyMaterials / BuyOneCheapest). Tylko licznik.</summary>
         internal static void NoteBuild(ItemObject item, int loads)
         {
@@ -185,6 +194,7 @@ namespace Armoury
         {
             try { Line(_iron); Line(_wood); }
             catch (Exception e) { Log.Error("OreLedger", e); }
+            finally { Bloomery.NewDay(); }   // E6/R1 (214): liczniki doby dymarek - po liniach zelaza i drewna
         }
 
         private static string Signed(int n) { return (n >= 0 ? "+" : "") + n; }
@@ -217,18 +227,22 @@ namespace Armoury
 
             float kg = Math.Max(0.1f, it.Weight);
             int all = towns + castles + villages + road;
+            bool bloom = b == _iron && Bloomery.IsBloom(it);   // E6/R1 (214): "iron" to lupa - linia "Zelazo (lupy) (214)" zamiast "Ruda:"
             var sb = new StringBuilder();
-            sb.Append(b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
-              .Append(" - wsie dopisaly ").Append(b.Villages).Append(" ladunkow (").Append((b.Villages * kg / 1000f).ToString("0.0"))
+            sb.Append(bloom ? "Zelazo (lupy) (214)" : b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
+              .Append(" - wsie dopisaly ").Append(b.Villages).Append(bloom ? " lup (" : " ladunkow (").Append((b.Villages * kg / 1000f).ToString("0.0"))
               .Append(" t, ").Append(b.Makers.Count).Append(" wsi; model ").Append(b.Model.ToString("0.#")).Append(" w ").Append(b.Modelled.Count)
               .Append(" wsiach z wynikiem > 0), ").Append(b.TownSource).Append(" +").Append(b.Towns);
+            if (bloom) sb.Append(Bloomery.IronSegment(b.Villages));   // E6/R1 (214): lupy z tickow kopalni, wegiel dymarek, kopalnia bez wegla
             if (b == _wood) sb.Append(", las wsi (126) +").Append(b.Woodlot).Append(" (").Append(b.WoodlotMakers.Count).Append(" wsi)");
             if (b.Scrap > 0) sb.Append(", zlom z nadmiaru (174) +").Append(b.Scrap);
             if (b.DrillScrap > 0) sb.Append(", zlom z cwiczen (musztra) +").Append(b.DrillScrap);
             sb.Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
               .Append(", budowy ").Append(b.Builds)
-              .Append(", strzelarze (172) ").Append(b.Fletch)
-              .Append("; zapas: miasta ").Append(towns);
+              .Append(", strzelarze (172) ").Append(b.Fletch);
+            if (b == _wood && (b.BloomWood > 0 || Bloomery.On)) sb.Append(Bloomery.WoodSegment(b.BloomWood));   // E6/R1 (214): dymarki przy kopalniach (targ - ujscie zapasu; las okregu - poza zapasem)
+            if (bloom) sb.Append(Bloomery.SmeltSegment(b.Scrap, b.DrillScrap));
+            sb.Append("; zapas: miasta ").Append(towns);
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
             sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road)
               .Append(" (wiesniacy ").Append(roadVillagers).Append(", karawany ").Append(roadCaravans).Append(", lordowie ").Append(roadLords)
@@ -236,12 +250,12 @@ namespace Armoury
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap - b.Shops - b.Lines - b.Builds - b.Fletch;
+                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)
               .Append("; zima: ").Append(WinterBite.WinterNow() ? "TAK" : "nie")
-              .Append(". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
+              .Append(bloom ? ". Lupa = " : ". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
             b.Shown = new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all }; b.ShownDay = (int)CampaignTime.Now.ToDays;
             b.LastAll = all; b.LastTowns = towns; b.NewDay();
