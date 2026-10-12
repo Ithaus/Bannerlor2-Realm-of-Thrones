@@ -30,6 +30,11 @@ namespace RealisticCaptivity
         private bool _debtOffered;
         private string _rescuerLeaderId = "";
         private int _rescueCooldown;
+        // E8/RC (259, DebtToCaptorHome): pojmujacy bez bohatera - dokad ida splaty dlugu okupu i wykup rynsztunku (regula decyzji 9: kasa osady milicji /
+        // zalogi / lochu albo kiesa bandy). Zapis: jedna sekcja z wersja rc_e8_captorHome; stary zapis bez niej = puste (brak odbiorcy - nic nie pobrane).
+        private string _captorHomeId = "";        // StringId osady
+        private string _captorBandId = "";        // StringId partii bez bohatera i bez osady (banda)
+        private int _e8DebtHomeN, _e8DebtHomeGold, _e8DebtNoTaker;   // liczniki sesji (nie w save; nowa instancja = nowa kampania, R8)
 
         // ODBICIE SILA, ALE NIE PRZEZ SILNIK (13.09): wlasna odsiecz rodu konczy
         // niewole przez ApplyByEscape (Rescue.cs:76), a nie ReleasedAfterBattle -
@@ -45,7 +50,7 @@ namespace RealisticCaptivity
         /// <summary>Wlasna odsiecz wlasnie przecina wiezy - rynsztunek ma wrocic, nie isc na targ.</summary>
         internal void MarkRescuedByForce() { _rescuedByForce = true; }
 
-        public CaptivityBehavior() { Instance = this; }
+        public CaptivityBehavior() { Instance = this; Work.ResetE8(); }   // E8/RC: liczniki pracy od zera przy kazdej kampanii (R8)
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -68,6 +73,15 @@ namespace RealisticCaptivity
                 dataStore.SyncData("rc_familyHomeGranted", ref _familyHomeGranted);
                 dataStore.SyncData("rc_workDays", ref _workDays);
                 dataStore.SyncData("rc_workLast", ref _workLast);
+                // E8/RC: sekcja z wersja ("1|osada|partia"); stary zapis jej nie ma - pola zostaja puste, bez bledu
+                string e8 = "1|" + (_captorHomeId ?? "") + "|" + (_captorBandId ?? "");
+                dataStore.SyncData("rc_e8_captorHome", ref e8);
+                if (dataStore.IsLoading)
+                {
+                    _captorHomeId = ""; _captorBandId = "";
+                    var e8p = (e8 ?? "").Split('|');
+                    if (e8p.Length >= 3 && e8p[0] == "1") { _captorHomeId = e8p[1]; _captorBandId = e8p[2]; }
+                }
                 _familyHomeSold = _familyHomeSold || Homes.FamilyHomeSold;
                 dataStore.SyncData("rc_familyHomeSold", ref _familyHomeSold);
                 Homes.FamilyHomeSold = _familyHomeSold;
@@ -112,6 +126,7 @@ namespace RealisticCaptivity
                 Work.LastDay = _workLast;
                 Homes.Add(starter);
                 Work.Add(starter);
+                if (Settings.Current.WorkRespectsReserve) TownWageLink.LinkSpare();   // E8/RC: linia PODPIETY/BRAK nadwyzki D4 raz na proces, juz przy starcie sesji
                 Homes.GrantFamilyHome(ref _familyHomeGranted);
                 Homes.AnnounceOwned();
                 Dialogs.Add(starter);
@@ -135,6 +150,7 @@ namespace RealisticCaptivity
                 _paroleBroken = false;
                 _captorHeroId = (capturer != null && capturer.LeaderHero != null) ? capturer.LeaderHero.StringId : "";
                 Log.Info("Gracz pojmany przez: " + (_captorHeroId == "" ? "(bez lorda)" : _captorHeroId));
+                NoteCaptorHome(capturer);   // E8/RC
 
                 _lowborn = !HasNobleStanding();
                 if (Settings.Current.StripEquipment || Settings.Current.CaptorTakesAllFromPlayer) StripGear();   // E5 decyzja 9: caly rynsztunek
@@ -300,6 +316,8 @@ namespace RealisticCaptivity
 
                 var newCaptor = CaptivityExtras.TrySellPrisoner();
                 if (newCaptor != null) _captorHeroId = newCaptor.StringId;
+                var cpNow = PlayerCaptivity.CaptorParty;   // E8/RC: pojmujacy zmienia sie w niewoli (sprzedaz, przeniesienie do lochu) - pamiec odbiorcy idzie za nim
+                if (cpNow != null) NoteCaptorHome(cpNow);
 
                 RunRescueMission();
                 OfferDebtDeal();
@@ -440,7 +458,27 @@ namespace RealisticCaptivity
                 if (pay > 0)
                 {
                     var captor = GetCaptorHero();
-                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, pay);
+                    if (s.DebtToCaptorHome && (captor == null || !captor.IsAlive))
+                    {
+                        // E8/RC (regula decyzji 9): pojmujacy bez zywego bohatera - rata do jego rodu / osady / bandy; bez odbiorcy nic nie pobrane (dlug czeka)
+                        int paid;
+                        string to = GoldToCaptorHome(captor, pay, out paid);
+                        if (to == null)
+                        {
+                            _e8DebtNoTaker++;
+                            if (_e8DebtNoTaker == 1 || _e8DebtNoTaker % 30 == 0)
+                                Log.Info("Dlug okupu (E8/RC): rata " + pay + " - brak odbiorcy (pojmujacy bez bohatera, osady i partii), nic nie pobrane, dlug " + _ransomDebt
+                                         + " czeka; dob bez odbiorcy w tej sesji " + _e8DebtNoTaker);
+                            if (_e8DebtNoTaker == 1) Log.Player("There is no one left to take the instalment on your ransom debt - the coin stays in your purse for now.");
+                            _debtDaysUnpaid = 0;   // recenzja E8/RC: gracz mial czym zaplacic - licznik hanby zeruje sie jak przy kazdej racie (jak przed paczka); bez tego dni bez zlota sumowalyby sie przez lata do DebtGraceDays
+                            return;
+                        }
+                        _e8DebtHomeN++; _e8DebtHomeGold += paid;
+                        Log.Info("Dlug okupu (E8/RC): rata " + paid + " -> " + to + " (pojmujacy bez zywego bohatera); dlug po racie " + Math.Max(0, _ransomDebt - paid)
+                                 + " | w tej sesji rat " + _e8DebtHomeN + ", razem " + _e8DebtHomeGold + ", dob bez odbiorcy " + _e8DebtNoTaker);
+                        pay = paid;
+                    }
+                    else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, pay);
                     _ransomDebt -= pay;
                     _debtDaysUnpaid = 0;
                     if (_ransomDebt <= 0)
@@ -600,6 +638,68 @@ namespace RealisticCaptivity
             var mp = capturer.IsMobile ? capturer.MobileParty : null;
             if (mp != null && (mp.IsMilitia || mp.IsGarrison)) return mp.CurrentSettlement ?? mp.HomeSettlement;
             return null;
+        }
+
+        /// <summary>E8/RC: pamiec odbiorcy dla pojmujacego BEZ bohatera - osada (loch, milicja, zaloga; ta sama CaptorHome co przy pojmaniu) albo banda
+        /// (partia w polu). Przy pojmaniu i co dobe w niewoli; pojmujacy z bohaterem - pamiec pusta (odbiorca to on, po jego smierci glowa rodu).</summary>
+        private void NoteCaptorHome(PartyBase captor)
+        {
+            try
+            {
+                string home = "", band = "";
+                if (captor != null && captor.LeaderHero == null)
+                {
+                    var st = CaptorHome(captor);
+                    if (st != null) home = st.StringId;
+                    else if (captor.IsMobile && captor.MobileParty != null) band = captor.MobileParty.StringId;
+                }
+                if (home == (_captorHomeId ?? "") && band == (_captorBandId ?? "")) return;
+                _captorHomeId = home; _captorBandId = band;
+                Log.Info("Pojmujacy (E8/RC): odbiorca splat, gdy bohatera brak - " + (home != "" ? "kasa osady " + home : band != "" ? "kiesa partii " + band : "nikt (pojmujacy ma bohatera)"));
+            }
+            catch (Exception e) { Log.Error("NoteCaptorHome", e); }
+        }
+
+        /// <summary>E8/RC (259, DebtToCaptorHome; regula decyzji 9 jak GoldToCaptor przy pojmaniu): zloto gracza dla pojmujacego, za ktorym nie stoi zywy bohater -
+        /// zmarly lord: glowa jego rodu (regula gry - zloto zmarlego dziedziczy glowa rodu, KillCharacterAction); milicja, zaloga, loch: kasa tej osady;
+        /// banda: kiesa partii, poki istnieje. Przelew gry (GiveGoldAction - zdarzenie widza ksiegi Armoury). Zwraca opis odbiorcy; null - nie ma komu dac
+        /// (nic nie pobrane). paid = ile naprawde zeszlo z kiesy gracza.</summary>
+        private string GoldToCaptorHome(Hero gone, int gold, out int paid)
+        {
+            paid = 0;
+            if (gold <= 0) return null;
+            int before = Hero.MainHero.Gold;
+            string to = null;
+            Hero heir = gone != null && gone.Clan != null ? gone.Clan.Leader : null;
+            Settlement home = !string.IsNullOrEmpty(_captorHomeId) ? Settlement.Find(_captorHomeId) : null;
+            if (heir != null && heir.IsAlive && heir != Hero.MainHero)
+            {
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, heir, gold);
+                to = "kiesa " + heir.Name + " (glowa rodu po " + gone.Name + ")";
+            }
+            else if (home != null && home.SettlementComponent != null)
+            {
+                GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, home, gold);
+                to = "kasa osady " + home.Name;
+            }
+            else if (!string.IsNullOrEmpty(_captorBandId))
+            {
+                MobileParty band = null;
+                foreach (var mp in MobileParty.All)
+                    if (mp != null && mp.IsActive && mp.StringId == _captorBandId) { band = mp; break; }
+                if (band != null && band.LeaderHero != null && band.LeaderHero != Hero.MainHero)   // banda dostala wodza - jego kiesa (jak lord w GoldToCaptor)
+                {
+                    GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, band.LeaderHero, gold);
+                    to = "kiesa " + band.LeaderHero.Name + " (wodz partii " + band.Name + ")";
+                }
+                else if (band != null && band.LeaderHero == null)
+                {
+                    GiveGoldAction.ApplyForCharacterToParty(Hero.MainHero, band.Party, gold);
+                    to = "kiesa partii " + band.Name;
+                }
+            }
+            if (to != null) paid = Math.Max(0, before - Hero.MainHero.Gold);
+            return to;
         }
 
         // ---------------------------------------------------------------- parol
@@ -826,7 +926,15 @@ namespace RealisticCaptivity
             {
                 if (Hero.MainHero.Gold < BuybackPrice) return false;
                 var captor = GetCaptorHero();
-                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, BuybackPrice);
+                if (Settings.Current.DebtToCaptorHome && (captor == null || !captor.IsAlive))
+                {
+                    // E8/RC: ta sama regula co splata dlugu. Dialog wykupu wymaga rozmowy z pojmujacym (CanBuyBackFrom), wiec to zabezpieczenie - 0 trafien w grze
+                    int paid;
+                    string to = GoldToCaptorHome(captor, BuybackPrice, out paid);
+                    if (to == null) { Log.Info("Wykup rynsztunku (E8/RC): brak odbiorcy zaplaty (pojmujacy bez bohatera, osady i partii) - nic nie pobrane, rynsztunek zostaje w ksiedze."); return false; }
+                    Log.Info("Wykup rynsztunku (E8/RC): " + paid + " -> " + to + " (pojmujacy bez zywego bohatera)");
+                }
+                else GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, captor, BuybackPrice);
                 RestoreGear();
                 Log.Player("You bought back your war gear for " + BuybackPrice + " gold.");
                 return true;

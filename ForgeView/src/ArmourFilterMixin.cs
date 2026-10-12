@@ -193,6 +193,9 @@ namespace ForgeView
                             | System.Reflection.BindingFlags.Static);
                         break;
                     }
+                    // E8/M (247): jedna linia przy pierwszym odczycie; fallback bez zmian
+                    Log.Info("Armoury RangedLore (filtr): " + (_knownOf != null ? "PODPIETY (Armoury.RangedLore.KnownOf)"
+                             : "BRAK (Armoury.RangedLore.KnownOf) - zostaje: kazdy wzor liczony jako znany"));
                 }
                 if (_knownOf == null) return true;
                 return (bool)_knownOf.Invoke(null, new object[] { it });
@@ -260,6 +263,9 @@ namespace ForgeView
                             | System.Reflection.BindingFlags.Static);
                         break;
                     }
+                    // E8/M (247): jedna linia przy pierwszym odczycie; fallback bez zmian
+                    Log.Info("Armoury UniqueLore (polka CRAFT): " + (_fLore != null ? "PODPIETY (Armoury.ArmouryBehavior.UniqueLore)"
+                             : "BRAK (Armoury.ArmouryBehavior.UniqueLore) - zostaje: bez nauczonych unikatow na polce"));
                 }
                 return _fLore != null ? _fLore.GetValue(null) as List<string> : null;
             }
