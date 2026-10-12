@@ -193,6 +193,12 @@ Uzycie (Python 3, tylko odczyt):
                     >= 1.2 x Z33 w tych samych dobach (tabela Z33 w narzedziu), W-2 naprawy na sztuke zuzyta wedlug starej reguly ("stare zuzycie N%
                     zuzyloby") >= Z33 i stosunek nowe / stare INFO, W-3 INFO korelacja zuzycia i strat, W-4 amunicja AI (W CIENIU: INFO; wlaczona:
                     zeszlo > 0 i strzaly na polkach >= 50% Z33 doby 120), W-5 potkniecia 0 i koszt dopasowania INFO; INFO kolejka, zakupy, wraki.
+                    Blok etap8_a (E8/A, paczka 250): misja gracza - A-1 dwie linie startu "Misja gracza (E8/A)": latki wpiete 1/1 (DTE
+                    Global.ProcessAgentEquipment - biezacy agent) i 2/2 (DTE OnAgentRemoved - zabojca, PartyBattleRecord.AddLootedItem - sztuka);
+                    reszta dla biegu z gra Jeffa (autotest nie gra misji - INFO "brak"): A-2 "AmmoRecovery: po bitwie - strona gracza odzysk X z N,
+                    przeciwnik Y z M, bez rozstrzygniecia Z z K" = linia "wrocilo / przepadlo", latka wpieta, potkniecia 0; A-3 INFO "Zuzycie (E8/A)"
+                    (ciosy poza bitwa pominiete, ksiega ciosow wyzerowana na poczatku bitwy i po klesce); A-4 "BattlefieldLaw (E8/A): lup cialo po
+                    ciele" - sztuki z wlasnych zabojstw w calosci, dzialka wobec sredniej z puli, potkniecia 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8956,6 +8962,116 @@ def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
              f"{sum(bottom.values()) / nd:.1f}/d; wrakow w ksiedze: pierwsza doba {wr[days[0]]}, ostatnia {wr[days[-1]]}"),
             "INFO (wraku kowale nie naprawiaja, a AI go nie wymienia - do decyzji po liczbach)", None)
 
+# ============================================================ ETAP 8 (E8/A, paczka 250): misja gracza - odzysk wedlug strony, arena nie obija, lup z wlasnych zabojstw
+E8_A_ST_AMMO = "Misja gracza (E8/A): start - odzysk amunicji wedlug strony agenta"
+E8_A_ST_LOOT = "Misja gracza (E8/A): start - lup z wlasnych zabojstw w calosci"
+E8_A_AMMO = "AmmoRecovery: po bitwie - strona gracza odzysk"
+E8_A_AMMO_OLD = "AmmoRecovery: po bitwie kolczanow/stosow wrocilo"
+E8_A_SKIP = "Zuzycie (E8/A): misja poza bitwa"
+E8_A_ZERO = "Zuzycie (E8/A): poczatek bitwy - ksiega ciosow wyzerowana"
+E8_A_LOST = "Zuzycie (E8/A): bitwa przegrana albo opuszczona"
+E8_A_LOOT = "BattlefieldLaw (E8/A): lup cialo po ciele"
+
+
+def e8a_pts(pat, s):
+    """Punkty ksiegi ciosow z linii (ulamek z kropka albo przecinkiem - zalezy od ustawien systemu)."""
+    m = re.search(pat, s)
+    if not m:
+        return 0.0
+    try:
+        return float(m.group(1).replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/A (250, projekt etapu 8 v2 rozdz. 3 "E8/A" Test; odpowiedz Jeffa 12.10 nr 1). Autotest nie gra misji, wiec progiem jest tylko A-1; reszta
+    to wiersze dla biegu z gra Jeffa (8.16 punkty 9-10) - w biegu bez bitew z misja sa INFO "brak".
+    A-1 dwie linie startu "Misja gracza (E8/A)": latki wpiete 1/1 (DTE Global.ProcessAgentEquipment - biezacy agent) i 2/2 (DTE OnAgentRemoved - zabojca,
+    PartyBattleRecord.AddLootedItem - sztuka), bez "nie znaleziono";
+    A-2 linia "AmmoRecovery: po bitwie - strona gracza odzysk X z N, przeciwnik Y z M, bez rozstrzygniecia Z z K": trzy pozycje sumuja sie do linii
+    "kolczanow/stosow wrocilo / przepadlo" tej samej bitwy, latka wpieta, potkniecia 0 (udzialy odzysku wedlug stron - INFO: strona, ktora oddala pole,
+    ma odzysk 0 z agentow rozliczonych po rozstrzygnieciu);
+    A-3 INFO: "Zuzycie (E8/A)" - misje poza bitwa (ciosy i strzaly pominiete), ksiega wyzerowana na poczatku bitwy, po bitwie przegranej;
+    A-4 "BattlefieldLaw (E8/A): lup cialo po ciele": sztuki z wlasnych zabojstw w calosci, zolnierskie x trzecia, dzialka wobec sredniej z puli;
+    potkniecia 0, a przy >= 5 wrogach powalonych przez gracza i towarzyszy sztuk z ich cial > 0 (inaczej DTE nie dopisuje lupu zabojcy-gracza)."""
+    st_a = [s for s in lines if s.startswith(E8_A_ST_AMMO)]
+    st_l = [s for s in lines if s.startswith(E8_A_ST_LOOT)]
+    am = [s for s in lines if s.startswith(E8_A_AMMO)]
+    am_old = [s for s in lines if s.startswith(E8_A_AMMO_OLD)]
+    skip = [s for s in lines if s.startswith(E8_A_SKIP)]
+    zero = [s for s in lines if s.startswith(E8_A_ZERO)]
+    lost = [s for s in lines if s.startswith(E8_A_LOST)]
+    loot = [s for s in lines if s.startswith(E8_A_LOOT)]
+    if not (st_a or st_l or am or skip or zero or lost or loot):
+        rep.add("E8/A: linie Misja gracza (E8/A)", "brak w logu", "sa od wgrania E8/A (AmmoRecoveryBySide, ArenaNoWear, OwnKillsLootWhole)", None)
+        return
+
+    def states(rows, name):
+        v = sorted(set(m for s in rows for m in re.findall(re.escape(name) + r" \[(\w+)\]", s)))
+        return "/".join(v) if v else "-"
+    # A-1
+    wa = [(num(r"latki wpiete (\d+)/\d+", s), num(r"latki wpiete \d+/(\d+)", s)) for s in st_a]
+    wl = [(num(r"latki wpiete (\d+)/\d+", s), num(r"latki wpiete \d+/(\d+)", s)) for s in st_l]
+    nf = [s.split(" | nie znaleziono: ", 1)[1] for s in st_a + st_l if " | nie znaleziono: " in s]
+    bad = [f"{a}/{b}" for a, b in wa if a != 1 or b != 1] + [f"{a}/{b}" for a, b in wl if a != 2 or b != 2]
+    rep.add("A-1: latki E8/A wpiete przy starcie (biezacy agent DTE 1/1, zabojca i sztuka lupu 2/2)",
+            (f"linie startu: odzysk {len(st_a)} ({', '.join(sorted(set(f'{a}/{b}' for a, b in wa))) or '-'}), lup {len(st_l)} "
+             f"({', '.join(sorted(set(f'{a}/{b}' for a, b in wl))) or '-'}) | klucze przy starcie: odzysk wedlug strony [{states(st_a, 'strony agenta')}], "
+             f"arena nie obija [{states(st_a, 'arena nie obija')}], lup z wlasnych zabojstw [{states(st_l, 'w calosci')}]"
+             + (f" | nie znaleziono: {nf[-1][:200]}" if nf else "")),
+            "obie linie przy starcie, 1/1 i 2/2, bez 'nie znaleziono'", len(st_a) > 0 and len(st_l) > 0 and not bad and not nf)
+    # A-2
+    if not am:
+        rep.add("A-2: odzysk amunicji wedlug stron po bitwie gracza", "brak bitew gracza z misja i strzelaniem w biegu" + (f" (stara linia {len(am_old)}x)" if am_old else ""),
+                "trzy pozycje = linia 'wrocilo / przepadlo', latka wpieta, potkniecia 0 (sprawdza Jeff w grze - 8.16 pkt 9)", None if not am_old else False)
+    else:
+        tot = [0, 0, 0, 0, 0, 0]
+        for s in am:
+            m = re.search(r"strona gracza odzysk (\d+) z (\d+), przeciwnik (\d+) z (\d+), bez rozstrzygniecia \([^)]*\) (\d+) z (\d+)", s)
+            if m:
+                for i in range(6):
+                    tot[i] += int(m.group(i + 1))
+        kept = sum(num(r"wrocilo (\d+)", s, default=0) for s in am_old)
+        gone = sum(num(r"przepadlo (\d+)", s, default=0) for s in am_old)
+        stum = max([num(r"potkniecia \(sesja\) (\d+)", s, default=0) for s in am] + [0])
+        unw = sum(1 for s in am if "latka NIE WPIETA" in s)
+        ok = (tot[0] + tot[2] + tot[4] == kept and tot[1] + tot[3] + tot[5] == kept + gone and len(am) == len(am_old) and stum == 0 and unw == 0)
+
+        def share(a, b):
+            return f"{a} z {b}" + (f" ({100.0 * a / b:.0f}%)" if b > 0 else "")
+        rep.add("A-2: odzysk amunicji wedlug stron po bitwie gracza",
+                (f"{len(am)} bitew: strona gracza {share(tot[0], tot[1])}, przeciwnik {share(tot[2], tot[3])}, bez rozstrzygniecia (w trakcie misji - stara regula) "
+                 f"{share(tot[4], tot[5])} | linia 'wrocilo / przepadlo': {kept} / {gone} | stan [{states(am, 'odzysk wedlug strony (E8/A)')}], potkniecia {stum}"
+                 + (f", latka NIE WPIETA w {unw} liniach" if unw else "")),
+                "trzy pozycje = linia 'wrocilo / przepadlo', latka wpieta, potkniecia 0 (strona, ktora oddala pole: odzysk 0)", ok)
+    # A-3
+    hits = sum(num(r"- (\d+) ciosow", s, default=0) for s in skip)
+    shots = sum(num(r"i (\d+) strzalow", s, default=0) for s in skip)
+    zp = sum(e8a_pts(r"wyzerowana, ([0-9.,]+) pkt", s) for s in zero)
+    lp = sum(e8a_pts(r"opuszczona - ([0-9.,]+) pkt", s) for s in lost)
+    rep.add("A-3: arena nie obija - ciosy poza bitwa i ksiega ciosow",
+            (f"misje poza bitwa z pominietymi ciosami: {len(skip)} ({hits} ciosow, {shots} strzalow bohatera); ksiega wyzerowana na poczatku bitwy: {len(zero)}x "
+             f"({zp:.1f} pkt); po bitwie przegranej albo opuszczonej: {len(lost)}x ({lp:.1f} pkt)") if (skip or zero or lost)
+            else "brak misji poza bitwa i bitew gracza z ciosami w biegu",
+            "INFO (sprawdza Jeff w grze - 8.16 pkt 10: po arenie i wygranej bitwie rynsztunek bez obic z areny)", None)
+    # A-4
+    if not loot:
+        rep.add("A-4: lup z wlasnych zabojstw w calosci (cialo po ciele)", "brak wygranych bitew gracza z misja i lupem DTE w biegu",
+                "potkniecia 0; przy >= 5 powalonych przez gracza i towarzyszy sztuki z ich cial > 0 (sprawdza Jeff w grze)", None)
+    else:
+        h = sum(num(r"i towarzyszy (\d+) szt\. w calosci", s, default=0) for s in loot)
+        k = sum(num(r"\(powalonych wrogow (\d+)\)", s, default=0) for s in loot)
+        t = sum(num(r"przez zolnierzy (\d+) szt\.", s, default=0) for s in loot)
+        u = sum(num(r"bez znanego zabojcy (\d+) szt\.", s, default=0) for s in loot)
+        new = sum(num(r"dzialka gracza (\d+) szt\.", s, default=0) for s in loot)
+        avg = sum(num(r"srednia z puli dalaby (\d+) szt\.", s, default=0) for s in loot)
+        stum = max([num(r"potkniecia \(sesja\) (\d+)", s, default=0) for s in loot] + [0])
+        rep.add("A-4: lup z wlasnych zabojstw w calosci (cialo po ciele)",
+                (f"{len(loot)} bitew: z cial powalonych przez gracza i towarzyszy {h} szt. w calosci (powalonych wrogow {k}), przez zolnierzy {t} szt., "
+                 f"bez znanego zabojcy {u} szt. | dzialka gracza {new} szt., srednia z puli dalaby {avg} szt. | potkniecia {stum}"),
+                "potkniecia 0; dzialka >= sztuki z wlasnych zabojstw; przy >= 5 powalonych przez gracza i towarzyszy sztuki z ich cial > 0",
+                stum == 0 and new >= h and not (k >= 5 and h == 0))
 
 
 def etap8_main(logp, start_arg, until=120, csp=None):
@@ -8982,6 +9098,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_p2)   # E8/P2 (244): pomiary sprzetu AI, lupu i korony
     blocks.append(etap8_x)    # E8/X (248): doswiadczenie za skutek
     blocks.append(etap8_w)    # E8/W (249): zuzycie i naprawy AI
+    blocks.append(etap8_a)    # E8/A (250): misja gracza - odzysk wedlug strony, arena nie obija, lup z wlasnych zabojstw
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

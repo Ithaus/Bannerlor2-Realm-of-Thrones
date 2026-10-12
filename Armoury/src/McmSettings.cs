@@ -484,6 +484,10 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool BreakAtZeroCondition { get; set; } = false;
 
+        [SettingPropertyBool("Arena No Wear", HintText = "blows and shots in the arena, a tournament, a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory")]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool ArenaNoWear { get; set; } = true;
+
         [SettingPropertyBool("Unique Crowns Enabled", HintText = "crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones")]
         [SettingPropertyGroup("Crown jewels")]
         public bool UniqueCrownsEnabled { get; set; } = true;
@@ -795,6 +799,10 @@ namespace Armoury
         [SettingPropertyInteger("Player Loot Share Percent", 0, 132, "0", HintText = "the captain's third: your cut of what YOUR MEN strip from the foes they felled (the rest is theirs, in the army armoury); foes felled by you or your companions are all yours; auto-resolved battles use this share for everything")]
         [SettingPropertyGroup("The law of the battlefield")]
         public int PlayerLootSharePercent { get; set; } = 33;
+
+        [SettingPropertyBool("Own Kills Loot Whole", HintText = "what you felled is yours: every piece stripped from a foe that you or a companion brought down goes to your loot whole, and from a foe felled by one of your men you take the captain's share (Player Loot Share Percent) - before, your cut was one average taken evenly from every kind of piece, so a single fine piece off your own kill could stay with the men")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool OwnKillsLootWhole { get; set; } = true;
 
         [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2327,6 +2335,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Ammo Repair Percent", 0.00f, 80.00f, "0.00", HintText = "share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost")]
         [SettingPropertyGroup("Iron Bank")]
         public float AmmoRepairPercent { get; set; } = 20f;
+
+        [SettingPropertyBool("Ammo Recovery By Side", HintText = "in a battle you fight yourself each side is judged by its own outcome: the men of the side that holds the field gather their shot arrows back (Ammo Recover Percent + Ammo Repair Percent), the men of the beaten side lose what they shot - before, your result decided for the enemy too (a beaten foe gathered arrows, a winning foe lost them all)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool AmmoRecoveryBySide { get; set; } = true;
 
         [SettingPropertyBool("Keep Wear Through Battle", HintText = "gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired")]
         [SettingPropertyGroup("Iron Bank")]
@@ -5060,6 +5072,7 @@ namespace Armoury
             s.ThresholdRuined = ThresholdRuined;
             s.RepairCostFactor = RepairCostFactor;
             s.BreakAtZeroCondition = BreakAtZeroCondition;
+            s.ArenaNoWear = ArenaNoWear;
             s.UniqueCrownsEnabled = UniqueCrownsEnabled;
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;
@@ -5138,6 +5151,7 @@ namespace Armoury
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
+            s.OwnKillsLootWhole = OwnKillsLootWhole;
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
@@ -5521,6 +5535,7 @@ namespace Armoury
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;
+            s.AmmoRecoveryBySide = AmmoRecoveryBySide;
             s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.StartKitEnabled = StartKitEnabled;
             s.StartGoldAdventurer = StartGoldAdventurer;

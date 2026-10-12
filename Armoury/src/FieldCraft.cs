@@ -228,6 +228,50 @@ namespace Armoury
             for (int i = 0; i < 12; i++) { into[i] = WearLedger[i]; WearLedger[i] = 0f; }
         }
 
+        // E8/A (250, PLAN 8.8e, regula R4 "arena i turniej nie obijaja"): ksiegi zuzycia (WearLedger bohatera i TroopWearLedger wojska) pisza tylko w BITWIE
+        // kampanii - misja z bitwa gracza na mapie (MapEvent.PlayerMapEvent) i CombatType Combat. Sam CombatType nie wystarcza: zaden zarzadzany kod gry
+        // 1.4.8 go nie ustawia (recenzja E8/X), wiec arena i turniej moga miec Combat; rozstrzyga bitwa na mapie - ten sam warunek co strzal w
+        // XpFair.ShotPrefix. Arena, turniej, cwiczenia, bojka w zaulku, ucieczka z lochu nie maja bitwy na mapie - ciosy z nich nie ida do ksiag.
+        // Ksiega bohatera jest tez zerowana na poczatku kazdej bitwy gracza i po bitwie przegranej albo opuszczonej (ArmouryBehavior) - dotad ciosy spoza
+        // bitwy i z kleski czekaly w niej do najblizszego zwyciestwa. Klucz ArenaNoWear.
+        private int _battle = -1;                 // -1 nie sprawdzone, 0 misja poza bitwa, 1 bitwa kampanii (stale przez cala misje)
+        private int _skipHits, _skipShots;        // ciosy / strzaly bohatera pominiete w tej misji (misja poza bitwa)
+
+        private bool InBattle()
+        {
+            if (_battle < 0)
+            {
+                try
+                {
+                    _battle = TaleWorlds.CampaignSystem.MapEvents.MapEvent.PlayerMapEvent != null
+                              && Mission.CombatType == Mission.MissionCombatType.Combat ? 1 : 0;
+                }
+                catch { return true; }            // nie wiadomo - jak dotad (ksiegi pisza); sprawdzimy przy nastepnym ciosie
+            }
+            return _battle == 1;
+        }
+
+        /// <summary>E8/A: suma ksiegi bohatera i jej wyzerowanie (poczatek bitwy gracza, bitwa przegrana albo opuszczona).</summary>
+        internal static float DropLedger()
+        {
+            float sum = 0f;
+            for (int i = 0; i < 12; i++) { sum += WearLedger[i]; WearLedger[i] = 0f; }
+            return sum;
+        }
+
+        protected override void OnEndMission()
+        {
+            try
+            {
+                if (_skipHits + _skipShots > 0)
+                    Log.Info("Zuzycie (E8/A): misja poza bitwa (arena, turniej, bojka) - " + _skipHits + " ciosow i " + _skipShots
+                             + " strzalow bohatera nie poszlo do ksiegi zuzycia; rynsztunek bez zmian.");
+                _skipHits = 0; _skipShots = 0;
+            }
+            catch { }
+            base.OnEndMission();
+        }
+
         private static int ArmorSlotFor(BoneBodyPartType part, Agent a)
         {
             switch (part)
@@ -267,6 +311,12 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // E8/A: poza bitwa kampanii (arena, turniej, cwiczenia) strzal nie zuzywa luku bohatera ani wojska - cala metoda pisze tylko do ksiag
+                if (c.ArenaNoWear && !InBattle())
+                {
+                    if (c.WearEnabled && shooterAgent != null && shooterAgent.IsMainAgent) _skipShots++;
+                    return;
+                }
                 // wpis 96: strzal zolnierza partii gracza - luk/kusza
                 if (c.TroopWearEnabled && shooterAgent != null && shooterAgent.IsHuman && !shooterAgent.IsHero && BattlefieldLaw.IsMainPartyAgent(shooterAgent))
                 {
@@ -301,9 +351,14 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // E8/A: ksiegi zuzycia pisza tylko w bitwie kampanii (arena, turniej, bojka - nie); odpinanie strzal nizej dziala wszedzie jak dotad
+                bool counts = !c.ArenaNoWear || InBattle();
+                if (!counts && c.WearEnabled && blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor) > 0
+                    && ((affectedAgent != null && affectedAgent.IsMainAgent) || (affectorAgent != null && affectorAgent.IsMainAgent)))
+                    _skipHits++;
 
                 // wpis 96: zuzycie WOJSKA z przebiegu walki - trafienia zolnierzy partii gracza (nie bohaterow)
-                if (c.TroopWearEnabled)
+                if (c.TroopWearEnabled && counts)
                 {
                     try
                     {
@@ -322,7 +377,7 @@ namespace Armoury
                 }
 
                 // --- zuzycie sprzetu gracza: tylko od faktycznych zdarzen ---
-                if (c.WearEnabled)
+                if (c.WearEnabled && counts)
                 {
                     int raw = blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor);
                     // strzala robi w pancerzu dziurke, nie wyrwe - liczymy tylko ulamek

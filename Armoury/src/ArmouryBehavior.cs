@@ -1814,6 +1814,17 @@ namespace Armoury
             try
             {
                 if (mapEvent == null || !mapEvent.IsPlayerMapEvent) return;
+                // E8/A (250, PLAN 8.8e): ksiega ciosow bohatera zaczyna kazda bitwe od zera - to, co w niej zostalo (walka poza bitwa sprzed paczki albo przy
+                // wylaczonym FieldCraft w tamtej misji, bitwa przegrana), nie obije rynsztunku po tym zwyciestwie
+                try
+                {
+                    if (Settings.Current.ArenaNoWear)
+                    {
+                        float stale = FieldCraft.DropLedger();
+                        if (stale > 0.01f) Log.Info("Zuzycie (E8/A): poczatek bitwy - ksiega ciosow wyzerowana, " + stale.ToString("0.0") + " pkt sprzed tej bitwy przepada (rynsztunek bez zmian).");
+                    }
+                }
+                catch (Exception e) { Log.Error("OnMapEventStarted.DropLedger", e); }
                 _hpBeforeBattle = Hero.MainHero.HitPoints;
                 _lootSnapshot = SnapshotBaggage();
                 SnapshotOwnRanks();   // roznica po bitwie = polegli (GatherFallen)
@@ -1844,6 +1855,17 @@ namespace Armoury
                     if (dropped > 0)
                         Log.Info("Pole przegrane/opuszczone - " + dropped + " sztuk lupu zostaje na ziemi.");
                     _hpBeforeBattle = -1;
+                    // E8/A (250): kleska nie obija (jak dotad) - ciosy z przegranej albo opuszczonej bitwy nie czekaja juz w ksiedze na najblizsze zwyciestwo
+                    // (zerowanie na poczatku bitwy nie lapie bitwy, do ktorej gracz DOLACZYL - MapEventStarted poszlo wtedy bez gracza)
+                    try
+                    {
+                        if (Settings.Current.ArenaNoWear)
+                        {
+                            float lostWear = FieldCraft.DropLedger();
+                            if (lostWear > 0.01f) Log.Info("Zuzycie (E8/A): bitwa przegrana albo opuszczona - " + lostWear.ToString("0.0") + " pkt z ksiegi ciosow przepada (kleska nie obija, jak dotad).");
+                        }
+                    }
+                    catch (Exception e) { Log.Error("OnMapEventEnded.DropLedger", e); }
                     return;
                 }
 

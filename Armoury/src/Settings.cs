@@ -136,6 +136,9 @@ namespace Armoury
         public int ThresholdRuined = 20;                   // below this it is barely worth carrying
         public float RepairCostFactor = 0.5f;              // share of item value for a full repair (with Smith Mend From Market on, the town smiths charge by their day wages instead - this share is left only for pieces they have no recipe for)
         public bool BreakAtZeroCondition = false;          // at zero the piece finally breaks and is gone for good
+        // E8/A (250, PLAN 8.8e, regula R4): ksiegi zuzycia (rynsztunek bohatera i sprzet wojska) pisza tylko w bitwie kampanii - misja z bitwa gracza na mapie;
+        // arena, turniej, cwiczenia i bojki nie obijaja; ksiega ciosow bohatera zerowana na poczatku bitwy i po bitwie przegranej albo opuszczonej (FieldCraft, ArmouryBehavior)
+        public bool ArenaNoWear = true;                    // blows and shots in the arena, a tournament, a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory
         // --- Crown jewels ---
         public bool UniqueCrownsEnabled = true;            // crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones
         public int UniqueCrownHeadArmor = 10;              // head armour of a crown - it is jewellery, not a helmet (ROT ships every crown at 75)
@@ -245,6 +248,9 @@ namespace Armoury
         public bool LootArrivesBattleWorn = true;          // loot-screen items from fought battles arrive battle-worn but keep their worth
         public bool SimBattleFullDrop = true;              // auto-resolved battles ignore the hidden per-tier drop multipliers
         public int PlayerLootSharePercent = 33;            // the captain's third: your cut of what YOUR MEN strip from the foes they felled (the rest is theirs, in the army armoury); foes felled by you or your companions are all yours; auto-resolved battles use this share for everything
+        // E8/A (250, odpowiedz Jeffa 12.10 nr 1): lup cialo po ciele - sztuka z ciala powalonego przez gracza albo towarzysza idzie w calosci do gracza, z ciala
+        // powalonego przez zolnierza trzecia kapitana (dotad srednia z puli brana po rowno z kazdej pozycji lupu); BattlefieldLaw.LootTag, AfterDtePartyItems
+        public bool OwnKillsLootWhole = true;              // what you felled is yours: every piece stripped from a foe that you or a companion brought down goes to your loot whole, and from a foe felled by one of your men you take the captain's share (Player Loot Share Percent) - before, your cut was one average taken evenly from every kind of piece, so a single fine piece off your own kill could stay with the men
         public bool WreckSalvageEnabled = true;            // the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge
         public int LootMinConditionPercent = 3;            // gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)
         public int LegendaryLootValueFloor = 100000;       // weapons worth this much clean (the named blades of the realm) never lie in the common loot sacks (0 = off)
@@ -678,6 +684,9 @@ namespace Armoury
         public bool AmmoRecoveryEnabled = true;            // arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot
         public float AmmoRecoverPercent = 45f;             // share of shot arrows the winner picks up whole (estimate from Poitiers, Towton and the 1343 Breton shipment)
         public float AmmoRepairPercent = 20f;              // share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost
+        // E8/A (250, PLAN 8.4b): odzysk amunicji w bitwie gracza wedlug strony agenta - strona, ktora utrzymala pole, odzyskuje; pokonana traci, co wystrzelila
+        // (dotad wynik gracza decydowal takze za wroga); agent zdjety w trakcie misji (wynik nieznany) - jak dotad (AmmoRecovery, latka DTE ProcessAgentEquipment)
+        public bool AmmoRecoveryBySide = true;             // in a battle you fight yourself each side is judged by its own outcome: the men of the side that holds the field gather their shot arrows back (Ammo Recover Percent + Ammo Repair Percent), the men of the beaten side lose what they shot - before, your result decided for the enemy too (a beaten foe gathered arrows, a winning foe lost them all)
         public bool KeepWearThroughBattle = true;          // gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired
         public bool StartKitEnabled = true;                // starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original
         public int StartGoldAdventurer = 100;              // coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); -1 leaves Banner Kings as it is

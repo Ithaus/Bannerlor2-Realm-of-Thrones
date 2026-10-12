@@ -256,6 +256,27 @@ namespace Armoury
                         Log.Info("BattlefieldLaw: dzialka gracza z lupow DTE trafia na ekran (solo 100%, z druzyna "
                                  + Settings.Current.PlayerLootSharePercent + "%)."
                                  + (CasualtyLootCut ? " Jency z bitew ida pod obszukanie (placa fizycznie za rannych)." : ""));
+                        // E8/A (250, odpowiedz Jeffa 12.10 nr 1): lup cialo po ciele - kto powalil wlasciciela sztuki dopisywanej do lupu (latki wpiete zawsze,
+                        // klucz OwnKillsLootWhole czytany w LootTag i AfterDtePartyItems; bez latek dzialka liczy sie srednia z puli jak dotad)
+                        MethodInfo removedL = null, addL = null;
+                        try
+                        {
+                            removedL = AccessTools.Method(dteMission, "OnAgentRemoved");
+                            addL = AccessTools.Method(dteRecord, "AddLootedItem", new[] { typeof(ItemObject) });
+                            if (removedL != null && addL != null)
+                            {
+                                h.Patch(removedL, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(LootKillPrefix)),
+                                        finalizer: new HarmonyMethod(typeof(BattlefieldLaw), nameof(LootKillFinalizer)));
+                                _lootWired++;
+                                h.Patch(addL, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(LootTag)));
+                                _lootWired++;
+                            }
+                        }
+                        catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (E8/A)", e); }
+                        Log.Info("Misja gracza (E8/A): start - lup z wlasnych zabojstw w calosci [" + (Settings.Current.OwnKillsLootWhole ? "wl" : "wyl")
+                                 + "], latki wpiete " + _lootWired + "/2 (DTE DynamicTroopMissionLogic.OnAgentRemoved - zabojca, PartyBattleRecord.AddLootedItem - sztuka)"
+                                 + (_lootWired == 2 ? "" : " | nie znaleziono: " + (removedL == null ? "OnAgentRemoved " : "") + (addL == null ? "AddLootedItem(ItemObject) " : "")
+                                                           + (removedL != null && addL != null ? "(wyjatek przy wpinaniu)" : "")) + ".");
                     }
                     else Log.Info("BattlefieldLaw: nie znalazlem wnetrza DTE - dzialka gracza nieaktywna.");
                 }
@@ -416,7 +437,18 @@ namespace Armoury
                 if (!Settings.Current.BattlefieldLawEnabled || !isPlayerParty || !isVictorious) return;
                 if (RotEnlisted()) return;
                 int pct = PlayerSharePercent();
-                if (pct <= 0) return;
+                // E8/A (250, odpowiedz Jeffa 1): cialo po ciele - sztuki z cial powalonych przez Ciebie i towarzyszy w calosci, przez zolnierzy trzecia
+                // kapitana, bez znanego zabojcy (lup morski z losowania DTE) srednia z puli jak dotad; brak znacznikow z tej misji = sama srednia (kod sprzed)
+                bool whole = false;
+                int third = 0, wHero = 0, wTroop = 0, wUnk = 0, wAvg = 0, wNew = 0;
+                try
+                {
+                    third = Math.Max(0, Math.Min(100, Settings.Current.PlayerLootSharePercent));
+                    lock (_lootHero)
+                        whole = Settings.Current.OwnKillsLootWhole && ReferenceEquals(Mission.Current, _lootMission) && _lootHero.Count + _lootTroop.Count > 0;
+                }
+                catch { whole = false; }
+                if (pct <= 0 && !whole) return;
 
                 var armory = _dteArmory.GetValue(null) as ItemRoster;
                 if (armory == null) return;
@@ -439,6 +471,14 @@ namespace Armoury
                         int count = (int)kt.GetProperty("Value").GetValue(kv, null);
                         if (item == null || count <= 0) continue;
                         int share = Math.Min(count, (int)Math.Round(count * pct / 100.0, MidpointRounding.AwayFromZero));
+                        if (whole)
+                        {
+                            int hk, tk;
+                            lock (_lootHero) { _lootHero.TryGetValue(item, out hk); _lootTroop.TryGetValue(item, out tk); }
+                            wAvg += share;
+                            share = WholeShare(count, ref hk, ref tk, third, pct);
+                            wHero += hk; wTroop += tk; wUnk += count - hk - tk; wNew += share;
+                        }
                         if (share <= 0) continue;
                         // audyt pelny W1: zdejmujemy po wszystkich elementach tej sztuki RAZEM z ich stanem -
                         // wczesniej AddToCounts(item, -take) celowal w element bez modyfikatora, a kolejka i tak
@@ -456,9 +496,80 @@ namespace Armoury
                     }
                     break;   // rekord partii gracza znaleziony i przetworzony
                 }
-                if (moved > 0) Log.Info("BattlefieldLaw: " + moved + " szt. (" + pct + "%) z magazynu wojska czeka na ekran lupow.");
+                if (moved > 0) Log.Info("BattlefieldLaw: " + moved + " szt. (" + (whole ? "cialo po ciele, srednia z puli " : "") + pct + "%) z magazynu wojska czeka na ekran lupow.");
+                if (whole)
+                {
+                    Log.Info("BattlefieldLaw (E8/A): lup cialo po ciele - z cial powalonych przez Ciebie i towarzyszy " + wHero + " szt. w calosci (powalonych wrogow "
+                             + (ReferenceEquals(Mission.Current, _killMission) ? _killsHero : 0) + "), przez zolnierzy " + wTroop + " szt. x " + third
+                             + "%, bez znanego zabojcy " + wUnk + " szt. x " + pct + "% | dzialka gracza " + wNew + " szt. (zdjete z magazynu " + moved
+                             + "), srednia z puli dalaby " + wAvg + " szt. | potkniecia (sesja) " + _lootStumbles + ".");
+                    lock (_lootHero) { _lootHero.Clear(); _lootTroop.Clear(); _lootMission = null; }
+                }
             }
             catch (Exception e) { Log.Error("AfterDtePartyItems", e); }
+        }
+
+        // E8/A (250; odpowiedz Jeffa 12.10 nr 1 "to, co ja zabilem, idzie do mnie"): LUP CIALO PO CIELE. Wpis 82 liczyl dzialke gracza jako SREDNIA z puli
+        // (Ty i towarzysze 100%, zolnierze trzecia) i bral ja po rowno z kazdej pozycji lupu - przy sredniej ponizej 50% pojedyncza sztuka z ciala, ktore
+        // powaliles sam, zaokraglala sie do zera i zostawala w zbrojowni ludzi. Teraz kazda sztuka dopisywana przez DTE do lupu partii gracza pamieta, kto
+        // powalil jej wlasciciela: Ty albo towarzysz - cala Twoja; zolnierz - trzecia kapitana (PlayerLootSharePercent); bez znanego zabojcy (lup morski
+        // z losowania przy rozliczeniu) - srednia z puli jak dotad. Zabojca jak w CountKill (jezdziec za konia). Klucz OwnKillsLootWhole.
+        [ThreadStatic] private static Agent _lootKiller;        // zabojca w biegu DTE OnAgentRemoved (prefiks ustawia, finalizer czysci)
+        [ThreadStatic] private static int _lootKind;            // 0 poza OnAgentRemoved, -1 jeszcze nie policzone, 1 Ty / towarzysz, 2 zolnierz partii gracza, 3 inni
+        private static object _lootMission;
+        private static readonly Dictionary<ItemObject, int> _lootHero = new Dictionary<ItemObject, int>();    // sztuki z cial powalonych przez gracza i towarzyszy
+        private static readonly Dictionary<ItemObject, int> _lootTroop = new Dictionary<ItemObject, int>();   // ... przez zolnierzy partii gracza
+        private static int _lootWired, _lootStumbles;
+
+        /// <summary>Dzialka gracza z jednej pozycji lupu (count sztuk): hero sztuk z cial powalonych przez gracza i towarzyszy - w calosci; troop sztuk z cial
+        /// powalonych przez zolnierzy - third procent; reszta (bez znanego zabojcy) - pct procent (srednia z puli). Ulamek zaokraglany jak dotad (od zera),
+        /// razem dla czesci zolnierskiej i nieznanej; hero i troop przyciete do count.</summary>
+        internal static int WholeShare(int count, ref int hero, ref int troop, int third, int pct)
+        {
+            if (count <= 0) { hero = 0; troop = 0; return 0; }
+            hero = Math.Max(0, Math.Min(count, hero));
+            troop = Math.Max(0, Math.Min(count - hero, troop));
+            int unk = count - hero - troop;
+            return Math.Min(count, hero + (int)Math.Round((troop * third + unk * pct) / 100.0, MidpointRounding.AwayFromZero));
+        }
+
+        public static void LootKillPrefix(Agent __1) { _lootKiller = __1; _lootKind = -1; }
+
+        public static void LootKillFinalizer() { _lootKiller = null; _lootKind = 0; }
+
+        /// <summary>Prefiks DTE PartyBattleRecord.AddLootedItem(ItemObject): sztuka idzie do lupu partii zabojcy - zapamietaj, czy powalil bohater partii
+        /// gracza, czy jej zolnierz (partia zabojcy = partia gracza, wiec to jej rekord). Tylko licznik; nie rzuca.</summary>
+        public static void LootTag(ItemObject __0)
+        {
+            try
+            {
+                if (_lootKind == 0 || __0 == null) return;
+                var s = Settings.Current;
+                if (s == null || !s.OwnKillsLootWhole || !s.BattlefieldLawEnabled) return;
+                if (_lootKind < 0) _lootKind = KillerKind(_lootKiller);
+                if (_lootKind != 1 && _lootKind != 2) return;
+                var m = Mission.Current;
+                lock (_lootHero)
+                {
+                    if (!ReferenceEquals(m, _lootMission)) { _lootMission = m; _lootHero.Clear(); _lootTroop.Clear(); }
+                    var d = _lootKind == 1 ? _lootHero : _lootTroop;
+                    int n; d.TryGetValue(__0, out n); d[__0] = n + 1;
+                }
+            }
+            catch { _lootStumbles++; }
+        }
+
+        private static int KillerKind(Agent a)
+        {
+            try
+            {
+                if (a == null) return 3;
+                if (a.IsMount && a.RiderAgent != null) a = a.RiderAgent;   // stratowany przez konia - liczy sie jezdziec (jak CountKill)
+                if (a == Agent.Main) return 1;
+                if (!IsMainPartyAgent(a)) return 3;                           // sojusznicy i wrogowie - ich lup, ich rekord
+                return a.IsHero ? 1 : 2;
+            }
+            catch { return 3; }
         }
 
         // wpis 82 (Jeff 05.10: "a jak jestem sam z 1 zolnierzem, a zabilem wszystkich ja?"): historycznie lup nalezal do
