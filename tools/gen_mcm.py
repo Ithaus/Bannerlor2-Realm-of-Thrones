@@ -145,6 +145,8 @@ RANGES = {
     'VillageOutputStep': (1.0, 2.0, "0.00"),
     'ValveStockDaysLow': (7, 120, "0"),
     'ValveStockDaysHigh': (14, 240, "0"),
+    # E6/K3 (219): czesc polki miasta na konie rycerzy w jednym postoju (kod przycina do 0..1, Stables.KnightBuy)
+    'KnightHorseMarketShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

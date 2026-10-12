@@ -687,6 +687,7 @@ namespace Armoury
                 if (c == null || !c.CavalryNeedsMounts) return;
                 var list = __result as IList;
                 if (list == null || list.Count == 0 || party == null) return;
+                CavalryTemplate.Steer(party, list);   // E6/K3 (219): przy rozwidleniu pieszy/konny zostaje strona, ktora przybliza partie lorda AI do celu szablonu - PRZED filtrem koni (konny bez konia -> czeka i zakup)
                 int refused = 0, trimmed = 0;   // 175.0: pomiar (HorseCensus) - proby odrzucone i przyciete z braku konia
                 for (int i = list.Count - 1; i >= 0; i--)
                 {
@@ -798,7 +799,9 @@ namespace Armoury
                 // ilu dalej brakuje konia - Stajnia dokupi razem z konmi na awanse
                 int lack = Remount(party);
                 if (!c.CavalryNeedsMounts || !c.AiBuysMounts) return;
-                if (!settlement.IsTown && !settlement.IsVillage) return;
+                // E6/K3 (219): na zamku rodu partii tylko kon rycerza od rodu (stado wsi przypietej do zamku); zwykle zakupy jak dotad tylko w miescie i we wsi
+                bool castle = settlement.IsCastle && CavalryTemplate.KnightOn && settlement.OwnerClan != null && settlement.OwnerClan == CavalryTemplate.ClanOf(party);
+                if (!settlement.IsTown && !settlement.IsVillage && !castle) return;
 
                 // KONIOKRADZTWO GOSPODARCZE: bez przerwy miedzy zakupami powstawala
                 // pompa - lord kupowal konie, AI sprzedawalo je jako zwykly towar
@@ -808,8 +811,19 @@ namespace Armoury
                 double today = CampaignTime.Now.ToDays;
                 double last;
                 string pid = party.StringId ?? "";
+                int[] knK = CavalryTemplate.KnightOn ? new int[3] : null;   // E6/K3: czekajacy rycerze wedlug kategorii (NeedByCategory)
+                int[] needK = null;
                 if (_lastBuy.TryGetValue(pid, out last)
-                    && today - last < Math.Max(0f, c.AiMountBuyCooldownDays)) return;
+                    && today - last < Math.Max(0f, c.AiMountBuyCooldownDays))
+                {
+                    // E6/K3 (219, KB K3-pompa): przerwa zdjeta dla partii z czekajacymi awansami tylko przy czynnej sprzedazy K2(b) - gra nie sprzedaje
+                    // koni lordow (SpareHorses.SellOn), wiec nie ma pompy; zakup i tak tylko do zapasu kategorii z histereza 1.5 (K2). Inaczej przerwa zostaje.
+                    if (!CavalryTemplate.AnyOn) return;
+                    needK = NeedByCategory(party.Party, knK);
+                    if (needK[0] + needK[1] + needK[2] <= 0) return;
+                    if (!SpareHorses.SellOn) { CavalryTemplate.NoteCooldown(false); return; }
+                    CavalryTemplate.NoteCooldown(true);
+                }
 
                 var lord = party.LeaderHero;
 
@@ -829,8 +843,9 @@ namespace Armoury
                 int waitUp = NeedForUpgrades(party.Party);       // E6/K2: osobno do logu (dotad want - AiMountSpareBuffer - lack)
                 int want = waitUp + lack;   // sklad7b-p: + jezdzcy bez konia w zbrojowni
                 if (want <= 0) return;
+                if (needK == null) needK = NeedByCategory(party.Party, knK);
+                if (castle && (knK == null || knK[0] + knK[1] + knK[2] <= 0)) return;   // E6/K3: zamek - tylko czekajacy rycerze
                 HorseCensus.OnLordVisit(party);                  // 175.0: wizyta z potrzeba (pomiar)
-                var needK = NeedByCategory(party.Party);
                 bool ff = FreeFirst(party.Party);
                 var bal = ff ? Balance(party) : null;
                 int deficit = 0, freeNeeded = 0;
@@ -863,10 +878,6 @@ namespace Armoury
                 int cap = Math.Max(1, c.AiMountMaxPerVisit);
                 if (need > cap) need = cap;              // jeden postoj to kilka koni, nie stado
 
-                int purse = lord.Gold;
-                int budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
-                if (budget < 50) { HorseCensus.OnLordBuyFailed(party, HorseCensus.FailNoGold); return; }
-
                 int bought = 0, paid = 0, boughtMarket = 0;
                 bool tooDear = false;   // przeglad 175: byly konie (dozwolona czesc polki albo wsie), ale najtanszy ponad budzet
                 string what = null;   // id kupionych ras do logu (diagnoza "skad kamele")
@@ -885,80 +896,99 @@ namespace Armoury
                         var e0 = shelf[i];
                         if (e0.EquipmentElement.Item != null && e0.Amount > 0 && IsPlainMount(e0.EquipmentElement.Item)) shelfMounts += e0.Amount;
                     }
-                int marketAllow = (int)(shelfMounts * MBMath.ClampFloat(c.AiMountMarketSharePercent / 100f, 0f, 1f));
-                marketAllow = Math.Min(marketAllow, Math.Max(0, shelfMounts - Math.Max(0, c.AiMountShelfFloor)));
-                int fromMarket = Math.Min(need, marketAllow);
-                int needMarket = fromMarket;
-                // 1. z targu osady - najtansze najpierw (w granicach dozwolonej czesci polki)
-                while (needMarket > 0 && shelf != null)
+
+                // E6/K3 (219): kon rycerza od rodu - PRZED zwyklym zakupem, w kwocie zapasu K2 (quota) i limicie postoju; stado wsi rodu, potem targ miasta
+                int kMarket = 0, kVill = 0, kGold = 0;
+                if (knK != null && quota != null && knK[0] + knK[1] + knK[2] > 0)
                 {
-                    int best = -1, bestPrice = int.MaxValue;
-                    for (int i = 0; i < shelf.Count; i++)
-                    {
-                        var el = shelf[i];
-                        var it = el.EquipmentElement.Item;
-                        if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
-                        if (quota != null) { int qk = Level(it.ItemCategory); if (qk < 0 || quota[qk] <= 0) continue; }   // E6/K2: tylko kategoria ponizej zapasu
-                        // KLIMAT (Jeff 30.08: "kamele w zimowym srodowisku?!"):
-                        // wielblad/rydwan schodzi z targu tylko u swoich -
-                        // lord Polnocy nie wsadzi jazdy na dromadery
-                        var iid = it.StringId ?? "";
-                        if ((iid.Contains("camel") || iid.Contains("chariot"))
-                            && (settlement.Culture == null || it.Culture != settlement.Culture)) continue;
-                        int price = PriceOf(settlement, el.EquipmentElement);
-                        if (price < bestPrice) { bestPrice = price; best = i; }
-                    }
-                    if (best >= 0 && bestPrice > budget - paid) tooDear = true;
-                    if (best < 0 || bestPrice > budget - paid) break;
-                    var chosen = shelf[best];
-                    var cel = chosen.EquipmentElement;
-                    // ceny hurtu (Jeff 09.10 08:00): kazdy kon po swojej cenie - po zdjeciu konia z polki nastepny wyceniany od nowa (ShelfBuy);
-                    // dotad cena pierwszego x liczba koni. Pierwszy - cena z przegladu polki (ta sama polka).
-                    int cost, first, lastP;
-                    int mk = quota != null ? Level(cel.Item.ItemCategory) : -1;
-                    int upTo = Math.Min(needMarket, chosen.Amount);
-                    if (mk >= 0) upTo = Math.Min(upTo, quota[mk]);
-                    int take = ShelfBuy.Take(shelf, cel, upTo, budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
-                    if (take <= 0) break;
-                    if (mk >= 0) { quota[mk] -= take; SpareHorses.NoteBuy(party, mk, take); }
-                    party.ItemRoster.AddToCounts(cel, take);
-                    paid += cost; bought += take; need -= take; needMarket -= take; boughtMarket += take;
-                    var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
-                    if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
+                    int kb = KnightBuy(party, settlement, knK, quota, need, shelfMounts, ref what, ref tooDear, out kMarket, out kVill, out kGold);
+                    bought += kb; need -= kb; boughtMarket += kMarket;
                 }
 
-                // 2. targ pusty, a lord potrzebuje - zamawia u hodowcy (narzut za fatyge)
-                // AUDYT 04.10 (C1): wczesniej kon "od hodowcy" powstawal z niczego. Teraz hodowca to wsie
-                // tej osady: kon schodzi z ich zapasu, zloto (z narzutem za fatyge) idzie do wsi.
-                int toVillages = 0;
-                if (need > 0 && c.AiMountBreederFallback && settlement.BoundVillages != null)
+                int marketAllow = 0, fromMarket = 0, toVillages = 0;
+                if (!castle && need > 0)
                 {
-                    float markup = Math.Max(1f, c.AiMountBreederMarkup);
-                    bool byMarket = c.HorsesAtMarketPrice;
-                    foreach (var v in settlement.BoundVillages)
+                    int purse = lord.Gold;
+                    int budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+                    if (budget < 50) { if (bought <= 0) { HorseCensus.OnLordBuyFailed(party, HorseCensus.FailNoGold); return; } }
+                    else
                     {
-                        if (need <= 0) break;
-                        var vs = v != null ? v.Settlement : null;
-                        if (vs == null || vs.ItemRoster == null) continue;
-                        var vr = vs.ItemRoster;
-                        for (int i = vr.Count - 1; i >= 0 && need > 0; i--)
+                        marketAllow = (int)(shelfMounts * MBMath.ClampFloat(c.AiMountMarketSharePercent / 100f, 0f, 1f));
+                        marketAllow = Math.Min(marketAllow, Math.Max(0, shelfMounts - Math.Max(0, c.AiMountShelfFloor)));
+                        marketAllow = Math.Max(0, marketAllow - kMarket - (settlement.IsVillage ? kVill : 0));   // E6/K3: rycerze zdjeli juz czesc polki (polka liczona przed ich zakupem; wies postoju to tez stado rodu)
+                        fromMarket = Math.Min(need, marketAllow);
+                        int needMarket = fromMarket;
+                        // 1. z targu osady - najtansze najpierw (w granicach dozwolonej czesci polki)
+                        while (needMarket > 0 && shelf != null)
                         {
-                            var el = vr.GetElementCopyAtIndex(i);
-                            var it = el.EquipmentElement.Item;
-                            if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
-                            int vk = quota != null ? Level(it.ItemCategory) : -1;
-                            if (quota != null && (vk < 0 || quota[vk] <= 0)) continue;   // E6/K2: tylko kategoria ponizej zapasu
-                            int price = BreederPrice(settlement, el.EquipmentElement, markup, byMarket);
-                            int take = 0;
-                            while (take < el.Amount && need > 0 && (vk < 0 || take < quota[vk]) && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
-                            if (take <= 0) { tooDear = true; continue; }
-                            if (vk >= 0) { quota[vk] -= take; SpareHorses.NoteBuy(party, vk, take); }
-                            vr.AddToCounts(el.EquipmentElement, -take);
-                            party.ItemRoster.AddToCounts(el.EquipmentElement, take);
-                            TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, vs, price * take);
-                            bought += take;
-                            var nid = it.StringId ?? "?";
-                            if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
+                            int best = -1, bestPrice = int.MaxValue;
+                            for (int i = 0; i < shelf.Count; i++)
+                            {
+                                var el = shelf[i];
+                                var it = el.EquipmentElement.Item;
+                                if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                                if (quota != null) { int qk = Level(it.ItemCategory); if (qk < 0 || quota[qk] <= 0) continue; }   // E6/K2: tylko kategoria ponizej zapasu
+                                // KLIMAT (Jeff 30.08: "kamele w zimowym srodowisku?!"):
+                                // wielblad/rydwan schodzi z targu tylko u swoich -
+                                // lord Polnocy nie wsadzi jazdy na dromadery
+                                var iid = it.StringId ?? "";
+                                if ((iid.Contains("camel") || iid.Contains("chariot"))
+                                    && (settlement.Culture == null || it.Culture != settlement.Culture)) continue;
+                                int price = PriceOf(settlement, el.EquipmentElement);
+                                if (price < bestPrice) { bestPrice = price; best = i; }
+                            }
+                            if (best >= 0 && bestPrice > budget - paid) tooDear = true;
+                            if (best < 0 || bestPrice > budget - paid) break;
+                            var chosen = shelf[best];
+                            var cel = chosen.EquipmentElement;
+                            // ceny hurtu (Jeff 09.10 08:00): kazdy kon po swojej cenie - po zdjeciu konia z polki nastepny wyceniany od nowa (ShelfBuy);
+                            // dotad cena pierwszego x liczba koni. Pierwszy - cena z przegladu polki (ta sama polka).
+                            int cost, first, lastP;
+                            int mk = quota != null ? Level(cel.Item.ItemCategory) : -1;
+                            int upTo = Math.Min(needMarket, chosen.Amount);
+                            if (mk >= 0) upTo = Math.Min(upTo, quota[mk]);
+                            int take = ShelfBuy.Take(shelf, cel, upTo, budget - paid, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
+                            if (take <= 0) break;
+                            if (mk >= 0) { quota[mk] -= take; SpareHorses.NoteBuy(party, mk, take); }
+                            party.ItemRoster.AddToCounts(cel, take);
+                            paid += cost; bought += take; need -= take; needMarket -= take; boughtMarket += take;
+                            var cid = chosen.EquipmentElement.Item != null ? chosen.EquipmentElement.Item.StringId : "?";
+                            if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
+                        }
+
+                        // 2. targ pusty, a lord potrzebuje - zamawia u hodowcy (narzut za fatyge)
+                        // AUDYT 04.10 (C1): wczesniej kon "od hodowcy" powstawal z niczego. Teraz hodowca to wsie
+                        // tej osady: kon schodzi z ich zapasu, zloto (z narzutem za fatyge) idzie do wsi.
+                        if (need > 0 && c.AiMountBreederFallback && settlement.BoundVillages != null)
+                        {
+                            float markup = Math.Max(1f, c.AiMountBreederMarkup);
+                            bool byMarket = c.HorsesAtMarketPrice;
+                            foreach (var v in settlement.BoundVillages)
+                            {
+                                if (need <= 0) break;
+                                var vs = v != null ? v.Settlement : null;
+                                if (vs == null || vs.ItemRoster == null) continue;
+                                var vr = vs.ItemRoster;
+                                for (int i = vr.Count - 1; i >= 0 && need > 0; i--)
+                                {
+                                    var el = vr.GetElementCopyAtIndex(i);
+                                    var it = el.EquipmentElement.Item;
+                                    if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                                    int vk = quota != null ? Level(it.ItemCategory) : -1;
+                                    if (quota != null && (vk < 0 || quota[vk] <= 0)) continue;   // E6/K2: tylko kategoria ponizej zapasu
+                                    int price = BreederPrice(settlement, el.EquipmentElement, markup, byMarket);
+                                    int take = 0;
+                                    while (take < el.Amount && need > 0 && (vk < 0 || take < quota[vk]) && paid + toVillages + price <= budget) { take++; need--; toVillages += price; }
+                                    if (take <= 0) { tooDear = true; continue; }
+                                    if (vk >= 0) { quota[vk] -= take; SpareHorses.NoteBuy(party, vk, take); }
+                                    vr.AddToCounts(el.EquipmentElement, -take);
+                                    party.ItemRoster.AddToCounts(el.EquipmentElement, take);
+                                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, vs, price * take);
+                                    bought += take;
+                                    var nid = it.StringId ?? "?";
+                                    if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
+                                }
+                            }
                         }
                     }
                 }
@@ -968,20 +998,145 @@ namespace Armoury
                     // 175.0 + przeglad 175: brak koni rozdzielony (decyzja 4.3 rozroznia "brakuje koni na rynku" i "lordowie za biedni"):
                     // za drogie (byly konie, najtanszy ponad budzet), polka zarezerwowana (konie na polce, ale AiMountMarketSharePercent /
                     // AiMountShelfFloor nie dopuszczaja ani sztuki, a wsie nic nie daly), pusto (ani na polce, ani we wsiach)
-                    HorseCensus.OnLordBuyFailed(party, tooDear ? HorseCensus.FailTooDear : (shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
+                    HorseCensus.OnLordBuyFailed(party, tooDear ? HorseCensus.FailTooDear : (!castle && shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
                     return;
                 }
                 _lastBuy[pid] = today;
                 if (lack > 0) Remount(party);   // sklad7b-p: kupione konie najpierw pod jezdzcow bez konia, reszta czeka w taborze na awanse
-                HorseCensus.OnLordBought(party, bought, paid + toVillages, boughtMarket, bought - boughtMarket);
+                HorseCensus.OnLordBought(party, bought, paid + toVillages + kGold, boughtMarket, bought - boughtMarket);
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
-                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "") + " (czekalo na awans " + waitUp
+                         + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "")
+                         + (kGold > 0 ? " (+ " + kGold + " za konie rycerzy od rodu E6/K3: ze stad wsi " + kVill + ", z targu " + kMarket + ")" : "")
+                         + " (czekalo na awans " + waitUp
                          + ", jezdzcow bez konia " + lack
                          + ", mial " + have + (quota != null ? " wolnych - kupno do zapasu wedlug kategorii E6/K2" : "") + "; z targu " + fromMarket + " przy polce " + shelfMounts + ").");
             }
             catch (Exception e) { Log.Error("Stables.AiBuy", e); }
+        }
+
+        /// <summary>
+        /// E6/K3 (219, projekt etapu 6 v2 rozdz. 3 "E6/K3" pkt 3; KB K3-przerzut) - KON RYCERZA KUPUJE ROD. Kwota: czekajacy rycerze kategorii (knK - NeedByCategory:
+        /// cel konny z linii szlacheckiej kultury albo z linii wlasnego szablonu rodu, CavalryTemplate.IsKnight) w granicach zapasu K2 (quota) i limitu postoju (need).
+        /// (1) Stado: wsie rodu partii przypiete do osady postoju (BoundVillages; wies postoju - ona sama), gdy wlasciciel wsi (Settlement.OwnerClan = pan osady,
+        ///     do ktorej wies nalezy) to rod partii; kon schodzi z magazynu wsi, zloto do wsi bez narzutu (BreederPrice z narzutem 1 - przy HorsesAtMarketPrice
+        ///     cena tego konia na targu, jak zwykly hodowca). Dalekie lenna - bez przerzutu (R15).
+        /// (2) Targ miasta postoju (nie zamek, nie wies): najtansze w kategorii do KnightHorseMarketShare polki (polka liczona przed zakupem, ostatnie
+        ///     AiMountShelfFloor sztuk zostaja), kazdy kon po swojej cenie (ShelfBuy), zloto do miasta.
+        /// Budzet: przydzial sprzetu rodu (ClanBudget.GearCap; GearSpent po zakupie) najwyzej kiesa pana; rod bez budzetu 166 - AiMountPurseShare kiesy, jak zwykly
+        /// zakup. Tylko wierzchowce rodziny konia (IsPlainMount; MountLaw.Allowed - kon zawsze). quota zmniejszana - zwykly zakup kupuje reszte.
+        /// </summary>
+        private static int KnightBuy(MobileParty party, TaleWorlds.CampaignSystem.Settlements.Settlement settlement, int[] knK, int[] quota, int need, int shelf0,
+                                     ref string what, ref bool tooDear, out int fromMarket, out int fromVill, out int goldAll)
+        {
+            fromMarket = 0; fromVill = 0; goldAll = 0;
+            var c = Settings.Current;
+            var lord = party.LeaderHero;
+            var clan = CavalryTemplate.ClanOf(party);
+            var kq = new int[3];
+            int want = 0;
+            for (int k = 0; k < 3; k++) { kq[k] = Math.Min(Math.Max(0, quota[k]), Math.Max(0, knK[k])); want += kq[k]; }
+            want = Math.Min(want, need);
+            if (want <= 0 || lord == null || clan == null) return 0;
+            int gearCap;
+            bool capped = ClanBudget.GearCap(clan, out gearCap);
+            int budget = capped ? Math.Min(Math.Max(0, lord.Gold), gearCap) : (int)(Math.Max(0, lord.Gold) * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+            CavalryTemplate.NoteKnightVisit(budget <= 0);
+            if (budget <= 0) return 0;
+            int bought = 0, spent = 0;
+            try
+            {
+                // (1) stado wsi rodu przypietej do osady postoju
+                var herds = new System.Collections.Generic.List<TaleWorlds.CampaignSystem.Settlements.Settlement>();
+                if (settlement.IsVillage) { if (settlement.OwnerClan == clan) herds.Add(settlement); }
+                else if (settlement.BoundVillages != null)
+                    foreach (var v in settlement.BoundVillages)
+                    {
+                        var vs = v != null ? v.Settlement : null;
+                        if (vs != null && vs.OwnerClan == clan) herds.Add(vs);
+                    }
+                bool byMarket = c.HorsesAtMarketPrice;
+                foreach (var vs in herds)
+                {
+                    if (bought >= want) break;
+                    var vr = vs.ItemRoster;
+                    if (vr == null) continue;
+                    for (int i = vr.Count - 1; i >= 0 && bought < want; i--)
+                    {
+                        var el = vr.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                        int lv = Level(it.ItemCategory);
+                        if (lv < 0 || kq[lv] <= 0) continue;
+                        int price = BreederPrice(settlement, el.EquipmentElement, 1f, byMarket);   // bez narzutu - stado rodu
+                        int take = 0;
+                        while (take < el.Amount && take < kq[lv] && bought + take < want && spent + (take + 1) * price <= budget) take++;
+                        if (take <= 0) { tooDear = true; continue; }
+                        vr.AddToCounts(el.EquipmentElement, -take);
+                        party.ItemRoster.AddToCounts(el.EquipmentElement, take);
+                        TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, vs, take * price);   // kazda partia koni od razu zaplacona
+                        spent += take * price;
+                        kq[lv] -= take; quota[lv] -= take; bought += take; fromVill += take;
+                        SpareHorses.NoteBuy(party, lv, take);
+                        CavalryTemplate.NoteKnightBuy(lv, take, true);
+                        var nid = it.StringId ?? "?";
+                        if (what == null) what = nid; else if (!what.Contains(nid)) what += "," + nid;
+                    }
+                }
+
+                // (2) targ miasta postoju do KnightHorseMarketShare polki
+                var shelf = settlement.ItemRoster;
+                if (settlement.IsTown && shelf != null && bought < want)
+                {
+                    int allow = (int)(shelf0 * MBMath.ClampFloat(c.KnightHorseMarketShare, 0f, 1f));
+                    allow = Math.Min(allow, Math.Max(0, shelf0 - Math.Max(0, c.AiMountShelfFloor)));
+                    int left = Math.Min(allow, want - bought);
+                    while (left > 0)
+                    {
+                        int best = -1, bestPrice = int.MaxValue;
+                        for (int i = 0; i < shelf.Count; i++)
+                        {
+                            var el = shelf[i];
+                            var it = el.EquipmentElement.Item;
+                            if (it == null || el.Amount <= 0 || !IsPlainMount(it)) continue;
+                            int lv = Level(it.ItemCategory);
+                            if (lv < 0 || kq[lv] <= 0) continue;
+                            var iid = it.StringId ?? "";
+                            if ((iid.Contains("camel") || iid.Contains("chariot"))
+                                && (settlement.Culture == null || it.Culture != settlement.Culture)) continue;
+                            int price = PriceOf(settlement, el.EquipmentElement);
+                            if (price < bestPrice) { bestPrice = price; best = i; }
+                        }
+                        int room = budget - spent;
+                        if (best >= 0 && bestPrice > room) tooDear = true;
+                        if (best < 0 || bestPrice > room) break;
+                        var chosen = shelf[best];
+                        var cel = chosen.EquipmentElement;
+                        int mk = Level(cel.Item.ItemCategory);
+                        int upTo = Math.Min(Math.Min(left, chosen.Amount), kq[mk]);
+                        int cost, first, lastP;
+                        int take = ShelfBuy.Take(shelf, cel, upTo, room, () => PriceOf(settlement, cel), out cost, out first, out lastP, bestPrice);
+                        if (take <= 0) break;
+                        party.ItemRoster.AddToCounts(cel, take);
+                        TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, cost);   // kazda partia koni od razu zaplacona
+                        spent += cost; left -= take;
+                        kq[mk] -= take; quota[mk] -= take; bought += take; fromMarket += take;
+                        SpareHorses.NoteBuy(party, mk, take);
+                        CavalryTemplate.NoteKnightBuy(mk, take, false);
+                        var cid = cel.Item.StringId ?? "?";
+                        if (what == null) what = cid; else if (!what.Contains(cid)) what += "," + cid;
+                    }
+                }
+            }
+            catch (Exception e) { CavalryTemplate.Stumble("KnightBuy", e); }
+            if (spent > 0)
+            {
+                if (capped) ClanBudget.GearSpent(clan, spent);   // 166: schodzi z przydzialu sprzetu rodu
+                CavalryTemplate.NoteKnightGold(spent, capped);
+            }
+            goldAll = spent;
+            return bought;
         }
 
         /// <summary>
@@ -994,13 +1149,26 @@ namespace Armoury
         /// (FilterTargets/PayInHorses daja mu awans bez rumaka - dotad liczylo sie tu jako potrzeba konia); cel pieszy - bez konia.
         /// Przy kilku konnych celach czlowiek liczy sie raz, w kategorii najtanszego z najliczniejszych gotowych.
         /// </summary>
-        internal static int[] NeedByCategory(PartyBase party)
+        internal static int[] NeedByCategory(PartyBase party) { return NeedByCategory(party, null); }
+
+        /// <summary>
+        /// Jak wyzej; knight != null - dopisuje w nim (wedlug kategorii) ludzi, ktorych wybrany cel konny jest rycerzem (E6/K3: linia szlachecka kultury albo
+        /// linia wlasnego szablonu rodu - CavalryTemplate.IsKnight). E6/K3 (CavalryShareByTemplate): czlowiek z rozwidleniem pieszy/konny, ktorego awans
+        /// Stables.FilterTargets skieruje do piechoty (partia lorda AI na celu szablonu albo powyzej - CavalryTemplate.WantRider), nie czeka na konia -
+        /// ta sama decyzja dla kupna (zapas K2), Stajni i pomiaru 175.
+        /// </summary>
+        internal static int[] NeedByCategory(PartyBase party, int[] knight)
         {
             var need = new int[3];
             try
             {
                 var r = party.MemberRoster;
                 if (r == null) return need;
+                var mp = party.MobileParty;
+                bool steer = CavalryTemplate.ShareOn && CavalryTemplate.Steered(mp);
+                float tgt = steer ? CavalryTemplate.TargetOf(CavalryTemplate.ClanOf(mp)) : -1f;
+                Clan kc = knight != null ? CavalryTemplate.ClanOf(mp) : null;
+                int m3 = -1, t3 = 0;   // udzial t3+ partii - liczony raz, przy pierwszym rozwidleniu
                 for (int i = 0; i < r.Count; i++)
                 {
                     var el = r.GetElementCopyAtIndex(i);
@@ -1012,10 +1180,13 @@ namespace Armoury
                     if (targets == null || targets.Length == 0) continue;
 
                     int bestForThisRank = 0, bestLevel = -1;
+                    CharacterObject bestTg = null;
+                    bool foot = false;
                     for (int t = 0; t < targets.Length; t++)
                     {
                         var tg = targets[t];
-                        if (tg == null || tg.IsHero || !tg.IsMounted) continue;   // ta sciezka nie sadza w siodle
+                        if (tg == null || tg.IsHero) continue;
+                        if (!tg.IsMounted) { foot = true; continue; }   // ta sciezka nie sadza w siodle
                         ItemCategory cat = null;
                         try { cat = RequiredMountFor(party, tg); } catch { }
                         int lv = Level(cat);
@@ -1028,9 +1199,16 @@ namespace Armoury
                         }
                         catch { }
                         if (ready <= 0) continue;
-                        if (ready > bestForThisRank || (ready == bestForThisRank && lv < bestLevel)) { bestForThisRank = ready; bestLevel = lv; }
+                        if (ready > bestForThisRank || (ready == bestForThisRank && lv < bestLevel)) { bestForThisRank = ready; bestLevel = lv; bestTg = tg; }
                     }
-                    if (bestLevel >= 0) need[bestLevel] += bestForThisRank;   // jeden czlowiek = jeden kon, nie po jednym na sciezke
+                    if (bestLevel < 0) continue;
+                    if (foot && tgt >= 0f)
+                    {
+                        if (m3 < 0) CavalryTemplate.Share(mp, out m3, out t3);
+                        if (!CavalryTemplate.WantRider(m3, t3, bestForThisRank, tgt)) continue;   // E6/K3: ten awans pojdzie pieszo
+                    }
+                    need[bestLevel] += bestForThisRank;   // jeden czlowiek = jeden kon, nie po jednym na sciezke
+                    if (knight != null && CavalryTemplate.IsKnight(bestTg, kc)) knight[bestLevel] += bestForThisRank;
                 }
             }
             catch { }

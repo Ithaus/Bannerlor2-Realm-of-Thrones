@@ -104,6 +104,10 @@ Uzycie (Python 3, tylko odczyt):
                     po przesunieciu > 0 nie ponizej dolnego progu (30 dni zuzycia), zaden kierunek kategorii nie zmienia sie w dwoch kolejnych decyzjach,
                     potkniecia 0; bieg roczny (okno >= d360): stos koni na targu d180 -> until bez trendu (+-10%); mnozniki, przesuniecie, ciecie na sucho,
                     przeglad stadnin - INFO.
+                    Blok E6/K3 (219, etap 6 - progi tutaj) K3-1..K3-10 - linia "Rycerze i jazda (219)": oba klucze CZYNNE, jazda partii AI srednio >= 12% [S]
+                    w d91-until i nie spada wobec d61-90 (-0.3 pp), Dothrakowie (khuzait) >= 60%, Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel
+                    szablonow + 3 pp, czeka na konia swojej kategorii nie rosnie w d91-until (5 ostatnich <= 1.05 x 5 pierwszych dob), przerwa "zostaje (K3 bez K2)" 0
+                    przy czynnej sprzedazy K2(b), potkniecia 0; awanse przy rozwidleniu i konie rycerzy od rodu - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3346,6 +3350,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k4(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K3 (219): jazda wedlug szablonu partii (175), rycerz z koniem rodu, przerwa zakupow tylko przy czynnym K2(b) (brak linii - INFO)
+    try:
+        etap5_k3(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E6/N1 (217): naprawy jedna regula - AI naprawia tylko noszone, czeka na material, skora odziezy wojska (brak segmentu - INFO)
     try:
         etap5_n1(rep, lines, start, until)
@@ -4023,6 +4032,94 @@ def etap5_k4(rep, lines, start, until):
         rep.add("K4-9: bieg roczny - konie na targu d180 -> until", f"d{min(ks)} {a0} -> d{max(st)} {e0}", "bez trendu (+-10%)", abs(e0 - a0) <= 0.10 * max(1, a0))
     else:
         rep.add("K4-9: bieg roczny - konie na targu bez trendu", "okno krotsze niz d360", "+-10% (tylko bieg roczny)", None)
+
+
+def etap5_k3(rep, lines, start, until):
+    """E6/K3 (219, projekt etapu 6 v2 rozdz. 3 "E6/K3" Test; rozdz. 4 prog 6.14): linia doby "Rycerze i jazda (219): dzien N | ..." (dzien = doba gry, okno
+    1-until jak etap5_main). Progi [S] projektu (ostateczne z rachunku koni E6/0 po tescie): jazda partii AI srednio >= 12% w d91-until i nie spada wobec
+    d61-90 (tolerancja 0.3 pp), Dothrakowie (khuzait) >= 60%, Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na
+    konia swojej kategorii nie rosnie w d91-until (srednia 5 ostatnich dob <= 1.05 x srednia 5 pierwszych), przerwa "zostaje (K3 bez K2)" 0 przy czynnej
+    sprzedazy K2(b), potkniecia 0; awanse przy rozwidleniu, konie rycerzy (stada, targ, zloto, budzet sprzetu) - INFO. Pompa koni - K2-5, wojsko lordow
+    i bankruci - progi E2/E5."""
+    seg = {}
+    for d, s in by_day(lines, "Rycerze i jazda (219): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            seg[rd] = s
+    rep.add("K3-1: linia Rycerze i jazda (219)", f"{len(seg)} dob", "codziennie od wgrania E6/K3 (linia przy Stage6MeasureLog albo kluczach K3)", None)
+    if not seg:
+        return
+    days = sorted(seg)
+    off = [x for x in days if "jazda wedlug szablonu CZYNNE" not in seg[x] or "kon rycerza od rodu CZYNNE" not in seg[x]]
+    rep.add("K3-2: E6/K3 CZYNNE w dobach okna (oba klucze)", f"{len(days) - len(off)} z {len(days)}" + (f"; ostatnia nieczynna d{off[-1]}" if off else ""),
+            "wszystkie doby (CavalryShareByTemplate, KnightHorseFromHouse; wymaga AiSellsSpareHorses)", len(off) == 0)
+
+    def share(s):
+        return num(r"\| jazda partii ([\d.]+)%", s, float)
+
+    def realm(s, kid):
+        m = re.search(r"(?:\[|, )" + re.escape(kid) + r" ([\d.]+)%/t3 ([\d.]+)% \(cel ([\d.]+)%", s)
+        return (float(m.group(1)), float(m.group(2)), float(m.group(3))) if m else None
+
+    def mean(v):
+        return sum(v) / len(v) if v else None
+    lo = 91 if until >= 91 and any(x >= 91 for x in days) else None
+    w91 = [x for x in days if lo is not None and x >= lo]
+    w61 = [x for x in days if 61 <= x <= 90]
+    a91 = mean([v for v in (share(seg[x]) for x in w91) if v is not None])
+    a61 = mean([v for v in (share(seg[x]) for x in w61) if v is not None])
+    if a91 is None:
+        allv = [v for v in (share(seg[x]) for x in days) if v is not None]
+        rep.add("K3-3: jazda partii AI srednio w d91-until", f"okno nie siega d91 (srednio {mean(allv) or 0:.1f}% w d{days[0]}-{days[-1]})", ">= 12% [S]", None)
+    else:
+        rep.add(f"K3-3: jazda partii AI srednio w d91-{until}", f"{a91:.1f}%", ">= 12% [S] (bieg roczny 18-22%; przed K3 8.3%)", a91 >= 12.0)
+        if a61 is not None:
+            rep.add("K3-4: jazda partii nie spada (d61-90 -> d91-until)", f"{a61:.1f}% -> {a91:.1f}%", "nie mniej niz d61-90 - 0.3 pp", a91 >= a61 - 0.3)
+        for code, kid, name, rule, ok in (("K3-5", "khuzait", "Dothrakowie", ">= 60% [S]", lambda r: r[0] >= 60.0),
+                                          ("K3-6", "sturgia", "Zelazne Wyspy", "<= 5% [S]", lambda r: r[0] <= 5.0)):
+            rr = [realm(seg[x], kid) for x in w91]
+            rr = [r for r in rr if r]
+            if not rr:
+                rep.add(f"{code}: jazda partii - {name} ({kid}) d91-{until}", "brak krainy w linii", rule, None)
+                continue
+            m0 = mean([r[0] for r in rr])
+            rep.add(f"{code}: jazda partii - {name} ({kid}) d91-{until}", f"{m0:.1f}% (t3+ {mean([r[1] for r in rr]):.1f}%, cel szablonow {mean([r[2] for r in rr]):.1f}%)",
+                    rule, ok((m0, 0, 0)))
+        rr = [r for r in (realm(seg[x], "freefolk") for x in w91) if r]
+        if rr:
+            t3, tg = mean([r[1] for r in rr]), mean([r[2] for r in rr])
+            rep.add(f"K3-7: Wolni Ludzie (freefolk) t3+ wobec celu szablonow d91-{until}", f"{t3:.1f}% przy celu {tg:.1f}%", "<= cel + 3 pp", t3 <= tg + 3.0)
+        else:
+            rep.add(f"K3-7: Wolni Ludzie (freefolk) t3+ wobec celu szablonow d91-{until}", "brak krainy w linii", "<= cel + 3 pp", None)
+        wv = [(x, num(r"\| czeka (\d+)", seg[x])) for x in w91]
+        wv = [v for x, v in wv if v is not None]
+        if len(wv) >= 10:
+            f5, l5 = mean(wv[:5]), mean(wv[-5:])
+            rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until} (lordowie i zalogi AI)", f"5 pierwszych dob {f5:.0f}, 5 ostatnich {l5:.0f}",
+                    "nie rosnie (<= 1.05 x)", l5 <= 1.05 * f5 + 1)
+        else:
+            rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until}", f"{len(wv)} dob z pomiarem (Army175Measure)", "nie rosnie - potrzeba >= 10 dob", None)
+    rows = [seg[x] for x in days]
+    kept = sum(num(r"zostaje \(K3 bez K2\) (\d+)", x, int, 0) or 0 for x in rows)
+    lifted = sum(num(r"przerwa: zdjeta (\d+)", x, int, 0) or 0 for x in rows)
+    sell = all("pominieta K2(b): TAK" in x for x in rows)
+    stu = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K3-9: przerwa zakupow (zdjeta / zostaje K3 bez K2) i potkniecia (suma okna)", f"zdjeta {lifted}, zostaje {kept}, potkniecia {stu}"
+            + ("" if sell else " (sprzedaz K2(b) nie we wszystkich dobach)"), "zostaje 0 przy czynnym K2(b), potkniecia 0", (kept == 0 if sell else True) and stu == 0)
+
+    def cats(pat, x):
+        m = re.search(pat, x)
+        return [int(v) for v in m.groups()] if m else [0, 0, 0]
+    herd, mkt = [0, 0, 0], [0, 0, 0]
+    for x in rows:
+        h = cats(r"ze stad wsi postoju (\d+)/(\d+)/(\d+)", x)
+        k = cats(r"z targu (\d+)/(\d+)/(\d+)", x)
+        herd = [herd[i] + h[i] for i in range(3)]
+        mkt = [mkt[i] + k[i] for i in range(3)]
+    th, tf, gold, gear = (sum(num(p, x, int, 0) or 0 for x in rows) for p in (
+        r"awanse przy rozwidleniu: do jazdy (\d+)", r", do piechoty (\d+) ludzi", r"z targu \d+/\d+/\d+, za (\d+) zl", r"\(budzet sprzetu (\d+)\)"))
+    rep.add("K3-10: awanse przy rozwidleniu i konie rycerzy od rodu (suma okna)", f"do jazdy {th}, do piechoty {tf} ludzi; konie rycerzy ze stad wsi postoju "
+            f"{'/'.join(map(str, herd))}, z targu {'/'.join(map(str, mkt))} (zwykly/bojowy/szlachetny) za {gold} zl (budzet sprzetu {gear})", "INFO", None)
 
 
 def etap5_n1(rep, lines, start, until):

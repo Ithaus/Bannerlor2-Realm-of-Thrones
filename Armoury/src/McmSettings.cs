@@ -4788,6 +4788,18 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HorseBreedingByDemand { get; set; } = true;
 
+        [SettingPropertyBool("Cavalry Share By Template", HintText = "an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool CavalryShareByTemplate { get; set; } = true;
+
+        [SettingPropertyBool("Knight Horse From House", HintText = "a knight's horse is bought by his house - from the herds of its villages by the place where he stops first, then at the market - and goes into his own armoury; the house pays from its arms budget, and lords with men waiting for a horse no longer wait days between purchases while the game does not sell their horses. Works only with Ai Sells Spare Horses on (off = knights' horses are bought like any other)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool KnightHorseFromHouse { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Knight Horse Market Share", 0.00f, 1.00f, "0.00", HintText = "the share of the horses on a town's shelf a house may buy for its knights in one visit (other horses: Ai Mount Market Share Percent); the last few always stay on the shelf")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float KnightHorseMarketShare { get; set; } = 0.5f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5984,6 +5996,9 @@ namespace Armoury
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;
             s.HorseBreedingByDemand = HorseBreedingByDemand;
+            s.CavalryShareByTemplate = CavalryShareByTemplate;
+            s.KnightHorseFromHouse = KnightHorseFromHouse;
+            s.KnightHorseMarketShare = KnightHorseMarketShare;
         }
 
         internal static void Apply()

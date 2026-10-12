@@ -200,10 +200,12 @@ namespace Armoury
             var lords = new Row(); var player = new Row(); var gar = new Row(); var car = new Row();
             var cache = new Dictionary<CharacterObject, int>();
             bool census = HorseCensus.On;   // 175.0: spis koni AI w tej samej petli (bez drugiej petli po partiach)
+            bool k3 = CavalryTemplate.LineOn;   // E6/K3 (219): spis jazdy wobec celu szablonow w tej samej petli
             foreach (var mp in MobileParty.All)
             {
                 if (mp == null || !mp.IsActive) continue;
                 if (census) HorseCensus.CountParty(mp);
+                if (k3) CavalryTemplate.CountParty(mp);
                 Row r = mp.IsMainParty ? player : mp.IsLordParty ? lords : mp.IsGarrison ? gar : mp.IsCaravan ? car : null;
                 if (r == null) continue;
                 var roster = mp.MemberRoster;

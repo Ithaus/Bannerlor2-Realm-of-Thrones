@@ -1492,6 +1492,14 @@ namespace Armoury
         // juczny): krok x1.3 kategorii chcianej CZYNNY, przesuniecie do 25% produkcji zwyklych stadniny na bojowe jej listy (te same sztuki) CZYNNE, ciecie ponizej
         // bazy gry NA SUCHO (linia "Hodowla (220)" - "mnoznik by byl"; czynne pod osobnym kluczem po biegu rocznym); dziala tylko z HarvestValve
         public bool HorseBreedingByDemand = true;          // every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal is only reported for now; works only with Harvest Valve on (off = stud farms breed what the game says)
+        // E6/K3 (219, PLAN 6.14, R12): jazda wedlug szablonu partii (175) - cel partii lorda AI = udzial konnych (IsMounted) w stosach t3+ szablonu rodu wodza
+        // (Clan.DefaultPartyTemplate, wagi MaxValue - jak ROT GetTemplateComposition); przy rozwidleniu awansu pieszy/konny zostaje strona, ktora przybliza partie
+        // do celu (Stables.FilterTargets; konny bez konia czeka i Stajnia kupuje). Rycerz (linia szlachecka kultury albo linia wlasnego szablonu rodu) - kon od rodu:
+        // stado wsi rodu przypietej do osady postoju bez narzutu, potem targ miasta do KnightHorseMarketShare polki, z budzetu sprzetu rodu (166). Przerwa
+        // AiMountBuyCooldownDays zdjeta dla czekajacych awansow tylko przy czynnej sprzedazy K2(b). Obie czesci tylko z AiSellsSpareHorses (K2) - CavalryTemplate.cs
+        public bool CavalryShareByTemplate = true;         // an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)
+        public bool KnightHorseFromHouse = true;           // a knight's horse is bought by his house - from the herds of its villages by the place where he stops first, then at the market - and goes into his own armoury; the house pays from its arms budget, and lords with men waiting for a horse no longer wait days between purchases while the game does not sell their horses. Works only with Ai Sells Spare Horses on (off = knights' horses are bought like any other)
+        public float KnightHorseMarketShare = 0.5f;        // the share of the horses on a town's shelf a house may buy for its knights in one visit (other horses: Ai Mount Market Share Percent); the last few always stay on the shelf
 
         public static void Load(string moduleDataDir)
         {

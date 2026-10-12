@@ -124,6 +124,16 @@ namespace Armoury
             return r;
         }
 
+        /// <summary>E6/K3 (219): stan doby "czeka na konia swojej kategorii" (lordowie i zalogi AI, CountParty) i w tym mimo koni innej kategorii - czytane
+        /// przed Daily (zeruje _day); false - pomiar wylaczony (Army175Measure).</summary>
+        internal static bool WaitToday(out long wait, out long other)
+        {
+            wait = 0; other = 0;
+            if (!On) return false;
+            foreach (var kv in _day) { wait += kv.Value[CCzeka]; other += kv.Value[CCzekaInnaKat]; }
+            return true;
+        }
+
         internal static void Add(IFaction f, int col, long v) { Add(KeyOf(f), col, v); }
 
         internal static void Add(string key, int col, long v)
