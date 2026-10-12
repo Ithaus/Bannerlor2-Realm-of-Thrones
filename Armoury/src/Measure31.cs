@@ -33,6 +33,8 @@ namespace Armoury
     ///  3. STATKI: zwrot NavalDLC za statki (RecoverGoldFromRemainingShipsAfterDistribution) przy rozwiazaniu / przy zniszczeniu na ladzie /
     ///     DRUGI zwrot tej samej partii w dobie (rozwiazanie wysyla OnPartyDisbanded i potem MobilePartyDestroyed, oba wolaja zwrot, a zwrot statkow
     ///     nie zabiera - krytyka W6); zloto za statki zatopione w bitwach morskich (PlunderedGold zwyciezcow w LootDefeatedPartyShips) - w "bitwy".
+    ///     E5/B5 (181 domyslnie WL): zwrot liczy tylko zloto z niczego - wyplaty kas portow (ShipsToPort181.PaidRun) odjete; pryzy - finalizer po
+    ///     181 PrizeFin (ten sam priorytet, wpiety pozniej), wiec przy WL widzi PlunderedGold juz bez dopisku gry.
     ///  4. POWTORNE LUPIENIE CIAL: wywolania LootCasualtyCharacter na jedno wywolanie LootDefeatedPartyCasualties wobec liczby cial pokonanych
     ///     (zabici + ranni) - skad 371 043 wywolan w dobie 420 biegu 457.
     ///  5. INNI (nieumarli, krytyka W12): kiesy ich rodow i wplywy wedlug zrodla (rozliczenie rodu - model z zoldem; bitwy; lup z cial; inne
@@ -212,7 +214,7 @@ namespace Armoury
         public static void NavDestrPre(out int __state) { __state = _shipCtx; _shipCtx = 2; }
         public static void NavCtxFin(int __state) { _shipCtx = __state; }
 
-        public struct ShipState { public bool On; public Hero H; public int G0; }
+        public struct ShipState { public bool On; public Hero H; public int G0; public long P0; }
 
         public static void RecoverPre(MobileParty __0, out ShipState __state)
         {
@@ -223,7 +225,7 @@ namespace Armoury
                 var c = __0.ActualClan;
                 var h = c != null ? c.Leader : null;
                 if (h == null) return;
-                __state.On = true; __state.H = h; __state.G0 = h.Gold;
+                __state.On = true; __state.H = h; __state.G0 = h.Gold; __state.P0 = ShipsToPort181.PaidRun;
             }
             catch (Exception e) { Seal31.Stumble("Measure31.RecoverPre", e); }
         }
@@ -233,7 +235,9 @@ namespace Armoury
             if (!__state.On) return;
             try
             {
-                long d = (long)__state.H.Gold - __state.G0;
+                // E5/B5: przy Ships To Port WL glowa rodu dostaje zaplate z kasy portu (181 RecoverPrefix, GiveGoldAction osada -> bohater) - to przelew,
+                // nie zwrot z niczego; odejmujemy wyplaty portow z tego wywolania (przy WYL PaidRun stoi - pomiar jak dotad)
+                long d = (long)__state.H.Gold - __state.G0 - (ShipsToPort181.PaidRun - __state.P0);
                 if (d <= 0) return;
                 int n; _shipPaidParty.TryGetValue(__0, out n);
                 _shipPaidParty[__0] = n + 1;

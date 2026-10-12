@@ -27,7 +27,9 @@ namespace Armoury
     ///    zwyciezcy dostaja Z NICZEGO (ksiega: ZRODLA "bitwy", UJSCIA "bitwy" = 0). Wodz zostaje w partii tylko przy odwrocie strony (RetreatingSide)
     ///    i przy smierci w bitwie (DeathMark) - wtedy gra placi zdarzeniem wodz -> nic.
     ///  - Statki zatopione w bitwie morskiej (LootDefeatedPartyShips, MapEvent.cs:1800-1817) dopisuja PlunderedGold PO podziale puli - to paczka B5
-    ///    (ShipsPrizesToPort 181), tu tylko liczone osobno.
+    ///    (ShipsPrizesToPort 181), tu tylko liczone osobno. E5/B5 (181 domyslnie WL): PrizeFin zdejmuje dopisek w finalizerze LootDefeatedPartyShips,
+    ///    przed CommitCalculatedMapEventResults (MapEvent.cs:1419-1429), a port placi zwyciezcom przelewem - CountShips widzi wtedy statki 0, migawka
+    ///    puli (Pool) = PlunderedGold sprzed LootDefeatedPartyShips, wiec rozliczenie A6 bez zmian; 1/9 korony z pryzow zglasza 181 (PayPrize).
     ///  - Inne mody: NavalDLCBattleRewardModel oddaje metody lupu modelowi bazowemu; ROT (CalculateAndCommitMapEventResults - tylko przedmioty smokow),
     ///    BK, RBM, BEE, DTE tych metod nie lataja (skan DLL i dekompilacja 11.10). Recenzja A6 (2): ROT EnlistmentPatches.patch39 - postfiks na
     ///    GETTERZE MapEventParty.PlunderedGold (blob atrybutu: MapEventParty, "PlunderedGold", MethodType.Getter) zwraca 0 dla MainParty, gdy gracz
@@ -499,7 +501,8 @@ namespace Armoury
                   .Append(", wodzowie zdjeci z partii (A6 - niewola, ucieczka) ").Append(_takeOurs).Append(_takePlayer > 0 ? " (w tym gracz " + _takePlayer + ")" : "")
                   .Append(", kiesy partii bez wodza (3.2) ").Append(_takePurse).Append(" (razem ").Append(take).Append(")")
                   .Append(" | netto z niczego na ladzie ").Append(net >= 0 ? "+" : "").Append(net).Append(" (prog 0 +- 1 tys./d; bez A6 byloby ").Append(_vanilla >= 0 ? "+" : "").Append(_vanilla).Append(")")
-                  .Append(" | statki zatopione w bitwach morskich (NavalDLC, dopisek gry do PlunderedGold po podziale puli - paczka B5, bez zmian): wyplacone z niczego ").Append(_shipsPaid)
+                  .Append(" | statki zatopione w bitwach morskich (NavalDLC, dopisek gry do PlunderedGold po podziale puli - paczka B5: przy Ship Prizes To Port ")
+                  .Append(ShipsToPort181.PrizeOn ? "WL dopisek zdejmuje 181, port placi zwyciezcom - tu 0" : "WYL gra placi jak dotad").Append("): wyplacone z niczego ").Append(_shipsPaid)
                   .Append(", bez wyplaty (zwyciezca bez wodza i kiesy) ").Append(_shipsUnpaid)
                   .Append(" | obciete zwyciezcom (pokonany bez zlota albo poza swiatem) ").Append(_cut).Append(", Innym nie wyplacono ").Append(_undeadCut)
                   .Append(", udzialy, ktorych gra nie wyplaca (milicja, osada, partia bez wodza i kiesy) - pokonani ich nie placa ").Append(_unpaid)

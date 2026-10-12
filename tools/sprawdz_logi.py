@@ -57,6 +57,10 @@ Uzycie (Python 3, tylko odczyt):
                     te same), panowie samych zamkow (budzet-rodow.csv): udzial w D swiata >= 30% (prog glowny) i w D stalym 30-35% - srednia d252-364
                     (bieg roczny, --do-doby 364; krotszy - INFO), mediana kiesy - srednia 4 blokow 28 dob (odczyt), renty dnia wedlug rodzaju rodu i gracz -
                     INFO, bledy. A1-T8 bierze udzial pana z linii B3 tej doby (bez linii - klucz 0.67, 1/3 dla korony).
+                    Blok E5/B5 (181 ON, statki do portow) B5-1..B5-13 - linia "Statki (181)" z segmentem kas portow: codziennie i czytelna, trzy wylaczniki
+                    WL caly bieg zbioru B (WYL - pulapka MCM, K3), latki 181 w kazdej sesji, zloto z niczego / w nicosc sciezek 181 = 0, kontrolki prog 0,
+                    nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob z rzedu, pozycje statkow w ksiedze ("Pieniadz swiata - przyczyny") = 0,
+                    zgodnosc z A6 i pomiarami (A6, 164a, E5/0 - statki z niczego 0), bledy; wyplaty portow, zloto swiata i wraki - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2689,6 +2693,16 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/B3: linia Wyrownanie panow zamkow (E5/B3)", "brak w logu", "jest od wgrania E5/B3 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_b3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B5 (181 ON): statki do portow - linia "Statki (181)" (dzien ksiegi, jak "Pieniadz swiata") z segmentem kas portow E5/B5; log sprzed B5 - INFO
+    shp = by_day(lines, "Statki (181): dzien")
+    try:
+        if any("| kasy portow (miasta z portem i stocznia)" in x for x in shp.values()):
+            etap5_b5(rep, lines, start, until, shp)
+        else:
+            rep.add("E5/B5: linia Statki (181) z segmentem kas portow", "brak w logu" + (" (linie 181 sprzed B5)" if shp else ""),
+                    "jest od wgrania E5/B5 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b5", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -4159,6 +4173,164 @@ def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
     errs = [s for s in lines if s.startswith("ERROR in ") and "LordsEvenUp" in s]
     stm = sum(rows[d]["stum"] for d in ds)
     rep.add("E5/B3 B3-10: bledy LordsEvenUp, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
+
+
+def _b5_segs(s):
+    """Linia "Statki (181)" -> {klucz segmentu: tekst}; segmenty rozdziela " | " (kod ShipsToPort181.Daily)."""
+    out = {}
+    for seg in s.split(" | ")[1:]:
+        for key, pre in (("sw", "wylaczniki:"), ("p1", "1. "), ("p2", "2. "), ("p3", "3. "), ("pk", "premie zarzadcow"), ("p4", "4. "),
+                         ("tot", "razem naprawde dzis"), ("pp", "kasy portow (miasta z portem i stocznia)"), ("err", "wyjatki zlapane")):
+            if seg.startswith(pre):
+                out[key] = seg
+                break
+    return out
+
+
+def etap5_b5(rep, lines, start, until, sh):
+    """E5/B5 (181 ON, PLAN 3.3): projekt etapu 5 rozdz. 3 "E5/B5" Test (zbior B) i rozdz. 5.2 pkt 9 (K3: bieg B ze statkami OFF = blad). Linia "Statki (181): dzien N"
+    (dzien ksiegi, jak "Pieniadz swiata") z segmentem E5/B5 "kasy portow". Wiersze B5-1..B5-13: linia, trzy wylaczniki WL caly bieg, latki, zloto z niczego / w nicosc
+    sciezek 181 = 0, kontrolki prog 0, nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob, pozycje statkow w ksiedze = 0, zgodnosc z A6 i pomiarami
+    (164a, E5/0) = 0, wyplaty portow / zloto swiata / wraki - INFO, bledy."""
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    win = sorted(d for d in sh if 1 <= run_day(d, start) <= until)
+    rsw = re.compile(r"do portu \(Ships To Port\) (WL|WYL), handel przez kase portu \(Ship Trade Through Port\) (WL|WYL), pryzy do portu \(Ship Prizes To Port\) (WL|WYL)")
+    rtot = re.compile(r"z niczego (-?\d+), w nicosc (-?\d+), netto (-?\d+); kasy portow wydaly \(181\) (\d+) w (\d+) portach, przyjely (\d+); wyplaty ponad nadwyzke (\d+) \(prog 0\),"
+                      r" statki przekazane za 0 zl (\d+) \(prog 0\)")
+    rpp = re.compile(r"kasy portow \(miasta z portem i stocznia\) (\d+), nadwyzka (z D4 TownPurse \(A1 czynne\)|ze starej formuly[^:]*): bez nadwyzki dzis (\d+)"
+                     r" \(nadwyzka portow razem (\d+)\), najdluzej bez nadwyzki (\d+) dob z rzedu \((.*?)\), >= 7 dob (\d+), >= 28 dob (\d+)")
+    rreal = re.compile(r"regula 181 - naprawde: statkow (\d+): nalezne (\d+), zaplacone (\d+)")
+    rscrap = re.compile(r"zlom: brak portu z miejscem (\d+), brak pieniedzy (\d+)")
+    rows = {}
+    for d in win:
+        s = sh[d]
+        g = _b5_segs(s)
+        a, t, p = rsw.search(g.get("sw", "")), rtot.search(g.get("tot", "")), rpp.search(g.get("pp", ""))
+        if not (a and t and p):
+            continue
+        r1, r4 = rreal.search(g.get("p1", "")), rreal.search(g.get("p4", ""))
+        s1, s4 = rscrap.search(g.get("p1", "")), rscrap.search(g.get("p4", ""))
+        rows[d] = {"lost": a.group(1) == "WL", "trade": a.group(2) == "WL", "prize": a.group(3) == "WL",
+                   "from": int(t.group(1)), "to": int(t.group(2)), "spent": int(t.group(4)), "nports": int(t.group(5)), "took": int(t.group(6)),
+                   "over": int(t.group(7)), "free": int(t.group(8)),
+                   "ports": int(p.group(1)), "d4": p.group(2).startswith("z D4"), "dry": int(p.group(3)), "spare": int(p.group(4)), "streak": int(p.group(5)),
+                   "streakName": p.group(6), "w28": int(p.group(8)),
+                   "paid1": int(r1.group(3)) if r1 else 0, "due1": int(r1.group(2)) if r1 else 0, "paid4": int(r4.group(3)) if r4 else 0, "due4": int(r4.group(2)) if r4 else 0,
+                   "noMoney": (int(s1.group(2)) if s1 else 0) + (int(s4.group(2)) if s4 else 0),
+                   "game1": num(r"zloto gry \(dzis z niczego[^)]*\) (\d+) - wedlug", g.get("p1", ""), int, 0) or 0,
+                   "removed4": num(r"zdjete z lupu zwyciezcow (\d+)", g.get("p4", ""), int, 0) or 0,
+                   "sell2": num(r"; z kas portow (\d+)", g.get("p2", ""), int, 0) or 0,
+                   "buy3": num(r"; do kas portow (\d+)", g.get("p3", ""), int, 0) or 0,
+                   "wrecks": num(r"wraki po uszkodzeniu po bitwie \(gra nie placi, 181 nie rusza - E5/B5\) (\d+)", g.get("p4", ""), int, 0) or 0,
+                   "stum": num(r"wyjatki zlapane (\d+)", g.get("err", ""), int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    rep.add("E5/B5 B5-1: linia Statki (181) codziennie (czytelna, z segmentem kas portow E5/B5)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob" + (f" (pierwsza {miss[0]})" if miss else ""),
+            "0 (LogEnabled)", (len(miss) == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    # B5-2: trzy wylaczniki WL caly bieg zbioru B (K3: bieg B ze statkami OFF - blad)
+    off = [d for d in ds if not (rows[d]["lost"] and rows[d]["trade"] and rows[d]["prize"])]
+    rep.add("E5/B5 B5-2: wylaczniki Ships To Port, Ship Trade Through Port, Ship Prizes To Port WLACZONE",
+            f"ktorys WYL w {len(off)} z {len(ds)} dob (do portu WYL {sum(1 for d in ds if not rows[d]['lost'])}, handel WYL {sum(1 for d in ds if not rows[d]['trade'])},"
+            f" pryzy WYL {sum(1 for d in ds if not rows[d]['prize'])})" + (f" (pierwsza {off[0]})" if off else ""),
+            "WL caly bieg zbioru B (WYL = MCM/Armoury.json z wartoscia sprzed B5 - pulapka MCM)", len(off) == 0)
+    # B5-3: latki (linia startowa kazdej sesji) i cudze latki na naszych metodach
+    stl = [s for s in lines if s.startswith("Statki (181): latki - ")]
+    hk = [s for s in lines if s.startswith("Statki (181) - start sesji:")]
+    bad3 = [s for s in stl if ("BRAK" in s or " NIE" in s.split(". Wylaczniki")[0] or "podmienione zaplaty 8/8" not in s
+                               or "handel 1/1" not in s or "naprawa 1/1" not in s)]
+    foreign = sorted({_grp(r"cudze latki na naszych metodach: (.*?)\.$", s, 1) for s in hk})
+    rep.add("E5/B5 B5-3: latki 181 wpiete (linia startowa kazdej sesji: 10 latek, podmienione zaplaty 8/8 + 1/1 + 1/1)",
+            f"sesji {len(stl)}, z brakiem {len(bad3)}; cudze latki na naszych metodach: {', '.join(foreign) if foreign else '-'}",
+            "0 sesji z brakiem (BRAK/NIE = gra albo NavalDLC inne niz 1.4.8 - wylaczyc B5)", (len(bad3) == 0) if stl else None)
+    on = [d for d in ds if rows[d]["lost"] and rows[d]["trade"] and rows[d]["prize"]]
+    # B5-4: zloto z niczego / w nicosc sciezek 181 przy trzech WL = 0 (wyjatek w sprzedazy oddaje grze - licznik B5-13)
+    f4 = sum(rows[d]["from"] for d in on)
+    t4 = sum(rows[d]["to"] for d in on)
+    rep.add("E5/B5 B5-4: sciezki statkow - zloto z niczego / w nicosc przy trzech WL (suma dob WL)", f"{f4} / {t4} ({len(on)} dob)",
+            "0 / 0 (R18: rozbita druzyna, handel z portem i pryzy przez kase portu)", (f4 == 0 and t4 == 0) if on else None)
+    # B5-5: kontrolki prog 0
+    ov, fr = sum(rows[d]["over"] for d in ds), sum(rows[d]["free"] for d in ds)
+    rep.add("E5/B5 B5-5: kontrolki - wyplaty ponad nadwyzke portu / statki przekazane za 0 zl (suma)", f"{ov} / {fr}", "0 / 0", ov == 0 and fr == 0)
+    # B5-6: porty placa z nadwyzki D4 (A1) - caly bieg
+    nod4 = [d for d in ds if not rows[d]["d4"]]
+    rep.add("E5/B5 B5-6: nadwyzka portow = D4 TownPurse (A1 czynne)", f"stara formula w {len(nod4)} z {len(ds)} dob" + (f" (pierwsza {nod4[0]})" if nod4 else ""),
+            "D4 caly bieg (projekt R18: porty z TownPurse.Spare)", len(nod4) == 0)
+    # B5-7: kasy portow bez nadwyzki (kasa <= zapas kupcow) nie dluzej niz 28 dob z rzedu
+    worst = max(ds, key=lambda d: rows[d]["streak"])
+    t28 = _last28(ds)
+    rep.add("E5/B5 B5-7: kasy portow bez nadwyzki - najdluzsza seria dob z rzedu (pamiec sesji)",
+            f"{rows[worst]['streak']} dob ({rows[worst]['streakName']}, dzien {worst}); portow {rows[ds[-1]]['ports']}, bez nadwyzki sr28 {st.mean(rows[d]['dry'] for d in t28):.1f},"
+            f" >= 28 dob maks. {max(rows[d]['w28'] for d in ds)}; nadwyzka portow razem sr28 {st.mean(rows[d]['spare'] for d in t28):.0f}",
+            "<= 28 dob (projekt E5/B5 Test)", rows[worst]["streak"] <= 28)
+    # B5-8: pozycje statkow w ksiedze pieniadza (Pieniadz swiata - przyczyny) przy trzech WL = 0
+    bal = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    zs = zo = uk = uo = 0
+    nb = 0
+    for d in on:
+        s = bal.get(d)
+        if not s:
+            continue
+        segs = s.split(" | ")
+        zr = next((x for x in segs if x.startswith("ZRODLA")), "")
+        uj = next((x for x in segs if x.startswith("UJSCIA")), "")
+        zs += num(r"statki: sprzedaz osadom i premie zarzadcow (-?\d+)", zr, int, 0) or 0
+        zo += num(r"statki NavalDLC inne (-?\d+)", zr, int, 0) or 0
+        uk += num(r"statki: kupno od osad (-?\d+)", uj, int, 0) or 0
+        uo += num(r"statki NavalDLC inne (-?\d+)", uj, int, 0) or 0
+        nb += 1
+    rep.add("E5/B5 B5-8: ksiega - ZRODLA statki (sprzedaz osadom i premie; NavalDLC inne) / UJSCIA statki (kupno od osad; NavalDLC inne), doby trzech WL",
+            f"{zs} + {zo} / {uk} + {uo} ({nb} dob)", "0 / 0 (bieg E4 bez B5: ok. 0.4 mln/d z niczego)", (zs == 0 and zo == 0 and uk == 0 and uo == 0) if nb else None)
+    # B5-9: zgodnosc z A6 i pomiarami (dopisek pryzow zdjety przed rozliczeniem A6 i finalizerem 164a; zwrot 164a bez wyplat portow)
+    a6 = by_day(lines, "Lup w bitwie (A6): dzien")
+    m164 = by_day(lines, "Szczelnosc (164a): dzien")
+    b50 = by_day(lines, "Bitwy (E5/0): dzien")
+    pa6 = p164 = r164 = p50 = 0
+    n9 = 0
+    for d in ds:
+        x = rows[d]
+        if x["prize"]:
+            if d in a6:
+                pa6 += num(r"wyplacone z niczego (\d+)", a6[d], int, 0) or 0
+                n9 += 1
+            if d in m164:
+                p164 += num(r"bitwach morskich \(PlunderedGold\) (-?\d+)", m164[d], int, 0) or 0
+                n9 += 1
+            if d in b50:
+                p50 += num(r"\| statki zatopione (-?\d+)", b50[d], int, 0) or 0
+                n9 += 1
+        if x["lost"] and d in m164:
+            m = re.search(r"zwrot za statki: przy rozwiazaniu (-?\d+) \(\d+\), przy zniszczeniu na ladzie (-?\d+) \(\d+\), poza oknami (-?\d+)", m164[d])
+            if m:
+                r164 += int(m.group(1)) + int(m.group(2)) + int(m.group(3))
+                n9 += 1
+    rep.add("E5/B5 B5-9: zgodnosc z A6 i pomiarami - statki z niczego: A6 / 164a pryzy / E5/0 Bitwy / 164a zwrot (suma dob WL)",
+            f"{pa6} / {p164} / {p50} / {r164}", "0 / 0 / 0 / 0 (dopisek pryzow zdjety przed A6 i 164a; zwrot 164a bez wyplat portow)",
+            (pa6 == 0 and p164 == 0 and p50 == 0 and r164 == 0) if n9 else None)
+    # B5-10..12: INFO - wyplaty portow, zloto z niczego zastapione i zloto swiata, wraki
+    rep.add("E5/B5 B5-10: wyplaty portow sr28 (INFO): rozbite druzyny / pryzy / sprzedaz AI i graczu; kasy portow wydaly / przyjely; zlom z braku pieniedzy",
+            f"{st.mean(rows[d]['paid1'] for d in t28):.0f} (z naleznych {st.mean(rows[d]['due1'] for d in t28):.0f}) / {st.mean(rows[d]['paid4'] for d in t28):.0f}"
+            f" (z {st.mean(rows[d]['due4'] for d in t28):.0f}) / {st.mean(rows[d]['sell2'] for d in t28):.0f}; kasy portow wydaly {st.mean(rows[d]['spent'] for d in t28):.0f}"
+            f" w {st.mean(rows[d]['nports'] for d in t28):.1f} portach, przyjely {st.mean(rows[d]['took'] for d in t28):.0f}; zlom z braku pieniedzy {sum(rows[d]['noMoney'] for d in t28)} statkow",
+            "INFO (rabat AI 0.01 przy kupnie - 181d - zostaje do pomiaru, projekt rozdz. 7)", None)
+    pw = by_day(lines, "Pieniadz swiata: dzien")
+    pd = [d for d in alld if d in pw]
+    ch = "-"
+    if len(pd) >= 2:
+        a0 = pd[-29] if len(pd) > 28 else pd[0]
+        za, zb = num(r"\| razem (\d+)", pw[a0]), num(r"\| razem (\d+)", pw[pd[-1]])
+        if za and zb is not None:
+            ch = f"{(zb - za) / max(1, pd[-1] - a0):+.0f}/d ({(zb - za) / za * 100:+.2f}% d{run_day(a0, start)}-d{run_day(pd[-1], start)})"
+    rep.add("E5/B5 B5-11: zloto z niczego zastapione przez porty sr28 (zloto gry za rozbite druzyny + zdjete z lupu pryzow) i zloto swiata (INFO)",
+            f"{st.mean(rows[d]['game1'] + rows[d]['removed4'] for d in t28):.0f}/d; zloto swiata {ch}",
+            "INFO - wobec biegu bez B5 (bieg E4 bez B5: statki NavalDLC ok. 0.37-0.43 mln/d z niczego)", None)
+    rep.add("E5/B5 B5-12: wraki po uszkodzeniu po bitwie - gra nie placi, 181 nie rusza (suma, INFO)", sum(rows[d]["wrecks"] for d in ds), "INFO", None)
+    errs = [s for s in lines if s.startswith("ERROR in ShipsToPort181")]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B5 B5-13: bledy ShipsToPort181, wyjatki zlapane (suma)", f"bledy {len(errs)}, wyjatki {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
             len(errs) == 0 and stm == 0)
 
 

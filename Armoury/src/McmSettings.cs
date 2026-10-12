@@ -4508,21 +4508,21 @@ namespace Armoury
         [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
         public float CrownRentWeightCastleWithFolk { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
+        [SettingPropertyBool("Ships To Port", HintText = "When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipsToPort { get; set; } = false;
+        public bool ShipsToPort { get; set; } = true;
 
         [SettingPropertyInteger("Ship Sale Ports Tried", 0, 12, "0", HintText = "how many nearest ports (first of the realm, then of realms at peace with the house) are asked for the full price of a lost or prize ship before the port with the most spare money pays what it can (0 counts as 1)")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public int ShipSalePortsTried { get; set; } = 3;
 
-        [SettingPropertyBool("Ship Trade Through Port", HintText = "Off until the war tax of stage 5 - see docs. Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before")]
+        [SettingPropertyBool("Ship Trade Through Port", HintText = "Ships bought from or sold to a port are paid into or out of the port's purse (above its merchants' reserve), and the governor's merchant-prince and shipwright bonuses come out of it too; a port without spare money buys no ship from the AI and pays you at most what it has. Off = the price of a ship bought from a port vanishes and a ship sold to a port is paid out of thin air, as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipTradeThroughPort { get; set; } = false;
+        public bool ShipTradeThroughPort { get; set; } = true;
 
-        [SettingPropertyBool("Ship Prizes To Port", HintText = "Off until the war tax of stage 5 - see docs. After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
+        [SettingPropertyBool("Ship Prizes To Port", HintText = "After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
-        public bool ShipPrizesToPort { get; set; } = false;
+        public bool ShipPrizesToPort { get; set; } = true;
 
         [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game")]
         [SettingPropertyGroup("The townsfolk's purse")]
