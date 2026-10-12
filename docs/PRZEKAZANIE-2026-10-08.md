@@ -924,3 +924,11 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   priorytet), nowy rod szlachty BK 15 000 i herszt BK 10 000; dziury pomiaru: koszt paktow Diplomacy -2.7 tys./d bez odbiorcy, skoki reszty od rodow BK; uspione G24/N3
   (ozyja przy A1 tryb 2). Bez rozszerzen A3 zostanie 9-11 tys./d (prog 8.5), z A3' i zaulkami ok. 2 tys./d. Robie teraz (S): A3' (uciac drugie 10 000 BK),
   zaulki z kasy miasta, priorytet turniejow RealPayer, licznik G24/N3. Na pozniej: E5/A7 (rabunek, zaloga, tier, perki), E5/A8 (BK i Diplomacy - najpierw pomiar).
+- (01:50 UTC) **DOKONCZENIE KODU GOTOWE** (wf_ffb7265d-1e8, kazde z recenzja): T1 w-toku/e4-fix2 13b8b07 (pobor z miast wedlug udzialu TownLevyByShare; T11/S15 dol INFO,
+  gora +1150/d zostaje jako kontrola ludzi z niczego - do potwierdzenia Jeffa); T2 cs-bledy abe3f62 + 3b33863 (strawa Polnocy TradeBound; 3 atuty BK BkBattleRewardPerks;
+  CS DLL 842f64a4, CS-at 13168fd4); T3 w-toku/e5-fix (A2b+Z8: wplaty do wlasnych osad jako "wlasne" - D staly spadnie; RC: kazdy pojmujacy zabiera graczowi cale zloto
+  i rynsztunek do siebie, osada bez bohatera - kasa osady; GarrisonRecruitFee - oplata werbunku zalog do sprzedajacego; RC DLL test\RealisticCaptivity-e5.dll);
+  T4 w-toku/e6-waski (E6/0 CraftRealm/ArmsBook pomiar; M1 zbroje wedlug kultury krainy WorkshopCraftByRealm; M2 bramka WorkshopsFollowInputs + wielblady tylko Qarth
+  SandSteedsInDorne (NK); recenzja c5c05cc). Pytania nowe (raport): RC - czy "wszystko" obejmuje juki z towarem/zywnoscia (dzis 75% wg xml Jeffa); rynsztunek trzymany
+  przez zywego lorda bez odkupu (stare, osobny projekt).
+  Autotest: RC przez -ExtraDll <sciezka>\RealisticCaptivity.dll (nazwa pliku = nazwa modulu).
