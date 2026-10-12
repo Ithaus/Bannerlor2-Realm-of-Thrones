@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (Scalenie koncowe czesc 1 w `w-toku/zbior-final`) - ETAP 4 Z POPRAWKAMI PO TESCIE + PORCJA A ETAPU 5 + DECYZJE JEFFA 12.10 + AUDYT ZLOTA + ETAP 6 WASKI W JEDNYM ZBIORZE
+**Mod:** Armoury + RealisticCaptivity + narzedzie | **Galaz:** `w-toku/zbior-final` (od `w-toku/zbior-e5` c3855de = etap 4 7658247 + porcja A etapu 5 775e7f6 + dwie poprawki recenzji scalenia A) | **Scalone po kolei (`git merge --no-ff`):** `w-toku/zbior-e4-koniec` 459e74b (d61935e), `w-toku/e4-fix2` 13b8b07 (2676213), `w-toku/e5-fix` 4073592 (b0258fd), `w-toku/e5-audyt` 371c586 (4c4f0c6), `w-toku/e6-waski` c5c05cc (6c6737b) | **DLL do testu (zbudowane z 6c6737b, hash commitu w wersji DLL):** `SCRATCH(ae222cb7)\test\Armoury-final1.dll` **md5 `a18d3e24c3d17c814a21b3dd1d9d0cea`**, `SCRATCH(ae222cb7)\test\rc-final\RealisticCaptivity.dll` **md5 `6bca8d7ebd8d7147c9235a70d3aa9b59`**
+
+**Problem:** piec galezi wyszlo obok siebie z tej samej bazy (etap 4 / zbior-e5): poprawki etapu 4 po tescie koncowym (fixA/fixB/fixC + recenzja), decyzje Jeffa 12.10 nr 1-3 (e4-fix2) i nr 5, 7, 9 (e5-fix), audyt zlota z niczego 11.10 (e5-audyt) i etap 6 w zakresie waskim (E6/0, M1, M2). Test zbiorczy (zasada Jeffa 11.10) wymaga jednego DLL z calosci.
+
+**Przyczyna:** praca rownolegla - kazda galaz dopisywala wpisy na gorze CHANGELOG, bloki w `sprawdz_logi.py` i (e5-fix, e6) pozycje w konstruktorze `ArmouryBehavior`.
+
+**Zmiana (tylko scalenie, bez nowego kodu gry):**
+- Konflikty: CHANGELOG w kazdym kroku - suma wpisow (kolejnosc wedlug czasu commitu galezi: e5-fix, e6-waski, e5-audyt, e4-fix2, zbior-e4-koniec, zbior-e5). `ArmouryBehavior` konstruktor - suma `Reset()` (`GarrisonRecruitFee` + `Stage6Measure`, `WorkshopInputs`, `CamelLaw`); SyncData (`arm_garfee`, `arm_e6_camels`) i `SubModuleMain` ApplyAll/Daily (`GarrisonRecruitFee`, `CraftRealm`, `WorkshopInputs`, `Stage6Measure`, `CamelLaw`) scalily sie same - kazdy wpis raz, kazdy we wlasnym try.
+- `sprawdz_logi.py`: docstring - suma (opis blokow E5/A1-A6, etap5_aud, opcje `--crashscribe`/`--baza-doby`, zdanie fix2); `etap5_main` - oba bloki (`etap5_fee` z e5-fix, `etap5_aud` z audytu), kazdy we wlasnym try; obie funkcje. **Jedyny konflikt tresci:** E4/7 T11 i E4/5 S15 - recenzja fixC (zbior-e4-koniec) zrobila je calkiem INFO z oznaczeniem pasa w wartosci, fix2 - wynik z gory +1150/d, dol -721/d (-0.5%/rok) tylko INFO. Scalone: oznaczenie pasa w wartosci (`e4_zywi_band`) + wynik `e4_zywi_ok` (gora pasa - prog, "ludzie z niczego"), regula `E4_ZYWI_RULE`; T11c (mobilizacja 28 dob) z recenzji fixC zostaje; T11b - INFO (recenzja fixC, scalone bez konfliktu). Decyzja Jeffa 12.10 nr 2 mowi tylko o progu -0.5%/rok - gora pasa nie jest hamulcem strat.
+- Przenumerowania: **brak**. MoneyLedger - zadna galaz nie dodala pozycji Mark (Marks 18, MName 18; M0-M13 + M17, M14-M16 rezerwa A1; e5-fix tylko licznik `_garFee`), Notes 9, N169 6 - unikalne. PeopleBook - MKinds 52 = MName 52, FKinds 64 = FName 64 (FDieSiege 62, FEscape 63 z fixA), CKinds 6, DKinds 3 - unikalne (sprawdzone skryptem).
+- `McmSettings.cs` z `tools/gen_mcm.py` po kazdym kroku (Armoury 1122 -> 1123 -> 1126 -> 1128 -> 1132). Nowe klucze wzgledem zbior-e5 (13): `LevyVillageFromTown`, `PrisonEscapeGoHome`, `TownLevyByShare`, `OwnPaymentsBackAsOwn`, `CrownRefundIgnoresOwnBack`, `GarrisonRecruitFeeToSeller`, `NotableBkGiftCut`, `AlleyIncomeFromTown`, `Stage6MeasureLog`, `WorkshopCraftByRealm`, `WorkshopsFollowInputs`, `SandSteedsInDorne` (Armoury), `CaptorTakesAllFromPlayer` (RealisticCaptivity).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Build po kazdym z 5 krokow: Armoury kod 0, RealisticCaptivity kod 0; `sprawdz_logi.py` - py_compile poza repo, bez zdublowanych `def`.
+- `sprawdz_logi --grupa etap2/etap3/etap4/etap5` na `kopia-e4k\czesc-d120.log` (stary bieg sprzed poprawek) - bez wyjatku narzedzia: etap2 53 progi NIE 2, etap3 20 NIE 0, etap4 285 NIE 8 (T1 CrashScribe, T3/V10/K19 rownanie krain sarnor, T4, T6, G4, K4 - stan sprzed fixA/fixB), etap5 68 NIE 5 (bloki paczek bez linii w starym logu). T11/S15 na tym logu: TAK, "w pasie", zywi -402/d.
+- Kolizje do obejrzenia w tescie zbiorczym: e5-fix (A2b `CourtFull.OwnPaid`, `SoldierPay`, `ClanIncomeBook.StableD`) i audyt (`NotableGold`, `TownPurse`, `RealPayer`, `CirculationWindows`) nie dziela plikow poza `Settings.cs`/`McmSettings.cs`; e6 (`MaterialLaw`, `WorkshopLaw`, `ColdStart`, `MineralOnce`, `TownFletchers`, `ArmsScrap`, `Measure174b`) nie dzieli plikow z etapem 5. Wspolny stan: e4-fix2 i fixA w `PeopleBook.Origin.cs` (`TakeLevy`) - scalone bez konfliktu, build 0.
+- Pulapka MCM: 13 nowych kluczy - przy wgraniu grep w `Armoury.json` Jeffa i autotestu (szczegolnie `TownLevyByShare`, `OwnPaymentsBackAsOwn`, `GarrisonRecruitFeeToSeller`, `WorkshopCraftByRealm`, `CaptorTakesAllFromPlayer` w pliku RealisticCaptivity).
+- RealisticCaptivity: modul w folderze `rc-final\RealisticCaptivity.dll` (nazwa pliku = nazwa modulu).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy (gry nie uruchamiano). Czesc 2 scalenia - osobno.
+
 ## 2026-10-12 (etap 5, recenzja T3-E5 pracy `w-toku/e5-fix` - decyzje Jeffa 5, 7, 9) - A2b: WPLATY DNIA OSADY, KTORA ZMIENILA PANA, LICZONE JAKO "UTRACONE (NOWY PAN)"; OPIS NoteLevyBack NA MIEJSCU
 **Mod:** Armoury | **Galaz:** `w-toku/e5-fix` (po c49958f) | **Pliki:** `Armoury/src/CourtFull.cs` (TodayOf, `_lostToday`), `Armoury/src/MoneyLedger.cs` (tylko komentarz XML)
 
