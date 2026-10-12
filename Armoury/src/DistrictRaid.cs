@@ -521,7 +521,8 @@ namespace Armoury
         {
             try
             {
-                if (_alert.Count == 0 || settlement == null || !settlement.IsVillage || settlement.StringId == null) return true;
+                // recenzja E7/R1: wylacznik zdjety (MCM) - wies leczy sie jak w grze takze z czujnoscia z zapisu albo sprzed zdjecia (off = stan sprzed R1)
+                if (_alert.Count == 0 || !On || settlement == null || !settlement.IsVillage || settlement.StringId == null) return true;
                 int end;
                 if (!_alert.TryGetValue(settlement.StringId, out end)) return true;
                 var v = settlement.Village;

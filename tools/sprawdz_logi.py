@@ -2441,8 +2441,14 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     rg = [(d, fnum(r" - rabunek gry -" + F_, hea[d]) or 0.0, num(r"pod spustoszeniem E4/5 krokow (\d+)", hea[d], int, 0) or 0) for d in gm if d in on]
     bad = [run_day(d, start) for d, h, _ in rg if abs(h) >= 0.005]
     steps = sum(x[2] for x in rg)
-    rep.add("E4/5 S5: \"rabunek gry\" w Hearth (E4/0) przy CZYNNYM", f"niezerowy w {len(bad)} dobach" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else "") + f"; krokow pod spustoszeniem {steps}",
-            "0.00 hearth kazdej doby; krokow pod spustoszeniem > 0 w dobach z rabunkami", (len(bad) == 0 and steps > 0) if rg else None)
+    # recenzja E7/R1 (235): rabunki AI prowadzi rabunek osada po osadzie (oryginal gry nie biegnie, E4/5 pomija je straznikiem) - kroki gry pod E4/5 i trafieni
+    # "osobodni lupienia" zostaja tylko przy rabunkach gracza i sesjach oddanych grze; "krokow > 0" (S5) i pasmo S7 wiaza tylko bez sesji R1 w oknie
+    # (trafieni R1 - odcinek "rabunek osada po osadzie (E7/R1)" linii Ludzie (spustoszenie), progi R1 - blok etap7_r1)
+    r1 = e4_series(lines, "Rabunek osada po osadzie (E7/R1): dzien")
+    r1ses = sum(num(r"\| sesji (\d+) \(", r1[d], int, 0) or 0 for d in win if d in r1)
+    rep.add("E4/5 S5: \"rabunek gry\" w Hearth (E4/0) przy CZYNNYM", f"niezerowy w {len(bad)} dobach" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else "") + f"; krokow pod spustoszeniem {steps}"
+            + (f"; sesji E7/R1 {r1ses} (rabunki AI poza krokami gry)" if r1ses else ""),
+            "0.00 hearth kazdej doby; krokow pod spustoszeniem > 0 w dobach z rabunkami (przy sesjach E7/R1 - tylko 0.00)", (len(bad) == 0 and (steps > 0 or r1ses > 0)) if rg else None)
     # S6 / S14 (porownanie z biegiem E4/4)
     rest = [fnum(r"RESZTA " + SF, hea[d]) for d in gm]
     rest = [x for x in rest if x is not None]
@@ -2453,9 +2459,11 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     rs = [num(r"krokow gry (\d+)", dev[d], int, 0) or 0 for d in on]
     rall = [fnum(r"osobodni lupienia [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in on]
     per_raid = (sum(rall) / (sum(rs) / 20.0)) if sum(rs) > 0 else None
-    rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else ""),
-            "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo",
-            (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh else None)
+    r1h = [fnum(r"rabunek osada po osadzie \(E7/R1\): trafieni " + F_, dev[d]) or 0.0 for d in d31]
+    rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else "")
+            + (f"; rabunek osada po osadzie (E7/R1) {st.mean(r1h):.0f}/d, sesji {r1ses}" if r1ses and r1h else ""),
+            "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo (przy sesjach E7/R1 - INFO, rabunki AI w bloku etap7_r1)",
+            (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh and r1ses == 0 else None)
     # S8 (poprawka po tescie koncowym etapu 4): pasmo 50-450/d to szacunek planu z liczby partii w polu (z30 4.2/d) - INFO z partiami/d; wiaze rachunek
     # kazdej doby: trafieni <= osobodni x stawka (Devastation Per Forager Day; tolerancja zaokraglen linii)
     rx8 = re.compile(r"\| zerowanie: partii (\d+), osobodni " + F_ + r" x " + F_ + r" -> trafieni " + F_)
