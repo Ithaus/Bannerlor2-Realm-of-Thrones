@@ -1462,6 +1462,10 @@ namespace Armoury
         public bool PackAnimalsFromMarket = true;          // a new caravan buys its pack animals at the market of its home town with its own trade money (up to half of it) instead of getting them from nothing; what the market lacks it buys later on the road (off = the game gives a new caravan half as many pack animals as men, from nothing)
         public int SpareHorseCarryKg = 60;                 // how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)
 
+        // --- Roads, camps and villages (stage 7) ---
+        // E7/0 (224, projekt etapu 7 v2 rozdz. 3): pomiar etapu 7 - tylko log (wojna i pokoj z przyczyna, zbiorka armii w nocy, turnieje wedlug tygodnia pory)
+        public bool Stage7MeasureLog = true;               // counts wars and peaces with their cause, army members riding to the muster at night and tournaments by week of the season - written to the log only, changes nothing in the game
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

@@ -793,6 +793,7 @@ namespace Armoury
             if (Undead.Party(mp)) { Mark(e, StOther); return; }                 // Inni nie spia
             bool leader = IsLeader(mp);
             if (leader) t.LeadField++; else t.LoneField++;
+            bool member = !leader && mp.Army != null;   // E7/0 (224): czlonek armii niedoczepiony (AttachedTo == null wyzej) - w drodze do wodza (tylko licznik)
             bool asleep = campSet.Contains(mp);
             NightOrder mine = null;
             if (asleep) _orders.TryGetValue(mp, out mine);
@@ -813,6 +814,7 @@ namespace Armoury
                     EnableAi(mp);
                 }
                 t.Count(leader, r);
+                if (leader || member) WorldClock7.MusterHour(leader, member, r == NReason.Flee ? WorldClock7.MFlee : r == NReason.Chase ? WorldClock7.MChase : WorldClock7.MRelief);   // E7/0 (224)
                 CountDayReason(r);
                 Mark(e, StReason, r);
                 Example(mp, "idzie noca: " + det, debt, leader);
@@ -833,6 +835,7 @@ namespace Armoury
                 EnableAi(mp);
                 _alarmed[mp] = new AlarmInfo { AtH = NowH(), Pos = mp.GetPosition2D, DebtPath = false };
                 if (leader) t.LeadAlarm++; else t.LoneAlarm++;
+                if (leader || member) WorldClock7.MusterHour(leader, member, WorldClock7.MAlarm);   // E7/0 (224)
                 _day.HAlarm++;
                 Mark(e, StAlarm);
                 Example(mp, "ALARM - " + how + " - AI ocenia ucieczke", debt, leader);
@@ -843,6 +846,7 @@ namespace Armoury
             mp.SetMoveModeHold();
             if (!asleep) { _camping.Add(mp); _bedPos[mp] = mp.GetPosition2D; }
             if (leader) t.LeadSleep++; else t.LoneSleep++;
+            if (leader || member) WorldClock7.MusterHour(leader, member, WorldClock7.MSleep);   // E7/0 (224)
             Mark(e, StSlept);
         }
 
@@ -1033,7 +1037,16 @@ namespace Armoury
                         if (mt != null && known && moved && mp.IsActive && mp.AttachedTo == null && mp.CurrentSettlement == null && mp.MapEvent == null)
                         {
                             if (mp.IsCurrentlyAtSea) mt.Sea++;   // zeglujacy (W2) - osobno, poza "bez wpisu powodu"
-                            else mt.Add(e, IsLeader(mp), stamp - 1);
+                            else
+                            {
+                                mt.Add(e, IsLeader(mp), stamp - 1);
+                                // E7/0 (224): czlonek armii niedoczepiony ruszyl sie w minionej godzinie obozu bez wpisu powodu - ta sama miara co MoveTally.Add
+                                if (mp.Army != null && !IsLeader(mp))
+                                {
+                                    byte mst = e.StateStamp == stamp - 1 ? e.State : StNone;
+                                    if (!(mst == StReason || (mst == StAlarm && e.AlarmEnd == 1))) WorldClock7.MusterMoved(mst == StSlept || mst == StDebt);
+                                }
+                            }
                         }
                         e.Pos = pos; e.Stamp = stamp;
                         // splata od reki (jak CreditRest gracza): cala suma -> dlug 0
@@ -1078,6 +1091,7 @@ namespace Armoury
             if (isDawn)
             {
                 try { LogDawn(on); } catch (Exception ex) { Log.Error("NocnyMarsz.LogDawn", ex); }
+                WorldClock7.MusterDawn(ByReason(s));   // E7/0 (224): linia "Zbiorka (E7/0)" - po ostatniej godzinie obozu (ruch tej godziny policzony wyzej); wlasny try
                 if (on) { try { LogPenaltySample(); } catch (Exception ex) { Log.Error("NocnyMarsz.LogPenaltySample", ex); } }
                 _day = new DayCounters();
                 _ledgerCalls = 0; _ledgerMsSum = 0; _ledgerMsMax = 0;

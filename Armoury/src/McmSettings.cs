@@ -4736,6 +4736,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
 
+        [SettingPropertyBool("Stage7 Measure Log", HintText = "counts wars and peaces with their cause, army members riding to the muster at night and tournaments by week of the season - written to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool Stage7MeasureLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5919,6 +5923,7 @@ namespace Armoury
             s.AiSpareHorseShare = AiSpareHorseShare;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
+            s.Stage7MeasureLog = Stage7MeasureLog;
         }
 
         internal static void Apply()

@@ -773,6 +773,7 @@ namespace Armoury
                     if (mp.IsLordParty && _debtSleep.ContainsKey(mp))
                     {
                         tally.DebtField++;
+                        if (byReason) WorldClock7.MusterDebt(mp);   // E7/0 (224): czlonek albo wodz armii w polu spi snem dlugu (tylko licznik)
                         if (e != null) Mark(e, StDebt);
                         continue;
                     }

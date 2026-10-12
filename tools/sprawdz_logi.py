@@ -88,7 +88,12 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
                     CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), zakup i sprzedaz tej samej
                     kategorii w 7 dobach 0, potkniecia 0; sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
---crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
+--grupa etap7     : (E7/0, paczka 224) szkielet etapu 7 (projekt etapu 7 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok E7/0: T0 bledy
+                    WorldClock7 i potkniecia 0 (takze w logu sesji CS), koszt linii dobowych <= 1 ms/dobe, T1 kazda zmiana KRONIKI WOJEN (CS) ma linie
+                    "Wojna i pokoj (E7/0)" tej pary i rodzaju (pokoj - takze upadek krolestwa) +-1 doba (zegar obu logow tego samego startu; --crashscribe P),
+                    T2 linia "Zbiorka (E7/0)" w kazdej nocy (brak najwyzej 1), T3 linie "Turnieje (E7/0)" i dobowa wojny co dobe; INFO - przyczyny, przerwy
+                    pokoj -> wojna (< 21 dni), sen czlonkow armii w drodze, okna bez startu turnieju i tygodnie pory bez startu (progi wynikowe - E7/K, E7/O1).
+--crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
@@ -5882,6 +5887,243 @@ def etap5_b6(rep, lines, start, win, bud):
             + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0", len(errs) == 0 and stm == 0)
     rep.add("E5/B6 B6-14: reszta ksiegi pieniadza < 10 tys./d (nowy posiadacz H37)", "--grupa etap3 na tym samym logu", "INFO", None)
 
+E7_WAR = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?) - (.+?): (WOJNA|POKOJ) \(przyczyna (.*?)\) \| dni od poprzedniego zdarzenia tej pary (\S+)")
+E7_FALL = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?): KROLESTWO ZNISZCZONE")
+E7_KRON = re.compile(r"^KRONIKA WOJEN \((dzien|po wczytaniu), [^)]*\): (.*)$")
+
+
+def _start_dt_of(path, fallback=None):
+    """Chwila startu pliku z nazwy (Armoury-/session-RRRR-MM-DD_GG-MM-SS.log); bez niej - fallback."""
+    import datetime as dt
+    m = re.search(r"(\d{4})-(\d\d)-(\d\d)_(\d\d)-(\d\d)-(\d\d)", os.path.basename(path))
+    if m:
+        try:
+            return dt.datetime(*(int(x) for x in m.groups()))
+        except ValueError:
+            pass
+    return fallback
+
+
+def _abs_lines(path, start_dt):
+    """E7/0: linie logu z chwila bezwzgledna (data startu pliku + [gg:mm:ss], przejscie przez polnoc = spadek godziny o > 1 h) -> [(datetime, tekst)]."""
+    import datetime as dt
+    out, day, prev = [], 0, None
+    base = dt.datetime(start_dt.year, start_dt.month, start_dt.day)
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.strip())
+            if not m:
+                continue
+            hh, mi, ss = (int(x) for x in m.group(1).split(":"))
+            t = hh * 3600 + mi * 60 + ss
+            if prev is not None and t < prev - 3600:
+                day += 1
+            prev = t
+            out.append((base + dt.timedelta(days=day, seconds=t), m.group(2)))
+    return out
+
+
+def _kron_set(body):
+    if body.startswith("POKOJ WSZEDZIE"):
+        return set()
+    out = set()
+    for part in body.split("; "):
+        if " vs " in part:
+            a, b = part.split(" vs ", 1)
+            out.add(frozenset((a.strip(), b.strip())))
+    return out
+
+
+def etap7_t1(rep, logp, csp, t_lo, t_hi):
+    """E7/0 T1: kazda zmiana KRONIKI WOJEN (CrashScribe, raz na dobe) ma linie zdarzenia E7/0 tej pary i rodzaju (pokoj - takze upadek krolestwa)
+    w oknie +-1 doba (od linii KRONIKI przed poprzednia do linii po nastepnej; chwile z zegara obu logow tego samego startu). Przejscie do linii
+    "po wczytaniu" pomijane (inny zapis). Tylko zmiany w czasie okna dob linii E7/0 (t_lo..t_hi)."""
+    import datetime as dt
+    name = "E7/0 T1: kazda zmiana KRONIKI WOJEN (CS) ma linie E7/0 z przyczyna (+-1 doba)"
+    path, how = crashscribe_session_of(logp, csp)
+    if not path:
+        rep.add(name, how, "100% zmian (bez logu sesji - INFO)", None)
+        return
+    a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+    c0 = _start_dt_of(path)
+    if a0 is None or c0 is None:
+        rep.add(name, "brak chwili startu logu Armoury albo CS (nazwa pliku)", "100% zmian", None)
+        return
+    kr = []
+    for t, s in _abs_lines(path, c0):
+        m = E7_KRON.match(s)
+        if m:
+            kr.append((t, m.group(1), _kron_set(m.group(2))))
+    ev, fall = [], []
+    for t, s in _abs_lines(logp, a0):
+        m = E7_WAR.match(s)
+        if m:
+            ev.append((t, frozenset((m.group(2), m.group(3))), m.group(4)))
+            continue
+        m = E7_FALL.match(s)
+        if m:
+            fall.append((t, m.group(2)))
+    day = dt.timedelta(days=1)
+    total, miss = 0, []
+    for i in range(1, len(kr)):
+        t, kind, now = kr[i]
+        if kind != "dzien" or t_lo is None or not (t_lo <= t <= t_hi):
+            continue
+        prev = kr[i - 1][2]
+        lo = kr[i - 2][0] if i >= 2 else kr[i - 1][0] - day
+        hi = kr[i + 1][0] if i + 1 < len(kr) else t + day
+        for p, want in [(p, "WOJNA") for p in now - prev] + [(p, "POKOJ") for p in prev - now]:
+            total += 1
+            ok = any(e[1] == p and e[2] == want and lo <= e[0] <= hi for e in ev)
+            if not ok and want == "POKOJ":
+                ok = any(f[1] in p and lo <= f[0] <= hi for f in fall)
+            if not ok:
+                miss.append(f"{' - '.join(sorted(p))} {want} ({t:%H:%M:%S})")
+    val = (f"zmian KRONIKI {total}, z linia E7/0 {total - len(miss)}" + (f"; bez linii: {', '.join(miss[:5])}" + (" ..." if len(miss) > 5 else "") if miss else "")
+           + f" | {os.path.basename(path)} ({how}); linii KRONIKI {len(kr)}, zdarzen E7/0 {len(ev)}, upadkow {len(fall)}")
+    rep.add(name, val, "100% zmian w oknie (zmiana bez linii = NIE)", (len(miss) == 0) if total else None)
+
+
+def etap7_0(rep, lines, start, until, logp=None, csp=None):
+    """E7/0 (224): pomiar etapu 7 - tylko log (projekt etapu 7 v2 rozdz. 3 "E7/0" Test). Okno: doby kampanii 1-until (dzien linii = doba ksiegi, jak
+    "Pieniadz swiata"). T0 bledy i potkniecia, koszt <= 1 ms/dobe, T1 KRONIKA (CS), T2 linia zbiorki co noc, T3 linia turniejow i linia dobowa wojny
+    co dobe; przyczyny wojen i pokojow, pary z nowa wojna < 21 dni po pokoju, sen czlonkow armii, okna bez startu turnieju i tygodnie pory - INFO
+    (progi wynikowe maja E7/K i E7/O1)."""
+    # linia dobowa (z "od poprzedniej linii") - by_day wzialby ostatnia linie doby, a linie zdarzen tej samej doby moga ja przykryc
+    wd = {}
+    for s in lines:
+        if s.startswith("Wojna i pokoj (E7/0): dzien") and "| od poprzedniej linii:" in s:
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                wd[k] = s
+    tu = by_day(lines, "Turnieje (E7/0): dzien")
+    zb = {}
+    for s in lines:
+        if s.startswith("Zbiorka (E7/0): noc"):
+            k = num(r"noc (\d+)", s)
+            if k is not None:
+                zb[k] = s
+    if not wd and not tu:
+        rep.add("E7/0: linie Wojna i pokoj / Turnieje (E7/0)", "brak w logu", "sa od wgrania E7/0 (Stage7MeasureLog)", None)
+        return
+    win = [d for d in sorted(set(wd) | set(tu)) if 1 <= run_day(d, start) <= until]
+    base = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    # ---- T0 bledy, potkniecia, koszt
+    errs = [s for s in lines if s.startswith("ERROR in WorldClock7")]
+    stum = max([num(r"\| potkniecia (\d+)", wd[d], default=0) for d in win if d in wd] or [0])
+    rep.add("E7/0 T0: bledy WorldClock7 i potkniecia", f"ERROR in WorldClock7 {len(errs)}; potkniecia (najwiecej w linii dobowej) {stum}", "0 i 0", len(errs) == 0 and stum == 0)
+    if logp:
+        crashscribe_t1_row(rep, "E7/0 T0: bledy WorldClock7 polkniete przez CrashScribe (log sesji)", logp, csp, where_filter="WorldClock7")
+    cost = [(fnum(r"koszt E7/0 ([0-9.]+) ms/dobe", tu[d]), d) for d in win if d in tu]
+    cost = [(c, d) for c, d in cost if c is not None]
+    if cost:
+        m = sum(c for c, _ in cost) / len(cost)
+        mx = max(cost)
+        rep.add("E7/0 koszt linii dobowych", f"srednio {m:.3f} ms/dobe, najwiecej {mx[0]:.3f} ms (d{run_day(mx[1], start)}) - {len(cost)} dob", "<= 1 ms/dobe srednio", m <= 1.0)
+    else:
+        rep.add("E7/0 koszt linii dobowych", "brak liczby kosztu w linii Turnieje (E7/0)", "<= 1 ms/dobe", None)
+    # ---- T1 KRONIKA (CS)
+    t_lo = t_hi = None
+    if logp and win:
+        a0 = _start_dt_of(logp) or (armoury_start_times(logp) or [None])[0]
+        if a0 is not None:
+            times = [t for t, s in _abs_lines(logp, a0) if s.startswith("Turnieje (E7/0): dzien") and num(r"dzien (\d+)", s) in set(win)]
+            if times:
+                t_lo, t_hi = min(times), max(times)
+    if logp:
+        etap7_t1(rep, logp, csp, t_lo, t_hi)
+    # ---- T2 zbiorka co noc
+    nights = [d for d in win if d in zb]
+    lead = [d for d in nights if (num(r"wodzowie armii obozuja \d+/(\d+)", zb[d], default=0) or 0) > 0]
+    missing = [run_day(d, start) for d in win if d not in zb]
+    rep.add("E7/0 T2: linia Zbiorka (E7/0) w kazdej nocy okna", f"noce z linia {len(nights)} z {len(win)} dob (z wodzem armii w polu {len(lead)})"
+            + (f"; bez linii doby kampanii {missing[:8]}" if missing else ""),
+            "brakuje najwyzej 1 nocy (ostatnia doba logu; bez obozu swiata AiCampsAtNight - brak linii)", len(missing) <= 1 if win else None)
+    off = sum(1 for d in nights if "regula powodow T10 wylaczona" in zb[d])
+    a = sum(num(r"partio-godzin (\d+)", zb[d], default=0) or 0 for d in nights)
+    b = sum(num(r", spia (\d+) \(", zb[d], default=0) or 0 for d in nights)
+    c = sum(num(r"ida z powodem (\d+)", zb[d], default=0) or 0 for d in nights)
+    g = sum(num(r"\), alarm (\d+)", zb[d], default=0) or 0 for d in nights)
+    nr = sum(num(r"ida bez powodu (\d+)", zb[d], default=0) or 0 for d in nights)
+    wk = sum(num(r"w tym uspieni (\d+)", zb[d], default=0) or 0 for d in nights)
+    le = sum(num(r"wodzowie armii obozuja (\d+)/", zb[d], default=0) or 0 for d in nights)
+    lf = sum(num(r"wodzowie armii obozuja \d+/(\d+)", zb[d], default=0) or 0 for d in nights)
+    rep.add("E7/0 zbiorka: czlonkowie armii w drodze w oknie obozu (suma okna)",
+            (f"partio-godzin {a}, spia {b} ({100.0 * b / a:.1f}%), ida z powodem {c}, alarm {g}, ida bez powodu {nr} (w tym uspieni {wk}); "
+             if a else "partio-godzin 0; ") + f"wodzowie armii obozuja {le}/{lf}" + (f"; noce z regula T10 wylaczona {off}" if off else ""),
+            "INFO (prog >= 95% snu - E7/O1 T7)", None)
+    # ---- T3 linie dobowe co dobe
+    rep.add("E7/0 T3: linia Turnieje (E7/0) co dobe", f"{sum(1 for d in base if d in tu)} z {len(base)} dob z linia Pieniadz swiata (okno 1-{until})",
+            f"{len(base)}/{len(base)}", (all(d in tu for d in base)) if base else None)
+    rep.add("E7/0 T3b: linia dobowa Wojna i pokoj (E7/0) co dobe", f"{sum(1 for d in base if d in wd)} z {len(base)} dob",
+            f"{len(base)}/{len(base)}", (all(d in wd for d in base)) if base else None)
+    # ---- INFO: przyczyny, szybkie wojny, przerwy pokoj -> wojna
+    causes, quick, gaps, n_ev = {}, [], [], 0
+    for s in lines:
+        m = E7_WAR.match(s)
+        if not m or not (1 <= run_day(int(m.group(1)), start) <= until):
+            continue
+        n_ev += 1
+        k = m.group(4) + " " + m.group(5).split(",")[0]
+        causes[k] = causes.get(k, 0) + 1
+        if m.group(4) == "WOJNA" and "(POKOJ)" in s:
+            dd = num(r"tej pary (\d+) \(POKOJ\)", s)
+            if dd is not None:
+                gaps.append(dd)
+                if dd < 21:
+                    quick.append(f"{m.group(2)} - {m.group(3)} {dd} d ({m.group(5).split(',')[0]})")
+    top = ", ".join(f"{k} {v}" for k, v in sorted(causes.items(), key=lambda kv: -kv[1])[:8])
+    rep.add("E7/0 wojny i pokoje krolestw wedlug przyczyny (okno)", f"zdarzen {n_ev}" + (f": {top}" if top else ""), "INFO (kazde z przyczyna - T1)", None)
+    rep.add("E7/0 przerwy pokoj -> wojna tej samej pary (pamiec sesji)",
+            (f"{len(gaps)} przerw, najkrotsza {min(gaps)} d, mediana {st.median(gaps):.0f} d; < 21 dni: {len(quick)}" + (f" ({'; '.join(quick[:5])})" if quick else ""))
+            if gaps else "brak par z pokojem i nowa wojna w oknie", "INFO (prog >= 87/90 dni - E7/K)", None)
+    # ---- INFO: turnieje - okna bez startu, tygodnie pory
+    started = {d: (num(r"rozpoczete od poprzedniej linii (\d+)", tu[d], default=0) or 0) for d in win if d in tu}
+    gap, best, best_end, weeks = 0, 0, None, {}
+    for d in sorted(started):
+        if started[d] > 0:
+            gap = 0
+            w = num(r"tydzien pory (\d+)", tu[d])
+            if w is not None:
+                weeks[w] = weeks.get(w, 0) + started[d]
+        else:
+            gap += 1
+            if gap > best:
+                best, best_end = gap, d
+    wmax = num(r"tydzien pory \d+ \(0-(\d+)", tu[win[-1]]) if win and win[-1] in tu else None
+    empty = [w for w in range(0, (wmax if wmax is not None else 12) + 1) if w not in weeks]
+    rep.add("E7/0 turnieje: starty w oknie, najdluzsze okno bez startu, tygodnie pory bez startu",
+            f"startow {sum(started.values())}, najdluzej bez startu {best} dob" + (f" (do d{run_day(best_end, start)})" if best_end is not None else "")
+            + f"; tygodnie pory bez startu {empty if empty else '-'}", "INFO (prog: okno < 14 dob, starty w kazdym tygodniu 0-12 - E7/K)", None)
+
+
+def etap7_main(logp, start_arg, until=120, csp=None):
+    """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
+    (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
+    start, until, ...); kazdy blok rusza tylko przy swojej linii - brak linii = wiersz INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
+          f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
+    for blk in (etap7_0,):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+        try:
+            blk(rep, lines, start, until, logp=logp, csp=csp)
+        except Exception as e:   # narzedzie nigdy nie przerywa raportu
+            rep.add(f"blok {blk.__name__}", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -5916,7 +6158,9 @@ def main(argv):
     if group == "etap4" and logp:
         return etap4_main(logp, start_arg, until_arg, csp, bdp)   # E4/0 (188)
     if group == "etap5" and logp:
-        return etap5_main(logp, start_arg, until_arg, csvp, csp)   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
+        return etap5_main(logp, start_arg, until_arg, csvp, csp)
+    if group == "etap7" and logp:
+        return etap7_main(logp, start_arg, until_arg, csp)   # E7/0 (224): szkielet etapu 7 + blok E7/0; kolejne paczki dopisuja bloki   # E5/0 (195): szkielet etapu 5 + blok E5/0; kolejne paczki dopisuja bloki
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
