@@ -1776,11 +1776,14 @@ namespace Armoury
                 a[0] += v.Rest; a[1] += live;
                 world += v.Rest; alive += live;
             }
-            string worst = "-"; double worstRest = 0, worstPc = 0;
+            string worst = "-"; double worstRest = 0, worstPc = 0; bool worstOff = false;
             foreach (var kv in realms)
             {
                 double pc = kv.Value[1] > 0 ? 100.0 * kv.Value[0] / kv.Value[1] : 0.0;
-                if (worst == "-" || Math.Abs(pc) > Math.Abs(worstPc)) { worst = kv.Key; worstRest = kv.Value[0]; worstPc = pc; }
+                // Jeff 12.10: prog "0.1% albo 200 ludzi, co wieksze" - kraina poza progiem wypiera kazda w progu (linia podaje jedna kraine; bez tego
+                // mala kraina z wiekszym % w 200 ludziach zaslanialaby wieksza poza progiem); w grupie - jak dotad najwiekszy |%|
+                bool off = Math.Abs(pc) > 0.1 && Math.Abs(kv.Value[0]) > 200.0;
+                if (worst == "-" || (off && !worstOff) || (off == worstOff && Math.Abs(pc) > Math.Abs(worstPc))) { worst = kv.Key; worstRest = kv.Value[0]; worstPc = pc; worstOff = off; }
             }
             var sb = new StringBuilder(500);
             sb.Append(" | E4/7: konto SLUZBA ").Append(N0(sk)).Append(" + \"\" ").Append(N0(s - sk)).Append(", JENCY ").Append(N0(jk)).Append(" + \"\" ").Append(N0(j - jk))

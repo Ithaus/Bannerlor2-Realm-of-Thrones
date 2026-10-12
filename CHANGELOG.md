@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (recenzja decyzji 12.10 1-4) - LINIA "LUDZIE (KSIEGA)" PODAJE KRAINE POZA PROGIEM 0.1% ALBO 200 LUDZI
+**Mod:** Armoury | **Galaz:** `w-toku/e6-p2` (po 2e7465a) | **Pliki:** `PeopleBook.Origin.cs` (tylko wybor krainy do logu)
+
+**Problem:** (recenzja, bez gry) po decyzji (2) narzedzie (T3/V10/K19) moglo dac falszywe TAK: linia gry podawala jedna kraine - najwieksza wedlug %; mala kraina z wiekszym % w 200 ludziach zaslaniala wieksza kraine z % > 0.1 i reszta > 200 ludzi (ograniczenie wpisane w poprzednim wpisie, punkt (2) ryzyka).
+**Przyczyna:** `PeopleBook.Origin.cs` OriginSegment - wybor `worst` tylko po |%|.
+**Zmiana:** kraina poza progiem (|%| > 0.1 i |reszta| > 200) wypiera kazda w progu; w obrebie grupy - jak dotad najwiekszy |%|. Format linii bez zmian; gdy zadna kraina nie jest poza progiem - linia jak dotad. Recenzja reszty 2e7465a: (1) jedyne uzycie Levies :399, json bez klucza; (3) zloto i juki do tego samego odbiorcy (`CaptorHome`), przy braku odbiorcy nic nie zabrane, wylaczony klucz - jak dotad; (4) bramka `Holds` tylko przy Pend > 0, czesc za zaulki zdjeta z wyplaty gry (nic z niczego), kontrola A4-3 liczy wyjasnione Pend >= zaplacone; wyjatki per wywolanie z licznikiem. gen_mcm bez roznic, py_compile OK.
+**Ryzyko / co sprawdzic:** tylko log (zadnego wplywu na gre); T3/V10/K19 czytaja te sama linie tym samym regexem; N12 - tekst. W tescie: gdy T3 = NIE, kraina w wierszu to kraina poza progiem (reszta > 200 ludzi), nie najmniejsza z najwiekszym %.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - test (wspolny z E6 porcja 2).
+
 ## 2026-10-12 (decyzje Jeffa 12.10, raport nocny pytania 1-4) - DANINA WSI 2.5%; PROG ROWNANIA KRAIN 0.1% ALBO 200 LUDZI; POJMUJACY BIERZE CALE JUKI GRACZA; ZAULKI W OBLEZONYM MIESCIE WSTRZYMANE
 **Mod:** Armoury + RealisticCaptivity + narzedzie | **Galaz:** `w-toku/e6-p2` (po recenzji E6/K5 45e4f6b) | **Decyzje:** `docs/STAN-PRAC.md` wpisy 09:20-09:35 UTC 12.10 | **Pliki:** Armoury `Settings.cs`, `McmSettings.cs` (gen_mcm), `BesiegedPay.cs`, `NotableGold.cs`; RC `Settings.cs`, `McmSettings.cs` (gen_mcm), `CaptivityBehavior.cs`; `tools/sprawdz_logi.py`
 
