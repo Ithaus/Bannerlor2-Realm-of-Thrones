@@ -4489,7 +4489,7 @@ namespace Armoury
 
         /// <summary>Nazwa rodu do dymka: czlon przed przecinkiem ("Tully,Blackfish" -> Tully); "House X" dla rodow; Dothrakowie - "the khalasar
         /// of X"; Wolni Ludzie - sama nazwa; kompanie i bractwa (frakcja pomniejsza, najemnicy, "Second Sons", "Company of the Cat") - "the X".</summary>
-        private static string HouseName(Clan c)
+        internal static string HouseName(Clan c)   // E7/W2: takze rod rycerza z tytulem BK (MapVillageLore.KnightLine)
         {
             string n = c.Name != null ? c.Name.ToString() : "";
             int comma = n.IndexOf(',');
@@ -4605,27 +4605,32 @@ namespace Armoury
             {
                 try
                 {
-                    var list = new List<TooltipProperty>();
-                    list.Add(new TooltipProperty("", _s.R.Name, 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                     TextObject district = _s.D.S != null ? _s.D.S.Name : new TextObject(_s.D.Id);
                     string held = Settings.Current.VillageTipHeldBy ? HeldLineSafe(_s.D) : null;   // T7 (W-2); null = stary tekst
-                    list.Add(new TooltipProperty("", held ?? VillageTexts.Make(VillageTexts.VilTipDistrict, "DISTRICT", district).ToString(), 0));
+                    string heldText = held ?? VillageTexts.Make(VillageTexts.VilTipDistrict, "DISTRICT", district).ToString();
                     // E4/11: ludzie i stan z ksiegi wiosek (w domu + poza domem); ksiega nieczynna - stary wzor osady x 250 (PROJEKT-RABUNEK pkt 1)
                     VillageBook.VState vs;
                     bool book = VillageBook.StateOf(_s.R.Uid, out vs);
                     int people = book ? (int)Math.Round(vs.Home + vs.Away) : _s.R.Settlements * 250;
                     int setl = book ? Math.Max(1, (int)Math.Round(vs.Settlements)) : _s.R.Settlements;
-                    list.Add(new TooltipProperty("", VillageTexts.Make(VillageTexts.VilTipPeople, "PEOPLE", people.ToString("N0", CultureInfo.InvariantCulture),
-                        "SETTLEMENTS", setl).ToString(), 0));
+                    string peopleText = VillageTexts.Make(VillageTexts.VilTipPeople, "PEOPLE", people.ToString("N0", CultureInfo.InvariantCulture), "SETTLEMENTS", setl).ToString();
                     string state = book ? StateLine(vs) : null;
-                    if (state != null) list.Add(new TooltipProperty("", state, 0));
+                    string fire = null;
                     if (_s.FxWanted == FxFire && _s.D.S != null)
                     {
                         string raider = RaiderName(_s.D.S);
-                        list.Add(new TooltipProperty("", raider != "?"
+                        fire = raider != "?"
                             ? VillageTexts.Make(VillageTexts.VilTipBurning, "RAIDER", raider).ToString()
-                            : VillageTexts.Make(VillageTexts.VilBurning, "VILLAGE", _s.R.Name).ToString(), 0));
+                            : VillageTexts.Make(VillageTexts.VilBurning, "VILLAGE", _s.R.Name).ToString();
                     }
+                    // E7/W2 (233): dymek z herbem pana, rycerzem, wiara BK i po Alt lore (MapVillageTooltip) - z TYCH SAMYCH linii; blad budowy = dymek jak dotad ponizej
+                    if (Settings.Current.VillageTipLore && MapVillageTooltip.Show(_s.R.Uid, _s.R.Name, _s.D.S, heldText, held != null, peopleText, state, fire)) return;
+                    var list = new List<TooltipProperty>();
+                    list.Add(new TooltipProperty("", _s.R.Name, 0, false, TooltipProperty.TooltipPropertyFlags.Title));
+                    list.Add(new TooltipProperty("", heldText, 0));
+                    list.Add(new TooltipProperty("", peopleText, 0));
+                    if (state != null) list.Add(new TooltipProperty("", state, 0));
+                    if (fire != null) list.Add(new TooltipProperty("", fire, 0));
                     InformationManager.ShowTooltip(typeof(List<TooltipProperty>), new object[] { list });
                 }
                 catch (Exception e)

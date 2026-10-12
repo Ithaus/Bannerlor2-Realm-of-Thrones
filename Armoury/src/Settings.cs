@@ -1467,6 +1467,9 @@ namespace Armoury
         // E7/W1 (232, PLAN 7.10 a, R10/R14): komunikat "plonie / spalona / splondrowana" (VillageNews) wedlug stanu ksiegi wiosek i pamiec wojny wioski (sekcja m: klucza arm_district)
         public int VillageRaidMessages = 1;                // who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom
         public bool VillageWarMemory = true;               // a village remembers who burned or plundered it, when, and how many fled and died
+        // E7/W2 (233, PLAN 7.9 a, R11/R12): dymek wioski z herbem pana (wlasny prefab GUI\Prefabs\ArmMapVillageTooltip.xml), rycerzem (tytul wsi z BK albo lore),
+        // wiara BK; po Alt zajecie, swiete miejsce, historia, pamiec wojny (MapVillageTooltip, MapVillageLore; lore = arm_map_village_lore.tsv z bramka ukladu)
+        public bool VillageTipLore = true;                 // the village tooltip shows the lord's banner, the knight who keeps the village and its faith from Banner Kings; hold Alt for its trade, history and war memory
 
         public static void Load(string moduleDataDir)
         {

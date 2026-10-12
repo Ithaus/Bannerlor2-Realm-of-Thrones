@@ -4748,6 +4748,10 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageWarMemory { get; set; } = true;
 
+        [SettingPropertyBool("Village Tip Lore", HintText = "the village tooltip shows the lord's banner, the knight who keeps the village and its faith from Banner Kings; hold Alt for its trade, history and war memory")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageTipLore { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5934,6 +5938,7 @@ namespace Armoury
             s.TwinsCrossingCount = TwinsCrossingCount;
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;
+            s.VillageTipLore = VillageTipLore;
         }
 
         internal static void Apply()

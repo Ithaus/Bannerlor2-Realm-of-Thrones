@@ -103,6 +103,15 @@ mixina DTE — kosztem widgetu na pasku (przycisk otwierania zbrojowni ma
 osobna droge). Ostroznie: ForgeView tez zyje na UIExtenderEx, mend nie moze
 dotykac cudzych mixinow.
 
+### A7. BKROTPatch: religia Norvos (`bearded_god`) z wiara Tyrosh — NIENAPRAWIONE (etap 8, 12.10)
+
+`ROTReligions.Initialize` (BKROTPatch, dekompilacja 12.10, `BKROTPatch.decompiled.cs:6373`):
+`BeardedGod.Initialize((Faith)...ROTFaiths.Instance.HuesOfTrios, ...)` - religia `bearded_god`
+dostaje wiare `HuesOfTrios` (jak `hues_of_trios`, :6369), choc BKROTPatch ma wlasna `BeardedGodFaith`.
+Id religii jest dobre (lore E7/L i bramka wiary dymka E7/W2 porownuja `Religion.StringId`),
+ale nazwa wiary (`Faith.GetFaithName`) w BK i w dymku wioski E7/W2 dla Norvos = nazwa wiary Tyrosh.
+Zauwazone w E7/L, wpisane przy E7/W2; bez latki (zasada: drobne bledy - etap 8).
+
 ---
 
 ## B. Bledy NASZE, ktore juz naprawilismy (nie powtarzaj ich)

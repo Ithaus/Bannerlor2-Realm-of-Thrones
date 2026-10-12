@@ -77,6 +77,13 @@ namespace Armoury.Villages
         public const string VilMemBurned = "{=arm_vil_mem_burned}Burned by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
         public const string VilMemPlundered = "{=arm_vil_mem_plundered}Plundered by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
         public const string VilMemGone = "{=arm_vil_mem_gone}a raider long gone";
+        // E7/W2 (233, R11/R12): rycerz wioski (tytul wsi z BK albo dane lore, knight_form) i wiara z BK w dymku - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
+        public const string VilTipKept = "{=arm_vil_tip_kept}Kept for them by {KNIGHT}";
+        public const string VilTipKeptOwn = "{=arm_vil_tip_kept_own}Kept for you by {KNIGHT}";
+        public const string VilTipTribute = "{=arm_vil_tip_tribute}{KNIGHT} takes its tribute";
+        public const string VilTipTributeOwn = "{=arm_vil_tip_tribute_own}{KNIGHT} takes its tribute for you";
+        public const string VilTipHolderOf = "{=arm_vil_tip_holder_of}{HERO} of {HOUSE}";
+        public const string VilTipFaith = "{=arm_vil_tip_faith}Faith: {FAITH} ({SHARE}%)";
 
         /// <summary>TextObject z para (NAZWA, wartosc) - np. Make(VilBurning, "VILLAGE", "Brackenford").</summary>
         public static TextObject Make(string text, params object[] kv)

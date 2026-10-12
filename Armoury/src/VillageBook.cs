@@ -1239,6 +1239,18 @@ namespace Armoury
             catch (Exception e) { Stumble("VillageBook.FireNames", e); return false; }
         }
 
+        /// <summary>E7/W2 (233, R11): crc ukladu (ten sam co "L:" zapisu) i uid wierszy pliku ukladu - bramka danych lore (MapVillageLore). Plik ukladu
+        /// wczytuje LoadFile raz na proces (Resolve w OnSessionLaunched); false - pliku nie ma albo z innej sceny. Tylko odczyt, bez Gate (_file sie nie zmienia).</summary>
+        internal static bool Layout(out uint crc, out List<string> uids)
+        {
+            crc = _layoutCrc; uids = null;
+            var f = _file;
+            if (f == null) return false;
+            uids = new List<string>(f.Records.Count);
+            foreach (var r in f.Records) uids.Add(r.Uid);
+            return true;
+        }
+
         /// <summary>Pamiec wojny wioski po uid (dymek W2). false - ksiega nieczynna, wioska nieznana albo bez pamieci.</summary>
         internal static bool MemoryOf(string uid, out WarMemory wm)
         {

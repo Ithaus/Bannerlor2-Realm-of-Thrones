@@ -97,6 +97,10 @@ Uzycie (Python 3, tylko odczyt):
                     pokazanych "plonie" 0; T3 bieg zapisu: wpisy pamieci przy wczytaniu = przy ostatnim zapisie (stary zapis - 0 wpisow, bez bledu); T4 potkniecia 0;
                     T5 spalone w ksiedze = "spalone dzis" linii "Ksiega wiosek (E4/11)" w kazdej dobie, komunikatow "burned" (z "by bylo") <= spalonych;
                     T6 zapis bez nazw (identyfikatory odrzucone przez BadId - INFO); spladrowane, pamiec wojny, przyklady - INFO.
+                    Blok etap7_w2 (E7/W2, paczka 233): T1 linia startowa "Dymek wioski (E7/W2): start" (ostatnia sesja): lore N/N, bramka zgodna, odrzucone 0,
+                    dymek ArmMapVillageTooltip zarejestrowany, herby z lore niewazne 0; odczyty BK wiara i tytuly; W2-0 linia doby w kazdej dobie okna; T2 potkniecia
+                    dymka (budowa, odswiezanie) i lore/BK 0; T4 probka wiary (pierwsza doba sesji): wiara w dymku = najwiekszy udzial BK we wszystkich wioskach probki
+                    z danymi BK (>= 10); dymki pokazane, zdanie lore o swietym miejscu - INFO; T3 zdjecia - poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -5912,7 +5916,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
     win = [d for d in alld if 1 <= run_day(d, start) <= until]
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
-    for blk in (etap7_b, etap7_w1):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_b, etap7_w1, etap7_w2):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, win, until=until)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -6072,6 +6076,67 @@ def etap7_w1(rep, lines, start, win, until=120, **kw):
     rej = sum(num(r"odrzucone przez BadId (\d+)", s, int, 0) or 0 for s in saves)
     rep.add("E7/W1 T6: zapis pamieci - same identyfikatory", f"zapisow {len(saves)}, identyfikatorow odrzuconych przez BadId {rej}",
             "INFO (nazw w sekcji m: nie ma z konstrukcji)", None)
+
+
+def etap7_w2(rep, lines, start, win, until=120, **kw):
+    """E7/W2 (233, PLAN 7.9 a, projekt etapu 7 v2 rozdz. 3 "E7/W2" Test): linia startowa "Dymek wioski (E7/W2): start" (OnSessionLaunched), linia doby
+    "Dymek wioski (E7/W2): dzien N" (dzien = doba gry) i probka wiary raz na sesje "Dymek wioski (E7/W2): probka wiary" (pierwsza doba). Wiazace: T1, T2, T4;
+    W2-0 linia doby; T3 (zdjecia dymka) poza narzedziem."""
+    starts = [s for s in lines if s.startswith("Dymek wioski (E7/W2): start")]
+    rows = {}
+    for d, s in by_day(lines, "Dymek wioski (E7/W2): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = s
+    samples = [s for s in lines if s.startswith("Dymek wioski (E7/W2): probka wiary")]
+    if not starts and not rows:
+        rep.add("E7/W2: linie Dymek wioski (E7/W2)", "brak w logu", "sa od wgrania E7/W2 (VillageTipLore, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        body = s.split("| ", 1)[1] if "| " in s else s
+        if "WYLACZONY" in s:
+            rep.add("E7/W2 T1: linia startowa (ostatnia sesja)", body[:200], "klucz VillageTipLore wlaczony", False)
+        else:
+            m = re.search(r"lore (\d+)/(\d+) \(bramka ([0-9A-F]{8}) zgodna, odrzucone (\d+), bez lore (\d+)", s)
+            reg = "dymek ArmMapVillageTooltip zarejestrowany" in s
+            herb = num(r"herby z lore niewazne (\d+)", s, int)
+            ok = bool(m) and m.group(1) == m.group(2) and int(m.group(4)) == 0 and reg and herb == 0
+            rep.add("E7/W2 T1: lore i dymek (linia startowa, ostatnia sesja)", body[:260],
+                    "lore N/N, bramka zgodna (5A8C2735), odrzucone 0, dymek zarejestrowany, herby z lore niewazne 0", ok)
+            bk = re.search(r"BK: wiara (tak|nie), tytuly (tak|nie)", s)
+            rep.add("E7/W2 W2-1b: odczyty BK (odbicie)", bk.group(0) if bk else "brak", "wiara tak, tytuly tak (BannerKings w zestawie)",
+                    (bk.group(1) == "tak" and bk.group(2) == "tak") if bk else None)
+    else:
+        rep.add("E7/W2 T1: linia startowa", "brak", "jest przy starcie kazdej sesji (OnSessionLaunched)", None)
+    days = sorted(rows)
+    need = max(0, len(win) - 1)
+    rep.add("E7/W2 W2-0: linia doby Dymek wioski (E7/W2)", f"{len(days)} dob (dob okna {len(win)})", f">= {need} (codziennie w oknie)",
+            (len(days) >= need and need > 0) if win else None)
+    if days:
+        def tot(pat):
+            return sum(num(pat, rows[x], int, 0) or 0 for x in days)
+
+        def most(pat):
+            return max([num(pat, rows[x], int, 0) or 0 for x in days] or [0])
+        sb, sr = tot(r"budowa (\d+), odswiezanie"), tot(r"odswiezanie (\d+) \(sesja")
+        fw, ft, fr = most(r"wiara (\d+), tytul"), most(r"tytul (\d+), wiersz"), most(r"wiersz (\d+) \(sesja\)")
+        rep.add("E7/W2 T2: potkniecia dymka (suma okna) i lore/BK (najwiecej w sesji)", f"budowa {sb}, odswiezanie {sr}; wiara {fw}, tytul {ft}, wiersz {fr}", "0",
+                sb + sr + fw + ft + fr == 0)
+        tips, fb = tot(r"dymkow z herbem (\d+)"), tot(r"zapas bez herbu (\d+)")
+        rep.add("E7/W2 W2-2b: dymki pokazane (suma okna)", f"z herbem {tips}, zapas bez herbu {fb}",
+                "INFO (bez najechan 0; zapas > 0 = brak prefabu GUI\\Prefabs albo rejestracji)", None)
+    if samples:
+        s = samples[-1]
+        a = num(r"najwiekszy udzial BK (\d+)/", s, int)
+        b = num(r"najwiekszy udzial BK \d+/(\d+)", s, int)
+        n = num(r"\(wiosek probki (\d+),", s, int)
+        rep.add("E7/W2 T4: wiara w dymku = najwiekszy udzial BK (probka 20 wiosek, ostatnia sesja)", f"{a}/{b} wiosek z danymi BK (probki {n})",
+                "wszystkie wioski probki z danymi BK, co najmniej 10", (a == b and b >= 10) if a is not None and b is not None else None)
+        m = re.search(r"zdanie lore o swietym miejscu: (\d+)/(\d+) wiosek z lore \(okreg bez danych BK (\d+)\)", s)
+        rep.add("E7/W2 W2-4b: zdanie lore o swietym miejscu (faith_bk = dominujaca wiara BK okregu, cala mapa)", m.group(0) if m else "brak", "INFO", None)
+    else:
+        rep.add("E7/W2 T4: probka wiary", "brak linii", "jest w pierwszej dobie sesji (VillageTipLore)", None)
+    rep.add("E7/W2 T3: zdjecia dymka (Polnoc, Reach, Dorne) - herb, rycerz, Alt", "poza narzedziem", "tryb zdjec autotestu", None)
 
 def main(argv):
     args = argv[1:]

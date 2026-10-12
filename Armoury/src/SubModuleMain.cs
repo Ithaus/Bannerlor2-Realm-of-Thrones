@@ -42,6 +42,9 @@ namespace Armoury
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
         {
             base.OnBeforeInitialModuleScreenSetAsRoot();
+            // E7/W2 (233): typ dymka wioski z herbem (wlasny prefab Armoury\GUI\Prefabs) - raz na proces, we wlasnym try i metodzie NoInlining (blad ladowania typow VM
+            // zostaje tutaj); niezalezny od latek ponizej - ich wywrotka nie zabiera dymka
+            try { TipRegister(); } catch (Exception e) { Log.Error("MapVillageTooltip.Register (ladowanie)", e); }
             try
             {
                 if (_modelsPatched) return;
@@ -242,6 +245,19 @@ namespace Armoury
                 try { GoodsLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoodsLedger.ApplyAll", e); }
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void TipRegister() { MapVillageTooltip.Register(); }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void TipUnregister() { MapVillageTooltip.Unregister(); }
+
+        /// <summary>E7/W2 (233): wyrejestrowanie typu dymka wioski przy wyladowaniu modulu.</summary>
+        protected override void OnSubModuleUnloaded()
+        {
+            try { TipUnregister(); } catch { }
+            base.OnSubModuleUnloaded();
         }
 
         private static int _mapVillagesLoadFails;
