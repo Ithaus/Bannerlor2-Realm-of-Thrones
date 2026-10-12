@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (scalenie decyzji Jeffa do zbioru etapow 5-8) - `w-toku/a8-gentry0` (bc5e3ef: NOWY ROD SZLACHTY BK STARTUJE Z 0) W `w-toku/zbior-5-8`, BEZ ZMIAN LOGIKI POZA TA DECYZJA
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-5-8` (po przegladzie calosci 2, 1500d97; `git merge --no-ff w-toku/a8-gentry0`, wspolna baza 2b30405) | **Pliki:** `Armoury/src/BkDipGold.cs`, `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (generowany), `CHANGELOG.md`
+
+**Problem:** decyzja Jeffa 12.10 ok. 18:40 UTC (nowy rod szlachty BK startuje z 0, klucz `GentryStartFromTown` = false) lezala na osobnej galezi, bo w zbior-5-8 pracowal workflow - test zbiorczy etapow 5-8 musi ja miec.
+**Przyczyna:** praca rownolegla na dwoch drzewach, nie blad.
+**Zmiana:** scalenie jednego commitu bc5e3ef. Konflikt tylko w `CHANGELOG.md` (oba wpisy na gorze pliku) - zachowane WSZYSTKIE wpisy (661 naglowkow = 660 zbioru + 1 decyzji; wpis decyzji stoi nad E5/C2, czyli nad swoja baza). `BkDipGold.cs` - zbior nie ruszal go od bazy, wszedl caly z galezi decyzji. `Settings.cs` - suma pol (18 linii zbioru + nowe pole `GentryStartFromTown` i nowy opis `GentryPurseFromTown`), scalone bez konfliktu. `McmSettings.cs` - nie scalany recznie: po scaleniu `python tools/gen_mcm.py` -> Armoury 1228 ustawien (1227 + 1), wynik bajt w bajt rowny scaleniu automatycznemu; RealisticCaptivity 109 i GrandTourney 40 bez zmian.
+**Ryzyko / co sprawdzic:**
+- Kontrola mechaniczna (skrypt, liczenie linii): kazda linia dodana w bc5e3ef jest w wyniku (BkDipGold 6/6, Settings 2/2, McmSettings 6/6, CHANGELOG 9/9), zadna linia usunieta w bc5e3ef nie wrocila, kazda linia dodana w zbiorze od bazy (Settings 18, McmSettings 35, CHANGELOG 198) zostala; poza tymi 4 plikami drzewo = 1500d97. Pliki .cs i CHANGELOG nadal CRLF.
+- Kolizje: `GentryOn` / `GentryTownPays` czyta tylko `BkDipGold.cs` (grep po calym drzewie); zadna paczka zbioru po 2b30405 nie dotyka rodu szlachty BK ani `Seal31.Spare` w tym miejscu. Zamknieta ekonomia: 15 000 BK zdejmowane jak dotad (z niczego powstalo, w nic wraca - para znosi sie w tej samej latce), kasa miasta nie placi - nikt nie traci i nikt nie zyskuje.
+- Narzedzie: prog E5/A8-1 (`z kas <= BK dalby <= 15 000 x rody`) przechodzi przy `z kas miast 0`; linia doby bez zmian formatu; zmieniona tylko linia startowa (`(start rodu: 0)`), ktorej `sprawdz_logi.py` nie czyta (czyta `latki przy starcie gry`). Opis progu A8-1 nadal mowi o 15 000 z kasy miasta - poza zakresem scalenia, do poprawy przy audycie.
+- `Armoury.json` Jeffa (tylko odczyt): brak kluczy `GentryPurseFromTown` i `GentryStartFromTown` - obowiazuja domyslne z kodu (true / false), czyli rod startuje z 0.
+- Build Armoury: kod wyjscia 0 (1 ostrzezenie CS0169 `BattlefieldLaw._vanillaHandledSetter` - stare, poza zakresem); DLL zawiera `GentryStartFromTown`. DLL nie wgrany.
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (przeglad calosci 2 zbioru etapow 5-8 - KOD I KOLIZJE) - 1 POPRAWKA NARZEDZIA (DLL bez zmian): prog E7/C T1 dawal falszywe NIE na scalonym drzewie - lista wyjatkow "zegar realny tylko w widoku" nie znala widoku proby drog E7/D0 z drugiej galezi
 **Mod:** narzedzie (`tools/sprawdz_logi.py`), Armoury sam odczyt | **Galaz:** `w-toku/zbior-5-8` (po przegladzie 1, 69e6f70) | **Zakres:** `git diff w-toku/e6-p3..HEAD` czytany po plikach pod katem: ta sama latka Harmony z dwoch paczek, kolejnosc w dobie, stan pisany dwa razy, klucze ustawien i zapisu, Reset, narzedzie, pulapki CLAUDE.md 7, pliki danych i prefaby.
 
@@ -197,6 +212,15 @@
 - Poza zakresem (zauwazone, do etapu 8): brak.
 
 **Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8 (autotest: C4-0 wlaczone i kiesa czynna, C4-3 = 0; reczne otwarcie okna przez Jeffa: C4-1 i C4-2 TAK).
+
+## 2026-10-12 (decyzja Jeffa ok. 18:40 UTC do E5/A8) - NOWY ROD SZLACHTY BK STARTUJE Z 0 (zamiast 15 000 z nadwyzki kasy miasta handlu wsi)
+**Mod:** Armoury | **Galaz:** `w-toku/a8-gentry0` (od `w-toku/zbior-5-8` 2b30405 - osobne drzewo, bo w zbior-5-8 pracowal workflow; do scalenia) | **Pliki:** `Armoury/src/BkDipGold.cs` (GentryTownPays, GentryFin, linia startu), `Armoury/src/Settings.cs` (+1 klucz), `McmSettings.cs` (gen_mcm: Armoury 1221)
+
+**Problem:** E5/A8 dawal nowemu rodowi szlachty BK 15 000 z nadwyzki kasy miasta handlu wsi (regula R10). Jeff 12.10: "zawsze 0".
+**Przyczyna:** decyzja Jeffa (kierunek), nie blad.
+**Zmiana:** `GentryPurseFromTown` (wlaczony) zdejmuje 15 000 BK jak dotad, ale kasa miasta placi tylko przy NOWYM kluczu `GentryStartFromTown` (domyslnie **false**) - nowy rod startuje z 0. Cena wolnego majatku 0 bez zmian. Linia startu: "(start rodu: 0 | z kasy miasta)". Linia doby bez zmian ("z kas miast handlu wsi 0", "uciete" = cale 15 000).
+**Ryzyko / co sprawdzic:** nowy rod gentry (2 na 120 dob) bez gotowki - zyje z dochodu majatku (BK), zold i drabina dlugu jak kazdy rod; GentryService (rycerze bez lenna jada w druzynie pana, pan placi) - bez zmian. sprawdz_logi A8-1 (z kas <= BK dalby) dalej TAK przy 0. Klucz nowy - w Armoury.json Jeffa go nie ma. Build kod 0.
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8 (scalic do w-toku/zbior-5-8 po skonczeniu wf_42f8dda9-fa3).
 
 ## 2026-10-12 (etap 5 reszta, paczka E5/C2 - 203, PLAN 5.9 "glod ma skutki") - JEDNA DEFINICJA GLODU `Hunger.Of` (brak jedzenia / brak pieniedzy); GALAZ JEDZENIA R14 TYLKO PRZY GLODZIE Z BRAKU PIENIEDZY (7 dob Afford < 0.95, kampania >= 120 dob, jedzenie na polce); klucz `TownFolkHungerHurts`
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-5-8` (po recenzji E5/C1 d493556) | **Projekt:** `docs/etap5/PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md` rozdz. 3 "E5/C2", R14 (v2 K2), D2, [D 09.10 A] | **Pliki:** nowy `Armoury/src/Hunger.cs`, `Armoury/src/TownFolk.Live.cs` (R14, `C2Food`, `BracketHadFood`, `MoneyHungry`, `NoteHungerDay`, `HungerLine`, zapis pola 17), `Armoury/src/TownFolk.cs` (2 pola `Folk`), `Armoury/src/PopulationLaw.cs` (`TownRate` - glod okregu z `Hunger.District`), `Armoury/src/Settings.cs` + `McmSettings.cs` (`python tools/gen_mcm.py`: Armoury 1220, RC 109 i GrandTourney 40 bez zmian), `tools/sprawdz_logi.py` (blok `etap5_c2`, opis grupy etap5)

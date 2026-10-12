@@ -968,9 +968,13 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool TradePerkGiftsAiOff { get; set; } = true;
 
-        [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it is paid from the spare money of the town the estate's village trades with (above its merchants' reserve), as much as there is, so the house may start with less or nothing. The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before")]
+        [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it starts with nothing (see Gentry Start From Town). The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool GentryPurseFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Gentry Start From Town", HintText = "only with Gentry Purse From Town: the new gentry house's 15,000 is paid from the spare money of the town the estate's village trades with (above its merchants' reserve), as much as there is. Off (default) = the new house starts with nothing")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool GentryStartFromTown { get; set; } = false;
 
         [SettingPropertyBool("Bandit Hero Purse From Hideout", HintText = "a Banner Kings bandit leader no longer gets 10,000 out of thin air - he takes it from his hideout's spare coin (above the hoard kept for whoever clears it), as much as there is. When his band leaves the hideout its loot is no longer turned into coin out of thin air: it stays in the packs and goes to the fences like any band's loot. Off = out of thin air, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -5162,6 +5166,7 @@ namespace Armoury
             s.TierIncomeAiOff = TierIncomeAiOff;
             s.TradePerkGiftsAiOff = TradePerkGiftsAiOff;
             s.GentryPurseFromTown = GentryPurseFromTown;
+            s.GentryStartFromTown = GentryStartFromTown;
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
             s.FeastTownGetsPaid = FeastTownGetsPaid;
             s.PactCostToOtherRealm = PactCostToOtherRealm;
