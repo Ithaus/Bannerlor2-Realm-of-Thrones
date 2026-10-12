@@ -201,7 +201,7 @@ namespace Armoury
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);
-                try { ShipsToPort181.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ShipsToPort181.ApplyAll", e); }   // 3.1/3.3 (33) 181: statki do portu (NavalDLC, ChangeShipOwnerAction, MapEvent) - wylaczniki domyslnie WYL = sam pomiar; PRZED oknami ksiegi obiegu (okna O07/O08 maja Priority.First)
+                try { ShipsToPort181.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ShipsToPort181.ApplyAll", e); }   // 3.1/3.3 (33) 181: statki do portu (NavalDLC, ChangeShipOwnerAction, MapEvent) - E5/B5: wylaczniki domyslnie WL (porty placa z nadwyzki D4); WYL w MCM = sam pomiar; PRZED oknami ksiegi obiegu (okna O07/O08 maja Priority.First)
                 // paczka 169: ksiega obiegu (tylko log) - okna pomiaru zlota; PO naszych latkach na te same metody (BuildFunding, WorkshopTrade,
                 // MoneyLedger), PRZED ksiega towarow, ktora musi byc ostatnia; kazde okno wpinane we wlasnym try
                 try { CirculationWindows.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CirculationWindows.ApplyAll", e); }

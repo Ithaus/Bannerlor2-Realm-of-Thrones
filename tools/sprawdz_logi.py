@@ -57,10 +57,11 @@ Uzycie (Python 3, tylko odczyt):
                     te same), panowie samych zamkow (budzet-rodow.csv): udzial w D swiata >= 30% (prog glowny) i w D stalym 30-35% - srednia d252-364
                     (bieg roczny, --do-doby 364; krotszy - INFO), mediana kiesy - srednia 4 blokow 28 dob (odczyt), renty dnia wedlug rodzaju rodu i gracz -
                     INFO, bledy. A1-T8 bierze udzial pana z linii B3 tej doby (bez linii - klucz 0.67, 1/3 dla korony).
-                    Blok E5/B5 (181 ON, statki do portow) B5-1..B5-13 - linia "Statki (181)" z segmentem kas portow: codziennie i czytelna, trzy wylaczniki
+                    Blok E5/B5 (181 ON, statki do portow) B5-1..B5-14 - linia "Statki (181)" z segmentem kas portow: codziennie i czytelna, trzy wylaczniki
                     WL caly bieg zbioru B (WYL - pulapka MCM, K3), latki 181 w kazdej sesji, zloto z niczego / w nicosc sciezek 181 = 0, kontrolki prog 0,
                     nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob z rzedu, pozycje statkow w ksiedze ("Pieniadz swiata - przyczyny") = 0,
-                    zgodnosc z A6 i pomiarami (A6, 164a, E5/0 - statki z niczego 0), bledy; wyplaty portow, zloto swiata i wraki - INFO.
+                    zgodnosc z A6 i pomiarami (A6, 164a, E5/0 - statki z niczego 0), bledy; wyplaty portow, zloto swiata, wraki i zakupy portow ponad
+                    liczbe idealna stoczni (B5-14, decyzja Jeffa) - INFO.
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -4181,7 +4182,8 @@ def _b5_segs(s):
     out = {}
     for seg in s.split(" | ")[1:]:
         for key, pre in (("sw", "wylaczniki:"), ("p1", "1. "), ("p2", "2. "), ("p3", "3. "), ("pk", "premie zarzadcow"), ("p4", "4. "),
-                         ("tot", "razem naprawde dzis"), ("pp", "kasy portow (miasta z portem i stocznia)"), ("err", "wyjatki zlapane")):
+                         ("tot", "razem naprawde dzis"), ("ov", "zakupy portow ponad liczbe idealna stoczni"), ("pp", "kasy portow (miasta z portem i stocznia)"),
+                         ("err", "wyjatki zlapane")):
             if seg.startswith(pre):
                 out[key] = seg
                 break
@@ -4190,9 +4192,9 @@ def _b5_segs(s):
 
 def etap5_b5(rep, lines, start, until, sh):
     """E5/B5 (181 ON, PLAN 3.3): projekt etapu 5 rozdz. 3 "E5/B5" Test (zbior B) i rozdz. 5.2 pkt 9 (K3: bieg B ze statkami OFF = blad). Linia "Statki (181): dzien N"
-    (dzien ksiegi, jak "Pieniadz swiata") z segmentem E5/B5 "kasy portow". Wiersze B5-1..B5-13: linia, trzy wylaczniki WL caly bieg, latki, zloto z niczego / w nicosc
+    (dzien ksiegi, jak "Pieniadz swiata") z segmentem E5/B5 "kasy portow". Wiersze B5-1..B5-14: linia, trzy wylaczniki WL caly bieg, latki, zloto z niczego / w nicosc
     sciezek 181 = 0, kontrolki prog 0, nadwyzka portow z D4 (A1), kasy portow bez nadwyzki <= 28 dob, pozycje statkow w ksiedze = 0, zgodnosc z A6 i pomiarami
-    (164a, E5/0) = 0, wyplaty portow / zloto swiata / wraki - INFO, bledy."""
+    (164a, E5/0) = 0, wyplaty portow / zloto swiata / wraki - INFO, bledy; B5-14 (po recenzji) zakupy portow ponad liczbe idealna stoczni i gracz bez ceny kupna - INFO."""
     alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
     win = sorted(d for d in sh if 1 <= run_day(d, start) <= until)
     rsw = re.compile(r"do portu \(Ships To Port\) (WL|WYL), handel przez kase portu \(Ship Trade Through Port\) (WL|WYL), pryzy do portu \(Ship Prizes To Port\) (WL|WYL)")
@@ -4223,6 +4225,10 @@ def etap5_b5(rep, lines, start, until, sh):
                    "sell2": num(r"; z kas portow (\d+)", g.get("p2", ""), int, 0) or 0,
                    "buy3": num(r"; do kas portow (\d+)", g.get("p3", ""), int, 0) or 0,
                    "wrecks": num(r"wraki po uszkodzeniu po bitwie \(gra nie placi, 181 nie rusza - E5/B5\) (\d+)", g.get("p4", ""), int, 0) or 0,
+                   "hasOv": "ov" in g,
+                   "ovN": num(r"\): naprawde (\d+) / \d+", g.get("ov", ""), int, 0) or 0,
+                   "ovGold": num(r"\): naprawde \d+ / (\d+)", g.get("ov", ""), int, 0) or 0,
+                   "shortBuy": num(r"kupno przed sprzedaza w jednym potwierdzeniu, pominiete \(E5/B5\) (\d+)", g.get("p3", ""), int, 0) or 0,
                    "stum": num(r"wyjatki zlapane (\d+)", g.get("err", ""), int, 0) or 0}
     exp = sorted(set(alld) | set(win))
     miss = [d for d in exp if d not in rows]
@@ -4332,6 +4338,18 @@ def etap5_b5(rep, lines, start, until, sh):
     stm = sum(rows[d]["stum"] for d in ds)
     rep.add("E5/B5 B5-13: bledy ShipsToPort181, wyjatki zlapane (suma)", f"bledy {len(errs)}, wyjatki {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
             len(errs) == 0 and stm == 0)
+    # B5-14 (poprawka po recenzji B5): zakupy portow, przy ktorych port mial juz liczbe idealna stoczni NavalDLC (limit - 2) - nadmiar, ktory stocznia
+    # kasuje nastepnej doby (TryRemoveExcessShipsFromTown); miejsce do limitu zostaje (wiazace) - decyzja Jeffa; gracz bez ceny kupna (kupno przed sprzedaza)
+    ovd = [d for d in ds if rows[d]["hasOv"]]
+    if ovd:
+        t28o = _last28(ovd)
+        og, spo = sum(rows[d]["ovGold"] for d in t28o), sum(rows[d]["spent"] for d in t28o)
+        rep.add("E5/B5 B5-14: zakupy portow ponad liczbe idealna stoczni (limit - 2) sr28; gracz bez ceny kupna - pominiete (suma) - INFO",
+                f"{st.mean(rows[d]['ovN'] for d in t28o):.1f} statkow / {og / len(t28o):.0f} zl na dobe = {(og / spo * 100) if spo else 0:.1f}% wydatkow portow (181);"
+                f" gracz {sum(rows[d]['shortBuy'] for d in ds)}",
+                "INFO - decyzja Jeffa: miejsce w porcie do liczby idealnej zamiast limitu stoczni (mniej odplywu z kas portow, wiecej zlomu - mniej zlota lordow)", None)
+    else:
+        rep.add("E5/B5 B5-14: zakupy portow ponad liczbe idealna stoczni - INFO", "brak pola w logu (linie 181 sprzed poprawki po recenzji B5)", "INFO", None)
 
 
 def main(argv):
