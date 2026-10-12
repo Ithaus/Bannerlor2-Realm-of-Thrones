@@ -629,10 +629,16 @@ namespace Armoury
             int have = MenPurse.Get(mp);
             int old = Math.Min(have, Math.Max(0, cost));
             if (!On || hold <= 0 || !lordPays) return old;
-            Day();
             int keep = Math.Min(old, Math.Max(0, have - hold));
-            _wBuys++;
-            if (old > keep) { _wBuyShift += old - keep; _wBuyShiftN++; }
+            // recenzja E8/W: licznik i zmiana doby ksiegi (Day pisze linie logu) nie moga przerwac ZAPLATY - PurseShare biegnie w srodku zakupu
+            // (sztuka juz zdjeta z polki i dopisana do zbrojowni, zloto jeszcze nie zaplacone); wyjatek = licznik potkniec, podzial zaplaty bez zmiany
+            try
+            {
+                Day();
+                _wBuys++;
+                if (old > keep) { _wBuyShift += old - keep; _wBuyShiftN++; }
+            }
+            catch (Exception e) { WStumble("PurseShare", e); }
             return QueueOn ? keep : old;
         }
 

@@ -8867,17 +8867,21 @@ def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     lo = max(1, until - 29)
     zu = by_day(lines, "Zuzycie AI: dzien")
     tri = {}
+    skip = {}   # recenzja E8/W: E6/N1 "pominiete (lup nienoszony)" z tej samej linii - kontekst do W-1 (Z33 jest sprzed N1)
     for d, s in zu.items():
         rd = run_day(d, start)
         if lo <= rd <= until:
             tri[rd] = (num(r"lup obity (\d+) szt\.", s, default=0), num(r"zuzyte w bitwach (\d+)", s, default=0), num(r"naprawione w miastach (\d+)", s, default=0))
+            skip[rd] = num(r"pominiete \(lup nienoszony\) (\d+) szt", s)
     both = sorted(rd for rd in tri if rd in E8_W_Z33)
     if len(both) >= 10:
         a = [sum(tri[rd][i] for rd in both) for i in range(3)]
         z = [sum(E8_W_Z33[rd][i] for rd in both) for i in range(3)]
         r1, z1 = a[2] / max(1, a[0] + a[1]), z[2] / max(1, z[0] + z[1])
+        sk = [skip[rd] for rd in both if skip.get(rd) is not None]
         rep.add(f"W-1: kolejka napraw - naprawione / (zuzyte w bitwach + lup obity), doby {both[0]}-{both[-1]}",
                 (f"{r1:.3f} ({a[2]} / ({a[1]} + {a[0]}), {len(both)} dob) wobec Z33 w tych samych dobach {z1:.3f} ({z[2]} / ({z[1]} + {z[0]})) = x{r1 / z1 if z1 > 0 else 0:.2f}"
+                 + (f"; E6/N1: w zleceniach pominieto {sum(sk)} szt. lupu nienoszonego ({len(sk)} dob, liczone przy kazdej wizycie) - tego lupu kowale juz nie naprawiaja, a jest w mianowniku" if sk else "")
                  + ("" if q_off == 0 else f"; klucz AiMendQueueContinue wylaczony w {q_off} dobach")),
                 ">= 1.2 x Z33 w tych samych dobach (projekt podaje dla przykladu dobe 120 Z33: 0.50; Z33 jest sprzed E6/N1 - naprawial tez lup nienoszony)",
                 (r1 >= 1.2 * z1) if (q_off == 0 and z1 > 0) else None)
