@@ -664,8 +664,8 @@ namespace Armoury
             Seal31.RegisterEvents(this);   // 3.1 (31): Reset stanu kampanii; nasluch MobilePartyDestroyed DRUGI (biegnie przedostatni - po 3.2 i 112, przed ksiega obiegu), OnPartyRemoved, upadek krolestw, zdarzenia zlota
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
-            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => CamelLaw.OnNewGame());
-            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Bloomery.OnNewGame());   // E6/R1 (214): wytop przy kopalni - tylko nowa kampania (flaga w zapisie)   // E6/M2 (208): wielblady tylko w Qarthu - tylko nowa kampania (flaga w zapisie)
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => CamelLaw.OnNewGame());   // E6/M2 (208): wielblady tylko w Qarthu - tylko nowa kampania (flaga w zapisie)
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Bloomery.OnNewGame());   // E6/R1 (214): wytop przy kopalni - tylko nowa kampania (flaga w zapisie)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => WinterTrial.OnNewGame());   // E4/1 (B): proba zimy autotestu - plik-przelacznik w Documents\...\CrashScribe, tylko nowa kampania, tylko w pamieci
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom

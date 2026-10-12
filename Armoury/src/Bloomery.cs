@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
@@ -58,13 +59,18 @@ namespace Armoury
         private static int _stumbles, _stumblesDay;
 
         [ThreadStatic] private static Village _tv;
+        // recenzja R1: kopalnia BK w miescie - drewno z polki dopiero po cyklu, ktory naprawde dal lupy (postfiks cyklu; gra moze odrzucic cykl PO prefiksie)
+        [ThreadStatic] private static Workshop _pw;
+        [ThreadStatic] private static int _pNeed, _pPrice, _pCount;
+        private static bool _cycleWired;
+        private static int _dTownMineRej;
         [ThreadStatic] private static int _tvBefore, _tvReserved;
         [ThreadStatic] private static float _tvModel;
 
         /// <summary>Nowa gra albo wczytanie (konstruktor ArmouryBehavior): flaga, kopalnie, liczniki od zera.</summary>
         internal static void Reset()
         {
-            NewCampaign = false; _iron = null; _wood = null; _applied = false; _scale = 1f; _wpb = -1;
+            NewCampaign = false; _iron = null; _wood = null; _applied = false; _scale = 1f; _wpb = -1; _pw = null;
             _mines.Clear(); _byMarket = null; _pending = null;
             NewDay(); _stumbles = 0;
         }
@@ -372,9 +378,12 @@ namespace Armoury
         // ------------------------------------------------------------ kopalnia BK w miescie / zamku
         /// <summary>WorkshopLaw.CyclePrefix po BulkLineSkip: linia bez wsadu dajaca lupy (kopalnia BK w miescie albo zamku) wytapia z drewnem z polki
         /// tej osady - warsztat kupuje WoodPerBloom x sztuki ladunkow po cenie targu (kasa warsztatu -> kasa miasta). Brak drewna albo kapitalu -
-        /// cykl nie idzie (true). Linia drewna i reszta warsztatow bez zmian (false).</summary>
+        /// cykl nie idzie (true). Linia drewna i reszta warsztatow bez zmian (false).
+        /// Recenzja R1: gra po prefiksie moze cykl jeszcze odrzucic (CanNotableWorkshopProduceThisCycle: utarg <= place cyklu, kasa miasta < utarg) -
+        /// zakup idzie wiec w postfiksie cyklu (CyclePostfix), tylko gdy cykl dal lupy; tu tylko sprawdzenie i rezerwacja. Bez postfiksu - zakup od razu (jak dotad).</summary>
         internal static bool TownMineBlocked(WorkshopType.Production p, Workshop w)
         {
+            _pw = null;
             if (!_applied || w == null) return false;
             try
             {
@@ -393,27 +402,52 @@ namespace Armoury
                 int need = wpb * count;
                 int price = Math.Max(0, town.MarketData.GetPrice(new EquipmentElement(wood)));
                 if (shelf.GetItemNumber(wood) < need || w.Capital < need * price) { _dTownMineSkip++; return true; }
-                var gf = GoodsLedger.Begin(GoodsLedger.FBloom, town);
-                try
-                {
-                    shelf.AddToCounts(wood, -need);
-                    if (price > 0)
-                    {
-                        w.ChangeGold(-need * price);
-                        town.ChangeGold(need * price);
-                    }
-                }
-                finally { GoodsLedger.End(gf); }
-                if (price > 0)
-                {
-                    try { MoneyLedger.Note(MoneyLedger.NShop, st, need * price); } catch { }
-                    try { TownFolk.Sale(st, need * price, TownFolk.MixGoods); } catch { }
-                }
-                OreLedger.NoteBloomeryWood(wood, need);
-                _dTownMine += count; _dTownMineWood += need;
+                if (_cycleWired) { _pw = w; _pNeed = need; _pPrice = price; _pCount = count; return false; }
+                BuyTownMineWood(w, st, town, shelf, wood, need, price, count);
                 return false;
             }
             catch (Exception e) { Stumble("TownMineBlocked", e); return false; }
+        }
+
+        /// <summary>Postfiks WorkshopsCampaignBehavior.TickOneProductionCycleForNotableWorkshop: cykl kopalni BK zarezerwowany w TownMineBlocked dal lupy
+        /// (__result) - dopiero teraz drewno z polki i zaplata; cykl odrzucony przez gre - nic (licznik).</summary>
+        public static void CyclePostfix(Workshop __1, bool __result)
+        {
+            var w = _pw; _pw = null;
+            if (w == null || !ReferenceEquals(w, __1)) return;
+            if (!__result) { _dTownMineRej++; return; }
+            try
+            {
+                var st = w.Settlement; var town = st != null ? st.Town : null; var shelf = st != null ? st.ItemRoster : null; var wood = Wood();
+                if (town == null || shelf == null || wood == null) return;
+                int need = Math.Min(_pNeed, Math.Max(0, shelf.GetItemNumber(wood)));
+                int wpb = WoodPerBloom();
+                if (need < _pNeed && wpb > 0) _dOver += (_pNeed - need + wpb - 1) / wpb;   // nie powinno sie zdarzyc: w cyklu nikt nie zdejmuje drewna
+                if (need > 0) BuyTownMineWood(w, st, town, shelf, wood, need, _pPrice, _pCount);
+            }
+            catch (Exception e) { Stumble("CyclePostfix", e); }
+        }
+
+        private static void BuyTownMineWood(Workshop w, Settlement st, Town town, ItemRoster shelf, ItemObject wood, int need, int price, int count)
+        {
+            var gf = GoodsLedger.Begin(GoodsLedger.FBloom, town);
+            try
+            {
+                shelf.AddToCounts(wood, -need);
+                if (price > 0)
+                {
+                    w.ChangeGold(-need * price);
+                    town.ChangeGold(need * price);
+                }
+            }
+            finally { GoodsLedger.End(gf); }
+            if (price > 0)
+            {
+                try { MoneyLedger.Note(MoneyLedger.NShop, st, need * price); } catch { }
+                try { TownFolk.Sale(st, need * price, TownFolk.MixGoods); } catch { }
+            }
+            OreLedger.NoteBloomeryWood(wood, need);
+            _dTownMine += count; _dTownMineWood += need;
         }
 
         // ------------------------------------------------------------ linia (OreLedger)
@@ -433,7 +467,7 @@ namespace Armoury
               .Append("; kopalnia bez wegla ").Append(_dUnwon.ToString("0.#", inv)).Append(" lup (model ponad drewno w dymarce)")
               .Append(", lupy bez drewna ").Append(_dOver)
               .Append("; w dymarkach ").Append(bank).Append(" ladunkow przy potrzebie doby ").Append(want).Append(" (kopalni ponizej potrzeby ").Append(empty).Append(")")
-              .Append("; kopalnie BK w miastach: lupy ").Append(_dTownMine).Append(", drewno ").Append(_dTownMineWood).Append(", bez drewna/kapitalu ").Append(_dTownMineSkip)
+              .Append("; kopalnie BK w miastach: lupy ").Append(_dTownMine).Append(", drewno ").Append(_dTownMineWood).Append(", bez drewna/kapitalu ").Append(_dTownMineSkip).Append(", cykl odrzucony przez gre ").Append(_dTownMineRej)
               .Append("; potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(") |");
             return sb.ToString();
         }
@@ -453,7 +487,7 @@ namespace Armoury
         internal static void NewDay()
         {
             _dBlooms = 0; _dBurnt = 0; _dWoods = 0; _dBought = 0; _dGold = 0; _dShortShelf = 0; _dShortGold = 0; _dNoMarket = 0; _dTicked = 0; _dOver = 0;
-            _dTownMine = 0; _dTownMineWood = 0; _dTownMineSkip = 0; _dUnwon = 0f; _stumblesDay = 0;
+            _dTownMine = 0; _dTownMineWood = 0; _dTownMineSkip = 0; _dTownMineRej = 0; _dUnwon = 0f; _stumblesDay = 0;
         }
 
         // ------------------------------------------------------------ wpiecie
@@ -468,6 +502,14 @@ namespace Armoury
                               postfix: new HarmonyMethod(typeof(Bloomery), nameof(TickPostfix)),
                               finalizer: new HarmonyMethod(typeof(Bloomery), nameof(TickFinalizer)));
                 _wired = true;
+                // recenzja R1: zakup drewna kopalni BK w miescie po cyklu, ktory dal lupy (bez tego wpiecia - zakup w prefiksie jak dotad)
+                try
+                {
+                    var wsb = AccessTools.TypeByName("TaleWorlds.CampaignSystem.CampaignBehaviors.WorkshopsCampaignBehavior");
+                    var cyc = wsb != null ? AccessTools.Method(wsb, "TickOneProductionCycleForNotableWorkshop") : null;
+                    if (cyc != null) { h.Patch(cyc, postfix: new HarmonyMethod(typeof(Bloomery), nameof(CyclePostfix))); _cycleWired = true; }
+                }
+                catch (Exception e) { Log.Error("Bloomery.ApplyAll(cykl)", e); }
                 Log.Info("Bloomery (E6/R1, 214): tick produkcji wsi wpiety (prefiks Priority.First przed BK, postfiks, finalizer) - lupa i dymarka tylko w nowej kampanii przy kluczu Bloomery At Mine.");
             }
             catch (Exception e) { Log.Error("Bloomery.ApplyAll", e); }
