@@ -32,6 +32,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Gear and plunder")]
         public int LootGoldPercent { get; set; } = 60;
 
+        [SettingPropertyBool("Captor Takes All From Player", HintText = "whoever takes you - outlaws, a lord, a town's militia or garrison - takes every coin you carry and all your war gear: the gold goes to the lord's purse, to the band's purse, or to the coffers of the settlement whose men took you (overrides Loot Gold Percent and Strip Equipment); the baggage they seize goes to them too, never to nobody (off = Loot Gold Percent, and with no lord to take it the gold simply vanishes, as before)")]
+        [SettingPropertyGroup("Gear and plunder")]
+        public bool CaptorTakesAllFromPlayer { get; set; } = true;
+
         [SettingPropertyBool("Buyback Enabled", HintText = "your gear can be bought back from whoever holds it")]
         [SettingPropertyGroup("Gear and plunder")]
         public bool BuybackEnabled { get; set; } = true;
@@ -447,6 +451,7 @@ namespace RealisticCaptivity
             s.LeaveInRags = LeaveInRags;
             s.LootPartyInventoryPercent = LootPartyInventoryPercent;
             s.LootGoldPercent = LootGoldPercent;
+            s.CaptorTakesAllFromPlayer = CaptorTakesAllFromPlayer;
             s.BuybackEnabled = BuybackEnabled;
             s.BuybackPriceMultiplier = BuybackPriceMultiplier;
             s.MinDaysBeforeEscape = MinDaysBeforeEscape;

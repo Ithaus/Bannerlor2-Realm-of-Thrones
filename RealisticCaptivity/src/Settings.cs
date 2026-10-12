@@ -15,6 +15,8 @@ namespace RealisticCaptivity
         public bool LeaveInRags = true;                    // even the clothes go - you are left in rags
         public int LootPartyInventoryPercent = 75;         // percent of the baggage train they seize
         public int LootGoldPercent = 60;                   // percent of the gold on your person they take
+        // E5 decyzja 9 Jeffa (12.10): gracz pojmany przez kogokolwiek traci cale zloto i caly rynsztunek - do pojmujacego, nie w nicosc
+        public bool CaptorTakesAllFromPlayer = true;       // whoever takes you - outlaws, a lord, a town's militia or garrison - takes every coin you carry and all your war gear: the gold goes to the lord's purse, to the band's purse, or to the coffers of the settlement whose men took you (overrides Loot Gold Percent and Strip Equipment); the baggage they seize goes to them too, never to nobody (off = Loot Gold Percent, and with no lord to take it the gold simply vanishes, as before)
         public bool BuybackEnabled = true;                 // your gear can be bought back from whoever holds it
         public float BuybackPriceMultiplier = 1.6f;        // times the market value they ask for it
 
