@@ -968,6 +968,22 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool TradePerkGiftsAiOff { get; set; } = true;
 
+        [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it is paid from the spare money of the town the estate's village trades with (above its merchants' reserve), as much as there is, so the house may start with less or nothing. The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool GentryPurseFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Bandit Hero Purse From Hideout", HintText = "a Banner Kings bandit leader no longer gets 10,000 out of thin air - he takes it from his hideout's spare coin (above the hoard kept for whoever clears it), as much as there is. When his band leaves the hideout its loot is no longer turned into coin out of thin air: it stays in the packs and goes to the fences like any band's loot. Off = out of thin air, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool BanditHeroPurseFromHideout { get; set; } = true;
+
+        [SettingPropertyBool("Feast Town Gets Paid", HintText = "when a Banner Kings feast buys its food and drink from the town market, the town gets only what the host actually paid - a host short of coin no longer makes the town richer by the full price out of thin air. Off = the town gets the full price, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool FeastTownGetsPaid { get; set; } = true;
+
+        [SettingPropertyBool("Pact Cost To Other Realm", HintText = "the gold a ruler (or you) pays in Diplomacy for a non-aggression pact or for peace goes to the treasury of the other realm in the treaty instead of vanishing; if that realm is gone, nothing is taken. Off = the gold vanishes, as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PactCostToOtherRealm { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -5113,6 +5129,10 @@ namespace Armoury
             s.GarrisonNoStartPurse = GarrisonNoStartPurse;
             s.TierIncomeAiOff = TierIncomeAiOff;
             s.TradePerkGiftsAiOff = TradePerkGiftsAiOff;
+            s.GentryPurseFromTown = GentryPurseFromTown;
+            s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
+            s.FeastTownGetsPaid = FeastTownGetsPaid;
+            s.PactCostToOtherRealm = PactCostToOtherRealm;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;

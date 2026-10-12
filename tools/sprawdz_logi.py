@@ -3314,6 +3314,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_a7(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_a7", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/A8 (audyt 11.10, wiersze 17, 18, 23 + koszt paktu Diplomacy): rod szlachty BK, herszt BK, uczta BK, pakty - brak linii (log sprzed A8) - INFO
+    try:
+        etap5_a8(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_a8", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
     wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
     try:
@@ -4447,6 +4452,79 @@ def etap5_a7(rep, lines, start, until):
     rep.add("E5/A7-7: kontrola (niedopasowane w oknie rabunku, stos, potkniecia, ERROR SmallGold.*, kiesa starej zalogi do kasy osady)", f"{st} / {ov} / {sm} / {errs} / {gtw}",
             "0 / 0 / 0 / 0 / 0", st == 0 and ov == 0 and sm == 0 and errs == 0 and gtw == 0)
 
+
+def etap5_a8(rep, lines, start, until):
+    """E5/A8 (audyt zlota z niczego 11.10, wiersze 17, 18, 23 i rozdz. 2b koszt paktu Diplomacy; BkDipGold.cs) - BK i Diplomacy bez platnika albo odbiorcy.
+    Linie: startowa "BK i Diplomacy (E5/A8): latki przy starcie gry" i doby "BK i Diplomacy (E5/A8): dzien N"; zamkniecie widac w reszcie R
+    ("Pieniadz swiata (bilans - przyczyny)") w dobach z nowym rodem szlachty, hersztem i paktem (dotad skoki +15 000..+38 000, +10 000, -500..-25 500).
+    Doby kampanii 2-until."""
+    wire = [x for x in lines if x.startswith("BK i Diplomacy (E5/A8): latki przy starcie gry")]
+    a8 = by_day(lines, "BK i Diplomacy (E5/A8): dzien")
+    win = [d for d in sorted(a8) if 2 <= run_day(d, start) <= until]
+    if not wire and not a8:
+        rep.add("E5/A8: linie BK i Diplomacy (E5/A8)", "brak w logu", "sa od wgrania E5/A8 (LogEnabled)", None)
+        return
+    if wire:
+        rep.add("E5/A8-0: latki (rod szlachty, herszt, juki herszta, uczta BK; okna NAP i pokoju, koszt bez odbiorcy Diplomacy)", wire[-1][:260], "BRAK: - (7 wpietych)",
+                "BRAK: -." in wire[-1])
+    if not win:
+        rep.add("E5/A8: linia doby", "brak w dobach 2-%d" % until, "codziennie (LogEnabled)", False)
+        return
+
+    def tot(rx, days=None):
+        return sum(num(rx, a8[d], int, 0) or 0 for d in (days if days is not None else win))
+    # ---------------- 1. nowy rod szlachty BK
+    gn, gd, gp = tot(r"nowe rody szlachty BK[^:]*: (\d+), BK dalby"), tot(r"nowe rody szlachty BK[^:]*: \d+, BK dalby (\d+)"), tot(r"z kas miast handlu wsi (\d+)")
+    gs, gc, gcn = tot(r"kasa nie starczyla u (\d+)\)"), tot(r"cena majatku bez odbiorcy niepowstala (\d+)"), tot(r"cena majatku bez odbiorcy niepowstala \d+ \((\d+)\)")
+    go, goff = tot(r"majatek z wlascicielem - cena z niczego jak dotad \d+ \((\d+)\)"), tot(r"; z niczego jak dotad (\d+) u \d+ \| herszt")
+    rep.add("E5/A8-1: nowe rody szlachty BK - 15 000 z kasy miasta handlu wsi majatku (suma dob 2-%d)" % until,
+            f"rodow {gn}, BK dalby {gd}, z kas miast {gp}, uciete {gd - gp} (kasa nie starczyla u {gs}); cena majatku niepowstala {gc} w {gcn}"
+            + (f"; majatek z wlascicielem (cena jak dotad) {go}" if go else "") + (f"; WYLACZONE - z niczego jak dotad {goff}" if goff else ""),
+            "z kas <= BK dalby <= 15 000 x rody; INFO (audyt: 1 / 0 / 2 rody na bieg)", gp <= gd <= 15000 * gn)
+    # ---------------- 2. herszt BK
+    hn, hd, hp = tot(r"\| herszt BK[^:]*: nowi (\d+)"), tot(r"\| herszt BK[^:]*: nowi \d+, BK dalby (\d+)"), tot(r"z nadwyzki kryjowek (\d+)")
+    hs, hoff = tot(r"kryjowka nie starczyla u (\d+)\)"), tot(r"; z niczego jak dotad (\d+) u \d+; juki")
+    rep.add("E5/A8-2: herszt BK - 10 000 z nadwyzki kasy kryjowki (suma dob 2-%d)" % until,
+            f"hersztow {hn}, BK dalby {hd}, z kryjowek {hp}, uciete {hd - hp} (kryjowka nie starczyla u {hs})" + (f"; WYLACZONE - z niczego jak dotad {hoff}" if hoff else ""),
+            "z kryjowek <= BK dalby <= 10 000 x herszci; INFO (audyt: 0 / 1 / 6 na bieg)", hp <= hd <= 10000 * hn)
+    pl, pu, pv = tot(r"\(BK sprzedawal z niczego\): wyjsc (\d+)"), tot(r"\(BK sprzedawal z niczego\): wyjsc \d+, (\d+) szt\."), tot(r"szt\. o wartosci (\d+) -> paser")
+    ps, pp, pn = tot(r"paser \(kasy miast\) kupil (\d+) szt\."), tot(r"paser \(kasy miast\) kupil \d+ szt\. \(z zywnoscia, gdy ja skupuje\) za (\d+)"), tot(r"; bez pasera (\d+)")
+    poff = tot(r"sprzedane z niczego jak dotad (\d+)")
+    rep.add("E5/A8-3: juki herszta BK przy wyjsciu z kryjowki - przez kasy miast paserem OutlawLaw (suma dob 2-%d)" % until,
+            f"wyjsc {pl}, {pu} szt. o wartosci {pv}; paser kupil {ps} szt. za {pp}, bez pasera {pn}" + (f"; WYLACZONE - sprzedane z niczego jak dotad {poff}" if poff else ""),
+            "INFO (dotad BK sprzedawal je z niczego po cenie miasta; teraz kasy miast przez pasera, bron i sprzet zostaja jak u kazdej bandy)", None)
+    # ---------------- 3. uczta BK
+    fn, fp, fg = tot(r"\| uczty BK[^:]*: zakupow (\d+)"), tot(r"gospodarze zaplacili (\d+)"), tot(r"miasta dostalyby (-?\d+)")
+    fc, fcn, foff = tot(r"cofniete z kas miast (\d+)"), tot(r"cofniete z kas miast \d+ \((\d+)\)"), tot(r"; z niczego jak dotad (\d+) \(\d+\) \| pakty")
+    rep.add("E5/A8-4: uczty BK - miasto dostaje tyle, ile zaplacil gospodarz (suma dob 2-%d)" % until,
+            f"zakupow {fn}, gospodarze zaplacili {fp}, miasta dostalyby {fg}, cofniete {fc} w {fcn}" + (f"; WYLACZONE - z niczego jak dotad {foff}" if foff else ""),
+            "cofniete <= miasta dostalyby - zaplacone; INFO (audyt: male, tylko biedny gospodarz)", fc <= max(0, fg - fp))
+    # ---------------- 4. koszt paktu Diplomacy
+    kn, kd, kp = tot(r"\| pakty Diplomacy \(nieagresja, pokoj\)[^:]*: (\d+), koszt"), tot(r"\(nieagresja, pokoj\)[^:]*: \d+, koszt (\d+)"), tot(r"do skarbcow drugiej strony (\d+)")
+    kpl, knr, knrn = tot(r"drugiej strony \d+ \(w tym gracz (\d+)\)"), tot(r"bez drugiej strony nie pobrane (\d+)"), tot(r"bez drugiej strony nie pobrane \d+ \((\d+)\)")
+    koff = tot(r"; w nicosc jak dotad (\d+)")
+    rep.add("E5/A8-5: koszt paktu o nieagresji i pokoju Diplomacy do skarbca drugiej strony (suma dob 2-%d)" % until,
+            f"paktow {kn}, koszt {kd}, do skarbcow drugiej strony {kp} (gracz {kpl}); bez drugiej strony nie pobrane {knr} w {knrn}"
+            + (f"; WYLACZONE - w nicosc jak dotad {koff}" if koff else ""),
+            "do skarbcow <= koszt; INFO (audyt z31-A: 39 NAP + 18 pokojow, -2,66 tys./d w nicosc)", kp <= kd)
+    # ---------------- reszta R w dobach ze zdarzeniami A8 (dotad skoki)
+    bil = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    ev = [d for d in win if d in bil and (num(r"nowe rody szlachty BK: (\d+)", a8[d], int, 0) or num(r"\| herszt BK: nowi (\d+)", a8[d], int, 0)
+                                          or num(r"\(nieagresja, pokoj\): (\d+)", a8[d], int, 0))]
+    rest = [d for d in win if d in bil and d not in ev]
+    if ev:
+        rv = [num(r" R=(-?\d+)", bil[d], int, 0) or 0 for d in ev]
+        rr = [num(r" R=(-?\d+)", bil[d], int, 0) or 0 for d in rest]
+        rep.add("E5/A8-6: reszta R w dobach z nowym rodem, hersztem albo paktem (czynne klucze)",
+                f"srednio {sum(rv) / len(rv):+.0f} w {len(ev)} dobach (najwiecej {max(rv, key=abs):+d}); pozostale doby srednio " + (f"{sum(rr) / len(rr):+.0f}" if rr else "-"),
+                "INFO (dotad: nowy rod +15 000..+38 000, herszt +10 000, pakt -500..-25 500; po A8 jak tlo)", None)
+    else:
+        rep.add("E5/A8-6: reszta R w dobach ze zdarzeniami A8", "brak dob z nowym rodem, hersztem albo paktem przy czynnych kluczach", "INFO", None)
+    # ---------------- kontrola
+    ov, op_, sm = tot(r"stos paktow przepelniony (\d+)"), tot(r"otwarte okna paktow (\d+)"), tot(r"\| potkniecia (\d+)")
+    errs = sum(1 for x in lines if "ERROR" in x and "BkDipGold." in x)
+    rep.add("E5/A8-7: kontrola (stos paktow, otwarte okna na koniec doby, potkniecia, ERROR BkDipGold.*)", f"{ov} / {op_} / {sm} / {errs}", "0 / 0 / 0 / 0",
+            ov == 0 and op_ == 0 and sm == 0 and errs == 0)
 
 def etap5_b1(rep, lines, start, until, logp):
     """E5/B1 (173, kiesa ludu czynna; plan kodu docs/etap5/PLAN-KODU-E5B1.md rozdz. 11, progi B1-T1..T20). Okno: doby kampanii 2-until; sr28 - ostatnie 28 dob okna.

@@ -1702,6 +1702,34 @@ namespace Armoury
             return Math.Max(0, comp.Gold - keep);
         }
 
+        /// <summary>E5/A8 (BkDipGold): kiesa startowa herszta BK z kasy jego kryjowki - ta sama regula co kiesa nowej bandy (StartGoldPostfix): tylko z nadwyzki
+        /// ponad skarbiec i tylko tyle, ile jej jest; przez HoardChange (suma _hoardSeen). Zwraca, ile zdjeto z kasy kryjowki.</summary>
+        internal static int TakeHoardSurplus(Settlement hideout, int want)
+        {
+            if (hideout == null || want <= 0) return 0;
+            int got = Math.Min(want, HoardSurplus(hideout));
+            if (got > 0) HoardChange(hideout, -got);
+            return Math.Max(0, got);
+        }
+
+        /// <summary>E5/A8 (BkDipGold): juki herszta BK przy wyjsciu z kryjowki - zamiast "sprzedazy" BK z niczego ten sam paser co w dobie (FenceSell: miasta
+        /// w promieniu placa z kasy ponad rezerwe, towar na polke, bron i sprzet zostaja), od razu w chwili, w ktorej BK sprzedawal. Zaplata do kiesy bandy
+        /// jak u kazdej bandy. Bez prawa wyrzutkow albo bez skupu lupu - nic (juki zostaja). Zwraca false, gdy paser nie ruszyl.</summary>
+        internal static bool FenceNow(MobileParty p)
+        {
+            var s = Settings.Current;
+            if (!On || s == null || p == null || !p.IsActive || p.MapEvent != null || !s.OutlawFenceBuysLoot) return false;
+            float share = MBMath.ClampFloat(s.OutlawFenceLootShare, 0f, 1f);
+            if (share <= 0f) return false;
+            try { FenceSell(p, share, (int)Math.Max(0f, s.TownRentFloorGold)); }
+            catch (Exception e)
+            {
+                _sellStumbles++;
+                if (!_errSell) { _errSell = true; Log.Error("OutlawLaw.FenceSell", e); }
+            }
+            return true;
+        }
+
         /// <summary>Czy nadwyzka kasy kryjowki bandy pokryje brakujaca kwote. Zwraca kryjowke albo null.</summary>
         private static Settlement HoardSpare(MobileParty p, int lack)
         {

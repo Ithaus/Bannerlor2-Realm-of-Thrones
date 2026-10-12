@@ -235,6 +235,7 @@ namespace Armoury
                 try { Seal31.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Seal31.ApplyAll", e); }   // 3.1 (31): szczelnosc etapu 3 - PO oknach ksiegi (prefiksy zmieniajace zloto maja nizszy priorytet niz okna First)
                 try { NotableGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NotableGold.ApplyAll", e); }   // E5/A3 (164c): zloto notabli przez kase miasta handlu - PO oknach ksiegi (O03/O04 First) i PO Seal31
                 try { SmallGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SmallGold.ApplyAll", e); }   // E5/A7: drobne zrodla gry (rabunek z kiesy wsi, kiesa nowej zalogi, perki AI) - PO NotableGold (prefiksy Low na GiveGoldAction)
+                try { BkDipGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkDipGold.ApplyAll", e); }   // E5/A8: BK i Diplomacy bez platnika albo odbiorcy (rod szlachty, herszt, uczta BK, koszt paktu Diplomacy) - PO SmallGold
                 Measure169c.SetHarmony(_harmony);
                 ClanBudget.SetHarmony(_harmony);    // 166: tylko zapamietanie - latki gry wpina EnsureHooks w kampanii
                 OverflowHome.SetHarmony(_harmony);  // W4c: tylko zapamietanie - okno dezercji gry wpina EnsureHooks w kampanii
