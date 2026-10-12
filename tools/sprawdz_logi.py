@@ -189,6 +189,11 @@ Uzycie (Python 3, tylko odczyt):
                     wojnie z panem przeprawy); Q-2 koszt <= 5 ms/dobe; Q-3 zadna partia zawracana ponad 3 razy na dobe (zakleszczenie); Q-4 INFO
                     szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen; Q-5 INFO partie w strefie bez rozkazu (spiacy,
                     przerwa 3 h, oblezenie, eskorty, woda, AI wylaczone, brak punktu na ladzie) i punkt odwrotu; Q-K potkniecia i linie "ERROR in CrossingLaw.*" 0.
+                    Blok etap8_g1 (E8/G1, paczka 260 - karawany BK w miescie co godzine i wyspy bez drogi, CaravanFlow.cs): G1-0 latki wpiete N/N, linia
+                    "Karawany (E8/G1)" w kazdej dobie okna, oba klucze czynne, spis slepych zaulkow mapy <= 25% osad; G1-1 karawany bez statkow 7+ dob
+                    w tym samym miescie <= 10 (Z33: 29); G1-2 sredni postoj karawan AI w miescie <= 12 h (linia E8/P3); G1-3 karawany bez drogi na koniec
+                    biegu 0, ponowne i nieudane rozwiazania 0, zamiary zakupu BK widziane przez latke >= zakupy z ksiegi obiegu; G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe; G1-5 suma kas miast d120 +-10% Z33, kasy
+                    ponizej zapasu przez nasza wyplate 0, kiesy karawan d120 +-20% Z33, wizyty i zakupy INFO; G1-K potkniecia i "ERROR in CaravanFlow.*" 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8614,6 +8619,161 @@ def etap8_q(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rep.add("Q-K: kontrola (potkniecia petli, linie ERROR in CrossingLaw.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
 
 
+# E8/G1 (260): blok etap8_g1 - karawany: BK w miescie co godzine i wyspy bez drogi (CaravanFlow.cs)
+E8_G1_DAY = "Karawany (E8/G1): dzien"
+E8_G1_Z33_TOWNS = 10264881      # suma kas miast w dobie 120 biegu Z33 (WGRANIE 33, linia "Nadwyzka kas (E5/0)")
+E8_G1_Z33_CARAVANS = 4076294    # kiesy karawan w dobie 120 biegu Z33 (linia "Pieniadz swiata": partie bez wodza - karawany; 902 karawany notabli i 57 lordow)
+
+
+def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/G1 (260, projekt etapu 8 v2 rozdz. 3 "E8/G1" Test; odpowiedz Jeffa 3: TAK): karawany BK w miescie co godzine (postfiks na prefiksie BKROT) i wyspy
+    bez drogi (zakup lorda pominiety, karawana bez drogi rozwiazana). Linia doby "Karawany (E8/G1): dzien N" (dzien ksiegi, jak "Postoj karawan (E8/P3)").
+    G1-0 latki wpiete N/N, linia w kazdej dobie okna (bez pierwszej i ostatniej), oba klucze czynne, spis slepych zaulkow mapy najwyzej 25% osad (kontrola
+    reguly - pamiec drog zna pary wies - miasto);
+    G1-1 karawany bez statkow 7+ dob w tym samym miescie <= 10 w ostatniej dobie okna (linia "Wyspy i drogi"; Z33: 29);
+    G1-2 sredni postoj karawan AI w miescie <= 12 h (linia "Postoj karawan (E8/P3)", srednia wazona wyjazdami okna);
+    G1-3 karawany bez drogi na koniec biegu 0 ("zostalo" w ostatniej linii), ponowne rozwiazania u tego samego wlasciciela 0, nieudane 0;
+    G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe (srednio; czas brutto tikow, ktore otworzylismy);
+    G1-5 (prog, nie INFO): suma kas miast w dobie 120 w +-10% Z33, kasy ponizej zapasu przez nasza wyplate 0, kiesy karawan w dobie 120 w +-20% Z33
+    (bieg krotszy niz 120 dob - INFO); wizyty i zakupy karawan - INFO;
+    G1-K potkniecia i linie "ERROR in CaravanFlow.*" 0."""
+    rows = {d: s for d, s in by_day(lines, E8_G1_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Karawany (E8/G1): latki przy starcie gry")]
+    if not rows and not wire:
+        rep.add("E8/G1: linie Karawany (E8/G1)", "brak w logu", "sa od wgrania E8/G1 (CaravanFlow.cs)", None)
+        return
+    # ---------------- G1-0: latki, linia, klucze, spis slepych zaulkow
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("G1-0: latki (postfiks na prefiksie BKROT, pomiar tiku BK, zakup karawany lorda BK)", w0[:200],
+                "wpiete N/N, BRAK: -", a is not None and b is not None and a == b and "; BRAK: - |" in w0)
+    else:
+        rep.add("G1-0: latki", "brak linii startowej", "wpiete N/N", False)
+    if not rows:
+        rep.add("G1-0b: linia Karawany (E8/G1)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    last = rows[days[-1]]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_h = [d for d in days if "(Caravan Town Hourly WYLACZONE)" in rows[d]]
+    off_i = [d for d in days if "(Island Caravan Fix WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    if off_h:
+        val += f"; Caravan Town Hourly WYLACZONE w {len(off_h)} dobach"
+    if off_i:
+        val += f"; Island Caravan Fix WYLACZONE w {len(off_i)} dobach"
+    rep.add("G1-0b: linia Karawany (E8/G1) w kazdej dobie okna, oba klucze czynne", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_h and not off_i) if inner else None)
+    cen = re.search(r"slepe zaulki mapy dla karawany bez statkow \(raz na sesje\): miasta (\d+), zamki (\d+), wsie (\d+) z (\d+) osad", last)
+    if cen:
+        ct, cc, cv, ca = (int(x) for x in cen.groups())
+        share = 100.0 * (ct + cc + cv) / ca if ca else 0.0
+        rep.add("G1-0c: slepe zaulki mapy (osady bez drogi ladowej do dwoch miast) - kontrola reguly zakupu",
+                f"miasta {ct}, zamki {cc}, wsie {cv} z {ca} osad ({share:.1f}%)", "<= 25% osad (wiecej = pamiec drog nie zna par osad - zakup lordow blokowany na ladzie)",
+                share <= 25.0)
+    else:
+        bad = re.search(r"slepe zaulki mapy dla karawany bez statkow \(raz na sesje\): (.*?) \| latki", last)
+        rep.add("G1-0c: slepe zaulki mapy - kontrola reguly zakupu", bad.group(1)[:120] if bad else "brak w linii", "spis pelny, <= 25% osad", False)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- G1-1: karawany 7+ dob w tym samym miescie
+    isl = {d: s for d, s in by_day(lines, "Wyspy i drogi (").items() if 1 <= run_day(d, start) <= until}
+    p3 = {d: s for d, s in by_day(lines, "Postoj karawan (E8/P3): dzien").items() if 1 <= run_day(d, start) <= until}
+    if isl:
+        li = isl[max(isl)]
+        idle = num(r"w tym samym miescie od 7\+ dob \(kazde miasto, probka dobowa\): (\d+)", li)
+        where = re.search(r"probka dobowa\): \d+( \[.*?\])", li)
+        p3idle = num(r"h, 7\+ dob (\d+)\)", p3[max(p3)], int, None) if p3 else None
+        rep.add("G1-1: karawany bez statkow 7+ dob w tym samym miescie (ostatnia doba okna, linia Wyspy i drogi)",
+                ((f"{idle}" + (where.group(1) if where else "")) if idle is not None else "brak liczby w linii")
+                + (f"; wszystkie karawany AI z wjazdem w pamieci (E8/P3) 7+ dob: {p3idle}" if p3idle is not None else ""),
+                "<= 10 (Z33: 29; licznik postoju zeruje sie przy wczytaniu - bieg bez wczytania w ostatnich 7 dobach)", (idle <= 10) if idle is not None else None)
+    else:
+        rep.add("G1-1: karawany bez statkow 7+ dob w tym samym miescie", "brak linii Wyspy i drogi", "<= 10", None)
+    # ---------------- G1-2: sredni postoj w miescie
+    if p3:
+        left = sum(num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0 for s in p3.values())
+        hrs = sum((num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0) * (fnum(r"postoj srednio ([0-9.]+) h", s) or 0.0) for s in p3.values())
+        rep.add("G1-2: sredni postoj karawan AI w miescie (linia Postoj karawan (E8/P3), srednia wazona wyjazdami)",
+                (f"{hrs / left:.1f} h z {left} wyjazdow ({left / len(p3):.1f}/dobe)" if left else "brak wyjazdow z wjazdem w pamieci"),
+                "<= 12 h (przed E8/G1 ok. 3 doby)", (hrs / left <= 12.0) if left else None)
+    else:
+        rep.add("G1-2: sredni postoj karawan AI w miescie", "brak linii Postoj karawan (E8/P3) - Stage8WorldLog wylaczony?", "<= 12 h", None)
+    # ---------------- G1-3: karawany bez drogi
+    left_now = num(r", zostalo (\d+) \(w cieniu", last)
+    done, again, fail = tot(r", rozwiazane (\d+)"), tot(r"ponowne u tego samego wlasciciela (\d+)"), tot(r"nie zniknely mimo rozkazu (\d+)")
+    skip, ask = tot(r"zakup pominiety (\d+)"), tot(r"BK chcial kupic karawane lordowi (\d+) razy")
+    why = re.search(r"; powody( \[.*?\]| -)\), ponowne", last)
+    rep.add("G1-3: karawany bez drogi na koniec biegu (bez statkow w miescie bez innego miasta w zasiegu ladu)",
+            (f"zostalo {left_now}" if left_now is not None else "brak liczby") + (f" (powody{why.group(1)})" if why and left_now else "")
+            + f"; w oknie rozwiazane {done}, ponowne u tego samego wlasciciela {again}, nieudane {fail}; zakup karawany lorda pominiety {skip} z {ask} zamiarow BK",
+            "zostalo 0, ponowne 0, nieudane 0", (left_now == 0 and again == 0 and fail == 0) if left_now is not None else None)
+    ob = {d: s for d, s in by_day(lines, "Obieg: notable i karawany: dzien").items() if 1 <= run_day(d, start) <= until}
+    if ob:
+        bought = sum(num(r"kupione przez lordow BK (\d+)", s, int, 0) or 0 for s in ob.values())
+        rep.add("G1-3c: postfiks zakupu biegnie - zamiary BK widziane przez latke wobec karawan kupionych przez lordow (ksiega obiegu)",
+                f"zamiary {ask}, pominiete {skip}, kupione wedlug ksiegi {bought}", "zamiary - pominiete >= kupione (0 zamiarow przy zakupach = latka omijana)",
+                (ask - skip >= bought) if (ask or bought) else None)
+    if done:
+        sold_u, sold_g = tot(r"towar sprzedany miastu (\d+) szt\."), tot(r"szt\. za (\d+) zl z nadwyzki kasy")
+        uns_u, uns_v = tot(r"niesprzedane (\d+) szt\."), tot(r"szt\. warte (\d+) zl")
+        purse, got = tot(r"kiesa z utargiem (\d+) zl"), tot(r"wlascicielom przybylo (\d+)\)")
+        men, mp = tot(r"\), ludzie (\d+) \(do domu"), tot(r"sakiewki ludzi (\d+) zl")
+        rep.add("G1-3b: rozwiazane karawany - dokad poszedl dobytek (suma okna)",
+                f"towar miastu {sold_u} szt. za {sold_g} zl, niesprzedane na polke {uns_u} szt. warte {uns_v} zl; kiesa z utargiem {purse} zl (wlascicielom przybylo {got})"
+                f"; ludzie do domu {men}; sakiewki ludzi do kas miast {mp} zl", "INFO (kiesa = przybylo, gdy wlasciciel zyje)", None)
+    # ---------------- G1-4: koszt dodatkowych tikow
+    cost = [fnum(r"koszt dodatkowych tikow ([0-9.]+) ms/dobe", x) for x in w]
+    cm = _mean(cost)
+    cx = max([c for c in cost if c is not None] or [0.0])
+    opened, ran, orders = tot(r" - otwarte (\d+) u "), tot(r"po otwarciu: tiki BK (\d+)"), tot(r"nowy cel karawany (\d+)")
+    lng, lngc = tot(r"w tym samym postoju: (\d+) tikow"), _mean([num(r"tikow u (\d+) karawan \(bez celu", x) for x in w])
+    rep.add("G1-4: koszt dodatkowych tikow BK karawan w miescie (czas brutto otwartych tikow)",
+            (f"srednio {cm:.2f} ms/dobe, najdrozsza doba {cx:.2f} ms" if cm is not None else "brak liczby w linii")
+            + f"; otwarte {opened / n:.0f}/dobe, nowy cel {orders / n:.1f}/dobe", "<= 5 ms/dobe srednio", (cm <= 5.0) if cm is not None else None)
+    rep.add("G1-4b: otwarte tiki bez skutku - ponad 24 tiki w tym samym postoju (karawany bez celu albo ranni)",
+            f"{lng / n:.0f} tikow/dobe" + (f" u srednio {lngc:.1f} karawan" if lngc is not None else "") + f"; tiki BK po otwarciu {ran / n:.0f}/dobe",
+            "INFO (duzo = rozwazyc przerwe w otwieraniu dla karawany, ktora nie wyjezdza)", None)
+    # ---------------- G1-5: ekonomia (prog)
+    full = bool(win) and run_day(win[-1], start) >= 120
+    nk = {d: s for d, s in by_day(lines, "Nadwyzka kas (E5/0): dzien").items() if 1 <= run_day(d, start) <= until}
+    if nk:
+        tg = num(r"\| miasta \d+: kasy (-?\d+)", nk[max(nk)])
+        if tg is not None:
+            dev = 100.0 * (tg - E8_G1_Z33_TOWNS) / E8_G1_Z33_TOWNS
+            rep.add("G1-5a: suma kas miast w ostatniej dobie okna wobec Z33", f"{tg} ({dev:+.1f}% wobec {E8_G1_Z33_TOWNS}; doba {run_day(max(nk), start)})",
+                    "+-10% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 10.0) if full else None)
+    below = tot(r"kasy ponizej zapasu przez nasza wyplate (\d+)")
+    rep.add("G1-5b: kasy miast ponizej zapasu przez nasza wyplate za towar rozwiazanej karawany", f"{below}", "0", below == 0)
+    pw = {d: s for d, s in by_day(lines, "Pieniadz swiata: dzien").items() if 1 <= run_day(d, start) <= until}
+    if pw:
+        cg = num(r"partie bez wodza: tabory wsi -?\d+ \([^)]*\), karawany (-?\d+)", pw[max(pw)])
+        if cg is not None:
+            dev = 100.0 * (cg - E8_G1_Z33_CARAVANS) / E8_G1_Z33_CARAVANS
+            rep.add("G1-5c: kiesy karawan w ostatniej dobie okna wobec Z33", f"{cg} ({dev:+.1f}% wobec {E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)})",
+                    "+-20% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 20.0) if full else None)
+    vis = {d: s for d, s in by_day(lines, "Karawany: dzien").items() if 1 <= run_day(d, start) <= until}
+    why2 = {d: s for d, s in by_day(lines, "Karawany (przyczyny): dzien").items() if 1 <= run_day(d, start) <= until}
+    info = []
+    if vis:
+        v_in = sum(num(r"wjazdy karawan do miast (\d+)", s, int, 0) or 0 for s in vis.values())
+        info.append(f"wjazdy do miast {v_in / len(vis):.0f}/dobe (Z33 doba 120: 138)")
+    if why2:
+        v_buy = sum(num(r"zakup surowcow przed wyborem celu (\d+) wizyt", s, int, 0) or 0 for s in why2.values())
+        info.append(f"zakup surowcow przed wyborem celu {v_buy / len(why2):.0f} wizyt/dobe (Z33 doba 120: 115)")
+    if info:
+        rep.add("G1-5d: wiecej handlu karawan - wizyty i zakupy (CaravanBulk)", "; ".join(info), "INFO", None)
+    # ---------------- G1-K
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in CaravanFlow."))
+    rep.add("G1-K: kontrola (potkniecia, linie ERROR in CaravanFlow.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8636,6 +8796,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks = [etap8_t0, etap8_0, etap8_p3]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
     blocks.append(etap8_s)   # E8/S (246): porzadek stanu (osobna linia - czyste scalenie z lista drugiej galezi)
     blocks.append(etap8_q)   # E8/Q (262): straz przeprawy na zegarze gry
+    blocks.append(etap8_g1)   # E8/G1 (260): karawany BK w miescie co godzine, wyspy bez drogi
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

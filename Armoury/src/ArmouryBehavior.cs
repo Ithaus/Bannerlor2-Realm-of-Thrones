@@ -1529,6 +1529,7 @@ namespace Armoury
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); } DayProfile.Lap("TerrainEase.DailyAudit");
             try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); } DayProfile.Lap("WorldMeasure.Daily");   // T6: linia "Miara: marsz" (tylko log)
             try { Stage8World.Daily(); } catch (Exception e) { Log.Error("Stage8World.Daily", e); } DayProfile.Lap("Stage8World.Daily");   // E8/P3 (245): linie pomiarow swiata (owce, postoj karawan, najemnicy BK, rozkazy morskie; raz na sesje model produkcji wsi) - tylko log
+            try { CaravanFlow.Daily(); } catch (Exception e) { Log.Error("CaravanFlow.Daily", e); } DayProfile.Lap("CaravanFlow.Daily");   // E8/G1 (260): karawany bez drogi (wyspa z jednym miastem) - towar miastu z nadwyzki kasy i rozwiazanie; linia "Karawany (E8/G1)"; PO pomiarze postoju E8/P3, PRZED MoneyLedger.BlockOpen
             try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");

@@ -237,6 +237,7 @@ namespace Armoury
                 try { SmallGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SmallGold.ApplyAll", e); }   // E5/A7: drobne zrodla gry (rabunek z kiesy wsi, kiesa nowej zalogi, perki AI) - PO NotableGold (prefiksy Low na GiveGoldAction)
                 try { BkDipGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkDipGold.ApplyAll", e); }   // E5/A8: BK i Diplomacy bez platnika albo odbiorcy (rod szlachty, herszt, uczta BK, koszt paktu Diplomacy) - PO SmallGold
                 try { Stage8World.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Stage8World.ApplyAll", e); }   // E8/P3 (245): pomiary swiata (tylko log) - postfiksy DTE (kara Underequipped), prefiksy / postfiksy BK (GiveFood, FinancialCompromise, DrainGold, BuyGoods); niczego nie zmieniaja
+                try { CaravanFlow.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanFlow.ApplyAll", e); }   // E8/G1 (260): postfiks na prefiksie BKROT (dlawik karawan tylko w drodze), pomiar tiku BK, postfiks BK ShouldHaveCaravan (lord nie kupuje karawany bez statkow w slepym zaulku); klucze czytane na zywo
                 Measure169c.SetHarmony(_harmony);
                 ClanBudget.SetHarmony(_harmony);    // 166: tylko zapamietanie - latki gry wpina EnsureHooks w kampanii
                 OverflowHome.SetHarmony(_harmony);  // W4c: tylko zapamietanie - okno dezercji gry wpina EnsureHooks w kampanii

@@ -2016,6 +2016,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool IslandRoadsFix { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Town Hourly", HintText = "a Banner Kings caravan standing in a town decides every hour again whether to buy and move on, as Banner Kings meant it - the Realm of Thrones patch let it decide only once a day, so caravans stood about three days in every town instead of about three hours. On the road the once-a-day limit stays. Expect more trade between towns. Off = as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CaravanTownHourly { get; set; } = true;
+
+        [SettingPropertyBool("Island Caravan Fix", HintText = "a caravan without ships is no longer left stranded where it cannot trade: a lord does not buy one (Banner Kings) in a town, castle or village that has no road to two towns - his gold stays with him - and a caravan already standing in a town with no other town in reach by land is wound up: the town buys its goods out of its spare money, the purse goes to the owner, the men go home. Your own caravans are never touched. Off = as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool IslandCaravanFix { get; set; } = true;
+
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageClogDiagnostics { get; set; } = true;
@@ -5415,6 +5423,8 @@ namespace Armoury
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
             s.IslandRoadsFix = IslandRoadsFix;
+            s.CaravanTownHourly = CaravanTownHourly;
+            s.IslandCaravanFix = IslandCaravanFix;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
