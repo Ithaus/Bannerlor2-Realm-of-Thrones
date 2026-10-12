@@ -4896,6 +4896,10 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
+        [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
+        public bool StateHygieneEnabled { get; set; } = true;
+
         [SettingPropertyBool("Stage8 Profile Log", HintText = "Writes one daily line with the time each part of the mod takes (diagnostics only).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8ProfileLog { get; set; } = true;
@@ -6127,6 +6131,7 @@ namespace Armoury
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.StateHygieneEnabled = StateHygieneEnabled;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
         }

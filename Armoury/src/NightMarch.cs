@@ -1494,6 +1494,11 @@ namespace Armoury
             // w osadzie wystarczy wstrzymac AI (gra nie wypusci partii z wylaczonym AI) - rozkaz zostaje nietkniety
             bool inTown = mp.CurrentSettlement != null;
             var ds = new DebtSleeper { Bed = mp.GetPosition2D, Kind = ed >= 2 ? 2 : 1, Order = given ?? (inTown ? null : TakeOrder(mp)) };
+            // E8/S (246, rozpoznanie C poz. 17): w osadzie rozkaz zostaje przy partii (Order == null), wiec TakeOrder nie biegnie i wpis obozu swiata
+            // w _orders (rozkaz sprzed snu w polu, zanim partia weszla do osady) zostawal martwy: gdy dluznik wyszedl z osady cudzym rozkazem i spal
+            // dalej w polu, galaz switu oddawala mu ten stary rozkaz i budzila go o 6:00 (licznik E7/O1 "dluznicy obudzeni o 6:00"). Zdejmujemy wpis tutaj;
+            // biezacy rozkaz partii nietkniety (jesli wyjdzie z osady, AiDebtCamp zapamieta go w ds.Order jak dotad)
+            if (inTown && ds.Order == null && StateHygiene.On && _orders.Remove(mp)) StateHygiene.NoteDeadOrder();
             DropFromCamp(mp);
             _debtSleep[mp] = ds;
             if (ds.Kind == 2) { if (e.Acc < 0f) e.Acc = e.Rest; _day.ContSleeps++; } else _day.EveningCamps++;

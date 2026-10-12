@@ -788,6 +788,17 @@ namespace Armoury
         private static readonly System.Collections.Generic.Dictionary<string, double> _lastBuy =
             new System.Collections.Generic.Dictionary<string, double>();
 
+        /// <summary>E8/S (246, PLAN 8.11): nowa kampania albo wczytanie (konstruktor ArmouryBehavior przez StateHygiene.ResetAll). _lastBuy trzyma dzien
+        /// kampanii pod StringId druzyny, a te same StringId sa w kazdej kampanii: po nowej grze albo wczytaniu wczesniejszego zapisu w tej samej sesji
+        /// "today - last" bylo ujemne, czyli mniejsze od przerwy - stajnie AI nie kupowaly koni przez tyle dob, o ile poprzednia kampania byla dalej.
+        /// Po wyzerowaniu pierwsza wizyta kupuje jak po uruchomieniu gry (slownik nigdy nie byl w zapisie). Zwraca liczbe wpisow (do linii startu).</summary>
+        internal static int Reset()
+        {
+            int n = _lastBuy.Count;
+            _lastBuy.Clear();
+            return n;
+        }
+
         internal static void OnSettlementEntered(MobileParty party, TaleWorlds.CampaignSystem.Settlements.Settlement settlement)
         {
             try
@@ -818,6 +829,7 @@ namespace Armoury
                 if (_lastBuy.TryGetValue(pid, out last)
                     && today - last < Math.Max(0f, c.AiMountBuyCooldownDays))
                 {
+                    StateHygiene.NoteStableHold(today - last < 0);   // E8/S (246): tylko licznik - wizyta w przerwie zakupow; znacznik z przyszlosci = pamiec innej kampanii (ma byc 0)
                     // E6/K3 (219, KB K3-pompa): przerwa zdjeta dla partii z czekajacymi awansami tylko przy czynnej sprzedazy K2(b) - gra nie sprzedaje
                     // koni lordow (SpareHorses.SellOn), wiec nie ma pompy; zakup i tak tylko do zapasu kategorii z histereza 1.5 (K2). Inaczej przerwa zostaje.
                     if (!k3 || !CavalryTemplate.AnyOn) return;
@@ -1004,6 +1016,7 @@ namespace Armoury
                     return;
                 }
                 _lastBuy[pid] = today;
+                StateHygiene.NoteStableBuy();   // E8/S (246): tylko licznik - zakup stajni AI (linia doby "Porzadek stanu (E8/S)")
                 if (lack > 0) Remount(party);   // sklad7b-p: kupione konie najpierw pod jezdzcow bez konia, reszta czeka w taborze na awanse
                 HorseCensus.OnLordBought(party, bought, paid + toVillages + kGold, boughtMarket, bought - boughtMarket);
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);

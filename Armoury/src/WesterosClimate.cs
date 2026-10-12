@@ -37,6 +37,13 @@ namespace Armoury
         private static readonly List<Seg> _segs = new List<Seg>();
         private static readonly Random _rng = new Random();
         private static bool _initBroken;
+        // E8/S (246, PLAN 8.11c; CLAUDE.md 7 "licz potkniecia, nie gas funkcji"): _initBroken gasil klimat (pory roku, zime, 19 metod ekonomii) do konca
+        // sesji po JEDNYM wyjatku w Ready(). Teraz to tylko "stoj do nastepnej doby": Daily zdejmuje flage i Ready() probuje jeszcze raz - najwyzej
+        // InitStumblesMax prob w kampanii, potem linia ERROR raz na dobe (pory roku jak w grze do wczytania albo nowej kampanii). Ponowienie nie doda
+        // drugiego lata: Ready() wychodzi na _segs.Count > 0, zanim cokolwiek doda. Klucz StateHygieneEnabled off = jak dotad (flaga do konca sesji)
+        private static int _initStumbles, _initRetries;
+        private static Exception _initLast;
+        private const int InitStumblesMax = 3;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.ClimateEnabled; } }
         private static bool EconOn { get { var s = Settings.Current; return s != null && s.ClimateEnabled && s.ClimateDrivesEconomy; } }
@@ -46,7 +53,23 @@ namespace Armoury
         // sie dopiero w ok. 1. dobie - wartosc z Settings.Current juz by wtedy nie zyla. Reset (konstruktor ArmouryBehavior) = kazda kampania od nowa.
         private static int _trialSummerLeft = -1, _trialFirstAutumn = -1;
 
-        internal static void Reset() { _segs.Clear(); _initBroken = false; _trialSummerLeft = -1; _trialFirstAutumn = -1; }
+        internal static void Reset() { _segs.Clear(); _initBroken = false; _trialSummerLeft = -1; _trialFirstAutumn = -1; _initStumbles = 0; _initRetries = 0; _initLast = null; }
+
+        /// <summary>E8/S (246): stan startu klimatu do linii "Porzadek stanu (E8/S)" - potkniecia Ready() w tej kampanii, ponowienia, czy pory roku czynne.</summary>
+        internal static void HygieneState(out int stumbles, out int retries, out bool live)
+        {
+            stumbles = _initStumbles; retries = _initRetries; live = _segs.Count > 0;
+        }
+
+        /// <summary>E8/S (246): raz na dobe (Daily, przed Ready) - po potknieciu startu klimatu ponowna proba w tej dobie; po InitStumblesMax potknieciach
+        /// juz tylko linia ERROR raz na dobe. Bez klucza StateHygieneEnabled nic nie robi (flaga zostaje do konca sesji, jak dotad).</summary>
+        private static void RetryInit()
+        {
+            if (!_initBroken || _segs.Count > 0 || !StateHygiene.On) return;
+            if (_initStumbles < InitStumblesMax) { _initBroken = false; _initRetries++; return; }
+            Log.Error("WesterosClimate.Init (E8/S: " + _initStumbles + " potkniecia - klimat nie wystartowal, pory roku jak w grze do wczytania albo nowej kampanii)",
+                      _initLast ?? new InvalidOperationException("brak zapamietanego wyjatku"));
+        }
 
         /// <summary>WinterTrial (nowa kampania z plikiem-przelacznikiem): lato konczy sie za summerLeft dni od startu, pierwsza jesien trwa
         /// firstAutumn dni (jak Min = Max w ustawieniach). Gdy klimat juz ruszyl w tej kampanii (samo lato startowe - ktos zapytal o pore przed
@@ -82,9 +105,22 @@ namespace Armoury
                 _segs.Add(new Seg { Start = now - soFar, Season = (int)CampaignTime.Seasons.Summer, Len = soFar + left });
                 Log.Info("Klimat: start - lato trwa juz " + (int)soFar + " dni, skonczy sie za " + (int)left
                          + " dni (dzien kampanii " + (int)now + ")" + (_trialSummerLeft >= 0 ? " - PROBNA ZIMA (autotest), pierwsza jesien " + _trialFirstAutumn + " dni" : "") + ".");
+                if (_initStumbles > 0) Log.Info("Klimat (E8/S): start udany po " + _initStumbles + " potknieciach (ponowien " + _initRetries + ") - pory roku czynne.");
                 return true;
             }
-            catch (Exception e) { _initBroken = true; Log.Error("WesterosClimate.Init", e); return false; }
+            catch (Exception e)
+            {
+                // E8/S (246): licznik potkniec - flaga trzyma juz tylko do nastepnej doby (RetryInit w Daily), nie do konca sesji.
+                // Jedna proba = jedno potkniecie: gdyby pore roku czytaly naraz dwa watki gry, drugi w tej samej probie nie liczy drugi raz
+                bool first = !_initBroken;
+                _initBroken = true;
+                if (first)
+                {
+                    _initStumbles++; _initLast = e;
+                    Log.Error("WesterosClimate.Init (potkniecie " + _initStumbles + "/" + InitStumblesMax + ")", e);
+                }
+                return false;
+            }
         }
 
         private static double Rand(double a, double b)
@@ -126,6 +162,7 @@ namespace Armoury
         /// <summary>Raz dziennie: czy minela pora roku? Biale kruki Cytadeli.</summary>
         internal static void Daily()
         {
+            if (On) RetryInit();   // E8/S (246): po potknieciu startu klimatu - ponowna proba w tej dobie (najwyzej 3 w kampanii), potem ERROR raz na dobe
             if (!On || !Ready()) return;
             double now = NowDays();
             int guard = 0;

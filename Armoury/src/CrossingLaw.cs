@@ -37,6 +37,17 @@ namespace Armoury
         private static bool _haveSafe;
         private static DateTime _lastShout = DateTime.MinValue;
 
+        /// <summary>E8/S (246, PLAN 8.11): nowa kampania albo wczytanie (konstruktor ArmouryBehavior przez StateHygiene.ResetAll). Dotad ostatnia bezpieczna
+        /// pozycja gracza i przerwy odbitych partii AI zyly do konca procesu: w nowej kampanii straz przeprawy odsylala gracza w miejsce z POPRZEDNIEJ
+        /// (teraz jak po uruchomieniu gry - bez pozycji: prosto od zamku), a slownik trzymal partie starej gry. Zwraca, ile bylo w pamieci (do linii startu).</summary>
+        internal static int Reset()
+        {
+            int had = (_haveSafe ? 1 : 0) + _aiCooldown.Count;
+            _lastSafe = default(Vec2); _haveSafe = false;
+            _aiCooldown.Clear();
+            return had;
+        }
+
         internal static void OnTick(float dt)
         {
             try

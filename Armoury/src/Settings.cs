@@ -1555,6 +1555,13 @@ namespace Armoury
         // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
         // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)
         public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
+        // --- A clean slate between campaigns (stage 8) ---
+        // E8/S (246, PLAN 8.11; rozpoznanie C poz. 11, 15, 17): porzadek stanu (StateHygiene.cs) - przy nowej kampanii i kazdym wczytaniu zerowana pamiec, ktora dotad
+        // zyla do konca procesu: przeszukanie i odwet kryjowki (HideoutPurge), oboz gracza (potkniecia namiotu, pytanie o nocleg, flaga obozu), dzien audytu
+        // predkosci, przerwa zakupow stajni AI (dzien z dalszej kampanii blokowal zakupy koni), pozycja i przerwy strazy przeprawy; jedna wywrotka nie gasi juz
+        // klimatu do konca sesji (ponowna proba w kolejnej dobie, najwyzej 3) ani czekajacego przeszukania kryjowki (najwyzej 3 proby); sen dlugu w osadzie zdejmuje
+        // martwy wpis obozu swiata. Linie "Porzadek stanu (E8/S)" przy starcie sesji i co dobe. Off = wszystko jak przed E8/S
+        public bool StateHygieneEnabled = true;            // starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before
         // --- Diagnostics (stage 8) ---
         // E8/0 (242, PLAN 8.17 pomiar): linia "Profil doby (E8/0)" raz na dobe - takt doby (top 15 wywolan Daily), sluchacze godzinowe, zdarzenia (probka 1/16),
         // podzialy CyclePrefix / musztry / cen wedlug wolajacego, pamiec polki, zapis logu, GC (DayProfile.cs); opakowania zdarzen zakladane przy wczytaniu tylko przy wlaczonym kluczu

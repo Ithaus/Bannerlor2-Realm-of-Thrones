@@ -179,6 +179,11 @@ Uzycie (Python 3, tylko odczyt):
                     P3-3 INFO: lancuch modeli produkcji wsi i iloraz czynny / pod nim, sredni postoj karawan AI w miastach (stan przed E8/G1), zamiana BK
                     u klanow najemnikow (przed E8/G2), zrodla i ujscia BK bez platnika, owce, rozkazy partii ze statkami po switcie, kara Underequipped
                     po bitwach gracza, koszt; P3-K potkniecia i linie "ERROR in Stage8World.*" 0.
+                    Blok etap8_s (E8/S, paczka 246 - porzadek stanu, StateHygiene.cs; bieg "nowa kampania -> zapis -> wczytanie innego zapisu w tej samej
+                    sesji" - jeden log z >= 2 liniami startu, czytany po kolei, bez okna dob): S-1 stajnie AI kupuja w pierwszej dobie po wczytaniu -
+                    "znacznik z przyszlosci" 0 w kazdej linii doby i zakupy > 0 w dwoch pierwszych liniach doby po ostatnim starcie (jeden start - INFO);
+                    S-2 linia startu "Porzadek stanu (E8/S)" przy kazdym starcie sesji: wyzerowane 5 klas, potkniecia zerowania 0; S-3 klimat - linii
+                    "ERROR in WesterosClimate.Init" 0 albo po ponowieniu "czynny tak"; S-K linie "ERROR in StateHygiene*" i potkniecia linii 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8426,6 +8431,93 @@ def etap8_p3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         rep.add("P3-K: kontrola (potkniecia pomiarow, linie ERROR in Stage8World.*)", f"{sm} / {errs}", "0 / 0", sm == 0 and errs == 0)
 
 
+# E8/S (246): blok etap8_s - porzadek stanu (StateHygiene.cs)
+E8_S = "Porzadek stanu (E8/S): "
+E8_S_DAY = "Porzadek stanu (E8/S): dzien"
+
+
+def etap8_s(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/S (246, projekt etapu 8 v2 rozdz. 3 "E8/S" Test): porzadek stanu (StateHygiene.cs). Bieg "nowa kampania -> zapis -> wczytanie innego zapisu
+    w tej samej sesji" (procedura "zapis 9 dob") daje w JEDNYM logu co najmniej dwie linie startu - blok czyta log po kolei, nie po numerach dob
+    (druga kampania moze miec te same doby), i nie uzywa okna --do-doby.
+    S-1 stajnie AI kupuja w pierwszej dobie po wczytaniu: "znacznik z przyszlosci" 0 w kazdej linii doby calego logu, a po OSTATNIEJ linii startu
+    (przy >= 2 startach) zakupy > 0 w pierwszych dwoch liniach doby (pierwsza obejmuje niepelna dobe); jeden start w logu albo zero zakupow - INFO;
+    S-2 linia startu przy kazdym starcie sesji (tyle, ile linii "Jedna skala czasu (E7/C): odwet kryjowek"): "wyzerowane 5 klas", potkniecia
+    zerowania 0; WYLACZONE albo UWAGA = NIE;
+    S-3 klimat: potkniecia 0 (brak linii "ERROR in WesterosClimate.Init") albo ponowione i czynne (w kazdej sesji z potknieciem ostatnia linia doby
+    ma "czynny tak");
+    S-K linie "ERROR in StateHygiene*" 0 i potkniecia linii 0; INFO - co bylo w pamieci przy kazdym starcie, kryjowka, martwe wpisy obozu, stajnie."""
+    idx = [i for i, s in enumerate(lines) if s.startswith(E8_S) and not s.startswith(E8_S_DAY)]
+    days = [(i, s) for i, s in enumerate(lines) if s.startswith(E8_S_DAY)]
+    if not idx and not days:
+        rep.add("E8/S: linie Porzadek stanu (E8/S)", "brak w logu", "sa od wgrania E8/S (StateHygieneEnabled)", None)
+        return
+
+    def tot(rows, rx):
+        return sum(num(rx, s, int, 0) or 0 for s in rows)
+    all_days = [s for _, s in days]
+    # ---------------- S-2: linia startu
+    ref = sum(1 for s in lines if s.startswith("Jedna skala czasu (E7/C): odwet kryjowek"))
+    bad = []
+    for i in idx:
+        s = lines[i]
+        if "WYLACZONE" in s or "UWAGA" in s or num(r"wyzerowane (\d+) klas", s) != 5 or num(r"potkniecia zerowania (\d+)", s) != 0:
+            bad.append(s[len(E8_S):len(E8_S) + 90])
+    ok2 = bool(idx) and not bad and (ref == 0 or len(idx) == ref)
+    rep.add("S-2: linia startu przy kazdym starcie sesji (wyzerowane 5 klas, potkniecia zerowania 0)",
+            f"linii startu {len(idx)}, startow sesji wedlug linii E7/C {ref if ref else '?'}" + (f"; zle: {bad[:2]}" if bad else ""),
+            "kazdy start: wyzerowane 5 klas, potkniecia zerowania 0", ok2)
+    # ---------------- S-1: stajnie AI po wczytaniu
+    fut = tot(all_days, r"znacznik z przyszlosci (\d+)")
+    if len(idx) >= 2:
+        after = [s for i, s in days if i > idx[-1]]
+        buys2 = tot(after[:2], r"stajnie AI: zakupy (\d+)")
+        had = num(r"stajnie AI \(wpisy\) (\d+)", lines[idx[-1]])
+        val = (f"startow {len(idx)}; przy ostatnim starcie w pamieci {had if had is not None else '?'} wpisow stajni; po nim linii doby {len(after)}, zakupy w pierwszych dwoch {buys2}"
+               f"; znacznik z przyszlosci w calym logu {fut}")
+        ok1 = False if fut > 0 else (True if buys2 > 0 else None)
+        if not after:
+            val += " (brak linii doby po ostatnim starcie - bieg za krotki)"
+    else:
+        val = f"jeden start sesji w logu - bieg \"nowa kampania -> zapis -> wczytanie innego zapisu\" nie byl grany; znacznik z przyszlosci {fut}"
+        ok1 = False if fut > 0 else None
+    rep.add("S-1: stajnie AI kupuja w pierwszej dobie po wczytaniu (bez znacznika zakupu z innej kampanii)", val,
+            "znacznik z przyszlosci 0 i zakupy > 0 po ostatnim starcie (>= 2 starty w logu)", ok1)
+    # ---------------- S-3: klimat - potkniecia 0 albo ponowione i czynne (osobno w kazdej sesji logu)
+    cuts = idx + [len(lines)]
+    segs = [(cuts[k], cuts[k + 1]) for k in range(len(idx))] or [(0, len(lines))]
+    n_err, dead = 0, 0
+    for a, b in segs:
+        e = sum(1 for s in lines[a:b] if s.startswith("ERROR in WesterosClimate.Init"))
+        if e == 0:
+            continue
+        n_err += e
+        seg_days = [s for i, s in days if a <= i < b]
+        if not seg_days or "czynny tak" not in seg_days[-1]:
+            dead += 1
+    last = all_days[-1] if all_days else ""
+    st = re.search(r"klimat: (potkniecia \d+/3, ponowien \d+, czynny \w+)", last)
+    rep.add("S-3: klimat - potkniecia startu 0 albo ponowione i czynne",
+            f"linii ERROR in WesterosClimate.Init {n_err}, sesji z potknieciem bez czynnego klimatu na koncu {dead}; ostatnia doba: {st.group(1) if st else '?'}",
+            "0 potkniec albo po ponowieniu \"czynny tak\"", (dead == 0) if (all_days or n_err == 0) else None)
+    # ---------------- S-K i INFO
+    errs = sum(1 for s in lines if s.startswith("ERROR in StateHygiene"))
+    sm = max([num(r"potkniecia linii (\d+)", s, int, 0) or 0 for s in all_days] or [0])
+    rep.add("S-K: kontrola (linie ERROR in StateHygiene*, potkniecia linii doby)", f"{errs} / {sm}", "0 / 0", errs == 0 and sm == 0)
+    mem = []
+    for i in idx:
+        m = re.search(r"bylo: (.*?) \| potkniecia zerowania", lines[i])
+        mem.append(m.group(1) if m else "?")
+    rep.add("E8/S: w pamieci po poprzedniej kampanii przy kolejnych startach sesji", " || ".join(mem[:4]) if mem else "-",
+            "INFO (pierwszy start po uruchomieniu gry: same 0; po wczytaniu w tej samej sesji zwykle > 0 - to zostalo wyzerowane)", None)
+    if all_days:
+        b_all, h_all = tot(all_days, r"stajnie AI: zakupy (\d+)"), tot(all_days, r"wizyty w przerwie zakupow (\d+)")
+        hs, hg, do = tot(all_days, r"potkniecia przeszukania (\d+)"), tot(all_days, r"porzucone (\d+)"), tot(all_days, r"dluznikom w osadzie (\d+)")
+        rep.add("E8/S: stajnie AI, kryjowka, oboz (suma linii doby)",
+                f"zakupy stajni {b_all}, wizyty w przerwie zakupow {h_all}; kryjowka: potkniecia przeszukania {hs}, porzucone {hg}"
+                f"; martwe wpisy obozu zdjete dluznikom w osadzie {do}", "INFO", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8446,6 +8538,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     blocks = [etap8_t0, etap8_0, etap8_p3]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
+    blocks.append(etap8_s)   # E8/S (246): porzadek stanu (osobna linia - czyste scalenie z lista drugiej galezi)
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
