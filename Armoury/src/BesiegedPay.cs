@@ -41,7 +41,7 @@ namespace Armoury
     /// OBOWIAZKOWO w TownPurse.Valve zastapic bezwarunkowe `if (st.IsUnderSiege) { _vSiege++; return true; }` bramka: najpierw
     /// `int pay = CastlePurse.Dues(...)`, potem `if (BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) { _vSiege++; return true; }` (klucz
     /// wylaczony = zawor pobiera jak zwykle i licznik "zaplacone mimo oblezenia"). Galaz renty miast w PopulationLaw.Daily jest przy czynnym zaworze A1
-    /// pomijana - jej bramka zostaje dla A1 wylaczonego (wtedy przepuszcza i liczy). B2 (podatek wojenny 184 przy Earn) i B1 (oplaty stale wsi)
+    /// pomijana - jej bramka zostaje dla A1 wylaczonego (wtedy przepuszcza i liczy). B2 (podatek wojenny 184 - TownFolk.PayCrown) i B1 (oplaty stale wsi)
     /// wolaja te sama bramke (Holds). E5/B2: rodzaj KFolkWarTax - wstrzymanie przy samym kluczu (placi kiesa ludu, nie kasa osady - zawsze prawdziwy pieniadz),
     /// a w kontroli "co naprawde zeszlo z kas oblezonych" go nie ma (nie schodzi z kasy osady).
     /// Wyjatek - per wywolanie, licznik potkniec; bramka przy wyjatku przepuszcza (pobor jak dotad), bez globalnego wylacznika.

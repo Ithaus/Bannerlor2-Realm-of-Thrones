@@ -591,7 +591,7 @@ namespace Armoury
               .Append(", bandom ").Append(VillageTakings.CartToBands).Append(", zapasowemu odbiorcy ").Append(VillageTakings.CartToSpare)
               .Append(", bez odbiorcy (prog 0) ").Append(VillageTakings.Unrouted)
               .Append(" | korona [P]: wplywy - powinnosci ").Append(KingdomTreasury.LastDues).Append(", danina wojenna ").Append(KingdomTreasury.LastSubsidy)
-              .Append(", podatek wojenny ludu (184) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarTax)   // E5/B2: pobor przy zarobku ludu (TownFolk.Earn B1)
+              .Append(", podatek wojenny ludu (184) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarTax)   // E5/B2: pobor raz na dobe od zarobku okna (TownFolk.PayCrown, scalenie B)
               .Append(", udzial z zaworu zamkow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", udzial z zaworu kas miast (E5/A1) ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")

@@ -27,7 +27,7 @@ namespace Armoury
     /// Rozruch (flaga zapisu arm_sutlers): przy pierwszej dobie z wlaczona paczka - gdy sakiewki partii rodow maja wiecej niz 15 dni ich zoldu (stary
     /// zapis Jeffa, zapis testowy z doby 362), stawka rosnie od 1% do SutlerDailyShare w SutlerRampDays (28) dob; inaczej (nowa kampania) od razu pelna.
     /// Bez rozruchu pierwsza doba zabralaby ok. 2 mln naraz, a pierwszy tydzien ok. 10-15 mln (projekt rozdz. 3 E5/A3).
-    /// Hak B1 (KL 1.3: uslugi 75% kupcy / 25% lud) - czesc miejska idzie dzis cala do kasy miasta; B1 dzieli ja w tym samym miejscu (One, przy wplacie do kasy miasta).
+    /// Hak B1 (KL 1.3: uslugi 75% kupcy / 25% lud) - E5/B1: czesc miejska dzielona w One przy wplacie (TownFolk.EarnService KLife); kiesa nieczynna - calosc do kasy miasta.
     /// Zloto nie powstaje i nie znika: sakiewka ludzi -> kasa miasta / kiesa wsi (posiadacze "Pieniadz swiata"). Wyjatek per partia - licznik potkniec.
     /// </summary>
     internal static class Sutlers
