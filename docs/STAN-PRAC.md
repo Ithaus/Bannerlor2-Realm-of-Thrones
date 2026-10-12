@@ -1204,6 +1204,9 @@ ZATWIERDZONE: Armoury 9d314ea6, RealisticCaptivity 90665425, GrandTourney bbb841
   (8) A1: ubogie miasta bez zakupow zbroi - ZOSTAWIC ("tak dziala ekonomia, niech miasta stana sie bogate");
   (9) ujscia: BANDA ZABIERA WSZYSTKO (cale zloto i rynsztunek gracza - "zostawia mnie w lachmanach") do swojej kiesy/jukow (nie w nicosc); oplata za werbunek zalog
       NIE MOZE znikac (do sprzedajacego - notabla/osady).
+  (00:25 UTC) (7) A5 Z8 - POPRAWIC razem z (5): zwrot wlasnych pieniedzy gracza/lorda nie obniza dopłaty korony do zoldu zalog; (9) doprecyzowanie: "tylko czesc,
+  lord nie wozi calego majatku" - gracz: caly rynsztunek + % zlota z RealisticCaptivity (60, ustawienie Jeffa) DO KIESY/JUKOW BANDY (nie w nicosc); lord AI: czesc
+  (A6: 5% sakiewki, max 10 000) do zwyciezcow; skarbiec rodu zostaje. (Jeff moze podac jedna liczbe "sakiewki podroznej" dla wszystkich.)
 
 **WGRANIE 31 (11.10 ok. 10:55 zegara komp.; drugi test zbiorczy):** Armoury cf40fefa (galaz noc/wgranie-31 = w-toku/zbior31 dfb12df = WGRANIE 30 +
 E4/4 (przyrost naturalny wsi g = 0.5 + 0.6 x dobrobyt - 0.6 x niebezpieczenstwo, korytarz -1.3..+0.8 %/rok zamiast stalej gry; miasta jako stan; podloga 10 hearth z puli
