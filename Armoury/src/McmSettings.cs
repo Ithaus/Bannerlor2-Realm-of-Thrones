@@ -4772,6 +4772,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int ValveStockDaysHigh { get; set; } = 60;
 
+        [SettingPropertyBool("Horse Breeding By Demand", HintText = "every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal is only reported for now; works only with Harvest Valve on (off = stud farms breed what the game says)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseBreedingByDemand { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5964,6 +5968,7 @@ namespace Armoury
             s.VillageOutputStep = VillageOutputStep;
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;
+            s.HorseBreedingByDemand = HorseBreedingByDemand;
         }
 
         internal static void Apply()

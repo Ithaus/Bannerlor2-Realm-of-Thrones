@@ -1482,6 +1482,10 @@ namespace Armoury
         public float VillageOutputStep = 1.3f;             // the most a village can make of a good the world is short of, as a multiple of its normal output (1 = never more than normal; a cut-back good first returns to normal)
         public int ValveStockDaysLow = 30;                 // a village makes more of a good once the stock across the world falls below this many days of use
         public int ValveStockDaysHigh = 60;                // a village makes less of a good once the stock across the world grows beyond this many days of use
+        // E6/K4 (220, PLAN 6.12, R9; krytyka K1-02): hodowla wedlug popytu w regulatorze wsi (HarvestValve) - konie wedlug kategorii (zwykly, bojowy, szlachetny,
+        // juczny): krok x1.3 kategorii chcianej CZYNNY, przesuniecie do 25% produkcji zwyklych stadniny na bojowe jej listy (te same sztuki) CZYNNE, ciecie ponizej
+        // bazy gry NA SUCHO (linia "Hodowla (220)" - "mnoznik by byl"; czynne pod osobnym kluczem po biegu rocznym); dziala tylko z HarvestValve
+        public bool HorseBreedingByDemand = true;          // every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal is only reported for now; works only with Harvest Valve on (off = stud farms breed what the game says)
 
         public static void Load(string moduleDataDir)
         {

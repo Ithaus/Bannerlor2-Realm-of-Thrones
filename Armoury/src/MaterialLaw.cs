@@ -219,6 +219,9 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((valve - 1f) * sum, HarvestValve.Text);
                 }
+                // E6/K4 (220): hodowla wedlug popytu - mnoznik kategorii konia (krok x1.3 czynny, ciecie ponizej x1 na sucho) i w ticku stadniny przesuniecie
+                // czesci zwyklych na bojowe (HarvestValve.HorseStep); ten sam wzor (czynnik x suma), przemienny z R1/W3, PRZED W2 (ostatni krok)
+                HarvestValve.HorseStep(village, item, ref __result);
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);

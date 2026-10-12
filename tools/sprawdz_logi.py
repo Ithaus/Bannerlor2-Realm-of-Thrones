@@ -99,6 +99,11 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/W3 (221, etap 6 - progi tutaj) W3-1..W3-8 - linie "Regulator wsi (221)", "BK gnicie surowcow (174.3)" i ksiegi "Towary:": regulator CZYNNY,
                     pierwsza decyzja do d60 (gdy okno siega d60), kasowanie 0 w kazdej dobie po pierwszej decyzji, zaden towar nie zmienia kierunku w dwoch kolejnych
                     decyzjach, potkniecia 0, sol i glina - zapas d90 -> until bez wzrostu (<= +2%, gdy okno siega d92); mnozniki i kierunki decyzji - INFO.
+                    Blok E6/K4 (220, etap 6 - progi tutaj) K4-1..K4-9 - linie "Hodowla (220)" (doba i decyzja) i "Przeglad stadnin (220)": hodowla CZYNNA,
+                    podaz koni bojowych d61-until > d1-60 (srednio na dobe; gdy w decyzji do d60 bojowe chciane i okno siega d90), stos zwyklych w decyzjach
+                    po przesunieciu > 0 nie ponizej dolnego progu (30 dni zuzycia), zaden kierunek kategorii nie zmienia sie w dwoch kolejnych decyzjach,
+                    potkniecia 0; bieg roczny (okno >= d360): stos koni na targu d180 -> until bez trendu (+-10%); mnozniki, przesuniecie, ciecie na sucho,
+                    przeglad stadnin - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3336,6 +3341,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_w3(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_w3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K4 (220): hodowla wedlug popytu - konie wedlug kategorii w regulatorze wsi, krok i przesuniecie czynne, ciecie na sucho (brak linii - INFO)
+    try:
+        etap5_k4(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3919,6 +3929,95 @@ def etap5_w3(rep, lines, start, until):
             upn = num(r"w gore (\d+), bez zmian", s, int, 0)
             dirs.append(f"d{rd}: w dol {dn}, w gore {upn}")
         rep.add("W3-8: decyzje w oknie (w dol / w gore)", "; ".join(dirs), "INFO", None)
+
+
+def etap5_k4(rep, lines, start, until):
+    """E6/K4 (220, projekt etapu 6 v2 rozdz. 3 "E6/K4" Test i rozdz. 4 prog 6.12): linie "Hodowla (220): dzien N - ..." (doba: CZYNNA | produkcja doby,
+    WYLACZONA, NIEAKTYWNA, CZYNNA od tej doby, start pomiaru koni; decyzja co 28 dob) i "Przeglad stadnin (220)" (dzien = doba gry - 1, okno 1-until jak
+    etap5_main). Wiazace: hodowla CZYNNA w oknie (klucz HorseBreedingByDemand i regulator wsi), podaz koni bojowych d61-until > d1-60 (srednio na dobe, gdy
+    w decyzji do d60 bojowe chciane i okno siega d90), stos zwyklych w kazdej decyzji po przesunieciu > 0 nie ponizej dolnego progu stosu (30 dni zuzycia),
+    zaden kierunek kategorii nie zmienia sie w dwoch kolejnych decyzjach (gdy >= 2 decyzje), potkniecia 0; bieg roczny (okno >= d360): stos koni na targu
+    d180 -> until bez trendu (+-10%); mnozniki i przesuniecie ostatniej decyzji, ciecie na sucho, przeglad stadnin - INFO."""
+    day_l, dec_l, rev = {}, {}, None
+    for s in lines:
+        if s.startswith("Przeglad stadnin (220): dzien "):
+            rev = s
+            continue
+        if not s.startswith("Hodowla (220): dzien "):
+            continue
+        d = num(r"dzien (\d+)", s)
+        if d is None:
+            continue
+        rd = run_day(d, start)
+        if not (1 <= rd <= until):
+            continue
+        if " - decyzja " in s:
+            dec_l[rd] = s
+        else:
+            day_l[rd] = s
+    if not day_l and not dec_l:
+        rep.add("K4-1: linie Hodowla (220)", "brak linii w oknie", "jest od wgrania E6/K4", None)
+        return
+    off = sorted(rd for rd, s in day_l.items() if "WYLACZONA" in s or "NIEAKTYWNA" in s)
+    act = {rd: s for rd, s in day_l.items() if " - CZYNNA |" in s}
+    rep.add("K4-1: hodowla wedlug popytu CZYNNA w oknie", f"linii doby CZYNNA {len(act)}, wylaczona/nieaktywna {len(off)}" + (f" (np. d{off[0]})" if off else ""),
+            "CZYNNA (klucze HorseBreedingByDemand i HarvestValve)", len(off) == 0 and len(act) > 0)
+
+    def prod(s):
+        m = re.search(r"produkcja doby zwykly/bojowy/szlachetny/juczny (\d+)/(\d+)/(\d+)/(\d+)", s)
+        return [int(x) for x in m.groups()] if m else None
+
+    a = [prod(s)[1] for rd, s in act.items() if rd <= 60 and prod(s)]
+    b = [prod(s)[1] for rd, s in act.items() if rd >= 61 and prod(s)]
+    early = sorted(rd for rd in dec_l if rd <= 60)
+    wanted = ("bojowe chciane TAK" in dec_l[early[0]]) if early else None
+    if a and b and max(act) >= 90:
+        ma, mb = sum(a) / len(a), sum(b) / len(b)
+        note = (f"; bojowe chciane w decyzji d{early[0]}: {'TAK' if wanted else 'NIE'}" if early else "; brak decyzji do d60")
+        rep.add("K4-2: podaz koni bojowych d61-until wobec d1-60 (srednio na dobe)", f"{ma:.1f} -> {mb:.1f}{note}",
+                "wiecej (gdy bojowe chciane; projekt 6.12)", (mb > ma) if wanted else None)
+    else:
+        rep.add("K4-2: podaz koni bojowych d61-until wobec d1-60", "za krotkie okno albo brak linii doby", "wiecej (gdy okno siega d90 i bojowe chciane)", None)
+    bad, chk = [], 0
+    for rd, s in sorted(dec_l.items()):
+        sh = re.search(r"przesuniecie zwykle -> bojowe ([\d.]+)% -> ([\d.]+)%", s)
+        lo = num(r"stos (\d+)-\d+ dni zuzycia", s, int, 30) or 30
+        z = re.search(r"\[zwykly: [^;\]]*?stos (\d+) = (\d+) dni zuzycia", s)
+        if sh and float(sh.group(1)) > 0:
+            chk += 1
+            if z and int(z.group(2)) < lo:
+                bad.append(f"d{rd}: {z.group(2)} dni")
+    rep.add("K4-3: stos zwyklych w decyzjach po przesunieciu zwykle -> bojowe", f"decyzji z przesunieciem {chk}, ponizej progu {len(bad)}" + (f" ({'; '.join(bad[:3])})" if bad else ""),
+            ">= dolny prog stosu (30 dni zuzycia)", (len(bad) == 0) if chk else None)
+    flips = sum(num(r"zmiany kierunku w kolejnych decyzjach (\d+)", s, int, 0) or 0 for s in dec_l.values())
+    rep.add("K4-4: zmiany kierunku kategorii koni w dwoch kolejnych decyzjach (suma okna)", f"{flips} w {len(dec_l)} decyzjach", "0 (brak kolysania)",
+            (flips == 0) if len(dec_l) >= 2 else None)
+    stu = max([num(r"potkniecia (\d+)\.", s, int, 0) or 0 for s in list(act.values()) + list(dec_l.values())] or [0])
+    rep.add("K4-5: potkniecia regulatora (najwiecej w liniach Hodowla)", str(stu), "0", stu == 0)
+    if dec_l:
+        last = dec_l[max(dec_l)]
+        sh = re.search(r"przesuniecie zwykle -> bojowe ([\d.]+%) -> ([\d.]+%)", last)
+        i, j = last.find(": ["), last.find("] | przesuniecie")
+        body = last[i + 3:j] if i >= 0 and j > i else ""
+        mult = [p.split(",")[0] for p in body.split("; ")]
+        rep.add("K4-6: ostatnia decyzja - mnozniki kategorii i przesuniecie", f"d{max(dec_l)}: " + "; ".join(mult) + (f" | przesuniecie {sh.group(1)} -> {sh.group(2)}" if sh else ""), "INFO", None)
+        dry = re.search(r"\| ciecie na sucho: (.*?) \(czynne", last)
+        rep.add("K4-7: ciecie na sucho (ostatnia decyzja)", dry.group(1) if dry else "-", "INFO (czynne po biegu rocznym)", None)
+    else:
+        rep.add("K4-6: decyzje hodowli", "brak decyzji w oknie", "INFO (pierwsza 56 dob po starcie pomiaru)", None)
+    if rev:
+        rep.add("K4-8: przeglad stadnin", rev.split(" - ", 1)[-1][:300], "INFO", None)
+    st = {}
+    for rd, s in act.items():
+        m = re.search(r"stos na targu \(spis co \d+ dob\) (\d+)/(\d+)/(\d+)/(\d+)", s)
+        if m:
+            st[rd] = sum(int(x) for x in m.groups())
+    if st and max(st) >= 360:
+        ks = [d for d in st if d >= 180]
+        a0, e0 = st[min(ks)], st[max(st)]
+        rep.add("K4-9: bieg roczny - konie na targu d180 -> until", f"d{min(ks)} {a0} -> d{max(st)} {e0}", "bez trendu (+-10%)", abs(e0 - a0) <= 0.10 * max(1, a0))
+    else:
+        rep.add("K4-9: bieg roczny - konie na targu bez trendu", "okno krotsze niz d360", "+-10% (tylko bieg roczny)", None)
 
 
 def etap5_fee(rep, lines):
