@@ -800,7 +800,9 @@ namespace Armoury
                 int lack = Remount(party);
                 if (!c.CavalryNeedsMounts || !c.AiBuysMounts) return;
                 // E6/K3 (219): na zamku rodu partii tylko kon rycerza od rodu (stado wsi przypietej do zamku); zwykle zakupy jak dotad tylko w miescie i we wsi
-                bool castle = settlement.IsCastle && CavalryTemplate.KnightOn && settlement.OwnerClan != null && settlement.OwnerClan == CavalryTemplate.ClanOf(party);
+                // recenzja 219: K3 (kon rycerza, zamek, zdjeta przerwa) tylko dla partii rodow AI (CavalryTemplate.Steered) - rod gracza bez zmian, jak sterowanie awansem
+                bool k3 = CavalryTemplate.Steered(party);
+                bool castle = k3 && settlement.IsCastle && CavalryTemplate.KnightOn && settlement.OwnerClan != null && settlement.OwnerClan == CavalryTemplate.ClanOf(party);
                 if (!settlement.IsTown && !settlement.IsVillage && !castle) return;
 
                 // KONIOKRADZTWO GOSPODARCZE: bez przerwy miedzy zakupami powstawala
@@ -811,14 +813,14 @@ namespace Armoury
                 double today = CampaignTime.Now.ToDays;
                 double last;
                 string pid = party.StringId ?? "";
-                int[] knK = CavalryTemplate.KnightOn ? new int[3] : null;   // E6/K3: czekajacy rycerze wedlug kategorii (NeedByCategory)
+                int[] knK = k3 && CavalryTemplate.KnightOn ? new int[3] : null;   // E6/K3: czekajacy rycerze wedlug kategorii (NeedByCategory)
                 int[] needK = null;
                 if (_lastBuy.TryGetValue(pid, out last)
                     && today - last < Math.Max(0f, c.AiMountBuyCooldownDays))
                 {
                     // E6/K3 (219, KB K3-pompa): przerwa zdjeta dla partii z czekajacymi awansami tylko przy czynnej sprzedazy K2(b) - gra nie sprzedaje
                     // koni lordow (SpareHorses.SellOn), wiec nie ma pompy; zakup i tak tylko do zapasu kategorii z histereza 1.5 (K2). Inaczej przerwa zostaje.
-                    if (!CavalryTemplate.AnyOn) return;
+                    if (!k3 || !CavalryTemplate.AnyOn) return;
                     needK = NeedByCategory(party.Party, knK);
                     if (needK[0] + needK[1] + needK[2] <= 0) return;
                     if (!SpareHorses.SellOn) { CavalryTemplate.NoteCooldown(false); return; }
