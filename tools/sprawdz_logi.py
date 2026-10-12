@@ -4385,7 +4385,7 @@ def etap5_a7(rep, lines, start, until):
         rep.add("E5/A7: linie Drobne zrodla (E5/A7)", "brak w logu", "sa od wgrania E5/A7 (LogEnabled)", None)
         return
     if wire:
-        rep.add("E5/A7-0: latki (rabunek, nowa zaloga, Insurance Plans, Rapid Development, strona przelewu)", wire[-1][:220], "BRAK: - (5 wpietych)", "BRAK: -;" in wire[-1])
+        rep.add("E5/A7-0: latki (rabunek, nowa zaloga, kiesa starej zalogi, Insurance Plans, Rapid Development, strona przelewu)", wire[-1][:240], "BRAK: - (6 wpietych)", "BRAK: -;" in wire[-1])
     if not win:
         rep.add("E5/A7: linia doby", "brak w dobach 2-%d" % until, "codziennie (LogEnabled)", False)
         return
@@ -4412,11 +4412,15 @@ def etap5_a7(rep, lines, start, until):
     # ---------------- 2. nowe zalogi
     gn, gt = tot(r"\| nowe zalogi[^:]*: (\d+), kiesa startowa"), tot(r"kiesa startowa gry (\d+) -> 0")
     goff = tot(r"rozliczeniem zoldu\), z niczego jak dotad (\d+)")
+    # recenzja A7: kiesa starej zalogi przy zdobyciu przechodzi na nowa zaloge (przelew; wczesniej znikala - U8 "garnizony")
+    gh, ghn = tot(r"przy zdobyciu: nowej zalodze (\d+)"), tot(r"przy zdobyciu: nowej zalodze \d+ \((\d+)\)")
+    gb = tot(r"z powrotem do zalogi osady (\d+)")
     op = [x for x in lines if x.startswith("Drobne zrodla (E5/A7): start")]
     rep.add("E5/A7-3: nowe zalogi bez kiesy startowej z niczego (suma dob 2-%d)" % until,
             f"zalog {gn}, kiesa startowa gry niepowstala {gt}" + (f" (sr. {gt / gn:.0f} na zaloge)" if gn else "") + (f"; z niczego jak dotad {goff}" if goff else "")
+            + f"; kiesa starej zalogi przejeta przez nowa {gh} w {ghn} zdobyciach" + (f", z powrotem do zalogi osady {gb}" if gb else "")
             + (" | bilans otwarcia" + op[-1].split("bilans otwarcia")[-1][:100] if op else ""),
-            "INFO (audyt: 5000 na zdobycie twierdzy - reszta R +5000 w dobach zdobycia znika; kiese wypelnia rod rozliczeniem zoldu)", None)
+            "INFO (audyt: 5000 na zdobycie twierdzy - reszta R +5000 w dobach zdobycia znika, U8 garnizony przy zdobyciu ok. 0; kiese wypelnia rod rozliczeniem zoldu)", None)
     # ---------------- 3. za tier
     ton = [d for d in win if "za tier rody AI bez lenn WYLACZONE" not in a7[d]]
     tc, tn = tot(r"za tier rody AI bez lenn[^:]*: gra dalaby (\d+)"), tot(r"za tier rody AI bez lenn[^:]*: gra dalaby \d+ u (\d+) rodow")
@@ -4438,9 +4442,10 @@ def etap5_a7(rep, lines, start, until):
             "kwota = 5000 x liczba; INFO (audyt: 3 / 2 / 14 paczek na bieg)", pi == 5000 * pin_ and pr == 5000 * prn)
     # ---------------- kontrola
     st, ov, sm = tot(r"zdarzenia w oknie rabunku niedopasowane (\d+)"), tot(r"stos przepelniony (\d+)"), tot(r"\| potkniecia (\d+)")
+    gtw = tot(r"kiesa starej zalogi bez zalogi - do kasy osady (\d+)")
     errs = sum(1 for x in lines if "ERROR" in x and "SmallGold." in x)
-    rep.add("E5/A7-7: kontrola (niedopasowane w oknie rabunku, stos, potkniecia, ERROR SmallGold.*)", f"{st} / {ov} / {sm} / {errs}", "0 / 0 / 0 / 0",
-            st == 0 and ov == 0 and sm == 0 and errs == 0)
+    rep.add("E5/A7-7: kontrola (niedopasowane w oknie rabunku, stos, potkniecia, ERROR SmallGold.*, kiesa starej zalogi do kasy osady)", f"{st} / {ov} / {sm} / {errs} / {gtw}",
+            "0 / 0 / 0 / 0 / 0", st == 0 and ov == 0 and sm == 0 and errs == 0 and gtw == 0)
 
 
 def etap5_b1(rep, lines, start, until, logp):

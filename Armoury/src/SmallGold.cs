@@ -29,12 +29,15 @@ namespace Armoury
     ///    kwote przed obcieciem, wiec raz na rabunek - komunikat, gdy kiesa wsi nie starcza. Lupienie gracza akcja wrogosci (VillageHostileActionCampaignBehavior
     ///    :556) - poza zakresem (tylko gracz). E7/R1 (projekt etapu 7) ma lupic swoje rabunki ta sama regula (kiesa wsi do jej wysokosci).
     /// 2. KIESA STARTOWA NOWEJ ZALOGI (GarrisonNoStartPurse; G GarrisonPartyComponent.cs:96): gra daje kazdej nowej zalodze PartyGoldLowerThreshold (5 000)
-    ///    z niczego - po zdobyciu twierdzy stara zaloga ginie (ChangeOwnerOfSettlementAction.cs:34-41), nowa powstaje z 5 000. Kiesa starej zalogi ma juz odbiorce
-    ///    (3.2 BeatenPurse: zwyciezca; poza regula 3.2 - E3/7 CaravanCapital.RoutePurse: glowa rodu albo miasto), wiec "kiesy starej" w chwili tworzenia nowej
-    ///    nie ma. Teraz nowa zaloga po starcie gry zostaje z kiesa sprzed InitializePartyTrade (nowa partia: 0); kiese wypelnia rod wlasciciela z salda zwyklym
-    ///    rozliczeniem zoldu (BK PartyExpensesPrefix: zold + 200/d, dopoki kiesa < 5 000; gra: do 5 000 - SoldierPay placi zalodze tylko to, co jest w kiesie).
-    ///    Prefiks zapamietuje kiese przed, postfiks ja przywraca - partia zamieniona w zaloge (SetPartyComponent) nie traci swojej kiesy. Tworzenie swiata
-    ///    (przed GameStarted) - regula gry (bilans otwarcia, liczba w linii).
+    ///    z niczego - po zdobyciu twierdzy stara zaloga ginie (ChangeOwnerOfSettlementAction.cs:34-41), nowa powstaje z 5 000. Teraz nowa zaloga po starcie gry
+    ///    zostaje z kiesa sprzed InitializePartyTrade (nowa partia: 0). Recenzja A7: kiesa STAREJ zalogi przy zdobyciu (BySiege) nie miala odbiorcy - 3.2
+    ///    BeatenPurse.TypeOf pomija zalogi (tylko tabory, karawany, bandy), E3/7 RoutePurse tylko partie rozwiazane (niszczyciel null), wiec znikala z partia
+    ///    (U8 "garnizony" w ksiedze - CirculationWindows.OnPartyDestroyed). Teraz okno ChangeOwnerOfSettlementAction.ApplyInternal (BySiege, jest zaloga) zdejmuje
+    ///    kiese starej zalogi przed zniszczeniem, a nowa zaloga tej osady ja przejmuje (audyt 5b E5/A7 (2): "dostaje kiese starej zalogi" - przelew, zloto ani
+    ///    nie powstaje, ani nie znika; falszywa para U8/R znika). Gdy nowej zalogi nie ma (gra nie zniszczyla starej, wyjatek) - kiesa wraca do zalogi osady,
+    ///    a bez zalogi - do kasy osady (licznik kontroli). Dalej kiese wypelnia rod wlasciciela z salda zwyklym rozliczeniem zoldu (BK PartyExpensesPrefix:
+    ///    zold + 200/d, dopoki kiesa < 5 000; gra: do 5 000 - SoldierPay placi zalodze tylko to, co jest w kiesie). Prefiks zapamietuje kiese przed, postfiks
+    ///    ja przywraca - partia zamieniona w zaloge (SetPartyComponent) nie traci swojej kiesy. Tworzenie swiata (przed GameStarted) - regula gry (bilans otwarcia).
     /// 3. "ZA TIER" (TierIncomeAiOff; G DefaultClanFinanceModel.cs:133-137): rody AI bez lenn poza krolestwem i najemnicy dostaja Tier x 80 (+40) na dobe
     ///    z niczego. MercContract.TierPostfix zdejmowal to tylko najemnikom AI z umowa 185; teraz (ten sam postfiks, ten sam wpis bez opisu) wszystkim rodom AI
     ///    z warunkiem gry. Gracz bez zmian (gra i tak go pomija). Ksiega obiegu (O40) nie liczy zdjetego "za tier" jako zrodla - MercContract.CancelsTier.
@@ -72,6 +75,10 @@ namespace Armoury
         private static int _rN, _rShortN, _rEmptyN, _rOffN;
         private static long _gTaken, _gOpenGold, _gOffGold;
         private static int _gN, _gOpenN, _gOffN;
+        private static long _gHand, _gBack, _gTown;               // recenzja A7: kiesa starej zalogi - nowej zalodze / z powrotem do zalogi osady / do kasy osady
+        private static int _gHandN, _gBackN, _gTownN;
+        private static Settlement _capSt;                          // okno zdobycia: osada, ktorej stara zaloga oddala kiese
+        private static long _capPurse;                             // kiesa starej zalogi czekajaca na nowa zaloge tej osady
         private static long _tCut, _tCutMerc, _tOff;
         private static int _tN, _tOffN;
         private static long _pIns, _pRapid, _pInsP, _pRapidP, _pOff;
@@ -89,6 +96,7 @@ namespace Armoury
             Array.Clear(_stack, 0, _stack.Length); _depth = 0;
             RaidPaidSum = 0; _told = null;
             _gOpenGold = 0; _gOpenN = 0; _startLogged = false;
+            _capSt = null; _capPurse = 0;
             _stumbles = 0; _err.Clear();
             ClearDay();
         }
@@ -97,6 +105,7 @@ namespace Armoury
         {
             _rDue = _rPaid = _rDueP = _rPaidP = _rOff = 0; _rN = _rShortN = _rEmptyN = _rOffN = 0;
             _gTaken = _gOffGold = 0; _gN = _gOffN = 0;
+            _gHand = _gBack = _gTown = 0; _gHandN = _gBackN = _gTownN = 0;
             _tCut = _tCutMerc = _tOff = 0; _tN = _tOffN = 0;
             _pIns = _pRapid = _pInsP = _pRapidP = _pOff = 0; _pInsN = _pRapidN = _pInsPN = _pRapidPN = _pOffN = 0;
             _strays = _overflow = 0;
@@ -172,13 +181,64 @@ namespace Armoury
                 if (mp == null) return;
                 int now = mp.PartyTradeGold;
                 long made = (long)now - __state;                                // tyle InitializePartyTrade dopisal z niczego (5 000 u nowej)
-                if (made <= 0) return;
-                if (!Live) { _gOpenN++; _gOpenGold += made; return; }          // tworzenie swiata - regula gry (bilans otwarcia)
-                if (!GarrisonOn) { _gOffN++; _gOffGold += made; return; }
-                mp.PartyTradeGold = __state;                                    // kiesa jak przed - zloto nie powstaje; kiese wypelnia rod rozliczeniem zoldu
-                _gN++; _gTaken += made;
+                if (made > 0)
+                {
+                    if (!Live) { _gOpenN++; _gOpenGold += made; return; }      // tworzenie swiata - regula gry (bilans otwarcia)
+                    if (!GarrisonOn) { _gOffN++; _gOffGold += made; return; }
+                    mp.PartyTradeGold = __state;                                // kiesa jak przed - zloto nie powstaje; kiese wypelnia rod rozliczeniem zoldu
+                    _gN++; _gTaken += made;
+                }
+                TakeOver(__instance, mp);                                       // recenzja A7: nowa zaloga zdobytej osady przejmuje kiese starej (przelew)
             }
             catch (Exception e) { Stumble("GarrisonPost", e); }
+        }
+
+        /// <summary>Nowa zaloga osady z otwartego okna zdobycia przejmuje kiese starej zalogi (zdjeta w CapturePre) - przelew miedzy zalogami tej samej osady.</summary>
+        private static void TakeOver(GarrisonPartyComponent gc, MobileParty mp)
+        {
+            if (_capSt == null || _capPurse <= 0 || gc == null || mp == null || !ReferenceEquals(gc.Settlement, _capSt)) return;
+            long p = _capPurse;
+            _capPurse = 0; _capSt = null;
+            mp.PartyTradeGold = (int)Math.Min(int.MaxValue, (long)Math.Max(0, mp.PartyTradeGold) + p);
+            _gHand += p; _gHandN++;
+        }
+
+        // ------------------------------------------------------------ 2a. stara zaloga przy zdobyciu: okno ChangeOwnerOfSettlementAction.ApplyInternal
+        /// <summary>Prefiks (Low): przy zdobyciu (BySiege) gra niszczy stara zaloge (DestroyPartyAction - jej kiesa znikala z partia, U8) i od razu tworzy nowa
+        /// (AddGarrisonParty). Kiesa starej zalogi zdjeta tu, przed zniszczeniem - przejmie ja nowa zaloga tej osady (TakeOver w GarrisonPost).</summary>
+        public static void CapturePre(Settlement __0, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail __3, out bool __state)
+        {
+            __state = false;
+            try
+            {
+                if (!Live || !GarrisonOn || __0 == null || !__0.IsFortification || __0.Town == null) return;
+                if (__3 != ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege) return;   // tylko wtedy gra niszczy zaloge (:33-36)
+                var g = __0.Town.GarrisonParty;
+                if (g == null || !g.IsActive) return;
+                if (_capSt != null) Flush();                                    // niedokonczone okno (nie powinno sie zdarzyc) - najpierw oddac tamta kiese
+                int purse = Math.Max(0, g.PartyTradeGold);
+                _capSt = __0; _capPurse = purse; __state = true;
+                if (purse > 0) g.PartyTradeGold = 0;                            // zloto czeka na nowa zaloge - nie znika z niszczona partia
+            }
+            catch (Exception e) { __state = false; Stumble("CapturePre", e); }
+        }
+
+        /// <summary>Finalizer (High): kiesa, ktorej nowa zaloga nie przejela (gra nie zniszczyla starej, wyjatek) - do obecnej zalogi osady, bez zalogi - do kasy osady.</summary>
+        public static void CaptureFin(bool __state)
+        {
+            if (!__state) return;
+            try { Flush(); }
+            catch (Exception e) { Stumble("CaptureFin", e); }
+        }
+
+        private static void Flush()
+        {
+            var st = _capSt; long p = _capPurse;
+            _capSt = null; _capPurse = 0;
+            if (st == null || p <= 0) return;
+            var g = st.Town != null ? st.Town.GarrisonParty : null;
+            if (g != null && g.IsActive) { g.PartyTradeGold = (int)Math.Min(int.MaxValue, (long)Math.Max(0, g.PartyTradeGold) + p); _gBack += p; _gBackN++; return; }
+            if (st.SettlementComponent != null) { st.SettlementComponent.ChangeGold((int)Math.Min(int.MaxValue, p)); _gTown += p; _gTownN++; }
         }
 
         // ------------------------------------------------------------ 3. "za tier" - wolane z MercContract.TierPostfix (przy rozliczeniu, applyWithdrawals)
@@ -338,6 +398,8 @@ namespace Armoury
             var gar = AccessTools.Method(typeof(GarrisonPartyComponent), "OnMobilePartySetOnCreation");
             Patch(h, "nowa zaloga (GarrisonPartyComponent.OnMobilePartySetOnCreation)", gar != null && gar.DeclaringType == typeof(GarrisonPartyComponent) ? gar : null,
                   nameof(GarrisonPre), nameof(GarrisonPost), null, Priority.Normal);
+            Patch(h, "kiesa starej zalogi (ChangeOwnerOfSettlementAction.ApplyInternal)", AccessTools.Method(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal"),
+                  nameof(CapturePre), null, nameof(CaptureFin), Priority.Low);
             Patch(h, "Insurance Plans (DestroyPartyAction.ApplyInternal)", AccessTools.Method(typeof(DestroyPartyAction), "ApplyInternal"),
                   nameof(InsPre), null, nameof(CtxFin), Priority.Low);
             Patch(h, "Rapid Development (WorkshopsCampaignBehavior.OnSettlementOwnerChanged)", AccessTools.Method(typeof(WorkshopsCampaignBehavior), "OnSettlementOwnerChanged"),
@@ -371,8 +433,10 @@ namespace Armoury
                   .Append(" (kiesa wsi nie starczyla w ").Append(_rShortN).Append(" krokach, pusta w ").Append(_rEmptyN).Append("); gracz: gra dalaby ").Append(_rDueP).Append(", z kies wsi ").Append(_rPaidP);
                 if (_rOffN > 0) sb.Append("; z niczego jak dotad ").Append(_rOff).Append(" w ").Append(_rOffN).Append(" krokach");
                 sb.Append(" | nowe zalogi").Append(GarrisonOn ? "" : " WYLACZONE (Garrison No Start Purse)").Append(": ").Append(_gN).Append(", kiesa startowa gry ").Append(_gTaken)
-                  .Append(" -> 0 (kiese wypelnia rod rozliczeniem zoldu)");
+                  .Append(" -> 0 (po zdobyciu kiesa starej zalogi, dalej kiese wypelnia rod rozliczeniem zoldu)");
                 if (_gOffN > 0) sb.Append(", z niczego jak dotad ").Append(_gOffGold).Append(" u ").Append(_gOffN);
+                sb.Append("; kiesa starej zalogi przy zdobyciu: nowej zalodze ").Append(_gHand).Append(" (").Append(_gHandN).Append("), z powrotem do zalogi osady ").Append(_gBack)
+                  .Append(" (").Append(_gBackN).Append(')');
                 sb.Append(" | za tier rody AI bez lenn").Append(TierOn ? "" : " WYLACZONE (Tier Income Ai Off)").Append(": gra dalaby ").Append(_tCut).Append(" u ").Append(_tN)
                   .Append(" rodow (w tym najemnicy ").Append(_tCutMerc).Append("), dostaly 0; poza tym 185 zdejmuje najemnikom z umowa (linia Kontrakty najemnikow)");
                 if (_tOffN > 0) sb.Append(", z niczego jak dotad ").Append(_tOff).Append(" u ").Append(_tOffN);
@@ -380,7 +444,8 @@ namespace Armoury
                   .Append("), Rapid Development uciete ").Append(_pRapid).Append(" (").Append(_pRapidN).Append(')');
                 if (_pOffN > 0) sb.Append(", z niczego jak dotad ").Append(_pOff).Append(" (").Append(_pOffN).Append(')');
                 sb.Append("; gracz bez zmian: Insurance Plans ").Append(_pInsP).Append(" (").Append(_pInsPN).Append("), Rapid Development ").Append(_pRapidP).Append(" (").Append(_pRapidPN).Append(')');
-                sb.Append(" | kontrola (prog 0): zdarzenia w oknie rabunku niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow);
+                sb.Append(" | kontrola (prog 0): zdarzenia w oknie rabunku niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow)
+                  .Append(", kiesa starej zalogi bez zalogi - do kasy osady ").Append(_gTown).Append(" (").Append(_gTownN).Append(')');
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                 sb.Append('.');
                 Log.Info(sb.ToString());

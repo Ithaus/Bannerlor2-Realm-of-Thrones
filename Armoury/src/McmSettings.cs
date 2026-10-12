@@ -956,7 +956,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool RaidLootFromVillage { get; set; } = true;
 
-        [SettingPropertyBool("Garrison No Start Purse", HintText = "a garrison formed after the campaign has begun (a captured castle or town, a garrison set up again) no longer gets 5,000 out of thin air - it starts with an empty purse, and its owner's house fills it from its own coffers with the daily wages, as for any party. The garrisons of a new world keep the game's starting purse. Off = 5,000 out of thin air, as before")]
+        [SettingPropertyBool("Garrison No Start Purse", HintText = "a garrison formed after the campaign has begun no longer gets 5,000 out of thin air - the new garrison of a captured castle or town takes over the purse of the garrison it replaces (which used to vanish), any other new garrison starts with an empty purse, and its owner's house fills it from its own coffers with the daily wages, as for any party. The garrisons of a new world keep the game's starting purse. Off = 5,000 out of thin air and the old garrison's purse lost, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool GarrisonNoStartPurse { get; set; } = true;
 
