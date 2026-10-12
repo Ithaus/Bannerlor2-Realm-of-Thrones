@@ -1,0 +1,2432 @@
+[
+{
+"id": "looters",
+"name": "Broken Men",
+"culture": "looters",
+"home": "hideout_mountain_2",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "sea_raiders",
+"name": "Pirates",
+"culture": "sea_raiders",
+"home": "hideout_seaside_6",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "mountain_bandits",
+"name": "Highland Brigands",
+"culture": "mountain_bandits",
+"home": "hideout_mountain_15",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "forest_bandits",
+"name": "Woodland Brigands",
+"culture": "forest_bandits",
+"home": "hideout_forest_19",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "desert_bandits",
+"name": "Desert Brigands",
+"culture": "desert_bandits",
+"home": "hideout_desert_12",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "steppe_bandits",
+"name": "Rogue Dothraki",
+"culture": "steppe_bandits",
+"home": "hideout_steppe_5",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "clan_empire_north_1",
+"name": "Royce",
+"culture": "vale",
+"home": "castle_EN3",
+"super": "empire",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_1"
+},
+{
+"id": "clan_empire_north_2",
+"name": "Tully",
+"culture": "river",
+"home": "town_V2",
+"super": "riverlands",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_3"
+},
+{
+"id": "clan_empire_north_3",
+"name": "Frey",
+"culture": "river",
+"home": "ROT_town3",
+"super": "riverlands",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_5"
+},
+{
+"id": "clan_empire_north_4",
+"name": "Corbray",
+"culture": "vale",
+"home": "ROT_town6",
+"super": "empire",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_20"
+},
+{
+"id": "clan_empire_north_5",
+"name": "Tully,Blackfish",
+"culture": "river",
+"home": "ROT_town4",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_50"
+},
+{
+"id": "clan_empire_north_6",
+"name": "Hunter",
+"culture": "vale",
+"home": "castle_EN4",
+"super": "empire",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_51"
+},
+{
+"id": "clan_empire_north_7",
+"name": "Mallister",
+"culture": "river",
+"home": "ROT_town33",
+"super": "riverlands",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_58"
+},
+{
+"id": "clan_empire_north_8",
+"name": "Blackwood",
+"culture": "river",
+"home": "castle_EN7",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_NE8_l"
+},
+{
+"id": "clan_empire_north_9",
+"name": "Mooton",
+"culture": "river",
+"home": "town_EW6",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_NE9_l"
+},
+{
+"id": "clan_empire_west_1",
+"name": "Tyrell",
+"culture": "reach",
+"home": "town_V5",
+"super": "empire_w",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_7"
+},
+{
+"id": "clan_empire_west_2",
+"name": "Baratheon,Renly",
+"culture": "stormlands",
+"home": "town_EW3",
+"super": "stormlands",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_9"
+},
+{
+"id": "clan_empire_west_3",
+"name": "Baratheon,Stannis",
+"culture": "dragonstone",
+"home": "town_EW1",
+"super": "dragonstone",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_11"
+},
+{
+"id": "clan_empire_west_4",
+"name": "Buckler",
+"culture": "stormlands",
+"home": "castle_EW3",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_40"
+},
+{
+"id": "clan_empire_west_5",
+"name": "Tarth",
+"culture": "stormlands",
+"home": "ROT_town8",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_45"
+},
+{
+"id": "clan_empire_west_6",
+"name": "Velaryon",
+"culture": "dragonstone",
+"home": "town_S5",
+"super": "dragonstone",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_52"
+},
+{
+"id": "clan_empire_west_7",
+"name": "Footly",
+"culture": "reach",
+"home": "town_ES7",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_53"
+},
+{
+"id": "clan_empire_west_8",
+"name": "Ashford",
+"culture": "reach",
+"home": "town_V1",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_71"
+},
+{
+"id": "clan_empire_west_9",
+"name": "Seaworth",
+"culture": "dragonstone",
+"home": "ROT_castle18",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_WE9_l"
+},
+{
+"id": "clan_empire_south_1",
+"name": "Targaryen",
+"culture": "valyrian",
+"home": "town_K1",
+"super": "empire_s",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_14"
+},
+{
+"id": "clan_empire_south_2",
+"name": "Maegyr",
+"culture": "volantine",
+"home": "town_ES2",
+"super": "volantis",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_15"
+},
+{
+"id": "clan_empire_south_3",
+"name": "Bolton",
+"culture": "battania",
+"home": "ROT_town1",
+"super": "battania",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_17"
+},
+{
+"id": "clan_empire_south_4",
+"name": "Antaryon",
+"culture": "empire",
+"home": "town_EN5",
+"super": "bravos",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_30"
+},
+{
+"id": "clan_empire_south_5",
+"name": "Aloran",
+"culture": "nord",
+"home": "town_EN6",
+"super": "nord",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_1_63"
+},
+{
+"id": "clan_empire_south_6",
+"name": "Paenymion",
+"culture": "volantine",
+"home": "town_ES5",
+"super": "volantis",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_54"
+},
+{
+"id": "clan_empire_south_7",
+"name": "Selmy",
+"culture": "stormlands",
+"home": "castle_EW7",
+"super": "stormlands",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_1_55"
+},
+{
+"id": "clan_empire_south_8",
+"name": "Vhassar",
+"culture": "volantine",
+"home": "town_ES4",
+"super": "volantis",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_1_72"
+},
+{
+"id": "clan_empire_south_9",
+"name": "Celeris",
+"culture": "empire",
+"home": "ROT_town14",
+"super": "bravos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_SE9_l"
+},
+{
+"id": "clan_aserai_1",
+"name": "Martell",
+"culture": "aserai",
+"home": "town_A1",
+"super": "aserai",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_3_1"
+},
+{
+"id": "clan_aserai_2",
+"name": "Drahar",
+"culture": "myrish",
+"home": "town_A8",
+"super": "myr",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_3_3"
+},
+{
+"id": "clan_aserai_3",
+"name": "Mopatis",
+"culture": "pentoshi",
+"home": "town_EN4",
+"super": "pentos",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_3_5"
+},
+{
+"id": "clan_aserai_4",
+"name": "Vaith",
+"culture": "aserai",
+"home": "town_A6",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_3_16"
+},
+{
+"id": "clan_aserai_5",
+"name": "Yronwood",
+"culture": "aserai",
+"home": "ROT_town30",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_3_17"
+},
+{
+"id": "clan_aserai_6",
+"name": "Ormollen",
+"culture": "lyseni",
+"home": "town_A4",
+"super": "lys",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_3_18"
+},
+{
+"id": "clan_aserai_7",
+"name": "Manwoody",
+"culture": "aserai",
+"home": "castle_A4",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_3_19"
+},
+{
+"id": "clan_aserai_8",
+"name": "Ryndoon",
+"culture": "tyroshi",
+"home": "town_A5",
+"super": "tyrosh",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_3_22"
+},
+{
+"id": "clan_aserai_9",
+"name": "Moharis",
+"culture": "pentoshi",
+"home": "ROT_town13",
+"super": "pentos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_A9_l"
+},
+{
+"id": "clan_vlandia_1",
+"name": "Lannister",
+"culture": "vlandia",
+"home": "castle_V5",
+"super": "vlandia",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_4_1"
+},
+{
+"id": "clan_vlandia_2",
+"name": "Tarly",
+"culture": "reach",
+"home": "castle_V1",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_3"
+},
+{
+"id": "clan_vlandia_3",
+"name": "Arryn",
+"culture": "vale",
+"home": "town_EN1",
+"super": "empire",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_4_6"
+},
+{
+"id": "clan_vlandia_4",
+"name": "Hightower",
+"culture": "reach",
+"home": "town_V6",
+"super": "empire_w",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_4_16"
+},
+{
+"id": "clan_vlandia_5",
+"name": "Clegane",
+"culture": "vlandia",
+"home": "castle_V4",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.lord_4_21"
+},
+{
+"id": "clan_vlandia_6",
+"name": "Lefford",
+"culture": "vlandia",
+"home": "castle_V6",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_22"
+},
+{
+"id": "clan_vlandia_7",
+"name": "Kenning",
+"culture": "vlandia",
+"home": "town_V8",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_23"
+},
+{
+"id": "clan_vlandia_8",
+"name": "Swyft",
+"culture": "vlandia",
+"home": "castle_ES5",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_24"
+},
+{
+"id": "clan_vlandia_9",
+"name": "Crakehall",
+"culture": "vlandia",
+"home": "castle_V3",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_27"
+},
+{
+"id": "clan_vlandia_10",
+"name": "Rykker",
+"culture": "vlandia",
+"home": "town_EW5",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_4_28"
+},
+{
+"id": "clan_vlandia_11",
+"name": "Redwyne",
+"culture": "reach",
+"home": "town_V7",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_V11_l"
+},
+{
+"id": "clan_battania_1",
+"name": "Stark",
+"culture": "battania",
+"home": "town_B2",
+"super": "battania",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_5_1"
+},
+{
+"id": "clan_battania_2",
+"name": "Mormont-Nights Watch",
+"culture": "nightswatch",
+"home": "town_B5",
+"super": "nightswatch",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_5_3"
+},
+{
+"id": "clan_battania_3",
+"name": "Reed",
+"culture": "battania",
+"home": "castle_B2",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_5_5"
+},
+{
+"id": "clan_battania_4",
+"name": "Manderly",
+"culture": "battania",
+"home": "town_B3",
+"super": "battania",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_5_14"
+},
+{
+"id": "clan_battania_5",
+"name": "Umber",
+"culture": "battania",
+"home": "ROT_town23",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_5_16"
+},
+{
+"id": "clan_battania_6",
+"name": "Snow",
+"culture": "nightswatch",
+"home": "castle_N5",
+"super": "nightswatch",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_5_17"
+},
+{
+"id": "clan_battania_7",
+"name": "Glover",
+"culture": "battania",
+"home": "ROT_town2",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_5_15"
+},
+{
+"id": "clan_battania_8",
+"name": "Mormont",
+"culture": "battania",
+"home": "town_N2",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_B8_l"
+},
+{
+"id": "clan_khuzait_1",
+"name": "Pono",
+"culture": "khuzait",
+"home": "town_K3",
+"super": "khuzait",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_6_1"
+},
+{
+"id": "clan_khuzait_2",
+"name": "Second Sons",
+"culture": "ghiscari",
+"home": "town_A3",
+"super": "empire_s",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_6_4"
+},
+{
+"id": "clan_khuzait_3",
+"name": "Quarro",
+"culture": "norvos",
+"home": "town_ES1",
+"super": "norvos",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_6_5"
+},
+{
+"id": "clan_khuzait_4",
+"name": "Jhago",
+"culture": "khuzait",
+"home": "town_K4",
+"super": "khuzait",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_6_16"
+},
+{
+"id": "clan_khuzait_5",
+"name": "Talordis",
+"culture": "qohorik",
+"home": "town_ES6",
+"super": "qohor",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_6_17"
+},
+{
+"id": "clan_khuzait_6",
+"name": "Moro",
+"culture": "khuzait",
+"home": "castle_K4",
+"super": "khuzait",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_6_18"
+},
+{
+"id": "clan_khuzait_7",
+"name": "Stormcrows",
+"culture": "ghiscari",
+"home": "castle_A6",
+"super": "empire_s",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_6_19"
+},
+{
+"id": "clan_khuzait_8",
+"name": "Forzho",
+"culture": "khuzait",
+"home": "castle_K3",
+"super": "khuzait",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_6_20"
+},
+{
+"id": "clan_khuzait_9",
+"name": "Adory",
+"culture": "qohorik",
+"home": "ROT_town17",
+"super": "qohor",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_K9_l"
+},
+{
+"id": "clan_sturgia_1",
+"name": "Greyjoy",
+"culture": "sturgia",
+"home": "town_S3",
+"super": "sturgia",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_2_1"
+},
+{
+"id": "clan_sturgia_2",
+"name": "Rayder",
+"culture": "freefolk",
+"home": "town_S4",
+"super": "freefolk",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_2_3"
+},
+{
+"id": "clan_sturgia_3",
+"name": "Harlaw",
+"culture": "sturgia",
+"home": "ROT_town22",
+"super": "sturgia",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_2_5"
+},
+{
+"id": "clan_sturgia_4",
+"name": "Dayne",
+"culture": "aserai",
+"home": "ROT_town9",
+"super": "aserai",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_2_16"
+},
+{
+"id": "clan_sturgia_5",
+"name": "Styr Magnar",
+"culture": "freefolk",
+"home": "town_S6",
+"super": "freefolk",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_2_17"
+},
+{
+"id": "clan_sturgia_6",
+"name": "Karstark",
+"culture": "battania",
+"home": "ROT_town24",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_2_18"
+},
+{
+"id": "clan_sturgia_7",
+"name": "Giantsbane",
+"culture": "freefolk",
+"home": "castle_S6",
+"super": "freefolk",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_2_19"
+},
+{
+"id": "clan_sturgia_8",
+"name": "Goodbrother",
+"culture": "sturgia",
+"home": "castle_S3",
+"super": "sturgia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_2_20"
+},
+{
+"id": "clan_sturgia_9",
+"name": "Selmy, Barristan",
+"culture": "stormlands",
+"home": "ROT_town19",
+"super": "empire_s",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_S9_l"
+},
+{
+"id": "clan_nord_1",
+"name": "Baratheon, Joffrey",
+"culture": "crownlands",
+"home": "ROT_castle61",
+"super": "vlandia",
+"minor": "",
+"tier": "6",
+"owner": "Hero.lord_7_1"
+},
+{
+"id": "clan_nord_2",
+"name": "Mormont, Jorah",
+"culture": "battania",
+"home": "town_A2",
+"super": "empire_s",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_1_3"
+},
+{
+"id": "clan_nord_3",
+"name": "Tollett",
+"culture": "nightswatch",
+"home": "castle_B7",
+"super": "nightswatch",
+"minor": "",
+"tier": "5",
+"owner": "Hero.lord_5_21"
+},
+{
+"id": "clan_nord_4",
+"name": "Tallhart",
+"culture": "battania",
+"home": "castle_S8",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_3"
+},
+{
+"id": "clan_nord_5",
+"name": "Cerwyn",
+"culture": "battania",
+"home": "castle_K8",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_4"
+},
+{
+"id": "clan_nord_6",
+"name": "Hornwood",
+"culture": "battania",
+"home": "castle_K9",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_6"
+},
+{
+"id": "clan_nord_7",
+"name": "Dustin",
+"culture": "battania",
+"home": "town_B4",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_5_3"
+},
+{
+"id": "clan_nord_8",
+"name": "Dogshead",
+"culture": "freefolk",
+"home": "town_S7",
+"super": "freefolk",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_14_3"
+},
+{
+"id": "clan_nord_9",
+"name": "Sixskins",
+"culture": "freefolk",
+"home": "castle_S5",
+"super": "freefolk",
+"minor": "",
+"tier": "3",
+"owner": "Hero.lord_7_21_1"
+},
+{
+"id": "ROTclan_10",
+"name": "Botley",
+"culture": "sturgia",
+"home": "town_S2",
+"super": "sturgia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_22"
+},
+{
+"id": "ROTclan_11",
+"name": "Borrell",
+"culture": "vale",
+"home": "town_S1",
+"super": "empire",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_18_1"
+},
+{
+"id": "ROTclan_12",
+"name": "Grafton",
+"culture": "vale",
+"home": "town_EN2",
+"super": "empire",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_15"
+},
+{
+"id": "ROTclan_13",
+"name": "Paege",
+"culture": "river",
+"home": "town_B1",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_15_4"
+},
+{
+"id": "ROTclan_14",
+"name": "Cox",
+"culture": "river",
+"home": "town_EN3",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_25"
+},
+{
+"id": "ROTclan_15",
+"name": "bar Emmon",
+"culture": "dragonstone",
+"home": "ROT_town31",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.lord_7_28"
+},
+{
+"id": "ROTclan_16",
+"name": "Celtigar",
+"culture": "dragonstone",
+"home": "ROT_town5",
+"super": "dragonstone",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_4"
+},
+{
+"id": "ROTclan_17",
+"name": "Fell",
+"culture": "dragonstone",
+"home": "ROT_castle17",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.dead_lord_7_2"
+},
+{
+"id": "ROTclan_18",
+"name": "Connington",
+"culture": "stormlands",
+"home": "castle_EW6",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_63"
+},
+{
+"id": "ROTclan_19",
+"name": "Whitehead",
+"culture": "stormlands",
+"home": "town_EW2",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_66"
+},
+{
+"id": "ROTclan_20",
+"name": "Rowan",
+"culture": "reach",
+"home": "castle_V8",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_70"
+},
+{
+"id": "ROTclan_21",
+"name": "Uller",
+"culture": "aserai",
+"home": "castle_A1",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_74"
+},
+{
+"id": "ROTclan_22",
+"name": "Uhoris",
+"culture": "tyroshi",
+"home": "ROT_town10",
+"super": "tyrosh",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_77"
+},
+{
+"id": "ROTclan_23",
+"name": "Vaelaro",
+"culture": "lyseni",
+"home": "ROT_town11",
+"super": "lys",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_80"
+},
+{
+"id": "ROTclan_25",
+"name": "Hortyr",
+"culture": "norvos",
+"home": "ROT_town16",
+"super": "norvos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_86"
+},
+{
+"id": "ROTclan_24",
+"name": "Saldorys",
+"culture": "myrish",
+"home": "ROT_town12",
+"super": "myr",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_83"
+},
+{
+"id": "ROTclan_26",
+"name": "Phassar",
+"culture": "nord",
+"home": "ROT_town15",
+"super": "nord",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_89"
+},
+{
+"id": "ROTclan_27",
+"name": "Vaelaros",
+"culture": "volantine",
+"home": "town_ES3",
+"super": "volantis",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_92"
+},
+{
+"id": "ROTclan_28",
+"name": "Heggo",
+"culture": "khuzait",
+"home": "castle_K7",
+"super": "khuzait",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_95"
+},
+{
+"id": "ROTclan_29",
+"name": "Stalwart Shields",
+"culture": "ghiscari",
+"home": "castle_K2",
+"super": "empire_s",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_97"
+},
+{
+"id": "ROTclan_30",
+"name": "Flint",
+"culture": "battania",
+"home": "ROT_town34",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_101"
+},
+{
+"id": "ROTclan_31",
+"name": "Forrester",
+"culture": "battania",
+"home": "castle_EN1",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_104"
+},
+{
+"id": "ROTclan_32",
+"name": "Whitehill",
+"culture": "battania",
+"home": "castle_N1",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_111"
+},
+{
+"id": "ROTclan_33",
+"name": "Pyke",
+"culture": "nightswatch",
+"home": "castle_B8",
+"super": "nightswatch",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_116"
+},
+{
+"id": "ROTclan_34",
+"name": "Dalba",
+"culture": "freefolk",
+"home": "castle_N6",
+"super": "freefolk",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_121"
+},
+{
+"id": "ROTclan_35",
+"name": "Ryswell",
+"culture": "battania",
+"home": "castle_N7",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_125"
+},
+{
+"id": "ROTclan_36",
+"name": "Flint, Lyessa",
+"culture": "battania",
+"home": "castle_N2",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_130"
+},
+{
+"id": "ROTclan_37",
+"name": "Stout",
+"culture": "battania",
+"home": "castle_N4",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_134"
+},
+{
+"id": "ROTclan_38",
+"name": "Orkwood",
+"culture": "sturgia",
+"home": "castle_S4",
+"super": "sturgia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_138"
+},
+{
+"id": "ROTclan_39",
+"name": "Blacktyde",
+"culture": "sturgia",
+"home": "ROT_town7",
+"super": "sturgia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_143"
+},
+{
+"id": "ROTclan_40",
+"name": "Redfort",
+"culture": "vale",
+"home": "castle_N8",
+"super": "empire",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_149"
+},
+{
+"id": "ROTclan_41",
+"name": "Belmore",
+"culture": "vale",
+"home": "castle_S2",
+"super": "empire",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_155"
+},
+{
+"id": "ROTclan_42",
+"name": "Coldwater",
+"culture": "vale",
+"home": "castle_S1",
+"super": "empire",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_160"
+},
+{
+"id": "ROTclan_43",
+"name": "Waxley",
+"culture": "vale",
+"home": "ROT_town18",
+"super": "empire",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_165"
+},
+{
+"id": "ROTclan_44",
+"name": "Brax",
+"culture": "vlandia",
+"home": "ROT_town29",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_170"
+},
+{
+"id": "ROTclan_45",
+"name": "Westerling",
+"culture": "vlandia",
+"home": "castle_EN6",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_175"
+},
+{
+"id": "ROTclan_46",
+"name": "Bracken",
+"culture": "river",
+"home": "castle_EN8",
+"super": "riverlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_180"
+},
+{
+"id": "ROTclan_47",
+"name": "Smallwood",
+"culture": "river",
+"home": "castle_EN5",
+"super": "riverlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_187"
+},
+{
+"id": "ROTclan_48",
+"name": "Vance",
+"culture": "river",
+"home": "ROT_castle39",
+"super": "riverlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_192"
+},
+{
+"id": "ROTclan_49",
+"name": "Darry",
+"culture": "river",
+"home": "ROT_castle16",
+"super": "riverlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_198"
+},
+{
+"id": "ROTclan_50",
+"name": "Rosby",
+"culture": "vlandia",
+"home": "ROT_castle15",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_203"
+},
+{
+"id": "ROTclan_51",
+"name": "Brune",
+"culture": "dragonstone",
+"home": "castle_S7",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_207"
+},
+{
+"id": "ROTclan_52",
+"name": "Staunton",
+"culture": "dragonstone",
+"home": "castle_EW2",
+"super": "dragonstone",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_212"
+},
+{
+"id": "ROTclan_53",
+"name": "Massey",
+"culture": "dragonstone",
+"home": "castle_EW5",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_217"
+},
+{
+"id": "ROTclan_54",
+"name": "Errol",
+"culture": "stormlands",
+"home": "castle_EN9",
+"super": "stormlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_222"
+},
+{
+"id": "ROTclan_55",
+"name": "Estermont",
+"culture": "stormlands",
+"home": "castle_EW4",
+"super": "stormlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_227"
+},
+{
+"id": "ROTclan_56",
+"name": "Wylde",
+"culture": "stormlands",
+"home": "castle_K6",
+"super": "stormlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_232"
+},
+{
+"id": "ROTclan_57",
+"name": "Mertyns",
+"culture": "stormlands",
+"home": "castle_ES4",
+"super": "stormlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_237"
+},
+{
+"id": "ROTclan_58",
+"name": "Dondarrion",
+"culture": "stormlands",
+"home": "ROT_castle19",
+"super": "stormlands",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_243"
+},
+{
+"id": "ROTclan_59",
+"name": "Banefort",
+"culture": "vlandia",
+"home": "ROT_castle20",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_247"
+},
+{
+"id": "ROTclan_60",
+"name": "Serrett",
+"culture": "vlandia",
+"home": "ROT_castle21",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_252"
+},
+{
+"id": "ROTclan_61",
+"name": "Caswell",
+"culture": "reach",
+"home": "castle_EW1",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_257"
+},
+{
+"id": "ROTclan_62",
+"name": "Beesbury",
+"culture": "reach",
+"home": "castle_ES8",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_262"
+},
+{
+"id": "ROTclan_63",
+"name": "Blackbar",
+"culture": "reach",
+"home": "ROT_castle23",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_267"
+},
+{
+"id": "ROTclan_64",
+"name": "Cuy",
+"culture": "reach",
+"home": "castle_V7",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_272"
+},
+{
+"id": "ROTclan_65",
+"name": "Oakheart",
+"culture": "reach",
+"home": "ROT_castle22",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_277"
+},
+{
+"id": "ROTclan_66",
+"name": "Bulwer",
+"culture": "reach",
+"home": "castle_V2",
+"super": "empire_w",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_281"
+},
+{
+"id": "ROTclan_67",
+"name": "Locke",
+"culture": "battania",
+"home": "castle_B3",
+"super": "battania",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_285"
+},
+{
+"id": "ROTclan_68",
+"name": "Blackmont",
+"culture": "aserai",
+"home": "ROT_castle24",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_289"
+},
+{
+"id": "ROTclan_69",
+"name": "Jordayne",
+"culture": "aserai",
+"home": "ROT_castle25",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_294"
+},
+{
+"id": "ROTclan_70",
+"name": "Toland",
+"culture": "aserai",
+"home": "ROT_castle26",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_299"
+},
+{
+"id": "ROTclan_71",
+"name": "Wyl",
+"culture": "aserai",
+"home": "castle_A7",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_304"
+},
+{
+"id": "ROTclan_72",
+"name": "Qorgyle",
+"culture": "aserai",
+"home": "ROT_castle27",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_309"
+},
+{
+"id": "ROTclan_73",
+"name": "Amai",
+"culture": "sarnor",
+"home": "town_K6",
+"super": "sarnor",
+"minor": "",
+"tier": "6",
+"owner": "Hero.ROTlord_314"
+},
+{
+"id": "ROTclan_74",
+"name": "Lozar",
+"culture": "sarnor",
+"home": "town_K5",
+"super": "sarnor",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_319"
+},
+{
+"id": "ROTclan_75",
+"name": "Tymai",
+"culture": "sarnor",
+"home": "castle_K5",
+"super": "sarnor",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_324"
+},
+{
+"id": "ROTclan_76",
+"name": "Qhaedarene",
+"culture": "tyroshi",
+"home": "castle_A5",
+"super": "tyrosh",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_329"
+},
+{
+"id": "ROTclan_77",
+"name": "Alayris",
+"culture": "myrish",
+"home": "castle_A8",
+"super": "myr",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_334"
+},
+{
+"id": "ROTclan_78",
+"name": "Pendaerys",
+"culture": "lyseni",
+"home": "castle_A2",
+"super": "lys",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_339"
+},
+{
+"id": "ROTclan_79",
+"name": "Moesia",
+"culture": "pentoshi",
+"home": "castle_ES1",
+"super": "pentos",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_344"
+},
+{
+"id": "ROTclan_80",
+"name": "Prestayn",
+"culture": "empire",
+"home": "castle_ES6",
+"super": "bravos",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_349"
+},
+{
+"id": "ROTclan_81",
+"name": "Dimittis",
+"culture": "nord",
+"home": "castle_ES7",
+"super": "nord",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_354"
+},
+{
+"id": "ROTclan_82",
+"name": "Golathis",
+"culture": "norvos",
+"home": "castle_ES2",
+"super": "norvos",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_359"
+},
+{
+"id": "ROTclan_83",
+"name": "Ostyrion",
+"culture": "qohorik",
+"home": "castle_ES3",
+"super": "qohor",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_364"
+},
+{
+"id": "ROTclan_84",
+"name": "Targaryen, Aegon",
+"culture": "valyrian",
+"home": "town_K2",
+"super": "valyrian",
+"minor": "",
+"tier": "6",
+"owner": "Hero.ROTlord_369"
+},
+{
+"id": "ROTclan_85",
+"name": "Connington, Jon",
+"culture": "stormlands",
+"home": "ROT_town21",
+"super": "valyrian",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_373"
+},
+{
+"id": "ROTclan_86",
+"name": "Duckfield",
+"culture": "reach",
+"home": "ROT_town20",
+"super": "valyrian",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_377"
+},
+{
+"id": "ROTclan_87",
+"name": "Frozen Shore",
+"culture": "freefolk",
+"home": "ROT_castle45",
+"super": "freefolk",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_381"
+},
+{
+"id": "ROTclan_88",
+"name": "Norrey",
+"culture": "battania",
+"home": "castle_B6",
+"super": "battania",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_389"
+},
+{
+"id": "ROTclan_89",
+"name": "Drumm",
+"culture": "sturgia",
+"home": "ROT_castle42",
+"super": "sturgia",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_395"
+},
+{
+"id": "ROTclan_90",
+"name": "Merlyn",
+"culture": "sturgia",
+"home": "town_N4",
+"super": "sturgia",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_403"
+},
+{
+"id": "ROTclan_91",
+"name": "Farwynd",
+"culture": "sturgia",
+"home": "town_N3",
+"super": "sturgia",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_409"
+},
+{
+"id": "ROTclan_92",
+"name": "Sunderly",
+"culture": "sturgia",
+"home": "ROT_castle44",
+"super": "sturgia",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_417"
+},
+{
+"id": "ROTclan_93",
+"name": "Fregar",
+"culture": "empire",
+"home": "castle_B5",
+"super": "bravos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_422"
+},
+{
+"id": "ROTclan_94",
+"name": "Volentin",
+"culture": "empire",
+"home": "ROT_castle32",
+"super": "bravos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_427"
+},
+{
+"id": "ROTclan_95",
+"name": "Estatis",
+"culture": "pentoshi",
+"home": "ROT_castle46",
+"super": "pentos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_432"
+},
+{
+"id": "ROTclan_96",
+"name": "Sontho",
+"culture": "pentoshi",
+"home": "ROT_castle31",
+"super": "pentos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_437"
+},
+{
+"id": "ROTclan_97",
+"name": "Staegone",
+"culture": "tyroshi",
+"home": "ROT_castle47",
+"super": "tyrosh",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_442"
+},
+{
+"id": "ROTclan_98",
+"name": "Ohoros",
+"culture": "tyroshi",
+"home": "ROT_castle28",
+"super": "tyrosh",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_447"
+},
+{
+"id": "ROTclan_99",
+"name": "Orthys",
+"culture": "lyseni",
+"home": "ROT_castle29",
+"super": "lys",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_452"
+},
+{
+"id": "ROTclan_100",
+"name": "Terys",
+"culture": "myrish",
+"home": "ROT_castle30",
+"super": "myr",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_457"
+},
+{
+"id": "ROTclan_101",
+"name": "Eranos",
+"culture": "nord",
+"home": "ROT_castle33",
+"super": "nord",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_462"
+},
+{
+"id": "ROTclan_102",
+"name": "Kasgos",
+"culture": "norvos",
+"home": "ROT_castle34",
+"super": "norvos",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_467"
+},
+{
+"id": "ROTclan_103",
+"name": "Tendiras",
+"culture": "qohorik",
+"home": "ROT_castle35",
+"super": "qohor",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_472"
+},
+{
+"id": "ROTclan_104",
+"name": "Sumai",
+"culture": "sarnor",
+"home": "ROT_castle36",
+"super": "sarnor",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_477"
+},
+{
+"id": "ROTclan_105",
+"name": "Melane",
+"culture": "volantine",
+"home": "castle_A9",
+"super": "volantis",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_482"
+},
+{
+"id": "ROTclan_106",
+"name": "Qaggaz",
+"culture": "ghiscari",
+"home": "ROT_castle38",
+"super": "valyrian",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_486"
+},
+{
+"id": "ROTclan_107",
+"name": "Stane",
+"culture": "skagosi",
+"home": "town_N1",
+"super": "skagosi",
+"minor": "",
+"tier": "2",
+"owner": "Hero.ROTlord_489"
+},
+{
+"id": "ROTclan_108",
+"name": "Marbrand",
+"culture": "vlandia",
+"home": "ROT_castle40",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_493"
+},
+{
+"id": "ROTclan_109",
+"name": "Piper",
+"culture": "river",
+"home": "castle_N9",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_497"
+},
+{
+"id": "ROTclan_110",
+"name": "Crane",
+"culture": "reach",
+"home": "ROT_castle41",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_501"
+},
+{
+"id": "ROTclan_111",
+"name": "Strickland",
+"culture": "volantine",
+"home": "castle_K1",
+"super": "valyrian",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_508"
+},
+{
+"id": "ROTclan_112",
+"name": "Xho",
+"culture": "summer",
+"home": "ROT_town25",
+"super": "summer",
+"minor": "",
+"tier": "2",
+"owner": "Hero.ROTlord_515"
+},
+{
+"id": "ROTclan_113",
+"name": "Lo",
+"culture": "yiti",
+"home": "ROT_town26",
+"super": "yiti",
+"minor": "",
+"tier": "2",
+"owner": "Hero.ROTlord_519"
+},
+{
+"id": "ROTclan_114",
+"name": "Balar",
+"culture": "nord",
+"home": "ROT_castle49",
+"super": "nord",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_523"
+},
+{
+"id": "ROTclan_115",
+"name": "Lohar",
+"culture": "lyseni",
+"home": "ROT_castle50",
+"super": "lys",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_527"
+},
+{
+"id": "ROTclan_116",
+"name": "Albersan",
+"culture": "myrish",
+"home": "ROT_castle51",
+"super": "myr",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_531"
+},
+{
+"id": "ROTclan_117",
+"name": "Tavellen",
+"culture": "norvos",
+"home": "ROT_castle52",
+"super": "norvos",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_535"
+},
+{
+"id": "ROTclan_118",
+"name": "Lorosene",
+"culture": "qohorik",
+"home": "ROT_castle53",
+"super": "qohor",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_539"
+},
+{
+"id": "ROTclan_119",
+"name": "Qhaedar",
+"culture": "volantine",
+"home": "ROT_castle54",
+"super": "volantis",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_543"
+},
+{
+"id": "ROTclan_120",
+"name": "Chovaqqo",
+"culture": "khuzait",
+"home": "ROT_castle56",
+"super": "khuzait",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_547"
+},
+{
+"id": "ROTclan_121",
+"name": "Alexi",
+"culture": "sarnor",
+"home": "ROT_castle55",
+"super": "sarnor",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_549"
+},
+{
+"id": "ROTclan_122",
+"name": "Fowler",
+"culture": "aserai",
+"home": "ROT_castle57",
+"super": "aserai",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_553"
+},
+{
+"id": "ROTclan_123",
+"name": "Lynderly",
+"culture": "vale",
+"home": "ROT_castle58",
+"super": "empire",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_558"
+},
+{
+"id": "ROTclan_124",
+"name": "Farman",
+"culture": "vlandia",
+"home": "ROT_castle59",
+"super": "vlandia",
+"minor": "",
+"tier": "3",
+"owner": "Hero.ROTlord_563"
+},
+{
+"id": "ROTclan_125",
+"name": "Thorne",
+"culture": "nightswatch",
+"home": "ROT_castle60",
+"super": "nightswatch",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_568"
+},
+{
+"id": "ROTclan_127",
+"name": "Florent",
+"culture": "reach",
+"home": "ROT_castle62",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_571"
+},
+{
+"id": "ROTclan_128",
+"name": "Hewett",
+"culture": "reach",
+"home": "ROT_town27",
+"super": "empire_w",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_575"
+},
+{
+"id": "ROTclan_129",
+"name": "Caron",
+"culture": "stormlands",
+"home": "ROT_castle63",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_579"
+},
+{
+"id": "ROTclan_130",
+"name": "Swann",
+"culture": "stormlands",
+"home": "ROT_town28",
+"super": "stormlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_583"
+},
+{
+"id": "ROTclan_131",
+"name": "Lydden",
+"culture": "vlandia",
+"home": "castle_B4",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_587"
+},
+{
+"id": "ROTclan_132",
+"name": "Sarsfield",
+"culture": "vlandia",
+"home": "ROT_castle64",
+"super": "vlandia",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_591"
+},
+{
+"id": "ROTclan_133",
+"name": "Waynwood",
+"culture": "vale",
+"home": "ROT_castle65",
+"super": "empire",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_595"
+},
+{
+"id": "ROTclan_134",
+"name": "Allyrion",
+"culture": "aserai",
+"home": "castle_A3",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_599"
+},
+{
+"id": "ROTclan_135",
+"name": "Gargalen",
+"culture": "aserai",
+"home": "ROT_castle67",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_603"
+},
+{
+"id": "ROTclan_136",
+"name": "Dalt",
+"culture": "aserai",
+"home": "ROT_castle66",
+"super": "aserai",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_607"
+},
+{
+"id": "ROTclan_137",
+"name": "Ryger",
+"culture": "river",
+"home": "ROT_castle68",
+"super": "riverlands",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_611"
+},
+{
+"id": "ROTclan_138",
+"name": "Sunglass",
+"culture": "dragonstone",
+"home": "castle_EW8",
+"super": "dragonstone",
+"minor": "",
+"tier": "4",
+"owner": "Hero.ROTlord_615"
+},
+{
+"id": "faith_militant",
+"name": "Faith Militant",
+"culture": "crownlands",
+"home": "town_EW4",
+"super": "",
+"minor": "true",
+"tier": "3",
+"owner": ""
+},
+{
+"id": "brotherhood",
+"name": "Brotherhood without Banners",
+"culture": "vlandia",
+"home": "town_V2",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "golden_company",
+"name": "Company of the Cat",
+"culture": "empire",
+"home": "town_ES2",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "brave_companions",
+"name": "Brave Companions",
+"culture": "empire",
+"home": "town_EN3",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "moon_brothers",
+"name": "Moon Brothers",
+"culture": "vale",
+"home": "town_EN1",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "stone_crows",
+"name": "Stone Crows",
+"culture": "vale",
+"home": "town_EN2",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "long_lances",
+"name": "Long Lances",
+"culture": "empire",
+"home": "town_EN4",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "windblown",
+"name": "The Windblown",
+"culture": "empire",
+"home": "town_EN5",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "wild_hares",
+"name": "Wild Hares",
+"culture": "battania",
+"home": "town_B4",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "bright_banners",
+"name": "Bright Banners",
+"culture": "ghiscari",
+"home": "town_EN5",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "sons_of_the_harpy",
+"name": "Sons of the Harpy",
+"culture": "ghiscari",
+"home": "town_K1",
+"super": "",
+"minor": "true",
+"tier": "3",
+"owner": ""
+},
+{
+"id": "robber_knights",
+"name": "Robber Knights",
+"culture": "robber_knights",
+"home": "hideout_robber_1",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "kingswood_outlaw",
+"name": "Kingswood Outlaws",
+"culture": "kingswood_outlaw",
+"home": "hideout_kingswood_1",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "wildlings",
+"name": "Wildling Renegades",
+"culture": "wildlings",
+"home": "wight_hideout_1",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "hilltribesmen",
+"name": "Hill Tribesmen",
+"culture": "hilltribesmen",
+"home": "hideout_mountain_4",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "yiti_bandits",
+"name": "Lengii Slavers",
+"culture": "yiti_bandits",
+"home": "hideout_yiti_1",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "ROTclan_126",
+"name": "Others",
+"culture": "whitewalker",
+"home": "castle_village_N6_1",
+"super": "",
+"minor": "true",
+"tier": "4",
+"owner": ""
+},
+{
+"id": "ROTclan_139",
+"name": "Emeros",
+"culture": "qartheen",
+"home": "ROT_town35",
+"super": "qarth",
+"minor": "",
+"tier": "6",
+"owner": "Hero.ROTlord_619"
+},
+{
+"id": "ROTclan_140",
+"name": "Casat",
+"culture": "ibbenese",
+"home": "ROT_town38",
+"super": "ibb",
+"minor": "",
+"tier": "6",
+"owner": "Hero.ROTlord_623"
+},
+{
+"id": "ROTclan_141",
+"name": "Qar Deeth",
+"culture": "qartheen",
+"home": "ROT_town37",
+"super": "qarth",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_627"
+},
+{
+"id": "ROTclan_142",
+"name": "Qaraxos",
+"culture": "qartheen",
+"home": "ROT_castle70",
+"super": "qarth",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_631"
+},
+{
+"id": "ROTclan_143",
+"name": "Mallarawan",
+"culture": "qartheen",
+"home": "ROT_town36",
+"super": "qarth",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_635"
+},
+{
+"id": "ROTclan_144",
+"name": "Joth",
+"culture": "ibbenese",
+"home": "ROT_town39",
+"super": "ibb",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_639"
+},
+{
+"id": "ROTclan_145",
+"name": "Gasso",
+"culture": "ibbenese",
+"home": "ROT_town40",
+"super": "ibb",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_643"
+},
+{
+"id": "ROTclan_146",
+"name": "Thuk",
+"culture": "ibbenese",
+"home": "ROT_castle69",
+"super": "ibb",
+"minor": "",
+"tier": "5",
+"owner": "Hero.ROTlord_647"
+},
+{
+"id": "northern_pirates",
+"name": "Sea Raiders",
+"culture": "looters",
+"home": "hideout_mountain_12",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+},
+{
+"id": "southern_pirates",
+"name": "Stepstone Pirates",
+"culture": "southern_pirates",
+"home": "hideout_forest_4",
+"super": "",
+"minor": "",
+"tier": "1",
+"owner": ""
+}
+]
