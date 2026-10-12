@@ -1514,6 +1514,15 @@ def etap4_e47(rep, lines, start, win, hea, lud, until):
     rep.add("fixA P1-2: polegli od ostrzalu w oblezeniu (srednio na dobe, suma)", f"{st.mean(sd):.1f}/d, {sum(sd):.0f}", "INFO (sceptyk: ok. 45 na oblezenie na dobe)", None)
     vt_ = [fnum(r"odwrot wsi do stanu miasta regionu \(fixA T6\) " + F_, poc[d]) or 0 for d in pdays]
     rep.add("fixA T6: odwrot wsi na podlodze do stanu miasta regionu (suma)", f"{sum(vt_):.0f}", "INFO (T6 pobor na podlodze -> 0)", None)
+    # E4 fix2 (P1-4, decyzja Jeffa 12.10 nr 3): pobor E4/7 w miescie wedlug udzialu miasta w ludnosci krainy - czesc z wsi regionu i dobor z miasta po podlodze wsi
+    sv_ = [fnum(r"pobor miast wedlug udzialu \(fix2 P1-4\) z wsi regionu " + F_, poc[d]) for d in pdays]
+    sb_ = [fnum(r"wsie na podlodze - znow z miasta " + F_, poc[d]) or 0 for d in pdays]
+    so_ = sum(1 for d in pdays if "WYLACZONY (Town Levy By Share)" in poc[d])
+    svv = [x for x in sv_ if x is not None]
+    rep.add("fix2 P1-4: pobor miast wedlug udzialu - z wsi regionu / znow z miasta (srednio na dobe, suma)",
+            (f"{st.mean(svv):.1f}/d / {st.mean(sb_):.1f}/d (suma {sum(svv):.0f} / {sum(sb_):.0f}, dob {len(svv)}" + (f", wylaczony {so_} dob" if so_ else "") + ")") if svv else
+            (f"WYLACZONY (Town Levy By Share) {so_} dob" if so_ else "brak pola (log sprzed fix2)"),
+            "INFO (CHANGELOG fix2: z wsi ok. 375/d, \"w tym ze stanu miast\" ok. 3 razy mniej, znow z miasta maly; T6 nie rosnie)", None)
     cuts = {}
     for d in pdays:
         m = re.search(r"niedobor skladow wedlug stanu partii \(diagnostyka P2-T4\): (.*?); najwiekszy", poc[d])
@@ -1725,7 +1734,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
     hr = [x for x in hr if x is not None]
     rep.add("E4/8 N13: Hearth (E4/0) RESZTA - srednia (z o13 E4/8 w \"nasze\")", f"{st.mean(hr):+.2f}/d (|max| {max(abs(x) for x in hr):.1f})" if hr else "-", "|srednia| <= 1 hearth/d", (abs(st.mean(hr)) <= 1.0) if hr else None)
     # N14 - netto Ludnosc (E4/7 T11)
-    rep.add("E4/8 N14: ludnosc netto d28-120", "patrz E4/7 T11 (ubytek naturalny miast w netto)", "-720..+1150/d", None)
+    rep.add("E4/8 N14: ludnosc netto d28-120", "patrz E4/7 T11 (ubytek naturalny miast w netto)", "INFO (prog w E4/7 T11: <= +1150/d; dol -0.5%/rok tylko INFO - Jeff 12.10 nr 2)", None)
     # N15 - koszt
     ms = [fnum(r"\| czas " + F_ + r" ms\.", arm[d]) for d in adays]
     ms = [x for x in ms if x is not None]
@@ -1984,7 +1993,7 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
     rep.add(f"E4/4: przyrost naturalny wsi w WOJNIE d28-{until} (% rocznie)",
             (f"{st.mean(x[2] for x in ws):+.3f}%/rok (g {st.mean(x[0] for x in ws):+.3f}); {st.mean(x[1] for x in ws):+.0f} ludzi/d z {st.mean(x[3] for x in ws):.2f} mln; "
              f"wsi {min(x[4] for x in ws)}-{max(x[4] for x in ws)}, dob {len(ws)}") if ws else "-",
-            "INFO (nizej niz pokoj: wojna U +0.3 -> g -0.18; prog wojny - netto >= -0.5%/rok - w tescie razem z E4/5)", None)
+            "INFO (nizej niz pokoj: wojna U +0.3 -> g -0.18; netto wojny -0.5%/rok tylko INFO - Jeff 12.10 nr 2, wiersz E4/5 S15)", None)
     gv = [fnum(r"\(g srednio " + SF + r"% rocznie", prz[d]) for d in pw]
     gv = [x for x in gv if x is not None]
     rep.add("E4/4: g srednio (pkt % rocznie, wazone ludnoscia wsi)", f"{st.mean(gv):+.3f}" if gv else "-", "INFO (pokoj i wojna razem - prog na wierszu \"w POKOJU\")", None)
@@ -2011,7 +2020,7 @@ def etap4_e44(rep, lines, start, win, hea, lud, until):
         mn = st.mean(net)
         rm = st.mean(raid) if raid else 0.0
         rep.add(f"E4/4: netto \"Ludzie:\" d28-{until} (ludzi/d)", f"{mn:+.0f} = {100.0 * mn * 364 / 52.5e6:+.2f}%/rok od 52.5 mln; w tym rabunek gry {rm:+.0f}/d",
-                "INFO do E4/5 (rabunek w nicosc); prog etapu Jeffa 11.10: pokoj +0.2..+0.8%/rok, ciagla wojna >= -0.5%/rok - test razem z E4/5", None)
+                "INFO do E4/5 (rabunek w nicosc); Jeff 11.10: pokoj +0.2..+0.8%/rok; ciagla wojna -0.5%/rok tylko INFO (Jeff 12.10 nr 2) - wiersz E4/5 S15", None)
         rep.add(f"E4/4: netto bez rabunku gry d28-{until} (ludzi/d)", f"{mn - rm:+.0f} = {100.0 * (mn - rm) * 364 / 52.5e6:+.2f}%/rok",
                 "INFO (przyrost naturalny - tabory do konta TABOR - wyrzutki; smierc w ksiedze od E4/7)", None)
     tw = [x for x in lines if x.startswith("PopulationLaw: ludnosc miast zapisana jako stan (E4/4")]

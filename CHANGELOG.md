@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 4, recenzja T1-E4 poprawek `w-toku/e4-fix2`) - NARZEDZIE: WIERSZ INFO POBORU MIAST WEDLUG UDZIALU (P1-4), STARE TEKSTY "PROG -0.5%/ROK" W WIERSZACH INFO
+**Mod:** narzedzie (`tools/sprawdz_logi.py`; kod Armoury bez zmian) | **Galaz:** `w-toku/e4-fix2` | **Commity:** ten | **Decyzje (wiazace):** `docs/STAN-PRAC.md` "(00:20 UTC 12.10) DECYZJE JEFFA" nr 2, 3
+
+**Problem (recenzja):** kod fix2 (b9dbe0a) dopisal do linii "Pochodzenie (E4/7)" pole `pobor miast wedlug udzialu (fix2 P1-4) z wsi regionu N ludzi, wsie na podlodze - znow z miasta M ludzi`, ale `sprawdz_logi.py` go nie czytal (wpis fix2 opisuje oczekiwania testu zbiorczego na tym polu - raport by ich nie pokazal; fixA ma taki wiersz dla T6). Trzy wiersze INFO (E4/8 N14, E4/4 "przyrost w WOJNIE", E4/4 "netto Ludzie:") dalej pisaly "prog -720..+1150/d" / "prog wojny - netto >= -0.5%/rok" - wbrew decyzji 2 (dol tylko INFO).
+
+**Przyczyna:** fix2 zmienil progi T11/S15, ale nie teksty wierszy INFO odsylajacych do nich; brak wiersza dla nowego pola linii.
+
+**Zmiana:** `tools/sprawdz_logi.py` (`etap4_e47`, za wierszem fixA T6): wiersz INFO `fix2 P1-4: pobor miast wedlug udzialu - z wsi regionu / znow z miasta (srednio na dobe, suma)` (dob z polem, "WYLACZONY (Town Levy By Share) N dob", log sprzed fix2 - "brak pola"); teksty trzech wierszy INFO (N14, E4/4 x2) - "-0.5%/rok tylko INFO (Jeff 12.10 nr 2)". Wynik zadnego progu bez zmian.
+
+**Ryzyko / co sprawdzic (kontrola calosci):** tylko odczyt logu. Na `kopia-e4k\czesc-d120.log`: etap4 razem 284 progi (bylo 283 + nowy wiersz INFO), NIE 8 jak przed recenzja; etap5 NIE 0. Regex sprawdzony na probce pola (375.2 / 3). Recenzja kodu fix2: `TakeLevy` (galaz miasta) - przy wylaczniku wylaczonym co do instrukcji stary rachunek; dlug miasta `TownOut`/`VillOut` z `fromTown` (z doborem po podlodze wsi); `TownShareOf` - jednostki zgodne (stan miasta E4/4 i `PeopleOf` wsi = hearth x k, ludzie); bez nowych latek Harmony, bez nowego zapisu; koszt - petla po wsiach miasta na wywolanie poboru miejskiego; `gen_mcm.py` bez roznic. Prosba Jeffa (00:35 UTC) "lord i milicja tez mi wszystko zabiera" - poza ta galezia (ujscia gracza pojmanego, etap 5 / RealisticCaptivity).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy (Armoury build kod 0; gry nie uruchamiano).
+
 ## 2026-10-12 (etap 4, poprawki po decyzjach Jeffa 12.10 - `w-toku/e4-fix2`) - POBOR Z MIASTA WEDLUG UDZIALU MIASTA W LUDNOSCI KRAINY (P1-4), PROG LUDNOSCI -0.5%/ROK TYLKO INFO (T11/S15)
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e4-fix2` (od `w-toku/zbior-e4-koniec` 47b2225) | **Commity:** b9dbe0a (kod + narzedzie + MCM), ten wpis | **Decyzje (wiazace):** `docs/STAN-PRAC.md` "(00:20 UTC 12.10) DECYZJE JEFFA" nr 1, 2, 3 | **Diagnoza:** `SCRATCH(ae222cb7)\kopia-e4k\diagnoza-d120.json` (P1-4, P1-5)
 
