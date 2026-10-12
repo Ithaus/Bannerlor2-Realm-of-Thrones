@@ -908,6 +908,9 @@ namespace Armoury
                     _goods[g.Id] = g;
                 }
                 Rebuild();
+                // recenzja 220: stos koni na targu z ostatniego spisu = SB wpisow "#kon:N" (stos na ostatniej granicy kubelka) - bez tego po wczytaniu linia doby
+                // "Hodowla (220)" (i prog K4-9 sprawdz_logi) widzi stos 0/0/0/0 az do nastepnego spisu (do 28 dob)
+                for (int c = 0; c < HCats; c++) { var hg = HFind(c); if (hg != null && hg.SB >= 0) _hNow[c] = hg.SB; }
             }
             catch (Exception e) { Clear(); Log.Error("HarvestValve.Import", e); }
         }
