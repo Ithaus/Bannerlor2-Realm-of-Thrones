@@ -46,6 +46,8 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E5/A6 (198, lup z kiesy pokonanego) prog "bitwy z niczego netto
                     = 0 +- 1 tys./d" (srednia 28 dob): z linii "Pieniadz swiata (bilans - przyczyny)" ZRODLA "bitwy" - UJSCIA "bitwy" + N4 (zloto partii
                     bez wodza w oknie bitew) - statki zatopione wyplacone z niczego (linia "Lup w bitwie (A6)" tej doby; statki to paczka B5). Linia A6 - INFO.
+                    E5/BITWY (rozpoznanie 12.10): BITWY-1 ta sama roznica w KAZDEJ dobie okna |doba| <= 1 tys.; BITWY-2 (INFO) rozbicie ZRODEL "bitwy"
+                    brutto (wyplata gry zwyciezcom) na UJSCIA "bitwy" + kiesy partii bez wodza (-N4) + statki + netto - brutto to nie zloto z niczego.
                     Wolany z etap5_main E5/0 (scalenie porcji A).
                     Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
                     zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
@@ -645,6 +647,7 @@ def etap5_a6(rep, lines, start, win, until=120, **kw):
     a6 = {d: x for d, x in by_day(lines, "Lup w bitwie (A6): dzien").items() if inwin(d)}
     days = sorted(cau)
     land, ships164, miss, fb = {}, {}, 0, 0
+    parts = {}                                         # E5/BITWY: skladniki doby (zrodla brutto, ujscia, N4, statki)
     for d in days:
         s = cau[d]
         src = num(r"statki NavalDLC inne \d+, bitwy (\d+),", s)
@@ -658,6 +661,7 @@ def etap5_a6(rep, lines, start, win, until=120, **kw):
             miss += 1
             continue
         land[d] = src - out + n4 - sh
+        parts[d] = (src, out, n4, sh)
     win = last_window(land)
     if win:
         m = st.mean(land[d] for d in win)
@@ -667,6 +671,20 @@ def etap5_a6(rep, lines, start, win, until=120, **kw):
                 "0 +- 1 tys./d", abs(m) <= 1000)
     else:
         rep.add("E5/A6: bitwy z niczego netto na ladzie (ksiega; srednia 28 dob)", f"brak linii (dob bez kompletu: {miss})", "0 +- 1 tys./d", None)
+    # E5/BITWY (rozpoznanie 12.10): ZRODLA "bitwy" w bilansie to wyplata gry zwyciezcom BRUTTO (zdarzenie nic -> wodz, log WGRANIE 33: sr28
+    # 26,3 tys./d) - para: UJSCIA "bitwy" (wodzowie pokonanych) i N4 (kiesy partii bez wodza). Prog na kazda dobe okna, nie tylko srednia 28.
+    if land:
+        wd = max(land, key=lambda d: abs(land[d]))
+        rep.add("E5/BITWY-1: bitwy z niczego netto na ladzie - kazda doba okna (ksiega)",
+                f"najgorsza doba {land[wd]:+d} (dzien {wd}); suma okna {sum(land.values()):+d} w {len(land)} dobach",
+                "|doba| <= 1 tys.", abs(land[wd]) <= 1000)
+        w28 = last_window(parts)
+        mp = lambda i: st.mean(parts[d][i] for d in w28)
+        rep.add("E5/BITWY-2: ZRODLA \"bitwy\" brutto = UJSCIA \"bitwy\" - N4 + statki + netto (srednia 28 dob)",
+                f"{mp(0):.0f} = {mp(1):.0f} + {-mp(2):.0f} + {mp(3):.0f} + ({st.mean(land[d] for d in w28):+.0f})",
+                "INFO (brutto to nie zloto z niczego)", None)
+    else:
+        rep.add("E5/BITWY-1: bitwy z niczego netto na ladzie - kazda doba okna (ksiega)", f"brak linii (dob bez kompletu: {miss})", "|doba| <= 1 tys.", None)
     def mean_a6(pat):
         vals = [num(pat, a6[d]) for d in last_window(a6)]
         vals = [x for x in vals if x is not None]
