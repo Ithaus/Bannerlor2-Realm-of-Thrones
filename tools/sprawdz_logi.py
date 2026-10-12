@@ -184,6 +184,11 @@ Uzycie (Python 3, tylko odczyt):
                     "znacznik z przyszlosci" 0 w kazdej linii doby i zakupy > 0 w dwoch pierwszych liniach doby po ostatnim starcie (jeden start - INFO);
                     S-2 linia startu "Porzadek stanu (E8/S)" przy kazdym starcie sesji: wyzerowane 5 klas, potkniecia zerowania 0; S-3 klimat - linii
                     "ERROR in WesterosClimate.Init" 0 albo po ponowieniu "czynny tak"; S-K linie "ERROR in StateHygiene*" i potkniecia linii 0.
+                    Blok etap8_q (E8/Q, paczka 262 - straz przeprawy na zegarze gry, CrossingLaw.cs): Q-0 linia "Straz przeprawy (E8/Q)" z licznikiem
+                    (zegar gry TAK, przebiegi > 0) w kazdej dobie okna, WYLACZONE 0; Q-1 INFO zawrocone partie lordow wedlug przeprawy (> 0 dopiero przy
+                    wojnie z panem przeprawy); Q-2 koszt <= 5 ms/dobe; Q-3 zadna partia zawracana ponad 3 razy na dobe (zakleszczenie); Q-4 INFO
+                    szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen; Q-5 INFO partie w strefie bez rozkazu (spiacy,
+                    przerwa 3 h, oblezenie, eskorty, woda, AI wylaczone, brak punktu na ladzie) i punkt odwrotu; Q-K potkniecia i linie "ERROR in CrossingLaw.*" 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8518,6 +8523,97 @@ def etap8_s(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"; martwe wpisy obozu zdjete dluznikom w osadzie {do}", "INFO", None)
 
 
+# E8/Q (262): blok etap8_q - straz przeprawy na zegarze gry (CrossingLaw.cs)
+E8_Q_DAY = "Straz przeprawy (E8/Q): dzien"
+
+
+def etap8_q(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/Q (262, projekt etapu 8 v2 rozdz. 3 "E8/Q" Test): petla AI strazy przeprawy na zegarze gry (CrossingLaw.AiHourly). Linia doby
+    "Straz przeprawy (E8/Q): dzien N" (dzien = doba gry, jak "Przeprawa Bliznaki (E7/B)"; "Pieniadz swiata" nosi dzien ksiegi = doba gry - 1).
+    Q-0 linia z licznikiem (zegar gry TAK, przebiegi > 0) w kazdej dobie okna - WYLACZONE albo doba bez przebiegow = NIE;
+    Q-1 INFO: zawrocone N (N/d) wedlug przeprawy, wrogie partio-godziny przy przeprawach i w strefie (> 0 zawrocen dopiero przy wojnie z panem przeprawy);
+    Q-2 koszt <= 5 ms/dobe (srednio i najdrozsza doba);
+    Q-3 zadna partia zawracana > 3 razy na dobe (suma "partii zawroconych ponad 3 razy" w oknie = 0; zakleszczenie);
+    Q-4 INFO: szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen przy ROT_town3, w tym w ciagu 3 h po zawroceniu;
+    Q-5 INFO: partie w strefie bez rozkazu (spiacy, przerwa 3 h, oblezenie, eskorty, osada / bitwa, woda, AI wylaczone, brak punktu na ladzie), punkt odwrotu;
+    Q-K potkniecia 0 i linie "ERROR in CrossingLaw.*" 0."""
+    rows = {}
+    for d, s in by_day(lines, E8_Q_DAY).items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    if not rows:
+        rep.add("E8/Q: linie Straz przeprawy (E8/Q)", "brak w logu", "sa od wgrania E8/Q (CrossingLawAiClock, LogEnabled)", None)
+        return
+    days = sorted(rows)
+    off = [x for x in days if "WYLACZONE" in rows[x]]
+    live = [x for x in days if "| zegar gry TAK" in rows[x] and (num(r"\| przebiegi (\d+),", rows[x], int, 0) or 0) > 0]
+    need = max(0, len(win) - 1)
+    val = f"{len(live)} dob z przebiegami (wszystkich linii {len(days)}; dob okna {len(win)})"
+    if off:
+        why = re.search(r"WYLACZONE \((.*?)\)", rows[off[0]])
+        val += f"; WYLACZONE w {len(off)} dobach ({why.group(1)[:60] if why else '?'})"
+    rep.add("Q-0: linia Straz przeprawy z licznikiem (zegar gry TAK, przebiegi > 0)", val,
+            f">= {need} (codziennie w oknie; dzien gry = dzien ksiegi + 1), WYLACZONE 0", (not off and len(live) >= need and need > 0) if win else None)
+    if not live:
+        return
+    w = [rows[x] for x in live]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    # ---------------- Q-1: zawrocone (INFO)
+    turned = tot(r"\| zawrocone (\d+) \(")
+    per = {}
+    for x in w:
+        m = re.search(r"\| zawrocone \d+ \((.*?); punkt odwrotu", x)
+        if m:
+            for name, v in re.findall(r"(\S+) (\d+)", m.group(1)):
+                per[name] = per.get(name, 0) + int(v)
+    near, zone = tot(r", wrogich przy przeprawach (\d+) partio-godzin"), tot(r"partio-godzin, w strefie (\d+)")
+    seen = _mean([num(r"\(srednio (\d+) na przebieg\)", x) for x in w])
+    miss = [x for x in live if num(r"; przeprawy (\d+)/", rows[x]) != num(r"; przeprawy \d+/(\d+)\)", rows[x])]
+    v1 = f"{turned} ({turned / len(w):.2f}/d): " + (", ".join(f"{k} {v}" for k, v in per.items()) if per else "-")
+    v1 += f"; wrogich przy przeprawach {near} partio-godzin, w strefie {zone}"
+    if seen is not None:
+        v1 += f"; partii lordow na przebieg srednio {seen:.0f}"
+    rep.add("Q-1: zawrocone partie lordow (suma okna)", v1,
+            "INFO (> 0 dopiero przy wojnie z panem przeprawy - np. z Freyami; 0 wrogich w strefie = nie bylo kogo zawracac)", None)
+    if miss:
+        rep.add("Q-1b: przeprawy znalezione po id (ROT_town3, castle_B1, castle_EN2)", f"brak osady w {len(miss)} dobach (pierwsza d{miss[0]})", "3/3", False)
+    # ---------------- Q-2: koszt
+    cost = [num(r"\| koszt ([\d.]+) ms/dobe", x, float) for x in w]
+    cm = _mean(cost)
+    cx = max([c for c in cost if c is not None] or [0.0])
+    rep.add("Q-2: koszt petli godzinnej", f"srednio {cm:.3f} ms/dobe, najdrozsza doba {cx:.3f} ms" if cm is not None else "brak liczby w linii",
+            "<= 5 ms/dobe (srednio i najdrozsza doba)", (cm <= 5.0 and cx <= 5.0) if cm is not None else None)
+    # ---------------- Q-3: zakleszczenie
+    over = tot(r"partii zawroconych ponad 3 razy (\d+)")
+    worst, who, wd = 0, "-", None
+    for x in live:
+        m = re.search(r"najwiecej zawrocen jednej partii (\d+) \((.*?)\)", rows[x])
+        if m and int(m.group(1)) > worst:
+            worst, who, wd = int(m.group(1)), m.group(2), x
+    rep.add("Q-3: zadna partia zawracana ponad 3 razy na dobe (zakleszczenie)",
+            f"partio-dob ponad 3 zawrocenia: {over}; najwiecej {worst}" + (f" ({who}, d{wd})" if wd is not None else ""), "0", over == 0)
+    # ---------------- Q-4, Q-5: INFO
+    cross, cool = tot(r"wrogich lordow przez most (\d+) \("), tot(r"\(w ciagu 3 h po zawroceniu (\d+)\)")
+    tw = per.get("ROT_town3", 0)
+    dead = sum(1 for x in w if "(licznik E7/B): nieczynny" in x)
+    rep.add("Q-4: szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen",
+            f"przez most {cross} (w ciagu 3 h po zawroceniu {cool}), zawrocone przy ROT_town3 {tw}" + (f"; licznik E7/B nieczynny w {dead} z {len(w)} dob" if dead else ""),
+            "INFO (przejscia mimo strazy: przerwa 3 h po zawroceniu, armie w drodze na oblezenie, eskorty; decyzja po tescie)", None)
+    skip = (("spiacy", r"spiacy (\d+),"), ("w przerwie 3 h", r"w przerwie 3 h (\d+),"), ("oblezenie przeprawy", r"oblezenie przeprawy (\d+),"),
+            ("eskorty armii", r"eskorty armii (\d+),"), ("w osadzie albo bitwie", r"w osadzie albo bitwie (\d+),"), ("na wodzie", r"na wodzie (\d+),"),
+            ("AI wylaczone", r"AI wylaczone (\d+),"), ("bez punktu na ladzie", r"bez punktu na ladzie (\d+) "))
+    back = (("skad przyszla", r"skad przyszla (\d+) /"), ("prosto od zamku", r"prosto od zamku (\d+)\)"))
+    rep.add("Q-5: partie w strefie bez rozkazu i punkt odwrotu (suma okna, partio-godziny)",
+            ", ".join(f"{k} {tot(p)}" for k, p in skip) + "; punkt odwrotu: " + ", ".join(f"{k} {tot(p)}" for k, p in back), "INFO", None)
+    # ---------------- Q-K
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in CrossingLaw."))
+    rep.add("Q-K: kontrola (potkniecia petli, linie ERROR in CrossingLaw.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8539,6 +8635,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     blocks = [etap8_t0, etap8_0, etap8_p3]   # kolejne paczki etapu 8 dopisuja tu swoje bloki
     blocks.append(etap8_s)   # E8/S (246): porzadek stanu (osobna linia - czyste scalenie z lista drugiej galezi)
+    blocks.append(etap8_q)   # E8/Q (262): straz przeprawy na zegarze gry
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

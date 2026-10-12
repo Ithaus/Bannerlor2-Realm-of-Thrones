@@ -26,6 +26,8 @@ namespace Armoury
     /// 3. Pamiec: slownik partia -> ostatnia pewna strona i pozycja (tylko partie w strefie i czekajace w Bliznakach; wpis znika po wyjsciu albo smierci partii).
     ///    Przejscie = zmiana strony. Partia szybsza niz ok. 8 jedn./h moze przeskoczyc strefe miedzy probkami - licznik zaniza, nie zawyza.
     /// 4. Wejscia do osady (Measure169c.OnSettlementEntered, linia "(e) Bliznaki") zostaja obok (porownanie). CrossingLaw - bez zmian (etap 8).
+    ///    E8/Q (262): przejscie partii lordow zglaszane do CrossingLaw.NoteBridgeCrossed (licznik wrogow pana przeprawy, ktorzy przeszli most), a linia doby
+    ///    dostaje dopisek "straz przeprawy (E8/Q)" - zawrocone przy Bliznakach i wrogie przejscia (CrossingLaw.TwinsSuffix).
     /// Linia doby "Przeprawa Bliznaki (E7/B)" po ksiedze pieniadza; w pierwszych 3 dobach sesji z licznikiem - pozycje przejsc (punkt na osi miedzy probkami).
     /// </summary>
     internal static class TwinsCrossing
@@ -60,6 +62,9 @@ namespace Armoury
         private static long _carGold, _carMen, _carAnimals, _tollCar, _tollVil, _tollClan, _tollBand, _tollOther, _tollPlayer;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TwinsCrossingCount; } }
+
+        /// <summary>E8/Q (262): licznik naprawde liczy (klucz i wyznaczona os rzeki) - linia strazy przeprawy nie pokazuje wtedy zera zamiast "nieczynny".</summary>
+        internal static bool Counting { get { return On && _state == 1; } }
 
         internal static void Reset()
         {
@@ -269,7 +274,11 @@ namespace Armoury
             if (mp.IsMainParty) { _player++; if (!OwnRealm(mp.ActualClan)) _tollPlayer += toll; }   // gracz w krolestwie pana - bez myta, jak inne rody tego krolestwa
             else if (mp.IsCaravan) { _car++; _carGold += mp.PartyTradeGold; _carMen += men; _carAnimals += animals; _tollCar += toll; }
             else if (mp.IsVillager) { _vil++; _tollVil += toll; }
-            else if (mp.IsLordParty) { if (OwnRealm(mp.ActualClan)) _clanOwn++; else { _clanForeign++; _tollClan += toll; } }
+            else if (mp.IsLordParty)
+            {
+                if (OwnRealm(mp.ActualClan)) _clanOwn++; else { _clanForeign++; _tollClan += toll; }
+                CrossingLaw.NoteBridgeCrossed(mp, _twins);   // E8/Q (262): wrog pana przeprawy przeszedl most mimo strazy - sam licznik (wlasny try)
+            }
             else if (mp.IsBandit) { _band++; _tollBand += toll; }
             else { _other++; _tollOther += toll; }
             if (_activeLines < PosDays && _pos.Count < PosMax)
@@ -326,6 +335,7 @@ namespace Armoury
                   .Append(" | strefa r ").Append(ZoneR.ToString("0", Inv)).Append(" od bramy: partii ").Append(_inZone).Append(", w pamieci ").Append(_seen.Count)
                   .Append(" | koszt probek ").Append(ms.ToString("0.000", Inv)).Append(" ms/dobe (").Append(_samples).Append(" probek)")
                   .Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(")");
+                sb.Append(CrossingLaw.TwinsSuffix());   // E8/Q (262): licznik zawrocen strazy przy Bliznakach - PRZED pozycjami przejsc (wzorzec T3 narzedzia czyta je do konca linii)
                 if (_activeLines < PosDays)
                     sb.Append(" | pozycje przejsc (x/y, odl. od bramy): ").Append(_pos.Count > 0 ? string.Join(", ", _pos.ToArray()) : "brak");
                 sb.Append('.');

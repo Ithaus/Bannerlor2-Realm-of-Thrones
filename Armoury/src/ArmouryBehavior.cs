@@ -830,6 +830,9 @@ namespace Armoury
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, Stage8World.OnLeft);
             // E7/T (225): probka kar terenu - partie AI w ruchu w lesie / na pustyni / na rowninie i do 8 rozpisek gry na godzine (tylko log, Stage7MeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TerrainEase.Hourly", delegate { try { TerrainEase.Hourly(); } catch (Exception e) { Log.Error("TerrainEase.Hourly", e); } }));
+            // E8/Q (262): straz przeprawy zawraca wrogie partie lordow AI raz na godzine gry, niezaleznie od gracza (wylacznik CrossingLawAiClock). Rejestracja PRZED
+            // probka E7/B = wolanie PO niej (gra dopisuje sluchacza na poczatek listy - MbEvent): licznik przejsc widzi przerwy sprzed rozkazu tej godziny
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CrossingLaw.AiHourly", delegate { try { CrossingLaw.AiHourly(); } catch (Exception e) { Log.Error("CrossingLaw.AiHourly", e); } }));
             // E7/B (231): licznik przejsc przez Bliznaki - lokator mapy wokol bramy raz na godzine (tylko log, wylacznik TwinsCrossingCount)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TwinsCrossing.Hourly", delegate { try { TwinsCrossing.Hourly(); } catch (Exception e) { Log.Error("TwinsCrossing.Hourly", e); } }));
             // E7/W1 (232): wiesci z wiosek - zdarzenie gry tylko kolejkuje (odczyt ksiegi), komunikaty w ticku godzinnym (wylacznik VillageRaidMessages = 0)
@@ -1687,6 +1690,7 @@ namespace Armoury
             try { WorldClock7.Daily(); } catch (Exception e) { Log.Error("WorldClock7.Daily", e); } DayProfile.Lap("WorldClock7.Daily");   // E7/0 (224): linie "Wojna i pokoj (E7/0)" i "Turnieje (E7/0)" (tylko log) - po ksiedze pieniadza
             try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
             try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
+            try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow
             try { MapVillageLore.Daily(); } catch (Exception e) { Log.Error("MapVillageLore.Daily", e); } DayProfile.Lap("MapVillageLore.Daily");   // E7/W2 (233): linia "Dymek wioski (E7/W2)" (dymki i potkniecia doby), w pierwszej dobie sesji probka wiary BK 20 wiosek (T4)
             try { DistrictMenu.Daily(); } catch (Exception e) { Log.Error("DistrictMenu.Daily", e); } DayProfile.Lap("DistrictMenu.Daily");   // E7/W3 (234): w pierwszej dobie sesji linia startowa "Menu okregu (E7/W3): start" (index pozycji po wszystkich modach), potem linia doby tylko przy uzyciu

@@ -157,6 +157,10 @@ namespace Armoury
         public bool CrossingLawEnabled = true;             // fortified crossings (The Twins) bar their bridge to ENEMIES of the holder - allies and neutrals pass; take the castle, make peace, or go by sea
         public bool CrossingLawAi = true;                  // the bridge watch also turns back hostile AI lord parties (they get a fallback point and a 3h cooldown so their pathfinding never jams)
         public float CrossingRadius = 3f;                  // how far the bridge watch reaches around the crossing castle
+        // E8/Q (262, ERRORS/E7; rozpoznanie C rozdz. 6 i poz. 9): petla AI strazy przeprawy na zegarze gry - raz na godzine gry, niezaleznie od gracza (dotad biegla
+        // tylko wtedy, gdy straz wypychala samego gracza, czyli w praktyce nigdy); pomija spiacych (E7/O1) i wojsko idace oblegac przeprawe; punkt odwrotu = skad
+        // partia przyszla. Linia "Straz przeprawy (E8/Q)" co dobe. Off = petla jak przed E8/Q (klucz Jeffa CrossingLawAi nietkniety)
+        public bool CrossingLawAiClock = true;             // the bridge watch turns hostile AI lord parties back once every game hour, wherever you are (before, it only did so while you yourself were being turned back at a crossing). Sleeping parties and armies marching to besiege the crossing are left alone. Off = as before
 
         // --- The slow muster ---
         public int VolunteerRegenPercent = 100;            // notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)

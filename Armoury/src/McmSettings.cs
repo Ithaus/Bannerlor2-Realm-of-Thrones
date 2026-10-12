@@ -532,6 +532,10 @@ namespace Armoury
         [SettingPropertyGroup("The crossing law")]
         public float CrossingRadius { get; set; } = 3f;
 
+        [SettingPropertyBool("Crossing Law Ai Clock", HintText = "the bridge watch turns hostile AI lord parties back once every game hour, wherever you are (before, it only did so while you yourself were being turned back at a crossing). Sleeping parties and armies marching to besiege the crossing are left alone. Off = as before")]
+        [SettingPropertyGroup("The crossing law")]
+        public bool CrossingLawAiClock { get; set; } = true;
+
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 400, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 100;
@@ -5040,6 +5044,7 @@ namespace Armoury
             s.CrossingLawEnabled = CrossingLawEnabled;
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;
+            s.CrossingLawAiClock = CrossingLawAiClock;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
