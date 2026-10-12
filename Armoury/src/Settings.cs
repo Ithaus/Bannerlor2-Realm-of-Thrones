@@ -369,7 +369,7 @@ namespace Armoury
 
         // --- The marching column ---
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
-        public int WorldPacePercent = 50;                  // base map speed of EVERY party as a percent of the game's own (100 = unchanged) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it
+        public int WorldPacePercent = 50;                  // base map speed of EVERY party as a percent of the game's own (100 or more = unchanged, it never speeds the world up) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it
         public bool TerrainEaseEnabled = true;             // replace the game's percentage terrain and night penalties with the flat map-speed penalties below (the vanilla share is shown undone in the tooltip, then ours applied)
         public float ForestSpeedPenalty = 0.10f;           // flat speed lost in forest (vanilla: 30% of your speed)
         public float DesertSpeedPenalty = 0.20f;           // flat speed lost in desert and dunes (vanilla: 10%)

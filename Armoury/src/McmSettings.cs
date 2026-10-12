@@ -1204,7 +1204,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party as a percent of the game's own (100 = unchanged) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it")]
+        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party as a percent of the game's own (100 or more = unchanged, it never speeds the world up) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it")]
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 

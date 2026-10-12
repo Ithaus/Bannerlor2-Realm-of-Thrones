@@ -24,7 +24,9 @@
 
 **Poza zakresem (zauwazone, nie ruszane - etap 8):** `HideoutPurge.SearchTick` (:464 przed paczka) wola `GameMenu.SwitchToMenu` z ticku menu czekania przy "Call the search off" - pulapka CLAUDE.md 7 (CTD), do sprawdzenia; catch w `OnTick` gasi `_pending` po jednym wyjatku (lup przepada); statyki `_reprisalPack` / `_pending` nie sa czyszczone przy wczytaniu innego zapisu (OnSessionLaunched); `WorldPace.BasePostfix` przy 0-4% zostawia predkosc gry, a `MarchPace` ten sam suwak przycina do 5% (rozne odczyty skrajnych wartosci); komentarze "168 dni" w `Rations.cs:16`, `SlowMuster.cs:10`, CrashScribe `Fabula.cs:77` - historyczne, poza oknem projektu.
 
-**Build:** Armoury kod 0 (md5 88c7eae5). gen_mcm OK (Armoury 1185 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmian). Gry nie uruchamiano.
+**Poprawka recenzji (E7/C):** nowa podpowiedz `World Pace Percent` mowila "(100 = unchanged)", co sugeruje, ze 150 przyspieszy swiat - a kazdy odczyt suwaka (`WorldPace.BasePostfix` :57-58, `MarketCarts.PerDay` :343-344, `MarchPace` :116 przycina do 100, `WorldMeasure` :172) traktuje >= 100 jako predkosc gry. Tekst: "(100 or more = unchanged, it never speeds the world up)" (Settings.cs + gen_mcm); T2 dalej czysty. Kod gry bez zmian. Sprawdzone bez zmian: `Campaign.Tick` (G :954-961 - TickEvent tylko przy `_dt > 0` albo w 3 pierwszych tickach), AI band co godzine gry (G `CampaignPeriodicEventManager` :275-277, TickPartialHourlyAi), `MobilePartyAi.SetAiBehavior(AiBehavior, IInteractablePoint, CampaignVec2)` (G :1405; `PartyBase : IInteractablePoint`, `MobileParty.Position` CampaignVec2) i `SetInitiative` (:1597) - refleksja pasuje; zaden mod (BK, nasze) nie latuje `SetAiBehavior`/`SetShortTermBehavior`; klucz 0 = te same wywolania co przed paczka; bez stanu w zapisie; blok `etap7_c` (py_compile poza repo) T1/T2 TAK, T3 z linii obu rodzajow konca pogoni.
+
+**Build:** Armoury kod 0 (md5 88c7eae5; po recenzji d52b3d77 - tylko tekst podpowiedzi). gen_mcm OK (Armoury 1185 ustawien, RealisticCaptivity 109, GrandTourney 40 - bez zmian). Gry nie uruchamiano.
 
 **Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
 
