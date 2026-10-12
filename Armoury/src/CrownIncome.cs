@@ -324,7 +324,7 @@ namespace Armoury
                 {
                     var sb = new StringBuilder(2048);
                     sb.Append("Korona: wplywy dnia (165): dzien ").Append(today)
-                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, podatek wojenny ludu (184), clo, 1/3 zaworu zamkow i miast, 1/9 prawa trzecich (178) ").Append(own)
+                      .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, podatek wojenny ludu (184), clo, czesc korony z zaworu zamkow i miast (E5/B3: miast 1/2 przy wyrownaniu), 1/9 prawa trzecich (178) ").Append(own)
                       .Append(", w tym podatek wojenny ludu (184) ").Append(wtax)
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)

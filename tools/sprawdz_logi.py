@@ -51,6 +51,12 @@ Uzycie (Python 3, tylko odczyt):
                     165 i kiesa ludu (B1) czynna (K3), s nie ponad pulap, krok tygodnia zgodny z regula potrzeby (potrzeba -> w gore, luz i pokoj -> w dol), dlug 186
                     d364 <= d182 (bieg roczny), zaleglosc 186 przy s < pulapu = 0, zwrot zoldu >= 70% naleznego (165), pobor czynny (> 0 przy s > 0
                     w wojnie - kiesa ludu B1), Obieg = linia 184, bledy; wielkosc 184, wstrzymane w oblezeniu, wplywy korony - INFO.
+                    Blok E5/B3 (Z15-5, wyrownanie dla panow zamkow) B3-1..B3-10 - linia "Wyrownanie panow zamkow (E5/B3)": codziennie i czytelna,
+                    wyrownanie CZYNNE caly bieg zbioru B (wylacznik i kiesa ludu B1 - K3), zawor: udzial korony z kwot = 1 - udzial pana z linii (sr28),
+                    wartosci czynne zgodne z regula (czynne: klucze With Folk 1/2 i 2/1.5/0.25, nieczynne: klucze sprzed B3; wagi w linii "Renty korony (180)"
+                    te same), panowie samych zamkow (budzet-rodow.csv): udzial w D swiata >= 30% (prog glowny) i w D stalym 30-35% - srednia d252-364
+                    (bieg roczny, --do-doby 364; krotszy - INFO), mediana kiesy - srednia 4 blokow 28 dob (odczyt), renty dnia wedlug rodzaju rodu i gracz -
+                    INFO, bledy. A1-T8 bierze udzial pana z linii B3 tej doby (bez linii - klucz 0.67, 1/3 dla korony).
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
@@ -2674,6 +2680,15 @@ def etap5_main(logp, start_arg, until=120, csvp=None):
             rep.add("E5/B2: linia Korona: podatek wojenny ludu (184)", "brak w logu", "jest od wgrania E5/B2 (LogEnabled)", None)
     except Exception as e:
         rep.add("blok etap5_b2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/B3 (Z15-5): wyrownanie dla panow zamkow - linia z dniem gry (klucz = dzien ksiegi, jak 165/180); bez linii (log sprzed B3) - INFO
+    eq = e4_series(lines, "Wyrownanie panow zamkow (E5/B3): dzien", 1)
+    try:
+        if eq:
+            etap5_b3(rep, lines, start, until, eq, logp, csvp)
+        else:
+            rep.add("E5/B3: linia Wyrownanie panow zamkow (E5/B3)", "brak w logu", "jest od wgrania E5/B3 (LogEnabled)", None)
+    except Exception as e:
+        rep.add("blok etap5_b3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3053,14 +3068,32 @@ def etap5_a1(rep, lines, start, until, logp):
         if m:
             vz[d] = [int(x) for x in m.groups()]
     off8 = [d for d in win if seg.get(d) and "zawor: NIE DZIALA" in seg[d]]
+    # E5/B3 (Z15-5): udzial pana czynny dzis z linii "Wyrownanie panow zamkow (E5/B3)" (dzien gry; ten sam blok dobowy co 169c) - przy wyrownaniu 1/2;
+    # doba bez linii B3 (log sprzed B3) - klucz 0.67. Oczekiwany udzial korony = srednia (1 - udzial pana) wazona podstawa LBk + K
+    b3l = e4_series(lines, "Wyrownanie panow zamkow (E5/B3): dzien", 1)
     if vz:
         badsum = [d for d, v in vz.items() if v[0] != v[1] + v[4]]
         k28 = sum(vz[d][4] for d in last28 if d in vz)
         lbk28 = sum(vz[d][3] for d in last28 if d in vz)
         ratio = k28 / (lbk28 + k28) if lbk28 + k28 > 0 else None
+        ew = en = 0.0
+        nb3 = 0
+        for d in last28:
+            if d not in vz:
+                continue
+            sh = fnum(r"\| zawor kas miast \(A1 [^)]*\): panu ([\d.]+)%", b3l.get(d))
+            if sh is not None:
+                nb3 += 1
+            base = vz[d][3] + vz[d][4]
+            ew += (1.0 - (sh / 100.0 if sh is not None else 0.67)) * base
+            en += base
+        exp8 = ew / en if en > 0 else 0.33
+        lo8, hi8 = exp8 - 0.01, exp8 + 0.01
+        rule8 = (f"0 dob; {lo8:.2f}-{hi8:.2f} (1 - udzial pana z linii E5/B3 w {nb3} dobach sr28, poza nimi klucz 0.67)" if nb3
+                 else "0 dob; 0.32-0.34 (1/3 - klucz 0.67)")
         rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony sr28 K / (LBk + K)",
                 f"D != L + K w {len(badsum)} z {len(vz)} dob; udzial korony " + (f"{ratio:.3f}" if ratio is not None else "-") + (f"; NIE DZIALA w {len(off8)} dobach" if off8 else ""),
-                "0 dob; 0.32-0.34 (1/3 - klucz 0.67)", len(badsum) == 0 and ratio is not None and 0.32 <= ratio <= 0.34 if live else None)
+                rule8, len(badsum) == 0 and ratio is not None and lo8 <= ratio <= hi8 if live else None)
     else:
         rep.add("E5/A1 A1-T8: zawor D = L + K; udzial korony", "brak liczb zaworu" + (f" (NIE DZIALA w {len(off8)} dobach - Population Rent Enabled?)" if off8 else ""),
                 "zawor czynny w biegu A", None if not live else False)
@@ -3951,6 +3984,176 @@ def etap5_b2(rep, lines, start, until, wt):
     errs = [s for s in lines if s.startswith("ERROR in ") and "KingdomTreasury.WarTax" in s]
     stm = sum(rows[d]["stum"] for d in ds)
     rep.add("E5/B2 B2-14: bledy KingdomTreasury.WarTax, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
+            len(errs) == 0 and stm == 0)
+
+
+def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
+    """E5/B3 (Z15-5, PLAN 5.7 - wyrownanie dla panow zamkow: R4 zawor kasy miasta pan 1/2 : korona 1/2, R16 renty korony wedlug wag lenn 2 / 1.5 / 0.25):
+    projekt rozdz. 3 "E5/B3" Test i rozdz. 4 (progi panow zamkow; zbior B, z kiesa ludu B1). Linia "Wyrownanie panow zamkow (E5/B3): dzien N" (dzien gry;
+    eq ma klucz = dzien ksiegi, jak 165/180) - po rentach 180. Wiersze B3-1..B3-10: linia, stan (czynne caly bieg B - K3), zawor (udzial korony z kwot =
+    1 - udzial pana z linii), wartosci czynne zgodne z regula i z linia 180, udzial panow samych zamkow w D swiata (prog glowny, srednia d252-364) i w D stalym
+    (30-35%), mediana kiesy (odczyt - srednia 4 blokow 28 dob), renty dnia wedlug rodzaju rodu, gracz, bledy."""
+    win = sorted(d for d in eq if 1 <= run_day(d, start) <= until)
+    alld = sorted(d for d in by_day(lines, "Pieniadz swiata: dzien") if 1 <= run_day(d, start) <= until)
+    r180 = e4_series(lines, "Renty korony (180): dzien", 1)
+    rst = re.compile(r"\| wylacznik Castle Lords Even Up (tak|nie), kiesa ludu \(B1\) (czynna|nieczynna) -> wyrownanie (CZYNNE|NIECZYNNE)")
+    rzv = re.compile(r"\| zawor kas miast \(A1 (czynny|nieczynny)[^)]*\): panu ([\d.]+)%, koronie ([\d.]+)% \(z wyrownaniem ([\d.]+)%, bez ([\d.]+)%")
+    rwg = re.compile(r"\| wagi rent korony \(180 (czynne|nieczynne)\): miasto ([\d.]+), zamek ([\d.]+), wies ([\d.]+) \(z wyrownaniem ([\d.]+) / ([\d.]+) / ([\d.]+),"
+                     r" bez ([\d.]+) / ([\d.]+) / ([\d.]+)\)")
+    rzd = re.compile(r"\| zawor dzis: panom (\d+) \(w krolestwach przed dekretem (\d+)\) \+ koronie (\d+)")
+    rrd = re.compile(r"\| renty korony dzis (\d+): rody samych zamkow (\d+) \(rodow (\d+), z renta (\d+); wag ([\d.]+)%, rent ([\d.]+)%\), rody z miastem (\d+)"
+                     r" \(rodow (\d+), z renta (\d+); wag ([\d.]+)%, rent ([\d.]+)%\), rod gracza (\d+) \(wag ([\d.]+)%\)")
+    rpl = re.compile(r"\| gracz: zawor \(czesc pana\) (\d+), renta (\d+)")
+    rows = {}
+    for d in win:
+        s = eq[d]
+        a, z, w, v, r, p = rst.search(s), rzv.search(s), rwg.search(s), rzd.search(s), rrd.search(s), rpl.search(s)
+        if not (a and z and w and v and r and p):
+            continue
+        rows[d] = {"key": a.group(1) == "tak", "folk": a.group(2) == "czynna", "live": a.group(3) == "CZYNNE",
+                   "valve": z.group(1) == "czynny", "lord": float(z.group(2)), "lordW": float(z.group(4)), "lordB": float(z.group(5)),
+                   "w": tuple(float(w.group(i)) for i in (2, 3, 4)), "wW": tuple(float(w.group(i)) for i in (5, 6, 7)), "wB": tuple(float(w.group(i)) for i in (8, 9, 10)),
+                   "rentsOn": w.group(1) == "czynne",
+                   "vLord": int(v.group(1)), "vBaseK": int(v.group(2)), "vCrown": int(v.group(3)),
+                   "rAll": int(r.group(1)), "rCastle": int(r.group(2)), "nCastle": int(r.group(3)), "pCastle": int(r.group(4)), "wCastle": float(r.group(5)),
+                   "shCastle": float(r.group(6)), "rTown": int(r.group(7)), "nTown": int(r.group(8)), "wTown": float(r.group(10)), "shTown": float(r.group(11)),
+                   "rPlayer": int(r.group(12)), "pValve": int(p.group(1)), "pRent": int(p.group(2)),
+                   "stum": num(r"\| potkniecia (\d+)\.", s, int, 0) or 0}
+    exp = sorted(set(alld) | set(win))
+    miss = [d for d in exp if d not in rows]
+    rep.add("E5/B3 B3-1: linia Wyrownanie panow zamkow (E5/B3) codziennie (czytelna)", f"brak/nieczytelna w {len(miss)} z {len(exp)} dob" + (f" (pierwsza {miss[0]})" if miss else ""),
+            "0 (LogEnabled)", (len(miss) == 0) if exp else None)
+    if not rows:
+        return
+    ds = sorted(rows)
+    # B3-2: wyrownanie czynne caly bieg zbioru B (K3: tylko z czynna kiesa ludu; nieczynne = udzial 2/3 i wagi 3/1/0.25 sprzed paczki)
+    off = [d for d in ds if not rows[d]["live"]]
+    nofolk = len([d for d in ds if not rows[d]["folk"]])
+    nokey = len([d for d in ds if not rows[d]["key"]])
+    rep.add("E5/B3 B3-2: wyrownanie CZYNNE (wylacznik Castle Lords Even Up i kiesa ludu B1 czynna)",
+            f"nieczynne w {len(off)} z {len(ds)} dob (kiesa ludu nieczynna {nofolk}, wylacznik wylaczony {nokey})" + (f" (pierwsza {off[0]})" if off else ""),
+            "czynne caly bieg zbioru B (nieczynne - zawor 2/3 i wagi 3/1/0.25 jak przed paczka - K3)", len(off) == 0)
+    # B3-3: zawor - udzial korony z kwot dnia = 1 - udzial pana z linii (doby z czynnym wyrownaniem i zaworem A1, ostatnie 28 takich dob)
+    vd = [d for d in ds if rows[d]["live"] and rows[d]["valve"] and rows[d]["vBaseK"] + rows[d]["vCrown"] > 0][-28:]
+    if vd:
+        kk = sum(rows[d]["vCrown"] for d in vd)
+        bb = sum(rows[d]["vBaseK"] + rows[d]["vCrown"] for d in vd)
+        ex = sum((1.0 - rows[d]["lord"] / 100.0) * (rows[d]["vBaseK"] + rows[d]["vCrown"]) for d in vd) / bb
+        q = kk / bb
+        rep.add("E5/B3 B3-3: zawor kas miast - udzial korony K / (LBk + K) przy wyrownaniu (sr28 dob czynnych)",
+                f"{q:.3f} wobec {ex:.3f} (1 - udzial pana z linii; {len(vd)} dob; koronie {kk}, podstawa {bb})",
+                "+-0.01 (Z15-5: 1/2 - korona 0.49-0.51 przy kluczu 0.5)", abs(q - ex) <= 0.01)
+    else:
+        rep.add("E5/B3 B3-3: zawor kas miast - udzial korony przy wyrownaniu", "brak dob z czynnym wyrownaniem i zaworem A1 (z poborem)",
+                "+-0.01 wobec 1 - udzial pana (zbior B)", None)
+    # B3-4: wartosci czynne zgodne z regula (czynne - klucze With Folk, nieczynne - klucze sprzed B3) i wagi w linii 180 te same co w linii B3
+    bad4 = []
+    n180 = 0
+    for d in ds:
+        x = rows[d]
+        want_l, want_w = (x["lordW"], x["wW"]) if x["live"] else (x["lordB"], x["wB"])
+        if abs(x["lord"] - want_l) > 0.05 or any(abs(a - b) > 1e-6 for a, b in zip(x["w"], want_w)):
+            bad4.append((d, "regula"))
+            continue
+        s180 = r180.get(d)
+        if s180:
+            m = re.search(r"\| wagi: miasto ([\d.]+), zamek ([\d.]+), wies ([\d.]+) \(E5/B3: (z wyrownaniem|bez wyrownania)\)", s180)
+            if m:
+                n180 += 1
+                if any(abs(float(m.group(i + 1)) - x["w"][i]) > 1e-6 for i in range(3)) or (m.group(4) == "z wyrownaniem") != x["live"]:
+                    bad4.append((d, "linia 180"))
+    lv = [d for d in ds if rows[d]["live"]]
+    last = rows[ds[-1]]
+    rep.add("E5/B3 B3-4: wartosci czynne zgodne z regula; wagi w linii Renty korony (180) = linia B3",
+            f"niezgodnych {len(bad4)} z {len(ds)} dob (porownanych z 180: {n180})" + (f" (pierwsza {bad4[0]})" if bad4 else "")
+            + f"; ostatnia doba: panu {last['lord']:.1f}%, wagi {last['w'][0]:g} / {last['w'][1]:g} / {last['w'][2]:g} ({'z wyrownaniem' if last['live'] else 'bez wyrownania'})",
+            "0 (czynne: 50% i 2 / 1.5 / 0.25 przy domyslnych; nieczynne: 67% i 3 / 1 / 0.25)", len(bad4) == 0)
+    # B3-5..B3-7: panowie samych zamkow (budzet-rodow.csv; rodzaj "zamek" = rod z zamkami bez miasta, gracz poza)
+    csvp = csvp or (csv_path_of(logp) if logp else None)
+    crow = read_csv(csvp) if csvp else []
+    if not crow:
+        rep.add("E5/B3 B3-5..B3-7: panowie samych zamkow (budzet-rodow.csv)", f"brak {csvp}", "udzial w D swiata >= 30% (d252-364)", None)
+    else:
+        byd = {}
+        for r in crow:
+            try:
+                byd.setdefault(int(r.get("dzien") or 0), []).append(r)
+            except ValueError:
+                continue
+        cd = sorted(d for d in byd if 1 <= run_day(d, start) <= until)
+        wd = [d for d in cd if 252 <= run_day(d, start) <= 364]
+        full = len(wd) >= 28
+        use = wd if full else cd[-28:]
+
+        def fv(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+        shD, shS = [], []
+        for d in use:
+            tD = tS = zD = zS = 0.0
+            for r in byd[d]:
+                D, S = fv(r.get("D")) or 0.0, fv(r.get("d_staly")) or 0.0
+                tD += D
+                tS += S
+                if r.get("rodzaj") == "zamek":
+                    zD += D
+                    zS += S
+            if tD:
+                shD.append(zD / tD)
+            if tS:
+                shS.append(zS / tS)
+        mD, mS = _mean(shD), _mean(shS)
+        span = f"doby {run_day(use[0], start)}-{run_day(use[-1], start)}" if use else "-"
+        rep.add("E5/B3 B3-5: udzial panow samych zamkow w D swiata (srednia d252-364) - PROG GLOWNY",
+                (f"{mD * 100:.1f}%" if mD is not None else "-") + f" ({span})" + ("" if full else " - bieg krotszy niz 252 doby (--do-doby 364): odczyt ostatnich 28 dob"),
+                ">= 30% (bieg A z31 d93-120: 30.1%)", (mD is not None and mD >= 0.30) if full else None)
+        rep.add("E5/B3 B3-6: udzial panow samych zamkow w D stalym (srednia d252-364)",
+                (f"{mS * 100:.1f}%" if mS is not None else "-") + f" ({span})" + ("" if full else " - odczyt (bieg krotszy)"),
+                "30-35% (bieg A z31: 24.3%)", (mS is not None and 0.30 <= mS <= 0.35) if full else None)
+        # B3-7 (odczyt, v2 E5K1-10): zmiana mediany kiesy glowy w 4 blokach po 28 dob (d252-279, 280-307, 308-335, 336-363); tylko rody, ktorych krolestwo bylo
+        # w wojnie >= 21 z 28 dob bloku; srednia blokow >= -2% - przy niezdanym, a B3-5 zdanym, B3 nie jest wylaczane (rozrzut blokow dzis 16 pkt)
+        blocks = []
+        for b in range(4):
+            lo = 252 + 28 * b
+            bd = [d for d in cd if lo <= run_day(d, start) <= lo + 27]
+            if len(bd) < 21:
+                continue
+            war = {}
+            for d in bd:
+                for r in byd[d]:
+                    if r.get("rodzaj") == "zamek" and r.get("wojna") == "1":
+                        war[r.get("rod_id")] = war.get(r.get("rod_id"), 0) + 1
+            need = min(21, max(1, len(bd) * 3 // 4))
+            ids = {k for k, n in war.items() if n >= need}
+
+            def med(d):
+                ks = sorted(k for k in (fv(r.get("kiesa_glowy")) for r in byd[d] if r.get("rodzaj") == "zamek" and r.get("rod_id") in ids) if k is not None)
+                return ks[len(ks) // 2] if ks else None
+            m0, m1 = med(bd[0]), med(bd[-1])
+            if m0 and m1 is not None:
+                blocks.append((lo, (m1 / m0 - 1) * 100, len(ids)))
+        if blocks:
+            mb = _mean([x[1] for x in blocks])
+            rep.add("E5/B3 B3-7: mediana kiesy panow samych zamkow w wojnie - srednia zmiany w blokach 28 dob d252-364 (odczyt)",
+                    f"{mb:+.1f}% (bloki: " + ", ".join(f"d{x[0]} {x[1]:+.1f}% ({x[2]} rodow)" for x in blocks) + f"); >= -2%: {'tak' if mb >= -2 else 'nie'}",
+                    "INFO - odczyt >= -2% (prog glowny B3-5; z31 d93-120: -2.5%)", None)
+        else:
+            rep.add("E5/B3 B3-7: mediana kiesy panow samych zamkow (bloki 28 dob d252-364)", "brak pelnych blokow (bieg krotszy niz 279 dob)", "INFO - odczyt (bieg roczny)", None)
+    # B3-8: renty dnia wedlug rodzaju rodu (sr28) - czy wyrownanie trafia do panow samych zamkow
+    t28 = _last28(lv if lv else ds)
+    rep.add("E5/B3 B3-8: renty korony dnia - rody samych zamkow: udzial w rentach / w wagach (sr28" + (" dob z wyrownaniem" if lv else ", wyrownanie nieczynne") + ")",
+            f"renty {st.mean(rows[d]['rAll'] for d in t28):.0f}/d, rodom samych zamkow {st.mean(rows[d]['rCastle'] for d in t28):.0f}/d"
+            f" ({st.mean(rows[d]['shCastle'] for d in t28):.1f}% rent, {st.mean(rows[d]['wCastle'] for d in t28):.1f}% wag), rodom z miastem"
+            f" {st.mean(rows[d]['shTown'] for d in t28):.1f}% rent / {st.mean(rows[d]['wTown'] for d in t28):.1f}% wag",
+            "INFO - renta wedlug wag lenn za sluzbe (udzial rent < udzial wag = rody bez warunku albo krolestwa bez reszty po zwrocie)", None)
+    rep.add("E5/B3 B3-9: gracz - ta sama regula (suma okna): zawor (czesc pana) / renta",
+            f"{sum(rows[d]['pValve'] for d in ds)} / {sum(rows[d]['pRent'] for d in ds)} zl",
+            "INFO - zawor jego miast i renta jego rodu jak u AI (decyzja Jeffa 09.10 E)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ") and "LordsEvenUp" in s]
+    stm = sum(rows[d]["stum"] for d in ds)
+    rep.add("E5/B3 B3-10: bledy LordsEvenUp, potkniecia (suma)", f"bledy {len(errs)}, potkniecia {stm}" + (f" (pierwszy: {errs[0][:160]})" if errs else ""), "0 / 0",
             len(errs) == 0 and stm == 0)
 
 

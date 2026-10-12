@@ -3052,7 +3052,7 @@ namespace Armoury
         [SettingPropertyGroup("The town's purse")]
         public bool TownFolkBuyWithoutMinting { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Town Rent Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest - you and the AI alike (a town held outside any kingdom pays everything to its lord)")]
+        [SettingPropertyFloatingInteger("Town Rent Lord Share", 0.00f, 1.00f, "0.00", HintText = "of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest - you and the AI alike (a town held outside any kingdom pays everything to its lord). With Castle Lords Even Up while the townsfolk's purse is live, Town Rent Lord Share With Folk is used instead")]
         [SettingPropertyGroup("The town's purse")]
         public float TownRentLordShare { get; set; } = 0.67f;
 
@@ -3332,15 +3332,15 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRents { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Town", 0.00f, 12.00f, "0.00", HintText = "rent weight of a town (a castle 1, a village a quarter by default)")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Town", 0.00f, 12.00f, "0.00", HintText = "rent weight of a town (a castle 1, a village a quarter by default); with Castle Lords Even Up while the townsfolk's purse is live, Crown Rent Weight Town With Folk is used instead")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightTown { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Castle", 0.00f, 4.00f, "0.00", HintText = "rent weight of a castle")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Castle", 0.00f, 4.00f, "0.00", HintText = "rent weight of a castle; with Castle Lords Even Up while the townsfolk's purse is live, Crown Rent Weight Castle With Folk is used instead")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightCastle { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Crown Rent Weight Village", 0.00f, 1.00f, "0.00", HintText = "rent weight of a village")]
+        [SettingPropertyFloatingInteger("Crown Rent Weight Village", 0.00f, 1.00f, "0.00", HintText = "rent weight of a village - the same with Castle Lords Even Up")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownRentWeightVillage { get; set; } = 0.25f;
 
@@ -4492,6 +4492,22 @@ namespace Armoury
         [SettingPropertyGroup("The war tax on the people (stage 5)")]
         public int WarTaxReserveDays { get; set; } = 60;
 
+        [SettingPropertyBool("Castle Lords Even Up", HintText = "while the townsfolk's purse is live, the crown evens up what it costs the lords of castles (the villagers then keep most of their market takings and spend them in the towns): a town's lord shares the town's daily dues half and half with the crown (Town Rent Lord Share With Folk) instead of keeping two thirds, and the crown shares out its rents by fixed fief weights that favour castles - a town 2, a castle 1.5, a village a quarter (Crown Rent Weight Town and Castle With Folk) instead of 3, 1 and a quarter. Never by the size of a garrison. You and the AI alike. Without the townsfolk's purse, or off = Town Rent Lord Share and the Crown Rent Weights, as before")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public bool CastleLordsEvenUp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Rent Lord Share With Folk", 0.00f, 1.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: of what a town purse gives up each day its lord keeps this share and the kingdom treasury the rest (0.5 = half and half; a town held outside any kingdom pays everything to its lord)")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float TownRentLordShareWithFolk { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Town With Folk", 0.00f, 8.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: rent weight of a town (a castle Crown Rent Weight Castle With Folk, a village Crown Rent Weight Village)")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float CrownRentWeightTownWithFolk { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Crown Rent Weight Castle With Folk", 0.00f, 6.00f, "0.00", HintText = "with Castle Lords Even Up while the townsfolk's purse is live: rent weight of a castle")]
+        [SettingPropertyGroup("Evening up for the castle lords (stage 5)")]
+        public float CrownRentWeightCastleWithFolk { get; set; } = 1.5f;
+
         [SettingPropertyBool("Ships To Port", HintText = "Off until the war tax of stage 5 - see docs. When a party is destroyed on land or disbanded, the ships its house cannot use are sold to the nearest port of the realm with room in its shipyard (or, if the realm's ports cannot pay, to a port of a realm at peace with the house). The port pays the usual sale price (30% of the value minus repairs) out of its spare money above its merchants' reserve - the same for you and the AI. No buyer: the ships are lost. Off = the game pays the house the full worth of those ships out of thin air (you get 30%), as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipsToPort { get; set; } = false;
@@ -5634,6 +5650,10 @@ namespace Armoury
             s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
             s.WarTaxStep = WarTaxStep;
             s.WarTaxReserveDays = WarTaxReserveDays;
+            s.CastleLordsEvenUp = CastleLordsEvenUp;
+            s.TownRentLordShareWithFolk = TownRentLordShareWithFolk;
+            s.CrownRentWeightTownWithFolk = CrownRentWeightTownWithFolk;
+            s.CrownRentWeightCastleWithFolk = CrownRentWeightCastleWithFolk;
             s.ShipsToPort = ShipsToPort;
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;

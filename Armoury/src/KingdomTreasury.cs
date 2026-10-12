@@ -245,7 +245,8 @@ namespace Armoury
                     if (c.IsUnderMercenaryService) { merc += kv.Value; continue; }
                     int v = kv.Value;
                     long own;
-                    // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownRentLordShare) - tyle tniemy; korona swojej czesci nie oddaje drugi raz
+                    // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownPurse.LordShare: TownRentLordShare, z wyrownaniem
+                    // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz
                     float cs = TownPurse.ValveLive ? cutShare * TownPurse.LordShare(k) : cutShare;
                     if (cur && cs > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
                     {
