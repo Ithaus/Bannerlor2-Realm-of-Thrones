@@ -947,3 +947,9 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   cctor (Game.Current.GameTextManager null) -> TypeInitializationException na caly proces (pulapka ERRORS.md 14.09). POPRAWIONE: splata zakladana w kampanii
   (GarrisonRecruitFee.EnsureHooks, ArmouryBehavior obok CrownIncome.EnsureHooks) - w-toku/zbior-final 329f2c7; jedyna nowa latka na tej klasie (grep diffu od 7658247).
   DLL test\Armoury-final.dll 101c8cfe. **TEST ZBIORCZY 2 ruszyl** (bl5mnkmtn): wyjscia test\at-fin2-120.out.txt, at-fin2-zapis.out.txt, at-fin2-zima.out.txt.
+- (05:00 UTC) **TEST ZBIORCZY 2 - 120 dob OK** (17.6 s/dobe; Armoury 0 ERROR; CrashScribe 24 - stare BK/BKROT, teraz widoczne osobno dzieki kluczowi powtorek;
+  logi SCRATCH(ae222cb7)\kopia-fin). Progi: etap3 NIE 1 (probki wokol okien 2); etap4 NIE 6 (pula wyrzutkow d120 3115 > 3053, **wojsko lordow d90-120 83.7 tys.**,
+  N6 Miasta 3.8, K8 Straz 24 (1 doba), K9 dezerterzy Strazy 10 Polnoc/2 inne, K22 koszt); etap2: **wojsko w wojnie sr28 78.6 tys. < podloga 85 tys.** (po samym E4
+  109 tys.); etap5 NIE 8 + DECYZJA 2: A1-T11 BK rynek -107 tys./d (prog 2 tys.), A1-T12 dar startowy 7.6 mln bez ujscia, A1-T14 1 doba, narzedzie etap5_a2 wyjatek,
+  A3-2 sakiewki 19.1 dnia (prog 15), A3-7 koszt 40 ms, B5-7 port Saath 43 doby bez nadwyzki, B4-6 5.66% (prog 5.6), B1-T7/T8 DECYZJA (spodziewane).
+  -> NIE WGRYWAM przed poprawka wojska. Diagnoza + poprawka (wf_c17ab7f0-2e7) -> ponowny test 120 -> wgranie. Test zapisu i zimy biegna dalej (bl5mnkmtn).
