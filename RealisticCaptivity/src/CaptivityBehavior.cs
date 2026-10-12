@@ -470,6 +470,7 @@ namespace RealisticCaptivity
                                 Log.Info("Dlug okupu (E8/RC): rata " + pay + " - brak odbiorcy (pojmujacy bez bohatera, osady i partii), nic nie pobrane, dlug " + _ransomDebt
                                          + " czeka; dob bez odbiorcy w tej sesji " + _e8DebtNoTaker);
                             if (_e8DebtNoTaker == 1) Log.Player("There is no one left to take the instalment on your ransom debt - the coin stays in your purse for now.");
+                            _debtDaysUnpaid = 0;   // recenzja E8/RC: gracz mial czym zaplacic - licznik hanby zeruje sie jak przy kazdej racie (jak przed paczka); bez tego dni bez zlota sumowalyby sie przez lata do DebtGraceDays
                             return;
                         }
                         _e8DebtHomeN++; _e8DebtHomeGold += paid;
