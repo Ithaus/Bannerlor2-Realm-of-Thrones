@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -31,6 +34,14 @@ namespace Armoury
     ///  (empire) i Lorath (nord) tylko dla nich samych (poziom 1) albo jako wspolne strony morza (4) - Volantis, Myr, Tyrosh nie kuja rzymskich i
     ///  nordyckich wzorow. W koszyku zostaje tylko najnizszy dostepny poziom (Allowed); pusto - koszyk nie powstaje (przywozi handel).
     /// Stan czyszczony w konstruktorze ArmouryBehavior (Reset); spis wyrobow raz na sesje (po HistoricalPrices.Apply - metal z ArmsPricing.CostOf).
+    ///
+    /// E6/M1 (207) - LANCUCH CZYNNY (klucz WorkshopCraftByRealm; Jeff 12.10 00:00: zakaz unikatow tylko dla kowali miast i AI, kuznia gracza bez zmian):
+    /// ta sama funkcja Allowed w czterech drogach wyrobu miasta - warsztaty notabli (WorkshopLaw.Candidates: bez "pusta linia = cala obca pula"),
+    /// strzelarze (TownFletchers.CandidatesOf), dorobek startowy (ColdStart.Markets) i droga gry (warsztaty gracza i linie towarowe z wyrobem
+    /// uzbrojenia): postfiks GetRandomItemAux (WorkshopLaw.RandomItemPostfix) - wyrob spoza lancucha albo unikat losowany od nowa z tej samej
+    /// kategorii wedlug lancucha (wagi gry 1/(max(100, wartosc)+100)), pusto - pusty wyrob (gra go pomija, cykl gracza bez utargu nie biegnie).
+    /// Zapas gry wola GetRandomItemAux bez miasta, wiec miasto daje okno kontekstu: prefiks + finalizer na GetItemsToProduce ([ThreadStatic]).
+    /// Kuznia gracza (SmithingModel, nasze receptury) - bez zmian.
     /// </summary>
     internal static class CraftRealm
     {
@@ -110,6 +121,7 @@ namespace Armoury
             _nItems = _nPrefix = _nTypo = _nHouse = _nCommonW = _nCommonE = _nBandit = _nNobody = _nKhuzaitSteel = _nUnique = _nNeutral = _ffSteel = 0;
             _startLogged = false;
             Array.Clear(_day, 0, _day.Length); _dayUnique = _daySide = 0; _foreignBy.Clear();
+            _lineDays = _lineLost = _gameRedrawn = _gameEmptied = _gameUnique = 0;
             _stumbles = 0; _errSites.Clear();
         }
 
@@ -120,6 +132,13 @@ namespace Armoury
         }
 
         internal static bool MeasureOn { get { var s = Settings.Current; return s != null && s.Stage6MeasureLog; } }
+        /// <summary>E6/M1: lancuch czynny (klucz) i spis gotowy - inaczej wszystkie drogi jak przed paczka.</summary>
+        internal static bool Active { get { var s = Settings.Current; return s != null && s.WorkshopCraftByRealm && Ready; } }
+
+        // E6/M1: liczniki (od ostatniej linii) - dni-linii warsztatow notabli, z nich bez wzoru krainy (stara regula dalaby obca pule); droga gry
+        private static long _lineDays, _lineLost, _gameRedrawn, _gameEmptied, _gameUnique;
+        [ThreadStatic] private static Town _ctx;
+        private static System.Reflection.FieldInfo _itemsInCategory;
 
         /// <summary>Uzbrojenie (zbroja, tarcza, bron, amunicja, uprzaz) - wyroby, ktore lancuch dotyczy.</summary>
         internal static bool IsArms(ItemObject it)
@@ -345,6 +364,81 @@ namespace Armoury
             return m != null && m.ContainsKey(it);
         }
 
+        // ------------------------------------------------------------ E6/M1: droga gry i liczniki linii
+        /// <summary>WorkshopLaw.Candidates: jedna linia warsztatu notabla na dobe - lost = lancuch nie daje zadnego wzoru, a stara regula dalaby obca pule.</summary>
+        internal static void NoteLine(bool lost) { _lineDays++; if (lost) _lineLost++; }
+
+        public static void CtxPrefix(Workshop __1) { _ctx = __1 != null && __1.Settlement != null ? __1.Settlement.Town : null; }
+        public static Exception CtxFinalizer(Exception __exception) { _ctx = null; return __exception; }
+
+        /// <summary>Z WorkshopLaw.RandomItemPostfix (postfiks GetRandomItemAux gry): wyrob uzbrojenia spoza lancucha krainy miasta albo unikat - losowanie od nowa
+        /// z tej samej kategorii wedlug lancucha; pusto - pusty wyrob. Miasto: argument gry albo okno kontekstu GetItemsToProduce.</summary>
+        internal static void FilterRandom(WorkshopsCampaignBehavior beh, ItemCategory cat, Town arg, ref EquipmentElement res)
+        {
+            try
+            {
+                var it = res.Item;
+                if (it == null || cat == null || !IsArms(it)) return;
+                var town = arg ?? _ctx;
+                if (town == null || !Active) return;
+                string realm = RealmOfTown(town);
+                var m = AllowedMap(realm);
+                if (m == null || m.ContainsKey(it)) return;
+                bool last = arg == null || _ctx == null;           // zapas gry (bez miasta) albo wywolanie spoza GetItemsToProduce - ostatnie losowanie tego wyrobu
+                if (ArmsPricing.IsUnique(it) && last) _gameUnique++;
+                if (_itemsInCategory == null) _itemsInCategory = AccessTools.Field(typeof(WorkshopsCampaignBehavior), "_itemsInCategory");
+                var dict = beh != null && _itemsInCategory != null ? _itemsInCategory.GetValue(beh) as Dictionary<ItemCategory, List<ItemObject>> : null;
+                List<ItemObject> items;
+                var cands = new List<ItemObject>(); var ws = new List<float>(); float total = 0f;
+                if (dict != null && dict.TryGetValue(cat, out items) && items != null)
+                    foreach (var x in items)
+                    {
+                        if (x == null || x.ItemCategory != cat || !m.ContainsKey(x)) continue;
+                        float w = 1f / (Math.Max(100, x.Value) + 100f);
+                        cands.Add(x); ws.Add(w); total += w;
+                    }
+                if (cands.Count == 0 || total <= 0f)
+                {
+                    res = default(EquipmentElement);
+                    if (last) _gameEmptied++;
+                    return;
+                }
+                float r = MBRandom.RandomFloat * total;
+                int k = 0;
+                for (; k < cands.Count - 1; k++) { r -= ws[k]; if (r < 0f) break; }
+                var pick = cands[k];
+                ItemModifier mod = null;
+                try { var g = pick.ItemComponent != null ? pick.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
+                res = new EquipmentElement(pick, mod);
+                _gameRedrawn++;
+            }
+            catch (Exception e) { Stumble("FilterRandom", e); }
+        }
+
+        internal static void ApplyAll(Harmony h)
+        {
+            try
+            {
+                var m = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "GetItemsToProduce");
+                if (m != null)
+                {
+                    h.Patch(m, prefix: new HarmonyMethod(typeof(CraftRealm), nameof(CtxPrefix)), finalizer: new HarmonyMethod(typeof(CraftRealm), nameof(CtxFinalizer)));
+                    CtxWired = true;
+                }
+                Log.Info("CraftRealm (E6/M1): okno kontekstu drogi gry " + (CtxWired ? "GetItemsToProduce wpiete" : "BRAK GetItemsToProduce - droga gry filtruje tylko losowanie z miastem")
+                         + "; lancuch czytany na zywo (Workshop Craft By Realm).");
+            }
+            catch (Exception e) { Log.Error("CraftRealm.ApplyAll", e); }
+        }
+
+        private static string ChainText()
+        {
+            if (!Active) return "";
+            return " | lancuch E6/M1: dni-linii warsztatow " + _lineDays + ", bez wzoru krainy " + _lineLost
+                   + (_lineDays > 0 ? " (" + (100.0 * _lineLost / _lineDays).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%)" : "")
+                   + "; droga gry: wylosowano od nowa " + _gameRedrawn + ", pusto " + _gameEmptied + ", unikatow odcietych " + _gameUnique;
+        }
+
         // ------------------------------------------------------------ E6/0: liczniki i linie
         /// <summary>Nasluch OnItemProducedEvent (ArmouryBehavior): wyrob uzbrojenia dopisany miastu - poziom lancucha wobec krainy miasta (tylko licznik).</summary>
         internal static void OnItemProduced(ItemObject it, Settlement st, int n)
@@ -399,7 +493,7 @@ namespace Armoury
                      + ", neutralnych " + _nNeutral + ", rodowych " + _nHouse + ", wspolnych strony morza W " + _nCommonW + " / E " + _nCommonE + ", bandyckich " + _nBandit
                      + ", unikatow/legend/zakazanych " + _nUnique + " | odciete lore: Wolni Ludzie stal " + _ffSteel + ", Dothrakowie stal wanilii " + _nKhuzaitSteel
                      + ", wanilia Braavos/Lorath tylko u siebie (regula), nikt (lion_sword, wildling) " + _nNobody + " | okno kontekstu drogi gry: " + (CtxWired ? "GetItemsToProduce OK" : "BRAK (E6/M1 niewpiete)")
-                     + " | lancuch tylko pomiar.");
+                     + " | lancuch " + (Active ? "CZYNNY (E6/M1)" : "tylko pomiar") + ".");
             Log.Info("CraftRealm (E6/0) pokrycie koszykow korpusu T, helmu H, tarczy S t1-6 (w wlasne, p pokrewne, r region, n wspolne/neutralne, s strona morza, . nie kuje - przywozi handel), pustych "
                      + empty + ": " + string.Join("; ", parts.ToArray()) + ".");
         }
@@ -407,7 +501,7 @@ namespace Armoury
         /// <summary>Z ArmouryBehavior.OnDailyTick (Stage6Measure.Daily): linia "Warsztaty wedlug krainy (E6/0)" i zerowanie licznikow doby.</summary>
         internal static void Daily()
         {
-            if (!MeasureOn) { Array.Clear(_day, 0, _day.Length); _dayUnique = _daySide = 0; _foreignBy.Clear(); return; }
+            if (!MeasureOn) { Array.Clear(_day, 0, _day.Length); _dayUnique = _daySide = 0; _foreignBy.Clear(); _lineDays = _lineLost = _gameRedrawn = _gameEmptied = _gameUnique = 0; return; }
             if (!Ready) return;
             if (!_startLogged) StartLine();
             int day = (int)CampaignTime.Now.ToDays;
@@ -415,11 +509,12 @@ namespace Armoury
             top.Sort((a, b) => b.Value.CompareTo(a.Value));
             var tp = new List<string>();
             for (int i = 0; i < top.Count && i < 5; i++) tp.Add(top[i].Key + ": " + top[i].Value);
-            Log.Info("Warsztaty wedlug krainy (E6/0, na sucho): dzien " + day + " | sztuk: wlasne " + _day[LOwn]
+            Log.Info("Warsztaty wedlug krainy (E6/0" + (Active ? ", lancuch E6/M1 CZYNNY" : ", na sucho") + "): dzien " + day + " | sztuk: wlasne " + _day[LOwn]
                      + ", pokrewne " + _day[LKin] + ", region " + _day[LRegion] + ", wspolne " + (_day[LCommon] + _day[LSide]) + " (w tym strona morza " + _daySide + "), OBCE " + _day[LForeign]
-                     + ", bandyckie/nikt " + _day[LNobody] + " | unikatow " + _dayUnique + " | najwiecej obcych: [" + string.Join(", ", tp.ToArray()) + "]"
+                     + ", bandyckie/nikt " + _day[LNobody] + " | unikatow " + _dayUnique + ChainText() + " | najwiecej obcych: [" + string.Join(", ", tp.ToArray()) + "]"
                      + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
             Array.Clear(_day, 0, _day.Length); _dayUnique = _daySide = 0; _foreignBy.Clear();
+            _lineDays = _lineLost = _gameRedrawn = _gameEmptied = _gameUnique = 0;
         }
     }
 }

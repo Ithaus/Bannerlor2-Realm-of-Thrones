@@ -56,6 +56,7 @@ namespace Armoury
             public readonly List<ItemObject> Items = new List<ItemObject>();
             public readonly Dictionary<int, ItemObject> Rep = new Dictionary<int, ItemObject>();   // koszyk -> przedmiot do wywolania Factor
             public int Foreign;                                                                       // koszyki z obcym wyrobem
+            public bool M1;                                                                           // E6/M1 (207): zbudowane wedlug lancucha krainy
         }
 
         private static List<ItemObject> _all;          // null = jeszcze nie szukane w tej sesji
@@ -387,13 +388,15 @@ namespace Armoury
         private static TownCands CandidatesOf(Town town)
         {
             TownCands tc;
+            bool m1 = CraftRealm.Active;   // E6/M1 (207): strzelarze kuja wedlug lancucha krainy, koszyk bez wzoru nie powstaje (bez obcej puli)
+            string realm = m1 ? CraftRealm.RealmOfTown(town) : null;
             string key = town.Settlement.StringId;
-            if (_town.TryGetValue(key, out tc)) return tc;
-            tc = new TownCands();
+            if (_town.TryGetValue(key, out tc) && tc.M1 == m1) return tc;   // E6/M1: przelacznik w MCM - kandydaci od nowa
+            tc = new TownCands { M1 = m1 };
             var local = new Dictionary<int, List<ItemObject>>(); var foreign = new Dictionary<int, List<ItemObject>>();
             foreach (var it in All())
             {
-                bool own = it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture;
+                bool own = m1 ? CraftRealm.Allowed(realm, it) : (it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture);
                 var d = own ? local : foreign;
                 int k = Basket(it);
                 List<ItemObject> l;
@@ -404,7 +407,7 @@ namespace Armoury
             foreach (var k in keys)
             {
                 List<ItemObject> l;
-                if (!local.TryGetValue(k, out l) || l.Count == 0) { l = foreign[k]; tc.Foreign++; }
+                if (!local.TryGetValue(k, out l) || l.Count == 0) { if (m1) continue; l = foreign[k]; tc.Foreign++; }
                 var pool = new List<ItemObject>(l);
                 var names = new HashSet<string>();
                 int took = 0;

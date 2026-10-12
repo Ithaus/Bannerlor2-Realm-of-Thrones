@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 6, paczka 207 = E6/M1) - KOWALE KUJA WEDLUG KULTURY SWOJEJ KRAINY (6.19), BEZ UNIKATOW I BEZ CUDZYCH WZOROW RODOWYCH
+**Mod:** Armoury | **Galaz:** `w-toku/e6-waski` (po E6/0 76ec1df) | **Projekt:** etap 6 v2 rozdz. 3 "E6/M1"; decyzje Jeffa 11.10 17:30 (NOWE 6.19) i 12.10 00:00 (1: zakaz unikatow tylko kowali miast i AI, NIE kuzni gracza)
+
+**Problem:** Jeff 11.10: "Polnoc nie kuje zbroi Lannisterow, nikt nie kuje unikatow typu helm Ramsaya; kazda kraina swoj rodzaj zbroi - lore". Rozpoznanie B6 1.4 / `SCR\e6P\wynik.txt`: Winterfell kuje Lannister Sword, katane, rapier, tarcze Westerlands; Castle Black - cala obca pula (249 obcych); droga gry (warsztat gracza) przepuszcza unikaty. Licznik E6/0 "OBCE" pokazuje to w logu.
+
+**Przyczyna:** `WorkshopLaw.Candidates` :528-532 - lokalne = `Item.Culture == town.Culture` albo neutralne, a przy pustej linii `pool = foreign` (cala obca pula); to samo `TownFletchers.CandidatesOf` (obcy koszyk), `ColdStart.Markets` (kultura miasta + neutralne); droga gry `GetRandomItemAux` (G WorkshopsCampaignBehavior.cs:1049) losuje z kategorii bez filtra unikatow, a zapas `GetRandomItem` (:1046) losuje bez miasta z calej kategorii.
+
+**Zmiana (klucz `WorkshopCraftByRealm` = true, `Settings.cs:1365`):**
+- `CraftRealm.cs`: `Active` (klucz + spis gotowy), `FilterRandom` (wyrob uzbrojenia spoza lancucha krainy albo unikat -> losowanie od nowa z tej samej kategorii wedlug lancucha, wagi gry 1/(max(100, wartosc)+100), modyfikator jak gra; pusto -> pusty wyrob - gra go pomija, cykl gracza bez utargu nie biegnie: G :709), okno kontekstu `CtxPrefix`/`CtxFinalizer` na `GetItemsToProduce` ([ThreadStatic] miasto - zapas gry wola Aux bez miasta), `ApplyAll`, liczniki: dni-linii warsztatow, bez wzoru krainy ("cykle utracone przez M1"), droga gry (wylosowano od nowa, pusto, unikatow odcietych).
+- `WorkshopLaw.cs:517-518, :531, :536` - lokalne = `CraftRealm.Allowed(kraina miasta, wyrob)`; przy M1 bez `pool = foreign` (pusta linia = rece do innej linii cechu, jak dotad przy pustym rankingu); `:1486-1489` `RandomItemPostfix(__instance, ItemCategory __0, Town __1, ref __result)` wola `CraftRealm.FilterRandom` (rozlaczne z zamiana wegla/sztabek - inne kategorie).
+- `TownFletchers.cs:391-399, :409` - kandydaci strzelarzy wedlug lancucha, koszyk bez wzoru nie powstaje (bez obcego); pamiec kandydatow z flaga `M1` (przelacznik MCM = kandydaci od nowa, klucz pamieci bez zmian - diagnoza `:712` dalej czyta po StringId).
+- `ColdStart.cs:149-190` - dorobek startowy (tylko nowa kampania) z puli "@kraina" wedlug lancucha, bez doklejki neutralnej (neutralne sa w lancuchu na poziomie 4).
+- `SubModuleMain.cs:93` - `CraftRealm.ApplyAll` po `WorkshopLaw.ApplyAll`. `McmSettings.cs` z `gen_mcm.py` (1121 -> 1122).
+- Kuznia gracza (SmithingModel, nasze receptury, `SmeltTab`) - BEZ zmian (decyzja Jeffa 12.10 pkt 1). `RotUniques.cs` bez zmian (`lion_sword` tylko "nikt" w `CraftRealm`, dopisanie do spisu przez `tools/rot_uniques.py` - osobna zmiana danych).
+
+**Linie logu:** start `CraftRealm (E6/M1): okno kontekstu drogi gry GetItemsToProduce wpiete ...`; `CraftRealm (E6/0): ... | okno kontekstu drogi gry: GetItemsToProduce OK | lancuch CZYNNY (E6/M1).` + linia pokrycia T/H/S; codziennie `Warsztaty wedlug krainy (E6/0, lancuch E6/M1 CZYNNY): dzien N | sztuk: wlasne, pokrewne, region, wspolne, OBCE 0, bandyckie/nikt 0 | unikatow 0 | lancuch E6/M1: dni-linii warsztatow n, bez wzoru krainy l (x%); droga gry: wylosowano od nowa r, pusto p, unikatow odcietych u | najwiecej obcych: []`.
+
+**Ryzyko / co sprawdzic (kontrola calosci - zasada 0):**
+- Regresje: wylaczony klucz = dokladnie stara regula w kazdej drodze (`m1` false: te same wyrazenia co przed paczka). `Active` wymaga spisu (`HistoricalPrices.Applied`) - przy tworzeniu nowej gry (przed `OnSessionLaunched`) gra zapelnia rynki po staremu (WorkshopLaw :234 "start gry - vanilla"), od sesji - lancuch.
+- Kolizje: `RandomItemPostfix` - jedyny nasz postfiks `GetRandomItemAux`; BK wola go refleksja tylko w wylaczonym `HandleItemAvailability` (BK BKSettlementBehavior :528) - gdyby byl czynny, tez dostanie lancuch (miasto w argumencie). `GetItemsToProduce` - nikt inny nie lata (grep BK, nasze mody). Wyrob pusty: `GetItemsToProduce` pomija go (`Debug.FailedAssert` - w Shipping no-op), utarg bez niego.
+- Spojnosc: jedna funkcja `Allowed` w czterech drogach; kraina miasta = `FreeHands.RealmOf` (ta sama co E4/7, zima E4/1). Unikaty, legendy, zakazane - odciete na kazdym poziomie (jak dotad w Candidates/strzelarzach/ColdStart, nowe na drodze gry). Zamknieta ekonomia bez zmian: mniej roznych wyrobow, ten sam wsad i place (pusta linia nie bierze surowca).
+- Ryzyka z projektu: male krainy (Wyspy Letnie, Qarth, Yi Ti) kuja mniej koszykow (linia pokrycia pokaze "." - przywozi handel); bez strojow bandytow linia heavy t4 traci neutralna sztuke; `HouseOf` po nazwie - mozliwe falszywe trafienia ("reed", "umber") - lista jak w `chain.py`.
+- Progi testu: OBCE = 0 kazdej doby, unikatow na drodze gry 0 (licznik "unikatow" w linii E6/0), "bez wzoru krainy" <= 5% dni-linii, korpus t3+ w partiach >= 25% (linie 174b/175), Winterfell bez Lannister Sword. Dorobek startowy - tylko nowa kampania (NK).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy (120 dob nowej kampanii).
+
 ## 2026-10-12 (etap 6, paczka 206 = E6/0) - POMIAR ETAPU 6: KSIEGA UZBROJENIA, KSIEGA KONI, "CO KUJE KAZDA KRAINA" (TYLKO LOG)
 **Mod:** Armoury | **Galaz:** `w-toku/e6-waski` (od `w-toku/zbior-e5` c3855de) | **Projekt:** `docs/etap6/PROJEKT-ETAP6-RZEMIOSLO-SUROWCE-KONIE-2026-10-12.md` v2 rozdz. 3 "E6/0" + `KRYTYKA-E6.md`; decyzje Jeffa 11.10 17:30 (6.19) i 12.10 00:00 (unikaty tylko kowale miast i AI)
 
