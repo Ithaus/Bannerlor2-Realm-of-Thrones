@@ -55,6 +55,9 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E5/C2 (203, glod ma skutki - Hunger.Of, linia "Glod ludu (E5/C2)") C2-1..C2-5: obie kary tej samej doby (korekta jedzenia C2
                     i warownia z Food 0) 0 kazdej doby, korekt C2 przed 120. doba kampanii 0, korekty Food w "Zadowolenie ludu (R14)" = korekty C2,
                     korekty C2 <= 1% osado-dob, przyczyny glodu (INFO). Doby kampanii 2-until; klucz wylaczony / log sprzed C2 - INFO.
+                    Blok E5/C4 (205, zdanie o chlebie w oknie "People of this land", klucz PeopleMenuShowsBread) C4-0..C4-3: klucz i kiesa (INFO),
+                    fragment "w linii Kiesa ludu:" linii "PeopleMenu (E5/C4): dzien N" = fragment linii "Kiesa ludu: dzien N" tej samej doby, liczba
+                    w oknie = udzial x 100 w dol (+-1), "ERROR in PeopleMenu.Bread/Consequence" 0; bez otwarc okna (autotest) - C4-1/C4-2 INFO.
                     Blok audytu zlota 11.10 (etap5_aud): A3' dar BK uciety (INFO) i "inne" w dobach z nowymi notablami < 5 000 na notabla,
                     zaulki z kasy miasta (nalezne = z kas + uciete; z niczego netto dochodu notabli |sr| <= 100/d), nagrody turniejow AI
                     z niczego 0 (RealPayer przed RBM; wyplaty INFO), pomiar G24/N3 (INFO; latka niewpieta = NIE).
@@ -3353,6 +3356,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_c2(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_c2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land - linie okna tylko przy recznym otwarciu (autotest - INFO)
+    try:
+        etap5_c4(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_c4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/B2 (184): podatek wojenny ludu - linia z dniem gry (klucz = dzien ksiegi, jak 165); bez linii (log sprzed B2) - INFO
     wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
     try:
@@ -4714,6 +4722,82 @@ def etap5_c2(rep, lines, start, until):
             f"brak pieniedzy {mo / n:.1f}, z licznikiem >= 1 doby {sk / n:.1f} | brak jedzenia: Food 0 warowni {fz / n:.1f}, glod okregu {dg / n:.1f}"
             f" | zdjete z R14 (suma): brak jedzenia {xf}, poza glodem z braku pieniedzy {xw}, bez jedzenia na polce {xs} | ostatnia doba d{run_day(last, start)}",
             "INFO", None)
+
+
+def etap5_c4(rep, lines, start, until):
+    """E5/C4 (205, PLAN 5.13 - napis "czy ludzi stac na chleb" w oknie "People of this land"; projekt etapu 5 rozdz. 3 "E5/C4"). Linie "PeopleMenu (E5/C4): start"
+    (klucz PeopleMenuShowsBread, stan kiesy ludu) i "PeopleMenu (E5/C4): dzien N | ..." przy kazdym otwarciu okna - autotest okna nie otwiera (reczne sprawdzenie Jeffa).
+    C4-0 klucz i kiesa (INFO); C4-1 fragment "w linii Kiesa ludu: ..." linii okna jest podciagiem ostatniej wczesniejszej linii "Kiesa ludu: dzien N" tej samej doby
+    (liczba okna pochodzi z liczb linii Kiesa ludu); C4-2 liczba w oknie = udzial z linii okna x 100 w dol (+-1 za zaokraglenie F2/N0), 0-100; C4-3 linie
+    "ERROR in PeopleMenu.Bread" / "ERROR in PeopleMenu.Consequence" 0. Okno: doby kampanii 1-until; bez linii okna - C4-1/C4-2 INFO."""
+    stl = [s for s in lines if s.startswith("PeopleMenu (E5/C4): start")]
+    if not stl:
+        rep.add("E5/C4-0: linia PeopleMenu (E5/C4): start", "brak w logu", "przy kazdym starcie sesji (log sprzed C4 - brak)", None)
+    else:
+        last = stl[-1]
+        on = "(PeopleMenuShowsBread) wlaczone" in last
+        live = "| kiesa ludu czynna" in last
+        rep.add("E5/C4-0: klucz PeopleMenuShowsBread i kiesa ludu (ostatni start sesji)",
+                f"zdanie {'wlaczone' if on else 'wylaczone'}, kiesa {'czynna' if live else 'NIECZYNNA'} ({len(stl)} startow)",
+                "INFO (domyslnie wlaczone; kiesa nieczynna - okno bez zdania)", None)
+    # C4-1 / C4-2: linie okna w kolejnosci logu, z ostatnia wczesniejsza linia "Kiesa ludu: dzien N"
+    kl = {}
+    ok1 = bad1 = nofolk = early = 0
+    ok2 = 0
+    bad1x, bad2x = [], []
+    for s in lines:
+        if s.startswith("Kiesa ludu: dzien"):
+            k = num(r"dzien (\d+)", s)
+            if k is not None:
+                kl[k] = s
+            continue
+        if not s.startswith("PeopleMenu (E5/C4): dzien"):
+            continue
+        d = num(r"dzien (\d+)", s)
+        if d is None or not (1 <= run_day(d, start) <= until):
+            continue
+        if "brak liczb tej doby" in s:
+            early += 1
+            continue
+        if "| w linii Kiesa ludu: " not in s:
+            nofolk += 1
+            continue
+        frag = s.split("| w linii Kiesa ludu: ", 1)[1].strip()
+        if frag and frag in kl.get(d, ""):
+            ok1 += 1
+        else:
+            bad1 += 1
+            bad1x.append(d)
+        # C4-2: liczba w oknie z udzialu w tej samej linii
+        m = re.search(r"\| stac jedzenie ([\d.]+), pelny ([\d.]+) \(w oknie (\d+) / (\d+) na 100", s)
+        pairs = []
+        if m:
+            pairs = [(float(m.group(1)), int(m.group(3))), (float(m.group(2)), int(m.group(4)))]
+        else:
+            m = re.search(r"\| wies: zakupy (\d+) z ([\d.]+) \(w oknie (\d+) na 100", s)
+            if m and float(m.group(2)) > 0:
+                pairs = [(min(1.0, int(m.group(1)) / float(m.group(2))), int(m.group(3)))]
+        if pairs and all(0 <= v <= 100 and abs(v - 100.0 * x) <= 1.0 + 1e-9 for x, v in pairs):
+            ok2 += 1
+        else:
+            bad2x.append(d)
+    n = ok1 + bad1
+    if n == 0:
+        rep.add("E5/C4-1: liczba w oknie = liczba z linii Kiesa ludu (ta sama doba)",
+                f"brak otwarc okna z liczbami w dobach 1-{until}" + (f" ('not reckoned yet' {early}, bez zdania {nofolk})" if early or nofolk else ""),
+                "reczne sprawdzenie Jeffa (autotest nie otwiera menu): fragment linii okna = fragment linii Kiesa ludu", None)
+        rep.add("E5/C4-2: liczba w oknie = udzial x 100 (w dol)", "brak otwarc okna z liczbami", "+-1, 0-100", None)
+    else:
+        rep.add("E5/C4-1: liczba w oknie = liczba z linii Kiesa ludu (ta sama doba)",
+                f"zgodne {ok1} z {n} otwarc" + (f" (pierwsza niezgodna d{run_day(bad1x[0], start)})" if bad1x else "")
+                + (f"; 'not reckoned yet' {early}, bez zdania {nofolk}" if early or nofolk else ""),
+                "wszystkie zgodne (fragment linii okna jest w linii Kiesa ludu: dzien N)", bad1 == 0)
+        rep.add("E5/C4-2: liczba w oknie = udzial x 100 (w dol)",
+                f"zgodne {ok2} z {n}" + (f" (pierwsza niezgodna d{run_day(bad2x[0], start)})" if bad2x else ""),
+                "+-1 (zaokraglenie F2/N0 w linii), 0-100", len(bad2x) == 0)
+    # C4-3: bledy
+    err = [s for s in lines if s.startswith(("ERROR in PeopleMenu.Bread", "ERROR in PeopleMenu.Consequence"))]
+    rep.add("E5/C4-3: bledy okna (ERROR in PeopleMenu.Bread / Consequence)", f"{len(err)}", "0", len(err) == 0)
 
 
 def etap5_b1(rep, lines, start, until, logp):

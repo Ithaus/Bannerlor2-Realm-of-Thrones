@@ -17,6 +17,8 @@ namespace Armoury
     /// E4/11 (193, plan rozdz. 6): pod tekstem E4/7 sekcja okregu z ksiegi wiosek (VillageBook.MenuSection - wies: lista wiosek, miasto i zamek: wiersz na okreg);
     /// ta sama pozycja takze w menu village_looted (gracz we wsi spladrowanej trafia do niego zamiast do "village"), index 0 - nad "Leave...".
     /// Scalenie calosci etapu 4: najpierw wszystkie dopiski E4/7/E4/8/E4/10 do sb, potem body = sb.TrimEnd i sekcja okregu E4/11.
+    /// E5/C4 (205, PLAN 5.13): na koncu czesci E4/7 jedno zdanie "czy ludzi stac na chleb" dla osady, w ktorej stoi gracz (TownFolk.BreadLine - kiesa ludu z ostatniej doby),
+    /// linia "PeopleMenu (E5/C4)" do logu przy kazdym otwarciu; wylacznik PeopleMenuShowsBread. Dalej ShowInquiry, bez SwitchToMenu.
     /// </summary>
     internal static class PeopleMenu
     {
@@ -31,6 +33,9 @@ namespace Armoury
                 // E4/11 (5.3, RB K9): wies Looted - gra przelacza na village_looted (jedyna opcja "Leave..." isLeave); AddGameMenuOption wstawia na index 0 (nad nia)
                 starter.AddGameMenuOption("village_looted", "arm_people_village_looted", "{=!}People of this land", Condition, Consequence, false, 0);
                 Log.Info("PeopleMenu (E4/7): pozycja \"People of this land\" w menu wsi, miasta i zamku wpieta (wylacznik People Menu Entry); E4/11: takze we wsi spladrowanej (village_looted) i z sekcja okregu (ksiega wiosek).");
+                var s0 = Settings.Current;
+                Log.Info("PeopleMenu (E5/C4): start | zdanie o chlebie (PeopleMenuShowsBread) " + (s0 != null && s0.PeopleMenuShowsBread ? "wlaczone" : "wylaczone")
+                         + " | kiesa ludu " + (TownFolk.LiveKey ? "czynna" : "NIECZYNNA - bez zdania") + " | liczby z ostatniej doby kiesy (linia Kiesa ludu:), linia PeopleMenu (E5/C4) przy kazdym otwarciu okna.");
             }
             catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }
         }
@@ -117,6 +122,19 @@ namespace Armoury
                     if (men > 0) sb.Append("In this town's tavern: ").Append(men).Append(men == 1 ? " veteran waits" : " veterans wait").Append(" for a master (").Append(mounted).Append(" mounted); the longest has waited ")
                                    .Append(days).Append(days == 1 ? " day." : " days.").Append('\n');
                     else sb.Append("No veterans wait in this town's tavern.\n");
+                }
+                // E5/C4 (205, PLAN 5.13): czy ludzi tej osady stac na chleb - liczby kiesy ludu z ostatniej doby (tylko odczyt), linia do logu przy kazdym otwarciu
+                var s1 = Settings.Current;
+                if (s1 != null && s1.PeopleMenuShowsBread)
+                {
+                    try
+                    {
+                        string blog;
+                        string bread = TownFolk.BreadLine(st, out blog);
+                        if (blog != null) Log.Info(blog);
+                        if (!string.IsNullOrEmpty(bread)) sb.Append(bread).Append('\n');
+                    }
+                    catch (Exception e) { Log.Error("PeopleMenu.Bread", e); }
                 }
                 string body = sb.ToString().TrimEnd('\n');
                 // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu

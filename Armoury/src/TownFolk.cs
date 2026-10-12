@@ -116,6 +116,8 @@ namespace Armoury
             public double G0a;                                        // budzet gry po kotwicy i ofercie nadwyzki (okno - linia)
             public int HungerDays;                                    // E5/C2: doby z rzedu z Afford jedzenia na jutro < 0.95 (zapis arm_townfolk, pole 17)
             public bool C2Hit;                                        // E5/C2: korekta jedzenia R14 w oknie doby (kontrola "obie kary tej samej doby")
+            public int ADay = -1;                                     // E5/C4: doba ostatniego liczenia kiesy czynnej tej osady (DAff/DAffF albo zakupy wsi) - okno People of this land; bez zapisu
+            public double DVNeed; public long DVBuy;                  // E5/C4: wies - potrzeba zakupow i zakupy ostatniej doby (skladniki "wsie: zakupy X z Y" linii Kiesa ludu); bez zapisu
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();

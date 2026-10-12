@@ -781,6 +781,8 @@ namespace Armoury
         public float FreeHandsIronIslandsExtraMax = 0.2f;  // Iron Islands: thralls work the land, so up to this much more of the men may go reaving (grows with the number of thralls)
         public bool FreeHandsBrake = true;                 // a land with no free hands left raises no new volunteers until births make up its losses (the Free Folk and the Watch excepted)
         public bool PeopleMenuEntry = true;                // "People of this land" in the menus of villages, towns and castles: the land's people at home, under arms, held captive, outlawed, fallen and its free hands
+        // E5/C4 (205, PLAN 5.13): w oknie "People of this land" jedno zdanie, czy ludzi tej osady stac na chleb - liczby kiesy ludu z ostatniej doby (TownFolk.BreadLine), tylko odczyt
+        public bool PeopleMenuShowsBread = true;           // "People of this land" also tells how many of the people of the town or castle you are in can afford their daily bread and their full basket, as reckoned at the last dawn (in a village: how much of the salt, tools, cloth, pots and ale they need the villagers bought at their market). Needs Town Folk Live
         // E4/8 (164b-2, PLAN 4.7, 4.9; plan docs/etap4/PLAN-KODU-E48.md rozdz. 11): wojsko z ludzi - zalogi bez przyrostu z modelu, milicja z wolnych rak, nowe druzyny lordow
         // z ludzi i z zalogi siedziby, karawany z ludzi osady startu, wedrowcy i konwoje BK jako ludzie (R19), miasta z narodzinami i migracja (R2) - ArmsFromPeople.cs,
         // PeopleBook.Arms.cs, TownGrowth.cs. Kolejnosc wylaczania przy niezdanym progu: Travellers, Caravans, Grain, Seat Garrison, New Party, Militia, Town Growth, Garrison

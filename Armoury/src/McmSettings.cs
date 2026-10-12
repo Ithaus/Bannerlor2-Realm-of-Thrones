@@ -2652,6 +2652,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleMenuEntry { get; set; } = true;
 
+        [SettingPropertyBool("People Menu Shows Bread", HintText = "'People of this land' also tells how many of the people of the town or castle you are in can afford their daily bread and their full basket, as reckoned at the last dawn (in a village: how much of the salt, tools, cloth, pots and ale they need the villagers bought at their market). Needs Town Folk Live")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PeopleMenuShowsBread { get; set; } = true;
+
         [SettingPropertyBool("Garrison Growth Only Recruits", HintText = "garrisons grow only from men who really join them - recruits the garrison pays for and men left by parties; the game's free daily growth (enlistment policy, rebels, quests) adds no one. The Night's Watch keeps it until it gets its own recruits from all of Westeros")]
         [SettingPropertyGroup("Iron Bank")]
         public bool GarrisonGrowthOnlyRecruits { get; set; } = true;
@@ -5554,6 +5558,7 @@ namespace Armoury
             s.FreeHandsIronIslandsExtraMax = FreeHandsIronIslandsExtraMax;
             s.FreeHandsBrake = FreeHandsBrake;
             s.PeopleMenuEntry = PeopleMenuEntry;
+            s.PeopleMenuShowsBread = PeopleMenuShowsBread;
             s.GarrisonGrowthOnlyRecruits = GarrisonGrowthOnlyRecruits;
             s.GarrisonAutoRecruitPerDay = GarrisonAutoRecruitPerDay;
             s.MilitiaFromFreeHands = MilitiaFromFreeHands;

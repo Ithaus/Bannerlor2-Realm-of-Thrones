@@ -93,6 +93,7 @@ namespace Armoury
         }
         private static LDay _ld;
         private static LWin _lw;
+        private static int _liveDay = -1;                              // E5/C4: dzien biezacej doby kiesy czynnej (stempel ADay osad - okno People of this land)
         private static string _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineTithe, _lineC2;
         private static double _lastR = double.NaN; private static long _lastDStock, _lastIn, _lastOut;
         // zapasy startowe (linia jednorazowa)
@@ -104,7 +105,7 @@ namespace Armoury
             _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
             _ctlStock0 = long.MinValue; _ctlIn = _ctlOut = 0;
-            _win = new LWin(); _ld = null; _lw = null;
+            _win = new LWin(); _ld = null; _lw = null; _liveDay = -1;
             _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
             _lastR = double.NaN; _lastDStock = _lastIn = _lastOut = 0;
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
@@ -619,6 +620,7 @@ namespace Armoury
         private static void DailyLive()
         {
             int day = (int)CampaignTime.Now.ToDays - 1;
+            _liveDay = day;                                            // E5/C4: stempel doby liczb osad (ADay)
             EnsureImported();
             bool first = _sessionDay < 0;
             if (first) _sessionDay = day;
@@ -853,6 +855,7 @@ namespace Armoury
             double needAll = f.Need[0] + f.Need[1] + f.Need[2], nf = f.Need[0] * FdW + f.Need[1] * FdR + f.Need[2] * FdP;
             f.DAff = needAll > 0 ? (f.AffC[0] * f.Need[0] + f.AffC[1] * f.Need[1] + f.AffC[2] * f.Need[2]) / needAll : 1;
             f.DAffF = nf > 0 ? (f.AffFC[0] * f.Need[0] * FdW + f.AffFC[1] * f.Need[1] * FdR + f.AffFC[2] * f.Need[2] * FdP) / nf : 1;
+            f.ADay = _liveDay;                                         // E5/C4: liczby tej doby gotowe (okno People of this land)
         }
 
         private static void CastleLiveDay(Folk f, LDay d)
@@ -895,6 +898,7 @@ namespace Armoury
             if (f.CourtCr <= 0) d.CNoCourt++;
             d.CHeads += f.HW; d.KC += f.KW; d.CCr += f.CourtCr; d.CNeed += f.Need[0]; d.CAff += f.AffC[0] * f.Need[0]; d.CWg += f.SpendGame;
             f.DB = f.HW * BC * (f.Idx > 0 ? f.Idx : 1); f.DWg = f.SpendGame; f.DM = f.MAnc; f.DAff = f.AffC[0]; f.DAffF = f.AffFC[0]; f.DR = 1;
+            f.ADay = _liveDay;                                         // E5/C4
             // jedzenie zuzyte w konsumpcji zamku (pierscien 7 dob - linia "Jedzenie z targu", B4)
             f.Food7[f.Food7Head] = f.FoodSold; f.Food7Head = (f.Food7Head + 1) % 7; if (f.Food7Fill < 7) f.Food7Fill++;
             f.FoodSold = 0;
@@ -914,6 +918,7 @@ namespace Armoury
                 if (f.Kind != 2) continue;
                 try
                 {
+                    f.DVNeed = 0; f.DVBuy = 0;                         // E5/C4: zakupy tej doby (okno People of this land)
                     var vil = f.St.Village;
                     if (vil == null) continue;
                     if (!f.Cal) { d.VNoCal++; continue; }
@@ -924,16 +929,18 @@ namespace Armoury
                     double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
+                    f.DVNeed = nv; f.ADay = _liveDay;                  // E5/C4
                     if (want < 1) continue;
                     var mk = vil.TradeBound ?? vil.Bound;
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
                     long spent = BuyGoods(vil, mk, list, want, d);
+                    f.DVBuy = Math.Max(0, spent);                      // E5/C4
                     if (spent <= 0) { d.VNoGoods++; continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
-                catch (Exception e) { Stumble("Villages(wies)", e); }
+                catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
             }
         }
 
@@ -1451,6 +1458,54 @@ namespace Armoury
             foreach (var f in _f.Values) if (f.Kind < 2 && f.FacOk && (food ? f.AffFood : f.AffRest) < 0.98) n++;
             return n;
         }
+
+        // ============================================================ E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land
+        /// <summary>E5/C4: zdanie do okna "People of this land" (PeopleMenu) dla osady, w ktorej stoi gracz - liczby kiesy czynnej z ostatniej doby tej osady:
+        /// miasto i zamek DAffF / DAff (te same co kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv i skladniki sum "stac jedzenie" / "pelny" / "stac" linii "Kiesa ludu:"),
+        /// wies - zakupy tej doby / potrzeba (skladniki "wsie: zakupy X z Y"). Tylko odczyt: bez Get (nie tworzy wpisu), bez zlota i bez stanu.
+        /// null - bez zdania (kiesa nieczynna, zawor zamkow wylaczony, osada spoza ksiegi, wies bez miasta targowego). log - linia do logu z fragmentem linii
+        /// "Kiesa ludu:" tej samej doby (sprawdz_logi E5/C4-1 porownuje go z linia doby).</summary>
+        internal static string BreadLine(Settlement st, out string log)
+        {
+            log = null;
+            if (st == null || !Live) return null;
+            Folk f;
+            if (!_f.TryGetValue(st, out f) || f == null || f.Kind < 0 || f.Kind > 2) return null;
+            if (f.Kind == 1 && !CastleLive) return null;               // podzamcze nie liczone (zawor 110 wylaczony) - nie ma czego pokazac
+            // dzien ostatniej doby kiesy (ten sam co w linii "Kiesa ludu: dzien N" tej doby); liczby osady swieze, gdy policzone w tej dobie, a doba nie starsza niz wczoraj
+            int now = (int)CampaignTime.Now.ToDays - 1, day = _liveDay >= 0 ? _liveDay : now;
+            string head = "PeopleMenu (E5/C4): dzien " + day + " | " + Clean(st.Name != null ? st.Name.ToString() : st.StringId) + " (" + st.StringId + ", "
+                          + (f.Kind == 0 ? "miasto" : f.Kind == 1 ? "zamek" : "wies") + ")";
+            var d = _ld;
+            if (d == null || _liveDay < 0 || f.ADay != _liveDay || now - _liveDay > 1)
+            {
+                log = head + " | brak liczb tej doby (ostatnie liczenie osady: " + (f.ADay >= 0 ? "dzien " + f.ADay : "brak w tej sesji") + ") - zdanie 'not reckoned yet'";
+                return "Bread: the people's purses have not been reckoned yet - look again tomorrow.";
+            }
+            if (f.Kind == 2)
+            {
+                var vil = st.Village;
+                var mk = vil != null ? (vil.TradeBound ?? vil.Bound) : null;    // to samo miasto targowe co Villages()
+                if (mk == null || mk.Town == null || !(f.DVNeed > 0)) { log = head + " | bez zdania (brak miasta targowego albo potrzeby zakupow 0)"; return null; }
+                int v = In100(f.DVBuy / f.DVNeed);
+                log = head + " | wies: zakupy " + f.DVBuy + " z " + F2(f.DVNeed) + " (w oknie " + v + " na 100, targ " + Clean(mk.Name != null ? mk.Name.ToString() : mk.StringId)
+                      + ") | w linii Kiesa ludu: wsie " + d.Villages + ": zakupy " + d.VBuy + " z " + N0(d.VNeed) + " (" + P1(d.VBuy, d.VNeed);
+                string market = mk.Name != null ? mk.Name.ToString() : "the market";
+                return "Bread: the villagers grow their own; at the market of " + market + " they bought "
+                       + (v >= 100 ? "all the salt, tools, cloth, pots and ale they need." : v + " parts in 100 of the salt, tools, cloth, pots and ale they need.");
+            }
+            int a = In100(f.DAffF), b = In100(f.DAff);
+            string who = f.Kind == 0 ? "townsfolk" : "castle folk";
+            log = head + " | stac jedzenie " + F2(f.DAffF) + ", pelny " + F2(f.DAff) + " (w oknie " + a + " / " + b + " na 100; kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv) | w linii Kiesa ludu: "
+                  + (f.Kind == 0
+                     ? "stac jedzenie W/R/P " + Pct(d.AFW, d.NFW) + " / " + Pct(d.AFR, d.NFR) + " / " + Pct(d.AFP, d.NFP)
+                       + ", pelny W/R/P " + Pct(d.AW, d.NW) + " / " + Pct(d.AR, d.NR) + " / " + Pct(d.AP, d.NP) + " (swiat " + Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP) + ")"
+                     : "zamkow bez kredytu " + d.CNoCourt + "), stac " + P1(d.CAff, d.CNeed));
+            return "Bread: " + a + " in 100 " + who + " can afford their daily bread, " + b + " in 100 their full basket.";
+        }
+
+        /// <summary>E5/C4: udzial 0..1 jako "ile na 100" - w dol (99.6% to jeszcze nie wszyscy), NaN - 0.</summary>
+        private static int In100(double x) { return double.IsNaN(x) ? 0 : (int)Math.Max(0, Math.Min(100, Math.Floor(100.0 * x + 1e-9))); }
 
         private static void CsvRowLive(StringBuilder sb, int day, Folk f)
         {
