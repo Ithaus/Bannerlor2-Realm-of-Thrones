@@ -953,3 +953,6 @@ bez nowych watkow, gry (testy) moga biec; tydzien 48% o 17:20. Raport: docs/RAPO
   109 tys.); etap5 NIE 8 + DECYZJA 2: A1-T11 BK rynek -107 tys./d (prog 2 tys.), A1-T12 dar startowy 7.6 mln bez ujscia, A1-T14 1 doba, narzedzie etap5_a2 wyjatek,
   A3-2 sakiewki 19.1 dnia (prog 15), A3-7 koszt 40 ms, B5-7 port Saath 43 doby bez nadwyzki, B4-6 5.66% (prog 5.6), B1-T7/T8 DECYZJA (spodziewane).
   -> NIE WGRYWAM przed poprawka wojska. Diagnoza + poprawka (wf_c17ab7f0-2e7) -> ponowny test 120 -> wgranie. Test zapisu i zimy biegna dalej (bl5mnkmtn).
+- (05:35 UTC) **TEST ZBIORCZY 2 - zapis 9 dob OK** (zapis konca biegu 120 z calym stanem E4/E5/E6 wczytany, 18.4 s/dobe, Armoury 0 ERROR) i **zima 120 OK** (0 ERROR; spichlerze
+  F6/F7/F8 TAK - zadna warownia AI nie glodzi, mediana zapasu >= 1980 dni; zywi -0.19%/rok). W zimie: wojsko lordow d90-120 70.3 tys. (!), pula wyrzutkow d120 4294,
+  Straz d120 7293 (baza 86xx), T8 koszt 30.8 ms. Wszystko to samo zrodlo - mniej zlota u rodow (diagnoza wf_c17ab7f0-2e7 w toku).
