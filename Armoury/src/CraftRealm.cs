@@ -385,7 +385,7 @@ namespace Armoury
                 var m = AllowedMap(realm);
                 if (m == null || m.ContainsKey(it)) return;
                 bool last = arg == null || _ctx == null;           // zapas gry (bez miasta) albo wywolanie spoza GetItemsToProduce - ostatnie losowanie tego wyrobu
-                if (ArmsPricing.IsUnique(it) && last) _gameUnique++;
+                if (ArmsPricing.IsUnique(it)) _gameUnique++;      // recenzja T4-E6: kazde odciete losowanie unikatu (takze pierwsze, z miastem - unikat zastapiony od razu wyrobem lancucha tez byl odciety)
                 if (_itemsInCategory == null) _itemsInCategory = AccessTools.Field(typeof(WorkshopsCampaignBehavior), "_itemsInCategory");
                 var dict = beh != null && _itemsInCategory != null ? _itemsInCategory.GetValue(beh) as Dictionary<ItemCategory, List<ItemObject>> : null;
                 List<ItemObject> items;

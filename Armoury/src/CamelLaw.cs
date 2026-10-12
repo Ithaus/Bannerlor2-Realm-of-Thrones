@@ -56,8 +56,8 @@ namespace Armoury
         internal static void Import(string s) { NewCampaign = s == "nk"; }
         internal static void OnNewGame() { NewCampaign = true; }
 
-        /// <summary>Klucz, nowa kampania i wpieta lista produkcji BK (bez niej wielblad zostalby w produkcji, a kon dostalby jego wage - nic z niczego).</summary>
-        internal static bool On { get { var s = Settings.Current; return s != null && s.SandSteedsInDorne && NewCampaign && MineralOnce.Wired; } }
+        /// <summary>Klucz, nowa kampania i wpieta lista produkcji BK (bez niej wielblad zostalby w produkcji, a kon dostalby jego wage - nic z niczego). Recenzja T4-E6: takze MaterialLaw.ProdPostfix w modelach produkcji (MaterialLaw.ProdModels &gt; 0) - bez niego lista traci wielblady, a mnoznika gospodarza nie ma czym oddac (sztuki w nicosc), jak czesc mineralow MineralOnce._patched.</summary>
+        internal static bool On { get { var s = Settings.Current; return s != null && s.SandSteedsInDorne && NewCampaign && MineralOnce.Wired && MaterialLaw.ProdModels > 0; } }
 
         private static void Stumble(string where, Exception e)
         {
@@ -257,7 +257,7 @@ namespace Armoury
             }
             int day = (int)CampaignTime.Now.ToDays;
             if (!NewCampaign) { if (day % 28 == 0) Log.Info("Wierzchowce kanonu (208): dzien " + day + " | stary zapis (bez flagi nowej kampanii) - stadniny jak w grze."); return; }
-            Log.Info("Wierzchowce kanonu (208): dzien " + day + " | " + (MineralOnce.Wired ? "" : "BRAK listy produkcji BK - NIECZYNNE | ") + "stadniny z przerobiona lista " + lists
+            Log.Info("Wierzchowce kanonu (208): dzien " + day + " | " + (MineralOnce.Wired && MaterialLaw.ProdModels > 0 ? "" : MineralOnce.Wired ? "BRAK MaterialLaw w modelach produkcji wsi - NIECZYNNE | " : "BRAK listy produkcji BK - NIECZYNNE | ") + "stadniny z przerobiona lista " + lists
                      + " (typy stadnin pustynnych poza Qarthem " + out_ + ", stadnin Qarthu " + in_ + ") | wielblady Qarthu z modelu " + qb.ToString("0.0", CultureInfo.InvariantCulture)
                      + "/d | sztuki wedlug krainy - linia \"Konie (E6/0)\" (wielblady poza Qarthem ma byc 0)" + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
         }

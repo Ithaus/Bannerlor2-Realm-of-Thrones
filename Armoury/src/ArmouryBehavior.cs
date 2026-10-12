@@ -1586,9 +1586,9 @@ namespace Armoury
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); }   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
             try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); }   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
             try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); }     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
-            try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); }
+            try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); }   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
             try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); }   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
-            try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); }   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
+            try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); }   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)
             try { TownFolk.Lines(); } catch (Exception e) { Log.Error("TownFolk.Lines", e); }   // E5/0 (195): linie Kiesa ludu, Nadwyzka kas, Bitwy, Notable, Jedzenie z targu, Zadowolenie BK - po ksiedze pieniadza, przed Seal31.Daily (zeruje Measure31)
             // 3.2: linia "Kiesy rozbitych (3.2)" i zerowanie licznikow doby - PO ksiedze pieniadza, ktora je czyta, i PRZED VillageTakings.Daily
             // (czyta jego liczniki sakw taborow oddanych zwyciezcom - recenzja 3.2 (2))
