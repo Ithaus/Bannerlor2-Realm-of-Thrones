@@ -30,6 +30,9 @@ namespace Armoury
     /// go z powrotem na konnego bez konia - wtedy konny zostaje (licznik "pieszego brak w puli", ostrzezenie raz w logu).
     /// Styk z 171: w tej bazie echo werbunku ROT daje zastepcy przez RecruitKit pelny komplet wzorca z koniem (sciezka "bez
     /// zapisu") - dlatego wolne konie (175.1-wolne) sa domyslnie wylaczone; 171 to zamyka (po scaleniu straz widzi tylko prawdziwe konie).
+    /// E6/K1 (211, TroopSwapNeedsHorse, AllOn): ta sama straz w KAZDEJ krainie - konny z zamiany ROT dostaje konia jak przy awansie (wolny w zbrojowni przy
+    /// AiFreeArmoryHorsesFirst, potem tabor), inaczej staje sie pieszym tego samego tieru z puli rodu (ten sam rodzaj i kultura najpierw - pieszy z puli,
+    /// wiec ROT go nie zamienia z powrotem; ten sam tier - ROT nie przelicza zlota); bez pieszego tego tieru w puli zostaje konny bez konia (licznik K1).
     /// </summary>
     internal static class RotHorseGuard
     {
@@ -49,6 +52,16 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 return _bound && s != null && s.Army175DothrakiHorseGuard && s.CavalryNeedsMounts && CsMarks.DothrakiPoolActive;
+            }
+        }
+
+        /// <summary>E6/K1 (211, TroopSwapNeedsHorse): straz konia przy zamianach ROT w KAZDEJ krainie (pieszy tego samego tieru z puli rodu); Dothrakowie - jak dotad (On).</summary>
+        internal static bool AllOn
+        {
+            get
+            {
+                var s = Settings.Current;
+                return _bound && s != null && s.TroopSwapNeedsHorse && s.CavalryNeedsMounts;
             }
         }
 
@@ -136,9 +149,11 @@ namespace Armoury
             {
                 if (troop == null || troop.IsMounted || mp == null || roster == null || added == null || plus <= 0) return;
                 if (!_footBuilt) BuildFoot();
-                if (_nomad == null) return;
                 var pool = Pool(rot, owner, settlement);
-                if (pool == null || !pool.Contains(_nomad)) return;
+                if (pool == null) return;
+                // Dothrakowie (175.1b, On + khuzait_nomad w puli) - mapa pieszych jak dotad; E6/K1 (AllOn) - kazda kraina: pieszy z puli rodu
+                bool dothraki = On && _nomad != null && pool.Contains(_nomad);
+                if (!dothraki && !AllOn) return;
                 var party = mp.Party;
                 string key = HorseCensus.KeyOfParty(party);
                 bool fix = Stables.AiFix(party), ff = Stables.FreeFirst(party);
@@ -172,7 +187,7 @@ namespace Armoury
                     int toFoot = 0, keep = 0, noPool = 0;
                     if (s > 0)
                     {
-                        var foot = FootFor(val);
+                        var foot = dothraki ? FootFor(val) : PoolFoot(pool, val);
                         if (foot != null && !pool.Contains(foot))
                         {
                             // bez dopisku CS ROT jutro zamienilby pieszego z powrotem na konnego bez konia - konny zostaje
@@ -204,9 +219,23 @@ namespace Armoury
                     HorseCensus.Add(key, HorseCensus.CStrazPieszy, toFoot);
                     HorseCensus.Add(key, HorseCensus.CStrazT6, keep);
                     HorseCensus.Add(key, HorseCensus.CStrazBrakPuli, noPool);
+                    if (!dothraki) HorseFate.NoteRot(fromFree + fromRoster, toFoot, keep + noPool);   // E6/K1: zamiany ROT poza Dothrakami (linia K1)
                 }
             }
             catch (Exception e) { _stumbles++; if (_stumbles <= 3) Log.Error("RotHorseGuard.Apply", e); }
+        }
+
+        /// <summary>E6/K1 (211): pieszy z puli rodu tego samego tieru - ten sam rodzaj (strzelec/wojownik) i kultura najpierw (null: brak).</summary>
+        private static CharacterObject PoolFoot(IList<CharacterObject> pool, CharacterObject rider)
+        {
+            CharacterObject best = null; int bs = -1;
+            foreach (var c in pool)
+            {
+                if (c == null || c.IsHero || c.IsMounted || c.Tier != rider.Tier) continue;
+                int sc = (c.IsRanged == rider.IsRanged ? 2 : 0) + (c.Culture == rider.Culture ? 1 : 0);
+                if (sc > bs) { bs = sc; best = c; }
+            }
+            return best;
         }
 
         private static string FootId(CharacterObject rider)

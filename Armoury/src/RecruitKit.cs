@@ -502,7 +502,20 @@ namespace Armoury
                     else if (settlement != null)                                                                              // 7: najemnik z karczmy
                     {
                         _dOwnMerc++;
-                        foreach (var e in TemplateItems(troop)) if (MenPurse.HorseKind(e.Item)) { items.Add(e); _dMercHorsePcs++; }   // 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana, kon nadal z wzorca (jego kon w zbrojowni starego pana - krok sprzetu)
+                        // E6/K1 (211, VeteranKeepsHorse): kon najemnika z puli koni weteranow tej karczmy (kon zwolnionego konnego), nie z wzorca; brak konia - bez konia
+                        // i bez rzedu (karczma pokazuje typ konny tylko do liczby koni w puli - Veterans.Sync); rzad nadal z wzorca (poza zakresem K1)
+                        bool vetHorse = HorseFate.VetHorseOn && troop.IsMounted;
+                        ItemObject vh = vetHorse ? HorseFate.VetHireHorse(settlement, troop) : null;
+                        if (vh != null) { items.Add(new EquipmentElement(vh)); _dMercHorsePcs++; }
+                        int tplHorse = 0;
+                        foreach (var e in TemplateItems(troop))
+                            if (MenPurse.HorseKind(e.Item))
+                            {
+                                if (vetHorse && (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse || vh == null)) continue;
+                                items.Add(e); _dMercHorsePcs++;
+                                if (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse) tplHorse++;
+                            }   // 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana; E6/K1: przy kluczu kon z puli (wyzej)
+                        HorseFate.NoteMercTemplateHorse(tplHorse);
                     }
                     else { _dOwnNoSource++; if (troop.IsMounted) _dMountedNoHorse++; }                                        // 8: bez zrodla (ochotnik z mapy, inne mody)
                     _dOwnPcs += items.Count; _tOwn[TierIdx(troop)]++;

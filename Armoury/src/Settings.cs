@@ -1439,6 +1439,14 @@ namespace Armoury
         // E6/W2 (210, PLAN 6.18, R7): wioski poboczne wedlug rodzaju (kolumna model arm_map_villages.tsv w VillageBook) - okreg z wioskami rybackimi: zboze x (1 - u)
         // i ryby + tyle samo sztuk, u = udzial ludzi w domu wiosek rybackich x 0.5; ostatni krok MaterialLaw.ProdPostfix (HamletKinds), ryby za zbozem na liscie BK
         public bool HamletKindsInDistrict = true;          // the hamlets of a district shape what it sends to market: fishing hamlets land fish in place of part of the grain (the same number of loads), mills and granaries keep it grain. Needs Village Book Enabled (off = the district sends grain as before)
+        // E6/K1 (211, PLAN 6.11, R9/R10/R14): kon ginie tylko zabity (misja - prawdziwy zgon, autobitwa AI - z zabitym jezdzcem x W z misji; lup koni DTE jako
+        // przeniesienie), dobytek rozbitych do zwyciezcow albo osady, kon weterana w puli karczmy, dary startowe nowej druzyny z polki siedziby, zamiana ROT na konnego tylko z koniem
+        public bool HorsesDieOnlyKilled = true;            // a horse dies only when it is killed: in your battles as it falls, in battles between AI lords along with its killed rider at the rate seen in real battles; a horse that lives through a lost battle is the victors' spoil
+        public int HorseDeathRatioMinBattles = 50;         // how many of your own battles with fallen riders are needed before their rate of dead horses per dead rider is used for battles between AI lords (until then one horse for each killed rider who had one)
+        public bool SpoilsOfBrokenParties = true;          // what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes
+        public bool VeteranKeepsHorse = true;              // a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman
+        public bool NewPartyHorsesFromSeat = true;         // a new lord's party gets its first horses and food from the shelves of its seat, paid by the house - or none
+        public bool TroopSwapNeedsHorse = true;              // when a realm's troop rules turn a soldier into a mounted trooper, he rides only if his party has a horse for him, as for an upgrade; otherwise he becomes a footman of the same rank from his house's list
 
         public static void Load(string moduleDataDir)
         {

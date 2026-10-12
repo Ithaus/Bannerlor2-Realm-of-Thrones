@@ -792,6 +792,9 @@ namespace Armoury
         /// <summary>Towar, ktory zostal w partii w chwili jej zniszczenia, znika razem z nia (lup zwyciezca wzial wczesniej - to przewoz).</summary>
         internal static void OnPartyDestroyed(MobileParty mp, PartyBase destroyer)
         {
+            // E6/K1 (211, R14, SpoilsOfBrokenParties): tabor i konie zbrojowni rozbitej/rozwiazanej partii - do zwyciezcow albo na polke osady (PRZED licznikami
+            // "przepadlo" i ArmsLeaks.NoteLost - licza juz tylko to, co zostalo: unikaty dla UniqueSpoils, sztuki nie-towarowe); nie rzuca
+            try { HorseFate.Spoils(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(K1)", e); }
             try
             {
                 if (mp == null || !On || !EnsureItems()) return;

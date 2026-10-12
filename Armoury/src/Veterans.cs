@@ -116,9 +116,18 @@ namespace Armoury
                         foreach (var c in cls)
                         {
                             bool f;
-                            var tt = TypeFor(st.Culture, c[0] >= 100, c[0] % 100, out f);
+                            // E6/K1 (211, VeteranKeepsHorse): klasa konna pokazana jako konna tylko do liczby koni w puli miasta; bez koni - typ pieszy (najemnik bez konia)
+                            bool horse = c[0] >= 100;
+                            int shown = c[1];
+                            if (horse && HorseFate.VetHorseOn)
+                            {
+                                int hp = HorseFate.VetHorsesIn(st);
+                                if (hp <= 0) { horse = false; HorseFate.NoteVetFootShown(); }
+                                else shown = Math.Min(shown, hp);
+                            }
+                            var tt = TypeFor(st.Culture, horse, c[0] % 100, out f);
                             if (tt == null) { PeopleBook.VNoType++; continue; }
-                            troop = tt; men = c[1]; key = c[0]; foot = f;
+                            troop = tt; men = shown; key = c[0]; foot = f || (c[0] >= 100 && !horse);
                             break;
                         }
                     }

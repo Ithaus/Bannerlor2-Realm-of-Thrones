@@ -81,6 +81,10 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/W2 (210, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W2-1..W2-6 - linia "Wioski wedlug rodzaju (210)": CZYNNE w dobach
                     okna, tozsamosc zboze zdjete = ryby dodane w kazdej dobie (|a - b| <= 1 + 0.1% a), ryby > 0 przy okregach z rybakami, potkniecia 0;
                     okregi z rybakami, u srednio i wsie bez pamieci zboza - INFO.
+                    Blok E6/K1 (211, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K1-1..K1-10 - linie "Konie - smierc, lup, dobytek (E6/K1)" i "Konie (E6/0)":
+                    CZYNNE w dobach okna, reszta niewyjasniona koni - kazde 7 dob d31-until: |suma| <= max(5, 1% (zrodla + ujscia)), kon najemnika z wzorca 0,
+                    dobytek rozbitych bez miejsca 0, kopie lupu DTE bez pokrycia u pokonanych 0, potkniecia 0; polegle (misja/autobitwa, W), lup, dobytek,
+                    pula weteranow, dary z polki siedziby, zamiany ROT - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -3267,6 +3271,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_w2(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_w2", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # E6/K1 (211): kon ginie tylko zabity, dobytek rozbitych, kon weterana, dary z polki siedziby, zamiany ROT (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
+    try:
+        etap5_k1(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     rep.show()
     return 0
 
@@ -3384,6 +3393,79 @@ def etap5_w2(rep, lines, start, until):
             "INFO (ryby bez dopisku - zboze bez zmian; zboze bez ryb - odczyt magazynu wsi bez ticku produkcji; kontrola W2-3 liczy pary z ticku)", None)
     st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
     rep.add("W2-6: potkniecia HamletKinds w oknie", str(st), "0", st == 0)
+
+def etap5_k1(rep, lines, start, until):
+    """E6/K1 (211, projekt etapu 6 v2 rozdz. 3 "E6/K1" Test, K1-13): linia doby "Konie - smierc, lup, dobytek (E6/K1): dzien N" i pozycje K1 w "Konie (E6/0): dzien N"
+    (dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Reszta niewyjasniona koni: kazde 7 dob (bloki od d31) |suma| <= max(5, 1% (zrodla pierwotne + ujscia))."""
+    dl = by_day(lines, "Konie - smierc, lup, dobytek (E6/K1): dzien")
+    days = sorted(d for d in dl if 1 <= run_day(d, start) <= until)
+    rep.add("K1-1: linia Konie - smierc, lup, dobytek (E6/K1) w oknie", f"{len(days)} dob (z {len(dl)} w logu)", "codziennie od wgrania E6/K1", None)
+    if not days:
+        return
+    rows = [dl[d] for d in days]
+    off = [d for d in days if " | CZYNNE:" not in dl[d]]
+    rep.add("K1-2: K1 CZYNNE w dobach okna", f"{len(days) - len(off)} z {len(days)}" + (f"; ostatnia nieczynna d{off[-1]}" if off else ""),
+            "wszystkie doby (klucze HorsesDieOnlyKilled, SpoilsOfBrokenParties, VeteranKeepsHorse, NewPartyHorsesFromSeat, TroopSwapNeedsHorse)", len(off) == 0)
+    rest = {}
+    for d, s in by_day(lines, "Konie (E6/0): dzien").items():
+        m = re.search(r"reszta niewyjasniona [\d/-]+ \(razem (-?\d+), mianownik zrodla \+ ujscia (\d+)", s)
+        if m:
+            rest[run_day(d, start)] = (int(m.group(1)), int(m.group(2)))
+    bad, blocks = [], 0
+    lo = 31
+    while lo + 6 <= until:
+        blk = [rest[x] for x in range(lo, lo + 7) if x in rest]
+        if len(blk) == 7:
+            blocks += 1
+            sr = sum(a for a, _ in blk)
+            lim = max(5.0, 0.01 * sum(b for _, b in blk))
+            if abs(sr) > lim:
+                bad.append(f"d{lo}-{lo + 6}: {sr} (prog {lim:.0f})")
+        lo += 7
+    rep.add("K1-3: reszta niewyjasniona koni - bloki 7 dob od d31 (|suma| <= max(5, 1% zrodla + ujscia))",
+            f"blokow pelnych {blocks}, ponad prog {len(bad)}" + (f" [{', '.join(bad[:6])}]" if bad else ""),
+            "0 blokow ponad prog (linia Konie (E6/0) przy Stage6MeasureLog)", (len(bad) == 0) if blocks else None)
+    tpl = sum(num(r"kon z wzorca (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K1-4: kon najemnika z wzorca (suma okna)", str(tpl), "0 (VeteranKeepsHorse - kon z puli weteranow)", tpl == 0)
+    nw = sum(num(r", bez miejsca (\d+)", x, int, 0) or 0 for x in rows)
+    left = sum(num(r"zostalo w taborze \(unikaty, nie-towar\) (\d+)", x, int, 0) or 0 for x in rows)
+    skip = sum(num(r"pominiete partie bez niszczyciela \(inne mody, dostawy BK\) (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K1-5: dobytek rozbitych bez miejsca (suma okna)", f"{nw}; zostalo w taborze (unikaty - UniqueSpoils, nie-towar) {left}, pominiete partie {skip}",
+            "0 (przepadlo z rozbitymi - towary i konie)", nw == 0)
+    miss = sum(num(r"brak u pokonanych (\d+)", x, int, 0) or 0 for x in rows)
+    mv = sum(num(r"lup DTE: dopisane zwyciezcom (\d+)", x, int, 0) or 0 for x in rows)
+    cp = sum(num(r"kopie zdjete u pokonanych (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K1-6: lup koni DTE jako przeniesienie (suma okna)", f"dopisane zwyciezcom {mv}, kopie zdjete u pokonanych {cp}, bez pokrycia {miss}",
+            "bez pokrycia 0", miss == 0)
+
+    def cats(pat, x):
+        m = re.search(pat, x)
+        return sum(int(v) for v in m.group(1).split("/")) if m else 0
+    dm = sum(cats(r"polegle w misji \(zdjete ze zbrojowni\) ([\d/]+)", x) for x in rows)
+    da = sum(cats(r"polegle w autobitwie ([\d/]+)", x) for x in rows)
+    kr = sum(num(r"zabitych jezdzcow (\d+)", x, int, 0) or 0 for x in rows)
+    s = rows[-1]
+    w = num(r"\| W ([\d.]+) \(obserwacji", s, float)
+    ob = num(r"\(obserwacji (\d+)/", s, int)
+    rep.add("K1-7: polegle konie (suma okna) i W", f"misja {dm}, autobitwa {da} (zabitych jezdzcow {kr}, srednio {da / max(1, len(rows)):.0f}/d); W {w} (obserwacji {ob})",
+            "INFO (projekt: ok. 40-150 koni/d; w autotescie W = 1.0 - misji nie ma)", None)
+    vin = sum(num(r"pula weteranow: \+(\d+)", x, int, 0) or 0 for x in rows)
+    vh = sum(num(r"najemnik: kon z puli (\d+)", x, int, 0) or 0 for x in rows)
+    vn = sum(num(r"najemnik: kon z puli \d+, bez konia (\d+)", x, int, 0) or 0 for x in rows)
+    vs = num(r"\(najem \d+, na polki \d+\), stan (\d+)", s, int)
+    rep.add("K1-8: pula koni weteranow (suma okna)", f"do puli {vin}, najem z koniem z puli {vh}, najem konnego bez konia {vn}, stan (ostatnia doba) {vs}", "INFO", None)
+    gh = sum(num(r"z polki konie (\d+)", x, int, 0) or 0 for x in rows)
+    gf = sum(num(r"z polki konie \d+, zywnosc (\d+)", x, int, 0) or 0 for x in rows)
+    gnh = sum(num(r"brak koni (\d+)", x, int, 0) or 0 for x in rows)
+    gg = sum(num(r"zloto do siedzib (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K1-9: dary startowe nowej druzyny z polki siedziby (suma okna)", f"konie {gh}, zywnosc {gf}, brak koni {gnh}, zloto {gg}; z niczego 0 z definicji",
+            "INFO (dary z niczego 0)", None)
+    rh = sum(num(r"zamiany ROT na konnego: z koniem (\d+)", x, int, 0) or 0 for x in rows)
+    rf = sum(num(r"z koniem \d+, na pieszego (\d+)", x, int, 0) or 0 for x in rows)
+    rk = sum(num(r"zostal konny bez konia (\d+)", x, int, 0) or 0 for x in rows)
+    st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
+    rep.add("K1-10: zamiany ROT na konnego (suma okna) i potkniecia HorseFate", f"z koniem {rh}, na pieszego {rf}, konny bez konia {rk}; potkniecia {st}",
+            "potkniecia 0 (zamiany - INFO)", st == 0)
 
 def etap5_fee(rep, lines):
     """E5 decyzja 9 Jeffa (12.10): oplata za werbunek zalog (Clan.AutoRecruitmentExpenses, H6) nie znika - do notabla, ktory dal czlowieka (zmarly -

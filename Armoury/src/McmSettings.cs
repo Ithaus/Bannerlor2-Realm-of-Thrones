@@ -4680,6 +4680,30 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HamletKindsInDistrict { get; set; } = true;
 
+        [SettingPropertyBool("Horses Die Only Killed", HintText = "a horse dies only when it is killed: in your battles as it falls, in battles between AI lords along with its killed rider at the rate seen in real battles; a horse that lives through a lost battle is the victors' spoil")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorsesDieOnlyKilled { get; set; } = true;
+
+        [SettingPropertyInteger("Horse Death Ratio Min Battles", 0, 200, "0", HintText = "how many of your own battles with fallen riders are needed before their rate of dead horses per dead rider is used for battles between AI lords (until then one horse for each killed rider who had one)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseDeathRatioMinBattles { get; set; } = 50;
+
+        [SettingPropertyBool("Spoils Of Broken Parties", HintText = "what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool SpoilsOfBrokenParties { get; set; } = true;
+
+        [SettingPropertyBool("Veteran Keeps Horse", HintText = "a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool VeteranKeepsHorse { get; set; } = true;
+
+        [SettingPropertyBool("New Party Horses From Seat", HintText = "a new lord's party gets its first horses and food from the shelves of its seat, paid by the house - or none")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool NewPartyHorsesFromSeat { get; set; } = true;
+
+        [SettingPropertyBool("Troop Swap Needs Horse", HintText = "when a realm's troop rules turn a soldier into a mounted trooper, he rides only if his party has a horse for him, as for an upgrade; otherwise he becomes a footman of the same rank from his house's list")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool TroopSwapNeedsHorse { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -5849,6 +5873,12 @@ namespace Armoury
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;
             s.HamletKindsInDistrict = HamletKindsInDistrict;
+            s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
+            s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;
+            s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
+            s.VeteranKeepsHorse = VeteranKeepsHorse;
+            s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
+            s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;
         }
 
         internal static void Apply()

@@ -177,6 +177,9 @@ namespace Armoury
                 // E6/K0 (209): licznik koni gry u zrodla (postfiks ItemRoster.OnRosterUpdated - liczy dopiero przy kluczu, flaga ustawiana w kampanii),
                 // odswiezenie stanu koni partii po oplaconym awansie, pomiar koni porzuconych przez gre; PRZED MarchPace (ten czyta stan koni partii)
                 try { HorseState.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HorseState.ApplyAll", e); }
+                // E6/K1 (211): okno DTE OnMapEventEnded (zgony koni autobitwy przed lupem, lup koni jako przeniesienie), zgony koni misji po zwrotach DTE (OnEndMission),
+                // BK karawany (wyrzucony dobytek na polke), dary startowe nowej druzyny z polki siedziby (GiveInitialItemsToParty, Last - po pomiarze E4/8)
+                try { HorseFate.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HorseFate.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
@@ -269,6 +272,8 @@ namespace Armoury
             {
                 // F1 (H3 w autobitwie gracza): bitwa gracza z misja nie jest autobitwa, nawet gdy potem "wyslij wojsko"
                 if (Campaign.Current != null) LosersFlee.NoteMission();
+                // E6/K1 (211): zgony koni w misji (agent konia zabity) - zdjete ze zbrojowni wlasciciela po zwrotach DTE; bitwa z misja bez reguly W autobitwy
+                if (Campaign.Current != null && mission != null) HorseFate.OnMissionInit(mission);
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
                 if (Settings.Current.HitScribeEnabled && mission != null)

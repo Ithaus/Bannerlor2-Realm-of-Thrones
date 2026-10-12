@@ -317,22 +317,34 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Heroes", e); }
+            // E6/K1 (211): pula koni weteranow w karczmach - czesc stanu (kon weterana przechodzi zbrojownia -> pula -> zbrojownia/polka: przeniesienie)
+            // oraz zbrojownia gracza (DTE ArmyArmory - zgon konia gracza w misji jest ujsciem, lup DTE dla gracza przeniesieniem)
+            var vet = new long[Cats]; var parm = new long[Cats];
+            try { HorseFate.VetPoolCats(vet); } catch (Exception e) { Stumble("VetPool", e); }
+            try { HorseFate.PlayerArmoryCats(parm); } catch (Exception e) { Stumble("PlayerArmory", e); }
             var now = new long[Cats];
-            for (int i = 0; i < Cats; i++) now[i] = shelf[i] + vil[i] + stash[i] + party[i] + arm[i] + hero[i];
+            for (int i = 0; i < Cats; i++) now[i] = shelf[i] + vil[i] + stash[i] + party[i] + arm[i] + hero[i] + vet[i] + parm[i];
             string state = "stan " + Row(now) + " (polki miast i zamkow " + Row(shelf) + ", magazyny wsi " + Row(vil) + ", schowki " + Row(stash) + ", tabory " + Row(party)
-                           + ", zbrojownie DTE " + Row(arm) + ", bohaterowie " + Row(hero) + ")";
+                           + ", zbrojownie DTE " + Row(arm) + ", zbrojownia gracza " + Row(parm) + ", bohaterowie " + Row(hero) + ", pula weteranow " + Row(vet) + ")";
             if (_prev == null)
             {
                 Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " - stan wyjsciowy, reszta od nastepnej doby.");
                 _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0;
                 return;
             }
-            var rest = new long[Cats]; long rs = 0, src = 0;
-            for (int i = 0; i < Cats; i++) { rest[i] = (now[i] - _prev[i]) - _prod[i]; rs += rest[i]; src += _prod[i]; }
+            // E6/K1 (211): zgony koni (zdjete ze zbrojowni w misji i w autobitwie) - UJSCIE; lup, dobytek rozbitych, pula weteranow, dary z polki - przeniesienia w stanie
+            var dead = new long[Cats];
+            try { HorseFate.DeathsCats(dead); } catch (Exception e) { Stumble("Deaths", e); }
+            string k1 = "";
+            try { k1 = HorseFate.BookPart(); } catch (Exception e) { Stumble("BookPart", e); }
+            var rest = new long[Cats]; long rs = 0, src = 0, sink = 0;
+            for (int i = 0; i < Cats; i++) { rest[i] = (now[i] - _prev[i]) - _prod[i] + dead[i]; rs += rest[i]; src += _prod[i]; sink += dead[i]; }
             Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " | zrodla: stadniny wsi " + Row(_prod)
+                     + " | ujscia: " + k1
                      + " | wielblady wyprodukowane: w Qarthu " + _camelQarth + ", poza Qarthem " + _camelElse
-                     + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + (src > 0 ? ", " + (100.0 * rs / src).ToString("0", CultureInfo.InvariantCulture) + "% produkcji" : "")
-                     + ") | nie podpiete (w reszcie): polegle, mieszczanie, LegendaryLaw, rozbite partie, BK stadniny i karawany, dary startowe, kon z wzorca, zamiany ROT, zakupy gry"
+                     + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + ", mianownik zrodla + ujscia " + (src + sink)
+                     + (src + sink > 0 ? ", " + (100.0 * rs / (src + sink)).ToString("0", CultureInfo.InvariantCulture) + "%" : "")
+                     + ") | nie podpiete (w reszcie): mieszczanie, LegendaryLaw, BK stadniny, zbrojownie rozwiazanych zdjete przez DTE, zakupy gry"
                      + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
             _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0;
             if (++_days7 >= 7)

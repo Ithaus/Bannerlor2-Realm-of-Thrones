@@ -389,7 +389,7 @@ namespace Armoury
             _inRot++;
             try
             {
-                if ((!On && !RotHorseGuard.On) || __1 == null || __2 == null || __2.IsHero || __3 <= 0) return;
+                if ((!On && !RotHorseGuard.On && !RotHorseGuard.AllOn) || __1 == null || __2 == null || __2.IsHero || __3 <= 0) return;   // E6/K1: AllOn - straz w kazdej krainie
                 MobileParty mp = null;
                 if (__5 != null) { if (__5.Town != null) mp = __5.Town.GarrisonParty; }
                 else if (__0 != null) mp = __0.PartyBelongedTo;
@@ -433,7 +433,7 @@ namespace Armoury
                     // przeglad 175: konie, ktore przybyly do zbrojowni w trakcie zamiany (echo werbunku - komplet wzorca z koniem z RecruitKit)
                     if (st.ArmH >= 0) { int d = Stables.ArmoryMounts(st.Mp) - st.ArmH; if (d > 0) r[CKonieEcho] += d; }
                 }
-                if (plus > 0 && RotHorseGuard.On) RotHorseGuard.Apply(__instance, __0, __1, __2, __5, st.Mp, added, plus);
+                if (plus > 0 && (RotHorseGuard.On || RotHorseGuard.AllOn)) RotHorseGuard.Apply(__instance, __0, __1, __2, __5, st.Mp, added, plus);
             }
             catch (Exception e) { _stumbles++; if (_stumbles <= 3) Log.Error("HorseCensus.ExchangePostfix", e); }
         }

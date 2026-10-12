@@ -322,7 +322,7 @@ namespace Armoury
         // ================================================================ wejscie do puli (R16) - jedna regula
         internal const int VROk = 0, VRBelow = 1, VRNoTown = 2;
         /// <summary>Plan wejscia (bez zapisu stanu): miasto, klasa, t z akumulatora. Commit zapisuje (W1 - po BK wsi, wszystko-albo-nic).</summary>
-        internal sealed class VetTicket { internal int Reason, N, T, Src, Key; internal Town Town; internal CharacterObject Troop; internal bool Horse; internal double Acc; }
+        internal sealed class VetTicket { internal int Reason, N, T, Src, Key; internal Town Town; internal CharacterObject Troop; internal bool Horse; internal double Acc; internal MobileParty Party; }   // E6/K1: Party - zbrojownia, z ktorej konny bierze konia
 
         /// <summary>Uprawniony do karczmy (krok 2 planu 3.1): szeregowy zolnierz albo najemnik (bez wightow i Strazy), partia nie milicja/tabor/karawana/Straz/Inni.</summary>
         private static bool VetEligible(MobileParty party, CharacterObject troop)
@@ -361,7 +361,7 @@ namespace Armoury
                 double acc = x - t;
                 if (acc < 0) acc = 0;
                 if (acc > 0.999999) acc = 0.999999;
-                return new VetTicket { Reason = VROk, N = n, T = t, Src = vsrc, Key = VKey(horse, tier), Town = town, Troop = troop, Horse = horse, Acc = acc };
+                return new VetTicket { Reason = VROk, N = n, T = t, Src = vsrc, Key = VKey(horse, tier), Town = town, Troop = troop, Horse = horse, Acc = acc, Party = party };
             }
             catch (Exception e) { VStumble("VetPlan", e); return null; }
         }
@@ -394,6 +394,8 @@ namespace Armoury
                     if (org != null && OriginLive) _vDestTake += t;          // E4/7 "dokad": wyjscie ze SLUZBY (Take wolajacego) do WETERANI
                 }
                 catch { }
+                // E6/K1 (211, VeteranKeepsHorse): konny bierze swojego konia ze zbrojowni partii do puli koni miasta (po zapisie do klasy; nie rzuca)
+                if (tk.Horse) HorseFate.VetTakeHorses(tk.Party, tk.Troop, tk.Town.Settlement, t);
                 return t;
             }
             catch (Exception e) { VStumble("VetCommit", e); return 0; }

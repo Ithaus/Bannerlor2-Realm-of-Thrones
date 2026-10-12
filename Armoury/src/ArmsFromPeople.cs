@@ -677,7 +677,10 @@ namespace Armoury
 
         public static Exception GiftsFin(Exception __exception, MobileParty __0, long[] __state)
         {
-            try { if (__state != null && __0 != null && __0.ItemRoster != null) { var now = Goods(__0.ItemRoster); D.gifts += now[0] - __state[0]; D.giftsValue += now[1] - __state[1]; } }
+            // E6/K1 (211, NewPartyHorsesFromSeat): dary obsluzyl HorseFate - konie i zywnosc kupione z polki siedziby, nie dar z niczego (licznik E4/8 bez nich)
+            bool seat = false;
+            try { seat = HorseFate.TakeGiftRun(); } catch { }
+            try { if (!seat && __state != null && __0 != null && __0.ItemRoster != null) { var now = Goods(__0.ItemRoster); D.gifts += now[0] - __state[0]; D.giftsValue += now[1] - __state[1]; } }
             catch (Exception e) { Stumble("GiftsFin", e); }
             return __exception;
         }
