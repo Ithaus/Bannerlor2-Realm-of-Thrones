@@ -101,6 +101,10 @@ Uzycie (Python 3, tylko odczyt):
                     (klucz TerrainEaseExact on), T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej DECYZJA), T3 ponizej sufitu MarchPace (karawany, wozy wsi,
                     d31-until): Polnoc las < rownina, Dorne pustynia <= rownina, T4 koszt probki <= 20 ms/dobe, bledy/potkniecia 0, T6 towar wsi niesprzedany w miastach
                     <= 2%; rody, zwrot ponad netto starej reguly, udzial probek na suficie - INFO; T5 tempo marszu poza blokiem (marsz.py).
+                    Blok E7/C (227) - jedna skala czasu: T1 grep kodu Armoury/src obok narzedzia (zegar realny DateTime.Now/UtcNow, TickCount, ApplicationTime,
+                    += realDt, akumulator dt poza misja) tylko na liscie wyjatkow bloku (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8),
+                    T2 tekst MCM World Pace Percent (Settings.cs i McmSettings.cs) bez "168" i "month"; linia startowa "Jedna skala czasu (E7/C)" i T3 odnowien
+                    pogoni na dobe gry (dopisek "E7/C:" linii konca pogoni HideoutPurge) - INFO.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -6381,6 +6385,95 @@ def etap7_t(rep, lines, start, until, logp=None, csp=None):
     rep.add("E7/T T5: tempo marszu", "poza blokiem", "Miara: marsz (marsz.py, rozdz. 4) w progu 124-138 km/dobe", None)
 
 
+# E7/C (227): wyjatki od R4 "kazda decyzja gry na zegarze gry" - plik -> (dozwolonych trafien, powod). Liczba to gorna granica: nowe trafienie w pliku = NIE
+_E7C_ALLOWED = {
+    "Log.cs": (4, "znaczniki czasu logu"),
+    "GoodsLedger.cs": (1, "godzina w linii logu"),
+    "NightRest.cs": (4, "widok: namiot gracza (ReassertPlayerTent, co 5 s) i namioty mijanych obozow (co 2 s)"),
+    "Wayfinder.cs": (2, "dlawienie komunikatu drogi"),
+    "QuartermasterLaw.cs": (4, "dlawienie okrzyku kwatermistrza"),
+    "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
+    "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
+    "HideoutPurge.cs": (2, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne"),
+}
+_E7C_PAT = re.compile(r"DateTime\.(?:Now|UtcNow)\b|Environment\.TickCount|ApplicationTime|\+=\s*realDt\b")
+_E7C_ACC = re.compile(r"\b_acc\w*\s*\+=\s*dt\b")
+_E7C_ONLY_IN = {"HideoutPurge.cs": "bool PursuitDue()"}   # wylacznik: zegar realny tylko w galezi klucza 0 tej metody
+
+
+def etap7_c(rep, lines, start, until, logp=None, csp=None):
+    """E7/C (227): jedna skala czasu (projekt etapu 7 v2 rozdz. 3 "E7/C" Test, PLAN 7.1, R4). T1 grep kodu Armoury/src (katalog obok tools/): zegar realny
+    (DateTime.Now/UtcNow, Environment.TickCount, ApplicationTime, += realDt) i akumulator dt (_acc += dt) poza plikami misji (OnMissionTick - zegar misji
+    to zegar gry w bitwie) tylko w plikach z _E7C_ALLOWED i najwyzej w ich liczbie; brak zrodel obok narzedzia - INFO. T2 podpowiedz World Pace Percent
+    (Settings.cs i McmSettings.cs) bez "168" i "month". Linia startowa i T3 odnowien pogoni na dobe gry (dopisek "E7/C:" linii konca pogoni) - INFO."""
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Armoury", "src")
+    if not os.path.isdir(src):
+        rep.add("E7/C T1: zegar realny i akumulatory klatek w logice gry (grep kodu)", f"brak zrodel ({src})", "uruchomic z drzewa repo", None)
+        rep.add("E7/C T2: tekst MCM World Pace Percent bez 168", "brak zrodel", "uruchomic z drzewa repo", None)
+    else:
+        hits, over = {}, []
+        for fn in sorted(os.listdir(src)):
+            if not fn.endswith(".cs"):
+                continue
+            try:
+                with open(os.path.join(src, fn), encoding="utf-8", errors="replace") as f:
+                    txt = f.read()
+            except OSError:
+                continue
+            mission = "OnMissionTick" in txt
+            # plik z wyjatkiem w jednej metodzie (wylacznik): trafienia poza jej cialem sa zawsze NIE (stara regula w OnTick dawala tyle samo trafien)
+            only_in = _E7C_ONLY_IN.get(fn)
+            span = None
+            if only_in:
+                a = txt.find(only_in)
+                b = txt.find("\n        }", a) if a >= 0 else -1
+                span = (txt.count("\n", 0, a), txt.count("\n", 0, b)) if a >= 0 and b >= 0 else (-1, -1)
+            n = 0
+            outside = 0
+            for i, ln in enumerate(txt.splitlines()):
+                code = ln.split("//", 1)[0]
+                k = len(_E7C_PAT.findall(code)) + (0 if mission else len(_E7C_ACC.findall(code)))
+                n += k
+                if span is not None and k and not (span[0] <= i <= span[1]):
+                    outside += k
+            if n:
+                hits[fn] = n
+                lim = _E7C_ALLOWED.get(fn, (0, ""))[0]
+                if n > lim or outside:
+                    over.append(f"{fn} {n}/{lim}" + (f" (poza {only_in}: {outside})" if outside else ""))
+        hp = hits.get("HideoutPurge.cs", 0)
+        rep.add("E7/C T1: zegar realny i akumulatory klatek w logice gry (grep kodu Armoury/src)",
+                f"poza lista wyjatkow: {', '.join(over) if over else '0'}; w wyjatkach: "
+                + ", ".join(f"{k} {v}" for k, v in sorted(hits.items()) if k in _E7C_ALLOWED) + f" (HideoutPurge {hp} - tylko wylacznik)",
+                "0 poza lista (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8)", not over)
+        bad = []
+        for fn in ("Settings.cs", "McmSettings.cs"):
+            try:
+                with open(os.path.join(src, fn), encoding="utf-8", errors="replace") as f:
+                    row = [ln for ln in f if ("WorldPacePercent =" in ln and "//" in ln) or ('"World Pace Percent"' in ln and "HintText" in ln)]
+            except OSError:
+                row = []
+            if not row:
+                bad.append(f"{fn}: brak wiersza")
+            for ln in row:
+                if "168" in ln or "month" in ln.lower():
+                    bad.append(fn)
+        rep.add("E7/C T2: tekst MCM World Pace Percent bez 168 i obietnicy miesiaca", "; ".join(bad) if bad else "czysty (Settings.cs, McmSettings.cs)",
+                "bez '168' i 'month'", not bad)
+    st_ = [s for s in lines if s.startswith("Jedna skala czasu (E7/C)")]
+    rep.add("E7/C: linia startowa", st_[-1] if st_ else "brak (log sprzed E7/C?)", "INFO (co ile godzin gry odwet odnawia pogon)", None)
+    rr = [s for s in lines if s.startswith("HideoutPurge: pogon") and "(E7/C:" in s]
+    if rr:
+        ren = sum(num(r"odnowien (\d+) w", s, default=0) or 0 for s in rr)
+        hrs = sum(fnum(r" w ([0-9.]+) h gry =", s, default=0.0) or 0.0 for s in rr)
+        steps = sorted({m.group(1) for s in rr for m in [re.search(r"; (co [^)]+)\)", s)] if m})
+        rate = f"{ren * 24.0 / hrs:.1f}" if hrs > 0.01 else "-"
+        rep.add("E7/C T3: odnowien pogoni odwetu na dobe gry (caly log)", f"{len(rr)} pogoni, odnowien {ren} w {hrs:.1f} h gry = {rate} na dobe ({'; '.join(steps)})",
+                "INFO (klucz 0.5 h - ok. 48 na dobe przy kazdej predkosci gry)", None)
+    else:
+        rep.add("E7/C T3: odnowien pogoni odwetu na dobe gry", "brak pogoni w logu", "INFO (odwet rusza po przeszukaniu kryjowki z bandami w poblizu)", None)
+
+
 def etap7_main(logp, start_arg, until=120, csp=None):
     """E7/0 (224): grupa --grupa etap7 (projekt etapu 7 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap5_main
     (linia "Pomiary 169c: ... start kampanii dzien N", inaczej pierwsza doba logu). Kolejne paczki dopisuja WLASNE bloki etap7_<paczka>(rep, lines,
@@ -6399,7 +6492,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
         start = alld[0] if alld else 0
     print(f"plik: {logp} | doby z linia Pieniadz swiata: {len(alld)} (doby kampanii {run_day(alld[0], start) if alld else '-'}-{run_day(alld[-1], start) if alld else '-'})"
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until}")
-    for blk in (etap7_0, etap7_o1, etap7_t):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
+    for blk in (etap7_0, etap7_o1, etap7_t, etap7_c):   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu

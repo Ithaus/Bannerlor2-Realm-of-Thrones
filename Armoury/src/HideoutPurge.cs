@@ -42,7 +42,12 @@ namespace Armoury
         private static readonly System.Collections.Generic.List<MobileParty> _reprisalPack =
             new System.Collections.Generic.List<MobileParty>();
         private static CampaignTime _reprisalUntil = CampaignTime.Zero;
-        private static DateTime _lastReprisalRefresh = DateTime.MinValue;
+        private static DateTime _lastReprisalRefresh = DateTime.MinValue;   // tylko klucz HideoutPursuitHours 0 (stara regula 3 s realne)
+        // E7/C (227, R4): odnowienie pogoni na zegarze gry - co HideoutPursuitHours h gry przy kazdej predkosci gry
+        // (dotad co 3 s realne: przy x8 co ok. 7 h gry, przy x1 co ok. 0.9 h); licznik odnowien do linii konca pogoni
+        private static CampaignTime _lastReprisalTick = CampaignTime.Zero;
+        private static CampaignTime _pursuitStart = CampaignTime.Zero;
+        private static int _pursuitRenewals;
         // lup przedmiotowy - ekran jak po bitwie, otwierany na czystej mapie
         private static ItemRoster _lootRoster;
 
@@ -50,6 +55,7 @@ namespace Armoury
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => OneShotVendetta());
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, AddMenus);
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => LogClock());   // E7/C: linia startowa
             CampaignEvents.OnHideoutBattleCompletedEvent.AddNonSerializedListener(this, OnHideoutBattle);
             CampaignEvents.TickEvent.AddNonSerializedListener(this, OnTick);
         }
@@ -131,10 +137,10 @@ namespace Armoury
             try
             {
                 if (Campaign.Current == null) return;
-                // rozkaz pogoni odnawiany co ~3 s realne, dopoki odwet trwa
-                if (_reprisalPack.Count > 0 && (DateTime.Now - _lastReprisalRefresh).TotalSeconds > 3.0)
+                // rozkaz pogoni odnawiany co HideoutPursuitHours h gry (E7/C), dopoki odwet trwa
+                if (_reprisalPack.Count > 0 && PursuitDue())
                 {
-                    _lastReprisalRefresh = DateTime.Now;
+                    _pursuitRenewals++;
                     DriveReprisal();
                 }
 
@@ -162,6 +168,60 @@ namespace Armoury
                 GameMenu.ActivateGameMenu("arm_hideout_search");
             }
             catch (Exception e) { Log.Error("HideoutPurge.OnTick", e); _pending = false; }
+        }
+
+        /// <summary>E7/C (227): czy pora odnowic rozkaz pogoni. Zegar gry - co HideoutPursuitHours h gry
+        /// (ujemna roznica = wczytany wczesniejszy zapis: odnow od razu); klucz 0 = stara regula co 3 s realne.
+        /// TickEvent gry biegnie tylko przy plynacym czasie (Campaign.Tick: _dt > 0), wiec pauza nic nie odnawia.</summary>
+        private static bool PursuitDue()
+        {
+            var c = Settings.Current;
+            float step = c != null ? c.HideoutPursuitHours : 0.5f;
+            if (step <= 0f)
+            {
+                if ((DateTime.Now - _lastReprisalRefresh).TotalSeconds <= 3.0) return false;
+                _lastReprisalRefresh = DateTime.Now;
+                return true;
+            }
+            var now = CampaignTime.Now;
+            double dh = (now - _lastReprisalTick).ToHours;
+            if (dh >= 0 && dh < step) return false;
+            _lastReprisalTick = now;
+            return true;
+        }
+
+        /// <summary>E7/C: start zegara pogoni (nowa horda) - pierwsze odnowienie po HideoutPursuitHours h gry od rozkazu startowego.</summary>
+        private static void StartPursuitClock()
+        {
+            _lastReprisalTick = CampaignTime.Now;
+            _pursuitStart = CampaignTime.Now;
+            _pursuitRenewals = 0;   // _lastReprisalRefresh (klucz 0) nietkniety - stara regula dokladnie jak dotad
+        }
+
+        /// <summary>E7/C: dopisek linii konca pogoni - odnowien i odnowien na dobe gry (miara T3 bloku etap7_c).</summary>
+        private static string PursuitTally()
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            double h = (CampaignTime.Now - _pursuitStart).ToHours;
+            var c = Settings.Current;
+            float step = c != null ? c.HideoutPursuitHours : 0.5f;
+            return " (E7/C: odnowien " + _pursuitRenewals + " w " + h.ToString("0.0", ci) + " h gry = "
+                   + (h > 0.01 ? (_pursuitRenewals * 24.0 / h).ToString("0.0", ci) : "-") + " na dobe gry; "
+                   + (step > 0f ? "co " + step.ToString("0.##", ci) + " h gry" : "co 3 s realne - stara regula") + ")";
+        }
+
+        /// <summary>E7/C: linia startowa - czym mierzony jest odwet kryjowek.</summary>
+        private static void LogClock()
+        {
+            try
+            {
+                var c = Settings.Current;
+                float step = c != null ? c.HideoutPursuitHours : 0.5f;
+                Log.Info(step > 0f
+                    ? "Jedna skala czasu (E7/C): odwet kryjowek co " + step.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " h gry (HideoutPursuitHours)."
+                    : "Jedna skala czasu (E7/C): odwet kryjowek co 3 s realne - stara regula (HideoutPursuitHours 0).");
+            }
+            catch (Exception e) { Log.Error("HideoutPurge.LogClock", e); }
         }
 
         /// <summary>Tlo menu: grafika kultury gracza, zapasowo ogolna - zadnych czerwonych TEMP.</summary>
@@ -249,6 +309,7 @@ namespace Armoury
                 _reprisalPack.Add(boss);
                 float hrs = Math.Max(1f, Settings.Current != null ? Settings.Current.HideoutReprisalHours : 48f);
                 _reprisalUntil = CampaignTime.HoursFromNow(hrs);
+                StartPursuitClock();
                 DriveReprisal();
                 Log.Player("The bands you wronged have found each other - one warband now, and it is coming for you.", true);
                 Log.Info("Vendetta: scalono " + (merged + 1) + " band w horde " + boss.MemberRoster.TotalManCount + " ludzi - pogon " + hrs + " h.");
@@ -404,6 +465,7 @@ namespace Armoury
                 _reprisalPack.Clear();
                 if (boss != null) _reprisalPack.Add(boss); else _reprisalPack.AddRange(pack);
                 _reprisalUntil = CampaignTime.HoursFromNow(Math.Max(1f, c.HideoutReprisalHours));
+                StartPursuitClock();
                 DriveReprisal();
                 Log.Player("The scattered bands mass into one warband - they want their gold back and they will chase you for it!", true);
                 Log.Info("HideoutPurge: odwet rusza JEDNA HORDA (" + (merged + 1) + " band scalono, "
@@ -433,7 +495,7 @@ namespace Armoury
                     foreach (var mp in _reprisalPack)
                         try { if (mp != null && mp.IsActive) mp.Ai.SetInitiative(1f, 1f, 1f); } catch { }
                     _reprisalPack.Clear();
-                    Log.Info("HideoutPurge: pogon wygasla - horda daje za wygrana.");
+                    Log.Info("HideoutPurge: pogon wygasla - horda daje za wygrana." + PursuitTally());
                     return;
                 }
                 if (_mSetAiBehavior == null)
@@ -453,6 +515,9 @@ namespace Armoury
                     }
                     catch { }
                 }
+                // E7/C: horda rozbita albo rozwiazana przed terminem - ta sama miara odnowien co przy wygasnieciu (raz na pogon)
+                if (_reprisalPack.Count == 0)
+                    Log.Info("HideoutPurge: pogon skonczona - hordy juz nie ma." + PursuitTally());
             }
             catch (Exception e) { Log.Error("HideoutPurge.DriveReprisal", e); }
         }

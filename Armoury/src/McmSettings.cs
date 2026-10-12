@@ -748,6 +748,10 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutReprisalHours { get; set; } = 48f;
 
+        [SettingPropertyFloatingInteger("Hideout Pursuit Hours", 0.00f, 2.00f, "0.00", HintText = "a reprisal band renews its chase every this many game hours, whatever the game speed (0 = the old every three real seconds)")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutPursuitHours { get; set; } = 0.5f;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -1200,7 +1204,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar")]
+        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party as a percent of the game's own (100 = unchanged) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it")]
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 
@@ -4934,6 +4938,7 @@ namespace Armoury
             s.HideoutReprisalRadius = HideoutReprisalRadius;
             s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;
             s.HideoutReprisalHours = HideoutReprisalHours;
+            s.HideoutPursuitHours = HideoutPursuitHours;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

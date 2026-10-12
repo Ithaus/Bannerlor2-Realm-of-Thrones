@@ -13,14 +13,17 @@ namespace Armoury
 {
     /// <summary>
     /// TEMPO SWIATA (Jeff 31.08: "nasz czas leci x2 wzgledem zwyklego, bylo x4
-    /// - marsz i oblezenia trzeba uwzglednic"). Rok wydluzylismy do 168 dni,
+    /// - marsz i oblezenia trzeba uwzglednic"). Rok wydluzylismy (31.08 do 168 dni,
+    /// dzis 364 dni - Calendar.cs, WeeksPerSeason 13, jeden dzien to jeden dzien),
     /// ale mapa zostala vanillowa: armia robila ~340 km na dzien gry (skala
     /// z lore: Mur->Sunspear = 1012 jedn. = ~4800 km, czyli ~4.75 km/jedn.),
     /// Winterfell->Krolewska Przystan w 6.5 dnia zamiast ksiazkowego miesiaca.
     /// Dwa suwaki, oba domyslnie 50%:
     ///  - WorldPacePercent: predkosc BAZOWA kazdej partii x50% - po tym
-    ///    Winterfell->KP to ~13 dni ze 168-dniowego roku, czyli dokladnie
-    ///    lore'owy miesiac jako ulamek kalendarza; teren, ladunek, kary snu
+    ///    Winterfell->KP to ~13 dni (pomiar 31.08; przy 75% Jeffa ~8.7 dnia).
+    ///    Przy roku 168 bylo to "miesiac lore jako ulamek kalendarza"; przy roku
+    ///    364 ta zbieznosc nie zachodzi (E7/C: tekst MCM juz jej nie obiecuje) -
+    ///    suwak to po prostu predkosc bazowa; teren, ladunek, kary snu
     ///    i sufit kolumny licza sie dalej od wolniejszej bazy;
     ///  - SiegePacePercent: budowa machin obleczniczych x50% - oblezenia
     ///    trwaja ~2x dluzej, wiec glodzenie twierdzy wraca do gry.

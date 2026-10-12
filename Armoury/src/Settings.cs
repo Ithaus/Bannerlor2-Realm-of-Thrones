@@ -228,6 +228,8 @@ namespace Armoury
         public float HideoutReprisalRadius = 40f;          // map-distance within which bandit parties join the reprisal
         public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away
         public float HideoutReprisalHours = 48f;           // the horde hunts you this long - then gives up and drifts back to its old ways
+        // E7/C (227, PLAN 7.1, R4): jedna skala czasu - rozkaz pogoni odwetu odnawiany na zegarze gry (HideoutPurge.PursuitDue), nie co 3 s realne
+        public float HideoutPursuitHours = 0.5f;           // a reprisal band renews its chase every this many game hours, whatever the game speed (0 = the old every three real seconds)
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used
@@ -367,7 +369,7 @@ namespace Armoury
 
         // --- The marching column ---
         public bool MarchPaceEnabled = true;               // a column moves at the pace of its slowest man: any soldier or prisoner on foot holds the whole party to walking speed
-        public int WorldPacePercent = 50;                  // base map speed of EVERY party - 50% matches the doubled year: Winterfell to King's Landing takes a lore-true month of the 168-day calendar
+        public int WorldPacePercent = 50;                  // base map speed of EVERY party as a percent of the game's own (100 = unchanged) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it
         public bool TerrainEaseEnabled = true;             // replace the game's percentage terrain and night penalties with the flat map-speed penalties below (the vanilla share is shown undone in the tooltip, then ours applied)
         public float ForestSpeedPenalty = 0.10f;           // flat speed lost in forest (vanilla: 30% of your speed)
         public float DesertSpeedPenalty = 0.20f;           // flat speed lost in desert and dunes (vanilla: 10%)
