@@ -850,6 +850,9 @@ namespace Armoury
                             _camping.Remove(mp);
                             _bedPos.Remove(mp);
                             GiveOrderBack(mp);          // alarm w nocy - rozkaz wraca od reki
+                            // E7/O1 recenzja: faza snu odnawia termin AI przed czasem (zostaje do ok. 1 h) - bez tego obudzony przez wroga (karawana przed banda)
+                            // szedlby do celu z wylaczonym AI (bez oceny ucieczki); dotad termin mijal wlasnie o tej pelnej godzinie. Tylko nasz termin (<= 1.0 h).
+                            if (GateOn(s)) { try { WakeOurs(mp); } catch (Exception ex) { GuardStumble("DangerWake", mp, ex); } }
                             cause = "wrog";             // wrog blisko - zwijaja sie i ida
                         }
                     }
