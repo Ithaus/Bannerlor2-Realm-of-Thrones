@@ -179,6 +179,12 @@ Uzycie (Python 3, tylko odczyt):
                     (BRAK -); R2-1 linie "ERROR in DistrictRaid.R2" 0 i "okienko zawiodlo" 0; R2-2 sesje gracza w oknie (autotest gra AI: 0 - INFO, test Jeffa);
                     przy sesjach gracza: R2-3 sesje gracza z linii R1 ("gracz N") = zakonczone z linii R2, R2-4 wybory z okienka <= okienka otwarte; kroki, okienka,
                     "End Raiding", klucz zdjety - INFO. Bilans zlota, towaru i spichlerza rabunkow gracza - te same wiersze T1-T3 bloku etap7_r1 (jedna linia doby).
+                    Blok etap7_w4 (E7/W4, paczka 237 - wyglad spalonej wioski i napisy nad spalonymi): W4-0 linia startowa "Wioski - wyglad (E7/W4): start" (ostatnia
+                    mapa): wyglad CZYNNY, napisy CZYNNE, ksiega wiosek czynna (ksiega nieczynna - NIE); T1 w KAZDEJ linii stanu przebudowy obrazka <= zmiany stanu
+                    i pokazane + schowane + bez obrazka + polaczone + czeka = zmiany stanu (0 zmian - INFO); T1b najwiecej przebudow jednej wioski <= 20; W4-2
+                    ciemne obrazki maja przyciemnione encje (spalonych 0 - INFO); W4-3 napisow w kadrze 1-30 i przeliczenie pozycji < 0.3 ms/klatke (0 napisow -
+                    INFO); T4 potkniecia 0, linie "ERROR in MapVillagesView.Look* / Label*" 0, brak linii "BRAK prefabu" i "WYLACZONE do nastepnego wczytania";
+                    T2 zdjecie spalonej, T3 spadek klatek < 2% - tryb zdjec (DLL zdjec -p:W4Photo=true zglasza sie w linii startowej), poza narzedziem.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
@@ -7767,7 +7773,7 @@ def etap7_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     # scalenie zbior-5-8: obie galezie etapu 7 zbudowaly szkielet grupy; jeden szkielet, dwie konwencje wywolania (opis w docstringu)
     blocks = ([(b, False) for b in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2)]
-              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1, etap7_r2)])
+              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1, etap7_r2, etap7_w4)])
     for blk, by_win in blocks:   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             if by_win:
@@ -8249,6 +8255,94 @@ def etap7_w5(rep, lines, start, win, until=120, **kw):
             "INFO (po bitwie z proporczykami w poblizu > 0)", None)
     rep.add("E7/W5 T2: spadek klatek przy kamerze 30 / 60 / 90 i 0 / 40 / 80 proporczykach, plotno, puste flagi po bitwie", "poza narzedziem",
             "< 5% w trybie zdjec (inaczej VillagePennants domyslnie false)", None)
+
+
+def etap7_w4(rep, lines, start, win, until=120, **kw):
+    """E7/W4 (237, PLAN 7.10 b, projekt etapu 7 v2 rozdz. 3 "E7/W4"): linia startowa "Wioski - wyglad (E7/W4): start" (pierwszy tick widoku wiosek na
+    mapie - raz na mape / wczytanie) i linia stanu "Wioski - wyglad (E7/W4): przebudowy obrazka ..." (co 2 minuty przy zmianie i na koniec mapy; liczniki
+    od wczytania mapy). Widok mapy nie ma doby - progi z calego logu. Wiazace: T1 (kazda przebudowa obrazka ma swoja zmiane stanu, zadna wioska nie miga),
+    W4-3 (napisy <= 30, przeliczenie pozycji), T4 (potkniecia 0). T2 (zdjecie spalonej wioski) i T3 (spadek klatek z napisami < 2%) - tryb zdjec, poza
+    narzedziem; DLL zdjec (-p:W4Photo=true) zglasza sie w linii startowej."""
+    starts = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): start")]
+    rows = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): przebudowy obrazka")]
+    if not starts and not rows:
+        rep.add("E7/W4: linie Wioski - wyglad (E7/W4)", "brak w logu",
+                "sa od wgrania E7/W4 przy czynnych wioskach na mapie (MapVillagesEnabled, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        look, lbl, book = "wioski CZYNNY" in s, "spalonymi CZYNNE" in s, "ksiega wiosek czynna" in s
+        rep.add("E7/W4 W4-0: klucze i ksiega wiosek (ostatnia mapa)",
+                f"wyglad {'CZYNNY' if look else 'wylaczony'}, napisy {'CZYNNE' if lbl else 'wylaczone'}, ksiega {'czynna' if book else 'NIECZYNNA'}",
+                "wyglad CZYNNY, napisy CZYNNE, ksiega czynna (klucz zdjety - INFO: proba wylacznika; ksiega nieczynna - NIE, bez niej nie ma spalonych)",
+                True if (look and lbl and book) else (False if not book else None))
+        lv = re.search(r"wiosek poziomu 2 w pliku (\d+), poziomu 3 (\d+) z (\d+)", s)
+        if lv:
+            rep.add("E7/W4: wioski, ktore moga zmalec (poziom 2 i 3 w pliku)", f"poziom 2: {lv.group(1)}, poziom 3: {lv.group(2)} z {lv.group(3)}",
+                    "INFO (poziom 1 nie maleje - u tych wiosek zmienia sie tylko wyglad spalonej)", None)
+        if "KOMPILACJA ZDJEC" in s:
+            rep.add("E7/W4: DLL zdjec (W4_PHOTO)", "TAK - pierwsza wioska kazdego okregu pokazana jako spalona",
+                    "tylko bieg zdjec; ten DLL NIE idzie do biegu A ani do Jeffa", None)
+    else:
+        rep.add("E7/W4 W4-0: linia startowa", "brak", "jest przy pierwszym ticku widoku wiosek na mapie", None)
+    for key, what in (("wyglad malejacej i spalonej wioski wylaczony w MCM", "BurnedVillageLook"), ("napisy nad spalonymi wylaczone w MCM", "BurnedVillageLabels")):
+        off = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): " + key)]
+        if off:
+            rep.add(f"E7/W4: wylacznik {what} w biegu", f"wylaczen {len(off)}", "INFO (proba wylacznika albo bisekcja)", None)
+    if not rows:
+        rep.add("E7/W4 T1: linia stanu", "brak", "co 2 minuty przy zmianie i na koniec mapy", None)
+        return
+
+    def g(pat, s):
+        return num(pat, s, int, 0) or 0
+
+    def parts_of(s):
+        return (g(r"; pokazane (\d+)", s), g(r"schowane do nastepnego pokazania (\d+)", s), g(r"bez obrazka (\d+)", s),
+                g(r"polaczone (\d+)", s), g(r"czeka (\d+)", s))
+
+    bad, worst, top = [], 0, None
+    for s in rows:
+        n, m = g(r"przebudowy obrazka (\d+) \(zmiany stanu", s), g(r"zmiany stanu (\d+);", s)
+        if n > m or sum(parts_of(s)) != m:
+            bad.append((n, m))
+        worst = max(worst, g(r"najwiecej przebudow jednej wioski (\d+)", s))
+        if top is None or m >= top[1]:
+            top = (n, m, s)
+    n, m, s = top
+    pp = parts_of(s)
+    detail = (f"przebudowy {n}, zmiany stanu {m} (pokazane {pp[0]}, schowane {pp[1]}, bez obrazka {pp[2]}, polaczone {pp[3]}, czeka {pp[4]});"
+              f" linii zlych {len(bad)} z {len(rows)}")
+    rep.add("E7/W4 T1: przebudowy obrazka wobec zmian stanu ksiegi (linia z najwieksza liczba zmian)", detail,
+            "przebudowy <= zmiany stanu i skladniki = zmiany stanu w KAZDEJ linii (0 przebudow bez zmiany); 0 zmian w biegu - INFO",
+            (not bad) if m > 0 else (None if not bad else False))
+    rep.add("E7/W4 T1b: najwiecej przebudow jednej wioski (obrazek nie miga)", str(worst), "<= 20 na mape (poziom w dol / w gore, spalona, odbudowa)",
+            worst <= 20 if m > 0 else None)
+    burned = max(g(r"spalonych w ksiedze (\d+)", x) for x in rows)
+    dark = max(g(r"ciemny obrazek stoi (\d+)", x) for x in rows)
+    smoke = max(g(r"dym nad spalonymi (\d+)", x) for x in rows)
+    small = max(g(r"mniejszych (\d+)", x) for x in rows)
+    built = max(g(r"ciemnych obrazkow od wczytania (\d+)", x) for x in rows)
+    tint = max(g(r"encji przyciemnionych (\d+)", x) for x in rows)
+    rep.add("E7/W4 W4-2: spalone w ksiedze widziane przez widok, ciemne obrazki, dym, mniejsze (najwiecej w linii mapy)",
+            f"spalonych {burned}, ciemny obrazek {dark}, dym {smoke}, mniejszych {small}; ciemnych obrazkow od wczytania {built} (encji {tint})",
+            "ciemny obrazek ma przyciemnione encje (ciemnych > 0 => encji > 0); spalonych 0 - INFO (T2 wtedy z DLL zdjec)",
+            (tint > 0) if built > 0 else None)
+    lmax = max(g(r"napisy w kadrze teraz \d+, maks\. (\d+)", x) for x in rows)
+    fr = max(g(r"klatek z napisami (\d+)", x) for x in rows)
+    ms = max([num(r"przeliczenie pozycji sr\. ([0-9.]+) ms/klatke", x, float, 0.0) or 0.0 for x in rows] or [0.0])
+    rep.add("E7/W4 W4-3: napisy nad spalonymi w kadrze (najwiecej w biegu) i przeliczenie pozycji",
+            f"maks. {lmax}, sr. {ms:.4f} ms/klatke (klatek z napisami najwiecej {fr})",
+            "1-30 napisow i < 0.3 ms/klatke (2% klatki przy 60/s); 0 napisow = kamera nie zjechala ponizej 90 przy spalonej wiosce - INFO",
+            (1 <= lmax <= 30 and ms < 0.3) if lmax > 0 else None)
+    st = max(g(r"potkniecia: wyglad (\d+)", x) for x in rows)
+    sl = max(g(r"potkniecia: wyglad \d+, napisy (\d+)", x) for x in rows)
+    err = [x for x in lines if x.startswith(("ERROR in MapVillagesView.Look", "ERROR in MapVillagesView.Label"))]
+    lost = [x for x in lines if x.startswith("Wioski - wyglad (E7/W4):") and ("BRAK prefabu" in x or "WYLACZONE do nastepnego wczytania" in x)]
+    rep.add("E7/W4 T4: potkniecia wygladu i napisow (najwiecej w linii mapy), linie ERROR, napisy zgaszone / brak prefabu",
+            f"wyglad {st}, napisy {sl}, linii ERROR {len(err)}, napisy zgaszone albo brak prefabu {len(lost)}",
+            "0 (brak prefabu = katalog GUI\\Prefabs nie wgrany razem z DLL)", st == 0 and sl == 0 and not err and not lost)
+    rep.add("E7/W4 T2 / T3: zdjecie spalonej wioski (ciemna, bez detali, dym, napis), spadek klatek z napisami", "poza narzedziem",
+            "tryb zdjec: wyglad czytelny, klik i dymek mapy pod napisem dzialaja, spadek klatek < 2%", None)
 
 
 def etap7_d0(rep, lines, start, win, until=120, **kw):

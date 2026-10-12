@@ -1562,6 +1562,11 @@ namespace Armoury
         // E7/W5 (238, PLAN 7.9 c, R17): proporczyk pana nad wioskami z bliska (MapVillagePennants.cs: kamera z <= 90, najblizsze 80, budowa 12 na cwierc sekundy,
         // kod herbu raz na sekunde, przebudowa po misji); off = zdjete od razu. Prog autotestu: spadek klatek > 5% w trybie zdjec = domyslnie false
         public bool VillagePennants = true;                // the lord's pennant flies over villages close to the camera
+        // E7/W4 (237, PLAN 7.10 b, R10/R17, Jeff L): wyglad wioski wedlug ksiegi wiosek (MapVillageLook.cs) - poziom obrazka nizszy od 1/3 i 2/3 pustych osad, spalona w ksiedze
+        // (od 50% osad) bez detali, ciemna, z dymem w rabunku i czujnosci; przebudowa obrazka tylko przy zmianie stanu. Napisy "X has been burned" tylko nad spalonymi,
+        // z bliska (kamera z <= 90, najwyzej 30), wlasna warstwa bez wejscia i fokusu (prefab GUI\Prefabs\ArmBurnedVillageLabels.xml). Off = obrazki i mapa jak dotad
+        public bool BurnedVillageLook = true;              // a village shrinks as its settlements empty, and a burned one stands dark
+        public bool BurnedVillageLabels = true;            // "X has been burned" over burned villages, close up only
         // --- Map roads (test) ---
         // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
         // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)

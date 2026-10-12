@@ -4908,6 +4908,14 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillagePennants { get; set; } = true;
 
+        [SettingPropertyBool("Burned Village Look", HintText = "a village shrinks as its settlements empty, and a burned one stands dark")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool BurnedVillageLook { get; set; } = true;
+
+        [SettingPropertyBool("Burned Village Labels", HintText = "'X has been burned' over burned villages, close up only")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool BurnedVillageLabels { get; set; } = true;
+
         [SettingPropertyBool("Map Roads Probe Enabled", HintText = "TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn")]
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
@@ -6138,6 +6146,8 @@ namespace Armoury
             s.VillageTipLore = VillageTipLore;
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
+            s.BurnedVillageLook = BurnedVillageLook;
+            s.BurnedVillageLabels = BurnedVillageLabels;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
         }
 

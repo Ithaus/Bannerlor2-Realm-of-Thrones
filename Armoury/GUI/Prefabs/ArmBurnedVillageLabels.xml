@@ -1,0 +1,30 @@
+<Prefab>
+  <Constants>
+  </Constants>
+  <VisualDefinitions>
+  </VisualDefinitions>
+  <Window>
+    <!-- Armoury E7/W4 (237): napisy "X has been burned" nad spalonymi wioskami na mapie (MapVillageLook.cs, VM MapBurnedLabelsVM - stala pula 30 napisow).
+         Caly ekran BEZ zdarzen: korzen DoNotAcceptEvents + DoNotPassEventsToChildren - GauntletLayer.HitTest zwraca false, wiec ScreenManager.FirstHitLayer
+         zostaje warstwa sceny (klik w mape i dymek pod napisem dzialaja). Napis: punkt 2x2 przesuwany w pikselach (ScaledPositionXOffset / YOffset, jak kursor
+         w Native GamepadCursor.xml), tekst wysrodkowany nad punktem (Widget.SetLayout: Center i Bottom licza sie takze dla dziecka wiekszego od rodzica).
+         Pedzel Map.Tracker.Name (SandBox Nameplates.xml - nazwy sledzonych partii na mapie). -->
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+      <Children>
+
+        <Widget DataSource="{Labels}" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+          <ItemTemplate>
+
+            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="2" SuggestedHeight="2" HorizontalAlignment="Left" VerticalAlignment="Top" ScaledPositionXOffset="@X" ScaledPositionYOffset="@Y" IsVisible="@IsShown" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+              <Children>
+                <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center" VerticalAlignment="Bottom" Brush="Map.Tracker.Name" Text="@Text" DoNotAcceptEvents="true" />
+              </Children>
+            </Widget>
+
+          </ItemTemplate>
+        </Widget>
+
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>
