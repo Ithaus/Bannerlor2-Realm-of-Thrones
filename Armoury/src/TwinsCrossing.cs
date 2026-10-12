@@ -21,7 +21,8 @@ namespace Armoury
     ///    inna liczba lukow = licznik wylaczony z napisem "BRAK OSI" (bez wywrotki; wzorce okregow r 3-6 w linii startowej - do poprawki promienia z dowodu).
     /// 2. Raz na godzine gry (HourlyTickEvent): lokator mapy wokol bramy (MobileParty.StartFindingLocatablesAroundPosition, jak NightMarch.AlarmThreat) - tylko
     ///    partie w promieniu 8 od bramy, bez petli po MobileParty.All. Strona = znak odleglosci od osi (iloczyn wektorowy (pozycja - os) x kierunek rzeki);
-    ///    pas 0.5 jedn. przy osi (most, wieza) strony nie zmienia. Partia w osadzie (pozycja = brama) strony nie zmienia; partia na morzu - pominieta.
+    ///    pas 0.5 jedn. przy osi (most, wieza) strony nie zmienia. Partia w osadzie stoi na bramie (setter MobileParty.CurrentSettlement) - strona bramy, jak kazda
+    ///    pozycja (recenzja: wizyta z drugiego brzegu = zawsze dwa przejscia, nie 0 albo 2 wedlug trafienia probki w dojscie do bramy); partia na morzu - pominieta.
     /// 3. Pamiec: slownik partia -> ostatnia pewna strona i pozycja (tylko partie w strefie i czekajace w Bliznakach; wpis znika po wyjsciu albo smierci partii).
     ///    Przejscie = zmiana strony. Partia szybsza niz ok. 8 jedn./h moze przeskoczyc strefe miedzy probkami - licznik zaniza, nie zawyza.
     /// 4. Wejscia do osady (Measure169c.OnSettlementEntered, linia "(e) Bliznaki") zostaja obok (porownanie). CrossingLaw - bez zmian (etap 8).
@@ -227,13 +228,7 @@ namespace Armoury
                         Seen e;
                         bool had = _seen.TryGetValue(mp, out e);
                         e.Stamp = _stamp;
-                        if (mp.CurrentSettlement != null)
-                        {
-                            // w osadzie pozycja = brama - strona bez zmian (wyjscie po drugiej stronie policzy sie przy pierwszej probce za osada)
-                            if (!had) { e.Side = 0; e.Pos = pos; }
-                            _seen[mp] = e;
-                            continue;
-                        }
+                        // partia w osadzie: pozycja = brama osady (gra), strona liczona jak kazda inna pozycja
                         float d = SD(pos);
                         sbyte side = d > DeadBand ? (sbyte)1 : (d < -DeadBand ? (sbyte)-1 : (sbyte)0);
                         if (side != 0)
@@ -271,7 +266,7 @@ namespace Armoury
             var ir = mp.ItemRoster;
             int animals = mp.Party.NumberOfMenWithHorse + ir.NumberOfMounts + ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals;
             long toll = (long)TollMan * men + (long)TollAnimal * animals;
-            if (mp.IsMainParty) { _player++; _tollPlayer += toll; }
+            if (mp.IsMainParty) { _player++; if (!OwnRealm(mp.ActualClan)) _tollPlayer += toll; }   // gracz w krolestwie pana - bez myta, jak inne rody tego krolestwa
             else if (mp.IsCaravan) { _car++; _carGold += mp.PartyTradeGold; _carMen += men; _carAnimals += animals; _tollCar += toll; }
             else if (mp.IsVillager) { _vil++; _tollVil += toll; }
             else if (mp.IsLordParty) { if (OwnRealm(mp.ActualClan)) _clanOwn++; else { _clanForeign++; _tollClan += toll; } }
