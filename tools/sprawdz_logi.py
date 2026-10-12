@@ -6328,11 +6328,17 @@ def etap7_t(rep, lines, start, until, logp=None, csp=None):
     df_, dpl, n3, n4 = wavg("ponizej:Dorne pustynia/rownina", w31)
     f3 = lambda v: f"{v:.3f}" if v is not None else "-"
     ok3 = None
+    near3 = False
     if nf is not None and npl is not None and df_ is not None and dpl is not None:
         ok3 = (nf < npl) and (df_ <= dpl)
+        # recenzja E7/T: przy kluczu on Dorne z cecha ma na pustyni te sama predkosc co na rowninie (oczekiwana roznica 0), Polnoc w lesie ok. -1.5%;
+        # srednie z roznych partii i godzin (ladunek, pogoda, pora) rozjezdzaja sie o 1-2% w obie strony, wiec scisly prog bylby rzutem moneta.
+        # Chybienie w granicy 2% = DECYZJA (ocenic z T1), nie NIE; stara regula daje +12% / +5%, wiec ta granica nadal ja odroznia
+        near3 = (not ok3) and nf <= npl * 1.02 and df_ <= dpl * 1.02
     rep.add("E7/T T3: ponizej sufitu MarchPace - karawany i wozy wsi (d31-okno, srednie wazone)",
             f"Polnoc las/rownina {f3(nf)}/{f3(npl)} (n {n1}/{n2}), Dorne pustynia/rownina {f3(df_)}/{f3(dpl)} (n {n3}/{n4})",
-            "Polnoc las < rownina, Dorne pustynia <= rownina (klucz on; off - spodziewane odwrotnie)", ok3 if on else None)
+            "Polnoc las < rownina, Dorne pustynia <= rownina (klucz on; off - spodziewane odwrotnie; chybienie do 2% - DECYZJA: rozrzut skladu probek, ocenic z T1)",
+            ok3 if on else None, decide=near3)
     lf, lpl, m1, m2 = wavg("Polnoc las/rownina", w31)
     ld, ldp, m3, m4 = wavg("Dorne pustynia/rownina", w31)
     caps = [fnum(r"na suficie MarchPace ([0-9.]+)%", kt[d]) for d in w31]
