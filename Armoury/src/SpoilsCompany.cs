@@ -277,7 +277,9 @@ namespace Armoury
         {
             try
             {
-                if (__0 == null || __6 == null || !IsSpoilsClan(__0.ActualClan) || __6.ToString() != "VolunteerFromMap") return true;
+                if (__0 == null || __6 == null) return true;
+                if (!IsSpoilsClan(__0.ActualClan)) { MercFeast.NoteRecruit(__0, __4, __6); return true; }   // E8/G2 (261): ochotnicy z mapy u pozostalych klanow najemnikow - tylko licznik, gra jak dotad
+                if (__6.ToString() != "VolunteerFromMap") return true;
                 int b = On ? 0 : 1;
                 _mapTimes[b]++; _mapMen[b] += Math.Max(0, __4);
                 return b == 1;
@@ -407,14 +409,20 @@ namespace Armoury
 
         /// <summary>Prefiks BK ConvertTroopsMercenaries(klan): przy wlaczniku dla klanu Spoils nie zachodzi - przywodca zostaje w swojej
         /// druzynie, zwerbowani zostaja tymi, kogo zwerbowano, zolnierz z niczego nie powstaje. Inne klany i wlacznik NIE - BK jak dotad
-        /// (przy NIE tylko pomiar: bohaterowie w druzynach klanu przed zamiana).</summary>
-        public static bool BkConvertPrefix(Clan __0, out int __state)
+        /// (przy NIE tylko pomiar: bohaterowie w druzynach klanu przed zamiana).
+        /// E8/G2 (261): pozostale klany najemnikow - MercFeast.ConvertClan (klucz MercClansRealSoldiers): w krolestwie zamiana 1:1 jak BK, ale bez bohaterow,
+        /// bez krolestwa nic; metoda BK wtedy nie biegnie. Jeden prefiks na tej metodzie (projekt etapu 8 rozdz. 5.1).</summary>
+        public static bool BkConvertPrefix(object __instance, Clan __0, out int __state)
         {
             __state = -1;
             try
             {
                 if (__0 == null) return true;
-                if (!IsSpoilsClan(__0)) { Stage8World.MercBefore(__0); return true; }   // E8/P3 (245): pozostale klany najemnikow - tylko pomiar (stan druzyn przed zamiana BK), BK jak dotad
+                if (!IsSpoilsClan(__0))
+                {
+                    Stage8World.MercBefore(__0);                 // E8/P3 (245): pomiar - stan druzyn przed zamiana (postfiks liczy skutek, takze naszej zamiany)
+                    return MercFeast.ConvertClan(__instance, __0);   // E8/G2 (261): true = BK jak dotad (nie najemnicy albo klucz wylaczony), false = zamiana zrobiona u nas
+                }
                 if (On) { _bkSkipped++; return false; }
                 __state = HeroesInParties(__0);
             }

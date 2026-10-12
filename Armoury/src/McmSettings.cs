@@ -988,6 +988,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PactCostToOtherRealm { get; set; } = true;
 
+        [SettingPropertyBool("Merc Clans Real Soldiers", HintText = "the sellsword clans of the world keep their captains and get no men out of thin air: every day Banner Kings threw each hero of a hired mercenary clan out of his own warband and put a soldier made from nothing in his place, and it would hand a clan without a contract 3 to 5 free men per warband. With this on the heroes stay, hired men of other stock are still turned one for one into the clan's own troops as Banner Kings does, and nobody is added from nothing. Your Spoils of War company has its own switch. Off = as Banner Kings does")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool MercClansRealSoldiers { get; set; } = true;
+
+        [SettingPropertyBool("Feast No Free Goods", HintText = "the food and drink a Banner Kings feast buys really leave the town market: Banner Kings put the bought goods into the feast's larder and then added the same amount to the market stalls again instead of taking it off, so every purchase made goods out of thin air twice over. Off = as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool FeastNoFreeGoods { get; set; } = true;
+
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool FieldCraftEnabled { get; set; } = true;
@@ -5166,6 +5174,8 @@ namespace Armoury
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
             s.FeastTownGetsPaid = FeastTownGetsPaid;
             s.PactCostToOtherRealm = PactCostToOtherRealm;
+            s.MercClansRealSoldiers = MercClansRealSoldiers;
+            s.FeastNoFreeGoods = FeastNoFreeGoods;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;

@@ -196,6 +196,10 @@ Uzycie (Python 3, tylko odczyt):
                     ponizej zapasu przez nasza wyplate 0, kiesy karawan d120 +-20% Z33, wizyty i zakupy INFO; G1-6 (recenzja) miasta bez rudy w dobach
                     91-120 <= 1.25 x Z33 (dowoz kontraktami 174.2 bierze karawane stojaca w zrodle), kontrakty i "brak karawany w zrodle" INFO;
                     G1-K potkniecia i "ERROR in CaravanFlow.*" 0.
+                    Blok etap8_g2 (E8/G2, paczka 261 - najemnicy i uczta BK, MercFeast.cs): G2-0 latki wpiete N/N i tresc metody BK zgodna ze sprawdzona,
+                    linia "Najemnicy i uczta BK (E8/G2)" w kazdej dobie okna, oba klucze czynne; G2-1 bohaterowie zamienieni 0 i ludzie dosypani 0
+                    (pomiar E8/P3), rozjazd liczby ludzi 0, cien 0; G2-1b wywolania klanow w sluzbie >= 50% klano-dob; G2-2 INFO wielkosc druzyn,
+                    zamiana 1:1, ochotnicy z mapy gry; G2-3 uczta: towar z niczego 0, rynek nie traci ponad zakup; G2-K potkniecia i "ERROR in MercFeast.*" 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8802,6 +8806,121 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rep.add("G1-K: kontrola (potkniecia, linie ERROR in CaravanFlow.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
 
 
+# E8/G2 (261): blok etap8_g2 - najemnicy i uczta BK (MercFeast.cs)
+E8_G2_DAY = "Najemnicy i uczta BK (E8/G2): dzien"
+
+
+def etap8_g2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/G2 (261, projekt etapu 8 v2 rozdz. 3 "E8/G2" Test; odpowiedz Jeffa 4: TAK): klany najemnikow bez ludzi z niczego i bez wyrzucania wodza (zamiana
+    BK ConvertTroopsMercenaries robiona u nas, bez bohaterow) i uczta BK bez towaru z niczego (zakup schodzi z rynku). Linia doby "Najemnicy i uczta BK
+    (E8/G2): dzien N" (dzien ksiegi, jak "Najemnicy BK (E8/P3)").
+    G2-0 latki wpiete N/N i tresc metody BK zgodna ze sprawdzona (dlugosc IL), linia w kazdej dobie okna (bez pierwszej i ostatniej), oba klucze czynne;
+    G2-1 bohaterowie zamienieni 0 i ludzie dosypani 0 (pomiar E8/P3 - linia "Najemnicy BK (E8/P3)", suma okna), rozjazd liczby ludzi przy zamianie 1:1 = 0,
+    wywolania w cieniu 0; G2-1b zamiana czynna: wywolania klanow w sluzbie >= polowa klano-dob w sluzbie (0 przy klanach w sluzbie = latka omijana);
+    G2-2 INFO wielkosc druzyn klanow (pierwsza i ostatnia doba), zolnierze zamienieni 1:1, bohaterowie zostawieni, ochotnicy z mapy gry (poza paczka);
+    G2-3 uczta: towar z niczego po calosci 0 i rynek nie stracil ponad zakup (suma okna; bez zakupow w oknie - INFO); G2-3b INFO zakupy uczt;
+    G2-K potkniecia i linie "ERROR in MercFeast.*" 0."""
+    rows = {d: s for d, s in by_day(lines, E8_G2_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Najemnicy i uczta BK (E8/G2): latki przy starcie gry")]
+    if not rows and not wire:
+        rep.add("E8/G2: linie Najemnicy i uczta BK (E8/G2)", "brak w logu", "sa od wgrania E8/G2 (MercFeast.cs)", None)
+        return
+    # ---------------- G2-0: latki, tresc metody BK, linia, klucze
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("G2-0: latki (prefiks na BK ConvertTroopsMercenaries, metoda szansy BK, okno uczty na Feast.Automanage) i tresc metody BK", w0[:260],
+                "wpiete N/N, BRAK: -, tresc BK zgodna ze sprawdzona",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0 and "zgodna ze sprawdzona" in w0)
+    else:
+        rep.add("G2-0: latki", "brak linii startowej", "wpiete N/N", False)
+    if not rows:
+        rep.add("G2-0b: linia Najemnicy i uczta BK (E8/G2)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    first, last = rows[days[0]], rows[days[-1]]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_m = [d for d in days if "(Merc Clans Real Soldiers WYLACZONE)" in rows[d]]
+    off_f = [d for d in days if "(Feast No Free Goods WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    if off_m:
+        val += f"; Merc Clans Real Soldiers WYLACZONE w {len(off_m)} dobach"
+    if off_f:
+        val += f"; Feast No Free Goods WYLACZONE w {len(off_f)} dobach"
+    rep.add("G2-0b: linia Najemnicy i uczta BK (E8/G2) w kazdej dobie okna, oba klucze czynne", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_m and not off_f) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- G2-1: bohaterowie zamienieni 0, dosypani 0
+    p3 = {d: s for d, s in by_day(lines, "Najemnicy BK (E8/P3): dzien").items() if 1 <= run_day(d, start) <= until}
+    drift, sh_calls, sh_her = tot(r"rozjazd liczby ludzi (\d+)"), tot(r"BK jak dotad\): wywolan (\d+)"), tot(r"bohaterow do zamiany (\d+)")
+    own = f"linia E8/G2: rozjazd liczby ludzi przy zamianie 1:1 {drift}, w cieniu wywolan {sh_calls} (bohaterow do zamiany {sh_her})"
+    if p3:
+        h3 = sum(num(r"bohaterow zamienionych na zolnierza z niczego (\d+)", s, int, 0) or 0 for s in p3.values())
+        a3 = sum(num(r"ludzi dosypanych z niczego (\d+)", s, int, 0) or 0 for s in p3.values())
+        c3 = sum(num(r"wywolan (\d+) \(w sluzbie", s, int, 0) or 0 for s in p3.values())
+        rep.add("G2-1: klany najemnikow - bohaterowie zamienieni na zolnierza z niczego i ludzie dosypani z niczego (pomiar E8/P3, suma okna)",
+                f"bohaterow zamienionych {h3}, ludzi dosypanych {a3} (wywolan zmierzonych {c3}, linii {len(p3)}); " + own,
+                "0 i 0; rozjazd 0; w cieniu 0", h3 == 0 and a3 == 0 and drift == 0 and sh_calls == 0)
+    else:
+        rep.add("G2-1: klany najemnikow - bohaterowie zamienieni i ludzie dosypani z niczego",
+                "brak linii Najemnicy BK (E8/P3) - pomiar wylaczony (Stage8WorldLog); " + own,
+                "0 i 0 w pomiarze E8/P3; rozjazd 0; w cieniu 0", False if (drift or sh_calls) else None)
+    calls, c_k = tot(r"nasza zamiast BK (\d+) razy"), tot(r"nasza zamiast BK \d+ razy \(w sluzbie (\d+)")
+    c_f = tot(r"nasza zamiast BK \d+ razy \(w sluzbie \d+, bez sluzby (\d+)\)")
+    svc_days = tot(r"w sluzbie krolestwa (\d+)")
+    if svc_days > 0:
+        rep.add("G2-1b: zamiana czynna - wywolania klanow najemnikow w sluzbie wobec klano-dob w sluzbie",
+                f"wywolan w sluzbie {c_k} przy {svc_days} klano-dobach w sluzbie ({100.0 * c_k / svc_days:.0f}%); bez sluzby {c_f} (galaz BK martwa - oczekiwane 0)",
+                ">= 50% klano-dob (BK wola metode raz na dobe dla klanu w krolestwie z wodzem; 0 = latka omijana)", c_k * 2 >= svc_days)
+    else:
+        rep.add("G2-1b: zamiana czynna", f"brak klanow najemnikow w sluzbie w calym oknie (wywolan {calls}) - zamiana nie miala okazji", "INFO", None)
+
+    # ---------------- G2-2: INFO wielkosc druzyn
+    def state(s):
+        g = re.search(r"bez klanu Spoils\) (\d+), w sluzbie krolestwa (\d+), bez sluzby \d+; druzyn (\d+) \(w sluzbie (\d+)\), ludzi (\d+), bohaterow w druzynach (\d+)"
+                      r" \(w sluzbie (\d+)\), wodzow prowadzacych druzyne (\d+) z \d+ \(w sluzbie (\d+) z \d+\)", s)
+        if not g:
+            return "brak stanu w linii"
+        c, k, p, pk, m, h, hk, ld, ldk = (int(x) for x in g.groups())
+        return f"klanow {c} (w sluzbie {k}), druzyn {p} (w sluzbie {pk}), ludzi {m}, bohaterow {h} (w sluzbie {hk}), wodz prowadzi {ld} (w sluzbie {ldk})"
+    rep.add("G2-2: wielkosc druzyn klanow najemnikow (pierwsza -> ostatnia doba okna)",
+            f"d{run_day(days[0], start)}: {state(first)} -> d{run_day(days[-1], start)}: {state(last)}",
+            "INFO (mniejsze druzyny bez sluzby sa zamierzone - bez doplat)", None)
+    sw, kept = tot(r"zolnierzy zamienionych 1:1 na szablon klanu (\d+)"), tot(r"bohaterow zostawionych w druzynach (\d+)")
+    free_p, no_tpl, no_to, no_luck = tot(r"niezaszla w (\d+) druzynach"), tot(r"bez szablonu (\d+)"), tot(r"bez wzorca zamiany (\d+)"), tot(r"pominiete (\d+)")
+    v_t, v_m = tot(r"tylko licznik\): (\d+) razy"), tot(r"tylko licznik\): \d+ razy / (\d+) ludzi")
+    rep.add("G2-2b: zamiana 1:1 i bohaterowie (suma okna; na dobe)",
+            f"zolnierzy zamienionych 1:1 {sw} ({sw / n:.1f}/d), bohaterow zostawionych {kept} ({kept / n:.1f}/d - tylu BK zamienialby co dobe na zolnierza z niczego)"
+            f"; dosypka BK bez sluzby niezaszla w {free_p} druzynach; bez szablonu {no_tpl}, bez wzorca {no_to}, szansa BK ponizej 1: {no_luck}",
+            "INFO", None)
+    rep.add("G2-2c: ochotnicy z mapy gry u klanow najemnikow (poza paczka - ludzie bez pochodzenia u klanu bez sluzby)",
+            f"{v_t} razy / {v_m} ludzi ({v_m / n:.1f}/d)", "INFO (do decyzji: ta sama blokada co klan Spoils)", None)
+    # ---------------- G2-3: uczta
+    g_calls, g_buys = tot(r"zakupy BK Automanage (\d+) razy"), tot(r"razy \(z towarem (\d+)\)")
+    g_in, g_bk, g_out = tot(r"do spizarni (\d+) szt\."), tot(r"BK dopisal rynkowi (\d+) szt\."), tot(r"zdjete z rynku (\d+) szt\.")
+    g_free, g_lost = tot(r"towar z niczego po calosci (\d+) szt\."), tot(r"rynek stracil ponad zakup (\d+) szt\.")
+    g_odd, g_short, g_nor = tot(r"rynek zmieniony bez zakupu (\d+)"), tot(r"rynek mial mniej niz kupiono (\d+)"), tot(r"bez rynku albo spizarni (\d+)")
+    rep.add("G2-3: uczta BK - towar z niczego po calosci i rynek ponad zakup (suma okna)",
+            f"z niczego {g_free} szt., rynek stracil ponad zakup {g_lost} szt.; zakupow z towarem {g_buys} z {g_calls} wywolan, do spizarni {g_in} szt.",
+            "0 i 0 (bez zakupow uczt w oknie - INFO)", (g_free == 0 and g_lost == 0) if g_buys > 0 else (None if g_free == 0 and g_lost == 0 else False))
+    rep.add("G2-3b: uczta BK - zakupy (suma okna; na dobe)",
+            f"do spizarni {g_in} szt. ({g_in / n:.1f}/d), BK dopisal rynkowi z niczego {g_bk} szt., zdjete z rynku {g_out} szt. (zakup + dopisek BK)"
+            f"; rynek zmieniony bez zakupu {g_odd}, rynek mial mniej niz kupiono {g_short}, bez rynku albo spizarni {g_nor}",
+            "INFO (zdjete = do spizarni + dopisek BK)", None)
+    # ---------------- G2-4 / G2-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("G2-4: koszt (zamiana, okno uczty, linia)", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in MercFeast."))
+    rep.add("G2-K: kontrola (potkniecia, linie ERROR in MercFeast.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8825,6 +8944,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_s)   # E8/S (246): porzadek stanu (osobna linia - czyste scalenie z lista drugiej galezi)
     blocks.append(etap8_q)   # E8/Q (262): straz przeprawy na zegarze gry
     blocks.append(etap8_g1)   # E8/G1 (260): karawany BK w miescie co godzine, wyspy bez drogi
+    blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
