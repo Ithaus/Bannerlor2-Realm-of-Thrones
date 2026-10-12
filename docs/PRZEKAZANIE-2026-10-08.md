@@ -1059,3 +1059,5 @@ drzewa czyste (git status bez zmian poza build.log). Na koniec dokonczone tylko 
 
 **Decyzje Jeffa z 12.10 (wszystkie w STAN-PRAC):** caly kod 5-8, potem jeden test; ekonomia bez doplat; pan 45% / dziesiecina / 15%/d; ceny - poziom zostaje, odchylki w 8.5, dochody
 gracza 8.18; etap 7 - predkosc bez zmian, premia drog nie, Diplomacy 364 tak, myto - policzyc; etap 6 - hodowla tak, naprawy - ulamki w pamieci; rod szlachty BK - 0; etap 8 - odpowiedzi 1-11.
+- (19:50 UTC 12.10) **OSTATNI STAN:** recenzja E8/M ZROBIONA (`w-toku/e8-b` 9237d23, bez poprawek). Recenzja E8/0 PRZERWANA przed zmianami (drzewo e8\a czyste, HEAD 8a8df38) -
+  **drugie konto: najpierw recenzja E8/0** (prompt recenzji jak w `docs/przekazanie/wf-e8-kod.js`), potem dalej wedlug listy w rozdz. 27. Wszystkie workflow i pushery tego konta zatrzymane.
