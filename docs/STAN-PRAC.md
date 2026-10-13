@@ -1622,3 +1622,13 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   (test\at-fin5-cien40.out.txt; pliki danych z MarriageFastShadow = true w SCRATCH\tmp\tree-cien) -> BIEG ROCZNY 364 doby calosci z regulami czynnymi (test\at-fin5-rok364.out.txt;
   Armoury f2afb329 + CS-at-swaty 3da55349).** Po nim: progi (wojsko d337-364 cel 72-80 tys., zelazo, sluby/rok), zapis 9 dob, WGRANIE 37 (Armoury f2afb329 + CrashScribe 3ca8aa08 +
   CrashScribe.settings.xml), jesli 0 bledow i liczby nie gorsze.
+- (13:25 UTC 13.10 = 15:25 czasu polskiego; UWAGA: godziny wpisow z 13.10 powyzej oznaczone "UTC" to w praktyce czas polski, kolejnosc wpisow jest dobra) **PROJEKT OBIEGU KIESY LUDU
+  GOTOWY (bez kodu; wf_d4abe57d-6c8 / wfjdtpxt8):** `docs/kiesa-ludu/PROJEKT-OBIEG-KIESY-LUDU-2026-10-13.md` (sedzia; rozdz. 0 prostym jezykiem, rozdz. 8 paczki, rozdz. 9 progi,
+  rozdz. 11 pytania) + ROZPOZNANIE-OBIEG-KIESY + trzy projekty (WYDATKI, INWESTYCJE, POZYCZKI) - w repo, commit po ff7e490. WERDYKT: drabina nadwyzki - zapas ok. miesiaca zakupow
+  (nietykalny) -> zbytki z polki -> budowa wlasnego miasta -> w wojnie danina 2.5%/d z oszczednosci ponad zapas do korony, ktora tego dnia placi rodom. Wdrazanie od konca:
+  P1 (tor S) danina + pomiary -> P1b lojalnosc -> P2 lud buduje (bez "trzeciej dla pana") -> P3 lista dostatku -> P4 targ widzi sakiewke -> P5 podzamcza i wsie; pozyczka miejska,
+  karta, sakiewka turniejowa "na slowo Jeffa". Uczciwy skutek: lokata 23.8 -> ok. 3 mln, kiesy miast ok. 15-16 mln zamiast 36.5 mln, do panow 50-65 tys. zl/d, wojsko tylko +1.5-2.5 tys.
+  (wojsko odbudowuje runda 3). Regula koni roboczych (k13a 137dbc3) wchodzi dopiero z P1 i po biegu 120 dob z obiema. **CZEKA NA JEFFA: 6 pytan o kierunek (rozdz. 11) - podane mu
+  w czacie; KODU P1 NIE ZACZYNAC przed jego "tak".** Kolizje do sprawdzenia przed P1: rozdz. 10 pkt 11 (FolkSurplusSpendShare w Armoury.json Jeffa; kolejnosc danina / oferta).
+  W GRZE: lancuch z wpisu wyzej ruszyl 13:14 UTC (bieg cienia swatow 40 dob, potem bieg roczny 364 doby; koniec ok. 14:50 UTC). Limit 5 h: 83% (zeruje sie 15:50 UTC) - do tego czasu
+  bez nowych workflow; po biegu rocznym: progi, zapis 9 dob, WGRANIE 37.
