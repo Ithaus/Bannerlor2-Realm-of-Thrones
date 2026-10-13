@@ -210,7 +210,7 @@ namespace Armoury
                 else if (s == null || !s.BloomeryAtMine) st = "WYLACZONE (klucz Bloomery At Mine) - ruda 100 kg jak dotad"
                                                               + (_regime == RBloom && !_fresh ? "; UWAGA: ta kampania zaczela sie z lupami - klucz zdjety w trakcie kampanii, lupy licza sie teraz jak ladunki rudy" : "");
                 else if (!NewCampaign) st = "NIEAKTYWNE - stary zapis (kampania sprzed paczki): ruda 100 kg jak dotad";
-                else if (_regime == ROre && !_fresh) st = "NIEAKTYWNE - ta kampania zaczela sie bez lupy (klucz Bloomery At Mine wlaczony w trakcie kampanii): ruda 100 kg jak dotad, lupa od nowej kampanii";
+                else if (_regime == ROre && !_fresh) st = "NIEAKTYWNE - ta kampania zaczela sie bez lupy (w pierwszej sesji lupa nie weszla: klucz Bloomery At Mine, ceny historyczne albo przelicznik ladunku wlaczone dopiero w trakcie kampanii): ruda 100 kg jak dotad, lupa od nowej kampanii";
                 else if (!bulk) st = "NIEAKTYWNE - przelicznik ladunku 1 (ceny historyczne wylaczone albo HistBulkUnitFactor = 1)";
                 else st = "NIEAKTYWNE - brak latki " + (!_wired ? "ticku produkcji wsi (TickGoodProduction)" : "modelu produkcji wsi (MaterialLaw.ProdPostfix)");
                 Log.Info("Bloomery (E6/R1, 214): " + st + ".");
