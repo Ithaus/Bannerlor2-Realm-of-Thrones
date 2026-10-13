@@ -226,15 +226,19 @@
   <!-- Faster marriage search for AI lords (needs Realm of Thrones together with Banner Kings). Once a day Realm of
        Thrones looks for a match for every lord, and its code walks the whole list of adult heroes almost twice per
        lord - about one second of every in-game day. With this on, CrashScribe runs the same search in a single pass:
-       the same couples marry on the same day and the game's random numbers are used in exactly the same order, it
-       only takes less time. If the marriage rules in the game are not the known Realm of Thrones + Banner Kings ones,
+       the same rules and the same chances, it only takes less time. The couples are not the very ones Realm of
+       Thrones would have picked that day: Banner Kings itself draws a random number while it judges a couple, so
+       the random numbers come out in a different order - as they do between two play-throughs (measured in the
+       game on 13.10; outside the game the two searches gave identical couples).
+       If the marriage rules in the game are not the known Realm of Thrones + Banner Kings ones,
        or another mod changes them, the fast search stands aside and the original runs (one line in the CrashScribe log).
        Set MarriageFast to false to leave the search to Realm of Thrones (old behaviour). -->
   <MarriageFast>true</MarriageFast>
   <!-- Test switch for the search above. With this on, Realm of Thrones decides as before and the fast search only
        works out what it would have chosen from the same random state; one line a day in the CrashScribe log compares
-       the two (a difference count of 0 means identical results). Slower than either search alone - keep it off for
-       normal play. -->
+       the two. In the real game the count is not 0 (about a quarter of the clans a day differ in the random state),
+       because Banner Kings draws random numbers of its own while judging a couple - the line is a measuring tool,
+       not a pass mark. Slower than either search alone - keep it off for normal play. -->
   <MarriageFastShadow>false</MarriageFastShadow>
   <!-- Gameplay change, not a speed-up: AI lords only pick marriage candidates they can actually marry. Realm of
        Thrones picks one random candidate a day for every unmarried lord and only then asks for the marriage chance.

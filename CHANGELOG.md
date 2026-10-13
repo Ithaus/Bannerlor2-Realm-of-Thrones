@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (Z.3 SWATY ROT - pomiar w grze) - bieg cienia NIE daje 0 roznic: przyczyna zmierzona (BK zuzywa losowanie w ocenie szansy), opis w ustawieniach poprawiony; kod bez zmian
+**Mod:** CrashScribe (sam plik danych) | **Galaz:** `w-toku/zbior-e8` | **Pliki:** `CrashScribe/ModuleData/CrashScribe.settings.xml` (same komentarze przy `MarriageFast` i `MarriageFastShadow`), `CHANGELOG.md`. DLL bez zmian (CrashScribe 3ca8aa08).
+
+**Co zmierzone (13.10, trzy biegi nowej kampanii na probnej DLL z diagnostyka; logi sesji CrashScribe 06-14-40, 09-03-40, 09-10-31):**
+- Bieg cienia 40 dob: 13 303 wywolania rodu, 3 228 roznic stanu generatora (ok. 85 rodow z 330 na dobe; wynik "bez slubu / bez slubu" - rozny jest stan losowy, nie para). Oczekiwane 0 - NIESPELNIONE.
+- Pomiar 1 (ta sama nasza droga puszczona dwa razy z tego samego stanu generatora, potem oryginal): pierwsza proba rozna od drugiej w ok. 100 rodach na dobe; druga wobec oryginalu w 8-18 rodach na dobe. Czyli TEN SAM kod z TEGO SAMEGO stanu losowego zuzywa rozna liczbe krokow - stan zmienia sie miedzy probami (pamieci dnia modelu BK: `_spouseScoreCache`, `_isClanHeirCache`).
+- Pomiar 2 (migawka generatora wokol kazdego wywolania cudzego kodu): `IsCoupleSuitableForMarriage` 0 krokow w ok. 880 tys. ocen na dobe, `Hero.CanMarry` 0 krokow; **`NpcCoupleMarriageChance` (model BK) zuzywa 1 krok generatora gry w 130-156 wywolaniach na dobe** (takze przy wyniku 0).
+- Wniosek: dowod spoza gry ("te same pary, ten sam ciag losowy", 57 tys. wywolan, 0 roznic) jest prawdziwy dla samego ROT + BK na danych testu, ale w grze ocena szansy BK sama losuje. Nasza droga pomija te ocene dla lorda z zyjacym malzonkiem (szansa i tak 0), a pamieci dnia BK sprawiaja, ze nawet dwa przebiegi tej samej drogi roznia sie stanem. **Regula i szanse sa te same; pary w danym dniu nie sa tymi samymi, ktore wylosowalby sam ROT - tak jak roznia sie dwie rozgrywki.** Bieg cienia jest narzedziem pomiaru, nie progiem "0".
+- Bieg roczny z regulami czynnymi (364 doby, `MarriageOnlyViableCandidates` = true): 215 slubow AI-AI (przed zmiana 113 na rok), 0 bledow, czas swatow ok. 685 ms na dobe (oryginal ok. 1 450 ms).
+- Nie ustalone: ktore dokladnie wywolanie w BK losuje (do sprawdzenia przy okazji; nie zmienia wniosku). Komentarze w `Config.cs` i naglowku `MarriageFast.cs` dalej mowia "ten sam ciag losowy" - do poprawy przy najblizszej zmianie kodu CrashScribe (teraz nie ruszane, zeby wgrana DLL byla ta sama, ktora przeszla bieg roczny).
+
 ## 2026-10-13 (P3/WOJSKO - recenzja z poprawka) - 6 poprawek paczki sprawdzone niezaleznie; dopisany pomiar skutku W1 w zlocie i ludziach, wiersz narzedzia pilnuje, ze latka zadatku BK jest wolana
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (sama linia doby 180 - liczniki i tekst), `tools/sprawdz_logi.py` (tylko blok `etap8_p3woj`), `CHANGELOG.md`. Zachowanie gry bez zmian (sam log i narzedzie).
 
