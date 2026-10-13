@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -21,6 +23,7 @@ namespace Armoury
     /// Pamieci Needs / DayWageOf z projektu NIE MA (odstepstwo, CHANGELOG): proba poza gra - wzor liczy sie ok. 11 ns, odczyt pamieci ok. 10 ns, zysk ponizej szumu,
     /// a pamiec wymagalaby pilnowania 14 wejsc (ustawienia, wagi surowcow, lupa). Poziom plac miasta (K2-6) i dniowka licza sie wiec na zywo, jak dotad.
     /// R9: co 64. trafienie kazdej pamieci liczy tez stara droge i porownuje; rozjazd = wynik starej drogi, licznik, najwyzej 3 linie "ROZJAZD" w logu.
+    /// Recenzja E8/O2 (R9 "wynik i czas"): probka mierzy tez czas starej drogi i odczytu pamieci (powtorzony odczyt - sam pomiar); srednie w linii doby.
     /// Wyjatek w nowej drodze = potkniecie (licznik, jedna linia Log.Error) i wynik starej drogi dla tego wywolania - bez globalnego wylacznika.
     /// Linia doby (sam log) "Warsztaty bez powtorzen (E8/O2)"; stan czyszczony w WorkshopLaw.Reset (nowa kampania = nowe obiekty przedmiotow i typow warsztatow).
     /// Nic w zapisie, zadnego zlota ani sztuki. Tylko watek gry (jak caly WorkshopLaw).
@@ -40,6 +43,21 @@ namespace Armoury
         private static int _fLineHit, _fLineNew, _fFactorHit, _fFactorNew, _fForbidHit, _fForbidNew, _fProbes;
         private static int _fMismatch, _fMismatchLogged, _fStumbles, _fKeyMisSeen, _fKeyProbesSeen;
         private static bool _fErrLogged;
+        // recenzja E8/O2 (R9 "wynik i czas"): czas starej i nowej drogi w probkach doby - 0 nazwa linii, 1 mnoznik polki, 2 lista zakazanych (takty Stopwatch)
+        private static readonly long[] _fTOld = new long[3], _fTNew = new long[3];
+        private static readonly int[] _fTN = new int[3];
+
+        private static void FastTime(int k, long t0, long t1, long t2) { _fTOld[k] += t1 - t0; _fTNew[k] += t2 - t1; _fTN[k]++; }
+        private static void FastTimeClear() { Array.Clear(_fTOld, 0, 3); Array.Clear(_fTNew, 0, 3); Array.Clear(_fTN, 0, 3); }
+
+        /// <summary>Sredni czas probki "stara / nowa" w mikrosekundach ("- / -" bez probek).</summary>
+        private static string FastUs(long oldT, long newT, int n)
+        {
+            if (n <= 0) return "- / -";
+            double us = 1000000.0 / Stopwatch.Frequency;
+            var inv = CultureInfo.InvariantCulture;
+            return (oldT * us / n).ToString("0.000", inv) + " / " + (newT * us / n).ToString("0.000", inv);
+        }
 
         private static void FastStumble(string where, Exception e)
         {
@@ -60,7 +78,7 @@ namespace Armoury
         {
             _lineKeys.Clear(); _forbidMemo.Clear(); _forbidMemoSrc = null; _basketF.Clear();
             _fLineHit = _fLineNew = _fFactorHit = _fFactorNew = _fForbidHit = _fForbidNew = _fProbes = 0;
-            _fMismatch = _fMismatchLogged = _fStumbles = 0; _fErrLogged = false;
+            _fMismatch = _fMismatchLogged = _fStumbles = 0; _fErrLogged = false; FastTimeClear();
             WorkshopLineKeys.ClearDay(); _fKeyMisSeen = WorkshopLineKeys.Mismatches; _fKeyProbesSeen = WorkshopLineKeys.Probes;
         }
 
@@ -100,9 +118,13 @@ namespace Armoury
                     for (int i = 0; i < n; i++) if (!ReferenceEquals(m.Cats[i], outs[i].Item1)) { same = false; break; }
                     if (same)
                     {
-                        if ((++_fLineHit & 63) == 0)   // R9
+                        if ((++_fLineHit & 63) == 0)   // R9: wynik i czas
                         {
+                            long t0 = Stopwatch.GetTimestamp();
                             string old = LineKeyOld(p);
+                            long t1 = Stopwatch.GetTimestamp();
+                            LineMemo m2; _lineKeys.TryGetValue(outs, out m2);   // odczyt pamieci jeszcze raz - tylko pomiar czasu nowej drogi
+                            FastTime(0, t0, t1, Stopwatch.GetTimestamp());
                             _fProbes++;
                             if (!string.Equals(old, m.Key)) { FastMismatch("nazwa linii", "z pamieci \"" + m.Key + "\", stara droga \"" + old + "\""); m.Key = old; }
                         }
@@ -137,10 +159,14 @@ namespace Armoury
                 if (_basketF.TryGetValue(basket, out b))
                 {
                     f = b.F; d = b.D; sh = b.S;
-                    if ((++_fFactorHit & 63) == 0)   // R9
+                    if ((++_fFactorHit & 63) == 0)   // R9: wynik i czas
                     {
                         float f2 = 1f, d2 = 0f; int s2 = 0; bool ok = false;
+                        long t0 = Stopwatch.GetTimestamp();
                         try { if (SupplyDemand.Active) f2 = SupplyDemand.Factor(town.Settlement, it, false, out d2, out s2); ok = true; } catch { }
+                        long t1 = Stopwatch.GetTimestamp();
+                        BasketF b2; _basketF.TryGetValue(basket, out b2);   // odczyt pamieci jeszcze raz - tylko pomiar czasu nowej drogi
+                        FastTime(1, t0, t1, Stopwatch.GetTimestamp());
                         _fProbes++;
                         if (!ok || !f2.Equals(f) || !d2.Equals(d) || s2 != sh)
                         {
@@ -182,9 +208,13 @@ namespace Armoury
                 bool r;
                 if (_forbidMemo.TryGetValue(it, out r))
                 {
-                    if ((++_fForbidHit & 63) == 0)   // R9
+                    if ((++_fForbidHit & 63) == 0)   // R9: wynik i czas
                     {
+                        long t0 = Stopwatch.GetTimestamp();
                         bool old = Forbidden(it);
+                        long t1 = Stopwatch.GetTimestamp();
+                        bool r2; _forbidMemo.TryGetValue(it, out r2);   // odczyt pamieci jeszcze raz - tylko pomiar czasu nowej drogi
+                        FastTime(2, t0, t1, Stopwatch.GetTimestamp());
                         _fProbes++;
                         if (old != r) { FastMismatch("lista zakazanych", it.StringId + ": z pamieci " + r + ", stara droga " + old); _forbidMemo[it] = old; r = old; }
                     }
@@ -222,11 +252,15 @@ namespace Armoury
                              + " | mnoznik polki koszyka z pamieci " + _fFactorHit + " / liczony " + _fFactorNew
                              + " | lista zakazanych z pamieci " + _fForbidHit + " / liczona " + _fForbidNew
                              + " | probka 1/64 (stara i nowa droga): " + (_fProbes + WorkshopLineKeys.Probes - _fKeyProbesSeen) + ", rozjazdow od startu sesji " + _fMismatch
+                             + " | czas w probce, stara / nowa droga (us): klucz " + FastUs(WorkshopLineKeys.ProbeOldTicks, WorkshopLineKeys.ProbeNewTicks, WorkshopLineKeys.Probes - _fKeyProbesSeen)
+                             + ", nazwa linii " + FastUs(_fTOld[0], _fTNew[0], _fTN[0]) + ", mnoznik polki " + FastUs(_fTOld[1], _fTNew[1], _fTN[1])
+                             + ", zakazane " + FastUs(_fTOld[2], _fTNew[2], _fTN[2])
                              + " | potkniecia od startu sesji " + _fStumbles + ".");
                 }
             }
             catch (Exception e) { Log.Error("WorkshopLaw.DailyFast", e); }
             _fLineHit = _fLineNew = _fFactorHit = _fFactorNew = _fForbidHit = _fForbidNew = _fProbes = 0;
+            FastTimeClear();
             _fKeyProbesSeen = WorkshopLineKeys.Probes;
             WorkshopLineKeys.ClearDay();
         }

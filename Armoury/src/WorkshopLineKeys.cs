@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
@@ -17,7 +18,8 @@ namespace Armoury
     /// Kolejnosc wpisow slownika (kolejnosc dopisywania = kolejnosc rekordow zapisu "arm_workshops") nie zalezy od skrotu - format i kolejnosc zapisu bez zmian.
     ///
     /// Tryb (Fast) zmienia WYLACZNIE SetMode - razem z przepisaniem obu slownikow w tej samej kolejnosci (wpisy policzone starym skrotem nie daloby sie znalezc nowym).
-    /// Fast = false: oba wywolania ida do porownania domyslnego - dokladnie kod sprzed paczki. Co 64. porownanie w trybie szybkim liczy tez stara droge (R9).
+    /// Fast = false: oba wywolania ida do porownania domyslnego - dokladnie kod sprzed paczki. Co 64. porownanie w trybie szybkim liczy tez stara droge (R9:
+    /// wynik i czas obu drog - recenzja E8/O2).
     /// Plik bez zaleznosci od reszty moda (proba poza gra kompiluje go wprost). Tylko watek gry (jak caly WorkshopLaw).
     /// </summary>
     internal sealed class WorkshopLineKeys : IEqualityComparer<KeyValuePair<Workshop, string>>
@@ -30,6 +32,7 @@ namespace Armoury
 
         // liczniki (sam log): skroty i porownania w trybie szybkim od ostatniego ClearDay; probki, rozjazdy i przepisania - narastajaco
         internal static int Hashes, Compares, Probes, Mismatches, Rekeys, Lost;
+        internal static long ProbeOldTicks, ProbeNewTicks;   // recenzja E8/O2 (R9 "wynik i czas"): czas starej i nowej drogi w probkach od ostatniego ClearDay (takty Stopwatch)
         internal static string LastMismatch;
 
         private WorkshopLineKeys() { }
@@ -38,9 +41,14 @@ namespace Armoury
         {
             if (!Fast) return Slow.Equals(a, b);
             bool r = ReferenceEquals(a.Key, b.Key) && string.Equals(a.Value, b.Value);
-            if ((++Compares & 63) == 0)   // R9: stara droga obok nowej
+            if ((++Compares & 63) == 0)   // R9: stara droga obok nowej - wynik i czas
             {
+                long t0 = Stopwatch.GetTimestamp();
                 bool old = Slow.Equals(a, b);
+                long t1 = Stopwatch.GetTimestamp();
+                r = ReferenceEquals(a.Key, b.Key) && string.Equals(a.Value, b.Value);   // nowa droga jeszcze raz (ten sam wynik) - tylko pomiar czasu
+                long t2 = Stopwatch.GetTimestamp();
+                ProbeOldTicks += t1 - t0; ProbeNewTicks += t2 - t1;
                 Probes++;
                 if (old != r)
                 {
@@ -59,7 +67,7 @@ namespace Armoury
             return (RuntimeHelpers.GetHashCode(k.Key) * 397) ^ (k.Value != null ? k.Value.GetHashCode() : 0);
         }
 
-        internal static void ClearDay() { Hashes = 0; Compares = 0; }
+        internal static void ClearDay() { Hashes = 0; Compares = 0; ProbeOldTicks = 0; ProbeNewTicks = 0; }
 
         /// <summary>
         /// Zmiana trybu razem z przepisaniem obu slownikow (te same wpisy, ta sama kolejnosc). Bez zmiany trybu - nic. Zwraca true, gdy przepisano.

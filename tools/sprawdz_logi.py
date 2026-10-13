@@ -245,7 +245,8 @@ Uzycie (Python 3, tylko odczyt):
                     dobie okna, stan klucza i tryb kluczy; O2-1 rozjazdy 0: probka 1/64 kazdej pamieci (stara i nowa droga, R9), linie ROZJAZD,
                     potkniecia i linie "ERROR in WorkshopLaw.Fast(" 0; O2-2 WorkshopLaw.CyclePrefix <= 500 ms/dobe srednio przy kluczu [WL]
                     (Z33 806; podzial z planem doby / kolejne - INFO); O2-3 zapis -> wczytanie: sztuk w toku wczytano tyle, ile zapisano
-                    (bieg zapisu), kazdy zapis = sztuki w pamieci; praca przejeta przez pamieci - INFO.
+                    (bieg zapisu), kazdy zapis = sztuki w pamieci; praca przejeta przez pamieci i szacunek oszczednosci z czasu probek
+                    (trafienia x czas starej - nowej drogi, R9 "wynik i czas") - INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -10090,9 +10091,28 @@ def etap8_o2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     fh, fn_ = tot(r"mnoznik polki koszyka z pamieci (\d+)", ol, on), tot(r"mnoznik polki koszyka z pamieci \d+ / liczony (\d+)", ol, on)
     bh, bn = tot(r"lista zakazanych z pamieci (\d+)", ol, on), tot(r"lista zakazanych z pamieci \d+ / liczona (\d+)", ol, on)
     rk = max([num(r"przepisan slownikow od startu gry (\d+)", ol[d], default=0) for d in days] + [0])
+    # recenzja E8/O2 (R9 "wynik i czas"): szacunek oszczednosci z czasu probek - trafienia doby x (stara - nowa droga); linia sprzed recenzji nie ma czasow
+    kinds = ((r"porownan (\d+),", r"klucz ([0-9.]+) / ([0-9.]+)", "klucze"), (r"nazwa linii z pamieci (\d+)", r"nazwa linii ([0-9.]+) / ([0-9.]+)", "nazwa linii"),
+             (r"mnoznik polki koszyka z pamieci (\d+)", r"mnoznik polki ([0-9.]+) / ([0-9.]+)", "mnoznik polki"),
+             (r"lista zakazanych z pamieci (\d+)", r"zakazane ([0-9.]+) / ([0-9.]+)", "zakazane"))
+    saved, timed = {k[2]: 0.0 for k in kinds}, 0
+    for d in on:
+        seg = ol[d].split("czas w probce, stara / nowa droga (us):", 1)
+        if len(seg) < 2:
+            continue
+        timed += 1
+        for hp, tp, name in kinds:
+            m = re.search(tp, seg[1])
+            if m:
+                try:
+                    saved[name] += num(hp, ol[d], default=0) * (float(m.group(1)) - float(m.group(2))) / 1000.0
+                except ValueError:
+                    pass
+    est = (f"; szacunek oszczednosci z czasu probek ({timed} dob): {sum(saved.values()) / timed:.1f} ms/d ("
+           + ", ".join(f"{k} {v / timed:.1f}" for k, v in saved.items()) + "; klucze - same porownania, bez skrotow)") if timed else "; czasu probek brak w linii"
     rep.add("E8/O2: praca przejeta przez pamieci (na dobe, doby z kluczem [WL])",
             f"klucze: skrotow {kh / n_on:.0f}, porownan {kc / n_on:.0f}; nazwa linii z pamieci {lh / n_on:.0f} / liczona {ln / n_on:.0f}; "
-            f"mnoznik polki {fh / n_on:.0f} / {fn_ / n_on:.0f}; zakazane {bh / n_on:.0f} / {bn / n_on:.0f}; przepisan slownikow kluczy {rk}",
+            f"mnoznik polki {fh / n_on:.0f} / {fn_ / n_on:.0f}; zakazane {bh / n_on:.0f} / {bn / n_on:.0f}; przepisan slownikow kluczy {rk}" + est,
             "INFO (projekt: zysk 150-400 ms/d)", None)
 
 
@@ -10127,7 +10147,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_r)    # E8/R (254): rynek i korona - bez premii wojennej, kon przy sprzedazy liczony raz, monopole od dziennej wyplaty
     blocks.append(etap8_b)    # E8/B (258): warsztaty i kowadlo - wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow, drobne poprawki kowadla
     blocks.append(etap8_o1)   # E8/O1 (265): pamiec polki po wlasnym zdjeciu sztuki (poprawka zamiast przebudowy), delegaty DTE/BK zamiast Invoke
-    blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii, potrzeb sztuki, zakazanych, mnoznik polki raz na koszyk
+    blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii i zakazanych, mnoznik polki raz na koszyk
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
