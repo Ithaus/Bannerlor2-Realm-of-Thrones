@@ -4988,6 +4988,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopCraftByRealm { get; set; } = true;
 
+        [SettingPropertyBool("Plain Saddle Every Realm", HintText = "with Workshop Craft By Realm: the saddlers of every realm make the plain saddle that belongs to no land - a common riding harness with next to no armour for the horse - beside their own patterns, so a realm whose only own horse gear is a house caparison or an elephant's harness still has saddles for its riders (off = only the realm's nearest pattern, as before; takes effect on the next load)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool PlainSaddleEveryRealm { get; set; } = true;
+
         [SettingPropertyBool("Workshops Follow Inputs", HintText = "a town's trade workshop is the kind its own villages feed - no wine press where no grapes grow: when the game picks the trade of a workshop (at the start of a new campaign, after a bankruptcy, when you lose a workshop) a trade whose raw goods neither grow in the town's villages nor come by a materials contract is all but never chosen, unless no trade has them. Workshops already working and your own workshops are not changed (off = the game's choice, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopsFollowInputs { get; set; } = true;
@@ -6446,6 +6450,7 @@ namespace Armoury
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
+            s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;
             s.SandSteedsInDorne = SandSteedsInDorne;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
