@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -104,10 +105,11 @@ namespace Armoury
         internal static void Ship(Settlement src, Settlement dst, ItemObject item, int m, int n, int paid, int days, bool naval, int today, string name)
         {
             if (src == null || dst == null || item == null || n <= 0) return;
+            Cart c = null;
             try
             {
                 days = Math.Max(1, days);
-                var c = new Cart { Src = src, Dst = dst, Item = item, Mat = m, N = n, Paid = Math.Max(0, paid), DayBought = today, DayDue = today + days, Naval = naval };
+                c = new Cart { Src = src, Dst = dst, Item = item, Mat = m, N = n, Paid = Math.Max(0, paid), DayBought = today, DayDue = today + days, Naval = naval };
                 _carts.Add(c);
                 AddIncoming(c, +1);
                 _dCarts++; _dGold += c.Paid; _dDaysSum += days;
@@ -118,9 +120,9 @@ namespace Armoury
             }
             catch (Exception e)
             {
-                // woz sie nie zapisal - sztuka nie moze zniknac: na polke celu od razu
+                // woz sie nie zapisal - sztuka nie moze zniknac: na polke celu od razu (woz juz na liscie - potkniecie tylko w licznikach, ladunek jedzie)
                 Stumble("Ship", e);
-                try { dst.ItemRoster.AddToCounts(item, n); } catch { }
+                if (c == null || !_carts.Contains(c)) { try { dst.ItemRoster.AddToCounts(item, n); } catch { } }
             }
         }
 
@@ -139,14 +141,14 @@ namespace Armoury
                     bool late = today - c.DayBought > Math.Max(MaxDays, c.DayDue - c.DayBought);
                     if (c.N <= 0 || c.Item == null) { _carts.RemoveAt(i); continue; }
                     if (!dstOk && !srcOk) { AddIncoming(c, -1); _dLost += c.N; _carts.RemoveAt(i); continue; }   // nie ma dokad ani skad (tylko po zlym zapisie)
-                    if (!dstOk || (late && srcOk)) { Back(c); _carts.RemoveAt(i); continue; }
+                    if (!dstOk || (late && srcOk)) { Back(c); if (c.N <= 0) _carts.RemoveAt(i); continue; }
                     if (c.Dst.IsUnderSiege && !late) { _dWait++; continue; }
-                    int n = c.N;
-                    AddIncoming(c, -1);
-                    c.Dst.ItemRoster.AddToCounts(c.Item, n);
-                    c.N = 0;
+                    int n = Put(c, c.Dst.ItemRoster);
+                    if (n <= 0) continue;                 // polka nie przyjela ani sztuki (wyjatek zdarzenia polki) - woz czeka do jutra
+                    _dArr += n;
+                    if (c.N > 0) continue;                // przyjeta tylko czesc - reszta zostaje w wozie (bez dubla, bez zguby)
                     _carts.RemoveAt(i);
-                    _dArr += n; _dArrCarts++; _dArrDays += today - c.DayBought;
+                    _dArrCarts++; _dArrDays += today - c.DayBought;
                     try { if (arrived != null) arrived(c.Dst, c.Mat, n, today - c.DayBought); } catch (Exception e) { Stumble("Arrivals(pamiec drogi)", e); }
                 }
                 catch (Exception e) { Stumble("Arrivals", e); }   // woz zostaje w drodze - sprobuje nazajutrz
@@ -157,11 +159,11 @@ namespace Armoury
         /// to samo zloto, ktore cel zaplacil; jak TradeCarts.Back).</summary>
         private static void Back(Cart c)
         {
-            int n = c.N;
-            AddIncoming(c, -1);
-            c.Src.ItemRoster.AddToCounts(c.Item, n);
-            c.N = 0;
-            _dBack++; _dBackPcs += n;
+            int n = Put(c, c.Src.ItemRoster);
+            if (n <= 0) return;
+            _dBackPcs += n;
+            if (c.N > 0) return;                          // reszta wroci jutro; zwrot zaplaty dopiero z calym ladunkiem
+            _dBack++;
             if (c.Src.Town == null || c.Dst == null || c.Dst.Town == null) return;
             int r = Math.Min(c.Paid, Math.Max(0, c.Src.Town.Gold));
             if (r <= 0) return;
@@ -169,6 +171,26 @@ namespace Armoury
             c.Dst.Town.ChangeGold(r);
             c.Paid = 0;
             _dRefund += r;
+        }
+
+        /// <summary>Ladunek wozu na polke (cel albo zrodlo przy zawroceniu): zwraca sztuki, ktore polka NAPRAWDE przyjela (stan polki po minus przed - wyjatek
+        /// w zdarzeniu polki nie robi ani dubla, ani zguby); o tyle maleje ladunek wozu i "w drodze" celu.</summary>
+        private static int Put(Cart c, ItemRoster shelf)
+        {
+            int n = c.N;
+            if (n <= 0 || shelf == null || c.Item == null) return 0;
+            int before = shelf.GetItemNumber(c.Item), put = n;
+            try { shelf.AddToCounts(c.Item, n); }
+            catch (Exception e)
+            {
+                Stumble("Put", e);
+                put = Math.Max(0, Math.Min(n, shelf.GetItemNumber(c.Item) - before));
+            }
+            if (put <= 0) return 0;
+            AddIncoming(c, -1);
+            c.N = n - put;
+            if (c.N > 0) AddIncoming(c, +1);
+            return put;
         }
 
         /// <summary>Wstawka linii "Kontrakty surowca (174)": zakupy wozem, dostawy, w drodze i kontrola "wczoraj + kupione - dowiezione - zawrocone - bez celu

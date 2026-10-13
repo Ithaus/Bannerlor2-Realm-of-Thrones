@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/ZELAZO Z1 - przeglad wlasny, tor S) - WOZ KUPCOW: polka liczy tylko sztuki naprawde przyjete, potkniecie w licznikach nie dubluje ladunku
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/MaterialCarts.cs` (`Put`, `Arrivals`, `Back`, `Ship`).
+
+**Problem (przeglad kodu przed testem, bez logu):** (1) `Arrivals` i `Back` zdejmowaly "w drodze" PRZED `AddToCounts` - wyjatek w zdarzeniu polki (cudzy podsluch rosteru) zostawial woz z ladunkiem, ale bez wpisu "w drodze" (miasto zamowiloby drugi raz), a nazajutrz dopisalby ladunek drugi raz, jesli pierwszy `AddToCounts` jednak doszedl; (2) `Ship` po wyjatku w licznikach (po dopisaniu wozu do listy) kladl ladunek takze na polke celu - sztuka z niczego.
+
+**Przyczyna:** kolejnosc operacji przejeta z `TradeCarts` bez pomiaru, ile polka naprawde przyjela.
+
+**Zmiana:** `Put(woz, polka)` - stan polki przed i po; przy wyjatku liczy sie tylko roznica (0..ladunek), o tyle maleje ladunek wozu i "w drodze" celu, reszta jedzie dalej nazajutrz; zwrot zaplaty przy zawroceniu dopiero z calym ladunkiem. `Ship` - zapasowe polozenie na polce celu tylko wtedy, gdy wozu nie ma na liscie.
+
+**Ryzyko / co sprawdzic:** sciezka bez wyjatku bez zmian (te same liczniki, kontrola "reszta wozow" 0). `GetItemNumber` liczy pierwszy stos przedmiotu - surowce nie maja modyfikatorow, wiec to caly zapas.
+
+**Build:** Armoury kod 0. **Status:** DO SPRAWDZENIA - bieg roczny (razem z Z1: "potkniecia wozow" 0, "reszta wozow" 0).
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO - narzedzie progow) - BLOK `etap8_p3_zelazo` w tools/sprawdz_logi.py (17 wierszy; istniejace wiersze bez zmian)
 **Mod:** narzedzie | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `tools/sprawdz_logi.py` (nowy blok przed `etap8_main` + jedna linia `blocks.append`).
 
