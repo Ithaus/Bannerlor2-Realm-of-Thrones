@@ -1896,3 +1896,18 @@ Cofniecie: Armoury a5e2fbf9 z kopii albo klucz Scutage = false.
   -> recenzja z poprawka. Wynik: `docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md` (robocze SCRATCH\gosp-ludzie\). Bez kodu; kod po "tak" Jeffa na pytania
   o kierunek. To jest teraz NAJWAZNIEJSZE zadanie - poprawka lnu (N5b), stawka wojenna (W7) i strojenie podatkow czekaja na ten projekt, bo zmieni dochody wszystkich krolestw.
   UWAGA DO WGRANIA N5: regula A (sufit 4.0 bez kosztu) NIE ma wejsc do gry wlaczona - przed wgraniem ustawic ValveRaiseWhileShort domyslnie false (B, C, D, E zostaja).
+- (20:30 UTC 13.10) **TEST 120 dob N5 TOWARY (fin11, regula A jeszcze wlaczona, ale bez skutku przed d169): 120/120, 0 ERROR** (Armoury-2026-10-13_12-59-58.log + tabele, kopie na D:;
+  progi SCRATCH\test\progi-n5\). **B skora: uboj bez skory 0, skory surowe 510/d, skora wyprawiona 207/d, miast bez skory wyprawionej srednio 16.3 (bylo 33-43) - TAK. C zbroja:
+  t3+t4 45.0/d (bez paczki 29.8; prog 32.8) - TAK; brak dalej rosnie (6 253 na koniec okna - wojsko 111 tys.). D drewno: zapas d120 17 727 = 6 dni zuzycia wedlug regulatora
+  (ponizej pasma 30 dni - budowy biora wiecej; do obejrzenia w dluzszym biegu), przyrost +84/d - TAK. E budowy: idzie w 95.4 osadach (bylo 55), 26 poziomow w oknie, wydatki
+  28.7 tys. zl/d; dopuszczone w wojnie 74.3, przy froncie 57.1, pan bez luzu zoldu 30.4 - TAK.** Wojsko lordow w wojnie d93-120: **111 158** (najwyzszy wynik dnia). NIE: etap2 0,
+  etap5 14, etap8 11 (do przejrzenia po biegu lacznym).
+  **POPRAWKA DANINY W5b GOTOWA I SCALONA:** `w-toku/w5b-potrzeba-korony` eea7786 -> zbior-e8 d1c70d3; potem commit **4d33042 = regula A N5 wylaczona domyslnie**
+  (ValveRaiseWhileShort false). `w-toku/zbior-e8` = **4d33042** = WGRANIE 42 + N5 (bez A) + W5b; gen_mcm 1338; Armoury 959d544d = test\fin12. W5b: (1) druga stawka SN tylko dla
+  daniny z oszczednosci - rosnie o 0.5 pkt na tydzien, gdy srednia 7 dob niepokrytej potrzeby W5 > max(250 zl, 5% naleznego zwrotu), pomiar z co najmniej 4 dob; podatek 184 od
+  zarobku po staremu (chleb miast); (2) skarbiec ponad zapas wojny doklada do garnka W5 najwyzej 1/30 nadwyzki dziennie, kolejnosc danina -> skarbiec -> tarczowe. Klucze
+  WarAidFollowsLordsShortfall, WarAidLordsShortfallShare 0.05, CrownSurplusFeedsNeedAid, CrownSurplusAidDays 30; do zapisu doszla 1 liczba na krolestwo (29. w szostym polu 165 -
+  zgodne wstecz). Progi W5b-0..5 w `--grupa w5`. Szacunek recenzji: Wyspy - skarbiec pokrywa brak ok. pol roku, potem stawka daniny rosnie; przy potrzebie z konca biegu rocznego
+  ok. 53 z 59 tys. zl/d zostaje niepokryte tam, gdzie lud nie odklada (Wyspy, Wolni Ludzie, Ibben, Qohor) - danina tego nie zamknie.
+  **W GRZE: test 120 dob lacznie N5 (bez A) + W5b** (fin12; test\at-w43-120.out.txt). Po czystym wyniku: progi (etap8 N5, w5 z --csv, w6, kiesa1, etap2), zapis 9 dob,
+  WGRANIE 43 (`wgraj.ps1 -DllDir test\fin12 -Tree zb\int -Tag 2026-10-13-noc43`), galaz noc/wgranie-43 = 4d33042, bieg kontrolny 10 dob.
