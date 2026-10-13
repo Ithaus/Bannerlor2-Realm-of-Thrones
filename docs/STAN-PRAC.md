@@ -1472,3 +1472,29 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   29.6%, kolejka odziezy wojska i skory, sakiewki 22 dni zoldu, reszta koni w ksiedze (K1-3), port Saath 37 dob bez nadwyzki, F8-2 2.8%.
   **W TOKU:** zapis 9 dob na 8547369; potem BIEG PORownawczy z NotableCaravanCap = 3 (wariant probny Armoury d8a50add, drzewo SCRATCH(dbc3d3d1)\cap3, bez commita) - czy trzecia karawana
   kupca przywraca dowoz zelaza i rudy do poziomu W33 i ile kosztuje czasu; potem wybor limitu i wgranie.
+
+**WGRANIE 34 (13.10 ok. 09:15 UTC; CALY KOD ETAPOW 5-8 + poprawki po audycie i trzech biegach):** Armoury e69adbd3, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4,
+ForgeView e17e0233 (galaz `noc/wgranie-34` = `w-toku/zbior-e8` 8547369) + pliki poza DLL: Armoury\GUI\Prefabs\ArmBurnedVillageLabels.xml, ArmMapVillageTooltip.xml, Armoury\ModuleData\
+arm_map_roads_probe.tsv, arm_map_village_lore.tsv, Armoury\Prefabs\arm_map_roads.xml, CrashScribe\ModuleData\CrashScribe.settings.xml. Skrypt `tools/wgranie/wgraj.ps1` (md5 kazdego pliku OK).
+Kopie poprzedniej wersji (WGRANIE 33: abe15b3b / 842f64a4 / 9cdc53ee / bbb841d7 / b058c7d2): obok plikow `*.bak-2026-10-13-noc34-przed` + `D:\Backup-Bannerlord\wgrane\2026-10-13-noc34-przed`.
+**Pliki ustawien Jeffa zmienione przy wgraniu (decyzje Jeffa 09.10 i 12.10; kopie `*.bak-2026-10-13-noc34` obok + D:):** Armoury.json - usunieta linia `"CampBattlePropsEnabled": false`
+(dziala domyslna true z DLL); DiplomacySettings_v1.2.json - rok 364: min. wojna 21 -> 91, przerwa przed nowa wojna 21 -> 91, min. sojusz 42 -> 182, pakt 84 -> 364, przerwa miedzy wojnami
+domowymi 240 -> 1000 (koniec suwaka; 1040 poza zakresem), frakcja 120 -> 520; better_economy_settings.xml (skrypt tools/bee/zamknij-ujscia-bee.ps1, E8/E): EconomicEventDailySpawnChance
+0.14 -> 0 (SHA-256 po: 114635f1...c10e1; kopia `.bak-2026-10-13-przed-BEE-ujscia`; 13 kluczy ujsc bylo juz zamknietych).
+**TESTY (autotest):** 120 dob nowej kampanii - 120/120, Armoury 0 ERROR, CS 0 blokow naszych modow, **11.8 s/dobe (W33 17.5 - o 1/3 szybciej)**, log Armoury-2026-10-13_01-06-48.log;
+zapis 9 dob z konca biegu - 129/129, 0 ERROR, 11.6 s/dobe (Armoury-2026-10-13_01-35-30.log). Bledy CrashScribe = 22-23 znane wyjatki startowe cudzych modow (jak w W33).
+Zima i bieg dlugi NIE robione (zima - po wgraniu calosci, jak chcial Jeff; bieg dlugi - nastepny krok). Zdjecia proby drog NIE robione (MapRoadsProbeEnabled domyslnie false).
+ZATWIERDZONE: Armoury e69adbd3, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
+
+- (09:15 UTC 13.10) **Porownanie limitu karawan kupca (NotableCaravanCap) - bieg 120 dob z limitem 3 (wariant probny, niewgrany; Armoury-2026-10-13_01-41-11.log):** czas doby 11.9 s
+  (limit 2: 11.8 - bez roznicy); karawan 638 (limit 2: 500; W33: 962); wjazdy do miast 164/d (limit 2: 98; W33: 138); wojsko w wojnie 88 171 (86 917); kasy miast 91.4% Z33 (94.5%);
+  miasta bez zelaza 45.1 (44.3), bez rudy 43.3 (43.0) - BEZ poprawy; dymarki bez wegla 13.8% (7.0%), "brak drewna" w warsztatach 284/d (229). WGRANE Z LIMITEM 2 (przetestowany takze
+  zapisem). **DO DECYZJI JEFFA (kierunek):** 2 = mniej druzyn na mapie i mniej handlu niz w W33; 3 = handel o 19% wiekszy niz w W33 przy tym samym czasie doby. Suwak MCM "Notable Caravan Cap".
+- **OTWARTE PO WGRANIU 34 (nastepne kroki):** (1) ZELAZO: miasta bez zelaza 44 (W33 27), bez rudy 43 (26) - nie zalezy od liczby karawan; do rozpoznania lancuch R1 lupa -> miasto
+  (kontrakty 174, wozy wsi); (2) jazda t3+ 64% celu K3, jezdzcy z koniem bez uprzezy 11.9% (prog 10), Dothrakowie czekajacy na konia 29.6% - trend po kolejnym biegu, potem
+  AiMountMarketSharePercent 25 -> 40 (TRIAZ-2 "K3-8" pkt 3); (3) K1-3a krok 2 - mieszczanie tylko konie robocze + czynne ciecie hodowli (decyzja Jeffa 12.10, licznik F3 juz mierzy);
+  (4) E8/O4 musztra (po tescie); (5) kolejka odziezy wojska i skory (W1-7, N1-2/3/6), sakiewki 22 dni zoldu (A3-2), port Saath 37 dob bez nadwyzki, reszta koni w ksiedze (K1-3),
+  unikat cersei_red_dress znika z targu (F1-3), F8-2 2.8% przejsc poza strefa mostu; (6) bieg dlugi (364-728 dob) + zima; (7) zdjecia proby drog i decyzja "ile drog"; (8) stawki myta
+  na Bliznakach z licznika E7/B (Jeff: "chce, ale policz"); (9) reczne testy Jeffa 8.16 (29 punktow, projekt etapu 8) - sciezki gracza, ktorych autotest nie cwiczy: okienko rabunku R2,
+  menu okregu, dymek wioski, kuznia, nagrody zadan, turniej, brama awansu na jezdzca (siodlo), rekrut gracza, dary Spoils, niewola; (10) zalozenia E8/H do potwierdzenia: bohaterowie
+  poza regula uprzezy, zold jazdy bez zmian, zalogi nie kupuja uprzezy, 4 wzorce ROT bez uprzezy; (11) czy kupcy maja wozic unikaty miedzy miastami.
