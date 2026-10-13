@@ -427,6 +427,14 @@ Uzycie (Python 3, tylko odczyt):
                     paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W6-3b liczy rezerwe z kolumny nadwyzka_ponad_rezerwe_w6 (rezerwa BUDZETU 166 przed poborem), nie z kolumny R
                     (R w CSV = rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza - na biegu rocznym 3.7% platnikow mialoby kiese pod nia).
+--grupa m6b       : (m6b, poprawka 6 po raporcie rocznym 13.10, wiersze 22-24) konie juczne z niczego, zboze i ryby bez zrodla, Thenn bez pieniedzy.
+                    python -I tools/sprawdz_logi.py --grupa m6b [--do-doby 364] <Armoury-*.log>
+                    Wiersze M6b-0..M6b-7: linie i klucze; tabory wsi - juczne gry zdjete co do sztuki i skad nowe (stado wsi / brak);
+                    reszta niewyjasniona jucznych w ksiedze koni |srednia d31-until| <= 20/d; kopia jucznych DTE do zbrojowni 0; stan jucznych
+                    i brak jucznych nowych karawan (INFO); zboze i ryby "bez wyjasnienia" |srednia| <= 20 szt./d, 15 zywnosci konwojow DTE
+                    suma |srednich| <= 40 szt./d; zboze nowych druzyn (INFO); kasy zaulkow - kanaly Thenn i Frostfang's Camp (INFO);
+                    najdluzszy postoj karawany bez statkow w miescie <= 35 dob; doby z kasa < 1 000 (INFO); potkniecia 0.
+                    Log bez paczki (bez linii m6b albo klucz wylaczony): wiersze INFO z wartosciami (stan wyjsciowy), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -15863,6 +15871,208 @@ def w6_main(logp, start_arg, until=120, csvp=None):
     return 0
 
 
+def m6b_main(logp, start_arg, until=120):
+    """m6b (poprawka 6, ksiegi i Thenn - raport roczny 13.10 wiersze 22, 23, 24): konie juczne z niczego, zboze i ryby bez zrodla, kasy zaulkow
+    i karawana bez zysku. Okno: doby kampanii 1-until (--do-doby); srednie dobowe z dob d31-until (jak K1-11). Wiersze:
+    M6b-0 linie i klucze; M6b-4a tabory wsi - zdjete = gra dala co do sztuki; M6b-4b reszta niewyjasniona jucznych w ksiedze koni (srednio na dobe,
+    |r| <= 20; bez paczki: bieg roczny +135/d, bieg 120 dob +100/d); M6b-4c kopia jucznych DTE do zbrojowni przy kluczu = 0 zostawionych; M6b-4d/4e stan jucznych (tabory,
+    zbrojownie DTE, polki) i brak jucznych nowych karawan (INFO); M6b-5a/5b reszta "bez wyjasnienia" zboza i ryb (|r| <= 20 szt./d) i 15 rodzajow
+    zywnosci z konwojow DTE (suma |r| <= 40 szt./d); M6b-5c zboze nowych druzyn (INFO); M6b-6a kasy zaulkow - kanaly Thenn i Frostfang's Camp (INFO);
+    M6b-6b karawany bez zysku - najdluzszy postoj karawany bez statkow w miescie (ostatnie 28 dob, <= 35 dob); M6b-6c doby z kasa < 1 000 (INFO);
+    M6b-7 potkniecia 0. Log bez paczki (bez linii m6b albo klucz wylaczony): wiersze INFO z wartosciami, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    jz = by_day(lines, "Juczne z niczego (m6b): dzien")
+    kon = by_day(lines, "Konie (E6/0): dzien")
+    kz = by_day(lines, "Kasy zaulkow (m6b): dzien")
+    kar = by_day(lines, "Karawany (E8/G1): dzien")
+    wyd = by_day(lines, "Wyspy i drogi")
+    j213 = by_day(lines, "Juczne (213): dzien")
+    kas = by_day(lines, "Kasy miast (169c): dzien")
+    alld = sorted(set(kon) | set(jz) | set(j213))
+    if start is None:
+        start = alld[0] if alld else 0
+    inwin = lambda d: 1 <= run_day(d, start) <= until
+    w31 = lambda d: 31 <= run_day(d, start) <= until
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} (srednie d31-{until})")
+    # ---- M6b-0
+    on4 = [d for d in jz if inwin(d) and "(Villager Packs From Herd TAK)" in jz[d]]
+    ondte = [d for d in jz if inwin(d) and "(Dte Convoy Packs Stay With Convoy TAK)" in jz[d]]
+    start_lines = [s for s in lines if s.startswith("PackSources (m6b):") or s.startswith("AlleyProbe (m6b):")]
+    fish_frame = any(s.startswith("GoodsLedger: ksiega towarow") and "polow lodzi rybackich (NavalDLC)" in s and "BRAK: polow" not in s for s in lines)
+    food_on = any(s.startswith("PackSources (m6b):") and "FoodSourcesInLedger (teraz TAK)" in s for s in lines)
+    idle_on = [d for d in kar if inwin(d) and "karawany bez zysku (Idle Caravan Disband CZYNNE" in kar[d]]
+    kz_win = [d for d in kz if inwin(d)]
+    if not jz and not start_lines:
+        rep.add("M6b-0: linie i klucze paczki m6b", "brak linii (log bez paczki m6b)", "INFO", None)
+    else:
+        rep.add("M6b-0: linie i klucze paczki m6b", f"Juczne z niczego {len([d for d in jz if inwin(d)])} dob (tabory TAK {len(on4)}, DTE TAK {len(ondte)}), "
+                f"ramka polowu {'wpieta' if fish_frame else 'BRAK'}, FoodSourcesInLedger {'TAK' if food_on else 'NIE/brak'}, Kasy zaulkow {len(kz_win)} dob, "
+                f"karawany bez zysku czynne {len(idle_on)} dob", "linie co dobe; klucze domyslnie TAK", None)
+    # ---- M6b-4a tabory wsi: zdjete = gra dala
+    pat_v = re.compile(r"nowe (\d+), gra dala (\d+), zdjete (\d+), ze stada wsi (\d+), brak (\d+)")
+    tot = [0] * 5; bad = 0
+    for d in on4:
+        m = pat_v.search(jz[d])
+        if not m:
+            continue
+        v = [int(x) for x in m.groups()]
+        for i in range(5):
+            tot[i] += v[i]
+        if v[1] != v[2]:
+            bad += 1
+    if on4:
+        rep.add("M6b-4a: tabory wsi - juczne gry zdjete co do sztuki", f"nowe {tot[0]}, gra dala {tot[1]}, zdjete {tot[2]} (dob z roznica {bad})",
+                "zdjete = gra dala w kazdej dobie (juczne nie z niczego)", bad == 0 and tot[1] == tot[2])
+        need = tot[1] if tot[1] else 1
+        rep.add("M6b-4a2: skad juczne nowych taborow", f"ze stada wsi {tot[3]} ({100.0 * tot[3] / need:.0f}%), brak {tot[4]} ({100.0 * tot[4] / need:.0f}%)",
+                "INFO - brak nie zatrzymuje taboru (woz zabiera caly magazyn), tabor dobiera juczne ze stada przy kolejnych wyjazdach", None)
+    else:
+        rep.add("M6b-4a: tabory wsi - juczne gry zdjete co do sztuki", "brak linii z kluczem TAK", "INFO", None)
+    # ---- M6b-4b reszta jucznych w ksiedze koni
+    rp = re.compile(r"reszta niewyjasniona (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+) \(razem")
+    rr = [int(rp.search(kon[d]).group(4)) for d in sorted(kon) if w31(d) and rp.search(kon[d])]
+    has_named = any("zrodla nazwane z niczego (m6b)" in kon[d] for d in kon)
+    if rr:
+        avg = sum(rr) / len(rr)
+        txt = f"{avg:+.1f} szt./d ({len(rr)} dob, suma {sum(rr):+d})"
+        if has_named and on4:
+            rep.add("M6b-4b: reszta niewyjasniona jucznych (ksiega koni, d31-until)", txt, "|srednia| <= 20 szt./d (bez paczki: bieg roczny +135/d, bieg 120 dob +100/d)", abs(avg) <= 20.0)
+        else:
+            rep.add("M6b-4b: reszta niewyjasniona jucznych (ksiega koni, d31-until)", txt, "INFO (log bez paczki m6b - stan wyjsciowy)", None)
+    else:
+        rep.add("M6b-4b: reszta niewyjasniona jucznych (ksiega koni, d31-until)", "brak linii Konie (E6/0) z reszta w oknie", "INFO", None)
+    # ---- M6b-4c kopia DTE
+    pat_d = re.compile(r"zapas drogi (\d+) konwojow, juczne DTE (\d+) \+ gry (\d+) .*?kopia do zbrojowni celu zdjeta (\d+), zostawiona (\d+)")
+    dt = [0] * 5
+    for d in jz:
+        if not inwin(d):
+            continue
+        m = pat_d.search(jz[d])
+        if m:
+            for i in range(5):
+                dt[i] += int(m.group(i + 1))
+    if ondte:
+        rep.add("M6b-4c: konwoje DTE - juczne nie kopiowane do zbrojowni", f"konwojow {dt[0]}, juczne DTE {dt[1]} + gry {dt[2]}, kopia zdjeta {dt[3]}, zostawiona {dt[4]}",
+                "zostawiona = 0 przy kluczu TAK", dt[4] == 0)
+    else:
+        rep.add("M6b-4c: konwoje DTE - juczne nie kopiowane do zbrojowni", "brak linii z kluczem TAK" if not jz else f"zostawiona {dt[4]} (klucz wylaczony)", "INFO", None)
+    # ---- M6b-4d stan jucznych
+    ps = re.compile(r"polki miast i zamkow [\d/]+/(\d+)/\d+, magazyny wsi [\d/]+/(\d+)/\d+, .*?tabory [\d/]+/(\d+)/\d+, zbrojownie DTE [\d/]+/(\d+)/\d+")
+    sd = [d for d in sorted(kon) if inwin(d) and ps.search(kon[d])]
+    if sd:
+        a, b = ps.search(kon[sd[0]]).groups(), ps.search(kon[sd[-1]]).groups()
+        rep.add("M6b-4d: juczne - stan (polki / magazyny wsi / tabory / zbrojownie DTE)", f"d{run_day(sd[0], start)} {'/'.join(a)} -> d{run_day(sd[-1], start)} {'/'.join(b)}",
+                "INFO - zbrojownie DTE nie rosna o kopie konwojow (bieg roczny bez paczki 24 -> 9 749)", None)
+    pk = re.compile(r"\(cel (\d+); .*?\), z niczego (-?\d+) .*?brak (\d+) \(")
+    ct = cb = 0
+    for d in j213:
+        if w31(d):
+            m = pk.search(j213[d])
+            if m:
+                ct += int(m.group(1)); cb += int(m.group(3))
+    rep.add("M6b-4e: nowe karawany - brak jucznych na targu przy tworzeniu (d31-until)", f"{cb} z {ct} ({100.0 * cb / ct:.0f}%)" if ct else "brak linii Juczne (213)",
+            "INFO - bez paczki d31-until: bieg roczny 12%, bieg 120 dob 26% (dokupi gra przy handlu); patrzec, czy nie rosnie", None)
+    # ---- M6b-5 ksiega towarow
+    tw = re.compile(r"^Towary: dzien (\d+) - (\S+) \(\d+ d\).*?\| bez wyjasnienia ([-+]\d+)")
+    un = {}
+    named = False
+    for s in lines:
+        if not s.startswith("Towary: dzien "):
+            continue
+        m = tw.match(s)
+        if not m:
+            continue
+        d = int(m.group(1)) + 1
+        if not w31(d):
+            continue
+        un.setdefault(m.group(2), []).append(int(m.group(3)))
+        if "lodzie rybackie (NavalDLC, polow)" in s or "nowe druzyny lordow (zboze gry)" in s or "przepadlo z partiami usunietymi bez zniszczenia" in s:
+            named = True
+    gate = named and food_on
+    for good, name in (("grain", "zboze"), ("fish", "ryby")):
+        v = un.get(good, [])
+        if not v:
+            rep.add(f"M6b-5a: {name} - bez wyjasnienia (d31-until)", "brak linii Towary", "INFO", None)
+            continue
+        avg = sum(v) / len(v)
+        rep.add(f"M6b-5a: {name} - bez wyjasnienia (d31-until)", f"{avg:+.1f} szt./d ({len(v)} dob, suma {sum(v):+d})",
+                "|srednia| <= 20 szt./d (bieg roczny bez paczki: zboze +179/d, ryby +164/d)" if gate else "INFO (log bez paczki m6b)", (abs(avg) <= 20.0) if gate else None)
+    foods = ["orange", "apple", "meat", "date_fruit", "pie", "Egg", "honey", "butter", "olives", "WhaleMeat", "grape", "cheese", "bread", "beer", "carrot"]
+    fs = [sum(un.get(f, [0])) / max(1, len(un.get(f, [0]))) for f in foods]
+    tot_abs = sum(abs(x) for x in fs)
+    rep.add("M6b-5b: 15 rodzajow zywnosci konwojow DTE - bez wyjasnienia (suma |srednich|, d31-until)", f"{tot_abs:.1f} szt./d (najwieksza {max(fs, key=abs) if fs else 0:+.1f})",
+            "<= 40 szt./d (bieg roczny bez paczki ok. 280/d: -17 szt. kazdej zywnosci na konwoj)" if gate else "INFO (log bez paczki m6b)", (tot_abs <= 40.0) if gate else None)
+    wz = by_day(lines, "Wojsko z ludzi (E4/8): dzien")
+    g = [0] * 7
+    pg = re.compile(r"; zboze (\d+) szt\. \((\d+) partii\): z zapasu siedziby (\d+), z innej warowni (\d+), z niczego \(brak zapasu\) (\d+) \(zdjete m6b (\d+), zboze gry dla druzyn Innych (\d+)\)")
+    for d in wz:
+        if inwin(d):
+            m = pg.search(wz[d])
+            if m:
+                for i in range(7):
+                    g[i] += int(m.group(i + 1))
+    rep.add("M6b-5c: zboze nowych druzyn lordow (okno)", f"{g[0]} szt. w {g[1]} partiach: z siedziby {g[2]}, z innej warowni {g[3]}, bez zapasu {g[4]} (zdjete {g[5]}), druzyny Innych {g[6]}"
+            if g[1] else "brak dopisku m6b w linii E4/8", "INFO - zrodlo z platnikiem w ksiedze towarow (grupa 'nowe druzyny lordow')", None)
+    # ---- M6b-6a kasy zaulkow
+    if kz_win:
+        ch = {}
+        for town in ("Thenn", "Frostfang's Camp"):
+            agg = {}
+            days = 0
+            for d in kz_win:
+                seg = None
+                for part in kz[d].split(" | "):
+                    if part.startswith(town + ": kasa"):
+                        seg = part
+                if not seg:
+                    continue
+                days += 1
+                for key, pat in (("zmiana", r"zmiana ([-+]?\d+)"), ("nasz tick", r"nasz tick dobowy (-?\d+)"), ("tabory wsi", r"tabory wsi (-?\d+)"), ("reszta", r"reszta \(ticki gry\) (-?\d+)")):
+                    v = num(pat, seg)
+                    if v is not None:
+                        agg[key] = agg.get(key, 0) + v
+                for m in re.finditer(r"(lordowie|notable|karawany|inne partie|wsie|inne osady|z niczego / w nicosc) \+(\d+)/-(\d+)", seg):
+                    agg[m.group(1)] = agg.get(m.group(1), 0) + int(m.group(2)) - int(m.group(3))
+            ch[town] = (days, agg)
+        for town, (days, agg) in ch.items():
+            txt = f"{days} dob w linii" + ("; " + ", ".join(f"{k} {v:+d}" for k, v in sorted(agg.items(), key=lambda x: x[1])) if agg else "")
+            rep.add(f"M6b-6a: kasy zaulkow - {town} (suma kanalow w oknie)", txt, "INFO - rozpoznanie: ktory kanal oproznia kase (najbardziej ujemny pierwszy)", None)
+    else:
+        rep.add("M6b-6a: kasy zaulkow (Thenn, Frostfang's Camp)", "brak linii Kasy zaulkow (m6b)", "INFO", None)
+    # ---- M6b-6b karawany bez zysku
+    last28 = [d for d in sorted(wyd) if inwin(d)][-28:]
+    mx = [num(r"najdluzej ([\d.]+) dob", wyd[d], float) for d in last28]
+    mx = [x for x in mx if x is not None]
+    disb = sum(num(r"karawany bez zysku \(Idle Caravan Disband CZYNNE.*?rozwiazane (\d+)", kar[d], int, 0) or 0 for d in idle_on)
+    if mx:
+        rep.add("M6b-6b: najdluzszy postoj karawany bez statkow w miescie (ostatnie 28 dob okna)", f"{max(mx):.1f} dob; rozwiazane karawany bez zysku w oknie {disb}",
+                "<= 35 dob (28 + probka dobowa + ochrona przed petla wlasciciela)" if idle_on else "INFO (log bez paczki m6b; bieg roczny 289 dob)", (max(mx) <= 35.0) if idle_on else None)
+    else:
+        rep.add("M6b-6b: najdluzszy postoj karawany bez statkow w miescie", "brak linii Wyspy i drogi z postojem", "INFO", None)
+    k1000 = [num(r"ponizej 1000 (\d+)", kas[d]) for d in sorted(kas) if inwin(d)]
+    k1000 = [x for x in k1000 if x is not None]
+    rep.add("M6b-6c: doby z miastem o kasie ponizej 1 000 zl (okno)", f"{sum(1 for x in k1000 if x > 0)} z {len(k1000)} dob" if k1000 else "brak linii",
+            "INFO - z linii 169c (bez paczki: bieg roczny 12 dob, bieg 120 dob 0; raport z CSV: 38 dob); przyczyne mierzy M6b-6a", None)
+    # ---- M6b-7 potkniecia
+    st = [num(r"potkniecia dzis (\d+)", jz[d]) for d in jz if inwin(d)] + [num(r"potkniecia dzis (\d+)", kz[d]) for d in kz_win]
+    st = [x for x in st if x is not None]
+    err = [s for s in lines if s.startswith("ERROR in ") and ("PackSources" in s or "AlleyProbe" in s)]
+    if st or err:
+        rep.add("M6b-7: potkniecia PackSources i AlleyProbe", f"{sum(st)} (ERROR {len(err)})", "0", sum(st) == 0 and not err)
+    else:
+        rep.add("M6b-7: potkniecia PackSources i AlleyProbe", "brak linii", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -15909,6 +16119,8 @@ def main(argv):
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
     if group == "w6" and logp:
         return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
+    if group == "m6b" and logp:
+        return m6b_main(logp, start_arg, until_arg)   # m6b (poprawka 6): konie juczne z niczego, zboze i ryby bez zrodla, kasy zaulkow i karawana bez zysku
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

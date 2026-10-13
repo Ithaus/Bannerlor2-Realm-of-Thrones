@@ -194,6 +194,11 @@ namespace Armoury
                 // E6/K5 (213): juczne nowych karawan z targu miasta startu (postfiks InitializeCaravanOnCreation + postfiks CreateCaravanParty VeryLow - po E4/8 Low,
                 // przed finalizerami CaravanCapital/O17) i udzwig luzaka pod jukami (postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity); dziala przy kluczach
                 try { PackMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackMarket.ApplyAll", e); }
+                // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,
+                // nazwane pozycje ksiegi koni (zapas drogi DTE i BK, konie przy RemoveParty) i towar partii usunietych bez zniszczenia (ksiega towarow, klucz FoodSourcesInLedger)
+                try { PackSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackSources.ApplyAll", e); }
+                // m6b (6): kasy zaulkow - rozbicie zmiany kasy miast ponizej 1/4 zapasu kupcow na kanaly (tylko log)
+                try { AlleyProbe.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AlleyProbe.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc

@@ -397,6 +397,19 @@ namespace Armoury
             lock (_lock) { return Lonely(town); }
         }
 
+        /// <summary>m6b (6, CaravanFlow - karawany bez zysku): ile dob karawana bez statkow stoi w tym samym miescie (probka dobowa tej linii);
+        /// -1 - nie stoi w miescie albo nie ma jej w probce.</summary>
+        internal static double StayDays(MobileParty c)
+        {
+            if (c == null) return -1;
+            lock (_lock)
+            {
+                Rec r;
+                if (!_inTown.TryGetValue(c, out r) || r == null || r.At != c.CurrentSettlement) return -1;
+                return CampaignTime.Now.ToDays - r.First;
+            }
+        }
+
         /// <summary>Raz na dobe (z CartTownExit.Daily): linia "Wyspy i drogi:" - co latka zrobila z rozkazami BK bez drogi ladowej, kto dalej stoi.</summary>
         internal static void Daily()
         {

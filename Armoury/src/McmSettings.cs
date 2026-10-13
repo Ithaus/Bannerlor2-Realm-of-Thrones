@@ -2812,6 +2812,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool NewPartyGrainFromSeat { get; set; } = true;
 
+        [SettingPropertyBool("Food Sources In Ledger", HintText = "the goods ledger names what it used to call unexplained: the grain a new lord's party sets out with (paid from his seat's food stores), the fish that fishing boats catch at sea, and the goods of parties removed without a battle (supply convoys); and when no fortress of his realm has food to spare, the new party's grain no longer comes from nothing - it sets out without it and buys food at the next market (off = as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FoodSourcesInLedger { get; set; } = true;
+
         [SettingPropertyBool("Caravans From People", HintText = "a new caravan's guards and drivers are people of the town it sets out from (villagers, if it starts from a village), and a sea convoy fills its ranks from the town it reaches")]
         [SettingPropertyGroup("Iron Bank")]
         public bool CaravansFromPeople { get; set; } = true;
@@ -3279,6 +3283,14 @@ namespace Armoury
         [SettingPropertyBool("Town Pays From Surplus", HintText = "a town purse buys for us only with the coin it holds above the working coin: loot from outlaws, contract and bulk goods and arrows from caravans, spare kit of garrisons, lords and your men, drill scrap, the armourers' finished wares - as castles do. Below the working coin the game topped a purse up from nowhere, so whatever was bought from it was in truth paid from nowhere. Needs Town Purse Regulator. Off = the whole purse, as before")]
         [SettingPropertyGroup("The town's purse")]
         public bool TownPaysFromSurplus { get; set; } = true;
+
+        [SettingPropertyBool("Alley Cash Probe", HintText = "log only: for every town whose purse is below a quarter of the merchants' working coin a daily line splits the change of its purse by where the coin went and came from - our daily reckoning, villagers' carts, lords, notables, caravans, other parties, villages and the rest - so the cause of an empty purse can be read from the log; changes nothing in the game")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool AlleyCashProbe { get; set; } = true;
+
+        [SettingPropertyBool("Idle Caravan Disband", HintText = "a caravan without ships that has stood in the same town for 28 days although roads lead to other towns (it finds no trade worth the road - a Thenn merchant's caravan stood there 289 days) is wound up the way a caravan stranded on an island is: its goods are sold to the town only with coin the town has to spare, the rest go to the town's market, its purse goes home to its owner and its men go home (off = it waits, as in the game)")]
+        [SettingPropertyGroup("The town's purse")]
+        public bool IdleCaravanDisband { get; set; } = true;
 
         [SettingPropertyBool("Crown Current Income", HintText = "the crown pays out of what comes in each day: the vassals' dues, the war subsidy, customs, its share of the castle dues and whatever else reaches the treasury that day, plus a slow release of the old hoard above Crown Reserve Gold (one part in Crown Reserve Release Days a day). Wage refunds, gifts to other crowns, reparation instalments and mercenary contracts come out of that, in this order; what is not there is not paid (no debt). The refund counts only the parties in the field, not garrisons (their pay comes back through the dues), less what the party's men spent in their own house's towns. Works only together with Clan Budget Enabled (a crown paying from its income without the houses keeping their armies within their means would ruin them). Off = the refund comes out of whatever lies in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -5164,6 +5176,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool PackAnimalsFromMarket { get; set; } = true;
 
+        [SettingPropertyBool("Villager Packs From Herd", HintText = "a new villager party takes its pack animals from the village's own herd instead of getting half as many pack animals as men from nothing; what the herd lacks, the party goes without and picks up from the herd on its next trips from home - villagers who carry their whole store are not slowed by it (off = the game gives them from nothing)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool VillagerPacksFromHerd { get; set; } = true;
+
+        [SettingPropertyBool("Dte Convoy Packs Stay With Convoy", HintText = "the pack animals of a supply convoy (Dynamic Troop Equipment) carry its load and leave with it - they are no longer copied into the armoury of the party it supplies, where they stayed on as horses from nothing (off = copied, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool DteConvoyPacksStayWithConvoy { get; set; } = true;
+
         [SettingPropertyInteger("Spare Horse Carry Kg", 20, 100, "0", HintText = "how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
@@ -6066,6 +6086,7 @@ namespace Armoury
             s.NewPartyFromPeople = NewPartyFromPeople;
             s.NewPartyFromSeatGarrison = NewPartyFromSeatGarrison;
             s.NewPartyGrainFromSeat = NewPartyGrainFromSeat;
+            s.FoodSourcesInLedger = FoodSourcesInLedger;
             s.CaravansFromPeople = CaravansFromPeople;
             s.TravellersFromPeople = TravellersFromPeople;
             s.TownGrowthEnabled = TownGrowthEnabled;
@@ -6183,6 +6204,8 @@ namespace Armoury
             s.TownPurseNoBkSkim = TownPurseNoBkSkim;
             s.TownPurseNoBkSkimVillages = TownPurseNoBkSkimVillages;
             s.TownPaysFromSurplus = TownPaysFromSurplus;
+            s.AlleyCashProbe = AlleyCashProbe;
+            s.IdleCaravanDisband = IdleCaravanDisband;
             s.CrownCurrentIncome = CrownCurrentIncome;
             s.CrownReserveGold = CrownReserveGold;
             s.CrownReserveReleaseDays = CrownReserveReleaseDays;
@@ -6654,6 +6677,8 @@ namespace Armoury
             s.AiSellsSpareHorses = AiSellsSpareHorses;
             s.AiSpareHorseShare = AiSpareHorseShare;
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
+            s.VillagerPacksFromHerd = VillagerPacksFromHerd;
+            s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
