@@ -333,6 +333,25 @@ namespace Armoury
             catch (Exception e) { Stumble("DeserterRegion", e); return null; }
         }
 
+        /// <summary>N7 (StragglersRally, recenzja K5/O5): region Polnocy najblizszy punktowi - rozbici Strazy rozchodzacy sie z osady zbiorki "do lasu" ida ta sama
+        /// droga co rozbici Strazy w bitwie (DeserterRegion, E4/9 4.5); null - prawo nieczynne albo brak regionow Polnocy (wolajacy bierze region punktu).</summary>
+        internal static Settlement NorthRegionAt(TaleWorlds.Library.Vec2 p)
+        {
+            try
+            {
+                if (!Live) return null;
+                EnsureLists();
+                Settlement best = null; float bd = float.MaxValue;
+                foreach (var r in _north)
+                {
+                    float d = p.DistanceSquared(r.GetPosition2D);
+                    if (d < bd) { bd = d; best = r; }
+                }
+                return best;
+            }
+            catch (Exception e) { Stumble("NorthRegionAt", e); return null; }
+        }
+
         // ================================================================ H1 - Straz nie pali wsi (4.6)
         internal static void ApplyAll(Harmony h)
         {

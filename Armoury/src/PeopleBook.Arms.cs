@@ -437,8 +437,10 @@ namespace Armoury
         {
             double mi = 0, mo = 0; int regs = 0;
             foreach (var r in _rg.Values) { mi += r.MigIn; mo += r.MigOut; if (r.MigIn > Eps || r.MigOut > Eps) regs++; }
-            double road = 0; foreach (var v in Views()) road += v.Road;
-            return " | E4/8: migracja R19 od siewu: wyszlo " + N0(mo) + ", przyszlo " + N0(mi) + " (regionow z migracja " + regs + "), w drodze teraz z pochodzeniem " + N0(road);
+            double road = 0, rally = 0; foreach (var v in Views()) { road += v.Road; rally += v.Rally; }
+            // N7 (recenzja K3 / O8): czekajacy w osadach zbiorki maja w rownaniu regionu wlasne konto (Rally) - nie sa "w drodze" BK
+            return " | E4/8: migracja R19 od siewu: wyszlo " + N0(mo) + ", przyszlo " + N0(mi) + " (regionow z migracja " + regs + "), w drodze teraz z pochodzeniem " + N0(road)
+                   + ", czekajacy w osadach zbiorki N7 z pochodzeniem " + N0(rally);
         }
     }
 }

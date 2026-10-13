@@ -1500,7 +1500,7 @@ namespace Armoury
 
         /// <summary>Bitwa gracza: jedna linia z liczbami po wyniku i podzialem rozbitych (3.2). Walka w polu - H3 jej nie rusza ("pominieta");
         /// autobitwa objeta przez F1 - liczby po H3 (plan w linii "Bitwa: H3 autobitwa gracza").</summary>
-        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool, int undead, int tavern = 0)
+        internal static void PlayerLine(MapEvent me, int pool, int bk, int village, int template, int homeless, bool toPool, int undead, int tavern = 0, int rally = 0)
         {
             try
             {
@@ -1531,6 +1531,7 @@ namespace Armoury
                 sb.Append(" | rozbici: do puli ").Append(pool).Append(", do domu ").Append(bk + village).Append(" (BK ").Append(bk).Append(", wies ").Append(village)
                   .Append("), z szablonu ").Append(template).Append(", bez domu ").Append(homeless).Append(homeless > 0 ? (toPool ? " (do puli)" : " (znikneli - prawo wyrzutkow wylaczone)") : "")
                   .Append(", do karczmy (E4/10) ").Append(tavern)
+                  .Append(", do zbiorki pod choragiew (N7) ").Append(rally)        // N7 (recenzja K11): rozbici druzyn lordow pobitych w bitwie gracza (gracz i obie strony)
                   .Append(undead > 0 ? ", Inni (wighty - z niczego, do niczego) " + undead : "").Append('.');
                 Log.Info(sb.ToString());
             }
@@ -1634,7 +1635,8 @@ namespace Armoury
                   .Append(_vanished > 0 ? " (znikneli - prawo wyrzutkow wylaczone " + _vanished + ")" : " (do puli)")
                   .Append(", do karczmy (E4/10) ").Append(_tavernRouted + _tavernFreed).Append(" (rozbici ").Append(_tavernRouted).Append(", uwolnieni jency ").Append(_tavernFreed).Append(')');
                 // ta sama suma wedlug zrodla: "rozbici z bitew" tej doby = dopisek H3 linii "Wyrzutki:" tej samej doby (ludnosc BK, do wsi,
-                // z szablonu); "z puli" pochodzi z powrotu w OutlawLaw.Daily, ktory biegnie PO tej linii - to liczba z linii "Wyrzutki:" doby wczesniej
+                // z szablonu) + rozejscie zbiorki N7 tej doby (linia "Rozbici wracaja (N7)": rozeszli sie - dom; StragglersRally.Disperse idzie ta sama droga
+                // SrcRouted, ale poza dopiskiem H3 - recenzja O8); "z puli" pochodzi z powrotu w OutlawLaw.Daily, ktory biegnie PO tej linii - to liczba z linii "Wyrzutki:" doby wczesniej
                 sb.Append(" | domy wedlug zrodla: rozbici z bitew - BK ").Append(_bkBy[SrcRouted]).Append(", wies ").Append(_hearthBy[SrcRouted]).Append(", z szablonu ").Append(_tplBy[SrcRouted])
                   .Append("; uwolnieni jency - BK ").Append(_bkBy[SrcFreed]).Append(", wies ").Append(_hearthBy[SrcFreed]).Append(", z szablonu ").Append(_tplBy[SrcFreed])
                   .Append("; z puli (linia \"Wyrzutki:\" doby ").Append(day - 1).Append(") - BK ").Append(_bkBy[SrcPool])

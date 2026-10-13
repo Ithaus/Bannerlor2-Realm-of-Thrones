@@ -18,9 +18,9 @@ namespace Armoury
     /// dezercji, wiec wraca; czesc wybiera zycie banity, a czesc wraca do domow" - takze bitwy w polu). Wylacznik StragglersRally.
     ///
     /// Kogo dotyczy: szeregowi DRUZYN LORDOW (partia rodu z wodzem, takze kompanie najemne i druzyna gracza) pobitych w bitwie objetej H3 (pole, autobitwa
-    /// gracza F1, pod murami N3) oraz druzyna gracza pobita w walce w polu (misja - H3 jej nie rusza, ale "jego rozbici czekaja tak samo"). Bandy, karawany,
-    /// tabory wsi, zalogi, milicje, Inni - bez zmian. Zabici i jency - bez zmian (H3). Zmienia sie tylko los ROZBITYCH tych druzyn (RoutedInBattle przy
-    /// MapEventEnded - OutlawLaw.RoutedH3Body):
+    /// gracza F1, pod murami N3) oraz w walce gracza w polu (misja - H3 jej nie rusza): druzyna gracza i druzyny lordow pobitej strony (recenzja O2 - jedna
+    /// zasada dla jednego zjawiska; "jego rozbici czekaja tak samo"). Bandy, karawany, tabory wsi, zalogi, milicje, Inni - bez zmian. Zabici i jency - bez zmian
+    /// (H3). Zmienia sie tylko los ROZBITYCH tych druzyn (RoutedInBattle przy MapEventEnded - OutlawLaw.RoutedH3Body):
     ///  - podzial (Jeff): 55% pod choragiew, 30% do domu, 15% do lasu; pod choragiew weterani (tier 4+) 70%, tier 3 55%, rekruci (tier 1-2) 45%, reszta dom : las
     ///    = 2 : 1; kraj WLASNY (wlasciciel warowni regionu bitwy = frakcja pobitej druzyny): pod choragiew -5, dom +10, las -5 pkt; kraj OBCY: +5 / -10 / +5;
     ///    zalegly zold (WarLedger - doby zaleglosci druzyny, najdluzsza w rodzie): -10 pkt powrotu za kazdy pelny tydzien (najwyzej do 20%), odjeci - do lasu;
@@ -28,18 +28,21 @@ namespace Armoury
     ///  - do domu i do lasu - te same drogi co dotad (karczma E4/10, SendHome, pula wyrzutkow regionu, bez prawa wyrzutkow las = dom);
     ///  - pod choragiew: ZBIORKA w najblizszej bitwie twierdzy rodu (bez twierdzy - miasto, potem zamek krolestwa; potem siedziba rodu, potem najblizsze
     ///    niewrogie miasto; nic - podzial dom : las 2 : 1, Straz - las) po 3-10 dobach (droga piesza z miejsca bitwy, MarketCarts.PerDay); potem czekaja
-    ///    najwyzej StragglersRallyWaitDays dob na pana. Raz na dobe kazda gotowa grupa idzie do najblizszej druzyny SWOJEGO rodu (pan wrocil z niewoli, nowa
+    ///    najwyzej StragglersRallyWaitDays dob na pana. Raz na dobe kazda gotowa grupa szuka najblizszej druzyny SWOJEGO rodu (pan wrocil z niewoli, nowa
     ///    druzyna, inna druzyna rodu; gracz - jego druzyna i druzyny jego rodu) w zasiegu StragglersRallyReachDays dob marszu od osady zbiorki - druzyna poza
-    ///    bitwa, nie na morzu, z wodzem na wolnosci, nie w oblezonej osadzie. Druzyna przyjmuje najwyzej tylu, na ilu ma miejsce w limicie (PartySizeLimit)
-    ///    i w zoldzie: gdy ma limit zoldu (pulap ClanBudget przez SetWagePaymentLimit) - GetAvailableWageBudget / zold czlowieka, ta sama miara co werbunek gry
-    ///    (RecruitmentCampaignBehavior :490); Straz bez zoldu - pula Strazy w ludziach (ClanBudget.WatchRoom). Weterani pierwsi. Reszta czeka dalej.
-    ///    Po czasie czekania: polowa do domu, polowa do lasu (Straz - las) tymi samymi drogami.
+    ///    bitwa, nie na morzu, z wodzem na wolnosci, nie w oblezonej osadzie - i MASZERUJE do niej tyle dob, ile wynosi droga (recenzja K8); po dojsciu druzyny
+    ///    w zasiegu przyjmuja najwyzej tylu, na ilu maja miejsce w limicie (PartySizeLimit) i w zoldzie: gdy druzyna ma limit zoldu (pulap ClanBudget przez
+    ///    SetWagePaymentLimit) - GetAvailableWageBudget / zold czlowieka, ta sama miara co werbunek gry (RecruitmentCampaignBehavior :490); Straz bez zoldu - pula
+    ///    Strazy w ludziach (ClanBudget.WatchRoom, czytana na zywo). Weterani pierwsi. Reszta czeka dalej; gdy druzyny w zasiegu juz nie ma - wracaja do osady.
+    ///    Osada zbiorki oblezona - tej doby bez odbioru; zdobyta przez wroga rodu - grupa idzie do nowej osady zbiorki (FindRally od tej osady), a gdy takiej
+    ///    nie ma - rozchodzi sie (recenzja K2). Po czasie czekania: polowa do domu, polowa do lasu (Straz - las Polnocy, WatchLaw.NorthRegionAt) tymi samymi drogami.
     /// Ksiega ludzi: nikt nie powstaje i nie znika. Udzialy pochodzenia zdjete z druzyny przy rozbiciu (Take FRouted - jak dotad) jada z grupa (dokad: "do zbiorki
-    /// pod choragiew (N7)"), przy odbiorze wracaja do druzyny (Give FRally), przy rozejsciu - PoolShares / SendHome jak dotad. Kontrola linii doby:
+    /// pod choragiew (N7)"), przy odbiorze wracaja do druzyny (Give FRally), przy rozejsciu - PoolShares / SendHome jak dotad (i schodza z "do zbiorki" - netto,
+    /// RallyOut). W rownaniu regionu czekajacy maja wlasne konto Rally (menu: "Stragglers waiting to rejoin their lords"). Kontrola linii doby:
     /// czekali wczoraj + nowi - odebrani - rozeszli sie - zgubieni = czekaja dzis. Zloto: nic - czekajacy nie sa w druzynie, wiec nie dostaja zoldu; sakiewka
     /// ludzi zostaje przy druzynie (MenPurse, jak dotad); konie zostaja w zbiorowni druzyny (DTE) - wracajacy jezdziec jest jak nowy rekrut konny.
-    /// Zapis: klucz "arm_n7_rally" (SaveText.Sync), wersja 1; brak klucza = pusta pula. Linia doby "Rozbici wracaja (N7): dzien", wpis w bitwy.log
-    /// "Bitwa: N7 rozbici dzien" na kazda pobita druzyne lorda z rozbitymi. Potkniecia liczone per obiekt (bez globalnego wylacznika).
+    /// Zapis: klucz "arm_n7_rally" (SaveText.Sync), wersja 1; brak klucza = pusta pula. Linia doby "Rozbici wracaja (N7): dzien" (blad linii - linia "BLAD LINII"
+    /// z potknieciami), wpis w bitwy.log "Bitwa: N7 rozbici dzien" na kazda pobita druzyne lorda z rozbitymi. Potkniecia liczone per obiekt (bez globalnego wylacznika).
     /// </summary>
     internal static class StragglersRally
     {
@@ -71,6 +74,7 @@ namespace Armoury
         {
             public string ClanId, RallyId; public Clan Clan; public Settlement Rally;
             public int Day, Ready; public bool Watch, Announced;
+            public int Arrive;                      // recenzja K8: doba dojscia do druzyny rodu (0 - w osadzie zbiorki; > dzis - w marszu)
             public readonly List<TN> T = new List<TN>();
             public PeopleBook.Shares O = new PeopleBook.Shares();
             public int Men { get { int n = 0; for (int i = 0; i < T.Count; i++) n += Math.Max(0, T[i].N); return n; } }
@@ -78,39 +82,40 @@ namespace Armoury
         private static readonly List<G> _groups = new List<G>();
         private static bool _needResolve;
         private static int _lastW = 0;              // czekajacy z konca poprzedniej linii (po wczytaniu - z zapisu)
-        private static int _lastChars = -1, _importN = -1, _importBad, _badIds;
+        private static int _importN = -1, _importBad, _badIds;
+        private static readonly StringBuilder _xsb = new StringBuilder(4096);   // recenzja K9: jeden bufor zapisu (linia doby liczy znaki bez nowego napisu)
 
         // ---------------------------------------------------------------- liczniki doby
-        private static int _dParties, _dBattles, _dRouted, _dBack, _dHome, _dWoods, _dNoRally, _dPlayerBack;
+        private static int _dParties, _dBattles, _dRouted, _dBack, _dHome, _dWoods, _dNoRally, _dPlayerBack, _dBadMark;
         private static double _dEB, _dEH, _dEW;
         private static MapEvent _lastMe;
-        private static int _dPicked, _dPickParties, _dPickPlayer, _dReady, _dAdded;
-        private static int _dDispHome, _dDispWoods, _dDispTavern, _dDispLost, _dExpire, _dOff, _dNoClan, _dLoadLost, _dStale;
-        private static int _dWaitNoParty, _dWaitFar, _dWaitFull, _dWaitWage;
+        private static int _dPicked, _dPickParties, _dPickPlayer, _dReady, _dAdded, _dMarchStart, _dMarchBack, _dMoved;
+        private static int _dDispHome, _dDispWoods, _dDispTavern, _dDispLost, _dExpire, _dOff, _dNoClan, _dLostRally, _dLoadLost, _dStale;
+        private static int _dWaitNoParty, _dWaitFar, _dWaitFull, _dWaitWage, _dWaitSiege;
         private static double _dFarDays; private static int _dFarN;
         private static int _stMark, _stSplit, _stPick, _stDisp, _stSave, _stLine;
         private static long _ticks;
         private static readonly HashSet<string> _err = new HashSet<string>();
-        private static int _watchTaken;             // Straz bez zoldu: miejsce w puli Strazy zajete dzis odbiorem
 
         internal static void Reset()
         {
-            _marks.Clear(); _groups.Clear(); _needResolve = false; _lastW = 0; _lastChars = -1; _importN = -1; _importBad = 0; _badIds = 0;
-            _forts = null; _fortsDay = -1; _err.Clear();
+            _marks.Clear(); _groups.Clear(); _needResolve = false; _lastW = 0; _importN = -1; _importBad = 0; _badIds = 0;
+            _forts = null; _fortsDay = -1; _err.Clear(); _xsb.Length = 0;
             ClearDay();
         }
 
         private static void ClearDay()
         {
-            _dParties = _dBattles = _dRouted = _dBack = _dHome = _dWoods = _dNoRally = _dPlayerBack = 0; _dEB = _dEH = _dEW = 0; _lastMe = null;
-            _dPicked = _dPickParties = _dPickPlayer = _dReady = _dAdded = 0;
-            _dDispHome = _dDispWoods = _dDispTavern = _dDispLost = _dExpire = _dOff = _dNoClan = _dLoadLost = _dStale = 0;
-            _dWaitNoParty = _dWaitFar = _dWaitFull = _dWaitWage = 0; _dFarDays = 0; _dFarN = 0;
+            _dParties = _dBattles = _dRouted = _dBack = _dHome = _dWoods = _dNoRally = _dPlayerBack = _dBadMark = 0; _dEB = _dEH = _dEW = 0; _lastMe = null;
+            _dPicked = _dPickParties = _dPickPlayer = _dReady = _dAdded = _dMarchStart = _dMarchBack = _dMoved = 0;
+            _dDispHome = _dDispWoods = _dDispTavern = _dDispLost = _dExpire = _dOff = _dNoClan = _dLostRally = _dLoadLost = _dStale = 0;
+            _dWaitNoParty = _dWaitFar = _dWaitFull = _dWaitWage = _dWaitSiege = 0; _dFarDays = 0; _dFarN = 0;
             _stMark = _stSplit = _stPick = _stDisp = _stSave = _stLine = 0;
-            _ticks = 0; _watchTaken = 0;
+            _ticks = 0;
         }
 
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
+        private static double PerDay { get { return Math.Max(1.0, MarketCarts.PerDay(Settings.Current)); } }
 
         private static void Stumble(ref int counter, string where, Exception e)
         {
@@ -146,17 +151,15 @@ namespace Armoury
             m.Watch = IsWatch(mp);
             m.Weeks = ArrearsDays(mp, c) / 7;
             m.Rally = FindRally(c, pos);
-            if (m.Rally != null)
-            {
-                double per = Math.Max(1.0, MarketCarts.PerDay(Settings.Current));
-                double d = pos.Distance(m.Rally.GetPosition2D);
-                m.Gather = Math.Max(GatherMin, Math.Min(GatherMax, (int)Math.Ceiling(d / per)));
-            }
+            // recenzja K7: id rodu / osady ze znakiem separatora zapisu - grupa nie przezylaby zapisu (ludzie znikneliby bez nazwy); bez zbiorki - dom : las jak przy braku osady
+            if (m.Rally != null && (Bad(c.StringId) || Bad(m.Rally.StringId))) { m.Rally = null; _dBadMark++; }
+            if (m.Rally != null) m.Gather = Math.Max(GatherMin, Math.Min(GatherMax, (int)Math.Ceiling(pos.Distance(m.Rally.GetPosition2D) / PerDay)));
             return m;
         }
 
-        /// <summary>Znacznik dla rozbitych tej partii w tej bitwie (zdejmowany przy uzyciu); druzyna gracza pobita w walce w polu - liczony tu. null - jak dotad.</summary>
-        internal static Mark For(MapEvent me, MobileParty mp)
+        /// <summary>Znacznik dla rozbitych tej partii w tej bitwie (zdejmowany przy uzyciu); walka gracza w polu (misja; H3 jej nie rusza) - liczony tu dla
+        /// druzyny gracza i druzyn lordow pobitej strony (recenzja O2). null - jak dotad.</summary>
+        internal static Mark For(MapEvent me, MobileParty mp, BattleSideEnum side)
         {
             if (!On || me == null || mp == null) return null;
             try
@@ -166,9 +169,8 @@ namespace Armoury
                     var m = _marks[i];
                     if (ReferenceEquals(m.Mp, mp) && ReferenceEquals(m.Me, me)) { _marks.RemoveAt(i); return m; }
                 }
-                // gracz pobity w walce w polu (misja; H3 jej nie rusza) - "jego rozbici czekaja tak samo" (decyzja Jeffa)
-                if (mp == MobileParty.MainParty && me.IsPlayerMapEvent && me.IsFieldBattle && !me.IsNavalMapEvent
-                    && me.DefeatedSide != BattleSideEnum.None && me.DefeatedSide == me.PlayerSide)
+                // walka gracza w polu - "jego rozbici czekaja tak samo" (decyzja Jeffa); lordowie pobici przez gracza i towarzysze gracza - ta sama zasada
+                if (me.IsPlayerMapEvent && me.IsFieldBattle && !me.IsNavalMapEvent && me.DefeatedSide != BattleSideEnum.None && side == me.DefeatedSide)
                     return MakeMark(mp, me, me.Position.ToVec2());
             }
             catch (Exception e) { Stumble(ref _stMark, "For", e); }
@@ -214,7 +216,7 @@ namespace Armoury
             return f != null && cf != null && f != cf && FactionManager.IsAtWarAgainstFaction(f, cf);
         }
 
-        /// <summary>Twierdza rodu najblizsza bitwie (nieoblegana); brak - miasto, potem zamek krolestwa; potem siedziba rodu (wies - jej twierdza), gdy niewroga;
+        /// <summary>Twierdza rodu najblizsza punktowi (nieoblegana); brak - miasto, potem zamek krolestwa; potem siedziba rodu (wies - jej twierdza), gdy niewroga;
         /// potem najblizsze niewrogie miasto. null - brak.</summary>
         private static Settlement FindRally(Clan c, Vec2 pos)
         {
@@ -253,7 +255,7 @@ namespace Armoury
 
         // ================================================================ podzial rozbitych (OutlawLaw.RoutedH3Body, typ po typie)
         /// <summary>Udzialy: pod choragiew b, do domu h, do lasu w (suma 1) dla typu t przy znaczniku m (bez osady zbiorki - b rozdzielone dom : las 2 : 1).</summary>
-        private static void Parts(Mark m, CharacterObject t, out double b, out double h, out double w)
+        private static void Parts(Mark m, CharacterObject t, bool noRally, out double b, out double h, out double w)
         {
             if (m.Watch) { b = WatchBack; h = 0.0; }
             else
@@ -265,7 +267,7 @@ namespace Armoury
             }
             if (m.Weeks > 0 && b > BackFloor) b = Math.Max(BackFloor, b - ArrearsPerWeek * m.Weeks);    // odjeci - do lasu (w = reszta)
             w = Math.Max(0.0, 1.0 - b - h);
-            if (m.Rally == null)
+            if (m.Rally == null || noRally)
             {
                 if (m.Watch) w += b; else { h += b * HomeOfRest; w += b * (1.0 - HomeOfRest); }
                 b = 0.0;
@@ -273,24 +275,38 @@ namespace Armoury
         }
 
         /// <summary>n rozbitych typu t: ilu idzie do zbiorki (dopisani do grupy z udzialami wycietymi ze slice) i ilu do lasu (toWoods); reszta - do domu u wolajacego.
-        /// Blad - 0 / 0 (wolajacy wysyla wszystkich do domu jak dotad).</summary>
+        /// Blad przed dopisaniem do grupy - 0 / 0 i udzialy wracaja do slice (wolajacy wysyla wszystkich do domu jak dotad); blad po dopisaniu - wynik jak bez bledu
+        /// (recenzja O7: ludzie nie moga byc naraz w grupie i w domu).</summary>
         internal static int Split(Mark m, CharacterObject t, int n, PeopleBook.Shares slice, out int toWoods)
         {
             toWoods = 0;
             if (m == null || t == null || n <= 0) return 0;
             var sw = Stopwatch.StartNew();
+            PeopleBook.Shares cut = null;
+            bool committed = false;
+            int nb = 0, nw = 0;
             try
             {
                 double b, h, w;
-                Parts(m, t, out b, out h, out w);
-                int nb = Math.Max(0, Math.Min(n, MBRandom.RoundRandomized((float)(n * b))));
-                int nw = Math.Max(0, Math.Min(n - nb, MBRandom.RoundRandomized((float)(n * w))));
+                Parts(m, t, Bad(t.StringId), out b, out h, out w);
+                nb = Math.Max(0, Math.Min(n, MBRandom.RoundRandomized((float)(n * b))));
+                nw = Math.Max(0, Math.Min(n - nb, MBRandom.RoundRandomized((float)(n * w))));
+                if (nb > 0)
+                {
+                    cut = slice != null ? slice.Cut(nb) : null;
+                    AddGroup(m, t, nb, cut, ref committed);
+                }
                 m.EB += n * b; m.EH += n * h; m.EW += n * w;
-                if (nb > 0) AddGroup(m, t, nb, slice != null ? slice.Cut(nb) : null);
                 toWoods = nw;
                 return nb;
             }
-            catch (Exception e) { Stumble(ref _stSplit, "Split", e); toWoods = 0; return 0; }
+            catch (Exception e)
+            {
+                Stumble(ref _stSplit, "Split", e);
+                if (committed) { toWoods = nw; return nb; }
+                if (cut != null && slice != null) { try { slice.AddAll(cut); } catch { } }
+                toWoods = 0; return 0;
+            }
             finally { _ticks += sw.ElapsedTicks; }
         }
 
@@ -301,32 +317,37 @@ namespace Armoury
             m.Routed += n; m.Back += back; m.Woods += woods; m.Home += Math.Max(0, n - back - woods);
         }
 
-        private static void AddGroup(Mark m, CharacterObject t, int n, PeopleBook.Shares sh)
+        /// <summary>Dopisanie n ludzi typu t do grupy (rod, osada, doba bitwy, doba gotowosci, Straz - recenzja K8: czas zbiorki i znacznik Strazy wlasne dla grupy).
+        /// Najpierw wszystko, co moze rzucic (wyszukanie, nowe obiekty); potem sam zapis stanu - committed = true tuz przed nim (recenzja O7).</summary>
+        private static void AddGroup(Mark m, CharacterObject t, int n, PeopleBook.Shares sh, ref bool committed)
         {
             int day = Today;
+            int ready = day + m.Gather;
             G g = null;
             for (int i = _groups.Count - 1; i >= 0; i--)
             {
                 var x = _groups[i];
-                if (x.Day == day && ReferenceEquals(x.Clan, m.Clan) && ReferenceEquals(x.Rally, m.Rally)) { g = x; break; }
+                if (x.Day == day && x.Ready == ready && x.Watch == m.Watch && ReferenceEquals(x.Clan, m.Clan) && ReferenceEquals(x.Rally, m.Rally)) { g = x; break; }
             }
-            if (g == null)
-            {
-                g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = day + m.Gather, Watch = m.Watch };
-                _groups.Add(g);
-            }
+            bool newG = g == null;
+            if (newG) g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = ready, Watch = m.Watch };
             TN tn = null;
             for (int i = 0; i < g.T.Count; i++) if (ReferenceEquals(g.T[i].C, t)) { tn = g.T[i]; break; }
-            if (tn == null) { tn = new TN { C = t, Id = t.StringId }; g.T.Add(tn); }
-            tn.N += n;
+            bool newT = tn == null;
+            if (newT) tn = new TN { C = t, Id = t.StringId };
             if (sh == null) sh = PeopleBook.Shares.None(n);
+            // od tego miejsca tylko zapis stanu - ludzie i udzialy wchodza do grupy razem
+            committed = true;
+            if (newG) _groups.Add(g);
+            if (newT) g.T.Add(tn);
+            tn.N += n;
             g.O.AddAll(sh);
             if (g.O.Total < g.Men - 1e-6) g.O.Add("", g.Men - g.O.Total);
             PeopleBook.RallyShares(sh);
             _dAdded += n;
         }
 
-        /// <summary>Wpis w bitwy.log dla pobitej druzyny lorda z rozbitymi (po calym rosterze rozbitych tej partii).</summary>
+        /// <summary>Wpis w bitwy.log dla pobitej druzyny lorda z rozbitymi (po calym rosterze rozbitych tej partii); gracz i jego rod - komunikat (recenzja K11).</summary>
         internal static void BattleLine(Mark m, MapEvent me)
         {
             if (m == null || m.Routed <= 0) return;
@@ -345,8 +366,11 @@ namespace Armoury
                   .Append(", do domu ").Append(m.Home).Append(", do lasu ").Append(m.Woods)
                   .Append(" | oczekiwane ").Append(m.EB.ToString("0.0", ci)).Append(" / ").Append(m.EH.ToString("0.0", ci)).Append(" / ").Append(m.EW.ToString("0.0", ci))
                   .Append(" | kraj ").Append(m.Own ? "wlasny" : "obcy").Append(", zalegly zold ").Append(m.Weeks).Append(" tyg., Straz ").Append(m.Watch ? "tak" : "nie")
-                  .Append(m.Player ? ", rod gracza" : "").Append('.');
+                  .Append(m.Player ? ", rod gracza" : "").Append(me.IsPlayerMapEvent ? ", bitwa gracza" : "").Append('.');
                 Log.Info(sb.ToString());
+                if (m.Player && m.Back > 0 && m.Rally != null)
+                    Log.Player(m.Mp == MobileParty.MainParty ? "Stragglers: " + m.Back + " of your men fled toward " + m.Rally.Name + "."
+                                                            : "Stragglers: " + m.Back + " men of " + m.Name + " fled toward " + m.Rally.Name + ".");
             }
             catch (Exception e) { Stumble(ref _stLine, "BattleLine", e); }
         }
@@ -368,6 +392,7 @@ namespace Armoury
             if (Campaign.Current == null) return;
             var sw = Stopwatch.StartNew();
             int day = Today;
+            bool lined = false;
             try
             {
                 Resolve();
@@ -377,7 +402,8 @@ namespace Armoury
                 {
                     _groups.Sort((a, b) => a.Ready != b.Ready ? a.Ready.CompareTo(b.Ready) : a.Day.CompareTo(b.Day));
                     var cand = new Dictionary<Clan, List<MobileParty>>();
-                    double reach = Math.Max(0.0, Settings.Current.StragglersRallyReachDays) * Math.Max(1.0, MarketCarts.PerDay(Settings.Current));
+                    double per = PerDay;
+                    double reach = Math.Max(0.0, Settings.Current.StragglersRallyReachDays) * per;
                     int wait = Math.Max(1, Settings.Current.StragglersRallyWaitDays);
                     for (int i = 0; i < _groups.Count; i++)
                     {
@@ -387,6 +413,8 @@ namespace Armoury
                             if (g.Men <= 0) continue;
                             if (!on) { _dOff += Disperse(g); continue; }
                             if (g.Clan == null || g.Clan.IsEliminated) { _dNoClan += Disperse(g); continue; }
+                            // recenzja K2: osada zbiorki zdobyta przez wroga rodu (albo rod zmienil strone) - nowa osada zbiorki od tej; brak - rozejscie stad
+                            if (g.Rally != null && Hostile(g.Rally, g.Clan) && !Move(g, day, per)) { _dLostRally += Disperse(g); continue; }
                             if (day < g.Ready) continue;
                             if (!g.Announced)
                             {
@@ -394,16 +422,24 @@ namespace Armoury
                                 if (g.Clan == Clan.PlayerClan && g.Rally != null) Log.Player("Stragglers: " + g.Men + " of your men have gathered at " + g.Rally.Name + ".");
                             }
                             if (day >= g.Ready + wait) { _dExpire += Disperse(g); continue; }
-                            Pickup(g, cand, reach);
+                            // recenzja K2: osada oblezona - nikt nie wychodzi do druzyny tej doby (marsz przerwany - wracaja za mury)
+                            if (g.Rally != null && g.Rally.IsUnderSiege) { MarchBack(g); _dWaitSiege += g.Men; continue; }
+                            Pickup(g, cand, reach, per, day);
                         }
                         catch (Exception e) { Stumble(ref _stPick, "Daily(grupa)", e); }
                     }
                     _groups.RemoveAll(x => x.Men <= 0);
                 }
+                _ticks += sw.ElapsedTicks;
                 Line(day, on);
+                lined = true;
             }
             catch (Exception e) { Stumble(ref _stLine, "Daily", e); }
-            finally { ClearDay(); }
+            finally
+            {
+                if (!lined) FailLine(day);           // recenzja K1: bez linii doby narzedzie widzi dziure (N7-0) i potkniecia (N7-5)
+                ClearDay();
+            }
         }
 
         private static bool Usable(MobileParty mp)
@@ -434,12 +470,36 @@ namespace Armoury
             return l;
         }
 
-        private static void Pickup(G g, Dictionary<Clan, List<MobileParty>> cand, double reach)
+        /// <summary>Osada zbiorki zdobyta: grupa idzie do nowej osady zbiorki (FindRally od tej osady; droga piesza 1-10 dob, czekanie liczone od dojscia). false - brak.</summary>
+        private static bool Move(G g, int day, double per)
+        {
+            var old = g.Rally;
+            var op = old.GetPosition2D;
+            var nr = FindRally(g.Clan, op);
+            if (nr == null || ReferenceEquals(nr, old) || Bad(nr.StringId)) return false;
+            int men = g.Men;
+            int dd = Math.Max(1, Math.Min(GatherMax, (int)Math.Ceiling(op.Distance(nr.GetPosition2D) / per)));
+            g.Rally = nr; g.RallyId = nr.StringId; g.Ready = Math.Max(g.Ready, day + dd); g.Arrive = 0; g.Announced = false;
+            _dMoved += men;
+            if (g.Clan == Clan.PlayerClan) Log.Player("Stragglers: " + old.Name + " has fallen to the enemy - " + men + " of your men are making for " + nr.Name + ".");
+            return true;
+        }
+
+        /// <summary>Marsz do druzyny przerwany (druzyny w zasiegu juz nie ma, osada oblezona) - grupa wraca do osady zbiorki; nastepny marsz od nowa.</summary>
+        private static void MarchBack(G g)
+        {
+            if (g.Arrive <= 0) return;
+            _dMarchBack += g.Men;
+            g.Arrive = 0;
+        }
+
+        private static void Pickup(G g, Dictionary<Clan, List<MobileParty>> cand, double reach, double per, int day)
         {
             if (g.Rally == null) return;
+            if (g.Arrive > day) return;                                   // w marszu (linia: "w marszu do druzyny")
             List<MobileParty> ps;
             if (!cand.TryGetValue(g.Clan, out ps)) { ps = Candidates(g.Clan); cand[g.Clan] = ps; }
-            if (ps.Count == 0) { _dWaitNoParty += g.Men; return; }
+            if (ps.Count == 0) { MarchBack(g); _dWaitNoParty += g.Men; return; }
             var rp = g.Rally.GetPosition2D;
             var near = new List<KeyValuePair<float, MobileParty>>();
             float nearest = float.MaxValue;
@@ -451,12 +511,19 @@ namespace Armoury
             }
             if (near.Count == 0)
             {
+                MarchBack(g);
                 _dWaitFar += g.Men;
-                double per = Math.Max(1.0, MarketCarts.PerDay(Settings.Current));
                 _dFarDays += nearest / per; _dFarN++;
                 return;
             }
             near.Sort((a, b) => a.Key.CompareTo(b.Key));
+            // recenzja K8: odbior nie jest natychmiastowy - grupa idzie do najblizszej druzyny tyle dob, ile wynosi droga od osady zbiorki
+            if (g.Arrive == 0)
+            {
+                int md = (int)Math.Ceiling(near[0].Key / per);
+                if (md >= 1) { g.Arrive = day + md; _dMarchStart += g.Men; return; }
+                g.Arrive = day;
+            }
             bool full = false, wage = false;
             foreach (var kv in near)
             {
@@ -468,22 +535,25 @@ namespace Armoury
             if (g.Men > 0) { if (wage && !full) _dWaitWage += g.Men; else _dWaitFull += g.Men; }
         }
 
-        /// <summary>Odbior do druzyny mp: najwyzej miejsce w limicie i w zoldzie (weterani pierwsi). why: 0 - przyjal albo nic do przyjecia, 1 - brak miejsca, 2 - brak zoldu.</summary>
+        /// <summary>Odbior do druzyny mp: najwyzej miejsce w limicie i w zoldzie (weterani pierwsi); typ po typie: roster, grupa, udzialy (Give FRally) i liczniki
+        /// razem (recenzja O7). why: 0 - przyjal albo nic do przyjecia, 1 - brak miejsca, 2 - brak zoldu.</summary>
         private static int TakeInto(G g, MobileParty mp, out int why)
         {
             why = 0;
+            int taken = 0;
             try
             {
                 int room = mp.Party.PartySizeLimit - mp.MemberRoster.TotalManCount;
+                // Straz bez zoldu: pula Strazy w ludziach czytana na zywo (odebrani wczesniej tej doby juz sa w skladzie - recenzja K4/O6, bez drugiego odejmowania)
                 int wr = ClanBudget.WatchRoom(g.Clan);
-                if (wr >= 0) room = Math.Min(room, wr - _watchTaken);
+                if (wr >= 0) room = Math.Min(room, wr);
                 if (room <= 0) { why = 1; return 0; }
                 bool lim = mp.HasLimitedWage();
                 int budget = lim ? mp.GetAvailableWageBudget() : int.MaxValue;
                 if (lim && budget <= 0) { why = 2; return 0; }
                 var wm = Campaign.Current.Models.PartyWageModel;
                 g.T.Sort((a, b) => (b.C != null ? b.C.Tier : 0).CompareTo(a.C != null ? a.C.Tier : 0));
-                int taken = 0; bool wageShort = false;
+                bool wageShort = false, first = true;
                 foreach (var tn in g.T)
                 {
                     if (tn.N <= 0 || tn.C == null) continue;
@@ -491,15 +561,14 @@ namespace Armoury
                     if (lim) { w = wm.GetCharacterWage(tn.C); if (w > 0) { int kw = budget / w; if (kw < k) { k = kw; wageShort = true; } } }
                     if (k <= 0) continue;
                     mp.MemberRoster.AddToCounts(tn.C, k);
-                    tn.N -= k; room -= k; taken += k;
+                    tn.N -= k; room -= k; taken += k; _dPicked += k;
+                    if (first) { first = false; _dPickParties++; }
+                    if (mp == MobileParty.MainParty) _dPickPlayer += k;
                     if (lim && w > 0) budget -= k * w;
+                    PeopleBook.Give(mp.MemberRoster, g.O.Cut(k), PeopleBook.FRally);
                     if (room <= 0) break;
                 }
                 if (taken <= 0) { why = wageShort ? 2 : 1; return 0; }
-                PeopleBook.Give(mp.MemberRoster, g.O.Cut(taken), PeopleBook.FRally);
-                if (wr >= 0) _watchTaken += taken;
-                _dPicked += taken; _dPickParties++;
-                if (mp == MobileParty.MainParty) _dPickPlayer += taken;
                 if (g.Clan == Clan.PlayerClan)
                 {
                     string from = g.Rally != null ? " from " + g.Rally.Name : "";
@@ -509,81 +578,118 @@ namespace Armoury
                 if (g.Men > 0) why = room <= 0 ? 1 : (wageShort ? 2 : 0);
                 return taken;
             }
-            catch (Exception e) { Stumble(ref _stPick, "TakeInto", e); return 0; }
+            catch (Exception e) { Stumble(ref _stPick, "TakeInto", e); return taken; }
         }
 
-        /// <summary>Rozejscie grupy: polowa do domu (karczma E4/10, SendHome, bez domu - las), polowa do lasu (Straz - wszyscy do lasu; bez prawa wyrzutkow - dom).
-        /// Zwraca, ilu odeszlo z puli (dom + las + zgubieni).</summary>
+        /// <summary>Udzialy, ktore opuszczaja grupe bez odbioru i bez drogi docelowej - nicosc nazwana (i zejscie z "do zbiorki" netto).</summary>
+        private static void LoseShares(PeopleBook.Shares s)
+        {
+            if (s == null || !(s.Total > 1e-6)) return;
+            PeopleBook.RallyOut(s);
+            PeopleBook.Lost(s);
+        }
+
+        /// <summary>Rozejscie grupy: polowa do domu (karczma E4/10, SendHome, bez domu - las), polowa do lasu (Straz - wszyscy do lasu Polnocy; bez prawa wyrzutkow -
+        /// dom). Typ po typie we wlasnym try: kto nie trafil do domu / lasu / karczmy - zgubieni nazwani (PeopleBook.Lost, recenzja O7). Zwraca, ilu odeszlo.</summary>
         private static int Disperse(G g)
         {
             int men = g.Men;
             if (men <= 0) return 0;
             int home = 0, woods = 0, tavern = 0, lost = 0;
+            if (g.Rally == null)
+            {
+                foreach (var tn in g.T) tn.N = 0;
+                try { LoseShares(g.O.Cut(g.O.Total)); } catch { }
+                _dDispLost += men;
+                return men;
+            }
+            var pos = g.Rally.GetPosition2D;
+            Settlement region = null; IFaction fac = null;
             try
             {
-                if (g.Rally == null)
-                {
-                    lost = men;
-                    foreach (var tn in g.T) tn.N = 0;
-                    PeopleBook.Lost(g.O.Cut(men));
-                    return men;
-                }
-                var pos = g.Rally.GetPosition2D;
-                var region = OutlawLaw.On ? OutlawLaw.PoolRegionAt(pos) : null;
-                IFaction fac = g.Clan != null ? g.Clan.MapFaction : null;
+                // recenzja K5/O5: Straz "do lasu" - pula najblizszego regionu Polnocy (jak rozbici Strazy w bitwie, E4/9 4.5); reszta - region osady zbiorki
+                if (OutlawLaw.On) region = (g.Watch ? WatchLaw.NorthRegionAt(pos) : null) ?? OutlawLaw.PoolRegionAt(pos);
+                fac = g.Clan != null ? g.Clan.MapFaction : null;
                 LosersFlee.BeginBattle();                  // pamiec osad domowych na grupe (miejsce zbiorki)
-                foreach (var tn in g.T)
+            }
+            catch (Exception e) { Stumble(ref _stDisp, "Disperse(osada)", e); }
+            foreach (var tn in g.T)
+            {
+                int n = tn.N;
+                if (n <= 0) continue;
+                PeopleBook.Shares slice = null;
+                int done = 0;
+                try
                 {
-                    int n = tn.N;
-                    if (n <= 0) continue;
-                    tn.N = 0;
-                    var slice = g.O.Cut(n);
-                    if (tn.C == null) { lost += n; PeopleBook.Lost(slice); continue; }
+                    slice = g.O.Cut(n);
+                    PeopleBook.RallyOut(slice);
+                    if (tn.C == null) continue;            // finally: zgubieni nazwani
                     int nw = g.Watch ? n : n - MBRandom.RoundRandomized(n * 0.5f);
                     nw = Math.Max(0, Math.Min(n, nw));
                     if (region == null) nw = 0;            // bez prawa wyrzutkow - do domu (jak rozbici dotad)
+                    if (nw > 0)
+                    {
+                        OutlawLaw.RallyWoods(region, tn.C, nw); done += nw; woods += nw;
+                        LosersFlee.NoteWoods(region, nw); PeopleBook.PoolShares(region, slice.Cut(nw));
+                    }
                     int nh = n - nw;
-                    if (nw > 0) { OutlawLaw.RallyWoods(region, tn.C, nw); LosersFlee.NoteWoods(region, nw); PeopleBook.PoolShares(region, slice.Cut(nw)); woods += nw; }
                     if (nh <= 0) continue;
                     int vt = PeopleBook.VetDivert(null, tn.C, nh, pos, PeopleBook.VH3, slice);
-                    if (vt > 0) { LosersFlee.NoteTavern(vt, LosersFlee.SrcRouted); tavern += vt; }
+                    if (vt > 0) { done += vt; tavern += vt; LosersFlee.NoteTavern(vt, LosersFlee.SrcRouted); }
                     int rest = nh - vt;
                     if (rest <= 0) continue;
                     int cat;
                     int got = LosersFlee.SendHome(null, tn.C, rest, pos, fac, LosersFlee.SrcRouted, out cat, slice);
-                    home += got;
+                    done += got; home += got;
                     int left = rest - got;
                     if (left <= 0) continue;
-                    if (region != null) { OutlawLaw.RallyWoods(region, tn.C, left); LosersFlee.NoteWoods(region, left); PeopleBook.PoolShares(region, slice); woods += left; LosersFlee.NoteHomeless(left, true); }
-                    else { lost += left; PeopleBook.Lost(slice); LosersFlee.NoteHomeless(left, false); }
+                    if (region != null)
+                    {
+                        OutlawLaw.RallyWoods(region, tn.C, left); done += left; woods += left;
+                        LosersFlee.NoteWoods(region, left); LosersFlee.NoteHomeless(left, true);
+                        var s2 = slice; slice = null; PeopleBook.PoolShares(region, s2);
+                    }
+                    else LosersFlee.NoteHomeless(left, false);   // finally: zgubieni nazwani (jak "znikneli" H3 bez prawa wyrzutkow)
                 }
-                if (g.O.Total > 1e-6) PeopleBook.Lost(g.O.Cut(g.O.Total));     // reszty udzialow (nie powinno byc)
+                catch (Exception e) { Stumble(ref _stDisp, "Disperse", e); }
+                finally
+                {
+                    tn.N = 0;
+                    int miss = n - done;
+                    if (miss > 0) lost += miss;
+                    if (slice != null && slice.Total > 1e-6) { try { PeopleBook.Lost(slice); } catch { } }    // reszta udzialow typu (zgubieni albo zaokraglenie)
+                }
+            }
+            try
+            {
+                if (g.O.Total > 1e-6) LoseShares(g.O.Cut(g.O.Total));     // reszty udzialow grupy (nie powinno byc)
                 if (g.Clan == Clan.PlayerClan)
                     Log.Player("Stragglers: " + men + " of your men at " + g.Rally.Name + " gave up waiting - " + (home + tavern) + " went home, " + woods + " took to the woods.");
             }
-            catch (Exception e)
-            {
-                Stumble(ref _stDisp, "Disperse", e);
-                int left = g.Men;                          // czesc niezrobiona: zgubieni nazwani (nikt nie zostaje w pamieci bez konta)
-                foreach (var tn in g.T) tn.N = 0;
-                lost += left;
-                if (g.O.Total > 1e-6) PeopleBook.Lost(g.O.Cut(g.O.Total));
-            }
+            catch (Exception e) { Stumble(ref _stDisp, "Disperse(koniec)", e); }
             _dDispHome += home + tavern; _dDispWoods += woods; _dDispTavern += tavern; _dDispLost += lost;
             return home + tavern + woods + lost;
         }
 
         // ================================================================ linia doby
+        private static int StumblesToday { get { return _stMark + _stSplit + _stPick + _stDisp + _stSave + _stLine; } }
+
+        private static string StumbleText()
+        {
+            return " | potkniecia " + StumblesToday + " (znacznik " + _stMark + ", podzial " + _stSplit + ", odbior " + _stPick + ", rozejscie " + _stDisp + ", zapis " + _stSave
+                   + ", linia " + _stLine + ")";
+        }
+
         private static void Line(int day, bool on)
         {
             var ci = CultureInfo.InvariantCulture;
-            var sb = new StringBuilder(1200);
-            int w = 0, wz = 0, wg = 0; double sh = 0, shk = 0, shDiff = 0;
+            var sb = new StringBuilder(1400);
+            int w = 0, wz = 0, wg = 0, wm = 0; double sh = 0, shk = 0, shDiff = 0;
             var rallies = new HashSet<string>();
             foreach (var g in _groups)
             {
                 int m = g.Men; if (m <= 0) continue;
-                w += m; if (day < g.Ready) wz += m; else wg += m;
+                w += m; if (day < g.Ready) wz += m; else { wg += m; if (g.Arrive > day) wm += m; }
                 rallies.Add(g.RallyId ?? "?");
                 sh += g.O.Total; shk += g.O.Known; shDiff += Math.Abs(g.O.Total - m);
             }
@@ -599,23 +705,25 @@ namespace Armoury
               .Append(" (").Append(er > 0 ? (100.0 * _dEB / er).ToString("0.0", ci) + "% / " + (100.0 * _dEH / er).ToString("0.0", ci) + "% / " + (100.0 * _dEW / er).ToString("0.0", ci) + "%" : "-")
               .Append("; regula: weterani t4+ 70, t3 55, rekruci 45, reszta dom : las 2 : 1; kraj wlasny -5/+10/-5, obcy +5/-10/+5; zalegly zold -10 pkt/tydz., min. 20; Straz 80/0/20)");
             sb.Append(" | czekaja ").Append(w).Append(" ludzi w ").Append(_groups.Count).Append(" grupach w ").Append(rallies.Count).Append(" osadach (zbieraja sie ").Append(wz)
-              .Append(", gotowi ").Append(wg).Append("; gotowi bez druzyny rodu ").Append(_dWaitNoParty).Append(", druzyna dalej niz zasieg ").Append(_dWaitFar)
+              .Append(", gotowi ").Append(wg).Append(", w marszu do druzyny ").Append(wm).Append("; gotowi bez druzyny rodu ").Append(_dWaitNoParty).Append(", druzyna dalej niz zasieg ").Append(_dWaitFar)
               .Append(_dFarN > 0 ? " (srednio " + (_dFarDays / _dFarN).ToString("0.0", ci) + " dob marszu)" : "").Append(", druzyny bez miejsca ").Append(_dWaitFull)
-              .Append(", bez zoldu ").Append(_dWaitWage).Append(')');
-            sb.Append(" | gotowi dzis ").Append(_dReady).Append(", odebrani ").Append(_dPicked).Append(" (druzyn ").Append(_dPickParties).Append(", gracz ").Append(_dPickPlayer).Append(')')
+              .Append(", bez zoldu ").Append(_dWaitWage).Append(", osada oblezona ").Append(_dWaitSiege).Append(')');
+            sb.Append(" | gotowi dzis ").Append(_dReady).Append(", wyruszyli do druzyny ").Append(_dMarchStart).Append(", odebrani ").Append(_dPicked).Append(" (druzyn ").Append(_dPickParties)
+              .Append(", gracz ").Append(_dPickPlayer).Append(')')
               .Append(", rozeszli sie ").Append(disp).Append(" (dom ").Append(_dDispHome).Append(" - w tym karczma ").Append(_dDispTavern).Append(" / las ").Append(_dDispWoods)
-              .Append(" / zgubieni ").Append(_dDispLost).Append("; po czasie czekania ").Append(_dExpire).Append(", wylaczone ").Append(_dOff).Append(", rod upadl ").Append(_dNoClan).Append(')')
+              .Append(" / zgubieni ").Append(_dDispLost).Append("; po czasie czekania ").Append(_dExpire).Append(", wylaczone ").Append(_dOff).Append(", rod upadl ").Append(_dNoClan)
+              .Append(", osada zdobyta bez nowej ").Append(_dLostRally).Append(')')
+              .Append(", przeniesieni (osada zdobyta) ").Append(_dMoved).Append(", wrocili z marszu (druzyna odeszla) ").Append(_dMarchBack)
               .Append(", zgubieni przy wczytaniu ").Append(_dLoadLost);
             sb.Append(" | kontrola: czekali wczoraj ").Append(_lastW).Append(" + nowi ").Append(_dAdded).Append(" - odebrani ").Append(_dPicked).Append(" - rozeszli sie ").Append(disp)
               .Append(" - zgubieni przy wczytaniu ").Append(_dLoadLost).Append(" - czekaja ").Append(w).Append(" = ").Append(ctl);
             sb.Append(" | ksiega pochodzenia: udzialy czekajacych ").Append(sh.ToString("0.0", ci)).Append(" (z pochodzeniem ").Append(shk.ToString("0.0", ci))
               .Append("), roznica udzialy - ludzie ").Append(shDiff.ToString("0.00", ci));
-            string ex = null;
-            try { ex = Export(); } catch (Exception e) { Stumble(ref _stSave, "Export(linia)", e); }
-            sb.Append(" | zapis: znakow ").Append(ex != null ? ex.Length : -1).Append(_importN >= 0 ? ", wczytano grup " + _importN + " (zlych " + _importBad + ")" : "")
-              .Append(_badIds > 0 ? ", pominiete (znaki w id) " + _badIds : "");
-            sb.Append(" | potkniecia ").Append(_stMark + _stSplit + _stPick + _stDisp + _stSave + _stLine).Append(" (znacznik ").Append(_stMark).Append(", podzial ").Append(_stSplit)
-              .Append(", odbior ").Append(_stPick).Append(", rozejscie ").Append(_stDisp).Append(", zapis ").Append(_stSave).Append(", linia ").Append(_stLine).Append(')')
+            int len = -1;
+            try { _badIds = ExportInto(_xsb); len = _xsb.Length; } catch (Exception e) { Stumble(ref _stSave, "Export(linia)", e); }
+            sb.Append(" | zapis: znakow ").Append(len).Append(_importN >= 0 ? ", wczytano grup " + _importN + " (zlych " + _importBad + ")" : "")
+              .Append(_badIds > 0 ? ", pominiete (znaki w id) " + _badIds : "").Append(_dBadMark > 0 ? ", druzyn bez zbiorki (znaki w id) " + _dBadMark : "");
+            sb.Append(StumbleText())
               .Append(_dStale > 0 ? " | znaczniki bez konca bitwy " + _dStale : "")
               .Append(" | zasieg ").Append(Settings.Current.StragglersRallyReachDays.ToString("0.0", ci)).Append(" dob marszu, czekanie ").Append(Settings.Current.StragglersRallyWaitDays).Append(" dob")
               .Append(" | czas ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.00", ci)).Append(" ms.");
@@ -624,7 +732,20 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        /// <summary>Udzialy pochodzenia czekajacych wedlug regionu (bez "") - rownanie regionu ksiegi pochodzenia (PeopleBook.RegionNow, jak "w drodze").</summary>
+        /// <summary>Linia doby, gdy Daily albo Line rzucily (recenzja K1): czekajacy policzeni od nowa (kontrola nastepnej doby od tego stanu) i potkniecia doby.</summary>
+        private static void FailLine(int day)
+        {
+            try
+            {
+                int w = 0;
+                foreach (var g in _groups) { try { w += g.Men; } catch { } }
+                _lastW = w;
+                Log.Info("Rozbici wracaja (N7): dzien " + day + " - BLAD LINII (wyjatek - log bledow StragglersRally) | czekaja " + w + " ludzi" + StumbleText() + ".");
+            }
+            catch { }
+        }
+
+        /// <summary>Udzialy pochodzenia czekajacych wedlug regionu (bez "") - konto Rally rownania regionu ksiegi pochodzenia (PeopleBook.RegionNow).</summary>
         internal static void KnownByRegion(Dictionary<string, double> into)
         {
             if (into == null) return;
@@ -639,12 +760,20 @@ namespace Armoury
         // ================================================================ zapis (SaveText.Sync, klucz arm_n7_rally)
         private static bool Bad(string id) { return string.IsNullOrEmpty(id) || id.IndexOf('|') >= 0 || id.IndexOf(',') >= 0 || id.IndexOf(';') >= 0 || id.IndexOf(':') >= 0; }
 
-        /// <summary>"1|klan,osada,doba,gotowi,flagi;typ:n,typ:n;region:ludzie,~:ludzie;W|..." (flagi: w - Straz, a - ogloszona). Pusta pula - "".</summary>
+        /// <summary>"1|klan,osada,doba,gotowi,flagi,marsz;typ:n,typ:n;region:ludzie,~:ludzie;W|..." (flagi: w - Straz, a - ogloszona; marsz - doba dojscia do druzyny,
+        /// 0 - w osadzie). Pusta pula - "".</summary>
         internal static string Export()
         {
-            if (_groups.Count == 0) return "";
+            _badIds = ExportInto(_xsb);
+            return _xsb.ToString();
+        }
+
+        /// <summary>Zapis do bufora sb (czyszczony); zwraca liczbe grup pominietych przez znak separatora w id.</summary>
+        private static int ExportInto(StringBuilder sb)
+        {
+            sb.Length = 0;
+            if (_groups.Count == 0) return 0;
             var ci = CultureInfo.InvariantCulture;
-            var sb = new StringBuilder(256 + 200 * _groups.Count);
             sb.Append(Ver);
             int bad = 0;
             foreach (var g in _groups)
@@ -652,7 +781,7 @@ namespace Armoury
                 if (g.Men <= 0) continue;
                 if (Bad(g.ClanId) || Bad(g.RallyId)) { bad++; continue; }
                 sb.Append('|').Append(g.ClanId).Append(',').Append(g.RallyId).Append(',').Append(g.Day).Append(',').Append(g.Ready).Append(',')
-                  .Append(g.Watch ? "w" : "").Append(g.Announced ? "a" : "").Append(';');
+                  .Append(g.Watch ? "w" : "").Append(g.Announced ? "a" : "").Append(',').Append(g.Arrive).Append(';');
                 bool f = true;
                 foreach (var tn in g.T)
                 {
@@ -670,9 +799,7 @@ namespace Armoury
                 }
                 sb.Append(';').Append(g.O.W.ToString("0.###", ci));
             }
-            _badIds = bad;
-            _lastChars = sb.Length;
-            return sb.ToString();
+            return bad;
         }
 
         internal static void Import(string s)
@@ -691,6 +818,7 @@ namespace Armoury
                     var g = new G { ClanId = h[0], RallyId = h[1], Day = int.Parse(h[2], ci), Ready = int.Parse(h[3], ci) };
                     string fl = h.Length > 4 ? h[4] : "";
                     g.Watch = fl.IndexOf('w') >= 0; g.Announced = fl.IndexOf('a') >= 0;
+                    if (h.Length > 5 && h[5].Length > 0) g.Arrive = Math.Max(0, int.Parse(h[5], ci));
                     if (f.Length > 1 && f[1].Length > 0)
                         foreach (var x in f[1].Split(','))
                         {
@@ -737,9 +865,9 @@ namespace Armoury
                     {
                         if (tn.N <= 0) continue;
                         tn.C = LosersFlee.TroopOf(tn.Id);
-                        if (tn.C == null || tn.C.IsHero) { _dLoadLost += tn.N; PeopleBook.Lost(g.O.Cut(tn.N)); tn.N = 0; }
+                        if (tn.C == null || tn.C.IsHero) { _dLoadLost += tn.N; LoseShares(g.O.Cut(tn.N)); tn.N = 0; }
                     }
-                    if (g.Rally == null && g.Men > 0) { int m = g.Men; _dLoadLost += m; PeopleBook.Lost(g.O.Cut(m)); foreach (var tn in g.T) tn.N = 0; }
+                    if (g.Rally == null && g.Men > 0) { int m = g.Men; _dLoadLost += m; LoseShares(g.O.Cut(m)); foreach (var tn in g.T) tn.N = 0; }
                 }
                 catch (Exception e) { Stumble(ref _stSave, "Resolve", e); }
             }

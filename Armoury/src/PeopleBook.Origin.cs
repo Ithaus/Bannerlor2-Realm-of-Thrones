@@ -262,6 +262,7 @@ namespace Armoury
             _gAll = _tAll = _zAll = _qAll = _gone = _deadCarts = _pendIn = _pendLost = _homeNoVillage = 0;
             _deduceCalls = _deduceOutside = _deduceNoWin = _floorCalls = 0; _deduceMen = _floorMen = 0; _a5Bk = _a5BkFail = 0;
             _deduceVetCalls = 0; _deduceVetMen = 0; _vDestTake = 0;    // E4/10
+            _rallyIn = _rallyOut = 0;                                  // N7
             _homeTown = 0; _foldKeys = 0; _foldMen = 0; _pressIn = _pressLost = _pressHome = 0;
             _defParties = 0; _defMen = 0; _siegeCalls = 0; _siegeDead = 0; _villTown = 0; _villTownBy = null;     // fixA
             _townShareVill = 0; _townShareBack = 0;                                                     // fix2
@@ -792,7 +793,12 @@ namespace Armoury
         internal static void Lost(Shares s) { if (s != null && s.Total > Eps) _dest[OLost] += s.Total; }
 
         /// <summary>N7: udzialy rozbitych, ktore poszly do zbiorki pod choragiew (StragglersRally trzyma je przy grupie do odbioru albo rozejscia) - licznik "dokad".</summary>
-        internal static void RallyShares(Shares s) { if (s != null && s.Total > Eps && OriginLive) _dest[ORally] += s.Total; }
+        internal static void RallyShares(Shares s) { if (s != null && s.Total > Eps && OriginLive) { _dest[ORally] += s.Total; _rallyIn += s.Total; } }
+
+        /// <summary>N7 (recenzja K6): udzialy, ktore opuszczaja zbiorke INACZEJ niz odbiorem (rozejscie do domu / do lasu / do karczmy, zgubieni) - schodza z "do zbiorki"
+        /// (netto), bo te same udzialy licza sie drugi raz w drodze docelowej (dom, pula, karczma, nicosc nazwana); suma "dokad" = wyjscia. Odbior to wejscie (Give FRally).</summary>
+        internal static void RallyOut(Shares s) { if (s != null && s.Total > Eps && OriginLive) { _dest[ORally] -= s.Total; _rallyOut += s.Total; } }
+        private static double _rallyIn, _rallyOut;      // N7: udzialy do zbiorki i z rozejscia zbiorki (doba)
 
         // ================================================================ dokad
         /// <summary>R3: POLEGLI regionu pochodzenia (trwaly ubytek; DOM juz go nie mial od werbunku); "" - licznik.</summary>
@@ -1589,6 +1595,7 @@ namespace Armoury
             public double Road;     // E4/8 (Z9): wedrowcy i eskorta konwojow BK w drodze (slowniki KRoad) - poza S, w rownaniu regionu jak TABOR
             public double Vet;      // E4/10: WETERANI w karczmach wedlug regionu pochodzenia (konto poza DOM i poza SLUZBA - nie liczy sie do S w R5)
             public double T, W;     // E4/9 (Z11): NIEWOLNI wedlug regionu pochodzenia (wszedzie) i konto MUR wedlug regionu pochodzenia
+            public double Rally;    // N7 (recenzja K3): rozbici czekajacy w osadzie zbiorki (StragglersRally) - poza S (nie podnosza wolnych rak), poza domem; osobno od "w drodze" BK
         }
 
         private static Dictionary<string, RegionNum> RegionNow()
@@ -1625,12 +1632,13 @@ namespace Armoury
             sum(_mem, false); sum(_pris, true);
             foreach (var d in _poolOrg.Values)
                 foreach (var kv in d) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Wy += kv.Value; now[kv.Key] = x; }
-            // N7: rozbici czekajacy w osadzie zbiorki (StragglersRally) - w rownaniu regionu jak "w drodze" (Road): poza sluzba (nie podnosza S ani wolnych rak) i poza domem
+            // N7: rozbici czekajacy w osadzie zbiorki (StragglersRally) - w rownaniu regionu osobne konto Rally (recenzja K3: nie "w drodze" BK): poza sluzba (nie podnosza S
+            // ani wolnych rak) i poza domem
             try
             {
                 var rally = new Dictionary<string, double>();
                 StragglersRally.KnownByRegion(rally);
-                foreach (var kv in rally) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Road += kv.Value; now[kv.Key] = x; }
+                foreach (var kv in rally) { RegionNum x; now.TryGetValue(kv.Key, out x); x.Rally += kv.Value; now[kv.Key] = x; }
             }
             catch (Exception e) { OStumble("RegionNow(N7)", e); }
             // E4/10 (Z10): konto WETERANI w rownaniu regionu (wejscie SLUZBA -> WETERANI, siew DOM miasta -> WETERANI, powrot WETERANI -> DOM, najem WETERANI -> SLUZBA)
@@ -1665,6 +1673,7 @@ namespace Armoury
             public double Vet;      // E4/10: weterani tej krainy czekajacy w karczmach (menu, rownanie)
             public int Villages; public double VillagePeople, TownPeople;
             public double Road, MigIn, MigOut;     // E4/8: w drodze (wedrowcy i konwoje BK), migracja od siewu
+            public double Rally;                   // N7 (recenzja K3): rozbici tej krainy czekajacy w osadach zbiorki na druzyne swojego rodu (menu, rownanie)
             // E4/9: NIEWOLNI z regionu (wedlug pochodzenia) i MUR z regionu; stan dnia siewu i zmarli niewolni od siewu; niewolni TRZYMANI w regionie (menu, krainy)
             public double T, W, TRef, WRef, TDead, THeld;
             /// <summary>E4/9 (R5, recenzja E4/7 R1-2): niewolni z regionu od siewu (zywi + zmarli - stan dnia siewu) - ubytek rak jak polegli (bilans otwarcia NK nie wchodzi).</summary>
@@ -1697,7 +1706,7 @@ namespace Armoury
                 var v = new RegionView
                 {
                     Id = kv.Key, Node = node, Realm = FreeHands.RealmOf(node),
-                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road, Vet = x.Vet, T = x.T, W = x.W
+                    Dom = x.Dom, S = x.S, J = x.J, Wy = x.Wy, U = x.U, Carts = x.Carts, Road = x.Road, Vet = x.Vet, T = x.T, W = x.W, Rally = x.Rally
                 };
                 try { v.THeld = ThrallsHeldIn(kv.Key); } catch (Exception e) { OStumble("BuildViews(E4/9)", e); }
                 if (r != null)
@@ -1710,7 +1719,8 @@ namespace Armoury
                     // E4/8 (10.5): + w drodze (wedrowcy BK; w dniu siewu bez pochodzenia - 0) + MigOut - MigIn (wedrowcy u celu w innym regionie)
                     // E4/10 (Z10): + WETERANI (bez stanu w dniu siewu E4/7: pula zaklada sie po nim, a przed siewem E4/7 ma tylko udzialy "" - poza regionami)
                     // E4/9 (4.7): + NIEWOLNI i MUR z regionu (stan) - ich stan dnia siewu + zmarli niewolni od siewu; liczniki Enslaved/ToWall rosna juz tylko przy wylaczonych prawach
-                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet + x.T + x.W) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef + r.TRef + r.WRef)
+                    // N7: + czekajacy w osadach zbiorki (Rally; bez stanu w dniu siewu - udzialy z pochodzeniem dostaja dopiero przy rozbiciu po siewie)
+                    v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet + x.T + x.W + x.Rally) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef + r.TRef + r.WRef)
                              - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn;
                 }
                 try
@@ -1787,7 +1797,7 @@ namespace Armoury
             {
                 double[] a; string rk = v.Realm ?? "?";
                 if (!realms.TryGetValue(rk, out a)) { a = new double[2]; realms[rk] = a; }
-                double live = v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W;
+                double live = v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W + v.Rally;
                 a[0] += v.Rest; a[1] += live;
                 world += v.Rest; alive += live;
             }
@@ -1874,7 +1884,8 @@ namespace Armoury
               .Append(", w nicosc nazwana (rozbici bez puli, bez domu) ").Append(M0(_dest[OLost]))
               .Append(", do rosterow bez ksiegi (tabory, Inni, konwoje BK, lup gracza - P2) ").Append(M0(_dest[ODrop]))
               .Append(", do karczmy (WETERANI, E4/10) ").Append(M0(_vDestTake))
-              .Append(", do zbiorki pod choragiew (N7) ").Append(M0(_dest[ORally]));
+              .Append(", do zbiorki pod choragiew (N7) netto ").Append(M0(_dest[ORally])).Append(" (weszli ").Append(M0(_rallyIn)).Append(", rozeszli sie ze zbiorki ").Append(M0(_rallyOut))
+              .Append(" - ci juz w drogach wyzej: dom, pula, karczma, nicosc)");
             sb.Append(" | bez nazwy: z niczego +").Append(M0(_zAll)).Append(" (");
             f = true;
             for (int k = 0; k < KKinds; k++) { if (_zBy[k] <= 0) continue; sb.Append(f ? "" : ", ").Append(KName[k]).Append(' ').Append(M0(_zBy[k])); f = false; }

@@ -757,9 +757,9 @@ namespace Armoury
                         var roster = mep.RoutedInBattle;
                         // E4/9 (4.5): rozbici Strazy "do lasu" i bez domu - pula najblizszego regionu Polnocy (region liczony na partie; reszta - region bitwy jak dotad)
                         var preg = (region != null ? WatchLaw.DeserterRegion(mp) : null) ?? region;
-                        // N7 (decyzja Jeffa 13.10 "proporcje pasuja"): pobita druzyna lorda w bitwie objetej H3 (albo druzyna gracza pobita w polu) - czesc rozbitych
+                        // N7 (decyzja Jeffa 13.10 "proporcje pasuja"): pobita druzyna lorda w bitwie objetej H3 (albo w walce gracza w polu - gracz i druzyny lordow pobitej strony, recenzja O2) - czesc rozbitych
                         // do zbiorki pod choragiew, reszta dom / las wedlug reguly N7 (StragglersRally.Parts); null - podzial jak dotad (OutlawRoutedShare)
-                        var n7 = StragglersRally.For(me, mp);
+                        var n7 = StragglersRally.For(me, mp, side.MissionSide);
                         // E4/7 (4.7): udzialy pochodzenia rozbitych - rozbici zeszli z rosteru w bitwie, slownik jeszcze ich ma (tabor: region wsi z definicji)
                         PeopleBook.Shares org = null;
                         try { if (PeopleBook.OriginLive && !undeadParty && mep.Party != null) org = PeopleBook.Take(mep.Party.MemberRoster, PeopleBook.Men(roster), PeopleBook.FRouted); } catch { org = null; }
@@ -820,7 +820,7 @@ namespace Armoury
             LosersFlee.NoteHomeless(homeless, law && region != null);
             LosersFlee.NoteUndead(undead);
             LosersFlee.NoteTavern(tavern, LosersFlee.SrcRouted);         // E4/10: rozbici do karczmy (kontrola: rozbici = pula + domy + bez domu + do karczmy)
-            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead, tavern);
+            if (LosersFlee.PlayerIn(me)) LosersFlee.PlayerLine(me, pool, bk, village, template, homeless, law && region != null, undead, tavern, rally);
         }
 
         internal static void OnVillageLooted(Village v)

@@ -1373,6 +1373,8 @@ def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
     bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    # N7 (recenzja O1): rozbici czekajacy w osadach zbiorki - stan T7 (ten sam tick co "Ludzie"; dzien gry jak Wyrzutki - shift 1); log bez paczki - 0
+    n7w = e4_series(lines, "Rozbici wracaja (N7): dzien", 1)
     start = start_arg
     if start is None:
         for s in lines:
@@ -1539,7 +1541,10 @@ def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
             s = lud[dd]
             sold = sum(fnum(re.escape(k) + r" (\d+) \(\d+ partii", s) or 0 for k in E4_KINDS)
             m = re.search(r"jency w partiach (\d+), w lochach osad (\d+) \| wyrzutki w puli (\d+)", s)
-            return sold + (sum(int(x) for x in m.groups()) if m else 0)
+            # N7 (recenzja O1): rozbici czekajacy w osadach zbiorki - zeszli z druzyny (rozbici), wroca odbiorem albo rozejsciem (dom - H3 domy, las - pula);
+            # bez nich rozbity w drodze do zbiorki to -1 bez nazwy, a odbior i rozejscie do lasu +1
+            n7 = num(r"\| czekaja (\d+) ludzi", n7w.get(dd, "")) or 0
+            return sold + (sum(int(x) for x in m.groups()) if m else 0) + n7
         dS = state(d) - state(d - 1)
         s_lud = lud[d]
         newp = {}
@@ -15870,28 +15875,46 @@ def w6_main(logp, start_arg, until=120, csvp=None):
 
 
 # ============================================================ N7 (decyzja Jeffa 13.10 "proporcje pasuja"): rozbici wracaja pod choragiew - grupa --grupa n7
-# Linia doby "Rozbici wracaja (N7): dzien D" (StragglersRally.Line - przed "Przegrani (H3)"; podzial rozbitych z bitew od poprzedniej linii, odbior i rozejscie tej doby),
-# dopisek H3 linii "Wyrzutki:" ("+ do zbiorki pod choragiew (N7) X; kontrola kodu - roznica 0") i stan puli wyrzutkow ("Wyrzutki: dzien D | pula N ludzi").
+# Linia doby "Rozbici wracaja (N7): dzien D" (StragglersRally.Line - przed "Przegrani (H3)"; podzial rozbitych z bitew od poprzedniej linii, odbior i rozejscie tej doby;
+# blad linii - "Rozbici wracaja (N7): dzien D - BLAD LINII ... | potkniecia P (...)"), dopisek H3 linii "Wyrzutki:" ("+ do zbiorki pod choragiew (N7) X; kontrola kodu -
+# roznica 0") i stan puli wyrzutkow ("Wyrzutki: dzien D | pula N ludzi").
 N7_PREFIX = "Rozbici wracaja (N7): dzien"
 N7_SPLIT = re.compile(r"- rozbici druzyn lordow (\d+) \(druzyn (\d+), bitew (\d+)\): pod choragiew (\d+) / do domu (\d+) / do lasu (\d+); nowi do zbiorki (\d+), bez osady zbiorki (\d+)")
 N7_EXP = re.compile(r"\| oczekiwany podzial " + F_ + " / " + F_ + " / " + F_ + r" \(")
-N7_WAIT = re.compile(r"\| czekaja (\d+) ludzi w (\d+) grupach w (\d+) osadach \(zbieraja sie (\d+), gotowi (\d+); gotowi bez druzyny rodu (\d+), druzyna dalej niz zasieg (\d+)"
-                     r"(?: \(srednio " + F_ + r" dob marszu\))?, druzyny bez miejsca (\d+), bez zoldu (\d+)\)")
-N7_FLOW = re.compile(r"\| gotowi dzis (\d+), odebrani (\d+) \(druzyn (\d+), gracz (\d+)\), rozeszli sie (\d+) \(dom (\d+) - w tym karczma (\d+) / las (\d+) / zgubieni (\d+); "
-                     r"po czasie czekania (\d+), wylaczone (\d+), rod upadl (\d+)\), zgubieni przy wczytaniu (\d+)")
+# czekaja: 0 W, 1 grup, 2 osad, 3 zbieraja sie, 4 gotowi, 5 w marszu, 6 bez druzyny, 7 dalej niz zasieg, 8 (srednio dob), 9 bez miejsca, 10 bez zoldu, 11 osada oblezona
+N7_WAIT = re.compile(r"\| czekaja (\d+) ludzi w (\d+) grupach w (\d+) osadach \(zbieraja sie (\d+), gotowi (\d+), w marszu do druzyny (\d+); gotowi bez druzyny rodu (\d+), "
+                     r"druzyna dalej niz zasieg (\d+)(?: \(srednio " + F_ + r" dob marszu\))?, druzyny bez miejsca (\d+), bez zoldu (\d+), osada oblezona (\d+)\)")
+# ruch: 0 gotowi dzis, 1 wyruszyli, 2 odebrani, 3 druzyn, 4 gracz, 5 rozeszli sie, 6 dom, 7 karczma, 8 las, 9 zgubieni, 10 po czasie, 11 wylaczone, 12 rod upadl,
+# 13 osada zdobyta bez nowej, 14 przeniesieni, 15 wrocili z marszu, 16 zgubieni przy wczytaniu
+N7_FLOW = re.compile(r"\| gotowi dzis (\d+), wyruszyli do druzyny (\d+), odebrani (\d+) \(druzyn (\d+), gracz (\d+)\), rozeszli sie (\d+) \(dom (\d+) - w tym karczma (\d+) / "
+                     r"las (\d+) / zgubieni (\d+); po czasie czekania (\d+), wylaczone (\d+), rod upadl (\d+), osada zdobyta bez nowej (\d+)\), przeniesieni \(osada zdobyta\) (\d+), "
+                     r"wrocili z marszu \(druzyna odeszla\) (\d+), zgubieni przy wczytaniu (\d+)")
 N7_CTL = re.compile(r"\| kontrola: czekali wczoraj -?\d+ \+ nowi \d+ - odebrani \d+ - rozeszli sie \d+ - zgubieni przy wczytaniu \d+ - czekaja \d+ = (-?\d+)")
 N7_SHD = re.compile(r"roznica udzialy - ludzie " + F_)
 N7_SAVE = re.compile(r"\| zapis: znakow (-?\d+)")
 N7_ST = re.compile(r"\| potkniecia (\d+) \(znacznik")
+N7_W = re.compile(r"\| czekaja (\d+) ludzi")
+N7_H3 = re.compile(r"\+ do zbiorki pod choragiew \(N7\) (\d+); kontrola kodu - roznica (-?\d+)")
+
+
+def n7_waiting(lines):
+    """T7 (recenzja O1): czekajacy N7 na dobe {dzien: ludzie} z linii "Rozbici wracaja (N7)" (takze z linii BLAD LINII); log bez paczki - {}."""
+    out = {}
+    for d, s in by_day(lines, N7_PREFIX).items():
+        w = num(r"\| czekaja (\d+) ludzi", s)
+        if w is not None:
+            out[d] = w
+    return out
 
 
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
-    t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, czekanie do 30 dob na druzyne rodu
-    w zasiegu, potem polowa dom / polowa las. Okno: doby kampanii 1-until (--do-doby). Wiersze N7-0..N7-7: linia i klucz, podzial wobec oczekiwanego z reguly (N7-1),
-    ksiega ludzi zamknieta (N7-2: kontrola linii N7 = 0 kazdej doby, udzialy = ludzie, nowi do zbiorki = pod choragiew, dopisek H3 linii Wyrzutki - roznica 0),
-    odebrani / (odebrani + rozeszli sie po czasie czekania) >= 50% (N7-3), pula wyrzutkow d120 <= 4 tys. (N7-4; cel ok. 3 tys.), potkniecia 0 (N7-5), rozmiar zapisu (N7-6, INFO),
-    dlaczego czekaja (N7-7, INFO). Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
+    czekanie do 30 dob, potem polowa dom / polowa las. Okno: doby kampanii 1-until (--do-doby). Wiersze N7-0..N7-7: linia kazdej doby z kodem N7 (dopisek "(N7)" w linii
+    Wyrzutki) i pola, podzial wobec oczekiwanego z reguly (N7-1; N7-1b - INFO wobec 55/30/15 Jeffa i naplyw do puli z wojska), ksiega ludzi zamknieta (N7-2: kontrola linii N7 = 0
+    kazdej doby, udzialy = ludzie, nowi do zbiorki = pod choragiew, dopisek H3 linii Wyrzutki - roznica 0), odebrani / (odebrani + rozeszli sie po czasie czekania i po utracie
+    osady) >= 50% (N7-3), pula wyrzutkow d120 <= 4 tys. (N7-4; cel ok. 3 tys.), potkniecia 0 (N7-5, takze z linii BLAD LINII), rozmiar zapisu (N7-6, INFO), dlaczego czekaja
+    (N7-7, INFO). Log bez paczki: wiersze INFO, nigdy wyjatek."""
     lines = read(logp)
     rep = Report()
     start = start_arg
@@ -15908,7 +15931,12 @@ def n7_main(logp, start_arg, until=120):
         start = alld[0] if alld else 0
     win = [d for d in sorted(rows) if 1 <= run_day(d, start) <= until]
     wyw = [d for d in sorted(wy) if 1 <= run_day(d, start) <= until]
-    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 1-{until}, dob z linia N7 {len(win)}, z linia Wyrzutki {len(wyw)}")
+    # recenzja K1: doby z kodem N7 (dopisek "(N7)" w linii Wyrzutki), w ktorych linii N7 nie ma albo jest BLAD LINII - dziura w ksiedze, nie INFO
+    n7code = [d for d in wyw if "(N7)" in wy[d]]
+    missing = [run_day(d, start) for d in n7code if d not in rows]
+    failed = [d for d in win if " - BLAD LINII" in rows[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 1-{until}, dob z linia N7 {len(win)} (BLAD LINII {len(failed)}), z linia Wyrzutki {len(wyw)}"
+          f" (z dopiskiem N7 {len(n7code)})")
 
     def pool_row():
         # N7-4: pula wyrzutkow - srednia 7 ostatnich dob okna (jedna doba skacze o kilkaset ludzi); werdykt tylko, gdy okno konczy sie w dobach 115-125 (jak P1-1)
@@ -15923,16 +15951,20 @@ def n7_main(logp, start_arg, until=120):
         ok = (avg <= 4000) if (avg is not None and 115 <= rd <= 125 and on) else None
         rep.add("N7-4: pula wyrzutkow - srednia 7 ostatnich dob okna", (f"{avg:.0f} ludzi (doby kampanii {run_day(last[0], start)}-{rd}, min {min(ps)}, max {max(ps)})" if ps else "brak liczb"),
                 "<= 4 000 (cel ok. 3 tys.); przed N7 te same doby d114-120: WGRANIE 43 5 793, bieg N3 6 310, bieg daniny bez N3 2 903, bieg roczny bez N3 5 034 "
-                "(rozrzut kampanii duzy); okno poza d115-125 albo N7 wylaczone - INFO", ok)
+                "(rozrzut kampanii duzy; recenzja obiegu: przy odbiorze ok. 50-70% szacunek 3.5-4.3 tys. - granica); okno poza d115-125 albo N7 wylaczone - INFO", ok)
 
-    on = [d for d in win if " - WYLACZONE" not in rows[d]]
+    on = [d for d in win if " - WYLACZONE" not in rows[d] and d not in failed]
+    hole = (f"; doby z kodem N7 bez linii {len(missing)}" + (f" (doby kampanii {missing[:5]})" if missing else "")
+            + f", z BLAD LINII {len(failed)}" + (f" (doby kampanii {[run_day(d, start) for d in failed[:5]]})" if failed else ""))
     if not win:
-        rep.add("N7-0: linia Rozbici wracaja (N7)", "brak w logu", "jest od wgrania N7; bez niej wiersze paczki = INFO (log sprzed paczki)", None)
+        rep.add("N7-0: linia Rozbici wracaja (N7)", "brak w logu" + hole, "jest od wgrania N7 (kazda doba z dopiskiem \"(N7)\" w linii Wyrzutki); log sprzed paczki - INFO",
+                False if missing else None)
         pool_row()
         rep.show()
         return 0
-    if not on:
-        rep.add("N7-0: linia Rozbici wracaja (N7)", f"WYLACZONE w {len(win)} dobach", "INFO (klucz StragglersRally wylaczony - rozbici jak przed paczka)", None)
+    if not on and not failed:
+        rep.add("N7-0: linia Rozbici wracaja (N7)", f"WYLACZONE w {len(win)} dobach" + hole, "INFO (klucz StragglersRally wylaczony - rozbici jak przed paczka)",
+                False if missing else None)
         pool_row()
         rep.show()
         return 0
@@ -15947,10 +15979,15 @@ def n7_main(logp, start_arg, until=120):
             continue
         P[d] = dict(sp=[int(x) for x in m1.groups()], ex=[float(x) for x in m2.groups()], wt=m3.groups(), fl=[int(x) for x in m4.groups()],
                     ctl=int(m5.group(1)), shd=float(m6.group(1)), save=int(m7.group(1)), st=int(m8.group(1)))
-    rep.add("N7-0: linia N7 kazdej doby, klucz i pola", f"dob z linia {len(win)}, klucz tak w {len(on)}, pola nieodczytane w {len(bad)}" + (f" (doby {bad[:5]})" if bad else ""),
-            "klucz tak przez caly bieg, wszystkie pola odczytane", (len(on) == len(win) and not bad))
+    off = len(win) - len(on) - len(failed)
+    rep.add("N7-0: linia N7 kazdej doby z kodem N7, klucz i pola",
+            f"dob z linia {len(win)}, klucz tak w {len(on)}, wylaczone {off}, pola nieodczytane w {len(bad)}" + (f" (doby {bad[:5]})" if bad else "") + hole,
+            "linia kazdej doby z dopiskiem \"(N7)\" w linii Wyrzutki, bez BLAD LINII, klucz tak przez caly bieg, wszystkie pola odczytane",
+            (off == 0 and not bad and not missing and not failed))
     if not P:
         pool_row()
+        st_f = sum(num(r"\| potkniecia (\d+) \(", rows[d]) or 0 for d in failed)
+        rep.add("N7-5: potkniecia N7 (suma okna)", f"{st_f} (tylko z linii BLAD LINII)", "0", st_f == 0)
         rep.show()
         return 0
     days = sorted(P)
@@ -15963,40 +16000,58 @@ def n7_main(logp, start_arg, until=120):
     def pc(x, of):
         return 100.0 * x / of if of > 0 else 0.0
     if R > 0 and ER > 0:
-        diffs = (abs(pc(B, R) - pc(EB, ER)), abs(pc(H, R) - pc(EH, ER)), abs(pc(L, R) - pc(EW, ER)))
+        # recenzja K10: bez prawa wyrzutkow las = dom (kod wysyla "las" do domu) - wtedy porownanie pod choragiew i dom + las razem
+        nolaw = L == 0 and EW > 0
+        if nolaw:
+            diffs = (abs(pc(B, R) - pc(EB, ER)), abs(pc(H + L, R) - pc(EH + EW, ER)))
+        else:
+            diffs = (abs(pc(B, R) - pc(EB, ER)), abs(pc(H, R) - pc(EH, ER)), abs(pc(L, R) - pc(EW, ER)))
         rep.add("N7-1: podzial rozbitych druzyn lordow wobec reguly (suma okna)",
                 f"rozbici {R}: pod choragiew {B} ({pc(B, R):.1f}%), do domu {H} ({pc(H, R):.1f}%), do lasu {L} ({pc(L, R):.1f}%); z reguly {pc(EB, ER):.1f}% / {pc(EH, ER):.1f}% / {pc(EW, ER):.1f}%"
-                f" - najwieksza odchylka {max(diffs):.1f} pkt; bez osady zbiorki {nor}; Jeff: 55 / 30 / 15 przed poprawkami",
-                "|faktyczny - z reguly| <= 2 pkt na kazdej drodze (przy >= 500 rozbitych; mniej - INFO); bez prawa wyrzutkow las = dom", (max(diffs) <= 2.0) if R >= 500 else None)
+                f" - najwieksza odchylka {max(diffs):.1f} pkt" + (" (bez prawa wyrzutkow: dom + las razem)" if nolaw else "") + f"; bez osady zbiorki {nor}",
+                "|faktyczny - z reguly| <= 2 pkt na kazdej drodze (przy >= 500 rozbitych; mniej - INFO); bez prawa wyrzutkow las = dom (dom + las razem). Sprawdza "
+                "losowanie i zaokraglenia, nie regule - regule pokazuje N7-1b", (max(diffs) <= 2.0) if R >= 500 else None)
     else:
         rep.add("N7-1: podzial rozbitych druzyn lordow wobec reguly (suma okna)", "0 rozbitych druzyn lordow w oknie", "INFO", None)
+    # ---- N7-1b (recenzja O4): wobec 55 / 30 / 15 Jeffa i naplyw do puli wyrzutkow z wojska (las z pola + bez domu + rozejscie zbiorki do lasu)
+    army = sum(num(r"w las \d+ \(wojsko (\d+),", wy[d]) or 0 for d in wyw)
+    homeless = sum(num(r"\+ bez domu \(do puli\) (-?\d+)", wy[d]) or 0 for d in wyw)
+    dwoods = sum(P[d]["fl"][8] for d in days)
+    nwy = max(1, len(wyw))
+    rep.add("N7-1b: podzial wobec 55 / 30 / 15 Jeffa i naplyw do puli z wojska (INFO)",
+            (f"rozbici {R}: {pc(B, R):.1f}% / {pc(H, R):.1f}% / {pc(L, R):.1f}% (Jeff 55 / 30 / 15 przed poprawkami tieru, kraju, zoldu i Strazy); " if R > 0 else "0 rozbitych; ")
+            + f"do puli z wojska: las z bitew {army} + rozejscie zbiorki do lasu {dwoods} = {army + dwoods} ({(army + dwoods) / nwy:.0f}/d), bez domu (wszystkie rodzaje) {homeless}",
+            "INFO - przed N7 (WGRANIE 43, d1-120) wojsko w las 22 788 (190/d); recenzja obiegu: kraj wlasny tylko ok. 23% rozbitych, wiec podzial ok. 54 / 27 / 19", None)
     # ---- N7-2 ksiega ludzi zamknieta
     ctl = [P[d]["ctl"] for d in days]
     shd = max(P[d]["shd"] for d in days)
     newd = [run_day(d, start) for d in days if P[d]["sp"][6] != P[d]["sp"][3]]
     h3 = []
     for d in wyw:
-        m = re.search(r"\+ do zbiorki pod choragiew \(N7\) (\d+); kontrola kodu - roznica (-?\d+)", wy[d])
+        m = N7_H3.search(wy[d])
         if m:
             h3.append(int(m.group(2)))
-    lost = sum(P[d]["fl"][8] + P[d]["fl"][12] for d in days)
+    lost = sum(P[d]["fl"][9] + P[d]["fl"][16] for d in days)
     ok2 = all(x == 0 for x in ctl) and shd <= 1.0 and not newd and all(x == 0 for x in h3)
     rep.add("N7-2: ksiega ludzi zamknieta (czekajacy, udzialy, dopisek H3)",
             f"kontrola linii N7 rozna od 0 w {sum(1 for x in ctl if x != 0)} dobach (najwieksza |x| {max(abs(x) for x in ctl)}), udzialy - ludzie najwiecej {shd:.2f}, "
             f"nowi do zbiorki != pod choragiew w {len(newd)} dobach, dopisek H3 (Wyrzutki) z rozbitymi N7: dob {len(h3)}, roznica != 0 w {sum(1 for x in h3 if x != 0)}; "
-            f"zgubieni nazwani (rozejscie bez osady + wczytanie) {lost}",
+            f"zgubieni nazwani (rozejscie bez domu i puli + wczytanie) {lost}",
             "kontrola 0 kazdej doby, udzialy = ludzie (<= 1), nowi = pod choragiew, roznica H3 0; zgubieni nazwani - INFO", ok2)
-    # ---- N7-3 odebrani wobec rozeszlych po czasie czekania
-    O = sum(P[d]["fl"][1] for d in days); EXP = sum(P[d]["fl"][9] for d in days)
-    DH = sum(P[d]["fl"][5] for d in days); DL = sum(P[d]["fl"][7] for d in days); OP = sum(P[d]["fl"][3] for d in days)
-    den = O + EXP
+    # ---- N7-3 odebrani wobec rozeszlych po czasie czekania i po utracie osady zbiorki
+    O = sum(P[d]["fl"][2] for d in days); EXP = sum(P[d]["fl"][10] for d in days); LR = sum(P[d]["fl"][13] for d in days)
+    DH = sum(P[d]["fl"][6] for d in days); DL = sum(P[d]["fl"][8] for d in days); OP = sum(P[d]["fl"][4] for d in days)
+    MV = sum(P[d]["fl"][14] for d in days); MB = sum(P[d]["fl"][15] for d in days); MS = sum(P[d]["fl"][1] for d in days)
+    den = O + EXP + LR
     rep.add("N7-3: odebrani przez druzyny rodu wobec rozeszlych po czasie czekania (suma okna)",
-            f"odebrani {O} (w tym gracz {OP}), rozeszli sie po czasie czekania {EXP} -> odebranych {pc(O, den):.1f}%; rozejscie razem: dom {DH}, las {DL}",
-            ">= 50% (przy >= 200 rozstrzygnietych; mniej - INFO)", (pc(O, den) >= 50.0) if den >= 200 else None)
+            f"odebrani {O} (w tym gracz {OP}), rozeszli sie po czasie czekania {EXP}, po utracie osady bez nowej {LR} -> odebranych {pc(O, den):.1f}%; "
+            f"rozejscie razem: dom {DH}, las {DL}; wyruszyli do druzyny {MS}, wrocili z marszu {MB}, przeniesieni (osada zdobyta) {MV}",
+            ">= 50% (przy >= 200 rozstrzygnietych; mniej - INFO); recenzja obiegu szacuje 50-70% - granica", (pc(O, den) >= 50.0) if den >= 200 else None)
     pool_row()
-    # ---- N7-5 potkniecia
+    # ---- N7-5 potkniecia (takze z linii BLAD LINII - recenzja K1)
     st = sum(P[d]["st"] for d in days)
-    rep.add("N7-5: potkniecia N7 (suma okna)", f"{st}", "0", st == 0)
+    st_f = sum(num(r"\| potkniecia (\d+) \(", rows[d]) or 0 for d in failed)
+    rep.add("N7-5: potkniecia N7 (suma okna)", f"{st + st_f}" + (f" (w tym z linii BLAD LINII {st_f})" if failed else ""), "0", st + st_f == 0)
     # ---- N7-6 zapis
     sv = [P[d]["save"] for d in days]
     w = [int(P[d]["wt"][0]) for d in days]
@@ -16006,14 +16061,16 @@ def n7_main(logp, start_arg, until=120):
             "INFO (SaveText.Sync dzieli napis na kawalki po 8000 znakow)", None)
     # ---- N7-7 dlaczego czekaja (srednie dobowe)
     n = float(len(days))
-    nop = sum(int(P[d]["wt"][5]) for d in days) / n
-    far = sum(int(P[d]["wt"][6]) for d in days) / n
-    farD = [float(P[d]["wt"][7]) for d in days if P[d]["wt"][7] is not None]
-    full = sum(int(P[d]["wt"][8]) for d in days) / n
-    wage = sum(int(P[d]["wt"][9]) for d in days) / n
+    mar = sum(int(P[d]["wt"][5]) for d in days) / n
+    nop = sum(int(P[d]["wt"][6]) for d in days) / n
+    far = sum(int(P[d]["wt"][7]) for d in days) / n
+    farD = [float(P[d]["wt"][8]) for d in days if P[d]["wt"][8] is not None]
+    full = sum(int(P[d]["wt"][9]) for d in days) / n
+    wage = sum(int(P[d]["wt"][10]) for d in days) / n
+    sie = sum(int(P[d]["wt"][11]) for d in days) / n
     rep.add("N7-7: gotowi, ktorzy dzis nie wrocili - przyczyna (srednio na dobe; INFO)",
-            f"bez druzyny rodu {nop:.0f}, druzyna dalej niz zasieg {far:.0f}" + (f" (srednio {sum(farD) / len(farD):.1f} dob marszu)" if farD else "")
-            + f", druzyny bez miejsca {full:.0f}, bez zoldu {wage:.0f}",
+            f"w marszu do druzyny {mar:.0f}, bez druzyny rodu {nop:.0f}, druzyna dalej niz zasieg {far:.0f}" + (f" (srednio {sum(farD) / len(farD):.1f} dob marszu)" if farD else "")
+            + f", druzyny bez miejsca {full:.0f}, bez zoldu {wage:.0f}, osada oblezona {sie:.0f}",
             "INFO - do strojenia zasiegu (Stragglers Rally Reach Days) i czasu czekania", None)
     rep.show()
     return 0
