@@ -1835,3 +1835,17 @@ Armoury b2423a38 z kopii albo klucz CrownWarAidByNeed = false.
   prawie wygasa; (2) rod gracza ani nie placi, ani nie dostaje - czy ma?; (3) krolestwa bez platnikow (Zelazne Wyspy, Wolni Ludzie, Ibben, Qohor) dalej bez pomocy.**
   **POPRAWKA DANINY (W5b) - W TOKU:** wf_370f605f-283 (docs/przekazanie/wf-w5b-potrzeba-korony.js), galaz `w-toku/w5b-potrzeba-korony` od 0a387b5, drzewo SC\zb\w5b.
   W GRZE (lancuch): bieg kontrolny po WGRANIU 41 -> test 120 dob W6 (test\at-w6-120.out.txt). Limity 19:20 UTC: 5 h 74% (zeruje sie 20:50), tydzien 91%.
+- (19:40 UTC 13.10) **POPRAWKA 5 TOWARY (N5) - KOD GOTOWY I SCALONY (NIEWGRANE, BEZ TESTU W GRZE):** `w-toku/n5-towary` 71249d4 -> `w-toku/zbior-e8` (HEAD po tym scaleniu - patrz
+  "git log"; gen_mcm 1334; Armoury w test\fin11: P1 + N3 + W5 + W6 + N5). Piec regul, kazda z wlasnym kluczem:
+  A PLOTNO - przyczyna: len (20 wsi) stoi na suficie regulatora x1.30 od d85, a plotno wykupuje lud (120 ze 164 szt./d) - brak PRODUKCJI; regula: surowiec z brakiem w > 15
+    miastach ma sufit 4.0 (ValveRaiseWhileShort, ValveShortCeiling); skutek dopiero od d169, w roku 1 polki moga zostac puste.
+  B SKORA - przyczyna INNA niz zakladana: linie uboju gry (owca -> mieso, swinia -> 2 miesa) nie daja skory, 134 zwierzat/d; regula: 1 skora na zwierze (SlaughterKeepsHides).
+  C ZBROJA t3-4 - przyczyna: liczba rak platnerzy (0.10 / 1000 ludzi), nie przydzial; regula: rece x1.3 (WorkshopHandsStep).
+  D DREWNO - przyczyna: regulator podniosl wyreb do x1.30 w d113 i nie mial jak cofnac; regula: krok wraca do zmierzonego zuzycia (ValveStepFollowsUse).
+  E BUDOWY CYWILNE - przyczyna: wstrzymane sama flaga wojny; regula: warownia "przy froncie" tylko, gdy w 14 dobach w zasiegu 60 bylo oblezenie / wroga druzyna / bitwa / rabunek
+    (CivilWorksAwayFromFront, CivilWorksCalmDays 14, CivilWorksFrontRange 60, CivilWorksNeedWageRoom - pan z zoldem przy 95% pulapu nie oplaca budowy).
+  Progi N5-0..N5-5 w `--grupa etap8`. Oczekiwane w 120 dobach: B skory 394 -> 480-530/d; C t3+t4 29.8 -> 33-39/d; E budowa w 95-115 osadach (bylo 55), wydatki 35-55 tys. zl/d;
+  A i D nie do oceny w 120 dobach (potrzeba >= 200). **DO JEFFA (7 spraw, zadna nie blokuje): len - wiecej wsi lnianych / wyzszy sufit / szybsze kroki / len kosztem zboza wsi;
+  skora - zwierzeta rzezne pod regulator; rece 1.3 czy 1.5; warunek luzu zoldu zdejmuje 49-78 osad z budow; pasmo drewna 30-60 dni; sol stoi na suficie jak len (regula A jej nie
+  obejmuje); regula A daje drewnu i zelazu ten sam sufit 4.0 (projekt budow zakladal 1.8).** Ryzyka: budowy kupia 2-3 x wiecej drewna; nowy strumien zlota od panow do miast
+  (+16-21 tys. zl/d do kies ludu); pamiec frontu tylko w sesji. KOLEJKA GRY: test 120 dob W6 (w toku) -> WGRANIE 42 -> test 120 dob N5 (fin11) -> WGRANIE 43.
