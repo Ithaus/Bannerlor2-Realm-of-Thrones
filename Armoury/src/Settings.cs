@@ -1887,6 +1887,13 @@ namespace Armoury
         // GL-0 / P6 (decyzja Jeffa 13.10, pyt. 3): Nocna Straz poza regula - wsie Daru przy dzisiejszej stalej produkcji, rynek Castle Black i podzamcza Strazy
         // ze skala 1 (PeopleScale.WatchException); dopoki zadna paczka nie czyta skal - bez skutku w grze
         public bool WatchKeepsFlatOutput = true;           // The Night's Watch stands outside the rules that tie goods to the number of people: the villages of the Gift keep today's output, and Castle Black and the Watch's castles keep a market of ordinary size, although only some twenty thousand people live there - the Watch lives on the men and gifts of all Westeros. Off = the Watch's lands are measured by their people like any other
+        // GL-1 / P1 (projekt docs/gospodarka-od-ludzi rozdz. 3.3, 8 P1; decyzja Jeffa 13.10 "produkuja ludzie"): plon i wydobycie wsi (kazdy towar listy typu wsi,
+        // takze zwierzeta i konie) i las wsi = stawka typu x skala ludzi u_v x g(typ) zamiast progu hearth; g liczone raz (suma swiata typu w dniu kalibracji
+        // bez zmian), w zapisie arm_villagepeople; regulator wsi od nowa przy zmianie stanu (VillageByPeople.cs). Off = plon wedlug progu hearth gry (stan 4d33042)
+        public bool VillageOutputByPeople = true;          // Each village on the map stands for all the villages of its district: its fields, herds, mines and woods yield by the number of people living there - a village of a crowded land brings forth several times what a village of an empty land does, while the world as a whole makes as much of every good as before (the hearth no longer sets the yield; winter, raids, war and the world's demand still do). The village tooltip shows 'People of this land' and the village's 'People of this land' window tells why it yields more or less. Off = village output follows the hearth thresholds, as before
+        // GL-1 / P6 (decyzja Jeffa 13.10, pyt. 3): Sarnor w tabeli ludnosci krain 0.1 -> 0.25 mln (gestosc Zelaznych Wysp); dziala przy kalibracji ludnosci,
+        // czyli w NOWEJ kampanii (k na osade w zapisie - stary zapis ma ludzi Sarnoru jak dotad). Off = 0.1 mln (stan 4d33042)
+        public bool SarnorPeopleRaised = true;             // Sarnor counts a quarter of a million people instead of a hundred thousand - as thickly settled as the Iron Islands - so its villages and towns are not left almost empty once goods follow the people. Takes effect in a new campaign only (a campaign already begun keeps the people it was reckoned with). Off = a hundred thousand, as before
 
         public static void Load(string moduleDataDir)
         {

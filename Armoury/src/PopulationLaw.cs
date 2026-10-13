@@ -66,12 +66,23 @@ namespace Armoury
             { "ghiscari",   new Region(3000000f, 0.40f) },  // Zatoka Niewolnicza
             { "qartheen",   new Region(4000000f, 0.37f) },
             { "khuzait",    new Region(750000f,  0f) },     // Dothrakowie
-            { "sarnor",     new Region(100000f,  0.20f) },
+            { "sarnor",     new Region(100000f,  0.20f) },  // GL-1 / P6: z kluczem SarnorPeopleRaised 0.25 mln (TablePop) - tylko nowa kampania
             { "ibbenese",   new Region(350000f,  0.20f) },
             { "summer",     new Region(750000f,  0.10f) },
             { "yiti",       new Region(100000f,  0.20f) },
             { "valyrian",   new Region(50000f,   0f) },
         };
+
+        // GL-1 / P6 (decyzja Jeffa 13.10, pyt. 3; projekt "gospodarka od ludzi" rozdz. 6): Sarnor 0.1 -> 0.25 mln (gestosc Zelaznych Wysp: 16 tys. ludzi na wies
+        // zamiast 5.7 tys.) przy kluczu SarnorPeopleRaised. Liczba tabeli dziala w kalibracji ludnosci (k krainy i k na osade - w zapisie), wiec zmienia
+        // ludzi tylko w NOWEJ kampanii; w starym zapisie rusza tylko liczba kontrolna TableTotal (linia "Rece (174)") i wzor tabeli przy wylaczonym
+        // TownPeopleFrozen. Klucz wylaczony - 0.1 mln (stan 4d33042).
+        private const float SarnorRaisedPop = 250000f;
+        private static float TablePop(string culture, Region r)
+        {
+            if (culture == "sarnor") { var s = Settings.Current; if (s != null && s.SarnorPeopleRaised) return SarnorRaisedPop; }
+            return r.Pop;
+        }
 
         // kultura -> [ludzi na punkt hearth wsi, ludzi na punkt dobrobytu miasta]
         private static readonly Dictionary<string, float[]> _k = new Dictionary<string, float[]>();
@@ -112,7 +123,7 @@ namespace Armoury
             {
                 float h, p;
                 hearth.TryGetValue(kv.Key, out h); prosp.TryGetValue(kv.Key, out p);
-                float pop = kv.Value.Pop * scale;
+                float pop = TablePop(kv.Key, kv.Value) * scale;
                 // E4/9 (5.4, U15b): nowa kampania - niewolni Zelaznych Wysp to CZESC ludzi tabeli krainy (nie dodatek): k wsi i miast wysp liczone z reszty, niewolni
                 // na konto NIEWOLNI ksiegi ludzi ponizej (SeedThralls - to samo wywolanie, ten sam warunek: nigdy odjete z DOM bez konta albo odwrotnie)
                 float thr = 0f;
@@ -132,7 +143,7 @@ namespace Armoury
                 }
                 _k[kv.Key] = new[] { kv0, kv1 };
                 parts.Add(kv.Key + " " + (pop / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M (wies " + (int)kv0 + "/hearth, miasto " + (int)kv1 + "/dobrobyt)"
-                          + (thr > 0f ? " + niewolni " + thr.ToString("0", CultureInfo.InvariantCulture) + " (czesc tabeli " + (kv.Value.Pop * scale / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M, E4/9)" : ""));
+                          + (thr > 0f ? " + niewolni " + thr.ToString("0", CultureInfo.InvariantCulture) + " (czesc tabeli " + (TablePop(kv.Key, kv.Value) * scale / 1e6f).ToString("0.00", CultureInfo.InvariantCulture) + "M, E4/9)" : ""));
             }
             Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray())
                      + (cut.Count > 0 ? " | obcieto (pulap " + (int)cap + " ludzi na punkt hearth wsi, E4/3): " + string.Join(", ", cut.ToArray()) + "; poza mapa razem "
@@ -187,7 +198,7 @@ namespace Armoury
                 {
                     float h, p;
                     hearth.TryGetValue(kv.Key, out h); prosp.TryGetValue(kv.Key, out p);
-                    float pop = kv.Value.Pop * scale;
+                    float pop = TablePop(kv.Key, kv.Value) * scale;
                     float urban = p > 0f ? kv.Value.Urban : 0f;
                     if (h <= 0f) urban = p > 0f ? 1f : 0f;
                     _kTab[kv.Key] = new[] { h > 0f ? pop * (1f - urban) / h : 0f, p > 0f ? pop * urban / p : 0f };
@@ -205,7 +216,7 @@ namespace Armoury
         internal static float TableTotal()
         {
             float scale = Math.Max(0f, Settings.Current.PopulationScale), sum = 0f;
-            foreach (var kv in Table) sum += kv.Value.Pop * scale;
+            foreach (var kv in Table) sum += TablePop(kv.Key, kv.Value) * scale;
             return sum;
         }
 

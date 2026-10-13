@@ -136,6 +136,10 @@ namespace Armoury
         /// <summary>Dzien gry, z ktorego jest pamiec skal (-1 = brak).</summary>
         internal static int MemoryDay { get { var m = _mem; return m != null ? m.Day : -1; } }
 
+        /// <summary>GL-1 (tylko odczyt, watek glowny): srednia wies swiata z kalibracji (ludzie; 0 = nieskalibrowane). P1 trzyma ja obok g typow - inna liczba
+        /// po wczytaniu = usluga skalibrowala sie od nowa (brak albo blad pola arm_peoplescale), wiec g typow trzeba policzyc od nowa.</summary>
+        internal static double RefVillage { get { return _cal ? _refV : 0.0; } }
+
         /// <summary>Klucz WatchKeepsFlatOutput: Nocna Straz poza regula (decyzja Jeffa 13.10, pyt. 3).</summary>
         internal static bool WatchExceptionOn { get { var s = Settings.Current; return s != null && s.WatchKeepsFlatOutput; } }
 
