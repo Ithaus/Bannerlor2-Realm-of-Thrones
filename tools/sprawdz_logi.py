@@ -240,6 +240,12 @@ Uzycie (Python 3, tylko odczyt):
                     O1-1 rozjazdy 0: probka 1/64 poprawki (stara i nowa droga, R9), samokontrola odczytow, potkniecia; O1-2 przebudowy pamieci
                     polki <= 9 000/dobe srednio (Z33 ok. 13 800) i poprawione w pamieci > 0; O1-3 ceny sprzetu (PricePostfix) <= 450 ms/dobe
                     srednio (Z33 617); O1-4 delegaty zbudowane N/N i 0 wywolan przez Invoke przy kluczu [WL]; czas poprawki i przebudowy - INFO.
+                    Blok etap8_o2 (E8/O2, paczka 266): WorkshopLaw bez refleksji i powtorzen - linia doby "Warsztaty bez powtorzen (E8/O2)"
+                    (WorkshopLaw.DailyFast) oraz linie "Koszt 171-174 (doba)", "Profil doby (E8/0)" i "Warsztaty (zapis 174)": O2-0 linia w kazdej
+                    dobie okna, stan klucza i tryb kluczy; O2-1 rozjazdy 0: probka 1/64 kazdej pamieci (stara i nowa droga, R9), linie ROZJAZD,
+                    potkniecia i linie "ERROR in WorkshopLaw.Fast(" 0; O2-2 WorkshopLaw.CyclePrefix <= 500 ms/dobe srednio przy kluczu [WL]
+                    (Z33 806; podzial z planem doby / kolejne - INFO); O2-3 zapis -> wczytanie: sztuk w toku wczytano tyle, ile zapisano
+                    (bieg zapisu), kazdy zapis = sztuki w pamieci; praca przejeta przez pamieci - INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9979,6 +9985,117 @@ def etap8_o1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"szacunek oszczednosci przy {deltas / n_on:.0f} poprawkach/d: {saved:.1f} ms/d", "INFO (projekt: zysk 70-150 ms/d z delegatami)", None)
 
 
+# ============================================================ ETAP 8 (E8/O2, paczka 266): WorkshopLaw bez refleksji i powtorzen - blok etap8_o2
+E8_O2_LINE = "Warsztaty bez powtorzen (E8/O2): dzien"
+# Prog projektu etapu 8 v2 rozdz. 3 "E8/O2" i rozdz. 1 (wzor Z33: WorkshopLaw.CyclePrefix 840 ms / 7 093 cykli w dobie 120, srednio 806 ms/dobe)
+E8_O2_CYCLE_MS_MAX = 500.0
+
+
+def etap8_o2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O2 (266, projekt etapu 8 v2 rozdz. 3 "E8/O2" Test, R9): linia doby "Warsztaty bez powtorzen (E8/O2)" (WorkshopLaw.DailyFast) + "Koszt 171-174
+    (doba)" (WorkshopLaw.CyclePrefix ms / cykli) + "Profil doby (E8/0)" (cykle z planem doby / kolejne) + "Warsztaty (zapis 174)" (zapis i wczytanie).
+    O2-0 linia w kazdej dobie okna, stan klucza i tryb kluczy; O2-1 rozjazdy 0 - probka 1/64 kazdej pamieci (stara i nowa droga), linie ROZJAZD,
+    potkniecia 0 (bez probek - INFO); O2-2 CyclePrefix <= 500 ms/dobe srednio w dobach z kluczem [WL]; O2-3 zapis -> wczytanie: ta sama liczba sztuk
+    w toku (pary zapis / wczytanie w tym samym logu - bieg zapisu) i kazdy zapis = sztuki w pamieci; INFO: ile pracy przejely pamieci."""
+    ol = {d: s for d, s in by_day(lines, E8_O2_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not ol:
+        rep.add("E8/O2: linia Warsztaty bez powtorzen (E8/O2)", "brak w logu", "jest od wgrania E8/O2", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "WorkshopLawFast [WL]" in ol[d] and "WYLACZONE w MCM" not in ol[d]]
+    fastk = [d for d in days if "klucze linii (robota w toku i ranking): wlasne porownanie" in ol[d]]
+    rep.add("O2-0: linia Warsztaty bez powtorzen (E8/O2) w kazdej dobie okna; stan klucza",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; WorkshopLawFast wl {len(on)} / wyl {len(days) - len(on)} dob, klucze z wlasnym porownaniem {len(fastk)} dob",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def tot(pat, src, sel, cast=int):
+        return sum(num(pat, src[d], cast=cast, default=0) for d in sel)
+
+    # O2-1: rozjazdy (R9)
+    mis = max([num(r"rozjazdow od startu sesji (\d+)", ol[d], default=0) for d in days] + [0])
+    stum = max([num(r"\| potkniecia od startu sesji (\d+)\.", ol[d], default=0) for d in days] + [0])
+    probes = tot(r"probka 1/64 \(stara i nowa droga\): (\d+),", ol, days)
+    alarm = sum(1 for s in lines if s.startswith("Warsztaty bez powtorzen (E8/O2): ROZJAZD"))
+    errs = sum(1 for s in lines if s.startswith("ERROR in WorkshopLaw.Fast(") or s.startswith("ERROR in WorkshopLaw.DailyFast"))
+    ok = None
+    if on and (probes > 0 or mis or stum or alarm or errs):
+        ok = mis == 0 and stum == 0 and alarm == 0 and errs == 0
+    rep.add("O2-1: rozjazdy - pamieci warsztatow wobec starej drogi (probka 1/64: klucze, nazwa linii, mnoznik polki, zakazane)",
+            f"probek {probes}, rozjazdow {mis}; linii ROZJAZD w logu {alarm}; potkniecia {stum}, linii bledu nowej drogi {errs}",
+            "0 rozjazdow i 0 potkniec (R9: rozjazd > 0 = paczka wylaczona); bez probek - INFO", ok)
+
+    # O2-2: czas CyclePrefix
+    kos = {d: s for d, s in by_day(lines, "Koszt 171-174 (doba): dzien").items() if 1 <= run_day(d, start) <= until}
+    pat = r"WorkshopLaw\.CyclePrefix ([0-9.]+) ms/"
+
+    def cyc(sel):
+        v = [fnum(pat, kos[d]) for d in sel if d in kos]
+        return [x for x in v if x is not None]
+
+    c_on, c_off = cyc(on), cyc([d for d in days if d not in on])
+    calls = [num(r"WorkshopLaw\.CyclePrefix [0-9.]+ ms/(\d+)", kos[d]) for d in on if d in kos]
+    calls = [x for x in calls if x is not None]
+    prof = {d: s for d, s in by_day(lines, E8_PROF).items() if 1 <= run_day(d, start) <= until}
+    p0 = [fnum(r"CyclePrefix z planem doby ([0-9.]+) ms/", prof[d]) for d in on if d in prof]
+    p1 = [fnum(r"\), kolejne ([0-9.]+) ms/", prof[d]) for d in on if d in prof]
+    p0, p1 = [x for x in p0 if x is not None], [x for x in p1 if x is not None]
+    extra = (f"; z linii Profil doby: z planem doby {sum(p0) / len(p0):.0f} ms/d, kolejne {sum(p1) / len(p1):.0f} ms/d" if p0 and p1 else "") \
+        + (f"; klucz wylaczony {len(c_off)} dob: srednio {sum(c_off) / len(c_off):.0f} ms/d" if c_off else "")
+    if c_on:
+        avg = sum(c_on) / len(c_on)
+        per = (avg * 1000.0 / (sum(calls) / len(calls))) if calls and sum(calls) > 0 else None
+        rep.add("O2-2: WorkshopLaw.CyclePrefix na dobe (Koszt 171-174) przy kluczu [WL]",
+                f"srednio {avg:.0f} ms/d ({len(c_on)} dob, najwiecej {max(c_on):.0f}; Z33 806)" + (f", {per:.0f} us na cykl (Z33 136)" if per is not None else "") + extra,
+                f"<= {E8_O2_CYCLE_MS_MAX:.0f} ms/d srednio", avg <= E8_O2_CYCLE_MS_MAX)
+    else:
+        rep.add("O2-2: WorkshopLaw.CyclePrefix na dobe", ("brak dob z kluczem [WL] i linia Koszt 171-174 (doba)" if on else "klucz WorkshopLawFast wylaczony w calym oknie") + extra,
+                f"<= {E8_O2_CYCLE_MS_MAX:.0f} ms/d srednio przy kluczu [WL]", None)
+
+    # O2-3: zapis -> wczytanie (caly log - zapis i wczytanie nie maja doby w linii)
+    saves, pairs, mism, bad_saves, last_save = 0, 0, [], [], None
+    for s in lines:
+        if not s.startswith("Warsztaty (zapis 174):"):
+            continue
+        if "zapis gry - sztuk w toku" in s:
+            n, m, k = num(r"sztuk w toku (\d+) \(w pamieci", s), num(r"\(w pamieci (\d+)\)", s), num(r"pominietych (\d+)", s, default=0)
+            if n is None or m is None:
+                continue
+            saves += 1
+            last_save = n
+            if not (n <= m and m - n <= k):
+                bad_saves.append(f"zapisano {n} / w pamieci {m} (pominietych {k})")
+        elif "wczytano sztuk w toku" in s:
+            p, sk = num(r"wczytano sztuk w toku (\d+)", s), num(r", pominieto (\d+) \(warsztatu", s, default=0)
+            if last_save is not None and p is not None:
+                pairs += 1
+                if not (p <= last_save <= p + sk):
+                    mism.append(f"wczytano {p} + pominieto {sk} / zapisano {last_save}")
+    ok = None
+    if bad_saves or mism:
+        ok = False
+    elif pairs:
+        ok = True
+    rep.add("O2-3: zapis -> wczytanie - sztuki w toku warsztatow (Warsztaty (zapis 174))",
+            f"zapisow {saves}, niezgodnych z pamiecia {len(bad_saves)}" + (f" ({'; '.join(bad_saves[:3])})" if bad_saves else "")
+            + f"; par zapis -> wczytanie {pairs}, niezgodnych {len(mism)}" + (f" ({'; '.join(mism[:3])})" if mism else ""),
+            "wczytano tyle sztuk, ile zapisano (wczytanie ostatniego zapisu tego biegu); kazdy zapis = sztuki w pamieci; bez pary - INFO", ok)
+
+    # INFO: ile pracy przejely pamieci (doby z kluczem [WL])
+    n_on = max(1, len(on))
+    kh, kc = tot(r"skrotow (\d+),", ol, on), tot(r"porownan (\d+),", ol, on)
+    lh, ln = tot(r"nazwa linii z pamieci (\d+)", ol, on), tot(r"nazwa linii z pamieci \d+ / liczona (\d+)", ol, on)
+    fh, fn_ = tot(r"mnoznik polki koszyka z pamieci (\d+)", ol, on), tot(r"mnoznik polki koszyka z pamieci \d+ / liczony (\d+)", ol, on)
+    bh, bn = tot(r"lista zakazanych z pamieci (\d+)", ol, on), tot(r"lista zakazanych z pamieci \d+ / liczona (\d+)", ol, on)
+    rk = max([num(r"przepisan slownikow od startu gry (\d+)", ol[d], default=0) for d in days] + [0])
+    rep.add("E8/O2: praca przejeta przez pamieci (na dobe, doby z kluczem [WL])",
+            f"klucze: skrotow {kh / n_on:.0f}, porownan {kc / n_on:.0f}; nazwa linii z pamieci {lh / n_on:.0f} / liczona {ln / n_on:.0f}; "
+            f"mnoznik polki {fh / n_on:.0f} / {fn_ / n_on:.0f}; zakazane {bh / n_on:.0f} / {bn / n_on:.0f}; przepisan slownikow kluczy {rk}",
+            "INFO (projekt: zysk 150-400 ms/d)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -10010,6 +10127,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_r)    # E8/R (254): rynek i korona - bez premii wojennej, kon przy sprzedazy liczony raz, monopole od dziennej wyplaty
     blocks.append(etap8_b)    # E8/B (258): warsztaty i kowadlo - wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow, drobne poprawki kowadla
     blocks.append(etap8_o1)   # E8/O1 (265): pamiec polki po wlasnym zdjeciu sztuki (poprawka zamiast przebudowy), delegaty DTE/BK zamiast Invoke
+    blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii, potrzeb sztuki, zakazanych, mnoznik polki raz na koszyk
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

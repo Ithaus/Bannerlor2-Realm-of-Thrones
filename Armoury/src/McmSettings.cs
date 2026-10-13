@@ -4604,6 +4604,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool DteDelegates { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Law Fast", HintText = "the town workshops that make arms and armour do the same reckoning with less work for the game: the pull of the stall is reckoned once for each kind of piece instead of once for every piece, and what a workshop has in hand is looked up directly - the same pieces, prices and wages as before. Off: the old way")]
+        [SettingPropertyGroup("Arms production")]
+        public bool WorkshopLawFast { get; set; } = true;
+
         [SettingPropertyBool("Town Material Order By Sea", HintText = "a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates")]
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderBySea { get; set; } = true;
@@ -6202,6 +6206,7 @@ namespace Armoury
             s.ShelfIndexSelfCheckDays = ShelfIndexSelfCheckDays;
             s.ShelfIndexOwnUpdate = ShelfIndexOwnUpdate;
             s.DteDelegates = DteDelegates;
+            s.WorkshopLawFast = WorkshopLawFast;
             s.TownMaterialOrderBySea = TownMaterialOrderBySea;
             s.TownMaterialOrderSeaMaxRoute = TownMaterialOrderSeaMaxRoute;
             s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;

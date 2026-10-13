@@ -1449,6 +1449,10 @@ namespace Armoury
         // (AiGear), gra SetMoveGoToSettlement i GetCampaignBehavior, BK ReleaseCaravanFromHold i InvalidateRedirectCache (MaterialOrders); ta sama metoda i
         // to samo wejscie (latki Harmony biegna); delegat, ktory nie powstal = to miejsce dalej przez Invoke; off = wszystko przez Invoke jak dotad
         public bool DteDelegates = true;                   // the mod calls the routines of other mods it relies on (the armouries of Dynamic Troop Equipment, the caravans of Banner Kings) directly instead of looking them up anew each time - the same result, a little less work for the game. Off: the old way
+        // E8/O2 (266, PLAN 8.17; RD8 K2 / O2): WorkshopLaw bez refleksji i powtorzen (WorkshopLawFast.cs, WorkshopLineKeys.cs) - klucze roboty w toku i rankingu z wlasnym
+        // porownaniem zamiast refleksji, nazwa linii i lista zakazanych z pamieci, mnoznik polki raz na koszyk w rankingu; co 64. trafienie pamieci liczone tez
+        // stara droga (R9). Potrzeby sztuki, dniowka i poziom plac miasta licza sie na zywo, jak dotad. Linia doby "Warsztaty bez powtorzen (E8/O2)"; off = jak dotad
+        public bool WorkshopLawFast = true;                // the town workshops that make arms and armour do the same reckoning with less work for the game: the pull of the stall is reckoned once for each kind of piece instead of once for every piece, and what a workshop has in hand is looked up directly - the same pieces, prices and wages as before. Off: the old way
         public bool TownMaterialOrderBySea = true;         // a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates
         public float TownMaterialOrderSeaMaxRoute = 1000f; // longest sea voyage (map distance) for such an order - about two weeks under sail
         public bool TownMaterialOrderFromPacks = true;     // a caravan that already carries the material may take the order and deliver it, if that pays better than selling it where it stands
