@@ -10204,7 +10204,15 @@ def etap8_o3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"ostatnie {len(tail)} dob okna (do doby {last_run}): srednio {avg:.1f} ms, najwiecej {max(ms[d] for d in tail):.1f} ms; prog "
                 f"{lim:.0f} ms ({'O1+O3' if both else 'sam O3 - ShelfIndexOwnUpdate nie byl [WL] w tych dobach'})" + extra, rule, avg <= lim)
     else:
-        why = "klucz TradeExportFast wylaczony w calym oknie" if not on else ("brak dob z wywozem" if not on_ms else f"okno siega doby {last_run}")
+        if not on:
+            why = "klucz TradeExportFast wylaczony w calym oknie"
+        elif not on_ms:
+            why = "brak dob z wywozem"
+        elif last_run < E8_O3_MIN_DAY:
+            why = f"okno siega doby {last_run}"
+        else:   # recenzja E8/O3: okno dosc dlugie, ale w jego koncu za malo dob z wywozem przy kluczu [WL] - powod wprost, nie "okno siega doby"
+            why = (f"w ostatnich {E8_O3_LAST_DAYS} dobach okna (do doby {last_run}) tylko {len(tail)} dob z wywozem przy kluczu [WL] "
+                   f"(potrzeba {E8_O3_LAST_DAYS // 2})")
         rep.add("O3-2: czas wywozu kupcow (jedna klatka)", why + extra, rule, None)
 
     # O3-3: sztuki i zaplacone w probce
