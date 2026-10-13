@@ -86,6 +86,10 @@ namespace CrashScribe
         // --- E8/M (247): edukacja BK gracza (patrz Quiet.KnownBkEducation, Mends.BkEducationCheck) ---
         public static bool QuietBkEducation = true;          // znany wyjatek BK CorrectPlayerEducation (finalizer BKROT go polyka): jedna linia zamiast bloku ERROR + raz na gre linia jezyka gracza w BK; false = blok ERROR jak dotad, bez linii
 
+        // --- Z.3 (13.10): swaty lordow ROT szybciej (patrz MarriageFast.cs) ---
+        public static bool MarriageFast = true;              // ROT CheckNPCMarriages liczone nasza droga: te same pary, ta sama doba, ten sam ciag losowy - jedno przejscie po kandydatach przeciwnej plci, lord z zyjacym malzonkiem tylko "czy jest ktokolwiek"; false = oryginal ROT bez latki
+        public static bool MarriageFastShadow = false;       // bieg cienia: decyduje oryginal ROT, nasza droga tylko liczy na tym samym stanie losowym; linia doby "Swaty ROT (Z.3): klanow N, par stara droga A, nowa B, roznic R, czas stara X ms, nowa Y ms" (roznic ma byc 0); wolniej niz kazda z drog osobno - tylko do testu
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -153,6 +157,8 @@ namespace CrashScribe
                         case "WallOldSaveFix": WallOldSaveFix = B(v); break;
                         case "BkBattleRewardPerks": BkBattleRewardPerks = B(v); break;
                         case "QuietBkEducation": QuietBkEducation = B(v); break;
+                        case "MarriageFast": MarriageFast = B(v); break;
+                        case "MarriageFastShadow": MarriageFastShadow = B(v); break;
                     }
                 }
             }
