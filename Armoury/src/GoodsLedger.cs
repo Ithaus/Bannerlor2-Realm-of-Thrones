@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, Kinds = 29;   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, FFish = 29, Kinds = 30;   // FFish: m6b (5) - polow lodzi rybackich NavalDLC (FishingPartyCampaignBehavior.CatchFish, tick godzinowy - dotad poza ramkami, "bez wyjasnienia");   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)", "polow lodzi rybackich (NavalDLC)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         // P3/Z1 (TRIAZ-3 O2-1 P1): HCart - surowiec w wozach kupcow w drodze (MaterialCarts; poza rosterami - bez tego posiadacza zakup wozem bylby "bez wyjasnienia")
@@ -76,9 +76,10 @@ namespace Armoury
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
                              GDiscard = "porzucone przez lordow (gra)",
-                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)";
-        private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GScrap, GDrill, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GDiscard, GNoBuyer, GTick };
+                             GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)",
+                             GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)";   // m6b (5)
+        private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -179,6 +180,12 @@ namespace Armoury
         internal static bool On
         {
             get { var s = Settings.Current; return s != null && s.GoodsLedgerEnabled && s.LogEnabled; }
+        }
+
+        /// <summary>m6b (5): klucz FoodSourcesInLedger - nazwane zrodla zywnosci (polow lodzi, zboze nowych druzyn) i ujscie przy RemoveParty bez zniszczenia.</summary>
+        internal static bool SourcesOn
+        {
+            get { var s = Settings.Current; return s != null && s.FoodSourcesInLedger; }
         }
 
         internal static void Reset()
@@ -528,6 +535,9 @@ namespace Armoury
                 case FBloom:       // E6/R1 (214): drewno zdjete z polki miasta na wegiel dymarek przy kopalniach (Bloomery) - ujscie
                     foreach (var i in f.Touched) Book(i, GBloom, null, f.Net[i]);
                     return;
+                case FFish:        // m6b (5): ryby zlowione przez lodzie rybackie NavalDLC (produkcja ludzi wsi rybackiej na morzu) - zrodlo
+                    foreach (var i in f.Touched) Book(i, GFish, null, f.Net[i]);
+                    return;
                 case FRaid:        // E7/R1 (235): magazyn wsi -> napastnik znosi sie do zera, reszta (-) = spalone w rabunku; zboze ze spichlerza okregu dla napastnikow (+)
                     foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GRaid, n > 0 ? "zboze ze spichlerza okregu dla napastnikow" : "spalone w rabunku", n); }
                     return;
@@ -772,6 +782,49 @@ namespace Armoury
         {
             __state = null;
             try { if (__0 != null) __state = Begin(FDecay, __0); } catch (Exception e) { Stumble("DecayPre", e); }
+        }
+
+        /// <summary>m6b (5): prefiks NavalDLC FishingPartyCampaignBehavior.CatchFish(FishingPartyComponent) - ramka polowu (typ NavalDLC, stad object).</summary>
+        public static void FishPre(object __0, out Frame __state)
+        {
+            __state = null;
+            try { if (__0 != null && SourcesOn) __state = Begin(FFish, __0); } catch (Exception e) { Stumble("FishPre", e); }
+        }
+
+        /// <summary>
+        /// m6b (5): towar, ktory dodala gra w miejscu, o ktorym wiemy, skad jest (zboze nowej druzyny lorda 15-30 - G LordPartyComponent.cs:41; zaplacone zapasem
+        /// siedziby w ArmsFromPeople.SpawnGrain). W otwartej ramce (tick dobowy) podsluch juz zapisal przyrost do ramki - zdejmujemy go z ramki, zeby nie poszedl
+        /// do "inne ticki"; poza ramka (tick klanu - HeroSpawnCampaignBehavior) dotad byl "bez wyjasnienia". Zrodlo w grupie GSpawn, podpozycja sub.
+        /// </summary>
+        internal static void NoteSource(ItemObject it, int n, string sub)
+        {
+            try
+            {
+                if (n == 0 || it == null || !On || !SourcesOn || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(it, out i)) return;
+                var f = _top;
+                if (f != null && Environment.CurrentManagedThreadId == f.Thread) { f.Touch(i); f.Net[i] -= n; }
+                Book(i, GSpawn, sub, n);
+            }
+            catch (Exception e) { Stumble("NoteSource", e); }
+        }
+
+        /// <summary>m6b (5): MobileParty.RemoveParty bez zdarzenia zniszczenia (konwoje DTE - CutTheirSupplyBehavior.CleanupCaravan): roster znika bez sladu
+        /// (G MobileParty.cs:3525 ItemRoster.Clear - nie przez AddToCounts) - towar jako ujscie. Po zdarzeniu zniszczenia liczy OnPartyDestroyed (GLost).</summary>
+        internal static void OnPartyRemoved(MobileParty mp)
+        {
+            if (mp == null || !On || !SourcesOn || !EnsureItems()) return;
+            var r = mp.ItemRoster;
+            if (r == null) return;
+            string sub = HolderName[PartyClass(mp)];
+            for (int k = 0; k < r.Count; k++)
+            {
+                var el = r.GetElementCopyAtIndex(k);
+                int i;
+                if (el.Amount <= 0 || el.EquipmentElement.Item == null || !_idx.TryGetValue(el.EquipmentElement.Item, out i)) continue;
+                Book(i, GRemoved, sub, -el.Amount);
+            }
         }
 
         public static void BkSettlePre(Settlement __0, out Frame __state)
@@ -1169,6 +1222,10 @@ namespace Armoury
                 if (t == null) { _missing.Add("BetterEconomy " + bee[0] + " (brak modu)"); continue; }
                 frame("BetterEconomy " + bee[0], t.GetMethod("OnSettlementDailyTick", any, null, new[] { typeof(Settlement) }, null), bee[1]);
             }
+            // m6b (5): polow lodzi rybackich NavalDLC (tick godzinowy partii - poza ramkami dobowymi)
+            var tFish = QuartermasterLaw.FindType("NavalDLC.CampaignBehaviors.FishingPartyCampaignBehavior");
+            if (tFish == null) _missing.Add("polow lodzi rybackich (brak NavalDLC)");
+            else frame("polow lodzi rybackich (NavalDLC)", AccessTools.Method(tFish, "CatchFish"), nameof(FishPre));
             // ramki zewnetrzne: dyspozytor dobowych zdarzen gry (wszyscy sluchacze naraz; ramki wewnetrzne wyzej zabieraja swoje)
             var disp = typeof(CampaignEventDispatcher);
             frame("tick partii", disp.GetMethod("DailyTickParty", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(MobileParty) }, null), nameof(TickPartyPre));

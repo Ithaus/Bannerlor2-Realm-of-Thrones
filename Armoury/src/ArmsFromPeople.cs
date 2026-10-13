@@ -77,7 +77,7 @@ namespace Armoury
             public long mTickUp, mTickDown;      // tylko okno ticku (N7 - porownanie z "milicja (E4/0): z modelu w ticku")
             // nowe druzyny
             public int p, p1, p2, p3; public long n, nOff; public double a1, aFrac; public long a2, a3h, a3g, a3f, a4;
-            public long g, g1, g2, g3; public int gN; public long gifts; public long giftsValue;
+            public long g, g1, g2, g3, g3x, gOth; public int gN; public long gifts; public long giftsValue;   // m6b (5): g3x - zboze bez zapasu zdjete (FoodSourcesInLedger), gOth - zboze gry dla druzyn Innych (nazwane w ksiedze towarow)
             // karawany
             public int k; public long kMen; public double c1, c1t, c1c, c1v, cFrac; public long c2, c2Master; public double c3; public long c4; public int c3N;
             public long cWatch;
@@ -542,7 +542,7 @@ namespace Armoury
             {
                 var day = D;
                 day.p++;
-                if (Undead.Party(__0) || OthersRise.IsWhiteWalkerClan(__1.Clan)) { day.p2++; return; }     // Inni: E4/2 tnie szablon do puli CIALA
+                if (Undead.Party(__0) || OthersRise.IsWhiteWalkerClan(__1.Clan)) { day.p2++; try { OthersGrain(__0, __state.Grain0); } catch (Exception e) { Stumble("SpawnPost(zboze Innych)", e); } return; }     // Inni: E4/2 tnie szablon do puli CIALA
                 try { SpawnGrain(__0, __1, __state.Grain0); } catch (Exception e) { Stumble("SpawnPost(zboze)", e); }
                 if (__0 == MobileParty.MainParty || __1.Clan == Clan.PlayerClan) { day.p3++; return; }      // rod gracza - bez szablonu (gra)
                 var r = __0.MemberRoster;
@@ -656,7 +656,7 @@ namespace Armoury
             var seat = h.HomeSettlement;
             var home = seat != null && seat.IsVillage && seat.Village != null ? seat.Village.Bound : seat;
             var f = h.MapFaction;
-            if (home != null && home.Town != null && SeatUsable(home, h) && home.Town.FoodStocks >= 2f * g) { home.Town.FoodStocks -= g; day.g1 += g; return; }
+            if (home != null && home.Town != null && SeatUsable(home, h) && home.Town.FoodStocks >= 2f * g) { home.Town.FoodStocks -= g; day.g1 += g; GoodsLedger.NoteSource(DefaultItems.Grain, g, "ze spichlerza siedziby"); return; }   // m6b (5): zrodlo z platnikiem w ksiedze towarow
             Settlement best = null; float bd = float.MaxValue;
             var pos = mp.Position.ToVec2();
             foreach (var t in Town.AllFiefs)
@@ -665,8 +665,26 @@ namespace Armoury
                 float dd = pos.DistanceSquared(t.Settlement.GetPosition2D);
                 if (dd < bd) { bd = dd; best = t.Settlement; }
             }
-            if (best != null) { best.Town.FoodStocks -= g; day.g2 += g; return; }
+            if (best != null) { best.Town.FoodStocks -= g; day.g2 += g; GoodsLedger.NoteSource(DefaultItems.Grain, g, "ze spichlerza innej warowni"); return; }
             day.g3 += g;
+            // m6b (5, FoodSourcesInLedger): zadna warownia krolestwa nie ma zapasu - zboze nie powstaje z niczego; druzyna rusza bez niego i kupi zywnosc
+            // na najblizszym targu (gra: PartiesBuyFoodCampaignBehavior, BK zaopatrzenie); glod bez zywnosci to tylko kara morale (G FoodConsumptionBehavior.cs:195-201)
+            if (GoodsLedger.SourcesOn && mp.ItemRoster != null)
+            {
+                int have = mp.ItemRoster.GetItemNumber(DefaultItems.Grain);
+                int take = Math.Min(g, have);
+                if (take > 0) { mp.ItemRoster.AddToCounts(DefaultItems.Grain, -take); day.g3x += take; }
+            }
+        }
+
+        /// <summary>m6b (5): zboze gry (15-30) dla nowej druzyny Innych - SpawnGrain ich pomija (E4/2); w ksiedze towarow nazwane jako zrodlo z niczego.</summary>
+        private static void OthersGrain(MobileParty mp, int grain0)
+        {
+            if (Campaign.Current == null || !Campaign.Current.GameStarted) return;
+            int g = Grain(mp) - grain0;
+            if (g <= 0) return;
+            D.gOth += g;
+            GoodsLedger.NoteSource(DefaultItems.Grain, g, "druzyny Innych - z niczego");
         }
 
         public static void GiftsPre(MobileParty __0, out long[] __state)
@@ -1082,6 +1100,7 @@ namespace Armoury
               .Append(" + nie wystawieni ").Append(a3).Append(" (bez wolnych rak ").Append(d.a3h).Append(", zaloga ponizej rezerwy albo w bitwie/oblezeniu ").Append(d.a3g).Append(", podloga ").Append(d.a3f).Append(")")
               .Append(" + Straz \"\" ").Append(d.a4).Append(" + ksiega bez poboru ").Append(d.nOff)
               .Append("; zboze ").Append(d.g).Append(" szt. (").Append(d.gN).Append(" partii): z zapasu siedziby ").Append(d.g1).Append(", z innej warowni ").Append(d.g2).Append(", z niczego (brak zapasu) ").Append(d.g3)
+              .Append(" (zdjete m6b ").Append(d.g3x).Append(", zboze gry dla druzyn Innych ").Append(d.gOth).Append(")")
               .Append("; dary startowe gry (poza E4/8 - etap 6): ").Append(d.gifts).Append(" szt. za ").Append(d.giftsValue).Append(" zl");
             // karawany
             sb.Append(" | KARAWANY: ").Append(d.k).Append(" nowych (ludzi ").Append(d.kMen).Append("): z ludzi osady startu ").Append(F1(d.c1)).Append(" (miasta ").Append(F1(d.c1t)).Append(", zamki ").Append(F1(d.c1c))

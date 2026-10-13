@@ -120,6 +120,17 @@ namespace Armoury
                                                    "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
                                                    "weterani (E5/B6): pula sakiewek weteranow w karczmach -> kasy miast karczm (zycie)" };
 
+        /// <summary>m6b (6, recenzja - AlleyProbe): liczba pozycji naszego ticku i krotka nazwa pozycji (do pierwszego " (" albo ":").</summary>
+        internal static int MarkCount { get { return Marks; } }
+        internal static string MarkShort(int k)
+        {
+            if (k < 0 || k >= Marks) return "?";
+            string n = MName[k];
+            int a = n.IndexOf(" (", StringComparison.Ordinal), b = n.IndexOf(':');
+            int cut = a >= 0 && (b < 0 || a < b) ? a : b;
+            return cut > 0 ? n.Substring(0, cut) : n;
+        }
+
         // posiadacze zlota
         private const int HTowns = 0, HCastles = 1, HVillages = 2, HLeaders = 3, HLords = 4, HPlayer = 5, HNotables = 6, HWanderers = 7, HOtherHeroes = 8,
                           HKingdoms = 9, HWorkshops = 10, HPurses = 11, HBank = 12, HVillagers = 13, HCaravans = 14, HGarrisons = 15, HBandits = 16,
@@ -573,6 +584,7 @@ namespace Armoury
         internal static void BlockOpen()
         {
             ClearLast169();                                 // paczka 169 (D20): liczby dnia Last* modulow bloku zeruje JEDNO miejsce - wlasny try
+            try { AlleyProbe.OnBlockOpen(); } catch { }     // m6b (6, recenzja): kasy zaulkow - moduly naszego ticku przed ksiega przeplywow (tylko log)
             try { _blockSnap = Snap(); _inBlock = true; }
             catch (Exception e) { _inBlock = false; _blockSnap = null; Log.Error("MoneyLedger.BlockOpen", e); }
             BlockWorld169();                                // paczka 169 (D10): zloto swiata przed naszym tickiem (RB) - wlasny try
@@ -587,6 +599,7 @@ namespace Armoury
                 var s = Snap();
                 for (int c = 0; c < Classes; c++) _mark[c, kind] += s[c] - _blockSnap[c];
                 _blockSnap = s;
+                try { AlleyProbe.OnMark(kind); } catch { }  // m6b (6, recenzja): ta sama pozycja dla kazdego miasta-zaulka (tylko log)
                 MarkWorld169(kind, s);                      // paczka 169b: zloto swiata na granicy modulow (RB wedlug odcinkow) - wlasny try
             }
             catch (Exception e) { Log.Error("MoneyLedger.Mark", e); }

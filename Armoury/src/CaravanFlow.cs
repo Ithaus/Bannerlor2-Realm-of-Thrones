@@ -116,6 +116,12 @@ namespace Armoury
         private static readonly List<string> _dEx = new List<string>();
         private const int MaxEx = 4;
         private static readonly Dictionary<Hero, int> _ownerDay = new Dictionary<Hero, int>();   // wlasciciel -> doba rozwiazania jego karawany (ochrona przed petla: rozwiaz - kup - rozwiaz)
+        // m6b (6, klucz IdleCaravanDisband): karawana bez statkow, ktora stoi w tym samym miescie z droga do innych miast od IdleDisbandDays+ dob (BK nie znajduje
+        // zysku - bieg roczny: kupiec z Thenn 289 dob), rozwiazywana ta sama droga co karawana bez drogi (Resolve): towar z nadwyzki kasy, kiesa do wlasciciela
+        private const double IdleDisbandDays = 28.0;
+        private static int _dIdle, _dIdleDone, _dIdleLeft;
+        private static double _dIdleMax;
+        private static readonly Dictionary<string, int> _dIdleAt = new Dictionary<string, int>();
 
         // ------------------------------------------------------------ 4. limit karawan kupca (A1)
         private static int _dCapAsk, _dCapHeld;
@@ -143,6 +149,7 @@ namespace Armoury
             _dStuck = _dDone = _dLeft = _dGoneShadow = _dFail = _dAgain = _dBelow = _dMen = 0;
             _dSoldU = _dSoldG = _dUnsoldU = _dUnsoldV = _dPurse = _dOwnerGot = _dMenPurse = 0;
             _dDoneAt.Clear(); _dKept.Clear(); _dEx.Clear();
+            _dIdle = _dIdleDone = _dIdleLeft = 0; _dIdleMax = 0; _dIdleAt.Clear();   // m6b (6)
             _dCapAsk = _dCapHeld = 0; _dCapWho.Clear();
         }
 
@@ -353,7 +360,7 @@ namespace Armoury
         }
 
         /// <summary>Powod, dla ktorego karawana bez drogi zostaje (null = mozna rozwiazac).</summary>
-        private static string Blocker(MobileParty c, Settlement at, Hero owner, int day)
+        private static string Blocker(MobileParty c, Settlement at, Hero owner, int day, bool idle = false)
         {
             if (c.IsMainParty || c.ActualClan == Clan.PlayerClan || (owner != null && owner == Hero.MainHero)) return "rod gracza";
             if (owner == null) return "bez wlasciciela (usuwa ja BK)";
@@ -364,11 +371,13 @@ namespace Armoury
             if (!c.IsPartyTradeActive || c.Ai == null || c.Ai.DoNotMakeNewDecisions) return "nie handluje";
             if ((c.MemberRoster != null && c.MemberRoster.TotalHeroes > 0) || (c.PrisonRoster != null && c.PrisonRoster.TotalManCount > 0)) return "bohater w skladzie albo jency";
             int was;
-            if (_ownerDay.TryGetValue(owner, out was) && was != day) { _dAgain++; return "wlasciciel mial juz rozwiazana karawane (ochrona przed petla)"; }
+            // m6b (6, recenzja): karawana bez zysku - sam prog postoju (IdleDisbandDays) jest hamulcem petli (nowa karawana musi stac 28+ dob), wiec ochrona
+            // blokuje tylko rozwiazanie blizsze niz IdleDisbandDays od poprzedniego; inaczej druga karawana tego samego kupca stalaby do konca sesji
+            if (_ownerDay.TryGetValue(owner, out was) && was != day && (!idle || day - was < IdleDisbandDays)) { _dAgain++; return "wlasciciel mial juz rozwiazana karawane (ochrona przed petla)"; }
             if (!CaravanCapital.On) return "Caravan Capital Real wylaczone (kiesa przepadlaby)";
             if (!HorseFate.SpoilsOn) return "Spoils Of Broken Parties wylaczone (towar przepadlby)";
             if (!SmallGold.PerksOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
-            if (RoadNow(c, at)) return "droga jest w swiezym odczycie";
+            if (!idle && RoadNow(c, at)) return "droga jest w swiezym odczycie";   // m6b (6): karawana bez zysku ma droge - stoi, bo BK nie widzi zysku
             return null;
         }
 
@@ -419,15 +428,15 @@ namespace Armoury
             }
         }
 
-        private static void Resolve(MobileParty c, Settings s, int day)
+        private static void Resolve(MobileParty c, Settings s, int day, bool idle = false)
         {
             var at = c.CurrentSettlement;
             if (at == null) return;
             Hero owner = null;
             try { owner = c.Owner ?? (c.Party != null ? c.Party.Owner : null); } catch { owner = null; }
-            string why = Blocker(c, at, owner, day);
-            if (why != null) { _dLeft++; Bump(_dKept, why); return; }
-            if (!s.IslandCaravanFix) { _dLeft++; _dGoneShadow++; return; }       // w cieniu: tylko licznik
+            string why = Blocker(c, at, owner, day, idle);
+            if (why != null) { if (idle) _dIdleLeft++; else _dLeft++; Bump(_dKept, (idle ? "bez zysku: " : "") + why); return; }
+            if (idle ? !s.IdleCaravanDisband : !s.IslandCaravanFix) { if (idle) _dIdleLeft++; else { _dLeft++; _dGoneShadow++; } return; }       // w cieniu: tylko licznik
             string town = Name(at), who = "?";
             try { who = owner.Name != null ? owner.Name.ToString() : "?"; } catch { }
             int men = c.MemberRoster != null ? c.MemberRoster.TotalManCount : 0;
@@ -440,8 +449,8 @@ namespace Armoury
             int g0 = head != null ? head.Gold : 0;
             _ownerDay[owner] = day;
             DestroyPartyAction.Apply(null, c);
-            if (c.IsActive) { _dFail++; _dLeft++; return; }
-            _dDone++; Bump(_dDoneAt, town);
+            if (c.IsActive) { _dFail++; if (idle) _dIdleLeft++; else _dLeft++; return; }
+            if (idle) { _dIdleDone++; Bump(_dIdleAt, town); } else { _dDone++; Bump(_dDoneAt, town); }
             _dUnsoldU += leftU; _dUnsoldV += leftV; _dPurse += purse; _dMen += men; _dMenPurse += menPurse;
             if (head != null) _dOwnerGot += Math.Max(0, head.Gold - g0);
             if (_dEx.Count < MaxEx)
@@ -450,7 +459,7 @@ namespace Armoury
 
         private static void Islands(Settings s, int day)
         {
-            List<MobileParty> cand = null;
+            List<MobileParty> cand = null, idle = null;
             var all = MobileParty.AllCaravanParties;
             if (all == null) return;
             foreach (var c in all)
@@ -461,19 +470,34 @@ namespace Armoury
                     var at = c.CurrentSettlement;
                     if (at == null || !at.IsTown) continue;
                     if (!c.HasLandNavigationCapability || c.HasNavalNavigationCapability) continue;
-                    if (!IslandRoads.LonelyTown(at)) continue;
+                    if (!IslandRoads.LonelyTown(at))
+                    {
+                        // m6b (6): miasto z droga do innych miast - karawana stoi, bo BK nie widzi zysku; od IdleDisbandDays dob w tym samym miescie - rozwiazanie
+                        double stay = IslandRoads.StayDays(c);
+                        if (stay < IdleDisbandDays) continue;
+                        _dIdle++; if (stay > _dIdleMax) _dIdleMax = stay;
+                        if (idle == null) idle = new List<MobileParty>();
+                        idle.Add(c);
+                        continue;
+                    }
                     _dStuck++;
                     if (cand == null) cand = new List<MobileParty>();
                     cand.Add(c);
                 }
                 catch (Exception e) { Stumble("Islands(przeglad)", e); }
             }
-            if (cand == null) return;
-            foreach (var c in cand)                                              // rozwiazanie po przegladzie - lista karawan gry zmienia sie przy usuwaniu
-            {
-                try { Resolve(c, s, day); }
-                catch (Exception e) { _dLeft++; Stumble("Islands(rozwiazanie)", e); }
-            }
+            if (cand != null)
+                foreach (var c in cand)                                          // rozwiazanie po przegladzie - lista karawan gry zmienia sie przy usuwaniu
+                {
+                    try { Resolve(c, s, day); }
+                    catch (Exception e) { _dLeft++; Stumble("Islands(rozwiazanie)", e); }
+                }
+            if (idle != null)
+                foreach (var c in idle)                                          // m6b (6): karawany bez zysku - ta sama droga rozwiazania
+                {
+                    try { Resolve(c, s, day, true); }
+                    catch (Exception e) { _dIdleLeft++; Stumble("Islands(bez zysku)", e); }
+                }
         }
 
         // ------------------------------------------------------------ 4. limit karawan kupca (A1)
@@ -619,6 +643,10 @@ namespace Armoury
                   .Append(" karawan (wracaja do tiku BKROT raz na dobe; nowe postoje po limicie dzis ").Append(_dShutNew).Append(", wedlug stanu").Append(_dShutWhy.Count > 0 ? Top(_dShutWhy, 8) : " -")
                   .Append(") | po otwarciu cialo tiku BK pominiete przez inny prefiks (kontrakt 174): ").Append(_dBlocked).Append(" tikow, ")
                   .Append((_dBlockedTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms (poza 'tiki BK' i kosztem dodatkowych tikow)");
+                // m6b (6): dopisek na koncu linii
+                sb.Append(" | karawany bez zysku (Idle Caravan Disband ").Append(s.IdleCaravanDisband ? "CZYNNE" : "WYLACZONE").Append("; bez statkow, w tym samym miescie z droga do innych miast od ")
+                  .Append(IdleDisbandDays.ToString("0", Inv)).Append("+ dob): stan ").Append(_dIdle).Append(", najdluzej ").Append(_dIdleMax.ToString("0.0", Inv)).Append(" dob, rozwiazane ").Append(_dIdleDone)
+                  .Append(Top(_dIdleAt, 4)).Append(", zostalo ").Append(_dIdleLeft).Append(" (powody w 'karawany bez drogi' z przedrostkiem 'bez zysku')");
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

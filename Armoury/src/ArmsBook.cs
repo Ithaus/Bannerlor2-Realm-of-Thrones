@@ -344,7 +344,7 @@ namespace Armoury
 
         internal static void Daily()
         {
-            if (!On) { _prev = null; Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats); _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _days7 = 0; ClearSinks(); return; }
+            if (!On) { _prev = null; Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats); _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _days7 = 0; ClearSinks(); try { PackSources.TakeBook(null, null, null, null); } catch { } return; }
             int day = (int)CampaignTime.Now.ToDays;
             var shelf = new long[Cats]; var vil = new long[Cats]; var stash = new long[Cats]; var party = new long[Cats]; var arm = new long[Cats]; var hero = new long[Cats];
             Stage6Measure.ForEachRoster((r, kind) =>
@@ -399,6 +399,7 @@ namespace Armoury
             {
                 Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " - stan wyjsciowy, reszta od nastepnej doby.");
                 _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0; ClearSinks();
+                try { PackSources.TakeBook(null, null, null, null); } catch { }   // m6b: pozycje nazwane od stanu wyjsciowego
                 return;
             }
             // E6/K1 (211): zgony koni (zdjete ze zbrojowni w misji i w autobitwie) - UJSCIE; lup, dobytek rozbitych, pula weteranow, dary z polki - przeniesienia w stanie
@@ -411,8 +412,16 @@ namespace Armoury
             for (int i = 0; i < MCats; i++) { folk[i] = _folkN[0, i] + _folkN[1, i]; folkAll += folk[i]; }
             long tap = ArmsLeaks.NoFolkHorses;   // kontrola drugim licznikiem: konie zdjete w ramce "konsumpcja osady" ksiegi towarow (podsluch AddToCounts); brak = ksiega towarow bez linii
             try { tap = ArmsLeaks.TakeFolkHorses(); } catch (Exception e) { Stumble("FolkTap", e); }
+            // m6b (4): pozycje nazwane - zapas drogi z niczego (konwoje DTE: DTE + gra; partie BK: GiveMounts / GivePackAnimals) i konie, ktore odchodza z partia
+            // przy MobileParty.RemoveParty (po zdarzeniu zniszczenia albo bez niego - konwoje DTE); dotad wszystko to bylo w "reszcie niewyjasnionej"
+            var nDte = new long[Cats]; var nBk = new long[Cats]; var gone = new long[Cats]; var removed = new long[Cats];
+            try { PackSources.TakeBook(nDte, nBk, gone, removed); } catch (Exception e) { Stumble("PackSources", e); }
             var rest = new long[Cats]; long rs = 0, src = 0, sink = 0;
-            for (int i = 0; i < Cats; i++) { rest[i] = (now[i] - _prev[i]) - _prod[i] + dead[i] + folk[i] + _disc[i]; rs += rest[i]; src += _prod[i]; sink += dead[i] + folk[i] + _disc[i]; }
+            for (int i = 0; i < Cats; i++)
+            {
+                rest[i] = (now[i] - _prev[i]) - _prod[i] - nDte[i] - nBk[i] + dead[i] + folk[i] + _disc[i] + gone[i] + removed[i];
+                rs += rest[i]; src += _prod[i] + nDte[i] + nBk[i]; sink += dead[i] + folk[i] + _disc[i] + gone[i] + removed[i];
+            }
             Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " | zrodla: stadniny wsi " + Row(_prod)
                      + " | ujscia: " + k1
                      + " | ujscia poza K1 (F3, pomiar): mieszczanie miast " + FolkRow(_folkN, 0) + " szt. za " + FolkRow(_folkGold, 0) + " zl, mieszczanie zamkow "
@@ -420,6 +429,8 @@ namespace Armoury
                      + " zloto = cena polki przy zdjeciu; nawiasy konsumpcji " + _folkBr + ", bez pelnej wyceny " + _folkPart + "; kontrola ksiegi towarow: "
                      + (tap != ArmsLeaks.NoFolkHorses ? "konie w ramce konsumpcji " + tap + ", roznica " + (folkAll - tap) : "brak (ksiega towarow bez linii)")
                      + "), porzucone przez gre u lordow " + Row(_disc) + " (nadmiar stada " + _discHerd + ", ponad udzwig " + _discWeight + ")"
+                     + " | zrodla nazwane z niczego (m6b): konwoje DTE " + Row(nDte) + ", partie BK " + Row(nBk)
+                     + " | ujscia (m6b): konie przepadle przy RemoveParty - po zniszczeniu " + Row(gone) + ", bez zniszczenia (konwoje DTE) " + Row(removed)
                      + " | wielblady wyprodukowane: w Qarthu " + _camelQarth + ", poza Qarthem " + _camelElse
                      + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + ", mianownik zrodla + ujscia " + (src + sink)
                      + (src + sink > 0 ? ", " + (100.0 * rs / (src + sink)).ToString("0", CultureInfo.InvariantCulture) + "%" : "")

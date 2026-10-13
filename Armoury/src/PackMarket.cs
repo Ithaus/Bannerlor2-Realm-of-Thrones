@@ -156,7 +156,7 @@ namespace Armoury
                 if (!On) { _off++; _offN += added; return; }
                 // konwoj DTE (CaravanCapital: kapital 0, nie handluje) - juczne gry zostaja: bez nich ladunek DTE (17 z kazdej zywnosci, 17 jucznych) przeciazalby konwoj,
                 // a caly ladunek konwoju jest z niczego po stronie DTE (poza K5)
-                if (CaravanCapital.InDteConvoy()) { _dte++; _dteN += added; return; }
+                if (CaravanCapital.InDteConvoy()) { _dte++; _dteN += added; PackSources.NoteDteGame(got); return; }   // m6b: zapas drogi konwoju - zrodlo nazwane w ksiedze koni
                 var mp = __result;
                 var r = mp.ItemRoster;
                 _new++; _given += added;
