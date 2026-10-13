@@ -822,6 +822,57 @@ namespace Armoury
             catch (Exception e) { Log.Error("WorkshopTrade.ApplyInCampaign", e); }
         }
 
+        // ------------------------------------------------------------ E8/B (258, LAWA 6): ekran rodu - utrzymanie warsztatu z poziomem plac miasta
+        private static bool _clanTried;
+        private static readonly TextObject _txtDailyWage = new TextObject("{=CaRbMaZY}Daily Wage");
+
+        /// <summary>
+        /// Ekran rodu pokazuje przy warsztacie "Daily Wage" = Workshop.Expense, czyli stala modelu (DailyExpensePostfix: gole utrzymanie), a warsztat
+        /// placi utrzymanie x poziom plac SWOJEGO miasta (UpkeepAt, ExpensePrefix). Postfiks na ClanFinanceWorkshopItemVM.PopulateStatsList podmienia
+        /// sam napis tej pozycji na kwote, ktora warsztat naprawde placi - zadnej zmiany w modelu ani w pieniadzach. Zakladany w kampanii, raz na proces
+        /// (jak ApplyInCampaign); gdy nie znajdzie celu - linia "nie znaleziono" i ekran jak dotad (R11). Wlacznik SmallFixes8 czytany w postfiksie.
+        /// </summary>
+        internal static void ApplyClanScreen()
+        {
+            if (_clanTried || _harmony == null) return;
+            _clanTried = true;
+            try
+            {
+                var vm = AccessTools.TypeByName("TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanFinance.ClanFinanceWorkshopItemVM");
+                var m = vm != null ? AccessTools.Method(vm, "PopulateStatsList") : null;
+                if (m == null) { Log.Info("Kowadlo i drobne (E8/B): ekran rodu - nie znaleziono ClanFinanceWorkshopItemVM.PopulateStatsList, 'Daily Wage' jak dotad (wpiete 0/1)."); return; }
+                _harmony.Patch(m, postfix: new HarmonyMethod(typeof(WorkshopTrade), nameof(ClanWagePostfix)));
+                Log.Info("Kowadlo i drobne (E8/B): ekran rodu - 'Daily Wage' warsztatu pokazuje utrzymanie x poziom plac jego miasta (wpiete 1/1).");
+            }
+            catch (Exception e) { Log.Error("WorkshopTrade.ApplyClanScreen", e); }
+        }
+
+        public static void ClanWagePostfix(object __instance)
+        {
+            try
+            {
+                if (!On || !_finPatched || !SmallFixes8.On || __instance == null) return;
+                var tr = Traverse.Create(__instance);
+                var w = tr.Property("Workshop").GetValue<Workshop>();
+                var list = tr.Property("ItemProperties").GetValue() as System.Collections.IEnumerable;
+                if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || list == null) return;
+                string name = _txtDailyWage.ToString();
+                string was = w.Expense.ToString();
+                string now = ((int)Math.Round(UpkeepAt(w))).ToString();
+                if (was == now) return;
+                foreach (var p in list)
+                {
+                    if (p == null) continue;
+                    var tp = Traverse.Create(p);
+                    if (tp.Property("Name").GetValue<string>() != name || tp.Property("Value").GetValue<string>() != was) continue;
+                    tp.Property("Value").SetValue(now);
+                    SmallFixes8.NoteClanWage();
+                    break;
+                }
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.ClanWagePostfix", e); }
+        }
+
         // ------------------------------------------------------------ wycena
         private static float EquipScale { get { return MBMath.ClampFloat(Settings.Current.WorkshopTradeEquipmentScale, 0.01f, 10f); } }
 
@@ -1337,11 +1388,13 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, WorkshopTrade.OnGold);   // 123: pomiar kies notabli (tylko licznik)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("ArtisanInputs.Daily", ArtisanInputs.Daily));           // 147: linia dnia rzemieslnikow BK
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("SmallFixes8.Daily", SmallFixes8.Daily));               // E8/B (258): linia dnia "Kowadlo i drobne (E8/B)" (sam log)
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             WorkshopTrade.ApplyInCampaign();
+            WorkshopTrade.ApplyClanScreen();   // E8/B (258, LAWA 6): "Daily Wage" warsztatu w ekranie rodu z poziomem plac miasta (sam napis)
             // 124: kapitalu startowego NIE tu - ten sluchacz idzie przed ArmouryBehavior (gra wola od ostatnio dopisanego), czyli przed
             // HistoricalPrices.Apply; SeedNewCampaign wola ArmouryBehavior.OnSessionLaunched zaraz po RawPrice.SeedNewCampaign
             try
@@ -1362,6 +1415,14 @@ namespace Armoury
                 if (dataStore.IsLoading) WorkshopTrade.Import(data);
             }
             catch (Exception e) { Log.Error("WorkshopTrade.SyncData", e); }
+            // E8/B (258): liczniki welny z uboju rzemieslnikow BK (ulamek sztuki na osade, ArtisanInputs) - wlasny try; stary zapis bez klucza = puste liczniki
+            try
+            {
+                string wool = dataStore.IsSaving ? ArtisanInputs.ExportWool() : null;
+                SaveText.Sync(dataStore, "arm_wool_frac", ref wool);
+                if (dataStore.IsLoading) ArtisanInputs.ImportWool(wool);
+            }
+            catch (Exception e) { Log.Error("WorkshopTrade.SyncData(arm_wool_frac)", e); }
         }
     }
 }

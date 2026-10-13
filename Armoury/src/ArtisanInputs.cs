@@ -38,6 +38,15 @@ namespace Armoury
     /// Bez zmian: jakosc BK, linie bez wsadu (WorkshopNoFreeRaw), linie uzbrojenia (WorkshopLaw), kopalnie, warsztaty notabli i gracza.
     /// Zloto tylko miedzy dwiema kasami, ktore rusza BK (kapital rzemieslnikow i kasa miasta); MoneyLedger widzi to jako osobna pozycje.
     /// Wylaczone - gra i BK jak dotad (zadna latka nie zmienia stanu).
+    ///
+    /// E8/B (258, PLAN 8.9; odpowiedz Jeffa 12.10 nr 5) - WYROBY UBOCZNE Z KAZDEGO CYKLU (wlacznik ArtisanByproductsFull). Liczbe cykli ustala pierwszy
+    /// wyrob; nastepne wywolanie (wyrob uboczny albo drozsza odmiana), w ktorym BK dopisal MNIEJ sztuk niz cykli, zostawalo bez reszty: krowa, owca
+    /// i swinia dodatkowych cykli schodzily z polki, a skor i welny za nie nie bylo (ujscie towaru). Teraz brakujace sztuki sa dopisane na polke,
+    /// a kasa miasta placi za nie warsztatowi cene polki TYLKO z nadwyzki ponad zapas kupcow (Seal31.Spare, R1): tyle sztuk, ile nadwyzka oplaci,
+    /// reszta nie powstaje (licznik "niesprzedane"). Przed startem gry i w linii bez zlota - bez zaplaty, jak sztuki BK.
+    /// WELNA Z UBOJU (wsad: owca, wyrob kategorii wool): pierwszy cykl daje sztuke z receptury gry, owca kazdego dodatkowego cyklu - ArtisanWoolPerSheep
+    /// (0.15) sztuki do licznika OSADY; pelna sztuka, gdy licznik dojdzie do 1 (pamiec ulamkow jak N1b: zapis arm_wool_frac, Reset). Jedna regula takze
+    /// tam, gdzie BK dopisal welny wiecej niz 1 + pelne sztuki z licznika - nadwyzka zdjeta ze zwrotem zaplaty, jak kazda sztuka bez wsadu.
     /// </summary>
     internal static class ArtisanInputs
     {
@@ -67,11 +76,22 @@ namespace Armoury
         private static readonly Dictionary<string, int[]> _dOut = new Dictionary<string, int[]>();   // wyrob -> [BK dopisal, zdjete]
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
 
+        // E8/B (258): wyroby uboczne z kazdego cyklu - licznik welny z uboju na osade (ulamek sztuki, zapis arm_wool_frac) i liczby linii dnia
+        internal static bool ByOn { get { var s = Settings.Current; return s != null && s.ArtisanByproductsFull; } }
+        private const float WoolEps = 0.0001f, WoolMin = 0.001f;
+        private static readonly Dictionary<string, float> _woolFrac = new Dictionary<string, float>();   // osada (StringId) -> ulamek sztuki welny
+        private static int _bCalls, _bLost, _bAdd, _bFree, _bUnsold, _bBelow, _bWoolSheep, _bWoolWhole, _bWoolCut;
+        private static long _bPaid, _bUnsoldV;
+        private static double _bWoolIn;
+        private static readonly Dictionary<string, int> _bOut = new Dictionary<string, int>();        // wyrob -> sztuki dopisane (E8/B)
+
         /// <summary>Nowa gra / wczytanie (z WorkshopTrade.Reset, czyli z konstruktora ArmouryBehavior).</summary>
         internal static void Reset()
         {
             _w = null; _open = _armed = false; _cycles = -1; _item = null;
             _errOnce.Clear();
+            _woolFrac.Clear();   // E8/B: liczniki welny - wczytanie oddaje je w SyncData (arm_wool_frac), nowa kampania zaczyna od zera
+            SmallFixes8.Reset(); // E8/B: liczniki drobnych poprawek (sesja)
             ClearDay();
         }
 
@@ -80,6 +100,9 @@ namespace Armoury
             _dCycles = _dMulti = _dCap = _dExtra = _dNoInput = _dNoProfit = _dNoGold = _dStumbles = 0;
             _dPaidIn = _dRefund = _dRefundShort = 0;
             _dUsed.Clear(); _dOut.Clear();
+            _bCalls = _bLost = _bAdd = _bFree = _bUnsold = _bBelow = _bWoolSheep = _bWoolWhole = _bWoolCut = 0;
+            _bPaid = _bUnsoldV = 0; _bWoolIn = 0;
+            _bOut.Clear();
         }
 
         /// <summary>Wyjatek przy jednym cyklu: pierwszy z danego miejsca do pliku, kazdy liczony w linii dnia (regula dziala dalej).</summary>
@@ -179,8 +202,18 @@ namespace Armoury
                 }
                 else
                 {
-                    remove = Math.Min(added - _cycles, Plain(roster, _item));
-                    if (remove > 0) roster.AddToCounts(new EquipmentElement(_item), -remove);
+                    // E8/B (258): ile sztuk nalezy sie z tego wywolania - tyle, ile cykli (welna z uboju: 1 + pelne sztuki z licznika osady);
+                    // BK dopisal wiecej - nadwyzka zdjeta jak dotad, mniej - brakujace dopisane za zaplata kasy miasta z nadwyzki (Byproduct)
+                    bool by = ByOn;
+                    if (added < _cycles) { _bCalls++; _bLost += _cycles - added; }   // tyle sztuk gubi stara regula (liczone zawsze - dwie drogi w linii)
+                    int target = by ? ByTarget(w.Settlement) : _cycles;
+                    remove = Math.Min(added - target, Plain(roster, _item));
+                    if (remove > 0)
+                    {
+                        roster.AddToCounts(new EquipmentElement(_item), -remove);
+                        if (target < _cycles) _bWoolCut += remove - Math.Max(0, Math.Min(remove, added - _cycles));   // welna zdjeta ponad stara regule
+                    }
+                    else if (by && added < target) Byproduct(w, town, roster, target - added);
                 }
                 if (remove <= 0) return;
                 o[1] += remove;
@@ -252,6 +285,143 @@ namespace Armoury
             return sum;
         }
 
+        // ------------------------------------------------------------ E8/B (258): wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow
+        /// <summary>Welna z uboju: wyrob kategorii wool w linii z owca na wsadzie. sheep - owce jednego cyklu, perCall - owce na jedno wywolanie wyrobu
+        /// (receptura BK: 1 owca -> 1 welna, czyli 1).</summary>
+        private static bool SlaughterWool(out int sheep, out float perCall)
+        {
+            sheep = 0; perCall = 0f;
+            if (_item == null || _item.ItemCategory == null || _item.ItemCategory.StringId != "wool") return false;
+            foreach (var i in _p.Inputs) if (i.Item1 != null && i.Item1.StringId == "sheep" && i.Item2 > 0) sheep += i.Item2;
+            if (sheep <= 0) return false;
+            int calls = 0;
+            foreach (var o in _p.Outputs) if (o.Item1 != null && o.Item1.StringId == "wool" && o.Item2 > 0) calls += o.Item2;
+            if (calls <= 0) return false;
+            perCall = (float)sheep / calls;
+            return true;
+        }
+
+        /// <summary>Ile sztuk tego wyrobu nalezy sie z tego wywolania. Zwykly wyrob - tyle, ile cykli. Welna z uboju - 1 (pierwszy cykl, receptura gry)
+        /// + pelne sztuki z licznika osady: owce dodatkowych cykli x ArtisanWoolPerSheep idzie do licznika, sztuka wychodzi, gdy licznik >= 1
+        /// (ulamek zostaje w pamieci - zapis arm_wool_frac). Wolane raz na wywolanie wyrobu (zmienia licznik).</summary>
+        private static int ByTarget(Settlement st)
+        {
+            int extra = _cycles - 1;
+            int sheep; float perCall;
+            if (extra <= 0 || st == null || !SlaughterWool(out sheep, out perCall)) return _cycles;
+            var s = Settings.Current;
+            float rate = Math.Max(0f, Math.Min(1f, s != null ? s.ArtisanWoolPerSheep : 0.15f));
+            double inc = (double)extra * perCall * rate;
+            string key = st.StringId;
+            float f; _woolFrac.TryGetValue(key, out f);
+            double acc = Math.Max(0f, f) + inc;
+            int whole = (int)Math.Floor(acc + WoolEps);
+            if (whole < 0) whole = 0;
+            float rest = (float)Math.Max(0.0, acc - whole);
+            if (rest < WoolMin) _woolFrac.Remove(key); else _woolFrac[key] = rest;
+            _bWoolSheep += extra * sheep; _bWoolIn += inc; _bWoolWhole += whole;
+            return 1 + whole;
+        }
+
+        /// <summary>BK dopisal mniej sztuk tego wyrobu, niz sie nalezy (want = brak). Po starcie gry w linii ze zlotem kasa miasta placi warsztatowi
+        /// cene polki (ta sama wycena co prefiks BK: Town.GetItemPrice bez kupca, liczona juz ze sztukami BK na polce) TYLKO z nadwyzki ponad zapas
+        /// kupcow (Seal31.Spare): tyle sztuk, ile nadwyzka oplaci, reszta nie powstaje ("niesprzedane"). Przed startem gry / linia bez zlota - sztuki
+        /// bez zaplaty, jak sztuki BK. Zloto tylko miedzy kasa miasta i kapitalem rzemieslnikow; licznik "ponizej zapasu" ma zostac na 0.</summary>
+        private static void Byproduct(Workshop w, Town town, ItemRoster roster, int want)
+        {
+            if (want <= 0 || _item == null) return;
+            var el = new EquipmentElement(_item);
+            int add = want, price = 0;
+            bool paidLine = Live && _eff;
+            long spare = 0;
+            if (paidLine)
+            {
+                price = Math.Max(0, town.GetItemPrice(el));
+                if (price > 0)
+                {
+                    spare = Seal31.Spare(w.Settlement);
+                    add = (int)Math.Max(0L, Math.Min((long)want, spare / price));
+                    if (add < want) { _bUnsold += want - add; _bUnsoldV += (long)(want - add) * price; }
+                }
+            }
+            if (add <= 0) return;
+            roster.AddToCounts(el, add);
+            _bAdd += add;
+            int n; _bOut.TryGetValue(_item.StringId, out n); _bOut[_item.StringId] = n + add;
+            if (paidLine && price > 0)
+            {
+                int had = town.Gold;
+                town.ChangeGold(-add * price);
+                int got = had - town.Gold;                       // tyle naprawde zeszlo z kasy
+                if (got > 0)
+                {
+                    w.ChangeGold(got);
+                    MoneyLedger.NoteArtisanByproducts(w.Settlement, got);
+                    _bPaid += got;
+                }
+                if (got > spare) _bBelow++;                      // prog 0: wyplata ponad nadwyzke
+            }
+            else _bFree += add;
+            // zdarzenie gry jak przy kazdym naszym wyrobie (TanOrWeave, TownCrafts): sluchacze licza wartosc produkcji osady
+            try { CampaignEventDispatcher.Instance.OnItemProduced(_item, town.Owner.Settlement, add); }
+            catch (Exception e) { Stumble("ArtisanInputs.Byproduct(zdarzenie)", e); }
+        }
+
+        /// <summary>Zapis (WorkshopTradeBehavior.SyncData, klucz arm_wool_frac): "osada=ulamek;..."; tylko ulamki >= 0.001.</summary>
+        internal static string ExportWool()
+        {
+            var sb = new StringBuilder();
+            foreach (var kv in _woolFrac)
+            {
+                if (kv.Value < WoolMin) continue;
+                if (sb.Length > 0) sb.Append(';');
+                sb.Append(kv.Key).Append('=').Append(kv.Value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Wczytanie: stary zapis bez klucza (null) = puste liczniki; pomija wpisy bez nazwy osady i liczby ponizej 0.001 (ulamek to zawsze
+        /// mniej niz sztuka - wiecej przyciete). Osad nie sprawdza (wczytanie idzie w trakcie deserializacji); wpis osady, ktorej nie ma, nikt nie czyta.</summary>
+        internal static void ImportWool(string s)
+        {
+            _woolFrac.Clear();
+            if (string.IsNullOrEmpty(s)) return;
+            foreach (var p in s.Split(';'))
+            {
+                var a = p.Split('=');
+                if (a.Length != 2 || a[0].Length == 0) continue;
+                float v;
+                if (!float.TryParse(a[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v)) continue;
+                if (float.IsNaN(v) || float.IsInfinity(v) || v < WoolMin) continue;
+                _woolFrac[a[0]] = Math.Min(v, 0.999f);
+            }
+        }
+
+        /// <summary>E8/B: linia dnia wyrobow ubocznych (sam log; liczby "stara regula" liczone takze przy wylaczonym kluczu).</summary>
+        private static void ByLine(int day)
+        {
+            var outs = new List<string>();
+            foreach (var kv in _bOut) outs.Add(kv.Key + " " + kv.Value);
+            outs.Sort(StringComparer.Ordinal);
+            double mem = 0; foreach (var v in _woolFrac.Values) mem += v;
+            var s = Settings.Current;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.Append("Wyroby uboczne (E8/B): dzien ").Append(day)
+              .Append(" | ArtisanByproductsFull ").Append(ByOn ? "[WL]" : "[wyl]")
+              .Append(" | stara regula: wywolan z mniejsza liczba sztuk niz cykli ").Append(_bCalls).Append(", bez wyrobu zostawalo ").Append(_bLost).Append(" szt.")
+              .Append(" | dopisane ").Append(_bAdd).Append(" szt. [").Append(outs.Count > 0 ? string.Join(", ", outs.ToArray()) : "nic").Append("]")
+              .Append(", zaplacone przez kasy miast ").Append(_bPaid).Append(" zl z nadwyzki (kasy ponizej zapasu przez nasza wyplate ").Append(_bBelow).Append(")")
+              .Append(", bez zaplaty (start gry albo linia bez zlota) ").Append(_bFree).Append(" szt.")
+              .Append(", niesprzedane ").Append(_bUnsold).Append(" szt. warte ").Append(_bUnsoldV).Append(" zl")
+              .Append(" | welna z uboju: owce dodatkowych cykli ").Append(_bWoolSheep).Append(" x ")
+              .Append((s != null ? Math.Max(0f, Math.Min(1f, s.ArtisanWoolPerSheep)) : 0.15f).ToString("0.###", ci)).Append(" = +").Append(_bWoolIn.ToString("0.00", ci))
+              .Append(" szt. do licznikow, pelne sztuki z licznikow ").Append(_bWoolWhole).Append(", zdjete ponad regule ").Append(_bWoolCut)
+              .Append(", liczniki w ").Append(_woolFrac.Count).Append(" osadach razem ").Append(mem.ToString("0.00", ci)).Append(" szt.")
+              .Append(" | potkniecia ").Append(_dStumbles).Append('.');
+            Log.Info(sb.ToString());
+        }
+
         // ------------------------------------------------------------ linia dnia
         internal static void Daily()
         {
@@ -283,6 +453,7 @@ namespace Armoury
                 if (_dRefundShort > 0) sb.Append(" (niepelny zwrot - pusty kapital: ").Append(_dRefundShort).Append(")");
                 sb.Append("; potkniecia ").Append(_dStumbles).Append('.');
                 Log.Info(sb.ToString());
+                ByLine(day);   // E8/B (258): wyroby uboczne i welna z uboju (osobna linia - linia 147 bez zmian)
             }
             catch (Exception e) { Log.Error("ArtisanInputs.Daily", e); }
             ClearDay();

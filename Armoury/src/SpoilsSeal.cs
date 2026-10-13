@@ -884,7 +884,9 @@ namespace Armoury
                 if (done == p.Pieces) mat = p.Mat;   // cala robota zrobiona: ta sama suma co w planie (menu) - zaplata co do pensa jak w menu
                 matGold = MatGold(mat);
                 int due = labor + matGold;
+                int coffer = MendMaterial.CofferNow(st);
                 if (due > 0) GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, st, due, true);
+                if (due > 0) MendMaterial.PlayerLaborToFolk(st, coffer, labor);   // E8/B (258, R5): robocizna z kasy do kiesy ludu (jak N1), material zostaje w kasie
             }
         }
 

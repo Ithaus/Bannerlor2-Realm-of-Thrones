@@ -1537,7 +1537,13 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.PlayerWorkshopsSameRule || __1 == null || __1.Settlement == null) return true;
+                if (s == null || __1 == null || __1.Settlement == null) return true;
+                // E8/B (258, RC8 poz. 30): kopalnia BK w rekach gracza - ten sam dlawik co u notabla (BulkLineSkip: przy ladunku 100 kg tylko co
+                // HistBulkUnitFactor-ty cykl, zeby kg rudy sie nie zmienily). Dotad warsztat gracza go omijal: x10 metalu z niczego. Wlasny klucz.
+                // Kopalnia w takim cyklu pracuje (ladunek zbiera sie z dziesieciu cykli) - znacznik ostatniej pracy idzie dalej, zeby ekran rodu
+                // nie pisal "Halted" (LastRunCampaignTime czyta tylko ten ekran; gra stawia go po udanym cyklu).
+                if (s.PlayerMineBulkSkip && BulkLineSkip(__0)) { SmallFixes8.NotePlayerMine(); __1.UpdateLastRunTime(); __result = false; return false; }
+                if (!s.PlayerWorkshopsSameRule) return true;
                 bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
                 if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
                 if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;

@@ -73,6 +73,33 @@ namespace Armoury
         private static string _pending;
         private static MethodInfo _setMove;
         internal static bool ReleaseHooked;
+        // E8/O1 (265, RD8 K6 / O6): te same metody (gra, BK) delegatem zamiast MethodInfo.Invoke - budowa raz, leniwie przy pierwszym uzyciu w kampanii
+        // (EnsureFast); null = delegat nie powstal - to miejsce dalej wola przez Invoke. Instancja BK dalej brana przy kazdym wywolaniu (krytyka 174b.1)
+        private static volatile bool _fastTried;
+        private static readonly object _fastGate = new object();
+        private static Action<MobileParty, Settlement, MobileParty.NavigationType, bool> _setMoveFast;
+        private static Func<Campaign, object> _bkGetBehFast, _shipGetBehFast;
+        private static Action<object, MobileParty> _bkReleaseFast, _shipInvalidateFast;
+
+        private static void EnsureFast()
+        {
+            if (_fastTried) return;
+            lock (_fastGate)   // prefiks BK RouteCaravanHopByHop moze przyjsc z innego watku - znacznik dopiero po zbudowaniu wszystkich
+            {
+                if (_fastTried) return;
+                try
+                {
+                    if (_setMove == null) _setMove = typeof(MobileParty).GetMethod("SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) });
+                    _setMoveFast = FastCall.Of<Action<MobileParty, Settlement, MobileParty.NavigationType, bool>>(_setMove, "gra MobileParty.SetMoveGoToSettlement");
+                    _bkGetBehFast = FastCall.Of<Func<Campaign, object>>(_bkGetBeh, "gra Campaign.GetCampaignBehavior<BKCaravansBehavior>");
+                    _bkReleaseFast = FastCall.Open<MobileParty>(_bkRelease, "BK ReleaseCaravanFromHold");
+                    _shipGetBehFast = FastCall.Of<Func<Campaign, object>>(_shipGetBeh, "gra Campaign.GetCampaignBehavior<BKShippingBehavior>");
+                    _shipInvalidateFast = FastCall.Open<MobileParty>(_shipInvalidate, "BK InvalidateRedirectCache");
+                }
+                catch (Exception e) { Stumble("EnsureFast", e); }
+                _fastTried = true;
+            }
+        }
 
         // liczniki doby (linia "Kontrakty surowca (174)")
         private static readonly int[] _dMade = new int[M], _dMadeQty = new int[M];
@@ -700,8 +727,11 @@ namespace Armoury
                 var nav = naval ? MobileParty.NavigationType.Naval : MobileParty.NavigationType.Default;   // 174b.2: konwoj (statki bez ladu) - jak BK ReleaseCaravanFromHold
                 bool port = naval && dest.HasPort;
                 if (_setMove == null) _setMove = typeof(MobileParty).GetMethod("SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) });
-                if (_setMove != null)
+                EnsureFast();
+                if (_setMoveFast != null && FastCall.On) { FastCall.Fast++; _setMoveFast(car, dest, nav, port); }   // E8/O1 (265): to samo wejscie metody (prefiks BK ze straznikiem), wyjatek bez opakowania
+                else if (_setMove != null)
                 {
+                    FastCall.Slow++;
                     try { _setMove.Invoke(car, new object[] { dest, nav, port }); }
                     catch (TargetInvocationException e) { throw e.InnerException ?? e; }
                 }
@@ -739,8 +769,15 @@ namespace Armoury
                 if (mp == null || !mp.IsActive || mp.Ai == null || mp.MapEvent != null || mp.CurrentSettlement != null || _byCar.ContainsKey(mp)) return;
                 if (_bkRelease != null && _bkGetBeh != null && Campaign.Current != null)
                 {
-                    var beh = _bkGetBeh.Invoke(Campaign.Current, null);
-                    if (beh != null) { _bkRelease.Invoke(beh, new object[] { mp }); _dWokeBk++; return; }
+                    EnsureFast();
+                    bool fast = _bkGetBehFast != null && _bkReleaseFast != null && FastCall.On;   // E8/O1 (265): obie metody delegatem albo obie przez Invoke
+                    if (fast) FastCall.Fast++; else FastCall.Slow++;
+                    var beh = fast ? _bkGetBehFast(Campaign.Current) : _bkGetBeh.Invoke(Campaign.Current, null);
+                    if (beh != null)
+                    {
+                        if (fast) { FastCall.Fast++; _bkReleaseFast(beh, mp); } else { FastCall.Slow++; _bkRelease.Invoke(beh, new object[] { mp }); }
+                        _dWokeBk++; return;
+                    }
                 }
                 mp.Ai.RethinkAtNextHourlyTick = true;
             }
@@ -754,8 +791,14 @@ namespace Armoury
             try
             {
                 if (car == null || _shipInvalidate == null || _shipGetBeh == null || Campaign.Current == null) return;
-                var beh = _shipGetBeh.Invoke(Campaign.Current, null);
-                if (beh != null) _shipInvalidate.Invoke(beh, new object[] { car });
+                EnsureFast();
+                bool fast = _shipGetBehFast != null && _shipInvalidateFast != null && FastCall.On;   // E8/O1 (265): obie metody delegatem albo obie przez Invoke
+                if (fast) FastCall.Fast++; else FastCall.Slow++;
+                var beh = fast ? _shipGetBehFast(Campaign.Current) : _shipGetBeh.Invoke(Campaign.Current, null);
+                if (beh != null)
+                {
+                    if (fast) { FastCall.Fast++; _shipInvalidateFast(beh, car); } else { FastCall.Slow++; _shipInvalidate.Invoke(beh, new object[] { car }); }
+                }
             }
             catch (Exception e) { Stumble("ShipForget", e); }
         }
@@ -868,7 +911,16 @@ namespace Armoury
             {
                 if (__0 == null || _byCar.Count == 0 || !_byCar.ContainsKey(__0)) return true;
                 _dShipBlocked++;
-                try { if (_shipInvalidate != null && __instance != null) _shipInvalidate.Invoke(__instance, new object[] { __0 }); } catch (Exception e) { Stumble("RouteHopPrefix(stan BK)", e); }
+                try
+                {
+                    if (_shipInvalidate != null && __instance != null)
+                    {
+                        EnsureFast();
+                        if (_shipInvalidateFast != null && FastCall.On) { FastCall.Fast++; _shipInvalidateFast(__instance, __0); }   // E8/O1 (265)
+                        else { FastCall.Slow++; _shipInvalidate.Invoke(__instance, new object[] { __0 }); }
+                    }
+                }
+                catch (Exception e) { Stumble("RouteHopPrefix(stan BK)", e); }
                 __result = false;
                 return false;
             }

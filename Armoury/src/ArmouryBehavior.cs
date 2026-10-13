@@ -1698,6 +1698,7 @@ namespace Armoury
             try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); } DayProfile.Lap("RecruitCost.Daily");   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
             try { RotLeaks37.Daily(); } catch (Exception e) { Log.Error("RotLeaks37.Daily", e); } DayProfile.Lap("RotLeaks37.Daily");   // 3.7: linia "ROT szczelnosc (3.7): dzien" (tylko gdy cos sie zdarzylo)
             try { ShelfBuy.Daily(); } catch (Exception e) { Log.Error("ShelfBuy.Daily", e); } DayProfile.Lap("ShelfBuy.Daily");   // ceny hurtu (Jeff 09.10 08:00): linia "Ceny hurtu (09.10)" - pomiar petli po sztukach i doplata (tylko log)
+            try { ShelfIndex.DailyOwn(); } catch (Exception e) { Log.Error("ShelfIndex.DailyOwn", e); } DayProfile.Lap("ShelfIndex.DailyOwn");   // E8/O1 (265): linia "Polka i delegaty (E8/O1)" - pamiec polki po wlasnej zmianie, delegaty DTE/BK (tylko log)
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
             try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
@@ -2804,6 +2805,33 @@ namespace Armoury
             catch (Exception e) { Log.Error("SlotWreck", e); return false; }
         }
 
+        /// <summary>
+        /// E8/B (258, LAWA 3): cena kowala za JEDNA zalozona sztuke wedlug ksiegi zuzycia - ta sama robocizna (HarnessLabor) i ten sam material
+        /// (MendMaterial.NeedsFor), co "Mend everything you wear" (PlanRepair / RepairCost); dla SmithMenu "Pick a piece" (jedna cena tej samej
+        /// naprawy). false = wycena wedlug modyfikatora jak dotad: ksiega nie zna zuzycia tej sztuki (stan 100 - np. obity lup zalozony przed
+        /// chwila) albo sztuka weszla na grzbiet juz zuzyta (oryginalny stan ponizej pelnego - lawka "Pick a piece" oddaje ja czysta, a "Mend
+        /// everything you wear" w stanie lupu: to dwie rozne uslugi, kazda ze swoja cena). Sam odczyt.
+        /// </summary>
+        internal bool SlotSmithQuote(int slot, out int labor, out float[] need)
+        {
+            labor = 0; need = null;
+            try
+            {
+                if (slot < 0 || slot >= 12) return false;
+                var el = Hero.MainHero.BattleEquipment[slot];
+                if (el.Item == null) return false;
+                float cond = GetConditionQuiet(slot);
+                if (cond >= 100f) return false;
+                var origId = OriginalModifier(slot);
+                ItemModifier orig = string.IsNullOrEmpty(origId) ? null : MBObjectManager.Instance.GetObject<ItemModifier>(origId);
+                if (orig != null && orig.PriceMultiplier < 0.999f) return false;
+                labor = HarnessLabor(el.Item, cond);
+                need = MendMaterial.NeedsFor(el.Item, (100f - cond) / 100f);
+                return true;
+            }
+            catch (Exception e) { Log.Error("SlotSmithQuote", e); labor = 0; need = null; return false; }
+        }
+
         /// <summary>Ile czesci na grzbiecie wymaga naprawy.</summary>
         internal int WornPieces()
         {
@@ -2978,7 +3006,9 @@ namespace Armoury
                     if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
                     if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
                 }
+                int coffer = MendMaterial.CofferNow(here);
                 Pay.ToSettlement(cost);   // wpis 90 (audyt): zaplata kowalowi do kasy miasta, nie w nicosc
+                if (order != null) MendMaterial.PlayerLaborToFolk(here, coffer, order.Labor);   // E8/B (258, R5): robocizna z kasy do kiesy ludu (jak N1), material zostaje w kasie
 
                 var eq = Hero.MainHero.BattleEquipment;
                 for (int slot = 0; slot < 12; slot++)
