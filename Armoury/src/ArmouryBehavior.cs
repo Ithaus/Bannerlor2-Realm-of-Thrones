@@ -1261,6 +1261,7 @@ namespace Armoury
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
             try { SkillLedger.EnsureHooks(); } catch (Exception e) { Log.Error("SkillLedger.EnsureHooks", e); }   // E8/P1 (243): ksiega umiejetnosci - latki-liczniki w kampanii (raz na proces, tylko przy SkillLedgerLog), linia startu sesji
             try { XpFair.EnsureHooks(); } catch (Exception e) { Log.Error("XpFair.EnsureHooks", e); }   // E8/X (248): doswiadczenie za skutek - latki w kampanii (raz na proces, tylko sprawy wlaczone), linia "FairXp (E8/X): start sesji"
+            try { DayProfile.EnsureHooks(); } catch (Exception e) { Log.Error("DayProfile.EnsureHooks", e); }   // Z.3 poz. 3: stopery wnetrza cudzych tikow (warsztaty gry, trening gry) - latki w kampanii (raz na proces, tylko przy Stage8ProfileLog), tylko log
             try { Drill.SessionStart(); } catch (Exception e) { Log.Error("Drill.SessionStart", e); }   // musztra: zapas z zapisu, opisy perkow kwatermistrza, linia startowa
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan

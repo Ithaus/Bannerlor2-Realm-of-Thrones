@@ -2,7 +2,9 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -28,6 +30,18 @@ namespace Armoury
     /// - prog E80-2 >= 80%. Koszt samego profilu: linia (stoper) + stopery i opakowania (kalibracja raz na sesje) - prog E80-3 <= 1 ms/dobe.
     /// Opakowania zdarzen i godzin zakladane przy RegisterEvents tylko przy wlaczonym Stage8ProfileLog (wylaczony = te same delegaty co dotad);
     /// wylaczenie w trakcie gry gasi linie i stopery taktu od razu, opakowania - przy nastepnym wczytaniu. Wolane z watku gry (liczniki bez blokad - to log).
+    /// Z.3 POZYCJA 3 (13.10, docs/zakonczenie/ROZPOZNANIE-Z3-CUDZY-KOD-2026-10-13.md; tylko log, gra bez zmian) - WNETRZE CUDZYCH TIKOW, w ktorych siedza nasze
+    /// latki: WorkshopsCampaignBehavior.DailyTickTown (warsztaty gry) i MobilePartyTrainingBehavior.OnDailyTickParty (trening gry). Pelny stoper kazdego
+    /// wywolania calej zalatanej metody: prefiks Priority.First (void, tylko "out __state" - biegnie zawsze, takze gdy inny prefiks pominie oryginal),
+    /// postfiks Priority.Last - w srodku sa oryginal gry, model BK i wszystkie latki (nasze i cudze). Zakladane W KAMPANII (EnsureHooks z OnSessionLaunched,
+    /// raz na proces, tylko przy Stage8ProfileLog - CLAUDE.md 7). Sekcje NA KONCU linii (po "koszt profilu"): "razem / w tym nasze z profilu / reszta" -
+    /// "nasze z profilu" to pozycje, ktore linia juz podaje (warsztaty: CyclePrefix z probek 1/16 + TownFletchers; trening: "trening" musztry, pelny zegar),
+    /// reszta = gra, BK i nasze latki bez wlasnego stopera (WorkshopTrade, ArtisanInputs, ksiegi, ArmsDrill poza Drill.Shape). CyclePrefix liczony osobno
+    /// "w tym tiku" i "poza tym tikiem": gra tika warsztaty tylko miast (Town.AllTowns), a warsztaty zamkow puszcza BK sam (BKSettlementBehavior.TickCastle
+    /// -> RunTownWorkshop przez odbicie) - te cykle ida przez nasz CyclePrefix, ale nie przez DailyTickTown gry. Na obu metodach wisi tez sledzenie BK
+    /// (BannerKings.Patches.Diag.TraceVanillaDailyTickParty, prefiks i postfiks na kazdym tiku doby kazdego zachowania gry) - jest w srodku stopera. Trening dodatkowo wedlug
+    /// rodzaju druzyny (lordow / zalogi / pozostale - wzor musztry i kontekst partii licza sie tylko w druzynach lordow). Do sekcji musztry dopisany na jej koncu czas liczenia nadwyzki K1
+    /// w kontekscie partii (Drill.CtxOf -> CountAiStock). Koszt: 2 odczyty zegara i para prefiks/postfiks na wywolanie - w "koszt profilu".
     /// </summary>
     internal static class DayProfile
     {
@@ -84,8 +98,22 @@ namespace Armoury
         private static long _selfTicks, _tsCount;
         private static double _nsWrap = -1.0, _nsTs = -1.0;
         private static long _calCalls, _calSink;
-        private static readonly long[] _drill = new long[8];
+        private static readonly long[] _drill = new long[Drill.PSlots];
         private static readonly int[] _ord = new int[LMax + XMax + EMax];
+
+        // ---- Z.3 poz. 3: wnetrze cudzych tikow (pelny stoper calej zalatanej metody gry); trening takze wedlug rodzaju druzyny
+        private const int IWork = 0, ITrain = 1;
+        private const int PkLord = 0, PkGarrison = 1, PkOther = 2;
+        private const string InWhyDefault = "zakladany przy starcie sesji z wlaczonym Stage8ProfileLog";
+        private static readonly long[] _inTicks = new long[2], _inCalls = new long[2], _inMax = new long[2];
+        private static readonly long[] _inKindTicks = new long[3], _inKindCalls = new long[3];
+        private static readonly bool[] _inHooked = new bool[2];   // na caly proces (latki zostaja miedzy kampaniami)
+        private static readonly string[] _inWhy = new string[2];
+        private static bool _inTried, _inLive;
+        // CyclePrefix W SRODKU tiku warsztatow gry (te same pozycje co _cCalls/_cTicks/_cSampled): BK sam wola RunTownWorkshop dla zamkow (BKSettlementBehavior.TickCastle,
+        // odbicie) - te cykle przechodza przez nasz CyclePrefix, ale POZA DailyTickTown gry (gra tika tylko miasta: Town.AllTowns), wiec nie wolno ich odejmowac od stopera
+        private static bool _inWorkOpen;
+        private static readonly long[] _cwCalls = new long[2], _cwTicks = new long[2], _cwSampled = new long[2];
 
         /// <summary>Nowa gra / wczytanie (konstruktor ArmouryBehavior): liczniki i stan okresu od zera; nazwy slotow zostaja (opakowania z RegisterEvents).</summary>
         internal static void Reset()
@@ -93,6 +121,7 @@ namespace Armoury
             ClearPeriod();
             _inTick = false; _hadTick = false; _lastDay = -1; Depth = 0; _gcSet = false; _selfTicks = 0; _nsWrap = -1.0; _nsTs = -1.0;
             _hourKey = int.MinValue; _hourAcc = 0;
+            _inLive = false; _inWorkOpen = false;   // Z.3 poz. 3: stopery wnetrza stoja do EnsureHooks tej kampanii (latki z poprzedniej kampanii zostaja w procesie)
         }
 
         private static void ClearPeriod()
@@ -105,6 +134,8 @@ namespace Armoury
             Array.Clear(_cCalls, 0, 2); Array.Clear(_cTicks, 0, 2); Array.Clear(_cSampled, 0, 2);
             Array.Clear(_pTicks, 0, 6); Array.Clear(_pSampled, 0, 6);
             _tsCount = 0;
+            Array.Clear(_inTicks, 0, 2); Array.Clear(_inCalls, 0, 2); Array.Clear(_inMax, 0, 2); Array.Clear(_inKindTicks, 0, 3); Array.Clear(_inKindCalls, 0, 3);
+            Array.Clear(_cwCalls, 0, 2); Array.Clear(_cwTicks, 0, 2); Array.Clear(_cwSampled, 0, 2);
         }
 
         // ------------------------------------------------------------ takt doby
@@ -113,7 +144,8 @@ namespace Armoury
         {
             long t0 = Stopwatch.GetTimestamp();
             _inTick = false;
-            if (!On) { _hadTick = false; return; }
+            _inWorkOpen = false;   // Z.3 poz. 3: takt doby nie biegnie w srodku tiku warsztatow - znacznik po wyjatku w tym tiku (postfiks nie pobiegl) nie przezyje doby
+            if (!On) { _hadTick = false; _inLive = false; return; }   // Z.3 poz. 3: wylaczenie w trakcie gry gasi tez stopery wnetrza (od tego taktu)
             try
             {
                 if (_hadTick) Line();
@@ -127,6 +159,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("DayProfile.Line", e); }
             ClearPeriod();
             _hadTick = true;
+            _inLive = _inHooked[IWork] || _inHooked[ITrain];   // Z.3 poz. 3: klucz wlaczony na nowo w trakcie gry - stopery wnetrza licza od tego taktu (gdy latki sa juz w procesie)
             try { _lastDay = (int)CampaignTime.Now.ToDays; } catch { }
             long now = Stopwatch.GetTimestamp();
             _selfTicks = now - t0;           // koszt linii i zerowania - do nastepnej linii (ta jest juz wypisana)
@@ -277,6 +310,7 @@ namespace Armoury
             int k = plan ? 0 : 1;
             _cCalls[k]++;
             if (dt > 0) { _cTicks[k] += dt; _cSampled[k]++; }
+            if (_inWorkOpen) { _cwCalls[k]++; if (dt > 0) { _cwTicks[k] += dt; _cwSampled[k]++; } }   // Z.3 poz. 3: ten cykl biegnie w srodku DailyTickTown gry (tylko pomiar)
         }
 
         /// <summary>SupplyDemand.PricePostfix (finally) przy probce Cost174 SPrice: czas probki do wolajacego.</summary>
@@ -286,6 +320,80 @@ namespace Armoury
             int c = Caller;
             int k = c >= CAiGear && c <= CWorkshop ? c - 1 : (Depth > 0 ? 4 : 5);
             _pTicks[k] += dt; _pSampled[k]++;
+        }
+
+        // ------------------------------------------------------------ Z.3 poz. 3: wnetrze cudzych tikow (latki-stopery, tylko pomiar)
+        /// <summary>Z ArmouryBehavior.OnSessionLaunched (kampania istnieje - CLAUDE.md 7): przy wlaczonym Stage8ProfileLog zaklada raz na proces stopery
+        /// na WorkshopsCampaignBehavior.DailyTickTown i MobilePartyTrainingBehavior.OnDailyTickParty i pisze linie startu; wylaczony = nic nie zaklada.</summary>
+        internal static void EnsureHooks()
+        {
+            try
+            {
+                _inLive = false;
+                if (Campaign.Current == null) return;
+                if (!On)
+                {
+                    Log.Info("Profil doby (E8/0): stopery wnetrza (Z.3 poz. 3) WYLACZONE (Stage8ProfileLog off) - " + (_inTried ? "latki z wczesniejszej sesji zostaja, nie licza." : "latki niezalozone."));
+                    return;
+                }
+                if (!_inTried) { _inTried = true; Hook(); }
+                _inLive = _inHooked[IWork] || _inHooked[ITrain];
+                Log.Info("Profil doby (E8/0): stopery wnetrza (Z.3 poz. 3) - warsztaty gry (WorkshopsCampaignBehavior.DailyTickTown) " + InState(IWork)
+                         + ", trening gry (MobilePartyTrainingBehavior.OnDailyTickParty) " + InState(ITrain)
+                         + "; pelny stoper kazdego wywolania (prefiks pierwszy, postfiks ostatni - w srodku gra, BK i wszystkie latki), sekcje na koncu linii doby.");
+            }
+            catch (Exception e) { Log.Error("DayProfile.EnsureHooks", e); }
+        }
+
+        private static string InState(int k) { return _inHooked[k] ? "zalozony" : "BRAK (" + (_inWhy[k] ?? InWhyDefault) + ")"; }
+
+        private static void Hook()
+        {
+            Harmony h;
+            try { h = new Harmony("com.jeff.armoury.dayprofile"); }
+            catch (Exception e) { _inWhy[IWork] = _inWhy[ITrain] = "Harmony, blad: " + e.Message; Log.Error("DayProfile.Hook", e); return; }
+            HookOne(h, IWork, typeof(WorkshopsCampaignBehavior), "DailyTickTown", typeof(Town), nameof(InWorkPre), nameof(InWorkPost));
+            HookOne(h, ITrain, typeof(MobilePartyTrainingBehavior), "OnDailyTickParty", typeof(MobileParty), nameof(InTrainPre), nameof(InTrainPost));
+        }
+
+        private static void HookOne(Harmony h, int k, Type t, string name, Type arg, string pre, string post)
+        {
+            try
+            {
+                var m = AccessTools.Method(t, name, new[] { arg });
+                if (m == null) { _inWhy[k] = "nie znaleziono metody"; return; }
+                h.Patch(m, prefix: new HarmonyMethod(typeof(DayProfile), pre) { priority = Priority.First },
+                           postfix: new HarmonyMethod(typeof(DayProfile), post) { priority = Priority.Last });
+                _inHooked[k] = true;
+            }
+            catch (Exception e) { _inWhy[k] = "blad: " + e.Message; Log.Error("DayProfile.Hook(" + name + ")", e); }
+        }
+
+        // Prefiksy stoperow: tylko znacznik czasu (0 = stoper stoi). Bez parametrow gry - Harmony nie pomija ich, gdy inny prefiks pominie oryginal.
+        public static void InWorkPre(out long __state)
+        {
+            if (!_inLive) { __state = 0L; return; }
+            _inWorkOpen = true;   // CyclePrefix do konca tego tiku liczy sie jako "w tym tiku" (Cycle)
+            __state = Stopwatch.GetTimestamp();
+        }
+
+        public static void InWorkPost(long __state)
+        {
+            _inWorkOpen = false;
+            if (__state == 0) return;
+            long d = Stopwatch.GetTimestamp() - __state;
+            _inTicks[IWork] += d; _inCalls[IWork]++; if (d > _inMax[IWork]) _inMax[IWork] = d;
+        }
+
+        public static void InTrainPre(out long __state) { __state = _inLive ? Stopwatch.GetTimestamp() : 0L; }
+
+        public static void InTrainPost(MobileParty __0, long __state)
+        {
+            if (__state == 0) return;
+            long d = Stopwatch.GetTimestamp() - __state;
+            _inTicks[ITrain] += d; _inCalls[ITrain]++; if (d > _inMax[ITrain]) _inMax[ITrain] = d;
+            int k = __0 == null ? PkOther : (__0.IsLordParty ? PkLord : (__0.IsGarrison ? PkGarrison : PkOther));   // pola partii (auto-wlasciwosci) - bez wyjatku
+            _inKindTicks[k] += d; _inKindCalls[k]++;
         }
 
         // ------------------------------------------------------------ linia
@@ -387,6 +495,12 @@ namespace Armoury
             sb.Append(" | musztra: godziny ").Append(F1(Ms(_drill[0]))).Append(", trening ").Append(F1(dTrain)).Append(" (w tym zuzycie ").Append(F1(dWear))
               .Append(", kowale w tiku ").Append(F1(dScrap)).Append("), kowale przy wejsciu ").Append(F1(Ms(_drill[2]))).Append(", linie ").Append(F1(Ms(_drill[3])))
               .Append(", inne ").Append(F1(Ms(_drill[4]) + Ms(_drill[5]))).Append(" ms");
+            // Z.3 poz. 3: dopisek NA KONCU sekcji musztry (pola wyzej bez zmian) - liczenie nadwyzki K1 w kontekscie partii AI (czesc "trening"):
+            // czas, liczba wywolan (jedno na partie AI z pomiarem zapasu) i srednia na partie
+            long surN = _drill[Drill.PCtxSurN];
+            double surMs = Ms(_drill[Drill.PCtxSur]);
+            sb.Append("; kontekst CtxOf - nadwyzka K1 (AiSurplus) ").Append(F1(surMs)).Append(" ms/").Append(surN).Append(" partii, srednio ")
+              .Append(surN > 0 ? F1(surMs * 1000.0 / surN) : "-").Append(" us na partie (w tym w treningu)");
 
             // ceny wedlug wolajacego (probki Cost174 SPrice x wywolan/probek tej pozycji)
             double pr = Cost174.Ratio(Cost174.SPrice);
@@ -426,13 +540,51 @@ namespace Armoury
             // Recenzja E8/0: ta linia nalezy juz do nastepnego okresu (jej czas pokaze nastepna linia) - doliczana tu szla do sumy dwa razy
             // (kazda linia w dwoch kolejnych dobach), a prog E80-3 to 1 ms/dobe. Odczyty zegara: godzina, inne sluchacze doby, MenPurse (_tsCount),
             // odcinki i poczatek taktu, stopery zuzycia i kowali w tiku musztry (Drill), dwa na kazdy zapis logu (Log.Info / Csv / Error).
-            long wraps = 0; for (int i = 0; i < _eN; i++) wraps += _eCalls[i];
-            long reads = _tsCount + _lapCount + 2 + drillReads + 2 * wl;
+            // Z.3 poz. 3: stopery wnetrza cudzych tikow - na wywolanie 2 odczyty zegara i para prefiks/postfiks (liczona jak jedno opakowanie zdarzenia);
+            // odczyty stopera nadwyzki K1 w CtxOf sa juz w drillReads
+            long inCalls = _inCalls[IWork] + _inCalls[ITrain];
+            long wraps = inCalls; for (int i = 0; i < _eN; i++) wraps += _eCalls[i];
+            long reads = _tsCount + _lapCount + 2 + drillReads + 2 * wl + 2 * inCalls;
             double stoppers = (wraps * _nsWrap + reads * _nsTs) / 1e6;
             double lineMs = Ms(_selfTicks);
             sb.Append(" | koszt profilu ").Append(F2(lineMs + stoppers)).Append(" ms (linia poprzedniej doby ").Append(F2(lineMs)).Append(", stopery i opakowania ~").Append(F2(stoppers))
               .Append(": opakowan ").Append(wraps).Append(" x ").Append(_nsWrap.ToString("0.0", inv)).Append(" ns, odczytow zegara ").Append(reads)
               .Append(" x ").Append(_nsTs.ToString("0.0", inv)).Append(" ns)");
+
+            // Z.3 poz. 3 - dwie sekcje NA KONCU linii (pola wyzej bez zmian): calosc zalatanej metody gry (pelny stoper), w tym to, co ta linia juz mierzy
+            // jako nasze, i reszta = gra, BK i nasze latki bez wlasnego stopera. Warsztaty: "nasze" z probek 1/16 (CyclePrefix z planem + kolejne - tylko cykle
+            // W TYM TIKU; TownFletchers - gdy pracuja w postfiksie tej metody), wiec reszta dziedziczy szum probki; cykle poza tikiem (zamki: BK sam wola
+            // RunTownWorkshop) osobno, zeby suma zgadzala sie z "CyclePrefix z planem doby / kolejne". Trening: zegar musztry pelny (Shape, Done, TickPrefix, TickPostfix).
+            sb.Append(" | wnetrze warsztatow gry (WorkshopsCampaignBehavior.DailyTickTown): ");
+            if (!_inHooked[IWork]) sb.Append("stoper niezalozony (").Append(_inWhy[IWork] ?? InWhyDefault).Append(')');
+            else
+            {
+                double all = Ms(_inTicks[IWork]), cycIn = 0, cycOut = 0;
+                for (int k = 0; k < 2; k++)
+                {
+                    // w tiku: srednia z probek w tiku x cykle w tiku (bez probki w tiku - srednia pozycji z calej doby); poza tikiem: to samo na roznicy
+                    long oc = _cCalls[k] - _cwCalls[k], os = _cSampled[k] - _cwSampled[k];
+                    double mean = _cSampled[k] > 0 ? Ms(_cTicks[k]) / _cSampled[k] : 0.0;
+                    cycIn += _cwCalls[k] * (_cwSampled[k] > 0 ? Ms(_cwTicks[k]) / _cwSampled[k] : mean);
+                    cycOut += oc * (os > 0 ? Ms(_cTicks[k] - _cwTicks[k]) / os : mean);
+                }
+                double fl = TownFletchers.TickHooked ? Cost174.MsOf(Cost174.SFletch) : 0.0;
+                sb.Append("razem ").Append(F1(all)).Append(" ms/").Append(_inCalls[IWork]).Append(" (maks. ").Append(F2(Ms(_inMax[IWork]))).Append(" ms), w tym nasze z profilu ")
+                  .Append(F1(cycIn + fl)).Append(" ms (CyclePrefix w tym tiku ").Append(F1(cycIn)).Append(" ms/").Append(_cwCalls[0] + _cwCalls[1]).Append(" + TownFletchers ")
+                  .Append(TownFletchers.TickHooked ? F1(fl) : "poza tikiem").Append("; probki 1/16), reszta ").Append(F1(all - cycIn - fl))
+                  .Append(" ms (gra, BK i nasze latki bez stopera); CyclePrefix poza tym tikiem ").Append(F1(cycOut)).Append(" ms/")
+                  .Append(_cCalls[0] + _cCalls[1] - _cwCalls[0] - _cwCalls[1]).Append(" (zamki - BK wola RunTownWorkshop sam)");
+            }
+            sb.Append(" | wnetrze treningu gry (MobilePartyTrainingBehavior.OnDailyTickParty): ");
+            if (!_inHooked[ITrain]) sb.Append("stoper niezalozony (").Append(_inWhy[ITrain] ?? InWhyDefault).Append(')');
+            else
+            {
+                double all = Ms(_inTicks[ITrain]);
+                sb.Append("razem ").Append(F1(all)).Append(" ms/").Append(_inCalls[ITrain]).Append(" (maks. ").Append(F2(Ms(_inMax[ITrain]))).Append(" ms), w tym nasze z profilu ")
+                  .Append(F1(dTrain)).Append(" ms (trening musztry), reszta ").Append(F1(all - dTrain)).Append(" ms (gra, BK i nasze latki bez stopera); wedlug druzyn: lordow ")
+                  .Append(F1(Ms(_inKindTicks[PkLord]))).Append(" ms/").Append(_inKindCalls[PkLord]).Append(", zalogi ").Append(F1(Ms(_inKindTicks[PkGarrison]))).Append(" ms/")
+                  .Append(_inKindCalls[PkGarrison]).Append(", pozostale ").Append(F1(Ms(_inKindTicks[PkOther]))).Append(" ms/").Append(_inKindCalls[PkOther]);
+            }
             Log.Info(sb.ToString());
         }
 
