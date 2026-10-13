@@ -1751,3 +1751,4 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   R1-10b cykle warsztatow bez surowca 190/d (prog 177), E5/B5-7 port Lordsport 36 dob bez nadwyzki (prog 28).
 - Test zapisu: wczytany `autotest-dlugi` (doba 60 biegu daniny) + 9 dob: 0 ERROR, linia daniny liczy dalej. Bieg kontrolny po wgraniu w toku (test\at-w39-kontrola10.out.txt).
 - NIE SPRAWDZONE AUTOTESTEM (do recznego testu Jeffa): zdanie "Savings: ..." w oknie "People of this land" i komunikat "War aid: ..." dla osad gracza.
+- (19:10 UTC 13.10) Bieg kontrolny PO WGRANIU 39 (10 dob nowej kampanii): 10/10, Armoury 0 ERROR; w grze Armoury ccfbf36a, CrashScribe 04f44a0e (md5 sprawdzone).
