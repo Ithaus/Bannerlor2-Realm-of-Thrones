@@ -1397,3 +1397,10 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   **NOWE DRZEWO SCALENIA `w-toku/zbior-e8` (zb\int)** - wf_f8505b0b-689 (docs/przekazanie/wf-zbior-e8-scalenie-i-H.js): wczesne scalenie e8-a@3e34ef0 + e8-c@ac3bd70 (z mechaniczna weryfikacja),
   potem E8/H (jezdziec = kon + uprzaz, wariant A z rozpoznania; klucz RiderNeedsHarness). PLAN ZLOZENIA KONCOWEGO: do `zbior-e8` dojda kolejnymi scaleniami: zbior-5-8 (etapy 5-7 + e8-b +
   poprawki F), ogon e8-c (D1, D2), ogon e8-a (R, B, O1-O6); potem F6 pkt 2 (AiWear), przeglad kolizji, pelny audyt, test zbiorczy. Limit 5 h 18%, tydzien 20%.
+- (04:45 UTC 13.10) **`w-toku/zbior-e8` (zb\int) = 0641a9c:** wczesne scalenie e8-a@3e34ef0 + e8-c@ac3bd70 (3095630, weryfikacja mechaniczna: 0 brakow, 0 dubli), **E8/H 0e7a7f7 + recenzja cf59001**
+  (jezdziec = kon + uprzaz: SaddleLaw.cs, klucz RiderNeedsHarness, brama awansu AI/gracz/ROT/najemnik, bitwa gracza, AiGear.BuySaddles; recenzja: brama gracza nie zamykala sie - poprawione;
+  zalozenia DO POTWIERDZENIA PRZEZ JEFFA: bohaterowie poza regula, zold jazdy bez zmian, zalogi nie kupuja uprzezy, 4 wzorce ROT bez uprzezy), ogon e8-c 3f2f0df (D1, D2), e8-a do O1 0641a9c
+  (R, B, O1). Moje scalenia: konflikty tylko CHANGELOG (suma) i sprawdz_logi.py (bloki dopisane w tym samym miejscu - suma; 24 def etap8_*, 0 dubli, py_compile), gen_mcm Armoury 1282, build 5 modow 0.
+  **Etap 8 drzewo C SKONCZONE** (`e8-c` 136216e: P3, S, Q, G1, G2, T, E, K, D1, D2). Drzewo A: zostaje O2, O3, O5, O6 (wf_1db23a93-783). Poprawki zbior-5-8: F4a 81f81e3, F4b 25d2fbf, F3 3c47f2a
+  (recenzja w toku), potem zlozenie F9b. **W TOKU wf_88688069-5bf (szwy w zbior-e8):** E8/H - E8/O1 (zakup siodel w pamieci polki) i F6 pkt 2 (pamiec AiWear.UsedByMen).
+  DALEJ: scalenie zbior-5-8 (po F9b) do zbior-e8 -> bieg probny 120 dob -> ogon e8-a (O2-O6) -> przeglad kolizji + pelny audyt -> test zbiorczy -> wgranie.
