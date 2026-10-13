@@ -62,8 +62,9 @@ namespace Armoury
             "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
-        private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, Holders = 10;
-        private static readonly string[] HolderName = { "miasta", "zamki", "wsie", "schowki osad", "inne osady", "wozy", "karawany", "lordowie", "gracz", "inne partie" };
+        // P3/Z1 (TRIAZ-3 O2-1 P1): HCart - surowiec w wozach kupcow w drodze (MaterialCarts; poza rosterami - bez tego posiadacza zakup wozem bylby "bez wyjasnienia")
+        private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, HCart = 10, Holders = 11;
+        private static readonly string[] HolderName = { "miasta", "zamki", "wsie", "schowki osad", "inne osady", "wozy", "karawany", "lordowie", "gracz", "inne partie", "wozy surowcow" };
 
         // ------------------------------------------------------------ przewoz (handel miedzy osada a partia)
         private const int TWagon = 0, TCarBuy = 1, TCarSell = 2, TLordBuy = 3, TLordSell = 4, TOthBuy = 5, TOthSell = 6, TSupplyBuy = 7, Transfers = 8;
@@ -920,6 +921,9 @@ namespace Armoury
                     if (mp == null) continue;
                     Count(mp.ItemRoster, PartyClass(mp));
                 }
+                // P3/Z1: surowiec w wozach kupcow w drodze (zdjety z polki zrodla, jeszcze nie na polce celu)
+                try { MaterialCarts.ForEachInTransit((it, n) => { int i; if (it != null && n > 0 && _idx.TryGetValue(it, out i)) _acc[i].Hold[HCart] += n; }); }
+                catch (Exception e) { Stumble("Daily(wozy surowcow)", e); }
                 long tStock = Stopwatch.GetTimestamp() - t0;
 
                 // ---- linie towarow
@@ -1080,7 +1084,7 @@ namespace Armoury
                 var a = _acc[i];
                 long vil = Group(a.Src, GVil), wood = Group(a.Src, GWoodlot), towns = Group(a.Src, GShop) + Group(a.Src, GArt);
                 long shops = Group(a.Sink, GArms), lines = Group(a.Sink, GShopIn) + Group(a.Sink, GArt), builds = Group(a.Sink, GBuild);
-                long stock = a.Hold[HTown] + a.Hold[HCastle] + a.Hold[HVillage] + a.Hold[HWagon] + a.Hold[HCaravan] + a.Hold[HLord] + a.Hold[HPlayer] + a.Hold[HOtherParty];
+                long stock = a.Hold[HTown] + a.Hold[HCastle] + a.Hold[HVillage] + a.Hold[HWagon] + a.Hold[HCaravan] + a.Hold[HLord] + a.Hold[HPlayer] + a.Hold[HOtherParty] + a.Hold[HCart];
                 bool ok = vil == o[0] && wood == o[1] && shops == o[3] && lines == o[4] && builds == o[5] && stock == o[6];
                 return name + " " + (ok ? "ZGODNA" : "NIEZGODNA") + " (wsie " + vil + "/" + o[0] + ", las " + wood + "/" + o[1] + ", zbrojne " + shops + "/" + o[3]
                        + ", linie " + lines + "/" + o[4] + ", budowy " + builds + "/" + o[5] + ", zapas " + stock + "/" + o[6] + "; wyroby miast " + towns + " wobec zdarzen gry " + o[2] + ")";

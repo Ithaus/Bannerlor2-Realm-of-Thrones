@@ -345,6 +345,9 @@ namespace Armoury
                 });
             }
             catch (Exception e) { Stumble("Census.wozy", e); }
+            // P3/Z1 (TRIAZ-3 O2-1 P1): surowiec w wozach kupcow w drodze (MaterialCarts) - czesc stosu swiata jak wozy kupcow R3
+            try { MaterialCarts.ForEachInTransit((it, n) => { if (n > 0 && Eligible(it)) { long k; c.TryGetValue(it, out k); c[it] = k + n; } }); }
+            catch (Exception e) { Stumble("Census.wozy surowcow", e); }
             _hNow = h;
             return c;
         }

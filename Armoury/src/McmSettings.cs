@@ -4748,6 +4748,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderPlayerCaravans { get; set; } = true;
 
+        [SettingPropertyBool("Town Material Order By Cart", HintText = "a town short of a raw material that finds no caravan to carry its order sends for it by merchants' cart: it buys the load from the stall of the nearest town or castle that has more than it needs (by road, or from port to port by sea), pays that town or castle from its own purse above the merchants' reserve, and the goods reach its stall after the days the road takes - a besieged town waits, and after thirty days the cart turns back and the money is returned. With bloomeries at the mines iron then travels as far as the other materials. Off = caravans only, as before")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderByCart { get; set; } = true;
+
         [SettingPropertyBool("Fletchers Bid For Ore", HintText = "when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it")]
         [SettingPropertyGroup("Arms production")]
         public bool FletchersBidForOre { get; set; } = true;
@@ -6410,6 +6414,7 @@ namespace Armoury
             s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;
             s.TownMaterialOrderAhead = TownMaterialOrderAhead;
             s.TownMaterialOrderPlayerCaravans = TownMaterialOrderPlayerCaravans;
+            s.TownMaterialOrderByCart = TownMaterialOrderByCart;
             s.FletchersBidForOre = FletchersBidForOre;
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;

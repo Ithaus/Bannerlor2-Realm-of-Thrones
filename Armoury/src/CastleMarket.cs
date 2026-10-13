@@ -217,6 +217,20 @@ namespace Armoury
             return p > 0 ? b / p : 0.0;
         }
 
+        /// <summary>P3/Z1 (kontrakt wozem, MaterialOrders.CastleKeep): popyt ludnosci osady na ten towar w sztukach na dobe - ta sama miara co targ przy
+        /// zamku (budzet dnia BK kategorii / cena targu osady); 0 = bez popytu albo blad (liczony).</summary>
+        internal static double FolkPerDay(Town t, ItemObject it)
+        {
+            try
+            {
+                var c = it != null ? it.GetItemCategory() : null;
+                if (t == null || c == null || t.MarketData == null || Campaign.Current == null) return 0.0;
+                double v = PerDay(t, it, c);
+                return double.IsNaN(v) || double.IsInfinity(v) || v < 0.0 ? 0.0 : v;
+            }
+            catch (Exception e) { Stumble("CastleMarket.FolkPerDay", e); return 0.0; }
+        }
+
         private static int ShelfUnits(Settlement st, ItemCategory c)
         {
             int n = 0;
