@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (Z.3 - PROSBA JEFFA - RECENZJA) - SWATY ROT, klucz MarriageOnlyViableCandidates: dowod i kod bez zarzutu (kod bez zmian); poprawione liczby kosztu i szacunku, dopisany skutek dla puli wolnych
+**Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-rot` | **Pliki:** `CrashScribe/ModuleData/CrashScribe.settings.xml` (tylko opis klucza), `CHANGELOG.md`. Recenzja wpisu nizej (commit 0bc9dde). Kod `MarriageFast.cs` i `Config.cs` BEZ ZMIAN. Bez zmian zapisu, bez nowych kluczy.
+
+**Problem (liczby):** niezalezna recenzja wpisu nizej. Bledu w kodzie nie znalazlem; trzy poprawki w opisie.
+1. Koszt byl rozpisany blednie (suma dobra). Model stanu startowego, przeliczone osobno (`scratchpad\tmp\z3r2\cost.py`): pytan o szanse na dobe 939 zamiast 516 (+423) - srednio 1.8 na wolnego lorda, a nie "1.3-1.5"; 10 lordow bez zadnego kandydata z szansa pyta razem o 25 osob, a nie "10 x ok. 21". Granica gorna (gdyby zaden wolny lord nie mial kandydata z szansa): 10 782 pytania na dobe.
+2. Widelki "185-260 slubow w pierwszym roku" nie mowily o suficie puli: na starcie jest 308 wolnych mezczyzn i 208 wolnych kobiet (lista ROT), w ciagu roku dorasta ok. 24 osob - z puli startowej nie da sie zawrzec wiecej niz ok. 220 slubow na rok. Symulacja z wyczerpywaniem puli daje 180-192 (x1.65-1.8); 260 byloby mozliwe tylko, gdyby w grze pula sie dopelniala (wdowy po poleglych, nowi dorosli z BK) - pomiar starej reguly (rowno 0.31 slubu na dobe przez caly rok, bez spadku) sugeruje, ze czesciowo tak jest. Pewne jest tempo NA STARCIE: x1.6-2.3 na dobe.
+3. Brakowalo skutku dla gracza: wolni szlachcice koncza sie ok. 2 razy szybciej. Model: po roku zostaje ok. 30-40 wolnych kobiet z ok. 220 (stara regula: ok. 110; pomiar starej reguly: 113 slubow na rok, czyli juz dzis ok. polowa). Dotyczy tez kandydatek i kandydatow dla gracza. W kolejnych latach liczba slubow na rok jest przy obu regulach taka sama (tylu, ilu dochodzi wolnych) - nowa regula przyspiesza glownie pierwszy rok.
+
+**Przyczyna:** szacunki we wpisie nizej liczone z tempa startowego bez sufitu puli; podzial kosztu podany z pamieci, nie z modelu.
+
+**Co sprawdzone niezaleznie (dekompilacja z plikow w grze, nie z kopii):**
+- Dowod strat PRAWDZIWY. `BannerKings.dll` z `Modules\BannerKings.Redux`: `BKMarriageModel.IsSuitableForMarriage` nie ma warunku `Spouse == null` (ma go tylko model gry), wiec zonaci sa na liscie `_unmarriedHeroes` i przechodza `IsCoupleSuitableForMarriage` (ROT + gra: rod, wojna, stosunki >= -50, wiek, kultura / odleglosc, plec, pokrewienstwo, `CanMarry` x 2 - malzonka nikt tam nie pyta). Dopiero `NpcCoupleMarriageChance` zeruje: `IsMarriageAdequate` -> `secondHero.HasPrimarySpouse()` -> -10000. `BKROTMarriageModel` (BKROTPatch) nadpisuje tylko `GetSpouseScore`. Typ (a) (swat z malzonkiem: `proposer.HasPrimarySpouse()`) to nie strata. Wojna, wiek, jency (`PartyBelongedToAsPrisoner` w `CanMarry`), rod gracza (lista bez rodu gracza, `clan == PlayerClan` konczy metode) - sprawdzane PRZED losowaniem w obu regulach.
+- Liczby: wlasny spis `ROT_heroes.xml` (`z3r2\count.py`): 903 doroslych zywych z rodem, 343 z zyjacym malzonkiem (38%) - zgodne z modelem autora (lista 858, zonatych 342 = 40%, udzial zonatych wsrod kandydatow wolnego lorda 39%). Udzial (c) "wolny odrzucony wynikiem BK" (ok. 18%) zalezy od przyblizen modelu (wiara, tytuly) - prawdziwy poda linia biegu cienia. Pomiar 113 slubow / 364 doby potwierdzony z logu Armoury (biegi 120 dob: 44, 32, 32).
+- "Mozliwy slub" = DOKLADNIE warunki oryginalu, bez poszerzenia: ta sama lista kandydatow (`_cand` z tych samych wywolan `IsCoupleSuitableForMarriage`), ta sama metoda szansy pytana dla wylosowanego, ten sam rzut `RandomFloat < szansa`, ta sama kontrola zalotow stanu >= 3, `MarriageAction.Apply`, najwyzej jeden slub rodu na dobe. Kazda para nowej reguly mogla pasc takze w oryginale przy tym samym stanie gry. Skrot "kandydat z zyjacym malzonkiem = 0 bez pytania modelu" stoi na tej samej strazy co skrot dla zonatych (dlugosci IL lancucha szansy, brak obcych latek).
+- Klucz false = droga rownowazna oryginalowi: roznica wobec c64c3d2 to dwa odczyty pola i dwa liczniki. Bieg cienia dalej wazny (przy nim regula nie dziala i linia to mowi - przyjete odstepstwo od opisu zadania: w biegu cienia i tak decyduje oryginal ROT).
+- Testy na `CrashScribe.dll` z tego drzewa: (1) powtorzony test autora `z3v\dlltest2`: klucz wylaczony przeciw ROT 1:1 - 56 992 wywolania, 0 roznic par / generatora / pamieci domu; klucz wlaczony przeciw wzorcowi - 56 095 wywolan, 0 roznic, 0 par niemozliwych. (2) WLASNY test rozkladu (`z3r2\dlltest3`): rod z 3 wolnymi lordami i 1 zonatym, 6 swiatow x 400 000 wywolan prawdziwej `MarriageFast.Decide`; czestosci wynikow (kto z kim albo nikt) przeciw prawdopodobienstwom policzonym wprost z definicji "odsiej kandydatow bez szans, losuj rowno, rzut" - chi2 32.8-54.8 przy 25-40 stopniach swobody (przyblizone granice 0.999: 50.9-71.7), par spoza zbioru mozliwych 0.
+- Praca: przy kluczu wylaczonym i w biegu cienia zero dodatkowych pytan do modelu. Przy wlaczonym +423 pytania o szanse na dobe (jedno pytanie = ok. 2-3 pelne oceny pary; latka szybkosci robi ich ok. 17 600 na dobe) - ok. 6-7% pracy latki, szacunkowo 10-30 ms na dobe; z czasem maleje, bo wolnych ubywa. Licznik "pytan o szanse" i "czas" w linii doby pokaza prawde.
+
+**Zmiana:** tylko opis klucza w `CrashScribe.settings.xml` (po angielsku): tempo "na starcie kampanii" zamiast "w pierwszym roku" i zdanie o szybszym wyczerpaniu puli wolnych szlachcicow (takze dla gracza).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Kod bez zmian - ryzyka z wpisu nizej bez zmian. Plik ustawien: sam komentarz, XML sprawdzony parserem.
+- Do decyzji Jeffa po autotescie: jesli szybkie wyczerpanie puli wolnych przeszkadza (malo kandydatek dla gracza po pierwszym roku), wylacznik to `MarriageOnlyViableCandidates` = false.
+- W autotescie patrzec na "proby wolnych lordow" w linii doby - spadek tej liczby z doby na dobe to wlasnie wyczerpywanie puli; "pytan o szanse" ma byc rzedu 900-1000 na starcie (alarm przy kilku tysiacach).
+- NIE sprawdzone w grze (gry nie uruchamiano, w katalogu gry nic nie zapisano).
+
+**Build:** CrashScribe kod 0, 0 ostrzezen (drzewo `zb/z3`).
+
+**Status:** DO SPRAWDZENIA - autotest jak we wpisie nizej (bieg cienia: roznic 0 i zmierzony udzial strat; bieg zwykly: liczba slubow, "pytan o szanse", czas).
+
 ## 2026-10-13 (Z.3 - PROSBA JEFFA) - SWATY ROT: wolny lord losuje tylko kandydatow, z ktorymi slub jest mozliwy (klucz MarriageOnlyViableCandidates) - ZMIANA ROZGRYWKI
 **Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-rot` | **Pliki:** `CrashScribe/src/MarriageFast.cs`, `CrashScribe/src/Config.cs`, `CrashScribe/ModuleData/CrashScribe.settings.xml`, `CHANGELOG.md`. Na wpisach nizej (1c6ae85 + c64c3d2). Bez zmian zapisu. Nowy klucz: `MarriageOnlyViableCandidates` (domyslnie true).
 

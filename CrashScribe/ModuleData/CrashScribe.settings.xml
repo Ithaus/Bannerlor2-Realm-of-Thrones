@@ -242,8 +242,11 @@
        accept for that lord (chance 0), so more than half of the daily attempts are wasted and AI weddings are rarer
        than Realm of Thrones intended. With this on, an unmarried lord draws only among candidates whose marriage
        chance is above zero; the chance itself and every other rule (age, clan, culture, distance, war, race) stay
-       as they are. Expect roughly twice as many AI weddings in the first year of a campaign (estimate from a model
-       of the starting world: 1.6 to 2.3 times). Needs MarriageFast above; it is paused while MarriageFastShadow is
+       as they are. Expect roughly twice as many AI weddings a day at the start of a campaign (estimate from a
+       model of the starting world: 1.6 to 2.3 times). Side effect: unmarried nobles, including the ones the player
+       could marry, are taken about twice as fast (in the model most of them are married within the first year);
+       once they run out, the yearly number of weddings is the same as before.
+       Needs MarriageFast above; it is paused while MarriageFastShadow is
        on (the original decides then) and when another mod changes the marriage chance (one line in the CrashScribe
        log says so). The daily "Swaty ROT (Z.3)" log line ends with the attempts of unmarried lords, how many of
        them the old rule would have wasted, and the weddings of the day and since loading.
