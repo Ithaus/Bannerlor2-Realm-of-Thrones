@@ -1665,3 +1665,14 @@ Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d
   10 dob po wgraniu (test\at-w37-kontrola10.out.txt). PO NICH: test 120 dob P1; scalenie k13a (konie robocze) + drugi bieg 120 dob z obiema; projekt "podatki wojenne -> wojsko".
 - (16:25 UTC 13.10) **Bieg kontrolny PO WGRANIU 37 (pliki z gry, 10 dob nowej kampanii): 10/10, Armoury 0 ERROR** (Armoury-2026-10-13_09-20-34.log); swaty "PODPIETY - decyduje nasza
   droga"; po biegu w grze WGRANIE 37 (md5: Armoury f2afb329, CrashScribe 3ca8aa08, settings ef8cd722). Workflowy raportu, lupu miast i paczki P1 dalej w toku.
+- (16:45 UTC 13.10) **DECYZJE JEFFA (druga tura):** (1) budowa przez lud - pyta "a czemu mieliby dokladac, jaka jest za tym logika?" (odpowiedz dana: mury chronia ich oszczednosci,
+  spichlerz przed glodem, targ / port to ich zarobek, 3/4 wraca do nich jako place; propozycja doprecyzowania: lud placi tylko za budowle sluzace miastu, wojskowe placi pan -
+  CZEKA na tak / nie); (2) podatki na wojsko: "1 2 i 3" = korona placi wedlug potrzeby + tarczowe + stawka wojenna podatku pana - PROJEKTOWAC wszystkie trzy (workflow po raporcie
+  rocznym); (3) sluby: **"Przyhamuj, aby sluby zawieraly sie rzadziej"** - klucz MarriageChanceScale 0.7 (cel ok. 150 / rok; bylo 113 przed zmiana, 215 po), w toku wf_44f307aa-c9f
+  (docs/przekazanie/wf-sluby-hamulec.js) na galezi `w-toku/z3-swaty-hamulec` (drzewo SC\zb\sh od 6d91156), przy okazji poprawka nieprawdziwych komentarzy o ciagu losowym;
+  (4) pomysly dodatkowe (pozyczka miejska, karta, sakiewka turniejowa) - POZNIEJ, potwierdzone.
+  **Z analizy wojska raportu rocznego (SCRATCH\raport-rok\wojsko.md, przed weryfikacja):** luka do limitu druzyn to w 71% PULAP ZOLDU (regula budzetu ClanBudget.cs 191-210: zold <=
+  0.60 dochodu stalego + 0.8 nadwyzki kiesy / 45 dni), nie brak ludzi; pulap zjadaja zalogi (83.6 tys. w zalogach, placone pierwsze; 16 rodow placi zalogom wiecej niz caly pulap);
+  rody na pulapie (111) trzymaja 38% limitu, z wolnym miejscem (85) 64% = rownowaga AI; sufit swiata ok. 100 tys.; **do 85 tys. trzeba 30-45 tys. zl/d CELOWANE (do rodow na
+  pulapie) albo 60-190 tys. dzisiejsza droga; do 95 tys. 80-115 tys. celowane.** Moje wczesniejsze zdanie Jeffowi "164 rodom podatki nic nie dadza" bylo za mocne - poprawione.
+  Limity: 5 h 24%, TYDZIEN 77% (zeruje sie 19.10) - przy 99% przekazanie na drugie konto.
