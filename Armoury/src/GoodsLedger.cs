@@ -645,6 +645,9 @@ namespace Armoury
             return l;
         }
 
+        /// <summary>N5-B (SlaughterHides): receptura linii zmieniona w sesji - opisy linii (klucz "wsad>wyroby") od nowa przy nastepnym cyklu.</summary>
+        internal static void ForgetLines() { _lines.Clear(); }
+
         // ------------------------------------------------------------ prefiksy (otwarcie ramki) i finalizer (zamkniecie)
         public static void VillagePre(Village __0, bool __1, out Frame __state)
         {

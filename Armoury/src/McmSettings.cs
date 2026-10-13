@@ -5312,6 +5312,42 @@ namespace Armoury
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8WorldLog { get; set; } = true;
 
+        [SettingPropertyBool("Valve Raise While Short", HintText = "a raw material that more than Valve Short Towns towns have none of may be raised by the village regulator above Village Output Step - step by step every four weeks, up to Valve Short Ceiling - as long as the world uses up all that is made and the stock stays low: the same villages put more of their work into it (flax for the weavers stood at the ordinary ceiling all year while nine towns in ten had no linen). Off = the ordinary ceiling holds, and a good already above it returns to it at the next decision")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool ValveRaiseWhileShort { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Valve Short Ceiling", 1.00f, 8.00f, "0.00", HintText = "the most a village can make of a raw material the towns are short of, as a multiple of its normal output (needs Valve Raise While Short)")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public float ValveShortCeiling { get; set; } = 4f;
+
+        [SettingPropertyBool("Valve Step Follows Use", HintText = "a village good raised above its normal output is brought back to what the world really uses once a full eight-week window shows it is made faster than it is used - without waiting for two months of stock to pile up - and close to the lower stock limit it is raised by small steps instead of a third at once (timber piled up all year after one such step). Never below normal output: the woodcutters go back to the village's other work. Off = a raised good stays raised until the stock exceeds Valve Stock Days High, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool ValveStepFollowsUse { get; set; } = true;
+
+        [SettingPropertyBool("Slaughter Keeps Hides", HintText = "the town craftsmen who slaughter a sheep or a pig for meat alone keep its hide as well, as the other butchers do: one raw hide from every animal, sold on the town's stall like the meat (about a fifth of all livestock was slaughtered with the hide thrown away while the tanners stood idle). Takes effect at the next load. Off = the game's recipes, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool SlaughterKeepsHides { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Workshop Hands Step", 1.00f, 3.00f, "0.00", HintText = "further step of arms craftsmen on top of Workshop Hands Per 1000 People, now that ore and timber are plentiful: every town has this many times the armourers, weaponsmiths, bowyers and saddlers (and with them its weavers, tanners and fletchers) - still below medieval Europe. Needs Workshop Hands By People. 1 = off, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public float WorkshopHandsStep { get; set; } = 1.3f;
+
+        [SettingPropertyBool("Civil Works Away From Front", HintText = "in a kingdom at war, civil buildings are built again in towns and castles the war does not reach: no siege, no enemy lord's party, no battle between lords and no raid within Civil Works Front Range, and none of its own villages raided or burned, for Civil Works Calm Days. Near the front only walls, barracks and other military works go on, as before, and a house with a military work in hand finishes it first. The lord pays from his building allowance as always. Off = no civil building anywhere in a kingdom at war, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool CivilWorksAwayFromFront { get; set; } = true;
+
+        [SettingPropertyInteger("Civil Works Calm Days", 1, 60, "0", HintText = "days without any sign of war near a town or castle before civil building may go on there (needs Civil Works Away From Front)")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public int CivilWorksCalmDays { get; set; } = 14;
+
+        [SettingPropertyFloatingInteger("Civil Works Front Range", 10.00f, 300.00f, "0", HintText = "how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public float CivilWorksFrontRange { get; set; } = 60f;
+
+        [SettingPropertyBool("Civil Works Need Wage Room", HintText = "with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool CivilWorksNeedWageRoom { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6639,6 +6675,15 @@ namespace Armoury
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
+            s.ValveRaiseWhileShort = ValveRaiseWhileShort;
+            s.ValveShortCeiling = ValveShortCeiling;
+            s.ValveStepFollowsUse = ValveStepFollowsUse;
+            s.SlaughterKeepsHides = SlaughterKeepsHides;
+            s.WorkshopHandsStep = WorkshopHandsStep;
+            s.CivilWorksAwayFromFront = CivilWorksAwayFromFront;
+            s.CivilWorksCalmDays = CivilWorksCalmDays;
+            s.CivilWorksFrontRange = CivilWorksFrontRange;
+            s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
         }
 
         internal static void Apply()

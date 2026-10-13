@@ -57,11 +57,24 @@ namespace Armoury
     /// Mnoznik kategorii w MaterialLaw.ProdPostfix (czynnik x suma, po W3, przed W2). Klucz HorseBreedingByDemand (dziala tylko z HarvestValve); wylaczony - konie
     /// wyczyszczone (mnozniki 1, przesuniecie 0); wlaczony w biegu regulatora - pomiar koni od pelnego okna. Linie "Hodowla (220)" (doba, decyzja) i raz na sesje
     /// "Przeglad stadnin (220)" (wsie z konmi wedlug krainy i typu - dane do decyzji o typach wsi; paczka typow wsi nie zmienia).
+    ///
+    /// N5 (poprawka 5 po biegu rocznym 364 doby, decyzja Jeffa 13.10) - dwie reguly decyzji towarow (konie bez zmian), kazda z wlasnym kluczem:
+    ///  - N5-A ValveRaiseWhileShort: surowiec z tabeli karawan, ktorego nie ma w wiecej niz ValveShortTowns miastach, ma sufit kroku w gore ValveShortCeiling (4)
+    ///    zamiast VillageOutputStep (1.3) - warunki kroku bez zmian (zuzycie >= 98% produkcji, stos < ValveStockDaysLow dni). Bieg roczny: len x1.30 od doby 85 do
+    ///    konca, zuzycie/produkcja 0.99-1.01, stos 12-13 dni, 58-70 miast bez lnu. Wylaczony: sufit zwykly, a mnoznik ponad max(sufit, 1.3) wraca do niego od razu.
+    ///  - N5-D ValveStepFollowsUse: krok ponad baze wraca do zuzycia bez czekania na stos > ValveStockDaysHigh dni. Bieg roczny: drewno x1.30 od doby 113,
+    ///    zuzycie/produkcja 0.79-0.90 przez 8 decyzji, stos 17 488 -> 152 862. Przyciecie (m > 1, poprzednia decyzja nie byla krokiem w gore - pelne okno przy
+    ///    nowym mnozniku): stos < dolny prog i zuzycie < 90% produkcji -> 1.05 x zuzycie / produkcja bazowa okna; stos >= dolny prog i zuzycie < 98% -> zuzycie /
+    ///    produkcja bazowa; nie ponizej 1, tylko gdy zmiana >= 2%. Krok w gore od bazy wzwyz: x (1 + brak stosu do dolnego progu), w granicach 1.05-1.3, i nie
+    ///    w decyzji zaraz po przycieciu. Cel przyciecia zalezy tylko od zuzycia i produkcji bazowej (powtorzony daje ten sam mnoznik), wiec bez kolysania.
     /// </summary>
     internal static class HarvestValve
     {
         private const int Bucket = 28;             // doby kubelka; decyzja co kubelek, okno = dwa kubelki
         private const float CutBelow = 0.90f, StepAbove = 0.98f, CutTarget = 0.95f, CutMaxStep = 0.5f, Floor = 0.1f, UpStep = 1.3f;
+        // N5: najwyzszy mnoznik w stanie i w zapisie (sufit braku N5-A przycinany do niego); przyciecie kroku N5-D: zapas na odbudowe stosu ponizej dolnego progu,
+        // najmniejsza zmiana warta decyzji; najmniejszy krok w gore od bazy wzwyz
+        private const float MaxM = 8f, TrimSpare = 1.05f, TrimMin = 0.02f, StepMin = 1.05f;
 
         private sealed class Good
         {
@@ -439,7 +452,13 @@ namespace Armoury
             Dictionary<ItemObject, int> emptyOf = null;
             int shortAt = s != null ? Math.Max(0, s.ValveShortTowns) : 15, holdCut = 0, holdBack = 0;
             bool holdKey = s != null && s.ValveHoldWhileShort, holdReady = false;
-            if (decide && holdKey)
+            // N5-A / N5-D (poprawka 5 po biegu rocznym): sufit kroku przy braku w miastach i krok ponad baze wedlug zuzycia. Tabela pustych polek (holdReady) liczona
+            // takze dla samego N5-A; bezpiecznik P3/Z2 dziala dalej tylko przy swoim kluczu (holdKey)
+            bool raiseKey = s != null && s.ValveRaiseWhileShort, followKey = s != null && s.ValveStepFollowsUse;
+            float shortCeil = s != null ? Math.Max(1f, Math.Min(MaxM, s.ValveShortCeiling)) : ceil;
+            int n5Raised = 0, n5Trim = 0, n5TrimWait = 0, n5UpWait = 0, n5Back = 0;
+            var n5Above = new List<string>();
+            if (decide && (holdKey || raiseKey))
             {
                 try
                 {
@@ -482,7 +501,7 @@ namespace Armoury
                             int emptyTowns = -1;
                             bool shortNow = holdReady && emptyOf.TryGetValue(g.Item, out emptyTowns) && emptyTowns > shortAt;   // P3/Z2: brak w miastach
                             string holdNote = null;
-                            if (shortNow && m0 < 1f)
+                            if (holdKey && shortNow && m0 < 1f)
                             {
                                 // P3/Z2 (c): powrot do bazy - cofniecie wlasnego ciecia krokiem x1.3, nigdy ponad baze, bez warunku stosu < ValveStockDaysLow
                                 // (ten warunek jest nieosiagalny, dopoki zapas lezy tam, skad nie wyjezdza)
@@ -490,6 +509,12 @@ namespace Armoury
                                 if (m1 > m0 + 1e-4f) dir = 1; else m1 = m0;
                                 holdBack++;
                                 holdNote = ", powrot do bazy: bez towaru " + emptyTowns + " miast";
+                            }
+                            else if (!raiseKey && m0 > Math.Max(ceil, UpStep) + 1e-4f)
+                            {
+                                // N5-A wylaczone: mnoznik ponad zwykly sufit (osiagalny tylko krokiem N5-A) wraca do niego od razu - stan sprzed paczki
+                                m1 = Math.Max(ceil, UpStep); dir = -1; n5Back++;
+                                holdNote = ", powrot do zwyklego sufitu (N5-A wylaczone)";
                             }
                             else if (P > 0.0 && C < CutBelow * P && (cDay > 0.0 ? now > high * cDay : now > high * pDay))
                             {
@@ -499,13 +524,43 @@ namespace Armoury
                                 float target = (float)(CutTarget * C / (baseP > 0.0 ? baseP : P));
                                 m1 = Math.Max(Floor, Math.Max(target, m0 * CutMaxStep));
                                 // P3/Z2 (b): przy braku w miastach ciecie nie schodzi ponizej bazy (cofniecie wlasnego kroku x1.3 do x1.00 dziala dalej)
-                                if (shortNow && m1 < 1f) { m1 = 1f; holdCut++; holdNote = ", ciecie wstrzymane: bez towaru " + emptyTowns + " miast"; }
+                                if (holdKey && shortNow && m1 < 1f) { m1 = 1f; holdCut++; holdNote = ", ciecie wstrzymane: bez towaru " + emptyTowns + " miast"; }
                                 if (m1 < m0 - 1e-4f) dir = -1; else m1 = m0;
+                            }
+                            else if (followKey && m0 > 1f + 1e-4f && cDay > 0.0 && (now < low * cDay ? C < CutBelow * P : C < StepAbove * P))
+                            {
+                                // N5-D: krok ponad baze wraca do zuzycia - bez czekania na stos > ValveStockDaysHigh dni (warunek ciecia 221 wyzej). Dopiero po pelnym
+                                // oknie przy nowym mnozniku (poprzednia decyzja nie byla krokiem w gore): okno z dwoma mnoznikami po kroku ma tez wozy i magazyny
+                                // dopelniane nowa produkcja - to nie jest jeszcze nadprodukcja
+                                if (g.Dir > 0) { n5TrimWait++; holdNote = ", przyciecie kroku czeka na pelne okno (N5-D)"; }
+                                else
+                                {
+                                    double bp = (g.MA > 0f ? g.P0 / g.MA : g.P0) + (m0 > 0f ? g.P1 / m0 : g.P1);
+                                    if (!(bp > 0.0)) bp = P;
+                                    bool spare = now < low * cDay;   // stos ponizej dolnego progu - zostaje 5% ponad zuzycie na jego odbudowe
+                                    float target = (float)((spare ? TrimSpare : 1.0) * C / bp);
+                                    m1 = Math.Max(1f, Math.Min(m0, target));
+                                    if (m1 < m0 * (1f - TrimMin)) { dir = -1; n5Trim++; holdNote = ", przyciecie kroku do zuzycia (N5-D" + (spare ? ", z 5% na odbudowe stosu" : "") + ")"; }
+                                    else m1 = m0;
+                                }
                             }
                             else if (cDay > 0.0 && C >= StepAbove * P && now < low * cDay)
                             {
-                                m1 = Math.Min(m0 < 1f ? 1f : ceil, m0 * UpStep);
-                                if (m1 > m0 + 1e-4f) dir = 1; else m1 = m0;
+                                if (followKey && m0 >= 1f && g.Dir < 0) { n5UpWait++; holdNote = ", krok w gore czeka po przycieciu (N5-D)"; }   // bez zmiany kierunku w kolejnych decyzjach
+                                else
+                                {
+                                    // N5-A: sufit kroku przy braku w miastach; N5-D: od bazy wzwyz krok proporcjonalny do braku stosu (x1.05 przy dolnym progu, x1.3 przy pustym)
+                                    bool raise = raiseKey && shortNow && shortCeil > ceil;
+                                    float step = UpStep;
+                                    if (followKey && m0 >= 1f) step = Math.Max(StepMin, Math.Min(UpStep, 1f + (float)((low * cDay - now) / (low * cDay))));
+                                    m1 = Math.Min(m0 < 1f ? 1f : (raise ? shortCeil : ceil), m0 * step);
+                                    if (m1 > m0 + 1e-4f)
+                                    {
+                                        dir = 1;
+                                        if (raise && m1 > ceil + 1e-4f) { n5Raised++; holdNote = ", ponad zwykly sufit (N5-A): bez towaru " + emptyTowns + " miast"; }
+                                    }
+                                    else m1 = m0;
+                                }
                             }
                             if (dir != 0 && g.Dir == -dir) { g.Flips++; flips++; }
                             g.Dir = dir;
@@ -522,6 +577,7 @@ namespace Armoury
                 }
                 g.P0 = g.P1; g.P1 = 0.0; g.D0 = g.D1; g.D1 = 0.0; g.SA = g.SB; g.SB = now; g.MA = mBucket;
                 if (g.Item != null && g.M != 1f) f[g.Item] = g.M;
+                if (g.M > ceil + 1e-4f) n5Above.Add(id + " x" + g.M.ToString("0.00", inv));   // N5-A: towary ponad zwyklym sufitem (do linii decyzji)
             }
             _factors = f.Count > 0 ? f : null;
             string hl = null;
@@ -559,6 +615,15 @@ namespace Armoury
                 }
                 sb.Append(fe ? "-]" : "]");
             }
+            // N5: stan dwoch kluczy i liczniki tej decyzji (noty przy towarach - w nawiasie kwadratowym wyzej)
+            sb.Append("; N5-A sufit przy braku w miastach: ");
+            if (!raiseKey) sb.Append("WYLACZONY (Valve Raise While Short), powroty do zwyklego sufitu ").Append(n5Back);
+            else if (!holdReady) sb.Append("NIECZYNNY (tabela surowcow karawan niegotowa)");
+            else sb.Append("CZYNNY x").Append(shortCeil.ToString("0.00", inv)).Append(" przy braku w ponad ").Append(shortAt).Append(" miastach, kroki ponad zwykly sufit ").Append(n5Raised)
+                   .Append(", towary ponad zwyklym sufitem [").Append(n5Above.Count > 0 ? string.Join(", ", n5Above.ToArray()) : "-").Append(']');
+            sb.Append("; N5-D krok wedlug zuzycia: ");
+            if (!followKey) sb.Append("WYLACZONY (Valve Step Follows Use)");
+            else sb.Append("CZYNNY, przyciecia ").Append(n5Trim).Append(", przyciecia czekajace na pelne okno ").Append(n5TrimWait).Append(", kroki w gore czekajace po przycieciu ").Append(n5UpWait);
             sb.Append("; potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             if (hl != null) Log.Info(hl);
@@ -961,9 +1026,9 @@ namespace Armoury
                         D0 = double.Parse(p[4], inv), D1 = double.Parse(p[5], inv), SA = long.Parse(p[6], inv), SB = long.Parse(p[7], inv),
                         Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
                     };
-                    if (!(g.M > 0f) || g.M > 2f) g.M = 1f;
+                    if (!(g.M > 0f) || g.M > MaxM) g.M = 1f;   // N5-A: sufit braku do MaxM (dotad 2 - zwykly sufit); wylaczony klucz cofa nadwyzke przy najblizszej decyzji
                     g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
-                    if (!(g.MA > 0f) || g.MA > 2f) g.MA = g.M;
+                    if (!(g.MA > 0f) || g.MA > MaxM) g.MA = g.M;
                     _goods[g.Id] = g;
                 }
                 Rebuild();
