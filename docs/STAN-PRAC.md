@@ -1584,3 +1584,11 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   POZYCZKI dla panow i podatek nadzwyczajny - wzor IronBank, DebtLadder) -> sedzia sklada jeden: docs/kiesa-ludu/PROJEKT-OBIEG-KIESY-LUDU-2026-10-13.md z rozdzialem dla Jeffa i pytaniami
   o kierunek. Kod dopiero po "tak" Jeffa. Kierunek podany Jeffowi od reki: zapas oszczednosci w dniach koszyka, ponad nim lud po kolei wydaje lepiej, inwestuje w swoje miasto, pozycza panom.
   Jeff zapytal tez o rozwiazanie na wojsko - opisane (5 punktow z TRIAZ-3; kod w toku wf_a30e8861-78e). W grze: bieg pomiarowy K1-3a 120 dob (test\at-k13a-120.out.txt).
+- (14:05 UTC 13.10) **Z.3 swaty ROT GOTOWE (kod + recenzja, bez testu w grze):** `w-toku/z3-swaty-rot` c64c3d2 (zb\z3; CrashScribe/src/MarriageFast.cs, klucze MarriageFast = true,
+  MarriageFastShadow = false): te same pary i ten sam ciag losowy - dowod poza gra na prawdziwej DLL: 57 493 wywolania rodu, 20 299 par w obu drogach, 0 roznic; szac. zysk ok. 63% kosztu
+  swatow (ok. 0.7 s/dobe; cel < 10% nieosiagniety - dalej tylko latkami na Hero.CanMarry / Romance.GetCourtedHeroInOtherClan, osobna decyzja). DO TESTU: najpierw BIEG CIENIA (probna CS
+  z MarriageFastShadow = true - linia "Swaty ROT (Z.3): ... roznic R" ma dac 0). **Z.3 pomiary GOTOWE:** `w-toku/z3-pomiary` 58a5148 (zb\pm; DayProfile + Drill: wnetrze warsztatow
+  i treningu gry, stoper nadwyzki K1 w musztrze - pola na koncu linii profilu). **W TOKU wf_16d6890e-484** (docs/przekazanie/wf-sluby-npc.js) na zb\z3: prosba Jeffa - sluby NPC:
+  najpierw dowod, gdzie proby przepadaja (uwaga: zonaty lord SZUKAJACY ma szanse 0 - to nie strata; pytanie, czy przepadaja proby WOLNYCH przez kandydatow bez szans), potem klucz
+  MarriageOnlyViableCandidates = true; jesli twierdzenie rozpoznania falszywe - "pominieta" z dowodem i powiedziec Jeffowi.
+  KOLEJKA TESTOW W GRZE: bieg pomiarowy K1-3a (w toku) -> bieg cienia swatow (CS probna) -> po rundzie 3 (wojsko, zelazo): scalenie p3 + z3 + pm do zbior-e8, bieg roczny, wgranie.
