@@ -4596,6 +4596,14 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public int ShelfIndexSelfCheckDays { get; set; } = 1;
 
+        [SettingPropertyBool("Shelf Index Own Update", HintText = "when the mod itself takes a piece off a stall or puts one back (what lords, garrisons, stables and builders buy, and the surplus arms the merchants carry between towns), the remembered tally of that stall is corrected by that one piece instead of being counted anew before the next price - the same prices, less work for the game. Off: counted anew after every piece, as before")]
+        [SettingPropertyGroup("Arms production")]
+        public bool ShelfIndexOwnUpdate { get; set; } = true;
+
+        [SettingPropertyBool("Dte Delegates", HintText = "the mod calls the routines of other mods it relies on (the armouries of Dynamic Troop Equipment, the caravans of Banner Kings) directly instead of looking them up anew each time - the same result, a little less work for the game. Off: the old way")]
+        [SettingPropertyGroup("Arms production")]
+        public bool DteDelegates { get; set; } = true;
+
         [SettingPropertyBool("Town Material Order By Sea", HintText = "a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates")]
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderBySea { get; set; } = true;
@@ -6192,6 +6200,8 @@ namespace Armoury
             s.WorkshopPiecesPerCycleMax = WorkshopPiecesPerCycleMax;
             s.ShelfIndexEnabled = ShelfIndexEnabled;
             s.ShelfIndexSelfCheckDays = ShelfIndexSelfCheckDays;
+            s.ShelfIndexOwnUpdate = ShelfIndexOwnUpdate;
+            s.DteDelegates = DteDelegates;
             s.TownMaterialOrderBySea = TownMaterialOrderBySea;
             s.TownMaterialOrderSeaMaxRoute = TownMaterialOrderSeaMaxRoute;
             s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;

@@ -44,6 +44,9 @@ namespace Armoury
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
+        // E8/O1 (265, RD8 K6): te same dwie metody DTE delegatem (FastCall) zamiast MethodInfo.Invoke; null = delegat nie powstal - dalej przez Invoke
+        private static Action<MBGUID, ItemObject, int> _addFast;
+        private static Func<ItemObject, bool> _blFast;
         private static bool _looked;
         private static readonly Dictionary<MobileParty, int> _lastDay = new Dictionary<MobileParty, int>();
         private static int _dayPieces, _dayGold, _dayVisits, _dayLogged, _dayStamp = -1;
@@ -193,6 +196,9 @@ namespace Armoury
                     // poprawki sklad7: ten sam test, ktory DTE robi w AddItemToPartyArmory (rozpoznanie sztuki + blacklist.json) - przed zakupem
                     var bl = _dte.Assembly.GetType("DynamicTroopEquipmentReupload.ItemBlackList");
                     _blTest = bl != null ? bl.GetMethod("Test", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(ItemObject) }, null) : null;
+                    // E8/O1 (265): delegaty raz na proces, tutaj - Look biegnie leniwie przy pierwszym uzyciu w kampanii (FastCall nie rzuca)
+                    _addFast = FastCall.Of<Action<MBGUID, ItemObject, int>>(_add, "DTE AddItemToPartyArmory");
+                    _blFast = FastCall.Of<Func<ItemObject, bool>>(_blTest, "DTE ItemBlackList.Test");
                 }
             }
             catch { }
@@ -415,7 +421,9 @@ namespace Armoury
                 if (!Look() || mp == null || it == null || n <= 0) return false;
                 var all = _armories.GetValue(null) as Dictionary<MBGUID, Dictionary<ItemObject, int>>;
                 long before = ArmTotal(all, mp.Id);
-                _add.Invoke(null, new object[] { mp.Id, it, n });
+                var add = _addFast;
+                if (add != null && FastCall.On) { FastCall.Fast++; add(mp.Id, it, n); }   // E8/O1 (265): ta sama metoda DTE delegatem (z naszym prefiksem UniqueLaw, jak przy Invoke)
+                else { FastCall.Slow++; _add.Invoke(null, new object[] { mp.Id, it, n }); }
                 bool ok = ArmTotal(all, mp.Id) - before == n;
                 if (!ok) { _dteRefused.Add(it); _dteOk.Remove(it); }   // poprawki sklad7: zapamietane na sesje - zakupy (BuyLoop, BuySubstitutes, MenUpgrade) juz jej nie biora
                 return ok;
@@ -441,11 +449,20 @@ namespace Armoury
             try
             {
                 if (_blTest == null && !Look()) return true;
-                if (_blTest != null && !(bool)_blTest.Invoke(null, new object[] { it })) { _dteRefused.Add(it); return false; }
+                if (_blTest != null && !BlTest(it)) { _dteRefused.Add(it); return false; }
                 if (_blTest != null) _dteOk.Add(it);
             }
             catch { }
             return true;
+        }
+
+        /// <summary>E8/O1 (265): DTE ItemBlackList.Test - delegatem albo (wylacznik, delegat nie powstal) przez Invoke jak dotad; wyjatek lapie DteTakes.</summary>
+        private static bool BlTest(ItemObject it)
+        {
+            var f = _blFast;
+            if (f != null && FastCall.On) { FastCall.Fast++; return f(it); }
+            FastCall.Slow++;
+            return (bool)_blTest.Invoke(null, new object[] { it });
         }
 
         private static long ArmTotal(Dictionary<MBGUID, Dictionary<ItemObject, int>> all, MBGUID id)

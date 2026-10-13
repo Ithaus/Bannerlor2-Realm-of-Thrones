@@ -235,6 +235,11 @@ Uzycie (Python 3, tylko odczyt):
                     B-3 ksiega licznikow welny zamknieta: liczniki dzis = wczoraj + dopisane - pelne sztuki (+-0.05 szt. na dobe);
                     B-4 linia startu "ekran rodu ... (wpiete 1/1)", potkniecia 0, robocizna gracza do ludu <= robocizna; liczby kowadla - INFO
                     (sprawdzenia reczne 8.16 pkt 2-4).
+                    Blok etap8_o1 (E8/O1, paczka 265): polka po wlasnym zdjeciu sztuki i delegaty - linia doby "Polka i delegaty (E8/O1)"
+                    (ShelfIndex.DailyOwn) oraz linie "Koszt 171-174 (doba)" i "Profil doby (E8/0)": O1-0 linia w kazdej dobie okna, stan kluczy;
+                    O1-1 rozjazdy 0: probka 1/64 poprawki (stara i nowa droga, R9), samokontrola odczytow, potkniecia; O1-2 przebudowy pamieci
+                    polki <= 9 000/dobe srednio (Z33 ok. 13 800) i poprawione w pamieci > 0; O1-3 ceny sprzetu (PricePostfix) <= 450 ms/dobe
+                    srednio (Z33 617); O1-4 delegaty zbudowane N/N i 0 wywolan przez Invoke przy kluczu [WL]; czas poprawki i przebudowy - INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9866,6 +9871,114 @@ def etap8_b(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         rep.add("B-4: kowadlo i drobne", "brak linii Kowadlo i drobne (E8/B)", "linia w kazdej dobie", None)
 
 
+# ============================================================ ETAP 8 (E8/O1, paczka 265): polka po wlasnym zdjeciu sztuki; delegaty - blok etap8_o1
+E8_O1_LINE = "Polka i delegaty (E8/O1): dzien"
+# Progi projektu etapu 8 v2 rozdz. 3 "E8/O1" i rozdz. 4 pkt 4 (wzor Z33: przebudowy pamieci polki ok. 13.8 tys./dobe, ceny sprzetu 617 ms/dobe)
+E8_O1_BUILDS_MAX = 9000
+E8_O1_PRICE_MS_MAX = 450.0
+
+
+def etap8_o1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O1 (265, projekt etapu 8 v2 rozdz. 3 "E8/O1" Test, R9): linia doby "Polka i delegaty (E8/O1)" (ShelfIndex.DailyOwn) + "Koszt 171-174 (doba)"
+    (przebudowy, samokontrola, ceny sprzetu) + "Profil doby (E8/0)" (przebudowy wlasne / reszta). O1-0 linia w kazdej dobie okna i stan kluczy;
+    O1-1 rozjazdy 0 - probka 1/64 poprawki po wlasnej zmianie (stara i nowa droga), samokontrola odczytow, potkniecia 0 (bez probek - INFO);
+    O1-2 przebudowy pamieci polki <= 9 000/dobe srednio w dobach z kluczem [WL] i poprawione w pamieci > 0; O1-3 ceny sprzetu <= 450 ms/dobe srednio;
+    O1-4 delegaty: zbudowane N/N (ostatnia doba), wywolan przez Invoke przy kluczu [WL] 0; INFO: sredni czas poprawki i przebudowy z probek."""
+    ol = {d: s for d, s in by_day(lines, E8_O1_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not ol:
+        rep.add("E8/O1: linia Polka i delegaty (E8/O1)", "brak w logu", "jest od wgrania E8/O1", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "ShelfIndexOwnUpdate [WL]" in ol[d] and "pamiec polki WYLACZONA" not in ol[d]]
+    don = [d for d in days if "delegaty DteDelegates [WL]" in ol[d]]
+    rep.add("O1-0: linia Polka i delegaty (E8/O1) w kazdej dobie okna; stan kluczy",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; ShelfIndexOwnUpdate wl {len(on)} / wyl {len(days) - len(on)} dob, DteDelegates wl {len(don)} / wyl {len(days) - len(don)} dob",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def tot(pat, src, sel, cast=int):
+        return sum(num(pat, src[d], cast=cast, default=0) for d in sel)
+
+    kos = {d: s for d, s in by_day(lines, "Koszt 171-174 (doba): dzien").items() if 1 <= run_day(d, start) <= until}
+    prof = {d: s for d, s in by_day(lines, E8_PROF).items() if 1 <= run_day(d, start) <= until}
+
+    # O1-1: rozjazdy (R9)
+    own_mis = max([num(r"rozjazdow od startu sesji (\d+)", ol[d], default=0) for d in days] + [0])
+    self_mis = max([num(r"samokontroli \d+, rozjazdow od startu sesji (\d+)", kos[d], default=0) for d in kos] + [0])
+    stum = max([num(r"\| potkniecia od startu sesji (\d+)\.", ol[d], default=0) for d in days] + [0])
+    probes = tot(r"probka 1/64 \(stara i nowa droga\): (\d+),", ol, days)
+    checks = tot(r"samokontroli (\d+),", kos, sorted(kos))
+    alarm = sum(1 for s in lines if s.startswith("Polka i delegaty (E8/O1): ROZJAZD") or s.startswith("Pamiec polki (174b.5): ROZJAZD"))
+    ok = None
+    if on and (probes > 0 or own_mis or self_mis or stum):
+        ok = own_mis == 0 and self_mis == 0 and stum == 0
+    rep.add("O1-1: rozjazdy - poprawka po wlasnej zmianie polki wobec pelnej przebudowy (probka 1/64) i samokontrola odczytow",
+            f"probek poprawki {probes}, rozjazdow {own_mis}; samokontroli odczytow {checks}, rozjazdow {self_mis}; linii ROZJAZD w logu {alarm}; potkniecia {stum}",
+            "0 rozjazdow i 0 potkniec (R9: rozjazd > 0 = paczka wylaczona); bez probek - INFO", ok)
+
+    # O1-2: przebudowy pamieci polki
+    deltas, skips, noidx = tot(r"poprawione w pamieci (\d+)", ol, on), tot(r"bez poprawki (\d+)", ol, on), tot(r"polka bez pamieci (\d+)", ol, on)
+    kon = [d for d in on if d in kos]
+    kb = [num(r"przebudow (\d+),", kos[d]) for d in kon]
+    kb = [x for x in kb if x is not None]
+    pon = [d for d in on if d in prof]
+    p_own = [num(r"polka przebudowy wlasne (\d+) / reszta \d+", prof[d]) for d in pon]
+    p_rest = [num(r"polka przebudowy wlasne \d+ / reszta (\d+)", prof[d]) for d in pon]
+    p_own, p_rest = [x for x in p_own if x is not None], [x for x in p_rest if x is not None]
+    n_on = max(1, len(on))
+    txt = (f"poprawione w pamieci {deltas} ({deltas / n_on:.0f}/d), bez poprawki {skips} ({skips / n_on:.0f}/d), polka bez pamieci {noidx} ({noidx / n_on:.0f}/d)"
+           + (f"; z linii Profil doby: przebudowy wlasne {sum(p_own) / len(p_own):.0f}/d, reszta {sum(p_rest) / len(p_rest):.0f}/d" if p_own and p_rest else ""))
+    if kb:
+        avg = sum(kb) / len(kb)
+        rep.add("O1-2: przebudowy pamieci polki na dobe (Koszt 171-174) przy kluczu [WL]",
+                f"srednio {avg:.0f}/d ({len(kb)} dob, najwiecej {max(kb)}; Z33 ok. 13 800); " + txt,
+                f"<= {E8_O1_BUILDS_MAX}/d srednio i poprawione w pamieci > 0", avg <= E8_O1_BUILDS_MAX and deltas > 0)
+    else:
+        rep.add("O1-2: przebudowy pamieci polki na dobe", ("brak dob z kluczem [WL] i linia Koszt 171-174 (doba); " if on else "klucz ShelfIndexOwnUpdate wylaczony w calym oknie; ") + txt,
+                f"<= {E8_O1_BUILDS_MAX}/d srednio przy kluczu [WL]", None)
+
+    # O1-3: ceny sprzetu
+    pr = [fnum(r"ceny sprzetu \(PricePostfix\) ([0-9.]+) ms/", kos[d]) for d in kon]
+    pr = [x for x in pr if x is not None]
+    if pr:
+        avg = sum(pr) / len(pr)
+        rep.add("O1-3: ceny sprzetu (PricePostfix) na dobe przy kluczu [WL]", f"srednio {avg:.0f} ms/d ({len(pr)} dob, najwiecej {max(pr):.0f}; Z33 617)",
+                f"<= {E8_O1_PRICE_MS_MAX:.0f} ms/d srednio", avg <= E8_O1_PRICE_MS_MAX)
+    else:
+        rep.add("O1-3: ceny sprzetu (PricePostfix) na dobe", "brak dob z kluczem [WL] i linia Koszt 171-174 (doba)", f"<= {E8_O1_PRICE_MS_MAX:.0f} ms/d srednio", None)
+
+    # O1-4: delegaty
+    last = ol[days[-1]]
+    m = re.search(r"zbudowane (\d+)/(\d+)", last)
+    built, wanted = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+    badm = re.search(r"\(nieudane - dalej przez Invoke: ([^)]*)\)", last)
+    fast_on, slow_on = tot(r"wywolania delegatem (\d+)", ol, don), tot(r"/ przez Invoke (\d+)", ol, don)
+    off = [d for d in days if d not in don]
+    slow_off = tot(r"/ przez Invoke (\d+)", ol, off)
+    ok = None
+    if don and wanted > 0:
+        ok = built == wanted and slow_on == 0
+    rep.add("O1-4: delegaty zamiast MethodInfo.Invoke (DTE, BK, gra)",
+            f"ostatnia doba: zbudowane {built}/{wanted}" + (f" (nieudane: {badm.group(1)[:160]})" if badm else "")
+            + f"; przy kluczu [WL] ({len(don)} dob): wywolania delegatem {fast_on}, przez Invoke {slow_on}"
+            + (f"; klucz wylaczony {len(off)} dob: przez Invoke {slow_off}" if off else ""),
+            "zbudowane N/N i 0 wywolan przez Invoke przy kluczu [WL] (zadne miejsce jeszcze nie wolane - INFO)", ok)
+
+    # INFO: czas poprawki i przebudowy z probek (wazony liczba probek doby)
+    wd = wb = wn = 0.0
+    for d in days:
+        n = num(r"probka 1/64 \(stara i nowa droga\): (\d+),", ol[d], default=0)
+        a, c = fnum(r"srednio poprawka ([0-9.]+) us", ol[d]), fnum(r"/ przebudowa ([0-9.]+) us", ol[d])
+        if n and a is not None and c is not None:
+            wd, wb, wn = wd + a * n, wb + c * n, wn + n
+    if wn:
+        saved = (wb - wd) / wn * deltas / n_on / 1000.0
+        rep.add("E8/O1: czas jednej poprawki i jednej przebudowy (probki)", f"poprawka {wd / wn:.2f} us, przebudowa {wb / wn:.2f} us ({int(wn)} probek); "
+                f"szacunek oszczednosci przy {deltas / n_on:.0f} poprawkach/d: {saved:.1f} ms/d", "INFO (projekt: zysk 70-150 ms/d z delegatami)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9896,6 +10009,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_c)    # E8/C (253): cennik - rzad konski z wagi prawdziwej, helmy t4-6, luki, bron miotana, konie wedlug kategorii
     blocks.append(etap8_r)    # E8/R (254): rynek i korona - bez premii wojennej, kon przy sprzedazy liczony raz, monopole od dziennej wyplaty
     blocks.append(etap8_b)    # E8/B (258): warsztaty i kowadlo - wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow, drobne poprawki kowadla
+    blocks.append(etap8_o1)   # E8/O1 (265): pamiec polki po wlasnym zdjeciu sztuki (poprawka zamiast przebudowy), delegaty DTE/BK zamiast Invoke
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

@@ -72,7 +72,8 @@ namespace Armoury
                     }
                     if (p <= 0 || p > budget - cost || (cap > 0 && p > cap)) break;   // E8/Z (251): cap - sufit ceny sztuki (0 = bez sufitu)
                     bool gone = true;
-                    try { shelf.AddToCounts(el, -1); ShelfIndex.NoteOwn(shelf); }   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
+                    object idx0 = ShelfIndex.OwnBefore(shelf);   // E8/O1 (265): pamiec polki aktualna tuz przed wlasnym zdjeciem (albo null)
+                    try { shelf.AddToCounts(el, -1); ShelfIndex.NoteOwn(shelf); ShelfIndex.OwnAfter(shelf, idx0, el, -1); }   // E8/0: zrodlo przebudowy (licznik); E8/O1: indeks -1 zamiast przebudowy
                     catch
                     {
                         // wyjatek w zdarzeniu albo podsluchu polki: sztuka liczy sie tylko, jesli naprawde zeszla (wolajacy ja oplaca), i partia sie konczy
@@ -100,8 +101,10 @@ namespace Armoury
         internal static void PutBack(ItemRoster shelf, EquipmentElement el, int n, int cost, int first)
         {
             if (shelf == null || n <= 0) return;
+            object idx0 = ShelfIndex.OwnBefore(shelf);   // E8/O1 (265): pamiec polki aktualna tuz przed wlasnym oddaniem (albo null)
             shelf.AddToCounts(el, n);
             ShelfIndex.NoteOwn(shelf);   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
+            ShelfIndex.OwnAfter(shelf, idx0, el, n);   // E8/O1: indeks +n zamiast przebudowy (nowy stos = skok wersji o 2 - zwykla przebudowa)
             _dBatches--; _dPieces -= n; _dCost -= cost; _dFlat -= (long)first * n; _dBack += n;
             if (n > 1) _dMulti--;
         }
