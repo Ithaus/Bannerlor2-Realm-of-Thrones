@@ -1802,3 +1802,15 @@ LosersFleeBesiegers = false.
   Pan przyjmuje tylko tylu, na ilu ma miejsce w druzynie i w budzecie zoldu. Gracz: jego rozbici czekaja tak samo, komunikat "Stragglers: N of your men have gathered at {TOWN}".
   Ksiega ludzi: nikt nie powstaje i nie znika. Oczekiwane (szacunek, do policzenia w projekcie): pobita armia wraca do ok. 35-45% dawnej sily zamiast zaczynac od zera; pula
   wyrzutkow z powrotem w okolice 3 tys. w d120.
+- (18:55 UTC 13.10) **JEFF: "Proporcje pasuja. Zrob poprawke daniny."** Czyli dwie nowe paczki ZATWIERDZONE:
+  **(N7) ROZBICI WRACAJA POD CHORAGIEW** - zasady z wpisu wyzej (55 / 30 / 15; weterani 70, rekruci 45; -10 pkt za tydzien zaleglego zoldu, min. 20; wlasny / obcy kraj; Nocna Straz
+  80 / 0; zbiorka 3-10 dob w twierdzy rodu, czekanie 30 dob, pan przyjmuje w granicach miejsca i budzetu; gracz z komunikatem; pole + pod murami). Tor M/L: LosersFlee.cs /
+  OutlawLaw.cs (RoutedH3Body, SendHome), ksiega ludzi; potrzebna pula czekajacych na rod i osade, ktora PRZEZYWA ZAPIS (nowe pole zapisu przez SaveText.Sync - limit 32 KB na napis,
+  patrz CLAUDE.md / pamiec). NIE ZACZETE - ruszyc po zejsciu z kolejki tarczowego i towarow (limit 5 h).
+  **(W5b) POPRAWKA DANINY - "potrzeba korony" ma widziec brak wojska u panow:** dzis stawka s (KingdomTreasury.WarTax.cs, krok co 7 dob) rosnie tylko przy kredycie 186, zwrocie >
+  wplywy albo skarbcu < zapas wojny, a spada przy skarbcu > 2 x zapas - Zelazne Wyspy: skarbiec 1 046 588 / zapas 500 000, s = 0%, druzyny 1.6 tys. z 8.1 tys. (bledne kolo: pusty
+  budzet panow = maly zwrot zoldu = "korona bez potrzeby"). Do zrobienia: (1) niepokryta potrzeba W5 krolestwa (rody ponizej 60% z powodu pulapu) liczy sie jako potrzeba korony -
+  s nie spada i rosnie o krok, dopoki jest; (2) skarbiec ponad zapas wojny zasila garnek W5 (np. 1/30 nadwyzki dziennie), przed tarczowym. Zalezy od W6 (ten sam plik NeedAid) -
+  ruszyc PO zakonczeniu wf_99079863-f58. Uwaga z raportu: lud Wysp odklada ok. 3.9 tys. zl/d przy potrzebie 6 tys. - sama danina nie wystarczy, reszta z tarczowego.
+  STAN GRY: bieg kontrolny po WGRANIU 40 czysty (10/10); trwa test 120 dob W5 (fin9). Limity 18:51 UTC: 5 h 66% (zeruje sie 20:50), tydzien 89% - od teraz nowe workflowy po
+  jednym naraz.
