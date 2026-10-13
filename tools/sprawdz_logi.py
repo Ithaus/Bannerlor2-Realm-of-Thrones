@@ -427,6 +427,14 @@ Uzycie (Python 3, tylko odczyt):
                     paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W6-3b liczy rezerwe z kolumny nadwyzka_ponad_rezerwe_w6 (rezerwa BUDZETU 166 przed poborem), nie z kolumny R
                     (R w CSV = rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza - na biegu rocznym 3.7% platnikow mialoby kiese pod nia).
+--grupa m6a       : (M6a, raport roczny 13.10 tabela 6.2 wiersze 17-19; DECYZJE z pelnymi uprawnieniami) najkrotsza sluzba kompanii najemnej AI
+                    (MercTenure), okup powtorny tanszy (RansomRepeat), uwolnienie jencow przy pokoju krolestw po 24 h (PeaceHold).
+                    python -I tools/sprawdz_logi.py --grupa m6a [--do-doby 364] <Armoury-*.log>
+                    Wiersze M6a-0 (linie, latki, potkniecia), M6a-1a/1b (sluzba krotsza niz najkrotsza bez wyjatku = 0, najem u wroga poprzedniego
+                    pana = 0), M6a-1c/1d (zmiany pana, odstep umow 185, ludzie najemnikow - INFO), M6a-2a (cena po mnozniku miedzy podloga a pelna),
+                    M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
+                    przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
+                    85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa w6b       : (W6b, decyzja Jeffa 13.10 "rod gracza tez dotyczy, ale pod warunkiem, ze mam ziemie i sluze jakiemus krolowi") rod gracza w
                     tarczowym W6 i doplacie W5 na zasadach rodu AI (miasto albo zamek, wasal - nie wladca, nie najemnik, wojna).
                     python -I tools/sprawdz_logi.py --grupa w6b [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -16243,6 +16251,248 @@ def w6b_main(logp, start_arg, until=120, csvp=None):
     return 0
 
 
+def m6a_main(logp, start_arg, until=120):
+    """M6a (galaz m6a-dyplomacja-jency; raport roczny 13.10 tabela 6.2 wiersze 17-19; DECYZJE z pelnymi uprawnieniami): najkrotsza sluzba kompanii
+    najemnej AI (MercTenure.cs), okup powtorny tanszy (RansomRepeat.cs), uwolnienie jencow przy pokoju krolestw po 24 h (PeaceHold.cs).
+    Okno: doby kampanii 2-until (--do-doby). Wiersze M6a-0..M6a-3c. Log bez paczki (bez linii albo klucz wylaczony): wiersze paczki INFO, a pomiary
+    z linii, ktore sa w kazdym logu (umowy 185, okupy 178, niewola 169c, wojna i pokoj E7/0), daja INFO z liczbami biegu odniesienia - nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+
+    def daily(prefix):
+        d = {}
+        for s in lines:
+            if s.startswith(prefix) and "| klucz " in s:
+                k = num(r"dzien (\d+)", s)
+                if k is not None:
+                    d[k] = s
+        return d
+
+    mt = daily("Najemnicy - sluzba (M6a-1): dzien")
+    rr = daily("Okupy powtorne (M6a-2): dzien")
+    ph = daily("Pokoj a jency (M6a-3): dzien")
+    c185 = by_day(lines, "Kontrakty najemnikow (185): dzien")
+    c169 = by_day(lines, "Niewola lordow i okupy (169c): dzien")
+    alld = sorted(set(c169) | set(c185) | set(mt))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return 2 <= run_day(d, start) <= until
+
+    def sumf(ser, days, pat):
+        return sum(num(pat, ser[d]) or 0 for d in days)
+
+    wmt = [d for d in sorted(mt) if inwin(d)]
+    wrr = [d for d in sorted(rr) if inwin(d)]
+    wph = [d for d in sorted(ph) if inwin(d)]
+    on1 = [d for d in wmt if "klucz Merc Min Service tak" in mt[d]]
+    on2 = [d for d in wrr if "klucz Ransom Repeat Cheaper tak" in rr[d]]
+    on3 = [d for d in wph if "klucz Peace Release After Day tak" in ph[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until} | dob z liniami M6a-1 {len(wmt)} (klucz tak {len(on1)}), "
+          f"M6a-2 {len(wrr)} (klucz tak {len(on2)}), M6a-3 {len(wph)} (klucz tak {len(on3)})")
+
+    # ---- M6a-0 linie, klucze, latki, potkniecia
+    if not (wmt or wrr or wph):
+        rep.add("M6a-0: linie paczki M6a (M6a-1, M6a-2, M6a-3)", "brak w logu (bieg odniesienia bez paczki)", "sa od wgrania M6a (LogEnabled); bez nich wiersze paczki = INFO", None)
+    else:
+        lat1 = [s for s in lines if s.startswith("Najemnicy - sluzba (M6a-1): latki")]
+        lat3 = [s for s in lines if s.startswith("Pokoj a jency (M6a-3): latki")]
+        w1 = lat1[-1].count(" wpiety") if lat1 else 0
+        w3 = ("pokoj (OnMakePeaceEvent) wpiety" in lat3[-1]) if lat3 else False
+        stum = 0
+        for ser in (mt, rr, ph):
+            for d in ser:
+                stum = max(stum, num(r"\| potkniecia (\d+)", ser[d]) or 0)
+        nwin = len([d for d in alld if inwin(d)])
+        ok = len(wmt) >= nwin - 1 and len(wrr) >= nwin - 1 and len(wph) >= nwin - 1 and w1 == 3 and w3 and stum == 0
+        rep.add("M6a-0: linie M6a kazdej doby, latki wpiete, potkniecia",
+                f"dob okna {nwin}: linie M6a-1 {len(wmt)}, M6a-2 {len(wrr)}, M6a-3 {len(wph)}; latki M6a-1 wpiete {w1}/3, M6a-3 {'tak' if w3 else 'NIE'};"
+                f" potkniecia (sesja, najwiecej) {stum}",
+                "linia kazdej doby (najwyzej 1 brak - doba wczytania), latki 3/3 i 1/1, potkniecia 0", ok)
+
+    # ---- M6a-1 najemnicy
+    pat_bad = r"bez wyjatku (\d+)"
+    pat_en = r"najem u wroga poprzedniego pana w \d+ dob (\d+)"
+    if on1:
+        bad = sumf(mt, on1, pat_bad)
+        bad_days = [run_day(d, start) for d in on1 if (num(pat_bad, mt[d]) or 0) > 0]
+        rep.add("M6a-1a: sluzba kompanii AI krotsza niz najkrotsza bez wyjatku (pokoj u pracodawcy, niedoplata 185, upadek krolestwa)",
+                f"{bad} w {len(on1)} dobach z kluczem" + (f" (doby {bad_days[:8]})" if bad_days else ""), "0", bad == 0)
+        en = sumf(mt, on1, pat_en)
+        rep.add("M6a-1b: najem kompanii AI u wroga poprzedniego pana w oknie dob po odejsciu (bez gracza-krola)", f"{en}",
+                "0 (bieg roczny bez paczki: 11 w roku)", en == 0)
+    else:
+        rep.add("M6a-1a: sluzba kompanii AI krotsza niz najkrotsza bez wyjatku",
+                f"{sumf(mt, wmt, pat_bad)} (klucz wylaczony - pomiar)" if wmt else "brak linii M6a-1 z kluczem tak", "0 przy kluczu Merc Min Service; bez paczki INFO", None)
+        rep.add("M6a-1b: najem kompanii AI u wroga poprzedniego pana", f"{sumf(mt, wmt, pat_en)} (klucz wylaczony - pomiar)" if wmt else "brak linii",
+                "0 przy kluczu; bez paczki INFO", None)
+    if wmt:
+        ends = sumf(mt, wmt, r"konce sluzby (\d+)")
+        hires = sumf(mt, wmt, r"\| dzis: najmy (\d+)")
+        blk = [sumf(mt, wmt, r"wstrzymane: najem gry u wroga poprzedniego pana (\d+)"), sumf(mt, wmt, r"zwolnienie BK w sluzbie wojennej (\d+)"),
+               sumf(mt, wmt, r"przejscie BK do wroga \(zostaje samo zwolnienie\) (\d+)")]
+        avg = num(r"srednia sluzba ([\d.]+) dob", mt[wmt[-1]], float)
+        rep.add("M6a-1c: zmiany pana kompanii AI (INFO)",
+                f"najmy {hires}, konce sluzby {ends} w {len(wmt)} dobach = {ends * 364.0 / max(1, len(wmt)):.0f} na rok; srednia sluzba w sesji {avg} dob;"
+                f" wstrzymane (gra do wroga / BK zwolnienie / BK do wroga) {blk[0]} / {blk[1]} / {blk[2]}",
+                "INFO - bieg roczny bez paczki: 762 umowy, mediana 3 doby; z paczka spodziewane ok. 150 na rok, sluzba ok. 27-31 dob", None)
+    # z linii 185 (w kazdym logu): odstep miedzy nowymi umowami tej samej kompanii
+    pend, hires185 = [], {}
+    rx = re.compile(r"^Kontrakty najemnikow \(185\): (.+?) w sluzbie (.+?) - kontrakt")
+    rd = re.compile(r"^Kontrakty najemnikow \(185\): dzien (\d+) \| kompanii AI w sluzbie")
+    for s in lines:
+        m = rx.match(s)
+        if m:
+            pend.append(m.group(1))
+            continue
+        m = rd.match(s)
+        if m:
+            d = int(m.group(1))
+            if inwin(d):
+                for c in pend:
+                    hires185.setdefault(c, []).append(d)
+            pend = []
+    gaps = sorted(b - a for l in hires185.values() for a, b in zip(l, l[1:]))
+    if gaps:
+        n185 = sum(len(l) for l in hires185.values())
+        ndays = len([d for d in c185 if inwin(d)])
+        men = [num(r"ludzie najemnikow AI (\d+)", c185[d]) for d in sorted(c185) if inwin(d)]
+        men = [x for x in men if x is not None][-28:]
+        rep.add("M6a-1d: nowe umowy 185 i odstep miedzy nimi u tej samej kompanii (INFO, kazdy log)",
+                f"kompanii {len(hires185)}, umow {n185} ({n185 * 364.0 / max(1, ndays):.0f} na rok), mediana odstepu {gaps[len(gaps) // 2]} dob,"
+                f" odstepow < 28 dob {sum(1 for g in gaps if g < 28)} z {len(gaps)}; ludzie najemnikow AI (srednia ostatnich {len(men)} dob) {(sum(men) / len(men)) if men else 0:.0f}",
+                "INFO - bieg roczny bez paczki: 762 umowy, mediana 3 doby, ludzie ok. 2.0-2.7 tys.; z paczka ludzi nie mniej (wojsko 85 tys.)", None)
+    else:
+        rep.add("M6a-1d: nowe umowy 185 (INFO)", "brak linii umow 185 w oknie", "INFO", None)
+
+    # ---- M6a-2 okupy powtorne
+    if on2:
+        rows = []
+        for d in on2:
+            m = re.search(r"w tym powtorne w oknie (\d+): cena pelna (\d+), zaplacona (\d+)", rr[d])
+            if m:
+                rows.append((d, int(m.group(1)), int(m.group(2)), int(m.group(3))))
+        fl = num(r"podloga ([\d.]+) ceny", rr[on2[-1]], float) or 0.0
+        bad = [run_day(d, start) for d, n, f, p in rows if p > f]
+        nf, nfull, npaid = sum(r[1] for r in rows), sum(r[2] for r in rows), sum(r[3] for r in rows)
+        low = npaid + nf < fl * nfull   # zaokraglenia: najwyzej 1 zl na okup
+        rep.add("M6a-2a: okup powtorny - cena po mnozniku miedzy podloga a pelna cena",
+                f"powtornych {nf}: cena pelna {nfull}, po mnozniku {npaid} ({100.0 * npaid / nfull if nfull else 0:.0f}%); dob z cena ponad pelna {len(bad)}; podloga {fl:.2f}",
+                "w kazdej dobie po mnozniku <= pelna, razem >= podloga x pelna", (not bad and not low) if nf else None)
+        tot = sumf(rr, on2, r"\| okupy dzis \(AI-AI i kurier\) (\d+)")
+        rep.add("M6a-2b: okupy powtorne i zloto, ktore zostalo u rodzin jencow (INFO)",
+                f"okupy {tot}, powtorne {nf} ({100.0 * nf / tot if tot else 0:.0f}%), zostalo u rodzin {nfull - npaid} zl = {(nfull - npaid) / max(1, len(on2)):.0f} zl/d",
+                "INFO - rachunek na biegu rocznym bez paczki: ok. 14.4 tys. zl/d (5.25 mln w roku, 10% okupow)", None)
+    else:
+        rep.add("M6a-2a: okup powtorny - cena miedzy podloga a pelna", "brak linii M6a-2 z kluczem tak (bieg odniesienia)", "INFO", None)
+    # z linii 178 i 169c (kazdy log): ta sama osoba wykupiona ponownie w 56 dobach
+    pend, ev = [], {}
+    rx = re.compile(r"^Okupy \(178\): (?:AI-AI|kurier) - (.+?) \((?:glowa rodu|lord), (.+?)\) wolny za (\d+) zl")
+    for s in lines:
+        m = rx.match(s)
+        if m:
+            pend.append((m.group(1) + "|" + m.group(2), int(m.group(3))))
+            continue
+        if s.startswith("Niewola lordow i okupy (169c): dzien"):
+            d = num(r"dzien (\d+)", s)
+            if d is not None and inwin(d):
+                for k, p in pend:
+                    ev.setdefault(k, []).append((d, p))
+            pend = []
+    if ev:
+        n = sum(len(l) for l in ev.values())
+        rep56 = [l[i][1] for l in ev.values() for i in range(1, len(l)) if l[i][0] - l[i - 1][0] < 56]
+        g = sum(p for l in ev.values() for _, p in l)
+        five = [l for l in ev.values() if len(l) >= 5]
+        rep.add("M6a-2c: okupy tej samej osoby w 56 dobach od poprzedniego (INFO, kazdy log)",
+                f"okupow {n} ({len(ev)} osob), w 56 dobach od poprzedniego {len(rep56)} ({100.0 * len(rep56) / n:.0f}%; zloto {100.0 * sum(rep56) / g if g else 0:.0f}%);"
+                f" osob 5+ razy {len(five)} ({sum(len(l) for l in five)} okupow)",
+                "INFO - bieg roczny bez paczki: 1 260 okupow, 32% w 56 dobach (27% zlota), 53 osoby 5+ razy", None)
+    else:
+        rep.add("M6a-2c: okupy tej samej osoby (INFO)", "brak linii okupow 178 w oknie", "INFO", None)
+
+    # ---- M6a-3 pokoj a jency
+    allph = [s for s in lines if s.startswith("Pokoj a jency (M6a-3): dzien") and "| klucz " in s]
+    if allph:
+        held = sum(num(r"z odlozonym uwolnieniem (\d+)", s) or 0 for s in allph)
+        kept = sum(num(r"znow w wojnie - jency zostaja (\d+)", s) or 0 for s in allph)
+        freed = sum(num(r"nadal pokoj - uwolnieni (\d+)", s) or 0 for s in allph)
+        gone = sum(num(r"krolestwo upadlo (\d+)", s) or 0 for s in allph)
+        wait_end = num(r"\| czeka (\d+)", allph[-1]) or 0
+        loaded = sum(num(r"wczytano par (\d+)", s) or 0 for s in allph)
+        ok = held + loaded == kept + freed + gone + wait_end
+        rep.add("M6a-3a: pokoje krolestw z odlozonym uwolnieniem - zamkniecie (caly log)",
+                f"odlozone {held} + wczytane {loaded} = odwolane {kept} + uwolnione po dobie {freed} + krolestwo upadlo {gone} + czeka na koncu {wait_end}",
+                "rowne (kazdy pokoj rozstrzygniety po 24 h)", ok)
+    else:
+        rep.add("M6a-3a: pokoje krolestw z odlozonym uwolnieniem", "brak linii M6a-3 (bieg odniesienia)", "INFO", None)
+    # uwolnienia przez pokoj w doby pokoju fabularnego (kazdy log): E7/0 "WOJNA ... dni od poprzedniego zdarzenia tej pary 0 (POKOJ)" przed linia 169c
+    rw = re.compile(r"^Wojna i pokoj \(E7/0\): dzien \d+ \| .*: WOJNA .*dni od poprzedniego zdarzenia tej pary 0 \(POKOJ\)")
+    rc = re.compile(r"^Niewola lordow i okupy \(169c\): dzien (\d+) .*?uwolnieni dzis: okup \d+, pokoj (\d+)")
+    # recenzja M6a: uwolnienia M6a-3 po dobie (prawdziwy pokoj innej pary rozstrzygniety tej doby - "nadal pokoj - uwolnieni N (jencow-bohaterow M)"
+    # z linii doby M6a-3, to samo okno co 169c) odjete od licznika doby fabularnej - prog mierzy tylko uwolnienia w klatce pokoju na zero dni
+    # (bez tego jeden prawdziwy pokoj rozstrzygniety w dobie fabularnej dawal falszywe NIE; M liczy wszystkich bohaterow, 169c samych lordow - odjecie lagodne)
+    story, sd, sn, od, onn, shf = False, 0, 0, 0, 0, 0
+    for s in lines:
+        if rw.match(s):
+            story = True
+            continue
+        m = rc.match(s)
+        if m:
+            d = int(m.group(1))
+            if inwin(d):
+                if story:
+                    hf = (num(r"nadal pokoj - uwolnieni \d+ \(jencow-bohaterow (\d+)\)", ph[d]) or 0) if d in ph else 0
+                    sd += 1
+                    sn += max(0, int(m.group(2)) - hf)
+                    shf += min(hf, int(m.group(2)))
+                else:
+                    od += 1
+                    onn += int(m.group(2))
+            story = False
+    val = (f"doby z pokojem fabularnym (pokoj i wojna tej samej pary tej doby) {sd}: uwolnionych przez pokoj {sn} ({sn / sd if sd else 0:.2f} na dobe)"
+           f" - bez {shf} uwolnionych tych dob przez M6a-3 po dobie (prawdziwy pokoj innej pary);"
+           f" pozostale doby {od}: {onn} ({onn / od if od else 0:.2f} na dobe)")
+    if on3 and sd:
+        rep.add("M6a-3b: lordowie uwolnieni przez pokoj w doby pokoju fabularnego", val, "<= 1.0 na taka dobe (bieg roczny bez paczki: 440 w 65 dobach = 6.8)", sn <= 1.0 * sd)
+    else:
+        rep.add("M6a-3b: lordowie uwolnieni przez pokoj w doby pokoju fabularnego (INFO)", val if (sd or od) else "brak linii 169c / E7/0 w oknie",
+                "<= 1.0 na taka dobe przy kluczu Peace Release After Day; bez paczki INFO (bieg roczny: 440 w 65 dobach)", None)
+    if allph:
+        keptl = sum(num(r"jency zostaja \d+ \(jencow-bohaterow (\d+)\)", s) or 0 for s in allph)
+        rep.add("M6a-3c: jency-bohaterowie, ktorzy zostali w niewoli po pokoju na zero dni (INFO)", f"{keptl}",
+                "INFO - bieg roczny bez paczki: ok. 440 uwolnionych za darmo; wojsko w polu - wiersz M6a-4 (podloga 85 tys.)", None)
+    # ---- M6a-4 (recenzja): miara progu 85 tys. i lordowie w niewoli w tym samym oknie - porownanie z biegiem bez paczki (kazdy log, INFO)
+    # rachunek recenzji: M6a-3 trzyma ok. 6.6 lorda wiecej w niewoli naraz (440 x 5.5 doby / 364), M6a-1 ok. +0.27 tys. ludzi kompanii w wojnie
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + men
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[d] for d in ds) / len(ds)
+        capt = [num(r"w niewoli teraz (\d+)", c169[d]) for d in ds if d in c169]
+        capt = [x for x in capt if x is not None]
+        rep.add(f"M6a-4: druzyny lordow krolestw w wojnie (miara progu 85 tys.) i lordowie w niewoli, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)} (INFO)",
+                f"{v / 1e3:.1f} tys. ludzi; w niewoli srednio {(sum(capt) / len(capt)) if capt else 0:.1f} lordow",
+                "INFO - bez paczki: bieg 120 dob WGRANIA 43 (doby 93-120) 108.7 tys., w niewoli 34.9; bieg roczny doby 93-120 95.6 tys. / 32.9, doby 337-364 79.6 tys. / 42.1."
+                " Paczka: wojsko nie nizsze niz bieg 120 dob WGRANIA 43 poza szumem (rachunek paczki -0.5..+0.9 tys.); niewola ok. +6.6 lorda (M6a-3). Wojsko nizsze o ponad 2 tys. - wylaczyc Peace Release After Day i powtorzyc",
+                None)
+    else:
+        rep.add("M6a-4: druzyny lordow krolestw w wojnie (miara progu 85 tys.)", "brak linii Skarbce w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -16289,6 +16539,8 @@ def main(argv):
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
     if group == "w6" and logp:
         return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
+    if group == "m6a" and logp:
+        return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "n7" and logp:

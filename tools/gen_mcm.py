@@ -174,6 +174,10 @@ RANGES = {
     # E7/R1 (235): oddzial rabunku osada po osadzie i najdluzsza czujnosc - zgodnie z przycieciem w DistrictRaid.Start / EndFin
     'RaidDetachmentMen': (20, 2000, "0"),
     'RaidAlertMaxDays': (1, 60, "0"),
+    # M6a: najkrotsza sluzba najemnika (kod przycina do 1..364), okno i podloga okupu powtornego (kod przycina do 1..364 i 0..1)
+    'MercMinServiceDays': (1, 112, "0"),
+    'RansomRepeatDays': (1, 364, "0"),
+    'RansomRepeatFloor': (0.0, 1.0, "0.00"),
     # N7 (rozbici pod choragiew): czas czekania w osadzie zbiorki i zasieg odbioru w dobach marszu (StragglersRally.Daily)
     'StragglersRallyWaitDays': (5, 90, "0"),
     'StragglersRallyReachDays': (0.5, 15.0, "0.0"),

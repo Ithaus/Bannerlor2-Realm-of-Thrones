@@ -3520,6 +3520,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercBkDownPaymentAiOff { get; set; } = true;
 
+        [SettingPropertyBool("Merc Min Service", HintText = "an AI mercenary company hired by a realm at war serves at least Merc Min Service Days: it neither leaves nor changes masters before that, and the ruler does not dismiss it (Banner Kings). It may still go early if its master is at peace with every realm, if the crown leaves more than half of its contract unpaid for four weeks (Merc Unpaid Leave Days), or if the realm falls. For the same number of days after leaving a master, a company does not hire out to a realm at war with that master - a company dismissed under Banner Kings no longer goes straight over to the enemy, it is only dismissed. Only AI companies: as a mercenary yourself you decide as before, and as a king you may still dismiss companies. Off = AI companies may change masters any day, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercMinService { get; set; } = true;
+
+        [SettingPropertyInteger("Merc Min Service Days", 1, 112, "0", HintText = "with Merc Min Service: the shortest service of an AI company with a realm at war, and how many days after leaving a master it will not serve that master's enemies (28 = four weeks)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public int MercMinServiceDays { get; set; } = 28;
+
         [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
@@ -3779,6 +3787,22 @@ namespace Armoury
         [SettingPropertyBool("Crown Thirds Player Loot", HintText = "as a vassal of a realm at war you also pay the crown a ninth of the value of the loot you take from the battlefield (at the price the nearest town would pay you), the next day out of your purse")]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool CrownThirdsPlayerLoot { get; set; } = true;
+
+        [SettingPropertyBool("Ransom Repeat Cheaper", HintText = "with Lord Ransom By Income: a lord or lady ransomed again within Ransom Repeat Days of their last ransom costs less - Ransom Repeat Floor of the price right after the last ransom, rising evenly to the full price after Ransom Repeat Days. The family has just paid once, and the captor takes what it can still raise. The same for every way of ransoming (between AI houses, by courier, through a broker, from your party screen) and for a king paid by his treasury; your own ransom when you are a captive is unchanged. The coin still goes from the captive's family to the captor - only less of it. Off = every ransom at the full price, as before")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomRepeatCheaper { get; set; } = true;
+
+        [SettingPropertyInteger("Ransom Repeat Days", 1, 364, "0", HintText = "with Ransom Repeat Cheaper: for how many days after a ransom the next ransom of the same person is cheaper (56 = eight weeks)")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public int RansomRepeatDays { get; set; } = 56;
+
+        [SettingPropertyFloatingInteger("Ransom Repeat Floor", 0.00f, 1.00f, "0.00", HintText = "with Ransom Repeat Cheaper: the share of the full price a ransom costs right after the last one (0.25 = a quarter); it rises evenly to the full price over Ransom Repeat Days")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomRepeatFloor { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Peace Release After Day", HintText = "when two realms make peace, the lords and ladies they hold captive go free a day later instead of at once - and only if the peace still holds by then. If the war is back within that day (Realm of Thrones declares its story wars again the same day), the captives stay captive, to be ransomed, to escape or to be freed in battle as in any war. The peace of a single house (a company leaving its master, a house leaving a realm) is unchanged. You and the AI alike. Off = captives go free the moment peace is made, as before")]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool PeaceReleaseAfterDay { get; set; } = true;
 
         [SettingPropertyBool("Gentry No Parties", HintText = "Banner Kings gentry - knights who hold one estate and no town or castle - no longer lead parties of their own. When the banners are called, the knight rides in his lord's party (the lord who holds the village of his estate) as a member of it; if the lord has no party or is not in an army, in the party of the realm's nearest army leader. AI knights answer when their realm is at war and an army of the realm is in the field; your own knights ride only when you call your banners. The men of the estate stay at home - the knight comes alone. When the army breaks up, in peace or if the party changes sides, he goes back to his estate. A knight's party left from before is not reinforced and Banner Kings disbands it at the estate (its men return to the estate village). Off = Banner Kings raises the knight's own party, as before")]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
@@ -6259,6 +6283,8 @@ namespace Armoury
             s.MercGameContractAiOff = MercGameContractAiOff;
             s.MercContractPaysMenUnderArms = MercContractPaysMenUnderArms;
             s.MercBkDownPaymentAiOff = MercBkDownPaymentAiOff;
+            s.MercMinService = MercMinService;
+            s.MercMinServiceDays = MercMinServiceDays;
             s.CrownGifts = CrownGifts;
             s.GiftWatchNorth = GiftWatchNorth;
             s.GiftWatchIronThrone = GiftWatchIronThrone;
@@ -6324,6 +6350,10 @@ namespace Armoury
             s.CrownThirds = CrownThirds;
             s.CrownThirdsShare = CrownThirdsShare;
             s.CrownThirdsPlayerLoot = CrownThirdsPlayerLoot;
+            s.RansomRepeatCheaper = RansomRepeatCheaper;
+            s.RansomRepeatDays = RansomRepeatDays;
+            s.RansomRepeatFloor = RansomRepeatFloor;
+            s.PeaceReleaseAfterDay = PeaceReleaseAfterDay;
             s.GentryNoParties = GentryNoParties;
             s.GentryKnightWage = GentryKnightWage;
             s.GentryEstateSpendCap = GentryEstateSpendCap;

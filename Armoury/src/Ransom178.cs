@@ -132,11 +132,12 @@ namespace Armoury
             {
                 byCrown = true;
                 D = CrownAvg(k);
-                return (long)(Math.Max(0f, s.RansomKingDays) * D);   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
+                // M6a-2: okup powtorny w oknie RansomRepeatDays tanszy (RansomRepeat.Factor; klucz wylaczony - mnoznik 1, cena jak dotad)
+                return (long)(Math.Max(0f, s.RansomKingDays) * D * RansomRepeat.Factor(captive));   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
             }
             D = DebtLadder.DebtD(captive.Clan);
             double w = captive.Clan.Leader == captive ? head : Math.Max(0f, s.RansomLordDays);
-            return (long)(w * D);
+            return (long)(w * D * RansomRepeat.Factor(captive));   // M6a-2: jw.
         }
 
         private static double CrownAvg(Kingdom k)
@@ -298,6 +299,7 @@ namespace Armoury
             var s = Settings.Current;
             bool byCrown; double D;
             long price = PriceOf(captive, out byCrown, out D);
+            long fullBase = price;   // M6a-2: cena z mnoznikiem okupu powtornego, przed pulapem dlugu (licznik)
             var rcv = ReceiverFor(captive, captorClan);
             if (rcv.Hero == null && rcv.Crown == null) return false;
             var payerClan = captive.Clan;
@@ -324,6 +326,8 @@ namespace Armoury
                 if (debt > 0) DebtLadder.AddRansomDebt(payerClan, rcv.Crown != null, rcv.Crown != null ? rcv.Crown.StringId : rcv.Hero.StringId, "", debt);
             }
             if (price <= 0) _dZeroN++;
+            // M6a-2: licznik okupu powtornego (cena pelna = cena bez mnoznika; po mnozniku = cena przed pulapem dlugu - pulap liczy sie osobno, jak dotad)
+            try { double rf = RansomRepeat.Factor(captive); RansomRepeat.Note(rf > 0 && rf < 1.0 ? (long)Math.Round(fullBase / rf) : fullBase, fullBase, rf < 1.0); } catch { }
             _dPrice += price; _dCash += cash; _dDebt += debt;
             if (price > _dMaxV) { _dMaxV = price; _dMax = Name(payerClan) + " -> " + (rcv.Crown != null ? "korona " + rcv.Crown.Name : Name(rcv.Hero)) + " " + price + " za " + Name(captive); }
             Log.Info("Okupy (178): " + path + " - " + Name(captive) + " (" + (captive.Clan.Leader == captive ? "glowa rodu" : "lord") + ", " + Name(payerClan) + ") wolny za " + price

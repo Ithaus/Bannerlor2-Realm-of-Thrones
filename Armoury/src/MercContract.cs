@@ -268,7 +268,10 @@ namespace Armoury
                     {
                         var k = c.Kingdom;
                         _deals.Remove(c.StringId);
-                        ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(c, false);
+                        // M6a-1: odejscie po niedoplacie to wyjatek od najkrotszej sluzby - znacznik dla pomiaru MercTenure (tylko licznik)
+                        MercTenure.UnpaidLeave = true;
+                        try { ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(c, false); }
+                        finally { MercTenure.UnpaidLeave = false; }
                         LastLeft++;
                         Log.Info("Kontrakty najemnikow (185): " + c.Name + " odchodzi ze sluzby " + (k != null ? k.Name.ToString() : "?") + " - korona nie placila ponad polowy kontraktu przez " + leaveDays + " dob.");
                     }
