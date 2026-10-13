@@ -1933,3 +1933,5 @@ CivilWorksAwayFromFront, WarAidFollowsLordsShortfall, CrownSurplusFeedsNeedAid).
   od razu (wies zboza Polnoc ok. 39 szt./d, Reach ok. 125; dzis obie ok. 54), pieniadz powoli: dochod staly rodow dzis -> pierwszy krok -> granica: Reach 53 -> 62 -> 100 tys.
   zl/d, Polnoc 84 -> 75 -> 39, Dorne 45 -> 39 -> 13, Wyspy 20 -> 17 -> 6, Volantis 22 -> 29 -> 60, Qarth 17 -> 23 -> 48. Niepewne: tempo pieniadza; lud ludnych miast nie
   udzwignie wiekszego koszyka bez doplywu zlota. **CZEKA NA JEFFA: pytania o kierunek z rozdz. 10 (podane w czacie); KODU NIE ZACZYNAC przed jego "tak".**
+- (22:45 UTC 13.10) **KONIEC PRACY NA KONCIE DRUGIM (sesja dbc3d3d1) - Jeff przechodzi na nastepne konto.** Nic nie biegnie w tle; w grze WGRANIE 43. START: PRZEKAZANIE rozdz. 29,
+  blok "STAN KONCOWY". Czeka: 7 odpowiedzi Jeffa do projektu gospodarki od ludzi (maja byc w jego pierwszej wiadomosci), potem kod.

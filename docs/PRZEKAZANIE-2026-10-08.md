@@ -1086,6 +1086,14 @@ woza unikaty; K1-3a krok 2 (mieszczanie tylko konie robocze); ile drog (po zdjec
 
 ## 29. KONIEC KONTA DRUGIEGO (sesja dbc3d3d1; 13.10 ok. 20:15 UTC; tydzien 94%, reset 19.10 17:00 UTC) - START TUTAJ DLA NASTEPNEGO KONTA
 
+**STAN KONCOWY (13.10 ok. 22:45 UTC) - CZYTAJ NAJPIERW TO.** Jeff przechodzi na nastepne konto. Nic nie biegnie w tle (zadnego workflow, gra zamknieta, w grze pliki zatwierdzone).
+- W GRZE: **WGRANIE 43** (Armoury 959d544d, CrashScribe 04f44a0e, settings 3e31434f, RC f9a944c1, GT 035878c4, ForgeView e17e0233); `noc/wgranie-43` = `w-toku/zbior-e8` = 4d33042. Bieg kontrolny czysty.
+- Z poprawek 1-6 (raport roczny) WGRANE: 1 danina + korona wedlug potrzeby + poprawka daniny, 2 tarczowe, 3 pobity oblegajacy uchodzi, 5 towary (bez lnu / soli). ZOSTALY: 6 male poprawki, 4 bieg dwuletni (na samym koncu).
+- **PROJEKT GOSPODARKI OD LUDZI GOTOWY, BEZ KODU:** `docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md` (477 linii; rozdz. 0, 4, 4A, 8 paczki, 10 pytania). Jeff dostal 7 pytan o kierunek w czacie 13.10 - ODPOWIEDZI POWINNY BYC W JEGO PIERWSZEJ WIADOMOSCI na nowym koncie; jesli ich nie ma, zapytac o nie raz (rady projektu: 1 tak, 2 lup i milicja bez wyjatku, 3 dwa razy tak, 4 zostawic i zmierzyc, 5 tak, 6 len przez nowe symbole wsi + sol x2, 7 zloto startowe kupcow / ludu / wsi wedlug ludzi tak; skarbce koron wedlug ludzi - rada tak, majatki rodow bez zmian).
+- KOLEJNOSC PRACY NA NOC (propozycja; Jeff: 'rob dalej, rozpoznanie, zmiany'): (a) gospodarka od ludzi - NAJPIERW rachunek na sucho, czy swiat utrzyma 85 tys. wojska w polu (obietnica dana Jeffowi w pyt. 1; jesli nie - wrocic do niego z liczbami przed kodem), potem paczki z rozdz. 8 projektu, kazda: workflow autor + recenzent, test 120 dob, zapis, wgranie; (b) N7 rozbici wracaja pod choragiew (proporcje zatwierdzone - nizej); (c) W6b rod gracza w tarczowym i doplacie; (d) poprawka 6 (male); (e) reszta z listy 'ZATWIERDZONE, NIE ZACZETE'; (f) bieg dwuletni na koncu.
+- Zasady Jeffa z 13.10: zapisywac kazda skonczona zmiane od razu (commit + push + STAN-PRAC), pilnowac limitu 5 h (pauza przy 90%) i tygodnia, pracowac do konca konta.
+
+
 Jeff 13.10: "Rob dalej - rozpoznanie, zmiany - i zapisuj do przekazania; jak dojdzie do 100%, tyle, ile uda sie zrobic, przekazujemy drugiemu kontu na nocna prace."
 Szczegoly kazdego kroku: `docs/STAN-PRAC.md` od wpisu "WGRANIE 37" do konca (godziny wpisow z 13.10 po 18:40 sa przyblizone, do +-40 min; kolejnosc dobra).
 
