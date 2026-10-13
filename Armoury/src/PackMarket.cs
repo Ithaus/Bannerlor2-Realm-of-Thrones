@@ -28,7 +28,9 @@ namespace Armoury
     ///     GiveGoldAction partia -> osada. Brak (pusta polka, kapital 0 - karawana gracza dostaje zloto po zaplacie, CaravanCapital.CtxFin; miasto oblezone albo nie
     ///     miasto) - mniej jucznych; dokupi je gra przy handlu (CaravansCampaignBehavior.BuyGoods: juczne do liczby ludzi, przy zlocie > 1000) - takze z targu.
     ///     Konwoj DTE (kontekst CaravanCapital KDte - kapital 0, nie handluje) - juczne gry zostaja (ladunek konwoju DTE z niczego, poza K5). Karawana morska
-    ///     (bez drogi ladowej) - juczne zdjete bez zakupu (gra nie kupuje im jucznych, na morzu nie nosza). Karawany startowe (isInitialSpawn, przed GameStarted) -
+    ///     (bez drogi ladowej) - juczne zdjete bez zakupu (gra nie kupuje im jucznych, na morzu nie nosza) - zdejmowane juz w InitPost (krok 2 K5), bo gra
+    ///     sprzedaje je miastu startu wewnatrz CreateCaravanParty (EnterSettlementAction -> CaravansCampaignBehavior.OnSettlementEntered :719 ->
+    ///     SellGoodsInternal :1147) przed postfiksem CreatePost; galaz morska w CreatePost zostaje jako bezpiecznik. Karawany startowe (isInitialSpawn, przed GameStarted) -
     ///     jak w grze (stan wyjsciowy ksiegi koni). Juczny przechodzi z polki do taboru - przeniesienie w "Konie (E6/0)" (suma bez zmian), zloto z kasy karawany
     ///     do kasy miasta. Poza K5: BK GiveMounts/GivePackAnimals (3.11 - osobna paczka) i ladunek konwoju DTE (AddReinforcementSupplies: 17 jucznych i zywnosc; juczne gry konwoju zostaja).
     /// (b) Zapasowe konie lordow = zapas Stables.Reserve z E6/K2 (osobnego klucza nie ma - to bylaby trzecia definicja zapasu); jedza jak kazdy kon (pasza K0).
@@ -113,7 +115,27 @@ namespace Armoury
                     if (got == null) got = new List<KeyValuePair<EquipmentElement, int>>(1);
                     got.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount));
                 }
-                if (got != null) _pend[__0] = got;
+                if (got == null) return;
+                // krok 2 K5 (poprawka A3 po biegu probnym 2, TRIAZ-2 K5-4): karawana morska - juczne zdjete OD RAZU, bez zakupu. Gra sprzedaje je miastu startu
+                // jeszcze w CreateCaravanParty (EnterSettlementAction -> CaravansCampaignBehavior.OnSettlementEntered -> SellGoodsInternal: partia bez drogi
+                // ladowej oddaje juczne bez progu), czyli PRZED postfiksem CreatePost - ten zdejmowal tylko reszte (120 dob: 325 sztuk z niczego na polkach
+                // miast portowych). Liczniki jak w CreatePost (_new - morskie sa w "nowe karawany", prog K5-5); partia nie idzie do _pend.
+                // Live: karawany startowe jak w grze; wylaczony klucz i konwoj DTE - do _pend, rozlicza je CreatePost jak dotad.
+                if (Live && On && !__0.HasLandNavigationCapability && !CaravanCapital.InDteConvoy())
+                {
+                    int added = 0, taken = 0;
+                    foreach (var kv in got)
+                    {
+                        added += kv.Value;
+                        int at = r.FindIndexOfElement(kv.Key);
+                        int have = at >= 0 ? r.GetElementNumber(at) : 0;
+                        int take = Math.Min(kv.Value, have);
+                        if (take > 0) { r.AddToCounts(kv.Key, -take); taken += take; }
+                    }
+                    _calls++; _new++; _given += added; _removed += taken; _naval++; _navalN += added;
+                    return;
+                }
+                _pend[__0] = got;
             }
             catch (Exception e) { Stumble("InitPost", e); }
         }

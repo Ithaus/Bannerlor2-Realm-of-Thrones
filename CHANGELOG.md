@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (POPRAWKA A3 po biegu probnym 2 - S) - E6/K5 KROK 2: JUCZNE KARAWANY MORSKIEJ ZDEJMOWANE OD RAZU (InitPost) - koniec 325 jucznych z niczego na polkach miast portowych
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 503c7e0) | **Pliki:** `Armoury/src/PackMarket.cs`, `CHANGELOG.md`. Bez nowego klucza (ten sam `PackAnimalsFromMarket`), bez zmian zapisu. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "K5-4" (poprawka ostateczna, krok 2).
+
+**Problem (dowod z logu biegu 2):** linia "Juczne (213)" - w 120 dobach "z niczego" razem 325 sztuk (gra dala 14 351, zdjete 14 026), wylacznie w dobach z karawana morska: 44 doby z morskimi (57 karawan) - z niczego 325 w 43 z nich; 75 dob bez morskich - 0 w kazdej. Przyklad dzien 108952: "nowe karawany 3 ... z niczego 10 (gra dala 45, zdjete 35; poza CreateCaravanParty 0 partii, 0 sztuk) | morskie 1 (zdjete 31 bez zakupu)". F2 zamknal 96% przecieku (13 622 -> 325); to jest reszta.
+
+**Przyczyna:** gra dodaje nowej karawanie juczne w `InitializeCaravanOnCreation` (wewnatrz `MobileParty.CreateParty`), a zaraz potem, jeszcze w `CreateCaravanParty`, wprowadza ja do miasta startu (`EnterSettlementAction` -> `CaravansCampaignBehavior.OnSettlementEntered` :691-719 -> `SellGoodsInternal` :1147): partia BEZ drogi ladowej sprzedaje juczne miastu bez progu 0.6 x ludzie (karawana ladowa ma 0.5 x ludzie, wiec nie sprzedaje nic). Nasz postfiks `CreatePost` biegnie po tym i zdejmowal tylko to, co zostalo (`take = min(dane, ma)`) - srednio 5.7 sztuki na karawane morska zostawalo na polce miasta startu jako sztuki z niczego (zloto to przelew kasa miasta -> kiesa konwoju, ok. 220 zl/d, nie zloto z niczego).
+
+**Zmiana:** `PackMarket.InitPost` - po zebraniu listy jucznych dodanych przez gre: gdy kampania trwa (`Live`), klucz czynny, partia bez drogi ladowej (`!HasLandNavigationCapability` - gra ustawia to PRZED dodaniem jucznych, CaravanPartyComponent.cs:54 wobec :83) i nie konwoj DTE (`CaravanCapital.InDteConvoy`) - juczne zdjete od razu po liscie (nie w petli po indeksach rostera), liczniki `_calls`, `_new`, `_given`, `_removed`, `_naval`, `_navalN` jak w `CreatePost` (morskie sa czescia "nowe karawany" - prog K5-5 sie nie rozjezdza), partia nie idzie do `_pend`. Reszta bez zmian: karawany startowe (przed GameStarted), wylaczony klucz i konwoje DTE ida do `_pend` i rozlicza je `CreatePost`; galaz morska w `CreatePost` zostaje jako bezpiecznik (nie powinna sie juz wykonywac). Tekst linii "Juczne (213)" bez zmian.
+
+**Co Jeff zobaczy w grze:** nic. Z targow miast portowych znika 2.7 jucznych na dobe, ktore powstawaly z niczego; kasy tych miast nie placa za nie konwojom.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: po poprawce miasto nie placi za sztuki z niczego - nic nie powstaje i nic nie ginie (juczne gry sa zdejmowane w tej samej chwili, w ktorej gra je dodala; konwoj morski startuje bez jucznych - jak dotad po postfiksie; gra i tak nie kupuje im jucznych).
+- Zdjecie przed nadaniem Id partii: `ItemRoster.AddToCounts` zmienia tylko liczniki rostera; `HorseState.RosterPostfix` pracuje na instancji rostera (bez slownika po partii). Miedzy InitPost a koncem CreateCaravanParty nic nie potrzebuje jucznych konwoju (InitializePartyTrade, AdjustConvoyShips, RefillConvoyTroops, E4/8 CaravanPost, finalizery CaravanCapital / O17). Linia O17 "w kasach zaraz po wejsciu" spadnie o utarg ze sprzedazy (tylko informacja).
+- `InDteConvoy()` dziala juz w InitPost (kontekst DTE i `_createDepth` sa podniesione przed wywolaniem CreateCaravanParty) - konwoj DTE dalej idzie galezia "konwoje DTE" (1 385 jucznych z niczego w 120 dob po stronie DTE - swiadomie poza K5).
+- Zapis: nic; nowa kampania niepotrzebna. Po wczytaniu zapisu przeciek dzialal od pierwszej doby - poprawka tez.
+- Czas doby: jeden warunek na nowa karawane.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy (K5-4 "z niczego" = 0 we wszystkich dobach, takze z "morskie" > 0; "gra dala" = "zdjete"; K5-5 rowne; K5-4b 0/0; potkniecia 0; brak "ERROR in PackMarket.InitPost").
+
 ## 2026-10-13 (POPRAWKA A2 po biegu probnym 2 - BLOKUJE) - E8/G1: LIMIT OTWARTYCH TIKOW BK NA POSTOJ W MIESCIE (Caravan Town Hourly Max Ticks = 12) - karawana bez celu wraca do jednego spojrzenia na dobe; licznik "tiki BK" liczy tylko przebiegi z cialem BK
 **Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 031c41a) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1299 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "G1-4" (poprawka ostateczna "G1b") i `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md` "[latki] Karawany (E8/G1): 'po otwarciu: tiki BK' liczy takze przebiegi...".
 
