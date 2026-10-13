@@ -1926,3 +1926,10 @@ CivilWorksAwayFromFront, WarAidFollowsLordsShortfall, CrownSurplusFeedsNeedAid).
   (len / sol - po projekcie gospodarki od ludzi), 6 male poprawki - NIE ZACZETE, 4 bieg dwuletni - na koncu.**
 - (21:10 UTC 13.10) Bieg kontrolny PO WGRANIU 43 (10 dob nowej kampanii): 10/10, Armoury 0 ERROR; w grze Armoury 959d544d (md5 sprawdzone). Tydzien 97% - na tym koncie biegnie
   juz tylko workflow projektu gospodarki od ludzi (wf_fb11d85b-5e0); pliki rozpoznan w `docs/gospodarka-od-ludzi/robocze/`. START dla nastepnego konta: PRZEKAZANIE rozdz. 29.
+- (22:30 UTC 13.10) **PROJEKT "GOSPODARKA OD LUDZI" GOTOWY (bez kodu; wf_fb11d85b-5e0: 3 rozpoznania, projekt, recenzja z poprawka):**
+  `docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md` (rozdz. 0 prostym jezykiem, 4 tabela krolestw, 4A tabela towarow, 8 paczki, 10 pytania) + rozpoznania
+  w `docs/gospodarka-od-ludzi/robocze/`. Regula: wies = symbol wszystkich wsi okregu (produkuje wedlug ludzi okregu z ksiegi; rodzaj wsi mowi CO), miasto = symbol rynku okregu
+  (kupuje, zjada, przerabia wedlug ludzi rynku), pieniedzy nikt nie mnozy, werbunek i milicja za ludzmi; hearth, dobrobyt, limity druzyn, liczba osad bez zmian. Towar zmienia sie
+  od razu (wies zboza Polnoc ok. 39 szt./d, Reach ok. 125; dzis obie ok. 54), pieniadz powoli: dochod staly rodow dzis -> pierwszy krok -> granica: Reach 53 -> 62 -> 100 tys.
+  zl/d, Polnoc 84 -> 75 -> 39, Dorne 45 -> 39 -> 13, Wyspy 20 -> 17 -> 6, Volantis 22 -> 29 -> 60, Qarth 17 -> 23 -> 48. Niepewne: tempo pieniadza; lud ludnych miast nie
+  udzwignie wiekszego koszyka bez doplywu zlota. **CZEKA NA JEFFA: pytania o kierunek z rozdz. 10 (podane w czacie); KODU NIE ZACZYNAC przed jego "tak".**
