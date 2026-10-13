@@ -202,7 +202,8 @@ Uzycie (Python 3, tylko odczyt):
                     zamiana 1:1, ochotnicy z mapy gry; G2-3 uczta: towar z niczego 0, rynek nie traci ponad zakup; G2-K potkniecia i "ERROR in MercFeast.*" 0.
                     Blok etap8_t (E8/T, paczka 263 - start kampanii i rekrut gracza jak u AI; NOWA KAMPANIA; ColdStart.cs, LevyGold.cs, PlayerRecruit.cs):
                     T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w linii sesji; T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob
-                    1-3) >= 280; T-2 budzet cechow przepadly 0, T-2b INFO cechy; T-3 nowe partie lordow w dobach 1-3 bez dorobku bez powodu 0, T-3b INFO
+                    1-3) >= 280; T-2 budzet cechow przepadly 0, T-2b INFO cechy; T-3 nowe partie lordow w dobach 1-3 bez dorobku bez powodu 0 (powody: drugi
+                    raz ten sam wodz, bez ludzi, umarli - sprzet poza gospodarka, rod gracza), T-3b INFO
                     wszystkie nowe partie AI w dobie 1 wobec Z33; T-4 zakupy AI w dobach 1-3 <= 50% Z33; T-5 rekrut gracza: tier 2+ = zablokowane komplety
                     DTE, tier 1 = komplety DTE (bez werbunku gracza - INFO, sprawdzenie reczne 8.16 p. 2 i 19); T-K potkniecia i linie ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
@@ -8939,9 +8940,10 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     "ColdStart: zbrojownie" i "ColdStart: budzet cechow (E8/T)" (raz, nowa gra), "Dorobek startowy (E8/T): dzien N" (doby 1-4 kampanii),
     "Rekrut gracza (E8/T): dzien N" (kazdy werbunek / najem gracza).
     T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w ostatniej linii sesji;
-    T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob 1-3) >= 280 (projekt: ok. 280-300; Z33 mial 34 sprzed startu i 276 + 38 + 23 nowych);
+    T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob 1-3) >= 280 (projekt: ok. 280-300; Z33 mial 34 sprzed startu i 276 + 23 + 38 nowych);
     T-2 budzet cechow przepadly 0 (roboczodni, po zaokragleniu); T-2b INFO podzial na cechy i sztuki z wyzszego tieru;
-    T-3 nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz "drugi raz ten sam wodz" albo "bez ludzi" = 0; T-3b INFO wszystkie nowe
+    T-3 nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz "drugi raz ten sam wodz", "bez ludzi", umarli (sprzet umarlych poza
+    gospodarka - recenzja E8/T) albo rod gracza = 0; T-3b INFO wszystkie nowe
     partie AI bez kompletu w dobie 1 wobec Z33 (541, z czego 276 lordow) i progu projektu 100 - reszta to wozy wsi, bandy i karawany, ktore dorobku
     z projektu nie dostaja;
     T-4 zakupy AI (szt.) w dobach 1-3 <= 50% Z33 (2 451 / 6 123 / 5 037);
@@ -8987,7 +8989,7 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         pcs = tot(d13, r"nowe partie lordow AI z dorobkiem \d+ \(szt\. (\d+)\)")
         rep.add("T-1: partie lordow z dorobkiem stuleci (sprzed startu + nowe z dob 1-3 kampanii)",
                 f"{allp - gar} sprzed startu + {lp} nowych = {allp - gar + lp} (nowe dostaly {pcs} szt.; linii doby {len(d13)} z 3)",
-                ">= 280 (projekt ok. 280-300; Z33: 34 sprzed startu, nowych 276 + 38 + 23)", (allp - gar + lp) >= 280 if d13 else False)
+                ">= 280 (projekt ok. 280-300; Z33: 34 sprzed startu, nowych 276 + 23 + 38)", (allp - gar + lp) >= 280 if d13 else False)
     else:
         rep.add("T-1: partie lordow z dorobkiem stuleci", "brak linii \"ColdStart: zbrojownie\" - log nie zaczyna nowej kampanii", "INFO (prog tylko w nowej kampanii)", None)
     # ---------------- T-2: budzet cechow
@@ -9009,9 +9011,12 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         lords = tot(d13, r"w tym partie lordow (\d+)\)")
         empty, again = tot(d13, r"bez ludzi albo bez brakow (\d+)"), tot(d13, r"drugi raz ten sam wodz (\d+)")
         nolead, keyoff = tot(d13, r"bez wodza (\d+)"), tot(d13, r"klucz wylaczony (\d+)")
-        bad = lords - empty - again
-        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz \"drugi raz ten sam wodz\" albo \"bez ludzi\"",
-                f"{bad} (bez dorobku razem {lords}: bez ludzi albo bez brakow {empty}, drugi raz ten sam wodz {again}, bez wodza {nolead}, klucz wylaczony {keyoff})",
+        # recenzja E8/T: umarli (sprzet umarlych poza gospodarka) i rod gracza - celowo bez dorobku; log sprzed recenzji nie ma tych pol (0)
+        undead, pclan = tot(d13, r"umarli \(sprzet poza gospodarka\) (\d+)"), tot(d13, r"rod gracza (\d+); nowe partie AI")
+        bad = lords - empty - again - undead - pclan
+        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz \"drugi raz ten sam wodz\", \"bez ludzi\", umarli albo rod gracza",
+                f"{bad} (bez dorobku razem {lords}: bez ludzi albo bez brakow {empty}, drugi raz ten sam wodz {again}, umarli {undead}, rod gracza {pclan}, "
+                f"bez wodza {nolead}, klucz wylaczony {keyoff})",
                 "0", bad == 0)
         first = [late[d] for d in sorted(late) if run_day(d, start) == 1]
         if first:

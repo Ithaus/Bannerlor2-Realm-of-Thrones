@@ -271,13 +271,14 @@ namespace Armoury
 
         // ------------------------------------------------------------ E8/T (263, PLAN 8.10c): dorobek partii lordow z pierwszych dob kampanii
         // Armories() widzi tylko partie stojace na mapie przy starcie sesji (Z33: 34 partie lordow). Pozostale gra tworzy po starcie z ludzmi z szablonu klanu
-        // (Z33: 276 partii w dobie 1, potem 38 i 23), a LevyGold.PartyCreatedPrefix blokuje im komplet DTE: ludzie sa, ich dorobku stuleci nie ma i pierwsze doby
+        // (Z33: 276 partii w dobie 1, potem 23 i 38), a LevyGold.PartyCreatedPrefix blokuje im komplet DTE: ludzie sa, ich dorobku stuleci nie ma i pierwsze doby
         // to fala zakupow (2 451 / 6 123 / 5 037 szt.). Teraz nowa partia lorda AI w oknie nowej gry (te same 3 doby co Run) dostaje ten sam dorobek co partie
         // sprzed startu - RAZ na wodza: partia odtworzona po rozbiciu w tych dobach nie dostaje drugiego (wodzowie w zapisie arm_e8_coldlate do konca okna).
         private const double LateDays = 3.0;
         private static bool _ran;
         private static readonly HashSet<string> _lateLeaders = new HashSet<string>();
         private static int _dLateParties, _dLatePieces, _dLateEmpty, _dLateAgain, _dLateNoLeader, _dLateOff, _lateStumbles, _lateErrDay = -1;
+        private static int _dLateUndead, _dLatePlayer;   // recenzja E8/T: partie lordow celowo bez dorobku w oknie nowej gry (umarli, rod gracza) - linia doby i prog T-3
         private static long _tLateParties, _tLatePieces;
 
         internal static bool LateOn { get { var s = Settings.Current; return s != null && s.ColdStartEnabled && s.ColdStartLateLordParties; } }
@@ -286,6 +287,7 @@ namespace Armoury
         {
             _ran = false; _lateLeaders.Clear();
             _dLateParties = _dLatePieces = _dLateEmpty = _dLateAgain = _dLateNoLeader = _dLateOff = 0; _lateStumbles = 0; _lateErrDay = -1;
+            _dLateUndead = _dLatePlayer = 0;
             _tLateParties = _tLatePieces = 0;
         }
 
@@ -318,9 +320,13 @@ namespace Armoury
             try
             {
                 if (mp == null || !mp.IsLordParty || mp.IsMainParty || mp.MemberRoster == null) return false;
-                if (mp.ActualClan == Clan.PlayerClan) return false;      // druzyna rodu gracza - nie "partia lorda AI"
                 if (!_ran || !_done) return false;                       // przed startem sesji (echo wczytania DTE) albo dorobek stuleci nie biegl w tej kampanii
                 if (Hunger.CampaignAge() > LateDays) return false;       // po oknie nowej gry - lord kupuje na targu jak dotad
+                // recenzja E8/T: dwie odmowy celowe - liczone (linia doby), zeby prog T-3 nie bral ich za blad
+                if (mp.ActualClan == Clan.PlayerClan) { _dLatePlayer++; return false; }   // druzyna rodu gracza - nie "partia lorda AI"
+                // umarli (Nocny Krol): sprzet umarlych jest poza gospodarka - DTE dopelnia im wzorzec w bitwie i tak (GarrisonKit.DteDresses, PartyTakesKit;
+                // ta sama metoda FillToTemplate w GarrisonArmory C9a tez ich pomija). Dorobek w zbrojowni DTE bylby sprzetem z niczego do wziecia po rozbiciu partii.
+                if (Undead.Party(mp)) { _dLateUndead++; return false; }
                 if (!LateOn) { _dLateOff++; return false; }
                 var key = LeaderKey(mp);
                 if (string.IsNullOrEmpty(key)) { _dLateNoLeader++; return false; }
@@ -340,14 +346,15 @@ namespace Armoury
             try
             {
                 double age = Hunger.CampaignAge();
-                int any = _dLateParties + _dLateEmpty + _dLateAgain + _dLateNoLeader + _dLateOff;
+                int any = _dLateParties + _dLateEmpty + _dLateAgain + _dLateNoLeader + _dLateOff + _dLateUndead + _dLatePlayer;
                 if (_done && (any > 0 || age <= LateDays + 2.0))
                     Log.Info("Dorobek startowy (E8/T): dzien " + day + " - nowe partie lordow AI z dorobkiem " + _dLateParties + " (szt. " + _dLatePieces + ")"
                              + ", bez dorobku: bez ludzi albo bez brakow " + _dLateEmpty + ", drugi raz ten sam wodz " + _dLateAgain + ", bez wodza " + _dLateNoLeader + ", klucz wylaczony " + _dLateOff
+                             + ", umarli (sprzet poza gospodarka) " + _dLateUndead + ", rod gracza " + _dLatePlayer
                              + "; nowe partie AI bez kompletu DTE i bez dorobku " + skippedAll + " (w tym partie lordow " + skippedLords + ")"
                              + "; od startu sesji: partii z dorobkiem " + _tLateParties + ", szt. " + _tLatePieces + "; wodzow z dorobkiem w pamieci " + _lateLeaders.Count
                              + "; potkniecia " + _lateStumbles + " (Cold Start Late Lord Parties " + (LateOn ? "CZYNNE" : "WYLACZONE") + ").");
-                _dLateParties = _dLatePieces = _dLateEmpty = _dLateAgain = _dLateNoLeader = _dLateOff = 0;
+                _dLateParties = _dLatePieces = _dLateEmpty = _dLateAgain = _dLateNoLeader = _dLateOff = 0; _dLateUndead = _dLatePlayer = 0;
                 if (age > LateDays && _lateLeaders.Count > 0) _lateLeaders.Clear();   // po oknie pamiec wodzow niepotrzebna (sekcja zapisu pusta)
             }
             catch (Exception e) { LateStumble("LateFlush", e); }
