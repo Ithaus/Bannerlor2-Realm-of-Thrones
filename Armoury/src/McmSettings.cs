@@ -2224,6 +2224,26 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistBowLaborMultiplier { get; set; } = 1.0f;
 
+        [SettingPropertyFloatingInteger("Harness Kg Per Armor", 0.00f, 1.00f, "0.00", HintText = "horse harness is priced by a real weight, not by the weight the game gives it: at most this many kilograms for each point of horse armour (and never under 3 kg) count in its worth, at the workshop, at your forge and in repairs - a Realm of Thrones barding of 140 kg was priced as 140 kg of plate, a saddle of 100 kg as 100 kg (0 = the game's weight, as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float HarnessKgPerArmor { get; set; } = 0.4f;
+
+        [SettingPropertyFloatingInteger("Helm Days Per Kg", 0.00f, 3.00f, "0.00", HintText = "a plate helmet of tier 4 to 6 takes this many days of an armourer's work for each kilogram, plus half a day for each tier above the third - before, it was priced like a breastplate and cost three to five times a real bascinet (0 = as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float HelmDaysPerKg { get; set; } = 1.0f;
+
+        [SettingPropertyBool("Hist Bow Days New", HintText = "a bowyer makes a bow in one and a half to two and a half days, as a war bow sold for 12 to 18 pence says, instead of 2 to 12 days - bows of tier 3 to 6 cost a half to a third of what they did, and workshops make more of them in a day's work")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistBowDaysNew { get; set; } = true;
+
+        [SettingPropertyBool("Hist Thrown Own Days", HintText = "javelins, throwing axes and throwing knives are priced by their own days of work; before, they also carried the eightfold fletcher's work of a sheaf of arrows")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistThrownOwnDays { get; set; } = true;
+
+        [SettingPropertyBool("Hist Horse Prices", HintText = "horses by their kind: a common riding horse (tier 3, a rouncey) costs four tenths of the game's worth, a man-at-arms' war horse (tier 4) half as much again; pack horses, palfreys, chargers and noble horses keep their worth. Town demand for horses is counted in the new coin, so townsfolk buy as many of these horses as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool HistHorsePrices { get; set; } = true;
+
         [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownHouseholdUse { get; set; } = true;
@@ -2359,6 +2379,10 @@ namespace Armoury
         [SettingPropertyBool("Ammo Recovery By Side", HintText = "in a battle you fight yourself each side is judged by its own outcome: the men of the side that holds the field gather their shot arrows back (Ammo Recover Percent + Ammo Repair Percent), the men of the beaten side lose what they shot - before, your result decided for the enemy too (a beaten foe gathered arrows, a winning foe lost them all)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool AmmoRecoveryBySide { get; set; } = true;
+
+        [SettingPropertyBool("Thrown As Missile", HintText = "javelins, throwing axes and throwing knives are missiles: they are spent by being thrown (some are gathered back after the battle, like arrows) and no longer get battered like a sword as well. A thrown weapon that is already damaged stays damaged until a smith mends it")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ThrownAsMissile { get; set; } = true;
 
         [SettingPropertyBool("Keep Wear Through Battle", HintText = "gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired")]
         [SettingPropertyGroup("Iron Bank")]
@@ -5543,6 +5567,11 @@ namespace Armoury
             s.HistHidesPerKg = HistHidesPerKg;
             s.HistFlaxPerKg = HistFlaxPerKg;
             s.HistBowLaborMultiplier = HistBowLaborMultiplier;
+            s.HarnessKgPerArmor = HarnessKgPerArmor;
+            s.HelmDaysPerKg = HelmDaysPerKg;
+            s.HistBowDaysNew = HistBowDaysNew;
+            s.HistThrownOwnDays = HistThrownOwnDays;
+            s.HistHorsePrices = HistHorsePrices;
             s.TownHouseholdUse = TownHouseholdUse;
             s.TownUseFlax = TownUseFlax;
             s.TownUseWool = TownUseWool;
@@ -5577,6 +5606,7 @@ namespace Armoury
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;
             s.AmmoRecoveryBySide = AmmoRecoveryBySide;
+            s.ThrownAsMissile = ThrownAsMissile;
             s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.StartKitEnabled = StartKitEnabled;
             s.StartGoldAdventurer = StartGoldAdventurer;

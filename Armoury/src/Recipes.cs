@@ -259,7 +259,7 @@ namespace Armoury
             {
                 int tier = Grade(item);
                 r.Tier = tier;
-                float weight = MathF.Max(0.5f, item.Weight);
+                float weight = MathF.Max(0.5f, ArmsPricing.CostWeight(item));   // E8/C (R7): uprzaz z tej samej wagi co wartosc (siodlo ROT 100 kg: 160 + 40 sztab za sztuke warta 257)
                 int units = ArmourUnits(item);
                 // pancerz liczy sie z punktow ochrony; bron/tarcze/strzaly dalej z wagi
                 float baseIron = item.HasArmorComponent && units > 0

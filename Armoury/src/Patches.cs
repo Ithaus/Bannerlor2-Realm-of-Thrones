@@ -827,7 +827,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.ShowConditionPercent || __result == null) return;
-                if (ArmouryBehavior.NoWear(__instance.Item)) return;   // amunicja bez dopiskow stanu
+                if (ArmouryBehavior.NoState(__instance.Item)) return;   // amunicja bez dopiskow stanu (E8/C: NoState - obity oszczep dalej pokazuje stan)
                 var m = __instance.ItemModifier;
                 if (m == null) return;
                 float pm = m.PriceMultiplier;

@@ -25,7 +25,7 @@ namespace Armoury
                 var el = elN.Value;
                 var item = el.Item;
                 var m = el.ItemModifier;
-                if (item == null || m == null || ArmouryBehavior.NoWear(item)) return;
+                if (item == null || m == null || ArmouryBehavior.NoState(item)) return;   // E8/C: NoState (bron miotana ze stanem dalej go pokazuje)
                 float pm = ConditionScaling.ConditionOf(m);   // wpis 95: stan lupu Spoils wedlug ich skali
                 if (pm >= 0.999f || pm <= 0f) return;
                 int pct = Math.Max(1, (int)Math.Round(pm * 100f));
@@ -102,7 +102,7 @@ namespace Armoury
                 // sekcja pokazuje sie dla KAZDEJ zbroi i broni - nowka ma 100/100 (New);
                 // amunicja (strzaly/belty) jest POZA systemem zuzycia - bez sekcji
                 if (!item.HasArmorComponent && !item.HasWeaponComponent) return;
-                if (ArmouryBehavior.NoWear(item)) return;
+                if (ArmouryBehavior.NoState(item)) return;   // E8/C: NoState
                 var m = el.ItemModifier;
                 float pm = m != null ? m.PriceMultiplier : 1f;
                 bool damaged = m != null && pm < 0.999f && pm > 0f;

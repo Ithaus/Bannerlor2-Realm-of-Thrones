@@ -1333,7 +1333,7 @@ namespace Armoury
                         var el = armory[i];
                         var it = el.EquipmentElement.Item;
                         var m = el.EquipmentElement.ItemModifier;
-                        if (it != null && el.Amount > 0 && !ArmouryBehavior.NoWear(it)
+                        if (it != null && el.Amount > 0 && !ArmouryBehavior.NoState(it)   // E8/C: NoState (obita bron miotana dalej liczona do naprawy)
                             && m != null && m.PriceMultiplier < 0.999f && m.PriceMultiplier > 0f)
                         {
                             wornPieces += el.Amount;

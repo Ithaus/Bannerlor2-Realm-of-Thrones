@@ -71,8 +71,7 @@ namespace Armoury
                 if (s == null || !s.AmmoRecoveryEnabled || !__0.HasValue) return;
                 var mw = __0.Value;
                 if (mw.IsEmpty || mw.Item == null) return;
-                var t = mw.Item.ItemType;
-                if (t != ItemObject.ItemTypeEnum.Arrows && t != ItemObject.ItemTypeEnum.Bolts && t != ItemObject.ItemTypeEnum.Thrown) return;
+                if (!ArmouryBehavior.IsMissile(mw.Item)) return;   // E8/C (R3): jeden predykat "pocisk" - strzaly, belty, bron miotana (ten sam zbior co dotad)
                 int max = Math.Max(1, (int)mw.ModifiedMaxAmount);
                 float used = 1f - Math.Max(0, (int)mw.Amount) / (float)max;
                 if (used <= 0.001f) { __result = false; return; }        // nic nie wystrzelil - kolczan wraca

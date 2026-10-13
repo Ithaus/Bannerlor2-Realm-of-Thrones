@@ -176,7 +176,7 @@ namespace Armoury
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
         // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
         // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0; _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0; _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); _ratioSkip.Clear(); _e8cHorses.Clear(); _e8cHorseSt = 0; }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
 
         // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
         // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
@@ -300,7 +300,9 @@ namespace Armoury
         {
             var s = Settings.Current;
             float days = c.Days;
-            if (IsAmmo(it)) days *= Math.Max(0f, s.HistAmmoLaborMultiplier);          // fletcher i grotnik: snop to dzien-dwa pracy
+            // E8/C (253, PLAN 8.4c, R3): mnoznik snopa tylko dla strzal i beltow - oszczep, topor i noz miotany maja wlasne dni (ArmsPricing.DaysThrown 0.5-3);
+            // dotad x8 jak snop 24 strzal (stos oszczepow t5 70 d). Klucz HistThrownOwnDays; dniowka (DayWageOf) bez zmian
+            if (IsAmmo(it) && !(s.HistThrownOwnDays && it.ItemType == ItemObject.ItemTypeEnum.Thrown)) days *= Math.Max(0f, s.HistAmmoLaborMultiplier);          // fletcher i grotnik: snop to dzien-dwa pracy
             else if (it.ItemType == ItemObject.ItemTypeEnum.Bow) days *= Math.Max(0f, s.HistBowLaborMultiplier);   // luk wojenny 12-18 d
             return days;
         }
@@ -343,6 +345,41 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("HistoricalPrices.PriceOne", e); }
         }
+
+        // ------------------------------------------------------------ E8/C (253, PLAN 8.5g): konie wedlug kategorii
+        // Odpowiedz Jeffa 12.10 nr 2: TAK. Dump 12.10: zwykly kon pod siodlo t3 kategorii "horse" (empire / battania / aserai_horse, camel) 929-1 177 d przy
+        // rounceyu 160-480 d (2.2-6.6x), rumak t4 kategorii "war_horse" (t2_*) 1 221-2 380 d przy koniu zbrojnego 1 820-3 940 d (dolna granica); juczne (99-140),
+        // palafreje t4 kategorii "horse" (1 114-1 258), hunter, charger i szlachetne - w widelkach, bez zmian. Regula po kategorii i tierze, tylko konie i wielblady
+        // na handel (mamut, slon, rydwan i smok tez leza w "horse" - MountLaw.FamilyOf). Wartosc idzie ta sama droga co zywy inwentarz 144: setter, blokada cen
+        // (_target), przelicznik popytu kategorii (krok 3: "horse" /2.5, "war_horse" /0.67 - miasto kupuje dziennie tyle samo TYCH koni co dotad, placi w nowej
+        // monecie; ges i kura zostaja poza przelicznikiem - poprawka 156) i wagi polki kategorii mieszanych (MixedShelf: nieprzeliczone sztuki kategorii waza
+        // wartosc / przelicznik). Wylaczone HistHorsePrices = konie jak przed E8/C
+        internal const float HorseCommonFactor = 0.4f, HorseWarFactor = 1.5f;
+        private static readonly List<string> _e8cHorses = new List<string>();
+        private static int _e8cHorseSt;
+        // przedmioty pominiete w przeliczniku kategorii (poprawka 156: przeliczone zwierze w kategorii z nieprzeliczonym towarem) - MixedShelf liczy monete popytu bez nich
+        private static readonly HashSet<ItemObject> _ratioSkip = new HashSet<ItemObject>();
+
+        private static float HorseFactor(ItemObject it)
+        {
+            if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse || it.NotMerchandise || it.Value <= 0 || it.ItemCategory == null) return 1f;
+            var fam = MountLaw.FamilyOf(it);
+            int t = (int)it.Tier + 1;
+            if (t == 3 && it.ItemCategory == DefaultItemCategories.Horse && (fam == MountLaw.Fam.Horse || fam == MountLaw.Fam.Camel)) return HorseCommonFactor;
+            if (t == 4 && it.ItemCategory == DefaultItemCategories.WarHorse && fam == MountLaw.Fam.Horse) return HorseWarFactor;
+            return 1f;
+        }
+
+        /// <summary>E8/C: czesc linii startu cennika - konie przeliczone w tej sesji (PriceList8.StartLine).</summary>
+        internal static string HorseLine()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.HistHorsePrices) return "konie wedlug kategorii [wyl]";
+            return "konie wedlug kategorii [wl]: zwykly kon t3 x" + HorseCommonFactor.ToString("0.0#", CultureInfo.InvariantCulture) + ", rumak t4 x" + HorseWarFactor.ToString("0.0#", CultureInfo.InvariantCulture)
+                   + " [" + string.Join(", ", _e8cHorses.ToArray()) + "], potkniecia " + _e8cHorseSt;
+        }
+        internal static int HorseCount { get { return _e8cHorses.Count; } }
+        internal static int HorseStumbles { get { return _e8cHorseSt; } }
 
         private static bool IsArms(ItemObject it)
         {
@@ -441,6 +478,24 @@ namespace Armoury
                         beasts.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
                     }
 
+                // 1d. E8/C (253): konie wedlug kategorii (opis przy HorseFactor) - przed przelicznikiem popytu kategorii (krok 3) i wagami polki
+                _e8cHorses.Clear();
+                if (s.HistHorsePrices)
+                    foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        try
+                        {
+                            float f = HorseFactor(it);
+                            if (f == 1f) continue;
+                            int was;
+                            if (!_orig.TryGetValue(it, out was)) was = it.Value;   // drugie przeliczenie tych samych obiektow liczy od wartosci sprzed zmiany
+                            set(it, was * f);
+                            _target[it] = it.Value;
+                            _e8cHorses.Add(it.StringId + " " + was + "->" + it.Value);
+                        }
+                        catch (Exception e) { _e8cHorseSt++; if (_e8cHorseSt <= 1) Log.Error("HistoricalPrices.Apply (E8/C konie)", e); }   // jeden kon - licznik, reszta idzie dalej
+                    }
+
                 foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 })
                 {
                     var it = Recipes.MaterialItem(g);
@@ -470,7 +525,7 @@ namespace Armoury
                 // stara = wartosc z definicji przedmiotu (HistDemandFromDefinition; opis przy _defValue), wylaczone - wartosc z chwili Apply
                 // _defUsed: kategorie, w ktorych definicja rozni sie od wartosci z chwili Apply - zapisywane takze przy wylaczonym
                 // wlaczniku (linia dnia pokazuje je wtedy bez przelicznika - do porownania przed / po w tej samej grze)
-                _catRatio.Clear(); _defUsed.Clear();
+                _catRatio.Clear(); _defUsed.Clear(); _ratioSkip.Clear();
                 bool fromDef = s.HistDemandFromDefinition;
                 var sumLog = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
                 var defLog = new List<string>(); var zeroLog = new List<string>();
@@ -497,7 +552,7 @@ namespace Armoury
                 {
                     var cat = kv.Key.ItemCategory;
                     if (cat == null || kv.Key.Value <= 0) continue;
-                    if (beastOut.Contains(cat) && beastSet.Contains(kv.Key)) { beastOutLog.Add(kv.Key.StringId + " [" + cat.StringId + "]"); continue; }   // poprawka 156
+                    if (beastOut.Contains(cat) && beastSet.Contains(kv.Key)) { beastOutLog.Add(kv.Key.StringId + " [" + cat.StringId + "]"); _ratioSkip.Add(kv.Key); continue; }   // poprawka 156 (E8/C: zapamietane dla MixedShelf)
                     int def = DemandBase(kv.Key, kv.Value);
                     if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
                     int old = fromDef ? def : kv.Value;
@@ -528,7 +583,7 @@ namespace Armoury
                 if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
-                Log.Info("HistoricalPrices: zywy inwentarz " + (s.HistLivestockPrices ? "[" + string.Join(", ", beasts.ToArray()) + "] d za sztuke (konie bez zmian)"
+                Log.Info("HistoricalPrices: zywy inwentarz " + (s.HistLivestockPrices ? "[" + string.Join(", ", beasts.ToArray()) + "] d za sztuke (" + (s.HistHorsePrices ? "konie - linia startu cennika E8/C" : "konie bez zmian") + ")"
                                                                                         + "; poza przelicznikiem popytu kategorii (w kategorii sa przedmioty na handel z cena nieprzeliczona - jej popyt jak przed 144): "
                                                                                         + (beastOutLog.Count > 0 ? string.Join(", ", beastOutLog.ToArray()) : "zadne")
                                                                                       : "po wartosci gry (HistLivestockPrices wylaczone)") + ".");
@@ -626,6 +681,7 @@ namespace Armoury
                 _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0;
                 // 1. przelicznik kazdego przeliczonego towaru handlowego - ten sam skladnik, z ktorego Apply liczy przelicznik kategorii
                 var own = new Dictionary<ItemObject, double>(); var sum = new Dictionary<ItemCategory, double>(); var cnt = new Dictionary<ItemCategory, int>();
+                var skipSum = new Dictionary<ItemCategory, double>(); var skipCnt = new Dictionary<ItemCategory, int>();   // E8/C: sztuki, ktorych Apply nie wzial do przelicznika kategorii
                 foreach (var kv in _orig)
                 {
                     var it = kv.Key; var cat = it.ItemCategory;
@@ -638,12 +694,22 @@ namespace Armoury
                     double lr = CastleSteel.RatioValue(it) != it.Value ? Math.Log((double)old / Math.Max(1, CastleSteel.RatioValue(it)) * CountScale(it)) : l;
                     double a; sum.TryGetValue(cat, out a); sum[cat] = a + lr;
                     int k; cnt.TryGetValue(cat, out k); cnt[cat] = k + 1;
+                    if (_ratioSkip.Contains(it)) { double sa; skipSum.TryGetValue(cat, out sa); skipSum[cat] = sa + lr; int sk; skipCnt.TryGetValue(cat, out sk); skipCnt[cat] = sk + 1; }   // E8/C
                 }
                 // 2. moneta popytu kategorii (logarytm): ten przelicznik, ktorym DemandPostfix naprawde dzieli popyt (_catRatio); kategorii
                 // z przelicznikiem blizej 1 niz 2% Apply nie wpisuje - jej popyt zostaje nieprzeliczony, moneta 1 (recenzja 121: srednia
                 // dalaby tam wagi do 2% obok monety popytu); surowiec masowy z popytem z prawdziwego zuzycia - jego wlasny
                 var coin = new Dictionary<ItemCategory, double>(); var byUse = new HashSet<ItemCategory>();
                 foreach (var kv in sum) coin[kv.Key] = _catRatio.ContainsKey(kv.Key) ? kv.Value / cnt[kv.Key] : 0.0;
+                // E8/C (253): kategoria z przelicznikiem, w ktorej Apply pominal czesc sztuk (poprawka 156: ges i kura w "horse") - moneta popytu to srednia BEZ nich,
+                // ta sama, ktora DemandPostfix dzieli popyt (dotad taka kategoria nie miala przelicznika i miala monete 1; od E8/C "horse" ma przelicznik z koni t3,
+                // a srednia razem z gesia i kura dalaby /5.4 zamiast /2.5 - konie na polce wazylyby 2.2 x za malo). Kategorie bez pominietych sztuk - bez zmian
+                foreach (var kv in skipCnt)
+                {
+                    int all;
+                    if (!_catRatio.ContainsKey(kv.Key) || !cnt.TryGetValue(kv.Key, out all) || all - kv.Value <= 0) continue;
+                    coin[kv.Key] = (sum[kv.Key] - skipSum[kv.Key]) / (all - kv.Value);
+                }
                 if (s.RawPriceByUse && s.HistDemandScaling)
                     foreach (var b in CaravanBulk.Items())
                     {

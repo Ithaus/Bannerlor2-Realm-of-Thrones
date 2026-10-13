@@ -660,6 +660,18 @@ namespace Armoury
         public float HistHidesPerKg = 1f;                  // raw hides, pence per kg (an ox hide of 25-30 kg sold for 1-3 shillings)
         public float HistFlaxPerKg = 2f;                   // raw flax and hemp, pence per kg (estimate)
         public float HistBowLaborMultiplier = 1.0f;        // a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)
+        // E8/C (253, PLAN 8.5d-g; odpowiedz Jeffa 12.10 nr 2 "konie wedlug kategorii TAK"; regula R7 "jedna wycena") - cennik: (1) rzad konski liczony z wagi
+        // prawdziwej, nie z wagi ROT (bardy 140 kg, "siodla" 100 kg): waga do kosztu = min(waga gry, max(3, HarnessKgPerArmor x pancerz konia)) - ta sama w wartosci,
+        // w warsztacie, w kwicie kuzni gracza i w materiale naprawy (ArmsPricing.CostWeight); (2) helm plytowy t4-6: dni pracy = waga x HelmDaysPerKg + 0.5 x (t - 3)
+        // (dotad wzor napiersnika); (3) luki: dni pracy lukmistrza {1.5, 1.5, 1.5, 1.7, 2, 2.5} zamiast {2, 3, 4, 6, 8, 12}; (4) bron miotana bez mnoznika snopa
+        // strzal (x8 zostaje tylko dla Arrows/Bolts); (5) konie: zwykly kon t3 kategorii "horse" x0.4, rumak t4 kategorii "war_horse" x1.5 (popyt miast na obie
+        // kategorie liczony w nowej monecie - mieszczanie kupuja tyle samo tych koni co dotad). Linie startu "HistoricalPrices: uprzaz z wagi prawdziwej ..."
+        // i "Cennik (E8/C): mediany ..." (PriceList8.cs). 0 / off = jak przed E8/C
+        public float HarnessKgPerArmor = 0.4f;             // horse harness is priced by a real weight, not by the weight the game gives it: at most this many kilograms for each point of horse armour (and never under 3 kg) count in its worth, at the workshop, at your forge and in repairs - a Realm of Thrones barding of 140 kg was priced as 140 kg of plate, a saddle of 100 kg as 100 kg (0 = the game's weight, as before)
+        public float HelmDaysPerKg = 1.0f;                 // a plate helmet of tier 4 to 6 takes this many days of an armourer's work for each kilogram, plus half a day for each tier above the third - before, it was priced like a breastplate and cost three to five times a real bascinet (0 = as before)
+        public bool HistBowDaysNew = true;                 // a bowyer makes a bow in one and a half to two and a half days, as a war bow sold for 12 to 18 pence says, instead of 2 to 12 days - bows of tier 3 to 6 cost a half to a third of what they did, and workshops make more of them in a day's work
+        public bool HistThrownOwnDays = true;              // javelins, throwing axes and throwing knives are priced by their own days of work; before, they also carried the eightfold fletcher's work of a sheaf of arrows
+        public bool HistHorsePrices = true;                // horses by their kind: a common riding horse (tier 3, a rouncey) costs four tenths of the game's worth, a man-at-arms' war horse (tier 4) half as much again; pack horses, palfreys, chargers and noble horses keep their worth. Town demand for horses is counted in the new coin, so townsfolk buy as many of these horses as before
         public bool TownHouseholdUse = true;               // townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)
         public float TownUseFlax = 0.02f;                  // share of the townsfolk's old appetite for raw flax they keep (home spinning)
         public float TownUseWool = 0.02f;                  // share kept for raw wool
@@ -698,6 +710,11 @@ namespace Armoury
         // E8/A (250, PLAN 8.4b): odzysk amunicji w bitwie gracza wedlug strony agenta - strona, ktora utrzymala pole, odzyskuje; pokonana traci, co wystrzelila
         // (dotad wynik gracza decydowal takze za wroga); agent zdjety w trakcie misji (wynik nieznany) - jak dotad (AmmoRecovery, latka DTE ProcessAgentEquipment)
         public bool AmmoRecoveryBySide = true;             // in a battle you fight yourself each side is judged by its own outcome: the men of the side that holds the field gather their shot arrows back (Ammo Recover Percent + Ammo Repair Percent), the men of the beaten side lose what they shot - before, your result decided for the enemy too (a beaten foe gathered arrows, a winning foe lost them all)
+        // E8/C (253, PLAN 8.4c, regula R3 "jeden predykat pocisk" - ArmouryBehavior.IsMissile): bron miotana zuzywa sie przez RZUT (odzysk po bitwie jak strzaly -
+        // AmmoRecovery, juz dzis), nie przez obijanie: poza zuzyciem walki i loteria stanu lupu u gracza i u AI (ArmouryBehavior.NoWear). Stan, ktory sztuka juz ma
+        // (lup Spoils, stary zapis), zostaje: widac go, tnie cene i kowal go naprawia (ArmouryBehavior.NoState); CleanseAmmo czysci dalej tylko strzaly i belty.
+        // Off = bron miotana obija sie jak bron biala, jak przed E8/C
+        public bool ThrownAsMissile = true;                // javelins, throwing axes and throwing knives are missiles: they are spent by being thrown (some are gathered back after the battle, like arrows) and no longer get battered like a sword as well. A thrown weapon that is already damaged stays damaged until a smith mends it
         public bool KeepWearThroughBattle = true;          // gear your men take into battle comes back in the state it went out (and worse after the fight) - worn mail no longer returns as new; damage piles up and must be repaired
         public bool StartKitEnabled = true;                // starting gear you cannot wear (heavy armour your Athletics cannot carry) is swapped once, after character creation, for the best piece of the same kind you can wear - never dearer than the original
         public int StartGoldAdventurer = 100;              // coins an Adventurer starts with in the Banner Kings start (Banner Kings gives 1000 - over a year of a labourer's pay); -1 leaves Banner Kings as it is

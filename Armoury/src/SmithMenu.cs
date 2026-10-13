@@ -379,7 +379,7 @@ namespace Armoury
 
         private static bool IsBattleWorn(ItemObject it, ItemModifier m)
         {
-            if (ArmouryBehavior.NoWear(it)) return false;   // strzaly/belty poza systemem zuzycia
+            if (ArmouryBehavior.NoState(it)) return false;   // strzaly/belty poza systemem zuzycia (E8/C: NoState - obita bron miotana dalej do naprawy)
             return m != null && m.PriceMultiplier < 0.999f && m.PriceMultiplier > 0f;
         }
 
@@ -1417,7 +1417,7 @@ namespace Armoury
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type)) continue;
                         count += el.Amount;
                         tierSum += Recipes.Grade(it) * el.Amount;
-                        if (!ArmouryBehavior.NoWear(it))
+                        if (!ArmouryBehavior.NoState(it))   // E8/C: NoState
                         {
                             wearable = true;
                             var m = el.EquipmentElement.ItemModifier;

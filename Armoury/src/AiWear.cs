@@ -366,7 +366,7 @@ namespace Armoury
                 {
                     var it = kv.Key;
                     if (it == null || kv.Value <= 0) continue;
-                    int kind = it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : it.ItemType == ItemObject.ItemTypeEnum.Bolts ? 1 : it.ItemType == ItemObject.ItemTypeEnum.Thrown ? 2 : -1;
+                    int kind = AmmoKind(it);   // E8/C (R3): jeden predykat "pocisk"
                     if (kind < 0) continue;
                     if (need == null) need = AiGear.NeedBuckets(mp);
                     int bk = AiGear.Bucket(it), nd;
@@ -560,7 +560,8 @@ namespace Armoury
 
         private static int AmmoKind(ItemObject it)
         {
-            return it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : it.ItemType == ItemObject.ItemTypeEnum.Bolts ? 1 : it.ItemType == ItemObject.ItemTypeEnum.Thrown ? 2 : -1;
+            if (!ArmouryBehavior.IsMissile(it)) return -1;   // E8/C (R3): jeden predykat "pocisk" (ten sam zbior co dotad: strzaly 0, belty 1, bron miotana 2)
+            return it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : it.ItemType == ItemObject.ItemTypeEnum.Bolts ? 1 : 2;
         }
 
         /// <summary>

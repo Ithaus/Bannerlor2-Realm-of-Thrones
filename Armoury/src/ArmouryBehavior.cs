@@ -1281,6 +1281,7 @@ namespace Armoury
             try { ArmsLeaks.SessionStart(); } catch (Exception e) { Log.Error("ArmsLeaks.SessionStart", e); }   // paczka 174.0: linia startowa (ujscia uzbrojenia zamkniete, BK bron i tarcze, konserwacja zapasu)
             try { WorkshopLaw.HandsStartLine(); } catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }   // 174.3: linia "Rece (174)" - po ColdStart (ten liczy dawnymi rekami)
             try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
+            try { PriceList8.StartLine(); } catch (Exception e) { Log.Error("PriceList8.StartLine", e); }   // E8/C (253): linie startu cennika (tylko log) - PO HistoricalPrices.Apply i ClearCostCache
             try { Recipes.AmmoStartLine(); } catch (Exception e) { Log.Error("Recipes.AmmoStartLine", e); }   // sklad8-s S1: kwity amunicji kuzni gracza (tylko log) - PO HistoricalPrices.Apply (wartosci sztabek w pensach)
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
@@ -2339,9 +2340,34 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Poza systemem zuzycia: amunicja, zywy inwentarz i wszelki towar.</summary>
+        /// <summary>
+        /// E8/C (253, PLAN 8.4c, regula R3): JEDEN PREDYKAT "POCISK" - strzaly, belty i bron miotana (oszczep, topor, noz). Schodzi przez wystrzelenie albo rzut:
+        /// odzysk po bitwie gracza (AmmoRecovery), pomiar i zuzycie amunicji AI (AiWear.AmmoKind). IsAmmo (Arrows/Bolts) zostaje dla CleanseAmmo - bron miotana
+        /// ma stany, ktorych nie wolno zdjac za darmo (obity oszczep z lupu wracalby do stanu fabrycznego bez kowala).
+        /// </summary>
+        internal static bool IsMissile(ItemObject it)
+        {
+            return it != null && (it.ItemType == ItemObject.ItemTypeEnum.Arrows
+                               || it.ItemType == ItemObject.ItemTypeEnum.Bolts
+                               || it.ItemType == ItemObject.ItemTypeEnum.Thrown);
+        }
+
+        /// <summary>E8/C: sztuka BEZ STANU w ogole (strzaly i belty, zywy inwentarz, towar) - dla widoku stanu i naprawy: dopisek w nazwie, sekcja w dymku,
+        /// lista napraw kowala, stan sprzetu wojska. To dawne NoWear: bron miotana, ktora ma juz stan (lup Spoils, stary zapis), dalej go pokazuje i da sie naprawic.</summary>
+        internal static bool NoState(ItemObject it)
+        {
+            return IsAmmo(it) || IsBeast(it) || IsGoods(it);
+        }
+
+        /// <summary>Poza systemem zuzycia: amunicja, zywy inwentarz i wszelki towar. E8/C (R3): przy ThrownAsMissile takze bron miotana - nie obija sie w walce
+        /// i nie dostaje stanu lupu u gracza ani u AI (zuzywa ja rzut - AmmoRecovery); wylaczone = bron miotana obija sie jak bron, jak przed E8/C.</summary>
         internal static bool NoWear(ItemObject it)
         {
+            if (it != null && it.ItemType == ItemObject.ItemTypeEnum.Thrown)
+            {
+                var s = Settings.Current;
+                if (s != null && s.ThrownAsMissile) return true;
+            }
             return IsAmmo(it) || IsBeast(it) || IsGoods(it);
         }
 

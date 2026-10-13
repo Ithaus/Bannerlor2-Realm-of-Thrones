@@ -213,6 +213,15 @@ Uzycie (Python 3, tylko odczyt):
                     u ocalalych pokonanych = 0; L-2 INFO komu zeszlo (zalogi, partie lordow, inne) i rodzaje; L-3a Send troops (dzialka kapitana
                     <= lup DTE z poleglych, loterie pominiete), L-3b dar dla miasta (sztuk = zaloga + polka + sakwy + przepadlo, przy [wl]
                     przepadlo 0, milicja z niczego przyznana 0), L-3c trofea zostawione na polu (na polke warowni); L-4 potkniecia 0.
+                    Blok etap8_c (E8/C, paczka 253): cennik - linie startu "HistoricalPrices: uprzaz z wagi prawdziwej N szt., helmy t4-6 N,
+                    luki N, oszczepy N, konie N (E8/C)" i "Cennik (E8/C): mediany ..." (PriceList8.cs): C-0 linie sa, stan kluczy, potkniecia 0;
+                    C-1 mediany wartosci sztuk na handel: siodla 24-60 (tolerancja do 90), kropierze INFO, bardy t4-5 <= 2 400, barda t6 <= 2 600
+                    (do 2 850 = DECYZJA: projekt liczyl stal szlachetna 8 d/kg, t6 kuje sie ze stali zamkowej 12 d/kg; maks. INFO), helm t4 30-50 /
+                    t5 60-100 / t6 100-160 (helm t3 wobec t4 - INFO), luk t3 15-24 / t4 20-32 / t5 28-44 / t6 38-60, bron miotana <= 40;
+                    C-2 kwit kuzni uprzezy z plyty i kolczugi: material >= wartosc 0 sztuk (skora i tkanina - INFO, poza paczka); C-3 polki lukow
+                    w ostatniej dobie okna <= 2 x Z33 (2 995), helmy, bron miotana i uprzaz INFO; C-4 suma kas miast w dobie 120 >= 80% Z33
+                    (10 264 881), kasy ponizej zapasu przez nasze sciezki 0, rody na minusie <= Z33 + 10% (197); C-5 INFO (obity oszczep przez
+                    zapis - 8.16); C-6 INFO konie: przelicznik popytu kategorii horse / war_horse, polki koni wobec Z33.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9384,6 +9393,203 @@ def etap8_l(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rep.add("L-4: potkniecia E8/L", f"potkniecia (sesja) {stum} | okno DTE: " + ", ".join(wired), "potkniecia 0 (HorseFate, SpoilsSeal E8/L, BattlefieldLaw E8/L razem)", stum == 0)
 
 
+E8_C_START = "HistoricalPrices: uprzaz z wagi prawdziwej"
+E8_C_MED = "Cennik (E8/C): mediany"
+# Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log, doba 120): polki z linii "Rynek broni" (L:35865), kasy miast z "Nadwyzka kas (E5/0)" (L:36070),
+# rody na minusie = suma "na minusie N" linii "Skarbce" ostatniej doby (projekt etapu 8 v2 rozdz. 4 pkt 5), polki koni z "Konie (E6/0)" (zwykly / bojowy)
+E8_C_Z33_SHELF = {"Bow": 2995, "HeadArmor": 945, "Thrown": 373, "HorseHarness": 1253}
+E8_C_Z33_TOWN_GOLD = 10264881
+E8_C_Z33_CLANS_MINUS = 197
+E8_C_Z33_HORSES = (3599, 1737)
+E8_C_BARD6_MAX = 2600      # prog projektu (z szacunku 2 531 przy stali szlachetnej 8 d/kg)
+E8_C_BARD6_DECIDE = 2850   # ten sam wzor ze stala zamkowa t6 (12 d/kg, 177-1) daje ok. 2 760 - powyzej progu projektu, ponizej tej granicy = DECYZJA
+E8_C_MED_RE = r" (-|[0-9.]+) \((\d+) szt\.(?:, (\d+)-(\d+))?\)"
+
+
+def e8c_med(line, label):
+    """'<label> 47 (13 szt., 28-79)' -> (mediana, liczba, min, maks) albo None; '- (0 szt.)' -> (None, 0, None, None)."""
+    m = re.search(re.escape(label) + E8_C_MED_RE, line)
+    if not m:
+        return None
+    if m.group(1) == "-":
+        return (None, 0, None, None)
+    return (float(m.group(1)), int(m.group(2)), int(m.group(3)) if m.group(3) else None, int(m.group(4)) if m.group(4) else None)
+
+
+def e8c_shelves(lines):
+    """Polki uzbrojenia wedlug doby: linia "Rynek broni: na polkach N szt. [Typ N, ...]" (bez etykiety doby) stoi przed "Pieniadz swiata: dzien N" tej samej doby."""
+    out, pend = {}, None
+    for s in lines:
+        if s.startswith("Rynek broni: na polkach"):
+            m = re.search(r"\[([^\]]*)\]", s)
+            pend = dict((k, int(v)) for k, v in re.findall(r"(\w+) (\d+)", m.group(1))) if m else None
+        elif s.startswith("Pieniadz swiata: dzien") and pend is not None:
+            d = num(r"dzien (\d+)", s)
+            if d is not None:
+                out[d] = pend
+            pend = None
+    return out
+
+
+def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/C (253, projekt etapu 8 v2 rozdz. 3 "E8/C" Test; odpowiedz Jeffa 12.10 nr 2 - konie wedlug kategorii TAK). Linie startu sesji (PriceList8.StartLine,
+    po HistoricalPrices.Apply): "HistoricalPrices: uprzaz z wagi prawdziwej N szt., helmy t4-6 N, luki N, oszczepy N, konie N (E8/C) | ..." i
+    "Cennik (E8/C): mediany wartosci sztuk na handel bez unikatow ...". Brana ostatnia para linii w logu (ostatnie wczytanie sesji).
+    C-0 linie sa, klucze, potkniecia 0; C-1 mediany (progi projektu; reguly z wylaczonym kluczem - INFO); C-2 kwit kuzni uprzezy metalowej < wartosc;
+    C-3 polki lukow w ostatniej dobie okna <= 2 x Z33; C-4 kasy miast i rody na minusie wobec Z33 (wspolne progi rozdz. 4 pkt 5, tu dla zmiany cen helmow i lukow);
+    C-5 INFO (reczne 8.16); C-6 INFO konie."""
+    st = [s for s in lines if s.startswith(E8_C_START)]
+    md = [s for s in lines if s.startswith(E8_C_MED)]
+    if not st and not md:
+        rep.add("E8/C: linie startu cennika", "brak w logu", "sa od wgrania E8/C (HarnessKgPerArmor, HelmDaysPerKg, HistBowDaysNew, HistThrownOwnDays, HistHorsePrices, ThrownAsMissile)", None)
+        return
+    s0 = st[-1] if st else ""
+    m0 = md[-1] if md else ""
+    # ---- C-0
+    cnt = re.search(r"uprzaz z wagi prawdziwej (\d+) szt\., helmy t4-6 (\d+), luki (\d+), oszczepy (\d+), konie (\d+)", s0)
+    hist = "ceny historyczne CZYNNE" in s0
+    k_har = "| uprzaz: [wl]" in s0
+    k_helm = "| helm plytowy t4-6: [wl]" in s0
+    k_bow = "| luki [wl]" in s0
+    k_thr = "| bron miotana bez mnoznika snopa [wl]" in s0
+    k_mis = "bez obijania (R3) [wl]" in s0
+    k_hor = "konie wedlug kategorii [wl]" in s0
+    stum = max([num(r"potkniecia (\d+)\.$", x, default=0) for x in (s0, m0) if x] + [0])
+    if cnt:
+        nh, nhe, nb, nt, nk = (int(cnt.group(i)) for i in range(1, 6))
+        okc = hist and (nh > 0 or not k_har) and (nhe > 0 or not k_helm) and (nb > 0 or not k_bow) and (nt > 0 or not k_thr) and (nk > 0 or not k_hor) and bool(m0)
+        rep.add("C-0a: linie startu cennika (E8/C)",
+                f"uprzaz z wagi prawdziwej {nh} szt., helmy t4-6 {nhe}, luki {nb}, oszczepy {nt}, konie {nk} | ceny historyczne {'CZYNNE' if hist else 'WYLACZONE'}"
+                f" | klucze: uprzaz {'wl' if k_har else 'WYL'}, helm {'wl' if k_helm else 'WYL'}, luki {'wl' if k_bow else 'WYL'}, bron miotana bez snopa {'wl' if k_thr else 'WYL'},"
+                f" konie {'wl' if k_hor else 'WYL'}, bron miotana jak pocisk {'wl' if k_mis else 'WYL'} | linia median {'jest' if m0 else 'BRAK'}",
+                "obie linie sa, ceny historyczne czynne, kazda wlaczona regula obejmuje > 0 sztuk", okc)
+    else:
+        rep.add("C-0a: linie startu cennika (E8/C)", "linia startu w innym formacie albo brak" + ("" if m0 else "; linii median brak"), "format linii z PriceList8.StartLine", False)
+    rep.add("C-0b: potkniecia cennika (E8/C)", f"potkniecia {stum}", "0 (PriceList8 i konie HistoricalPrices razem)", stum == 0)
+    if not m0:
+        return
+    # ---- C-1 mediany
+    def row(name, label, lo, hi, key_on, note=""):
+        v = e8c_med(m0, label)
+        if v is None:
+            rep.add(name, "brak w linii median", "format linii z PriceList8.StartLine", False)
+            return None
+        if v[1] == 0:
+            rep.add(name, "0 sztuk", "INFO (brak sztuk tej grupy na handel)", None)
+            return None
+        rng = f", zakres {v[2]}-{v[3]}" if v[2] is not None else ""
+        txt = f"mediana {v[0]:g} ({v[1]} szt.{rng}){note}"
+        if lo is None and hi is None:
+            rep.add(name, txt, "INFO", None)
+        elif not (hist and key_on):
+            rep.add(name, txt + " | regula wylaczona albo bez cen historycznych", f"INFO (prog przy wlaczonym kluczu: {lo if lo is not None else '-'}-{hi})", None)
+        else:
+            rep.add(name, txt, (f"{lo}-{hi}" if lo is not None else f"<= {hi}"), (lo is None or v[0] >= lo) and v[0] <= hi)
+        return v
+    row("C-1a: siodla (uprzaz z pancerzem konia do 10)", "siodla", 24, 90, k_har, " | historia 24-60, tolerancja do 90")
+    row("C-1b: kropierze (pancerz konia 11-30)", "kropierze", None, None, k_har)
+    row("C-1c: bardy t1-3 (w tym 'siodla' ROT z naczolkiem, pancerz 38-44)", "bardy t1-3", None, None, k_har)
+    row("C-1d: bardy t4-5", "bardy t4-5", None, 2400, k_har)
+    b6 = e8c_med(m0, "bardy t6")
+    if b6 is None:
+        rep.add("C-1e: barda t6", "brak w linii median", "format linii z PriceList8.StartLine", False)
+    elif b6[1] == 0:
+        rep.add("C-1e: barda t6", "0 sztuk", "INFO", None)
+    elif not (hist and k_har):
+        rep.add("C-1e: barda t6", f"mediana {b6[0]:g} ({b6[1]} szt., maks. {b6[3]}) | regula wylaczona albo bez cen historycznych", f"INFO (prog przy wlaczonym kluczu <= {E8_C_BARD6_MAX})", None)
+    else:
+        ok6 = b6[0] <= E8_C_BARD6_MAX
+        rep.add("C-1e: barda t6 (maks. INFO)",
+                f"mediana {b6[0]:g} ({b6[1]} szt., maks. {b6[3]})"
+                + ("" if ok6 else f" | prog projektu {E8_C_BARD6_MAX} liczony z szacunku 2 531 (stal szlachetna 8 d/kg); t6 kuje sie ze stali zamkowej 12 d/kg (177-1) - ten sam wzor"
+                                  f" 0.4 kg na punkt daje ok. 2 760; do decyzji: zostawic (historia: 'najlepsze wyzej') albo HarnessKgPerArmor 0.37"),
+                f"<= {E8_C_BARD6_MAX} (do {E8_C_BARD6_DECIDE} = DECYZJA - opis w wierszu)", ok6, decide=(not ok6 and b6[0] <= E8_C_BARD6_DECIDE))
+    h3 = row("C-1f: helm t3 (bez zmiany - regula od t4)", "helm t3", None, None, k_helm)
+    h4 = row("C-1g: helm t4", "helm t4", 30, 50, k_helm)
+    row("C-1h: helm t5", "helm t5", 60, 100, k_helm)
+    row("C-1i: helm t6", "helm t6", 100, 160, k_helm)
+    if h3 and h4 and h3[0] is not None and h4[0] is not None:
+        rep.add("C-1j: helm t3 wobec t4", f"t3 {h3[0]:g}, t4 {h4[0]:g}" + (" - helm t3 drozszy od t4 (regula projektu obejmuje tylko t4-6; opcja z rozpoznania B 2.5: ta sama regula od t3)" if h3[0] > h4[0] else ""),
+                "INFO (do decyzji, gdy t3 > t4)", None)
+    row("C-1k: luk t1", "luk t1", None, None, k_bow)
+    row("C-1l: luk t2", "luk t2", None, None, k_bow)
+    row("C-1m: luk t3", "luk t3", 15, 24, k_bow)
+    row("C-1n: luk t4", "luk t4", 20, 32, k_bow)
+    row("C-1o: luk t5", "luk t5", 28, 44, k_bow)
+    row("C-1p: luk t6", "luk t6", 38, 60, k_bow)
+    row("C-1q: bron miotana (stos)", "bron miotana", None, 40, k_thr)
+    # ---- C-2 kwit kuzni
+    q = re.search(r"uprzaz z plyty i kolczugi - material >= wartosc (\d+) z (\d+)( \[[^\]]*\])?, uprzaz ze skory i tkaniny \([^)]*\) (\d+) z (\d+)( \[[^\]]*\])?", m0)
+    if q:
+        rep.add("C-2a: kwit kuzni gracza - uprzaz z plyty i kolczugi", f"material >= wartosc {q.group(1)} z {q.group(2)}{q.group(3) or ''}",
+                "0 sztuk (kwit z tej samej wagi co wartosc - R7)" + ("" if k_har else " - INFO przy wylaczonym kluczu"), (int(q.group(1)) == 0) if (hist and k_har) else None)
+        rep.add("C-2b: kwit kuzni gracza - uprzaz ze skory i tkaniny", f"material >= wartosc {q.group(4)} z {q.group(5)}{q.group(6) or ''}",
+                "INFO (kwit z punktow pancerza w calych sztukach skory 40 d i plotna 100 d - poza E8/C)", None)
+    else:
+        rep.add("C-2: kwit kuzni gracza wobec wartosci", "brak w linii median", "format linii z PriceList8.StartLine", False)
+    # ---- C-3 polki
+    sh = e8c_shelves(lines)
+    days = [d for d in sorted(sh) if 1 <= run_day(d, start) <= until]
+    if days:
+        last = days[-1]
+        cur = sh[last]
+        bows = cur.get("Bow", 0)
+        full = run_day(last, start) >= until
+        rep.add(f"C-3a: polki lukow (doba {run_day(last, start)})", f"{bows} szt. wobec Z33 doba 120: {E8_C_Z33_SHELF['Bow']} (x{bows / E8_C_Z33_SHELF['Bow']:.2f})",
+                f"<= 2 x Z33 ({2 * E8_C_Z33_SHELF['Bow']})" + ("" if (full and until == 120) else " - INFO poza doba 120"), (bows <= 2 * E8_C_Z33_SHELF["Bow"]) if (full and until == 120) else None)
+        rep.add(f"C-3b: polki helmow, broni miotanej i uprzezy (doba {run_day(last, start)})",
+                ", ".join(f"{k} {cur.get(k, 0)} (Z33 {E8_C_Z33_SHELF[k]})" for k in ("HeadArmor", "Thrown", "HorseHarness")),
+                "INFO (warsztaty robia wiecej helmow i lukow na roboczodzien; bron miotana bez mnoznika snopa)", None)
+    else:
+        rep.add("C-3: polki lukow", "brak linii Rynek broni w oknie", "INFO", None)
+    # ---- C-4 kasy miast, rody na minusie
+    nad = {d: s for d, s in by_day(lines, "Nadwyzka kas (E5/0): dzien").items() if 1 <= run_day(d, start) <= until}
+    if nad:
+        last = max(nad)
+        gold = num(r"miasta \d+: kasy (-?\d+)", nad[last])
+        full = run_day(last, start) >= until - 1 and until == 120
+        if gold is not None:
+            rep.add(f"C-4a: suma kas miast (doba {run_day(last, start)})", f"{gold} wobec Z33 doba 120: {E8_C_Z33_TOWN_GOLD} ({100.0 * gold / E8_C_Z33_TOWN_GOLD:.1f}%)",
+                    ">= 80% Z33" + ("" if full else " - INFO poza doba 120"), (gold >= 0.8 * E8_C_Z33_TOWN_GOLD) if full else None)
+        ours = [num(r"nasze sciezki (\d+) z", s, default=None) for s in nad.values()]
+        ours = [v for v in ours if v is not None]
+        if ours:
+            rep.add("C-4b: kasy miast ponizej zapasu przez nasze sciezki (suma okna)", f"{sum(ours)} w {len(ours)} dobach (niezerowe {sum(1 for v in ours if v)})",
+                    "0 (wspolny prog rozdz. 4 pkt 5; rozbicie - bloki etapu 5)", sum(ours) == 0)
+    else:
+        rep.add("C-4a: suma kas miast", "brak linii Nadwyzka kas (E5/0)", "INFO", None)
+    minus = {}
+    for s in lines:
+        if s.startswith("Skarbce: dzien"):
+            d = num(r"dzien (\d+)", s)
+            v = num(r"na minusie (\d+)", s)
+            if d is not None and v is not None and 1 <= run_day(d, start) <= until + 1:
+                minus[d] = minus.get(d, 0) + v
+    if minus:
+        last = max(minus)
+        full = run_day(last, start) >= until and until == 120
+        lim = E8_C_Z33_CLANS_MINUS * 1.1
+        rep.add(f"C-4c: rody na minusie (linie Skarbce, dzien {last})", f"{minus[last]} wobec Z33 {E8_C_Z33_CLANS_MINUS}",
+                f"<= Z33 + 10% ({lim:.0f})" + ("" if full else " - INFO poza doba 120"), (minus[last] <= lim) if full else None)
+    # ---- C-5, C-6
+    rep.add("C-5: obity oszczep w sakwach przez zapis i wczytanie", "autotest nie ma obitej broni miotanej w sakwach gracza", "INFO - reczne 8.16 (stan zostaje: CleanseAmmo czysci tylko strzaly i belty)", None)
+    hl = re.search(r"konie wedlug kategorii \[wl\]: ([^|]*)", s0)
+    dem = [x for x in lines if x.startswith("HistoricalPrices: popyt miast przeliczony")]
+    r1 = num(r"[ ,]horse /(\d+(?:\.\d+)?)", dem[-1], cast=float, default=None) if dem else None
+    r2 = num(r"war_horse /(\d+(?:\.\d+)?)", dem[-1], cast=float, default=None) if dem else None
+    kon = {d: s for d, s in by_day(lines, "Konie (E6/0): dzien").items() if 1 <= run_day(d, start) <= until}
+    ktxt = ""
+    if kon:
+        km = re.search(r"polki miast i zamkow (\d+)/(\d+)/", kon[max(kon)])
+        if km:
+            ktxt = f" | polki koni doba {run_day(max(kon), start)}: zwykle {km.group(1)} (Z33 {E8_C_Z33_HORSES[0]}), bojowe {km.group(2)} (Z33 {E8_C_Z33_HORSES[1]})"
+    rep.add("C-6: konie wedlug kategorii",
+            (hl.group(1).strip()[:300] if hl else "klucz wylaczony albo bez cen historycznych")
+            + f" | przelicznik popytu: horse {'/' + format(r1, 'g') if r1 else 'brak'}, war_horse {'/' + format(r2, 'g') if r2 else 'brak'}" + ktxt,
+            "przy wlaczonym kluczu przelicznik popytu horse /2.3-2.7 i war_horse /0.6-0.75 (mieszczanie kupuja tyle samo tych koni co dotad); polki koni INFO",
+            None if not (k_hor and hist) else bool(r1 and r2 and 2.3 <= r1 <= 2.7 and 0.6 <= r2 <= 0.75))
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9411,6 +9617,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_a)    # E8/A (250): misja gracza - odzysk wedlug strony, arena nie obija, lup z wlasnych zabojstw
     blocks.append(etap8_z)    # E8/Z (251): zakupy i nadwyzki AI - bez dodatnich stanow, sufit ceny (W CIENIU), uprzaz ponad zapas
     blocks.append(etap8_l)    # E8/L (252): lup to przeniesienie, Send troops - jedna droga, dar dla miasta do zalogi bez milicji, trofea zostawione na polke
+    blocks.append(etap8_c)    # E8/C (253): cennik - rzad konski z wagi prawdziwej, helmy t4-6, luki, bron miotana, konie wedlug kategorii
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

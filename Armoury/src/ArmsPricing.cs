@@ -64,6 +64,9 @@ namespace Armoury
         private static readonly float[] DaysThrown = { 0.5f, 0.8f, 1f, 1.5f, 2f, 3f };
         private static readonly float[] DaysShield = { 1f, 1.5f, 2f, 3f, 4f, 5f };
         private static readonly float[] DaysBow = { 2f, 3f, 4f, 6f, 8f, 12f };
+        // E8/C (253, PLAN 8.5f): luk dlugi kosztowal 12 d bialy i 18 d malowany (1341) - przy dniowce lukmistrza wedlug tieru to 1.5-2.5 dnia, nie 2-12 dni
+        // (luk t6 wychodzil 159 d). t1-2 schodza razem z t3, inaczej luk t2 bylby drozszy od t3. Klucz HistBowDaysNew; wylaczony = DaysBow
+        private static readonly float[] DaysBowWar = { 1.5f, 1.5f, 1.5f, 1.7f, 2f, 2.5f };
         private static readonly float[] DaysXbow = { 3f, 4f, 6f, 8f, 10f, 14f };
         // wpis 52: snop t6 nie 3x drozszy od t1 (12-16 d). sklad8-s S2: grot bodkin i grot plaski to ta sama robota - t1-4 jednakowo,
         // t5-6 (grot stalowany) +17% jak w 1341 (14 d za snop wobec 12 d, Close Rolls); dotad 0.30-0.50 (+67%)
@@ -125,6 +128,25 @@ namespace Armoury
                 // napraw i wyceny; wylaczone Tier6CastleSteel - stara regula (t6 ze stali szlachetnej). Cache CostOf - zmiana dopiero po wczytaniu.
                 default: return Settings.Current != null && Settings.Current.Tier6CastleSteel ? CraftingMaterials.Iron6 : CraftingMaterials.Iron5;
             }
+        }
+
+        /// <summary>E8/C (253, PLAN 8.5d, regula R7 "jedna wycena"): WAGA DO KOSZTU. Rzad konski ROT ma wagi spoza swiata (bardy 140-145 kg, "siodla" 100 kg,
+        /// kropierze 80 kg) przy pancerzu 20-88 - liczony jak 140 kg plyty dawal barde t6 za 11 522 d i siodlo za 1 626 d (historia: siodlo 24-60, barda 480-2 400).
+        /// Uprzaz liczymy z wagi prawdziwej: min(waga gry, max(3 kg, HarnessKgPerArmor x pancerz konia)) - sztuki o rozsadnej wadze zostaja przy swojej. Ta sama liczba
+        /// w wartosci (Compute -> HistCost), w warsztacie (WorkshopLaw.Needs z CostOf), w kwicie kuzni gracza (Recipes.BuildRecipe), w przetopie (z kwitu)
+        /// i w materiale naprawy (MendMaterial z CostOf). Waga sztuki w ekwipunku bez zmian. Inne typy i klucz 0 - waga gry.</summary>
+        internal static float CostWeight(ItemObject it)
+        {
+            if (it == null) return 0f;
+            float w = it.Weight;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || s.HarnessKgPerArmor <= 0f || it.ItemType != ItemObject.ItemTypeEnum.HorseHarness || it.ArmorComponent == null) return w;
+                float real = Math.Max(3f, s.HarnessKgPerArmor * Math.Max(0, it.ArmorComponent.BodyArmor));
+                return Math.Min(w, real);
+            }
+            catch { return w; }
         }
 
         private static int Stack(ItemObject it)
@@ -192,7 +214,7 @@ namespace Armoury
             try
             {
                 int t = TierOf(it);
-                float w = Math.Max(0.01f, it.Weight);
+                float w = Math.Max(0.01f, CostWeight(it));   // E8/C: uprzaz z wagi prawdziwej, reszta - waga gry
                 bool ammo = ArrowsOrBolts(it);
                 var grade = ammo ? AmmoGrade(t) : GradeFor(t);   // sklad8-s S2: grot strzaly z zelaza (t5-6 stalowany), reszta jak dotad
                 var metalItem = Recipes.MaterialItem(grade);
@@ -237,6 +259,12 @@ namespace Armoury
                     default:
                         return null;
                 }
+                // E8/C (253, PLAN 8.5e-f): helm plytowy t4-6 - dni z wagi i pol dnia za kazdy tier ponad trzeci (dotad wzor napiersnika: helm t5 2.4 kg = 13.4 dnia
+                // mistrza = 176 d przy bascinecie za 48 d); luki - tabela DaysBowWar. Metal, len i drewno bez zmian
+                if (it.ItemType == ItemObject.ItemTypeEnum.HeadArmor && mat == ArmorComponent.ArmorMaterialTypes.Plate && t >= 4 && s.HelmDaysPerKg > 0f)
+                    days = w * s.HelmDaysPerKg + 0.5f * (t - 3);
+                else if (it.ItemType == ItemObject.ItemTypeEnum.Bow && s.HistBowDaysNew)
+                    days = DaysBowWar[t - 1];
                 // jakosc konkretnej sztuki wzgledem jej typu i tieru (Jeff: pancerz, jaki daje)
                 float q = 1f;
                 float med;
