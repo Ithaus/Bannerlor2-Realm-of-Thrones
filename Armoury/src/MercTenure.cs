@@ -54,10 +54,14 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _inBkFiring;
         internal static bool UnpaidLeave;   // MercContract: odejscie po niedoplacie 185 (ustawiane na czas ApplyByLeaveKingdomAsMercenary)
+        // recenzja M6a: krotka sluzba bez wyjatku rozstrzygana dopiero w linii doby - Diplomacy SoftlyDestroyKingdomAction wypuszcza kompanie
+        // (LeaveAsMercenary) z krolestwa buntownikow, ktore jest jeszcze w wojnie i nie upadlo, a DestroyKingdomAction wola zaraz potem; w chwili
+        // zdarzenia nie da sie tego odroznic od zerwania sluzby (falszywe NIE w M6a-1a). Tylko licznik - zachowanie gry bez zmian.
+        private static readonly List<string> _pendBad = new List<string>();   // id krolestwa starego pana dla kazdej krotkiej sluzby bez wyjatku z tej doby
 
         internal static void Reset()
         {
-            _prev.Clear(); _joined.Clear(); ZeroDay();
+            _prev.Clear(); _joined.Clear(); _pendBad.Clear(); ZeroDay();
             _sHire = _sEnd = _sShortBad = _sToEnemy = _sBlockJoin = _sBlockFire = _sBlockEnemyBk = 0; _sServiceDays = 0; _sServiceN = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _inBkFiring = false; UnpaidLeave = false;
         }
@@ -141,7 +145,7 @@ namespace Armoury
                             // wyjatki: upadek krolestwa, niedoplata 185, pracodawca bez wojny (zwolnienie BK w pokoju osobno), krolestwo gracza (jego zwolnienie)
                             int why = ruin || oldK.IsEliminated ? 2 : UnpaidLeave ? 1 : !AtWar(oldK) ? (_inBkFiring ? 3 : 0) : oldK.RulingClan == Clan.PlayerClan ? 4 : -1;
                             if (why >= 0) { _dShortOk++; _dWhy[why]++; }
-                            else { _dShortBad++; _sShortBad++; }
+                            else _pendBad.Add(oldK.StringId ?? "");   // recenzja M6a: rozstrzygniecie w linii doby (upadek krolestwa tuz po odejsciu = wyjatek 2)
                         }
                     }
                     else _dShortUnknown++;
@@ -212,6 +216,14 @@ namespace Armoury
             try
             {
                 Sweep(out inService, out bound, out peace);
+                // recenzja M6a: krotkie sluzby bez wyjatku z tej doby - krolestwo, ktore upadlo po odejsciu kompanii (Diplomacy: krolestwo buntownikow), to wyjatek 2
+                foreach (var kid in _pendBad)
+                {
+                    var ok = KingdomById(kid);
+                    if (ok == null || ok.IsEliminated) { _dShortOk++; _dWhy[2]++; }
+                    else { _dShortBad++; _sShortBad++; }
+                }
+                _pendBad.Clear();
                 var old = new List<string>();
                 foreach (var kv in _prev) if (kv.Value == null || today - kv.Value.Day >= Days) old.Add(kv.Key);
                 foreach (var id in old) _prev.Remove(id);
@@ -234,6 +246,7 @@ namespace Armoury
                 _importN = -1;
             }
             catch (Exception e) { Stumble("Daily", e); }
+            _pendBad.Clear();
             ZeroDay();   // liczniki od tej linii do nastepnej
         }
 

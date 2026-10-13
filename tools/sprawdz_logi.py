@@ -433,7 +433,8 @@ Uzycie (Python 3, tylko odczyt):
                     Wiersze M6a-0 (linie, latki, potkniecia), M6a-1a/1b (sluzba krotsza niz najkrotsza bez wyjatku = 0, najem u wroga poprzedniego
                     pana = 0), M6a-1c/1d (zmiany pana, odstep umow 185, ludzie najemnikow - INFO), M6a-2a (cena po mnozniku miedzy podloga a pelna),
                     M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
-                    przez pokoj w doby pokoju fabularnego <= 1.0 na dobe), M6a-3c (INFO). Log bez paczki: INFO, bez wyjatku.
+                    przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
+                    85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -16056,22 +16057,29 @@ def m6a_main(logp, start_arg, until=120):
     # uwolnienia przez pokoj w doby pokoju fabularnego (kazdy log): E7/0 "WOJNA ... dni od poprzedniego zdarzenia tej pary 0 (POKOJ)" przed linia 169c
     rw = re.compile(r"^Wojna i pokoj \(E7/0\): dzien \d+ \| .*: WOJNA .*dni od poprzedniego zdarzenia tej pary 0 \(POKOJ\)")
     rc = re.compile(r"^Niewola lordow i okupy \(169c\): dzien (\d+) .*?uwolnieni dzis: okup \d+, pokoj (\d+)")
-    story, sd, sn, od, onn = False, 0, 0, 0, 0
+    # recenzja M6a: uwolnienia M6a-3 po dobie (prawdziwy pokoj innej pary rozstrzygniety tej doby - "nadal pokoj - uwolnieni N (jencow-bohaterow M)"
+    # z linii doby M6a-3, to samo okno co 169c) odjete od licznika doby fabularnej - prog mierzy tylko uwolnienia w klatce pokoju na zero dni
+    # (bez tego jeden prawdziwy pokoj rozstrzygniety w dobie fabularnej dawal falszywe NIE; M liczy wszystkich bohaterow, 169c samych lordow - odjecie lagodne)
+    story, sd, sn, od, onn, shf = False, 0, 0, 0, 0, 0
     for s in lines:
         if rw.match(s):
             story = True
             continue
         m = rc.match(s)
         if m:
-            if inwin(int(m.group(1))):
+            d = int(m.group(1))
+            if inwin(d):
                 if story:
+                    hf = (num(r"nadal pokoj - uwolnieni \d+ \(jencow-bohaterow (\d+)\)", ph[d]) or 0) if d in ph else 0
                     sd += 1
-                    sn += int(m.group(2))
+                    sn += max(0, int(m.group(2)) - hf)
+                    shf += min(hf, int(m.group(2)))
                 else:
                     od += 1
                     onn += int(m.group(2))
             story = False
-    val = (f"doby z pokojem fabularnym (pokoj i wojna tej samej pary tej doby) {sd}: uwolnionych przez pokoj {sn} ({sn / sd if sd else 0:.2f} na dobe);"
+    val = (f"doby z pokojem fabularnym (pokoj i wojna tej samej pary tej doby) {sd}: uwolnionych przez pokoj {sn} ({sn / sd if sd else 0:.2f} na dobe)"
+           f" - bez {shf} uwolnionych tych dob przez M6a-3 po dobie (prawdziwy pokoj innej pary);"
            f" pozostale doby {od}: {onn} ({onn / od if od else 0:.2f} na dobe)")
     if on3 and sd:
         rep.add("M6a-3b: lordowie uwolnieni przez pokoj w doby pokoju fabularnego", val, "<= 1.0 na taka dobe (bieg roczny bez paczki: 440 w 65 dobach = 6.8)", sn <= 1.0 * sd)
@@ -16081,7 +16089,26 @@ def m6a_main(logp, start_arg, until=120):
     if allph:
         keptl = sum(num(r"jency zostaja \d+ \(jencow-bohaterow (\d+)\)", s) or 0 for s in allph)
         rep.add("M6a-3c: jency-bohaterowie, ktorzy zostali w niewoli po pokoju na zero dni (INFO)", f"{keptl}",
-                "INFO - bieg roczny bez paczki: ok. 440 uwolnionych za darmo; wojsko w polu - wiersz W5-7 / etap2 (podloga 85 tys.)", None)
+                "INFO - bieg roczny bez paczki: ok. 440 uwolnionych za darmo; wojsko w polu - wiersz M6a-4 (podloga 85 tys.)", None)
+    # ---- M6a-4 (recenzja): miara progu 85 tys. i lordowie w niewoli w tym samym oknie - porownanie z biegiem bez paczki (kazdy log, INFO)
+    # rachunek recenzji: M6a-3 trzyma ok. 6.6 lorda wiecej w niewoli naraz (440 x 5.5 doby / 364), M6a-1 ok. +0.27 tys. ludzi kompanii w wojnie
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + men
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[d] for d in ds) / len(ds)
+        capt = [num(r"w niewoli teraz (\d+)", c169[d]) for d in ds if d in c169]
+        capt = [x for x in capt if x is not None]
+        rep.add(f"M6a-4: druzyny lordow krolestw w wojnie (miara progu 85 tys.) i lordowie w niewoli, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)} (INFO)",
+                f"{v / 1e3:.1f} tys. ludzi; w niewoli srednio {(sum(capt) / len(capt)) if capt else 0:.1f} lordow",
+                "INFO - bez paczki: bieg 120 dob WGRANIA 43 (doby 93-120) 108.7 tys., w niewoli 34.9; bieg roczny doby 93-120 95.6 tys. / 32.9, doby 337-364 79.6 tys. / 42.1."
+                " Paczka: wojsko nie nizsze niz bieg 120 dob WGRANIA 43 poza szumem (rachunek paczki -0.5..+0.9 tys.); niewola ok. +6.6 lorda (M6a-3). Wojsko nizsze o ponad 2 tys. - wylaczyc Peace Release After Day i powtorzyc",
+                None)
+    else:
+        rep.add("M6a-4: druzyny lordow krolestw w wojnie (miara progu 85 tys.)", "brak linii Skarbce w oknie", "INFO", None)
     rep.show()
     return 0
 
