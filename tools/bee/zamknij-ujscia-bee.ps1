@@ -37,6 +37,7 @@
 #                        Z -Cofnij (albo cofnij-ujscia-bee.ps1 -TylkoZdarzenia) to wylacznik samej paczki E8/E.
 #   -Cofnij              kierunek odwrotny: wartosci zmienione przez ten skrypt wracaja do stanu sprzed zmiany (13 kluczy ujsc,
 #                        wariant zbrojowni rozpoznawany sam, i klucz 14 - kazda grupa, ktora jest "po").
+#                        Gdy cofniecie obejmuje 13 kluczy ujsc, skrypt wypisuje UWAGA (ujscia znowu otwarte + jak zamknac).
 #                        Wygodniej: cofnij-ujscia-bee.ps1.
 #   -NaSucho             wszystkie kontrole i tabela, bez kopii i bez zapisu.
 #   -ProcesyGry <wzory>  nazwy procesow uznawanych za gre (do prob kontroli "gra uruchomiona"); kilka wzorow: jeden napis
@@ -421,6 +422,11 @@ try {
         exit 0
     }
     if ($ileZmian -ne 14 -and $ileZmian -ne 13 -and $ileZmian -ne 1) { Stop-Skrypt 1 ('Blad wewnetrzny: lista kluczy ma {0} pozycji (dozwolone 14, 13 albo 1).' -f $ileZmian) }
+    if ($Cofnij -and $ileZmian -ge 13) {
+        # Samo "cofnij" bywa brane za wylacznik paczki E8/E, a cofa tez 13 kluczy ujsc - skrypt mowi to wprost (takze na sucho),
+        # razem z przelacznikiem, ktory przy ponownym zamknieciu zachowa wariant zbrojowni z pliku.
+        Write-Host ('UWAGA: to cofniecie obejmuje 13 kluczy ujsc - po nim ujscia BEE (zloto i towar z niczego / w nicosc u AI) sa znowu OTWARTE. Sam klucz 14 (wylacznik E8/E): -TylkoZdarzenia. Ponowne zamkniecie w tym samym wariancie zbrojowni: zamknij-ujscia-bee.ps1' + $(if ($zbrojowniaWPliku.Klucz -ceq $ZbrojowniaLista.Klucz) { ' -ListaZFundamentu' } else { '' }) + '.')
+    }
 
     # 4. podmiana w pamieci: kazda kotwica dokladnie raz
     $plan = New-Object System.Collections.Generic.List[object]
@@ -560,7 +566,7 @@ try {
     if (-not $Cofnij) {
         Write-Host 'Dalej: uruchom gre; w Modules\BetterEconomy\bee_log.txt ma byc "settings loaded: 583 applied, 0 skipped". Nowa kampania nie jest potrzebna.'
         if ($wybrane.Contains($Zdarzenia)) { Write-Host 'Klucz 14: nowe losowe zdarzenia BEE juz nie powstana; te, ktore trwaja w zapisie, wygasna same w swoim terminie (klucze Event...DurationDays).' }
-        Write-Host 'Cofniecie: cofnij-ujscia-bee.ps1 (gra zamknieta); sam klucz 14: cofnij-ujscia-bee.ps1 -TylkoZdarzenia.'
+        Write-Host 'Cofniecie (gra zamknieta): sam klucz 14 - cofnij-ujscia-bee.ps1 -TylkoZdarzenia; cofnij-ujscia-bee.ps1 bez przelacznika cofa kazda grupe "po", czyli otwiera tez 13 ujsc.'
     }
 }
 catch {

@@ -621,3 +621,22 @@ w oknie BEE osady: pozycja "Active event" po najwyzej 21 dobach pokazuje "-" / "
 - Po aktualizacji BEE (nowy plik ustawien) trzeba uruchomic skrypt od nowa - jak dla 13 kluczy.
 - Skrypt w galezi dokumentow glownego repo (`tools\bee`) zostal w starej wersji - do wyrownania przy scalaniu galezi
   (bajt w bajt ta sama podstawa: commit importu 364470e = 9c49247).
+
+### 11.6 Recenzja (12.10)
+
+Niezalezny przeglad: wlasna dekompilacja `BetterEconomy.dll` z gry (`TrySpawnEvent`, `SettingsLoader`, odbiorcy mnoznikow), skan
+nazwy klucza we wszystkich DLL modow i wlasny zestaw prob na kopiach (83 sprawdzenia, 0 niezaliczonych; skrypty w postaci LF i
+CRLF) - logika i liczby z rozdz. 11.1-11.5 potwierdzone, skrot pliku Jeffa po zmianie `114635f1...10e1`.
+
+Jedna poprawka, tylko komunikaty (logika, kontrole, kody wyjscia i pliki wynikowe bez zmian):
+- linia koncowa `zamknij` mowi teraz: "Cofniecie (gra zamknieta): sam klucz 14 - cofnij-ujscia-bee.ps1 -TylkoZdarzenia;
+  cofnij-ujscia-bee.ps1 bez przelacznika cofa kazda grupe "po", czyli otwiera tez 13 ujsc." (dotad pierwszym podanym sposobem
+  cofniecia bylo samo `cofnij-ujscia-bee.ps1`, takze po zmianie jednego klucza 14);
+- cofanie, ktore obejmuje 13 kluczy ujsc (takze `-NaSucho`), wypisuje "UWAGA: to cofniecie obejmuje 13 kluczy ujsc - po nim
+  ujscia BEE ... sa znowu OTWARTE. Sam klucz 14 (wylacznik E8/E): -TylkoZdarzenia. Ponowne zamkniecie w tym samym wariancie
+  zbrojowni: zamknij-ujscia-bee.ps1 [-ListaZFundamentu]." - przelacznik w radzie wedlug wariantu rozpoznanego w pliku (po pelnym
+  cofnieciu pliku Jeffa samo `zamknij` zamkneloby zbrojownie w wariancie "tylko AI").
+
+Skrot skryptu w postaci LF po poprawce: `zamknij-ujscia-bee.ps1` `b126020f...ac90` (w 11.3: `ef1ff224...6ba2`);
+`cofnij-ujscia-bee.ps1` bez zmian. Nowa wersje poznac po pierwszej linii wyniku: "== BetterEconomy, 14 kluczy (13 ujsc +
+klucz 14: losowe zdarzenia): ...".
