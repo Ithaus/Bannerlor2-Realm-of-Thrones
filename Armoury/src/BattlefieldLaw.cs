@@ -331,7 +331,7 @@ namespace Armoury
                     var el = ShareQueue.GetElementCopyAtIndex(i);
                     __result.AddToCounts(el.EquipmentElement, el.Amount);
                 }
-                ShareQueue.Clear();
+                ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran
                 int wrecks = AppendWrecks(__result);
                 CleanseDragons(__result);
                 CleanseTrash(__result);
@@ -654,7 +654,17 @@ namespace Armoury
                 if (!Settings.Current.BattlefieldLawEnabled) return;
                 if (winnerParty == null || winnerParty != PartyBase.MainParty) return;
                 if (gainedLoots == null) return;
-                if (!RealFoughtBattle() || RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
+                if (!RealFoughtBattle() || RotEnlisted())
+                {
+                    // recenzja E8/L: nieodebrana dzialka z poprzedniego "Send troops" (do godziny w kolejce) zostaje - dotad to czyszczenie wyrzucalo ja w nicosc
+                    if (SimShareWaits())
+                    {
+                        Log.Info("BattlefieldLaw (E8/L): rozliczenie nastepnej bitwy bez misji - kolejka lupow nie jest czyszczona, czeka w niej dzialka z poprzedniego Send troops ("
+                                 + ShareQueue.Count + " pozycji); odbierze ja ekran lupow albo sakwy po godzinie.");
+                        return;
+                    }
+                    ShareQueue.Clear(); Wrecks.Clear(); return;
+                }
 
                 if (_rlPresent)
                 {
@@ -679,7 +689,7 @@ namespace Armoury
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         gainedLoots.AddToCounts(el.EquipmentElement, el.Amount);
                     }
-                    ShareQueue.Clear();
+                    ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran gry
                 }
                 AppendWrecks(gainedLoots);
                 CleanseDragons(gainedLoots);
@@ -729,9 +739,28 @@ namespace Armoury
         /// <summary>Lista trofeow Spoils ostatniej bitwy to prawdziwy lup z pola (podmieniona w AfterGenerateLoot), nie loteria Spoils - tylko taka
         /// reszta zostawiona przy "Leave" idzie na polke warowni (SpoilsSeal.RemnantPostfix); loteria z niczego przepada jak dotad.</summary>
         internal static bool ScreenIsRealLoot;
+        /// <summary>Recenzja E8/L: w kolejce lezy nieodebrana dzialka z "Send troops" (sztuki zdjete juz ze zbrojowni wojska). Po oblezeniu i bitwie morskiej
+        /// ekran Spoils nie przychodzi, wiec dzialka czeka do godziny na termin "do sakw" - a rozliczenie NASTEPNEJ bitwy bez misji czyscilo kolejke
+        /// (AfterCollectLoot) i te sztuki szly w nicosc (np. wypad zalogi odparty przez "Send troops", zaraz potem szturm przez "Send troops"). Dopoki
+        /// flaga stoi, tamto czyszczenie jest pomijane - kolejke odbierze ekran lupow albo termin godzinny. Gasnie tam, gdzie kolejka jest oddawana.</summary>
+        private static bool _simPending;
 
-        /// <summary>Nowa gra albo wczytanie (HorseFate.Reset z konstruktora ArmouryBehavior): liczniki E8/L od zera.</summary>
-        internal static void LReset() { _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false; }
+        /// <summary>Czy w kolejce czeka nieodebrana dzialka z "Send troops" (wtedy rozliczenie nastepnej bitwy bez misji kolejki nie czysci).</summary>
+        private static bool SimShareWaits()
+        {
+            if (_simPending && ShareQueue.Count == 0) _simPending = false;
+            return _simPending;
+        }
+
+        /// <summary>Nowa gra albo wczytanie (HorseFate.Reset z konstruktora ArmouryBehavior): liczniki E8/L od zera. Recenzja E8/L: takze kolejka lupow
+        /// (statyczna, bez zapisu) - dzialka czekajaca na ekran w jednej kampanii nie moze wyjsc na ekranie lupow innej (od E8/L czeka w niej do godziny
+        /// po kazdym "Send troops" bez ekranu Spoils).</summary>
+        internal static void LReset()
+        {
+            _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
+            _simPending = false;
+            try { ShareQueue.Clear(); Wrecks.Clear(); } catch { }
+        }
 
         /// <summary>Liczniki doby do linii "Lup i dary (E8/L)" (HorseFate.LLine) - zwraca tekst i zeruje.</summary>
         internal static string TakeSimCut()
@@ -812,12 +841,30 @@ namespace Armoury
                             left -= n; moved += n;
                         }
                 }
-                if (moved > 0) ArmouryBehavior.LootFlushIn(1f);
                 Log.Info("BattlefieldLaw (E8/L): Send troops - lup DTE z poleglych " + total + " szt. w zbrojowni wojska, dzialka kapitana " + pct + "% = " + moved
-                         + " szt. czeka na ekran lupow (reszta zostaje ludziom); loterie Spoils i gry za tych samych poleglych pominiete.");
+                         + " szt. w kolejce lupow - ekran Spoils albo sakwy (reszta zostaje ludziom); loterie Spoils i gry za tych samych poleglych pominiete.");
             }
             catch (Exception e) { _lStumbles++; Log.Error("QueueSimShare", e); }
+            // recenzja E8/L: poza try - takze gdy wyjatek przerwal zdejmowanie w polowie, sztuki juz zdjete maja termin i ochrone przed czyszczeniem kolejki
+            if (moved > 0) { _simPending = true; ArmouryBehavior.LootFlushIn(1f); }
             return moved;
+        }
+
+        /// <summary>
+        /// Recenzja E8/L (HorseFate.SimShare, zaraz po QueueSimShare): ekran lupow Spoils przychodzi tylko po bitwie polowej na ladzie (dekompilacja Spoils
+        /// 1.8.4: SkipVanillaLootPatch i LootCollectionBehavior.OnMapEventEnded - oblezenie i bitwe morska oddaje grze, a ekran gry byl PRZED koncem bitwy).
+        /// Po takiej bitwie dzialka idzie do sakw od razu, a nie po godzinie: kolejka jest statyczna i bez zapisu, wiec zapis i wczytanie w tej godzinie
+        /// (w zdobytym zamku czas stoi) gubily sztuki zdjete juz ze zbrojowni wojska. Po bitwie polowej bez zmian - ekran Spoils albo termin godzinny.
+        /// </summary>
+        internal static void SimShareNoScreen(MapEvent me)
+        {
+            try
+            {
+                if (!SimShareWaits()) return;
+                if (_rlPresent && me != null && me.IsFieldBattle && !me.IsNavalMapEvent) return;
+                FlushShareToBaggage("Send troops - ekran lupow Spoils po tej bitwie nie przychodzi (oblezenie, morze)");
+            }
+            catch (Exception e) { _lStumbles++; Log.Error("SimShareNoScreen", e); }
         }
 
         /// <summary>Czy agent nalezy do partii gracza (po Origin, przez refleksje -
@@ -913,7 +960,7 @@ namespace Armoury
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         armory.AddToCounts(el.EquipmentElement, el.Amount);
                     }
-                ShareQueue.Clear();
+                ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka wrocila do zbrojowni wojska
                 Wrecks.Clear();
             }
             catch (Exception e) { Log.Error("DropShare", e); }
@@ -953,7 +1000,7 @@ namespace Armoury
                         moved++;
                     }
                 }
-                ShareQueue.Clear();
+                ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana do sakw
                 moved += AppendWrecks(bag);
                 if (moved > 0)
                 {

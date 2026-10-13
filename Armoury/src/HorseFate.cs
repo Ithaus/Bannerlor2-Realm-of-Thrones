@@ -418,7 +418,7 @@ namespace Armoury
             var sn = __state as LootSnapshot;
             if (sn != null) { try { LootMove(sn); } catch (Exception e) { Stumble("DtePostfix", e); } }
             var sim = __state as SimSnapshot;
-            if (sim != null) { try { SimShare(sim); } catch (Exception e) { Stumble("DtePostfix(Send troops)", e); } }   // E8/L (252)
+            if (sim != null) { try { SimShare(sim, __0); } catch (Exception e) { Stumble("DtePostfix(Send troops)", e); } }   // E8/L (252)
             P2LootAfter(__0);   // E8/P2 (244): po LootMove - ile sztuk innych niz konie zostalo u pokonanych jako kopia (tylko pomiar, wlasny try)
         }
 
@@ -731,7 +731,7 @@ namespace Armoury
         // tej bitwy; dzialka kapitana (PlayerLootSharePercent - "auto-resolved battles use this share for everything", wpis 82) schodzi ze zbrojowni do kolejki
         // BattlefieldLaw na ekran lupow, reszta zostaje ludziom; loterie tnie BattlefieldLaw (AfterGenerateLoot, CutCasualtyLootPrefix). Konie pokonanych bez
         // zmian (E6/K1 tej drogi nie rusza). Nic nie powstaje: sztuki tylko przechodza ze zbrojowni druzyny na ekran gracza.
-        private static void SimShare(SimSnapshot sn)
+        private static void SimShare(SimSnapshot sn, MapEvent me)
         {
             var now = ArmsOf(MobileParty.MainParty, true, true);
             var gained = new Dictionary<ItemObject, int>();
@@ -743,6 +743,7 @@ namespace Armoury
             }
             _dSimEvents++; _dSimGained += total;
             _dSimShare += BattlefieldLaw.QueueSimShare(gained, total);
+            BattlefieldLaw.SimShareNoScreen(me);   // recenzja E8/L: oblezenie i morze - ekran Spoils nie przyjdzie, dzialka od razu do sakw (bez godziny w kolejce)
         }
 
         /// <summary>E8/L (252): polka najblizszej przyjaznej warowni dla porzuconego dobytku (regula (2): ta sama frakcja i nieoblegana, dalej niewroga,
