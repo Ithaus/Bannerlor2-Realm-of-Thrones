@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -259,6 +260,28 @@ namespace GrandTourney
             catch (Exception e) { Log.Error("ReleaseWarBound", e); }
         }
 
+        // F7 (test zbiorczy 5-8, TRIAZ zb58 "E7/O1 T3" pkt 2): wezwanie przez wejscie metody (MethodInfo.Invoke) - z latkami innych modow na
+        // MobileParty.SetMoveGoToSettlement (bramka snu Armoury SleepGate, straznik drog BK - droge All przepuszcza), jak kazdy rozkaz; wzor Armoury
+        // IslandRoads / MaterialOrders. Wywolanie wprost JIT moze zastapic kopia krotkiej metody gry sprzed latek: siec CrashScribe (Net.WrapModules)
+        // kompiluje SummonLords w menu glownym, zanim Armoury wepnie bramke - wezwanie omijalo ja i ruszalo spiacego lorda przed switem, a swit
+        // nadpisywal je rozkazem sprzed snu (bieg 120 dob: serie 9-41 lordow "inny rozkaz" w nocach ze startem turnieju, 12 z 12 probek celu = miasto
+        // turnieju). Teraz wezwanie spiacego czeka u Armoury do switu i swit oddaje wlasnie je. Bez Armoury - rozkaz idzie od reki, jak dotad.
+        // Wywolanie stoi w petli SummonLords (nie w osobnej metodzie): wyjatek rozkazu konczy sie jak dotad w jej catch.
+        private static MethodInfo _setMoveGo;
+        private static bool _setMoveGoTried;
+
+        /// <summary>Wejscie MobileParty.SetMoveGoToSettlement - szukane raz; null = brak (wtedy rozkaz wprost, jak dotad).</summary>
+        private static MethodInfo SetMoveGo()
+        {
+            if (!_setMoveGoTried)
+            {
+                _setMoveGoTried = true;
+                try { _setMoveGo = typeof(MobileParty).GetMethod("SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) }); }
+                catch (Exception e) { _setMoveGo = null; Log.Error("SetMoveGo (brak wejscia metody - rozkaz wprost, jak dotad)", e); }
+            }
+            return _setMoveGo;
+        }
+
         private int SummonLords(Town town, int hostFeePaid)
         {
             int invited = 0;
@@ -307,10 +330,16 @@ namespace GrandTourney
                              (int)baseRadius + " -> " + (int)radius);
 
                 candidates.Sort((a, b) => a.GetPosition2D.Distance(pos).CompareTo(b.GetPosition2D.Distance(pos)));
+                var setMove = SetMoveGo();   // F7: przez wejscie metody - spiacy lord dostaje wezwanie o swicie (bramka snu Armoury)
                 foreach (var mp in candidates)
                 {
                     if (invited >= s.MaxLordsInvited) break;
-                    mp.SetMoveGoToSettlement(town.Settlement, MobileParty.NavigationType.All, false);
+                    if (setMove != null)
+                    {
+                        try { setMove.Invoke(mp, new object[] { town.Settlement, MobileParty.NavigationType.All, false }); }
+                        catch (TargetInvocationException tie) { throw tie.InnerException ?? tie; }
+                    }
+                    else mp.SetMoveGoToSettlement(town.Settlement, MobileParty.NavigationType.All, false);
                     _summoned.Add(mp.StringId);
                     invited++;
                 }
