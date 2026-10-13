@@ -594,7 +594,7 @@ namespace Armoury
                              + " d za miare; na polce wazy koszt wykonania): " + string.Join(", ", vs.ToArray()) + (rebuilt > 0 ? "; dane rynku przeliczone w " + rebuilt + " miastach z klinga na polce" : "") + ".");
                 }
                 // E8/K (255, PLAN 8.3; rozpoznanie B 1.1): KSIAZKI BK. BK definiuje 24 ksiazki po 750 (opowiesci) i 1000 (umiejetnosci) przez BKItems.InitializeTradeGood,
-                // a prefiks BKROTPatch (BKItemsInitializePatch) dzieli wartosc kazdego towaru BK przez 100 (liczby calkowite) - ksiazki maja 7 i 10, obok 45 ksiazek
+                // a prefiks BKROTPatch (BKItemsInitializePatch) dzieli wartosc kazdego towaru BK przez 100 (liczby calkowite) - ksiazki maja 7 i 10, obok 36 ksiazek
                 // ROT po 1000 i 1500 w TEJ SAMEJ kategorii "book" (BKROT definiuje swoje wlasna metoda, bez dzielenia). Regula: ksiazka kategorii "book" warta mniej
                 // niz 100 -> x100 (700 / 1000 - rekopis XIV w. to kilka szylingow do kilku funtow); warunek "ponizej 100" = bez podwojenia, przy kazdym wczytaniu
                 // BKROT znow daje 7 / 10, a my znow x100. PO przeliczniku popytu (krok 3) i wagach polki: kategoria jest mieszana (ksiazki ROT maja cene
