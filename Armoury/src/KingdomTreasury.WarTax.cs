@@ -71,6 +71,7 @@ namespace Armoury
             _wt.Clear(); _wtWindow.Clear(); _wtCarry.Clear(); _wtWar.Clear(); _wtWarDay = int.MinValue;
             Array.Clear(_wtCls, 0, WtClasses); _wtHeld = 0; _wtCalls = _wtHeldN = 0; _wtStumbles = 0; _wtErr.Clear();
             _wtImportN = -1; _wtImportBad = 0; LastFolkWarTax = 0;
+            WarAidReset();   // P1: danina z oszczednosci ludu (KingdomTreasury.WarAid.cs) - stan sesji czyszczony razem z 184
         }
 
         private static void WtStumble(string where, Exception e)
@@ -187,12 +188,12 @@ namespace Armoury
         }
 
         /// <summary>CrownIncome.End (zawsze): okno wplywow dnia zamkniete - pobor po Begin, a przed End jest juz w migawce skarbcow (zapas, nie wplyw dnia).</summary>
-        internal static void FolkWarTaxWindowClear() { _wtWindow.Clear(); }
+        internal static void FolkWarTaxWindowClear() { _wtWindow.Clear(); _waWindow.Clear(); }   // P1: okno daniny z oszczednosci zamykane razem z oknem 184
 
         // ------------------------------------------------------------ doba: potrzeba korony, krok tygodnia, linia (po rentach 180, przed CrownIncome.End - DayOf czynne)
         internal static void WarTaxDaily()
         {
-            LastFolkWarTax = 0;
+            LastFolkWarTax = 0; LastFolkWarAid = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) { WtClearDay(); return; }
             try
@@ -309,6 +310,8 @@ namespace Armoury
                 }
             }
             catch (Exception e) { WtStumble("WarTaxDaily", e); }
+            // P1: linia doby daniny z oszczednosci i komunikaty gracza - po rentach 180, przed CrownIncome.End (DayOf czynne), przed zerowaniem licznikow doby
+            try { WarAidDay(); } catch (Exception e) { WaStumble("WarAidDay", e); }
             finally { WtClearDay(); }
         }
 
@@ -316,6 +319,7 @@ namespace Armoury
         {
             Array.Clear(_wtCls, 0, WtClasses); _wtHeld = 0; _wtCalls = _wtHeldN = 0; _wtStumbles = 0;
             foreach (var kv in _wt) { kv.Value.DTaken = 0; kv.Value.DHeld = 0; }
+            WaClearDay();   // P1: liczniki doby daniny z oszczednosci
         }
 
         // ------------------------------------------------------------ zapis: szoste pole klucza 165 (CrownIncome.Export/Import)

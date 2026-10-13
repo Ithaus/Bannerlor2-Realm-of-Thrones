@@ -19,6 +19,8 @@ namespace Armoury
     /// Scalenie calosci etapu 4: najpierw wszystkie dopiski E4/7/E4/8/E4/10 do sb, potem body = sb.TrimEnd i sekcja okregu E4/11.
     /// E5/C4 (205, PLAN 5.13): na koncu czesci E4/7 jedno zdanie "czy ludzi stac na chleb" dla osady, w ktorej stoi gracz (TownFolk.BreadLine - kiesa ludu z ostatniej doby),
     /// linia "PeopleMenu (E5/C4)" do logu przy kazdym otwarciu; wylacznik PeopleMenuShowsBread. Dalej ShowInquiry, bez SwitchToMenu.
+    /// P1 (obieg kiesy ludu): zaraz pod nim zdanie "Savings: ..." (TownFolk.SavingsLine - dni zycia w kiesie, kiesa ponad zapas, danina wojenna ostatniej doby),
+    /// linia "PeopleMenu (P1 Savings)" do logu; wylacznik PeopleMenuShowsSavings.
     /// </summary>
     internal static class PeopleMenu
     {
@@ -135,6 +137,19 @@ namespace Armoury
                         if (!string.IsNullOrEmpty(bread)) sb.Append(bread).Append('\n');
                     }
                     catch (Exception e) { Log.Error("PeopleMenu.Bread", e); }
+                }
+                // P1 (obieg kiesy ludu, projekt rozdz. 7): na ile dni zycia lud tej osady ma monety, ile lezy ponad zapasem i ile oddal koronie w daninie wojennej
+                // o ostatnim swicie - liczby kiesy ludu z ostatniej doby (tylko odczyt), linia do logu przy kazdym otwarciu; wylacznik PeopleMenuShowsSavings
+                if (s1 != null && s1.PeopleMenuShowsSavings)
+                {
+                    try
+                    {
+                        string slog;
+                        string sav = TownFolk.SavingsLine(st, out slog);
+                        if (slog != null) Log.Info(slog);
+                        if (!string.IsNullOrEmpty(sav)) sb.Append(sav).Append('\n');
+                    }
+                    catch (Exception e) { Log.Error("PeopleMenu.Savings", e); }
                 }
                 string body = sb.ToString().TrimEnd('\n');
                 // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu

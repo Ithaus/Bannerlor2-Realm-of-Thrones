@@ -54,8 +54,9 @@ namespace Armoury
         internal const int KFolkDues = 4;   // E5/B1 (173): podatki ludu od zarobku i farma gminy - w oblezonej osadzie zostaja w kiesie / gminie
         internal const int KFolkWarTax = 5;   // E5/B2 (184): podatek wojenny od zarobku ludu - placi kiesa ludu (nie kasa osady), wiec wstrzymanie zawsze przy wlaczonym kluczu (scalenie B: 4 -> 5, K4 zajete przez B1)
         internal const int KAlley = 6;   // Jeff 12.10: zaulki notabli z kasy miasta (NotableGold) - w oblezonym miescie wstrzymane jak inne oplaty
-        private const int KN = 7;
-        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls", "podatki ludu i farma gminy (E5/B1)", "podatek wojenny ludu (184)", "zaulki" };
+        internal const int KFolkAid = 7;   // P1 (obieg kiesy ludu): danina wojenna z oszczednosci ludu - placi kiesa ludu (jak 184: wstrzymanie przy samym kluczu, poza kontrola kas osad)
+        private const int KN = 8;
+        private static readonly string[] Names = { "renta miast", "Crown Duty", "War Tax", "Road Tolls", "podatki ludu i farma gminy (E5/B1)", "podatek wojenny ludu (184)", "zaulki", "danina z oszczednosci ludu (P1)" };
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.BesiegedPayNothing; } }
 
@@ -148,7 +149,8 @@ namespace Armoury
             {
                 if (st == null || !st.IsUnderSiege) return false;
                 bool on = On;
-                bool hold = on && (kind == KFolkWarTax || PurseReal(st));   // E5/B2: 184 placi kiesa ludu - prawdziwy pieniadz poza regulatorem gry (bez warunku PurseReal)
+                bool folk = kind == KFolkWarTax || kind == KFolkAid;        // P1: danina z oszczednosci - ta sama regula co 184 (placi kiesa ludu)
+                bool hold = on && (folk || PurseReal(st));   // E5/B2: 184 placi kiesa ludu - prawdziwy pieniadz poza regulatorem gry (bez warunku PurseReal)
                 if (count && amount > 0 && kind >= 0 && kind < KN)
                 {
                     if (hold) { _held[kind] += amount; _heldN[kind]++; _heldBy.Add(st); }
@@ -156,7 +158,7 @@ namespace Armoury
                     {
                         if (!on) { _paid[kind] += amount; _paidN[kind]++; _paidBy.Add(st); }
                         else { _reg[kind] += amount; _regN[kind]++; _regBy.Add(st); }
-                        if (kind != KFolkWarTax) { long e0; _expl.TryGetValue(st, out e0); _expl[st] = e0 + amount; }   // E5/B2: kontrola liczy tylko zloto z kas osad - 184 idzie z kiesy ludu
+                        if (!folk) { long e0; _expl.TryGetValue(st, out e0); _expl[st] = e0 + amount; }   // E5/B2: kontrola liczy tylko zloto z kas osad - 184 (i danina P1) idzie z kiesy ludu
                     }
                 }
                 return hold;

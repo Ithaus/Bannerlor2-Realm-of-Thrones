@@ -118,6 +118,13 @@ namespace Armoury
             public bool C2Hit;                                        // E5/C2: korekta jedzenia R14 w oknie doby (kontrola "obie kary tej samej doby")
             public int ADay = -1;                                     // E5/C4: doba ostatniego liczenia kiesy czynnej tej osady (DAff/DAffF albo zakupy wsi) - okno People of this land; bez zapisu
             public double DVNeed; public long DVBuy;                  // E5/C4: wies - potrzeba zakupow i zakupy ostatniej doby (skladniki "wsie: zakupy X z Y" linii Kiesa ludu); bez zapisu
+            // ---- P1 (obieg kiesy ludu, TownFolk.Savings.cs): liczby ostatniej doby i okna pomiaru - pamiec sesji, bez zapisu
+            public long DAid;                                         // danina z oszczednosci oddana koronie w ostatniej dobie (wszystkie klasy)
+            public double DOver;                                      // kiesa ponad zapas dni po daninie (suma klas z nadwyzka) - zdanie "Savings", pomiary
+            public readonly double[] DOvC = new double[3];            // to samo na klase (W, R, P; zamek [0])
+            public long Aid7; public double Of7X, Of7B;               // okno pomiaru (do 7 dob): danina, oferta nadwyzki dopisana do budzetu, kupione z oferty
+            public readonly long[] EarnK = new long[16];              // okno pomiaru: zarobek ludu osady wedlug rodzaju (Credit; K* 0-10, E* 11-15)
+            public int BQ, BMat, LuxShops;                            // pomiar tygodnia: czolo kolejki budow (0 brak, 1 cywilna, 2 wojskowa), sztuki materialu na polce targu, warsztaty zbytkow
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();
@@ -244,6 +251,7 @@ namespace Armoury
                 Settlement gs = gh == null && gp != null && gp.IsSettlement ? gp.Settlement : null;
                 Settlement rs = rh == null && rp != null && rp.IsSettlement ? rp.Settlement : null;
                 if (_btOpen || _ntHero != null) NoteBracketGold(gh, rh, gs, rs, a, gNone, rNone);   // nawiasy bitwy i pasma notabli (recenzja E5/0 (1-1), (1-2))
+                if (gs != null && gs.IsTown && rh == null && rp != null && rp.MobileParty != null && rp.MobileParty.IsCaravan) CaravanPaidNote(gs, a);   // P1 (pomiar): kasa miasta zaplacila karawanie (tylko licznik)
                 if (!inBlock)
                 {
                     if (rs != null && rs.IsVillage) VillTrans(rs, a);

@@ -48,6 +48,7 @@ namespace Armoury
             public long CallToWar;        // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny (skarbiec -> portfel wezwanego)
             public long LoanIn, LoanOut;  // 186: kredyt Banku na zwrot zoldu (kapital -> skarbiec) i rata (skarbiec -> kapital, pierwszy wydatek dnia)
             public long WarTax;           // E5/B2 (184): podatek wojenny ludu od wczorajszego zamkniecia korony (kiesy ludu -> skarbiec) - w Own
+            public long WarAid;           // P1 (obieg kiesy ludu): danina z oszczednosci ludu od wczorajszego zamkniecia korony (kiesy ludu -> skarbiec) - w Own
             public bool Snap;
         }
 
@@ -182,7 +183,9 @@ namespace Armoury
                         long thirds = Ransom178.ThirdsOf(k);   // 178: 1/9 z licznikow doby (prawo trzecich) - wplacone przed Begin
                         long wt = KingdomTreasury.FolkWarTaxWindow(k);   // E5/B2 (184): podatek wojenny ludu pobrany przy zarobku od wczorajszego End
                         d.WarTax = wt;
-                        d.Own = dues + lev + cas + tow + thirds + wt;
+                        long wa = KingdomTreasury.FolkWarAidWindow(k);   // P1: danina z oszczednosci ludu pobrana w dobie ludu (TownFolk.PayAid) od wczorajszego End
+                        d.WarAid = wa;
+                        d.Own = dues + lev + cas + tow + thirds + wt + wa;
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
@@ -298,16 +301,17 @@ namespace Armoury
                 if (!_open) { LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0; return; }
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0, loanIn = 0, loanOut = 0; int noSnap = 0;
                 long wtax = 0;   // E5/B2 (184)
+                long waid = 0;   // P1: danina z oszczednosci ludu
                 var parts = new List<KeyValuePair<long, string>>();
                 foreach (var kv in _day)
                 {
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid;
                     if (!d.Snap) noSnap++;
                     if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0) continue;
-                    parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "")
+                    parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "") + (d.WarAid > 0 ? " (danina P1 " + d.WarAid + ")" : "")
                               + (d.LoanOut > 0 ? " rata186 -" + d.LoanOut : "") + (d.LoanIn > 0 ? " kredyt186 +" + d.LoanIn : "")
                               + (d.GiftOut > 0 ? " dar -" + d.GiftOut : "") + (d.GiftIn > 0 ? " dar +" + d.GiftIn : "") + (d.RepOut > 0 ? " rata -" + d.RepOut : "") + (d.RepIn > 0 ? " rata +" + d.RepIn : "")
                               + (d.Contract > 0 ? " kontr. " + d.Contract : "") + (d.CallToWar > 0 ? " wezw. " + d.CallToWar : "") + (d.RefundDue > 0 ? " zwrot " + d.RefundGiven + "/" + d.RefundDue : "")
@@ -326,6 +330,7 @@ namespace Armoury
                     sb.Append("Korona: wplywy dnia (165): dzien ").Append(today)
                       .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, podatek wojenny ludu (184), clo, czesc korony z zaworu zamkow i miast (E5/B3: miast 1/2 przy wyrownaniu), 1/9 prawa trzecich (178) ").Append(own)
                       .Append(", w tym podatek wojenny ludu (184) ").Append(wtax)
+                      .Append(", danina z oszczednosci ludu (P1) ").Append(waid)
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)
                       .Append(" = do wydania ").Append(spend)

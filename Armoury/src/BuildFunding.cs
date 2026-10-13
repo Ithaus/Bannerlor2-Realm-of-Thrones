@@ -265,6 +265,27 @@ namespace Armoury
             return spent;
         }
 
+        /// <summary>P1 (pomiar obiegu kiesy ludu, TYLKO ODCZYT - nic nie kupuje i nie zmienia): czolo kolejki budow osady - false, gdy nic nie czeka albo czeka projekt
+        /// dzienny. military - budowla wojskowa; matPieces - sztuki materialu budow (MatIds) na polce targu osady (miasto - swoj, zamek - najblizsze miasto,
+        /// ten sam targ co przy zakupie w Daily).</summary>
+        internal static bool QueueHead(Settlement st, out bool military, out int matPieces)
+        {
+            military = false; matPieces = 0;
+            if (st == null || st.Town == null) return false;
+            var q = st.Town.BuildingsInProgress;
+            var b = q != null && q.Count > 0 ? q.Peek() : null;
+            if (b == null || b.BuildingType == null || b.BuildingType.IsDailyProject) return false;
+            military = b.BuildingType.IsMilitaryProject;
+            var market = st.IsTown ? st : NearestTown(st);
+            if (market != null && market.ItemRoster != null)
+                foreach (var id in MatIds)
+                {
+                    var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
+                    if (it != null) matPieces += Math.Max(0, market.ItemRoster.GetItemNumber(it));
+                }
+            return true;
+        }
+
         private static readonly Dictionary<Settlement, Settlement> _near = new Dictionary<Settlement, Settlement>();
         private static Settlement NearestTown(Settlement st)
         {

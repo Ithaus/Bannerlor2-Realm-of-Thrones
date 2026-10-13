@@ -215,6 +215,23 @@ namespace Armoury
             var b = Of(c); cap = b != null ? b.Cap : 0; return b != null;
         }
 
+        /// <summary>P1 (pomiar obiegu kiesy ludu, TYLKO ODCZYT): zloto glow rodow z budzetem policzonym dzis wedlug wypelnienia pulapu zoldu - n / gold (5 pol):
+        /// [0] na pulapie (zold partii + zalog + karawan >= 95% pulapu), [1] z luzem, [2] z luzem i w wojnie (czesc [1]), [3] bez pulapu (Straz bez zoldu albo
+        /// pulap 0), [4] kompanie najemne z umowa 185 (osobno, poza [0]-[3]). Linia "Rody z luzem pulapu (P1)" - nowy zbiornik zlota po daninie z oszczednosci.</summary>
+        internal static void SlackGold(int[] n, long[] gold)
+        {
+            if (n == null || gold == null || n.Length < 5 || gold.Length < 5) return;
+            foreach (var kv in _b)
+            {
+                var c = kv.Key; var b = kv.Value;
+                if (c == null || b == null || !b.Today || c.IsEliminated || c.Leader == null) continue;
+                long g = Math.Max(0, c.Leader.Gold);
+                int i = c.IsUnderMercenaryService ? 4 : (b.Zero || !(b.Cap > 0)) ? 3 : (b.WPar + b.WGar + b.WCar >= 0.95 * b.Cap ? 0 : 1);
+                n[i]++; gold[i] += g;
+                if (i == 1 && b.War) { n[2]++; gold[2] += g; }
+            }
+        }
+
         /// <summary>P3/W1: budzet wlaczony, ale w tej sesji jeszcze nie policzony (pierwsza doba po wczytaniu albo po starcie kampanii - CrownRents.Daily
         /// biegnie przed ClanBudget.Daily). Wtedy AtMeans nie ma na czym stanac i wolajacy trzyma stan z zapisu.</summary>
         internal static bool Pending { get { return On && _day < 0; } }

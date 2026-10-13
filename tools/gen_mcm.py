@@ -135,6 +135,8 @@ RANGES = {
     'VillageLordExtraShare': (0.0, 1.0, "0.00"),
     'TitheVillageShare': (0.0, 0.2, "0.00"),
     'FolkSurplusSpendShare': (0.0, 1.0, "0.00"),
+    # P1 (obieg kiesy ludu): danina z oszczednosci - kod przycina do 0..0.2 (KingdomTreasury.WarAid); suwak 0..0.1 z trzema miejscami (regula ogolna pokazalaby 0.025 jako 0.03)
+    'FolkWarAidShare': (0.0, 0.1, "0.000"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)
