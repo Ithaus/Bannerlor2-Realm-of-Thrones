@@ -1887,3 +1887,12 @@ Cofniecie: Armoury a5e2fbf9 z kopii albo klucz Scutage = false.
   Dolina 76 (68), Stormlands 65 (59), Dorzecze 65 (71), Wyspy 11 (31). PROPOZYCJA KIERUNKU PODANA JEFFOWI (czeka na "tak"; tor L, osobny projekt): plon wsi, rece rzemiosla,
   spozycie, podatki i pobor proporcjonalne do ludzi regionu z ksiegi ludzi (jedna skala na region), tak zeby ludne poludnie produkowalo i placilo wiecej, a polnoc mniej.
   Poprawka lnu (N5b) czeka na te decyzje - "wiecej lnu" ma wynikac z rak, nie z mnoznika.
+- (20:30 UTC 13.10) **JEFF: "tak, rob taki projekt - myslalem, ze tak to projektujemy"** (gospodarka od ludzi). Doprecyzowanie Jeffa (wiazace dla projektu): "produkcja lnu jest
+  zalezna od ludzi, tak samo kazdego innego towaru - nie tak, ze wioska produkuje tyle samo; **wioska to tylko SYMBOL wielu wiosek, ktore lacznie produkuja tyle, ilu jest ludzi**;
+  sprawdz, ile to powinno byc, dla kazdego surowca, jak to wygladalo"; przyklad: "wioska na Polnocy z symbolem zboza produkuje np. 10, bo w jej obszarze zyje 100 tys. ludzi, a ta
+  sama wioska z symbolem zboza w Reach produkuje 37, bo w jej obszarze zyje 370 tys."; "mozna jeszcze uwzglednic produkcje od dobrobytu, technologii, klimatu itp., zeby mialo to
+  sens". **W TOKU: workflow projektu wf_fb11d85b-5e0** (docs/przekazanie/wf-gospodarka-od-ludzi.js; dwa pierwsze uruchomienia zatrzymane po minucie, zeby dopisac doprecyzowania):
+  3 rozpoznania (kod: co dzis zalezy od ludzi; dane: produkcja / dochod na czlowieka po regionach; towary: kazdy surowiec dzis i wzorzec sredniowieczny na 1000 ludzi) -> projekt
+  -> recenzja z poprawka. Wynik: `docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md` (robocze SCRATCH\gosp-ludzie\). Bez kodu; kod po "tak" Jeffa na pytania
+  o kierunek. To jest teraz NAJWAZNIEJSZE zadanie - poprawka lnu (N5b), stawka wojenna (W7) i strojenie podatkow czekaja na ten projekt, bo zmieni dochody wszystkich krolestw.
+  UWAGA DO WGRANIA N5: regula A (sufit 4.0 bez kosztu) NIE ma wejsc do gry wlaczona - przed wgraniem ustawic ValveRaiseWhileShort domyslnie false (B, C, D, E zostaja).
