@@ -91,7 +91,7 @@
 - Liczniki E6/0 ida z `RawLevel` - zwykle siodlo policzy sie jako "wspolne", nie OBCE (progi M1 bez falszywego alarmu).
 - Zamknieta ekonomia: droga wyrobu ta sama (wsad, place, kupiec) - zadnej sztuki ani zlota z niczego; zapis bez zmian; czas doby 0 (mapa raz na kraine i sesje; `SaddleLaw.Fits` ma wlasna pamiec).
 - Skutki uboczne do obserwacji: kropierze t1 (krainy andalskie) i siodla slonia (Volantis) schodza z linii t1, dopoki zwykle siodlo da sie zaczac (rece ida tam, gdzie wiekszy zysk na roboczodzien); lordowie zaplaca za siodla mniej (dzis ok. 11 tys. zl/d -> spodziewane 2-4 tys.) = mniej zlota rodow do kas miast (C-4a); ok. 26% wyrobu RBM dostaje dodatni stan i AI go nie kupi (znane, poza zakresem); miasta bez skory albo rudy siodla nie zrobia.
-- Oczekiwane w biegu 3: w linii startu "dopisane wspolne w ok. 15 krainach"; H-3 >= 40 szt./d (d31-120); H-1 <= 10% w d61-120; srednia cena siodla E8/H ponizej 150 zl; `warsztaty.log` The Eyrie "pula" >= 3.
+- Oczekiwane w biegu 3: w linii startu "dopisane wspolne w CO NAJMNIEJ 15 krainach" (recenzja P2/C: 15 to krainy bez zadnego zwyklego siodla; wspolne dochodzi tez OBOK wlasnego / pokrewnego siodla krainy - definicja H-3 "bez warunku: kraina nie ma wlasnego" - wiec liczba bedzie raczej 25-29 i to nie jest odchylka; 0 albo "klucz wylaczony" = blad), "krain z wlasnym wzorem w lancuchu" ok. 15, "bez zadnego wzoru" 0 (najwyzej 1 - Wolni Ludzie); H-3 >= 40 szt./d (d31-120); H-1 <= 10% w d61-120; srednia cena siodla E8/H ponizej 150 zl; `warsztaty.log` The Eyrie "pula" >= 3.
 - NIE sprawdzone w grze - build kod 0, logika przeczytana w kodzie.
 
 **Status:** DO SPRAWDZENIA - test koncowy
