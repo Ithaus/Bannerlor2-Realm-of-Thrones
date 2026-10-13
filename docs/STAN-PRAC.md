@@ -1682,3 +1682,12 @@ Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d
   na prawdziwej DLL: 1.0 = WGRANIE 37 co do kroku generatora, 0.7 = 69.94% prob przy szansie 1); **W TOKU W GRZE: test 120 dob** (Armoury W37 + CrashScribe-at-hamulec ef7ee537,
   drzewo SC\zb\sh; test\at-hamulec-120.out.txt) - oczekiwane 52-58 slubow do d120 (bylo 78; < 40 albo > 70 = zle); po czystym wyniku WGRANIE 38 (sam CrashScribe + settings.xml;
   DLL do wgrania zbudowac z cd675b6 BEZ at1-cs.diff).
+- (17:25 UTC 13.10) **LUP ZDOBYTEGO MIASTA - ROZPOZNANIE I PROPOZYCJA GOTOWE (bez kodu; wf_063e9114-c56):** `docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md` (rozdz. 0 prostym
+  jezykiem, 1-2 jak jest dzis z dowodami, 3 regula, 4 sto procent przypadkow, 6 paczki L0-L7 i progi, 8 pytania); robocze SCRATCH\lup-miast\ (3 rozpoznania, weryfikacja - 8 poprawek
+  wniesionych). JAK JEST: gra zdejmuje dobrobyt i daje 15 zl za punkt; u nas placi to kasa kupcow zdobytej osady z nadwyzki (okno O10) - zloto prawdziwe, ale kwota nie zalezy od
+  bogactwa; w roku 14 zdobyc (3 miasta, 11 zamkow), lup razem 64.7 tys. zl; wiecej idzie bokiem - sprzedaz jencow kasie zdobytej osady 399 tys.; kies ludu, zapasu kupcow, towaru,
+  koni, zywnosci nikt nie rusza; zdobyte miasto w pieniadzu ZYSKUJE (zold wojska: Harrenhal kasa 210 -> 450 tys.). ZNALEZIONE BLEDY: "grabiez" gry takze po wygranej bitwie pod
+  murami bez zdobycia (5 x w roku; Vaes Efe), kiesa rozbitej zalogi znika (16 249 zl - dziura obiegu), zabici przez BK poza nasza ksiega ludzi, gracz dostaje 15% mniej lupu niz AI,
+  zdarzenie "Right of Pillage" pustoszy i nie daje nic. PROPOZYCJA: zdobywcy biora czesc KAZDEJ monety w osadzie (laska 0, grabiez 1/3, spustoszenie 2/3) z kasy kupcow i kies ludu,
+  podzial wedlug ludzi i "prawo trzecich", 3 doby bez zoldu wydawanego w lupionym miescie, laska bez naszej blizny, AI lupi z potrzeby; towar i konie z polek - drugi etap.
+  Lup NIE jest zrodlem na wojsko (ok. 1 mln zl/rok = 0.6% zoldu). **CZEKA NA JEFFA: 5 pytan o kierunek (rozdz. 8) - podane w czacie; kodu nie zaczynac przed "tak".**
