@@ -1,5 +1,10 @@
 # Paczka "bee": BetterEconomy - 13 kluczy zamykajacych ujscia i kurki AI (sam plik ustawien, bez kodu)
 
+**DOPISEK 12.10.2026 (E8/E, paczka 264, PLAN 8.14): skrypty obsluguja od dzis 14 wartosci - doszedl klucz 14
+`EconomicEventDailySpawnChance` 0.14 -> 0 (koniec losowych zdarzen BEE). Opis zmiany, zachowanie skryptow, proby i sposob
+wprowadzenia: rozdz. 11. Rozdzialy 0-10 opisuja stan z 06.10 (13 kluczy) i nie byly przepisywane - tam, gdzie mowia
+"13 wartosci", "14 znanych kluczy" albo cytuja komunikaty skryptu, obowiazuje rozdz. 11.**
+
 Stan na 06.10.2026, po drugim przejsciu autora i drugim niezaleznym przegladzie (pierwsze przejscie: autor + recenzent,
 noc 05/06.10 - historia w rozdz. 10). Drugi recenzent skryptow NIE zmienial (skroty jak w rozdz. 4); poprawil ten opis w
 trzech miejscach: co zostaje w pozycji "GiveGoldAction w nicosc" (5.2), brakujaca akcja gracza (1.2), uwaga o pliku
@@ -504,3 +509,115 @@ nowa na ostatecznej wersji.
 - *Nie podwazone:* wybor `ArmoryAiCheckCooldownDays` jako domyslnego klucza zbrojowni (dla AI skutek ten sam co klucz z listy,
   gracz zachowuje akcje - zgodnie z "funkcje gracza bez zmian"; nadal do potwierdzenia przez Jeffa), rachunek ogona oplat
   5 000 (ulamki 0.0525 / 0.0866 / 0.1088 / 0.1232 / 0.1326 przeliczone), przepelnienia int, brak nowej kampanii.
+
+## 11. Klucz 14 - losowe zdarzenia BEE (E8/E, paczka 264, PLAN 8.14; 12.10.2026)
+
+Projekt: `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/E"; rozpoznanie
+`docs/etap8/rozpoznanie-B.md` rozdz. 4. Bez DLL - zmienia sie tylko plik ustawien BEE, i dopiero wtedy, gdy ktos uruchomi skrypt
+(przy wgraniu koncowym, gra zamknieta). **Na prawdziwym pliku skrypt NIE byl uruchamiany - takze nie "na sucho"; plik byl tylko
+czytany jako zrodlo kopii (skrot przed i po probach ten sam).**
+
+### 11.1 Co i dlaczego
+
+| Nr | Klucz | Typ | Dzis | Docelowo | Linia w pliku Jeffa | Dotyczy |
+|---|---|---|---|---|---|---|
+| 14 | `EconomicEventDailySpawnChance` | float | 0.14 | 0 | 361 | World: BEE random events |
+
+BEE losuje co dobe z szansa 0.14 jedno "zdarzenie gospodarcze" (jarmark, zly zbior, susza, zaraza bydla, boom gorniczy, sezon
+karawan; do 12 naraz, 7-21 dob). To prawo na kostke: mnozy podatek, clo, plynnosc, popyt i przeplyw wsi w liczbach BEE bez
+zadnej przyczyny w swiecie. Sprawdzone w dekompilacji DLL lezacego w grze (`ilspycmd`, BetterEconomy.dll SHA-256 `6bcd2568...`,
+466 944 B, 20.08):
+- `EconomicEventCampaignBehavior.TrySpawnEvent` (:332-366): `if (szansa <= 0f || MBRandom.RandomFloat > szansa) return;` -
+  przy 0 nowe zdarzenie nie powstaje nigdy. To jedyne miejsce, w ktorym zdarzenie powstaje (`_events[...] =` :362), a pole
+  czyta tylko ta metoda (2 wystapienia nazwy w calym DLL: pole i ten odczyt). BEE niczego nie przycina do zakresu.
+- `SettingsLoader.TryAssign` (:64-97): `float.TryParse("0", Float, kultura niezmienna)` = 0; plik czytany przy starcie gry
+  (`BetterEconomySubModule` :35) i po skrocie przeladowania BEE (`HotkeyHandler` :56). Nowa kampania niepotrzebna.
+- Zdarzenia, ktore juz trwaja w zapisie (`BLE_EconomicEvents`), wygasaja same w `ExpireEvents` (:305-330) - w pliku Jeffa
+  najdluzsze trwa 21 dob (`EventDroughtDurationDays`, `EventMiningBoomDurationDays`); zapis wczytuje sie bez zmian.
+- Wszyscy odbiorcy (podatek, clo, plynnosc, popyt, dryf gildii i korupcji, przeplyw i zagrozenie wsi, model produkcji wsi,
+  okna BEE) pytaja przez `Instance?.Metoda(...) ?? 1f` albo `?? 0f` i przy braku zdarzenia dostaja mnoznik 1 / dodatek 0.
+  Przy BK (tryb zgodnosci 1) modele produkcji, dobrobytu i cen BEE nie sa w ogole rejestrowane
+  (`BetterEconomySubModule.OnGameStart`: `if (!isActive)`), wiec "susza" nie zmieniala plonu gry - ruszala tylko liczby BEE.
+- Nazwy klucza nie ma w zadnym innym z 263 plikow DLL modow (skan UTF-8 i UTF-16); w naszym kodzie tez nie (`BeeSeal.cs`,
+  `BeeGifts.cs`, `tools/sprawdz_logi.py` - 0 wystapien `EconomicEvent`).
+
+"Sol i piwo jako potrzeby" z PLAN 8.14 NIE sa kluczem pliku BEE (lista zaszyta w kodzie BEE, przy BK bez skutku; u nas to juz
+potrzeba wsi) - odrzucone w projekcie (rozdz. 2 i 7), skrypt tego nie dotyka.
+
+### 11.2 Zmiana skryptow
+
+- Klucz 14 jest **osobna grupa** obok 13 kluczy ujsc. Kazda grupa musi byc cala "przed" albo cala "po"; skrypt zmienia tylko
+  te grupe, ktora nie jest jeszcze w stanie docelowym. Liczba zmienianych wartosci N = 14, 13 albo 1; wszystkie kontrole
+  (kotwice, linie, drzewo XML, rachunek dlugosci) licza N zamiast stalej 13.
+- Plik, w ktorym 13 kluczy ujsc jest juz zamknietych (stan pliku Jeffa od 08.10, wariant `-ListaZFundamentu`), dostaje sama
+  zmiane klucza 14 - takze bez przelacznika wariantu: gdy grupa jest juz zamknieta, a `-ListaZFundamentu` nie podano, wariant
+  zbrojowni jest rozpoznawany z pliku i zostaje (tak jak od poczatku przy cofaniu). **To jedyna zmiana starego zachowania:**
+  dotad taki przebieg konczyl sie STOP "plik zamkniety w DRUGIM wariancie" z rada "najpierw cofnij" - a cofniecie i ponowne
+  zamkniecie bez przelacznika po cichu zmienialoby wariant wybrany przez Jeffa. Jawny `-ListaZFundamentu` na pliku zamknietym
+  w wariancie "tylko AI" dalej daje STOP (zmiana wariantu tylko przez cofniecie).
+- Nowy przelacznik `-TylkoZdarzenia` (oba skrypty): tylko klucz 14, 13 kluczy ujsc nie jest ruszane ani wymagane w jednym
+  stanie. `cofnij-ujscia-bee.ps1 -TylkoZdarzenia` to **wylacznik samej paczki E8/E**. `cofnij-ujscia-bee.ps1` bez przelacznika
+  cofa kazda grupe, ktora jest "po" - czyli otwiera tez 13 ujsc.
+- Kotwice sa dalej scisle: klucz 14 musi wystapic dokladnie raz z wartoscia dokladnie `0.14` albo `0` (reczne `0.0`, `0.2`,
+  brak, duplikat, klucz w komentarzu = STOP bez zapisu). Znanych kluczy jest teraz 15 (12 wspolnych + 2 zbrojowni + klucz 14).
+- Komunikaty wyniku: "liczba wartosci do zmiany: N" (na sucho), "liczba zmienionych wartosci: N", "plik jest juz w stanie
+  docelowym (14 z 14 kluczy)". Kody wyjscia, kopia, zapis przez plik tymczasowy, zrzut na dysk - bez zmian.
+
+| Stan pliku | `zamknij` | `zamknij -ListaZFundamentu` | `zamknij -TylkoZdarzenia` | `cofnij` | `cofnij -TylkoZdarzenia` |
+|---|---|---|---|---|---|
+| 13 "przed", klucz 14 "przed" | 14 (zbrojownia AI) | 14 (lista) | 1 | nic do cofania | nic do cofania |
+| 13 "po" (lista), klucz 14 "przed" - **plik Jeffa dzis** | **1** | 1 | 1 | 13 | nic do cofania |
+| 13 "po" (lista), klucz 14 "po" - plik Jeffa po E8/E | juz zrobione | juz zrobione | juz zrobione | 14 | 1 |
+| 13 "po" (tylko AI), klucz 14 "przed" | 1 | STOP (drugi wariant) | 1 | 13 | nic do cofania |
+| 13 "przed", klucz 14 "po" | 13 (zbrojownia AI) | 13 (lista) | juz zrobione | 1 | 1 |
+| 13 w stanie mieszanym | STOP | STOP | 1 albo juz zrobione | STOP | 1 albo nic |
+
+### 11.3 Proby na kopiach (12.10)
+
+Skrypty z indeksu galezi `w-toku/e8-c` (LF, czyste ASCII, parser PowerShella 5.1: 0 bledow skladni; SHA-256 w postaci LF:
+`zamknij-ujscia-bee.ps1` `ef1ff224...6ba2`, `cofnij-ujscia-bee.ps1` `0db093ae...7217`), kopie pliku Jeffa (SHA-256
+`3a24554b...d850`, 41 185 B) i kopii sprzed 13 kluczy (`...bak-2026-10-08-przed-BEE-ujscia`, `1f963cfa...6848`), kazde
+wywolanie z jawnym `-Path` do katalogu prob: **26 prob, 79 sprawdzen, 0 niezaliczonych** (kazdy wiersz tabeli 11.2 ma proby; `-TylkoZdarzenia` sprawdzone przy 13
+kluczach "przed", "po" i w stanie mieszanym). Skrypt prob i zapis: `scratchpad\tmp\e8e\proby-e8e.ps1`, `wynik-prob.txt` (poza repo).
+Najwazniejsze:
+- plik Jeffa, bez przelacznikow: kod 0, rozni sie dokladnie linia 361, 41 185 -> 41 182 B, LF i brak BOM zachowane, 583
+  elementy, kopia `.bak-<data>-przed-BEE-ujscia` = plik Jeffa; **SHA-256 po zmianie
+  `114635f1502c0a0a896d87f498bd25a40cb5a663645aac043a7d9be1a82c10e1`**; drugie uruchomienie: "juz w stanie docelowym
+  (14 z 14 kluczy)", nic nie zapisane; to samo z `-ListaZFundamentu` i z `-TylkoZdarzenia` (ten sam skrot);
+- `cofnij -TylkoZdarzenia` oddaje plik Jeffa bajt w bajt; pelne `cofnij` (14 wartosci) oddaje bajt w bajt plik sprzed 13 kluczy;
+- plik sprzed 13 kluczy + nowy skrypt `-ListaZFundamentu` (14 wartosci) = ten sam skrot `114635f1...` co plik Jeffa + klucz 14;
+  stary skrypt `-ListaZFundamentu` na tym pliku daje dokladnie plik Jeffa (`3a24554b...`);
+- stan mieszany, zla wartosc klucza 14, brak, duplikat, komentarz, przelaczniki wykluczajace sie, gra "uruchomiona", plik
+  tylko do odczytu: STOP z wlasciwym kodem (1 / 2 / 3), plik bez zmian; CRLF i BOM zachowane;
+- prawdziwy kod BEE (`SettingsLoader.TryAssign` z kopii DLL, przez refleksje, poza gra) na pliku po zmianie: 583 przyjete,
+  0 odrzuconych, `EconomicEventDailySpawnChance` = 0, `ArmoryRequiredArtisans` = 1E+09.
+Pierwszy przebieg prob zlapal blad autora (zmienna liczby zmian nadpisana w petli podmian - PowerShell nie rozroznia wielkosci
+liter): wlasne kontrole skryptu zatrzymaly go przed zapisem ("rozni sie 14 linii, ma byc 1"), poprawione przed commitem.
+
+### 11.4 Jak wprowadzic (przy wgraniu koncowym) i jak sprawdzic
+
+Gra i launcher zamkniete; skrypt z TEGO katalogu (galaz kodu po scaleniu), nie stara kopia:
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\bee\zamknij-ujscia-bee.ps1`
+Ma wypisac "13 kluczy ujsc: juz zamkniete, wariant zbrojowni w pliku: ArmoryRequiredArtisans ... - zostaje", tabele z jednym
+wierszem (klucz 14, linia 361, 0.14 -> 0) i "liczba zmienionych wartosci: 1 ... po `114635f1...`; 41185 -> 41182 bajtow".
+Skrot po zmianie wpisac do `docs/STAN-PRAC.md` (dowod pozycji 8.14 - projekt rozdz. 4 pkt 3). Wylacznik paczki:
+`cofnij-ujscia-bee.ps1 -TylkoZdarzenia`.
+
+**PULAPKA:** stara wersja skryptu (13 kluczy; SHA-256 `6cb86498...c678`, lezy m.in. w `tools\bee` galezi dokumentow glownego
+repo) na pliku Jeffa z `-ListaZFundamentu` wypisuje "plik jest juz w stanie docelowym (13 z 13 kluczy)" i klucza 14 NIE zmienia.
+Dowodem wykonania E8/E jest tekst "(14 z 14 kluczy)" przy drugim uruchomieniu albo skrot `114635f1...`, nie samo "juz w stanie
+docelowym".
+
+W grze: w `bee_log.txt` dalej "settings loaded: 583 applied, 0 skipped" (to nie dowodzi samego klucza). Dziennik BEE nie
+pisze u Jeffa linii "economic-events:" (poziom Verbose wylaczony - 0 takich linii w `bee_log.txt`), wiec skutek widac tylko
+w oknie BEE osady: pozycja "Active event" po najwyzej 21 dobach pokazuje "-" / "None" i juz sie nie zmienia.
+
+### 11.5 Ryzyko i czego nie sprawdzono
+
+- Nie uruchamiano gry. Skutek dla liczb BEE (podatek, clo, plynnosc, popyt w wirtualnej gospodarce BEE) nie byl mierzony -
+  znika losowy mnoznik, nic nie jest dodawane; ujscia zlota z BEE do swiata sa zamkniete 13 kluczami i `BeeSeal`.
+- Linia kampanii "BEE domkniecie (170)" w logu Armoury wypisuje 19 wartosci pliku BEE - klucza 14 wsrod nich nie ma (dopisanie
+  = zmiana DLL, poza zakresem "bez DLL"), wiec `sprawdz_logi.py` nie ma z czego go sprawdzic; dowod = skrot pliku.
+- Po aktualizacji BEE (nowy plik ustawien) trzeba uruchomic skrypt od nowa - jak dla 13 kluczy.
+- Skrypt w galezi dokumentow glownego repo (`tools\bee`) zostal w starej wersji - do wyrownania przy scalaniu galezi
+  (bajt w bajt ta sama podstawa: commit importu 364470e = 9c49247).

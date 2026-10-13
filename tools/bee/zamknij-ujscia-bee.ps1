@@ -1,17 +1,24 @@
 # zamknij-ujscia-bee.ps1
 #
-# Zamyka ujscia i kurki AI moda BetterEconomy ("Living Economy" v1.4.5) 13 wartosciami w pliku
+# Zamyka ujscia i kurki AI moda BetterEconomy ("Living Economy" v1.4.5) 14 wartosciami w pliku
 #   Modules\BetterEconomy\ModuleData\better_economy_settings.xml
-# (decyzja Jeffa 05.10; lista i uzasadnienie: docs\EKONOMIA-FUNDAMENT-2026-10-05.md, rozdz. 4.5; opis paczki: OPIS.md).
+# w dwoch grupach:
+#   - 13 kluczy ujsc (decyzja Jeffa 05.10; lista i uzasadnienie: docs\EKONOMIA-FUNDAMENT-2026-10-05.md, rozdz. 4.5; opis: OPIS.md);
+#   - klucz 14 (E8/E, 12.10, PLAN 8.14): EconomicEventDailySpawnChance 0.14 -> 0 - koniec losowych zdarzen BEE (jarmark, zly
+#     zbior, susza, zaraza bydla, boom gorniczy, sezon karawan; EconomicEventCampaignBehavior.TrySpawnEvent: szansa <= 0 =
+#     zadnego nowego zdarzenia; zdarzenia, ktore juz trwaja w zapisie, wygasaja same). Opis: OPIS.md rozdz. 11.
+# Kazda grupa osobno musi byc cala "przed" albo cala "po". Skrypt zmienia tylko te grupe, ktora jeszcze nie jest zamknieta:
+# plik, w ktorym 13 kluczy ujsc ma juz wartosci docelowe (stan pliku Jeffa od 08.10), dostaje sama zmiane klucza 14.
 #
 # Co robi, w tej kolejnosci:
 #   1. sprawdza, ze gra jest zamknieta (procesy z listy -ProcesyGry);
 #   2. czyta plik bajt w bajt, sprawdza kodowanie (UTF-8, z BOM albo bez) i to, ze jest poprawnym XML;
-#   3. dla kazdego z 13 kluczy wymaga DOKLADNIE JEDNEJ kotwicy <Klucz>wartosc-dzis</Klucz> - w tekscie i w drzewie XML;
-#      jakakolwiek niezgodnosc (brak, duplikat, inna wartosc, klucz w komentarzu, stan mieszany) = STOP bez zapisu;
-#   4. podmienia 13 wartosci w pamieci i sprawdza wynik: rozni sie dokladnie 13 linii, liczba linii i znakow CR bez zmian,
-#      w drzewie XML rozni sie dokladnie 13 elementow, kazda nowa wartosc czyta sie tak, jak czyta ja BetterEconomy
-#      (SettingsLoader.cs:64-97: int.TryParse / float.TryParse, kultura niezmienna);
+#   3. dla kazdego ze znanych kluczy wymaga DOKLADNIE JEDNEJ kotwicy <Klucz>wartosc</Klucz> z wartoscia "przed" albo "po" -
+#      w tekscie i w drzewie XML; jakakolwiek niezgodnosc (brak, duplikat, inna wartosc, klucz w komentarzu, stan mieszany
+#      w grupie 13 kluczy) = STOP bez zapisu;
+#   4. podmienia wartosci w pamieci (N = 14, 13 albo 1 - zalezy od stanu pliku) i sprawdza wynik: rozni sie dokladnie N linii,
+#      liczba linii i znakow CR bez zmian, w drzewie XML rozni sie dokladnie N elementow, kazda nowa wartosc czyta sie tak,
+#      jak czyta ja BetterEconomy (SettingsLoader.cs:64-97: int.TryParse / float.TryParse, kultura niezmienna);
 #   5. robi kopie pliku <plik>.bak-<data>-przed-BEE-ujscia, wymusza jej zrzut na dysk i sprawdza ja skrotem SHA-256;
 #   6. zapisuje przez plik tymczasowy (zapis od razu na dysk, bez pamieci podrecznej systemu - dysk C tej maszyny zeruje
 #      koncowki swiezych zapisow) + podmiane, czyta wynik z dysku i porownuje skrot; przy niezgodnosci przywraca kopie;
@@ -23,8 +30,13 @@
 #   -ListaZFundamentu    trzeci klucz doslownie z listy 4.5: ArmoryRequiredArtisans = 1000000000. Ten klucz blokuje zbrojownie
 #                        miasta takze GRACZOWI (TownEconomyCampaignBehavior.cs:542). Bez tego przelacznika skrypt zamyka
 #                        zbrojownie tylko AI kluczem ArmoryAiCheckCooldownDays = 1000000000 (TownEconomyCampaignBehavior.cs:2083)
-#                        - zgodnie z decyzja "funkcje gracza bez zmian". W obu wariantach zmienia sie dokladnie 13 wartosci.
-#   -Cofnij              kierunek odwrotny: 13 wartosci wraca do stanu sprzed zmiany (wariant zbrojowni rozpoznawany sam).
+#                        - zgodnie z decyzja "funkcje gracza bez zmian". W obu wariantach grupa ujsc to dokladnie 13 wartosci.
+#                        Gdy 13 kluczy ujsc jest juz zamknietych, a przelacznika nie podano, wariant jest rozpoznawany z pliku
+#                        i zostaje (jak przy cofaniu). Podany przelacznik przy pliku zamknietym w drugim wariancie = STOP.
+#   -TylkoZdarzenia      tylko klucz 14 (losowe zdarzenia BEE); 13 kluczy ujsc nie jest ruszane, w zadnym kierunku.
+#                        Z -Cofnij (albo cofnij-ujscia-bee.ps1 -TylkoZdarzenia) to wylacznik samej paczki E8/E.
+#   -Cofnij              kierunek odwrotny: wartosci zmienione przez ten skrypt wracaja do stanu sprzed zmiany (13 kluczy ujsc,
+#                        wariant zbrojowni rozpoznawany sam, i klucz 14 - kazda grupa, ktora jest "po").
 #                        Wygodniej: cofnij-ujscia-bee.ps1.
 #   -NaSucho             wszystkie kontrole i tabela, bez kopii i bez zapisu.
 #   -ProcesyGry <wzory>  nazwy procesow uznawanych za gre (do prob kontroli "gra uruchomiona"); kilka wzorow: jeden napis
@@ -43,6 +55,7 @@
 param(
     [string]$Path = 'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\BetterEconomy\ModuleData\better_economy_settings.xml',
     [switch]$ListaZFundamentu,
+    [switch]$TylkoZdarzenia,
     [switch]$Cofnij,
     [switch]$NaSucho,
     [string[]]$ProcesyGry = @('Bannerlord*', 'Launcher.Native', 'TaleWorlds.MountAndBlade*')
@@ -76,6 +89,11 @@ $Wspolne = @(
     (Nowy-Klucz 'TradeAgreementCorridorProsperityPerDay' 'float' '0.15'  '0'          'swiat (miasta korytarzy)'),
     (Nowy-Klucz 'RaidPeasantFlightFraction'              'float' '0.08'  '0'          'swiat (takze wsie gracza)')
 )
+
+# Klucz 14 (E8/E, PLAN 8.14) - osobna grupa: dzienna szansa nowego losowego zdarzenia gospodarczego BEE.
+# BEE: EconomicEventCampaignBehavior.TrySpawnEvent - "if (szansa <= 0f || MBRandom.RandomFloat > szansa) return;" (jedyne
+# miejsce, w ktorym zdarzenie powstaje; pole czyta tylko ta metoda).
+$Zdarzenia = Nowy-Klucz 'EconomicEventDailySpawnChance' 'float' '0.14' '0' 'World: BEE random events'
 
 function Zloz-Liste($Zbrojownia) {
     # 13 kluczy: 2 pierwsze wspolne, klucz zbrojowni, 10 pozostalych
@@ -267,9 +285,12 @@ try {
     $tryb = 'ZAMKNIECIE UJSC'
     if ($Cofnij) { $tryb = 'COFNIECIE' }
     if ($Cofnij -and $ListaZFundamentu) { Stop-Skrypt 1 'Przelaczniki -Cofnij i -ListaZFundamentu wykluczaja sie: przy cofaniu wariant zbrojowni jest rozpoznawany z pliku.' }
+    if ($TylkoZdarzenia -and $ListaZFundamentu) { Stop-Skrypt 1 'Przelaczniki -TylkoZdarzenia i -ListaZFundamentu wykluczaja sie: wariant zbrojowni dotyczy 13 kluczy ujsc, a -TylkoZdarzenia ich nie rusza.' }
+    $zakres = '14 kluczy (13 ujsc + klucz 14: losowe zdarzenia)'
+    if ($TylkoZdarzenia) { $zakres = 'tylko klucz 14 (losowe zdarzenia)' }
 
     $pelna = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-    Write-Host ('== BetterEconomy, 13 kluczy: ' + $tryb + $(if ($NaSucho) { ' (NA SUCHO - bez zapisu)' } else { '' }))
+    Write-Host ('== BetterEconomy, ' + $zakres + ': ' + $tryb + $(if ($NaSucho) { ' (NA SUCHO - bez zapisu)' } else { '' }))
     Write-Host ('Plik: ' + $pelna)
     if (-not (Test-Path -LiteralPath $pelna -PathType Leaf)) { Stop-Skrypt 1 'Nie ma takiego pliku.' }
     # Najdluzsza nazwa, jaka skrypt moze utworzyc obok pliku, to kopia z godzina przy cofaniu. Windows PowerShell 5.1
@@ -320,8 +341,8 @@ try {
         Write-Host 'UWAGA: BannerKingsCompatibilityMode nie jest rowne 1 - fundament 4.5 kaze zostawic 1 (skrypt go nie zmienia).'
     }
 
-    # 3. stan 14 znanych kluczy (12 wspolnych + oba warianty zbrojowni)
-    $wszystkie = @($Wspolne) + @($ZbrojowniaTylkoAI, $ZbrojowniaLista)
+    # 3. stan 15 znanych kluczy (12 wspolnych + oba warianty zbrojowni + klucz 14)
+    $wszystkie = @($Wspolne) + @($ZbrojowniaTylkoAI, $ZbrojowniaLista, $Zdarzenia)
     $stany = @(foreach ($d in $wszystkie) { Stan-Klucza $d $tekst $elementy })
     $zle = @($stany | Where-Object { $_.Stan -cne 'PRZED' -and $_.Stan -cne 'PO' })
     if ($zle.Length -gt 0) {
@@ -333,46 +354,73 @@ try {
     $wspolnePo = @($Wspolne | Where-Object { $stanWg[$_.Klucz].Stan -ceq 'PO' }).Length
     $aiPo = ($stanWg[$ZbrojowniaTylkoAI.Klucz].Stan -ceq 'PO')
     $listaPo = ($stanWg[$ZbrojowniaLista.Klucz].Stan -ceq 'PO')
+    $zdarzeniaPo = ($stanWg[$Zdarzenia.Klucz].Stan -ceq 'PO')
+    # Grupa 13 kluczy ujsc jako calosc: PRZED (zaden nie zmieniony), PO-AI albo PO-LISTA (12 wspolnych i dokladnie jeden klucz
+    # zbrojowni w stanie "po"), MIESZANY (wszystko inne). Klucz 14 jest osobna grupa i ma tylko PRZED albo PO.
+    $ujscia = 'MIESZANY'
+    if ($wspolnePo -eq 0 -and -not $aiPo -and -not $listaPo) { $ujscia = 'PRZED' }
+    elseif ($wspolnePo -eq 12 -and $aiPo -and -not $listaPo) { $ujscia = 'PO-AI' }
+    elseif ($wspolnePo -eq 12 -and $listaPo -and -not $aiPo) { $ujscia = 'PO-LISTA' }
+    $zbrojowniaWPliku = $null      # klucz zbrojowni grupy, ktora jest juz zamknieta
+    if ($ujscia -ceq 'PO-AI') { $zbrojowniaWPliku = $ZbrojowniaTylkoAI }
+    elseif ($ujscia -ceq 'PO-LISTA') { $zbrojowniaWPliku = $ZbrojowniaLista }
 
-    $wybrane = $null       # 13 definicji do zmiany
-    if (-not $Cofnij) {
+    $wybrane = New-Object System.Collections.Generic.List[object]      # definicje do zmiany: 14, 13 albo 1 (0 = nic do zrobienia)
+    $wZakresie = New-Object System.Collections.Generic.List[object]    # definicje, ktorych dotyczy to uruchomienie (do tabeli stanu)
+    if ($TylkoZdarzenia) {
+        Write-Host ('13 kluczy ujsc: stan {0} - nie ruszam (-TylkoZdarzenia).' -f $ujscia)
+    }
+    elseif (-not $Cofnij) {
         $zbrojownia = $ZbrojowniaTylkoAI
         $druga = $ZbrojowniaLista
         if ($ListaZFundamentu) { $zbrojownia = $ZbrojowniaLista; $druga = $ZbrojowniaTylkoAI }
-        $wybrane = Zloz-Liste $zbrojownia
-        $wybranePo = @($wybrane | Where-Object { $stanWg[$_.Klucz].Stan -ceq 'PO' }).Length
-        $drugaPo = ($stanWg[$druga.Klucz].Stan -ceq 'PO')
-        Write-Host ('Wariant zbrojowni: {0} ({1}).' -f $zbrojownia.Klucz, $zbrojownia.Kogo)
-        if ($wybranePo -eq 13 -and -not $drugaPo) {
-            Pokaz-Stany @($wybrane | ForEach-Object { $stanWg[$_.Klucz] })
-            Write-Host 'WYNIK: plik jest juz w stanie docelowym (13 z 13 kluczy). Nic nie zapisano, kopii nie robiono.'
-            exit 0
+        if ($ujscia -ceq 'PRZED') {
+            Write-Host ('Wariant zbrojowni: {0} ({1}).' -f $zbrojownia.Klucz, $zbrojownia.Kogo)
+            foreach ($d in (Zloz-Liste $zbrojownia)) { $wybrane.Add($d); $wZakresie.Add($d) }
         }
-        if ($wybranePo -ne 0 -or $drugaPo) {
+        elseif ($null -ne $zbrojowniaWPliku -and ($zbrojowniaWPliku.Klucz -ceq $zbrojownia.Klucz -or -not $ListaZFundamentu)) {
+            # Grupa juz zamknieta: w zadanym wariancie albo - gdy przelacznika wariantu nie podano - w wariancie rozpoznanym
+            # z pliku (jak przy cofaniu). Wariantu sie tu nie zmienia; do zmiany zostaje najwyzej klucz 14.
+            Write-Host ('13 kluczy ujsc: juz zamkniete, wariant zbrojowni w pliku: {0} ({1}) - zostaje.' -f $zbrojowniaWPliku.Klucz, $zbrojowniaWPliku.Kogo)
+            foreach ($d in (Zloz-Liste $zbrojowniaWPliku)) { $wZakresie.Add($d) }
+        }
+        else {
             Pokaz-Stany $stany
-            $rada = 'Stan mieszany - czesc kluczy jest juz zmieniona.'
-            if ($wspolnePo -eq 12 -and $drugaPo -and -not ($stanWg[$zbrojownia.Klucz].Stan -ceq 'PO')) {
-                $rada = 'Plik jest juz zamkniety w DRUGIM wariancie zbrojowni (' + $druga.Klucz + '). Zeby zmienic wariant, najpierw uruchom cofnij-ujscia-bee.ps1.'
+            $rada = 'Stan mieszany - czesc z 13 kluczy ujsc jest juz zmieniona. Sam klucz 14: -TylkoZdarzenia.'
+            if ($null -ne $zbrojowniaWPliku) {
+                $rada = 'Plik jest juz zamkniety w DRUGIM wariancie zbrojowni (' + $druga.Klucz + '). Zeby zmienic wariant, najpierw uruchom cofnij-ujscia-bee.ps1. Sam klucz 14: uruchom bez -ListaZFundamentu.'
             }
             Stop-Skrypt 1 ($rada + ' Nic nie zapisano.')
         }
     }
     else {
-        if ($wspolnePo -eq 0 -and -not $aiPo -and -not $listaPo) {
+        if ($ujscia -ceq 'MIESZANY') {
             Pokaz-Stany $stany
-            Write-Host 'WYNIK: nie ma czego cofac - wszystkie klucze maja wartosci sprzed zmiany. Nic nie zapisano, kopii nie robiono.'
-            exit 0
+            Stop-Skrypt 1 'Stan mieszany - do cofniecia potrzeba 12 kluczy wspolnych i dokladnie jednego klucza zbrojowni w stanie "po" (albo zadnego z 13). Sam klucz 14: -TylkoZdarzenia. Nic nie zapisano.'
         }
-        if ($wspolnePo -ne 12 -or ($aiPo -eq $listaPo)) {
-            Pokaz-Stany $stany
-            Stop-Skrypt 1 'Stan mieszany - do cofniecia potrzeba 12 kluczy wspolnych i dokladnie jednego klucza zbrojowni w stanie "po". Nic nie zapisano.'
+        if ($null -ne $zbrojowniaWPliku) {
+            Write-Host ('Wariant zbrojowni rozpoznany w pliku: {0}.' -f $zbrojowniaWPliku.Klucz)
+            foreach ($d in (Zloz-Liste $zbrojowniaWPliku)) { $wybrane.Add($d); $wZakresie.Add($d) }
         }
-        $zbrojownia = $ZbrojowniaTylkoAI
-        if ($listaPo) { $zbrojownia = $ZbrojowniaLista }
-        $wybrane = Zloz-Liste $zbrojownia
-        Write-Host ('Wariant zbrojowni rozpoznany w pliku: {0}.' -f $zbrojownia.Klucz)
     }
-    if (@($wybrane).Length -ne 13) { Stop-Skrypt 1 'Blad wewnetrzny: lista kluczy nie ma 13 pozycji.' }
+    # Klucz 14: zmieniany tylko wtedy, gdy nie jest jeszcze w stanie docelowym tego kierunku.
+    $wZakresie.Add($Zdarzenia)
+    if ((-not $Cofnij -and -not $zdarzeniaPo) -or ($Cofnij -and $zdarzeniaPo)) { $wybrane.Add($Zdarzenia) }
+
+    $ileZmian = $wybrane.Count
+    if ($ileZmian -eq 0) {
+        if (-not $Cofnij) {
+            Pokaz-Stany @($wZakresie | ForEach-Object { $stanWg[$_.Klucz] })
+            Write-Host ('WYNIK: plik jest juz w stanie docelowym ({0} z {0} kluczy). Nic nie zapisano, kopii nie robiono.' -f $wZakresie.Count)
+        }
+        else {
+            Pokaz-Stany $stany
+            if ($TylkoZdarzenia) { Write-Host 'WYNIK: nie ma czego cofac - klucz 14 ma wartosc sprzed zmiany. Nic nie zapisano, kopii nie robiono.' }
+            else { Write-Host 'WYNIK: nie ma czego cofac - wszystkie klucze maja wartosci sprzed zmiany. Nic nie zapisano, kopii nie robiono.' }
+        }
+        exit 0
+    }
+    if ($ileZmian -ne 14 -and $ileZmian -ne 13 -and $ileZmian -ne 1) { Stop-Skrypt 1 ('Blad wewnetrzny: lista kluczy ma {0} pozycji (dozwolone 14, 13 albo 1).' -f $ileZmian) }
 
     # 4. podmiana w pamieci: kazda kotwica dokladnie raz
     $plan = New-Object System.Collections.Generic.List[object]
@@ -393,13 +441,13 @@ try {
     [byte[]]$nowe = Zakoduj $nowyTekst $bom
     $skrotNowy = Skrot $nowe
 
-    # 4a. kontrola tekstu: te same linie poza dokladnie 13, znaki CR bez zmian, dlugosc zgodna z rachunkiem
+    # 4a. kontrola tekstu: te same linie poza dokladnie $ileZmian (14, 13 albo 1), znaki CR bez zmian, dlugosc zgodna z rachunkiem
     $linieA = $tekst.Split("`n")
     $linieB = $nowyTekst.Split("`n")
     if ($linieA.Length -ne $linieB.Length) { Stop-Skrypt 1 'Kontrola: zmienila sie liczba linii. Nic nie zapisano.' }
     $rozne = New-Object System.Collections.Generic.List[int]
     for ($i = 0; $i -lt $linieA.Length; $i++) { if ($linieA[$i] -cne $linieB[$i]) { $rozne.Add($i + 1) } }
-    if ($rozne.Count -ne 13) { Stop-Skrypt 1 ('Kontrola: rozni sie {0} linii, ma byc dokladnie 13 (kazdy klucz w osobnej linii). Nic nie zapisano.' -f $rozne.Count) }
+    if ($rozne.Count -ne $ileZmian) { Stop-Skrypt 1 ('Kontrola: rozni sie {0} linii, ma byc dokladnie {1} (kazdy klucz w osobnej linii). Nic nie zapisano.' -f $rozne.Count, $ileZmian) }
     foreach ($p in $plan) {
         if (-not $rozne.Contains([int]$p.Linia)) { Stop-Skrypt 1 ('Kontrola: linia {0} klucza {1} nie jest wsrod zmienionych. Nic nie zapisano.' -f $p.Linia, $p.Klucz) }
         if ($linieB[$p.Linia - 1].Trim() -cne $p.Nowa) { Stop-Skrypt 1 ('Kontrola: linia {0} ma inna tresc niz {1}. Nic nie zapisano.' -f $p.Linia, $p.Nowa) }
@@ -409,7 +457,7 @@ try {
     foreach ($p in $plan) { $delta += ($p.Nowa.Length - $p.Stara.Length) }
     if ($nowe.Length -ne $stare.Length + $delta) { Stop-Skrypt 1 'Kontrola: dlugosc pliku nie zgadza sie z rachunkiem podmian. Nic nie zapisano.' }
 
-    # 4b. kontrola drzewa XML: te same elementy w tej samej kolejnosci, rozni sie dokladnie 13 wartosci
+    # 4b. kontrola drzewa XML: te same elementy w tej samej kolejnosci, rozni sie dokladnie $ileZmian wartosci
     $elementyNowe = Wczytaj-Elementy $nowe
     if ($elementyNowe.Length -ne $elementy.Length) { Stop-Skrypt 1 'Kontrola XML: zmienila sie liczba elementow. Nic nie zapisano.' }
     $naWg = @{}
@@ -423,8 +471,8 @@ try {
             if (-not $naWg.ContainsKey($n) -or $elementyNowe[$i].Wartosc -cne $naWg[$n]) { Stop-Skrypt 1 ('Kontrola XML: nieoczekiwana zmiana elementu {0}. Nic nie zapisano.' -f $n) }
         }
     }
-    if ($rozneXml -ne 13) { Stop-Skrypt 1 ('Kontrola XML: rozni sie {0} elementow, ma byc dokladnie 13. Nic nie zapisano.' -f $rozneXml) }
-    Write-Host ('Kontrole w pamieci: 13 kotwic po 1 wystapieniu, 13 linii roznych, {0} elementow XML ({1} bez zmian), kodowanie i konce linii zachowane.' -f $elementyNowe.Length, ($elementyNowe.Length - 13))
+    if ($rozneXml -ne $ileZmian) { Stop-Skrypt 1 ('Kontrola XML: rozni sie {0} elementow, ma byc dokladnie {1}. Nic nie zapisano.' -f $rozneXml, $ileZmian) }
+    Write-Host ('Kontrole w pamieci: kotwic po 1 wystapieniu: {2}, linii roznych: {2}, {0} elementow XML ({1} bez zmian), kodowanie i konce linii zachowane.' -f $elementyNowe.Length, ($elementyNowe.Length - $ileZmian), $ileZmian)
 
     $wiersze = foreach ($p in $plan) {
         [pscustomobject][ordered]@{ Nr = ($plan.IndexOf($p) + 1); Klucz = $p.Klucz; Linia = $p.Linia; Typ = $p.Def.Typ; Przed = $p.Z; Po = $p.Na; Dotyczy = $p.Def.Kogo }
@@ -432,7 +480,7 @@ try {
 
     if ($NaSucho) {
         Write-Host (($wiersze | Format-Table -AutoSize | Out-String -Width 260).TrimEnd())
-        Write-Host ('WYNIK (NA SUCHO): zmieniloby sie 13 wartosci; SHA-256 po zmianie bylby {0}. Nic nie zapisano, kopii nie robiono.' -f $skrotNowy)
+        Write-Host ('WYNIK (NA SUCHO): liczba wartosci do zmiany: {1}; SHA-256 po zmianie bylby {0}. Nic nie zapisano, kopii nie robiono.' -f $skrotNowy, $ileZmian)
         exit 0
     }
 
@@ -507,11 +555,12 @@ try {
         [pscustomobject][ordered]@{ Nr = ($plan.IndexOf($p) + 1); Klucz = $p.Klucz; Linia = $p.Linia; Typ = $p.Def.Typ; Przed = $p.Z; Po = $zDyskuWg[$p.Klucz]; Dotyczy = $p.Def.Kogo }
     }
     Write-Host (($wiersze | Format-Table -AutoSize | Out-String -Width 260).TrimEnd())
-    Write-Host ('WYNIK: zmieniono 13 wartosci. SHA-256 przed {0}, po {1}; {2} -> {3} bajtow; elementow {4}.' -f $skrotStary, $skrotNowy, $stare.Length, $zDysku.Length, $elementyZDysku.Length)
+    Write-Host ('WYNIK: liczba zmienionych wartosci: {5}. SHA-256 przed {0}, po {1}; {2} -> {3} bajtow; elementow {4}.' -f $skrotStary, $skrotNowy, $stare.Length, $zDysku.Length, $elementyZDysku.Length, $ileZmian)
     if (-not $plikNaDysku) { Write-Host 'UWAGA: nie udalo sie wymusic zrzutu zmienionego pliku na dysk - po najblizszym wyjsciu z gry sprawdz go: zamknij-ujscia-bee.ps1 -NaSucho.' }
     if (-not $Cofnij) {
         Write-Host 'Dalej: uruchom gre; w Modules\BetterEconomy\bee_log.txt ma byc "settings loaded: 583 applied, 0 skipped". Nowa kampania nie jest potrzebna.'
-        Write-Host 'Cofniecie: cofnij-ujscia-bee.ps1 (gra zamknieta).'
+        if ($wybrane.Contains($Zdarzenia)) { Write-Host 'Klucz 14: nowe losowe zdarzenia BEE juz nie powstana; te, ktore trwaja w zapisie, wygasna same w swoim terminie (klucze Event...DurationDays).' }
+        Write-Host 'Cofniecie: cofnij-ujscia-bee.ps1 (gra zamknieta); sam klucz 14: cofnij-ujscia-bee.ps1 -TylkoZdarzenia.'
     }
 }
 catch {
