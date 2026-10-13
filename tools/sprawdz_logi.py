@@ -200,6 +200,11 @@ Uzycie (Python 3, tylko odczyt):
                     linia "Najemnicy i uczta BK (E8/G2)" w kazdej dobie okna, oba klucze czynne; G2-1 bohaterowie zamienieni 0 i ludzie dosypani 0
                     (pomiar E8/P3), rozjazd liczby ludzi 0, cien 0; G2-1b wywolania klanow w sluzbie >= 50% klano-dob; G2-2 INFO wielkosc druzyn,
                     zamiana 1:1, ochotnicy z mapy gry; G2-3 uczta: towar z niczego 0, rynek nie traci ponad zakup; G2-K potkniecia i "ERROR in MercFeast.*" 0.
+                    Blok etap8_t (E8/T, paczka 263 - start kampanii i rekrut gracza jak u AI; NOWA KAMPANIA; ColdStart.cs, LevyGold.cs, PlayerRecruit.cs):
+                    T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w linii sesji; T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob
+                    1-3) >= 280; T-2 budzet cechow przepadly 0, T-2b INFO cechy; T-3 nowe partie lordow w dobach 1-3 bez dorobku bez powodu 0, T-3b INFO
+                    wszystkie nowe partie AI w dobie 1 wobec Z33; T-4 zakupy AI w dobach 1-3 <= 50% Z33; T-5 rekrut gracza: tier 2+ = zablokowane komplety
+                    DTE, tier 1 = komplety DTE (bez werbunku gracza - INFO, sprawdzenie reczne 8.16 p. 2 i 19); T-K potkniecia i linie ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -8921,6 +8926,139 @@ def etap8_g2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rep.add("G2-K: kontrola (potkniecia, linie ERROR in MercFeast.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
 
 
+E8_T_LATE = "Dorobek startowy (E8/T): dzien"
+E8_T_PLAYER = "Rekrut gracza (E8/T): dzien"
+E8_T_Z33_BUYS = (2451, 6123, 5037)   # zakupy AI (szt.) w dobach 1-3 biegu Z33 (WGRANIE 33, linie "ZakupyAI: dzien" L:337, L:653, L:942)
+E8_T_Z33_NEW_D1 = 541                # nowe partie AI bez darmowego kompletu DTE w dobie 1 biegu Z33 (linia "Werbunek: dzien", L:341)
+E8_T_Z33_LORDS_D1 = 276              # z tego partie lordow (linia "dziura werbunku ... nowe partie z szablonu klanu ... (276 partii)" tej samej doby)
+
+
+def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/T (263, projekt etapu 8 v2 rozdz. 3 "E8/T" Test; NOWA KAMPANIA): start kampanii i rekruci gracza (ColdStart.cs, LevyGold.cs, RecruitKit.cs,
+    PlayerRecruit.cs). Linie: "Start kampanii (E8/T): sesja" (klucze, przy kazdym starcie sesji), "Rekrut gracza (E8/T): latki przy starcie gry",
+    "ColdStart: zbrojownie" i "ColdStart: budzet cechow (E8/T)" (raz, nowa gra), "Dorobek startowy (E8/T): dzien N" (doby 1-4 kampanii),
+    "Rekrut gracza (E8/T): dzien N" (kazdy werbunek / najem gracza).
+    T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w ostatniej linii sesji;
+    T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob 1-3) >= 280 (projekt: ok. 280-300; Z33 mial 34 sprzed startu i 276 + 38 + 23 nowych);
+    T-2 budzet cechow przepadly 0 (roboczodni, po zaokragleniu); T-2b INFO podzial na cechy i sztuki z wyzszego tieru;
+    T-3 nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz "drugi raz ten sam wodz" albo "bez ludzi" = 0; T-3b INFO wszystkie nowe
+    partie AI bez kompletu w dobie 1 wobec Z33 (541, z czego 276 lordow) i progu projektu 100 - reszta to wozy wsi, bandy i karawany, ktore dorobku
+    z projektu nie dostaja;
+    T-4 zakupy AI (szt.) w dobach 1-3 <= 50% Z33 (2 451 / 6 123 / 5 037);
+    T-5 rekrut gracza (gdy gracz werbowal): ludzi tieru 2+ = komplety DTE zablokowane i tier 1 = komplety DTE dane; bez werbunku gracza - INFO
+    (sprawdzenie reczne 8.16 p. 2 i 19);
+    T-K potkniecia 0 i linie "ERROR in ColdStart.*", "ERROR in PlayerRecruit.*", "ERROR in LevyGold.*" 0."""
+    ses = [s for s in lines if s.startswith("Start kampanii (E8/T): sesja")]
+    wire = [s for s in lines if s.startswith("Rekrut gracza (E8/T): latki przy starcie gry")]
+    bud = [s for s in lines if s.startswith("ColdStart: budzet cechow (E8/T)")]
+    late = {d: s for d, s in by_day(lines, E8_T_LATE).items() if 1 <= run_day(d, start) <= until}
+    pl = [s for s in lines if s.startswith(E8_T_PLAYER)]
+    if not ses and not wire and not bud and not late and not pl:
+        rep.add("E8/T: linie Start kampanii (E8/T) / Dorobek startowy (E8/T) / Rekrut gracza (E8/T)", "brak w logu", "sa od wgrania E8/T", None)
+        return
+    # ---------------- T-0 / T-K0: latki i klucze
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("T-0: latki rekruta gracza (komplet DTE, okno werbunku, najem w rozmowie i w menu)", w0[:150], "wpiete N/N, BRAK: -",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0)
+    else:
+        rep.add("T-0: latki rekruta gracza", "brak linii startowej", "wpiete N/N", False)
+    if ses:
+        s0 = ses[-1]
+        keys = ("Cold Start Tier Up", "Cold Start Late Lord Parties", "Player Recruit No Free Kit")
+        off = [k for k in keys if (k + " CZYNNE") not in s0]
+        path = "sciezka czynna" in s0
+        rep.add("T-K0: klucze paczki w ostatniej linii sesji (sesji w logu %d)" % len(ses),
+                ("wszystkie CZYNNE" if not off else "WYLACZONE: " + ", ".join(off)) + ("; rekrut gracza: sciezka czynna" if path else "; rekrut gracza: sciezka NIECZYNNA"),
+                "trzy klucze CZYNNE, sciezka rekruta gracza czynna", not off and path)
+    else:
+        rep.add("T-K0: klucze paczki", "brak linii \"Start kampanii (E8/T): sesja\"", "linia przy kazdym starcie sesji", False)
+
+    def tot(rows, pat):
+        return sum(num(pat, x, int, 0) or 0 for x in rows)
+    d13 = [late[d] for d in sorted(late) if 1 <= run_day(d, start) <= 3]
+    # ---------------- T-1: partie lordow z dorobkiem
+    arm = [s for s in lines if s.startswith("ColdStart: zbrojownie - ")]
+    if arm:
+        a0 = arm[-1]
+        allp, gar = num(r"zbrojownie - (\d+) partii", a0, int, 0) or 0, num(r"w tym garnizonow (\d+)", a0, int, 0) or 0
+        lp = tot(d13, r"nowe partie lordow AI z dorobkiem (\d+)")
+        pcs = tot(d13, r"nowe partie lordow AI z dorobkiem \d+ \(szt\. (\d+)\)")
+        rep.add("T-1: partie lordow z dorobkiem stuleci (sprzed startu + nowe z dob 1-3 kampanii)",
+                f"{allp - gar} sprzed startu + {lp} nowych = {allp - gar + lp} (nowe dostaly {pcs} szt.; linii doby {len(d13)} z 3)",
+                ">= 280 (projekt ok. 280-300; Z33: 34 sprzed startu, nowych 276 + 38 + 23)", (allp - gar + lp) >= 280 if d13 else False)
+    else:
+        rep.add("T-1: partie lordow z dorobkiem stuleci", "brak linii \"ColdStart: zbrojownie\" - log nie zaczyna nowej kampanii", "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-2: budzet cechow
+    if bud:
+        b0 = bud[-1]
+        giv, used, lost = num(r"dany (\d+) roboczodni", b0), num(r"zuzyty (\d+), przepadly", b0), num(r", przepadly (\d+) \(los tieru", b0)
+        draw, none, guard = num(r"stara regula (\d+) w", b0, int, 0), num(r"cech bez zadnej sztuki (\d+) w", b0, int, 0), num(r"straznik petli (\d+) w", b0, int, 0)
+        up = num(r"\): (\d+) szt\.; cechy", b0, int, 0)
+        rep.add("T-2: budzet cechow na starcie - przepadly (roboczodni)",
+                f"dany {giv}, zuzyty {used}, przepadly {lost} (los tieru - stara regula {draw}, cech bez zadnej sztuki {none}, straznik petli {guard}); z wyzszego tieru {up} szt.",
+                "przepadly 0", lost == 0 if lost is not None else False)
+        g = re.search(r"cechy \[(.*)\]\.", b0)
+        rep.add("T-2b: budzet wedlug cechu", g.group(1)[:420] if g else "brak podzialu w linii", "INFO", None)
+    else:
+        rep.add("T-2: budzet cechow na starcie", "brak linii \"ColdStart: budzet cechow (E8/T)\" - log nie zaczyna nowej kampanii albo zapas kupiecki wylaczony",
+                "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-3: nowe partie lordow bez dorobku
+    if d13:
+        lords = tot(d13, r"w tym partie lordow (\d+)\)")
+        empty, again = tot(d13, r"bez ludzi albo bez brakow (\d+)"), tot(d13, r"drugi raz ten sam wodz (\d+)")
+        nolead, keyoff = tot(d13, r"bez wodza (\d+)"), tot(d13, r"klucz wylaczony (\d+)")
+        bad = lords - empty - again
+        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz \"drugi raz ten sam wodz\" albo \"bez ludzi\"",
+                f"{bad} (bez dorobku razem {lords}: bez ludzi albo bez brakow {empty}, drugi raz ten sam wodz {again}, bez wodza {nolead}, klucz wylaczony {keyoff})",
+                "0", bad == 0)
+        first = [late[d] for d in sorted(late) if run_day(d, start) == 1]
+        if first:
+            n1, l1 = num(r"bez kompletu DTE i bez dorobku (\d+)", first[0], int, 0), num(r"w tym partie lordow (\d+)\)", first[0], int, 0)
+            rep.add("T-3b: wszystkie nowe partie AI bez kompletu w dobie 1",
+                    f"{n1} (w tym partie lordow {l1}); Z33 {E8_T_Z33_NEW_D1}, z czego {E8_T_Z33_LORDS_D1} partii lordow - reszta ({E8_T_Z33_NEW_D1 - E8_T_Z33_LORDS_D1}) to wozy wsi, bandy, karawany",
+                    "INFO (prog projektu <= 100 liczyl wszystkie rodzaje partii; dorobek z projektu dostaja tylko partie lordow - patrz T-3)", None)
+    else:
+        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku", "brak linii \"Dorobek startowy (E8/T)\" w dobach 1-3", "linia co dobe w dobach 1-3 nowej kampanii",
+                False if arm else None)
+    # ---------------- T-4: zakupy AI w dobach 1-3
+    buys = by_day(lines, "ZakupyAI: dzien")
+    got = []
+    for k in (1, 2, 3):
+        dd = [d for d in buys if run_day(d, start) == k]
+        got.append(num(r"wizyt, (\d+) szt\. kupionych", buys[dd[0]]) if dd else None)
+    if arm and all(x is not None for x in got):
+        rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33",
+                " / ".join(f"{x} ({100.0 * x / z:.0f}% z {z})" for x, z in zip(got, E8_T_Z33_BUYS)), "kazda doba <= 50% Z33 (2 451 / 6 123 / 5 037)",
+                all(2 * x <= z for x, z in zip(got, E8_T_Z33_BUYS)))
+    else:
+        rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33", "brak linii ZakupyAI w dobach 1-3 albo log nie zaczyna nowej kampanii: " + str(got),
+                "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-5: rekrut gracza
+    if pl:
+        men, blocked = tot(pl, r"ludzi tieru 2\+ (\d+)"), tot(pl, r"komplet DTE zablokowany dla (\d+) ludzi")
+        rec, own, tpl = tot(pl, r"z zapisu notabla (\d+)"), tot(pl, r"z tym co ma (\d+)"), tot(pl, r"wzorzec - wylacznik (\d+)")
+        pcs, hp, ref = tot(pl, r"do zbrojowni druzyny (\d+) szt\."), tot(pl, r"konie i rzedy najemnikow (\d+)"), tot(pl, r"nieprzyjete przez DTE (\d+)")
+        t1, t1d, noc = tot(pl, r"tier 1 z wlasnym dobytkiem (\d+)"), tot(pl, r"\(komplet DTE dla (\d+)\)"), tot(pl, r"ochotnik spoza koszyka (\d+)")
+        mer = sum(1 for s in pl if "najemnicy z karczmy" in s)
+        rep.add("T-5: rekrut gracza - ludzi tieru 2+ wobec zablokowanych kompletow DTE; tier 1 wobec kompletow DTE",
+                f"tier 2+: {men} ludzi / {blocked} zablokowanych kompletow; tier 1: {t1} ludzi / {t1d} kompletow DTE (werbunkow {len(pl)}, w tym najem z karczmy {mer})",
+                "rowne (kazdy rekrut tieru 2+ bez kompletu DTE, kazdy tieru 1 z kompletem DTE)", men == blocked and t1 == t1d)
+        rep.add("T-5b: rekrut gracza - skad rzeczy (suma logu)",
+                f"z zapisu notabla {rec}, z tym co ma {own}, wzorzec (wylacznik) {tpl}; do zbrojowni druzyny {pcs} szt. (konie i rzedy najemnikow {hp}, nieprzyjete przez DTE {ref})"
+                f"; ochotnik spoza koszyka {noc}", "INFO", None)
+    else:
+        rep.add("T-5: rekrut gracza", "gracz nie werbowal w tym logu (autotest)", "INFO - sprawdzenie reczne 8.16 p. 2 (rekrut u notabla) i p. 19 (najemnik z karczmy)", None)
+    # ---------------- T-K: kontrola
+    stu_l = max([num(r"; potkniecia (\d+) \(Cold Start Late", s, int, 0) or 0 for s in late.values()] or [0])
+    stu_p = max([num(r"; potkniecia (\d+)\.$", s, int, 0) or 0 for s in pl] or [0])
+    stu_s = max([num(r"sciezka (?:czynna|nieczynna), potkniecia (\d+)\)", s, int, 0) or 0 for s in ses] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in ColdStart.") or s.startswith("ERROR in PlayerRecruit.") or s.startswith("ERROR in LevyGold."))
+    rep.add("T-K: kontrola (potkniecia dorobku / rekruta gracza / w linii sesji, linie ERROR in ColdStart.*, PlayerRecruit.*, LevyGold.*)",
+            f"{stu_l} / {stu_p} / {stu_s} / {errs}", "0 / 0 / 0 / 0", stu_l == 0 and stu_p == 0 and stu_s == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -8945,6 +9083,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_q)   # E8/Q (262): straz przeprawy na zegarze gry
     blocks.append(etap8_g1)   # E8/G1 (260): karawany BK w miescie co godzine, wyspy bez drogi
     blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
+    blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

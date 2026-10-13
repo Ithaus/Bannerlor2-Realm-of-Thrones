@@ -1792,6 +1792,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool KitFromNotable { get; set; } = true;
 
+        [SettingPropertyBool("Player Recruit No Free Kit", HintText = "your recruits come as an AI lord's do, with no full free kit from Dynamic Troop Equipment: a volunteer above the first rank brings what his notable bought for him and what he owns, a first-rank man brings his own belongings as before, and a tavern hireling brings what he owns plus, if he rides, his own horse and its harness. The rest you buy or loot. Off = as before (every recruit brings a full kit)")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PlayerRecruitNoFreeKit { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ai Gear Budget Percent", 0.00f, 100.00f, "0.00", HintText = "share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town")]
         [SettingPropertyGroup("Army purchases")]
         public float AiGearBudgetPercent { get; set; } = 25f;
@@ -2111,6 +2115,14 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 240.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture); two months of stock, because recruits no longer bring a second kit from thin air")]
         [SettingPropertyGroup("Iron Bank")]
         public float ColdStartMarketDays { get; set; } = 60f;
+
+        [SettingPropertyBool("Cold Start Tier Up", HintText = "new campaign only: when the craftsmen's starting stock is laid out and a guild makes nothing as plain as the piece that was drawn, it lays out its next better piece instead of losing the rest of its share - armourers and shield makers no longer start with half-empty stalls. Off = as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ColdStartTierUp { get; set; } = true;
+
+        [SettingPropertyBool("Cold Start Late Lord Parties", HintText = "new campaign only: an AI lord's warband raised in the first three days of the campaign starts with the kit its men already wear lying in its stores, like the warbands that stood on the map at the very start - once for each lord, so the first days are no longer one great rush on the markets. Off = as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ColdStartLateLordParties { get; set; } = true;
 
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron Bank")]
@@ -5375,6 +5387,7 @@ namespace Armoury
             s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
+            s.PlayerRecruitNoFreeKit = PlayerRecruitNoFreeKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;
             s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;
@@ -5455,6 +5468,8 @@ namespace Armoury
             s.VolunteerKitKeyOnly = VolunteerKitKeyOnly;
             s.ColdStartEnabled = ColdStartEnabled;
             s.ColdStartMarketDays = ColdStartMarketDays;
+            s.ColdStartTierUp = ColdStartTierUp;
+            s.ColdStartLateLordParties = ColdStartLateLordParties;
             s.HistoricalPricesEnabled = HistoricalPricesEnabled;
             s.HistIronOrePerKg = HistIronOrePerKg;
             s.HistWoodPerKg = HistWoodPerKg;

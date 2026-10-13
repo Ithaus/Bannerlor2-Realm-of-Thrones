@@ -531,6 +531,10 @@ namespace Armoury
                 string cold = ColdStart.Export();
                 SaveText.Sync(dataStore, "arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
+                // E8/T (263): wodzowie partii z dorobkiem startowym pierwszych dob nowej kampanii (po 3. dobie pusty; stary zapis bez sekcji = pusty zbior)
+                string coldLate = ColdStart.ExportLate();
+                SaveText.Sync(dataStore, "arm_e8_coldlate", ref coldLate);
+                if (dataStore.IsLoading) ColdStart.ImportLate(coldLate);
                 string climate = WesterosClimate.Export();
                 SaveText.Sync(dataStore, "arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);

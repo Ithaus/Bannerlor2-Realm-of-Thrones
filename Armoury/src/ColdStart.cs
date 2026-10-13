@@ -23,12 +23,16 @@ namespace Armoury
     internal static class ColdStart
     {
         private static bool _done;
-        internal static void Reset() { _done = false; }
+        internal static void Reset() { _done = false; ResetLate(); }
         internal static string Export() { return _done ? "done" : ""; }
         internal static void Import(string s) { _done = s == "done"; }
 
         internal static void Run()
         {
+            // E8/T (263): sesja wystartowala (nowa kampania i kazde wczytanie; Run wola OnSessionLaunched) - dopiero od teraz nowa partia lorda to prawdziwe
+            // utworzenie, a nie echo wczytania DTE (OnGameLoaded wola OnMobilePartyCreated dla partii bez zbrojowni PRZED startem sesji)
+            _ran = true;
+            try { SessionLine(); } catch { }
             if (_done) return;
             var s = Settings.Current;
             if (s == null || !s.ColdStartEnabled) return;
@@ -59,6 +63,7 @@ namespace Armoury
                 // co ma w zbrojowni (GarrisonFightsWithArmoryOnly); dotad pomijana, bo poza systemem DTE kasowal jej zbrojownie co dobe. Nowa gra zwykle
                 // nie daje graczowi twierdzy - dotyczy startow z lennem.
                 int added = FillToTemplate(mp, dict);
+                if (!garrison) NoteLateLeader(mp);   // E8/T (263): wodz partii sprzed startu ma juz dorobek - jego partia odtworzona po rozbiciu nie dostaje drugiego
                 if (added > 0) { parties++; pieces += added; if (garrison) garrisons++; }
             }
             Log.Info("ColdStart: zbrojownie - " + parties + " partii (w tym garnizonow " + garrisons + ") dostalo " + pieces + " szt. kompletu swoich ludzi (dorobek stuleci, nie z targu).");
@@ -167,6 +172,10 @@ namespace Armoury
             float wsum = 0f; foreach (var g in guilds) wsum += WorkshopLaw.GuildWeight(g);
             if (wsum <= 0f) return;
             int towns = 0, pieces = 0; long worth = 0;
+            // E8/T (263, PLAN 8.10a): budzet cechow - dany / przepadly (zuzyty = dany - przepadly) w roboczodniach, sztuki i sztuki znalezione wyzej niz wylosowany tier
+            bool tierUp = s.ColdStartTierUp;
+            var bGiven = new double[guilds.Length]; var bLost = new double[guilds.Length]; var bPieces = new int[guilds.Length]; var bUp = new int[guilds.Length];
+            double lostDraw = 0, lostNone = 0, lostGuard = 0; int cellsDraw = 0, cellsNone = 0, cellsGuard = 0;
             var byType = new Dictionary<ItemObject.ItemTypeEnum, int>();
             foreach (var st in Settlement.All)
             {
@@ -191,14 +200,19 @@ namespace Armoury
                     }
                 }
                 int made = 0;
+                int gi = -1;
                 foreach (var g in guilds)
                 {
+                    gi++;
                     float budget = days * hands * WorkshopLaw.GuildWeight(g) / wsum;   // roboczodni cechu
                     List<ItemObject>[] byT = null;
                     Dictionary<string, List<ItemObject>[]> byG;
                     if (pool.TryGetValue(cul, out byG)) byG.TryGetValue(g, out byT);
                     List<ItemObject>[] neutral = null;
                     if (pool.TryGetValue("", out byG)) byG.TryGetValue(g, out neutral);
+                    if (budget > 0f) bGiven[gi] += budget;
+                    bool anyPiece = false;   // E8/T: cech ma w tym miescie jakakolwiek sztuke (kultury / krainy miasta albo neutralna)
+                    for (int tt = 0; tt < 6 && !anyPiece; tt++) anyPiece = (byT != null && byT[tt].Count > 0) || (neutral != null && neutral[tt].Count > 0);
                     int guard = 0;
                     while (budget > 0f && guard++ < 2000)
                     {
@@ -208,6 +222,14 @@ namespace Armoury
                         List<ItemObject> l = null;
                         for (int tt = t; tt >= 0 && (l == null || l.Count == 0); tt--)
                             l = byT != null && byT[tt].Count > 0 ? byT[tt] : neutral != null && neutral[tt].Count > 0 ? neutral[tt] : null;
+                        // E8/T (263, PLAN 8.10a): los tieru, ponizej ktorego cech nic nie robi (platnerz, tarczownik bez sztuk tieru 1) - dotad koniec petli i reszta
+                        // budzetu cechu przepadala; teraz po tierach w dol szukamy w gore (t+1..5), koniec dopiero, gdy cech nie ma zadnej sztuki
+                        if ((l == null || l.Count == 0) && tierUp)
+                        {
+                            for (int tt = t + 1; tt <= 5 && (l == null || l.Count == 0); tt++)
+                                l = byT != null && byT[tt].Count > 0 ? byT[tt] : neutral != null && neutral[tt].Count > 0 ? neutral[tt] : null;
+                            if (l != null && l.Count > 0) bUp[gi]++;
+                        }
                         if (l == null || l.Count == 0) break;
                         var it = l[MBRandom.RandomInt(l.Count)];
                         float d; var nd = WorkshopLaw.Needs(it, out d);
@@ -216,12 +238,144 @@ namespace Armoury
                         st.ItemRoster.AddToCounts(it, 1);
                         made++; worth += it.Value;
                         int n; byType.TryGetValue(it.ItemType, out n); byType[it.ItemType] = n + 1;
+                        bPieces[gi]++;
+                    }
+                    if (budget > 0f)
+                    {
+                        // E8/T: reszta budzetu cechu, ktorej nie zamieniono na sztuki - wedlug przyczyny (cech bez zadnej sztuki / los tieru - stara regula / straznik petli)
+                        bLost[gi] += budget;
+                        if (!anyPiece) { lostNone += budget; cellsNone++; }
+                        else if (guard > 2000) { lostGuard += budget; cellsGuard++; }
+                        else { lostDraw += budget; cellsDraw++; }
                     }
                 }
                 if (made > 0) { towns++; pieces += made; }
             }
             var parts = new List<string>(); foreach (var kv in byType) parts.Add(kv.Key + " " + kv.Value);
             Log.Info("ColdStart: zapas kupiecki - " + towns + " miast dostalo " + pieces + " szt. (" + days + " dni pracy rzemieslnikow, wartosc " + worth + " d) [" + string.Join(", ", parts.ToArray()) + "].");
+            // E8/T (263): linia budzetu cechow (prog T-2 narzedzia: przepadly 0)
+            double given = 0, lost = 0; int up = 0;
+            var gp = new List<string>();
+            for (int i = 0; i < guilds.Length; i++)
+            {
+                given += bGiven[i]; lost += bLost[i]; up += bUp[i];
+                gp.Add(guilds[i] + " dany " + R0(bGiven[i]) + " / zuzyty " + R0(bGiven[i] - bLost[i]) + " / przepadly " + R0(bLost[i]) + " / szt. " + bPieces[i] + " / z wyzszego tieru " + bUp[i]);
+            }
+            Log.Info("ColdStart: budzet cechow (E8/T) - dany " + R0(given) + " roboczodni, zuzyty " + R0(given - lost) + ", przepadly " + R0(lost)
+                     + " (los tieru bez sztuki nizej - stara regula " + R0(lostDraw) + " w " + cellsDraw + " miasto-cechach; cech bez zadnej sztuki " + R0(lostNone) + " w " + cellsNone
+                     + "; straznik petli " + R0(lostGuard) + " w " + cellsGuard + "); szukanie wyzszego tieru (Cold Start Tier Up " + (tierUp ? "CZYNNE" : "WYLACZONE") + "): " + up
+                     + " szt.; cechy [" + string.Join("; ", gp.ToArray()) + "].");
+        }
+
+        private static string R0(double v) { return ((long)Math.Round(v)).ToString(); }
+
+        // ------------------------------------------------------------ E8/T (263, PLAN 8.10c): dorobek partii lordow z pierwszych dob kampanii
+        // Armories() widzi tylko partie stojace na mapie przy starcie sesji (Z33: 34 partie lordow). Pozostale gra tworzy po starcie z ludzmi z szablonu klanu
+        // (Z33: 276 partii w dobie 1, potem 38 i 23), a LevyGold.PartyCreatedPrefix blokuje im komplet DTE: ludzie sa, ich dorobku stuleci nie ma i pierwsze doby
+        // to fala zakupow (2 451 / 6 123 / 5 037 szt.). Teraz nowa partia lorda AI w oknie nowej gry (te same 3 doby co Run) dostaje ten sam dorobek co partie
+        // sprzed startu - RAZ na wodza: partia odtworzona po rozbiciu w tych dobach nie dostaje drugiego (wodzowie w zapisie arm_e8_coldlate do konca okna).
+        private const double LateDays = 3.0;
+        private static bool _ran;
+        private static readonly HashSet<string> _lateLeaders = new HashSet<string>();
+        private static int _dLateParties, _dLatePieces, _dLateEmpty, _dLateAgain, _dLateNoLeader, _dLateOff, _lateStumbles, _lateErrDay = -1;
+        private static long _tLateParties, _tLatePieces;
+
+        internal static bool LateOn { get { var s = Settings.Current; return s != null && s.ColdStartEnabled && s.ColdStartLateLordParties; } }
+
+        private static void ResetLate()
+        {
+            _ran = false; _lateLeaders.Clear();
+            _dLateParties = _dLatePieces = _dLateEmpty = _dLateAgain = _dLateNoLeader = _dLateOff = 0; _lateStumbles = 0; _lateErrDay = -1;
+            _tLateParties = _tLatePieces = 0;
+        }
+
+        /// <summary>Wyjatek przy jednej partii: liczony w linii "Dorobek startowy (E8/T)", Log.Error najwyzej raz na dobe; nic nie gasnie.</summary>
+        private static void LateStumble(string where, Exception e)
+        {
+            _lateStumbles++;
+            try { int d = (int)CampaignTime.Now.ToDays; if (d != _lateErrDay) { _lateErrDay = d; Log.Error("ColdStart." + where, e); } } catch { }
+        }
+
+        private static string LeaderKey(MobileParty mp)
+        {
+            Hero h = null;
+            try { h = mp.LeaderHero ?? mp.Owner; } catch { }
+            return h != null ? h.StringId : null;
+        }
+
+        private static void NoteLateLeader(MobileParty mp)
+        {
+            try { var k = LeaderKey(mp); if (!string.IsNullOrEmpty(k)) _lateLeaders.Add(k); } catch { }
+        }
+
+        /// <summary>
+        /// Z LevyGold.PartyCreatedPrefix (prefiks DTE OnMobilePartyCreated, po starcie gry; sklad z szablonu klanu jest juz w partii - gra wypelnia go w
+        /// LordPartyComponent przed zdarzeniem): nowa partia lorda AI w pierwszych dobach nowej kampanii dostaje dorobek (FillToTemplate - regula Armories).
+        /// true = dostala sztuki (nie liczy sie jako "bez kompletu"). Nie rzuca.
+        /// </summary>
+        internal static bool LateLord(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || !mp.IsLordParty || mp.IsMainParty || mp.MemberRoster == null) return false;
+                if (mp.ActualClan == Clan.PlayerClan) return false;      // druzyna rodu gracza - nie "partia lorda AI"
+                if (!_ran || !_done) return false;                       // przed startem sesji (echo wczytania DTE) albo dorobek stuleci nie biegl w tej kampanii
+                if (Hunger.CampaignAge() > LateDays) return false;       // po oknie nowej gry - lord kupuje na targu jak dotad
+                if (!LateOn) { _dLateOff++; return false; }
+                var key = LeaderKey(mp);
+                if (string.IsNullOrEmpty(key)) { _dLateNoLeader++; return false; }
+                if (!_lateLeaders.Add(key)) { _dLateAgain++; return false; }
+                int added = FillToTemplate(mp);
+                if (added <= 0) { _dLateEmpty++; return false; }
+                _dLateParties++; _dLatePieces += added;
+                _tLateParties++; _tLatePieces += added;
+                return true;
+            }
+            catch (Exception e) { LateStumble("LateLord", e); return false; }
+        }
+
+        /// <summary>Z LevyGold.Tick przy zmianie doby (przed zerowaniem licznikow werbunku): linia doby w oknie nowej gry i dwie doby po nim albo gdy cos policzono.</summary>
+        internal static void LateFlush(int day, int skippedAll, int skippedLords)
+        {
+            try
+            {
+                double age = Hunger.CampaignAge();
+                int any = _dLateParties + _dLateEmpty + _dLateAgain + _dLateNoLeader + _dLateOff;
+                if (_done && (any > 0 || age <= LateDays + 2.0))
+                    Log.Info("Dorobek startowy (E8/T): dzien " + day + " - nowe partie lordow AI z dorobkiem " + _dLateParties + " (szt. " + _dLatePieces + ")"
+                             + ", bez dorobku: bez ludzi albo bez brakow " + _dLateEmpty + ", drugi raz ten sam wodz " + _dLateAgain + ", bez wodza " + _dLateNoLeader + ", klucz wylaczony " + _dLateOff
+                             + "; nowe partie AI bez kompletu DTE i bez dorobku " + skippedAll + " (w tym partie lordow " + skippedLords + ")"
+                             + "; od startu sesji: partii z dorobkiem " + _tLateParties + ", szt. " + _tLatePieces + "; wodzow z dorobkiem w pamieci " + _lateLeaders.Count
+                             + "; potkniecia " + _lateStumbles + " (Cold Start Late Lord Parties " + (LateOn ? "CZYNNE" : "WYLACZONE") + ").");
+                _dLateParties = _dLatePieces = _dLateEmpty = _dLateAgain = _dLateNoLeader = _dLateOff = 0;
+                if (age > LateDays && _lateLeaders.Count > 0) _lateLeaders.Clear();   // po oknie pamiec wodzow niepotrzebna (sekcja zapisu pusta)
+            }
+            catch (Exception e) { LateStumble("LateFlush", e); }
+        }
+
+        /// <summary>Linia sesji (nowa kampania i kazde wczytanie): stan trzech kluczy paczki E8/T i latek rekruta gracza - dla narzedzia (T-K).</summary>
+        private static void SessionLine()
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            Log.Info("Start kampanii (E8/T): sesja - Cold Start Tier Up " + (s.ColdStartTierUp ? "CZYNNE" : "WYLACZONE") + ", Cold Start Late Lord Parties " + (s.ColdStartLateLordParties ? "CZYNNE" : "WYLACZONE")
+                     + ", Player Recruit No Free Kit " + (s.PlayerRecruitNoFreeKit ? "CZYNNE" : "WYLACZONE") + " (" + PlayerRecruit.State() + ")"
+                     + "; dorobek stuleci " + (!s.ColdStartEnabled ? "wylaczony" : _done ? "zrobiony wczesniej w tej kampanii (zapis)" : "przed pierwszym biegiem (nowa gra albo kampania starsza niz 3 doby)")
+                     + "; wiek kampanii " + R0(Hunger.CampaignAge()) + " dob, wodzow z dorobkiem z zapisu " + _lateLeaders.Count + ".");
+        }
+
+        /// <summary>Zapis arm_e8_coldlate: "1|id,id,..." - wodzowie partii z dorobkiem w oknie nowej gry (po oknie pusty). Stary zapis bez sekcji = pusty zbior.</summary>
+        internal static string ExportLate()
+        {
+            if (_lateLeaders.Count == 0) return "";
+            return "1|" + string.Join(",", new List<string>(_lateLeaders).ToArray());
+        }
+
+        internal static void ImportLate(string s)
+        {
+            _lateLeaders.Clear();
+            if (string.IsNullOrEmpty(s) || !s.StartsWith("1|")) return;
+            foreach (var id in s.Substring(2).Split(',')) if (id.Length > 0) _lateLeaders.Add(id);
         }
     }
 }
