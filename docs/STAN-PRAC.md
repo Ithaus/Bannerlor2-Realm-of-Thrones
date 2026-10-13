@@ -1516,3 +1516,10 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   bylo 93 392; podloga etapu 2: 85 tys.)** - przyczyna nieznana, do rozpoznania przed dalszymi zmianami. Dobre: kasy miast d364 10.86 mln (105.8% Z33 d120), rody na minusie 159 (Z33 197),
   jezdzcy z koniem bez uprzezy w calym roku 8.3% (prog 10 - podaz siodel nadgania), jazda z para 5.76% ludzi (partie rodow 8.85%), nasze mody 1.33 s/dobe, takt doby mediana 354 ms.
   Zle: miasta bez zelaza 41.4 (W33 27), jazda t3+ 64% celu K3 po roku (cel >= 90%), karawan 439 w d364 (limit 2).
+- (11:10 UTC 13.10) **Jeff - odpowiedzi po wyjasnieniach:** (2) zalozenia E8/H "ok zgadza sie" - POTWIERDZONE wszystkie cztery: bohaterowie poza regula uprzezy; zold jazdy bez zmian (premia
+  wedlug typu jednostki, takze bez pary); zalogi nie kupuja uprzezy osobno i nie maja bramy; mamut olbrzyma i jednorozce Skagosu jada bez uprzezy (wielblady, slonie, smoki poza regula).
+  (4) mieszczanie tylko konie robocze - "tak robocze i to dobra zasada" -> **K1-3a KROK 2 W TOKU: wf_e7ce012a-8c7** (docs/przekazanie/wf-k1-3a-konie-robocze.js; tor M: autor + jedna
+  recenzja) w drzewie zb\k13a, galaz `w-toku/k13a-konie-robocze` od ca4aa87: klucze TownsfolkBuyOnlyWorkHorses = true (budzet BK na konie 0 + wlasny zakup: 1 kon roboczy na 25 ludzi,
+  15 lat, najtanszy juczny / zwykly z polki osady, placi kiesa ludu) i HorseBreedingCutLive = true (ciecie hodowli czynne). Potem: scalenie do zbior-e8, autotest 120 dob + zapis, wgranie.
+  **Rownolegle wf_b57efd4d-9ac (triaz 3, tylko odczyt; docs/przekazanie/wf-triaz-3-bieg-roczny.js):** (a) wojsko lordow topnieje w roku do 64 tys., (b) zelazo i ruda nie docieraja do miast.
+  Logi z nocy zabezpieczone: `D:\Backup-Bannerlord\logs\2026-10-13-noc34-35` (621 MB; gra trzyma tylko 12 ostatnich logow Armoury - log wzorca W33 juz sie przewinal).
