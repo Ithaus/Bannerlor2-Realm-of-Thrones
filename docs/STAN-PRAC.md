@@ -1578,3 +1578,9 @@ w dacie dla gracza zmienia sie o 0:00; format "Year 299, Day 19, Summer - 11:30"
 Zelazny Bank "due by Year 299, Day 183". Reszta bez zmian (CrashScribe 142fdd4a, RC f9a944c1, GT 035878c4, ForgeView e17e0233). Testy: 40 dob nowej kampanii 40/40, 0 ERROR, 10.9 s/dobe
 (Armoury-2026-10-13_04-30-18.log; dowod: 23:23 "Year 299, Day 1", 00:21 "Year 299, Day 2"), zapis 9 dob 129/129, 0 ERROR. Kopia: `Armoury.dll.bak-2026-10-13-noc36-przed` + D:.
 ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
+- (13:50 UTC 13.10) **Jeff o zlocie w kiesach ludu (+29 mln/rok): "co zrobic z kasa, ktora lezy; w prawdziwej ekonomii pieniadz cyrkuluje i ma zamkniety obieg - ludzie moga oszczedzac,
+  ale tez wydaja, inwestuja itp. Jak to zrobic w ramach silnika gry, aby mialo to sens?"** -> **wf_d4abe57d-6c8 PROJEKT BEZ KODU** (docs/przekazanie/wf-projekt-obieg-kiesy.js; tor L):
+  rozpoznanie obiegu (docs/kiesa-ludu/ROZPOZNANIE-OBIEG-KIESY-2026-10-13.md) -> trzy niezalezne projekty (WYDATKI wedlug zamoznosci / INWESTYCJE w miasto, warsztaty, karawany /
+  POZYCZKI dla panow i podatek nadzwyczajny - wzor IronBank, DebtLadder) -> sedzia sklada jeden: docs/kiesa-ludu/PROJEKT-OBIEG-KIESY-LUDU-2026-10-13.md z rozdzialem dla Jeffa i pytaniami
+  o kierunek. Kod dopiero po "tak" Jeffa. Kierunek podany Jeffowi od reki: zapas oszczednosci w dniach koszyka, ponad nim lud po kolei wydaje lepiej, inwestuje w swoje miasto, pozycza panom.
+  Jeff zapytal tez o rozwiazanie na wojsko - opisane (5 punktow z TRIAZ-3; kod w toku wf_a30e8861-78e). W grze: bieg pomiarowy K1-3a 120 dob (test\at-k13a-120.out.txt).
