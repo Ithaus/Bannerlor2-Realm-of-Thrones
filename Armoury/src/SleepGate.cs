@@ -58,8 +58,10 @@ namespace Armoury
 
         /// <summary>F7: czy oboz swiata trwa o godzinie zegara hourNow. Godzina obozu - tak (jak dotad). Pierwsza godzina PO obozie - tak, dopoki tick switu
         /// jeszcze nie przyszedl (_campNight) i klucz SleepersHoldOrders jest wlaczony: bramka, straznik i alarmy trzymaja do tego samego ticku, ktory budzi,
-        /// niezaleznie od fazy ticku godzinowego. Zegar zostaje jako bezpiecznik: najdalej godzine po koncu obozu sen sie konczy, nawet gdyby galaz switu
-        /// sie wywrocila przed czyszczeniem _camping (jedna wywrotka nie usypia swiata na stale - CLAUDE.md 7).</summary>
+        /// niezaleznie od fazy ticku godzinowego. Zegar zostaje jako bezpiecznik: najdalej godzine po koncu obozu sen sie konczy, nawet gdyby tick switu
+        /// w ogole nie doszedl do AiNightCamp (wyjatek wczesniej w AiHourly) i flaga zostala - jedna wywrotka nie usypia swiata na stale (CLAUDE.md 7).
+        /// Wywrotke w samej galezi switu zalatwia kolejnosc: flaga schodzi jako pierwsza rzecz galezi. Recenzja F7: przy fazie ticku tuz przed pelna
+        /// godzina i dlugiej klatce (szybka gra) tick switu moze przyjsc chwile po tej godzinie - bramka jest wtedy otwarta najwyzej jedna klatke.</summary>
         private static bool CampHolds(Settings s, int hourNow)
         {
             if (InCamp(hourNow)) return true;
