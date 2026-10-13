@@ -1,5 +1,56 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (runda poprawek przed testem koncowym, grupa B - audyt "[latki] Siec CrashScribe") - SIEC NA BLEDY NIE PLACI JUZ ZA KAZDE WYWOLANIE METODY MODA: FINALIZATORY BEZ `__originalMethod` (70-390 ns i 240 B SMIECI NA WYWOLANIE -> 1.4 ns I 0 B); METODA DO RAPORTU BRANA DOPIERO, GDY WYJATEK POLECI; ZAPIS BLEDU I POLYKANIE BEZ ZMIAN
+**Mod:** CrashScribe | **Galaz:** `w-toku/p2-b` (z e9dfa7f = `w-toku/zbior-e8`) | **Zrodlo:** `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md`, sekcja "[latki] Siec CrashScribe: finalizer z parametrem __originalMethod...", POPRAWKA OSTATECZNA ze sprawdzenia (nie wersja zglaszajacego - ta byla bledna) | **Pliki:** `CrashScribe/src/Net.cs`, `CHANGELOG.md`. Bez klucza, bez MCM, nic w zapisie, zero zlota i sztuk.
+
+**Problem (prostym jezykiem):** CrashScribe zaklada "siec" na kazda metode Armoury, RealisticCaptivity i GrandTourney, zeby blad w naszym kodzie zapisac i polknac zamiast wywalic gre. Siec kosztowala przy KAZDYM wywolaniu kazdej takiej metody - takze wtedy, gdy zadnego bledu nie bylo. Dowod z biegu 2 (`session-2026-10-12_22-38-56.log` :232-236): `Net cast over RealisticCaptivity: 183 methods` (22:39:04), `Net cast over Armoury (Armoury): 7834 methods` (22:39:16 - samo zakladanie 12 s), `GrandTourney: 57`, `Watch over the game's hotspots: 41 methods`. W `Armoury-2026-10-12_22-38-57.log`: `SleepGate N x, sr. 0.6-1.5 us` (119 dob, srednio 0.75 us, 56 807 wywolan - a pod stoperem sa tylko 2-3 odczyty slownika i jedna zagniezdzona metoda pod siecia), `ceny sprzetu (PricePostfix)` srednio 505 ms / 47 180 cen na dobe = 10.7 us na cene (ok. 20 metod pod siecia na jedna cene), `Profil doby (E8/0)`: `GC 0/1/2 +1686..+4365` kolekcji gen0 na dobe (srednio 2756). Zadna linia profilu nie wydziela kosztu sieci - Jeff chce szybszej gry, a ten koszt byl niewidoczny.
+
+**Przyczyna:** `Net.ModFinalizer(Exception __exception, MethodBase __originalMethod)` i `Net.WatchFinalizer` (ta sama sygnatura). Harmony 2.4.2 dla parametru `__originalMethod` wstawia przed KAZDYM wywolaniem finalizatora `ldtoken <metoda>; call MethodBase.GetMethodFromHandle` - nowy `RuntimeMethodInfo` (240 B), zamek na pamieci typu i szukanie liniowe po metodach typu - zanim finalizator sprawdzi `__exception == null`. Im wieksza klasa, tym drozej (PeopleBook 293 metody, TownFolk 179, NightRest 163).
+
+**Zmiana (`Net.cs`, tylko to):**
+- `ModFinalizer` i `WatchFinalizer` maja sygnature `(Exception __exception)` + `[MethodImpl(NoInlining)]`. Pierwsze dwie linie bez zmian (`if (__exception == null) return null; if (_inside) return __exception;`).
+- W galezi z wyjatkiem, BEZPOSREDNIO w ciele finalizatora: `m = Harmony.GetOriginalMethodFromStackframe(new System.Diagnostics.StackFrame(1, false))` - ramka 1 to kopia zastepcza Harmony zalatanej metody (to ona wola finalizator), Harmony zamienia ja na metode oryginalna. Dalej jak bylo: `Describe(m)`, `Scribe.Report(...)`, `Notify(m, ...)`, zwrot wedlug `SwallowModErrors` (straz gry: zawsze oddaje wyjatek).
+- Zapasowa droga `Backup(m, ex)`: gdy ramka 1 nie dala metody z typem (null albo sama kopia Harmony), pytamy Harmony o OSTATNIA ramke sladu wyjatku (to ta sama kopia, ktora wlasnie go lapie). Gdy i to zawiedzie - `Describe` wypisuje `[?] Typ.Metoda_Patch1` (nazwa kopii niesie typ) zamiast `[] ?.Nazwa`, a notka na ekranie `error in ?`. `(nieznana metoda)` zostaje tylko dla null.
+- NIE uzyte (bledna propozycja zglaszajacego): `__exception.TargetSite` ani "pierwsza ramka moda ze sladu" - kopia Harmony ma `DeclaringType == null`, wiec dalyby "(nieznana metoda)".
+- Bez zmian: `WrapModules` / `WrapAssembly` / `WrapHotspots` (te same metody, to samo miejsce i chwila zakladania - pulapka wklejania z wpisow o bramce SetMove* bez zmian), `_inside`, `Patchable`, `OnGameError`.
+
+**Proba poza gra (OBOWIAZKOWA; `...\dbc3d3d1-...\scratchpad\tmp\net-test\`, poza repo):** ten sam `0Harmony.dll` co w grze (2.4.2, md5 zgodne z `libs/` i `Modules\Bannerlord.Harmony`), CLR 4.0.30319 x64, kompilator Roslyn z SDK (jak `dotnet build`). PRAWDZIWY `Net.cs` skompilowany dwa razy z tymi samymi atrapami `Scribe` / `Config` / `Blame` / `InformationManager`: `nettest_old.exe` = Net.cs z e9dfa7f, `nettest_new.exe` = po poprawce. Siec zakladana prawdziwym `Net.WrapModules` + `Net.WrapHotspots` na osobnym zestawie `targets.dll` (550 metod) i na udawanych typach turniejowych gry.
+1. **Wlasciwa metoda:** 21 scenariuszy x 3 ustawienia = 63 proby, wszystkie OK w obu wersjach, a zapis zachowania (179 linii: wynik albo wyjatek, kazdy raport z WHERE, kazda notka) jest IDENTYCZNY miedzy stara i nowa wersja (`diff zach_old.txt zach_new.txt` pusty; stara bierze metode z `__originalMethod` - wzorzec prawdy). Scenariusze: metoda statyczna, instancyjna, struktury, wirtualna (`Derived.Virt -> base.Virt`), void, double z ref/out, wyjatek z BCL pod metoda moda, lambda (`Unit+<>c.<LambdaThrow>b__5_0`), lambda z domknieciem, iterator (`<Iter>d__12.MoveNext`), zagniezdzenie Outer->Mid->Inner (przy polykaniu raport Inner i wynik 110; bez polykania trzy raporty Inner, Mid, Outer po kolei), rekurencja x4, metoda zalatana przez cudzy mod PRZED siecia (prefiks + postfiks) i PO sieci, wyjatek rzucony w cudzym prefiksie, ponowne wejscie (blad w trakcie zapisu raportu - wyjatek przelatuje jak dotad), straz gry na `TournamentGame` / `FightTournamentGame`, klasa moda dziedziczaca po typie gry (oba finalizatory na jednej metodzie), inny watek.
+2. **Koszt wywolania BEZ wyjatku** (najlepszy z 3 przebiegow po 5 mln wywolan; bez latki 0.35 ns):
+
+| klasa / metoda | PRZED ns | PRZED gen0 na 5 mln | PRZED B/wywolanie | PO ns | PO gen0 | PO B |
+|---|---|---|---|---|---|---|
+| 20 metod: pierwsza / srodkowa / ostatnia | 73 / 95 / 105 | 191 | 240.7 | 1.41 / 1.43 / 1.41 | 0 | 0 |
+| 100 metod | 71 / 174 / 260 | 191 | 240.7 | 1.44 / 1.44 / 1.42 | 0 | 0 |
+| 300 metod | 393 / 199 / 152 | 191 | 240.7 | 1.42 / 1.42 / 1.42 | 0 | 0 |
+| instancyjna, klasa 100 | 176 | 191 | 240.7 | 1.41 | 0 | 0 |
+
+   Zostaje ok. 1 ns na wywolanie (sama ramka try/catch i wywolanie finalizatora). Zakladanie sieci na 550 metod: 303 -> 248 ms (w granicach szumu; na pewno nie wolniej).
+3. **Polykanie / przelot jak przed zmiana:** `SwallowModErrors=true` - wynik domyslny (0, a dla `MoveNext` false; parametry ref/out ustawione przed bledem zostaja), wyjatek nie wychodzi; `false` - ten sam wyjatek przelatuje przez kazdy poziom; straz gry zawsze oddaje wyjatek; `ShowInGame=false` - bez notek; powtorka tego samego bledu - `Scribe.Report` wolany, notki brak. Wszystko identyczne w zapisie obu wersji.
+4. **Zapasowa droga** (osobny finalizator proby na 8 metodach, pyta `Net.Backup` i `Net.Describe` przez refleksje): 8 z 8 ZGODNE - ostatnia ramka sladu wyjatku daje TE SAMA metode co ramka 1 (statyczna, instancyjna, wyjatek z BCL, wyjatek z niezalatanej metody glebiej, `throw;`, `ExceptionDispatchInfo.Throw`, dwa poziomy z przelotem); `Describe(kopia)` = `[?] Fake.Probe.StaticThrow_Patch1`.
+5. **Sciezka Z wyjatkiem jest minimalnie drozsza** (pobranie ramki stosu): 4.7 -> 7.3 us na polkniety wyjatek przy plytkim stosie, 12.1 -> 12.4 us na dnie rekurencji 60 poziomow (tam stara wersja placila 61 razy podatek od wywolania). Przy prawdziwym raporcie (plik, slad, BLAME) to nic; istotne byloby dopiero przy tysiacach polknietych wyjatkow na dobe, a test wymaga zera.
+
+**Sprawdzone w kodzie (zasada 0):**
+- Jedyne odwolania do `ModFinalizer` / `WatchFinalizer` to `GetMethod("...")` w `Net.WrapModules` / `WrapHotspots` (po nazwie - sygnatura nie gra roli); wolane z `SubModuleMain.cs:90-91`. Nikt nie wola finalizatorow wprost, wiec ramka 1 to zawsze kopia Harmony.
+- Tekst WHERE (`[Armoury] Armoury.Typ.Metoda`) wychodzi identyczny - klucz powtorek `Scribe.Report` (rodzina zawiera where), podsumowanie i `tools/sprawdz_logi.py` (bloki `# ERROR IN A MOD` z WHERE `[Armoury]`) czytaja to samo.
+- `Harmony.GetOriginalMethodFromStackframe` jest w `libs/0Harmony.dll` (ten sam plik co w grze). W `Net.cs` NIE wolno dodac `using System.Diagnostics` (kolizja `Debug` z `TaleWorlds.Library.Debug` w `WrapDebugChannel`) - stad pelne nazwy.
+- Finalizator ma bloki try/catch/finally, wiec JIT i tak go nie wkleja; `NoInlining` to gwarancja na przyszlosc.
+- `Mends.BkDemandSafe` (CrashScribe, `Mends.cs:724`) tez ma `__originalMethod`, ale wisi na 3 metodach BK wolanych raz na dobe - NIE ruszone (poza zakresem, koszt pomijalny). Latki Armoury z `__originalMethod` (QuestPay8.Enter, SoldierPay, MoneyLedger, CirculationWindows, Seal31B, BeatenPurse) - poza zakresem tej grupy.
+- Zauwazone, NIE zmienione (zastane): `FightTournamentGame` dostaje straz dwa razy (raz jako pochodna `TournamentGame`, raz z wlasnej pozycji listy) - blad w niej daje dwa raporty, drugi jako powtorke.
+
+**Co Jeff zobaczy w grze:** nic nowego na ekranie. Gra powinna chodzic troche szybciej i mniej smiecic pamiec (o ile - pokaze test koncowy; szacunek audytu to kilka procent doby, pewne minimum 1-2% z samych cen).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- **Siec musi sie zalozyc:** gdyby Harmony w grze odrzucil finalizator, kazde `Patch` rzuciloby wyjatek (polykany w `WrapAssembly`) i licznik bylby 0. W logu sesji CS musi byc `Net cast over Armoury (Armoury): N methods` z N >= 7800 (bieg 2: 7834), `RealisticCaptivity: 183`, `GrandTourney: 57`, `Watch over the game's hotspots: 41`.
+- **Mapowanie w grze:** w blokach `# ERROR IN A MOD` / `# ERROR IN GAME CODE` zadnego WHERE zaczynajacego sie od `[?] ` ani `(nieznana metoda)`. Gdyby byl - blad jest zapisany i polkniety jak zawsze, tylko opis gorszy (pelny slad stosu jest w raporcie), ale narzedzie liczace po `[Armoury]` by go nie zaliczylo.
+- **Porownania czasow:** wszystkie linie stoperow Armoury (`Profil doby`, `Koszt 171-174`, `SleepGate sr. us`, `ceny sprzetu`, `Profil CS`) spadna, bo metody byly mierzone razem z siecia. Zysk tej poprawki NIE jest zyskiem paczek E8/O1-O6 - progi ms porownywac tylko miedzy biegami na TEJ SAMEJ wersji CrashScribe (bieg 2 = stara siec).
+- Zapis gry, ekonomia, MCM, pliki ustawien - nie dotyczy (zero stanu, zero kluczy). Stary zapis wczytuje sie tak samo.
+- Wgranie: `CrashScribe.dll` to osobny plik - musi pojsc razem z reszta przy tescie koncowym.
+
+**Build:** CrashScribe kod 0 (drzewo `zb/pb`), 0 ostrzezen; w zbudowanym DLL sprawdzone dekompilacja: oba finalizatory `(Exception __exception)` z `NoInlining`. Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy.
+
 ## 2026-10-12 (RECENZJA: szew E8/H - E8/O1 = 14563c4 i poprawka F6 punkty 2-3 = 1a15da2) - OBIE PRZYJETE, KOD GRY BEZ ZMIAN; DOPISANE: W KTORA STRONE MYLI SIE REZERWA NAPRAW Z PAMIECI (NIE ZAWSZE W BEZPIECZNA) I CO ZROBIC, GDY PROBKA TO POTWIERDZI; sprostowane numery linii w obu wpisach
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` (po 1a15da2) | **Pliki:** `CHANGELOG.md` (ten wpis i numery linii w dwoch wpisach nizej). Kod i `tools/sprawdz_logi.py` bez zmian.
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TaleWorlds.Library;
 
@@ -17,16 +18,27 @@ namespace CrashScribe
         [ThreadStatic] private static bool _inside;
         private static int _wrapped;
 
-        internal static Exception ModFinalizer(Exception __exception, MethodBase __originalMethod)
+        // AUDYT 13.10 (siec): oba finalizatory BEZ parametru "MethodBase __originalMethod". Harmony wyliczal go przy
+        // KAZDYM wywolaniu zalatanej metody (ldtoken + MethodBase.GetMethodFromHandle: nowy RuntimeMethodInfo 240 B,
+        // zamek i szukanie liniowe po metodach typu), zanim finalizator sprawdzil "__exception == null" - 75-400 ns
+        // i smieci GC na kazde wywolanie kazdej metody pod siecia. Metode bierzemy dopiero, gdy wyjatek polecial.
+        // UWAGA: "new StackFrame(1, false)" MUSI stac w ciele finalizatora, nie w metodzie pomocniczej - ramka 1 to
+        // kopia zastepcza Harmony zalatanej metody (to ona wola finalizator). NoInlining pilnuje, zeby tak zostalo.
+        // Nie uzywac __exception.TargetSite ani "pierwszej ramki moda ze sladu": kopia ma DeclaringType == null.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static Exception ModFinalizer(Exception __exception)
         {
             if (__exception == null) return null;
             if (_inside) return __exception;
             try
             {
                 _inside = true;
-                string where = Describe(__originalMethod);
+                MethodBase m = null;
+                try { m = Harmony.GetOriginalMethodFromStackframe(new System.Diagnostics.StackFrame(1, false)); } catch { }
+                m = Backup(m, __exception);
+                string where = Describe(m);
                 bool fresh = Scribe.Report("ERROR IN A MOD", __exception, where, null);
-                if (fresh && Config.ShowInGame) Notify(__originalMethod, __exception);
+                if (fresh && Config.ShowInGame) Notify(m, __exception);
                 return Config.SwallowModErrors ? null : __exception;
             }
             catch { return __exception; }
@@ -34,18 +46,42 @@ namespace CrashScribe
         }
 
         /// <summary>Newralgiczne miejsca gry: spisujemy, ale NIE polykamy - polkniecie moze zepsuc stan gry.</summary>
-        internal static Exception WatchFinalizer(Exception __exception, MethodBase __originalMethod)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static Exception WatchFinalizer(Exception __exception)
         {
             if (__exception == null) return null;
             if (_inside) return __exception;
             try
             {
                 _inside = true;
-                Scribe.Report("ERROR IN GAME CODE", __exception, Describe(__originalMethod), null);
+                MethodBase m = null;   // ramka 1 = kopia Harmony - patrz uwaga przy ModFinalizer
+                try { m = Harmony.GetOriginalMethodFromStackframe(new System.Diagnostics.StackFrame(1, false)); } catch { }
+                Scribe.Report("ERROR IN GAME CODE", __exception, Describe(Backup(m, __exception)), null);
                 return __exception;
             }
             catch { return __exception; }
             finally { _inside = false; }
+        }
+
+        /// <summary>Zapasowa droga, gdy ramka 1 nie dala metody moda (null albo sama kopia Harmony, bez typu):
+        /// ostatnia ramka sladu wyjatku to ta sama kopia zastepcza, ktora wlasnie go lapie - pytamy Harmony o nia.
+        /// Gdy i to zawiedzie, zostaje kopia: Describe wypisze jej nazwe ("Typ.Metoda_Patch1"); pelny slad i tak jest w raporcie.</summary>
+        private static MethodBase Backup(MethodBase m, Exception ex)
+        {
+            if (m != null && m.DeclaringType != null) return m;
+            try
+            {
+                var st = new System.Diagnostics.StackTrace(ex, false);
+                int n = st.FrameCount;
+                if (n > 0)
+                {
+                    MethodBase o = Harmony.GetOriginalMethodFromStackframe(st.GetFrame(n - 1));
+                    if (o != null && o.DeclaringType != null) return o;
+                    if (m == null) m = o;
+                }
+            }
+            catch { }
+            return m;
         }
 
         private static void Notify(MethodBase m, Exception ex)
@@ -53,6 +89,7 @@ namespace CrashScribe
             try
             {
                 string mod = m != null ? Blame.ModuleOf(m.DeclaringType) : "?";
+                if (string.IsNullOrEmpty(mod)) mod = "?";   // kopia Harmony bez typu (mapowanie zawiodlo)
                 InformationManager.DisplayMessage(new InformationMessage(
                     "CrashScribe: error in " + mod + " (" + ex.GetType().Name + ") - details in CrashScribe\\" +
                     Path.GetFileName(Scribe.SessionFile), Colors.Red));
@@ -65,6 +102,8 @@ namespace CrashScribe
             try
             {
                 if (m == null) return "(nieznana metoda)";
+                // sama kopia Harmony (mapowanie zawiodlo): jej nazwa "Typ.Metoda_Patch1" niesie typ - lepsze niz "?"
+                if (m.DeclaringType == null) return "[?] " + m.Name;
                 var dt = m.DeclaringType != null ? m.DeclaringType.FullName : "?";
                 return "[" + Blame.ModuleOf(m.DeclaringType) + "] " + dt + "." + m.Name;
             }
