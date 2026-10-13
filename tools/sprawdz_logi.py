@@ -13832,6 +13832,201 @@ def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             lost == 0 and stum == 0 and old_on == 0 and errs == 0)
 
 
+def etap8_p3woj(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """P3/WOJSKO (bieg roczny 364 doby WGRANIA 34/35, TRIAZ-3 obszar "wojsko": O1-2, O1-3, O1-4, O1-7 A). Linie doby (dzien gry - klucz = dzien ksiegi):
+    "Renty korony (180)" (pola P3/W1), "Budzet rodow (166)" (pola P3/W2), "Kontrakty najemnikow (185)" (pola P3/W3), "Wezwania do wojny (168)" (pole P3/W4)
+    i budzet-rodow.csv. W1: rody z lennem bez warunku renty <= 10% (sr28; bylo 27%), "sluzba" <= 8 i "oba" <= 2, E5/F9 <= 20 tys. zl/d (bylo 62.6), rody z lennem
+    z 0 ludzi <= 12 (bylo 29), Polnoc >= 7.5 tys. (bieg roczny); W2: zold na zwalnianego >= 5 zl (bylo 3.65), zold na czlowieka rodow na pulapie <= 1.25 x
+    rodow z luzem (bylo 1.51 x); W3: latka zadatku BK wpieta, ludzie najemnikow >= 2 000, kiesy kompanii <= +10 tys. zl/d (bylo 48.7); W4: dlug "sprzed
+    paczki" nowy 0 i splacone w nicosc 0 (bylo 3.56 / 2.0 mln). Calosc: partie rodow AI sr28 >= 70 tys. w biegu rocznym (bylo 63 tys.). Progi wiaza tylko,
+    gdy log ma pola paczki (log sprzed paczki - te same liczby jako INFO, do porownania); liczby "na dobe 337-364" wiaza przy oknie >= 337 dob."""
+    def series(prefix):
+        return {d: s for d, s in e4_series(lines, prefix, 1).items() if 1 <= run_day(d, start) <= until}
+    r180, b166, k185, c168 = series("Renty korony (180): dzien"), series("Budzet rodow (166): dzien"), series("Kontrakty najemnikow (185): dzien"), series("Wezwania do wojny (168): dzien")
+    year = until >= 337
+    def tail(d, n=28):
+        return sorted(d)[-n:]
+    def avg(xs):
+        xs = [x for x in xs if x is not None]
+        return (sum(xs) / len(xs)) if xs else None
+    def fmt(v, f="{:.0f}"):
+        return "-" if v is None else f.format(v)
+
+    # ---- W1: renty korony (180)
+    p1 = [d for d in r180 if "P3/W1 sluzba na miare srodkow" in r180[d]]
+    if not r180:
+        rep.add("P3W1: linia Renty korony (180)", "brak w oknie", "jest (180 czynne)", None)
+    else:
+        on = [d for d in p1 if "(Crown Rent Service At Means): wylaczone" not in r180[d]]
+        called = [d for d in p1 if "(nie zobowiazuja - Crown Rent Contact Only When Called)" in r180[d]]
+        rep.add("P3W1-0: pola P3/W1 w linii 180; klucze Crown Rent Service At Means / Contact Only When Called",
+                f"dob z polami {len(p1)} z {len(r180)}; na miare srodkow wl {len(on)} dob, tylko przy wezwaniu wl {len(called)} dob",
+                "pola w kazdej dobie od wgrania paczki; oba klucze wlaczone (wylaczony = stan sprzed)", (len(on) == len(p1) and len(called) == len(p1)) if p1 else None)
+        t = tail(r180)
+        rx = re.compile(r"z warunkiem \d+, bez warunku (\d+) \(([0-9.]+)%\) - zaloga (\d+), sluzba (\d+), oba (\d+)")
+        mm = [rx.search(r180[d]) for d in t]
+        mm = [m for m in mm if m]
+        if mm:
+            pc = [float(m.group(2)) for m in mm]
+            last = mm[-1]
+            a = sum(pc) / len(pc)
+            rep.add(f"P3W1-1: rody z lennem bez warunku renty korony (sr{len(mm)} ostatnich dob okna)", f"{a:.1f}% (najwiecej {max(pc):.1f}%)",
+                    "<= 10% (bieg roczny przed paczka: 27% w d337-364, 28.8% w d364)", (a <= 10.0) if p1 else None)
+            rep.add("P3W1-2: bez warunku wedlug przyczyny, ostatnia doba okna (sluzba / zaloga / oba)", f"{last.group(4)} / {last.group(3)} / {last.group(5)}",
+                    "sluzba <= 8, oba <= 2 (przed paczka w d364: 47 / 3 / 7); 'oba' > 2 po 120 dobach = drugi krok dla warunku zalogi (do decyzji)",
+                    (int(last.group(4)) <= 8 and int(last.group(5)) <= 2) if p1 else None)
+        f9 = avg([num(r"\(Crown Rent Held To Serving\): (\d+) \(siedza w rentach\)", r180[d]) for d in t])
+        rep.add("P3W1-3: E5/F9 udzialy rodow bez warunku oddane sluzacym (sr28, zl/d)", fmt(f9), "<= 20 000 (przed paczka 62 558 w d337-364)",
+                (f9 <= 20000) if (p1 and f9 is not None) else None)
+        rm = re.compile(r"P3/W1 sluzba na miare srodkow \(Crown Rent Service At Means\): rodow w wojnie (\d+) \(z nich sluzylo i tak (\d+), doba zaliczona (\d+)\), wymog sluzby zdjety u (\d+) rodow")
+        ms = [rm.search(r180[d]) for d in t if d in p1]
+        ms = [m for m in ms if m]
+        if ms:
+            g = [sum(int(m.group(i)) for m in ms) / len(ms) for i in (1, 2, 3, 4)]
+            rep.add("P3W1-4: na miare srodkow (sr28): rodow w wojnie / z nich sluzylo i tak / doba zaliczona / wymog zdjety (rody z lennem)",
+                    f"{g[0]:.0f} / {g[1]:.0f} / {g[2]:.0f} / {g[3]:.0f}", "INFO (rachunek triazu: 51 rodow z lennem w d84, 118 w d364 przy progu 0.6; wymog zdjety - ok. 48)", None)
+        rs = re.compile(r"P3/W1 styk krolestw w wojnie wedlug zrodla \(krolestw w wojnie (\d+)\): armia w polu (\d+), oblezenie (\d+), napad na wlasna osade (\d+), tylko rajdy i bitwy wlasnych lordow (\d+)")
+        ss = [rs.search(r180[d]) for d in t if d in p1]
+        ss = [m for m in ss if m]
+        if ss:
+            g = [sum(int(m.group(i)) for m in ss) / len(ss) for i in (1, 2, 3, 4, 5)]
+            rep.add("P3W1-5: styk krolestw w wojnie wedlug zrodla (sr28 krolestw na dobe): w wojnie / armia w polu / oblezenie / napad na wlasna osade / tylko rajdy",
+                    f"{g[0]:.1f} / {g[1]:.1f} / {g[2]:.1f} / {g[3]:.1f} / {g[4]:.1f}", "INFO (brakujacy pomiar triazu: ile krolestw ma dobe wojny tylko z rajdow wlasnych lordow)", None)
+
+    # ---- W2: budzet rodow (166)
+    p2 = [d for d in b166 if "P3/W2 zwolnieni wedlug tieru" in b166[d]]
+    if b166:
+        t = tail(b166)
+        rt = re.compile(r"P3/W2 zwolnieni wedlug tieru \(ludzi / ich zold zl\): t1-2 (\d+) / (\d+), t3-4 (\d+) / (\d+), t5\+ (\d+) / (\d+) \(Release Across Tiers(: losowo| wylaczone)")
+        tt = [rt.search(b166[d]) for d in t if d in p2]
+        tt = [m for m in tt if m]
+        if tt:
+            men = [sum(int(m.group(i)) for m in tt) for i in (1, 3, 5)]
+            wage = [sum(int(m.group(i)) for m in tt) for i in (2, 4, 6)]
+            key_on = all(m.group(7) == ": losowo" for m in tt)
+            per = (sum(wage) / sum(men)) if sum(men) > 0 else None
+            rep.add(f"P3W2-1: zwolnieni 166 wedlug tieru (suma {len(tt)} dob): ludzi t1-2 / t3-4 / t5+; zold na zwalnianego",
+                    f"{men[0]} / {men[1]} / {men[2]}; " + (f"{per:.2f} zl" if per is not None else "nikt nie zwolniony") + f"; Release Across Tiers {'wl' if key_on else 'WYL (w czesci dob)'}",
+                    ">= 5.0 zl na zwalnianego przy kluczu (przed paczka 3.65 zl przy sredniej partii 9.28 zl; t3+ 22-32% zwalnianych)",
+                    (per >= 5.0) if (per is not None and key_on) else None)
+        else:
+            rep.add("P3W2-1: zwolnieni 166 wedlug tieru", "brak pola P3/W2 (log sprzed paczki)", ">= 5.0 zl na zwalnianego przy kluczu", None)
+        rel = avg([num(r"zwolnieni: do wsi \d+ ludzi \(z partii (\d+), z zalog \d+\)", b166[d]) for d in t])
+        rep.add("P3W2-2: zwolnieni przez budzet z partii (sr28 na dobe)", fmt(rel),
+                "INFO (przed paczka 215/d w d57-84, 520/d w d337-364; oczekiwane ok. polowa glow przy tym samym zoldzie zwalnianych)", None)
+        ge = [re.search(r"zajely caly pulap \(na partie 0\): (\d+), z tego bez ludzi w partiach (\d+)", b166[d]) for d in t if d in p2]
+        ge = [m for m in ge if m]
+        if ge:
+            rep.add("P3W2-3: rody w wojnie, ktorym zalogi i karawany zajely caly pulap / z tego bez ludzi w partiach (ostatnia doba okna)",
+                    f"{ge[-1].group(1)} / {ge[-1].group(2)}", "INFO (triaz: 38 rodow, partie 17 950 -> 616 ludzi - kolejnosc zwolnien nic tu nie zmienia; poprawia je renta W1)", None)
+
+    # ---- W3: kontrakty najemnikow (185)
+    wired = [s for s in lines if s.startswith("Kontrakty najemnikow (185): kontrakt gry dla AI")]
+    p3 = [d for d in k185 if "P3/W3 zadatek BK wstrzymany" in k185[d]]
+    if k185:
+        dn = [re.search(r"P3/W3 zadatek BK wstrzymany \(Merc Bk Down Payment Ai Off\): (\d+) najmow, (\d+) zl", k185[d]) for d in sorted(p3)]
+        dn = [m for m in dn if m]
+        hires, gold = sum(int(m.group(1)) for m in dn), sum(int(m.group(2)) for m in dn)
+        w_ok = bool(wired) and all("AddDownPayment) wpiety" in s for s in wired)
+        rep.add("P3W3-1: zadatek BK dla kompanii AI wstrzymany: latka; najmy i zloto, ktore zostalo w kiesach krolow (suma okna)",
+                (("wpieta" if w_ok else "BRAK latki albo linii startowej") + f"; {hires} najmow ({hires / max(1, len(p3)):.2f} na dobe), {gold} zl ({gold / max(1, len(p3)):.0f} zl/d)"
+                 + (f"; klucz wylaczony w {len(p3) - len(dn)} dobach" if len(dn) < len(p3) else "")) if p3 else "brak pola P3/W3 (log sprzed paczki)",
+                "latka wpieta, klucz wlaczony; ok. 1.9 najmu na dobe i ok. 33 tys. zl/d (przed paczka 681 najmow i 12.09 mln w roku z kies krolow do kompanii)",
+                (w_ok and len(dn) == len(p3)) if p3 else None)
+        pn = [re.search(r"P3/W3 kontrakt za ludzi pod bronia \(Merc Contract Pays Men Under Arms\): nalezne wedlug umowy (\d+), za ludzi pod bronia (\d+)", k185[d]) for d in sorted(p3)]
+        pn = [m for m in pn if m]
+        if pn:
+            deal, now = sum(int(m.group(1)) for m in pn), sum(int(m.group(2)) for m in pn)
+            rep.add("P3W3-2: kontrakty najemnikow: nalezne za ludzi pod bronia wobec naleznych wedlug umowy (suma okna)",
+                    f"{now} wobec {deal} ({100.0 * now / deal:.0f}%; w skarbcach zostaje {(deal - now) / max(1, len(pn)):.0f} zl/d)" if deal > 0 else "brak kontraktow",
+                    "INFO (rachunek: ok. 65% - 5.73 z 8.85 mln w roku, czyli ok. 7.6 tys. zl/d zostaje we wplywach dnia koron)", None)
+        elif p3:
+            rep.add("P3W3-2: kontrakty najemnikow: nalezne za ludzi pod bronia", "klucz Merc Contract Pays Men Under Arms wylaczony albo brak pola", "klucz wlaczony", False)
+        mn = avg([num(r"ludzie najemnikow AI (\d+) / z umowy", k185[d]) for d in tail(k185)])
+        rep.add("P3W3-3: ludzie najemnikow AI (sr28)", fmt(mn), ">= 2 000 (przed paczka 2 531 w d337-364; mniej = marza 0.30 nie starcza kompaniom)",
+                (mn >= 2000) if (p3 and mn is not None) else None)
+
+    # ---- W4: wezwania do wojny (168)
+    if c168:
+        p4 = [d for d in c168 if "P3/W4 po zerwaniu reszta ceny zdjeta" in c168[d]]
+        new = sum(num(r"sprzed paczki \(wezwany dostal od gry z niczego\): nowy (\d+)", c168[d], default=0) for d in c168)
+        void = sum(num(r"splacone dzis ze skarbcow w nicosc \(rownowazy\) (\d+)", c168[d], default=0) for d in c168)
+        ended = sum(num(r"reszta ceny skreslona (\d+)", c168[d], default=0) for d in c168)
+        ours = sum(num(r"\(latka konca porozumienia nie zadzialala\) (\d+)", c168[d], default=0) for d in p4)
+        off = len([d for d in p4 if "Call To War Break Restores Wallet wylaczone" in c168[d]])
+        rep.add("P3W4-1: wezwania 168: dlug 'sprzed paczki' nowy / splacony ze skarbcow w nicosc (suma okna)", f"{new} / {void}",
+                "0 / 0 w kampanii zaczetej z paczka (przed paczka w roku 3 558 755 / 2 005 256)", (new == 0 and void == 0 and off == 0) if p4 else None)
+        rep.add("P3W4-2: reszta cen zerwanych wezwan (suma okna) wobec reszty zdjetej z portfela przez nas",
+                f"{ended} wobec {ours}" + (f"; klucz wylaczony w {off} dobach" if off else "") if p4 else f"{ended}; brak pola P3/W4 (log sprzed paczki)",
+                "rowne (latka gry nie zadzialala - zdejmujemy sami) albo 0 przy braku 'nowego' dlugu (latka gry zadzialala)",
+                ((ours == ended or ours == 0) and new == 0) if p4 else None)
+    else:
+        rep.add("P3W4: linia Wezwania do wojny (168)", "brak w oknie (zadnego porozumienia)", "INFO", None)
+
+    # ---- budzet-rodow.csv: ludzie, kiesy kompanii, rody bez ludzi
+    packed = bool(p1 or p2 or p3)
+    try:
+        rows = read_csv(csv_path_of(logp)) if logp else []
+    except Exception:
+        rows = []
+    def ival(r, k):
+        try:
+            return int(float(r.get(k) or 0))
+        except ValueError:
+            return 0
+    byd = {}
+    for r in rows:
+        try:
+            d = int(r.get("dzien") or -1)
+        except ValueError:
+            continue
+        if 1 <= run_day(d, start) <= until:
+            byd.setdefault(d, []).append(r)
+    if not byd:
+        rep.add("P3W-CSV: budzet-rodow.csv", "brak pliku albo dob w oknie", "plik obok logu (uklad archiwum albo gry)", None)
+        return
+    days = sorted(byd)
+    t = days[-28:]
+    men = avg([sum(ival(r, "ludzi_partie") for r in byd[d]) for d in t])
+    rep.add(f"P3W-5: ludzie w partiach rodow AI (budzet-rodow.csv, sr{len(t)} ostatnich dob okna)", fmt(men),
+            ">= 70 000 w biegu rocznym (przed paczka 63 129 w d337-364 i dalej w dol do ok. 50 tys.; rachunek paczki 72-80 tys.); krotsze okno - INFO",
+            (men >= 70000) if (packed and year and men is not None) else None)
+    last = byd[days[-1]]
+    fief = [r for r in last if r.get("rodzaj") in ("miasto", "zamek")]
+    zero = sum(1 for r in fief if ival(r, "ludzi_partie") == 0)
+    rep.add("P3W1-6: rody z lennem z 0 ludzi w partiach (ostatnia doba okna)", f"{zero} z {len(fief)}",
+            "<= 12 (przed paczka 8 w d84, 15 w d196, 29 w d364)", (zero <= 12) if packed else None)
+    north = avg([sum(ival(r, "ludzi_partie") for r in byd[d] if r.get("krolestwo") == "The North") for d in t])
+    rep.add("P3W1-7: Polnoc - ludzie w partiach rodow (sr28)", fmt(north), ">= 7 500 w biegu rocznym (przed paczka 5 118 sr d337-364, 4 855 w d364); krotsze okno - INFO",
+            (north >= 7500) if (packed and year and north is not None) else None)
+    # rod "na pulapie zoldu": zold razem (partie + zalogi + karawany) z 28 dob >= 0.9 x pulap z tych dob; reszta - "z luzem" (kolumna na_suficie to co
+    # innego - sufit WIELKOSCI partii). Wasale i rody bez lenna z budzetem; kompanie najemne osobno (pulap = zold z umowy)
+    acc = {}
+    for d in t:
+        for r in byd[d]:
+            if r.get("rodzaj") not in ("miasto", "zamek", "bez lenna") or not (r.get("pulap") or "").strip():
+                continue
+            a = acc.setdefault(r.get("rod_id"), [0, 0, 0, 0])
+            a[0] += ival(r, "zold_partii") + ival(r, "zold_zalog") + ival(r, "zold_karawan"); a[1] += ival(r, "pulap")
+            a[2] += ival(r, "zold_partii"); a[3] += ival(r, "ludzi_partie")
+    cw = sum(a[2] for a in acc.values() if a[0] >= 0.9 * a[1]); cm = sum(a[3] for a in acc.values() if a[0] >= 0.9 * a[1])
+    fw = sum(a[2] for a in acc.values() if a[0] < 0.9 * a[1]); fm = sum(a[3] for a in acc.values() if a[0] < 0.9 * a[1])
+    ncap = sum(1 for a in acc.values() if a[0] >= 0.9 * a[1])
+    capd, free = (cw / cm) if cm > 0 else None, (fw / fm) if fm > 0 else None
+    rep.add("P3W2-4: zold partii na czlowieka (sr28): rody na pulapie zoldu (zold >= 0.9 pulapu) wobec rodow z luzem",
+            f"{fmt(capd, '{:.2f}')} zl ({ncap} rodow, {cm / max(1, len(t)):.0f} ludzi) wobec {fmt(free, '{:.2f}')} zl ({len(acc) - ncap} rodow, {fm / max(1, len(t)):.0f} ludzi)"
+            + (f" = {capd / free:.2f} x" if capd and free else ""),
+            "<= 1.25 x w biegu rocznym (przed paczka 7.89 wobec 5.21 zl = 1.51 x w d337-364, 6.07 wobec 4.49 = 1.35 x w d57-84); krotsze okno - INFO",
+            (capd / free <= 1.25) if (p2 and year and capd and free) else None)
+    # kompanie = rody, ktore w oknie choc raz byly w sluzbie najemnej (rodzaj "najemnik" maja tylko w dobach sluzby - poza nia "bez lenna")
+    mids = {r.get("rod_id") for d in days for r in byd[d] if r.get("rodzaj") == "najemnik"}
+    mg0 = sum(ival(r, "G") for r in byd[days[0]] if r.get("rod_id") in mids)
+    mg1 = sum(ival(r, "G") for r in last if r.get("rod_id") in mids)
+    rate = (mg1 - mg0) / max(1, len(days) - 1)
+    rep.add(f"P3W3-4: kiesy {len(mids)} kompanii najemnych: pierwsza -> ostatnia doba okna (przyrost na dobe)", f"{mg0} -> {mg1} ({rate:+.0f} zl/d)",
+            "<= +10 000 zl/d (przed paczka 2.87 -> 20.60 mln w roku = +48.7 tys. zl/d; rachunek po A i B ok. +4.5 tys. zl/d)", (rate <= 10000) if p3 else None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -13877,6 +14072,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_o3)   # E8/O3 (267): wywoz kupcow - cele w zasiegu z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku
     blocks.append(etap8_o5)   # E8/O5 (269): nadwyzki zalog po godzinach - maks. taktu doby, sztuki i utarg zalog tygodniowo wobec Z33, ksiega kas
     blocks.append(etap8_o6)   # E8/O6 (270): zapis logu otwartym plikiem - czas zapisu, proba 3 dob (bajty i linie), wpis kontrolny drogi bledu
+    blocks.append(etap8_p3woj)   # P3/WOJSKO (TRIAZ-3): sluzba na miare srodkow, zwolnienia wedlug tieru, zadatek BK i kontrakt najemnikow, zerwane wezwania 168
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

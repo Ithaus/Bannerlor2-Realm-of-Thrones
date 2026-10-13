@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO - narzedzie) - BLOK PROGOW `etap8_p3woj` w `tools/sprawdz_logi.py` (sam log, gra bez zmian)
+**Mod:** narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `tools/sprawdz_logi.py` (nowa funkcja `etap8_p3woj` na koncu blokow + 1 linia `blocks.append` w `etap8_main`; istniejace wiersze bez zmian), `CHANGELOG.md`.
+
+**Po co:** szesc poprawek paczki P3/wojsko (wpisy nizej: W1-A, W1-B, W2, W3-A, W3-B, W4) ma pola w liniach doby i kolumny CSV - bez wierszy progow skutku nie da sie odczytac jednym poleceniem. Wywolanie: `python -I tools/sprawdz_logi.py --grupa etap8 --do-doby 364 <Armoury-*.log>` (CSV szukany obok logu jak w grupie etap2).
+
+**Wiersze (15-17):** P3W1-0 pola i stan obu kluczy rent; P3W1-1 rody z lennem bez warunku renty <= 10% (sr28); P3W1-2 "sluzba" <= 8 i "oba" <= 2; P3W1-3 E5/F9 <= 20 tys. zl/d; P3W1-4 rody "na miare srodkow" (INFO); P3W1-5 zrodla styku krolestw (INFO - brakujacy pomiar triazu); P3W1-6 rody z lennem z 0 ludzi <= 12; P3W1-7 Polnoc >= 7.5 tys. (bieg roczny); P3W2-1 zold na zwalnianego >= 5 zl; P3W2-2 zwolnieni z partii na dobe (INFO); P3W2-3 rody, ktorym zalogi zajely pulap (INFO); P3W2-4 zold na czlowieka rodow na pulapie <= 1.25 x rodow z luzem (bieg roczny); P3W3-1 latka zadatku BK wpieta + najmy i zloto; P3W3-2 kontrakty za ludzi pod bronia wobec umowy (INFO); P3W3-3 ludzie najemnikow >= 2 000; P3W3-4 kiesy kompanii <= +10 tys. zl/d; P3W4-1 dlug "sprzed paczki" nowy 0 / w nicosc 0; P3W4-2 reszta zdjeta przez nas = reszta zerwanych; P3W-5 partie rodow AI >= 70 tys. (bieg roczny). Progi wiaza tylko, gdy log ma pola paczki; na logu sprzed paczki te same liczby wychodza jako INFO.
+
+**Sprawdzone:** (1) log bazowy biegu rocznego (`Armoury-2026-10-13_02-15-21.log`, okno 364): 15 wierszy INFO, liczby zgodne z triazem - bez warunku 27.5% (47 / 3 / 7), E5/F9 62 558, zwolnieni z partii 520/d, najemnicy 2 531 ludzi, dlug 168 3 558 755 / 2 005 256, partie 63 267, rody z 0 ludzi 29 z 198, Polnoc 5 118, zold na czlowieka 7.90 wobec 5.19 zl (1.52 x), kiesy 11 kompanii 2 867 093 -> 20 597 542 (+48.8 tys. zl/d); okno 120 dob - tez bez wyjatku. (2) sztuczny log 3 dob z polami paczki (teksty z szablonow kodu): wszystkie nowe pola czytane, 8 wierszy TAK. Czas bloku ok. 1 s.
+
+**Ryzyko:** grupa "na pulapie zoldu" w P3W2-4 liczona z CSV (zold razem z 28 dob >= 0.9 x pulap) - kolumna `na_suficie` to sufit WIELKOSCI partii i sie do tego nie nadaje (pierwsza wersja wiersza dawala 1.17 x zamiast 1.52 x). Kompanie w P3W3-4 = rody, ktore w oknie choc raz mialy rodzaj "najemnik" (poza sluzba sa "bez lenna").
+
+**Status:** DO SPRAWDZENIA - bieg roczny (narzedzie gotowe).
+
 ## 2026-10-13 (P3/WOJSKO W4, TRIAZ-3 O1-7 A) - ZERWANE WEZWANIE DO WOJNY NIE WRACA JAKO "DLUG SPRZED PACZKI": 2 mln zl rocznie przestaje isc w nicosc (klucz CallToWarBreakRestoresWallet) + lista DO DECYZJI JEFFA
 **Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownCallToWar.cs` (Daily, Import, Reset, liczniki, linia 168), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
 
