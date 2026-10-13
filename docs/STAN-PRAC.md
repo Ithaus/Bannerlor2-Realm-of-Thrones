@@ -1850,3 +1850,26 @@ Armoury b2423a38 z kopii albo klucz CrownWarAidByNeed = false.
   obejmuje); regula A daje drewnu i zelazu ten sam sufit 4.0 (projekt budow zakladal 1.8).** Ryzyka: budowy kupia 2-3 x wiecej drewna; nowy strumien zlota od panow do miast
   (+16-21 tys. zl/d do kies ludu); pamiec frontu tylko w sesji. KOLEJKA GRY: test 120 dob W6 (w toku) -> WGRANIE 42 -> test 120 dob N5 (fin11) -> WGRANIE 43.
 - (19:45 UTC 13.10) Bieg kontrolny PO WGRANIU 41 (10 dob nowej kampanii): 10/10, pliki w grze zatwierdzone (Armoury a5e2fbf9). Test 120 dob W6 w toku.
+
+**WGRANIE 42 (13.10 ok. 19:57 UTC; poprawka 2 - tarczowe, W6):** Armoury **772918be** (reszta jak WGRANIE 41). Galaz `noc/wgranie-42` = **0a387b5** (00a6496 + `w-toku/w6-tarczowe`
+8a33163; UWAGA: `w-toku/zbior-e8` jest dalej - d527d18 z N5, NIEWGRANE). Kopie: `*.bak-2026-10-13-noc42-przed` i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc42-przed`; md5 OK.
+Cofniecie: Armoury a5e2fbf9 z kopii albo klucz Scutage = false.
+- **TEST 120 dob przed wgraniem (fin10 + CS-at-hamulec): 120/120, 0 ERROR** (Armoury-2026-10-13_12-21-21.log + tabele, kopie na D:; progi SCRATCH\test\progi-w6\). Wszystkie progi
+  W6 TAK: pobrane = dopisane do garnka = wyplacone przez W5 ponad danine (rozjazd 0 w 119 dobach; CSV zgodny), platnik nigdy odbiorca, nikt ponizej rezerwy, potkniecia 0.
+  **Liczby (sr. 28 dob): platnikow 115 z 199, podstawa 288 tys. zl/d, nalezne 72.0 tys., niepokryta potrzeba po daninie 27.8 tys., do pobrania 5.5 tys., pobrane = wyplacone
+  2.7 tys. zl/d (razem w biegu 247 tys. zl)** - maly skutek w 120 dobach, zgodnie z szacunkiem (korona placi tylko za ludzi, ktorzy sa). Wojsko lordow w wojnie d93-120: 101 713
+  (bieg W5: 106 719 - inna kampania). **W5-4 w tym biegu NIE: wypelnienie rodow z doplata 47.5% -> 46.7%** (w biegu W5 49.8 -> 54.0) - do obejrzenia w biegu dluzszym: czy rody
+  z doplata rzeczywiscie werbuja. Zloto rodow z luzem +4.97 mln w 118 dob (P1-9 dalej NIE). Bez pokrycia w d120: Iron Islands 12.5 tys., Pentos 3.6, House Targaryen 2.2, Lys 0.9.
+- Test zapisu: `autotest-dlugi` + 9 dob: 0 ERROR. W GRZE (lancuch): bieg kontrolny po wgraniu -> test 120 dob N5 towary (fin11; test\at-n5-120.out.txt).
+- **DECYZJE JEFFA 13.10 ok. 19:55 UTC:** TARCZOWE: (1) "Jako zapas" - zostaje, bez wersji od dochodu; (2) rod gracza: "tez dotyczy, ale pod warunkiem, ze mam ziemie i sluze
+  jakiemus krolowi" - gracz-wasal z lennem PLACI tarczowe i DOSTAJE doplate W5 na tych samych zasadach (z komunikatem); (3) "tak, stawka wojenna podatku pana" - trzeci kierunek
+  do zaprojektowania i zakodowania. TOWARY: (1) len - "tak ma byc len, ale nie rozumiem, co proponujesz, bo nie widze liczb" - wyjasnione liczbami w czacie, czeka na wybor
+  (rada: szybsze kroki co 28 dob + len kosztem innego plonu tej wsi); (2) "jesli nie ma kasy, to nie buduje" - warunek luzu zoldu przy budowach ZOSTAJE; (3) sol pod regule A - TAK.
+- **KOLEJKA ZADAN (po kolei, po jednym workflow; limit 5 h 80% do 20:50 UTC, tydzien 92%):**
+  a. W5b poprawka daniny - w toku (wf_370f605f-283).
+  b. N7 rozbici wracaja pod choragiew (zasady we wpisie 18:55) - po odnowieniu limitu 5 h.
+  c. W7 stawka wojenna podatku pana (pan podnosi podatek w swoich miastach i wsiach na czas wojny, koszt: lojalnosc i dobrobyt; u gracza jego decyzja; pieniadz idzie na zold -
+     do zaprojektowania: czy do kiesy pana, czy przez garnek W5).
+  d. W6b gracz-wasal z lennem w tarczowym i doplacie (komunikaty po angielsku) + N5b sol pod regule A (i decyzja o lnie po odpowiedzi Jeffa).
+  e. poprawka 6 (male): najkrotsza sluzba najemnikow, przerwa po wykupie, konie juczne i zboze w ksiegach, Thenn. f. k13a konie robocze + bieg 120 dob. g. P1b, P2, P3-P5, lup miast.
+  h. BIEG DWULETNI - na samym koncu.
