@@ -177,7 +177,11 @@ namespace Armoury
             long road = 0;
             try { TradeCarts.ForEachInTransit((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; road += n; } }); }
             catch (Exception e) { Stumble("TradeCarts", e); }
-            long total = shelves + parties + armories + road;
+            // E8/H (271): uprzaz weteranow w pulach karczm - czesc stanu (zbrojownia partii -> pula miasta -> zbrojownia najemcy albo polka: przeniesienie)
+            long vetPool = 0;
+            try { HorseFate.VetPoolHarness((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; vetPool += n; } }); }
+            catch (Exception e) { Stumble("VetPool", e); }
+            long total = shelves + parties + armories + road + vetPool;
             if (_prev == null)
             {
                 _prev = now;
@@ -210,7 +214,7 @@ namespace Armoury
                      + " | ujscia: zlom " + Sum(_sink, KScrap) + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
                      + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + ", w drodze wozem (215) " + road + "), zmiana " + (total - prevTotal)
                      + " | reszta " + rest + (den > 0 ? " (" + (100.0 * rest / den).ToString("0.0", CultureInfo.InvariantCulture) + "% zrodel + ujsc)" : "")
-                     + " | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"
+                     + " | w stanie takze pule weteranow (E8/H) " + vetPool + " szt. uprzezy | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"
                      + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + " | [" + string.Join("; ", kinds.ToArray()) + "].");
             _prev = now;
             Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length);

@@ -261,6 +261,13 @@ Uzycie (Python 3, tylko odczyt):
                     kowalskie": zloto z niczego 0, zolnierz z niczego 0, bron w nicosc 0 (bez oddanego zlecenia - INFO, 8.16 p. 6); K-4 okno "ksiegarz":
                     zloto w nicosc 0, ksiazka z niczego 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia tylko z dozwolonych klas, srednia nagroda
                     <= 1000; K-5b / K-6 / K-7 INFO (klasy, wymiana zlecen startowych nowej kampanii, doswiadczenie, koszt); K-K potkniecia i linie ERROR 0.
+                    Blok etap8_h (E8/H, paczka 271 - jezdziec = kon + uprzaz; NOWA KAMPANIA; SaddleLaw.cs): linia doby "Jezdzcy i uprzaz (E8/H)" (spis par
+                    osobno: partie rodow AI, zalogi, rod gracza - takze przy wylaczonej regule) i linia startu; H-0 linia w kazdej dobie, brama awansu gracza
+                    wpieta 1/1; H-1 jezdzcy z koniem bez uprzezy <= 10% jezdzcow z koniem w dobach 61-120 (partie rodow AI); H-2 udzial jezdzcow z para w
+                    ludziach partii rodow AI i zalog w dobie 120 >= 4.60% (Z33 "z koniem"; ponizej 80% = NIE); H-3 uprzaz wykonana >= 40 szt./d w dobach
+                    31-120; H-4 rzad najemnika ze wzorca 0, reszta uprzezy w ksiedze uzbrojenia <= 10% zrodel; H-5 awanse AI na jezdnego >= 50% Z33 (823 /
+                    120 dob) i "wstrzymane z braku uprzezy" nie rosnie w dobach 91-120; H-6 polki uprzezy 300-2500, kupno siodla w 7 dob po sprzedazy
+                    uprzezy tej samej partii 0; H-7 koszt <= 5 ms/d, potkniecia i ERROR 0; zakupy, zamiany ROT, najemnicy, gracz - INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -10517,6 +10524,177 @@ def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
 
 
+# E8/H (271): blok etap8_h - jezdziec = kon + uprzaz (SaddleLaw.cs; brama awansu, bitwa gracza, zakup siodel, pula weteranow)
+E8_H_LINE = "Jezdzcy i uprzaz (E8/H): dzien"
+E8_H_START = "Jezdzcy i uprzaz (E8/H): start"
+E8_H_BOOK = "Uzbrojenie wedlug zrodla (E6/0): dzien"
+E8_H_Z33_HORSED_SHARE = 4.60    # Z33 doba 120: jezdzcy z koniem 7 711 z 167 462 ludzi partii lordow i zalog AI (L:36040) - odniesienie progu H-2
+E8_H_Z33_UPGRADES = 823         # Z33: awanse AI na jezdzca w 120 dob (konie-krolestwa.csv) - odniesienie progu H-5
+E8_H_Z33_MADE = 13.4            # Z33: uprzaz wykonana na dobe w dobach 91-120 (linia "Warsztaty")
+E8_H_GROUP = (r"\| %s: partii (\d+), ludzi (\d+), jazda wedlug typu (\d+) \([0-9.]+%%\), objeci regula (\d+), z koniem (\d+) \([0-9.]+%%\), z para (\d+) \([0-9.]+%%\), "
+              r"z koniem bez uprzezy (\d+), bez konia (\d+), wzorzec bez uprzezy (\d+); zbrojownie: konie (\d+), uprzaz rodziny konia (\d+), innej rodziny (\d+), wolna (\d+)")
+E8_H_FIELDS = ("partii", "ludzi", "typ", "regula", "kon", "para", "bez_uprzezy", "bez_konia", "wyjatek", "konie", "uprzaz", "inna", "wolna")
+
+
+def e8h_group(s, name):
+    m = re.search(E8_H_GROUP % re.escape(name), s)
+    return dict(zip(E8_H_FIELDS, (int(x) for x in m.groups()))) if m else None
+
+
+def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/H (271; decyzja Jeffa 12.10 "jezdziec = kon + uprzaz"; rozpoznanie docs/etap8/rozpoznanie-H-jezdziec-uprzaz.md rozdz. 5 "Progi do testu"): linia doby
+    "Jezdzcy i uprzaz (E8/H)" (SaddleLaw.cs, takt doby po "Konie AI (175)") - spis par osobno dla partii rodow AI, zalog i rodu gracza (takze przy wylaczonej
+    regule: "z koniem bez uprzezy" = tylu zeszloby z koni). H-0 linia w kazdej dobie okna, stan reguly, brama gracza wpieta; H-1 jezdzcy z koniem bez uprzezy
+    <= 10% jezdzcow z koniem w dobach 61-until (partie rodow AI; doby 1-30, zalogi i rod gracza - INFO); H-2 udzial jezdzcow z para w ludziach partii rodow AI
+    i zalog w ostatniej dobie okna wobec Z33 "z koniem" 4.60% (>= TAK, ponizej 80% tej liczby NIE); H-3 uprzaz wykonana >= 40 szt. na dobe w dobach 31-until;
+    H-4 nic z niczego, nic w nicosc: rzad najemnika ze wzorca 0 w dobach z regula, reszta uprzezy w ksiedze uzbrojenia |suma okna| <= 10% zrodel; H-5 awanse AI
+    na jezdnego >= 50% Z33 i "wstrzymane z braku uprzezy" nie rosnie w dobach 91-until wobec 61-90; H-6 polki uprzezy w ostatniej dobie 300-2500 i kupno siodla
+    w 7 dob po sprzedazy uprzezy tej samej partii = 0; H-7 koszt <= 5 ms na dobe, potkniecia i linie ERROR 0. Reczne (8.16): awans piechura na jezdzca u gracza
+    bez siodla - komunikat; bitwa z jezdzcami bez siodla - ida pieszo, komunikat "riders no saddle"; wczytanie zapisu sprzed E8/H bez bledu."""
+    hl = {d: s for d, s in by_day(lines, E8_H_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not hl:
+        rep.add("E8/H: linia Jezdzcy i uprzaz (E8/H)", "brak w logu", "jest od wgrania E8/H", None)
+        return
+    days = sorted(hl)
+    nd = max(1, len(days))
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in hl]
+    on = [d for d in days if "| regula [WL]" in hl[d]]
+    st = [s for s in lines if s.startswith(E8_H_START)]
+    wired = bool(st) and "brama awansu gracza wpieta 1/1" in st[-1]
+    rep.add("H-0: linia Jezdzcy i uprzaz (E8/H) w kazdej dobie okna; stan reguly; brama awansu gracza",
+            (f"{len(days)} dob (brak {len(miss)}" + (f": doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") if miss else "") + f" z {len(inner)}); regula wl {len(on)} / wyl "
+             f"{len(days) - len(on)} dob; linia startu " + ("brak" if not st else ("brama wpieta 1/1" if wired else "brama NIE wpieta"))),
+            "0 brakow (bez pierwszej i ostatniej doby okna), brama awansu gracza wpieta 1/1", ((not miss) and wired) if inner else None)
+
+    def col(pat, cast=int):
+        return {d: num(pat, hl[d], cast=cast, default=0) for d in days}
+
+    def tot(c, sel=None):
+        return sum(c[d] for d in (days if sel is None else sel))
+
+    def rng(a, b):
+        return [d for d in days if a <= run_day(d, start) <= b]
+    grp = {n: {d: e8h_group(hl[d], n) for d in days} for n in ("partie rodow AI", "zalogi", "rod gracza")}
+    bad = [run_day(d, start) for d in days if grp["partie rodow AI"][d] is None or grp["zalogi"][d] is None]
+    if bad:
+        rep.add("E8/H: spis par w linii", f"nie odczytany w {len(bad)} dobach (np. {bad[:5]})", "format linii z SaddleLaw.Daily", False)
+        return
+
+    def share(name, sel, a, b):
+        x = sum(grp[name][d][a] for d in sel if grp[name][d])
+        y = sum(grp[name][d][b] for d in sel if grp[name][d])
+        return x, y, (100.0 * x / y if y else 0.0)
+    # H-1: jezdzcy z koniem bez uprzezy
+    late, early = [d for d in rng(61, until) if d in on], rng(1, 30)
+    e_x, e_y, e_p = share("partie rodow AI", early, "bez_uprzezy", "kon")
+    g_x, g_y, g_p = share("zalogi", rng(61, until), "bez_uprzezy", "kon")
+    p_x, p_y, p_p = share("rod gracza", rng(61, until), "bez_uprzezy", "kon")
+    info = (f"doby 1-30: {e_p:.1f}% ({e_x} z {e_y} jezdzco-dob); zalogi doby 61-{until}: {g_p:.1f}% ({g_x} z {g_y}; nie kupuja uprzezy); "
+            f"rod gracza: {p_p:.1f}% ({p_x} z {p_y})")
+    if late:
+        l_x, l_y, l_p = share("partie rodow AI", late, "bez_uprzezy", "kon")
+        peak = max(days, key=lambda d: grp["partie rodow AI"][d]["bez_uprzezy"])
+        rep.add(f"H-1: jezdzcy z koniem bez uprzezy - partie rodow AI, doby 61-{until}",
+                f"{l_p:.1f}% ({l_x} z {l_y} jezdzco-dob w {len(late)} dobach z regula); szczyt okna: doba {run_day(peak, start)} = "
+                f"{grp['partie rodow AI'][peak]['bez_uprzezy']} z {grp['partie rodow AI'][peak]['kon']} | " + info,
+                "<= 10% jezdzcow z koniem (doby 1-30, zalogi, rod gracza - INFO)", l_p <= 10.0)
+    else:
+        rep.add("H-1: jezdzcy z koniem bez uprzezy", "brak dob 61+ z wlaczona regula | " + info
+                + ("" if on else " | regula wylaczona: tylu zeszloby z koni (pomiar 'przed')"), "INFO (prog liczony w dobach 61+ z regula)", None)
+    # H-2: udzial jezdzcow z para
+    last = days[-1]
+    a, g = grp["partie rodow AI"][last], grp["zalogi"][last]
+    men = a["ludzi"] + g["ludzi"]
+    pair = 100.0 * (a["para"] + g["para"]) / max(1, men)
+    horsed = 100.0 * (a["kon"] + g["kon"]) / max(1, men)
+    typ = 100.0 * (a["typ"] + g["typ"]) / max(1, men)
+    full = run_day(last, start) >= until and until == 120
+    lo = 0.8 * E8_H_Z33_HORSED_SHARE
+    rep.add(f"H-2: udzial jazdy w ludziach partii rodow AI i zalog (doba {run_day(last, start)})",
+            (f"wedlug typu jednostki {typ:.2f}%, z koniem {horsed:.2f}%, Z PARA {pair:.2f}% (Z33 doba 120 z koniem: {E8_H_Z33_HORSED_SHARE:.2f}%); same partie rodow AI: typ "
+             f"{100.0 * a['typ'] / max(1, a['ludzi']):.2f}%, z koniem {100.0 * a['kon'] / max(1, a['ludzi']):.2f}%, z para {100.0 * a['para'] / max(1, a['ludzi']):.2f}%; "
+             f"bez konia {a['bez_konia'] + g['bez_konia']}, wzorzec bez uprzezy {a['wyjatek'] + g['wyjatek']}"),
+            f"z para >= {E8_H_Z33_HORSED_SHARE:.2f}% (Z33 z koniem); ponizej {lo:.2f}% (80%) = NIE; pomiedzy - INFO" + ("" if full else " - INFO poza doba 120"),
+            (True if pair >= E8_H_Z33_HORSED_SHARE else (False if pair < lo else None)) if (full and last in on) else None)
+    # H-3: produkcja uprzezy
+    ws = {run_day(d, start): num(r"wykonano \d+ szt\. \[[^\]]*HorseHarness (\d+)", s, int, 0) or 0 for d, s in by_day(lines, "Warsztaty: dzien").items()}
+    w31 = [v for rd, v in ws.items() if 31 <= rd <= until]
+    if w31:
+        avg = sum(w31) / len(w31)
+        rep.add(f"H-3: uprzaz wykonana przez warsztaty (srednio doby 31-{until})", f"{avg:.1f} szt./d ({len(w31)} dob; Z33: {E8_H_Z33_MADE})",
+                ">= 40 szt./d (druga droga progu - linie siodel z pustym rankingiem <= 10 miast - w warsztaty.log, poza tym narzedziem)", avg >= 40.0)
+    else:
+        rep.add("H-3: uprzaz wykonana przez warsztaty", "brak linii Warsztaty w dobach 31+", "INFO", None)
+    # H-4: nic z niczego, nic w nicosc
+    tpl, loose, refd = col(r"rzad ze wzorca \(z niczego\) (\d+)"), col(r"w tym do zbrojowni nietrwalej (\d+)"), col(r"DTE nie przyjal (\d+)\)")
+    spoil = col(r"dobytek rozbitych: uprzaz zbrojowni (\d+)")
+    rep.add("H-4a: uprzaz z niczego - rzad najemnika ze wzorca",
+            f"doby z regula: {tot(tpl, on)} szt." + (f"; doby bez reguly: {tot(tpl, [d for d in days if d not in on])} szt." if len(on) < len(days) else "")
+            + f"; uprzaz zbrojowni rozbitych partii przeniesiona {tot(spoil)} szt.; z taboru do zbrojowni nietrwalej {tot(loose)} szt., DTE nie przyjal {tot(refd)}",
+            "rzad ze wzorca = 0 w dobach z regula (reszta - INFO)", (tot(tpl, on) == 0) if on else None)
+    bk = {d: s for d, s in by_day(lines, E8_H_BOOK).items() if d in hl}
+    src = rest = 0
+    nb = 0
+    for d, s in bk.items():
+        m = re.search(r"uprzaz t1-2/t3-4/t5-6: stan [\d/-]+, zrodla (\d+)/(\d+)/(\d+), reszta (-?\d+)/(-?\d+)/(-?\d+)", s)
+        if m:
+            nb += 1
+            src += int(m.group(1)) + int(m.group(2)) + int(m.group(3))
+            rest += int(m.group(4)) + int(m.group(5)) + int(m.group(6))
+    if nb:
+        rep.add("H-4b: reszta uprzezy w ksiedze uzbrojenia (E6/0) - suma okna", f"reszta {rest:+d} szt. przy zrodlach {src} szt. ({nb} dob; Z33: -1118 przy 1356)",
+                "|reszta| <= 10% zrodel (uprzaz nie powstaje i nie znika poza warsztatami i zlomem)", abs(rest) <= 0.10 * max(1, src))
+    else:
+        rep.add("H-4b: reszta uprzezy w ksiedze uzbrojenia (E6/0)", "brak linii z rodzajem uprzaz", "INFO (potrzebny Stage6MeasureLog)", None)
+    # H-5: awanse AI na jezdnego i czekajacy na uprzaz
+    up, ref, trim, payr = col(r"awanse na jezdnego z para (\d+)"), col(r"cele odrzucone (\d+) ludzi"), col(r"ludzi, przyciete (\d+)"), col(r"przy zaplacie (\d+)")
+    need_up = 0.5 * E8_H_Z33_UPGRADES * len(on) / 120.0
+    rep.add("H-5a: awanse AI na jezdnego (z para) w dobach z regula", f"{tot(up, on)} w {len(on)} dobach ({tot(up, on) / max(1, len(on)):.1f}/d; Z33: {E8_H_Z33_UPGRADES} w 120 dob = 6.9/d)",
+            f">= 50% Z33 w przeliczeniu na liczbe dob ({need_up:.0f})", (tot(up, on) >= need_up) if len(on) >= 30 else None)
+    a1, a2 = [d for d in rng(61, 90) if d in on], [d for d in rng(91, until) if d in on]
+    if a1 and a2:
+        m1, m2 = tot(ref, a1) / len(a1), tot(ref, a2) / len(a2)
+        rep.add(f"H-5b: wstrzymane z braku uprzezy (ludzi na dobe) - doby 91-{until} wobec 61-90", f"{m1:.1f}/d -> {m2:.1f}/d; w oknie: cele odrzucone {tot(ref)} ludzi, "
+                f"przyciete {tot(trim)}, przy zaplacie {tot(payr)}", "nie rosnie (<= 1.1 x + 5)", m2 <= 1.1 * m1 + 5.0)
+    else:
+        rep.add("H-5b: wstrzymane z braku uprzezy", f"cele odrzucone {tot(ref)} ludzi, przyciete {tot(trim)}, przy zaplacie {tot(payr)} (brak dob 61-90 i 91+ z regula)", "INFO", None)
+    # H-6: polki i kupno po sprzedazy
+    shelf = col(r"polki miast i zamkow: uprzaz (\d+)")
+    rebuy, held = col(r"dob po sprzedazy uprzezy (\d+) szt"), col(r"zatrzymane pod zapas przy sprzedazy nadwyzek (\d+)")
+    has_shelf = "polki miast i zamkow: uprzaz brak spisu" not in hl[last]
+    rep.add(f"H-6a: polki uprzezy miast i zamkow (doba {run_day(last, start)})",
+            (f"{shelf[last]} szt." if has_shelf else "brak spisu") + f" (Z33 doba 120: 1253); najmniej w oknie {min(shelf[d] for d in days)} szt.",
+            "300 - 2500 szt." + ("" if full else " - INFO poza doba 120"), (300 <= shelf[last] <= 2500) if (full and has_shelf) else None)
+    bp, bn, bpc, bg, bs, bo, rs = col(r"partie z brakiem (\d+)"), col(r"brak przed zakupem (\d+)"), col(r", kupione (\d+) szt\. za \d+ zl, brak po zakupach"), \
+        col(r", kupione \d+ szt\. za (\d+) zl, brak po zakupach"), col(r"brak po zakupach (\d+)"), col(r"zamowienia dla siodlarzy (\d+)"), col(r"z taboru do zbrojowni przy postoju (\d+)")
+    rep.add("H-6b: kupno siodla w 7 dob po sprzedazy uprzezy tej samej partii", f"{tot(rebuy)} szt. (zatrzymane pod zapas przy sprzedazy nadwyzek {tot(held)} szt.)",
+            "0 (petla kup-sprzedaj)", (tot(rebuy) == 0) if on else None)
+    rep.add("E8/H: zakupy siodel lordow AI (okno)",
+            (f"kupione {tot(bpc)} szt. za {tot(bg)} zl ({tot(bpc) / nd:.1f} szt./d, {tot(bg) / nd:.0f} zl/d, srednio {tot(bg) / max(1, tot(bpc)):.0f} zl za sztuke); wizyty z brakiem "
+             f"{tot(bp)}, brak przed zakupem {tot(bn)}, po zakupach {tot(bs)}; zamowienia dla siodlarzy {tot(bo)}; z taboru do zbrojowni przy postoju {tot(rs)} szt."),
+            "INFO (rozpoznanie: 30-50 siodel na dobe, 2-7 tys. zl na dobe)", None)
+    rp, rn = col(r"zamiany ROT: z para (\d+)"), col(r"zamiany ROT: z para \d+, bez pary (\d+)")
+    mp_, mb = col(r"najemnicy: z para z puli (\d+)"), col(r"kon z puli bez uprzezy (\d+)")
+    vi, vn, vo, vs = col(r"pula weteranow: uprzaz \+(\d+)"), col(r"weteran bez uprzezy (\d+)"), col(r"\), na polki (\d+), stan"), col(r"\), na polki \d+, stan (\d+)")
+    rep.add("E8/H: zamiany ROT, najemnicy, pula weteranow (okno)",
+            (f"zamiany ROT z para {tot(rp)}, bez pary (pieszy albo konny bez konia) {tot(rn)}; najemnicy z para z puli {tot(mp_)}, kon bez uprzezy {tot(mb)}; "
+             f"pula weteranow: uprzaz +{tot(vi)} (weteran bez uprzezy {tot(vn)}), na polki {tot(vo)}, stan w ostatniej dobie {vs[last]}"), "INFO", None)
+    pr, ps = col(r"gracz: awanse wstrzymane z braku uprzezy (\d+)"), col(r"uprzaz z sakw do zbrojowni (\d+)")
+    bpl, bl, bgr = col(r"z braku uprzezy - gracz (\d+)"), col(r"z braku uprzezy - gracz \d+, lordowie (\d+)"), col(r"z braku uprzezy - gracz \d+, lordowie \d+, zalogi (\d+)")
+    rep.add("E8/H: gracz - brama awansu i bitwy (okno)",
+            (f"awanse wstrzymane z braku uprzezy {tot(pr)}, uprzaz z sakw do zbrojowni {tot(ps)} szt.; bitwy gracza: zeszlo z koni z braku uprzezy - gracz {tot(bpl)}, "
+             f"lordowie {tot(bl)}, zalogi {tot(bgr)}"), "INFO (autotest bez gracza: 0; sprawdzenie reczne 8.16)", None)
+    # H-7: koszt i potkniecia
+    c1, c2 = col(r"koszt: spis ([0-9.]+) ms", cast=float), col(r"ms, zdarzenia ([0-9.]+) ms", cast=float)
+    cost = [c1[d] + c2[d] for d in days]
+    stum = max([num(r"potkniecia dzis \d+ \(sesja (\d+)\)", hl[d], default=0) for d in days] + [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in SaddleLaw.") or s.startswith("ERROR in GarrisonKit.SaddleGuard"))
+    rep.add("H-7: koszt E8/H na dobe (spis par + zdarzenia), potkniecia, linie ERROR in SaddleLaw.*",
+            f"srednio {sum(cost) / nd:.1f} ms/d (spis {sum(c1.values()) / nd:.1f}, zdarzenia {sum(c2.values()) / nd:.1f}), najwiecej {max(cost):.1f} ms; potkniecia (sesja) {stum}; ERROR {errs}",
+            "<= 5 ms/d srednio, potkniecia 0, ERROR 0 (wczytanie zapisu sprzed E8/H - procedura 'zapis 9 dob', recznie)", sum(cost) / nd <= 5.0 and stum == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -10552,6 +10730,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
     blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
     blocks.append(etap8_k)   # E8/K (255): ksiazki BK, zlecenia kowalskie gry (nagroda, platnik, bron, szablon), kupno u ksiegarza BK
+    blocks.append(etap8_h)   # E8/H (271): jezdziec = kon + uprzaz - brama awansu, bitwa gracza, zakup siodel, pula weteranow
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

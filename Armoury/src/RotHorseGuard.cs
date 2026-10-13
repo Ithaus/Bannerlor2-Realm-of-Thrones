@@ -172,6 +172,10 @@ namespace Armoury
                     int fromFree = ff ? Math.Min(n, Stables.FreeArmory(mp, cat, pending)) : 0;
                     int left = n - fromFree;
                     int fromRoster = left > 0 ? Math.Min(left, Stables.CountInRoster(party, cat)) : 0;
+                    // E8/H (271): jezdziec = kon + uprzaz - z tych, dla ktorych jest kon, tylu nie ma pary (wolna uprzaz zbrojowni + tabor); ich kon zostaje,
+                    // gdzie byl (najpierw tabor, potem wolny w zbrojowni), a oni ida droga konnych bez konia: pieszy tego samego tieru z puli rodu
+                    int noPair = SaddleLaw.RotNoPair(party, val, fromFree + fromRoster, pending);
+                    if (noPair > 0) { int cr = Math.Min(noPair, fromRoster); fromRoster -= cr; fromFree -= noPair - cr; }
                     int lost = 0;
                     if (fromRoster > 0)
                     {
@@ -183,7 +187,7 @@ namespace Armoury
                         HorseCensus.Add(key, HorseCensus.CKonModUjemny, mn);
                         HorseCensus.Add(key, HorseCensus.CKonModDodatni, mpos);
                     }
-                    int s = left - fromRoster;
+                    int s = n - fromFree - fromRoster;   // E8/H: left - fromRoster jak dotad, plus konni bez pary (noPair)
                     int toFoot = 0, keep = 0, noPool = 0;
                     if (s > 0)
                     {
@@ -213,6 +217,7 @@ namespace Armoury
                         if (keep < 0) keep = 0;
                     }
                     int p1; pending.TryGetValue(val, out p1); pending[val] = p1 + n;   // ci juz rozliczeni
+                    SaddleLaw.RotSeat(party, val, fromFree + fromRoster, pending);   // E8/H (271): uprzaz z taboru do zbrojowni pod nowych jezdzcow z koniem
                     HorseCensus.Add(key, HorseCensus.CStrazZbrojownia, fromFree);
                     HorseCensus.Add(key, HorseCensus.CStrazTabor, fromRoster);
                     HorseCensus.Add(key, HorseCensus.CStrazPrzepadlo, lost);

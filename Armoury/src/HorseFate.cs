@@ -902,7 +902,12 @@ namespace Armoury
                 // przy bitwie bez okna lupu K1 (HorsesDieOnlyKilled wylaczone) DTE skopiowal zbrojownie zwyciezcom - bez drugiego lupu (jak dotad DTE zdejmie ja z partia)
                 var arm = (fromBattle && (b.SimWin || !DieOn)) ? null : ArmOf(mp);
                 var armMoves = new List<KeyValuePair<ItemObject, int>>();
-                if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && IsHorse(kv.Key)) armMoves.Add(new KeyValuePair<ItemObject, int>(kv.Key, kv.Value));
+                // E8/H (271, RiderNeedsHarness): uprzaz zbrojowni rozbitej partii idzie razem z konmi (dotad znikala ze zbrojownia) - jezdziec = kon + uprzaz
+                bool withHarness = SaddleLaw.KeyOn;
+                if (arm != null)
+                    foreach (var kv in arm)
+                        if (kv.Value > 0 && kv.Key != null && (IsHorse(kv.Key) || (withHarness && kv.Key.ItemType == ItemObject.ItemTypeEnum.HorseHarness)))
+                            armMoves.Add(new KeyValuePair<ItemObject, int>(kv.Key, kv.Value));
                 if (moves.Count == 0 && armMoves.Count == 0) return;
                 if (ds.Count == 0) { foreach (var m in moves) _dSpNoWhere += m.Value; return; }
                 foreach (var m in moves)
@@ -917,8 +922,9 @@ namespace Armoury
                     var k = Split(m.Value, ds);
                     arm.Remove(m.Key);
                     var el = new EquipmentElement(m.Key);
-                    for (int i = 0; i < ds.Count; i++) Put(ds[i], el, k[i], true);
-                    _dSpArmHorses += m.Value;
+                    bool horse = IsHorse(m.Key);
+                    for (int i = 0; i < ds.Count; i++) Put(ds[i], el, k[i], horse);
+                    if (horse) _dSpArmHorses += m.Value; else SaddleLaw.NoteSpoil(m.Value);   // E8/H: uprzaz - jak sztuka taboru (udzwig zwyciezcy, inaczej polka)
                 }
                 _dSpParties++;
             }
@@ -991,9 +997,25 @@ namespace Armoury
         internal static int VetHorsesIn(Settlement town)
         {
             var p = PoolOf(town, false);
-            int n = 0;
-            if (p != null) foreach (var v in p.Values) n += Math.Max(0, v);
-            return n;
+            int n = 0, har = 0;
+            if (p != null)
+                foreach (var kv in p)
+                {
+                    if (IsHorse(kv.Key)) n += Math.Max(0, kv.Value);
+                    else if (SaddleLaw.Fits(kv.Key)) har += Math.Max(0, kv.Value);
+                }
+            // E8/H (271): typ konny w karczmie tylko do liczby PAR (kon + uprzaz) w puli - jezdziec = kon + uprzaz; regula wylaczona - konie jak dotad
+            return SaddleLaw.On ? Math.Min(n, har) : n;
+        }
+
+        /// <summary>E8/H (271): uprzaz z puli karczmy dla najemnika, ktory dostal z niej konia (para weterana); null - brak pasujacej.</summary>
+        internal static ItemObject VetHireHarness(Settlement town, ItemObject horse) { return SaddleLaw.VetHire(PoolOf(town, false), horse); }
+
+        /// <summary>E8/H (271): uprzaz w pulach karczm - czesc stanu ksiegi uzbrojenia E6/0 i linii "Jezdzcy i uprzaz (E8/H)" (tylko odczyt).</summary>
+        internal static void VetPoolHarness(Action<ItemObject, int> f)
+        {
+            EnsureLoaded();
+            foreach (var p in _vetPool.Values) foreach (var kv in p) if (kv.Value > 0 && kv.Key != null && !IsHorse(kv.Key)) f(kv.Key, kv.Value);
         }
 
         internal static void NoteVetFootShown() { _dVetFootShown++; }
@@ -1021,6 +1043,7 @@ namespace Armoury
                     got++;
                 }
                 _dVetIn += got; _dVetNoHorse += n - got;
+                SaddleLaw.VetTake(party, arm, pool, troop, n, got);   // E8/H (271): weteran zabiera tez uprzaz (para) - wolna w zbrojowni partii po jego odejsciu
                 if (got > 0) HorseState.Refresh(party);
             }
             catch (Exception e) { Stumble("VetTakeHorses", e); }
@@ -1036,7 +1059,7 @@ namespace Armoury
                 if (it == null && p != null)
                 {
                     // egzotyczny albo juczny w puli (spoza IsPlainMount) - pierwszy z brzegu
-                    foreach (var kv in p) if (kv.Value > 0) { it = kv.Key; break; }
+                    foreach (var kv in p) if (kv.Value > 0 && IsHorse(kv.Key)) { it = kv.Key; break; }   // E8/H: w puli lezy tez uprzaz weteranow - to nie wierzchowiec
                     if (it != null) { int c = p[it]; if (c <= 1) p.Remove(it); else p[it] = c - 1; }
                 }
                 if (it != null) _dVetHire++; else _dVetHireNone++;
@@ -1058,25 +1081,31 @@ namespace Armoury
                 try
                 {
                     var st = Settlement.Find(kv.Key);
-                    int total = 0; foreach (var v in kv.Value.Values) total += Math.Max(0, v);
-                    if (total <= 0) { drop.Add(kv.Key); continue; }
+                    // E8/H (271): w puli leza konie i - od E8/H - uprzaz weteranow (para). Konie liczone osobno (jak dotad wobec konnych weteranow miasta);
+                    // uprzaz ponad konie, ktore zostaja w puli, idzie na polke miasta razem z nimi (regula wylaczona - cala uprzaz na polke: nic w nicosc)
+                    int total = 0, harness = 0;
+                    foreach (var x in kv.Value) { if (IsHorse(x.Key)) total += Math.Max(0, x.Value); else harness += Math.Max(0, x.Value); }
+                    if (total + harness <= 0) { drop.Add(kv.Key); continue; }
                     int mounted = 0, old;
                     if (on && st != null) PeopleBook.VetInTown(st, out mounted, out old);
                     int excess = total - (on ? mounted : 0);
-                    if (excess <= 0) continue;
+                    int excessHar = harness - (SaddleLaw.On ? total - Math.Max(0, excess) : 0);
+                    if (excess <= 0 && excessHar <= 0) continue;
                     var m = MarketOf(st);
                     if (m == null) continue;
                     var cheap = new List<ItemObject>(kv.Value.Keys);
                     cheap.Sort((a, b) => a.Value.CompareTo(b.Value));
                     foreach (var it in cheap)
                     {
-                        if (excess <= 0) break;
+                        bool horse = IsHorse(it);
+                        int ex = horse ? excess : excessHar;
+                        if (ex <= 0) continue;
                         int c = kv.Value[it];
-                        int k = Math.Min(c, excess);
+                        int k = Math.Min(c, ex);
                         if (k <= 0) continue;
                         if (c - k > 0) kv.Value[it] = c - k; else kv.Value.Remove(it);
                         m.ItemRoster.AddToCounts(new EquipmentElement(it), k);
-                        excess -= k; _dVetOut += k;
+                        if (horse) { excess -= k; _dVetOut += k; } else { excessHar -= k; SaddleLaw.NoteVetOut(k); }
                     }
                     if (kv.Value.Count == 0) drop.Add(kv.Key);
                 }
@@ -1237,7 +1266,7 @@ namespace Armoury
                 var s = Settings.Current;
                 string yn(bool b) => b ? "TAK" : "NIE";
                 bool any = s != null && (s.HorsesDieOnlyKilled || s.SpoilsOfBrokenParties || s.VeteranKeepsHorse || s.NewPartyHorsesFromSeat || s.TroopSwapNeedsHorse);
-                long pool = 0; foreach (var p in _vetPool.Values) foreach (var v in p.Values) pool += Math.Max(0, v);
+                long pool = 0; foreach (var p in _vetPool.Values) foreach (var x in p) if (IsHorse(x.Key)) pool += Math.Max(0, x.Value);   // E8/H: konie (uprzaz puli - linia "Jezdzcy i uprzaz (E8/H)")
                 int min = s != null ? Math.Max(1, s.HorseDeathRatioMinBattles) : 50;
                 var sb = new StringBuilder();
                 sb.Append("Konie - smierc, lup, dobytek (E6/K1): dzien ").Append(day).Append(any ? " | CZYNNE" : " | WYLACZONE (wszystkie klucze K1)")

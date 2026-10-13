@@ -437,7 +437,7 @@ namespace Armoury
         // sklad7b: przydzialy partii lordow AI (takze towarzyszy i partii rodu gracza) w trybie "tylko to, co ma" (FillPrefix: bez dopelniania wzorca)
         private static readonly HashSet<object> _ownAssign = new HashSet<object>();
         private static FieldInfo _fDistParty, _fDistMission;
-        private static MethodInfo _canMount;
+        private static MethodInfo _canMount, _getChar;   // E8/H (271): _getChar - Assignment.Character (wzorzec jednostki z uprzeza albo bez)
         private static bool _mountsOk, _regHooked;
         // sklad7b: autorozstrzygniecie gracza (EveryoneCampaignBehavior.DistributePlayerSimulationLoot -> CreateMapEventAssignments): partia, ktorej
         // przydzialy licza lup tylko z tego, co ma (null - poza tym wywolaniem albo partia bez reguly)
@@ -451,11 +451,13 @@ namespace Armoury
         // sklad7b-p: Twoj rod osobno (uwaga 13), jezdzcy pieszo (uwagi 3 i 11), partie bez wodza (uwagi 2 i 9), ludzie partii z regula poza straza
         // (uwagi 7, 9 i 16: inny mod podmienil ekwipunek albo DTE nie dal przydzialu), wystawieni przez DTE z naszym przydzialem (uwaga 7)
         private static int _bClanMen, _bClanMiss, _bFootP, _bFootL, _bFootG, _bNoLeader, _bOutside, _bOutsideTpl, _bDte;
+        private static int _bSadP, _bSadL, _bSadG, _sadLog;   // E8/H (271): jezdzcy, ktorzy zeszli z konia z braku uprzezy (gracz / lordowie AI / zalogi)
 
         private static void ClearBattle()
         {
             _bPlayerMen = _bPlayerMiss = _bLordMen = _bLordMiss = _bGarMen = _bGarMiss = _bGuardP = _bGuardL = _bGuardG = _bNoEmergP = _bNoEmergL = _bNoEntry = _bUndead = 0;
             _bClanMen = _bClanMiss = _bFootP = _bFootL = _bFootG = _bNoLeader = _bOutside = _bOutsideTpl = _bDte = 0;
+            _bSadP = _bSadL = _bSadG = 0;
         }
 
         private static bool BattleTouched()
@@ -512,6 +514,7 @@ namespace Armoury
                 _fDistParty = AccessTools.Field(tDist, "_party");
                 _fDistMission = AccessTools.Field(tDist, "_mission");
                 _canMount = AccessTools.PropertyGetter(tAssign, "CanUseMountEquipment");
+                _getChar = AccessTools.PropertyGetter(tAssign, "Character");   // E8/H (271): bez niego straz uprzezy spi (nikt nie schodzi z konia)
                 string sim = "BRAK", end = "BRAK", entry = "BRAK", reg = "BRAK";
                 try
                 {
@@ -678,7 +681,7 @@ namespace Armoury
                 if (_spawn.Count == 0) return;
                 var main = MobileParty.MainParty;
                 object mySide = main != null && sides != null && sides.Contains(main.Id) ? sides[main.Id] : null;
-                int noWeapon = 0, noBody = 0, onFoot = 0, men = 0, allyBare = 0, enemyBare = 0;
+                int noWeapon = 0, noBody = 0, onFoot = 0, men = 0, allyBare = 0, enemyBare = 0, noSaddle = 0;
                 foreach (var si in _spawn.Values)
                 {
                     if (si == null) continue;
@@ -697,18 +700,20 @@ namespace Armoury
                             if (!rb.IsEmpty && rb.Item != null && (eb.IsEmpty || eb.Item == null)) noBody++;
                             if (RiderOnFoot(si.Asg, eq, rf)) onFoot++;
                         }
+                        if (SaddleMissing(si.Asg, eq)) noSaddle++;   // E8/H (271): ma konia, nie ma uprzezy - pojdzie pieszo (SaddleGuard przy wystawieniu)
                         continue;
                     }
                     if (!bare) continue;
                     object side = sides != null && sides.Contains(si.Party) ? sides[si.Party] : null;
                     if (side != null && mySide != null && side.Equals(mySide)) allyBare++; else enemyBare++;
                 }
-                Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot
+                Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot + ", jezdzcy z koniem bez uprzezy (E8/H) " + noSaddle
                          + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem).");
                 var parts = new List<string>();
                 if (noWeapon > 0) parts.Add(noWeapon + " have no weapon");
                 if (noBody > 0) parts.Add(noBody + " no body armour");
                 if (onFoot > 0) parts.Add(onFoot + " riders no horse");
+                if (noSaddle > 0) parts.Add(noSaddle + " riders no saddle");
                 if (parts.Count > 0)
                     Log.Player("Your stores are short for this battle - of your men, " + string.Join(", ", parts.ToArray()) + "; they fight with what they have.", true);
                 if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + allyBare + " fight bare-handed - their stores hold no more.");
@@ -857,6 +862,7 @@ namespace Armoury
             Log.Info("Bitwa gracza (sklad7b, nic z niczego; " + why + "): sloty wzorca bez sztuki (walcza bez) - gracz " + _bPlayerMiss + " (ludzi " + _bPlayerMen
                      + "), lordowie AI " + _bLordMiss + " (ludzi " + _bLordMen + "; w tym Twoj rod " + _bClanMiss + ", ludzi " + _bClanMen + "), zalogi " + _bGarMiss + " (ludzi " + _bGarMen
                      + "); jezdzcy pieszo (brak konia w zbrojowni) - gracz " + _bFootP + ", lordowie " + _bFootL + ", zalogi " + _bFootG
+                     + "; z koni z braku uprzezy (E8/H) - gracz " + _bSadP + ", lordowie " + _bSadL + ", zalogi " + _bSadG
                      + "; straz 'nic z niczego' zatrzymala - gracz " + _bGuardP + ", lordowie " + _bGuardL + ", zalogi " + _bGuardG
                      + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
                      + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
@@ -1067,9 +1073,11 @@ namespace Armoury
             try
             {
                 int g = si.Kind != 2 || OwnKitOn ? SpawnGuard(si, eq) : 0;
+                bool noSad = (si.Kind != 2 || OwnKitOn) && SaddleGuard(si, eq);   // E8/H (271): po strazy "nic z niczego" - kon bez uprzezy schodzi (pieszo)
                 int miss = Missing(si.Asg, eq);
                 var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
-                int foot = RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
+                int foot = !noSad && RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
+                if (noSad) { if (si.Kind == 0) _bSadP++; else if (si.Kind == 1) _bSadL++; else _bSadG++; }
                 if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot; }
                 else if (si.Kind == 1)
                 {
@@ -1268,6 +1276,49 @@ namespace Armoury
                 }
             }
             return n;
+        }
+
+        /// <summary>E8/H (271): czlowiek objety regula "jezdziec = kon + uprzaz" (wzorzec jednostki ma zwyklego wierzchowca i uprzaz) ma w przydziale konia
+        /// pod siodlo, a nie ma uprzezy rodziny tego konia. Tylko tam, gdzie DTE wpuszcza konie; kon tymczasowy (spoza zbrojowni) - poza regula. Sam odczyt.</summary>
+        private static bool SaddleMissing(object asg, Equipment eq)
+        {
+            if (!_mountsOk || eq == null || asg == null || _getChar == null || !SaddleLaw.On) return false;
+            try
+            {
+                var h = eq[EquipmentIndex.Horse];
+                if (h.IsEmpty || h.Item == null || !Stables.IsPlainMount(h.Item)) return false;
+                var hr = eq[EquipmentIndex.HorseHarness];
+                if (!hr.IsEmpty && hr.Item != null && SaddleLaw.Fits(hr.Item, h.Item)) return false;
+                if (!SaddleLaw.Needs(_getChar.Invoke(asg, null) as CharacterObject)) return false;
+                if (_isTemp != null && (bool)_isTemp.Invoke(asg, new object[] { EquipmentIndex.Horse, h.Item })) return false;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>E8/H (271, decyzja Jeffa 12.10: "sam kon nie wystarczy - musi miec tez uprzaz, zeby wojsko na nim jezdzilo") - STRAZ UPRZEZY PRZY WYSTAWIENIU,
+        /// jedna dla druzyny gracza, lordow AI i zalog, PO strazy "nic z niczego" (SpawnGuard) i po strazach CrashScribe (SkillLawWard, CamelCulling - ruszaja
+        /// sloty 10-11 wczesniej). Kon pod siodlo bez uprzezy swojej rodziny -> slot konia pusty (pieszo); kon zostaje w zbrojowni (DTE zdejmuje ze
+        /// zbrojowni tylko to, co czlowiek ma na sobie). DTE rozdaje pary z uprzeza pierwsze, wiec schodza tylko ci ponad liczbe uprzezy. true - zszedl.</summary>
+        private static bool SaddleGuard(SpawnInfo si, Equipment eq)
+        {
+            if (_setEq == null || !SaddleMissing(si.Asg, eq)) return false;
+            try
+            {
+                string id = eq[EquipmentIndex.Horse].Item.StringId ?? "";
+                var hr = eq[EquipmentIndex.HorseHarness];
+                _setEq.Invoke(si.Asg, new object[] { EquipmentIndex.Horse, default(EquipmentElement) });
+                if (!hr.IsEmpty && hr.Item != null) _setEq.Invoke(si.Asg, new object[] { EquipmentIndex.HorseHarness, default(EquipmentElement) });
+                SaddleLaw.NoteBattle(si.Kind);
+                if (_sadLog < 10)
+                {
+                    _sadLog++;
+                    Log.Info("Bitwa gracza: straz uprzezy (E8/H) - " + id + " (" + (si.Kind == 0 ? "druzyna gracza" : si.Kind == 1 ? "lord AI" : "zaloga")
+                             + ") bez uprzezy w zbrojowni - jezdziec idzie pieszo, kon zostaje w zbrojowni.");
+                }
+                return true;
+            }
+            catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.SaddleGuard", e); return false; }
         }
 
         /// <summary>sklad7b: ile sztuk (po StringId, jak DTE ArmyArmory.AssignEquipment) ma zbrojownia druzyny gracza z tych, ktore czlowiek nosi;

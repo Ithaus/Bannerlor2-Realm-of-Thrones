@@ -657,6 +657,72 @@ namespace Armoury
             return spent;
         }
 
+        // ------------------------------------------------------------ E8/H (271): siodlo dla jezdzca bez pary
+        /// <summary>
+        /// E8/H (271, decyzja Jeffa 12.10 "jezdziec = kon + uprzaz"): partia lorda AI kupuje uprzaz rodziny konia do zapasu SaddleLaw.Target (ludzie, ktorzy maja
+        /// na czym usiasc, + luz) - DOWOLNA pasujaca sztuka, najtansza najpierw (siodlo robi jezdzca; lader wzorca dokupuje E6/R3 po staremu jako "lepsze").
+        /// Reguly zakupow AI jak przy brakach: bez unikatow, czarnej listy DTE, dodatnich stanow i sztuk ponad sufit (AiBuyRules), kazda sztuka po swojej cenie
+        /// (ShelfBuy.Take), dostawa i zaplata ta sama (deliver = here: zbrojownia partii, sakiewka ludzi, potem kiesa pana -> kasa miasta). Ostatnie
+        /// AiMountShelfFloor sztuk pasujacej uprzezy zostaja na polce dla innych kupcow (jak konie). Polka bez sztuki dla AI = zamowienie dla siodlarzy
+        /// (SupplyDemand.NoteUnmetOnce, koszyk uprzaz t1); "za drogie na reszte budzetu" to nie brak towaru. Zwraca wydane zloto.
+        /// </summary>
+        private static int BuySaddles(Settlement market, MobileParty buyer, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
+        {
+            int spent = 0;
+            try
+            {
+                if (market == null || market.ItemRoster == null || market.Town == null || budget <= 0) return 0;
+                int want = SaddleLaw.BuyNeed(buyer);
+                if (want <= 0) return 0;
+                var s = Settings.Current;
+                var shelf = market.ItemRoster;
+                var cands = new List<SubCand>();
+                int onShelf = 0;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || !SaddleLaw.Fits(it)) continue;
+                    onShelf += el.Amount;
+                    if (ArmsPricing.IsUnique(it) || !DteTakes(it) || AiBuyRules.Barred(el.EquipmentElement)) continue;
+                    int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
+                    if (price <= 0 || AiBuyRules.OverCap(el.EquipmentElement, price)) continue;
+                    cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Price = price });
+                }
+                int allow = Math.Max(0, onShelf - Math.Max(0, s.AiMountShelfFloor));
+                int left = want;
+                bool any = cands.Count > 0 && allow > 0;
+                if (any)
+                {
+                    cands.Sort((x, y) => x.Price.CompareTo(y.Price));
+                    bool fresh = true;   // cena z przegladu wazna do pierwszego zakupu (polka ta sama), potem liczona od nowa
+                    for (int ci = 0; ci < cands.Count && left > 0 && allow > 0 && pieces < maxPieces && spent < budget; ci++)
+                    {
+                        var c = cands[ci];
+                        int price = fresh ? c.Price : market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party);
+                        if (price <= 0 || price > budget - spent) continue;
+                        if (AiBuyRules.OverCap(c.El, price, false)) continue;
+                        int maxN = Math.Min(Math.Min(left, c.Left), Math.Min(maxPieces - pieces, allow));
+                        if (maxN <= 0) continue;
+                        var cel = c.El;
+                        int cost, first, last;
+                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last, price, cap: AiBuyRules.CapPrice(cel));
+                        if (n <= 0) continue;
+                        fresh = false;
+                        if (!deliver(cel, n, SaddleLaw.Bucket, cost)) { ShelfBuy.PutBack(shelf, cel, n, cost, first); continue; }   // DTE odrzucil - wraca na polke, nikt nie placi
+                        ArmsScrap.NoteBuy(market, cel.Item, n);   // popyt koszyka w miescie (tylko licznik)
+                        spent += cost; pieces += n; left -= n; allow -= n;
+                        if (bought.Count < 6) bought.Add(cel.Item.StringId + " " + ShelfBuy.Prices(n, first, last) + " (siodlo E8/H)");
+                    }
+                }
+                bool order = left > 0 && !any;
+                if (order) SupplyDemand.NoteUnmetOnce(buyer, market, ItemObject.ItemTypeEnum.HorseHarness, 1, Math.Min(10, left));
+                SaddleLaw.NoteVisit(buyer, want, left, order);
+            }
+            catch (Exception e) { SaddleLaw.Stumble("BuySaddles", e); }
+            return spent;
+        }
+
         /// <summary>K1 (przeglad): czy ktos z oddzialow koszyka udzwignie sztuke (brak listy - bez warunku, jak dotad).</summary>
         private static bool Lift(List<CharacterObject> who, ItemObject it)
         {
@@ -845,12 +911,19 @@ namespace Armoury
                     ClanIncomeBook.NoteOwnPaid(st, lord != null ? lord.Clan : null, cost);   // 169c: "wlasne" D stalego - sprzet rodu kupiony w jego osadzie (tylko licznik)
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
                     try { TownFolk.Sale(st, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): sprzet AI - sprzedaz kupcow (tylko licznik)
-                    if (el.Item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { _dBardPcs += n; _dBardGold += cost; }   // E6/R3 (215): linia "Uprzaz" (tylko licznik)
+                    if (el.Item.ItemType == ItemObject.ItemTypeEnum.HorseHarness)
+                    {
+                        if (k == SaddleLaw.Bucket) SaddleLaw.NoteBought(n, cost);   // E8/H (271): siodlo dla jezdzca bez pary - linia "Jezdzcy i uprzaz (E8/H)" (tylko licznik)
+                        else { _dBardPcs += n; _dBardGold += cost; }                // E6/R3 (215): linia "Uprzaz" (tylko licznik)
+                    }
                     return true;
                 };
                 AiBuyRules.NewVisit();   // E8/Z (251): licznik "w ilu wizytach" (tylko log)
+                // E8/H (271): siodlo dla jezdzcow bez pary (partie lordow, nie zalogi) - PRZED brakami: najtansza sztuka partii, a bez niej kon stoi.
+                // Ta sama droga co braki (ShelfBuy.Take -> here -> AddToArmory), z tego samego budzetu i limitu sztuk wizyty
+                int sadSpent = !garrison ? BuySaddles(st, mp, budget, maxPieces, ref pieces, bought, here) : 0;
                 long tl = Cost174.Begin(Cost174.SBuyLoop);
-                int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here, who);
+                int spent = sadSpent + BuyLoop(st, mp, need, lifters, budget - sadSpent, maxPieces, ref pieces, bought, here, who);
                 Cost174.End(Cost174.SBuyLoop, tl);
                 if (bardNeed > 0)
                     foreach (var kv in need) if (kv.Value > 0 && kv.Key / 10 == (int)ItemObject.ItemTypeEnum.HorseHarness) _dBardShort += kv.Value;   // E6/R3: brak uprzezy po zakupach (tylko licznik)

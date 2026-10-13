@@ -522,7 +522,7 @@ namespace Armoury
         /// Kon i rzad najemnika z karczmy - wspolne dla AI (OnRecruited, przypadek 7) i gracza (E8/T). Zwraca liczbe dolozonych sztuk.
         /// 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana; E6/K1 (211, VeteranKeepsHorse): kon z puli koni weteranow tej karczmy
         /// (kon zwolnionego konnego), nie z wzorca; brak konia w puli - bez konia i bez rzedu (karczma pokazuje typ konny tylko do liczby koni w puli -
-        /// Veterans.Sync); rzad nadal z wzorca (poza zakresem K1).
+        /// Veterans.Sync); rzad nadal z wzorca (poza zakresem K1). E8/H (271, RiderNeedsHarness): rzad z puli weteranow razem z koniem (para), nie ze wzorca.
         /// </summary>
         private static int MercHorseKit(Settlement settlement, CharacterObject troop, List<EquipmentElement> items)
         {
@@ -530,15 +530,25 @@ namespace Armoury
             bool vetHorse = HorseFate.VetHorseOn && troop.IsMounted;
             ItemObject vh = vetHorse ? HorseFate.VetHireHorse(settlement, troop) : null;
             if (vh != null) { items.Add(new EquipmentElement(vh)); added++; }
-            int tplHorse = 0;
+            // E8/H (271): jezdziec = kon + uprzaz - rzad najemnika idzie z koniem z puli weteranow karczmy (weteran zabral pare - HorseFate.VetTakeHorses),
+            // nie ze wzorca z niczego; w puli nie ma pasujacej uprzezy - najemnik przychodzi z samym koniem (najemca dokupi siodlo)
+            bool pair = vetHorse && SaddleLaw.On;
+            if (pair && vh != null && SaddleLaw.Needs(troop))
+            {
+                var har = HorseFate.VetHireHarness(settlement, vh);
+                if (har != null) { items.Add(new EquipmentElement(har)); added++; }
+            }
+            int tplHorse = 0, tplHar = 0;
             foreach (var e in TemplateItems(troop))
                 if (MenPurse.HorseKind(e.Item))
                 {
                     if (vetHorse && (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse || vh == null)) continue;
+                    if (pair && e.Item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) continue;   // E8/H: rzad tylko z puli
                     items.Add(e); added++;
-                    if (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse) tplHorse++;
+                    if (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse) tplHorse++; else tplHar++;
                 }
             HorseFate.NoteMercTemplateHorse(tplHorse);
+            SaddleLaw.NoteMercTemplate(tplHar);   // rzad ze wzorca (regula wylaczona albo bez puli weteranow) - tylko licznik
             return added;
         }
 

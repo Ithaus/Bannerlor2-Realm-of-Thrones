@@ -1264,6 +1264,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public bool AiFreeArmoryHorsesFirst { get; set; } = false;
 
+        [SettingPropertyBool("Rider Needs Harness", HintText = "a mounted soldier needs a saddle as well as a horse - any horse harness will do: raising a footman to a rider takes a spare harness from the baggage or the troop armoury (yours and the AI's alike), in your battles a rider whose horse has no harness fights on foot, AI lords buy the cheapest saddle for every rider who has a horse and none, a veteran takes his saddle along to the tavern and a mounted mercenary brings it back; heroes are not checked; works with Cavalry Needs Mounts and Troops Fight With Own Kit Only (off = a horse alone is enough, as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public bool RiderNeedsHarness { get; set; } = true;
+
         [SettingPropertyBool("Long Year Enabled", HintText = "stretch the year so the world stops racing: children grow, lords age and seasons turn at a pace a long campaign can live with")]
         [SettingPropertyGroup("The turning year")]
         public bool LongYearEnabled { get; set; } = true;
@@ -5379,6 +5383,7 @@ namespace Armoury
             s.AiMountShelfFloor = AiMountShelfFloor;
             s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
             s.AiFreeArmoryHorsesFirst = AiFreeArmoryHorsesFirst;
+            s.RiderNeedsHarness = RiderNeedsHarness;
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;

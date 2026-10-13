@@ -685,6 +685,11 @@ namespace Armoury
                 int riders;
                 int over = have - AiBuyRules.HarnessKeep(mp, roster, garrison, out riders);
                 if (over <= 0) return;
+                // E8/H (271): jedna definicja potrzeby dla kupna i nadwyzki - zapas E8/Z liczy uprzaz bez rodzin wierzchowcow, a sprzedaje od najtanszej, czyli
+                // najpierw siodla koni. Uprzaz rodziny konia nie schodzi ponizej zapasu siodel (SaddleLaw.Target - ten sam, do ktorego kupuje AiGear.BuySaddles),
+                // inaczej partia z nadmiarem uprzezy innej rodziny sprzedawalaby siodla, ktore zaraz by odkupila (pompa)
+                int fitKeep = 0, fitHave = 0, held = 0;
+                if (SaddleLaw.On) { SaddleLaw.PairState ps; fitKeep = SaddleLaw.Target(mp, roster, garrison, out ps); fitHave = ps.Harness; }
                 items.Sort((a, b) =>
                 {
                     int d = AiGear.TierOf(a).CompareTo(AiGear.TierOf(b)); if (d != 0) return d;
@@ -695,10 +700,12 @@ namespace Armoury
                 {
                     if (over <= 0 || noBuyer) break;
                     var el = new EquipmentElement(it);
+                    bool fit = fitKeep > 0 && SaddleLaw.Fits(it);
                     while (over > 0)
                     {
                         int cnt;
                         if (!arm.TryGetValue(it, out cnt) || cnt <= 0) break;
+                        if (fit && fitHave <= fitKeep) { held += Math.Min(over, cnt); break; }   // E8/H: zapas siodel zostaje
                         int unit = SellPriceHere(el, st, mp);
                         if (CastlePurse.Spendable(st.Town) < unit) { noBuyer = true; stop = true; break; }   // kasa pusta - koniec na dzis
                         if (cnt > 1) arm[it] = cnt - 1; else arm.Remove(it);
@@ -716,12 +723,15 @@ namespace Armoury
                         Add(mp, unit - cut);
                         sold++; gold += unit; _dayLord += cut; cutSum += cut;
                         hSold++; hGold += unit; hThird += cut; over--;
+                        if (fit) fitHave--;
                         SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
                         MenUpgrade.NoteChurn(mp, it, false);                           // kupione i sprzedane tej samej doby (linia "Dozbrajanie"; autotest: 0)
                     }
                 }
+                SaddleLaw.NoteSaleHeld(held);
             }
             catch (Exception e) { AiBuyRules.Stumble("SellSpareHarness", e); }
+            SaddleLaw.NoteSale(mp, hSold);   // E8/H (271): doba sprzedazy uprzezy tej partii - licznik "kupno po sprzedazy" (tylko log)
             AiBuyRules.NoteHarness(garrison, hSold, hGold, hThird, noBuyer);
         }
 

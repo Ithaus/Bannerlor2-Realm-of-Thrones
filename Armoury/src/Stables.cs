@@ -84,6 +84,7 @@ namespace Armoury
                     Log.Info("Stajnia: awans gracza - " + moved + " koni z taboru przeszlo do zbrojowni (zamiast przepasc).");
                     Log.Player(moved + (moved == 1 ? " horse goes" : " horses go") + " from the baggage to the troop armoury - the new riders will find them there.", true);
                 }
+                SaddleLaw.PlayerBank(moved);   // E8/H (271): jezdziec = kon + uprzaz - uprzaz z sakw do zbrojowni dla nowych jezdzcow (konie sa juz w zbrojowni)
             }
             catch (Exception e) { Log.Error("Stables.BankPaidHorses", e); }
         }
@@ -725,6 +726,7 @@ namespace Armoury
                 }
                 // 175.0: proba odrzucona = "skret w inna droge", gdy lista celow zostala niepusta, inaczej "czeka"
                 if (refused + trimmed > 0) HorseCensus.OnFiltered(party, refused, list.Count == 0, trimmed);
+                SaddleLaw.FilterTargets(party, list);   // E8/H (271): jezdziec = kon + uprzaz - po bramie konia (i po jej pomiarze): cel na jezdnego bez wolnej uprzezy odpada albo jest przyciety
             }
             catch (Exception e) { Log.Error("Stables.Filter", e); }
         }
@@ -760,6 +762,7 @@ namespace Armoury
                 int free = FreeFirst(party) ? FreeArmory(party.MobileParty, cat) : 0;
                 int inRoster = CountInRoster(party, cat);
                 if (inRoster + free < need) { HorseCensus.OnPayRefused(party, need); return false; }   // konie wybrane - czekaja (XP zostaje)
+                if (!SaddleLaw.PayGate(party, target, need)) return false;   // E8/H (271): bez wolnej uprzezy awans czeka (XP zostaje) - PRZED zdjeciem konia z taboru
                 int fromFree = Math.Min(need, free);
                 int fromRoster = need - fromFree;
                 var taken = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<EquipmentElement, int>>();
@@ -767,6 +770,7 @@ namespace Armoury
                 int lost, modNeg, modPos;
                 int banked = BankToArmory(party.MobileParty, taken, fix, true, out lost, out modNeg, out modPos);
                 HorseCensus.OnUpgradePaid(party, cat, need, fromFree, banked, lost, modNeg, modPos);
+                SaddleLaw.AfterPay(party, target, need);   // E8/H (271): uprzaz nowego jezdzca - wolna w zbrojowni zostaje na miejscu, brakujaca z taboru do zbrojowni (jak kon)
                 HorseState.AfterPay(party);   // E6/K0: stan koni partii od nowa w postfiksie UpgradeTroop (nowy jezdziec w skladzie dopiero po tym prefiksie)
                 return true;
             }
@@ -796,6 +800,7 @@ namespace Armoury
         {
             int n = _lastBuy.Count;
             _lastBuy.Clear();
+            SaddleLaw.Reset();   // E8/H (271): pamiec sesji reguly "jezdziec = kon + uprzaz" (spisy wzorcow i przedmiotow, doby sprzedazy uprzezy) - ten sam Reset, nie drugi
             return n;
         }
 
@@ -1424,6 +1429,7 @@ namespace Armoury
                 var mUp = AccessTools.Method(tU, "UpgradeTroop");
                 if (mList != null) h.Patch(mList, postfix: new HarmonyMethod(typeof(Stables), "FilterTargets"));
                 if (mUp != null) h.Patch(mUp, prefix: new HarmonyMethod(typeof(Stables), "PayInHorses"));
+                SaddleLaw.ApplyAll(h);   // E8/H (271): brama awansu gracza (PartyScreenLogic.ValidateCommand) - jezdziec = kon + uprzaz
 
                 Log.Info("Stables: awans na jezdnego wymaga rumaka - gracz przez ekran druzyny (vanilla sam zabiera konie), "
                          + "AI przez tabor (lista=" + (mList != null) + ", zaplata=" + (mUp != null) + "). "

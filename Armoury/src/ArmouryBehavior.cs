@@ -817,6 +817,7 @@ namespace Armoury
                 {
                     try { Orders.OnSettlementEntered(mp, st); } catch { }
                     try { Stables.OnSettlementEntered(mp, st); } catch { }
+                    try { SaddleLaw.OnSettlementEntered(mp, st); } catch { }   // E8/H (271): uprzaz z taboru do zbrojowni do zapasu siodel - po Stajni, przed sprzedaza nadwyzek i zakupami sprzetu
                     try { if (mp == MobileParty.MainParty) ElephantQuarantine.Sweep(st); } catch { }
                 }));
             CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, DayProfile.TownDay("ElephantQuarantine+TroopSelfMend.Run",
@@ -1692,6 +1693,7 @@ namespace Armoury
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
             try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
+            try { SaddleLaw.Daily(); } catch (Exception e) { Log.Error("SaddleLaw.Daily", e); } DayProfile.Lap("SaddleLaw.Daily");   // E8/H (271): linia "Jezdzcy i uprzaz (E8/H)" - spis par kon + uprzaz (partie rodow AI, zalogi, rod gracza) i liczniki bramy, zakupow, bitwy (tylko log)
             try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); } DayProfile.Lap("KingdomBalance.Daily");   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
             try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); } DayProfile.Lap("MoneyLedger.Daily");     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
             try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); } DayProfile.Lap("Stage6Measure.Daily");   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
