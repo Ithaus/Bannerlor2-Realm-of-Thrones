@@ -34,14 +34,17 @@ namespace Armoury
     ///    krolestwo, ktorego panowie nie maja budzetu na druzyny, placi maly zwrot zoldu, "nie ma potrzeby", s = 0 i nie ma daniny P1 ani doplaty W5 (bledne
     ///    kolo; Zelazne Wyspy w dobie 364 biegu rocznego: skarbiec 1 046 588 przy zapasie wojny 500 000, s = 0, druzyny 1.6 tys. z 8.1 tys. limitu).
     ///    Wylacznik WarAidFollowsLordsShortfall (czynny tylko z danina P1 i doplata W5; wylaczony = stawka daniny idzie za samym s, jak przed paczka).
-    ///    DRUGA stawka krolestwa SN (WarTaxK.SN): w kroku tygodnia rosnie o WarTaxStep od biezacej stawki daniny (wiekszej z s i SN), do tego samego pulapu,
+    ///    DRUGA stawka krolestwa SN (WarTaxK.SN): w kroku tygodnia rosnie o JEDEN WarTaxStep od stawki, ktora danina szla w mierzonym tygodniu (wieksza z s i
+    ///    SN sprzed dzisiejszego kroku s - recenzja: nie dwa kroki naraz, gdy s samo roslo, i nie zero, gdy s spadalo), do tego samego pulapu,
     ///    gdy srednia z 7 dob NIEPOKRYTEJ potrzeby W5 (rody z warunkiem rent ponizej celu z powodu pulapu; po garnku daniny, po skarbcu ponad zapas wojny i po
     ///    tarczowym - NeedAidMeasure) > max(250 zl, WarAidLordsShortfallShare 5% sredniego naleznego zwrotu z 28 dob). Spada o krok, gdy brak przewidziany
     ///    przy nizszej stawce (potrzeba minus garnek daniny pomniejszony o ubytek po kroku) miesci sie w tym samym progu; w pokoju spada jak s.
     ///    OD SN LICZY SIE TYLKO DANINA Z OSZCZEDNOSCI (WtAidS: wieksza z s i SN - KingdomTreasury.WarAid.cs); podatek od zarobku (FolkWarTax) idzie dalej za
     ///    samym s - zarobek biednych miast nie jest ruszany (chleb swiata w biegu rocznym 97.4-98.1% przy progu 98%), a garnek W5 i tak jest ograniczony danina.
-    ///    Pamiec 7 dob to PAMIEC SESJI (po wczytaniu pusta: krok bez zadnej doby pomiaru stawki nie rusza; pierwsza doba sesji nie ma pomiaru, bo budzet 166
-    ///    nie jest policzony); sama stawka SN jest w zapisie - 29. liczba listy zwrotow szostego pola (starsza wersja moda czyta 28 i reszte pomija).
+    ///    Pamiec 7 dob to PAMIEC SESJI (po wczytaniu pusta; pierwsza doba sesji nie ma pomiaru, bo budzet 166 nie jest policzony). Recenzja: krok w gore i
+    ///    w dol tylko przy pomiarze z co najmniej LnMinDays (4) dob - niepokryta potrzeba chodzi z doby na dobe 2-5 razy w rytmie ok. 4 dob, srednia z 1-3
+    ///    dob dawalaby falszywy krok; krok z krotszym pomiarem stawki nie rusza (stoi stan z zapisu), w pokoju spadek jak s. Sama stawka SN jest w zapisie -
+    ///    29. liczba listy zwrotow szostego pola (starsza wersja moda czyta 28 i reszte pomija).
     /// Wyjatek per krolestwo / per pobor - licznik potkniec, bez globalnych wylacznikow (CLAUDE.md 7). MoneyLedger bez nowych pozycji (przelew miedzy
     /// posiadaczami spoza kas osad: kiesa ludu B1 -> skarbiec; licznik w "Obieg").
     /// </summary>
@@ -111,6 +114,12 @@ namespace Armoury
 
         /// <summary>Niepokryta potrzeba ponizej tej kwoty na dobe nie jest powodem (zold ok. 40 ludzi - jeden maly poczet, szum pomiaru).</summary>
         private const double LnFloor = 250;
+
+        /// <summary>Recenzja W5b: krok stawki daniny (w gore i w dol) tylko przy pomiarze z co najmniej tylu dob z ostatnich 7. Niepokryta potrzeba i danina
+        /// chodza z doby na dobe 2-5 razy (bieg 120 dob, doby 93-120: Iron Islands 0 - 6 051 zl, Free Folk 0 - 7 302 zl, rytm ok. 4 dob - dwie doby wysokie,
+        /// dwie niskie), wiec srednia z 1-3 dob po wczytaniu gry trafia w szczyt albo w dolek i dawalaby falszywy krok. 4 doby = pelny rytm. Sesja krotsza
+        /// niz 4 doby pomiaru przed doba kroku: stawka stoi (stan z zapisu), nic sie nie psuje; w pokoju spadek jak s - bez pomiaru.</summary>
+        private const int LnMinDays = 4;
 
         /// <summary>W5b regula 1: stawka potrzeby, od ktorej liczy sie DANINA z oszczednosci (P1) - wieksza z s korony (stara regula 184) i stawki z braku wojska
         /// u panow. Podatek 184 od zarobku tej liczby NIE uzywa (FolkWarTax / FolkWarTaxRate - samo S).</summary>
@@ -286,7 +295,7 @@ namespace Armoury
                         }
                         // W5b regula 1 - BRAK WOJSKA U PANOW: pamiec doby (zawsze - po wlaczeniu klucza srednia jest juz znana) i krok stawki daniny z oszczednosci.
                         // Krok W5 tej doby juz biegl (CrownRents.Daily, przed tym blokiem). Doba bez pomiaru (pokoj, W5 nieczynne, budzet 166 jeszcze nie policzony
-                        // w tej sesji) = NaN i nie wchodzi do sredniej. Po wczytaniu pierscien jest pusty: krok bez zadnej doby pomiaru stawki nie rusza.
+                        // w tej sesji) = NaN i nie wchodzi do sredniej. Po wczytaniu pierscien jest pusty: krok z pomiarem krotszym niz LnMinDays (4) doby stawki nie rusza.
                         double lu, lnd, lpt, lai;
                         bool lk = NeedAidMeasure(k, today, out lu, out lnd, out lpt, out lai);
                         w.LnU[w.HN] = lk ? lu : double.NaN; w.LnNeed[w.HN] = lk ? lnd : double.NaN; w.LnPot[w.HN] = lk ? lpt : double.NaN; w.LnAid[w.HN] = lk ? lai : double.NaN;
@@ -295,25 +304,29 @@ namespace Armoury
                         for (int i = 0; i < WtRing7; i++) if (!double.IsNaN(w.LnU[i])) { n7++; u7 += w.LnU[i]; nd7 += w.LnNeed[i]; pt7 += w.LnPot[i]; a7 += w.LnAid[i]; }
                         if (n7 > 0) { u7 /= n7; nd7 /= n7; pt7 /= n7; a7 /= n7; }
                         double lnThr = Math.Max(LnFloor, lnShare * davg);
-                        bool lnShort = ln && war && inc && n7 > 0 && u7 > lnThr, stepN = false;
+                        bool lnMeas = n7 >= LnMinDays;                     // recenzja W5b: pomiar z co najmniej 4 dob (srednia z 1-3 dob po wczytaniu = szczyt albo dolek rytmu daniny)
+                        bool lnShort = ln && war && inc && lnMeas && u7 > lnThr, stepN = false;
                         if (!on || !ln) w.SN = 0;                          // wylaczone (albo bez daniny P1 / bez W5) = stawka daniny idzie za samym s - stan sprzed paczki
                         else if (w.SN > cap + 1e-6) w.SN = Math.Round(cap, 6);
                         if (on && ln && step)
                         {
                             double n0 = w.SN, n1 = n0;
                             if (!war || !inc) n1 = n0 - fall;                            // pokoj albo bez 165 - spada jak s (do zera najwyzej w 4 tygodnie)
-                            else if (lnShort) n1 = Math.Max(n0, w.S) + stepV;            // brak ponad prog - zwykly krok w gore od biezacej stawki daniny, do zwyklego pulapu
+                            // brak ponad prog - JEDEN zwykly krok w gore od stawki, ktora danina szla w mierzonym tygodniu (eff0 - sprzed dzisiejszego kroku s), do
+                            // zwyklego pulapu. Recenzja W5b: liczone od eff0, nie od s po dzisiejszym kroku - inaczej w dobie, w ktorej s samo roslo, danina skakala
+                            // o dwa kroki naraz (krok s + krok z braku), a w dobie, w ktorej s spadalo ("luz"), mimo braku nie rosla wcale (s po spadku + krok = eff0)
+                            else if (lnShort) n1 = eff0 + stepV;
                             // brak zniknal: krok w dol dopiero, gdy garnek daniny pokrylby potrzebe takze przy nizszej stawce - brak przewidziany po kroku (potrzeba
                             // minus garnek pomniejszony o ubytek daniny) nie wiekszy od tego samego progu, ktory podnosi stawke; bez potrzeby - zawsze. Inaczej
                             // stawka krazylaby co tydzien w gore i w dol, a rody z doplata na zmiane werbowalyby i zwalnialy. Potrzeba pokrywana skarbcem albo
                             // tarczowym stawki nie obniza (liczy sie sam garnek daniny). Stawka nie wieksza od s korony niczego nie zmienia - schodzi do zera.
-                            else if (n0 > 0 && n7 > 0 && (n0 <= w.S + 1e-9 || nd7 - Math.Max(0, pt7 - a7 * stepV / n0) <= lnThr)) n1 = n0 - stepV;
+                            else if (n0 > 0 && lnMeas && (n0 <= w.S + 1e-9 || nd7 - Math.Max(0, pt7 - a7 * stepV / n0) <= lnThr)) n1 = n0 - stepV;
                             w.SN = Math.Round(WtClamp(n1, 0, cap), 6); stepN = true;
                         }
                         double eff1 = Math.Min(WtAidS(w), cap), moveN = eff1 - eff0;
                         if (war && ln)
                         {
-                            if (n7 == 0) lnBlindK++;
+                            if (!lnMeas) lnBlindK++;
                             if (lnShort) lnShortK++;
                             if (w.SN > w.S + 1e-9) lnPosK++;
                             if (stepN && inc) { if (moveN > 1e-9) lnUp++; else if (moveN < -1e-9) lnDown++; else lnHold++; }
@@ -384,7 +397,8 @@ namespace Armoury
                       .Append(s.WarAidFollowsLordsShortfall ? (ln ? "tak" : "tak, ale nieczynny (bez daniny P1 albo bez doplaty W5 - stawka daniny = s)") : "nie (stawka daniny = s - jak przed paczka)")
                       .Append(", powod: srednia z 7 dob niepokrytej potrzeby W5 (po daninie, skarbcu i tarczowym) > max(").Append(LnFloor.ToString("0", WtInv)).Append(", ")
                       .Append((100 * lnShare).ToString("0.0", WtInv)).Append("% naleznego zwrotu z 28 dob) - podnosi TYLKO stawke daniny z oszczednosci (podatek 184 od zarobku po staremu)")
-                      .Append("; krolestw w wojnie z brakiem ponad prog ").Append(lnShortK).Append(", ze stawka daniny ponad s ").Append(lnPosK).Append(", bez pomiaru ").Append(lnBlindK);
+                      .Append("; krok daniny tylko przy pomiarze z co najmniej ").Append(LnMinDays).Append(" dob z 7 (po wczytaniu gry stawka stoi do tego czasu)")
+                      .Append("; krolestw w wojnie z brakiem ponad prog ").Append(lnShortK).Append(", ze stawka daniny ponad s ").Append(lnPosK).Append(", z pomiarem krotszym niz ").Append(LnMinDays).Append(" doby ").Append(lnBlindK);
                     if (step) sb.Append("; krok daniny: w gore ").Append(lnUp).Append(", w dol ").Append(lnDown).Append(", bez zmian ").Append(lnHold);
                     sb.Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")
                       .Append(" | potkniecia ").Append(_wtStumbles).Append('.');

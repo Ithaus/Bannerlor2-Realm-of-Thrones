@@ -416,7 +416,7 @@ Uzycie (Python 3, tylko odczyt):
                     W5b (decyzja Jeffa 13.10 "poprawka daniny"): W5b-0 dopiski i klucze (linia W5: skarbiec ponad zapas wojny; linia 184: brak wojska u
                     panow), W5b-1 zamkniecie z nowym zrodlem (suma krolestw = razem = linia 165 = Obieg = kolumna CSV doplata_ze_skarbca_w5b; wyplata
                     <= pula <= 1/tempo nadwyzki i <= niepokryta potrzeba po daninie), W5b-2 skarbiec nigdy ponizej zapasu wojny przez te regule,
-                    W5b-3 brak ponad prog -> stawka daniny rosnie; 0 krolestw z brakiem w 4 ostatnich krokach i stawka 0, W5b-4 ile dala regula 1 i 2
+                    W5b-3 brak ponad prog (pomiar >= 4 doby) -> stawka daniny rosnie o jeden krok; 0 krolestw z brakiem w 4 ostatnich krokach i stawka 0, W5b-4 ile dala regula 1 i 2
                     na krolestwo (INFO), W5b-5 skarbce ponad zapas wojny i powod S (INFO). Log bez paczki: jeden wiersz INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
@@ -15330,27 +15330,38 @@ def w5b_block(rep, lines, start, until, w5, win, kor, obg, rows):
     if act1:
         k184 = {d: _w5b_184(wtx[d]) for d in act1}
         steps = [d for d in sorted(k184) if "krok tygodnia: dzis" in wtx[d]]
-        n_short = n_stuck = 0
+        # recenzja W5b: krok daniny (w gore i w dol) tylko przy pomiarze z co najmniej LN_MIN dob z 7 (KingdomTreasury.LnMinDays - rytm daniny ok. 4 dob,
+        # srednia z 1-3 dob po wczytaniu gry dawalaby falszywy krok); krok w gore to JEDEN krok tygodnia od stawki sprzed kroku (nie dwa, gdy s samo roslo)
+        LN_MIN = 4
+        n_short = n_stuck = n_thin = n_double = 0
         first = None
         for d in steps:
+            stepv = num(r"krok ([\d.]+) pkt co 7 dob", wtx[d], float, None)
             for nm, k in k184[d].items():
-                if not k["war"] or not k["ln"] or k["n"] <= 0 or k["brak"] <= k["prog"]:
+                if not k["war"] or not k["ln"] or k["brak"] <= k["prog"]:
+                    continue
+                if k["n"] < LN_MIN:
+                    n_thin += 1   # brak ponad prog, ale pomiar za krotki (po wczytaniu gry) - stawka stoi z reguly, to nie jest "bez wzrostu"
                     continue
                 n_short += 1
                 if k["sa"] < k["cap"] - 1e-6 and not (k["krok"] is not None and k["krok"] > 0):
                     n_stuck += 1
+                    first = first or (run_day(d, start), nm)
+                if stepv is not None and k["krok"] is not None and k["krok"] > stepv + 1e-6:
+                    n_double += 1
                     first = first or (run_day(d, start), nm)
         zero4 = []
         if len(steps) >= 4:
             last4 = steps[-4:]
             for nm in k184[last4[-1]]:
                 rr = [k184[d].get(nm) for d in last4]
-                if all(r is not None and r["war"] and r["ln"] and r["n"] > 0 and r["brak"] > r["prog"] for r in rr) and rr[-1]["sa"] <= 0:
+                if all(r is not None and r["war"] and r["ln"] and r["n"] >= LN_MIN and r["brak"] > r["prog"] for r in rr) and rr[-1]["sa"] <= 0:
                     zero4.append(nm)
-        rep.add("W5b-3: brak wojska u panow ponad prog w dobie kroku - stawka daniny rosnie (az do pulapu); krolestwa z brakiem ponad prog w 4 ostatnich krokach okna i stawka daniny 0",
-                f"krokow tygodnia {len(steps)}: krolestwo-krokow z brakiem ponad prog {n_short}, bez wzrostu ponizej pulapu {n_stuck}" + (f" (pierwszy {first})" if first else "")
+        rep.add("W5b-3: brak wojska u panow ponad prog w dobie kroku (pomiar >= 4 doby) - stawka daniny rosnie o jeden krok (az do pulapu); krolestwa z brakiem ponad prog w 4 ostatnich krokach okna i stawka daniny 0",
+                f"krokow tygodnia {len(steps)}: krolestwo-krokow z brakiem ponad prog {n_short}, bez wzrostu ponizej pulapu {n_stuck}, wzrost wiekszy niz jeden krok {n_double}"
+                + (f" (pierwszy {first})" if first else "") + f"; brak ponad prog przy pomiarze krotszym niz {LN_MIN} doby (po wczytaniu gry - stawka stoi z reguly) {n_thin}"
                 + f"; po 4 krokach ze stawka 0: {len(zero4)}" + (f" ({', '.join(sorted(zero4)[:5])})" if zero4 else ""),
-                "0 / 0 (krolestwo w wojnie z niepokryta potrzeba nie zostaje bez daniny)", (n_stuck == 0 and not zero4) if steps else None)
+                "0 / 0 / 0 (krolestwo w wojnie z niepokryta potrzeba nie zostaje bez daniny; krok z braku to jeden zwykly krok tygodnia)", (n_stuck == 0 and n_double == 0 and not zero4) if steps else None)
     else:
         rep.add("W5b-3: brak wojska u panow a stawka daniny", "klucz War Aid Follows Lords Shortfall wylaczony, nieczynny albo brak dopisku w linii 184", "brak ponad prog -> stawka daniny rosnie", None)
     # ---- W5b-4 ile dala regula 1 i 2 na krolestwo (INFO), srednia ostatnich 28 dob okna
@@ -15384,7 +15395,7 @@ def w5b_block(rep, lines, start, until, w5, win, kor, obg, rows):
                        + (f", stawka daniny {kk['sa']:.2f}% przy s {kk['s']:.2f}%" if kk.get("ln") else ""))
         rep.add(f"W5b-4: ile dala regula 1 (danina ponad s korony) i regula 2 (skarbiec ponad zapas wojny) na krolestwo, tys. zl/d (srednia ostatnich {len(ds)} dob okna; INFO)",
                 " ; ".join(txt) if txt else "brak krolestw z potrzeba",
-                "INFO - rachunek autora: bieg 120 dob z W5 (d93-120) niepokryte razem ok. 21 tys. zl/d w 9 krolestwach; koniec biegu rocznego bez W5 - potrzeba Iron Islands 24.3, Free Folk 14.4, Ibben 9.1, Qohor 6.7, Pentos 4.6 tys. zl/d", None)
+                "INFO - rachunek z danych (recenzja): bieg 120 dob z W5 bez W5b (d93-120) niepokryte po daninie 21.2 tys. zl/d w 15 krolestwach - z W5b oczekiwane ze skarbcow ok. 18 tys. zl/d i niepokryte ok. 3 tys. (Iron Islands i Free Folk po ok. 2.4 ze skarbca, Ibben 0); koniec biegu rocznego bez P1 i W5 - potrzeba Iron Islands 24.3, Free Folk 14.4, Ibben 9.1, Qohor 6.7, Pentos 4.6 tys. zl/d", None)
     # ---- W5b-5 skarbce ponad zapas wojny i powod S (INFO)
     if tot:
         dd = sorted(tot)
