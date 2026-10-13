@@ -8,12 +8,12 @@ oszczedzac, ale tez wydaja, inwestuja itp. Jak to zrobic w ramach silnika gry, a
 C = `PROJEKT-POZYCZKI-2026-10-13.md` (wszystkie w `docs\kiesa-ludu\`). LOG = `D:\Backup-Bannerlord\logs\2026-10-13-noc34-35\Armoury-2026-10-13_02-15-21.log`
 (bieg roczny 364 doby, WGRANIE 36; `:NNN` = numer linii). LOGK = `...\noc34-35\Armoury-2026-10-13_04-46-00.log` (bieg 120 dob z regula koni roboczych
 K1-3a). CSV = `...\noc34-35\Logs\2026-10-13_02-15-21\` (kiesa-ludu.csv, budzet-rodow.csv, kasy-miast.csv). SRC = kod WGRANIA 36
-(`...\ae222cb7-...\scratchpad\zb\int\Armoury\src`; numery linii z tej kopii - w `Settings.cs` sa o ok. 30-45 wyzsze niz u autorow A/B/C, tresc ta sama).
+(`...\ae222cb7-...\scratchpad\zb\int\Armoury\src`; numery linii z tej kopii - w `Settings.cs` sa o 0-45 linii wyzsze niz u autorow A/B/C, tresc ta sama).
 G = dekompilacja gry, BK = dekompilacja BannerKings. TRIAZ = `docs\test-zbiorczy\TRIAZ-3-bieg-roczny-2026-10-13.md`. SP = `docs\STAN-PRAC.md`.
 E5 = `docs\etap5\PROJEKT-ETAP5-KIESA-LUDU-KASY-MIAST-2026-10-11.md`. PLAN = `docs\PLAN-DO-KONCA-MODA-2026-10-09.md`.
 Skrypty sedziego (do powtorzenia kazdej liczby): `...\dbc3d3d1-...\scratchpad\kiesa\sedzia\v1.py` - `v10.py`.
 **Oznaczenia:** [P] = pomiar z logu albo csv, [S] = rachunek (nie bieg). Kwoty w zl na dobe calego swiata, 1 zl = 1 pens, rok = 364 doby.
-Bieg roczny mierzyl gospodarke WOJENNA (25-28 z 31 krolestw w wojnie przez caly rok); pokoju nie zmierzyl.
+Bieg roczny mierzyl gospodarke WOJENNA (przez wiekszosc roku 25-28 krolestw z ok. 30 w wojnie - LOG, linie "Korona: podatek wojenny ludu (184)"); pokoju nie zmierzyl.
 
 ---
 
@@ -24,7 +24,7 @@ Bieg roczny mierzyl gospodarke WOJENNA (25-28 z 31 krolestw w wojnie przez caly 
 3. Najpierw chleb i zwykle zakupy, potem zapas na czarna godzine (mniej wiecej miesiac zwyklych zakupow) - to jego oszczednosci i nikt ich nie rusza.
 4. Z tego, co ma ponad zapas, najpierw zyje lepiej: kupuje sukno, srebro, klejnoty i lepszy stol z polki swojego miasta, po cenie targu.
 5. Potem doklada do budowy swojego miasta - murow, spichlerza, portu: kupuje drewno i kamien z targu i placi murarzom.
-6. Na koncu, tylko w czasie wojny, oddaje koronie czterdziesta czesc dziennie z tego, co mu zostalo, a korona tego samego dnia placi tym rodom za sluzbe; czego nikt nie wzial, lezy dalej jako oszczednosc.
+6. Na koncu, tylko w czasie wojny, oddaje koronie czterdziesta czesc dziennie z tego, co mu zostalo, a korona tego samego dnia placi tym zlotem rodom za sluzbe; czego nikt nie wzial, lezy dalej jako oszczednosc.
 7. Ta danina to nie nowe prawo: kupcy i wsie placa ja od 04.10, a 09.10 zgodziles sie na podatek wojenny od ludzi - tylko ze dzis lud placi go od zarobku (13 tys. zl dziennie), a jego skrzynie zostaly poza poborem.
 8. Sprawdzilismy trzy pomysly osobno i zaden sam nie wystarcza: zbytkow swiat wytwarza tyle, ze lud wyda na nie najwyzej ok. 60 tys. zl dziennie wiecej (i to niepewne, bo zalezy od karawan); budowa wezmie 10-20 tys., z czego trzy czwarte wraca do miasta jako place; pozyczka dla pana niczego nie zamyka, bo odsetki plyna do ludu.
 9. Dlatego skladamy wszystko, ale wdrazamy od konca: najpierw danina (maly i pewny krok, zamyka obieg od razu), potem budowa, na koncu zbytki (najwieksza zmiana - rusza ceny i karawany, wejdzie dopiero po pomiarze).
@@ -34,7 +34,7 @@ Bieg roczny mierzyl gospodarke WOJENNA (25-28 z 31 krolestw w wojnie przez caly 
 13. Co zobaczysz: w oknie mieszkancow zdanie, ile lud ma oszczednosci i na co je wydal; bogate miasta buduja sie same - w Twoim miescie mieszczanie oplaca budowe, ktora ustawisz na czele kolejki; zbytki drozeja tam, gdzie lud ma pieniadze, wiec oplaca sie kupic klejnoty u zlotnika i zawiezc je do bogatego miasta; w wojnie Twoje miasta placa koronie.
 14. Ile wojska: uczciwie malo - ok. 1.5-2.5 tys. ludzi wiecej (najwyzej 6-7 tys.), a ubylo 31 tys.
 15. Powod: dwa rody na trzy maja pieniadze i niepelne druzyny z innych przyczyn, wiec z kazdych 3 zl, ktore wroca, tylko 1 zl trafia do pana, ktoremu naprawde brakuje na zold - sprawdzilismy, ze tak jest bez wzgledu na to, czy pieniadz idzie przez korone, czy wprost do pana miasta.
-16. Wojsko odbudowuja poprawki z rundy "wojsko" (pulapka rent, kolejnosc zwolnien, kompanie najemne) - sa juz napisane i czekaja na test; ta paczka zamyka obieg pieniadza ludu.
+16. Wojsko odbudowuja poprawki z rundy "wojsko" (pulapka rent, kolejnosc zwolnien, kompanie najemne) - sa juz napisane i w tescie 120 dob daly 101 tys. ludzi zamiast 88 tys., bieg roczny trwa; ta paczka zamyka obieg pieniadza ludu.
 17. Wazne: regula koni roboczych, ktora czeka na te paczke, podnosi nadwyzke ludu o ok. 125 tys. zl dziennie (pomiar 120 dob: 225 zamiast 101 tys. zl dziennie w czwartym miesiacu, skrzynie 32.9 mln zamiast 19.7 mln, wojsko -14.6 tys.); danina jest policzona tak, zeby to zloto wracalo do panow (oszczednosci ponad zapas stana wtedy na ok. 9 mln; bez daniny po 120 dobach bylo ich juz 17 mln i roslo) - dopiero z nia te regule mozna wgrac, co sprawdzimy biegiem 120 dob.
 18. Czego nie wiemy: jak to dziala w pokoju (bieg mial wojne caly rok; dwa male krolestwa bez wojny tez odkladaly), ile zbytkow naprawde dojedzie do bogatych miast i ile zlota osiadzie u bogatych rodow (szacunek: jedna trzecia tego, co wroci) - dlatego pierwszy krok zawiera pomiary.
 19. Koszt dla szybkosci gry: razem ok. 1 ms na dobe.
@@ -87,7 +87,8 @@ Nie sprawdzalem ponownie: udzialow "dokad idzie zloty wydany na zbytki" (A 4.3),
    ale maly. C (danina) zamyka obieg na pewno, tanio i w kazdej skali, ale niczego ludowi nie daje i dziala tylko w wojnie.
 2. **Trzon: danina wojenna z oszczednosci ludu (C, regula R1).** Powody: (a) jako jedyna zamyka obieg z rachunku, nie z nadziei - zapas w rownowadze = nadwyzka / stawka;
    (b) jako jedyna dziala takze przy nadwyzce 3 x wiekszej (regula koni roboczych, poz. 16-17); (c) tor S, bez ruszania cen, towaru i zapisu; (d) to nie nowe
-   prawo, tylko trzeci platnik istniejacej zasady "wojna kosztuje poddanych, kazdy od swojej nadwyzki" (E5 R15, :164).
+   prawo: zasada "wojna kosztuje poddanych, kazdy platnik od swojej podstawy" juz jest (E5 R15, :164) - kupcy i wsie placa od nadwyzki ponad potrzebe, a ludowi
+   wybrano dotad sama podstawe "zarobek", ktora daje 13 tys. zl/d zamiast oczekiwanych 30-60 tys. (E5 :184); dochodzi druga podstawa tego samego platnika.
 3. **Danina stoi jednak na KONCU drabiny, nie na poczatku.** Lud najpierw wydaje (A) i buduje (B), korona bierze z tego, co zostalo. Im wiecej lud potrafi kupic
    i zbudowac, tym mniej zostaje koronie - bez zmiany reguly. To jest odpowiedz na pytanie Jeffa: oszczedzaja, wydaja, inwestuja, placa podatki - po trochu.
 4. **A jest druga noga i jedynym ujsciem pokoju** - wchodzi po pomiarze na sucho, z poprawka z poz. 11. **B jest trzecia noga** - mala liczba, ale naprawia dwie
@@ -250,7 +251,7 @@ Czego lud nie wyda, nie zbuduje i czego korona nie wezmie - zostaje w kiesie. Ni
 | Podzamcze zamku | te same szczeble: danina od kiesy ponad 10 dni, budowa zamku z materialu najblizszego miasta (jak pan), zakupy z listy w miescie targowym (P5) |
 | Wies | danine juz placi (2.5%); lista dostatku w miescie targowym (P5); budowle wsi BK - poza projektem |
 | Krolestwo w pokoju | danina 0 (s spada do zera w 4 tygodnie); dzialaja tylko szczeble 2 i 3. Lokata rosnie do 6-10 mln (dzisiejsze reguly) i czeka na wojne - jak skarb na pierwsza kampanie. Z regula koni roboczych 17-31 mln [S] - patrz rozdz. 10 pkt 2 |
-| Krolestwo w wojnie bez potrzeby (s = 0: w d364 Iron Islands, Free Folk; s = 0.5%: Dothraki, Nocna Straz) | danina 0 albo mala - "korona nie potrzebuje, wiec nie bierze" (decyzja 09.10: stawka wedlug potrzeby). Ich udzial w lokacie: ok. 10% (poz. 4) |
+| Krolestwo w wojnie bez potrzeby (s = 0: w d364 Iron Islands, Free Folk; s = 0.5%: Dothraki, Nocna Straz) | danina 0 albo mala - "korona nie potrzebuje, wiec nie bierze" (decyzja 09.10: stawka wedlug potrzeby, SP :766-:767; LOG :128861). Ich udzial w lokacie: ok. 10% (v2.py: Dothraki 7.1%, Iron Islands 2.5%, Nocna Straz 1.0%) - tam zostaja tylko szczeble 2 i 3 |
 | Rod bez krolestwa, buntownicy | bez daniny (nie ma korony - jak 184) |
 | Osada oblezona | bez daniny (bramka jak 184), bez robot (jak budowy pana) |
 | Osada zmienia pana | danina od nastepnej doby do korony nowego pana; gra czysci kolejke budow, punkty poziomu zostaja |
@@ -378,7 +379,7 @@ zuzyciu, czy AI przy szybkich budowach wybierze same wojskowe.
 3. **Budowa.** Czy mieszczanie maja budowac miasto pana z wlasnej kiesy - takze mury w wojnie i takze w Twoich miastach (Ty ukladasz kolejke)? I czy pan ma przy tym
    dostawac trzecia czesc w gotowce? **Rada: budowa TAK, trzecia NIE** - pan dostaje budowle i nie wydaje na nie wlasnych pieniedzy, a gotowke dla panow niesie danina.
 4. **Zbytki.** Czy bogaty lud ma kupowac klejnoty, aksamit, futra i srebro, a ich cena ma rosnac tam, gdzie lud ma pieniadze (najwyzej do poltorej ceny zwyklej; chleb,
-   piwo, plotno i skora bez zmian)? **Rada: TAK, po pomiarze z pierwszego kroku** - to jedyna czesc, ktora dziala takze w pokoju, i jedyna, ktora daje Ci nowy handel.
+   piwo, plotno i skora bez zmian)? **Rada: TAK, po pomiarze z pierwszego kroku** - to glowne ujscie pieniadza ludu w pokoju i jedyna czesc, ktora daje Ci nowy handel.
 5. **Pomysly "na Twoje slowo".** Pozyczka pana od rady wlasnego miasta (12% rocznie, takze dla Ciebie w menu miasta), karta miejska, sakiewka turniejowa od mieszczan -
    teraz czy pozniej? **Rada: POZNIEJ, po biegu rocznym** - obiegu nie zamykaja (odsetki plyna do ludu), a po daninie mieszczanie maja mniej do pozyczenia.
 6. **Konie robocze.** Regula "mieszczanie kupuja tylko konie robocze" czeka na te paczke i potraja nadwyzke ludu. Wgrywamy ja razem z danina (wtedy stawka czterdziesta
@@ -389,7 +390,8 @@ zuzyciu, czy AI przy szybkich budowach wybierze same wojskowe.
 ## 12. Zaleznosci od innych prac
 
 - **Poprawki wojska rundy 3** (pulapka rent `CrownRentServiceAtMeans`, `CrownRentContactOnlyWhenCalled`, zwolnienia `ReleaseAcrossTiers`, kompanie najemne
-  `MercBkDownPaymentAiOff` i `MercContractPaysMenUnderArms`, blad wezwan `CallToWarBreakRestoresWallet`) - zakodowane i scalone, w tescie 120 dob (SP :1602-:1609).
+  `MercBkDownPaymentAiOff` i `MercContractPaysMenUnderArms`, blad wezwan `CallToWarBreakRestoresWallet`) - zakodowane i scalone (SP :1602-:1609); test 120 dob:
+  wojsko lordow w wojnie 101 144 wobec 88 171 bez nich, rody z lennem bez renty 7.2% (SP :1617-:1619); bieg roczny w toku, niewgrane.
   P1 po nich albo razem z nimi: bez pulapki rent danina Polnocy trafia w calosci do rodow z luzem (poz. 6), a bez poprawki kompanii uwolnione zloto konczy u najemnikow
   (ok. 49 tys. zl/d, TRIAZ O1-4).
 - **P1 to dopracowana "poprawka B" z TRIAZ O1-7** (danina takze z kies ludu; w SP :1605 "do decyzji Jeffa") - nie robic obu.
