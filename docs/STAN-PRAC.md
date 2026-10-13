@@ -1437,3 +1437,16 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   K1-3a krok 2 (mieszczanie tylko konie robocze + czynne ciecie hodowli - decyzja Jeffa 12.10, czeka na liczby), K5 krok 2 (juczne karawan morskich, 325 z niczego / 120 dob).
   **W TOKU:** BIEG 3 = 120 dob na komplecie e9dfa7f (Armoury b2893c27; test\at-e8r2-120.out.txt) - pierwszy bieg O2/O3/O5/O6; triaz biegu 2 (wf_48305665-088).
   Potem jedna runda poprawek (audyt: Net.cs, HorseFate :906 i drobne; triaz 2: karawany E8/G1 i reszta), test koncowy, wgranie.
+- (07:50 UTC 13.10) **TRIAZ BIEGU 2 GOTOWY** (wf_48305665-088): `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md`. **JEDNA PRZYCZYNA ZRODLOWA trzech objawow (czas doby +3.6 s, wojsko
+  lordow < 85 tys., kasy miast -15.6%): KARAWANY NOTABLI SIE MNOZA** - gra daje notablowi kolejna karawane, gdy zadna jego karawana nie ma wlaczonego AI (DefaultCaravanModel.CanHeroCreateCaravan),
+  a nasz nocny oboz wylacza AI spiacym karawanom w polu (NightRest: Ai.DisableForHours). Karawan na notabla w d120: W33 2.80, bieg 1 2.62, bieg 2 4.74 (1570 karawan; gra bez przecieku trzyma 1).
+  To STARY przeciek (jest w W33 - stad "partie 2 319 -> 5 201"), ktory E8/G1 potroilo (karawany nie stoja 3 dob w miescie, wiec spia w polu). Kapital 1 594 karawan zjadl nadwyzki kas miast ->
+  renty panow i korony o polowe nizsze -> mniej wojska. Drugi skladnik czasu: tiki BK otwarte przez E8/G1 1.4-1.7 s/dobe (44 karawany bez wyjazdu tykaja co godzine).
+  Pozostale: Polnoc 10.1 -> 5.8 tys. ludzi (renta korony tylko 2 z 20 rodow przez warunek sluzby), siodla - w wiekszosci krain nikt nie ma w puli zwyklego siodla (25.7 szt./d), zwiad AI
+  0.79 (stale 15/25 -> 10/16), 3 wyjatki skanu IL w QuestPay8; reszta to progi narzedzia albo objawy sprzed etapu 8. NIE odpowiadaja za spadek wojska: F5, E8/W, E8/H, E8/D1/D2/K.
+  **DECYZJA PROWADZACEGO (ekonomia; do potwierdzenia przez Jeffa w raporcie): NotableCaravanCap = 2** (0 = regula gry; 1 = najszybciej, czas ok. W33 i ok. 30% mniej wjazdow karawan niz W33;
+  2 = ok. 750 karawan, ok. 30% wiecej wjazdow niz W33, czas szac. +1.0 s wobec W33 przed optymalizacjami; 3 = poziom W33). E8/G1 zostaje wlaczone z limitem 12 tikow na postoj.
+  **W TOKU: wf_521dc7fa-0d5 - RUNDA POPRAWEK 2** (docs/przekazanie/wf-poprawki-runda-2.js), piec grup rownolegle w drzewach zb\pa..pe od e9dfa7f (galezie w-toku/p2-a..e), autor + recenzent:
+  A karawany (NotableCaravanCap, CaravanTownHourlyMaxTicks, juczne karawan morskich), B siec CrashScribe (Net.cs bez __originalMethod, z testem poza gra), C siodla/konie/renty korony
+  (PlainSaddleEveryRealm, zamowienia siodel, AiSaddleShelfFloor, HorseFate :906 i dorobek startowy, CrownRentServiceAfterFullDays), D drobne z audytu + skan IL QuestPay8 + stale zwiadu,
+  E narzedzie progow. Rownolegle BIEG 3 (120 dob na e9dfa7f, komplet bez poprawek rundy 2). Potem: scalenie p2-a..e do zbior-e8, test koncowy, wgranie.
