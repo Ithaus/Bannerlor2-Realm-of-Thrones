@@ -1501,3 +1501,18 @@ ZATWIERDZONE: Armoury e69adbd3, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
 - (09:20 UTC 13.10) **Bieg kontrolny PO WGRANIU 34 (stan z gry + nowe ustawienia Jeffa; 10 dob nowej kampanii): 10/10, Armoury 0 ERROR, 10.7 s/dobe** (Armoury-2026-10-13_02-10-48.log).
   Linia "CampScene (E7/O2): prefaby dostepne - namioty 5/5, ogniska 3/3, pochodnie 2/2, plot 2/2" JEST (po usunieciu klucza z Armoury.json). Po biegu w grze WGRANIE 34 (md5 sprawdzone),
   ustawienia Diplomacy 91/91/182/364/1000/520 na miejscu. Limit konta na koniec nocy: tydzien ok. 35-40%.
+
+**WGRANIE 35 (13.10 ok. 10:45 UTC; decyzja Jeffa "1. 3" - limit karawan kupca 3):** Armoury 527a9d2b (galaz `noc/wgranie-35` = `w-toku/zbior-e8` ca4aa87: jedyna zmiana wobec WGRANIA 34 to
+domyslna NotableCaravanCap 2 -> 3). Reszta bez zmian: CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233, pliki danych i ustawienia jak w WGRANIU 34.
+Testy: bieg 120 dob z limitem 3 (kod identyczny - diff pusty; Armoury-2026-10-13_01-41-11.log: 120/120, 0 ERROR, 11.9 s/dobe) + zapis 9 dob na wgranym DLL (wczytanie autotest-2026-10-13-0206,
+129/129, 0 ERROR, "Notable Caravan Cap 3" w logu; Armoury-2026-10-13_03-39-09.log). Kopia: `Armoury.dll.bak-2026-10-13-noc35-przed` + `D:\Backup-Bannerlord\wgrane\2026-10-13-noc35-przed`.
+ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
+
+- (10:45 UTC 13.10) **Jeff po raporcie: (1) limit karawan 3 - WGRANE (35); (3) kupcy woza unikaty miedzy miastami - TAK, zostaje jak jest; (2) zalozenia E8/H - "nie rozumiem"
+  -> wyjasnione prostym jezykiem, czeka na odpowiedz; (4) mieszczanie i konie robocze - "wyjasnij czemu robocze i po co kupuje te konie" -> wyjasnione, czeka na odpowiedz.**
+- (10:45 UTC 13.10) **BIEG ROCZNY na WGRANIU 34 (limit 2; 364 doby nowej kampanii): 364/364, Armoury 0 ERROR, srednio 13.0 s/dobe**, log Armoury-2026-10-13_02-15-21.log (113 MB), zapis
+  autotest-2026-10-13-0335.sav; progi z oknem 364: SCRATCH(dbc3d3d1)\test\progi-rok364\ (NIE: etap2 3, etap4 3, etap5 25, etap8 6). **W pierwszym roku NIE MA ZIMY** (narzedzie: "363 doby
+  bez zimy") - proba zimy wymaga osobnego biegu. **NAJWAZNIEJSZE: wojsko lordow w wojnie spada w ciagu roku do 64 013 (srednia ostatnich 28 dob; ostatnia doba 62 043; w dobach 90-120
+  bylo 93 392; podloga etapu 2: 85 tys.)** - przyczyna nieznana, do rozpoznania przed dalszymi zmianami. Dobre: kasy miast d364 10.86 mln (105.8% Z33 d120), rody na minusie 159 (Z33 197),
+  jezdzcy z koniem bez uprzezy w calym roku 8.3% (prog 10 - podaz siodel nadgania), jazda z para 5.76% ludzi (partie rodow 8.85%), nasze mody 1.33 s/dobe, takt doby mediana 354 ms.
+  Zle: miasta bez zelaza 41.4 (W33 27), jazda t3+ 64% celu K3 po roku (cel >= 90%), karawan 439 w d364 (limit 2).
