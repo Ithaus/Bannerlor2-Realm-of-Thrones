@@ -59,7 +59,7 @@ namespace Armoury
             CStrazPieszyElita = 57, CStrazBrakPuli = 58, CWolneZwykle = 59, CWolneBojowe = 60, CWolneSzlachetne = 61,
             // sklad9-p (przeglad sklad9, uwaga 5b): swiezy konny ochotnik t2+ bez kupionego konia ZOSTAJE (wariant lagodny 171) - nie "cofniety"
             COchotnikZostaje = 62,
-            // F5 (K3-3): wizyta bez zakupu, bo skonczyl sie przydzial sprzetu rodu (kiesa pana by starczyla) - osobno od "brak zlota"
+            // F5 (K3-3): wizyta bez zakupu, bo skonczyl sie przydzial sprzetu rodu (kiesa pana by starczyla) - osobno od "brak zlota"; recenzja F5: takze "za drogie" przy budzecie wyznaczonym przez przydzial (osobno od "za drogie" z kiesy)
             CNieudanePrzydzial = 63;
         private const int N = 64;
         private const string Header = "dzien;krolestwo;konni;wszyscy;czeka;odrzucone;skret;przyciete;wykonane;do_zbrojowni;przepadlo;kupione;zloto;"
@@ -201,7 +201,7 @@ namespace Armoury
             if (!On || mp == null) return;
             string key = KeyOfParty(mp.Party);
             if (kind == FailNoGold) { Add(key, CNieudaneZloto, 1); return; }
-            if (kind == FailNoShare) { Add(key, CNieudanePrzydzial, 1); return; }   // F5 (K3-3): wyczerpany przydzial sprzetu rodu - nie "brak zlota" i nie "brak koni"
+            if (kind == FailNoShare) { Add(key, CNieudanePrzydzial, 1); return; }   // F5 (K3-3): wyczerpany albo za maly na najtanszego konia przydzial sprzetu rodu - nie "brak zlota" i nie "brak koni"
             Add(key, CNieudaneBrak, 1);   // suma trzech ponizej (kolumna z projektu 4.2)
             Add(key, kind == FailTooDear ? CNieudaneDrogie : kind == FailShelfReserved ? CNieudaneRezerwa : CNieudanePusto, 1);
         }

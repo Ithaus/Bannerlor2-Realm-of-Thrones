@@ -908,7 +908,7 @@ namespace Armoury
                 }
 
                 int marketAllow = 0, fromMarket = 0, toVillages = 0;
-                bool gearRule = false;   // F5 (K3-3): zwykly zakup tej partii idzie z przydzialu sprzetu rodu (166) - po zakupie GearSpent
+                bool gearRule = false, shareBound = false;   // F5 (K3-3): gearRule - zwykly zakup tej partii idzie z przydzialu sprzetu rodu (166), po zakupie GearSpent; shareBound (recenzja F5) - budzet postoju wyznaczyl przydzial rodu, nie kiesa pana
                 if (!castle && need > 0)
                 {
                     int purse = lord.Gold;
@@ -925,7 +925,7 @@ namespace Armoury
                         int fromPurse = (int)(Math.Max(0, purse - Math.Max(0, c.AiGearGoldReserve)) * MBMath.ClampFloat(c.AiMountGearPurseShare, 0f, 1f));
                         budget = Math.Min(gearLeft, fromPurse);
                         noShare = gearLeft < 50 && fromPurse >= 50;   // kiesa by starczyla - skonczyl sie przydzial rodu (osobna przyczyna w pomiarze, nie "brak zlota")
-                        CavalryTemplate.NotePlainStop(gearLeft < fromPurse, budget >= 50 ? 0 : noShare ? 1 : 2);
+                        shareBound = gearLeft < fromPurse; CavalryTemplate.NotePlainStop(shareBound, budget >= 50 ? 0 : noShare ? 1 : 2);
                     }
                     else budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
                     if (budget < 50) { if (bought <= 0) { HorseCensus.OnLordBuyFailed(party, noShare ? HorseCensus.FailNoShare : HorseCensus.FailNoGold); return; } }
@@ -1016,7 +1016,8 @@ namespace Armoury
                     // 175.0 + przeglad 175: brak koni rozdzielony (decyzja 4.3 rozroznia "brakuje koni na rynku" i "lordowie za biedni"):
                     // za drogie (byly konie, najtanszy ponad budzet), polka zarezerwowana (konie na polce, ale AiMountMarketSharePercent /
                     // AiMountShelfFloor nie dopuszczaja ani sztuki, a wsie nic nie daly), pusto (ani na polce, ani we wsiach)
-                    HorseCensus.OnLordBuyFailed(party, tooDear ? HorseCensus.FailTooDear : (!castle && shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
+                    // recenzja F5 (kolizja 3e do konca): "za drogie" przy budzecie wyznaczonym przez przydzial rodu (przydzial 50+ zl, ale mniejszy niz udzial kiesy i niz najtanszy kon) to brak przydzialu, nie bieda pana - inaczej prog "za drogie" wskazywalby krok 2 (placi glowa W GRANICACH przydzialu), ktory tego nie naprawi. Sam pomiar.
+                    HorseCensus.OnLordBuyFailed(party, tooDear ? (shareBound ? HorseCensus.FailNoShare : HorseCensus.FailTooDear) : (!castle && shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
                     return;
                 }
                 _lastBuy[pid] = today;

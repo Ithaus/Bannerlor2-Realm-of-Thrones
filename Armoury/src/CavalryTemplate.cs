@@ -351,7 +351,7 @@ namespace Armoury
                   .Append(", z targu ").Append(_dMarket[0]).Append('/').Append(_dMarket[1]).Append('/').Append(_dMarket[2])
                   .Append(", za ").Append(_dGold).Append(" zl (budzet sprzetu ").Append(_dGoldGear).Append("); postoje z rycerzami ").Append(_dKnVisits)
                   .Append(" (bez zlota ").Append(_dKnNoGold).Append(')')
-                  .Append(" | zwykle konie z przydzialu sprzetu rodu (F5): ").Append(s.AiMountGearPurseShare > 0f ? "CZYNNE udzial kiesy ponad rezerwe " + s.AiMountGearPurseShare.ToString("0.00", inv) : "WYLACZONE")
+                  .Append(" | zwykle konie z przydzialu sprzetu rodu (F5): ").Append(s.AiMountGearPurseShare <= 0f ? "WYLACZONE" : !ClanBudget.On ? "NIECZYNNE (wymaga budzetu rodow 166 - ClanBudgetEnabled)" : "CZYNNE udzial kiesy ponad rezerwe " + s.AiMountGearPurseShare.ToString("0.00", inv))
                   .Append(", postoje ").Append(_dPlStops).Append(" (budzet wyznaczyl przydzial ").Append(_dPlByShare).Append(", kiesa ").Append(_dPlStops - _dPlByShare - _dPlNoShare - _dPlNoGold)
                   .Append("; bez budzetu: brak przydzialu ").Append(_dPlNoShare).Append(", brak zlota ponad rezerwe ").Append(_dPlNoGold)
                   .Append("), zdjete z przydzialu ").Append(_dPlGold).Append(" zl; rycerze zatrzymani rezerwa kiesy ").Append(_dKnReserve)
