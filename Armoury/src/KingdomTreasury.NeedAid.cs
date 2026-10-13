@@ -31,6 +31,9 @@ namespace Armoury
     ///    (ClanIncomeBook go nie widzi: nie jest dochodem, z ktorego liczy sie dwor, sprzet, budowy, limit Banku ani splata dlugu z jednorazowych).
     ///    Zwolnienia 166 rodu z doplata licza nadwyzke druzyn ponad pulap partii z doplata (nadwyzka zoldu zalog ponad pulap wlasny nie zwalnia ludzi
     ///    oplaconych przez korone); nowa druzyna i "sluzba na miare srodkow" dalej wedlug pulapu wlasnego.
+    ///    Recenzja W5: zold oplacony gotowka korony NIE liczy sie do zoldu, ktoremu ustepuje dwor (ClanBudget.Court) i niewydany przydzial sprzetu
+    ///    (CourtFull.Take, E5/A2) - obie reguly pytaja o zold, ktory rod placi SAM (b.AidCash). Bez tego rod z doplata i kiesa ponad rezerwe przestawalby
+    ///    wplacac niewydany sprzet do kasy siedziby (zatrzymywalby go w kiesie, a zold placilaby mu korona) - W5 zmienialoby po cichu regule E5/A2.
     ///  - 1 ZL = 1 ZL ZOLDU: zold oplacony doplata nie jest podstawa zwrotu 70% nastepnej doby (NeedAidRefundCut w WageRefund) - korona nie placi za tego
     ///    samego czlowieka 100% i jeszcze 70%.
     /// Platnik -> odbiorca: Kingdom.KingdomBudgetWallet -> kiesa glowy rodu (najpierw skarbiec, potem glowa; wyjatek = zloto wraca). Renty 180 maleja o to,
@@ -230,13 +233,23 @@ namespace Armoury
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(wyplata)", e); }
                 }
-                if (paidK > 0)
-                {
-                    CrownIncome.Spent(k, paidK);                          // doplata schodzi z reszty wplywow dnia; reszta garnka zostaje do rent tej doby
-                    day.NeedAid += paidK;
-                }
             }
             catch (Exception e) { NaStumble("NeedAidKingdom", e); }
+            finally
+            {
+                // recenzja W5: ksiegowanie wyplaty ZAWSZE, takze po wyjatku w polowie petli - zloto, ktore zeszlo ze skarbca, musi zejsc z reszty wplywow
+                // dnia (inaczej renty tej doby dzielilyby te same pieniadze drugi raz - z zapasu skarbca) i trafic do linii 165
+                if (paidK > 0)
+                {
+                    try
+                    {
+                        CrownIncome.Spent(k, paidK);                      // doplata schodzi z reszty wplywow dnia; reszta garnka zostaje do rent tej doby
+                        var dk = CrownIncome.DayOf(k);
+                        if (dk != null) dk.NeedAid += paidK;
+                    }
+                    catch (Exception e) { NaStumble("NeedAidKingdom(ksiega)", e); }
+                }
+            }
             return paidK;
         }
 
@@ -249,6 +262,20 @@ namespace Armoury
                 double b;
                 if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_naBoost.TryGetValue(c, out b)) return 0;
                 return b > 0 ? b : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>ClanBudget.Daily (recenzja W5): GOTOWKA korony dla rodu z dzisiejszego kroku W5 - zold druzyn, ktory dzis placi korona (bez miejsca na
+        /// werbunek). Budzet odejmuje ja od zoldu rodu tam, gdzie regula pyta "ile zoldu rod placi sam" (dwor i niewydany sprzet ustepujace zoldowi, pomiar
+        /// rodow z luzem). 0 - bez wyplaty, klucz wylaczony albo krok dzis nie biegl.</summary>
+        internal static long NeedAidCashOf(Clan c)
+        {
+            try
+            {
+                long p;
+                if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_naPaid.TryGetValue(c, out p)) return 0;
+                return p > 0 ? p : 0;
             }
             catch { return 0; }
         }

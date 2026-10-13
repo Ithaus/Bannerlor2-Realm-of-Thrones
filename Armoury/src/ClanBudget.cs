@@ -66,6 +66,7 @@ namespace Armoury
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap
+            public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja)
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -227,7 +228,10 @@ namespace Armoury
                 var c = kv.Key; var b = kv.Value;
                 if (c == null || b == null || !b.Today || c.IsEliminated || c.Leader == null) continue;
                 long g = Math.Max(0, c.Leader.Gold);
-                int i = c.IsUnderMercenaryService ? 4 : (b.Zero || !(b.Cap > 0)) ? 3 : (b.WPar + b.WGar + b.WCar >= 0.95 * b.Cap ? 0 : 1);
+                // recenzja W5: pomiar na pulapie WLASNYM i zoldzie, ktory rod placi sam (bez przydzialu i gotowki korony) - rod z doplata zostaje "na pulapie",
+                // a nie przechodzi do "z luzem" przez miejsce na werbunek dane przez korone; bez doplaty (Aid = 0) co do rodu jak dotad
+                double capOwn = b.Cap - b.Aid;
+                int i = c.IsUnderMercenaryService ? 4 : (b.Zero || !(capOwn > 0)) ? 3 : (b.WPar + b.WGar + b.WCar - b.AidCash >= 0.95 * capOwn ? 0 : 1);
                 n[i]++; gold[i] += g;
                 if (i == 1 && b.War) { n[2]++; gold[2] += g; }
             }
@@ -494,11 +498,12 @@ namespace Armoury
                         // (takze u rodu, ktoremu zalogi zajely caly pulap: druzyny dostaja dokladnie przydzial) i pulap rodu o te sama kwote. Nie wchodzi do D, wiec
                         // dwor, sprzet, budowy, kredyt wojenny i limit Banku licza sie jak bez doplaty. Liczniki wyzej (ponad pulapem partii, zalogi zajely pulap) -
                         // wedlug pulapu wlasnego, jak dotad. Klucz wylaczony albo rod bez przydzialu = 0 i budzet co do zlotowki jak przed paczka.
-                        b.Aid = 0;
+                        // Recenzja W5: AidCash = gotowka korony w tym przydziale (zold, ktorego rod nie placi sam) - Court, CourtFull.Take i SlackGold odejmuja ja od zoldu rodu.
+                        b.Aid = 0; b.AidCash = 0;
                         if (!b.Zero && !merc && b.War)
                         {
                             double aid = KingdomTreasury.NeedAidBoostOf(c);
-                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; }
+                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)KingdomTreasury.NeedAidCashOf(c))); }
                         }
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
@@ -727,7 +732,8 @@ namespace Armoury
             // dworu (CapBase) nie zajal; Straz bez zoldu - zold nominalny (ten sam, ktorym liczony jest pulap w ludziach)
             if (b.CourtRoom > 0 && share > 0)
             {
-                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar;
+                // recenzja W5: zold, ktory rod placi SAM - bez czesci oplaconej dzis gotowka korony (b.AidCash; 0 bez doplaty i przy wylaczonym kluczu)
+                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash;
                 double used = Math.Min(share, Math.Max(0, wageNow - b.CapBase));
                 if (used > 0) { share -= used; _dCourtYield += (long)used; _dCourtYieldN++; }
             }

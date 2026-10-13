@@ -412,6 +412,7 @@ Uzycie (Python 3, tylko odczyt):
                     liniach 165 i Obieg), garnek <= danina dnia, gotowka tylko rodom na pulapie (linia; z CSV niezaleznie), wypelnienie druzyn rodow
                     z doplata od >= 28 dob rosnie, zold oplacony doplata poza podstawa zwrotu, potkniecia, druzyny lordow w wojnie (INFO z celem
                     85 tys. w biegu rocznym), liczby paczki i krolestwa bez garnka (INFO). Log bez paczki: INFO, bez wyjatku.
+                    Recenzja: W5-9 (INFO, z CSV) zold na czlowieka i wypelnienie rodow z doplata wobec pozostalych rodow z lennem w wojnie.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -14993,6 +14994,31 @@ def w5_main(logp, start_arg, until=120, csvp=None):
         rep.add("W5-3b: rodo-doby z doplata, w ktorych zold druzyn < 90% pulapu wlasnego druzyn (budzet-rodow.csv - niezaleznie od linii)",
                 f"{slack} z {len(aided)} ({100.0 * slack / len(aided):.1f}%); doplata w CSV razem {cash:.0f} zl",
                 "<= 5% (pulap wlasny z budzetu tej samej doby, krok korony liczy od budzetu z wczoraj)", slack <= 0.05 * len(aided))
+        # ---- W5-9 (recenzja, INFO): czy miejsce w pulapie idzie w ludzi, czy w awanse - zold na czlowieka rodow z doplata wobec pozostalych rodow
+        # z lennem w wojnie (ostatnie 28 dob CSV z doplata); korona placi po sredniej stawce rodu, bez limitu stawki
+        try:
+            days9 = sorted({int(r.get("dzien") or 0) for r in aided})[-28:]
+            dset = set(days9)
+            ids = {(int(r.get("dzien") or 0), r.get("rod_id")) for r in aided}
+            aw = am = al = ow = om = ol = 0.0
+            for r in rows:
+                try:
+                    d9 = int(r.get("dzien") or 0)
+                except ValueError:
+                    continue
+                if d9 not in dset or r.get("wojna") != "1" or r.get("rodzaj") not in ("miasto", "zamek"):
+                    continue
+                if (d9, r.get("rod_id")) in ids:
+                    aw += fv(r, "zold_partii"); am += fv(r, "ludzi_partie"); al += fv(r, "limit_partii")
+                else:
+                    ow += fv(r, "zold_partii"); om += fv(r, "ludzi_partie"); ol += fv(r, "limit_partii")
+            if am > 0 and om > 0:
+                n9 = max(1, len(days9))
+                rep.add(f"W5-9: zold na czlowieka rodow z doplata wobec pozostalych rodow z lennem w wojnie (budzet-rodow.csv, ostatnie {len(days9)} dob z doplata; INFO)",
+                        f"z doplata {aw / am:.2f} zl ({am / n9:.0f} ludzi, {100.0 * am / al if al else 0:.1f}% limitu), pozostale {ow / om:.2f} zl ({om / n9:.0f} ludzi, {100.0 * om / ol if ol else 0:.1f}% limitu)",
+                        "INFO - bieg roczny bez paczki: rody na pulapie 7.0 zl i 37% limitu, rody z luzem 4.5 zl i 60%; stawka rodow z doplata rosnaca przy stojacym wypelnieniu = miejsce zjadaja awanse", None)
+        except Exception as e:   # wiersz pomocniczy nigdy nie wywraca grupy
+            rep.add("W5-9: zold na czlowieka rodow z doplata (budzet-rodow.csv; INFO)", f"nie policzono ({type(e).__name__})", "INFO", None)
     else:
         rep.add("W5-3b: doplata tylko rodom na pulapie (budzet-rodow.csv)", "brak CSV albo kolumny doplata_w5 bez wyplat" if rows else f"brak CSV ({csvp})",
                 "<= 5% rodo-dob z doplata ma zold druzyn < 90% pulapu wlasnego", None)
