@@ -420,6 +420,8 @@ Uzycie (Python 3, tylko odczyt):
                     suma krolestw; te same kwoty w liniach 165 i Obieg; W6-1b z CSV: suma kolumn rodow = linia), pobrane <= nalezne i <= niepokryta
                     potrzeba (W6-2), platnik nie jest odbiorca i nie placi ponizej rezerwy (W6-3 linia, W6-3b CSV), potkniecia (W6-4), liczby
                     paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
+                    Recenzja: W6-3b liczy rezerwe z kolumny nadwyzka_ponad_rezerwe_w6 (rezerwa BUDZETU 166 przed poborem), nie z kolumny R
+                    (R w CSV = rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza - na biegu rocznym 3.7% platnikow mialoby kiese pod nia).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -15331,11 +15333,24 @@ def w6_main(logp, start_arg, until=120, csvp=None):
                 f"dob porownanych {len(cmpd)}, z rozjazdem {len(badc)}" + (f" (doby {badc[:5]})" if badc else ""),
                 "0 rozjazdow (platnik -> skarbiec -> odbiorca, ta sama kwota po obu stronach)", (not badc) if cmpd else None)
         both = sum(1 for r in payers if fv(r, "doplata_w5") > 0 or fv(r, "podniesienie_pulapu_w5") > 0)
-        below = sum(1 for r in payers if fv(r, "G") < fv(r, "R"))
         overb = sum(1 for r in payers if fv(r, "tarczowe_w6") > fv(r, "podstawa_tarczowego_w6") + 1)
-        rep.add("W6-3b: rodo-doby platnikow w budzet-rodow.csv - z doplata W5 tej samej doby / z kiesa rodziny na koniec doby ponizej rezerwy / z tarczowym ponad podstawe",
-                f"{both} / {below} ({100.0 * below / len(payers):.1f}%) / {overb} z {len(payers)} rodo-dob; tarczowe w CSV razem {sum(fv(r, 'tarczowe_w6') for r in payers):.0f} zl",
-                "0 / <= 2% (kiesa w CSV jest z konca doby - po dworze i zoldzie; pobor zostawia co najmniej 44/45 nadwyzki) / 0", both == 0 and overb == 0 and below <= 0.02 * len(payers))
+        # recenzja: rezerwa reguly to rezerwa BUDZETU 166 (od dochodu stalego) - kolumna nadwyzka_ponad_rezerwe_w6 = kiesa rodziny minus ta rezerwa PRZED
+        # poborem. Kolumna R tego pliku liczy rezerwe od D z 28 dob ksiegi (zwykle wyzsza), wiec "G < R" nie jest miara reguly - zostaje jako INFO.
+        has_sur = "nadwyzka_ponad_rezerwe_w6" in rows[0]
+        rytm = None
+        for d in sorted(on, reverse=True):
+            rytm = num(r"najwyzej 1/(\d+) nadwyzki kiesy rodziny", w6[d])
+            if rytm:
+                break
+        rytm = rytm or 45
+        below = sum(1 for r in payers if has_sur and fv(r, "tarczowe_w6") > fv(r, "nadwyzka_ponad_rezerwe_w6"))
+        fast = sum(1 for r in payers if has_sur and fv(r, "tarczowe_w6") > fv(r, "nadwyzka_ponad_rezerwe_w6") / rytm + 1)
+        blr = sum(1 for r in payers if fv(r, "G") < fv(r, "R"))
+        rep.add(f"W6-3b: rodo-doby platnikow w budzet-rodow.csv - z doplata W5 tej samej doby / z tarczowym ponad nadwyzke kiesy nad rezerwa budzetu (pobor z rezerwy) / ponad 1/{rytm} tej nadwyzki / ponad podstawe",
+                (f"{both} / {below} / {fast} / {overb}" if has_sur else f"{both} / brak kolumny nadwyzka_ponad_rezerwe_w6 / - / {overb}")
+                + f" z {len(payers)} rodo-dob; tarczowe w CSV razem {sum(fv(r, 'tarczowe_w6') for r in payers):.0f} zl"
+                + f"; INFO: kiesa na koniec doby ponizej R z kolumny CSV (rezerwa od D z 28 dob, nie budzetu) w {blr} ({100.0 * blr / len(payers):.1f}%)",
+                "0 / 0 / 0 / 0 (nikt nie placi z rezerwy ani szybciej, niz budzet sam uwalnia nadwyzke)", both == 0 and overb == 0 and below == 0 and fast == 0)   # CSV bez kolumny nadwyzki: sam wynik doplaty i podstawy
     else:
         rep.add("W6-1b / W6-3b: platnicy w budzet-rodow.csv", ("brak kolumny tarczowe_w6 (CSV sprzed paczki)" if rows and not has_col else "brak wierszy z tarczowym" if rows else f"brak CSV ({csvp})"),
                 "suma kolumn = linia; platnik bez doplaty W5 i nie ponizej rezerwy", None)
@@ -15360,7 +15375,7 @@ def w6_main(logp, start_arg, until=120, csvp=None):
                 f"platnikow {av(0):.0f} z {av(1):.0f} ocenianych, podstawa {av(2) / 1e3:.1f} tys. zl/d, nalezne {av(4) / 1e3:.1f} tys., niepokryta potrzeba po daninie {av(5) / 1e3:.1f} tys."
                 f", do pobrania {av(6) / 1e3:.1f} tys., pobrane = wyplacone {av(7) / 1e3:.1f} tys. zl/d ({av(11):.0f} rodow, {(100.0 * av(7) / av(4) if av(4) else 0):.0f}% naleznego)"
                 + (f"; doplata W5 z daniny {sum(w5p) / len(w5p) / 1e3:.1f} tys. zl/d" if w5p else ""),
-                "INFO - szacunek: bieg 120 dob (d93-120) nalezne ok. 80 tys., pobrane do ok. 9 tys. zl/d (potrzeba mala, danina duza); koniec roku nalezne ok. 60 tys., pobrane 19-27 tys. zl/d", None)
+                "INFO - szacunek recenzji: bieg 120 dob (d93-120) nalezne 60-75 tys., pobrane do ok. 8 tys. zl/d (potrzeba mala, danina duza); koniec roku (po roku poboru) nalezne 33-45 tys., pobrane 9-19 tys. zl/d", None)
         # ---- W6-7 krolestwa bez pomocy (INFO)
         last = [k for k in _w6_kingdoms(w6[ds[-1]]) if "bad" not in k]
         nopay = sorted(((k["unc"], k["name"]) for k in last if k["unc"] > 0 and k["payn"] == 0), reverse=True)

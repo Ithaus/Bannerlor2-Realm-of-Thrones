@@ -36,8 +36,9 @@ namespace Armoury
     /// Platnik -> odbiorca: kiesa glowy rodu platnika -> Kingdom.KingdomBudgetWallet -> kiesa glowy rodu z doplata W5 (ta sama doba, ta sama kwota). Gotowka z
     /// tarczowego jest gotowka W5: znaczona na druzyny (przydzial w pulapie, nie w D), poza podstawa zwrotu 70% nastepnej doby, poza zoldem, ktoremu ustepuje
     /// dwor. Zapis gry: nic nowego (stan doby w pamieci sesji). Linia doby "Tarczowe (W6): dzien N" (z ArmouryBehavior po linii W5); kolumny budzet-rodow.csv
-    /// tarczowe_w6, podstawa_tarczowego_w6, doplata_z_tarczowego_w6. Wyjatek per krolestwo / per rod - licznik potkniec (pierwszy do pliku), bez globalnych
-    /// wylacznikow (CLAUDE.md 7).
+    /// tarczowe_w6, podstawa_tarczowego_w6, doplata_z_tarczowego_w6, nadwyzka_ponad_rezerwe_w6 (recenzja: nadwyzka kiesy platnika ponad rezerwe BUDZETU przed
+    /// poborem - kolumna R tego pliku to rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza niz rezerwa budzetu od dochodu stalego, wiec nie jest miara reguly).
+    /// Wyjatek per krolestwo / per rod - licznik potkniec (pierwszy do pliku), bez globalnych wylacznikow (CLAUDE.md 7).
     /// </summary>
     internal static partial class KingdomTreasury
     {
@@ -51,6 +52,7 @@ namespace Armoury
 
         private static readonly Dictionary<Clan, long> _scPaid = new Dictionary<Clan, long>();       // platnik -> tarczowe tej doby (CSV)
         private static readonly Dictionary<Clan, double> _scBase = new Dictionary<Clan, double>();   // platnik -> podstawa tej doby (CSV)
+        private static readonly Dictionary<Clan, double> _scSur = new Dictionary<Clan, double>();    // platnik -> nadwyzka kiesy rodziny ponad rezerwe wojenna budzetu przed poborem (CSV)
         private static readonly Dictionary<Clan, long> _scCash = new Dictionary<Clan, long>();       // odbiorca -> gotowka W5 ze szczebla tarczowego tej doby (CSV)
         private static readonly List<ScK> _scRows = new List<ScK>();
         private static readonly HashSet<string> _scErr = new HashSet<string>();
@@ -73,7 +75,7 @@ namespace Armoury
         /// <summary>Nowa doba kroku W5 (NaRoll): stan doby tarczowego znika razem z przydzialami W5.</summary>
         private static void ScClearDay()
         {
-            _scPaid.Clear(); _scBase.Clear(); _scCash.Clear(); _scRows.Clear();
+            _scPaid.Clear(); _scBase.Clear(); _scSur.Clear(); _scCash.Clear(); _scRows.Clear();
             _scSeen = _scNoBudget = _scNoParty = _scNoBase = _scNeed = _scNoSurplus = _scNoDue = _scCapSur = _scCapHead = _scCapCeil = 0;
             _scPayerAided = _scBelowReserve = _scNotAtCap = 0;
         }
@@ -148,7 +150,7 @@ namespace Armoury
                         if (d <= 0) { _scNoDue++; continue; }
                         sc.P.Add(new ScP { C = c, Base = bas, Sur = sur, Reserve = reserve, Due = d });
                         sc.Due += d; sc.Base += bas; sc.Sur += sur; sc.PayN++;
-                        _scBase[c] = bas;
+                        _scBase[c] = bas; _scSur[c] = sur;
                     }
                     catch (Exception e) { ScStumble("ScutagePlan(rod)", e); }
                 }
@@ -289,21 +291,23 @@ namespace Armoury
             }
         }
 
-        /// <summary>Kolumny budzet-rodow.csv (ostatnie - czytniki po nazwach): tarczowe zaplacone przez rod tej doby, jego podstawa i - u odbiorcy - czesc
-        /// gotowki W5 (kolumna doplata_w5), ktora przyszla z tarczowego.</summary>
-        internal const string ScutageCsvHeader = ";tarczowe_w6;podstawa_tarczowego_w6;doplata_z_tarczowego_w6";
+        /// <summary>Kolumny budzet-rodow.csv (ostatnie - czytniki po nazwach): tarczowe zaplacone przez rod tej doby, jego podstawa, u odbiorcy czesc
+        /// gotowki W5 (kolumna doplata_w5), ktora przyszla z tarczowego, i (recenzja) nadwyzka kiesy rodziny platnika ponad rezerwe wojenna budzetu PRZED
+        /// poborem (w dol do zlotowki) - prog "nikt nie placi z rezerwy i nie wiecej niz 1 / WarChestDays nadwyzki" liczony z pliku niezaleznie od linii.</summary>
+        internal const string ScutageCsvHeader = ";tarczowe_w6;podstawa_tarczowego_w6;doplata_z_tarczowego_w6;nadwyzka_ponad_rezerwe_w6";
 
         internal static string ScutageCsv(Clan c)
         {
             try
             {
-                if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays) return ";;;";
-                long p, r; double b;
-                bool hp = _scPaid.TryGetValue(c, out p), hb = _scBase.TryGetValue(c, out b), hr = _scCash.TryGetValue(c, out r);
-                if (!hp && !hb && !hr) return ";;;";
-                return ";" + (hb ? (hp ? p : 0).ToString(WtInv) : "") + ";" + (hb ? Math.Round(b).ToString("0", WtInv) : "") + ";" + (hr ? r.ToString(WtInv) : "");
+                if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays) return ";;;;";
+                long p, r; double b, su;
+                bool hp = _scPaid.TryGetValue(c, out p), hb = _scBase.TryGetValue(c, out b), hr = _scCash.TryGetValue(c, out r), hs = _scSur.TryGetValue(c, out su);
+                if (!hp && !hb && !hr) return ";;;;";
+                return ";" + (hb ? (hp ? p : 0).ToString(WtInv) : "") + ";" + (hb ? Math.Round(b).ToString("0", WtInv) : "") + ";" + (hr ? r.ToString(WtInv) : "")
+                       + ";" + (hb && hs ? Math.Floor(su).ToString("0", WtInv) : "");
             }
-            catch { return ";;;"; }
+            catch { return ";;;;"; }
         }
 
         private static string ScPct(double level) { return level >= 0 ? (100 * level).ToString("0.0", WtInv) + "%" : "-"; }
