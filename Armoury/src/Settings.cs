@@ -1453,6 +1453,10 @@ namespace Armoury
         // porownaniem zamiast refleksji, nazwa linii i lista zakazanych z pamieci, mnoznik polki raz na koszyk w rankingu; co 64. trafienie pamieci liczone tez
         // stara droga (R9). Potrzeby sztuki, dniowka i poziom plac miasta licza sie na zywo, jak dotad. Linia doby "Warsztaty bez powtorzen (E8/O2)"; off = jak dotad
         public bool WorkshopLawFast = true;                // the town workshops that make arms and armour do the same reckoning with less work for the game: the pull of the stall is reckoned once for each kind of piece instead of once for every piece, and what a workshop has in hand is looked up directly - the same pieces, prices and wages as before. Off: the old way
+        // E8/O3 (267, PLAN 8.17; RD8 K4 / O3): wywoz kupcow (SupplyDemand.DailyTradeCore) - cele w zasiegu kazdego zrodla z pamieci z kluczem (TradeExportMemo.cs: zbior osad,
+        // ich pozycje i zasieg sprawdzane przy kazdym wywozie), popyt osady i mnoznik ceny raz na osade w koszyku; co 64. wybor celu liczony tez stara droga (R9).
+        // Linia doby "Wywoz kupcow (E8/O3)"; off = jak dotad
+        public bool TradeExportFast = true;                // the merchants who carry surplus arms between towns pick the same buyers with less work for the game: which towns lie within reach of each town is remembered instead of measured anew for every cartload, and what a town wants of each kind of piece is reckoned once for the day's round instead of once for every cartload - the same pieces, buyers and prices as before. Off: the old way
         public bool TownMaterialOrderBySea = true;         // a town short of a raw material may also hire a merchant ship in a port that has it to spare: the sea leg costs a quarter of the same distance by road, and the ship can be taken by pirates
         public float TownMaterialOrderSeaMaxRoute = 1000f; // longest sea voyage (map distance) for such an order - about two weeks under sail
         public bool TownMaterialOrderFromPacks = true;     // a caravan that already carries the material may take the order and deliver it, if that pays better than selling it where it stands

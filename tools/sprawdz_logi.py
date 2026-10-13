@@ -247,6 +247,12 @@ Uzycie (Python 3, tylko odczyt):
                     (Z33 806; podzial z planem doby / kolejne - INFO); O2-3 zapis -> wczytanie: sztuk w toku wczytano tyle, ile zapisano
                     (bieg zapisu), kazdy zapis = sztuki w pamieci; praca przejeta przez pamieci i szacunek oszczednosci z czasu probek
                     (trafienia x czas starej - nowej drogi, R9 "wynik i czas") - INFO.
+                    Blok etap8_o3 (E8/O3, paczka 267): wywoz kupcow - cele w zasiegu z pamieci, popyt i mnoznik ceny raz na osade w koszyku -
+                    linia doby "Wywoz kupcow (E8/O3)" (TradeExportMemo.Daily): O3-0 linia w kazdej dobie okna, stan klucza; O3-1 rozjazdy 0:
+                    probka 1/64 wyboru celu i popytu zrodla (stara i nowa droga, R9), linie ROZJAZD, potkniecia i linie bledu 0; O3-2 czas
+                    wywozu srednio w ostatnich 10 dobach okna <= 150 ms przy O1+O3 (ShelfIndexOwnUpdate [WL]) albo <= 220 ms przy samym O3
+                    (Z33: 312.5 ms w dobie 120; okno krotsze niz 110 dob - INFO); O3-3 sztuki i zaplacone w probce: ten sam cel, ta sama
+                    liczba sztuk do wziecia i droga (rozjazdow celu i sztuk 0); praca przejeta przez pamiec i szacunek oszczednosci - INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -10116,6 +10122,124 @@ def etap8_o2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "INFO (projekt: zysk 150-400 ms/d)", None)
 
 
+# ============================================================ ETAP 8 (E8/O3, paczka 267): wywoz kupcow - cele w zasiegu z pamieci - blok etap8_o3
+E8_O3_LINE = "Wywoz kupcow (E8/O3): dzien"
+# Progi projektu etapu 8 v2 rozdz. 3 "E8/O3", rozdz. 1 i rozdz. 4 pkt 4 (wzor Z33: czas wywozu 608 ms w dobie 1 -> 312.5 ms w dobie 120)
+E8_O3_MS_ALONE = 220.0     # sam O3
+E8_O3_MS_WITH_O1 = 150.0   # O1 + O3 (ShelfIndexOwnUpdate [WL] w linii "Polka i delegaty (E8/O1)")
+E8_O3_LAST_DAYS = 10       # prog liczony ze sredniej ostatnich dob okna - wzor Z33 to doba 120, a czas wywozu spada z doba kampanii
+E8_O3_MIN_DAY = 110        # okno musi siegac tej doby kampanii; krotsze - INFO
+
+
+def etap8_o3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O3 (267, projekt etapu 8 v2 rozdz. 3 "E8/O3" Test, R9): linia doby "Wywoz kupcow (E8/O3)" (TradeExportMemo.Daily, z konca
+    SupplyDemand.DailyTrade) + stan klucza O1 z linii "Polka i delegaty (E8/O1)". O3-0 linia w kazdej dobie okna, stan klucza; O3-1 rozjazdy 0 -
+    probka 1/64 wyboru celu i popytu zrodla (stara i nowa droga), linie ROZJAZD, potkniecia i linie bledu 0 (bez probek - INFO); O3-2 czas wywozu:
+    srednia ostatnich 10 dob okna z kluczem [WL] <= 150 ms (O1+O3) albo <= 220 ms (sam O3), gdy okno siega doby >= 110 (inaczej INFO); O3-3 sztuki
+    i zaplacone w probce: rozjazdow celu i sztuk 0 (zdjecie sztuk i zaplata ida wspolnym kodem - ten sam wybor = te same sztuki i zloto);
+    INFO: praca przejeta przez pamiec i szacunek oszczednosci z czasu probek."""
+    ol = {d: s for d, s in by_day(lines, E8_O3_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not ol:
+        rep.add("E8/O3: linia Wywoz kupcow (E8/O3)", "brak w logu", "jest od wgrania E8/O3", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "TradeExportFast [WL]" in ol[d]]
+    ran = [d for d in days if "wywozu tej doby nie bylo" not in ol[d]]
+    rep.add("O3-0: linia Wywoz kupcow (E8/O3) w kazdej dobie okna; stan klucza",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; TradeExportFast wl {len(on)} / wyl {len(days) - len(on)} dob; dob bez wywozu {len(days) - len(ran)}",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def tot(pat, sel, cast=int):
+        return sum(num(pat, ol[d], cast=cast, default=0) for d in sel)
+
+    def top(pat):
+        return max([num(pat, ol[d], default=0) for d in days] + [0])
+
+    # O3-1: rozjazdy (R9)
+    mis = top(r"rozjazdow od startu sesji (\d+) \(cel")
+    m_t, m_p, m_s = top(r"\(cel (\d+), sztuki albo droga"), top(r"sztuki albo droga (\d+), zrodlo"), top(r", zrodlo (\d+)\)")
+    stum = top(r"\| potkniecia od startu sesji (\d+)\.")
+    pp, pt = tot(r"\): wybor celu (\d+) \(z celem", on), tot(r"\(z celem (\d+),", on)
+    ps = tot(r"popyt zrodla (\d+), rozjazdow", on)
+    alarm = sum(1 for s in lines if s.startswith("Wywoz kupcow (E8/O3): ROZJAZD"))
+    errs = sum(1 for s in lines if s.startswith("ERROR in TradeExportMemo.") or s.startswith("ERROR in SupplyDemand.DailyTrade"))
+    ok = None
+    if on and (pp + ps > 0 or mis or stum or alarm or errs):
+        ok = mis == 0 and stum == 0 and alarm == 0 and errs == 0
+    rep.add("O3-1: rozjazdy - wybor celu i popyt zrodla z pamieci wobec starej drogi (probka 1/64)",
+            f"probek wyboru celu {pp}, popytu zrodla {ps}; rozjazdow {mis} (cel {m_t}, sztuki albo droga {m_p}, zrodlo {m_s}); linii ROZJAZD w logu {alarm}; "
+            f"potkniecia {stum}, linii bledu wywozu {errs}",
+            "0 rozjazdow i 0 potkniec (R9: rozjazd > 0 = paczka wylaczona); bez probek - INFO", ok)
+
+    # O3-2: czas wywozu (jedna klatka na dobe)
+    ms = {d: fnum(r"czas wywozu ([0-9.]+) ms", ol[d]) for d in ran}
+    ms = {d: v for d, v in ms.items() if v is not None}
+    o1 = by_day(lines, E8_O1_LINE)
+
+    def with_o1(d):
+        return d in o1 and "ShelfIndexOwnUpdate [WL]" in o1[d] and "pamiec polki WYLACZONA" not in o1[d]
+
+    on_ms = [d for d in on if d in ms]
+    off_ms = [d for d in days if d not in on and d in ms]
+    last_run = max([run_day(d, start) for d in (win or days)] + [0])
+    tail = [d for d in on_ms if run_day(d, start) > last_run - E8_O3_LAST_DAYS]
+    extra = ""
+    if on_ms:
+        worst = max(on_ms, key=lambda d: ms[d])
+        first = min(on_ms)
+        extra = (f"; cale okno z kluczem [WL]: srednio {sum(ms[d] for d in on_ms) / len(on_ms):.1f} ms ({len(on_ms)} dob), pierwsza doba ({run_day(first, start)}) "
+                 f"{ms[first]:.1f} ms, najwiecej {ms[worst]:.1f} ms (doba {run_day(worst, start)})")
+    if off_ms:
+        extra += f"; klucz wylaczony {len(off_ms)} dob: srednio {sum(ms[d] for d in off_ms) / len(off_ms):.1f} ms"
+    both = bool(tail) and all(with_o1(d) for d in tail)
+    lim = E8_O3_MS_WITH_O1 if both else E8_O3_MS_ALONE
+    rule = (f"<= {E8_O3_MS_WITH_O1:.0f} ms przy O1+O3 (ShelfIndexOwnUpdate [WL]) albo <= {E8_O3_MS_ALONE:.0f} ms przy samym O3 - srednio w ostatnich "
+            f"{E8_O3_LAST_DAYS} dobach okna (Z33: 312.5 ms w dobie 120); okno krotsze niz {E8_O3_MIN_DAY} dob - INFO")
+    if tail and last_run >= E8_O3_MIN_DAY and len(tail) >= E8_O3_LAST_DAYS // 2:
+        avg = sum(ms[d] for d in tail) / len(tail)
+        rep.add("O3-2: czas wywozu kupcow (jedna klatka) przy kluczu [WL]",
+                f"ostatnie {len(tail)} dob okna (do doby {last_run}): srednio {avg:.1f} ms, najwiecej {max(ms[d] for d in tail):.1f} ms; prog "
+                f"{lim:.0f} ms ({'O1+O3' if both else 'sam O3 - ShelfIndexOwnUpdate nie byl [WL] w tych dobach'})" + extra, rule, avg <= lim)
+    else:
+        why = "klucz TradeExportFast wylaczony w calym oknie" if not on else ("brak dob z wywozem" if not on_ms else f"okno siega doby {last_run}")
+        rep.add("O3-2: czas wywozu kupcow (jedna klatka)", why + extra, rule, None)
+
+    # O3-3: sztuki i zaplacone w probce
+    pieces, gold = tot(r"wywiezione po nich (\d+) szt\.", on), tot(r"szt\. za (-?\d+) zl\)", on)
+    rep.add("O3-3: sztuki i zaplacone w probce - ten sam cel, ta sama liczba sztuk do wziecia i droga (zdjecie sztuk i zaplata ida wspolnym kodem)",
+            f"wyborow w probce {pp}, z celem {pt}; po nich wywiezione {pieces} szt. za {gold} zl; rozjazdow celu {m_t}, sztuk albo drogi {m_p}",
+            "0 rozjazdow celu i sztuk; bez probek - INFO", (m_t == 0 and m_p == 0) if (on and pp > 0) else None)
+
+    # INFO: ile pracy przejela pamiec (doby z kluczem [WL] i wywozem) i szacunek oszczednosci z czasu probek
+    sel = [d for d in on if d in ran]
+    n_on = max(1, len(sel))
+    pn, po = tot(r"wybor celu: nowa droga (\d+)", sel), tot(r"wybor celu: nowa droga \d+ / stara droga (\d+)", sel)
+    dh, dn = tot(r"popyt osady w koszyku z pamieci (\d+)", sel), tot(r"popyt osady w koszyku z pamieci \d+ / liczony (\d+)", sel)
+    mh, mn = tot(r"mnoznik ceny z pamieci (\d+)", sel), tot(r"mnoznik ceny z pamieci \d+ / liczony (\d+)", sel)
+    builds = top(r"budowana od startu sesji (\d+)")
+    pairs = num(r"par zrodlo-cel w zasiegu (\d+)", ol[sel[-1]], default=0) if sel else 0
+    places = num(r"\| osad (\d+),", ol[sel[-1]], default=0) if sel else 0
+    saved, timed = 0.0, 0
+    for d in sel:
+        seg = ol[d].split("czas w probce, stara / nowa droga (us):", 1)
+        m = re.search(r"wybor celu ([0-9.]+) / ([0-9.]+)", seg[1]) if len(seg) > 1 else None
+        if m:
+            try:
+                saved += num(r"wybor celu: nowa droga (\d+)", ol[d], default=0) * (float(m.group(1)) - float(m.group(2))) / 1000.0
+                timed += 1
+            except ValueError:
+                pass
+    est = f"; szacunek oszczednosci z czasu probek ({timed} dob): {saved / timed:.1f} ms/d" if timed else "; czasu probek brak w linii"
+    rep.add("E8/O3: praca przejeta przez pamiec (na dobe, doby z kluczem [WL] i wywozem)",
+            f"wybor celu nowa droga {pn / n_on:.0f} / stara {po / n_on:.0f}; popyt osady z pamieci {dh / n_on:.0f} / liczony {dn / n_on:.0f}; "
+            f"mnoznik ceny z pamieci {mh / n_on:.0f} / liczony {mn / n_on:.0f}; osad {places}, par zrodlo-cel w zasiegu {pairs}"
+            + (f" (srednio {pairs / places:.1f} celow na zrodlo zamiast {places - 1})" if places else "") + f"; pamiec celow budowana {builds} razy" + est,
+            "INFO (projekt: zysk 50-110 ms w jednej klatce)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -10148,6 +10272,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_b)    # E8/B (258): warsztaty i kowadlo - wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow, drobne poprawki kowadla
     blocks.append(etap8_o1)   # E8/O1 (265): pamiec polki po wlasnym zdjeciu sztuki (poprawka zamiast przebudowy), delegaty DTE/BK zamiast Invoke
     blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii i zakazanych, mnoznik polki raz na koszyk
+    blocks.append(etap8_o3)   # E8/O3 (267): wywoz kupcow - cele w zasiegu z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
