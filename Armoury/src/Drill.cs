@@ -449,15 +449,16 @@ namespace Armoury
                 {
                     // sklad8-p (uwaga 8): zapas liczy plan K1 (wiecej miejsc, ktore moga rzucic wyjatek) - osobny try: przy bledzie zapas z nadwyzki = 0
                     // (bez premii i bez zuzycia), a perki i S licza sie dalej; slad w liczniku potkniec (Stumble "CtxOf.Stock")
-                    // Z.3 poz. 3 (tylko pomiar): stoper liczenia nadwyzki K1 partii AI - wyjatek idzie przez finally do tego samego catch co dotad
+                    // Z.3 poz. 3 (tylko pomiar): stoper liczenia nadwyzki K1 partii AI - wyjatek idzie przez finally do tego samego catch co dotad.
+                    // Recenzja Z.3: stoper tylko przy Stage8ProfileLog (k0 = 0 - bez odczytu zegara i bez licznika; klucz wylaczony = brak pomiaru)
                     try
                     {
                         if (c.Main) CountPlayerStock(c);
                         else
                         {
-                            long k0 = Stopwatch.GetTimestamp();
+                            long k0 = s.Stage8ProfileLog ? Stopwatch.GetTimestamp() : 0L;
                             try { CountAiStock(c, mp); }
-                            finally { _prof[PCtxSur] += Stopwatch.GetTimestamp() - k0; _prof[PCtxSurN]++; _profReads += 2; }
+                            finally { if (k0 != 0) { _prof[PCtxSur] += Stopwatch.GetTimestamp() - k0; _prof[PCtxSurN]++; _profReads += 2; } }
                         }
                     }
                     catch (Exception e) { c.SurW = 0; c.SurA = 0; Stumble("CtxOf.Stock", e); }

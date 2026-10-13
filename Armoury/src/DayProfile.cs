@@ -387,7 +387,6 @@ namespace Armoury
 
         public static void InTrainPre(out long __state) { __state = _inLive ? Stopwatch.GetTimestamp() : 0L; }
 
-
         public static void InTrainPost(MobileParty __0, long __state)
         {
             if (__state == 0) return;
