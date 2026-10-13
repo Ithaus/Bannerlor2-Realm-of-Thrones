@@ -221,7 +221,8 @@ Uzycie (Python 3, tylko odczyt):
                     D2-0 linia startu: latki wpiete N/M komplet (N >= 21), podmiany wywolan i stalych komplet, BRAK: -, modele gry; D2-0b linia
                     "Wydatki gracza (E8/D2)" w kazdej dobie okna, cztery klucze czynne; D2-1 oplaty i zaklady: w nicosc 0 / z niczego 0 (bez wydatkow -
                     INFO, 8.16 p. 12 i 14); D2-2 nagroda turnieju gracza: przedmiot z polki albo cena od miasta, z niczego 0; D2-2b drobne zrodla
-                    z niczego 0; D2-3 kontrolka RealPayer (Szczelnosc 164a): czynny, niedopasowane 0, stos 0 - E8/D2 nie dubluje jencow i nagrod AI;
+                    z niczego 0; D2-3 kontrolka RealPayer (Szczelnosc 164a): czynny, niedopasowane 0, stos 0 - E8/D2 nie dubluje jencow i nagrod AI,
+                    latka "platnik: nagroda turnieju" wpieta (w jej prefiksie biegnie migawka sakw gracza);
                     D2-4 kasa miasta ponizej zapasu przez nasza wyplate 0; D2-5 INFO oplaty wedlug rodzaju; D2-6 INFO koszt; D2-K potkniecia i ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
@@ -9345,6 +9346,7 @@ def etap8_d1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 # E8/D2 (257): blok etap8_d2 - nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza (PlayerFees8.cs; RealPayer.cs - tylko migawka sakw)
 E8_D2_DAY = "Wydatki gracza (E8/D2): dzien"
 E8_D2_MIN = 21   # latki bez cudzych modow (Tournaments XPanded 2, NavalDLC 1); u Jeffa 24
+E8_D2_SNAP = "platnik: nagroda turnieju (GivePrizeToWinner)"   # etykieta Seal31.Patch (RealPayer.ApplyAll) - w jej prefiksie biegnie migawka sakw gracza
 
 
 def etap8_d2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
@@ -9354,7 +9356,8 @@ def etap8_d2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     D2-0b linia doby w kazdej dobie okna, cztery klucze czynne, latki komplet; D2-1 (suma okna) oplaty i zaklady: w nicosc 0 i z niczego 0 (bez wydatkow -
     INFO, 8.16 p. 12 i 14); D2-2 nagroda turnieju gracza: przedmiot z niczego 0, zloto z niczego 0 (bez wygranej - INFO, 8.16 p. 12); D2-2b drobne zrodla
     z niczego 0 (bez zdarzen - INFO); D2-3 kontrolka RealPayer (linia "Szczelnosc (164a)"): czynny, jency / nagrody turniejow / gracz u posrednika policzone,
-    niedopasowane 0 i stos 0 - dowod, ze E8/D2 nie dubluje RealPayer (sumy do porownania z Z33); D2-4 kasa miasta ponizej zapasu przez nasza wyplate 0;
+    niedopasowane 0 i stos 0 - dowod, ze E8/D2 nie dubluje RealPayer (sumy do porownania z Z33), oraz latka "platnik: nagroda turnieju" wpieta przy starcie
+    gry (w jej prefiksie biegnie migawka sakw gracza - recenzja E8/D2); D2-4 kasa miasta ponizej zapasu przez nasza wyplate 0;
     D2-5 INFO oplaty wedlug rodzaju (zaplacone / gra chciala), odbiorcy; D2-6 INFO koszt; D2-K potkniecia i linie ERROR in PlayerFees8.* 0."""
     rows = {d: s for d, s in by_day(lines, E8_D2_DAY).items() if 1 <= run_day(d, start) <= until}
     wire = [x for x in lines if x.startswith("Wydatki gracza (E8/D2): wpiete")]
@@ -9466,11 +9469,16 @@ def etap8_d2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         pl_due, pl_paid = st(r"gracz u posrednika i w miescie: wycena (\d+)"), st(r"gracz u posrednika i w miescie: wycena \d+, zaplacone (\d+)")
         strays, over = st(r"zdarzenia z niczego w kontekscie niedopasowane (\d+)"), st(r"stos przepelniony (\d+)")
         off = sum(1 for x in sv if "WYLACZONE (Town Pays Rewards)" in x)
-        rep.add("D2-3: kontrolka RealPayer (Szczelnosc 164a) - jency i nagrody turniejow AI dalej przez RealPayer, E8/D2 ich nie dubluje",
+        # recenzja E8/D2: migawka sakw gracza (PlayerFees8.PrizeBefore) biegnie w prefiksie RealPayer.TourneyPre - bez tej latki nagroda gracza nie jest
+        # rozliczana, a licznik N/M paczki (D2-0) tego nie widzi; wpiecie pokazuje linia startu gry "Szczelnosc (164a): latki przy starcie gry"
+        seal0 = [x for x in lines if x.startswith("Szczelnosc (164a): latki przy starcie gry")]
+        snap = bool(seal0) and E8_D2_SNAP in seal0[0].split("; BRAK:")[0]
+        rep.add("D2-3: kontrolka RealPayer (Szczelnosc 164a) - jency i nagrody turniejow AI dalej przez RealPayer, E8/D2 ich nie dubluje; latka z migawka sakw gracza wpieta",
                 f"linii {len(sv)}, WYLACZONE w {off}; jency: gra chciala {pr_due}, zaplacili {pr_paid}; nagrody turniejow: gra chciala {tr_due}, zaplacili {tr_paid} ({tr_n} wyplat)"
-                f"; gracz u posrednika: wycena {pl_due}, zaplacone {pl_paid}; niedopasowane {strays}, stos {over}",
-                "RealPayer czynny, niedopasowane 0, stos 0, zaplacili <= gra chciala (sumy do porownania z Z33 - bez zmian)",
-                off == 0 and strays == 0 and over == 0 and pr_paid <= pr_due and tr_paid <= tr_due and pl_paid <= pl_due)
+                f"; gracz u posrednika: wycena {pl_due}, zaplacone {pl_paid}; niedopasowane {strays}, stos {over}"
+                f"; latka \"{E8_D2_SNAP}\": " + ("wpieta" if snap else ("BRAK w linii startu gry" if seal0 else "brak linii startu gry Szczelnosc (164a)")),
+                "RealPayer czynny, niedopasowane 0, stos 0, zaplacili <= gra chciala (sumy do porownania z Z33 - bez zmian); latka nagrody turnieju wpieta",
+                off == 0 and strays == 0 and over == 0 and pr_paid <= pr_due and tr_paid <= tr_due and pl_paid <= pl_due and snap)
     else:
         rep.add("D2-3: kontrolka RealPayer (Szczelnosc 164a)", "brak linii Szczelnosc (164a) w dobach okna", "linia jest (RealPayer E3/1)", False)
     # ---------------- D2-4: zapas kupcow
