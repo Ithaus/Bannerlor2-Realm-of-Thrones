@@ -522,7 +522,7 @@ namespace Armoury
             foreach (var t in Town.AllTowns)
             {
                 if (t == null || !t.IsTown) continue;
-                long z = 10000 + (long)(12f * t.Prosperity);
+                long z = Seal31.TownReserve(t);   // GL-2: jeden wzor zapasu kupcow (x m_t przy MarketByPeople)
                 reserve += z;
                 long g = t.Gold;
                 if (g > z) { over += g - z; overN++; }

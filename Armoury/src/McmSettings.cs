@@ -5380,6 +5380,18 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool SarnorPeopleRaised { get; set; } = true;
 
+        [SettingPropertyBool("Market By People", HintText = "A town is the market of its whole district: the number of townsfolk who buy (and their purses' needs), what they eat and use each day, the working coin its merchants keep and the hands in the notables' workshops all follow the people of the town and of the villages that trade there, compared with the average market of the world (a castle's folk follow the people of its villages). The food stores of the keep count the townsfolk's purchases as before. Off = every town buys and keeps coin as today, by its prosperity")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool MarketByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Village Heads By People", HintText = "The fixed dues a village pays its lord and the salt, tools, cloth, pots and ale it buys in its market town follow the number of people of the village's district, and the folk below a castle follow the people of the castle's villages. Off = every village and castle counts its heads as today")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool VillageHeadsByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Start Gold By People", HintText = "New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool StartGoldByPeople { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6724,6 +6736,9 @@ namespace Armoury
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;
             s.SarnorPeopleRaised = SarnorPeopleRaised;
+            s.MarketByPeople = MarketByPeople;
+            s.VillageHeadsByPeople = VillageHeadsByPeople;
+            s.StartGoldByPeople = StartGoldByPeople;
         }
 
         internal static void Apply()

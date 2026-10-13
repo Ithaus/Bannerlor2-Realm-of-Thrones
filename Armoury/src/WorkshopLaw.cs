@@ -817,7 +817,7 @@ namespace Armoury
         internal static float Hands(Workshop workshop, Town town)
         {
             var s = Settings.Current;
-            if (!workshop.WorkshopType.IsHidden) return Math.Max(0.1f, s.WorkshopWorkers);
+            if (!workshop.WorkshopType.IsHidden) return Math.Max(0.1f, s.WorkshopWorkers) * PeopleMarket.WorkersScale(town);   // GL-2 (P2 d): 6 roboczodni x m_t (1 = klucz wylaczony)
             return TownHands(town);
         }
 

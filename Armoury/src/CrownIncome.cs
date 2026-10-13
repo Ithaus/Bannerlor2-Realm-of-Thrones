@@ -287,6 +287,13 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>GL-2 (zloto startowe): przelew `delta` do skarbca poza wplywami - wczorajsza migawka przesunieta o niego, wiec "inne wplywy" dnia go nie licza (nie wydaje sie go jak dochodu).</summary>
+        internal static void ShiftSnapshot(Kingdom k, long delta)
+        {
+            try { long w; if (k != null && k.StringId != null && delta != 0 && _wEnd.TryGetValue(k.StringId, out w)) _wEnd[k.StringId] = w + delta; }
+            catch (Exception e) { Log.Error("CrownIncome.ShiftSnapshot", e); }
+        }
+
         // ------------------------------------------------------------ koniec: migawka skarbcow i linia "Korona: wplywy dnia (165)"
         internal static void End()
         {

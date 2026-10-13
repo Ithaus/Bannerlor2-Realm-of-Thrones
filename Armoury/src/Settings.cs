@@ -1894,6 +1894,16 @@ namespace Armoury
         // GL-1 / P6 (decyzja Jeffa 13.10, pyt. 3): Sarnor w tabeli ludnosci krain 0.1 -> 0.25 mln (gestosc Zelaznych Wysp); dziala przy kalibracji ludnosci,
         // czyli w NOWEJ kampanii (k na osade w zapisie - stary zapis ma ludzi Sarnoru jak dotad). Off = 0.1 mln (stan 4d33042)
         public bool SarnorPeopleRaised = true;             // Sarnor counts a quarter of a million people instead of a hundred thousand - as thickly settled as the Iron Islands - so its villages and towns are not left almost empty once goods follow the people. Takes effect in a new campaign only (a campaign already begun keeps the people it was reckoned with). Off = a hundred thousand, as before
+        // GL-2 / P2 (projekt rozdz. 3.3, PeopleMarket.cs): rynek miasta od ludzi - glowy kiesy ludu wedlug ludzi rynku (TownFolk.Scale), popyt u zrodla x m_t
+        // (HistoricalPrices.DemandPostfix; zamek x skala podzamcza) i czlon dobrobytu wiersza BK x m_t (TownFolk.AnchorBudgetPostfix), zapas kupcow x m_t
+        // (TownPurse.Reserve, Seal31.TownReserve), rece warsztatow notabli x m_t (WorkshopLaw.Hands), licznik Food warowni zneutralizowany (1 / m_t na "sprzedane mieszczanom")
+        public bool MarketByPeople = true;                 // A town is the market of its whole district: the number of townsfolk who buy (and their purses' needs), what they eat and use each day, the working coin its merchants keep and the hands in the notables' workshops all follow the people of the town and of the villages that trade there, compared with the average market of the world (a castle's folk follow the people of its villages). The food stores of the keep count the townsfolk's purchases as before. Off = every town buys and keeps coin as today, by its prosperity
+        // GL-3 / P3 (projekt rozdz. 3.3): glowy wsi (oplata stala panu, zakupy wsi w miescie targowym) = srednia swiata glow BK wsi x u_v; podzamcze = srednia glow
+        // podzamczy x skala podzamcza (ludzie wsi zamku)
+        public bool VillageHeadsByPeople = true;           // The fixed dues a village pays its lord and the salt, tools, cloth, pots and ale it buys in its market town follow the number of people of the village's district, and the folk below a castle follow the people of the castle's villages. Off = every village and castle counts its heads as today
+        // GL-2 (decyzja Jeffa 13.10, pyt. 7): TYLKO nowa kampania - po darach startowych (TownPurse.TrimStartGift z kiesami ludu i wsi) zloto kas kupcow miast, kies ludu, kies wsi
+        // i skarbcow koron przelane wedlug ludzi przy tej samej sumie swiata (podloga skarbca 1.0 mln); flaga w zapisie (arm_peoplemarket) - nigdy na starym zapisie
+        public bool StartGoldByPeople = true;              // New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched
 
         public static void Load(string moduleDataDir)
         {

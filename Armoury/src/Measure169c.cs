@@ -348,7 +348,7 @@ namespace Armoury
                 {
                     if (st == null || !st.IsTown || st.Town == null) continue;
                     var t = st.Town;
-                    long g = t.Gold, z = 10000 + (long)(12f * t.Prosperity);
+                    long g = t.Gold, z = Seal31.TownReserve(t);   // GL-2: jeden wzor zapasu kupcow (x m_t przy MarketByPeople)
                     long c0; _regOutTown.TryGetValue(t, out c0);
                     long a0; _regInTown.TryGetValue(t, out a0);
                     long h = SoldierPay.HeldOf(st);
