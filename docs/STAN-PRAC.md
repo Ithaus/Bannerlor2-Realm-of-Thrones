@@ -1935,3 +1935,5 @@ CivilWorksAwayFromFront, WarAidFollowsLordsShortfall, CrownSurplusFeedsNeedAid).
   udzwignie wiekszego koszyka bez doplywu zlota. **CZEKA NA JEFFA: pytania o kierunek z rozdz. 10 (podane w czacie); KODU NIE ZACZYNAC przed jego "tak".**
 - (22:45 UTC 13.10) **KONIEC PRACY NA KONCIE DRUGIM (sesja dbc3d3d1) - Jeff przechodzi na nastepne konto.** Nic nie biegnie w tle; w grze WGRANIE 43. START: PRZEKAZANIE rozdz. 29,
   blok "STAN KONCOWY". Czeka: 7 odpowiedzi Jeffa do projektu gospodarki od ludzi (maja byc w jego pierwszej wiadomosci), potem kod.
+- (22:55 UTC 13.10) **JEFF ODPOWIEDZIAL NA 7 PYTAN PROJEKTU GOSPODARKI OD LUDZI: 1 tak; 2 "lup i milicja bez wyjatku"; 3 tak; 4 "zostawic i zmierzyc"; 5 tak; 6 tak; 7 "tak i tak,
+  majatki rodow zostawic tak, jak sa".** Pelne brzmienie w PRZEKAZANIE rozdz. 29 (blok STAN KONCOWY). Kod mozna zaczynac - najpierw rachunek na sucho 85 tys. wojska (pyt. 1).
