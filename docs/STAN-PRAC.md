@@ -1752,3 +1752,11 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
 - Test zapisu: wczytany `autotest-dlugi` (doba 60 biegu daniny) + 9 dob: 0 ERROR, linia daniny liczy dalej. Bieg kontrolny po wgraniu w toku (test\at-w39-kontrola10.out.txt).
 - NIE SPRAWDZONE AUTOTESTEM (do recznego testu Jeffa): zdanie "Savings: ..." w oknie "People of this land" i komunikat "War aid: ..." dla osad gracza.
 - (19:10 UTC 13.10) Bieg kontrolny PO WGRANIU 39 (10 dob nowej kampanii): 10/10, Armoury 0 ERROR; w grze Armoury ccfbf36a, CrashScribe 04f44a0e (md5 sprawdzone).
+- (19:35 UTC 13.10) **POPRAWKA 3 "POBITY OBLEGAJACY UCHODZI" - KOD GOTOWY I SCALONY (NIEWGRANE):** `w-toku/n3-oblegajacy-uchodzi` 82f7c06 -> `w-toku/zbior-e8` **8639c21**
+  (scalenie bez konfliktu; gen_mcm 1320; Armoury b2423a38 = test\fin8). Klucz `LosersFleeBesiegers` (true): bitwa IsSallyOut albo IsSiegeOutside na ladzie, pobita strona nie jest
+  strona twierdzy -> ta sama droga co pole (Plan / Apply / RoutedH3). Objete tez: szturm, do ktorego doszla odsiecz (gra liczy go jako bitwe w otwartym terenie). NIE objete: zwykly
+  szturm, pobita strona twierdzy, morze. Linie: "Przegrani pod murami (N3): dzien ", w bitwy.log "Bitwa: H3 pod murami (N3) dzien "; progi N3-1..N3-4 w `--grupa etap8`.
+  Oczekiwane w 120 dobach: 12-13 wypadow z pobitym oblegajacym, zabici + jency ok. 34% (dzis 100%), rozbici ok. 66%. RYZYKA DO OBEJRZENIA: do lasu ok. 23 tys. rozbitych rocznie
+  wiecej (bandy; pula wyrzutkow juz 11.9 tys.), rozbici NIE wracaja do druzyny (las 30 / 120 dob, ludnosc, karczmy) - wiec wiecej zdobytych twierdz paczka nie obiecuje; zaloga po
+  wygranym wypadzie mocniejsza (limit 5% zabitych zwyciezcy); jencow szeregowych ok. 39 tys. rocznie mniej (sprzedaz jencow ok. -0.8 mln zl/rok).
+  **W GRZE: test 120 dob** (test\at-n3-120.out.txt; start 19:33 UTC). Po czystym tescie: zapis 9 dob -> WGRANIE 40.
