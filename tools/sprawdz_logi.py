@@ -13862,12 +13862,13 @@ def etap8_p3_zelazo(rep, lines, start, win, until=120, logp=None, csp=None, **kw
         arr = isum(r"dojechalo wozow (\d+) ", rows)
         arrq = isum(r"dojechalo wozow \d+ \(sztuk (\d+),", rows)
         back = isum(r", zawrocone (\d+) \(sztuk", rows)
+        mix = isum(r"w tym ladem i morzem (\d+) \(sztuk", rows)   # recenzja P3/Z1: para bez drogi ladowej i bez rejsu port-port
         rest = [(run_day(d, start), num(r"reszta wozow (-?\d+)", z1[d])) for d in days]
         bad = [x for x in rest if x[1] not in (None, 0)]
         n = max(1, len(days))
         road = num(r", w drodze (\d+) sztuk w", rows[-1], int, 0)
         rep.add("P3/Z1-2: wozy kupcow - zakupy i dostawy (INFO)",
-                f"zawarto {made} ({made / n:.1f}/d), rudy {ore} lup ({ore / n:.1f}/d), za {gold} zl; ze zrodel-zamkow {cas} (sztuk {casq}), morzem {sea}; "
+                f"zawarto {made} ({made / n:.1f}/d), rudy {ore} lup ({ore / n:.1f}/d), za {gold} zl; ze zrodel-zamkow {cas} (sztuk {casq}), morzem {sea}, ladem i morzem {mix}; "
                 f"dojechalo {arr} wozow ({arrq} sztuk), zawrocone {back}; w drodze na koniec {road} sztuk",
                 "INFO (rachunek: kilkadziesiat wozow/d w pierwszych tygodniach, potem kilkanascie)", None)
         rep.add("P3/Z1-3: kontrola wozow (wczoraj + kupione - dowiezione - zawrocone = dzis)", f"dob z reszta != 0: {len(bad)}" + (f" {bad[:5]}" if bad else ""),

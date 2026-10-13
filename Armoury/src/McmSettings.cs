@@ -4752,7 +4752,7 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderPlayerCaravans { get; set; } = true;
 
-        [SettingPropertyBool("Town Material Order By Cart", HintText = "a town short of a raw material that finds no caravan to carry its order sends for it by merchants' cart: it buys the load from the stall of the nearest town or castle that has more than it needs (by road, or from port to port by sea), pays that town or castle from its own purse above the merchants' reserve, and the goods reach its stall after the days the road takes - a besieged town waits, and after thirty days the cart turns back and the money is returned. With bloomeries at the mines iron then travels as far as the other materials. Off = caravans only, as before")]
+        [SettingPropertyBool("Town Material Order By Cart", HintText = "a town short of a raw material that finds no caravan to carry its order sends for it by merchants' cart: it buys the load from the stall of the nearest town or castle that has more than it needs (by road - by road and water where no road runs all the way - or from port to port by sea), pays that town or castle from its own purse above the merchants' reserve, and the goods reach its stall after the days the road takes - a besieged town waits, and after thirty days the cart turns back and the money is returned. With bloomeries at the mines iron then travels as far as the other materials. Off = caravans only, as before")]
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderByCart { get; set; } = true;
 
