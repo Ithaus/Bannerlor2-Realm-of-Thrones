@@ -5112,6 +5112,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarvestValve { get; set; } = true;
 
+        [SettingPropertyBool("Valve Hold While Short", HintText = "the village regulator does not cut back a raw material that more than Valve Short Towns towns have none of: so many empty stalls mean the goods are not reaching the towns, not that the villages make too much - a stock lying where nothing carries it away no longer starves the rest of the world. A good already cut back returns to its normal output step by step while the shortage lasts (never above normal). Off = the regulator counts the whole stock, as before")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ValveHoldWhileShort { get; set; } = true;
+
+        [SettingPropertyInteger("Valve Short Towns", 0, 60, "0", HintText = "how many towns may have none of a raw material before the regulator stops cutting it back (needs Valve Hold While Short)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int ValveShortTowns { get; set; } = 15;
+
         [SettingPropertyFloatingInteger("Village Output Step", 1.00f, 2.00f, "0.00", HintText = "the most a village can make of a good the world is short of, as a multiple of its normal output (1 = never more than normal; a cut-back good first returns to normal)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float VillageOutputStep { get; set; } = 1.3f;
@@ -6505,6 +6513,8 @@ namespace Armoury
             s.ArmsTradeByCart = ArmsTradeByCart;
             s.WorkshopRecipesByValue = WorkshopRecipesByValue;
             s.HarvestValve = HarvestValve;
+            s.ValveHoldWhileShort = ValveHoldWhileShort;
+            s.ValveShortTowns = ValveShortTowns;
             s.VillageOutputStep = VillageOutputStep;
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;

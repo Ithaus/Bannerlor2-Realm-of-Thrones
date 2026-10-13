@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z2, tor S) - BEZPIECZNIK REGULATORA WSI: towar, ktorego nie ma w ponad 15 miastach, nie jest ciety ponizej bazy (klucze ValveHoldWhileShort, ValveShortTowns)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HarvestValve.cs` (`Close` - blok decyzji towarow; `HorseClose` nietkniete), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny, linia "Regulator wsi (221)"; TRIAZ-3 O2-2 z podwazeniem):** regulator przykrecil kopalnie przy pustych miastach. Decyzje dla `iron`: d196 x1.00 -> x0.73 (zuzycie/produkcja 0.77 = 11293/14713, stos 13191 = 65 dni, miast bez zelaza 34), d224 x0.72, d308 x0.72 -> x0.61 (0.89 = 9140/10249, stos 14025 = 86 dni), d336 bez zmian (0.90, 95 dni). Skutek w oknach 28 dob: wsie 265 -> 158 lup/d, zuzycie 207 -> 159/d, miast bez zelaza 36,5 -> 53,4 (ostatnie 5 dob 61,5); zdjeto ok. 14,9 tys. lup. Bez zelaza zostaly miasta, ktore przed cieciem mialy je zawsze (Seagard, Lannisport, Kayce, Starfall, Astapor, Last Hearth, Stoney Sept, The Twins: 42-75% probek d308-364).
+
+**Przyczyna (kod):** regula dziala jak napisana (`Close`: ciecie, gdy zuzycie < 90% produkcji i stos > 60 dni zuzycia), ale stos to wszystkie polki, partie i wozy swiata (`Census`), takze zapas, ktory do zuzycia nie dochodzi: d364 zamki 3 654 + juki karawan 2 582 + cztery miasta-zrodla 5 200 = 11 436 z 14 517 lup (79%). Mnoznik jest jeden na towar dla calego swiata, wiec ciecie trafia takze kopalnie przy pustych miastach; mniejszy dowoz zmniejsza zuzycie, stos w dniach rosnie (65 -> 95) i warunek powrotu w gore (stos < 30 dni) jest nieosiagalny - zapadka.
+
+**Zmiana (poprawka ostateczna pkt 2):** w `HarvestValve.Close`, tylko decyzje towarow:
+- (a) licznik pustych polek liczony na miejscu, raz na decyzje (28 dob): towary z tabeli surowcow karawan (`CaravanBulk.Items()`; w regulatorze: iron, hardwood, flax, wool) x miasta `Town.AllTowns` z 0 sztuk. Nie z pola `CaravanBulk.Empty` (liczone po regulatorze, po wczytaniu 0). Pusta tabela = bezpiecznik NIECZYNNY z dopiskiem w linii.
+- (b) brak = pustych miast > `ValveShortTowns` (15 - cel projektu R1-8b). Przy braku ciecie nie schodzi ponizej x1.00 (cofniecie wlasnego kroku x1.3 do x1.00 dziala dalej): dopisek "ciecie wstrzymane: bez towaru N miast".
+- (c) przy braku i mnozniku < 1.00: powrot krokiem x1.3 do najwyzej x1.00, bez warunku stosu < 30 dni: dopisek "powrot do bazy: bez towaru N miast".
+- (d) na koncu linii decyzji: "bezpiecznik braku w miastach (P3/Z2): CZYNNY prog 15 miast, ciecia wstrzymane N, powroty do bazy N, miast bez towaru [iron N, hardwood N, flax N, wool N]".
+- Progi 30/60 dni i 90%/98%, krok w gore ponad baze i hodowla koni - bez zmian. Klucz `ValveHoldWhileShort` wylaczony = regula sprzed paczki.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Nic z niczego: bezpiecznik tylko nie obniza bazowego wydobycia modelu; wytop dalej ogranicza drewno i kiesa kopalni.
+- Dopoki martwe konce dowozu nie znikna (Z1 kontrakt wozem, Z3 zamki), zapas rosnie jak przed cieciem (ok. 60 lup/d; do ok. 23 tys. na d364 zamiast 14,5 tys.) - to dodatek do poprawek dowozu, nie zamiennik. Jesli bieg roczny pokaze rosnacy zapas w czterech miastach i zamkach mimo Z1/Z3 - nastepny krok to ciecie miejscowe (tylko kopalnie, ktorych miasto zbytu ma nadmiar), wielkosc M (do decyzji po biegu).
+- Len (75 miast bez towaru, dzis x1.30) i welna (35): ciecie do x1.00 dziala, ponizej bazy nie zejda, dopoki pustych miast jest ponad 15 - zgodne z regula (brak w miastach to dowoz).
+- Drewno (ok. 8 pustych miast) - regulator jak dotad.
+- Kolizje: `Close` czyta tylko `CaravanBulk.Items()` (odczyt) i polki miast; rownolegla paczka koni zmienia `HorseClose` i dalsza czesc pliku - blok decyzji towarow jej nie dotyka. Parser progow (`valve_decisions`) czyta "..., w dol|w gore|bez zmian" - dopisek stoi za kierunkiem.
+- Czas: 97 miast x 4 towary raz na 28 dob - pomijalne (profil doby `HarvestValve.Daily`).
+- W biegu 120 dob ciecie i tak nie zapada - dzialanie potwierdzi dopiero bieg roczny. Kluczy nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane (rachunek podwazenia dla samego bezpiecznika): d196 "ciecie wstrzymane: bez towaru ok. 34 miast"; mnoznik `iron` x1.00 w kazdej decyzji przy miastach bez zelaza > 15; wsie 261-265 lup/d zamiast 185 -> 154; zuzycie ok. 200/d zamiast 159; z Z1 i Z3 miast bez zelaza mniej niz 35.
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z1, tor M) - KONTRAKT WOZEM KUPCOW: miasto bez surowca kupuje go z najblizszego zrodla z nadwyzka (klucz TownMaterialOrderByCart) + pomiary P2
 **Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` (od 74a3645) | **Pliki:** `Armoury/src/MaterialCarts.cs` (nowy), `IronLands.cs` (nowy, tylko log), `MaterialOrders.cs`, `CastleMarket.cs` (1 funkcja odczytu), `GoodsLedger.cs`, `OreLedger.cs`, `HarvestValve.cs` (spis stosu, 2 linie), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis: bez nowego klucza (rekordy `@w|...` w `arm_matorders`).
 
