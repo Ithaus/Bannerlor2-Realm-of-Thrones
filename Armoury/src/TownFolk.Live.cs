@@ -73,6 +73,10 @@ namespace Armoury
             public int Ticks, TicksC, Fallback, R14Food, R14Rest, VFeeN; public double R14Bk; public long VTaxCut, VTaxBase, VTaxAdd;
             public readonly long[] Earn = new long[EKinds]; public long EarnC;
             public int C2Hit, C2NoFood, C2Wait, C2NoShelf;     // E5/C2: korekty jedzenia R14 i zdjete (brak jedzenia, poza glodem z braku pieniedzy, bez jedzenia na polce)
+            // P1 (pomiar, TownFolk.Savings.cs): oferta nadwyzki dopisana do budzetu kategorii "lepszych" (zl), kupione z niej, oferta bez wiersza na polce; bez kategorii w slowniku
+            public readonly double[] OfX = new double[OfMax], OfBought = new double[OfMax], OfNoRow = new double[OfMax];
+            public readonly int[] OfN = new int[OfMax], OfNoRowN = new int[OfMax];
+            public double OfNoCat; public int OfNoCatN, OfPlaces;
         }
         private static LWin _win = new LWin();
 
@@ -90,6 +94,8 @@ namespace Armoury
             public long Seed, Orphan;
             // dziesiecina (E5/C3, TownFolk.Tithe.cs): wsie (nalezne / zaplacone), lud miast W/R/P, jalmuzna miast / wsi, place i material septow, bez kaplana, bez miasta targowego
             public long TiVDue, TiV, TiW, TiR, TiP, TiAlmsT, TiAlmsV, TiWage, TiMat, TiNoPriestT, TiNoPriestV, TiNoMarket; public int TiPriestN, TiNoPriestN, TiVN;
+            // P1 (obieg kiesy ludu): danina z oszczednosci do korony wedlug klasy (W, R, P, podzamcze) i kiesa ponad zapas dni przed / po daninie (klasy z nadwyzka)
+            public readonly long[] Aid = new long[4]; public readonly double[] Ov0 = new double[4], Ov1 = new double[4];
         }
         private static LDay _ld;
         private static LWin _lw;
@@ -110,6 +116,7 @@ namespace Armoury
             _lastR = double.NaN; _lastDStock = _lastIn = _lastOut = 0;
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
             ResetTithe();
+            ResetP1();   // P1: danina z oszczednosci i pomiary obiegu kiesy (pamiec sesji)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -135,6 +142,7 @@ namespace Armoury
         {
             if (amt <= 0) return;
             f.LDayIn += amt;
+            if (kind >= 0 && kind < EKinds) f.EarnK[kind] += amt;       // P1 (pomiar): sklad zarobku osady w oknie (tylko licznik)
             if (f.Kind == 1) { f.KW += amt; f.EarnWin[0] += amt; return; }
             double w, r, p;
             SplitOf(kind, out w, out r, out p);
@@ -382,17 +390,20 @@ namespace Armoury
             if (_better == null) _better = CatsOf(BetterIds, out _betterText);
             double sum = 0;
             foreach (var c in _better) { float v; if (dict.TryGetValue(c, out v) && v > 0) sum += v; }
-            if (!(sum > 0)) return 0;
+            if (!(sum > 0)) { OfferNoCat(off); return 0; }             // P1 (pomiar): cala oferta bez kategorii w slowniku (pieniadz zostaje w kiesie)
             double added = 0;
+            int bi = -1;
             foreach (var c in _better)
             {
                 float v;
+                bi++;
                 if (!dict.TryGetValue(c, out v) || !(v > 0)) continue;
                 double x = off * v / sum;
                 double idx = Math.Max(0.01, town.GetItemCategoryPriceIndex(c));
                 double hs = Math.Max(0.05, HistoricalPrices.HouseShare(c));
                 double add = x / (Math.Pow(idx, OfferIdxPow) * hs);
                 dict[c] = (float)(v + add); added += add;
+                OfferNote(bi, c, x, add, v);                             // P1 (pomiar): oferta w zlocie na kategorie (tylko licznik)
                 if (GroupOf(c) == 0) f.OfferFood += x; else f.OfferRest += x;
             }
             return added;
@@ -642,6 +653,7 @@ namespace Armoury
             // dziesiecina (E5/C3): kaplani BK raz na dobe, potem wsie (utarg okna) - przed miastami: place i material septow wsi licza sie w miastach targowych tej doby
             try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
+            AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
             for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var f in _f.Values)
@@ -659,8 +671,10 @@ namespace Armoury
             else _lastR = double.NaN;
             _ctlStock0 = stock; _ctlIn = _ctlOut = 0;
             _ld = d; _lw = lw;
+            _aidDay = day;                                             // P1: liczby daniny tej doby gotowe (linia korony "Danina z oszczednosci (P1)" czyta je w tym samym takcie)
             bool csvDay = !first && ((day - CampaignStart(day) + 1) % 7 == 0 || !_csvFirst);
             if (csvDay) _csvFirst = true;
+            try { MeasureP1Day(day, d, lw, first, csvDay); } catch (Exception e) { Stumble("MeasureP1Day", e); }   // P1: pomiary obiegu kiesy (sam log; tygodniowe razem z CSV) - przed BuildLines (zeruje liczby doby osad)
             try { BuildLines(day, d, lw, first, csvDay); } catch (Exception e) { Stumble("BuildLines", e); }
             ClearWindowsLive();
         }
@@ -810,17 +824,21 @@ namespace Armoury
             //         R ponad 21, P ponad 30 dni - ten sam udzial: 70% place, 30% towar (decyzja Jeffa 12.10 (3))
             double rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays)), sr = SpendRate(s);
             f.Offer[0] = f.Offer[1] = f.Offer[2] = 0;
-            if (f.Need[0] > 0) { double ov = f.KW - rdW * f.Need[0]; if (ov > 0) f.Offer[0] = (long)(sr * ov); d.Lokata += Math.Max(0, ov); }
+            // P1 (szczebel 4 drabiny nadwyzki): w wojnie i przy potrzebie korony klasa oddaje skarbcowi krolestwa czesc kiesy PONAD zapas dni (PayAid - po robotach gminy,
+            // przed oferta na jutro i placami z nadwyzki, ktore licza sie od reszty); wylaczone, pokoj, s = 0 - PayAid zwraca 0 i krok jest co do monety jak przed paczka
+            f.DAid = 0; f.DOver = 0; f.DOvC[0] = f.DOvC[1] = f.DOvC[2] = 0;
+            if (f.Need[0] > 0) { double ov = f.KW - rdW * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtW, ov, d); f.Offer[0] = (long)(sr * ov); } d.Lokata += Math.Max(0, ov); }
             if (f.Need[1] > 0)
             {
                 double ov = f.KR - RdR * f.Need[1];
-                if (ov > 0) { long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
+                if (ov > 0) { ov -= PayAid(f, 1, KingdomTreasury.WtR, ov, d); long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
             }
             if (f.Need[2] > 0)
             {
                 double ov = f.KP - RdP * f.Need[2];
                 if (ov > 0)
                 {
+                    ov -= PayAid(f, 2, KingdomTreasury.WtP, ov, d);
                     long lv = (long)(sr * ov), wp = (long)(SurpWage * lv), toW = (long)(wp * 0.6);
                     long moved = Move(f, 2, 0, toW) + Move(f, 2, 1, wp - toW);
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
@@ -889,7 +907,8 @@ namespace Armoury
             d.LabC += FromCoffer(f, (long)Math.Min(lab, Math.Max(0, town.Gold)), ELabour);
             // ---- 5. nadwyzka ponad 10 dni potrzeby: 7% na towar jutro (konsumpcja zamku)
             f.Offer[0] = 0;
-            if (f.Need[0] > 0) { double ov = f.KW - RdC * f.Need[0]; if (ov > 0) f.Offer[0] = (long)(SurplusRate * ov); }
+            f.DAid = 0; f.DOver = 0; f.DOvC[0] = 0;                    // P1: danina podzamcza z kiesy ponad 10 dni potrzeby - przed oferta (jak w miescie)
+            if (f.Need[0] > 0) { double ov = f.KW - RdC * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtCastle, ov, d); f.Offer[0] = (long)(SurplusRate * ov); } }
             d.OffC += f.Offer[0];
             // ---- 6. kotwica (z kredytem dworu)
             double wf, wr; Predict(f, out wf, out wr);
@@ -1424,6 +1443,11 @@ namespace Armoury
               .Append("; sztuk ").Append(d.VPieces).Append(", wsi bez towaru ").Append(d.VNoGoods).Append(", bez miasta targowego ").Append(d.NoTrade).Append(", nieskalibrowanych ").Append(d.VNoCal).Append(")")
               .Append(", oplaty stale ").Append(w.VFee).Append(" (").Append(w.VFeeN).Append(" wsi)")
               .Append(" | zapasy z nadwyzki dzis ").Append(d.Seed).Append(d.Orphan > 0 ? ", kiesy osad nieznanych do kasy " + d.Orphan : "")
+              // P1: nowy rodzaj wydatku kies (w kontroli nizej siedzi w "wydatki") - danina z oszczednosci do skarbcow krolestw; kiesa ponad zapas dni przed / po daninie
+              .Append(" | danina z oszczednosci do korony (P1) ").Append(d.Aid[0] + d.Aid[1] + d.Aid[2] + d.Aid[3]).Append(" (W ").Append(d.Aid[0]).Append(" / R ").Append(d.Aid[1])
+              .Append(" / P ").Append(d.Aid[2]).Append("; podzamcza ").Append(d.Aid[3]).Append("), kiesa ponad zapas dni przed / po: W ").Append(N0(d.Ov0[0])).Append(" / ").Append(N0(d.Ov1[0]))
+              .Append(", R ").Append(N0(d.Ov0[1])).Append(" / ").Append(N0(d.Ov1[1])).Append(", P ").Append(N0(d.Ov0[2])).Append(" / ").Append(N0(d.Ov1[2]))
+              .Append(", podzamcza ").Append(N0(d.Ov0[3])).Append(" / ").Append(N0(d.Ov1[3]))
               .Append(" | kontrola: zmiana kies ").Append(_lastDStock).Append(" = wplywy ").Append(_lastIn).Append(" - wydatki ").Append(_lastOut).Append(", r = ").Append(double.IsNaN(_lastR) ? "-" : N0(_lastR));
             _lineFolk = sb.ToString();
             _lineFolkPartial = partial;
@@ -1530,6 +1554,7 @@ namespace Armoury
             var l = new List<string>();
             foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineC2, _lineTithe }) if (x != null) l.Add(x);
             _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
+            TakeP1Lines(l);   // P1: linie pomiarow obiegu kiesy tej doby
             return l;
         }
     }

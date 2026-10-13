@@ -768,6 +768,7 @@ namespace Armoury
             CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, MoneyLedger.OnBeforeEntered);   // tabor wsi: stan PRZED sprzedaza / podzialem utargu
             CampaignEvents.AfterSettlementEntered.AddNonSerializedListener(this, MoneyLedger.OnAfterEntered);          // ... i PO
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, MoneyLedger.OnGoldTraded);             // kazdy GiveGoldAction gry
+            CampaignEvents.OnCaravanTransactionCompletedEvent.AddNonSerializedListener(this, TownFolk.OnCaravanTrade);   // P1 (obieg kiesy ludu): dostawy karawan do miast - marza kupcow na towarze z karawan (tylko log)
             // paczka 169: nasluch kies partii, ktore znikaja z mapy (CirculationWindows.OnPartyDestroyed) - B-1: przeniesiony na poczatek RegisterEvents
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, CirculationWindows.OnKingdomDestroyed); // paczka 169: skarbce krolestw, ktore upadly (tylko log)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, SellByCondition.OnPlayerExchange);   // cena sprzedazy sprzetu: kazda sprzedaz gracza do handel.log (tylko log)

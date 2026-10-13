@@ -5032,6 +5032,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
+        [SettingPropertyBool("Folk War Aid", HintText = "in war, while the crown is in need (the same weekly reckoning that sets the war tax on the people's earnings), the townsfolk and castle folk give the kingdom's treasury a part of the coin they hold above their reserve for hard times - Folk War Aid Share a day at the full war tax, less while the need is small, twice that under the War Tax policy. The reserve itself (Town Folk Reserve Days of their needs for labourers, 21 days for craftsmen, 30 for merchant families, 10 for castle folk) is never touched, so a poor town pays nothing. The crown spends the aid the same day on repaying war wages and on its rents to the houses. A besieged town or castle pays nothing, a town held outside any kingdom pays no one, in peace nothing is taken. Villages are not changed - they already pay the war subsidy. You and the AI alike: in your kingdom the aid goes to the realm's treasury, not to your purse. Needs War Tax From Folk. Off = no war aid, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkWarAid { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk War Aid Share", 0.000f, 0.100f, "0.000", HintText = "part of their coin above the reserve that townsfolk and castle folk give the crown each day of war at the full war tax (0.025 = one part in forty a day; scaled by the realm's current war tax against War Tax Max, so twice as much at the top rate under the War Tax policy)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkWarAidShare { get; set; } = 0.025f;
+
+        [SettingPropertyBool("People Menu Shows Savings", HintText = "'People of this land' also tells for how many days of living the people of the town, castle or village you are in hold coin, how much of it lies above their reserve for hard times and how much war aid they gave the crown at the last dawn (off = no such line, as before)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool PeopleMenuShowsSavings { get; set; } = true;
+
+        [SettingPropertyBool("Folk Ladder Measure Log", HintText = "writes daily and weekly lines that measure where the people's savings could go - the loyalty of towns and castles, what the townsfolk bought with their spare coin and what found no goods, what luxuries would cost if the market saw their purses, the merchants' margin on goods brought by caravans, towns with luxury workshops, the savings of towns that have something to build, the gold of houses with room under their wage ceiling and what each town earns from - to the log only, changes nothing in the game")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkLadderMeasureLog { get; set; } = true;
+
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool Stage6MeasureLog { get; set; } = true;
@@ -6529,6 +6545,10 @@ namespace Armoury
             s.TempleTithe = TempleTithe;
             s.TitheVillageShare = TitheVillageShare;
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
+            s.FolkWarAid = FolkWarAid;
+            s.FolkWarAidShare = FolkWarAidShare;
+            s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
+            s.FolkLadderMeasureLog = FolkLadderMeasureLog;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;

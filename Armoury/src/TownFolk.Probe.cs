@@ -40,7 +40,7 @@ namespace Armoury
         private static long _rentPaid, _rentBelow;
         private static int _noBkCons;
         // nawias konsumpcji
-        private sealed class Track { public double Pending = double.NaN, Spent, Add; public int Rows; }
+        private sealed class Track { public double Pending = double.NaN, Spent, Add, First = double.NaN; public int Rows; }   // First - P1 (pomiar): budzet pierwszego wiersza kategorii
         private static readonly Dictionary<ItemCategory, Track> _brTrack = new Dictionary<ItemCategory, Track>();
         private static readonly List<Track> _pool = new List<Track>();
         private static int _poolN;
@@ -186,6 +186,7 @@ namespace Armoury
                 _brHorse = HorseBook.FolkOn; _brRowGold = 0;
                 if (_brHorse) { Array.Clear(_brHorseGold, 0, _brHorseGold.Length); Array.Clear(_brHorseN, 0, _brHorseN.Length); }
                 _brAnchor = false; _brFacFood = _brFacRest = 1;   // E5/B1: czynniki kotwicy tego nawiasu (AnchorDict nizej)
+                OfferOpen();   // P1 (pomiar): oferta nadwyzki tego nawiasu od zera (AddOffer dopisuje, ConsumePostfix zamyka)
                 // recenzja E5/0 (2-1): warunek dokupu jedzenia BK (EconomyPatches :532) - zapas sie w petli nie zmienia (polka i kasa tak; FoodStocksUpperLimit to odczyt modelu)
                 _brLowFood = false;
                 try { _brLowFood = __0.FoodStocks <= __0.FoodStocksUpperLimit() * 0.1f; } catch (Exception e) { Stumble("DemandPostfix(zapas)", e); }
@@ -232,12 +233,13 @@ namespace Armoury
                 Track tr;
                 if (!_brTrack.TryGetValue(__2, out tr))
                 {
-                    if (_poolN < _pool.Count) { tr = _pool[_poolN]; tr.Pending = double.NaN; tr.Spent = tr.Add = 0; tr.Rows = 0; }
+                    if (_poolN < _pool.Count) { tr = _pool[_poolN]; tr.Pending = double.NaN; tr.Spent = tr.Add = 0; tr.Rows = 0; tr.First = double.NaN; }
                     else { tr = new Track(); _pool.Add(tr); }
                     _poolN++;
                     _brTrack[__2] = tr;
                 }
                 if (!double.IsNaN(tr.Pending)) tr.Spent += tr.Pending - __1;   // reszta po poprzednim wierszu = wejscie tego
+                if (tr.Rows == 0) tr.First = __result;                       // P1 (pomiar): budzet pierwszego wiersza kategorii (z oferta nadwyzki)
                 tr.Rows++;
                 // zmiana budzetu w petli (BK dobrobyt/indeks razem z mnoznikami HistoricalPrices) - tylko na wierszach, ktore BK przetwarza (recenzja E5/0 (2-2):
                 // wiersz z budzetem 0 - np. ArmsLeaks.ZeroTownBudget - nie zmienia slownika i nie wchodzi do wydatku, wiec nie wchodzi i tu)
@@ -273,6 +275,7 @@ namespace Armoury
                     spent += tr.Spent; add += tr.Add; rows += tr.Rows;
                     grp[GroupOf(kv.Key)] += tr.Spent;
                 }
+                OfferClose(f);   // P1 (pomiar, wlasny try): ile oferty nadwyzki tej osady znalazlo towar (wydatek kategorii ponad budzet gry)
                 f.ConsGold += __0.Gold - _brGold0;
                 double cv = double.NaN;
                 var econ = EconOf(f);
