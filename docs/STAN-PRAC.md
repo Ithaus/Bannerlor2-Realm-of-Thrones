@@ -1911,3 +1911,16 @@ Cofniecie: Armoury a5e2fbf9 z kopii albo klucz Scutage = false.
   ok. 53 z 59 tys. zl/d zostaje niepokryte tam, gdzie lud nie odklada (Wyspy, Wolni Ludzie, Ibben, Qohor) - danina tego nie zamknie.
   **W GRZE: test 120 dob lacznie N5 (bez A) + W5b** (fin12; test\at-w43-120.out.txt). Po czystym wyniku: progi (etap8 N5, w5 z --csv, w6, kiesa1, etap2), zapis 9 dob,
   WGRANIE 43 (`wgraj.ps1 -DllDir test\fin12 -Tree zb\int -Tag 2026-10-13-noc43`), galaz noc/wgranie-43 = 4d33042, bieg kontrolny 10 dob.
+
+**WGRANIE 43 (13.10 ok. 21:00 UTC; poprawka 5 - towary N5 bez reguly A + poprawka daniny W5b):** Armoury **959d544d** (reszta jak WGRANIE 42: CrashScribe 04f44a0e, settings
+3e31434f, RC f9a944c1, GT 035878c4, ForgeView e17e0233). Galaz `noc/wgranie-43` = `w-toku/zbior-e8` **4d33042**. Kopie: `*.bak-2026-10-13-noc43-przed` i
+`D:\Backup-Bannerlord\wgrane\2026-10-13-noc43-przed`; md5 OK. Cofniecie: Armoury 772918be z kopii albo klucze (SlaughterKeepsHides, WorkshopHandsStep 1, ValveStepFollowsUse,
+CivilWorksAwayFromFront, WarAidFollowsLordsShortfall, CrownSurplusFeedsNeedAid).
+- **TEST LACZNY 120 dob przed wgraniem (fin12 + CS-at-hamulec): 120/120, 0 ERROR** (Armoury-2026-10-13_13-28-08.log + tabele, kopie na D:; progi SCRATCH\test\progi-w43\).
+  Grupy w5 (z W5b) i w6: 0 NIE; etap2 0 NIE; etap8 8 NIE; kiesa1 2 NIE (P1-1 lokata, P1-9 zloto rodow z luzem - jak wczesniej). **W5b: ze skarbcow ponad zapas wojny wyplacono
+  717 612 zl (pula 1.83 mln) w 12 krolestwach, skarbiec nigdy ponizej zapasu (0 / 0 / 0), zamkniecie 0 rozjazdow; regula 1 (stawka daniny z braku wojska) w tym biegu nie musiala
+  zadzialac (0 krokow z brakiem ponad prog).** N5: A wylaczona (w logu "sufit przy braku wylaczony"), skora - miast bez skory wyprawionej 13.1, uboj bez skory 0; zbroja t3+t4
+  42.6/d; budowy ida w 93.2 osadach, 18 poziomow, 26.6 tys. zl/d. Wojsko lordow w wojnie d93-120: 108 990; chleb swiata 99.0%, miast < 95% srednio 3.9.
+- Test zapisu: `autotest-dlugi` + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu w toku (test\at-w43-kontrola10.out.txt).
+- **STAN POPRAWEK 1-6 (decyzja Jeffa "robimy 1-6"): 1a danina W39, 1b korona wedlug potrzeby W41 + poprawka daniny W43, 2 tarczowe W42, 3 oblegajacy uchodzi W40, 5 towary W43
+  (len / sol - po projekcie gospodarki od ludzi), 6 male poprawki - NIE ZACZETE, 4 bieg dwuletni - na koncu.**
