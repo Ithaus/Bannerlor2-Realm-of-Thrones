@@ -1498,3 +1498,6 @@ ZATWIERDZONE: Armoury e69adbd3, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   na Bliznakach z licznika E7/B (Jeff: "chce, ale policz"); (9) reczne testy Jeffa 8.16 (29 punktow, projekt etapu 8) - sciezki gracza, ktorych autotest nie cwiczy: okienko rabunku R2,
   menu okregu, dymek wioski, kuznia, nagrody zadan, turniej, brama awansu na jezdzca (siodlo), rekrut gracza, dary Spoils, niewola; (10) zalozenia E8/H do potwierdzenia: bohaterowie
   poza regula uprzezy, zold jazdy bez zmian, zalogi nie kupuja uprzezy, 4 wzorce ROT bez uprzezy; (11) czy kupcy maja wozic unikaty miedzy miastami.
+- (09:20 UTC 13.10) **Bieg kontrolny PO WGRANIU 34 (stan z gry + nowe ustawienia Jeffa; 10 dob nowej kampanii): 10/10, Armoury 0 ERROR, 10.7 s/dobe** (Armoury-2026-10-13_02-10-48.log).
+  Linia "CampScene (E7/O2): prefaby dostepne - namioty 5/5, ogniska 3/3, pochodnie 2/2, plot 2/2" JEST (po usunieciu klucza z Armoury.json). Po biegu w grze WGRANIE 34 (md5 sprawdzone),
+  ustawienia Diplomacy 91/91/182/364/1000/520 na miejscu. Limit konta na koniec nocy: tydzien ok. 35-40%.
