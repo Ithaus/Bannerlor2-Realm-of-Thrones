@@ -39,7 +39,8 @@ namespace Armoury
     /// dawal 44% potrzeby, polka wlasnego miasta handlowego 16% - drewno lezalo w miastach bez kopalni. Daily: (a) przyjazdy wozow, (b) zakup z wlasnej
     /// polki jak dotad, (c) zamowienie wozem. Ile: od NIEDOBORU doby (potrzeba - srednia 7 dob lasu okregu i zakupu z wlasnej polki; las, ktorego pelna
     /// dymarka nie przyjela, liczy sie jak przyjety - woz nie wypiera darmowego lasu) x (doby drogi + 1) minus wozy, ktore dojada do tego dnia; nie wiecej,
-    /// niz zmiesci dymarka w dniu przyjazdu (2 x potrzeba - doba lasu - przewidywany stan). Skad: miasta w zasiegu BloomeryCartRange (droga), niewrogie
+    /// niz zmiesci dymarka w dniu przyjazdu (2 x potrzeba - doba lasu - przewidywany stan; recenzja: liczone do ostatniego wozu w drodze, a po wozie
+    /// kupionym do sufitu z dalszego, tanszego zrodla blizsze zrodla karmia ogien do jego przyjazdu). Skad: miasta w zasiegu BloomeryCartRange (droga), niewrogie
     /// frakcji wsi, nieoblezone, tylko nadwyzka ponad prog kontraktow 174 (MaterialOrders.SourceKeepFor), najtansze, potem najblizsze. Cena: kazdy ladunek
     /// po swojej (ShelfBuy.Take), budzet = zloto wsi, bez kredytu; zloto wies -> kasa miasta-zrodla. Droga: ladem do wsi, wyspa - ladem i morzem do portu
     /// miasta handlowego kopalni + doba (TradeCarts.Road / DaysFor, predkosc wozu wsi). PRZEWOZ BEZ OPLATY - kosztem jest czas drogi, jak wozy wsi
@@ -574,25 +575,38 @@ namespace Armoury
             return list;
         }
 
-        /// <summary>Przewidywany stan dymarki zaraz po przyjazdach doby due (bez nowego wozu): co dobe las okregu (do sufitu 2 x potrzeba), ogien bierze
-        /// potrzebe doby, potem wozy z przyjazdem tego dnia.</summary>
-        private static float Project(Mine m, List<Cart> mine, int today, int due)
+        /// <summary>Miejsce w dymarce na nowy woz z przyjazdem w dniu due (ladunki; moze wyjsc ujemne). Stan przewidywany bez nowego wozu, doba po dobie:
+        /// las okregu (do sufitu 2 x potrzeba), ogien bierze potrzebe doby, potem wozy z przyjazdem tego dnia; miejsce = sufit wozu (2 x potrzeba - doba
+        /// lasu) - stan po przyjazdach dnia due.
+        /// Recenzja F4a: gdy PO dniu due dojezdzaja jeszcze inne wozy (dalsze zrodlo zamowione wczesniej), liczy sie najciasniejszy dzien az do ostatniego
+        /// z nich - nowy woz moze dowiezc tylko tyle, ile ogien spali przed ich przyjazdem (fed: ogien, ktorego bez nowego wozu by zabraklo, dolicza sie
+        /// do miejsca). Bez tego blizsze zrodlo dowozilo do sufitu, a pozniejszy woz trafial na pelna dymarke i wypieral las okregu.</summary>
+        private static float Room(Mine m, List<Cart> mine, int today, int due)
         {
-            float want = m.Want, top = 2f * want, forest = Math.Min(m.ForAvg, want), b = m.Bank;
-            for (int d = today + 1; d <= due; d++)
+            float want = m.Want, top = 2f * want, forest = Math.Min(m.ForAvg, want), lim = top - forest, b = m.Bank;
+            int last = due;
+            foreach (var c in mine) if (c.DayDue > last) last = c.DayDue;
+            float room = lim, fed = 0f;
+            bool seen = false;
+            for (int d = today + 1; d <= last; d++)
             {
                 if (b < top) b = Math.Min(top, b + forest);
+                if (d > due && b < want) fed += want - b;
                 b = Math.Max(0f, b - want);
                 foreach (var c in mine) if (c.DayDue == d || (d == today + 1 && c.DayDue <= today)) b += c.N;
+                if (d < due) continue;
+                float r = lim - b + fed;
+                if (!seen || r < room) { room = r; seen = true; }
             }
-            return b;
+            return room;
         }
 
         /// <summary>(c) Zamowienia: kopalnia z niedoborem doby (potrzeba - srednia 7 dob drewna na miejscu) kupuje wozem z miast z nadwyzka w zasiegu.
         /// Zamowienie pod zrodlo o drodze T dob = niedobor x (T + 1) - wozy, ktore dojada do dnia przyjazdu, nie wiecej niz miejsce w dymarce tego dnia
         /// (2 x potrzeba - doba lasu - przewidywany stan) i nie mniej niz drewno na jedna lupe. Kolejnosc: najtansze, potem najblizsze; nastepne zrodlo
-        /// tylko wtedy, gdy poprzedniemu zabraklo nadwyzki albo jego woz trafilby na pelna dymarke. Bez zamowien: zasieg 0, wies nie-Normal, potrzeba 0,
-        /// brak probki.</summary>
+        /// tylko wtedy, gdy poprzedniemu zabraklo nadwyzki albo jego woz trafilby na pelna dymarke. Recenzja F4a: po wozie kupionym do sufitu pytane sa
+        /// jeszcze zrodla o KROTSZEJ drodze (karmia ogien do przyjazdu tamtego wozu; miejsce liczy Room do ostatniego wozu w drodze - bez przepelnienia).
+        /// Bez zamowien: zasieg 0, wies nie-Normal, potrzeba 0, brak probki.</summary>
         private static void CartOrders(ItemObject wood, EquipmentElement el, int today)
         {
             var s = Settings.Current;
@@ -637,15 +651,16 @@ namespace Armoury
                         cands.Add(new Cand { Town = sc.Town, St = sc.St, Keep = sc.Keep, Price = price, Dist = d, Days = TradeCarts.DaysFor(d) + (port ? 1 : 0) });
                     }
                     cands.Sort((a, b) => a.Price != b.Price ? a.Price.CompareTo(b.Price) : a.Dist.CompareTo(b.Dist));
-                    int rest = -1; bool noGold = false, roomFull = false;
+                    int rest = -1, nearer = int.MaxValue; bool noGold = false, roomFull = false;
                     foreach (var c in cands)
                     {
+                        if (c.Days >= nearer) continue;                              // recenzja F4a: po wozie do sufitu pytamy juz tylko zrodla o krotszej drodze
                         int due = today + c.Days, arr = 0;
                         foreach (var k in mine) if (k.DayDue <= due) arr += k.N;
                         int need = (int)Math.Ceiling(x * (c.Days + 1) - 1e-3f) - arr;
                         if (need < wpb) { if (rest < 0) rest = 0; break; }          // pod te droge niczego nie brakuje - dalszych zrodel nie pytamy
                         if (rest < 0) rest = need;
-                        int room = (int)Math.Floor(2f * m.Want - Math.Min(m.ForAvg, m.Want) - Project(m, mine, today, due));
+                        int room = (int)Math.Floor(Room(m, mine, today, due));
                         // w dniu przyjazdu z tego zrodla dymarka bedzie pelna (np. wlasnie dojezdza woz z dalszego miasta) - to zrodlo pomijamy, ale dalsze
                         // (inny dzien przyjazdu) pytamy: przerwanie tutaj zostawialo dalszy strumien bez zamowien na tydzien (symulacja reguly)
                         if (room < wpb) { roomFull = true; continue; }
@@ -686,7 +701,10 @@ namespace Armoury
                             if (Math.Max(0, town.MarketData.GetPrice(el)) > v.Gold) { noGold = true; break; }
                             continue;
                         }
-                        if (n == room && room < need) { roomFull = true; break; }   // sufit dymarki
+                        // sufit dymarki w dniu przyjazdu z tego zrodla. Recenzja F4a: dalszych zrodel nie pytamy (wypieralyby las), ale zrodla o KROTSZEJ
+                        // drodze tak - ich woz dojedzie wczesniej i nakarmi ogien do przyjazdu tego wozu (Room liczy miejsce do ostatniego wozu w drodze).
+                        // Przerwanie tutaj zostawialo kopalnie bez drewna na cala droge tanszego, dalszego zrodla, choc blizsze mialo nadwyzke
+                        if (n == room && room < need) { roomFull = true; nearer = c.Days; continue; }
                     }
                     // niedobor doby bez wozu (najwyzej niedobor jednej doby - zamowienie pod droge liczy kilka dob naraz)
                     if (rest < 0) rest = (int)Math.Ceiling(x * (far - today + 1) - 1e-3f) - all;   // zadnego zrodla z nadwyzka w zasiegu
