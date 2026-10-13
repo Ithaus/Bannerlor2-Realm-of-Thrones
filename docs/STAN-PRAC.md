@@ -1924,3 +1924,5 @@ CivilWorksAwayFromFront, WarAidFollowsLordsShortfall, CrownSurplusFeedsNeedAid).
 - Test zapisu: `autotest-dlugi` + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu w toku (test\at-w43-kontrola10.out.txt).
 - **STAN POPRAWEK 1-6 (decyzja Jeffa "robimy 1-6"): 1a danina W39, 1b korona wedlug potrzeby W41 + poprawka daniny W43, 2 tarczowe W42, 3 oblegajacy uchodzi W40, 5 towary W43
   (len / sol - po projekcie gospodarki od ludzi), 6 male poprawki - NIE ZACZETE, 4 bieg dwuletni - na koncu.**
+- (21:10 UTC 13.10) Bieg kontrolny PO WGRANIU 43 (10 dob nowej kampanii): 10/10, Armoury 0 ERROR; w grze Armoury 959d544d (md5 sprawdzone). Tydzien 97% - na tym koncie biegnie
+  juz tylko workflow projektu gospodarki od ludzi (wf_fb11d85b-5e0); pliki rozpoznan w `docs/gospodarka-od-ludzi/robocze/`. START dla nastepnego konta: PRZEKAZANIE rozdz. 29.
