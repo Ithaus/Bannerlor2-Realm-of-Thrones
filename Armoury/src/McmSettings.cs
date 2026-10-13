@@ -3576,6 +3576,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Contact Only When Called", HintText = "with Crown Rent War Day Needs Contact: a day of war binds a realm to service only when the realm is truly called to it - an army of the realm is in the field, the realm besieges or is besieged, or one of its own settlements is raided, pressed or attacked that day. A battle in the open field and the raids of its own lone lords on enemy villages no longer bind the whole realm, so a war fought only by a few raiding houses asks no service of the rest. Off = any raid, pressing, assault or battle between lords of the two realms binds both realms, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentContactOnlyWhenCalled { get; set; } = true;
+
         [SettingPropertyBool("Crown Rent Service After Full Days", HintText = "the crown asks a house for service only once that house has seen as many days of real war under this crown as the crown asks days of service (Crown Rent Service Days); before that every house that keeps its garrisons draws its rent - a short clash at the start of a quiet war no longer strips the rent from every house that missed it (off = service is asked from the first day of real war, as before)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentServiceAfterFullDays { get; set; } = true;
@@ -6121,6 +6125,7 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownRentContactOnlyWhenCalled = CrownRentContactOnlyWhenCalled;
             s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
             s.CrownRentServiceAtMeans = CrownRentServiceAtMeans;
             s.CrownRentHeldToServing = CrownRentHeldToServing;

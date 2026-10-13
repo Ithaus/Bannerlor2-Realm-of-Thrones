@@ -46,6 +46,11 @@ namespace Armoury
     ///    dobach - inaczej zaloga zdazy spasc ponizej normy). Dotad kara za brak sluzby zabierala rente rodowi, ktorego nikt nie mogl wezwac, a bez renty
     ///    zold zalogi (placonej pierwszej) zjadal caly pulap - na druzyne 0 (57 rodow, partie 24.3 -> 5.8 tys.). Stan _means z ostatniej doby wojny rodu
     ///    (w pokoju bez zmian), w zapisie (5. pole). Gracz nie ma budzetu 166 - nigdy nie jest "na miare". Zloto: renta zmienia tylko odbiorce w krolestwie.
+    ///  - P3/W1 B (TRIAZ-3 O1-2 "Poprawka ostateczna" B; klucz CrownRentContactOnlyWhenCalled): DOBA WOJNY ZOBOWIAZUJE KROLESTWO TYLKO PRZY WEZWANIU
+    ///    ALBO NAPADZIE NA WLASNA ZIEMIE - armia krolestwa w polu, oblezenie (obie strony) albo zdarzenie przy WLASNEJ osadzie (rabunek, wymuszenie, szturm,
+    ///    wypad, blokada). Bitwa w polu i rajd samotnego lorda na wies wroga nie zobowiazuja jego krolestwa (dotad OnMapEvent dopisywal oba krolestwa:
+    ///    Polnoc od d141 bez jednej armii, doby wojny nabijaly rajdy 2-5 bogatych rodow - 18 rodow z pelnymi druzynami stracilo rente w d241-250).
+    ///    Uczestnicy dalej maja sluzbe 3/4/6/7 w dobach ze stykiem. Klucz wylaczony = oba krolestwa kazdego zdarzenia, jak dotad.
     ///    POMIAR (C): zrodla styku krolestw (armia w polu / oblezenie / napad na wlasna osade / tylko rajdy i bitwy wlasnych lordow), w CSV sluzba rodu
     ///    dzis (0-8), najwyzsze wypelnienie druzyny i znacznik "na miare".
     /// Kolejnosc (2.0b): po zwrocie zoldu (KingdomTreasury.WageRefund), przed CrownIncome.End; kazde krolestwo i kazdy rod we wlasnym try.
@@ -379,7 +384,10 @@ namespace Armoury
                 if (!meansOn && _means.Count > 0) _means.Clear();
                 int meansN = 0, meansServed = 0, srvMeans = 0, meansWaived = 0;
                 var armyK = new HashSet<Kingdom>(); var siegeK = new HashSet<Kingdom>();   // P3/W1 C: zrodla styku (pomiar)
-                var active = new HashSet<Kingdom>(_contact);   // styk z wrogiem od ostatniego ticku (zdarzenia: bitwy, rabunki, szturmy)
+                // P3/W1 B: przy kluczu zobowiazuja tylko zdarzenia przy WLASNEJ osadzie krolestwa (napad na jego ziemie); bitwy w polu i rajdy wlasnych
+                // lordow - nie. Armia w polu i oblezenie (nizej) bez zmian. Klucz wylaczony = oba krolestwa kazdego zdarzenia (stan sprzed)
+                bool onlyCalled = needContact && s.CrownRentContactOnlyWhenCalled;
+                var active = new HashSet<Kingdom>(onlyCalled ? _contactOwn : _contact);   // styk z wrogiem od ostatniego ticku (zdarzenia: bitwy, rabunki, szturmy)
                 var noContactK = new HashSet<Kingdom>();
                 var seen = new HashSet<string>();
                 var pend = new List<KeyValuePair<Svc, int>>(); var pendK = new List<Kingdom>();
@@ -652,6 +660,7 @@ namespace Armoury
                       .Append(" | P3/W1 styk krolestw w wojnie wedlug zrodla (krolestw w wojnie ").Append(warKingdoms).Append("): armia w polu ").Append(needContact ? srcArmy.ToString(Inv) : "-")
                       .Append(", oblezenie ").Append(needContact ? srcSiege.ToString(Inv) : "-").Append(", napad na wlasna osade ").Append(srcOwn)
                       .Append(", tylko rajdy i bitwy wlasnych lordow ").Append(needContact ? srcLone.ToString(Inv) : "-")
+                      .Append(!needContact ? "" : onlyCalled ? " (nie zobowiazuja - Crown Rent Contact Only When Called)" : " (zobowiazuja jak dotad - Crown Rent Contact Only When Called wylaczone)")
                       .Append(" | P3/W1 sluzba na miare srodkow (Crown Rent Service At Means): ")
                       .Append(meansOn ? "rodow w wojnie " + meansN + " (z nich sluzylo i tak " + meansServed + ", doba zaliczona " + srvMeans + "), wymog sluzby zdjety u " + meansWaived + " rodow z lennem"
                                         + (budgetPending ? "; budzet 166 jeszcze nie policzony w tej sesji - stan z zapisu" : "")

@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO W1-B, TRIAZ-3 O1-2 B) - DOBA WOJNY ZOBOWIAZUJE KROLESTWO TYLKO PRZY WEZWANIU ALBO NAPADZIE NA WLASNA ZIEMIE (klucz CrownRentContactOnlyWhenCalled)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (Daily: zbior krolestw ze stykiem; linia), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby):** Polnoc - 16 z 57 rodow bez renty. Do d196 zaden rod Polnocy nie byl bez sluzby, w d224 2, w d252 18; sluzbe stracily w tych samych dobach (d241-250) rody z PELNYMI druzynami (Flint Lyessa 99%, Mormont 100%, Whitehill 80-88%, Umber 72%, Manderly 80%). W d113-140 sluzylo wszystkie 20 rodow po 17 dob (armia fabularna ROT), a od d141 Polnoc nie zebrala ani jednej armii (`bitwy.log`: 1 zdarzenie armii w roku). Doby wojny ze stykiem nabijaly samotne rajdy 2-5 bogatych rodow na wsie wroga na poludniu: dni ze zdarzeniem 18 z 56 (d141-196), 56 z 56 (d253-308), 50 z 56; wlasna ziemia Polnocy napadnieta 0-2 dni na 91. Skutek: Stark, Bolton, Dustin, Ryswell biora 60.4 z 85.5 tys. D krolestwa, cala Polnoc 11 254 -> 4 855 ludzi w partiach przy rosnacym zlocie krolestwa (4.51 -> 5.04 mln).
+
+**Przyczyna:** `CrownRents.OnMapEvent` dopisywal do krolestw ze stykiem OBA krolestwa kazdego rabunku, wymuszenia, szturmu i bitwy lordow - rajd jednego lorda na wies wroga czynil dobe wojny calemu jego krolestwu, wiec maska sluzby wszystkich jego rodow przesuwala sie o dobe bez sluzby, choc nikt ich nie wzywal.
+
+**Zmiana (klucz `CrownRentContactOnlyWhenCalled`, domyslnie wlaczony; wylaczony = stan sprzed):** krolestwo ma dobe wojny, gdy (a) ma armie w polu, (b) oblega albo jest oblegane (obie strony - jak dotad), (c) od ostatniej doby bylo zdarzenie przy JEGO WLASNEJ osadzie: rabunek, wymuszenie, szturm, wypad, blokada (`MapEvent.MapEventSettlement`, wlasciciel = jedna ze stron w wojnie). Bitwa w polu i rajd wlasnych lordow na cudza ziemie krolestwa nie zobowiazuja. Typ zdarzenia sprawdzany wprost - gra bywa, ze przypisuje pobliska wies takze bitwie w polu (MapEvent.cs:785-805), wiec sama osada zdarzenia nie wystarcza. Linia 180: przy zrodlach styku dopisek "(nie zobowiazuja - ...)" albo "(zobowiazuja jak dotad ...)".
+
+**Zloto / ludzie:** bez zmiany zlota (renta zmienia odbiorce w krolestwie). Polnoc: od d141 0 dob zobowiazania -> maski stoja na 17-35 dobach sluzby przy wymogu 12 -> 20 z 20 rodow z renta; razem z W1-A partie Polnocy 7.5-7.9 tys. zamiast 4.9 tys. (samo A ok. +2.0 tys., B do +2.6 tys.). Poza Polnoca kierunek ten sam (zobowiazan nigdy wiecej niz dzis), wielkosc nieznana - dlatego pomiar zrodel styku w linii 180 (W1-A/C).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- W wojnie prowadzonej samymi rajdami nikt nie jest zobowiazany - renta wedlug wag lenn jak w pokoju; samotni lupiezcy przestaja zgarniac cudze udzialy przez E5/F9.
+- Doba bez zobowiazania nie przesuwa maski nikomu (takze lupiezcy) - regula C3 bez zmian; rod, ktory ma niedobor dob, odrabia go dopiero w nastepnych dobach zobowiazania (jak dotad przy `CrownRentWarDayNeedsContact`).
+- Napadnieta strona jest zobowiazana jak dotad; jej rody sluza poscigiem i odsiecza (rodzaj 6), bitwa (3/7) albo armia.
+- Czynne tylko z `CrownRentWarDayNeedsContact` (przy wylaczonym kazda doba wojny liczy sie jak dotad). Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu 364 dob: 0 rodow Polnocy bez renty w oknach samych rajdow; Polnoc >= 7.5 tys. ludzi w partiach w d337-364; w linii 180 "tylko rajdy i bitwy wlasnych lordow" > 0 w dobach, w ktorych dotad liczyla sie doba wojny.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (P3/WOJSKO W1-A, TRIAZ-3 O1-2 A + C) - SLUZBA NA MIARE SRODKOW: rod, ktorego nie stac na druzyne do wezwania, nie traci renty korony (klucz CrownRentServiceAtMeans)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` (od 74a3645) | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `Pending`, `AtMeans`), `CrownRents.cs` (Daily, OnMapEvent - pomiar, CsvCols/CsvHeader, Export/Import), `ClanIncomeBook.cs` (1 linia: naglowek CSV z `CrownRents.CsvHeader`), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis: `arm_rent180` dostaje 5. pole (stary zapis wczytuje sie bez niego).
 
