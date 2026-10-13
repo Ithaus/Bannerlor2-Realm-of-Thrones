@@ -5364,6 +5364,14 @@ namespace Armoury
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool CivilWorksNeedWageRoom { get; set; } = true;
 
+        [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool PeopleScaleDryRun { get; set; } = true;
+
+        [SettingPropertyBool("Watch Keeps Flat Output", HintText = "The Night's Watch stands outside the rules that tie goods to the number of people: the villages of the Gift keep today's output, and Castle Black and the Watch's castles keep a market of ordinary size, although only some twenty thousand people live there - the Watch lives on the men and gifts of all Westeros. Off = the Watch's lands are measured by their people like any other")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool WatchKeepsFlatOutput { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6704,6 +6712,8 @@ namespace Armoury
             s.CivilWorksCalmDays = CivilWorksCalmDays;
             s.CivilWorksFrontRange = CivilWorksFrontRange;
             s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
+            s.PeopleScaleDryRun = PeopleScaleDryRun;
+            s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
         }
 
         internal static void Apply()

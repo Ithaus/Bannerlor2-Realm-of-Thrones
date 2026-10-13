@@ -1879,6 +1879,15 @@ namespace Armoury
         public float CivilWorksFrontRange = 60f;           // how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours
         public bool CivilWorksNeedWageRoom = true;         // with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds
 
+        // --- Goods follow the people (GL) ---
+        // GL-0 (projekt docs/gospodarka-od-ludzi, P0): wspolna usluga skal "ludzie okregu" (PeopleScale.cs) - skala wsi u_v, skala rynku miasta m_t, skala podzamcza;
+        // odniesienia z kalibracji kampanii w zapisie (arm_peoplescale), pamiec doby dla paczek P1-P4. Usluga liczy zawsze (sam odczyt); ten klucz = tylko linie
+        // "Skale ludzi (GL0)" i plik skale-ludzi.csv
+        public bool PeopleScaleDryRun = true;              // Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)
+        // GL-0 / P6 (decyzja Jeffa 13.10, pyt. 3): Nocna Straz poza regula - wsie Daru przy dzisiejszej stalej produkcji, rynek Castle Black i podzamcza Strazy
+        // ze skala 1 (PeopleScale.WatchException); dopoki zadna paczka nie czyta skal - bez skutku w grze
+        public bool WatchKeepsFlatOutput = true;           // The Night's Watch stands outside the rules that tie goods to the number of people: the villages of the Gift keep today's output, and Castle Black and the Watch's castles keep a market of ordinary size, although only some twenty thousand people live there - the Watch lives on the men and gifts of all Westeros. Off = the Watch's lands are measured by their people like any other
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");
