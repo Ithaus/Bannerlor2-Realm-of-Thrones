@@ -209,13 +209,13 @@ namespace Armoury
             try
             {
                 sc.NeedN = cand.Count;
-                sc.Uncovered = Math.Max(0, row.Need - row.Pot);
+                sc.Uncovered = Math.Max(0, row.Need - row.Pot - row.Crown);   // W5b regula 2: po daninie i po puli ze skarbca ponad zapas wojny (klucz wylaczony: Crown = 0 - jak dotad)
                 sc.Level0 = level0; sc.Level1 = level0;
                 long room = (long)Math.Floor(Math.Min((double)sc.Due, sc.Uncovered));   // KORONA BIERZE TYLE, ILE POTRZEBA: najwyzej niepokryta potrzeba po daninie
                 sc.Room = room;
                 if (room <= 0 || cand.Count == 0) return;
                 // poziom wyrownania z garnkiem danina + tarczowe: ta sama regula co W5 (najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku)
-                double pot1 = row.Pot + room, level1 = target;
+                double pot1 = row.Pot + row.Crown + room, level1 = target;   // W5b regula 2: garnek = danina + skarbiec ponad zapas wojny + tarczowe (level0 = poziom po skarbcu)
                 if (row.Need > pot1)
                 {
                     double lo = 0, hi = target;
@@ -347,6 +347,7 @@ namespace Armoury
                     sb.Append("Tarczowe (W6): dzien ").Append(today)
                       .Append(" | wylacznik Scutage ").Append(s.Scutage ? "tak" : "nie (tarczowe 0 - jak przed paczka)")
                       .Append(", doplata wedlug potrzeby W5 (Crown War Aid By Need, renty 180, budzet 166) ").Append(NeedAidOn ? (ClanBudget.Pending ? "tak (budzet jeszcze nie policzony w tej sesji - tarczowe od jutra)" : "tak") : "nie (tarczowe 0)")
+                      .Append(CrownSurplusOn ? ", skarbiec ponad zapas wojny (W5b) tak - niepokryta potrzeba i gotowka \"ponad danine\" w tej linii licza sie po daninie i po skarbcu" : "")
                       .Append(" | stawka ").Append((100 * ScRate(s)).ToString("0", WtInv)).Append("% podstawy (pulap wlasny druzyn bez dworu, kredytu i przydzialu korony ponad zold druzyn doprowadzonych do celu W5 ")
                       .Append((100 * NaTarget(s)).ToString("0", WtInv)).Append("% limitu), najwyzej 1/").Append(Math.Max(1f, s.WarChestDays).ToString("0", WtInv))
                       .Append(" nadwyzki kiesy rodziny ponad rezerwe wojenna na dobe, glowa nie ponizej ").Append(Math.Max(0, s.FamilyPurseFloor))

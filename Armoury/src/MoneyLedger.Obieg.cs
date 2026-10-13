@@ -570,6 +570,7 @@ namespace Armoury
               .Append(", od innych ").Append(cib ? ClanIncomeBook.LastEvtOther.ToString(Inv) : "-").Append(')')
               .Append(", renty od korony (180) ").Append(CrownRents.LastPaid)
               .Append(", gotowka korony na zold druzyn (W5) ").Append(KingdomTreasury.LastNeedAid)   // recenzja W5: ta sama kwota co po stronie korony (skarbce -> glowy rodow)
+              .Append(", gotowka korony na zold druzyn ze skarbca ponad zapas wojny (W5b) ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: szczebel skarbca doplaty W5 (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn z tarczowego (W6) ").Append(KingdomTreasury.LastScutageOut)   // W6: szczebel tarczowego doplaty W5 (skarbce -> glowy rodow)
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))
@@ -630,6 +631,7 @@ namespace Armoury
               .Append(", doplata do zoldu wedlug potrzeby (W5) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAid)   // W5: z daniny P1 tej doby, przed rentami 180
               .Append(", tarczowe (W6) glowy rodow -> skarbce ").Append(KingdomTreasury.LastScutageIn)   // W6: pobrane tej doby i tej samej doby wyplacone (poza wplywami dnia)
               .Append(" i skarbce -> glowy rodow z doplata W5 ").Append(KingdomTreasury.LastScutageOut)
+              .Append(", doplata ze skarbcow ponad zapas wojny (W5b) skarbce -> glowy rodow ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: z zapasu skarbca, poza wplywami dnia
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)

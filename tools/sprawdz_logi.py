@@ -413,6 +413,11 @@ Uzycie (Python 3, tylko odczyt):
                     z doplata od >= 28 dob rosnie, zold oplacony doplata poza podstawa zwrotu, potkniecia, druzyny lordow w wojnie (INFO z celem
                     85 tys. w biegu rocznym), liczby paczki i krolestwa bez garnka (INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W5-9 (INFO, z CSV) zold na czlowieka i wypelnienie rodow z doplata wobec pozostalych rodow z lennem w wojnie.
+                    W5b (decyzja Jeffa 13.10 "poprawka daniny"): W5b-0 dopiski i klucze (linia W5: skarbiec ponad zapas wojny; linia 184: brak wojska u
+                    panow), W5b-1 zamkniecie z nowym zrodlem (suma krolestw = razem = linia 165 = Obieg = kolumna CSV doplata_ze_skarbca_w5b; wyplata
+                    <= pula <= 1/tempo nadwyzki i <= niepokryta potrzeba po daninie), W5b-2 skarbiec nigdy ponizej zapasu wojny przez te regule,
+                    W5b-3 brak ponad prog -> stawka daniny rosnie; 0 krolestw z brakiem w 4 ostatnich krokach i stawka 0, W5b-4 ile dala regula 1 i 2
+                    na krolestwo (INFO), W5b-5 skarbce ponad zapas wojny i powod S (INFO). Log bez paczki: jeden wiersz INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
                     python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -14952,15 +14957,20 @@ def _w5_kingdoms(s):
     seg = seg[:j] if j >= 0 else seg
     if seg.strip() in ("-", ""):
         return []
-    kre = re.compile(r"^(.*?): garnek (\d+) \(danina (\d+)\), potrzeba (\d+) u (\d+) rodow, poziom ([\d.]+%|-), wyplacono (\d+) \(rodow (\d+)\), reszta (-?\d+)$")
+    # W5b: dopisek na koncu wiersza (gotowka ze skarbca ponad zapas wojny, pula, nadwyzka skarbca, zapas wojny, niepokryte po wszystkich zrodlach) - opcjonalny
+    kre = re.compile(r"^(.*?): garnek (\d+) \(danina (\d+)\), potrzeba (\d+) u (\d+) rodow, poziom ([\d.]+%|-), wyplacono (\d+) \(rodow (\d+)\), reszta (-?\d+)"
+                     r"(?:, ze skarbca ponad zapas (\d+) z puli (\d+) \(nadwyzka (\d+), zapas wojny (\d+)\), niepokryte (\d+))?$")
     out = []
     for part in seg.split(" ; "):
         m = kre.match(part)
         if not m:
             out.append({"bad": part[:80]})
             continue
-        out.append({"name": m.group(1), "pot": int(m.group(2)), "aid": int(m.group(3)), "need": int(m.group(4)), "needn": int(m.group(5)),
-                    "level": (float(m.group(6)[:-1]) if m.group(6) != "-" else None), "paid": int(m.group(7)), "paidn": int(m.group(8)), "rest": int(m.group(9))})
+        k = {"name": m.group(1), "pot": int(m.group(2)), "aid": int(m.group(3)), "need": int(m.group(4)), "needn": int(m.group(5)),
+             "level": (float(m.group(6)[:-1]) if m.group(6) != "-" else None), "paid": int(m.group(7)), "paidn": int(m.group(8)), "rest": int(m.group(9))}
+        if m.group(10) is not None:
+            k.update({"cpaid": int(m.group(10)), "cpool": int(m.group(11)), "csur": int(m.group(12)), "cres": int(m.group(13)), "unc": int(m.group(14))})
+        out.append(k)
     return out
 
 
@@ -15122,6 +15132,8 @@ def w5_main(logp, start_arg, until=120, csvp=None):
         w6paid = {}   # W6: gotowka W5 ze szczebla tarczowego (linia "Tarczowe (W6)"; log bez W6 - pusto)
         for d6, s6 in e4_series(lines, "Tarczowe (W6): dzien", 1).items():
             w6paid[d6] = num(r"wyplacone przez W5 ponad danine (\d+)", s6) or 0
+        for d6 in w5:   # W5b: gotowka W5 ze skarbca ponad zapas wojny (ta sama linia; log bez paczki - 0)
+            w6paid[d6] = w6paid.get(d6, 0) + (num(r", wyplacono ze skarbca (\d+) \(rodow", w5[d6]) or 0)
         for i, d in enumerate(ds):
             c = num(r"zold oplacony wczorajsza doplata poza podstawa zwrotu 70% \(dzis\) (\d+)", w5[d])
             if c is None:
@@ -15175,8 +15187,219 @@ def w5_main(logp, start_arg, until=120, csvp=None):
         rep.add("W5-8b: krolestwa w wojnie z potrzeba i bez garnka w ostatniej dobie okna (lud bez nadwyzki albo s = 0 - regula tam nie dziala; INFO)",
                 (", ".join(f"{nm} {v / 1e3:.1f} tys." for v, nm in dry[:8]) if dry else "brak") + f"; z garnkiem mniejszym niz potrzeba: {short}",
                 "INFO - w biegu rocznym: Iron Islands, Free Folk, Ibben, Qohor, Pentos (potrzeba razem ok. 59 tys. zl/d, garnek 0)", None)
+    try:
+        w5b_block(rep, lines, start, until, w5, win, kor, obg, rows)
+    except Exception as e:   # blok W5b nigdy nie wywraca grupy (log sprzed paczki, inny uklad linii)
+        rep.add("W5b: blok progow", f"nie policzono ({type(e).__name__}: {e})", "INFO", None)
     rep.show()
     return 0
+
+
+def _w5b_184(s):
+    """Linia "Korona: podatek wojenny ludu (184)": wiersze krolestw -> {nazwa: slownik} z polami s, pulap, wojna, skarbiec, zapas wojny oraz (W5b)
+    brak (srednia 7 dob niepokrytej potrzeby), prog, pomiar (dob), stawka daniny, krok daniny (None poza doba kroku); ln = False bez dopisku."""
+    i = s.find("| na krolestwo: ")
+    if i < 0:
+        return {}
+    seg = s[i + len("| na krolestwo: "):]
+    j = seg.rfind(" | potkniecia ")
+    seg = seg[:j] if j >= 0 else seg
+    kre = re.compile(r"^(.*?): s ([\d.]+)% / pulap ([\d.]+)%, (wojna|pokoj).*?, skarbiec (-?\d+) / zapas wojny (\d+)")
+    lre = re.compile(r", brak wojska u panow (\d+) zl/d \(prog (\d+), pomiar (\d+) dob\), stawka daniny ([\d.]+)%(?:, krok daniny ([+-]?[\d.]+) pkt)?$")
+    out = {}
+    for part in seg.split(" ; "):
+        m = kre.match(part)
+        if not m:
+            continue
+        k = {"s": float(m.group(2)), "cap": float(m.group(3)), "war": m.group(4) == "wojna", "wallet": int(m.group(5)), "reserve": int(m.group(6)), "ln": False,
+             "need": bool(re.search(r", potrzeba [KZ]*S", part))}
+        lm = lre.search(part)
+        if lm:
+            k.update({"ln": True, "brak": int(lm.group(1)), "prog": int(lm.group(2)), "n": int(lm.group(3)), "sa": float(lm.group(4)),
+                      "krok": (float(lm.group(5)) if lm.group(5) is not None else None)})
+        out[m.group(1)] = k
+    return out
+
+
+def w5b_block(rep, lines, start, until, w5, win, kor, obg, rows):
+    """W5b (decyzja Jeffa 13.10 "zrob poprawke daniny"): regula 2 - skarbiec ponad zapas wojny doklada do garnka W5 (dopiski linii "Doplata wedlug potrzeby
+    (W5)", pozycje w liniach 165 i Obieg, kolumna doplata_ze_skarbca_w5b); regula 1 - brak wojska u panow podnosi stawke daniny z oszczednosci (dopiski
+    linii "Korona: podatek wojenny ludu (184)" i "Danina z oszczednosci (P1)"). Wiersze: W5b-0 dopiski i klucze, W5b-1 zamkniecie z nowym zrodlem, W5b-2
+    skarbiec nigdy ponizej zapasu wojny przez te regule, W5b-3 brak ponad prog a stawka daniny stoi, W5b-4 ile dala regula 1 i 2 na krolestwo (INFO),
+    W5b-5 skarbce ponad zapas wojny i powod S (INFO). Log bez paczki: jeden wiersz INFO."""
+    wtx = e4_series(lines, "Korona: podatek wojenny ludu (184): dzien", 1)
+    dan = e4_series(lines, "Danina z oszczednosci (P1): dzien", 1)
+    has2 = [d for d in win if "skarbiec ponad zapas wojny W5b (Crown Surplus Feeds Need Aid)" in w5[d]]
+    wwin = [d for d in sorted(wtx) if 2 <= run_day(d, start) <= until]
+    has1 = [d for d in wwin if "| brak wojska u panow (W5b): wylacznik War Aid Follows Lords Shortfall" in wtx[d]]
+    if not has2 and not has1:
+        rep.add("W5b-0: dopiski W5b w liniach W5 i 184", "brak w logu", "sa od wgrania W5b (LogEnabled); log sprzed paczki - wiersze W5b pominiete (INFO)", None)
+        return
+    on2 = [d for d in has2 if "skarbiec ponad zapas wojny W5b (Crown Surplus Feeds Need Aid) tak" in w5[d]]
+    on1 = [d for d in has1 if "wylacznik War Aid Follows Lords Shortfall tak" in wtx[d]]
+    idle1 = [d for d in on1 if "wylacznik War Aid Follows Lords Shortfall tak, ale nieczynny" in wtx[d]]
+    tre = re.compile(r"\| ze skarbca ponad zapas wojny \(W5b\): najwyzej 1/(\d+) nadwyzki .*?krolestw z nadwyzka skarbca (\d+) \(nadwyzka razem (\d+)\), z pula (\d+)"
+                     r"; pula ze skarbca (\d+), wyplacono ze skarbca (\d+) \(rodow (\d+)\), podniesienie pulapu ponad szczebel daniny (\d+)"
+                     r"; krolestw bez nadwyzki przez dlug 186 (\d+); kontrola skarbca: ponizej zapasu wojny po wyplacie (\d+)"
+                     r", gotowka przy zoldzie druzyn w pulapie wlasnym (\d+) \(oczekiwane 0\), potkniecia skarbca (\d+)"
+                     r" \| niepokryte po wszystkich zrodlach \(danina, skarbiec, tarczowe\) (\d+) w (\d+) krolestwach")
+    tot = {}
+    for d in has2:
+        m = tre.search(w5[d])
+        if m:
+            # 0 tempo (dob), 1 krolestw z nadwyzka, 2 nadwyzka razem, 3 z pula, 4 pula, 5 wyplacono, 6 rodow, 7 pulap, 8 dlug 186, 9 ponizej zapasu,
+            # 10 gotowka w pulapie wlasnym, 11 potkniecia, 12 niepokryte, 13 krolestw z niepokryta
+            tot[d] = [int(x) for x in m.groups()]
+    unread = [d for d in has2 if d not in tot]
+    rep.add("W5b-0: dopiski W5b - linia W5 (regula 2: skarbiec ponad zapas wojny) i linia 184 (regula 1: brak wojska u panow), klucze",
+            f"linia W5: dob z dopiskiem {len(has2)} z {len(win)}, klucz tak w {len(on2)}, pola nieodczytane w {len(unread)}"
+            + (f", tempo 1/{tot[sorted(tot)[-1]][0]}" if tot else "")
+            + f"; linia 184: dob z dopiskiem {len(has1)} z {len(wwin)}, klucz tak w {len(on1)} (nieczynny - bez daniny P1 albo W5 - w {len(idle1)})",
+            "dopiski kazdej doby, oba klucze tak i czynne, wszystkie pola odczytane",
+            (len(has2) == len(win) and len(on2) == len(has2) and not unread and len(has1) == len(wwin) and len(on1) == len(has1) and not idle1) if (win and wwin) else None)
+    # ---- W5b-1 zamkniecie z nowym zrodlem
+    if tot:
+        bad_k, bad_row, bad_165, bad_obg, bad_pool, n165, nobg = [], 0, [], [], [], 0, 0
+        for d, t in tot.items():
+            ks = _w5_kingdoms(w5[d])
+            bad_row += sum(1 for k in ks if "bad" in k or "cpaid" not in k)
+            ks = [k for k in ks if "bad" not in k and "cpaid" in k]
+            # wiersz ma kazde krolestwo z garnkiem albo potrzeba, a pula powstaje tylko przy potrzebie - suma wierszy = razem
+            if sum(k["cpaid"] for k in ks) != t[5] or sum(k["cpool"] for k in ks) != t[4]:
+                bad_k.append(run_day(d, start))
+            for k in ks:
+                unc0 = max(0, k["need"] - k["pot"])
+                if k["cpaid"] > k["cpool"] or k["cpool"] > unc0 + 1 or k["cpool"] > k["csur"] / max(1, t[0]) + 1 or (k["cpool"] > 0 and k["csur"] <= 0):
+                    bad_pool.append(run_day(d, start))
+            if d in kor:
+                v = num(r"doplata ze skarbcow ponad zapas wojny \(W5b, poza wplywami dnia - z zapasu\) (\d+)", kor[d])
+                if v is not None:
+                    n165 += 1
+                    if v != t[5]:
+                        bad_165.append(run_day(d, start))
+            if d in obg:
+                a = num(r"gotowka korony na zold druzyn ze skarbca ponad zapas wojny \(W5b\) (\d+)", obg[d])
+                b = num(r"doplata ze skarbcow ponad zapas wojny \(W5b\) skarbce -> glowy rodow (\d+)", obg[d])
+                if a is not None and b is not None:
+                    nobg += 1
+                    if a != t[5] or b != t[5]:
+                        bad_obg.append(run_day(d, start))
+        # CSV niezaleznie od linii: suma kolumny rodow = wyplacono ze skarbca
+        badc = []
+        if rows and "doplata_ze_skarbca_w5b" in rows[0]:
+            cd = {}
+            for r in rows:
+                try:
+                    dd = int(r.get("dzien") or 0)
+                    cd[dd] = cd.get(dd, 0.0) + float(r.get("doplata_ze_skarbca_w5b") or 0)
+                except ValueError:
+                    continue
+            cmpd = [d for d in tot if d in cd]
+            badc = [run_day(d, start) for d in cmpd if int(round(cd[d])) != tot[d][5]]
+            csvtxt = f", suma kolumny CSV doplata_ze_skarbca_w5b wobec linii: rozjazd w {len(badc)} z {len(cmpd)} dob"
+        else:
+            csvtxt = ", CSV bez kolumny doplata_ze_skarbca_w5b albo brak pliku"
+        ok1 = not bad_k and not bad_165 and not bad_obg and not bad_pool and not badc and bad_row == 0 and n165 > 0
+        rep.add("W5b-1: zamkniecie z nowym zrodlem - suma krolestw = razem; ta sama kwota w liniach 165 i Obieg (po obu stronach); wyplata <= pula <= 1/tempo nadwyzki i <= niepokryta potrzeba po daninie",
+                f"dob {len(tot)}: wyplacono ze skarbcow razem {sum(t[5] for t in tot.values())} zl (pula {sum(t[4] for t in tot.values())}); rozjazd krolestw w {len(bad_k)} (wiersze bez dopisku {bad_row})"
+                f", wobec linii 165 w {len(bad_165)} z {n165}, wobec Obieg w {len(bad_obg)} z {nobg}, pula ponad granice w {len(bad_pool)}" + csvtxt
+                + (f"; pierwsze doby: {(bad_k + bad_165 + bad_obg + bad_pool + badc)[:5]}" if (bad_k or bad_165 or bad_obg or bad_pool or badc) else ""),
+                "0 rozjazdow, co do zlotowki (skarbiec -> glowa rodu; szczebel daniny W5-1 i tarczowe W6-1 bez zmian)", ok1)
+        # ---- W5b-2 skarbiec nigdy ponizej zapasu wojny przez te regule
+        ctl = sum(t[9] for t in tot.values())
+        below, over = [], []
+        for d, t in tot.items():
+            k184 = _w5b_184(wtx[d]) if d in wtx else {}
+            for k in _w5_kingdoms(w5[d]):
+                if "bad" in k or k.get("cpaid", 0) <= 0:
+                    continue
+                if k["cpaid"] > k["csur"]:
+                    over.append((run_day(d, start), k["name"]))
+                kk = k184.get(k["name"])
+                if kk is not None and kk["wallet"] < k["cres"]:   # skarbiec na koniec doby (po rentach 180) wobec zapasu wojny z chwili rachunku
+                    below.append((run_day(d, start), k["name"], kk["wallet"], k["cres"]))
+        c10, c11 = sum(t[10] for t in tot.values()), sum(t[11] for t in tot.values())
+        rep.add("W5b-2: skarbiec nigdy ponizej zapasu wojny przez te regule - kontrola linii / wyplata ponad nadwyzke / skarbiec na koniec doby (linia 184) ponizej zapasu wojny w krolestwo-dobach z wyplata",
+                f"{ctl} / {len(over)} / {len(below)}" + (f" (pierwsze {(over + below)[:3]})" if over or below else "")
+                + f"; inne kontrole linii: gotowka przy zoldzie druzyn w pulapie wlasnym {c10}, potkniecia {c11}",
+                "0 / 0 / 0 i kontrole 0 (wyplata tylko z nadwyzki ponad zapas wojny, reszte wplywow dnia i dlug 186)", ctl == 0 and not over and not below and c10 == 0 and c11 == 0)
+    elif has2:
+        rep.add("W5b-1 / W5b-2: skarbiec ponad zapas wojny", "brak odczytanych dopiskow linii W5", "zamkniecie co do zlotowki; skarbiec nie ponizej zapasu wojny", None)
+    # ---- W5b-3 brak ponad prog, a stawka daniny stoi
+    act1 = [d for d in on1 if d not in idle1]
+    if act1:
+        k184 = {d: _w5b_184(wtx[d]) for d in act1}
+        steps = [d for d in sorted(k184) if "krok tygodnia: dzis" in wtx[d]]
+        n_short = n_stuck = 0
+        first = None
+        for d in steps:
+            for nm, k in k184[d].items():
+                if not k["war"] or not k["ln"] or k["n"] <= 0 or k["brak"] <= k["prog"]:
+                    continue
+                n_short += 1
+                if k["sa"] < k["cap"] - 1e-6 and not (k["krok"] is not None and k["krok"] > 0):
+                    n_stuck += 1
+                    first = first or (run_day(d, start), nm)
+        zero4 = []
+        if len(steps) >= 4:
+            last4 = steps[-4:]
+            for nm in k184[last4[-1]]:
+                rr = [k184[d].get(nm) for d in last4]
+                if all(r is not None and r["war"] and r["ln"] and r["n"] > 0 and r["brak"] > r["prog"] for r in rr) and rr[-1]["sa"] <= 0:
+                    zero4.append(nm)
+        rep.add("W5b-3: brak wojska u panow ponad prog w dobie kroku - stawka daniny rosnie (az do pulapu); krolestwa z brakiem ponad prog w 4 ostatnich krokach okna i stawka daniny 0",
+                f"krokow tygodnia {len(steps)}: krolestwo-krokow z brakiem ponad prog {n_short}, bez wzrostu ponizej pulapu {n_stuck}" + (f" (pierwszy {first})" if first else "")
+                + f"; po 4 krokach ze stawka 0: {len(zero4)}" + (f" ({', '.join(sorted(zero4)[:5])})" if zero4 else ""),
+                "0 / 0 (krolestwo w wojnie z niepokryta potrzeba nie zostaje bez daniny)", (n_stuck == 0 and not zero4) if steps else None)
+    else:
+        rep.add("W5b-3: brak wojska u panow a stawka daniny", "klucz War Aid Follows Lords Shortfall wylaczony, nieczynny albo brak dopisku w linii 184", "brak ponad prog -> stawka daniny rosnie", None)
+    # ---- W5b-4 ile dala regula 1 i 2 na krolestwo (INFO), srednia ostatnich 28 dob okna
+    ds = [d for d in sorted(set(has2) | set(has1)) if d in w5][-28:]
+    if ds:
+        acc = {}   # nazwa -> [regula 1 (danina ponad s korony), regula 2 (ze skarbca), niepokryte, potrzeba, danina]
+        lre = re.compile(r"^(.*?): s [\d.]+%.*, z braku wojska u panow \(W5b\) (\d+) \(s korony ([\d.]+)%\)$")
+        for d in ds:
+            for k in _w5_kingdoms(w5[d]):
+                if "bad" in k:
+                    continue
+                a = acc.setdefault(k["name"], [0.0, 0.0, 0.0, 0.0, 0.0])
+                a[1] += k.get("cpaid", 0); a[2] += k.get("unc", max(0, k["need"] - k["pot"])); a[3] += k["need"]; a[4] += k["aid"]
+            if d in dan:
+                seg = dan[d]
+                i = seg.find("| na krolestwo: ")
+                j = seg.rfind(" | czas poboru ")
+                if i >= 0:
+                    for part in seg[i + len("| na krolestwo: "):(j if j >= 0 else len(seg))].split(" ; "):
+                        m = lre.match(part)
+                        if m:
+                            acc.setdefault(m.group(1), [0.0, 0.0, 0.0, 0.0, 0.0])[0] += int(m.group(2))
+        n = float(len(ds))
+        lastk = _w5b_184(wtx[ds[-1]]) if ds[-1] in wtx else {}
+        txt = []
+        for nm, a in sorted(acc.items(), key=lambda kv: -(kv[1][0] + kv[1][1] + kv[1][2]))[:12]:
+            if a[0] + a[1] + a[2] <= 0:
+                continue
+            kk = lastk.get(nm, {})
+            txt.append(f"{nm}: potrzeba {a[3] / n / 1e3:.1f}, danina {a[4] / n / 1e3:.1f} (w tym regula 1: {a[0] / n / 1e3:.1f}), regula 2 ze skarbca {a[1] / n / 1e3:.1f}, niepokryte {a[2] / n / 1e3:.1f}"
+                       + (f", stawka daniny {kk['sa']:.2f}% przy s {kk['s']:.2f}%" if kk.get("ln") else ""))
+        rep.add(f"W5b-4: ile dala regula 1 (danina ponad s korony) i regula 2 (skarbiec ponad zapas wojny) na krolestwo, tys. zl/d (srednia ostatnich {len(ds)} dob okna; INFO)",
+                " ; ".join(txt) if txt else "brak krolestw z potrzeba",
+                "INFO - rachunek autora: bieg 120 dob z W5 (d93-120) niepokryte razem ok. 21 tys. zl/d w 9 krolestwach; koniec biegu rocznego bez W5 - potrzeba Iron Islands 24.3, Free Folk 14.4, Ibben 9.1, Qohor 6.7, Pentos 4.6 tys. zl/d", None)
+    # ---- W5b-5 skarbce ponad zapas wojny i powod S (INFO)
+    if tot:
+        dd = sorted(tot)
+        a, b = dd[0], dd[-1]
+        k184 = _w5b_184(wtx[b]) if b in wtx else {}
+        paid28 = {}
+        for d in dd[-28:]:
+            for k in _w5_kingdoms(w5[d]):
+                if "bad" not in k and k.get("cpaid", 0) > 0:
+                    paid28[k["name"]] = paid28.get(k["name"], 0) + k["cpaid"]
+        low = sorted(nm for nm in paid28 if nm in k184 and k184[nm]["wallet"] < k184[nm]["reserve"])
+        rep.add("W5b-5: skarbce krolestw w wojnie ponad zapas wojny (nadwyzka z linii W5): poczatek -> koniec okna; krolestwa z wyplata ze skarbca w ostatnich 28 dobach, w tym ze skarbcem < zapas wojny (powod S) w ostatniej dobie (INFO)",
+                f"{tot[a][2] / 1e6:.2f} mln u {tot[a][1]} krolestw -> {tot[b][2] / 1e6:.2f} mln u {tot[b][1]}; wyplacono ze skarbcow razem {sum(t[5] for t in tot.values()) / 1e6:.2f} mln"
+                f"; krolestw z wyplata {len(paid28)}, z powodem S {len(low)}" + (f" ({', '.join(low[:5])})" if low else ""),
+                "INFO - bieg roczny bez paczki: skarbiec ponad zapas wojny 19.4 mln u 23 krolestw (d120) -> 7.5 mln u 18 (d364), sam ubytek 1/360; powod S = stara regula 184 podnosi s (podatek od zarobku) - czytac razem z progiem chleba", None)
 
 
 def _w6_kingdoms(s):
