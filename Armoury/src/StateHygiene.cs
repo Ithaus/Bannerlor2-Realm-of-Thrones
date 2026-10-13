@@ -6,7 +6,8 @@ namespace Armoury
 {
     /// <summary>
     /// E8/S (246, PLAN 8.11; projekt etapu 8 v2 rozdz. 3 "E8/S"; rozpoznanie C poz. 11, 15, 17): PORZADEK STANU.
-    /// Dwie rzeczy, obie pod kluczem StateHygieneEnabled (off = wszystko jak przed E8/S):
+    /// Dwie rzeczy, obie pod kluczem StateHygieneEnabled (off = wszystko jak przed E8/S; wyjatek - audyt 13.10: pamiec paczki E8/H w SaddleLaw
+    /// jest czyszczona zawsze, bo powstala po E8/S):
     ///  1. Pamiec statyczna jednej kampanii nie przechodzi do drugiej w tym samym uruchomieniu gry (nowa gra -> zapis -> wczytanie innego zapisu):
     ///     HideoutPurge (czekajace przeszukanie, odwet, lup), oboz gracza w NightRest (potkniecia namiotu, odcisk wizerunku, dzien pytania o nocleg,
     ///     flaga obozu), dzien audytu predkosci w TerrainEase, przerwa zakupow stajni AI (Stables._lastBuy - dzien z dalszej kampanii dawal ujemna
@@ -41,7 +42,14 @@ namespace Armoury
                 _zeroed = 0; _resetStumbles = 0; _left = ""; _stumbles = 0;
                 _dBuys = _dHold = _dFuture = _dHideStumbles = _dHideGivenUp = _dDeadOrders = 0;
                 _wasOn = On;
-                if (!_wasOn) return;
+                // audyt 13.10 (drobne, [zapis]): pamiec paczki E8/H (SaddleLaw: spisy wzorcow i przedmiotow, doby sprzedazy uprzezy pod StringId partii,
+                // potkniecia) to stan NOWEJ paczki, nie "stan sprzed E8/S" - czyszczona zawsze, takze przy wylaczonym kluczu (dotad jedyna droga do
+                // SaddleLaw.Reset szla przez Stables.Reset pod kluczem). Przy wlaczonym kluczu bez zmian (Stables.Reset wola ja jak dotad).
+                if (!_wasOn)
+                {
+                    try { SaddleLaw.Reset(); } catch (Exception e) { _resetStumbles++; try { Log.Error("StateHygiene.Reset (uprzaz E8/H, klucz wylaczony)", e); } catch { } }
+                    return;
+                }
                 var sb = new StringBuilder();
                 Step(sb, "kryjowka", HideoutPurge.Reset);
                 Step(sb, "oboz gracza", NightRest.ResetCamp);
