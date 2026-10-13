@@ -418,6 +418,11 @@ Uzycie (Python 3, tylko odczyt):
                     <= pula <= 1/tempo nadwyzki i <= niepokryta potrzeba po daninie), W5b-2 skarbiec nigdy ponizej zapasu wojny przez te regule,
                     W5b-3 brak ponad prog (pomiar >= 4 doby) -> stawka daniny rosnie o jeden krok; 0 krolestw z brakiem w 4 ostatnich krokach i stawka 0, W5b-4 ile dala regula 1 i 2
                     na krolestwo (INFO), W5b-5 skarbce ponad zapas wojny i powod S (INFO). Log bez paczki: jeden wiersz INFO, bez wyjatku.
+--grupa gl2       : (GL-2 / GL-3, projekt docs/gospodarka-od-ludzi rozdz. 8) rynek miasta od ludzi (MarketByPeople), glowy wsi i podzamcza od ludzi
+                    (VillageHeadsByPeople), zloto startowe wedlug ludzi (StartGoldByPeople - tylko nowa kampania).
+                    python -I tools/sprawdz_logi.py --grupa gl2 [--do-doby 120] <Armoury-*.log>
+                    Wiersze GL2-0..GL2-10 (kazdy, P1 + P2, [R] P1 + P2 dopisane), GL3-1..3 (P3), GL2-S1 (zloto startowe: suma kazdej puli przed = po);
+                    progi wobec biegu bazowego = INFO z liczba. Log bez paczki: INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
                     python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -15863,6 +15868,212 @@ def w6_main(logp, start_arg, until=120, csvp=None):
     return 0
 
 
+def _gl2_kingdoms(s):
+    """Tabela tygodnia "Rynek od ludzi wedlug krolestw (GL2)" -> ({krolestwo: {...}}, {m>1.5}, r korelacji, miast w korelacji)."""
+    out, big, r, rn = {}, None, None, None
+    body = s.split(" - ", 1)[1] if " - " in s else s
+    parts = body.split(" || ")
+    pk = re.compile(r"^(.*?): miast (\d+), m_t sr\. ([\d.]+), wydatki ludu (\d+) zl/d, stac na koszyk ([\d-]+)%, dni oszczednosci ([\d-]+)"
+                    r", zapas kupcow / kasa (\d+) / (\d+) \(([\d.-]+)\), jedzenie na polkach ([\d.-]+) dob")
+    for seg in parts[0].split(" | "):
+        m = pk.match(seg.strip())
+        if not m:
+            continue
+        f = lambda x: None if x in ("-", "") else float(x)
+        out[m.group(1)] = {"miast": int(m.group(2)), "m": float(m.group(3)), "wyd": float(m.group(4)), "stac": f(m.group(5)), "dni": f(m.group(6)),
+                           "zapas": float(m.group(7)), "kasa": float(m.group(8)), "jedz": f(m.group(10))}
+    for seg in parts[1:]:
+        m = re.search(r"miasta o m_t > [\d.]+: (\d+), stac na koszyk ([\d-]+)%, dni oszczednosci ([\d-]+)", seg)
+        if m:
+            big = {"miast": int(m.group(1)), "stac": None if m.group(2) == "-" else float(m.group(2)), "dni": None if m.group(3) == "-" else float(m.group(3))}
+        m = re.search(r"korelacja wydatkow ludu z ludzmi rynku r = ([\d.-]+) \(miast (\d+)\)", seg)
+        if m:
+            r = None if m.group(1) == "-" else float(m.group(1))
+            rn = int(m.group(2))
+    return out, big, r, rn
+
+
+def gl2_main(logp, start_arg, until=120, csvp=None):
+    """GL-2 / GL-3 (projekt docs/gospodarka-od-ludzi rozdz. 8: "kazdy", "P1 + P2", "[R] P1 + P2, dopisane", "P3") - rynek miasta od ludzi (MarketByPeople),
+    glowy wsi i podzamcza od ludzi (VillageHeadsByPeople), zloto startowe wedlug ludzi (StartGoldByPeople). Okno: doby kampanii 2-until (--do-doby); "d91-120" =
+    ostatnie 30 dob okna. Progi liczone z logu (linie "Rynek od ludzi (GL2)", tabela tygodnia krolestw, "Zloto startowe wedlug ludzi (GL2)", "Glod ludu (E5/C2)",
+    "Warsztaty:", "Przeplywy osad", "Prawa panskie (E5/B1)") i z kasy-miast.csv (zawor do panow); progi wobec biegu bazowego = INFO z liczba (porownac recznie).
+    Log bez paczki (bez linii albo klucz wylaczony): wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    gl = by_day(lines, "Rynek od ludzi (GL2): dzien")
+    wk = by_day(lines, "Rynek od ludzi wedlug krolestw (GL2): dzien")
+    c2 = by_day(lines, "Glod ludu (E5/C2): dzien")
+    ws = by_day(lines, "Warsztaty: dzien")
+    pr = by_day(lines, "Prawa panskie (E5/B1): dzien")
+    fl = by_day(lines, "Przeplywy osad: dzien")
+    sg = [s for s in lines if s.startswith("Zloto startowe wedlug ludzi (GL2): dzien")]
+    if start is None:
+        alld = sorted(set(gl) | set(c2))
+        start = alld[0] if alld else 0
+    win = [d for d in sorted(gl) if 2 <= run_day(d, start) <= until]
+    on = [d for d in win if "MarketByPeople tak" in gl[d]]
+    hon = [d for d in win if "VillageHeadsByPeople tak" in gl[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia GL2 {len(win)} (MarketByPeople tak w {len(on)}, VillageHeadsByPeople tak w {len(hon)})")
+    # ---- kazdy: linia, klucze, potkniecia, praca nowej galezi, bledy
+    if not win:
+        rep.add("GL2-0: linia Rynek od ludzi (GL2) kazdej doby", "brak w logu", "jest od wgrania GL-2; bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+    else:
+        span = until - 1
+        rep.add("GL2-0: linia GL2 kazdej doby okna i klucze", f"dob z linia {len(win)} z {span}, MarketByPeople tak w {len(on)}, VillageHeadsByPeople tak w {len(hon)}",
+                f"{span}/{span} dob z linia, klucze tak przez caly bieg (projekt rozdz. 8 'kazdy')", (len(win) >= span and len(on) == len(win) and len(hon) == len(win)) if on else None)
+        st_ = [num(r"\| potkniecia (\d+)\.", gl[d]) for d in win]
+        st_ = [x for x in st_ if x is not None]
+        rep.add("GL2-1: potkniecia paczki (suma okna)", f"{sum(st_)} w {sum(1 for x in st_ if x)} dobach", "0 (projekt rozdz. 8 'kazdy')", (sum(st_) == 0) if st_ else None)
+        tms = [fnum(r"czlon dobrobytu wiersza x m: wywolan \d+, czas ([\d.]+) ms", gl[d]) for d in on]
+        tms = [x for x in tms if x is not None]
+        calls = [num(r"czlon dobrobytu wiersza x m: wywolan (\d+)", gl[d]) for d in on]
+        calls = [x for x in calls if x is not None]
+        rep.add("GL2-1b: praca nowej galezi czlonu dobrobytu wiersza (zasada 4)", (f"srednio {st.mean(calls):.0f} wywolan i {st.mean(tms):.1f} ms na dobe (max {max(tms):.1f} ms)") if tms else "brak liczb",
+                "INFO - czas doby wobec bazy nie gorszy o wiecej niz 0.3 s (projekt 'kazdy'; porownac DayProfile z biegiem bazowym)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ")]
+    rep.add("GL2-1c: bledy Armoury (ERROR in)", len(errs), "0 (projekt 'kazdy')", len(errs) == 0)
+    # ---- liczby paczki (INFO)
+    if on:
+        def ratio(pat, d):
+            m = re.search(pat, gl[d])
+            if not m:
+                return None
+            a, b = float(m.group(1)), float(m.group(2))
+            return b / a if a > 0 else None
+        dem = [x for x in (ratio(r"popyt x m_t \(budzet dnia z nawiasu konsumpcji\): swiat przed (\d+) / po (\d+)", d) for d in on) if x is not None]
+        res = [x for x in (ratio(r"zapas kupcow x m_t: swiat przed (\d+) / po (\d+)", d) for d in on) if x is not None]
+        up = [num(r"kotwica w gore (\d+) miast", gl[d]) for d in on]
+        up = [x for x in up if x is not None]
+        rep.add("GL2-I1: popyt swiata po / przed skala m (budzet dnia z nawiasu konsumpcji)", f"srednio x{st.mean(dem):.3f} (min {min(dem):.3f}, max {max(dem):.3f})" if dem else "brak liczb",
+                "INFO - regula zmienia podzial popytu miedzy miasta; suma swiata idzie za korelacja dobrobytu z ludzmi rynku", None)
+        rep.add("GL2-I2: zapas kupcow swiata po / przed skala m", f"srednio x{st.mean(res):.3f}" if res else "brak liczb", "INFO - projekt rozdz. 5: suma zapasow swiata ok. +3% [S]", None)
+        rep.add("GL2-I3: kotwica w gore (miast z m x czynnik kotwicy > 1, nowa galaz)", f"srednio {st.mean(up):.1f} miast na dobe" if up else "brak liczb", "INFO (zasada 4: nowy kod, dotad martwy)", None)
+    # ---- P1 + P2
+    wkon = [d for d in sorted(wk) if 2 <= run_day(d, start) <= until and d in gl and "MarketByPeople tak" in gl[d]] if wk else []
+    wlast = [d for d in wkon if run_day(d, start) > until - 30]
+    rs = []
+    for d in (wlast or wkon[-4:]):
+        _k, _b, r, rn = _gl2_kingdoms(wk[d])
+        if r is not None:
+            rs.append(r)
+    rep.add("GL2-2: korelacja wydatkow ludu miasta z ludzmi rynku (tabela tygodnia, d91-120)", f"r = {st.mean(rs):.2f} (probek {len(rs)})" if rs else "brak tabeli tygodnia przy kluczu",
+            ">= 0.8 (projekt rozdz. 8 'P1 + P2'; dzis 0.20 z ludzmi regionu)", (st.mean(rs) >= 0.8) if rs else None)
+    bz = [num(r"brak zlota/kupca (\d+)", ws[d]) for d in sorted(ws) if 2 <= run_day(d, start) <= until]
+    bz = [x for x in bz if x is not None]
+    rep.add("GL2-3: cykle warsztatow 'brak zlota / kupca' na dobe", f"srednio {st.mean(bz):.1f}" if bz else "brak pola", "INFO - nie wiecej niz baza (projekt: 288/d [P RK]); porownac z biegiem bazowym", None)
+    c2w = [d for d in sorted(c2) if 2 <= run_day(d, start) <= until]
+    early = [num(r"Food 0 warowni (\d+)", c2[d]) for d in c2w if run_day(d, start) < 30]
+    early = [x for x in early if x is not None]
+    rep.add("GL2-4: warownie z Food 0 przed 30. doba (glod warowni AI)", f"dob z Food 0 > 0: {sum(1 for x in early if x)} z {len(early)} (max {max(early) if early else '-'})" if early else "brak linii Glod ludu (E5/C2)",
+            "0 (projekt 'P1 + P2': zadna warownia AI nie gloduje przed 30. doba; oblezenia licza sie tu tez - sprawdzic linie w razie NIE)", (max(early) == 0) if (early and on) else None)
+    f0 = [num(r"Food 0 warowni (\d+)", c2[d]) for d in c2w]
+    f0 = [x for x in f0 if x is not None]
+    mon = [num(r"brak pieniedzy \([^)]*\): (\d+)", c2[d]) for d in c2w]
+    mon = [x for x in mon if x is not None]
+    rep.add("GL2-5: warownie z Food 0 i warownie z kara glodu C2 (srednio na dobe)", (f"Food 0 {st.mean(f0):.1f}, C2 brak pieniedzy {st.mean(mon):.1f}") if f0 and mon else "brak linii",
+            "INFO - nie wiecej niz baza (Food 0) i baza + 5 (C2); porownac z biegiem bazowym", None)
+    jd = {}
+    for d in wlast:
+        ks, _b, _r, _n = _gl2_kingdoms(wk[d])
+        for name in ("Qarth", "Volantis", "Braavos"):
+            if name in ks and ks[name]["jedz"] is not None:
+                jd.setdefault(name, []).append(ks[name]["jedz"])
+    if jd:
+        txt = ", ".join(f"{k} min {min(v):.1f}" for k, v in sorted(jd.items()))
+        rep.add("GL2-6: Qarth, Volantis, Braavos - jedzenie na polkach w dobach spozycia (d91-120, tabela tygodnia)", txt, ">= 7 dob (projekt 'P1 + P2')",
+                all(min(v) >= 7 for v in jd.values()) and len(jd) == 3)
+    else:
+        rep.add("GL2-6: Qarth, Volantis, Braavos - jedzenie na polkach (d91-120)", "brak tabeli tygodnia przy kluczu w d91-120", ">= 7 dob", None)
+    rep.add("GL2-7: wywoz zywnosci z Reach (karawany + wozy poza krolestwo, d91-120)", "brak miary w logu", "INFO - projekt: >= 500 szt./d", None)
+    # ---- [R] P1 + P2 dopisane
+    bd, bs = [], []
+    for d in wlast:
+        _k, b, _r, _n = _gl2_kingdoms(wk[d])
+        if b and b["dni"] is not None:
+            bd.append(b["dni"])
+        if b and b["stac"] is not None:
+            bs.append(b["stac"])
+    rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek",
+            ">= 60 (projekt [R] 'P1 + P2, dopisane'; recenzja: Braavos, Qarth i Reach tego progu NIE przejda - ma byc widac przed wgraniem)", (min(bd) >= 60) if bd else None)
+    rep.add("GL2-8b: lud miast o m_t > 1.5 - stac na pelny koszyk (d91-120)", f"srednio {st.mean(bs):.0f}%" if bs else "brak probek", "INFO - nie nizej niz bieg bazowy minus 5 pkt (porownac recznie)", None)
+    ludne = set()
+    if wkon:
+        ks, _b, _r, _n = _gl2_kingdoms(wk[wkon[0]])
+        ludne = {k for k, v in ks.items() if v["m"] >= 1.5}
+    kp = csv_path_of(logp).replace("budzet-rodow.csv", "kasy-miast.csv")
+    if ludne and os.path.isfile(kp):
+        per = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                k = merge_rebels(r.get("krolestwo"))
+                if k not in ludne:
+                    continue
+                try:
+                    dd = int(r["dzien"])
+                    z = float(r["zawor_do_pana"] or 0)
+                except (ValueError, KeyError, TypeError):
+                    continue
+                if not (2 <= run_day(dd, start) <= until):
+                    continue
+                per.setdefault(k, {}).setdefault(dd, 0.0)
+                per[k][dd] += z
+        worst = {}
+        for k, days in per.items():
+            run = mx = 0
+            for dd in sorted(days):
+                run = run + 1 if days[dd] <= 0 else 0
+                mx = max(mx, run)
+            worst[k] = mx
+        txt = ", ".join(f"{k} {v}" for k, v in sorted(worst.items(), key=lambda x: -x[1])) or "-"
+        rep.add("GL2-9: zawor kas do panow w krolestwach ludnych (m_t sr. >= 1.5) - najdluzsza seria dob bez zaworu", txt,
+                "<= 14 dob z rzedu (projekt [R] 'P1 + P2, dopisane')", (max(worst.values()) <= 14) if worst else None)
+    else:
+        rep.add("GL2-9: zawor kas do panow w krolestwach ludnych - seria dob bez zaworu", "brak tabeli tygodnia przy kluczu albo kasy-miast.csv (" + kp + ")", "<= 14 dob z rzedu", None)
+    un = [re.search(r"towar niesprzedany po wizycie: w miastach (\d+) szt\. \((\d+) wizyt\)", fl[d]) for d in sorted(fl) if 2 <= run_day(d, start) <= until]
+    un = [(int(m.group(1)), int(m.group(2))) for m in un if m]
+    rep.add("GL2-10: tabory wsi z towarem niesprzedanym w miastach (kasa nie starcza)", f"{sum(v for _, v in un)} wizyt w {sum(1 for _, v in un if v)} dobach ({sum(p for p, _ in un)} szt.)" if un else "brak linii Przeplywy osad",
+            "INFO - projekt: miast, w ktorych kasa nie starcza na zaplate taborom, 0 (miara obejmuje tez inne przyczyny; baza 120 dob W43: 21 wizyt w 18 dobach)", None)
+    # ---- P3
+    if hon:
+        hv = []
+        for d in hon:
+            m = re.search(r"glowy przed / po: miasta \d+ / \d+, wsie (\d+) / (\d+)", gl[d])
+            if m and float(m.group(1)) > 0:
+                hv.append(float(m.group(2)) / float(m.group(1)))
+        rep.add("GL3-1: glowy wsi swiata (oplata stala, zakupy) po / przed regula", f"srednio x{st.mean(hv):.3f} (min {min(hv):.3f}, max {max(hv):.3f})" if hv else "brak liczb",
+                "0.9-1.1 (projekt 'P3': oplaty stale wsi swiata 0.9-1.1 bazy - oplata liniowa w glowach)", (0.9 <= min(hv) and max(hv) <= 1.1) if hv else None)
+    else:
+        rep.add("GL3-1: glowy wsi swiata po / przed regula", "klucz VillageHeadsByPeople nie w oknie", "0.9-1.1", None)
+    fee = [num(r"oplaty stale wsi (\d+) \(", pr[d]) for d in sorted(pr) if 2 <= run_day(d, start) <= until]
+    fee = [x for x in fee if x is not None]
+    rep.add("GL3-2: oplaty stale wsi swiata (srednio na dobe)", f"{st.mean(fee):.0f} zl/d" if fee else "brak linii Prawa panskie", "INFO - projekt 'P3': 0.9-1.1 bazy (9.9 tys. zl/d w biegu rocznym)", None)
+    rep.add("GL3-3: kiesy wsi nie ujemne, zadna wies z zalegloscia ponad 28 dob", "brak miary zaleglosci w logu (kiesa wsi gry nie schodzi ponizej 0)", "INFO (projekt 'P3')", None)
+    # ---- zloto startowe
+    if sg:
+        s0 = sg[0]
+        ok_all = "(zgodne)" in s0
+        pools = re.findall(r"przed (\d+) = po (\d+)", s0)
+        cls = re.findall(r"[WRP] (\d+) = (\d+)", s0)
+        bad = [p for p in pools + cls if p[0] != p[1]]
+        m = re.search(r"skarbce koron: .*?na podlodze (\d+): (\d+)", s0)
+        rep.add("GL2-S1: zloto startowe wedlug ludzi - suma kazdej puli i swiata przed = po", f"linii {len(sg)}, pul {len(pools) + len(cls)}, rozjazdow {len(bad)}, swiat {'zgodny' if ok_all else 'ROZJAZD'}"
+                + (f"; skarbce na podlodze {m.group(1)}: {m.group(2)}" if m else ""), "1 linia w nowej kampanii, 0 rozjazdow (przelewy, nie mnozenie)", len(sg) == 1 and not bad and ok_all)
+    else:
+        stt = [re.search(r"zloto startowe: ([^|]*?) \|", gl[d]) for d in win[:1]]
+        txt = stt[0].group(1) if stt and stt[0] else "brak linii"
+        rep.add("GL2-S1: zloto startowe wedlug ludzi", txt, "1 linia w nowej kampanii (stary zapis albo klucz wylaczony - INFO)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -15909,6 +16120,8 @@ def main(argv):
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
     if group == "w6" and logp:
         return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
+    if group == "gl2" and logp:
+        return gl2_main(logp, start_arg, until_arg, csvp)   # GL-2/GL-3: rynek miasta od ludzi, glowy wsi i podzamcza, zloto startowe wedlug ludzi
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

@@ -224,6 +224,16 @@ namespace Armoury
         /// </summary>
         internal static int Reserve(Town town)
         {
+            int r = ReserveFlat(town);
+            // GL-2 (P2 c): zapas kupcow x m_t (miasto wiekszego rynku trzyma wiecej kapitalu obrotowego) - jedna funkcja dla zaworu, podatkow ponad prog i naszych zakupow
+            float m;
+            if (PeopleMarket.ReserveScale(town, out m)) { double x = r * (double)m; return x >= int.MaxValue ? int.MaxValue : (int)x; }
+            return r;
+        }
+
+        /// <summary>Zapas kupcow PLASKI (sprzed GL-2): dar startowy przycina sie wobec niego (TrimStartGift) - przestawienie kas wedlug ludzi robi zloto startowe GL-2.</summary>
+        internal static int ReserveFlat(Town town)
+        {
             float p = Prosperity(town);
             double game = GameTargetGold + (double)GameTargetPerProsperity * p;
             var s = Settings.Current;
@@ -593,6 +603,15 @@ namespace Armoury
             LastBelowN = below; LastBelow1000 = b1000; LastAtZero = zero; LastStreakMax = max; LastStreak7 = w7; LastStreak28 = w28; LastStreakName = maxName;
         }
 
+        /// <summary>GL-2 (zloto startowe): dar startowy kas miast rozliczony w tej kampanii albo nie do rozliczenia (A1 wylaczone, przyciecie wylaczone, wiek nieczytelny).</summary>
+        internal static bool StartTrimSettled { get { var s = Settings.Current; return !On || _trimDone || _trimSkip || s == null || !s.TownPurseTrimAtStart; } }
+
+        /// <summary>GL-2 (zloto startowe): przelew `delta` do kasy miasta poza obrotem - w oknie udzialu zysku kupcow jak dar startowy (nie doplyw netto miasta).</summary>
+        internal static void NoteStartShift(Town t, long delta)
+        {
+            try { if (t != null && delta != 0 && On) Add(_trimWin, t, -delta); } catch (Exception e) { Stumble("TownPurse.NoteStartShift", e); }
+        }
+
         // ------------------------------------------------------------ raz na kampanie: dar startowy (PRZED pierwszym zaworem; wzor CastlePurse.TrimStartGift)
         private static void TrimStartGift(Settings s)
         {
@@ -644,7 +663,7 @@ namespace Armoury
                     try
                     {
                         var town = st.Town;
-                        int cut0 = CastlePurse.StartGiftCut(town.Gold, Reserve(town), Prosperity(town), left);
+                        int cut0 = CastlePurse.StartGiftCut(town.Gold, ReserveFlat(town), Prosperity(town), left);   // GL-2: zapas plaski (zloto startowe przestawi kasy wedlug ludzi)
                         int used = TownFolk.SeedTown(st, cut0);
                         used += TownFolk.SeedVillages(st, cut0 - used);
                         giftLeft[town] = Math.Max(0, cut0 - used);
@@ -660,7 +679,7 @@ namespace Armoury
                 try
                 {
                     var town = st.Town;
-                    int gold = town.Gold, reserve = Reserve(town);
+                    int gold = town.Gold, reserve = ReserveFlat(town);                    // GL-2: zapas plaski (jak wyzej)
                     towns++; before += gold; reserveSum += reserve;
                     int cut;
                     if (giftLeft != null) { if (!giftLeft.TryGetValue(town, out cut)) cut = 0; cut = Math.Min(cut, Math.Max(0, gold - reserve)); }   // E5/B1: reszta daru po zapasach ludu

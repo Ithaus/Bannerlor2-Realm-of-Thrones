@@ -97,6 +97,7 @@ namespace Armoury
             public int Streak;                                        // zaulki: doby z rzedu ponizej zapasu kupcow
             // liczby ostatniej doby (CSV)
             public double DB, DWg, DM = double.NaN, DInc, DOut, DAff = 1, DAffF = 1, DUnpaid, DR = 1;
+            public double DBook;                                      // GL-2: ludzie ksiegi osady ostatniej doby (linia "ludzie ksiegi", CSV ludzie_ksiegi) - glowy moga isc od ludzi rynku
             // ---- E5/B1 (kiesa czynna, TownFolk.Live.cs): prawdziwe zloto w kiesach - long, przelewy co do zlotowki
             public long KW, KR, KP, KG;                               // miasto: kiesy W/R/P i gmina; zamek: KW = kiesa podzamcza (zapis arm_townfolk)
             public long CourtCr;                                      // zamek: kredyt dworu (kuchnia pana) - liczba, bez zlota (zapis)
@@ -157,6 +158,7 @@ namespace Armoury
                 _patchTicks = _dayTicks = 0;
                 Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length);
                 ResetProbe();
+                _hDay = int.MinValue;   // GL-2/GL-3: srednie glow swiata od nowa (TownFolk.Market.cs)
                 ResetLive();   // E5/B1: kiesy czynne, flagi zapasow startowych, liczniki (zapis wczytuje Import po konstruktorze)
             }
             catch { }
@@ -425,7 +427,17 @@ namespace Armoury
             f.TakeWin = f.RegIn = f.RegOut = 0;
         }
 
+        /// <summary>Mnoznik glow BK z kalibracji: GL-2 (a) miasto - wedlug ludzi rynku, GL-3 wies - wedlug ludzi okregu (TownFolk.Market.cs PeopleHeads);
+        /// inaczej (klucze wylaczone, Straz, brak skali) dzisiejszy wzor BookScale.</summary>
         private static double Scale(Folk f)
+        {
+            double r;
+            if (PeopleHeads(f, out r)) return r;
+            return BookScale(f);
+        }
+
+        /// <summary>Dzisiejszy wzor (sprzed GL-2): ludzie ksiegi osady dzis / przy kalibracji; zamek 1.</summary>
+        private static double BookScale(Folk f)
         {
             if (f.Kind == 1 || !(f.PeopleCal > 0)) return 1.0;
             double p = 0;
@@ -502,6 +514,7 @@ namespace Armoury
         {
             d.Towns++;
             double r = Scale(f); f.DR = r;
+            f.DBook = f.PeopleCal * (PeopleMarket.MarketOn ? BookScale(f) : r);   // GL-2: ludzie ksiegi osady (linia, CSV) - przy glowach wedlug rynku osobno
             double idx = f.Idx > 0 && !double.IsNaN(f.Idx) ? f.Idx : 1.0;
             // ---- 1. dochod okna (zewnetrzny) i wczorajszy (wewnetrzny)
             double life = f.Win[KLife], car = f.Win[KLifeCaravan], band = f.Win[KLifeBand], gar = f.Win[KGarrison], court = f.Win[KCourt];
@@ -539,7 +552,7 @@ namespace Armoury
             double Wg = f.SpendGame > 0 ? f.SpendGame : Math.Max(0, f.ConsGold);   // bez petli BK - zloto "zakupow" (vanilla)
             double G = Wg > 0 ? Math.Min(Wg, B) : 0;
             double m = Wg > 0 ? G / Wg : double.NaN;
-            d.HW += hW; d.HR += hR; d.HP += hP; d.HS += hS; d.People += r * f.PeopleCal; d.B += B; d.Wg += Wg; d.Wf += f.SpendFood; d.G0 += f.G0; d.G1 += f.G1;
+            d.HW += hW; d.HR += hR; d.HP += hP; d.HS += hS; d.People += f.DBook; d.B += B; d.Wg += Wg; d.Wf += f.SpendFood; d.G0 += f.G0; d.G1 += f.G1;
             if (!double.IsNaN(m)) { d.MSum += m; d.MN++; if (double.IsNaN(d.MMin) || m < d.MMin) d.MMin = m; if (m < 1) d.MLow++; }
             d.Spend += f.SpendGame; d.Consumed += f.ConsumedBk;
             double rateGame = f.SpendGame > 0 ? (f.Grp[0] * RhFood + f.Grp[1] * RhMid + f.Grp[2] * RhArms) / f.SpendGame : RhMid;
@@ -661,7 +674,8 @@ namespace Armoury
             double tp = inc * TaxC, tk = war ? inc * WarS * WarC : 0;
             d.TaxOut += tp + tk; d.CTax += tp + tk; d.WarT += tk;
             double L = f.LW + inc - tp - tk;
-            double B = f.HW * BC * idx, Wg = f.SpendGame;
+            double heads = CastleHeads(f);                                   // GL-3 (P3): podzamcze wedlug ludzi wsi zamku (klucz wylaczony - f.HW)
+            double B = heads * BC * idx, Wg = f.SpendGame;
             d.Spend += f.SpendGame; d.Consumed += f.ConsumedBk;
             double need = Wg > 0 ? Math.Min(Wg, B) : 0;
             double fc = need > 0 ? Math.Min(1.0, Math.Max(0, L) / need) : 1, ffc = need > 0 ? Math.Min(1.0, Math.Max(0, L) / (need * FdC)) : 1;
@@ -670,7 +684,7 @@ namespace Armoury
             double lv = SurplusRate * Math.Max(0, L - RdC * need); L -= lv; d.Paid += lv; d.CPaid += lv; d.CGoods += lv;
             NextLab(f, d, lv * RateNadW, 0);
             f.LW = L;
-            d.CHeads += f.HW; d.CB += B; d.CL += L; d.CNeed += need; d.CAff += fc * need; d.CWg += Wg;
+            d.CHeads += heads; d.CB += B; d.CL += L; d.CNeed += need; d.CAff += fc * need; d.CWg += Wg;
             d.A += (1 - fc) * need;
             f.DB = B; f.DWg = Wg; f.DM = Wg > 0 ? need / Wg : double.NaN; f.DInc = inc; f.DOut = sp2 + lv; f.DAff = fc; f.DAffF = ffc; f.DR = 1; f.DUnpaid = (1 - fc) * need;
             // zamek: jedzenie zuzyte w konsumpcji (pierscien 7 dob - linia "Jedzenie z targu")
@@ -682,6 +696,7 @@ namespace Armoury
         {
             d.Villages++;
             double r = Scale(f); f.DR = r;
+            f.DBook = f.PeopleCal * (PeopleMarket.HeadsOn ? BookScale(f) : r);   // GL-3: ludzie ksiegi wsi (CSV) - przy glowach wedlug u_v osobno
             double hand = VillShare * f.VHanded, inc = hand + f.VTrans + f.Win[KReleased];
             d.VInc += inc; d.VHand += hand; d.VTrans += f.VTrans; d.VRel += f.Win[KReleased];
             d.ExtIn += inc;
@@ -816,7 +831,7 @@ namespace Armoury
         private static void CsvRow(StringBuilder sb, int day, Folk f, Kingdom k)
         {
             var st = f.St;
-            double people = f.Kind == 1 ? f.HW : f.PeopleCal * f.DR;
+            double people = f.Kind == 1 ? CastleHeads(f) : f.DBook;   // GL-2: ludzie ksiegi (przy glowach wedlug rynku - nie PeopleCal x DR)
             double bk = f.HW + f.HR + f.HP + f.HS;
             long gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
             long res = f.Kind == 0 ? Seal31.TownReserve(st.Town) : (f.Kind == 1 ? CastlePurse.Reserve(st.Town) : 0);

@@ -416,17 +416,25 @@ namespace Armoury
         /// </summary>
         public static void AnchorBudgetPostfix(Town __0, ItemCategory __2, ref float __result)
         {
-            if (!_brAnchor || !_brOpen || __2 == null || !ReferenceEquals(__0, _brTown)) return;
+            if (__2 == null) return;
+            bool br = _brAnchor && _brOpen && ReferenceEquals(__0, _brTown);
+            // GL-2 (P2 b): czlon dobrobytu wiersza x m_t (zamek x skala podzamcza) - kazde wywolanie (nawias konsumpcji, prognoza targu zamku, RawPrice.HouseBudget),
+            // bo to ten sam popyt ludzi osady; 1 = klucz MarketByPeople wylaczony albo brak skali - wtedy dokladnie dawna kotwica (tylko w dol, tylko w nawiasie)
+            float sc = PeopleMarket.DemandScale(__0);
+            if (!br && sc == 1f) return;
+            long t0 = sc != 1f ? Stopwatch.GetTimestamp() : 0;
             try
             {
-                double fac = GroupOf(__2) == 0 ? _brFacFood : _brFacRest;
-                if (fac >= 1) return;
+                double fac = br ? (GroupOf(__2) == 0 ? _brFacFood : _brFacRest) : 1.0;
+                double k = sc * fac;                                       // NOWA galaz "w gore" (k > 1): tylko miasta i zamki z m x czynnik kotwicy > 1 (licznik linii GL2)
+                if (sc == 1f ? fac >= 1 : k == 1.0) return;
                 float part = HistoricalPrices.ProsperityPart(__0, __2);
                 if (!(part > 0)) return;
-                float v = __result - (float)((1 - fac) * part);
+                float v = __result + (float)((k - 1.0) * part);
                 __result = v > 0f ? v : 0f;
             }
             catch (Exception e) { Stumble("AnchorBudgetPostfix", e); }
+            finally { if (sc != 1f) PeopleMarket.NoteAnchorWork(Stopwatch.GetTimestamp() - t0); }
         }
 
         /// <summary>R13: postfiks na BK BKTaxModel.CalculateVillageTaxFromIncome(Village, int marketIncome) - przy kiesie czynnej podatek pana x VillageLordScale
@@ -712,7 +720,7 @@ namespace Armoury
             f.FacOk = true;
             if (f.Kind == 1)
             {
-                double B = f.HW * BC * idx;
+                double B = CastleHeads(f) * BC * idx;                  // GL-3 (P3): podzamcze wedlug ludzi wsi zamku (klucz wylaczony - f.HW)
                 double L = Math.Max(0, f.KW) + (s.TownFolkCastleCourtFeeds ? Math.Max(0, f.CourtCr) : 0);
                 double need = W > 0 ? Math.Min(W, B) : B, m = W > 0 && B > 0 ? Math.Min(1.0, B / W) : 1.0, F = need * FdC;
                 double af = F > 0 ? Math.Min(1.0, L / F) : 1.0, ar = need - F > 0 ? Math.Min(1.0, Math.Max(0, L - F) / (need - F)) : 1.0;
@@ -848,12 +856,13 @@ namespace Armoury
             // ---- 6. kotwica na jutro
             double wf, wr; Predict(f, out wf, out wr);
             double r = Scale(f); f.DR = r;
+            f.DBook = f.PeopleCal * (PeopleMarket.MarketOn ? BookScale(f) : r);   // GL-2: ludzie ksiegi osady (linia, CSV) - glowy moga isc od ludzi rynku
             Anchor(f, wf, wr);
             NoteHungerDay(f);                                          // E5/C2: doby z rzedu bez chleba z braku pieniedzy
             // ---- liczby swiata
             double hW = f.HW * r, hR = f.HR * r, hP = f.HP * r, hS = f.HS * r, idx = f.Idx > 0 && !double.IsNaN(f.Idx) ? f.Idx : 1.0;
             double B = (hW * BW + hR * BR + hP * BP + (f.Slave ? hS * BS : 0)) * idx;
-            d.HW += hW; d.HR += hR; d.HP += hP; d.HS += hS; d.People += r * f.PeopleCal; d.B += B;
+            d.HW += hW; d.HR += hR; d.HP += hP; d.HS += hS; d.People += f.DBook; d.B += B;
             d.Wg += f.SpendGame; d.Wf += f.SpendFood; d.Wp += wf + wr; d.G0 += f.G0; d.G0a += f.G0a;
             d.MSum += f.MAnc; d.MN++; if (double.IsNaN(d.MMin) || f.MAnc < d.MMin) d.MMin = f.MAnc; if (f.MAnc < 1) d.MLow++;
             double ff = s.TownFolkAnchorBasket ? Clamp01(f.FacFood) : 1, fr = s.TownFolkAnchorBasket ? Clamp01(f.FacRest) : 1;
@@ -915,8 +924,9 @@ namespace Armoury
             Anchor(f, wf, wr);
             NoteHungerDay(f);                                          // E5/C2
             if (f.CourtCr <= 0) d.CNoCourt++;
-            d.CHeads += f.HW; d.KC += f.KW; d.CCr += f.CourtCr; d.CNeed += f.Need[0]; d.CAff += f.AffC[0] * f.Need[0]; d.CWg += f.SpendGame;
-            f.DB = f.HW * BC * (f.Idx > 0 ? f.Idx : 1); f.DWg = f.SpendGame; f.DM = f.MAnc; f.DAff = f.AffC[0]; f.DAffF = f.AffFC[0]; f.DR = 1;
+            double ch = CastleHeads(f);                                // GL-3 (P3)
+            d.CHeads += ch; d.KC += f.KW; d.CCr += f.CourtCr; d.CNeed += f.Need[0]; d.CAff += f.AffC[0] * f.Need[0]; d.CWg += f.SpendGame;
+            f.DB = ch * BC * (f.Idx > 0 ? f.Idx : 1); f.DWg = f.SpendGame; f.DM = f.MAnc; f.DAff = f.AffC[0]; f.DAffF = f.AffFC[0]; f.DR = 1;
             f.ADay = _liveDay;                                         // E5/C4
             // jedzenie zuzyte w konsumpcji zamku (pierscien 7 dob - linia "Jedzenie z targu", B4)
             f.Food7[f.Food7Head] = f.FoodSold; f.Food7Head = (f.Food7Head + 1) % 7; if (f.Food7Fill < 7) f.Food7Fill++;
@@ -924,7 +934,12 @@ namespace Armoury
         }
 
         // ============================================================ wsie (R13): zakupy w miescie targowym, oplata stala, prog daniny
-        private static double VillHeads(Folk f, bool scaled) { return Math.Max(0, f.HW + f.HR) * (scaled ? Scale(f) : 1.0); }
+        private static double VillHeads(Folk f, bool scaled)
+        {
+            double h;
+            if (scaled && VillPeopleHeads(f, out h)) return h;            // GL-3 (P3): srednia swiata glow BK wsi x u_v (klucz VillageHeadsByPeople)
+            return Math.Max(0, f.HW + f.HR) * (scaled ? Scale(f) : 1.0);
+        }
 
         private static void Villages(LDay d)
         {
@@ -1535,7 +1550,7 @@ namespace Armoury
         {
             var st = f.St;
             var k = st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
-            double people = f.Kind == 1 ? f.HW : f.PeopleCal * f.DR;
+            double people = f.Kind == 1 ? CastleHeads(f) : f.DBook;     // GL-2: ludzie ksiegi (przy glowach wedlug rynku - nie PeopleCal x DR); podzamcze - glowy
             long gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
             long res = f.Kind == 0 ? Seal31.TownReserve(st.Town) : CastlePurse.Reserve(st.Town);
             sb.Append(day).Append(';').Append(day + 1).Append(';').Append(st.StringId).Append(';').Append(Clean(st.Name != null ? st.Name.ToString() : st.StringId)).Append(';')
