@@ -1567,3 +1567,8 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   odbior 24/d) - potrzebna paczka "juczne z niczego". Jeff powiadomiony, zapytany o paczke jucznych; plan: bieg 120 dob na probnym DLL (zb\k13a\Armoury\bin\Release) dla zmierzonych skutkow.
 - (13:10 UTC 13.10) **Kalendarz GOTOWY:** `w-toku/kalendarz-data` 7392436 scalone do zbior-e8 74a3645 (Armoury 65868156; klucz ReadableDateEnabled; "Year 299, Day 19, Summer - 11:30";
   dzien zmienia sie o 0:00; przyczyna: WesterosClimate.ToStringPrefix liczyl doby od startu pory). Test 40 dob + zapis w toku (test\at-fin3-40.out.txt) -> WGRANIE 36.
+- (13:25 UTC 13.10) **W TOKU wf_a30e8861-78e - RUNDA POPRAWEK 3** (docs/przekazanie/wf-poprawki-runda-3.js; specyfikacja TRIAZ-3, wiazaca "Poprawka ostateczna"): dwa drzewa od zbior-e8
+  74a3645: zb\woj `w-toku/p3-wojsko` (W1 renta korony a rod bez srodkow, W2 kolejnosc zwolnien, W3 zloto kompanii najemnych, W4 male pewne z O1-7) i zb\zel `w-toku/p3-zelazo`
+  (Z1 zamowienie zelaza przewozem z miasta z nadwyzka, Z2 regulator wsi a martwy zapas, Z3 zamki-studnia, Z4 licznik lup znikajacych z taborow); kazda autor + recenzent.
+  Test daty: 40 dob OK (0 ERROR, 10.9 s/dobe; dowod: 23:23 "Year 299, Day 1", 00:21 "Year 299, Day 2", stary wzor stal na 3641), zapis w toku. Rownolegle wf_4901dbf6-079 (swaty ROT + pomiary).
+  KOLEJKA: WGRANIE 36 (data) -> bieg 120 dob K1-3a na probnym DLL (pomiar skutkow dla Jeffa) -> po rundzie 3: scalenie, bieg roczny.
