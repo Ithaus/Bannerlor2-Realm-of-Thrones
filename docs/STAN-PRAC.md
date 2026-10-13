@@ -1873,3 +1873,17 @@ Cofniecie: Armoury a5e2fbf9 z kopii albo klucz Scutage = false.
   d. W6b gracz-wasal z lennem w tarczowym i doplacie (komunikaty po angielsku) + N5b sol pod regule A (i decyzja o lnie po odpowiedzi Jeffa).
   e. poprawka 6 (male): najkrotsza sluzba najemnikow, przerwa po wykupie, konie juczne i zboze w ksiegach, Thenn. f. k13a konie robocze + bieg 120 dob. g. P1b, P2, P3-P5, lup miast.
   h. BIEG DWULETNI - na samym koncu.
+- (20:15 UTC 13.10) **JEFF: len - "A i C" (szybkie kroki + len kosztem innego plonu), z zastrzezeniem: "produkuja ludzie; tam, gdzie jest ich wiecej, wiecej sie produkuje - dlatego
+  poludnie jest bogate, a polnoc mniej; od tego powinna byc zalezna gospodarka, inaczej to nie ma sensu. Ile ludnosci ma polnoc i ile zarabia - porownaj z poludniem i przelicz."**
+  POLICZONE (bieg roczny 06:24, doba 364 / srednia 28 dob; skrypt `docs/ludnosc/kr-ludnosc-a-zarobek.py`; tabele ludzie-regiony.csv, budzet-rodow.csv, kiesa-ludu.csv):
+  ludzie (tys.) / miasta / wsie / wplyw rodow zl/d (na 1000 ludzi) / zarobek mieszczan zl/d / wojsko w druzynach i zalogach (na 1000 ludzi):
+  The Reach 8 345 / 7 / 49 / 82.7 tys. (9.9) / 37.7 tys. / 11.6 tys. (1.4); King's Landing 4 781 / 6 / 49 / 100.2 (21.0) / 46.6 / 13.0 (2.7); **The North 3 227 / 10 / 60 / 108.9
+  (33.8) / 60.8 / 17.6 (5.4)**; The Vale 3 222 / 6 / 34 / 68.3 (21.2) / 47.2 / 11.3 (3.5); Stormlands 2 757 / 4 / 39 / 58.7 (21.3) / 22.9 / 10.9 (4.0); Riverlands 2 741 / 6 / 32 /
+  70.7 (25.8) / 35.9 / 10.2 (3.7); Dorne 1 116 / 4 / 29 / 103.1 (92.4) / 34.1 / 10.4 (9.4); Iron Islands 469 / 6 / 28 / 31.3 (66.8) / 22.0 / 6.4 (13.8); swiat 51 471 tys. ludzi,
+  1 213 tys. zl/d, srednio 23.6 zl na 1000 ludzi. **WNIOSEK: zarobek idzie za LICZBA OSAD, nie za liczba ludzi.** Przyczyna (zmierzona): w ksiedze ludzi wies Reach ma srednio
+  153.6 tys. ludzi, Polnocy 49.3 tys., Dorne 35.3 tys., Wysp 16.0 tys. - ale "hearth" gry na wies jest wszedzie prawie taki sam (Reach 406, Polnoc 364, Dorne 401, Wyspy 334),
+  a dobrobyt na miasto tez (6 300-7 200); produkcja wsi w grze liczy sie od progu hearth (0.5 / 1.0 / 1.5), podatki od dobrobytu - wiec kazda osada daje podobnie bez wzgledu na
+  to, ilu ludzi ksiega jej przypisuje. Gdyby zarobek rodow szedl za ludzmi (23.6 zl / 1000): Reach 197 tys. (dzis 83), Polnoc 76 (109), Dorne 26 (103), King's Landing 113 (100),
+  Dolina 76 (68), Stormlands 65 (59), Dorzecze 65 (71), Wyspy 11 (31). PROPOZYCJA KIERUNKU PODANA JEFFOWI (czeka na "tak"; tor L, osobny projekt): plon wsi, rece rzemiosla,
+  spozycie, podatki i pobor proporcjonalne do ludzi regionu z ksiegi ludzi (jedna skala na region), tak zeby ludne poludnie produkowalo i placilo wiecej, a polnoc mniej.
+  Poprawka lnu (N5b) czeka na te decyzje - "wiecej lnu" ma wynikac z rak, nie z mnoznika.
