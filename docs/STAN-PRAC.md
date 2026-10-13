@@ -1382,3 +1382,13 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   (4 przejscia dalej niz 3 jedn.), E7/B T4. BYLY JUZ W W33: K0-6, K1-3, K1-4, K5-4, A3-2, etap2 wojsko 90 tys./D staly 2254/kurier, etap4 pula wyrzutkow/T9/K22, E7/O2 T1 (klucz Jeffa).
   **W TOKU:** zapis 9 dob (wczytanie autotest-2026-10-12-1610) -> test\at-zb58-zapis9.out.txt; workflow wf_fe34e80e-003 - rozpoznanie przyczyn w 7 obszarach (tylko odczyt) + podwazenie
   kazdego wniosku BLAD/STROJENIE; potem poprawki na zbior-5-8 (autor + recenzent) rownolegle z kodem etapu 8 (wf_1db23a93-783: e8-a po X, e8-c po Q).
+- (00:20 UTC 13.10) **Zapis 9 dob na zbior-5-8 a589def: OK** (wczytanie autotest-2026-10-12-1610, 129/129, 18.5 s/dobe, Armoury 0 ERROR; wywrotka silnika przy zamykaniu - znana).
+  **TRIAZ GOTOWY** (wf_fe34e80e-003, 7 obszarow + podwazenie): `docs/test-zbiorczy/TRIAZ-zb58-120-2026-10-12.md` (+ .json). Wynik: wiekszosc NIE to zle progi narzedzia albo objawy
+  obecne juz w W33; prawdziwe poprawki kodu: F1 spis stali/unikatow nie widzi wozow kupcow (miecz nie zginal - jechal 4 doby wozem), F2 juczne nowych karawan z niczego 13 622/120 d (slownik
+  PackMarket._pend bez komparatora po referencji - K5(a) nigdy nie dzialalo, takze w W33), F6 koszt markietanow x2.8 (regresja E6/N1), F7 spiacy lordowie budzeni przed switem (zegar a tick
+  xx:30; + wezwania GT/RC przez wejscie metody), F8 licznik Bliznakow wokol mostu, F5 budzet postoju pana na konie (jazda 8.7%), F4a dowoz drewna do dymarek wozem z miast z nadwyzka
+  (36% lup niewytopionych, miasta bez zelaza 45 wobec 29), F4b rachunek za drewno przed udzialem pana, F3 licznik koni mieszczan (KROK 1; KROK 2 = decyzja Jeffa 12.10 "mieszczanie tylko
+  konie robocze" + czynne ciecie hodowli - czeka na liczby). **W TOKU: wf_3c309990-051** (skrypt docs/przekazanie/wf-poprawki-po-biegu-zb58.js): F1, F2, F6, F7, F8, F5, F4a, F4b, F3 po kolei
+  na `w-toku/zbior-5-8` (autor + recenzent, push po kazdej), rownolegle F9a narzedzie progow na `w-toku/zb58-progi` (zb\58t, od a589def), na koncu zlozenie F9b + DLL test\zb58f.
+  PO SCALENIU ETAPU 8: F6 pkt 2 (pamiec UsedByMen w AiWear - plik zmienia E8/W). DO JEFFA (raport): czy kupcy maja wozic unikaty miedzy miastami (bylo tez w W33).
+  Etap 8 (wf_1db23a93-783): `e8-a` po E8/A (652fe0d; zostaje Z, L, C, R, B, O1, O2, O3, O5, O6), `e8-c` po E8/G2 (c93dfe0; zostaje T, E, K, D1, D2).
