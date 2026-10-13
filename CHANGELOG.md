@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO W1-A, TRIAZ-3 O1-2 A + C) - SLUZBA NA MIARE SRODKOW: rod, ktorego nie stac na druzyne do wezwania, nie traci renty korony (klucz CrownRentServiceAtMeans)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` (od 74a3645) | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `Pending`, `AtMeans`), `CrownRents.cs` (Daily, OnMapEvent - pomiar, CsvCols/CsvHeader, Export/Import), `ClanIncomeBook.cs` (1 linia: naglowek CSV z `CrownRents.CsvHeader`), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis: `arm_rent180` dostaje 5. pole (stary zapis wczytuje sie bez niego).
+
+**Problem (bieg roczny 364 doby, log `Armoury-2026-10-13_02-15-21.log`, `budzet-rodow.csv`):** rody z lennem bez renty korony: 11 (d28) -> 29 (d84) -> 46 (d252) -> 57 z 198 w d364 (28.8%; linia "Renty korony (180)" :128859: zaloga 3, sluzba 47, oba 7). Partie tych 57 rodow: 24 264 ludzi (d57-84) -> 5 785 (d337-364). Rody z lennem z 0 ludzi w druzynach: 8 (d84) -> 15 (d196) -> 29 (d364); u 28 zold zalogi >= caly pulap zoldu. Udzialy rodow bez warunku oddawane sluzacym (E5/F9): 16-29 tys. zl/d w pierwszym polroczu -> 62.6 tys. zl/d w d337-364 (31% rent), w ok. 70% do rodow z luzem, ktore tego nie wydaja.
+
+**Przyczyna:** warunek sluzby (20 z 60 dob wojny ze stykiem, `CrownRents.Daily`) liczy dobe wojny rodowi, ktory nie ma czym sluzyc, a kara zabiera mu srodki potrzebne do spelnienia warunku: bez renty D rodu spada do samej ziemi, zold zalogi (w wojnie placonej pierwszej - `ClanBudget.GarFull`, `PartyCap = Cap - zalogi - karawany`) zjada caly pulap i na druzyne zostaje 0. Podwazenie triazu sprostowalo pierwotny wniosek: prog 60% NIE jest bramka sluzby (rody z wypelnieniem 30-60% sluza prawie jak pelne; zalamanie dopiero ponizej ok. 15% i przy 0 ludzi), a stan nie jest "bez wyjscia" (109 z 164 epizodow konczy sie odzyskaniem, mediana 19 dob) - bez powrotu jest wezszy przypadek "zold zalogi >= pulap". Pierwotne kryterium "zold >= 0.95 pulapu" lapalo 40 z 54 rodow; przyjete (nizej) 48 z 54 - pozostale 6 to 3 rody z druzyna ponad 60% i 3 z luzem (prawdziwy brak sluzby).
+
+**Zmiana (klucz `CrownRentServiceAtMeans`, domyslnie wlaczony; wylaczony = stan sprzed):**
+1. `ClanBudget.AtMeans(Clan, out fillMax)` - rod "na miare srodkow": zadna czynna druzyna rodu nie przekracza progu, od ktorego gra wzywa do armii (`ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy` = 0.6 - liczba gry, bez nowego parametru; BK ma te sama na sztywno w `MobilePartyExtensions.IsAvailableForArmies`), a pulap partii z ostatniego budzetu jest mniejszy niz potrzeba = 0.6 x suma limitow druzyn x zold na czlowieka (zold partii / ludzie przy >= 20 ludziach, inaczej srednia gry); rod bez druzyny: `MinNewPartyMen` (30) x zold na czlowieka. Straz bez zoldu, najemnik, gracz i rod bez budzetu - nigdy.
+2. `CrownRents.Daily`: rod w wojnie "na miare" bez sluzby tej doby dostaje sluzbe rodzaju 8 (bit maski w dobie ze stykiem); w warunku renty rod ze zbioru `_means` z niedoborem dob ma wymog 0 - renta wraca TEJ doby (nie po 20 dobach, inaczej zaloga spada ponizej normy i rod traci rente drugim warunkiem). Gdy rod odbuduje druzyne ponad 60% albo zejdzie pod potrzebe - zwykly wymog 20 z 60, a maska ma juz zaliczone doby.
+3. Stan `_means` (id rodow) z ostatniej doby wojny rodu, w zapisie (5. pole `arm_rent180`). Pierwsza doba po wczytaniu (budzet 166 jeszcze nie policzony - `ClanBudget.Pending`): stan z zapisu, wiec wczytanie nie zabiera rodom doby renty.
+4. POMIAR (C): linia "Renty korony (180)" - `P3/W1 styk krolestw w wojnie wedlug zrodla: armia w polu / oblezenie / napad na wlasna osade / tylko rajdy i bitwy wlasnych lordow` oraz `P3/W1 sluzba na miare srodkow: rodow w wojnie N (z nich sluzylo i tak M, doba zaliczona K), wymog sluzby zdjety u Z rodow z lennem`; `budzet-rodow.csv` - nowe ostatnie kolumny `sluzba_dzis_180` (0-8), `wyp_max_180` (najwyzsze wypelnienie druzyny), `na_miare_180`.
+
+**Zloto / ludzie:** nic nie powstaje - renta zmienia tylko odbiorce w tym samym krolestwie (skarbiec -> glowa, jak dotad). Do rodow objetych wraca do ok. 62.6 tys. zl/d, dzis prawie w calosci u rodow z luzem (ich kiesy +17 tys. zl/d). Oczekiwane w biegu rocznym: +3.5 do +5 tys. ludzi w partiach (gorna granica +5.4 tys. = powrot do stanu sprzed utraty renty), z tego Polnoc ok. +2.0 tys. To NIE zamyka spadku 97 -> 63 tys. (reszta to pulap zoldu i drozszy zolnierz).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regula sluzby K10 zostaje realna dla ok. 40% rodow: "na miare" przy progu 0.6 jest 51 (d84) do 118 (d364) rodow z lennem, dopoki pulap trzyma je ponizej 60% (z tego ok. 70 i tak ma dzis warunek). Prog nizszy niz liczba gry byl liczony i odrzucony (0.3: 84 rody, 44 zamiast 48 rodow bez sluzby).
+- Rod przy granicy moze miec rente co kilka dob (D to srednia 28 dob - pulap nie skacze).
+- Zostaja rody "oba" i sama "zaloga" (dzis 10): warunek zalogi nie jest ruszony. Jesli po 120 dobach "oba" > 2 - ta sama zasada dla zalogi jako drugi krok (do decyzji).
+- Kolejnosc doby: `CrownRents.Daily` (ArmouryBehavior.cs:1649) przed `ClanBudget.Daily` (:1672) - czyta budzet z wczoraj (`Of(c)`: `Today` z poprzedniej doby), bez kolizji. `AtMeans` tylko czyta.
+- W pokoju flaga zostaje z ostatniej doby wojny (maska tez stoi) - rod zwolniony w wojnie ma rente w pokoju; przeliczenie wraca z pierwsza doba wojny.
+- CSV: 3 nowe kolumny na koncu; `tools/sprawdz_logi.py` czyta po nazwach (`csv.DictReader`). Linia 180: nowe pola dopisane jako osobne segmenty po "doba wojny bez styku" - wzory narzedzia (`z warunkiem N, bez warunku N (P%)`, `| wagi: miasto ...`) nietkniete. Pole "sluzylo N" NIE zawiera dob zaliczonych "na miare" (osobne pole).
+- Czas doby: ok. 300 rodow x kilka druzyn (odczyt), bez znaczenia.
+- Klucza nie ma w `Armoury.json` Jeffa (grep) - dziala domyslna.
+- Sprawdzic w biegu 364 dob: rody z lennem bez warunku <= 10% w kazdym oknie (bylo 27%); "sluzba" <= 8, "oba" <= 2; rody z lennem z 0 ludzi <= 12 (bylo 29) i nie rosna po d196; E5/F9 <= 20 tys. zl/d (bylo 62.6); partie rodow d337-364 >= 66 tys.; suma zlota swiata bez zmiany.
+
+**Build:** Armoury kod 0 (drzewo `zb/woj`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (zgloszenie Jeffa, tor S) - CZYTELNA DATA "Year 299, Day 256, Autumn" + DZIEN ZMIENIA SIE O POLNOCY (klucz ReadableDateEnabled)
 **Mod:** Armoury | **Galaz:** `w-toku/kalendarz-data` (od ca4aa87 = WGRANIE 35) | **Pliki:** `Armoury/src/Calendar.cs` (nowa klasa `CalendarText`), `WesterosClimate.cs` (ToStringPrefix, TextSeason, OldTextDay, latka powiadomien), `MapClock.cs` (BarText), `IronBank.cs` i `DebtLadder.cs` (po 1 linii tekstu), `ArmouryBehavior.cs` (1 nasluch godzinny), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
 

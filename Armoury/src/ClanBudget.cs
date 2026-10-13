@@ -205,6 +205,49 @@ namespace Armoury
             var b = Of(c); cap = b != null ? b.Cap : 0; return b != null;
         }
 
+        /// <summary>P3/W1: budzet wlaczony, ale w tej sesji jeszcze nie policzony (pierwsza doba po wczytaniu albo po starcie kampanii - CrownRents.Daily
+        /// biegnie przed ClanBudget.Daily). Wtedy AtMeans nie ma na czym stanac i wolajacy trzyma stan z zapisu.</summary>
+        internal static bool Pending { get { return On && _day < 0; } }
+
+        /// <summary>P3/W1 (bieg roczny 364 doby, TRIAZ-3 O1-2 "Poprawka ostateczna" A) - ROD NA MIARE SRODKOW: zadna czynna druzyna rodu nie przekracza progu,
+        /// od ktorego gra wzywa do armii (ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy = 0.6 - ta sama liczba co w grze i w BK, bez
+        /// nowego parametru), a pulap partii z ostatniego budzetu (pulap minus zalogi i karawany) nie starcza na oplacenie druzyn do tego progu:
+        /// potrzeba = prog x suma limitow druzyn x zold na czlowieka (zold partii z rycerzami 179 / ludzie przy co najmniej 20 ludziach, inaczej srednia
+        /// gry); rod bez druzyny - MinNewPartyMen (30) x zold na czlowieka, ta sama liczba co regula "nowa partia" 166. Budzet z wczoraj (CrownRents.Daily
+        /// biegnie przed ClanBudget.Daily). false: rod bez budzetu (gracz, wylaczone 166, budzet jeszcze nie policzony), Straz bez zoldu, najemnik.
+        /// fillMax - najwyzsze wypelnienie druzyny rodu (-1 bez druzyny) - pomiar do CSV, liczony zawsze. Tylko odczyt.</summary>
+        internal static bool AtMeans(Clan c, out float fillMax)
+        {
+            fillMax = -1f;
+            try
+            {
+                var s = Settings.Current;
+                if (c == null || s == null || Campaign.Current == null) return false;
+                long limit = 0, men = 0, wage = 0; int parties = 0;
+                var wps = c.WarPartyComponents;
+                if (wps != null)
+                    for (int i = 0; i < wps.Count; i++)
+                    {
+                        var mp = wps[i] != null ? wps[i].MobileParty : null;
+                        if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.Party == null) continue;
+                        float fill = mp.PartySizeRatio;
+                        if (fill > fillMax) fillMax = fill;
+                        parties++;
+                        limit += Math.Max(0, mp.Party.PartySizeLimit);
+                        men += mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+                        wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
+                    }
+                var b = Of(c);
+                if (b == null || b.Zero || c.IsUnderMercenaryService) return false;
+                float gate = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
+                if (fillMax > gate) return false;                       // gra moze te druzyne wezwac - zwykly wymog sluzby
+                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage);
+                double need = parties > 0 ? (double)gate * limit * perMan : Math.Max(0, s.MinNewPartyMen) * perMan;
+                return b.PartyCap < need;
+            }
+            catch (Exception e) { Stumble("AtMeans", e); return false; }
+        }
+
         internal static int AdultsOf(Clan c)
         {
             int n = 0; bool leader = false;

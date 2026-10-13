@@ -3580,6 +3580,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentServiceAfterFullDays { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Service At Means", HintText = "a house whose wage ceiling cannot pay for parties big enough to be called to an army (the game calls only parties above 60% of their size) serves the crown with what it has: its days of war count as served and the crown does not ask it for more, so it keeps its rent and can raise men again; once it can afford such a party the usual service is asked. Needs Clan Budget Enabled; you are never judged this way. Off = every house must serve its days, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentServiceAtMeans { get; set; } = true;
+
         [SettingPropertyBool("Crown Rent Held To Serving", HintText = "the rent share of a house that does not serve (garrison or service days) goes to the houses of the same realm that do, by the same fief weights, instead of staying in the treasury; if no house of the realm serves, it stays in the treasury. Off = it stays in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentHeldToServing { get; set; } = true;
@@ -6118,6 +6122,7 @@ namespace Armoury
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
             s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
+            s.CrownRentServiceAtMeans = CrownRentServiceAtMeans;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CrownBorrows = CrownBorrows;
