@@ -282,10 +282,12 @@ namespace Armoury
             try
             {
                 var it = itemRosterElement.EquipmentElement.Item;
-                if (it == null || HorseBook.Cat(it) < 0) return;
+                int cat = it != null ? HorseBook.Cat(it) : -1;
+                if (cat < 0) return;
                 int n = Math.Min(itemRosterElement.Amount, numberOfAnimalsToDiscard);   // jak DiscardAnimal :124
                 if (n <= 0) return;
                 _discHerd += n;
+                HorseBook.NoteDiscard(cat, n, true);   // F3: ujscie w ksiedze koni (wedlug kategorii)
                 if (itemRosterElement.EquipmentElement.ItemModifier != null) _discHerdMod += n;
             }
             catch (Exception e) { Stumble("DiscardAnimal", e); }
@@ -296,12 +298,14 @@ namespace Armoury
             try
             {
                 var it = itemRosterElement.EquipmentElement.Item;
-                if (it == null || HorseBook.Cat(it) < 0) return;
+                int cat = it != null ? HorseBook.Cat(it) : -1;
+                if (cat < 0) return;
                 float w = itemRosterElement.EquipmentElement.GetEquipmentElementWeight();   // jak DiscardNecessaryAmountOfItems :116-117
                 int n = MBMath.ClampInt(itemRosterElement.GetRosterElementWeight() <= weightLeftToDiscard ? itemRosterElement.Amount
                                         : (w > 0f ? MathF.Ceiling(weightLeftToDiscard / w) : itemRosterElement.Amount), 0, discardLimit);
                 if (n <= 0) return;
                 _discWeight += n;
+                HorseBook.NoteDiscard(cat, n, false);   // F3: ujscie w ksiedze koni (wedlug kategorii)
                 if (itemRosterElement.EquipmentElement.ItemModifier != null) _discWeightMod += n;
             }
             catch (Exception e) { Stumble("DiscardWeight", e); }
