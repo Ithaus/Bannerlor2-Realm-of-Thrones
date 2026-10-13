@@ -5040,6 +5040,18 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkWarAidShare { get; set; } = 0.025f;
 
+        [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, not you. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownWarAidByNeed { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown War Aid Fill Target", 0.00f, 1.00f, "0.00", HintText = "how full the crown helps a house keep its field companies with Crown War Aid By Need, as a part of their size limit (0.60 = up to six men in ten - about what houses with coin to spare keep on their own)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float CrownWarAidFillTarget { get; set; } = 0.60f;
+
+        [SettingPropertyFloatingInteger("Crown War Aid Recruit Step", 0.00f, 1.00f, "0.00", HintText = "with Crown War Aid By Need: how many new men a day, as a part of the companies' size limit, a helped house may take on ahead of the crown's coin (the crown starts paying for them the day after they join)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float CrownWarAidRecruitStep { get; set; } = 0.10f;
+
         [SettingPropertyBool("People Menu Shows Savings", HintText = "'People of this land' also tells for how many days of living the people of the town, castle or village you are in hold coin, how much of it lies above their reserve for hard times and how much war aid they gave the crown at the last dawn (off = no such line, as before)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool PeopleMenuShowsSavings { get; set; } = true;
@@ -6547,6 +6559,9 @@ namespace Armoury
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.FolkWarAid = FolkWarAid;
             s.FolkWarAidShare = FolkWarAidShare;
+            s.CrownWarAidByNeed = CrownWarAidByNeed;
+            s.CrownWarAidFillTarget = CrownWarAidFillTarget;
+            s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
             s.Stage6MeasureLog = Stage6MeasureLog;

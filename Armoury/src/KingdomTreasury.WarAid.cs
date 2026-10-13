@@ -380,7 +380,7 @@ namespace Armoury
             sb.Append(" | do skarbcow ").Append(taken).Append(" (wplyw dnia 165 tej doby; krolestw ").Append(kN).Append(')')
               .Append(" | skarbce krolestw z danina: wplywy dnia ").Append(kMeas).Append(" + 1/360 zapasu ").Append(kRel).Append(" (w tym danina ").Append(kAid)
               .Append(", podatek 184 ").Append(kTax).Append("); wydane tej doby: zwrot zoldu ").Append(kGiven).Append(" z naleznego ").Append(kDue)
-              .Append(", renty (180) ").Append(kRent).Append(", pozostale (rata 186, dary, reparacje, kontrakty, wezwania) ").Append(other)
+              .Append(", renty (180) ").Append(kRent).Append(", pozostale (rata 186, dary, reparacje, kontrakty, wezwania, doplata wedlug potrzeby W5) ").Append(other)
               .Append(", zostalo z wplywow ").Append(kLeft).Append("; kredyt Banku (186) na zwrot ").Append(kLoan)
               .Append(" | wszystkie krolestwa: zwrot zoldu ").Append(aGiven).Append(" z naleznego ").Append(aDue).Append(", renty (180) ").Append(aRent)
               .Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")

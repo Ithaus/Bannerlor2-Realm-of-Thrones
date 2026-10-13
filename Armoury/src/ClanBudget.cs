@@ -65,6 +65,7 @@ namespace Armoury
             // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
+            public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -270,9 +271,25 @@ namespace Armoury
                 if (fillMax > gate) return false;                       // gra moze te druzyne wezwac - zwykly wymog sluzby
                 double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage);
                 double need = parties > 0 ? (double)gate * limit * perMan : Math.Max(0, s.MinNewPartyMen) * perMan;
-                return b.PartyCap < need;
+                return b.PartyCap - b.Aid < need;   // W5: pulap WLASNY (bez doplaty korony) - rod z doplata zostaje "na miare srodkow" tak, jak bylby bez niej
             }
             catch (Exception e) { Stumble("AtMeans", e); return false; }
+        }
+
+        /// <summary>W5 (KingdomTreasury.NeedAidKingdom - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu =
+        /// pulap partii z ostatniego budzetu bez przydzialu korony (pulap z dworem ustepujacym zoldowi i kredytem wojennym, minus zalogi i karawany).
+        /// false: rod bez budzetu policzonego (gracz, 166 wylaczone, pierwsza doba sesji), Straz bez zoldu, kompania najemna, rod w pokoju. Tylko odczyt.</summary>
+        internal static bool PartyCapOwn(Clan c, out double partyCap)
+        {
+            partyCap = 0;
+            try
+            {
+                var b = Of(c);
+                if (b == null || b.Zero || !b.War || c.IsUnderMercenaryService) return false;
+                partyCap = Math.Max(0, b.PartyCap - b.Aid);
+                return true;
+            }
+            catch (Exception e) { Stumble("PartyCapOwn", e); return false; }
         }
 
         internal static int AdultsOf(Clan c)
@@ -473,6 +490,16 @@ namespace Armoury
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
                         // P3/W2 (pomiar): rod w wojnie, ktoremu zalogi i karawany zajely caly pulap - partie zwalniane do zera, kolejnosc zwolnien nic tu nie zmienia
                         if (!b.Zero && !merc && b.War && b.PartyCap <= 0) { _dGarEatsCap++; if (b.MenPar <= 0) _dGarEatsCapEmpty++; }
+                        // W5 (doplata korony do zoldu wedlug potrzeby, KingdomTreasury.NeedAid.cs): przydzial tej doby jest ZNACZONY na druzyny - podnosi pulap partii
+                        // (takze u rodu, ktoremu zalogi zajely caly pulap: druzyny dostaja dokladnie przydzial) i pulap rodu o te sama kwote. Nie wchodzi do D, wiec
+                        // dwor, sprzet, budowy, kredyt wojenny i limit Banku licza sie jak bez doplaty. Liczniki wyzej (ponad pulapem partii, zalogi zajely pulap) -
+                        // wedlug pulapu wlasnego, jak dotad. Klucz wylaczony albo rod bez przydzialu = 0 i budzet co do zlotowki jak przed paczka.
+                        b.Aid = 0;
+                        if (!b.Zero && !merc && b.War)
+                        {
+                            double aid = KingdomTreasury.NeedAidBoostOf(c);
+                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; }
+                        }
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
                         CourtFull.Lapse(b, s, merc);   // E5/A2 (R8): przydzial przeterminowany dzis -> dwor (b.Lapsed; wlasny try, GearLeft bez zmian)
@@ -735,7 +762,12 @@ namespace Armoury
             long wage = b.WPar + b.WGar + b.WCar;
             int men = b.MenPar + b.MenGar;
             // 2: Straz - ponad pulapem jest CALA Straz (pula), nie rod; nadwyzka puli dzielona miedzy rody wedlug ich ludzi
-            bool over = b.Zero ? _watchPoolCap >= 0 && _watchPoolMen > hyst * _watchPoolCap : wage > hyst * b.Cap;
+            // W5: rod z przydzialem korony - przydzial jest znaczony na druzyny, wiec nadwyzka zoldu zalog ponad pulap wlasny (w wojnie zalog nie tniemy) nie
+            // zwalnia ludzi oplaconych przez korone: pulap do zwolnien = pulap partii z przydzialem + zalogi i karawany liczone jak w pulapie partii. U rodu,
+            // ktorego zalogi mieszcza sie w pulapie, to ta sama liczba co b.Cap; bez przydzialu (b.Aid = 0) regula bez zmian.
+            double capRel = b.Cap;
+            if (b.Aid > 0 && !b.Zero) capRel = Math.Max(capRel, b.PartyCap + (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) + b.WCar);
+            bool over = b.Zero ? _watchPoolCap >= 0 && _watchPoolMen > hyst * _watchPoolCap : wage > hyst * capRel;
             b.Streak = over ? b.Streak + 1 : 0;
             if (over) _dOver++;
             if (b.Streak < Math.Max(1, s.BudgetHysteresisDays)) return;
@@ -744,7 +776,7 @@ namespace Armoury
             // do zwolnienia: w zlocie (zold dzienny) albo - Straz bez zoldu - w ludziach
             // recenzja 2 (R1): Straz - nadwyzka calej puli dzielona wedlug ludzi rodu, ktorych da sie zwolnic (partie), nie wedlug zalog
             int rel = 0; if (b.Zero) _watchRel.TryGetValue(c, out rel);
-            double left = b.Zero ? (_watchRelSum > 0 ? Math.Ceiling(share * (_watchPoolMen - _watchPoolCap) * rel / (double)_watchRelSum) : 0) : share * (wage - b.Cap);
+            double left = b.Zero ? (_watchRelSum > 0 ? Math.Ceiling(share * (_watchPoolMen - _watchPoolCap) * rel / (double)_watchRelSum) : 0) : share * (wage - capRel);
             if (left <= 0) return;
             // 1. w pokoju zalogi ponad cel pokojowy (Straz bez zoldu - zalogi na Murze nie sa ciete; od partii)
             if (!GarFull(b, s) && c.Fiefs != null)
@@ -1197,7 +1229,7 @@ namespace Armoury
                 {
                     double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage);
                     cost = need * avg;
-                    room = b.PartyCap - b.WPar - used >= cost;
+                    room = b.PartyCap - b.Aid - b.WPar - used >= cost;   // W5: przydzial korony nie otwiera nowych druzyn (miejsce liczone od pulapu wlasnego)
                 }
                 if (!room) { _dSpawnBlock++; __result = null; return false; }   // ConsiderSpawningLordParties sprawdza null - partia nie powstaje
                 _spawnUsed[c] = used + cost;

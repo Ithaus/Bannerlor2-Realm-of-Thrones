@@ -622,6 +622,7 @@ namespace Armoury
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-")
               .Append(", renty wedlug lenn (180) skarbce -> glowy rodow ").Append(CrownRents.LastPaid).Append(" (z reszty wplywow dnia ").Append(CrownRents.LastPool)
               .Append("; wstrzymane w skarbcach ").Append(CrownRents.LastHeld).Append(")")
+              .Append(", doplata do zoldu wedlug potrzeby (W5) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAid)   // W5: z daniny P1 tej doby, przed rentami 180
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)
