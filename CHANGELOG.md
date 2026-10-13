@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (runda poprawek przed testem koncowym, grupa D 2/3 - drobne z audytu: wydajnosc, gracz) - NAPISY NAD SPALONYMI WSIAMI: WYLACZNIK "3 POTKNIECIA Z RZEDU" DZIALA TAKZE PRZY STALYM WYJATKU W WYBORZE NAPISOW; PRACA NAJEMNA (RC): WYJSCIE Z PRACY WRACA DO MENU OSADY, W KTOREJ GRACZ STOI (PO WCZYTANIU ZAPISU WE WSI NIE DO MENU MIASTA)
+**Mody:** Armoury, RealisticCaptivity | **Galaz:** `w-toku/p2-d` (po b5f9390) | **Zrodlo:** `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md`, sekcja "Drobne" ([wydajnosc] E7/W4, [gracz] praca najemna). Oba potwierdzone w kodzie (i w dekompilacji gry) przed zmiana | **Pliki:** `Armoury/src/MapVillageLook.cs`, `RealisticCaptivity/src/Work.cs`, `CHANGELOG.md`. Bez kluczy, bez zmian w zapisie.
+
+**1. E7/W4: licznik "3 potkniecia z rzedu" warstwy napisow byl zerowany co klatke.**
+- **Problem:** to wada siatki bezpieczenstwa, nie czynny blad - w biegu 2 (`Armoury-2026-10-12_22-38-57.log`) jest 0 linii "MapVillagesView.Label" i 0 "NAPISY WYLACZONE". Gdyby jednak wybor napisow (`LabelTick`, 4 razy na sekunde) zaczal stale rzucac wyjatek przy napisach w kadrze, wylacznik by nie zadzialal: wyjatek lecialby 4/s do konca sesji mapy (kazdy przez FirstChance CrashScribe).
+- **Przyczyna:** jeden licznik `_lblStrikes`; podnosil go kazdy wyjatek, a zerowala kazda udana klatka `LabelFrame` (wolana co klatke, gdy w kadrze jest napis - `MapVillagesView.OnVisualTick` :1773). Miedzy dwoma wyborami jest kilkanascie udanych klatek, wiec licznik nie dochodzil do 3. Do tego `LabelTick` po wylaczeniu dalej robil wybor (`PickLabels`) - wyjatek stamtad lecialby mimo wylacznika.
+- **Zmiana:** dwa liczniki "z rzedu": `_lblStrikes` (klatka - jak dotad, zeruje udana klatka) i nowy `_lblTickStrikes` (wybor - zeruje tylko udany wybor); wylacznik przy 3 na ktorymkolwiek. `LabelTick` zaczyna sie od `if (_lblBroken) { _lblCount = 0; return; }` - to ta sama droga co dotad (po wylaczeniu warstwy nie ma, wynik byl `_lblCount = 0`), tylko bez przebiegu `PickLabels`.
+- **Ryzyko / co sprawdzic:** w zwyklej grze bez zmiany (liczniki ruszaja tylko przy wyjatku). Odrzucony prostszy wariant z audytu (jeden licznik zerowany tylko w `LabelTick`): przy malej liczbie klatek (ponizej ok. 12/s) staly wyjatek w `LabelFrame` nie doszedlby do 3 miedzy dwoma wyborami - dlatego dwa liczniki. Linia doby "Wioski - wyglad" bez zmian formatu.
+
+**2. Praca najemna (RC): po wczytaniu zapisu zrobionego w menu pracy we wsi wyjscie z pracy przelaczalo na menu miasta.**
+- **Problem:** gracz najmuje sie do pracy we wsi, gra zapisuje (np. autozapis), zapis jest wczytany w nowym uruchomieniu gry. Pierwsze wyjscie z pracy - reczne "Enough of this toil", alarm, a od E8/RC takze samoczynne `StopForPurse` (wies bez nadwyzki na dniowke, czyli zwykle po pierwszej dobie) - robilo `GameMenu.SwitchToMenu("town")` na wsi. Dowodu z logu nie ma (biegi probne sa bez gracza w pracy) - dowod z kodu i dekompilacji: init menu miasta `PlayerTownVisitCampaignBehavior.game_menu_town_on_init` (:670-689) czyta `Settlement.CurrentSettlement.Town.GarrisonParty`, a `Town` wsi jest null -> NullReference w srodku przelaczania menu; gracz zostaje we wsi w menu miasta.
+- **Przyczyna:** `Work._cameFrom = "town"` to pole statyczne bez zapisu; ustawiaja je tylko opcje startu pracy, a menu oczekiwania wraca z zapisu samo.
+- **Zmiana:** `Work.BackMenu()` - menu powrotu z osady, w ktorej gracz stoi (`IsVillage` -> "village", `IsTown` -> "town", inaczej dawne pole jako zapas); wszystkie cztery przelaczenia (`StopForPurse`, `LabourTick`, `GuardTick`, `StillSafe`) biora je stamtad. Przelaczenie dalej tylko z TIKU menu oczekiwania (CLAUDE.md 7 - z opcji zakazane), bez zmian.
+- **Ryzyko / co sprawdzic:** w grze bez wczytywania wynik ten sam co dotad (praca dniowkowa: menu, z ktorego zaczeto; warta tylko w miescie). Menu "village" istnieje w grze (`PlayerTownVisitCampaignBehavior` :153). Do sprawdzenia przez Jeffa: najac sie we wsi, zapisac, wyjsc z gry, wczytac, kliknac "Enough of this toil" - ma wrocic menu wsi.
+
+**Co Jeff zobaczy w grze:** nic w zwyklej grze; po wczytaniu zapisu z pracy we wsi - poprawne menu wsi zamiast zepsutego menu miasta.
+
+**Build:** Armoury i RealisticCaptivity kod 0 (drzewo `zb/pd`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy.
+
 ## 2026-10-13 (runda poprawek przed testem koncowym, grupa D 1/3 - drobne z audytu: zloto, sztuki, zapis) - KOPALNIA BK GRACZA PALI DREWNO JAK U NOTABLA; KSIEGA TOWAROW NIE LICZY JUZ LUPU Z RABUNKU JAKO PRODUKCJI; PAMIEC UPRZEZY E8/H CZYSZCZONA TAKZE PRZY WYLACZONYM KLUCZU E8/S; DYMARKI: REZIM KAMPANII ZAPAMIETANY W PIERWSZEJ SESJI ("nk1" / "nk0")
 **Mod:** Armoury | **Galaz:** `w-toku/p2-d` (po e9dfa7f) | **Zrodlo:** `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md`, sekcja "Drobne" ([zloto] kopalnia BK gracza, [sztuki] ksiega towarow, [zapis] E8/H i E8/Q, [zapis] flaga NK dymarek). Znaleziska nie byly niezaleznie sprawdzane - kazde potwierdzone tu w kodzie i w dekompilacji gry przed zmiana | **Pliki:** `Armoury/src/WorkshopLaw.cs`, `Bloomery.cs`, `DistrictRaid.cs`, `StateHygiene.cs`, `CHANGELOG.md`. Bez nowych kluczy, `tools/sprawdz_logi.py` bez zmian.
 

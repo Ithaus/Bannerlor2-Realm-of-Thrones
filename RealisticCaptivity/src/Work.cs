@@ -32,6 +32,21 @@ namespace RealisticCaptivity
         private static bool _stopWork;                     // opcja "Enough of this toil" podnosi, tick przelacza
 
         private static Settlement Here { get { return Settlement.CurrentSettlement; } }
+
+        /// <summary>Audyt 13.10 (drobne, [gracz]): menu powrotu z pracy brane z osady, w ktorej gracz stoi, nie z pola statycznego. _cameFrom nie jest
+        /// w zapisie: po wczytaniu zapisu zrobionego w menu pracy we WSI mialo wartosc domyslna "town", a init menu miasta na wsi rzuca
+        /// NullReference (Settlement.Town = null) w srodku przelaczania menu. Pole zostaje tylko jako zapas, gdy osady nie da sie odczytac.</summary>
+        private static string BackMenu()
+        {
+            try
+            {
+                var h = Here;
+                if (h != null && h.IsVillage) return "village";
+                if (h != null && h.IsTown) return "town";
+            }
+            catch { }
+            return _cameFrom;
+        }
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
 
         // ------------------------------------------------------------------ ROT enlistment guard
@@ -141,7 +156,7 @@ namespace RealisticCaptivity
             Log.Info("Praca (E8/RC): " + what + " w " + Here.Name + " przerwana - osada nie ma nadwyzki na kolejna wyplate (nadwyzka " + Payable(Here) + ", kasa " + CofferOf(Here)
                      + "); przerwan pracy w tej sesji " + _e8Stops);
             Log.Player("There is no coin to spare for hired hands in " + Here.Name + " - the work ends here.", true);
-            GameMenu.SwitchToMenu(_cameFrom);
+            GameMenu.SwitchToMenu(BackMenu());
         }
 
         /// <summary>Komunikat dniowki: pelna, czesciowa albo zadna (pusta kasa osady).</summary>
@@ -380,7 +395,7 @@ namespace RealisticCaptivity
         {
             try
             {
-                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(_cameFrom); return; }
+                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(BackMenu()); return; }
                 if (!StillSafe(args)) return;
                 _hours += (float)dt.ToHours;
                 if (_hours < 24f) return;
@@ -417,7 +432,7 @@ namespace RealisticCaptivity
         {
             try
             {
-                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(_cameFrom); return; }
+                if (_stopWork) { _stopWork = false; GameMenu.SwitchToMenu(BackMenu()); return; }
                 if (!StillSafe(args)) return;
                 _hours += (float)dt.ToHours;
                 if (_hours < 24f) return;
@@ -481,7 +496,7 @@ namespace RealisticCaptivity
                 if (Here.IsUnderRaid || Here.IsUnderSiege)
                 {
                     Log.Player("Alarm bells - all work stops.", true);
-                    GameMenu.SwitchToMenu(_cameFrom);
+                    GameMenu.SwitchToMenu(BackMenu());
                     return false;
                 }
                 return true;
