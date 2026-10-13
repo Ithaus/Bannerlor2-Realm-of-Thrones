@@ -1775,3 +1775,20 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   **POPRAWKA 2 TARCZOWE (W6) - W TOKU:** wf_99079863-f58 (docs/przekazanie/wf-w6-tarczowe.js), galaz `w-toku/w6-tarczowe` od 00a6496, drzewo SC\zb\tc: placi rod AI z wolnym pulapem
   wlasnym i zlotem ponad rezerwe (stawka 25% wolnego pulapu, najwyzej 1/45 nadwyzki dziennie), korona bierze tylko tyle, ile wynosi niepokryta potrzeba W5, i wydaje tej samej doby
   przez garnek W5. Kolejka gry: test 120 dob poprawki 3 (konczy sie) -> zapis -> WGRANIE 40 -> test 120 dob W5 (fin9) -> WGRANIE 41 -> tarczowe -> towary (wf_8e1aa5c4-418 w toku).
+
+**WGRANIE 40 (13.10 ok. 18:45 UTC; poprawka 3 - pobity oblegajacy uchodzi):** Armoury **b2423a38** (reszta jak WGRANIE 39: CrashScribe 04f44a0e, settings 3e31434f, RC f9a944c1,
+GT 035878c4, ForgeView e17e0233). Galaz `noc/wgranie-40` = **8639c21** (55b59d7 + `w-toku/n3-oblegajacy-uchodzi` 82f7c06; UWAGA: `w-toku/zbior-e8` jest juz dalej - 00a6496 z W5,
+NIEWGRANE). Kopie: `*.bak-2026-10-13-noc40-przed` i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc40-przed`; md5 OK. Cofniecie: Armoury ccfbf36a z kopii albo klucz
+LosersFleeBesiegers = false.
+- **TEST 120 dob przed wgraniem (nowa kampania; fin8 + CS-at-hamulec): 120/120, 0 ERROR** (Armoury-2026-10-13_11-11-41.log + tabele, kopie na D:; progi SCRATCH\test\progi-n3\).
+  **N3-1: 13 bitew (8 wypadow, 5 pod murami), pobici oblegajacy 19 596 ludzi: zabici 20.1%, jency 7.8% (razem 27.8%), rozbici 72.2% - gra dalaby 7 099 zabitych i ok. 12 497
+  jencow (100%).** Ksiega N3-2: kontrola 0, roznica 0; potkniecia 0. Zwyciezcy bitew pod murami: zabici 4.1%.
+  SKUTKI UBOCZNE (zmierzone, przewidziane w recenzji): **pula wyrzutkow d60 / d90 / d120: 2 544 / 5 457 / 6 170 wobec 1 036 / 2 754 / 2 674 w biegu daniny bez N3** (prog 3 053 NIE;
+  powrot do domu 55.5/d wobec 25.4/d - wzrost zwalnia); bandy 661 / 13 084 ludzi wobec 663 / 11 932 (w progu). Wojsko lordow w wojnie d120: 99 917 (ostatnia doba 102 783) wobec
+  105 589 w biegu daniny i 101 144 w biegu rundy 3 - trzy rozne kampanie, roznica w szumie; N3 NIE podnosi wojska wprost, bo rozbici nie wracaja do druzyny (las, ludnosc, karczmy).
+  Nowe NIE wobec biegu daniny, wszystkie na granicy: P3W1-1 rody z lennem bez warunku renty 10.3% (prog 10; bylo 6.2), P3W1-3 26 986 zl/d (prog 20 000; bylo 15 072), G1-1
+  karawany bez statkow 7+ dob 14 (Pyke 12; prog 10), C-3a polki lukow x1.11. Danina P1 w tym biegu: 111.9 tys. zl/d, zamkniecie 0 roznych.
+  **DO JEFFA (kierunek, nie blokuje): czy rozbici z pobitej armii maja po kilku dobach wracac do swojego pana, zamiast rozchodzic sie do lasu / karczm - dopiero to odbuduje armie
+  po bitwie i zdejmie przyrost wyrzutkow.**
+- Test zapisu: `autotest-dlugi` (doba 60 biegu N3) + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu i test 120 dob W5 (fin9: Armoury a5e2fbf9, zbior-e8 00a6496) - lancuch w grze
+  (test\at-w40-kontrola10.out.txt, test\at-w5-120.out.txt).
