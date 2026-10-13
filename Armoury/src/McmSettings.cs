@@ -4120,6 +4120,22 @@ namespace Armoury
         [SettingPropertyGroup("Quest rewards")]
         public bool QuestGoodsReal { get; set; } = true;
 
+        [SettingPropertyBool("Player Tourney Prize From Town", HintText = "the prize you win at a tournament is a real thing: it comes off the shelves of the host town, and when the town has no such piece in its stores it pays you its price from its treasury instead - only from what the treasury can spare, so a poor town pays less and you are told. The prize money and match bonuses of Tournaments XPanded are paid by the host town the same way (off = the prize and the coin appear out of thin air, as before)")]
+        [SettingPropertyGroup("Player fees and bets")]
+        public bool PlayerTourneyPrizeFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Player Bets Counterparty", HintText = "your bets have someone on the other side: a tournament stake goes into the host town's treasury, a lost stake simply stays there, and your winnings are paid out of that treasury - your own stake always comes back, the profit only from what the town can spare. A wager at the tavern board is laid against the house the same way (off = stakes vanish and winnings appear out of thin air, as before)")]
+        [SettingPropertyGroup("Player fees and bets")]
+        public bool PlayerBetsCounterparty { get; set; } = true;
+
+        [SettingPropertyBool("Player Fees Historical", HintText = "small payments are in the world's coin and reach someone: bribing the guards costs about 60 when you are at war with the lord, 36 at war with his realm and 6 otherwise (a guard's pay for 30, 18 and 3 days; your renown and Roguery still count), bribing the gaolers for a prison break costs about a month's pay for every guard on the watch (hundreds, not thousands) - both go to the garrison's own purse; the barber takes 3, the tavern keeper 12 for news of the ruling clan, and a round for your party costs 0.3 a man - these go to the townsfolk (off = the game's sums, and the coin vanishes)")]
+        [SettingPropertyGroup("Player fees and bets")]
+        public bool PlayerFeesHistorical { get; set; } = true;
+
+        [SettingPropertyBool("Player Small Sources Closed", HintText = "small sums you receive have a payer: the practice-fight reward comes from the town's treasury (from what it can spare), the coin taken with forced supplies comes from the village's own purse - an empty village yields none - and the Coastal Guard Edict of the naval kingdoms no longer refills port garrisons' chests out of thin air (off = as before)")]
+        [SettingPropertyGroup("Player fees and bets")]
+        public bool PlayerSmallSourcesClosed { get; set; } = true;
+
         [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutFlagEnabled { get; set; } = true;
@@ -5997,6 +6013,10 @@ namespace Armoury
             s.QuestRewardInWageDays = QuestRewardInWageDays;
             s.QuestPlayerPaysSomeone = QuestPlayerPaysSomeone;
             s.QuestGoodsReal = QuestGoodsReal;
+            s.PlayerTourneyPrizeFromTown = PlayerTourneyPrizeFromTown;
+            s.PlayerBetsCounterparty = PlayerBetsCounterparty;
+            s.PlayerFeesHistorical = PlayerFeesHistorical;
+            s.PlayerSmallSourcesClosed = PlayerSmallSourcesClosed;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;

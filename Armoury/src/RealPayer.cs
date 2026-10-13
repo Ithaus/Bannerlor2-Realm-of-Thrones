@@ -170,6 +170,7 @@ namespace Armoury
         public static void TourneyPre(TournamentGame __0, Hero __1, out Ctx __state)
         {
             __state = null;
+            PlayerFees8.PrizeBefore(__0, __1);   // E8/D2 (257): migawka sakw gracza, gdy zwyciezca jest w jego druzynie (wlasny try; niezalezne od TownPaysRewards) - przedmiot nagrody rozlicza postfiks PlayerFees8.PrizeAfter
             try
             {
                 if (!On || !Live || __0 == null || __1 == null || __1.Clan == null || __1.Clan.Leader == null || __0.Town == null || __0.Town.Settlement == null) return;

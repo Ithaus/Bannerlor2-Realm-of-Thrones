@@ -1258,6 +1258,7 @@ namespace Armoury
             try { FixedSums38.SessionStart(); } catch (Exception e) { Log.Error("FixedSums38.SessionStart", e); }   // 3.8: TXP (drugi raz) i linia "Stale kwoty (3.8)" - PO HistoricalPrices.Apply
             try { CraftOrders8.SessionStart(); } catch (Exception e) { Log.Error("CraftOrders8.SessionStart", e); }   // E8/K (255): zlecenia kowalskie sprzed sesji (zapis, start nowej kampanii) - projekt i nagroda w nowej monecie; PO HistoricalPrices.Apply
             try { QuestPay8.SessionStart(this); } catch (Exception e) { Log.Error("QuestPay8.SessionStart", e); }   // E8/D1 (256): nagrody i wyplaty w zadaniach - nasluchy przyjecia zadan; skan metod zadan i latki raz na proces, W KAMPANII (CLAUDE.md 7)
+            try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
@@ -1543,6 +1544,7 @@ namespace Armoury
             try { MercFeast.Daily(); } catch (Exception e) { Log.Error("MercFeast.Daily", e); } DayProfile.Lap("MercFeast.Daily");   // E8/G2 (261): linia "Najemnicy i uczta BK (E8/G2)" - zamiana BK u klanow najemnikow bez bohaterow, zakupy uczt BK zdjete z rynku; tylko log
             try { CraftOrders8.Daily(); } catch (Exception e) { Log.Error("CraftOrders8.Daily", e); } DayProfile.Lap("CraftOrders8.Daily");   // E8/K (255): linia "Kuznia (E8/K)" - zlecenia kowalskie i ksiegarz BK; w nowej kampanii raz wymiana zlecen startowych
             try { QuestPay8.Daily(); } catch (Exception e) { Log.Error("QuestPay8.Daily", e); } DayProfile.Lap("QuestPay8.Daily");   // E8/D1 (256): linia "Nagrody zadan (E8/D1)" i porzadek w slowniku kwot zamrozonych
+            try { PlayerFees8.Daily(); } catch (Exception e) { Log.Error("PlayerFees8.Daily", e); } DayProfile.Lap("PlayerFees8.Daily");   // E8/D2 (257): linia "Wydatki gracza (E8/D2)" - tylko log
             try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");
