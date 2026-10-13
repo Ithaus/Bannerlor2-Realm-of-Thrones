@@ -268,6 +268,18 @@ Uzycie (Python 3, tylko odczyt):
                     31-120; H-4 rzad najemnika ze wzorca 0, reszta uprzezy w ksiedze uzbrojenia <= 10% zrodel; H-5 awanse AI na jezdnego >= 50% Z33 (823 /
                     120 dob) i "wstrzymane z braku uprzezy" nie rosnie w dobach 91-120; H-6 polki uprzezy 300-2500, kupno siodla w 7 dob po sprzedazy
                     uprzezy tej samej partii 0; H-7 koszt <= 5 ms/d, potkniecia i ERROR 0; zakupy, zamiany ROT, najemnicy, gracz - INFO.
+                    Blok etap8_d1 (E8/D1, paczka 256 - nagrody i wyplaty w zadaniach; QuestPay8.cs, GiverPay.cs):
+                    D1-1 linia startu: wpiete N >= 40 metod zadan, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery nagrody komplet; D1-0b linia
+                    "Nagrody zadan (E8/D1)" w kazdej dobie okna, cztery klucze czynne; D1-2 zloto z niczego 0 i w nicosc 0 (oba kierunki; bez wyplat -
+                    INFO, 8.16 p. 13); D1-3 obiecane = zaplacone + niedoplata przy pustej kiesie; D1-4 towar z niczego 0 / w nicosc 0; D1-5 INFO typy
+                    "kwota gry / po skali"; D1-6 INFO kwoty zamrozone przy przyjeciu; D1-7 INFO koszt; D1-K potkniecia i linie ERROR 0.
+                    Blok etap8_d2 (E8/D2, paczka 257 - nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza; PlayerFees8.cs):
+                    D2-0 linia startu: latki wpiete N/M komplet (N >= 21), podmiany wywolan i stalych komplet, BRAK: -, modele gry; D2-0b linia
+                    "Wydatki gracza (E8/D2)" w kazdej dobie okna, cztery klucze czynne; D2-1 oplaty i zaklady: w nicosc 0 / z niczego 0 (bez wydatkow -
+                    INFO, 8.16 p. 12 i 14); D2-2 nagroda turnieju gracza: przedmiot z polki albo cena od miasta, z niczego 0; D2-2b drobne zrodla
+                    z niczego 0; D2-3 kontrolka RealPayer (Szczelnosc 164a): czynny, niedopasowane 0, stos 0 - E8/D2 nie dubluje jencow i nagrod AI,
+                    latka "platnik: nagroda turnieju" wpieta (w jej prefiksie biegnie migawka sakw gracza);
+                    D2-4 kasa miasta ponizej zapasu przez nasza wyplate 0; D2-5 INFO oplaty wedlug rodzaju; D2-6 INFO koszt; D2-K potkniecia i ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -10699,6 +10711,289 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     rep.add("H-7: koszt E8/H na dobe (spis par + zdarzenia), potkniecia, linie ERROR in SaddleLaw.*",
             f"srednio {sum(cost) / nd:.1f} ms/d (spis {sum(c1.values()) / nd:.1f}, zdarzenia {sum(c2.values()) / nd:.1f}), najwiecej {max(cost):.1f} ms; potkniecia (sesja) {stum}; ERROR {errs}",
             "<= 5 ms/d srednio, potkniecia 0, ERROR 0 (wczytanie zapisu sprzed E8/H - procedura 'zapis 9 dob', recznie)", sum(cost) / nd <= 5.0 and stum == 0 and errs == 0)
+# E8/D1 (256): blok etap8_d1 - nagrody i wyplaty w zadaniach (QuestPay8.cs, GiverPay.cs)
+E8_D1_DAY = "Nagrody zadan (E8/D1): dzien"
+E8_D1_MIN = 40   # projekt: linia startu, N >= 40 (skan zywych bibliotek 1.4.8: 91 metod - gra 76, SandBox 13, ROT 1, NavalDLC 1)
+
+
+def etap8_d1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/D1 (256, projekt etapu 8 v2 rozdz. 3 "E8/D1" Test): nagrody zadan od zleceniodawcy w dniach zoldu, wyplaty gracza z odbiorca, towar zadan.
+    Linie: start sesji "Nagrody zadan (E8/D1): wpiete N metod w M typach", doba "Nagrody zadan (E8/D1): dzien N", zdarzenia "przyjete", "wyplata",
+    "gracz placi", "rzecz na wymiane". D1-1 linia startu: N >= 40, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery nagrody komplet; D1-0b linia doby
+    w kazdej dobie okna (bez pierwszej i ostatniej), cztery klucze czynne, latki komplet; D1-2 (suma okna) zloto z niczego 0 i w nicosc 0 - oba kierunki
+    (bez wyplat - INFO, sprawdzenie reczne 8.16 p. 13); D1-3 obiecane = zaplacone + niedoplata przy pustej kiesie (rachunek sie zgadza), INFO niedoplaty;
+    D1-4 towar z niczego 0 / w nicosc 0 (bez ruchu towaru - INFO); D1-5 INFO typy "kwota gry / po skali"; D1-6 INFO kwoty zamrozone; D1-7 INFO koszt;
+    D1-K potkniecia i linie ERROR in QuestPay8.* 0."""
+    rows = {d: s for d, s in by_day(lines, E8_D1_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Nagrody zadan (E8/D1): wpiete")]
+    if not rows and not wire:
+        rep.add("E8/D1: linie Nagrody zadan (E8/D1)", "brak w logu", "sa od wgrania E8/D1 (QuestPay8.cs)", None)
+        return
+    # ---------------- D1-1: linia startu
+    if wire:
+        w0 = wire[0]
+        n, m = num(r"wpiete (\d+) metod", w0, int, 0), num(r"metod w (\d+) typach", w0, int, 0)
+        cand = num(r"kandydatow (\d+)", w0, int, 0)
+        gs = re.search(r"miejsc towaru (\d+)/(\d+)", w0)
+        gt = re.search(r"gettery nagrody (\d+)/(\d+)", w0)
+        calls = num(r"wywolan podmienionych: zloto (\d+)", w0, int, 0)
+        asm = re.search(r"zestawy:([^;]*);", w0)
+        ms = re.search(r"skan (\d+) ms, skan i wpiecie (\d+) ms", w0)
+        ok = (n >= E8_D1_MIN and n == cand and "; BRAK: -;" in w0 and gs is not None and gs.group(1) == gs.group(2)
+              and gt is not None and gt.group(1) == gt.group(2) and int(gt.group(2)) > 0)
+        rep.add("D1-1: linia startu - latki na metodach zadan (wyplaty, towar, gettery nagrody)",
+                f"wpiete {n} metod w {m} typach (kandydatow {cand}), wywolan zlota {calls}, miejsc towaru {gs.group(1) + '/' + gs.group(2) if gs else '?'}, "
+                f"gettery {gt.group(1) + '/' + gt.group(2) if gt else '?'}; zestawy:{asm.group(1) if asm else ' ?'}"
+                + (f"; skan {ms.group(1)} ms, razem {ms.group(2)} ms" if ms else "") + ("" if "; BRAK: -;" in w0 else " | " + w0[w0.find("BRAK:"):][:200]),
+                f"N >= {E8_D1_MIN}, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery komplet", ok)
+    else:
+        rep.add("D1-1: linia startu", "brak linii Nagrody zadan (E8/D1): wpiete", f"N >= {E8_D1_MIN}", False)
+    if not rows:
+        rep.add("D1-0b: linia Nagrody zadan (E8/D1)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    keys = ("Quest Reward From Giver", "Quest Reward In Wage Days", "Quest Player Pays Someone", "Quest Goods Real")
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    off_any = False
+    for nm in keys:
+        off = [d for d in days if nm + " WYLACZONE" in rows[d]]
+        if off:
+            off_any = True
+            val += f"; {nm} WYLACZONE w {len(off)} dobach"
+    wired = [(num(r"latki wpiete (\d+)/\d+", x), num(r"latki wpiete \d+/(\d+)", x)) for x in w]
+    bad_w = sum(1 for (a, b), x in zip(wired, w) if a is None or a != b or "(BRAK:" in x)
+    if bad_w:
+        val += f"; latki niekompletne w {bad_w} liniach"
+    rep.add("D1-0b: linia Nagrody zadan (E8/D1) w kazdej dobie okna, cztery klucze czynne, latki komplet", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_any and not bad_w) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    # ---------------- D1-2 / D1-3: zloto w obu kierunkach
+    n_in, game, due = tot(r"nic -> gracz\): (\d+),"), tot(r"nic -> gracz\): \d+, kwota gry (\d+)"), tot(r"kwota gry \d+, obiecane (\d+)")
+    paid, p_hero, p_vil = tot(r"obiecane \d+, zaplacone (\d+)"), tot(r"\(zleceniodawcy (\d+)"), tot(r"kiesy wsi (\d+)\)")
+    short, short_n, nothing = tot(r"niedoplata przy pustej kiesie (\d+) w"), tot(r"niedoplata przy pustej kiesie \d+ w (\d+) wyplatach"), tot(r"wyplatach, z niczego (\d+)")
+    n_out, out_all = tot(r"gracz -> nic\): (\d+),"), tot(r"gracz -> nic\): \d+, kwota (\d+):")
+    o_town, o_hero, o_vil, void = tot(r"do kas osad (\d+)"), tot(r"do zleceniodawcow (\d+)"), tot(r"do kies wsi (\d+)"), tot(r"do kies wsi \d+, w nicosc (\d+)")
+    nopay = sorted({t.strip() for x in w for g in re.findall(r"\[brak platnika: ([^\]]*)\]", x) for t in g.split(",") if t.strip()})
+    if n_in > 0 or n_out > 0:
+        rep.add("D1-2: zloto zadan (suma okna) - z niczego (nic -> gracz) i w nicosc (gracz -> nic)",
+                f"z niczego {nothing}" + (f" [brak platnika: {', '.join(nopay)}]" if nopay else "") + f", w nicosc {void}; wyplat dla gracza {n_in}: kwota gry {game} -> obiecane {due}"
+                f", zaplacone {paid} (zleceniodawcy {p_hero}, kiesy wsi {p_vil}); wyplat gracza {n_out}: {out_all} (kasy osad {o_town}, zleceniodawcy {o_hero}, kiesy wsi {o_vil})",
+                "0 / 0", nothing == 0 and void == 0)
+        rep.add("D1-3: obiecane = zaplacone, gdy platnik ma pieniadze (obiecane = zaplacone + niedoplata przy pustej kiesie + z niczego)",
+                f"obiecane {due}, zaplacone {paid}, niedoplata {short} w {short_n} wyplatach, z niczego {nothing}; roznica rachunku {due - paid - short - nothing}",
+                "roznica rachunku 0 (niedoplata tylko przy pustej kiesie platnika - bez doplat)", due == paid + short + nothing)
+    else:
+        rep.add("D1-2: zloto zadan (z niczego / w nicosc)", "gracz nie dostal ani nie zaplacil nic w zadaniach w oknie (autotest nie robi zadan)",
+                "INFO - sprawdzenie reczne 8.16 p. 13 (oferta w nowej skali, zloto od zleceniodawcy, tyle, ile obiecal)", None)
+        rep.add("D1-3: obiecane = zaplacone", "bez wyplat w oknie", "INFO - 8.16 p. 13", None)
+    # ---------------- D1-4: towar
+    g_shelf, g_tabor, g_from = tot(r"od gracza na polke osady (\d+) szt"), tot(r"do taboru zleceniodawcy (\d+) szt"), tot(r"z magazynu osady (\d+) szt")
+    g_miss, g_gold, g_gshort = tot(r"zabraklo (\d+) szt"), tot(r"zamiast nich zloto (\d+)"), tot(r"zamiast nich zloto \d+ \(niedoplata (\d+)\)")
+    g_nothing, g_void = tot(r"towar z niczego (\d+) szt"), tot(r"/ w nicosc (\d+) szt")
+    if g_shelf + g_tabor + g_from + g_miss + g_nothing + g_void > 0:
+        rep.add("D1-4: towar zadan (suma okna) - z niczego / w nicosc",
+                f"z niczego {g_nothing} szt. / w nicosc {g_void} szt.; od gracza: polka osady {g_shelf}, tabor zleceniodawcy {g_tabor}; dla gracza z magazynu osady {g_from}"
+                f", zabraklo {g_miss} szt. - zamiast nich zloto {g_gold} (niedoplata {g_gshort})", "0 / 0", g_nothing == 0 and g_void == 0)
+    else:
+        rep.add("D1-4: towar zadan (z niczego / w nicosc)", "bez ruchu towaru zadan w oknie (autotest nie robi zadan)",
+                "INFO - sprawdzenie reczne 8.16 p. 13 (dostawa trafia do zleceniodawcy albo na polke osady)", None)
+    # ---------------- D1-5: typy
+    types = {}
+    for x in w:
+        seg = re.search(r"\| typy \(wyplat: kwota gry / po skali\):(.*?) \| latki wpiete", x)
+        if not seg:
+            continue
+        for g in re.finditer(r"(\S+) (\d+): (\d+) / (\d+)", seg.group(1)):
+            a = types.setdefault(g.group(1), [0, 0, 0])
+            a[0] += int(g.group(2)); a[1] += int(g.group(3)); a[2] += int(g.group(4))
+    rep.add("D1-5: typy zadan (suma okna) - wyplat: kwota gry / po skali",
+            "; ".join(f"{k} {v[0]}: {v[1]} / {v[2]}" for k, v in sorted(types.items())) if types else "bez wyplat w oknie", "INFO (skala: N ludzi x D dni x zold x 1.25; dostawy - tylko stala czesc)", None)
+    # ---------------- D1-6: kwoty zamrozone
+    frozen_new, closed = tot(r"przyjete dzis (\d+)"), tot(r"zamkniete (\d+),")
+    f_pay, f_now, shown = tot(r"wyplat z kwota zamrozona (\d+)"), tot(r"liczonych przy wyplacie (\d+)"), tot(r"oferta pokazana po skali (\d+) razy")
+    mem = num(r"kwoty zamrozone: w pamieci (\d+)", rows[days[-1]], int, 0)
+    ev = {k: sum(1 for x in lines if x.startswith("Nagrody zadan (E8/D1): " + k)) for k in ("przyjete", "wyplata", "gracz placi", "rzecz na wymiane")}
+    rep.add("D1-6: kwoty zamrozone przy przyjeciu (suma okna) i linie zdarzen w logu",
+            f"przyjete {frozen_new}, zamkniete {closed}, w pamieci na koniec {mem}; wyplat z kwota zamrozona {f_pay}, liczonych przy wyplacie {f_now} (stary zapis / rozwiazanie przez lorda)"
+            f"; oferta pokazana po skali {shown} razy; linie: przyjete {ev['przyjete']}, wyplata {ev['wyplata']}, gracz placi {ev['gracz placi']}, rzecz na wymiane {ev['rzecz na wymiane']}",
+            "INFO", None)
+    # ---------------- D1-7 / D1-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("D1-7: koszt linii doby", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO (skan przy starcie - w linii startu)", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    stu_s = max([num(r"potkniecia (\d+)\.$", x, int, 0) or 0 for x in wire] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in QuestPay8."))
+    rep.add("D1-K: kontrola (potkniecia doby / w linii startu, linie ERROR in QuestPay8.*)", f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
+
+
+# E8/D2 (257): blok etap8_d2 - nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza (PlayerFees8.cs; RealPayer.cs - tylko migawka sakw)
+E8_D2_DAY = "Wydatki gracza (E8/D2): dzien"
+E8_D2_MIN = 21   # latki bez cudzych modow (Tournaments XPanded 2, NavalDLC 1); u Jeffa 24
+E8_D2_SNAP = "platnik: nagroda turnieju (GivePrizeToWinner)"   # etykieta Seal31.Patch (RealPayer.ApplyAll) - w jej prefiksie biegnie migawka sakw gracza
+
+
+def etap8_d2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/D2 (257, projekt etapu 8 v2 rozdz. 3 "E8/D2" Test): oplaty i zaklady gracza z odbiorca, nagroda turnieju gracza z polki albo cena z kasy miasta,
+    drobne zrodla z platnikiem. Linie: start sesji "Wydatki gracza (E8/D2): wpiete N/M latek", doba "Wydatki gracza (E8/D2): dzien N", zdarzenia
+    "lapowka strazy", "odbicie wieznia", "nagroda turnieju". D2-0 linia startu: wpiete N/M komplet (N >= 21), podmiany komplet, BRAK: -, modele gry;
+    D2-0b linia doby w kazdej dobie okna, cztery klucze czynne, latki komplet; D2-1 (suma okna) oplaty i zaklady: w nicosc 0 i z niczego 0 (bez wydatkow -
+    INFO, 8.16 p. 12 i 14); D2-2 nagroda turnieju gracza: przedmiot z niczego 0, zloto z niczego 0 (bez wygranej - INFO, 8.16 p. 12); D2-2b drobne zrodla
+    z niczego 0 (bez zdarzen - INFO); D2-3 kontrolka RealPayer (linia "Szczelnosc (164a)"): czynny, jency / nagrody turniejow / gracz u posrednika policzone,
+    niedopasowane 0 i stos 0 - dowod, ze E8/D2 nie dubluje RealPayer (sumy do porownania z Z33), oraz latka "platnik: nagroda turnieju" wpieta przy starcie
+    gry (w jej prefiksie biegnie migawka sakw gracza - recenzja E8/D2); D2-4 kasa miasta ponizej zapasu przez nasza wyplate 0;
+    D2-5 INFO oplaty wedlug rodzaju (zaplacone / gra chciala), odbiorcy; D2-6 INFO koszt; D2-K potkniecia i linie ERROR in PlayerFees8.* 0."""
+    rows = {d: s for d, s in by_day(lines, E8_D2_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Wydatki gracza (E8/D2): wpiete")]
+    if not rows and not wire:
+        rep.add("E8/D2: linie Wydatki gracza (E8/D2)", "brak w logu", "sa od wgrania E8/D2 (PlayerFees8.cs)", None)
+        return
+    # ---------------- D2-0: linia startu
+    if wire:
+        w0 = wire[0]
+        m = re.search(r"wpiete (\d+)/(\d+) latek", w0)
+        c = re.search(r"podmian wywolan (\d+)/(\d+), stalych (\d+)/(\d+)", w0)
+        absent = re.search(r"mody nieobecne: (.*?); modele:", w0)
+        models = re.search(r"modele: (.*?); zwrot ceny warsztatu", w0)
+        ok = (m is not None and c is not None and m.group(1) == m.group(2) and int(m.group(2)) >= E8_D2_MIN and c.group(1) == c.group(2) and c.group(3) == c.group(4)
+              and "; BRAK: -;" in w0 and "INNY MODEL" not in w0)
+        rep.add("D2-0: linia startu - latki w miejscach wyplat gracza (wrappery, stale oplat, modele lapowek)",
+                (f"wpiete {m.group(1)}/{m.group(2)}" if m else "wpiete ?") + (f", podmian wywolan {c.group(1)}/{c.group(2)}, stalych {c.group(3)}/{c.group(4)}" if c else "")
+                + (f"; mody nieobecne: {absent.group(1)}" if absent else "") + (f"; modele: {models.group(1)}" if models else "")
+                + ("" if "; BRAK: -;" in w0 else " | " + w0[w0.find("BRAK:"):][:220]),
+                f"N = M >= {E8_D2_MIN}, podmiany komplet, BRAK: -, modele gry (Default...)", ok)
+    else:
+        rep.add("D2-0: linia startu", "brak linii Wydatki gracza (E8/D2): wpiete", "wpiete N/M komplet", False)
+    if not rows:
+        rep.add("D2-0b: linia Wydatki gracza (E8/D2)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    keys = ("Player Tourney Prize From Town", "Player Bets Counterparty", "Player Fees Historical", "Player Small Sources Closed")
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    off_any = False
+    for nm in keys:
+        off = [d for d in days if nm + " WYLACZONE" in rows[d]]
+        if off:
+            off_any = True
+            val += f"; {nm} WYLACZONE w {len(off)} dobach"
+    wired = [(num(r"latki wpiete (\d+)/\d+", x), num(r"latki wpiete \d+/(\d+)", x)) for x in w]
+    bad_w = sum(1 for (a, b), x in zip(wired, w) if a is None or a != b or "(BRAK:" in x)
+    if bad_w:
+        val += f"; latki niekompletne w {bad_w} liniach"
+    rep.add("D2-0b: linia Wydatki gracza (E8/D2) w kazdej dobie okna, cztery klucze czynne, latki komplet", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_any and not bad_w) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+
+    def src(label):
+        """(liczba, nalezne, zaplacone, niedoplata, z niczego) zrodla o etykiecie label - suma okna."""
+        p = re.escape(label) + r" (\d+), nalezne (\d+), zaplacone (\d+), niedoplata (\d+) w (\d+), z niczego (\d+)"
+        out = [0, 0, 0, 0, 0]
+        for x in w:
+            g = re.search(p, x)
+            if g:
+                out[0] += int(g.group(1)); out[1] += int(g.group(2)); out[2] += int(g.group(3)); out[3] += int(g.group(4)); out[4] += int(g.group(6))
+        return out
+    # ---------------- D2-1: oplaty i zaklady
+    f_n, f_sum, f_game = tot(r"oplaty \(gracz -> odbiorca\): (\d+),"), tot(r"oplaty \(gracz -> odbiorca\): \d+, kwota (\d+)"), tot(r"kwota \d+ \(gra chciala (\d+)\)")
+    to_g, to_c, to_t, to_f = tot(r"do sakiewek zalog (\d+)"), tot(r"do kies zalog (\d+)"), tot(r"do kas osad (\d+), do kiesy ludu"), tot(r"do kiesy ludu (\d+)")
+    f_void = tot(r"oplaty w nicosc (\d+)")
+    s_n, s_sum, s_void = tot(r"turniej - postawione (\d+):"), tot(r"turniej - postawione \d+: (\d+)"), tot(r"stawki w nicosc (\d+)")
+    l_n, l_sum, l_kept, l_noth = tot(r"przegrane (\d+): \d+ \(zostalo"), tot(r"przegrane \d+: (\d+) \(zostalo"), tot(r"zostalo w kasie (\d+)"), tot(r"kasie z niczego (\d+)")
+    stale = tot(r"stawki z przerwanych turniejow w kasie (\d+)")
+    b_n, b_sum, b_void = tot(r"plansza - przegrane (\d+):"), tot(r"plansza - przegrane \d+: (\d+)"), tot(r"plansza w nicosc (\d+)")
+    won, bwon = src("wygrane turnieju"), src("wygrane planszy")
+    if f_n + s_n + l_n + b_n + won[0] + bwon[0] > 0:
+        void_all, noth_all = f_void + s_void + b_void, l_noth + won[4] + bwon[4]
+        rep.add("D2-1: oplaty i zaklady gracza (suma okna) - w nicosc / z niczego",
+                f"w nicosc {void_all} (oplaty {f_void}, stawki {s_void}, plansza {b_void}) / z niczego {noth_all} (przegrana dopisana kasie {l_noth}, wygrane turnieju {won[4]}, planszy {bwon[4]})"
+                f"; oplaty {f_n}: {f_sum} (gra chciala {f_game}) -> sakiewki zalog {to_g}, kiesy zalog {to_c}, kasy osad {to_t}, kiesa ludu {to_f}"
+                f"; zaklad turniejowy: postawione {s_n}: {s_sum}, przegrane {l_n}: {l_sum} (w kasie {l_kept}), wygrane {won[0]}: nalezne {won[1]}, zaplacone {won[2]}, niedoplata {won[3]}"
+                f"; plansza: przegrane {b_n}: {b_sum}, wygrane {bwon[0]}: nalezne {bwon[1]}, zaplacone {bwon[2]}, niedoplata {bwon[3]}" + (f"; stawki z przerwanych turniejow w kasie {stale}" if stale else ""),
+                "0 / 0", void_all == 0 and noth_all == 0)
+    else:
+        rep.add("D2-1: oplaty i zaklady gracza (w nicosc / z niczego)", "gracz nie placil oplat i nie stawial zakladow w oknie (autotest tego nie robi)",
+                "INFO - sprawdzenie reczne 8.16 p. 12 (zaklad) i p. 14 (lapowka 60 / 36 / 6, golibroda 3, karczmarz 12, kolejka 0.3 na czlowieka)", None)
+    # ---------------- D2-2: nagroda turnieju gracza i zloto TXP
+    pz_n, pz_shelf, pz_alt = tot(r"nagroda turnieju gracza: (\d+) szt"), tot(r"z polki miasta (\d+)"), tot(r"w tym w stanie z polki (\d+)")
+    pz_noth, pz_noth_v, pz_noitem = tot(r"przedmiot z niczego (\d+) szt"), tot(r"przedmiot z niczego \d+ szt\. o wartosci (\d+)"), tot(r"wygrane bez sztuki w sakwach (\d+)")
+    pg, txp = src("cena zamiast przedmiotu"), src("zloto TXP")
+    if pz_n + pz_noitem + txp[0] > 0:
+        rep.add("D2-2: nagroda turnieju gracza (suma okna) - przedmiot z polki / cena od miasta, z niczego",
+                f"z niczego: przedmiot {pz_noth} szt. (wartosc {pz_noth_v}), cena {pg[4]}, zloto TXP {txp[4]}; nagrod {pz_n}: z polki miasta {pz_shelf} (w stanie z polki {pz_alt})"
+                f", cena zamiast przedmiotu {pg[0]}: nalezne {pg[1]}, zaplacone {pg[2]}, niedoplata {pg[3]}; zloto TXP {txp[0]}: nalezne {txp[1]}, zaplacone {txp[2]}, niedoplata {txp[3]}"
+                + (f"; wygrane bez sztuki w sakwach {pz_noitem} (inny mod wydal nagrode inaczej)" if pz_noitem else ""),
+                "z niczego 0 (przedmiot, cena, zloto TXP); kazda nagroda z polki albo ceny", pz_noth == 0 and pg[4] == 0 and txp[4] == 0 and pz_n == pz_shelf + pg[0])
+    else:
+        rep.add("D2-2: nagroda turnieju gracza (z polki / cena od miasta)", "gracz nie wygral turnieju w oknie (autotest nie walczy w turniejach)",
+                "INFO - sprawdzenie reczne 8.16 p. 12 (przedmiot znika z polki miasta albo cena z kasy miasta)", None)
+    # ---------------- D2-2b: drobne zrodla
+    arena, force = src("arena"), src("zapasy wsi")
+    ed, ed_pay = tot(r"pominiete rozliczenia (\d+)"), tot(r"pominiete rozliczenia \d+ \(z wyplata (\d+)\)")
+    if arena[0] + force[0] > 0:
+        rep.add("D2-2b: drobne zrodla gracza (suma okna) - z niczego",
+                f"z niczego {arena[4] + force[4]}; arena {arena[0]}: nalezne {arena[1]}, zaplacone {arena[2]}, niedoplata {arena[3]}; zapasy wsi {force[0]}: nalezne {force[1]}, zaplacone {force[2]}, niedoplata {force[3]}"
+                f"; edykt strazy wybrzeza - pominiete rozliczenia {ed} (z wyplata {ed_pay})", "0", arena[4] + force[4] == 0)
+    else:
+        rep.add("D2-2b: drobne zrodla gracza (arena, wymuszone zapasy wsi)", f"bez zdarzen w oknie; edykt strazy wybrzeza - pominiete rozliczenia {ed} (z wyplata {ed_pay})",
+                "INFO - sprawdzenie reczne 8.16 p. 15", None)
+    # ---------------- D2-3: kontrolka RealPayer - E8/D2 nie dubluje (jency, nagrody turniejow AI)
+    sea = {d: s for d, s in by_day(lines, "Szczelnosc (164a): dzien").items() if d in rows}
+    if sea:
+        sv = list(sea.values())
+
+        def st(pat):
+            return sum(num(pat, x, int, 0) or 0 for x in sv)
+        pr_due, pr_paid = st(r"jency sprzedani przez partie: gra chciala (\d+)"), st(r"jency sprzedani przez partie: gra chciala \d+, zaplacili (\d+)")
+        tr_due, tr_paid, tr_n = st(r"nagrody turniejow: gra chciala (\d+)"), st(r"nagrody turniejow: gra chciala \d+, zaplacili (\d+)"), st(r"nagrody turniejow: gra chciala \d+, zaplacili \d+, uciete \d+ \((\d+) wyplat")
+        pl_due, pl_paid = st(r"gracz u posrednika i w miescie: wycena (\d+)"), st(r"gracz u posrednika i w miescie: wycena \d+, zaplacone (\d+)")
+        strays, over = st(r"zdarzenia z niczego w kontekscie niedopasowane (\d+)"), st(r"stos przepelniony (\d+)")
+        off = sum(1 for x in sv if "WYLACZONE (Town Pays Rewards)" in x)
+        # recenzja E8/D2: migawka sakw gracza (PlayerFees8.PrizeBefore) biegnie w prefiksie RealPayer.TourneyPre - bez tej latki nagroda gracza nie jest
+        # rozliczana, a licznik N/M paczki (D2-0) tego nie widzi; wpiecie pokazuje linia startu gry "Szczelnosc (164a): latki przy starcie gry"
+        seal0 = [x for x in lines if x.startswith("Szczelnosc (164a): latki przy starcie gry")]
+        snap = bool(seal0) and E8_D2_SNAP in seal0[0].split("; BRAK:")[0]
+        rep.add("D2-3: kontrolka RealPayer (Szczelnosc 164a) - jency i nagrody turniejow AI dalej przez RealPayer, E8/D2 ich nie dubluje; latka z migawka sakw gracza wpieta",
+                f"linii {len(sv)}, WYLACZONE w {off}; jency: gra chciala {pr_due}, zaplacili {pr_paid}; nagrody turniejow: gra chciala {tr_due}, zaplacili {tr_paid} ({tr_n} wyplat)"
+                f"; gracz u posrednika: wycena {pl_due}, zaplacone {pl_paid}; niedopasowane {strays}, stos {over}"
+                f"; latka \"{E8_D2_SNAP}\": " + ("wpieta" if snap else ("BRAK w linii startu gry" if seal0 else "brak linii startu gry Szczelnosc (164a)")),
+                "RealPayer czynny, niedopasowane 0, stos 0, zaplacili <= gra chciala (sumy do porownania z Z33 - bez zmian); latka nagrody turnieju wpieta",
+                off == 0 and strays == 0 and over == 0 and pr_paid <= pr_due and tr_paid <= tr_due and pl_paid <= pl_due and snap)
+    else:
+        rep.add("D2-3: kontrolka RealPayer (Szczelnosc 164a)", "brak linii Szczelnosc (164a) w dobach okna", "linia jest (RealPayer E3/1)", False)
+    # ---------------- D2-4: zapas kupcow
+    below = tot(r"kasa miasta ponizej zapasu kupcow przez nasza wyplate (\d+)")
+    rep.add("D2-4: kasa miasta ponizej zapasu kupcow przez nasza wyplate (suma okna)", f"{below}", "0 (wyplaty tylko z nadwyzki Seal31.Spare; zwrot stawki gracza nie liczy sie)", below == 0)
+    # ---------------- D2-5: oplaty wedlug rodzaju
+    kinds = {}
+    for x in w:
+        seg = re.search(r"\(gra chciala \d+\):(.*?) - do sakiewek zalog", x)
+        if not seg:
+            continue
+        for g in re.finditer(r"([^;:]+?) (\d+): (\d+) / (\d+)", seg.group(1)):
+            a = kinds.setdefault(g.group(1).strip(), [0, 0, 0])
+            a[0] += int(g.group(2)); a[1] += int(g.group(3)); a[2] += int(g.group(4))
+    ev = {k: sum(1 for x in lines if x.startswith("Wydatki gracza (E8/D2): " + k)) for k in ("lapowka strazy", "odbicie wieznia", "nagroda turnieju")}
+    rep.add("D2-5: oplaty wedlug rodzaju (suma okna) - razy: zaplacone / gra chciala; linie zdarzen",
+            ("; ".join(f"{k} {v[0]}: {v[1]} / {v[2]}" for k, v in kinds.items() if v[0] > 0) or "bez oplat w oknie")
+            + f"; linie: lapowka strazy {ev['lapowka strazy']}, odbicie wieznia {ev['odbicie wieznia']}, nagroda turnieju {ev['nagroda turnieju']}", "INFO", None)
+    # ---------------- D2-6 / D2-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("D2-6: koszt linii doby", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO (latki raz na proces - czas w linii startu)", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    stu_s = max([num(r"potkniecia (\d+)\.$", x, int, 0) or 0 for x in wire] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in PlayerFees8."))
+    rep.add("D2-K: kontrola (potkniecia doby / w linii startu, linie ERROR in PlayerFees8.*)", f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
 
 
 def etap8_main(logp, start_arg, until=120, csp=None):
@@ -10737,6 +11032,8 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
     blocks.append(etap8_k)   # E8/K (255): ksiazki BK, zlecenia kowalskie gry (nagroda, platnik, bron, szablon), kupno u ksiegarza BK
     blocks.append(etap8_h)   # E8/H (271): jezdziec = kon + uprzaz - brama awansu, bitwa gracza, zakup siodel, pula weteranow
+    blocks.append(etap8_d1)   # E8/D1 (256): nagrody zadan od zleceniodawcy w dniach zoldu, wyplaty gracza z odbiorca, towar zadan
+    blocks.append(etap8_d2)   # E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - odbiorca i platnik, kontrolka RealPayer
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
