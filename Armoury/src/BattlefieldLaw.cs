@@ -295,19 +295,36 @@ namespace Armoury
         {
             try
             {
+                ScreenIsRealLoot = false;   // E8/L (252): do nastepnej podmiany - lista trofeow Spoils to loteria (z niczego)
                 if (!Settings.Current.BattlefieldLawEnabled) return;
                 // 177-2 (krytyka pkt 2): loteria Spoils losuje z PRAWDZIWEGO zestawu pokonanego bohatera (GetRandomBattleEquipment) i dodaje KOPIE -
                 // legenda i stal valyrianska z loterii to zawsze kopia (klinge bohatera bierze, jesli w ogole, zwyczaj wojenny - UniqueSpoils.Take);
                 // w bitwie stoczonej osobiscie to samo robi CleanseTrash nizej, w symulacji dotad nic
                 if (__result != null && Settings.Current.NoConjuredLegends) StripLegendCopies(__result);
                 if (RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
-                if (!RealFoughtBattle()) return;         // symulacje: zostaje loteria Spoils (odbramkowana)
+                bool sim = false;
+                if (!RealFoughtBattle())
+                {
+                    // E8/L (252, PLAN 8.6c): "Send troops" wygrane przez gracza - jedna droga lupu. Za tych samych poleglych placi juz DTE (lup z cial do
+                    // zbrojowni druzyny, dzialka kapitana w kolejce - HorseFate.SimShare), wiec loteria Spoils schodzi z ekranu jak w bitwie stoczonej
+                    sim = SimOneLoot(MapEvent.PlayerMapEvent ?? PlayerEncounter.Battle);
+                    if (!sim) return;                    // pozostale symulacje: zostaje loteria Spoils (odbramkowana)
+                }
                 if (__result == null) __result = new ItemRoster();
+                if (sim)
+                {
+                    int lot = 0;
+                    for (int i = 0; i < __result.Count; i++) { var le = __result.GetElementCopyAtIndex(i); if (le.Amount > 0) lot += le.Amount; }
+                    _simCutSpoils += lot; _simCutBattles++;
+                    Log.Info("BattlefieldLaw (E8/L): Send troops - loteria Spoils pominieta (" + lot + " szt. z niczego), na ekran idzie dzialka kapitana z lupu DTE ("
+                             + ShareQueue.Count + " pozycji w kolejce" + (ShareQueue.Count == 0 ? " - kolejka pusta: dzialka 0 albo DTE rozlicza po Spoils, wtedy trafi do sakw po godzinie" : "") + ").");
+                }
                 // AUDYT LUPOW (Jeff 29.08: "czy nie ma podwojnego otrzymywania?"):
                 // realna bitwa NIGDY nie zostawia vanillowej loterii na ekranie -
                 // nawet gdy kolejka jest pusta (np. flush godzinowy juz oddal
                 // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
+                ScreenIsRealLoot = true;    // E8/L (252): od teraz na liscie trofeow sa tylko prawdziwe sztuki z pola (albo nic)
                 if (ShareQueue.Count == 0 && Wrecks.Count == 0) return;
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
@@ -686,16 +703,121 @@ namespace Armoury
         /// AI dostaja swoje fizycznie przez rekordy DTE). Symulacje i bitwy
         /// bez DTE: vanilla po staremu.
         /// </summary>
-        public static bool CutCasualtyLootPrefix()
+        public static bool CutCasualtyLootPrefix(MapEvent __instance)
         {
             try
             {
                 if (!CasualtyLootCut || !Settings.Current.BattlefieldLawEnabled) return true;
+                // E8/L (252, PLAN 8.6c): "Send troops" wygrane przez gracza - za poleglych i rannych pokonanych placi DTE (DistributePlayerSimulationLoot:
+                // prawdziwy sprzet do zbrojowni zwyciezcow), wiec drugi komplet z szablonow nie powstaje - dla zadnej partii tej bitwy, jak w bitwie stoczonej
+                if (SimOneLoot(__instance))
+                {
+                    _simCutGame++;
+                    Log.Info("BattlefieldLaw (E8/L): Send troops - szablonowa loteria gry za poleglych/rannych pominieta (placi lup DTE z cial).");
+                    return false;
+                }
                 if (!RealFoughtBattle()) return true;
                 Log.Info("BattlefieldLaw: szablonowa loteria za poleglych/rannych pominieta (placi scena DTE i jency).");
                 return false;
             }
             catch { return true; }
+        }
+
+        // ------------------------------------------------------------------ E8/L (252, PLAN 8.6c): "Send troops" - jedna droga lupu
+        private static int _simCutSpoils, _simCutBattles, _simCutGame, _lStumbles;
+        internal static int LStumbles { get { return _lStumbles; } }
+        /// <summary>Lista trofeow Spoils ostatniej bitwy to prawdziwy lup z pola (podmieniona w AfterGenerateLoot), nie loteria Spoils - tylko taka
+        /// reszta zostawiona przy "Leave" idzie na polke warowni (SpoilsSeal.RemnantPostfix); loteria z niczego przepada jak dotad.</summary>
+        internal static bool ScreenIsRealLoot;
+
+        /// <summary>Nowa gra albo wczytanie (HorseFate.Reset z konstruktora ArmouryBehavior): liczniki E8/L od zera.</summary>
+        internal static void LReset() { _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false; }
+
+        /// <summary>Liczniki doby do linii "Lup i dary (E8/L)" (HorseFate.LLine) - zwraca tekst i zeruje.</summary>
+        internal static string TakeSimCut()
+        {
+            string r = "loteria Spoils pominieta w " + _simCutBattles + " bitwach (" + _simCutSpoils + " szt. z niczego), szablonowa loteria gry pominieta " + _simCutGame + " razy";
+            _simCutSpoils = _simCutBattles = _simCutGame = 0;
+            return r;
+        }
+
+        /// <summary>
+        /// Czy to bitwa gracza rozstrzygnieta przez "Send troops" i wygrana, za ktora DTE zaplaci lupem z poleglych (dekompilacja DTE v1.4.7
+        /// EveryoneCampaignBehavior.OnMapEventEnded :444-464 - te same warunki: zwyciestwo, nie odwrot, nie rozejscie sie okretow, nie kryjowka wyslana
+        /// rozkazem). Tylko wtedy tniemy loterie (Spoils i szablonowa gry) - inaczej za poleglych nie zaplacilby nikt. Sluga w cudzej armii (ROT) - jak dotad.
+        /// </summary>
+        internal static bool SimOneLoot(MapEvent me)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (me == null || s == null || !s.SendTroopsOneLoot || !s.BattlefieldLawEnabled) return false;
+                if (!CasualtyLootCut || _dteArmory == null || !HorseFate.DteWindowWired) return false;
+                if (!me.IsPlayerMapEvent || !me.IsPlayerSimulation) return false;
+                if (me.BattleState != BattleState.AttackerVictory && me.BattleState != BattleState.DefenderVictory) return false;
+                if (me.WinningSide != me.PlayerSide || me.EndedByRetreat) return false;
+                var pe = PlayerEncounter.Current;
+                if (pe != null && (pe.IsNavalEncounterFinishedWithDisengage || pe.ForceHideoutSendTroops)) return false;
+                return !RotEnlisted();
+            }
+            catch { _lStumbles++; return false; }
+        }
+
+        /// <summary>Dzialka kapitana w bitwie bez misji: stala trzecia (PlayerLootSharePercent - nie wiadomo, kto kogo powalil); sam w druzynie - wszystko.</summary>
+        private static int SimSharePercent()
+        {
+            int third = Math.Max(0, Math.Min(100, Settings.Current.PlayerLootSharePercent));
+            int troops = 0;
+            var roster = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster : null;
+            if (roster != null)
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    if (el.Character != null && !el.Character.IsHero) troops += el.Number;
+                }
+            return troops == 0 ? 100 : third;
+        }
+
+        /// <summary>
+        /// HorseFate.SimShare (postfiks okna DTE): gained = przybytek zbrojowni druzyny gracza z lupu "Send troops" (przedmiot -> ile). Dzialka kapitana
+        /// z kazdej pozycji (zaokraglenie jak w bitwie stoczonej - od zera) schodzi ze zbrojowni do kolejki na ekran lupow: najpierw sztuki bez stanu (te
+        /// dopisal przed chwila DTE), potem pozostale tej samej nazwy. Kolejke odbiera ekran Spoils (bitwa polowa) albo po godzinie sakwy gracza
+        /// (ArmouryBehavior.LootFlushIn - nasz sluchacz MapEventEnded biegnie PRZED oknem DTE i terminu sam by nie ustawil). Zwraca liczbe sztuk w kolejce.
+        /// </summary>
+        internal static int QueueSimShare(Dictionary<ItemObject, int> gained, int total)
+        {
+            int moved = 0, pct = 0;
+            try
+            {
+                var armory = _dteArmory != null ? _dteArmory.GetValue(null) as ItemRoster : null;
+                if (armory == null || gained == null || total <= 0)
+                {
+                    Log.Info("BattlefieldLaw (E8/L): Send troops - DTE nie dopisal lupu do zbrojowni wojska (0 szt.), dzialki nie ma.");
+                    return 0;
+                }
+                pct = SimSharePercent();
+                foreach (var kv in gained)
+                {
+                    if (kv.Key == null || kv.Value <= 0) continue;
+                    int left = Math.Min(kv.Value, (int)Math.Round(kv.Value * pct / 100.0, MidpointRounding.AwayFromZero));
+                    for (int pass = 0; pass < 2 && left > 0; pass++)
+                        for (int i = armory.Count - 1; i >= 0 && left > 0; i--)
+                        {
+                            var el = armory.GetElementCopyAtIndex(i);
+                            if (el.EquipmentElement.Item != kv.Key || el.Amount <= 0) continue;
+                            if (pass == 0 && el.EquipmentElement.ItemModifier != null) continue;
+                            int n = Math.Min(left, el.Amount);
+                            armory.AddToCounts(el.EquipmentElement, -n);
+                            ShareQueue.AddToCounts(el.EquipmentElement, n);
+                            left -= n; moved += n;
+                        }
+                }
+                if (moved > 0) ArmouryBehavior.LootFlushIn(1f);
+                Log.Info("BattlefieldLaw (E8/L): Send troops - lup DTE z poleglych " + total + " szt. w zbrojowni wojska, dzialka kapitana " + pct + "% = " + moved
+                         + " szt. czeka na ekran lupow (reszta zostaje ludziom); loterie Spoils i gry za tych samych poleglych pominiete.");
+            }
+            catch (Exception e) { _lStumbles++; Log.Error("QueueSimShare", e); }
+            return moved;
         }
 
         /// <summary>Czy agent nalezy do partii gracza (po Origin, przez refleksje -

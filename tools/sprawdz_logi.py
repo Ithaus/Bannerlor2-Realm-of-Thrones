@@ -207,6 +207,12 @@ Uzycie (Python 3, tylko odczyt):
                     zamowienia dla warsztatow z powodu reguly, sprzedaz uprzezy (sztuki, zloto, zalogi, trzecia panom, brak kupca).
                     Recenzja E8/Z: wiersz R3-9 (polki uprzezy d91 -> until, bloki etapu 6) pokazuje uprzaz przeniesiona ze zbrojowni AI na polki
                     (suma "sprzedana" linii E8/Z z tych dob); wzrost polek nie wiekszy niz to przeniesienie = DECYZJA zamiast NIE.
+                    Blok etap8_l (E8/L, paczka 252): lup i dary Spoils - linia startu "Lup i dary (E8/L): start" (L-0a: latki Spoils wpiete 4/4,
+                    okno DTE wpiete) i linia doby "Lup i dary (E8/L)" (L-0b: w kazdej dobie okna): L-1 lup to przeniesienie - w dobach z kluczem
+                    [wl] zdjete u pokonanych + brak = dopisane zwyciezcom i brak 0, a z linia E8/P2: dopisane (E8/L) = dopisane (E8/P2) i kopie
+                    u ocalalych pokonanych = 0; L-2 INFO komu zeszlo (zalogi, partie lordow, inne) i rodzaje; L-3a Send troops (dzialka kapitana
+                    <= lup DTE z poleglych, loterie pominiete), L-3b dar dla miasta (sztuk = zaloga + polka + sakwy + przepadlo, przy [wl]
+                    przepadlo 0, milicja z niczego przyznana 0), L-3c trofea zostawione na polu (na polke warowni); L-4 potkniecia 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9257,6 +9263,127 @@ def etap8_z(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "potkniecia 0 (koszt - INFO; projekt: koszt paczki ok. 0)", stum == 0)
 
 
+# ============================================================ ETAP 8 (E8/L, paczka 252): lup i dary Spoils - blok etap8_l
+E8_L_LINE = "Lup i dary (E8/L): dzien"
+E8_L_START = "Lup i dary (E8/L): start"
+E8_L_KINDS = ("bron", "pociski", "zbroja", "tarcze", "uprzaz i inne")
+E8_L_TR = re.compile(r"przeniesienie \[(wl|wyl)\]: bitew z lupem DTE innym niz konie (\d+), dopisane zwyciezcom (\d+) szt\., zdjete u pokonanych (\d+) szt\. w (\d+) partiach "
+                     r"\(zalogi (\d+), partie lordow (\d+), inne (\d+); bron (\d+), pociski (\d+), zbroja (\d+), tarcze (\d+), uprzaz i inne (\d+)\), brak u pokonanych (\d+)")
+E8_L_SIM = re.compile(r"Send troops \[(wl|wyl)\]: bitew (\d+), lup DTE z poleglych (\d+) szt\., dzialka kapitana na ekran (\d+) szt\., loteria Spoils pominieta w (\d+) bitwach "
+                      r"\((\d+) szt\. z niczego\), szablonowa loteria gry pominieta (\d+) razy")
+E8_L_GIFT = re.compile(r"dar dla miasta \[(wl|wyl), milicja z daru (wycieta|zostaje)\]: darow (\d+), sztuk (\d+), do zbrojowni zalogi (\d+), na polke miasta (\d+) \(w tym wrakow (\d+)\), "
+                       r"z powrotem do sakw (\d+), przepadlo \(klucz wylaczony\) (\d+), milicja z niczego: nie przyznano ([0-9.]+), przyznano ([0-9.]+)")
+E8_L_REM = re.compile(r"trofea zostawione na polu \[(wl|wyl)\]: wyjsc z resztka (\d+), na polke warowni (\d+) szt\., zostalo na polu \(unikaty, nie-towar\) (\d+), bez warowni (\d+), "
+                      r"przepadlo \(klucz wylaczony\) (\d+), loteria Spoils \(z niczego - przepada jak dotad\) (\d+), pozostalosc pola Spoils (\d+)")
+
+
+def etap8_l(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/L (252, projekt etapu 8 v2 rozdz. 3 "E8/L" Test; odpowiedzi Jeffa 12.10 nr 1 i 6). Linia doby "Lup i dary (E8/L)" (HorseFate.LLine - ten sam
+    takt i ta sama etykieta doby co "Lup DTE - kopie (E8/P2)") i linia startu "Lup i dary (E8/L): start" (SpoilsSeal.LWire).
+    L-0 linia startu: latki Spoils wpiete 4/4, okno DTE wpiete, prawo zachowania lupu czynne; linia doby w kazdej dobie okna (bez pierwszej i ostatniej);
+    L-1 (prog projektu) lup to przeniesienie - w dobach z kluczem [wl]: zdjete u pokonanych + brak u pokonanych = dopisane zwyciezcom i brak = 0
+        (sztuka dopisana zwyciezcy, ktorej u pokonanych nie bylo, to jedyna mozliwa kopia); gdy jest linia E8/P2 tych samych dob: dopisane (E8/L) =
+        dopisane zwyciezcom bez koni (E8/P2 - drugi, niezalezny pomiar tego samego okna DTE) i kopie u ocalalych pokonanych (E8/P2) = 0;
+    L-2 INFO (projekt: przybytek zbrojowni zalog po oblezeniach): komu zeszlo - zalogi, partie lordow, inne - i jakie rodzaje;
+    L-3 dary i "Send troops" (autotest ich nie gra - zwykle zera; progi dla gry Jeffa, 8.16 punkty 8 i 11): dar - sztuk = do zalogi + na polke + do sakw
+        + przepadlo, przy [wl] przepadlo 0, przy "milicja wycieta" przyznano 0; trofea - przy [wl] przepadlo (klucz wylaczony) 0; Send troops - dzialka
+        kapitana <= lup DTE z poleglych;
+    L-4 potkniecia (sesja) 0."""
+    ll = {d: s for d, s in by_day(lines, E8_L_LINE).items() if 1 <= run_day(d, start) <= until}
+    st = [s for s in lines if s.startswith(E8_L_START)]
+    if not ll and not st:
+        rep.add("E8/L: linia Lup i dary (E8/L)", "brak w logu", "jest od wgrania E8/L (LootIsTransfer, SendTroopsOneLoot, SpoilsGoodsHome, SpoilsGiftNoMilitia, SpoilsRemnantsHome)", None)
+        return
+    days = sorted(ll)
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ll]
+    # L-0: start i komplet linii
+    if st:
+        s0 = st[-1]
+        w = re.search(r"latki Spoils wpiete (\d+)/(\d+)", s0)
+        ok0 = bool(w) and w.group(1) == w.group(2) and "okno DTE wpiete" in s0 and "prawo zachowania lupu czynne" in s0 and "wylaczone w tej wersji" in s0
+        rep.add("L-0a: linia startu Lup i dary (E8/L)",
+                (f"latki Spoils wpiete {w.group(1)}/{w.group(2)}" if w else "brak liczby latek") + " | " + s0.split(" | ", 1)[-1][:260],
+                "latki Spoils wpiete 4/4, pozostalosci pola Spoils wylaczone w tej wersji, okno DTE wpiete, prawo zachowania lupu czynne", ok0)
+    else:
+        rep.add("L-0a: linia startu Lup i dary (E8/L)", "brak linii startu", "jest przy starcie gry (SpoilsSeal.ApplyAll) - bez Spoils of War jej nie ma", None)
+    rep.add("L-0b: linia Lup i dary (E8/L) w kazdej dobie okna", f"dob z linia {len(days)}; brak w dobach kampanii: {miss[:10] if miss else 'brak'}",
+            "linia w kazdej dobie okna (bez pierwszej i ostatniej)", (not miss) if inner else None)
+    if not days:
+        return
+    tr = {d: E8_L_TR.search(ll[d]) for d in days}
+    bad_fmt = [run_day(d, start) for d in days if not tr[d]]
+    if bad_fmt:
+        rep.add("L-1: lup to przeniesienie", f"linia w innym formacie w dobach {bad_fmt[:10]}", "format linii z HorseFate.LLine", False)
+        return
+    on = [d for d in days if tr[d].group(1) == "wl"]
+
+    def tsum(i, dd):
+        return sum(int(tr[d].group(i)) for d in dd)
+    ev, gained, taken, parties, gar, lord, oth, missing = (tsum(i, on) for i in (2, 3, 4, 5, 6, 7, 8, 14))
+    kinds = ", ".join(f"{E8_L_KINDS[k]} {tsum(9 + k, on)}" for k in range(5))
+    p2 = {d: s for d, s in by_day(lines, "Lup DTE - kopie (E8/P2): dzien").items() if d in ll}
+    p2on = [d for d in on if d in p2]
+    p2g = sum(num(r"dopisane zwyciezcom \(bez koni\) (\d+)", p2[d], default=0) for d in p2on)
+    p2k = sum(num(r"kopie u ocalalych pokonanych (\d+) szt\.", p2[d], default=0) for d in p2on)
+    lg = tsum(3, p2on)
+    if not on:
+        off_g = tsum(3, days)
+        rep.add("L-1: lup to przeniesienie", f"klucz LootIsTransfer wylaczony we wszystkich {len(days)} dobach (dopisane {off_g} szt. - kopie zostaja jak przed paczka)",
+                "klucz wlaczony: zdjete + brak = dopisane, brak 0, kopie u ocalalych (E8/P2) 0", None)
+    else:
+        ok1 = taken + missing == gained and missing == 0 and (not p2on or (lg == p2g and p2k == 0))
+        rep.add("L-1: lup to przeniesienie (sztuki inne niz konie)",
+                (f"{len(on)} dob z kluczem [wl]: bitew z lupem DTE {ev}, dopisane zwyciezcom {gained} szt., zdjete u pokonanych {taken} szt., brak u pokonanych {missing}"
+                 + (f" | E8/P2 w {len(p2on)} tych dobach: dopisane (bez koni) {p2g} szt. wobec {lg} z linii E8/L, kopie u ocalalych pokonanych {p2k} szt."
+                    + (" (jesli brak = 0 i sumy sie zgadzaja, to nie kopie, tylko sztuki, ktorych DTE zwyciezcom nie rozdal - sprawdzic w logu)" if p2k else "")
+                    if p2on else " | linii E8/P2 brak (Stage8MeasureLog wylaczony) - bez drugiego pomiaru")
+                 + ("" if len(on) == len(days) else f" | klucz wylaczony w {len(days) - len(on)} dobach")),
+                "zdjete + brak = dopisane i brak u pokonanych 0; z linia E8/P2: dopisane (E8/L) = dopisane (E8/P2) i kopie u ocalalych = 0", ok1)
+        rep.add("L-2: komu zeszlo ze zbrojowni (pokonani po bitwie)",
+                f"{parties} partii w {ev} bitwach: zalogi {gar} szt., partie lordow {lord} szt., inne {oth} szt. | rodzaje: {kinds} | srednio {taken / max(1, len(on)):.0f} szt./d",
+                "INFO (rozbite partie i tak tracily zbrojownie - nowe jest tylko to, co zeszlo ocalalym; ilu ocalalo - linia E8/P2)", None)
+    # L-3: Send troops, dar dla miasta, trofea zostawione
+    sim = [E8_L_SIM.search(ll[d]) for d in days]
+    if all(sim):
+        sb, sg, ss_, sc, scn, sgame = (sum(int(m.group(i)) for m in sim) for i in (2, 3, 4, 5, 6, 7))
+        son = sum(1 for m in sim if m.group(1) == "wl")
+        rep.add("L-3a: Send troops - jedna droga lupu",
+                f"bitew {sb}, lup DTE z poleglych {sg} szt., dzialka kapitana {ss_} szt., loteria Spoils pominieta w {sc} bitwach ({scn} szt. z niczego), szablonowa loteria gry pominieta {sgame} razy"
+                f" | klucz [wl] w {son} z {len(days)} dob",
+                "dzialka kapitana <= lup DTE z poleglych (autotest nie gra bitew gracza - zera to INFO)", (ss_ <= sg) if sb else None)
+    else:
+        rep.add("L-3a: Send troops - jedna droga lupu", "linia w innym formacie", "format linii z HorseFate.LLine", False)
+    if any("Spoils of War nieobecny" in ll[d] for d in days):
+        rep.add("L-3b: dar dla miasta i trofea zostawione", "Spoils of War nieobecny", "INFO (bez Spoils nie ma tych drog)", None)
+    else:
+        gf = [E8_L_GIFT.search(ll[d]) for d in days]
+        rm = [E8_L_REM.search(ll[d]) for d in days]
+        if not all(gf) or not all(rm):
+            rep.add("L-3b: dar dla miasta i trofea zostawione", "linia w innym formacie", "format czesci Spoils z SpoilsSeal.TakeLPart", False)
+        else:
+            gn, gp, ga, gs, gw, gb, gl = (sum(int(m.group(i)) for m in gf) for i in (3, 4, 5, 6, 7, 8, 9))
+            mc, ml = sum(float(m.group(10)) for m in gf), sum(float(m.group(11)) for m in gf)
+            lost_on = sum(int(m.group(9)) for m in gf if m.group(1) == "wl")
+            mil_on = sum(float(m.group(11)) for m in gf if m.group(2) == "wycieta")
+            okg = gp == ga + gs + gb + gl and lost_on == 0 and mil_on < 0.005
+            rep.add("L-3b: dar dla miasta (Donate to town) - sztuki do zalogi, bez milicji z niczego",
+                    f"darow {gn}, sztuk {gp}: do zbrojowni zalogi {ga}, na polke miasta {gs} (w tym wrakow {gw}), z powrotem do sakw {gb}, przepadlo {gl} (przy kluczu [wl] {lost_on})"
+                    f" | milicja z niczego: nie przyznano {mc:.2f}, przyznano {ml:.2f} (przy kluczu 'wycieta' {mil_on:.2f})",
+                    "sztuk = zaloga + polka + sakwy + przepadlo; przy [wl] przepadlo 0; przy 'milicja wycieta' przyznano 0 (autotest nie daje darow - zera to INFO)",
+                    okg if gn else None)
+            rn, rp_, rk, rw, rl_, rlot, rmade = (sum(int(m.group(i)) for m in rm) for i in (2, 3, 4, 5, 6, 7, 8))
+            rl_on = sum(int(m.group(6)) for m in rm if m.group(1) == "wl")
+            rep.add("L-3c: trofea zostawione na polu (Leave) - na polke najblizszej przyjaznej warowni",
+                    f"wyjsc z resztka {rn}: na polke warowni {rp_} szt., zostalo na polu (unikaty, nie-towar) {rk}, bez warowni {rw}, przepadlo (klucz wylaczony) {rl_} (przy kluczu [wl] {rl_on}),"
+                    f" loteria Spoils (z niczego - przepada) {rlot}, pozostalosc pola Spoils {rmade}",
+                    "przy [wl] przepadlo (klucz wylaczony) 0 i bez warowni 0 (autotest nie zbiera trofeow - zera to INFO)", (rl_on == 0 and rw == 0) if rn else None)
+    # L-4: potkniecia
+    stum = max([num(r"potkniecia \(sesja\) (\d+)", ll[d], default=0) for d in days] + [0])
+    wired = sorted(set((re.search(r"\| okno DTE (.*?) \| potkniecia", ll[d]) or [None, "?"])[1] for d in days))
+    rep.add("L-4: potkniecia E8/L", f"potkniecia (sesja) {stum} | okno DTE: " + ", ".join(wired), "potkniecia 0 (HorseFate, SpoilsSeal E8/L, BattlefieldLaw E8/L razem)", stum == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9283,6 +9410,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_w)    # E8/W (249): zuzycie i naprawy AI
     blocks.append(etap8_a)    # E8/A (250): misja gracza - odzysk wedlug strony, arena nie obija, lup z wlasnych zabojstw
     blocks.append(etap8_z)    # E8/Z (251): zakupy i nadwyzki AI - bez dodatnich stanow, sufit ceny (W CIENIU), uprzaz ponad zapas
+    blocks.append(etap8_l)    # E8/L (252): lup to przeniesienie, Send troops - jedna droga, dar dla miasta do zalogi bez milicji, trofea zostawione na polke
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

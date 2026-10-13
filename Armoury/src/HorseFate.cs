@@ -61,6 +61,10 @@ namespace Armoury
         internal static bool SpoilsOn { get { var s = Settings.Current; return s != null && s.SpoilsOfBrokenParties; } }
         internal static bool VetHorseOn { get { var s = Settings.Current; return s != null && s.VeteranKeepsHorse && PeopleBook.VetLive; } }
         internal static bool SeatOn { get { var s = Settings.Current; return s != null && s.NewPartyHorsesFromSeat; } }
+        // E8/L (252, R6): lup to przeniesienie - wszystkie rodzaje sztuk w tym samym oknie DTE (osobny klucz; konie dalej wedlug HorsesDieOnlyKilled)
+        internal static bool TransferOn { get { var s = Settings.Current; return s != null && s.LootIsTransfer; } }
+        /// <summary>E8/L: okno DTE EveryoneCampaignBehavior.OnMapEventEnded wpiete (prefiks + postfiks) - bez niego "Send troops" zostaje po staremu.</summary>
+        internal static bool DteWindowWired { get { return _wDte == "wpiete"; } }
 
         private const int Cats = 5;
         private static readonly int[] OrdHigh = { 1, 2, 0 }, OrdLow = { 0, 1, 2 };
@@ -87,7 +91,8 @@ namespace Armoury
         private sealed class Win { public PartyBase Party; public double W; }
         private sealed class Beaten { public List<Win> Wins; public bool SimWin; public int Day; }
         private static readonly Dictionary<MobileParty, Beaten> _beaten = new Dictionary<MobileParty, Beaten>();
-        private sealed class LootSnapshot { public List<KeyValuePair<MobileParty, Dictionary<ItemObject, int>>> Win; public List<MobileParty> Lose; }
+        private sealed class LootSnapshot { public List<KeyValuePair<MobileParty, Dictionary<ItemObject, int>>> Win; public List<MobileParty> Lose; public bool Horses, Rest; }
+        private sealed class SimSnapshot { public Dictionary<ItemObject, int> Before; }   // E8/L: zbrojownia druzyny gracza przed lupem DTE z "Send troops"
         private sealed class BkSnap { public List<KeyValuePair<MobileParty, Dictionary<EquipmentElement, int>>> Rows; }
 
         // ------------------------------------------------------------ wpiecie
@@ -100,6 +105,9 @@ namespace Armoury
         private static readonly long[] _dDeadMission = new long[Cats], _dDeadAuto = new long[Cats];
         private static long _dMissionOutside, _dMissionKiller, _dMissionGone, _dMissionRiders, _dMissionHorses, _dObsNew, _dAutoKilled, _dAutoExp, _dAutoNoHorse, _dAutoParties;
         private static long _dLootMoved, _dLootCopies, _dLootCopiesMissing;
+        // E8/L (252): przeniesienie pozostalych rodzajow (rodzaje jak w pomiarze E8/P2) i dzialka z "Send troops" - liczniki linii "Lup i dary (E8/L)"
+        private static readonly long[] _dTrGained = new long[P2Kinds], _dTrTaken = new long[P2Kinds];
+        private static long _dTrEvents, _dTrMissing, _dTrGar, _dTrLord, _dTrOther, _dTrParties, _dSimEvents, _dSimGained, _dSimShare;
         private static long _dSpWinPcs, _dSpWinHorses, _dSpShelfPcs, _dSpShelfHorses, _dSpArmHorses, _dSpOverflow, _dSpLeft, _dSpParties, _dSpNoWhere, _dSpSkip;
         private static long _dBkPcs, _dBkHorses;
         private static long _dVetIn, _dVetNoHorse, _dVetPlayer, _dVetHire, _dVetHireNone, _dVetOut, _dVetFootShown, _dMercTemplate;
@@ -115,6 +123,7 @@ namespace Armoury
             _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
             ClearDay(); _stumbles = 0; _errSites.Clear(); _giftRun = false;
             _p2Event = null; _p2Win.Clear(); _p2WinBefore.Clear(); _p2Lose.Clear(); _p2Open.Clear();   // E8/P2 (244): pomiar kopii lupu - stan miedzy kampaniami
+            BattlefieldLaw.LReset();   // E8/L (252): liczniki "Send troops" i flaga listy trofeow - ten sam moment
         }
 
         private static void ClearDay()
@@ -122,6 +131,8 @@ namespace Armoury
             Array.Clear(_dDeadMission, 0, Cats); Array.Clear(_dDeadAuto, 0, Cats);
             _dMissionOutside = _dMissionKiller = _dMissionGone = _dMissionRiders = _dMissionHorses = _dObsNew = _dAutoKilled = _dAutoExp = _dAutoNoHorse = _dAutoParties = 0;
             _dLootMoved = _dLootCopies = _dLootCopiesMissing = 0;
+            Array.Clear(_dTrGained, 0, _dTrGained.Length); Array.Clear(_dTrTaken, 0, _dTrTaken.Length);   // E8/L (252)
+            _dTrEvents = _dTrMissing = _dTrGar = _dTrLord = _dTrOther = _dTrParties = _dSimEvents = _dSimGained = _dSimShare = 0;
             _dSpWinPcs = _dSpWinHorses = _dSpShelfPcs = _dSpShelfHorses = _dSpArmHorses = _dSpOverflow = _dSpLeft = _dSpParties = _dSpNoWhere = _dSpSkip = 0;
             _dBkPcs = _dBkHorses = 0;
             _dVetIn = _dVetNoHorse = _dVetPlayer = _dVetHire = _dVetHireNone = _dVetOut = _dVetFootShown = _dMercTemplate = 0;
@@ -390,9 +401,14 @@ namespace Armoury
                 bool mission = ReferenceEquals(__0, _missionEvent);
                 if (mission) _missionEvent = null;
                 P2LootBefore(__0);   // E8/P2 (244): sumy zbrojowni zwyciezcow (bez koni) przed rozdaniem lupu DTE - tylko pomiar, wlasny try
-                if (!DieOn) return;
-                if (!mission) AutoDeaths(__0);
-                __state = LootSnap(__0);
+                // E8/L (252): migawka takze przy samym LootIsTransfer (pozostale rodzaje); zgony koni autobitwy i lup koni dalej tylko przy HorsesDieOnlyKilled
+                bool die = DieOn, rest = TransferOn;
+                if (die && !mission) AutoDeaths(__0);
+                // E8/L (PLAN 8.6c): "Send troops" wygrane przez gracza - DTE dopisze lup z poleglych do zbrojowni druzyny (DistributePlayerSimulationLoot);
+                // migawka zbrojowni przed, w postfiksie dzialka kapitana z przybytku idzie do kolejki na ekran lupow (LootSnap te droge pomija jak dotad)
+                if (BattlefieldLaw.SimOneLoot(__0)) { __state = new SimSnapshot { Before = ArmsOf(MobileParty.MainParty, true, true) }; return; }
+                if (!die && !rest) return;
+                __state = LootSnap(__0, die, rest);
             }
             catch (Exception e) { Stumble("DtePrefix", e); }
         }
@@ -401,6 +417,8 @@ namespace Armoury
         {
             var sn = __state as LootSnapshot;
             if (sn != null) { try { LootMove(sn); } catch (Exception e) { Stumble("DtePostfix", e); } }
+            var sim = __state as SimSnapshot;
+            if (sim != null) { try { SimShare(sim); } catch (Exception e) { Stumble("DtePostfix(Send troops)", e); } }   // E8/L (252)
             P2LootAfter(__0);   // E8/P2 (244): po LootMove - ile sztuk innych niz konie zostalo u pokonanych jako kopia (tylko pomiar, wlasny try)
         }
 
@@ -616,7 +634,8 @@ namespace Armoury
             }
         }
 
-        private static Dictionary<ItemObject, int> HorsesOfWinner(MobileParty mp)
+        /// <summary>Sztuki zbrojowni partii (gracz: ArmyArmory DTE, suma po stanach): konie (horses) i / albo pozostale rodzaje (rest - E8/L). Tylko odczyt.</summary>
+        private static Dictionary<ItemObject, int> ArmsOf(MobileParty mp, bool horses, bool rest)
         {
             var d = new Dictionary<ItemObject, int>();
             if (mp == MobileParty.MainParty)
@@ -627,24 +646,25 @@ namespace Armoury
                     {
                         var el = pa.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
-                        if (el.Amount <= 0 || !IsHorse(it)) continue;
+                        if (el.Amount <= 0 || it == null || !(IsHorse(it) ? horses : rest)) continue;
                         int n; d.TryGetValue(it, out n); d[it] = n + el.Amount;
                     }
                 return d;
             }
             var arm = ArmOf(mp);
-            if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && IsHorse(kv.Key)) d[kv.Key] = kv.Value;
+            if (arm != null) foreach (var kv in arm) if (kv.Value > 0 && kv.Key != null && (IsHorse(kv.Key) ? horses : rest)) d[kv.Key] = kv.Value;
             return d;
         }
 
-        private static LootSnapshot LootSnap(MapEvent me)
+        /// <summary>horses - konie (E6/K1, HorsesDieOnlyKilled); rest - pozostale rodzaje (E8/L, LootIsTransfer).</summary>
+        private static LootSnapshot LootSnap(MapEvent me, bool horses, bool rest)
         {
             if (me.WinningSide == BattleSideEnum.None) return null;
             if (me.IsPlayerSimulation && me.WinningSide == me.PlayerSide) return null;   // DTE DistributePlayerSimulationLoot - lup z poleglych, inna droga
             var win = me.WinningSide == BattleSideEnum.Attacker ? me.AttackerSide : me.DefenderSide;
             var lose = me.WinningSide == BattleSideEnum.Attacker ? me.DefenderSide : me.AttackerSide;
             if (win == null || lose == null) return null;
-            var sn = new LootSnapshot { Win = new List<KeyValuePair<MobileParty, Dictionary<ItemObject, int>>>(), Lose = new List<MobileParty>() };
+            var sn = new LootSnapshot { Win = new List<KeyValuePair<MobileParty, Dictionary<ItemObject, int>>>(), Lose = new List<MobileParty>(), Horses = horses, Rest = rest };
             foreach (var mep in lose.Parties)
             {
                 var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
@@ -654,7 +674,7 @@ namespace Armoury
             foreach (var mep in win.Parties)
             {
                 var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
-                if (mp != null) sn.Win.Add(new KeyValuePair<MobileParty, Dictionary<ItemObject, int>>(mp, HorsesOfWinner(mp)));
+                if (mp != null) sn.Win.Add(new KeyValuePair<MobileParty, Dictionary<ItemObject, int>>(mp, ArmsOf(mp, horses, rest)));
             }
             return sn;
         }
@@ -664,7 +684,7 @@ namespace Armoury
             var gained = new Dictionary<ItemObject, int>();
             foreach (var kv in sn.Win)
             {
-                var now = HorsesOfWinner(kv.Key);
+                var now = ArmsOf(kv.Key, sn.Horses, sn.Rest);
                 foreach (var x in now)
                 {
                     int b; kv.Value.TryGetValue(x.Key, out b);
@@ -673,10 +693,16 @@ namespace Armoury
             }
             if (gained.Count == 0) return;
             var touched = new HashSet<MobileParty>();
+            HashSet<MobileParty> stripped = null;   // E8/L: pokonani, ktorym zeszly sztuki inne niz konie (licznik partii)
+            bool anyRest = false;                   // E8/L: zwyciezcy dostali w tej bitwie sztuki inne niz konie (licznik bitew)
             foreach (var g in gained)
             {
+                // E8/L (252, R6): ta sama regula dla kazdego rodzaju sztuki - co DTE dopisalo zwyciezcom, schodzi ze zbrojowni pokonanych (konie: liczniki
+                // E6/K1 i odswiezenie stanu koni jak dotad; pozostale: liczniki linii "Lup i dary (E8/L)" wedlug rodzaju i wedlug tego, komu zeszlo)
+                bool horse = IsHorse(g.Key);
+                int kind = horse ? 0 : P2Kind(g.Key);
                 int left = g.Value;
-                _dLootMoved += g.Value;
+                if (horse) _dLootMoved += g.Value; else { _dTrGained[kind] += g.Value; anyRest = true; }
                 foreach (var mp in sn.Lose)
                 {
                     if (left <= 0) break;
@@ -685,11 +711,67 @@ namespace Armoury
                     if (arm == null || !arm.TryGetValue(g.Key, out c) || c <= 0) continue;
                     int k = Math.Min(c, left);
                     if (c - k > 0) arm[g.Key] = c - k; else arm.Remove(g.Key);
-                    left -= k; _dLootCopies += k; touched.Add(mp);
+                    left -= k;
+                    if (horse) { _dLootCopies += k; touched.Add(mp); continue; }
+                    _dTrTaken[kind] += k;
+                    if (mp.IsGarrison) _dTrGar += k; else if (mp.IsLordParty) _dTrLord += k; else _dTrOther += k;
+                    if (stripped == null) stripped = new HashSet<MobileParty>();
+                    stripped.Add(mp);
                 }
-                if (left > 0) _dLootCopiesMissing += left;
+                if (left > 0) { if (horse) _dLootCopiesMissing += left; else _dTrMissing += left; }
             }
+            if (anyRest) _dTrEvents++;
+            if (stripped != null) _dTrParties += stripped.Count;
             foreach (var mp in touched) HorseState.Refresh(mp);
+        }
+
+        // ================================================================ E8/L (252, PLAN 8.6c): "Send troops" - jedna droga lupu
+        // DTE DistributePlayerSimulationLoot (dekompilacja v1.4.7 :471-598) dopisuje sprzet poleglych i rannych pokonanych do zbrojowni druzyny gracza w calosci
+        // (ArmyArmory.AddItemToArmory, bez ekranu), a ekran dostawal osobno loterie Spoils za tych samych ludzi. Teraz: przybytek zbrojowni w oknie DTE = lup
+        // tej bitwy; dzialka kapitana (PlayerLootSharePercent - "auto-resolved battles use this share for everything", wpis 82) schodzi ze zbrojowni do kolejki
+        // BattlefieldLaw na ekran lupow, reszta zostaje ludziom; loterie tnie BattlefieldLaw (AfterGenerateLoot, CutCasualtyLootPrefix). Konie pokonanych bez
+        // zmian (E6/K1 tej drogi nie rusza). Nic nie powstaje: sztuki tylko przechodza ze zbrojowni druzyny na ekran gracza.
+        private static void SimShare(SimSnapshot sn)
+        {
+            var now = ArmsOf(MobileParty.MainParty, true, true);
+            var gained = new Dictionary<ItemObject, int>();
+            int total = 0;
+            foreach (var x in now)
+            {
+                int b; sn.Before.TryGetValue(x.Key, out b);
+                if (x.Value > b) { gained[x.Key] = x.Value - b; total += x.Value - b; }
+            }
+            _dSimEvents++; _dSimGained += total;
+            _dSimShare += BattlefieldLaw.QueueSimShare(gained, total);
+        }
+
+        /// <summary>E8/L (252): polka najblizszej przyjaznej warowni dla porzuconego dobytku (regula (2): ta sama frakcja i nieoblegana, dalej niewroga,
+        /// na koniec dowolna) - dla trofeow zostawionych na polu (SpoilsSeal.RemnantPostfix).</summary>
+        internal static Settlement AbandonedShelf(MobileParty mp)
+        {
+            try { return mp != null ? NearestMarket(PosOf(mp), mp.MapFaction) : null; } catch { return null; }
+        }
+
+        /// <summary>E8/L (252): linia doby "Lup i dary (E8/L)" - przeniesienie lupu DTE (pozostale rodzaje), "Send troops", dar dla miasta i trofea zostawione
+        /// na polu (liczniki Spoils z SpoilsSeal.TakeLPart). Tylko log.</summary>
+        private static void LLine(int day)
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            long g = 0, t = 0;
+            for (int k = 0; k < P2Kinds; k++) { g += _dTrGained[k]; t += _dTrTaken[k]; }
+            var sb = new StringBuilder();
+            sb.Append("Lup i dary (E8/L): dzien ").Append(day)
+              .Append(" | przeniesienie [").Append(s.LootIsTransfer ? "wl" : "wyl").Append("]: bitew z lupem DTE innym niz konie ").Append(_dTrEvents)
+              .Append(", dopisane zwyciezcom ").Append(g).Append(" szt., zdjete u pokonanych ").Append(t).Append(" szt. w ").Append(_dTrParties).Append(" partiach (zalogi ")
+              .Append(_dTrGar).Append(", partie lordow ").Append(_dTrLord).Append(", inne ").Append(_dTrOther).Append(";");
+            for (int k = 0; k < P2Kinds; k++) sb.Append(k == 0 ? " " : ", ").Append(P2KindNames[k]).Append(' ').Append(_dTrTaken[k]);
+            sb.Append("), brak u pokonanych ").Append(_dTrMissing)
+              .Append(" | Send troops [").Append(s.SendTroopsOneLoot ? "wl" : "wyl").Append("]: bitew ").Append(_dSimEvents).Append(", lup DTE z poleglych ").Append(_dSimGained)
+              .Append(" szt., dzialka kapitana na ekran ").Append(_dSimShare).Append(" szt., ").Append(BattlefieldLaw.TakeSimCut())
+              .Append(" | ").Append(SpoilsSeal.TakeLPart())
+              .Append(" | okno DTE ").Append(_wDte).Append(" | potkniecia (sesja) ").Append(_stumbles + SpoilsSeal.LStumbles + BattlefieldLaw.LStumbles).Append('.');
+            Log.Info(sb.ToString());
         }
 
         // ================================================================ (2) DOBYTEK ROZBITYCH
@@ -1187,6 +1269,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             try { P2Line((int)CampaignTime.Now.ToDays); } catch (Exception e) { Stumble("P2Line", e); }   // E8/P2 (244): "Lup DTE - kopie (E8/P2)" - przed zerowaniem dnia (tylko log)
+            try { LLine((int)CampaignTime.Now.ToDays); } catch (Exception e) { Stumble("LLine", e); }     // E8/L (252): "Lup i dary (E8/L)" - przed zerowaniem dnia (tylko log)
             ClearDay();
         }
 

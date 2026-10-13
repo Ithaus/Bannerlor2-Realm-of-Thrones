@@ -97,6 +97,18 @@ namespace Armoury
     /// 14. MUSZTRA (PROJEKT-MUSZTRA rozdz. 3, Drill.StockOn = DrillStock przy DrillLaw i DonationXpOff): przy "Leave" po trofeach bron i zbroje z
     ///     _lootScreenRoster ida do zapasu cwiczebnego ludzi (Drill.AcceptTrophies, do limitu; zdjete z listy) PRZED pozostalosciami pola i resztkami;
     ///     menu i podpowiedz "Leave" mowia o zapasie tylko przy Drill.LeaveOn (zapas czynny i ten prefiks wpiety - DrillLeaveWired).
+    /// 15. E8/L (252, PLAN 8.2a-b; odpowiedz Jeffa 12.10 nr 6): DAR DLA MIASTA IDZIE DO ZALOGI, BEZ MILICJI Z NICZEGO; TROFEA ZOSTAWIONE NA POLU NIE ZNIKAJA.
+    ///     - "Donate plundered equipment to the town" (DonateEquipmentBehavior.OnDonateScreenClosed): Spoils zerowal liste (sztuki w nicosc) i dawal
+    ///       bezpieczenstwo, milicje i relacje. Prefiks zapamietuje sztuki, finalizer (takze po wyjatku Spoils) kladzie je w zbrojowni DTE zalogi tego
+    ///       miasta ze stanem (AiGear.AddToArmory + AiWear.NoteBought - jak dostawy wozow zamkow); wrak, sztuka, ktorej DTE nie przyjmie, i miasto bez
+    ///       zalogi - na polke miasta bez zaplaty (porzucony dobytek, regula HorseFate (2)); bez miasta - z powrotem do sakw (SpoilsGoodsHome).
+    ///     - milicja z daru (Settlement.Militia += sztuki x DonateMilitiaPerItem - ludzie z niczego): transpiler zamienia wywolanie set_Militia na bramke
+    ///       GiftMilitia (bez dopisywania; bez cofania setterem, ktory przetasowalby sklad milicji) i poprawia dwa napisy obiecujace milicje
+    ///       (SpoilsGiftNoMilitia); bezpieczenstwo i relacje zostaja.
+    ///     - trofea zostawione przy "Leave" (LootCollectionBehavior.TryCreateBattlefieldRemnant): w 1.8.4 pozostalosc pola nie powstaje nigdy
+    ///       (BattlefieldRemnantsTemporarilyDisabled = true), wiec reszta listy znikala zawsze - postfiks przenosi ja (po zapasie musztry) na polke
+    ///       najblizszej przyjaznej warowni bez zaplaty; tylko gdy lista to prawdziwy lup (BattlefieldLaw.ScreenIsRealLoot), nie loteria Spoils
+    ///       (SpoilsRemnantsHome). Wygasanie pozostalosci: martwe w tej wersji (RemoveExpired wolane tylko przy czynnych pozostalosciach).
     /// Martwe w 1.8.4: zloto pozostalosci pola (BattlefieldRemnantsTemporarilyDisabled = true; i tak bralo z monet z cial).
     /// Bez zmian (to nie zloto z niczego): najem kwatermistrza, zalozenie / odnowienie / nowe druzyny klanu (zloto gracza
     /// czesciowo do nikad - ujscie), dary dla zalogi / milicji / zywnosc dla miasta (towar na wskazniki miasta), dzienny dochod
@@ -181,6 +193,7 @@ namespace Armoury
             ClearDay();
             _stumbles = 0;
             _lastWait = _lastWaitMask = _lastWrecks = _lastNoSmith = 0; _lastTown = "";
+            LClear(); _lStumbles = 0;   // E8/L (252): liczniki daru dla miasta i trofeow zostawionych na polu
             MendMaterial.Reset();   // zapas kowali miast (reszty calych sztuk) - wczytanie oddaje go w ArmouryBehavior.SyncData (arm_mendstock)
         }
 
@@ -1482,6 +1495,287 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ 15. E8/L (252): dar dla miasta do zalogi, bez milicji z niczego; trofea zostawione na polke
+
+        private const string GiftLabel = "dar dla miasta do zbrojowni zalogi (E8/L)", GiftMilLabel = "dar dla miasta bez milicji z niczego (E8/L)",
+                             GiftTipLabel = "podpowiedz daru dla miasta bez milicji (E8/L)", RemLabel = "trofea zostawione na polke warowni (E8/L)";
+        private const string GiftTipId = "{=RL_Donate_Tip}", GiftDoneId = "{=RL_Donate_Done}";
+        private static FieldInfo _fDonRoster;
+        private static MethodInfo _mSetMilitia, _mRemOff;
+        private static int _ltMil, _ltTxt;   // zamiany transpilera daru przy ostatnim wpinaniu (Harmony wola transpiler synchronicznie w Patch)
+        private static int _lGifts, _lGiftPcs, _lGiftArm, _lGiftShelf, _lGiftWreck, _lGiftBack, _lGiftLet, _lRem, _lRemPcs, _lRemKept, _lRemNoWhere, _lRemLet, _lRemLottery, _lRemMade;
+        private static float _lMilCut, _lMilLet;
+        private static int _lStumbles;
+        internal static int LStumbles { get { return _lStumbles; } }
+
+        private sealed class GiftState { public readonly List<KeyValuePair<EquipmentElement, int>> Lots = new List<KeyValuePair<EquipmentElement, int>>(); public Settlement St; public int N; }
+
+        private static void LClear()
+        {
+            _lGifts = _lGiftPcs = _lGiftArm = _lGiftShelf = _lGiftWreck = _lGiftBack = _lGiftLet = 0; _lMilCut = _lMilLet = 0f;
+            _lRem = _lRemPcs = _lRemKept = _lRemNoWhere = _lRemLet = _lRemLottery = _lRemMade = 0;
+        }
+
+        private static void LStumble(string where, Exception e)
+        {
+            _lStumbles++;
+            if (_lStumbles <= 3) Log.Error(where, e);
+        }
+
+        /// <summary>Czesc linii doby "Lup i dary (E8/L)" (HorseFate.LLine): dar dla miasta i trofea zostawione na polu - zwraca tekst i zeruje liczniki.</summary>
+        internal static string TakeLPart()
+        {
+            string r;
+            var s = Settings.Current;
+            if (!_present || s == null) r = "Spoils of War nieobecny";
+            else
+            {
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                r = "dar dla miasta [" + (s.SpoilsGoodsHome ? "wl" : "wyl") + ", milicja z daru " + (s.SpoilsGiftNoMilitia ? "wycieta" : "zostaje") + "]: darow " + _lGifts + ", sztuk " + _lGiftPcs
+                    + ", do zbrojowni zalogi " + _lGiftArm + ", na polke miasta " + _lGiftShelf + " (w tym wrakow " + _lGiftWreck + "), z powrotem do sakw " + _lGiftBack
+                    + ", przepadlo (klucz wylaczony) " + _lGiftLet + ", milicja z niczego: nie przyznano " + _lMilCut.ToString("0.00", ci) + ", przyznano " + _lMilLet.ToString("0.00", ci)
+                    + " | trofea zostawione na polu [" + (s.SpoilsRemnantsHome ? "wl" : "wyl") + "]: wyjsc z resztka " + _lRem + ", na polke warowni " + _lRemPcs
+                    + " szt., zostalo na polu (unikaty, nie-towar) " + _lRemKept + ", bez warowni " + _lRemNoWhere + ", przepadlo (klucz wylaczony) " + _lRemLet
+                    + ", loteria Spoils (z niczego - przepada jak dotad) " + _lRemLottery + ", pozostalosc pola Spoils " + _lRemMade;
+            }
+            LClear();
+            return r;
+        }
+
+        /// <summary>Prefiks DonateEquipmentBehavior.OnDonateScreenClosed: sztuki zostawione po lewej stronie ekranu (Spoils zaraz wyzeruje liste). Po Cancel
+        /// lista jest juz pusta (CancelPostfix oddal wszystko do sakw) - nic do zrobienia. Stan dla finalizera tylko wtedy, gdy Spoils liste wyzeruje.</summary>
+        public static void GiftHomePrefix(object __instance, out object __state)
+        {
+            __state = null;
+            try
+            {
+                if (_fDonRoster == null) return;
+                var r = _fDonRoster.GetValue(__instance) as ItemRoster;
+                var main = MobileParty.MainParty;
+                if (r == null || main == null || main.ItemRoster == null) return;   // Spoils wychodzi od razu, lista zostaje nietknieta
+                var g = new GiftState { St = Settlement.CurrentSettlement };
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    if (el.Amount <= 0 || el.EquipmentElement.Item == null) continue;
+                    g.Lots.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount));
+                    g.N += el.Amount;
+                }
+                if (g.N > 0) __state = g;
+            }
+            catch (Exception e) { LStumble("SpoilsSeal.GiftHome(prefiks)", e); }
+        }
+
+        /// <summary>Finalizer (biegnie takze po wyjatku Spoils - lista jest wtedy juz wyzerowana): kazdy stos trafia w jedno miejsce - zbrojownia zalogi
+        /// (ze stanem), polka miasta albo z powrotem sakwy. Zlota nie ma: dar. Nie polyka wyjatku Spoils (zwraca void).</summary>
+        public static void GiftHomeFinalizer(object __state)
+        {
+            var g = __state as GiftState;
+            if (g == null) return;
+            int arm = 0, shelf = 0, wreck = 0, back = 0;
+            try
+            {
+                var s = Settings.Current;
+                _lGifts++; _lGiftPcs += g.N;
+                if (s == null || !s.SpoilsGoodsHome)
+                {
+                    _lGiftLet += g.N;
+                    Log.Info("SpoilsSeal (E8/L): dar dla miasta - " + g.N + " szt. przepada jak w Spoils (Spoils Goods Home wylaczony).");
+                    return;
+                }
+                var main = MobileParty.MainParty;
+                var st = g.St;
+                var town = st != null ? st.Town : null;
+                MobileParty gar = null;
+                try { gar = town != null ? town.GarrisonParty : null; if (gar != null && !gar.IsActive) gar = null; } catch { gar = null; }
+                foreach (var lot in g.Lots)
+                {
+                    var el = lot.Key; int n = lot.Value; bool placed = false;
+                    try
+                    {
+                        if (town != null)   // poza miastem i zamkiem Spoils wychodzi bez niczego - sztuki wracaja do sakw
+                        {
+                            bool isWreck = LootPrices.IsWreck(el.ItemModifier);
+                            if (gar != null && !isWreck && AiGear.DteTakes(el.Item) && AiGear.AddToArmory(gar, el.Item, n))
+                            {
+                                placed = true; arm += n;
+                                try { AiWear.NoteBought(gar, el, n); } catch (Exception e) { LStumble("SpoilsSeal.GiftHome(zapis zuzycia)", e); }   // stan sztuki do ksiegi zalogi
+                            }
+                            else if (st.ItemRoster != null) { st.ItemRoster.AddToCounts(el, n); placed = true; shelf += n; if (isWreck) wreck += n; }
+                        }
+                    }
+                    catch (Exception e) { LStumble("SpoilsSeal.GiftHome", e); }
+                    if (placed) continue;
+                    try { if (main != null && main.ItemRoster != null) { main.ItemRoster.AddToCounts(el, n); back += n; } }
+                    catch (Exception e) { LStumble("SpoilsSeal.GiftHome(zwrot)", e); }
+                }
+                _lGiftArm += arm; _lGiftShelf += shelf; _lGiftWreck += wreck; _lGiftBack += back;
+                string name = Nm(st);
+                Log.Info("SpoilsSeal (E8/L): dar dla miasta " + name + " - " + g.N + " szt.: do zbrojowni zalogi " + arm + (gar == null ? " (zalogi brak)" : "")
+                         + ", na polke miasta " + shelf + " (w tym wrakow " + wreck + "; reszta - DTE nie przyjmuje albo brak zalogi), z powrotem do sakw " + back + "; bez zaplaty (dar).");
+                if (arm > 0) Log.Player("The garrison of " + name + " takes " + arm + " pieces into its armoury" + (shelf > 0 ? "; " + shelf + " it cannot use go to the market stalls." : "."));
+                else if (shelf > 0) Log.Player((gar == null ? "No garrison holds " + name + ": " : "The garrison of " + name + " cannot use this gear: ") + shelf + " pieces go to the market stalls.");
+                if (back > 0) Log.Player(back + " pieces come back to your baggage.");
+            }
+            catch (Exception e) { LStumble("SpoilsSeal.GiftHome(finalizer)", e); }
+        }
+
+        /// <summary>Wstawiane przez transpiler w miejsce Settlement.set_Militia w darze dla miasta (stos: osada, nowa wartosc): przy SpoilsGiftNoMilitia
+        /// wartosc nie jest zapisywana - milicjanci nie biora sie z oddanych sztuk; inaczej zapis jak w Spoils. Roznica do licznikow linii doby.</summary>
+        public static void GiftMilitia(Settlement st, float value)
+        {
+            bool cut = false;
+            try
+            {
+                var s = Settings.Current;
+                cut = s != null && s.SpoilsGiftNoMilitia;
+                float add = st != null ? value - st.Militia : 0f;
+                if (add > 0f) { if (cut) _lMilCut += add; else _lMilLet += add; }
+            }
+            catch (Exception e) { LStumble("SpoilsSeal.GiftMilitia", e); }
+            if (!cut && st != null) st.Militia = value;
+        }
+
+        /// <summary>Wstawiane za stale napisow daru dla miasta (podpowiedz opcji i komunikat po oddaniu): przy SpoilsGiftNoMilitia bez obietnicy milicji
+        /// (po angielsku gra bierze napis z kodu - MBTextManager.GetLocalizedText).</summary>
+        public static string GiftText(string s)
+        {
+            try
+            {
+                var c = Settings.Current;
+                if (s == null || c == null || !c.SpoilsGiftNoMilitia) return s;
+                if (s.StartsWith(GiftTipId, StringComparison.Ordinal))
+                    return GiftTipId + "Arm the local guard. +Security, +Relations." + (c.SpoilsGoodsHome ? " The gear goes into the garrison's armoury." : "") + " ({COUNT} plundered items available)";
+                if (s.StartsWith(GiftDoneId, StringComparison.Ordinal)) return GiftDoneId + "Donated {COUNT} items. Security +{SEC}.";
+                return s;
+            }
+            catch { return s; }
+        }
+
+        public static IEnumerable<CodeInstruction> GiftTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var mil = AccessTools.Method(typeof(SpoilsSeal), nameof(GiftMilitia));
+            var txt = AccessTools.Method(typeof(SpoilsSeal), nameof(GiftText));
+            foreach (var c in instructions)
+            {
+                if (mil != null && IsCall(c, _mSetMilitia)) { c.opcode = OpCodes.Call; c.operand = mil; _ltMil++; }   // stos: osada, wartosc - ten sam; etykiety zostaja
+                yield return c;
+                var s = c.opcode == OpCodes.Ldstr ? c.operand as string : null;
+                if (txt != null && s != null && s.Contains("Militia") && (s.StartsWith(GiftTipId, StringComparison.Ordinal) || s.StartsWith(GiftDoneId, StringComparison.Ordinal)))
+                { _ltTxt++; yield return new CodeInstruction(OpCodes.Call, txt); }
+            }
+        }
+
+        /// <summary>Spoils 1.8.4: LootCollectionBehavior.BattlefieldRemnantsTemporarilyDisabled = true - pozostalosc pola nie powstaje nigdy. Nie umiemy
+        /// sprawdzic (nowsza wersja bez tej skladowej) - false: Spoils zaklada pozostalosci sam, nie ruszamy.</summary>
+        private static bool RemnantsOff()
+        {
+            try { return _mRemOff != null && (bool)_mRemOff.Invoke(null, null); } catch { return false; }
+        }
+
+        /// <summary>Postfiks LootCollectionBehavior.TryCreateBattlefieldRemnant(leftoverLoot, leftoverGold) - wolane przy "Leave" po trofeach (reszta
+        /// _lootScreenRoster, po zapasie musztry DrillLeavePrefix) i przy "Leave without loot" (caly _generatedLoot): sztuki ida na polke najblizszej
+        /// przyjaznej warowni bez zaplaty i schodza z listy (przeniesienie); unikaty, nie-towar, sztuki zadaniowe i choragwie zostaja na liscie (przepadaja
+        /// jak dotad - ta sama regula co dobytek rozbitych). Zlota resztek nie ruszamy (monety z cial blokuje SpoilsNoFreeGold).</summary>
+        public static void RemnantPostfix(ItemRoster __0)
+        {
+            try
+            {
+                int n = Count(__0);
+                if (n <= 0) return;
+                _lRem++;
+                if (!RemnantsOff()) { _lRemMade += n; return; }                 // nowsza wersja Spoils zaklada pozostalosc pola sama
+                if (!BattlefieldLaw.ScreenIsRealLoot) { _lRemLottery += n; return; }   // lista z loterii Spoils (z niczego) - niech przepada jak dotad
+                var s = Settings.Current;
+                if (s == null || !s.SpoilsRemnantsHome) { _lRemLet += n; return; }
+                var st = HorseFate.AbandonedShelf(MobileParty.MainParty);
+                if (st == null || st.ItemRoster == null)
+                {
+                    _lRemNoWhere += n;
+                    Log.Info("SpoilsSeal (E8/L): trofea zostawione na polu - " + n + " szt. bez warowni w zasiegu, przepadaja jak dotad.");
+                    return;
+                }
+                int moved = 0, kept = 0;
+                for (int i = __0.Count - 1; i >= 0; i--)
+                {
+                    var el = __0.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || it == null) continue;
+                    if (it.NotMerchandise || it.IsBannerItem || el.EquipmentElement.IsQuestItem || UniqueSpoils.Is(it)) { kept += el.Amount; continue; }
+                    st.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                    __0.AddToCounts(el.EquipmentElement, -el.Amount);
+                    moved += el.Amount;
+                }
+                _lRemPcs += moved; _lRemKept += kept;
+                Log.Info("SpoilsSeal (E8/L): trofea zostawione na polu - " + moved + " szt. na polke " + Nm(st) + " bez zaplaty (porzucony dobytek), zostalo na polu "
+                         + kept + " szt. (unikaty, nie-towar).");
+                if (moved > 0) Log.Player("What you left on the field - " + moved + " pieces - is carted off to the market of " + Nm(st) + ".");
+            }
+            catch (Exception e) { LStumble("SpoilsSeal.RemnantHome", e); }
+        }
+
+        /// <summary>Transpiler daru: wpiety tylko, gdy znalazl swoje miejsce (needMil - wywolanie set_Militia; inaczej - napis). Wlasne liczniki, bo
+        /// OnDonateScreenClosed ma juz transpiler 11 (GiftXpTranspiler) i Harmony przy kazdym Patch puszcza wszystkie od nowa.</summary>
+        private static bool LWireT(Harmony h, MethodInfo m, string label, bool needMil)
+        {
+            MethodInfo tm = null;
+            try
+            {
+                if (m == null) { _missing.Add(label + " (brak metody DonateEquipmentBehavior)"); return false; }
+                if (needMil && _mSetMilitia == null) { _missing.Add(label + " (brak Settlement.set_Militia)"); return false; }
+                tm = AccessTools.Method(typeof(SpoilsSeal), nameof(GiftTranspiler));
+                _ltMil = _ltTxt = 0;
+                h.Patch(m, transpiler: new HarmonyMethod(tm));
+                if (needMil ? _ltMil > 0 : _ltTxt > 0) { _wired.Add(label + (needMil && _ltTxt == 0 ? " - komunikat Spoils bez zmiany" : "")); return true; }
+                try { h.Unpatch(m, tm); } catch { }
+                _missing.Add(label + " (nie znaleziono miejsca w " + m.Name + ")");
+            }
+            catch (Exception e)
+            {
+                Log.Error("SpoilsSeal.LWireT: " + label, e);
+                _missing.Add(label + " (wyjatek)");
+                Undo(h, m, nameof(GiftTranspiler));
+            }
+            return false;
+        }
+
+        /// <summary>15. E8/L: cztery latki Spoils, kazda osobno; linia startu "Lup i dary (E8/L): start" (R11: wpiete N/M).</summary>
+        private static void LWire(Harmony h)
+        {
+            int ok = 0;
+            MethodInfo close = null, cond = null;
+            try { _fDonRoster = _tDon != null ? AccessTools.Field(_tDon, "_donateScreenRoster") : null; } catch { _fDonRoster = null; }
+            try { _mSetMilitia = AccessTools.PropertySetter(typeof(Settlement), "Militia"); } catch { _mSetMilitia = null; }
+            try { _mRemOff = _tLoot != null ? AccessTools.PropertyGetter(_tLoot, "BattlefieldRemnantsTemporarilyDisabled") : null; if (_mRemOff != null && !_mRemOff.IsStatic) _mRemOff = null; } catch { _mRemOff = null; }
+            try { close = _tDon != null ? AccessTools.Method(_tDon, "OnDonateScreenClosed") : null; cond = _tDon != null ? AccessTools.Method(_tDon, "OnDonateCondition") : null; } catch { }
+            if (close == null) _missing.Add(GiftLabel + " (brak metody DonateEquipmentBehavior.OnDonateScreenClosed)");
+            else if (_fDonRoster == null) _missing.Add(GiftLabel + " (brak pola _donateScreenRoster)");
+            else
+                try
+                {
+                    h.Patch(close, prefix: new HarmonyMethod(typeof(SpoilsSeal), nameof(GiftHomePrefix)), finalizer: new HarmonyMethod(typeof(SpoilsSeal), nameof(GiftHomeFinalizer)));
+                    _wired.Add(GiftLabel); ok++;
+                }
+                catch (Exception e)
+                {
+                    Log.Error("SpoilsSeal.LWire: " + GiftLabel, e);
+                    _missing.Add(GiftLabel + " (wyjatek)");
+                    Undo(h, close, nameof(GiftHomePrefix)); Undo(h, close, nameof(GiftHomeFinalizer));
+                }
+            if (LWireT(h, close, GiftMilLabel, true)) ok++;
+            if (LWireT(h, cond, GiftTipLabel, false)) ok++;
+            int before = _wired.Count;
+            Wire(h, _tLoot, "TryCreateBattlefieldRemnant", null, nameof(RemnantPostfix), RemLabel, true);
+            if (_wired.Count > before) ok++;
+            bool off = RemnantsOff();
+            Log.Info("Lup i dary (E8/L): start - latki Spoils wpiete " + ok + "/4 (dar do zbrojowni zalogi, milicja z daru, podpowiedz daru, trofea zostawione)"
+                     + " | pozostalosci pola Spoils: " + (off ? "wylaczone w tej wersji - trofea zostawione ida na polke warowni" : "CZYNNE albo nieznane - trofea zostawione zostaja przy Spoils (sprawdzic dekompilacje)")
+                     + " | Send troops: okno DTE " + (HorseFate.DteWindowWired ? "wpiete" : "BRAK") + ", prawo zachowania lupu " + (BattlefieldLaw.CasualtyLootCut ? "czynne" : "BRAK (DTE albo latka loterii gry)")
+                     + " | klucze: przeniesienie [" + (Settings.Current.LootIsTransfer ? "wl" : "wyl") + "], Send troops [" + (Settings.Current.SendTroopsOneLoot ? "wl" : "wyl")
+                     + "], dar do zalogi [" + (Settings.Current.SpoilsGoodsHome ? "wl" : "wyl") + "], bez milicji [" + (Settings.Current.SpoilsGiftNoMilitia ? "wl" : "wyl")
+                     + "], trofea na polke [" + (Settings.Current.SpoilsRemnantsHome ? "wl" : "wyl") + "].");
+        }
+
         // ------------------------------------------------------------ wpiecie
 
         private static Type Find(string name) { return QuartermasterLaw.FindType(name); }
@@ -1731,6 +2025,10 @@ namespace Armoury
                     if (keptMissing.Count > 0) _missing.Add("Done bez pytania - nierozpoznane ekrany: " + string.Join(", ", keptMissing.ToArray()));
                 }
                 catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (13)", e); _missing.Add("13: wyjatek przy wpinaniu - patrz blad wyzej"); }
+
+                // 15. E8/L (252): dar dla miasta do zbrojowni zalogi i bez milicji z niczego, trofea zostawione na polke warowni (wlasny try, jak 11-13)
+                try { LWire(h); }
+                catch (Exception e) { Log.Error("SpoilsSeal.ApplyAll (15)", e); _missing.Add("15: wyjatek przy wpinaniu - patrz blad wyzej"); }
 
                 string ver = "?";
                 try { var sm = Find("RealisticLoot.RealisticLootSubModule"); var f = sm != null ? sm.GetField("Version") : null; if (f != null) ver = f.GetRawConstantValue() as string; } catch { }

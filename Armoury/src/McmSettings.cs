@@ -804,6 +804,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool OwnKillsLootWhole { get; set; } = true;
 
+        [SettingPropertyBool("Loot Is Transfer", HintText = "spoils are taken, not copied: whatever the victors of a battle get from a beaten party's armoury is taken out of that armoury - a garrison or a lord's band that lives through a defeat no longer keeps a second copy of the arms and armour the victors carried off (horses already worked this way; off = as before: the survivors keep a copy)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LootIsTransfer { get; set; } = true;
+
+        [SettingPropertyBool("Send Troops One Loot", HintText = "'Send troops' pays once: when your men fight without you and win, the gear of the fallen goes to the army armoury as before, the captain's share of it (Player Loot Share Percent) comes to your loot, and neither the Spoils of War lottery nor the game's own template loot for the same dead comes on top (off = as before: the armoury takes all of it and the lottery pays a second time)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SendTroopsOneLoot { get; set; } = true;
+
         [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool WreckSalvageEnabled { get; set; } = true;
@@ -839,6 +847,18 @@ namespace Armoury
         [SettingPropertyBool("Spoils Cancel Keeps", HintText = "Cancel on the Spoils of War screens that say 'take back what you want to keep' (equip a leader, donate gear to your company, donate food, equip the garrison, supply the militia, salvage, donate to the town) leaves everything as it was: all items stay in your baggage and nothing is given away; gear for a company leader who has no party comes back to you instead of vanishing (off = as before: Cancel gave everything away)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsCancelKeeps { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Goods Home", HintText = "gear you give with 'Donate plundered equipment to the town' (Spoils of War) no longer vanishes: it goes into the armoury of that town's garrison, with its wear; wrecks and pieces the garrison's stores cannot book go onto the town's market stalls, unpaid (off = as before: the gear disappears)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsGoodsHome { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Gift No Militia", HintText = "giving gear with 'Donate plundered equipment to the town' (Spoils of War) no longer raises militiamen out of nothing (Spoils of War added militia for every piece given - its Militia bonus per item); the town's security and the notables' regard rise as before, and the menu no longer promises militia (off = as before)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsGiftNoMilitia { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Remnants Home", HintText = "trophies you leave on the field when you choose Leave after a battle (Spoils of War) are not lost: what your men do not keep for their drill stock is carted to the market of the nearest friendly town or castle, unpaid - abandoned goods (off = as before: they vanish)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsRemnantsHome { get; set; } = true;
 
         [SettingPropertyBool("Living Economy Sealed", HintText = "BetterEconomy (Living Economy) may not make gold vanish nor conjure goods, men or experience out of nothing: its actions that would pay your gold into nothing (contributions to a town or castle treasury, town and village investments, market access, armory, training camp, paid drill) stay in its menus but are closed and say why, and the Lord wealth realism switch in its ledger stays off; finished armories stop turning market iron into weapons from nothing, AI training camps stop handing out free experience, villages stop their second production from nothing, and the taking of lords' gold and the AI's 5000 market-access fee stop (the fee only once BetterEconomy's own settings shut village trade diversion - until then the fee is the only thing holding it back; off = BetterEconomy as before; the log shows what was stopped)")]
         [SettingPropertyGroup("The living economy")]
@@ -5168,6 +5188,8 @@ namespace Armoury
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
             s.OwnKillsLootWhole = OwnKillsLootWhole;
+            s.LootIsTransfer = LootIsTransfer;
+            s.SendTroopsOneLoot = SendTroopsOneLoot;
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
@@ -5177,6 +5199,9 @@ namespace Armoury
             s.SpoilsQuartermasterRepair = SpoilsQuartermasterRepair;
             s.DonationXpOff = DonationXpOff;
             s.SpoilsCancelKeeps = SpoilsCancelKeeps;
+            s.SpoilsGoodsHome = SpoilsGoodsHome;
+            s.SpoilsGiftNoMilitia = SpoilsGiftNoMilitia;
+            s.SpoilsRemnantsHome = SpoilsRemnantsHome;
             s.LivingEconomySealed = LivingEconomySealed;
             s.BeePlayerGiftsReal = BeePlayerGiftsReal;
             s.PlagueSparesYourMen = PlagueSparesYourMen;

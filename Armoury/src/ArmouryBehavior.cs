@@ -1931,6 +1931,13 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnMapEventEnded", e); }
         }
 
+        /// <summary>E8/L (252): dzialka z "Send troops" wchodzi do kolejki lupow w oknie DTE, czyli PO naszym sluchaczu MapEventEnded (sluchacze biegna od
+        /// ostatnio zarejestrowanego - nasz przed DTE) - termin "ekran lupow nie przyszedl, do sakw" ustawia wtedy BattlefieldLaw.QueueSimShare.</summary>
+        internal static void LootFlushIn(float hours)
+        {
+            try { var b = Instance; if (b != null) b._lootFlushDue = CampaignTime.HoursFromNow(hours); } catch { }
+        }
+
         private Dictionary<string,int> SnapshotBaggage()
         {
             var map = new Dictionary<string,int>();
