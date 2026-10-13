@@ -130,7 +130,7 @@ namespace Armoury
         private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due; public long PaidSum, Want, Have, Lent; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); }
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera
 
         // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
         private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }
@@ -376,6 +376,8 @@ namespace Armoury
                 // 165 (D-7): clo raz - z licznika cel do skarbca, bez drugiego zdjecia z kasy miasta (licznik jest posiadaczem swiata w ksiedze)
                 bool single = CrownIncome.On && s.CrownCustomsSingleTake;
                 long[] p2 = s.Stage8MeasureLog ? P2MonopolyScan() : null;   // E8/P2 (244, PLAN 8.7b): stan warsztatow PRZED poborem (tylko odczyt)
+                bool monoNew = s.MonopolyFromDailyProfit;   // E8/R (254, PLAN 8.7b): monopol od dziennej wyplaty wlascicielowi (MonopolyDue)
+                long monShops = 0, monPayout = 0, monOld = 0;   // E8/R: liczniki linii "Rynek i korona (E8/R)" (tylko log)
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated) continue;
@@ -447,7 +449,10 @@ namespace Armoury
                             foreach (var w in st.Town.Workshops)
                             {
                                 if (w == null || w.Owner == null || w.Owner == ruler) continue;
-                                int x = Math.Min((int)(w.ProfitMade * 0.05f), Math.Max(0, w.Capital));
+                                int oldX = Math.Min((int)(w.ProfitMade * 0.05f), Math.Max(0, w.Capital));   // wzor sprzed E8/R: 5% STANU zysku (ProfitMade = kapital ponad startowy)
+                                int pay = 0;
+                                int x = monoNew ? MonopolyDue(w, out pay) : oldX;   // E8/R (254): 5% dziennej wyplaty wlascicielowi; wylacznik MonopolyFromDailyProfit = stary wzor
+                                monOld += oldX; if (x > 0) { monShops++; monPayout += pay; }   // E8/R: tylko liczniki
                                 if (x > 0) { w.ChangeGold(-x); ruler.ChangeHeroGold(x); mon += x; }
                                 if (x > 0) CirculationWindows.NoteHeroGold(ruler, x);   // paczka 169b (tylko licznik)
                                 if (x > 0) ClanIncomeBook.NoteInflow(ruler, x, ClanIncomeBook.KCrownLevies);   // paczka 169: D rodu (tylko licznik)
@@ -459,8 +464,35 @@ namespace Armoury
                 Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - danina wojenna z kas osad " + sub + ", clo od handlu miast " + cus
                          + " (do skarbcow krolestw" + (single ? "; 165: clo raz - z licznika cel prosto do skarbca " + single1 + ", kasy miast nie placa drugi raz" : "") + "); mennica " + deb + ", monopole " + mon + " (do krolow, z kas miast i kapitalu warsztatow).");
                 if (p2 != null) P2MonopolyLine(p2, mon, s.PolicyIncomeConserved);   // E8/P2 (244): "Monopole korony (E8/P2)" (tylko log)
+                MarketAndCrown.NoteMonopoly(monoNew, mon, monShops, monPayout, monOld);   // E8/R (254): monopole tej doby do linii "Rynek i korona (E8/R)" (tylko licznik)
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Levies", e); }
+            try { MarketAndCrown.Daily(); } catch (Exception e) { MarketAndCrown.Stumble("Daily", e); }   // E8/R (254): linia doby "Rynek i korona (E8/R)" i proba kup-sprzedaj konia (tylko log)
+        }
+
+        /// <summary>
+        /// E8/R (254, PLAN 8.7b): naleznosc monopolu korony z jednego warsztatu = 5% tego, co czynny model finansow gry wyplaci dzis jego wlascicielowi
+        /// (ClanFinanceModel.CalculateOwnerIncomeFromWorkshop - gra: ProfitMade / RevenueSmoothenFraction = 1/5 stanu zysku; u Jeffa czynny BKClanFinanceModel:
+        /// ProfitMade / 2), najwyzej kapital warsztatu. Dotad 5% STANU zysku (ProfitMade to kapital ponad startowy, nie zysk dnia) co dobe - kilka razy wiecej
+        /// niz "5% zysku". Wyplata przycieta do stanu zysku, wiec nowy wzor nigdy nie bierze wiecej niz stary. `payout` - dzienna wyplata wlascicielowi (do linii).
+        /// </summary>
+        internal static int MonopolyDue(TaleWorlds.CampaignSystem.Settlements.Workshops.Workshop w, out int payout)
+        {
+            payout = 0;
+            if (w == null) return 0;
+            int pm = w.ProfitMade;
+            if (pm <= 0) return 0;
+            try { payout = Campaign.Current.Models.ClanFinanceModel.CalculateOwnerIncomeFromWorkshop(w); }
+            catch (Exception e)
+            {
+                MarketAndCrown.Stumble("MonopolyDue", e);
+                float smooth = 5f;
+                try { smooth = Math.Max(1f, Campaign.Current.Models.ClanFinanceModel.RevenueSmoothenFraction()); } catch { }
+                payout = (int)(pm / smooth);   // wzor gry (DefaultClanFinanceModel)
+            }
+            if (payout < 0) payout = 0;
+            if (payout > pm) payout = pm;
+            return Math.Min(payout / 20, Math.Max(0, w.Capital));
         }
 
         // ------------------------------------------------------------ E8/P2 (244, PLAN 8.7b): pomiar monopoli korony (tylko log)
@@ -504,7 +536,7 @@ namespace Armoury
                             if (pm <= 0) continue;
                             r[P2Profit]++; r[P2Sum] += pm;
                             r[P2Old] += Math.Min((int)(pm * 0.05f), Math.Max(0, w.Capital));
-                            r[P2New] += Math.Min((int)(pm / smooth * 0.05f), Math.Max(0, w.Capital));
+                            int pay; r[P2New] += MonopolyDue(w, out pay);   // E8/R (254): ten sam wzor co pobor (czynny model finansow gry), nie wlasny rachunek
                         }
                     }
                 }
@@ -539,8 +571,8 @@ namespace Armoury
             else why = "5% zysku ponizej 1 zl albo kapital warsztatu 0";
             Log.Info("Monopole korony (E8/P2): dzien " + (int)CampaignTime.Now.ToDays + " | krolestw " + r[P2Kingdoms] + ", z polityka StateMonopolies " + r[P2Mono] + " (bez wladcy " + r[P2NoRuler]
                      + ") | miasta rodu krola " + r[P2Towns] + " (oblezone " + r[P2Sieged] + ") | warsztaty w nich " + r[P2Shops] + ", cudze " + r[P2Others] + ", z zyskiem (ProfitMade > 0) " + r[P2Profit]
-                     + ", suma ProfitMade " + r[P2Sum] + " zl | wzieto dzis " + taken + " zl (wzor dzisiejszy 5% stanu zysku dalby " + r[P2Old] + ") | nowy wzor (5% dziennej wyplaty wlascicielowi = ProfitMade / "
-                     + (r[P2Smooth100] / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " x 0.05) wzialby " + r[P2New] + " zl | swiat: warsztatow z wlascicielem " + r[P2WorldShops]
+                     + ", suma ProfitMade " + r[P2Sum] + " zl | wzieto dzis " + taken + " zl (wzor sprzed E8/R - 5% stanu zysku - dalby " + r[P2Old] + ") | nowy wzor E8/R (5% dziennej wyplaty wlascicielowi wedlug czynnego modelu finansow gry; sam model gry: ProfitMade / "
+                     + (r[P2Smooth100] / 100.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + ") wzialby " + r[P2New] + " zl | swiat: warsztatow z wlascicielem " + r[P2WorldShops]
                      + ", z zyskiem " + r[P2WorldProfit] + ", suma ProfitMade " + r[P2WorldSum] + " zl | przyczyna 0: " + why + ".");
         }
 

@@ -440,6 +440,14 @@ namespace Armoury
             return f != null && _war.TryGetValue(f, out v) ? v : 0f;
         }
 
+        /// <summary>E8/R (254, PLAN 8.5b): ile frakcji ma dzis premie oczekiwan wojennych i jaka najwyzsza (linia "Rynek i korona (E8/R)"; tylko odczyt).</summary>
+        internal static int WarPremiumCount(out float max)
+        {
+            max = 0f;
+            foreach (var kv in _war) if (kv.Value > max) max = kv.Value;
+            return _war.Count;
+        }
+
         // ------------------------------------------------------------ spis
         private static void Census()
         {

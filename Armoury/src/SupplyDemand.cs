@@ -371,6 +371,68 @@ namespace Armoury
             catch { return false; }
         }
 
+        // ------------------------------------------------------------ E8/R (254, PLAN 8.5c): kon przy sprzedazy liczony raz
+        // Cena sprzedazy z lancucha gry ma juz czynnik podazy gry: kon i zwierze juczne to u gry towar handlowy i zwierze
+        // (DefaultTradeItemPriceFactorModel.GetBasePriceFactor: 0.1-10, wykladnik 0.3; bron i zbroja tylko 0.8-1.3), a PricePostfix mnozyl ja jeszcze przez
+        // polke 0.25-4 - ta sama podaz dwa razy. Kupno juz idzie z wartosci (RetailFromWorth). Teraz podstawa sprzedazy = wartosc ze stanem x mnoznik sprzedazy
+        // gry BEZ czynnika podazy: 1 / (1 + kara handlowa czynnego modelu) - Handel, perki, wojna, zamek i kara BK zostaja; potem polka, podloga i ksiega jak
+        // dotad. Kara ujemna liczona jak 0 (cena nie ponad wartosc), wiec przy tej samej polce sprzedaz <= wartosc x polka < kupno (wartosc x marza x polka):
+        // petla "kup konia i sprzedaj w tym samym miescie" nie zarabia. Tylko gdy kupno idzie z wartosci (ceny historyczne i RetailFromWorth) - inaczej kupno
+        // mialoby czynnik gry, a sprzedaz nie. Wylacznik HorseSellFromWorth = false: kod sprzed paczki.
+        [ThreadStatic] private static int _horseForce;   // proba kup-sprzedaj (ProbeHorse): 0 = wedlug ustawien, 1 = stara droga, 2 = nowa droga
+        [ThreadStatic] private static bool _quiet;       // proba: bez linii "PodazPopyt" gracza i bez sladu w ksiedze skupu
+        private static long _hsN, _hsOld, _hsNew;        // wyceny sprzedazy koni nowa droga od ostatniej linii doby: ile, suma stara droga, suma nowa (tylko log)
+
+        internal static bool HorseSellOn
+        {
+            get { var s = Settings.Current; return s != null && s.HorseSellFromWorth && s.RetailFromWorth && HistoricalPrices.On; }
+        }
+
+        /// <summary>E8/R: podstawa ceny sprzedazy konia = wartosc ze stanem / (1 + kara handlowa czynnego modelu), te same argumenty co GetPrice. -1 = nie policzono
+        /// (zostaje cena gry; potkniecie liczone).</summary>
+        private static float HorseSaleBase(TradeItemPriceFactorModel model, EquipmentElement el, MobileParty client, PartyBase merchant, float inStore, float supply, float demand)
+        {
+            try
+            {
+                if (model == null || el.Item == null) return -1f;
+                float tp = model.GetTradePenalty(el.Item, client, merchant, true, inStore, supply, demand);
+                if (float.IsNaN(tp) || float.IsInfinity(tp)) return -1f;
+                return (float)el.ItemValue / (1f + Math.Max(0f, tp));
+            }
+            catch (Exception e) { MarketAndCrown.Stumble("HorseSaleBase", e); return -1f; }
+        }
+
+        /// <summary>E8/R: odczyt i wyzerowanie licznika wycen sprzedazy koni (linia doby "Rynek i korona (E8/R)").</summary>
+        internal static void TakeHorseTally(out long n, out long oldSum, out long newSum)
+        {
+            n = System.Threading.Interlocked.Exchange(ref _hsN, 0);
+            oldSum = System.Threading.Interlocked.Exchange(ref _hsOld, 0);
+            newSum = System.Threading.Interlocked.Exchange(ref _hsNew, 0);
+        }
+
+        /// <summary>
+        /// E8/R: proba kup-sprzedaj jednej sztuki konia na polce tej osady (tylko odczyt): cena kupna z polki, potem - z polka pomniejszona o te jedna sztuke
+        /// (Hold, jak przy wycenie zamowienia kowala) - cena sprzedazy stara droga i nowa droga, tym samym lancuchem modeli cen co ekran handlu
+        /// (TownMarketData.GetPrice z partia osady jako kupcem). Nie zmienia polki, zlota ani ksiag; false = osada poza prawem podazy.
+        /// </summary>
+        internal static bool ProbeHorse(Settlement st, EquipmentElement el, MobileParty client, out int buy, out int sellOld, out int sellNew)
+        {
+            buy = sellOld = sellNew = 0;
+            if (st == null || st.Town == null || st.ItemRoster == null || el.Item == null || !Prices(st.Party, el.Item)) return false;
+            bool q = _quiet; int hf = _horseForce;
+            try
+            {
+                _quiet = true;
+                var md = st.Town.MarketData;
+                _horseForce = 0; buy = md.GetPrice(el, client, false, st.Party);
+                Hold(st.ItemRoster, el.Item, 1);
+                _horseForce = 1; sellOld = md.GetPrice(el, client, true, st.Party);
+                _horseForce = 2; sellNew = md.GetPrice(el, client, true, st.Party);
+                return true;
+            }
+            finally { Release(); _horseForce = hf; _quiet = q; }
+        }
+
         /// <summary>Postfix na GetPrice kazdego modelu cen - po MarketGlut (rejestrowany pozniej).</summary>
         public static void PricePostfix(TradeItemPriceFactorModel __instance, EquipmentElement __0, MobileParty __1, PartyBase __2, bool __3, float __4, float __5, float __6, ref int __result)
         {
@@ -399,6 +461,13 @@ namespace Armoury
                 // ceny aktywnego modelu) i dopiero go mnozymy przez polke - "1 zl x polka" placilo za wrak tarczy wartej 2 zl 4-6 zl. Wylacznik SellPriceByCondition.
                 bool byCond = __3 && SellByCondition.On;
                 if (byCond && before <= 1) baseP = SellByCondition.Fraction(__instance, __0, __1, __2, __4, __5, __6);
+                // E8/R (254, PLAN 8.5c): kon przy sprzedazy liczony raz - podstawa bez czynnika podazy gry (opis przy HorseSaleBase); horseOld = podstawa stara droga (do linii)
+                float horseOld = -1f;
+                if (__3 && item.ItemType == ItemObject.ItemTypeEnum.Horse && (_horseForce == 2 || (_horseForce == 0 && HorseSellOn)))
+                {
+                    float hb = HorseSaleBase(__instance, __0, __1, __2, __4, __5, __6);
+                    if (hb >= 0f) { horseOld = baseP; baseP = hb; }
+                }
                 int np = (int)Math.Round(baseP * f);
                 __result = np < 1 ? 1 : np;
                 int floorP = 0, capP = 0, bound = 0;
@@ -422,10 +491,17 @@ namespace Armoury
                 // B3 (decyzja Jeffa 07.10 "tak"): kupiec nie da za sztuke wiecej niz SellCapPercentOfNewAsk (10%) ceny, jaka TA polka zada za NOWA
                 // sztuke tej jakosci - czyli nie wiecej, niz sam bierze za jej wrak; sufit wygrywa z podloga
                 if (byCond) { capP = SellByCondition.Cap(__0, f); if (capP > 0 && __result > capP) { __result = capP; bound = 2; } }
-                SellByCondition.Seen(__0, __3, __result, bound);   // ksiega skupu (tylko log)
+                if (horseOld >= 0f && _horseForce == 0)   // E8/R (254): wycena sprzedazy konia nowa droga - ile dalaby stara (ta sama polka i podloga; konie bez sufitu) - tylko licznik
+                {
+                    int op = (int)Math.Round(horseOld * f);
+                    if (op < 1) op = 1;
+                    if (floorP > 0 && op < floorP) op = floorP;
+                    System.Threading.Interlocked.Increment(ref _hsN); System.Threading.Interlocked.Add(ref _hsOld, op); System.Threading.Interlocked.Add(ref _hsNew, __result);
+                }
+                if (!_quiet) SellByCondition.Seen(__0, __3, __result, bound);   // ksiega skupu (tylko log); E8/R: proba kup-sprzedaj nie zostawia sladu w ksiedze
 
                 // log: handel gracza, raz na godzine gry na koszyk i miejsce
-                if (__1 == MobileParty.MainParty)
+                if (__1 == MobileParty.MainParty && !_quiet)   // E8/R: proba kup-sprzedaj (ProbeHorse) nie pisze linii handlu gracza
                 {
                     string key = st.StringId + "|" + item.ItemType + "|" + TierOf(item) + "|" + (__3 ? "s" : "b");
                     int hour = (int)CampaignTime.Now.ToHours;

@@ -1632,9 +1632,9 @@ namespace Armoury
         [SettingPropertyGroup("Arms pricing")]
         public float MaterialIndexMax { get; set; } = 1.5f;
 
-        [SettingPropertyBool("War Expectation Enabled", HintText = "when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives")]
+        [SettingPropertyBool("War Expectation Enabled", HintText = "when war is declared, traders on both sides expect armies to buy and raise their asking prices before the first lord arrives. Off since stage 8: the armies' real unfilled orders already raise demand on the stalls, so with this on a war counts twice - arms cost up to a third more than the true shortage calls for, and merchants haul them to towns where nobody has bought yet")]
         [SettingPropertyGroup("Arms pricing")]
-        public bool WarExpectationEnabled { get; set; } = true;
+        public bool WarExpectationEnabled { get; set; } = false;
 
         [SettingPropertyFloatingInteger("War Expectation Base", 0.00f, 2.00f, "0.00", HintText = "extra demand expected at the declaration of war, scaled by the enemy's strength against ours (0.5x to 2x)")]
         [SettingPropertyGroup("Arms pricing")]
@@ -3020,6 +3020,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float DebasementShare { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Monopoly From Daily Profit", HintText = "State Monopolies: in the towns of the ruling clan the ruler takes 5% of what a workshop pays its owner that day, out of the workshop's capital - not 5% of all the profit the workshop has piled up, which was several times the policy's five percent, taken every day. Off = the old reckoning")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool MonopolyFromDailyProfit { get; set; } = true;
+
         [SettingPropertyBool("Besieged Pay Nothing", HintText = "a besieged town, castle or village pays no rents, dues or war taxes while the siege lasts: its lord's rent and the crown's Crown Duty, War Tax and Road Tolls stay in its purse - but only where the purse holds real coin (a town with Town Purse Regulator 1 or 2, a castle with Castle Purse Enabled); elsewhere the game's daily regulator would delete most of what stays, so such a place pays as before (the war subsidy, the customs and a castle's dues were never taken during a siege, and a village being raided or looted pays nothing - as before). You and the AI alike. Off = a besieged town keeps paying its lord's rent and a besieged town or castle the crown's policy dues, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool BesiegedPayNothing { get; set; } = true;
@@ -3731,6 +3735,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Retail Markup Percent", 0.00f, 40.00f, "0.00", HintText = "the merchant's markup on what a piece is worth")]
         [SettingPropertyGroup("Supply and demand")]
         public float RetailMarkupPercent { get; set; } = 10f;
+
+        [SettingPropertyBool("Horse Sell From Worth", HintText = "what a town or castle merchant pays for a horse or a pack animal starts from its worth (with its condition) and the game's selling terms for the seller (Trade skill, perks, war), and then follows the stall's supply and demand once. Before, the game's own supply factor for horses was already in the price and the stall came on top - one glut counted twice. Buying already works this way; needs Retail From Worth and the historical prices. Off = the price from before stage 8")]
+        [SettingPropertyGroup("Supply and demand")]
+        public bool HorseSellFromWorth { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Supply Demand Max Factor", 0.00f, 16.00f, "0.00", HintText = "a starved stall never charges more than this many times the normal price (armour doubled and trebled in wartime shortages)")]
         [SettingPropertyGroup("Supply and demand")]
@@ -5766,6 +5774,7 @@ namespace Armoury
             s.CrownCustomsDutyMultiplier = CrownCustomsDutyMultiplier;
             s.PolicyIncomeConserved = PolicyIncomeConserved;
             s.DebasementShare = DebasementShare;
+            s.MonopolyFromDailyProfit = MonopolyFromDailyProfit;
             s.BesiegedPayNothing = BesiegedPayNothing;
             s.NoRotClanBailout = NoRotClanBailout;
             s.NoFreeKingdomGold = NoFreeKingdomGold;
@@ -5944,6 +5953,7 @@ namespace Armoury
             s.SupplyDemandMinFactor = SupplyDemandMinFactor;
             s.RetailFromWorth = RetailFromWorth;
             s.RetailMarkupPercent = RetailMarkupPercent;
+            s.HorseSellFromWorth = HorseSellFromWorth;
             s.SupplyDemandMaxFactor = SupplyDemandMaxFactor;
             s.SupplyDemandOrderWeight = SupplyDemandOrderWeight;
             s.SupplyDemandOrderDecay = SupplyDemandOrderDecay;

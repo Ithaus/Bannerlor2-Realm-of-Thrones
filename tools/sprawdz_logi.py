@@ -222,6 +222,12 @@ Uzycie (Python 3, tylko odczyt):
                     w ostatniej dobie okna <= 2 x Z33 (2 995), helmy, bron miotana i uprzaz INFO; C-4 suma kas miast w dobie 120 >= 80% Z33
                     (10 264 881), kasy ponizej zapasu przez nasze sciezki 0, rody na minusie <= Z33 + 10% (197); C-5 INFO (obity oszczep przez
                     zapis - 8.16); C-6 INFO konie: przelicznik popytu kategorii horse / war_horse, polki koni wobec Z33.
+                    Blok etap8_r (E8/R, paczka 254): rynek i korona - linia doby "Rynek i korona (E8/R)" (MarketAndCrown.cs): R-0 linia w kazdej
+                    dobie okna, stan trzech kluczy; R-1 premie wojenne: przy kluczu [wyl] 0 dob z premia, 0 linii 'kupcy oczekuja zakupow broni',
+                    kazda linia 'Rynek broni' z 'premie wojenne: brak' (mnoznik ceny z premii x1.00, Z33 do x1.28); R-2 proba kup-sprzedaj konia
+                    w jednym miescie: w dobach z kluczem [WL] zysk najwyzszy nowa droga <= 0 i 0 prob z zyskiem (stara droga INFO), wyceny
+                    sprzedazy koni nowa / stara droga INFO; R-3 monopole: wzieto <= 1/20 dziennej wyplaty wlascicielom tych warsztatow i <= stary
+                    wzor (pobor 0 w calym oknie - INFO z przyczyna z linii E8/P2); R-4 potkniecia 0, koszt proby INFO.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9590,6 +9596,141 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             None if not (k_hor and hist) else bool(r1 and r2 and 2.3 <= r1 <= 2.7 and 0.6 <= r2 <= 0.75))
 
 
+# ============================================================ ETAP 8 (E8/R, paczka 254): rynek i korona - blok etap8_r
+E8_R_LINE = "Rynek i korona (E8/R): dzien"
+# Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log): 70 linii "ArmsPricing: wojna ... kupcy oczekuja zakupow broni" w 120 dobach; doba 120 (L:35865):
+# 22 frakcje z premia, srednio +16% popytu, najwyzsza +63% (Tyrosh) = cena polki do x1.28 przy elastycznosci 0.5
+E8_R_Z33_WAR_LINES = 70
+E8_R_Z33_WAR_D120 = (22, 16, 63)
+E8_R_PROBE_NEW = re.compile(r"nowa droga: zysk najwyzszy (-?\d+) zl, z zyskiem (\d+), sprzedaz/kupno mediana ([0-9.]+) \(([0-9.]+)-([0-9.]+)\)")
+E8_R_PROBE_OLD = re.compile(r"stara droga: zysk najwyzszy (-?\d+) zl, z zyskiem (\d+), sprzedaz/kupno mediana ([0-9.]+) \(([0-9.]+)-([0-9.]+)\)")
+
+
+def etap8_r(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/R (254, projekt etapu 8 v2 rozdz. 3 "E8/R" Test i rozdz. 4 pkt 5): linia doby "Rynek i korona (E8/R)" (MarketAndCrown.cs, z KingdomTreasury.Levies).
+    R-0 linia w kazdej dobie okna i stan trzech kluczy; R-1 premie wojenne: przy kluczu [wyl] frakcji z premia 0 w kazdej dobie, 0 linii "kupcy oczekuja
+    zakupow broni" i kazda linia "Rynek broni" okna z "premie wojenne: brak" (mnoznik ceny z premii x1.00 wobec Z33 do x1.28); R-2 proba kup-sprzedaj konia
+    w jednym miescie: w dobach z kluczem [WL] zysk najwyzszy nowa droga <= 0 i 0 prob z zyskiem (stara droga - INFO, dwie drogi w jednej linii); wyceny
+    sprzedazy koni nowa / stara droga - INFO; R-3 monopole: w dobach z kluczem [WL] i poborem > 0: wzieto <= 1/20 dziennej wyplaty wlascicielom tych
+    warsztatow i nie wiecej niz stary wzor (pobor 0 w calym oknie - INFO z przyczyna z linii E8/P2); R-4 potkniecia 0, koszt proby INFO."""
+    rl = {d: s for d, s in by_day(lines, E8_R_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not rl:
+        rep.add("E8/R: linia Rynek i korona (E8/R)", "brak w logu", "jest od wgrania E8/R", None)
+        return
+    days = sorted(rl)
+    nd = max(1, len(days))
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rl]
+
+    def on_days(tag):
+        return [d for d in days if tag in rl[d]]
+
+    def col(pat, cast=int, default=0):
+        return {d: num(pat, rl[d], cast=cast, default=default) for d in days}
+
+    def tot(c, sel=None):
+        return sum(c[d] for d in (days if sel is None else sel))
+    war_on, horse_on, mono_on = on_days("| premie wojenne [WL]"), on_days("| kon przy sprzedazy [WL]"), on_days("| monopole [WL]")
+    horse_half = on_days("| kon przy sprzedazy [wyl - kupno nie z wartosci]")
+    rep.add("R-0: linia Rynek i korona (E8/R) w kazdej dobie okna; stan kluczy",
+            (f"{len(days)} dob (brak {len(miss)}" + (f": doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") if miss else "") + f" z {len(inner)}); "
+             f"WarExpectationEnabled wl {len(war_on)} / wyl {len(days) - len(war_on)} dob, HorseSellFromWorth wl {len(horse_on)} / wyl {len(days) - len(horse_on)}"
+             + (f" (w tym {len(horse_half)} dob: klucz wlaczony, ale kupno nie z wartosci - RetailFromWorth albo ceny historyczne wylaczone)" if horse_half else "")
+             + f", MonopolyFromDailyProfit wl {len(mono_on)} / wyl {len(days) - len(mono_on)}"),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    # R-1: premie oczekiwan wojennych
+    wn, wmax = col(r"frakcji z premia (\d+)"), col(r"najwyzsza \+(\d+)%")
+    war_off = [d for d in days if d not in war_on]
+    prem_days = [d for d in war_off if wn[d] > 0]
+    bumps = sum(1 for s in lines if s.startswith("ArmsPricing: wojna ") and "kupcy oczekuja zakupow broni" in s)
+    mk_all, mk_prem, pend = 0, 0, None
+    for s in lines:   # linia "Rynek broni" (bez etykiety doby) stoi przed "Pieniadz swiata: dzien N" tej samej doby
+        if s.startswith("Rynek broni: na polkach"):
+            pend = "premie wojenne: brak" not in s
+        elif s.startswith("Pieniadz swiata: dzien") and pend is not None:
+            d = num(r"dzien (\d+)", s)
+            if d is not None and 1 <= run_day(d, start) <= until:
+                mk_all += 1
+                mk_prem += 1 if pend else 0
+            pend = None
+    top = max(wmax.values()) if wmax else 0
+    z = E8_R_Z33_WAR_D120
+    txt = (f"klucz [wyl] {len(war_off)} dob: dob z premia {len(prem_days)}, najwiecej frakcji z premia {max([wn[d] for d in war_off] + [0])}; linie 'Rynek broni' okna z premia "
+           f"{mk_prem} z {mk_all}; linie 'kupcy oczekuja zakupow broni' (caly log) {bumps} (Z33: {E8_R_Z33_WAR_LINES}); najwyzsza premia okna +{top}% = cena polki najwyzej "
+           f"x{(1 + top / 100.0) ** 0.5:.2f} przy elastycznosci 0.5 (Z33 doba 120: {z[0]} frakcje, srednio +{z[1]}%, najwyzsza +{z[2]}% = do x{(1 + z[2] / 100.0) ** 0.5:.2f})"
+           + (f" | klucz [WL] {len(war_on)} dob: najwiecej frakcji z premia {max([wn[d] for d in war_on] + [0])}" if war_on else ""))
+    rep.add("R-1: ceny broni w wojnie bez premii oczekiwan (popyt wojenny tylko z prawdziwych zamowien armii)", txt,
+            "przy kluczu [wyl]: 0 dob z premia, 0 linii 'kupcy oczekuja', kazda linia 'Rynek broni' z 'premie wojenne: brak' (mnoznik z premii x1.00 <= Z33)",
+            (not prem_days and bumps == 0 and mk_prem == 0) if (war_off and not war_on) else None)
+
+    # R-2: proba kup-sprzedaj konia w jednym miescie (dwie drogi w jednej linii)
+    seen, probed, failed = col(r"proba kup-sprzedaj konia \([^)]*\): osad (\d+)"), col(r"z koniem na polce (\d+)"), col(r", nieudane (\d+)")
+    pn, po = {}, {}
+    for d in days:
+        a, b = E8_R_PROBE_NEW.search(rl[d]), E8_R_PROBE_OLD.search(rl[d])
+        if a and b:
+            pn[d] = (int(a.group(1)), int(a.group(2)), float(a.group(3)), float(a.group(4)), float(a.group(5)))
+            po[d] = (int(b.group(1)), int(b.group(2)), float(b.group(3)), float(b.group(4)), float(b.group(5)))
+    pd_ = sorted(pn)
+
+    def way(p, sel):
+        if not sel:
+            return "brak prob"
+        med = sorted(p[d][2] for d in sel)
+        return (f"zysk najwyzszy {max(p[d][0] for d in sel)} zl, prob z zyskiem {sum(p[d][1] for d in sel)} w {sum(1 for d in sel if p[d][1] > 0)} dobach, "
+                f"sprzedaz/kupno mediana dob {med[len(med) // 2]:.2f} (zakres {min(p[d][3] for d in sel):.2f}-{max(p[d][4] for d in sel):.2f})")
+    on_p = [d for d in pd_ if d in horse_on]
+    off_p = [d for d in pd_ if d not in horse_on]
+    head = (f"proby w {len(pd_)} dobach: osad sprawdzonych {tot(seen)}, z koniem na polce {tot(probed)}, nieudane {tot(failed)}"
+            + (f" | klucz [WL] {len(on_p)} dob - nowa droga: {way(pn, on_p)}; stara droga dalaby: {way(po, on_p)}" if on_p else "")
+            + (f" | klucz wylaczony {len(off_p)} dob - stara droga (czynna): {way(po, off_p)}; nowa dalaby: {way(pn, off_p)}" if off_p else ""))
+    worst = None
+    if on_p:
+        wd = max(on_p, key=lambda d: pn[d][0])
+        m = re.search(r"najblizej zysku nowa droga: (.*?) \| monopole", rl[wd])
+        worst = f" | najblizej zysku: doba {run_day(wd, start)} {m.group(1)[:90]}" if m else ""
+    rep.add("R-2: kup konia i sprzedaj w tym samym miescie nie zarabia (proba, jak przy paczce 155)", head + (worst or ""),
+            "w dobach z kluczem [WL]: zysk najwyzszy nowa droga <= 0 i 0 prob z zyskiem (stara droga - INFO); bez prob z kluczem [WL] - INFO",
+            (max(pn[d][0] for d in on_p) <= 0 and sum(pn[d][1] for d in on_p) == 0) if on_p else None)
+    hs_n, hs_old, hs_new = col(r"wycen sprzedazy koni nowa droga (\d+)"), col(r"stara droga dalaby razem (\d+) zl"), col(r"stara droga dalaby razem \d+ zl, nowa (\d+) zl")
+    rep.add("E8/R: wyceny sprzedazy koni w miastach i zamkach (kazda wycena, takze podglad ceny)",
+            (f"{tot(hs_n)} wycen nowa droga w oknie ({tot(hs_n) / nd:.0f}/d): stara droga dalaby {tot(hs_old)} zl, nowa {tot(hs_new)} zl"
+             + (f" = x{tot(hs_new) / tot(hs_old):.2f}" if tot(hs_old) > 0 else "")),
+            "INFO (kon liczony raz: zawalona polka placi wiecej niz dotad, pusta mniej; kasy miast - prog wspolny C-4)", None)
+
+    # R-3: monopole korony
+    taken, shops = col(r"monopole \[[^\]]*\]: wzieto (\d+) zl"), col(r"monopole \[[^\]]*\]: wzieto \d+ zl z (\d+) warsztatow")
+    payout = {d: num(r"dzienna wyplata wlascicielom tych warsztatow (\d+) zl", rl[d]) for d in days}
+    oldw = col(r"stary wzor \(5% stanu zysku\) wzialby (\d+) zl")
+    nodata = [d for d in days if "]: brak danych tej doby" in rl[d]]
+    on_t = [d for d in mono_on if taken[d] > 0]
+    over = [run_day(d, start) for d in on_t if payout[d] is None or taken[d] * 20 > payout[d]]
+    more = [run_day(d, start) for d in on_t if taken[d] > oldw[d]]
+    why = {}
+    for d, s in by_day(lines, E8_P2_MONO).items():
+        if d in rl:
+            m = re.search(r"\| przyczyna 0: (.*)\.$", s)
+            k = m.group(1) if m else "?"
+            why[k] = why.get(k, 0) + 1
+    wtxt = ("; przyczyna 0 (linia E8/P2): " + ", ".join(f"{k} x{v}" for k, v in sorted(why.items(), key=lambda kv: -kv[1]))) if why else "; linii E8/P2 brak"
+    off_m = [d for d in days if d not in mono_on]
+    txt = (f"klucz [WL] {len(mono_on)} dob: wzieto {tot(taken, mono_on)} zl w {len(on_t)} dobach z {tot(shops, on_t)} warsztato-dob, dzienna wyplata wlascicielom tych warsztatow "
+           f"{sum(payout[d] or 0 for d in on_t)} zl (pobor = {100.0 * tot(taken, on_t) / max(1, sum(payout[d] or 0 for d in on_t)):.1f}% wyplaty), stary wzor wzialby "
+           f"{tot(oldw, mono_on)} zl" + (f"; ponad 1/20 wyplaty w dobach {over[:5]}" if over else "") + (f"; ponad stary wzor w dobach {more[:5]}" if more else "")
+           + (f" | klucz wylaczony {len(off_m)} dob: wzieto {tot(taken, off_m)} zl (stary wzor)" if off_m else "")
+           + (f" | bez danych (wyjatek w Levies) {len(nodata)} dob" if nodata else "") + ("" if on_t else wtxt))
+    rep.add("R-3: monopole korony - 5% dziennej wyplaty wlascicielowi warsztatu", txt,
+            "w dobach z kluczem [WL] i poborem > 0: wzieto <= 1/20 dziennej wyplaty tych warsztatow i <= stary wzor; pobor 0 w calym oknie - INFO (przyczyna w E8/P2)",
+            (not over and not more) if on_t else None)
+
+    # R-4: potkniecia i koszt proby
+    stum = max([num(r"potkniecia \(sesja\) (\d+)", rl[d], default=0) for d in days] + [0])
+    cost = col(r"koszt proby ([0-9.]+) ms", cast=float, default=0.0)
+    rep.add("R-4: potkniecia E8/R i koszt proby kup-sprzedaj", f"potkniecia (sesja) {stum}; koszt proby srednio {sum(cost.values()) / nd:.1f} ms/d, najwiecej {max(cost.values()) if cost else 0.0:.1f} ms",
+            "potkniecia 0 (koszt - INFO; projekt: koszt paczki ok. 0)", stum == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9618,6 +9759,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_z)    # E8/Z (251): zakupy i nadwyzki AI - bez dodatnich stanow, sufit ceny (W CIENIU), uprzaz ponad zapas
     blocks.append(etap8_l)    # E8/L (252): lup to przeniesienie, Send troops - jedna droga, dar dla miasta do zalogi bez milicji, trofea zostawione na polke
     blocks.append(etap8_c)    # E8/C (253): cennik - rzad konski z wagi prawdziwej, helmy t4-6, luki, bron miotana, konie wedlug kategorii
+    blocks.append(etap8_r)    # E8/R (254): rynek i korona - bez premii wojennej, kon przy sprzedazy liczony raz, monopole od dziennej wyplaty
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
