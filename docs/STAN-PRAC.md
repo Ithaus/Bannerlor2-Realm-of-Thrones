@@ -1431,3 +1431,9 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   co klatke (MapVillageLook.cs:535), RC praca we wsi po wczytaniu - zle menu (Work.cs:144), licznik CaravanFlow. Zloto, sztuki, zapis, latki (sygnatury), sciezki gracza: bez krytycznych uwag.
   **Zapis 9 dob po biegu 2: OK** (129/129, Armoury 0 ERROR, 24.0 s/dobe). **PROFIL KLATKI (10 dob od d120, test\profil-e8r1.txt):** klatka 163.7 ms; Native 31%, silnik 20%, Armoury 18%
   (27.7 ms), BannerKings 16% (z tego tik karawan BK 17.5 ms = 11% klatki - skutek E8/G1), ROT-Core 10% (CheckNPCMarriages 14.9 ms). `w-toku/zbior-e8` = cd842e7 (+ E8/O2, O3).
+- (07:25 UTC 13.10) **KOD ETAPOW 5-8 KOMPLETNY: `w-toku/zbior-e8` = e9dfa7f** (zbior-5-8 z poprawkami F1-F9 + e8-a cale [E8/0, P1, P2, X, W, A, Z, L, C, R, B, O1, O2, O3, O5, O6] + e8-b
+  [M, RC] + e8-c cale [P3, S, Q, G1, G2, T, E, K, D1, D2] + E8/H + szwy). Workflow wf_1db23a93-783 SKONCZONY (89 watkow, wszystkie paczki autor + recenzent). Scalenia ogona e8-a: cd842e7
+  (O2, O3), e9dfa7f (O5, O6) - konflikt tylko CHANGELOG; gen_mcm Armoury 1297 / RC 111 / GT 40; build 5 modow kod 0. NIEZROBIONE Z PROJEKTU: E8/O4 (musztra - "po tescie"),
+  K1-3a krok 2 (mieszczanie tylko konie robocze + czynne ciecie hodowli - decyzja Jeffa 12.10, czeka na liczby), K5 krok 2 (juczne karawan morskich, 325 z niczego / 120 dob).
+  **W TOKU:** BIEG 3 = 120 dob na komplecie e9dfa7f (Armoury b2893c27; test\at-e8r2-120.out.txt) - pierwszy bieg O2/O3/O5/O6; triaz biegu 2 (wf_48305665-088).
+  Potem jedna runda poprawek (audyt: Net.cs, HorseFate :906 i drobne; triaz 2: karawany E8/G1 i reszta), test koncowy, wgranie.
