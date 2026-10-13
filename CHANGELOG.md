@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (POPRAWKA A1 po biegu probnym 2 - BLOKUJE) - KARAWANY NOTABLI MNOZYLY SIE BEZ GRANICY: limit karawan kupca (Notable Caravan Cap = 2), karawany spiace w polu tez sie licza
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (z e9dfa7f) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Seal31.cs` (1 linia wpiecia), `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1298 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcje S1, S2, O2-3, "POZA LISTA (zrodlo g, h i czasu doby)", "X-karawany-liczba" + decyzja prowadzacego (jeden klucz, limit 2, postfiks na modelu gry).
+
+**Problem (dowod z logu biegu 2, `Armoury-2026-10-12_22-38-57.log`):** w dobie 120 jest 1570 karawan zamiast ok. 350-400. Linia "Obieg: notable i karawany" d120: 1532 karawany u 323 notabli = 4.7 na notabla i dalej rosnie (W33: 902 u 322 = 2.8; bieg 1: 838 u 320 = 2.6); suma "nowe karawany (notable)" w 120 dob: 1555 (bieg 1: 743, W33: 863), lordowie bez zmian (204 / 208 / 187). Skutki: czas doby 21.2 s wobec 17.6 (ok. 6-8 s na 1000 karawan), kapital nowych karawan z kas miast 11.19 mln w 120 dob (bieg 1: 7.04 mln) - renty panow i korony o polowe nizsze, wojsko lordow ponizej 85 tys.; zold karawan nalezny 277 tys./d wobec 180 tys.
+
+**Przyczyna:** kod GRY, odsloniety przez nasz nocny oboz. `CaravansCampaignBehavior.DailyTickHero` (dekompilacja :578-584) daje kupcowi karawane z szansa 0.75 na dobe, gdy `CaravanModel.CanHeroCreateCaravan`; czynny `NavalDLCCaravanModel.CanHeroCreateCaravan` oddaje do `BaseModel` (ilspycmd NavalDLC.dll - sprawdzone), a `DefaultCaravanModel` (:34-41) liczy tylko karawany z WLACZONYM AI (`OwnedCaravans.Count(x => !x.MobileParty.Ai.IsDisabled) == 0`). `NightRest` wylacza AI karawanom spiacym w polu (`Ai.DisableForHours`), tik dobowy bohaterow jest rozlozony na cala dobe - kupiec z tikiem w nocy, ktorego wszystkie karawany spia w polu, wyglada dla gry jak kupiec bez karawany i dostaje nastepna. Bylo to juz w W33 (2.8 na notabla), ale E8/G1 wyprowadzil karawany z miast (w miescie AI zostaje wlaczone): w polu noca spi 74% karawan zamiast 42%.
+
+**Zmiana:**
+- Klucz `NotableCaravanCap = 2` (int; 0 = regula gry bez limitu; suwak 0-10). W `Armoury.json` Jeffa klucza nie ma (grep) - dziala domyslna.
+- `CaravanFlow.NotableCapPostfix` - postfiks na `TaleWorlds.CampaignSystem.GameComponents.DefaultCaravanModel.CanHeroCreateCaravan(Hero)`: TYLKO zmienia true na false, gdy bohater ma juz >= limit karawan liczonych WSZYSTKICH (`OwnedCaravans` z `MobileParty != null` - spiace, w osadzie, na morzu). Bohater bez karawany - regula gry (pierwsza karawana jak dotad). Gracz i bohaterowie rodu gracza - bez limitu. try/catch z licznikiem potkniec, bez globalnego wylacznika.
+- Wpiecie W KAMPANII, raz na proces: `CaravanFlow.EnsureHooks()` wolane z `Seal31.EnsureHooks` (ArmouryBehavior.OnSessionLaunched; wzor CaravanCapital.EnsureHooks, CLAUDE.md 7). Linia w logu przy starcie kampanii: "Karawany (E8/G1): latka w kampanii - limit karawan kupca wpieta 1/1 (DefaultCaravanModel.CanHeroCreateCaravan, czynny model NavalDLCCaravanModel)". Linia startowa "latki przy starcie gry - wpiete 3/3" BEZ zmian (czyta ja G1-0).
+- Linia doby "Karawany (E8/G1)" - dopiski NA KONCU (istniejace pola bez zmian): "limit karawan kupca (Notable Caravan Cap N; latka ...): gra chciala dac kolejna karawane kupcowi, ktory juz ma karawany, A razy, wstrzymane limitem B u C kupcow | karawany notabli (wszystkie, takze spiace): kupcow z 1 karawana X, z 2 Y, z 3 i wiecej Z (najwiecej M), razem karawan notabli T". Rozklad raz na dobe po `MobileParty.AllCaravanParties` (wlasciciele-notable, ta sama liczba, ktora czyta limit). Kropka konca linii przeszla za dopiski.
+
+**Co Jeff zobaczy w grze:** kupiec ma najwyzej 2 karawany. Karawan na mapie ok. 500-700 zamiast 1500 i liczba przestaje rosnac - doba gry krotsza o ok. 2.5 s i nie wydluza sie w dlugiej kampanii. Handel miedzy miastami zostaje (oczekiwane 120-170 wjazdow na dobe, wzorzec 135).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: latka blokuje decyzje PRZED utworzeniem partii - wszystkie nasze latki siedza na `CreateCaravanParty` (ArmsFromPeople, CaravanCapital, CirculationWindows O17, PackMarket), czyli ZA miejscem blokady; nic nie jest pobrane w polowie (kapital, ludzie, juczne). `AddPower(-30)` gry tez sie nie wykona. Nic nie powstaje i nic nie ginie.
+- Kolizje: `CanHeroCreateCaravan` wolaja tylko gra (:348 start nowej kampanii - bohaterowie maja 0 karawan, postfiks nic nie zmienia; :580 tik dobowy) i NavalDLC (przekazanie); skan DLL modulow - nikt inny jej nie nadpisuje ani nie lata. `DefaultCaravanModel` nie ma konstruktora statycznego (latka i tak w kampanii). BK tworzy karawany wlasna droga (lordowie, start gry) - bez zmian; kupno karawany z licytacji dlugu (DebtLadder) moze dac kupcowi wiecej niz limit - limit dotyczy tylko tworzenia.
+- Zapis: nic. Stary zapis wczyta sie bez zmian; nadmiar karawan ze starego zapisu ubywa sam (zgony notabli, rozbicia) - "z 3 i wiecej" > 0 w starym zapisie to nie blad. W NOWEJ kampanii "z 3 i wiecej" ma byc 0 (poza licytacja dlugu).
+- Twarda granica: 2 x 323 kupcow = 646 karawan notabli (+ ok. 55 lordow). W 120 dob oczekiwane 450-550 (drugi egzemplarz dostaje tylko kupiec, ktorego tik dobowy trafil w noc), w dlugiej kampanii dojdzie do granicy.
+- Mniej przewoznikow surowcow: patrzec na G1-6a (miasta bez rudy, dzis 30.2 przy progu 32.2), R1-8 (miasta bez zelaza), wjazdy do miast na dobe. Progi liczone wobec 902 karawan Z33 (G1-5c suma kies karawan) trzeba liczyc na karawane. Strojenie jedna liczba w MCM: 1 = ok. 380 karawan i ok. 105 wjazdow/d (najszybsza gra, handel -22%), 3 = ok. 560-680.
+- Czas: sam limit nie cofa calego wzrostu doby - koszt tikow BK w miescie to osobna poprawka A2 (nastepny wpis).
+- Cofniecie: `NotableCaravanCap = 0`.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy (nowa kampania: "wstrzymane limitem" > 0, "najwiecej" <= 2, "razem karawan notabli" <= 2 x liczba kupcow i krzywa sie wyplaszcza, "nowe karawany (notable)" spada do 0-3/d po ok. 30 dobach, czas doby d31-60).
+
 ## 2026-10-12 (RECENZJA: szew E8/H - E8/O1 = 14563c4 i poprawka F6 punkty 2-3 = 1a15da2) - OBIE PRZYJETE, KOD GRY BEZ ZMIAN; DOPISANE: W KTORA STRONE MYLI SIE REZERWA NAPRAW Z PAMIECI (NIE ZAWSZE W BEZPIECZNA) I CO ZROBIC, GDY PROBKA TO POTWIERDZI; sprostowane numery linii w obu wpisach
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` (po 1a15da2) | **Pliki:** `CHANGELOG.md` (ten wpis i numery linii w dwoch wpisach nizej). Kod i `tools/sprawdz_logi.py` bez zmian.
 

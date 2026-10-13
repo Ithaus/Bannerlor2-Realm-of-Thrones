@@ -185,6 +185,7 @@ namespace Armoury
             _hooksTried = true;
             try { Measure31.EnsureHooks(); } catch (Exception e) { Stumble("Measure31.EnsureHooks", e); }
             try { CaravanCapital.EnsureHooks(); } catch (Exception e) { Stumble("CaravanCapital.EnsureHooks", e); }
+            try { CaravanFlow.EnsureHooks(); } catch (Exception e) { Stumble("CaravanFlow.EnsureHooks", e); }   // A1: limit karawan kupca (DefaultCaravanModel.CanHeroCreateCaravan)
             var s = Settings.Current;
             Log.Info("Szczelnosc (164a): latki w kampanii - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-")

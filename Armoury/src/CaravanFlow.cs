@@ -40,6 +40,13 @@ namespace Armoury
     ///     a BK usuwa karawany wylacznie przez DestroyPartyAction.Apply(null, ..) (DailyTick: bez wlasciciela, rod wymarly). Gra przy kazdym zniszczeniu
     ///     karawany wyplaca wlascicielowi z perkiem Insurance Plans 5 000 z niczego (DestroyPartyAction.ApplyInternal) - u AI ucina to SmallGold
     ///     (TradePerkGiftsAiOff); bez tego ciecia karawany wlasciciela z perkiem nie rozwiazujemy. Karawany rodu gracza nie sa ruszane nigdy.
+    ///  4. LIMIT KARAWAN KUPCA (poprawka A1 po biegu probnym 2, TRIAZ-2 S2; klucz NotableCaravanCap, 0 = regula gry): gra daje kupcowi nowa karawane
+    ///     (CaravansCampaignBehavior.DailyTickHero, szansa 0.75 na dobe), gdy zadna jego karawana nie ma wlaczonego AI (DefaultCaravanModel.CanHeroCreateCaravan liczy
+    ///     tylko !Ai.IsDisabled; czynny NavalDLCCaravanModel oddaje do BaseModel - sprawdzone ilspycmd), a nocny oboz wylacza AI karawanom spiacym w polu
+    ///     (NightRest: Ai.DisableForHours) - kupiec z tikiem dobowym w nocy dostawal kolejna karawane bez granicy (d120: 1570 karawan, 4.7 na notabla).
+    ///     Postfiks na DefaultCaravanModel.CanHeroCreateCaravan tylko zmienia true na false, gdy bohater ma juz limit karawan liczonych WSZYSTKICH (spiace,
+    ///     w osadzie, na morzu). Rod gracza bez limitu. Latka zakladana W KAMPANII raz na proces (Seal31.EnsureHooks - CLAUDE.md 7), stan w linii doby.
+    ///     Blokada jest PRZED utworzeniem partii - nic nie zostaje pobrane w polowie (kapital, ludzie, juczne, wplyw notabla).
     /// Stan tylko w pamieci (liczniki doby, pamiec slepych zaulkow, wlasciciele rozwiazanych karawan) - Reset z WorldMeasure.Reset. Nic w zapisie.
     /// Linia doby "Karawany (E8/G1)" (takze przy wylaczonych kluczach - wtedy liczy, co by zrobila). Wyjatek = licznik potkniec, bez globalnego wylacznika.
     /// </summary>
@@ -100,6 +107,12 @@ namespace Armoury
         private const int MaxEx = 4;
         private static readonly Dictionary<Hero, int> _ownerDay = new Dictionary<Hero, int>();   // wlasciciel -> doba rozwiazania jego karawany (ochrona przed petla: rozwiaz - kup - rozwiaz)
 
+        // ------------------------------------------------------------ 4. limit karawan kupca (A1)
+        private static int _dCapAsk, _dCapHeld;
+        private static readonly HashSet<Hero> _dCapWho = new HashSet<Hero>();
+        private static bool _capTried;                                          // latka raz na proces - nie zerowane w Reset
+        private static string _capHook = "nie wpieta";
+
         /// <summary>Nowa kampania i kazde wczytanie (WorldMeasure.Reset - konstruktor ArmouryBehavior).</summary>
         internal static void Reset()
         {
@@ -118,6 +131,7 @@ namespace Armoury
             _dStuck = _dDone = _dLeft = _dGoneShadow = _dFail = _dAgain = _dBelow = _dMen = 0;
             _dSoldU = _dSoldG = _dUnsoldU = _dUnsoldV = _dPurse = _dOwnerGot = _dMenPurse = 0;
             _dDoneAt.Clear(); _dKept.Clear(); _dEx.Clear();
+            _dCapAsk = _dCapHeld = 0; _dCapWho.Clear();
         }
 
         // ------------------------------------------------------------ 1. dlawik BKROT tylko w drodze
@@ -410,6 +424,82 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ 4. limit karawan kupca (A1)
+
+        /// <summary>Karawany bohatera liczone WSZYSTKIE (spiace w polu, w osadzie, na morzu) - gra w DefaultCaravanModel liczy tylko te z wlaczonym AI.</summary>
+        private static int Owned(Hero h)
+        {
+            var own = h.OwnedCaravans;
+            if (own == null) return 0;
+            int n = 0;
+            for (int i = 0; i < own.Count; i++) { var c = own[i]; if (c != null && c.MobileParty != null) n++; }
+            return n;
+        }
+
+        /// <summary>Postfiks DefaultCaravanModel.CanHeroCreateCaravan(Hero): gra zgodzila sie dac karawane (true), choc bohater juz jakies ma (wszystkie z wylaczonym
+        /// AI - spia w polu) - przy limicie wynik false. Tylko zaweza (true -> false); bohater bez karawany - regula gry. Rod gracza bez limitu.</summary>
+        public static void NotableCapPostfix(Hero __0, ref bool __result)
+        {
+            if (!__result || __0 == null) return;
+            try
+            {
+                if (__0 == Hero.MainHero || (__0.Clan != null && __0.Clan == Clan.PlayerClan)) return;
+                int n = Owned(__0);
+                if (n <= 0) return;                                             // pierwsza karawana - jak w grze
+                _dCapAsk++;
+                var s = Settings.Current;
+                int cap = s != null ? s.NotableCaravanCap : 0;
+                if (cap <= 0 || n < cap) return;                                // 0 = regula gry; ponizej limitu - kolejna karawana jak w grze
+                __result = false;
+                _dCapHeld++; _dCapWho.Add(__0);
+            }
+            catch (Exception e) { Stumble("NotableCapPostfix", e); }
+        }
+
+        /// <summary>Raz na dobe: rozklad karawan na notabla-wlasciciela (ta sama liczba, ktora czyta limit - Owned).</summary>
+        private static void CapCensus(out int one, out int two, out int more, out int max, out int total)
+        {
+            one = two = more = max = total = 0;
+            var all = MobileParty.AllCaravanParties;
+            if (all == null) return;
+            var seen = new HashSet<Hero>();
+            foreach (var c in all)
+            {
+                var o = c != null ? c.Owner : null;
+                if (o == null || !o.IsNotable || !seen.Add(o)) continue;
+                int n = Owned(o);
+                if (n <= 0) continue;
+                total += n; if (n > max) max = n;
+                if (n == 1) one++; else if (n == 2) two++; else more++;
+            }
+        }
+
+        /// <summary>Latka na modelu gry - zakladana W KAMPANII, raz na proces (Seal31.EnsureHooks z ArmouryBehavior.OnSessionLaunched; CLAUDE.md 7: modeli gry
+        /// nie latac w SubModuleMain). Cel: DefaultCaravanModel.CanHeroCreateCaravan - tam jest regula; czynny NavalDLCCaravanModel oddaje do BaseModel, nikt inny
+        /// jej nie nadpisuje ani nie lata (skan DLL modulow). Linia startowa "latki przy starcie gry - wpiete 3/3" bez zmian; stan tej latki w linii doby.</summary>
+        internal static void EnsureHooks()
+        {
+            if (_capTried) return;
+            _capTried = true;
+            try
+            {
+                var h = Seal31.H;
+                var m = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultCaravanModel), "CanHeroCreateCaravan", new[] { typeof(Hero) });
+                var cm = Campaign.Current != null ? Campaign.Current.Models.CaravanModel : null;
+                if (h == null) _capHook = "BRAK (brak Harmony)";
+                else if (m == null || m.ReturnType != typeof(bool)) _capHook = "BRAK (DefaultCaravanModel.CanHeroCreateCaravan nie znaleziona)";
+                else
+                {
+                    h.Patch(m, postfix: new HarmonyMethod(typeof(CaravanFlow), nameof(NotableCapPostfix)));
+                    _capHook = "wpieta 1/1 (DefaultCaravanModel.CanHeroCreateCaravan, czynny model " + (cm != null ? cm.GetType().Name : "brak") + ")";
+                }
+            }
+            catch (Exception e) { _capHook = "BRAK (blad: " + e.Message + ")"; Log.Error("CaravanFlow.EnsureHooks", e); }
+            var s = Settings.Current;
+            Log.Info("Karawany (E8/G1): latka w kampanii - limit karawan kupca " + _capHook + " | Notable Caravan Cap " + (s != null ? s.NotableCaravanCap.ToString(Inv) : "?")
+                     + " (0 = regula gry; liczone wszystkie karawany kupca, takze spiace w polu).");
+        }
+
         // ------------------------------------------------------------ takt doby
 
         /// <summary>Raz na dobe (ArmouryBehavior.OnDailyTick, zaraz po Stage8World.Daily - PRZED MoneyLedger.BlockOpen: sprzedaz towaru miastu jest zwyklym
@@ -437,6 +527,8 @@ namespace Armoury
             {
                 try { _census = Census(); } catch (Exception e) { _census = "blad odczytu"; Stumble("Census", e); }
             }
+            int cap1 = 0, cap2 = 0, cap3 = 0, capMax = 0, capAll = 0;
+            try { CapCensus(out cap1, out cap2, out cap3, out capMax, out capAll); } catch (Exception e) { Stumble("CapCensus", e); }
             try
             {
                 double tickMs = _dTicks * 1000.0 / Stopwatch.Frequency;
@@ -463,7 +555,14 @@ namespace Armoury
                   .Append(" | latki wpiete ").Append(_wiredN).Append('/').Append(_wantedN)
                   .Append(_missing.Count > 0 ? " (BRAK: " + string.Join(", ", _missing.ToArray()) + ")" : "")
                   .Append(" | koszt linii ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms")
-                  .Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(").");
+                  .Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(")");
+                // dopiski NA KONCU linii (pola wyzej czyta narzedzie progow - bez zmian)
+                sb.Append(" | limit karawan kupca (Notable Caravan Cap ").Append(s.NotableCaravanCap).Append(s.NotableCaravanCap > 0 ? "" : " - WYLACZONE, regula gry")
+                  .Append("; latka ").Append(_capHook).Append("): gra chciala dac kolejna karawane kupcowi, ktory juz ma karawany, ").Append(_dCapAsk)
+                  .Append(" razy, wstrzymane limitem ").Append(_dCapHeld).Append(" u ").Append(_dCapWho.Count).Append(" kupcow")
+                  .Append(" | karawany notabli (wszystkie, takze spiace): kupcow z 1 karawana ").Append(cap1).Append(", z 2 ").Append(cap2).Append(", z 3 i wiecej ").Append(cap3)
+                  .Append(" (najwiecej ").Append(capMax).Append("), razem karawan notabli ").Append(capAll);
+                sb.Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
