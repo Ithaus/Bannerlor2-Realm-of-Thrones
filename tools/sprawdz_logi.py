@@ -13832,6 +13832,219 @@ def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             lost == 0 and stum == 0 and old_on == 0 and errs == 0)
 
 
+def etap8_p3_zelazo(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """P3/ZELAZO (TRIAZ-3 bieg roczny 13.10, obszar "zelazo": O2-1 kontrakt wozem Z1 + pomiary P2, O2-2 bezpiecznik regulatora Z2, O2-3 zamki Z3-A / Z3-B,
+    O2-7 towar kasowany lordom Z4). Linie: "Kontrakty surowca (174)" (wstawka "wozem kupcow (P3/Z1)"), "Zelazo wedlug ladow (P3/P2a)", "Miasta bez rudy i
+    strzal (174b)", "Regulator wsi (221)" (bezpiecznik), "Targ przy zamku (5.11)" (wjazdy nieskierowane), "Konie - smierc, lup, dobytek (E6/K1)" (polki wedlug
+    osady, porzucone przez lordow), "Zelazo (lupy) (214)", "Towary: ... iron". Brak linii = INFO (log sprzed paczki), nigdy wyjatek. Uwaga na daty: linia K1
+    ma numer dnia o 1 wiekszy niz "Towary" z tego samego taktu - sumy okna licza sie po dobach kazdej linii osobno."""
+    def inwin(d):
+        return 1 <= run_day(d, start) <= until
+
+    def isum(pat, rows):
+        return sum((num(pat, s, int, 0) or 0) for s in rows)
+
+    mo = {d: s for d, s in by_day(lines, "Kontrakty surowca (174): dzien").items() if inwin(d)}
+    z1 = {d: s for d, s in mo.items() if "wozem kupcow (P3/Z1): " in s}
+    if not z1:
+        rep.add("P3/Z1: wstawka wozem kupcow (P3/Z1) w linii Kontrakty surowca (174)", "brak w logu", "jest od wgrania P3/ZELAZO", None)
+    else:
+        days = sorted(z1)
+        rows = [z1[d] for d in days]
+        on = [d for d in days if "wozem kupcow (P3/Z1): CZYNNE" in z1[d]]
+        rep.add("P3/Z1-1: kontrakt wozem czynny", f"dob z wstawka {len(days)}, CZYNNE {len(on)}", "CZYNNE w kazdej dobie (klucz TownMaterialOrderByCart)", len(on) == len(days))
+        made = isum(r"wozem kupcow \(P3/Z1\): \w+(?: \([^)]*\))? - zawarto (\d+) \[", rows)
+        ore = isum(r"wozem kupcow \(P3/Z1\): .*? - zawarto \d+ \[ruda (\d+)", rows)
+        gold = isum(r"sztuk\] za (\d+) zl \(kasy miast-celow", rows)
+        cas = isum(r"w tym ze zrodel-zamkow (\d+) ", rows)
+        casq = isum(r"w tym ze zrodel-zamkow \d+ \(sztuk (\d+)\)", rows)
+        sea = isum(r"\), morzem (\d+) \(sztuk \d+\); dojechalo wozow", rows)
+        arr = isum(r"dojechalo wozow (\d+) ", rows)
+        arrq = isum(r"dojechalo wozow \d+ \(sztuk (\d+),", rows)
+        back = isum(r", zawrocone (\d+) \(sztuk", rows)
+        rest = [(run_day(d, start), num(r"reszta wozow (-?\d+)", z1[d])) for d in days]
+        bad = [x for x in rest if x[1] not in (None, 0)]
+        n = max(1, len(days))
+        road = num(r", w drodze (\d+) sztuk w", rows[-1], int, 0)
+        rep.add("P3/Z1-2: wozy kupcow - zakupy i dostawy (INFO)",
+                f"zawarto {made} ({made / n:.1f}/d), rudy {ore} lup ({ore / n:.1f}/d), za {gold} zl; ze zrodel-zamkow {cas} (sztuk {casq}), morzem {sea}; "
+                f"dojechalo {arr} wozow ({arrq} sztuk), zawrocone {back}; w drodze na koniec {road} sztuk",
+                "INFO (rachunek: kilkadziesiat wozow/d w pierwszych tygodniach, potem kilkanascie)", None)
+        rep.add("P3/Z1-3: kontrola wozow (wczoraj + kupione - dowiezione - zawrocone = dzis)", f"dob z reszta != 0: {len(bad)}" + (f" {bad[:5]}" if bad else ""),
+                "reszta wozow 0 w kazdej dobie (nic z niczego, nic w nicosc)", not bad)
+        st_ = isum(r"potkniecia wozow (\d+)", rows)
+        ms = [fnum(r"czas wozow ([0-9.]+) ms", s) for s in rows]
+        ms = [x for x in ms if x is not None]
+        rep.add("P3/Z1-4: potkniecia i czas wozow", f"potkniecia {st_}; czas srednio {sum(ms) / max(1, len(ms)):.1f} ms/d, najwiecej {max(ms) if ms else 0:.1f} ms",
+                "potkniecia 0; czas <= 30 ms/d srednio (zasada kosztu paczki)", st_ == 0 and (sum(ms) / max(1, len(ms)) <= 30.0 if ms else True))
+        why = {}
+        for s in rows:
+            m = re.search(r"bez kontraktu wedlug surowca \(P3\): (.*?); wozem kupcow", s)
+            g = re.search(r"ruda \d+ \(([^)]*)\)", m.group(1)) if m else None
+            if g:
+                for part in g.group(1).split(", "):
+                    k = part.rsplit(" ", 1)
+                    if len(k) == 2 and k[1].isdigit():
+                        why[k[0]] = why.get(k[0], 0) + int(k[1])
+        rep.add("P3/Z1-5: powody bez kontraktu dla rudy (suma okna; INFO)", ", ".join(f"{k} {v}" for k, v in sorted(why.items(), key=lambda x: -x[1])) or "-",
+                "INFO (do decyzji P3: brak zrodla = brak produkcji na ladzie, kasa miasta = miasta przy zapasie kupcow)", None)
+    # miasta bez zelaza: srednia od d91 i ostatnie 30 dob okna (linia doby 174; prog narzedzia 30, cel projektu 15)
+    emp = {run_day(d, start): num(r"miast bez rudy (\d+) z", s) for d, s in mo.items()}
+    emp = {k: v for k, v in emp.items() if v is not None}
+    late = [v for k, v in emp.items() if k >= 91]
+    if late:
+        last30 = [v for k, v in emp.items() if k > until - 30] or late
+        rep.add("P3/Z1-6: miasta bez zelaza (linia 174, doby 91+ i ostatnie 30 dob okna)",
+                f"srednio od d91 {sum(late) / len(late):.1f}, ostatnie 30 dob {sum(last30) / len(last30):.1f} (bieg roczny przed paczka: 40.1 i 51-61)",
+                "<= 30 srednio w ostatnich 30 dobach (rachunek podwazenia 20-29; cel projektu 15 wymaga P3 - Essos)", sum(last30) / len(last30) <= 30.0)
+    else:
+        rep.add("P3/Z1-6: miasta bez zelaza (doby 91+)", "okno krotsze niz 91 dob albo brak linii", "INFO", None)
+    lands = {d: s for d, s in by_day(lines, "Zelazo wedlug ladow (P3/P2a): dzien").items() if inwin(d) and run_day(d, start) >= 91}
+    if lands:
+        def land(name, pat):
+            v = [num(name + r" \(miast \d+\): .*?" + pat, s) for s in lands.values()]
+            v = [x for x in v if x is not None]
+            return sum(v) / len(v) if v else 0.0
+        ls = sorted(lands)[-1]
+        pp, pu, pe = r"lupy z kopaln (\d+)", r"zuzycie zmierzone (\d+)", r"miast bez zelaza (\d+) z"
+        how = re.search(r"podzial: (.*?) \|", lands[ls])
+        how = how.group(1)[:110] if how else "?"
+        rep.add("P3/P2a: zelazo wedlug ladow (srednio doby 91+; INFO)",
+                f"Westeros: lupy {land('Westeros', pp):.0f}/d, zuzycie {land('Westeros', pu):.0f}/d, bez zelaza {land('Westeros', pe):.1f}; "
+                f"Essos: lupy {land('Essos', pp):.0f}/d, zuzycie {land('Essos', pu):.0f}/d, bez zelaza {land('Essos', pe):.1f}; podzial: {how}",
+                "INFO (do decyzji P3: dluzszy rejs albo regulator wsi osobno na lad; rozpoznanie: Westeros 60 miast, Essos 37)", None)
+    nm = {d: s for d, s in by_day(lines, "Miasta bez rudy i strzal (174b): dzien").items() if inwin(d)}
+    if nm:
+        s = nm[sorted(nm)[-1]]
+        m = re.search(r"porty bez rudy (\d+): rejs <= 1000 (\d+), 1000-2400 (\d+), > 2400 (\d+), bez zrodla-portu (\d+)", s)
+        c = re.search(r"; zamki z ruda (\d+) \(razem (\d+)\), najwiekszy zapas: ([^;]*)", s)
+        if m or c:
+            rep.add("P3/P2b,d: zamki z ruda i rejsy portow bez rudy (ostatnia linia nazw; INFO)",
+                    (f"zamki z ruda {c.group(1)} (razem {c.group(2)} lup; {c.group(3)[:120]})" if c else "zamki -")
+                    + (f"; porty bez rudy {m.group(1)}: rejs <= 1000 {m.group(2)}, 1000-2400 {m.group(3)}, > 2400 {m.group(4)}, bez zrodla-portu {m.group(5)}" if m else ""),
+                    "INFO (P3 MORZE: czy podniesienie TownMaterialOrderSeaMaxRoute do 2400 obejmie porty bez rudy)", None)
+
+    # Z2: bezpiecznik regulatora wsi
+    vd = {d: s for d, s in by_day(lines, "Regulator wsi (221): dzien").items() if inwin(d) and " - CZYNNY, decyzja " in s}
+    if not vd:
+        rep.add("P3/Z2: decyzje regulatora wsi w oknie", "brak decyzji (pierwsza w d56)", "INFO", None)
+    else:
+        seg = [s for s in vd.values() if "bezpiecznik braku w miastach (P3/Z2): " in s]
+        if not seg:
+            rep.add("P3/Z2: bezpiecznik braku w miastach w linii decyzji", "brak wstawki", "jest od wgrania P3/ZELAZO", None)
+        else:
+            held = isum(r"ciecia wstrzymane (\d+),", seg)
+            backn = isum(r"powroty do bazy (\d+),", seg)
+            badv = []
+            for d in sorted(vd):
+                s = vd[d]
+                g = re.search(r"\biron: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja", s)
+                if not g:
+                    continue
+                m1 = float(g.group(2) or g.group(1))
+                e = num(r"miast bez towaru \[[^\]]*\biron (\d+)", s)
+                if e is None and d in mo:
+                    e = num(r"miast bez rudy (\d+) z", mo[d])
+                rising = g.group(2) is not None and float(g.group(2)) > float(g.group(1))
+                if e is not None and e > 15 and m1 < 0.999 and not rising:
+                    badv.append((run_day(d, start), m1, e))
+            act = sum(1 for s in seg if "(P3/Z2): CZYNNY" in s)
+            rep.add("P3/Z2-1: zelazo nie ciete ponizej bazy przy braku w miastach",
+                    f"decyzji {len(vd)}, bezpiecznik CZYNNY w {act}; zle decyzje (doba, mnoznik, miast bez zelaza): {badv[:5] if badv else 'brak'}",
+                    "w kazdej decyzji mnoznik iron >= 1.00 przy miastach bez zelaza > 15 (powrot krokiem w gore dozwolony)", not badv and act == len(seg))
+            rep.add("P3/Z2-2: ciecia wstrzymane i powroty do bazy (suma decyzji; INFO)", f"wstrzymane {held}, powroty {backn}",
+                    "INFO (bieg roczny przed paczka: ciecie zelaza d196 x0.73 i d308 x0.61 przy 34-50 miastach bez zelaza)", None)
+    il = {d: s for d, s in by_day(lines, "Zelazo (lupy) (214): dzien").items() if inwin(d)}
+    if il:
+        d0, d1 = sorted(il)[0], sorted(il)[-1]
+        tot = num(r"zapas: miasta .*?, razem (\d+)", il[d1])
+        c0, c1 = num(r", zamki (\d+), wsie", il[d0]), num(r", zamki (\d+), wsie", il[d1])
+        car = num(r"karawany (\d+), lordowie", il[d1])
+        top4 = 0
+        if nm:
+            g = re.search(r"najwiekszy zapas rudy: ([^;]*)", nm[sorted(nm)[-1]])
+            if g:
+                top4 = sum(int(x) for x in re.findall(r" (\d+)(?:,|$)", g.group(1).strip())[:4])
+        if tot and c1 is not None and car is not None:
+            rep.add("P3/Z2-3: zapas zelaza poza zasiegiem zuzycia na koniec okna (INFO)",
+                    f"zamki {c1}, juki karawan {car}, cztery najwieksze miasta {top4} = {100.0 * (c1 + car + top4) / tot:.0f}% z {tot} lup",
+                    "INFO (bieg roczny przed paczka: 79% z 14 517)", None)
+        if c0 is not None and c1 is not None and d1 > d0:
+            g = (c1 - c0) / float(d1 - d0)
+            rep.add("P3/Z3-1: przyrost zelaza w zamkach", f"{c0} -> {c1} lup w {d1 - d0} dob = {g:+.1f}/d (bieg roczny przed paczka +9.2/d, II polrocze +13.8/d)",
+                    "<= +2 lupy/d (zmiana A zamyka wjazdy, zmiana B dobytek, wozy Z1 wywoza nadwyzke)", g <= 2.0)
+
+    # Z3-A: wjazdy nieskierowane do zamkow
+    cm = {d: s for d, s in by_day(lines, "Targ przy zamku (5.11): dzien").items() if inwin(d) and "wjazdy nieskierowane (P3/Z3): " in s}
+    if not cm:
+        rep.add("P3/Z3-A: wstawka wjazdy nieskierowane (P3/Z3) w linii Targ przy zamku (5.11)", "brak w logu", "jest od wgrania P3/ZELAZO", None)
+    else:
+        rows = list(cm.values())
+        n = len(rows)
+        on = sum(1 for s in rows if "(P3/Z3): CZYNNE" in s)
+        load = isum(r"\(P3/Z3\): .*? - z ladunkiem (\d+) ", rows)
+        fl = isum(r"cel domyslny inny niz ten zamek (\d+);", rows)
+        li = isum(r"ladunek: zelazo (\d+),", rows)
+        onw = isum(r", dalej do miasta (\d+) \(zatrzymane", rows)
+        ki = isum(r"zatrzymane w wozie: zelazo (\d+),", rows)
+        nt = isum(r"bez miasta dalej (\d+);", rows)
+        di = isum(r"caly woz sprzedany zamkowi \(gra\): zelazo (\d+),", rows)
+        ge = isum(r"straz wygasla z ladunkiem (\d+);", rows)
+        bo = isum(r", lodzie (\d+),", rows)
+        rep.add("P3/Z3-A1: woz nieskierowany nie zostawia zelaza w zamku",
+                f"CZYNNE w {on} z {n} dob; wjazdy z ladunkiem {load} ({load / max(1, n):.1f}/d, schronienie {fl}), zelazo wwiezione {li} lup, sprzedane zamkom w calosci {di}, "
+                f"zatrzymane w wozie {ki}; dalej do miasta {onw}, bez miasta dalej {nt}",
+                "zelazo sprzedane zamkom w calosci <= 10% wwiezionego (bieg roczny przed paczka: 100%, 6-7 lup/d)", (di <= 0.10 * li) if li > 0 else None)
+        rep.add("P3/Z3-A2: straz wygasla z ladunkiem, lodzie (INFO)", f"straz wygasla z ladunkiem {ge} (kurs przepada, towar wraca do wsi), lodzie rybackie {bo}",
+                "INFO (pojedyncze; duzo = wozy stoja w zamkach ponad dobe)", None)
+    # Z3-B i Z4: linia K1
+    k1 = {d: s for d, s in by_day(lines, "Konie - smierc, lup, dobytek (E6/K1): dzien").items() if inwin(d)}
+    zb = [s for s in k1.values() if "polki wedlug osady (P3/Z3-B" in s]
+    if not zb:
+        rep.add("P3/Z3-B: wstawka polki wedlug osady (P3/Z3-B) w linii K1", "brak w logu", "jest od wgrania P3/ZELAZO", None)
+    else:
+        ic, it_ = 0, 0
+        for s in zb:
+            g = re.search(r"zelazo zamki/miasta (\d+)/(\d+)", s)
+            if g:
+                ic += int(g.group(1)); it_ += int(g.group(2))
+        mv = isum(r"towar nie-zywnosciowy z zamku do miasta (\d+),", zb)
+        nt = isum(r"z zamku do miasta \d+, bez miasta (\d+);", zb)
+        rep.add("P3/Z3-B1: dobytek rozbitych - zelazo na polki miast, nie zamkow",
+                f"zelazo z dobytku: zamki {ic}, miasta {it_} ({(ic + it_) / max(1, len(zb)):.1f}/d); towar nie-zywnosciowy przekierowany z zamku do miasta {mv}, bez miasta {nt}",
+                "zelazo do zamkow <= 10% zelaza z dobytku (rachunek przed paczka: 3.5-5.7 lup/d do zamkow)", (ic <= 0.10 * (ic + it_)) if ic + it_ > 0 else None)
+    z4 = [s.split("porzucone przez lordow (gra, P3/Z4): ", 1)[1].split(" | ", 1)[0] for s in k1.values() if "porzucone przez lordow (gra, P3/Z4): " in s]
+    if not z4:
+        rep.add("P3/Z4: wstawka porzucone przez lordow (gra, P3/Z4) w linii K1", "brak w logu", "jest od wgrania P3/ZELAZO", None)
+    else:
+        hooked = all(s.startswith("latka wpieta") for s in z4)
+        keyon = sum(1 for s in z4 if "na polke miasta TAK" in s)
+        g_, f_, l_, h_, a_ = (isum(p, z4) for p in (r", towar (\d+) \(w tym zelazo", r", zywnosc (\d+),", r", zywy inwentarz (\d+),", r", konie (\d+) \(ksiega koni", r"uzbrojenie i inne (\d+) "))
+        fe = isum(r"\(w tym zelazo (\d+)\)", z4)
+        sh = isum(r"; na polki miast (\d+) \(zelazo", z4)
+        she = isum(r"; na polki miast \d+ \(zelazo (\d+)\)", z4)
+        ns = isum(r"\), bez polki (\d+),", z4)
+        n = max(1, len(z4))
+        rep.add("P3/Z4-1: towar kasowany lordom przez gre - pomiar i polka miasta",
+                f"latka {'wpieta' if hooked else 'NIE wpieta'}, klucz TAK w {keyon} z {len(z4)} dob; towar {g_} ({g_ / n:.1f}/d, zelazo {fe}), zywnosc {f_} ({f_ / n:.1f}/d), "
+                f"zywy inwentarz {l_}, konie {h_} ({h_ / n:.1f}/d - bez zmian, do decyzji), uzbrojenie i inne {a_} (bez zmian); na polki miast {sh} (zelazo {she}), bez polki {ns}",
+                "latka wpieta i bez polki 0 (kazda skasowana sztuka towaru ma odbiorce)", hooked and ns == 0)
+    # zelazo "bez wyjasnienia" w ksiedze towarow (suma okna; prog roczny -150 przeliczony na dlugosc okna)
+    un, nd = 0, 0
+    for s in lines:
+        if s.startswith("Towary: dzien ") and " - iron (" in s:
+            d = num(r"dzien (\d+)", s)
+            if d is None or not inwin(d):
+                continue
+            v = num(r"\| bez wyjasnienia ([+-]?\d+)", s)
+            if v is not None:
+                un += v; nd += 1
+    if nd:
+        lim = -max(50.0, 150.0 * nd / 364.0)
+        rep.add("P3/Z4-2: zelazo bez wyjasnienia w ksiedze towarow (suma okna)", f"{un:+d} lup w {nd} dobach (bieg roczny przed paczka -1474 w 363 dobach; biegi 119 dob -46..-357)",
+                f">= {lim:.0f} (roczny prog -150 przeliczony na okno, najmniej -50); wozy kupcow nie moga dawac nowej pozycji", un >= lim)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -13877,6 +14090,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_o3)   # E8/O3 (267): wywoz kupcow - cele w zasiegu z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku
     blocks.append(etap8_o5)   # E8/O5 (269): nadwyzki zalog po godzinach - maks. taktu doby, sztuki i utarg zalog tygodniowo wobec Z33, ksiega kas
     blocks.append(etap8_o6)   # E8/O6 (270): zapis logu otwartym plikiem - czas zapisu, proba 3 dob (bajty i linie), wpis kontrolny drogi bledu
+    blocks.append(etap8_p3_zelazo)   # P3/ZELAZO (TRIAZ-3 bieg roczny): kontrakt wozem, bezpiecznik regulatora, zamki, towar kasowany lordom
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

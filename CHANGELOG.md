@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO - narzedzie progow) - BLOK `etap8_p3_zelazo` w tools/sprawdz_logi.py (17 wierszy; istniejace wiersze bez zmian)
+**Mod:** narzedzie | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `tools/sprawdz_logi.py` (nowy blok przed `etap8_main` + jedna linia `blocks.append`).
+
+**Problem:** poprawki Z1-Z4 pisza nowe wstawki w liniach doby, a progi G1-6b / R1-8 mierza stary ksztalt (kontrakty karawan, miasta bez rudy d91-120) - bez wlasnych wierszy bieg roczny nie powie, czy paczka dziala.
+
+**Zmiana:** grupa `--grupa etap8` dostaje blok P3/ZELAZO (kazdy wiersz przy braku swojej linii = INFO, nigdy wyjatek):
+- Z1-1 kontrakt wozem CZYNNY w kazdej dobie; Z1-2 INFO zakupy / dostawy (wozy, ruda, zloto, zamki-zrodla, morze, w drodze); Z1-3 "reszta wozow" 0 w kazdej dobie; Z1-4 potkniecia 0 i czas wozow <= 30 ms/d; Z1-5 INFO powody bez kontraktu dla rudy; Z1-6 miasta bez zelaza w ostatnich 30 dobach okna <= 30 (rachunek 20-29; cel projektu 15 wymaga P3);
+- P2a INFO zelazo wedlug ladow (lupy, zuzycie, miasta bez zelaza: Westeros / Essos); P2b,d INFO zamki z ruda i rejsy portow bez rudy (<= 1000 / 1000-2400 / > 2400);
+- Z2-1 mnoznik `iron` >= 1.00 w kazdej decyzji regulatora przy miastach bez zelaza > 15 (powrot krokiem w gore dozwolony); Z2-2 INFO ciecia wstrzymane / powroty; Z2-3 INFO zapas poza zasiegiem zuzycia (zamki + juki karawan + cztery najwieksze miasta);
+- Z3-1 przyrost zelaza w zamkach <= +2 lupy/d; Z3-A1 zelazo sprzedane zamkom w calosci <= 10% wwiezionego przez wozy nieskierowane; Z3-A2 INFO straz wygasla z ladunkiem, lodzie; Z3-B1 zelazo z dobytku do zamkow <= 10%;
+- Z4-1 latka wpieta i "bez polki" 0 (z liczbami towaru, zywnosci, koni i uzbrojenia na dobe - dane do decyzji o koniach); Z4-2 zelazo "bez wyjasnienia" w ksiedze towarow >= -150 na rok (przeliczone na dlugosc okna, najmniej -50).
+
+**Ryzyko / co sprawdzic:** sprawdzone na logu biegu rocznego (Armoury-2026-10-13_02-15-21.log, `--do-doby 364`): stare linie daja INFO "brak w logu" dla wstawek i odtwarzaja liczby triazu (miasta bez zelaza 40.3 od d91 / 51.4 w ostatnich 30 dobach, zamki 298 -> 3 654 = +9.2/d, zapas poza zasiegiem 81%, zelazo bez wyjasnienia -1 474) - trzy NIE na starym biegu sa oczekiwane; nowe wstawki sprawdzone na liniach zlozonych recznie wedlug formatow z kodu (17 wierszy bez wyjatku). Wiersze G1-6b i R1-8 (stary ksztalt) zostaja bez zmian - po biegu do przegladu przez wlasciciela narzedzia (kontrakty karawan nie sa juz miara dowozu). Rownolegle paczki dopisuja swoje bloki w tym samym miejscu listy `blocks` - scalenie reczne dwoch sasiednich linii.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (`python tools/sprawdz_logi.py --grupa etap8 --do-doby 364 <log>`).
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z4, tor M) - TOWAR KASOWANY LORDOM PRZEZ GRE: LICZNIK W KSIEDZE TOWAROW I POLKA NAJBLIZSZEGO MIASTA (klucz LordDiscardToShelf); konie i uzbrojenie DO DECYZJI
 **Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/LordDiscard.cs` (nowy), `GoodsLedger.cs` (`NoteDiscard`, przewoz `TDiscard`, ujscie, wpiecie latki), `HorseFate.cs` (`NearestTown`, wstawka linii K1), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
 
