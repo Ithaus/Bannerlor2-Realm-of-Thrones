@@ -2056,6 +2056,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float CastleMarketFoodDays { get; set; } = 10f;
 
+        [SettingPropertyBool("Castle Cart Food Only", HintText = "a village cart that drives into a castle it was not bound for - as a rule to hide from raiders - sells there only the food the castle folk are short of and takes the rest of its load on to a town market, instead of leaving iron, timber and wool at a castle that uses none of it (needs Castle Market First; a cart with no town in reach still sells the castle its whole load, as before)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CastleCartFoodOnly { get; set; } = true;
+
         [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageTakingsWhole { get; set; } = true;
@@ -5749,6 +5753,7 @@ namespace Armoury
             s.VillageCartFairPrice = VillageCartFairPrice;
             s.CastleMarketFirst = CastleMarketFirst;
             s.CastleMarketFoodDays = CastleMarketFoodDays;
+            s.CastleCartFoodOnly = CastleCartFoodOnly;
             s.VillageTakingsWhole = VillageTakingsWhole;
             s.VillageFoodSalesKept = VillageFoodSalesKept;
             s.VillagerPurseSurvives = VillagerPurseSurvives;

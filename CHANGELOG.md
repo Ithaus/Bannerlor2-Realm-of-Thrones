@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana A, tor S) - WOZ, KTORY SCHOWAL SIE W ZAMKU, SPRZEDAJE TAM TYLKO BRAKUJACE JEDZENIE (klucz CastleCartFoodOnly)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/CastleMarket.cs` (`SellPrefix`, nowa `Undirected`, `CastleTickPrefix`, zapis rekordu "o"), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis: rekord strazy `o|woz|zamek|godzina` dostaje opcjonalne 5. pole (godziny strazy) - stary zapis czyta sie jak dotad.
+
+**Problem (bieg roczny, linie "Zelazo (lupy) (214)" i "Przeplywy osad"; TRIAZ-3 O2-3 z podwazeniem):** zelazo w zamkach 298 -> 3 654 lup w roku (25% zapasu swiata; ubywa tylko 494), przyrost skokami calych wozow (d116 +165, d330 +133, d362 +124). Wjazdow taborow do zamkow 15 214, z tego skierowanych przez targ przy zamku (5.11) 12 207 - zostaje 3 007 nieskierowanych (4,7/d w I polroczu, 11,8/d w II), kazdy konczyl sie pustym wozem; zamki zaplacily za takie zrzuty 2,0-2,4 mln zl. To samo dla drewna, gliny, soli, welny, lnu (5-10% towaru wozow w II polroczu). Wjazdy rosna razem z bandami (402 -> 953) - korelacja 14-dobowa 0,82.
+
+**Przyczyna (kod gry, BK i nasz):** partia wsi uciekajaca przed wrogiem chowa sie w najblizszej warowni (gra `MobilePartyAi.GetBehaviorForNearbySettlementToFlee`: `IsFortification`); latka BK `VillagerSettlementEnterPatch` sprzedaje przy kazdym wjezdzie do osady z `Town != null`, takze w zamku; gra sprzedaje caly ladunek z calej kasy (`SellGoodsForTradeAction`). Nasz `CastleMarket.SellPrefix` lapal tylko woz skierowany przez `FirstStop` - dla wozu bez wpisu (`:327`) i dla innego zamku (`:331`) zwracal `true` ("jak dotad"). Zamek surowca nie zuzywa i nikt go stamtad nie wywozil.
+
+**Zmiana (poprawka ostateczna, zmiana A):** oba miejsca "jak dotad" ida do wspolnej galezi `Undirected` (czynna przy `CastleCartFoodOnly`, `CastleMarketFirst` i wpietym targu przy zamku):
+1. lodz rybacka NavalDLC (bez drogi ladowej), woz bez towaru, woz bez wsi, zamek Innych - jak dotad (`true`), z licznikiem;
+2. zamek kupuje tylko brakujace jedzenie ta sama funkcja co woz skierowany (`FeedFromDistrict`: do `CastleMarketFoodDays` dni popytu podzamcza, tylko ze `CastlePurse.Spendable`);
+3. woz pusty po jedzeniu - koniec (`false`); inaczej rozkaz do miasta tym samym `MarketRoad.PickTown` (wies miejska bez wyboru - jej miasto, gdy nieoblezone i niewrogie), straz przed odeslaniem do domu przez BK 24 h (woz czeka w zamku, az wrog odejdzie), sprzedaz gry pominieta (`false`);
+4. zadne miasto dalej - sprzedaz jedzenia cofnieta (`Undo`) i zamek kupuje caly woz jak dotad (`true`) - jak woz wsi zamkowej bez targu;
+5. znacznika "byl w zamku" nie stawia (woz moze jeszcze dowiezc jedzenie swojemu zamkowi).
+`CastleTickPrefix`: straz wedlug pola `Hold` (6 h dla wozu skierowanego jak dotad, 24 h dla nieskierowanego); nowy licznik "straz wygasla z ladunkiem" liczony w chwili wygasniecia.
+Linia "Targ przy zamku (5.11)" - nowa wstawka "wjazdy nieskierowane (P3/Z3)": z ladunkiem (w tym schronienie - cel domyslny inny niz ten zamek; ladunek: zelazo / drewno / inne), puste, lodzie, pominiete, jedzenie sprzedane (szt., zl, odmowy), pusty po jedzeniu, dalej do miasta (zatrzymane w wozie: zelazo / drewno / inne), bez miasta dalej, caly woz sprzedany zamkowi (gra) z 5 zamkami o najwiekszym zrzucie, straz wygasla z ladunkiem, czas wjazdow. Liczniki wjazdow i ladunku dzialaja takze przy wylaczonym kluczu (pomiar P2b). Liczniki wizyt 5.11 ("wizyt", "jedzenie sprzedane zamkom") licza dalej tylko wozy skierowane.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: jedzenie parami zloto/towar jak w wizycie 5.11 (ta sama funkcja, 12 207 wizyt w roku, "niezgodne" 54 na 40 974 sprzedaze); reszta ladunku zostaje w wozie. Kasy zamkow zatrzymuja 2,0-2,4 mln zl/rok; wsie zyskuja (zrzut dawal 500-900 zl na wjazd wobec ok. 3 600 zl za wizyte w miescie); panowie zamkow traca dzialke z tych zrzutow.
+- Podzamcza traca przypadkowy towar nie-zywnosciowy (rocznie zjadaly gline 4 093, sol 3 893, drewno 9 957 szt.) - zgodne z decyzja 5.11 (zamek kupuje tylko jedzenie); patrzec na "podzamcze zaplacone" w linii "Kiesa ludu".
+- Regresje sprawdzone w kodzie: woz skierowany - ta sama sciezka co dotad; woz wsi zamkowej bez targu w zasiegu (cel domyslny = ten zamek) konczy na pkt 4 - zamek kupuje caly woz jak dotad; `MarketCarts.SellPostfix` (zwrot nadplaty 119) i ramka ksiegi towarow widza sprzedaz jedzenia tak samo jak w wizycie 5.11; `Sweep` i zapis licza straz wedlug `Hold`.
+- Woz, ktory stoi w zamku ponad 24 h (wrog nie odchodzi), BK odesle do domu z ladunkiem - towar nie ginie, kurs przepada (licznik "straz wygasla z ladunkiem").
+- To zatyka ok. 2/3 doplywu zelaza do zamkow (droga A: 6-7 lup/d, w II polroczu 9,6/d). Pozostala 1/3 (dobytek rozbitych partii na polke najblizszej warowni) - osobna zmiana B w tym samym pakiecie.
+- Czas: kilkanascie wyborow miasta na dobe po ok. 0,2 ms - liczba w linii ("czas wjazdow"). Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (i autotest 120 dob). Oczekiwane: "caly woz sprzedany zamkowi (gra)" blisko 0 (tylko "bez miasta dalej"); "dalej do miasta" ok. 5-12/d; wizyty taborow w zamkach z pustym wozem po wizycie (linia "Przeplywy osad") z ok. 8/d do liczby wozow pustych i lodzi; przyrost zelaza w zamkach z 10,6/d do ok. 3,5-5,7/d (reszte zamyka zmiana B); "straz wygasla z ladunkiem" pojedyncze.
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z2, tor S) - BEZPIECZNIK REGULATORA WSI: towar, ktorego nie ma w ponad 15 miastach, nie jest ciety ponizej bazy (klucze ValveHoldWhileShort, ValveShortTowns)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HarvestValve.cs` (`Close` - blok decyzji towarow; `HorseClose` nietkniete), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
 
