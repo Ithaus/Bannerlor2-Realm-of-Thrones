@@ -1826,3 +1826,12 @@ Armoury b2423a38 z kopii albo klucz CrownWarAidByNeed = false.
   Zloto rodow z luzem: +4.08 mln w 118 dob (w biegu daniny bez W5: +7.01 mln) - lepiej, dalej ponad progiem P1-9 (tarczowe). Bez garnka w d120: The Reach 3.1 tys., Pentos 1.9,
   Qohor 1.7 tys. zl/d potrzeby (poprawka W5b). NIE: etap2 0, etap4 1 (pula wyrzutkow - N3), etap8 8, kiesa1 1 (P1-9).
 - Test zapisu: `autotest-dlugi` (doba 60 biegu W5) + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu w toku (test\at-w41-kontrola10.out.txt).
+- (19:25 UTC 13.10) **POPRAWKA 2 TARCZOWE (W6) - KOD GOTOWY I SCALONY (NIEWGRANE):** `w-toku/w6-tarczowe` 8a33163 -> `w-toku/zbior-e8` **0a387b5** (gen_mcm 1325; Armoury 772918be =
+  test\fin10: P1 + N3 + W5 + W6). Regula: placi rod AI krolestwa w wojnie z lennem, budzetem 166, czynna druzyna i kiesa ponad rezerwe wojenna; podstawa = pulap wlasny druzyn ponad
+  zold druzyn przy 60% limitu; nalezne 25% podstawy, najwyzej 1/45 nadwyzki ponad rezerwe dziennie; KORONA BIERZE TYLE, ILE WYNOSI NIEPOKRYTA POTRZEBA W5 po daninie i wyplaca te
+  gotowke tej samej doby przez W5 (platnik nigdy nie jest odbiorca; przy W5 wylaczonym i w pokoju 0). Klucze Scutage (true), ScutageRate 0.25. Linia "Tarczowe (W6): dzien ";
+  progi `--grupa w6`; CSV: tarczowe_w6, podstawa_tarczowego_w6, doplata_z_tarczowego_w6, nadwyzka_ponad_rezerwe_w6. Szacunek recenzji: 120 dob - pobrane 1-8 tys. zl/d; rok -
+  7-19 tys. zl/d (3-7 mln), +1 do +2.5 tys. ludzi ponad W5 (razem 84-88 tys.). **DO JEFFA: (1) tarczowe to ZAPAS, nie staly podatek - polowa po ok. 150 dobach, w wojnie > 2 lata
+  prawie wygasa; (2) rod gracza ani nie placi, ani nie dostaje - czy ma?; (3) krolestwa bez platnikow (Zelazne Wyspy, Wolni Ludzie, Ibben, Qohor) dalej bez pomocy.**
+  **POPRAWKA DANINY (W5b) - W TOKU:** wf_370f605f-283 (docs/przekazanie/wf-w5b-potrzeba-korony.js), galaz `w-toku/w5b-potrzeba-korony` od 0a387b5, drzewo SC\zb\w5b.
+  W GRZE (lancuch): bieg kontrolny po WGRANIU 41 -> test 120 dob W6 (test\at-w6-120.out.txt). Limity 19:20 UTC: 5 h 74% (zeruje sie 20:50), tydzien 91%.
