@@ -1252,7 +1252,7 @@ namespace Armoury
         // zwiad stale na godzine marszu, paser i samonaprawa za skutek, RBL bez XP za zaplate; linia doby "Doswiadczenie (E8/X)" - gra / po zmianie
         public bool ShotXpFair = true;                     // RBM's experience for every loosed arrow, bolt or thrown weapon is paid only in a real battle and at a third (bow 10, crossbow 20, thrown 17, sling 10); in the arena, a tournament or at practice a shot alone teaches nothing - the hit still does.
         public bool StewardFoodXpFair = true;              // Steward experience from feeding the party grows with the square root of its size, not with every mouth; a kind of food counts only from half a day's supply for the whole party; winter adds a quarter instead of a half.
-        public bool ScoutXpFair = true;                    // Scouting experience from marching is a flat 15 an hour (25 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.
+        public bool ScoutXpFair = true;                    // Scouting experience from marching is a flat 10 an hour (16 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.
         public bool SmallXpFair = true;                    // The fence teaches a flat 25 Roguery per deal instead of 5% of the coin paid; mending a piece with your own hands teaches in proportion to the condition you restore (at least a quarter).
         public bool RblPaidXpFair = true;                  // Realistic Bannerlord no longer gives Charm or Roguery experience for coin handed over (a bought council vote, a planted spy, hired saboteurs); the relation you gain still teaches Charm.
 
@@ -1311,10 +1311,10 @@ namespace Armoury
         // (lawa, uprzaz, kwatermistrz Spoils) idzie z kasy do kiesy ludu jak przy N1 (MendMaterial.PlayerLaborToFolk; wymaga tez MendPayToFolk).
         // Linia doby 'Kowadlo i drobne (E8/B)' (SmallFixes8.cs); off = kazde z pieciu miejsc jak przed paczka
         public bool SmallFixes8 = true;                     // five small corrections at the smith's: the work part of what you pay the town smiths for mending goes on to the townsfolk's purse as craft wages, like the repairs of your men and the lords' men (needs Mend Pay To Folk on); a worn piece on your back has one smith's price whether you pick it from the list or mend everything you wear; the clan screen shows a workshop's daily keep at its town's wage level - what it really pays; an order off the stalls cut short by your purse still sends word to the workshops of the pieces the stalls lacked; and the smiths' cheapest-first estimate no longer miscounts very light bars (off = all five as before)
-        public bool TakeApartEnabled = true;                // rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor
-        public float TakeApartBaseChance = 0.6f;           // szansa odczytania wzoru przy DOKLADNIE wymaganej Smithing
-        public float TakeApartSkillSpan = 300f;            // ile punktow Smithing daje pelny przeskok szansy
-        public float TakeApartSalvage = 0f;                // ile materialu wraca (0 = nic, 1 = tyle co z tygla)
+        public bool TakeApartEnabled = true;                // take a finished piece apart at the forge to learn its pattern (the piece is lost either way)
+        public float TakeApartBaseChance = 0.6f;           // chance to read the pattern when your Smithing is exactly what the piece requires
+        public float TakeApartSkillSpan = 300f;            // Smithing points above the requirement that add a full 100% to that chance (below it the chance falls the same way; it always stays between 5% and 95%)
+        public float TakeApartSalvage = 0f;                // share of the material that comes back when a piece is taken apart (0 = nothing, 1 = as much as smelting it would give)
         public float SmeltHoursPerTier = 0.5f;             // crucible hours per tier of the broken-down piece
 
         // --- Companion at the bellows ---

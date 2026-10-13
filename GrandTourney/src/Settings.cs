@@ -14,7 +14,7 @@ namespace GrandTourney
         public int GatherDays = 4;                         // days between the proclamation and the opening of the lists
         public int MaxLordsInvited = 8;                    // how many lords get a summons (16 places exist in all)
         public float InviteRadius = 200f;                  // map units - how far the heralds ride
-        public int MinLordsToHold = 8;
+        public int MinLordsToHold = 8;                     // the rule of eight: a grand tourney opens only when at least this many lords have come; with fewer the lists stay a local affair with a modest prize
         public bool PoliceAllTournaments = true;           // tourneys other mods start also answer to the rule of eight
         public bool WidenWhenScarce = true;                // in thin country the heralds ride further rather than cancel the tourney
         public float MaxInviteRadius = 600f;               // but never past this - a herald is not a raven

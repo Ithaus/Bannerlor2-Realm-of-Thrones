@@ -880,29 +880,87 @@ namespace Armoury
 
         private static readonly Dictionary<Module, Dictionary<int, bool>> _tokHit = new Dictionary<Module, Dictionary<int, bool>>();
 
-        /// <summary>Przesiew: czy w bajtach IL jest call / callvirt (0x28 / 0x6F) z tokenem metody, ktory w tym module wskazuje jedna z trzech metod zlota.
-        /// Token rozwiazywany raz na modul (pamiec); falszywe trafienie (bajt 0x28 w srodku innej instrukcji) koryguje pelny odczyt instrukcji.</summary>
+        // TRIAZ 2 (13.10, etap8 b): rozmiary operandow instrukcji IL - _op1 dla opcode jednobajtowego, _op2 dla drugiego bajtu po 0xFE.
+        // -1 = nieznany opcode, -2 = switch (4 bajty liczby + 4 x liczba). Budowane raz, leniwie, z pol System.Reflection.Emit.OpCodes.
+        private static int[] _op1, _op2;
+
+        private static void BuildOpSizes()
+        {
+            var a = new int[256]; var b = new int[256];
+            for (int i = 0; i < 256; i++) { a[i] = -1; b[i] = -1; }
+            foreach (var f in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (f.FieldType != typeof(OpCode)) continue;
+                var oc = (OpCode)f.GetValue(null);
+                int sz;
+                switch (oc.OperandType)
+                {
+                    case OperandType.InlineNone: sz = 0; break;
+                    case OperandType.ShortInlineBrTarget:
+                    case OperandType.ShortInlineI:
+                    case OperandType.ShortInlineVar: sz = 1; break;
+                    case OperandType.InlineVar: sz = 2; break;
+                    case OperandType.InlineI8:
+                    case OperandType.InlineR: sz = 8; break;
+                    case OperandType.InlineSwitch: sz = -2; break;
+                    default: sz = 4; break;   // InlineBrTarget, InlineField, InlineI, InlineMethod, InlineSig, InlineString, InlineTok, InlineType, ShortInlineR
+                }
+                ushort v = (ushort)oc.Value;
+                if (oc.Size == 1) a[v & 0xFF] = sz;
+                else if ((v >> 8) == 0xFE) b[v & 0xFF] = sz;
+            }
+            _op2 = b; _op1 = a;
+        }
+
+        /// <summary>Przesiew: czy w IL jest call / callvirt (0x28 / 0x6F) z tokenem metody, ktory w tym module wskazuje jedna z trzech metod zlota.
+        /// Token rozwiazywany raz na modul (pamiec). TRIAZ 2 (13.10): chodzenie PO GRANICACH INSTRUKCJI (tablica rozmiarow operandow) zamiast bajt
+        /// po bajcie - dotad 4 bajty ze srodka innej instrukcji szly do ResolveMethod jako token (11 wyjatkow ArgumentOutOfRangeException przy kazdym
+        /// starcie = 3 czerwone bloki w CrashScribe; zlapane, bez skutku w grze). Token po prawdziwym call / callvirt jest zawsze wazny.
+        /// Anomalia chodzenia (nieznany opcode, operand albo switch poza koncem, brak tablicy) = true: rozstrzyga pelny odczyt instrukcji w ScanType.</summary>
         private static bool MayCallGold(MethodBase m, byte[] il)
         {
+            if (_op1 == null) { try { BuildOpSizes(); } catch { return true; } }
+            int[] op1 = _op1, op2 = _op2;
+            if (op1 == null || op2 == null) return true;
             var mod = m.Module;
             Dictionary<int, bool> cache;
             if (!_tokHit.TryGetValue(mod, out cache)) { cache = new Dictionary<int, bool>(); _tokHit[mod] = cache; }
-            for (int i = 0; i + 4 < il.Length; i++)
+            int n = il.Length, i = 0;
+            while (i < n)
             {
-                byte op = il[i];
-                if (op != 0x28 && op != 0x6F) continue;
-                int tok = il[i + 1] | (il[i + 2] << 8) | (il[i + 3] << 16) | (il[i + 4] << 24);
-                int table = (tok >> 24) & 0xFF;
-                if (table != 0x06 && table != 0x0A) continue;               // MethodDef albo MemberRef
-                bool hit;
-                if (!cache.TryGetValue(tok, out hit))
+                byte op = il[i++];
+                int sz; bool call = false;
+                if (op == 0xFE) { if (i >= n) return true; sz = op2[il[i++]]; }   // 0xFE PRZED tablica: pole OpCodes.Prefix1 ma wartosc 0xFE i rozmiar 0
+                else { sz = op1[op]; call = op == 0x28 || op == 0x6F; }
+                if (sz == -1) return true;
+                if (sz == -2)
                 {
-                    hit = false;
-                    try { var mb = mod.ResolveMethod(tok); hit = mb != null && (mb == _mAbc || mb == _mAfcp || mb == _mChg); }
-                    catch { hit = false; }
-                    cache[tok] = hit;
+                    if (i + 4 > n) return true;
+                    long cnt = (uint)(il[i] | (il[i + 1] << 8) | (il[i + 2] << 16) | (il[i + 3] << 24));
+                    long next = i + 4L + 4L * cnt;
+                    if (next > n) return true;
+                    i = (int)next;
+                    continue;
                 }
-                if (hit) return true;
+                if (i + sz > n) return true;
+                if (call)
+                {
+                    int tok = il[i] | (il[i + 1] << 8) | (il[i + 2] << 16) | (il[i + 3] << 24);
+                    int table = (tok >> 24) & 0xFF;
+                    if (table == 0x06 || table == 0x0A)                         // MethodDef albo MemberRef
+                    {
+                        bool hit;
+                        if (!cache.TryGetValue(tok, out hit))
+                        {
+                            hit = false;
+                            try { var mb = mod.ResolveMethod(tok); hit = mb != null && (mb == _mAbc || mb == _mAfcp || mb == _mChg); }
+                            catch { hit = false; }
+                            cache[tok] = hit;
+                        }
+                        if (hit) return true;
+                    }
+                }
+                i += sz;
             }
             return false;
         }

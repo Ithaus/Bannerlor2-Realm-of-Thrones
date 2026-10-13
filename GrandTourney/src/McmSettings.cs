@@ -28,7 +28,7 @@ namespace GrandTourney
         [SettingPropertyGroup("The summons")]
         public float InviteRadius { get; set; } = 200f;
 
-        [SettingPropertyInteger("Min Lords To Hold", 0, 32, "0", HintText = "")]
+        [SettingPropertyInteger("Min Lords To Hold", 0, 32, "0", HintText = "the rule of eight: a grand tourney opens only when at least this many lords have come; with fewer the lists stay a local affair with a modest prize")]
         [SettingPropertyGroup("The summons")]
         public int MinLordsToHold { get; set; } = 8;
 
