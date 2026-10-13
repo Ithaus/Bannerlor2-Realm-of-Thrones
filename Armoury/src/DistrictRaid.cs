@@ -529,6 +529,11 @@ namespace Armoury
                 }
                 long v0 = Pieces(roster);
                 long take = 0, burn = 0;
+                // audyt 13.10 (drobne, [sztuki]): lista dla OnItemsLooted (got[]) budowana PO ramce FRaid. Dotad tymczasowy roster dostawal sztuki
+                // wewnatrz ramki, a podsluch ksiegi (GoodsLedger.Tap) liczy kazdy ItemRoster.AddToCounts bez pytania, czyj to roster - kazda zabrana
+                // sztuka byla w ksiedze falszywa produkcja "zboze ze spichlerza okregu dla napastnikow" i falszywym "bez wyjasnienia", a "spalone"
+                // wychodzilo za male. W ramce tylko prawdziwe ruchy (magazyn wsi -> tabor); tu ruchy do listy (partia, przedmiot, ile).
+                var mvP = new List<int>(); var mvEl = new List<EquipmentElement>(); var mvN = new List<int>();
                 var gf = GoodsLedger.Begin(GoodsLedger.FRaid, st);
                 try
                 {
@@ -539,7 +544,7 @@ namespace Armoury
                         int left = n;
                         if (Walks(it))
                         {
-                            parties[0].ItemRoster.AddToCounts(el, left); got[0].AddToCounts(el, left);
+                            parties[0].ItemRoster.AddToCounts(el, left); mvP.Add(0); mvEl.Add(el); mvN.Add(left);
                             take += left; _dTakeValue += (long)it.Value * left; left = 0;
                         }
                         else
@@ -549,7 +554,7 @@ namespace Armoury
                             {
                                 int fit = w > 1e-6 ? (int)Math.Min(left, Math.Floor(free[p] / w)) : left;
                                 if (fit <= 0) continue;
-                                parties[p].ItemRoster.AddToCounts(el, fit); got[p].AddToCounts(el, fit);
+                                parties[p].ItemRoster.AddToCounts(el, fit); mvP.Add(p); mvEl.Add(el); mvN.Add(fit);
                                 free[p] -= fit * w; left -= fit;
                                 take += fit; _dTakeValue += (long)it.Value * fit;
                             }
@@ -567,12 +572,16 @@ namespace Armoury
                 _dTake += take; _dBurn += burn;
                 ss.STake += take; ss.SBurn += burn;
                 _dBal2 += (p1 - p0) + burn - (v0 - v1);                          // niezalezny bilans: towar napastnika + spalone - ubytek magazynu
+                for (int k = 0; k < mvP.Count; k++) got[mvP[k]].AddToCounts(mvEl[k], mvN[k]);   // lista zdarzenia - juz poza ramka FRaid
                 for (int p = 0; p < parties.Count; p++)
                 {
                     if (got[p].Count == 0) continue;
                     try { CampaignEventDispatcher.Instance.OnItemsLooted(parties[p], got[p]); }   // jak oryginal (G :302-305): znaczniki nowych przedmiotow gry
                     catch (Exception e) { Stumble("Loot(OnItemsLooted)", e); }
                 }
+                // lista zyla tylko na czas zdarzenia (sluchacze gry jej nie trzymaja: znaczniki gracza, XP rabunku): zdjecie wpisow znosi ja do zera
+                // takze w ramce ZEWNETRZNEJ ksiegi (koniec rabunku wywolany z ticku dobowego partii / osady) - bez ramki podsluch konczy sie od razu
+                for (int k = 0; k < mvP.Count; k++) got[mvP[k]].AddToCounts(mvEl[k], -mvN[k]);
             }
             catch (Exception e) { Stumble("Loot(towar)", e); }
         }

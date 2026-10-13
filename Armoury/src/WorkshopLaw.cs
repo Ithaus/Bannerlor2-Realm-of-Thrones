@@ -1548,6 +1548,10 @@ namespace Armoury
                 // nie pisal "Halted" (LastRunCampaignTime czyta tylko ten ekran; gra stawia go po udanym cyklu).
                 if (s.PlayerMineBulkSkip && BulkLineSkip(__0)) { SmallFixes8.NotePlayerMine(); __1.UpdateLastRunTime(); __result = false; return false; }
                 if (!s.PlayerWorkshopsSameRule) return true;
+                // audyt 13.10 (drobne, [zloto]): kopalnia BK w rekach gracza - ta sama regula dymarki co u notabla (E6/R1, CyclePrefix): lupa tylko
+                // z drewnem z polki tego miasta, kupionym z kapitalu warsztatu (zloto do kasy miasta). Dotad cykl gracza omijal TownMineBlocked i lupy
+                // powstawaly bez spalonego drewna. Tu tylko sprawdzenie i rezerwacja - drewno schodzi w Bloomery.CyclePostfix po udanym cyklu gry.
+                if (Bloomery.TownMineBlocked(__0, __1, true)) { __result = false; return false; }
                 bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
                 if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
                 if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;

@@ -31,7 +31,7 @@ namespace Armoury
     ///     bez premii, cieple poludnie 0.4 - x1.10, reszta x1.25); WinterBite i WinterRealm tylko czytane. 100 ludzi i 5 rodzajow = 500 jak w grze.
     ///  3) ScoutXpFair - ZWIAD Z MARSZU. Gra (OnTraverseTerrain): predkosc x (1 + ludzie^0.66) x 0.15 (las, pustynia, wydmy, snieg 0.25), placone
     ///     od 5, karawany polowa - rosnie z dlugoscia kolumny, maly oddzial nie dostaje nic; do tego premia tylko dla AI 3-5 na godzine
-    ///     (OnAIPartiesTravel). Po naszemu: stale 15 na godzine marszu (25 w trudnym terenie - ta sama lista co w grze), karawany polowa, bez
+    ///     (OnAIPartiesTravel). Po naszemu: stale 10 na godzine marszu (16 w trudnym terenie - ta sama lista co w grze), karawany polowa, bez
     ///     progu, premia tylko-AI 0. Warunek "partia naprawde idzie" (predkosc > 1, pole gry _lastCalculatedSpeed) zostaje jak w grze.
     ///  4) SmallXpFair - PASER I SAMONAPRAWA (nasz kod): paser 25 Roguery za udana sprzedaz zamiast 5% zaplaty (SpoilsSeal.FencePrefix);
     ///     naprawa wlasnymi rekami: XP x udzial przywroconego stanu, najmniej 25% (SmithMenu.DoMendOne - obie galezie, Forge.SelfRepair).
@@ -52,7 +52,10 @@ namespace Armoury
         // ---- stawki (projekt E8/X; liczby wybiera projekt, bez suwakow)
         internal const float ShotBow = 10f, ShotCrossbow = 20f, ShotThrown = 17f, ShotSling = 10f;   // 1/3 stawek RBM 30 / 60 / 50 / 30
         internal const float FoodBase = 50f, FoodWinter = 0.25f, FoodHalfDay = 0.5f;
-        internal const float ScoutPlain = 15f, ScoutHard = 25f, ScoutCaravan = 0.5f;
+        // TRIAZ 2 (13.10, X-3): 15 / 25 -> 10 / 16. Stare 15 liczono dla predkosci 4.55 (samotny konny gracz); kolumna z piechota ma sufit 3.0
+        // (MarchFootPace 4.0 x WorldPace 75%): regula gry dla 100 ludzi daje wtedy 3.0 x 21.89 x 0.15 = 9.85 i x 0.25 = 16.4. Bieg 2: lordowie 300+
+        // po/gra 0.79 (pasmo 0.4-0.6), caly swiat +20% zamiast spadku.
+        internal const float ScoutPlain = 10f, ScoutHard = 16f, ScoutCaravan = 0.5f;
         internal const float FenceFlat = 25f, MendFloor = 0.25f;
         internal const int BigParty = 300;                                                           // progi X-2 / X-3: partie lordow 300+
 

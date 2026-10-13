@@ -17,6 +17,8 @@ namespace Armoury
     /// <summary>
     /// E6/R1 (214, PLAN 6.1, R1/R2; projekt etapu 6 v2 rozdz. 3 "E6/R1"): WYTOP PRZY KOPALNI. Tylko nowa kampania (flaga w zapisie
     /// arm_e6_bloom, wzor CamelLaw) i klucz BloomeryAtMine; stary zapis - ruda 100 kg jak dotad (stara ruda stalaby sie lupami).
+    /// Audyt 13.10: flaga niesie rezim PIERWSZEJ sesji kampanii ("nk1" = lupa weszla, "nk0" = kampania zaczeta bez lupy - klucz wlaczony pozniej
+    /// nie zamienia starej rudy w lupy; sam "nk" = zapis sprzed poprawki, jak dotad).
     ///  - Sztuka "iron" to lupa "Iron Bloom": metal z ladunku rudy (100 kg x WorkshopCrudeKgPerOre / 10 = 15 kg surowki), cena = surowka
     ///    + wegiel dymarki za kg (HistoricalPrices.Apply krok 0 i 1). Liczba sztuk z kopalni bez zmian: wszystko, co LICZY sztuki
     ///    (wydobycie MaterialLaw.ProdPostfix, kopalnie BK WorkshopLaw.BulkLineSkip, place cyklu WorkshopTrade.BulkFactor, zapas startowy
@@ -65,6 +67,12 @@ namespace Armoury
         private static readonly TextObject _txtNoCoal = new TextObject("{=!}Armoury: bloomery short of wood");
 
         internal static bool NewCampaign;
+        // audyt 13.10 (drobne, [zapis]): rezim kampanii zapamietany w PIERWSZEJ sesji (znacznik zapisu "nk1" / "nk0"). Dotad flaga "nk" stala
+        // niezaleznie od klucza: kampania zaczeta BEZ lupy (klucz wylaczony, ceny historyczne wylaczone, przelicznik ladunku 1) po wlaczeniu klucza
+        // zamieniala przy wczytaniu kazda stara sztuke rudy 100 kg w lupe 15 kg bez spalenia drewna. RUnknown = zapis sprzed tej poprawki (sam "nk") - jak dotad.
+        private const int RUnknown = 0, RBloom = 1, ROre = 2;
+        private static int _regime;
+        private static bool _fresh;   // ta sesja zaczela kampanie (OnNewGame) - tylko ona ustala rezim
         private static ItemObject _iron, _wood;
         private static bool _applied, _wired;
         private static float _scale = 1f;
@@ -139,7 +147,7 @@ namespace Armoury
         // recenzja R1: kopalnia BK w miescie - drewno z polki dopiero po cyklu, ktory naprawde dal lupy (postfiks cyklu; gra moze odrzucic cykl PO prefiksie)
         [ThreadStatic] private static Workshop _pw;
         [ThreadStatic] private static int _pNeed, _pPrice, _pCount;
-        private static bool _cycleWired;
+        private static bool _cycleWired, _cycleWiredPlayer;   // postfiks cyklu notabla / gracza (audyt 13.10: kopalnia BK w rekach gracza)
         private static int _dTownMineRej;
         [ThreadStatic] private static int _tvBefore, _tvReserved;
         [ThreadStatic] private static float _tvModel;
@@ -148,12 +156,20 @@ namespace Armoury
         internal static void Reset()
         {
             NewCampaign = false; _iron = null; _wood = null; _applied = false; _scale = 1f; _wpb = -1; _pw = null;
+            _regime = RUnknown; _fresh = false;
             _mines.Clear(); _byMarket = null; _pending = null;
             _carts.Clear(); _roads.Clear(); _dayOne = true; _shelfUse = null; _shelfDay.Clear(); _shelfN = 0;
             NewDay(); _stumbles = 0; _cPrev = -1; _bPrev = -1;
         }
 
-        internal static void OnNewGame() { NewCampaign = true; }
+        internal static void OnNewGame() { NewCampaign = true; _fresh = true; _regime = RUnknown; }
+
+        /// <summary>Pierwsza sesja kampanii: czy lupa naprawde weszla (po HistoricalPrices.Apply - StartLine; albo najpozniej przy pierwszym zapisie,
+        /// gdy ceny historyczne sa wylaczone i StartLine nie biegnie). Potem rezim czyta sie juz tylko z zapisu.</summary>
+        private static void SettleRegime()
+        {
+            if (_fresh && NewCampaign && _regime == RUnknown) _regime = _applied ? RBloom : ROre;
+        }
 
         /// <summary>Lupa obowiazuje w tej sesji (waga i cena ustawione przez HistoricalPrices.Apply).</summary>
         internal static bool On { get { return _applied; } }
@@ -167,7 +183,7 @@ namespace Armoury
         internal static bool CanApply()
         {
             var s = Settings.Current;
-            return s != null && s.BloomeryAtMine && NewCampaign && _wired && MaterialLaw.ProdModels > 0;
+            return s != null && s.BloomeryAtMine && NewCampaign && _regime != ROre && _wired && MaterialLaw.ProdModels > 0;
         }
 
         internal static void MarkApplied(ItemObject iron, float scale)
@@ -187,11 +203,14 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                SettleRegime();
                 string st;
                 if (_applied) st = "CZYNNE - \"iron\" to lupa " + (_iron != null ? _iron.Weight.ToString("0.#", CultureInfo.InvariantCulture) : "?") + " kg (metal z ladunku rudy, liczona jak ladunek: x" + _scale.ToString("0.#", CultureInfo.InvariantCulture)
                                   + "), drewna na lupe " + WoodPerBloom() + " ladunkow; kopalni z zapisu " + (_pending != null ? "do rozwiazania" : _mines.Count.ToString());
-                else if (s == null || !s.BloomeryAtMine) st = "WYLACZONE (klucz Bloomery At Mine) - ruda 100 kg jak dotad";
+                else if (s == null || !s.BloomeryAtMine) st = "WYLACZONE (klucz Bloomery At Mine) - ruda 100 kg jak dotad"
+                                                              + (_regime == RBloom && !_fresh ? "; UWAGA: ta kampania zaczela sie z lupami - klucz zdjety w trakcie kampanii, lupy licza sie teraz jak ladunki rudy" : "");
                 else if (!NewCampaign) st = "NIEAKTYWNE - stary zapis (kampania sprzed paczki): ruda 100 kg jak dotad";
+                else if (_regime == ROre && !_fresh) st = "NIEAKTYWNE - ta kampania zaczela sie bez lupy (w pierwszej sesji lupa nie weszla: klucz Bloomery At Mine, ceny historyczne albo przelicznik ladunku wlaczone dopiero w trakcie kampanii): ruda 100 kg jak dotad, lupa od nowej kampanii";
                 else if (!bulk) st = "NIEAKTYWNE - przelicznik ladunku 1 (ceny historyczne wylaczone albo HistBulkUnitFactor = 1)";
                 else st = "NIEAKTYWNE - brak latki " + (!_wired ? "ticku produkcji wsi (TickGoodProduction)" : "modelu produkcji wsi (MaterialLaw.ProdPostfix)");
                 Log.Info("Bloomery (E6/R1, 214): " + st + ".");
@@ -226,7 +245,8 @@ namespace Armoury
         internal static string Export()
         {
             if (!NewCampaign) return "";
-            var sb = new StringBuilder("nk");
+            SettleRegime();
+            var sb = new StringBuilder(_regime == RBloom ? "nk1" : _regime == ROre ? "nk0" : "nk");
             if (_pending != null) { sb.Append('|').Append(_pending); return sb.ToString(); }   // wczytane, jeszcze nie rozwiazane - oddajemy jak bylo
             foreach (var kv in _mines)
             {
@@ -262,7 +282,11 @@ namespace Armoury
         {
             NewCampaign = s != null && s.StartsWith("nk", StringComparison.Ordinal);
             _mines.Clear(); _byMarket = null; _carts.Clear(); _cPrev = -1; _bPrev = -1;
-            _pending = NewCampaign && s.Length > 3 ? s.Substring(3) : null;
+            // "nk1" / "nk0" = rezim z pierwszej sesji kampanii; sam "nk" (zapis sprzed poprawki: trzeci znak to '|' albo koniec) = nieznany, jak dotad
+            _regime = RUnknown; _fresh = false;
+            int head = 2;
+            if (NewCampaign && s.Length > 2 && (s[2] == '1' || s[2] == '0')) { _regime = s[2] == '1' ? RBloom : ROre; head = 3; }
+            _pending = NewCampaign && s.Length > head + 1 ? s.Substring(head + 1) : null;
         }
 
         private static void ResolvePending()
@@ -925,7 +949,7 @@ namespace Armoury
         /// cykl nie idzie (true). Linia drewna i reszta warsztatow bez zmian (false).
         /// Recenzja R1: gra po prefiksie moze cykl jeszcze odrzucic (CanNotableWorkshopProduceThisCycle: utarg <= place cyklu, kasa miasta < utarg) -
         /// zakup idzie wiec w postfiksie cyklu (CyclePostfix), tylko gdy cykl dal lupy; tu tylko sprawdzenie i rezerwacja. Bez postfiksu - zakup od razu (jak dotad).</summary>
-        internal static bool TownMineBlocked(WorkshopType.Production p, Workshop w)
+        internal static bool TownMineBlocked(WorkshopType.Production p, Workshop w, bool player = false)
         {
             _pw = null;
             if (!_applied || w == null) return false;
@@ -946,7 +970,7 @@ namespace Armoury
                 int need = wpb * count;
                 int price = Math.Max(0, town.MarketData.GetPrice(new EquipmentElement(wood)));
                 if (shelf.GetItemNumber(wood) < need || w.Capital < need * price) { _dTownMineSkip++; return true; }
-                if (_cycleWired) { _pw = w; _pNeed = need; _pPrice = price; _pCount = count; return false; }
+                if (player ? _cycleWiredPlayer : _cycleWired) { _pw = w; _pNeed = need; _pPrice = price; _pCount = count; return false; }
                 BuyTownMineWood(w, st, town, shelf, wood, need, price, count);
                 return false;
             }
@@ -954,7 +978,10 @@ namespace Armoury
         }
 
         /// <summary>Postfiks WorkshopsCampaignBehavior.TickOneProductionCycleForNotableWorkshop: cykl kopalni BK zarezerwowany w TownMineBlocked dal lupy
-        /// (__result) - dopiero teraz drewno z polki i zaplata; cykl odrzucony przez gre - nic (licznik).</summary>
+        /// (__result) - dopiero teraz drewno z polki i zaplata; cykl odrzucony przez gre - nic (licznik).
+        /// Audyt 13.10: ten sam postfiks na TickOneProductionCycleForPlayerWorkshop (ta sama sygnatura) - kopalnia BK gracza pali drewno jak u notabla
+        /// (rezerwacja w WorkshopLaw.PlayerCyclePrefix). Cykl gracza dzieli wyrob miedzy polke i magazyn postepem ulamkowym - srednio 1 sztuka na
+        /// wyrob cyklu, wiec drewno liczone od cyklu jak u notabla.</summary>
         public static void CyclePostfix(Workshop __1, bool __result)
         {
             var w = _pw; _pw = null;
@@ -1120,6 +1147,10 @@ namespace Armoury
                     var wsb = AccessTools.TypeByName("TaleWorlds.CampaignSystem.CampaignBehaviors.WorkshopsCampaignBehavior");
                     var cyc = wsb != null ? AccessTools.Method(wsb, "TickOneProductionCycleForNotableWorkshop") : null;
                     if (cyc != null) { h.Patch(cyc, postfix: new HarmonyMethod(typeof(Bloomery), nameof(CyclePostfix))); _cycleWired = true; }
+                    // audyt 13.10: kopalnia BK w rekach gracza - ten sam postfiks na cyklu warsztatu gracza (bez niego rezerwacja z PlayerCyclePrefix nie zdejmie drewna)
+                    var pcyc = wsb != null ? AccessTools.Method(wsb, "TickOneProductionCycleForPlayerWorkshop") : null;
+                    if (pcyc != null) { h.Patch(pcyc, postfix: new HarmonyMethod(typeof(Bloomery), nameof(CyclePostfix))); _cycleWiredPlayer = true; }
+                    else Log.Info("Dymarki: brak TickOneProductionCycleForPlayerWorkshop - drewno kopalni BK gracza kupowane przed cyklem.");
                 }
                 catch (Exception e) { Log.Error("Bloomery.ApplyAll(cykl)", e); }
                 Log.Info("Bloomery (E6/R1, 214): tick produkcji wsi wpiety (prefiks Priority.First przed BK, postfiks, finalizer) - lupa i dymarka tylko w nowej kampanii przy kluczu Bloomery At Mine.");

@@ -124,7 +124,7 @@ namespace Armoury
         private MapConversationView _lblConv;
         private Slot[] _lblCand = new Slot[64];
         private float[] _lblDist = new float[64];
-        private int _lblCount, _lblMax, _lblStrikes, _lblLayers, _lblFrames, _stLbl;
+        private int _lblCount, _lblMax, _lblStrikes, _lblTickStrikes, _lblLayers, _lblFrames, _stLbl;
         private bool _lblBroken, _lblPrefabChecked, _lblNoPrefab;
         private long _lblFrameTicks;
 
@@ -430,6 +430,7 @@ namespace Armoury
         {
             try
             {
+                if (_lblBroken) { _lblCount = 0; return; }   // audyt 13.10: po wylaczeniu (3 potkniecia z rzedu albo brak prefabu) warstwy juz nie ma - bez wyboru napisow, zeby staly wyjatek nie lecial dalej 4/s
                 if (!Settings.Current.BurnedVillageLabels)
                 {
                     if (_lblLayer != null) RemoveLabelLayer(true);
@@ -464,10 +465,11 @@ namespace Armoury
                     it.Owner = null;
                 }
                 _lblCount = n;
+                _lblTickStrikes = 0;   // audyt 13.10: wlasny licznik "z rzedu" wyboru napisow (4/s) - zeruje go tylko udany wybor (patrz LabelStumble)
                 if (n > _lblMax) _lblMax = n;
                 if (n > 0) LabelFrame(screen);   // nowy wlasciciel widzetu od razu na swoim miejscu (bez klatki ze starym)
             }
-            catch (Exception e) { LabelStumble("Tick", e); }
+            catch (Exception e) { _lblTickStrikes++; LabelStumble("Tick", e); }
         }
 
         private int PickLabels(MapScreen screen, Camera camera, Vec3 cam)
@@ -617,13 +619,17 @@ namespace Armoury
             }
         }
 
-        /// <summary>Potkniecie warstwy napisow: liczone; 3 z rzedu = napisy wylaczone do nastepnego wczytania mapy (obrazki i reszta widoku bez zmian).</summary>
+        /// <summary>Potkniecie warstwy napisow: liczone; 3 z rzedu = napisy wylaczone do nastepnego wczytania mapy (obrazki i reszta widoku bez zmian).
+        /// Audyt 13.10: dwa liczniki "z rzedu". _lblStrikes zeruje udana klatka (LabelFrame, co klatke), _lblTickStrikes - udany wybor napisow
+        /// (LabelTick, 4/s). Dotad byl jeden, zerowany co klatke: staly wyjatek w LabelTick (kilkanascie udanych klatek miedzy dwoma wyborami)
+        /// nigdy nie doszedl do 3 i lecial 4 razy na sekunde do konca sesji mapy.</summary>
         private void LabelStumble(string where, Exception e)
         {
             _stLbl++;
             _lblStrikes++;
-            if (_stLbl <= 3 || _stLbl % 500 == 0) Log.Error("MapVillagesView.Label" + where + " (potkniecie " + _stLbl + ", z rzedu " + _lblStrikes + "/" + LabelStrikesMax + ")", e);
-            if (_lblStrikes < LabelStrikesMax || _lblBroken) return;
+            int row = _lblStrikes > _lblTickStrikes ? _lblStrikes : _lblTickStrikes;
+            if (_stLbl <= 3 || _stLbl % 500 == 0) Log.Error("MapVillagesView.Label" + where + " (potkniecie " + _stLbl + ", z rzedu " + row + "/" + LabelStrikesMax + ")", e);
+            if (row < LabelStrikesMax || _lblBroken) return;
             _lblBroken = true;
             RemoveLabelLayer(true);
             Log.Info("Wioski - wyglad (E7/W4): napisy nad spalonymi WYLACZONE do nastepnego wczytania mapy po " + LabelStrikesMax + " potknieciach z rzedu (obrazki bez zmian).");

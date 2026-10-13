@@ -4088,7 +4088,7 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool StewardFoodXpFair { get; set; } = true;
 
-        [SettingPropertyBool("Scout Xp Fair", HintText = "Scouting experience from marching is a flat 15 an hour (25 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.")]
+        [SettingPropertyBool("Scout Xp Fair", HintText = "Scouting experience from marching is a flat 10 an hour (16 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.")]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool ScoutXpFair { get; set; } = true;
 
@@ -4216,19 +4216,19 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool SmallFixes8 { get; set; } = true;
 
-        [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
+        [SettingPropertyBool("Take Apart Enabled", HintText = "take a finished piece apart at the forge to learn its pattern (the piece is lost either way)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Take Apart Base Chance", 0.00f, 2.40f, "0.00", HintText = "szansa odczytania wzoru przy DOKLADNIE wymaganej Smithing")]
+        [SettingPropertyFloatingInteger("Take Apart Base Chance", 0.00f, 2.40f, "0.00", HintText = "chance to read the pattern when your Smithing is exactly what the piece requires")]
         [SettingPropertyGroup("Time at the forge")]
         public float TakeApartBaseChance { get; set; } = 0.6f;
 
-        [SettingPropertyFloatingInteger("Take Apart Skill Span", 0.00f, 1200.00f, "0.00", HintText = "ile punktow Smithing daje pelny przeskok szansy")]
+        [SettingPropertyFloatingInteger("Take Apart Skill Span", 0.00f, 1200.00f, "0.00", HintText = "Smithing points above the requirement that add a full 100% to that chance (below it the chance falls the same way; it always stays between 5% and 95%)")]
         [SettingPropertyGroup("Time at the forge")]
         public float TakeApartSkillSpan { get; set; } = 300f;
 
-        [SettingPropertyFloatingInteger("Take Apart Salvage", 0.00f, 1.00f, "0.00", HintText = "ile materialu wraca (0 = nic, 1 = tyle co z tygla)")]
+        [SettingPropertyFloatingInteger("Take Apart Salvage", 0.00f, 1.00f, "0.00", HintText = "share of the material that comes back when a piece is taken apart (0 = nothing, 1 = as much as smelting it would give)")]
         [SettingPropertyGroup("Time at the forge")]
         public float TakeApartSalvage { get; set; } = 0f;
 
