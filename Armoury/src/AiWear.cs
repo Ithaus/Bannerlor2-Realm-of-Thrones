@@ -43,6 +43,28 @@ namespace Armoury
         private static readonly Dictionary<string, KeyValuePair<int, Dictionary<string, int>>> _menUsed = new Dictionary<string, KeyValuePair<int, Dictionary<string, int>>>();
         private static int _daySkipLoot, _dayFolk;   // E6/N1: obite sztuki pominiete (lup nienoszony) w zleceniach doby; robocizna do kiesy ludu (tylko log)
         private static int _usedErr;                 // E6/N1: potkniecia dopasowania (do logu najwyzej 3; partia wraca wtedy do starej reguly - wszystkie obite)
+        // F6 pkt 2 (TRIAZ zb58 A3-7, sama wydajnosc): dopasowanie z _menUsed sluzy REZERWIE napraw (OutstandingCost) przez 5-8 dob zamiast do konca doby;
+        // naprawa w miescie liczy swiezo jak dotad. Liczniki doby linii "Rezerwa napraw AI - pamiec dopasowania (F6)" (tylko log) i probka 1/64 (R9):
+        // rezerwa z pamieci starszej niz doba obok rezerwy ze swiezego dopasowania - ile razy i o ile zlota sie roznia (wynik probki niczego nie zmienia)
+        private static int _muToday, _muOld, _muCalc, _muFresh, _muDrop, _muSeq, _muProbes, _muProbeDiff, _muStumbles;
+        private static long _muProbeGold, _muProbeAbs, _muProbeNet;
+
+        private static void MuClear()
+        {
+            _muToday = _muOld = _muCalc = _muFresh = _muDrop = _muProbes = _muProbeDiff = 0; _muProbeGold = _muProbeAbs = _muProbeNet = 0;
+        }
+
+        /// <summary>F6 pkt 2: dopasowanie tej partii z pamieci jest nieaktualne (bitwa: polegli, lup, pociski; nowa pozycja ksiegi obitych) - nastepna rezerwa liczy swiezo.</summary>
+        private static void DropUsed(string p) { if (p != null && _menUsed.Remove(p)) _muDrop++; }
+
+        /// <summary>F6 pkt 2: ile dob dopasowanie z pamieci sluzy rezerwie - 5-8 wedlug nazwy partii (staly rozrzut terminow: pamieci nie ma w zapisie, wiec po
+        /// wczytaniu wszystkie partie licza tej samej doby i bez rozrzutu wygasalyby razem).</summary>
+        private static int UsedKeepDays(string p)
+        {
+            int h = 0;
+            if (p != null) for (int i = 0; i < p.Length; i++) h = unchecked(h * 31 + p[i]);
+            return 5 + (h & 3);
+        }
 
         private static bool WornOnlyOn { get { var s = Settings.Current; return s != null && s.AiMendsWornOnly; } }
 
@@ -88,6 +110,7 @@ namespace Armoury
         {
             _worn.Clear(); _known.Clear(); _battleSince.Clear(); _lastMend.Clear(); _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = -1;
             _menUsed.Clear(); _daySkipLoot = _dayFolk = _usedErr = 0;
+            MuClear(); _muSeq = 0; _muStumbles = 0;   // F6 pkt 2
             ClearMatDay();
             P2Clear(); _p2Stumbles = 0;   // E8/P2
             WClear(); _wStumbles = 0;     // E8/W
@@ -127,7 +150,10 @@ namespace Armoury
             if (!_worn.TryGetValue(p, out byItem)) _worn[p] = byItem = new Dictionary<string, Dictionary<string, int>>();
             Dictionary<string, int> byMod;
             if (!byItem.TryGetValue(item, out byMod)) byItem[item] = byMod = new Dictionary<string, int>();
-            int v; byMod.TryGetValue(mod, out v); v += n;
+            int v; bool had = byMod.TryGetValue(mod, out v); v += n;
+            // F6 pkt 2: do ksiegi partii WCHODZI nowa pozycja (przedmiot albo jego stan, ktorego partia nie miala) - dopasowanie z pamieci liczono tylko dla typow,
+            // ktore mialy wtedy obite sztuki do naprawy, wiec moglo tego typu nie objac (przedmiot bez wpisu = "nikt nie nosi" = rezerwa 0). Pamiec tej partii precz
+            if (!had && n > 0) DropUsed(p);
             if (v > 0) byMod[mod] = v; else byMod.Remove(mod);
             if (byMod.Count == 0) byItem.Remove(item);
             if (byItem.Count == 0) _worn.Remove(p);
@@ -305,6 +331,7 @@ namespace Armoury
                         // wchodzil jako sprawny, a jej sprzet nie obijal sie w walce; taki "sprawny" lup szedl do kupca albo graczowi jako zwrot B6)
                         if (mp == null || mp.IsMainParty || !(mp.IsLordParty || mp.IsGarrison) || !mp.IsActive) continue;
                         _battleSince.Add(mp.StringId);   // przybytek do nastepnego spisu = lup (DTE doklada go w tym samym zdarzeniu)
+                        DropUsed(mp.StringId);           // F6 pkt 2: po bitwie inni ludzie i inna zbrojownia (polegli, lup, pociski) - rezerwa napraw liczy dopasowanie od nowa
                         if (p2) P2Ammo(me, side, mep, mp);   // E8/P2 (244, PLAN 8.4a): ile pociskow zeszloby tej partii - nic nie zdejmuje, bez losowania
                         float intensity = WBattle(mep, mp, s);   // E8/W (249, R4): natezenie bitwy tej partii i straty do linii (tylko licznik)
                         if (ammo) AmmoUse(me, side, mp, intensity);   // E8/W (PLAN 8.4a): pociski schodza ze zbrojowni - tylko przy AiAmmoUse (W CIENIU: domyslnie wylaczone)
@@ -719,20 +746,46 @@ namespace Armoury
             if (!_worn.TryGetValue(mp.StringId, out byItem)) return 0;
             MendMaterial.Bench bench = MendMaterial.MenAndLordsOn && st != null && st.IsTown ? new MendMaterial.Bench(st) : null;
             if (bench != null && !bench.Ok) bench = null;
-            // E6/N1 (217): rezerwa tylko na to, co kowale naprawia - przy AiMendsWornOnly obite sztuki, ktore nosza ludzie (dopasowanie z pamieci doby);
-            // dotad rezerwa obejmowala tez lup ponad potrzebe, ktorego nikt nie naprawi (sakiewka trzymana na zawsze)
-            var used = WornOnlyOn ? UsedByMen(mp, byItem, false) : null;
+            // E6/N1 (217): rezerwa tylko na to, co kowale naprawia - przy AiMendsWornOnly obite sztuki, ktore nosza ludzie (dopasowanie z pamieci - F6 pkt 2:
+            // do 5-8 dob, dotad do konca doby); dotad rezerwa obejmowala tez lup ponad potrzebe, ktorego nikt nie naprawi (sakiewka trzymana na zawsze)
+            bool oldMem = false;
+            var used = WornOnlyOn ? UsedByMen(mp, byItem, false, out oldMem) : null;
             var arm = used != null ? Armory(mp) : null;
             // E8/W (249, LAWA 15, R5): robocizna rezerwy przy placach miasta, w ktorym partia stoi - tyle zaplaci za naprawe (UnitCost(.., st) w MendInTown);
             // dotad zawsze poziom 1 (rezerwa za mala w bogatym miescie, za duza w biednym). Bez miasta (pole, zamek) - poziom 1 jak dotad
             Settlement wageAt = QueueOn && st != null && st.IsTown ? st : null;
+            sum = ReserveSum(byItem, used, arm, bench, wageAt);
+            // F6 pkt 2 (R9): co 64. rezerwa policzona z pamieci starszej niz doba liczona tez ze swiezego dopasowania - tylko licznik linii doby. Bez lawy
+            // (szacunek materialu z polki ma wlasny licznik w linii E8/B - probka nie moze go ruszyc); to droga markietanow, zaopatrzenia BK i zamkow
+            if (oldMem && used != null && bench == null && (++_muSeq & 63) == 0) ProbeReserve(mp, byItem, arm, wageAt, sum);
+            return sum;
+        }
+
+        /// <summary>
+        /// Suma rezerwy po ksiedze obitych partii (petla wydzielona z OutstandingCost w F6 pkt 2 - probka liczy ja drugi raz). used = null - stara regula:
+        /// wszystkie obite. F6 pkt 2 (TRIAZ A3-7 podpunkt 3), TEN SAM WYNIK mniejsza praca: przedmiot bez wolnych sztuk (ludzie nosza wszystkie) - kazdy
+        /// stan w calosci, bez MenWornLots (dwie listy, sortowanie i dwa dodatkowe odczyty stanu na przedmiot - oddalby dokladnie te stany i liczby);
+        /// wolnych sztuk co najmniej tyle, ile obitych - MenWornLots oddalby pusta liste, przedmiot pominiety; MenWornLots tylko w przypadku mieszanym.
+        /// </summary>
+        private static int ReserveSum(Dictionary<string, Dictionary<string, int>> byItem, Dictionary<string, int> used, Dictionary<ItemObject, int> arm, MendMaterial.Bench bench, Settlement wageAt)
+        {
+            int sum = 0;
             foreach (var it in byItem)
             {
                 var item = MBObjectManager.Instance.GetObject<ItemObject>(it.Key); if (item == null) continue;
                 if (used != null)
                 {
+                    int free = FreeOf(arm, item, used);
+                    if (free <= 0)
+                    {
+                        foreach (var m in it.Value) if (m.Value > 0) sum += LotCost(item, Mod(m.Key), bench, wageAt) * m.Value;
+                        continue;
+                    }
+                    int worn = 0;
+                    foreach (var m in it.Value) if (m.Value > 0) worn += m.Value;
+                    if (free >= worn) continue;
                     int skipped = 0;
-                    foreach (var lot in MenWornLots(it.Value, FreeOf(arm, item, used), ref skipped))
+                    foreach (var lot in MenWornLots(it.Value, free, ref skipped))
                         sum += LotCost(item, Mod(lot.Key), bench, wageAt) * lot.Value;
                     continue;
                 }
@@ -740,6 +793,20 @@ namespace Armoury
                     sum += LotCost(item, Mod(m.Key), bench, wageAt) * m.Value;
             }
             return sum;
+        }
+
+        /// <summary>F6 pkt 2 (R9, tylko licznik): rezerwa tej partii ze SWIEZEGO dopasowania obok rezerwy z pamieci (fromMem) - pamieci nie rusza, wyniku nie zmienia.</summary>
+        private static void ProbeReserve(MobileParty mp, Dictionary<string, Dictionary<string, int>> byItem, Dictionary<ItemObject, int> arm, Settlement wageAt, int fromMem)
+        {
+            try
+            {
+                var now = UsedNow(mp, byItem);
+                if (now == null) return;
+                int fresh = ReserveSum(byItem, now, arm, null, wageAt);
+                _muProbes++; _muProbeGold += fresh;
+                if (fresh != fromMem) { _muProbeDiff++; _muProbeAbs += Math.Abs(fromMem - fresh); _muProbeNet += fromMem - fresh; }
+            }
+            catch (Exception e) { if (++_muStumbles <= 3) Log.Error("AiWear.ProbeReserve (potkniecie " + _muStumbles + ")", e); }   // per partia, bez wylacznika (CLAUDE.md 7)
         }
 
         /// <summary>Rezerwa na jedna sztuke (wydzielone z OutstandingCost w E6/N1 - bez zmiany): robocizna + szacunek materialu z polki; 0 - nie do naprawy.
@@ -763,13 +830,29 @@ namespace Armoury
         // obite (ta sama kolejnosc co sprzedaz nadwyzki - TakeCondition bierze najgorsza); obite ponad wolne nosza ludzie - tylko te ida do kowala.
         // Obity lup ponad potrzebe zostaje obity: sprzedaz nadwyzek (MenPurse.SellArmorySurplus) oddaje go kupcowi w jego stanie (wrak - zlom, paczka 158).
 
-        /// <summary>Ile sztuk kazdego przedmiotu nosza ludzie partii (id -> sztuk). fresh = false - wynik z tej samej doby, jesli jest. null - blad (jak dotad: wszystkie).
-        /// Dopasowanie tylko dla typow, w ktorych sa obite sztuki do naprawy (koszt).</summary>
-        private static Dictionary<string, int> UsedByMen(MobileParty mp, Dictionary<string, Dictionary<string, int>> byItem, bool fresh)
+        /// <summary>Ile sztuk kazdego przedmiotu nosza ludzie partii (id -> sztuk). fresh = false (rezerwa napraw) - wynik z pamieci, jesli jest mlodszy niz
+        /// UsedKeepDays partii (F6 pkt 2: 5-8 dob; dotad tylko z tej samej doby) i nie z przyszlosci; fresh = true (naprawa w miescie) - zawsze liczone i zapisane.
+        /// old - wynik z pamieci starszej niz dzisiejsza (do probki). null - blad (jak dotad: wszystkie). Pamiec gasi bitwa i nowa pozycja ksiegi obitych (DropUsed).</summary>
+        private static Dictionary<string, int> UsedByMen(MobileParty mp, Dictionary<string, Dictionary<string, int>> byItem, bool fresh, out bool old)
         {
+            old = false;
             int today = (int)CampaignTime.Now.ToDays;
             KeyValuePair<int, Dictionary<string, int>> c;
-            if (!fresh && _menUsed.TryGetValue(mp.StringId, out c) && c.Key == today) return c.Value;
+            if (!fresh && _menUsed.TryGetValue(mp.StringId, out c) && c.Key <= today && today - c.Key < UsedKeepDays(mp.StringId))
+            {
+                if (c.Key == today) _muToday++; else { _muOld++; old = true; }
+                return c.Value;
+            }
+            if (fresh) _muFresh++; else _muCalc++;
+            var res = UsedNow(mp, byItem);
+            if (res != null) _menUsed[mp.StringId] = new KeyValuePair<int, Dictionary<string, int>>(today, res);
+            return res;
+        }
+
+        /// <summary>Dopasowanie "co nosza ludzie" policzone teraz, bez pamieci (cialo UsedByMen sprzed F6 pkt 2 - bez zmiany; wola je tez probka). null - blad.
+        /// Dopasowanie tylko dla typow, w ktorych sa obite sztuki do naprawy (koszt).</summary>
+        private static Dictionary<string, int> UsedNow(MobileParty mp, Dictionary<string, Dictionary<string, int>> byItem)
+        {
             var res = new Dictionary<string, int>();
             try
             {
@@ -790,7 +873,6 @@ namespace Armoury
                 }
             }
             catch (Exception e) { if (++_usedErr <= 3) Log.Error("AiWear.UsedByMen (potkniecie " + _usedErr + ")", e); return null; }   // per partia, bez wylacznika (CLAUDE.md 7)
-            _menUsed[mp.StringId] = new KeyValuePair<int, Dictionary<string, int>>(today, res);
             return res;
         }
 
@@ -841,7 +923,8 @@ namespace Armoury
                 int cap = (int)(SmithHours.Available(st.Town) / perPiece);
                 var jobs = new List<KeyValuePair<string, string>>();   // przedmiot, modyfikator - najgorsze najpierw
                 // E6/N1 (217, R16): przy AiMendsWornOnly tylko obite sztuki, ktore nosza ludzie (dopasowanie swieze - raz na dobe na partie, pamiec dla rezerwy)
-                var used = WornOnlyOn ? UsedByMen(mp, byItem, true) : null;
+                bool oldMem;   // F6 pkt 2: naprawa liczy swiezo (fresh) - nigdy z pamieci
+                var used = WornOnlyOn ? UsedByMen(mp, byItem, true, out oldMem) : null;
                 if (used != null)
                 {
                     var arm = Armory(mp);
@@ -1001,11 +1084,36 @@ namespace Armoury
             }
             if (_dayStamp >= 0 && P2On) P2Line();   // E8/P2 (244): przed zerowaniem licznikow doby - te same doby i ta sama etykieta co linia "Zuzycie AI"
             if (_dayStamp >= 0) WLine();            // E8/W (249): jw. - stara i nowa regula w tym samym biegu
+            if (_dayStamp >= 0) MuLine();           // F6 pkt 2: pamiec dopasowania rezerwy napraw (tylko log)
             _dayLoot = _dayWorn = _dayMended = _dayPaid = 0; _dayStamp = d;
             _daySkipLoot = _dayFolk = 0;
             ClearMatDay();
             P2Clear();
             WClear();
+            MuClear();
+        }
+
+        /// <summary>
+        /// F6 pkt 2 (TRIAZ zb58 A3-7): linia "Rezerwa napraw AI - pamiec dopasowania (F6)" - przy zmianie doby ksiegi (etykieta jak "Zuzycie AI"), gdy bylo co
+        /// liczyc. Ile rezerw wzielo dopasowanie z pamieci tej doby (tak bylo i przed poprawka), ile z pamieci starszej (to jest oszczednosc), ile liczylo od
+        /// nowa; ile pamieci zgasila bitwa albo nowa pozycja ksiegi; probka 1/64: ile razy rezerwa z pamieci starszej rozni sie od rezerwy ze swiezego
+        /// dopasowania i o ile zlota (rezerwa to kwota trzymana w sakiewce na kowala - roznica nie tworzy ani nie gubi zlota, przesuwa je w czasie).
+        /// </summary>
+        private static void MuLine()
+        {
+            try
+            {
+                if (_muToday + _muOld + _muCalc + _muFresh + _muDrop <= 0) return;
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
+                Log.Info("Rezerwa napraw AI - pamiec dopasowania (F6): dzien " + _dayStamp
+                         + " | rezerwy z dopasowaniem z pamieci tej doby " + _muToday + ", z pamieci starszej (wazna 5-8 dob wedlug partii) " + _muOld + ", liczone od nowa " + _muCalc
+                         + " | swieze dopasowanie przy naprawie w miescie " + _muFresh
+                         + " | pamiec zgaszona (bitwa, nowa pozycja ksiegi obitych) " + _muDrop + ", partii z pamiecia " + _menUsed.Count
+                         + " | probka 1/64 rezerw z pamieci starszej (bez lawy): " + _muProbes + ", inna niz ze swiezego dopasowania w " + _muProbeDiff
+                         + " (swieza razem " + _muProbeGold.ToString(ci) + " zl, roznica bezwzgledna " + _muProbeAbs.ToString(ci) + " zl, netto pamiec - swieza "
+                         + _muProbeNet.ToString(ci) + " zl) | potkniecia (sesja) " + _muStumbles + ".");
+            }
+            catch (Exception e) { if (++_muStumbles <= 3) Log.Error("AiWear.MuLine (potkniecie " + _muStumbles + ")", e); }
         }
 
         /// <summary>
