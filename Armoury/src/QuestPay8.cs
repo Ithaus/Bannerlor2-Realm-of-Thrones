@@ -80,20 +80,22 @@ namespace Armoury
         internal enum Who { Giver, Settlement, Here, Village, Field, Conv }
 
         /// <summary>Wyjatek od reguly domyslnej dla metody zadania (nazwa = poczatek nazwy metody; domkniecia maja nazwe "&lt;Metoda&gt;b__N").</summary>
-        internal sealed class Site { public string Stem, Method; public bool In; public Who Who; public string Field; }
+        /// Mult > 1: kontroferta, ktora gra liczy jako wielokrotnosc kwoty zadania ("kwota zadania x 2" w tekscie rozmowy) - skala tej wyplaty to kwota
+        /// zamrozona x Mult (recenzja E8/D1: bez tego gracz slyszal "2 x kwota po skali", a dostawal 1 x).
+        internal sealed class Site { public string Stem, Method; public bool In; public Who Who; public string Field; public int Mult = 1; }
 
-        private static Site In(string stem, string method, Who who, string field = null) { return new Site { Stem = stem, Method = method, In = true, Who = who, Field = field }; }
+        private static Site In(string stem, string method, Who who, string field = null, int mult = 1) { return new Site { Stem = stem, Method = method, In = true, Who = who, Field = field, Mult = mult }; }
         private static Site Out(string stem, string method, Who who) { return new Site { Stem = stem, Method = method, In = false, Who = who }; }
 
         private static readonly Site[] Sites =
         {
             // nic -> gracz: placi ten, kto sklada oferte (nie zleceniodawca)
             In("LandLordCompanyOfTrouble", "persuasion_complete_with_company_of_trouble_on_consequence", Who.Conv),   // lord kupuje kompanie (G :641)
-            In("LordWantsRivalCaptured", "QuestFailCounterOfferAccepted", Who.Field, "_targetHero"),                  // rywal placi za wolnosc (G :619)
+            In("LordWantsRivalCaptured", "QuestFailCounterOfferAccepted", Who.Field, "_targetHero", 2),               // rywal placi za wolnosc RewardGold x 2 (G :612, :619)
             In("GangLeaderNeedsToOffloadStolenGoods", "SucceedQuestByPayingAndGivingTheGoodsBack", Who.Field, "_counterOfferHero"),   // kupiec odkupuje towar (G :733)
             In("GangLeaderNeedsToOffloadStolenGoods", "FailQuestByGivingBackTheGoods", Who.Field, "_counterOfferHero"),               // (G :767)
             In("BettingFraud", "MainHeroAcceptsCounterOffer", Who.Field, "_counterOfferNotable"),                     // notabl placi za zdrade (G :797)
-            In("RivalGangMovingIn", "OnBattleWonWithBetrayal", Who.Field, "_rivalGangLeader"),                        // rywal herszta (SB)
+            In("RivalGangMovingIn", "OnBattleWonWithBetrayal", Who.Field, "_rivalGangLeader", 2),                     // rywal herszta placi _rewardGold x 2 (SB :861, :1432)
             In("SnareTheWealthy", "OnFail2", Who.Field, "_targetMerchantCharacter"),                                  // ostrzezony kupiec (SB)
             In("RevenueFarming", "ProgressRevenueCollectionForVillage", Who.Village),                                 // wplata godzinowa z kiesy wsi (G :611)
             // gracz -> nic
@@ -507,7 +509,7 @@ namespace Armoury
         private sealed class Plan
         {
             public int Amount, Due, GameAmount; public bool In, Handle;
-            public Hero Hero; public Settlement St; public bool Village; public string Stem, What; public Pledge P; public bool FrozenP;
+            public Hero Hero; public Settlement St; public bool Village; public string Stem, What; public Pledge P; public bool FrozenP; public int Mult = 1;
         }
 
         /// <summary>Wrapper wyplat (GiverPay.PayFromGiver): true = wyplata zrobiona tutaj, false = wywolanie gry bez zmian.</summary>
@@ -554,7 +556,8 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null) return null;
             Resolve(f);
-            var p = new Plan { In = true, Amount = amount, Due = amount, GameAmount = amount, Stem = f.Stem, What = f.R.Label };
+            var site = f.R.In;
+            var p = new Plan { In = true, Amount = amount, Due = amount, GameAmount = amount, Stem = f.Stem, What = f.R.Label, Mult = site != null && site.Mult > 1 ? site.Mult : 1 };
             if (s.QuestRewardInWageDays)
             {
                 var issue = f.Issue ?? IssueOf(f.Quest);
@@ -562,8 +565,11 @@ namespace Armoury
                 if (pl != null) { p.FrozenP = true; _inFrozen++; }
                 else { pl = MakePledge(issue, f.Quest, f.Stem, 0); _inComputed++; }
                 p.P = pl;
-                if (pl.Cap > 0 && pl.Cap < p.Due) p.Due = pl.Cap;
-                if (pl.Game > amount && amount == Math.Min(pl.Game, pl.Cap)) p.GameAmount = pl.Game;   // getter pokazal juz kwote po skali
+                // kontroferta "kwota zadania x Mult" (tabela Sites): skala i kwota gry tej wyplaty to wielokrotnosc kwoty zamrozonej - tyle pokazal tekst rozmowy
+                long cap = Math.Min((long)int.MaxValue, (long)pl.Cap * p.Mult);
+                long game = Math.Min((long)int.MaxValue, (long)pl.Game * p.Mult);
+                if (cap > 0 && cap < p.Due) p.Due = (int)cap;
+                if (game > amount && amount == Math.Min(game, cap)) p.GameAmount = (int)game;   // getter pokazal juz kwote po skali
             }
             _inN++; _inGame += p.GameAmount; _inDue += p.Due;
             Tally(f.Stem, p.GameAmount, p.Due);
@@ -574,7 +580,6 @@ namespace Armoury
                 return p;
             }
             p.Handle = true;
-            var site = f.R.In;
             var who = site != null ? site.Who : Who.Giver;
             if (who == Who.Village) { p.St = VillageHere(); p.Village = true; }
             else if (who == Who.Field) p.Hero = HeroField(f, site.Field);
@@ -620,6 +625,7 @@ namespace Armoury
                 var pl = p.P;
                 Log.Info("Nagrody zadan (E8/D1): wyplata - " + p.Stem + " (" + p.What + "): kwota gry " + p.GameAmount + ", po skali " + p.Due
                          + (pl != null ? " (praca " + pl.N + " x " + pl.D.ToString("0.#", Inv) + " dni x " + pl.Rate.ToString("0.00", Inv) + " x " + Premium.ToString("0.##", Inv) + " = " + pl.Labor
+                                         + (p.Mult > 1 ? ", kontroferta x " + p.Mult.ToString(Inv) : "")
                                          + (p.FrozenP ? ", kwota zamrozona przy przyjeciu" : ", liczona przy wyplacie") + ")" : " (skala wylaczona)")
                          + ", platnik " + payer + ", zaplacone " + paid + ".");
             }
