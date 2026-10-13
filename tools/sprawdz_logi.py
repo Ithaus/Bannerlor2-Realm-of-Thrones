@@ -399,8 +399,13 @@ Uzycie (Python 3, tylko odczyt):
                     chleb (swiat >= 98%, miast < 95% <= 10, bez zaplaty <= 2.5%), zwrot zoldu i renty 180, dlug koron w Banku, zloto rodow z luzem pulapu
                     (linia P1 albo budzet-rodow.csv), 31 najbiedniejszych miast (kiesa-ludu.csv), wojsko (INFO), lojalnosc (sam odczyt), pomiary do P2-P4
                     (kupione z oferty, marza z karawan, zbytki na sucho, warsztaty zbytkow, lokata a budowy, sklad zarobku - INFO), czas poboru < 0.1 ms.
-                    --do-doby >= 364 i log do doby 360: progi roczne (d364, okno d301-364); krocej: wersja "bieg 120 dob po P1" (ostatnie 30 dob okna).
+                    --do-doby >= 364 i log do doby 360: progi roczne (d364, okno d301-364); krocej: wersja "bieg 120 dob po P1" (ostatnie 30 dob okna) -
+                    progi stanu d120 (P1-1, P1-4) daja werdykt tylko, gdy okno konczy sie w dobach 115-125, inaczej INFO z liczba (recenzja P1).
                     Log bez P1 (bieg odniesienia): wiersze paczki = INFO z liczba, kontrole zamkniecia jak zwykle.
+                    Po recenzji P1: P1-1b lokata W wedlug poboru (krolestwa z poborem / wojna bez potrzeby s = 0 / pokoj / bez krolestwa - z wierszy
+                    krolestw linii "Danina z oszczednosci (P1)", pole "W miast"); P1-1 i P1-3 ponad progiem TYLKO o lokate krolestw bez poboru = DECYZJA
+                    (zasada "korona bez potrzeby nie bierze", nie blad paczki); P1-2 jednostronnie (przyrost <= +10 tys.); gorna granica P1-4 = INFO;
+                    P1-5c ponad 0.1% przy resztce R w progu = DECYZJA (bieg bazowy bez P1 mial 0.111% w d364 i 21% okien ponad 0.1%).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -14322,7 +14327,8 @@ def etap8_main(logp, start_arg, until=120, csp=None):
 
 
 def _k1_kingdoms(s):
-    """Linia "Danina z oszczednosci (P1)": odcinek "| na krolestwo: ..." -> lista slownikow (nazwa, s, stawka dnia, danina, nadwyzka ludu po, zwrot, renty, kredyt 186)."""
+    """Linia "Danina z oszczednosci (P1)": odcinek "| na krolestwo: ..." -> lista slownikow (nazwa, s, stawka dnia, danina, nadwyzka ludu po, w tym W miast
+    (None w linii sprzed poprawek po recenzji), zwrot, renty, kredyt 186). Od poprawek wiersz ma kazde krolestwo z nadwyzka ludu - takze pokoj i s = 0."""
     i = s.find("| na krolestwo: ")
     if i < 0:
         return []
@@ -14332,7 +14338,7 @@ def _k1_kingdoms(s):
     out = []
     if seg.strip() in ("-", ""):
         return out
-    kre = re.compile(r"^(.*?): s ([\d.]+)%( \(pokoj\))?, stawka dnia ([\d.]+)%, danina (\d+)(?: \((.*?)\))?, nadwyzka ludu po (\d+)"
+    kre = re.compile(r"^(.*?): s ([\d.]+)%( \(pokoj\))?, stawka dnia ([\d.]+)%, danina (\d+)(?: \((.*?)\))?, nadwyzka ludu po (\d+)(?: \(W miast (\d+)\))?"
                      r"(?:, zwrot (\d+)/(\d+), renty (\d+), kredyt186 (\d+))?")
     for part in seg.split(" ; "):
         m = kre.match(part)
@@ -14340,8 +14346,8 @@ def _k1_kingdoms(s):
             out.append({"bad": part[:80]})
             continue
         out.append({"name": m.group(1), "s": float(m.group(2)), "peace": bool(m.group(3)), "rate": float(m.group(4)), "aid": int(m.group(5)),
-                    "over": int(m.group(7)), "given": int(m.group(8) or 0), "due": int(m.group(9) or 0), "rent": int(m.group(10) or 0),
-                    "loan": int(m.group(11) or 0)})
+                    "over": int(m.group(7)), "overw": (int(m.group(8)) if m.group(8) is not None else None),   # overw: lokata W miast krolestwa (od poprawek po recenzji P1)
+                    "given": int(m.group(9) or 0), "due": int(m.group(10) or 0), "rent": int(m.group(11) or 0), "loan": int(m.group(12) or 0)})
     return out
 
 
@@ -14375,7 +14381,10 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
     obg = by_day(lines, "Obieg: dzien")
     last = full[-1] if full else None
     year = until >= 364 and last is not None and run_day(last, start) >= 360
-    mode = "roczny" if year else "120 dob"
+    # recenzja P1: progi stanu "d120" (P1-1 <= 4.5 mln, P1-4 >= 40 tys.) maja sens tylko, gdy okno konczy sie przy dobie 120 - na oknie 60 dob danina
+    # dopiero rosnie (falszywe NIE), a lokata jest mala i bez daniny (TAK za darmo); bieg roczny urwany przed doba 360 tez tu trafia
+    at120 = (not year) and last is not None and 115 <= run_day(last, start) <= 125
+    mode = "roczny" if year else ("120 dob" if at120 else f"okno do doby {run_day(last, start) if last is not None else '-'} - ani roczne, ani 120 dob (115-125): progi stanu = INFO")
     print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia Kiesa ludu {len(win)} (pelnych, kiesa czynna {len(full)})"
           f" | wersja progow: {mode}" + (" | REGULA KONI ROBOCZYCH (--regula-koni)" if horses else ""))
     if not full:
@@ -14417,25 +14426,71 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
     # ---- P1-1 lokata W (kiesa W ponad zapas dni, po daninie)
     lok = {d: kn(r"lokata \(kiesa W ponad zapas dni\) (\d+)", d) for d in full}
     lv = lok.get(last)
+    # recenzja P1: lokata swiata wedlug poboru. Danina bierze tylko tam, gdzie korona jest w wojnie i ma potrzebe (s > 0); skrzynie miast krolestw bez
+    # potrzeby (w biegu bazowym 13.10 Dothrakowie caly rok, Nocna Straz, pod koniec Iron Islands i Free Folk), w pokoju i rodow bez krolestwa zostaja -
+    # to zasada projektu (rozdz. 6), nie blad paczki. Zrodlo: wiersze krolestw linii daniny z ostatniej doby okna (pole "W miast").
+    lev = nolev = None
+    war0, pea, rest = [], [], 0
+    if p1 and lv is not None and last in dan and "W miast = lokata wyrobnikow" in dan[last]:
+        rows1 = [k for k in _k1_kingdoms(dan[last]) if "bad" not in k and k.get("overw") is not None]
+        lev = min(lv, sum(k["overw"] for k in rows1 if k["rate"] > 0))
+        war0 = sorted(((k["overw"], k["name"]) for k in rows1 if k["rate"] <= 0 and not k["peace"] and k["overw"] > 0), reverse=True)
+        pea = sorted(((k["overw"], k["name"]) for k in rows1 if k["rate"] <= 0 and k["peace"] and k["overw"] > 0), reverse=True)
+        nolev = max(0, lv - lev)                                   # wojna bez potrzeby + pokoj + bez krolestwa (reszta do lokaty swiata)
+        rest = max(0, nolev - sum(x[0] for x in war0) - sum(x[0] for x in pea))
     if year:
-        lim1, rule1 = (12e6 if horses else 6e6), ("<= 12 mln (regula koni)" if horses else "<= 6 mln (bieg 13.10 bez P1: 23.8 mln)")
+        lim1, rule1 = (12e6 if horses else 6e6), ("<= 12 mln (regula koni)" if horses else "<= 6 mln (biegi 13.10 bez P1: 23.8 i 29.5 mln)")
+    elif at120:
+        lim1, rule1 = (None if horses else 4.5e6), ("INFO (regula koni: prog dopiero w biegu rocznym <= 12 mln)" if horses else "<= 4.5 mln w d120 (biegi 13.10 bez P1: 8.9 i 10.6 mln)")
     else:
-        lim1, rule1 = (None if horses else 4.5e6), ("INFO (regula koni: prog dopiero w biegu rocznym <= 12 mln)" if horses else "<= 4.5 mln w d120 (bieg 13.10 bez P1: 8.9 mln)")
-    rep.add(f"P1-1: lokata W w dobie {run_day(last, start)} (kiesa wyrobnikow ponad zapas dni)", (f"{lv / 1e6:.2f} mln" if lv is not None else "brak pola") + pinfo, rule1,
-            (lv <= lim1) if (p1 and lv is not None and lim1 is not None) else None)
+        lim1, rule1 = None, "INFO - prog stanu tylko w d120 (<= 4.5 mln, okno do doby 115-125) i w d364 (<= 6 mln)"
+    if lim1 is not None:
+        rule1 += ("; ponad progiem tylko o lokate krolestw bez poboru (korona bez potrzeby nie bierze - projekt rozdz. 6) = DECYZJA"
+                  + ("" if horses else "; szacunek z danych biegu bazowego: " + ("7-9 mln, z tego ok. 4 mln bez poboru" if year else "5-10 mln, z tego ok. 3-4 mln bez poboru")))
+    ok1, dec1 = None, False
+    if p1 and lv is not None and lim1 is not None:
+        if lv <= lim1:
+            ok1 = True
+        else:
+            ok1, dec1 = False, (nolev is not None and lv - nolev <= lim1)
+    rep.add(f"P1-1: lokata W w dobie {run_day(last, start)} (kiesa wyrobnikow ponad zapas dni)",
+            (f"{lv / 1e6:.2f} mln" if lv is not None else "brak pola") + (f", z tego w krolestwach z poborem {lev / 1e6:.2f} mln, bez poboru {nolev / 1e6:.2f} mln" if nolev is not None else "") + pinfo,
+            rule1, ok1, decide=dec1)
+    if nolev is not None:
+        def top4(xs):
+            return ", ".join(f"{n} {v / 1e6:.2f}" for v, n in xs[:4]) or "-"
+        rep.add(f"P1-1b: lokata W wedlug poboru w dobie {run_day(last, start)} (wiersze krolestw linii daniny; INFO)",
+                (f"z poborem {lev / 1e6:.2f} mln; bez poboru {nolev / 1e6:.2f} mln ({100.0 * nolev / lv:.0f}% lokaty): wojna bez potrzeby (s = 0) {sum(x[0] for x in war0) / 1e6:.2f} mln [{top4(war0)}]"
+                 f", pokoj {sum(x[0] for x in pea) / 1e6:.2f} mln [{top4(pea)}], bez krolestwa {rest / 1e6:.2f} mln") if lv else "lokata 0",
+                "INFO - danina nie rusza skrzyn krolestw, ktorych korona nie ma potrzeby, ani krolestw w pokoju (zasada, nie blad); bieg bazowy 13.10 bez P1: w d364"
+                " w krolestwach bez poboru (s = 0 albo pokoj) kiesa W 6.75 mln z 38.7 mln, lokata ok. 5.6 mln z 29.5 mln (Dothrakowie s = 0 przez caly rok)", None)
+    else:
+        rep.add("P1-1b: lokata W wedlug poboru (krolestwa z poborem / bez)", "brak pola W miast w wierszach krolestw (log bez P1 albo sprzed poprawek po recenzji)",
+                "INFO (od poprawek po recenzji P1)", None)
     # ---- P1-2 przyrost lokaty w oknie
     if len(wa) >= 2 and lok.get(wa[0]) is not None and lok.get(wa[-1]) is not None:
         g2 = (lok[wa[-1]] - lok[wa[0]]) / float(max(1, wa[-1] - wa[0]))
-        rep.add(f"P1-2: przyrost lokaty W, srednia {wname}", f"{g2 / 1e3:+.1f} tys. zl/d" + pinfo, "w przedziale +-10 tys. zl/d (bieg 13.10 bez P1: +47.4 tys.)" + ("" if year else " - prog roczny, tu INFO"),
-                (abs(g2) <= 10e3) if (p1 and year) else None)
+        # recenzja P1: prog jednostronny - cel to "lokata przestaje rosnac"; spadek (danina zjada zapas, gdy kolejne krolestwa dochodza do pulapu s) nie jest wada
+        rep.add(f"P1-2: przyrost lokaty W, srednia {wname}", f"{g2 / 1e3:+.1f} tys. zl/d" + pinfo,
+                "<= +10 tys. zl/d (lokata przestaje rosnac; spadek dozwolony - szacunek z danych biegu bazowego -10..-20 tys.; biegi 13.10 bez P1: +47.4 i +64.9 tys.)"
+                + ("" if year else " - prog roczny, tu INFO"),
+                (g2 <= 10e3) if (p1 and year) else None)
     else:
-        rep.add("P1-2: przyrost lokaty W", "za krotkie okno albo brak pola", "+-10 tys. zl/d", None)
+        rep.add("P1-2: przyrost lokaty W", "za krotkie okno albo brak pola", "<= +10 tys. zl/d", None)
     # ---- P1-3 kiesy ludu miast
     kv = kn(r"\| kiesy (\d+) \(W ", last)
     lim3 = 26e6 if horses else 20e6
-    rep.add(f"P1-3: kiesy ludu miast w dobie {run_day(last, start)}", (f"{kv / 1e6:.2f} mln" if kv is not None else "brak pola") + pinfo,
-            (f"<= {lim3 / 1e6:.0f} mln" + (" (regula koni)" if horses else " (bieg 13.10 bez P1: 36.5 mln)")) + ("" if year else " - prog roczny, tu INFO"),
-            (kv <= lim3) if (p1 and year and kv is not None) else None)
+    ok3, dec3 = None, False
+    if p1 and year and kv is not None:
+        if kv <= lim3:
+            ok3 = True
+        else:
+            ok3, dec3 = False, (nolev is not None and kv - nolev <= lim3)
+    rep.add(f"P1-3: kiesy ludu miast w dobie {run_day(last, start)}",
+            (f"{kv / 1e6:.2f} mln" if kv is not None else "brak pola") + (f" (bez lokaty W krolestw bez poboru {(kv - nolev) / 1e6:.2f} mln)" if (kv is not None and nolev is not None) else "") + pinfo,
+            (f"<= {lim3 / 1e6:.0f} mln" + (" (regula koni)" if horses else " (biegi 13.10 bez P1: 36.5 i 44.0 mln)"))
+            + "; ponad progiem tylko o lokate krolestw bez poboru = DECYZJA" + ("" if horses else "; szacunek z danych biegu bazowego ok. 22 mln") + ("" if year else " - prog roczny, tu INFO"),
+            ok3, decide=dec3)
     # ---- P1-4 danina z oszczednosci (linia kiesy ludu - strona platnika)
     apat = r"danina z oszczednosci do korony \(P1\) (\d+) \(W (\d+) / R (\d+) / P (\d+); podzamcza (\d+)\)"
     aid = {}
@@ -14444,31 +14499,39 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
         if m:
             aid[d] = [int(m.group(i)) for i in range(1, 6)]
     if not aid:
-        rep.add("P1-4: danina z oszczednosci (linia Kiesa ludu)", "brak pola (log sprzed P1)", "45-90 tys. zl/d w d301-364; >= 40 tys. w d91-120", None)
+        rep.add("P1-4: danina z oszczednosci (linia Kiesa ludu)", "brak pola (log sprzed P1)", ">= 45 tys. zl/d w d301-364 (gorna granica projektu 90 tys. = INFO); >= 40 tys. w d91-120", None)
     else:
         av = [aid[d] for d in wa if d in aid]
         a4 = mean([x[0] for x in av])
         tot = sum(x[0] for x in aid.values())
         top = max(aid, key=lambda d: aid[d][0])
+        # recenzja P1: prog to DOLNA granica (danina plynie); gorna granica projektu (90 / 220 tys.) jest INFO - rachunek projektu przyjal nadwyzke
+        # +47 tys. zl/d, bieg bazowy z poprawkami wojska ma +65 tys., a danina dodatkowo zjada zapas (szacunek z danych: 85-115 tys. zl/d w d301-364)
         if year:
             lo4, hi4 = (130e3, 220e3) if horses else (45e3, 90e3)
-            rule4 = f"{lo4 / 1e3:.0f}-{hi4 / 1e3:.0f} tys. zl/d" + (" (regula koni)" if horses else "")
-        else:
+            rule4 = (f">= {lo4 / 1e3:.0f} tys. zl/d" + (" (regula koni)" if horses else "") + f"; gorna granica projektu {hi4 / 1e3:.0f} tys. = INFO, nie prog"
+                     + ("" if horses else " (szacunek z danych biegu bazowego 85-115 tys.)"))
+        elif at120:
             lo4, hi4 = 40e3, None
-            rule4 = ">= 40 tys. zl/d w d91-120 (nowa kampania: lokata musi urosnac - polowa drogi po 33 dobach)"
+            rule4 = ">= 40 tys. zl/d w d91-120 (nowa kampania: s rosnie tydzien po tygodniu i lokata musi urosnac; szacunek z danych biegu bazowego 50-75 tys.)"
+        else:
+            lo4, hi4 = None, None
+            rule4 = "INFO - prog tylko w d91-120 (>= 40 tys., okno do doby 115-125) i w d301-364 (>= 45 tys.)"
         ok4 = None
-        if p1 and a4 is not None:
-            ok4 = a4 >= lo4 and (hi4 is None or a4 <= hi4)
+        if p1 and a4 is not None and lo4 is not None:
+            ok4 = a4 >= lo4
         rep.add(f"P1-4: danina z oszczednosci, srednia {wname}",
                 (f"{a4 / 1e3:.1f} tys. zl/d (W {mean([x[1] for x in av]) / 1e3:.1f} / R {mean([x[2] for x in av]) / 1e3:.1f} / P {mean([x[3] for x in av]) / 1e3:.1f} / podzamcza {mean([x[4] for x in av]) / 1e3:.1f})"
-                 if a4 is not None else "brak dob w oknie") + f"; razem w oknie biegu {tot / 1e6:.2f} mln; najwieksza doba {aid[top][0]} (doba {run_day(top, start)})",
+                 if a4 is not None else "brak dob w oknie") + (f" - ponad gorna granice projektu {hi4 / 1e3:.0f} tys. (INFO)" if (a4 is not None and hi4 is not None and a4 > hi4) else "")
+                + f"; razem w oknie biegu {tot / 1e6:.2f} mln; najwieksza doba {aid[top][0]} (doba {run_day(top, start)})",
                 rule4, ok4)
         firsts = [d for d in sorted(aid) if aid[d][0] > 0]
         if firsts:
             f0 = firsts[0]
-            rep.add("P1-4b: pierwsza doba poboru (stary zapis = jednorazowy duzy wplyw; nowa kampania - po pierwszym kroku s)",
+            rep.add("P1-4b: pierwsza doba poboru (stary zapis = fala gasnaca przez 2-3 miesiace; nowa kampania - po pierwszym kroku s)",
                     f"doba {run_day(f0, start)}: {aid[f0][0]} zl; srednia pierwszych 7 dob poboru {mean([aid[d][0] for d in firsts[:7]]):.0f} zl/d",
-                    "INFO (projekt rozdz. 10 pkt 9: zapis z d364 - ok. 500 tys. zl pierwszego dnia; testowac na nowej kampanii)", None)
+                    "INFO (zapis z d364 biegu bazowego: ok. 0.6 mln zl pierwszej doby, ok. 0.3-0.4 mln zl/d po 30 dobach, razem ok. 13-15 mln w 30 dob wobec 0.45 mln zl/d"
+                    " wszystkich wplywow koron - progi kiesa1 i autotest TYLKO na nowej kampanii)", None)
     # ---- P1-5a kontrola zamknieta kies
     bad5 = []
     for d in full:
@@ -14502,7 +14565,10 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
         rep.add("P1-5b: zamkniecie - danina zdjeta z kies = dopisana skarbcom = wplyw dnia 165 = Obieg (ta sama doba)",
                 f"porownanych dob {cmpn}, roznych {len(diff)}" + (f" (pierwsza: d{diff[0][0]} {diff[0][1]})" if diff else ""),
                 "0 roznych (nic z niczego, nic w nicosc; wplyw tego samego dnia)", (len(diff) == 0) if cmpn else None)
-    # ---- P1-5c zloto swiata: okna 28 dob w progu 0.1% i reszta ksiegi
+    # ---- P1-5c zloto swiata: okna 28 dob w progu 0.1% i reszta ksiegi (rv - reszta R - liczona przed wierszem 5c: rozstrzyga NIE / DECYZJA)
+    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    cd = [d for d in full if d in cau]
+    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
     tot = {d: num(r"\| razem (-?\d+)", ps[d]) for d in ps if 2 <= run_day(d, start) <= until}
     tot = {d: v for d, v in tot.items() if v}
     td = sorted(tot)
@@ -14512,14 +14578,17 @@ def kiesa1_main(logp, start_arg, until=120, csvp=None, horses=False):
             lastw = [x for x in w28 if x[1] == td[-1]]
             worst = max(w28)
             lw = lastw[0][0] if lastw else None
+            over = sum(1 for x in w28 if x[0] >= 0.1)
+            # recenzja P1: prog 0.1% przekracza juz bieg bazowy bez P1 (0.111% w d364, 71 z 335 okien ponad 0.1%, najgorsze 0.332%) - zmiane sumy robia
+            # pozycje ksiegi sprzed paczki (zrodla i ujscia gry). Ponad progiem przy resztce R w progu (wszystko nazwane) = DECYZJA, nie NIE;
+            # o zamknieciu daniny rozstrzygaja P1-5a, P1-5b i P1-5d
             rep.add("P1-5c: zamkniecie - Pieniadz swiata, zmiana sumy w 28 dobach (ostatnie okno; najgorsze - INFO)",
-                    (f"{lw:.3f}%" if lw is not None else "brak ostatniego okna") + f"; najgorsze {worst[0]:.3f}% (doba {run_day(worst[1], start)})",
-                    "< 0.1% (bez skoku: danina to przelew kiesa -> skarbiec, suma swiata bez zmiany; bieg roczny 13.10 06:24 bez P1: 0.111% - nie z daniny)", (lw < 0.1) if lw is not None else None)
+                    (f"{lw:.3f}%" if lw is not None else "brak ostatniego okna") + f"; najgorsze {worst[0]:.3f}% (doba {run_day(worst[1], start)}); okien ponad 0.1%: {over} z {len(w28)}",
+                    "< 0.1% (danina to przelew kiesa -> skarbiec, suma swiata bez zmiany); ponad progiem przy resztce R w progu (P1-5d) = DECYZJA - bieg bazowy 13.10 06:24"
+                    " bez P1: 0.111% w d364, 71 z 335 okien ponad 0.1%, najgorsze 0.332% (pozycje ksiegi sprzed paczki, nie danina)",
+                    (lw < 0.1) if lw is not None else None, decide=(lw is not None and lw >= 0.1 and rv is not None and abs(rv) < 10000))
     else:
         rep.add("P1-5c: Pieniadz swiata, okno 28 dob", "za krotkie okno albo brak linii", "< 0.1% na 28 dob", None)
-    cau = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
-    cd = [d for d in full if d in cau]
-    rv = num(r"srednia 28 dob ([+-]?\d+)", cau[cd[-1]]) if cd else None
     rep.add("P1-5d: reszta ksiegi R (srednia 28 dob, ostatnia doba okna)", f"{rv}" if rv is not None else "brak linii", "|R| < 10 000 (prog etapu 3; bez nowej pozycji z niczego / w nicosc)",
             (abs(rv) < 10000) if rv is not None else None)
     errs = [s for s in lines if s.startswith("ERROR in ") and ("KingdomTreasury.WarAid" in s or "TownFolk.PayAid" in s or "TownFolk.P1." in s or "TownFolk.OfferClose" in s

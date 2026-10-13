@@ -24,8 +24,10 @@ namespace Armoury
     ///    w zwyklej kolejnosci (rata 186, dary, reparacje, kontrakty, wezwania, zwrot zoldu, renty 180).
     ///  - Linie: "Danina z oszczednosci (P1): dzien N" (dzien gry jak 184; po rentach 180, przed CrownIncome.End), dopisek w "Korona: wplywy dnia (165)",
     ///    w "Obieg" (korona) i w linii doby "Kiesa ludu:" (wydatek kies - kontrola zamknieta kies bez zmiany definicji).
-    ///  - Gracz: komunikat, gdy lud jego osady zaczyna placic (raz na wojne; stan w pamieci sesji - pierwsza doba po wczytaniu tylko zapamietuje), krol-gracz co
-    ///    7 dob suma daniny do skarbca. Bez spamu: najwyzej jeden komunikat kazdego rodzaju na dobe.
+    ///  - Gracz: komunikat, gdy lud jego osady zaczyna placic - raz na wojne (stan w pamieci sesji: zeruje go pokoj krolestwa gracza, zmiana krolestwa albo
+    ///    utrata osady, NIE s = 0 w trwajacej wojnie; pierwsza doba po wczytaniu tylko zapamietuje - WaPlayerSweep), z czescia dzisiejsza i najwyzsza;
+    ///    krol-gracz co 7 dob suma daniny do skarbca. Bez spamu: najwyzej jeden komunikat kazdego rodzaju na dobe.
+    ///  - Odczyt dla okna mieszkancow (FolkWarAidRate) nie zapisuje pamieci stanu wojny doby (WaAtWarPeek) - pobor 184 i danina licza wojne w takcie doby.
     /// Wyjatek per pobor / per linia - licznik potkniec (pierwszy do pliku), bez globalnych wylacznikow (CLAUDE.md 7). Zapis gry: nic nowego.
     /// </summary>
     internal static partial class KingdomTreasury
@@ -44,10 +46,12 @@ namespace Armoury
         private static readonly int[] _waWhy = new int[WaWhyN];
         private static long _waHeld; private static int _waCalls, _waHeldN, _waTowns, _waCastles, _waStumbles;
         private static readonly HashSet<string> _waErr = new HashSet<string>();
-        // gracz (pamiec sesji): osady rodu gracza - czy placily przy ostatnim poborze; nazwy do komunikatu tej doby; suma tygodnia krola-gracza
-        private static readonly Dictionary<Settlement, bool> _waPlayer = new Dictionary<Settlement, bool>();
+        // gracz (pamiec sesji): osady rodu gracza, o ktorych komunikat poczatku poboru juz byl W TEJ WOJNIE (wartosc - krolestwo, ktoremu placa; wpis znika
+        // przy pokoju, bez krolestwa, po zmianie krolestwa i po utracie osady - WaPlayerSweep); nazwy do komunikatu tej doby; suma tygodnia krola-gracza
+        private static readonly Dictionary<Settlement, Kingdom> _waPlayer = new Dictionary<Settlement, Kingdom>();
+        private static readonly List<Settlement> _waGone = new List<Settlement>();
         private static readonly List<string> _waTell = new List<string>();
-        private static double _waTellRate;
+        private static double _waTellRate, _waTellTop;
         private static int _waDawns, _waKingDays;
         private static long _waKingSum;
         /// <summary>"Obieg" (korona): danina z oszczednosci ludu pobrana w tej dobie (kiesy ludu -> skarbce).</summary>
@@ -58,7 +62,7 @@ namespace Armoury
             _waWindow.Clear(); _waCarry.Clear(); _waK.Clear(); _waPlaces.Clear();
             Array.Clear(_waCls, 0, WtClasses); Array.Clear(_waWhy, 0, WaWhyN);
             _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waStumbles = 0; _waErr.Clear();
-            _waPlayer.Clear(); _waTell.Clear(); _waTellRate = 0; _waDawns = 0; _waKingDays = 0; _waKingSum = 0;
+            _waPlayer.Clear(); _waGone.Clear(); _waTell.Clear(); _waTellRate = 0; _waTellTop = 0; _waDawns = 0; _waKingDays = 0; _waKingSum = 0;
             LastFolkWarAid = 0;
         }
 
@@ -82,8 +86,22 @@ namespace Armoury
             return c > 0 ? c : 0.03;
         }
 
-        /// <summary>Stawka dnia daniny osady (ulamek nadwyzki ponad zapas) BEZ bramki oblezenia; 0 i powod, gdy nie placi. k - krolestwo wlasciciela osady.</summary>
-        private static double WaRate(Settlement st, Settings s, out Kingdom k, out int why)
+        /// <summary>
+        /// Stan wojny krolestwa dla sciezek ODCZYTU spoza taktu doby (okno mieszkancow) - BEZ zapisu pamieci doby _wtWar (recenzja P1): takt doby nie jest
+        /// zrownany z granica licznika dob, wiec okno otwarte po zmianie licznika, a przed taktem, zapisaloby przez WtAtWar stan wojny, z ktorego w takcie
+        /// korzysta pobor 184 i danina (pokoj zawarty w miedzyczasie = doba poboru w pokoju). Tu: pamiec tylko czytana (ta sama doba i wpis jest), inaczej
+        /// stan liczony na swiezo i NIE zapamietywany. W takcie doby wynik ten sam co WtAtWar.
+        /// </summary>
+        private static bool WaAtWarPeek(Kingdom k)
+        {
+            bool w;
+            if (_wtWarDay == (int)CampaignTime.Now.ToDays && _wtWar.TryGetValue(k, out w)) return w;
+            return AtWar(k);
+        }
+
+        /// <summary>Stawka dnia daniny osady (ulamek nadwyzki ponad zapas) BEZ bramki oblezenia; 0 i powod, gdy nie placi. k - krolestwo wlasciciela osady.
+        /// peek - sciezka odczytu (okno, pomiary): stan wojny bez zapisu pamieci doby (WaAtWarPeek); pobor i linia doby - WtAtWar jak podatek 184.</summary>
+        private static double WaRate(Settlement st, Settings s, bool peek, out Kingdom k, out int why)
         {
             k = null; why = WaOff;
             if (s == null || !s.FolkWarAid || !WtOn) return 0;
@@ -91,15 +109,23 @@ namespace Armoury
             if (k == null || k.IsEliminated) { why = WaNoRealm; return 0; }
             why = WaNoNeed;
             var w = WtOf(k, false);
-            if (w == null || w.S <= 0 || !WtAtWar(k)) return 0;
+            if (w == null || w.S <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;
             double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(w.S, WtCap(k, s)) / WaBaseCap(s);
             if (!(rate > 0)) return 0;
             why = WaPaid;
             return rate > 1 ? 1 : rate;
         }
 
+        /// <summary>Najwyzsza stawka dnia daniny w tym krolestwie przy dzisiejszych prawach (s na pulapie krolestwa: 3%, z polityka War Tax 6%) - do komunikatu gracza.</summary>
+        private static double WaTopRate(Kingdom k, Settings s)
+        {
+            double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * WtCap(k, s) / WaBaseCap(s);
+            return rate > 1 ? 1 : rate;
+        }
+
         /// <summary>
-        /// Stawka dnia daniny tej osady dzis (ulamek nadwyzki ponad zapas) - TYLKO ODCZYT (bez licznikow i bez zlota): okno mieszkancow i pomiary.
+        /// Stawka dnia daniny tej osady dzis (ulamek nadwyzki ponad zapas) - TYLKO ODCZYT (bez licznikow, bez zlota i bez zapisu pamieci stanu wojny doby -
+        /// WaAtWarPeek): okno mieszkancow i pomiary.
         /// 0 i powod: wylaczone / kiesa nieczynna / bez 165 (WaOff), rod bez krolestwa (WaNoRealm), pokoj albo s = 0 (WaNoNeed), osada oblezona (WaSiege).
         /// </summary>
         internal static double FolkWarAidRate(Settlement st, out int why)
@@ -109,7 +135,7 @@ namespace Armoury
             {
                 if (st == null) return 0;
                 Kingdom k;
-                double rate = WaRate(st, Settings.Current, out k, out why);
+                double rate = WaRate(st, Settings.Current, true, out k, out why);
                 if (rate > 0 && st.IsUnderSiege && BesiegedPay.On) { why = WaSiege; return 0; }
                 return rate;
             }
@@ -131,14 +157,10 @@ namespace Armoury
                 if (st == null || cls < 0 || cls >= WtClasses || !(excess >= 1) || double.IsInfinity(excess)) return 0;
                 var s = Settings.Current;
                 Kingdom k; int why;
-                double rate = WaRate(st, s, out k, out why);
+                double rate = WaRate(st, s, false, out k, out why);
                 bool mine = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
-                if (!(rate > 0))
-                {
-                    _waWhy[why]++;
-                    if (mine) _waPlayer[st] = false;                // nowa wojna (albo nowa potrzeba korony) - nowy komunikat
-                    return 0;
-                }
+                // stan komunikatu gracza NIE jest tu zerowany: s = 0 w trwajacej wojnie to nie nowa wojna (recenzja P1) - zeruje pokoj (WaPlayerSweep, raz na dobe)
+                if (!(rate > 0)) { _waWhy[why]++; return 0; }
                 _waCalls++;
                 double owed = excess * rate;
                 double[] cr;
@@ -168,14 +190,17 @@ namespace Armoury
                 long x; _waWindow.TryGetValue(k, out x); _waWindow[k] = x + ip;   // wplyw dnia 165 (CrownIncome.Begin)
                 if (mine)
                 {
-                    bool was; bool known = _waPlayer.TryGetValue(st, out was);
-                    _waPlayer[st] = true;
-                    // pierwsza doba sesji tylko zapamietuje (po wczytaniu nie wiadomo, czy komunikat juz byl) - potem przy kazdym przejsciu "nie placi -> placi"
-                    if ((known && !was) || (!known && _waDawns > 0))
+                    Kingdom told; bool known = _waPlayer.TryGetValue(st, out told) && told == k;
+                    _waPlayer[st] = k;
+                    // raz na wojne: pierwszy pobor w osadzie, o ktorej w tej wojnie komunikatu nie bylo; pierwsza doba sesji tylko zapamietuje (po wczytaniu
+                    // nie wiadomo, czy komunikat juz byl - WaPlayerSweep dopisuje tej doby takze osady bez nadwyzki i oblezone)
+                    if (!known && _waDawns > 0)
                     {
                         string nm = st.Name != null ? st.Name.ToString() : st.StringId;
                         if (!_waTell.Contains(nm)) _waTell.Add(nm);
                         if (rate > _waTellRate) _waTellRate = rate;
+                        double top = WaTopRate(k, s);
+                        if (top > _waTellTop) _waTellTop = top;
                     }
                 }
                 if (k.RulingClan != null && k.RulingClan == Clan.PlayerClan) _waKingSum += ip;
@@ -202,20 +227,52 @@ namespace Armoury
             return names[0] + ", " + names[1] + ", " + names[2] + " and " + (n - 3) + " more";
         }
 
+        /// <summary>
+        /// Stan komunikatu "raz na wojne" osad rodu gracza - raz na dobe (z WarAidDay: po poborze tej doby, przed komunikatem). Krolestwo gracza w pokoju albo
+        /// brak krolestwa: wpisy znikaja (nastepna wojna = nowy komunikat); s = 0 w TRWAJACEJ wojnie niczego nie zeruje (recenzja P1 - komunikat wracal przy
+        /// kazdym przejsciu s przez zero). Wpisy osad, ktore odeszly od rodu, i wpisy innego krolestwa - usuwane. Pierwsza doba sesji: osady rodu, od ktorych
+        /// korona dzis bierze (sama stawka - takze bez nadwyzki, z czekajacym ulamkiem i oblezone), uznane za powiadomione - komunikat nie wraca po wczytaniu.
+        /// </summary>
+        private static void WaPlayerSweep(Settings s)
+        {
+            var pc = Clan.PlayerClan;
+            var pk = pc != null ? pc.Kingdom : null;
+            if (pk == null || pk.IsEliminated || !WtAtWar(pk)) { _waPlayer.Clear(); return; }
+            _waGone.Clear();
+            foreach (var kv in _waPlayer) if (kv.Value != pk || kv.Key.OwnerClan != pc) _waGone.Add(kv.Key);
+            foreach (var st in _waGone) _waPlayer.Remove(st);
+            _waGone.Clear();
+            if (_waDawns > 0) return;
+            foreach (var st in pc.Settlements)
+            {
+                if (st == null || !(st.IsTown || st.IsCastle) || _waPlayer.ContainsKey(st)) continue;
+                Kingdom k; int why;
+                if (WaRate(st, s, false, out k, out why) > 0 && k == pk) _waPlayer[st] = pk;
+            }
+        }
+
         /// <summary>Komunikaty gracza (napisy po angielsku): lud jego osad zaczal placic danine (raz na wojne); krol-gracz - suma tygodnia. Najwyzej jeden kazdego rodzaju na dobe.</summary>
         private static void WarAidTellPlayer(int today, Settings s)
         {
+            try { WaPlayerSweep(s); } catch (Exception e) { WaStumble("WaPlayerSweep", e); }
             if (_waTell.Count > 0)
             {
                 string names = WaNames(_waTell);
+                // stawka rosnie z potrzeba korony (s od 0.5% do pulapu) - komunikat jest jeden na wojne, wiec podaje czesc dzisiejsza i najwyzsza (recenzja P1:
+                // pierwszy pobor nowej kampanii wypada przy s = 0.5% = jedna czesc na 240, a po kilku tygodniach lud placi jedna na 40)
                 int part = _waTellRate > 0 ? (int)Math.Max(1, Math.Round(1.0 / _waTellRate)) : 0;
+                int top = _waTellTop > 0 ? (int)Math.Max(1, Math.Round(1.0 / _waTellTop)) : part;
                 if (part > 0)
                 {
-                    Log.Player("War aid: while the realm is at war, the people of " + names + " give the crown one part in " + part
-                               + " of the coin they hold above their reserve each day. Their bread money is not touched.");
-                    if (s.LogEnabled) Log.Info("Danina z oszczednosci (P1): komunikat gracza (poczatek poboru w jego osadach) - " + names + ", jedna czesc na " + part + " dziennie.");
+                    string share = top < part
+                        ? "one part in " + part + " now, never more than one in " + top + " under the realm's present laws"
+                        : "one part in " + part + ", the most the realm's present laws allow";
+                    Log.Player("War aid: while the realm is at war, the people of " + names + " give the crown a share of the coin they hold above their reserve each day."
+                               + " The share follows the crown's need: " + share + ". Their bread money is not touched.");
+                    if (s.LogEnabled) Log.Info("Danina z oszczednosci (P1): komunikat gracza (poczatek poboru w jego osadach) - " + names + ", jedna czesc na " + part
+                                               + " dziennie, najwyzej jedna na " + top + ".");
                 }
-                _waTell.Clear(); _waTellRate = 0;
+                _waTell.Clear(); _waTellRate = 0; _waTellTop = 0;
             }
             var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
             bool king = pk != null && !pk.IsEliminated && pk.RulingClan == Clan.PlayerClan;
@@ -261,8 +318,10 @@ namespace Armoury
                     var w = WtOf(k, false);
                     double sv = w != null ? Math.Min(w.S, WtCap(k, s)) : 0;
                     bool war = WtAtWar(k);
-                    double ovK = TownFolk.AidExcessOf(k, today - 1);
-                    if (a == null && !(war && ovK >= 1)) continue;
+                    // recenzja P1: wiersz ma KAZDE krolestwo z nadwyzka ludu - takze w pokoju i z s = 0 (skrzynie, ktorych danina nie rusza: "korona bez
+                    // potrzeby nie bierze"); lokata W miast osobno - narzedzie dzieli z niej lokate swiata na czesc z poborem i bez (wiersz P1-1b)
+                    double ovW, ovK = TownFolk.AidExcessOf(k, today - 1, out ovW);
+                    if (a == null && !(ovK >= 1)) continue;
                     long at = a != null ? a.Taken : 0;
                     if (at > 0)
                     {
@@ -278,7 +337,7 @@ namespace Armoury
                        .Append(", stawka dnia ").Append((100 * (war && s.FolkWarAid ? share * sv / baseCap : 0)).ToString("0.000", WtInv)).Append("%, danina ").Append(at);
                     if (a != null) sb1.Append(" (W ").Append(a.Cls[WtW]).Append(" / R ").Append(a.Cls[WtR]).Append(" / P ").Append(a.Cls[WtP]).Append(" / podz. ").Append(a.Cls[WtCastle])
                                       .Append("; osad ").Append(a.Places).Append(a.Held > 0 ? "; wstrzymane w oblezeniu " + a.Held : "").Append(')');
-                    sb1.Append(", nadwyzka ludu po ").Append(Math.Round(ovK).ToString("0", WtInv));
+                    sb1.Append(", nadwyzka ludu po ").Append(Math.Round(ovK).ToString("0", WtInv)).Append(" (W miast ").Append(Math.Round(ovW).ToString("0", WtInv)).Append(')');
                     if (kd != null) sb1.Append(", zwrot ").Append(kd.RefundGiven).Append('/').Append(kd.RefundDue).Append(", renty ").Append(kd.Rent).Append(", kredyt186 ").Append(kd.LoanIn);
                     else sb1.Append(", 165 bez dnia");
                     parts.Add(new KeyValuePair<long, string>(at, sb1.ToString()));
@@ -297,6 +356,7 @@ namespace Armoury
               .Append(" | stawka ").Append((100 * share).ToString("0.00", WtInv)).Append("%/d kiesy ponad zapas dni x s / ").Append((100 * baseCap).ToString("0.0", WtInv))
               .Append("% (s z podatku 184; z polityka War Tax najwyzej x").Append((capHi / baseCap).ToString("0.00", WtInv)).Append("); zapas dni potrzeby: W ")
               .Append(s.TownFolkReserveDays).Append(" / R 21 / P 30 / podzamcze 10; jedna stawka dla klas; s i stawka dnia w wierszach krolestw - po kroku tygodnia (pobor tej doby szedl stawka sprzed kroku)")
+              .Append("; wiersz ma kazde krolestwo z nadwyzka ludu - takze pokoj i s = 0, gdzie danina skrzyn nie rusza (W miast = lokata wyrobnikow)")
               .Append(" | pobrano ").Append(taken).Append(" zl z ").Append(_waPlaces.Count).Append(" osad (miasta ").Append(_waTowns).Append(", zamki ").Append(_waCastles)
               .Append("): W ").Append(_waCls[WtW]).Append(", R ").Append(_waCls[WtR]).Append(", P ").Append(_waCls[WtP]).Append(", podzamcza ").Append(_waCls[WtCastle])
               .Append("; wolan poboru ").Append(_waCalls)

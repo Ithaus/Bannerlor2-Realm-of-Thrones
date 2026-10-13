@@ -38,7 +38,7 @@ namespace Armoury
         // ---- danina (doba)
         private static long _aidTicks;
         private static int _aidDay = -1;
-        private static readonly Dictionary<Kingdom, double> _aidOvK = new Dictionary<Kingdom, double>();
+        private static readonly Dictionary<Kingdom, double[]> _aidOvK = new Dictionary<Kingdom, double[]>();   // [0] wszystkie klasy i podzamcza, [1] W miast (lokata)
         // ---- pomiar: oferta nadwyzki w otwartym nawiasie konsumpcji
         private static readonly ItemCategory[] _ofCat = new ItemCategory[OfMax];
         private static readonly int[] _ofIdx = new int[OfMax];
@@ -95,7 +95,12 @@ namespace Armoury
                 f.DAid += t; f.Aid7 += t; f.DOver += left; if (c >= 0 && c < 3) f.DOvC[c] = left;
                 d.Aid[cls] += t; d.Ov0[cls] += ov; d.Ov1[cls] += left;
                 var k = f.St.OwnerClan != null ? f.St.OwnerClan.Kingdom : null;
-                if (k != null) { double x; _aidOvK.TryGetValue(k, out x); _aidOvK[k] = x + left; }
+                if (k != null)
+                {
+                    double[] x;
+                    if (!_aidOvK.TryGetValue(k, out x)) { x = new double[2]; _aidOvK[k] = x; }
+                    x[0] += left; if (cls == KingdomTreasury.WtW) x[1] += left;
+                }
             }
             catch (Exception e) { Stumble("PayAid(liczniki)", e); }
             return t;
@@ -110,11 +115,15 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Kiesa ludu ponad zapas dni po daninie w osadach rodow tego krolestwa (doba kiesy `day`; 0 - nie biegla albo brak nadwyzki).</summary>
-        internal static double AidExcessOf(Kingdom k, int day)
+        /// <summary>Kiesa ludu ponad zapas dni po daninie w osadach rodow tego krolestwa (doba kiesy `day`; 0 - nie biegla albo brak nadwyzki): wszystkie klasy
+        /// i podzamcza; wTown - z tego wyrobnicy miast (czesc "lokaty" z linii Kiesa ludu przypadajaca na to krolestwo).</summary>
+        internal static double AidExcessOf(Kingdom k, int day, out double wTown)
         {
-            double x;
-            return k != null && _aidDay == day && _aidOvK.TryGetValue(k, out x) ? x : 0;
+            wTown = 0;
+            double[] x;
+            if (k == null || _aidDay != day || !_aidOvK.TryGetValue(k, out x)) return 0;
+            wTown = x[1];
+            return x[0];
         }
 
         /// <summary>Czas poboru daniny w dobie kiesy `day` (ms; "-" - doba nie biegla).</summary>
@@ -694,7 +703,14 @@ namespace Armoury
         private static void MeasureP1Day(int day, LDay d, LWin w, bool first, bool weekly)
         {
             _p1Day = -1;
-            if (!MeasureP1) { CvClear(); _cvPend.Clear(); _p1DayTicks = 0; return; }
+            if (!MeasureP1)
+            {
+                // pomiar wylaczony: bez linii i bez licznikow okna - zarobek wedlug rodzaju (Credit dopisuje zawsze), danina i oferta okna zerowane co dobe,
+                // zeby po wlaczeniu klucza w trakcie sesji pierwsza linia tygodnia nie dzielila zarobku calej sesji przez dni od wlaczenia (recenzja P1)
+                CvClear(); _cvPend.Clear(); _p1DayTicks = 0; _p1WinDays = 0;
+                foreach (var f in _f.Values) { Array.Clear(f.EarnK, 0, f.EarnK.Length); f.Aid7 = 0; f.Of7X = f.Of7B = 0; }
+                return;
+            }
             long t0 = Stopwatch.GetTimestamp();
             _p1Day = day; _p1WinDays++;
             try { _lineLoy = LoyaltyLine(day); } catch (Exception e) { Stumble("P1.LoyaltyLine", e); }
