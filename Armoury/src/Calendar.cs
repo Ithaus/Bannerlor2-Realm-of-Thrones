@@ -96,6 +96,8 @@ namespace Armoury
     /// Dzien roku liczy sie z tych samych tickow zegara co godzina na pasku (ticki / doba), wiec zmienia sie dokladnie o 0:00.
     /// Stary tekst "Day 3659 of Summer, 299 AC" liczyl PELNE DOBY od poczatku odcinka pory (WesterosClimate.Seg.Start = chwila
     /// pierwszego odczytu klimatu minus 3640 dni - z godzina tej chwili, nie z polnoca), wiec numer zmienial sie o tamtej godzinie.
+    /// Recenzja 13.10: kazda NASTEPNA pora zaczyna sie w last.Start + last.Len, a Len to losowa liczba dni z ulamkiem (WesterosClimate.Rand),
+    /// wiec po pierwszej zmianie pory stary numer zmienial sie o LOSOWEJ godzinie (pierwsze lato nowej kampanii: 05:52).
     /// Kto uzywa: CampaignTime.ToString (pasek mapy, encyklopedia, dziennik wojen - latka WesterosClimate.ToStringPrefix),
     /// powiadomienia ze scena (FormalPrefix), Zelazny Bank (IronBank.Describe, DebtLadder - DayStamp).
     /// To TYLKO tekst: bieg czasu, tiki dobowe i dzien pory czytany przez pogode / gospodarke (WesterosClimate.Day) bez zmian.
