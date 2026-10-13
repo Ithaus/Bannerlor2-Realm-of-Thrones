@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana B, tor S) - PORZUCONY DOBYTEK NIE-ZYWNOSCIOWY NA TARG MIASTA, NIE DO ZAMKU (klucz SpoilsNonFoodToTown)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HorseFate.cs` (`NearestMarket` z parametrem "tylko miasta", `Put`, `BkPostfix`, linia doby), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny; TRIAZ-3 O2-3, podwazenie pkt 3 - "droga B"):** ok. 1/3 doplywu zelaza do zamkow nie przechodzi przez sprzedaz wozow. Linia "Konie - smierc, lup, dobytek (E6/K1)": w roku 8 893 rozbite partie, na polki osad 240 533 szt. (ponad udzwig 213 969) - 404 szt./d w I polroczu, 916/d w II. Bilans zelaza: z rozbitych wozow zeszlo 8 099 lup (10,7% zaladowanych), miasta i zamki dostaly poza ramkami sprzedazy 8 294 lup. Dowod dzienny d330: zamki +133 lupy przy calym liczniku "wozy do osad" 102 i dobytku na polki 1 000 szt. Rachunek: droga B to ok. 1 200-1 350 lup/rok do zamkow (3,5/d, w II polroczu 5,7/d; blad ok. +-300 - rozbicia dobytku wedlug towaru w logu nie bylo).
+
+**Przyczyna (kod):** regula R14 (E6/K1 pkt 2, zamierzona: nic w nicosc) kladzie dobytek, ktory nie miesci sie w udzwigu zwyciezcy, CALY i ZA DARMO na polke najblizszej warowni: `HorseFate.Put` -> `NearestMarket` szuka po `Town.AllFiefs`, wiec takze po zamkach; to samo przy zwyciezcy-zalodze albo milicji zamku, przy rozwiazaniu partii bez zwyciezcy i przy nadmiarze zwycieskiej karawany BK (`BkPostfix`). W zamku towar nie-zywnosciowy jest martwy (zamek go nie zuzywa, karawany tam nie jezdza).
+
+**Zmiana (poprawka ostateczna, zmiana B):**
+- `NearestMarket(pos, frakcja, townsOnly)` - ta sama kolejnosc (wlasna frakcja nieoblegana -> niewroga -> dowolna), przy `townsOnly` tylko miasta.
+- `DeadInCastle(przedmiot)`: towar handlowy (`IsTradeGood`), ktory nie jest jedzeniem (`TownFolk.IsFoodCategory`), koniem ani uprzeza.
+- `Put`: (a) ponad udzwig zwyciezcy - taki towar na targ najblizszego miasta; (b) polka bedaca zamkiem (zaloga / milicja zwyciezca, rozwiazanie partii przy zamku, brak zwyciezcy) - taki towar na targ najblizszego miasta liczonego od tego zamku. `BkPostfix`: to samo dla nadmiaru zwycieskiej karawany. Brak miasta - jak dotad (najblizsza warownia), licznik "bez miasta".
+- Jedzenie, konie, uprzaz i uzbrojenie - jak dotad (podzamcze je zjada, zamki-siedziby kupuja konie).
+- Linia "Konie - smierc, lup, dobytek (E6/K1)": dopisek "polki wedlug osady (P3/Z3-B, klucz TAK/NIE): zamki N, miasta N, towar nie-zywnosciowy z zamku do miasta N, bez miasta N; zelazo zamki/miasta a/b, drewno zamki/miasta c/d" (pomiar, ktorego brakowalo - dziala takze przy wylaczonym kluczu).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: przerzut na polke bez platnika istnieje juz dzis (R14) - zmienia sie tylko adres (srednio dalej); ilosc towaru i zlota bez zmian.
+- Miasta dostaja za darmo wiecej surowca przy rejonach walk (bandy rozbijaja wozy): ok. 3,5-5,7 lup/d zelaza i odpowiednio drewna, gliny, soli - cena w tych miastach lekko w dol; podzamcza traca ten towar (jak w zmianie A).
+- Regresje sprawdzone w kodzie: `NearestMarket` bez trzeciego argumentu dziala jak dotad (wywolania dla koni, jedzenia i darow nietkniete); pamiec miasta (`_townMemo`) zyje tylko jedno rozdanie (czyszczona na poczatku `Spoils` i w liniach doby) - oblezenia i wojny czytane na swiezo; liczniki "na polki osad", "ponad udzwig", "bez miejsca", "BK karawany na polki" bez zmian znaczenia (progi K1-5 narzedzia).
+- Czas: jedno dodatkowe przejscie po 227 warowniach na rozdanie z towarem nie-zywnosciowym (ok. 24 partie/d) - ponizej 1 ms/d.
+- Jesli Jeff chce zostawic dobytek w zamkach - klucz wylaczony; zapas zamkow rosnie wtedy dalej o 3,5-5,7 lup/d (skutek zamierzony R14). Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane: "zelazo zamki/miasta" - zamki blisko 0 (tylko "bez miasta"); razem ze zmiana A doplyw zelaza do zamkow z 10,6/d brutto do ok. zera, zapas zamkow maleje (wlasne zuzycie + wozy kupcow Z1 wywoza nadwyzke): z ok. 300 lup startu nowej kampanii nie rosnie ponad kilkaset.
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana A, tor S) - WOZ, KTORY SCHOWAL SIE W ZAMKU, SPRZEDAJE TAM TYLKO BRAKUJACE JEDZENIE (klucz CastleCartFoodOnly)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/CastleMarket.cs` (`SellPrefix`, nowa `Undirected`, `CastleTickPrefix`, zapis rekordu "o"), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis: rekord strazy `o|woz|zamek|godzina` dostaje opcjonalne 5. pole (godziny strazy) - stary zapis czyta sie jak dotad.
 

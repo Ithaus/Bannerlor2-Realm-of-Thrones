@@ -5048,6 +5048,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int HorseDeathRatioMinBattles { get; set; } = 50;
 
+        [SettingPropertyBool("Spoils Non Food To Town", HintText = "goods other than food left behind by a broken party - iron, timber, wool, hides and the like - go to the market of the nearest friendly town instead of the nearest castle, where nobody uses them and no trader calls (food, horses, harness and arms go where they went before; needs Spoils Of Broken Parties)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool SpoilsNonFoodToTown { get; set; } = true;
+
         [SettingPropertyBool("Spoils Of Broken Parties", HintText = "what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsOfBrokenParties { get; set; } = true;
@@ -6501,6 +6505,7 @@ namespace Armoury
             s.HamletKindsInDistrict = HamletKindsInDistrict;
             s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
             s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;
+            s.SpoilsNonFoodToTown = SpoilsNonFoodToTown;
             s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
