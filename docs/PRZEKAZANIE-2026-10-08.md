@@ -1061,3 +1061,25 @@ drzewa czyste (git status bez zmian poza build.log). Na koniec dokonczone tylko 
 gracza 8.18; etap 7 - predkosc bez zmian, premia drog nie, Diplomacy 364 tak, myto - policzyc; etap 6 - hodowla tak, naprawy - ulamki w pamieci; rod szlachty BK - 0; etap 8 - odpowiedzi 1-11.
 - (19:50 UTC 12.10) **OSTATNI STAN:** recenzja E8/M ZROBIONA (`w-toku/e8-b` 9237d23, bez poprawek). Recenzja E8/0 PRZERWANA przed zmianami (drzewo e8\a czyste, HEAD 8a8df38) -
   **drugie konto: najpierw recenzja E8/0** (prompt recenzji jak w `docs/przekazanie/wf-e8-kod.js`), potem dalej wedlug listy w rozdz. 27. Wszystkie workflow i pushery tego konta zatrzymane.
+
+## 28. STAN PO NOCY 12/13.10 (konto drugie, sesja dbc3d3d1; 13.10 ok. 09:20 UTC) - START TUTAJ
+
+**W grze: WGRANIE 34** = caly kod etapow 5-8 (Armoury e69adbd3, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233; galaz `noc/wgranie-34` =
+`w-toku/zbior-e8` 8547369) + 6 plikow poza DLL + trzy zmiany w plikach ustawien Jeffa (Armoury.json, Diplomacy, BetterEconomy - STAN-PRAC "WGRANIE 34"). Test: 120 dob nowej kampanii
+120/120, 0 ERROR, 11.8 s/dobe (W33 17.5); zapis 9 dob OK. Cofniecie: kopie `*.bak-2026-10-13-noc34-przed` obok plikow i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc34-przed`
+(ustawienia: `*.bak-2026-10-13-noc34`, BEE: `.bak-2026-10-13-przed-BEE-ujscia`).
+
+**Co zrobiono tej nocy (wszystko w STAN-PRAC od wpisu "DRUGIE KONTO (sesja dbc3d3d1)"):** recenzja E8/0; E7/R2, W4 + dwa przeglady + a8-gentry0 na zbior-5-8; caly etap 8 w trzech drzewach
+(e8-a, e8-b, e8-c) + E8/H (jezdziec = kon + uprzaz); cztery biegi 120 dob (bieg 1 zbior-5-8, bieg 2 i 3 zbior-e8, test koncowy) + bieg porownawczy limitu karawan; dwa rozpoznania przyczyn
+z podwazeniem (`docs/test-zbiorczy/TRIAZ-zb58-120-2026-10-12.md`, `TRIAZ-2-zbior-e8-120-2026-10-13.md`); pelny audyt (`docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md`: 0 krytycznych,
+3 wazne, 9 drobnych - wszystkie poprawione albo wykonane przy wgraniu); dwie rundy poprawek (F1-F9 po biegu 1; grupy A-E po audycie i biegu 2).
+**Dwa najwazniejsze znaleziska:** (1) karawany notabli mnozyly sie przez nasz nocny oboz (gra nie liczy karawan z wylaczonym AI) - stary przeciek, tez w W33; zamkniety limitem
+NotableCaravanCap = 2; (2) siec CrashScribe doliczala 70-390 ns i 240 B smieci do kazdego wywolania kazdej metody naszych modow - poprawione w Net.cs. Razem z O1-O6: czas doby 17.5 -> 11.8 s.
+
+**Narzedzia tej nocy (repo, galaz claude/...):** `tools/wgranie/wgraj.ps1` (wgranie z kopiami i md5), `tools/wgranie/ustawienia-jeffa.ps1`, `tools/wgranie/bieg-autotest.ps1` (autotest z plikami
+danych: -DllDir, -CsAt, -Tree, -Out, -Days, -LoadSave, -Profile); autotest `at1-autotest` 486008e ma `-ExtraFile "cel wzgledem Modules=zrodlo"`. CrashScribe z autotestem dla drzewa:
+worktree + `git apply -3 SCRATCH(7016)\test\at1-cs.diff` + build (NIE wgrywac na stale - wgraj.ps1 odrzuca DLL z napisem autotest.json). Skrypty workflow: `docs/przekazanie/wf-*.js`.
+Drzewa robocze: SCRATCH(ae222cb7)\zb\int (zbior-e8, glowne), zb\58, zb\58t, zb\pa..pe, e8\a, e8\b, e8\c; SCRATCH(dbc3d3d1)\cs-at, cap3 (wariant limitu 3, bez commita), test\ (DLL i wyniki biegow).
+
+**Nastepne kroki:** lista "OTWARTE PO WGRANIU 34" w STAN-PRAC (11 punktow; pierwszy: zelazo w miastach). Decyzje czekajace na Jeffa: limit karawan 2 czy 3; zalozenia E8/H; czy kupcy
+woza unikaty; K1-3a krok 2 (mieszczanie tylko konie robocze); ile drog (po zdjeciach); myto na Bliznakach (po liczniku).
