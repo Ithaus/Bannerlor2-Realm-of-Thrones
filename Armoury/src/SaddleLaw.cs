@@ -262,12 +262,14 @@ namespace Armoury
             return mp != null && !mp.IsMainParty && mp.IsLordParty && On && !Undead.Party(mp);
         }
 
-        /// <summary>Uprzaz, na ktorej mozna posadzic NOWEGO jezdzca: wolna w zbrojowni (ponad jezdzcow z koniem) + tabor.</summary>
+        /// <summary>Uprzaz, na ktorej mozna posadzic NOWEGO jezdzca: uprzaz zbrojowni i taboru RAZEM ponad jezdzcow, ktorzy maja juz konia.
+        /// Recenzja E8/H: dotad "wolna w zbrojowni (od zera w gore) + tabor" - gdy partia miala jezdzcow z koniem bez uprzezy, siodlo z taboru liczylo sie
+        /// jako wolne, choc Seat i postoj oddaja je najpierw im: awans przechodzil, a jezdzcow bez pary przybywalo. Ta sama regula co brama gracza (PlayerAvail).</summary>
         internal static int Avail(PartyBase party, Dictionary<CharacterObject, int> adjust = null)
         {
             var mp = party.MobileParty;
             var p = Pairs(mp, adjust);
-            return p.FreeHarness + BagFit(party.ItemRoster);
+            return Math.Max(0, p.Harness + BagFit(party.ItemRoster) - p.Mounted);
         }
 
         // ------------------------------------------------------------ liczniki doby (tylko log)
@@ -491,19 +493,27 @@ namespace Armoury
                 var ups = src.UpgradeTargets;
                 if (ups == null || command.UpgradeTarget < 0 || command.UpgradeTarget >= ups.Length || !Needs(ups[command.UpgradeTarget])) return;
                 int n = Math.Max(1, command.TotalNumber);
-                int avail = PlayerAvail(__instance);
+                int total;
+                int avail = PlayerAvail(__instance, out total);
                 if (avail >= n) return;
                 __result = false;
                 _dPlRefused += n;
-                MBInformationManager.AddQuickInformation(new TextObject(avail <= 0
-                    ? "A rider needs a saddle as well as a horse - there is no spare horse harness in your baggage or in the troop armoury."
-                    : "A rider needs a saddle as well as a horse - you have spare horse harness for only " + avail + " more."));
+                MBInformationManager.AddQuickInformation(new TextObject(avail > 0
+                    ? "A rider needs a saddle as well as a horse - you have spare horse harness for only " + avail + " more."
+                    : total > 0
+                        ? "A rider needs a saddle as well as a horse - all the horse harness in your baggage and troop armoury is already needed by the riders you have."
+                        : "A rider needs a saddle as well as a horse - there is no spare horse harness in your baggage or in the troop armoury."));
             }
             catch (Exception e) { Stumble("ValidatePostfix", e); }
         }
 
-        private static int PlayerAvail(PartyScreenLogic logic)
+        /// <summary>Wolna uprzaz druzyny gracza w tej sesji ekranu: zbrojownia i sakwy RAZEM ponad jezdzcow z koniem (z awansowanymi juz w tej sesji - sklad
+        /// ekranu jest zywy, konie zaplacone w sesji z historii ekranu; siodlo z sakw schodzi dopiero przy zatwierdzeniu). total - cala uprzaz rodziny konia.
+        /// Recenzja E8/H: dotad max(0, zbrojownia - jezdzcy) + sakwy - niedobor zbrojowni byl obcinany do zera, wiec jedno siodlo w sakwach przepuszczalo
+        /// dowolnie wiele awansow w jednej sesji ekranu (brama gracza nie zamykala sie nigdy).</summary>
+        private static int PlayerAvail(PartyScreenLogic logic, out int total)
         {
+            total = int.MaxValue;
             var arm = PlayerArm();
             if (arm == null) return int.MaxValue;   // zbrojownia nieznana - nie blokujemy
             var roster = logic.MemberRosters != null && logic.MemberRosters.Length > 1 ? logic.MemberRosters[1] : MobileParty.MainParty.MemberRoster;
@@ -512,7 +522,8 @@ namespace Armoury
             if (hist != null) foreach (var t in hist) if (t != null) paid += Math.Max(0, t.Item2);
             var p = Pairs(roster, arm);
             int mounted = Math.Min(p.Riders, p.Horses + paid);
-            return Math.Max(0, p.Harness - mounted) + BagFit(PartyBase.MainParty.ItemRoster);
+            total = p.Harness + BagFit(PartyBase.MainParty.ItemRoster);
+            return Math.Max(0, total - mounted);
         }
 
         /// <summary>

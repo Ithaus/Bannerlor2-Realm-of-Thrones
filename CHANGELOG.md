@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 8, RECENZJA paczki E8/H - 271, commit 0e7a7f7) - brama uprzezy nie zamykala sie u gracza: jedno siodlo w sakwach przepuszczalo dowolnie wiele awansow na jezdzca; wolna uprzaz liczona teraz razem (zbrojownia + tabor) ponad jezdzcow z koniem - u gracza i u AI
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-e8` (po 0e7a7f7) | **Pliki:** `Armoury/src/SaddleLaw.cs` (`Avail`, `PlayerAvail`, `ValidatePostfix`), `tools/sprawdz_logi.py` (wiersz H-5a), `CHANGELOG.md`
+
+**Problem (slowami gracza):** masz 5 koni i JEDNO siodlo w sakwach, zadnego jezdzca. Na ekranie druzyny awansujesz piechura na jezdzca - przechodzi (dobrze). Drugiego - tez przechodzi, i trzeciego, i piatego (zle). Po zatwierdzeniu masz 5 jezdzcow z konmi i jedno siodlo: czterech "stworzonych" wbrew regule, w bitwie ida pieszo. Dowod: tylko z kodu (gry nie uruchamiano).
+**Przyczyna:** `SaddleLaw.PlayerAvail` liczyl `max(0, uprzaz zbrojowni - jezdzcy z koniem) + sakwy`. Sklad ekranu druzyny jest zywy (awansowani w tej sesji juz w nim sa, `PartyScreenLogic.UpgradeTroop`), a siodlo z sakw schodzi dopiero przy zatwierdzeniu (`PlayerBank`) - niedobor zbrojowni byl obcinany do zera, wiec siodlo z sakw liczylo sie od nowa przy kazdym kliknieciu. To samo obciecie bylo w `SaddleLaw.Avail` (AI: lista celow, zaplata, zamiana ROT): partia z jezdzcami z koniem bez uprzezy i siodlem w taborze dostawala awans, choc `Seat` i postoj oddaja to siodlo najpierw starym jezdzcom - jezdzcow bez pary przybywalo.
+
+**Zmiana:**
+- `Avail` (AI) i `PlayerAvail` (gracz): wolna uprzaz = `max(0, uprzaz zbrojowni + uprzaz taboru - jezdzcy z koniem)` - jedna regula dla obu. U gracza "jezdzcy z koniem" jak dotad licza konie zaplacone w tej sesji ekranu.
+- Komunikat odmowy u gracza ma trzeci wariant, gdy uprzaz jest, ale cala zajeta: "A rider needs a saddle as well as a horse - all the horse harness in your baggage and troop armoury is already needed by the riders you have."
+- `PlayerBank` bez zmian (z sakw do zbrojowni najwyzej tyle sztuk, ile koni zaplacono w sesji - stare braki gracz uzupelnia sam).
+- Narzedzie, H-5a: prog z rozpoznania (>= 50% Z33 = 412) zostaje, ale wiersz pokazuje tez procent biegu z K3 (zb58: 3047 awansow = 25.4/d) jako INFO. Powod: TRIAZ-zb58 "Styk K3 z E8/H" - prog z Z33 spelnia juz sam K3, wiec skutku bramy uprzezy nie pilnuje.
+
+**Sprawdzone niezaleznie, bez poprawek:**
+- **Jedna regula:** awans AI (lista + zaplata, sprawdzenie PRZED zdjeciem konia), awans gracza, zamiana ROT, najemnik z karczmy (AI i gracz - wspolny `MercHorseKit`), bitwa gracza (druzyna, lordowie AI, zalogi). Ochotnik notabla - wymog kon + uprzaz juz byl (`VolunteerKit`, ostrzejszy: tier wzorca). Swiadomie poza: autobitwa (gra liczy typ jednostki), zalogi bez bramy i zakupu, bohaterowie, karawany / wsie / milicje / bandy (DTE nie ubiera ich ze zbrojowni).
+- **Zamknieta ekonomia:** kazdy ruch uprzezy to przeniesienie albo zakup za zloto (`ShelfBuy.Take` -> `here`: sakiewka ludzi, potem kiesa pana -> kasa miasta; nieudana dostawa = `PutBack`). Pula weteranow zapisuje i wczytuje uprzaz tym samym wierszem "przedmiot=ile"; wszystkie petle po puli odrozniaja konia od uprzezy. Straz w bitwie tylko czysci slot przydzialu - DTE zdejmuje ze zbrojowni w postfiksie wystawienia to, co czlowiek ma na sobie (`SpawnAgentPatch.Postfix` -> `CreateEquipmentForArmoryConsumption`), wiec bez podwojnego zdjecia. E8/L rusza tylko lup z okna DTE - uprzaz zbrojowni rozbitej partii przenosi tylko `Spoils`, raz.
+- **Start nowej kampanii:** `ColdStart.FillToTemplate` daje konia i uprzaz wzorca (`Equipmentish` obejmuje oba typy). Skan plikow XML modulow gry: 281 wzorcow z koniem pod siodlo, 7 bez uprzezy (wyjatek), 0 z uprzeza innej rodziny niz kon - pary startowe pasuja, masowego zejscia z koni w dobie 1 nie bedzie.
+- **Wylacznik:** kazda galaz wraca do kodu sprzed (takze straz w bitwie, zamiana ROT, sprzedaz nadwyzek, pula). Bez nowej sekcji zapisu, `Reset` z `Stables.Reset`.
+- **Sygnatury:** `PartyScreenLogic.ValidateCommand(PartyCommand)` - jedna, publiczna, wolana tylko z wnetrza klasy (skan DLL gry i modow: nikt inny) - komunikat raz na klikniecie; `TroopUpgradeArgs` - 6 pol i konstruktor; DTE `Assignment.Character`, `SetEquipment`, `IsTemporarySlot`; parowanie DTE (`PopulateDictionaries`: pancerz konia wedlug rodziny, samo siodlo do kazdego) = `SaddleLaw.ItemKind`. Latka zakladana tam, gdzie od dawna `DoneLogic` tej samej klasy.
+- **Styk:** F5 w `Stables.cs` siedzi w liniach 910-1090 (postoj, `KnightBuy`), linie H w innych metodach. Sluchacze wjazdu biegna od ostatnio dopisanego - Stajnia i `SaddleLaw.OnSettlementEntered` PRZED sprzedaza nadwyzek i zakupami sprzetu. `ShopReserve` nie dotyczy uprzezy.
+- **Narzedzie:** `py_compile` kopii poza repo OK; blok `etap8_h` puszczony na 120 liniach zlozonych znak po znaku wedlug `SaddleLaw.Daily` - wszystkie wiersze czytaja liczby. `gen_mcm` 1264 bez rozjazdu.
+
+**Ryzyko / co sprawdzic:**
+- Brama jest teraz ostrzejsza przy starych brakach: partia (i gracz), ktora ma jezdzcow z koniem bez siodla, nie awansuje nikogo na jezdzca, dopoki nie dokupi siodel dla nich wszystkich. W nowej kampanii start to pary, wiec skutek dopiero przy niedoborze - widac w "wstrzymane z braku uprzezy" (H-5b).
+- U gracza przy starych brakach siodla w sakwach nie przechodza same do zbrojowni - komunikat odmowy mowi wtedy, ze uprzaz jest zajeta. Do sprawdzenia recznie (8.16) razem z komunikatem "riders no saddle".
+- Nie poprawiane, do wiedzy: (1) karczma pokazuje typ konny do liczby PAR w puli takze dla 7 wzorcow bez uprzezy - taki weteran moze wyjsc jako pieszy; (2) najemnik na wielbladzie przy wlaczonej regule nie dostaje juz rzedu ze wzorca (regula go nie obejmuje, wiec nikt mu go nie kupi - jedzie bez); (3) jezdziec t4+ bez uprzezy dostaje w jednej wizycie siodlo (E8/H) i lader (E6/R3) - siodlo zostaje luzem do progu sprzedazy E8/Z.
+
+**Build:** Armoury kod 0 (1 ostrzezenie jak dotad). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (etap 8, paczka E8/H - 271; decyzja Jeffa 12.10, tor M) - JEZDZIEC = KON + UPRZAZ: brama tworzenia jezdzca (AI, gracz, zamiana ROT, najemnik), w bitwie gracza kon bez uprzezy schodzi, lord AI kupuje najtansze siodlo, uprzaz idzie za koniem; klucz `RiderNeedsHarness`; NOWA KAMPANIA
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-e8` (po 3095630) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 6 odp. 7; rozpoznanie `docs/etap8/rozpoznanie-H-jezdziec-uprzaz.md` - WARIANT A | **Pliki:** `Armoury/src/SaddleLaw.cs` (nowy), `Stables.cs`, `AiGear.cs`, `GarrisonKit.cs`, `RecruitKit.cs`, `HorseFate.cs`, `RotHorseGuard.cs`, `MenPurse.cs`, `ArmsBook.cs`, `ArmouryBehavior.cs`, `Settings.cs`, `McmSettings.cs` (gen_mcm: 1264 = 1263 + 1), `tools/sprawdz_logi.py` (blok `etap8_h`)
 

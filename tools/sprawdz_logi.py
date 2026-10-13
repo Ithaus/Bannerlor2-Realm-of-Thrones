@@ -10530,6 +10530,7 @@ E8_H_START = "Jezdzcy i uprzaz (E8/H): start"
 E8_H_BOOK = "Uzbrojenie wedlug zrodla (E6/0): dzien"
 E8_H_Z33_HORSED_SHARE = 4.60    # Z33 doba 120: jezdzcy z koniem 7 711 z 167 462 ludzi partii lordow i zalog AI (L:36040) - odniesienie progu H-2
 E8_H_Z33_UPGRADES = 823         # Z33: awanse AI na jezdzca w 120 dob (konie-krolestwa.csv) - odniesienie progu H-5
+E8_H_ZB58_UPGRADES = 3047       # bieg zb58 (z E6/K3, bez E8/H): konie za awans AI w 120 dob (TRIAZ-zb58-120 "Styk K3 z E8/H") - odniesienie INFO przy H-5a
 E8_H_Z33_MADE = 13.4            # Z33: uprzaz wykonana na dobe w dobach 91-120 (linia "Warsztaty")
 E8_H_GROUP = (r"\| %s: partii (\d+), ludzi (\d+), jazda wedlug typu (\d+) \([0-9.]+%%\), objeci regula (\d+), z koniem (\d+) \([0-9.]+%%\), z para (\d+) \([0-9.]+%%\), "
               r"z koniem bez uprzezy (\d+), bez konia (\d+), wzorzec bez uprzezy (\d+); zbrojownie: konie (\d+), uprzaz rodziny konia (\d+), innej rodziny (\d+), wolna (\d+)")
@@ -10650,8 +10651,13 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     # H-5: awanse AI na jezdnego i czekajacy na uprzaz
     up, ref, trim, payr = col(r"awanse na jezdnego z para (\d+)"), col(r"cele odrzucone (\d+) ludzi"), col(r"ludzi, przyciete (\d+)"), col(r"przy zaplacie (\d+)")
     need_up = 0.5 * E8_H_Z33_UPGRADES * len(on) / 120.0
-    rep.add("H-5a: awanse AI na jezdnego (z para) w dobach z regula", f"{tot(up, on)} w {len(on)} dobach ({tot(up, on) / max(1, len(on)):.1f}/d; Z33: {E8_H_Z33_UPGRADES} w 120 dob = 6.9/d)",
-            f">= 50% Z33 w przeliczeniu na liczbe dob ({need_up:.0f})", (tot(up, on) >= need_up) if len(on) >= 30 else None)
+    # recenzja E8/H (TRIAZ zb58 "Styk K3 z E8/H"): prog z Z33 spelnia juz sam K3 (3047 awansow w biegu zb58) - skutek bramy uprzezy pokazuje procent biegu z K3 (INFO)
+    k3_up = E8_H_ZB58_UPGRADES * len(on) / 120.0
+    rep.add("H-5a: awanse AI na jezdnego (z para) w dobach z regula",
+            (f"{tot(up, on)} w {len(on)} dobach ({tot(up, on) / max(1, len(on)):.1f}/d; Z33: {E8_H_Z33_UPGRADES} w 120 dob = 6.9/d; bieg z K3 bez bramy uprzezy (zb58): "
+             f"{E8_H_ZB58_UPGRADES} = 25.4/d - teraz {100.0 * tot(up, on) / max(1.0, k3_up):.0f}% tego biegu)"),
+            f">= 50% Z33 w przeliczeniu na liczbe dob ({need_up:.0f}); prog z Z33 spelnia sam K3 - procent biegu z K3 to INFO o skutku bramy uprzezy",
+            (tot(up, on) >= need_up) if len(on) >= 30 else None)
     a1, a2 = [d for d in rng(61, 90) if d in on], [d for d in rng(91, until) if d in on]
     if a1 and a2:
         m1, m2 = tot(ref, a1) / len(a1), tot(ref, a2) / len(a2)
