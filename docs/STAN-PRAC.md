@@ -1691,3 +1691,20 @@ Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d
   zdarzenie "Right of Pillage" pustoszy i nie daje nic. PROPOZYCJA: zdobywcy biora czesc KAZDEJ monety w osadzie (laska 0, grabiez 1/3, spustoszenie 2/3) z kasy kupcow i kies ludu,
   podzial wedlug ludzi i "prawo trzecich", 3 doby bez zoldu wydawanego w lupionym miescie, laska bez naszej blizny, AI lupi z potrzeby; towar i konie z polek - drugi etap.
   Lup NIE jest zrodlem na wojsko (ok. 1 mln zl/rok = 0.6% zoldu). **CZEKA NA JEFFA: 5 pytan o kierunek (rozdz. 8) - podane w czacie; kodu nie zaczynac przed "tak".**
+
+**WGRANIE 38 (13.10 17:22 UTC; decyzja Jeffa "przyhamuj sluby"):** CrashScribe 04f44a0e + CrashScribe.settings.xml 3e31434f (reszta jak WGRANIE 37: Armoury f2afb329, RC f9a944c1,
+GT 035878c4, ForgeView e17e0233). Galaz `noc/wgranie-38` = `w-toku/zbior-e8` **cd675b6** (= 6d91156 + `w-toku/z3-swaty-hamulec`, przewiniecie bez konfliktu). Kopie: `*.bak-2026-10-13-noc38-przed`
+i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofniecie: CrashScribe 3ca8aa08 + settings ef8cd722 z tych kopii.
+- **Test 120 dob przed wgraniem (Armoury W37 + CrashScribe-at-hamulec ef7ee537, drzewo SC\zb\sh): 120/120, 0 ERROR**; linia startu "CZYNNE; mnoznik szansy 0.7 (MarriageChanceScale)";
+  **slubow AI-AI do d30 / d60 / d91 / d120: 8 / 25 / 35 / 46 (bez hamulca w biegu rocznym: 22 / 37 / 50 / 78)** - w pasie zaliczenia 40-70, ponizej oczekiwanych 52-58 (jeden bieg,
+  rozrzut losowy); liniowo ok. 140 na rok (przed regula 113, bez hamulca 215). Czas swatow 450-560 ms/d. Logi: session-2026-10-13_09-48-02.log, Armoury-2026-10-13_09-48-04.log (kopie na D:).
+- Test zapisu: wczytany `autotest-dlugi` (teraz zapis z doby 60 biegu hamulca) + 9 dob: 0 ERROR, sluby licza dalej z mnoznikiem 0.7.
+- Komentarze "ten sam ciag losowy" w Config.cs / MarriageFast.cs / linii startu poprawione w tym samym commicie (cd675b6).
+- **DECYZJE JEFFA - LUP MIAST (13.10 ok. 17:20 UTC): 1 TAK (lup z kazdej monety, takze z zapasow), 2 TAK (podzial: zolnierze 2/3, wodz 1/3, korona 1/3 z czesci wodza), 3 TAK (3 doby
+  bez zoldu wydawanego w lupionym miescie), 4 TAK (laska = laska, AI lupi z potrzeby), 5 "tak, i tak" = (a) towar i konie z polek TAK (drugi etap) oraz (b) skarbiec korony w stolicy,
+  okup zamiast szturmu, karawany wroga w murach TAK (odczytane jako: robic, ale jako ostatni etap - potwierdzone Jeffowi w czacie).** KIERUNEK DODANY PRZEZ JEFFA (wiazacy):
+  "lupienie miasta to straszna rzecz, miasto traci dobrobyt, kase, ludzi - trzeba to oddac; ale w grze wojny i lupienie sa czestsze niz normalnie, wiec miasto musi potrafic sie
+  odbudowac - nie za szybko, rozsadnie; ciagle lupione miasto nigdy sie nie odbuduje; **budynki tez maja byc niszczone - przy spustoszeniu masa budynkow splonie i trzeba budowac od nowa**".
+  DO PROJEKTU DOPISAC: (i) niszczenie budowli wedlug wyboru (laska 0 / grabiez czesc / spustoszenie duzo) - sprawdzic, co juz robi gra (poziomy budowli) i BK; (ii) tempo odbudowy
+  policzone (dobrobyt dzis wraca 230-570 dob [S]) razem z paczka P2 "lud buduje miasto" (Jeff TAK) - odbudowa ma byc mozliwa, ale wolna; (iii) ludzie: zabici przez BK takze w naszej
+  ksiedze. Kod lupu = tor L, po daninie P1 i budowie P2 (te same zbiorniki i te same pliki).
