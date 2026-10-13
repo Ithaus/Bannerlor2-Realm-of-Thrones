@@ -3284,7 +3284,7 @@ namespace Armoury
         [SettingPropertyGroup("The town's purse")]
         public bool TownPaysFromSurplus { get; set; } = true;
 
-        [SettingPropertyBool("Alley Cash Probe", HintText = "log only: for every town whose purse is below a quarter of the merchants' working coin a daily line splits the change of its purse by where the coin went and came from - our daily reckoning, villagers' carts, lords, notables, caravans, other parties, villages and the rest - so the cause of an empty purse can be read from the log; changes nothing in the game")]
+        [SettingPropertyBool("Alley Cash Probe", HintText = "log only: for the poorest towns whose purse is below the merchants' working coin a daily line splits the change of its purse by where the coin went and came from - our daily reckoning (item by item), villagers' carts, lords, notables, caravans, other parties, villages and the rest - so the cause of an empty purse can be read from the log; changes nothing in the game")]
         [SettingPropertyGroup("The town's purse")]
         public bool AlleyCashProbe { get; set; } = true;
 

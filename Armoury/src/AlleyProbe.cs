@@ -15,8 +15,10 @@ namespace Armoury
     /// kasa ponizej 1 000 zl przez 38 dob, Thenn 331 dob ponizej zapasu kupcow. Rozpoznanie z dostepnych danych (kasy-miast.csv, kiesa-ludu.csv): zawor do pana
     /// i korony, podatki ("pobrane") i budowy = 0 od ok. 30. doby (kasa ponizej zapasu - zawor nie dziala); kasa spada przez "doplyw netto" (handel i przelewy),
     /// a linia swiata "Przeplywy osad (kasy miast)" ma tylko sumy wszystkich miast - nie da sie z niej powiedziec, KTORY kanal oproznia Thenn (tabory wsi, lup
-    /// lordow, place ludu, karawany). Ta linia rozbija dobowa zmiane kasy KAZDEGO miasta ponizej 1/4 zapasu kupcow na kanaly:
-    ///  - nasz tick dobowy (zawor, korona, lud: zakupy i place E5/B1, markietani, renty - migawka kas na poczatku i koncu ArmouryBehavior.OnDailyTick);
+    /// lordow, place ludu, karawany). Ta linia rozbija dobowa zmiane kasy KAZDEGO miasta ponizej zapasu kupcow (zaulek - jak E5/C1; najbiedniejsze 8 w linii,
+    /// recenzja: bylo ponizej 1/4 zapasu - w biegu 120 dob Thenn z kasa 50-67 tys. przy zapasie ok. 65-70 tys. nie weszlby do linii ani razu) na kanaly:
+    ///  - nasz tick dobowy (zawor, korona, lud: zakupy i place E5/B1, markietani, renty - migawka kas na poczatku i koncu ArmouryBehavior.OnDailyTick),
+    ///    recenzja: rozbity na pozycje ksiegi przeplywow (MoneyLedger.Mark - te same co w linii "Przeplywy osad"), moduly przed ksiega i po niej;
     ///  - tabory wsi (SellGoodsForTradeAction.ApplyInternal - kasa przed i po sprzedazy taboru);
     ///  - przelewy gry (zdarzenie HeroOrPartyTradedGold - kazdy GiveGoldAction) wedlug drugiej strony: lordowie, notable, karawany, inne partie, wsie,
     ///    inne osady, "nic" (z niczego / w nicosc); poza naszym tickiem i poza sprzedaza taborow (tam juz policzone);
@@ -26,8 +28,9 @@ namespace Armoury
     internal static class AlleyProbe
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.AlleyCashProbe && s.LogEnabled; } }
-        private const double ShowBelow = 0.25;   // miasto w linii: kasa ponizej 1/4 zapasu kupcow (TownPurse.Reserve)
-        private const int MaxShown = 6;
+        private const double ShowBelow = 1.0;    // miasto w linii: kasa ponizej zapasu kupcow (TownPurse.Reserve) - zaulek (recenzja: bylo 1/4)
+        private const double DeepBelow = 0.25;   // licznik miast ponizej 1/4 zapasu (osobno)
+        private const int MaxShown = 8;
         private const int KLord = 0, KNotable = 1, KCaravan = 2, KParty = 3, KVillage = 4, KSettl = 5, KNone = 6, K = 7;
         private static readonly string[] KName = { "lordowie", "notable", "karawany", "inne partie", "wsie", "inne osady", "z niczego / w nicosc" };
 
@@ -36,11 +39,13 @@ namespace Armoury
             public long Gold0 = long.MinValue;   // kasa na koncu poprzedniego taktu (long.MinValue - pierwsza doba sesji)
             public long Tick, Carts;
             public readonly long[] In = new long[K], Out = new long[K];
-            public void Clear() { Tick = 0; Carts = 0; Array.Clear(In, 0, K); Array.Clear(Out, 0, K); }
+            public long[] Mk;                    // recenzja: nasz tick wedlug pozycji ksiegi przeplywow (MoneyLedger.Mark); ostatnia - moduly przed ksiega (BlockOpen)
+            public void Clear() { Tick = 0; Carts = 0; Array.Clear(In, 0, K); Array.Clear(Out, 0, K); if (Mk != null) Array.Clear(Mk, 0, Mk.Length); }
         }
 
         private static readonly Dictionary<Town, Acc> _acc = new Dictionary<Town, Acc>();
         private static readonly Dictionary<Town, long> _tick0 = new Dictionary<Town, long>();
+        private static readonly Dictionary<Town, long> _seg = new Dictionary<Town, long>();   // recenzja: kasa na ostatniej granicy pozycji naszego ticku
         private static readonly object _lock = new object();
         private static bool _inTick;
         [ThreadStatic] private static int _cartDepth;
@@ -50,7 +55,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            lock (_lock) { _acc.Clear(); _tick0.Clear(); _inTick = false; }
+            lock (_lock) { _acc.Clear(); _tick0.Clear(); _seg.Clear(); _inTick = false; }
             _stumbles = 0; _stumblesDay = 0; _errSites.Clear();
         }
 
@@ -139,12 +144,63 @@ namespace Armoury
             {
                 lock (_lock)
                 {
-                    _tick0.Clear();
-                    foreach (var t in Town.AllTowns) if (t != null) _tick0[t] = t.Gold;
+                    _tick0.Clear(); _seg.Clear();
+                    foreach (var t in Town.AllTowns) if (t != null) { _tick0[t] = t.Gold; _seg[t] = t.Gold; }
                     _inTick = true;
                 }
             }
             catch (Exception e) { Stumble("TickOpen", e); }
+        }
+
+        /// <summary>Recenzja m6b: MoneyLedger.BlockOpen - zmiana kas od poczatku naszego ticku do ksiegi przeplywow (moduly przed ksiega).</summary>
+        internal static void OnBlockOpen() { Seg(-1); }
+
+        /// <summary>Recenzja m6b: MoneyLedger.Mark(kind) - zmiana kas od poprzedniej granicy idzie na pozycje kind (ta sama co w linii "Przeplywy osad").</summary>
+        internal static void OnMark(int kind) { Seg(kind); }
+
+        private static void Seg(int kind)
+        {
+            if (!_inTick || !On) return;
+            try
+            {
+                int n = MoneyLedger.MarkCount;
+                int slot = kind < 0 || kind >= n ? n : kind;
+                lock (_lock)
+                {
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null) continue;
+                        long g = t.Gold, prev;
+                        if (_seg.TryGetValue(t, out prev) && g != prev)
+                        {
+                            var a = Get(t);
+                            if (a.Mk == null) a.Mk = new long[n + 1];
+                            a.Mk[slot] += g - prev;
+                        }
+                        _seg[t] = g;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("Seg", e); }
+        }
+
+        /// <summary>Recenzja m6b: nasz tick miasta wedlug pozycji (niezerowe), reszta - moduly po ostatniej pozycji ksiegi.</summary>
+        private static void AppendMarks(StringBuilder sb, Acc a)
+        {
+            if (a.Mk == null) return;
+            int n = a.Mk.Length - 1;
+            long sum = 0; bool any = false;
+            for (int k = 0; k <= n; k++)
+            {
+                long v = a.Mk[k];
+                if (v == 0) continue;
+                sum += v;
+                sb.Append(any ? ", " : " [").Append(k == n ? "moduly przed ksiega" : MoneyLedger.MarkShort(k)).Append(' ').Append(v);
+                any = true;
+            }
+            if (!any) return;
+            if (a.Tick - sum != 0) sb.Append(", moduly po ksiedze ").Append(a.Tick - sum);
+            sb.Append(']');
         }
 
         /// <summary>Koniec ArmouryBehavior.OnDailyTickBody: zmiana kas w naszym ticku, potem linia doby.</summary>
@@ -157,7 +213,7 @@ namespace Armoury
                 {
                     _inTick = false;
                     foreach (var kv in _tick0) if (kv.Key != null) Get(kv.Key).Tick += kv.Key.Gold - kv.Value;
-                    _tick0.Clear();
+                    _tick0.Clear(); _seg.Clear();
                 }
             }
             catch (Exception e) { _inTick = false; Stumble("TickClose", e); }
@@ -172,7 +228,7 @@ namespace Armoury
             {
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var rows = new List<KeyValuePair<double, string>>();
-                int below = 0; bool first = false;
+                int below = 0, deep = 0; bool first = false;
                 long sD = 0, sT = 0, sC = 0, sR = 0; var sIn = new long[K]; var sOut = new long[K];
                 lock (_lock)
                 {
@@ -191,12 +247,14 @@ namespace Armoury
                         double ratio = res > 0 ? (double)g / res : 1.0;
                         if (ratio < ShowBelow)
                         {
-                            below++;
+                            below++; if (ratio < DeepBelow) deep++;
                             sD += d; sT += a.Tick; sC += a.Carts; sR += rest;
                             for (int k = 0; k < K; k++) { sIn[k] += a.In[k]; sOut[k] += a.Out[k]; }
                             var sb = new StringBuilder(300);
                             sb.Append(t.Settlement.Name != null ? t.Settlement.Name.ToString() : t.Settlement.StringId).Append(": kasa ").Append(g).Append(" (zapas ").Append(res)
-                              .Append("), zmiana ").Append(d >= 0 ? "+" : "").Append(d).Append(" = nasz tick dobowy ").Append(a.Tick).Append(", tabory wsi ").Append(a.Carts);
+                              .Append("), zmiana ").Append(d >= 0 ? "+" : "").Append(d).Append(" = nasz tick dobowy ").Append(a.Tick);
+                            AppendMarks(sb, a);   // recenzja m6b: nasz tick wedlug pozycji ksiegi przeplywow (zawor, kiesa ludu, markietani, paser ...)
+                            sb.Append(", tabory wsi ").Append(a.Carts);
                             for (int k = 0; k < K; k++) if (a.In[k] != 0 || a.Out[k] != 0) sb.Append(", ").Append(KName[k]).Append(" +").Append(a.In[k]).Append("/-").Append(a.Out[k]);
                             sb.Append(", reszta (ticki gry) ").Append(rest);
                             rows.Add(new KeyValuePair<double, string>(ratio, sb.ToString()));
@@ -208,7 +266,7 @@ namespace Armoury
                 var line = new StringBuilder(1200);
                 line.Append("Kasy zaulkow (m6b): dzien ").Append(day).Append(" | ");
                 if (first) line.Append("pierwsza doba pomiaru - migawka kas, rozbicie od jutra | ");
-                line.Append("miast z kasa ponizej 1/4 zapasu kupcow ").Append(below).Append(" (pokazane ").Append(Math.Min(MaxShown, rows.Count)).Append(")");
+                line.Append("miast z kasa ponizej zapasu kupcow ").Append(below).Append(" (ponizej 1/4 zapasu ").Append(deep).Append("; pokazane ").Append(Math.Min(MaxShown, rows.Count)).Append(" najbiedniejszych)");
                 for (int i = 0; i < rows.Count && i < MaxShown; i++) line.Append(" | ").Append(rows[i].Value);
                 line.Append(" | razem tych miast: zmiana ").Append(sD).Append(" = nasz tick ").Append(sT).Append(", tabory wsi ").Append(sC);
                 for (int k = 0; k < K; k++) if (sIn[k] != 0 || sOut[k] != 0) line.Append(", ").Append(KName[k]).Append(" +").Append(sIn[k]).Append("/-").Append(sOut[k]);

@@ -16041,6 +16041,14 @@ def m6b_main(logp, start_arg, until=120):
                         agg[key] = agg.get(key, 0) + v
                 for m in re.finditer(r"(lordowie|notable|karawany|inne partie|wsie|inne osady|z niczego / w nicosc) \+(\d+)/-(\d+)", seg):
                     agg[m.group(1)] = agg.get(m.group(1), 0) + int(m.group(2)) - int(m.group(3))
+                # recenzja m6b: nasz tick wedlug pozycji ksiegi przeplywow - "nasz tick dobowy N [renty -1, kiesa ludu -2, ...]"
+                mb = re.search(r"nasz tick dobowy -?\d+ \[([^\]]*)\]", seg)
+                if mb:
+                    for it in mb.group(1).split(", "):
+                        mi = re.match(r"^(.*\S) (-?\d+)$", it)
+                        if mi:
+                            key = "tick: " + mi.group(1)
+                            agg[key] = agg.get(key, 0) + int(mi.group(2))
             ch[town] = (days, agg)
         for town, (days, agg) in ch.items():
             txt = f"{days} dob w linii" + ("; " + ", ".join(f"{k} {v:+d}" for k, v in sorted(agg.items(), key=lambda x: x[1])) if agg else "")
@@ -16049,12 +16057,15 @@ def m6b_main(logp, start_arg, until=120):
         rep.add("M6b-6a: kasy zaulkow (Thenn, Frostfang's Camp)", "brak linii Kasy zaulkow (m6b)", "INFO", None)
     # ---- M6b-6b karawany bez zysku
     last28 = [d for d in sorted(wyd) if inwin(d)][-28:]
-    mx = [num(r"najdluzej ([\d.]+) dob", wyd[d], float) for d in last28]
+    # recenzja m6b: tylko odcinek "w tym samym miescie od N+ dob (kazde miasto, probka dobowa)" - wczesniejsze "najdluzej" w linii to lordowie z AI
+    # wylaczonym przez BK i karawany w miescie-wyspie (pierwsze dopasowanie bralo ich liczbe, gdy byly)
+    mx = [num(r"probka dobowa\): [^;]*?najdluzej ([\d.]+) dob", wyd[d], float) for d in last28]
     mx = [x for x in mx if x is not None]
     disb = sum(num(r"karawany bez zysku \(Idle Caravan Disband CZYNNE.*?rozwiazane (\d+)", kar[d], int, 0) or 0 for d in idle_on)
-    if mx:
-        rep.add("M6b-6b: najdluzszy postoj karawany bez statkow w miescie (ostatnie 28 dob okna)", f"{max(mx):.1f} dob; rozwiazane karawany bez zysku w oknie {disb}",
-                "<= 35 dob (28 + probka dobowa + ochrona przed petla wlasciciela)" if idle_on else "INFO (log bez paczki m6b; bieg roczny 289 dob)", (max(mx) <= 35.0) if idle_on else None)
+    if mx or (last28 and idle_on):
+        top = max(mx) if mx else 0.0   # recenzja: "najdluzej -" = zadna karawana nie stoi 7+ dob - prog spelniony (dotad wiersz spadal do INFO)
+        rep.add("M6b-6b: najdluzszy postoj karawany bez statkow w miescie (ostatnie 28 dob okna)", f"{top:.1f} dob; rozwiazane karawany bez zysku w oknie {disb}",
+                "<= 35 dob (28 + probka dobowa; ochrona przed petla wlasciciela tylko w 28 dobach od poprzedniego rozwiazania)" if idle_on else "INFO (log bez paczki m6b; bieg roczny 289 dob)", (top <= 35.0) if idle_on else None)
     else:
         rep.add("M6b-6b: najdluzszy postoj karawany bez statkow w miescie", "brak linii Wyspy i drogi z postojem", "INFO", None)
     k1000 = [num(r"ponizej 1000 (\d+)", kas[d]) for d in sorted(kas) if inwin(d)]

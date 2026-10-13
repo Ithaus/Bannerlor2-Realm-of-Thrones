@@ -371,7 +371,9 @@ namespace Armoury
             if (!c.IsPartyTradeActive || c.Ai == null || c.Ai.DoNotMakeNewDecisions) return "nie handluje";
             if ((c.MemberRoster != null && c.MemberRoster.TotalHeroes > 0) || (c.PrisonRoster != null && c.PrisonRoster.TotalManCount > 0)) return "bohater w skladzie albo jency";
             int was;
-            if (_ownerDay.TryGetValue(owner, out was) && was != day) { _dAgain++; return "wlasciciel mial juz rozwiazana karawane (ochrona przed petla)"; }
+            // m6b (6, recenzja): karawana bez zysku - sam prog postoju (IdleDisbandDays) jest hamulcem petli (nowa karawana musi stac 28+ dob), wiec ochrona
+            // blokuje tylko rozwiazanie blizsze niz IdleDisbandDays od poprzedniego; inaczej druga karawana tego samego kupca stalaby do konca sesji
+            if (_ownerDay.TryGetValue(owner, out was) && was != day && (!idle || day - was < IdleDisbandDays)) { _dAgain++; return "wlasciciel mial juz rozwiazana karawane (ochrona przed petla)"; }
             if (!CaravanCapital.On) return "Caravan Capital Real wylaczone (kiesa przepadlaby)";
             if (!HorseFate.SpoilsOn) return "Spoils Of Broken Parties wylaczone (towar przepadlby)";
             if (!SmallGold.PerksOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
