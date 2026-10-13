@@ -1534,3 +1534,10 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   w drzewie zb\kal, galaz `w-toku/kalendarz-data` od ca4aa87: (1) dzien w dacie dla gracza zmienia sie o polnocy (tylko wyswietlanie - bieg czasu i tiki dobowe bez zmian), (2) czytelna data
   "Year N, Day N, pora roku" zamiast surowego numeru dnia, jedna funkcja formatujaca; dowod do autotestu: linia "Data na pasku (kalendarz)" co godzine przez 3 doby.
   DO POTWIERDZENIA U JEFFA: rok w dacie = rok swiata ROT (jak gra pokazuje dzis) czy rok kampanii (1, 2, 3...).
+- (11:50 UTC 13.10) **E8/O4 musztra - POMINIETA (pomiar):** wspolny odczyt pozycji lordow dalby < 1 ms/dobe, cala paczka 16-22 ms/dobe (prog 30). Prawdziwy koszt musztry to trening
+  114 ms/dobe, z tego ok. 96 ms liczenie nadwyzki K1 w kontekscie partii (Drill.AiSurplus -> MenPurse.AiMeleeLeft + 11 x AiSurplusPlan) - wspolny kod ze sprzedaza nadwyzek; najpierw stoper.
+  **Rozpoznanie Z.3 GOTOWE:** `docs/zakonczenie/ROZPOZNANIE-Z3-CUDZY-KOD-2026-10-13.md`: (1) swaty ROT CheckNPCMarriages - 9.4% klatki (ok. 1.2 s/dobe), latka CrashScribe "te same pary,
+  ten sam ciag losowy" szac. -0.8..1.0 s/dobe; (2) kafelki druzyn pod tabliczka miasta (wyglad, S); (3) pomiar wnetrza warsztatow i treningu (0.8 s/dobe razem z naszymi latkami);
+  NIE ruszac: AI lordow, finanse rodow, silnik. Uwaga dla Jeffa: w ROT zonaci sa na liscie swatow, przez co sluby NPC sa rzadsze, niz zamierzal ROT - zostawione bez zmian.
+  **W TOKU wf_4901dbf6-079** (docs/przekazanie/wf-z3-swaty-i-pomiary.js): swaty ROT w zb\z3 (`w-toku/z3-swaty-rot`, CrashScribe; klucze MarriageFast = true, MarriageFastShadow - bieg cienia
+  z licznikiem roznic) + pomiary w zb\pm (`w-toku/z3-pomiary`, Armoury DayProfile/Drill).
