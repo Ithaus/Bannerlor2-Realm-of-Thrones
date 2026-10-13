@@ -1549,3 +1549,6 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   szybkosci swatow (wf_4901dbf6-079, drzewo zb\z3, galaz `w-toku/z3-swaty-rot`):** nowy klucz CrashScribe (np. MarriageOnlyFreeCandidates = true; off = losowanie ROT jak dotad) - dzienna
   proba lorda losuje kandydata tylko sposrod WOLNYCH (bez malzonka), zamiast przepadac po trafieniu w zonatego; linia doby: proby, przepadle przez zonatego (stara regula), sluby. To zmiana
   rozgrywki (wiecej slubow i dzieci NPC) - decyzja Jeffa; rownowaznosc "te same pary" dotyczy tylko trybu z kluczem wylaczonym. Po pierwszym biegu podac Jeffowi liczby (ile slubow wiecej).
+- (12:40 UTC 13.10) **PROFIL KLATKI na WGRANIU 35 (10 dob od doby 120; SCRATCH(dbc3d3d1)\test\profil-w35.txt):** klatka srednio 59.3 ms (przed runda poprawek 2: 163.7 ms). Wedlug modow:
+  Native 35%, silnik 22%, ROT-Core 15%, **Armoury 11% (6.0 ms; bylo 27.7 ms = 18%)**, BannerKings 9%, StrategicCampaignAI 2%, CrashScribe 1%. Najdrozszy sluchacz: swaty ROT
+  CheckNPCMarriages 7.98 ms/klatke = 14.4% klatki (cel latki Z.3 - w toku), potem AiMilitaryBehavior 5.4%, takt doby Armoury 3.4%.
