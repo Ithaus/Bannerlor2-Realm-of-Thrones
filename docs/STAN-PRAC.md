@@ -1792,3 +1792,13 @@ LosersFleeBesiegers = false.
   po bitwie i zdejmie przyrost wyrzutkow.**
 - Test zapisu: `autotest-dlugi` (doba 60 biegu N3) + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu i test 120 dob W5 (fin9: Armoury a5e2fbf9, zbior-e8 00a6496) - lancuch w grze
   (test\at-w40-kontrola10.out.txt, test\at-w5-120.out.txt).
+- (18:55 UTC 13.10) **JEFF - ROZBICI WRACAJA POD CHORAGIEW (kierunek TAK, takze bitwy w polu):** "zolnierze z pobitej armii wracaja do armii, ale nie wszyscy; wiekszosc boi sie
+  dezercji, wiec wraca; czesc wybiera zycie banity, a czesc wraca do domow. Daj mi warunki, zasady i proporcje, takze bitwy w polu." PROPOZYCJA PODANA JEFFOWI (czeka na "tak" /
+  zmiany; kodu nie zaczynac przed odpowiedzia): dotyczy szeregowych druzyn lordow (pole + pod murami N3; bandy, karawany, tabory wsi, zalogi - jak dzis). Zabici i jency bez zmian
+  (H3: zabici 5-65% wedlug sytuacji, jency 30% weteranow / 5% reszty). Z tych, ktorzy uszli: **55% wraca pod choragiew, 30% do domu, 15% do lasu.** Poprawki: weterani (t4+) 70%
+  wraca, rekruci (t1-2) 45%; zalegly zold: -10 pkt powrotu za kazdy tydzien zaleglosci (min. 20%), ci ida do lasu; pobici we wlasnym kraju: wiecej do domu, w obcym: mniej do domu,
+  wiecej do lasu i pod choragiew; Nocna Straz 80% wraca, nikt do domu. Zbieraja sie 3-10 dob w najblizszej twierdzy rodu (gdy rod nie ma twierdzy - w najblizszym miescie
+  krolestwa), czekaja na pana do 30 dob (pan w niewoli / bez druzyny: odbiera ich po powrocie; inna druzyna tego samego rodu tez moze); po 30 dobach polowa do domu, polowa do lasu.
+  Pan przyjmuje tylko tylu, na ilu ma miejsce w druzynie i w budzecie zoldu. Gracz: jego rozbici czekaja tak samo, komunikat "Stragglers: N of your men have gathered at {TOWN}".
+  Ksiega ludzi: nikt nie powstaje i nie znika. Oczekiwane (szacunek, do policzenia w projekcie): pobita armia wraca do ok. 35-45% dawnej sily zamiast zaczynac od zera; pula
+  wyrzutkow z powrotem w okolice 3 tys. w d120.
