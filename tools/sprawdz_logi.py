@@ -13939,11 +13939,17 @@ def etap8_p3woj(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         dn = [m for m in dn if m]
         hires, gold = sum(int(m.group(1)) for m in dn), sum(int(m.group(2)) for m in dn)
         w_ok = bool(wired) and all("AddDownPayment) wpiety" in s for s in wired)
+        # recenzja P3: latka wpieta to za malo - prefiks musi byc wolany (wzor bledu W4: latka konca porozumienia wpieta, a w naszym wywolaniu nie odpalala).
+        # Kazdy najem kompanii z ludzmi w polu daje nowa umowe 185 (bieg roczny: 681 najmow, 678 nowych umow) - najmow co najmniej polowa nowych umow;
+        # pierwsza doba okna pominieta (start kampanii: umowy kompanii, ktore zaczynaja gre w sluzbie - bez najmu)
+        deals = sum(num(r"\(nowe umowy (\d+),", k185[d], default=0) for d in p3 if d != min(k185))
+        called = deals == 0 or hires * 2 >= deals
         rep.add("P3W3-1: zadatek BK dla kompanii AI wstrzymany: latka; najmy i zloto, ktore zostalo w kiesach krolow (suma okna)",
-                (("wpieta" if w_ok else "BRAK latki albo linii startowej") + f"; {hires} najmow ({hires / max(1, len(p3)):.2f} na dobe), {gold} zl ({gold / max(1, len(p3)):.0f} zl/d)"
+                (("wpieta" if w_ok else "BRAK latki albo linii startowej") + f"; {hires} najmow ({hires / max(1, len(p3)):.2f} na dobe) przy {deals} nowych umowach 185, {gold} zl ({gold / max(1, len(p3)):.0f} zl/d)"
+                 + ("" if called else " - LATKA NIE JEST WOLANA (najmy bez wstrzymanego zadatku)")
                  + (f"; klucz wylaczony w {len(p3) - len(dn)} dobach" if len(dn) < len(p3) else "")) if p3 else "brak pola P3/W3 (log sprzed paczki)",
-                "latka wpieta, klucz wlaczony; ok. 1.9 najmu na dobe i ok. 33 tys. zl/d (przed paczka 681 najmow i 12.09 mln w roku z kies krolow do kompanii)",
-                (w_ok and len(dn) == len(p3)) if p3 else None)
+                "latka wpieta i wolana (najmow >= polowa nowych umow 185), klucz wlaczony; ok. 1.9 najmu na dobe i ok. 33 tys. zl/d (przed paczka 681 najmow i 12.09 mln w roku z kies krolow do kompanii)",
+                (w_ok and called and len(dn) == len(p3)) if p3 else None)
         pn = [re.search(r"P3/W3 kontrakt za ludzi pod bronia \(Merc Contract Pays Men Under Arms\): nalezne wedlug umowy (\d+), za ludzi pod bronia (\d+)", k185[d]) for d in sorted(p3)]
         pn = [m for m in pn if m]
         if pn:

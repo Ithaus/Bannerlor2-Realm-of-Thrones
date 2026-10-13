@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 2026-10-13 (P3/WOJSKO - recenzja z poprawka) - 6 poprawek paczki sprawdzone niezaleznie; dopisany pomiar skutku W1 w zlocie i ludziach
+## 2026-10-13 (P3/WOJSKO - recenzja z poprawka) - 6 poprawek paczki sprawdzone niezaleznie; dopisany pomiar skutku W1 w zlocie i ludziach, wiersz narzedzia pilnuje, ze latka zadatku BK jest wolana
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (sama linia doby 180 - liczniki i tekst), `tools/sprawdz_logi.py` (tylko blok `etap8_p3woj`), `CHANGELOG.md`. Zachowanie gry bez zmian (sam log i narzedzie).
 
 **Co sprawdzone (kod wobec "Poprawki ostatecznej" TRIAZ-3 z uwagami podwazenia; log i CSV biegu rocznego 364 doby):**
@@ -15,11 +15,12 @@
 
 **Poprawione w recenzji:**
 1. **Linia 180 nie pokazywala skutku W1 w zlocie i ludziach** (wymog zadania: ile rodow, ile zlota, ile ludzi). Dopisane: `rody z lennem na miare F (z renta dzis R), ich renty dzis X zl, w ich druzynach Y ludzi` oraz przy zrodlach styku `tylko rajdy i bitwy wlasnych lordow K, w nich rodow M`. Powod dodatkowy: pole "wymog sluzby zdjety u N" liczy tylko rody z niedoborem dob, a w kampanii zaczetej z paczka doby "na miare" sa zaliczane od pierwszej doby (rodzaj 8) - N bedzie bliskie 0 i samo nie pokaze nic. Narzedzie: wiersz P3W1-4b i dopisek w P3W1-5.
+2. **Wiersz P3W3-1 dawal TAK przy latce wpietej, ale niewolanej** (0 najmow) - a wlasnie taki blad (latka wpieta, w wywolaniu nie odpala) jest przyczyna W4. Teraz: najmow co najmniej polowa nowych umow 185 z okna (bieg roczny: 681 najmow, 678 umow; pierwsza doba okna pominieta - kompanie zaczynajace gre w sluzbie), inaczej NIE z dopiskiem "LATKA NIE JEST WOLANA".
 
 **Odrzucone po sprawdzeniu (nie sa bledami):** podejrzenie petli wojna - pokoj po W4 (gra nie ponawia wezwan co dobe); rozjazd konca linii w `sprawdz_logi.py` (w repo LF, CRLF tylko w kopii roboczej); koszt `AtMeans`; brak zwolnienia rodow "oba" (zgodnie z poprawka ostateczna - drugi krok do decyzji).
 
 **Ryzyko / co sprawdzic:**
-- Sztuczny log 4 dob z polami po recenzji: wszystkie pola czytane.
+- Sztuczny log 4 dob z polami po recenzji: wszystkie pola czytane; wariant "0 najmow przy nowych umowach" daje P3W3-1 = NIE.
 - Stary zapis zrobiony wersja z bledem W4, w ktorym zerwanie wypadlo w ostatniej dobie przed zapisem: portfel wzywajacego zostaje na minusie bez wpisu (szukanie dlugu juz nie biega) - przy minusie ponizej 100 tys. to krolestwo nie wezwie sojusznika. Dotyczy tylko starych zapisow; nowa kampania tego nie ma.
 - Do audytu calosci (poza paczka): inne miejsca, w ktorych nasz kod wola wprost krotka metode gry i liczy na wlasna latke na niej - ten sam wzor bledu co W4.
 - W2 dalej wymaga testu 120 dob przed biegiem rocznym (zmiana skladu wojsk AI).
