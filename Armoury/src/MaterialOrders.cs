@@ -645,6 +645,21 @@ namespace Armoury
             return a[m];
         }
 
+        /// <summary>F4a (test zbiorczy 5-8, R1-7): prog nadwyzki miasta-zrodla dla wozow dymarek (Bloomery.Daily) - ta sama regula co kontrakty 174
+        /// ("co miasto sprzedaje na zewnatrz": prog karawan, 10 dob zuzycia, wlasny punkt zamowienia), z pamieci doby (SourceKeepDay; Bloomery.Daily biegnie
+        /// przed MaterialOrders.Daily, ktore te pamiec czysci - kontrakty licza swoj prog od nowa jak dotad). Surowiec spoza tabeli albo blad -
+        /// int.MaxValue (miasto nie ma nic na sprzedaz).</summary>
+        internal static int SourceKeepFor(Town t, ItemObject item)
+        {
+            try
+            {
+                int m;
+                if (t == null || item == null || Settings.Current == null || !Ready() || !_ix.TryGetValue(item, out m)) return int.MaxValue;
+                return SourceKeepDay(t, m);
+            }
+            catch (Exception e) { Stumble("SourceKeepFor", e); return int.MaxValue; }
+        }
+
         private static bool Eligible(MobileParty p, Settlement dest)
         {
             if (p == null || !p.IsCaravan || !p.IsActive || p.IsDisbanding || p.MapEvent != null || p.Army != null || !p.IsPartyTradeActive || p.ItemRoster == null || p.Party == null) return false;

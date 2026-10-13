@@ -1004,9 +1004,13 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool TradePerkGiftsAiOff { get; set; } = true;
 
-        [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it is paid from the spare money of the town the estate's village trades with (above its merchants' reserve), as much as there is, so the house may start with less or nothing. The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before")]
+        [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it starts with nothing (see Gentry Start From Town). The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool GentryPurseFromTown { get; set; } = true;
+
+        [SettingPropertyBool("Gentry Start From Town", HintText = "only with Gentry Purse From Town: the new gentry house's 15,000 is paid from the spare money of the town the estate's village trades with (above its merchants' reserve), as much as there is. Off (default) = the new house starts with nothing")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool GentryStartFromTown { get; set; } = false;
 
         [SettingPropertyBool("Bandit Hero Purse From Hideout", HintText = "a Banner Kings bandit leader no longer gets 10,000 out of thin air - he takes it from his hideout's spare coin (above the hoard kept for whoever clears it), as much as there is. When his band leaves the hideout its loot is no longer turned into coin out of thin air: it stays in the packs and goes to the fences like any band's loot. Off = out of thin air, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -1215,6 +1219,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Ai Mount Purse Share", 0.00f, 1.00f, "0.00", HintText = "he never spends more than this share of his purse on horses in one visit")]
         [SettingPropertyGroup("A knight needs a horse")]
         public float AiMountPurseShare { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Ai Mount Gear Purse Share", 0.00f, 1.00f, "0.00", HintText = "a lord whose house has an arms share (Gear Share Peace / War) buys his horses out of that share, like his arms and armour: at one stop he spends on horses at most this part of what his purse holds above Ai Gear Gold Reserve and never more than the unspent arms share of his house, and what he pays comes off that share. The horses a house buys for its knights leave the same reserve in his purse. Houses without a budget, your own house and mercenary companies go by Ai Mount Purse Share as before (0 = off: every lord goes by Ai Mount Purse Share and knights' horses are bought without the reserve, as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public float AiMountGearPurseShare { get; set; } = 0.75f;
 
         [SettingPropertyInteger("Ai Mount Max Per Visit", 0, 40, "0", HintText = "and never buys more than this many head at one stop - a stable is topped up, not a herd bought")]
         [SettingPropertyGroup("A knight needs a horse")]
@@ -5028,6 +5036,18 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryAtMine { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Bloomery Cart Range", 0.00f, 2400.00f, "0.00", HintText = "with Bloomery At Mine: farthest (by road) a mining village's cart goes for wood when the woods of its district and its own market town give too little - it buys only what a friendly town holds above its own needs, pays that town from the village's gold, and the wood arrives after the days the road takes (about ten days at 600); 0 = no such carts, as before")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float BloomeryCartRange { get; set; } = 600f;
+
+        [SettingPropertyBool("Bloomery Wood Demand", HintText = "with Bloomery At Mine: a town's own need for wood (its stock target, what it will sell and the price) counts the smiths' charcoal alone plus the wood the mines' bloomeries really buy from its market, instead of the old rate measured when the ore was smelted in town (off = the old rate)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryWoodDemand { get; set; } = true;
+
+        [SettingPropertyBool("Bloomery Coal Before Lord Share", HintText = "with Bloomery At Mine: what a mining village paid for the wood of its bloomery comes out of its cart's market takings first, and the lord takes his share only of what is left - the difference moves from the lord's tax on those takings to the village's purse when the cart comes home, so no gold is made; the owners of Banner Kings estates keep their part (needs Village Takings Whole; off = the lord's share is counted on the whole takings, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryCoalBeforeLordShare { get; set; } = true;
+
         [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ToolsByUse { get; set; } = true;
@@ -5096,6 +5116,22 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool DiplomacyYearLong { get; set; } = true;
 
+        [SettingPropertyBool("Raid By Settlement Enabled", HintText = "villages are raided settlement by settlement: each takes days, and the loot comes only from what the village really has")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidBySettlementEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Raid Detachment Men", 20, 2000, "0", HintText = "raiders split into bands of this many men, each band burning its own settlement at the same time - a lord with 112 men burns one settlement in about four and a half days, an army of 2000 burns ten together")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidDetachmentMen { get; set; } = 200;
+
+        [SettingPropertyInteger("Raid Alert Max Days", 1, 60, "0", HintText = "after a raid has burned its settlements the village stays looted and does not start to mend for 1 day plus 1 for each hundredth of its district's people struck, at most this many days")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidAlertMaxDays { get; set; } = 17;
+
+        [SettingPropertyBool("Raid Player Step Popup", HintText = "your raid stops after each settlement and asks: raid the next one (about N days) or end the raid (off = your raid burns one settlement and ends, as the lords' raids do)")]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidPlayerStepPopup { get; set; } = true;
+
         [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
@@ -5119,6 +5155,14 @@ namespace Armoury
         [SettingPropertyBool("Village Pennants", HintText = "the lord's pennant flies over villages close to the camera")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillagePennants { get; set; } = true;
+
+        [SettingPropertyBool("Burned Village Look", HintText = "a village shrinks as its settlements empty, and a burned one stands dark")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool BurnedVillageLook { get; set; } = true;
+
+        [SettingPropertyBool("Burned Village Labels", HintText = "'X has been burned' over burned villages, close up only")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool BurnedVillageLabels { get; set; } = true;
 
         [SettingPropertyBool("Map Roads Probe Enabled", HintText = "TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn")]
         [SettingPropertyGroup("Map roads (test)")]
@@ -5391,6 +5435,7 @@ namespace Armoury
             s.TierIncomeAiOff = TierIncomeAiOff;
             s.TradePerkGiftsAiOff = TradePerkGiftsAiOff;
             s.GentryPurseFromTown = GentryPurseFromTown;
+            s.GentryStartFromTown = GentryStartFromTown;
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
             s.FeastTownGetsPaid = FeastTownGetsPaid;
             s.PactCostToOtherRealm = PactCostToOtherRealm;
@@ -5443,6 +5488,7 @@ namespace Armoury
             s.AiBuysMounts = AiBuysMounts;
             s.AiMountSpareBuffer = AiMountSpareBuffer;
             s.AiMountPurseShare = AiMountPurseShare;
+            s.AiMountGearPurseShare = AiMountGearPurseShare;
             s.AiMountMaxPerVisit = AiMountMaxPerVisit;
             s.AiMountBuyCooldownDays = AiMountBuyCooldownDays;
             s.AiMountBreederFallback = AiMountBreederFallback;
@@ -6396,6 +6442,9 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
+            s.BloomeryCartRange = BloomeryCartRange;
+            s.BloomeryWoodDemand = BloomeryWoodDemand;
+            s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;
@@ -6413,12 +6462,18 @@ namespace Armoury
             s.TerrainEaseExact = TerrainEaseExact;
             s.TournamentsAllSeason = TournamentsAllSeason;
             s.DiplomacyYearLong = DiplomacyYearLong;
+            s.RaidBySettlementEnabled = RaidBySettlementEnabled;
+            s.RaidDetachmentMen = RaidDetachmentMen;
+            s.RaidAlertMaxDays = RaidAlertMaxDays;
+            s.RaidPlayerStepPopup = RaidPlayerStepPopup;
             s.TwinsCrossingCount = TwinsCrossingCount;
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;
             s.VillageTipLore = VillageTipLore;
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
+            s.BurnedVillageLook = BurnedVillageLook;
+            s.BurnedVillageLabels = BurnedVillageLabels;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.Stage8MeasureLog = Stage8MeasureLog;

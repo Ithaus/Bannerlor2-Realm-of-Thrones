@@ -454,11 +454,15 @@ namespace Armoury
                         // T1: rodzaj obudzenia (przed SetMoveModeHold) - sam zjazd na Hold,
                         // rozkaz taki jak nasz zapamietany przed snem, albo inny cudzy rozkaz
                         NightOrder mine;
+                        bool same = false;   // F7: rozkaz taki jak zapamietany - nie ma czego dopisywac
                         if (!ordered) _wokenHold++;
                         else if (_orders.TryGetValue(mp, out mine) && mine != null && mine.Behavior == mp.DefaultBehavior
-                                 && mine.Settlement == mp.TargetSettlement && mine.Party == mp.TargetParty) _wokenOurOrder++;
+                                 && mine.Settlement == mp.TargetSettlement && mine.Party == mp.TargetParty) { _wokenOurOrder++; same = true; }
                         else _wokenOther++;
                         if (mp.IsLordParty) _wokenLord++; else if (mp.IsCaravan) _wokenCar++;   // E7/O1 (228): rodzaj obudzonych (tylko licznik)
+                        // F7 (siatka): inny cudzy rozkaz, ktory ominal bramke, czeka do switu jak rozkaz zatrzymany bramka - zapis PRZED Hold (tylko przy kluczu)
+                        // i we wlasnym try: potkniecie zapisu jest liczone, a straznik i tak kladzie partie
+                        if (phase && ordered && !same) { try { KeepCaughtOrder(mp); } catch (Exception ex) { GuardStumble("KeepCaughtOrder", mp, ex); } }
                         _wokenDriftSum += drift; if (drift > _wokenDriftMax) _wokenDriftMax = drift;
                         mp.Ai.DisableForHours(1);
                         mp.SetMoveModeHold();
@@ -621,15 +625,20 @@ namespace Armoury
 
         /// <summary>174b: partia spi w nocnym obozie swiata (rozkaz zapamietany przed snem, swit go odda). Odczyt slownika O(1).
         /// Krytyka 174b (5): _orders czysci tylko galaz switu w AiNightCamp, a OnHourly wychodzi wczesniej przy NightRestEnabled = false
-        /// albo martwym bohaterze gracza - stary wpis nie moze wtedy udawac snu, wiec sprawdzamy tez wylaczniki i godzine obozu.</summary>
+        /// albo martwym bohaterze gracza - stary wpis nie moze wtedy udawac snu, wiec sprawdzamy tez wylaczniki i godzine obozu.
+        /// F7: przy SleepersHoldOrders ta sama definicja co bramka (SleepKind): legowisko _bedPos, dopoki oboz trwa - do ticku switu (CampHolds; zegar
+        /// zostaje jako bezpiecznik - najdalej godzine po koncu obozu). Bez tego w oknie 6:00 - tick switu kontrakt surowca (MaterialOrders.ReleasePrefix)
+        /// uznawal spiaca karawane za obudzona. Klucz wylaczony - jak dotad (_orders i godzina zegara).</summary>
         internal static bool IsCamping(MobileParty mp)
         {
             try
             {
-                if (mp == null || _orders.Count == 0) return false;
+                if (mp == null || (_orders.Count == 0 && _bedPos.Count == 0)) return false;
                 var s = Settings.Current;
-                if (s == null || !s.NightRestEnabled || !s.AiCampsAtNight || !InCamp(CampaignTime.Now.GetHourOfDay)) return false;
-                return _orders.ContainsKey(mp);
+                if (s == null || !s.NightRestEnabled || !s.AiCampsAtNight) return false;
+                int h = CampaignTime.Now.GetHourOfDay;
+                if (GateOn(s)) return _bedPos.ContainsKey(mp) && CampHolds(s, h);
+                return InCamp(h) && _orders.ContainsKey(mp);
             }
             catch { return false; }
         }
@@ -745,6 +754,7 @@ namespace Armoury
                 bool night = InCamp(h);   // T1: ticki 0..5 -> spia 0:00-6:00, o 6:00 pobudka
                 if (!s.AiCampsAtNight || !night)
                 {
+                    _campNight = false;   // F7: tick switu - oboz swiata sie skonczyl (pierwsza rzecz galezi: bramka i straznik puszczaja od tej chwili)
                     // E7/O1 (228): swit - AI obozu i osady wlaczone (nasz termin), liczniki oddawanych rozkazow - PRZED linia i czyszczeniem _camping
                     try { DawnWake(s); } catch (Exception ex) { Log.Error("SleepGate.DawnWake", ex); }
                     bool dawnAny = _dawnAiCamp + _dawnAiTown + _dawnGated + _dawnDebtors > 0;
@@ -773,6 +783,7 @@ namespace Armoury
                     _townHold.Clear();
                     return;
                 }
+                _campNight = true;   // F7: tick nocy - oboz swiata trwa do ticku switu (CampHolds)
 
                 // zagrozenia: partie lordow i bandytow (pogon nie zna pory snu) - stara sciezka T1 (karawany, bandy,
                 // lordowie przy wylaczonym AiNightMarchByReason); T10 dla lordow szuka zagrozen przez lokator mapy (AlarmThreat)
@@ -1378,7 +1389,8 @@ namespace Armoury
                     && GuardDue(ref _lastHoldSweep, ref _holdDhMax))
                 {
                     int hs = CampaignTime.Now.GetHourOfDay;
-                    if (InCamp(hs)) HoldSleepers();
+                    // F7: przy SleepersHoldOrders straznik pilnuje do ticku switu (ten sam tick budzi i oddaje rozkazy), nie do godziny zegara
+                    if (CampHolds(s, hs)) HoldSleepers();
                 }
 
                 // E7/O1 (228): faza snu lordow wstrzymanych w osadzie (_townHold, tylko godziny obozu - swit czysci) - AI odnawiane przed terminem co 0.1 h GRY

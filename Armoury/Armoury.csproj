@@ -23,6 +23,12 @@
          -p:OutDir=... i potem zwykly build z -t:Rebuild, zeby obj nie zostal z wersja na sucho). -->
     <DefineConstants>$(DefineConstants);T10_DRY</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(W4Photo)' == 'true'">
+    <!-- E7/W4 (237, projekt etapu 7 T2 "jesli spalonych 0"): DLL do zdjec - pierwsza wioska kazdego okregu pokazana na mapie jako spalona (sam widok:
+         obrazek, dym, napis; ksiega wiosek i gra bez zmian). Stala W4_PHOTO w MapVillageLook.cs. Budowanie: -p:W4Photo=true z osobnym -p:OutDir=...,
+         potem zwykly build z -t:Rebuild. NIE do wgrania Jeffowi. -->
+    <DefineConstants>$(DefineConstants);W4_PHOTO</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>

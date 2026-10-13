@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -50,8 +51,18 @@ namespace Armoury
 
         private static readonly TextObject _txtPack = new TextObject("{=!}Spare horses under packs");
 
-        // co gra dodala nowej karawanie (InitializeCaravanOnCreation) - zdejmowane w postfiksie CreateCaravanParty tej samej partii
-        private static readonly Dictionary<MobileParty, List<KeyValuePair<EquipmentElement, int>>> _pend = new Dictionary<MobileParty, List<KeyValuePair<EquipmentElement, int>>>();
+        // co gra dodala nowej karawanie (InitializeCaravanOnCreation) - zdejmowane w postfiksie CreateCaravanParty tej samej partii.
+        // Klucz po REFERENCJI (poprawka F2, test zbiorczy 5-8): InitializeCaravanOnCreation biegnie wewnatrz MobileParty.CreateParty PRZED nadaniem Id
+        // (G MobileParty.cs:4139 _partyComponent.Create, Id dopiero :4141 AddMobileParty = CampaignObjectManager.cs:448), a MBObjectBase.GetHashCode
+        // = Id.GetHashCode - zwykly slownik zapisywal partie pod haszem 0 i szukal jej pod (14 << 26) | n: postfiks CreateCaravanParty nie znalazl
+        // ani jednego wpisu (120 dob: 0 trafien na 951 nowych karawan, wszystkie zebrane jako "poza CreateCaravanParty").
+        private static readonly Dictionary<MobileParty, List<KeyValuePair<EquipmentElement, int>>> _pend = new Dictionary<MobileParty, List<KeyValuePair<EquipmentElement, int>>>(new PartyRefEq());
+
+        private sealed class PartyRefEq : IEqualityComparer<MobileParty>
+        {
+            public bool Equals(MobileParty a, MobileParty b) { return ReferenceEquals(a, b); }
+            public int GetHashCode(MobileParty o) { return RuntimeHelpers.GetHashCode(o); }
+        }
         private static FieldInfo _itemsField;
 
         // liczniki doby

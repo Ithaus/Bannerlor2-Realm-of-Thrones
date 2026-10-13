@@ -15,6 +15,22 @@ namespace CrashScribe
         private static readonly Dictionary<string, int> Seen = new Dictionary<string, int>();
         private static int _written;
 
+        // --- klucz powtorek (SCRIBE-KLUCZ-POWTOREK, 11.10; wylacznik Config.RepeatKeyByMessage) ---
+        // Dawny klucz (rodzaj|miejsce|typ|pierwsza ramka sladu) to teraz RODZINA. Klucz bazowy = rodzina + komunikat
+        // znormalizowany; dla FirstChance dochodzi ramka wolajacego z zywego stosu, bo slad wyjatku w chwili pierwszej
+        // szansy ma tylko ramke rzutu (ThrowHelper, EmitCallParameter, ReportException) i sklejal rozne bledy calej gry
+        // w jedna "powtorke" (session-2026-10-11_14-45-58.log: po countChange BK 6 kolejnych klas BK bez sladu).
+        private const int MsgMax = 300;           // dlugosc komunikatu w kluczu (przy 160 przeciazenia z latek Harmony sie sklejaja)
+        private const int FrameUntil = 100;       // ramke z zywego stosu liczymy dla pierwszych N zdarzen klucza bazowego (koszt stosu)
+        private const int MaxMsgsPerFamily = 20;  // najwyzej tyle roznych komunikatow na rodzine (id w tresci), reszta razem pod (inne)
+        private const int MaxFramesPerBase = 5;   // najwyzej tyle roznych wolajacych na klucz bazowy, reszta razem pod (inne)
+        private const string Other = "(inne)";
+        private sealed class BaseInfo { internal int Count; internal readonly List<string> Frames = new List<string>(); }
+        private static readonly Dictionary<string, BaseInfo> Bases = new Dictionary<string, BaseInfo>();
+        private static readonly Dictionary<string, int> FamilyMsgs = new Dictionary<string, int>();
+        // blad rzucony w trakcie skladania raportu (FirstChance z wnetrza Report) nie wchodzi drugi raz - bez rekurencji
+        [ThreadStatic] private static bool _busy;
+
         internal static void Init()
         {
             try
@@ -75,20 +91,28 @@ namespace CrashScribe
         /// <summary>Pelny raport o bledzie. Zwraca false, jesli to powtorka i pominelismy.</summary>
         internal static bool Report(string kind, Exception ex, string where, string extra)
         {
+            if (ex == null || _busy) return false;
+            _busy = true;
             try
             {
-                if (ex == null) return false;
-                string key = kind + "|" + where + "|" + ex.GetType().FullName + "|" + FirstFrame(ex);
+                string family = kind + "|" + where + "|" + ex.GetType().FullName + "|" + FirstFrame(ex);
+                bool split = Config.RepeatKeyByMessage;
+                string msg = split ? Norm(MessageOf(ex)) : null;
+                bool fc = split && where == "FirstChanceException";
 
                 lock (Gate)
                 {
+                    string frame = "";
+                    string key = split ? KeyOf(family, msg, fc, out frame) : family;
                     int n;
                     if (Seen.TryGetValue(key, out n))
                     {
                         Seen[key] = n + 1;
                         // ten sam blad w kolko - notujemy tylko co jakis czas, zeby nie utopic pliku
                         if (n != 4 && n != 24 && n % 250 != 0) return false;
-                        Raw(Environment.NewLine + "  (powtorka #" + (n + 1) + " of the same error)" + Environment.NewLine);
+                        // z opisem: linia stoi zwykle pod pelnym raportem INNEGO bledu
+                        Raw(Environment.NewLine + "  (powtorka #" + (n + 1)
+                            + (split ? ": " + RepeatLabel(kind, ex, where, frame) + ")" : " of the same error)") + Environment.NewLine);
                         return true;
                     }
                     Seen[key] = 1;
@@ -174,6 +198,178 @@ namespace CrashScribe
                 return true;
             }
             catch { return false; }
+            finally { _busy = false; }
+        }
+
+        /// <summary>Klucz powtorek (wolane pod Gate). Baza = rodzina + komunikat znormalizowany (najwyzej MaxMsgsPerFamily
+        /// komunikatow na rodzine); dla FirstChance + ramka wolajacego (najwyzej MaxFramesPerBase na baze). Ramke liczymy
+        /// tylko dla pierwszych FrameUntil zdarzen bazy; potem bez kosztu stosu: jedyna znana ramka albo (inne).</summary>
+        private static string KeyOf(string family, string msg, bool fc, out string frame)
+        {
+            frame = "";
+            string bkey = family + "|" + msg;
+            BaseInfo b;
+            if (!Bases.TryGetValue(bkey, out b))
+            {
+                int m;
+                FamilyMsgs.TryGetValue(family, out m);
+                if (m < MaxMsgsPerFamily) FamilyMsgs[family] = m + 1;
+                else
+                {
+                    bkey = family + "|" + Other;
+                    Bases.TryGetValue(bkey, out b);
+                }
+                if (b == null) { b = new BaseInfo(); Bases[bkey] = b; }
+            }
+            b.Count++;
+            if (!fc) return bkey;
+            if (b.Count <= FrameUntil)
+            {
+                frame = LiveFrame();
+                if (frame.Length > 0 && !b.Frames.Contains(frame))
+                {
+                    if (b.Frames.Count < MaxFramesPerBase) b.Frames.Add(frame);
+                    else frame = Other;
+                }
+            }
+            else frame = b.Frames.Count == 1 ? b.Frames[0] : (b.Frames.Count == 0 ? "" : Other);
+            return frame.Length > 0 ? bkey + "|" + frame : bkey;
+        }
+
+        /// <summary>Wolajacy z zywego stosu watku (FirstChance): pierwsza ramka moda, a bez niej pierwsza ramka gry.
+        /// Pomijamy infrastrukture (System., Microsoft., HarmonyLib., MonoMod., Mono., CrashScribe.) i ramki bez typu
+        /// (metody dynamiczne); przyrostek _PatchN latki Harmony obciety. "" gdy nic sie nie nadaje.</summary>
+        private static string LiveFrame()
+        {
+            try
+            {
+                var frames = new System.Diagnostics.StackTrace(1, false).GetFrames();
+                if (frames == null) return "";
+                string game = null;
+                foreach (var f in frames)
+                {
+                    var m = f != null ? f.GetMethod() : null;
+                    var t = m != null ? m.DeclaringType : null;
+                    if (t == null) continue;
+                    string tn = t.FullName ?? t.Name ?? "";
+                    if (Starts(tn, "System.") || Starts(tn, "Microsoft.") || Starts(tn, "HarmonyLib.")
+                        || Starts(tn, "MonoMod.") || Starts(tn, "Mono.") || Starts(tn, "CrashScribe.")) continue;
+                    string name = tn + "." + NoPatchSuffix(m.Name);
+                    if (Starts(tn, "TaleWorlds.") || Starts(tn, "SandBox.") || Starts(tn, "StoryMode.") || Starts(tn, "ManagedCallbacks."))
+                    {
+                        if (game == null) game = name;
+                        continue;
+                    }
+                    return name;
+                }
+                return game ?? "";
+            }
+            catch { return ""; }
+        }
+
+        private static bool Starts(string s, string prefix) { return s.StartsWith(prefix, StringComparison.Ordinal); }
+
+        /// <summary>"Metoda_Patch3" -> "Metoda": ponowne latanie tej samej metody nie zmienia klucza.</summary>
+        private static string NoPatchSuffix(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name ?? "";
+            int p = name.LastIndexOf("_Patch", StringComparison.Ordinal);
+            if (p <= 0 || p + 6 >= name.Length) return name;
+            for (int k = p + 6; k < name.Length; k++)
+                if (name[k] < '0' || name[k] > '9') return name;
+            return name.Substring(0, p);
+        }
+
+        /// <summary>Komunikat do klucza: kazdy ciag cyfr -> '#'; "0x.." i ciag samych znakow hex z cyfra dlugi na 6+
+        /// (adresy, hashe) -> '#' (litery a-f w zwyklych slowach zostaja); biale znaki zwiniete; najwyzej MsgMax znakow.</summary>
+        private static string Norm(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(Math.Min(s.Length, MsgMax) + 8);
+            int i = 0, len = s.Length;
+            while (i < len && sb.Length < MsgMax)
+            {
+                char c = s[i];
+                if (char.IsWhiteSpace(c))
+                {
+                    if (sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(' ');
+                    i++;
+                    continue;
+                }
+                if (!char.IsLetterOrDigit(c) && c != '_') { sb.Append(c); i++; continue; }
+                int j = i;
+                bool digit = false, hex = true;
+                while (j < len && (char.IsLetterOrDigit(s[j]) || s[j] == '_'))
+                {
+                    char d = s[j];
+                    if (d >= '0' && d <= '9') digit = true;
+                    else if (!IsHex(d)) hex = false;
+                    j++;
+                }
+                bool ox = j - i > 2 && s[i] == '0' && (s[i + 1] == 'x' || s[i + 1] == 'X') && HexOnly(s, i + 2, j);
+                if (ox || (digit && hex && j - i >= 6)) sb.Append('#');
+                else
+                {
+                    for (int k = i; k < j; k++)
+                    {
+                        char d = s[k];
+                        if (d >= '0' && d <= '9') { if (k == i || s[k - 1] < '0' || s[k - 1] > '9') sb.Append('#'); }
+                        else sb.Append(d);
+                    }
+                }
+                i = j;
+            }
+            if (sb.Length > MsgMax) sb.Length = MsgMax;
+            return sb.ToString();
+        }
+
+        private static bool IsHex(char d) { return (d >= '0' && d <= '9') || (d >= 'a' && d <= 'f') || (d >= 'A' && d <= 'F'); }
+
+        private static bool HexOnly(string s, int from, int to)
+        {
+            for (int k = from; k < to; k++) if (!IsHex(s[k])) return false;
+            return true;
+        }
+
+        private static string MessageOf(Exception ex)
+        {
+            try { return ex.Message ?? ""; } catch { return ""; }
+        }
+
+        /// <summary>Opis do linii powtorki: RODZAJ | TYP @ wolajacy (albo metoda / miejsce rzutu) - surowy komunikat do 100 znakow.</summary>
+        private static string RepeatLabel(string kind, Exception ex, string where, string frame)
+        {
+            string at;
+            if (!string.IsNullOrEmpty(frame) && frame != Other) at = frame;
+            else
+            {
+                at = !string.IsNullOrEmpty(where) && where != "FirstChanceException" ? where : ThrowSite(ex);
+                if (frame == Other) at = Other + " " + at;
+            }
+            return kind + " | " + ex.GetType().FullName + " @ " + at + " - " + Squash(MessageOf(ex), 100);
+        }
+
+        /// <summary>Pierwsza ramka sladu bez "at " i bez parametrow.</summary>
+        private static string ThrowSite(Exception ex)
+        {
+            string s = FirstFrame(ex);
+            if (s.StartsWith("at ", StringComparison.Ordinal)) s = s.Substring(3);
+            int p = s.IndexOf('(');
+            return p > 0 ? s.Substring(0, p) : s;
+        }
+
+        /// <summary>Jedna linia: biale znaki zwiniete, najwyzej max znakow (dalej "...").</summary>
+        private static string Squash(string s, int max)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(Math.Min(s.Length, max) + 4);
+            foreach (char c in s)
+            {
+                if (sb.Length >= max) { sb.Append("..."); break; }
+                if (char.IsWhiteSpace(c)) { if (sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(' '); }
+                else sb.Append(c);
+            }
+            return sb.ToString().TrimEnd();
         }
 
         private static string FirstFrame(Exception ex)

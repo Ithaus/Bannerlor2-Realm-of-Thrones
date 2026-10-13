@@ -89,6 +89,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki (bez zapisu)
         private static double _dBurned; private static int _dBurnN;    // spalone przy spustoszeniu od ostatniego Daily
+        private static double _dEaten;                                  // E7/R1 (K4): zjedzone przez napastnikow rabunku osada po osadzie od ostatniego Daily (racje)
         private static double _sessDead, _sessFled;
         private static int _stumblesAll, _stumblesMark;                 // potkniecia razem; stan przy ostatniej linii (linia pokazuje przyrost - R2-1)
         // poprawka po recenzji E4/6 (R2-4): wsie, ktorym ReturnGate (Devastation.Daily tej doby) zmienil powrot wobec samej reguly E4/5 - do kolumny konto_e46 CSV
@@ -145,7 +146,7 @@ namespace Armoury
         /// <summary>PeopleBook.Import (przed odczytem zapisu): spichlerze od zera - zapis bez "f:" (stary albo sprzed E4/6) zaklada je przy pierwszej dobie.</summary>
         internal static void Clear()
         {
-            lock (Gate) { _barns.Clear(); _shelterUnits.Clear(); _townStarved.Clear(); _dBurned = 0; _dBurnN = 0; }
+            lock (Gate) { _barns.Clear(); _shelterUnits.Clear(); _townStarved.Clear(); _dBurned = 0; _dBurnN = 0; _dEaten = 0; }
             _hungry = 0; _shelterN = 0;
             _gateTouched.Clear();
         }
@@ -297,6 +298,50 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Famine.Burn", e); }
+        }
+
+        /// <summary>E7/R1: racje w spichlerzu okregu teraz (niezalezny bilans "zjedzone - spichlerz"). false - wylaczone albo spichlerz nie zalozony. Nie rzuca.</summary>
+        internal static bool FoodOf(Village v, out double food)
+        {
+            food = 0.0;
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null) return false;
+            try
+            {
+                if (!On) return false;
+                lock (Gate)
+                {
+                    Barn b;
+                    if (!_barns.TryGetValue(v.Settlement.StringId, out b) || double.IsNaN(b.Food) || double.IsInfinity(b.Food)) return false;
+                    food = b.Food;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("Famine.FoodOf", e); return false; }
+        }
+
+        /// <summary>
+        /// E7/R1 (K4): napastnicy rabunku osada po osadzie jedza ze spichlerza okregu - zdejmuje calych `pieces` x `perPiece` racji, najwyzej tyle calych porcji, ile
+        /// jest w spichlerzu. Zwraca liczbe porcji zdjetych (napastnik dostaje tyle sztuk zboza). Spichlerz nie zalozony albo wylaczony - 0. Nie rzuca.
+        /// </summary>
+        internal static int Take(Village v, int pieces, double perPiece)
+        {
+            if (v == null || v.Settlement == null || pieces <= 0 || !(perPiece > 0.0)) return 0;
+            try
+            {
+                if (!On) return 0;
+                string id = v.Settlement.StringId;
+                if (id == null) return 0;
+                lock (Gate)
+                {
+                    Barn b;
+                    if (!_barns.TryGetValue(id, out b) || double.IsNaN(b.Food) || !(b.Food >= perPiece)) return 0;
+                    int n = (int)Math.Min(pieces, Math.Floor(b.Food / perPiece));
+                    if (n <= 0) return 0;
+                    b.Food -= n * perPiece; _dEaten += n * perPiece;
+                    return n;
+                }
+            }
+            catch (Exception e) { Stumble("Famine.Take", e); return 0; }
         }
 
         /// <summary>
@@ -510,9 +555,9 @@ namespace Armoury
             var byId = new Dictionary<string, Vil>(600);
             var regs = new Dictionary<Settlement, Reg>();
             int noK = 0, seeded = 0, winterV = 0;
-            double seededFood = 0, burned, wq = 0, wl = 0;
+            double seededFood = 0, burned, eaten, wq = 0, wl = 0;
             int burnN;
-            lock (Gate) { burned = _dBurned; burnN = _dBurnN; _dBurned = 0; _dBurnN = 0; }
+            lock (Gate) { burned = _dBurned; burnN = _dBurnN; eaten = _dEaten; _dBurned = 0; _dBurnN = 0; _dEaten = 0; }
             var seen = new HashSet<Village>();
             foreach (var st in Settlement.All)
             {
@@ -767,7 +812,7 @@ namespace Armoury
                 sb.Append(" | plon dzis ").Append(M(harvestAll)).Append(" mln racji = ").Append(F(hostsAll + presentAll > 0 ? 100.0 * harvestAll / (hostsAll + presentAll) : 0, "0.0"))
                   .Append("% potrzeby (q srednio ").Append(F(wl > 0 ? wq / wl : 0, "0.000")).Append(" x ").Append(F(yield, "0.##")).Append("; zima tnie plon ").Append(winterV).Append(" wsi)");
                 sb.Append(" | zjedli: gospodarze ").Append(M(eatHosts)).Append(" mln, uchodzcy ").Append(F0(eatRef)).Append(" | nadwyzka ponad sufit ").Append(M(overflow))
-                  .Append(" mln | spalone przy spustoszeniu od wczoraj ").Append(F0(burned)).Append(" racji (").Append(burnN).Append(" razy)")
+                  .Append(" mln | spalone przy spustoszeniu od wczoraj ").Append(F0(burned)).Append(" racji (").Append(burnN).Append(" razy)").Append(", zjedzone przez napastnikow (E7/R1) ").Append(F0(eaten)).Append(" racji")
                   .Append(" | kontrola spichlerzy ").Append(Sg(control, "0.###"));
                 sb.Append(" | przednowek (90%): wsi ").Append(rationedV).Append(", regionow z uchodzcami ").Append(regs.Values.Count(r => r.Present > 0.0 && r.Rationed));
                 sb.Append(" | glod: wsi ").Append(hungryV);

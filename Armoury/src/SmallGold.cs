@@ -143,6 +143,7 @@ namespace Armoury
             try
             {
                 if (__instance == null || !Live) return;
+                if (DistrictRaid.Owns(__instance)) return;                      // E7/R1 (v2): rabunek osada po osadzie placi sam (PayRaidLoot - ten sam platnik), oryginal nie biegnie
                 var def = __instance.DefenderSide;
                 if (def == null || def.TroopCount > 0) return;                  // poza faza lupienia gra nie placi (R:162) - bez alokacji co klatke
                 var st = __instance.MapEventSettlement;
@@ -320,13 +321,11 @@ namespace Armoury
                     if (!(c.V.Hearth < c.H0)) { _strays++; return; }            // przed spadkiem hearth to nie wyplata lupu (R:175 -> R:188)
                     c.Done = true;
                     if (c.Off) { _rOffN++; _rOff += __4; return; }               // wylacznik zdjety - lup z niczego jak dotad (licznik)
-                    var party = c.V.Settlement != null ? c.V.Settlement.Party : null;
-                    if (party == null) { _strays++; return; }                    // bez strony wsi - jak w grze (licznik)
-                    long due = __4, have = Math.Max(0, c.V.Gold);
-                    long pay = Math.Min(due, have);
+                    long due = __4, pay;
+                    PartyBase party;
+                    if (!LootPayer(c.V, due, out party, out pay)) { _strays++; return; }   // bez strony wsi - jak w grze (licznik)
                     __1 = party;                                                 // dajacy = kiesa wsi (gra obcina do jej stanu - GiveGoldAction.cs:21-25)
                     __4 = (int)pay;
-                    RaidPaidSum += pay;
                     _rN++; _rDue += due; _rPaid += pay;
                     if (c.Player) { _rDueP += due; _rPaidP += pay; }
                     if (pay < due) { _rShortN++; if (pay == 0) _rEmptyN++; }
@@ -358,6 +357,33 @@ namespace Armoury
                 __4 = 0;                                                         // uciete - zloto nie powstaje (zdarzenie z 0 ksiega pomija)
             }
             catch (Exception e) { Stumble("GivePrefix", e); }
+        }
+
+        /// <summary>
+        /// JEDEN PLATNIK LUPU Z RABUNKU (E5/A7 i E7/R1, R15): kiesa wsi (Settlement.Party wsi), najwyzej tyle, ile w niej jest - pusta wies nie daje nic.
+        /// Dopisuje zaplacone do RaidPaidSum (okna "lup z niczego" odejmuja przelew). false - wies bez strony (jak w grze: brak platnika).
+        /// </summary>
+        internal static bool LootPayer(Village v, long due, out PartyBase payer, out long pay)
+        {
+            payer = v != null && v.Settlement != null ? v.Settlement.Party : null;
+            pay = 0;
+            if (payer == null) return false;
+            pay = Math.Max(0, Math.Min(due, Math.Max(0, (long)v.Gold)));
+            RaidPaidSum += pay;
+            return true;
+        }
+
+        /// <summary>
+        /// E7/R1 (235): lup zlota rabunku osada po osadzie - ta sama funkcja platnika (LootPayer), przelew kiesa wsi -> wodz napastnika (GiveGoldAction ze strona wsi,
+        /// ksiega pieniadza widzi platnika i odbiorce; GivePrefix go nie rusza - dajacy nie jest "nic"). Zwraca zaplacone.
+        /// </summary>
+        internal static long PayRaidLoot(Village v, Hero leader, long due)
+        {
+            if (v == null || leader == null || due <= 0) return 0;
+            PartyBase payer; long pay;
+            if (!LootPayer(v, due, out payer, out pay) || pay <= 0) return 0;
+            GiveGoldAction.ApplyForPartyToCharacter(payer, leader, (int)Math.Min(int.MaxValue, pay), true);
+            return pay;
         }
 
         private static void TellPlayer(long pay, long due)

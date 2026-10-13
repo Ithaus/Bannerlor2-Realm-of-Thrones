@@ -76,17 +76,25 @@ Potencjalnie otwarta pozostaje trzecia galaz: `Kingdom.Leader` =
 w `GetHeroesToUpdate`). Dzis NIE wystepuje (zadne krolestwo nie jest w tym
 stanie); gdyby wrocila, latka to pominiecie krolestw bez wladcy w petli.
 
-### A5. BKROTPatch: dwie latki bez celu — NIESZKODLIWE, nie ruszac
+### A5. BKROTPatch: trzy latki bez celu — NIESZKODLIWE, nie ruszac
 
 - `DynamicPartySizePerformancePatch.TargetMethod()` szuka moda **DynamicPartySize**,
   nie znajduje i **zwraca `null`** zamiast uzyc `Prepare() => false`. Harmony:
   `returned an unexpected result: null`.
+- `DynamicPartySizeBattleSkipPatch.TargetMethod()` - to samo (E8/M, CS 12.10
+  `session-2026-10-12_02-44-08.log:132` - 1x `System.Exception` + 2x `HarmonyException` na klase).
 - `RebellionsGameEntityInstantiatePatch` celuje w `"RebellionsAndDemographics..."`
   po nazwie tekstowej — mod nieobecny → `Undefined target method`.
 
 ~20 wyjatkow raz, przy ladowaniu. Zero kosztu w grze.
 
-### A6. DTE: AmbiguousMatchException na ticku UI mapy — NIENAPRAWIONE (do decyzji)
+### A6. DTE: AmbiguousMatchException na ticku UI mapy — ZOSTAJE (decyzja Jeffa 12.10: paska nie wylaczac)
+
+**E8/M (247):** dzis 1 wyjatek na sesje (CS 12.10 :1539-1568), nie 604. Jeff 12.10 (pytanie 9): pasek zostaje
+wlaczony, poprawiamy tylko falszywa linie logu. Dawna linia "MapArmoryReadinessMixin nieobecny" byla falszywa:
+`Mends.QuietType` przeszukuje tylko assembly BannerKings (i zwraca `typeof(object)`), wiec latka usypiajaca nigdy
+sie nie wpiela. Od E8/M linia "pasek gotowosci zbrojowni DTE ... obecny - zostaje wlaczony"; latki brak.
+Ponizej opis z 29.08 (historia).
 
 `DynamicTroopEquipmentReupload.GUIExtensions.MapArmoryReadinessMixin` (widget
 gotowosci zbrojowni na pasku mapy) -> `UIExtenderEx BaseViewModelMixin<MapBarVM>`
@@ -111,6 +119,33 @@ dostaje wiare `HuesOfTrios` (jak `hues_of_trios`, :6369), choc BKROTPatch ma wla
 Id religii jest dobre (lore E7/L i bramka wiary dymka E7/W2 porownuja `Religion.StringId`),
 ale nazwa wiary (`Faith.GetFaithName`) w BK i w dymku wioski E7/W2 dla Norvos = nazwa wiary Tyrosh.
 Zauwazone w E7/L, wpisane przy E7/W2; bez latki (zasada: drobne bledy - etap 8).
+
+### A8. TournamentsXPanded: loader BUTR przy starcie (2 wyjatki) — NIESZKODLIWE, nie ruszac (E8/M, 12.10)
+
+`Bannerlord.ModuleLoader.TournamentsXPanded.Load()` -> `LoaderHelper.LoadSubModules` -> `AccessTools2.GetDelegate`
+na konstruktorze klasy abstrakcyjnej: `InvalidOperationException: Instances of abstract classes cannot be created`
+(CS 12.10 `session-2026-10-12_02-44-08.log:46-75`, 2 bloki raz przy ladowaniu). Loader lapie i laduje reszte;
+zero wplywu na gre i turnieje (GrandTourney niezalezny).
+
+### A9. MonoMod: first-chance przy latkach klimatu Armoury — NIESZKODLIWE (E8/M, 12.10)
+
+`Armoury.WesterosClimate.ApplyAll` -> `PatchProcessor.Patch` -> `PatchTools.DetourMethod` -> `Delegate.CreateDelegate`:
+`ArgumentException: Cannot bind to the target method...` (CS 12.10 :297-326, 1 raz). Wewnetrzna proba MonoMod
+(Harmony pada na inna droge detouru i konczy latke); Armoury.log: latki klimatu 25/25 wpiete. Bez zmian.
+
+### A10. BannerKings: `CorrectPlayerEducation` przy tworzeniu postaci — ODFILTROWANE (E8/M 247, 12.10)
+
+`BKCampaignStartBehavior.OnCharacterCreationOver` -> `EducationManager.CorrectPlayerEducation`: najpierw
+`Educations.Remove(gracz)`, potem `All.FirstOrDefault(x => x.Cultures.Any(...))`. BKROT `DefaultLanguagesInitializePatch`
+(prefiks zwraca false) inicjuje 7 jezykow vanilla z pustymi listami kultur, a `NordLanguage` wcale - `Cultures == null`,
+`Any` rzuca `ArgumentNullException` (CS 12.10 :1497-1530). Finalizer BKROT (`EducationManagerCorrectPlayerEducationPatch`)
+polyka wyjatek - okno BK "Welcome" i reszta zdarzenia biegna (CS :1536). Wpis gracza tworzy BK sam przy pierwszym
+`GetHeroEducation` (dobowy `BKEducationBehavior.OnDailyTick` -> `UpdateHeroData` -> `InitHeroEducation`; latka BKROT na
+lambdzie `<>c__DisplayClass9_0.<InitHeroEducation>b__0` - sprawdzona w IL BannerKings.dll 12.10 - pomija jezyk bez kultur):
+jezyk kultury gracza (ROT, np. vlandia -> Westerosi) albo Calradian - to samo, co dalaby korekta. **Bez latki**: CrashScribe
+(`QuietBkEducation`) zamienia blok ERROR na linie "Quiet (E8/M): znany wyjatek BK CorrectPlayerEducation ... odfiltrowany"
+i raz na gre pisze "Mends: edukacja BK gracza (E8/M) - wpis jest, jezyki: ..." (albo "BRAK wpisu gracza po 3 dobach" -
+wtedy latka `MendBkEducation` z projektu E8/M).
 
 ---
 

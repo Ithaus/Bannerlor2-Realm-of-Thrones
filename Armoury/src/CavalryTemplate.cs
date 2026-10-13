@@ -49,6 +49,8 @@ namespace Armoury
 
         // liczniki doby
         private static long _dToHorse, _dToFoot, _dLifted, _dKept, _dKnVisits, _dKnNoGold, _dGold, _dGoldGear;
+        // F5 (K3-3): zwykle zakupy koni z przydzialu sprzetu rodu (Stables.OnSettlementEntered) i rezerwa kiesy przy koniach rycerzy
+        private static long _dPlStops, _dPlByShare, _dPlNoShare, _dPlNoGold, _dPlGold, _dKnReserve;
         private static readonly long[] _dHerd = new long[3], _dMarket = new long[3];
         private sealed class Row { public long Parties, NoTarget, Men, Mounted, Men3, Mounted3; public double Tgt3; }
         private static readonly Dictionary<string, Row> _rows = new Dictionary<string, Row>();
@@ -65,6 +67,7 @@ namespace Armoury
         private static void DayReset()
         {
             _dToHorse = _dToFoot = _dLifted = _dKept = _dKnVisits = _dKnNoGold = _dGold = _dGoldGear = 0;
+            _dPlStops = _dPlByShare = _dPlNoShare = _dPlNoGold = _dPlGold = _dKnReserve = 0;
             Array.Clear(_dHerd, 0, 3); Array.Clear(_dMarket, 0, 3);
             _rows.Clear();
             _stumblesDay = 0;
@@ -256,6 +259,22 @@ namespace Armoury
 
         internal static void NoteKnightGold(int gold, bool gear) { if (gold <= 0) return; _dGold += gold; if (gear) _dGoldGear += gold; }
 
+        /// <summary>F5 (K3-3): postoj ze zwyklym zakupem koni liczonym z przydzialu sprzetu rodu. byShare - budzet postoju wyznaczyl przydzial rodu (mniejszy niz
+        /// udzial kiesy pana ponad rezerwe); fail: 0 - budzet byl, 1 - brak przydzialu (kiesa by starczyla), 2 - brak zlota ponad rezerwe. Tylko liczniki.</summary>
+        internal static void NotePlainStop(bool byShare, int fail)
+        {
+            _dPlStops++;
+            if (fail == 1) _dPlNoShare++;
+            else if (fail == 2) _dPlNoGold++;
+            else if (byShare) _dPlByShare++;
+        }
+
+        /// <summary>F5 (K3-3): zloto zwyklych zakupow koni zdjete z przydzialu sprzetu rodu (targ + wsie-hodowcy); konie rycerzy - NoteKnightGold.</summary>
+        internal static void NotePlainGold(int gold) { if (gold > 0) _dPlGold += gold; }
+
+        /// <summary>F5 (K3-3): postoj z rycerzami, w ktorym kon rycerza nie zostal kupiony tylko przez rezerwe kiesy pana (AiGearGoldReserve).</summary>
+        internal static void NoteKnightReserve() { _dKnReserve++; }
+
         // ------------------------------------------------------------ spis doby i linia
 
         /// <summary>Z petli MountedWage.Daily (bez drugiej petli po partiach): partia lorda AI - ludzie, konni, t3+ i cel szablonu, wedlug krolestwa.</summary>
@@ -332,6 +351,10 @@ namespace Armoury
                   .Append(", z targu ").Append(_dMarket[0]).Append('/').Append(_dMarket[1]).Append('/').Append(_dMarket[2])
                   .Append(", za ").Append(_dGold).Append(" zl (budzet sprzetu ").Append(_dGoldGear).Append("); postoje z rycerzami ").Append(_dKnVisits)
                   .Append(" (bez zlota ").Append(_dKnNoGold).Append(')')
+                  .Append(" | zwykle konie z przydzialu sprzetu rodu (F5): ").Append(s.AiMountGearPurseShare <= 0f ? "WYLACZONE" : !ClanBudget.On ? "NIECZYNNE (wymaga budzetu rodow 166 - ClanBudgetEnabled)" : "CZYNNE udzial kiesy ponad rezerwe " + s.AiMountGearPurseShare.ToString("0.00", inv))
+                  .Append(", postoje ").Append(_dPlStops).Append(" (budzet wyznaczyl przydzial ").Append(_dPlByShare).Append(", kiesa ").Append(_dPlStops - _dPlByShare - _dPlNoShare - _dPlNoGold)
+                  .Append("; bez budzetu: brak przydzialu ").Append(_dPlNoShare).Append(", brak zlota ponad rezerwe ").Append(_dPlNoGold)
+                  .Append("), zdjete z przydzialu ").Append(_dPlGold).Append(" zl; rycerze zatrzymani rezerwa kiesy ").Append(_dKnReserve)
                   .Append(" | czeka ").Append(w)
                   .Append(" | przerwa: zdjeta ").Append(_dLifted).Append(" / zostaje (K3 bez K2) ").Append(_dKept)
                   .Append(" | cele szablonow ").Append(_target.Count)

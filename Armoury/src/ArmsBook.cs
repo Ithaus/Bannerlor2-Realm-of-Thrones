@@ -62,7 +62,7 @@ namespace Armoury
     internal static class ArmsBook
     {
         internal const int SWorkshop = 0, SFletcher = 1, Sources = 2;
-        internal const int KScrap = 0, Sinks = 1;
+        internal const int KScrap = 0, KRaid = 1, Sinks = 2;   // KRaid: E7/R1 (235) - uzbrojenie spalone w rabunku osada po osadzie (z magazynu wsi, nie unioslo sie)
         internal const int TTrade = 0, TPurse = 1, TGarrison = 2, Transfers = 3;
         private const int Kinds = 10, Bands = 3, Slots = Kinds * Bands;
         private static readonly string[] KindNames = { "korpus", "helm", "nogi", "rece", "plaszcz", "tarcza", "bron biala", "strzelecka", "amunicja", "uprzaz" };
@@ -211,7 +211,7 @@ namespace Armoury
                 kinds.Add(KindNames[k] + " t1-2/t3-4/t5-6: stan " + string.Join("/", st) + ", zrodla " + string.Join("/", sr) + ", reszta " + string.Join("/", rs));
             }
             Log.Info("Uzbrojenie wedlug zrodla (E6/0): dzien " + day + " | zrodla: warsztaty " + Sum(_src, SWorkshop) + ", strzelarze " + Sum(_src, SFletcher) + " (dorobek startowy ColdStart - w stanie wyjsciowym)"
-                     + " | ujscia: zlom " + Sum(_sink, KScrap) + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
+                     + " | ujscia: zlom " + Sum(_sink, KScrap) + ", spalone w rabunku (E7/R1) " + Sum(_sink, KRaid) + " | przeniesienia (przyjazdy na polki miast, info): przerzut kupcow " + Sum(_xfer, TTrade) + ", sakiewki " + Sum(_xfer, TPurse)
                      + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + ", w drodze wozem (215) " + road + "), zmiana " + (total - prevTotal)
                      + " | reszta " + rest + (den > 0 ? " (" + (100.0 * rest / den).ToString("0.0", CultureInfo.InvariantCulture) + "% zrodel + ujsc)" : "")
                      + " | w stanie takze pule weteranow (E8/H) " + vetPool + " szt. uprzezy | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"
@@ -237,11 +237,29 @@ namespace Armoury
         private static long[] _prev;
         private static int _days7, _stumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        // F3 (test zbiorczy 5-8, K1-3a krok 1 - TYLKO POMIAR): dwa ujscia dotad schowane w "reszcie niewyjasnionej".
+        //  - mieszczanie: sztuki i zloto koni zdjetych z polki w konsumpcji osady (BK ItemConsumptionPatch / gra MakeConsumption), wedlug KATEGORII TARGU
+        //    (horse, war_horse, noble_horse, sumpter_horse - w tych jednostkach BK liczy budzet; wielblad albo rydwan liczy sie w kategorii swojej polki),
+        //    osobno miasta [0] i zamki [1]; liczy TownFolk.ConsumePostfix (nawias konsumpcji E5/0);
+        //  - porzucone przez gre u lordow (DiscardItemsCampaignBehavior - sztuki znikaja bez odbiorcy): wedlug kategorii ksiegi; liczy HorseState (prefiksy K0).
+        internal const int MCats = 4;
+        private static readonly long[,] _folkN = new long[2, MCats], _folkGold = new long[2, MCats];
+        private static int _folkBr, _folkPart;
+        private static readonly long[] _disc = new long[Cats];
+        private static long _discHerd, _discWeight;
 
         internal static void Reset()
         {
             Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats);
             _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _prev = null; _days7 = 0; _stumbles = 0; _errSites.Clear();
+            ClearSinks();
+        }
+
+        private static void ClearSinks()
+        {
+            Array.Clear(_folkN, 0, _folkN.Length); Array.Clear(_folkGold, 0, _folkGold.Length); _folkBr = _folkPart = 0;
+            Array.Clear(_disc, 0, Cats); _discHerd = _discWeight = 0;
+            ArmsLeaks.TakeFolkHorses();   // licznik kontrolny tej samej doby - zeby stara liczba nie wrocila po przerwie w pomiarze
         }
 
         private static void Stumble(string where, Exception e)
@@ -284,9 +302,49 @@ namespace Armoury
 
         private static string Row(long[] a) { var p = new string[Cats]; for (int i = 0; i < Cats; i++) p[i] = a[i].ToString(CultureInfo.InvariantCulture); return string.Join("/", p); }
 
+        // ------------------------------------------------------------ F3: ujscia "mieszczanie" i "porzucone przez gre" (tylko liczniki)
+        /// <summary>Czy liczyc konie w nawiasie konsumpcji osady (TownFolk pyta raz na nawias).</summary>
+        internal static bool FolkOn { get { return On; } }
+
+        /// <summary>Kategoria TARGU konia: 0 horse, 1 war_horse, 2 noble_horse, 3 sumpter_horse; -1 = inna kategoria (bydlo, towar). Kazdy przedmiot typu Horse
+        /// w grze, ROT i RBM stoi w jednej z tych czterech (przeglad XML modulow 12.10) - indeksy 0..3 zgodne z Cat(), poza egzotycznymi (Cat = 4).</summary>
+        internal static int MarketCat(ItemCategory c)
+        {
+            if (c == null) return -1;
+            if (c == DefaultItemCategories.Horse) return 0;
+            if (c == DefaultItemCategories.WarHorse) return 1;
+            if (c == DefaultItemCategories.NobleHorse) return 2;
+            if (c == DefaultItemCategories.PackAnimal) return 3;
+            return -1;
+        }
+
+        /// <summary>TownFolk.ConsumePostfix: konie zdjete z polki przez ludnosc osady w jednej konsumpcji - sztuki z dziennika sprzedazy gry, zloto = cena polki
+        /// kazdego wiersza w chwili zdjecia (tyle BK dopisuje kasie osady; ile z tego naprawde placi kiesa ludu, mowi linia "Kiesa ludu"). part = wycena niepelna.</summary>
+        internal static void NoteFolk(bool town, long[] pieces, long[] gold, bool part)
+        {
+            int k = town ? 0 : 1;
+            _folkBr++; if (part) _folkPart++;
+            for (int i = 0; i < MCats; i++) { _folkN[k, i] += pieces[i]; _folkGold[k, i] += gold[i]; }
+        }
+
+        /// <summary>HorseState (prefiksy DiscardItemsCampaignBehavior): kon lorda AI skasowany przez gre - nadmiar stada (herd) albo ponad udzwig.</summary>
+        internal static void NoteDiscard(int cat, int n, bool herd)
+        {
+            if (cat < 0 || cat >= Cats || n <= 0 || !On) return;
+            _disc[cat] += n;
+            if (herd) _discHerd += n; else _discWeight += n;
+        }
+
+        private static string FolkRow(long[,] a, int k)
+        {
+            var p = new string[MCats];
+            for (int i = 0; i < MCats; i++) p[i] = a[k, i].ToString(CultureInfo.InvariantCulture);
+            return string.Join("/", p);
+        }
+
         internal static void Daily()
         {
-            if (!On) { _prev = null; Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats); _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _days7 = 0; return; }
+            if (!On) { _prev = null; Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats); _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _days7 = 0; ClearSinks(); return; }
             int day = (int)CampaignTime.Now.ToDays;
             var shelf = new long[Cats]; var vil = new long[Cats]; var stash = new long[Cats]; var party = new long[Cats]; var arm = new long[Cats]; var hero = new long[Cats];
             Stage6Measure.ForEachRoster((r, kind) =>
@@ -340,7 +398,7 @@ namespace Armoury
             if (_prev == null)
             {
                 Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " - stan wyjsciowy, reszta od nastepnej doby.");
-                _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0;
+                _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0; ClearSinks();
                 return;
             }
             // E6/K1 (211): zgony koni (zdjete ze zbrojowni w misji i w autobitwie) - UJSCIE; lup, dobytek rozbitych, pula weteranow, dary z polki - przeniesienia w stanie
@@ -348,16 +406,27 @@ namespace Armoury
             try { HorseFate.DeathsCats(dead); } catch (Exception e) { Stumble("Deaths", e); }
             string k1 = "";
             try { k1 = HorseFate.BookPart(); } catch (Exception e) { Stumble("BookPart", e); }
+            // F3 (K1-3a krok 1): mieszczanie (kategorie targu 0..3 = kategorie ksiegi 0..3) i porzucone przez gre - UJSCIA, zdjete z reszty i doliczone do mianownika
+            var folk = new long[Cats]; long folkAll = 0;
+            for (int i = 0; i < MCats; i++) { folk[i] = _folkN[0, i] + _folkN[1, i]; folkAll += folk[i]; }
+            long tap = ArmsLeaks.NoFolkHorses;   // kontrola drugim licznikiem: konie zdjete w ramce "konsumpcja osady" ksiegi towarow (podsluch AddToCounts); brak = ksiega towarow bez linii
+            try { tap = ArmsLeaks.TakeFolkHorses(); } catch (Exception e) { Stumble("FolkTap", e); }
             var rest = new long[Cats]; long rs = 0, src = 0, sink = 0;
-            for (int i = 0; i < Cats; i++) { rest[i] = (now[i] - _prev[i]) - _prod[i] + dead[i]; rs += rest[i]; src += _prod[i]; sink += dead[i]; }
+            for (int i = 0; i < Cats; i++) { rest[i] = (now[i] - _prev[i]) - _prod[i] + dead[i] + folk[i] + _disc[i]; rs += rest[i]; src += _prod[i]; sink += dead[i] + folk[i] + _disc[i]; }
             Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " | zrodla: stadniny wsi " + Row(_prod)
                      + " | ujscia: " + k1
+                     + " | ujscia poza K1 (F3, pomiar): mieszczanie miast " + FolkRow(_folkN, 0) + " szt. za " + FolkRow(_folkGold, 0) + " zl, mieszczanie zamkow "
+                     + FolkRow(_folkN, 1) + " szt. za " + FolkRow(_folkGold, 1) + " zl (kategorie targu zwykly/bojowy/szlachetny/juczny - wielblad albo rydwan w kategorii swojej polki;"
+                     + " zloto = cena polki przy zdjeciu; nawiasy konsumpcji " + _folkBr + ", bez pelnej wyceny " + _folkPart + "; kontrola ksiegi towarow: "
+                     + (tap != ArmsLeaks.NoFolkHorses ? "konie w ramce konsumpcji " + tap + ", roznica " + (folkAll - tap) : "brak (ksiega towarow bez linii)")
+                     + "), porzucone przez gre u lordow " + Row(_disc) + " (nadmiar stada " + _discHerd + ", ponad udzwig " + _discWeight + ")"
                      + " | wielblady wyprodukowane: w Qarthu " + _camelQarth + ", poza Qarthem " + _camelElse
                      + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + ", mianownik zrodla + ujscia " + (src + sink)
                      + (src + sink > 0 ? ", " + (100.0 * rs / (src + sink)).ToString("0", CultureInfo.InvariantCulture) + "%" : "")
-                     + ") | nie podpiete (w reszcie): mieszczanie, LegendaryLaw, BK stadniny, zbrojownie rozwiazanych zdjete przez DTE, zakupy gry"
+                     + ") | nie podpiete (w reszcie): " + (_folkBr > 0 ? "" : "mieszczanie (nawias konsumpcji E5/0 nieczynny), ")
+                     + "LegendaryLaw, BK stadniny, zbrojownie rozwiazanych zdjete przez DTE, zakupy gry"
                      + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
-            _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0;
+            _prev = now; Array.Clear(_prod, 0, Cats); _camelQarth = _camelElse = 0; ClearSinks();
             if (++_days7 >= 7)
             {
                 var parts = new List<string>();

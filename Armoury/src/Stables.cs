@@ -925,11 +925,27 @@ namespace Armoury
                 }
 
                 int marketAllow = 0, fromMarket = 0, toVillages = 0;
+                bool gearRule = false, shareBound = false;   // F5 (K3-3): gearRule - zwykly zakup tej partii idzie z przydzialu sprzetu rodu (166), po zakupie GearSpent; shareBound (recenzja F5) - budzet postoju wyznaczyl przydzial rodu, nie kiesa pana
                 if (!castle && need > 0)
                 {
                     int purse = lord.Gold;
-                    int budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
-                    if (budget < 50) { if (bought <= 0) { HorseCensus.OnLordBuyFailed(party, HorseCensus.FailNoGold); return; } }
+                    // F5 (K3-3, test zbiorczy 5-8): rod z budzetem 166 kupuje zwykle konie z przydzialu sprzetu, jak sprzet (AiGear) i konie rycerzy (KnightBuy) -
+                    // budzet postoju = min(niewydany przydzial rodu, AiMountGearPurseShare x kiesa pana ponad AiGearGoldReserve). Dotad 15% kiesy
+                    // (AiMountPurseShare): wodz partii nie-glowa z kiesa ok. 5000 mial 750 zl = 1 kon na postoj. Udzial 0.75 (nie cala kiesa ponad rezerwe):
+                    // nasluch Stajni biegnie PRZED MenPurse.OnEntered / AiGear.TryBuy (SpareHorses.cs "Kolejnosc postoju"), a AiGear liczy 25% kiesy ponad
+                    // te sama rezerwe - reszta zostaje na sprzet i uprzaz. Po KnightBuy (kiesa i przydzial juz pomniejszone o konie rycerzy).
+                    int gearLeft, budget;
+                    bool noShare = false;
+                    gearRule = GearRule(CavalryTemplate.ClanOf(party), out gearLeft);
+                    if (gearRule)
+                    {
+                        int fromPurse = (int)(Math.Max(0, purse - Math.Max(0, c.AiGearGoldReserve)) * MBMath.ClampFloat(c.AiMountGearPurseShare, 0f, 1f));
+                        budget = Math.Min(gearLeft, fromPurse);
+                        noShare = gearLeft < 50 && fromPurse >= 50;   // kiesa by starczyla - skonczyl sie przydzial rodu (osobna przyczyna w pomiarze, nie "brak zlota")
+                        shareBound = gearLeft < fromPurse; CavalryTemplate.NotePlainStop(shareBound, budget >= 50 ? 0 : noShare ? 1 : 2);
+                    }
+                    else budget = (int)(purse * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+                    if (budget < 50) { if (bought <= 0) { HorseCensus.OnLordBuyFailed(party, noShare ? HorseCensus.FailNoShare : HorseCensus.FailNoGold); return; } }
                     else
                     {
                         marketAllow = (int)(shelfMounts * MBMath.ClampFloat(c.AiMountMarketSharePercent / 100f, 0f, 1f));
@@ -1017,7 +1033,8 @@ namespace Armoury
                     // 175.0 + przeglad 175: brak koni rozdzielony (decyzja 4.3 rozroznia "brakuje koni na rynku" i "lordowie za biedni"):
                     // za drogie (byly konie, najtanszy ponad budzet), polka zarezerwowana (konie na polce, ale AiMountMarketSharePercent /
                     // AiMountShelfFloor nie dopuszczaja ani sztuki, a wsie nic nie daly), pusto (ani na polce, ani we wsiach)
-                    HorseCensus.OnLordBuyFailed(party, tooDear ? HorseCensus.FailTooDear : (!castle && shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
+                    // recenzja F5 (kolizja 3e do konca): "za drogie" przy budzecie wyznaczonym przez przydzial rodu (przydzial 50+ zl, ale mniejszy niz udzial kiesy i niz najtanszy kon) to brak przydzialu, nie bieda pana - inaczej prog "za drogie" wskazywalby krok 2 (placi glowa W GRANICACH przydzialu), ktory tego nie naprawi. Sam pomiar.
+                    HorseCensus.OnLordBuyFailed(party, tooDear ? (shareBound ? HorseCensus.FailNoShare : HorseCensus.FailTooDear) : (!castle && shelfMounts > 0 && marketAllow <= 0) ? HorseCensus.FailShelfReserved : HorseCensus.FailEmpty);
                     return;
                 }
                 _lastBuy[pid] = today;
@@ -1025,6 +1042,12 @@ namespace Armoury
                 if (lack > 0) Remount(party);   // sklad7b-p: kupione konie najpierw pod jezdzcow bez konia, reszta czeka w taborze na awanse
                 HorseCensus.OnLordBought(party, bought, paid + toVillages + kGold, boughtMarket, bought - boughtMarket);
                 if (paid > 0) TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyForCharacterToSettlement(lord, settlement, paid);
+                if (gearRule && paid + toVillages > 0)
+                {
+                    // F5 (K3-3): zwykle konie schodza z przydzialu sprzetu rodu (sam licznik przydzialu - zloto poszlo wyzej: pan -> miasto / wsie); konie rycerzy policzyl KnightBuy
+                    ClanBudget.GearSpent(CavalryTemplate.ClanOf(party), paid + toVillages);
+                    CavalryTemplate.NotePlainGold(paid + toVillages);
+                }
                 Log.Info("Stajnia AI: " + lord.Name + " kupil " + bought + " koni ["
                          + (what ?? "?") + "] w " + settlement.Name
                          + " za " + paid + (toVillages > 0 ? " (+ " + toVillages + " wsiom-hodowcom" + (c.HorsesAtMarketPrice ? " po cenie targu" : "") + ")" : "")
@@ -1037,6 +1060,21 @@ namespace Armoury
         }
 
         /// <summary>
+        /// F5 (K3-3, test zbiorczy 5-8): czy ZWYKLY zakup koni partii tego rodu idzie z przydzialu sprzetu rodu (166) - klucz AiMountGearPurseShare > 0 i rod
+        /// z budzetem policzonym dzis (ClanBudget.GearCap; gearLeft - niewydany przydzial). Po staremu (AiMountPurseShare kiesy, bez przydzialu) zostaja: rod bez
+        /// budzetu, rod gracza (ClanBudget go nie liczy) i kompanie najemne - takze z umowa 185, choc te MAJA budzet (ClanBudget.Daily liczy im Gear z D,
+        /// a D to zold z umowy): bieg 120 dob - 11 kompanii, przydzial 30 dni srednio 9 tys. przy 15% kiesy glowy srednio 51 tys. na postoj; regula
+        /// przydzialu ucielaby im konie wielokrotnie, a rozpoznanie K3-3 zakladalo, ze zostaja po staremu. KnightBuy bez zmiany zakresu (jak od E6/K3).
+        /// </summary>
+        private static bool GearRule(Clan clan, out int gearLeft)
+        {
+            gearLeft = 0;
+            var c = Settings.Current;
+            if (c == null || c.AiMountGearPurseShare <= 0f || clan == null || clan.IsUnderMercenaryService) return false;
+            return ClanBudget.GearCap(clan, out gearLeft);
+        }
+
+        /// <summary>
         /// E6/K3 (219, projekt etapu 6 v2 rozdz. 3 "E6/K3" pkt 3; KB K3-przerzut) - KON RYCERZA KUPUJE ROD. Kwota: czekajacy rycerze kategorii (knK - NeedByCategory:
         /// cel konny z linii szlacheckiej kultury albo z linii wlasnego szablonu rodu, CavalryTemplate.IsKnight) w granicach zapasu K2 (quota) i limitu postoju (need).
         /// (1) Stado: wsie rodu partii przypiete do osady postoju (BoundVillages; wies postoju - ona sama), gdy wlasciciel wsi (Settlement.OwnerClan = pan osady,
@@ -1044,8 +1082,8 @@ namespace Armoury
         ///     cena tego konia na targu, jak zwykly hodowca). Dalekie lenna - bez przerzutu (R15).
         /// (2) Targ miasta postoju (nie zamek, nie wies): najtansze w kategorii do KnightHorseMarketShare polki (polka liczona przed zakupem, ostatnie
         ///     AiMountShelfFloor sztuk zostaja), kazdy kon po swojej cenie (ShelfBuy), zloto do miasta.
-        /// Budzet: przydzial sprzetu rodu (ClanBudget.GearCap; GearSpent po zakupie) najwyzej kiesa pana; rod bez budzetu 166 - AiMountPurseShare kiesy, jak zwykly
-        /// zakup. Tylko wierzchowce rodziny konia (IsPlainMount; MountLaw.Allowed - kon zawsze). quota zmniejszana - zwykly zakup kupuje reszte.
+        /// Budzet: przydzial sprzetu rodu (ClanBudget.GearCap; GearSpent po zakupie) najwyzej kiesa pana ponad AiGearGoldReserve (F5); rod bez budzetu 166 -
+        /// AiMountPurseShare kiesy, jak zwykly zakup. Tylko wierzchowce rodziny konia (IsPlainMount; MountLaw.Allowed - kon zawsze). quota zmniejszana - zwykly zakup kupuje reszte.
         /// </summary>
         private static int KnightBuy(MobileParty party, TaleWorlds.CampaignSystem.Settlements.Settlement settlement, int[] knK, int[] quota, int need, int shelf0,
                                      ref string what, ref bool tooDear, out int fromMarket, out int fromVill, out int goldAll)
@@ -1061,7 +1099,12 @@ namespace Armoury
             if (want <= 0 || lord == null || clan == null) return 0;
             int gearCap;
             bool capped = ClanBudget.GearCap(clan, out gearCap);
-            int budget = capped ? Math.Min(Math.Max(0, lord.Gold), gearCap) : (int)(Math.Max(0, lord.Gold) * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+            // F5 (K3-3): ta sama rezerwa kiesy co przy sprzecie i zwyklych koniach (AiGearGoldReserve - zold ma pierwszenstwo); dotad min(kiesa, przydzial)
+            // moglo wyzerowac kiese pana przed zoldem. Bez udzialu AiMountGearPurseShare - kon rycerza ma pierwszenstwo (projekt E6/K3 pkt 3).
+            // AiMountGearPurseShare 0 (wylacznik F5) - bez rezerwy, jak przed F5.
+            int reserve = capped && c.AiMountGearPurseShare > 0f ? Math.Max(0, c.AiGearGoldReserve) : 0;
+            int budget = capped ? Math.Min(Math.Max(0, lord.Gold - reserve), gearCap) : (int)(Math.Max(0, lord.Gold) * MBMath.ClampFloat(c.AiMountPurseShare, 0f, 1f));
+            if (reserve > 0 && budget <= 0 && gearCap > 0 && lord.Gold > 0) CavalryTemplate.NoteKnightReserve();   // tylko licznik: zatrzymala rezerwa (przed F5 byl budzet)
             CavalryTemplate.NoteKnightVisit(budget <= 0);
             if (budget <= 0) return 0;
             int bought = 0, spent = 0;

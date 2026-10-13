@@ -22,6 +22,13 @@ namespace Armoury
     ///     przechodzi flaga _gatePass. 79% obudzen to karawany budzone przez BK (ReleaseCaravanFromHold -> SetMoveGoToSettlement bez patrzenia na AI).
     /// Harmony 2.4.2 (u Jeffa): po naszym false prefiksy bool / z parametrem referencyjnym sa pomijane (MethodCreator AffectsOriginal), postfiksy biegna -
     /// BK FreezeWatchdog.Exit tylko zeruje pola. Stan bez zapisu (jak _orders) - stary zapis wczytuje sie bez zmian.
+    /// F7 (test zbiorczy 5-8, TRIAZ zb58 "E7/O1 T3"): JEDEN KONIEC SNU = TICK SWITU. Tick godzinowy gry nie bije o pelnej godzinie (nowa kampania: 0.5 h
+    /// po starcie - G Campaign.cs:1012 initialWait2 = Hours(0.5f), w biegu 120 dob ok. 6:25-6:30 - z licznika przegladow; po wczytaniu faza inna), a pobudka (DawnWake, oddanie
+    /// rozkazow, czyszczenie _camping / _bedPos) biegnie dopiero w ticku h = CampEnd. Bramka i straznik pytaly zegar, wiec od 6:00 do ticku switu partia
+    /// lezala w obozie (AI wylaczone, namiot), ale brala cudze rozkazy i nikt jej nie kladl; w nowej kampanii ok. 0.5 h przed tickiem switu bije tick
+    /// dobowy (wezwania GrandTourney - omijaly bramke, teraz ida przez wejscie metody). Teraz oboz trwa do ticku switu (CampHolds: flaga _campNight
+    /// z galezi nocy / switu AiNightCamp); cudzy rozkaz zlapany przez straznika czeka do switu jak rozkaz zatrzymany bramka (KeepCaughtOrder).
+    /// Pod tym samym kluczem (SleepersHoldOrders); wylaczony = zegar jak dotad.
     /// </summary>
     internal static partial class NightRest
     {
@@ -44,12 +51,29 @@ namespace Armoury
 
         private static bool GateOn(Settings s) { return s != null && s.SleepersHoldOrders && s.NightRestEnabled; }
 
-        /// <summary>Jedna funkcja snu (R5): oboz swiata (legowisko _bedPos w godzinie obozu; _bedPos zawsze razem z _camping), sen dlugu, lord wstrzymany
-        /// w osadzie, brak. Bramka czyta ja przy kazdym rozkazie spiacego; przeglady odnawiaja AI wedlug stanu, ktory same prowadza.</summary>
+        // F7: oboz swiata trwa (stawiana w galezi nocy AiNightCamp, zdejmowana na poczatku galezi switu; ResetGate i MasterSwitch - od zera). Bez zapisu.
+        private static bool _campNight;
+        // F7: cudze rozkazy zlapane przez straznika i zachowane do switu - od poprzedniej linii AiNightCamp / NightRest swit (ResetGateHour)
+        private static int _kLord, _kCar, _kOther;
+
+        /// <summary>F7: czy oboz swiata trwa o godzinie zegara hourNow. Godzina obozu - tak (jak dotad). Pierwsza godzina PO obozie - tak, dopoki tick switu
+        /// jeszcze nie przyszedl (_campNight) i klucz SleepersHoldOrders jest wlaczony: bramka, straznik i alarmy trzymaja do tego samego ticku, ktory budzi,
+        /// niezaleznie od fazy ticku godzinowego. Zegar zostaje jako bezpiecznik: najdalej godzine po koncu obozu sen sie konczy, nawet gdyby tick switu
+        /// w ogole nie doszedl do AiNightCamp (wyjatek wczesniej w AiHourly) i flaga zostala - jedna wywrotka nie usypia swiata na stale (CLAUDE.md 7).
+        /// Wywrotke w samej galezi switu zalatwia kolejnosc: flaga schodzi jako pierwsza rzecz galezi. Recenzja F7: przy fazie ticku tuz przed pelna
+        /// godzina i dlugiej klatce (szybka gra) tick switu moze przyjsc chwile po tej godzinie - bramka jest wtedy otwarta najwyzej jedna klatke.</summary>
+        private static bool CampHolds(Settings s, int hourNow)
+        {
+            if (InCamp(hourNow)) return true;
+            return _campNight && GateOn(s) && InCamp(hourNow - 1);
+        }
+
+        /// <summary>Jedna funkcja snu (R5): oboz swiata (legowisko _bedPos, dopoki oboz trwa - F7: do ticku switu; _bedPos zawsze razem z _camping), sen dlugu,
+        /// lord wstrzymany w osadzie, brak. Bramka czyta ja przy kazdym rozkazie spiacego; przeglady odnawiaja AI wedlug stanu, ktory same prowadza.</summary>
         internal static int SleepKind(MobileParty mp)
         {
             if (mp == null) return SkNone;
-            if (_bedPos.Count > 0 && _bedPos.ContainsKey(mp) && InCamp(CampaignTime.Now.GetHourOfDay)) return SkCamp;
+            if (_bedPos.Count > 0 && _bedPos.ContainsKey(mp) && CampHolds(Settings.Current, CampaignTime.Now.GetHourOfDay)) return SkCamp;
             if (_debtSleep.Count > 0 && _debtSleep.ContainsKey(mp)) return SkDebt;
             if (_townHold.Count > 0 && _townHold.Contains(mp)) return SkTown;
             return SkNone;
@@ -239,9 +263,51 @@ namespace Armoury
             }
         }
 
+        /// <summary>F7 (siatka, TRIAZ zb58 "E7/O1 T3" pkt 3): cudzy rozkaz, ktory ominal bramke (wolajacy skompilowany przed wpieciem latki - JIT wkleja wtedy
+        /// kopie krotkiej metody gry i prefiks nie biegnie) i zostal zlapany przez straznika HoldSleepers - zapisany do _orders jak rozkaz zatrzymany bramka
+        /// (swit odda najnowszy, ze sprawdzeniem waznosci w ApplyOrder), ZANIM straznik polozy partie na Hold. Tylko rozkaz, ktory ApplyOrder umie oddac;
+        /// reszta (Hold / None, MoveToNearestLandOrPort, punkt z obiektem mapy, brak celu) niczego nie nadpisuje - zostaje rozkaz sprzed snu, jak dotad.
+        /// Stan czytany z partii tak, jak go ustawia gra (G MobileParty.SetMove*: DefaultBehavior, TargetSettlement, TargetParty, TargetPosition,
+        /// DesiredAiNavigationType, IsTargetingPort).</summary>
+        private static void KeepCaughtOrder(MobileParty mp)
+        {
+            var b = mp.DefaultBehavior;
+            var st = mp.TargetSettlement; var tp = mp.TargetParty;
+            bool hasPt = false;
+            switch (b)
+            {
+                case AiBehavior.GoToSettlement:
+                case AiBehavior.BesiegeSettlement:
+                case AiBehavior.RaidSettlement:
+                case AiBehavior.DefendSettlement:
+                    if (st == null) return;
+                    break;
+                case AiBehavior.EngageParty:
+                case AiBehavior.EscortParty:
+                case AiBehavior.GoAroundParty:
+                    if (tp == null) return;
+                    break;
+                case AiBehavior.PatrolAroundPoint:
+                    hasPt = st == null;   // z osada - ApplyOrder oddaje patrol wokol osady
+                    break;
+                case AiBehavior.GoToPoint:
+                    if (mp.Ai != null && mp.Ai.AiBehaviorInteractable != null) return;   // cel z obiektem mapy (SetMoveGoToInteractablePoint) - sam punkt to inny rozkaz
+                    hasPt = true;
+                    break;
+                default:
+                    return;
+            }
+            var nav = mp.DesiredAiNavigationType;
+            if (nav == MobileParty.NavigationType.None) nav = MobileParty.NavigationType.Default;   // jak wpis z RememberOrder
+            _orders[mp] = new NightOrder { Behavior = b, Settlement = st, Party = tp, Point = hasPt ? mp.TargetPosition : default(CampaignVec2), HasPoint = hasPt,
+                                           Nav = nav, Port = mp.IsTargetingPort, Gated = true };
+            if (mp.IsLordParty) _kLord++; else if (mp.IsCaravan) _kCar++; else _kOther++;
+        }
+
         // ------------------------------------------------------------ linie i stan
         private static void ResetGateHour()
         {
+            _kLord = 0; _kCar = 0; _kOther = 0;   // F7
             _gLord = 0; _gLordSet = 0; _gLordPt = 0; _gLordEng = 0; _gCar = 0; _gCarBk = 0; _gOther = 0; _gDebt = 0; _gDebtNew = 0; _gGivenDebt = 0;
             _rnCamp = 0; _rnDebt = 0; _rnTown = 0; _awLord = 0; _awCar = 0; _awOther = 0; _wokenLord = 0; _wokenCar = 0;
             _gateCalls = 0; _gateUsSum = 0; _townDhMax = 0;
@@ -253,6 +319,7 @@ namespace Armoury
         {
             _lastTownSweep = CampaignTime.Zero;
             _gatePass = false;
+            _campNight = false;   // F7: oboz swiata nie trwa, dopoki nie przyjdzie pierwszy tick nocy
         }
 
         /// <summary>Dopisek E7/O1 do linii godzinowej "AiNightCamp" i do linii "NightRest swit" (wartosci od poprzedniej z tych linii).</summary>
@@ -268,7 +335,9 @@ namespace Armoury
                    + "/osada " + _rnTown + ") | AI wstalo przed switem: lordowie " + _awLord + ", karawany " + _awCar + ", inne " + _awOther
                    + " | SleepGate " + _gateCalls + " x, sr. " + (_gateCalls > 0 ? _gateUsSum / _gateCalls : 0).ToString("0.0", ci) + " us, razem "
                    + (_gateUsSum / 1000.0).ToString("0.000", ci) + " ms, potkniecia w sesji " + _gateStumbles + "; przeglad osad maks. odstep "
-                   + _townDhMax.ToString("0.000", ci) + " h";
+                   + _townDhMax.ToString("0.000", ci) + " h"
+                   // F7: dopisek NA KONCU (wzorce narzedzia czytaja poczatek dopisku E7/O1 - bez zmian)
+                   + " | F7: cudze rozkazy zlapane przez straznika i zachowane do switu: lordowie " + _kLord + ", karawany " + _kCar + ", inne " + _kOther;
         }
 
         /// <summary>Dopisek E7/O1 do linii switu (DawnWake liczy przed wypisaniem).</summary>

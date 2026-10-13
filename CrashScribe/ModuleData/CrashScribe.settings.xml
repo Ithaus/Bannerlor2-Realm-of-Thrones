@@ -31,6 +31,12 @@
   <MaxReportsPerSession>300</MaxReportsPerSession>
   <KeepSessions>15</KeepSessions>
 
+  <!-- What counts as "the same error" for the repeat counter. true: the same type and place AND the same message
+       (numbers and hex addresses ignored), and for errors caught further up also the same calling method - so
+       different errors get their own report, and every "repeat" line says which error it is about.
+       false: type and first stack frame only (old behaviour - different errors could be counted as one). -->
+  <RepeatKeyByMessage>true</RepeatKeyByMessage>
+
   <!-- The Night King's Call: the Others' bands pool their wights into the strongest band until it
        reaches ROT's siege threshold (500 healthy), and the horde's party size bonus is kept so that
        band sits at NightKingCallFullness of its limit (ROT besieges at 80%+). Everything else -
@@ -74,6 +80,15 @@
   <NightKingRespectShackles>true</NightKingRespectShackles>
   <NightKingWallFromDay>2184</NightKingWallFromDay>
   <NightKingCallFromDay>728</NightKingCallFromDay>
+  <!-- The siege gate (needs NightKingCalendarEnabled): Realm of Thrones itself orders the Others to besiege
+       the Wall, Fist of the First Men and Craster's Keep, which have no shackles of their own, as soon as a band
+       has 500 healthy wights. With the gate on, no band of the Others can start, join or keep a siege, an assault
+       or a raid on a settlement before that settlement's day (a village counts by its castle or town): such an
+       order from the AI is dropped, a band arriving at the gates with one turns away to patrol around its clan's
+       seat, and a siege already under way (from a save) is lifted once a day and right after loading - the band
+       simply walks away, no men are lost. Sieges of every other faction, the Night's Watch included, are untouched.
+       Set NightKingCalendarSiegeGate to false to switch the gate off (such sieges are then only written to the log). -->
+  <NightKingCalendarSiegeGate>true</NightKingCalendarSiegeGate>
 
   <!-- The Others grow only from the dead: in the books the wights are the fallen and the captives of the
        Others, raised again - nobody hands the Night King an army out of thin air. Realm of Thrones does:
@@ -94,9 +109,117 @@
   <OthersNoDailyWights>true</OthersNoDailyWights>
   <OthersNoMapVolunteers>true</OthersNoMapVolunteers>
 
+  <!-- No war reparations in Realm of Thrones storyline wars (needs Diplomacy and Realm of Thrones). When Diplomacy's
+       war exhaustion forces a peace in a war that Realm of Thrones enforces (the list under Edit Storyline Wars, for
+       example the Reach and Dorne, Dragonstone and the Stormlands, the Night's Watch and the Free Folk), Realm of Thrones
+       declares that same war again at the next daily tick - yet Diplomacy still bills the loser full war reparations:
+       the losing lords pay them out of their own purses within about three days and that gold simply vanishes, while
+       the winner gets the whole sum at once, out of thin air. With this on, such a peace costs no reparations at all
+       (0 for both sides; the kingdom screen shows 0 as well). Every other peace keeps Diplomacy's reparations exactly
+       as before, and nothing changes in who goes to war or makes peace. The log shows one "Reparacje (T9)" line for
+       every peace Diplomacy settles. Set StorylineWarNoReparations to false to restore Diplomacy's reparations. -->
+  <StorylineWarNoReparations>true</StorylineWarNoReparations>
+
+  <!-- Peace out of poverty: a realm that cannot pay for a war seeks peace. Once a day each kingdom's treasury is measured
+       against what it has been losing over the last week: enough for 28 days or less counts as an empty treasury, enough for
+       a whole season (91 days) or more as no poverty at all, with a gradual scale in between. A lord counts as poor below
+       5000 gold for each of his realm's wars, and as able to afford it from 50000 (Banner Kings' own "cannot afford a war").
+       With this on: (1) the realm's wish to declare a war (Banner Kings' war score, which drives war proposals and votes)
+       is lowered in proportion to the empty treasury - the tooltip shows "The royal treasury cannot pay for a war"; it mostly
+       stops wars that were barely worth it. Whether it also lowers Banner Kings' support for an ongoing war depends on which
+       mod supplies the kingdom decision rules (with Diplomacy's "at peace" rule it does not); (2) in a vote on peace, a lord
+       whose own poverty plus the treasury's adds up to more than one votes for peace, unless the game itself finds peace
+       unsuitable (a young war with the enemy far ahead). Rich lords in a poor realm and poor lords in a rich one vote as before. Storyline wars of Realm of Thrones
+       are left alone, and so are Diplomacy's war exhaustion and reparations. The log shows "Pokoj z biedy (E1)" lines:
+       the kingdoms in poverty once a day and every war or peace vote between kingdoms. Set PovertyPeace to false to switch it off. -->
+  <PovertyPeace>true</PovertyPeace>
+
+  <!-- Peace proposals out of poverty (needs PovertyPeace). Lords rarely propose peace on their own: the game only lets them
+       propose it when Banner Kings' peace score for the realm is above zero, which a poor realm at war rarely reaches.
+       With this on, a realm whose treasury poverty is at least
+       0.5 (enough for about 60 days or less) puts a peace proposal to its lords at most once every 7 days: against the enemy
+       realm it is doing worst against (the game's war progress: kills, sieges, raids), choosing only among wars where the game
+       and Diplomacy allow a peace proposal and the game finds peace suitable; storyline wars of Realm of Thrones are never
+       chosen. The proposer is the poorest lord of the realm who already favours peace out of poverty and has the influence to
+       propose it (he pays the usual influence cost). The lords then vote as usual. Set PovertyPeaceProposals to false to leave
+       peace proposals to the game and Banner Kings. -->
+  <PovertyPeaceProposals>true</PovertyPeaceProposals>
+
+  <!-- How poverty of the crown is measured. false: by the treasury against what it has been losing over the last week (as above).
+       true: by how much of the war wage refund the crown owed its lords over the last 28 days it could not pay (Armoury), compared
+       with 25% and with the world average - meant for after the crown pays its refunds from current income. -->
+  <PovertyPeaceArrearsMeasure>false</PovertyPeaceArrearsMeasure>
+
   <!-- Siege camps do not rot while fed: RealisticBannerlord's SiegeAttritionBehavior kills 2-5 men
        of every besieging party each day (escalating) regardless of food and morale. With this on,
        the camp only suffers those losses while it is STARVING, and a besieged garrison only while
        the town has no food stocks. Set to false to restore RealisticBannerlord's daily attrition. -->
   <RbSiegeAttritionOnlyStarving>true</RbSiegeAttritionOnlyStarving>
+
+  <!-- Roose Bolton's army at Harrenhal (needs Banner Kings and Realm of Thrones). The storyline event "Roose Bolton
+       Besieges Harrenhal" asks the North to raise an army for Roose, but Banner Kings' army rules refuse it: Roose is not
+       the king and holds no title of his own, and the North's feudal law only lets titled lords call an army. The event then
+       breaks and a stand-in lord leads the siege, or nobody does. With this on, Banner Kings lets that one scripted army
+       through - only for the commander of that single siege setup, never for any other army. Every other army in the
+       world keeps Banner Kings' rules. Set HarrenhalBkArmyPass to false to restore the old behaviour. -->
+  <HarrenhalBkArmyPass>true</HarrenhalBkArmyPass>
+
+  <!-- Waiting for Roose Bolton at Harrenhal (needs Realm of Thrones). When the siege of Harrenhal is being set up and
+       Roose Bolton is alive, free and leads his own party, but is fighting a battle or taking part in another siege
+       right now, the setup is put off hour by hour (as Realm of Thrones itself retries) instead of handing the siege
+       to a stand-in lord at once. Nobody is moved to the gates while we wait. Only after HarrenhalWaitHours in-game
+       hours (72 = 3 days; a day is 24 hours whatever the calendar length), or when Roose is dead, captive or without
+       a party, a stand-in lord of the North leads the siege - never Roose himself. Set HarrenhalWaitForRoose to false
+       to hand the siege to a stand-in at once (old behaviour); HarrenhalWaitHours 0 or less means no waiting. -->
+  <HarrenhalWaitForRoose>true</HarrenhalWaitForRoose>
+  <HarrenhalWaitHours>72</HarrenhalWaitHours>
+
+  <!-- Releasing the commander of the siege of Harrenhal (needs Realm of Thrones). The commander of the siege is held
+       in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only releases the
+       North's lords if Roose Bolton's own army was the siege army - a stand-in commander stayed frozen for good, and
+       the game keeps that in the save. With this on, when the event ends the siege army of its commander is disbanded
+       and the commander is released; when the commander changes (to another stand-in or back to Roose), the previous one is released at once.
+       A party held by a quest, by a party disbanding, or by another active Realm of Thrones siege event is left alone.
+       Set HarrenhalReleaseCommander to false to leave it to Realm of Thrones (old behaviour). -->
+  <HarrenhalReleaseCommander>true</HarrenhalReleaseCommander>
+
+  <!-- Repair of older saves (needs Realm of Thrones). Once after loading: if the siege of Harrenhal is already over,
+       but the party that commanded it is still frozen (no decisions of its own) and nothing else holds it (a quest,
+       a party disbanding, another active Realm of Thrones siege event), its leftover siege army is disbanded and the
+       party is released. Other frozen lords of the North are only listed in the CrashScribe log, never changed.
+       Set HarrenhalOldSaveFix to false to switch the repair off. -->
+  <HarrenhalOldSaveFix>true</HarrenhalOldSaveFix>
+
+  <!-- Releasing the commander of the Free Folk attack on the Wall (needs Realm of Thrones). The commander of the attack
+       is held in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only
+       disbands the army Mance Rayder is in and only releases Free Folk lords who are not in any army - a stand-in
+       commander who led his own army (Mance was fighting a battle or dead when the siege was set up) stayed frozen
+       for good, and the game keeps that in the save. With this on, when the event ends the siege army of its commander
+       is disbanded and the commander is released; when the commander changes (to another stand-in or back to Mance),
+       the previous one is released at once. A party held by a quest, by a party disbanding, or by another active
+       Realm of Thrones siege event (Harrenhal, Blackwater, the Bastards) is left alone.
+       Set WallReleaseCommander to false to leave it to Realm of Thrones (old behaviour). -->
+  <WallReleaseCommander>true</WallReleaseCommander>
+
+  <!-- Repair of older saves, the Wall (needs Realm of Thrones). Once after loading: if the Free Folk attack on the Wall
+       is already over, but the party that commanded it is still frozen (no decisions of its own) and nothing else holds
+       it (a quest, a party disbanding, another active Realm of Thrones siege event), its leftover siege army is disbanded
+       and the party is released. Other frozen Free Folk lords are only listed in the CrashScribe log, never changed.
+       Set WallOldSaveFix to false to switch the repair off. -->
+  <WallOldSaveFix>true</WallOldSaveFix>
+
+  <!-- Battle-reward perks of Banner Kings (needs Banner Kings). Banner Kings adds three
+       battle-reward bonuses, but on this game version its own patch for them fails to load, so they do nothing:
+       the Warband perk (+25% influence from a won battle), the Famous Sellswords perk (+20% renown) and the
+       Cataphract lifestyle (+12% renown). With this on, CrashScribe adds the same three bonuses with the same rules,
+       for the player and for AI lords alike, and only where Banner Kings has not applied them itself (so they are
+       never counted twice). Set BkBattleRewardPerks to false to leave these perks without effect (old behaviour). -->
+  <BkBattleRewardPerks>true</BkBattleRewardPerks>
+
+  <!-- Banner Kings player education: BK's CorrectPlayerEducation throws once at character creation
+       (a BK language without cultures); BKROTPatch already swallows it and BK gives the player the
+       language of their culture on the first daily tick. With this on, that one known error becomes a
+       single line instead of an error block, and once per game the log states the player's BK languages.
+       Set QuietBkEducation to false to get the full error block back (old behaviour). -->
+  <QuietBkEducation>true</QuietBkEducation>
 </CrashScribe>

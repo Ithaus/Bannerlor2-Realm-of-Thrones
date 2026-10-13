@@ -42,6 +42,8 @@ namespace Armoury
         private static long _bkAiWeap, _bkAiShield, _bkPlWeap, _bkPlShield, _lost;
         internal static int BkZeroCalls, BkReset;    // BkSupplyTemper: przeliczenia potrzeby z wynikiem 0 i wyzerowane zapisane potrzeby (bron, tarcze)
         private static int _lastStacks = -1;
+        internal const long NoFolkHorses = long.MinValue;
+        private static long _folkHorses = NoFolkHorses;   // F3: konie zdjete netto w ramce "konsumpcja osady" w dobie ostatniej linii (kontrola dla HorseBook)
         internal static bool DecayHooked;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
@@ -50,8 +52,11 @@ namespace Armoury
             _skipStacks = _otherPieces = _decayTowns = _budgetZero = _stumbles = _stumblesAll = 0;
             _upkeepDay = 0; _upkeep.Clear(); _kindOut = null; _byKey.Clear();
             _bkAiWeap = _bkAiShield = _bkPlWeap = _bkPlShield = _lost = 0; BkZeroCalls = BkReset = 0;
-            _lastStacks = -1; _errSites.Clear();
+            _lastStacks = -1; _folkHorses = NoFolkHorses; _errSites.Clear();
         }
+
+        /// <summary>F3 (pomiar): konie z ramki konsumpcji osad z ostatniej linii dnia - HorseBook porownuje ze swoim licznikiem mieszczan; odczyt zeruje.</summary>
+        internal static long TakeFolkHorses() { long v = _folkHorses; _folkHorses = NoFolkHorses; return v; }
 
         internal static void Stumble(string where, Exception e)   // internal: BkSupplyTemper (bron i tarcze BK) liczy tu swoje potkniecia (recenzja 174)
         {
@@ -224,6 +229,7 @@ namespace Armoury
                 var inv = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder();
                 Func<int, int, long> K = (k, c) => _kindOut != null && k >= 0 && k < _kindOut.GetLength(0) ? _kindOut[k, c] : 0;
+                _folkHorses = K(fCons, CHorse);   // F3: kontrola licznika "mieszczanie" w linii "Konie (E6/0)" (ta sama doba, drugi licznik)
                 sb.Append("Uzbrojenie (ujscia 174): dzien ").Append(day).Append(" - mieszczanie: uzbrojenie ").Append(K(fCons, CArms)).Append(" szt., odziez (garment) ")
                   .Append(K(fCons, CGarment)).Append(" szt. (miasta i zamki; budzetow uzbrojenia wyzerowanych ").Append(_budgetZero).Append(", ").Append(NotHousehold ? "regula CZYNNA" : "regula wylaczona").Append(')');
                 sb.Append("; kasowanie gry: uzbrojenie ").Append(K(fDecay, CArms)).Append(" szt. (pominieto ").Append(_skipStacks).Append(" stosow, oczekiwane ok. ")

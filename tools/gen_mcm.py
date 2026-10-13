@@ -152,8 +152,13 @@ RANGES = {
     'ValveStockDaysHigh': (14, 240, "0"),
     # E6/K3 (219): czesc polki miasta na konie rycerzy w jednym postoju (kod przycina do 0..1, Stables.KnightBuy)
     'KnightHorseMarketShare': (0.0, 1.0, "0.00"),
+    # F5 (K3-3, test zbiorczy 5-8): udzial kiesy pana ponad rezerwe na zwykle konie z przydzialu sprzetu rodu (kod przycina do 0..1, Stables.OnSettlementEntered; 0 = wylaczone)
+    'AiMountGearPurseShare': (0.0, 1.0, "0.00"),
     # E7/W1 (232): kto slyszy wiesci z wiosek - 0 nikt, 1 wlasne lenna, 2 cale krolestwo (VillageNews.Shows)
     'VillageRaidMessages': (0, 2, "0"),
+    # E7/R1 (235): oddzial rabunku osada po osadzie i najdluzsza czujnosc - zgodnie z przycieciem w DistrictRaid.Start / EndFin
+    'RaidDetachmentMen': (20, 2000, "0"),
+    'RaidAlertMaxDays': (1, 60, "0"),
 }
 
 def gen(module_dir, ns, display):

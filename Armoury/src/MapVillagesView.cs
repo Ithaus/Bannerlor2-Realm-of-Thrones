@@ -1352,7 +1352,7 @@ namespace Armoury
     // =====================================================================================================
 
     /// <summary>Wioski na mapie (W2): obrazki, widocznosc, ogien / dym, dymek. Rejestracja: SubModuleMain.OnApplicationTick.</summary>
-    public sealed partial class MapVillagesView : EntityVisualManagerBase   // E7/W5: proporczyki w MapVillagePennants.cs
+    public sealed partial class MapVillagesView : EntityVisualManagerBase   // E7/W5: proporczyki w MapVillagePennants.cs; E7/W4: wyglad spalonej i napisy w MapVillageLook.cs
     {
         // po partiach (10), osadach (40), sladach (50), pogodzie (60) i dzwieku (70): dymek tylko, gdy nikt inny nie trafil
         public override int Priority => 100;
@@ -1453,6 +1453,17 @@ namespace Armoury
             public bool Placed;               // Cx / Cy / Deg ustawione
             public string Why = "";
             public PenState Pen;              // E7/W5: proporczyk pana (MapVillagePennants.cs); null = nigdy nie wybrany
+            // E7/W4 (237): wyglad wedlug ksiegi wiosek (MapVillageLook.cs) - nic do zapisu gry, od nowa przy wczytaniu mapy
+            public bool LookDirty = true;     // stan ksiegi do odczytu (przy tworzeniu obrazka albo z kolejki widoku)
+            public bool LookKnown;            // wyglad policzony co najmniej raz (zmiana liczona dopiero od drugiego odczytu)
+            public bool LookQueued;           // w kolejce widoku (ma obrazek)
+            public bool LookRebuild;          // obrazek stoi w starym wygladzie - do przebudowy (raz na zmiane stanu)
+            public bool BookBurned;           // spalona w ksiedze (napis)
+            public bool PicBurned;            // obrazek ciemny, bez detali (BookBurned przy wlaczonym BurnedVillageLook)
+            public int LookDrop;              // o ile poziomow nizej (0-2; pamiec histerezy)
+            public int PicLevel;              // poziom obrazka po zmniejszeniu (1-3); wazny przy LookKnown
+            public int LookBuilds;            // przebudowy obrazka tej wioski od wczytania mapy (kontrola: obrazek nie miga)
+            public string Label;              // napis "X has been burned" (budowany raz na spalenie)
         }
 
         // ---------- v4: wzor obrazka (okreg, model) - elementy z siatkami, bez fizyki / skryptow / czastek ----------
@@ -1517,6 +1528,7 @@ namespace Armoury
         private readonly List<Slot> _slots = new List<Slot>();
         private readonly List<District> _districts = new List<District>();
         private readonly Dictionary<string, Slot> _slotByUid = new Dictionary<string, Slot>(StringComparer.Ordinal);   // E4/11: uid wioski -> slot (ogien z ksiegi wiosek)
+        private readonly Dictionary<string, District> _distById = new Dictionary<string, District>(StringComparer.Ordinal);   // E7/W4: id okregu -> okreg (zmiany stanu ksiegi)
         private readonly Dictionary<long, List<Slot>> _grid = new Dictionary<long, List<Slot>>();
         private readonly List<Slot> _shown = new List<Slot>();
         private readonly SortedDictionary<string, int> _skip = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -1670,6 +1682,7 @@ namespace Armoury
                     l.Add(s);
                 }
                 _districts.Add(d);
+                _distById[d.Id] = d;   // E7/W4: okreg po id (zmiany stanu ksiegi wiosek)
             }
             _active = true;
             _diagOn = AutotestActive();
@@ -1730,14 +1743,17 @@ namespace Armoury
                 bool sceneAlive = _screen != null && ReferenceEquals(MapScreen.Instance, _screen);
                 string sum = _active ? SummaryText() : "";
                 string pen = _active && _penMesh != null ? PennantLine() : null;   // E7/W5: stan proporczykow przed zdjeciem
+                string look = _active && _lookStarted ? LookLine() : null;         // E7/W4: stan wygladu i napisow przed zdjeciem
+                RemoveLabelLayer(sceneAlive);                                      // E7/W4: warstwa napisow (wlasny try; cudzego ekranu nie rusza)
                 if (sceneAlive) removed = RemoveAll(); else DropAll();
                 if (_active)
                     Log.Info("Wioski: koniec mapy (wyjscie z kampanii albo wczytanie) - zdjete obrazki " + removed + (sceneAlive ? "" : " (scena juz nie ta - same odwolania)")
                              + "; " + sum);
                 if (pen != null) Log.Info(pen);
+                if (look != null) Log.Info(look);
             }
             catch (Exception e) { Log.Error("MapVillagesView.OnFinalize", e); }
-            _slots.Clear(); _districts.Clear(); _grid.Clear(); _shown.Clear(); _slotByUid.Clear();
+            _slots.Clear(); _districts.Clear(); _grid.Clear(); _shown.Clear(); _slotByUid.Clear(); _distById.Clear(); _lookQueue.Clear();
             _active = false;
             _screen = null;
             base.OnFinalize();
@@ -1754,6 +1770,7 @@ namespace Armoury
         public override void OnVisualTick(MapScreen screen, float realDt, float dt)
         {
             if (!_active || _finalized) return;
+            if (_lblCount > 0) LabelFrame(screen);   // E7/W4: pozycje napisow w kadrze (najwyzej 30) co klatke - samo przeliczenie na ekran, zadnych encji mapy
             _acc += realDt;
             _sinceSummary += realDt;
             if (_acc < TickEvery) return;
@@ -1764,6 +1781,7 @@ namespace Armoury
                 {
                     if (!_wasOff)
                     {
+                        RemoveLabelLayer(true);   // E7/W4: napisy razem z obrazkami
                         int n = RemoveAll();
                         Log.Info("Wioski: wylaczone w MCM - zdjete obrazki " + n + ".");
                         _wasOff = true;
@@ -1772,8 +1790,10 @@ namespace Armoury
                 }
                 if (_wasOff) { _wasOff = false; _firstFillDone = false; Log.Info("Wioski: wlaczone w MCM - obrazki wracaja przy kamerze."); }
                 PollRaids();
+                LookTick();            // E7/W4: zmiany stanu ksiegi wiosek -> przebudowa obrazka raz na zmiane (wlasny try i liczniki), przed pokazaniem
                 UpdateVisibility(screen);
                 PennantTick(screen);   // E7/W5: proporczyki przy wioskach z obrazkiem (wlasny try i liczniki)
+                LabelTick(screen);     // E7/W4: wybor napisow nad spalonymi sposrod pokazanych obrazkow tego ticku (wlasny try i liczniki)
                 if (_sinceSummary >= SummaryEvery)
                 {
                     _sinceSummary = 0f;
@@ -1783,6 +1803,11 @@ namespace Armoury
                     {
                         string pl = PennantLine();
                         if (pl != _penLastLine) { _penLastLine = pl; Log.Info(pl); }
+                    }
+                    if (_lookStarted)
+                    {
+                        string ll = LookLine();
+                        if (ll != _lookLastLine) { _lookLastLine = ll; Log.Info(ll); }
                     }
                 }
             }
@@ -1862,6 +1887,8 @@ namespace Armoury
             sb.Append("; potkniecia: tworzenie ").Append(_stCreate).Append(", wzor ").Append(_stTemplate).Append(", ogien ").Append(_stFx)
               .Append(", widocznosc ").Append(_stVis).Append(", dymek ").Append(_stHover).Append(", zdejmowanie ").Append(_stRemove)
               .Append(", tick ").Append(_stTick).Append(", diagnostyka ").Append(_stDiag).Append(", pan w dymku ").Append(_stHeld).Append('.');
+            // E7/W4 (237): projekt etapu 7 rozdz. 3 - dopisek w linii "Wioski"; szczegoly w linii "Wioski - wyglad (E7/W4)"
+            sb.Append(" | przebudowy obrazka ").Append(_lookRebuilt + _lookDropped).Append(" (zmiany stanu ").Append(_lookChanges).Append("), napisy w kadrze maks. ").Append(_lblMax);
             return sb.ToString();
         }
 
@@ -1921,6 +1948,7 @@ namespace Armoury
                     if (want == FxSmoke && d.Fx != FxSmoke && target != null) _smokes++;
                     d.Fx = want;
                     d.FxSlot = target;
+                    BurnedFx(d);   // E7/W4: dym nad spalonymi wioskami okregu razem ze stanem wsi gry (rabunek, czujnosc) - tylko przy tej zmianie
                 }
                 catch (Exception e)
                 {
@@ -2080,6 +2108,7 @@ namespace Armoury
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
+                if (s.LookDirty) RefreshLook(s);   // E7/W4: obrazek od razu w wygladzie z ksiegi wiosek (odczyt tablic, nie rzuca)
                 Create(s, t);
                 _createTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                 _created++;
@@ -2110,6 +2139,9 @@ namespace Armoury
         private void Create(Slot s, Template t)
         {
             int lv = Math.Max(1, Math.Min(3, s.R.Level));
+            // E7/W4 (237): wioska czesciowo pusta - nizszy poziom obrazka; spalona w ksiedze - bez detali i ciemna (RefreshLook, raz na zmiane stanu)
+            if (s.LookKnown && s.PicLevel >= 1 && s.PicLevel < lv) lv = s.PicLevel;
+            bool burnedPic = s.LookKnown && s.PicBurned;
             Scene scene = MapScene;
             if (scene == null) throw new InvalidOperationException("brak sceny mapy");
             // 0. uklad: korzen BEZ pochylenia (obrot z pliku), skala matki x poziom x dopasowanie do matki
@@ -2150,13 +2182,16 @@ namespace Armoury
                 if (want < k.ThinN) keepThin = MapVillageData.ThinVillage(s.R.Uid, k.ThinX, k.ThinY, k.ThinDetail, want, MapVillageData.VillageDetailMax(lv));
             }
             var vis = new List<int>();
-            for (int i = 0; i < k.Pieces.Count; i++)
-            {
-                Piece p = k.Pieces[i];
-                if (p.Parent >= 0 || (p.Levels & (1 << lv)) == 0) continue;
-                if (keepThin != null && p.ThinIndex >= 0 && p.ThinIndex < keepThin.Length && !keepThin[p.ThinIndex]) continue;
-                vis.Add(i);
-            }
+            // E7/W4: spalona - zdjete detale (stog, woz, worki, studnia, szopy); gdyby bez nich nie zostalo nic (sam detal na poziomie), obrazek jak dotad
+            for (int pass = burnedPic ? 0 : 1; pass < 2 && vis.Count == 0; pass++)
+                for (int i = 0; i < k.Pieces.Count; i++)
+                {
+                    Piece p = k.Pieces[i];
+                    if (p.Parent >= 0 || (p.Levels & (1 << lv)) == 0) continue;
+                    if (keepThin != null && p.ThinIndex >= 0 && p.ThinIndex < keepThin.Length && !keepThin[p.ThinIndex]) continue;
+                    if (pass == 0 && IsBurnedDetail(k, p)) continue;
+                    vis.Add(i);
+                }
             if (vis.Count == 0) throw new InvalidOperationException("brak elementow obrazka na poziomie " + lv);
             int n = vis.Count;
             var px = new float[n];
@@ -2357,12 +2392,12 @@ namespace Armoury
                 MatrixFrame rf = new MatrixFrame(in rr, new Vec3(g.Cx, g.Cy, zc, 1f));
                 root.SetFrame(ref rf, true);
                 var made = new GameEntity[k.Pieces.Count];
-                int meshes = 0, snapped = 0, tilted = 0;
+                int meshes = 0, snapped = 0, tilted = 0, tinted0 = 0;   // tinted0 - E7/W4: encje przyciemnione (spalona)
                 for (int j = 0; j < n; j++)
                 {
                     if (!alive[j]) continue;
                     Piece p = k.Pieces[vis[j]];
-                    GameEntity e = MakeEntity(scene, root, p, frames[j], t.NoSeason, ref meshes);
+                    GameEntity e = MakeEntity(scene, root, p, frames[j], t.NoSeason, ref meshes, burnedPic, ref tinted0);
                     if (e == (GameEntity)null) continue;
                     made[vis[j]] = e;
                     if (tilt[j]) tilted++; else snapped++;
@@ -2372,7 +2407,7 @@ namespace Armoury
                 {
                     Piece p = k.Pieces[i];
                     if (p.Parent < 0 || p.Parent >= made.Length || made[p.Parent] == (GameEntity)null) continue;
-                    MakeEntity(scene, made[p.Parent], p, p.Local, t.NoSeason, ref meshes);
+                    MakeEntity(scene, made[p.Parent], p, p.Local, t.NoSeason, ref meshes, burnedPic, ref tinted0);
                 }
                 if (meshes == 0) throw new InvalidOperationException("kopia bez siatek");
                 if (t.NoSeason) root.EntityFlags = root.EntityFlags | EntityFlags.NotAffectedBySeason;   // snieg jak na matce (projekt 5.1)
@@ -2386,6 +2421,8 @@ namespace Armoury
                 _tiltPieces += tilted;
                 _boatsWater += boatsW;
                 _boatsBeach += boatsB;
+                _lookTinted += tinted0;                      // E7/W4
+                if (burnedPic) _lookDarkBuilt++;
                 _modelAsked[Math.Max(0, Math.Min(MapVillageData.ModelCount - 1, s.R.Model))]++;
                 _modelMade[k.Model]++;
                 s.Root = root;
@@ -2757,16 +2794,20 @@ namespace Armoury
         }
 
         /// <summary>Encja elementu: pusta encja + kopie siatek (jak namiot partii: CreateEmpty + AddMultiMesh + SetFrame + AddChild), flagi jak dotad.</summary>
-        private static GameEntity MakeEntity(Scene scene, GameEntity parent, Piece p, MatrixFrame f, bool noSeason, ref int meshes)
+        private static GameEntity MakeEntity(Scene scene, GameEntity parent, Piece p, MatrixFrame f, bool noSeason, ref int meshes, bool burned, ref int tinted)
         {
             GameEntity e = GameEntity.CreateEmpty(scene, false, false, false);
             if (e == (GameEntity)null) return null;
+            int own = 0;
             for (int m = 0; m < p.Meshes.Length; m++)
             {
                 MetaMesh copy = p.Meshes[m].CreateCopy();
                 if (copy == null || !copy.IsValid) copy = MetaMesh.GetCopy(p.Meshes[m].GetName(), false, true);
-                if (copy != null && copy.IsValid) { e.AddMultiMesh(copy, true); meshes++; }
+                if (copy != null && copy.IsValid) { e.AddMultiMesh(copy, true); meshes++; own++; }
             }
+            // E7/W4 (237): spalona wioska - siatki tej encji przyciemnione (GameEntity.SetFactorColor na encji z siatkami, jak gra przyciemnia plonacy maszt:
+            // NavalDLC SailVisual - barwa pierwszej siatki x 0.75). Stala barwa, bez odczytu z silnika; raz przy tworzeniu obrazka, kopie nie maja skryptow.
+            if (burned && own > 0) { e.SetFactorColor(BurnedTint); tinted++; }
             e.SetFrame(ref f, true);                 // jak namiot partii: ramka, potem AddChild bez przeliczania = ramka lokalna
             parent.AddChild(e, false);
             // recenzja 08.10: flaga "bez sniegu pory roku" na KAZDEJ encji obrazka, gdy ma ja matka (zima ROT: jednolita szara brylka)
@@ -4395,6 +4436,7 @@ namespace Armoury
         {
             int n = 0;
             RemovePennants();   // E7/W5: proporczyki razem z obrazkami (wroca przy kamerze po ponownym wlaczeniu)
+            LookReset();        // E7/W4: kolejka wygladu i napisy od zera (stan ksiegi czytany od nowa przy tworzeniu obrazka)
             foreach (var s in _slots)
             {
                 if (s.Root != null)
@@ -4420,6 +4462,7 @@ namespace Armoury
         private void DropAll()
         {
             DropPennants();   // E7/W5: scena juz nie ta - same odwolania
+            LookReset();      // E7/W4
             foreach (var s in _slots) { s.Root = null; s.V = null; s.Shown = false; s.Placed = false; }
             foreach (var d in _districts) { d.T = null; d.TemplateTried = false; d.Kits = null; }
             _shown.Clear();

@@ -58,6 +58,7 @@ namespace CrashScribe
                         {
                             if (e.Exception == null) return;
                             System.Threading.Interlocked.Increment(ref Blame.FcSeen);   // E8/0 (242): liczniki doby (tylko pomiar)
+                            if (Config.QuietBkEducation && Quiet.KnownBkEducation(e.Exception)) { System.Threading.Interlocked.Increment(ref Blame.FcFiltered); return; }   // E8/M (247); licznik E8/0 - odfiltrowane
                             if (Config.OnlyModdedFirstChance && Blame.Culprits(e.Exception).Count == 0) { System.Threading.Interlocked.Increment(ref Blame.FcFiltered); return; }
                             if (Scribe.Report("ERROR CAUGHT FURTHER UP", e.Exception, "FirstChanceException", null)) System.Threading.Interlocked.Increment(ref Blame.FcReported);
                             else System.Threading.Interlocked.Increment(ref Blame.FcRepeat);
@@ -90,8 +91,13 @@ namespace CrashScribe
                 Net.WrapHotspots(_harmony);
                 Quiet.Install(_harmony);
                 Mends.Install(_harmony);
+                NameplateGhosts.Install(_harmony);   // 10.10: ikony-duchy partii nad osadami
                 Fabula.Install(_harmony);
                 OthersGrowth.Install(_harmony);   // T2b: Inni bez dosypki z niczego (Jeff 07.10 H2)
+                NightKingGate.Install(_harmony);  // T2c: Inni bez oblezen zamknietych celow przed dniem z kalendarza
+                StorylineReparations.Install(_harmony);  // T9: pokoj w wojnie fabularnej ROT bez reparacji Diplomacy
+                PovertyPeace.Install(_harmony);  // E1: pokoj z biedy (glos rodu o pokoj + ocena wojny BK)
+                Army175.Install(_harmony);       // 175: dopisek pieszych Dothrakow do puli ROT (postfiks ROTTroopRecruiter.Settings)
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
@@ -110,6 +116,17 @@ namespace CrashScribe
             }
         }
 
+        /// <summary>175 (09.10): pierwszy moment z wczytanymi przedmiotami, rosterami, szablonami partii i jednostkami
+        /// (po XSLT ROT), a jeszcze przed SyncData, partiami i zalogami nowej gry i przed kazdym OnSessionLaunched
+        /// (Armoury TroopFit/ColdStart). CrashScribe laduje sie przed Sandbox, wiec biegnie tez przed jego
+        /// InitializeCharactersAfterLoad - stad zawsze nowy roster dla zmienianej jednostki (Army175.Rewrite).</summary>
+        public override void AfterRegisterSubModuleObjects(bool isSavedCampaign)
+        {
+            base.AfterRegisterSubModuleObjects(isSavedCampaign);
+            try { Army175.OnObjectsRegistered(isSavedCampaign); }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AfterRegisterSubModuleObjects.Army175", null); } catch { } }
+        }
+
         protected override void OnApplicationTick(float dt)
         {
             base.OnApplicationTick(dt);
@@ -121,6 +138,7 @@ namespace CrashScribe
             base.OnGameStart(game, gameStarterObject);
             try { Scribe.Line("=== New game / save loaded: " + game.GameType.GetType().Name + " ==="); Trail.Drop("game", "start " + game.GameType.GetType().Name); }
             catch { }
+            try { Army175.Reset(); } catch { }   // 175: stan sesji (wybory zamiennikow, flagi, znaczniki) - przed AfterRegister
             try
             {
                 var cgs = gameStarterObject as TaleWorlds.CampaignSystem.CampaignGameStarter;
@@ -129,6 +147,8 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new DialogEscape());
                 if (cgs != null) cgs.AddBehavior(new NightKingCall());   // Zew Nocnego Krola (Jeff 16.09)
                 if (cgs != null) cgs.AddBehavior(new OthersGrowthBehavior());   // T2b: linia dobowa "Inni bez dosypki"
+                if (cgs != null) cgs.AddBehavior(new StorylineReparationsBehavior());   // T9: linie "Reparacje (T9)" (pokoj + doba)
+                if (cgs != null) cgs.AddBehavior(new PovertyPeaceBehavior());   // E1: linie "Pokoj z biedy (E1)" (decyzje + doba)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }

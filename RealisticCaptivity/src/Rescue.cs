@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -34,6 +36,28 @@ namespace RealisticCaptivity
             catch (Exception e) { Log.Error("FindRescueParty", e); return null; }
         }
 
+        // F7 (test zbiorczy 5-8, TRIAZ zb58 "E7/O1 T3" pkt 2): rozkazy odsieczy przez wejscie metody (MethodInfo.Invoke) - z latkami innych modow na
+        // MobileParty.SetMoveGoToSettlement / SetMoveEngageParty (bramka snu Armoury SleepGate, straznicy BK), jak kazdy rozkaz; wzor Armoury IslandRoads /
+        // MaterialOrders. Wywolanie wprost JIT moze zastapic kopia krotkiej metody gry sprzed latek (siec CrashScribe kompiluje metody tego moda w menu
+        // glownym, zanim Armoury wepnie bramke) - rozkaz omijal wtedy bramke i ruszal spiaca druzyne przed switem. Teraz rozkaz spiacej druzyny czeka u
+        // Armoury do switu (albo do nocnego powodu marszu wedlug jego regul). Bez Armoury - rozkaz idzie od reki, jak dotad.
+        // Wywolania stoja w DriveTowardCaptor (nie w osobnych metodach): wyjatek rozkazu konczy sie jak dotad w jej catch (false = jeszcze w drodze).
+        private static MethodInfo _setMoveGo, _setMoveEngage;
+        private static bool _setMoveTried;
+
+        /// <summary>Wejscia MobileParty.SetMoveGoToSettlement / SetMoveEngageParty - szukane raz; null = brak (wtedy rozkaz wprost, jak dotad).</summary>
+        private static void FindMoves()
+        {
+            if (_setMoveTried) return;
+            _setMoveTried = true;
+            try
+            {
+                _setMoveGo = typeof(MobileParty).GetMethod("SetMoveGoToSettlement", new[] { typeof(Settlement), typeof(MobileParty.NavigationType), typeof(bool) });
+                _setMoveEngage = typeof(MobileParty).GetMethod("SetMoveEngageParty", new[] { typeof(MobileParty), typeof(MobileParty.NavigationType) });
+            }
+            catch (Exception e) { Log.Error("Rescue.FindMoves (brak wejscia metody - rozkaz wprost, jak dotad)", e); }
+        }
+
         /// <summary>Kieruje odsiecz w strone zdobywcy. Zwraca true, gdy juz dojechala.</summary>
         internal static bool DriveTowardCaptor(MobileParty rescuer, PartyBase captor)
         {
@@ -44,13 +68,25 @@ namespace RealisticCaptivity
 
                 if (captor.IsSettlement && captor.Settlement != null)
                 {
-                    rescuer.SetMoveGoToSettlement(captor.Settlement, MobileParty.NavigationType.All, false);
+                    FindMoves();   // F7: przez wejscie metody
+                    if (_setMoveGo != null)
+                    {
+                        try { _setMoveGo.Invoke(rescuer, new object[] { captor.Settlement, MobileParty.NavigationType.All, false }); }
+                        catch (TargetInvocationException tie) { throw tie.InnerException ?? tie; }
+                    }
+                    else rescuer.SetMoveGoToSettlement(captor.Settlement, MobileParty.NavigationType.All, false);
                     float d = rescuer.GetPosition2D.Distance(captor.Settlement.GetPosition2D);
                     return d <= s.RescueArrivalDistance;
                 }
                 if (captor.IsMobile && captor.MobileParty != null)
                 {
-                    rescuer.SetMoveEngageParty(captor.MobileParty, MobileParty.NavigationType.All);
+                    FindMoves();   // F7: przez wejscie metody
+                    if (_setMoveEngage != null)
+                    {
+                        try { _setMoveEngage.Invoke(rescuer, new object[] { captor.MobileParty, MobileParty.NavigationType.All }); }
+                        catch (TargetInvocationException tie) { throw tie.InnerException ?? tie; }
+                    }
+                    else rescuer.SetMoveEngageParty(captor.MobileParty, MobileParty.NavigationType.All);
                     float d = rescuer.GetPosition2D.Distance(captor.MobileParty.GetPosition2D);
                     return d <= s.RescueArrivalDistance;
                 }

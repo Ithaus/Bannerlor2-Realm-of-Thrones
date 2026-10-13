@@ -698,6 +698,7 @@ namespace Armoury
                 _orders.Clear();
                 int sleeping = _camping.Count;
                 _camping.Clear(); _bedPos.Clear();
+                _campNight = false;   // F7: oboz swiata zwolniony razem ze spiacymi
                 _ai.Clear();
                 RebuildPenalties(false);
                 _debtWasOn = null; _ledgerStamp = -1;
@@ -1589,6 +1590,7 @@ namespace Armoury
             var list = new List<KeyValuePair<MobileParty, AlarmInfo>>(_alarmed);
             double now = NowH();
             int hNow = CampaignTime.Now.GetHourOfDay;
+            bool campOn = CampHolds(Settings.Current, hNow);   // F7: oboz swiata trwa do ticku switu (przy SleepersHoldOrders; inaczej zegar jak dotad)
             foreach (var kv in list)
             {
                 var mp = kv.Key; var a = kv.Value;
@@ -1609,7 +1611,9 @@ namespace Armoury
                     }
                     // poprawka recenzji: alarm obozu swiata, a oboz juz sie skonczyl (alarm 5:30-6:00) - galaz switu oddala rozkaz sprzed snu,
                     // nie cofamy go i rozstrzygamy od reki (inaczej lord zostawal w Hold bez rozkazu do ok. 6:30)
-                    bool campOver = !a.DebtPath && !InCamp(hNow);
+                    // F7: "oboz sie skonczyl" = tick switu juz byl (CampHolds), nie godzina zegara - miedzy 6:00 a tickiem switu rozkazow jeszcze nikt
+                    // nie oddal, wiec alarm rozstrzyga sie jak w nocy (z powrotem spac do switu)
+                    bool campOver = !a.DebtPath && !campOn;
                     if (!campOver)
                     {
                         if (mp.DefaultBehavior != AiBehavior.Hold) { mp.SetMoveModeHold(); _alarmResets++; }   // nowy cel strategiczny - bez powodu nie idzie
@@ -1643,7 +1647,7 @@ namespace Armoury
                 ApplyOrder(mp, a.Order, false);   // dlug splacony albo koniec okna - rozkaz sprzed snu
                 return;
             }
-            if (s != null && s.AiCampsAtNight && InCamp(h))
+            if (s != null && s.AiCampsAtNight && CampHolds(s, h))   // F7: do ticku switu (byla godzina zegara)
             {
                 RememberOrder(mp);   // rozkaz sprzed snu zwykle juz jest (zostal przy alarmie)
                 mp.Ai.DisableForHours(1);

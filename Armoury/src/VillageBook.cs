@@ -75,6 +75,7 @@ namespace Armoury
             public int Z;                                   // przydzial zastepczy czeka (powod)
             public bool Event;                              // zdarzenie dzis (wiersz CSV)
             public Mem[] M;                                 // E7/W1 (232): pamiec wojny na wioske (indeks jak Br; W = wies gry) - sekcja m: zapisu
+            public bool LookDirty;                          // E7/W4 (237): okreg czeka na odczyt wygladu przez widok mapy (bez zapisu)
         }
 
         // E7/W1: C - napastnik sesji (identyfikatory do pamieci i komunikatu), Burned - ta sesja przeszla jakas wioske na spalona (przy Looted bez "plundered")
@@ -149,6 +150,13 @@ namespace Armoury
         private const int NewsMax = 64;
         private static readonly List<BurnNews> _news = new List<BurnNews>();
         private static int _nBurned, _nNewsLost, _nMemNew, _savedM;
+        // E7/W4 (237, R10/R17): zmiany stanu ksiegi dla widoku mapy - okregi, w ktorych zmienily sie puste osady albo flagi (LookTouch w CheckUp = kazdy wzrost, Remove =
+        // kazdy spadek, zdarzenie "odbudowana", pierwsze n okregu), albo wszystko (Reset, Resolve). Widok czyta numer zmiany bez blokady (4 razy na sekunde), liste zabiera
+        // tylko przy nowym numerze. Wlasna blokada (kolejnosc Gate -> _lookLock, TakeLookDirty bierze sama _lookLock). Bez zapisu - widok po wczytaniu czyta wszystko od nowa.
+        private static readonly object _lookLock = new object();
+        private static readonly List<Dist> _lookDirty = new List<Dist>();
+        private static bool _lookAll = true;
+        private static int _lookVer;
 
         /// <summary>Ksiega czynna: klucz VillageBookEnabled i okregi rozwiazane w tej sesji (bez pliku ukladu - kazdy okreg to sama wies gry).</summary>
         internal static bool Active { get { var s = Settings.Current; return s != null && s.VillageBookEnabled && _resolved; } }
@@ -187,6 +195,7 @@ namespace Armoury
         internal static void Reset()
         {
             lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); _news.Clear(); _nBurned = _nNewsLost = _nMemNew = _savedM = 0; }
+            LookTouchAll();                                 // E7/W4: stare okregi puszczone, widok czyta wszystko od nowa
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
             _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _distNoVillageIds.Clear();
             _newN.Clear(); _newNames.Clear(); _csvPath = null;
@@ -316,6 +325,7 @@ namespace Armoury
                     ApplyPending();
                 }
                 _resolved = true;
+                LookTouchAll();                             // E7/W4: stan z zapisu (albo pusty) - widok czyta wszystko od nowa
             }
             catch (Exception e) { Stumble("VillageBook.Resolve", e); }
             _resolveMs = sw.Elapsed.TotalMilliseconds;
@@ -330,7 +340,7 @@ namespace Armoury
         }
 
         // zapis: "v1|L:<crc ukladu hex>|P:<ludzi na osade>|n:<id>=<N>;...|w:<id>=<br>/<bf>,...;...|x:<id>=<i>:<flaga>:<doba zdarzenia>:<doba odbudowy>,...;...|y:<id>=<ARexp>/<AFexp>;..."
-        // (zarezerwowane, nie pisane w E4/11: r: sesje rabunku, c: czujnosc, u: uprowadzeni - etap 7.11)
+        // (zarezerwowane w E4/11: r: sesje rabunku, c: czujnosc - pisze je E7/R1 przez DistrictRaid.Export/Import; u: uprowadzeni - wolne)
         // poprawka po recenzji (R1-5): "|o:1" - ksiega byla wylaczona przy zapisie (OffDay wyzerowal puste osady i konto oczekiwane) - po wczytaniu przydzial zastepczy
         // z powodem "wlaczenie" (dotad liczony jako doplyw bez zrodla d0); starsze DLL te sekcje pomijaja
         private static void ApplyPending()
@@ -349,7 +359,7 @@ namespace Armoury
                 _resolveNote = "z zapisu: nieznana wersja klucza arm_district - jak stary zapis";
                 return;
             }
-            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null;
+            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null, sr = null, sc = null;
             foreach (var p in parts)
             {
                 if (p.Length < 2 || p[1] != ':') continue;
@@ -364,8 +374,11 @@ namespace Armoury
                     case 'y': sy = body; break;
                     case 'm': sm = body; break;              // E7/W1 (232): pamiec wojny (starsze DLL te sekcje pomijaja)
                     case 'o': wasOff = body == "1"; break;
+                    case 'r': sr = body; break;              // E7/R1 (235): sesje rabunku osada po osadzie (po id wsi gry - bez indeksow wiosek, niezalezne od ukladu)
+                    case 'c': sc = body; break;              // E7/R1 (235): czujnosc wsi (id wsi gry -> doba konca)
                 }
             }
+            try { DistrictRaid.Import(sr, sc); } catch (Exception e) { Stumble("VillageBook.Import(r/c)", e); }
             _layoutSame = hasCrc && _file != null && crc == _layoutCrc;
             if (!string.IsNullOrEmpty(sn))
                 foreach (var item in sn.Split(';'))
@@ -557,7 +570,28 @@ namespace Armoury
             }
             try { var st = Settings.Current; if (st != null && st.LogEnabled) Log.Info("Wioski - wiesci (E7/W1): zapis - pamiec wojny " + memN + " wpisow (same identyfikatory; odrzucone przez BadId " + memBad + ")."); }
             catch { }
+            // E7/R1 (235): sesje rabunku osada po osadzie (r:) i czujnosc wsi (c:) - jeden pisarz klucza arm_district (ta ksiega); starsze DLL te sekcje pomijaja
+            try { DistrictRaid.Export(sb); } catch (Exception e) { Stumble("VillageBook.Export(r/c)", e); }
             return sb.ToString();
+        }
+
+        /// <summary>E7/R1 (235): liczba osad okregu n (zamrozona w ksiedze przy pierwszym odczycie - ta sama, co menu, dymek i lancuch palenia). false - ksiega
+        /// nieczynna albo okreg nieznany (DistrictRaid liczy wtedy n z ludzi i DistrictSettlementPeople bez zamrazania). Nie rzuca.</summary>
+        internal static bool DistrictN(Village v, out double n)
+        {
+            n = 0.0;
+            if (v == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || !EnsureN(d)) return false;
+                    n = d.N;
+                    return n >= 1.0;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.DistrictN", e); return false; }
         }
 
         // ------------------------------------------------------------ n okregu i podzial na wioski (WM 3)
@@ -579,6 +613,7 @@ namespace Armoury
             d.N = Math.Max(1.0, Math.Round(l0 / _p));
             d.NSet = true;
             Split(d);
+            LookTouch(d);                                   // E7/W4: okreg ma n - widok moze czytac wyglad jego wiosek
             _newN.Add(d.N); _newNames.Add(d.Name);
             return true;
         }
@@ -740,6 +775,7 @@ namespace Armoury
 
         private static void CheckUp(Dist d, int w, int today, string raider, bool list, Cx cx = null)
         {
+            LookTouch(d);                                   // E7/W4 (237): kazdy wzrost pustych osad przechodzi tedy (Burn, FillFamine, Fallback) - okreg do odczytu przez widok
             double nw = d.Nw[w];
             if (!(nw > Eps)) return;
             if ((d.Flag[w] & FBurned) == 0 && d.Br[w] >= BurnShare * nw - 1e-12)
@@ -902,6 +938,7 @@ namespace Armoury
         // ------------------------------------------------------------ uzgodnienie doby (3.5) - jedyny spadek pustych osad
         private static double Remove(Dist d, double[] b, double x)
         {
+            if (x > 1e-12) LookTouch(d);                    // E7/W4 (237): jedyny spadek pustych osad - okreg do odczytu przez widok
             double left = x;
             for (int pass = 0; pass < 4 && left > 1e-12; pass++)
             {
@@ -1063,7 +1100,7 @@ namespace Armoury
             bool raid = false;
             try { raid = d.S != null && d.S.Cur == w && d.St.IsUnderRaid; } catch { raid = false; }
             if (raid) return SBurning;
-            if ((d.Flag[w] & FBurned) != 0 && d.Br[w] >= KeepShare * nw) return SBurned;
+            if (BurnedAt(d, w)) return SBurned;
             if ((d.Flag[w] & FAbandoned) != 0 && b >= KeepShare * nw) return SAbandoned;
             if (d.Flag[w] != 0) return SRebuilding;
             if (b < StandShare * nw) return SStanding;
@@ -1093,6 +1130,69 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("VillageBook.StateOf", e); return false; }
+        }
+
+        // ------------------------------------------------------------ E7/W4 (237, R10/R17): wyglad wioski dla widoku mapy
+        /// <summary>Spalona w ksiedze (R10 - JEDNA definicja, ta sama w StateAt): flaga spalenia (przejscie przy 50% osad w CheckUp) i spalone osady nie ponizej 47%
+        /// (histereza). Rabunek w toku jej nie zdejmuje - wioska moze plonac i byc spalona naraz (WM 6.3).</summary>
+        private static bool BurnedAt(Dist d, int w)
+        {
+            return (d.Flag[w] & FBurned) != 0 && d.Br[w] >= KeepShare * d.Nw[w];
+        }
+
+        /// <summary>Okreg do odczytu wygladu przez widok mapy (raz do zabrania listy). Wolane pod Gate z miejsc, ktore zmieniaja puste osady albo flagi.</summary>
+        private static void LookTouch(Dist d)
+        {
+            if (d == null) return;
+            lock (_lookLock) { if (!d.LookDirty) { d.LookDirty = true; _lookDirty.Add(d); } }
+            System.Threading.Interlocked.Increment(ref _lookVer);
+        }
+
+        private static void LookTouchAll()
+        {
+            lock (_lookLock) { foreach (var d in _lookDirty) d.LookDirty = false; _lookDirty.Clear(); _lookAll = true; }
+            System.Threading.Interlocked.Increment(ref _lookVer);
+        }
+
+        /// <summary>Numer zmiany wygladu (rosnie przy kazdej zmianie pustych osad albo flag) - widok porownuje go bez blokady i dopiero przy nowym zabiera liste.</summary>
+        internal static int LookVersion { get { return System.Threading.Volatile.Read(ref _lookVer); } }
+
+        /// <summary>Widok mapy: id okregow ze zmiana od poprzedniego zabrania (all - wszystko od nowa: nowa kampania, wczytanie). Nie rzuca.</summary>
+        internal static void TakeLookDirty(List<string> into, out bool all)
+        {
+            all = false;
+            try
+            {
+                lock (_lookLock)
+                {
+                    all = _lookAll; _lookAll = false;
+                    foreach (var d in _lookDirty) { d.LookDirty = false; if (!all && d.Id != null) into.Add(d.Id); }
+                    _lookDirty.Clear();
+                }
+            }
+            catch (Exception e) { all = true; Stumble("VillageBook.TakeLookDirty", e); }
+        }
+
+        /// <summary>Wyglad wioski po uid: osady wioski, puste osady (rabunek + glod) i czy spalona w ksiedze (BurnedAt). Sam odczyt tablic pod Gate - bez kont ludzi
+        /// (tanszy niz StateOf). false - ksiega nieczynna, wioska nieznana albo okreg bez n (widok pokazuje wtedy obrazek z pliku).</summary>
+        internal static bool LookOf(string uid, out double settlements, out double empty, out bool burned)
+        {
+            settlements = empty = 0.0; burned = false;
+            if (uid == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    KeyValuePair<Dist, int> kv;
+                    if (!_byUid.TryGetValue(uid, out kv) || kv.Key == null || !kv.Key.NSet) return false;
+                    var d = kv.Key; int w = kv.Value;
+                    settlements = d.Nw[w]; empty = d.Br[w] + d.Bf[w];
+                    if (!(settlements > Eps)) return false;
+                    burned = BurnedAt(d, w);
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.LookOf", e); return false; }
         }
 
         /// <summary>E6/W2 (210): udzial ludzi W DOMU wiosek rybackich w ludziach w domu okregu tej wsi gry (People: dom wioski ~ osady - puste, ten sam mianownik
@@ -1315,6 +1415,7 @@ namespace Armoury
                                 if (d.Flag[w] == 0 || d.Br[w] + d.Bf[w] >= StandShare * d.Nw[w]) continue;
                                 int ev = d.EvDay[w];
                                 d.Flag[w] = 0; d.RebuiltDay[w] = today; d.Event = true; _dRebuiltN++;
+                                LookTouch(d);               // E7/W4: flaga zdjeta (odbudowana)
                                 if (_dRebuiltList.Count < TopEvents) _dRebuiltList.Add(d.VName[w] + " (" + d.Name + ") po " + (ev >= 0 ? (today - ev).ToString(Inv) : "?") + " dobach");
                             }
                             d.Z = ZNone;

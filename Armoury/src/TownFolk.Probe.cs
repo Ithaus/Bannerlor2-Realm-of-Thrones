@@ -49,6 +49,10 @@ namespace Armoury
         // recenzja E5/0 (2-1): dokup jedzenia BK (zapas warowni <= 10% gornej granicy w chwili otwarcia nawiasu - ten sam warunek co BK :532)
         private static bool _brLowFood; private static int _lowFoodN; private static double _lowFoodCut;
         private static int _brGoldMark; private static ItemCategory _brGoldCat; private static long _brFoodGold;   // recenzja B1 (1-5): zloto wierszy jedzenia w nawiasie (gmina w PayForGoods)
+        // F3 (test zbiorczy 5-8, K1-3a krok 1 - tylko pomiar, klucz Stage6MeasureLog): konie zdjete z polki przez ludnosc osady w tym nawiasie - zloto wierszy
+        // kategorii koni (wzor _brFoodGold) i zloto wszystkich wierszy przed ostatnim (ostatni = ConsumedValue BK - ta suma); sztuki z dziennika sprzedazy gry
+        private static bool _brHorse; private static long _brRowGold;
+        private static readonly long[] _brHorseGold = new long[HorseBook.MCats], _brHorseN = new long[HorseBook.MCats];
         private static readonly Dictionary<ItemCategory, int> _grp = new Dictionary<ItemCategory, int>();
         private static long _foodTown, _foodCastle;
         private static readonly double[] _satPlus = new double[4], _satMinus = new double[4];
@@ -78,6 +82,7 @@ namespace Armoury
             Array.Clear(_take, 0, Takes); Array.Clear(_takeBelow, 0, Takes); _rentPaid = _rentBelow = 0; _noBkCons = 0;
             _brTrack.Clear(); _pool.Clear(); _poolN = 0; _brTown = null; _brOpen = false; _brUnclosed = _brMismatch = _brAborted = 0;
             _brLowFood = false; _lowFoodN = 0; _lowFoodCut = 0; _brGoldMark = 0; _brGoldCat = null; _brFoodGold = 0;
+            _brHorse = false; _brRowGold = 0; Array.Clear(_brHorseGold, 0, _brHorseGold.Length); Array.Clear(_brHorseN, 0, _brHorseN.Length);
             _grp.Clear(); _foodTown = _foodCastle = 0; Array.Clear(_satPlus, 0, 4); Array.Clear(_satMinus, 0, 4);
             _btN = _btN1 = _btN2 = _btN3 = _btOffN = 0; _btA = _btB = _btC1 = _btC2 = _btC3 = _btAOff = _btC1Off = 0; _btOpen = false; _btLead = null;
             _ntTownOut = _ntTownIn = _ntVillOut = _ntVillIn = 0; _ntAll = _ntVill = _ntCastleMarket = 0; _ntDemand.Clear();
@@ -177,6 +182,9 @@ namespace Armoury
                 if (_brOpen) _brUnclosed++;
                 _brTown = __0; _brOpen = true; _brTrack.Clear(); _poolN = 0; _brGold0 = __0.Gold;
                 _brGoldMark = __0.Gold; _brGoldCat = null; _brFoodGold = 0;   // recenzja B1 (1-5): zloto wierszy jedzenia od zera
+                // F3: pomiar koni mieszczan w tym nawiasie (ksiega koni E6/0) - liczniki nawiasu od zera
+                _brHorse = HorseBook.FolkOn; _brRowGold = 0;
+                if (_brHorse) { Array.Clear(_brHorseGold, 0, _brHorseGold.Length); Array.Clear(_brHorseN, 0, _brHorseN.Length); }
                 _brAnchor = false; _brFacFood = _brFacRest = 1;   // E5/B1: czynniki kotwicy tego nawiasu (AnchorDict nizej)
                 // recenzja E5/0 (2-1): warunek dokupu jedzenia BK (EconomyPatches :532) - zapas sie w petli nie zmienia (polka i kasa tak; FoodStocksUpperLimit to odczyt modelu)
                 _brLowFood = false;
@@ -214,6 +222,12 @@ namespace Armoury
                 // recenzja B1 (1-5): zloto wiersza = przyrost kasy miedzy kolejnymi wierszami (BK ChangeGold(num6) idzie po CalculateBudget tego wiersza) - czesc jedzenia dla gminy
                 int g = __0.Gold;
                 if (_brGoldCat != null && GroupOf(_brGoldCat) == 0) _brFoodGold += g - _brGoldMark;
+                if (_brHorse && _brGoldCat != null)   // F3: zloto poprzedniego wiersza - do sumy wierszy, a wiersz kategorii koni do jej licznika
+                {
+                    int dg = g - _brGoldMark;
+                    _brRowGold += dg;
+                    if (dg != 0 && _brGoldCat.IsAnimal) { int hc = HorseBook.MarketCat(_brGoldCat); if (hc >= 0) _brHorseGold[hc] += dg; }
+                }
                 _brGoldMark = g; _brGoldCat = __2;
                 Track tr;
                 if (!_brTrack.TryGetValue(__2, out tr))
@@ -284,10 +298,44 @@ namespace Armoury
                 int food = 0;
                 if (__2 != null) foreach (var kv in __2) if (kv.Key != null && kv.Value > 0 && GroupOf(kv.Key) == 0) food += kv.Value;
                 if (__0.IsTown) _foodTown += food; else { _foodCastle += food; f.FoodSold += food; }
+                if (_brHorse) HorseFolk(__0, __2, cv);   // F3: konie mieszczan do ksiegi koni (tylko liczniki)
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("ConsumePostfix", e); }
-            finally { _brOpen = false; _brTown = null; _brLowFood = false; _brAnchor = false; }
+            finally { _brOpen = false; _brTown = null; _brLowFood = false; _brAnchor = false; _brHorse = false; }
+        }
+
+        /// <summary>F3 (K1-3a krok 1, tylko pomiar): konie zdjete z polki tej osady w zamykanym nawiasie -> HorseBook ("ujscia poza K1: mieszczanie").
+        /// Sztuki: dziennik sprzedazy gry (BK dopisuje w nim liczbe zdjeta z kazdego wiersza polki). Zloto: przyrost kasy miedzy kolejnymi wierszami BK
+        /// (BudgetPostfix); ostatni wiersz nie ma nastepnego, a kasa jest juz po CastlePurse / TownPurse (First) - jego zloto to ConsumedValue BK tej osady
+        /// (suma zlota wszystkich wierszy) minus wiersze juz policzone. Bez ConsumedValue albo bez wierszy BK (konsumpcja gry) - "bez pelnej wyceny".</summary>
+        private static void HorseFolk(Town town, Dictionary<ItemCategory, int> sold, double cv)
+        {
+            try
+            {
+                bool part = false;
+                if (_brGoldCat != null && _brGoldCat.IsAnimal)
+                {
+                    int hc = HorseBook.MarketCat(_brGoldCat);
+                    if (hc >= 0)
+                    {
+                        long last = double.IsNaN(cv) ? -1 : (long)Math.Round(cv) - _brRowGold;
+                        if (last < 0) part = true; else _brHorseGold[hc] += last;
+                    }
+                }
+                long any = 0;
+                if (sold != null)
+                    foreach (var kv in sold)
+                    {
+                        if (kv.Key == null || kv.Value <= 0 || !kv.Key.IsAnimal) continue;
+                        int hc = HorseBook.MarketCat(kv.Key);
+                        if (hc < 0) continue;
+                        _brHorseN[hc] += kv.Value; any += kv.Value;
+                    }
+                if (any > 0 && _brGoldCat == null) part = true;   // sztuki bez zadnego wiersza BK w nawiasie (osada bez ludnosci BK - petla gry): zloto nieznane
+                HorseBook.NoteFolk(town.IsTown, _brHorseN, _brHorseGold, part);
+            }
+            catch (Exception e) { Stumble("ConsumePostfix(konie)", e); }
         }
 
         /// <summary>Wyjatek w cudzym kodzie konsumpcji - nawias zamkniety od razu (void: wyjatek leci dalej bez zmian).</summary>

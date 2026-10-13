@@ -87,50 +87,69 @@ Uzycie (Python 3, tylko odczyt):
                     osierocone 0, posiadacz "Pieniadz swiata" = pula, bledy i potkniecia 0; najem z puli, wydatek wobec stawki, Werbunek - INFO.
                     Blok E6/K0 (209, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K0-1..K0-10 - linia "Marsz - konie partii (E6/K0)" i dopisek
                     "pasza (E6/K0" w linii zimy E4/1: latka licznika gry wpieta, kontrola licznik gry = pelne przeliczenie (roznica 0 w kazdej dobie
-                    z "liczy TAK"), sufit tempa AI z K0 nizszy niz bez K0 = 0 (na sucho w tym samym wywolaniu), koszt K0 srednio <= 2 ms/dobe,
+                    z "liczy TAK"), sufit tempa AI z K0 nizszy niz bez K0 = 0 (na sucho w tym samym wywolaniu), koszt K0: goraca sciezka (postfiks OnRosterUpdated) srednio <= 2 ms/dobe i przeliczenie raz na dobe (stan doby + odswiezenia) <= 15 ms/dobe,
                     potkniecia 0; luzaki, wolne konie zbrojowni, sufit wyzszy, konie porzucone przez gre i pasza (konie partii / po glowie) - INFO.
                     Blok E6/W2 (210, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W2-1..W2-6 - linia "Wioski wedlug rodzaju (210)": CZYNNE w dobach
                     okna, tozsamosc zboze zdjete = ryby dodane w kazdej dobie (|a - b| <= 1 + 0.1% a), ryby > 0 przy okregach z rybakami, potkniecia 0;
                     okregi z rybakami, u srednio i wsie bez pamieci zboza - INFO.
                     Blok E6/K1 (211, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K1-1..K1-10 - linie "Konie - smierc, lup, dobytek (E6/K1)" i "Konie (E6/0)":
-                    CZYNNE w dobach okna, reszta niewyjasniona koni - kazde 7 dob d31-until: |suma| <= max(5, 1% (zrodla + ujscia)), kon najemnika z wzorca 0,
+                    CZYNNE w dobach okna, reszta niewyjasniona koni - kazde 7 dob d31-until: |suma| <= max(5, 1% (zrodla + ujscia)), kon najemnika z wzorca 0 po siewie puli weteranow (doby do siewu - INFO),
                     dobytek rozbitych bez miejsca 0, kopie lupu DTE bez pokrycia u pokonanych 0, potkniecia 0; polegle (misja/autobitwa, W), lup, dobytek,
                     pula weteranow, dary z polki siedziby, zamiany ROT - INFO.
                     Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
-                    CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), zakup i sprzedaz tej samej
-                    kategorii w 7 dobach 0, potkniecia 0; sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
-                    Blok E6/R1 (214, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) R1-1..R1-12 - linie "Bloomery (E6/R1, 214)" i "Zelazo (lupy) (214)": CZYNNE
+                    CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), potkniecia 0;
+                    pompa (zakup i sprzedaz tej samej kategorii w 7 dobach) - INFO z udzialem w kupionych do zapasu do poprawki licznika (potem <= 2%); sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
+                    Blok E6/R1 (214, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) R1-1..R1-18 - linie "Bloomery (E6/R1, 214)" i "Zelazo (lupy) (214)": CZYNNE
                     (stary zapis / wylaczone - INFO), tick wpiety, tozsamosci kazdej doby (lupy wsi = lupy z tickow kopalni, drewno spalone = drewna na lupe x lupy),
-                    lupy bez drewna 0, kopalnia bez wegla <= 5% lup (d8-until), miasta bez zelaza <= 15 (srednio d61-until), stos drewna miast d61 -> until bez wzrostu
-                    (<= +2%), cykle "brak surowca [ruda" <= 584/d (srednio d31-until, linia "Warsztaty"), potkniecia 0; las okregu, targ, zloto, braki - INFO.
+                    lupy bez drewna 0, kopalnia bez wegla <= 5% lup (d61-until; d8-60 INFO), miasta bez zelaza <= 30 (srednio d61-until; cel 15 INFO), przyrost stosu drewna
+                    miast d61 -> until <= 290/d, cykle "brak surowca [ruda" <= 715/d (srednio d91-until, linia "Warsztaty"), brak zlota i pusta kiesa wsi <= 5% potrzeby
+                    drewna (R1-7b, d61-until; NIE tylko, gdy zapas zelaza swiata nie rosnie w d91-until), potkniecia 0; las okregu, targ, zloto, braki - INFO; log bez dymarki (wzorzec):
+                    R1-8/R1-9/R1-10 z linii "Ruda:" jako INFO.
                     Blok E6/W1 (216, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) W1-1..W1-8 - linia startowa "Receptury (216)" i linie ksiegi "Towary:":
-                    WLACZONE, zadna linia z mniejszym wsadem niz gra, linie z welny, lnu i skor zmienione, potkniecia 0; len i welna - co najmniej jeden z miesiecy
-                    2-4 bez wzrostu zapasu (gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92), kolejka odziezy wojska
+                    WLACZONE, zadna linia z mniejszym wsadem niz gra, linie z welny, lnu i skor zmienione, potkniecia 0; len i welna - stos z ostatniej decyzji regulatora wsi
+                    <= 60 dni zuzycia albo decyzja w dol (bez decyzji regulatora: co najmniej jeden z miesiecy 2-4 z przyrostem <= +2%; gdy okno siega d112), skora i plotno - srednia zmiana d91-until >= -10/d (gdy okno siega d92), kolejka odziezy wojska
                     (czeka: skora + sukno + plotno) d90 -> until bez wzrostu (<= +2%, gdy okno siega d92).
                     Blok E6/W3 (221, etap 6 - progi tutaj) W3-1..W3-8 - linie "Regulator wsi (221)", "BK gnicie surowcow (174.3)" i ksiegi "Towary:": regulator CZYNNY,
                     pierwsza decyzja do d60 (gdy okno siega d60), kasowanie 0 w kazdej dobie po pierwszej decyzji, zaden towar nie zmienia kierunku w dwoch kolejnych
-                    decyzjach, potkniecia 0, sol i glina - zapas d90 -> until bez wzrostu (<= +2%, gdy okno siega d92); mnozniki i kierunki decyzji - INFO.
+                    decyzjach, potkniecia 0, sol i glina - stos z ostatniej decyzji regulatora <= 60 dni zuzycia albo decyzja w gore (ponad 60 dni albo bez decyzji: zapas
+                    bez wzrostu <= +2%; gdy okno siega d92); mnozniki i kierunki decyzji - INFO.
                     Blok E6/K4 (220, etap 6 - progi tutaj) K4-1..K4-9 - linie "Hodowla (220)" (doba i decyzja) i "Przeglad stadnin (220)": hodowla CZYNNA,
                     podaz koni bojowych d61-until > d1-60 (srednio na dobe; gdy w decyzji do d60 bojowe chciane i okno siega d90), stos zwyklych w decyzjach
                     po przesunieciu > 0 nie ponizej dolnego progu (30 dni zuzycia), zaden kierunek kategorii nie zmienia sie w dwoch kolejnych decyzjach,
                     potkniecia 0; bieg roczny (okno >= d360): stos koni na targu d180 -> until bez trendu (+-10%); mnozniki, przesuniecie, ciecie na sucho,
                     przeglad stadnin - INFO.
-                    Blok E6/K3 (219, etap 6 - progi tutaj) K3-1..K3-10 - linia "Rycerze i jazda (219)": oba klucze CZYNNE, jazda partii AI srednio >= 12% [S]
-                    w d91-until i nie spada wobec d61-90 (-0.3 pp), Dothrakowie (khuzait) >= 60%, Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel
-                    szablonow + 3 pp, czeka na konia swojej kategorii nie rosnie w d91-until (5 ostatnich <= 1.05 x 5 pierwszych dob), przerwa "zostaje (K3 bez K2)" 0
-                    przy czynnej sprzedazy K2(b), potkniecia 0; awanse przy rozwidleniu i konie rycerzy od rodu - INFO.
+                    Blok E6/K3 (219, etap 6 - progi tutaj) K3-1..K3-10 - linia "Rycerze i jazda (219)": oba klucze CZYNNE, wykonanie celu szablonow (jazda t3+ % / cel %) srednio
+                    >= 80% [S] w d91-until (bieg roczny >= 90%) i nie spada wobec d61-90 (-2 pp), Dothrakowie (khuzait) t3+ >= 90% celu i czekajacy na konia <= 10%
+                    ludzi (konie-krolestwa.csv), Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na konia swojej kategorii
+                    maleje w d91-until (5 ostatnich < 5 pierwszych dob - F5) i <= 0.5 x brak do celu t3+ (bez khuzait), przerwa "zostaje (K3 bez K2)" 0
+                    przy czynnej sprzedazy K2(b), potkniecia 0; jazda wszystkich ludzi z sufitem (12% / 60% wiazace w biegu rocznym), decyzje sterowania przy
+                    rozwidleniu z awansami wykonanymi ("Konie AI (175)") i konie rycerzy od rodu - INFO.
+                    Narzedzie progow F9b (po poprawkach kodu F1-F8 testu zbiorczego 5-8; wiersz czytajacy nowe pole daje INFO "brak linii" na logu sprzed
+                    poprawki, wiersz mierzacy objaw na starych polach liczy sie zawsze): blok F1 (etap5_f1) - F1-1 linie "ERROR in ValyrianBlades.Census" 0,
+                    F1-2 spis "Stal valyrianska: dzien" z klng < rejestr 0 (bez spisu startowego), F1-3 unikat z targu albo z wozu na "nigdzie" bez nowego
+                    miejsca 0 (plik sesji unikaty.log), F1-4 / F1-5 INFO; K5 - K5-4b (F2-1) partie i sztuki poza CreateCaravanParty 0 we WSZYSTKICH dobach,
+                    K5-5 (F2-2), F2-3 kupione > 0 i <= cel, F2-4 "ERROR in PackMarket." 0, F2-5 / F2-6 INFO; K1 - K1-11 / K1-12 INFO, K1-13 nawias
+                    konsumpcji czynny i roznica z ksiega towarow 0, K1-14 porzucone wedlug kategorii = liczniki K0; R1 - R1-7b brak zlota i pusta kiesa wsi
+                    <= 5% potrzeby drewna (d61-until), R1-7c / R1-7d wozy dymarek CZYNNE i kontrola 0, R1-10b brak drewna w warsztatach <= 177/d, R1-14..R1-16
+                    rachunek za drewno (CZYNNE, kontrola 0, dwa liczniki zgodne), R1-7e / R1-13 / R1-17 / R1-18 INFO; K3 - K3-8 czekajacy maleja, F5-1 pole F5
+                    CZYNNE i postoje > 0, F5-2 zakupy lordow >= 80/d, F5-3 "za drogie" <= 5% wizyt, F5-4 brak przydzialu i brak zlota <= 10% wizyt, F5-6
+                    korpus partii >= 62%, F5-5 / F5-7 INFO; A3 - F6-1 INFO, F6-2 oszczednosci K1 w sakiewkach >= rezerwa K1 markietanow w kazdej dobie.
 --grupa etap7     : (E7/0, paczka 224) szkielet etapu 7 (projekt etapu 7 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok E7/0: T0 bledy
                     WorldClock7 i potkniecia 0 (takze w logu sesji CS), koszt linii dobowych <= 1 ms/dobe, T1 kazda zmiana KRONIKI WOJEN (CS) ma linie
                     "Wojna i pokoj (E7/0)" tej pary i rodzaju (pokoj - takze upadek krolestwa) +-1 doba (zegar obu logow tego samego startu; --crashscribe P),
                     T2 linia "Zbiorka (E7/0)" w kazdej nocy (brak najwyzej 1), T3 linie "Turnieje (E7/0)" i dobowa wojny co dobe; INFO - przyczyny, przerwy
                     pokoj -> wojna (< 21 dni), sen czlonkow armii w drodze, okna bez startu turnieju i tygodnie pory bez startu (progi wynikowe - E7/K, E7/O1).
-                    Blok E7/O1 (228) - dopisek "E7/O1" linii "AiNightCamp" / "NightRest swit", noc zamyka linia switu: T1 obudzeni cudza reka <= 10 na noc
-                    (lordowie <= 3), T2 zjazd sr. <= 0.15, T3 lordowie w ruchu bez wpisu powodu <= 3 na noc (wyjazd z osady <= 1), T4 AI spiacych lordow
+                    Blok E7/O1 (228) - dopisek "E7/O1" linii "AiNightCamp" (plik sesji noc.log, wplatany w glowny log po znaczniku czasu) / "NightRest swit",
+                    noc zamyka linia switu: T1 obudzeni cudza reka <= 10 na noc (lordowie <= 3), T2 zjazd sr. obudzonych rozkazem <= 0.15 (probka >= 20,
+                    mniej - INFO; Hold bez rozkazu - INFO), T3 lordowie w ruchu bez wpisu powodu <= 2 na noc bez klasy Inni/doczepieni (wyjazd z osady / po bitwie <= 1.7 - prog po F7), T4 AI spiacych lordow
                     wstalo przed switem 0 w kazdej nocy (doby kampanii 31-until), T6 bledy/potkniecia 0 i dluznicy obudzeni o 6:00 = 0, T7 zbiorka >= 95%,
-                    T9 koszt bramki <= 5 ms na noc; rozkazy zatrzymane, zwolnienia BK, odnowienia AI, swit, oddane dluznikom - INFO.
+                    T9 koszt bramki <= 5 ms na noc; rozkazy zatrzymane, zwolnienia BK, odnowienia AI, swit, oddane dluznikom - INFO. F9b (F7): F7-2 spiacy
+                    ruszeni cudza reka w liniach "AiNightCamp: ruch" <= 1.0 na noc (d31-okno) i <= 3.0 (d1-30), F7-3 straznik HoldSleepers w takcie switu
+                    >= 0.8 x srednia taktow 1:00-5:00, F7-4 wezwania GoToSettlement zatrzymane do switu >= 2.0 na noc (tylko nowa kampania), F7-5 "inny
+                    rozkaz" <= 8 w jednej linii nocy i switu, F7-6 rozkazy zlapane przez straznika - INFO.
                     Blok E7/T (225) - linia "Kary terenu (E7/T)": T1 z rozpiski gry zwrot > kary gry 0 i kara Jeffa poza ulamkiem gry 0, maks. |netto| <= 0.001
                     (klucz TerrainEaseExact on), T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej DECYZJA), T3 ponizej sufitu MarchPace (karawany, wozy wsi,
-                    d31-until): Polnoc las < rownina, Dorne pustynia <= rownina, T4 koszt probki <= 20 ms/dobe, bledy/potkniecia 0, T6 towar wsi niesprzedany w miastach
+                    d31-until): Polnoc las < rownina, Dorne pustynia <= rownina, T4 koszt probki <= 30 ms/dobe, bledy/potkniecia 0, T6 towar wsi niesprzedany w miastach
                     <= 2%; rody, zwrot ponad netto starej reguly, udzial probek na suficie - INFO; T5 tempo marszu poza blokiem (marsz.py).
                     Blok E7/C (227) - jedna skala czasu: T1 grep kodu Armoury/src obok narzedzia (zegar realny DateTime.Now/UtcNow, TickCount, ApplicationTime,
                     += realDt, akumulator dt poza misja) tylko na liscie wyjatkow bloku (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8),
@@ -146,8 +165,10 @@ Uzycie (Python 3, tylko odczyt):
                     ("CampScene: postawiono") - INFO (T2 test Jeffa: wojsko nie grzeznie w scenografii bez fizyki).
                     Bloki z galezi w-toku/e7-b (E7/B, paczka 231 - tam pierwotnie wlasny szkielet grupy; przy scaleniu zbior-5-8 dopisane do szkieletu E7/0, okno doby kampanii 1-120 (--do-doby N), start kampanii jak etap5):
                     Blok etap7_b (projekt etapu 7 v2 rozdz. 3 "E7/B" Test): os rzeki wyznaczona (bez BRAK OSI); T1 linia "Przeprawa Bliznaki (E7/B)" z licznikiem
-                    w kazdej dobie okna; T2 przejsc > 0; T3 pozycje przejsc z pierwszych 3 dob sesji <= 3 jedn. od bramy (inaczej brod albo drugi most w strefie -
-                    zmniejszyc promien); T4 koszt probek < 0.1 ms/dobe (srednio); potkniecia 0; przejscia wedlug rodzaju, myto gdyby bylo i wejscia do osady (169c) - INFO.
+                    w kazdej dobie okna; T2 przejsc > 0; T3 pozycje przejsc z pierwszych 3 dob sesji <= 2 jedn. od mostu (od F8 pole "odl. od mostu"; log sprzed
+                    F8: <= 1 jedn. od srodka lukow wody na osi rzeki; inaczej brod albo drugi most w strefie); T4 koszt probek < 0.5 ms/dobe (mediana); potkniecia 0;
+                    F9b (F8): F8-1 przejsc poza mostem 0, F8-2 zmiana strony poza strefa 0, F8-3 strefa r 8 wokol mostu na osi (linia startowa i linie doby);
+                    przejscia wedlug rodzaju, myto gdyby bylo i wejscia do osady (169c) - INFO.
                     Blok etap7_w1 (E7/W1, paczka 232): T0 linia "Wioski - wiesci (E7/W1)" w kazdej dobie okna; T1 zdarzen "plonie" = rabunki zakonczone z linii
                     "Ludzie (spustoszenie)" (+-1/dobe w sumie okna; po E7/R1 + sesje R1); T2 komunikatow "by bylo" > 0 (dowod sciezki), przy braku wsi gracza w zdarzeniach
                     pokazanych "plonie" 0; T3 bieg zapisu: wpisy pamieci przy wczytaniu = przy ostatnim zapisie (stary zapis - 0 wpisow, bez bledu); T4 potkniecia 0;
@@ -301,6 +322,26 @@ Uzycie (Python 3, tylko odczyt):
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
+                    Blok etap7_r1 (E7/R1, paczka 235 - rabunek osada po osadzie dla AI, NK): R1-0 linia "latki przy starcie gry - GOTOWE" (BRAK -); R1-1 linia doby
+                    "Rabunek osada po osadzie (E7/R1)" w kazdej dobie okna; T1 bilans zlota (zloto wodza - kiesa wsi) 0 w kazdej dobie i lup z niczego AI w "Ludzie (spustoszenie)"
+                    0 zl (przy sesjach oddanych grze - INFO); T2 bilans towaru (towar + spalone - magazyn) 0 i spichlerza (zjedzone - spichlerz) |x| < 0.5 w kazdej dobie;
+                    T3 kontrola trafionych |x| <= 0.01 w kazdej dobie; T4 mediana dob na osade lorda (lista z linii) <= 5 (przy >= 10 krokach lordow); T5 wioski spalone
+                    ("Ksiega wiosek (E4/11)" spalone dzis) > 0 przy oknie >= 240 dob (krotsze - INFO z najwiekszym puste_r okregu z wioski-okregi.csv); T6 udzial przerwanych - INFO; T7 potkniecia 0 i linie "ERROR in DistrictRaid." 0; T9 zapis -> wczytanie:
+                    sesje i czujnosc przy wczytaniu = przy ostatnim zapisie; T10 jency z rabunkow R1 > 0 (przy >= 20 sesjach); T11 zabici RaidDead = zabici R1 (+-1 na sesje);
+                    koszt prefiksu < 50 ms/dobe (srednio); lup, czujnosc, okreg wypalony, u przyciete, oddane grze - INFO.
+                    Blok etap7_r2 (E7/R2, paczka 236 - okienko gracza po kazdej osadzie, NK): R2-0 linia "Okienko rabunku gracza (E7/R2): latki przy starcie gry - GOTOWE"
+                    (BRAK -); R2-1 linie "ERROR in DistrictRaid.R2" 0 i "okienko zawiodlo" 0; R2-2 sesje gracza w oknie (autotest gra AI: 0 - INFO, test Jeffa);
+                    przy sesjach gracza: R2-3 sesje gracza z linii R1 ("gracz N") = zakonczone z linii R2, R2-4 wybory z okienka <= okienka otwarte; kroki, okienka,
+                    "End Raiding", klucz zdjety - INFO. Bilans zlota, towaru i spichlerza rabunkow gracza - te same wiersze T1-T3 bloku etap7_r1 (jedna linia doby).
+                    Blok etap7_w4 (E7/W4, paczka 237 - wyglad spalonej wioski i napisy nad spalonymi): W4-0 linia startowa "Wioski - wyglad (E7/W4): start" (ostatnia
+                    mapa): wyglad CZYNNY, napisy CZYNNE, ksiega wiosek czynna (ksiega nieczynna - NIE); T1 w KAZDEJ linii stanu przebudowy obrazka <= zmiany stanu
+                    i pokazane + schowane + bez obrazka + polaczone + czeka = zmiany stanu (0 zmian - INFO); T1b najwiecej przebudow jednej wioski <= 20; W4-2
+                    ciemne obrazki maja przyciemnione encje (spalonych 0 - INFO); W4-3 napisow w kadrze 1-30 i przeliczenie pozycji < 0.3 ms/klatke (0 napisow -
+                    INFO); T4 potkniecia 0, linie "ERROR in MapVillagesView.Look* / Label*" 0, brak linii "BRAK prefabu" i "WYLACZONE do nastepnego wczytania",
+                    a takze (recenzja) potkniecia tworzenia / ognia / zdejmowania z linii "Wioski:" 0 i linie "ERROR in MapVillagesView.Create / Remove /
+                    ApplyFx / PollRaids" 0 - przebudowa obrazka, zdjecie starego i dym nad spalonymi licza potkniecia w tych starych licznikach;
+                    T2 zdjecie spalonej, T3 spadek klatek < 2% - tryb zdjec (DLL zdjec -p:W4Photo=true zglasza sie w linii startowej), poza narzedziem.
+--crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
                     metody, ktorych nie ma w Armoury.log); domyslnie session-*.log z tego samego startu (+-5 s wobec naglowka / nazwy logu Armoury) z katalogu
                     logu, potem z Dokumenty\\Mount and Blade II Bannerlord\\CrashScribe; bez logu sesji - wiersz INFO.
                     Poprawki po tescie koncowym etapu 4: E4/7 T11 i E4/5 S15 licza ludzi ZYWYCH z linii "Ludzie (ksiega)" (DOM + uchodzcy - INFO z rozbiciem,
@@ -2571,8 +2612,14 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     rg = [(d, fnum(r" - rabunek gry -" + F_, hea[d]) or 0.0, num(r"pod spustoszeniem E4/5 krokow (\d+)", hea[d], int, 0) or 0) for d in gm if d in on]
     bad = [run_day(d, start) for d, h, _ in rg if abs(h) >= 0.005]
     steps = sum(x[2] for x in rg)
-    rep.add("E4/5 S5: \"rabunek gry\" w Hearth (E4/0) przy CZYNNYM", f"niezerowy w {len(bad)} dobach" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else "") + f"; krokow pod spustoszeniem {steps}",
-            "0.00 hearth kazdej doby; krokow pod spustoszeniem > 0 w dobach z rabunkami", (len(bad) == 0 and steps > 0) if rg else None)
+    # recenzja E7/R1 (235): rabunki AI prowadzi rabunek osada po osadzie (oryginal gry nie biegnie, E4/5 pomija je straznikiem) - kroki gry pod E4/5 i trafieni
+    # "osobodni lupienia" zostaja tylko przy rabunkach gracza i sesjach oddanych grze; "krokow > 0" (S5) i pasmo S7 wiaza tylko bez sesji R1 w oknie
+    # (trafieni R1 - odcinek "rabunek osada po osadzie (E7/R1)" linii Ludzie (spustoszenie), progi R1 - blok etap7_r1)
+    r1 = e4_series(lines, "Rabunek osada po osadzie (E7/R1): dzien")
+    r1ses = sum(num(r"\| sesji (\d+) \(", r1[d], int, 0) or 0 for d in win if d in r1)
+    rep.add("E4/5 S5: \"rabunek gry\" w Hearth (E4/0) przy CZYNNYM", f"niezerowy w {len(bad)} dobach" + (f" (d{', d'.join(str(x) for x in bad[:6])})" if bad else "") + f"; krokow pod spustoszeniem {steps}"
+            + (f"; sesji E7/R1 {r1ses} (rabunki AI poza krokami gry)" if r1ses else ""),
+            "0.00 hearth kazdej doby; krokow pod spustoszeniem > 0 w dobach z rabunkami (przy sesjach E7/R1 - tylko 0.00)", (len(bad) == 0 and (steps > 0 or r1ses > 0)) if rg else None)
     # S6 / S14 (porownanie z biegiem E4/4)
     rest = [fnum(r"RESZTA " + SF, hea[d]) for d in gm]
     rest = [x for x in rest if x is not None]
@@ -2583,9 +2630,11 @@ def etap4_e45(rep, lines, start, win, hea, lud, until, logp):
     rs = [num(r"krokow gry (\d+)", dev[d], int, 0) or 0 for d in on]
     rall = [fnum(r"osobodni lupienia [\d.]+ x [\d.]+ -> trafieni " + F_, dev[d]) or 0.0 for d in on]
     per_raid = (sum(rall) / (sum(rs) / 20.0)) if sum(rs) > 0 else None
-    rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else ""),
-            "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo",
-            (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh else None)
+    r1h = [fnum(r"rabunek osada po osadzie \(E7/R1\): trafieni " + F_, dev[d]) or 0.0 for d in d31]
+    rep.add(f"E4/5 S7: trafieni z rabunku d31-{until} (ludzi/d)", (f"{st.mean(rh):.0f}/d" if rh else "-") + (f"; na pelny rabunek (kroki/20) {per_raid:.0f}" if per_raid else "")
+            + (f"; rabunek osada po osadzie (E7/R1) {st.mean(r1h):.0f}/d, sesji {r1ses}" if r1ses and r1h else ""),
+            "50-500/d (szacunek 150); na pelny rabunek 60-400 - ponizej/ponad = sprawdzic okno, nie stroic na slepo (przy sesjach E7/R1 - INFO, rabunki AI w bloku etap7_r1)",
+            (50 <= st.mean(rh) <= 500 and (per_raid is None or 60 <= per_raid <= 400)) if rh and r1ses == 0 else None)
     # S8 (poprawka po tescie koncowym etapu 4): pasmo 50-450/d to szacunek planu z liczby partii w polu (z30 4.2/d) - INFO z partiami/d; wiaze rachunek
     # kazdej doby: trafieni <= osobodni x stawka (Devastation Per Forager Day; tolerancja zaokraglen linii)
     rx8 = re.compile(r"\| zerowanie: partii (\d+), osobodni " + F_ + r" x " + F_ + r" -> trafieni " + F_)
@@ -2907,6 +2956,39 @@ def session_file_of(logp, name):
     d, f = os.path.split(logp)
     stem = os.path.splitext(f)[0].replace("Armoury-", "")
     return os.path.join(d, stem, name)
+
+
+def session_file_find(logp, name):
+    """Narzedzie progow zb58: plik sesji w ukladzie archiwum (<katalog>/<znacznik>/<name>, jak session_file_of) albo w ukladzie gry
+    (<katalog>/Logs/<znacznik>/<name> - Log.cs: glowny log w katalogu modulu, pliki tematyczne i CSV w Logs/<sesja>/). Zwraca istniejaca sciezke,
+    a gdy pliku nie ma nigdzie - sciezke ukladu archiwum (do komunikatu). Uzywane tylko przez wiersze poprawione po triazu zb58 (noc.log,
+    wioski-okregi.csv, konie-krolestwa.csv); pozostale wiersze czytaja jak dotad (session_file_of / csv_path_of / ludzie_csv_of)."""
+    p = session_file_of(logp, name)
+    if os.path.exists(p):
+        return p
+    d, f = os.path.split(logp)
+    stem = os.path.splitext(f)[0].replace("Armoury-", "")
+    q = os.path.join(d, "Logs", stem, name)
+    return q if os.path.exists(q) else p
+
+
+def valve_decisions(lines, start, until):
+    """Narzedzie progow zb58 (TRIAZ W1-5, W3-6): decyzje regulatora wsi z linii "Regulator wsi (221): dzien N - CZYNNY, decyzja k (doba pomiaru M,
+    okno O dob, stos LO-HI dni zuzycia, ...): [<towar>: x.., zuzycie/produkcja R (zuzycie/produkcja ...), stos S = D dni zuzycia, <kierunek>; ...]".
+    Zwraca ({towar: [(doba kampanii, D, kierunek, S, zuzycie okna, produkcja okna, okno dob)]} rosnaco po dobie, LO, HI); brak decyzji = ({}, 30, 60)."""
+    out, lo, hi = {}, 30, 60
+    for d, s in sorted(by_day(lines, "Regulator wsi (221): dzien").items()):
+        rd = run_day(d, start)
+        if not (1 <= rd <= until) or " - CZYNNY, decyzja " not in s:
+            continue
+        m = re.search(r"stos (\d+)-(\d+) dni zuzycia", s)
+        if m:
+            lo, hi = int(m.group(1)), int(m.group(2))
+        okno = num(r"okno (\d+) dob", s, int, 56) or 56
+        for g in re.finditer(r"(\w+): x[\d.]+(?: -> x[\d.]+)?, zuzycie/produkcja [\d.]+ \((\d+)/(\d+)[^)]*\), stos (-?\d+) = (-?\d+) dni zuzycia, "
+                             r"(w dol|w gore|bez zmian)", s):
+            out.setdefault(g.group(1), []).append((rd, int(g.group(5)), g.group(6), int(g.group(4)), int(g.group(2)), int(g.group(3)), okno))
+    return out, lo, hi
 
 
 def etap4_e411(rep, lines, start, win, until, logp):
@@ -3577,6 +3659,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_r3(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_r3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # F1 (test zbiorczy 5-8, narzedzie progow F9b): spis stali valyrianskiej i kronika unikatow widza sztuki w wozach kupcow (TradeCarts 215)
+    try:
+        etap5_f1(rep, lines, start, until, logp)
+    except Exception as e:
+        rep.add("blok etap5_f1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E6/W1 (216): receptury warsztatow wedlug wartosci - wsad z welny, lnu i skor (etap 6 - grupy etap6 jeszcze nie ma; brak linii - INFO)
     try:
         etap5_w1(rep, lines, start, until)
@@ -3594,7 +3681,7 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         rep.add("blok etap5_k4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E6/K3 (219): jazda wedlug szablonu partii (175), rycerz z koniem rodu, przerwa zakupow tylko przy czynnym K2(b) (brak linii - INFO)
     try:
-        etap5_k3(rep, lines, start, until)
+        etap5_k3(rep, lines, start, until, logp)
     except Exception as e:
         rep.add("blok etap5_k3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E6/N1 (217): naprawy jedna regula - AI naprawia tylko noszone, czeka na material, skora odziezy wojska (brak segmentu - INFO)
@@ -3648,7 +3735,24 @@ def etap5_k0(rep, lines, start, until):
             "INFO (szybsze kolumny - styk z etapem 7)", None)
     cost = [num(r"razem ([\d.]+) ms \(prog 2 ms/dobe\)", s, float) for s in rows]
     cost = [x for x in cost if x is not None]
-    if cost:
+    # narzedzie progow zb58 (TRIAZ K0-6): prog 2 ms z projektu (KRYTYKA-E6 K0-koszt) pilnuje goracej sciezki - postfiksu ItemRoster.OnRosterUpdated
+    # (SpeedPostfix tylko czyta, nie liczy Balance przy kazdej zmianie predkosci). Przeliczenie raz na dobe ("stan doby" = HorseState.Rebuild ->
+    # Stables.Balance kazdej partii ze zbrojownia, plus odswiezenia po Remount/awansie) to osobny prog regresji 15 ms (W33 9.56 + 0.57, zb58 9.71 + 0.76;
+    # rosnie z liczba partii). Log bez rozbicia kosztu - stary wiersz K0-6 na sumie.
+    hot = [x for x in (num(r"OnRosterUpdated \d+ wywolan ([\d.]+) ms", s, float) for s in rows) if x is not None]
+    once = [(num(r"stan doby ([\d.]+) ms", s, float), num(r"odswiezenia \d+ \(([\d.]+) ms\)", s, float)) for s in rows]
+    once = [(a, b or 0.0) for a, b in once if a is not None]
+    if hot and once:
+        m = sum(hot) / len(hot)
+        rep.add("K0-6a: koszt K0 - goraca sciezka (postfiks OnRosterUpdated)", f"srednio {m:.2f} ms/dobe, najwiecej {max(hot):.2f} ({len(hot)} dob)",
+                "srednio <= 2 ms/dobe (prog projektu: K0 nie liczy przy kazdej zmianie)", m <= 2.0)
+        tot1 = [a + b for a, b in once]
+        m1 = sum(tot1) / len(tot1)
+        rep.add("K0-6b: koszt K0 - przeliczenie raz na dobe (stan doby + odswiezenia)",
+                f"srednio {m1:.2f} ms/dobe (stan doby {sum(a for a, _ in once) / len(once):.2f} + odswiezenia {sum(b for _, b in once) / len(once):.2f}), "
+                f"najwiecej {max(tot1):.2f} ({len(once)} dob)" + (f"; razem z goraca sciezka srednio {sum(cost) / len(cost):.2f}" if cost else ""),
+                "srednio <= 15 ms/dobe (prog regresji; wzorzec W33 10.1 - rosnie z liczba partii)", m1 <= 15.0)
+    elif cost:
         m = sum(cost) / len(cost)
         rep.add("K0-6: koszt K0 (OnRosterUpdated + stan doby + odswiezenia)", f"srednio {m:.2f} ms/dobe, najwiecej {max(cost):.2f} ({len(cost)} dob)",
                 "srednio <= 2 ms/dobe", m <= 2.0)
@@ -3664,7 +3768,7 @@ def etap5_k0(rep, lines, start, until):
     wgt = sum(num(r"ponad udzwig (\d+)", x, int, 0) or 0 for x in rows)
     wgtm = sum(num(r"ponad udzwig \d+ \(ze stanem (\d+)\)", x, int, 0) or 0 for x in rows)
     rep.add("K0-9: konie porzucone przez gre (lordowie AI, DiscardItemsCampaignBehavior; suma okna)",
-            f"nadmiar stada {herd} (ze stanem {herdm}), ponad udzwig {wgt} (ze stanem {wgtm})", "INFO (ujscie koni bez przyczyny w ksiedze - K1)", None)
+            f"nadmiar stada {herd} (ze stanem {herdm}), ponad udzwig {wgt} (ze stanem {wgtm})", "INFO (od F3 ujscie w ksiedze koni - patrz K1-14; log sprzed F3: ujscie bez przyczyny w ksiedze)", None)
     zw = [x for x in by_day(lines, "Zima wedlug krain (E4/1): dzien").values() if "| pasza (E6/K0, FodderFromHorseState" in x]
     if zw:
         hs = sum(num(r"pasza \(E6/K0, FodderFromHorseState \w+\): konie partii (\d+)", x, int, 0) or 0 for x in zw)
@@ -3722,7 +3826,8 @@ def etap5_w2(rep, lines, start, until):
 
 def etap5_k1(rep, lines, start, until):
     """E6/K1 (211, projekt etapu 6 v2 rozdz. 3 "E6/K1" Test, K1-13): linia doby "Konie - smierc, lup, dobytek (E6/K1): dzien N" i pozycje K1 w "Konie (E6/0): dzien N"
-    (dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Reszta niewyjasniona koni: kazde 7 dob (bloki od d31) |suma| <= max(5, 1% (zrodla pierwotne + ujscia))."""
+    (dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Reszta niewyjasniona koni: kazde 7 dob (bloki od d31) |suma| <= max(5, 1% (zrodla pierwotne + ujscia)).
+    Od F9b wiersze poprawki F3 (K1-11..K1-14 - konie mieszczan i konie porzucone przez gre w ksiedze koni) w _k1_f3."""
     dl = by_day(lines, "Konie - smierc, lup, dobytek (E6/K1): dzien")
     days = sorted(d for d in dl if 1 <= run_day(d, start) <= until)
     rep.add("K1-1: linia Konie - smierc, lup, dobytek (E6/K1) w oknie", f"{len(days)} dob (z {len(dl)} w logu)", "codziennie od wgrania E6/K1", None)
@@ -3750,9 +3855,24 @@ def etap5_k1(rep, lines, start, until):
         lo += 7
     rep.add("K1-3: reszta niewyjasniona koni - bloki 7 dob od d31 (|suma| <= max(5, 1% zrodla + ujscia))",
             f"blokow pelnych {blocks}, ponad prog {len(bad)}" + (f" [{', '.join(bad[:6])}]" if bad else ""),
-            "0 blokow ponad prog (linia Konie (E6/0) przy Stage6MeasureLog)", (len(bad) == 0) if blocks else None)
-    tpl = sum(num(r"kon z wzorca (\d+)", x, int, 0) or 0 for x in rows)
-    rep.add("K1-4: kon najemnika z wzorca (suma okna)", str(tpl), "0 (VeteranKeepsHorse - kon z puli weteranow)", tpl == 0)
+            "0 blokow ponad prog (linia Konie (E6/0) przy Stage6MeasureLog; od F3 reszta po ujsciach mieszczanie + porzucone przez gre)",
+            (len(bad) == 0) if blocks else None)
+    # narzedzie progow zb58 (TRIAZ K1-4): kon z puli weteranow dziala dopiero po siewie puli (HorseFate.VetHorseOn = VeteranKeepsHorse && PeopleBook.VetLive,
+    # VetLive wymaga _vSown; siew w pierwszym ticku doby kampanii - linia "Weterani (E4/10): siew dnia N"). Najem z karczm przed siewem idzie stara sciezka
+    # 160 (RecruitKit: vetHorse = false -> kon i rzad z wzorca) - dorobek startowy jak karawany startowe, nie regula biegu. Prog 0 dotyczy dob po siewie
+    # (linie K1 z dniem > N); doby do siewu - INFO. Log bez linii siewu (wczytany zapis) - liczy sie cale okno.
+    sow = None
+    for x in lines:
+        if x.startswith("Weterani (E4/10): siew dnia "):
+            sow = num(r"siew dnia (\d+)", x)
+            break
+    pre = [d for d in days if sow is not None and d <= sow]
+    tpl = sum(num(r"kon z wzorca (\d+)", dl[d], int, 0) or 0 for d in days if d not in pre)
+    rep.add("K1-4: kon najemnika z wzorca (suma okna po siewie puli weteranow)", str(tpl), "0 (VeteranKeepsHorse - kon z puli weteranow)", tpl == 0)
+    if pre:
+        tpl0 = sum(num(r"kon z wzorca (\d+)", dl[d], int, 0) or 0 for d in pre)
+        rep.add("K1-4a: kon najemnika z wzorca przed siewem puli weteranow", f"{tpl0} (siew dnia {sow}, linii K1 do siewu {len(pre)})",
+                "INFO (karczmy jak w grze - dorobek startowy, sciezka 160: kon i rzad z wzorca)", None)
     nw = sum(num(r", bez miejsca (\d+)", x, int, 0) or 0 for x in rows)
     left = sum(num(r"zostalo w taborze \(unikaty, nie-towar\) (\d+)", x, int, 0) or 0 for x in rows)
     skip = sum(num(r"pominiete partie bez niszczyciela \(inne mody, dostawy BK\) (\d+)", x, int, 0) or 0 for x in rows)
@@ -3792,6 +3912,130 @@ def etap5_k1(rep, lines, start, until):
     st = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
     rep.add("K1-10: zamiany ROT na konnego (suma okna) i potkniecia HorseFate", f"z koniem {rh}, na pieszego {rf}, konny bez konia {rk}; potkniecia {st}",
             "potkniecia 0 (zamiany - INFO)", st == 0)
+    _k1_f3(rep, lines, start, until)
+
+
+def _k1_f3(rep, lines, start, until):
+    """Narzedzie progow F9b (F3 krok 1 - konie mieszczan i konie porzucone przez gre w ksiedze koni, TYLKO POMIAR): wiersze K1-11..K1-14 z linii
+    "Konie (E6/0): dzien N" (okno d31-until, jak K1-3). Czlon F3 linii: "| ujscia poza K1 (F3, pomiar): mieszczanie miast a/b/c/d szt. za .. zl,
+    mieszczanie zamkow .. (...; nawiasy konsumpcji N, bez pelnej wyceny M; kontrola ksiegi towarow: konie w ramce konsumpcji T, roznica R | brak
+    (ksiega towarow bez linii)), porzucone przez gre u lordow a/b/c/d/e (nadmiar stada H, ponad udzwig W)". Log sprzed F3 (bez czlonu) - K1-12..K1-14
+    INFO "brak linii"; K1-11 liczy sie zawsze (pole "reszta niewyjasniona" jest od E6/0). Linia "stan wyjsciowy" (bez reszty) poza wierszami."""
+    kl = {}
+    for d, s in by_day(lines, "Konie (E6/0): dzien").items():
+        kl[run_day(d, start)] = s
+    w31 = [x for x in sorted(kl) if 31 <= x <= until and " | reszta niewyjasniona " in kl[x]]
+    f3 = [x for x in w31 if "| ujscia poza K1 (F3, pomiar): " in kl[x]]
+    rr = []
+    for x in w31:
+        m = re.search(r"reszta niewyjasniona (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+) \(razem", kl[x])
+        if m:
+            rr.append([int(v) for v in m.groups()])
+    if rr:
+        n = float(len(rr))
+        a = [sum(r[i] for r in rr) / n for i in range(5)]
+        rep.add("K1-11: reszta niewyjasniona koni wedlug kategorii (srednio na dobe, d31-until)",
+                f"zwykly {a[0]:+.1f}, bojowy {a[1]:+.1f}, szlachetny {a[2]:+.1f}; juczny {a[3]:+.1f}, egzotyczny {a[4]:+.1f} ({len(rr)} dob)"
+                + ("" if f3 else " [log sprzed F3 - reszta bez ujsc mieszczanie + porzucone]"),
+                "INFO (od F3 zwykly i bojowy blisko 0, szlachetny bez oczekiwania; przed F3: -119.6 / -28.9 / -3.0, W33 -129.8 / -32.1 / -3.1)", None)
+    else:
+        rep.add("K1-11: reszta niewyjasniona koni wedlug kategorii (d31-until)", "brak linii Konie (E6/0) z reszta w oknie", "INFO", None)
+    if not f3:
+        rep.add("K1-12..K1-14: konie mieszczan i konie porzucone przez gre w ksiedze koni (F3)",
+                "brak linii (log sprzed F3 - bez czlonu \"ujscia poza K1 (F3, pomiar)\" w linii Konie (E6/0))" if w31 else "okno nie siega d31",
+                "czlon jest od F3 (Stage6MeasureLog)", None)
+        return
+    # ---- K1-12 (INFO): sztuki i zloto mieszczan wedlug kategorii targu, miasta i zamki osobno; udzial w produkcji stadnin (kategorie 1-4)
+    fre = re.compile(r"mieszczanie miast (\d+)/(\d+)/(\d+)/(\d+) szt\. za (\d+)/(\d+)/(\d+)/(\d+) zl, mieszczanie zamkow (\d+)/(\d+)/(\d+)/(\d+) szt\. za "
+                     r"(\d+)/(\d+)/(\d+)/(\d+) zl")
+    tn, tg, cn, cg, prod, nf = [0] * 4, [0] * 4, [0] * 4, [0] * 4, [0] * 4, 0
+    for x in f3:
+        m = fre.search(kl[x])
+        if not m:
+            continue
+        g = [int(v) for v in m.groups()]
+        nf += 1
+        for i in range(4):
+            tn[i] += g[i]; tg[i] += g[4 + i]; cn[i] += g[8 + i]; cg[i] += g[12 + i]
+        mp = re.search(r"zrodla: stadniny wsi (\d+)/(\d+)/(\d+)/(\d+)/(\d+)", kl[x])
+        if mp:
+            for i in range(4):
+                prod[i] += int(mp.group(i + 1))
+    if nf:
+        k = float(nf)
+        pcs, gold = sum(tn) + sum(cn), sum(tg) + sum(cg)
+
+        def row(v):
+            return "/".join(f"{q / k:.1f}" for q in v)
+        shr = "/".join((f"{100.0 * (tn[i] + cn[i]) / prod[i]:.0f}%" if prod[i] else "-") for i in range(4))
+        rep.add("K1-12: konie mieszczan wedlug kategorii targu (zwykly/bojowy/szlachetny/juczny; srednio na dobe, d31-until)",
+                f"miasta {row(tn)} szt. za {sum(tg) / k:.0f} zl/d, zamki {row(cn)} szt. za {sum(cg) / k:.0f} zl/d; razem {pcs / k:.1f} szt./d"
+                + (f", srednia cena {gold / float(pcs):.0f} zl" if pcs else "") + f"; udzial w produkcji stadnin {shr} ({nf} dob)",
+                "INFO (liczby dla kroku 2 F3; gorna granica TRIAZ 119 / 29 / 2.8 szt./d; miedzy biegami porownywac sztuki - zloto tylko przy tym samym cenniku koni E8/C)",
+                None)
+    else:
+        rep.add("K1-12: konie mieszczan wedlug kategorii targu (d31-until)", "brak pola mieszczan w czlonie F3", "INFO", None)
+    # ---- K1-13 (wiazacy): (i) nawias konsumpcji czynny w kazdej dobie i 0 wierszy bez pelnej wyceny, (ii) roznica z licznikiem ksiegi towarow 0
+    # (doba bez kontroli = INFO; doba zaraz po dobie bez kontroli albo bez linii - poza kontrola: licznik ksiegi towarow obejmuje wtedy wiecej niz dobe),
+    # (iii) 0 dob z "nie podpiete (w reszcie): mieszczanie" (tylko linie Konie (E6/0))
+    cre = re.compile(r"kontrola ksiegi towarow: konie w ramce konsumpcji (-?\d+), roznica (-?\d+)")
+    nobr, part, diff, chk, nochk, skip, bad_d = [], 0, 0, 0, 0, 0, []
+    for x in f3:
+        m = re.search(r"nawiasy konsumpcji (\d+), bez pelnej wyceny (\d+)", kl[x])
+        if not m or int(m.group(1)) <= 0:
+            nobr.append(x)
+        if m:
+            part += int(m.group(2))
+        c = cre.search(kl[x])
+        if not c:
+            nochk += 1
+            continue
+        if (x - 1) not in kl or not cre.search(kl[x - 1]):
+            skip += 1
+            continue
+        chk += 1
+        if int(c.group(2)) != 0:
+            diff += abs(int(c.group(2)))
+            bad_d.append(f"d{x}: {int(c.group(2)):+d}")
+    unh = [x for x in f3 if "nie podpiete (w reszcie): mieszczanie" in kl[x]]
+    fail = bool(nobr) or part != 0 or diff != 0 or bool(unh)
+    rep.add("K1-13: pomiar koni mieszczan czynny i zgodny z ksiega towarow (d31-until)",
+            f"dob bez nawiasu konsumpcji {len(nobr)} z {len(f3)}" + (f" (pierwsza d{nobr[0]})" if nobr else "") + f", wierszy bez pelnej wyceny {part}; "
+            f"kontrola ksiegi towarow: dob porownanych {chk}, suma |roznica| {diff}" + (f" [{', '.join(bad_d[:6])}]" if bad_d else "")
+            + f", bez kontroli {nochk}, pominiete po przerwie {skip}; dob z \"nie podpiete: mieszczanie\" {len(unh)}",
+            "nawias > 0 w kazdej dobie, bez pelnej wyceny 0, suma |roznica| 0, 0 dob \"nie podpiete: mieszczanie\" (bez dob z kontrola - INFO)",
+            False if fail else (True if chk > 0 else None))
+    # ---- K1-14 (wiazacy): porzucone wedlug kategorii = nadmiar stada + ponad udzwig, a te dwa = liczniki linii K0 tej samej doby (etykieta K0 = N - 1);
+    # porownanie z K0 tylko dla doby N, ktora ma linie Konie (E6/0) doby N - 1 (po przerwie licznik ksiegi obejmuje wiecej niz dobe)
+    k0 = {}
+    for d, s in by_day(lines, "Marsz - konie partii (E6/K0): dzien").items():
+        k0[run_day(d, start)] = s
+    dre = re.compile(r"porzucone przez gre u lordow (\d+)/(\d+)/(\d+)/(\d+)/(\d+) \(nadmiar stada (\d+), ponad udzwig (\d+)\)")
+    bad, cmpn, seen, th, tw = [], 0, 0, 0, 0
+    for x in f3:
+        m = dre.search(kl[x])
+        if not m:
+            continue
+        g = [int(v) for v in m.groups()]
+        seen += 1
+        th += g[5]; tw += g[6]
+        if sum(g[:5]) != g[5] + g[6]:
+            bad.append(f"d{x}: kategorie {sum(g[:5])} wobec {g[5]} + {g[6]}")
+            continue
+        ks = k0.get(x - 1)
+        if (x - 1) not in kl or not ks:
+            continue
+        h, w = num(r"nadmiar stada (\d+)", ks, int), num(r"ponad udzwig (\d+)", ks, int)
+        if h is None or w is None:
+            continue
+        cmpn += 1
+        if (h, w) != (g[5], g[6]):
+            bad.append(f"d{x}: ksiega {g[5]}/{g[6]} wobec K0 {h}/{w}")
+    rep.add("K1-14: konie porzucone przez gre u lordow - kategorie = nadmiar stada + ponad udzwig = liczniki K0 (d31-until)",
+            f"dob z polem {seen}, porownanych z linia K0 {cmpn}, niezgodnych {len(bad)}" + (f" [{', '.join(bad[:5])}]" if bad else "")
+            + f"; suma okna: nadmiar stada {th}, ponad udzwig {tw}" + (f" ({(th + tw) / float(seen):.1f}/d)" if seen else ""),
+            "0 niezgodnych (suma kategorii = nadmiar stada + ponad udzwig; oba = linia Marsz - konie partii (E6/K0) doby N - 1)",
+            (len(bad) == 0) if seen else None)
 
 def etap5_k2(rep, lines, start, until):
     """E6/K2 (212, projekt etapu 6 v2 rozdz. 3 "E6/K2" Test): segment "zapas koni wedlug kategorii (E6/K2)" w linii doby "Konie AI (175): dzien N"
@@ -3825,8 +4069,6 @@ def etap5_k2(rep, lines, start, until):
     rows = [seg[x] for x in days]
     pump = sum(num(r"zakup i sprzedaz tej samej kategorii w 7 dobach (\d+)", x, int, 0) or 0 for x in rows)
     stu = sum(num(r"potkniecia dzis (\d+)", x, int, 0) or 0 for x in rows)
-    rep.add("K2-5: pompa koni (zakup i sprzedaz tej samej kategorii w partii w 7 dobach) i potkniecia (suma okna)", f"pompa {pump}, potkniecia {stu}",
-            "pompa 0, potkniecia 0", pump == 0 and stu == 0)
 
     def cats(pat, x):
         m = re.search(pat, x)
@@ -3840,6 +4082,15 @@ def etap5_k2(rep, lines, start, until):
     bought = [0, 0, 0]
     for x in rows:
         bought = add3(bought, cats(r"kupione do zapasu ([\d/]+)", x))
+    # narzedzie progow zb58 (TRIAZ K2-5): licznik pompy zawyza - SpareHorses.NoteVisit dolicza CALA sprzedaz kategorii, gdy partia kupila choc 1 konia tej
+    # kategorii w 7 dobach (_pump += soldK[k]), a zakup to srednio 2-3 konie; kon idzie tabor -> polka miasta za zloto kasy miasta (suma koni i zlota bez
+    # zmian). Do poprawki licznika (min(sprzedane, kupione w 7 dobach) - nowa linia logu, osobny krok) pompa jest INFO z udzialem w koniach kupionych do
+    # zapasu; po poprawce prog: pompa <= 2% kupionych do zapasu. Potkniecia zostaja wiazace.
+    rep.add("K2-5a: potkniecia SpareHorses (suma okna)", f"{stu}", "0", stu == 0)
+    nb = sum(bought)
+    rep.add("K2-5b: pompa koni (zakup i sprzedaz tej samej kategorii w partii w 7 dobach; suma okna)",
+            f"pompa {pump}" + (f" = {100.0 * pump / nb:.1f}% z {nb} kupionych do zapasu" if nb else "") + (f" ({100.0 * pump / sold:.1f}% z {sold} sprzedanych)" if sold else ""),
+            "INFO do poprawki licznika (dolicza cala sprzedaz kategorii po zakupie 1 konia); po poprawce <= 2% koni kupionych do zapasu", None)
     rep.add("K2-6: sprzedaz nadmiaru i kupno do zapasu (suma okna)", f"sprzedane {sold} za {gold} (ze zbrojowni {arm}; kasa miasta bez nadwyzki {nob} postojow), "
             f"kupione do zapasu zwykle/bojowe/szlachetne {'/'.join(map(str, bought))}; handel koni gry pominiety: zakupy {gb}, sprzedaze {gs} postojow",
             "INFO (projekt: sprzedaze gry 0 - pominiete)", None)
@@ -3847,7 +4098,10 @@ def etap5_k2(rep, lines, start, until):
 
 def etap5_k5(rep, lines, start, until):
     """E6/K5 (213, projekt etapu 6 v2 rozdz. 3 "E6/K5" Test): linia doby "Juczne (213): dzien N" (dzien = doba gry, okno doby kampanii 1-until jak etap5_main).
-    Wiazace: juczne z niczego 0 (suma okna), nowe karawany >= 90% licznika na sucho, potkniecia 0, wpiecia bez BRAK; reszta INFO."""
+    Wiazace: juczne z niczego 0 (suma okna), partie i sztuki poza CreateCaravanParty 0 we wszystkich dobach (F2-1 - od F2 takze karawany startowe
+    przechodza przez CreatePost), karawany policzone przez K5 = "nowe karawany: N" linii "Obieg: notable i karawany" (doba wczesniej; F2-2), juczne
+    kupione z targu > 0 i <= cel w kazdej dobie (F2-3), 0 linii "ERROR in PackMarket." (F2-4), potkniecia 0, wpiecia bez BRAK; reszta INFO (F2-5
+    karawany startowe, K5-7 zakup i braki, F2-6 targ koni jucznych)."""
     rows = {}
     for d, s in by_day(lines, "Juczne (213): dzien").items():
         rd = run_day(d, start)
@@ -3870,32 +4124,217 @@ def etap5_k5(rep, lines, start, until):
         return sum(num(pat, x, int, 0) or 0 for x in win)
     left = tot(r", z niczego (-?\d+) \(gra dala")
     given, removed = tot(r"\(gra dala (\d+)"), tot(r"\(gra dala \d+, zdjete (\d+)")
-    rep.add("K5-4: juczne nowych karawan z niczego (suma okna)", f"{left} (gra dala {given}, zdjete {removed})", "0", left == 0)
-    new, dry = tot(r"nowe karawany (\d+) \(na sucho"), tot(r"na sucho z jucznymi gry (\d+)")
-    rep.add("K5-5: nowe karawany wobec licznika na sucho (suma okna)", f"{new} z {dry}" + (f" ({100.0 * new / dry:.1f}%)" if dry else ""),
-            ">= 90% (zakup nie wstrzymuje tworzenia)", (new >= 0.9 * dry) if dry else None)
+    # narzedzie progow F9b (F2, K5-4): w wartosci roznica "gra dala" - "zdjete" i karawany morskie (zdjete bez zakupu) - z niczego > 0 przy samych
+    # morskich (bez sierot spoza CreateCaravanParty) to wskazanie na krok 2 poprawki K5
+    naval, naval_off = tot(r"\| morskie (\d+) \(zdjete"), tot(r"\| morskie \d+ \(zdjete (\d+) bez zakupu\)")
+    orph, orph_n = tot(r"poza CreateCaravanParty (\d+) partii"), tot(r"poza CreateCaravanParty \d+ partii, (\d+) sztuk")
+    rep.add("K5-4: juczne nowych karawan z niczego (suma okna)",
+            f"{left} (gra dala {given}, zdjete {removed}, roznica {given - removed}; morskie {naval} karawan, zdjete bez zakupu {naval_off})"
+            + ("; z niczego przy karawanach morskich bez sierot - wskazanie na krok 2 poprawki K5" if left > 0 and naval > 0 and orph == 0 else ""), "0", left == 0)
+    # narzedzie progow zb58 (TRIAZ K5-4/K5-5): K5(a) nie zadzialalo w zadnym biegu (slownik _pend po partii przed nadaniem Id - CreatePost nie znajduje
+    # wpisu), a stary K5-5 "nowe z na sucho" byl pusty (przy wlaczonym kluczu zawsze 100%, przy 0 z 0 - INFO), wiec blad przeszedl dwa biegi.
+    # K5-4b: partie, ktorych InitializeCaravanOnCreation nie przeszlo przez CreatePost ("poza CreateCaravanParty N partii") - 0 poza pierwsza linia
+    # kampanii (karawany startowe - stan wyjsciowy). K5-5: karawany policzone przez CreatePost = "nowe karawany: N" z linii "Obieg: notable i karawany"
+    # (finalizer O17 na tej samej metodzie; etykieta Juczne o 1 dobe pozniej). Skladniki z kodu PackMarket.CreatePost: nowe (_new - morskie sa JUZ w nim,
+    # _naval liczone po _new++), startowe (_start), przy wylaczonym kluczu (_off), konwoje DTE (_dte) - TRIAZ pisal "+ morskie", to liczyloby je dwa razy.
+    # narzedzie progow F9b (F2-1): od F2 (slownik _pend po referencji partii) takze karawany startowe przechodza przez CreatePost (pole "startowe N z M
+    # jucznymi gry"), wiec "poza CreateCaravanParty" ma byc 0 partii i 0 sztuk we WSZYSTKICH dobach okna - razem z pierwsza linia kampanii, ktora F9a
+    # pomijal (przed F2 karawany startowe byly sierotami). Jedna regula na jedno zjawisko: wiersz F9a K5-4b jest teraz F2-1.
+    first = days[0] if days[0] <= 2 else None
+    tail = [x for x in days if x != first]
+    orph0 = (num(r"poza CreateCaravanParty (\d+) partii", rows[first], int, 0) or 0) if first is not None else None
+    rep.add("K5-4b (F2-1): nowe karawany poza CreateCaravanParty (partii / sztuk; suma wszystkich dob okna)",
+            f"{orph} partii / {orph_n} sztuk w {len(days)} dobach" + (f"; w tym pierwsza linia kampanii (karawany startowe) {orph0} partii" if orph0 is not None else ""),
+            "0 / 0 (kazda nowa karawana, takze startowa, przechodzi przez CreatePost; okno d2-120: a589def 1307 / 13622, W33 1404 / 14603 - w pelnych 120 "
+            "liniach 1315 / 13739 i 1408 / 14649)", orph == 0 and orph_n == 0)
+    o17 = {}
+    for d, s in by_day(lines, "Obieg: notable i karawany: dzien").items():
+        v = num(r"\| nowe karawany: (\d+)", s, int)
+        if v is not None:
+            o17[run_day(d, start)] = v
+    pair = [x for x in tail if (x - 1) in o17]
+    seen = sum((num(r"nowe karawany (\d+) \(na sucho", rows[x], int, 0) or 0) + (num(r"; startowe (\d+) z", rows[x], int, 0) or 0)
+               + (num(r"przy wylaczonym kluczu (\d+) z", rows[x], int, 0) or 0) + (num(r"\| konwoje DTE (\d+)", rows[x], int, 0) or 0) for x in pair)
+    exp = sum(o17[x - 1] for x in pair)
+    rep.add("K5-5 (F2-2): nowe karawany policzone przez K5 wobec linii Obieg: notable i karawany (suma okna, doba Juczne = doba Obiegu + 1)",
+            f"{seen} z {exp} ({len(pair)} dob z para linii)", "rowne (nowe z morskimi + startowe po pierwszej linii + przy wylaczonym kluczu + konwoje DTE; "
+            "wyjatek: karawana zadania gracza Caravan Ambush jest w Obiegu, nie w K5 - w biegu automatycznym 0)", (seen == exp) if pair else None)
     stu = tot(r"potkniecia dzis (\d+)")
     rep.add("K5-6: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
     bought, paid, target, short = tot(r"kupily (\d+) za"), tot(r"kupily \d+ za (\d+)"), tot(r"\(cel (\d+);"), tot(r", brak (\d+) \(")
-    zero, naval, dte = tot(r"kapital 0 przy tworzeniu - karawany gracza (\d+)"), tot(r"\| morskie (\d+)"), tot(r"\| konwoje DTE (\d+)")
+    zero, dte, dte_n = tot(r"kapital 0 przy tworzeniu - karawany gracza (\d+)"), tot(r"\| konwoje DTE (\d+)"), tot(r"\| konwoje DTE \d+ - juczne gry zostaja (\d+)")
+    # narzedzie progow F9b (F2-3, F2-4): zakup K5(a) zyje - w oknie kupiono > 0 jucznych za > 0 zl i zadna doba nie kupila ponad cel (przed F2 slownik
+    # _pend gubil kazda partie: 0 za 0 w obu biegach); 0 linii bledu PackMarket. Okno bez nowych karawan (K5 i Obieg 0) - INFO.
+    newc, obg = tot(r"nowe karawany (\d+) \(na sucho"), sum(o17.get(x - 1, 0) for x in days)
+    over = [x for x in days if (num(r"kupily (\d+) za", rows[x], int, 0) or 0) > (num(r"\(cel (\d+);", rows[x], int, 0) or 0)]
+    rep.add("F2-3: juczne nowych karawan kupione z targu (suma okna) i zakup <= cel w kazdej dobie",
+            f"kupione {bought} za {paid} zl (cel {target}); dob z zakupem ponad cel {len(over)}" + (" [" + ", ".join(f"d{x}" for x in over[:6]) + "]" if over else "")
+            + f"; nowych karawan: K5 {newc}, linia Obieg {obg}",
+            "kupione > 0 sztuk i > 0 zl, zadna doba ponad cel (a589def i W33: 0 za 0 - zakup K5(a) nie dzialal)",
+            (bought > 0 and paid > 0 and not over) if (newc > 0 or obg > 0) else None)
+    perr = [x for x in lines if x.startswith("ERROR in PackMarket.")]
+    rep.add("F2-4: bledy PackMarket (linie ERROR in PackMarket.)", f"{len(perr)}" + (f" (pierwszy: {perr[0][:160]})" if perr else ""), "0", len(perr) == 0)
+    if first is not None:
+        ms_ = re.search(r"startowe (\d+) z (\d+) jucznymi gry", rows[first])
+        rep.add("F2-5: karawany startowe w pierwszej linii kampanii", f"{ms_.group(1)} z {ms_.group(2)} jucznymi gry (d{first})" if ms_ else "brak pola",
+                "INFO (nowa kampania od F2: ok. 364 z ok. 5100; log sprzed F2: 0 z 0 - startowe byly poza CreateCaravanParty)", None)
+    else:
+        rep.add("F2-5: karawany startowe w pierwszej linii kampanii", "okno bez pierwszej doby kampanii (wczytany zapis: 0 z 0)", "INFO", None)
     last = rows[days[-1]]
     under, foot = num(r"luzakow pod jukami (\d+)", last, int, 0) or 0, num(r"pod piechurem albo jencem (\d+)", last, int, 0) or 0
+
+    def part(ds):
+        def t_(pat):
+            return sum(num(pat, rows[x], int, 0) or 0 for x in ds)
+        b, c = t_(r"kupily (\d+) za"), t_(r"\(cel (\d+);")
+        full, some, none = t_(r"; pelne (\d+), czesciowo"), t_(r", czesciowo (\d+), bez jucznych"), t_(r", bez jucznych (\d+)\)")
+        sh, z0, nt, es = (t_(r", brak (\d+) \("), t_(r"kapital 0 przy tworzeniu - karawany gracza (\d+)"), t_(r"nie miasto albo oblezone (\d+)"),
+                          t_(r"polka bez jucznych w budzecie (\d+)"))
+        return (f"kupione {b} z celu {c}" + (f" ({100.0 * b / c:.0f}%)" if c else "") + f", pelne {full} / czesciowo {some} / bez jucznych {none}, "
+                f"brak {sh} (kapital 0 {z0}, nie miasto albo oblezone {nt}, polka bez jucznych w budzecie {es})")
+    d231, rest = [x for x in days if 2 <= x <= 31], [x for x in days if x > 31]
     rep.add("K5-7: zakup jucznych, brak i udzwig (suma okna; udzwig - ostatnia doba)",
-            f"kupione {bought} za {paid} (cel {target}, brak {short}; kapital 0 - gracz {zero}; morskie {naval}; konwoje DTE {dte}); "
-            f"luzakow pod jukami {under}, pod piechurem albo jencem {foot} (d{days[-1]})", "INFO (utarg kupcow - linia Kupcy/obieg)", None)
+            f"kupione {bought} za {paid} (cel {target}, brak {short}; kapital 0 - gracz {zero}; morskie {naval}; konwoje DTE {dte} - juczne gry zostaja {dte_n}); "
+            + (f"doby 2-31: {part(d231)}; " if d231 else "") + (f"doby 32-{days[-1]}: {part(rest)}; " if rest else "")
+            + f"luzakow pod jukami {under}, pod piechurem albo jencem {foot} (d{days[-1]})",
+            "INFO (utarg kupcow - linia Kupcy/obieg; od F2 oczekiwane: kapital 0 ok. 21 - karawany notabli bez kapitalu, nie miasto do ok. 35 - kupno lordow BK "
+            "w zamkach i wsiach, konwoje DTE ok. 146 / ok. 1320 sztuk na 120 dob - juczne z niczego poza K5-4)", None)
+    # F2-6 (INFO, targ koni): czwarta liczba (juczne) z "polki miast i zamkow" i z "reszta niewyjasniona" linii "Konie (E6/0)" oraz czwarty mnoznik
+    # linii "Hodowla (220)" - nowy popyt karawan na juczne (ok. 61/d) ma zdjac przyrost stosu jucznych na targach. Doba = dzien ksiegi (etykieta
+    # linii - 1, jak "Pieniadz swiata" tego samego ticku) - tak licza liczby odniesienia wpisu F2 (doba 2 = pierwsza linia z reszta, rozruch)
+    kon = {}
+    for d, s in by_day(lines, "Konie (E6/0): dzien").items():
+        if 1 <= run_day(d, start) - 1 <= until:
+            kon[run_day(d, start) - 1] = s
+    shelf = {x: num(r"polki miast i zamkow -?\d+/-?\d+/-?\d+/(-?\d+)/", kon[x], int) for x in kon}
+    shelf = {x: v for x, v in shelf.items() if v is not None}
+    rst = {x: num(r"reszta niewyjasniona -?\d+/-?\d+/-?\d+/(-?\d+)/", kon[x], int) for x in kon}
+    rst = {x: v for x, v in rst.items() if v is not None}
+    mul = None
+    for d, s in sorted(by_day(lines, "Hodowla (220): dzien").items()):
+        if 1 <= run_day(d, start) <= until:
+            v = num(r"mnozniki x[\d.]+/x[\d.]+/x[\d.]+/x([\d.]+)", s, float)
+            mul = v if v is not None else mul
+    if shelf or rst:
+        sd = sorted(shelf)
+        a = 30 if 30 in shelf else (sd[0] if sd else None)
+        r3 = [rst[x] for x in sorted(rst) if x >= 3]
+        rep.add("F2-6: targ koni jucznych - polki miast i zamkow, reszta niewyjasniona, mnoznik hodowli (linie Konie (E6/0) i Hodowla (220))",
+                (f"polki d{a} {shelf[a]} -> d{sd[-1]} {shelf[sd[-1]]}" if sd else "polki: brak pola")
+                + (f"; reszta niewyjasniona jucznych suma dob 3-{max(rst)} {sum(r3):+d} ({sum(r3) / float(len(r3)):+.1f}/d)" if r3 else "; reszta: brak dob od 3")
+                + (f", doba 2 osobno {rst[2]:+d} (rozruch)" if 2 in rst else "") + (f"; mnoznik hodowli jucznych x{mul:.2f}" if mul is not None else ""),
+                "INFO (doba = dzien ksiegi; a589def: polki 1768 -> 5138, reszta +3748, doba 2 +4110, mnoznik 1.00; W33: 1922 -> 3862, +1892, doba 2 +4023; "
+                "od F2 spodziewany spadek reszty o ok. 61/d)", None)
+    else:
+        rep.add("F2-6: targ koni jucznych (linie Konie (E6/0) i Hodowla (220))", "brak linii Konie (E6/0) w oknie", "INFO", None)
+
+
+def etap5_r1_stock(rep, lines, start, until, rows, ref=False):
+    """Narzedzie progow zb58 (TRIAZ "PROGI R1-8, R1-9, R1-10", R1-8 i R1-10 z podwazeniem): trzy progi skutku wytopu liczone z linii zelaza (rows -
+    "Zelazo (lupy) (214)" albo, w logu bez dymarki, "Ruda:"), "Drewno:" i "Warsztaty:". ref=True (log bez linii startowej Bloomery - wzorzec):
+    te same miary jako INFO, zeby porownanie z wzorcem bylo w raporcie. Progi: R1-8 srednio d61-until <= 30 (nie gorzej niz W33 29.4; cel projektu 15
+    osobnym wierszem INFO - W33 nigdy nie zszedl ponizej 19), R1-9 przyrost stosu drewna miast d61 -> until <= 290 ladunkow/d (W33 +17 095 w 59 dob;
+    stos rosl tez we wzorcu), R1-10 srednio d91-until <= 715/d (okno, z ktorego pochodzi 584 z biegu z31A; 715 = najwyzszy z 4 biegow bez dymarki)."""
+    tag = " [wzorzec bez dymarki - linia Ruda:]" if ref else ""
+
+    def okv(v):
+        return None if ref else v
+    days = sorted(rows)
+    w61 = [x for x in days if x >= 61]
+    if w61:
+        empty = [num(r"miast bez towaru (\d+) z", rows[x], int, 0) or 0 for x in w61]
+        avg = sum(empty) / len(empty)
+        rep.add("R1-8: miasta bez zelaza (srednio d61-until)" + tag, f"{avg:.1f} (d{w61[0]}-d{w61[-1]})",
+                "<= 30 (nie gorzej niz wzorzec W33 29.4)" if not ref else "INFO (prog biegu z dymarka: <= 30)", okv(avg <= 30.0))
+        if not ref:
+            rep.add("R1-8b: miasta bez zelaza wobec celu projektu (srednio d61-until)", f"{avg:.1f}",
+                    "INFO (cel projektu <= 15 - do oceny po dowozie drewna do dymarek i E8/G1; wzorzec nie zszedl ponizej 19)", None)
+    wood, flow = {}, {}
+    for d, s in by_day(lines, "Drewno: dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            v = num(r"zapas: miasta (\d+)", s, int)
+            if v is not None:
+                wood[rd] = v
+            flow[rd] = num(r"las okregu poza zapasem (\d+)", s, int, 0) or 0
+    wd = sorted(x for x in wood if x >= 61)
+    if len(wd) >= 2:
+        a, b = wood[wd[0]], wood[wd[-1]]
+        per = (b - a) / float(wd[-1] - wd[0])
+        rep.add("R1-9: stos drewna miast (d61 -> until)" + tag, f"{a} -> {b} (d{wd[0]}-d{wd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%, {per:+.0f}/d)",
+                "przyrost <= 290 ladunkow/d (wzorzec W33 +17 095 w 59 dob; po dowozie drewna do dymarek zaostrzyc do <= 0)" if not ref
+                else "INFO (prog biegu z dymarka: przyrost <= 290 ladunkow/d)", okv(per <= 290.0))
+    led = {}
+    for s in lines:
+        if s.startswith("Towary: dzien "):
+            m = re.match(r"Towary: dzien (\d+) - hardwood \([^)]*\): zapas -?\d+ .*?\| produkcja (\d+) .*?\| zuzycie (\d+) ", s)
+            if m:
+                rd = run_day(int(m.group(1)), start)
+                if 61 <= rd <= until:
+                    led[rd] = (int(m.group(2)), int(m.group(3)))
+    if led:
+        n = float(len(led))
+        fo = sum(flow.get(x, 0) for x in led) / n
+        pr, co = sum(v[0] for v in led.values()) / n + fo, sum(v[1] for v in led.values()) / n + fo
+        rep.add("R1-9b: drewno - produkcja z lasem okregu minus zuzycie (ksiega Towary, srednio d61-until)" + tag,
+                f"produkcja {pr:.0f}/d (w tym las okregu poza zapasem {fo:.0f}), zuzycie {co:.0f}/d, roznica {pr - co:+.0f}/d ({len(led)} dob)",
+                "INFO (stos rosnie, gdy swiat tnie wiecej drewna, niz pali)", None)
+    ws, ws31 = {}, {}
+    for d, s in by_day(lines, "Warsztaty: dzien").items():
+        rd = run_day(d, start)
+        v = num(r"brak surowca \d+ \[ruda (\d+)", s, int)
+        if v is None:
+            continue
+        if 91 <= rd <= until:
+            ws[rd] = v
+        if 31 <= rd <= until:
+            ws31[rd] = v
+    if ws:
+        avg = sum(ws.values()) / len(ws)
+        rep.add("R1-10: cykle warsztatow \"brak surowca [ruda\" (srednio d91-until)" + tag,
+                f"{avg:.0f}/d ({len(ws)} dob; d31-until {sum(ws31.values()) / len(ws31):.0f}/d)"
+                + ("" if ref else "; miara zanizona przy lupie (cykle z pustym rankingiem nie sa liczone) - wiazace dla zjawiska jest R1-8"),
+                "<= 715/d (najwyzszy z 4 biegow bez dymarki w d91-120: z31A 584, 464, 714, W33 509)" if not ref else "INFO (prog biegu z dymarka: <= 715/d)",
+                okv(avg <= 715.0))
+    elif ws31:
+        rep.add("R1-10: cykle warsztatow \"brak surowca [ruda\"" + tag, f"okno nie siega d91 (srednio d31-until {sum(ws31.values()) / len(ws31):.0f}/d, {len(ws31)} dob)",
+                "<= 715/d srednio d91-until", None)
+    # narzedzie progow F9b (F4a R1-10b): woz dymarki nie moze zabierac drewna kuzniom miast handlowych - cykle "brak surowca [.., drewno" srednio
+    # d91-until nie wiecej niz w biegu sprzed wozow (a589def 177/d, W33 199/d); liczba porownywana po zaokragleniu, jak w wierszu
+    wdw = {}
+    for d, s in by_day(lines, "Warsztaty: dzien").items():
+        rd = run_day(d, start)
+        v = num(r"brak surowca \d+ \[ruda \d+, drewno (\d+)", s, int)
+        if v is not None and 91 <= rd <= until:
+            wdw[rd] = v
+    if wdw:
+        avg = sum(wdw.values()) / len(wdw)
+        rep.add("R1-10b: cykle warsztatow \"brak surowca [.., drewno\" (srednio d91-until)" + tag, f"{avg:.0f}/d ({len(wdw)} dob)",
+                "<= 177/d (bieg sprzed wozow dymarek a589def 177, W33 199 - woz nie zabiera drewna kuzniom miast handlowych)" if not ref
+                else "INFO (prog biegu z dymarka: <= 177/d)", okv(round(avg) <= 177))
 
 
 def etap5_r1(rep, lines, start, until):
     """E6/R1 (214, projekt etapu 6 v2 rozdz. 3 "E6/R1" Test): linia startowa "Bloomery (E6/R1, 214):" i linia doby "Zelazo (lupy) (214): dzien N"
     (OreLedger - dzien = doba gry, okno doby kampanii 1-until jak etap5_main). Wiazace: tozsamosci lup i drewna w kazdej dobie, lupy bez drewna 0,
-    kopalnia bez wegla <= 5% lup (d8-until - pierwsza doba kopalni bez drewna), miasta bez zelaza <= 15 (srednio d61-until), stos drewna miast
-    bez wzrostu d61-until (linia "Drewno:", <= +2%), "brak surowca [ruda" <= 584/d srednio d31-until (linia "Warsztaty:"), potkniecia 0; reszta INFO."""
+    kopalnia bez wegla <= 5% lup (d61-until - po pierwszej decyzji regulatora drewna d56; d8-60 INFO), miasta bez zelaza <= 30 (srednio d61-until;
+    cel 15 INFO), przyrost stosu drewna miast d61-until <= 290/d (linia "Drewno:"), "brak surowca [ruda" <= 715/d srednio d91-until (linia "Warsztaty:"),
+    brak zlota i pusta kiesa wsi <= 5% potrzeby drewna (R1-7b, d61-until; NIE tylko, gdy zapas zelaza swiata nie rosnie w d91-until), potkniecia 0;
+    od F9b wiersze poprawek F4a / F4b (_r1_f4: wozy dymarek R1-7c..R1-7e, R1-13, rachunek za drewno R1-14..R1-18) i R1-10b; reszta INFO. Log bez linii
+    startowej Bloomery (wzorzec bez dymarki): R1-8/R1-9/R1-10/R1-10b z linii "Ruda:" i "Warsztaty:" jako INFO (etap5_r1_stock)."""
     start_l = [x for x in lines if x.startswith("Bloomery (E6/R1, 214): ") and ("CZYNNE" in x or "NIEAKTYWNE" in x or "WYLACZONE" in x)]
     wire = [x for x in lines if x.startswith("Bloomery (E6/R1, 214): tick produkcji") or x.startswith("Bloomery (E6/R1, 214): BRAK")]
     if wire:
         rep.add("R1-2: wpiecie ticku produkcji wsi (TickGoodProduction)", wire[-1][:160], "bez BRAK", "BRAK" not in wire[-1])
     if not start_l:
         rep.add("R1-1: linia startowa Bloomery (E6/R1, 214)", "brak", "jest od wgrania E6/R1 (HistoricalPrices.Apply)", None)
+        ore = {}
+        for d, s in by_day(lines, "Ruda: dzien").items():
+            rd = run_day(d, start)
+            if 1 <= rd <= until:
+                ore[rd] = s
+        if ore:
+            etap5_r1_stock(rep, lines, start, until, ore, ref=True)
         return
     if "CZYNNE" not in start_l[-1]:
         rep.add("R1-1: wytop przy kopalni", start_l[-1][:200], "CZYNNE w nowej kampanii (stary zapis / wylaczone - ruda jak dotad)", None)
@@ -3920,46 +4359,248 @@ def etap5_r1(rep, lines, start, until):
         return sum(num(pat, rows[x], cast, 0) or 0 for x in ds)
     over = tot(r"lupy bez drewna (\d+)", days)
     rep.add("R1-6: lupy bez drewna w dymarce (suma okna)", str(over), "0", over == 0)
-    w8 = [x for x in days if x >= 8]
-    if w8:
-        made = tot(r"lupy z tickow kopalni (\d+)", w8)
-        unwon = tot(r"kopalnia bez wegla ([\d.]+) lup", w8, float)
-        share = 100.0 * unwon / max(1.0, made + unwon)
-        rep.add("R1-7: kopalnia bez wegla wobec lup (d8-until)", f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "<= 5%", share <= 5.0)
+    # narzedzie progow zb58 (TRIAZ R1-7 pkt 9): swiatu brakuje drewna do pelnej potrzeby dymarek az do pierwszej decyzji regulatora drewna (d56), wiec
+    # 5% jest wiazace w d61-until; d8-60 (od pierwszej doby kopalni bez drewna) - INFO. Okno krotsze niz d61 - sam wiersz INFO.
+    def coal(ds):
+        made = tot(r"lupy z tickow kopalni (\d+)", ds)
+        unwon = tot(r"kopalnia bez wegla ([\d.]+) lup", ds, float)
+        return made, unwon, 100.0 * unwon / max(1.0, made + unwon)
     w61 = [x for x in days if x >= 61]
+    w8 = [x for x in days if 8 <= x <= 60]
     if w61:
-        empty = [num(r"miast bez towaru (\d+) z", rows[x], int, 0) or 0 for x in w61]
-        avg = sum(empty) / len(empty)
-        rep.add("R1-8: miasta bez zelaza (srednio d61-until)", f"{avg:.1f} (d{w61[0]}-d{w61[-1]})", "<= 15", avg <= 15.0)
-    wood = {}
-    for d, s in by_day(lines, "Drewno: dzien").items():
-        rd = run_day(d, start)
-        if 1 <= rd <= until:
-            v = num(r"zapas: miasta (\d+)", s, int)
-            if v is not None:
-                wood[rd] = v
-    wd = sorted(x for x in wood if x >= 61)
-    if len(wd) >= 2:
-        a, b = wood[wd[0]], wood[wd[-1]]
-        rep.add("R1-9: stos drewna miast (d61 -> until)", f"{a} -> {b} (d{wd[0]}-d{wd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%)", "bez wzrostu (<= +2%)", b <= a * 1.02)
-    ws = {}
-    for d, s in by_day(lines, "Warsztaty: dzien").items():
-        rd = run_day(d, start)
-        if 31 <= rd <= until:
-            v = num(r"brak surowca \d+ \[ruda (\d+)", s, int)
-            if v is not None:
-                ws[rd] = v
-    if ws:
-        avg = sum(ws.values()) / len(ws)
-        rep.add("R1-10: cykle warsztatow \"brak surowca [ruda\" (srednio d31-until)", f"{avg:.0f}/d ({len(ws)} dob)", "<= 584/d (z31A)", avg <= 584.0)
+        made, unwon, share = coal(w61)
+        rep.add("R1-7: kopalnia bez wegla wobec lup (d61-until)", f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "<= 5%", share <= 5.0)
+    if w8:
+        made, unwon, share = coal(w8)
+        rep.add("R1-7a: kopalnia bez wegla wobec lup (d8-60, przed pierwsza decyzja regulatora drewna)",
+                f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "INFO (prog <= 5% wiazacy w d61-until)", None)
+    etap5_r1_stock(rep, lines, start, until, rows)
     stu = tot(r"potkniecia dzis (\d+) \(od wczytania", days)
     rep.add("R1-11: potkniecia Bloomery (suma okna)", str(stu), "0", stu == 0)
     woods, bought, gold = tot(r", las okregu (\d+), targ", days), tot(r", targ (\d+) za", days), tot(r", targ \d+ za (\d+) zl", days)
     shelf, nogold, nomk = tot(r"\(brak na polce (\d+)", days), tot(r"brak zlota wsi (\d+)", days), tot(r"bez miasta handlowego (\d+)", days)
     tm, tmw, tms = tot(r"kopalnie BK w miastach: lupy (\d+)", days), tot(r"kopalnie BK w miastach: lupy \d+, drewno (\d+)", days), tot(r"bez drewna/kapitalu (\d+)", days)
+    miss = shelf + nogold + nomk
     rep.add("R1-12: wegiel dymarek - skad (suma okna)",
-            f"las okregu {woods}, targ {bought} ladunkow za {gold} zl; braki: na polce {shelf}, zlota wsi {nogold}, bez miasta handlowego {nomk}; "
-            f"kopalnie BK w miastach: lupy {tm}, drewno {tmw}, bez drewna/kapitalu {tms}", "INFO (projekt: las okregu ok. 100/d, reszta z targu)", None)
+            f"las okregu {woods} ({woods / float(len(days)):.0f}/d), targ {bought} ladunkow za {gold} zl" + (f" ({gold / float(bought):.1f} zl za ladunek)" if bought else "")
+            + f"; braki: na polce {shelf}, zlota wsi {nogold}" + (f" ({100.0 * nogold / miss:.0f}% brakow)" if miss else "") + f", bez miasta handlowego {nomk}; "
+            f"kopalnie BK w miastach: lupy {tm}, drewno {tmw}, bez drewna/kapitalu {tms}",
+            "INFO (las okregu z pomiaru; szacunek projektu ok. 100/d nieaktualny; reszta z targu)", None)
+    # narzedzie progow zb58 (TRIAZ R1-12 pkt 4, PROGI pkt 5) + F9b (F4a R1-7b, dopisek F4b): niedobor drewna z braku zlota wsi wobec potrzeby doby.
+    # Jedna regula na jedno zjawisko: wiersz F9a "R1-13 brak zlota wsi (d91-until)" jest teraz R1-7b z listy F4a - okno d61-until, licznik = "brak zlota
+    # wsi" (polka wlasnego miasta handlowego) + "pusta kiesa wsi" (woz z dalszego miasta; pole od F4a, w logu sprzed F4a - 0). Ponad 5% przy rosnacym
+    # zapasie zelaza swiata ("razem" w linii, d91-until: 5 ostatnich dob > 5 pierwszych) = niewyplacalna kopalnia jako regulator nadprodukcji (cena lupy
+    # ponizej kosztu drewna) - INFO; NIE dopiero, gdy zelaza nie przybywa. Numer R1-13 nosi od F4a wiersz "najbardziej bez wegla" (INFO).
+    w91 = [x for x in days if x >= 91]
+    if w61:
+        ng, npu, need = tot(r"brak zlota wsi (\d+)", w61), tot(r"pusta kiesa wsi (\d+)", w61), tot(r"przy potrzebie doby (\d+)", w61)
+        has_cart = any(", pusta kiesa wsi " in rows[x] for x in w61)
+        stock = [num(r"zapas: miasta .*?, razem (\d+) \(", rows[x], int) for x in w91]
+        stock = [v for v in stock if v is not None]
+        if need > 0:
+            sh = 100.0 * (ng + npu) / need
+            grows = len(stock) >= 10 and sum(stock[-5:]) > sum(stock[:5])
+            n91, need91 = tot(r"brak zlota wsi (\d+)", w91) + tot(r"pusta kiesa wsi (\d+)", w91), tot(r"przy potrzebie doby (\d+)", w91)
+            rep.add("R1-7b: brak zlota wsi i pusta kiesa wsi wobec potrzeby drewna dymarek (d61-until)",
+                    f"{sh:.1f}% (brak zlota wsi {ng} + pusta kiesa wsi {npu}" + ("" if has_cart else " [pole od F4a - brak w logu]") + f" z {need} ladunkow)"
+                    + (f"; zapas zelaza swiata d91-until: 5 pierwszych dob {sum(stock[:5]) / 5.0:.0f}, 5 ostatnich {sum(stock[-5:]) / 5.0:.0f}" if len(stock) >= 10 else "")
+                    + (" - rosnie (regulator nadprodukcji)" if grows and sh > 5.0 else "")
+                    + (f"; okno d91-until {100.0 * n91 / need91:.1f}% ({n91} z {need91})" if need91 > 0 else ""),
+                    "<= 5% (ponad 5% przy rosnacym zapasie zelaza swiata w d91-until - INFO \"regulator nadprodukcji\"; NIE, gdy zelaza nie przybywa)",
+                    True if sh <= 5.0 else (None if grows else False))
+        else:
+            rep.add("R1-7b: brak zlota wsi i pusta kiesa wsi wobec potrzeby drewna dymarek (d61-until)", "brak potrzeby doby w oknie", "<= 5%", None)
+    else:
+        rep.add("R1-7b: brak zlota wsi i pusta kiesa wsi wobec potrzeby drewna dymarek (d61-until)", "okno nie siega d61", "<= 5%", None)
+    _r1_f4(rep, lines, start, until, rows, days)
+
+
+def _r1_f4(rep, lines, start, until, rows, days):
+    """Narzedzie progow F9b: wiersze poprawek F4a (wozy dymarek) i F4b (rachunek za drewno przed dzialka pana) z wstawek linii "Zelazo (lupy) (214)":
+    "; wozy dymarek (F4a): CZYNNE zasieg R, wozem kupione a ladunkow za b zl w c wozach (srednio d dob drogi; miast z nadwyzka e), dojechalo ..,
+    czeka .. wozow, zawrocone f w g wozach (zwrot h zl), w drodze wozem ..; niedobor doby bez wozu: bez nadwyzki w zasiegu i, pusta kiesa wsi j;
+    kontrola wozow: ... - bez celu k - w drodze dzis = reszta r; czas wozow t ms", "; rachunek za drewno (F4b): CZYNNE, powroty wozow kopaln ..;
+    kontrola rachunku: ... = reszta r; kiesy kopaln: ..; najwiecej bez zlota: ..", "; najbardziej bez wegla: ..; miasta handlowe kopaln ponizej
+    potrzeby: .." oraz z dopisku "rachunek za drewno kopaln (F4b)" linii "Utarg wsi (112)" (ta sama etykieta doby). Log sprzed poprawki (bez wstawki)
+    - INFO "brak linii"."""
+    def tot(pat, ds, cast=int):
+        return sum(num(pat, rows[x], cast, 0) or 0 for x in ds)
+    w31, w61 = [x for x in days if x >= 31], [x for x in days if x >= 61]
+    need61 = tot(r"przy potrzebie doby (\d+)", w61)
+    # ---- F4a: wozy dymarek
+    cart = [x for x in days if "; wozy dymarek (F4a): " in rows[x]]
+    if not cart:
+        rep.add("R1-7c..R1-7e: wozy dymarek (F4a)", "brak linii (log sprzed F4a - bez wstawki \"wozy dymarek (F4a)\" w linii Zelazo)",
+                "wstawka jest od F4a (klucz BloomeryCartRange)", None)
+    else:
+        offc = [x for x in days if "; wozy dymarek (F4a): CZYNNE" not in rows[x]]
+        b31 = tot(r", wozem kupione (\d+) ladunkow", [x for x in cart if x >= 31])
+        rep.add("R1-7c: wozy dymarek CZYNNE w kazdej dobie i zakupy wozem w d31-until",
+                f"CZYNNE w {len(days) - len(offc)} z {len(days)} dob" + (f" (ostatnia nieczynna d{offc[-1]})" if offc else "") + f"; wozem kupione w d31-until {b31} ladunkow",
+                "CZYNNE we wszystkich dobach i kupione > 0 (klucz BloomeryCartRange > 0)", (len(offc) == 0 and b31 > 0) if w31 else (False if offc else None))
+        cre = re.compile(r"kontrola wozow: w drodze wczoraj \d+ \+ kupione - dojechalo - zawrocone - bez celu (\d+) - w drodze dzis = reszta (-?\d+)")
+        cc = []
+        for x in cart:
+            m = cre.search(rows[x])
+            if m:
+                cc.append((x, int(m.group(1)), int(m.group(2))))
+        badc = [c for c in cc if c[1] != 0 or c[2] != 0]
+        rep.add("R1-7d: kontrola wozow dymarek (w drodze wczoraj + kupione - dojechalo - zawrocone - bez celu = w drodze dzis)",
+                f"dob z kontrola {len(cc)}, z reszta albo \"bez celu\" {len(badc)}"
+                + (" [" + ", ".join(f"d{c[0]}: bez celu {c[1]}, reszta {c[2]}" for c in badc[:5]) + "]" if badc else ""),
+                "reszta 0 i bez celu 0 w kazdej dobie z tym polem", (len(badc) == 0) if cc else None)
+        ere = re.compile(r", wozem kupione (\d+) ladunkow za (\d+) zl w (\d+) wozach \(srednio ([\d.]+) dob drogi; miast z nadwyzka (\d+|-)\)")
+        bre = re.compile(r", zawrocone (\d+) w (\d+) wozach \(zwrot (\d+) zl\)")
+        cb = cg = cn = bk = bkc = rf = 0
+        dsum, srcs = 0.0, []
+        for x in cart:
+            m = ere.search(rows[x])
+            if m:
+                cb += int(m.group(1)); cg += int(m.group(2)); cn += int(m.group(3)); dsum += float(m.group(4)) * int(m.group(3))
+                if m.group(5) != "-":
+                    srcs.append(int(m.group(5)))
+            m = bre.search(rows[x])
+            if m:
+                bk += int(m.group(1)); bkc += int(m.group(2)); rf += int(m.group(3))
+        ns61 = tot(r"bez nadwyzki w zasiegu (\d+)", [x for x in cart if x >= 61])
+        tms = [v for v in (num(r"czas wozow ([\d.]+) ms", rows[x], float) for x in cart) if v is not None]
+        tavg = sum(tms) / len(tms) if tms else 0.0
+        rep.add("R1-7e: wozy dymarek - zakupy, zawrocone, niedobor bez nadwyzki w zasiegu, czas (suma okna)",
+                f"kupione {cb} ladunkow ({cb / float(len(cart)):.0f}/d) za {cg} zl" + (f" ({cg / float(cb):.1f} zl za ladunek)" if cb else "") + f" w {cn} wozach"
+                + (f" (srednio {dsum / cn:.1f} dob drogi)" if cn else "") + (f"; miast z nadwyzka srednio {sum(srcs) / float(len(srcs)):.1f}" if srcs else "")
+                + f"; zawrocone {bk} w {bkc} wozach (zwrot {rf} zl); bez nadwyzki w zasiegu d61-until {ns61}"
+                + (f" ({100.0 * ns61 / need61:.1f}% potrzeby)" if need61 > 0 else "")
+                + (f"; czas wozow srednio {tavg:.1f} ms/dobe, najwiecej {max(tms):.1f}" + (" - UWAGA: ponad 20 ms" if tavg > 20.0 else "") if tms else ""),
+                "INFO (oczekiwane: zawrocone 0, bez nadwyzki w zasiegu <= 5% potrzeby w d61-until, czas ok. 10 ms/dobe - ostrzegawczo > 20)", None)
+    # ---- R1-13 (F4a, INFO): kopalnie najbardziej bez wegla i miasta handlowe kopaln ponizej potrzeby
+    mre = re.compile(r"najbardziej bez wegla: (.*?); miasta handlowe kopaln ponizej potrzeby: (.*?); potkniecia")
+    mm = []
+    for x in days:
+        m = mre.search(rows[x])
+        if m:
+            mm.append((x, m.group(1), m.group(2)))
+    if not mm:
+        rep.add("R1-13: kopalnie najbardziej bez wegla i miasta handlowe kopaln ponizej potrzeby", "brak linii (log sprzed F4a - bez wstawki \"najbardziej bez wegla\")",
+                "INFO", None)
+    else:
+        towns, mines, n61 = {}, {}, 0
+        for x, a, b in mm:
+            if x < 61:
+                continue
+            n61 += 1
+            for nm in b.split(", "):
+                if nm and nm != "-":
+                    towns[nm] = towns.get(nm, 0) + 1
+            for nm in re.findall(r"(?:^|\), )([^\[\]]+?) \[", a):
+                mines[nm] = mines.get(nm, 0) + 1
+        top = sorted(towns.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+        topm = sorted(mines.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+        lx, la, lb = mm[-1]
+        rep.add("R1-13: kopalnie najbardziej bez wegla i miasta handlowe kopaln ponizej potrzeby",
+                f"d{lx}: {la[:320]} | miasta ponizej potrzeby: {lb[:160]}"
+                + (f"; najczestsze miasta w d61-until ({n61} dob): " + ", ".join(f"{k} {v}" for k, v in top) if top else "")
+                + ("; najczestsze kopalnie: " + ", ".join(f"{k} {v}" for k, v in topm) if topm else ""),
+                "INFO (warunek odbioru R1-8 / R1-10: wsrod najczestszych nie ma juz stale Yunkai, Meereen, Tolos, Mantarys, Vaes Diaf; brak nie spada stale na "
+                "te same kopalnie)", None)
+    # ---- F4b: rachunek za drewno przed dzialka pana
+    bill = [x for x in days if "; rachunek za drewno (F4b): " in rows[x]]
+    if not bill:
+        rep.add("R1-14..R1-18: rachunek za drewno przed dzialka pana (F4b)", "brak linii (log sprzed F4b - bez wstawki \"rachunek za drewno (F4b)\" w linii Zelazo)",
+                "wstawka jest od F4b (klucz BloomeryCoalBeforeLordShare)", None)
+        return
+    ut = {}
+    for d, s in by_day(lines, "Utarg wsi (112): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            ut[run_day(d, start)] = s
+    offb = [x for x in days if "; rachunek za drewno (F4b): CZYNNE" not in rows[x]]
+    offu = [x for x in sorted(ut) if "; rachunek za drewno kopaln (F4b): CZYNNE" not in ut[x]]
+    rep.add("R1-14: rachunek za drewno CZYNNE w kazdej dobie (linia Zelazo 214 i linia Utarg wsi 112)",
+            f"Zelazo: CZYNNE w {len(days) - len(offb)} z {len(days)} dob" + (f" (ostatnia nieczynna d{offb[-1]})" if offb else "")
+            + f"; Utarg wsi: CZYNNE w {len(ut) - len(offu)} z {len(ut)} dob" + (f" (ostatnia nieczynna d{offu[-1]})" if offu else ""),
+            "CZYNNE we wszystkich dobach obu linii (klucze BloomeryCoalBeforeLordShare i VillageTakingsWhole)", (not offb and not offu) if ut else (False if offb else None))
+    kre = re.compile(r"kontrola rachunku: otwarty wczoraj (\d+) \+ drewno kupione (\d+) - na rachunek (\d+) - wygasle ponad \d+ dob zakupow (\d+) - zwrot "
+                     r"zawroconych wozow (\d+) - otwarty dzis = reszta (-?\d+)")
+    kk = []
+    for x in bill:
+        m = kre.search(rows[x])
+        if m:
+            kk.append((x, int(m.group(6))))
+    badk = [c for c in kk if c[1] != 0]
+    rep.add("R1-15: kontrola rachunku za drewno (otwarty wczoraj + kupione - na rachunek - wygasle - zwrot zawroconych = otwarty dzis)",
+            f"dob z kontrola {len(kk)}, z reszta {len(badk)}" + (" [" + ", ".join(f"d{c[0]}: {c[1]:+d}" for c in badk[:5]) + "]" if badk else ""),
+            "reszta 0 w kazdej dobie z tym polem", (len(badk) == 0) if kk else None)
+    # R1-16: dwa niezalezne liczniki tej samej doby (Bloomery i VillageTakings) - sumy "na rachunek" i zwrotu rowne w dobach z obiema liniami; zwrot kazdej
+    # doby <= 0.55 x "na rachunek" + 2 na powrot ze zwrotem (0.55 = polityka wysoka przy czynnej kiesie ludu; + 2 = dwa obciecia do calosci w modelu)
+    zre = re.compile(r"z tego na rachunek (\d+) zl, z licznikow panow do kies wsi (\d+) zl \((\d+) powrotow\)")
+    ure = re.compile(r"powroty ze zwrotem (\d+), utarg zaliczony na rachunek (\d+), z licznikow panow do kies wsi (\d+)")
+    za, ua = {}, {}
+    for x in bill:
+        m = zre.search(rows[x])
+        if m:
+            za[x] = tuple(int(v) for v in m.groups())      # (na rachunek, zwrot, powrotow ze zwrotem)
+    for x in ut:
+        m = ure.search(ut[x])
+        if m:
+            ua[x] = tuple(int(v) for v in m.groups())      # (powrotow ze zwrotem, na rachunek, zwrot)
+    both = sorted(set(za) & set(ua))
+    if both:
+        zs, zb, zn = (sum(za[x][i] for x in both) for i in range(3))
+        un, us, ub = (sum(ua[x][i] for x in both) for i in range(3))
+        over = [x for x in sorted(za) if za[x][1] > 0.55 * za[x][0] + 2 * za[x][2]]
+        rep.add("R1-16: rachunek za drewno - licznik dymarek (214) = licznik utargu wsi (112); zwrot <= 0.55 x \"na rachunek\" + 2 na powrot",
+                f"na rachunek {zs} wobec {us}, zwrot z licznikow panow do kies wsi {zb} wobec {ub} (powrotow ze zwrotem {zn} wobec {un}; {len(both)} dob z para linii); "
+                f"dob ze zwrotem ponad granice {len(over)}" + (" [" + ", ".join(f"d{x}" for x in over[:6]) + "]" if over else "")
+                + (f"; zwrot / na rachunek {zb / float(zs):.2f}" if zs else ""),
+                "obie pary rowne i 0 dob ponad granice (INFO: zwrot / na rachunek oczekiwane ok. 0.40-0.45)", zs == us and zb == ub and not over)
+    else:
+        rep.add("R1-16: rachunek za drewno - licznik dymarek (214) = licznik utargu wsi (112)", "brak dob z para linii (pole F4b w linii Utarg wsi 112)",
+                "obie pary rowne", None)
+    ore = re.compile(r"rachunek otwarty (\d+) zl w (\d+) kopalniach")
+    op = {}
+    for x in bill:
+        m = ore.search(rows[x])
+        if m:
+            op[x] = (int(m.group(1)), int(m.group(2)))
+    cut_ = tot(r"wygasle ponad \d+ dob zakupow (\d+)", [x for x in bill if x >= 15])
+    ret, hand, settled = (tot(r"powroty wozow kopaln (\d+) z utargiem", bill), tot(r"powroty wozow kopaln \d+ z utargiem (\d+) zl", bill),
+                          tot(r"z tego na rachunek (\d+) zl", bill))
+    o91 = [op[x][0] for x in op if x >= 91]
+    ld = None
+    for x in lines:
+        m = re.search(r"rachunki za drewno \(F4b\) (\d+) \((\d+) zl\)(?:, nieczytelnych (\d+))?", x)
+        if m:
+            ld = m
+    lx = max(op) if op else None
+    rep.add("R1-17: rachunek za drewno - otwarty, wygasle, utarg wozow kopaln (okno)",
+            (f"otwarty d{lx}: {op[lx][0]} zl w {op[lx][1]} kopalniach" if lx is not None else "otwarty: brak pola")
+            + (f", srednio d91-until {sum(o91) / float(len(o91)):.0f} zl" if o91 else "") + f"; wygasle ponad 14 dob zakupow (suma d15-until) {cut_}"
+            + (" - UWAGA: > 0 (wozy kopalni nie wracaja albo zakupy drewna stale ponad utarg)" if cut_ > 0 else "")
+            + f"; powroty wozow kopaln {ret} z utargiem {hand} zl ({hand / float(len(bill)):.0f} zl/d)" + (f", na rachunek {100.0 * settled / hand:.0f}% utargu" if hand else "")
+            + (f"; wczytanie: rachunki {ld.group(1)} ({ld.group(2)} zl)" + (f", nieczytelnych {ld.group(3)}" if ld.group(3) else "") if ld else ""),
+            "INFO (wygasle ostrzegawczo > 0; bazy nie ma - w biegu a589def zakup drewna ok. 47% utargu z zelaza)", None)
+    pre = re.compile(r"kiesy kopaln: min (\d+) / mediana (\d+) / suma (\d+) zl w (\d+) kopalniach, ponizej kosztu drewna doby (\d+) z (\d+)")
+    nre = re.compile(r"najwiecej bez zlota: (.*?); najbardziej bez wegla:")
+    w91b = [x for x in bill if x >= 91] or bill
+    pp = [tuple(int(v) for v in m.groups()) for m in (pre.search(rows[x]) for x in w91b) if m]
+    names, lastn = {}, None
+    for x in w91b:
+        m = nre.search(rows[x])
+        if not m:
+            continue
+        lastn = (x, m.group(1))
+        for nm in re.findall(r"(?:^|\), )(.+?) \(kiesa ", m.group(1)):
+            names[nm] = names.get(nm, 0) + 1
+    topn = sorted(names.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+    if pp:
+        k = float(len(pp))
+        rep.add(f"R1-18: kiesy kopaln i kopalnie najwiecej bez zlota (srednio d{w91b[0]}-d{w91b[-1]})",
+                f"min {sum(q[0] for q in pp) / k:.0f} / mediana {sum(q[1] for q in pp) / k:.0f} / suma {sum(q[2] for q in pp) / k:.0f} zl w {pp[-1][3]} kopalniach; "
+                f"ponizej kosztu drewna doby srednio {sum(q[4] for q in pp) / k:.1f} z {sum(q[5] for q in pp) / k:.1f}"
+                + (f"; d{lastn[0]} najwiecej bez zlota: {lastn[1][:260]}" if lastn else "")
+                + ("; najczestsze: " + ", ".join(f"{a} {b}" for a, b in topn) if topn else ""),
+                "INFO (bazy nie ma - pierwszy bieg ustala; kopalnia, ktora nic nie kupila, nie dostaje zwrotu - cecha reguly F4b)", None)
+    else:
+        rep.add("R1-18: kiesy kopaln i kopalnie najwiecej bez zlota", "brak pola kies kopaln", "INFO", None)
 
 
 def etap5_r3(rep, lines, start, until):
@@ -4038,11 +4679,87 @@ def etap5_r3(rep, lines, start, until):
         rep.add("R3-12: potkniecia ToolsByUse (suma okna)", str(stu), "0", stu == 0)
 
 
+def etap5_f1(rep, lines, start, until, logp=None):
+    """Narzedzie progow F9b - poprawka F1 (test zbiorczy 5-8; TradeCarts 215, ValyrianBlades, UniqueSpoils): spis stali valyrianskiej i kronika
+    unikatow widza sztuki w wozach kupcow. Linie: "ERROR in ValyrianBlades.Census" (UBYTEK - klinga poza spisem), "Stal valyrianska: dzien N - X klng,
+    Y miar (rejestr Z klng, ...), ..., w drodze wozem W" (glowny log; pisana przy zmianie; pole "w drodze wozem" od F1) oraz plik sesji unikaty.log:
+    "Kronika unikatow: dzien N - stan swiata (K unikatow w obiegu): <id>: <miejsce> | ..." / "... - zmiany: <id>: <miejsce> | ..." (miejsce = skladniki
+    po "; ", "nigdzie" = zero skladnikow). Wiazace (prog 0): F1-1 bledy spisu, F1-2 spis z klng < rejestr (bez pierwszej linii pliku - spis startowy
+    sesji, magazyny DTE odtwarzane po starcie), F1-3 wpis kroniki, w ktorym ubyl skladnik "targ " albo "w drodze wozem " i nie przybyl zaden nowy.
+    INFO: F1-4 wpisy kroniki "w drodze wozem" i najwiecej kling w wozach (brak pola = stary DLL), F1-5 wszystkie wpisy "nigdzie"."""
+    cre = re.compile(r"^Stal valyrianska: dzien (\d+) - (\d+) klng, \d+ miar \(rejestr (\d+) klng")
+    cen = []
+    for x in lines:
+        m = cre.match(x)
+        if m:
+            cen.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), x))
+    errs = [x for x in lines if x.startswith("ERROR in ValyrianBlades.Census")]
+    rep.add("F1-1: bledy spisu stali valyrianskiej (linie ERROR in ValyrianBlades.Census)", f"{len(errs)}" + (f" (pierwszy: {errs[0][:220]})" if errs else ""),
+            "0 (UBYTEK = klinga poza spisem; od F1 woz kupca jest miejscem spisu; a589def 1, W33 0)", (len(errs) == 0) if (cen or errs) else None)
+    body = [c for c in cen[1:] if run_day(c[0], start) <= until + 1]
+    low = [c for c in body if c[1] < c[2]]
+    if cen:
+        rep.add("F1-2: spis stali valyrianskiej z liczba kling ponizej rejestru (bez spisu startowego sesji)",
+                f"{len(low)} z {len(body)} linii spisu" + (" [" + ", ".join(f"d{run_day(c[0], start)}: {c[1]} z {c[2]}" for c in low[:6]) + "]" if low else ""),
+                "0 (a589def 4 ze 120 - klinga w wozie kupca; W33 0)", (len(low) == 0) if body else None)
+    else:
+        rep.add("F1-2: spis stali valyrianskiej z liczba kling ponizej rejestru", "brak linii Stal valyrianska: dzien", "0", None)
+    fld = [v for v in (num(r", w drodze wozem (\d+)", c[3], int) for c in cen) if v is not None]
+    up = session_file_find(logp, "unikaty.log") if logp else None
+    if not up or not os.path.exists(up):
+        rep.add("F1-3: unikat z targu albo z wozu na \"nigdzie\" bez nowego miejsca (kronika unikatow)", f"brak pliku unikaty.log ({up or 'bez sciezki logu'})",
+                "0 (plik sesji unikaty.log obok logu albo w Logs/<sesja>/)", None)
+        rep.add("F1-4: unikaty i stal valyrianska w wozach kupcow", ("spis: najwiecej kling w wozach " + str(max(fld)) + f" ({len(fld)} linii z polem)") if fld
+                else ("spis: BRAK pola \"w drodze wozem\" (stary DLL)" if cen else "brak linii spisu") + "; kronika: brak pliku", "INFO", None)
+        rep.add("F1-5: wpisy kroniki \"nigdzie\"", "brak pliku unikaty.log", "INFO", None)
+        return
+    kre = re.compile(r"^Kronika unikatow: dzien (\d+) - (stan swiata \(\d+ unikatow w obiegu\): |zmiany: )(.*)$")
+    state, hits, road, nowhere, nlines = {}, [], 0, [], 0
+    for x in read(up):
+        m = kre.match(x)
+        if not m:
+            continue
+        rd = run_day(int(m.group(1)), start)
+        first = m.group(2).startswith("stan")
+        txt = m.group(3)
+        if txt.endswith("."):
+            txt = txt[:-1]
+        if first:
+            state = {}
+        inwin = rd <= until + 1
+        nlines += 1 if inwin else 0
+        for ent in txt.split(" | "):
+            if ": " not in ent:
+                continue
+            uid, place = ent.split(": ", 1)
+            comp = set() if place.startswith("nigdzie") else set(place.split("; "))
+            old = state.get(uid)
+            if inwin and not first:
+                if any(c.startswith("w drodze wozem ") for c in comp):
+                    road += 1
+                if not comp:
+                    nowhere.append(f"d{rd} {uid}")
+                if old:
+                    lost = [c for c in old - comp if c.startswith("targ ") or c.startswith("w drodze wozem ")]
+                    if lost and not (comp - old):
+                        hits.append(f"d{rd} {uid}: {sorted(lost)[0]} -> " + ("nigdzie" if not comp else "ubylo"))
+            state[uid] = comp
+    rep.add("F1-3: unikat z targu albo z wozu na \"nigdzie\" bez nowego miejsca (kronika unikatow, unikaty.log)",
+            f"{len(hits)} w {nlines} liniach kroniki" + (" [" + "; ".join(hits[:5]) + "]" if hits else ""),
+            "0 (a589def 2 - oba woz kupca, od F1 0; W33 1 - cersei_red_dress z polki, inna droga)", (len(hits) == 0) if nlines else None)
+    rep.add("F1-4: unikaty i stal valyrianska w wozach kupcow (wpisy kroniki \"w drodze wozem\" / najwiecej kling w wozach w spisie)",
+            f"wpisow kroniki {road}; spis: " + (f"najwiecej {max(fld)} ({len(fld)} linii z polem)" if fld else ("BRAK pola \"w drodze wozem\" (stary DLL)" if cen else "brak linii spisu")),
+            "INFO (od F1 woz kupca jest miejscem w kronice i w spisie)", None)
+    rep.add("F1-5: wpisy kroniki unikatow \"nigdzie\" (wszystkie, okno)", f"{len(nowhere)}" + (" [" + ", ".join(nowhere[:8]) + "]" if nowhere else ""),
+            "INFO (a589def 5, W33 3; po F1 zostaja przejsciowe \"nigdzie\" rzeczy noszonych i przypadki poza wozem)", None)
+
+
 def etap5_w1(rep, lines, start, until):
     """E6/W1 (216, projekt etapu 6 v2 rozdz. 3 "E6/W1" Test): linia startowa sesji "Receptury (216):" (raz na sesje, po HistoricalPrices.Apply - ocena
     ostatniej w logu) i linie ksiegi "Towary: dzien N - <towar> (W d): zapas S" (dzien = doba gry - 1, okno doby kampanii 1-until jak etap5_main).
     Wiazace: WLACZONE, zadna linia z mniejszym wsadem niz receptura gry, dla welny, lnu i skor co najmniej jedna linia zmieniona, potkniecia 0;
-    len i welna - dla kazdego co najmniej jeden z miesiecy 2-4 (d29-56, d57-84, d85-112) bez wzrostu zapasu (gdy okno siega d112, inaczej INFO);
+    len i welna - stos z ostatniej decyzji regulatora wsi <= 60 dni zuzycia albo decyzja w dol w oknie (bez decyzji regulatora: co najmniej jeden
+    z miesiecy 2-4 (d29-56, d57-84, d85-112) z przyrostem <= +2% zapasu z poczatku miesiaca); gdy okno siega d112, inaczej INFO;
     skora i plotno - srednia zmiana zapasu d91-until >= -10/d (gdy okno siega d92, inaczej INFO); kolejka odziezy wojska (150, skora + sukno + plotno
     "czeka") d90 -> until bez wzrostu (<= +2%, gdy okno siega d92, inaczej INFO)."""
     st = [s for s in lines if s.startswith("Receptury (216):")]
@@ -4073,18 +4790,37 @@ def etap5_w1(rep, lines, start, until):
     def at(x, d):
         ks = [k for k in x if k <= d]
         return x[max(ks)] if ks else None
+    # narzedzie progow zb58 (TRIAZ W1-5): prog sprzed W3 ("ktorys miesiac bez wzrostu") przeczyl pasmu regulatora wsi - towar ze stosem w pasmie albo
+    # ponizej pasma (LO-HI dni zuzycia, ValveStockDaysHigh 60) ma rosnac powoli z zamiaru. (a) miesiac zaliczony przy zmianie <= +2% zapasu z poczatku
+    # miesiaca (tolerancja jak W3-6 / W1-7); (b) gdy sa decyzje regulatora dla towaru: NIE dopiero, gdy stos z ostatniej decyzji > HI bez zadnej decyzji
+    # "w dol" w oknie (wolne puchniecie ponad pasmo). Log bez decyzji regulatora - sama regula (a), gdy okno siega d112.
+    vdec, vlo, vhi = valve_decisions(lines, start, until)
     for k, name in (("wool", "welna"), ("flax", "len")):
         x = ser.get(k, {})
         if not x:
-            rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", "brak linii Towary", "co najmniej jeden <= 0 (gdy okno siega d112)", None)
+            rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", "brak linii Towary", "co najmniej jeden miesiac <= +2% (gdy okno siega d112)", None)
             continue
-        ch = []
+        ch, tol = [], []
         for mth in (2, 3, 4):
             a, b2 = at(x, 28 * (mth - 1)), at(x, 28 * mth)
-            ch.append(None if a is None or b2 is None or max(x) < 28 * mth else b2 - a)
+            c = None if a is None or b2 is None or max(x) < 28 * mth else b2 - a
+            ch.append(c)
+            tol.append(c is not None and c <= 0.02 * a)
         full = max(x) >= 112 and all(c is not None for c in ch)
-        rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", ", ".join("-" if c is None else f"{c:+d}" for c in ch) + f" (ostatnia doba d{max(x)})",
-                "co najmniej jeden <= 0 (gdy okno siega d112)", (any(c <= 0 for c in ch)) if full else None)
+        txt = ", ".join("-" if c is None else f"{c:+d}" for c in ch) + f" (ostatnia doba d{max(x)}; miesiecy z przyrostem <= +2%: {sum(1 for t in tol if t)})"
+        dd = vdec.get(k, [])
+        if dd:
+            rd, dn, dirn = dd[-1][0], dd[-1][1], dd[-1][2]
+            down = [q[0] for q in dd if q[2] == "w dol"]
+            swollen = dn > vhi and not down
+            pos = "ponad pasmem" if dn > vhi else ("w pasmie" if dn >= vlo else "ponizej pasma")
+            rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", txt + f"; regulator d{rd}: stos {dn} dni zuzycia ({pos} {vlo}-{vhi}), {dirn}"
+                    + (f", w dol w d{down[-1]}" if down else ""),
+                    f"stos regulatora <= {vhi} dni zuzycia albo decyzja w dol w oknie (wzrost w pasmie i ponizej pasma zamierzony); bez decyzji regulatora: "
+                    "co najmniej jeden miesiac <= +2%", (not swollen) if full else None)
+        else:
+            rep.add(f"W1-5: {name} - zmiana zapasu w miesiacach 2-4", txt, "co najmniej jeden miesiac <= +2% zapasu z poczatku miesiaca (gdy okno siega d112)",
+                    (any(tol)) if full else None)
     for k, name in (("leather", "skora"), ("linen", "plotno")):
         x = ser.get(k, {})
         a = at(x, 90) if x else None
@@ -4124,7 +4860,8 @@ def etap5_w3(rep, lines, start, until):
     stan z zapisu), "BK gnicie surowcow (174.3): dzien N - skasowano X szt." i ksiegi "Towary: dzien N - <towar> (W d): zapas S" (dzien = doba gry - 1, okno
     doby kampanii 1-until jak etap5_main). Wiazace: regulator CZYNNY w oknie, pierwsza decyzja do d60 (nowa kampania; gdy okno siega d60), kasowanie 0
     w kazdej dobie po dobie pierwszej decyzji, zaden towar nie zmienia kierunku w dwoch kolejnych decyzjach (gdy >= 2 decyzje), potkniecia 0; sol i glina -
-    zapas d90 -> until bez wzrostu (<= +2%, gdy okno siega d92); mnozniki ostatniej decyzji i liczba decyzji w dol / w gore - INFO."""
+    stos z ostatniej decyzji regulatora <= 60 dni zuzycia albo decyzja w gore (ponad 60 dni - zapas bez wzrostu <= +2% od tej decyzji; towar
+    bez decyzji - zapas d90 -> until bez wzrostu <= +2%; gdy okno siega d92); mnozniki ostatniej decyzji i liczba decyzji w dol / w gore - INFO."""
     reg = {}
     for d, s in by_day(lines, "Regulator wsi (221): dzien").items():
         rd = run_day(d, start)
@@ -4174,6 +4911,11 @@ def etap5_w3(rep, lines, start, until):
                 rd = run_day(int(m.group(1)), start)
                 if 1 <= rd <= until:
                     ser.setdefault(m.group(2), {})[rd] = int(m.group(3))
+    # narzedzie progow zb58 (TRIAZ W3-6 sol, glina): prog "bez wzrostu" zakladal nadmiar sprzed zakupow wsi E5/B1 i przeczyl pasmu regulatora. Ocena
+    # z ostatniej decyzji regulatora dla towaru: stos D <= HI (ValveStockDaysHigh 60) albo decyzja "w gore" - wzrost zamierzony (sol: 10 dni, x1.30;
+    # glina: 41 dni w pasmie - ciecie dopiero powyzej 60); dopiero przy D > HI wymagany brak wzrostu zapasu (<= +2%) od tej decyzji. Towar bez decyzji
+    # w oknie - stara regula d90 -> until.
+    vdec, vlo, vhi = valve_decisions(lines, start, until)
     for key, name in (("salt", "sol"), ("clay", "glina")):
         x = ser.get(key, {})
         ks = [d for d in x if d <= 90]
@@ -4181,7 +4923,25 @@ def etap5_w3(rep, lines, start, until):
             rep.add(f"W3-6: {name} - zapas d90 -> until", "za krotkie okno albo brak linii Towary", "bez wzrostu <= +2% (gdy okno siega d92)", None)
             continue
         a, e = x[max(ks)], max(x)
-        rep.add(f"W3-6: {name} - zapas d90 -> until", f"d{max(ks)} {a} -> d{e} {x[e]}", "bez wzrostu (<= +2%)", x[e] <= a * 1.02 + 1)
+        dd = vdec.get(key, [])
+        if not dd:
+            rep.add(f"W3-6: {name} - zapas d90 -> until", f"d{max(ks)} {a} -> d{e} {x[e]}", "bez wzrostu (<= +2%)", x[e] <= a * 1.02 + 1)
+            continue
+        rd, dn, dirn, stos, cons, prod, okno = dd[-1]
+        ups = [q[0] for q in dd if q[2] == "w gore"]
+        txt = f"d{max(ks)} {a} -> d{e} {x[e]}; regulator d{rd}: stos {stos} = {dn} dni zuzycia, {dirn}" + (f" (w gore w d{ups[-1]})" if ups and dirn != "w gore" else "")
+        if dn <= vhi or dirn == "w gore":
+            txt += f" - {'ponizej pasma' if dn < vlo else 'w pasmie'} {vlo}-{vhi}, wzrost zamierzony"
+            grow = (prod - cons) / float(max(1, okno))
+            if vlo <= dn <= vhi and grow > 0 and cons > 0:
+                txt += f"; przy {grow:+.0f}/d stos {vhi} dni ok. d{rd + (vhi * cons / float(okno) - stos) / grow:.0f} - wtedy ciecie (prog wiazacy w biegu dlugim)"
+            rep.add(f"W3-6: {name} - zapas d90 -> until", txt, f"stos regulatora <= {vhi} dni zuzycia albo decyzja w gore; ponad {vhi} dni - zapas bez wzrostu "
+                    "(<= +2%) od tej decyzji", True)
+        else:
+            kd = [d for d in x if d <= rd]
+            base = x[max(kd)] if kd else a
+            rep.add(f"W3-6: {name} - zapas d90 -> until", txt + f" - ponad pasmo {vlo}-{vhi}; zapas od decyzji {base} -> {x[e]}",
+                    f"stos regulatora <= {vhi} dni zuzycia albo decyzja w gore; ponad {vhi} dni - zapas bez wzrostu (<= +2%) od tej decyzji", x[e] <= base * 1.02 + 1)
     if dec:
         last = dec[max(dec)]
         i, j = last.find(": ["), last.rfind("]; w dol")
@@ -4285,13 +5045,15 @@ def etap5_k4(rep, lines, start, until):
         rep.add("K4-9: bieg roczny - konie na targu bez trendu", "okno krotsze niz d360", "+-10% (tylko bieg roczny)", None)
 
 
-def etap5_k3(rep, lines, start, until):
+def etap5_k3(rep, lines, start, until, logp=None):
     """E6/K3 (219, projekt etapu 6 v2 rozdz. 3 "E6/K3" Test; rozdz. 4 prog 6.14): linia doby "Rycerze i jazda (219): dzien N | ..." (dzien = doba gry, okno
-    1-until jak etap5_main). Progi [S] projektu (ostateczne z rachunku koni E6/0 po tescie): jazda partii AI srednio >= 12% w d91-until i nie spada wobec
-    d61-90 (tolerancja 0.3 pp), Dothrakowie (khuzait) >= 60%, Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na
-    konia swojej kategorii nie rosnie w d91-until (srednia 5 ostatnich dob <= 1.05 x srednia 5 pierwszych), przerwa "zostaje (K3 bez K2)" 0 przy czynnej
-    sprzedazy K2(b), potkniecia 0; awanse przy rozwidleniu, konie rycerzy (stada, targ, zloto, budzet sprzetu) - INFO. Pompa koni - K2-5, wojsko lordow
-    i bankruci - progi E2/E5."""
+    1-until jak etap5_main). Progi po triazu zb58 (miara = to, czym K3 steruje - konni wsrod ludzi t3+): wykonanie celu szablonow (t3+ % / cel %) srednio
+    >= 80% w d91-until (bieg roczny >= 90%) i nie spada wobec d61-90 (tolerancja 2 pp), Dothrakowie (khuzait) t3+ >= 90% celu i czekajacy na konia
+    <= 10% ludzi (konie-krolestwa.csv), Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na konia swojej
+    kategorii maleje w d91-until (srednia 5 ostatnich dob < srednia 5 pierwszych - F5) i nie przekracza polowy braku do celu t3+ (bez khuzait),
+    przerwa "zostaje (K3 bez K2)" 0 przy czynnej sprzedazy K2(b), potkniecia 0; jazda wszystkich ludzi z sufitem (12% / 60% wiazace tylko w biegu
+    rocznym), decyzje sterowania przy rozwidleniu z awansami wykonanymi (linia "Konie AI (175)"), konie rycerzy (stada, targ, zloto, budzet sprzetu) -
+    INFO. Pompa koni - K2-5, wojsko lordow i bankruci - progi E2/E5."""
     seg = {}
     for d, s in by_day(lines, "Rycerze i jazda (219): dzien").items():
         rd = run_day(d, start)
@@ -4319,15 +5081,76 @@ def etap5_k3(rep, lines, start, until):
     w61 = [x for x in days if 61 <= x <= 90]
     a91 = mean([v for v in (share(seg[x]) for x in w91) if v is not None])
     a61 = mean([v for v in (share(seg[x]) for x in w61) if v is not None])
+    # narzedzie progow zb58 (TRIAZ K3-3 "Poprawka ostateczna" B i "K3-3 / K3-5 / K3-8 - miara progow"): K3 steruje udzialem konnych wsrod ludzi t3+
+    # (CavalryTemplate), a stare progi mierzyly wszystkich ludzi z rekrutami t1-t2 - sufit miary przy pelnym celu to ok. 12.7% (d91-120), wiec 12% bylo
+    # 95% sufitu, a Dothrakom (cel 99%, t3+ 97.9%) brakowalo nie K3, tylko koni dla rekrutow t1. Wiazace teraz: K3-3 wykonanie celu = srednia (t3+ %)
+    # / srednia (cel szablonow %) w d91-until >= 80% (bieg roczny >= 90%); K3-4 to samo wykonanie nie spada wobec d61-90 (tolerancja 2 pp); K3-5a
+    # Dothrakowie t3+ >= 90% celu; K3-5 czekajacy Dothrakow <= 10% ludzi (konie-krolestwa.csv - prawdziwy objaw: rekruci t1 bez konia). Udzial jazdy
+    # wszystkich ludzi - INFO z sufitem; 12% (i 60% Dothrakow) zostaje progiem tylko w biegu rocznym (okno >= d360).
+    def tmpl(s):
+        m = re.search(r"konnych (\d+) z (\d+) ludzi .*?; t3\+ ([\d.]+)% z (\d+) wobec celu szablonow ([\d.]+)%", s)
+        return (int(m.group(1)), int(m.group(2)), float(m.group(3)), int(m.group(4)), float(m.group(5))) if m else None
+
+    def done(ds):
+        tt = [t for t in (tmpl(seg[x]) for x in ds) if t]
+        got, goal = mean([t[2] for t in tt]), mean([t[4] for t in tt])
+        return (100.0 * got / goal, got, goal) if tt and goal else None
+
+    def ceil_of(ds):
+        tt = [t for t in (tmpl(seg[x]) for x in ds) if t and t[1] > 0]
+        return mean([100.0 * (t[4] / 100.0 * t[3] + max(0.0, t[0] - t[2] / 100.0 * t[3])) / t[1] for t in tt])
+    year = until >= 360 and days[-1] >= 360
+    khz = {}
+    cp = session_file_find(logp, "konie-krolestwa.csv") if logp else None
+    if cp and os.path.exists(cp):
+        try:
+            with open(cp, encoding="utf-8", errors="replace") as fh:
+                for r in csv.DictReader(fh, delimiter=";"):
+                    if r.get("krolestwo") == "khuzait":
+                        khz[run_day(int(r["dzien"]), start)] = (int(r["czeka"]), int(r["wszyscy"]))
+        except (KeyError, ValueError, OSError):
+            khz = {}
     if a91 is None:
         allv = [v for v in (share(seg[x]) for x in days) if v is not None]
-        rep.add("K3-3: jazda partii AI srednio w d91-until", f"okno nie siega d91 (srednio {mean(allv) or 0:.1f}% w d{days[0]}-{days[-1]})", ">= 12% [S]", None)
+        e0 = done(days)
+        rep.add("K3-3: jazda t3+ wobec celu szablonow srednio w d91-until", "okno nie siega d91 (" + (f"wykonanie celu {e0[0]:.0f}%, " if e0 else "")
+                + f"jazda partii srednio {mean(allv) or 0:.1f}% w d{days[0]}-{days[-1]})", ">= 80% celu [S]", None)
     else:
-        rep.add(f"K3-3: jazda partii AI srednio w d91-{until}", f"{a91:.1f}%", ">= 12% [S] (bieg roczny 18-22%; przed K3 8.3%)", a91 >= 12.0)
-        if a61 is not None:
+        e91, e61 = done(w91), done(w61)
+        cl = ceil_of(w91)
+        if e91:
+            rep.add(f"K3-3: jazda t3+ wobec celu szablonow srednio w d91-{until} (wykonanie celu K3)",
+                    f"{e91[0]:.0f}% (t3+ {e91[1]:.1f}% przy celu {e91[2]:.1f}%)", (">= 90% celu (bieg roczny)" if year else ">= 80% celu [S] (bieg roczny >= 90%)"),
+                    e91[0] >= (90.0 if year else 80.0))
+        else:
+            rep.add(f"K3-3: jazda t3+ wobec celu szablonow srednio w d91-{until}", "brak udzialu t3+ i celu w linii", ">= 80% celu [S]", None)
+        rep.add(f"K3-3b: jazda partii AI (wszyscy ludzie, z rekrutami t1-t2) srednio w d91-{until}",
+                f"{a91:.1f}%" + (f"; sufit przy pelnym celu t3+ {cl:.1f}%" if cl is not None else ""),
+                ">= 12% [S] (bieg roczny 18-22%)" if year else "INFO (12% i 18-22% to progi biegu rocznego; wzorzec W33 7.4%)", (a91 >= 12.0) if year else None)
+        if e91 and e61:
+            rep.add("K3-4: wykonanie celu K3 nie spada (d61-90 -> d91-until)", f"{e61[0]:.0f}% -> {e91[0]:.0f}% (jazda partii {a61:.1f}% -> {a91:.1f}%)",
+                    "nie mniej niz d61-90 - 2 pp", e91[0] >= e61[0] - 2.0)
+        elif a61 is not None:
             rep.add("K3-4: jazda partii nie spada (d61-90 -> d91-until)", f"{a61:.1f}% -> {a91:.1f}%", "nie mniej niz d61-90 - 0.3 pp", a91 >= a61 - 0.3)
-        for code, kid, name, rule, ok in (("K3-5", "khuzait", "Dothrakowie", ">= 60% [S]", lambda r: r[0] >= 60.0),
-                                          ("K3-6", "sturgia", "Zelazne Wyspy", "<= 5% [S]", lambda r: r[0] <= 5.0)):
+        rr = [r for r in (realm(seg[x], "khuzait") for x in w91) if r]
+        if not rr:
+            rep.add(f"K3-5: jazda partii - Dothrakowie (khuzait) d91-{until}", "brak krainy w linii", "t3+ >= 90% celu; czeka <= 10% ludzi", None)
+        else:
+            m0, t3, tg = mean([r[0] for r in rr]), mean([r[1] for r in rr]), mean([r[2] for r in rr])
+            kw = [khz[x] for x in w91 if x in khz]
+            if kw and sum(b for _, b in kw) > 0:
+                wsh = 100.0 * sum(a for a, _ in kw) / sum(b for _, b in kw)
+                rep.add(f"K3-5: Dothrakowie (khuzait) - czekajacy na konia wobec ludzi d91-{until} (konie-krolestwa.csv, lordowie i zalogi)",
+                        f"{wsh:.1f}% (czeka srednio {mean([a for a, _ in kw]):.0f} z {mean([b for _, b in kw]):.0f} ludzi; {len(kw)} dob)",
+                        "<= 10% (rekrut t1 Dothrakow ma jeden cel - konnego t2; bez konia czeka)", wsh <= 10.0)
+            else:
+                rep.add(f"K3-5: Dothrakowie (khuzait) - czekajacy na konia wobec ludzi d91-{until}", "brak konie-krolestwa.csv albo wierszy khuzait w oknie",
+                        "<= 10% (plik sesji konie-krolestwa.csv)", None)
+            rep.add(f"K3-5a: Dothrakowie (khuzait) - jazda t3+ wobec celu szablonow d91-{until}", f"{100.0 * t3 / tg:.0f}% (t3+ {t3:.1f}% przy celu {tg:.1f}%)" if tg
+                    else f"t3+ {t3:.1f}%, cel 0", ">= 90% celu", (t3 >= 0.9 * tg) if tg else None)
+            rep.add(f"K3-5b: jazda partii - Dothrakowie (khuzait), wszyscy ludzie d91-{until}", f"{m0:.1f}%",
+                    ">= 60% [S]" if year else "INFO (60% to prog biegu rocznego - rekruci t1 czekaja na konia; sufit szablonu ok. 63%)", (m0 >= 60.0) if year else None)
+        for code, kid, name, rule, ok in (("K3-6", "sturgia", "Zelazne Wyspy", "<= 5% [S]", lambda r: r[0] <= 5.0),):
             rr = [realm(seg[x], kid) for x in w91]
             rr = [r for r in rr if r]
             if not rr:
@@ -4346,8 +5169,21 @@ def etap5_k3(rep, lines, start, until):
         wv = [v for x, v in wv if v is not None]
         if len(wv) >= 10:
             f5, l5 = mean(wv[:5]), mean(wv[-5:])
+            # narzedzie progow F9b (F5, K3-8): po F5 (konie lordow z przydzialu sprzetu rodu) kolejka ma malec, nie tylko "nie rosnac"
             rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until} (lordowie i zalogi AI)", f"5 pierwszych dob {f5:.0f}, 5 ostatnich {l5:.0f}",
-                    "nie rosnie (<= 1.05 x)", l5 <= 1.05 * f5 + 1)
+                    "maleje: 5 ostatnich dob < 5 pierwszych [S] (a589def 4465 -> 4176 przy poziomie 2.2 x W33)", l5 < f5)
+            # narzedzie progow zb58 (TRIAZ "K3-3 / K3-5 / K3-8 - miara", pkt 3): sam trend przechodzil przy poziomie 2.2 x wzorca i rownym brakowi do celu -
+            # dochodzi poziom: czekajacy (bez Dothrakow - ich rekruci t1 to osobny wiersz K3-5) <= 0.5 x brak konnych do celu t3+ partii rodow
+            gap = [t[3] * max(0.0, t[4] - t[2]) / 100.0 for t in (tmpl(seg[x]) for x in w91) if t]
+            kwt = [khz[x][0] for x in w91 if x in khz]
+            if gap and kwt:
+                wl, gp = mean(wv) - mean(kwt), mean(gap)
+                rep.add(f"K3-8b: czeka na konia - poziom wobec braku do celu t3+ d91-{until} (bez khuzait)",
+                        f"czeka srednio {wl:.0f} (wszyscy {mean(wv):.0f}, khuzait {mean(kwt):.0f}) wobec braku do celu t3+ {gp:.0f}",
+                        "<= 0.5 x brak do celu t3+ (wzorzec W33: czeka 1949 razem z khuzait)", wl <= 0.5 * gp)
+            else:
+                rep.add(f"K3-8b: czeka na konia - poziom wobec braku do celu t3+ d91-{until} (bez khuzait)",
+                        "brak konie-krolestwa.csv (czekajacy khuzait) albo udzialu t3+ w linii", "<= 0.5 x brak do celu t3+", None)
         else:
             rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until}", f"{len(wv)} dob z pomiarem (Army175Measure)", "nie rosnie - potrzeba >= 10 dob", None)
     rows = [seg[x] for x in days]
@@ -4369,8 +5205,119 @@ def etap5_k3(rep, lines, start, until):
         mkt = [mkt[i] + k[i] for i in range(3)]
     th, tf, gold, gear = (sum(num(p, x, int, 0) or 0 for x in rows) for p in (
         r"awanse przy rozwidleniu: do jazdy (\d+)", r", do piechoty (\d+) ludzi", r"z targu \d+/\d+/\d+, za (\d+) zl", r"\(budzet sprzetu (\d+)\)"))
-    rep.add("K3-10: awanse przy rozwidleniu i konie rycerzy od rodu (suma okna)", f"do jazdy {th}, do piechoty {tf} ludzi; konie rycerzy ze stad wsi postoju "
-            f"{'/'.join(map(str, herd))}, z targu {'/'.join(map(str, mkt))} (zwykly/bojowy/szlachetny) za {gold} zl (budzet sprzetu {gear})", "INFO", None)
+    # narzedzie progow zb58 (TRIAZ K3-10): licznik "awanse przy rozwidleniu" nie liczy awansow - CavalryTemplate dodaje n przy kazdym wywolaniu
+    # GetPossibleUpgradeTargets przed filtrem koni, wiec ci sami czekajacy sa liczeni co dobe (osobo-proby). Awanse wykonane, skret w piechote i czekajacy
+    # - z linii "Konie AI (175)" tych samych dob.
+    kai = {}
+    for d, s in by_day(lines, "Konie AI (175): dzien").items():
+        if run_day(d, start) in seg:
+            kai[run_day(d, start)] = s
+    kr = [kai[x] for x in sorted(kai)]
+    dn, dz, db, dsz, skr = (sum(num(p, x, int, 0) or 0 for x in kr) for p in (
+        r"awanse na jezdzca: wykonane (\d+)", r"awanse na jezdzca: wykonane \d+ \(zwykly (\d+)", r"awanse na jezdzca: wykonane \d+ \(zwykly \d+, bojowy (\d+)",
+        r"awanse na jezdzca: wykonane \d+ \(zwykly \d+, bojowy \d+, szlachetny (\d+)", r"proby odrzucone z braku konia \d+ \(skret (\d+)"))
+    wlast = num(r"stan: czeka na konia swojej kategorii (\d+) ludzi", kr[-1], int) if kr else None
+    rep.add("K3-10: decyzje sterowania przy rozwidleniu (osobo-proby - czekajacy liczeni co dobe) i konie rycerzy od rodu (suma okna)",
+            f"decyzje do jazdy {th}, do piechoty {tf}" + (f"; awanse wykonane na jezdzca {dn} (zwykly {dz}, bojowy {db}, szlachetny {dsz}), skret w piechote {skr}, "
+                                                           f"czeka (ostatnia doba) {wlast} - linia Konie AI (175), {len(kr)} dob" if kr else "")
+            + f"; konie rycerzy ze stad wsi postoju {'/'.join(map(str, herd))}, z targu {'/'.join(map(str, mkt))} (zwykly/bojowy/szlachetny) za {gold} zl "
+            f"(budzet sprzetu {gear})", "INFO", None)
+    _k3_f5(rep, lines, start, until, seg, days)
+
+
+def _k3_f5(rep, lines, start, until, seg, days):
+    """Narzedzie progow F9b: wiersze poprawki F5 (konie lordow z przydzialu sprzetu rodu; okno d91-until). Pole linii "Rycerze i jazda (219)":
+    "| zwykle konie z przydzialu sprzetu rodu (F5): CZYNNE udzial kiesy ponad rezerwe u, postoje n (budzet wyznaczyl przydzial a, kiesa b; bez budzetu:
+    brak przydzialu c, brak zlota ponad rezerwe d), zdjete z przydzialu e zl; rycerze zatrzymani rezerwa kiesy f"; zakupy i nieudane wizyty z linii
+    "Konie AI (175)" ("zakupy lordow: n koni ...; wizyt z potrzeba v ...), nieudane: brak zlota g, brak koni h (pusto .., za drogie i, ..), brak
+    przydzialu sprzetu rodu j" - ostatnie pole od F5); korpus z "Pokrycie zbrojowni AI (171)"; przydzial i przeterminowane z "Budzet rodow (166)"."""
+    w91 = [x for x in days if 91 <= x <= until]
+    if not w91:
+        rep.add("F5-1..F5-7: konie lordow z przydzialu sprzetu rodu (F5)", "okno nie siega d91", "progi F5 licza sie w d91-until", None)
+        return
+    f5d = [x for x in w91 if "| zwykle konie z przydzialu sprzetu rodu (F5): " in seg[x]]
+    fre = re.compile(r"postoje (\d+) \(budzet wyznaczyl przydzial (\d+), kiesa (-?\d+); bez budzetu: brak przydzialu (\d+), brak zlota ponad rezerwe (\d+)\), "
+                     r"zdjete z przydzialu (\d+) zl; rycerze zatrzymani rezerwa kiesy (\d+)")
+    if not f5d:
+        rep.add("F5-1: zwykle konie z przydzialu sprzetu rodu CZYNNE (linia Rycerze i jazda 219)",
+                "brak linii (log sprzed F5 - bez pola \"zwykle konie z przydzialu sprzetu rodu (F5)\")", "CZYNNE w kazdej dobie d91-until i postoje > 0", None)
+        rep.add("F5-5: postoje lordow z budzetem na konie (liczniki F5, linia 219)", "brak linii (log sprzed F5)", "INFO", None)
+    else:
+        offd = [x for x in w91 if "| zwykle konie z przydzialu sprzetu rodu (F5): CZYNNE" not in seg[x]]
+        tt = [0] * 7
+        for x in f5d:
+            m = fre.search(seg[x])
+            if m:
+                for i in range(7):
+                    tt[i] += int(m.group(i + 1))
+        kn = sum(num(r"postoje z rycerzami (\d+)", seg[x], int, 0) or 0 for x in f5d)
+        rep.add(f"F5-1: zwykle konie z przydzialu sprzetu rodu CZYNNE w kazdej dobie d91-{until} i postoje z budzetem > 0 (linia Rycerze i jazda 219)",
+                f"CZYNNE w {len(w91) - len(offd)} z {len(w91)} dob" + (f" (ostatnia nieczynna d{offd[-1]})" if offd else "") + f"; postoje (suma okna) {tt[0]}",
+                "CZYNNE we wszystkich dobach (WYLACZONE / NIECZYNNE = NIE) i suma postojow > 0", len(offd) == 0 and tt[0] > 0)
+        warn = []
+        if tt[0] and tt[1] > 0.5 * tt[0]:
+            warn.append("przydzial wyznaczyl ponad 50% postojow")
+        if kn and tt[6] > 0.1 * kn:
+            warn.append("rezerwa kiesy zatrzymala ponad 10% postojow z rycerzami")
+        rep.add(f"F5-5: postoje lordow z budzetem na konie (liczniki F5, suma d91-{until})",
+                f"postoje {tt[0]}: budzet wyznaczyl przydzial {tt[1]}" + (f" ({100.0 * tt[1] / tt[0]:.0f}%)" if tt[0] else "") + f", kiesa {tt[2]}; bez budzetu: brak "
+                f"przydzialu {tt[3]}, brak zlota ponad rezerwe {tt[4]}; zdjete z przydzialu {tt[5]} zl; rycerze zatrzymani rezerwa kiesy {tt[6]} z {kn} postojow "
+                "z rycerzami" + (" - UWAGA [S]: " + ", ".join(warn) if warn else ""),
+                "INFO (uwaga, gdy przydzial wyznaczyl > 50% postojow albo rezerwa zatrzymala > 10% postojow z rycerzami)", None)
+    kr = []
+    for d, s in sorted(by_day(lines, "Konie AI (175): dzien").items()):
+        if 91 <= run_day(d, start) <= until:
+            kr.append(s)
+    buy = [v for v in (num(r"\| zakupy lordow: (\d+) koni", x, int) for x in kr) if v is not None]
+    if buy:
+        avg = sum(buy) / float(len(buy))
+        rep.add(f"F5-2: zakupy koni lordow srednio d91-{until} (linia Konie AI 175)", f"{avg:.1f}/d ({len(buy)} dob)",
+                ">= 80/d [S] (a589def 50.8 w tym oknie, w TRIAZ 49.6; prognoza po F5 80-95)", avg >= 80.0)
+        vis = sum(num(r"; wizyt z potrzeba (\d+),", x, int, 0) or 0 for x in kr)
+        dear = sum(num(r"brak koni \d+ \(pusto \d+, za drogie (\d+)", x, int, 0) or 0 for x in kr)
+        nog = sum(num(r"nieudane: brak zlota (\d+)", x, int, 0) or 0 for x in kr)
+        rep.add(f"F5-3: nieudane zakupy koni lordow \"za drogie\" wobec wizyt z potrzeba d91-{until}",
+                f"{100.0 * dear / vis:.1f}% ({dear} z {vis} wizyt)" if vis else f"brak wizyt z potrzeba (za drogie {dear})",
+                "<= 5% [S] (a589def 20%; powyzej - krok 2 TRIAZ: za konie placi glowa rodu; od F5 pole liczy tylko \"za drogie\" z kiesy pana)",
+                (100.0 * dear / vis <= 5.0) if vis else None)
+        nsh = [v for v in (num(r", brak przydzialu sprzetu rodu (\d+)", x, int) for x in kr) if v is not None]
+        if nsh and vis:
+            a, b = 100.0 * sum(nsh) / vis, 100.0 * nog / vis
+            rep.add(f"F5-4: nieudane zakupy koni lordow - brak przydzialu sprzetu rodu i brak zlota wobec wizyt d91-{until}",
+                    f"brak przydzialu {a:.1f}% ({sum(nsh)} z {vis}), brak zlota {b:.1f}% ({nog} z {vis})", "oba <= 10% wizyt [S]", a <= 10.0 and b <= 10.0)
+        else:
+            rep.add(f"F5-4: nieudane zakupy koni lordow - brak przydzialu sprzetu rodu i brak zlota wobec wizyt d91-{until}",
+                    ("brak linii (log sprzed F5 - bez pola \"brak przydzialu sprzetu rodu\")" if not nsh else "brak wizyt z potrzeba")
+                    + (f"; brak zlota {100.0 * nog / vis:.1f}% ({nog} z {vis})" if vis else ""), "oba <= 10% wizyt [S]", None)
+    else:
+        rep.add(f"F5-2..F5-4: zakupy koni lordow d91-{until} (linia Konie AI 175)", "brak linii Konie AI (175) z polem zakupow w oknie", "pomiar Army175Measure", None)
+    cov = {}
+    for d, s in by_day(lines, "Pokrycie zbrojowni AI (171): dzien").items():
+        v = num(r"partie rodow AI \(\d+ ludzi\): korpus (\d+)%", s, int)
+        if v is not None and 1 <= run_day(d, start) <= until:
+            cov[run_day(d, start)] = v
+    if cov:
+        lc = max(cov)
+        rep.add("F5-6: korpus partii rodow AI - ostatnia linia Pokrycie zbrojowni AI (171) w oknie", f"{cov[lc]}% (d{lc}; pierwsza d{min(cov)} {cov[min(cov)]}%)",
+                ">= 62% [S] (a589def 65 - konie z przydzialu sprzetu nie moga zjesc zbroi)", (cov[lc] >= 62) if lc >= 91 else None)
+    else:
+        rep.add("F5-6: korpus partii rodow AI (linia Pokrycie zbrojowni AI 171)", "brak linii w oknie", ">= 62% [S]", None)
+    bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    bw = [bud[d] for d in sorted(bud) if 91 <= run_day(d, start) <= until]
+    gear = [(num(r"sprzet: przydzial dnia (\d+)", x, int), num(r"wydane przez panow od wczoraj (\d+)", x, int)) for x in bw]
+    gear = [(a, b) for a, b in gear if a is not None and b is not None]
+    lap = [v for v in (num(r"przeterminowane dzis (\d+)", x, int) for x in bw) if v is not None]
+    twn = [v for v in (num(r"\(miasta (\d+) / zamki \d+\)", x, int) for x in bw) if v is not None]
+    cas = [v for v in (num(r"\(miasta \d+ / zamki (\d+)\)", x, int) for x in bw) if v is not None]
+    if gear:
+        ga, gb = sum(a for a, _ in gear), sum(b for _, b in gear)
+        rep.add(f"F5-7: przydzial sprzetu rodow - wydane, przeterminowane, do kas siedzib (linia Budzet rodow 166, srednio d91-{until})",
+                f"wydane przez panow {gb / float(len(gear)):.0f} z przydzialu {ga / float(len(gear)):.0f} na dobe" + (f" ({100.0 * gb / ga:.0f}%)" if ga else "")
+                + (f"; przeterminowane {sum(lap) / float(len(lap)):.0f}/d" if lap else "")
+                + (f"; do kas siedzib: miasta {sum(twn) / float(len(twn)):.0f}/d, zamki {sum(cas) / float(len(cas)):.0f}/d" if twn and cas else ""),
+                "INFO (a589def: wydane 23%, przeterminowane 156 tys./d, zamki 65 tys./d; oczekiwane po F5 [S]: 50-65%, 50-65 tys./d, zamki ok. 20 tys./d)", None)
+    else:
+        rep.add("F5-7: przydzial sprzetu rodow (linia Budzet rodow 166)", "brak linii z polem sprzetu w oknie", "INFO", None)
 
 
 def etap5_n1(rep, lines, start, until):
@@ -5693,8 +6640,14 @@ def etap5_a1(rep, lines, start, until, logp):
         b14 = [d for d, x in v14.items() if x != 0]
         split14 = any("zwroty i likwidacje" in (e50.get(d) or "") for d in v14)
         if split14:
-            rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu (E5/0, bez zwrotow i likwidacji)", f"niezerowe w {len(b14)} z {len(v14)} dob", "0 (BuyFloor)",
-                    (len(b14) == 0) if live else None)
+            # narzedzie progow zb58 (TRIAZ A1-T14, wariant bez DLL): sonda liczy "ponizej zapasu" z Seal31.TownReserve (mnozenie w float), a BuyFloor /
+            # Seal31.Spare z TownPurse.Reserve (double) - rozjazd zaokraglen 1 zl w ok. 0.2-0.4% miasto-dob; kapital karawany notabla zbija kase
+            # dokladnie do Reserve, sonda mierzy wobec Reserve + 1. Prawdziwy zakup ponizej BuyFloor to dziesiatki zl - doba liczona dopiero ponad 2 zl.
+            r14 = [d for d, x in v14.items() if 0 < x <= 2]
+            b14 = [d for d, x in v14.items() if x > 2]
+            rep.add("E5/A1 A1-T14: nasze zakupy kas miast ponizej zapasu (E5/0, bez zwrotow i likwidacji)",
+                    f"ponad 2 zl w {len(b14)} z {len(v14)} dob (suma okna {sum(v14.values())} zl; doby z 1-2 zl: {len(r14)} - rozjazd zaokraglen zapasu kupcow float/double)",
+                    "0 dob ponad 2 zl (BuyFloor)", (len(b14) == 0) if live else None)
         else:
             rep.add("E5/A1 A1-T14: nasze sciezki kas miast ponizej zapasu (E5/0 bez rozbicia)", f"niezerowe w {len(b14)} z {len(v14)} dob, suma {sum(v14.values())}",
                     "INFO - E5/0 liczy tu tez sciezki bez BuyFloor (RecruitKit, zwrot 171, zwrot CaravanBulk, wedrowcy 36b); 0 (NIE) po rozbiciu przy scaleniu", None)
@@ -5988,7 +6941,8 @@ def etap5_a3(rep, lines, start, until, mar, nob):
                        "town": int(g[7]), "towns": int(g[8]), "vill": int(g[10]), "vills": int(g[11]), "k3": int(g[12]), "nt": int(g[13]), "ntg": int(g[14]),
                        "nv": int(g[15]), "nvg": int(g[16]), "ms": num(r"koszt ([\d.]+) ms", s, float, 0.0) or 0.0,
                        "days": num(r"sakiewki partii rodow \d+ = ([\d.]+) dni zoldu", s, float),
-                       "kdays": num(r"w tym oszczednosci K1 \d+ = ([\d.]+) dni", s, float)}
+                       "kdays": num(r"w tym oszczednosci K1 \d+ = ([\d.]+) dni", s, float),
+                       "ks": num(r"w tym oszczednosci K1 (\d+) = ", s, int), "kk": num(r"rezerwy: naprawy i odziez \d+, oszczednosci K1 (\d+)", s, int)}
     miss = [d for d in mwin if d not in rows and d not in off]
     rep.add("E5/A3 A3-1: linia Markietani (E5/A3) codziennie", f"brak/nieczytelna w {len(miss)} z {len(mwin)} dob" + (f", wylaczone w {len(off)}" if off else ""),
             "0 (LogEnabled; paczka czynna w biegu zbioru A)", (len(miss) == 0) if mwin else None)
@@ -6026,8 +6980,34 @@ def etap5_a3(rep, lines, start, until, mar, nob):
         rep.add("E5/A3 A3-6: K3 - markietani we wlasnych miastach rodow (srednia)", f"{st.mean(rows[d]['k3'] for d in late):.0f}/d; gracz razem {sum(rows[d]['pl'] for d in late)}",
                 "INFO (ten sam licznik co OnLeft: CrownIncome.NoteOwnSpend; gracz = AI)", None)
         ms = [rows[d]["ms"] for d in late]
-        rep.add("E5/A3 A3-7: koszt petli markietanow (srednia / najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms", "<= 20 ms/dobe (projekt rozdz. 5.2 pkt 3 [S])",
-                st.mean(ms) <= 20.0)
+        # narzedzie progow zb58 (TRIAZ A3-7 pkt 4 i podwazenie pkt 6): 20 ms z projektu [S] jest nieosiagalne z zasady - sama baza to 0.031 ms x ok. 530
+        # partii = 16-17 ms, wzorzec W33 mial 38.7 / 69.9. Prog = pomiar wzorca + ok. 30%; po biegu z poprawka wydajnosci (Sutlers / AiWear) ustawic wedlug
+        # pomiaru. Regresja E6/N1 (109.7 / 221.0) zostaje NIE.
+        rep.add("E5/A3 A3-7: koszt petli markietanow (srednia / najwiecej)", f"{st.mean(ms):.1f} / {max(ms):.1f} ms",
+                "srednia <= 50 ms/dobe i najwiecej <= 90 ms (wzorzec W33 38.7 / 69.9 + ok. 30%; projekt [S] 20 ms ponizej samej bazy; F6 czesc 1 z 3 - "
+                "rezerwa napraw raz na partie w polu, czesci 2-3 w AiWear po scaleniu etapu 8)", st.mean(ms) <= 50.0 and max(ms) <= 90.0)
+        # narzedzie progow F9b (F6): F6-1 koszt ostatnich 30 dob i koszt na partie w polu (INFO - miara czesci 1 z 3 poprawki wydajnosci); F6-2 rezerwa
+        # K1 liczona przez markietanow (K - "rezerwy: ..., oszczednosci K1") nie moze przekraczac oszczednosci K1 w sakiewkach partii rodow (S - dopisek
+        # "w tym oszczednosci K1") w zadnej dobie: KeptFor zostaje dla partii pominietych, wiec S > K
+        l30 = late[-30:]
+        m30 = st.mean(rows[d]["ms"] for d in l30)
+        pa, p30 = [rows[d]["ms"] / rows[d]["n"] for d in late if rows[d]["n"] > 0], [rows[d]["ms"] / rows[d]["n"] for d in l30 if rows[d]["n"] > 0]
+        rep.add("E5/A3 F6-1: koszt petli markietanow w ostatnich 30 dobach i na partie w polu (srednia z dob)",
+                f"ostatnie {len(l30)} dob {m30:.1f} ms" + (f"; na partie w polu {st.mean(pa):.3f} ms (okno) / {st.mean(p30):.3f} ms (ostatnie {len(l30)} dob)"
+                                                           if pa and p30 else "")
+                + (" - UWAGA: >= 182 ms = poprawka F6 nie dziala" if m30 >= 182.0 else ""),
+                "INFO (a589def 182.2 ms, 0.214 / 0.353; W33 60.3, 0.079 / 0.124; po F6 czesc 1 oczekiwane ok. 130-160 ms i 0.25-0.31)", None)
+        sk = [(d, rows[d]["ks"], rows[d]["kk"]) for d in late if rows[d]["ks"] is not None and rows[d]["kk"] is not None]
+        if sk and not off:
+            neg = [run_day(d, start) for d, a, b in sk if a < b]
+            dsum, ssum = sum(a - b for _, a, b in sk), sum(a for _, a, _b in sk)
+            rep.add("E5/A3 F6-2: oszczednosci K1 w sakiewkach partii rodow (S) nie mniejsze niz rezerwa K1 markietanow (K) w kazdej dobie",
+                    f"dob z S < K: {len(neg)} z {len(sk)}" + (f" (doby {neg[:6]})" if neg else "") + f"; S - K srednio {dsum / float(len(sk)):.0f}/d"
+                    + (f", udzial (S - K) / S {100.0 * dsum / ssum:.1f}%" if ssum else ""),
+                    "0 dob z S < K i suma (S - K) > 0 (a589def 20.8%, W33 19.3%)", len(neg) == 0 and dsum > 0)
+        else:
+            rep.add("E5/A3 F6-2: oszczednosci K1 w sakiewkach partii rodow (S) nie mniejsze niz rezerwa K1 markietanow (K)",
+                    "bez wyniku (paczka wylaczona w biegu albo brak pol w linii)", "0 dob z S < K i suma (S - K) > 0", None)
         rr = [d for d in late if rows[d]["ramp"].startswith("rozruch")]
         rep.add("E5/A3 INFO: stawka i rozruch", f"stawka pelna {full:.1f}%; doby rozruchu w oknie {len(rr)}"
                 + (f" (stawka {rows[rr[0]]['rate']:.1f}% -> {rows[rr[-1]]['rate']:.1f}%)" if rr else ""),
@@ -7326,23 +8306,52 @@ E7O1_GATE = re.compile(r"\| E7/O1 \(SleepersHoldOrders (on|off)\): obudzeni cudz
                        r"sr\. ([\d.]+) us, razem ([\d.]+) ms, potkniecia w sesji (\d+)")
 E7O1_DAWN = re.compile(r"E7/O1 swit: AI wlaczone o swicie (\d+) \(oboz (\d+)/osada (\d+)\), rozkazy zatrzymane i oddane o swicie (\d+), dluznicy obudzeni o 6:00 (\d+)")
 E7O1_MOVE = re.compile(r"^AiNightCamp: ruch .*BEZ WPISU POWODU (\d+):.*wyjazd z osady / po bitwie (\d+)")
+# narzedzie progow F9b (F7-6): dopisek na koncu dopisku E7/O1 (linie nocy w noc.log i linia switu w glownym logu)
+E7O1_KEPT = re.compile(r"\| F7: cudze rozkazy zlapane przez straznika i zachowane do switu: lordowie (\d+), karawany (\d+), inne (\d+)")
 E7O1_KEYS = ("wl", "wc", "gl", "gls", "glp", "gle", "glo", "gc", "gcb", "gco", "go", "gd", "gdn", "gdv", "rn", "rnc", "rnd", "rnt", "awl", "awc", "awo",
              "gn", "gus", "gms", "gst")
 
 
 def etap7_o1(rep, lines, start, until, logp=None, csp=None):
     """E7/O1 (228): sen do switu (projekt etapu 7 v2 rozdz. 3 "E7/O1" Test, rozdz. 4 (7.6)). Noc = linie "AiNightCamp: H:00 - spi" i "AiNightCamp: ruch"
-    zamkniete linia "NightRest swit"; doba nocy = ostatnia linia "Pieniadz swiata: dzien N" przed switem. Okno progow T1-T4: doby kampanii 31-until.
-    T1 obudzonych cudza reka <= 10 na noc (srednio), lordowie <= 3; T2 zjazd sr. <= 0.15 jedn.; T3 lordowie w ruchu bez wpisu powodu <= 3 na noc, w tym
-    wyjazd z osady / po bitwie <= 1; T4 AI spiacych lordow wstalo przed switem = 0 w kazdej nocy; T6 bledy/potkniecia SleepGate i straznikow 0, dluznicy
+    (plik sesji noc.log - wplatany w glowny log po znaczniku czasu) zamkniete linia "NightRest swit"; doba nocy = ostatnia linia "Pieniadz swiata:
+    dzien N" przed switem. Okno progow T1-T4: doby kampanii 31-until. T1 obudzonych cudza reka <= 10 na noc (srednio), lordowie <= 3; T2 zjazd sr.
+    obudzonych rozkazem <= 0.15 jedn. (probka >= 20, mniej - INFO; Hold bez rozkazu - INFO); T3 lordowie w ruchu bez wpisu powodu (bez klasy
+    Inni/doczepieni) <= 2 na noc, w tym wyjazd z osady / po bitwie <= 1.7 (prog po F7); T4 AI spiacych lordow wstalo przed switem = 0 w kazdej nocy; T6 bledy/potkniecia SleepGate i straznikow 0, dluznicy
     obudzeni o 6:00 = 0; T7 zbiorka (E7/0) >= 95% partio-godzin snu; T9 koszt bramki <= 5 ms/dobe; reszta (rozkazy zatrzymane, zwolnienia BK, odnowienia,
-    oddane dluznikom) - INFO. T5 (dlug 3) i T8 (KRONIKA, Miara: marsz) - poza blokiem (grupa etap6/T10 i marsz.py)."""
+    oddane dluznikom) - INFO. T5 (dlug 3) i T8 (KRONIKA, Miara: marsz) - poza blokiem (grupa etap6/T10 i marsz.py). F9b (poprawka F7 - jeden koniec
+    snu = tick switu, wezwania przez bramke snu): F7-2 spiacy ruszeni cudza reka w liniach "AiNightCamp: ruch" <= 1.0 na noc (d31-okno) i <= 3.0 (d1-30),
+    F7-3 wywolania HoldSleepers w takcie switu >= 0.8 x srednia taktow 1:00-5:00, F7-4 GoToSettlement zatrzymane do switu >= 2.0 na noc (nowa kampania),
+    F7-5 "inny rozkaz" <= 8 w jednej linii nocy i switu, F7-6 rozkazy zlapane przez straznika (pole od F7) - INFO."""
     nights, cur, day, klucz = [], None, None, set()
 
     def new():
-        return {"woken": 0, "drift_sum": 0.0, "nr": 0, "exit": 0, "dawn": None, "lines": 0, **{k: 0 for k in E7O1_KEYS}}
+        return {"woken": 0, "drift_sum": 0.0, "nr": 0, "exit": 0, "dawn": None, "lines": 0, "hourly": 0, "att": 0, "nr56": 0,
+                "hold": 0, "our": 0, "oth": 0, "d_ord": 0.0, "d_hold": 0.0, "mixed": 0,
+                "mw": 0, "hs_d": None, "hs_h": [], "ox_h": 0, "ox_d": 0, "k7": [0, 0, 0], "k7n": 0,   # F9b (F7-2..F7-6)
+                **{k: 0 for k in E7O1_KEYS}}
 
-    for s in lines:
+    # narzedzie progow zb58 (TRIAZ "E7/O1 T2 (i caly blok etap7_o1)", "E7/O1 T3"): linie "AiNightCamp" ida do pliku tematycznego noc.log (Log.TopicOf),
+    # w glownym logu zostaje tylko "NightRest swit" - 1 z 7 taktow nocy, wiec blok czytal ulamek nocy (falszywe TAK, wiersze INFO zanizone ok. 6 x).
+    # Linie noc.log sa wplatane w glowny log po znaczniku czasu; przy tej samej sekundzie linie nocy ida przed liniami glownego logu (kolejnosc w grze:
+    # "ruch 5:00-6:00" przed "NightRest swit" tego samego taktu). Linia "ruch" po switaniu bez otwartej nocy dopisuje sie do nocy wlasnie zamknietej.
+    src, noc_n, nocp = lines, 0, None
+    if logp:
+        nocp = session_file_find(logp, "noc.log")
+        if os.path.exists(nocp):
+            try:
+                import datetime as _dt
+                t0 = _start_dt_of(logp, fallback=_dt.datetime(2000, 1, 1))
+                a = _abs_lines(logp, t0)
+                b = _abs_lines(nocp, t0)
+                if a and b and b[0][0] < a[0][0] - _dt.timedelta(hours=1):   # noc.log zaczety po polnocy, glowny log przed nia
+                    b = [(t + _dt.timedelta(days=1), s) for t, s in b]
+                both = [(t, 1, i, s) for i, (t, s) in enumerate(a)] + [(t, 0, i, s) for i, (t, s) in enumerate(b)]
+                both.sort(key=lambda q: q[:3])
+                src, noc_n = [q[3] for q in both], len(b)
+            except (OSError, ValueError):
+                src, noc_n = lines, 0
+    for s in src:
         if s.startswith("Pieniadz swiata: dzien"):
             k = num(r"dzien (\d+)", s)
             if k is not None:
@@ -7353,18 +8362,52 @@ def etap7_o1(rep, lines, start, until, logp=None, csp=None):
         mv = E7O1_MOVE.match(s) if s.startswith("AiNightCamp: ruch") else None
         if not (hourly or dawn or mv):
             continue
+        if mv:
+            tgt = cur if cur is not None else (nights[-1] if nights and " ruch 5:00-6:00 " in s[:40] else None)
+            if tgt is None:
+                cur = tgt = new()
+            att = num(r"Inni/doczepieni (\d+)", s, default=0) or 0
+            tgt["nr"] += int(mv.group(1))
+            tgt["exit"] += int(mv.group(2))
+            tgt["att"] += att
+            tgt["mw"] += num(r"obudzeni cudza reka (\d+),", s, default=0) or 0   # F9b (F7-2): spiacy ruszeni cudza reka - wszystkie linie ruchu nocy
+            if " ruch 5:00-6:00 " in s[:40]:
+                tgt["nr56"] += int(mv.group(1)) - att
+            continue
         if cur is None:
             cur = new()
-        if mv:
-            cur["nr"] += int(mv.group(1))
-            cur["exit"] += int(mv.group(2))
-            continue
         cur["lines"] += 1
+        if hourly:
+            cur["hourly"] += 1
         w = num(r"obudzonych cudza reka od poprzedniej godziny: (\d+)", s, default=0) or 0
         cur["woken"] += w
         dr = fnum(r"Zjazd obudzonych: sr\. ([\d.]+)", s)
         if dr is not None:
             cur["drift_sum"] += dr * w
+        # narzedzie progow F9b (F7-3, F7-6): wywolania straznika HoldSleepers w takcie (swit osobno, takty 1:00-5:00 osobno), rozkazy zlapane przez straznika
+        hs = num(r"Stoper: HoldSleepers (\d+) x", s)
+        if hs is not None:
+            if dawn:
+                cur["hs_d"] = hs
+            elif re.match(r"AiNightCamp: [1-5]:00 - spi ", s):
+                cur["hs_h"].append(hs)
+        k7 = E7O1_KEPT.search(s)
+        if k7:
+            cur["k7n"] += 1
+            for i7 in range(3):
+                cur["k7"][i7] += int(k7.group(i7 + 1))
+        mk = re.search(r"rodzaj: Hold bez rozkazu (\d+), rozkaz jak nasz zapamietany (\d+), inny rozkaz (\d+)", s)
+        if mk:
+            kh, ko, kx = (int(v) for v in mk.groups())
+            cur["ox_d" if dawn else "ox_h"] = max(cur["ox_d" if dawn else "ox_h"], kx)   # F9b (F7-5): najwieksza seria "inny rozkaz" w jednej linii
+            cur["hold"] += kh
+            cur["our"] += ko
+            cur["oth"] += kx
+            if dr is not None:   # linia podaje jedna srednia zjazdu dla wszystkich obudzonych godziny - w liniach mieszanych przyjeta dla obu rodzajow
+                cur["d_ord"] += dr * (ko + kx)
+                cur["d_hold"] += dr * kh
+                if kh and (ko + kx):
+                    cur["mixed"] += ko + kx
         m = E7O1_GATE.search(s)
         if m:
             klucz.add(m.group(1))
@@ -7395,32 +8438,98 @@ def etap7_o1(rep, lines, start, until, logp=None, csp=None):
     win = [n for n in have if 31 <= run_day(n["day"], start) <= until]
     allw = [n for n in have if 1 <= run_day(n["day"], start) <= until]
     nw = len(win)
+    # narzedzie progow zb58: bez linii godzinowych nocy (brak noc.log obok logu) blok widzi tylko takt switu - T1-T4 i T9 nie sa wtedy pomiarem (INFO)
+    full = sum(n["hourly"] for n in have) > 0
+    rep.add("E7/O1: zrodlo linii nocy (noc.log wpleciony w glowny log po znaczniku czasu)",
+            (f"noc.log {noc_n} linii, " if noc_n else f"brak noc.log ({nocp or 'bez sciezki logu'}), ") + f"taktow godzinowych w nocach {sum(n['hourly'] for n in have)}, "
+            f"switow {len(have)}", "INFO (bez linii godzinowych T1-T4 i T9 sa INFO - sam swit to 1 z 7 taktow nocy)", None)
+
+    def okf(v):
+        return v if full else None
     # ---- T1 obudzeni cudza reka
     if nw:
         avg = sum(n["woken"] for n in win) / nw
         avl = sum(n["wl"] for n in win) / nw
         avc = sum(n["wc"] for n in win) / nw
         worst = max(win, key=lambda n: n["woken"])
+        t1ok = avg <= 10 and avl <= 3
         rep.add("E7/O1 T1: obudzeni cudza reka na noc (d31-okno, srednio)", f"{avg:.1f} na noc (lordowie {avl:.1f}, karawany {avc:.1f}); najwiecej {worst['woken']} "
-                f"(d{run_day(worst['day'], start)}) - {nw} nocy", "<= 10 na noc, lordowie <= 3 (dzis 91, 79% karawan)", avg <= 10 and avl <= 3)
+                f"(d{run_day(worst['day'], start)}) - {nw} nocy", "<= 10 na noc, lordowie <= 3 (dzis 91, 79% karawan)", okf(t1ok))
+        # T2 (TRIAZ): srednia tylko z obudzonych rozkazem ("rozkaz jak nasz" + "inny rozkaz"); "Hold bez rozkazu" (partia stoi na Hold bez celu i zjechala
+        # z legowiska - przejscia lad/morze rodow wysp i portow, tez we wzorcu) osobnym wierszem INFO; prog tylko przy probce >= 20
         tw = sum(n["woken"] for n in win)
-        drift = sum(n["drift_sum"] for n in win) / tw if tw else 0.0
-        rep.add("E7/O1 T2: zjazd obudzonych srednio (d31-okno)", f"{drift:.2f} jedn. ({tw} obudzonych)", "<= 0.15 jedn. (dzis 0.40)", drift <= 0.15)
-        anr = sum(n["nr"] for n in win) / nw
+        to, th = sum(n["our"] + n["oth"] for n in win), sum(n["hold"] for n in win)
+        tmix = sum(n["mixed"] for n in win)
+        if to + th == 0 and tw:   # log bez podzialu na rodzaj - stara miara na wszystkich obudzonych
+            drift = sum(n["drift_sum"] for n in win) / tw
+            rep.add("E7/O1 T2: zjazd obudzonych srednio (d31-okno)", f"{drift:.2f} jedn. ({tw} obudzonych)", "<= 0.15 jedn. (dzis 0.40)", okf(drift <= 0.15))
+        else:
+            drift = sum(n["d_ord"] for n in win) / to if to else 0.0
+            rep.add("E7/O1 T2: zjazd obudzonych rozkazem srednio (d31-okno)",
+                    f"{drift:.2f} jedn. ({to} obudzonych rozkazem: jak nasz {sum(n['our'] for n in win)}, inny {sum(n['oth'] for n in win)}"
+                    + (f"; {tmix} w liniach z Hold - srednia linii" if tmix else "") + ")"
+                    + ("" if to >= 20 else " - probka < 20" + (", T1 spelniony" if t1ok and full else "")),
+                    "<= 0.15 jedn. przy probce >= 20 obudzonych rozkazem (mniej - INFO; dzis 0.40)", okf(drift <= 0.15) if to >= 20 else None)
+            rep.add("E7/O1 T2a: obudzeni z Hold bez rozkazu (zjazd z legowiska bez celu - przejscia lad/morze)",
+                    f"{th} w {nw} nocach" + (f", zjazd sr. {sum(n['d_hold'] for n in win) / th:.2f} jedn." if th else ""), "INFO (nie rozkaz - bramka ich nie dotyczy)", None)
+        # T3 (TRIAZ): klasa "Inni/doczepieni" to nie spiacy (NightMarch) - poza miara; godzina 5:00-6:00 osobno (takt switu)
+        anr = sum(n["nr"] - n["att"] for n in win) / nw
         aex = sum(n["exit"] for n in win) / nw
-        rep.add("E7/O1 T3: lordowie w ruchu bez wpisu powodu w oknie obozu (d31-okno, srednio)", f"{anr:.1f} na noc, w tym wyjazd z osady / po bitwie {aex:.1f}",
-                "<= 3 na noc, wyjazd z osady <= 1 (dzis ok. 20)", anr <= 3 and aex <= 1)
+        rep.add("E7/O1 T3: lordowie w ruchu bez wpisu powodu w oknie obozu (d31-okno, srednio)",
+                f"{anr:.1f} na noc (klasa Inni/doczepieni {sum(n['att'] for n in win) / nw:.1f} poza miara - to nie spiacy), w tym wyjazd z osady / po bitwie {aex:.1f}, "
+                f"w godzinie 5:00-6:00 {sum(n['nr56'] for n in win) / nw:.1f}",
+                "<= 2.0 na noc (bez klasy Inni/doczepieni), wyjazd z osady / po bitwie <= 1.7 (prog po F7: W33 1.75 / 1.53 + ok. 10%; czesc \"cudza reka\" "
+                "pilnuje F7-2)", okf(anr <= 2.0 and aex <= 1.7))
         bad = [run_day(n["day"], start) for n in win if n["awl"] > 0]
         rep.add("E7/O1 T4: AI spiacych lordow wstalo przed switem (d31-okno)", f"noce z wstaniem {len(bad)} z {nw}" + (f" (doby {bad[:8]})" if bad else "")
                 + f"; razem lordowie {sum(n['awl'] for n in win)}, karawany {sum(n['awc'] for n in win)} (odczyt), inne {sum(n['awo'] for n in win)}",
-                "lordowie 0 w kazdej nocy (dowod fazy)", not bad)
+                "lordowie 0 w kazdej nocy (dowod fazy)", okf(not bad))
     else:
         rep.add("E7/O1 T1-T4: noce d31-okno", f"brak (nocy w logu {len(have)})", "noce d31-120", None)
+    # ---- narzedzie progow F9b (F7): sen do switu - jeden koniec snu = tick switu, wezwania na turniej i rozkazy odsieczy przez bramke snu
+    w30 = [n for n in have if 1 <= run_day(n["day"], start) <= min(30, until)]
+    if win or w30:
+        a31 = sum(n["mw"] for n in win) / float(len(win)) if win else None
+        a30 = sum(n["mw"] for n in w30) / float(len(w30)) if w30 else None
+        rep.add("E7/O1 F7-2: spiacy lordowie ruszeni cudza reka (linie AiNightCamp: ruch, srednio na noc)",
+                (f"d31-okno {a31:.2f} ({len(win)} nocy)" if a31 is not None else "d31-okno: brak nocy") + "; "
+                + (f"d1-30 {a30:.2f} ({len(w30)} nocy)" if a30 is not None else "d1-30: brak nocy"),
+                "<= 1.0 na noc w d31-okno i <= 3.0 w d1-30 (a589def 5.45 i 62.4 - w TRIAZ 5.54 i 61.9, noc graniczna liczona inaczej; W33 ok. 1.0 i 64; bieg z zapisu 0)",
+                okf((a31 is None or a31 <= 1.0) and (a30 is None or a30 <= 3.0)))
+    hd = [n["hs_d"] for n in allw if n["hs_d"] is not None]
+    hh = [v for n in allw for v in n["hs_h"]]
+    if hd and hh and sum(hh) > 0:
+        md_, mh_ = sum(hd) / float(len(hd)), sum(hh) / float(len(hh))
+        rep.add("E7/O1 F7-3: straznik HoldSleepers pracuje do ticku switu (wywolan w takcie switu wobec taktow 1:00-5:00, srednio)",
+                f"{md_:.2f} wobec {mh_:.2f} = {md_ / mh_:.2f} ({len(hd)} switow, {len(hh)} taktow nocy)",
+                ">= 0.8 x srednia taktow nocy (a589def 3.29 / 6.74 = 0.49; W33 3.27 / 6.77; oczekiwane ok. 1.0)", md_ >= 0.8 * mh_)
+    else:
+        rep.add("E7/O1 F7-3: straznik HoldSleepers pracuje do ticku switu", "brak taktow 1:00-5:00 (brak noc.log) albo pola Stoper: HoldSleepers",
+                ">= 0.8 x srednia taktow nocy", None)
+    if allw:
+        n7 = float(len(allw))
+        newc = any(x.startswith("Weterani (E4/10): siew dnia ") for x in lines)
+        gs = sum(n["gls"] for n in allw)
+        rep.add("E7/O1 F7-4: wezwania GoToSettlement zatrzymane u spiacych lordow do switu (na noc, okno)",
+                f"{gs / n7:.2f} na noc ({gs} w {len(allw)} nocach)" + ("" if newc else " - bieg z zapisu (tick dobowy poza obozem)"),
+                ">= 2.0 na noc w nowej kampanii (a589def 0.12; oczekiwane kilkanascie - tylu spiacych budzil herold; bieg z zapisu - INFO)",
+                okf(gs / n7 >= 2.0) if newc else None)
+        xh, xd = max(n["ox_h"] for n in allw), max(n["ox_d"] for n in allw)
+        rep.add("E7/O1 F7-5: serie \"inny rozkaz\" u obudzonych - najwiecej w jednej linii (takty nocy / linia switu)", f"{xh} / {xd}",
+                "<= 8 w jednej linii taktu nocy i w linii switu (a589def 41 i 28)", okf(xh <= 8 and xd <= 8))
+        if sum(n["k7n"] for n in allw):
+            k7l, k7c, k7o = (sum(n["k7"][i7] for n in allw) for i7 in range(3))
+            rep.add("E7/O1 F7-6: cudze rozkazy zlapane przez straznika i zachowane do switu (na noc, okno)",
+                    f"{(k7l + k7c + k7o) / n7:.2f} na noc (lordowie {k7l}, karawany {k7c}, inne {k7o} w {len(allw)} nocach)",
+                    "INFO (oczekiwane pojedyncze - nie wiecej niz \"inny rozkaz\" tej nocy)", None)
+        else:
+            rep.add("E7/O1 F7-6: cudze rozkazy zlapane przez straznika i zachowane do switu", "brak linii (log sprzed F7 - bez dopisku \"| F7: cudze rozkazy\")",
+                    "INFO", None)
     # ---- T6 bledy, potkniecia, dluznicy o 6:00
     errs = [s for s in lines if s.startswith("ERROR in SleepGate") or s.startswith("ERROR in HoldSleepers") or s.startswith("ERROR in KeepTownAsleep")
             or s.startswith("ERROR in DawnWake") or s.startswith("ERROR in HoldDebtSleepers")]
     gst = max([n["gst"] for n in have] or [0])
-    gs = max([num(r"Potkniecia straznikow w sesji: (\d+)", s, default=0) or 0 for s in lines if s.startswith("AiNightCamp: ") or s.startswith("NightRest swit")] or [0])
+    gs = max([num(r"Potkniecia straznikow w sesji: (\d+)", s, default=0) or 0 for s in src if s.startswith("AiNightCamp: ") or s.startswith("NightRest swit")] or [0])
     rep.add("E7/O1 T6: bledy i potkniecia SleepGate / straznikow snu", f"ERROR {len(errs)}; potkniecia bramki w sesji {gst}, straznikow w sesji {gs}"
             + (f" (pierwszy: {errs[0][:140]})" if errs else ""), "0 / 0 / 0", len(errs) == 0 and gst == 0 and gs == 0)
     if logp:
@@ -7452,7 +8561,7 @@ def etap7_o1(rep, lines, start, until, logp=None, csp=None):
         mx = max(allw, key=lambda n: n["gms"])
         calls = sum(n["gn"] for n in allw)
         rep.add("E7/O1 T9: koszt SleepGate na noc (okno)", f"srednio {sum(ms) / len(ms):.3f} ms, najwiecej {mx['gms']:.3f} ms (d{run_day(mx['day'], start)}); wywolan {calls}",
-                "<= 5 ms/dobe (odnawianie - stoper HoldSleepers w tej samej linii)", sum(ms) / len(ms) <= 5.0)
+                "<= 5 ms/dobe (odnawianie - stoper HoldSleepers w tej samej linii)", okf(sum(ms) / len(ms) <= 5.0))
     # ---- T7 zbiorka (linia E7/0)
     a = b = 0
     for s in lines:
@@ -7484,7 +8593,7 @@ def etap7_t(rep, lines, start, until, logp=None, csp=None):
     T1 z rozpiski gry (wpisy GRY przed naszym zwrotem i zmiany od zwrotu i kary w tej samej liczbie): zwrot > kary gry = 0 i kara Jeffa poza ulamkiem
     gry = 0 w kazdej dobie, maks. |netto| <= 0.001 jedn. (klucz on; off - INFO, stara regula); T2 partio-godzin w lesie z cecha lasu >= 50 (inaczej
     DECYZJA - prog nieczytelny); T3 ponizej sufitu MarchPace (karawany i wozy wsi; d31-until, srednie wazone): Polnoc las < rownina, Dorne pustynia
-    <= rownina; T4 koszt probki <= 20 ms/dobe (srednio), bledy TerrainEase i potkniecia 0; T6 regresja E5: towar wsi niesprzedany w miastach <= 2%
+    <= rownina; T4 koszt probki <= 30 ms/dobe (srednio), bledy TerrainEase i potkniecia 0; T6 regresja E5: towar wsi niesprzedany w miastach <= 2%
     sprzedanego (miasta kupuja >= 98% plonu, d31-until). Rody (na suficie i nie), zwrot ponad netto starej reguly, udzial probek na suficie - INFO;
     T5 tempo marszu - poza blokiem (marsz.py, rozdz. 4). Probki pkt 6 bez "Marching column" nie wchodza do T3: sa tylko w lesie/na pustyni, bez
     pary na rowninie (srednia bylaby stronnicza) - T3 liczy karawany i wozy wsi, ktorych MarchPace nigdy nie tnie."""
@@ -7574,8 +8683,10 @@ def etap7_t(rep, lines, start, until, logp=None, csp=None):
     if cost:
         m = sum(c for c, _ in cost) / len(cost)
         mx = max(cost)
+        # narzedzie progow zb58 (TRIAZ E7/T T4): koszt z konstrukcji rosnie z liczba partii (pomiar: ok. 4.7 ms stale + 3.4 ms na 1000 partio-godzin
+        # w lesie i na pustyni; projekt liczyl ok. 1000 partii, jest kilka razy wiecej) - to sam pomiar pod Stage7MeasureLog, ok. 0.1% doby
         rep.add("E7/T T4: koszt probki (godzinna + rozpiska gry)", f"srednio {m:.3f} ms/dobe, najwiecej {mx[0]:.3f} ms (d{run_day(mx[1], start)}) - {len(cost)} dob",
-                "<= 20 ms/dobe srednio", m <= 20.0)
+                "<= 30 ms/dobe srednio (koszt rosnie z liczba partii; szacunek projektu 20 ms liczyl ok. 1000 partii)", m <= 30.0)
     errs = [s for s in lines if s.startswith("ERROR in TerrainEase")]
     stum = max([num(r"\| potkniecia (\d+)", kt[d], default=0) or 0 for d in win] or [0])
     rep.add("E7/T T4: bledy TerrainEase i potkniecia probki", f"ERROR in TerrainEase {len(errs)}; potkniecia (najwiecej w linii) {stum}", "0 i 0",
@@ -7603,6 +8714,7 @@ _E7C_ALLOWED = {
     "Wayfinder.cs": (2, "dlawienie komunikatu drogi"),
     "QuartermasterLaw.cs": (4, "dlawienie okrzyku kwatermistrza"),
     "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
+    "MapRoadsProbe.cs": (3, "widok proby drog E7/D0 (OnVisualTick realDt: czas klatki do histogramu, dlawienie 4 x na sekunde, podsumowanie; klucz MapRoadsProbeEnabled domyslnie false)"),
     "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
     "HideoutPurge.cs": (2, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne"),
 }
@@ -7894,11 +9006,11 @@ def etap7_main(logp, start_arg, until=120, csp=None):
           f" | start kampanii {start} | okno progow: doby kampanii 1-{until} ({len(win)} dob)")
     # scalenie zbior-5-8: obie galezie etapu 7 zbudowaly szkielet grupy; jeden szkielet, dwie konwencje wywolania (opis w docstringu)
     blocks = ([(b, False) for b in (etap7_0, etap7_o1, etap7_t, etap7_c, etap7_k, etap7_o2)]
-              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0)])
+              + [(b, True) for b in (etap7_b, etap7_w1, etap7_w2, etap7_w3, etap7_w5, etap7_d0, etap7_r1, etap7_r2, etap7_w4)])
     for blk, by_win in blocks:   # kolejne paczki etapu 7 dopisuja tu swoje bloki
         try:
             if by_win:
-                blk(rep, lines, start, win, until=until)
+                blk(rep, lines, start, win, until=until, logp=logp)   # narzedzie progow zb58: logp dla plikow sesji (E7/R1 T5 - wioski-okregi.csv)
             else:
                 blk(rep, lines, start, until, logp=logp, csp=csp)
         except Exception as e:   # narzedzie nigdy nie przerywa raportu
@@ -7911,7 +9023,10 @@ def etap7_main(logp, start_arg, until=120, csp=None):
 def etap7_b(rep, lines, start, win, until=120, **kw):
     """E7/B (231, PLAN 7.12, projekt etapu 7 v2 rozdz. 3 "E7/B" Test): linia startowa "Przeprawa Bliznaki (E7/B): os rzeki" i linia doby
     "Przeprawa Bliznaki (E7/B): dzien N" (dzien = doba gry, jak "Juczne (213)"; "Pieniadz swiata" nosi dzien ksiegi = doba gry - 1, stad -1 w T1).
-    Wiazace: os bez BRAK OSI, T1 linia z licznikiem w kazdej dobie okna, T2 przejsc > 0, T3 pozycje <= 3 jedn. od bramy, T4 koszt < 0.1 ms/dobe, potkniecia 0."""
+    Wiazace: os bez BRAK OSI, T1 linia z licznikiem w kazdej dobie okna, T2 przejsc > 0, T3 pozycje <= 2 jedn. od mostu (od F8 pole "odl. od mostu";
+    log sprzed F8: <= 1 jedn. od srodka lukow wody na osi rzeki), T4 koszt < 0.5 ms/dobe (mediana), potkniecia 0; od F9b (poprawka F8 - strefa r 8 wokol
+    mostu): F8-1 przejsc poza mostem 0, F8-2 zmiana strony poza strefa 0, F8-3 linia startowa "most na osi", "strefa r 8 od mostu", brama < 8 jedn. od
+    mostu i linie doby "od mostu" (log sprzed F8 - INFO "brak linii")."""
     axis = [s for s in lines if s.startswith("Przeprawa Bliznaki (E7/B): os rzeki")]
     rows = {}
     for d, s in by_day(lines, "Przeprawa Bliznaki (E7/B): dzien").items():
@@ -7924,7 +9039,7 @@ def etap7_b(rep, lines, start, win, until=120, **kw):
     if axis:
         a = axis[-1]
         ok = ("BRAK OSI" not in a) and (" nie ma " not in a)
-        rep.add("E7/B B-0: os rzeki przy moscie (2 luki wody na okregu r 4)", a[:260], "os wyznaczona (bez BRAK OSI) - inaczej wzorce okregow r3-r6 w linii", ok)
+        rep.add("E7/B B-0: os rzeki przy moscie (2 luki wody na okregu r 4)", a[:420], "os wyznaczona (bez BRAK OSI) - inaczej wzorce okregow r3-r6 w linii", ok)
     else:
         rep.add("E7/B B-0: os rzeki przy moscie", "brak linii startowej", "jest przy pierwszej godzinie gry sesji", None)
     days = sorted(rows)
@@ -7940,19 +9055,85 @@ def etap7_b(rep, lines, start, win, until=120, **kw):
         return sum(num(pat, x, int, 0) or 0 for x in w)
     n = tot(r"\| przejsc (\d+) \(")
     rep.add("E7/B T2: przejsc mostem (suma okna)", f"{n} ({n / len(w):.1f}/d)", "> 0", n > 0)
-    pos = []
+    # narzedzie progow F9b (F8, T3): od F8 strefa probek lezy wokol mostu, a pole pozycji nazywa sie "odl. od mostu" (liczba w nawiasie = odleglosc od
+    # mostu na osi rzeki) - prog wszystkie <= 2 jedn.; log sprzed F8 ("odl. od bramy") - miara F9a nizej (odleglosc od srodka lukow wody, <= 1 jedn.)
+    pos, pts, from_bridge = [], [], False
     for x in w:
-        m = re.search(r"pozycje przejsc \(x/y, odl\. od bramy\): (.*?)\.$", x)
-        if m and m.group(1) != "brak":
-            pos += [float(v) for v in re.findall(r"-?[\d.]+/-?[\d.]+ \(([\d.]+)\)", m.group(1))]
-    far = [v for v in pos if v > 3.0]
-    rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od bramy", f"{len(pos)} pozycji, dalej niz 3 jedn.: {len(far)}" + (f" (najdalej {max(pos):.1f})" if pos else ""),
-            "wszystkie <= 3 jedn. (inaczej brod albo drugi most w strefie - zmniejszyc promien)", (len(far) == 0) if pos else None)
+        m = re.search(r"pozycje przejsc \(x/y, odl\. od (bramy|mostu)\): (.*?)\.$", x)
+        if m and m.group(1) == "mostu":
+            from_bridge = True
+        if m and m.group(2) != "brak":
+            for px, py, pd in re.findall(r"(-?[\d.]+)/(-?[\d.]+) \(([\d.]+)\)", m.group(2)):
+                pos.append(float(pd))
+                pts.append((float(px), float(py)))
+    # narzedzie progow zb58 (TRIAZ E7/B T3): pozycja osady (brama) to nie most - na mapie ROT rzeka plynie obok miasta (brama 4.69 jedn. od osi), wiec
+    # odleglosc od bramy to geometria, nie znak brodu. Most = punkt na osi rzeki: srodek dwoch srodkow lukow wody z linii startowej ("luki 2 (srodki
+    # a/b, c/d)"); wszystkie pozycje maja lezec <= 1 jedn. od niego (pozycje w drugim skupisku = brod albo drugi most w strefie). Linia startowa bez
+    # dwoch lukow - stara miara od bramy.
+    brg = None
+    if axis:
+        m = re.search(r"luki 2 \(srodki (-?[\d.]+)/(-?[\d.]+), (-?[\d.]+)/(-?[\d.]+)\)", axis[-1])
+        if m:
+            c = [float(v) for v in m.groups()]
+            brg = (0.5 * (c[0] + c[2]), 0.5 * (c[1] + c[3]))
+    if from_bridge:
+        far = [v for v in pos if v > 2.0]
+        rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od mostu (pole \"odl. od mostu\", od F8)",
+                f"{len(pos)} pozycji, dalej niz 2 jedn.: {len(far)}" + (f" (najdalej {max(pos):.1f})" if pos else ""),
+                "wszystkie <= 2 jedn. od mostu (oczekiwane 0.0-0.3; inaczej brod albo drugi most w strefie)", (len(far) == 0) if pos else None)
+    elif brg and pts:
+        dist = [((px - brg[0]) ** 2 + (py - brg[1]) ** 2) ** 0.5 for px, py in pts]
+        far = [v for v in dist if v > 1.0]
+        rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od mostu (srodek lukow wody na osi rzeki)",
+                f"{len(pts)} pozycji, most {brg[0]:.2f}/{brg[1]:.2f}, dalej niz 1 jedn.: {len(far)} (najdalej {max(dist):.2f}; od bramy najdalej {max(pos):.1f})",
+                "wszystkie <= 1 jedn. od mostu (inaczej brod albo drugi most w strefie - zmniejszyc promien)", len(far) == 0)
+    else:
+        far = [v for v in pos if v > 3.0]
+        rep.add("E7/B T3: pozycje przejsc z 3 pierwszych dob sesji - odleglosc od bramy", f"{len(pos)} pozycji, dalej niz 3 jedn.: {len(far)}" + (f" (najdalej {max(pos):.1f})" if pos else ""),
+                "wszystkie <= 3 jedn. (inaczej brod albo drugi most w strefie - zmniejszyc promien)", (len(far) == 0) if pos else None)
     cost = [num(r"koszt probek ([\d.]+) ms/dobe", x, float) for x in w]
     cm = _mean(cost)
-    rep.add("E7/B T4: koszt probek godzinnych (srednio)", f"{cm:.3f} ms/dobe" if cm is not None else "brak", "< 0.1 ms/dobe", (cm < 0.1) if cm is not None else None)
+    # narzedzie progow zb58 (TRIAZ E7/B T4): prog 0.1 ms byl szacunkiem "ok. 0"; 24 zapytania lokatora mapy na dobe to ok. 0.19 ms (mediana), a srednia
+    # zawyza pierwsza doba sesji z jednorazowym liczeniem osi rzeki (ok. 3 ms) - prog 0.5 ms liczony z mediany
+    cs = sorted(v for v in cost if v is not None)
+    if cs:
+        med = cs[len(cs) // 2] if len(cs) % 2 else 0.5 * (cs[len(cs) // 2 - 1] + cs[len(cs) // 2])
+        rep.add("E7/B T4: koszt probek godzinnych (mediana)", f"mediana {med:.3f} ms/dobe (srednio {cm:.3f}, najwiecej {cs[-1]:.3f} - doba z liczeniem osi rzeki)",
+                "< 0.5 ms/dobe z mediany (szacunek projektu 0.1 = 'ok. 0')", med < 0.5)
+    else:
+        rep.add("E7/B T4: koszt probek godzinnych (mediana)", "brak", "< 0.5 ms/dobe z mediany", None)
     stu = tot(r"potkniecia dzis (\d+)")
     rep.add("E7/B B-5: potkniecia (suma okna)", f"{stu}", "0", stu == 0)
+    # narzedzie progow F9b (F8): strefa probek wokol mostu na osi rzeki i dwa liczniki kontrolne linii doby ("| kontrola: przejsc poza mostem N (...;
+    # najdalej dzis X), zmiana strony poza strefa M (...)"); log sprzed F8 (strefa od bramy, bez licznikow) - INFO "brak linii"
+    f8 = [x for x in w if "| kontrola: przejsc poza mostem " in x]
+    a8 = axis[-1] if axis else ""
+    if not f8 and "most na osi " not in a8:
+        rep.add("E7/B F8-1..F8-3: strefa wokol mostu i liczniki kontrolne (F8)",
+                "brak linii (log sprzed F8" + (" - strefa r 8 od bramy, licznik zaniza do ok. 5%" if "strefa r 8 od bramy" in a8 else "") + ")",
+                "pola sa od F8 (most na osi, kontrola: przejsc poza mostem, zmiana strony poza strefa)", None)
+    else:
+        offb = sum(num(r"kontrola: przejsc poza mostem (\d+)", x, int, 0) or 0 for x in f8)
+        farv = [v for v in (num(r"najdalej dzis ([\d.]+)", x, float) for x in f8) if v is not None]
+        rep.add("E7/B F8-1: przejscia poza mostem (punkt przejscia ponad prog od mostu; suma okna)",
+                f"{offb} w {len(f8)} dobach" + (f"; najdalej od mostu {max(farv):.1f} jedn." if farv else "; brak przejsc z pomiarem"),
+                "0 (wynik > 0: os nie pasuje do rzeki albo cieciwa dlugiego skoku - zglosic, nie zaliczac)", (offb == 0) if f8 else None)
+        ls = [x for x in f8 if ", zmiana strony poza strefa " in x]
+        lost = sum(num(r"zmiana strony poza strefa (\d+)", x, int, 0) or 0 for x in ls)
+        rep.add("E7/B F8-2: zmiana strony rzeki poza strefa (suma okna)", f"{lost} w {len(ls)} dobach",
+                "0 (wynik > 0 przy partiach wolniejszych niz 7.5 jedn./h: rozjazd osi z rzeka ok. 4.5+ jedn. od mostu albo inna przeprawa - rozstrzyga F8-1)",
+                (lost == 0) if ls else None)
+        mb = re.search(r"most na osi (-?[\d.]+)/(-?[\d.]+)", a8)
+        gd = num(r"\), ([\d.]+) jedn\. od mostu", a8, float)
+        zone = "strefa r 8 od mostu" in a8
+        dz = [x for x in w if re.search(r"strefa r \d+ od mostu: partii", x)]
+        rep.add("E7/B F8-3: strefa probek wokol mostu na osi rzeki (linia startowa i linie doby)",
+                ((f"most na osi {mb.group(1)}/{mb.group(2)}" if mb else "brak pola \"most na osi\"") + (", strefa r 8 od mostu" if zone else ", brak \"strefa r 8 od mostu\"")
+                 + (f", brama {gd:.2f} jedn. od mostu" if gd is not None else ", brak odleglosci bramy od mostu") if axis else "brak linii startowej")
+                + f"; linie doby ze strefa od mostu {len(dz)} z {len(w)}"
+                + (" - stary napis \"strefa r 8 od bramy\" (licznik sprzed F8 zaniza do ok. 5%)" if "strefa r 8 od bramy" in a8 else ""),
+                "most na osi, strefa r 8 od mostu, brama < 8 jedn. od mostu, wszystkie linie doby \"od mostu\"",
+                (bool(mb) and zone and gd is not None and gd < 8.0 and len(dz) == len(w)) if axis else None)
     car, vil, cown, cfor = tot(r" - karawany (\d+) \("), tot(r", wozy wsi (\d+)"), tot(r"\(krolestwo pana (\d+) /"), tot(r" / obce (\d+)\)")
     band, oth, pl = tot(r", bandy (\d+), inne"), tot(r", inne (\d+), gracz"), tot(r", gracz TAK \((\d+)\)")
     ns = (tot(r"\(na polnoc (\d+),"), tot(r", na poludnie (\d+)\)"))
@@ -8059,6 +9240,200 @@ def etap7_w1(rep, lines, start, win, until=120, **kw):
     rej = sum(num(r"odrzucone przez BadId (\d+)", s, int, 0) or 0 for s in saves)
     rep.add("E7/W1 T6: zapis pamieci - same identyfikatory", f"zapisow {len(saves)}, identyfikatorow odrzuconych przez BadId {rej}",
             "INFO (nazw w sekcji m: nie ma z konstrukcji)", None)
+
+
+def etap7_r1(rep, lines, start, win, until=120, **kw):
+    """E7/R1 (235, PLAN 7.11 a, projekt etapu 7 v2 rozdz. 3 "E7/R1" Test i rozdz. 4 (7.11)): linia startowa "Rabunek osada po osadzie (E7/R1): latki przy starcie gry",
+    linia doby "Rabunek osada po osadzie (E7/R1): dzien N" (dzien ksiegi = doba gry - 1, jak "Ludzie (spustoszenie)"), linie "zapis - sesji N, czujnosc M wsi" i
+    "wczytanie - sesji N, czujnosc M wsi". Wiazace: R1-0, R1-1, T1, T2, T3, T4 (>= 10 krokow lordow), T5 (przy oknie >= 240 dob; krotsze - INFO), T7, T9 (gdy byl zapis i wczytanie), T10 (>= 20 sesji), T11, koszt."""
+    P = "Rabunek osada po osadzie (E7/R1): "
+    starts = [x for x in lines if x.startswith(P + "latki przy starcie gry")]
+    rows = {}
+    for d, x in by_day(lines, P + "dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = x
+    if not starts and not rows:
+        rep.add("E7/R1: linie Rabunek osada po osadzie (E7/R1)", "brak w logu", "sa od wgrania E7/R1 (LogEnabled)", None)
+        return
+    if starts:
+        a = starts[-1]
+        rep.add("E7/R1 R1-0: latki przy starcie gry", a[:240], "GOTOWE, BRAK: -", ("GOTOWE" in a) and ("BRAK: -" in a))
+    off = [x for x in rows.values() if "| WYLACZONE" in x]
+    live = sorted(d for d in rows if "| sesji " in rows[d])
+    need = max(0, len(win) - 1)
+    rep.add("E7/R1 R1-1: linia doby z sesjami", f"{len(live)} dob (wylaczone {len(off)}; dob okna {len(win)})", f">= {need} (codziennie w oknie, klucz Raid By Settlement Enabled)",
+            (len(live) >= need and need > 0) if win and not off else None)
+    if not live:
+        return
+    w = [rows[d] for d in live]
+
+    def tot(pat, cast=int):
+        return sum(num(pat, x, cast, 0) or 0 for x in w)
+    ses = tot(r"\| sesji (\d+) \(")
+    steps = tot(r", krokow (\d+) \(")
+    intr = tot(r", przerwanych (\d+) \(")
+    rel = tot(r"oddane grze \((?:gracz w zdarzeniu, )?potkniecia\) (\d+)")   # E7/R2: sama etykieta "(potkniecia)" - rabunki z graczem prowadzi ta sama regula
+    rep.add("E7/R1 R1-2: sesje zakonczone (suma okna)", f"sesji {ses}, krokow pelnych {steps}, przerwanych {intr}, oddanych grze {rel}", "> 0 (rabunki AI pod R1)", ses > 0)
+    # T1 - bilans zlota kazdej doby i lup z niczego AI w linii spustoszenia
+    b1 = [(d, num(r"zloto wodza - kiesa wsi " + F_, rows[d], float)) for d in live]
+    bad1 = [f"d{d}: {x}" for d, x in b1 if x is None or abs(x) >= 1]
+    rep.add("E7/R1 T1: bilans zlota (zloto wodza - kiesa wsi) w kazdej dobie", f"dob niezgodnych {len(bad1)} z {len(b1)}" + (f" ({', '.join(bad1[:6])})" if bad1 else ""),
+            "0 w kazdej dobie (lup zlota tylko z kiesy wsi - jeden platnik E5/A7)", len(bad1) == 0)
+    dev = by_day(lines, "Ludzie (spustoszenie): dzien")
+    ai_free = 0
+    for d in live:
+        x = dev.get(d, "")
+        t = num(r"lup z niczego (\d+) zl \(gracz", x, int, 0) or 0
+        pl = num(r"lup z niczego \d+ zl \(gracz (\d+)\)", x, int, 0) or 0
+        ai_free += t - pl
+    rep.add("E7/R1 T1b: lup z niczego AI w rabunkach pod spustoszeniem (Ludzie (spustoszenie), suma okna)", f"{ai_free} zl (sesji oddanych grze {rel})",
+            "0 zl (AI pod R1 nie dostaje zlota gry za hearth)", (ai_free == 0) if rel == 0 else None)
+    # T2 - bilans towaru i spichlerza
+    bad2 = []
+    for d in live:
+        g = num(r"towar \+ spalone - magazyn " + F_, rows[d], float)
+        f = num(r"zjedzone - spichlerz " + F_, rows[d], float)
+        if g is None or f is None or abs(g) >= 1 or abs(f) >= 0.5:
+            bad2.append(f"d{d}: {g}/{f}")
+    rep.add("E7/R1 T2: bilans towaru (towar + spalone - magazyn) i spichlerza (zjedzone - spichlerz) w kazdej dobie", f"dob niezgodnych {len(bad2)}" + (f" ({', '.join(bad2[:6])})" if bad2 else ""),
+            "towar 0, spichlerz |x| < 0.5 (towar i jedzenie tylko z zasobow wsi)", len(bad2) == 0)
+    # T3 - kontrola trafionych
+    chk = [(d, num(r"\(kontrola " + F_ + r"; uderzen", rows[d], float)) for d in live]
+    bad3 = [f"d{d}: {x}" for d, x in chk if x is None or abs(x) > 0.01]
+    rep.add("E7/R1 T3: trafieni = zabici + las + jency + uchodzcy (kontrola) w kazdej dobie", f"dob niezgodnych {len(bad3)}" + (f" ({', '.join(bad3[:6])})" if bad3 else ""), "|kontrola| <= 0.01", len(bad3) == 0)
+    # T4 - mediana dob na osade lorda (lista z linii)
+    vals = []
+    for x in w:
+        m = re.search(r"\(lordowie \d+: ([\d./]+)\)", x)
+        if m:
+            vals += [float(v) for v in m.group(1).split("/") if v]
+    vals.sort()
+    med = (vals[len(vals) // 2] if len(vals) % 2 else 0.5 * (vals[len(vals) // 2 - 1] + vals[len(vals) // 2])) if vals else None
+    rep.add("E7/R1 T4: mediana dob na osade - lordowie (krok pelny, doby lupienia / osady kroku)", f"{med:.2f} d ({len(vals)} krokow)" if med is not None else "brak krokow lordow",
+            "<= 5 dob (lord ze 112 ludzmi ok. 4.6)", (med <= 5.0) if len(vals) >= 10 else None)
+    # T5 - wioski spalone w ksiedze
+    book = by_day(lines, "Ksiega wiosek (E4/11): dzien")
+    burnt = sum(num(r"\| spalone dzis (\d+)", book[d], int, 0) or 0 for d in win if d in book)
+    # narzedzie progow zb58 (TRIAZ E7/R1 T5): spalona = puste osady >= 50% osad JEDNEJ wioski (ok. 16 osad po 250 ludzi -> 8 osad = 2000 ludzi); przy
+    # tempie rabunku z biegu (najbardziej spustoszony okreg ok. 4.6 pustych osad w d120, takze we wzorcu) prog "> 0 w 120 dob" jest nieosiagalny w tym
+    # oknie. Prog twardy "> 0" tylko przy oknie >= 240 dob; w krotszym - INFO z najwiekszym puste_r okregu (wioski-okregi.csv) i tempem 30 dob.
+    if len(win) >= 240 or not book:
+        rep.add("E7/R1 T5: wioski spalone w ksiedze (Ksiega wiosek (E4/11) spalone dzis, suma okna)", f"{burnt}", "> 0 przy oknie >= 240 dob (przed R1: 0)",
+                (burnt > 0) if book else None)
+    else:
+        top = ""
+        cp = session_file_find(kw["logp"], "wioski-okregi.csv") if kw.get("logp") else None
+        if cp and os.path.exists(cp):
+            try:
+                emp = {}
+                with open(cp, encoding="utf-8", errors="replace") as fh:
+                    for r in csv.DictReader(fh, delimiter=";"):
+                        rd = run_day(int(r["dzien"]) - 1, start)
+                        if 1 <= rd <= until:
+                            emp.setdefault(rd, {})[r["okreg"]] = float(r["puste_r"])
+                if emp:
+                    ld = max(emp)
+                    nm = max(emp[ld], key=lambda k: emp[ld][k])
+                    pd = max([d for d in emp if d <= ld - 30 and nm in emp[d]] or [min(d for d in emp if nm in emp[d])])
+                    pace = (emp[ld][nm] - emp[pd][nm]) / float(max(1, ld - pd))
+                    top = (f"; najbardziej spustoszony okreg {nm}: {emp[ld][nm]:.2f} pustych osad (d{ld}) wobec ok. 8 potrzebnych w jednej wiosce, "
+                           f"tempo {pace:.3f} osady/d (d{pd}-d{ld})" + (f" - 8 osad ok. d{ld + (8.0 - emp[ld][nm]) / pace:.0f}" if pace > 0 and emp[ld][nm] < 8.0 else ""))
+            except (KeyError, ValueError, OSError):
+                top = "; wioski-okregi.csv nieczytelny"
+        else:
+            top = "; brak wioski-okregi.csv (najwieksze spustoszenie okregu nieznane)"
+        rep.add("E7/R1 T5: wioski spalone w ksiedze (Ksiega wiosek (E4/11) spalone dzis, suma okna)", f"{burnt}" + top,
+                "INFO w oknie < 240 dob (spalona = puste osady >= 50% osad jednej wioski, ok. 8 x 250 ludzi); > 0 wiazace przy oknie >= 240 dob", None)
+    rep.add("E7/R1 T6: udzial przerwanych sesji", f"{intr} z {ses} ({100.0 * intr / ses:.0f}%)" if ses else "-", "INFO (przed R1: 233 z 308 rabunkow przerwanych)", None)
+    # T7 - potkniecia
+    stu = tot(r"\| potkniecia (\d+)\.")
+    err = [x for x in lines if x.startswith("ERROR in DistrictRaid.")]
+    rep.add("E7/R1 T7: potkniecia (suma okna) i linie ERROR in DistrictRaid.", f"potkniecia {stu}, linii ERROR {len(err)}" + (f" (pierwsza: {err[0][:120]})" if err else ""), "0", stu == 0 and not err)
+    # T10 - jency z rabunkow R1, T11 - zabici w stanie rabunku = zabici R1
+    cap = tot(r"\| jency z rabunkow R1 (\d+),")
+    rep.add("E7/R1 T10: jency z rabunkow R1 do lochu najezdzcy (suma okna)", f"{cap} (sesji {ses})", "> 0 (najezdzcy z niewola - E4/9 na wspolnym stanie rabunku)", (cap > 0) if ses >= 20 else None)
+    rd = tot(r"zabici w stanie rabunku \(RaidDead\) " + F_, float)
+    r1d = tot(r"\(zabici R1 " + F_ + r"\)", float)
+    rep.add("E7/R1 T11: zabici w stanie rabunku (RaidDead, Inni i jency) = zabici z uderzen R1 (suma okna)", f"{rd:.1f} / {r1d:.1f} (roznica {rd - r1d:+.1f}, sesji {ses})",
+            "|roznica| <= liczba sesji", abs(rd - r1d) <= max(1, ses))
+    # koszt
+    cost = [num(r"\| czas " + F_ + r" ms \|", x, float) for x in w]
+    cm = _mean([c for c in cost if c is not None])
+    rep.add("E7/R1 R1-3: koszt prefiksu rabunku (srednio)", f"{cm:.1f} ms/dobe" if cm is not None else "brak", "< 50 ms/dobe", (cm < 50.0) if cm is not None else None)
+    # INFO
+    gold, take, tval = tot(r"zloto z kiesy wsi (\d+) zl"), tot(r"towar z magazynu (\d+) szt\."), tot(r"towar z magazynu \d+ szt\. \((\d+) zl\)")
+    burn, bval, eat = tot(r"spalone w rabunku (\d+) szt\."), tot(r"spalone w rabunku \d+ szt\. \((\d+) zl\)"), tot(r"jedzenie ze spichlerza (\d+) szt\.")
+    rep.add("E7/R1 R1-4: lup (suma okna)", f"zloto z kies wsi {gold} zl, towar {take} szt. ({tval} zl), spalone {burn} szt. ({bval} zl), zboze ze spichlerza {eat} szt.",
+            "INFO (zloto gry z niczego przed R1 ok. 670 zl/d)", None)
+    alert = num(r"\| czujnosc: wsi (\d+) \(", w[-1], int, 0) or 0
+    held = tot(r"leczenie wstrzymane (\d+)\)")
+    bo, uc = tot(r"\| okreg wypalony (\d+),"), tot(r"u przyciete do [\d.]+ (\d+),")
+    rep.add("E7/R1 R1-5: czujnosc, okreg wypalony, u przyciete", f"czujnosc wsi (ostatnia doba) {alert}, leczenie wstrzymane (suma) {held}; okreg wypalony {bo}, u przyciete {uc} (sesji {ses})",
+            "INFO (u przyciete czesto = okregi prawie wypalone - sprawdzic tempo wojny)", None)
+    # T9 - zapis -> wczytanie
+    pairs, mism, last = 0, [], None
+    for x in lines:
+        if x.startswith(P + "zapis - sesji"):
+            last = (num(r"sesji (\d+)", x, int), num(r"czujnosc (\d+)", x, int))
+        elif x.startswith(P + "wczytanie - sesji"):
+            got = (num(r"sesji (\d+)", x, int), num(r"czujnosc (\d+)", x, int))
+            if last is not None:
+                pairs += 1
+                if got != last:
+                    mism.append(f"{got[0]}/{got[1]} wobec {last[0]}/{last[1]}")
+    rep.add("E7/R1 T9: sesje i czujnosc zapis -> wczytanie", f"par {pairs}, niezgodnych {len(mism)}" + (f" ({', '.join(mism[:4])})" if mism else ""),
+            "0 niezgodnych (bieg zapisu 9 dob)", (len(mism) == 0) if pairs else None)
+
+def etap7_r2(rep, lines, start, win, until=120, **kw):
+    """E7/R2 (236, PLAN 7.11 b, projekt etapu 7 v2 rozdz. 3 "E7/R2" Test): linia startowa "Okienko rabunku gracza (E7/R2): latki przy starcie gry" i linia doby
+    "Okienko rabunku gracza (E7/R2): dzien N" (tylko w dobach z rabunkiem gracza; dzien ksiegi = doba gry - 1, jak linia R1). Autotest gra AI, wiec bez sesji
+    gracza wiaza tylko R2-0 (latki) i R2-1 (bledy); okienko, "End the raid", "End Raiding", wczytanie w stanie decyzji - test Jeffa (lista RB ryzyko 7)."""
+    P = "Okienko rabunku gracza (E7/R2): "
+    starts = [x for x in lines if x.startswith(P + "latki przy starcie gry")]
+    rows = {}
+    for d, x in by_day(lines, P + "dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            rows[d] = x
+    if not starts and not rows:
+        rep.add("E7/R2: linie Okienko rabunku gracza (E7/R2)", "brak w logu", "sa od wgrania E7/R2 (LogEnabled)", None)
+        return
+    if starts:
+        a = starts[-1]
+        rep.add("E7/R2 R2-0: latki okienka przy starcie gry", a[len(P):][:220], "GOTOWE, BRAK: - (tick menu raiding_village i End Raiding)", ("GOTOWE" in a) and ("BRAK: -" in a))
+    else:
+        rep.add("E7/R2 R2-0: latki okienka przy starcie gry", "brak linii startowej", "jest przy kazdym starcie gry", None)
+    w = [rows[d] for d in sorted(rows)]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    err = [x for x in lines if x.startswith("ERROR in DistrictRaid.R2")]
+    fail = tot(r"okienko zawiodlo (\d+)")
+    rep.add("E7/R2 R2-1: bledy okienka (linie ERROR in DistrictRaid.R2, okienko zawiodlo)", f"linii ERROR {len(err)}, okienko zawiodlo {fail}" + (f" (pierwsza: {err[0][:120]})" if err else ""),
+            "0", not err and fail == 0)
+    new, ended = tot(r"sesji gracza: nowych (\d+),"), tot(r", zakonczonych (\d+) \(spalone")
+    won, called, broken = tot(r"\(spalone (\d+),"), tot(r"odwolane przy 0 osadach (\d+),"), tot(r"przerwane po >= 1 osadzie (\d+)\)")
+    steps, settl = tot(r"\| krokow pelnych (\d+) \("), tot(r"\| krokow pelnych \d+ \(osad (\d+)\)")
+    shown, asks, again, nonext = tot(r"\| okienek (\d+) z "), tot(r"\| okienek \d+ z (\d+) decyzji"), tot(r"\(ponownie (\d+),"), tot(r"bez nastepnej osady (\d+)\)")
+    nxt, endp = tot(r"wybory: nastepna (\d+),"), tot(r"wybory: nastepna \d+, koniec (\d+);")
+    em, em0, auto = tot(r"End Raiding po >= 1 osadzie (\d+),"), tot(r"przy 0 osadach (\d+);"), tot(r"koniec bez okienka \(klucz zdjety w decyzji\) (\d+),")
+    off = [d for d in rows if "| okienko NIE" in rows[d]]
+    if not rows or (new == 0 and ended == 0 and steps == 0):
+        rep.add("E7/R2 R2-2: rabunki gracza w oknie", "0 sesji (autotest gra AI)", "INFO - test Jeffa: pasek 99% przy okienku, End the raid, End Raiding po 1 osadzie i przy 0, wczytanie w decyzji, armia, Escape", None)
+        return
+    rep.add("E7/R2 R2-2: rabunki gracza w oknie (suma)",
+            f"sesji nowych {new}, zakonczonych {ended} (spalone {won}, odwolane przy 0 osadach {called}, przerwane po >= 1 osadzie {broken}); krokow pelnych {steps} (osad {settl})"
+            + (f"; dob z okienkiem NIE: {len(off)}" if off else ""), "INFO", None)
+    # R2-3: sesje gracza w linii R1 = zakonczone w linii R2 (te same zdarzenia konca rabunku)
+    r1 = {}
+    for d, x in by_day(lines, "Rabunek osada po osadzie (E7/R1): dzien").items():
+        if 1 <= run_day(d, start) <= until:
+            r1[d] = x
+    r1p = sum(num(r"\(AI \d+, gracz (\d+)\)", x, int, 0) or 0 for x in r1.values())
+    rep.add("E7/R2 R2-3: sesje gracza w linii R1 (gracz N) = zakonczone w linii R2 (suma okna)", f"{r1p} / {ended}", "rowne", r1p == ended)
+    rep.add("E7/R2 R2-4: wybory z okienka <= okienka otwarte (suma okna)", f"nastepna {nxt} + koniec {endp} wobec okienek {shown} + ponownie {again} (decyzji {asks}, bez nastepnej osady {nonext})",
+            "wybory <= okienka", (nxt + endp) <= (shown + again))
+    rep.add("E7/R2 R2-5: End Raiding i koniec bez okienka (suma okna)", f"End Raiding po >= 1 osadzie {em} (rabunek spalony), przy 0 osadach {em0} (odwolany - gra); koniec bez okienka (klucz zdjety w decyzji) {auto}",
+            "INFO", None)
 
 
 def etap7_w2(rep, lines, start, win, until=120, **kw):
@@ -8211,6 +9586,105 @@ def etap7_w5(rep, lines, start, win, until=120, **kw):
             "INFO (po bitwie z proporczykami w poblizu > 0)", None)
     rep.add("E7/W5 T2: spadek klatek przy kamerze 30 / 60 / 90 i 0 / 40 / 80 proporczykach, plotno, puste flagi po bitwie", "poza narzedziem",
             "< 5% w trybie zdjec (inaczej VillagePennants domyslnie false)", None)
+
+
+def etap7_w4(rep, lines, start, win, until=120, **kw):
+    """E7/W4 (237, PLAN 7.10 b, projekt etapu 7 v2 rozdz. 3 "E7/W4"): linia startowa "Wioski - wyglad (E7/W4): start" (pierwszy tick widoku wiosek na
+    mapie - raz na mape / wczytanie) i linia stanu "Wioski - wyglad (E7/W4): przebudowy obrazka ..." (co 2 minuty przy zmianie i na koniec mapy; liczniki
+    od wczytania mapy). Widok mapy nie ma doby - progi z calego logu. Wiazace: T1 (kazda przebudowa obrazka ma swoja zmiane stanu, zadna wioska nie miga),
+    W4-3 (napisy <= 30, przeliczenie pozycji), T4 (potkniecia 0). T2 (zdjecie spalonej wioski) i T3 (spadek klatek z napisami < 2%) - tryb zdjec, poza
+    narzedziem; DLL zdjec (-p:W4Photo=true) zglasza sie w linii startowej."""
+    starts = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): start")]
+    rows = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): przebudowy obrazka")]
+    if not starts and not rows:
+        rep.add("E7/W4: linie Wioski - wyglad (E7/W4)", "brak w logu",
+                "sa od wgrania E7/W4 przy czynnych wioskach na mapie (MapVillagesEnabled, LogEnabled)", None)
+        return
+    if starts:
+        s = starts[-1]
+        look, lbl, book = "wioski CZYNNY" in s, "spalonymi CZYNNE" in s, "ksiega wiosek czynna" in s
+        rep.add("E7/W4 W4-0: klucze i ksiega wiosek (ostatnia mapa)",
+                f"wyglad {'CZYNNY' if look else 'wylaczony'}, napisy {'CZYNNE' if lbl else 'wylaczone'}, ksiega {'czynna' if book else 'NIECZYNNA'}",
+                "wyglad CZYNNY, napisy CZYNNE, ksiega czynna (klucz zdjety - INFO: proba wylacznika; ksiega nieczynna - NIE, bez niej nie ma spalonych)",
+                True if (look and lbl and book) else (False if not book else None))
+        lv = re.search(r"wiosek poziomu 2 w pliku (\d+), poziomu 3 (\d+) z (\d+)", s)
+        if lv:
+            rep.add("E7/W4: wioski, ktore moga zmalec (poziom 2 i 3 w pliku)", f"poziom 2: {lv.group(1)}, poziom 3: {lv.group(2)} z {lv.group(3)}",
+                    "INFO (poziom 1 nie maleje - u tych wiosek zmienia sie tylko wyglad spalonej)", None)
+        if "KOMPILACJA ZDJEC" in s:
+            rep.add("E7/W4: DLL zdjec (W4_PHOTO)", "TAK - pierwsza wioska kazdego okregu pokazana jako spalona",
+                    "tylko bieg zdjec; ten DLL NIE idzie do biegu A ani do Jeffa", None)
+    else:
+        rep.add("E7/W4 W4-0: linia startowa", "brak", "jest przy pierwszym ticku widoku wiosek na mapie", None)
+    for key, what in (("wyglad malejacej i spalonej wioski wylaczony w MCM", "BurnedVillageLook"), ("napisy nad spalonymi wylaczone w MCM", "BurnedVillageLabels")):
+        off = [s for s in lines if s.startswith("Wioski - wyglad (E7/W4): " + key)]
+        if off:
+            rep.add(f"E7/W4: wylacznik {what} w biegu", f"wylaczen {len(off)}", "INFO (proba wylacznika albo bisekcja)", None)
+    if not rows:
+        rep.add("E7/W4 T1: linia stanu", "brak", "co 2 minuty przy zmianie i na koniec mapy", None)
+        return
+
+    def g(pat, s):
+        return num(pat, s, int, 0) or 0
+
+    def parts_of(s):
+        return (g(r"; pokazane (\d+)", s), g(r"schowane do nastepnego pokazania (\d+)", s), g(r"bez obrazka (\d+)", s),
+                g(r"polaczone (\d+)", s), g(r"czeka (\d+)", s))
+
+    bad, worst, top = [], 0, None
+    for s in rows:
+        n, m = g(r"przebudowy obrazka (\d+) \(zmiany stanu", s), g(r"zmiany stanu (\d+);", s)
+        if n > m or sum(parts_of(s)) != m:
+            bad.append((n, m))
+        worst = max(worst, g(r"najwiecej przebudow jednej wioski (\d+)", s))
+        if top is None or m >= top[1]:
+            top = (n, m, s)
+    n, m, s = top
+    pp = parts_of(s)
+    detail = (f"przebudowy {n}, zmiany stanu {m} (pokazane {pp[0]}, schowane {pp[1]}, bez obrazka {pp[2]}, polaczone {pp[3]}, czeka {pp[4]});"
+              f" linii zlych {len(bad)} z {len(rows)}")
+    rep.add("E7/W4 T1: przebudowy obrazka wobec zmian stanu ksiegi (linia z najwieksza liczba zmian)", detail,
+            "przebudowy <= zmiany stanu i skladniki = zmiany stanu w KAZDEJ linii (0 przebudow bez zmiany); 0 zmian w biegu - INFO",
+            (not bad) if m > 0 else (None if not bad else False))
+    rep.add("E7/W4 T1b: najwiecej przebudow jednej wioski (obrazek nie miga)", str(worst), "<= 20 na mape (poziom w dol / w gore, spalona, odbudowa)",
+            worst <= 20 if m > 0 else None)
+    burned = max(g(r"spalonych w ksiedze (\d+)", x) for x in rows)
+    dark = max(g(r"ciemny obrazek stoi (\d+)", x) for x in rows)
+    smoke = max(g(r"dym nad spalonymi (\d+)", x) for x in rows)
+    small = max(g(r"mniejszych (\d+)", x) for x in rows)
+    built = max(g(r"ciemnych obrazkow od wczytania (\d+)", x) for x in rows)
+    tint = max(g(r"encji przyciemnionych (\d+)", x) for x in rows)
+    rep.add("E7/W4 W4-2: spalone w ksiedze widziane przez widok, ciemne obrazki, dym, mniejsze (najwiecej w linii mapy)",
+            f"spalonych {burned}, ciemny obrazek {dark}, dym {smoke}, mniejszych {small}; ciemnych obrazkow od wczytania {built} (encji {tint})",
+            "ciemny obrazek ma przyciemnione encje (ciemnych > 0 => encji > 0); spalonych 0 - INFO (T2 wtedy z DLL zdjec)",
+            (tint > 0) if built > 0 else None)
+    lmax = max(g(r"napisy w kadrze teraz \d+, maks\. (\d+)", x) for x in rows)
+    fr = max(g(r"klatek z napisami (\d+)", x) for x in rows)
+    ms = max([num(r"przeliczenie pozycji sr\. ([0-9.]+) ms/klatke", x, float, 0.0) or 0.0 for x in rows] or [0.0])
+    rep.add("E7/W4 W4-3: napisy nad spalonymi w kadrze (najwiecej w biegu) i przeliczenie pozycji",
+            f"maks. {lmax}, sr. {ms:.4f} ms/klatke (klatek z napisami najwiecej {fr})",
+            "1-30 napisow i < 0.3 ms/klatke (2% klatki przy 60/s); 0 napisow = kamera nie zjechala ponizej 90 przy spalonej wiosce - INFO",
+            (1 <= lmax <= 30 and ms < 0.3) if lmax > 0 else None)
+    st = max(g(r"potkniecia: wyglad (\d+)", x) for x in rows)
+    sl = max(g(r"potkniecia: wyglad \d+, napisy (\d+)", x) for x in rows)
+    # recenzja E7/W4: przebudowa obrazka (TryCreate -> Create z barwa, bez detali, z nizszym poziomem), zdjecie starego obrazka (DropPicture) i dym nad
+    # spalonymi (BurnedFx -> ApplyFx) licza potkniecia w STARYCH licznikach linii "Wioski:" (tworzenie, ogien, zdejmowanie) i pisza ERROR pod starymi
+    # nazwami - bez nich T4 byl zielony takze wtedy, gdy spalona wioska nie stawala (3 potkniecia tworzenia = wioska znika z mapy do wczytania).
+    # Liczniki wspolne z W2: kazde potkniecie w nich to blad obrazkow wiosek (bieg bazowy 11-12.10: wszedzie 0).
+    wl = [x for x in lines if x.startswith("Wioski: ") and "potkniecia: tworzenie" in x]
+    sc = max([g(r"potkniecia: tworzenie (\d+)", x) for x in wl] or [0])
+    sf = max([g(r"potkniecia: tworzenie \d+, wzor \d+, ogien (\d+)", x) for x in wl] or [0])
+    sr = max([g(r"zdejmowanie (\d+), tick", x) for x in wl] or [0])
+    err = [x for x in lines if x.startswith(("ERROR in MapVillagesView.Look", "ERROR in MapVillagesView.Label", "ERROR in MapVillagesView.Create ",
+                                             "ERROR in MapVillagesView.Remove ", "ERROR in MapVillagesView.ApplyFx", "ERROR in MapVillagesView.PollRaids"))]
+    lost = [x for x in lines if x.startswith("Wioski - wyglad (E7/W4):") and ("BRAK prefabu" in x or "WYLACZONE do nastepnego wczytania" in x)]
+    rep.add("E7/W4 T4: potkniecia wygladu i napisow (najwiecej w linii mapy), tworzenia / ognia / zdejmowania obrazkow (linia Wioski), linie ERROR,"
+            " napisy zgaszone / brak prefabu",
+            f"wyglad {st}, napisy {sl}, tworzenie {sc}, ogien {sf}, zdejmowanie {sr}, linii ERROR {len(err)}, napisy zgaszone albo brak prefabu {len(lost)}",
+            "0 (brak prefabu = katalog GUI\\Prefabs nie wgrany razem z DLL; tworzenie / ogien / zdejmowanie - liczniki wspolne z W2, tedy ida przebudowa"
+            " i dym W4)", st == 0 and sl == 0 and sc == 0 and sf == 0 and sr == 0 and not err and not lost)
+    rep.add("E7/W4 T2 / T3: zdjecie spalonej wioski (ciemna, bez detali, dym, napis), spadek klatek z napisami", "poza narzedziem",
+            "tryb zdjec: wyglad czytelny, klik i dymek mapy pod napisem dzialaja, spadek klatek < 2%", None)
 
 
 def etap7_d0(rep, lines, start, win, until=120, **kw):
@@ -11856,6 +13330,12 @@ def main(argv):
             rep.add("D staly pana samych zamkow (doba 40) wobec bazy", f"{v} wobec bazy {b40} ({v - b40:+d})", "baza .. baza +440 (krok B tylko doklada panom zamkow)",
                     b40 <= v <= b40 + 440)
             rep.add("D staly pana samych zamkow (doba 40)", v, "INFO po kroku B (169c bez paczek: 400-1300)", None)
+        elif any(s.startswith("Wyrownanie panow zamkow (E5/B3)") for s in lines):
+            # narzedzie progow zb58 (TRIAZ "D staly pana samych zamkow"): 400-1300 to sprawdzenie miary 169c bez paczek; od paczek 180 i E5/B3 D pana
+            # samych zamkow to glownie korona (renty korony rodow samych zamkow - linia "Wyrownanie panow zamkow (E5/B3)"). Bez pliku bazy: pasmo wobec
+            # wzorca W33 (2222) +-20%. Log bez linii E5/B3 - stara miara 400-1300.
+            rep.add("D staly pana samych zamkow (doba 40)", v, "1800-2700 (wzorzec W33 2222 +-20%, po 180 i E5/B3; 400-1300 = miara 169c sprzed paczek)",
+                    (1800 <= v <= 2700) if v is not None else None)
         else:
             rep.add("D staly pana samych zamkow (doba 40)", v, "400-1300", (400 <= v <= 1300) if v is not None else None)
     unr = [(d, num(r"nierozpoznane: modul \d+ zl = ([\d.]+)% wplywu", s, float)) for d, s in sd.items()]
@@ -11901,9 +13381,17 @@ def main(argv):
     hide = sum(num(r"kasa kryjowki bandy (\d+)", s) or 0 for s in h if s.startswith("Okupy (2.14): dzien"))
     rep.add("2.14: okup do kasy osady (kryjowka / miasto bez pana)", f"kryjowka {hide}, kasa miasta {town}" if h else "brak linii", "INFO (kasa miasta ponad cel regulatora gry jest kasowana)", None)
     harn = [s for s in lines if s.startswith("Harness niewoli (2.14)")]
+    # narzedzie progow zb58 (TRIAZ "2.14 kurier prawdziwy w harnessie"): od paczki 178 harness przy Ransom178.On robi prawdziwe AcceptRansomOffer w galezi
+    # 178 i wraca przed krokami 2b/2c (RansomFlows) - prawdziwy kurier biegnie pod nazwa "Harness niewoli (178): krok 2 - kurier prawdziwy". Gdy ta linia
+    # jest: TAK, jesli konczy sie "OK." i ma "z niczego 0"; brak 2b/2c jest wtedy oczekiwany.
+    h178 = [s for s in lines if s.startswith("Harness niewoli (178): krok 2 - kurier prawdziwy")]
     if not harn:
         rep.add("2.14: harness niewoli (krok 1 i 2)", "brak linii (nie autotest albo RansomHarnessInAutotest wylaczone)", "wynik OK w kazdym kroku", None)
-        rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", "brak linii", "2b i 2c OK", None)
+        if h178:
+            rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", "178: ..." + h178[-1][-150:], "krok 2 galezi 178: OK. i z niczego 0",
+                    all(s.rstrip().endswith("OK.") and "z niczego 0," in s for s in h178))
+        else:
+            rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", "brak linii", "2b i 2c OK", None)
     else:
         base_steps = [s for s in harn if not s.startswith("Harness niewoli (2.14): krok 2b") and not s.startswith("Harness niewoli (2.14): krok 2c - ")
                       and not s.startswith("Harness niewoli (2.14): sprzatanie")]
@@ -11915,6 +13403,10 @@ def main(argv):
         if real["2b"] and real["2c"]:
             okr = all(s.rstrip(".").endswith(" OK") for k in ("2b", "2c") for s in real[k])
             rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", " / ".join(k + ": ..." + real[k][-1][-120:] for k in ("2b", "2c")), "2b i 2c OK", okr)
+        elif h178:
+            rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", "178: ..." + h178[-1][-150:],
+                    "2b i 2c OK albo (od 178) krok 2 galezi 178: OK. i z niczego 0 - 2b/2c wtedy nie biegna",
+                    all(s.rstrip().endswith("OK.") and "z niczego 0," in s for s in h178))
         else:
             why = skip[-1][:160] if skip else ("tylko 2b" if real["2b"] else "brak linii 2b/2c")
             rep.add("2.14: kurier prawdziwy w harnessie (krok 2b, 2c)", why, "2b i 2c OK (pominiety = NIE)", False)

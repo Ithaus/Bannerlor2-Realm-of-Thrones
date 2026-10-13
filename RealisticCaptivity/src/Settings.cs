@@ -104,6 +104,8 @@ namespace RealisticCaptivity
         public int DebtDailyInstalment = 250;              // gold taken from you each day until it is cleared
         public int DebtGraceDays = 60;                     // days of missed payment before the disgrace lands
         public int DebtDefaultRenownLoss = 50;             // renown lost for defaulting on the debt
+        // E8/RC (259, regula decyzji 9): splata dlugu okupu i wykup rynsztunku przy pojmujacym bez zywego bohatera - do jego rodu, osady albo bandy, nie w nicosc
+        public bool DebtToCaptorHome = true;               // when no living lord stands behind your captor, the daily instalment on your ransom debt and the price of buying back your war gear go to whoever holds the claim: the head of a dead captor's house, the coffers of the settlement whose militia, garrison or dungeon held you, or the purse of the band that took you; with no one left to take it nothing is taken and the debt waits (off = that coin simply vanishes, as before)
 
         // --- Escape needs help ---
         public bool EscapeNeedsHelp = true;                // no one walks out of a cell alone - it takes help
@@ -151,6 +153,8 @@ namespace RealisticCaptivity
         public float LabourerDayWage = 1.5f;               // an unskilled labourer's day in a middling town, pence (England c.1300: a labourer about 1.5 d, a craftsman 3 d); a night on the watch pays the same
         public float VillageWageShare = 0.75f;             // a day's hire in a village pays this share of the wage in its market town
         public float GuardBrawlBonusDays = 3f;             // cracking heads when trouble comes pays this many days' wages on top
+        // E8/RC (259, LAWA 7/16, 8, 10): dniowki i warta z nadwyzki miasta (regula R1 etapu 8), bez zaokraglania w gore do 1, pusta nadwyzka zatrzymuje prace
+        public bool WorkRespectsReserve = true;            // with Historical Town Rates on, day labour and the night watch are paid only out of what a town can spare above its merchants' reserve (the town surplus of Armoury; a village pays from its whole purse): with nothing to spare no one hires, work under way stops and an unpaid day does not count towards the half-pay limit; a wage under one stag is no longer rounded up to a full stag every day (off = paid down to the last coin of the coffers and never less than 1 stag a day, as before)
 
         // --- In the lord's service ---
         public bool EnlistedHonestWounds = true;           // no miracle full-heal after enlisted battles - wounds mend with rest, as they should

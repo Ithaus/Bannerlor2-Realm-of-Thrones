@@ -58,8 +58,10 @@ namespace Armoury
             CDoZbrojowniNietrwalej = 52, CWolneZaloga = 53, CWolneDezercja = 54, CKonieEcho = 55, CStrazPieszyFootman = 56,
             CStrazPieszyElita = 57, CStrazBrakPuli = 58, CWolneZwykle = 59, CWolneBojowe = 60, CWolneSzlachetne = 61,
             // sklad9-p (przeglad sklad9, uwaga 5b): swiezy konny ochotnik t2+ bez kupionego konia ZOSTAJE (wariant lagodny 171) - nie "cofniety"
-            COchotnikZostaje = 62;
-        private const int N = 63;
+            COchotnikZostaje = 62,
+            // F5 (K3-3): wizyta bez zakupu, bo skonczyl sie przydzial sprzetu rodu (kiesa pana by starczyla) - osobno od "brak zlota"; recenzja F5: takze "za drogie" przy budzecie wyznaczonym przez przydzial (osobno od "za drogie" z kiesy)
+            CNieudanePrzydzial = 63;
+        private const int N = 64;
         private const string Header = "dzien;krolestwo;konni;wszyscy;czeka;odrzucone;skret;przyciete;wykonane;do_zbrojowni;przepadlo;kupione;zloto;"
             + "nieudane_zloto;nieudane_brak;bez_konia;naplyw_ochotnicy;naplyw_najemnicy;naplyw_jency;rot_plus;rot_minus;awanse;wolne_w_zbrojowni;"
             + "awanse_z_wolnych;straz_zbrojownia;straz_tabor;straz_pieszy;straz_t6;rot_plus_jeniec;rot_plus_najemnik;rot_plus_obcy;rot_zloto;"
@@ -69,9 +71,9 @@ namespace Armoury
             + "czeka_mimo_koni_innej_kategorii;czekaja_proby;nieudane_pusto;nieudane_za_drogie;nieudane_polka_zarezerwowana;"
             + "wizyty_bez_zakupu_konie_innej_kategorii;do_zbrojowni_nietrwalej;wolne_po_jezdzcach_w_zalodze;wolne_po_dezerterach;"
             + "konie_z_echa_rot;straz_pieszy_footman;straz_pieszy_z_elity;straz_pieszego_brak_w_puli;wolne_zwykle;wolne_bojowe;wolne_szlachetne;"
-            + "ochotnik_konny_bez_konia_zostaje";
+            + "ochotnik_konny_bez_konia_zostaje;nieudane_brak_przydzialu";
         internal const string NoKingdom = "bez_krolestwa", PlayerClanKey = "rod_gracza", OtherPartiesKey = "inne_partie";
-        internal const int FailNoGold = 0, FailEmpty = 1, FailTooDear = 2, FailShelfReserved = 3;
+        internal const int FailNoGold = 0, FailEmpty = 1, FailTooDear = 2, FailShelfReserved = 3, FailNoShare = 4;
 
         private static readonly Dictionary<string, long[]> _day = new Dictionary<string, long[]>();
         private static long _volKhuzaitBought, _volKhuzaitReverted, _volKhuzaitStays;   // ochotnicy-jezdzcy u notabli kultury khuzait (linia dnia)
@@ -199,6 +201,7 @@ namespace Armoury
             if (!On || mp == null) return;
             string key = KeyOfParty(mp.Party);
             if (kind == FailNoGold) { Add(key, CNieudaneZloto, 1); return; }
+            if (kind == FailNoShare) { Add(key, CNieudanePrzydzial, 1); return; }   // F5 (K3-3): wyczerpany albo za maly na najtanszego konia przydzial sprzetu rodu - nie "brak zlota" i nie "brak koni"
             Add(key, CNieudaneBrak, 1);   // suma trzech ponizej (kolumna z projektu 4.2)
             Add(key, kind == FailTooDear ? CNieudaneDrogie : kind == FailShelfReserved ? CNieudaneRezerwa : CNieudanePusto, 1);
         }
@@ -569,6 +572,7 @@ namespace Armoury
               .Append("; wizyt z potrzeba ").Append(t[CWizyty]).Append(", bez zakupu przy koniach innej kategorii w taborze ").Append(t[CWizytyInnaKat])
               .Append("), nieudane: brak zlota ").Append(t[CNieudaneZloto]).Append(", brak koni ").Append(t[CNieudaneBrak])
               .Append(" (pusto ").Append(t[CNieudanePusto]).Append(", za drogie ").Append(t[CNieudaneDrogie]).Append(", polka zarezerwowana ").Append(t[CNieudaneRezerwa]).Append(")")
+              .Append(", brak przydzialu sprzetu rodu ").Append(t[CNieudanePrzydzial])   // F5 (K3-3)
               .Append(" | naplyw konnych do partii lordow: ochotnicy ").Append(t[CNaplywOchotnicy]).Append(", najemnicy ").Append(t[CNaplywNajemnicy]).Append(", jency ").Append(t[CNaplywJency])
               .Append(", inne ").Append(t[CNaplywInne]).Append(", zamiany ROT +").Append(t[CRotPlus]).Append("/-").Append(t[CRotMinus]).Append(" (wszystkie partie AI), awanse ").Append(t[CAwanse])
               .Append(" | ROT +konni wedlug zrodla: jency ").Append(t[CRotPlusJeniec]).Append(", najemnicy ").Append(t[CRotPlusNajemnik]).Append(", obcy ").Append(t[CRotPlusObcy])

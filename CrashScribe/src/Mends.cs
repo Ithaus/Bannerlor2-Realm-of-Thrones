@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -23,8 +24,25 @@ namespace CrashScribe
     /// </summary>
     internal static class Mends
     {
-        /// <summary>Prefix usypiajacy odswiezanie martwego widgetu DTE (A6).</summary>
-        internal static bool SkipDteMapWidget() { return false; }
+        // ---- E8/M (247): odczyt ustawien innego moda - jedna linia przy pierwszym odczycie (raz na proces) ----
+        // Klucz = literal (nazwa odczytu albo pola), bez skladania napisow przed sprawdzeniem - ArmouryFloat
+        // bywa wolane czesto (HeroReqOn), a linia ma kosztowac tylko lock i HashSet.
+        private static readonly System.Collections.Generic.HashSet<string> _linkSaid = new System.Collections.Generic.HashSet<string>();
+
+        private static bool LinkFirst(string key)
+        {
+            lock (_linkSaid) { return _linkSaid.Add(key); }
+        }
+
+        private static void LinkLine(string link, bool ok, string field, string fallback)
+        {
+            try
+            {
+                if (!LinkFirst(link)) return;
+                Scribe.Line("Mends: " + link + ": " + (ok ? "PODPIETY (" + field + ")" : "BRAK (" + field + ") - zostaje " + fallback));
+            }
+            catch { }
+        }
 
         /// <summary>
         /// UMARLI NIE ZNAJA STRACHU (Jeff 30.08). ROT nie rusza morale
@@ -48,8 +66,9 @@ namespace CrashScribe
 
         /// <summary>Bialy Wedrowiec albo Nocny Krol - NIE zwykly wight.
         /// Wedrowcy to jednostki whitewalker2/3/4 i szablon ROTuniqueleader_whitewalker;
-        /// NK w bitwie to bohater kultury whitewalker (tak samo bohater-Other gracza).</summary>
-        private static bool WalkerBlood(BasicCharacterObject c)
+        /// NK w bitwie to bohater kultury whitewalker (tak samo bohater-Other gracza).
+        /// 175c: takze OthersSteel (liczniki bitew z Innymi) - stad internal.</summary>
+        internal static bool WalkerBlood(BasicCharacterObject c)
         {
             try
             {
@@ -74,6 +93,19 @@ namespace CrashScribe
         /// narzedzie). Piesc, kopyto konia i upadek NIE przebijaja lodu: tier 0.
         /// Bron T6+ bije normalnie; reszta zadaje 15% (min 1). PULAPKA TIEROW:
         /// ItemTiers.Tier1 == 0, wiec wyswietlany tier = (int)Tier + 1.
+        /// 175c (Jeff 09.10 ok. 07:45, "jak w ksiazkach"): pelne obrazenia tylko stal
+        /// valyrianska, smocze szklo i ogien smoka; t6 (stal zamkowa) OthersCastleSteelPercent
+        /// (dom. 50), reszta 15% - klasa ciosu i liczniki w OthersSteel. Wylacznik
+        /// OthersSteelRule = stara zasada wyzej. Ogien jezdzca smoka (cios ROT bez broni,
+        /// atakujacy = czlowiek) dotad wpadal w 15% - teraz pelne w obu trybach.
+        /// Recenzja 175c: pocisk przy wlaczonej zasadzie - bron rzucana wedlug siebie, amunicja
+        /// wedlug swojej wyrzutni (zmiana broni w locie bez wplywu), kamien/machina = reszta;
+        /// cios wlasny (wlasciciel = ofiara: odbicie wlasnego ciosu) poza licznikami bitwy.
+        /// 175d (Jeff 09.10 ok. 08:40): pocisk wedlug tieru AMUNICJI (strzaly, belty; luk i kusza sie
+        /// nie licza), kamienie, glazy, garnki i pociski machin zawsze 15%, bron rzucana wedlug siebie;
+        /// pierwszy cios gracza albo jego ludzi bronia, ktora tnie - komunikat raz na misje (OthersSteel.Warn).
+        /// Recenzja 175d: uderzenie tarcza/glowica (Blow.AttackType Bash) i cios tarcza - reszta, bez komunikatu;
+        /// pocisk strzelca usunietego z misji (att == null) wedlug przedmiotu pocisku, nie gole rece.
         /// </summary>
         public static void ValyrianWard(TaleWorlds.MountAndBlade.Agent __instance,
                                         ref TaleWorlds.MountAndBlade.Blow blow)
@@ -84,45 +116,20 @@ namespace CrashScribe
                 var v = __instance;
                 if (v == null || !v.IsHuman || !WalkerBlood(v.Character)) return;
 
-                int tier = 0;                                    // gole rece / kopyto = zadna stal
-                var rec = blow.WeaponRecord;
                 var mission = TaleWorlds.MountAndBlade.Mission.Current;
+                OthersSteel.MissionCheck(mission);               // raz na misje: suwaki z Armoury, kubelek licznikow pola
                 var att = mission != null ? mission.FindAgentWithIndex(blow.OwnerId) : null;
-                // SMOCZY OGIEN pali Innych pelnia takze w polu (Jeff 31.08) -
-                // cios od agenta-smoka nie podlega cieciu T6
-                if (att != null && !att.IsHuman)
+                int note;
+                int k = OthersSteel.FieldClass(att, blow.WeaponRecord, blow.AttackType, mission, out note);
+                int pre = blow.InflictedDamage;
+                int post = OthersSteel.Apply(k, pre);
+                blow.InflictedDamage = post;
+                if (att != null && ReferenceEquals(att, v)) OthersSteel.CountSelf();   // odbicie wlasnego ciosu - nie bitwa
+                else
                 {
-                    try
-                    {
-                        var mu = att.Monster != null ? (att.Monster.MonsterUsage ?? "") : "";
-                        if (mu.IndexOf("dragon", StringComparison.OrdinalIgnoreCase) >= 0) return;
-                    }
-                    catch { }
+                    OthersSteel.CountField(k, pre, post, v, note);
+                    OthersSteel.Warn(att, v, k, note);           // 175d: komunikat dla gracza, raz na misje
                 }
-                if (rec.HasWeapon() && att != null)
-                {
-                    ItemObject it = null;
-                    if (!rec.IsMissile)
-                    {
-                        int slot = rec.AffectorWeaponSlotOrMissileIndex;
-                        if (slot >= 0 && slot < 5)
-                        {
-                            var mw = att.Equipment[(EquipmentIndex)slot];
-                            if (!mw.IsEmpty) it = mw.Item;
-                        }
-                    }
-                    else
-                    {
-                        var mw = att.WieldedWeapon;
-                        if (!mw.IsEmpty) it = mw.Item;
-                    }
-                    if (it != null) tier = (int)it.Tier + 1;
-                }
-                if (tier >= 6) return;                           // rownowaznik valyrianskiej stali
-
-                int cut = blow.InflictedDamage * 15 / 100;
-                if (cut < 1) cut = 1;
-                blow.InflictedDamage = cut;
             }
             catch { }                                            // per-cios: zadnego raportowania
         }
@@ -162,6 +169,8 @@ namespace CrashScribe
         /// </summary>
         public static bool HarrenhalGuard(object __instance)
         {
+            _scriptedArmyLeader = null;                  // B6: przepustka BK zyje tylko w jednym wywolaniu (patrz HarrenhalBkPass)
+            _bkArmyPassedNow = false;
             try
             {
                 Hero roose = null;
@@ -179,12 +188,35 @@ namespace CrashScribe
                 else if (roose.Clan == null || roose.Clan.Kingdom == null) why = "Roose Bolton bez krolestwa (klan "
                     + (roose.Clan != null ? roose.Clan.Name.ToString() : "?") + ")";
                 else if (north != null && roose.Clan.Kingdom != north) why = "Roose Bolton sluzy " + roose.Clan.Kingdom.Name + ", nie Polnocy";
-                else if (roose.PartyBelongedTo.MapEvent != null) why = "Roose Bolton w bitwie";
+                Settlement harrenhal = null;
+                try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
+                // B6b: przeszkoda CHWILOWA (bitwa, cudze oblezenie) osobno od trwalych - na nia czekamy (patrz HarrenhalWait).
+                // Odlozenie (return false) zapada TU, przed jakimkolwiek ruchem: teleport pod brame robi oryginal ROT
+                // (SetupSiegeAttackers :337, pominiety przez false) albo nasz port HarrenhalSetupWith (nizej).
+                bool waitOn = Config.HarrenhalWaitForRoose && Config.HarrenhalWaitHours > 0;
+                string busy = why == null ? HarrenhalRooseBusy(roose.PartyBelongedTo, harrenhal) : null;
+                if (busy == null) _harrenhalWaitSince = -1;          // Roose wolny albo trwale niezdolny - okno czekania zamkniete
+                else if (waitOn)
+                {
+                    if (HarrenhalWait(busy)) return false;
+                    why = busy + " dluzej niz " + Config.HarrenhalWaitHours + " h - limit czekania minal";
+                }
+                else if (roose.PartyBelongedTo.MapEvent != null) why = "Roose Bolton w bitwie";   // wylacznik: po staremu (bitwa = zastepca od razu)
+                bool rooseBusy = waitOn && busy != null;
                 // ROT juz raz sie wywrocil mimo "zdolnego" Roose'a (02.09 14:43: 104 NRE
                 // w GatherArmy - Kingdom.CreateArmy nie dal armii) -> od tej chwili NIE
                 // oddajemy mu sterow: sami rozstawiamy, najpierw z Roose'em, a gdy
                 // Polnoc i jemu nie da armii - z zastepca
-                if (why == null && !_harrenhalRotFailed) return true;   // Roose zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null && !_harrenhalRotFailed)
+                {
+                    // B6b-p: ROT ustawi SiegeLeaderParty = partia Roose'a (:325) - poprzedni dowodca z naszego portu (zamrozony)
+                    // wypadlby z pamieci ROT (np. po wczytaniu zapisu z zastepca i SetupSiegeArmy=true); odmrazamy jak przy zmianie w porcie
+                    HarrenhalReleasePrev(__instance, roose.PartyBelongedTo, harrenhal);
+                    // B6: BK (CreateArmyPatch) odmawia armii Roose'owi bez tytulu - przepuszczamy TYLKO to jedno
+                    // skryptowe TheNorth.CreateArmy(Roose); flage zeruje finalizer HarrenhalSafe
+                    if (_bkArmyPassInstalled) _scriptedArmyLeader = roose;
+                    return true;   // Roose zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                }
                 if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Roose'em (NullReference w GatherArmy)";
 
                 // ZASTEPCA (Jeff 02.09: "dajemy innego dowodce, jak tamten w niewoli
@@ -192,8 +224,6 @@ namespace CrashScribe
                 // wolna partia lorda Polnocy prowadzi oblezenie ta sama sekwencja,
                 // ktora ROT robi dla Roose'a. Po rozstawieniu reszta wydarzenia
                 // patrzy tylko na SiegeLeaderParty, nie na Roose'a - bezpieczne.
-                Settlement harrenhal = null;
-                try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
                 Hero robb = null;
                 try { robb = _rotLords != null ? Traverse.Create(_rotLords).Property("RobbStark").GetValue() as Hero : null; } catch { }
                 if (north == null || harrenhal == null)
@@ -202,13 +232,19 @@ namespace CrashScribe
                     return false;
                 }
                 // najpierw sam Roose (jesli zdolny) nasza bezpieczna sciezka, potem zastepca
+                // (B6b: Roose zajety po limicie czekania - nie wyrywamy go z bitwy/oblezenia, od razu zastepca)
                 if (roose != null && roose.IsAlive && !roose.IsPrisoner && roose.PartyBelongedTo != null
-                    && roose.PartyBelongedTo.LeaderHero == roose && roose.PartyBelongedTo.MapEvent == null
+                    && roose.PartyBelongedTo.LeaderHero == roose && roose.PartyBelongedTo.MapEvent == null && !rooseBusy
                     && HarrenhalSetupWith(__instance, roose.PartyBelongedTo, north, harrenhal, robb, why))
+                {
+                    _harrenhalWaitSince = -1;
                     return false;
-                var sub = HarrenhalPickSubstitute(north, robb);
+                }
+                // B6b: Roose nigdy nie jest "zastepca" samego siebie (11.10 04:36: jego proba padla, wybor dal znow jego - zastoj).
+                // B6b-p: zawsze, niezaleznie od wylacznika czekania - wybor Roose'a tutaj to zawsze powtorka proby, ktora wlasnie padla
+                var sub = HarrenhalPickSubstitute(north, robb, roose);
                 if (sub == null) { HarrenhalPostponed(why + "; zaden lord Polnocy nie jest wolny"); return false; }
-                HarrenhalSetupWith(__instance, sub, north, harrenhal, robb, why);
+                if (HarrenhalSetupWith(__instance, sub, north, harrenhal, robb, why)) _harrenhalWaitSince = -1;
                 return false;
             }
             catch (Exception e)
@@ -223,6 +259,30 @@ namespace CrashScribe
         private static bool _harrenhalRotFailed;
         private static double _harrenhalSwallowLog = -1;
 
+        // ===== B6: BK NIE DAJE ARMII ROOSE'OWI = NRE W SKRYPCIE ROT (testy 10-11.10, doba 117) =====
+        // BK CreateArmyPatch (prefiks na Kingdom.CreateArmy, AIArmyFormation) pyta BKArmyManagementModel.CanCreateArmy;
+        // Roose nie jest krolem, a Polnoc (Feudal, ArmyPrivate) wymaga tytulu - duchy Dreadfort ma w BKROTPatch Ramsay.
+        // Odmowa -> armia null -> GatherArmyAction -> NullReference w GatherArmyLogEntry. Postfiks zamienia odmowe
+        // na zgode TYLKO dla bohatera z przepustki, ustawianej na czas jednego skryptowego CreateArmy (sciezka ROT
+        // z Roose'em albo nasz port HarrenhalSetupWith). Tylko odblokowuje (false -> true), nigdy nie blokuje.
+        private static Hero _scriptedArmyLeader;     // przepustka: jedyny bohater, ktoremu BK przepuszcza armie
+        private static bool _bkArmyPassedNow;        // w biezacym rozstawieniu BK odmowil i przepuscilismy
+        private static int _bkArmyPassed;            // licznik zadzialan (zamian false -> true) w sesji
+        private static bool _bkArmyPassInstalled;    // postfiks wpiety (wylacznik Config.HarrenhalBkArmyPass)
+        private static double _harrenhalBkLog = -1;
+
+        public static void HarrenhalBkPass(Hero __0, ref bool __result)
+        {
+            try
+            {
+                if (__result || _scriptedArmyLeader == null || __0 == null || __0 != _scriptedArmyLeader) return;
+                __result = true;
+                _bkArmyPassedNow = true;
+                _bkArmyPassed++;
+            }
+            catch { }
+        }
+
         private static void HarrenhalPostponed(string why)
         {
             double now = CampaignTime.Now.ToDays;
@@ -233,7 +293,9 @@ namespace CrashScribe
             }
         }
 
-        private static MobileParty HarrenhalPickSubstitute(Kingdom north, Hero robb)
+        /// <summary>Najsilniejsza wolna partia lorda Polnocy. B6b: <paramref name="roose"/> != null - Roose wykluczony
+        /// (jego wlasna proba juz padla albo jest zajety; B6b-p: wolajacy podaje go zawsze).</summary>
+        private static MobileParty HarrenhalPickSubstitute(Kingdom north, Hero robb, Hero roose)
         {
             MobileParty best = null; float bestStr = -1f;
             foreach (var clan in north.Clans)
@@ -245,6 +307,7 @@ namespace CrashScribe
                     if (mp == null || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty) continue;
                     var h = mp.LeaderHero;
                     if (h == null || !h.IsAlive || h.IsPrisoner || h == robb) continue;
+                    if (roose != null && h == roose) continue;
                     if (mp.MapEvent != null || mp.SiegeEvent != null) continue;
                     float str = mp.Party != null ? mp.Party.EstimatedStrength : 0f;
                     if (str > bestStr) { bestStr = str; best = mp; }
@@ -258,6 +321,7 @@ namespace CrashScribe
         private static bool HarrenhalSetupWith(object ev, MobileParty sub, Kingdom north, Settlement harrenhal, Hero robb, string why)
         {
             var tr = Traverse.Create(ev);
+            HarrenhalReleasePrev(ev, sub, harrenhal);   // B6b: przed zmiana pola (patrz HarrenhalReleasePrev)
             tr.Field("SetupSiegeArmy").SetValue(false);
             tr.Field("SiegeLeaderParty").SetValue(sub);
             if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
@@ -267,7 +331,18 @@ namespace CrashScribe
                 if (sub.Army != null) DisbandArmyAction.ApplyByUnknownReason(sub.Army);
                 sub.Position = harrenhal.GatePosition;
                 sub.IsCurrentlyAtSea = false;
-                north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
+                // B6: ta sama bramka BK co u Roose'a - przepustka tylko na to jedno wywolanie, zawsze zdejmowana
+                try
+                {
+                    if (_bkArmyPassInstalled) _scriptedArmyLeader = sub.LeaderHero;
+                    _bkArmyPassedNow = false;
+                    north.CreateArmy(sub.LeaderHero, harrenhal, Army.ArmyTypes.Besieger, null);
+                }
+                finally { _scriptedArmyLeader = null; }
+                if (_bkArmyPassedNow && sub.Army != null)
+                    Scribe.Line("Mends: oblezenie Harrenhal - BK odmowil armii " + sub.LeaderHero.Name
+                                + ", przepuszczona dla rozstawienia (zastepczy port ROT; razem " + _bkArmyPassed + ").");
+                _bkArmyPassedNow = false;
             }
             tr.Field("SiegeArmy").SetValue(sub.Army);
             if (!fresh) return true;
@@ -320,9 +395,36 @@ namespace CrashScribe
             return true;
         }
 
-        public static Exception HarrenhalSafe(Exception __exception)
+        public static Exception HarrenhalSafe(Exception __exception, object __instance)
         {
-            if (__exception == null) return null;
+            // B6: przepustke BK zdejmujemy NA SAMYM POCZATKU - finalizer biegnie zawsze (takze po pominietym oryginale)
+            var scripted = _scriptedArmyLeader;
+            bool passed = _bkArmyPassedNow;
+            _scriptedArmyLeader = null;
+            _bkArmyPassedNow = false;
+            if (__exception == null)
+            {
+                // udana sciezka ROT sama nic nie loguje - bez tej linii test nie da dowodu, ze armia Roose'a powstala
+                if (scripted != null)
+                {
+                    try
+                    {
+                        double now = CampaignTime.Now.ToDays;
+                        if (_harrenhalBkLog < 0 || now - _harrenhalBkLog >= 1.0)
+                        {
+                            _harrenhalBkLog = now;
+                            Army army = null;
+                            try { army = Traverse.Create(__instance).Field("SiegeArmy").GetValue() as Army; } catch { }
+                            Scribe.Line("Mends: oblezenie Harrenhal - ROT rozstawil oblezenie sam, dowodzi " + scripted.Name
+                                        + (passed ? "; BK odmowil mu armii, przepuszczona dla skryptu ROT (razem " + _bkArmyPassed + ")"
+                                                  : "; BK dal mu armie bez przepustki")
+                                        + "; armia " + (army != null ? army.Parties.Count + " partii" : "BRAK") + ".");
+                        }
+                    }
+                    catch { }
+                }
+                return null;
+            }
             try
             {
                 _harrenhalRotFailed = true;              // od teraz rozstawiamy sami (patrz HarrenhalGuard)
@@ -337,6 +439,305 @@ namespace CrashScribe
                 {
                     _harrenhalSwallowLog = now;
                     Scribe.Line("Mends: oblezenie Harrenhal - wyjatek ROT (" + __exception.GetType().Name + ") polkniety; od nastepnej godziny rozstawiamy sami.");
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // ===== B6b: ROOSE CHWILOWO ZAJETY = CZEKAMY; KONIEC WYDARZENIA = SPRZATANIE DOWODCY (testy 10-11.10) =====
+        // (a) 6 z 9 biegow: "Roose Bolton w bitwie" -> od razu zastepca. Teraz bitwa albo cudze oblezenie = proba odlozona
+        //     (ROT ponawia co godzine, bo SetupSiegeArmy zostaje true), zastepca dopiero po Config.HarrenhalWaitHours.
+        // (b) ROT ResetAttackerParties (CompleteEvent) rozwiazuje tylko armie ROOSE'A i odmraza tylko partie Polnocy
+        //     z Army == null - dowodca-zastepca zostawal z DoNotMakeNewDecisions=true (SaveableProperty) na zawsze.
+        //     Postfiks HarrenhalEnd na CompleteEvent sprzata dowodce zapamietanego przez ROT (bh.SiegeLeaderParty, w sejwie);
+        //     HarrenhalSetupWith odmraza poprzedniego przy zmianie dowodcy, wiec innych zamrozonych przez nas nie ma.
+        private static double _harrenhalWaitSince = -1;   // godzina gry (CampaignTime.ToHours) pierwszej odlozonej proby w biezacym oknie; -1 = nie czekamy
+        private static int _harrenhalWaitTries;           // ile godzinnych prob odlozylismy w biezacym oknie
+        private static bool _harrenhalWaitExpiredLogged;  // linia "limit minal" juz byla w tym oknie
+        private static bool _harrenhalFixPending;         // naprawa starych zapisow: raz po starcie gry, na pierwszej godzinie
+        private static int _harrenhalStumbles;            // potkniecia B6b w sesji (per wywolanie, bez globalnego wylacznika)
+        private static Type _rotHarrenhalSiege;           // ROT.Events.HarrenhalSiegeEvent
+        // B6c: wszystkie 4 wydarzenia oblezenia ROT (dotad 3 "inne" niz Harrenhal) - SiegeOtherFreezer pomija leadera
+        // wydarzenia, ktore wlasnie sprzatamy (self), reszte i obroncow sprawdza jak dotad
+        private static Type[] _rotSieges;                 // Harrenhal/Blackwater/Wall/Bastards SiegeEvent - ich dowodcy i obroncy bywaja zamrozeni
+        private static readonly string[][] _rotSiegeDefenders =
+        {
+            new[] { "AmoryLorch", "Polliver" },                            // HarrenhalSiegeEvent.HandleDoneButton -> DefendSiegeTarget
+            new[] { "JoffreyBaratheon", "LancelLannister" },               // BlackwaterSiegeEvent.HandleDoneButton -> DefendSiegeTarget
+            new[] { "AlliserThorne", "JonSnow" },                          // WallSiegeEvent.HandleDoneButton
+            new[] { "RamsaySnow", "SmalljonUmber", "HaroldKarstark" },     // BastardsSiegeEvent.HandleDoneButton
+        };
+
+        /// <summary>Stan sesji - wolane z konstruktora MendsBehavior (OnGameStart, przy kazdej nowej grze i wczytaniu).</summary>
+        internal static void HarrenhalResetSession()
+        {
+            _harrenhalWaitSince = -1;
+            _harrenhalWaitTries = 0;
+            _harrenhalWaitExpiredLogged = false;
+            _harrenhalFixPending = true;
+            _harrenhalStumbles = 0;
+        }
+
+        private static void HarrenhalStumble(string where, Exception e)
+        {
+            SiegeStumble(ref _harrenhalStumbles, "oblezenie Harrenhal", "Mends.Harrenhal", "B6b", where, e);
+        }
+
+        /// <summary>B6b/B6c: potkniecie per wywolanie - licznik w sesji, raport do 3, linia w logu; bez globalnego wylacznika.</summary>
+        private static void SiegeStumble(ref int counter, string label, string reportName, string tag, string where, Exception e)
+        {
+            counter++;
+            try
+            {
+                if (counter <= 3) Scribe.Report("CrashScribe", e, reportName + " (" + where + ")", null);
+                Scribe.Line("Mends: " + label + " - " + where + ": wyjatek " + e.GetType().Name
+                            + " polkniety (potkniec " + tag + " w sesji " + counter + ").");
+            }
+            catch { }
+        }
+
+        /// <summary>Przeszkoda chwilowa Roose'a: bitwa albo udzial w cudzym oblezeniu (MobileParty.SiegeEvent =
+        /// BesiegerCamp?.SiegeEvent - tylko oblegajacy). Oblezenie Harrenhal nie jest przeszkoda (ROT :330 - bez teleportu).</summary>
+        private static string HarrenhalRooseBusy(MobileParty p, Settlement harrenhal)
+        {
+            if (p == null) return null;
+            if (p.MapEvent != null) return "Roose Bolton w bitwie";
+            var se = p.SiegeEvent;
+            if (se != null && (harrenhal == null || se != harrenhal.SiegeEvent))
+                return "Roose Bolton oblega " + (se.BesiegedSettlement != null ? se.BesiegedSettlement.Name.ToString() : "inna osade");
+            return null;
+        }
+
+        /// <summary>true = odloz probe (czekamy na Roose'a); false = limit minal, bierzemy zastepce.
+        /// Okno liczone od pierwszej odlozonej proby; zamyka je HarrenhalGuard, gdy Roose wolny albo rozstawienie sie udalo.</summary>
+        private static bool HarrenhalWait(string busy)
+        {
+            double now = CampaignTime.Now.ToHours;
+            if (_harrenhalWaitSince < 0 || now < _harrenhalWaitSince)
+            {
+                _harrenhalWaitSince = now;
+                _harrenhalWaitTries = 0;
+                _harrenhalWaitExpiredLogged = false;
+            }
+            double waited = now - _harrenhalWaitSince;
+            int limit = Config.HarrenhalWaitHours;
+            if (waited >= limit)
+            {
+                if (!_harrenhalWaitExpiredLogged)
+                {
+                    _harrenhalWaitExpiredLogged = true;
+                    Scribe.Line("Mends: oblezenie Harrenhal - " + busy + " od " + (int)waited + " h (limit " + limit + " h, odlozonych prob "
+                                + _harrenhalWaitTries + ") - koniec czekania, bierzemy zastepce.");
+                }
+                return false;
+            }
+            _harrenhalWaitTries++;
+            if (_harrenhalWaitTries == 1)
+                Scribe.Line("Mends: oblezenie Harrenhal ODLOZONE - " + busy + "; czekamy na niego zamiast brac zastepce (najwyzej "
+                            + limit + " h gry; nikt nie idzie pod brame; ROT ponowi za godzine).");
+            else HarrenhalPostponed(busy + "; czekamy na niego (" + (int)waited + " h z " + limit + ", proba " + _harrenhalWaitTries + ")");
+            return true;
+        }
+
+        /// <summary>Kto INNY moze trzymac partie zamrozona (DoNotMakeNewDecisions): zadanie, rozwiazywanie partii (gra),
+        /// trwajace wydarzenie oblezenia ROT (dowodca albo obronca z HandleDoneButton). null = nikt znany.
+        /// B6c: wspolne dla Harrenhal i Muru. <paramref name="self"/> = wydarzenie, ktorego dowodce wlasnie sprzatamy -
+        /// jego dowodca sie nie liczy (to ta sama partia), jego obroncy tak (ROT zamraza ich celowo; po CompleteEvent
+        /// wydarzenie ma IsActive=false i jest pomijane w calosci). Dla Harrenhal wynik jak w B6b (Amory Lorch i Polliver
+        /// nigdy nie prowadza partii Polnocy).
+        /// Inne zrodla true w grze i modach (grep 37 modow): zadania gry (partie zadan), DisbandPartyCampaignBehavior
+        /// (karawany gracza), DTE i Armoury (karawany) - lordow Polnocy ani Wolnych Ludzi nie dotycza.</summary>
+        private static string SiegeOtherFreezer(MobileParty mp, Type self)
+        {
+            if (mp.IsCurrentlyUsedByAQuest) return "uzywa jej zadanie (quest)";
+            if (mp.IsDisbanding) return "partia sie rozwiazuje";
+            if (_rotSieges == null) return null;
+            for (int i = 0; i < _rotSieges.Length && i < _rotSiegeDefenders.Length; i++)
+            {
+                var t = _rotSieges[i];
+                if (t == null) continue;
+                object inst = null;
+                try { var f = AccessTools.Field(t, "Instance"); inst = f != null ? f.GetValue(null) : null; } catch { }
+                if (inst == null) continue;
+                bool active;
+                try { active = (bool)Traverse.Create(inst).Property("IsActive").GetValue(); }
+                catch { return "stanu wydarzenia ROT " + t.Name + " nie da sie odczytac"; }   // ostroznie: nie ruszamy
+                if (!active) continue;
+                if (t != self)
+                {
+                    MobileParty lead = null;
+                    try { lead = Traverse.Create(inst).Field("SiegeLeaderParty").GetValue() as MobileParty; } catch { }
+                    if (lead == mp) return "dowodzi trwajacym wydarzeniem ROT " + t.Name;
+                }
+                foreach (var name in _rotSiegeDefenders[i])
+                {
+                    Hero h = null;
+                    try { h = _rotLords != null ? Traverse.Create(_rotLords).Property(name).GetValue() as Hero : null; } catch { }
+                    if (h != null && mp.LeaderHero == h) return "broni w trwajacym wydarzeniu ROT " + t.Name;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>Sprzata dowodce oblezenia: (disband) jego armie, jesli to armia oblezenia (SiegeArmy albo cel wydarzenia),
+        /// potem zdejmuje DoNotMakeNewDecisions, chyba ze trzyma go inne zrodlo. Zwraca opis do logu. Wyjatki - u wolajacego.
+        /// B6c: wspolne dla Harrenhal (target = Harrenhal) i Muru (target = The Wall); self - patrz SiegeOtherFreezer.</summary>
+        private static string SiegeRelease(MobileParty mp, Army siegeArmy, Settlement target, bool disband, Type self)
+        {
+            if (mp == null) return "brak (ROT nie zapamietal partii dowodcy)";
+            string s = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : (mp.Name != null ? mp.Name.ToString() : "?");
+            if (!mp.IsActive) return s + " - partii juz nie ma";
+            if (disband)
+            {
+                var a = mp.Army;
+                if (a != null && a.LeaderParty == mp && (a == siegeArmy || (target != null && ReferenceEquals(a.AiBehaviorObject, target))))
+                {
+                    int n = a.Parties.Count;
+                    if (mp.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(mp);   // jak ROT ResetAttackerParties (Harrenhal :449-453, Mur :434-438)
+                    DisbandArmyAction.ApplyByObjectiveFinished(a);
+                    s += ": armia oblezenia rozwiazana (" + n + " partii)";
+                }
+                else if (a != null)
+                    s += a.LeaderParty == mp ? ": prowadzi inna armie - zostaje"
+                                             : ": w armii " + (a.LeaderParty != null && a.LeaderParty.LeaderHero != null ? a.LeaderParty.LeaderHero.Name.ToString() : "?") + " - zostaje";
+                else s += ": bez armii";
+            }
+            if (!mp.Ai.DoNotMakeNewDecisions) return s + ", nie byl zamrozony";
+            string other = SiegeOtherFreezer(mp, self);
+            if (other != null) return s + ", zamrozony, ale " + other + " - zostawiony";
+            mp.Ai.SetDoNotMakeNewDecisions(false);
+            return s + ", odmrozony";
+        }
+
+        /// <summary>B6b: zmiana dowodcy (nasz port albo oddanie sterow ROT, ktory ustawi partie Roose'a) - poprzedni dowodca
+        /// (zamrozony przez nasz port albo TickEvent ROT :234) wypada z pamieci ROT (bh.SiegeLeaderParty) i nic by go juz nie
+        /// odmrozilo (ROT :455-471 tylko partie bez armii) - odmrazamy od razu, bez rozwiazywania armii. Dzieki temu zamrozony
+        /// przez nas jest zawsze najwyzej biezacy SiegeLeaderParty, ktorego ROT zapisuje w sejwie. Wolac PRZED zmiana pola.</summary>
+        private static void HarrenhalReleasePrev(object ev, MobileParty next, Settlement harrenhal)
+        {
+            if (!Config.HarrenhalReleaseCommander) return;
+            try
+            {
+                string res = SiegeReleasePrev(ev, next, harrenhal, _rotHarrenhalSiege);
+                if (res != null) Scribe.Line("Mends: oblezenie Harrenhal - " + res);
+            }
+            catch (Exception e) { HarrenhalStumble("zmiana dowodcy", e); }
+        }
+
+        /// <summary>B6b/B6c: rdzen odmrozenia poprzedniego dowodcy (pole SiegeLeaderParty wydarzenia <paramref name="ev"/>,
+        /// jeszcze przed zmiana) - bez rozwiazywania armii. Zwraca tekst do logu albo null (nic do zrobienia). Wyjatki - u wolajacego.</summary>
+        private static string SiegeReleasePrev(object ev, MobileParty next, Settlement target, Type self)
+        {
+            var prev = Traverse.Create(ev).Field("SiegeLeaderParty").GetValue() as MobileParty;
+            if (prev == null || prev == next || !prev.IsActive || !prev.Ai.DoNotMakeNewDecisions) return null;
+            string who = next == null ? "?" : (next.LeaderHero != null ? next.LeaderHero.Name.ToString() : next.Name.ToString());
+            return "zmiana dowodcy na " + who + ": poprzedni " + SiegeRelease(prev, null, target, false, self) + ".";
+        }
+
+        /// <summary>Postfiks na ROT HarrenhalSiegeEvent.CompleteEvent - biegnie PO ResetDefenderParties/ResetAttackerParties ROT.</summary>
+        public static void HarrenhalEnd(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
+                var army = tr.Field("SiegeArmy").GetValue() as Army;
+                Settlement harrenhal = null;
+                try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
+                Hero roose = null;
+                try { roose = _rotLords != null ? Traverse.Create(_rotLords).Property("RooseBolton").GetValue() as Hero : null; } catch { }
+                string role = leader == null ? "" : (leader.LeaderHero != null && leader.LeaderHero == roose ? " [Roose]" : " [zastepca z naszego portu]");
+                string res = SiegeRelease(leader, army, harrenhal, true, _rotHarrenhalSiege);
+                Scribe.Line("Mends: oblezenie Harrenhal - koniec: dowodca " + res + role + "; Harrenhal ma "
+                            + (harrenhal != null && harrenhal.OwnerClan != null ? harrenhal.OwnerClan.Name.ToString() : "?") + ".");
+            }
+            catch (Exception e) { HarrenhalStumble("koniec", e); }
+        }
+
+        /// <summary>NAPRAWA STARYCH ZAPISOW (raz po starcie gry, pierwsza godzina): wydarzenie skonczone (ROT IsActive=false,
+        /// TotalEvents>0), a dowodca zapamietany przez ROT (bh.SiegeLeaderParty) dalej zamrozony bez innego zrodla - sprzatamy go.
+        /// Pozostali zamrozeni lordowie Polnocy - tylko lista w logu (powodu nie da sie ustalic na pewno), bez zmian.</summary>
+        internal static void HarrenhalOldSaveCheck()
+        {
+            if (!_harrenhalFixPending) return;
+            _harrenhalFixPending = false;
+            if (!Config.HarrenhalOldSaveFix || _rotHarrenhalSiege == null) return;
+            try
+            {
+                Settlement harrenhal = null;
+                try { harrenhal = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("Harrenhal").GetValue() as Settlement : null; } catch { }
+                Kingdom north = null;
+                try { north = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("TheNorth").GetValue() as Kingdom : null; } catch { }
+                string res = SiegeOldSaveScan(_rotHarrenhalSiege, harrenhal, north, "Polnocy");
+                if (res != null) Scribe.Line("Mends: oblezenie Harrenhal - naprawa zapisu (wydarzenie skonczone): " + res);
+            }
+            catch (Exception e) { HarrenhalStumble("naprawa zapisu", e); }
+        }
+
+        /// <summary>B6b/B6c: rdzen naprawy starych zapisow dla wydarzenia <paramref name="evType"/>: skonczone (IsActive=false,
+        /// TotalEvents>0), a dowodca zapamietany przez ROT (SiegeLeaderParty, w sejwie) dalej zamrozony - SiegeRelease z
+        /// rozwiazaniem armii oblezenia. Inni zamrozeni lordowie krolestwa <paramref name="kingdom"/> - tylko lista. Zwraca tekst
+        /// do logu albo null (brak wydarzenia, trwa - sprzata postfiks konca - albo jeszcze nie bylo). Wyjatki - u wolajacego.</summary>
+        private static string SiegeOldSaveScan(Type evType, Settlement target, Kingdom kingdom, string kingdomLabel)
+        {
+            var fInst = AccessTools.Field(evType, "Instance");
+            object inst = fInst != null ? fInst.GetValue(null) : null;
+            if (inst == null) return null;
+            var tr = Traverse.Create(inst);
+            if ((bool)tr.Property("IsActive").GetValue() || (int)tr.Property("TotalEvents").GetValue() <= 0) return null;   // trwa (sprzata postfiks konca) albo jeszcze nie bylo
+            var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
+            var army = tr.Field("SiegeArmy").GetValue() as Army;
+            string fixedLine = null;
+            if (leader != null && leader.IsActive && leader.Ai.DoNotMakeNewDecisions)
+                fixedLine = SiegeRelease(leader, army, target, true, evType);
+            var sus = new System.Collections.Generic.List<string>();
+            if (kingdom != null)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    if (clan == null || clan.WarPartyComponents == null) continue;
+                    foreach (var wpc in clan.WarPartyComponents)
+                    {
+                        var mp = wpc != null ? wpc.MobileParty : null;
+                        if (mp == null || mp == leader || mp.IsMainParty || !mp.IsActive || !mp.IsLordParty || !mp.Ai.DoNotMakeNewDecisions) continue;
+                        string other = SiegeOtherFreezer(mp, evType);
+                        sus.Add((mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : mp.Name.ToString())
+                                + (other != null ? " (" + other + ")" : "")
+                                + (mp.Army != null ? " [w armii " + (mp.Army.LeaderParty != null ? mp.Army.LeaderParty.Name.ToString() : "?") + "]" : ""));
+                    }
+                }
+            }
+            return (fixedLine != null ? "dowodca " + fixedLine
+                                      : "dowodca " + (leader != null && leader.LeaderHero != null ? leader.LeaderHero.Name.ToString() : "brak") + " nie zamrozony - nic do naprawy")
+                   + (sus.Count > 0 ? "; inni zamrozeni lordowie " + kingdomLabel + " (" + sus.Count + ", BEZ zmian - powodu nie da sie ustalic na pewno): " + string.Join(", ", sus) : "")
+                   + ".";
+        }
+
+        // ===== BK ZADANIE PRETENDENTA = CRASH (bieg 2-letni 10.10, doba 457) =====
+        // BannerKings ClaimantDemand.SetTexts (:220) rzuca NullReferenceException (pretendent albo jego krolestwo juz nie istnieje), wolane z
+        // Demand.Fulfill <- Demand.DoAiChoice <- RadicalGroup.Tick <- KingdomDiplomacy.Update <- BKDiplomacyBehavior.OnDailyTick; BLSE pokazuje okno
+        // ButterLib i gra stoi. Finalizery: SetTexts, Fulfill i DoAiChoice - wyjatek polkniety (zadanie nie spelnione tego dnia), log raz na dzien.
+        private static bool _bkDemandSaved;
+        private static double _bkDemandLog = -1;
+        private static int _bkDemandSwallowed;
+        public static Exception BkDemandSafe(Exception __exception, MethodBase __originalMethod)
+        {
+            if (__exception == null) return null;
+            try
+            {
+                _bkDemandSwallowed++;
+                string where = __originalMethod != null ? __originalMethod.DeclaringType.Name + "." + __originalMethod.Name : "BK Demand";
+                if (!_bkDemandSaved)
+                {
+                    _bkDemandSaved = true;
+                    Scribe.Report("BannerKings " + where + " wywrocil sie - wyjatek polkniety, gra zyje", __exception, where, null);
+                }
+                double now = CampaignTime.Now.ToDays;
+                if (_bkDemandLog < 0 || now - _bkDemandLog >= 1.0)
+                {
+                    _bkDemandLog = now;
+                    Scribe.Line("Mends: zadanie BK (" + where + ") - wyjatek " + __exception.GetType().Name + " polkniety (razem " + _bkDemandSwallowed + "); zadanie bez skutku tego dnia.");
                 }
             }
             catch { }
@@ -378,7 +779,13 @@ namespace CrashScribe
                     + (mance.Clan != null ? mance.Clan.Name.ToString() : "?") + ")";
                 else if (freeFolk != null && mance.Clan.Kingdom != freeFolk) why = "Mance Rayder sluzy " + mance.Clan.Kingdom.Name + ", nie Wolnym Ludziom";
                 else if (mance.PartyBelongedTo.MapEvent != null) why = "Mance Rayder w bitwie";
-                if (why == null && !_wallRotFailed) return true;   // Mance zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                if (why == null && !_wallRotFailed)
+                {
+                    // B6c: ROT ustawi SiegeLeaderParty = partia Mance'a (:314) - poprzedni dowodca z naszego portu (zamrozony)
+                    // wypadlby z pamieci ROT (np. armia zastepcy zniknela -> TickEvent :221-224 -> SetupSiegeArmy=true); odmrazamy
+                    WallReleasePrev(__instance, mance.PartyBelongedTo, wall);
+                    return true;   // Mance zdolny, ROT jeszcze nie zawiodl - ROT robi swoje
+                }
                 if (why == null) why = "ROT nie zdolal rozstawic oblezenia z Mance'em (wyjatek w SetupSiegeAttackers)";
 
                 if (freeFolk == null || wall == null)
@@ -438,6 +845,7 @@ namespace CrashScribe
         private static bool WallSetupWith(object ev, MobileParty sub, Kingdom freeFolk, Settlement wall, string why)
         {
             var tr = Traverse.Create(ev);
+            WallReleasePrev(ev, sub, wall);   // B6c: przed zmiana pola (patrz WallReleasePrev)
             tr.Field("SetupSiegeArmy").SetValue(false);
             tr.Field("SiegeLeaderParty").SetValue(sub);
             if (sub.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(sub);
@@ -522,6 +930,83 @@ namespace CrashScribe
             }
             catch { }
             return null;
+        }
+
+        // ===== B6c: KONIEC WYDARZENIA MURU = SPRZATANIE DOWODCY (decyzja Jeffa 11.10: "tak, napraw") =====
+        // ROT WallSiegeEvent.CompleteEvent (:402-408) -> ResetAttackerParties (:428-458): rozwiazuje tylko armie, w ktorej
+        // jest MANCE (:430-439), i odmraza tylko partie lordow Wolnych Ludzi z Army == null (:440-457). Dowodca-zastepca
+        // z WallSetupWith (SetDoNotMakeNewDecisions(true) + Hold; ROT TickEvent :230 co tick przed szturmem) prowadzi
+        // WLASNA armie, gdy Mance do niej nie wszedl (w bitwie, martwy) - zostawal zamrozony na stale (flaga w sejwie).
+        // Te same funkcje co B6b (SiegeRelease, SiegeReleasePrev, SiegeOldSaveScan); pamiec dowodcy = w.SiegeLeaderParty ROT
+        // (ROTEventBehavior :1071 zapis, :1130 odczyt), bez SyncData. Czekania na Mance'a NIE dodajemy (CHANGELOG B6c).
+        private static Type _rotWallSiege;           // ROT.Events.WallSiegeEvent (ustawiane przy wpinaniu straznika Muru)
+        private static bool _wallFixPending;         // naprawa starych zapisow: raz po starcie gry, na pierwszej godzinie
+        private static int _wallStumbles;            // potkniecia B6c w sesji (per wywolanie, bez globalnego wylacznika)
+
+        /// <summary>Stan sesji - wolane z konstruktora MendsBehavior (OnGameStart, przy kazdej nowej grze i wczytaniu).</summary>
+        internal static void WallResetSession()
+        {
+            _wallFixPending = true;
+            _wallStumbles = 0;
+        }
+
+        private static void WallStumble(string where, Exception e)
+        {
+            SiegeStumble(ref _wallStumbles, "Mur", "Mends.Wall", "B6c", where, e);
+        }
+
+        /// <summary>B6c: zmiana dowodcy Muru (nasz port albo oddanie sterow ROT, ktory ustawi partie Mance'a) - poprzedni
+        /// dowodca (zamrozony) wypada z w.SiegeLeaderParty; ROT odmrozi go na koncu tylko, gdy jest bez armii i dalej
+        /// u Wolnych Ludzi - odmrazamy od razu, bez rozwiazywania armii. Wolac PRZED zmiana pola.</summary>
+        private static void WallReleasePrev(object ev, MobileParty next, Settlement wall)
+        {
+            if (!Config.WallReleaseCommander) return;
+            try
+            {
+                string res = SiegeReleasePrev(ev, next, wall, _rotWallSiege);
+                if (res != null) Scribe.Line("Mends: Mur - " + res);
+            }
+            catch (Exception e) { WallStumble("zmiana dowodcy", e); }
+        }
+
+        /// <summary>Postfiks na ROT WallSiegeEvent.CompleteEvent - biegnie PO ResetDefenderParties/ResetAttackerParties ROT.</summary>
+        public static void WallEnd(object __instance)
+        {
+            try
+            {
+                var tr = Traverse.Create(__instance);
+                var leader = tr.Field("SiegeLeaderParty").GetValue() as MobileParty;
+                var army = tr.Field("SiegeArmy").GetValue() as Army;
+                Settlement wall = null;
+                try { wall = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("TheWall").GetValue() as Settlement : null; } catch { }
+                Hero mance = null;
+                try { mance = _rotLords != null ? Traverse.Create(_rotLords).Property("ManceRayder").GetValue() as Hero : null; } catch { }
+                string role = leader == null ? "" : (leader.LeaderHero != null && leader.LeaderHero == mance ? " [Mance]" : " [zastepca z naszego portu]");
+                string res = SiegeRelease(leader, army, wall, true, _rotWallSiege);
+                Scribe.Line("Mends: Mur - koniec: dowodca " + res + role + "; Mur ma "
+                            + (wall != null && wall.OwnerClan != null ? wall.OwnerClan.Name.ToString() : "?") + ".");
+            }
+            catch (Exception e) { WallStumble("koniec", e); }
+        }
+
+        /// <summary>NAPRAWA STARYCH ZAPISOW (raz po starcie gry, pierwsza godzina): oblezenie Muru skonczone, a dowodca
+        /// zapamietany przez ROT (w.SiegeLeaderParty) dalej zamrozony bez innego zrodla - sprzatamy go. Pozostali zamrozeni
+        /// lordowie Wolnych Ludzi - tylko lista w logu, bez zmian.</summary>
+        internal static void WallOldSaveCheck()
+        {
+            if (!_wallFixPending) return;
+            _wallFixPending = false;
+            if (!Config.WallOldSaveFix || _rotWallSiege == null) return;
+            try
+            {
+                Settlement wall = null;
+                try { wall = _rotSettlements != null ? Traverse.Create(_rotSettlements).Property("TheWall").GetValue() as Settlement : null; } catch { }
+                Kingdom freeFolk = null;
+                try { freeFolk = _rotKingdoms != null ? Traverse.Create(_rotKingdoms).Property("FreeFolk").GetValue() as Kingdom : null; } catch { }
+                string res = SiegeOldSaveScan(_rotWallSiege, wall, freeFolk, "Wolnych Ludzi");
+                if (res != null) Scribe.Line("Mends: Mur - naprawa zapisu (wydarzenie skonczone): " + res);
+            }
+            catch (Exception e) { WallStumble("naprawa zapisu", e); }
         }
 
         public static void GoodsUnlooted(TaleWorlds.CampaignSystem.Roster.ItemRoster __result)
@@ -746,6 +1231,16 @@ namespace CrashScribe
 
                     Hero wearer = FindAliveHero(owner);
                     if (wearer == null) wearer = FindAliveHero(heir);
+                    // Z16: GRACZ zaklada sztuke kanonu tylko, gdy ja udzwignie (lustro Armoury ItemReq.MeetsHero) - inaczej
+                    // jedna sztuka na polke miasta (nic nie znika). Bohater AI zaklada zawsze (przydzial z kanonu), a
+                    // HeroSinewAll zaraz po tej metodzie podnosi mu Atletyke do nowego zestawu.
+                    if (wearer != null && wearer == Hero.MainHero && slotS.Length > 0 && HeroReqOn()
+                        && !CanUseHero(wearer.CharacterObject, item))
+                    {
+                        Scribe.Line("Mends: Z16 - " + wearer.Name + " (gracz) nie udzwignie " + id + " (wymog " + item.Difficulty
+                                    + ") - sztuka idzie na polke miasta.");
+                        wearer = null;
+                    }
                     if (wearer != null && slotS.Length > 0)
                     {
                         int slot = SlotOf(slotS);
@@ -824,12 +1319,19 @@ namespace CrashScribe
         /// <summary>Przy starcie sesji: unikaty schodza z handlu (NotMerchandise,
         /// wiec targi przestaja je LOSOWAC) i znikaja z polek istniejacych miast.
         /// Ekwipunek bohaterow, stash i sakwy gracza - nietykane: zdobyty
-        /// egzemplarz pozostaje jedyny na swiecie.</summary>
+        /// egzemplarz pozostaje jedyny na swiecie.
+        /// POPRAWKA Z16-1c (recenzja Z16): czystka polek POMIJA unikaty, ktorych droge po swiecie sledzi Armoury UniqueSpoils
+        /// (Armoury.UniqueSpoils.Is - spis RotUniques bez "strojow" noszonych przez wielu). Jeff 04.10: "jesli sprzedam, to bedzie
+        /// gdzies w swiecie... jak sprzedam, moze pojawia sie gdzies indziej, bo ktos sprzeda albo jakis lord kupi" - a ta czystka
+        /// przy kazdym wczytaniu zjadala z polek sprzedane unikaty z listy UniqueGear (sprzedane przez gracza i przez lordow AI,
+        /// ktorzy od Z16 odkladaja do taboru unikat, ktorego nie udzwigna - gra sprzedaje tabor w miescie). Kopie startowe tych
+        /// sztuk Armoury zdejmuje sam, raz na kampanie (flaga w zapisie). Bez Armoury - czystka jak dotad.</summary>
         internal static void UniqueWares()
         {
             try
             {
-                int flagged = 0, purged = 0;
+                int flagged = 0, purged = 0, tracked = 0;
+                var armouryIs = ArmouryUniqueIs();
                 var setter = AccessTools.PropertySetter(typeof(ItemObject), "NotMerchandise");
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -847,14 +1349,39 @@ namespace CrashScribe
                         if (it == null || !IsUniqueGear(it)) continue;
                         if (RelicIds.Contains(it.StringId)) continue;   // relikwie polozone celowo - nie zjadac
                         int n = ro.GetElementNumber(i);
+                        bool keep = false;
+                        if (armouryIs != null) { try { keep = armouryIs(it); } catch { keep = false; } }
+                        if (keep) { tracked += n; continue; }           // Z16-1c: sprzedany unikat sledzony przez Armoury - lezy dalej
                         purged += n;
                         ro.AddToCounts(ro.GetElementCopyAtIndex(i).EquipmentElement, -n);
                     }
                 }
                 Scribe.Line("Mends: unikaty imienne - " + flagged + " itemow zeszlo z handlu, "
-                            + purged + " kopii zdjetych z targow miast.");
+                            + purged + " kopii zdjetych z targow miast"
+                            + (armouryIs != null ? ", " + tracked + " zostawionych na polkach (unikaty sledzone przez Armoury - sprzedane, Jeff 04.10)"
+                                                 : " (bez Armoury - czystka wszystkich)") + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.UniqueWares", null); } catch { } }
+        }
+
+        /// <summary>Z16-1c: Armoury.UniqueSpoils.Is (refleksja) - unikat, ktorego droge po swiecie sledzi Armoury (spis RotUniques
+        /// bez "strojow"); null bez Armoury albo przy innej sygnaturze.</summary>
+        private static Func<ItemObject, bool> ArmouryUniqueIs()
+        {
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "Armoury") continue;
+                    var t = asm.GetType("Armoury.UniqueSpoils");
+                    var m = t != null ? t.GetMethod("Is", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public
+                                                          | System.Reflection.BindingFlags.Static, null, new[] { typeof(ItemObject) }, null) : null;
+                    if (m == null || m.ReturnType != typeof(bool)) return null;
+                    return (Func<ItemObject, bool>)Delegate.CreateDelegate(typeof(Func<ItemObject, bool>), m);
+                }
+            }
+            catch { }
+            return null;
         }
 
         /// <summary>
@@ -878,6 +1405,7 @@ namespace CrashScribe
                 // MNIEJSZYM niz prog (2 = tylko T1 za darmo, 5 = stan z 30.08,
                 // 7 = brama praktycznie otwarta). Dziala od zaladowania sesji.
                 int prog = 2;
+                bool linked = false;
                 try
                 {
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -887,11 +1415,12 @@ namespace CrashScribe
                         var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
                         var so = cur != null ? cur.GetValue(null) : null;
                         var fld = so != null ? so.GetType().GetField("ForgePartsFreeBelowTier") : null;
-                        if (fld != null) prog = (int)fld.GetValue(so);
+                        if (fld != null) { prog = (int)fld.GetValue(so); linked = true; }
                         break;
                     }
                 }
                 catch { }
+                LinkLine("brama kucia", linked, "Armoury.Settings.ForgePartsFreeBelowTier", "prog 2");   // E8/M (247)
                 if (prog < 2 || prog > 7) prog = 2;
 
                 var tpls = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>();
@@ -1041,13 +1570,14 @@ namespace CrashScribe
         // ---- STRAZ SKILLI W PRZYDZIALE DTE (Jeff 14.09: "niech nie przyjmuja
         // strzal, ktorych nie moga uzyc - z polki schodzi tylko to, do czego
         // ludzie maja skill") ----
-        private static SkillObject ReqSkill(ItemObject it)
+        internal static SkillObject ReqSkill(ItemObject it)
         {
             if (it == null) return null;
             var rs = it.RelevantSkill;
             if (rs != null) return rs;
             if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) return DefaultSkills.Bow;       // RBM: 105/140/175
             if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) return DefaultSkills.Crossbow;
+            if (it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return DefaultSkills.Riding;   // ladry konskie - Jazda (Jeff 09.10)
             if (it.HasArmorComponent) return DefaultSkills.Athletics;                           // Prawo Wagi
             return null;
         }
@@ -1133,7 +1663,7 @@ namespace CrashScribe
         /// <summary>Jak DTE ItemObjectExtension.IsSuitableForMount: bron bez uzycia
         /// "RequiresNoMount" i bez flagi "CantReloadOnHorseback" - jezdziec nie dostanie
         /// dlugiego luku ani kuszy nie do przeladowania z siodla.</summary>
-        private static bool MountOk(ItemObject it)
+        internal static bool MountOk(ItemObject it)
         {
             try
             {
@@ -1576,7 +2106,13 @@ namespace CrashScribe
         public static bool NoDragonGank(ref bool __result) { __result = false; return false; }
 
         /// <summary>Sprzet umarlych: lodowe bronie Innych i martwe wierzchowce.
-        /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.</summary>
+        /// Zywi tego nie tkna - lod topnieje, martwe ciało sie rozpada.
+        /// 175c (recenzja 09.10): lodowe bronie Innych po DOKLADNYM id (ice_sword2, ice_spear;
+        /// oba i tak kultury whitewalker - ROTassets.xml:7813, :7838), nie po prefiksie "ice_":
+        /// prefiks lapal tez ice_sword = Lod Starkow (stal valyrianska, kultura battania,
+        /// ROTassets.xml:367) - MeltDeadLoot topil go w taborze gracza, MeltDeadArmory w zbrojowni,
+        /// straze DTE i Armoury QuartermasterLaw braly go za sprzet umarlych. Lod jest teraz
+        /// zwykla klinga lore jak Longclaw czy Oathkeeper (rejestr 177).</summary>
         internal static bool IsDeadGear(ItemObject it)
         {
             try
@@ -1585,7 +2121,7 @@ namespace CrashScribe
                 var cu = it.Culture != null ? (it.Culture.StringId ?? "") : "";
                 if (cu == "wights" || cu == "whitewalker") return true;
                 var id = it.StringId ?? "";
-                return id.StartsWith("ice_", StringComparison.Ordinal)
+                return id == "ice_sword2" || id == "ice_spear"
                     || id.StartsWith("wight_", StringComparison.Ordinal)
                     || id == "nightking_blade" || id == "white_walker_saddle";
             }
@@ -1718,7 +2254,7 @@ namespace CrashScribe
 
         /// <summary>Najwyzszy tier broni z wzorcow bojowych jednostki (tarcze
         /// nie sa stala bojowa i nie licza sie). PULAPKA: ItemTiers.Tier1 == 0.</summary>
-        private static int BestWeaponTier(CharacterObject c)
+        internal static int BestWeaponTier(CharacterObject c)
         {
             try
             {
@@ -1751,17 +2287,30 @@ namespace CrashScribe
         /// Cios jednostki bez broni T6+ w Wedrowca/Nocnego Krola tnie sie do
         /// 15% jak w polu. Smoki celowo NIE sa ciete: ROT nadpisuje ich wynik
         /// PO nas (DragonDamageScaling) - smoczy ogien pali Innych, jak w lore.
+        /// 175c: klasa trafienia z OthersSteel.SimClass (bohater - jego zestaw bojowy,
+        /// zolnierz - migawka 175; przy wlaczonej zasadzie tier broni BEZ amunicji - recenzja
+        /// 175c, jak pole; przy wylaczonej PreTierBest jak dotad); smok liczony jako ogien
+        /// i nie ciety (ROT i tak nadpisuje); __3 = partia trafionego (rundy z samym
+        /// Wedrowcem), __5 = MapEvent (liczniki bitwy).
+        /// 175d (Jeff 09.10 ok. 08:40): zolnierz wedlug wzorca PO zamianie 175 (jak pole, oba tryby
+        /// zasady); przy wlaczonej zasadzie strzaly/belty wedlug wlasnego tieru, wyrzutnie i kamienie nie.
         /// </summary>
-        public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result)
+        public static void ValyrianWardSim(CharacterObject __0, CharacterObject __1, ref ExplainedNumber __result,
+                                           TaleWorlds.CampaignSystem.Party.PartyBase __3,
+                                           TaleWorlds.CampaignSystem.MapEvents.MapEvent __5)
         {
             try
             {
-                if (__result.ResultNumber <= 1f) return;
+                float pre = __result.ResultNumber;
+                if (pre <= 1f) return;
                 if (!WalkerBlood(__1)) return;                   // __1 = trafiany
-                if (BestWeaponTier(__0) >= 6) return;            // __0 = bijacy
-                float cut = __result.ResultNumber * 0.15f;
-                if (cut < 1f) cut = 1f;
-                __result = new ExplainedNumber(cut);
+                // 175d: bron z wzorca PO zamianie sprzetu wedlug tieru (decyzja Jeffa 09.10 ok. 08:40 pkt 1 - jedna
+                // zasada z polem; dotad migawka sprzed zamiany); 175c zmienia, ile bije t6, 175d - tier pocisku z amunicji
+                int note;
+                int k = OthersSteel.SimClass(__0, out note);     // __0 = bijacy
+                float post = OthersSteel.ApplyF(k, pre);
+                if (post != pre) __result = new ExplainedNumber(post);
+                OthersSteel.CountSim(__5, k, pre, post, __1, __3, note);
             }
             catch { }
         }
@@ -1796,8 +2345,11 @@ namespace CrashScribe
         /// </summary>
         /// <summary>Odczyt pola float z ustawien Armoury (suwaki MCM) refleksja
         /// - wspolny wzorzec dla praw kuzni.</summary>
-        private static float ArmouryFloat(string field, float def)
+        internal static float ArmouryFloat(string field, float def)
         {
+            // E8/M (247): wynik bez zmian (pierwsze trafienie albo domyslna); dochodzi tylko linia PODPIETY/BRAK
+            // przy pierwszym odczycie kazdego pola (klucz = nazwa pola, napis skladany tylko raz)
+            float res = def; bool ok = false;
             try
             {
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -1810,15 +2362,22 @@ namespace CrashScribe
                     if (fld != null)
                     {
                         var v = fld.GetValue(so);
-                        if (v is float f) return f;
-                        if (v is bool b) return b ? 1f : 0f;
-                        if (v is int n) return n;
+                        if (v is float f) { res = f; ok = true; }
+                        else if (v is bool b) { res = b ? 1f : 0f; ok = true; }
+                        else if (v is int n) { res = n; ok = true; }
                     }
                     break;
                 }
             }
             catch { }
-            return def;
+            try
+            {
+                if (field != null && LinkFirst(field))
+                    Scribe.Line("Mends: ustawienia Armoury: " + (ok ? "PODPIETY (Armoury.Settings." + field + ")"
+                                : "BRAK (Armoury.Settings." + field + ") - zostaje domyslna " + def.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            catch { }
+            return res;
         }
 
         /// <summary>
@@ -2023,7 +2582,8 @@ namespace CrashScribe
                 if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo wagi spi."); return; }
                 // wspolczynnik z suwaka MCM Armoury (KgPerAthleticsPoint,
                 // dom. 0.25) - Jeff stroi bez rebuildu; dziala od startu sesji
-                float kg = 0.25f;
+                float kg = 0.333f;   // 09.10 (Jeff: wszystko wedlug wagi): 50 kg plyty = 150 Atletyki
+                bool kgLinked = false;
                 try
                 {
                     foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -2032,14 +2592,15 @@ namespace CrashScribe
                         var ts = asm.GetType("Armoury.Settings");
                         var cur = ts != null ? ts.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
                         var so = cur != null ? cur.GetValue(null) : null;
-                        var fld = so != null ? so.GetType().GetField("KgPerAthleticsPoint") : null;
-                        if (fld != null) kg = (float)fld.GetValue(so);
+                        var fld = so != null ? so.GetType().GetField("ArmourKgPerAthletics") : null;
+                        if (fld != null) { kg = (float)fld.GetValue(so); kgLinked = true; }
                         break;
                     }
                 }
                 catch { }
-                if (kg < 0.05f || kg > 2f) kg = 0.25f;
-                int raised = 0;
+                LinkLine("prawo wagi", kgLinked, "Armoury.Settings.ArmourKgPerAthletics", "0.333 kg/pkt");   // E8/M (247)
+                if (kg < 0.05f || kg > 2f) kg = 0.333f;
+                int raised = 0, lowered = 0;
                 foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null) continue;
@@ -2048,11 +2609,13 @@ namespace CrashScribe
                         && ty != ItemObject.ItemTypeEnum.LegArmor && ty != ItemObject.ItemTypeEnum.HandArmor
                         && ty != ItemObject.ItemTypeEnum.Cape) continue;
                     int want = (int)Math.Round(it.Weight / kg);
-                    if (want <= it.Difficulty) continue;
+                    // 09.10 (Jeff: "wszystko wedlug wagi"): wymog pancerza = DOKLADNIE waga / kg - takze w dol (ROT wpisuje
+                    // helmom 140, sukniom 175-200 bez zwiazku z waga); rekawice, peleryny, czapki i suknie prawie nic
+                    if (want == it.Difficulty) continue;
+                    if (want > it.Difficulty) raised++; else lowered++;
                     setter.Invoke(it, new object[] { want });
-                    raised++;
                 }
-                Scribe.Line("Mends: prawo wagi - Atletyka niesie 0.25 kg/pkt; wymagania podniesione " + raised + " pancerzom (" + kg.ToString("0.##") + " kg na punkt Atletyki).");
+                Scribe.Line("Mends: prawo wagi (jedyny wymog pancerza od 09.10) - " + kg.ToString("0.###") + " kg na punkt Atletyki; wymagania ustawione z wagi: podniesione " + raised + ", obnizone " + lowered + " pancerzom.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeightLaw", null); } catch { } }
         }
@@ -2108,6 +2671,10 @@ namespace CrashScribe
         /// Village.VillageType to pole - ustawiane refleksja; produkcja
         /// przelicza sie od nastepnego dnia. Idempotentne (juz zamienione
         /// pomija).
+        /// E6/M2 (R8, 12.10): prase przestawiamy w miescie TARGOWYM wsi
+        /// (TradeBound - stad gra bierze wsad warsztatow), nie w Bound (zamek
+        /// przy wsi zamkowej); tlocznia gracza nietknieta (licznik); miasto,
+        /// ktorego okreg nadal daje wsad tloczni, prase zachowuje.
         /// </summary>
         internal static void NorthernFare()
         {
@@ -2131,32 +2698,186 @@ namespace CrashScribe
                     var st = Settlement.Find(kv.Key);
                     if (st == null || st.Village == null) { Scribe.Line("Mends: strawa Polnocy - brak wioski " + kv.Key + " w tej kampanii."); continue; }
                     var cur = st.Village.VillageType;
-                    if (cur != null && cur.StringId == kv.Value) { if (st.Village.Bound != null) towns.Add(st.Village.Bound); continue; }
+                    // E6/M2 (R8): miasto TARGOWE wsi (TradeBound), nie Bound - gra dobiera typ warsztatu z wsi o TradeBound == miasto
+                    // (G WorkshopsCampaignBehavior.DecideBestWorkshopType); Bound wsi zamkowej to zamek, wiec tlocznia w miescie zostawala
+                    if (cur != null && cur.StringId == kv.Value) { if (st.Village.TradeBound != null) towns.Add(st.Village.TradeBound); continue; }
                     if (cur == null || cur.StringId != "vineyard") { continue; }   // ktos juz zmienil na cos innego - nie ruszamy
                     var vt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<VillageType>(kv.Value);
                     if (vt == null) { Scribe.Line("Mends: strawa Polnocy - brak typu wioski " + kv.Value + "."); continue; }
                     fld.SetValue(st.Village, vt);
                     done.Add(st.Name + ": winnica -> " + vt.ShortName);
-                    if (st.Village.Bound != null) towns.Add(st.Village.Bound);
+                    if (st.Village.TradeBound != null) towns.Add(st.Village.TradeBound);
                 }
-                int presses = 0;
+                int presses = 0, playerKept = 0;
                 var brewery = TaleWorlds.CampaignSystem.Settlements.Workshops.WorkshopType.Find("brewery");
+                // E6/M2 (R8): wsad tloczni (kategorie wejsc wine_press) - miasto, ktorego okreg nadal go daje, tloczni nie traci
+                var pressType = TaleWorlds.CampaignSystem.Settlements.Workshops.WorkshopType.Find("wine_press");
+                var pressInputs = new System.Collections.Generic.HashSet<ItemCategory>();
+                if (pressType != null)
+                    foreach (var pr in pressType.Productions)
+                        foreach (var inp in pr.Inputs) if (inp.Item1 != null) pressInputs.Add(inp.Item1);
                 foreach (var town in towns)
                 {
                     if (town == null || town.Town == null || brewery == null) continue;
+                    string grapesFrom = null;
+                    foreach (var v in Village.All)
+                    {
+                        if (v == null || v.TradeBound != town || v.VillageType == null) continue;
+                        foreach (var p in v.VillageType.Productions)
+                            if (p.Item1 != null && p.Item1.ItemCategory != null && pressInputs.Contains(p.Item1.ItemCategory)) { grapesFrom = v.Name.ToString(); break; }
+                        if (grapesFrom != null) break;
+                    }
+                    if (grapesFrom != null) { done.Add(town.Name + ": winogrona nadal z " + grapesFrom + " - tlocznia zostaje"); continue; }
                     foreach (var ws in town.Town.Workshops)
                     {
                         if (ws == null || ws.WorkshopType == null || ws.WorkshopType.StringId != "wine_press") continue;
+                        if (ws.Owner == Hero.MainHero) { playerKept++; continue; }   // E6/M2 v2: warsztatow gracza nie przestawiamy
                         try { ws.ChangeWorkshopProduction(brewery); presses++; done.Add(town.Name + ": prasa do wina -> browar"); }
                         catch (Exception e) { Scribe.Report("CrashScribe", e, "Mends.NorthernFare(workshop)", null); }
                     }
                 }
+                if (playerKept > 0) done.Add("tlocznie gracza nietkniete: " + playerKept);
                 if (done.Count > 0)
                     Scribe.Line("Mends: strawa Polnocy - " + string.Join("; ", done.ToArray()) + ".");
                 else
                     Scribe.Line("Mends: strawa Polnocy - wioski Polnocy juz bez winnic (nic do zmiany).");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.NorthernFare", null); } catch { } }
+        }
+
+        // ===== ATUTY BK Z NAGRODY ZA BITWE (decyzja Jeffa 4, 12.10) =====
+        // BK VanillaModelTweakPatches+BKBattleRewardTweakPatches pada w 1.4.8 na nazwie parametru 'party' postfiksu
+        // CalculateInfluenceGain (gra: winnerParty, DefaultBattleRewardModel.cs:73); Harmony przerywa reszte klasy, wiec
+        // CalculateRenownGain tez nie wchodzi (docs/ERRORS.md, BK #7). Tu te same dwa postfiksy z ta sama logika co w BK
+        // (CommanderWarband +25% wplywu; MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), z pozycyjnym
+        // parametrem __0 (= winnerParty). Wpinane raz na proces, po OnGameStart BK (pierwsze OnSessionLaunched), kazdy
+        // osobno i tylko gdy na metodzie nie ma postfiksu wlasciciela "BannerKings" (po poprawce w BK bonus liczylby sie
+        // podwojnie). NIGDY CreateClassProcessor na klasie BK (podwoilby postfiks lupu). Lancuch modeli:
+        // NavalDLCBattleRewardModel -> BaseModel = DefaultBattleRewardModel, wiec latka na Default dziala. BK bez refleksji
+        // nie jest dostepny (CrashScribe nie ma referencji do BK) - skladowe BK czytane refleksja, wartosci co wywolanie
+        // (BK tez czyta Instance.CommanderWarband przy kazdym wywolaniu; atuty rejestrowane od nowa w kazdej kampanii).
+        private static Harmony _lateHarmony;          // z Install
+        private static bool _bkRewardChecked;         // raz na proces (latki BK tez raz na proces - BK Main._patchesInstalled)
+        private static PropertyInfo _bkCfgInst, _bkEduMgr, _bkEduLife, _bkPerksInst, _bkWarband, _bkSellswords, _bkLifeInst, _bkCataphract, _bkLifeName;
+        private static MethodInfo _bkGetEdu, _bkHasPerk;
+        private static int _bkRewardStumbles;         // potkniecia per wywolanie (bez globalnego wylacznika)
+
+        /// <summary>Decyzja 4: sprawdzenie latek BK na nagrodzie za bitwe i wpiecie brakujacych postfiksow (OnSessionLaunched).</summary>
+        internal static void BkRewardPerks()
+        {
+            if (_bkRewardChecked) return;
+            _bkRewardChecked = true;
+            try
+            {
+                if (!Config.BkBattleRewardPerks) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - wylaczone (BkBattleRewardPerks=false)."); return; }
+                var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                if (tCfg == null) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - BK nieobecny, nic do wpiecia."); return; }
+                var tPerks = AccessTools.TypeByName("BannerKings.Managers.Skills.BKPerks");
+                var tLifes = AccessTools.TypeByName("BannerKings.Managers.Education.Lifestyles.DefaultLifestyles");
+                _bkCfgInst = AccessTools.Property(tCfg, "Instance");
+                _bkEduMgr = AccessTools.Property(tCfg, "EducationManager");
+                _bkGetEdu = _bkEduMgr != null ? AccessTools.Method(_bkEduMgr.PropertyType, "GetHeroEducation", new[] { typeof(Hero) }) : null;
+                var tEdu = _bkGetEdu != null ? _bkGetEdu.ReturnType : null;
+                _bkHasPerk = tEdu != null ? AccessTools.Method(tEdu, "HasPerk", new[] { typeof(TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject) }) : null;
+                _bkEduLife = tEdu != null ? AccessTools.Property(tEdu, "Lifestyle") : null;
+                _bkPerksInst = tPerks != null ? AccessTools.Property(tPerks, "Instance") : null;
+                _bkWarband = tPerks != null ? AccessTools.Property(tPerks, "CommanderWarband") : null;
+                _bkSellswords = tPerks != null ? AccessTools.Property(tPerks, "MercenaryFamousSellswords") : null;
+                _bkLifeInst = tLifes != null ? AccessTools.Property(tLifes, "Instance") : null;
+                _bkCataphract = tLifes != null ? AccessTools.Property(tLifes, "Cataphract") : null;
+                _bkLifeName = _bkCataphract != null ? AccessTools.Property(_bkCataphract.PropertyType, "Name") : null;
+                var miss = new System.Collections.Generic.List<string>();
+                if (_bkCfgInst == null) miss.Add("BannerKingsConfig.Instance");
+                if (_bkGetEdu == null) miss.Add("EducationManager.GetHeroEducation");
+                if (_bkHasPerk == null) miss.Add("EducationData.HasPerk");
+                if (_bkEduLife == null) miss.Add("EducationData.Lifestyle");
+                if (_bkPerksInst == null || _bkWarband == null || _bkSellswords == null) miss.Add("BKPerks");
+                if (_bkLifeInst == null || _bkCataphract == null || _bkLifeName == null) miss.Add("DefaultLifestyles.Cataphract");
+                if (miss.Count > 0) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - brak skladowych BK (" + string.Join(", ", miss.ToArray()) + ") - NIE wpiete."); return; }
+                var tModel = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultBattleRewardModel);
+                string inf = BkRewardHook(AccessTools.DeclaredMethod(tModel, "CalculateInfluenceGain"), "BkInfluencePerk");
+                string ren = BkRewardHook(AccessTools.DeclaredMethod(tModel, "CalculateRenownGain"), "BkRenownPerks");
+                Scribe.Line("Mends: atuty BK z nagrody za bitwe (decyzja 4) - wplyw (CommanderWarband +25%): " + inf
+                            + "; slawa (MercenaryFamousSellswords +20%, styl Cataphract +12%): " + ren + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRewardPerks", null); } catch { } }
+        }
+
+        /// <summary>Wpiecie jednego postfiksu, gdy BK nie ma juz swojego na tej metodzie; zwraca stan do linii logu.</summary>
+        private static string BkRewardHook(MethodInfo m, string postfix)
+        {
+            if (m == null) return "metoda gry nieznaleziona - NIE wpiete";
+            try
+            {
+                var info = Harmony.GetPatchInfo(m);
+                if (info != null && info.Postfixes != null)
+                    foreach (var p in info.Postfixes)
+                        if (p != null && p.owner == "BannerKings") return "BK juz ma (postfiks BannerKings) - nie wpinamy";
+                if (_lateHarmony == null) return "brak Harmony CrashScribe - NIE wpiete";
+                _lateHarmony.Patch(m, postfix: new HarmonyMethod(typeof(Mends), postfix));
+                return "wpiete";
+            }
+            catch (Exception e)
+            {
+                try { Scribe.Report("CrashScribe", e, "Mends.BkRewardHook(" + postfix + ")", null); } catch { }
+                return "wyjatek " + e.GetType().Name + " - NIE wpiete";
+            }
+        }
+
+        /// <summary>Wyksztalcenie BK dowodcy partii (jak BK: party.LeaderHero -> EducationManager.GetHeroEducation); null = bez bonusu.</summary>
+        private static object BkEducation(PartyBase party)
+        {
+            var hero = party != null ? party.LeaderHero : null;
+            if (hero == null) return null;
+            var cfg = _bkCfgInst.GetValue(null, null);
+            var mgr = cfg != null ? _bkEduMgr.GetValue(cfg, null) : null;
+            return mgr != null ? _bkGetEdu.Invoke(mgr, new object[] { hero }) : null;
+        }
+
+        /// <summary>Postfiks DefaultBattleRewardModel.CalculateInfluenceGain (__0 = winnerParty) - BK CommanderWarband +25%.</summary>
+        internal static void BkInfluencePerk(PartyBase __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var edu = BkEducation(__0);
+                if (edu == null) return;
+                var perk = _bkWarband.GetValue(_bkPerksInst.GetValue(null, null), null) as TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject;
+                if (perk != null && (bool)_bkHasPerk.Invoke(edu, new object[] { perk }))
+                    __result.AddFactor(0.25f, perk.Name);
+            }
+            catch (Exception e) { BkRewardStumble("wplyw", e); }
+        }
+
+        /// <summary>Postfiks DefaultBattleRewardModel.CalculateRenownGain (__0 = winnerParty) - BK MercenaryFamousSellswords +20%, styl Cataphract +12%.</summary>
+        internal static void BkRenownPerks(PartyBase __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var edu = BkEducation(__0);
+                if (edu == null) return;
+                var perk = _bkSellswords.GetValue(_bkPerksInst.GetValue(null, null), null) as TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject;
+                if (perk != null && (bool)_bkHasPerk.Invoke(edu, new object[] { perk }))
+                    __result.AddFactor(0.2f, perk.Name);
+                var life = _bkEduLife.GetValue(edu, null);
+                if (life == null) return;
+                var cat = _bkCataphract.GetValue(_bkLifeInst.GetValue(null, null), null);
+                if (cat != null && life.Equals(cat))   // Lifestyle.Equals BK = ten sam StringId
+                    __result.AddFactor(0.12f, _bkLifeName.GetValue(cat, null) as TaleWorlds.Localization.TextObject);
+            }
+            catch (Exception e) { BkRewardStumble("slawa", e); }
+        }
+
+        /// <summary>Potkniecie postfiksu atutow BK: licznik w procesie, raport i linia do 3 (bez wylaczania latki).</summary>
+        private static void BkRewardStumble(string where, Exception e)
+        {
+            _bkRewardStumbles++;
+            if (_bkRewardStumbles > 3) return;
+            try
+            {
+                Scribe.Report("CrashScribe", e, "Mends.BkRewardPerks (" + where + ")", null);
+                Scribe.Line("Mends: atuty BK z nagrody za bitwe - " + where + ": wyjatek " + e.GetType().Name + " polkniety (potkniec " + _bkRewardStumbles + ").");
+            }
+            catch { }
         }
 
         /// <summary>
@@ -2300,8 +3021,8 @@ namespace CrashScribe
             {
                 var setter = AccessTools.PropertySetter(typeof(ItemObject), "Difficulty");
                 if (setter == null) { Scribe.Line("Mends: ItemObject.Difficulty bez settera - prawo tieru pancerza spi."); return; }
-                float step = ArmouryFloat("ArmorAthleticsPerTier", 35f);
-                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmorAthleticsPerTier 0)."); return; }
+                float step = ArmouryFloat("ArmourTierAthletics", 0f);
+                if (step < 0.5f) { Scribe.Line("Mends: prawo tieru pancerza wylaczone (ArmourTierAthletics 0 - od 09.10 pancerz tylko wedlug wagi)."); return; }
                 if (step > 100f) step = 100f;
 
                 int raised = 0;
@@ -2355,7 +3076,7 @@ namespace CrashScribe
                 if (step < 0.5f) { Scribe.Line("Mends: prawo tieru broni wylaczone (WeaponSkillPerTier 0)."); return; }
                 if (step > 100f) step = 100f;
 
-                int raised = 0;
+                int raised = 0, lowered = 0;
                 var perTier = new int[7];
                 var perTierAll = new int[7];
                 var worst = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
@@ -2373,7 +3094,15 @@ namespace CrashScribe
                     if (grade > 6) grade = 6;
                     perTierAll[grade]++;
                     int want = (int)Math.Round((grade - 1) * step);
-                    if (want <= it.Difficulty) continue;
+                    // 09.10 (Jeff "tak" - jak przy pancerzu: wymog z danych ROT bez zwiazku z tierem to bzdura; drzewce t3 z wymogiem 140
+                    // pompowaly zolnierzom umiejetnosc przez SkillSinew): bron biala, tarcze i bron rzucana - wymog DOKLADNIE z tieru,
+                    // takze w dol; luki, kusze, proce i amunicja - jak dotad tylko w gore (naciag / Twoja zasada 02.09 o strzalach)
+                    if (ExactTierWeapon(ty))
+                    {
+                        if (want == it.Difficulty) continue;
+                        if (want < it.Difficulty) { setter.Invoke(it, new object[] { want }); lowered++; continue; }
+                    }
+                    else if (want <= it.Difficulty) continue;
                     worst.Add(new System.Collections.Generic.KeyValuePair<int, string>(
                         want - it.Difficulty, it.StringId + " t" + grade + " " + it.Difficulty + "->" + want));
                     setter.Invoke(it, new object[] { want });
@@ -2384,7 +3113,7 @@ namespace CrashScribe
                 sb.Append("Mends: prawo tieru broni - ").Append(step.ToString("0.#")).Append(" skilla na tier; wymog podniesiony ")
                   .Append(raised).Append(" broniom (per tier: ");
                 for (int t = 2; t <= 6; t++) sb.Append("t").Append(t).Append(" ").Append(perTier[t]).Append("/").Append(perTierAll[t]).Append(t < 6 ? ", " : "");
-                sb.Append(").");
+                sb.Append("); obnizony do tieru (bron biala, tarcze, rzucana - od 09.10) ").Append(lowered).Append(".");
                 Scribe.Line(sb.ToString());
                 if (worst.Count > 0)
                 {
@@ -2398,10 +3127,21 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.WeaponTierLaw", null); } catch { } }
         }
 
+        /// <summary>09.10: bron, ktorej wymog jest DOKLADNIE z tieru (takze w dol): bron biala, tarcze, rzucana.
+        /// Luki, kusze, proce i amunicja - tylko w gore (naciag, zasada strzal 02.09).</summary>
+        internal static bool ExactTierWeapon(ItemObject.ItemTypeEnum ty)
+        {
+            return ty == ItemObject.ItemTypeEnum.OneHandedWeapon || ty == ItemObject.ItemTypeEnum.TwoHandedWeapon
+                || ty == ItemObject.ItemTypeEnum.Polearm || ty == ItemObject.ItemTypeEnum.Shield || ty == ItemObject.ItemTypeEnum.Thrown;
+        }
+
         internal static bool SinewApplied;
 
         internal static void SkillSinew()
         {
+            // 175 (09.10, decyzja 8b): wzorce zolnierzy sa juz W TIERZE jednostki (Army175.TierGear przy
+            // wczytaniu), wiec "umiejetnosc do wlasnego sprzetu" nie podnosi juz t2-t4 pod tarcze i belty t6.
+            // Zasada bez zmian: raise, never lower. Po niej Army175.NorthHardy / DothrakiRiders (bonusy 175).
             try
             {
                 int fixedN = 0, seen = 0, fixedSkills = 0;
@@ -2479,25 +3219,505 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillSinew", null); } catch { } }
         }
 
-        internal static void Install(Harmony harmony)
+        // ===== Z16: UMIEJETNOSC BOHATERA AI DO WLASNEGO SPRZETU (Jeff 09.10: 02:50, 03:05 SPROSTOWANIE, 03:55) =====
+        // "jak nie mam danej umiejetnosci, np. atletyki, nie moge zalozyc pancerza, ktory ma takie wymaganie" + zasada z 29.08
+        // "CALY ekwipunek". Zakladanie pilnuje Armoury (ItemReq.MeetsHero: ekran, Spoils, unikaty, zaciag ROT); TU - decyzja 2:
+        // lordom AI, towarzyszom i doroslej rodzinie gracza Atletyka (pancerz, sloty 5-9), Luk (strzaly) i Kusza (belty, sloty 0-3)
+        // podniesione do wymogu ich WLASNEGO zestawu bojowego, zeby nikt nie stracil zbroi - ta sama zasada co SkillSinew u zolnierzy
+        // (15.09: "nie zmieniaj sprzetu, podnies umiejetnosci"), tylko w gore, niczego nie zdejmujemy (decyzja 3). GRACZ nigdy.
+        // Dzieci (sprzet i umiejetnosci dostaja przy pelnoletnosci) i notable (nie wychodza w pole) - poza. Bez broni, koni i ladr
+        // (ladry: od Z16b ReqSkill daje Jazde, a bohaterom ladr nie sprawdzamy - CanUseHero). Bez treningu Atletyki w zbroi (decyzja 03:55).
+        // SetInitialSkillLevel (gra 1.4.8, HeroDeveloper.cs:190-196) ustawia umiejetnosc i XP pod nia: bez awansu poziomu i bez
+        // komunikatu (tak robi RC przy zaniku miesni). PERKI (POPRAWKA Z16-1c po recenzji - dotad stalo tu "bez perkow"): sam
+        // SetInitialSkillLevel ich nie daje, ale gra dobiera je bohaterom spoza klanu gracza CODZIENNIE
+        // (CharacterDevelopmentCampaignBehavior.DailyTickHero -> HeroDeveloper.DevelopCharacterStats -> SelectPerks,
+        // HeroDeveloper.cs:441-453: kazdy perk z RequiredSkillValue <= umiejetnosc, z pary 50/50), wiec podniesienie odblokowuje perki
+        // do nowego progu (25/50/.../175): np. Atletyka 77 -> 175 to 4 perki (Powerful albo Sprint, Surging Blow albo Braced, Walk It
+        // Off albo A Good Days Rest, Durable albo Energetic), a przejscie przez Atletyke 75 (Imposing Stature) i Luk 100 (Merry Men)
+        // daje dowodcy +5 rozmiaru partii (DefaultPartySizeLimitModel.cs:311-317). Towarzysze i rodzina gracza: przy wylaczonym
+        // AutoAllocateClanMemberPerks - wolne wybory perkow na ekranie postaci, przy wlaczonym gra wybiera sama. Pomiar: linia
+        // "Mends: Z16 perki" w drugim dziennym przegladzie po wczytaniu. Skutek decyzji 2 - do oceny Jeffa przed wgraniem.
+        // Trzy chwile, jedna funkcja: (1) przy wczytaniu, PO DressTheNamesakes;
+        // (2) po przydziale z szablonu - postfiks na gardle EquipmentHelper.AssignHeroEquipmentFromEquipment tylko dopisuje bohatera
+        // do kolejki, liczonej w najblizszej godzinie (BK ubiera rycerza dwa razy, a gra po CreateSpecialHero jeszcze ustawia
+        // umiejetnosci startowe - liczy sie komplet koncowy); (3) raz na dobe przeglad wszystkich (drogi omijajace gardlo: zwolniony
+        // wedrowiec - Hero.ResetEquipments, sztuka usunieta z gry - Hero.HandleInvalidItem; normalnie 0 podniesien).
+        // Bez stanu w zapisie (podniesienie jest trwale w umiejetnosciach i idempotentne) - zadnego SyncData.
+        // Wylacznik: Armoury HeroSkillToOwnGear (bez Armoury - wlaczone); wylaczenie nie obniza juz podniesionych. POPRAWKA Z16-1c
+        // (recenzja): podnoszenie dziala tylko przy wlaczonym sicie HeroGearRequirements - podniesienie ma sens tylko po to, zeby przy
+        // sicie nikt nie stracil zbroi; przy sicie wylaczonym gracz mogl zalozyc towarzyszowi plyte t6, a dzienny przeglad dawal mu
+        // nastepnego dnia Atletyke 175 i perki "z niczego".
+
+        /// <summary>Z16: Armoury HeroSkillToOwnGear (domyslnie TAK; bez Armoury - TAK).</summary>
+        internal static bool HeroSkillOn() { return ArmouryFloat("HeroSkillToOwnGear", 1f) > 0.5f; }
+
+        /// <summary>Z16: Armoury HeroGearRequirements - sito u bohaterow (domyslnie TAK; bez Armoury - TAK).</summary>
+        internal static bool HeroReqOn() { return ArmouryFloat("HeroGearRequirements", 1f) > 0.5f; }
+
+        /// <summary>Z16-1c: podnoszenie - tylko przy obu wlacznikach (HeroSkillToOwnGear i HeroGearRequirements).</summary>
+        internal static bool HeroRaiseOn() { return HeroSkillOn() && HeroReqOn(); }
+
+        /// <summary>Z16: lustro Armoury ItemReq.MeetsHero - ten sam wymog co CanUse (ReqSkill + Difficulty), tylko ladry
+        /// konskie przepuszczone. To DECYZJA, nie obejscie: od Z16b ReqSkill daje ladrom Jazde (zolnierze, K1, kwatermistrz),
+        /// a bohaterom ladr nie sprawdzamy (opis MCM Armoury HeroGearRequirements: "Horse barding is not checked").</summary>
+        internal static bool CanUseHero(CharacterObject co, ItemObject it)
+        {
+            try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return true; } catch { }
+            return CanUse(co, it);
+        }
+
+        /// <summary>Z16: kogo podnosimy - zywy, dorosly bohater poza graczem, nie notable.</summary>
+        internal static bool IsAiHeroForSinew(Hero h)
         {
             try
             {
-                // ===== A6: MARTWY WIDGET DTE NA PASKU MAPY =====
-                // MapArmoryReadinessMixin (wskaznik gotowosci zbrojowni przy
-                // zegarze mapy) pada na 1.4.8 w inicjalizacji swojej bazy
-                // (AmbiguousMatch w UIExtenderEx) i KAZDE odswiezenie paska
-                // rzuca od nowa - 604 wyjatki w sesji 29.08, a wskaznika
-                // i tak nie widac. Usypiamy samo odswiezanie; przycisk
-                // otwierania zbrojowni ma osobna droge i zostaje.
-                var tMix = QuietType("MapArmoryReadinessMixin");
-                var mRef = tMix != null ? AccessTools.Method(tMix, "OnRefresh") : null;
-                if (mRef != null)
+                return h != null && h != Hero.MainHero && h.IsAlive && !h.IsChild && !h.IsNotable
+                       && h.HeroDeveloper != null && h.CharacterObject != null;
+            }
+            catch { return false; }
+        }
+
+        private static bool IsWornArmourType(ItemObject.ItemTypeEnum t)
+        {
+            return t == ItemObject.ItemTypeEnum.HeadArmor || t == ItemObject.ItemTypeEnum.BodyArmor
+                || t == ItemObject.ItemTypeEnum.LegArmor || t == ItemObject.ItemTypeEnum.HandArmor
+                || t == ItemObject.ItemTypeEnum.Cape;
+        }
+
+        /// <summary>Z16: wymog ZESTAWU BOJOWEGO bohatera - Atletyka: pancerz w slotach 5-9 (helm, korpus, nogi, rece,
+        /// peleryna); Luk: strzaly, Kusza: belty w slotach 0-3 (to samo mapowanie co ReqSkill i Armoury ItemReq.SkillFor).
+        /// pieces = liczba zajetych slotow pancerza i amunicji (tylko informacyjnie - Z16-1c: "przed = po" w linii wczytania bylo
+        /// zawsze prawdziwe, bo HeroSinew sprzetu nie rusza; miara utraty to puste sloty, EmptySlots).</summary>
+        internal static void HeroGearNeed(Hero h, out int ath, out int bow, out int xbow, out int pieces)
+        {
+            ath = 0; bow = 0; xbow = 0; pieces = 0;
+            Equipment eq = null;
+            try { eq = h != null ? h.BattleEquipment : null; } catch { }
+            if (eq == null) return;
+            for (int s = 0; s <= 9; s++)
+            {
+                if (s == 4) continue;                                   // sztandar
+                ItemObject it;
+                try { it = eq[(EquipmentIndex)s].Item; } catch { continue; }
+                if (it == null) continue;
+                bool armour = s >= 5 && it.HasArmorComponent && IsWornArmourType(it.ItemType);
+                bool ammo = s <= 3 && (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts);
+                if (!armour && !ammo) continue;
+                pieces++;
+                if (it.Difficulty <= 0) continue;
+                var rs = ReqSkill(it);
+                if (armour && rs == DefaultSkills.Athletics) { if (it.Difficulty > ath) ath = it.Difficulty; }
+                else if (ammo && rs == DefaultSkills.Bow) { if (it.Difficulty > bow) bow = it.Difficulty; }
+                else if (ammo && rs == DefaultSkills.Crossbow) { if (it.Difficulty > xbow) xbow = it.Difficulty; }
+            }
+        }
+
+        /// <summary>Z16: podnosi JEDNEMU bohaterowi AI Atletyke/Luk/Kusze do wymogu jego zestawu bojowego (tylko w gore,
+        /// sprzet nietkniety). gain: [Atletyka, Luk, Kusza] - suma podniesien (moze byc null). Zwraca opis albo null.</summary>
+        internal static string HeroSinew(Hero h, int[] gain, int[] raised)
+        {
+            if (!IsAiHeroForSinew(h)) return null;
+            int ath, bow, xbow, pieces;
+            HeroGearNeed(h, out ath, out bow, out xbow, out pieces);
+            string note = null;
+            note = RaiseHeroSkill(h, DefaultSkills.Athletics, ath, note, gain, raised, 0);
+            note = RaiseHeroSkill(h, DefaultSkills.Bow, bow, note, gain, raised, 1);
+            note = RaiseHeroSkill(h, DefaultSkills.Crossbow, xbow, note, gain, raised, 2);
+            return note;
+        }
+
+        private static string RaiseHeroSkill(Hero h, SkillObject sk, int need, string note, int[] gain, int[] raised, int idx)
+        {
+            if (sk == null || need <= 0) return note;
+            int have = h.GetSkillValue(sk);
+            if (have >= need) return note;
+            PerkWatchBefore(h);                                   // Z16-1c: zrzut perkow PRZED pierwszym podniesieniem
+            h.HeroDeveloper.SetInitialSkillLevel(sk, need);
+            if (gain != null && idx < gain.Length) gain[idx] += need - have;
+            if (raised != null && idx < raised.Length) raised[idx]++;
+            string part = sk.StringId + " " + have + "->" + need;
+            return note == null ? part : note + ", " + part;
+        }
+
+        /// <summary>Z16: umiejetnosci gracza wobec wymogu jego zestawu bojowego - "Atletyka 60 (zestaw wymaga 175); Luk ...".</summary>
+        private static string PlayerSkillsText()
+        {
+            try
+            {
+                var mh = Hero.MainHero;
+                if (mh == null) return "brak gracza";
+                int ath, bow, xbow, pc;
+                HeroGearNeed(mh, out ath, out bow, out xbow, out pc);
+                return "Atletyka " + mh.GetSkillValue(DefaultSkills.Athletics) + " (zestaw wymaga " + ath + "); Luk "
+                       + mh.GetSkillValue(DefaultSkills.Bow) + "/" + bow + "; Kusza " + mh.GetSkillValue(DefaultSkills.Crossbow) + "/" + xbow;
+            }
+            catch { return "?"; }
+        }
+
+        private static string HeroLabel(Hero h)
+        {
+            try { return (h.Name != null ? h.Name.ToString() : "?") + " [" + h.StringId + "]"; }
+            catch { return "?"; }
+        }
+
+        // kolejka z gardla EquipmentHelper (przydzial z szablonu) - liczona w najblizszej godzinie; nie w zapisie
+        private static readonly System.Collections.Generic.HashSet<Hero> _sinewQueue = new System.Collections.Generic.HashSet<Hero>();
+
+        // pierwszy dzienny przeglad po wczytaniu ma wlasna etykiete: na nowej kampanii to "jeszcze raz z pierwszym dniem"
+        // (jak SinewApplied u zolnierzy) - podniesienia tam nie sa nieznana droga
+        private static bool _sinewFirstDay = true;
+
+        /// <summary>Z16: postfiks na Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment - tylko DOPISUJE bohatera do
+        /// kolejki. Harmony puszcza postfiks takze po DressedOrNot zwracajacym false (null w argumentach) - stad straznik.</summary>
+        public static void DressedQueue(Hero __0, Equipment __1)
+        {
+            try
+            {
+                if (__0 == null || __1 == null || __0 == Hero.MainHero) return;
+                lock (_sinewQueue) _sinewQueue.Add(__0);
+            }
+            catch { }
+        }
+
+        /// <summary>Z16: co godzine - bohaterowie ubrani z szablonu od ostatniej godziny (gra: nowy bohater, pelnoletnosc,
+        /// nowy wladca, towarzysz zostaje lordem; BK: towarzysz, rycerz, ziemianin, bohater bandy; BKROTPatch: rycerz).</summary>
+        internal static void HeroSinewQueue()
+        {
+            try
+            {
+                Hero[] list;
+                lock (_sinewQueue)
                 {
-                    harmony.Patch(mRef, prefix: new HarmonyMethod(typeof(Mends), "SkipDteMapWidget"));
-                    Scribe.Line("Mends: martwy wskaznik gotowosci DTE na pasku mapy uspiony (bylo 604 wyjatki/sesje).");
+                    if (_sinewQueue.Count == 0) return;
+                    list = new Hero[_sinewQueue.Count];
+                    _sinewQueue.CopyTo(list);
+                    _sinewQueue.Clear();
                 }
-                else Scribe.Line("Mends: MapArmoryReadinessMixin nieobecny - nic do usypiania.");
+                if (!HeroRaiseOn()) return;
+                int n = 0, bad = 0;
+                string firstBad = null;
+                var sb = new System.Text.StringBuilder();
+                foreach (var h in list)
+                {
+                    string note = null;
+                    // Z16-1c (recenzja; CLAUDE.md "licz potkniecia, nie gas"): wywrotka na jednym bohaterze liczona, nie polykana
+                    try { note = HeroSinew(h, null, null); }
+                    catch (Exception e1)
+                    {
+                        bad++;
+                        if (firstBad == null) firstBad = HeroLabel(h) + ": " + e1.GetType().Name + " " + e1.Message;
+                    }
+                    if (note == null) continue;
+                    n++;
+                    if (n <= 20) sb.Append(n > 1 ? "; " : "").Append(HeroLabel(h)).Append(" ").Append(note);
+                }
+                if (n > 0)
+                    Scribe.Line("Mends: Z16 (przydzial z szablonu) - " + n + " z " + list.Length + " ubranych bohaterow AI dostalo umiejetnosc"
+                                + " do nowego zestawu: " + sb + (n > 20 ? "; ..." : "") + ".");
+                if (bad > 0)
+                    Scribe.Line("Mends: Z16 kolejka - " + bad + " potkniec z " + list.Length + " (pierwsze: " + firstBad + ").");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewQueue", null); } catch { } }
+        }
+
+        // ---- Z16-1c: POMIAR PERKOW po podniesieniu (recenzja Z16: gra dobiera bohaterom AI perki do nowej umiejetnosci co dobe).
+        // Zrzut perkow Atletyki, Luku i Kuszy kazdego bohatera PRZED jego pierwszym podniesieniem w sesji (wczytanie, kolejka, doba),
+        // raport raz - w drugim dziennym przegladzie po wczytaniu (dobowy tick bohaterow gra rozklada na godziny doby, wiec po
+        // drugiej dobie przeszli go wszyscy). Tylko log, bez zapisu (SyncData nie potrzebne).
+        private sealed class PerkSnap { internal int Ath, Bow, Xbow, Free; internal bool Imposing, Merry; }
+        private static System.Collections.Generic.Dictionary<Hero, PerkSnap> _perkWatch;
+        private static System.Collections.Generic.List<TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject> _z16Perks;
+        private static int _perkWatchDays;
+
+        private static void PerkWatchBefore(Hero h)
+        {
+            try
+            {
+                if (_perkWatch == null || h == null || _perkWatch.ContainsKey(h)) return;
+                _perkWatch[h] = TakePerkSnap(h);
+            }
+            catch { }
+        }
+
+        private static PerkSnap TakePerkSnap(Hero h)
+        {
+            if (_z16Perks == null)
+            {
+                var list = new System.Collections.Generic.List<TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject>();
+                foreach (var p in TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject.All)
+                    if (p != null && (p.Skill == DefaultSkills.Athletics || p.Skill == DefaultSkills.Bow || p.Skill == DefaultSkills.Crossbow))
+                        list.Add(p);
+                _z16Perks = list;
+            }
+            var s = new PerkSnap();
+            foreach (var p in _z16Perks)
+            {
+                if (h.GetPerkValue(p))
+                {
+                    if (p.Skill == DefaultSkills.Athletics) s.Ath++;
+                    else if (p.Skill == DefaultSkills.Bow) s.Bow++;
+                    else s.Xbow++;
+                }
+                else if (h.GetSkillValue(p.Skill) >= p.RequiredSkillValue
+                         && (p.AlternativePerk == null
+                             || (!h.GetPerkValue(p.AlternativePerk) && string.CompareOrdinal(p.StringId, p.AlternativePerk.StringId) < 0)))
+                    s.Free++;                                   // wolny wybor (para liczona raz)
+            }
+            s.Imposing = h.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Athletics.ImposingStature);
+            s.Merry = h.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Bow.MerryMen);
+            return s;
+        }
+
+        private static void PerkWatchReport()
+        {
+            try
+            {
+                if (_perkWatch == null) return;
+                int n = _perkWatch.Count, gained = 0, a = 0, b = 0, x = 0, imp = 0, impLead = 0, mer = 0, merLead = 0;
+                int clanN = 0, freeBefore = 0, freeNow = 0;
+                foreach (var kv in _perkWatch)
+                {
+                    var h = kv.Key;
+                    var s0 = kv.Value;
+                    if (h == null || !h.IsAlive) continue;
+                    var s1 = TakePerkSnap(h);
+                    int da = Math.Max(0, s1.Ath - s0.Ath), db = Math.Max(0, s1.Bow - s0.Bow), dx = Math.Max(0, s1.Xbow - s0.Xbow);
+                    if (da + db + dx > 0) gained++;
+                    a += da; b += db; x += dx;
+                    bool lead = h.PartyBelongedTo != null && h.PartyBelongedTo.LeaderHero == h;
+                    if (s1.Imposing && !s0.Imposing) { imp++; if (lead) impLead++; }
+                    if (s1.Merry && !s0.Merry) { mer++; if (lead) merLead++; }
+                    if (h.Clan == Clan.PlayerClan) { clanN++; freeBefore += s0.Free; freeNow += s1.Free; }
+                }
+                bool auto = false;
+                try { auto = CampaignOptions.AutoAllocateClanMemberPerks; } catch { }
+                Scribe.Line("Mends: Z16 perki (" + _perkWatchDays + ". przeglad dzienny po wczytaniu, dzien " + (int)CampaignTime.Now.ToDays + ") - z " + n
+                            + " podniesionych bohaterow nowe perki Atletyki/Luku/Kuszy dostalo " + gained + ": Atletyka +" + a + ", Luk +" + b
+                            + ", Kusza +" + x + "; Imposing Stature +" + imp + " (dowodcy partii " + impLead + "), Merry Men +" + mer
+                            + " (dowodcy partii " + merLead + ") - kazdy z tych dwoch to +5 rozmiaru partii dowodcy; klan gracza (" + clanN
+                            + " podniesionych): wolne wybory perkow tych umiejetnosci przed " + freeBefore + ", teraz " + freeNow
+                            + (auto ? " (AutoAllocateClanMemberPerks wlaczone - gra wybiera sama)" : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.PerkWatchReport", null); } catch { } }
+            finally { _perkWatch = null; }
+        }
+
+        /// <summary>Z16-1c: puste sloty pancerza (5-9) i bohater bez zadnej broni (0-3) - miara utraty sprzetu porownywana miedzy
+        /// wczytaniami (recenzja: "sloty przed = po" w jednej funkcji bylo zawsze prawdziwe).</summary>
+        private static void EmptySlots(Hero h, ref int armour, ref int noWeapon)
+        {
+            try
+            {
+                var eq = h.BattleEquipment;
+                if (eq == null) return;
+                for (int s = 5; s <= 9; s++) if (eq[(EquipmentIndex)s].IsEmpty) armour++;
+                bool any = false;
+                for (int s = 0; s < 4; s++) if (!eq[(EquipmentIndex)s].IsEmpty) { any = true; break; }
+                if (!any) noWeapon++;
+            }
+            catch { }
+        }
+
+        /// <summary>Z16: przeglad wszystkich bohaterow AI. "wczytanie" - pelna linia przed/po (miara autotestu: po = 0,
+        /// gracz bez zmian, puste sloty pancerza i bez broni - do porownania miedzy wczytaniami); "dzien" - linia tylko, gdy ktos
+        /// zostal podniesiony (normalnie 0 - liczba > 0 to droga omijajaca gardlo albo nowa droga do zbadania); w drugim dziennym
+        /// przegladzie po wczytaniu - raz linia "Z16 perki" (Z16-1c).</summary>
+        internal static void HeroSinewAll(string when)
+        {
+            try
+            {
+                bool load = when == "wczytanie";
+                if (load) { lock (_sinewQueue) _sinewQueue.Clear(); _sinewFirstDay = true; }   // wczytanie liczy wszystkich; kolejka z poprzedniej kampanii precz
+                bool on = HeroRaiseOn();                       // Z16-1c: tylko przy wlaczonym sicie HeroGearRequirements
+                if (load)
+                {
+                    // Z16-1c: pomiar perkow od nowa (obiekty perkow sa per kampania)
+                    _perkWatch = on ? new System.Collections.Generic.Dictionary<Hero, PerkSnap>() : null;
+                    _perkWatchDays = 0;
+                    _z16Perks = null;
+                }
+                else if (_perkWatch != null && ++_perkWatchDays >= 2) PerkWatchReport();
+                if (!on && !load) return;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var heroes = new System.Collections.Generic.List<Hero>();
+                foreach (var h in Hero.AllAliveHeroes) if (IsAiHeroForSinew(h)) heroes.Add(h);
+                string playerBefore = PlayerSkillsText();
+
+                int[] overBefore = new int[3], overAfter = new int[3];
+                int emptyArmour = 0, noWeapon = 0;
+                int[] gain = new int[3], raised = new int[3];
+                int nLords = 0, nComp = 0, nOther = 0;
+                var big = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>>();
+                var names = new System.Text.StringBuilder();
+                int named = 0;
+                foreach (var h in heroes)
+                {
+                    int ath, bow, xbow, pc;
+                    HeroGearNeed(h, out ath, out bow, out xbow, out pc);
+                    if (load) EmptySlots(h, ref emptyArmour, ref noWeapon);
+                    int hAth = h.GetSkillValue(DefaultSkills.Athletics);
+                    if (ath > hAth) overBefore[0]++;
+                    if (bow > h.GetSkillValue(DefaultSkills.Bow)) overBefore[1]++;
+                    if (xbow > h.GetSkillValue(DefaultSkills.Crossbow)) overBefore[2]++;
+                    if (!on) continue;
+                    string note = null;
+                    try { note = HeroSinew(h, gain, raised); }
+                    catch (Exception e1) { try { Scribe.Report("CrashScribe", e1, "Mends.HeroSinew", null); } catch { } }
+                    if (note == null) continue;
+                    if (h.IsLord) nLords++;
+                    else if (h.CompanionOf != null || h.IsWanderer) nComp++;
+                    else nOther++;
+                    if (load) { if (ath > hAth) big.Add(new System.Collections.Generic.KeyValuePair<int, string>(ath - hAth, HeroLabel(h) + " " + note)); }
+                    else if (named++ < 20) names.Append(named > 1 ? "; " : "").Append(HeroLabel(h)).Append(" ").Append(note);
+                }
+                foreach (var h in heroes)
+                {
+                    int ath, bow, xbow, pc;
+                    HeroGearNeed(h, out ath, out bow, out xbow, out pc);
+                    if (ath > h.GetSkillValue(DefaultSkills.Athletics)) overAfter[0]++;
+                    if (bow > h.GetSkillValue(DefaultSkills.Bow)) overAfter[1]++;
+                    if (xbow > h.GetSkillValue(DefaultSkills.Crossbow)) overAfter[2]++;
+                }
+                int total = nLords + nComp + nOther;
+                if (!load)
+                {
+                    bool first = _sinewFirstDay;
+                    _sinewFirstDay = false;
+                    if (total > 0)
+                        Scribe.Line("Mends: Z16 (dzien " + (int)CampaignTime.Now.ToDays + ") - przeglad bohaterow AI: podniesiono " + total
+                                    + (first ? " (pierwsza doba po wczytaniu - na nowej kampanii sprzet/umiejetnosci ustawione po starcie sesji)"
+                                             : " (droga bez gardla EquipmentHelper albo nowa - zbadac)")
+                                    + ": " + names + (total > 20 ? "; ..." : "") + ".");
+                    return;
+                }
+                string playerAfter = PlayerSkillsText();
+                string player = playerBefore == playerAfter
+                    ? "gracz bez zmian (" + playerAfter + ")"
+                    : "GRACZ ZMIENIONY - BLAD (przed " + playerBefore + ", po " + playerAfter + ")";
+                var sb = new System.Text.StringBuilder("Mends: Z16 (wczytanie) - bohaterowie AI (" + heroes.Count + ", dorosli, bez gracza i notabli)");
+                sb.Append(" ponad wymog wlasnego zestawu bojowego PRZED: Atletyka ").Append(overBefore[0]).Append(", Luk ").Append(overBefore[1])
+                  .Append(", Kusza ").Append(overBefore[2]).Append("; ");
+                if (on)
+                {
+                    sb.Append("podniesiono ").Append(total).Append(" (lordow ").Append(nLords).Append(", towarzyszy ").Append(nComp)
+                      .Append(", innych ").Append(nOther).Append("): Atletyka ").Append(raised[0])
+                      .Append(raised[0] > 0 ? " (srednio +" + (gain[0] / raised[0]) + ")" : "")
+                      .Append(", Luk ").Append(raised[1]).Append(raised[1] > 0 ? " (srednio +" + (gain[1] / raised[1]) + ")" : "")
+                      .Append(", Kusza ").Append(raised[2]).Append(raised[2] > 0 ? " (srednio +" + (gain[2] / raised[2]) + ")" : "")
+                      .Append("; ");
+                }
+                else sb.Append("podnoszenie WYLACZONE (Armoury HeroSkillToOwnGear albo HeroGearRequirements); ");
+                sb.Append("PO: Atletyka ").Append(overAfter[0]).Append(", Luk ").Append(overAfter[1]).Append(", Kusza ").Append(overAfter[2])
+                  .Append("; puste sloty pancerza (5-9) ").Append(emptyArmour).Append(", bez zadnej broni (0-3) ").Append(noWeapon)
+                  .Append(" (porownac miedzy wczytaniami - Z16 sprzetu nie zdejmuje)")
+                  .Append("; ").Append(player).Append("; ").Append(sw.ElapsedMilliseconds).Append(" ms.");
+                Scribe.Line(sb.ToString());
+                if (big.Count > 0)
+                {
+                    big.Sort((a, b) => b.Key.CompareTo(a.Key));
+                    int show = Math.Min(15, big.Count);
+                    var sb2 = new System.Text.StringBuilder("Mends: Z16 - najwieksze podniesienia Atletyki: ");
+                    for (int i = 0; i < show; i++) { if (i > 0) sb2.Append("; "); sb2.Append(big[i].Value); }
+                    Scribe.Line(sb2.ToString());
+                }
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.HeroSinewAll", null); } catch { } }
+        }
+
+        // ---- E8/M (247): JEZYK GRACZA W BK - sprawdzenie zamiast latki ----
+        // Korekta BK CorrectPlayerEducation pada przy tworzeniu postaci (Quiet.KnownBkEducation), ale wpis
+        // gracza tworzy BK sam przy pierwszym GetHeroEducation (dobowy UpdateHeroData). Raz na sesje, tylko
+        // odczyt slownika Educations pod tym samym lockiem co BK (CacheLock) - bez GetHeroEducation, ktore
+        // samo tworzy wpis. Do 3 dob czekania na wpis (kolejnosc sluchaczy doby), potem linia BRAK.
+        private static bool _eduDone;
+        private static int _eduTries;
+
+        internal static void ResetBkEducationCheck() { _eduDone = false; _eduTries = 0; }
+
+        internal static void BkEducationCheck()
+        {
+            if (_eduDone || !Config.QuietBkEducation) return;
+            try
+            {
+                var hero = Hero.MainHero;
+                if (hero == null) return;
+                var tCfg = Type.GetType("BannerKings.BannerKingsConfig, BannerKings");
+                var pInst = tCfg != null ? AccessTools.Property(tCfg, "Instance") : null;
+                var cfg = pInst != null ? pInst.GetValue(null, null) : null;
+                var pEm = cfg != null ? AccessTools.Property(tCfg, "EducationManager") : null;
+                var em = pEm != null ? pEm.GetValue(cfg, null) : null;
+                var pEdu = em != null ? AccessTools.Property(em.GetType(), "Educations") : null;
+                if (pEdu == null)
+                {
+                    _eduDone = true;
+                    Scribe.Line("Mends: edukacja BK gracza (E8/M) - BannerKings/EducationManager.Educations nieobecne, nic do sprawdzenia.");
+                    return;
+                }
+                var pLock = AccessTools.Property(em.GetType(), "CacheLock");
+                var lk = pLock != null ? pLock.GetValue(em, null) : null;
+                object data = null;
+                var dict = pEdu.GetValue(em, null) as System.Collections.IDictionary;
+                if (dict != null)
+                {
+                    if (lk != null) { lock (lk) { if (dict.Contains(hero)) data = dict[hero]; } }
+                    else if (dict.Contains(hero)) data = dict[hero];
+                }
+                string cult = hero.Culture != null ? hero.Culture.StringId : "?";
+                if (data == null)
+                {
+                    if (++_eduTries < 3) return;
+                    _eduDone = true;
+                    Scribe.Line("Mends: edukacja BK gracza (E8/M) - BRAK wpisu gracza po 3 dobach (kultura " + cult
+                                + ", znany wyjatek CorrectPlayerEducation: " + Quiet.BkEducationHits + ") - jezyk gracza nieznany BK.");
+                    return;
+                }
+                var parts = new System.Collections.Generic.List<string>();
+                var langs = Traverse.Create(data).Property("Languages").GetValue() as System.Collections.IEnumerable;
+                if (langs != null)
+                    foreach (var kv in langs)
+                    {
+                        if (kv == null || parts.Count >= 6) continue;
+                        var tk = Traverse.Create(kv);
+                        var lang = tk.Property("Key").GetValue();
+                        var name = lang != null ? Traverse.Create(lang).Property("Name").GetValue() : null;
+                        var val = tk.Property("Value").GetValue();
+                        parts.Add((name != null ? name.ToString() : "?") + " "
+                                  + (val is float fl ? fl.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "?"));
+                    }
+                _eduDone = true;
+                Scribe.Line("Mends: edukacja BK gracza (E8/M) - wpis jest, jezyki: " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "(pusto)")
+                            + " | kultura " + cult + " | bez latki - znany wyjatek CorrectPlayerEducation odfiltrowany: " + Quiet.BkEducationHits + ".");
+            }
+            catch (Exception e) { _eduDone = true; try { Scribe.Report("CrashScribe", e, "Mends.BkEducationCheck", null); } catch { } }
+        }
+
+        internal static void Install(Harmony harmony)
+        {
+            _lateHarmony = harmony;   // decyzja 4 (12.10): do latek wpinanych dopiero po starcie sesji (BkRewardPerks)
+            try
+            {
+                // ===== A6: PASEK GOTOWOSCI ZBROJOWNI DTE (MapArmoryReadinessMixin) =====
+                // E8/M (247), decyzja Jeffa 12.10 (pytanie 9): paska NIE usypiamy - dzis 1 wyjatek
+                // na sesje (bylo 604 w sesji 29.08). Dawny mend szukal mixina przez QuietType, a ta
+                // przeszukuje tylko assembly BannerKings (i zwraca typeof(object)) - stad falszywe
+                // "nieobecny" (CS 12.10 :240), choc mixin DTE zyl i rzucal (:1568). Latka nigdy sie
+                // nie wpiela; zostaje sama prawdziwa linia - typ po pelnej nazwie w assembly DTE (plik
+                // DynamicTroopEquipmentReupload.v1.4.7.dll, wiec nazwa po prefiksie; bez skanu wszystkich typow).
+                Type tMix = null;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        var an = asm.GetName().Name;
+                        if (an == null || !an.StartsWith("DynamicTroopEquipmentReupload", StringComparison.Ordinal)) continue;
+                        tMix = asm.GetType("DynamicTroopEquipmentReupload.GUIExtensions.MapArmoryReadinessMixin", false);
+                        if (tMix != null) break;
+                    }
+                    catch { }
+                }
+                Scribe.Line(tMix != null
+                    ? "Mends: pasek gotowosci zbrojowni DTE (MapArmoryReadinessMixin) obecny - zostaje wlaczony (decyzja Jeffa 12.10; znany 1 wyjatek AmbiguousMatch na sesje, ERRORS A6)."
+                    : "Mends: pasek gotowosci zbrojowni DTE (MapArmoryReadinessMixin) nieobecny - nic do sprawdzania.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(dteWidget)", null); } catch { } }
 
@@ -2613,16 +3833,17 @@ namespace CrashScribe
 
             try
             {
-                // ===== VALYRIANSKA ZASADA T6 =====
-                // Bron ponizej T6 ledwie drasnie Wedrowca i Nocnego Krola
-                // (patrz ValyrianWard). Zwykle wighty padaja od wszystkiego.
+                // ===== VALYRIANSKA ZASADA T6 (od 175c: ZASADA STALI INNYCH) =====
+                // Pelne obrazenia Wedrowcom i Nocnemu Krolowi tylko stal valyrianska,
+                // smocze szklo i ogien smoka; t6 OthersCastleSteelPercent, reszta 15%
+                // (patrz ValyrianWard, OthersSteel). Zwykle wighty padaja od wszystkiego.
                 var mBlow = AccessTools.Method(typeof(TaleWorlds.MountAndBlade.Agent), "RegisterBlow");
                 if (mBlow != null)
                 {
                     harmony.Patch(mBlow, prefix: new HarmonyMethod(typeof(Mends), "ValyrianWard") { priority = Priority.High });
-                    Scribe.Line("Mends: valyrianska zasada T6 - bron ponizej tieru 6 zadaje Bialym Wedrowcom i Nocnemu Krolowi 15% obrazen.");
+                    Scribe.Line("Mends: zasada stali Innych (175c) wpieta w Agent.RegisterBlow - Bialym Wedrowcom i Nocnemu Krolowi pelne obrazenia tylko stal valyrianska, smocze szklo i ogien smoka, t6 wedlug suwaka, reszta 15% (ustawienia i listy w linii przy starcie sesji).");
                 }
-                else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - valyrianska zasada spi.");
+                else Scribe.Line("Mends: Agent.RegisterBlow nieznaleziony - zasada stali Innych spi.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrian)", null); } catch { } }
 
@@ -2642,9 +3863,9 @@ namespace CrashScribe
                 if (mSim != null)
                 {
                     harmony.Patch(mSim, postfix: new HarmonyMethod(typeof(Mends), "ValyrianWardSim") { priority = Priority.Last });
-                    Scribe.Line("Mends: valyrianska zasada T6 dziala tez w autokalkulacji bitew (symulacja tnie do 15% jak pole).");
+                    Scribe.Line("Mends: zasada stali Innych (175c) dziala tez w autokalkulacji bitew (SimulateHit: te same klasy co pole, liczniki per bitwa).");
                 }
-                else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady T6.");
+                else Scribe.Line("Mends: DefaultCombatSimulationModel.SimulateHit nieznaleziony - symulacja bez zasady stali Innych.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(valyrianSim)", null); } catch { } }
 
@@ -2734,6 +3955,15 @@ namespace CrashScribe
                     harmony.Patch(mDress, prefix: new HarmonyMethod(typeof(Mends), "DressedOrNot"));
                     Scribe.Line("Mends: ubieranie bohatera bez zestawu strojow nie kladzie juz gry - brakujacy szablon"
                                 + " (elekcja krola, narodziny dziecka) zostawia bohatera w jego wlasnym sprzecie.");
+                    // Z16: ten sam cel - POSTFIKS tylko dopisuje ubranego bohatera AI do kolejki podniesienia umiejetnosci
+                    // do nowego zestawu (HeroSinewQueue, co godzine); osobny try - jego wywrotka nie rusza prefiksu
+                    try
+                    {
+                        harmony.Patch(mDress, postfix: new HarmonyMethod(typeof(Mends), "DressedQueue"));
+                        Scribe.Line("Mends: Z16 - bohater AI ubrany z szablonu (EquipmentHelper) trafia do kolejki: Atletyka, Luk i Kusza"
+                                    + " do wymogu nowego zestawu w najblizszej godzinie.");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(Z16 kolejka)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment NIEZNALEZIONE - elekcja krola nadal moze polozyc gre.");
             }
@@ -2750,7 +3980,7 @@ namespace CrashScribe
                 // (13:43:14 -> 13:43:23). Prefix sprawdza Roose'a i ODKLADA probe
                 // (wydarzenie ponowi co godzine), wypisujac w logu, czego brakuje;
                 // finalizer lapie reszte, zeby zadna inna dziura ROT nie zabila gry.
-                Type tHar = null, tLords = null, tKing = null, tSet = null;
+                Type tHar = null, tLords = null, tKing = null, tSet = null, tBw = null, tWallS = null, tBast = null;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     try
@@ -2760,20 +3990,80 @@ namespace CrashScribe
                         if (tLords == null) tLords = asm.GetType("ROT.Misc.ROTLords");
                         if (tKing == null) tKing = asm.GetType("ROT.Misc.ROTKingdoms");
                         if (tSet == null) tSet = asm.GetType("ROT.Misc.ROTSettlements");
+                        if (tBw == null) tBw = asm.GetType("ROT.Events.BlackwaterSiegeEvent");      // B6b: inne zrodla zamrozenia (SiegeOtherFreezer)
+                        if (tWallS == null) tWallS = asm.GetType("ROT.Events.WallSiegeEvent");
+                        if (tBast == null) tBast = asm.GetType("ROT.Events.BastardsSiegeEvent");
                     }
                     catch { }
                 }
                 _rotLords = tLords; _rotKingdoms = tKing; _rotSettlements = tSet;
+                _rotHarrenhalSiege = tHar; _rotSieges = new[] { tHar, tBw, tWallS, tBast };   // kolejnosc = _rotSiegeDefenders (B6c: z Harrenhal)
                 var mSetup = tHar != null ? AccessTools.Method(tHar, "SetupSiegeAttackers") : null;
                 if (mSetup != null)
                 {
                     harmony.Patch(mSetup, prefix: new HarmonyMethod(typeof(Mends), "HarrenhalGuard"),
                                           finalizer: new HarmonyMethod(typeof(Mends), "HarrenhalSafe"));
                     Scribe.Line("Mends: oblezenie Harrenhal (ROT) zabezpieczone - bez zdolnego Roose'a Boltona proba jest odkladana, nie wywala gry.");
+                    // B6: przepustka BK dla skryptowej armii oblezenia (patrz HarrenhalBkPass); osobny try - jej wywrotka nie rusza straznika
+                    try
+                    {
+                        if (Config.HarrenhalBkArmyPass)
+                        {
+                            var tBkArmy = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKArmyManagementModel");
+                            var mBkCan = tBkArmy != null ? AccessTools.DeclaredMethod(tBkArmy, "CanCreateArmy", new[] { typeof(Hero) }) : null;
+                            if (mBkCan != null)
+                            {
+                                harmony.Patch(mBkCan, postfix: new HarmonyMethod(typeof(Mends), "HarrenhalBkPass"));
+                                _bkArmyPassInstalled = true;
+                                Scribe.Line("Mends: B6 - BK przepuszcza armie oblezenia Harrenhal (BKArmyManagementModel.CanCreateArmy) tylko dla dowodcy"
+                                            + " z jednego skryptowego CreateArmy (Roose w sciezce ROT albo dowodca naszego portu) - wpiete.");
+                            }
+                            else Scribe.Line("Mends: B6 - BK BKArmyManagementModel.CanCreateArmy nieznaleziony - BRAK przepustki, oblezenie Harrenhal po staremu (straznik i zastepca).");
+                        }
+                        else Scribe.Line("Mends: B6 - przepustka BK dla armii oblezenia Harrenhal wylaczona (HarrenhalBkArmyPass=false).");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(harrenhal-bk)", null); } catch { } }
+                    // B6b: sprzatanie dowodcy na koncu wydarzenia (patrz HarrenhalEnd); osobny try - wywrotka nie rusza straznika
+                    try
+                    {
+                        if (Config.HarrenhalReleaseCommander)
+                        {
+                            var mEnd = AccessTools.DeclaredMethod(tHar, "CompleteEvent");
+                            if (mEnd != null)
+                            {
+                                harmony.Patch(mEnd, postfix: new HarmonyMethod(typeof(Mends), "HarrenhalEnd"));
+                                Scribe.Line("Mends: B6b - koniec oblezenia Harrenhal (HarrenhalSiegeEvent.CompleteEvent) sprzata dowodce: armia oblezenia"
+                                            + " rozwiazana, dowodca odmrozony (takze poprzedni przy zmianie dowodcy) - wpiete.");
+                            }
+                            else Scribe.Line("Mends: B6b - HarrenhalSiegeEvent.CompleteEvent nieznaleziony - BRAK sprzatania dowodcy na koncu wydarzenia.");
+                        }
+                        else Scribe.Line("Mends: B6b - sprzatanie dowodcy oblezenia Harrenhal wylaczone (HarrenhalReleaseCommander=false).");
+                        Scribe.Line("Mends: B6b - zajety Roose (bitwa, cudze oblezenie): "
+                                    + (Config.HarrenhalWaitForRoose && Config.HarrenhalWaitHours > 0 ? "czekamy do " + Config.HarrenhalWaitHours + " h gry, potem zastepca (nigdy sam Roose)"
+                                                                                                       : "zastepca od razu (HarrenhalWaitForRoose=false albo HarrenhalWaitHours<=0)")
+                                    + "; naprawa starych zapisow: " + (Config.HarrenhalOldSaveFix ? "wlaczona" : "wylaczona") + ".");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(harrenhal-b6b)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: ROT HarrenhalSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Harrenhal bez straznika.");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(harrenhal)", null); } catch { } }
+
+            try
+            {
+                // ===== BK ZADANIE PRETENDENTA (10.10) - patrz BkDemandSafe =====
+                var fin = new HarmonyMethod(typeof(Mends), "BkDemandSafe");
+                int n = 0;
+                var tClaim = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.ClaimantDemand");
+                var tDem = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.Demands.Demand");
+                var m1 = tClaim != null ? AccessTools.Method(tClaim, "SetTexts") : null;
+                var m2 = tDem != null ? AccessTools.Method(tDem, "Fulfill") : null;
+                var m3 = tDem != null ? AccessTools.Method(tDem, "DoAiChoice") : null;
+                foreach (var m in new[] { m1, m2, m3 })
+                    if (m != null && !m.IsAbstract) { harmony.Patch(m, finalizer: fin); n++; }
+                Scribe.Line("Mends: zadania BK (pretendent, spelnienie, wybor AI) zabezpieczone - " + n + " z 3 metod; wyjatek nie wywala gry.");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.Install(bk-demand)", null); } catch { } }
 
             try
             {
@@ -2786,9 +4076,28 @@ namespace CrashScribe
                 var mWall = tWall != null ? AccessTools.Method(tWall, "SetupSiegeAttackers") : null;
                 if (mWall != null)
                 {
+                    _rotWallSiege = tWall;   // B6c: typ wydarzenia dla SiegeOtherFreezer/SiegeOldSaveScan (przed wpieciem straznika)
                     harmony.Patch(mWall, prefix: new HarmonyMethod(typeof(Mends), "WallGuard"),
                                          finalizer: new HarmonyMethod(typeof(Mends), "WallSafe"));
                     Scribe.Line("Mends: oblezenie Muru (ROT) zabezpieczone - bez zdolnego Mance'a Raydera proba jest odkladana albo dowodzi zastepca, nie wywala gry.");
+                    // B6c: sprzatanie dowodcy na koncu wydarzenia (patrz WallEnd); osobny try - wywrotka nie rusza straznika
+                    try
+                    {
+                        if (Config.WallReleaseCommander)
+                        {
+                            var mEnd = AccessTools.DeclaredMethod(tWall, "CompleteEvent");
+                            if (mEnd != null)
+                            {
+                                harmony.Patch(mEnd, postfix: new HarmonyMethod(typeof(Mends), "WallEnd"));
+                                Scribe.Line("Mends: Mur - B6c: koniec oblezenia Muru (WallSiegeEvent.CompleteEvent) sprzata dowodce: armia oblezenia"
+                                            + " rozwiazana, dowodca odmrozony (takze poprzedni przy zmianie dowodcy) - wpiete.");
+                            }
+                            else Scribe.Line("Mends: Mur - B6c: WallSiegeEvent.CompleteEvent nieznaleziony - BRAK sprzatania dowodcy na koncu wydarzenia.");
+                        }
+                        else Scribe.Line("Mends: Mur - B6c: sprzatanie dowodcy oblezenia Muru wylaczone (WallReleaseCommander=false).");
+                        Scribe.Line("Mends: Mur - B6c: naprawa starych zapisow: " + (Config.WallOldSaveFix ? "wlaczona" : "wylaczona") + ".");
+                    }
+                    catch (Exception e2) { try { Scribe.Report("CrashScribe", e2, "Mends.Install(wall-b6c)", null); } catch { } }
                 }
                 else Scribe.Line("Mends: ROT WallSiegeEvent.SetupSiegeAttackers nieznaleziony - oblezenie Muru bez straznika.");
             }
@@ -4686,17 +5995,38 @@ namespace CrashScribe
     /// wstanie - obiekty jednostek istnieja dopiero po starcie sesji.</summary>
     internal sealed class MendsBehavior : CampaignBehaviorBase
     {
+        // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart); B6c: tak samo Mur
+        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); }   // E8/M: linia jezyka gracza raz na gre
+
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
                 delegate (CampaignGameStarter s)
-                { Mends.ArmorSanity(); Mends.AmmoSanity(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
+                { Mends.ArmorSanity(); Mends.AmmoSanity(); Army175.TierGearCheck(); Mends.WeightLaw(); Mends.ArmorTierLaw(); Mends.WeaponTierLaw(); Mends.SkillSinew(); Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); Mends.UniqueWares(); Mends.LoreForgeGate(); Mends.DressTheNamesakes(); Mends.HeroSinewAll("wczytanie"); Mends.NorthernFare(); Mends.ItemDump(); Mends.ReligionAudit(); Mends.RulerRobesAudit(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this,
-                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); });
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m) { Mends.MeltDeadLoot(m); Mends.WardReport(); OthersSteel.OnMapEventEnded(m); });
+            // 175c: Wedrowcy obecni od poczatku bitwy (do linii "Inni (175c): bitwa")
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
+                delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); });
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); });   // decyzja 4: atuty BK po OnGameStart BK
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
-                delegate { Mends.DragonPurge(false); if (!Mends.SinewApplied) Mends.SkillSinew(); });
+                delegate
+                {
+                    Mends.DragonPurge(false);
+                    Mends.BkEducationCheck();   // E8/M (247): jezyk gracza w BK, raz na gre (tylko odczyt)
+                    Army175.DailyCatchUp();   // 175: zamiana wedlug tieru, gdy przy wczytaniu zestawy byly puste
+                    if (!Mends.SinewApplied) Mends.SkillSinew();
+                    if (Mends.SinewApplied) { Army175.NorthHardy(); Army175.DothrakiRiders(); Army175.OldArmouries(); }   // raz (znacznik), potem nic
+                    Army175.PoolDaily();      // 175: stan postfiksu puli ROT (Dothrakowie), gdy cos sie dzialo
+                    Army175.RespawnDaily();   // 175: partie lordow AI z szablonu (konni bez konia z odrodzenia)
+                    OthersSteel.Daily();      // 175c: suwaki zasady stali Innych, linia dobowa bitew z Innymi
+                    Mends.HeroSinewAll("dzien");   // Z16: przeglad bohaterow AI (drogi omijajace gardlo; normalnie 0)
+                });
+            // Z16: bohaterowie AI ubrani z szablonu od ostatniej godziny - umiejetnosc do nowego zestawu
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { Mends.HeroSinewQueue(); Mends.HarrenhalOldSaveCheck(); Mends.WallOldSaveCheck(); });   // B6b/B6c: naprawa zapisu raz, na pierwszej godzinie
+            CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this,
+                delegate (TaleWorlds.CampaignSystem.Party.MobileParty mp) { Army175.OnPartyCreated(mp); });
         }
 
         public override void SyncData(IDataStore dataStore)
