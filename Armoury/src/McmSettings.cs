@@ -2096,9 +2096,9 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool IslandCaravanFix { get; set; } = true;
 
-        [SettingPropertyInteger("Notable Caravan Cap", 0, 10, "0", HintText = "a merchant keeps at most this many caravans; caravans asleep in the field count too. The game gave a merchant another caravan whenever none of his caravans was awake, so with night camps their number grew without end and every day took longer. Your own clan is never limited. 0 = the game's rule, no limit")]
+        [SettingPropertyInteger("Notable Caravan Cap", 0, 12, "0", HintText = "a merchant keeps at most this many caravans; caravans asleep in the field count too. The game gave a merchant another caravan whenever none of his caravans was awake, so with night camps their number grew without end and every day took longer. Your own clan is never limited. 0 = the game's rule, no limit")]
         [SettingPropertyGroup("The road to market")]
-        public int NotableCaravanCap { get; set; } = 2;
+        public int NotableCaravanCap { get; set; } = 3;
 
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
         [SettingPropertyGroup("The road to market")]

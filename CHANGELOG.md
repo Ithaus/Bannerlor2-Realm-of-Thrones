@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (po WGRANIU 34, decyzja Jeffa) - LIMIT KARAWAN KUPCA 2 -> 3 (NotableCaravanCap)
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Pliki:** `Armoury/src/Settings.cs` (domyslna), `McmSettings.cs` (gen_mcm)
+
+**Problem:** przy limicie 2 karawan na kupca (P2/A1) w dobie 120 jest 500 karawan i 98 wjazdow do miast na dobe (W33: 962 i 138) - handel o ok. 30% mniejszy niz w WGRANIU 33.
+Bieg porownawczy 120 dob z limitem 3 (Armoury-2026-10-13_01-41-11.log): 638 karawan, 164 wjazdy/d (+19% wobec W33), czas doby 11.9 s (limit 2: 11.8 - bez roznicy), wojsko w wojnie
+88 171 (86 917), kasy miast 91.4% Z33 (94.5%); miasta bez zelaza 45.1 (44.3) i bez rudy 43.3 (43.0) - bez zmiany; dymarki bez wegla 13.8% (7.0%), "brak drewna" w warsztatach 284/d (229).
+
+**Przyczyna:** wybor kierunku rozgrywki - Jeff 13.10 po raporcie: "1. 3".
+
+**Zmiana:** domyslna `NotableCaravanCap` 2 -> 3. Klucza nie ma w Armoury.json Jeffa (grep 0), wiec dziala domyslna. Kod latki bez zmian (P2/A1, 031c41a).
+
+**Ryzyko / co sprawdzic:** dymarki bez wegla i "brak drewna" w warsztatach gorsze niz przy limicie 2 (jeden bieg - moze byc losowosc kampanii) - patrzec w nastepnym biegu razem
+z rozpoznaniem zelaza; liczba karawan ma stanac ponizej 3 x liczba kupcow (w biegu 584 karawany notabli u 323 kupcow, 128 kupcow z trzema).
+
+**Status:** WGRANE (WGRANIE 35) po tescie zapisu.
+
 ## 2026-10-13 (POPRAWKA A3 po biegu probnym 2 - S) - E6/K5 KROK 2: JUCZNE KARAWANY MORSKIEJ ZDEJMOWANE OD RAZU (InitPost) - koniec 325 jucznych z niczego na polkach miast portowych
 **Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 503c7e0) | **Pliki:** `Armoury/src/PackMarket.cs`, `CHANGELOG.md`. Bez nowego klucza (ten sam `PackAnimalsFromMarket`), bez zmian zapisu. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "K5-4" (poprawka ostateczna, krok 2).
 
