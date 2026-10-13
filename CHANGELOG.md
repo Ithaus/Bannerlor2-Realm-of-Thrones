@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (N5 regula A wylaczona domyslnie) - "surowiec z brakiem moze rosnac do 4 x" nie wchodzi do gry wlaczony: decyzja Jeffa "produkuja ludzie"
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Pliki:** `Armoury/src/Settings.cs` (domyslna `ValveRaiseWhileShort` true -> false), `Armoury/src/McmSettings.cs` (gen_mcm), `CHANGELOG.md`.
+
+**Problem:** regula A paczki N5 podnosi sufit regulatora plonu z 1.3 do 4.0 dla surowca, ktorego brakuje w ponad 15 miastach - ci sami ludzie wsi daliby do 4 razy wiecej lnu (takze soli, drewna, zelaza) i nic za to nie oddaja. To towar z niczego.
+
+**Decyzja Jeffa (13.10):** "produkuja ludzie; wioska to tylko symbol wielu wiosek, ktore lacznie produkuja tyle, ilu jest ludzi" - produkcja ma wynikac z liczby ludzi okregu (projekt `docs/gospodarka-od-ludzi/`), nie z mnoznika.
+
+**Zmiana:** klucz zostaje w kodzie, domyslnie WYLACZONY (stan jak przed regula A: sufit 1.3). Reguly B (skora z uboju), C (rece platnerzy x1.3), D (drewno - krok za zuzyciem), E (budowy cywilne z dala od frontu) bez zmian, wlaczone. Regula D ma wlasny klucz `ValveStepFollowsUse` i nie zalezy od A.
+
+**Jak sprawdzic:** w linii decyzji "Regulator wsi (221)" ogon "N5-A" pokazuje wylacznik; mnoznik zadnego surowca nie przekracza 1.30.
+
 ## 2026-10-13 (W5b - recenzja z poprawka) - POPRAWKA DANINY sprawdzona niezaleznie: obieg, kolejnosc zrodel garnka, wylaczniki, zapis i progi bez zarzutu (zloto reguly 2 bez zmian); poprawione w regule 1: krok daniny z braku wojska to JEDEN krok od stawki z mierzonego tygodnia (bylo: dwa kroki naraz, gdy s samo roslo, i zaden, gdy s spadalo) i tylko przy pomiarze z co najmniej 4 dob (po wczytaniu gry wystarczala jedna doba, a brak chodzi z doby na dobe od 0 do 7 tys.); rachunek na krolestwo przeliczony - lud Wysp ma odlozone ok. 2.2 mln, wiec most trwa ok. pol roku, nie miesiac
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/w5b-potrzeba-korony` (recenzja commita 3e94e39 wobec 0a387b5) | **Tor:** M | **Pliki:** `Armoury/src/KingdomTreasury.WarTax.cs` (krok `SN`: `eff0 + krok` w miejsce `max(SN, s) + krok`; stala `LnMinDays` = 4; teksty linii 184), `tools/sprawdz_logi.py` (W5b-3: pomiar >= 4 doby i "wzrost wiekszy niz jeden krok"; tekst W5b-4), `CHANGELOG.md` (ten wpis + liczby we wpisie W5b nizej). `Settings.cs` bez zmian (gen_mcm uruchomiony - 0 roznic, Armoury 1329 ustawien). Zapis gry: bez zmian wobec 3e94e39 (jedna liczba na krolestwo na koncu listy w szostym polu klucza 165).
 

@@ -5330,7 +5330,7 @@ namespace Armoury
 
         [SettingPropertyBool("Valve Raise While Short", HintText = "a raw material that more than Valve Short Towns towns have none of may be raised by the village regulator above Village Output Step - step by step every four weeks, up to Valve Short Ceiling - as long as the world uses up all that is made and the stock stays low: the same villages put more of their work into it (flax for the weavers stood at the ordinary ceiling all year while nine towns in ten had no linen). Off = the ordinary ceiling holds, and a good already above it returns to it at the next decision")]
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
-        public bool ValveRaiseWhileShort { get; set; } = true;
+        public bool ValveRaiseWhileShort { get; set; } = false;
 
         [SettingPropertyFloatingInteger("Valve Short Ceiling", 1.00f, 8.00f, "0.00", HintText = "the most a village can make of a raw material the towns are short of, as a multiple of its normal output (needs Valve Raise While Short)")]
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
