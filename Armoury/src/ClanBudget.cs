@@ -296,6 +296,25 @@ namespace Armoury
             catch (Exception e) { Stumble("PartyCapOwn", e); return false; }
         }
 
+        /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
+        /// tarczowego = pulap partii z ostatniego budzetu bez przydzialu korony (W5), bez udzialu dworu dopisanego do pulapu w wojnie (rod z luzem placi dwor
+        /// w calosci - to nie jest zaoszczedzony zold) i bez miejsca kredytu wojennego; reserve = rezerwa wojenna R z tego samego budzetu. false: rod bez
+        /// budzetu policzonego (gracz, 166 wylaczone, pierwsza doba sesji), Straz bez zoldu, kompania najemna, rod w pokoju, dluznik albo rod w zajeciu
+        /// (168 - jego kiese bierze wierzyciel). Tylko odczyt.</summary>
+        internal static bool ScutageCap(Clan c, out double partyCap, out double reserve)
+        {
+            partyCap = 0; reserve = 0;
+            try
+            {
+                var b = Of(c);
+                if (b == null || b.Zero || !b.War || c.IsUnderMercenaryService || b.Debtor || b.Seized) return false;
+                partyCap = Math.Max(0, b.PartyCap - b.Aid - b.CourtRoom - b.KwRoom);
+                reserve = b.R;
+                return true;
+            }
+            catch (Exception e) { Stumble("ScutageCap", e); return false; }
+        }
+
         internal static int AdultsOf(Clan c)
         {
             int n = 0; bool leader = false;

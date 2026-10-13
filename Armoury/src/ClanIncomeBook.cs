@@ -630,6 +630,7 @@ namespace Armoury
                     StableCsv(csv, c, leaderGold, sdOn);   // 169c: kolumny D stalego, zold przyciety, doby bankruta
                     csv.Append(CrownRents.CsvCols(c));     // 180: renta dnia i warunek sluzby (ostatnie kolumny - czytniki CSV po nazwach kolumn)
                     csv.Append(KingdomTreasury.NeedAidCsv(c));   // W5: doplata do zoldu wedlug potrzeby tej doby i przydzial w pulapie (za kolumnami 180)
+                    csv.Append(KingdomTreasury.ScutageCsv(c));   // W6: tarczowe zaplacone, podstawa, gotowka W5 z tarczowego i nadwyzka platnika ponad rezerwe budzetu (za kolumnami W5)
                     csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
@@ -640,7 +641,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);
