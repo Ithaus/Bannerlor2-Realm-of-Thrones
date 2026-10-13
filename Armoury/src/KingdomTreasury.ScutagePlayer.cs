@@ -197,8 +197,7 @@ namespace Armoury
                     Log.Player("War aid: in war the crown helps pay the wages of vassals whose lands cannot keep their companies at "
                                + (100 * (s != null ? NaTarget(s) : 0.6)).ToString("0", WtInv) + "% of their size. It pays only for men already in your companies, and only while you keep the crown's terms for rents (garrisons and service).");
                 }
-                if ((paid > 0 || got > 0) && c.Kingdom != null && c.Kingdom.Name != null) _plWeekK = c.Kingdom.Name.ToString();
-                _plWeekPaid += paid; _plWeekGot += got;
+                // recenzja W6b: suma dob start..start+6 podana w dobie start+7 PRZED dopisaniem tej doby (bylo: pierwszy tydzien 8 dob)
                 if (_plWeekStart < 0 || today < _plWeekStart) _plWeekStart = today;
                 if (today - _plWeekStart >= 7)
                 {
@@ -207,6 +206,8 @@ namespace Armoury
                     if (_plWeekGot > 0) Log.Player("War aid: the crown of " + kn + " paid you " + _plWeekGot + " denars this week toward your soldiers' wages.");
                     _plWeekPaid = _plWeekGot = 0; _plWeekStart = today; _plWeekK = null;
                 }
+                if ((paid > 0 || got > 0) && c.Kingdom != null && c.Kingdom.Name != null) _plWeekK = c.Kingdom.Name.ToString();
+                _plWeekPaid += paid; _plWeekGot += got;
             }
             catch (Exception e) { ScStumble("PlWeek", e); }
         }

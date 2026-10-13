@@ -355,7 +355,9 @@ namespace Armoury
                     try
                     {
                         var seat = Seat(c);
-                        if (seat != null && seat.Town != null) court = Math.Max(0, s.HouseholdShareWar * D * f - PartyFood(c, seat));
+                        double hh = s.HouseholdShareWar * D * f;
+                        if (DebtLadder.On && DebtLadder.IsDebtor(c)) hh *= 0.5;   // recenzja W6b: dluznik (168) - dwor -50%, jak b.Household u AI (u gracza tylko z PlayerSameLadder)
+                        if (seat != null && seat.Town != null) court = Math.Max(0, hh - PartyFood(c, seat));
                     }
                     catch (Exception e) { court = 0; Stumble("PlayerCaps(dwor)", e); }
                 }

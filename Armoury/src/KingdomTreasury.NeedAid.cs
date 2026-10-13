@@ -115,33 +115,21 @@ namespace Armoury
         private static double NaStep(Settings s) { return WtClamp(s.CrownWarAidRecruitStep, 0, 1); }
 
         /// <summary>Czynne druzyny lordow rodu (bez druzyn wstrzymanych rodu rycerza 179): suma limitow wielkosci, zwykli ludzie, zold z rycerzami 179 -
-        /// te same liczby co ClanBudget (zold partii) i CrownRents (ludzie druzyn).</summary>
+        /// te same liczby co ClanBudget (zold partii) i CrownRents (ludzie druzyn). W6b (recenzja): druzyna gracza jest tu bez zmian w kodzie - MainParty to
+        /// LordPartyComponent (gra: Campaign.InitializeMainParty i OnLoad - LordPartyComponent.ConvertPartyToLordParty; IsLordParty = komponent LordPartyComponent),
+        /// a WarPartyComponent.OnInitialize wpisuje ja do Clan.WarPartyComponents rodu gracza; w niewoli MainParty.IsActive = false (PlayerCaptivity) - pominieta.</summary>
         private static bool NaParties(Clan c, out int limit, out int men, out long wage)
         {
             limit = 0; men = 0; wage = 0;
             var wps = c.WarPartyComponents;
-            bool main = false;
-            if (wps != null)
-                for (int i = 0; i < wps.Count; i++)
-                {
-                    var mp = wps[i] != null ? wps[i].MobileParty : null;
-                    // W6b: druzyna gracza liczy sie jak druzyna lorda (rod AI nigdy nie ma MainParty - dla AI bez zmian)
-                    if (mp == null || !mp.IsActive || !(mp.IsLordParty || mp.IsMainParty) || mp.Party == null || GentryService.IsHeldParty(mp)) continue;
-                    if (mp.IsMainParty) main = true;
-                    limit += Math.Max(0, mp.Party.PartySizeLimit);
-                    men += mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
-                    wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
-                }
-            // W6b: druzyna gracza, gdyby gra nie trzymala jej na liscie druzyn rodu (tylko rod gracza; AI bez zmian)
-            if (!main && c == Clan.PlayerClan)
+            if (wps == null) return false;
+            for (int i = 0; i < wps.Count; i++)
             {
-                var mp = MobileParty.MainParty;
-                if (mp != null && mp.IsActive && mp.Party != null && mp.ActualClan == c)
-                {
-                    limit += Math.Max(0, mp.Party.PartySizeLimit);
-                    men += mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
-                    wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
-                }
+                var mp = wps[i] != null ? wps[i].MobileParty : null;
+                if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.Party == null || GentryService.IsHeldParty(mp)) continue;
+                limit += Math.Max(0, mp.Party.PartySizeLimit);
+                men += mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+                wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
             }
             return limit > 0;
         }
