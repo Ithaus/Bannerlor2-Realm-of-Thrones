@@ -315,6 +315,74 @@ namespace Armoury
             catch (Exception e) { Stumble("ScutageCap", e); return false; }
         }
 
+        /// <summary>W6b (decyzja Jeffa 13.10: rod gracza w tarczowym W6 i doplacie W5, "gdy mam ziemie i sluze krolowi") - POMIAR rodu gracza TYM SAMYM wzorem pulapu
+        /// co rod AI (Ceiling: D staly z ksiegi dochodu - ksiega liczy go tez graczowi; pomiar krotszy niz 28 dob mieszany jak u AI, tylko "D z zapisu" to D169 ksiegi
+        /// (pierscien 28 dob jest w zapisie), bez niego G/60; G = kiesy rodziny; R z doroslych; wojna jak w budzecie), TYLKO jako miara do W5 / W6. Gracz nie ma
+        /// budzetu 166: nic tu nie zmienia stanu gry, limitow partii ani werbunku. capW5 = pulap wlasny druzyn jak PartyCapOwn AI (pulap + udzial dworu
+        /// ustepujacy zoldowi, minus zold zalog i karawan - zalogi w calosci, bo gracz sam ustawia ich limity; kredytu wojennego 168 gracz nie ma);
+        /// capW6 = jak ScutageCap AI (bez udzialu dworu); reserve = R. Liczony w chwili kroku W5 (AI - z wczorajszego budzetu; gracz budzetu z wczoraj nie ma).
+        /// false: 166 wylaczone, budzet jeszcze nie policzony w tej sesji (jak AI - od jutra), rod nie w wojnie, Straz bez zoldu. Tylko odczyt.</summary>
+        internal static bool PlayerCaps(Clan c, out double capW5, out double capW6, out double reserve, out double D)
+        {
+            capW5 = 0; capW6 = 0; reserve = 0; D = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || c == null || c != Clan.PlayerClan || !On || Pending || c.Leader == null || c.Kingdom == null || !AtWar(c)) return false;
+                if (CrownGifts.WatchUnpaidOn && s.UnpaidTroopsCapInMen && CrownGifts.IsWatch(c.Kingdom)) return false;   // Straz bez zoldu - jak b.Zero u AI
+                long G = ClanIncomeBook.FamilyGoldOf(c);
+                int adults = AdultsOf(c);
+                // D: ta sama droga co DOf rodu AI; "D z zapisu" (D0) = D169 ksiegi dochodu (zapisana), bez niej G/60 (start 166)
+                double d0 = ClanIncomeBook.StableIncome(c);
+                if (!(d0 >= 0)) d0 = Math.Max(0, G / 60.0);
+                double d; int days; double once;
+                if (s.ClanBudgetStableD && ClanIncomeBook.StableDWithDays(c, out d, out days, out once))
+                {
+                    if (Array.IndexOf(Raiders, c.Kingdom.StringId) >= 0) d += once;   // najezdzcy: lup w D (wyjatek lore W-1, jak AI)
+                    days = Math.Max(0, Math.Min(Days28, days));
+                    D = (days * d + (Days28 - days) * d0) / Days28;
+                }
+                else D = d0;
+                D = Math.Max(0, D);
+                // 168: rod w zajeciu - D bez dochodu wsi (jak AI; W5 i W6 i tak go pomijaja)
+                if (DebtLadder.On && DebtLadder.IsSeized(c)) D = Math.Max(0, D - Math.Min(D, ClanIncomeBook.VillageIncomeOf(c)));
+                double R, f, chest;
+                double cap = Ceiling(D, G, true, adults, out R, out f, out chest);
+                // udzial dworu ustepujacy zoldowi (jak AI w wojnie): dwor i wyzywienie minus jedzenie partii, gdy jest siedziba z kasa
+                double court = 0;
+                if (s.HouseholdMinimal && s.WarCourtYieldsToWages)
+                {
+                    try
+                    {
+                        var seat = Seat(c);
+                        double hh = s.HouseholdShareWar * D * f;
+                        if (DebtLadder.On && DebtLadder.IsDebtor(c)) hh *= 0.5;   // recenzja W6b: dluznik (168) - dwor -50%, jak b.Household u AI (u gracza tylko z PlayerSameLadder)
+                        if (seat != null && seat.Town != null) court = Math.Max(0, hh - PartyFood(c, seat));
+                    }
+                    catch (Exception e) { court = 0; Stumble("PlayerCaps(dwor)", e); }
+                }
+                // zold zalog (twierdze rodu) i karawan rodu - ta sama miara co przejscie po partiach w Daily
+                double gar = 0, car = 0;
+                var fiefs = c.Fiefs;
+                if (fiefs != null)
+                    for (int i = 0; i < fiefs.Count; i++)
+                    {
+                        var gp = fiefs[i] != null ? fiefs[i].GarrisonParty : null;
+                        if (gp != null && gp.IsActive) gar += Math.Max(0, gp.TotalWage);
+                    }
+                foreach (var mp in MobileParty.All)
+                {
+                    if (mp == null || !mp.IsActive || !mp.IsCaravan || mp.IsMainParty || OwnerOf(mp) != c) continue;
+                    car += Math.Max(0, mp.TotalWage);
+                }
+                capW6 = Math.Max(0, cap - gar - car);
+                capW5 = Math.Max(0, cap + court - gar - car);
+                reserve = R;
+                return true;
+            }
+            catch (Exception e) { Stumble("PlayerCaps", e); return false; }
+        }
+
         internal static int AdultsOf(Clan c)
         {
             int n = 0; bool leader = false;

@@ -23,8 +23,9 @@ namespace Armoury
     ///  - KOLEJNOSC DOBY: danina wplywa (TownFolk.Daily) -> ... -> zwrot zoldu (WageRefund) -> DOPLATA (z CrownRents.Daily, po warunkach rodow) -> renty 180
     ///    (reszta wplywow dnia, juz bez doplaty) -> ClanBudget.Daily (pulap rodu z przydzialem tej doby).
     ///  - KOMU: rody AI krolestwa w wojnie z wierszem rent 180 i spelnionym warunkiem rent (ta sama zaloga i sluzba - CrownRents.Daily podaje gotowy wynik),
-    ///    z budzetem 166 w wojnie; bez Nocnej Strazy (sluzy bez zoldu - ClanBudget: pulap w ludziach), bez kompanii najemnych (renty ich nie licza), bez rodu
-    ///    gracza (nie ma budzetu AI; renty dostaje jak dotad), bez rodow rycerzy 179 (druzyny wstrzymane), bez rodow w zajeciu za dlugi (168 - kiese
+    ///    z budzetem 166 w wojnie; bez Nocnej Strazy (sluzy bez zoldu - ClanBudget: pulap w ludziach), bez kompanii najemnych (renty ich nie licza), rod
+    ///    gracza TYLKO z W6b (klucz ScutagePlayerClan: miasto albo zamek, wasal - nie wladca i nie najemnik, warunek rent; pulap wlasny tym samym wzorem -
+    ///    ClanBudget.PlayerCaps; sama gotowka, bez miejsca w pulapie - KingdomTreasury.ScutagePlayer.cs), bez rodow rycerzy 179 (druzyny wstrzymane), bez rodow w zajeciu za dlugi (168 - kiese
     ///    ponad podloge bierze wierzyciel). Rod bez lenna nie ma wiersza rent - bez doplaty.
     ///  - ILE: pulap wlasny druzyn rodu = pulap partii z wczorajszego budzetu BEZ doplaty (ClanBudget.PartyCapOwn). Koszt rodu przy poziomie f (ulamek limitu
     ///    druzyn): zold dzisiejszych ludzi do f x limit (po sredniej stawce rodu) + zold brakujacych do f x limit, minus pulap wlasny. Potrzeba = koszt przy celu.
@@ -50,7 +51,7 @@ namespace Armoury
     /// </summary>
     internal static partial class KingdomTreasury
     {
-        private sealed class NaClan { public Clan C; public double Pc0, W, P; public int M, L; }
+        private sealed class NaClan { public Clan C; public double Pc0, W, P; public int M, L; public bool Pl; }   // Pl - rod gracza (W6b): bez miejsca w pulapie, sama gotowka
         private sealed class NaK
         {
             public string Name = ""; public long Pot, Aid, Paid; public double Need, Alloc, Level, Boost;
@@ -114,7 +115,9 @@ namespace Armoury
         private static double NaStep(Settings s) { return WtClamp(s.CrownWarAidRecruitStep, 0, 1); }
 
         /// <summary>Czynne druzyny lordow rodu (bez druzyn wstrzymanych rodu rycerza 179): suma limitow wielkosci, zwykli ludzie, zold z rycerzami 179 -
-        /// te same liczby co ClanBudget (zold partii) i CrownRents (ludzie druzyn).</summary>
+        /// te same liczby co ClanBudget (zold partii) i CrownRents (ludzie druzyn). W6b (recenzja): druzyna gracza jest tu bez zmian w kodzie - MainParty to
+        /// LordPartyComponent (gra: Campaign.InitializeMainParty i OnLoad - LordPartyComponent.ConvertPartyToLordParty; IsLordParty = komponent LordPartyComponent),
+        /// a WarPartyComponent.OnInitialize wpisuje ja do Clan.WarPartyComponents rodu gracza; w niewoli MainParty.IsActive = false (PlayerCaptivity) - pominieta.</summary>
         private static bool NaParties(Clan c, out int limit, out int men, out long wage)
         {
             limit = 0; men = 0; wage = 0;
@@ -177,16 +180,22 @@ namespace Armoury
                     var c = list[i];
                     try
                     {
-                        if (c == null || !ok[i] || c == Clan.PlayerClan || c.Leader == null || !c.Leader.IsAlive) continue;
+                        if (c == null || c.Leader == null || !c.Leader.IsAlive) continue;
+                        // W6b (decyzja Jeffa 13.10): rod gracza tylko z kluczem ScutagePlayerClan, z miastem albo zamkiem, jako wasal krolestwa (nie wladca, nie
+                        // najemnik) i z warunkiem rent jak AI; bez tego - pominiety jak przed W6b. Rod AI: jak dotad (warunek rent)
+                        bool pl = c == Clan.PlayerClan;
+                        if (pl ? !PlW5Gate(k, ok[i]) : !ok[i]) continue;
                         // rod w zajeciu za dlugi (168): jego kiese ponad podloge bierze wierzyciel, a poczet ma malec - korona nie doplaca (zloto nie pojdzie do Banku)
                         if (DebtLadder.On && DebtLadder.IsSeized(c)) { row.NoBudget++; continue; }
                         double pc0;
-                        if (!ClanBudget.PartyCapOwn(c, out pc0)) { row.NoBudget++; continue; }   // Straz bez zoldu, najemnik, rod bez budzetu 166 (pierwsza doba sesji)
+                        if (pl) { if (!PlCapW5(out pc0)) { row.NoBudget++; continue; } }       // W6b: pulap wlasny gracza tym samym wzorem co AI (ClanBudget.PlayerCaps)
+                        else if (!ClanBudget.PartyCapOwn(c, out pc0)) { row.NoBudget++; continue; }   // Straz bez zoldu, najemnik, rod bez budzetu 166 (pierwsza doba sesji)
                         int limit, men; long wage;
-                        if (!NaParties(c, out limit, out men, out wage)) continue;               // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
-                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage };
+                        if (!NaParties(c, out limit, out men, out wage)) { if (pl) _plWhy = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
+                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage, Pl = pl };
                         row.Cand++;
                         double need = NaCost(x, target);
+                        if (pl) PlNote(x, need);                                                 // W6b: do linii - zold, ludzie, limit i potrzeba gracza
                         if (!(need > 0)) continue;                                               // rod stac na cel z wlasnego pulapu - bez doplaty
                         row.NeedN++; row.Need += need; row.NeedMen += men; row.NeedLimit += limit;
                         cand.Add(x);
@@ -226,8 +235,9 @@ namespace Armoury
                         if (!(alloc > 0)) continue;
                         row.Alloc += alloc;
                         double funded = NaFunded(x, level);
-                        // miejsce na krok werbunku (bez gotowki): tylko gdy druzyny sa ponizej poziomu; razem z gotowka nigdy ponad koszt rodu przy poziomie
-                        double room = x.M < level * x.L ? Math.Min(step * x.L, level * x.L - x.M) * x.P : 0;
+                        // miejsce na krok werbunku (bez gotowki): tylko gdy druzyny sa ponizej poziomu; razem z gotowka nigdy ponad koszt rodu przy poziomie.
+                        // W6b: rod gracza bez miejsca (nie ma pulapu 166 - werbuje sam), dostaje sama gotowke za ludzi, ktorzy sa
+                        double room = !x.Pl && x.M < level * x.L ? Math.Min(step * x.L, level * x.L - x.M) * x.P : 0;
                         double boost = Math.Min(alloc, Math.Max(0, funded + room - x.Pc0));
                         long cash = (long)Math.Floor(Math.Max(0, funded - x.Pc0));               // tylko za ludzi, ktorzy dzis sa w druzynach
                         if (cash > left) cash = left;
@@ -456,6 +466,7 @@ namespace Armoury
                       .Append("; z doplata od co najmniej 28 dob ").Append(_naOldN).Append(" rodow: wypelnienie wtedy ").Append(NaPct(_naOldMen0, _naOldLim0))
                       .Append(" -> dzis ").Append(NaPct(_naOldMenNow, _naOldLimNow)).Append(", ludzi ").Append(_naOldMen0).Append(" -> ").Append(_naOldMenNow)
                       .Append(" | zold oplacony wczorajsza doplata poza podstawa zwrotu 70% (dzis) ").Append(_naCut).Append(" (wpisow platnikow ").Append(_naCutN).Append(')')
+                      .Append(PlSeg(today, false))                                      // W6b: " | gracz: ..." (warunki 1-3, pulap wlasny, dostal / zaplacil)
                       .Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")
                       .Append(" | potkniecia ").Append(_naStumbles).Append('.');
                     Log.Info(sb.ToString());

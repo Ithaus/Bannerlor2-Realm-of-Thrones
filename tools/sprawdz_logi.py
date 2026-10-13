@@ -427,6 +427,15 @@ Uzycie (Python 3, tylko odczyt):
                     paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W6-3b liczy rezerwe z kolumny nadwyzka_ponad_rezerwe_w6 (rezerwa BUDZETU 166 przed poborem), nie z kolumny R
                     (R w CSV = rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza - na biegu rocznym 3.7% platnikow mialoby kiese pod nia).
+--grupa w6b       : (W6b, decyzja Jeffa 13.10 "rod gracza tez dotyczy, ale pod warunkiem, ze mam ziemie i sluze jakiemus krolowi") rod gracza w
+                    tarczowym W6 i doplacie W5 na zasadach rodu AI (miasto albo zamek, wasal - nie wladca, nie najemnik, wojna).
+                    python -I tools/sprawdz_logi.py --grupa w6b [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
+                    Wiersze W6b-0..W6b-4: segment " | gracz: ..." w liniach W5 i W6 (klucz Scutage Player Clan), W6b-1 zamkniecie W5/W6 co do zlotowki
+                    Z GRACZEM (pobrane = dopisane = wyplacone, zostalo 0; sumy kolumn CSV z wierszem gracza = linie; wiersz gracza w CSV = "dostal" /
+                    "zaplacil" z linii), W6b-2 gracz nie jest platnikiem i odbiorca tej samej doby (linia i CSV), W6b-3 bez warunkow albo z kluczem
+                    wylaczonym gracz 0 / 0, W6b-4 liczby gracza (INFO). Autotest (gracz bez lenna): W6b-3 TAK, reszta INFO "warunki nie spelnione".
+                    Uwaga: read_csv pomija wiersz gracza - od W6b sumy kolumn W5b-1 (doplata_ze_skarbca_w5b) i W6-1b (tarczowe_w6,
+                    doplata_z_tarczowego_w6) doliczaja go (read_csv_player), inaczej gracz-platnik dawalby tam rozjazd rowny swojej kwocie.
 --grupa n7        : (N7, decyzja Jeffa 13.10 "proporcje pasuja") rozbici z pobitej druzyny lorda wracaja pod choragiew (55 / 30 / 15 z poprawkami),
                     zbiorka w twierdzy rodu, odbior przez druzyny rodu w zasiegu, rozejscie po czasie czekania.
                     python -I tools/sprawdz_logi.py --grupa n7 [--do-doby 120] <Armoury-*.log>
@@ -535,6 +544,19 @@ def read_csv(path):
             if r.get("rodzaj") == "gracz":
                 continue
             out.append(r)
+    return out
+
+
+def read_csv_player(path):
+    """W6b: wiersze rodu gracza (rodzaj = gracz) z budzet-rodow.csv - read_csv je pomija (progi rodow AI), a od W6b gracz moze placic tarczowe
+    i dostawac doplate W5: sumy kolumn porownywane z liniami W5 / W6 musza je doliczyc. Brak pliku = []."""
+    if not path or not os.path.isfile(path):
+        return []
+    out = []
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        for r in csv.DictReader(f, delimiter=";"):
+            if r.get("rodzaj") == "gracz":
+                out.append(r)
     return out
 
 
@@ -15422,7 +15444,7 @@ def w5_main(logp, start_arg, until=120, csvp=None):
                 (", ".join(f"{nm} {v / 1e3:.1f} tys." for v, nm in dry[:8]) if dry else "brak") + f"; z garnkiem mniejszym niz potrzeba: {short}",
                 "INFO - w biegu rocznym: Iron Islands, Free Folk, Ibben, Qohor, Pentos (potrzeba razem ok. 59 tys. zl/d, garnek 0)", None)
     try:
-        w5b_block(rep, lines, start, until, w5, win, kor, obg, rows)
+        w5b_block(rep, lines, start, until, w5, win, kor, obg, rows + read_csv_player(csvp))   # W6b: suma kolumny doplata_ze_skarbca_w5b z wierszem gracza
     except Exception as e:   # blok W5b nigdy nie wywraca grupy (log sprzed paczki, inny uklad linii)
         rep.add("W5b: blok progow", f"nie policzono ({type(e).__name__}: {e})", "INFO", None)
     rep.show()
@@ -15788,7 +15810,7 @@ def w6_main(logp, start_arg, until=120, csvp=None):
     payers = [r for r in rows if has_col and fv(r, "tarczowe_w6") > 0]
     if payers and tot:
         pd_, rd_ = {}, {}
-        for r in rows:
+        for r in rows + read_csv_player(csvp):   # W6b: z wierszem gracza (platnik albo odbiorca na zasadach AI)
             try:
                 d = int(r.get("dzien") or 0)
             except ValueError:
@@ -16076,6 +16098,151 @@ def n7_main(logp, start_arg, until=120):
     return 0
 
 
+def w6b_main(logp, start_arg, until=120, csvp=None):
+    """W6b (decyzja Jeffa 13.10: rod gracza w tarczowym W6 i doplacie W5, gdy ma miasto albo zamek i jest wasalem krolestwa w wojnie) - Armoury/src/
+    KingdomTreasury.ScutagePlayer.cs. Okno: doby kampanii 2-until (--do-doby), doby jak w w6_main. Wiersze W6b-0..W6b-4 (opis w __doc__). Log bez segmentu
+    "| gracz:" (sprzed W6b): jeden wiersz INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    w5 = e4_series(lines, "Doplata wedlug potrzeby (W5): dzien", 1)
+    w6 = e4_series(lines, "Tarczowe (W6): dzien", 1)
+    alld = sorted(set(w5) | set(w6))
+    if start is None:
+        start = alld[0] if alld else 0
+    win5 = [d for d in sorted(w5) if 2 <= run_day(d, start) <= until]
+    win6 = [d for d in sorted(w6) if 2 <= run_day(d, start) <= until]
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 2-{until}, dob z linia W5 {len(win5)}, z linia W6 {len(win6)}")
+    sre = re.compile(r"\| gracz: klucz Scutage Player Clan (tak|nie)")
+    cre = re.compile(r"ziemia \(miasto albo zamek\) (tak|nie), wasal krolestwa \(nie wladca, nie najemnik\) (tak|nie), krolestwo w wojnie (tak|nie) -> warunki (tak|nie spelnione)")
+    gre = re.compile(r"\| gracz: .*?, dostal (\d+), zaplacil (\d+)")
+
+    def seg(s):
+        """-> (klucz, [ziemia, wasal, wojna] albo None, warunki, dostal, zaplacil) albo None (brak segmentu / nie do odczytania)."""
+        m = sre.search(s)
+        g = gre.search(s)
+        if not m or not g:
+            return None
+        c = cre.search(s)
+        return (m.group(1) == "tak", [c.group(i) == "tak" for i in (1, 2, 3)] if c else None, bool(c) and c.group(4) == "tak", int(g.group(1)), int(g.group(2)))
+    p5 = {d: seg(w5[d]) for d in win5}
+    p6 = {d: seg(w6[d]) for d in win6}
+    has5 = [d for d in win5 if p5[d] is not None]
+    has6 = [d for d in win6 if p6[d] is not None]
+    # ---- W6b-0 segment i klucz
+    if not has5 and not has6:
+        rep.add("W6b-0: segment gracza w liniach W5 i W6", "brak (log sprzed W6b albo bez linii W5 / W6)", "jest od wgrania W6b (LogEnabled)", None)
+        rep.show()
+        return 0
+    keyon = sum(1 for d in has5 if p5[d][0]) + sum(1 for d in has6 if p6[d][0])
+    rep.add("W6b-0: segment gracza w liniach W5 i W6 kazdej doby (klucz Scutage Player Clan)",
+            f"W5: {len(has5)} z {len(win5)} dob, W6: {len(has6)} z {len(win6)} dob; klucz tak w {keyon} z {len(has5) + len(has6)} segmentow",
+            "segment w kazdej linii W5 i W6 okna", len(has5) == len(win5) and len(has6) == len(win6))
+    # ---- CSV: rody AI (read_csv) + wiersz gracza (read_csv_player)
+    if csvp is None:
+        csvp = csv_path_of(logp)
+    rows = read_csv(csvp)
+    prow = read_csv_player(csvp)
+
+    def fv(r, k):
+        try:
+            return float(r.get(k) or 0)
+        except ValueError:
+            return 0.0
+    pl = {}
+    for r in prow:
+        try:
+            pl[int(r.get("dzien") or 0)] = r
+        except ValueError:
+            continue
+    # ---- W6b-1 zamkniecie z graczem
+    tre = re.compile(r"\| pobrane (\d+) od \d+ rodow = dopisane do garnka W5 (\d+), wyplacone przez W5 ponad danine (\d+) .*?zostalo w skarbcach (-?\d+)")
+    bad6 = []
+    for d in win6:
+        m = tre.search(w6[d])
+        if m and not (int(m.group(1)) == int(m.group(2)) == int(m.group(3)) and int(m.group(4)) == 0):
+            bad6.append(run_day(d, start))
+    act = sorted(set(d for d in has5 if p5[d][3] > 0 or p5[d][4] > 0) | set(d for d in has6 if p6[d][3] > 0 or p6[d][4] > 0))
+    first = (rows or prow or [{}])[0]
+    has_col = "tarczowe_w6" in first and "doplata_w5" in first
+    badrow, badsum, ncmp = [], [], 0
+    if has_col and act:
+        cs = {}
+        for r in rows + prow:
+            try:
+                dd = int(r.get("dzien") or 0)
+            except ValueError:
+                continue
+            a = cs.setdefault(dd, [0.0, 0.0, 0.0, 0.0])
+            a[0] += fv(r, "tarczowe_w6"); a[1] += fv(r, "doplata_z_tarczowego_w6"); a[2] += fv(r, "doplata_w5"); a[3] += fv(r, "doplata_ze_skarbca_w5b")
+        for d in act:
+            sg = p6.get(d) or p5.get(d)
+            r = pl.get(d)
+            if r is not None and (int(round(fv(r, "doplata_w5"))) != sg[3] or int(round(fv(r, "tarczowe_w6"))) != sg[4]):
+                badrow.append(run_day(d, start))
+            m6 = tre.search(w6[d]) if d in w6 else None
+            if d in cs and d in w5 and m6:
+                a5 = num(r", wyplacono (\d+) \(rodow \d+\), reszta do rent", w5[d]) or 0
+                b5 = num(r", wyplacono ze skarbca (\d+) \(rodow", w5[d]) or 0
+                c = cs[d]
+                ncmp += 1
+                if (int(round(c[0])) != int(m6.group(1)) or int(round(c[1])) != int(m6.group(3)) or int(round(c[2])) != a5 + b5 + int(m6.group(3))
+                        or int(round(c[3])) != b5):
+                    badsum.append(run_day(d, start))
+    if act:
+        ok1 = not bad6 and not badrow and not badsum and has_col
+        rep.add("W6b-1: zamkniecie W5 / W6 co do zlotowki z graczem - pobrane = dopisane = wyplacone, zostalo 0; wiersz gracza w CSV = dostal / zaplacil z linii; sumy kolumn CSV z graczem = linie",
+                f"dob z graczem placacym albo dostajacym {len(act)}: rozjazd linii W6 w {len(bad6)} dobach okna, wiersz gracza w {len(badrow)}, sumy kolumn w {len(badsum)} z {ncmp}"
+                + ("" if has_col else "; CSV bez kolumn W5 / W6 albo brak pliku") + (f"; doby {(bad6 + badrow + badsum)[:5]}" if not ok1 else ""),
+                "0 rozjazdow (nic z niczego, nic w nicosc - gracz jak rod AI)", ok1)
+    else:
+        rep.add("W6b-1: zamkniecie W5 / W6 z graczem",
+                f"gracz ani nie placil, ani nie dostawal w oknie - warunki nie spelnione albo bez potrzeby / podstawy (rozjazd linii W6 w {len(bad6)} dobach; calosc - --grupa w5 / w6)",
+                "0 rozjazdow; proba z graczem dopiero w grze z lennem (test reczny Jeffa)", None if not bad6 else False)
+    # ---- W6b-2 gracz nie jest platnikiem i odbiorca tej samej doby
+    both = sorted(set(run_day(d, start) for d in has5 if p5[d][3] > 0 and p5[d][4] > 0) | set(run_day(d, start) for d in has6 if p6[d][3] > 0 and p6[d][4] > 0))
+    bothc = sorted(run_day(d, start) for d, r in pl.items() if 2 <= run_day(d, start) <= until and fv(r, "tarczowe_w6") > 0 and fv(r, "doplata_w5") > 0)
+    rep.add("W6b-2: gracz nie jest platnikiem tarczowego i odbiorca doplaty W5 tej samej doby (linie; wiersz gracza w CSV)",
+            f"dob z obiema kwotami: linie {len(both)}, CSV {len(bothc)} (dob z segmentem {len(set(has5) | set(has6))}, wierszy gracza w CSV {len(pl)})"
+            + (f"; doby {(both + bothc)[:5]}" if both or bothc else ""),
+            "0 / 0", not both and not bothc)
+    # ---- W6b-3 bez warunkow (albo z kluczem wylaczonym) gracz 0 / 0
+    off = [(d, p5[d]) for d in has5 if not p5[d][0] or not p5[d][2]] + [(d, p6[d]) for d in has6 if not p6[d][0] or not p6[d][2]]
+    leak = sorted(set(run_day(d, start) for d, sg in off if sg[3] > 0 or sg[4] > 0))
+    met = sorted(set(d for d in has5 if p5[d][0] and p5[d][2]) | set(d for d in has6 if p6[d][0] and p6[d][2]))
+    why = {}
+    for d in has6:
+        sg = p6[d]
+        if sg[0] and not sg[2] and sg[1] is not None:
+            for nm, v in zip(("bez miasta i zamku", "nie wasal (bez krolestwa, wladca albo najemnik)", "krolestwo w pokoju"), sg[1]):
+                if not v:
+                    why[nm] = why.get(nm, 0) + 1
+    rep.add("W6b-3: bez warunkow 1-3 albo z kluczem wylaczonym gracz ani nie placi, ani nie dostaje",
+            f"segmentow bez warunkow albo z kluczem nie {len(off)}, w tym z kwota > 0: {len(leak)}" + (f" (doby {leak[:5]})" if leak else "")
+            + f"; dob z warunkami spelnionymi {len(met)}" + ("; warunki nie spelnione (linia W6, doby): " + ", ".join(f"{k} {v}" for k, v in sorted(why.items())) if why else ""),
+            "0 (autotest: gracz bez lenna i bez krolestwa - warunki nie spelnione; ten wiersz jest jedyna proba W6b w autotescie)", (not leak) if off else None)
+    # ---- W6b-4 liczby gracza (INFO)
+    g5 = [p5[d][3] for d in has5]
+    g6 = [p6[d][4] for d in has6]
+    pre5 = re.compile(r"\| gracz: .*?pulap wlasny (\d+|-) \(D (\d+|-)\)")
+    pre6 = re.compile(r"\| gracz: .*?pulap wlasny bez dworu (\d+|-), podstawa gracza (-?\d+|-), nadwyzka kiesy rodziny ponad rezerwe (-?\d+|-), nalezne gracza (\d+)")
+    last5 = next((m for m in (pre5.search(w5[d]) for d in reversed(has5)) if m), None)
+    last6 = next((m for m in (pre6.search(w6[d]) for d in reversed(has6)) if m), None)
+    rep.add("W6b-4: liczby gracza w oknie (INFO)",
+            f"dob z warunkami {len(met)}; doplata W5 dla gracza w {sum(1 for x in g5 if x > 0)} dobach, razem {sum(g5)} zl; tarczowe gracza w {sum(1 for x in g6 if x > 0)} dobach, razem {sum(g6)} zl"
+            + (f"; ostatni pulap wlasny {last5.group(1)} (D {last5.group(2)})" if last5 else "")
+            + (f"; ostatnio bez dworu {last6.group(1)}, podstawa {last6.group(2)}, nadwyzka {last6.group(3)}, nalezne {last6.group(4)}" if last6 else ""),
+            "INFO - autotest nie ma gracza z lennem: wynik reguly sprawdza Jeff w grze (CHANGELOG W6b, 3 punkty)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -16122,6 +16289,8 @@ def main(argv):
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
     if group == "w6" and logp:
         return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
+    if group == "w6b" and logp:
+        return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "kiesa1" and logp:
