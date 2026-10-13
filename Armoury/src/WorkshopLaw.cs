@@ -40,7 +40,7 @@ namespace Armoury
     /// Linie z towarami (mieso, narzedzia, wino...) i warsztaty GRACZA zostaja vanilla - poza poprawka 174b (PlayerWorkshopsSameRule): linie bez wsadu
     /// (zbroja, strzaly) zamkniete i ruda dla strzelarzy tak jak u notabli (PlayerCyclePrefix, PlayerGatePostfix).
     /// </summary>
-    internal static class WorkshopLaw
+    internal static partial class WorkshopLaw   // E8/O2 (266): druga czesc klasy w WorkshopLawFast.cs (pamieci i klucze - te same liczby, mniej pracy)
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
         internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
@@ -48,6 +48,7 @@ namespace Armoury
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
+            FastReset();             // E8/O2 (266): pamieci nazw linii i zakazanych oraz liczniki (nowa kampania = nowe obiekty przedmiotow i typow warsztatow)
         }
         private static ItemObject _ore, _wood, _leather, _linen, _wool;
         private static readonly int[] _skipMatBy = new int[4];      // "brak surowca" wedlug surowca: ruda, drewno, skora, len albo welna (tylko licznik)
@@ -251,6 +252,7 @@ namespace Armoury
                 var s = Settings.Current;
                 int day = (int)CampaignTime.Now.ToDays;
                 if (_dayStamp != day) { Flush(); _dayStamp = day; }
+                FastSync();   // E8/O2 (266): tryb kluczy _wip / _rank wedlug WorkshopLawFast - przed pierwszym odczytem obu slownikow w tym cyklu
                 string line = LineKey(production);
                 float floor;
                 float share = LineShare(__instance, workshop, production, town, day, out floor);
@@ -488,7 +490,7 @@ namespace Armoury
         }
 
         private static FieldInfo _itemsInCategory;
-        private static readonly Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>> _rank = new Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>>();
+        private static readonly Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>> _rank = new Dictionary<KeyValuePair<Workshop, string>, KeyValuePair<int, List<Cand>>>(WorkshopLineKeys.Instance);   // E8/O2 (266): wlasne porownanie klucza - ta sama rownosc
 
         /// <summary>Pozycja rankingu dnia (174.1): przedmiot, koszyk (typ*10+tier), potrzeby i dni, przychod i koszt z tego samego przebiegu, popyt d i polka s
         /// koszyka w tym miescie (z SupplyDemand.Factor, ktory juz liczy przychod - bez nowych wywolan), brak koszyka i waga braku.</summary>
@@ -519,6 +521,7 @@ namespace Armoury
                 var pool = new List<ItemObject>(); var foreign = new List<ItemObject>();
                 var seen = new HashSet<ItemObject>();
                 bool byShort = ChooseByShortage;
+                bool fast = FastOn;   // E8/O2 (266): pamiec zakazanych i mnoznik polki raz na koszyk (WorkshopLawFast.cs); off = jak dotad
                 // E6/M1 (207): kowale krainy kuja wedlug lancucha (wlasne -> pokrewne -> region -> wspolne -> nic), bez wzorow rodowych innych krain,
                 // bez unikatow; pusta linia NIE bierze juz calej obcej puli (rece przechodza do innej linii cechu). Wylaczone - jak dotad.
                 bool m1 = CraftRealm.Active;
@@ -533,7 +536,7 @@ namespace Armoury
                             if (o.Item1 == null || !dict.TryGetValue(o.Item1, out items)) continue;
                             foreach (var it in items)
                             {
-                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || Forbidden(it)) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
+                                if (it == null || !seen.Add(it) || ArmsPricing.IsUnique(it) || LegendaryLaw.IsLegend(it) || (fast ? ForbiddenFast(it) : Forbidden(it))) continue;   // Jeff 04.10: zadnych unikatow rodow, klingi valyrianskiej ani legend z warsztatu
                                 if (byShort && CivilianOnly(it)) { _civSkipped++; continue; }   // 174.1: stroj mieszczan (ladys_shoe) - nie wyrob linii zbrojnej
                                 bool local = m1 ? CraftRealm.Allowed(realm, it) : (it.Culture == null || it.Culture.StringId == "neutral_culture" || it.Culture == town.Culture);
                                 (local ? pool : foreign).Add(it);
@@ -549,6 +552,7 @@ namespace Armoury
                 Resolve();
                 float pOre = MatPrice(town, _ore, 0), pWood = MatPrice(town, _wood, 1), pLea = MatPrice(town, _leather, 2), pLin = MatPrice(town, _linen, 3);
                 float elast = MBMath.ClampFloat(s.SupplyDemandElasticity, 0.05f, 2f), lo = MBMath.ClampFloat(s.SupplyDemandMinFactor, 0.01f, 1f), hi = Math.Max(1f, s.SupplyDemandMaxFactor);
+                if (fast) _basketF.Clear();   // E8/O2 (266): mnoznik polki raz na koszyk TEGO przebiegu (inne miasto albo inna chwila = od nowa)
                 foreach (var it in pool)
                 {
                     float days;
@@ -557,7 +561,7 @@ namespace Armoury
                     float mat = need[0] * pOre + need[1] * pWood + need[2] * pLea + need[3] * pLin;
                     float cost = mat + days * DayWage(it, town);
                     float d; int sh;
-                    float revenue = Revenue(town, it, out d, out sh);
+                    float revenue = fast ? RevenueFast(town, it, out d, out sh) : Revenue(town, it, out d, out sh);
                     float perDay = (revenue - cost) / Math.Max(0.1f, days);
                     if (perDay <= 0f) continue;
                     var c = new Cand { Item = it, Basket = (int)it.ItemType * 10 + TierOf(it), Need = need, Days = days, Rev = revenue, Cost = cost, MatCost = mat, PerDay = perDay, D = d, S = sh, W = 1f };
@@ -659,7 +663,7 @@ namespace Armoury
                 || o == Occupation.Guard || o == Occupation.PrisonGuard || o == Occupation.BannerBearer;
         }
 
-        private static string LineKey(WorkshopType.Production p)
+        private static string LineKeyOld(WorkshopType.Production p)   // E8/O2 (266): stara droga; LineKey (z pamiecia na liste wyjsc linii) w WorkshopLawFast.cs
         {
             var parts = new List<string>();
             try { foreach (var o in p.Outputs) if (o.Item1 != null) parts.Add(o.Item1.StringId); } catch { }
@@ -668,7 +672,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ cechy (wpis 48)
         private sealed class Wip { public ItemObject Item; public float Days, Labor, MunAcc; public int MatCost, Day; }   // MunAcc: 174.1 (C) licznik sztuk "na amunicje" linii
-        private static readonly Dictionary<KeyValuePair<Workshop, string>, Wip> _wip = new Dictionary<KeyValuePair<Workshop, string>, Wip>();
+        private static readonly Dictionary<KeyValuePair<Workshop, string>, Wip> _wip = new Dictionary<KeyValuePair<Workshop, string>, Wip>(WorkshopLineKeys.Instance);   // E8/O2 (266): wlasne porownanie klucza - ta sama rownosc i kolejnosc wpisow (zapis bez zmian)
         // 174.1: plan rak warsztatu na dobe - udzial i podloga kazdej linii (LineShare)
         private sealed class LinePlan { public string Key, Guild; public bool Wip, Active; public float Short, Share, Floor, Labor; public List<Cand> Rank; }
         private static readonly Dictionary<Workshop, KeyValuePair<int, Dictionary<string, LinePlan>>> _plans = new Dictionary<Workshop, KeyValuePair<int, Dictionary<string, LinePlan>>>();

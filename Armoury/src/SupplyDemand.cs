@@ -117,7 +117,7 @@ namespace Armoury
             _noted = 0;
         }
 
-        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); _imported = -1; _importedPieces = 0f; _keys = new System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]>(); _topRef = null; _topOpen = false; }
+        internal static void ResetOrders() { _unmet.Clear(); _noted = 0; _onceSeen.Clear(); _loggedHour.Clear(); _imported = -1; _importedPieces = 0f; _keys = new System.Runtime.CompilerServices.ConditionalWeakTable<Settlement, string[]>(); _topRef = null; _topOpen = false; TradeExportMemo.Reset(); }   // E8/O3 (267): pamiec celow wywozu od zera
 
         // 174.0b: zamowienia (sygnal popytu dla warsztatow) w zapisie gry - klucz "arm_unmet" (SaveText.Sync); dotad startowaly od zera po kazdym wczytaniu.
         // Klucz zamowienia ("osada|typ|tier") nie zalezy od obiektow gry - wczytanie od razu w SyncData. Wylacznik WorkshopStateInSave.
@@ -549,6 +549,7 @@ namespace Armoury
             int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CExport;   // E8/0 (242): wolajacy cen - wywoz kupcow (tylko pomiar)
             try { DailyTradeCore(); }
             finally { DayProfile.Caller = pc; try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } }
+            TradeExportMemo.Daily();   // E8/O3 (267): linia doby "Wywoz kupcow (E8/O3)" (sam log) - takze gdy wywozu nie bylo
         }
 
         private static void DailyTradeCore()
@@ -592,20 +593,27 @@ namespace Armoury
                 // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
                 // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
                 bool noCastles = GarrisonCarts.On;
+                // E8/O3 (267): cele w zasiegu kazdego zrodla z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku (TradeExportMemo.cs);
+                // fast = false (TradeExportFast wylaczony albo potkniecie) - ponizej dokladnie kod sprzed paczki
+                bool fast = TradeExportMemo.Begin(places, stock, range);
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
+                    int si = -1;   // E8/O3: indeks zrodla w spisie places
+                    if (fast) TradeExportMemo.Bucket(probe);
                     // recenzja 171: tylko bron i zbroje - konie i rzedy kupcy woza do zamkow jak dotad (zaloga ich nie zamawia, gracz kupuje je na polce zamku)
                     bool noCastlesHere = noCastles && !MenPurse.HorseKind(probe);
                     foreach (var src in places)
                     {
+                        si++;
                         int have; stock[src].TryGetValue(key, out have);
                         if (have <= 0) continue;
                         if (carts && src.IsUnderSiege) continue;   // E6/R3 (215): z oblezonej osady woz nie wyjedzie
-                        float surplus = have - Demand(src, probe);
+                        float srcD = fast ? TradeExportMemo.SrcDemand(si, src, probe) : Demand(src, probe);   // E8/O3: popyt zrodla z pamieci koszyka
+                        float surplus = have - srcD;
                         if (surplus <= 0f) continue;
                         int toShip = (int)Math.Ceiling(surplus * share);
-                        float srcFactor = (float)Math.Pow((Demand(src, probe) + 1f) / (have + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
+                        float srcFactor = (float)Math.Pow(((fast ? srcD : Demand(src, probe)) + 1f) / (have + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
                         srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
                         var srcPos = src.GetPosition2D;
                         var poor = new HashSet<Settlement>();   // odbiorcy bez zlota - do konca tego przebiegu
@@ -617,8 +625,12 @@ namespace Armoury
                             // brak w celu to nie warunek, tylko powod, dla ktorego tam drozej
                             Settlement best = null; float bestProfit = 0f; int bestCap = 0; float bestDist = 0f;
                             float elast = MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f);
-                            float srcIdx = srcFactor * ArmsPricing.Multiplier(src, probe);
+                            float srcIdx = fast ? 0f : srcFactor * ArmsPricing.Multiplier(src, probe);   // E8/O3: przy pamieci liczy go PickStart
                             float perDist = Math.Max(0f, c.TradeTransportPercentPer100) / 100f / 100f;
+                            // E8/O3 (267): pk 1 - cel wybrany nowa droga (petla ponizej nie biegnie), pk 2 - probka R9 (co 64. wybor: obie drogi, PickEnd
+                            // porownuje i zostawia wynik starej), pk 0 - stara droga. Petla starej drogi bez zmian
+                            int pk = fast ? TradeExportMemo.PickStart(si, src, probe, key, noCastlesHere, carts, poor, c, elast, srcFactor, perDist, out srcIdx) : 0;
+                            if (pk != 1)
                             foreach (var dst in places)
                             {
                                 if (dst == src || poor.Contains(dst)) continue;
@@ -635,6 +647,7 @@ namespace Armoury
                                 if (profit <= bestProfit) continue;
                                 best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;
                             }
+                            if (pk != 0) TradeExportMemo.PickEnd(pk, src, probe, srcIdx, ref best, ref bestProfit, ref bestCap, ref bestDist);   // E8/O3
                             if (best == null) { stuck += toShip; break; }
                             // przenosimy sztuki koszyka ze zrodla (od konca polki), placi odbiorca
                             int want = Math.Min(toShip, bestCap);
@@ -643,6 +656,7 @@ namespace Armoury
                             if (resFree <= 0) { stuck += toShip; break; }
                             want = Math.Min(want, resFree);
                             int got = 0;
+                            long paid0 = paid;   // E8/O3: zloto tej transakcji do probki (sam licznik)
                             var shelf = src.ItemRoster;
                             var market = src;   // zrodlo do wyceny (zmienna lokalna dla lambdy)
                             for (int i = shelf.Count - 1; i >= 0 && got < want; i--)
@@ -673,6 +687,7 @@ namespace Armoury
                                 try { TownFolk.OnTownCoin(best, -cost, TownFolk.BOurs); } catch { }   // E5/0 (195): zakup kasy odbiorcy - czesc ponizej zapasu kupcow (tylko licznik)
                                 got += n; paid += cost;
                             }
+                            if (pk == 2) TradeExportMemo.SampleDeal(got, paid - paid0);   // E8/O3: sztuki i zloto po wyborze policzonym obiema drogami (sam licznik)
                             if (got <= 0) { poor.Add(best); continue; }   // biedny odbiorca - pomijamy go dzis
                             int sh; stock[src].TryGetValue(key, out sh); stock[src][key] = sh - got;
                             // E6/R3: przy wozach sztuki sa juz w TradeCarts.Incoming celu (doliczane przy wyborze) - polka celu bez zmian, inaczej liczone dwa razy
@@ -681,6 +696,8 @@ namespace Armoury
                         }
                     }
                 }
+                TradeExportMemo.NoteDay(places.Count, range, moved, deals, paid, stuck, tradeEvals,
+                                        (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);   // E8/O3 (267): liczby wywozu do linii doby (sam licznik)
                 if (moved > 0 || stuck > 0)
                     Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
                              + paid + " zlota, kazda sztuka po cenie straganu zrodla - wycen " + tradeEvals + ", czas wywozu "
