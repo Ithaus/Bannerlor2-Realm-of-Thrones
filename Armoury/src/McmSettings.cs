@@ -3492,6 +3492,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercGameContractAiOff { get; set; } = true;
 
+        [SettingPropertyBool("Merc Contract Pays Men Under Arms", HintText = "with Merc Contract Enabled: each day the crown pays a hired company Merc Contract Factor times the wages of the men it really has under arms that day, never more than its contract (half of it in peace). The contract still sets how far the company may grow, so a company signed after a defeat fills its ranks from its own purse and is paid for the new men from the next day; a company with no men in the field is paid nothing. Off = the full contract every day whatever the company's strength, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercContractPaysMenUnderArms { get; set; } = true;
+
         [SettingPropertyBool("Merc Bk Down Payment Ai Off", HintText = "with Merc Contract Enabled: an AI mercenary company no longer takes BannerKings' earnest-money out of the hiring king's own purse each time it changes its master - the crown's daily contract is its one pay for the service (companies changed masters every few days and drained the purses of the small kings). You still get your earnest-money when you hire out as a mercenary; when you are the king, you pay none to an AI company. Off = BannerKings pays the earnest-money, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercBkDownPaymentAiOff { get; set; } = true;
@@ -6112,6 +6116,7 @@ namespace Armoury
             s.MercHireFloorShare = MercHireFloorShare;
             s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
             s.MercGameContractAiOff = MercGameContractAiOff;
+            s.MercContractPaysMenUnderArms = MercContractPaysMenUnderArms;
             s.MercBkDownPaymentAiOff = MercBkDownPaymentAiOff;
             s.CrownGifts = CrownGifts;
             s.GiftWatchNorth = GiftWatchNorth;

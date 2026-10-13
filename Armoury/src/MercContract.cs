@@ -24,6 +24,12 @@ namespace Armoury
     ///  - Gra dla AI w sluzbie nie placi nic z siebie (MercGameContractAiOff): "za tier" (Tier x 120 z niczego) = 0 i kontrakt gry (AddMercenaryIncome:
     ///    wplyw x mnoznik z MercenaryWallet, ktory splacaja wasale) = 0 - bez dopisku do MercenaryWallet, wiec wasale placa tylko za kontrakt gracza.
     ///    GRACZ-najemnik zostaje na kontrakcie gry (prawdziwy platnik - wasale).
+    ///  - P3/W3-B (TRIAZ-3 O1-4 B; klucz MercContractPaysMenUnderArms): KONTRAKT PLACONY ZA LUDZI POD BRONIA, UMOWA DALEJ WYZNACZA PULAP. Wyplata dnia =
+    ///    min(kontrakt z umowy, MercContractFactor x prawdziwy zold kompanii tej doby); w pokoju najwyzej polowa kontraktu. Umowa (K, zold i ludzie z
+    ///    umowy, podloga najmu 0.5, przeglad 28 dob) i pulap 166 (CapOf) bez zmian - kompania dobiera ludzi do umowy z wlasnej kiesy, a korona od nastepnej
+    ///    doby placi 1.30 x za tych, ktorzy sa. Dotad korona placila za "ludzi z umowy" (3 429 przy 2 692 prawdziwych w d364: nalezne 30 466 zl przy zoldzie
+    ///    ok. 16.6 tys.), a kompania bez ludzi w polu (wodz w niewoli) brala pelny kontrakt za nic. NIE "kontrakt od prawdziwych ludzi" - to cofneloby
+    ///    C1-m (pulap = zold z umowy; kompania najeta po bitwie nie odroslaby nigdy).
     ///  - P3/W3-A (bieg roczny 364 doby, TRIAZ-3 O1-4 A; klucz MercBkDownPaymentAiOff): ZADATEK BANNERKINGS dla kompanii AI wylaczony - "jedna zaplata za
     ///    jedna sluzbe". BK przy kazdym najmie (BKMercenaryCareerBehavior.OnClanChangedKingdom -> AddDownPayment) przelewa z kiesy KROLA do glowy kompanii
     ///    (5% zlota rodu krola + sila kompanii x MercenaryAwardMultiplier / 2) x reputacja, najwyzej cala kiese (ChangeHeroGold bez zdarzenia gry - ksiega
@@ -145,6 +151,9 @@ namespace Armoury
                 var byKingdom = new Dictionary<Kingdom, List<KeyValuePair<Clan, long>>>();
                 var seen = new HashSet<string>();
                 long menNow = 0, menDeal = 0;
+                // P3/W3-B: wyplata za ludzi pod bronia (klucz wylaczony = pelny kontrakt z umowy, stan sprzed); pomiar: nalezne wedlug umowy i kompanie bez ludzi
+                bool payNow = s.MercContractPaysMenUnderArms;
+                long dueDeal = 0; int noMen = 0;
                 foreach (var c in Clan.All)
                 {
                     try
@@ -152,6 +161,7 @@ namespace Armoury
                         if (!AiMerc(c)) continue;
                         seen.Add(c.StringId);
                         long wage; int men; Company(c, out wage, out men);
+                        long wageNow = wage;   // P3/W3-B: prawdziwy zold kompanii tej doby (przed podloga umowy w dniu najmu)
                         bool war = KingdomTreasury.AtWar(c.Kingdom);
                         Deal d;
                         if (!_deals.TryGetValue(c.StringId, out d) || d.Kingdom != c.Kingdom.StringId)
@@ -199,6 +209,9 @@ namespace Armoury
                             }
                         }
                         long due = war ? d.K : (long)(d.K * peace);
+                        dueDeal += due;
+                        // P3/W3-B: korona placi MercContractFactor x zold ludzi, ktorzy sa dzis pod bronia, najwyzej kontrakt z umowy (w pokoju - jego polowe)
+                        if (payNow) { due = Math.Min(due, (long)Math.Round(factor * (double)wageNow)); if (wageNow <= 0) noMen++; }
                         menNow += men; menDeal += war ? d.Men : (long)(d.Men * peace);
                         if (due <= 0) continue;
                         List<KeyValuePair<Clan, long>> list;
@@ -270,6 +283,9 @@ namespace Armoury
                              + " | ludzie najemnikow AI " + menNow + " / z umowy (w pokoju polowa) " + menDeal
                              + " | gra dla AI w sluzbie: \"za tier\" wylaczone " + LastTierOff + " zl, kontrakt gry wylaczony " + LastGameOff + " zl (od wczoraj; AI dostaje 0 z gry)"
                              + " | MercenaryWallet krolestw razem " + wallet + " (zmienia sie tylko o kontrakt gracza)"
+                             + " | P3/W3 kontrakt za ludzi pod bronia (Merc Contract Pays Men Under Arms): " + (payNow
+                                 ? "nalezne wedlug umowy " + dueDeal + ", za ludzi pod bronia " + LastDue + " (roznica " + (dueDeal - LastDue) + " zostaje we wplywach dnia koron); kompanie bez ludzi w polu (wyplata 0) " + noMen
+                                 : "wylaczone - pelny kontrakt z umowy (" + dueDeal + ")")
                              + " | P3/W3 zadatek BK wstrzymany (Merc Bk Down Payment Ai Off): " + (s.MercBkDownPaymentAiOff
                                  ? bkDownN + " najmow, " + bkDownGold + " zl zostalo w kiesach krolow (od wczoraj; latka " + _bkDownWire + ")"
                                  : "wylaczone - BK placi zadatek z kiesy krola jak dotad")

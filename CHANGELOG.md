@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO W3-B, TRIAZ-3 O1-4 B) - KONTRAKT NAJEMNIKA PLACONY ZA LUDZI POD BRONIA, UMOWA DALEJ WYZNACZA PULAP (klucz MercContractPaysMenUnderArms)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/MercContract.cs` (Daily: wyplata dnia, linia 185), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby, linia "Kontrakty najemnikow (185)", 364 doby):** kontrakty nalezne 8 849 699 zl, zaplacone 8 492 101 zl przy zoldzie kompanii 4.41 mln - zamierzone 1.30 x zold to 5.73 mln, nadplata 2.76 mln w roku (7.6 tys. zl/d srednio, 8.8 tys. zl/d pod koniec). W d364: nalezne 30 466 zl przy zoldzie ok. 16.6 tys.; "ludzie najemnikow AI 2 692 / z umowy 3 429" (srednia roku 2 231 / 3 122).
+
+**Przyczyna:** `MercContract.Daily` placil codziennie caly kontrakt K z dnia najmu (`due = war ? d.K : d.K x peace`), a K liczone jest od "ludzi z umowy" - co najmniej polowy pelnej wielkosci kompanii (podloga C1-m `MercHireFloorShare`). Kompanie zmieniaja krola co kilka dob (678 nowych umow w roku), wiec kazda umowa ma podloge, a przeglad co 28 dob nigdy nie nastepuje - korona placila stale za ok. 900 ludzi, ktorych nie bylo. Kompania bez ludzi w polu (wodz w niewoli) brala pelny kontrakt za nic.
+
+**Zmiana (klucz `MercContractPaysMenUnderArms`, domyslnie wlaczony; wylaczony = pelny kontrakt z umowy, stan sprzed):** wyplata dnia = min(kontrakt z umowy - w pokoju jego polowa, `MercContractFactor` x prawdziwy zold kompanii tej doby). Umowa (K, zold i ludzie z umowy, podloga 0.5, przeglad 28 dob) i pulap 166 (`CapOf` = zold ludzi z umowy) BEZ ZMIAN: kompania dobiera ludzi do umowy z wlasnej kiesy, a korona od nastepnej doby placi 1.30 x za tych, ktorzy sa. Pierwotny wniosek ("kontrakt liczony od prawdziwych ludzi") odrzucony - cofnalby C1-m (kompania najeta po bitwie nie odroslaby: test 120 dob, najemnicy -79%). Linia doby 185: `P3/W3 kontrakt za ludzi pod bronia: nalezne wedlug umowy X, za ludzi pod bronia Y (roznica Z zostaje we wplywach dnia koron); kompanie bez ludzi w polu (wyplata 0) N`.
+
+**Zloto / ludzie:** nic nie powstaje i nic nie znika - mniej wychodzi ze skarbca, wiec wiecej zostaje we wplywach dnia na zwrot zoldu i renty (kolejnosc 165 bez zmian). W skarbcach zostaje ok. 7.6 tys. zl/d (8.8 tys. pod koniec roku). Razem z W3-A bilans kompanii: 1.30 x zold + zdarzenia (lup, jency) 12.9 tys. zl/d - zold - pozostale wydatki 12.0 tys. zl/d = ok. +4.5 tys. zl/d zamiast +48.7 tys. zl/d. Wojsko: do ok. +1 tys. ludzi (przez zwrot zoldu i renty).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Jesli marza 0.30 nie pokryje jedzenia, sprzetu i werbunku, kompanie beda powoli malec - pilnowac "ludzie najemnikow AI" (nie ponizej 2 000); kiesy startowe ok. 240 tys. daja zapas. Stad klucz.
+- Niedoplata (`Unpaid`, odejscie po 28 dobach) liczona wobec nowej kwoty naleznej - bez zmiany reguly.
+- Kompania w sluzbie Strazy (zold 0): prawdziwy zold = stawka nominalna jej ludzi (`Company`), jak przy umowie.
+- Pulap 166 kompanii, zwolnienia, przeglad - nietkniete. Latki gry (kontrakt gry i "za tier" = 0) - nietkniete.
+- Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu: linia 185 "kontrakty nalezne" ok. 1.30 x zold (13-16 tys. zl/d w d1-120, bylo 23 tys.); "ludzie najemnikow AI" >= 2 000; kiesy kompanii (csv) nie rosna szybciej niz ok. 5 tys. zl/d.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (P3/WOJSKO W3-A, TRIAZ-3 O1-4 A) - ZADATEK BANNERKINGS DLA KOMPANII AI WYLACZONY: jedna zaplata za jedna sluzbe (klucz MercBkDownPaymentAiOff)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/MercContract.cs` (prefiks `BkDownPaymentPrefix`, `EnsureHooks`, linia 185), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
 
