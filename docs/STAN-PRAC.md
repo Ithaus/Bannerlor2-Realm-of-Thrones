@@ -1814,3 +1814,15 @@ LosersFleeBesiegers = false.
   ruszyc PO zakonczeniu wf_99079863-f58. Uwaga z raportu: lud Wysp odklada ok. 3.9 tys. zl/d przy potrzebie 6 tys. - sama danina nie wystarczy, reszta z tarczowego.
   STAN GRY: bieg kontrolny po WGRANIU 40 czysty (10/10); trwa test 120 dob W5 (fin9). Limity 18:51 UTC: 5 h 66% (zeruje sie 20:50), tydzien 89% - od teraz nowe workflowy po
   jednym naraz.
+
+**WGRANIE 41 (13.10 ok. 19:20 UTC; poprawka 1b - korona placi wedlug potrzeby, W5):** Armoury **a5e2fbf9** (reszta jak WGRANIE 40). Galaz `noc/wgranie-41` = `w-toku/zbior-e8`
+**00a6496** (8639c21 + `w-toku/w5-korona-wg-potrzeby` ad9023d). Kopie: `*.bak-2026-10-13-noc41-przed` i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc41-przed`; md5 OK. Cofniecie:
+Armoury b2423a38 z kopii albo klucz CrownWarAidByNeed = false.
+- **TEST 120 dob przed wgraniem (nowa kampania; fin9 + CS-at-hamulec): 120/120, 0 ERROR** (Armoury-2026-10-13_11-46-24.log + tabele, kopie na D:; progi SCRATCH\test\progi-w5\).
+  Wszystkie progi W5 TAK: zamkniecie co do zlotowki (wyplacono + reszta = garnek; linie 165 i Obieg zgodne w 119 z 119 dob), garnek <= danina, gotowka tylko rodom ponad pulap
+  wlasny (W5-3b: 1.7% rodo-dob ponizej 90% pulapu), zwrot 70% nie placi dwa razy (98.0%), potkniecia 0. **Liczby (sr. 28 dob): garnek 95.7 tys. zl/d, rodow z potrzeba 37 z 187,
+  potrzeba 48.9 tys., wyplacono 22.2 tys. zl/d (25 rodow), reszta do rent 73.5 tys.; wypelnienie druzyn rodow z doplata 49.8% -> 54.0%.** Wojsko lordow w wojnie d93-120:
+  **106 719** (ostatnia doba 107 008) - wobec 99 917 (bieg N3), 105 589 (bieg daniny), 101 144 (runda 3); rozne kampanie, ale najwyzszy wynik z czterech. Danina 98.5 tys. zl/d.
+  Zloto rodow z luzem: +4.08 mln w 118 dob (w biegu daniny bez W5: +7.01 mln) - lepiej, dalej ponad progiem P1-9 (tarczowe). Bez garnka w d120: The Reach 3.1 tys., Pentos 1.9,
+  Qohor 1.7 tys. zl/d potrzeby (poprawka W5b). NIE: etap2 0, etap4 1 (pula wyrzutkow - N3), etap8 8, kiesa1 1 (P1-9).
+- Test zapisu: `autotest-dlugi` (doba 60 biegu W5) + 9 dob: 0 ERROR. Bieg kontrolny po wgraniu w toku (test\at-w41-kontrola10.out.txt).
