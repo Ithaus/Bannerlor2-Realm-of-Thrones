@@ -99,7 +99,7 @@ Uzycie (Python 3, tylko odczyt):
                     Blok E6/K2 (212, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) K2-1..K2-6 - segment "zapas koni wedlug kategorii (E6/K2)" linii "Konie AI (175)":
                     CZYNNE w dobach okna, wpiecia gry bez BRAK, nadwyzka ponad 1.5 x zapas po postoju w miescie <= 2% konnych (d91-until), potkniecia 0;
                     pompa (zakup i sprzedaz tej samej kategorii w 7 dobach) - INFO z udzialem w kupionych do zapasu do poprawki licznika (potem <= 2%); sprzedane, kupione do zapasu, handel koni gry pominiety - INFO.
-                    Blok E6/R1 (214, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) R1-1..R1-12 - linie "Bloomery (E6/R1, 214)" i "Zelazo (lupy) (214)": CZYNNE
+                    Blok E6/R1 (214, etap 6 - grupy etap6 jeszcze nie ma, progi tutaj) R1-1..R1-13 - linie "Bloomery (E6/R1, 214)" i "Zelazo (lupy) (214)": CZYNNE
                     (stary zapis / wylaczone - INFO), tick wpiety, tozsamosci kazdej doby (lupy wsi = lupy z tickow kopalni, drewno spalone = drewna na lupe x lupy),
                     lupy bez drewna 0, kopalnia bez wegla <= 5% lup (d61-until; d8-60 INFO), miasta bez zelaza <= 30 (srednio d61-until; cel 15 INFO), przyrost stosu drewna
                     miast d61 -> until <= 290/d, cykle "brak surowca [ruda" <= 715/d (srednio d91-until, linia "Warsztaty"), brak zlota wsi <= 5% potrzeby drewna
@@ -4029,9 +4029,13 @@ def etap5_r1(rep, lines, start, until):
             sh = 100.0 * ng / need
             s0, s1 = sum(stock[:5]) / 5.0, sum(stock[-5:]) / 5.0
             grows = s1 > s0
+            # recenzja F9a: TRIAZ R1-7 pkt 9 nazywa te sama miare "R1-7b" w oknie d61-until bez warunku zapasu zelaza. Jedna regula na jedno
+            # zjawisko - wiazaca zostaje wersja sekcji R1-12 (okno d91, warunek zapasu), a udzial w oknie d61 jest wypisany w wierszu (zb58: 5.0%)
+            ng61, need61 = tot(r"brak zlota wsi (\d+)", w61), tot(r"przy potrzebie doby (\d+)", w61)
             rep.add("R1-13: brak zlota wsi wobec potrzeby drewna dymarek (d91-until)",
                     f"{sh:.1f}% ({ng} z {need} ladunkow); zapas zelaza swiata: 5 pierwszych dob {s0:.0f}, 5 ostatnich {s1:.0f}"
-                    + (" - rosnie (regulator nadprodukcji)" if grows and sh > 5.0 else ""),
+                    + (" - rosnie (regulator nadprodukcji)" if grows and sh > 5.0 else "")
+                    + (f"; okno d61-until {100.0 * ng61 / need61:.1f}% ({ng61} z {need61})" if need61 > 0 else ""),
                     "<= 5% (NIE tylko, gdy zapas zelaza swiata nie rosnie w oknie; gdy rosnie - INFO)", True if sh <= 5.0 else (None if grows else False))
         else:
             rep.add("R1-13: brak zlota wsi wobec potrzeby drewna dymarek (d91-until)", "brak potrzeby doby albo mniej niz 10 dob z zapasem w oknie", "<= 5%", None)

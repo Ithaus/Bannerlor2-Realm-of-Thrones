@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (test zbiorczy etapow 5-8, bieg 120 dob - RECENZJA NARZEDZIA PROGOW F9a) - commit 1674360 sprawdzony wiersz po wierszu z TRIAZ: wszystkie zmiany progow przyjete, 0 cofnietych; w wierszu R1-13 dopisane okno d61; DLL BEZ ZMIAN
+**Mod:** narzedzie (`tools/sprawdz_logi.py`), kod gry nietkniety | **Galaz:** `w-toku/zb58-progi` | **Pliki:** `tools/sprawdz_logi.py`, `CHANGELOG.md` | **Specyfikacja:** `docs/test-zbiorczy/TRIAZ-zb58-120-2026-10-12.md`
+
+**Problem:** recenzja F9a - czy kazda zmiana progu ma dowod w TRIAZ (zla miara / zle okno / prog nieaktualny), a nie jest luzowaniem; czy nowa miara liczy to, co mowi opis; czy zaden inny wiersz nie zmienil werdyktu.
+
+**Co sprawdzone (wynik: bez uwag, poza jedna ponizej):**
+- Wyniki sprzed zmian (narzedzie z a589def) odtworzone bajt w bajt z `progi-zb58` / `progi-w33` (12 plikow: etap2-7 x 2 logi). Po zmianie: etap3 i etap4 identyczne w obu logach; werdykt zmieniaja tylko wiersze z listy TRIAZ (NIE razem: nowy bieg 36 -> 27, wzorzec 15 -> 11). Wyniki autora (`po-zb58`, `po-w33`) = moje, bajt w bajt.
+- Przeliczone recznie z linii logu wlasnym skryptem (bez kodu narzedzia), wszystkie zgodne: K5-4b / K5-5 (943 partie w 118 dobach = 943 z linii Obieg; wzorzec 1046 = 1046; liczniki nowe / startowe / wylaczony klucz / DTE = 0), K1-4 (30 / 35 tylko w linii dnia 108837 = dzien siewu), K0-6a/b (1.17 i 9.71 + 0.76; wzorzec 1.16 i 9.56 + 0.57), R1-7 (5638 z 16766 = 33.6%; d8-60 39.4%), R1-8 (45.0 / 29.4), R1-9 (+380.3 / +289.7 na dobe), R1-10 (810 / 509), R1-13 (3421 z 44815 = 7.6%; zapas 5106 -> 6050), K3-3 (17.71 / 26.40 = 67.1%), K3-4 (71.1% -> 67.1%), K3-5 (29.9%), K3-5a (97.9 / 99.0), K3-8b (brak do celu 3661), E7/O1 T3 z `noc.log` (7.17 na noc bez doczepionych 1.84, wyjazd 1.35, godzina 5-6: 5.62), E7/B T3 (srodek lukow 372.205/627.835, 4 pozycje do 0.11 jedn.), E7/B T4 (mediana 0.187), W1-5 / W3-6 (decyzje regulatora d57 / d85 / d113: welna 33 / 26 / 27 dni, sol 9 / 7 / 10 z "w gore" w d85, glina 32 / 32 / 41), A1-T14 (jedna doba z 1 zl na 120 linii).
+- Kod, na ktory powoluje sie TRIAZ: `PackMarket.cs:129` / `:139` (`_new++` przed `_naval++` - odstepstwo K5-5 "bez + morskie" sluszne), `SpareHorses.cs:96`, `HorseFate.cs:62`, `NightMarch.cs:792-793` (doczepieni i Inni poza snem - klasa slusznie poza T3), `Log.cs:108` (linie nocy w `noc.log`), `RansomFlows.cs:468`.
+- Wiersze luzowane maja dowod w TRIAZ i zaden nie chowa objawu: tam, gdzie objaw jest prawdziwy, wiersz zostaje NIE (A3-7 109.7 ms, R1-7, R1-8, R1-9, R1-10, K3-3, K3-5) albo NIE dochodzi (K5-4b, K5-5, K3-4, K3-8b, E7/O1 T3). Prog T3 E7/O1 (3 / 1) nieruszony.
+- `py_compile` kod 0; nazwy progow: 0 dubli w kazdym z 8 wynikow, 0 nowych zdublowanych kodow, te same nazwy tylko w rozlacznych galeziach if / else; 0 wyjatkow na 3 innych logach z katalogu gry (16-11-38 z zapisu, 15-28-21, 03-21-36) i oknach `--do-doby 30` / `70`.
+
+**Zmiana (jedyna):**
+- **R1-13 - dopisany udzial w oknie d61-until.** TRIAZ ma dwie definicje tej samej miary: R1-7 pkt 9 ("R1-7b", d61-until, bez warunku) i R1-12 pkt 4 ("R1-13", d91-until, NIE tylko gdy zapas zelaza swiata nie rosnie). F9a wzial wersje sekcji R1-12 (sekcja tego zjawiska, po podwazeniu) i nie wpisal tego w odstepstwa. W nowym biegu okno d61-120 daje 5.03% (4512 z 89715) - wedlug R1-7 pkt 9 byloby NIE o wlos; okno d91-120 daje 7.6% = INFO, bo zapas zelaza rosnie. Werdykt bez zmian (jedna regula na jedno zjawisko), liczba d61 jest teraz w wierszu - do decyzji przy progach po poprawce dowozu drewna (P1).
+- Naglowek narzedzia: blok E6/R1 "R1-1..R1-13".
+
+**Ryzyko / co sprawdzic:**
+- Tylko tekst jednego wiersza INFO. Po zmianie wszystkie grupy na obu logach: rozni sie tylko wiersz R1-13 nowego biegu i linia opisu; wzorzec bez roznic; `py_compile` kod 0.
+- Uwagi dla kroku po poprawkach kodu (bez zmian teraz): (1) R1-9 - wzorzec ma +289.7/d, czyli prog 290/d przechodzi o 0.3/d; z trzema innymi biegami bez dymarki (+384 / +387 / +416) to prog z jednego biegu - pytanie autora F9a zostaje otwarte. (2) E7/O1 T3 - wzorzec liczony recznie z `noc.log`: 2.82 na noc bez doczepionych, wyjazd z osady 1.53, czyli czesc "wyjazd <= 1" nie byla spelniona takze we wzorcu (TRIAZ pkt 6: prog do ustalenia po poprawce bramki snu).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (test zbiorczy etapow 5-8, bieg 120 dob - NARZEDZIE PROGOW F9a) - `tools/sprawdz_logi.py` po triazu zb58: progi ze zla miara, zlym oknem albo nieaktualne poprawione wedlug TRIAZ, blok E7/O1 czyta noc.log; DLL BEZ ZMIAN
 **Mod:** narzedzie (`tools/sprawdz_logi.py`), kod gry nietkniety | **Galaz:** `w-toku/zb58-progi` (z `w-toku/zbior-5-8` a589def) | **Pliki:** `tools/sprawdz_logi.py`, `CHANGELOG.md` | **Specyfikacja:** `docs/test-zbiorczy/TRIAZ-zb58-120-2026-10-12.md` - sekcje z werdyktem PROG_DO_POPRAWY i czesci "NARZEDZIE" sekcji BLAD / STROJENIE ("Poprawka ostateczna" razem z uwagami podwazenia)
 
