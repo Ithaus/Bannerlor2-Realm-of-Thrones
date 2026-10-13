@@ -1718,3 +1718,19 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   **LIMIT TYGODNIOWY 84% (17:40 UTC; ok. +4 pkt/h przy workflowach) - PLAN NA RESZTE KONTA (podany Jeffowi): (1) dokonczyc P1 danine (recenzja w toku wf_e6948e4c-524 -> test 120 dob ->
   wgranie), (2) projekt podatkow wojennych (korona wedlug potrzeby + tarczowe + stawka wojenna pana) oszczednie, (3) komplet do przekazania. Budowa przez lud (P2), lup miast (tor L),
   konie robocze (k13a + bieg 120 dob z danina) - dla drugiego konta, chyba ze Jeff zmieni kolejnosc.**
+- (18:35 UTC 13.10) **JEFF: "Robimy poprawki od 1 do 6" (lista (g) raportu rocznego), "pilnujemy limitu 5 h i tygodniowego, zapisujemy kazda skonczona zmiane, robimy az wyczerpie sie
+  konto, potem drugie konto"; "dopiero jak wszystko poprawimy, robimy bieg dwuletni".** KOLEJKA I STAN (aktualizowac po kazdym kroku):
+  1a. DANINA P1 - KOD GOTOWY I SCALONY: `w-toku/kiesa-p1-danina` e872bd9 -> `w-toku/zbior-e8` **55b59d7** (Armoury ccfbf36a = test\fin7; klucze FolkWarAid, FolkWarAidShare 0.025,
+      PeopleMenuShowsSavings, FolkLadderMeasureLog; progi `--grupa kiesa1`). **W GRZE: test 120 dob** (test\at-p1-120.out.txt; start 17:31 UTC). Oczekiwane (szacunek recenzji z danych
+      biegu, +-30%): lokata W d120 ok. 6-7.5 mln (z tego 3-4 mln w krolestwach BEZ poboru: Dothrakowie caly rok s = 0, Nocna Straz, pokoj) -> P1-1 = DECYZJA; danina d91-120 60-75 tys.
+      zl/d (prog >= 40); P1-5a r = 0, P1-5b 0 roznych. DO JEFFA: skrzyn miast krolestw "bez potrzeby korony" danina nie ruszy (zasada z 09.10) - ok. polowy lokaty po roku.
+      Po czystym tescie: zapis 9 dob -> WGRANIE 39.
+  1b. KORONA PLACI WEDLUG POTRZEBY - w toku (workflow, galaz `w-toku/w5-korona-wg-potrzeby` od 55b59d7, drzewo SC\zb\wn).
+  2.  TARCZOWE - po 1b (ten sam garnek korony). Stawka wojenna podatku pana (trzeci wybor Jeffa) - po tarczowym.
+  3.  POBITY OBLEGAJACY UCHODZI - w toku wf_5efe7e4c-7b2 (docs/przekazanie/wf-n3-oblegajacy-uchodzi.js), galaz `w-toku/n3-oblegajacy-uchodzi` od cd675b6, drzewo SC\zb\n3
+      (LosersFlee.cs ma warunek IsFieldBattle; 38 wypadow = 55 tys. ludzi/rok w 100% straconych).
+  4.  BIEG DWULETNI - NA SAMYM KONCU, po wszystkich poprawkach (decyzja Jeffa).
+  5.  TOWARY (len, skora, platnerze, hamulec drewna, budowy z dala od frontu) - nie zaczete.
+  6.  MALE POPRAWKI (najkrotsza sluzba najemnikow, przerwa po wykupie, konie juczne i zboze w ksiegach, Thenn) - nie zaczete.
+  Poza lista 1-6, zatwierdzone przez Jeffa i czekajace: konie robocze k13a + bieg 120 dob z danina; P1b kara lojalnosci (po pomiarze); P2 lud buduje miasto (tylko budowle sluzace
+  miastu); P3-P5 zbytki; lup miast (5 x tak + niszczenie budowli, rozsadna odbudowa).
