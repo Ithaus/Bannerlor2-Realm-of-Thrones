@@ -1663,3 +1663,5 @@ Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d
   robocze SCRATCH\raport-rok\), `wf-lup-miast.js` (wf_063e9114-c56 -> docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md; SCRATCH\lup-miast\), `wf-kiesa-p1-danina.js`
   (wf_e6948e4c-524: paczka P1 na galezi `w-toku/kiesa-p1-danina`, drzewo SC\zb\p1 od 9e2e0e6: danina FolkWarAid 2.5% x s/3%, zdanie Savings, pomiary, progi). W grze: bieg kontrolny
   10 dob po wgraniu (test\at-w37-kontrola10.out.txt). PO NICH: test 120 dob P1; scalenie k13a (konie robocze) + drugi bieg 120 dob z obiema; projekt "podatki wojenne -> wojsko".
+- (16:25 UTC 13.10) **Bieg kontrolny PO WGRANIU 37 (pliki z gry, 10 dob nowej kampanii): 10/10, Armoury 0 ERROR** (Armoury-2026-10-13_09-20-34.log); swaty "PODPIETY - decyduje nasza
+  droga"; po biegu w grze WGRANIE 37 (md5: Armoury f2afb329, CrashScribe 3ca8aa08, settings ef8cd722). Workflowy raportu, lupu miast i paczki P1 dalej w toku.
