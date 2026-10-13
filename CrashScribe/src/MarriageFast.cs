@@ -50,7 +50,8 @@ namespace CrashScribe
     ///
     /// Straze (jedna linia "Mends: swaty ROT (Z.3): PODPIETY / BRAK" przy starcie sesji; gdy cos nie pasuje - liczy oryginal ROT):
     ///  dlugosci IL znanych metod (inna = inna logika), model na wierzchu ROTMarriageModel, pod nim pochodna BKMarriageModel z
-    ///  IsCoupleSuitableForMarriage z gry; obce latki Harmony na lancuchu oceny pary (poza RaceLaw) albo obcy prefiks bool / transpiler
+    ///  IsCoupleSuitableForMarriage z gry; obce latki Harmony na lancuchu oceny pary (poza RaceLaw; lancuch = metody modelu obu
+    ///  poziomow, Hero.CanMarry, Romance.GetCourtedHeroInOtherClan, Hero.HomeSettlement i UpdateHomeSettlement) albo obcy prefiks bool / transpiler
     ///  na samej metodzie ROT - nasza droga stoi; obca latka na lancuchu szansy (np. AIInfluence: prefiks DefaultMarriageModel
     ///  .NpcCoupleMarriageChance) - wylaczony tylko skrot (c). Obce latki sprawdzane przy pierwszym wywolaniu sesji i raz na dobe.
     /// Wyjatek w naszej drodze: stan generatora cofniety do wejscia, potkniecie policzone, ten rod liczy oryginal (latka zostaje).
@@ -147,10 +148,21 @@ namespace CrashScribe
             catch { return -1; }
         }
 
-        /// <summary>Implementacja metody wirtualnej, ktora naprawde wykona sie dla typu t (DeclaringType = klasa, ktora ja nadpisala).</summary>
+        /// <summary>
+        /// Implementacja metody wirtualnej, ktora naprawde wykona sie dla typu t - zawsze jako metoda ZADEKLAROWANA (ReflectedType ==
+        /// DeclaringType = klasa, ktora ja nadpisala). Metoda odziedziczona wzieta przez typ pochodny to inny obiekt MethodInfo, a Harmony
+        /// trzyma latki pod zadeklarowana: Harmony.GetPatchInfo dalby dla niej null i obca latka bylaby niewidoczna (sprawdzone na
+        /// Harmony 2.4.2 z gry). Gdy zadeklarowanej nie da sie znalezc - null (straz nie puszcza).
+        /// </summary>
         private static MethodInfo Impl(Type t, string name, Type[] args)
         {
-            try { return t.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, args, null); }
+            try
+            {
+                const BindingFlags all = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                var m = t.GetMethod(name, all, null, args, null);
+                if (m == null || m.DeclaringType == null || m.ReflectedType == m.DeclaringType) return m;
+                return m.DeclaringType.GetMethod(name, all | BindingFlags.DeclaredOnly, null, args, null);
+            }
             catch { return null; }
         }
 
@@ -252,6 +264,13 @@ namespace CrashScribe
             var mCan = AccessTools.DeclaredMethod(typeof(Hero), "CanMarry", Type.EmptyTypes);
             if (mCan == null) return "brak Hero.CanMarry()";
             chain.Add(mCan);
+            // reszta lancucha oceny pary w grze: zaloty i pamiec domu - skroty stoja na tym, ze to same odczyty plus jedno pole pamieci
+            var mCourt = AccessTools.DeclaredMethod(typeof(Romance), "GetCourtedHeroInOtherClan", H2);
+            var mHomeGet = AccessTools.DeclaredPropertyGetter(typeof(Hero), "HomeSettlement");
+            var mHomeUpd = AccessTools.DeclaredMethod(typeof(Hero), "UpdateHomeSettlement", Type.EmptyTypes);
+            if (mCourt == null || mHomeGet == null || mHomeUpd == null)
+                return "brak Romance.GetCourtedHeroInOtherClan / Hero.HomeSettlement / Hero.UpdateHomeSettlement";
+            chain.Add(mCourt); chain.Add(mHomeGet); chain.Add(mHomeUpd);
             _chainCouple = chain.ToArray();
 
             // skrot dla zonatych: szansa slubu lorda z zyjacym malzonkiem musi byc zerem bez losowania
@@ -436,7 +455,12 @@ namespace CrashScribe
             long t0 = Stopwatch.GetTimestamp();
             try { _busy = true; decided = Decide(model, list, __0, out h1, out pick); }
             catch (Exception e) { err = e; }
-            finally { _busy = false; }
+            finally
+            {
+                _busy = false;
+                // bufory nie trzymaja bohaterow miedzy wywolaniami (po wyjsciu do menu przypinalyby stara kampanie do nastepnego wczytania)
+                _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear();
+            }
             long dt = Stopwatch.GetTimestamp() - t0;
 
             _dayClans++; _totClans++;

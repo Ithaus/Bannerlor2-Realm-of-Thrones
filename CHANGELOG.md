@@ -1,5 +1,41 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (Z.3 POZYCJA 1 - RECENZJA) - SWATY ROT: straz obcych latek widziala tylko 8 z 14 metod (poprawione); prawdziwy kod z DLL przeciw wzorcowi ROT: 0 roznic
+**Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-rot` | **Pliki:** `CrashScribe/src/MarriageFast.cs`, `CHANGELOG.md`. Poprawka do wpisu nizej (commit 1c6ae85). Bez zmian zapisu, bez nowych kluczy.
+
+**Problem (liczby):** niezalezna recenzja wpisu nizej. Wybor par i ciag losowy - bez zarzutu (dowod nizej, 0 roznic). Znalezione: 1 blad strazy i 2 drobiazgi.
+1. Straz "obca latka Harmony" byla slepa na 6 z 14 pilnowanych metod: `DefaultMarriageModel.IsCoupleSuitableForMarriage`, `ShouldNpcMarriageBetweenClansBeAllowed`, `IsClanSuitableForMarriage` (gra) oraz `BKMarriageModel.IsSuitableForMarriage`, `NpcCoupleMarriageChance`, `IsMarriageAdequate` (BK). Obcy mod latajacy ktoras z nich nie zatrzymalby naszej drogi ani skrotu dla zonatych - wynik gry moglby sie rozejsc z oryginalem bez slowa w logu. Dzis u Jeffa nikt ich nie lata (przeszukane wszystkie DLL modow: nazwy w atrybutach, odwolaniach i napisach), wiec to blad na przyszlosc, nie na dzis.
+2. Bufory statyczne (`_lords`, `_males`, `_females`, `_nullHomes`, `_cand`) trzymaly do ok. 1000 bohaterow miedzy wywolaniami - po wyjsciu do menu przypinaly stara kampanie w pamieci do nastepnego wczytania.
+3. Lancuch strazy nie obejmowal trzech metod gry, na ktorych stoja skroty: `Romance.GetCourtedHeroInOtherClan`, `Hero.HomeSettlement` (odczyt), `Hero.UpdateHomeSettlement`.
+
+**Przyczyna:** `Impl()` bral metode przez typ pochodny (`typeof(BKROTMarriageModel).GetMethod(...)`). Dla metody odziedziczonej to INNY obiekt `MethodInfo` (ReflectedType != DeclaringType), a Harmony trzyma latki pod metoda zadeklarowana - `Harmony.GetPatchInfo` zwracal dla takiej null. Sprawdzone probka na Harmony 2.4.2 z gry (`scratchpad\tmp\z3rev\hid`): latka zalozona na `Base.M`, pytanie przez `typeof(Top).GetMethod("M")` -> null; przez metode zadeklarowana -> 1 postfiks.
+
+**Zmiana:**
+- `Impl()` zwraca zawsze metode zadeklarowana (drugie pytanie z `DeclaredOnly` na `DeclaringType`; gdy sie nie uda - null i straz nie puszcza).
+- Lancuch oceny pary: + `Romance.GetCourtedHeroInOtherClan`, `Hero.HomeSettlement` (getter), `Hero.UpdateHomeSettlement` - obca latka na ktorejkolwiek = nasza droga stoi, liczy oryginal ROT (linia "obca latka - ..."). Razem pilnowanych 17 metod (12 oceny pary + 5 szansy).
+- Bufory czyszczone po kazdym wywolaniu rodu (w `finally` po `Decide`).
+- Logika wyboru par, losowania i biegu cienia - BEZ ZMIAN.
+
+**Dowod rownowaznosci (recenzja, niezaleznie od autora):**
+- Oryginal przeczytany w IL (448 bajtow) i C#: kolejnosc `PlayerClan` -> `IsClanSuitableForMarriage` -> `AliveLords.ToList()` -> `CanMarry` -> `Where` + `GetRandomElementInefficiently` (`Any` do pierwszego trafienia, `Count` cala lista, `RandomInt(Count)`, `ElementAt`) -> `NpcCoupleMarriageChance` -> `RandomFloat` tylko gdy szansa > 0 (`ble.un` - takze NaN bez losowania) -> zaloty `Level >= 3` (porownania referencji) -> `MarriageAction.Apply(.., true)` i koniec. `Decide` robi to samo 1:1.
+- Losowania na papierze: (1) lord bez malzonka, 7 kandydatow, szansa 0.03: stara `Next(7)` + `NextFloat` = 2 kroki, nowa `Next(7)` + `NextFloat` = 2 kroki, ten sam numer -> ten sam kandydat; (2) lord z zyjacym malzonkiem, 7 kandydatow: stara `Next(7)`, szansa 0 (BK `IsMarriageAdequate`: `HasPrimarySpouse` -> -10000 -> `num = 0` -> `0 * 1.25`), bez `NextFloat` = 1 krok; nowa `Next(1)` = 1 krok (`MBFastRandom.Next(int)` = jeden XorShift bez wzgledu na argument); (3) brak kandydatow albo `CanMarry` = false: 0 krokow w obu; wdowiec (`Spouse` martwy) idzie jak (1) w obu.
+- Stan w srodku doby: nic nie jest pamietane miedzy rodami - podzial wedlug plci i spis pustych domow robione od nowa w kazdym wywolaniu rodu, malzonek lorda czytany w chwili wywolania (jak `HasPrimarySpouse`), lista kandydatow to ta sama lista ROT (martwi, pojmani i swiezo poslubieni przechodza przez ten sam warunek modelu co w oryginale; pelnoletni z tej doby wchodza na liste dopiero przy nastepnym `DailyTick` ROT - w obu drogach).
+- Czystosc warunku pary sprawdzona do dna: `ROTMarriageModel` (`IsGreatHouse` -> `IsWesterosi` -> `HomeSettlement`), `DefaultMarriageModel`, `Romance`, `Hero.CanMarry` -> `BKMarriageModel.IsSuitableForMarriage` + `IssueManager` / `QuestManager` (jedyne nadpisanie w grze: `LordsNeedsTutorIssue`, jedyny sluchacz zdarzenia: StoryMode - same odczyty), `Hero.UpdateHomeSettlement` (czyta gubernatorow, rodzine, dom rodu - nie czyta cudzej pamieci domu, wiec kolejnosc ocen nie ma znaczenia). BK `_spouseScoreCache` wypelnia tylko liczenie szansy za `HasPrimarySpouse` - skrot dla zonatych go nie omija.
+- PRAWDZIWY kod z DLL: `MarriageFast.Split` / `Scan` ze zbudowanej `CrashScribe.dll` (refleksja) na prawdziwych obiektach `Hero`, prawdziwym `MBRandom` i `Extensions.GetRandomElementInefficiently`, przeciw wzorcowi 1:1 z ROT (`scratchpad\tmp\z3rev\dlltest`): 4000 losowych swiatow (puste domy 0 / 25 / 70 / 100%, wdowcy, martwi na liscie, 10-70% zonatych, skrot zonatych wlaczony i wylaczony), 57 493 wywolania rodu (56 705 z losowaniem): par stara 20 299, nowa 20 299, roznic par 0, stanu generatora 0, pamieci domu 0. Kontrole negatywne: zonaty z szansa > 0 -> 1677 roznic par i 2466 stanu; bez zasady pustego domu -> 235 roznic pamieci.
+- Straze na prawdziwych DLL z folderu gry (sama refleksja, `scratchpad\tmp\z3rev\guardtest`): 11 metod modelu znalezionych jako zadeklarowane we wlasciwych klasach, dlugosci IL 448 / 475 / 148 / 19 / 48 / 453 / 48 zgodne ze stalymi - linia startu powinna byc `PODPIETY`, skrot dla zonatych `tak`.
+- Bieg cienia: nasza droga liczy bez slubu, generator wraca do wejscia, decyduje oryginal; porownanie pary i stanu generatora w chwili decyzji; wyjatek ktorejkolwiek drogi liczony jako roznica. Stanu gry nie zmienia (pamiec domu i pamiec BK wypelniane tymi samymi wartosciami, ktore chwile pozniej wpisalby oryginal).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: zmiana dotyka tylko strazy i buforow; wybor par i losowania nie ruszone (test wyzej na DLL po poprawce).
+- Falszywe zatrzymanie: nowe 3 metody w lancuchu - zaden mod Jeffa ich nie lata (przeszukane DLL; BKROTPatch, Spoils of War i VoiceActingPatch uzywaja napisu "HomeSettlement" tylko do odczytu / ustawienia domu RODU przez refleksje). Gdyby w logu pojawila sie linia "obca latka - ... - nasza droga stoi" - swaty liczy oryginal, zysku nie ma, wynik gry bez zmian.
+- **Cel "ponizej 10% kosztu oryginalu" nadal NIE jest osiagniety** (szacunek autora ok. 37%; prawdziwa liczbe da linia cienia). Wiecej bez zmiany wyniku wymaga latek na dwie metody gry (pamiec `Hero.CanMarry` i skrot `Romance.GetCourtedHeroInOtherClan` na czas przegladu) - osobna zmiana i osobny bieg cienia, nie w tej.
+- Wyjatek modelu: gdyby model rzucal dla pary, ktorej nasza droga nie pyta (ta sama plec z policzonym domem; u zonatego - kandydaci po pierwszym trafieniu), oryginal by sie wywrocil, a nasza droga nie. Biegi roczne: 0 takich bledow; w biegu cienia wyszloby jako "wyjatek oryginalu".
+- Autotest bez zmian: najpierw bieg cienia (`roznic 0`, `par stara droga` = `nowa`, potkniecia 0, brak linii "obca latka"), potem bieg bez cienia.
+
+**Build:** CrashScribe kod 0, 0 ostrzezen (drzewo `zb/z3`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - autotest (najpierw bieg cienia: roznic 0).
+
 ## 2026-10-13 (Z.3 POZYCJA 1 - S, tor M) - SWATY LORDOW ROT SZYBCIEJ: te same pary, ta sama doba, ten sam ciag losowy (MarriageFast) + BIEG CIENIA (MarriageFastShadow)
 **Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-rot` (od ca4aa87 = WGRANIE 35) | **Pliki:** `CrashScribe/src/MarriageFast.cs` (nowy), `CrashScribe/src/Config.cs`, `CrashScribe/src/SubModuleMain.cs` (1 linia: `MarriageFastBehavior`), `CrashScribe/ModuleData/CrashScribe.settings.xml`, `CHANGELOG.md`. Rozpoznanie: `docs/zakonczenie/ROZPOZNANIE-Z3-CUDZY-KOD-2026-10-13.md` (pozycja 1). Bez zmian zapisu.
 
