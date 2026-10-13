@@ -1043,7 +1043,10 @@ namespace Armoury
         public float PovertyDeepFactor = 0.5f;             // the wage ceiling of a house deep in poverty at war (share of the normal one)
         public float BudgetHysteresis = 1.1f;              // a house is over its budget only when its wages pass this many times the ceiling
         public int BudgetHysteresisDays = 3;               // ... for this many days in a row before men are sent home
-        public float ReleasePerDay = 0.15f;                // share of the excess wages sent home each day (as men, lowest first)
+        public float ReleasePerDay = 0.15f;                // share of the excess wages sent home each day (as men; who goes first is set by Release Across Tiers)
+        // P3/W2 (bieg roczny 364 doby, TRIAZ-3 O1-3: rody na pulapie - ten sam zold partii 99.4 -> 100.8 tys./d, ludzie 18 867 -> 12 259, zold na czlowieka
+        // 5.27 -> 8.22 zl; zwalniany kosztowal 3.65 zl przy sredniej partii 9.28 zl): zwolnienia losowo z calej partii zamiast od najnizszego tieru
+        public bool ReleaseAcrossTiers = true;             // men sent home for lack of budget are drawn evenly from the whole party or garrison (every man has the same chance), not lowest tier first - for the same wages fewer men leave, and a poor house keeps more heads instead of a few veterans; tavern mercenaries still go first. Off = lowest tier first, as before
         public int MinNewPartyMen = 30;                    // a house raises a new party only when its ceiling has room for this many more men (a house with no party at all may always raise one)
         public float GarrisonPeaceShare = 0.5f;            // in peace a garrison is held at this share of its average war strength (in wages)
         public bool GarrisonWarFull = true;                // at war garrisons keep the game's own limit and are paid first; the parties get the rest of the ceiling. Off = garrisons are held at the peace target in war too

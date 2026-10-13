@@ -3384,9 +3384,13 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int BudgetHysteresisDays { get; set; } = 3;
 
-        [SettingPropertyFloatingInteger("Release Per Day", 0.00f, 1.00f, "0.00", HintText = "share of the excess wages sent home each day (as men, lowest first)")]
+        [SettingPropertyFloatingInteger("Release Per Day", 0.00f, 1.00f, "0.00", HintText = "share of the excess wages sent home each day (as men; who goes first is set by Release Across Tiers)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float ReleasePerDay { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Release Across Tiers", HintText = "men sent home for lack of budget are drawn evenly from the whole party or garrison (every man has the same chance), not lowest tier first - for the same wages fewer men leave, and a poor house keeps more heads instead of a few veterans; tavern mercenaries still go first. Off = lowest tier first, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool ReleaseAcrossTiers { get; set; } = true;
 
         [SettingPropertyInteger("Min New Party Men", 0, 120, "0", HintText = "a house raises a new party only when its ceiling has room for this many more men (a house with no party at all may always raise one)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -6078,6 +6082,7 @@ namespace Armoury
             s.BudgetHysteresis = BudgetHysteresis;
             s.BudgetHysteresisDays = BudgetHysteresisDays;
             s.ReleasePerDay = ReleasePerDay;
+            s.ReleaseAcrossTiers = ReleaseAcrossTiers;
             s.MinNewPartyMen = MinNewPartyMen;
             s.GarrisonPeaceShare = GarrisonPeaceShare;
             s.GarrisonWarFull = GarrisonWarFull;

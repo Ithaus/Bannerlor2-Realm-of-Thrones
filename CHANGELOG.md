@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO W2, TRIAZ-3 O1-3) - ZWOLNIENIA Z BRAKU BUDZETU LOSOWO Z CALEJ PARTII, NIE OD NAJNIZSZEGO TIERU (klucz ReleaseAcrossTiers)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `DrawAcross`, `ReleaseFrom`, liczniki i linia 166), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian (zadnego nowego stanu).
+
+**Problem (bieg roczny 364 doby, `budzet-rodow.csv`):** 37 rodow na pulapie zoldu z >= 100 ludzi w obu oknach: zold partii 99.4 -> 100.8 tys. zl/d (bez zmiany), ludzie 18 867 -> 12 259 (-35%), zold na czlowieka 5.27 -> 8.22 zl (+56%; u rodow z luzem 4.31 -> 5.27, +22% - zwykle starzenie wojska). W dniach zwalniania odchodzacy kosztowali 3.65 zl na czlowieka (40 036 ludzi, 145 978 zl), a srednia tych partii to 9.28 zl. Zwolnieni przez budzet 148 569 w roku (z partii 129 063: 215/d w d57-84 -> 520/d w d337-364) - tyle, co polegli w partiach (132 029).
+
+**Przyczyna:** `ClanBudget.ReleaseFrom` po najemnikach z karczmy zdejmowal stosy od najnizszego tieru (`stacks.Sort` po tierze, `n = ceil(reszta / zold)`): zeby zdjac 100 zl zoldu, pan odprawial ok. 50 ludzi t1 zamiast ok. 8 z t5. Druga polowa zapadki (podwazenie): awanse gry wypelniaja wolne miejsce limitu natychmiast, a pulap skacze z kiesa - 382 przejscia "pod pulapem -> ponad 1.10" w 64 rodach, czyli rotacja werbunek -> zwolnienie najtanszych -> awans reszty. To zamierzona regula 166 (strojenie, nie blad); tlumaczy najwyzej 6 z 34 tys. rocznego spadku (18%; gorna granica 9.8 tys.).
+
+**Zmiana (klucz `ReleaseAcrossTiers`, domyslnie wlaczony; wylaczony = najnizszy tier najpierw, stan sprzed):**
+1. `DrawAcross` - LOSOWANIE CZLOWIEKA: kazdy czlowiek partii ma rowna szanse (stos z waga = liczba ludzi, `MBRandom.RandomInt`), bez zwracania, az zebrany zold >= kwota; ostatni czlowiek przy reszcie mniejszej niz jego zold odchodzi z prawdopodobienstwem reszta / zold. Srednio wychodzi dokladnie kwota (symulacja 20 000 losowan: kwota 3 / 20 / 60 / 300 zl -> srednio 3.0 / 20.0 / 60.0 / 300.1 zl; glow 8.0 zamiast 25 przy 60 zl w partii 160 ludzi po 7.6 zl). Wzor z pierwotnego wniosku (`ceil` na stos) odrzucony: mediana kwoty dnia rodu to 60 zl = 8.6% zoldu partii, ceil dawalby po 1 czlowieku z kazdego stosu, czyli kilka razy wiecej niz kwota.
+2. `ReleaseFrom`: poza przebiegiem "tylko najemnicy z karczmy" liczby na stos z losowania, potem to samo cialo petli co dotad (ranni proporcjonalnie, `PeopleBook.Take` -> `ToVillage` -> `AddToCounts`, najwyzej jedno `ToVillage` na stos). Ta sama regula dla partii i zalog (jedna zasada). Najemnicy z karczmy dalej pierwsi.
+3. POMIAR w linii "Budzet rodow (166)": `P3/W2 zwolnieni wedlug tieru (ludzi / ich zold zl): t1-2, t3-4, t5+` oraz `rody w wojnie, ktorym zalogi i karawany zajely caly pulap (na partie 0): N, z tego bez ludzi w partiach M` - bez tego skutku nie da sie potwierdzic.
+
+**Zloto / ludzie:** nic z niczego - ci sami zwalniani ida tymi samymi drogami (wies z pochodzeniem, 1/3 uprawnionych t3+ do karczmy); sakiewka idzie proporcjonalnie do glow, wiec do kies wsi pojdzie ok. polowa dzisiejszej kwoty, reszta zostaje w sakiewkach partii. Dotyczy rodow na pulapie z partiami (73 rody, 18.3 tys. ludzi, zold 146.8 tys. zl/d, 8.01 zl/czl): przy tym samym zoldzie zwalnianym odchodzi ok. 59 zamiast 128 ludzi/d. Oczekiwane: zold na czlowieka tej grupy 8.0 -> 5.2-6.0 zl = +6 do +9.8 tys. glow w 3-6 miesiecy bez monety wiecej. 38 rodow, ktorym zalogi zajely pulap (partie 17 950 -> 616), nie zyska nic - to sprawa renty (W1) i pulapu.
+
+**Audyt sprzetu i koni zwalnianych (odczyt kodu, pkt 4 poprawki ostatecznej):** sprzet zostaje w zbrojowni partii; `MenPurse.AiSurplusPlan` trzyma to, co moze nosic ktos z rosteru, a nadwyzke sprzedaje od najgorszej sztuki na polke miasta za cene miasta z kasy miasta (trzecia panu, reszta do sakiewki ludzi) - nic nie znika. Konni idacy do karczmy zabieraja konia swojej kategorii do puli miasta (`HorseFate.VetTakeHorses`), reszta koni zostaje w zbrojowni, nadmiar ponad zapas idzie na polke (E6/K2). CENA: w d364 "nadwyzki sprzedane 5369 szt. za 7571 zl" = 1.41 zl/szt. (korpus 897 szt. / 2344 zl, konie i rzedy 21 szt. / 179 zl) - polki sa zapchane i placa grosze JUZ DZIS, takze za sprzet poleglych; poprawka zmienia sklad (mniej sztuk, wyzszy tier), nie droge.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Wielkosc M: zmiana skladu wojsk AI w calym swiecie - elita i jazda rodow na pulapie rzednie (t5+ odchodzi wedlug udzialu), druzyny liczniejsze i nizszego tieru. Odrzucone: "najdrozsi najpierw" (rozbiera elite), blokada awansow przy pulapie (latka na kod gry).
+- Do karczm trafia wiecej t3+ w udziale, mniej w liczbie (dzis ok. 115-165/d z 520; po zmianie ok. 135-150/d z ok. 245). Pula weteranow juz dzis sie nie stabilizuje (309 -> 10 094, +38/d) - pilnowac.
+- Drogi sprzet zwalnianych t5+ sprzedawany za grosze na zapchanych polkach (patrz audyt) - pilnowac linii "Sakiewka ludzi: nadwyzki sprzedane" (szt. i zl); ceny skupu to obszar gospodarki, nie wojska.
+- Losowanie zalezy od `MBRandom` - dwa biegi z tego samego zapisu roznia sie zwolnionymi (jak werbunek i bitwy AI).
+- Kolizje: `Releases` (podzial kwoty miedzy partie, przebiegi) bez zmian; `ToVillage`, ksiega ludzi, sakiewka - to samo cialo petli. Straz bez zoldu (kwota w ludziach) - ta sama regula, ale Straz nie zwalnia (`WatchNoReleases`).
+- Klucza nie ma w `Armoury.json` Jeffa (grep).
+- PROGI (test 120 dob wobec WGRANIA 35, potem bieg roczny): zold na czlowieka rodow na pulapie nie rosnie szybciej niz u rodow z luzem o wiecej niz 5 pkt proc.; "zwolnieni z partii" w glowach ok. polowa przy podobnym zoldzie zwalnianych; ludzie partii >= +3 tys. w d120; pula weteranow nie rosnie szybciej niz +38/d; 0 ERROR.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (wczesniej test 120 dob - zmiana M).
+
 ## 2026-10-13 (P3/WOJSKO W1-B, TRIAZ-3 O1-2 B) - DOBA WOJNY ZOBOWIAZUJE KROLESTWO TYLKO PRZY WEZWANIU ALBO NAPADZIE NA WLASNA ZIEMIE (klucz CrownRentContactOnlyWhenCalled)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (Daily: zbior krolestw ze stykiem; linia), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
 
