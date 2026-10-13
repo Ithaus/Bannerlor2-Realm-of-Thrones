@@ -1734,3 +1734,20 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   6.  MALE POPRAWKI (najkrotsza sluzba najemnikow, przerwa po wykupie, konie juczne i zboze w ksiegach, Thenn) - nie zaczete.
   Poza lista 1-6, zatwierdzone przez Jeffa i czekajace: konie robocze k13a + bieg 120 dob z danina; P1b kara lojalnosci (po pomiarze); P2 lud buduje miasto (tylko budowle sluzace
   miastu); P3-P5 zbytki; lup miast (5 x tak + niszczenie budowli, rozsadna odbudowa).
+
+**WGRANIE 39 (13.10 19:02 UTC; poprawka 1a - danina wojenna z oszczednosci ludu, paczka P1 obiegu kiesy):** Armoury **ccfbf36a** (reszta jak WGRANIE 38: CrashScribe 04f44a0e, settings
+3e31434f, RC f9a944c1, GT 035878c4, ForgeView e17e0233). Galaz `noc/wgranie-39` = `w-toku/zbior-e8` **55b59d7** (= cd675b6 + `w-toku/kiesa-p1-danina` e872bd9). Kopie:
+`*.bak-2026-10-13-noc39-przed` i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc39-przed`; md5 OK. Cofniecie: Armoury f2afb329 z tych kopii (albo klucz FolkWarAid = false w MCM).
+- **TEST 120 dob przed wgraniem (nowa kampania; Armoury ccfbf36a + CS-at-hamulec): 120/120, 0 ERROR, 11.5 s/dobe** (Armoury-2026-10-13_10-30-28.log + tabele, kopie na D:; progi
+  SCRATCH\test\progi-p1\). **Danina d91-120: 121.7 tys. zl/d** (W 87.3 / R 6.8 / P 7.5 / podzamcza 20.1; szacunek byl 60-75 tys.), razem 6.06 mln; pierwsza doba poboru d29 (s rosnie
+  tygodniami). **Zamkniecie: kontrola kies r = 0 w 119 z 119 dob; danina z kies = do skarbcow = wplyw 165 = Obieg, roznych dob 0; reszta ksiegi R 126; potkniecia 0.**
+  **Wojsko lordow w wojnie (sr. 28 dob w d120): 105 589 wobec 101 144 w tescie rundy 3 bez daniny (+4.4 tys.; ostatnia doba 104 622 wobec 88 797)**; zalegly zold 0.01%; zwrot
+  zoldu 100%, renty 282.5 tys. zl/d. Lokata W d120 7.94 mln (z poborem 5.91, bez poboru 2.04: Dothrakowie, Sarnor, Dolina, Qarth s = 0; pokoj Dorzecze, Yi Ti) wobec 8.9-10.6 bez
+  daniny - prog 4.5 mln NIE: zloto wraca do ludu jako zarobek (zold wydany w miastach), wiec lokata rosnie dalej +18.9 tys./d (bylo +47-65). **P1-9 NIE: zloto rodow z luzem pulapu
+  +7.01 mln w 118 dob (31.35 -> 38.36 mln); rodow na pulapie 81 -> 65** - danina rozdawana wedlug ziemi osiada u rodow, ktorym nie brakuje (przewidziane ryzyko; lekarstwo = poprawka
+  1b "korona wedlug potrzeby" i tarczowe). Lojalnosc: miasta srednio 93, zadne <= 30 (pomiar pod P1b). Kupione z oferty nadwyzki 4.6% (oferta 1.35 mln zl/d, z tego aksamit 1.09 mln
+  bez towaru na polce) - dane pod P3 / P4. Czas poboru 0.061 ms/d.
+  Nowe NIE wobec testu rundy 3 (wszystkie na granicy, do obejrzenia w biegu dluzszym): R1-8 miasta bez zelaza d91-120 31.6 (prog 30; bylo 25.9 - wieksze wojsko zuzywa wiecej),
+  R1-10b cykle warsztatow bez surowca 190/d (prog 177), E5/B5-7 port Lordsport 36 dob bez nadwyzki (prog 28).
+- Test zapisu: wczytany `autotest-dlugi` (doba 60 biegu daniny) + 9 dob: 0 ERROR, linia daniny liczy dalej. Bieg kontrolny po wgraniu w toku (test\at-w39-kontrola10.out.txt).
+- NIE SPRAWDZONE AUTOTESTEM (do recznego testu Jeffa): zdanie "Savings: ..." w oknie "People of this land" i komunikat "War aid: ..." dla osad gracza.
