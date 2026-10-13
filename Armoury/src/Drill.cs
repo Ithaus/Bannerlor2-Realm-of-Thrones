@@ -197,14 +197,17 @@ namespace Armoury
 
         // E8/0 (242): ten sam zegar kosztu wedlug wejscia zewnetrznego (linia "Profil doby (E8/0)", tylko pomiar): 0 godziny ruchu, 1 tik treningu (Shape, Done,
         // TickPrefix, TickPostfix), 2 kowale przy wejsciu do miasta, 3 linie dnia, 4 (wolne), 5 ekrany i trofea; 6 zuzycie i 7 kowale w TickPostfix (w tym w 1)
-        internal const int PHour = 0, PTrain = 1, PSmith = 2, PLines = 3, PScreen = 5, PWear = 6, PScrapTick = 7;
+        // Z.3 poz. 3 (13.10, tylko pomiar): 8 - liczenie nadwyzki K1 partii AI w CtxOf (CountAiStock: AiSurplus -> MenPurse.AiMeleeLeft + AiSurplusPlan; w tym w 1),
+        // 9 - liczba tych wywolan (LICZNIK, nie czas - jedno na partie AI z pomiarem zapasu w dobie)
+        internal const int PHour = 0, PTrain = 1, PSmith = 2, PLines = 3, PScreen = 5, PWear = 6, PScrapTick = 7, PCtxSur = 8, PCtxSurN = 9, PSlots = 10;
         private static int _clkCat;
-        private static readonly long[] _prof = new long[8];
-        private static long _profReads;   // recenzja E8/0: odczyty zegara stoperow zuzycia i kowali w TickPostfix - do "koszt profilu" (prog E80-3)
-        /// <summary>E8/0: kopiuje czasy wedlug wejscia (ticki zegara) do dst[0..7] i zeruje; zwraca liczbe odczytow zegara stoperow 6 i 7 od poprzedniego odczytu.</summary>
+        private static readonly long[] _prof = new long[PSlots];
+        private static long _profReads;   // recenzja E8/0: odczyty zegara stoperow zuzycia i kowali w TickPostfix - do "koszt profilu" (prog E80-3); Z.3: takze stopera 8
+        /// <summary>E8/0: kopiuje czasy wedlug wejscia (ticki zegara; pozycja 9 - licznik) do dst[0..PSlots-1] i zeruje; zwraca liczbe odczytow zegara stoperow
+        /// 6, 7 i 8 od poprzedniego odczytu.</summary>
         internal static long ProfileTake(long[] dst)
         {
-            for (int i = 0; i < 8 && i < dst.Length; i++) { dst[i] = _prof[i]; _prof[i] = 0; }
+            for (int i = 0; i < PSlots && i < dst.Length; i++) { dst[i] = _prof[i]; _prof[i] = 0; }
             long n = _profReads; _profReads = 0;
             return n;
         }
@@ -446,7 +449,17 @@ namespace Armoury
                 {
                     // sklad8-p (uwaga 8): zapas liczy plan K1 (wiecej miejsc, ktore moga rzucic wyjatek) - osobny try: przy bledzie zapas z nadwyzki = 0
                     // (bez premii i bez zuzycia), a perki i S licza sie dalej; slad w liczniku potkniec (Stumble "CtxOf.Stock")
-                    try { if (c.Main) CountPlayerStock(c); else CountAiStock(c, mp); }
+                    // Z.3 poz. 3 (tylko pomiar): stoper liczenia nadwyzki K1 partii AI - wyjatek idzie przez finally do tego samego catch co dotad
+                    try
+                    {
+                        if (c.Main) CountPlayerStock(c);
+                        else
+                        {
+                            long k0 = Stopwatch.GetTimestamp();
+                            try { CountAiStock(c, mp); }
+                            finally { _prof[PCtxSur] += Stopwatch.GetTimestamp() - k0; _prof[PCtxSurN]++; _profReads += 2; }
+                        }
+                    }
                     catch (Exception e) { c.SurW = 0; c.SurA = 0; Stumble("CtxOf.Stock", e); }
                     c.PerkW = mp.HasPerk(DefaultPerks.Steward.GivingHands);
                     c.PerkA = mp.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
