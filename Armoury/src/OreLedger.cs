@@ -176,10 +176,11 @@ namespace Armoury
         }
 
         /// <summary>E6/R1 (214): drewno kupione z polki miasta handlowego przez dymarke kopalni (Bloomery.Daily) albo spalone przez kopalnie BK
-        /// w miescie (Bloomery.TownMineBlocked) - ujscie drewna. Tylko licznik.</summary>
+        /// w miescie (Bloomery.TownMineBlocked) - ujscie drewna. Tylko licznik. F4a: takze drewno kupione wozem z dalszego miasta (w chwili zakupu) i wpis
+        /// UJEMNY, gdy woz zawraca (drewno wraca na polke zrodla).</summary>
         internal static void NoteBloomeryWood(ItemObject item, int loads)
         {
-            try { var b = Of(item); if (b != null && loads > 0) b.BloomWood += loads; }
+            try { var b = Of(item); if (b != null && loads != 0) b.BloomWood += loads; }
             catch { }
         }
 

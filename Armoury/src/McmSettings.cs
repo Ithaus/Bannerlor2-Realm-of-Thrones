@@ -4808,6 +4808,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryAtMine { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Bloomery Cart Range", 0.00f, 2400.00f, "0.00", HintText = "with Bloomery At Mine: farthest (by road) a mining village's cart goes for wood when the woods of its district and its own market town give too little - it buys only what a friendly town holds above its own needs, pays that town from the village's gold, and the wood arrives after the days the road takes (about ten days at 600); 0 = no such carts, as before")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float BloomeryCartRange { get; set; } = 600f;
+
+        [SettingPropertyBool("Bloomery Wood Demand", HintText = "with Bloomery At Mine: a town's own need for wood (its stock target, what it will sell and the price) counts the smiths' charcoal alone plus the wood the mines' bloomeries really buy from its market, instead of the old rate measured when the ore was smelted in town (off = the old rate)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryWoodDemand { get; set; } = true;
+
         [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ToolsByUse { get; set; } = true;
@@ -6129,6 +6137,8 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
+            s.BloomeryCartRange = BloomeryCartRange;
+            s.BloomeryWoodDemand = BloomeryWoodDemand;
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;

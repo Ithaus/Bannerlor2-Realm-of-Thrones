@@ -117,16 +117,30 @@ namespace Armoury
         /// <summary>Doby drogi wozem: droga ladowa, wyspa - ladem i morzem, bez drogi - odleglosc prosta (straight, jak zasieg kupcow); co najmniej 1.</summary>
         private static int Days(Settlement src, Settlement dst, float straight)
         {
+            return DaysFor(Road(src, dst, Math.Max(0f, straight)));
+        }
+
+        /// <summary>F4a (test zbiorczy 5-8): droga wozem miedzy osadami w jednostkach mapy - ten sam rachunek co Days (wystawiony dla wozow dymarek,
+        /// Bloomery): droga ladowa, wyspa - ladem i morzem (porty obu osad), bez drogi - straight; straight ujemne = bez drogi wynik -1.
+        /// landOnly - sama droga ladowa (woz do wsi: wies portu nie ma).</summary>
+        internal static float Road(Settlement src, Settlement dst, float straight, bool landOnly = false)
+        {
             float d = -1f;
             try
             {
                 var m = Campaign.Current.Models.MapDistanceModel;
                 try { d = m.GetDistance(src, dst, false, false, MobileParty.NavigationType.Default); } catch { d = -1f; }
-                if (!(d >= 0f && d < CartTownExit.BkLimit))
+                if (!landOnly && !(d >= 0f && d < CartTownExit.BkLimit))
                     try { d = m.GetDistance(src, dst, src.HasPort, dst.HasPort, MobileParty.NavigationType.All); } catch { d = -1f; }
             }
             catch { d = -1f; }
-            if (!(d >= 0f && d < CartTownExit.BkLimit)) d = Math.Max(0f, straight);
+            if (!(d >= 0f && d < CartTownExit.BkLimit)) d = straight >= 0f ? straight : -1f;
+            return d;
+        }
+
+        /// <summary>F4a: doby drogi wozu wsi na odcinku d (predkosc MarketCarts.PerDay); co najmniej 1.</summary>
+        internal static int DaysFor(float d)
+        {
             double perDay = Math.Max(1.0, MarketCarts.PerDay(Settings.Current));
             return Math.Max(1, (int)Math.Ceiling(d / perDay));
         }

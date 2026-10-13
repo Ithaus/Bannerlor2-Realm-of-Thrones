@@ -221,7 +221,21 @@ namespace Armoury
             // cykl) prawdziwy przerob rzemiosla w tym miescie (srednia z ok. 14 dob, sztuki wsadu na dobe; takze welna)
             float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
             float hands = s.CaravanBulkLegacyHands ? WorkshopLaw.LegacyTownHands(town) : WorkshopLaw.TownHands(town);   // 174.3: cel zapasu i prog nadwyzki na dawnych rekach (zrodla kontraktow 174.2 nie znikaja)
-            return hands * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
+            return HandUse(town, g, s, hands) + g.Fixed + crafts + ShopUse(town, g);
+        }
+
+        // F4a (test zbiorczy 5-8, R1-7b): drewno przy wytopie przy kopalni. Stawka 0.157 ladunku na roboczodzien to pomiar z dymarka w miescie (5 ladunkow
+        // drewna na ladunek rudy x 0.025 rudy na roboczodzien = 0.125) - kuznia pali juz tylko wegiel kowalski: 0.157 - 5 x 0.025 = 0.032.
+        private const int WoodIx = 1;
+        private const float WoodPerHandForge = 0.032f;
+
+        /// <summary>F4a (R1-7b): zuzycie rzemieslnikow na dobe - jedno miejsce dla Use (cel zapasu, prog nadwyzki, cena) i UseNow (ilosc kontraktu 174).
+        /// Drewno przy Bloomery.On i kluczu BloomeryWoodDemand: stawka kowalska (bez dymarki) + drewno naprawde kupowane przez dymarki z polki tego
+        /// miasta (Bloomery.ShelfUse - srednia ok. 14 dob) - popyt przeniesiony, nie liczony dwa razy. Reszta surowcow i klucz wylaczony - jak dotad.</summary>
+        private static float HandUse(Town town, Good g, Settings s, float hands)
+        {
+            if (g.Ix == WoodIx && s.BloomeryWoodDemand && Bloomery.On) return hands * WoodPerHandForge + Bloomery.ShelfUse(town);
+            return hands * g.PerHand;
         }
 
         /// <summary>Dla ceny surowcow (RawPrice): to samo zuzycie dobowe, z ktorego karawany licza zapas docelowy miasta - przedmiot
@@ -260,7 +274,7 @@ namespace Armoury
             {
                 if (g.Item != item) continue;
                 float crafts = TownCrafts.Active ? TownCrafts.UseOf(town, g.Item) : g.PerCycle * Math.Max(0, s.ArtisanTanWeavePerCycle);
-                return WorkshopLaw.TownHands(town) * g.PerHand + g.Fixed + crafts + ShopUse(town, g);
+                return HandUse(town, g, s, WorkshopLaw.TownHands(town)) + g.Fixed + crafts + ShopUse(town, g);
             }
             return 0f;
         }
