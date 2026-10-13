@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (poprawki po biegu probnym 2, grupa C - renty korony, P2/C4, tor S) - RENTA KORONY: WARUNEK SLUZBY DOPIERO OD 20 DOB WOJNY ZE STYKIEM (krotki styk na poczatku cichej wojny nie odbiera juz renty wszystkim rodom, ktore go przegapily); klucz `CrownRentServiceAfterFullDays`
+**Mod:** Armoury | **Galaz:** `w-toku/p2-c` (po P2/C3) | **Specyfikacja:** `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "O2-2 Polnoc 10.1 -> 5.8 tys. ludzi..." (Poprawka ostateczna pkt 1-3 i 5); "O2-1" pkt 1 to ta sama poprawka w innym zapisie (klucz liczbowy `CrownRentServiceFromWarDays`) - NIE zdublowana, wziety zapis O2-2 (klucz bool, prog = ten sam suwak `CrownRentServiceDays`) | **Pliki:** `Armoury/src/CrownRents.cs`, `Settings.cs`, `McmSettings.cs` (gen_mcm: 1300 = 1299 + 1). `tools/sprawdz_logi.py` NIE ruszane (grupa E).
+
+**Problem (slowami gracza):** Polnoc bez jednej bitwy lordow stracila prawie polowe wojska: rody nie mialy z czego placic zoldu i zwalnialy ludzi, bo cala renta korony szla do dwoch rodow, ktore nie mialy na co jej wydac.
+**Dowod z logu (bieg 2):** `Logs/2026-10-12_22-38-57/budzet-rodow.csv`, doba 100 (dzien 108936), krolestwo The North, kolumna `warunek_180`: 17 rodow "sluzba 0/3", 1 rod "sluzba 1/3", 2 rody "tak 8/3" - renta_180 razem 21 003 zl/d tylko u tych dwoch (odczyt wlasny); wedlug TRIAZ-2 tak od doby 30 do 117, bo Polnoc miala 8 dob styku (d21-28) i potem 89 dob bez styku; partie rodow Polnocy d70 10 034 -> d120 5 794 ludzi, zwolnieni na sucho d61-120 4 403 (bieg 1: 2 532). Linia "Renty korony (180)" doba 100 (linia pliku 34799): "rody z lennem 215 ... bez warunku 60 (27.9%) - zaloga 4, sluzba 56".
+**Przyczyna:** `CrownRents.Daily`: wymog sluzby = ceil(20 x Seen / 60) juz od pierwszej doby wojny ze stykiem (Seen 9 -> wymog 3), a doba wojny BEZ styku nie przesuwa okna ani licznika (`CrownRentWarDayNeedsContact`). Rod, ktory nie sluzyl w krotkim styku, nie ma jak tego odrobic do nastepnego styku; E5/F9 oddaje wtedy cala pule krolestwa rodom z warunkiem. Regula sprzed etapu 8 (180 + F9), wyzwolona cicha wojna.
+
+**Zmiana:**
+- `CrownRents.Daily`: wymog sluzby (`row.Need`) liczony dopiero, gdy rod widzial co najmniej `CrownRentServiceDays` (20) dob wojny ze stykiem (`v.Seen >= svcDays`); ponizej - wymog 0, jak dotad u rodu bez zadnej doby wojny. Od 20 do 59 dob - ta sama czesc co dotad (pierwszy wymog 7 dob), od 60 - pelne 20 z 60. Liczba dob sluzby (`row.Served`) zostaje w wierszu - linia logu i CSV pokaza np. "tak 2/0".
+- Klucz `CrownRentServiceAfterFullDays = true` (Settings.cs przy kluczach pomiaru sluzby 180, opis MCM po angielsku). Wylaczony = wzor sprzed poprawki. W `Armoury.json` Jeffa klucza nie ma (grep = 0) - dziala domyslna.
+- Opisy: komentarz klasy i koncowka opisu warunku w linii "Renty korony (180)" ("...ta sama czesc; mniej niz 20 dob wojny ze stykiem - warunek sluzby nie obowiazuje (P2/C4)"). Poczatek tego zdania bez zmian; narzedzie tego tekstu nie czyta (grep).
+
+**Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
+- Zloto: renta to przelew skarbiec krolestwa -> glowa rodu; zmienia sie tylko ODBIORCA w tym samym krolestwie (przy E5/F9 suma rent krolestwa ta sama). Jedyny przypadek, gdy wyplata rosnie: krolestwo, w ktorym zaden rod nie mial warunku (renta stala w skarbcu) - teraz wychodzi do rodow, zgodnie z celem F9. Nic z niczego.
+- Kto czyta wynik (grep `CrownRents.` w calym `Armoury/src`): `LordsEvenUp` tylko `Paid` (`RowOf`) i wagi, `ClanIncomeBook` kolumny CSV `Served/Need` (`CsvCols`), `MoneyLedger` i `CrownIncome` same sumy `LastPaid` / `LastHeld`, linia gracza `Served/Need` - nikt nie liczy wymogu drugi raz. Zapis `arm_rent180` (v2 ma `Seen`) bez zmian - stary zapis wczyta sie tak samo; czas doby 0.
+- Prog przy Seen = 20: wymog skacze 0 -> 7 dob naraz. Krolestwo, ktore wlasnie dobilo do 20 dob styku, moze jednego dnia stracic rente u wielu rodow (TRIAZ: The Reach 12 z 16 w dobie 45) i odzyskiwac ja przez ok. 30 dob - jak dzis, tylko 20 dob pozniej.
+- Nowy wasal i gracz: pierwsze 20 dob styku bez wymogu sluzby (warunek zalogi dziala od razu). Rody, ktore sluza, traca w tych dobach doplate z udzialow niesluzacych.
+- Nie zalatwia: nizszych wplywow koron w biegu 2 (pula rent Polnocy d21-80 o 43% nizsza - obszar korona / karawany, grupa innych poprawek) ani rodow "zamrozonych" po 20. dobie styku w cichej wojnie (TRIAZ: 0.4-5% tego, co zdejmuje ta poprawka; osobna paczka M, jesli bieg 3 pokaze skale).
+- Oczekiwane w biegu 3: Polnoc - 20 z 20 rodow z renta do 20. doby styku; partie rodow Polnocy d93-120 ok. 10-11 tys. (bieg 2: 6.6); wojsko lordow swiata ok. +4-5 tys. (ok. 88 tys.); "rody bez warunku" srednio d31-120 z 35.8% do ok. 11-14%.
+- NIE sprawdzone w grze - build kod 0, logika przeczytana w kodzie.
+
+**Status:** DO SPRAWDZENIA - test koncowy
+
 ## 2026-10-13 (poprawki po biegu probnym 2 i audycie, grupa C - konie i uprzaz, P2/C3, tor S) - NOWA DRUZYNA: PRZY SIEDZIBIE KUPUJE TYLKO KONIE, KTORYCH JESZCZE NIE MA, I SIODLO DO KAZDEGO KUPIONEGO KONIA; ROZBITA PARTIA: PRZY WYLACZONYM `LootIsTransfer` UPRZAZ NIE POWSTAJE DRUGI RAZ
 **Mod:** Armoury | **Galaz:** `w-toku/p2-c` (po P2/C2) | **Specyfikacja:** `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md` "[ustawienia] Wylacznik LootIsTransfer nie wraca do stanu sprzed..." (Poprawka ostateczna) i drobne "[zderzenia] Nowa partia lorda w dobach 1-3 nowej kampanii dostaje konie dwa razy..."; `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` "H-1" Poprawka 2 | **Pliki:** `Armoury/src/HorseFate.cs` (`Spoils` 1 linia, `SeatGifts`, nowa `SeatSaddles`, liczniki, linia doby), `CHANGELOG.md` (ten wpis + sprostowanie jednego zdania we wpisie E8/H 271). Bez nowych kluczy, `Settings.cs` bez zmian.
 

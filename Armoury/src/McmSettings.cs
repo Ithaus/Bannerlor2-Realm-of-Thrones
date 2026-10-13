@@ -3568,6 +3568,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Service After Full Days", HintText = "the crown asks a house for service only once that house has seen as many days of real war under this crown as the crown asks days of service (Crown Rent Service Days); before that every house that keeps its garrisons draws its rent - a short clash at the start of a quiet war no longer strips the rent from every house that missed it (off = service is asked from the first day of real war, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentServiceAfterFullDays { get; set; } = true;
+
         [SettingPropertyBool("Crown Rent Held To Serving", HintText = "the rent share of a house that does not serve (garrison or service days) goes to the houses of the same realm that do, by the same fief weights, instead of staying in the treasury; if no house of the realm serves, it stays in the treasury. Off = it stays in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentHeldToServing { get; set; } = true;
@@ -6099,6 +6103,7 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CrownBorrows = CrownBorrows;
