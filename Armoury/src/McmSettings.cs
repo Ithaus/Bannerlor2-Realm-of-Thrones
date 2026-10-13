@@ -4104,6 +4104,22 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersOpenedOnly { get; set; } = true;
 
+        [SettingPropertyBool("Quest Reward From Giver", HintText = "a quest reward is paid by the one who asked for the work: the notable, lord or gang leader pays from his own purse instead of the coin appearing out of thin air. A client short of coin pays what he has and you are told ('... could pay only N of the agreed M'). A counter-offer is paid by whoever makes it, and the hourly takings of the tax-farming quest come out of the village's own purse. Off = rewards appear from nowhere as before")]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestRewardFromGiver { get; set; } = true;
+
+        [SettingPropertyBool("Quest Reward In Wage Days", HintText = "a quest pays for the work in the world's coin: at most the wages of the men the job needs for the days it takes (the game's own numbers for sending a companion; your whole party for the tasks without that option), at your party's wage per man, plus a quarter - clearing a hideout pays about 440 instead of 3,000. The offer in the conversation shows the new sum and it is fixed when you accept. Goods you deliver are still paid at their worth on top of the fee. Off = the game's sums")]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestRewardInWageDays { get; set; } = true;
+
+        [SettingPropertyBool("Quest Player Pays Someone", HintText = "what you pay inside a quest reaches someone instead of vanishing: the cost of sending a companion to buy what is needed and any bribe go to the treasury of the quest's settlement, the stake at the tavern to the town you stand in, losses and pay-offs of the tax-farming quest to the village, everything else to the quest giver. The sums themselves do not change")]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestPlayerPaysSomeone { get; set; } = true;
+
+        [SettingPropertyBool("Quest Goods Real", HintText = "goods in quests have an owner: tools, animals and wares you deliver go onto the shelf of the quest's settlement (or into the baggage of the lord who asked) instead of vanishing, goods offered to you in exchange come out of the settlement's stock - what it lacks the quest giver pays in coin - and weapons handed to the gang or kept by the guards end up on the town's shelf")]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestGoodsReal { get; set; } = true;
+
         [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutFlagEnabled { get; set; } = true;
@@ -5977,6 +5993,10 @@ namespace Armoury
             s.BookPriceFix = BookPriceFix;
             s.CraftOrdersHistorical = CraftOrdersHistorical;
             s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;
+            s.QuestRewardFromGiver = QuestRewardFromGiver;
+            s.QuestRewardInWageDays = QuestRewardInWageDays;
+            s.QuestPlayerPaysSomeone = QuestPlayerPaysSomeone;
+            s.QuestGoodsReal = QuestGoodsReal;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;

@@ -61,6 +61,7 @@ namespace Armoury
             CaravanFlow.Reset();   // E8/G1 (260): karawany w miescie co godzine i wyspy bez drogi - liczniki doby, pamiec slepych zaulkow, wlasciciele rozwiazanych karawan (ta sama chwila)
             MercFeast.Reset();     // E8/G2 (261): najemnicy i uczta BK - liczniki doby (ta sama chwila)
             CraftOrders8.Reset();  // E8/K (255): zlecenia kowalskie i ksiegarz BK - liczniki, pamiec wartosci projektow, kontekst wyplat (ta sama chwila)
+            QuestPay8.Reset();     // E8/D1 (256): nagrody zadan - liczniki, ramki, slownik kwot zamrozonych (wraca z zapisu w SyncData - ta sama chwila, PRZED SyncData)
             StateHygiene.ResetAll();   // E8/S (246): porzadek stanu - HideoutPurge, oboz gracza, audyt predkosci, stajnie AI, przeprawa; ta sama chwila, PRZED SyncData (linia konstruktora nietknieta - jak E8/P3, czyste scalenie)
         }
 

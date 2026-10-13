@@ -212,6 +212,11 @@ Uzycie (Python 3, tylko odczyt):
                     kowalskie": zloto z niczego 0, zolnierz z niczego 0, bron w nicosc 0 (bez oddanego zlecenia - INFO, 8.16 p. 6); K-4 okno "ksiegarz":
                     zloto w nicosc 0, ksiazka z niczego 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia tylko z dozwolonych klas, srednia nagroda
                     <= 1000; K-5b / K-6 / K-7 INFO (klasy, wymiana zlecen startowych nowej kampanii, doswiadczenie, koszt); K-K potkniecia i linie ERROR 0.
+                    Blok etap8_d1 (E8/D1, paczka 256 - nagrody i wyplaty w zadaniach; QuestPay8.cs, GiverPay.cs):
+                    D1-1 linia startu: wpiete N >= 40 metod zadan, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery nagrody komplet; D1-0b linia
+                    "Nagrody zadan (E8/D1)" w kazdej dobie okna, cztery klucze czynne; D1-2 zloto z niczego 0 i w nicosc 0 (oba kierunki; bez wyplat -
+                    INFO, 8.16 p. 13); D1-3 obiecane = zaplacone + niedoplata przy pustej kiesie; D1-4 towar z niczego 0 / w nicosc 0; D1-5 INFO typy
+                    "kwota gry / po skali"; D1-6 INFO kwoty zamrozone przy przyjeciu; D1-7 INFO koszt; D1-K potkniecia i linie ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9210,6 +9215,127 @@ def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
 
 
+# E8/D1 (256): blok etap8_d1 - nagrody i wyplaty w zadaniach (QuestPay8.cs, GiverPay.cs)
+E8_D1_DAY = "Nagrody zadan (E8/D1): dzien"
+E8_D1_MIN = 40   # projekt: linia startu, N >= 40 (skan zywych bibliotek 1.4.8: 91 metod - gra 76, SandBox 13, ROT 1, NavalDLC 1)
+
+
+def etap8_d1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/D1 (256, projekt etapu 8 v2 rozdz. 3 "E8/D1" Test): nagrody zadan od zleceniodawcy w dniach zoldu, wyplaty gracza z odbiorca, towar zadan.
+    Linie: start sesji "Nagrody zadan (E8/D1): wpiete N metod w M typach", doba "Nagrody zadan (E8/D1): dzien N", zdarzenia "przyjete", "wyplata",
+    "gracz placi", "rzecz na wymiane". D1-1 linia startu: N >= 40, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery nagrody komplet; D1-0b linia doby
+    w kazdej dobie okna (bez pierwszej i ostatniej), cztery klucze czynne, latki komplet; D1-2 (suma okna) zloto z niczego 0 i w nicosc 0 - oba kierunki
+    (bez wyplat - INFO, sprawdzenie reczne 8.16 p. 13); D1-3 obiecane = zaplacone + niedoplata przy pustej kiesie (rachunek sie zgadza), INFO niedoplaty;
+    D1-4 towar z niczego 0 / w nicosc 0 (bez ruchu towaru - INFO); D1-5 INFO typy "kwota gry / po skali"; D1-6 INFO kwoty zamrozone; D1-7 INFO koszt;
+    D1-K potkniecia i linie ERROR in QuestPay8.* 0."""
+    rows = {d: s for d, s in by_day(lines, E8_D1_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Nagrody zadan (E8/D1): wpiete")]
+    if not rows and not wire:
+        rep.add("E8/D1: linie Nagrody zadan (E8/D1)", "brak w logu", "sa od wgrania E8/D1 (QuestPay8.cs)", None)
+        return
+    # ---------------- D1-1: linia startu
+    if wire:
+        w0 = wire[0]
+        n, m = num(r"wpiete (\d+) metod", w0, int, 0), num(r"metod w (\d+) typach", w0, int, 0)
+        cand = num(r"kandydatow (\d+)", w0, int, 0)
+        gs = re.search(r"miejsc towaru (\d+)/(\d+)", w0)
+        gt = re.search(r"gettery nagrody (\d+)/(\d+)", w0)
+        calls = num(r"wywolan podmienionych: zloto (\d+)", w0, int, 0)
+        asm = re.search(r"zestawy:([^;]*);", w0)
+        ms = re.search(r"skan (\d+) ms, skan i wpiecie (\d+) ms", w0)
+        ok = (n >= E8_D1_MIN and n == cand and "; BRAK: -;" in w0 and gs is not None and gs.group(1) == gs.group(2)
+              and gt is not None and gt.group(1) == gt.group(2) and int(gt.group(2)) > 0)
+        rep.add("D1-1: linia startu - latki na metodach zadan (wyplaty, towar, gettery nagrody)",
+                f"wpiete {n} metod w {m} typach (kandydatow {cand}), wywolan zlota {calls}, miejsc towaru {gs.group(1) + '/' + gs.group(2) if gs else '?'}, "
+                f"gettery {gt.group(1) + '/' + gt.group(2) if gt else '?'}; zestawy:{asm.group(1) if asm else ' ?'}"
+                + (f"; skan {ms.group(1)} ms, razem {ms.group(2)} ms" if ms else "") + ("" if "; BRAK: -;" in w0 else " | " + w0[w0.find("BRAK:"):][:200]),
+                f"N >= {E8_D1_MIN}, wpiete = kandydaci, BRAK: -, miejsca towaru i gettery komplet", ok)
+    else:
+        rep.add("D1-1: linia startu", "brak linii Nagrody zadan (E8/D1): wpiete", f"N >= {E8_D1_MIN}", False)
+    if not rows:
+        rep.add("D1-0b: linia Nagrody zadan (E8/D1)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    keys = ("Quest Reward From Giver", "Quest Reward In Wage Days", "Quest Player Pays Someone", "Quest Goods Real")
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    off_any = False
+    for nm in keys:
+        off = [d for d in days if nm + " WYLACZONE" in rows[d]]
+        if off:
+            off_any = True
+            val += f"; {nm} WYLACZONE w {len(off)} dobach"
+    wired = [(num(r"latki wpiete (\d+)/\d+", x), num(r"latki wpiete \d+/(\d+)", x)) for x in w]
+    bad_w = sum(1 for (a, b), x in zip(wired, w) if a is None or a != b or "(BRAK:" in x)
+    if bad_w:
+        val += f"; latki niekompletne w {bad_w} liniach"
+    rep.add("D1-0b: linia Nagrody zadan (E8/D1) w kazdej dobie okna, cztery klucze czynne, latki komplet", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_any and not bad_w) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    # ---------------- D1-2 / D1-3: zloto w obu kierunkach
+    n_in, game, due = tot(r"nic -> gracz\): (\d+),"), tot(r"nic -> gracz\): \d+, kwota gry (\d+)"), tot(r"kwota gry \d+, obiecane (\d+)")
+    paid, p_hero, p_vil = tot(r"obiecane \d+, zaplacone (\d+)"), tot(r"\(zleceniodawcy (\d+)"), tot(r"kiesy wsi (\d+)\)")
+    short, short_n, nothing = tot(r"niedoplata przy pustej kiesie (\d+) w"), tot(r"niedoplata przy pustej kiesie \d+ w (\d+) wyplatach"), tot(r"wyplatach, z niczego (\d+)")
+    n_out, out_all = tot(r"gracz -> nic\): (\d+),"), tot(r"gracz -> nic\): \d+, kwota (\d+):")
+    o_town, o_hero, o_vil, void = tot(r"do kas osad (\d+)"), tot(r"do zleceniodawcow (\d+)"), tot(r"do kies wsi (\d+)"), tot(r"do kies wsi \d+, w nicosc (\d+)")
+    nopay = sorted({t.strip() for x in w for g in re.findall(r"\[brak platnika: ([^\]]*)\]", x) for t in g.split(",") if t.strip()})
+    if n_in > 0 or n_out > 0:
+        rep.add("D1-2: zloto zadan (suma okna) - z niczego (nic -> gracz) i w nicosc (gracz -> nic)",
+                f"z niczego {nothing}" + (f" [brak platnika: {', '.join(nopay)}]" if nopay else "") + f", w nicosc {void}; wyplat dla gracza {n_in}: kwota gry {game} -> obiecane {due}"
+                f", zaplacone {paid} (zleceniodawcy {p_hero}, kiesy wsi {p_vil}); wyplat gracza {n_out}: {out_all} (kasy osad {o_town}, zleceniodawcy {o_hero}, kiesy wsi {o_vil})",
+                "0 / 0", nothing == 0 and void == 0)
+        rep.add("D1-3: obiecane = zaplacone, gdy platnik ma pieniadze (obiecane = zaplacone + niedoplata przy pustej kiesie + z niczego)",
+                f"obiecane {due}, zaplacone {paid}, niedoplata {short} w {short_n} wyplatach, z niczego {nothing}; roznica rachunku {due - paid - short - nothing}",
+                "roznica rachunku 0 (niedoplata tylko przy pustej kiesie platnika - bez doplat)", due == paid + short + nothing)
+    else:
+        rep.add("D1-2: zloto zadan (z niczego / w nicosc)", "gracz nie dostal ani nie zaplacil nic w zadaniach w oknie (autotest nie robi zadan)",
+                "INFO - sprawdzenie reczne 8.16 p. 13 (oferta w nowej skali, zloto od zleceniodawcy, tyle, ile obiecal)", None)
+        rep.add("D1-3: obiecane = zaplacone", "bez wyplat w oknie", "INFO - 8.16 p. 13", None)
+    # ---------------- D1-4: towar
+    g_shelf, g_tabor, g_from = tot(r"od gracza na polke osady (\d+) szt"), tot(r"do taboru zleceniodawcy (\d+) szt"), tot(r"z magazynu osady (\d+) szt")
+    g_miss, g_gold, g_gshort = tot(r"zabraklo (\d+) szt"), tot(r"zamiast nich zloto (\d+)"), tot(r"zamiast nich zloto \d+ \(niedoplata (\d+)\)")
+    g_nothing, g_void = tot(r"towar z niczego (\d+) szt"), tot(r"/ w nicosc (\d+) szt")
+    if g_shelf + g_tabor + g_from + g_miss + g_nothing + g_void > 0:
+        rep.add("D1-4: towar zadan (suma okna) - z niczego / w nicosc",
+                f"z niczego {g_nothing} szt. / w nicosc {g_void} szt.; od gracza: polka osady {g_shelf}, tabor zleceniodawcy {g_tabor}; dla gracza z magazynu osady {g_from}"
+                f", zabraklo {g_miss} szt. - zamiast nich zloto {g_gold} (niedoplata {g_gshort})", "0 / 0", g_nothing == 0 and g_void == 0)
+    else:
+        rep.add("D1-4: towar zadan (z niczego / w nicosc)", "bez ruchu towaru zadan w oknie (autotest nie robi zadan)",
+                "INFO - sprawdzenie reczne 8.16 p. 13 (dostawa trafia do zleceniodawcy albo na polke osady)", None)
+    # ---------------- D1-5: typy
+    types = {}
+    for x in w:
+        seg = re.search(r"\| typy \(wyplat: kwota gry / po skali\):(.*?) \| latki wpiete", x)
+        if not seg:
+            continue
+        for g in re.finditer(r"(\S+) (\d+): (\d+) / (\d+)", seg.group(1)):
+            a = types.setdefault(g.group(1), [0, 0, 0])
+            a[0] += int(g.group(2)); a[1] += int(g.group(3)); a[2] += int(g.group(4))
+    rep.add("D1-5: typy zadan (suma okna) - wyplat: kwota gry / po skali",
+            "; ".join(f"{k} {v[0]}: {v[1]} / {v[2]}" for k, v in sorted(types.items())) if types else "bez wyplat w oknie", "INFO (skala: N ludzi x D dni x zold x 1.25; dostawy - tylko stala czesc)", None)
+    # ---------------- D1-6: kwoty zamrozone
+    frozen_new, closed = tot(r"przyjete dzis (\d+)"), tot(r"zamkniete (\d+),")
+    f_pay, f_now, shown = tot(r"wyplat z kwota zamrozona (\d+)"), tot(r"liczonych przy wyplacie (\d+)"), tot(r"oferta pokazana po skali (\d+) razy")
+    mem = num(r"kwoty zamrozone: w pamieci (\d+)", rows[days[-1]], int, 0)
+    ev = {k: sum(1 for x in lines if x.startswith("Nagrody zadan (E8/D1): " + k)) for k in ("przyjete", "wyplata", "gracz placi", "rzecz na wymiane")}
+    rep.add("D1-6: kwoty zamrozone przy przyjeciu (suma okna) i linie zdarzen w logu",
+            f"przyjete {frozen_new}, zamkniete {closed}, w pamieci na koniec {mem}; wyplat z kwota zamrozona {f_pay}, liczonych przy wyplacie {f_now} (stary zapis / rozwiazanie przez lorda)"
+            f"; oferta pokazana po skali {shown} razy; linie: przyjete {ev['przyjete']}, wyplata {ev['wyplata']}, gracz placi {ev['gracz placi']}, rzecz na wymiane {ev['rzecz na wymiane']}",
+            "INFO", None)
+    # ---------------- D1-7 / D1-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("D1-7: koszt linii doby", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO (skan przy starcie - w linii startu)", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    stu_s = max([num(r"potkniecia (\d+)\.$", x, int, 0) or 0 for x in wire] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in QuestPay8."))
+    rep.add("D1-K: kontrola (potkniecia doby / w linii startu, linie ERROR in QuestPay8.*)", f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9236,6 +9362,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
     blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
     blocks.append(etap8_k)   # E8/K (255): ksiazki BK, zlecenia kowalskie gry (nagroda, platnik, bron, szablon), kupno u ksiegarza BK
+    blocks.append(etap8_d1)   # E8/D1 (256): nagrody zadan od zleceniodawcy w dniach zoldu, wyplaty gracza z odbiorca, towar zadan
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
