@@ -55,6 +55,7 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double HoldHours = 6.0;            // straz przed BK VillagersCastleTick: najwyzej tyle godzin od rozkazu do miasta
+        private const double HoldHoursFlight = 24.0;     // P3/Z3: straz dla wjazdu nieskierowanego (woz schowal sie przed wrogiem - czeka w zamku, az wrog odejdzie)
         private const double TripMaxDays = 10.0;         // rezerwacja jedzenia wozu w drodze do zamku wygasa po tylu dobach
 
         // ------------------------------------------------------------ wpiecie (raz na proces)
@@ -65,7 +66,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan kampanii (Reset w konstruktorze ArmouryBehavior; _bound, _visited, _onward - zapis arm_castlemarket)
         private sealed class Trip { public Settlement Castle; public readonly Dictionary<ItemCategory, int> Units = new Dictionary<ItemCategory, int>(); public double Day; }
-        private sealed class Onward { public Settlement Castle; public double Hour; }
+        private sealed class Onward { public Settlement Castle; public double Hour; public double Hold = HoldHours; }
         internal struct Sale { public EquipmentElement El; public int N; public int Pay; }   // jedna pozycja sprzedazy B4 (do cofniecia w tym samym ApplyInternal)
         private static readonly Dictionary<MobileParty, Trip> _bound = new Dictionary<MobileParty, Trip>();          // woz w drodze do zamku (pierwszy przystanek)
         private static readonly Dictionary<MobileParty, Settlement> _visited = new Dictionary<MobileParty, Settlement>(); // znacznik "byl w zamku" (do wyjazdu z domu)
@@ -80,6 +81,10 @@ namespace Armoury
         private static int _dAsk, _dRouted, _dFull, _dRouteNoCoin, _dVisits, _dNoNeed, _dNoCoin, _dOnward, _dFallback, _dEmpty, _dRepeat, _dWrong, _dOff;
         private static int _dBkHeld, _dHomeLoad, _dStale, _dBudgetBk, _dUndone, _stumbles;
         private static long _dRoutedUnits, _dSoldUnits, _dSoldGold, _dNoCoinUnits;
+        // P3/Z3 (TRIAZ-3 O2-3 zmiana A): wjazdy do zamku wozow nieskierowanych przez targ przy zamku (ucieczka przed wrogiem, inny zamek, rozkaz BK)
+        private static int _uLoad, _uFlight, _uEmpty, _uBoat, _uSkip, _uEmptyAfter, _uOnward, _uNoTown, _uNoCoin, _uGuardEndLoad;
+        private static long _uLoadIron, _uLoadWood, _uLoadOther, _uFoodUnits, _uFoodGold, _uKeptIron, _uKeptWood, _uKeptOther, _uDumpIron, _uDumpWood, _uDumpOther, _uTicks;
+        private static readonly Dictionary<Settlement, int> _uDumpBy = new Dictionary<Settlement, int>();
 
         internal static void Reset()
         {
@@ -93,6 +98,9 @@ namespace Armoury
             _dAsk = _dRouted = _dFull = _dRouteNoCoin = _dVisits = _dNoNeed = _dNoCoin = _dOnward = _dFallback = _dEmpty = _dRepeat = _dWrong = _dOff = 0;
             _dBkHeld = _dHomeLoad = _dStale = _dBudgetBk = _dUndone = _stumbles = 0;
             _dRoutedUnits = _dSoldUnits = _dSoldGold = _dNoCoinUnits = 0;
+            _uLoad = _uFlight = _uEmpty = _uBoat = _uSkip = _uEmptyAfter = _uOnward = _uNoTown = _uNoCoin = _uGuardEndLoad = 0;
+            _uLoadIron = _uLoadWood = _uLoadOther = _uFoodUnits = _uFoodGold = _uKeptIron = _uKeptWood = _uKeptOther = _uDumpIron = _uDumpWood = _uDumpOther = _uTicks = 0;
+            _uDumpBy.Clear();
         }
 
         /// <summary>Wyjatek przy jednym wozie albo zamku: liczony zawsze, do pliku raz na miejsce (mechanizmu nie gasimy).</summary>
@@ -217,6 +225,20 @@ namespace Armoury
             return p > 0 ? b / p : 0.0;
         }
 
+        /// <summary>P3/Z1 (kontrakt wozem, MaterialOrders.CastleKeep): popyt ludnosci osady na ten towar w sztukach na dobe - ta sama miara co targ przy
+        /// zamku (budzet dnia BK kategorii / cena targu osady); 0 = bez popytu albo blad (liczony).</summary>
+        internal static double FolkPerDay(Town t, ItemObject it)
+        {
+            try
+            {
+                var c = it != null ? it.GetItemCategory() : null;
+                if (t == null || c == null || t.MarketData == null || Campaign.Current == null) return 0.0;
+                double v = PerDay(t, it, c);
+                return double.IsNaN(v) || double.IsInfinity(v) || v < 0.0 ? 0.0 : v;
+            }
+            catch (Exception e) { Stumble("CastleMarket.FolkPerDay", e); return 0.0; }
+        }
+
         private static int ShelfUnits(Settlement st, ItemCategory c)
         {
             int n = 0;
@@ -324,11 +346,11 @@ namespace Armoury
         {
             if (__0 == null || __1 == null || !__1.IsVillager || !__0.IsCastle) return true;
             Trip trip;
-            if (_bound.Count == 0 || !_bound.TryGetValue(__1, out trip)) return true;   // woz nie skierowany przez targ przy zamku - jak dotad
+            if (_bound.Count == 0 || !_bound.TryGetValue(__1, out trip)) return Undirected(__0, __1);   // woz nie skierowany przez targ przy zamku - P3/Z3 (wylaczone: jak dotad)
             try
             {
                 _bound.Remove(__1);
-                if (trip.Castle != __0) { _dWrong++; return true; }        // woz wjechal do innego zamku - jak dotad
+                if (trip.Castle != __0) { _dWrong++; return Undirected(__0, __1); }        // woz wjechal do innego zamku - P3/Z3 (wylaczone: jak dotad)
                 var s = Settings.Current;
                 var home = __1.HomeSettlement;
                 var v = home != null ? home.Village : null;
@@ -363,6 +385,91 @@ namespace Armoury
                 return false;
             }
             catch (Exception e) { Stumble("CastleMarket.SellPrefix", e); return true; }   // blad: reszta jak w grze (to, co juz przeszlo, przeszlo parami zloto/towar)
+        }
+
+        /// <summary>
+        /// P3/Z3 (TRIAZ-3 bieg roczny 13.10, O2-3 "Poprawka ostateczna" zmiana A) - WOZ, KTORY WJECHAL DO ZAMKU NIESKIEROWANY, SPRZEDAJE TYLKO BRAKUJACE JEDZENIE.
+        /// Bieg roczny: zelazo w zamkach 298 -> 3 654 lup (25% zapasu swiata), 3 007 wjazdow nieskierowanych w roku (4,7/d w I polroczu, 11,8/d w II), kazdy
+        /// konczyl sie pustym wozem; zamki zaplacily za takie zrzuty 2,0-2,4 mln zl. Droga: partia wsi uciekajaca przed wrogiem chowa sie w najblizszej warowni
+        /// (gra MobilePartyAi - GetBehaviorForNearbySettlementToFlee), latka BK VillagerSettlementEnterPatch sprzedaje przy kazdym wjezdzie do osady z Town != null,
+        /// a gra sprzedaje caly ladunek z calej kasy zamku. Zamek surowca nie zuzywa i nikt go stamtad nie wywozil.
+        /// Teraz (klucz CastleCartFoodOnly, tylko przy czynnym targu przy zamku): taki woz sprzedaje zamkowi tylko brakujace jedzenie ta sama funkcja co woz
+        /// skierowany (FeedFromDistrict: do CastleMarketFoodDays dni popytu podzamcza, tylko ze Spendable) i dostaje rozkaz do miasta (MarketRoad.PickTown; wies
+        /// miejska bez wyboru - jej miasto); sprzedaz gry pominieta (false). Straz przed odeslaniem do domu przez BK trzyma 24 h (woz czeka, az wrog odejdzie).
+        /// Jak dotad (true): lodz rybacka NavalDLC (bez drogi ladowej), woz bez wsi, zamek Innych, woz bez towaru, woz bez zadnego miasta dalej (sprzedaz
+        /// jedzenia cofnieta - zamek kupuje caly woz, jak woz wsi zamkowej bez targu). Znacznika "byl w zamku" nie stawia - woz moze jeszcze dowiezc jedzenie
+        /// swojemu zamkowi. Liczniki wjazdow i ladunku liczone takze przy wylaczonym kluczu (pomiar P2b: caly woz sprzedany w zamku poza targiem 5.11).
+        /// </summary>
+        private static bool Undirected(Settlement castle, MobileParty cart)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                if (!cart.HasLandNavigationCapability) { _uBoat++; return true; }
+                if (!Sellable(cart)) { _uEmpty++; return true; }
+                var s = Settings.Current;
+                var home = cart.HomeSettlement;
+                var v = home != null ? home.Village : null;
+                var fort = castle.Town;
+                if (s == null || v == null || fort == null || Others(castle)) { _uSkip++; return true; }
+                _uLoad++;
+                if (!(cart.DefaultBehavior == AiBehavior.GoToSettlement && cart.TargetSettlement == castle)) _uFlight++;   // cel domyslny inny niz ten zamek = schronienie
+                long li, lw, lo;
+                LoadOf(cart, out li, out lw, out lo);
+                _uLoadIron += li; _uLoadWood += lw; _uLoadOther += lo;
+                string why;
+                if (!s.CastleCartFoodOnly || !On(s) || !Ready(out why)) { Dump(castle, li, lw, lo); return true; }   // wylaczone: gra sprzedaje caly woz jak dotad
+                long gold; int shortN; bool wanted;
+                var sales = new List<Sale>();
+                int sold = FeedFromDistrict(fort, cart, s, out gold, out shortN, out wanted, sales);
+                if (!Sellable(cart)) { NoteFood(sold, gold, shortN); _uEmptyAfter++; return false; }   // wiozl samo jedzenie i zamek kupil wszystko - BK odesle go do domu
+                var go = MarketRoad.PickTown(cart, home, v, s, false);
+                if ((go == null || !go.IsTown) && v.Bound != null && v.Bound.IsTown && !v.Bound.IsUnderSiege && !Hostile(cart, home, v.Bound)) go = v.Bound;   // wies miejska
+                if (go == null || !go.IsTown)
+                {
+                    // zadne miasto dalej: jedna sprzedaz na jedno ApplyInternal - sprzedaz jedzenia cofnieta, caly woz sprzedaje gra jak dotad
+                    if (sales.Count > 0) Undo(fort, cart, sales);
+                    _uNoTown++;
+                    Dump(castle, li, lw, lo);
+                    return true;
+                }
+                NoteFood(sold, gold, shortN);
+                LoadOf(cart, out li, out lw, out lo);
+                _uKeptIron += li; _uKeptWood += lw; _uKeptOther += lo;
+                MarketRoad.Move(Villagers(), cart, go);
+                _onward[cart] = new Onward { Castle = castle, Hour = CampaignTime.Now.ToHours, Hold = HoldHoursFlight };
+                _uOnward++;
+                return false;
+            }
+            catch (Exception e) { Stumble("CastleMarket.Undirected", e); return true; }   // blad: reszta jak w grze (to, co juz przeszlo, przeszlo parami zloto/towar)
+            finally { _uTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        private static void NoteFood(int sold, long gold, int shortN)
+        {
+            _uFoodUnits += sold; _uFoodGold += gold;
+            if (shortN > 0) _uNoCoin++;
+        }
+
+        private static void Dump(Settlement castle, long iron, long wood, long other)
+        {
+            _uDumpIron += iron; _uDumpWood += wood; _uDumpOther += other;
+            int n; _uDumpBy.TryGetValue(castle, out n); _uDumpBy[castle] = n + (int)Math.Min(int.MaxValue, iron + wood + other);
+        }
+
+        /// <summary>Ladunek wozu do sprzedania (bez zwierzat jucznych): zelazo, drewno, reszta - tylko liczniki linii.</summary>
+        private static void LoadOf(MobileParty cart, out long iron, out long wood, out long other)
+        {
+            iron = wood = other = 0;
+            var r = cart.ItemRoster;
+            if (r == null) return;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || it.ItemCategory == DefaultItemCategories.PackAnimal) continue;
+                if (it.StringId == "iron") iron += el.Amount; else if (it.StringId == "hardwood") wood += el.Amount; else other += el.Amount;
+            }
         }
 
         /// <summary>Liczniki linii dla sprzedazy B4, ktora zostaje (woz pusty albo dalej do miasta); przy cofnieciu (bez miasta dalej) nic.</summary>
@@ -459,9 +566,10 @@ namespace Armoury
                 if (!_onward.TryGetValue(__0, out o)) return true;
                 if (__0.CurrentSettlement != o.Castle) { _onward.Remove(__0); return true; }    // woz juz wyjechal - straz wygasa
                 var t = __0.TargetSettlement;
-                if (CampaignTime.Now.ToHours - o.Hour > HoldHours || t == null || !t.IsTown || __0.DefaultBehavior != AiBehavior.GoToSettlement)
+                if (CampaignTime.Now.ToHours - o.Hour > o.Hold || t == null || !t.IsTown || __0.DefaultBehavior != AiBehavior.GoToSettlement)
                 {
                     _onward.Remove(__0);                                      // straz tylko dla swiezego rozkazu do miasta
+                    if (o.Hold > HoldHours && Sellable(__0)) _uGuardEndLoad++;   // P3/Z3: straz wjazdu nieskierowanego wygasla, woz stoi z ladunkiem - BK odsyla go do domu (kurs przepada, towar nie)
                     return true;
                 }
                 _dBkHeld++;
@@ -513,7 +621,9 @@ namespace Armoury
             {
                 var mp = kv.Key;
                 if (mp == null || !mp.IsActive || string.IsNullOrEmpty(mp.StringId) || kv.Value == null || kv.Value.Castle == null) continue;
-                sb.Append("o|").Append(mp.StringId).Append('|').Append(kv.Value.Castle.StringId).Append('|').Append(kv.Value.Hour.ToString("R", Inv)).Append('~');
+                sb.Append("o|").Append(mp.StringId).Append('|').Append(kv.Value.Castle.StringId).Append('|').Append(kv.Value.Hour.ToString("R", Inv));
+                if (kv.Value.Hold > HoldHours) sb.Append('|').Append(kv.Value.Hold.ToString("R", Inv));   // P3/Z3: 5. pole tylko dla strazy wjazdu nieskierowanego (starszy DLL taki rekord pomija)
+                sb.Append('~');
             }
             return sb.ToString();
         }
@@ -568,11 +678,12 @@ namespace Armoury
                             _bound[mp] = t; nb++;
                         }
                         else if (a[0] == "v" && a.Length == 3) { _visited[mp] = castle; nv++; }
-                        else if (a[0] == "o" && a.Length == 4)
+                        else if (a[0] == "o" && (a.Length == 4 || a.Length == 5))
                         {
-                            double h;
+                            double h, hold = HoldHours;
                             if (!double.TryParse(a[3], NumberStyles.Float, Inv, out h)) { lost++; continue; }
-                            _onward[mp] = new Onward { Castle = castle, Hour = h }; no++;
+                            if (a.Length == 5 && (!double.TryParse(a[4], NumberStyles.Float, Inv, out hold) || double.IsNaN(hold) || hold < HoldHours || hold > HoldHoursFlight)) hold = HoldHours;
+                            _onward[mp] = new Onward { Castle = castle, Hour = h, Hold = hold }; no++;
                         }
                         else lost++;
                     }
@@ -602,7 +713,7 @@ namespace Armoury
             {
                 var mp = kv.Key; var o = kv.Value;
                 if (mp == null || !mp.IsActive) { drop.Add(mp); continue; }
-                if (mp.CurrentSettlement == o.Castle && nowH - o.Hour <= HoldHours) continue;
+                if (mp.CurrentSettlement == o.Castle && nowH - o.Hour <= o.Hold) continue;
                 // woz zawrocony do domu z ladunkiem (straz nie zadzialala - np. JIT wkleil metode BK) zamiast do miasta
                 if (mp.TargetSettlement != null && mp.TargetSettlement == mp.HomeSettlement && Sellable(mp)) _dHomeLoad++;
                 drop.Add(mp);
@@ -685,6 +796,24 @@ namespace Armoury
                   .Append(_dSoldUnits).Append(" szt. (polka podzamcza)")
                   .Append(" | BK odeslanie do domu wstrzymane ").Append(_dBkHeld).Append(", wrocily do domu z ladunkiem po zamku ").Append(_dHomeLoad)
                   .Append(" | powtorne wizyty bez znacznika: ").Append(_dRepeat);
+                // P3/Z3: wjazdy wozow nieskierowanych (liczone takze przy wylaczonym kluczu - pomiar zrzutow calych wozow)
+                sb.Append(" | wjazdy nieskierowane (P3/Z3): ").Append(s.CastleCartFoodOnly ? (on && ready ? "CZYNNE" : "NIECZYNNE (targ przy zamku nieczynny)") : "WYLACZONE (Castle Cart Food Only)")
+                  .Append(" - z ladunkiem ").Append(_uLoad).Append(" (schronienie - cel domyslny inny niz ten zamek ").Append(_uFlight).Append("; ladunek: zelazo ").Append(_uLoadIron)
+                  .Append(", drewno ").Append(_uLoadWood).Append(", inne ").Append(_uLoadOther).Append(" szt.), puste ").Append(_uEmpty).Append(", lodzie ").Append(_uBoat)
+                  .Append(", pominiete (bez wsi, zamek Innych) ").Append(_uSkip).Append("; jedzenie sprzedane ").Append(_uFoodUnits).Append(" szt. (").Append(_uFoodGold)
+                  .Append(" zl; odmowy - brak Spendable ").Append(_uNoCoin).Append("), pusty po jedzeniu ").Append(_uEmptyAfter).Append(", dalej do miasta ").Append(_uOnward)
+                  .Append(" (zatrzymane w wozie: zelazo ").Append(_uKeptIron).Append(", drewno ").Append(_uKeptWood).Append(", inne ").Append(_uKeptOther)
+                  .Append(" szt.), bez miasta dalej ").Append(_uNoTown).Append("; caly woz sprzedany zamkowi (gra): zelazo ").Append(_uDumpIron).Append(", drewno ").Append(_uDumpWood)
+                  .Append(", inne ").Append(_uDumpOther).Append(" szt.");
+                if (_uDumpBy.Count > 0)
+                {
+                    var top = new List<KeyValuePair<Settlement, int>>(_uDumpBy);
+                    top.Sort((x, y) => y.Value.CompareTo(x.Value));
+                    sb.Append(" [");
+                    for (int k = 0; k < top.Count && k < 5; k++) sb.Append(k > 0 ? ", " : "").Append(top[k].Key.Name).Append(' ').Append(top[k].Value);
+                    sb.Append(']');
+                }
+                sb.Append("; straz wygasla z ladunkiem ").Append(_uGuardEndLoad).Append("; czas wjazdow ").Append((_uTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms");
                 if (_dBudgetBk > 0) sb.Append(" | budzet BK z bledem (model gry) ").Append(_dBudgetBk);
                 sb.Append(" | czas ").Append(ms.ToString("0.0", Inv)).Append(" ms");
                 if (_stumbles > 0) sb.Append(" | POTKNIECIA ").Append(_stumbles);

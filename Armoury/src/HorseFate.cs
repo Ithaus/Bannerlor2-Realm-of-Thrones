@@ -110,6 +110,9 @@ namespace Armoury
         private static long _dTrEvents, _dTrMissing, _dTrGar, _dTrLord, _dTrOther, _dTrParties, _dSimEvents, _dSimGained, _dSimShare;
         private static long _dSpWinPcs, _dSpWinHorses, _dSpShelfPcs, _dSpShelfHorses, _dSpArmHorses, _dSpOverflow, _dSpLeft, _dSpParties, _dSpNoWhere, _dSpSkip;
         private static long _dBkPcs, _dBkHorses;
+        // P3/Z3-B (TRIAZ-3 O2-3 zmiana B): dobytek na polki wedlug rodzaju osady (zamki / miasta), osobno zelazo i drewno; towar nie-zywnosciowy przekierowany z zamku do miasta
+        private static long _dShCastle, _dShTown, _dShIronCastle, _dShIronTown, _dShWoodCastle, _dShWoodTown, _dShToTown, _dShNoTown;
+        private static readonly Dictionary<object, Settlement> _townMemo = new Dictionary<object, Settlement>();   // miasto dla zwyciezcy / zamku - na czas jednego rozdania dobytku
         private static long _dVetIn, _dVetNoHorse, _dVetPlayer, _dVetHire, _dVetHireNone, _dVetOut, _dVetFootShown, _dMercTemplate;
         private static long _dGiftHorses, _dGiftFood, _dGiftNoHorse, _dGiftNoFood, _dGiftGold, _dGiftParties, _dGiftNoSeat;
         private static long _dGiftHadHorse, _dGiftSaddles, _dGiftNoSaddle, _dGiftSaddleGold;   // P2/C3: konie, ktore partia juz miala (bez zakupu), siodla z polki siedziby / brak, zloto za siodla
@@ -136,6 +139,7 @@ namespace Armoury
             _dTrEvents = _dTrMissing = _dTrGar = _dTrLord = _dTrOther = _dTrParties = _dSimEvents = _dSimGained = _dSimShare = 0;
             _dSpWinPcs = _dSpWinHorses = _dSpShelfPcs = _dSpShelfHorses = _dSpArmHorses = _dSpOverflow = _dSpLeft = _dSpParties = _dSpNoWhere = _dSpSkip = 0;
             _dBkPcs = _dBkHorses = 0;
+            _dShCastle = _dShTown = _dShIronCastle = _dShIronTown = _dShWoodCastle = _dShWoodTown = _dShToTown = _dShNoTown = 0; _townMemo.Clear();
             _dVetIn = _dVetNoHorse = _dVetPlayer = _dVetHire = _dVetHireNone = _dVetOut = _dVetFootShown = _dMercTemplate = 0;
             _dGiftHorses = _dGiftFood = _dGiftNoHorse = _dGiftNoFood = _dGiftGold = _dGiftParties = _dGiftNoSeat = 0;
             _dGiftHadHorse = _dGiftSaddles = _dGiftNoSaddle = _dGiftSaddleGold = 0;
@@ -228,14 +232,48 @@ namespace Armoury
             return st != null && st.Town != null && st.ItemRoster != null ? st : null;
         }
 
-        /// <summary>Najblizsza warownia (miasto, zamek) tej samej frakcji, nieoblegana; dalej niewroga; na koniec dowolna.</summary>
-        private static Settlement NearestMarket(Vec2 pos, IFaction f)
+        /// <summary>P3/Z3-B (TRIAZ-3 O2-3 zmiana B): towar handlowy, ktory nie jest jedzeniem, koniem ani uprzeza - w zamku jest martwy (zamek go nie zuzywa,
+        /// karawany tam nie jezdza; bieg roczny: ok. 1 200-1 350 lup zelaza rocznie z dobytku rozbitych trafialo za darmo na polki zamkow). Klucz SpoilsNonFoodToTown.</summary>
+        private static bool DeadInCastle(ItemObject it)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.SpoilsNonFoodToTown || it == null || !it.IsTradeGood) return false;
+            if (it.HasHorseComponent || it.ItemType == ItemObject.ItemTypeEnum.Horse || it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) return false;
+            var c = it.ItemCategory;
+            return c != null && !TownFolk.IsFoodCategory(c);
+        }
+
+        /// <summary>P3/Z3-B: najblizsze MIASTO (ta sama kolejnosc co NearestMarket) dla klucza rozdania (zwyciezca albo zamek) - z pamieci jednego rozdania.</summary>
+        private static Settlement TownFor(object key, Vec2 pos, IFaction f)
+        {
+            Settlement m;
+            if (key != null && _townMemo.TryGetValue(key, out m)) return m;
+            m = NearestMarket(pos, f, true);
+            if (key != null) _townMemo[key] = m;
+            return m;
+        }
+
+        private static void NoteShelf(Settlement m, ItemObject it, long k)
+        {
+            if (m == null || it == null || k <= 0) return;
+            bool castle = m.IsCastle;
+            if (castle) _dShCastle += k; else _dShTown += k;
+            if (it.StringId == "iron") { if (castle) _dShIronCastle += k; else _dShIronTown += k; }
+            else if (it.StringId == "hardwood") { if (castle) _dShWoodCastle += k; else _dShWoodTown += k; }
+        }
+
+        /// <summary>P3/Z4 (LordDiscard): najblizsze miasto wedlug reguly NearestMarket - polka dla towaru, ktory gra kasuje lordowi ponad udzwig.</summary>
+        internal static Settlement NearestTown(Vec2 pos, IFaction f) { return NearestMarket(pos, f, true); }
+
+        /// <summary>Najblizsza warownia (miasto, zamek) tej samej frakcji, nieoblegana; dalej niewroga; na koniec dowolna. townsOnly (P3/Z3-B) - tylko miasta.</summary>
+        private static Settlement NearestMarket(Vec2 pos, IFaction f, bool townsOnly = false)
         {
             Settlement b1 = null, b2 = null, b3 = null; float d1 = float.MaxValue, d2 = float.MaxValue, d3 = float.MaxValue;
             foreach (var t in Town.AllFiefs)
             {
                 var st = t != null ? t.Settlement : null;
                 if (st == null || st.ItemRoster == null) continue;
+                if (townsOnly && !st.IsTown) continue;
                 float d = pos.IsValid ? pos.DistanceSquared(st.GetPosition2D) : 0f;
                 if (d < d3) { d3 = d; b3 = st; }
                 if (st.IsUnderSiege) continue;
@@ -829,14 +867,27 @@ namespace Armoury
                     _dSpWinPcs += k; if (horse) _dSpWinHorses += k;
                     return;
                 }
-                var m = NearestMarket(PosOf(d.Party), d.Party.MapFaction);
+                // P3/Z3-B: towar nie-zywnosciowy ponad udzwig zwyciezcy - na targ najblizszego miasta (brak miasta: jak dotad, najblizsza warownia)
+                Settlement m = null;
+                bool dead = DeadInCastle(el.Item);
+                if (dead) { m = TownFor(d.Party, PosOf(d.Party), d.Party.MapFaction); if (m == null) _dShNoTown += k; }
+                if (m == null) m = NearestMarket(PosOf(d.Party), d.Party.MapFaction);
                 if (m == null) { _dSpNoWhere += k; return; }
                 m.ItemRoster.AddToCounts(el, k);
                 _dSpOverflow += k; _dSpShelfPcs += k;
+                NoteShelf(m, el.Item, k);
                 return;
             }
-            d.Shelf.ItemRoster.AddToCounts(el, k);
+            var shelf = d.Shelf;
+            if (shelf.IsCastle && DeadInCastle(el.Item))
+            {
+                // P3/Z3-B: polka zamku (zaloga albo milicja zwyciezca, rozwiazanie partii przy zamku) - towar nie-zywnosciowy na targ najblizszego miasta
+                var mt = TownFor(shelf, shelf.GetPosition2D, shelf.MapFaction);
+                if (mt != null && mt.ItemRoster != null) { shelf = mt; _dShToTown += k; } else _dShNoTown += k;
+            }
+            shelf.ItemRoster.AddToCounts(el, k);
             _dSpShelfPcs += k; if (horse) _dSpShelfHorses += k;
+            NoteShelf(shelf, el.Item, k);
         }
 
         /// <summary>Podzial a sztuk wedlug wag (proporcja, reszta najwiekszym ulamkom) - jak podzial lupu zlota.</summary>
@@ -863,6 +914,7 @@ namespace Armoury
             if (mp == null || !SpoilsOn || mp.IsMainParty) return;
             try
             {
+                _townMemo.Clear();   // P3/Z3-B: pamiec miasta tylko na jedno rozdanie (oblezenia i wojny sie zmieniaja)
                 Beaten b;
                 bool had = _beaten.TryGetValue(mp, out b);
                 if (had) _beaten.Remove(mp);
@@ -972,7 +1024,7 @@ namespace Armoury
                 {
                     var mp = row.Key;
                     if (mp == null || mp.ItemRoster == null) continue;
-                    Settlement m = null;
+                    Settlement m = null, mTown = null; bool townAsked = false;
                     foreach (var kv in row.Value)
                     {
                         int ix = mp.ItemRoster.FindIndexOfElement(kv.Key);
@@ -981,8 +1033,16 @@ namespace Armoury
                         if (gone <= 0) continue;
                         if (m == null) m = NearestMarket(PosOf(mp), mp.MapFaction);
                         if (m == null) { _dSpNoWhere += gone; continue; }
-                        m.ItemRoster.AddToCounts(kv.Key, gone);
+                        // P3/Z3-B: towar nie-zywnosciowy wyrzucony przez zwycieska karawane - na targ najblizszego miasta (brak miasta: jak dotad)
+                        var to = m;
+                        if (m.IsCastle && DeadInCastle(kv.Key.Item))
+                        {
+                            if (!townAsked) { townAsked = true; mTown = NearestMarket(PosOf(mp), mp.MapFaction, true); }
+                            if (mTown != null) { to = mTown; _dShToTown += gone; } else _dShNoTown += gone;
+                        }
+                        to.ItemRoster.AddToCounts(kv.Key, gone);
                         _dBkPcs += gone; if (IsHorse(kv.Key.Item)) _dBkHorses += gone;
+                        NoteShelf(to, kv.Key.Item, gone);
                     }
                 }
             }
@@ -1362,6 +1422,10 @@ namespace Armoury
                   .Append("), w tym konie zbrojowni rozbitych ").Append(_dSpArmHorses).Append(", BK karawany na polki ").Append(_dBkPcs).Append(" (koni ").Append(_dBkHorses)
                   .Append("), zostalo w taborze (unikaty, nie-towar) ").Append(_dSpLeft).Append(", bez miejsca ").Append(_dSpNoWhere)
                   .Append(", pominiete partie bez niszczyciela (inne mody, dostawy BK) ").Append(_dSpSkip)
+                  .Append(", polki wedlug osady (P3/Z3-B, klucz ").Append(yn(s != null && s.SpoilsNonFoodToTown)).Append("): zamki ").Append(_dShCastle).Append(", miasta ").Append(_dShTown)
+                  .Append(", towar nie-zywnosciowy z zamku do miasta ").Append(_dShToTown).Append(", bez miasta ").Append(_dShNoTown)
+                  .Append("; zelazo zamki/miasta ").Append(_dShIronCastle).Append('/').Append(_dShIronTown).Append(", drewno zamki/miasta ").Append(_dShWoodCastle).Append('/').Append(_dShWoodTown)
+                  .Append(LordDiscard.Segment())   // P3/Z4: towar kasowany lordom przez gre (ponad udzwig) - liczniki doby
                   .Append(" | pula weteranow: +").Append(_dVetIn).Append(" (bez konia ").Append(_dVetNoHorse).Append(", gracz bez zmian ").Append(_dVetPlayer).Append(") / -")
                   .Append(_dVetHire + _dVetOut).Append(" (najem ").Append(_dVetHire).Append(", na polki ").Append(_dVetOut).Append("), stan ").Append(pool)
                   .Append(", karczma z typem pieszym zamiast konnego ").Append(_dVetFootShown).Append(" | najemnik: kon z puli ").Append(_dVetHire)

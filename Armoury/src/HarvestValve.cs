@@ -345,6 +345,9 @@ namespace Armoury
                 });
             }
             catch (Exception e) { Stumble("Census.wozy", e); }
+            // P3/Z1 (TRIAZ-3 O2-1 P1): surowiec w wozach kupcow w drodze (MaterialCarts) - czesc stosu swiata jak wozy kupcow R3
+            try { MaterialCarts.ForEachInTransit((it, n) => { if (n > 0 && Eligible(it)) { long k; c.TryGetValue(it, out k); c[it] = k + n; } }); }
+            catch (Exception e) { Stumble("Census.wozy surowcow", e); }
             _hNow = h;
             return c;
         }
@@ -429,6 +432,32 @@ namespace Armoury
             int high = s != null ? Math.Max(low + 1, s.ValveStockDaysHigh) : 60;
             double win = 2.0 * Bucket;
             int down = 0, up = 0, keep = 0, flips = 0;
+            // P3/Z2 (TRIAZ-3 bieg roczny, O2-2 "Poprawka ostateczna" pkt 2) - BEZPIECZNIK: towar, ktorego nie ma w wiecej niz ValveShortTowns miastach, nie jest
+            // nadprodukowany - zly jest dowoz. Stos swiata liczy tez zapas, ktory do zuzycia nie dochodzi (bieg roczny d364: zamki 3 654 + juki karawan 2 582 +
+            // cztery miasta 5 200 = 79% z 14 517 lup), wiec regulator cial wszystkie kopalnie (d196 x0.73, d308 x0.61) przy 34-50 miastach bez zelaza.
+            // Liczone tutaj (raz na 28 dob), nie z pola CaravanBulk (przeliczane po regulatorze, po wczytaniu 0): towary z tabeli surowcow karawan, puste polki miast.
+            Dictionary<ItemObject, int> emptyOf = null;
+            int shortAt = s != null ? Math.Max(0, s.ValveShortTowns) : 15, holdCut = 0, holdBack = 0;
+            bool holdKey = s != null && s.ValveHoldWhileShort, holdReady = false;
+            if (decide && holdKey)
+            {
+                try
+                {
+                    var bulk = CaravanBulk.Items();
+                    if (bulk.Count > 0)
+                    {
+                        emptyOf = new Dictionary<ItemObject, int>(new RefEq());
+                        foreach (var it in bulk) emptyOf[it] = 0;
+                        foreach (var t in Town.AllTowns)
+                        {
+                            if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                            foreach (var it in bulk) if (t.Owner.ItemRoster.GetItemNumber(it) <= 0) emptyOf[it]++;
+                        }
+                        holdReady = true;
+                    }
+                }
+                catch (Exception e) { Stumble("Close.bezpiecznik", e); holdReady = false; }
+            }
             var parts = new List<string>();
             var ids = new List<string>(_goods.Keys); ids.Sort(StringComparer.Ordinal);
             var f = new Dictionary<ItemObject, float>(new RefEq());
@@ -450,13 +479,27 @@ namespace Armoury
                             double cDay = C / win, pDay = P / win;
                             float m0 = g.M, m1 = m0;
                             int dir = 0;
-                            if (P > 0.0 && C < CutBelow * P && (cDay > 0.0 ? now > high * cDay : now > high * pDay))
+                            int emptyTowns = -1;
+                            bool shortNow = holdReady && emptyOf.TryGetValue(g.Item, out emptyTowns) && emptyTowns > shortAt;   // P3/Z2: brak w miastach
+                            string holdNote = null;
+                            if (shortNow && m0 < 1f)
+                            {
+                                // P3/Z2 (c): powrot do bazy - cofniecie wlasnego ciecia krokiem x1.3, nigdy ponad baze, bez warunku stosu < ValveStockDaysLow
+                                // (ten warunek jest nieosiagalny, dopoki zapas lezy tam, skad nie wyjezdza)
+                                m1 = Math.Min(1f, m0 * UpStep);
+                                if (m1 > m0 + 1e-4f) dir = 1; else m1 = m0;
+                                holdBack++;
+                                holdNote = ", powrot do bazy: bez towaru " + emptyTowns + " miast";
+                            }
+                            else if (P > 0.0 && C < CutBelow * P && (cDay > 0.0 ? now > high * cDay : now > high * pDay))
                             {
                                 // recenzja 221: cel = 0.95 x zuzycie / produkcja BAZOWA okna (przy mnozniku 1) - kubelek starszy powstal przy MA, biezacy przy m0;
                                 // m0 x C / P przy oknie z dwoma mnoznikami (po cieciu) cial drugi raz towar juz ustawiony na 0.95 x zuzycia (np. 0.57 -> 0.41)
                                 double baseP = (g.MA > 0f ? g.P0 / g.MA : g.P0) + (m0 > 0f ? g.P1 / m0 : g.P1);
                                 float target = (float)(CutTarget * C / (baseP > 0.0 ? baseP : P));
                                 m1 = Math.Max(Floor, Math.Max(target, m0 * CutMaxStep));
+                                // P3/Z2 (b): przy braku w miastach ciecie nie schodzi ponizej bazy (cofniecie wlasnego kroku x1.3 do x1.00 dziala dalej)
+                                if (shortNow && m1 < 1f) { m1 = 1f; holdCut++; holdNote = ", ciecie wstrzymane: bez towaru " + emptyTowns + " miast"; }
                                 if (m1 < m0 - 1e-4f) dir = -1; else m1 = m0;
                             }
                             else if (cDay > 0.0 && C >= StepAbove * P && now < low * cDay)
@@ -472,7 +515,7 @@ namespace Armoury
                                       + ", zuzycie/produkcja " + (P > 0.0 ? (C / P).ToString("0.00", inv) : "-") + " (" + C.ToString("0", inv) + "/" + P.ToString("0", inv)
                                       + (D > 0.0 ? ", skasowane " + D.ToString("0", inv) : "") + "), stos " + now + " = "
                                       + (cDay > 0.0 ? (now / cDay).ToString("0", inv) + " dni zuzycia" : "bez odbiorcy") + ", "
-                                      + (dir < 0 ? "w dol" : dir > 0 ? "w gore" : "bez zmian"));
+                                      + (dir < 0 ? "w dol" : dir > 0 ? "w gore" : "bez zmian") + (holdNote ?? ""));
                         }
                     }
                     catch (Exception e) { Stumble("Decide", e); }
@@ -500,7 +543,23 @@ namespace Armoury
               .Append(", okno ").Append((int)win).Append(" dob, stos ").Append(low).Append('-').Append(high).Append(" dni zuzycia, sufit x").Append(ceil.ToString("0.00", inv)).Append("): [")
               .Append(string.Join("; ", parts.ToArray())).Append("]; w dol ").Append(down).Append(", w gore ").Append(up).Append(", bez zmian ").Append(keep)
               .Append("; zmiany kierunku w kolejnych decyzjach ").Append(flips).Append("; skasowano 0 (od doby ").Append(_firstDecisionDay)
-              .Append(" gnicie BK stawka 0); potkniecia ").Append(_stumbles).Append('.');
+              .Append(" gnicie BK stawka 0)");
+            // P3/Z2: stan bezpiecznika i puste miasta wedlug towaru z tabeli surowcow karawan (tylko towary regulatora)
+            sb.Append("; bezpiecznik braku w miastach (P3/Z2): ");
+            if (!holdKey) sb.Append("WYLACZONY (Valve Hold While Short)");
+            else if (!holdReady) sb.Append("NIECZYNNY (tabela surowcow karawan niegotowa)");
+            else
+            {
+                sb.Append("CZYNNY prog ").Append(shortAt).Append(" miast, ciecia wstrzymane ").Append(holdCut).Append(", powroty do bazy ").Append(holdBack).Append(", miast bez towaru [");
+                bool fe = true;
+                foreach (var kv in emptyOf)
+                {
+                    if (kv.Key == null || !_byItem.ContainsKey(kv.Key)) continue;
+                    sb.Append(fe ? "" : ", ").Append(kv.Key.StringId).Append(' ').Append(kv.Value); fe = false;
+                }
+                sb.Append(fe ? "-]" : "]");
+            }
+            sb.Append("; potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             if (hl != null) Log.Info(hl);
         }

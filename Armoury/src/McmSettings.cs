@@ -2056,6 +2056,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public float CastleMarketFoodDays { get; set; } = 10f;
 
+        [SettingPropertyBool("Castle Cart Food Only", HintText = "a village cart that drives into a castle it was not bound for - as a rule to hide from raiders - sells there only the food the castle folk are short of and takes the rest of its load on to a town market, instead of leaving iron, timber and wool at a castle that uses none of it (needs Castle Market First; a cart with no town in reach still sells the castle its whole load, as before)")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CastleCartFoodOnly { get; set; } = true;
+
         [SettingPropertyBool("Village Takings Whole", HintText = "what a village's carts bring home from market no longer vanishes: after the lord's tax (Banner Kings: 70 percent, or 50 / 90 by the fief's tax decree) and the estate owners' cut, the village purse keeps the whole remainder - until now half of that remainder was simply deleted. The lord's tax, the estates and his tax counter stay exactly as Banner Kings sets them. Off = half the remainder vanishes as before")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageTakingsWhole { get; set; } = true;
@@ -4772,6 +4776,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool TownMaterialOrderPlayerCaravans { get; set; } = true;
 
+        [SettingPropertyBool("Town Material Order By Cart", HintText = "a town short of a raw material that finds no caravan to carry its order sends for it by merchants' cart: it buys the load from the stall of the nearest town or castle that has more than it needs (by road - by road and water where no road runs all the way - or from port to port by sea), pays that town or castle from its own purse above the merchants' reserve, and the goods reach its stall after the days the road takes - a besieged town waits, and after thirty days the cart turns back and the money is returned. With bloomeries at the mines iron then travels as far as the other materials. Off = caravans only, as before")]
+        [SettingPropertyGroup("Arms production")]
+        public bool TownMaterialOrderByCart { get; set; } = true;
+
         [SettingPropertyBool("Fletchers Bid For Ore", HintText = "when a town lacks arrows, its iron ore goes to whoever earns more on it - the armourers or the fletchers - as far as the fletchers' hands can use it")]
         [SettingPropertyGroup("Arms production")]
         public bool FletchersBidForOre { get; set; } = true;
@@ -5064,6 +5072,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int HorseDeathRatioMinBattles { get; set; } = 50;
 
+        [SettingPropertyBool("Spoils Non Food To Town", HintText = "goods other than food left behind by a broken party - iron, timber, wool, hides and the like - go to the market of the nearest friendly town instead of the nearest castle, where nobody uses them and no trader calls (food, horses, harness and arms go where they went before; needs Spoils Of Broken Parties)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool SpoilsNonFoodToTown { get; set; } = true;
+
+        [SettingPropertyBool("Lord Discard To Shelf", HintText = "goods a lord's party throws away because it carries more than it can - most often loot taken from a broken cart or caravan - are left at the market of the nearest friendly town instead of vanishing (food and livestock too; horses and arms are not touched). The lord loses exactly what he lost before. Off = the goods vanish, as in the base game")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool LordDiscardToShelf { get; set; } = true;
+
         [SettingPropertyBool("Spoils Of Broken Parties", HintText = "what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsOfBrokenParties { get; set; } = true;
@@ -5131,6 +5147,14 @@ namespace Armoury
         [SettingPropertyBool("Harvest Valve", HintText = "every four weeks a village makes less of a good the world does not use up and more of a good it does - instead of the stock rotting away on the stalls; the stock stays between one and two months of use (food and livestock are not touched; off = villages make what the game says and unsold stock rots as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarvestValve { get; set; } = true;
+
+        [SettingPropertyBool("Valve Hold While Short", HintText = "the village regulator does not cut back a raw material that more than Valve Short Towns towns have none of: so many empty stalls mean the goods are not reaching the towns, not that the villages make too much - a stock lying where nothing carries it away no longer starves the rest of the world. A good already cut back returns to its normal output step by step while the shortage lasts (never above normal). Off = the regulator counts the whole stock, as before")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ValveHoldWhileShort { get; set; } = true;
+
+        [SettingPropertyInteger("Valve Short Towns", 0, 60, "0", HintText = "how many towns may have none of a raw material before the regulator stops cutting it back (needs Valve Hold While Short)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int ValveShortTowns { get; set; } = 15;
 
         [SettingPropertyFloatingInteger("Village Output Step", 1.00f, 2.00f, "0.00", HintText = "the most a village can make of a good the world is short of, as a multiple of its normal output (1 = never more than normal; a cut-back good first returns to normal)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -5761,6 +5785,7 @@ namespace Armoury
             s.VillageCartFairPrice = VillageCartFairPrice;
             s.CastleMarketFirst = CastleMarketFirst;
             s.CastleMarketFoodDays = CastleMarketFoodDays;
+            s.CastleCartFoodOnly = CastleCartFoodOnly;
             s.VillageTakingsWhole = VillageTakingsWhole;
             s.VillageFoodSalesKept = VillageFoodSalesKept;
             s.VillagerPurseSurvives = VillagerPurseSurvives;
@@ -6440,6 +6465,7 @@ namespace Armoury
             s.TownMaterialOrderFromPacks = TownMaterialOrderFromPacks;
             s.TownMaterialOrderAhead = TownMaterialOrderAhead;
             s.TownMaterialOrderPlayerCaravans = TownMaterialOrderPlayerCaravans;
+            s.TownMaterialOrderByCart = TownMaterialOrderByCart;
             s.FletchersBidForOre = FletchersBidForOre;
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
@@ -6513,6 +6539,8 @@ namespace Armoury
             s.HamletKindsInDistrict = HamletKindsInDistrict;
             s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
             s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;
+            s.SpoilsNonFoodToTown = SpoilsNonFoodToTown;
+            s.LordDiscardToShelf = LordDiscardToShelf;
             s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
@@ -6530,6 +6558,8 @@ namespace Armoury
             s.ArmsTradeByCart = ArmsTradeByCart;
             s.WorkshopRecipesByValue = WorkshopRecipesByValue;
             s.HarvestValve = HarvestValve;
+            s.ValveHoldWhileShort = ValveHoldWhileShort;
+            s.ValveShortTowns = ValveShortTowns;
             s.VillageOutputStep = VillageOutputStep;
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;

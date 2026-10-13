@@ -72,7 +72,7 @@ namespace Armoury
             return id == "iron" ? _iron : (id == "hardwood" ? _wood : null);
         }
 
-        internal static void Reset() { _iron.Reset(); _wood.Reset(); }
+        internal static void Reset() { _iron.Reset(); _wood.Reset(); IronLands.Reset(); }
 
         /// <summary>StartStock przeliczyl zapas startowy na ladunki: liczniki zebrane do tej chwili pochodza z tickow startowych nowej
         /// kampanii i sa w sztukach z gry (10 kg), a ksiega liczy w ladunkach. Oddajemy je do logu przeliczenia i zerujemy -
@@ -118,7 +118,7 @@ namespace Armoury
             {
                 var b = Of(item);
                 if (b == null || st == null || count <= 0) return;
-                if (st.IsVillage) { b.Villages += count; b.Makers.Add(st); }
+                if (st.IsVillage) { b.Villages += count; b.Makers.Add(st); if (b == _iron) IronLands.NoteProduced(st, count); }   // P3/P2a: lupy wedlug ladow (tylko licznik)
                 else b.Towns += count;
             }
             catch { }
@@ -127,7 +127,7 @@ namespace Armoury
         /// <summary>Zdarzenie gry: wsad linii towarowej warsztatu (kuznia narzedzi, tartak). Warsztaty zbrojne ida przez NoteWorkshop.</summary>
         internal static void OnConsumed(ItemObject item, Settlement st, int count)
         {
-            try { var b = Of(item); if (b != null && count > 0) b.Lines += count; }
+            try { var b = Of(item); if (b != null && count > 0) { b.Lines += count; if (b == _iron) IronLands.NoteLine(st, count); } }   // P3/P2a: wsad linii wedlug ladow (tylko licznik)
             catch { }
         }
 
@@ -227,7 +227,9 @@ namespace Armoury
             }
 
             float kg = Math.Max(0.1f, it.Weight);
-            int all = towns + castles + villages + road;
+            int carts = 0;   // P3/Z1: surowiec w wozach kupcow w drodze (MaterialCarts) - czesc zapasu swiata, inaczej zakup wozem bylby "bez wyjasnienia"
+            try { carts = (int)MaterialCarts.InTransitOf(it); } catch { }
+            int all = towns + castles + villages + road + carts;
             bool bloom = b == _iron && Bloomery.IsBloom(it);   // E6/R1 (214): "iron" to lupa - linia "Zelazo (lupy) (214)" zamiast "Ruda:"
             var sb = new StringBuilder();
             sb.Append(bloom ? "Zelazo (lupy) (214)" : b.Name).Append(": dzien ").Append((int)CampaignTime.Now.ToDays - 1)
@@ -247,7 +249,9 @@ namespace Armoury
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
             sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road)
               .Append(" (wiesniacy ").Append(roadVillagers).Append(", karawany ").Append(roadCaravans).Append(", lordowie ").Append(roadLords)
-              .Append(", inne ").Append(roadOther).Append(" - w tym bandy ").Append(roadBandits).Append("), razem ").Append(all);
+              .Append(", inne ").Append(roadOther).Append(" - w tym bandy ").Append(roadBandits).Append(")");
+            if (carts > 0) sb.Append(", wozy kupcow w drodze (P3/Z1) ").Append(carts);
+            sb.Append(", razem ").Append(all);
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
@@ -258,6 +262,7 @@ namespace Armoury
               .Append("; zima: ").Append(WinterBite.WinterNow() ? "TAK" : "nie")
               .Append(bloom ? ". Lupa = " : ". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
+            if (b == _iron) IronLands.Daily(it, (int)CampaignTime.Now.ToDays - 1);   // P3/P2a: linia "Zelazo wedlug ladow" (tylko log; wlasny licznik potkniec)
             b.Shown = new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all }; b.ShownDay = (int)CampaignTime.Now.ToDays;
             b.LastAll = all; b.LastTowns = towns; b.NewDay();
         }

@@ -201,6 +201,192 @@
 **Build:** Armoury kod 0 (drzewo `zb/woj`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
 
 **Status:** DO SPRAWDZENIA - bieg roczny.
+## 2026-10-13 (P3/ZELAZO Z1 - recenzja niezalezna, tor M) - WOZ KUPCOW: para bez drogi ladowej jedzie LADEM I MORZEM (jak wozy R3 i F4a), nie tylko port-port
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/MaterialOrders.cs` (`CartRoadMixed` - nowa, `CartRoads`, `OrderByCart`, `NamesExtra`, `Line`), `Settings.cs` (opis klucza) + `McmSettings.cs` (gen_mcm), `tools/sprawdz_logi.py` (tylko wlasny blok `etap8_p3_zelazo`: licznik w wierszu P3/Z1-2).
+
+**Problem (recenzja kodu wobec TRIAZ-3 O2-1 "Poprawka ostateczna" P1 pkt 2; liczby z biegu rocznego Armoury-2026-10-13_02-15-21.log, doba 364, i z mapy ROT-Map settlements.xml):** poprawka ostateczna kaze liczyc droge wozu jak `TradeCarts.Road` (lad, a bez drogi ladowej - ladem i morzem), a Z1 liczyl tylko droge ladowa (`Default`) albo rejs z portu do portu (`Naval`). Para bez drogi ladowej, w ktorej zrodlo ALBO cel nie ma portu, nie miala wtedy zadnej drogi. Na mapie ROT portu nie ma 44 z 97 miast i zaden ze 130 zamkow. Skutek na liczbach doby 364: z ok. 5 830 lup nadwyzki w 15 najwiekszych z 18 zrodel 3 933 (67%) lezy w dwoch miastach bez portu - Barrowton 2 411 i Pyke 1 522; Pyke to wyspa bez portu (ladem najpewniej tylko do Lordsport, 14 jednostek obok, ktore samo ma nadwyzke 844 - 13 karawan bez statkow stoi w Pyke caly rok), wiec jego zapas nie mial drogi do nikogo, kto go potrzebuje; Barrowton nie mial drogi do miast-wysp (Sisterton 254 w linii, Mormont Keep 239), a rejs z Wysp Zelaznych do Trzech Siostr idzie dookola kontynentu (rachunek z mapy, nie pomiar). 19 z 55 miast bez zelaza nie ma portu (m.in. Hornvale - najblizsze nadwyzki w linii to Ten Towers 177, Pyke 185, Lordsport 192, wszystkie na wyspach; Karhold i Last Hearth - Hardhome 217 i 174) - te miasta dostawaly towar tylko ze zrodel na wlasnym ladzie.
+
+**Przyczyna:** `CartRoads` pytal pamiec drog gry tylko o `NavigationType.Default` i `Naval` (port-port); trzeciej drogi, ktora jezdza juz wozy kupcow R3 i wozy dymarek F4a (`TradeCarts.Road`: `NavigationType.All`, port tam, gdzie osada go ma), nie bylo.
+
+**Zmiana:** `CartRoadMixed(zrodlo, cel)` - droga `All` z pamieci kampanii (trzecie pole `_cartRoad`; wazna tylko > 0 i < straznik BK). `OrderByCart`: gdy para nie ma drogi ladowej, a `TownMaterialOrderBySea` jest czynne - bierze droge ladem i morzem i liczy ja JAK LAD: ten sam zasieg (`TownMaterialOrderRange` 600), pelna oplata drogi w warunku zysku (bez znizki morza), doby wozu z calej dlugosci. Rejs port-port zostaje osobna, tansza droga (wygrywa, gdy jest). Liczniki: w linii "Kontrakty surowca (174)" po "drugi przebieg zamowien (woz) N" doszlo "w tym ladem i morzem N (sztuk M; ...)", w przykladach dopisek "(ladem i morzem)"; linia "Miasta bez rudy i strzal (174b)": "bez drogi ladowej, ale ladem i morzem <= 600 ma N" i przy miescie "lad - (ladem i morzem X, zrodlo)". Narzedzie: wiersz P3/Z1-2 podaje "ladem i morzem N". Opis MCM klucza `TownMaterialOrderByCart` uzupelniony (po angielsku).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Nic z niczego bez zmian: ta sama sciezka zakupu i wozu, zmienia sie tylko to, ktore pary maja droge. Wylaczony `TownMaterialOrderByCart` = stan sprzed paczki; wylaczony `TownMaterialOrderBySea` = wozy tylko ladem.
+- Pamiec drog `All` dla pary bez portu: ta sama metoda i te same flagi portu co `TradeCarts.Road` (R3 od E6, F4a od testu 5-8); wynik 0 albo >= straznik BK = bez drogi (jak dotad). Pierwsze pytanie o pare moze policzyc droge na zywo (gra chowa ja potem w pamieci) - koszt w "czas wozow".
+- Zapis bez zmian (rekord wozu ma tylko "morzem 0/1"; droga mieszana to 0).
+- W biegu: "w tym ladem i morzem" > 0 w pierwszych tygodniach; z linii nazw - czy Hornvale, Sisterton, Karhold, Last Hearth maja "ladem i morzem <= 600"; Pyke w "wywieziona wozami".
+- Pozostale punkty recenzji (bez zmian w kodzie, sprawdzone): build Armoury kod 0 (pelna przebudowa; 1 stare ostrzezenie BattlefieldLaw), `gen_mcm` bez rozjazdu, opisy MCM po angielsku, 6 kluczy nie ma w Armoury.json Jeffa; narzedzie na logu rocznym bez wyjatku - istniejace 245 wierszy identyczne z wersja 74a3645, nowe wstawki "brak w logu" (INFO), a trzy wiersze liczone ze starych linii daja stan sprzed paczki: miasta bez zelaza 40.3 / 51.4 (NIE), zamki +9.2/d (NIE), bez wyjasnienia -1474 (NIE); blok sprawdzony tez na liniach zlozonych wedlug formatow z kodu (17 wierszy, bez wyjatku). Ksiegi: zakup wozem to przelew kasa-kasa w oknie `MOrders` ksiegi pieniadza, sztuki w drodze maja posiadacza w ksiedze towarow, ksiedze zelaza i spisie regulatora (ten sam moment spisu). Z2: len (75 miast bez towaru, x1.30) i welna (33-35 miast) - ciecie ponizej bazy wstrzymane takze dla nich (jedna regula; welna w d336 nie zeszlaby z x1.00 na x0.82); powrot do bazy zaraz po cieciu liczy sie w istniejacym wierszu W3-4 jako zmiana kierunku.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano. **Status:** DO SPRAWDZENIA - bieg roczny (razem z Z1).
+
+## 2026-10-13 (P3/ZELAZO Z1 - przeglad wlasny, tor S) - WOZ KUPCOW: polka liczy tylko sztuki naprawde przyjete, potkniecie w licznikach nie dubluje ladunku
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/MaterialCarts.cs` (`Put`, `Arrivals`, `Back`, `Ship`).
+
+**Problem (przeglad kodu przed testem, bez logu):** (1) `Arrivals` i `Back` zdejmowaly "w drodze" PRZED `AddToCounts` - wyjatek w zdarzeniu polki (cudzy podsluch rosteru) zostawial woz z ladunkiem, ale bez wpisu "w drodze" (miasto zamowiloby drugi raz), a nazajutrz dopisalby ladunek drugi raz, jesli pierwszy `AddToCounts` jednak doszedl; (2) `Ship` po wyjatku w licznikach (po dopisaniu wozu do listy) kladl ladunek takze na polke celu - sztuka z niczego.
+
+**Przyczyna:** kolejnosc operacji przejeta z `TradeCarts` bez pomiaru, ile polka naprawde przyjela.
+
+**Zmiana:** `Put(woz, polka)` - stan polki przed i po; przy wyjatku liczy sie tylko roznica (0..ladunek), o tyle maleje ladunek wozu i "w drodze" celu, reszta jedzie dalej nazajutrz; zwrot zaplaty przy zawroceniu dopiero z calym ladunkiem. `Ship` - zapasowe polozenie na polce celu tylko wtedy, gdy wozu nie ma na liscie.
+
+**Ryzyko / co sprawdzic:** sciezka bez wyjatku bez zmian (te same liczniki, kontrola "reszta wozow" 0). `GetItemNumber` liczy pierwszy stos przedmiotu - surowce nie maja modyfikatorow, wiec to caly zapas.
+
+**Build:** Armoury kod 0. **Status:** DO SPRAWDZENIA - bieg roczny (razem z Z1: "potkniecia wozow" 0, "reszta wozow" 0).
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO - narzedzie progow) - BLOK `etap8_p3_zelazo` w tools/sprawdz_logi.py (17 wierszy; istniejace wiersze bez zmian)
+**Mod:** narzedzie | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `tools/sprawdz_logi.py` (nowy blok przed `etap8_main` + jedna linia `blocks.append`).
+
+**Problem:** poprawki Z1-Z4 pisza nowe wstawki w liniach doby, a progi G1-6b / R1-8 mierza stary ksztalt (kontrakty karawan, miasta bez rudy d91-120) - bez wlasnych wierszy bieg roczny nie powie, czy paczka dziala.
+
+**Zmiana:** grupa `--grupa etap8` dostaje blok P3/ZELAZO (kazdy wiersz przy braku swojej linii = INFO, nigdy wyjatek):
+- Z1-1 kontrakt wozem CZYNNY w kazdej dobie; Z1-2 INFO zakupy / dostawy (wozy, ruda, zloto, zamki-zrodla, morze, w drodze); Z1-3 "reszta wozow" 0 w kazdej dobie; Z1-4 potkniecia 0 i czas wozow <= 30 ms/d; Z1-5 INFO powody bez kontraktu dla rudy; Z1-6 miasta bez zelaza w ostatnich 30 dobach okna <= 30 (rachunek 20-29; cel projektu 15 wymaga P3);
+- P2a INFO zelazo wedlug ladow (lupy, zuzycie, miasta bez zelaza: Westeros / Essos); P2b,d INFO zamki z ruda i rejsy portow bez rudy (<= 1000 / 1000-2400 / > 2400);
+- Z2-1 mnoznik `iron` >= 1.00 w kazdej decyzji regulatora przy miastach bez zelaza > 15 (powrot krokiem w gore dozwolony); Z2-2 INFO ciecia wstrzymane / powroty; Z2-3 INFO zapas poza zasiegiem zuzycia (zamki + juki karawan + cztery najwieksze miasta);
+- Z3-1 przyrost zelaza w zamkach <= +2 lupy/d; Z3-A1 zelazo sprzedane zamkom w calosci <= 10% wwiezionego przez wozy nieskierowane; Z3-A2 INFO straz wygasla z ladunkiem, lodzie; Z3-B1 zelazo z dobytku do zamkow <= 10%;
+- Z4-1 latka wpieta i "bez polki" 0 (z liczbami towaru, zywnosci, koni i uzbrojenia na dobe - dane do decyzji o koniach); Z4-2 zelazo "bez wyjasnienia" w ksiedze towarow >= -150 na rok (przeliczone na dlugosc okna, najmniej -50).
+
+**Ryzyko / co sprawdzic:** sprawdzone na logu biegu rocznego (Armoury-2026-10-13_02-15-21.log, `--do-doby 364`): stare linie daja INFO "brak w logu" dla wstawek i odtwarzaja liczby triazu (miasta bez zelaza 40.3 od d91 / 51.4 w ostatnich 30 dobach, zamki 298 -> 3 654 = +9.2/d, zapas poza zasiegiem 81%, zelazo bez wyjasnienia -1 474) - trzy NIE na starym biegu sa oczekiwane; nowe wstawki sprawdzone na liniach zlozonych recznie wedlug formatow z kodu (17 wierszy bez wyjatku). Wiersze G1-6b i R1-8 (stary ksztalt) zostaja bez zmian - po biegu do przegladu przez wlasciciela narzedzia (kontrakty karawan nie sa juz miara dowozu). Rownolegle paczki dopisuja swoje bloki w tym samym miejscu listy `blocks` - scalenie reczne dwoch sasiednich linii.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (`python tools/sprawdz_logi.py --grupa etap8 --do-doby 364 <log>`).
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z4, tor M) - TOWAR KASOWANY LORDOM PRZEZ GRE: LICZNIK W KSIEDZE TOWAROW I POLKA NAJBLIZSZEGO MIASTA (klucz LordDiscardToShelf); konie i uzbrojenie DO DECYZJI
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/LordDiscard.cs` (nowy), `GoodsLedger.cs` (`NoteDiscard`, przewoz `TDiscard`, ujscie, wpiecie latki), `HorseFate.cs` (`NearestTown`, wstawka linii K1), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny, ksiega "Towary: iron"; TRIAZ-3 O2-7 z podwazeniem):** 54 doby z ujemnym "bez wyjasnienia", razem -1 474 lupy w roku (1,85% podazy, 4,1/d; nigdy na plus; kwartaly -252 / -654 / -304 / -264). Najwieksze doby: 109000 -207, 109186 -174, 108888 -101. 86% ubytku siedzi u lordow (1 266 z 1 474); lordowie z ok. 3 390 zdobytych lup sprzedali 1 807, maja 110, zgubili 1 474. W czterech biegach po 119 dob to samo, zawsze tylko na minus (-46, -180, -357, -80). Korelacja dzienna koni "ponad udzwig" (linia K0) z suma "bez wyjasnienia" 25 towarow nie-zywnosciowych: r = 0,61.
+
+**Przyczyna (kod gry - pewna co do drogi, ilosc dotad niemierzona):** `DiscardItemsCampaignBehavior.OnHourlyTickParty` (tylko partia lorda AI z wodzem) kasuje nadbagaz (`DiscardNecessaryAmountOfItems`: od konca taboru, z pominieciem 20 dob jedzenia) i stado ponad ludzi (`DiscardAnimal`) - `AddToCounts(-n)` bez odbiorcy. Gra rozdaje lup pokonanego bez sprawdzania udzwigu (`MapEvent`, `DefaultBattleRewardModel`), wiec lord, ktory wzial zelazo z wozu albo karawany (lupa 15 kg, woz 1,5-3,7 t), traci je w najblizszej godzinie. Kasowanie jest godzinowe, ramki ksiegi towarow obejmuja tylko dyspozytory dobowe - dlatego ladowalo w "bez wyjasnienia". Nasz kod liczyl te droge tylko dla koni (prefiksy K0, `HorseBook.NoteDiscard`).
+
+**Zmiana:**
+1. `LordDiscard` - postfiks na obu metodach gry liczy dokladnie to, co zeszlo (stan stosu sprzed wywolania minus stan po) - to jest pomiar, ktorego brakowalo.
+2. Towar ksiegi towarow (towar handlowy z zywnoscia, zywy inwentarz): przy `LordDiscardToShelf` na polke najblizszego przyjaznego MIASTA (`HorseFate.NearestTown` - kolejnosc jak R14: wlasna frakcja nieoblegana, niewroga, dowolna), bez zaplaty (porzucony dobytek, jak dobytek ponad udzwig zwyciezcy). Klucz wylaczony albo brak miasta - sztuki znikaja jak w grze.
+3. Ksiega towarow: polozone na polce = przewoz "lordowie porzucili na polki miast N" (zapas swiata bez zmian); znikajace = ujscie "porzucone przez lordow (gra)". W obu przypadkach ta droga schodzi z "bez wyjasnienia" (takze przy wylaczonym kluczu).
+4. Linia "Konie - smierc, lup, dobytek (E6/K1)": wstawka "porzucone przez lordow (gra, P3/Z4): latka, na polke miasta TAK/NIE - kasowan N, towar X (w tym zelazo), zywnosc Y, zywy inwentarz L, konie H (ksiega koni - bez zmian), uzbrojenie i inne G (bez zmian); na polki miast S (zelazo), bez polki B, przepadlo przy wylaczonym kluczu K; czas, potkniecia".
+
+**ODLOZONE - DO DECYZJI (poprawka ostateczna triazu chciala wiecej; tu zrobiona czesc pewna):**
+- KONIE (ok. 34/d: 8 830 "ponad udzwig" + 3 468 "nadmiar stada" w roku) - zostaja jak dotad (znikaja, liczy je ksiega koni). Przeniesienie ich na targ zmienia bilans hodowli E6 (regulator K4), a rownolegla paczka koni wlasnie zmienia hodowle i zakupy mieszczan - wlasciciel obszaru koni powinien zdecydowac po swoim biegu. Kod przeniesienia jest ten sam (jedna galaz w `LordDiscard.Handle`) + rozdzial "przeniesione / ujscie" w `HorseBook.NoteDiscard`.
+- UZBROJENIE i inne nie-towary z taboru lorda - znikaja jak dotad, teraz policzone ("uzbrojenie i inne"); ksiega uzbrojenia ma wlasne pozycje, a unikaty (stal valyrianska w taborze przeladowanego lorda) wymagaja osobnej reguly "zostaje w taborze" - liczba z biegu powie, czy to problem.
+- Samo przeladowanie lorda lupem gry zostaje (latka nie zmienia rozdania lupu).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Nic z niczego: przenosi sie tylko sztuke, ktora gra wlasnie zdjela (roznica stanu stosu), bez zlota; lord traci to samo co dotad (tempo marszu i AI bez zmian); gracz nietkniety (gra kasuje tylko lordom AI, dodatkowo straz `IsMainParty`).
+- Zywnosc: jesli duza czesc "bez wyjasnienia" zywnosci (w biegu rocznym do ok. 815 szt./d) to ta droga, miasta przy teatrach wojny dostana darmowa zywnosc - pierwsza linia pomiaru rozstrzygnie; klucz pozwala wrocic.
+- Kolizje sprawdzone: te same dwie metody gry lataja prefiksy `HorseState` (same liczniki koni) - postfiks ich nie rusza; `HorseBook.NoteDiscard` bez zmian (konie dalej ujscie); w otwartej ramce ksiegi (nie powinno sie zdarzyc - tick godzinowy) ubytek ksieguje ramka, `NoteDiscard` nie dubluje. Skan triazu: zaden mod poza Armoury nie dotyka `DiscardItemsCampaignBehavior`.
+- Czas: postfiks tylko przy faktycznym kasowaniu (50-150 razy na dobe), kazde to jedno przejscie po 227 warowniach - ponizej 1 ms/d (liczba w linii).
+- Pulapka dat: linia K1 ma numer dnia o 1 wiekszy niz "Towary" z tego samego ticku. Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane: zelazo "bez wyjasnienia" w roku powyzej -150 (dzis -1 474), "na polki miast (zelazo)" ok. 4/d (1 200-1 500 w roku), "bez polki" 0; 25 towarow nie-zywnosciowych "bez wyjasnienia" wyraznie mniej niz -20 136 (dolna granica poprawy 9 824 - spadki widoczne u lordow); liczby miast bez zelaza to nie zmienia (4 lupy/d).
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana B, tor S) - PORZUCONY DOBYTEK NIE-ZYWNOSCIOWY NA TARG MIASTA, NIE DO ZAMKU (klucz SpoilsNonFoodToTown)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HorseFate.cs` (`NearestMarket` z parametrem "tylko miasta", `Put`, `BkPostfix`, linia doby), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny; TRIAZ-3 O2-3, podwazenie pkt 3 - "droga B"):** ok. 1/3 doplywu zelaza do zamkow nie przechodzi przez sprzedaz wozow. Linia "Konie - smierc, lup, dobytek (E6/K1)": w roku 8 893 rozbite partie, na polki osad 240 533 szt. (ponad udzwig 213 969) - 404 szt./d w I polroczu, 916/d w II. Bilans zelaza: z rozbitych wozow zeszlo 8 099 lup (10,7% zaladowanych), miasta i zamki dostaly poza ramkami sprzedazy 8 294 lup. Dowod dzienny d330: zamki +133 lupy przy calym liczniku "wozy do osad" 102 i dobytku na polki 1 000 szt. Rachunek: droga B to ok. 1 200-1 350 lup/rok do zamkow (3,5/d, w II polroczu 5,7/d; blad ok. +-300 - rozbicia dobytku wedlug towaru w logu nie bylo).
+
+**Przyczyna (kod):** regula R14 (E6/K1 pkt 2, zamierzona: nic w nicosc) kladzie dobytek, ktory nie miesci sie w udzwigu zwyciezcy, CALY i ZA DARMO na polke najblizszej warowni: `HorseFate.Put` -> `NearestMarket` szuka po `Town.AllFiefs`, wiec takze po zamkach; to samo przy zwyciezcy-zalodze albo milicji zamku, przy rozwiazaniu partii bez zwyciezcy i przy nadmiarze zwycieskiej karawany BK (`BkPostfix`). W zamku towar nie-zywnosciowy jest martwy (zamek go nie zuzywa, karawany tam nie jezdza).
+
+**Zmiana (poprawka ostateczna, zmiana B):**
+- `NearestMarket(pos, frakcja, townsOnly)` - ta sama kolejnosc (wlasna frakcja nieoblegana -> niewroga -> dowolna), przy `townsOnly` tylko miasta.
+- `DeadInCastle(przedmiot)`: towar handlowy (`IsTradeGood`), ktory nie jest jedzeniem (`TownFolk.IsFoodCategory`), koniem ani uprzeza.
+- `Put`: (a) ponad udzwig zwyciezcy - taki towar na targ najblizszego miasta; (b) polka bedaca zamkiem (zaloga / milicja zwyciezca, rozwiazanie partii przy zamku, brak zwyciezcy) - taki towar na targ najblizszego miasta liczonego od tego zamku. `BkPostfix`: to samo dla nadmiaru zwycieskiej karawany. Brak miasta - jak dotad (najblizsza warownia), licznik "bez miasta".
+- Jedzenie, konie, uprzaz i uzbrojenie - jak dotad (podzamcze je zjada, zamki-siedziby kupuja konie).
+- Linia "Konie - smierc, lup, dobytek (E6/K1)": dopisek "polki wedlug osady (P3/Z3-B, klucz TAK/NIE): zamki N, miasta N, towar nie-zywnosciowy z zamku do miasta N, bez miasta N; zelazo zamki/miasta a/b, drewno zamki/miasta c/d" (pomiar, ktorego brakowalo - dziala takze przy wylaczonym kluczu).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: przerzut na polke bez platnika istnieje juz dzis (R14) - zmienia sie tylko adres (srednio dalej); ilosc towaru i zlota bez zmian.
+- Miasta dostaja za darmo wiecej surowca przy rejonach walk (bandy rozbijaja wozy): ok. 3,5-5,7 lup/d zelaza i odpowiednio drewna, gliny, soli - cena w tych miastach lekko w dol; podzamcza traca ten towar (jak w zmianie A).
+- Regresje sprawdzone w kodzie: `NearestMarket` bez trzeciego argumentu dziala jak dotad (wywolania dla koni, jedzenia i darow nietkniete); pamiec miasta (`_townMemo`) zyje tylko jedno rozdanie (czyszczona na poczatku `Spoils` i w liniach doby) - oblezenia i wojny czytane na swiezo; liczniki "na polki osad", "ponad udzwig", "bez miejsca", "BK karawany na polki" bez zmian znaczenia (progi K1-5 narzedzia).
+- Czas: jedno dodatkowe przejscie po 227 warowniach na rozdanie z towarem nie-zywnosciowym (ok. 24 partie/d) - ponizej 1 ms/d.
+- Jesli Jeff chce zostawic dobytek w zamkach - klucz wylaczony; zapas zamkow rosnie wtedy dalej o 3,5-5,7 lup/d (skutek zamierzony R14). Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane: "zelazo zamki/miasta" - zamki blisko 0 (tylko "bez miasta"); razem ze zmiana A doplyw zelaza do zamkow z 10,6/d brutto do ok. zera, zapas zamkow maleje (wlasne zuzycie + wozy kupcow Z1 wywoza nadwyzke): z ok. 300 lup startu nowej kampanii nie rosnie ponad kilkaset.
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana A, tor S) - WOZ, KTORY SCHOWAL SIE W ZAMKU, SPRZEDAJE TAM TYLKO BRAKUJACE JEDZENIE (klucz CastleCartFoodOnly)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/CastleMarket.cs` (`SellPrefix`, nowa `Undirected`, `CastleTickPrefix`, zapis rekordu "o"), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis: rekord strazy `o|woz|zamek|godzina` dostaje opcjonalne 5. pole (godziny strazy) - stary zapis czyta sie jak dotad.
+
+**Problem (bieg roczny, linie "Zelazo (lupy) (214)" i "Przeplywy osad"; TRIAZ-3 O2-3 z podwazeniem):** zelazo w zamkach 298 -> 3 654 lup w roku (25% zapasu swiata; ubywa tylko 494), przyrost skokami calych wozow (d116 +165, d330 +133, d362 +124). Wjazdow taborow do zamkow 15 214, z tego skierowanych przez targ przy zamku (5.11) 12 207 - zostaje 3 007 nieskierowanych (4,7/d w I polroczu, 11,8/d w II), kazdy konczyl sie pustym wozem; zamki zaplacily za takie zrzuty 2,0-2,4 mln zl. To samo dla drewna, gliny, soli, welny, lnu (5-10% towaru wozow w II polroczu). Wjazdy rosna razem z bandami (402 -> 953) - korelacja 14-dobowa 0,82.
+
+**Przyczyna (kod gry, BK i nasz):** partia wsi uciekajaca przed wrogiem chowa sie w najblizszej warowni (gra `MobilePartyAi.GetBehaviorForNearbySettlementToFlee`: `IsFortification`); latka BK `VillagerSettlementEnterPatch` sprzedaje przy kazdym wjezdzie do osady z `Town != null`, takze w zamku; gra sprzedaje caly ladunek z calej kasy (`SellGoodsForTradeAction`). Nasz `CastleMarket.SellPrefix` lapal tylko woz skierowany przez `FirstStop` - dla wozu bez wpisu (`:327`) i dla innego zamku (`:331`) zwracal `true` ("jak dotad"). Zamek surowca nie zuzywa i nikt go stamtad nie wywozil.
+
+**Zmiana (poprawka ostateczna, zmiana A):** oba miejsca "jak dotad" ida do wspolnej galezi `Undirected` (czynna przy `CastleCartFoodOnly`, `CastleMarketFirst` i wpietym targu przy zamku):
+1. lodz rybacka NavalDLC (bez drogi ladowej), woz bez towaru, woz bez wsi, zamek Innych - jak dotad (`true`), z licznikiem;
+2. zamek kupuje tylko brakujace jedzenie ta sama funkcja co woz skierowany (`FeedFromDistrict`: do `CastleMarketFoodDays` dni popytu podzamcza, tylko ze `CastlePurse.Spendable`);
+3. woz pusty po jedzeniu - koniec (`false`); inaczej rozkaz do miasta tym samym `MarketRoad.PickTown` (wies miejska bez wyboru - jej miasto, gdy nieoblezone i niewrogie), straz przed odeslaniem do domu przez BK 24 h (woz czeka w zamku, az wrog odejdzie), sprzedaz gry pominieta (`false`);
+4. zadne miasto dalej - sprzedaz jedzenia cofnieta (`Undo`) i zamek kupuje caly woz jak dotad (`true`) - jak woz wsi zamkowej bez targu;
+5. znacznika "byl w zamku" nie stawia (woz moze jeszcze dowiezc jedzenie swojemu zamkowi).
+`CastleTickPrefix`: straz wedlug pola `Hold` (6 h dla wozu skierowanego jak dotad, 24 h dla nieskierowanego); nowy licznik "straz wygasla z ladunkiem" liczony w chwili wygasniecia.
+Linia "Targ przy zamku (5.11)" - nowa wstawka "wjazdy nieskierowane (P3/Z3)": z ladunkiem (w tym schronienie - cel domyslny inny niz ten zamek; ladunek: zelazo / drewno / inne), puste, lodzie, pominiete, jedzenie sprzedane (szt., zl, odmowy), pusty po jedzeniu, dalej do miasta (zatrzymane w wozie: zelazo / drewno / inne), bez miasta dalej, caly woz sprzedany zamkowi (gra) z 5 zamkami o najwiekszym zrzucie, straz wygasla z ladunkiem, czas wjazdow. Liczniki wjazdow i ladunku dzialaja takze przy wylaczonym kluczu (pomiar P2b). Liczniki wizyt 5.11 ("wizyt", "jedzenie sprzedane zamkom") licza dalej tylko wozy skierowane.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: jedzenie parami zloto/towar jak w wizycie 5.11 (ta sama funkcja, 12 207 wizyt w roku, "niezgodne" 54 na 40 974 sprzedaze); reszta ladunku zostaje w wozie. Kasy zamkow zatrzymuja 2,0-2,4 mln zl/rok; wsie zyskuja (zrzut dawal 500-900 zl na wjazd wobec ok. 3 600 zl za wizyte w miescie); panowie zamkow traca dzialke z tych zrzutow.
+- Podzamcza traca przypadkowy towar nie-zywnosciowy (rocznie zjadaly gline 4 093, sol 3 893, drewno 9 957 szt.) - zgodne z decyzja 5.11 (zamek kupuje tylko jedzenie); patrzec na "podzamcze zaplacone" w linii "Kiesa ludu".
+- Regresje sprawdzone w kodzie: woz skierowany - ta sama sciezka co dotad; woz wsi zamkowej bez targu w zasiegu (cel domyslny = ten zamek) konczy na pkt 4 - zamek kupuje caly woz jak dotad; `MarketCarts.SellPostfix` (zwrot nadplaty 119) i ramka ksiegi towarow widza sprzedaz jedzenia tak samo jak w wizycie 5.11; `Sweep` i zapis licza straz wedlug `Hold`.
+- Woz, ktory stoi w zamku ponad 24 h (wrog nie odchodzi), BK odesle do domu z ladunkiem - towar nie ginie, kurs przepada (licznik "straz wygasla z ladunkiem").
+- To zatyka ok. 2/3 doplywu zelaza do zamkow (droga A: 6-7 lup/d, w II polroczu 9,6/d). Pozostala 1/3 (dobytek rozbitych partii na polke najblizszej warowni) - osobna zmiana B w tym samym pakiecie.
+- Czas: kilkanascie wyborow miasta na dobe po ok. 0,2 ms - liczba w linii ("czas wjazdow"). Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (i autotest 120 dob). Oczekiwane: "caly woz sprzedany zamkowi (gra)" blisko 0 (tylko "bez miasta dalej"); "dalej do miasta" ok. 5-12/d; wizyty taborow w zamkach z pustym wozem po wizycie (linia "Przeplywy osad") z ok. 8/d do liczby wozow pustych i lodzi; przyrost zelaza w zamkach z 10,6/d do ok. 3,5-5,7/d (reszte zamyka zmiana B); "straz wygasla z ladunkiem" pojedyncze.
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z2, tor S) - BEZPIECZNIK REGULATORA WSI: towar, ktorego nie ma w ponad 15 miastach, nie jest ciety ponizej bazy (klucze ValveHoldWhileShort, ValveShortTowns)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HarvestValve.cs` (`Close` - blok decyzji towarow; `HorseClose` nietkniete), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny, linia "Regulator wsi (221)"; TRIAZ-3 O2-2 z podwazeniem):** regulator przykrecil kopalnie przy pustych miastach. Decyzje dla `iron`: d196 x1.00 -> x0.73 (zuzycie/produkcja 0.77 = 11293/14713, stos 13191 = 65 dni, miast bez zelaza 34), d224 x0.72, d308 x0.72 -> x0.61 (0.89 = 9140/10249, stos 14025 = 86 dni), d336 bez zmian (0.90, 95 dni). Skutek w oknach 28 dob: wsie 265 -> 158 lup/d, zuzycie 207 -> 159/d, miast bez zelaza 36,5 -> 53,4 (ostatnie 5 dob 61,5); zdjeto ok. 14,9 tys. lup. Bez zelaza zostaly miasta, ktore przed cieciem mialy je zawsze (Seagard, Lannisport, Kayce, Starfall, Astapor, Last Hearth, Stoney Sept, The Twins: 42-75% probek d308-364).
+
+**Przyczyna (kod):** regula dziala jak napisana (`Close`: ciecie, gdy zuzycie < 90% produkcji i stos > 60 dni zuzycia), ale stos to wszystkie polki, partie i wozy swiata (`Census`), takze zapas, ktory do zuzycia nie dochodzi: d364 zamki 3 654 + juki karawan 2 582 + cztery miasta-zrodla 5 200 = 11 436 z 14 517 lup (79%). Mnoznik jest jeden na towar dla calego swiata, wiec ciecie trafia takze kopalnie przy pustych miastach; mniejszy dowoz zmniejsza zuzycie, stos w dniach rosnie (65 -> 95) i warunek powrotu w gore (stos < 30 dni) jest nieosiagalny - zapadka.
+
+**Zmiana (poprawka ostateczna pkt 2):** w `HarvestValve.Close`, tylko decyzje towarow:
+- (a) licznik pustych polek liczony na miejscu, raz na decyzje (28 dob): towary z tabeli surowcow karawan (`CaravanBulk.Items()`; w regulatorze: iron, hardwood, flax, wool) x miasta `Town.AllTowns` z 0 sztuk. Nie z pola `CaravanBulk.Empty` (liczone po regulatorze, po wczytaniu 0). Pusta tabela = bezpiecznik NIECZYNNY z dopiskiem w linii.
+- (b) brak = pustych miast > `ValveShortTowns` (15 - cel projektu R1-8b). Przy braku ciecie nie schodzi ponizej x1.00 (cofniecie wlasnego kroku x1.3 do x1.00 dziala dalej): dopisek "ciecie wstrzymane: bez towaru N miast".
+- (c) przy braku i mnozniku < 1.00: powrot krokiem x1.3 do najwyzej x1.00, bez warunku stosu < 30 dni: dopisek "powrot do bazy: bez towaru N miast".
+- (d) na koncu linii decyzji: "bezpiecznik braku w miastach (P3/Z2): CZYNNY prog 15 miast, ciecia wstrzymane N, powroty do bazy N, miast bez towaru [iron N, hardwood N, flax N, wool N]".
+- Progi 30/60 dni i 90%/98%, krok w gore ponad baze i hodowla koni - bez zmian. Klucz `ValveHoldWhileShort` wylaczony = regula sprzed paczki.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Nic z niczego: bezpiecznik tylko nie obniza bazowego wydobycia modelu; wytop dalej ogranicza drewno i kiesa kopalni.
+- Dopoki martwe konce dowozu nie znikna (Z1 kontrakt wozem, Z3 zamki), zapas rosnie jak przed cieciem (ok. 60 lup/d; do ok. 23 tys. na d364 zamiast 14,5 tys.) - to dodatek do poprawek dowozu, nie zamiennik. Jesli bieg roczny pokaze rosnacy zapas w czterech miastach i zamkach mimo Z1/Z3 - nastepny krok to ciecie miejscowe (tylko kopalnie, ktorych miasto zbytu ma nadmiar), wielkosc M (do decyzji po biegu).
+- Len (75 miast bez towaru, dzis x1.30) i welna (35): ciecie do x1.00 dziala, ponizej bazy nie zejda, dopoki pustych miast jest ponad 15 - zgodne z regula (brak w miastach to dowoz).
+- Drewno (ok. 8 pustych miast) - regulator jak dotad.
+- Kolizje: `Close` czyta tylko `CaravanBulk.Items()` (odczyt) i polki miast; rownolegla paczka koni zmienia `HorseClose` i dalsza czesc pliku - blok decyzji towarow jej nie dotyka. Parser progow (`valve_decisions`) czyta "..., w dol|w gore|bez zmian" - dopisek stoi za kierunkiem.
+- Czas: 97 miast x 4 towary raz na 28 dob - pomijalne (profil doby `HarvestValve.Daily`).
+- W biegu 120 dob ciecie i tak nie zapada - dzialanie potwierdzi dopiero bieg roczny. Kluczy nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane (rachunek podwazenia dla samego bezpiecznika): d196 "ciecie wstrzymane: bez towaru ok. 34 miast"; mnoznik `iron` x1.00 w kazdej decyzji przy miastach bez zelaza > 15; wsie 261-265 lup/d zamiast 185 -> 154; zuzycie ok. 200/d zamiast 159; z Z1 i Z3 miast bez zelaza mniej niz 35.
+
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z1, tor M) - KONTRAKT WOZEM KUPCOW: miasto bez surowca kupuje go z najblizszego zrodla z nadwyzka (klucz TownMaterialOrderByCart) + pomiary P2
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` (od 74a3645) | **Pliki:** `Armoury/src/MaterialCarts.cs` (nowy), `IronLands.cs` (nowy, tylko log), `MaterialOrders.cs`, `CastleMarket.cs` (1 funkcja odczytu), `GoodsLedger.cs`, `OreLedger.cs`, `HarvestValve.cs` (spis stosu, 2 linie), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis: bez nowego klucza (rekordy `@w|...` w `arm_matorders`).
+
+**Problem (bieg roczny 364 doby, Armoury-2026-10-13_02-15-21.log; TRIAZ-3 O2-1 z podwazeniem):** zelaza nie brakuje - nie dociera. Rok: lupy 75 640 + zlom 3 872, zuzycie 66 154, zapas swiata 1 035 -> 14 517 (d364: miasta 6 748, zamki 3 654, karawany 2 582), a miast bez zelaza 35-61 z 97 (d91-364 srednio 40,1; ostatnie 5 dob 61,5). Cztery miasta (Barrowton 2 442, Pyke 1 572, Lordsport 892, Ten Towers 294-866) trzymaja 64% zelaza wszystkich miast. Kontraktow surowca 322 w roku (0,9/d; zelaza 1 586 lup = 2% podazy); powody "bez kontraktu" na dobe (7 surowcow, d91-364): brak karawany w zrodle 128, brak zrodla w zasiegu 186, bez drogi 123 (w tym brak konwoju w porcie zrodla 70).
+
+**Przyczyna (kod):** kontrakt 174 moze wziac tylko karawana STOJACA w zrodle w chwili taktu doby (`MaterialOrders.Order`: petla `src.Parties`, `Eligible`), a po E8/G1 karawany stoja godzine (mediana 1,4 h) - w miastach stoi srednio 21 zamiast 355; morzem tylko konwoj stojacy w porcie zrodla; ruda miala zasieg 200 (`TownMaterialOrderRangeOre`) zamiast 600; zamki nie byly zrodlem (3 654 lup martwe). Podwazenie: same "zywe kontrakty" nie sa przyczyna poziomu (bieg 1 z 10-13 kontraktami/d mial 46 miast bez zelaza) - brakuje ogniwa bez przewoznika, a w Essos brakuje samej produkcji.
+
+**Zmiana (poprawka ostateczna P1 + pomiary P2):**
+1. `MaterialOrders.Order`: gdy zadna karawana nie wziela zamowienia - drugi przebieg `OrderByCart` bez przewoznika. Zrodla (`CartSources`, raz na dobe i surowiec): miasta ponad prog nadwyzki kontraktow (`SourceKeepDay`) ORAZ zamki ponad 10 dob wlasnego zuzycia (`CastleKeep` = zmierzone zuzycie + popyt podzamcza z budzetu BK, `CastleMarket.FolkPerDay`), niewrogie, nieoblezone, z nadwyzka co najmniej jednego ladunku minimalnego.
+2. Droga (`CartRoads`, pamiec kampanii): ladem <= `TownMaterialOrderRange` (600) albo morzem port-port jak dotad (rejs <= `TownMaterialOrderSeaMaxRoute`, rejs x `SeaFreightShare` <= zasieg); wybrana tansza. Odleglosc 0 miedzy roznymi osadami = bez drogi. Przy dymarkach (`Bloomery.On`) i wlaczonym kluczu zelazo ma zasieg 600 takze w kontrakcie karawany.
+3. Ilosc: zapas na max(10, D + 4) dob zuzycia minus polka minus w drodze, D = doby wozu dla TEJ pary (`TradeCarts.DaysFor`); nie mniej niz ladunek minimalny (`TownMaterialOrderMinLoadKg` 100 kg = 7 lup - ODSTEPSTWO od tekstu triazu: miasto o zuzyciu ponizej 0,5 lupy/d nie zamowiloby nigdy, bo jego brak nie urosnie ponad 100 kg), nie wiecej niz nadwyzka zrodla i kasa celu. Warunek zysku z oplata drogi jak w kontrakcie (cena srodkowej sztuki celu - zrodla - oplata > 0, polowienie); wygrywa marza na kg.
+4. Zakup: sztuka po sztuce z polki zrodla (`ShelfBuy.Take`, cena targu zrodla), placi kasa miasta-celu ponad zapas kupcow (`TownPurse.BuyFloor`) -> kasa zrodla (`Town.ChangeGold` - takze zamek); liczniki `TownFolk.OnTownCoin` / `TownFolk.Sale` jak R3 i F4a. Oplaty frachtu nikt nie placi (jak R3 i F4a). Pozycja `MOrders` ksiegi pieniadza (netto 0 miedzy kasami osad).
+5. Woz (`MaterialCarts`, osobna lista - linia 215 i jej progi bez zmian): na polke celu po dobach drogi; cel oblezony - czeka; po 30 dobach (albo po planowanej drodze, jesli dluzsza) zawraca - sztuki na polke zrodla, zwrot z kasy zrodla do kasy celu (najwyzej kasa zrodla). Zmiana wlasciciela celu albo wojna po zakupie - dojezdza. Przy dostawie `NoteTrip` (doby od zakupu) - punkt zamowienia miasta liczy prawdziwa droge. `InTransit` dolicza wozy (bez podwojnego zamowienia).
+6. Ksiegi: `GoodsLedger` posiadacz "wozy surowcow" (i w kontroli z ksiega rudy), `OreLedger` "wozy kupcow w drodze" w zapasie razem, spis stosu regulatora (`HarvestValve.Census`).
+7. Zapis: rekordy `@w|zrodlo|cel|surowiec|sztuk|zaplacone|dobaZakupu|dobaPrzyjazdu|morzem` w kluczu `arm_matorders` (stary zapis - brak wozow; starszy DLL rekord pomija).
+8. Linia "Kontrakty surowca (174)" - nowe wstawki: "bez kontraktu wedlug surowca (P3)" (P2c: powod po obu przebiegach, kazdy surowiec osobno), "wozem kupcow (P3/Z1): zawarto N [sztuk wedlug surowca] za X zl, ze zrodel-zamkow, morzem, dojechalo, czeka pod oblezeniem, zawrocone (zwrot), w drodze, kontrola ... reszta wozow 0", "drugi przebieg zamowien (woz) N, czas wozow X ms", "przed dostawami wozow tej doby miast bez rudy bylo N".
+9. Pomiary P2 (tylko log): (a) nowa linia doby "Zelazo wedlug ladow (P3/P2a)" - lupy, zuzycie zmierzone, zapas miast i zamkow, nadwyzka zrodel, miasta bez zelaza osobno dla Westeros i Essos (podzial skladowymi drogi ladowej, wyspy do blizszego ladu; zapasowo x = 800 z dopiskiem); (b, d) linia "Miasta bez rudy i strzal (174b)" co 5 dob: zamki z ruda (10 najwiekszych), ruda dowieziona / wywieziona wozami, a dla kazdego miasta bez rudy powod ostatniej odmowy i droga ladem / rejs do najblizszego zrodla-miasta z nadwyzka >= 200 oraz podsumowanie rejsow wobec 1000 i 2400.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- KIERUNEK DO POTWIERDZENIA PRZEZ JEFFA: 05.10 chcial, zeby surowce wozily prawdziwe partie; woz z czasem drogi bez partii jest juz przyjety dla broni (R3) i drewna dymarek (F4a), ale bandyci go nie rozbija. Wariant z prawdziwa karawana nie obejmie wysp (brak konwoju 70/d). Klucz wylaczony = stan sprzed.
+- Zamknieta ekonomia: sztuka zdjeta z polki zrodla = sztuka w wozie = sztuka na polce celu (kontrola "reszta wozow" w linii, ma byc 0); zloto kasa celu -> kasa zrodla, zwrot najwyzej z kasy zrodla. Panowie traca clo ok. 10% z tych sprzedazy (jak R3). Nic nie powstaje.
+- Regresje sprawdzone w kodzie: `InTransit` czytaja `Order` i punkt zamowienia (`Daily`) - oba maja liczyc wozy; `_keepDay` dla zamkow wypelnia tylko `CastleKeep` (SourceKeepFor / linia nazw pytaja wylacznie miasta); `Line` nie wraca przed wstawka, gdy sa wozy przy wylaczonych kontraktach; karawany (CaravanBulk) nie wiedza o wozach - po dostawie miasto jest ponad celem i karawana sprzeda gdzie indziej (regula c).
+- Poza zasiegiem P1 (nie 100%): Essos (brak produkcji - rachunek podwazenia 16-21 miast), miasta z kasa na zapasie kupcow (3-12), pary w wojnie, miasta ponad 600 drogi bez portu. Do decyzji P3 po biegu: `TownMaterialOrderSeaMaxRoute` 1000 -> 2400 albo regulator wsi osobno na lad - liczby da linia "wedlug ladow" i podsumowanie rejsow.
+- Karawany zostaja z ok. 2 600 lup w jukach - patrzec na kiesy karawan i "w jukach karawan" (O2-5: nie ruszac).
+- Czas: drugi przebieg ok. 450 zamowien/d w pierwszych dobach (potem mniej - przerwa 3 doby po zakupie), kazdy po liscie zrodel z nadwyzka (kilka-kilkadziesiat) z drogami z pamieci; rachunek +5-20 ms/d z 12 500 ms - liczba w linii ("czas wozow") i w profilu doby (`MaterialOrders.Daily`); linia "wedlug ladow" ok. 1 ms/d.
+- Stary zapis: wczytuje sie bez zmian (brak rekordow wozow). Klucza nie ma w Armoury.json Jeffa (grep 0) - dziala domyslna.
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane (rachunek podwazenia, nie pomiar): miast bez zelaza 20-29 pod koniec roku zamiast 50-60 (Westeros 5-8, Essos 16-21); "wozem kupcow: zawarto" kilkadziesiat na dobe w pierwszych tygodniach, potem kilkanascie; "reszta wozow 0" codziennie; zamki z ruda maleja; "bez wyjasnienia" zelaza w ksiedze towarow bez nowej pozycji.
 
 ## 2026-10-13 (zgloszenie Jeffa, tor S) - CZYTELNA DATA "Year 299, Day 256, Autumn" + DZIEN ZMIENIA SIE O POLNOCY (klucz ReadableDateEnabled)
 **Mod:** Armoury | **Galaz:** `w-toku/kalendarz-data` (od ca4aa87 = WGRANIE 35) | **Pliki:** `Armoury/src/Calendar.cs` (nowa klasa `CalendarText`), `WesterosClimate.cs` (ToStringPrefix, TextSeason, OldTextDay, latka powiadomien), `MapClock.cs` (BarText), `IronBank.cs` i `DebtLadder.cs` (po 1 linii tekstu), `ArmouryBehavior.cs` (1 nasluch godzinny), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
