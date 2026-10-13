@@ -15,6 +15,9 @@ namespace Armoury
     ///    Zapasu nikt nie rusza: pobor najwyzej cala nadwyzka w dol do pelnej zlotowki; biedne miasto (bez nadwyzki) nie placi nic. Wies - bez zmian (Levies 2.5%).
     ///  - ILE: stawka dnia = FolkWarAidShare x s / WarTaxMax, s = biezaca stawka potrzeby korony z podatku 184 (WarTaxK.S, najwyzej pulap krolestwa: 3%, z polityka
     ///    War Tax 6% - wtedy danina x 2). s = 0 (korona bez potrzeby, pokoj) - danina 0. Jedna stawka dla wszystkich klas (rozroznienie klas jest w zapasie dni).
+    ///    W5b regula 1 (klucz WarAidFollowsLordsShortfall, KingdomTreasury.WarTax.cs): w miejsce s wchodzi wieksza z s i stawki z braku wojska u panow (WtAidS) -
+    ///    krolestwo, ktorego rody nie maja z czego oplacic druzyn, placi danine takze wtedy, gdy rachunki samej korony potrzeby nie pokazuja. Podatek od
+    ///    zarobku tej stawki nie uzywa. Klucz wylaczony = samo s.
     ///  - BRAMKI dokladnie jak FolkWarTax: WtOn (WarTaxFromFolk, kiesa ludu czynna, 165), wlasciciel osady ma krolestwo (rod bez krolestwa, buntownicy bez korony -
     ///    nic), krolestwo w wojnie (WtAtWar), osada nieoblezona (BesiegedPay.Holds, rodzaj KFolkAid - liczy, ile by zaplacila). Krolestwo gracza na tych samych
     ///    zasadach: danina do skarbca krolestwa, nie do kiesy gracza.
@@ -36,7 +39,7 @@ namespace Armoury
         internal const int WaPaid = 0, WaOff = 1, WaNoRealm = 2, WaNoNeed = 3, WaSiege = 4, WaWait = 5;
         private const int WaWhyN = 6;
 
-        private sealed class WarAidK { public long Taken, Held; public readonly long[] Cls = new long[WtClasses]; public int Places; }
+        private sealed class WarAidK { public long Taken, Held; public readonly long[] Cls = new long[WtClasses]; public int Places; public double Lords; }   // Lords - W5b: czesc daniny ze stawki ponad s korony (brak wojska u panow)
 
         private static readonly Dictionary<Kingdom, long> _waWindow = new Dictionary<Kingdom, long>();              // pobrane od ostatniego CrownIncome.End (wplyw dnia 165)
         private static readonly Dictionary<Settlement, double[]> _waCarry = new Dictionary<Settlement, double[]>();   // ulamek ponizej 1 zl na osade i klase (niezaplacona reszta)
@@ -45,6 +48,7 @@ namespace Armoury
         private static readonly long[] _waCls = new long[WtClasses];
         private static readonly int[] _waWhy = new int[WaWhyN];
         private static long _waHeld; private static int _waCalls, _waHeldN, _waTowns, _waCastles, _waStumbles;
+        private static double _waLords;   // W5b regula 1: danina doby ze stawki ponad s korony (brak wojska u panow) - licznik linii
         private static readonly HashSet<string> _waErr = new HashSet<string>();
         // gracz (pamiec sesji): osady rodu gracza, o ktorych komunikat poczatku poboru juz byl W TEJ WOJNIE (wartosc - krolestwo, ktoremu placa; wpis znika
         // przy pokoju, bez krolestwa, po zmianie krolestwa i po utracie osady - WaPlayerSweep); nazwy do komunikatu tej doby; suma tygodnia krola-gracza
@@ -61,7 +65,7 @@ namespace Armoury
         {
             _waWindow.Clear(); _waCarry.Clear(); _waK.Clear(); _waPlaces.Clear();
             Array.Clear(_waCls, 0, WtClasses); Array.Clear(_waWhy, 0, WaWhyN);
-            _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waStumbles = 0; _waErr.Clear();
+            _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waStumbles = 0; _waErr.Clear(); _waLords = 0;
             _waPlayer.Clear(); _waGone.Clear(); _waTell.Clear(); _waTellRate = 0; _waTellTop = 0; _waDawns = 0; _waKingDays = 0; _waKingSum = 0;
             LastFolkWarAid = 0;
         }
@@ -70,7 +74,7 @@ namespace Armoury
         {
             _waK.Clear(); _waPlaces.Clear();
             Array.Clear(_waCls, 0, WtClasses); Array.Clear(_waWhy, 0, WaWhyN);
-            _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0;
+            _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waLords = 0;
         }
 
         private static void WaStumble(string where, Exception e)
@@ -109,8 +113,9 @@ namespace Armoury
             if (k == null || k.IsEliminated) { why = WaNoRealm; return 0; }
             why = WaNoNeed;
             var w = WtOf(k, false);
-            if (w == null || w.S <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;
-            double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(w.S, WtCap(k, s)) / WaBaseCap(s);
+            double sv = WtAidS(w);   // W5b regula 1: wieksza z s korony i stawki z braku wojska u panow (klucz wylaczony albo bez W5 = samo s, jak przed paczka)
+            if (w == null || sv <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;
+            double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(sv, WtCap(k, s)) / WaBaseCap(s);
             if (!(rate > 0)) return 0;
             why = WaPaid;
             return rate > 1 ? 1 : rate;
@@ -185,6 +190,13 @@ namespace Armoury
                 WarAidK a;
                 if (!_waK.TryGetValue(k, out a)) { a = new WarAidK(); _waK[k] = a; }
                 a.Taken += ip; a.Cls[cls] += ip;
+                // W5b regula 1 (sam licznik linii): czesc poboru, ktora wziela sie ze stawki ponad s korony - danina x (stawka - s) / stawka
+                var wk = WtOf(k, false);
+                if (wk != null && wk.SN > wk.S && LnOn)
+                {
+                    double cap = WtCap(k, s), sa = Math.Min(wk.SN, cap), s0 = Math.Min(wk.S, cap);
+                    if (sa > s0) { double part = ip * (sa - s0) / sa; a.Lords += part; _waLords += part; }
+                }
                 if (_waPlaces.Add(st)) { a.Places++; if (st.IsTown) _waTowns++; else _waCastles++; }
                 _waCls[cls] += ip; _waWhy[WaPaid]++;
                 long x; _waWindow.TryGetValue(k, out x); _waWindow[k] = x + ip;   // wplyw dnia 165 (CrownIncome.Begin)
@@ -316,7 +328,7 @@ namespace Armoury
                     if (kd != null) { aGiven += kd.RefundGiven; aDue += kd.RefundDue; aRent += kd.Rent; }
                     WarAidK a; _waK.TryGetValue(k, out a);
                     var w = WtOf(k, false);
-                    double sv = w != null ? Math.Min(w.S, WtCap(k, s)) : 0;
+                    double sv = w != null ? Math.Min(WtAidS(w), WtCap(k, s)) : 0;   // W5b regula 1: stawka, od ktorej liczy sie danina (wieksza z s korony i stawki z braku wojska u panow)
                     bool war = WtAtWar(k);
                     // recenzja P1: wiersz ma KAZDE krolestwo z nadwyzka ludu - takze w pokoju i z s = 0 (skrzynie, ktorych danina nie rusza: "korona bez
                     // potrzeby nie bierze"); lokata W miast osobno - narzedzie dzieli z niej lokate swiata na czesc z poborem i bez (wiersz P1-1b)
@@ -340,6 +352,10 @@ namespace Armoury
                     sb1.Append(", nadwyzka ludu po ").Append(Math.Round(ovK).ToString("0", WtInv)).Append(" (W miast ").Append(Math.Round(ovW).ToString("0", WtInv)).Append(')');
                     if (kd != null) sb1.Append(", zwrot ").Append(kd.RefundGiven).Append('/').Append(kd.RefundDue).Append(", renty ").Append(kd.Rent).Append(", kredyt186 ").Append(kd.LoanIn);
                     else sb1.Append(", 165 bez dnia");
+                    // W5b regula 1 (na koncu wiersza): s korony z podatku 184, gdy danina liczy sie od stawki wyzszej, i czesc dzisiejszej daniny z tej roznicy
+                    if (w != null && w.SN > w.S && LnOn)
+                        sb1.Append(", z braku wojska u panow (W5b) ").Append(Math.Round(a != null ? a.Lords : 0).ToString("0", WtInv)).Append(" (s korony ")
+                           .Append((100 * Math.Min(w.S, WtCap(k, s))).ToString("0.00", WtInv)).Append("%)");
                     parts.Add(new KeyValuePair<long, string>(at, sb1.ToString()));
                 }
                 catch (Exception e) { WaStumble("WarAidDay(krolestwo)", e); }
@@ -354,7 +370,7 @@ namespace Armoury
               .Append(", kiesa ludu (B1) ").Append(WtFolkLive ? "czynna" : "nieczynna (danina 0)")
               .Append(", 165 Crown Current Income ").Append(CrownIncome.On ? "tak" : "nie (danina 0)")
               .Append(" | stawka ").Append((100 * share).ToString("0.00", WtInv)).Append("%/d kiesy ponad zapas dni x s / ").Append((100 * baseCap).ToString("0.0", WtInv))
-              .Append("% (s z podatku 184; z polityka War Tax najwyzej x").Append((capHi / baseCap).ToString("0.00", WtInv)).Append("); zapas dni potrzeby: W ")
+              .Append("% (s z podatku 184").Append(LnOn ? " albo wyzsza stawka z braku wojska u panow - W5b" : "").Append("; z polityka War Tax najwyzej x").Append((capHi / baseCap).ToString("0.00", WtInv)).Append("); zapas dni potrzeby: W ")
               .Append(s.TownFolkReserveDays).Append(" / R 21 / P 30 / podzamcze 10; jedna stawka dla klas; s i stawka dnia w wierszach krolestw - po kroku tygodnia (pobor tej doby szedl stawka sprzed kroku)")
               .Append("; wiersz ma kazde krolestwo z nadwyzka ludu - takze pokoj i s = 0, gdzie danina skrzyn nie rusza (W miast = lokata wyrobnikow)")
               .Append(" | pobrano ").Append(taken).Append(" zl z ").Append(_waPlaces.Count).Append(" osad (miasta ").Append(_waTowns).Append(", zamki ").Append(_waCastles)
@@ -378,6 +394,8 @@ namespace Armoury
                 sb.Append(", razem ").Append(Math.Round(b0).ToString("0", WtInv)).Append(" / ").Append(Math.Round(b1).ToString("0", WtInv));
             }
             sb.Append(" | do skarbcow ").Append(taken).Append(" (wplyw dnia 165 tej doby; krolestw ").Append(kN).Append(')')
+              .Append(", w tym ze stawki ponad s korony - brak wojska u panow (W5b, War Aid Follows Lords Shortfall ").Append(s.WarAidFollowsLordsShortfall ? (LnOn ? "tak" : "tak, nieczynny") : "nie")
+              .Append(") ").Append(Math.Round(_waLords).ToString("0", WtInv))
               .Append(" | skarbce krolestw z danina: wplywy dnia ").Append(kMeas).Append(" + 1/360 zapasu ").Append(kRel).Append(" (w tym danina ").Append(kAid)
               .Append(", podatek 184 ").Append(kTax).Append("); wydane tej doby: zwrot zoldu ").Append(kGiven).Append(" z naleznego ").Append(kDue)
               .Append(", renty (180) ").Append(kRent).Append(", pozostale (rata 186, dary, reparacje, kontrakty, wezwania, doplata wedlug potrzeby W5) ").Append(other)

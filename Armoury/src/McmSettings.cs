@@ -5064,6 +5064,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float ScutageRate { get; set; } = 0.25f;
 
+        [SettingPropertyBool("War Aid Follows Lords Shortfall", HintText = "in war the people's war aid from their savings also rises when the lords of the realm cannot pay for their companies: while the houses the crown helps (Crown War Aid By Need) still lack wages that the day's war aid, the crown's spare treasure and the shield money together do not cover - on average over a week, and more than War Aid Lords Shortfall Share of the wage refunds the crown owes - the share the townsfolk and castle folk give of their coin above the reserve rises by one step of the war tax each week, up to the same ceiling (3%, 6% under the War Tax policy), whatever the crown's own accounts say. It falls back step by step once the aid would cover the lack even at the lower share, and within four weeks in peace. Only the aid from savings rises: the war tax on the people's earnings is reckoned as before, and the reserve for hard times is never touched, so a poor town pays nothing more. You and the AI alike. Needs Folk War Aid and Crown War Aid By Need. Off = the war aid follows the crown's own need only, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool WarAidFollowsLordsShortfall { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("War Aid Lords Shortfall Share", 0.00f, 0.50f, "0.00", HintText = "with War Aid Follows Lords Shortfall: the lords' lack of wages counts once it is larger than this part of the wage refunds the crown owes in a day (0.05 = one part in twenty), and never while it is under 250 coins a day")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float WarAidLordsShortfallShare { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Crown Surplus Feeds Need Aid", HintText = "in war, when the day's war aid from the people does not cover the wages of the houses the crown helps (Crown War Aid By Need), the crown adds coin from its own treasury - but only from what it holds above its war reserve (the larger of Crown Reserve Gold and War Tax Reserve Days of wage refunds) and above what it owes the Iron Bank, never more in a day than one part in Crown Surplus Aid Days of that surplus and never more than is still lacking. The crown pays before the rich houses are asked for shield money and, like the rest of that aid, only for men who stand in the companies today. A treasury at or below its war reserve gives nothing. You and the AI alike: in your kingdom the coin comes from the realm's treasury, not from your purse. Needs Crown War Aid By Need. Off = the aid by need is paid from the day's war aid and shield money only, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownSurplusFeedsNeedAid { get; set; } = true;
+
+        [SettingPropertyInteger("Crown Surplus Aid Days", 1, 360, "0", HintText = "with Crown Surplus Feeds Need Aid: each day the crown spends at most one part in this many of its treasure above the war reserve (30 = a month's worth; the reserve itself is never touched)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int CrownSurplusAidDays { get; set; } = 30;
+
         [SettingPropertyBool("People Menu Shows Savings", HintText = "'People of this land' also tells for how many days of living the people of the town, castle or village you are in hold coin, how much of it lies above their reserve for hard times and how much war aid they gave the crown at the last dawn (off = no such line, as before)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool PeopleMenuShowsSavings { get; set; } = true;
@@ -6613,6 +6629,10 @@ namespace Armoury
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
             s.Scutage = Scutage;
             s.ScutageRate = ScutageRate;
+            s.WarAidFollowsLordsShortfall = WarAidFollowsLordsShortfall;
+            s.WarAidLordsShortfallShare = WarAidLordsShortfallShare;
+            s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
+            s.CrownSurplusAidDays = CrownSurplusAidDays;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
             s.Stage6MeasureLog = Stage6MeasureLog;
