@@ -1607,3 +1607,10 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   z nadwyzka: lad do 600, morze port-port, kasa -> kasa; MaterialCarts.cs, zapis arm_matorders), ValveHoldWhileShort + ValveShortTowns 15 (regulator nie tnie towaru, ktorego brak
   w > 15 miastach), CastleCartFoodOnly (woz w zamku sprzedaje tylko brakujace jedzenie), SpoilsNonFoodToTown, LordDiscardToShelf. Progi: bloki etap8_p3woj, etap8_p3_zelazo.
   **W TOKU: test 120 dob na b9e4d36** (test\fin4, test\at-fin4-120.out.txt), potem bieg roczny i wgranie. Czeka: z3-swaty-rot (po paczce slubow NPC wf_16d6890e-484) - bieg cienia.
+- (15:10 UTC 13.10) **SLUBY NPC GOTOWE (kod + recenzja, bez testu w grze): `w-toku/z3-swaty-rot` e7d8391** (klucz MarriageOnlyViableCandidates = true). DOWOD: twierdzenie prawdziwe -
+  BKMarriageModel.IsSuitableForMarriage nie pyta o malzonka, zonaci sa losowani jako kandydaci, szanse zeruje dopiero IsMarriageAdequate: 39% dziennych prob wolnych lordow trafia
+  w kandydata z malzonkiem + ok. 18% w odrzuconego progiem BK = ok. 57% prob przepada. Dzis 113 slubow AI-AI na rok (0.31/d); po poprawce szac. 180-192 (sufit puli: 208 wolnych kobiet
+  na starcie). Test na prawdziwej DLL: klucz off - 56 992 wywolania, 0 roznic wobec ROT; klucz on - 0 par niemozliwych, rozklad rowny. **DO WIEDZY / DECYZJI JEFFA: wolni szlachcice
+  (takze kandydatki dla gracza) koncza sie ok. 2x szybciej - po roku zostaje ok. 30-40 wolnych kobiet zamiast ok. 110; wylacznik = MarriageOnlyViableCandidates false.**
+  Probne DLL do testu: SCRATCH(dbc3d3d1)\test\CrashScribe-at-swaty-cien.dll (a38b68ab: bieg cienia - decyduje ROT, linia "Swaty ROT (Z.3) ... roznic R" ma dac 0) i
+  CrashScribe-at-swaty.dll (3da55349: reguly czynne). KOLEJKA GRY: fin4 120 dob (w toku) -> cien swatow 40 dob -> swaty czynne 120 dob -> scalenie z3 do zbior-e8 -> bieg roczny calosci -> wgranie.

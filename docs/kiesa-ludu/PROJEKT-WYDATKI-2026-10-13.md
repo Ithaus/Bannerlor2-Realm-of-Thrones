@@ -28,7 +28,7 @@ Bieg mierzyl gospodarke WOJENNA (25 z 30 krolestw w wojnie caly rok); pokoju nie
 5. Te oferte widzi targ: miasto z bogatym ludem ma prawdziwy popyt na te towary, cena w nim rosnie (najwyzej do poltorej ceny zwyklej - wiecej lud nie
    da), karawany maja po co tam jechac i wolno im tam sprzedac, a warsztaty zbytkow, z ktorych dzis pracuje 11 z 18 i 3 z 7, maja zbyt.
 6. Do tego lud doklada do budowy swojego miasta kwote rowna cwierci tego, co przeznacza na towar: material z polki, robocizna dla wlasnych ludzi -
-   dzis 198 z 227 budow stoi, bo placi je sam pan.
+   dzis 198 z 227 budow stoi, bo placi je sam pan, a w wojnie tylko mury.
 7. Rachunek: swiat wytwarza zbytkow i sukna za ok. 157 tys. zl na dobe (wedlug cen historycznych), lud placi za nie dzis ok. 85 tys.; zeby kiesy
    przestaly rosnac, musi wydawac o ok. 60 tys. zl na dobe wiecej (48-73 tys.) - to sie miesci po cenach NIZSZYCH niz historyczne (ok. 0.9), bez
    dodruku towaru i bez dodruku zlota.
@@ -213,7 +213,7 @@ Potrzeba: ok. 60 tys. zl/d (48-73 tys.). **Starczy bez wyjscia ponad cene histor
 | Wplywy | 524 782 | ok. 547 tys. |
 | Wydatki | 486 462 | ok. 547 tys. |
 | - w tym dodatkowy wydatek na liste dostatku | 0 (oferta nie kupuje) | ok. 60 tys. (48-73) |
-| - w tym roboty ludu (material do kupcow / place wracaja do ludu) | 0 | ok. 5 tys. / 17 tys. |
+| - w tym roboty ludu (material do kupcow / place wracaja do ludu) | 0 | ok. 5 tys. / 16 tys. |
 | Przyrost kies | +38 320 (lokata +49 tys., reszta kies -11 tys.) | **ok. 0** |
 | Kiesy ludu miast | 36.5 mln i rosna | **ok. 18 mln** (poza lokata 12.8 mln + lokata 5.2 mln) |
 | Lokata ponad zapas | 23.8 mln = 24 dni wydatkow W (TRIAZ O1-7) | ok. 5 mln = 5 dni (3-11 mln w calym przedziale fi i S0) |
