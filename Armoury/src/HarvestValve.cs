@@ -47,8 +47,10 @@ namespace Armoury
     ///  - stos kategorii = konie na targu: polki i magazyny osad, schowki osad, wozy kupcow w drodze (bez taborow - kon w partii jest w uzyciu); ten sam spis co 28 dob;
     ///  - zuzycie okna = produkcja - (stos teraz - stos 56 dob temu), najmniej 0 - zakupy wojska i karawan, mieszczanie, odkup po zgonach, netto po zwrotach na targ;
     ///  - (b) w gore CZYNNE: regula towarow (zuzycie >= 98% produkcji i stos < ValveStockDaysLow dni) -> x1.3, najwyzej VillageOutputStep;
-    ///  - (a) w dol: ponizej mnoznika 1 (baza gry) TYLKO NA SUCHO - linia podaje "mnoznik by byl" i ile sztuk na dobe by ubylo (ciecie czynne pod osobnym kluczem
-    ///    po biegu rocznym: popyt na konie odwraca sie ok. d360); czynne jest tylko cofniecie wlasnego kroku (z x1.3 najwyzej do x1);
+    ///  - (a) w dol: ponizej mnoznika 1 (baza gry) CZYNNE przy kluczu HorseBreedingCutLive (K1-3a krok 2 (c), decyzja Jeffa 12.10 15:15 "hodowla - TAK": ta sama
+    ///    regula co towary - cel 0.95 x zuzycie / produkcja bazowa, najwyzej x0.5 na decyzje, podloga 0.1; powrot w gore x1.3 na decyzje najwyzej do x1);
+    ///    bez klucza NA SUCHO - linia podaje "mnoznik by byl" i ile sztuk na dobe by ubylo, czynne tylko cofniecie wlasnego kroku (z x1.3 najwyzej do x1),
+    ///    a mnozniki ponizej x1 z czasu wlaczonego klucza wracaja do x1 (HorseKeyState);
     ///  - (c) przesuniecie CZYNNE: bojowe chciane (regula w gore) i zwykle w nadmiarze (stos > ValveStockDaysHigh dni) -> udzial +12.5 pp (najwyzej 25%) produkcji
     ///    zwyklych kazdej stadniny z bojowymi w liscie typu wsi idzie na bojowe tej listy (wedlug wag listy); zwykle ponizej ValveStockDaysLow dni albo bojowe w nadmiarze
     ///    -> -12.5 pp; pomiedzy bez zmian. Te same sztuki: w ticku stadniny wynik zwyklych x (1 - udzial) po wszystkich czynnikach (MaterialLaw.ProdPostfix ->
@@ -125,6 +127,9 @@ namespace Armoury
 
         /// <summary>E6/K4 (220): klucz hodowli wedlug popytu.</summary>
         private static bool HorseKey { get { var s = Settings.Current; return s != null && s.HorseBreedingByDemand; } }
+
+        /// <summary>K1-3a krok 2 (c): ciecie hodowli ponizej bazy gry czynne (klucz HorseBreedingCutLive; dziala tylko z hodowla wedlug popytu).</summary>
+        private static bool HorseCutLive { get { var s = Settings.Current; return s != null && s.HorseBreedingCutLive; } }
 
         /// <summary>E6/K4 (220): hodowla wedlug popytu dziala - klucz i regulator wsi.</summary>
         internal static bool HorseOn { get { return On && HorseKey; } }
@@ -700,6 +705,23 @@ namespace Armoury
                 _hLine = true;
                 return;
             }
+            if (_hHas && !HorseCutLive)
+            {
+                // K1-3a krok 2 (c): klucz ciecia wylaczony - mnozniki ponizej x1 (z czasu czynnego ciecia) wracaja do x1 (stan sprzed: ciecie tylko w logu)
+                var back = new List<string>();
+                for (int c = 0; c < HCats; c++)
+                {
+                    var g = HFind(c);
+                    if (g == null || !(g.M < 1f - 1e-4f)) continue;
+                    back.Add(HNames[c] + " x" + g.M.ToString("0.00", CultureInfo.InvariantCulture) + " -> x1.00");
+                    g.M = 1f; g.Dir = 0;
+                }
+                if (back.Count > 0)
+                {
+                    RebuildHorse();
+                    Log.Info("Hodowla (220): dzien " + day + " - ciecie hodowli WYLACZONE (Horse Breeding Cut Live = off) - mnozniki ponizej x1 wracaja do bazy gry: " + string.Join("; ", back.ToArray()) + ".");
+                }
+            }
             if (_start >= 0 && !_hHas)
             {
                 for (int c = 0; c < HCats; c++) HAdd(c, -1);
@@ -720,6 +742,8 @@ namespace Armoury
             var now = _hNow;
             var parts = new List<string>();
             var dry = new List<string>();
+            var cuts = new List<string>();              // K1-3a krok 2 (c): ciecia czynne tej decyzji (ponizej x1)
+            bool cutLive = HorseCutLive;
             var want = new bool[HCats]; var over = new bool[HCats]; var lowS = new bool[HCats]; var done = new bool[HCats];
             int flips = 0;
             for (int c = 0; c < HCats; c++)
@@ -744,19 +768,29 @@ namespace Armoury
                         done[c] = true;
                         if (P > 0.0 && C < CutBelow * P && over[c])
                         {
-                            // ta sama regula co towary (cel 0.95 x zuzycie / produkcja bazowa okna, najwyzej x0.5, podloga 0.1); ponizej x1 - NA SUCHO
+                            // ta sama regula co towary (cel 0.95 x zuzycie / produkcja bazowa okna, najwyzej x0.5, podloga 0.1); ponizej x1 - czynne tylko z kluczem ciecia
                             double baseP = (g.MA > 0f ? g.P0 / g.MA : g.P0) + (m0 > 0f ? g.P1 / m0 : g.P1);
                             if (!(baseP > 0.0)) baseP = P;
                             float cut = Math.Max(Floor, Math.Max((float)(CutTarget * C / baseP), m0 * CutMaxStep));
                             if (cut < m0 - 1e-4f)
                             {
-                                float live = Math.Max(1f, cut);           // czynne tylko cofniecie wlasnego kroku (najwyzej do x1)
+                                // K1-3a krok 2 (c): przy HorseBreedingCutLive ciecie ponizej x1 CZYNNE (jak towary wsi); bez klucza czynne tylko cofniecie
+                                // wlasnego kroku (najwyzej do x1), reszta na sucho
+                                float live = cutLive ? cut : Math.Max(1f, cut);
                                 if (live < m0 - 1e-4f) { m1 = live; dir = -1; }
                                 if (cut < 1f - 1e-4f)
                                 {
-                                    double less = (Math.Min(m1, 1f) - cut) * baseP / win;
-                                    dr = "x" + cut.ToString("0.00", inv) + " (-" + less.ToString("0.0", inv) + " szt./d)";
-                                    dry.Add(HNames[c] + " " + dr);
+                                    if (cutLive)
+                                    {
+                                        double drop = (m0 - cut) * baseP / win;
+                                        cuts.Add(HNames[c] + " x" + m0.ToString("0.00", inv) + " -> x" + cut.ToString("0.00", inv) + " (-" + drop.ToString("0.0", inv) + " szt./d)");
+                                    }
+                                    else
+                                    {
+                                        double less = (Math.Min(m1, 1f) - cut) * baseP / win;
+                                        dr = "x" + cut.ToString("0.00", inv) + " (-" + less.ToString("0.0", inv) + " szt./d)";
+                                        dry.Add(HNames[c] + " " + dr);
+                                    }
                                 }
                             }
                         }
@@ -771,7 +805,7 @@ namespace Armoury
                         parts.Add(HNames[c] + ": x" + m0.ToString("0.00", inv) + (dir != 0 ? " -> x" + m1.ToString("0.00", inv) : "")
                                   + ", zuzycie/produkcja " + (P > 0.0 ? (C / P).ToString("0.00", inv) : "-") + " (" + C.ToString("0", inv) + "/" + P.ToString("0", inv) + ")"
                                   + ", stos " + n + " = " + (cDay > 0.0 ? (n / cDay).ToString("0", inv) + " dni zuzycia" : "bez odbiorcy") + ", "
-                                  + (dir < 0 ? "w dol (cofniecie kroku)" : dir > 0 ? "w gore" : "bez zmian") + (want[c] ? ", chciane" : "")
+                                  + (dir < 0 ? (m1 < 1f - 1e-4f ? "w dol (ciecie czynne)" : "w dol (cofniecie kroku)") : dir > 0 ? "w gore" : "bez zmian") + (want[c] ? ", chciane" : "")
                                   + (dr.Length > 0 ? ", ciecie na sucho: mnoznik by byl " + dr : ""));
                     }
                     catch (Exception e) { Stumble("HorseDecide", e); }
@@ -797,7 +831,9 @@ namespace Armoury
               .Append("] | przesuniecie zwykle -> bojowe ").Append(Pct(s0)).Append(" -> ").Append(Pct(s1))
               .Append(" (bojowe chciane ").Append(tn(done[1], want[1])).Append(", zwykle w nadmiarze ").Append(tn(done[0], over[0]))
               .Append(", zwykle ponizej ").Append(low).Append(" dni ").Append(tn(done[0], lowS[0])).Append(", bojowe w nadmiarze ").Append(tn(done[1], over[1])).Append(')')
-              .Append(" | ciecie na sucho: ").Append(dry.Count > 0 ? string.Join("; ", dry.ToArray()) : "brak").Append(" (czynne dopiero po biegu rocznym)")
+              .Append(" | ciecie na sucho: ").Append(dry.Count > 0 ? string.Join("; ", dry.ToArray()) : "brak")
+              .Append(cutLive ? " (czynne - klucz Horse Breeding Cut Live)" : " (czynne pod kluczem Horse Breeding Cut Live - wylaczony)")
+              .Append(" | ciecie czynne (K1-3a): ").Append(!cutLive ? "wylaczone" : cuts.Count > 0 ? string.Join("; ", cuts.ToArray()) : "brak")
               .Append(" | zmiany kierunku w kolejnych decyzjach ").Append(flips).Append("; potkniecia ").Append(_stumbles).Append('.');
             return sb.ToString();
         }
@@ -817,7 +853,8 @@ namespace Armoury
                   .Append(Pct(_shift)).Append(": zdjete ze zwyklych ").Append(_shiftTakeDay.ToString("0.0", inv)).Append(", dopisane bojowym ").Append(_shiftAddDay)
                   .Append(" | mnozniki ");
                 for (int c = 0; c < HCats; c++) sb.Append(c > 0 ? "/" : "").Append('x').Append((hm != null ? hm[c] : 1f).ToString("0.00", inv));
-                sb.Append(" (czynne: krok w gore i cofniecie kroku; ciecie ponizej x1 na sucho) | stos na targu (spis co ").Append(Bucket).Append(" dob) ").Append(Row(_hNow))
+                sb.Append(HorseCutLive ? " (czynne: krok w gore, cofniecie kroku i ciecie ponizej x1 - Horse Breeding Cut Live) | stos na targu (spis co "
+                                       : " (czynne: krok w gore i cofniecie kroku; ciecie ponizej x1 na sucho) | stos na targu (spis co ").Append(Bucket).Append(" dob) ").Append(Row(_hNow))
                   .Append(" | doba pomiaru ").Append(today - _start).Append(", nastepna decyzja za ").Append(Math.Max(0, Bucket - (today - _bucketStart)))
                   .Append(" dob; potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());

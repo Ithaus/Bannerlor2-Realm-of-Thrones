@@ -999,6 +999,9 @@ namespace Armoury
                 // paczka 174.0: bron, zbroja, tarcze i uprzaz to nie towar domowy - budzet mieszczan 0 (BK ItemConsumptionPatch bierze z polki tylko
                 // kategorie z budzetem); miasta i zamki, takze przy wylaczonym TownHouseholdUse i bez cen historycznych. Odziez "garment" i "arrows" - bez zmian
                 if (ArmsLeaks.ZeroTownBudget(category)) { __result = 0f; return; }
+                // K1-3a krok 2: przy regule koni roboczych (TownsfolkBuyOnlyWorkHorses i czynna kiesa ludu) koszyk BK nie kupuje koni zadnej z czterech kategorii
+                // targu - wymiane padlych koni roboczych robi TownFolk.WorkHorsesDaily (jeden zakup, jedna zaplata); takze bez cen historycznych
+                if (TownFolk.NoHorseBasket(town, category, true)) { __result = 0f; return; }
                 if (!_applied) return;
                 var s = Settings.Current;
                 float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));
@@ -1018,13 +1021,13 @@ namespace Armoury
         /// <summary>
         /// E5/B1 (kotwica, K1): czlon dobrobytu w budzecie wiersza BK CalculateBudget tak, jak go zostawil BudgetPostfix - jedno zrodlo prawdy dla
         /// TownFolk.AnchorBudgetPostfix (Priority.Low, po nas): BK dobrobyt/1000/indeks, przy HistDemandScaling / przelicznik kategorii, x czesc domowa
-        /// (TownUse; strzaly HouseUse), bron i zbroja 0 (ZeroTownBudget). Sam odczyt (bez licznikow 172). Wyjatek - 0 (kotwica nie tnie).
+        /// (TownUse; strzaly HouseUse), bron i zbroja 0 (ZeroTownBudget), konie przy regule koni roboczych 0 (TownFolk.NoHorseBasket). Sam odczyt (bez licznikow 172). Wyjatek - 0 (kotwica nie tnie).
         /// </summary>
         internal static float ProsperityPart(Town town, ItemCategory category)
         {
             try
             {
-                if (town == null || category == null || ArmsLeaks.ZeroTownBudget(category)) return 0f;
+                if (town == null || category == null || ArmsLeaks.ZeroTownBudget(category) || TownFolk.NoHorseBasket(town, category, false)) return 0f;   // K1-3a krok 2: konie jak bron - 0
                 float raw = town.GetItemCategoryPriceIndex(category);
                 if (!_applied) return raw > 0f ? town.Prosperity / 1000f / raw : 0f;
                 var s = Settings.Current;

@@ -118,6 +118,10 @@ Uzycie (Python 3, tylko odczyt):
                     po przesunieciu > 0 nie ponizej dolnego progu (30 dni zuzycia), zaden kierunek kategorii nie zmienia sie w dwoch kolejnych decyzjach,
                     potkniecia 0; bieg roczny (okno >= d360): stos koni na targu d180 -> until bez trendu (+-10%); mnozniki, przesuniecie, ciecie na sucho,
                     przeglad stadnin - INFO.
+                    Blok K1-3a krok 2 (konie robocze mieszczan - progi tutaj) KR-1..KR-11 - linia "Konie robocze (K1-3a)", czlony "mieszczanie" i "starosc koni
+                    roboczych" linii "Konie (E6/0)", decyzje "Hodowla (220)", "Kasy miast (169c)", "Zawor zamkow (110)", "Juczne (213)": regula CZYNNA,
+                    kupione <= przyrost licznika (najwyzej 3 na osade na dobe, kontrola 0), koszyk BK kupuje 0 koni, ksiega koni zgodna, ciecie hodowli czynne,
+                    stos zwyklych i bojowych ponad 60 dni zuzycia nie rosnie od 4. decyzji, kasy miast i zamkow razem >= zapas kupcow, czas <= 2 ms/dobe.
                     Blok E6/K3 (219, etap 6 - progi tutaj) K3-1..K3-10 - linia "Rycerze i jazda (219)": oba klucze CZYNNE, wykonanie celu szablonow (jazda t3+ % / cel %) srednio
                     >= 80% [S] w d91-until (bieg roczny >= 90%) i nie spada wobec d61-90 (-2 pp), Dothrakowie (khuzait) t3+ >= 90% celu i czekajacy na konia <= 10%
                     ludzi (konie-krolestwa.csv), Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na konia swojej kategorii
@@ -3718,6 +3722,11 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         etap5_k4(rep, lines, start, until)
     except Exception as e:
         rep.add("blok etap5_k4", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    # K1-3a krok 2: mieszczanie kupuja tylko konie robocze w miejsce padlych ze starosci; ciecie hodowli czynne (brak linii - INFO)
+    try:
+        etap5_k13a(rep, lines, start, until)
+    except Exception as e:
+        rep.add("blok etap5_k13a", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E6/K3 (219): jazda wedlug szablonu partii (175), rycerz z koniem rodu, przerwa zakupow tylko przy czynnym K2(b) (brak linii - INFO)
     try:
         etap5_k3(rep, lines, start, until, logp)
@@ -3894,7 +3903,8 @@ def etap5_k1(rep, lines, start, until):
         lo += 7
     rep.add("K1-3: reszta niewyjasniona koni - bloki 7 dob od d31 (|suma| <= max(5, 1% zrodla + ujscia))",
             f"blokow pelnych {blocks}, ponad prog {len(bad)}" + (f" [{', '.join(bad[:6])}]" if bad else ""),
-            "0 blokow ponad prog (linia Konie (E6/0) przy Stage6MeasureLog; od F3 reszta po ujsciach mieszczanie + porzucone przez gre)",
+            "0 blokow ponad prog (linia Konie (E6/0) przy Stage6MeasureLog; od F3 reszta po ujsciach mieszczanie + porzucone przez gre, od K1-3a krok 2 takze "
+            "po ujsciu starosc koni roboczych)",
             (len(bad) == 0) if blocks else None)
     # narzedzie progow zb58 (TRIAZ K1-4): kon z puli weteranow dziala dopiero po siewie puli (HorseFate.VetHorseOn = VeteranKeepsHorse && PeopleBook.VetLive,
     # VetLive wymaga _vSown; siew w pierwszym ticku doby kampanii - linia "Weterani (E4/10): siew dnia N"). Najem z karczm przed siewem idzie stara sciezka
@@ -5079,7 +5089,7 @@ def etap5_k4(rep, lines, start, until):
         mult = [p.split(",")[0] for p in body.split("; ")]
         rep.add("K4-6: ostatnia decyzja - mnozniki kategorii i przesuniecie", f"d{max(dec_l)}: " + "; ".join(mult) + (f" | przesuniecie {sh.group(1)} -> {sh.group(2)}" if sh else ""), "INFO", None)
         dry = re.search(r"\| ciecie na sucho: (.*?) \(czynne", last)
-        rep.add("K4-7: ciecie na sucho (ostatnia decyzja)", dry.group(1) if dry else "-", "INFO (czynne po biegu rocznym)", None)
+        rep.add("K4-7: ciecie na sucho (ostatnia decyzja)", dry.group(1) if dry else "-", "INFO (na sucho tylko przy wylaczonym Horse Breeding Cut Live - wiersz KR-7)", None)
     else:
         rep.add("K4-6: decyzje hodowli", "brak decyzji w oknie", "INFO (pierwsza 56 dob po starcie pomiaru)", None)
     if rev:
@@ -5095,6 +5105,188 @@ def etap5_k4(rep, lines, start, until):
         rep.add("K4-9: bieg roczny - konie na targu d180 -> until", f"d{min(ks)} {a0} -> d{max(st)} {e0}", "bez trendu (+-10%)", abs(e0 - a0) <= 0.10 * max(1, a0))
     else:
         rep.add("K4-9: bieg roczny - konie na targu bez trendu", "okno krotsze niz d360", "+-10% (tylko bieg roczny)", None)
+
+
+def etap5_k13a(rep, lines, start, until):
+    """K1-3a krok 2 (mieszczanie kupuja tylko konie robocze w miejsce padlych ze starosci; klucze TownsfolkBuyOnlyWorkHorses i HorseBreedingCutLive).
+    Linia doby "Konie robocze (K1-3a): dzien N | CZYNNE | ..." (dzien = doba gry - 1, jak "Kiesa ludu"; okno 1-until), czlony "mieszczanie" i "starosc koni
+    roboczych (K1-3a)" linii "Konie (E6/0): dzien N" (ta sama doba ma etykiete o 1 wieksza), decyzje "Hodowla (220)", "Kasy miast (169c)", "Zawor zamkow
+    (110)" i "Juczne (213)". Wiazace: regula CZYNNA w kazdej dobie, konie kupione <= przyrost licznika (i najwyzej 3 na osade na dobe, kontrola licznika 0),
+    koszyk BK kupuje 0 koni wszystkich kategorii, ksiega koni widzi te same sztuki, ciecie hodowli czynne, stos zwyklych i bojowych ponad 60 dni zuzycia
+    nie rosnie miedzy decyzjami (od 4. decyzji - wczesniejsze ciecia jeszcze dzialaja), kasy miast i zamkow razem nie ponizej zapasu kupcow, czas, potkniecia.
+    Log sprzed paczki (bez linii) - INFO."""
+    rows = {}
+    for d, s in by_day(lines, "Konie robocze (K1-3a): dzien").items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    if not rows:
+        rep.add("KR-1: linia Konie robocze (K1-3a)", "brak linii w oknie (log sprzed paczki K1-3a krok 2)", "codziennie od wgrania K1-3a krok 2", None)
+        return
+    days = sorted(rows)
+    act = [x for x in days if "| CZYNNE |" in rows[x]]
+    off = [x for x in days if x not in act]
+    rep.add("KR-1: regula koni roboczych CZYNNA w dobach okna", f"{len(act)} z {len(days)}" + (f"; nieczynna np. d{off[0]}: {rows[off[0]].split(' | ', 1)[-1][:90]}" if off else ""),
+            "wszystkie doby (klucz TownsfolkBuyOnlyWorkHorses i czynna kiesa ludu)", len(off) == 0 and len(act) > 0)
+    if not act:
+        return
+    win = [rows[x] for x in act]
+
+    def tot(pat, cast=float):
+        return sum(num(pat, x, cast, 0) or 0 for x in win)
+    n = float(len(win))
+    accr, bought = tot(r"przyrost licznika dzis ([\d.]+)"), int(tot(r"kupione dzis (\d+):", int))
+    pt, zt, gt = int(tot(r"miasta juczne (\d+) /", int)), int(tot(r"miasta juczne \d+ / zwykle (\d+)", int)), int(tot(r"miasta juczne \d+ / zwykle \d+ za (\d+) zl", int))
+    pc, zc, gc = int(tot(r"zamki juczne (\d+) /", int)), int(tot(r"zamki juczne \d+ / zwykle (\d+)", int)), int(tot(r"zamki juczne \d+ / zwykle \d+ za (\d+) zl", int))
+    first = num(r"licznik razem [\d.]+ \(wczoraj ([\d.]+)", rows[act[0]], float, 0.0) or 0.0
+    over = []
+    for x in act:
+        st = (num(r"\| CZYNNE \| miasta (\d+):", rows[x], int, 0) or 0) + (num(r", zamki (\d+): podzamcza", rows[x], int, 0) or 0)
+        if (num(r"kupione dzis (\d+):", rows[x], int, 0) or 0) > 3 * st:
+            over.append(f"d{x}")
+    ctl = [f"d{x}" for x in act if (num(r"kontrola licznika r = (-?[\d.]+)", rows[x], float, 0.0) or 0.0) != 0.0]
+    rep.add("KR-2: konie mieszczan <= przyrost licznika (suma okna) i kontrola licznika",
+            f"kupione {bought} ({bought / n:.1f}/d; miasta juczne {pt} / zwykle {zt} za {gt} zl, zamki juczne {pc} / zwykle {zc} za {gc} zl), przyrost licznika {accr:.1f} "
+            f"({accr / n:.1f}/d), licznik przed oknem {first:.1f}; dob ponad 3 na osade {len(over)}, dob z kontrola != 0: {len(ctl)}" + (f" [{', '.join(ctl[:5])}]" if ctl else ""),
+            "kupione <= przyrost + licznik przed oknem, 0 dob ponad 3 sztuki na osade, kontrola licznika 0 w kazdej dobie (projekt: ok. 13.6 konia/d na swiat)",
+            bought <= accr + first + 0.5 and not over and not ctl)
+    # ---- koszyk BK bez koni i ksiega koni: linia Konie (E6/0) z etykieta N + 1 = ta sama doba co linia reguly N; doba liczy sie, gdy regula byla czynna takze dobe wczesniej
+    kon = {}
+    for d, s in by_day(lines, "Konie (E6/0): dzien").items():
+        kon[run_day(d, start) - 1] = s
+    fre = re.compile(r"mieszczanie miast (\d+)/(\d+)/(\d+)/(\d+) szt\. za [\d/]+ zl, mieszczanie zamkow (\d+)/(\d+)/(\d+)/(\d+) szt\.")
+    wre = re.compile(r"starosc koni roboczych \(K1-3a\): miasta ([\d/]+) szt\. za (\d+) zl, zamki ([\d/]+) szt\. za (\d+) zl")
+    aset = set(act)
+    folk_t, folk_c, cmp_days, book, line, bad_b, castle_off = [0] * 4, [0] * 4, 0, 0, 0, [], 0
+    for x in act:
+        s = kon.get(x)
+        if s is None or (x - 1) not in aset:
+            continue
+        m = fre.search(s)
+        if not m:
+            continue
+        cmp_days += 1
+        g = [int(v) for v in m.groups()]
+        for i in range(4):
+            folk_t[i] += g[i]; folk_c[i] += g[4 + i]
+        castle_off = max(castle_off, num(r"zamki bez zaworu 110 (\d+)", rows[x], int, 0) or 0)
+        w = wre.search(s)
+        if w:
+            b = sum(int(v) for v in w.group(1).split("/")) + sum(int(v) for v in w.group(3).split("/"))
+            q = num(r"kupione dzis (\d+):", rows[x], int, 0) or 0
+            book += b; line += q
+            if b != q:
+                bad_b.append(f"d{x}: ksiega {b} wobec linii {q}")
+    if cmp_days:
+        ok = sum(folk_t) == 0 and (sum(folk_c) == 0 or castle_off > 0)
+        rep.add("KR-3: koszyk BK bez koni - mieszczanie w linii Konie (E6/0) przy czynnej regule (suma okna, zwykly/bojowy/szlachetny/juczny)",
+                f"miasta {'/'.join(str(v) for v in folk_t)}, zamki {'/'.join(str(v) for v in folk_c)} ({cmp_days} dob)"
+                + (f"; zamkow bez zaworu 110 (koszyk BK jak dotad) do {castle_off}" if castle_off else ""),
+                "0/0/0/0 w miastach i zamkach (WGRANIE 35, d31-119: miasta 69.8/26.7/3.9/140.9 i zamki 22.7/5.2/0.6/32.1 na dobe)", ok)
+        rep.add("KR-4: ksiega koni - starosc koni roboczych = kupione z linii Konie robocze (te same doby)",
+                f"ksiega {book}, linia {line}, dob niezgodnych {len(bad_b)}" + (f" [{', '.join(bad_b[:4])}]" if bad_b else ""),
+                "rowne w kazdej dobie (Stage6MeasureLog; bez czlonu w linii Konie (E6/0) - INFO)", (len(bad_b) == 0) if (book or line) else None)
+    else:
+        rep.add("KR-3: koszyk BK bez koni (linia Konie (E6/0))", "brak par linii (Stage6MeasureLog wylaczony albo okno 1 doby)", "INFO", None)
+    last = rows[act[-1]]
+    ws, wp = tot(r"czeka: pusta polka (\d+) osad", int), tot(r"za mala kiesa ponad jutrzejszy koszyk (\d+) osad", int)
+    lost_w = tot(r"przepadlo ponad sufit dzis ([\d.]+)")
+    owed_l, owing_l = num(r"licznik razem ([\d.]+)", last, float), num(r"osad z licznikiem >= 1: (\d+)", last, int)
+    rep.add("KR-5: licznik czeka - pusta polka, za mala kiesa, przepadlo ponad sufit",
+            f"srednio osad na dobe: pusta polka {ws / n:.1f}, za mala kiesa {wp / n:.1f}; przepadlo ponad sufit (suma okna) {lost_w:.1f}; "
+            f"ostatnia doba: licznik razem {owed_l}, osad z licznikiem >= 1: {owing_l}",
+            "INFO (pusta polka = osada bez konia jucznego i zwyklego na targu; sufit licznika 3 na osade)", None)
+    ms = [num(r"\| czas ([\d.]+) ms", x, float, 0.0) or 0.0 for x in win]
+    stu = max([num(r"potkniecia (\d+)\.", x, int, 0) or 0 for x in win] or [0])
+    rep.add("KR-6: czas zakupu koni roboczych (srednio na dobe) i potkniecia", f"{sum(ms) / n:.2f} ms/dobe (najwiecej {max(ms):.2f}); potkniecia {stu}",
+            "<= 2 ms/dobe srednio, potkniecia 0", sum(ms) / n <= 2.0 and stu == 0)
+    # ---- hodowla: ciecie czynne, stos zwyklych i bojowych w decyzjach
+    dec = {}
+    for s in lines:
+        if s.startswith("Hodowla (220): dzien ") and " - decyzja " in s:
+            d = num(r"dzien (\d+)", s)
+            if d is not None and 1 <= run_day(d, start) <= until:
+                dec[run_day(d, start)] = s
+    if dec:
+        dry_on = [f"d{x}" for x in sorted(dec) if "| ciecie czynne (K1-3a): wylaczone" in dec[x] or "| ciecie czynne (K1-3a): " not in dec[x]]
+        cuts = []
+        for x in sorted(dec):
+            m = re.search(r"\| ciecie czynne \(K1-3a\): (.*?) \| zmiany kierunku", dec[x])
+            if m and m.group(1) not in ("brak", "wylaczone"):
+                cuts.append(f"d{x}: {m.group(1)}")
+        rep.add("KR-7: ciecie hodowli czynne w decyzjach (Horse Breeding Cut Live)", f"decyzji {len(dec)}, bez czynnego ciecia {len(dry_on)}"
+                + (f" [{', '.join(dry_on[:4])}]" if dry_on else "") + ("; ciecia: " + " || ".join(cuts[:6]) if cuts else "; ciec ponizej x1: brak"),
+                "czynne w kazdej decyzji (bez czynnego ciecia reguly koni roboczych nie wolno wlaczac)", len(dry_on) == 0)
+        hi = 60
+        bad, seen = [], []
+        ds = sorted(dec)
+        for name in ("zwykly", "bojowy"):
+            prev = None
+            for i, x in enumerate(ds):
+                m = re.search(name + r": [^;\]]*?stos (\d+) = (\d+ dni zuzycia|bez odbiorcy)", dec[x])
+                if not m:
+                    prev = None
+                    continue
+                hi = num(r"stos \d+-(\d+) dni zuzycia", dec[x], int, 60) or 60
+                st_ = int(m.group(1))
+                dd = None if m.group(2) == "bez odbiorcy" else int(m.group(2).split()[0])
+                seen.append(f"{name} d{x}: {st_} = {'bez odbiorcy' if dd is None else str(dd) + ' dni'}")
+                if i >= 3 and prev is not None and (dd is None or dd > hi) and st_ > 1.05 * prev:
+                    bad.append(f"{name} d{x}: {prev} -> {st_}")
+                prev = st_
+        rep.add("KR-8: stos zwyklych i bojowych w decyzjach hodowli - ponad 60 dni zuzycia nie rosnie (od 4. decyzji, tolerancja 5%)",
+                f"rosnie ponad prog {len(bad)}" + (f" [{', '.join(bad[:4])}]" if bad else "") + " | " + "; ".join(seen[-8:]),
+                "0 (pierwsze trzy decyzje - INFO: ciecie najwyzej x0.5 na decyzje; WGRANIE 35 bez reguly: zwykly 32-62 dni, bojowy 17-40 dni)",
+                (len(bad) == 0) if len(ds) >= 4 else None)
+    else:
+        rep.add("KR-7: ciecie hodowli czynne w decyzjach", "brak decyzji w oknie", "INFO (pierwsza decyzja 56 dob po starcie pomiaru)", None)
+    # ---- kasy miast i zamkow: razem nie ponizej zapasu kupcow; wplywy od ludu i zawor - INFO wobec WGRANIA 35
+    km, kz = {}, {}
+    for d, s in by_day(lines, "Kasy miast (169c): dzien").items():
+        m = re.search(r"miast \d+: kasy (-?\d+) wobec celu[^)]*\) (\d+) \(kasa/cel: mediana ([\d.]+)", s)
+        if m and 1 <= run_day(d, start) <= until:
+            km[run_day(d, start)] = (int(m.group(1)), int(m.group(2)), float(m.group(3)), num(r"zawor: zeszlo (\d+)", s, int, 0) or 0,
+                                     num(r"lud zaplacil kasom \(E5/B1\) (\d+)", s, int, 0) or 0)
+    for d, s in by_day(lines, "Zawor zamkow (110): dzien").items():
+        m = re.search(r"stan (-?\d+) w \d+ zamkach: zapas kupcow (\d+)", s)
+        if m and 1 <= run_day(d, start) <= until:
+            kz[run_day(d, start)] = (int(m.group(1)), int(m.group(2)), num(r"podzamcze zaplacilo kasom \(E5/B1\) (\d+)", s, int, 0) or 0,
+                                     num(r"zawor: (\d+) do panow", s, int, 0) or 0)
+    if km and kz:
+        a, b = max(km), max(kz)
+        w31 = [x for x in km if x >= 31] or list(km)
+        z31 = [x for x in kz if x >= 31] or list(kz)
+
+        def av(dct, ks, i):
+            return sum(dct[k][i] for k in ks) / float(len(ks))
+        rep.add("KR-9: kasy miast i zamkow razem nie ponizej zapasu kupcow (ostatnia doba okna)",
+                f"miasta {km[a][0]} wobec celu {km[a][1]} ({km[a][0] / float(max(1, km[a][1])):.2f}; mediana kasa/cel {km[a][2]:.2f}), zamki {kz[b][0]} wobec zapasu "
+                f"{kz[b][1]} ({kz[b][0] / float(max(1, kz[b][1])):.2f})",
+                ">= 1.00 w miastach i w zamkach (szacunek: regula zdejmuje najwyzej nadwyzke ponad zapas; WGRANIE 35 d119: miasta 1.29, mediana 1.19, zamki 1.18)",
+                km[a][0] >= km[a][1] and kz[b][0] >= kz[b][1])
+        rep.add("KR-10: wplywy kas od ludu i zawor panow (srednio na dobe, d31-until)",
+                f"lud zaplacil kasom miast {av(km, w31, 4):.0f}, zawor miast zeszlo {av(km, w31, 3):.0f}; podzamcza zaplacily kasom zamkow {av(kz, z31, 2):.0f}, "
+                f"zawor zamkow do panow {av(kz, z31, 3):.0f}",
+                "INFO (WGRANIE 35 d31-119: 376235 / 197603 / 44283 / 18467; konie w tym: miasta ok. 154 tys., zamki ok. 34 tys. na dobe - tyle moze ubyc)", None)
+    jl = {}
+    for d, s in by_day(lines, "Juczne (213): dzien").items():
+        if 32 <= run_day(d, start) <= until:
+            jl[run_day(d, start)] = s
+    if jl:
+        def tj(pat):
+            return sum(num(pat, x, int, 0) or 0 for x in jl.values())
+        shelf = {x: num(r"polki miast i zamkow -?\d+/-?\d+/-?\d+/(-?\d+)/", kon[x], int) for x in kon if 1 <= x <= until}
+        shelf = {x: v for x, v in shelf.items() if v is not None}
+        sd = sorted(shelf)
+        jb, jc = tj(r"kupily (\d+) za"), tj(r"\(cel (\d+);")
+        jf, jp, jn = tj(r"; pelne (\d+), czesciowo"), tj(r", czesciowo (\d+), bez jucznych"), tj(r", bez jucznych (\d+)\)")
+        je = tj(r"polka bez jucznych w budzecie (\d+)")
+        s0 = 30 if 30 in shelf else (sd[0] if sd else None)
+        rep.add("KR-11: juczne dla nowych karawan przy regule (doby 32-until) i polki jucznych",
+                f"kupione {jb} z celu {jc}; pelne {jf} / czesciowo {jp} / bez jucznych {jn}, polka bez jucznych w budzecie {je}"
+                + (f"; polki jucznych d{s0} {shelf[s0]} -> d{sd[-1]} {shelf[sd[-1]]}" if sd else ""),
+                "INFO (WGRANIE 35 d31-119: kupione 11.6/d z celu 14.3/d, pelne 123 / czesciowo 28 / bez jucznych 20; polki jucznych d30 1366 -> d119 3899; "
+                "mieszczanie zdejmowali 173 juczne/d - po regule ok. 13/d, wiec polki jucznych maja rosnac szybciej)", None)
 
 
 def etap5_k3(rep, lines, start, until, logp=None):

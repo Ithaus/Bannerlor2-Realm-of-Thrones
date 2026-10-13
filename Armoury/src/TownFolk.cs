@@ -118,6 +118,7 @@ namespace Armoury
             public bool C2Hit;                                        // E5/C2: korekta jedzenia R14 w oknie doby (kontrola "obie kary tej samej doby")
             public int ADay = -1;                                     // E5/C4: doba ostatniego liczenia kiesy czynnej tej osady (DAff/DAffF albo zakupy wsi) - okno People of this land; bez zapisu
             public double DVNeed; public long DVBuy;                  // E5/C4: wies - potrzeba zakupow i zakupy ostatniej doby (skladniki "wsie: zakupy X z Y" linii Kiesa ludu); bez zapisu
+            public double HorseOwed;                                  // K1-3a krok 2: licznik koni roboczych do wymiany (ulamek; miasto i zamek; zapis arm_townfolk, pole 18; sufit WhMax)
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();

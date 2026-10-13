@@ -110,6 +110,7 @@ namespace Armoury
             _lastR = double.NaN; _lastDStock = _lastIn = _lastOut = 0;
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
             ResetTithe();
+            ResetHorses();   // K1-3a krok 2: liczniki linii koni roboczych (licznik osady jest w Folk - czysci go Reset)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -1250,7 +1251,7 @@ namespace Armoury
 
         private static string D(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : v.ToString("R", Inv); }
 
-        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest,HungerDays" (|; pole 17 - E5/C2, starszy zapis bez niego = 0, starsze DLL je pomijaja). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
+        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest,HungerDays" (|; pole 17 - E5/C2, starszy zapis bez niego = 0, starsze DLL je pomijaja; pole 18 - K1-3a krok 2: licznik koni roboczych HorseOwed, starszy zapis bez niego = 0). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
         internal static string Export()
         {
             try
@@ -1267,7 +1268,8 @@ namespace Armoury
                     sb.Append('|').Append(f.St.StringId.Replace("|", "").Replace(",", "")).Append(',').Append(f.Kind).Append(',').Append(f.Cal ? 1 : 0).Append(',')
                       .Append(D(f.HW)).Append(',').Append(D(f.HR)).Append(',').Append(D(f.HP)).Append(',').Append(D(f.HS)).Append(',').Append(D(f.PeopleCal)).Append(',').Append(f.Slave ? 1 : 0).Append(',')
                       .Append(f.KW).Append(',').Append(f.KR).Append(',').Append(f.KP).Append(',').Append(f.KG).Append(',').Append(f.CourtCr).Append(',')
-                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest)).Append(',').Append(f.HungerDays);
+                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest)).Append(',').Append(f.HungerDays)
+                      .Append(',').Append(Math.Max(0, Math.Min(WhMax, f.HorseOwed)).ToString("0.####", Inv));   // K1-3a krok 2: pole 18
                 }
                 return sb.ToString();
             }
@@ -1316,6 +1318,7 @@ namespace Armoury
                         double idx = Dd(a[14]); if (idx > 0) f.Idx = idx;
                         f.PredFood = Math.Max(0, Dd(a[15])); f.PredRest = Math.Max(0, Dd(a[16]));
                         f.HungerDays = a.Length > 17 ? (int)Math.Max(0, Math.Min(100000, L(a[17]))) : 0;   // E5/C2: zapis sprzed C2 - licznik od zera
+                        f.HorseOwed = a.Length > 18 ? Math.Max(0, Math.Min(WhMax, Dd(a[18]))) : 0;   // K1-3a krok 2: zapis sprzed paczki - licznik koni roboczych od zera
                         f.FacOk = false;
                     }
                     catch (Exception e) { Stumble("Import(osada)", e); }

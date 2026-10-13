@@ -1597,6 +1597,9 @@ namespace Armoury
             var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
             try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
             finally { GoodsLedger.End(gfFolk); } DayProfile.Lap("TownFolk.Daily");
+            // K1-3a krok 2: wymiana padlych koni roboczych miast i zamkow z polki osady za zloto kiesy ludu - PO kotwicy doby (pieniadze ponad jutrzejszy koszyk),
+            // w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa osady); poza ramka zakupow wsi ksiegi towarow (kon nie jest towarem tej ksiegi)
+            try { TownFolk.WorkHorsesDaily(); } catch (Exception e) { Log.Error("TownFolk.WorkHorsesDaily", e); } DayProfile.Lap("TownFolk.WorkHorsesDaily");
             // E6/R1 (214): woz kopalni kupuje drewno dymarki z polki miasta handlowego za zloto wsi (na nastepna dobe) - zakup wsi w miescie jak E5/B1
             // (pozycja MFolk ksiegi pieniadza, wlasna ramka ksiegi towarow FBloom), PRZED ksiega zelaza i drewna (OreLedger.Daily)
             try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
