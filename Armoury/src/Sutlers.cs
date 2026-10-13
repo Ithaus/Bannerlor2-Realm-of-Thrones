@@ -50,6 +50,7 @@ namespace Armoury
         private static int _dRampDay = -1, _dRampDays;
         private static double _dMs;
         private static int _stumbles;
+        private static bool _planned;   // F6: One tej partii doszlo do CampPlan - jej oszczednosci K1 sa juz w _dLordSaved (flaga jednej partii, ustawiana w petli Daily)
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly HashSet<Settlement> _towns = new HashSet<Settlement>(), _vills = new HashSet<Settlement>();
 
@@ -112,8 +113,8 @@ namespace Armoury
                 if (main != null) parties.Add(main);   // gracz - jedna regula (tez wtedy, gdy gra nie liczy jego partii do AllLordParties)
                 foreach (var mp in parties)
                 {
-                    // oszczednosci K1 wedlug tej samej reguly co markietani (MenPurse.KeptFor - limit OnLeft od zoldu TERAZ; recenzja E5/A3 1-1), tylko do linii
-                    try { int pu = Math.Max(0, MenPurse.Get(mp)); _dLordPurse += pu; if (s.LogEnabled && pu > 0) _dLordSaved += Math.Min(pu, Math.Max(0, MenPurse.KeptFor(mp))); }
+                    // F6 (test zbiorczy 5-8, A3-7): tu sama suma sakiewek; oszczednosci K1 do linii daje One (kept z CampPlan) albo ReadSaved (partie pominiete)
+                    try { _dLordPurse += Math.Max(0, MenPurse.Get(mp)); }
                     catch (Exception e) { Stumble("Daily.Read", e); }
                 }
                 _dLordWage = SoldierPay.LastLordAcc;   // zold partii rodow naliczony tej doby (SoldierPay.Daily biegnie przed nami w bloku)
@@ -122,6 +123,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily.Parties", e); }
             if (!On)
             {
+                foreach (var mp in parties) ReadSaved(s, mp);   // F6: paczka wylaczona - One nie biegnie, pelna petla odczytu jak dotad
                 sw.Stop();
                 if (s.LogEnabled)
                     Log.Info("Markietani (E5/A3): dzien " + today + " | wylaczone (Sutlers Enabled / Men Purse Enabled) - sakiewki wydaja tylko przy wyjezdzie z miasta, jak dotad"
@@ -136,9 +138,13 @@ namespace Armoury
             if (rate > 0f)
                 foreach (var mp in parties)
                 {
+                    _planned = false;
                     try { One(mp, rate, townShare); }
                     catch (Exception e) { Stumble("One", e); }   // wyjatek jednej partii - licznik, reszta biegnie dalej (bez globalnego wylacznika)
+                    if (!_planned) ReadSaved(s, mp);             // F6: One nie doszlo do CampPlan (partia pominieta albo wyjatek przed rezerwa) - odczyt jak dotad
                 }
+            else
+                foreach (var mp in parties) ReadSaved(s, mp);    // F6: stawka 0 (Sutler Daily Share 0 albo wyjatek RateToday) - One nie biegnie, pelna petla odczytu jak dotad
             _dTownsN = _towns.Count; _dVillsN = _vills.Count;
             LastTown = _dTown; LastVill = _dVill;
             sw.Stop();
@@ -148,6 +154,17 @@ namespace Armoury
         }
 
         private static double Days() { return _dLordWage > 0 ? (double)_dLordPurse / _dLordWage : 0.0; }
+
+        /// <summary>F6 (test zbiorczy 5-8, A3-7): oszczednosci K1 jednej partii do linii - sam odczyt, wedlug tej samej reguly co markietani (MenPurse.KeptFor -
+        /// limit OnLeft od zoldu TERAZ; recenzja E5/A3 1-1). KeptFor liczy rezerwe napraw (dopasowanie AiWear - drogie), wiec tylko dla partii, ktorych One nie
+        /// policzylo: pominietych przed CampPlan (nieczynne, w osadzie, w bitwie, na morzu, bez miasta) i dla calej listy, gdy markietani nie biegna
+        /// (paczka wylaczona, stawka 0). Partie w polu daja te sama liczbe z CampPlan w One. Sakiewka pusta - nic (jak dotad).</summary>
+        private static void ReadSaved(Settings s, MobileParty mp)
+        {
+            if (!s.LogEnabled) return;
+            try { int pu = Math.Max(0, MenPurse.Get(mp)); if (pu > 0) _dLordSaved += Math.Min(pu, Math.Max(0, MenPurse.KeptFor(mp))); }
+            catch (Exception e) { Stumble("Daily.Read", e); }
+        }
 
         /// <summary>Odczyt: ile sakiewek partii rodow to oszczednosci K1 (markietani ich nie ruszaja - rezerwa jak w OnLeft; limit MenGearSaveDays dni zoldu).</summary>
         private static string SavedNote()
@@ -198,6 +215,9 @@ namespace Armoury
             if (town == null || town.Town == null) { _dEmpty++; return; }   // swiat bez miast - nic nie schodzi
             int reserve, kept;
             int want = MenPurse.CampPlan(mp, rate, out reserve, out kept);
+            // F6: kept z CampPlan to ta sama liczba, ktora dawal odczyt MenPurse.KeptFor (ta sama CampReserve na tej samej sakiewce; 0 <= kept <= sakiewka) -
+            // rezerwa napraw (AiWear.OutstandingCost) liczona raz na partie w polu, nie dwa
+            _planned = true; _dLordSaved += kept;
             _dParties++; _dReserve += reserve; _dKept += kept;
             if (want <= 0) return;
             bool wantVill = (int)(want * (double)(1f - townShare)) > 0;
