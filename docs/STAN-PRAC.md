@@ -1632,3 +1632,34 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   w czacie; KODU P1 NIE ZACZYNAC przed jego "tak".** Kolizje do sprawdzenia przed P1: rozdz. 10 pkt 11 (FolkSurplusSpendShare w Armoury.json Jeffa; kolejnosc danina / oferta).
   W GRZE: lancuch z wpisu wyzej ruszyl 13:14 UTC (bieg cienia swatow 40 dob, potem bieg roczny 364 doby; koniec ok. 14:50 UTC). Limit 5 h: 83% (zeruje sie 15:50 UTC) - do tego czasu
   bez nowych workflow; po biegu rocznym: progi, zapis 9 dob, WGRANIE 37.
+
+**WGRANIE 37 (13.10 16:17 UTC; runda 3: wojsko + zelazo, pomiary Z.3, sluby NPC):** Armoury f2afb329, CrashScribe 3ca8aa08, CrashScribe.settings.xml ef8cd722 (reszta bez zmian:
+RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233, 5 plikow danych Armoury). Galaz `noc/wgranie-37` = `w-toku/zbior-e8` **6d91156** (= 9e2e0e6 + sam tekst
+komentarzy w CrashScribe.settings.xml i CHANGELOG). Kopie: obok plikow `*.bak-2026-10-13-noc37-przed` i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc37-przed`; md5 po wgraniu OK.
+Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d2908 z tych kopii.
+- **BIEG ROCZNY przed wgraniem (364 doby nowej kampanii, Armoury f2afb329 + CS-at-swaty 3da55349, reguly slubow czynne): 364/364, 0 ERROR, 12.0 s/dobe** (log
+  `D:\Backup-Bannerlord\logs\2026-10-13-noc34-35\Armoury-2026-10-13_06-24-10.log`, sesja `session-2026-10-13_06-24-09.log`, tabele `Logs\2026-10-13_06-24-10\`; progi
+  SCRATCH(dbc3d3d1)\test\progi-rok5\). **Wojsko lordow w wojnie (sr. 28 dob) 79 409 wobec 64 013 w biegu rocznym WGRANIA 34** (ostatnia doba 73 578; podloga 85 tys. dalej NIE);
+  zalegly zold w partiach 2.49% (3.17%); **miasta bez zelaza: od d91 srednio 9.1, ostatnie 30 dob 4.2 (przedtem 40.1 i 51-61); bez rudy d91-120 8.9 (39.8)**; sluby AI-AI 215 w roku
+  (przedtem 113), czas swatow ok. 685 ms/d (oryginal ok. 1 450). NIE wedlug grup (teraz / poprzedni bieg roczny): etap2 2/3, etap3 1/0, etap4 4/3, etap5 27/25, etap7 2/0, etap8 9/6.
+  Nowe NIE do obejrzenia (robi to workflow raportu): E4/3 pula wyrzutkow 11 869 w d364 (baza 3 053) i bandy 819 / 17 279 ludzi; E4/11 G5 (1 doba, d229); E4/9 K8 Straz (d175: 56);
+  E7/O1 T3 2.3 na noc (prog 2.0), T4 4 noce z 333; etap3 rozjazd probek 2 doby; etap5: A1-T19, A1-T21, B3-6, N1-6, W1-7; etap8: C-4b (2), P3-2, Q-3 (1 partia), G1-5c, H-4b
+  (reszta uprzezy -7 395 przy zrodlach 14 995), O1-2, O5-2, P3W1-6 (14 z 205, prog 12), P3W2-4 (1.38 x, prog 1.25).
+- **Test zapisu:** wczytany `autotest-dlugi` (doba 360 biegu rocznego) + 9 dob: 0 ERROR, pula wyrzutkow i klimat wczytane, sluby licza dalej (test\at-fin5-zapis9.out.txt).
+- **SWATY - POMIAR W GRZE (bieg cienia NIE dal 0):** 40 dob: 3 228 roznic stanu generatora w 13 303 wywolaniach. Dwa biegi z probna DLL z diagnostyka (CrashScribe-at-diag /
+  -diag2; zrodlo niecommitowane w SCRATCH\cs-at): ta sama nasza droga puszczona 2 razy z tego samego stanu rozni sie w ok. 100 rodach/d; **`NpcCoupleMarriageChance` (BK) sama
+  zuzywa 1 krok generatora w 130-156 wywolaniach/d; `IsCoupleSuitableForMarriage` i `CanMarry` - 0.** Czyli w grze "ten sam ciag losowy" jest nieosiagalny (BK losuje w ocenie
+  szansy + pamieci dnia BK); regula i szanse te same, pary inne niz w samym ROT - jak miedzy dwiema rozgrywkami. Opis w settings.xml poprawiony; komentarze w Config.cs i naglowku
+  MarriageFast.cs do poprawy przy najblizszej zmianie kodu CS. Nie ustalone: ktore wywolanie w BK losuje. Jeff powiadomiony.
+- **DECYZJE JEFFA 13.10 (po pytaniach projektu obiegu kiesy):** 1 danina z oszczednosci TAK; 2 kara lojalnosci TAK (osobny krok po pomiarze); 3 budowa - "wyjasnij dokladniej"
+  (wyjasnione, czeka na tak / nie); 4 zbytki TAK; 5 "tak" = pozniej, jak w radzie (zaznaczone Jeffowi); 6 konie robocze razem z danina po biegu 120 dob TAK.
+  **Jeff NIE chce obnizac progu wojska 85 tys.: "to podatki trzeba gdzies zwiekszyc, na czas wojny" - prosi o propozycje.** Podane kierunki: (1) danina z oszczednosci, (2) korona
+  placi wedlug potrzeby (najpierw rody w polu na pulapie zoldu), (3) tarczowe (rod z niepelna druzyna placi koronie, korona rodom walczacym), (4) stawka wojenna podatku pana
+  z kosztem lojalnosci, (5) clo od kupcow - odradzone. Fakt z biegu: 143 rody (31 tys. ludzi) maja zold >= 0.9 pulapu, 164 rody (45 tys.) maja luz i niepelne druzyny - im podatki
+  nie pomoga; przyczyna do ustalenia w raporcie. Liczby i projekt po raporcie rocznym.
+  **Nowe pytania Jeffa:** jak dzis dziala lup po zdobyciu miasta ("powinno dac sie pladrowac prawdziwe bogactwo miasta"); raport z biegu rocznego ("ile wojska, ile zarabiaja
+  rody i panstwa, czy gra jest spojna").
+- **W TOKU (workflow, kopie skryptow w docs/przekazanie):** `wf-raport-roczny.js` (wf_bd6c538c-c31: 5 analiz + 5 weryfikacji + synteza -> docs/test-zbiorczy/RAPORT-ROCZNY-2026-10-13.md;
+  robocze SCRATCH\raport-rok\), `wf-lup-miast.js` (wf_063e9114-c56 -> docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md; SCRATCH\lup-miast\), `wf-kiesa-p1-danina.js`
+  (wf_e6948e4c-524: paczka P1 na galezi `w-toku/kiesa-p1-danina`, drzewo SC\zb\p1 od 9e2e0e6: danina FolkWarAid 2.5% x s/3%, zdanie Savings, pomiary, progi). W grze: bieg kontrolny
+  10 dob po wgraniu (test\at-w37-kontrola10.out.txt). PO NICH: test 120 dob P1; scalenie k13a (konie robocze) + drugi bieg 120 dob z obiema; projekt "podatki wojenne -> wojsko".
