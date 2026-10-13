@@ -11,7 +11,10 @@ namespace Armoury
     /// Harmony na celu (nasze - UniqueLaw na DTE AddItemToPartyArmory, MaterialOrders.ReleasePrefix na BK ReleaseCaravanFromHold - i cudze, np. straznik
     /// BK na SetMoveGoToSettlement) biegna jak przy Invoke (sprawdzone poza gra na tym samym 0Harmony.dll: delegat zbudowany przed latka i po niej).
     /// Jedyna roznica: wyjatek z celu leci bez opakowania TargetInvocationException (miejsca wywolan lapia Exception - bez zmiany skutku).
-    /// Budowa raz na miejsce, leniwie przy pierwszym uzyciu w kampanii (nigdy przy starcie gry - CLAUDE.md 7). Nieudana budowa (inna sygnatura w innej
+    /// Budowa raz na miejsce i proces. MaterialOrders: leniwie przy pierwszym uzyciu w kampanii (EnsureFast). AiGear: w Look(), ktore pierwszy raz biegnie
+    /// z AiGear.ApplyAll przy starcie gry (OnBeforeInitialModuleScreenSetAsRoot), PRZED latka UniqueLaw na tym samym celu - samo zbudowanie delegata nie
+    /// wola celu i nie uruchamia konstruktora statycznego jego klasy (inaczej niz latka Harmony - CLAUDE.md 7), a delegat sprzed latki i sprzed pierwszego
+    /// wywolania celu idzie przez prefiks (recenzja E8/O1: sprawdzone poza gra, CLR 4 x64 + Harmony 2.4.2). Nieudana budowa (inna sygnatura w innej
     /// wersji cudzego moda) = to miejsce dalej wola przez Invoke, a jego nazwa stoi w linii doby "Polka i delegaty (E8/O1)". Wylacznik DteDelegates =
     /// false: kazde miejsce wola przez Invoke jak przed paczka (delegaty zbudowane, nieuzywane).
     /// </summary>

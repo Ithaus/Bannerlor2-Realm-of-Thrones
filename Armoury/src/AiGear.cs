@@ -196,7 +196,7 @@ namespace Armoury
                     // poprawki sklad7: ten sam test, ktory DTE robi w AddItemToPartyArmory (rozpoznanie sztuki + blacklist.json) - przed zakupem
                     var bl = _dte.Assembly.GetType("DynamicTroopEquipmentReupload.ItemBlackList");
                     _blTest = bl != null ? bl.GetMethod("Test", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(ItemObject) }, null) : null;
-                    // E8/O1 (265): delegaty raz na proces, tutaj - Look biegnie leniwie przy pierwszym uzyciu w kampanii (FastCall nie rzuca)
+                    // E8/O1 (265): delegaty raz na proces, tutaj - Look biegnie pierwszy raz z AiGear.ApplyAll przy starcie gry, przed latka UniqueLaw na AddItemToPartyArmory (recenzja: budowa delegata celu nie wola, delegat sprzed latki idzie przez prefiks; FastCall nie rzuca)
                     _addFast = FastCall.Of<Action<MBGUID, ItemObject, int>>(_add, "DTE AddItemToPartyArmory");
                     _blFast = FastCall.Of<Func<ItemObject, bool>>(_blTest, "DTE ItemBlackList.Test");
                 }
