@@ -1523,3 +1523,9 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   15 lat, najtanszy juczny / zwykly z polki osady, placi kiesa ludu) i HorseBreedingCutLive = true (ciecie hodowli czynne). Potem: scalenie do zbior-e8, autotest 120 dob + zapis, wgranie.
   **Rownolegle wf_b57efd4d-9ac (triaz 3, tylko odczyt; docs/przekazanie/wf-triaz-3-bieg-roczny.js):** (a) wojsko lordow topnieje w roku do 64 tys., (b) zelazo i ruda nie docieraja do miast.
   Logi z nocy zabezpieczone: `D:\Backup-Bannerlord\logs\2026-10-13-noc34-35` (621 MB; gra trzyma tylko 12 ostatnich logow Armoury - log wzorca W33 juz sie przewinal).
+- (11:25 UTC 13.10) **Jeff: "rob dalej to co mozesz w tym samym czasie".** CZTERY WATKI NARAZ (limit 5 h: 2%, tydzien 45%):
+  (1) wf_e7ce012a-8c7 K1-3a krok 2 konie robocze mieszczan (zb\k13a, `w-toku/k13a-konie-robocze`); (2) wf_b57efd4d-9ac triaz 3 - wojsko w roku i zelazo (odczyt);
+  (3) wf_aec5979e-7e6 (docs/przekazanie/wf-o4-i-rozpoznanie-z3.js): E8/O4 musztra w zb\o4 (`w-toku/e8-o4`, autor + recenzent; "pominieta", jesli zysk < ok. 30 ms/dobe) + rozpoznanie Z.3
+  cudzy kod (ROT malzenstwa 9.4% klatki itd.) -> docs/zakonczenie/ROZPOZNANIE-Z3-CUDZY-KOD-2026-10-13.md; (4) GRA: PROBA ZIMY 120 dob na WGRANIU 35 (plik-przelacznik
+  Documents\...\CrashScribe\armoury-proba-zimy.flag kladziony i usuwany przez tools/wgranie/bieg-zima.ps1; wynik test\at-w35-zima120.out.txt).
+  KOLEJKA GRY po zimie: test K1-3a (120 dob + zapis) -> wgranie; potem bieg 2-letni.
