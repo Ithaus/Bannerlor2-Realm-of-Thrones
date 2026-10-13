@@ -45,6 +45,7 @@ namespace Armoury
         private static float _crack = -1f;
         private static ItemModifier _mod;
         private static Dictionary<EquipmentElement, int> _bag0;   // E8/B: surowce kuzni w sakwach przed zdjeciem kwitu (tylko przy ArmourBotchHalfBack)
+        private static string _botchNote;                         // E8/B (recenzja): opis zwrotu po peknieciu - zwrot w postfiksie, linia logu w finalizerze
 
         /// <summary>Nasza brama odmowila (za malo Smithing) - BK nie kuje; postfiks FletchForge nie uczy wzorow i nie pokazuje okna.</summary>
         internal static bool Refused;
@@ -80,7 +81,7 @@ namespace Armoury
         {
             _active = false; _rolled = false; _postRan = false; _success = false;
             _item = null; _smith = null; _r = default(Recipes.Recipe); _skill = 0; _before = 0; _crack = -1f; _mod = null;
-            _bag0 = null;
+            _bag0 = null; _botchNote = null;
         }
 
         /// <summary>Potkniecie na jednej sztuce: licznik, do logu tylko pierwsze 5 (dymek i lista kowadla wolaja co klatke).</summary>
@@ -163,7 +164,14 @@ namespace Armoury
         public static void CraftPostfix()
         {
             if (!_active) return;
-            try { _postRan = true; _success = TotalOf(_item) > _before; }
+            try
+            {
+                _postRan = true; _success = TotalOf(_item) > _before;
+                // E8/B (recenzja): zwrot po peknieciu TU, nie w finalizerze. Ten postfiks idzie pierwszy (Priority.First) - przed odswiezeniem
+                // licznikow zakladki (FletchForge.BkCraftPostfix -> RefreshCraftScreen). Z finalizera surowce wracaly juz PO odswiezeniu: ekran
+                // pokazywal sakwy po zdjeciu calego kwitu i gasil przycisk Craft ("You don't have all required materials!"), choc surowca bylo dosc
+                if (!_success) _botchNote = BotchBack();
+            }
             catch (Exception e) { Stumble("ArmourQuality.CraftPostfix", e); }
         }
 
@@ -176,7 +184,7 @@ namespace Armoury
                 {
                     string res;
                     if (!_postRan) res = "przerwane (wyjatek w BK)";
-                    else if (!_success) { _cracked++; res = "PEKLA (" + BotchBack() + ", pol staminy - jak u BK)"; }
+                    else if (!_success) { _cracked++; res = "PEKLA (" + (_botchNote ?? "material przepadl") + ", pol staminy - jak u BK)"; }   // E8/B: zwrot zrobiony w CraftPostfix
                     else
                     {
                         _made++;
@@ -229,7 +237,8 @@ namespace Armoury
             return d;
         }
 
-        /// <summary>Zwrot po peknieciu (wolane z finalizera, raz na klikniecie). Zwraca opis do linii logu; przy wylaczonym kluczu - tekst sprzed paczki.</summary>
+        /// <summary>Zwrot po peknieciu (wolane z CraftPostfix, raz na klikniecie - przed odswiezeniem licznikow zakladki). Zwraca opis do linii logu
+        /// (pisze ja finalizer); przy wylaczonym kluczu - tekst sprzed paczki.</summary>
         private static string BotchBack()
         {
             if (_bag0 == null) return "material przepadl";
