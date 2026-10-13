@@ -332,6 +332,21 @@ Uzycie (Python 3, tylko odczyt):
                     wywozu srednio w ostatnich 10 dobach okna <= 150 ms przy O1+O3 (ShelfIndexOwnUpdate [WL]) albo <= 220 ms przy samym O3
                     (Z33: 312.5 ms w dobie 120; okno krotsze niz 110 dob - INFO); O3-3 sztuki i zaplacone w probce: ten sam cel, ta sama
                     liczba sztuk do wziecia i droga (rozjazdow celu i sztuk 0); praca przejeta przez pamiec i szacunek oszczednosci - INFO.
+                    Blok etap8_o5 (E8/O5, paczka 269): nadwyzki zalog po godzinach (kolejka tygodniowa Id % 168 zamiast ok. 32 zalog w takcie doby)
+                    - linia doby "Nadwyzki zalog po godzinach (E8/O5)" (GarrisonArmory.LineO5) oraz "Profil doby (E8/0)", "Sakiewka ludzi",
+                    "Zakupy i nadwyzki AI (E8/Z)" i "Przeplywy osad": O5-0 linia w kazdej dobie okna, stan klucza; O5-1 maks. taktu doby
+                    <= 1 000 ms w dobach z kluczem [WL] (czas i najdluzsza godzina sprzedazy po godzinach - INFO); O5-2 sztuki i utarg zalog
+                    w pelnych tygodniach okna w +-15% Z33 w tych samych dobach (tabela Z33 w narzedziu; bez uprzezy E8/Z; wiaze od 8 pelnych
+                    tygodni przy kluczu [WL] - to zmiana kolejnosci w dobie, poza R9; doba 1 kampanii liczona do 1. tygodnia - po godzinach
+                    czesc zalog sprzedaje przed pierwszym taktem doby); O5-3 INFO ksiega kas: "skup nadwyzek zbrojowni" (poza
+                    taktem doby) wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0.
+                    Blok etap8_o6 (E8/O6, paczka 270): zapis logu otwartym plikiem (jeden slownik pisarzy dla Info, Error i Csv) - linia doby
+                    "Log (E8/O6)" (Log.DailyO6), wpisy "Log (E8/O6) wpis kontrolny drogi bledu" oraz "Profil doby (E8/0)": O6-0 linia w kazdej
+                    dobie okna, stan klucza; O6-1 czas zapisu logu <= 20 ms/dobe srednio w dobach z kluczem [WL] ("log zapis" z linii
+                    profilu; bieg 9 dob z 12.10 23:35 przed paczka: 71-87 ms); O6-2 proba 3 dob sesji: bajty wyslane do kazdego pliku = rozmiar pliku
+                    (rozjazd 0, plikow z rozjazdem 0) i numer linii doby w glownym pliku = liczba linii wyslanych (liczy narzedzie w pliku
+                    logu) - tak samo przy kluczu wlaczonym i wylaczonym; O6-3 wpisy kontrolne drogi Log.Error sa w pliku (tyle, ile
+                    wyslano, >= 1); O6-4 zapisy stracone, potkniecia pisarza i linie bledu Log.DailyO6 0, zapisy stara droga przy [WL] 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -13126,6 +13141,332 @@ def etap8_o3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "INFO (projekt: zysk 50-110 ms w jednej klatce)", None)
 
 
+# ============================================================ ETAP 8 (E8/O5, paczka 269): nadwyzki zalog po godzinach - blok etap8_o5
+E8_O5_LINE = "Nadwyzki zalog po godzinach (E8/O5): dzien"
+# Progi projektu etapu 8 v2 rozdz. 3 "E8/O5" (poza regula R9 - to zmiana kolejnosci w dobie) i rozdz. 4 pkt 4
+E8_O5_TICK_MS = 1000.0   # O5-1: maks. taktu doby (linia "Profil doby (E8/0)")
+E8_O5_BAND = 0.15        # O5-2: sprzedane sztuki i utarg zalog tygodniowo w +-15% Z33
+E8_O5_MIN_WEEKS = 8      # O5-2 wiaze od tylu pelnych tygodni okna (kazda zaloga sprzedaje raz w tygodniu; pierwsze tygodnie to wyprzedaz zapasow startowych)
+# Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log, start kampanii 108836, kolejka w takcie doby): linia "Sakiewka ludzi: dzien N ... (w tym zalogi A za B" -
+# sztuki i utarg zalog w dobach kampanii 1..120 (indeks = doba - 1). Pelne tygodnie od doby 2: 17 tygodni = 101 362 szt. za 215 748 zl; tygodnie 5-17: 36 878 / 88 033.
+# Ksiega kas Z33 (srednio na dobe): zamki "skup nadwyzek zbrojowni" -2, "pozostale moduly ticku" -255; miasta -12 180 (nadwyzki lordow) i -1 536.
+E8_O5_Z33_PCS = (
+    0, 2712, 1760, 2783, 3224, 5269, 5542, 2605, 6649, 4207, 6610, 1969, 1831, 2205, 386, 1284, 1391, 2707, 1557, 1136,
+    1598, 963, 1691, 1172, 1263, 401, 993, 229, 347, 199, 562, 1164, 269, 234, 380, 300, 353, 312, 1521, 689,
+    26, 753, 409, 611, 1665, 1802, 327, 650, 587, 492, 186, 605, 1096, 125, 445, 468, 217, 214, 223, 920,
+    204, 654, 258, 408, 324, 70, 61, 169, 472, 592, 287, 42, 325, 291, 74, 339, 318, 63, 591, 111,
+    536, 78, 373, 151, 140, 85, 167, 340, 275, 92, 235, 121, 486, 448, 594, 224, 388, 70, 537, 121,
+    355, 579, 88, 281, 268, 78, 328, 408, 380, 518, 403, 728, 861, 154, 505, 192, 589, 633, 60, 552,
+)
+E8_O5_Z33_GOLD = (
+    0, 2794, 1863, 3313, 5134, 10347, 9278, 4108, 14201, 7846, 12968, 3284, 5828, 5129, 900, 3225, 2647, 6502, 2120, 4794,
+    3722, 1089, 4429, 2281, 4693, 698, 3662, 294, 566, 244, 915, 4295, 368, 1190, 560, 316, 371, 346, 6159, 736,
+    26, 840, 651, 707, 1950, 5225, 379, 4068, 1111, 834, 198, 1415, 5589, 254, 3225, 1086, 254, 214, 499, 4435,
+    246, 2732, 576, 438, 380, 117, 261, 217, 1009, 992, 335, 58, 497, 1333, 91, 1472, 697, 68, 639, 128,
+    2393, 81, 2756, 334, 140, 87, 197, 1275, 280, 689, 320, 121, 511, 747, 1050, 297, 750, 165, 663, 138,
+    676, 1289, 103, 816, 346, 78, 371, 571, 2215, 999, 533, 839, 873, 160, 521, 886, 939, 1410, 61, 607,
+)
+
+
+def etap8_o5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O5 (269, projekt etapu 8 v2 rozdz. 3 "E8/O5" Test - poza R9): linia doby "Nadwyzki zalog po godzinach (E8/O5)" (GarrisonArmory.LineO5, z
+    GarrisonArmory.Daily; dzien linii = dzien gry - 1) + "Profil doby (E8/0)", "Sakiewka ludzi", "Zakupy i nadwyzki AI (E8/Z)", "Przeplywy osad".
+    O5-0 linia w kazdej dobie okna, stan klucza; O5-1 maks. taktu doby <= 1.0 s w dobach z kluczem [WL] (Profil doby; czas i najdluzsza godzina sprzedazy
+    po godzinach - INFO); O5-2 sztuki i utarg zalog w pelnych tygodniach okna w +-15% Z33 w tych samych dobach (bez uprzezy E8/Z, ktorej Z33 nie
+    sprzedawal; wiaze od 8 pelnych tygodni przy kluczu [WL], krotsze okno - INFO; doba 1 kampanii w 1. tygodniu); O5-3 INFO ksiega kas: "skup nadwyzek
+    zbrojowni" (poza taktem doby) wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0."""
+    ol = {d: s for d, s in by_day(lines, E8_O5_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not ol:
+        rep.add("E8/O5: linia Nadwyzki zalog po godzinach (E8/O5)", "brak w logu", "jest od wgrania E8/O5", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "GarrisonSellHourly [WL]" in ol[d]]
+    on_set = set(on)
+    off = [d for d in days if d not in on_set]
+    dead = [d for d in days if "sprzedaz nadwyzek zalog wylaczona" in ol[d]]
+    rep.add("O5-0: linia Nadwyzki zalog po godzinach (E8/O5) w kazdej dobie okna; stan klucza",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; GarrisonSellHourly wl {len(on)} / wyl {len(off)} dob" + (f"; sprzedaz nadwyzek zalog wylaczona w {len(dead)} dobach" if dead else ""),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def tot(pat, sel, cast=int):
+        return sum(num(pat, ol[d], cast=cast, default=0) for d in sel)
+
+    # O5-1: maks. taktu doby. Linia profilu "dzien D" mierzy takt doby gry D; stan klucza w tym takcie podaje linia E8/O5 "dzien D - 1" (ten sam takt)
+    prof = by_day(lines, E8_PROF)
+    tick = {}
+    for d, s in prof.items():
+        if (d - 1) in ol:
+            v = fnum(r"\| takt doby ([0-9.]+) ms", s)
+            if v is not None:
+                tick[d] = v
+    t_on = {d: v for d, v in tick.items() if (d - 1) in on_set}
+    t_off = {d: v for d, v in tick.items() if (d - 1) not in on_set}
+    rule1 = f"<= {E8_O5_TICK_MS:.0f} ms w kazdej dobie z kluczem [WL] (projekt rozdz. 3 \"E8/O5\" i rozdz. 4 pkt 4; bez linii Profil doby - INFO)"
+    if t_on:
+        vals = sorted(t_on.values())
+        worst = sorted(t_on, key=lambda d: -t_on[d])[:3]
+        over = sum(1 for v in vals if v > E8_O5_TICK_MS)
+
+        def lap(d):   # odcinek GarrisonArmory.Daily w 15 najdluzszych odcinkach taktu (po paczce: sama linia)
+            return fnum(r"GarrisonArmory\.Daily ([0-9.]+)", prof[d].split("; inne sluchacze", 1)[0])
+
+        laps = [x for x in (lap(d) for d in t_on) if x is not None]
+        extra = (f"; odcinek GarrisonArmory.Daily w czolowce taktu w {len(laps)} dobach (najwiecej {max(laps):.1f} ms)" if laps
+                 else "; odcinka GarrisonArmory.Daily nie ma w czolowce taktu")
+        if t_off:
+            lo = [x for x in (lap(d) for d in t_off) if x is not None]
+            extra += (f"; klucz wylaczony {len(t_off)} dob: takt maks. {max(t_off.values()):.0f} ms"
+                      + (f", GarrisonArmory.Daily srednio {sum(lo) / len(lo):.1f} ms w {len(lo)} dobach" if lo else ""))
+        rep.add("O5-1: najdluzszy takt doby (jedna klatka) przy kluczu [WL]",
+                f"maks. {vals[-1]:.0f} ms, mediana {vals[len(vals) // 2]:.0f} ms, dob ponad prog {over} z {len(vals)}; najdluzsze: "
+                + ", ".join(f"d{run_day(d, start)} {t_on[d]:.0f} ms" for d in worst) + extra, rule1, vals[-1] <= E8_O5_TICK_MS)
+    else:
+        why = "brak linii Profil doby (E8/0) - Stage8ProfileLog wylaczony?" if not tick else "klucz GarrisonSellHourly wylaczony w calym oknie"
+        rep.add("O5-1: najdluzszy takt doby (jedna klatka)", why + (f"; takt maks. {max(t_off.values()):.0f} ms przy wylaczonym kluczu" if t_off else ""), rule1, None)
+
+    # INFO: czas sprzedazy po godzinach i najdluzsza godzina (zamrozenie nie moze sie tylko przeniesc z taktu doby na godzine)
+    if on:
+        ms = tot(r"jednej godziny \d+, czas ([0-9.]+) ms", on, float)
+        busy = tot(r"\(z kolejka (\d+),", on)
+        hmax = {d: fnum(r"najdluzsza godzina ([0-9.]+) ms", ol[d], 0.0) for d in on}
+        omax = {d: fnum(r"najdluzsza zaloga ([0-9.]+) ms", ol[d], 0.0) for d in on}
+        dh, do = max(on, key=lambda d: hmax[d]), max(on, key=lambda d: omax[d])
+        mo = re.search(r"najdluzsza zaloga [0-9.]+ ms \((.*?)\) \| w takcie doby", ol[do])
+        most = max(num(r"najwiecej w kolejce jednej godziny (\d+)", ol[d], default=0) for d in on)
+        hq = num(r"najdluzsza godzina [0-9.]+ ms \(zalog w kolejce (\d+)\)", ol[dh], default=0)
+        due = tot(r"zalog w terminie (\d+)", on)
+        caught, rept = tot(r"nadrobione numery godzin (\d+)", on), tot(r"powtorzone (\d+)\)", on)
+        txt = (f"srednio {ms / len(on):.1f} ms/dobe w {busy / len(on):.1f} godzinach z kolejka; najdluzsza godzina {hmax[dh]:.1f} ms (d{run_day(dh, start)}, zalog w kolejce "
+               f"{hq}); najdluzsza zaloga {omax[do]:.1f} ms ({mo.group(1) if mo else '-'}, d{run_day(do, start)}); najwiecej zalog w kolejce jednej godziny {most}; "
+               f"zalog w terminie srednio {due / len(on):.1f}/d; nadrobione numery godzin {caught}, powtorzone {rept}")
+        if off:
+            tq = [fnum(r"w takcie doby: zalog w kolejce \d+, czas ([0-9.]+) ms", ol[d], 0.0) for d in off]
+            txt += f"; klucz wylaczony {len(off)} dob: w takcie doby srednio {sum(tq) / len(tq):.1f} ms, najwiecej {max(tq):.1f} ms"
+        rep.add("E8/O5: sprzedaz po godzinach - czas i najdluzsza godzina", txt,
+                "INFO (projekt: 0 CPU, znika zamrozenie w takcie doby; Z33 w takcie doby srednio 103 ms, najwiecej 748 ms - godzina o takim czasie = zamrozenie tylko przeniesione)", None)
+
+    # O5-2: sztuki i utarg zalog w pelnych tygodniach okna wobec Z33 w tych samych dobach (linia "Sakiewka ludzi" - doba wedlug chwili sprzedazy w obu biegach)
+    cur = {}
+    for d, s in by_day(lines, "Sakiewka ludzi: dzien").items():
+        rd = run_day(d, start)
+        m = re.search(r"\(w tym zalogi (\d+) za (\d+)", s)
+        if m and 1 <= rd <= until:
+            cur[rd] = (int(m.group(1)), int(m.group(2)))
+    har = {}   # E8/Z: uprzaz ponad zapas sprzedana przez zalogi (sztuki dokladnie; zloto - udzial zalog w sztukach x zloto calej sprzedazy uprzezy)
+    for d, s in by_day(lines, E8_Z_LINE).items():
+        m = re.search(r"uprzaz ponad zapas \[(?:WL|wyl)\]: sprzedana (\d+) szt\. za (\d+) zl \(w tym zalogi (\d+) szt\.", s)
+        if m and int(m.group(1)) > 0:
+            har[run_day(d, start)] = (int(m.group(3)), int(m.group(2)) * int(m.group(3)) / int(m.group(1)))
+    rule2 = (f"sztuki i utarg zalog w pelnych tygodniach okna w +-{100 * E8_O5_BAND:.0f}% Z33 w tych samych dobach (bez uprzezy E8/Z; wiaze od {E8_O5_MIN_WEEKS} pelnych "
+             "tygodni przy kluczu [WL]). Wzor Z33 jest sprzed etapow 5-8 (ceny E8/C, naprawy E8/W, lup E8/L tez zmieniaja nadwyzki) - poza pasmem przy "
+             "czystych O5-0 i O5-4 rozstrzyga bieg kontrolny z kluczem wylaczonym. Doba 1 kampanii liczona do 1. tygodnia: po godzinach czesc zalog "
+             "sprzedaje juz przed pierwszym taktem doby, w Z33 (kolejka w takcie doby) doba 1 to zero")
+    last_rd = min(max(cur) if cur else 0, until, len(E8_O5_Z33_PCS))
+    weeks = max(0, (last_rd - 1) // 7)
+    if weeks >= 1:
+        # doby kampanii tygodnia k (1..): 2 + 7(k-1) .. 1 + 7k. Recenzja E8/O5: 1. tydzien bierze tez dobe 1 - po godzinach ok. 26 ze 168 terminow tygodnia
+        # (24 godziny doby 1 i dwie nadrabiane przy starcie sesji) wypada przed pierwszym taktem doby, a kolejka w takcie doby (Z33, klucz wylaczony)
+        # rusza od doby 2 (wzor ma w dobie 1 zero). Bez doby 1 pierwsza sprzedaz tych zalog wypadala z porownania (ok. -3% sztuk przy pasmie +-15%)
+        def wk(k):
+            return range(1 if k == 1 else 2 + 7 * (k - 1), 2 + 7 * k)
+
+        rows = []
+        for k in range(1, weeks + 1):
+            cp = sum(cur.get(rd, (0, 0))[0] for rd in wk(k)); cg = sum(cur.get(rd, (0, 0))[1] for rd in wk(k))
+            hp = sum(har.get(rd, (0, 0.0))[0] for rd in wk(k)); hg = sum(har.get(rd, (0, 0.0))[1] for rd in wk(k))
+            zp = sum(E8_O5_Z33_PCS[rd - 1] for rd in wk(k)); zg = sum(E8_O5_Z33_GOLD[rd - 1] for rd in wk(k))
+            rows.append((cp - hp, cg - hg, zp, zg, hp, hg))
+
+        def ratio(sel, i):
+            a, z = sum(r[i] for r in sel), sum(r[i + 2] for r in sel)
+            return (a / z) if z > 0 else None
+
+        rp, rg = ratio(rows, 0), ratio(rows, 1)
+        span_on = {run_day(d, start) for d in on}
+        span_all = {run_day(d, start) for d in days}
+        key_off = sorted(rd for rd in range(1, 2 + 7 * weeks) if rd in span_all and rd not in span_on)
+        wr = [r[0] / r[2] for r in rows if r[2] > 0]
+        d1 = cur.get(1, (0, 0))
+        txt = (f"{weeks} pelnych tygodni (doby 1-{1 + 7 * weeks}, doba 1 w 1. tygodniu): sztuki {sum(r[0] for r in rows):.0f} wobec Z33 {sum(r[2] for r in rows)}"
+               + (f" (x{rp:.2f})" if rp is not None else "") + f", utarg {sum(r[1] for r in rows):.0f} zl wobec {sum(r[3] for r in rows)}"
+               + (f" (x{rg:.2f})" if rg is not None else "") + f"; w tym doba 1 (przed pierwszym taktem doby) {d1[0]} szt. / {d1[1]} zl"
+               + f"; odjeta uprzaz E8/Z zalog {sum(r[4] for r in rows):.0f} szt. / ok. {sum(r[5] for r in rows):.0f} zl")
+        if weeks > 4:
+            sp, sg = ratio(rows[4:], 0), ratio(rows[4:], 1)
+            txt += f"; tygodnie 5-{weeks}: sztuki " + (f"x{sp:.2f}" if sp is not None else "-") + ", utarg " + (f"x{sg:.2f}" if sg is not None else "-")
+        if wr:
+            txt += f"; pojedynczy tydzien sztuk od x{min(wr):.2f} do x{max(wr):.2f}"
+        if key_off:
+            txt += f"; klucz wylaczony w {len(key_off)} dobach tych tygodni"
+        binding = weeks >= E8_O5_MIN_WEEKS and not key_off and bool(on) and rp is not None and rg is not None
+        ok = (abs(rp - 1.0) <= E8_O5_BAND and abs(rg - 1.0) <= E8_O5_BAND) if binding else None
+        rep.add("O5-2: sprzedane sztuki i utarg zalog tygodniowo wobec Z33", txt, rule2, ok)
+    else:
+        rep.add("O5-2: sprzedane sztuki i utarg zalog tygodniowo wobec Z33",
+                "brak linii Sakiewka ludzi z segmentem 'w tym zalogi'" if not cur else f"okno siega doby {last_rd} - nie ma pelnego tygodnia", rule2, None)
+
+    # O5-3 (INFO): ksiega kas - utarg zalog schodzi z kas w pozycji "skup nadwyzek zbrojowni" (poza taktem doby), nie w "pozostale moduly ticku"
+    def flow(prefix, pat, head=None):
+        out = []
+        for d, s in by_day(lines, prefix).items():
+            if not (1 <= run_day(d, start) <= until):
+                continue
+            seg = s
+            if head is not None:
+                seg = next((p for p in s.split(" | ") if p.startswith(head)), "")
+            out.append(num(pat, seg, default=0))
+        return out
+
+    cz, cm = flow("Przeplywy osad (przyczyny): dzien", r"skup nadwyzek zbrojowni ([+-]?\d+)", "kasy zamkow:"), flow("Przeplywy osad (przyczyny): dzien", r"skup nadwyzek zbrojowni ([+-]?\d+)", "kasy miast:")
+    pz, pm = flow("Przeplywy osad (kasy zamkow): dzien", r"pozostale moduly ticku ([+-]?\d+)"), flow("Przeplywy osad (kasy miast): dzien", r"pozostale moduly ticku ([+-]?\d+)")
+    if cz or pz:
+        avg = lambda L: (sum(L) / len(L)) if L else 0.0
+        gd = [v[1] for v in cur.values()]
+        rep.add("O5-3: ksiega kas - skup nadwyzek zbrojowni (poza taktem doby) wobec pozostale moduly ticku (srednio na dobe)",
+                f"kasy zamkow: skup {avg(cz):+.0f}, pozostale moduly ticku {avg(pz):+.0f}; kasy miast: skup {avg(cm):+.0f}, pozostale moduly ticku {avg(pm):+.0f}; "
+                f"utarg zalog {avg(gd):.0f}/d",
+                "INFO - przy [WL] utarg zalog schodzi z kas w pozycji 'skup nadwyzek zbrojowni' (ta sama co nadwyzki lordow), nie w 'pozostale moduly ticku' "
+                "(Z33: zamki skup -2 i pozostale -255, miasta skup -12 180 i pozostale -1 536); to przelew kasa -> pan i sakiewka zalogi, reszta R bilansu swiata bez zmian", None)
+
+    # O5-4: potkniecia (licznik GarrisonArmory doby - takze A7 i ekran druzyny) i linie bledu
+    stum = tot(r"\| potkniecia (\d+)\.", days)
+    errs = sum(1 for s in lines if s.startswith("ERROR in GarrisonArmory."))
+    rep.add("O5-4: potkniecia zbrojowni zalog i linie bledu GarrisonArmory", f"potkniecia {stum} (suma dob okna), linii ERROR in GarrisonArmory.* w logu {errs}",
+            "0 i 0 (wyjatek jednej zalogi nie gasi kolejki - liczony)", stum == 0 and errs == 0)
+
+
+# ============================================================ ETAP 8 (E8/O6, paczka 270): zapis logu otwartym plikiem - blok etap8_o6
+E8_O6_LINE = "Log (E8/O6): dzien"
+E8_O6_CTL = "Log (E8/O6) wpis kontrolny drogi bledu"
+E8_O6_WRITE_MS = 20.0   # O6-1: czas zapisu logu na dobe przy kluczu [WL] (projekt etapu 8 v2 rozdz. 3 "E8/O6"; linia "Profil doby (E8/0)": "log zapis X ms / N linii")
+E8_O6_SAMPLE = re.compile(r"\| proba (\d)/(\d): plikow (\d+), bajtow wyslanych (\d+), w plikach (\d+), rozjazd (\d+) \(plikow z rozjazdem (\d+)\), "
+                          r"glowny plik linii wyslanych (\d+) \(z ta linia\)")
+
+
+def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O6 (270, projekt etapu 8 v2 rozdz. 3 "E8/O6" Test, regula R9, krytyka K2-5): linia doby "Log (E8/O6)" (Log.DailyO6 - dzien linii = dzien gry - 1),
+    wpisy "Log (E8/O6) wpis kontrolny drogi bledu" i "Profil doby (E8/0)". O6-0 linia w kazdej dobie okna, stan klucza; O6-1 "log zapis" <= 20 ms/dobe
+    srednio w dobach z kluczem [WL] bez zapisow stara droga; O6-2 proba 3 dob sesji - bajty wyslane do kazdego pliku = rozmiar pliku i numer linii doby
+    w glownym pliku = liczba linii wyslanych (narzedzie liczy linie w pliku logu); O6-3 wpisy kontrolne drogi Log.Error w pliku = wyslane, >= 1;
+    O6-4 zapisy stracone, potkniecia pisarza, linie bledu Log.DailyO6 0 i zapisy stara droga w dobach [WL] 0."""
+    allo = [s for s in lines if s.startswith(E8_O6_LINE)]
+    if not allo:
+        rep.add("E8/O6: linia Log (E8/O6)", "brak w logu", "jest od wgrania E8/O6", None)
+        return
+    ol = {d: s for d, s in by_day(lines, E8_O6_LINE).items() if 1 <= run_day(d, start) <= until}
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "LogKeepOpen [WL]" in ol[d]]
+    on_set = set(on)
+    off = [d for d in days if d not in on_set]
+    wr = max((num(r"pisarze otwarci (\d+)", ol[d], default=0) for d in days), default=0)
+    rep.add("O6-0: linia Log (E8/O6) w kazdej dobie okna; stan klucza",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; LogKeepOpen wl {len(on)} / wyl {len(off)} dob; najwiecej otwartych pisarzy {wr}",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    # O6-1: czas zapisu logu. Linia profilu "dzien D" i linia E8/O6 "dzien D" powstaja w tym samym takcie doby (okres od poprzedniego taktu)
+    prof = by_day(lines, E8_PROF)
+    wms, wn, wms_off, wms_mix = {}, {}, {}, {}
+    for d in days:
+        if d not in prof:
+            continue
+        v, n = fnum(r"\| log zapis ([0-9.]+) ms", prof[d]), num(r"\| log zapis [0-9.]+ ms / (\d+) linii", prof[d])
+        if v is None:
+            continue
+        if d in on_set and num(r"stara droga (\d+)", ol[d], default=0) == 0:
+            wms[d] = v
+            wn[d] = n or 0
+        elif d not in on_set:
+            wms_off[d] = v
+        else:
+            wms_mix[d] = v   # klucz [WL], ale czesc zapisow doby poszla stara droga (przelaczenie w trakcie doby albo potkniecie pisarza) - poza srednia, liczone w O6-4
+    rule1 = f"<= {E8_O6_WRITE_MS:.0f} ms/dobe srednio w dobach z kluczem [WL] (projekt rozdz. 3 \"E8/O6\"; bez linii Profil doby - INFO)"
+    if wms:
+        avg = sum(wms.values()) / len(wms)
+        dmax = max(wms, key=lambda d: wms[d])
+        tot_n = sum(wn.values())
+        txt = (f"srednio {avg:.1f} ms/dobe w {len(wms)} dobach, najwiecej {wms[dmax]:.1f} ms (d{run_day(dmax, start)}); zapisow srednio {tot_n / len(wms):.0f}/d"
+               + (f", {1000.0 * sum(wms.values()) / tot_n:.1f} us na zapis" if tot_n else ""))
+        if wms_off:
+            txt += f"; klucz wylaczony {len(wms_off)} dob: srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe"
+        if wms_mix:
+            txt += f"; poza srednia {len(wms_mix)} dob [WL] z zapisami stara droga (patrz O6-4): srednio {sum(wms_mix.values()) / len(wms_mix):.1f} ms/dobe"
+        rep.add("O6-1: czas zapisu logu przy kluczu [WL]", txt, rule1, avg <= E8_O6_WRITE_MS)
+    else:
+        # recenzja E8/O6: prawdziwy powod werdyktu INFO (bylo "klucz wylaczony w calym oknie" takze wtedy, gdy klucz byl wlaczony, a doby wypadly ze sredniej)
+        if not any(d in prof for d in days):
+            why = "brak linii Profil doby (E8/0) - Stage8ProfileLog wylaczony?"
+        elif not on:
+            why = "klucz LogKeepOpen wylaczony w calym oknie"
+        elif wms_mix:
+            why = (f"klucz [WL] w {len(on)} dobach, zadna nie wchodzi do sredniej: w {len(wms_mix)} byly zapisy stara droga (klucz przelaczany w trakcie doby "
+                   f"albo potkniecia pisarza - patrz O6-4; srednio {sum(wms_mix.values()) / len(wms_mix):.1f} ms/dobe)")
+        else:
+            why = f"klucz [WL] w {len(on)} dobach, zadna z nich nie ma linii Profil doby (E8/0) z czasem zapisu"
+        rep.add("O6-1: czas zapisu logu", why + (f"; przy wylaczonym kluczu srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe" if wms_off else ""), rule1, None)
+
+    # O6-2: proba 3 dob sesji (cala sesja, nie tylko okno): bajty i numer linii doby w glownym pliku
+    samp = [(s, E8_O6_SAMPLE.search(s)) for s in allo]
+    samp = [(s, m) for s, m in samp if m]
+    rule2 = ("rozjazd bajtow 0 i plikow z rozjazdem 0 w kazdej probie; numer linii doby w glownym pliku = liczba linii wyslanych "
+             "(R9 - tak samo przy kluczu wlaczonym i wylaczonym; bez prob w logu - INFO)")
+    if samp:
+        gap = sum(int(m.group(6)) for _, m in samp)
+        gapf = sum(int(m.group(7)) for _, m in samp)
+        last = samp[-1][1]
+        want = {int(m.group(8)) for _, m in samp}
+        pos, bad_pos, how = {}, [], ""
+        if logp and os.path.isfile(logp):
+            mark = (E8_O6_LINE).encode("utf-8")
+            with open(logp, "rb") as f:
+                for i, ln in enumerate(f, 1):
+                    if mark in ln and b"glowny plik linii wyslanych " in ln:
+                        k = num(r"glowny plik linii wyslanych (\d+)", ln.decode("utf-8", errors="replace"))
+                        if k is not None:
+                            pos[k] = i
+            bad_pos = sorted(k for k in want if pos.get(k) != k)
+            how = (f"; numer linii w pliku zgodny w {len(want) - len(bad_pos)} z {len(want)} prob"
+                   + (f" (niezgodne: " + ", ".join(f"wyslanych {k} / linia {pos.get(k, '?')}" for k in bad_pos[:3]) + ")" if bad_pos else ""))
+        else:
+            how = "; numer linii w pliku - brak pliku logu (INFO)"
+        keys = "".join("W" if "LogKeepOpen [WL]" in s else "w" for s, _ in samp)
+        ctrl_ms = [fnum(r"sprawdzenie ([0-9.]+) ms", s, 0.0) for s, _ in samp]
+        worst = [s.split("[najwiekszy rozjazd: ", 1)[1].rstrip("]") for s, _ in samp if "[najwiekszy rozjazd: " in s]
+        rep.add("O6-2: proba 3 dob - wyslane do plikow wobec plikow (bajty wszystkich plikow, linie glownego)",
+                f"prob {len(samp)} z {last.group(2)} (klucz w probach: {keys}; W = wlaczony); ostatnia: plikow {last.group(3)}, bajtow wyslanych {last.group(4)} / "
+                f"w plikach {last.group(5)}; rozjazd bajtow lacznie {gap}, plikow z rozjazdem {gapf}" + how
+                + (f"; najwiekszy: {worst[0]}" if worst else "") + f"; koszt sprawdzenia najwiecej {max(ctrl_ms):.2f} ms",
+                rule2, gap == 0 and gapf == 0 and not bad_pos)
+    else:
+        rep.add("O6-2: proba 3 dob - wyslane do plikow wobec plikow", "brak linii z proba (sesja bez pierwszych trzech taktow doby w logu?)", rule2, None)
+
+    # O6-3: wpisy kontrolne drogi Log.Error (K2-5) - sa w pliku logu, bo narzedzie czyta je z pliku
+    n_ctl = sum(1 for s in lines if s.startswith(E8_O6_CTL))
+    tried = max((num(r"wpisow kontrolnych drogi bledu (\d+)", s, default=0) for s in allo), default=0)
+    key3 = [s for s, _ in samp]
+    rep.add("O6-3: wpisy kontrolne drogi Log.Error w pliku logu",
+            f"w pliku {n_ctl}, wyslanych {tried}" + (f"; klucz [WL] w {sum(1 for s in key3 if 'LogKeepOpen [WL]' in s)} z {len(key3)} prob" if key3 else ""),
+            "w pliku = wyslanych i >= 1 (wpis idzie droga Log.Error - plik glowny, ten sam pisarz; bez slow 'ERROR in', zeby T0 go nie liczyl)",
+            (n_ctl == tried and tried >= 1) if (tried or n_ctl) else None)
+
+    # O6-4: zapisy stracone i potkniecia pisarza (liczniki sesji - ostatnia linia), zapisy stara droga w dobach [WL], linie bledu
+    lost = num(r"straconych (\d+)", allo[-1], default=0)
+    stum = num(r"potkniecia pisarza (\d+)", allo[-1], default=0)
+    old_on = sum(num(r"stara droga (\d+)", ol[d], default=0) for d in on)
+    errs = sum(1 for s in lines if s.startswith("ERROR in Log.DailyO6"))
+    first = allo[-1].split("[pierwsze: ", 1)[1].split("]", 1)[0] if "[pierwsze: " in allo[-1] else ""
+    opened, closed = num(r"od startu sesji otwarc (\d+)", allo[-1], default=0), num(r"zamkniec (\d+)\)", allo[-1], default=0)
+    rep.add("O6-4: zapisy stracone, potkniecia pisarza, zapisy stara droga przy [WL], linie bledu Log.DailyO6",
+            f"{lost} / {stum} / {old_on} / {errs}" + (f" (pierwsze potkniecie: {first})" if first else "") + f"; od startu sesji otwarc pisarzy {opened}, zamkniec {closed}",
+            "0 / 0 / 0 / 0 (blad pisarza = potkniecie, linia idzie stara droga - liczony, bez wylacznika na sesje)",
+            lost == 0 and stum == 0 and old_on == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -13169,6 +13510,8 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_o1)   # E8/O1 (265): pamiec polki po wlasnym zdjeciu sztuki (poprawka zamiast przebudowy), delegaty DTE/BK zamiast Invoke
     blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii i zakazanych, mnoznik polki raz na koszyk
     blocks.append(etap8_o3)   # E8/O3 (267): wywoz kupcow - cele w zasiegu z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku
+    blocks.append(etap8_o5)   # E8/O5 (269): nadwyzki zalog po godzinach - maks. taktu doby, sztuki i utarg zalog tygodniowo wobec Z33, ksiega kas
+    blocks.append(etap8_o6)   # E8/O6 (270): zapis logu otwartym plikiem - czas zapisu, proba 3 dob (bajty i linie), wpis kontrolny drogi bledu
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

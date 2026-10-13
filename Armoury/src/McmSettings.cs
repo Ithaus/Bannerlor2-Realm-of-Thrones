@@ -4328,6 +4328,10 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Log Keep Open", HintText = "keep the log files open while the game runs instead of opening and closing a file for every line - the same lines, each written out at once (nothing is lost if the game crashes), and the log can still be read during play; saves a little time every day. Off: a file is opened and closed for every line, as before")]
+        [SettingPropertyGroup("Grateful villages")]
+        public bool LogKeepOpen { get; set; } = true;
+
         [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175Measure { get; set; } = true;
@@ -4491,6 +4495,10 @@ namespace Armoury
         [SettingPropertyBool("Garrison Sells Surplus", HintText = "once a week a garrison sells the arms it holds beyond what its men can use and wear (and a tenth spare; men out on patrol count) to the stall of its own town or castle, at the merchant's buying price; a third of the coin goes to the lord of the place, the rest to the garrison's purse (without garrison purses all of it to the lord); your garrisons too when they keep a purse or with Garrison Buys Gear Player")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonSellsSurplus { get; set; } = true;
+
+        [SettingPropertyBool("Garrison Sell Hourly", HintText = "garrisons take their weekly turn at selling spare arms one or two at a time through the hours of the week, instead of some thirty garrisons all at once at the turn of every day - the same rule and one turn a week for each garrison as before, without that short freeze once a day. Off: all at the turn of the day, as before")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonSellHourly { get; set; } = true;
 
         [SettingPropertyBool("Garrison Drill Needs Arms", HintText = "a garrison's daily drill (training fields, drills) teaches only the men who have a weapon of their kind and grade in the armoury - the experience is scaled by the share of armed men (AI garrisons; yours when they keep a purse or with Garrison Buys Gear Player; only while AI lords and garrisons buy their gear)")]
         [SettingPropertyGroup("Arming the garrisons")]
@@ -6273,6 +6281,7 @@ namespace Armoury
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
+            s.LogKeepOpen = LogKeepOpen;
             s.Army175Measure = Army175Measure;
             s.NorthHomeEdgePercent = NorthHomeEdgePercent;
             s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;
@@ -6314,6 +6323,7 @@ namespace Armoury
             s.GarrisonArmoryRestoreOldSave = GarrisonArmoryRestoreOldSave;
             s.KitMovesWithMen = KitMovesWithMen;
             s.GarrisonSellsSurplus = GarrisonSellsSurplus;
+            s.GarrisonSellHourly = GarrisonSellHourly;
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;

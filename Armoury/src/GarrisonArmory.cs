@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace Armoury
 {
@@ -49,6 +50,7 @@ namespace Armoury
             _loaded = false; _restored = false; _pending = null;
             ClearDay(); _stumbles = 0; _errDay = -1; _errWhere.Clear();
             _patrols = null; _patrolsDay = -1;
+            _hLast = -1; ClearO5();   // E8/O5 (269): kolejka po godzinach rusza od biezacej godziny, liczniki linii od zera
         }
 
         private static int _dKeptLeaderless;   // recenzja 171: partie lordow bez wodza / rozwiazywane, ktorych zbrojowni DTE nie skasowal (wywolania GC - raz na partie na dobe)
@@ -478,9 +480,14 @@ namespace Armoury
         internal static void Daily()
         {
             int today = (int)CampaignTime.Now.ToDays;
-            long tc = Cost174.Begin(Cost174.SGarrison);   // 174b.5 F6 (tylko log)
-            try { SellWeek(today); } catch (Exception e) { Stumble("SellWeek", e); }
+            // E8/O5 (269): przy GarrisonSellHourly kolejke nadwyzek obsluguje Hourly (kazda zaloga w swojej godzinie tygodnia) - w takcie doby zostaja same
+            // linie; klucz wylaczony = kolejka w takcie doby jak dotad (te same wywolania)
+            bool hourly = SellHourly;
+            long tc = hourly ? 0L : Cost174.Begin(Cost174.SGarrison);   // 174b.5 F6 (tylko log)
+            long o0 = hourly ? 0L : Stopwatch.GetTimestamp(); int oq = _dQueue;
+            try { if (!hourly) SellWeek(today); } catch (Exception e) { Stumble("SellWeek", e); }
             finally { Cost174.End(Cost174.SGarrison, tc); }
+            if (!hourly) { _oTickTicks += Stopwatch.GetTimestamp() - o0; _oTickQueue += _dQueue - oq; }
             var s = Settings.Current;
             int moves = _dLeftMen + _dTakenMen + _dDisbandIn + _dDisbandGone + _dQueue + _stumbles + _dScrToMen + _dScrFromMen + _dScrToPartyMen + _dScrFromPartyMen + _dNewPartyMen;
             if (moves > 0 || (s != null && (s.KitMovesWithMen || s.GarrisonSellsSurplus)))
@@ -493,10 +500,16 @@ namespace Armoury
                          + _dDisbandGone + " (komplety z ludzmi " + _dDisbandGoneKit + " szt., tabor sprzedany " + _dDisbandSold + " szt. za " + _dDisbandGold + " zl); nadwyzki zalog: sprzedalo "
                          + _dSoldGarrisons + " z " + _dQueue + " zalog w kolejce, " + _dSoldPcs + " szt. za " + _dSoldGold + " zl (kasy osad -> trzecia panom, reszta sakiewkom zalog; w tym ludzie na patrolach BK policzeni "
                          + _dPatrolCounted + " zalogi); partie lordow bez wodza albo rozwiazywane - zbrojownia zachowana " + _dKeptLeaderless + "; potkniecia " + _stumbles + ".");
+            try { LineO5(today, hourly); } catch (Exception e) { Stumble("LineO5", e); }   // E8/O5: linia "Nadwyzki zalog po godzinach (E8/O5)" - przed zerowaniem licznikow doby
             ClearDay(); _stumbles = 0;
         }
 
-        private static void SellWeek(int today)
+        private static void SellWeek(int today) { SellQueue(today, false, 0, 0); }
+
+        /// <summary>Kolejka nadwyzek zalog (C10, sklad7). W takcie doby (hourly false): zalogi z Id % 7 == dzien % 7. E8/O5 (269), po godzinach (hourly true):
+        /// zalogi, ktorych termin Id % 168 wypada w godzinach gry hFrom..hNow (GarrisonHours.Due; zwykle jedna godzina). Ta sama petla, te same warunki
+        /// i ta sama sprzedaz - rozni sie tylko wybor zalog i wiek mapy patroli BK.</summary>
+        private static void SellQueue(int today, bool hourly, int hFrom, int hNow)
         {
             var s = Settings.Current;
             if (s == null || !s.GarrisonSellsSurplus || !AiGear.On || AiGear.Armories() == null) return;
@@ -505,7 +518,10 @@ namespace Armoury
             {
                 if (st == null || !st.IsFortification || st.Town == null) continue;
                 var g = st.Town.GarrisonParty;
-                if (g == null || (int)(g.Id.InternalValue % 7) != today % 7) continue;   // kazda zaloga raz na 7 dob (jak DTE GarbageCollectEquipments)
+                if (g == null) continue;
+                // kazda zaloga raz na 7 dob (jak DTE GarbageCollectEquipments); E8/O5: po godzinach - raz na 168 godzin gry, w swojej godzinie
+                if (hourly ? !GarrisonHours.Due(g.Id.InternalValue, hFrom, hNow) : (int)(g.Id.InternalValue % 7) != today % 7) continue;
+                if (hourly) _oDue++;
                 try
                 {
                     if (!InSystem(st)) continue;   // sklad7: zaloga gracza w systemie, gdy ma sakiewke (K1) albo GarrisonBuysGearPlayer
@@ -517,9 +533,11 @@ namespace Armoury
                     var arm = ArmoryOf(g);
                     if (arm == null || arm.Count == 0) continue;
                     _dQueue++;
+                    long o1 = hourly ? Stopwatch.GetTimestamp() : 0L;   // E8/O5: czas jednej zalogi (tylko linia)
                     // ludzie zalogi na patrolu BK - sprzet zostal w twierdzy (GarrisonPartyComponent.CreateParty), nie sprzedajemy go
                     TroopRoster roster = g.MemberRoster;
-                    if (patrols == null) patrols = PatrolsToday();
+                    // E8/O5: po godzinach mapa patroli z tej godziny (pamiec dobowa bylaby do doby stara - w takcie doby jest z tej samej chwili)
+                    if (patrols == null) patrols = hourly ? Patrols() : PatrolsToday();
                     List<MobileParty> pl;
                     if (patrols.TryGetValue(st, out pl) && pl.Count > 0)
                     {
@@ -536,10 +554,91 @@ namespace Armoury
                     // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa (raz na tydzien na zaloge - kolejka C10)
                     if (sold > 0 && mine)
                         Log.Player("Your garrison of " + st.Name + " sold " + sold + " spare pieces of kit for " + gold + " denars; your third: " + Math.Max(0, Hero.MainHero.Gold - before) + ".");
+                    if (o1 != 0) NoteOne(st, Stopwatch.GetTimestamp() - o1);
                 }
                 // poprawki sklad7: jedno miejsce w logu na dobe (dotad osobno dla kazdej zalogi, a MenPurse.SellGarrisonSurplus logowal jeszcze raz sam) - reszta w liczniku potkniec
                 catch (Exception e) { Stumble("SellWeek(zaloga)", e); }
             }
+        }
+
+        // ------------------------------------------------------------ E8/O5 (269, PLAN 8.17; RD8 K7 / O7): nadwyzki zalog po godzinach
+        // Kolejka C10 obslugiwala w takcie doby ok. 32 zalogi naraz (Id % 7): 0.02-0.75 s w jednej klatce co dobe (Z33: srednio 103 ms). Teraz kazda zaloga
+        // ma termin raz na 168 godzin gry (Id % 168) i sprzedaje w swojej godzinie - srednio 1-2 zalogi na godzine. Ta sama petla i ta sama sprzedaz
+        // (SellQueue -> MenPurse.SellGarrisonSurplus); zmienia sie chwila: stan polki i kasy osady jest z tej godziny, nie z taktu doby zaraz po zaworach kas
+        // (PopulationLaw.Daily, CastlePurse.Daily) i przed wywozem kupcow - dlatego prog wzgledny O5-2, a nie regula R9 "te same liczby".
+        // Ksiega kas: zmiana kasy osady poza taktem doby idzie przez MoneyLedger.Note169 (pozycja "skup nadwyzek zbrojowni", ta sama co nadwyzki lordow)
+        // zamiast przez migawke "pozostale moduly ticku"; zloto swiata bez zmian (kasa osady -> pan i sakiewka zalogi), wiec reszta R bilansu tez.
+        // Terminy i zakres godzin: GarrisonHours.cs (numer godziny moze sie powtorzyc albo przeskoczyc - obslugiwany jest zakres od ostatniej godziny).
+        // Bez zapisu: po wczytaniu kolejka rusza od biezacej godziny (i dwoch poprzednich). Klucz GarrisonSellHourly czytany co godzine i w takcie doby.
+        private static int _hLast = -1;   // ostatnia obsluzona godzina gry; -1 = poczatek sesji albo klucz wylaczony
+        // liczniki linii "Nadwyzki zalog po godzinach (E8/O5)" - od poprzedniej linii (takt doby)
+        private static int _oHours, _oBusy, _oDue, _oCatch, _oRepeat, _oMostInHour, _oMaxHourQueue, _oTickQueue;
+        private static long _oTicks, _oMaxHour, _oMaxOne, _oTickTicks;
+        private static string _oMaxOneName;
+
+        internal static bool SellHourly { get { var s = Settings.Current; return s != null && s.GarrisonSellHourly; } }
+
+        private static void ClearO5()
+        {
+            _oHours = _oBusy = _oDue = _oCatch = _oRepeat = _oMostInHour = _oMaxHourQueue = _oTickQueue = 0;
+            _oTicks = _oMaxHour = _oMaxOne = _oTickTicks = 0; _oMaxOneName = null;
+        }
+
+        private static void NoteOne(Settlement st, long ticks)
+        {
+            if (ticks <= _oMaxOne) return;
+            _oMaxOne = ticks;
+            try { _oMaxOneName = st != null && st.Name != null ? st.Name.ToString() : null; } catch { _oMaxOneName = null; }
+        }
+
+        /// <summary>
+        /// E8/O5 (269): sluchacz HourlyTickEvent (ArmouryBehavior.RegisterEvents) - zalogi, ktorych termin tygodnia wypada w tej godzinie gry (i w godzinach
+        /// nadrabianych - GarrisonHours.Range). Klucz wylaczony: nic (kolejka w takcie doby jak dotad), a po ponownym wlaczeniu kolejka rusza od biezacej
+        /// godziny, bez nadrabiania wstecz (inaczej cala kolejka tygodnia spadlaby na jedna godzine). Wyjatek jednej zalogi liczy Stumble w petli (kolejka
+        /// idzie dalej), wyjatek calej godziny - potkniecie i nastepna godzina normalnie. Czas: pelny pomiar do Cost174 (pozycja GarrisonArmory).
+        /// </summary>
+        internal static void Hourly()
+        {
+            if (!SellHourly) { _hLast = -1; return; }
+            int now = (int)CampaignTime.Now.ToHours;
+            _oHours++;
+            int from, caught;
+            if (!GarrisonHours.Range(_hLast, now, out from, out caught)) { _oRepeat++; return; }
+            _oCatch += caught;
+            _hLast = now;
+            int q0 = _dQueue;
+            long t0 = Stopwatch.GetTimestamp();
+            try { SellQueue(0, true, from, now); } catch (Exception e) { Stumble("SellHour", e); }
+            long dt = Stopwatch.GetTimestamp() - t0;
+            Cost174.AddExact(Cost174.SGarrison, dt);   // 174b.5 F6 (tylko log) - pelny pomiar zamiast probki 1/16
+            int q = _dQueue - q0;
+            _oTicks += dt;
+            if (q > 0) _oBusy++;
+            if (q > _oMostInHour) _oMostInHour = q;
+            if (dt > _oMaxHour) { _oMaxHour = dt; _oMaxHourQueue = q; }
+        }
+
+        /// <summary>
+        /// E8/O5: linia doby "Nadwyzki zalog po godzinach (E8/O5)" (sam log) - z Daily, przed zerowaniem licznikow doby; za okres od poprzedniego taktu doby,
+        /// dzien ksiegi = dzien gry - 1 (jak "Pieniadz swiata"). Przy wylaczonym kluczu segment "w takcie doby" to kolejka tego taktu.
+        /// </summary>
+        private static void LineO5(int today, bool hourly)
+        {
+            var s = Settings.Current;
+            if (s == null) { ClearO5(); return; }
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            double f = 1000.0 / Stopwatch.Frequency;
+            bool sells = s.GarrisonSellsSurplus && AiGear.On;
+            Log.Info("Nadwyzki zalog po godzinach (E8/O5): dzien " + (today - 1)
+                     + " | GarrisonSellHourly " + (hourly ? "[WL]" : "[wyl]") + (sells ? "" : " (sprzedaz nadwyzek zalog wylaczona: GarrisonSellsSurplus albo zakupy AI)")
+                     + " | po godzinach: godzin " + _oHours + " (z kolejka " + _oBusy + ", nadrobione numery godzin " + _oCatch + ", powtorzone " + _oRepeat
+                     + "), zalog w terminie " + _oDue + ", najwiecej w kolejce jednej godziny " + _oMostInHour
+                     + ", czas " + (_oTicks * f).ToString("0.0", inv) + " ms, najdluzsza godzina " + (_oMaxHour * f).ToString("0.0", inv) + " ms (zalog w kolejce " + _oMaxHourQueue
+                     + "), najdluzsza zaloga " + (_oMaxOne * f).ToString("0.0", inv) + " ms (" + (_oMaxOneName ?? "-") + ")"
+                     + " | w takcie doby: zalog w kolejce " + _oTickQueue + ", czas " + (_oTickTicks * f).ToString("0.0", inv) + " ms"
+                     + " | razem od poprzedniej linii: zalog w kolejce " + _dQueue + ", sprzedalo " + _dSoldGarrisons + ", " + _dSoldPcs + " szt. za " + _dSoldGold + " zl"
+                     + " | potkniecia " + _stumbles + ".");
+            ClearO5();
         }
 
         /// <summary>E6/N1 (217): roster do dopasowania "co nosza ludzie" partii AI - zaloga razem z ludzmi jej patroli BK (jak sprzedaz nadwyzek SellWeek;

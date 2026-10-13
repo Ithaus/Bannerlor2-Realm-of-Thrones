@@ -729,6 +729,10 @@ namespace Armoury
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
+            // E8/O5 (269): nadwyzki zalog po godzinach - kazda zaloga w swojej godzinie tygodnia (Id % 168) zamiast ok. 32 zalog w takcie doby; wylacznik GarrisonSellHourly
+            // na zywo (wylaczony = sluchacz nic nie robi, kolejka w GarrisonArmory.Daily jak dotad). Rejestracja PRZED ArmoryFit.HourlyOnce = wolanie PO nim (gra dopisuje
+            // sluchacza na poczatek listy - MbEvent): przeglad zbrojowni pierwszej godziny sesji widzi stan sprzed sprzedazy, jak dotad
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("GarrisonArmory.Hourly", delegate { try { GarrisonArmory.Hourly(); } catch (Exception e) { Log.Error("GarrisonArmory.Hourly", e); } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmoryFit.HourlyOnce", delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } }));
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled
@@ -1700,6 +1704,7 @@ namespace Armoury
             try { ShelfBuy.Daily(); } catch (Exception e) { Log.Error("ShelfBuy.Daily", e); } DayProfile.Lap("ShelfBuy.Daily");   // ceny hurtu (Jeff 09.10 08:00): linia "Ceny hurtu (09.10)" - pomiar petli po sztukach i doplata (tylko log)
             try { ShelfIndex.DailyOwn(); } catch (Exception e) { Log.Error("ShelfIndex.DailyOwn", e); } DayProfile.Lap("ShelfIndex.DailyOwn");   // E8/O1 (265): linia "Polka i delegaty (E8/O1)" - pamiec polki po wlasnej zmianie, delegaty DTE/BK (tylko log)
             try { WorkshopLaw.DailyFast(); } catch (Exception e) { Log.Error("WorkshopLaw.DailyFast", e); } DayProfile.Lap("WorkshopLaw.DailyFast");   // E8/O2 (266): linia "Warsztaty bez powtorzen (E8/O2)" - pamieci i klucze warsztatow, probka stara / nowa droga (tylko log)
+            try { Log.DailyO6((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Log.DailyO6", e); } DayProfile.Lap("Log.DailyO6");   // E8/O6 (270): linia "Log (E8/O6)" - pisarze logu, zapisy stracone, proba 3 dob: linie wyslane wobec linii w plikach (tylko log)
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
             try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)

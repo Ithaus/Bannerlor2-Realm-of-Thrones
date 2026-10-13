@@ -45,6 +45,14 @@ namespace Armoury
             return d;
         }
         internal static void NotePriceArms() { _priceArms++; }
+        /// <summary>E8/O5 (269): pelny pomiar jednego wywolania, bez probki 1/16 - dla pozycji wolanej raz na godzine z nierowna praca (kolejka nadwyzek
+        /// zalog po godzinach: probka co 16. godzine trafialaby co tydzien w te same zalogi). Wywolanie i probka +1, wiec mnoznik pozycji zostaje 1.</summary>
+        internal static void AddExact(int s, long ticks)
+        {
+            if (ticks < 0) ticks = 0;
+            _calls[s]++; _sampled[s]++; _ticks[s] += ticks;
+            if (ticks > _max[s]) _max[s] = ticks;
+        }
 
         // E8/0 (242): odczyt dla linii "Profil doby (E8/0)" - PRZED Daily (ten sam okres, Daily zeruje)
         internal static double MsOf(int s) { return Ms(s); }
