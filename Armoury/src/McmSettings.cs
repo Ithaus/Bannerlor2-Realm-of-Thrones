@@ -3384,9 +3384,13 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int BudgetHysteresisDays { get; set; } = 3;
 
-        [SettingPropertyFloatingInteger("Release Per Day", 0.00f, 1.00f, "0.00", HintText = "share of the excess wages sent home each day (as men, lowest first)")]
+        [SettingPropertyFloatingInteger("Release Per Day", 0.00f, 1.00f, "0.00", HintText = "share of the excess wages sent home each day (as men; who goes first is set by Release Across Tiers)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float ReleasePerDay { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Release Across Tiers", HintText = "men sent home for lack of budget are drawn evenly from the whole party or garrison (every man has the same chance), not lowest tier first - for the same wages fewer men leave, and a poor house keeps more heads instead of a few veterans; tavern mercenaries still go first. Off = lowest tier first, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool ReleaseAcrossTiers { get; set; } = true;
 
         [SettingPropertyInteger("Min New Party Men", 0, 120, "0", HintText = "a house raises a new party only when its ceiling has room for this many more men (a house with no party at all may always raise one)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -3488,6 +3492,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercGameContractAiOff { get; set; } = true;
 
+        [SettingPropertyBool("Merc Contract Pays Men Under Arms", HintText = "with Merc Contract Enabled: each day the crown pays a hired company Merc Contract Factor times the wages of the men it really has under arms that day, never more than its contract (half of it in peace). The contract still sets how far the company may grow, so a company signed after a defeat fills its ranks from its own purse and is paid for the new men from the next day; a company with no men in the field is paid nothing. Off = the full contract every day whatever the company's strength, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercContractPaysMenUnderArms { get; set; } = true;
+
+        [SettingPropertyBool("Merc Bk Down Payment Ai Off", HintText = "with Merc Contract Enabled: an AI mercenary company no longer takes BannerKings' earnest-money out of the hiring king's own purse each time it changes its master - the crown's daily contract is its one pay for the service (companies changed masters every few days and drained the purses of the small kings). You still get your earnest-money when you hire out as a mercenary; when you are the king, you pay none to an AI company. Off = BannerKings pays the earnest-money, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercBkDownPaymentAiOff { get; set; } = true;
+
         [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
@@ -3576,9 +3588,17 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Contact Only When Called", HintText = "with Crown Rent War Day Needs Contact: a day of war binds a realm to service only when the realm is truly called to it - an army of the realm is in the field, the realm besieges or is besieged, or one of its own settlements is raided, pressed or attacked that day. A battle in the open field and the raids of its own lone lords on enemy villages no longer bind the whole realm, so a war fought only by a few raiding houses asks no service of the rest. Off = any raid, pressing, assault or battle between lords of the two realms binds both realms, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentContactOnlyWhenCalled { get; set; } = true;
+
         [SettingPropertyBool("Crown Rent Service After Full Days", HintText = "the crown asks a house for service only once that house has seen as many days of real war under this crown as the crown asks days of service (Crown Rent Service Days); before that every house that keeps its garrisons draws its rent - a short clash at the start of a quiet war no longer strips the rent from every house that missed it (off = service is asked from the first day of real war, as before)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentServiceAfterFullDays { get; set; } = true;
+
+        [SettingPropertyBool("Crown Rent Service At Means", HintText = "a house whose wage ceiling cannot pay for parties big enough to be called to an army (the game calls only parties above 60% of their size) serves the crown with what it has: its days of war count as served and the crown does not ask it for more, so it keeps its rent and can raise men again; once it can afford such a party the usual service is asked. Needs Clan Budget Enabled; you are never judged this way. Off = every house must serve its days, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentServiceAtMeans { get; set; } = true;
 
         [SettingPropertyBool("Crown Rent Held To Serving", HintText = "the rent share of a house that does not serve (garrison or service days) goes to the houses of the same realm that do, by the same fief weights, instead of staying in the treasury; if no house of the realm serves, it stays in the treasury. Off = it stays in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -3587,6 +3607,10 @@ namespace Armoury
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
+
+        [SettingPropertyBool("Call To War Break Restores Wallet", HintText = "with Crown Pays Call To War: when a crown can no longer pay a day's part and the agreement is broken, the unpaid rest of the price is struck off the calling realm's call-to-war purse at once - nobody owes it and nobody is paid it. Before, the rest came back the next day as an 'old debt' and the treasury paid it off into nothing, a day's part at a time. A debt from before the mod is looked for only once, after loading a save made without this rule. Off = as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarBreakRestoresWallet { get; set; } = true;
 
         [SettingPropertyBool("Crown Borrows", HintText = "with Crown Current Income and Iron Bank Enabled: a crown at war whose day's income cannot cover the wage refunds it owes its houses borrows the missing part from the Iron Bank - only for the refunds, never for gifts or rents; no new loans in peace. The crown owes at most Crown Loan Limit Days of its average taxes and pays the Bank first each day, before any other expense: one part in Crown Loan Repay Days of its largest debt, at most Crown Loan Max Income Share of its taxes, at the Bank's usual interest (like a king: 20% a year, 30% on a running debt, 2% fee). A crown that pays less than half of its instalments over 28 days falls into arrears: the Bank lends nothing more to it or to its houses and lends more to the houses of the realms at war with it, until it has paid in full for 28 days. The debt of a realm that is destroyed is lost to the Bank. You as king borrow by the same rule. Off = no crown borrows, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -6070,6 +6094,7 @@ namespace Armoury
             s.BudgetHysteresis = BudgetHysteresis;
             s.BudgetHysteresisDays = BudgetHysteresisDays;
             s.ReleasePerDay = ReleasePerDay;
+            s.ReleaseAcrossTiers = ReleaseAcrossTiers;
             s.MinNewPartyMen = MinNewPartyMen;
             s.GarrisonPeaceShare = GarrisonPeaceShare;
             s.GarrisonWarFull = GarrisonWarFull;
@@ -6095,6 +6120,8 @@ namespace Armoury
             s.MercHireFloorShare = MercHireFloorShare;
             s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
             s.MercGameContractAiOff = MercGameContractAiOff;
+            s.MercContractPaysMenUnderArms = MercContractPaysMenUnderArms;
+            s.MercBkDownPaymentAiOff = MercBkDownPaymentAiOff;
             s.CrownGifts = CrownGifts;
             s.GiftWatchNorth = GiftWatchNorth;
             s.GiftWatchIronThrone = GiftWatchIronThrone;
@@ -6117,9 +6144,12 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownRentContactOnlyWhenCalled = CrownRentContactOnlyWhenCalled;
             s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
+            s.CrownRentServiceAtMeans = CrownRentServiceAtMeans;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
+            s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CrownBorrows = CrownBorrows;
             s.CrownLoanLimitDays = CrownLoanLimitDays;
             s.CrownLoanRepayDays = CrownLoanRepayDays;

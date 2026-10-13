@@ -31,6 +31,9 @@ namespace Armoury
     ///  - ZWOLNIENIA zamiast dezercji gry z limitu zoldu (AiWageLimitDesertionOff): zold > 1.10 x pulap przez 3 doby -> codziennie 15% nadwyzki ludzi:
     ///    najpierw zalogi ponad cel pokojowy (pokoj), potem najemnicy z karczmy, potem najnizszy tier. Ludzie do ludnosci BK najblizszej wsi rodu (zaloga -
     ///    wsi tej twierdzy), czesc sakiewki partii do kiesy tej wsi; bez wsi z danymi BK nikt nie jest zwalniany (nikt nie znika - Z6).
+    ///    P3/W2 (bieg roczny 364 doby, TRIAZ-3 O1-3; klucz ReleaseAcrossTiers): po najemnikach z karczmy NIE "najnizszy tier", tylko losowanie czlowieka z
+    ///    calej partii (kazdy ma rowna szanse, DrawAcross) - zwalniany kosztuje srednio tyle, co sredni czlowiek partii, wiec za ten sam zold odchodzi
+    ///    mniej glow. Ta sama regula dla partii i zalog. Klucz wylaczony = najnizszy tier najpierw (stan sprzed).
     ///  - Straz bez zoldu (182): pulap w ludziach = pulap zoldu / nominalny zold czlowieka; werbunek, nowe partie i przyrost zalog Strazy staja na nim.
     ///  - nowa partia rodu: nie, gdy wolne miejsce w pulapie partii < 30 ludzi x sredni zold (rod bez zadnej partii - tak).
     ///  - KIESA RODZINY: dorosly czlonek AI z kiesa ponad 5 000 dopelnia kiese glowy do max(5 000; koszt dnia rodu), sam nie schodzi ponizej 5 000.
@@ -82,6 +85,11 @@ namespace Armoury
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
+        // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
+        // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
+        private static readonly int[] _dRelTier = new int[3];
+        private static readonly long[] _dRelTierWage = new long[3];
+        private static int _dGarEatsCap, _dGarEatsCapEmpty;
         private static long _dRelPurseVet;  // E5/B6 (201): ich czesc sakiewki partii - do puli weteranow miasta karczmy (VetPurse.FromRelease)
         // E5/B6 (201): miasta karczm i ilu zwolnionych w nich stanelo w JEDNYM ReleaseFrom (zbierane w ToVillage tylko przy _relTavOn, czytane przy sakiewce)
         private static readonly List<KeyValuePair<Settlement, int>> _relTav = new List<KeyValuePair<Settlement, int>>();
@@ -133,6 +141,8 @@ namespace Armoury
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dRelTavern = 0; _dRelPurseVet = 0;
+            for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
+            _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
             _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
@@ -203,6 +213,49 @@ namespace Armoury
         internal static bool TryCap(Clan c, out double cap)
         {
             var b = Of(c); cap = b != null ? b.Cap : 0; return b != null;
+        }
+
+        /// <summary>P3/W1: budzet wlaczony, ale w tej sesji jeszcze nie policzony (pierwsza doba po wczytaniu albo po starcie kampanii - CrownRents.Daily
+        /// biegnie przed ClanBudget.Daily). Wtedy AtMeans nie ma na czym stanac i wolajacy trzyma stan z zapisu.</summary>
+        internal static bool Pending { get { return On && _day < 0; } }
+
+        /// <summary>P3/W1 (bieg roczny 364 doby, TRIAZ-3 O1-2 "Poprawka ostateczna" A) - ROD NA MIARE SRODKOW: zadna czynna druzyna rodu nie przekracza progu,
+        /// od ktorego gra wzywa do armii (ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy = 0.6 - ta sama liczba co w grze i w BK, bez
+        /// nowego parametru), a pulap partii z ostatniego budzetu (pulap minus zalogi i karawany) nie starcza na oplacenie druzyn do tego progu:
+        /// potrzeba = prog x suma limitow druzyn x zold na czlowieka (zold partii z rycerzami 179 / ludzie przy co najmniej 20 ludziach, inaczej srednia
+        /// gry); rod bez druzyny - MinNewPartyMen (30) x zold na czlowieka, ta sama liczba co regula "nowa partia" 166. Budzet z wczoraj (CrownRents.Daily
+        /// biegnie przed ClanBudget.Daily). false: rod bez budzetu (gracz, wylaczone 166, budzet jeszcze nie policzony), Straz bez zoldu, najemnik.
+        /// fillMax - najwyzsze wypelnienie druzyny rodu (-1 bez druzyny) - pomiar do CSV, liczony zawsze. Tylko odczyt.</summary>
+        internal static bool AtMeans(Clan c, out float fillMax)
+        {
+            fillMax = -1f;
+            try
+            {
+                var s = Settings.Current;
+                if (c == null || s == null || Campaign.Current == null) return false;
+                long limit = 0, men = 0, wage = 0; int parties = 0;
+                var wps = c.WarPartyComponents;
+                if (wps != null)
+                    for (int i = 0; i < wps.Count; i++)
+                    {
+                        var mp = wps[i] != null ? wps[i].MobileParty : null;
+                        if (mp == null || !mp.IsActive || !mp.IsLordParty || mp.Party == null) continue;
+                        float fill = mp.PartySizeRatio;
+                        if (fill > fillMax) fillMax = fill;
+                        parties++;
+                        limit += Math.Max(0, mp.Party.PartySizeLimit);
+                        men += mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+                        wage += Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
+                    }
+                var b = Of(c);
+                if (b == null || b.Zero || c.IsUnderMercenaryService) return false;
+                float gate = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
+                if (fillMax > gate) return false;                       // gra moze te druzyne wezwac - zwykly wymog sluzby
+                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage);
+                double need = parties > 0 ? (double)gate * limit * perMan : Math.Max(0, s.MinNewPartyMen) * perMan;
+                return b.PartyCap < need;
+            }
+            catch (Exception e) { Stumble("AtMeans", e); return false; }
         }
 
         internal static int AdultsOf(Clan c)
@@ -401,6 +454,8 @@ namespace Armoury
                         Garrisons(c, b, s);
                         b.PartyCap = Math.Max(0, b.Cap - (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) - b.WCar);
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
+                        // P3/W2 (pomiar): rod w wojnie, ktoremu zalogi i karawany zajely caly pulap - partie zwalniane do zera, kolejnosc zwolnien nic tu nie zmienia
+                        if (!b.Zero && !merc && b.War && b.PartyCap <= 0) { _dGarEatsCap++; if (b.MenPar <= 0) _dGarEatsCapEmpty++; }
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
                         CourtFull.Lapse(b, s, merc);   // E5/A2 (R8): przydzial przeterminowany dzis -> dwor (b.Lapsed; wlasny try, GearLeft bez zmian)
@@ -738,8 +793,36 @@ namespace Armoury
             }
         }
 
-        /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru; mercsOnly -
-        /// tylko najemnicy z karczmy. Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi (E5/B6: czesc ludzi w karczmie - do puli weteranow). Zwraca zwolnione (zl albo ludzi).</summary>
+        /// <summary>P3/W2 (TRIAZ-3 O1-3 "Poprawka ostateczna"): ilu ludzi z kazdego stosu odchodzi przy zwolnieniu za `amount` - LOSOWANIE CZLOWIEKA z calej
+        /// partii: kazdy czlowiek ma rowna szanse (stos z waga = liczba ludzi), bez zwracania, az zebrany zold >= amount. Ostatni czlowiek, gdy reszta jest
+        /// mniejsza niz jego zold, odchodzi z prawdopodobienstwem reszta / zold - srednio wychodzi dokladnie kwota (bez stalego nadmiaru z zaokraglen w gore
+        /// i bez zatoru przy malych kwotach dnia: mediana kwoty dnia rodu to 60 zl). Bez stanu - sam rachunek.</summary>
+        private static int[] DrawAcross(List<TroopRosterElement> stacks, TaleWorlds.CampaignSystem.ComponentInterfaces.PartyWageModel wageModel, double amount, bool menUnit)
+        {
+            int k = stacks.Count;
+            var take = new int[k]; var left = new int[k]; var w = new int[k];
+            int total = 0;
+            for (int i = 0; i < k; i++)
+            {
+                left[i] = Math.Max(0, stacks[i].Number); total += left[i];
+                w[i] = menUnit ? 1 : Math.Max(1, wageModel.GetCharacterWage(stacks[i].Character));
+            }
+            double done = 0;
+            while (done < amount && total > 0)
+            {
+                int x = MBRandom.RandomInt(total), i = 0;
+                while (i < k - 1 && x >= left[i]) { x -= left[i]; i++; }
+                if (left[i] <= 0) break;                                   // suma wag = total, wiec nie powinno sie zdarzyc
+                double rest = amount - done;
+                if (w[i] > rest) { if (MBRandom.RandomFloat < rest / w[i]) take[i]++; break; }   // ostatni czlowiek - z prawdopodobienstwem reszta / zold
+                take[i]++; left[i]--; total--; done += w[i];
+            }
+            return take;
+        }
+
+        /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru (P3/W2: przy
+        /// ReleaseAcrossTiers - losowo z calej partii, DrawAcross); mercsOnly - tylko najemnicy z karczmy (zawsze od najnizszego tieru).
+        /// Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi (E5/B6: czesc ludzi w karczmie - do puli weteranow). Zwraca zwolnione (zl albo ludzi).</summary>
         private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison)
         {
             var r = mp.MemberRoster;
@@ -759,15 +842,20 @@ namespace Armoury
             if (village == null) { _dNoVillage++; return 0; }   // bez wsi z danymi BK nikt nie odchodzi (nikt nie znika - Z6)
             int menBefore = r.TotalRegulars;
             double done = 0; int gone = 0;
+            // P3/W2: poza przebiegiem najemnikow z karczmy - liczby na stos z losowania czlowieka (take), potem to samo cialo petli co dotad (najwyzej jedno
+            // ToVillage na stos); klucz wylaczony albo najemnicy - take == null i stara petla "od najnizszego tieru az do kwoty"
+            var st0 = Settings.Current;
+            int[] take = !mercsOnly && st0 != null && st0.ReleaseAcrossTiers ? DrawAcross(stacks, wageModel, amount, menUnit) : null;
             _relTav.Clear(); _relTavOn = true;      // E5/B6 (201): ToVillage dopisuje miasta karczm tego zwolnienia
             try
             {
-                foreach (var el in stacks)
+                for (int si = 0; si < stacks.Count; si++)
                 {
-                    if (done >= amount) break;
+                    var el = stacks[si];
+                    if (take == null && done >= amount) break;
                     var ch = el.Character;
                     int w = menUnit ? 1 : Math.Max(1, wageModel.GetCharacterWage(ch));
-                    int n = (int)Math.Min(el.Number, Math.Ceiling((amount - done) / w));
+                    int n = take != null ? Math.Min(el.Number, take[si]) : (int)Math.Min(el.Number, Math.Ceiling((amount - done) / w));
                     if (n <= 0) continue;
                     int wounded = el.WoundedNumber > 0 ? Math.Min(el.WoundedNumber, (int)Math.Round(n * (double)el.WoundedNumber / el.Number)) : 0;
                     // E4/7: udzialy pochodzenia zwalnianych - tuz PRZED ToVillage (zdjecie z rosteru jest po nim - Take nie stoi miedzy zdjeciem a dopisaniem, U24)
@@ -776,6 +864,9 @@ namespace Armoury
                     if (!ToVillage(village, ch, n, PeopleBook.M166, org, mp)) { try { PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch { } _dNoVillage++; continue; }
                     r.AddToCounts(ch, -n, false, -wounded);
                     done += (double)n * w; gone += n;
+                    // P3/W2 (pomiar): tier zwalnianych i ich zold (zl dziennie - takze u Strazy bez zoldu, gdzie kwota jest w ludziach)
+                    int tb = ch.Tier <= 2 ? 0 : ch.Tier <= 4 ? 1 : 2;
+                    _dRelTier[tb] += n; _dRelTierWage[tb] += (long)n * Math.Max(1, wageModel.GetCharacterWage(ch));
                 }
             }
             finally { _relTavOn = false; }
@@ -1201,6 +1292,10 @@ namespace Armoury
               .Append(", z tego do karczmy (E4/10) ").Append(_dRelTavern)
               .Append(", nie zwolniono - brak wsi z danymi BK ").Append(_dNoVillage).Append(", sakiewki zwolnionych do kies wsi ").Append(_dRelPurse).Append(" zl")
               .Append(", do puli weteranow w karczmach (E5/B6) ").Append(_dRelPurseVet).Append(" zl")
+              .Append(" | P3/W2 zwolnieni wedlug tieru (ludzi / ich zold zl): t1-2 ").Append(_dRelTier[0]).Append(" / ").Append(_dRelTierWage[0])
+              .Append(", t3-4 ").Append(_dRelTier[1]).Append(" / ").Append(_dRelTierWage[1]).Append(", t5+ ").Append(_dRelTier[2]).Append(" / ").Append(_dRelTierWage[2])
+              .Append(s.ReleaseAcrossTiers ? " (Release Across Tiers: losowo z calej partii)" : " (Release Across Tiers wylaczone: najnizszy tier najpierw)")
+              .Append("; rody w wojnie, ktorym zalogi i karawany zajely caly pulap (na partie 0): ").Append(_dGarEatsCap).Append(", z tego bez ludzi w partiach ").Append(_dGarEatsCapEmpty)
               .Append(" | dezercja gry z limitu zoldu wylaczona (rody z budzetem): ").Append(_dDesertOff).Append(" wywolan")
               .Append(" | limity: partie zmienione ").Append(_dPartyLimited).Append(", zalogi przyciete do celu pokojowego ").Append(_dGarLimited)
               .Append(", nowe partie wstrzymane ").Append(_dSpawnBlock)

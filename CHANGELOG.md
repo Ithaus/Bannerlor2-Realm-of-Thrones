@@ -1,5 +1,207 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO - recenzja z poprawka) - 6 poprawek paczki sprawdzone niezaleznie; dopisany pomiar skutku W1 w zlocie i ludziach, wiersz narzedzia pilnuje, ze latka zadatku BK jest wolana
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (sama linia doby 180 - liczniki i tekst), `tools/sprawdz_logi.py` (tylko blok `etap8_p3woj`), `CHANGELOG.md`. Zachowanie gry bez zmian (sam log i narzedzie).
+
+**Co sprawdzone (kod wobec "Poprawki ostatecznej" TRIAZ-3 z uwagami podwazenia; log i CSV biegu rocznego 364 doby):**
+- **W1-A** zgodne. Kryterium przeliczone wlasnym skryptem na `budzet-rodow.csv`: w d364 z 54 rodow bez sluzby lapie 48 (poza nim 3 rody z druzyna ponad 60% i 3 z luzem - prawdziwy brak sluzby); rodow z lennem "na miare" ok. 36 (d84), 92 (d196), 112 (d364) - przyblizenie z CSV (wypelnienie calego rodu zamiast najwiekszej druzyny; podwazenie triazu: 51 / 94 / 118). Po zdjeciu wymogu w d364 zostaje bez renty 16 z 198 (8.1%; 10 przez zaloge) - prog 10% trzyma z malym zapasem. Gracz nigdy (brak budzetu 166), zapis: 5. pole `arm_rent180`, zapis bez niego wczytuje sie (pusty zbior), Reset czysci.
+- **W1-B** zgodne: armia w polu i obie strony oblezenia jak dotad, zdarzenia tylko przy WLASNEJ osadzie; klucz wylaczony = oba krolestwa kazdego zdarzenia.
+- **W2** zgodne (losowanie czlowieka, bez `ceil` na stos, najemnicy z karczmy dalej pierwsi, to samo cialo petli). Uwaga do opisu: pojedyncze losowanie trafia srednio dokladnie w kwote, ale `Releases` ponawia niedobor w drugiej petli (nadmiaru nie cofa), wiec rod zwalnia srednio ok. 1/6 zoldu jednego czlowieka ponad kwote dnia (ok. 1.3 zl przy medianie 60 zl, ok. 2%) - mniej niz stare zaokraglenie w gore; bez zmiany kodu.
+- **W3-A** zgodne. `AddDownPayment` w zainstalowanym BannerKings.dll: 148 bajtow IL (ilspycmd) - nie do wklejenia w wolajacego; pomijany jest tylko przelew krol -> kompania i komunikat gracza-najemnika, `AddCareer` biegnie dalej.
+- **W3-B** zgodne: zmieniona tylko wyplata dnia (min z kontraktem; w pokoju z jego polowa), umowa, podloga 0.5, przeglad i `CapOf` nietkniete. Liczba "kompanii AI w sluzbie" w linii 185 nie liczy juz kompanii bez ludzi w polu (osobne pole).
+- **W4** zgodne i potwierdzone drugim dowodem: w dobach zerwan licznik pomiaru 3.1 "portfele wezwan ... koniec (N)" ma 0, a w 7 dobach konca porozumienia przez gre 1 - w NASZYM wywolaniu `EndCallToWarAgreement` nie odpala zadna latka Harmony (ani `EndPostfix`, ani okno `Measure31`), w wywolaniach gry odpalaja obie. To jest fakt z logu; PRZYCZYNA ("kompilator wkleja krotka metode w nasz Daily") pozostaje hipoteza, nie rozstrzygnieta (latki sa wpinane przy starcie sesji, przed pierwsza doba). Poprawka nie zalezy od przyczyny (warunek "wpis dalej na liscie"). Wezwania gra proponuje tylko przy nowej wojnie albo nowym sojuszu, wiec zdjecie falszywego dlugu nie daje petli wezwanie - zerwanie; krolestwo po zerwaniu znow moze wzywac (dotad falszywy dlug ponizej -100 tys. blokowal je na miesiace - `DefaultAllianceModel.GetScoreOfCallingToWar`).
+- Zamknieta ekonomia: zadna poprawka nie tworzy ani nie niszczy zlota i ludzi (W1 - ten sam przelew skarbiec -> glowa, inny odbiorca; W3 - przelew nie nastepuje / mniejszy; W4 - koniec ujscia w nicosc; W2 - te same drogi ludzi i sakiewki). Wylaczniki: 6 kluczy, kazdy wylaczony = kod sprzed. Kluczy nie ma w `Armoury.json` Jeffa. `gen_mcm.py` bez rozjazdu, opisy po angielsku, build kod 0.
+- Narzedzie: wobec 74a3645 same dopisane linie (0 usunietych), `py_compile` poza repo, bieg na logu rocznym (okna 364 i 120) bez wyjatku - nowe wiersze INFO, pozostale wiersze bez zmian. Koszt doby: `AtMeans` to jeden odczyt zoldu na druzyne rodu w wojnie (caly `ClanBudget.Daily` z kilkoma takimi odczytami na partie kosztuje 12 ms) - ponizej 2 ms.
+
+**Poprawione w recenzji:**
+1. **Linia 180 nie pokazywala skutku W1 w zlocie i ludziach** (wymog zadania: ile rodow, ile zlota, ile ludzi). Dopisane: `rody z lennem na miare F (z renta dzis R), ich renty dzis X zl, w ich druzynach Y ludzi` oraz przy zrodlach styku `tylko rajdy i bitwy wlasnych lordow K, w nich rodow M`. Powod dodatkowy: pole "wymog sluzby zdjety u N" liczy tylko rody z niedoborem dob, a w kampanii zaczetej z paczka doby "na miare" sa zaliczane od pierwszej doby (rodzaj 8) - N bedzie bliskie 0 i samo nie pokaze nic. Narzedzie: wiersz P3W1-4b i dopisek w P3W1-5.
+2. **Wiersz P3W3-1 dawal TAK przy latce wpietej, ale niewolanej** (0 najmow) - a wlasnie taki blad (latka wpieta, w wywolaniu nie odpala) jest przyczyna W4. Teraz: najmow co najmniej polowa nowych umow 185 z okna (bieg roczny: 681 najmow, 678 umow; pierwsza doba okna pominieta - kompanie zaczynajace gre w sluzbie), inaczej NIE z dopiskiem "LATKA NIE JEST WOLANA".
+
+**Odrzucone po sprawdzeniu (nie sa bledami):** podejrzenie petli wojna - pokoj po W4 (gra nie ponawia wezwan co dobe); rozjazd konca linii w `sprawdz_logi.py` (w repo LF, CRLF tylko w kopii roboczej); koszt `AtMeans`; brak zwolnienia rodow "oba" (zgodnie z poprawka ostateczna - drugi krok do decyzji).
+
+**Ryzyko / co sprawdzic:**
+- Sztuczny log 4 dob z polami po recenzji: wszystkie pola czytane; wariant "0 najmow przy nowych umowach" daje P3W3-1 = NIE.
+- Stary zapis zrobiony wersja z bledem W4, w ktorym zerwanie wypadlo w ostatniej dobie przed zapisem: portfel wzywajacego zostaje na minusie bez wpisu (szukanie dlugu juz nie biega) - przy minusie ponizej 100 tys. to krolestwo nie wezwie sojusznika. Dotyczy tylko starych zapisow; nowa kampania tego nie ma.
+- Do audytu calosci (poza paczka): inne miejsca, w ktorych nasz kod wola wprost krotka metode gry i liczy na wlasna latke na niej - ten sam wzor bledu co W4.
+- W2 dalej wymaga testu 120 dob przed biegiem rocznym (zmiana skladu wojsk AI).
+
+**Build:** Armoury kod 0. Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
+## 2026-10-13 (P3/WOJSKO - narzedzie) - BLOK PROGOW `etap8_p3woj` w `tools/sprawdz_logi.py` (sam log, gra bez zmian)
+**Mod:** narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `tools/sprawdz_logi.py` (nowa funkcja `etap8_p3woj` na koncu blokow + 1 linia `blocks.append` w `etap8_main`; istniejace wiersze bez zmian), `CHANGELOG.md`.
+
+**Po co:** szesc poprawek paczki P3/wojsko (wpisy nizej: W1-A, W1-B, W2, W3-A, W3-B, W4) ma pola w liniach doby i kolumny CSV - bez wierszy progow skutku nie da sie odczytac jednym poleceniem. Wywolanie: `python -I tools/sprawdz_logi.py --grupa etap8 --do-doby 364 <Armoury-*.log>` (CSV szukany obok logu jak w grupie etap2).
+
+**Wiersze (15-17):** P3W1-0 pola i stan obu kluczy rent; P3W1-1 rody z lennem bez warunku renty <= 10% (sr28); P3W1-2 "sluzba" <= 8 i "oba" <= 2; P3W1-3 E5/F9 <= 20 tys. zl/d; P3W1-4 rody "na miare srodkow" (INFO); P3W1-5 zrodla styku krolestw (INFO - brakujacy pomiar triazu); P3W1-6 rody z lennem z 0 ludzi <= 12; P3W1-7 Polnoc >= 7.5 tys. (bieg roczny); P3W2-1 zold na zwalnianego >= 5 zl; P3W2-2 zwolnieni z partii na dobe (INFO); P3W2-3 rody, ktorym zalogi zajely pulap (INFO); P3W2-4 zold na czlowieka rodow na pulapie <= 1.25 x rodow z luzem (bieg roczny); P3W3-1 latka zadatku BK wpieta + najmy i zloto; P3W3-2 kontrakty za ludzi pod bronia wobec umowy (INFO); P3W3-3 ludzie najemnikow >= 2 000; P3W3-4 kiesy kompanii <= +10 tys. zl/d; P3W4-1 dlug "sprzed paczki" nowy 0 / w nicosc 0; P3W4-2 reszta zdjeta przez nas = reszta zerwanych; P3W-5 partie rodow AI >= 70 tys. (bieg roczny). Progi wiaza tylko, gdy log ma pola paczki; na logu sprzed paczki te same liczby wychodza jako INFO.
+
+**Sprawdzone:** (1) log bazowy biegu rocznego (`Armoury-2026-10-13_02-15-21.log`, okno 364): 15 wierszy INFO, liczby zgodne z triazem - bez warunku 27.5% (47 / 3 / 7), E5/F9 62 558, zwolnieni z partii 520/d, najemnicy 2 531 ludzi, dlug 168 3 558 755 / 2 005 256, partie 63 267, rody z 0 ludzi 29 z 198, Polnoc 5 118, zold na czlowieka 7.90 wobec 5.19 zl (1.52 x), kiesy 11 kompanii 2 867 093 -> 20 597 542 (+48.8 tys. zl/d); okno 120 dob - tez bez wyjatku. (2) sztuczny log 3 dob z polami paczki (teksty z szablonow kodu): wszystkie nowe pola czytane, 8 wierszy TAK. Czas bloku ok. 1 s.
+
+**Ryzyko:** grupa "na pulapie zoldu" w P3W2-4 liczona z CSV (zold razem z 28 dob >= 0.9 x pulap) - kolumna `na_suficie` to sufit WIELKOSCI partii i sie do tego nie nadaje (pierwsza wersja wiersza dawala 1.17 x zamiast 1.52 x). Kompanie w P3W3-4 = rody, ktore w oknie choc raz mialy rodzaj "najemnik" (poza sluzba sa "bez lenna").
+
+**Status:** DO SPRAWDZENIA - bieg roczny (narzedzie gotowe).
+
+## 2026-10-13 (P3/WOJSKO W4, TRIAZ-3 O1-7 A) - ZERWANE WEZWANIE DO WOJNY NIE WRACA JAKO "DLUG SPRZED PACZKI": 2 mln zl rocznie przestaje isc w nicosc (klucz CallToWarBreakRestoresWallet) + lista DO DECYZJI JEFFA
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownCallToWar.cs` (Daily, Import, Reset, liczniki, linia 168), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby, linie "Wezwania do wojny (168)"):** "Pieniadz swiata" 208.40 -> 206.03 mln (-2.37 mln; w d364 -14.0 tys. zl/d) - swiat nie byl zamkniety. 5 zerwan z braku wplywow dnia (log :24932 16 963 zl, :47526 869 737, :60938 1 004 403, :75474 666 428, :125291 1 001 224) - kazde nastepnej doby wraca z TA SAMA kwota jako "dlug portfela sprzed paczki: nowy" (:25299, :47881, :61289, :75833, :125646). Razem zaksiegowano 3 558 755 zl, skarbce zaplacily w nicosc 2 005 256 zl, w kolejce zostalo 1.55 mln (9-17 tys. zl/d pod koniec roku, placone PRZED zwrotem zoldu i rentami). To nowa kampania - dlugu sprzed paczki byc w niej nie moze.
+
+**Przyczyna (ustalona z logu i dekompilacji - triaz jej nie znal):** przy zerwaniu `CrownCallToWar.Daily` wola `AllianceCampaignBehavior.EndCallToWarAgreement`, a reszte ceny ma zdjac z portfela wzywajacego nasz postfiks `EndPostfix`. W TYM wywolaniu postfiks nie jest wolany: metoda gry ma 2 wywolania (`RemoveCallToWarAgreement` + zdarzenie) i kompilator wkleja ja w nasz `Daily`, omijajac latke Harmony. Dowod: (a) kwota "nowy" nastepnej doby = co do zlotowki reszta ceny z doby zerwania - portfel zostal na minusie; (b) w wywolaniach samej gry postfiks DZIALA - porozumienie Nocnej Strazy (reszta ok. 470 tys.) zniklo z listy w d85 bez "nowego" dlugu nastepnej doby, tak samo trzy nastepne (d194, d203, d239) - a wykrywanie dlugu biegalo co dobe, wiec portfel byl wyrownany. Wpis usuwalismy "na wypadek", wiec nastepnej doby wykrywanie dlugu sprzed paczki (`portfel < -dlug z naszych porozumien`) bralo minus portfela za stary dlug i skarbiec placil go w nicosc po 1/182 na dobe. Przy okazji: liczniki "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0 (zerowane na poczatku `Daily`, zanim linia je wypisala) - stad triaz nie mogl rozstrzygnac, czy postfiks dziala.
+
+**Zmiana (klucz `CallToWarBreakRestoresWallet`, domyslnie wlaczony; wylaczony = stan sprzed):**
+1. Po `EndCallToWarAgreement` przy zerwaniu: jesli wpis dalej jest na liscie (postfiks nie zadzialal) - sami zdejmujemy reszte ceny z portfela wzywajacego (`CallToWarWallet += reszta`, ta sama arytmetyka co `EndPostfix`, pomiar `Measure31.CtwOther`), dopiero potem usuwamy wpis. Gdy postfiks zadziala, wpisu juz nie ma - nic nie robimy (bez podwojnego zdjecia).
+2. Szukanie "dlugu portfela sprzed paczki" tylko RAZ: w pierwszej dobie po wczytaniu zapisu bez klucza `arm_ctw168` albo po ponownym wlaczeniu paczki (wtedy rody splacaly portfel grze). W kampanii zaczetej z paczka - nigdy.
+3. Liczniki zdarzen miedzy dobami ("nowe dzis", "skreslone przez gre") zerowane PO linii doby - linia pokazuje prawde (sam log).
+4. Linia 168: `P3/W4 po zerwaniu reszta ceny zdjeta z portfela wzywajacego przez nas (latka konca porozumienia nie zadzialala) N`.
+
+**Zloto:** 2.0 mln zl w roku (9-17 tys. zl/d pod koniec) przestaje znikac - zostaje we wplywach dnia koron na zwrot zoldu i renty; suma swiata przestaje spadac o te kwote (z -2.37 mln zostaje ok. -0.37 mln do wyjasnienia w obszarze zlota). Nikt nic nie dostaje z niczego: wezwany dostal tylko to, co skarbiec naprawde zaplacil; reszta ceny jest skreslona (nikt jej nie byl winien i nikt jej nie dostal).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Podwojne zdjecie reszty wykluczone warunkiem "wpis dalej na liscie" (postfiks usuwa wpis przed nami).
+- Stary zapis zrobiony wersja z bledem ma juz "stare dlugi" na liscie (wpisy bez wezwanego) - beda splacane do konca jak dotad; nowa kampania ich nie ma. Zapis sprzed 168 (bez klucza) - jedno szukanie w pierwszej dobie, jak dotad.
+- Porozumienie zakonczone przez gre, gdyby postfiks nie zadzialal takze w ktoryms wywolaniu gry: wpis zostaje, skarbiec placi wezwanemu do konca ceny (prawdziwy platnik i odbiorca, portfel wraca do zera) - bez przecieku; w biegu rocznym nie zaobserwowane. Poprawiona linia pokaze teraz "skreslone: koniec porozumienia przez gre" > 0, gdy postfiks dziala.
+- Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu: "splacone dzis ze skarbcow w nicosc" = 0 kazdej doby, "nowy" = 0; po kazdym zerwaniu "reszta ceny zdjeta ... przez nas" = reszta z linii zerwania; zloto swiata na 28 dob w progu 0.1%.
+
+**DO DECYZJI JEFFA (nie zakodowane - z rachunkiem):**
+1. **Kiesy ludu miast rosna i stoja (TRIAZ-3 O1-7 B, wielkosc M, obszar zlota - nie wojska).** Stan: 7.17 -> 36.59 mln w roku (+29.4 mln); przyrost gasnie razem z zasilkiem skarbcow (okna 30 dob: +190, +130, +126, +103, +96, +78, +97, +78, +65, +50, +44, +33 tys. zl/d). "Lokata" 23.8 mln = 24 dni wydatkow ludu (projekt zakladal ponizej 5 dni). Powod: danina wojenna bierze nadwyzke kas kupcow (24 tys. zl/d) i kies wsi (193 tys. zl/d), a kies ludu miast nie siega - lud z 36.6 mln placi tylko 12.9 tys. zl/d. Warianty: (a) ZOSTAWIC - lokata rosnie dalej coraz wolniej (ok. 33 tys. zl/d i mniej), wojsko nic nie zyskuje; (b) DANINA WOJENNA TAKZE Z NADWYZKI KIES LUDU, 1% dziennie w wojnie (ta sama stawka co kasy miast; z polityka War Tax 2%) - lokata ustala sie na 3.3-10 mln (3-10 dni wydatkow; z War Tax 1.7-5 mln), do koron stale 33-100 tys. zl/d i dalej zwrotem zoldu i rentami do panow; wojsko realnie +1 do +3 tys. ludzi (gorna granica 4-11 tys.); (c) stawka 0.5% - lokata 6.6-20 mln, do koron te same 33-100 tys. zl/d w stanie ustalonym, tylko pozniej. Przelicznik: 10 tys. zl/d = 0.3-0.45 tys. ludzi (203 rody maja luz pulapu i tak nie wydaja). Dlaczego nie teraz: liczby stanu ustalonego sa z rachunku, nie z symulacji obiegu; zmiana rusza `KingdomTreasury.Levies` i `TownFolk.Live` (kiesa ludu E5/B1) - inny obszar, wymaga wlasnego testu 120 dob (lokata, glowy ponizej 5 000, wojsko). Samo to NIE da 85 tys.
+2. **Minimalny czas sluzby kompanii 28 dob (TRIAZ-3 O1-4 C, wielkosc S).** Kompanie zmieniaja krola co ok. 4 doby (681 najmow w roku) - gra nie ustawia terminu sluzby. Postfiks na najem: `ShouldStayInKingdomUntil` = 28 dob -> najwyzej ok. 125 najmow w roku, przeglad umowy co 28 dob wreszcie dziala, kompania ma czas dojsc na front. Do zlota po W3-A i W3-B niepotrzebne; zmienia zachowanie na mapie (kompania stoi do 28 dob w krolestwie, ktore zawarlo pokoj - na polowie kontraktu), wiec osobno, po biegu z A+B, zeby bylo wiadomo, co dalo skutek.
+3. **Warunek zalogi renty (drugi krok W1).** Po W1-A zostaja rody tracace rente przez zaloge ponizej normy (dzis "zaloga" 3 + "oba" 7; w nowej kampanii oczekiwane 2-4). Jesli po 120 dobach "oba" > 2 - ta sama zasada "na miare srodkow" dla warunku zalogi.
+4. **Cel liczby wojska.** Prog 85 tys. (95-115 tys.) byl strojony na swiecie, ktory drukowal ok. 460 tys. zl/d. W zamknietym: 95 tys. ludzi x 6.42 zl = 610 tys. zl/d zoldu partii, jest 426 tys. Poprawki tej paczki daja razem ok. 72-80 tys. zamiast zejscia do ok. 50 tys. Do wyboru: przyjac ok. 70-80 tys. jako nowy prog albo obnizyc zold na czlowieka (tanszy weteran) - doplat z niczego nie robimy.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
+## 2026-10-13 (P3/WOJSKO W3-B, TRIAZ-3 O1-4 B) - KONTRAKT NAJEMNIKA PLACONY ZA LUDZI POD BRONIA, UMOWA DALEJ WYZNACZA PULAP (klucz MercContractPaysMenUnderArms)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/MercContract.cs` (Daily: wyplata dnia, linia 185), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby, linia "Kontrakty najemnikow (185)", 364 doby):** kontrakty nalezne 8 849 699 zl, zaplacone 8 492 101 zl przy zoldzie kompanii 4.41 mln - zamierzone 1.30 x zold to 5.73 mln, nadplata 2.76 mln w roku (7.6 tys. zl/d srednio, 8.8 tys. zl/d pod koniec). W d364: nalezne 30 466 zl przy zoldzie ok. 16.6 tys.; "ludzie najemnikow AI 2 692 / z umowy 3 429" (srednia roku 2 231 / 3 122).
+
+**Przyczyna:** `MercContract.Daily` placil codziennie caly kontrakt K z dnia najmu (`due = war ? d.K : d.K x peace`), a K liczone jest od "ludzi z umowy" - co najmniej polowy pelnej wielkosci kompanii (podloga C1-m `MercHireFloorShare`). Kompanie zmieniaja krola co kilka dob (678 nowych umow w roku), wiec kazda umowa ma podloge, a przeglad co 28 dob nigdy nie nastepuje - korona placila stale za ok. 900 ludzi, ktorych nie bylo. Kompania bez ludzi w polu (wodz w niewoli) brala pelny kontrakt za nic.
+
+**Zmiana (klucz `MercContractPaysMenUnderArms`, domyslnie wlaczony; wylaczony = pelny kontrakt z umowy, stan sprzed):** wyplata dnia = min(kontrakt z umowy - w pokoju jego polowa, `MercContractFactor` x prawdziwy zold kompanii tej doby). Umowa (K, zold i ludzie z umowy, podloga 0.5, przeglad 28 dob) i pulap 166 (`CapOf` = zold ludzi z umowy) BEZ ZMIAN: kompania dobiera ludzi do umowy z wlasnej kiesy, a korona od nastepnej doby placi 1.30 x za tych, ktorzy sa. Pierwotny wniosek ("kontrakt liczony od prawdziwych ludzi") odrzucony - cofnalby C1-m (kompania najeta po bitwie nie odroslaby: test 120 dob, najemnicy -79%). Linia doby 185: `P3/W3 kontrakt za ludzi pod bronia: nalezne wedlug umowy X, za ludzi pod bronia Y (roznica Z zostaje we wplywach dnia koron); kompanie bez ludzi w polu (wyplata 0) N`.
+
+**Zloto / ludzie:** nic nie powstaje i nic nie znika - mniej wychodzi ze skarbca, wiec wiecej zostaje we wplywach dnia na zwrot zoldu i renty (kolejnosc 165 bez zmian). W skarbcach zostaje ok. 7.6 tys. zl/d (8.8 tys. pod koniec roku). Razem z W3-A bilans kompanii: 1.30 x zold + zdarzenia (lup, jency) 12.9 tys. zl/d - zold - pozostale wydatki 12.0 tys. zl/d = ok. +4.5 tys. zl/d zamiast +48.7 tys. zl/d. Wojsko: do ok. +1 tys. ludzi (przez zwrot zoldu i renty).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Jesli marza 0.30 nie pokryje jedzenia, sprzetu i werbunku, kompanie beda powoli malec - pilnowac "ludzie najemnikow AI" (nie ponizej 2 000); kiesy startowe ok. 240 tys. daja zapas. Stad klucz.
+- Niedoplata (`Unpaid`, odejscie po 28 dobach) liczona wobec nowej kwoty naleznej - bez zmiany reguly.
+- Kompania w sluzbie Strazy (zold 0): prawdziwy zold = stawka nominalna jej ludzi (`Company`), jak przy umowie.
+- Pulap 166 kompanii, zwolnienia, przeglad - nietkniete. Latki gry (kontrakt gry i "za tier" = 0) - nietkniete.
+- Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu: linia 185 "kontrakty nalezne" ok. 1.30 x zold (13-16 tys. zl/d w d1-120, bylo 23 tys.); "ludzie najemnikow AI" >= 2 000; kiesy kompanii (csv) nie rosna szybciej niz ok. 5 tys. zl/d.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
+## 2026-10-13 (P3/WOJSKO W3-A, TRIAZ-3 O1-4 A) - ZADATEK BANNERKINGS DLA KOMPANII AI WYLACZONY: jedna zaplata za jedna sluzbe (klucz MercBkDownPaymentAiOff)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/MercContract.cs` (prefiks `BkDownPaymentPrefix`, `EnsureHooks`, linia 185), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby, `budzet-rodow.csv`):** kiesy 11 kompanii najemnych 2.87 mln (d1) -> 20.60 mln (d364), +17.73 mln = 48.7 tys. zl/d, rowno caly rok (bez stabilizacji); to 33% zlota wszystkich rodow przy 2 494 ludziach. Po drugiej stronie krolowie: z kiesa ponizej 20 tys. bylo ich 0 (d30), 4 (d120), 15 (d300), 11 z 31 (d364); 21 krolow konczacych rok ponizej rezerwy zaplacilo 8.70 mln, ich wlasne druzyny 9 461 (d60) -> 3 736 ludzi (d364) przy limicie 16 tys. (Qarth: kiesa 519 775 -> 1 745, druzyna 708 -> 26; Dragonstone/Stannis 347 572 -> 1 383, 557 -> 0).
+
+**Przyczyna (dekompilacja BannerKings.dll):** `BKMercenaryCareerBehavior.OnClanChangedKingdom` przy kazdym najmie (`JoinAsMercenary`) wola `AddDownPayment`: kwota = min(`BKDiplomacyModel.GetMercenaryDownPayment`, kiesa rodu krola), `kingdom.RulingClan.Leader.ChangeHeroGold(-kwota)`, `mercenaryClan.Leader.ChangeHeroGold(+kwota)`. Wzor: (5% zlota rodu krola + sila kompanii x MercenaryAwardMultiplier / 2) x reputacja. `ChangeHeroGold` bez zdarzenia gry - ksiega rodow tego nie widziala. Paczka 185 zalozyla "gra dla AI w sluzbie nie placi nic z siebie" i wylaczyla dwie wyplaty gry, tej trzeciej nie znala. Najmow w roku 681 (nowe umowy w linii 185: 678), bo kompanie skacza od krola do krola (mediana sluzby 4 doby); przyrost kies kompanii ponad ksiege w dobach najmu = 12.09 mln (33.2 tys. zl/d; srednio 17.7 tys. na najem, najwiecej 182 920 - doba 334, Bright Banners do Targaryena: 40% kiesy krola). Pierwotny wniosek podejrzewal barter gry (`ExecuteAiBarter`) - obalone: barter szedlby przez `GiveGoldAction` i bylby w ksiedze.
+
+**Zmiana (klucz `MercBkDownPaymentAiOff`, domyslnie wlaczony; wylaczony = BK placi zadatek jak dotad):** prefiks Harmony na `BannerKings.Behaviours.Mercenary.BKMercenaryCareerBehavior.AddDownPayment(Clan, Kingdom)`, wpinany w kampanii (`MercContract.EnsureHooks`, obok dwoch latek 185): przy czynnej 185 i kompanii AI zwraca false (BK nic nie przelewa) i liczy najem oraz kwote, ktora BK by przelal (ten sam wzor BK przez refleksje, sam odczyt). Brak BK albo metody - "BRAK" w linii startowej 185, nic sie nie dzieje. Linia doby 185: `P3/W3 zadatek BK wstrzymany: N najmow, M zl zostalo w kiesach krolow`.
+
+**Zloto / ludzie:** nic nie powstaje i nic nie znika - przelew krol -> kompania po prostu nie nastepuje; kompania dalej dostaje kontrakt 185 ze skarbca (wplywy dnia). W kiesach krolow zostaje ok. 33 tys. zl/d (12.09 mln w roku), u 21 zubozalych krolow 23.9 tys. zl/d. Oczekiwane dla wojska: +3 do +4 tys. ludzi po roku (wlasne druzyny krolow malych krolestw) - ok. 10% rocznego spadku, nie wiecej.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Gracz: jako najemnik dostaje zadatek BK jak dotad (prefiks go przepuszcza). Jako KROL najmujacy kompanie AI nie placi zadatku z wlasnej kiesy (placi skarbiec kontraktem 185) - zmiana na korzysc gracza, do wiadomosci Jeffa.
+- Skakanie kompanii miedzy krolami NIE zmaleje (ocena najmu nie zawiera zadatku; 221 / 219 / 255 zmian na 120 dob w trzech biegach) - osobna poprawka "minimalny czas sluzby 28 dob" jest DO DECYZJI (zmienia zachowanie na mapie).
+- Bogatsi krolowie podnosza mnoznik nagrody gry (`DefaultMinorFactionsModel` liczy zloto wodzow) - kompanie chetniej ida do tych samych krolestw; na zloto bez wplywu.
+- Nagromadzone 20.6 mln zostaje u kompanii w starej kampanii (Jeff gra nowa - wystarczy zamknac doplyw).
+- Latka w kampanii, nie w SubModuleMain (pulapka konstruktorow statycznych). `AddDownPayment` ma 148 bajtow IL - gra nie wkleja jej w wolajacego (prog 100), wiec prefiks jest wolany (inaczej niz krotkie `EndCallToWarAgreement` - patrz W4).
+- Czynne tylko z 185 (`MercContractEnabled` i 165). Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu: linia 185 "zadatek BK wstrzymany" ok. 1.9 najmu na dobe; kiesy kompanii (csv, rodzaj najemnik) w d120 ok. 3-4 mln (bylo 7.97 mln); krolow z kiesa ponizej 20 tys. w d120 najwyzej 1 (bylo 4); wlasne druzyny krolow w d120 nie mniejsze niz w d60.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
+## 2026-10-13 (P3/WOJSKO W2, TRIAZ-3 O1-3) - ZWOLNIENIA Z BRAKU BUDZETU LOSOWO Z CALEJ PARTII, NIE OD NAJNIZSZEGO TIERU (klucz ReleaseAcrossTiers)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `DrawAcross`, `ReleaseFrom`, liczniki i linia 166), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian (zadnego nowego stanu).
+
+**Problem (bieg roczny 364 doby, `budzet-rodow.csv`):** 37 rodow na pulapie zoldu z >= 100 ludzi w obu oknach: zold partii 99.4 -> 100.8 tys. zl/d (bez zmiany), ludzie 18 867 -> 12 259 (-35%), zold na czlowieka 5.27 -> 8.22 zl (+56%; u rodow z luzem 4.31 -> 5.27, +22% - zwykle starzenie wojska). W dniach zwalniania odchodzacy kosztowali 3.65 zl na czlowieka (40 036 ludzi, 145 978 zl), a srednia tych partii to 9.28 zl. Zwolnieni przez budzet 148 569 w roku (z partii 129 063: 215/d w d57-84 -> 520/d w d337-364) - tyle, co polegli w partiach (132 029).
+
+**Przyczyna:** `ClanBudget.ReleaseFrom` po najemnikach z karczmy zdejmowal stosy od najnizszego tieru (`stacks.Sort` po tierze, `n = ceil(reszta / zold)`): zeby zdjac 100 zl zoldu, pan odprawial ok. 50 ludzi t1 zamiast ok. 8 z t5. Druga polowa zapadki (podwazenie): awanse gry wypelniaja wolne miejsce limitu natychmiast, a pulap skacze z kiesa - 382 przejscia "pod pulapem -> ponad 1.10" w 64 rodach, czyli rotacja werbunek -> zwolnienie najtanszych -> awans reszty. To zamierzona regula 166 (strojenie, nie blad); tlumaczy najwyzej 6 z 34 tys. rocznego spadku (18%; gorna granica 9.8 tys.).
+
+**Zmiana (klucz `ReleaseAcrossTiers`, domyslnie wlaczony; wylaczony = najnizszy tier najpierw, stan sprzed):**
+1. `DrawAcross` - LOSOWANIE CZLOWIEKA: kazdy czlowiek partii ma rowna szanse (stos z waga = liczba ludzi, `MBRandom.RandomInt`), bez zwracania, az zebrany zold >= kwota; ostatni czlowiek przy reszcie mniejszej niz jego zold odchodzi z prawdopodobienstwem reszta / zold. Srednio wychodzi dokladnie kwota (symulacja 20 000 losowan: kwota 3 / 20 / 60 / 300 zl -> srednio 3.0 / 20.0 / 60.0 / 300.1 zl; glow 8.0 zamiast 25 przy 60 zl w partii 160 ludzi po 7.6 zl). Wzor z pierwotnego wniosku (`ceil` na stos) odrzucony: mediana kwoty dnia rodu to 60 zl = 8.6% zoldu partii, ceil dawalby po 1 czlowieku z kazdego stosu, czyli kilka razy wiecej niz kwota.
+2. `ReleaseFrom`: poza przebiegiem "tylko najemnicy z karczmy" liczby na stos z losowania, potem to samo cialo petli co dotad (ranni proporcjonalnie, `PeopleBook.Take` -> `ToVillage` -> `AddToCounts`, najwyzej jedno `ToVillage` na stos). Ta sama regula dla partii i zalog (jedna zasada). Najemnicy z karczmy dalej pierwsi.
+3. POMIAR w linii "Budzet rodow (166)": `P3/W2 zwolnieni wedlug tieru (ludzi / ich zold zl): t1-2, t3-4, t5+` oraz `rody w wojnie, ktorym zalogi i karawany zajely caly pulap (na partie 0): N, z tego bez ludzi w partiach M` - bez tego skutku nie da sie potwierdzic.
+
+**Zloto / ludzie:** nic z niczego - ci sami zwalniani ida tymi samymi drogami (wies z pochodzeniem, 1/3 uprawnionych t3+ do karczmy); sakiewka idzie proporcjonalnie do glow, wiec do kies wsi pojdzie ok. polowa dzisiejszej kwoty, reszta zostaje w sakiewkach partii. Dotyczy rodow na pulapie z partiami (73 rody, 18.3 tys. ludzi, zold 146.8 tys. zl/d, 8.01 zl/czl): przy tym samym zoldzie zwalnianym odchodzi ok. 59 zamiast 128 ludzi/d. Oczekiwane: zold na czlowieka tej grupy 8.0 -> 5.2-6.0 zl = +6 do +9.8 tys. glow w 3-6 miesiecy bez monety wiecej. 38 rodow, ktorym zalogi zajely pulap (partie 17 950 -> 616), nie zyska nic - to sprawa renty (W1) i pulapu.
+
+**Audyt sprzetu i koni zwalnianych (odczyt kodu, pkt 4 poprawki ostatecznej):** sprzet zostaje w zbrojowni partii; `MenPurse.AiSurplusPlan` trzyma to, co moze nosic ktos z rosteru, a nadwyzke sprzedaje od najgorszej sztuki na polke miasta za cene miasta z kasy miasta (trzecia panu, reszta do sakiewki ludzi) - nic nie znika. Konni idacy do karczmy zabieraja konia swojej kategorii do puli miasta (`HorseFate.VetTakeHorses`), reszta koni zostaje w zbrojowni, nadmiar ponad zapas idzie na polke (E6/K2). CENA: w d364 "nadwyzki sprzedane 5369 szt. za 7571 zl" = 1.41 zl/szt. (korpus 897 szt. / 2344 zl, konie i rzedy 21 szt. / 179 zl) - polki sa zapchane i placa grosze JUZ DZIS, takze za sprzet poleglych; poprawka zmienia sklad (mniej sztuk, wyzszy tier), nie droge.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Wielkosc M: zmiana skladu wojsk AI w calym swiecie - elita i jazda rodow na pulapie rzednie (t5+ odchodzi wedlug udzialu), druzyny liczniejsze i nizszego tieru. Odrzucone: "najdrozsi najpierw" (rozbiera elite), blokada awansow przy pulapie (latka na kod gry).
+- Do karczm trafia wiecej t3+ w udziale, mniej w liczbie (dzis ok. 115-165/d z 520; po zmianie ok. 135-150/d z ok. 245). Pula weteranow juz dzis sie nie stabilizuje (309 -> 10 094, +38/d) - pilnowac.
+- Drogi sprzet zwalnianych t5+ sprzedawany za grosze na zapchanych polkach (patrz audyt) - pilnowac linii "Sakiewka ludzi: nadwyzki sprzedane" (szt. i zl); ceny skupu to obszar gospodarki, nie wojska.
+- Losowanie zalezy od `MBRandom` - dwa biegi z tego samego zapisu roznia sie zwolnionymi (jak werbunek i bitwy AI).
+- Kolizje: `Releases` (podzial kwoty miedzy partie, przebiegi) bez zmian; `ToVillage`, ksiega ludzi, sakiewka - to samo cialo petli. Straz bez zoldu (kwota w ludziach) - ta sama regula, ale Straz nie zwalnia (`WatchNoReleases`).
+- Klucza nie ma w `Armoury.json` Jeffa (grep).
+- PROGI (test 120 dob wobec WGRANIA 35, potem bieg roczny): zold na czlowieka rodow na pulapie nie rosnie szybciej niz u rodow z luzem o wiecej niz 5 pkt proc.; "zwolnieni z partii" w glowach ok. polowa przy podobnym zoldzie zwalnianych; ludzie partii >= +3 tys. w d120; pula weteranow nie rosnie szybciej niz +38/d; 0 ERROR.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny (wczesniej test 120 dob - zmiana M).
+
+## 2026-10-13 (P3/WOJSKO W1-B, TRIAZ-3 O1-2 B) - DOBA WOJNY ZOBOWIAZUJE KROLESTWO TYLKO PRZY WEZWANIU ALBO NAPADZIE NA WLASNA ZIEMIE (klucz CrownRentContactOnlyWhenCalled)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (Daily: zbior krolestw ze stykiem; linia), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby):** Polnoc - 16 z 57 rodow bez renty. Do d196 zaden rod Polnocy nie byl bez sluzby, w d224 2, w d252 18; sluzbe stracily w tych samych dobach (d241-250) rody z PELNYMI druzynami (Flint Lyessa 99%, Mormont 100%, Whitehill 80-88%, Umber 72%, Manderly 80%). W d113-140 sluzylo wszystkie 20 rodow po 17 dob (armia fabularna ROT), a od d141 Polnoc nie zebrala ani jednej armii (`bitwy.log`: 1 zdarzenie armii w roku). Doby wojny ze stykiem nabijaly samotne rajdy 2-5 bogatych rodow na wsie wroga na poludniu: dni ze zdarzeniem 18 z 56 (d141-196), 56 z 56 (d253-308), 50 z 56; wlasna ziemia Polnocy napadnieta 0-2 dni na 91. Skutek: Stark, Bolton, Dustin, Ryswell biora 60.4 z 85.5 tys. D krolestwa, cala Polnoc 11 254 -> 4 855 ludzi w partiach przy rosnacym zlocie krolestwa (4.51 -> 5.04 mln).
+
+**Przyczyna:** `CrownRents.OnMapEvent` dopisywal do krolestw ze stykiem OBA krolestwa kazdego rabunku, wymuszenia, szturmu i bitwy lordow - rajd jednego lorda na wies wroga czynil dobe wojny calemu jego krolestwu, wiec maska sluzby wszystkich jego rodow przesuwala sie o dobe bez sluzby, choc nikt ich nie wzywal.
+
+**Zmiana (klucz `CrownRentContactOnlyWhenCalled`, domyslnie wlaczony; wylaczony = stan sprzed):** krolestwo ma dobe wojny, gdy (a) ma armie w polu, (b) oblega albo jest oblegane (obie strony - jak dotad), (c) od ostatniej doby bylo zdarzenie przy JEGO WLASNEJ osadzie: rabunek, wymuszenie, szturm, wypad, blokada (`MapEvent.MapEventSettlement`, wlasciciel = jedna ze stron w wojnie). Bitwa w polu i rajd wlasnych lordow na cudza ziemie krolestwa nie zobowiazuja. Typ zdarzenia sprawdzany wprost - gra bywa, ze przypisuje pobliska wies takze bitwie w polu (MapEvent.cs:785-805), wiec sama osada zdarzenia nie wystarcza. Linia 180: przy zrodlach styku dopisek "(nie zobowiazuja - ...)" albo "(zobowiazuja jak dotad ...)".
+
+**Zloto / ludzie:** bez zmiany zlota (renta zmienia odbiorce w krolestwie). Polnoc: od d141 0 dob zobowiazania -> maski stoja na 17-35 dobach sluzby przy wymogu 12 -> 20 z 20 rodow z renta; razem z W1-A partie Polnocy 7.5-7.9 tys. zamiast 4.9 tys. (samo A ok. +2.0 tys., B do +2.6 tys.). Poza Polnoca kierunek ten sam (zobowiazan nigdy wiecej niz dzis), wielkosc nieznana - dlatego pomiar zrodel styku w linii 180 (W1-A/C).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- W wojnie prowadzonej samymi rajdami nikt nie jest zobowiazany - renta wedlug wag lenn jak w pokoju; samotni lupiezcy przestaja zgarniac cudze udzialy przez E5/F9.
+- Doba bez zobowiazania nie przesuwa maski nikomu (takze lupiezcy) - regula C3 bez zmian; rod, ktory ma niedobor dob, odrabia go dopiero w nastepnych dobach zobowiazania (jak dotad przy `CrownRentWarDayNeedsContact`).
+- Napadnieta strona jest zobowiazana jak dotad; jej rody sluza poscigiem i odsiecza (rodzaj 6), bitwa (3/7) albo armia.
+- Czynne tylko z `CrownRentWarDayNeedsContact` (przy wylaczonym kazda doba wojny liczy sie jak dotad). Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu 364 dob: 0 rodow Polnocy bez renty w oknach samych rajdow; Polnoc >= 7.5 tys. ludzi w partiach w d337-364; w linii 180 "tylko rajdy i bitwy wlasnych lordow" > 0 w dobach, w ktorych dotad liczyla sie doba wojny.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
+## 2026-10-13 (P3/WOJSKO W1-A, TRIAZ-3 O1-2 A + C) - SLUZBA NA MIARE SRODKOW: rod, ktorego nie stac na druzyne do wezwania, nie traci renty korony (klucz CrownRentServiceAtMeans)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` (od 74a3645) | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `Pending`, `AtMeans`), `CrownRents.cs` (Daily, OnMapEvent - pomiar, CsvCols/CsvHeader, Export/Import), `ClanIncomeBook.cs` (1 linia: naglowek CSV z `CrownRents.CsvHeader`), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis: `arm_rent180` dostaje 5. pole (stary zapis wczytuje sie bez niego).
+
+**Problem (bieg roczny 364 doby, log `Armoury-2026-10-13_02-15-21.log`, `budzet-rodow.csv`):** rody z lennem bez renty korony: 11 (d28) -> 29 (d84) -> 46 (d252) -> 57 z 198 w d364 (28.8%; linia "Renty korony (180)" :128859: zaloga 3, sluzba 47, oba 7). Partie tych 57 rodow: 24 264 ludzi (d57-84) -> 5 785 (d337-364). Rody z lennem z 0 ludzi w druzynach: 8 (d84) -> 15 (d196) -> 29 (d364); u 28 zold zalogi >= caly pulap zoldu. Udzialy rodow bez warunku oddawane sluzacym (E5/F9): 16-29 tys. zl/d w pierwszym polroczu -> 62.6 tys. zl/d w d337-364 (31% rent), w ok. 70% do rodow z luzem, ktore tego nie wydaja.
+
+**Przyczyna:** warunek sluzby (20 z 60 dob wojny ze stykiem, `CrownRents.Daily`) liczy dobe wojny rodowi, ktory nie ma czym sluzyc, a kara zabiera mu srodki potrzebne do spelnienia warunku: bez renty D rodu spada do samej ziemi, zold zalogi (w wojnie placonej pierwszej - `ClanBudget.GarFull`, `PartyCap = Cap - zalogi - karawany`) zjada caly pulap i na druzyne zostaje 0. Podwazenie triazu sprostowalo pierwotny wniosek: prog 60% NIE jest bramka sluzby (rody z wypelnieniem 30-60% sluza prawie jak pelne; zalamanie dopiero ponizej ok. 15% i przy 0 ludzi), a stan nie jest "bez wyjscia" (109 z 164 epizodow konczy sie odzyskaniem, mediana 19 dob) - bez powrotu jest wezszy przypadek "zold zalogi >= pulap". Pierwotne kryterium "zold >= 0.95 pulapu" lapalo 40 z 54 rodow; przyjete (nizej) 48 z 54 - pozostale 6 to 3 rody z druzyna ponad 60% i 3 z luzem (prawdziwy brak sluzby).
+
+**Zmiana (klucz `CrownRentServiceAtMeans`, domyslnie wlaczony; wylaczony = stan sprzed):**
+1. `ClanBudget.AtMeans(Clan, out fillMax)` - rod "na miare srodkow": zadna czynna druzyna rodu nie przekracza progu, od ktorego gra wzywa do armii (`ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy` = 0.6 - liczba gry, bez nowego parametru; BK ma te sama na sztywno w `MobilePartyExtensions.IsAvailableForArmies`), a pulap partii z ostatniego budzetu jest mniejszy niz potrzeba = 0.6 x suma limitow druzyn x zold na czlowieka (zold partii / ludzie przy >= 20 ludziach, inaczej srednia gry); rod bez druzyny: `MinNewPartyMen` (30) x zold na czlowieka. Straz bez zoldu, najemnik, gracz i rod bez budzetu - nigdy.
+2. `CrownRents.Daily`: rod w wojnie "na miare" bez sluzby tej doby dostaje sluzbe rodzaju 8 (bit maski w dobie ze stykiem); w warunku renty rod ze zbioru `_means` z niedoborem dob ma wymog 0 - renta wraca TEJ doby (nie po 20 dobach, inaczej zaloga spada ponizej normy i rod traci rente drugim warunkiem). Gdy rod odbuduje druzyne ponad 60% albo zejdzie pod potrzebe - zwykly wymog 20 z 60, a maska ma juz zaliczone doby.
+3. Stan `_means` (id rodow) z ostatniej doby wojny rodu, w zapisie (5. pole `arm_rent180`). Pierwsza doba po wczytaniu (budzet 166 jeszcze nie policzony - `ClanBudget.Pending`): stan z zapisu, wiec wczytanie nie zabiera rodom doby renty.
+4. POMIAR (C): linia "Renty korony (180)" - `P3/W1 styk krolestw w wojnie wedlug zrodla: armia w polu / oblezenie / napad na wlasna osade / tylko rajdy i bitwy wlasnych lordow` oraz `P3/W1 sluzba na miare srodkow: rodow w wojnie N (z nich sluzylo i tak M, doba zaliczona K), wymog sluzby zdjety u Z rodow z lennem`; `budzet-rodow.csv` - nowe ostatnie kolumny `sluzba_dzis_180` (0-8), `wyp_max_180` (najwyzsze wypelnienie druzyny), `na_miare_180`.
+
+**Zloto / ludzie:** nic nie powstaje - renta zmienia tylko odbiorce w tym samym krolestwie (skarbiec -> glowa, jak dotad). Do rodow objetych wraca do ok. 62.6 tys. zl/d, dzis prawie w calosci u rodow z luzem (ich kiesy +17 tys. zl/d). Oczekiwane w biegu rocznym: +3.5 do +5 tys. ludzi w partiach (gorna granica +5.4 tys. = powrot do stanu sprzed utraty renty), z tego Polnoc ok. +2.0 tys. To NIE zamyka spadku 97 -> 63 tys. (reszta to pulap zoldu i drozszy zolnierz).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regula sluzby K10 zostaje realna dla ok. 40% rodow: "na miare" przy progu 0.6 jest 51 (d84) do 118 (d364) rodow z lennem, dopoki pulap trzyma je ponizej 60% (z tego ok. 70 i tak ma dzis warunek). Prog nizszy niz liczba gry byl liczony i odrzucony (0.3: 84 rody, 44 zamiast 48 rodow bez sluzby).
+- Rod przy granicy moze miec rente co kilka dob (D to srednia 28 dob - pulap nie skacze).
+- Zostaja rody "oba" i sama "zaloga" (dzis 10): warunek zalogi nie jest ruszony. Jesli po 120 dobach "oba" > 2 - ta sama zasada dla zalogi jako drugi krok (do decyzji).
+- Kolejnosc doby: `CrownRents.Daily` (ArmouryBehavior.cs:1649) przed `ClanBudget.Daily` (:1672) - czyta budzet z wczoraj (`Of(c)`: `Today` z poprzedniej doby), bez kolizji. `AtMeans` tylko czyta.
+- W pokoju flaga zostaje z ostatniej doby wojny (maska tez stoi) - rod zwolniony w wojnie ma rente w pokoju; przeliczenie wraca z pierwsza doba wojny.
+- CSV: 3 nowe kolumny na koncu; `tools/sprawdz_logi.py` czyta po nazwach (`csv.DictReader`). Linia 180: nowe pola dopisane jako osobne segmenty po "doba wojny bez styku" - wzory narzedzia (`z warunkiem N, bez warunku N (P%)`, `| wagi: miasto ...`) nietkniete. Pole "sluzylo N" NIE zawiera dob zaliczonych "na miare" (osobne pole).
+- Czas doby: ok. 300 rodow x kilka druzyn (odczyt), bez znaczenia.
+- Klucza nie ma w `Armoury.json` Jeffa (grep) - dziala domyslna.
+- Sprawdzic w biegu 364 dob: rody z lennem bez warunku <= 10% w kazdym oknie (bylo 27%); "sluzba" <= 8, "oba" <= 2; rody z lennem z 0 ludzi <= 12 (bylo 29) i nie rosna po d196; E5/F9 <= 20 tys. zl/d (bylo 62.6); partie rodow d337-364 >= 66 tys.; suma zlota swiata bez zmiany.
+
+**Build:** Armoury kod 0 (drzewo `zb/woj`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (zgloszenie Jeffa, tor S) - CZYTELNA DATA "Year 299, Day 256, Autumn" + DZIEN ZMIENIA SIE O POLNOCY (klucz ReadableDateEnabled)
 **Mod:** Armoury | **Galaz:** `w-toku/kalendarz-data` (od ca4aa87 = WGRANIE 35) | **Pliki:** `Armoury/src/Calendar.cs` (nowa klasa `CalendarText`), `WesterosClimate.cs` (ToStringPrefix, TextSeason, OldTextDay, latka powiadomien), `MapClock.cs` (BarText), `IronBank.cs` i `DebtLadder.cs` (po 1 linii tekstu), `ArmouryBehavior.cs` (1 nasluch godzinny), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
 

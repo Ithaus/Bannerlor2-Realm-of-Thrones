@@ -25,6 +25,14 @@ namespace Armoury
     ///    gdy nie trzyma go w niej inne wezwanie); reszta ceny skreslona (nikt jej nie dostal);
     ///  - porozumienie skonczone przez gre (termin, pokoj) - reszta ceny skreslona.
     /// Wylaczone: porozumienia w toku wracaja do gry (portfel wezwanego dostaje niezaplacona reszte jak przy starcie gry). Zapis: "arm_ctw168".
+    /// P3/W4 (bieg roczny 364 doby, TRIAZ-3 O1-7 A; klucz CallToWarBreakRestoresWallet): ZERWANE WEZWANIE NIE WRACA JAKO "DLUG SPRZED PACZKI". Przy
+    /// zerwaniu z braku wplywow dnia wolamy EndCallToWarAgreement gry, a reszte ceny mial zdjac z portfela wzywajacego nasz postfiks (EndPostfix) - w tym
+    /// jednym miejscu nie jest wolany (krotka metoda gry, 2 wywolania, wklejana przez kompilator w nasz Daily; w wywolaniach samej gry postfiks dziala).
+    /// Wpis usuwalismy "na wypadek", portfel zostawal na minusie i nastepnej doby wykrywanie "dlugu sprzed paczki" bralo go za stary dlug: skarbiec placil
+    /// te sama kwote w nicosc po 1/182 na dobe (5 zerwan w roku = 3.56 mln zaksiegowane, 2.0 mln zniszczone). Teraz: po wywolaniu gry, jesli wpis dalej
+    /// jest na liscie - sami zdejmujemy reszte z portfela (ta sama arytmetyka co EndPostfix; warunek "wpis dalej na liscie" chroni przed podwojnym
+    /// zdjeciem). Szukanie dlugu sprzed paczki - tylko raz: w pierwszej dobie po wczytaniu zapisu bez klucza 168 albo po ponownym wlaczeniu paczki;
+    /// w kampanii zaczetej z paczka nigdy. Klucz wylaczony = stan sprzed (szukanie co dobe, bez wyrownania).
     /// </summary>
     internal static class CrownCallToWar
     {
@@ -38,11 +46,18 @@ namespace Armoury
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _ending;   // nasze EndCallToWarAgreement - postfiks nie liczy drugi raz
+        // P3/W4: szukac dlugu portfela sprzed paczki w najblizszej dobie (stary zapis bez klucza 168 albo paczka byla wylaczona); reszta ceny zdjeta z portfela
+        // przez nas po zerwaniu (postfiks nie zadzialal) - doba
+        private static bool _legacyScan;
+        private static long _dRestored;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
-        internal static void Reset() { _agr.Clear(); ZeroDay(); LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dCancelled = _dLegacy = _dLegacyPaid = _dUndone = 0; _dEndedN = _dPaidN = _dPeaceN = _dNewN = 0; }
+        internal static void Reset() { _agr.Clear(); ZeroDay(); ZeroEvents(); _legacyScan = false; LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; }
+        /// <summary>P3/W4: liczniki zdarzen miedzy dobami (nowe porozumienia - StartPostfix, skreslenia przez gre - EndPostfix) zerowane PO linii doby.
+        /// Dotad zerowal je poczatek Daily, zanim linia je wypisala - "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0.</summary>
+        private static void ZeroEvents() { _dCancelled = 0; _dNewN = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -145,15 +160,24 @@ namespace Armoury
                 // wylaczone: porozumienia w toku wracaja do gry - wezwany dostaje niezaplacona reszte (jak przy starcie gry), rody wzywajacego splacaja portfel
                 foreach (var a in _agr) { try { var called = KingdomById(a.Called); if (called != null && a.Left > 0) { int ow0 = called.CallToWarWallet; called.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left); _dUndone += a.Left; Measure31.CtwOther(called, ow0); } } catch { } }   // 3.1 (31, E3/0): Measure31.CtwOther
                 _agr.Clear();
+                _legacyScan = true;   // P3/W4: po ponownym wlaczeniu - jedno szukanie dlugu portfela (rody wzywajacego splacaly go grze, reszta zostaje koronie)
+                ZeroEvents();
                 return;
             }
             try
             {
+                var s0 = Settings.Current;
+                bool fix = s0 != null && s0.CallToWarBreakRestoresWallet;   // P3/W4; wylaczony = stan sprzed
                 // portfel wzywajacego ponizej dlugu z naszych porozumien = dlug rodow sprzed paczki: wezwany dostal go juz od gry z niczego, a rody splacalyby
                 // go w nicosc (to rownowazylo zloto gry). Recenzja D: nie skreslany (zostaloby zloto z niczego) - placi skarbiec wzywajacego czesciami dnia w nicosc
                 var owed = new Dictionary<string, long>();
                 foreach (var a in _agr) { long v; owed.TryGetValue(a.Calling, out v); owed[a.Calling] = v + a.Left; }
                 int today = (int)CampaignTime.Now.ToDays;
+                // P3/W4: szukanie tylko raz - po wczytaniu zapisu bez klucza 168 albo po ponownym wlaczeniu paczki. W kampanii prowadzonej z paczka portfel
+                // schodzi ponizej dlugu z naszych porozumien tylko przez nasz wlasny blad (zerwanie bez wyrownania) - to nie jest dlug sprzed paczki
+                bool scan = !fix || _legacyScan;
+                _legacyScan = false;
+                if (scan)
                 foreach (var k in Kingdom.All)
                 {
                     if (k == null || k.IsEliminated || k.StringId == null) continue;
@@ -213,6 +237,15 @@ namespace Armoury
                             _ending = true;
                             try { beh.EndCallToWarAgreement(calling, called, against); }
                             finally { _ending = false; }
+                            // P3/W4: postfiks (EndPostfix) w tym wywolaniu nie jest wolany - wpis zostaje na liscie, a portfel wzywajacego na minusie o reszte
+                            // ceny. Zdejmujemy ja sami (ta sama arytmetyka co EndPostfix); gdy postfiks jednak zadzialal, wpisu juz nie ma - nic nie robimy
+                            if (fix && a.Left > 0 && _agr.Contains(a))
+                            {
+                                int rw0 = calling.CallToWarWallet;
+                                calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left);
+                                _dRestored += a.Left;
+                                Measure31.CtwOther(calling, rw0);   // 3.1 (31, E3/0): zmiana dodatniej czesci pola bez platnika (skreslenie reszty), jak przy upadku krolestwa
+                            }
                             _agr.Remove(a);   // na wypadek, gdyby postfiks nie znalazl wpisu
                             _dEnded += left; _dEndedN++;
                             bool peace = false;
@@ -244,6 +277,7 @@ namespace Armoury
             {
                 LastPaid = _dPaid; LastEnded = _dEnded; LastEndedN = _dEndedN; LastUnpaid = _dUnpaid; LastLegacyPaid = _dLegacyPaid;
                 try { Line(); } catch (Exception e) { Stumble("Line", e); }
+                ZeroEvents();   // P3/W4: liczniki zdarzen miedzy dobami - po linii
             }
         }
 
@@ -276,6 +310,9 @@ namespace Armoury
               .Append(", niedoplata (bez zachowania gry) ").Append(_dUnpaid)
               .Append(" | skreslone: koniec porozumienia przez gre ").Append(_dCancelled)
               .Append(" | dlug portfela sprzed paczki (wezwany dostal od gry z niczego): nowy ").Append(_dLegacy).Append(", splacone dzis ze skarbcow w nicosc (rownowazy) ").Append(_dLegacyPaid)
+              .Append(" | P3/W4 po zerwaniu reszta ceny zdjeta z portfela wzywajacego przez nas (latka konca porozumienia nie zadzialala) ").Append(_dRestored)
+              .Append(s.CallToWarBreakRestoresWallet ? "; dlug sprzed paczki szukany tylko raz po wczytaniu zapisu bez klucza 168 (Call To War Break Restores Wallet)"
+                                                     : "; Call To War Break Restores Wallet wylaczone - bez wyrownania, dlug szukany co dobe jak dotad")
               .Append(" | rody nic nie placa (latki: ").Append(_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-").Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-").Append(')')
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             if (_importN >= 0) { sb.Append(" Wczytano z zapisu: porozumien ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
@@ -306,10 +343,10 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _agr.Clear(); _importN = 0; _importBad = 0;
+            _agr.Clear(); _importN = 0; _importBad = 0; _legacyScan = false;
             try
             {
-                if (string.IsNullOrEmpty(data)) return;
+                if (string.IsNullOrEmpty(data)) { _legacyScan = true; return; }   // P3/W4: zapis bez klucza 168 - jedno szukanie dlugu portfela sprzed paczki
                 var f = data.Split('|');
                 if (f.Length < 2 || f[0] != "v1") { _importBad++; return; }
                 if (f[1].Length == 0) return;
