@@ -1392,3 +1392,8 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   na `w-toku/zbior-5-8` (autor + recenzent, push po kazdej), rownolegle F9a narzedzie progow na `w-toku/zb58-progi` (zb\58t, od a589def), na koncu zlozenie F9b + DLL test\zb58f.
   PO SCALENIU ETAPU 8: F6 pkt 2 (pamiec UsedByMen w AiWear - plik zmienia E8/W). DO JEFFA (raport): czy kupcy maja wozic unikaty miedzy miastami (bylo tez w W33).
   Etap 8 (wf_1db23a93-783): `e8-a` po E8/A (652fe0d; zostaje Z, L, C, R, B, O1, O2, O3, O5, O6), `e8-c` po E8/G2 (c93dfe0; zostaje T, E, K, D1, D2).
+- (03:00 UTC 13.10) Postep: poprawki na `w-toku/zbior-5-8` do F5 (7452951): F1 b762fe4, F2 7d8d0cd, F6 cd06bcd, F7 a11e2e7 (3 mody), F8 38cb329, F5 57819b1 - kazda z recenzja; zostaje F4a, F4b, F3,
+  zlozenie F9b. Narzedzie progow F9a gotowe: `w-toku/zb58-progi` b5509fe. Etap 8: `e8-a` po E8/C (3e34ef0; R zakodowane d09215f; zostaje B, O1, O2, O3, O5, O6), `e8-c` po E8/K (ac3bd70; zostaje D1, D2).
+  **NOWE DRZEWO SCALENIA `w-toku/zbior-e8` (zb\int)** - wf_f8505b0b-689 (docs/przekazanie/wf-zbior-e8-scalenie-i-H.js): wczesne scalenie e8-a@3e34ef0 + e8-c@ac3bd70 (z mechaniczna weryfikacja),
+  potem E8/H (jezdziec = kon + uprzaz, wariant A z rozpoznania; klucz RiderNeedsHarness). PLAN ZLOZENIA KONCOWEGO: do `zbior-e8` dojda kolejnymi scaleniami: zbior-5-8 (etapy 5-7 + e8-b +
+  poprawki F), ogon e8-c (D1, D2), ogon e8-a (R, B, O1-O6); potem F6 pkt 2 (AiWear), przeglad kolizji, pelny audyt, test zbiorczy. Limit 5 h 18%, tydzien 20%.
