@@ -1422,3 +1422,12 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   koszt markietanow w progu, czeka na skore 1632 -> 654/d. Progi: etap2 1 NIE, etap3 2, etap4 3, etap5 17, etap7 3, etap8 22 (pierwszy bieg etapu 8).
   **W TOKU:** triaz biegu 2 wf_48305665-088 (5 obszarow: szybkosc, wojsko, konie/uprzaz, etap 8 reszta, etapy 3-7 reszta; BLOKUJE / STROJENIE / PROG; z podwazeniem), pelny audyt wf_512814c1-89f,
   zapis 9 dob (autotest-2026-10-12-2322), drzewo A (O3, O5, O6). Potem: jedna runda poprawek (audyt + triaz), ogon e8-a, test koncowy, wgranie.
+- (07:00 UTC 13.10) **PELNY AUDYT GOTOWY** (wf_512814c1-89f; 8 przegladow + sprawdzenie): `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md`. 13 znalezisk: 0 krytycznych, 3 wazne (wszystkie
+  potwierdzone), 9 drobnych. WAZNE: (1) siec CrashScribe - finalizer z parametrem __originalMethod na kazdej metodzie Armoury/RC/GT (7 834 metody) kosztuje 0.07-1.6 us + 240 B smieci na KAZDE
+  wywolanie (koszt zastany, tez w W33; poprawka S w Net.cs - metoda z ramki stosu dopiero przy wyjatku); (2) HorseFate.cs:906 - przy wylaczonym LootIsTransfer uprzaz rozbitej partii powstaje
+  drugi raz (S); (3) krok wgrania: USUNAC linie "CampBattlePropsEnabled": false z Armoury.json Jeffa (:302), nie zmieniac na true. DROBNE: kopalnia BK gracza wytapia bez drewna
+  (WorkshopLaw.cs:1535), ksiega towarow liczy lup z rabunku jako produkcje (DistrictRaid.cs:542), Reset SaddleLaw/CrossingLaw tylko pod kluczem E8/S (StateHygiene.cs:44), flaga NK dymarek
+  niezalezna od klucza (Bloomery.cs:156), 4 opisy MCM po polsku + 1 bez opisu, nowa partia lorda w dobach 1-3 dostaje konie dwa razy (HorseFate.cs:1151), licznik potkniec napisow W4 zerowany
+  co klatke (MapVillageLook.cs:535), RC praca we wsi po wczytaniu - zle menu (Work.cs:144), licznik CaravanFlow. Zloto, sztuki, zapis, latki (sygnatury), sciezki gracza: bez krytycznych uwag.
+  **Zapis 9 dob po biegu 2: OK** (129/129, Armoury 0 ERROR, 24.0 s/dobe). **PROFIL KLATKI (10 dob od d120, test\profil-e8r1.txt):** klatka 163.7 ms; Native 31%, silnik 20%, Armoury 18%
+  (27.7 ms), BannerKings 16% (z tego tik karawan BK 17.5 ms = 11% klatki - skutek E8/G1), ROT-Core 10% (CheckNPCMarriages 14.9 ms). `w-toku/zbior-e8` = cd842e7 (+ E8/O2, O3).
