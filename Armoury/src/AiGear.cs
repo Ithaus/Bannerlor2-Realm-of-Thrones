@@ -680,8 +680,11 @@ namespace Armoury
         /// na czym usiasc, + luz) - DOWOLNA pasujaca sztuka, najtansza najpierw (siodlo robi jezdzca; lader wzorca dokupuje E6/R3 po staremu jako "lepsze").
         /// Reguly zakupow AI jak przy brakach: bez unikatow, czarnej listy DTE, dodatnich stanow i sztuk ponad sufit (AiBuyRules), kazda sztuka po swojej cenie
         /// (ShelfBuy.Take), dostawa i zaplata ta sama (deliver = here: zbrojownia partii, sakiewka ludzi, potem kiesa pana -> kasa miasta). Ostatnie
-        /// AiMountShelfFloor sztuk pasujacej uprzezy zostaja na polce dla innych kupcow (jak konie). Polka bez sztuki dla AI = zamowienie dla siodlarzy
-        /// (SupplyDemand.NoteUnmetOnce, koszyk uprzaz t1); "za drogie na reszte budzetu" to nie brak towaru. Zwraca wydane zloto.
+        /// AiSaddleShelfFloor sztuk pasujacej uprzezy zostaja na polce dla innych kupcow (P2/C2: wlasny klucz siodel = 1; dotad podloga koni AiMountShelfFloor = 4
+        /// trzymala do 4 x 97 miast = 388 sztuk przy 955 jezdzcach bez uprzezy; konie zostaja przy swojej podlodze). Zamowienie dla siodlarzy
+        /// (SupplyDemand.NoteUnmetOnce, koszyk uprzaz t1) - P2/C2: zawsze, gdy po zakupach zostal brak i ponad podloge nie lezy juz zadna sztuka dla AI tieru 1
+        /// (ta sama zasada co OnShelf dla brakow; dotad polka z sama droga barda albo 1-2 kupionymi siodlami nie dawala sygnalu: 32% wizyt z brakiem konczylo
+        /// sie zakupem 1.84 szt. przy braku 9.6 i bez zamowienia); "za drogie na reszte budzetu" przy lezacym tanim siodle to dalej nie brak towaru. Zwraca wydane zloto.
         /// Szew z E8/O1 (265): zdjecie i zwrot ida przez ShelfBuy.Take / PutBack, wiec pamiec polki dostaje poprawke o jedna sztuke jak przy brakach (dziesiate
         /// miejsce Take; uprzaz jest w prawie podazy, przeglad polki wycenia kandydatow i zostawia pamiec aktualna przed pierwszym zdjeciem) - bez wlasnego kodu.
         /// </summary>
@@ -708,7 +711,7 @@ namespace Armoury
                     if (price <= 0 || AiBuyRules.OverCap(el.EquipmentElement, price)) continue;
                     cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Price = price });
                 }
-                int allow = Math.Max(0, onShelf - Math.Max(0, s.AiMountShelfFloor));
+                int allow = Math.Max(0, onShelf - Math.Max(0, s.AiSaddleShelfFloor));   // P2/C2: podloga siodel osobno od podlogi koni
                 int left = want;
                 bool any = cands.Count > 0 && allow > 0;
                 if (any)
@@ -731,10 +734,16 @@ namespace Armoury
                         if (!deliver(cel, n, SaddleLaw.Bucket, cost)) { ShelfBuy.PutBack(shelf, cel, n, cost, first); continue; }   // DTE odrzucil - wraca na polke, nikt nie placi
                         ArmsScrap.NoteBuy(market, cel.Item, n);   // popyt koszyka w miescie (tylko licznik)
                         spent += cost; pieces += n; left -= n; allow -= n;
+                        c.Left -= n; cands[ci] = c;   // P2/C2: SubCand to struktura - stan po zakupie wraca na liste (ile sztuk kandydata zostalo na polce)
                         if (bought.Count < 6) bought.Add(cel.Item.StringId + " " + ShelfBuy.Prices(n, first, last) + " (siodlo E8/H)");
                     }
                 }
-                bool order = left > 0 && !any;
+                // P2/C2 (TRIAZ-2 K3-3): czy ponad podloge zostala na polce sztuka tieru 1, ktora AI moze wziac - jesli nie, a brak zostal, siodlarze dostaja zamowienie
+                bool cheapLeft = false;
+                if (allow > 0)
+                    for (int ci = 0; ci < cands.Count; ci++)
+                        if (cands[ci].Left > 0 && TierOf(cands[ci].El.Item) <= 1) { cheapLeft = true; break; }
+                bool order = left > 0 && !cheapLeft;
                 if (order) SupplyDemand.NoteUnmetOnce(buyer, market, ItemObject.ItemTypeEnum.HorseHarness, 1, Math.Min(10, left));
                 SaddleLaw.NoteVisit(buyer, want, left, order);
             }

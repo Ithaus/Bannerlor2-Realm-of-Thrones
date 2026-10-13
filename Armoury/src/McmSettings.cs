@@ -1268,6 +1268,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountShelfFloor { get; set; } = 4;
 
+        [SettingPropertyInteger("Ai Saddle Shelf Floor", 0, 10, "0", HintText = "the same for saddles: an AI lord buying harness for riders who have a horse and no saddle leaves this many pieces of fitting horse harness on a town's shelf for other buyers (horses keep their own floor above)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public int AiSaddleShelfFloor { get; set; } = 1;
+
         [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing. Always on while Troops Fight With Own Kit Only is on - a rider there rides only a horse from the stores. Takes effect at once (off, with own kit only also off = the AI horse is gone on upgrade as before)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool AiUpgradeHorseToArmory { get; set; } = true;
@@ -3572,6 +3576,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentWarDayNeedsContact { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rent Service After Full Days", HintText = "the crown asks a house for service only once that house has seen as many days of real war under this crown as the crown asks days of service (Crown Rent Service Days); before that every house that keeps its garrisons draws its rent - a short clash at the start of a quiet war no longer strips the rent from every house that missed it (off = service is asked from the first day of real war, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentServiceAfterFullDays { get; set; } = true;
+
         [SettingPropertyBool("Crown Rent Held To Serving", HintText = "the rent share of a house that does not serve (garrison or service days) goes to the houses of the same realm that do, by the same fief weights, instead of staying in the treasury; if no house of the realm serves, it stays in the treasury. Off = it stays in the treasury, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentHeldToServing { get; set; } = true;
@@ -4996,6 +5004,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopCraftByRealm { get; set; } = true;
 
+        [SettingPropertyBool("Plain Saddle Every Realm", HintText = "with Workshop Craft By Realm: the saddlers of every realm make the plain saddle that belongs to no land - a common riding harness with next to no armour for the horse - beside their own patterns, so a realm whose only own horse gear is a house caparison or an elephant's harness still has saddles for its riders (off = only the realm's nearest pattern, as before; takes effect on the next load)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool PlainSaddleEveryRealm { get; set; } = true;
+
         [SettingPropertyBool("Workshops Follow Inputs", HintText = "a town's trade workshop is the kind its own villages feed - no wine press where no grapes grow: when the game picks the trade of a workshop (at the start of a new campaign, after a bankruptcy, when you lose a workshop) a trade whose raw goods neither grow in the town's villages nor come by a materials contract is all but never chosen, unless no trade has them. Workshops already working and your own workshops are not changed (off = the game's choice, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopsFollowInputs { get; set; } = true;
@@ -5524,6 +5536,7 @@ namespace Armoury
             s.MountedWageFactor = MountedWageFactor;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
+            s.AiSaddleShelfFloor = AiSaddleShelfFloor;
             s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
             s.AiFreeArmoryHorsesFirst = AiFreeArmoryHorsesFirst;
             s.RiderNeedsHarness = RiderNeedsHarness;
@@ -6100,6 +6113,7 @@ namespace Armoury
             s.CrownRentGarrisonNormKingdom = CrownRentGarrisonNormKingdom;
             s.CrownRentServiceWholeDay = CrownRentServiceWholeDay;
             s.CrownRentWarDayNeedsContact = CrownRentWarDayNeedsContact;
+            s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CrownBorrows = CrownBorrows;
@@ -6456,6 +6470,7 @@ namespace Armoury
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
+            s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;
             s.WorkshopsFollowInputs = WorkshopsFollowInputs;
             s.SandSteedsInDorne = SandSteedsInDorne;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;

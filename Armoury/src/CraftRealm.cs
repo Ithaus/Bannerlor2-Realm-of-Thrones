@@ -114,10 +114,13 @@ namespace Armoury
         private static readonly Dictionary<string, int> _foreignBy = new Dictionary<string, int>();
         private static int _stumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
+        // P2/C1: zwykle siodlo w kazdej krainie - kraina -> { wzory zwyklego siodla juz w lancuchu, wzory dopisane }; wzor dopisany -> w ilu krainach (do linii startu)
+        private static readonly Dictionary<string, int[]> _plain = new Dictionary<string, int[]>();
+        private static readonly Dictionary<string, int> _plainIds = new Dictionary<string, int>();
 
         internal static void Reset()
         {
-            lock (Gate) { _info = null; _region = null; _allowed.Clear(); _best.Clear(); }
+            lock (Gate) { _info = null; _region = null; _allowed.Clear(); _best.Clear(); _plain.Clear(); _plainIds.Clear(); }
             _nItems = _nPrefix = _nTypo = _nHouse = _nCommonW = _nCommonE = _nBandit = _nNobody = _nKhuzaitSteel = _nUnique = _nNeutral = _ffSteel = 0;
             _startLogged = false;
             Array.Clear(_day, 0, _day.Length); _dayUnique = _daySide = 0; _foreignBy.Clear();
@@ -352,8 +355,69 @@ namespace Armoury
             }
             m = new Dictionary<ItemObject, int>();
             foreach (var kv in lv) if (kv.Value == best[d[kv.Key].Basket]) m[kv.Key] = kv.Value;
-            lock (Gate) { _allowed[realm] = m; _best[realm] = best; }
+            // P2/C1 (bieg probny 2, TRIAZ-2 "GLOWNE", H-1, H-3): ZWYKLE SIODLO KUJE SIODLARZ KAZDEJ KRAINY - nazwany wyjatek od reguly "w koszyku tylko najnizszy
+            // poziom lancucha" (E6/M1). Kropierz rodowy (poziom 1) albo siodlo slonia (region) wypieralo z koszyka uprzaz t1 neutralne siodlo (poziom 4) w 15 z 30
+            // krain = 52 z 97 miast, a Reach mial pule pusta - po E8/H (jezdziec = kon + uprzaz) siodlarze robili 25.7 szt./d przy potrzebie 40+. Dopisywane tylko
+            // wzory poziomu wspolnego (neutralne i wspolne strony morza: bez rodowych, bandyckich, unikatow; Wolni Ludzie dalej bez metalu - Level), rodziny konia
+            // (SaddleLaw.Fits), z pancerzem konia do granicy "siodlo" cennika (PriceList8.SaddleMaxArmor). best / Cover bez zmian (linia pokrycia nie liczy uprzezy).
+            int had = 0, added = 0;
+            List<string> ids = null;
+            var st = Settings.Current;
+            if (st != null && st.PlainSaddleEveryRealm)
+                foreach (var kv in lv)
+                {
+                    if (!IsPlainSaddle(kv.Key)) continue;
+                    if (m.ContainsKey(kv.Key)) { had++; continue; }
+                    if (kv.Value != LCommon) continue;
+                    m[kv.Key] = LCommon; added++;
+                    if (ids == null) ids = new List<string>();
+                    ids.Add(kv.Key.StringId ?? "?");
+                }
+            lock (Gate)
+            {
+                if (!_allowed.ContainsKey(realm))
+                {
+                    _plain[realm] = new[] { had, added };
+                    if (ids != null) foreach (var id in ids) { int c; _plainIds.TryGetValue(id, out c); _plainIds[id] = c + 1; }
+                }
+                _allowed[realm] = m; _best[realm] = best;
+            }
             return m;
+        }
+
+        /// <summary>P2/C1: zwykle siodlo - uprzaz rodziny konia z pancerzem konia do granicy "siodlo" cennika E8/C (kropierze i bardy - nie).</summary>
+        private static bool IsPlainSaddle(ItemObject it)
+        {
+            try
+            {
+                if (it == null || it.ItemType != ItemObject.ItemTypeEnum.HorseHarness) return false;
+                var ac = it.ArmorComponent;
+                return ac != null && ac.BodyArmor <= PriceList8.SaddleMaxArmor && SaddleLaw.Fits(it);
+            }
+            catch (Exception e) { Stumble("IsPlainSaddle", e); return false; }
+        }
+
+        /// <summary>P2/C1: dopisek linii startu - w ilu krainach zwykle siodlo bylo juz w lancuchu, w ilu dopisane i ktore wzory (wzor x liczba krain).</summary>
+        private static string PlainText()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.PlainSaddleEveryRealm) return " | zwykle siodlo w kazdej krainie (P2/C1): klucz wylaczony";
+            int own = 0, addedIn = 0, none = 0;
+            var tp = new List<string>();
+            lock (Gate)
+            {
+                foreach (var kv in _plain)
+                {
+                    if (kv.Key == "?") continue;
+                    if (kv.Value[0] > 0) own++;
+                    if (kv.Value[1] > 0) addedIn++;
+                    if (kv.Value[0] + kv.Value[1] == 0) none++;
+                }
+                foreach (var kv in _plainIds) tp.Add(kv.Key + " x" + kv.Value);
+            }
+            tp.Sort(StringComparer.Ordinal);
+            return " | zwykle siodlo w kazdej krainie (P2/C1): krain z wlasnym wzorem w lancuchu " + own + ", dopisane wspolne w " + addedIn + " krainach, bez zadnego wzoru " + none
+                   + " [" + string.Join(", ", tp.ToArray()) + "]";
         }
 
         /// <summary>Czy kowale tej krainy kuja ten wyrob (lancuch na koszyk). False takze przy braku spisu.</summary>
@@ -493,7 +557,7 @@ namespace Armoury
                      + ", neutralnych " + _nNeutral + ", rodowych " + _nHouse + ", wspolnych strony morza W " + _nCommonW + " / E " + _nCommonE + ", bandyckich " + _nBandit
                      + ", unikatow/legend/zakazanych " + _nUnique + " | odciete lore: Wolni Ludzie stal " + _ffSteel + ", Dothrakowie stal wanilii " + _nKhuzaitSteel
                      + ", wanilia Braavos/Lorath tylko u siebie (regula), nikt (lion_sword, wildling) " + _nNobody + " | okno kontekstu drogi gry: " + (CtxWired ? "GetItemsToProduce OK" : "BRAK (E6/M1 niewpiete)")
-                     + " | lancuch " + (Active ? "CZYNNY (E6/M1)" : "tylko pomiar") + ".");
+                     + " | lancuch " + (Active ? "CZYNNY (E6/M1)" : "tylko pomiar") + PlainText() + ".");
             Log.Info("CraftRealm (E6/0) pokrycie koszykow korpusu T, helmu H, tarczy S t1-6 (w wlasne, p pokrewne, r region, n wspolne/neutralne, s strona morza, . nie kuje - przywozi handel), pustych "
                      + empty + ": " + string.Join("; ", parts.ToArray()) + ".");
         }

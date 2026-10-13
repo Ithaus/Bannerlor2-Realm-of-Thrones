@@ -26,6 +26,10 @@ namespace Armoury
     ///       nalezy do krolestwa, z ktorym jest wojna); niewola u wroga liczy sie jako sluzba. Karawana i partia we wlasnych osadach - nie. Rod, ktory widzial
     ///       mniej niz 60 dob wojny tej korony (nowa kampania, nowy wasal, stary zapis), potrzebuje tej samej czesci dob, ktore widzial (20/60); bez zadnej doby
     ///       wojny - warunek sluzby nie obowiazuje (nie bylo wojny, w ktorej mozna sluzyc).
+    ///       P2/C4 (klucz CrownRentServiceAfterFullDays; bieg probny 2, TRIAZ-2 O2-2): rod, ktory widzial MNIEJ niz CrownRentServiceDays (20) dob wojny ze
+    ///       stykiem - warunek sluzby tez nie obowiazuje (wymog 0); od 20 do 59 dob - ta sama czesc (pierwszy wymog 7 dob), od 60 - pelne 20. Dotad wymog
+    ///       rosl od pierwszej doby styku (9 dob styku = 3 doby sluzby), a doba wojny bez styku nie przesuwa okna - rod, ktory nie zdazyl sluzyc w krotkim
+    ///       styku, nie mial jak tego odrobic do nastepnego: Polnoc 80 dob z renta u 2 z 20 rodow (cala pula przez E5/F9 do tych dwoch), partie 10.1 -> 5.8 tys.
     ///    Udzial rodu bez warunku zostaje w skarbcu (zapas); reszta z zaokraglen tez. E5/F9 (klucz CrownRentHeldToServing, diagnoza wojska biegu zbiorczego
     ///    329f2c7: 58 tys./d wstrzymanych rent - jedyny staly przeciek korony): udzial rodu bez warunku idzie do rodow z warunkiem tego samego krolestwa
     ///    wedlug tych samych wag lenn (renta = pula x waga / suma wag rodow z warunkiem); bez zadnego rodu z warunkiem - zostaje w skarbcu jak dotad.
@@ -466,8 +470,10 @@ namespace Armoury
                                 Svc v;
                                 if (_svc.TryGetValue(c.StringId, out v) && v.Kingdom == k.StringId && v.Seen > 0)
                                 {
-                                    row.Served = Popcount(v.Mask);
-                                    row.Need = Math.Min(svcDays, (int)Math.Ceiling(svcDays * (double)v.Seen / Window - 1e-9));
+                                    row.Served = Popcount(v.Mask);   // liczba dob sluzby zostaje w wierszu (linia, CSV) takze wtedy, gdy wymog jeszcze nie obowiazuje
+                                    // P2/C4 (TRIAZ-2 O2-2): wymog dopiero, gdy rod widzial co najmniej svcDays dob wojny ze stykiem; klucz wylaczony = wzor sprzed poprawki
+                                    if (!s.CrownRentServiceAfterFullDays || v.Seen >= svcDays)
+                                        row.Need = Math.Min(svcDays, (int)Math.Ceiling(svcDays * (double)v.Seen / Window - 1e-9));
                                 }
                                 row.SvcOk = row.Served >= row.Need;
                             }
@@ -575,7 +581,8 @@ namespace Armoury
                       .Append(" | wagi: miasto ").Append(LordsEvenUp.WeightTown(s).ToString("0.##", Inv)).Append(", zamek ").Append(LordsEvenUp.WeightCastle(s).ToString("0.##", Inv))
                       .Append(", wies ").Append(LordsEvenUp.WeightVillage(s).ToString("0.##", Inv)).Append(LordsEvenUp.Live ? " (E5/B3: z wyrownaniem)" : " (E5/B3: bez wyrownania)")
                       .Append("; warunek: zaloga >= ").Append((garShare * 100f).ToString("0", Inv)).Append("% normy ").Append(s.CrownRentGarrisonNormKingdom ? "krolestwa" : "swiata")
-                      .Append(" (28 dob), sluzba >= ").Append(svcDays).Append(" z ostatnich ").Append(Window).Append(" dob wojny (rod, ktory widzial mniej dob wojny - ta sama czesc)")
+                      .Append(" (28 dob), sluzba >= ").Append(svcDays).Append(" z ostatnich ").Append(Window).Append(" dob wojny (rod, ktory widzial mniej dob wojny - ta sama czesc")
+                      .Append(s.CrownRentServiceAfterFullDays ? "; mniej niz " + svcDays + " dob wojny ze stykiem - warunek sluzby nie obowiazuje (P2/C4)" : "; P2/C4 wylaczone").Append(')')
                       .Append(" | sluzba dzis: rody w wojnie ").Append(warClans).Append(", sluzylo ").Append(srvArmy + srvSiege + srvBattle + srvLand + srvCaptive + srvGuard + srvBattleEvt)
                       .Append(" (armia ").Append(srvArmy).Append(", oblezenie ").Append(srvSiege).Append(", bitwa ").Append(srvBattle).Append(", ziemia wroga ").Append(srvLand)
                       .Append(", niewola ").Append(srvCaptive).Append(", poscig i odsiecz ").Append(srvGuard).Append(", bitwa w ciagu doby (zdarzenie) ").Append(srvBattleEvt).Append(')')
