@@ -161,7 +161,7 @@ namespace Armoury
             var seen = new HashSet<string>();
             foreach (var kv in arm)
             {
-                if (kv.Key == null || !SupplyDemand.Equipmentish(kv.Key) || ArmouryBehavior.NoWear(kv.Key) || MenPurse.HorseKind(kv.Key)) continue;
+                if (kv.Key == null || !SupplyDemand.Equipmentish(kv.Key) || ArmouryBehavior.NoState(kv.Key) || MenPurse.HorseKind(kv.Key)) continue;   // recenzja E8/C: NoState - ksiega dalej prowadzi stan, ktory bron miotana juz ma (nowego nie dostaje: PickWornModifier -> NoWear)
                 string id = kv.Key.StringId; seen.Add(id);
                 int was; known.TryGetValue(id, out was);
                 int now = Math.Max(0, kv.Value);
@@ -192,7 +192,7 @@ namespace Armoury
             if (!On || mp == null || el.Item == null) return;
             NoteSound(mp, el.Item, n);
             var m = el.ItemModifier;
-            if (m != null && m.PriceMultiplier < 1f && !MenPurse.HorseKind(el.Item) && !ArmouryBehavior.NoWear(el.Item)) AddWorn(mp.StringId, el.Item.StringId, m.StringId, n);
+            if (m != null && m.PriceMultiplier < 1f && !MenPurse.HorseKind(el.Item) && !ArmouryBehavior.NoState(el.Item)) AddWorn(mp.StringId, el.Item.StringId, m.StringId, n);   // recenzja E8/C: NoState - obita bron miotana (zakup z polki, komplet od gracza, dar) zostaje obita
         }
 
         internal static void Forget(MobileParty mp)
@@ -215,7 +215,7 @@ namespace Armoury
             if (!On || from == null || to == null || it == null || n <= 0) return;
             if (sync) Sync(from);   // sync = false: spis dawcy zrobiony juz w tym samym przeniesieniu (Known trzyma go w zgodzie)
             NoteSound(to, it, n);   // przybytek u odbiorcy to nie lup (spis od razu, gdy odbiorca ma spis)
-            if (ArmouryBehavior.NoWear(it) || MenPurse.HorseKind(it)) return;
+            if (ArmouryBehavior.NoState(it) || MenPurse.HorseKind(it)) return;   // recenzja E8/C: NoState
             string pf = from.StringId, id = it.StringId;
             int w = WornOf(pf, id);
             if (w > 0)
@@ -247,7 +247,7 @@ namespace Armoury
             var list = new List<KeyValuePair<ItemModifier, int>>();
             if (!On || from == null || it == null || n <= 0) return list;
             if (sync) Sync(from);
-            if (!ArmouryBehavior.NoWear(it) && !MenPurse.HorseKind(it))
+            if (!ArmouryBehavior.NoState(it) && !MenPurse.HorseKind(it))   // recenzja E8/C: NoState - obita bron miotana wraca do druzyny gracza obita
             {
                 string pf = from.StringId, id = it.StringId;
                 int w = WornOf(pf, id);
@@ -606,7 +606,7 @@ namespace Armoury
                     if (!arm.TryGetValue(g.Key, out have) || have <= 0) continue;
                     int k = Math.Min(have, g.Value), left = have - k;
                     if (left > 0) arm[g.Key] = left; else arm.Remove(g.Key);
-                    if (!ArmouryBehavior.NoWear(g.Key))
+                    if (!ArmouryBehavior.NoState(g.Key))   // recenzja E8/C: NoState - bron miotana jest w spisie i w ksiedze obitych
                     {
                         Known(mp, g.Key, -k);
                         int w = WornOf(p, g.Key.StringId);
@@ -687,7 +687,7 @@ namespace Armoury
         internal static void PutBack(MobileParty mp, ItemObject it, ItemModifier mod)
         {
             if (!On || mp == null || it == null) return;
-            if (mod != null && mod.PriceMultiplier < 1f && !MenPurse.HorseKind(it) && !ArmouryBehavior.NoWear(it)) AddWorn(mp.StringId, it.StringId, mod.StringId, 1);
+            if (mod != null && mod.PriceMultiplier < 1f && !MenPurse.HorseKind(it) && !ArmouryBehavior.NoState(it)) AddWorn(mp.StringId, it.StringId, mod.StringId, 1);   // recenzja E8/C: NoState
             Known(mp, it, 1);
         }
 

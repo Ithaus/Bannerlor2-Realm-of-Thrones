@@ -2353,7 +2353,10 @@ namespace Armoury
         }
 
         /// <summary>E8/C: sztuka BEZ STANU w ogole (strzaly i belty, zywy inwentarz, towar) - dla widoku stanu i naprawy: dopisek w nazwie, sekcja w dymku,
-        /// lista napraw kowala, stan sprzetu wojska. To dawne NoWear: bron miotana, ktora ma juz stan (lup Spoils, stary zapis), dalej go pokazuje i da sie naprawic.</summary>
+        /// lista napraw kowala, stan sprzetu wojska. To dawne NoWear: bron miotana, ktora ma juz stan (lup Spoils, stary zapis), dalej go pokazuje i da sie naprawic.
+        /// Recenzja E8/C: takze ksiega stanu zbrojowni AI (AiWear: spis, zakup z polki, komplety od gracza i z powrotem, dar, zwrot niesprzedanej sztuki) - inaczej
+        /// obity oszczep oddany zalodze z ludzmi wracal z nimi sprawny (naprawa bez kowala), a AI kupowalo obity z polki jako sprawny. Nowego stanu bron miotana
+        /// nie dostaje nigdzie (NoWear).</summary>
         internal static bool NoState(ItemObject it)
         {
             return IsAmmo(it) || IsBeast(it) || IsGoods(it);
