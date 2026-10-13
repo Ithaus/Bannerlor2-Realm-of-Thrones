@@ -129,6 +129,7 @@ namespace Armoury
                 // ile lenn z budowa ma kazdy rod
                 var count = new Dictionary<Clan, int>();
                 var jobs = new List<KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>>();
+                var civilWar = new List<KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>>();   // N5-E: budowle cywilne w wojnie dopuszczone z dala od frontu
                 foreach (var st in Settlement.All)
                 {
                     if (st == null || st.Town == null || (!st.IsTown && !st.IsCastle) || st.OwnerClan == null || st.IsUnderSiege) continue;
@@ -139,9 +140,29 @@ namespace Armoury
                     // wpis 86 (audyt pkt 8): wojna wstrzymuje cywilne JUZ TU - nie zabieraja dzialki murom
                     bool warNow = false;
                     try { if (st.OwnerClan.Kingdom != null) foreach (var k in Kingdom.All) if (k != st.OwnerClan.Kingdom && !k.IsEliminated && st.OwnerClan.Kingdom.IsAtWarWith(k)) { warNow = true; break; } } catch { }
-                    if (warNow && !b.BuildingType.IsMilitaryProject) { _warSkipped++; continue; }
+                    if (warNow && !b.BuildingType.IsMilitaryProject)
+                    {
+                        // N5-E (poprawka 5 po biegu rocznym): o budowli cywilnej w wojnie decyduje prawdziwe zagrozenie warowni, nie flaga wojny krolestwa
+                        // (WarFront.CivilAllowed: spokoj wokol warowni od CivilWorksCalmDays dob i luz pana w pulapie zoldu). Klucz wylaczony - false, jak dotad
+                        if (!WarFront.CivilAllowed(st)) { _warSkipped++; continue; }
+                        civilWar.Add(new KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>(st, b));
+                        continue;
+                    }
                     jobs.Add(new KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>(st, b));
                     int n; count.TryGetValue(st.OwnerClan, out n); count[st.OwnerClan] = n + 1;
+                }
+                // N5-E: mury pierwsze (wpis 86: cywilne nie zabieraja dzialki murom) - rod z budowa wojskowa w toku dzieli przydzial tylko miedzy nie, jak dotad;
+                // cywilne w wojnie ida tylko u rodu bez budowy wojskowej (jego przydzial budow lezal dotad bez uzytku)
+                if (civilWar.Count > 0)
+                {
+                    var wallClans = new HashSet<Clan>(count.Keys);
+                    foreach (var kv in civilWar)
+                    {
+                        var clan = kv.Key.OwnerClan;
+                        if (wallClans.Contains(clan)) { _warSkipped++; WarFront.NoteWallsFirst(); continue; }
+                        jobs.Add(kv); WarFront.NoteGo();
+                        int nc; count.TryGetValue(clan, out nc); count[clan] = nc + 1;
+                    }
                 }
                 var income = new Dictionary<Clan, float>();
                 var model = Campaign.Current.Models.ClanFinanceModel;
@@ -198,7 +219,7 @@ namespace Armoury
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
-                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ".");
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail());
         }
 
         /// <summary>

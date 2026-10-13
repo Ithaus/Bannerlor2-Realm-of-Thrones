@@ -802,8 +802,17 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null || !s.WorkshopHandsByPeople || town == null) return old;
             float byPeople = Math.Min(Math.Max(1f, s.WorkshopHandsMaxPerTown), Math.Max(0f, s.WorkshopHandsPer1000People) * MarketPeople(town) / 1000f * TownWage.Index(town));
-            return Math.Max(old, byPeople);
+            float h = Math.Max(old, byPeople);
+            // N5-C (poprawka 5 po biegu rocznym): krok 2 rak rzemieslnikow broni - x WorkshopHandsStep dla kazdego miasta (takze na dawnym wzorze), sufit
+            // WorkshopHandsMaxPerTown bez zmian (nigdy mniej niz bez kroku). Bieg roczny: rece zajete w 98%, brak zbroi korpusu t3-4 ok. 4 900 szt. przy 45 dziennie,
+            // ruda indeks 0.52, drewno 0.16. Rzemioslo miasta (x2) i strzelarze (x0.6) licza od tych samych rak - sa zajeci w 17% i 12%, wiec bez skutku
+            float step = HandsStep;
+            if (step > 1f) h = Math.Max(h, Math.Min(h * step, Math.Max(1f, s.WorkshopHandsMaxPerTown)));
+            return h;
         }
+
+        /// <summary>N5-C: krok rak rzemieslnikow broni (1 = wylaczony; tylko przy WorkshopHandsByPeople).</summary>
+        internal static float HandsStep { get { var s = Settings.Current; return s != null && s.WorkshopHandsByPeople ? MBMath.ClampFloat(s.WorkshopHandsStep, 1f, 3f) : 1f; } }
 
         internal static float Hands(Workshop workshop, Town town)
         {
@@ -903,6 +912,7 @@ namespace Armoury
                          + ", cel karawan " + (s.CaravanBulkLegacyHands ? "na dawnych rekach" : "NA NOWYCH rekach") + "; suma celow rudy " + oreT + ", Keep " + oreK
                          + "; kopalnie x" + Math.Max(0f, s.MineOutputStep).ToString("0.##", inv) + ", las wsi x" + Math.Max(0f, s.WoodlotStep).ToString("0.##", inv)
                          + ", BK gnicie surowcow trwalych " + (s.BkRawNoRot ? (RawNoRot.Hooked ? "wylaczone (drewno, len, welna 0.2%)" : "BRAK latki") : "jak w BK (MCM)")
+                         + "; krok rak (N5-C, Workshop Hands Step) x" + HandsStep.ToString("0.00", inv) + " - w liczbach tej linii"
                          + "; petla cyklu do " + PiecesPerCycleMax + " szt.");
             }
             catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }
@@ -1186,7 +1196,8 @@ namespace Armoury
             try
             {
                 float wh = WorldHands();   // 174.3: rece swiata (tabela stala - zmiana tylko z dobrobytu i placy)
-                sb.Append("; rece swiata ").Append(wh.ToString("0", inv)).Append(" (zmiana od startu ").Append(_handsStart > 0f ? ((wh / _handsStart - 1f) * 100f).ToString("+0.0;-0.0", inv) : "0").Append("%)");
+                sb.Append("; rece swiata ").Append(wh.ToString("0", inv)).Append(" (zmiana od startu ").Append(_handsStart > 0f ? ((wh / _handsStart - 1f) * 100f).ToString("+0.0;-0.0", inv) : "0").Append("%)")
+                  .Append(", krok rak (N5-C) x").Append(HandsStep.ToString("0.00", inv));
             }
             catch { }
             return sb.ToString();

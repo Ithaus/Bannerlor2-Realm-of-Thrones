@@ -14335,6 +14335,192 @@ def etap8_n3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "INFO (bieg roczny przed paczka: odsiecz 10 bitew / 6 052 ludzi - 100% strat; zwyciezcy wypadow 11.5% zabitych; strona twierdzy: wypad 0, pod murami 5 bitew / 3 604 ludzi)", None)
 
 
+# ============================================================ N5 (poprawka 5 po biegu rocznym 13.10): towary - blok etap8_n5
+# Linie: "Ceny surowcow" (miasta bez plotna / skory), "Towary: <towar>" (len, plotno, skory, skora, drewno, hog, sheep), "Regulator wsi (221)" (wstawki N5-A / N5-D),
+# "Skora z uboju (N5-B)" (start sesji), "Warsztaty: dzien" (krok rak N5-C), "Zbroja na polkach (174b)", "Budowy" i "Budowy oplacone" (wstawka N5-E);
+# plik tematyczny warsztaty.log ("najwiekszy brak"). Liczby "przed paczka" - bieg roczny 364 doby (Armoury-2026-10-13_06-24-10.log).
+N5_GOODS = ("flax", "linen", "hides", "leather", "hardwood", "hog", "sheep")
+
+
+def etap8_n5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """N5 (decyzja Jeffa 13.10 "robimy poprawki od 1 do 6", poprawka 5 - towary): plotno / len (N5-A sufit regulatora przy braku w miastach), skora (N5-B skora
+    z kazdego uboju), zbroja t3-4 (N5-C krok rak), drewno (N5-D krok regulatora wedlug zuzycia), budowy cywilne (N5-E z dala od frontu). Log sprzed paczki
+    (brak wstawek N5) - wszystkie wiersze INFO ze stanem wyjsciowym; progi wiazace dopiero przy czynnej regule i dosc dlugim oknie. Nigdy wyjatek."""
+    def inwin(d):
+        return 1 <= run_day(d, start) <= until
+
+    def mean(xs):
+        xs = [x for x in xs if x is not None]
+        return sum(xs) / float(len(xs)) if xs else None
+
+    def fmt(x, f="{:.0f}"):
+        return f.format(x) if x is not None else "-"
+
+    def tail(series, n=28):
+        ds = sorted(series)
+        return [series[d] for d in ds[-n:]]
+
+    span = len(win)
+    # ---- ksiega towarow: zapas, produkcja, zuzycie na dobe; uboj bez skory
+    tow = {g: {} for g in N5_GOODS}
+    nohide = {}
+    pat = re.compile(r"Towary: dzien (\d+) - (\w+) \([^)]*\): zapas (-?\d+) .*?\| produkcja (\d+) .*?\| zuzycie (\d+) ")
+    for s in lines:
+        if not s.startswith("Towary: dzien "):
+            continue
+        m = pat.match(s)
+        if not m or m.group(2) not in tow:
+            continue
+        d = int(m.group(1))
+        if not inwin(d):
+            continue
+        g = m.group(2)
+        tow[g][d] = (int(m.group(3)), int(m.group(4)), int(m.group(5)))
+        if g == "hog":
+            nohide[d] = nohide.get(d, 0) + (num(r"hog>2meat (\d+)", s, int, 0) or 0)
+        elif g == "sheep":
+            nohide[d] = nohide.get(d, 0) + (num(r"sheep>meat (\d+)", s, int, 0) or 0)
+    # ---- ceny surowcow: miasta bez towaru
+    ceny = {d: s for d, s in by_day(lines, "Ceny surowcow: dzien").items() if inwin(d)}
+    nolin = {d: num(r"plotno \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast", s) for d, s in ceny.items()}
+    nolea = {d: num(r"\bskora \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast", s) for d, s in ceny.items()}
+    # ---- regulator wsi
+    dec = {d: s for d, s in by_day(lines, "Regulator wsi (221): dzien").items() if inwin(d) and " - CZYNNY, decyzja " in s}
+    packA = any("N5-A sufit przy braku w miastach: " in s for s in dec.values())
+    onA = any("N5-A sufit przy braku w miastach: CZYNNY" in s for s in dec.values())
+    onD = any("N5-D krok wedlug zuzycia: CZYNNY" in s for s in dec.values())
+
+    def mult(good):
+        out = []
+        for d in sorted(dec):
+            g = re.search(r"\b%s: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja ([\d.]+) \((\d+)/(\d+)[^)]*\), stos (-?\d+) = (-?\d+) dni zuzycia" % good, dec[d])
+            if g:
+                e = num(r"miast bez towaru \[[^\]]*\b%s (\d+)" % good, dec[d])
+                out.append((run_day(d, start), float(g.group(2) or g.group(1)), float(g.group(3)), int(g.group(7)), e))
+        return out
+
+    hidl = next((s for s in lines if s.startswith("Skora z uboju (N5-B):")), None)
+    onB = hidl is not None and "WLACZONE" in hidl
+    wl = {d: s for d, s in by_day(lines, "Warsztaty: dzien").items() if inwin(d)}
+    stepC = [num(r"krok rak \(N5-C\) x([\d.]+)", s, float) for s in wl.values()]
+    stepC = [x for x in stepC if x is not None]
+    onC = bool(stepC) and max(stepC) > 1.0
+    bo = {d: s for d, s in by_day(lines, "Budowy oplacone: dzien").items() if inwin(d - 1)}
+    packE = any("N5-E budowle cywilne z dala od frontu: " in s for s in bo.values())
+    onE = any("N5-E budowle cywilne z dala od frontu: CZYNNE" in s for s in bo.values())
+    pack = packA or hidl is not None or bool(stepC) or packE
+    rep.add("N5-0: reguly poprawki 5 w logu",
+            ("log sprzed paczki - wiersze N5 to stan wyjsciowy" if not pack else
+             f"N5-A sufit przy braku {'CZYNNY' if onA else ('wylaczony' if packA else 'brak decyzji w oknie')}, N5-B skora z uboju {'CZYNNA' if onB else ('wylaczona' if hidl else 'brak linii')}, "
+             f"N5-C krok rak {('x%.2f' % max(stepC)) if stepC else 'brak'}, N5-D krok wedlug zuzycia {'CZYNNY' if onD else ('wylaczony' if packA else 'brak decyzji w oknie')}, "
+             f"N5-E budowle cywilne {'CZYNNE' if onE else ('wylaczone' if packE else 'brak linii')}") + f"; okno {span} dob",
+            "INFO", None)
+
+    # ---- N5-1 plotno i len
+    fl = mult("flax")
+    lin = tow["linen"]
+    lp_now = mean([v[1] for v in tail(lin)])
+    lp_ref = mean([lin[d][1] for d in lin if 29 <= run_day(d, start) <= 56])
+    nl = mean(tail(nolin))
+    fm = fl[-1] if fl else None
+    val = (f"miast bez plotna srednio ostatnie 28 dob {fmt(nl, '{:.1f}')}; plotno z warsztatow i rzemiosla {fmt(lp_now)}/d (doby 29-56: {fmt(lp_ref)}/d); "
+           f"len: produkcja wsi {fmt(mean([v[1] for v in tail(tow['flax'])]))}/d, regulator " + (f"d{fm[0]} x{fm[1]:.2f}, zuzycie/produkcja {fm[2]:.2f}, stos {fm[3]} dni, miast bez lnu {fm[4] if fm[4] is not None else '-'}" if fm else "bez decyzji"))
+    ok = None
+    if onA and span >= 200 and fm and lp_now is not None and lp_ref:
+        ok = fm[1] > 1.3001 and lp_now >= 1.5 * lp_ref
+    rep.add("N5-1: plotno - len ponad zwykly sufit przy braku w miastach", val,
+            "okno >= 200 dob: mnoznik lnu > x1.30 i plotna >= 1.5 x doby 29-56 (bieg roczny przed paczka: len x1.30 od doby 85, plotno 130 -> 164/d, miast bez plotna 83-93 - INFO)", ok)
+
+    # ---- N5-2 skora
+    hd = tow["hides"]
+    nh = mean(tail(nohide)) if nohide else None
+    hp, hu = mean([v[1] for v in tail(hd)]), mean([v[2] for v in tail(hd)])
+    ks = sorted(hd)
+    val = (f"miast bez skory wyprawionej srednio ostatnie 28 dob {fmt(mean(tail(nolea)), '{:.1f}')}; uboj bez skory (hog>2meat, sheep>meat) {fmt(nh, '{:.1f}')} zwierzat/d; "
+           f"skory surowe: produkcja {fmt(hp)}/d, zuzycie {fmt(hu)}/d, zapas " + (f"d{run_day(ks[0], start)} {hd[ks[0]][0]} -> d{run_day(ks[-1], start)} {hd[ks[-1]][0]}" if ks else "-")
+           + f"; skora wyprawiona {fmt(mean([v[1] for v in tail(tow['leather'])]))}/d" + (f"; linia startowa: {hidl[22:200]}" if hidl else ""))
+    ok = None
+    if onB and nh is not None and span >= 28:
+        ok = nh <= 1.0 and (hp is None or hu is None or span < 120 or hp >= 0.95 * hu)
+    rep.add("N5-2: skora - kazdy uboj daje skore", val,
+            "uboj bez skory 0/d; okno >= 120 dob: produkcja skor surowych >= 95% zuzycia (bieg roczny przed paczka, ostatnie 28 dob: 134 zwierzat/d bez skory, skory 348/d przy zuzyciu 359, miast bez skory wyprawionej 33 -> 43 - INFO)", ok)
+
+    # ---- N5-3 zbroja t3-4
+    zb = {d: s for d, s in by_day(lines, "Zbroja na polkach (174b): dzien").items() if inwin(d)}
+    t34 = {d: num(r"korpus: t1-2 \d+ szt\.[^,]*, t3-4 (\d+) szt\.", s) for d, s in zb.items()}
+    body = {d: num(r"wykonano \d+ szt\. \[[^\]]*\bBodyArmor (\d+)", s, int, 0) or 0 for d, s in wl.items()}
+    hands = [num(r"rece swiata (\d+)", s) for d, s in sorted(wl.items())]
+    hands = [x for x in hands if x is not None]
+    idle = mean([num(r"bezczynne \d+ = ([\d.]+)%", s, float) for s in tail(wl)])
+    lack = None
+    lack0 = None
+    try:
+        wp = session_file_find(logp, "warsztaty.log") if logp else None
+        if wp and os.path.isfile(wp):
+            rows = [x for x in read(wp) if "najwiekszy brak - [" in x]
+
+            def brak(x):
+                return sum(int(v) for v in re.findall(r"BodyArmor t[34]: popyt \d+, polka \d+, w toku \d+, brak (\d+)", x))
+            if rows:
+                lack = brak(rows[min(len(rows), until) - 1])
+                if len(rows) >= 30:
+                    lack0 = brak(rows[29])
+    except Exception:
+        lack = None
+    val = (f"brak zbroi korpusu t3+t4 (warsztaty.log, koniec okna) {fmt(lack)}" + (f" (doba 30: {lack0})" if lack0 is not None else "")
+           + f"; korpus t3-4 na polkach srednio ostatnie 28 dob {fmt(mean(tail(t34)))} szt.; zbroi korpusu z warsztatow {fmt(mean(tail(body)), '{:.1f}')}/d; "
+           f"rece swiata {hands[0] if hands else '-'} -> {hands[-1] if hands else '-'}, krok rak {('x%.2f' % max(stepC)) if stepC else 'brak w linii'}, bezczynne {fmt(idle, '{:.1f}')}%")
+    ok = None
+    if onC and span >= 200 and lack is not None:
+        ok = lack <= 3500
+    rep.add("N5-3: zbroja korpusu t3-4 - krok rak rzemieslnikow", val,
+            "okno >= 200 dob: brak t3+t4 <= 3 500 szt. (bieg roczny przed paczka: 6 575 w dobie 30 -> 4 912 w dobie 364, 45 szt. t3-4 dziennie, rece zajete w 98%)", ok)
+
+    # ---- N5-4 drewno
+    hw = tow["hardwood"]
+    kw_ = sorted(hw)
+    use = mean([v[2] for v in tail(hw)])
+    days = (hw[kw_[-1]][0] / use) if kw_ and use else None
+    grow = None
+    if len(kw_) >= 92:
+        grow = (hw[kw_[-1]][0] - hw[kw_[-92]][0]) / 91.0
+    hm = mult("hardwood")
+    flips = sum(num(r"zmiany kierunku w kolejnych decyzjach (\d+)", s, int, 0) or 0 for s in dec.values())
+    val = (f"zapas drewna " + (f"d{run_day(kw_[-1], start)} {hw[kw_[-1]][0]}" if kw_ else "-") + f" = {fmt(days)} dni zuzycia (ksiega towarow, zuzycie {fmt(use)}/d); przyrost ostatnich 91 dob "
+           + (f"{grow:+.0f}/d" if grow is not None else "-") + "; regulator: " + (", ".join(f"d{x[0]} x{x[1]:.2f}" for x in hm[-4:]) if hm else "bez decyzji")
+           + f"; zmiany kierunku w kolejnych decyzjach (wszystkie towary) {flips}")
+    ok = None
+    if onD and dec:
+        ok = flips == 0
+        if span >= 250 and days is not None and grow is not None:
+            ok = ok and days <= 60 and grow <= 250
+    rep.add("N5-4: drewno - krok regulatora wraca do zuzycia", val,
+            "zmiany kierunku 0; okno >= 250 dob: zapas <= 60 dni zuzycia i przyrost ostatnich 91 dob <= +250/d (bieg roczny przed paczka: 152 862 = 102 dni, +642/d w ostatnich 91 dobach, x1.30 od doby 113)", ok)
+
+    # ---- N5-5 budowy cywilne
+    bd = {d: s for d, s in by_day(lines, "Budowy: dzien").items() if inwin(d - 1)}
+    go = mean([num(r"\(idzie (\d+), stoi", s) for s in tail(bd)])
+    stay = mean([num(r", stoi (\d+), ukonczonych", s) for s in tail(bd)])
+    lev = sum(num(r"ukonczonych poziomow (\d+)", s, int, 0) or 0 for s in bd.values())
+    spent = mean([num(r", wydano (\d+) \(", s) for s in tail(bo)])
+    nomat = mean([num(r"wstrzymane: brak materialow (\d+)", s) for s in tail(bo)])
+    seg = [s for s in tail(bo) if "N5-E budowle cywilne z dala od frontu: CZYNNE" in s]
+    e_go = mean([num(r"w krolestwie w wojnie \d+: dopuszczone (\d+),", s) for s in seg])
+    e_fr = mean([num(r"wstrzymane przy froncie (\d+),", s) for s in seg])
+    e_pu = mean([num(r"pan bez luzu zoldu (\d+),", s) for s in seg])
+    e_wa = mean([num(r"rod buduje mury (\d+);", s) for s in seg])
+    e_ft = mean([num(r"warownie przy froncie (\d+) z", s) for s in seg])
+    e_st = sum(num(r"potkniecia (\d+)\.$", s, int, 0) or 0 for s in seg[-1:])
+    val = (f"osad z budowa: idzie {fmt(go, '{:.1f}')}, stoi {fmt(stay, '{:.1f}')} (srednio ostatnie 28 dob); ukonczonych poziomow w oknie {lev}; wydane {fmt(spent)} zl/d; "
+           f"wstrzymane brakiem materialow {fmt(nomat, '{:.1f}')}" + (f"; N5-E: cywilne w wojnie dopuszczone {fmt(e_go, '{:.1f}')}, przy froncie {fmt(e_fr, '{:.1f}')}, pan bez luzu zoldu {fmt(e_pu, '{:.1f}')}, "
+           f"rod buduje mury {fmt(e_wa, '{:.1f}')}; warownie przy froncie {fmt(e_ft, '{:.1f}')}; potkniecia {e_st}" if seg else ""))
+    ok = None
+    if onE and seg and span >= 60 and go is not None:
+        ok = go >= 60 and e_st == 0 and (nomat is None or nomat <= 15)
+    rep.add("N5-5: budowy cywilne z dala od frontu", val,
+            "okno >= 60 dob: budowa idzie w >= 60 osadach (srednio ostatnie 28 dob), brak materialow <= 15, potkniecia 0 (bieg roczny przed paczka: idzie 58 w Q1 -> 29 w Q4 z 227, 189 wstrzymanych wojna, 144 stoja >= 300 dni, 9 180 zl/d)", ok)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -14383,6 +14569,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_p3woj)   # P3/WOJSKO (TRIAZ-3): sluzba na miare srodkow, zwolnienia wedlug tieru, zadatek BK i kontrakt najemnikow, zerwane wezwania 168
     blocks.append(etap8_p3_zelazo)   # P3/ZELAZO (TRIAZ-3 bieg roczny): kontrakt wozem, bezpiecznik regulatora, zamki, towar kasowany lordom
     blocks.append(etap8_n3)   # N3 (poprawka 3 po biegu rocznym): pobity oblegajacy i pobita odsiecz uchodza - zabici + jency <= 45%, ksiega bitew pod murami
+    blocks.append(etap8_n5)   # N5 (poprawka 5 po biegu rocznym): towary - len ponad sufit przy braku, skora z kazdego uboju, krok rak, drewno wedlug zuzycia, budowy cywilne z dala od frontu
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

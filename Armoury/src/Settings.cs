@@ -1828,6 +1828,37 @@ namespace Armoury
         // zrodla i ujscia BK bez platnika (dopisek do linii "BK i Diplomacy (E5/A8)"), wsie Normal bez wozu ponad 7 dob, rozkazy partii ze statkami po switcie; gra bez zmian
         public bool Stage8WorldLog = true;                 // Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).
 
+        // --- Goods after the yearly run (N5) ---
+        // N5 (poprawka 5 po biegu rocznym 364 doby, decyzja Jeffa 13.10; RAPORT-ROCZNY-2026-10-13 niespojnosci 8, 9, 11, 12, 13) - piec spraw, kazda z wlasnym kluczem.
+        // N5-A (plotno): len stal na suficie regulatora wsi x1.30 od doby 85 do konca roku (zuzycie = produkcja, stos 12-13 dni, 58-70 miast bez lnu, 88-91 bez plotna,
+        // w 72 miastach przerob stoi z braku lnu). Surowiec z tabeli karawan, ktorego nie ma w wiecej niz ValveShortTowns miastach, rosnie krokami regulatora ponad
+        // VillageOutputStep, najwyzej do ValveShortCeiling - tylko gdy swiat zuzywa wszystko (>= 98% produkcji) i stos jest ponizej ValveStockDaysLow dni zuzycia
+        // (HarvestValve.Close); te same wsie, wiecej ich pracy przy tym towarze. Mnoznik w dotychczasowym zapisie arm_harvestvalve - bez nowych pol
+        public bool ValveRaiseWhileShort = true;           // a raw material that more than Valve Short Towns towns have none of may be raised by the village regulator above Village Output Step - step by step every four weeks, up to Valve Short Ceiling - as long as the world uses up all that is made and the stock stays low: the same villages put more of their work into it (flax for the weavers stood at the ordinary ceiling all year while nine towns in ten had no linen). Off = the ordinary ceiling holds, and a good already above it returns to it at the next decision
+        public float ValveShortCeiling = 4f;               // the most a village can make of a raw material the towns are short of, as a multiple of its normal output (needs Valve Raise While Short)
+        // N5-D (drewno): regulator podniosl drewno do x1.30 w dobie 113 (stos 8 dni, zuzycie 99%, 25 miast bez drewna) i nie mial jak cofnac kroku - ciecie wymaga
+        // stosu ponad ValveStockDaysHigh (60) dni zuzycia, a to trwalo 250 dob: zuzycie/produkcja 0.79-0.90, zapas swiata 17 488 -> 152 862 ladunkow. Krok ponad baze
+        // wraca do zmierzonego zuzycia po pelnym oknie przy nowym mnozniku: stos ponizej dolnego progu i zuzycie < 90% produkcji -> 1.05 x zuzycie (5% na odbudowe
+        // stosu); stos od dolnego progu i zuzycie < 98% -> zuzycie; nigdy ponizej bazy (ponizej bazy tnie dalej regula 221). Krok w gore od bazy wzwyz proporcjonalny
+        // do braku stosu (x1.05 przy progu, x1.3 przy pustym), bez kroku w gore zaraz po przycieciu i bez przyciecia zaraz po kroku w gore - zero zmian kierunku
+        public bool ValveStepFollowsUse = true;            // a village good raised above its normal output is brought back to what the world really uses once a full eight-week window shows it is made faster than it is used - without waiting for two months of stock to pile up - and close to the lower stock limit it is raised by small steps instead of a third at once (timber piled up all year after one such step). Never below normal output: the woodcutters go back to the village's other work. Off = a raised good stays raised until the stock exceeds Valve Stock Days High, as before
+        // N5-B (skora wyprawiona): skory surowe powstaja tylko z uboju w miastach; linie uboju gry w ukrytym warsztacie (owca -> mieso, swinia -> 2 miesa) nie daja
+        // skory i sa dwa razy szybsze od linii BK - 54 swinie i 44 owce dziennie ubite bez skory przy 320 skorach z calego uboju i zuzyciu 382 (SlaughterHides.cs)
+        public bool SlaughterKeepsHides = true;            // the town craftsmen who slaughter a sheep or a pig for meat alone keep its hide as well, as the other butchers do: one raw hide from every animal, sold on the town's stall like the meat (about a fifth of all livestock was slaughtered with the hide thrown away while the tanners stood idle). Takes effect at the next load. Off = the game's recipes, as before
+        // N5-C (zbroja t3-4): rece platnerzy zajete w 98%, warsztaty robia juz glownie t3-5 wedlug braku, ruda i drewno w nadmiarze (indeks 0.52 i 0.16), a przydzial
+        // sprzetu rodow nie ma czego kupic. Rece rzemieslnikow broni to 0.10 na 1000 ludzi rynku - "krok 1, polowa minimum historycznego 0.3-0.6, podnoszony krokami
+        // razem z ruda i drewnem" (174.3). Krok 2: x WorkshopHandsStep (WorkshopLaw.TownHands; sufit WorkshopHandsMaxPerTown bez zmian). Nowy klucz, nie zmiana
+        // WorkshopHandsPer1000People (wartosc zapisana w MCM Jeffa nadpisalaby nowa domyslna - CLAUDE.md rozdz. 7)
+        public float WorkshopHandsStep = 1.3f;             // further step of arms craftsmen on top of Workshop Hands Per 1000 People, now that ore and timber are plentiful: every town has this many times the armourers, weaponsmiths, bowyers and saddlers (and with them its weavers, tanners and fletchers) - still below medieval Europe. Needs Workshop Hands By People. 1 = off, as before
+        // N5-E (budowy cywilne): BuildFunding wstrzymywal kazda budowle cywilna, gdy krolestwo pana bylo w wojnie z kimkolwiek - a wojna fabularna nie konczy sie
+        // w pierwszym roku (25-26 z 29 krolestw w wojnie): 189 osad wstrzymanych, 144 stoja co najmniej 300 dni. Teraz decyduje prawdziwe zagrozenie warowni
+        // (WarFront.cs): oblezenie, wroga druzyna, bitwa lordow albo rabunek w zasiegu, wlasna wies najezdzana albo spalona - w ostatnich CivilWorksCalmDays dobach.
+        // Pan placi z tego samego przydzialu budow; rod z budowa wojskowa w toku cywilnej nie zaczyna, a pan z zoldem przy pulapie jej nie oplaca. Bez pol zapisu
+        public bool CivilWorksAwayFromFront = true;        // in a kingdom at war, civil buildings are built again in towns and castles the war does not reach: no siege, no enemy lord's party, no battle between lords and no raid within Civil Works Front Range, and none of its own villages raided or burned, for Civil Works Calm Days. Near the front only walls, barracks and other military works go on, as before, and a house with a military work in hand finishes it first. The lord pays from his building allowance as always. Off = no civil building anywhere in a kingdom at war, as before
+        public int CivilWorksCalmDays = 14;                // days without any sign of war near a town or castle before civil building may go on there (needs Civil Works Away From Front)
+        public float CivilWorksFrontRange = 60f;           // how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours
+        public bool CivilWorksNeedWageRoom = true;         // with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

@@ -151,6 +151,11 @@ RANGES = {
     # E6/W3 (221): regulator wsi - sufit kroku x1.3 (kod przycina do 1..2), progi stosu w dniach zuzycia (kod: niski >= 1, wysoki > niski)
     'VillageOutputStep': (1.0, 2.0, "0.00"),
     'ValveStockDaysLow': (7, 120, "0"),
+    # N5 (poprawka 5 po biegu rocznym): suwaki zgodne z przycieciem w kodzie (HarvestValve.Close, WorkshopLaw.HandsStep, WarFront)
+    'ValveShortCeiling': (1.0, 8.0, "0.00"),
+    'WorkshopHandsStep': (1.0, 3.0, "0.00"),
+    'CivilWorksCalmDays': (1, 60, "0"),
+    'CivilWorksFrontRange': (10.0, 300.0, "0"),
     'ValveStockDaysHigh': (14, 240, "0"),
     # E6/K3 (219): czesc polki miasta na konie rycerzy w jednym postoju (kod przycina do 0..1, Stables.KnightBuy)
     'KnightHorseMarketShare': (0.0, 1.0, "0.00"),

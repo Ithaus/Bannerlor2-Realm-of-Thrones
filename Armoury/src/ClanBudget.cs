@@ -1099,6 +1099,18 @@ namespace Armoury
             var b = Of(c); share = b != null ? (float)Math.Max(0, b.Build) : 0f; return b != null;
         }
 
+        /// <summary>N5-E (BuildFunding przez WarFront.CivilAllowed - budowle cywilne w wojnie): rod ma luz w pulapie zoldu - zold partii, zalog i karawan z ostatniego
+        /// budzetu ponizej 95% pulapu (ta sama miara co SlackGold [1]). Budzet 166 wylaczony albo Straz bez zoldu - true (bez pulapu zoldu nie ma czego chronic);
+        /// budzet jeszcze nie policzony w tej sesji (pierwsza doba po wczytaniu), pulap 0 albo najemnik - false. Tylko odczyt.</summary>
+        internal static bool WageRoom(Clan c)
+        {
+            if (!On) return true;
+            var b = Of(c);
+            if (b == null || c == null) return false;
+            if (b.Zero) return true;
+            return b.Cap > 0 && !c.IsUnderMercenaryService && b.WPar + b.WGar + b.WCar < 0.95 * b.Cap;
+        }
+
         // ------------------------------------------------------------ latki gry (w kampanii, raz na proces - pulapka konstruktorow statycznych modeli)
         private static Harmony _harmony;
         private static bool _hooksTried;
