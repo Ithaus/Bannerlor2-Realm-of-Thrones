@@ -1268,6 +1268,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountShelfFloor { get; set; } = 4;
 
+        [SettingPropertyInteger("Ai Saddle Shelf Floor", 0, 10, "0", HintText = "the same for saddles: an AI lord buying harness for riders who have a horse and no saddle leaves this many pieces of fitting horse harness on a town's shelf for other buyers (horses keep their own floor above)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public int AiSaddleShelfFloor { get; set; } = 1;
+
         [SettingPropertyBool("Ai Upgrade Horse To Armory", HintText = "the horse an AI lord or garrison pays for a man's upgrade to a mounted troop goes into that party's armoury for the new rider, just as yours does, instead of vanishing. Always on while Troops Fight With Own Kit Only is on - a rider there rides only a horse from the stores. Takes effect at once (off, with own kit only also off = the AI horse is gone on upgrade as before)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool AiUpgradeHorseToArmory { get; set; } = true;
@@ -5520,6 +5524,7 @@ namespace Armoury
             s.MountedWageFactor = MountedWageFactor;
             s.AiMountMarketSharePercent = AiMountMarketSharePercent;
             s.AiMountShelfFloor = AiMountShelfFloor;
+            s.AiSaddleShelfFloor = AiSaddleShelfFloor;
             s.AiUpgradeHorseToArmory = AiUpgradeHorseToArmory;
             s.AiFreeArmoryHorsesFirst = AiFreeArmoryHorsesFirst;
             s.RiderNeedsHarness = RiderNeedsHarness;

@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (poprawki po biegu probnym 2, grupa C - konie i uprzaz, P2/C2, tor S) - ZAKUP SIODEL LORDOW AI: ZAMOWIENIE DLA SIODLARZY IDZIE TAKZE PO CZESCIOWYM ZAKUPIE (gdy ponad podloge nie zostalo tanie siodlo), PODLOGA POLKI DLA SIODEL OSOBNO OD KONI - klucz `AiSaddleShelfFloor` = 1 (konie zostaja przy 4)
+**Mod:** Armoury | **Galaz:** `w-toku/p2-c` (po P2/C1) | **Specyfikacja:** `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcje "K3-3" (Poprawka ostateczna pkt 1) i "K3-4" (pkt 3) + decyzja prowadzacego (podloga 1) | **Pliki:** `Armoury/src/AiGear.cs` (tylko `BuySaddles`), `Settings.cs`, `McmSettings.cs` (gen_mcm: 1299 = 1298 + 1). Bramy E8/H (`SaddleLaw.FilterTargets` / `PayGate` / `Avail`) NIE ruszane.
+
+**Problem (slowami gracza):** lord, ktoremu brakuje dziesieciu siodel, kupuje jedno-dwa i odjezdza, a siodlarz miasta nie dowiaduje sie, ze reszty brakuje; do tego w kazdym miescie cztery ostatnie siodla leza nietykalne, choc tysiac jezdzcow chodzi pieszo.
+**Dowod z logu (bieg 2, linia "Jezdzcy i uprzaz (E8/H)", okno d91-120, przeliczenie TRIAZ-2 K3-3 / K3-4):** wizyt lordow z brakiem siodel 35.9/d, brak 9.6 na wizyte, kupione 0.58 na wizyte (pokrycie braku 6%); 11.4 z 35.9 wizyt/d (32%) konczy sie zakupem 1.84 szt. i BEZ zamowienia; zamowienia spadaja 46.4 -> 29.1 -> 24.5/d, choc "brak po zakupach" rosnie 285 -> 319 -> 325/d. Polki uprzezy 654-1056 szt. przy 955 jezdzcach z koniem bez uprzezy (doba 120).
+**Przyczyna:** `AiGear.BuySaddles`: (1) `order = left > 0 && !any`, gdzie `any` = przed zakupem lezala ponad podloge JAKAKOLWIEK sztuka dla AI (takze barda za 700-7000 zl albo siodlo, ktore lord zaraz kupil) - sygnal dla siodlarzy gasl przy kazdej polce, ktora nie byla calkiem pusta; (2) podloga `AiMountShelfFloor` = 4 byla pozyczona od koni i trzymala do 4 x 97 miast = 388 pasujacych sztuk.
+
+**Zmiana:**
+- Zamowienie (`SupplyDemand.NoteUnmetOnce`, koszyk uprzaz t1, `min(10, left)` - bez zmian) idzie zawsze, gdy po zakupach `left > 0` i ponad podloge NIE zostala zadna sztuka kandydata z `TierOf <= 1` (kandydat = pasuje do konia, nie unikat, DTE ja bierze, bez dodatniego stanu, cena pod sufitem - filtry bez zmian). Ta sama zasada co `OnShelf` dla brakow. Do tego licznik pozostalych sztuk kandydata po zakupie (`SubCand` to struktura - stan odkladany z powrotem na liste). Nowy warunek jest nadzbiorem starego: kazda wizyta, ktora dotad dawala zamowienie, daje je dalej (pusta lista kandydatow albo polka na podlodze).
+- Bez zmian: "za drogie na reszte budzetu" przy lezacym tanim siodle dalej NIE jest zamowieniem (to brak zlota, nie towaru); limit sztuk na wizyte; kolejnosc najtansze najpierw; `ShelfBuy.Take` / `PutBack` (szew O1); `SaddleLaw.NoteVisit` (te same trzy liczby).
+- Nowy klucz `AiSaddleShelfFloor = 1` (Settings.cs zaraz pod `AiMountShelfFloor`, opis MCM po angielsku), czytany TYLKO w `BuySaddles` zamiast `AiMountShelfFloor`. Konie (`Stables.cs` :952, :1156) zostaja przy `AiMountShelfFloor` = 4. Obu kluczy nie ma w `Armoury.json` Jeffa (grep = 0) - dzialaja domyslne. Osobnego wylacznika dla zamowienia nie ma (TRIAZ: "klucz niepotrzebny") - dziala pod `RiderNeedsHarness`; powrot podlogi: `AiSaddleShelfFloor` = 4.
+
+**Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
+- Zloto i sztuki: zakup jak dotad (sakiewka ludzi / kiesa pana -> kasa miasta, sztuka polka -> zbrojownia); zamowienie to sam wpis popytu - nic z niczego. Zapis bez zmian, czas doby 0 (jedna petla po liscie kandydatow tej wizyty).
+- Petla drozenia: `NoteUnmetOnce` przyjmuje od jednego kupca w jednym miescie jedno zamowienie koszyka na `SupplyDemandOrderRepeatDays` - bez zmian; wiecej zamowien t1 = wyzszy mnoznik polki tanich siodel (takze dla gracza), sufit mnoznika bez zmian.
+- Podloga 1: jednorazowo do 3 x 97 = 291 siodel z polek do zbrojowni, gracz zastaje w miescie 1 pasujaca sztuke zamiast 4 (do podlogi licza sie wszystkie pasujace sztuki, takze z dodatnim stanem, ktorych AI nie kupi). Polki uprzezy spadna - patrzec H-6a (300-2500).
+- Kolizje: `BuySaddles` wola tylko `AiGear.TryBuy` dla partii lordow (zalogi nie kupuja - bez zmian); E6/R3 (barda wzorca) ma wlasne zamowienia i wlasna rezerwe kramu - nietkniete; E8/Z (sprzedaz nadwyzek) czyta `SaddleLaw.Target`, nie podloge.
+- Miernik "zamowienia dla siodlarzy" w linii E8/H ZMIENIA ZNACZENIE: liczy teraz takze wizyty z czesciowym zakupem - wzrosnie i nie jest juz miara pustych polek (patrz PROGI w raporcie grupy C).
+- Spodziewane (TRIAZ, szacunek): produkcja siodel +3-6/d od samego sygnalu; razem z P2/C1 H-3 >= 40/d.
+- NIE sprawdzone w grze - build kod 0, logika przeczytana w kodzie.
+
+**Status:** DO SPRAWDZENIA - test koncowy
+
 ## 2026-10-13 (poprawki po biegu probnym 2, grupa C - konie i uprzaz, P2/C1, tor S) - ZWYKLE SIODLO KUJE SIODLARZ KAZDEJ KRAINY (nazwany wyjatek od lancucha E6/M1 "w koszyku tylko najnizszy poziom"); klucz `PlainSaddleEveryRealm`; licznik w linii startu "CraftRealm (E6/0)"
 **Mod:** Armoury | **Galaz:** `w-toku/p2-c` (z e9dfa7f = `w-toku/zbior-e8`) | **Specyfikacja:** `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcje "GLOWNE - czy wymog uprzezy dlawi jazde", "H-1" (Poprawka 1), "H-3" (definicja) | **Pliki:** `Armoury/src/CraftRealm.cs`, `Settings.cs`, `McmSettings.cs` (gen_mcm: 1298 = 1297 + 1). `tools/sprawdz_logi.py` NIE ruszane (grupa E).
 
