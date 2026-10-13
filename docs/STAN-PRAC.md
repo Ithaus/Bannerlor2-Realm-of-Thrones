@@ -1708,3 +1708,13 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   DO PROJEKTU DOPISAC: (i) niszczenie budowli wedlug wyboru (laska 0 / grabiez czesc / spustoszenie duzo) - sprawdzic, co juz robi gra (poziomy budowli) i BK; (ii) tempo odbudowy
   policzone (dobrobyt dzis wraca 230-570 dob [S]) razem z paczka P2 "lud buduje miasto" (Jeff TAK) - odbudowa ma byc mozliwa, ale wolna; (iii) ludzie: zabici przez BK takze w naszej
   ksiedze. Kod lupu = tor L, po daninie P1 i budowie P2 (te same zbiorniki i te same pliki).
+- (17:50 UTC 13.10) **Bieg kontrolny PO WGRANIU 38 (10 dob nowej kampanii): 10/10, Armoury 0 ERROR**, swaty "CZYNNE; mnoznik szansy 0.7"; w grze WGRANIE 38 (Armoury f2afb329,
+  CrashScribe 04f44a0e, settings 3e31434f). **RAPORT ROCZNY GOTOWY** (wf_bd6c538c-c31): `docs/test-zbiorczy/RAPORT-ROCZNY-2026-10-13.md` + rozdzialy i weryfikacje w
+  `docs/test-zbiorczy/raport-roczny-2026-10-13/` - podany Jeffowi (rozdz. 0). Najwazniejsze nowe ustalenia: wojny fabularne ROT wznawiane tego samego dnia (73 x; przymus 10 z 14
+  konczy sie w d433); armia oblegajaca pobita wypadem ginie cala (38 x, 55 tys. ludzi/rok); pan bez klopotu z pieniadzem trzyma ok. 60% druzyny (przyczyna nieznana; sufit pieniadza
+  96-105 tys.); zolnierz zdrozal 4.64 -> 5.78 zl/d; ok. 100 z 205 panow na granicy budzetu (druzyny 37%), u 47 zalogi zjadaja caly budzet; korona dzieli wedlug ziemi (rody bez
+  budzetu dostaja 45% rent); plotna brak w 89 z 97 miast, skory w 42, drewno x13; najemnicy zmieniaja pana 764 x/rok, wykup tej samej osoby do 11 x, 440 jencow-lordow za darmo;
+  56 tys. koni jucznych z niczego, 125 tys. szt. zboza i ryb bez zrodla, Thenn pol roku bez pieniedzy. Kolejnosc napraw w rozdz. 0 (g).
+  **LIMIT TYGODNIOWY 84% (17:40 UTC; ok. +4 pkt/h przy workflowach) - PLAN NA RESZTE KONTA (podany Jeffowi): (1) dokonczyc P1 danine (recenzja w toku wf_e6948e4c-524 -> test 120 dob ->
+  wgranie), (2) projekt podatkow wojennych (korona wedlug potrzeby + tarczowe + stawka wojenna pana) oszczednie, (3) komplet do przekazania. Budowa przez lud (P2), lup miast (tor L),
+  konie robocze (k13a + bieg 120 dob z danina) - dla drugiego konta, chyba ze Jeff zmieni kolejnosc.**
