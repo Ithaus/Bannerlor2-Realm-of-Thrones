@@ -1545,3 +1545,7 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   armoury-proba-zimy.flag usunieta po biegu; w grze WGRANIE 35). Zima: ciecie plonu wsi srednio 40.8%, zywnosc wsi -41% wobec startu i stoi (d30/d60/d120), zadna warownia AI nie
   gloduje przed 30. doba zimy (F6 TAK), mediana zapasu warowni 1949-2057 dni (F7 TAK), zmarli z glodu 0. Wojsko lordow w zimie d90-120: 80 353 (podloga 85 tys. - NIE; latem 91-93 tys.).
 - (12:20 UTC 13.10) **Jeff: rok w dacie = "rok swiata tak jak gra pokazuje"** - zgodne z tym, co robi wf_f008eb9b-7f9 (kalendarz).
+- (12:30 UTC 13.10) **Jeff o slubach NPC w ROT ("zonaci na liscie - sluby rzadsze, niz zamierzal ROT"): "mozemy to poprawic??" -> TAK, DO ZROBIENIA jako osobna paczka PO recenzji latki
+  szybkosci swatow (wf_4901dbf6-079, drzewo zb\z3, galaz `w-toku/z3-swaty-rot`):** nowy klucz CrashScribe (np. MarriageOnlyFreeCandidates = true; off = losowanie ROT jak dotad) - dzienna
+  proba lorda losuje kandydata tylko sposrod WOLNYCH (bez malzonka), zamiast przepadac po trafieniu w zonatego; linia doby: proby, przepadle przez zonatego (stara regula), sluby. To zmiana
+  rozgrywki (wiecej slubow i dzieci NPC) - decyzja Jeffa; rownowaznosc "te same pary" dotyczy tylko trybu z kluczem wylaczonym. Po pierwszym biegu podac Jeffowi liczby (ile slubow wiecej).
