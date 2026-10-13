@@ -205,6 +205,8 @@ Uzycie (Python 3, tylko odczyt):
                     ponad sufit 0, p90 cena / wartosc <= sufit, pokrycie korpusu zalog w ostatniej dobie okna >= Z33 doby 120 = 90%), Z-3 uprzaz
                     w zbrojowniach AI w dobie 120 <= 1.2 x doba 60 (z --do-doby N: doba N wobec N/2), Z-4 potkniecia 0 i koszt spisu INFO; INFO
                     zamowienia dla warsztatow z powodu reguly, sprzedaz uprzezy (sztuki, zloto, zalogi, trzecia panom, brak kupca).
+                    Recenzja E8/Z: wiersz R3-9 (polki uprzezy d91 -> until, bloki etapu 6) pokazuje uprzaz przeniesiona ze zbrojowni AI na polki
+                    (suma "sprzedana" linii E8/Z z tych dob); wzrost polek nie wiekszy niz to przeniesienie = DECYZJA zamiast NIE.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -3922,7 +3924,16 @@ def etap5_r3(rep, lines, start, until):
         sd = sorted(x for x in shelf if shelf[x] is not None)
         if len(sd) >= 2:
             a, b = shelf[sd[0]], shelf[sd[-1]]
-            rep.add("R3-9: polki uprzezy miast i zamkow (d91 -> until)", f"{a} -> {b} (d{sd[0]}-d{sd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%)", "bez wzrostu (<= +2%)", b <= a * 1.02)
+            # recenzja E8/Z (251): uprzaz ponad zapas ze zbrojowni AI idzie od E8/Z na te same polki (przeniesienie starego zapasu, nie produkcja) -
+            # suma "sprzedana" linii E8/Z z dob po pierwszej dobie pomiaru; wzrost polek nie wiekszy niz to przeniesienie = DECYZJA zamiast NIE
+            zrow = rows_of("Zakupy i nadwyzki AI (E8/Z): dzien")
+            zin = sum(num(r"uprzaz ponad zapas \[[^\]]*\]: sprzedana (\d+) szt", zrow[x], int, 0) or 0 for x in zrow if sd[0] < x <= sd[-1])
+            ok9 = b <= a * 1.02
+            rep.add("R3-9: polki uprzezy miast i zamkow (d91 -> until)",
+                    f"{a} -> {b} (d{sd[0]}-d{sd[-1]}, {100.0 * (b - a) / max(1, a):+.1f}%)"
+                    + (f"; w tym ze zbrojowni AI na polki (E8/Z, uprzaz ponad zapas) +{zin} szt. - bez nich {a} -> {b - zin} ({100.0 * (b - zin - a) / max(1, a):+.1f}%)" if zin > 0 else ""),
+                    "bez wzrostu (<= +2%)" + ("; wzrost nie wiekszy niz przeniesienie ze zbrojowni AI (E8/Z) - DECYZJA, czytac z Z-3" if zin > 0 else ""),
+                    ok9, decide=(not ok9 and zin > 0 and b - zin <= a * 1.02))
     tools = rows_of("Narzedzia wedlug zuzycia (215): dzien")
     rep.add("R3-10: linia Narzedzia wedlug zuzycia (215)", f"{len(tools)} dob", "codziennie od wgrania E6/R3", None)
     if tools:
