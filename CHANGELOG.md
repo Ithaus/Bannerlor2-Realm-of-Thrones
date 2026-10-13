@@ -1,5 +1,59 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (runda poprawek S przed testem koncowym, grupa E - NARZEDZIE PROGOW p2) - `tools/sprawdz_logi.py` PO ROZPOZNANIU BIEGU PROBNEGO 2: 16 falszywych NIE zdjetych, 3 wiersze na INFO, 1 wiersz zaostrzony (TAK -> NIE), 3 nowe wiersze; wiersze z prawdziwym objawem zostaja NIE z dopiskiem; KOD GRY BEZ ZMIAN
+**Mod:** narzedzie progow (wszystkie mody) | **Galaz:** `w-toku/p2-e` (z e9dfa7f) | **Pliki:** `tools/sprawdz_logi.py`, `CHANGELOG.md`. Kod C#, `Settings.cs`, `McmSettings.cs` bez zmian (build Armoury na tym drzewie: kod 0).
+
+**Problem (dowod z logu):** bieg probny 2 (zbior-e8 e60928a, 120 dob nowej kampanii; `Armoury-2026-10-12_22-38-57.log`, `session-2026-10-12_22-38-56.log`) dal w narzedziu etap5 17 NIE, etap7 3 NIE, etap8 22 NIE. Rozpoznanie z niezaleznym podwazeniem (`docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md`) orzeklo dla czesci wierszy PROG_DO_POPRAWY: kod gry dziala, a myli sie miara, okno albo prog narzedzia. Przyklady z logu: `E8 T0 CorrectPlayerEducation = 2` przy 0 blokach ze sladem tej metody (dwie zwykle linie "Quiet (E8/M) ... odfiltrowany" i "Mends: edukacja BK gracza" policzone w cudzych blokach); `G1-4 koszt 1411 ms/d przy progu 5 ms/d` (5 ms to 3 wyjazdy karawan na dobe, a sama decyzja wyjazdu BK kosztuje 1.73 ms); `X-2 po/gra 0.31 przy pasmie 0.4-0.6` (pasmo policzono dla samego pierwiastka - ten ma 0.50 w kazdej ze 119 dob); `H-4a 30 szt.` (tylko pierwsza linia kampanii, przed siewem puli weteranow); `F8-2 = 12` przy 1096 przejsciach mostem i F8-1 = 0.
+
+**Przyczyna:** cztery rodzaje bledu narzedzia. (1) Blad odczytu: blok raportu CrashScribe nie konczyl sie na kracie zamykajacej (E8 T0); plik `budzet-rodow.csv` szukany tylko w ukladzie archiwum, a gra pisze go do `Logs/<sesja>/` (kazdy wiersz z CSV dawal "brak CSV"); C1-3 czytal dopisek linii robiony w innej chwili doby niz stan w `kasy-miast.csv` (1 doba zamiast 16). (2) Zla miara: suma zamiast "na sztuke" (G1-5c kiesy karawan, O1-3 ms/d zamiast us na wywolanie, H-6b sztuki zamiast udzialu), zlozenie dwoch regul zamiast jednej (X-2), osobo-proby czytane jak ludzie (H-5b), pierwsze 5 / ostatnie 5 dob rozstrzygane jedna bitwa (K3-8), cala linia ZakupyAI z zalogami zamiast kompletu lordow (T-4), poziom zamiast trendu (C-3a), licznik biegnacy takze przez spladrowanie (P3-2). (3) Zle okno albo baza: R1-8 z dobami 61-90 (dochodzenie po starcie), W-1 wobec Z33 sprzed E6/N1, H-4a razem z doba przed siewem puli weteranow. (4) Prog nierealny: szacunki [S] projektu, ktorych pomiar nie potwierdzil (E80-3 1 ms, P1-2 30 ms, H-7 5 ms, G1-4 5 ms, F5-2 80/d, K3-8b 0.5, G1-5a +-10% ciasniejsze niz prog projektu 80-110%).
+
+**Zmiana - tabela "wiersz: bylo -> jest" na logu biegu 2 (ta sama para logow, narzedzie przed i po):**
+- **E8 T0 wyjatki BK CorrectPlayerEducation: NIE (2) -> TAK (0).** Blok CS konczy sie na kracie po tresci albo na pierwszej zwyklej linii logu; liczone sa bloki ze sladem metody w tresci (W33 z prawdziwym sladem w stosie dalej NIE 1; bieg 1 NIE 2 -> TAK 0).
+- **E80-3 koszt profilu: NIE -> TAK (9.67 ms/d; prog 1 -> 15 ms/d).** 126 tys. opakowan zdarzen x 74 ns; szacunek projektu liczyl 13 tys.; koszt staly, 0.04% doby.
+- **P1-2 koszt ksiegi umiejetnosci: NIE -> TAK (34.4 ms/d; prog 30 -> 40).** Ponad polowe daja znaczniki zrodel (ok. 18 ms), ktorych projekt nie liczyl; koszt plaski.
+- **X-2 Steward z jedzenia lordow 300+: NIE -> TAK (sam pierwiastek/gra 0.50 w dobach bez zimy; po/gra 0.31 zostaje w tresci).** Pasmo 0.4-0.6 projekt policzyl dla samego pierwiastka; "rodzaj od pol dnia" to druga, zamierzona regula. Stawka FoodBase 50 bez zmian. Nowy wiersz INFO "rodzaje od pol dnia - po/pierwiastek" (pierwsza / druga polowa okna 0.70 / 0.56; doby zimowe osobno).
+- **W-1 kolejka napraw: NIE -> TAK (0.272 wobec bazy zb58 0.250 = x1.09; bylo wobec 1.2 x Z33).** Z33 jest sprzed E6/N1 (naprawial tez lup nienoszony), wiec stary prog mierzyl skutek E6/N1; mnoznik 1.2 zdjety, bo sakiewka zatrzymuje 0.7% sztuk u kowala (468 z 67 735) - kolejka nie ma czego poprawiac. Baza tylko dla dob 91-120 (krotszy bieg - INFO).
+- **W-2 naprawy na sztuke wedlug starej reguly: NIE -> INFO.** Licznik to glownie naprawy lupu, ktorego jest mniej (95 768 wobec 118 498 w zb58) - nie mierzy kolejki.
+- **C-3a polki lukow: NIE -> TAK (7176 wobec doby 90: 7247 = x0.99; zakupy broni strzeleckiej AI 357.3 szt./d wobec Z33 348.5).** Nadmiar powstal w dobach 1-30 i od doby 60 stoi, AI kupuje tyle samo sztuk; poziom wobec Z33 (x2.40) zostaje w tresci jako INFO.
+- **P3-2 zatkane wsie bez wozu: NIE -> TAK (5 dob po 1 wsi, najdluzszy ciag 2 doby).** Wies wpada w wiersz w dniu powrotu do Normal i znika po wystawieniu wozu; NIE dopiero od 3 dob z rzedu.
+- **G1-4 koszt dodatkowych tikow BK: NIE -> NIE (1411 ms/d wobec progu 820 = 2.2 ms x 304 nowe cele + 150; bylo 5 ms/d).** Prog policzony z nieuniknionej decyzji wyjazdu BK; wiersz zostaje NIE, bo objaw jest prawdziwy: 62% kosztu to tiki karawan, ktore nie wyjezdzaja (4.64 ms na nowy cel) - czeka na limit otwartych tikow na postoj.
+- **G1-4b: INFO -> INFO.** Czyta tylko opis "ponad 24 tiki w tym samym postoju"; gdy linia po poprawce ma inny opis, mowi to wprost zamiast liczyc cudze pole.
+- **G1-5a suma kas miast: NIE -> TAK (84.4% Z33).** Prog projektu to >= 80% i <= 110% (ten sam co C-4a na tej samej liczbie), wiersz mial wlasne +-10%.
+- **G1-5c kiesy karawan: TAK -> NIE (2079 zl na karawane wobec 4237 w Z33 = -50.9%; suma -18.7%).** Miara na karawane: suma przechodzila przy 1594 karawanach zamiast 962 i kiesie o polowe chudszej. Objaw prawdziwy - czeka na limit karawan kupca.
+- **T-4 zakupy AI w pierwszych trzech dobach: NIE -> TAK (komplet lordow - korpus + bron biala - 2074 szt. = 28% Z33 7496).** Cala linia ZakupyAI (77% / 53% / 51%) liczy tez zalogi i kategorie, ktorych dorobek nie obejmuje; zostaje w tresci.
+- **H-3 uprzaz z warsztatow: NIE -> NIE (25.7 szt./d, prog 40 bez zmian).** Dopisane: TAK takze przy H-1 <= 10% (wtedy produkcje ogranicza popyt); dzis czeka na podaz siodel.
+- **H-4a rzad najemnika ze wzorca: NIE -> TAK (0 po siewie puli weteranow; 30 szt. przed siewem - INFO).** Ta sama poprawka co K1-4 / K1-4a po triazu zb58.
+- **H-5b wstrzymane z braku uprzezy: NIE -> INFO (653 -> 817 osobo-prob/d).** Pochodna H-1 (20.5% - NIE): kolejka rosnie, dopoki brakuje siodel; prog "nie rosnie" liczony, gdy H-1 jest TAK. W tresci: awanse z para 10.1 -> 14.4/d (bieg z K3 bez bramy 25.4/d), kolejka do konia x1.41.
+- **H-6b kupno siodla po sprzedazy uprzezy: NIE -> TAK (1 z 3120 = 0.03%; prog 0 -> 1% kupionych siodel).**
+- **H-7 koszt E8/H: NIE -> TAK (zdarzenia 2.5, razem ze spisem 10.8 ms/d; prog: zdarzenia <= 5 i razem <= 15).** Ponad stary prog byl tylko spis par do linii logu.
+- **O1-3 ceny sprzetu: NIE -> TAK (10.71 us na wywolanie; prog 450 ms/d -> 11.5 us).** Te same miary: zb58 bez E8/O1 12.39 us, Z33 13.75 us; bieg 2 ma o 11% wiecej wywolan.
+- **K3-8 czeka na konia: NIE -> NIE (mediana dziennej zmiany +38/d wobec progu +30; bylo "5 ostatnich dob < 5 pierwszych").** Stara miare rozstrzygala jedna przegrana bitwa (jedyne TAK w zb58: Dothrakowie -511 w jedna dobe); zb58 w nowej mierze +24 (TAK). Znane, czeka na poprawke uprzezy i limit polki koni.
+- **K3-8b poziom wobec braku do celu: NIE -> INFO (0.85; baza zb58 0.76).** Prog 0.5 nie byl spelniony w zadnym biegu z K3.
+- **K3-3, K3-4: NIE -> NIE** (dopisek o bramie uprzezy; w K3-4 ludzie t3+ 36 900 -> 40 106 i konni t3+ wedlug typu 6763 -> 6695). **Nowy K3-4b: TAK** (jezdzcy z para w partiach rodow AI 4078 -> 4288 - prawdziwa jazda rosnie).
+- **F5-2 zakupy koni lordow: NIE -> TAK (61.0/d; prog 80 -> 58.4 = 1.15 x bieg bez F5).** 80/d bylo prognoza przy jednym gardle; pomiar pokazal nastepne (pusta polka 37% wizyt, limit 25% polki). Straznik dziala: bieg bez F5 (50.8/d) dalej NIE.
+- **R1-8 miasta bez zelaza: NIE -> NIE (30.9 w dobach 91-120; bylo 33.4 z dob 61-120).** Wzorzec W33 ta sama miara: 26.7 i 29.4.
+- **E5/C1-3 kasa miasta < 1000: NIE -> NIE (16 dob z `kasy-miast.csv`, Karhold minimum 31 zl; dopisek linii widzial 1 dobe).**
+- **Nowy wiersz "180: rody z lennem bez warunku renty korony, srednia d31-120": NIE (35.8%; prog projektu etapu 2 <= 20%; zb58 32.4%, W33 27.7%).** Czeka na poprawke warunku sluzby.
+- **E7/C T1 zegar realny: NIE -> TAK.** `HideoutPurge.cs` 2 -> 4: dwa odczyty E8/S w `OnTick` to odstep ponownej proby otwarcia okna gracza; limit trzymany osobno na metode (`PursuitDue` 2, `OnTick` 2). `Log.cs` 4 -> 5: piaty znacznik czasu linii logu z E8/O6 (tego rozpoznanie nie mialo - powstal po scaleniu E8/O6; wszystkie 5 trafien to znaczniki czasu logu).
+- **E7/B F8-2 zmiana strony rzeki poza strefa: NIE -> TAK (12 = 1.1% z 1096 przejsc; prog 0 -> 2% przejsc mostem).** F8-1 bez zmian.
+- **Sciezka CSV:** `budzet-rodow.csv` szukany takze w `Logs/<sesja>/` - wiersze "brak CSV" maja tresc (wszystkie INFO: etap2 "zalogi w wojnie", etap5 "etap 5 (B3)", "E5/A2 INFO", B3-5 / B3-6 / B3-7 w miejsce jednego "B3-5..B3-7").
+
+Razem NIE na biegu 2: etap5 17 -> 16, etap7 3 -> 1, etap8 22 -> 8. Zostaja NIE tylko wiersze, ktorym rozpoznanie dalo BLOKUJE / STROJENIE / BYLO_WCZESNIEJ.
+
+**Ryzyko / co sprawdzic (kontrola calosci, 8.0):**
+- Narzedzie tylko czyta logi i zrodla; zaden plik gry, ustawien ani zapisu nie jest dotykany. Zloto, sztuki, zapis, czas doby - bez zwiazku.
+- `py_compile` kopii poza repo: OK. Szesc grup (etap2-5, 7, 8) na logu biegu 2: 0 wierszy "wyjatek narzedzia", stderr pusty. Porownanie wiersz po wierszu z wynikami sprzed zmian: poza tabela zaden wiersz nie zmienil werdyktu (etap2, etap3, etap4: 0 zmian). Cztery wiersze INFO "E8/O2, O3, O5, O6: brak w logu" wobec zapisanych wynikow to bloki narzedzia z e9dfa7f, ktorych tamto wydanie narzedzia nie mialo.
+- Regresja na innych logach: W33 i bieg 1 (stare i nowe narzedzie, 6 grup): 0 wyjatkow; zmiany werdyktu tylko w biegu 1: E8 T0 (NIE 2 -> TAK 0) i K3-8b (NIE -> INFO); nowy wiersz "180" jest NIE w obu (27.7% i 32.4%); F5-2 w biegu 1 zostaje NIE, K3-8 w biegu 1 zostaje TAK. Okna skrocone (`--do-doby` 30 / 60 / 95): 0 wyjatkow.
+- Straznik E7/C sprawdzony na trzech zepsutych kopiach `HideoutPurge.cs`: trzeci odczyt w `OnTick` -> NIE; odczyt w innej metodzie -> NIE; stara regula przeniesiona do `OnTick` (dalej 4 trafienia razem) -> NIE. Samo "2 -> 4" tego trzeciego by nie zlapalo.
+- Do decyzji prowadzacego (nie ruszone, bo rozpoznanie podaje sprzeczne liczby albo zalezy od poprawek tej rundy): prog H-3 40 czy 45 szt./d; odbior poprawki siodel na H-5a (>= 20/d w dobach 91-120 czy >= 30/d); G1-5d wjazdy do miast jako pasmo 100-200 (zalezy od wybranego limitu karawan); wiersze dla nowych linii (limit karawan, limit tikow, wiersz CSV "sluzba przy Need < 7").
+- Cienkie marginesy, ktore moga dac NIE z samego szumu: C-3a zakupy 357.3 wobec 348.5 (biegi bez E8/C roznia sie o 8%); W-1 x1.09 w dobach 91-120 (w dobach 31-60 ten sam stosunek to x0.97).
+- G1-5c po limicie karawan: przy mniejszej liczbie karawan kiesa na karawane moze wyjsc ponad +20% - ocenic po biegu.
+- G1-4b po scaleniu poprawki limitu tikow trzeba dopasowac do nowego opisu linii (dzis mowi "brak opisu").
+- X-3 (0.79) bez zmian progu - czeka na stawke zwiadu w kodzie; tekst INFO bierze stawke z linii startu sesji.
+- E5/C1-3 z pliku CSV daje NIE wczesniej niz dopisek linii (w oknie 60 i 95 dob bieg 2: TAK -> NIE) - to ta sama, dokladniejsza liczba.
+
+**Status:** DO SPRAWDZENIA - test koncowy.
+
 ## 2026-10-12 (RECENZJA: szew E8/H - E8/O1 = 14563c4 i poprawka F6 punkty 2-3 = 1a15da2) - OBIE PRZYJETE, KOD GRY BEZ ZMIAN; DOPISANE: W KTORA STRONE MYLI SIE REZERWA NAPRAW Z PAMIECI (NIE ZAWSZE W BEZPIECZNA) I CO ZROBIC, GDY PROBKA TO POTWIERDZI; sprostowane numery linii w obu wpisach
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` (po 1a15da2) | **Pliki:** `CHANGELOG.md` (ten wpis i numery linii w dwoch wpisach nizej). Kod i `tools/sprawdz_logi.py` bez zmian.
 

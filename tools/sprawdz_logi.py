@@ -189,7 +189,10 @@ Uzycie (Python 3, tylko odczyt):
                     przy kazdym starcie i 0 linii 'postawione'; bieg zdjec (klucz MapRoadsProbeEnabled = true w konfiguracji testu) - D0-2a plik: stempli > 0, zle wiersze 0,
                     CRC sceny zgodne; D0-2b postawione N z N (bez materialu 0, potkniecia 0); oba - D0-3 potkniecia i linie "ERROR in MapRoadsProbe*" 0;
                     czas stawiania, klatka z drogami / bez - INFO; zdjecia - poza narzedziem.
---grupa etap8     : (E8/0, paczka 242) szkielet etapu 8 (projekt etapu 8 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok etap8_t0: T0 etapu -
+--grupa etap8     : [NARZEDZIE PROGOW p2, 13.10 - po rozpoznaniu biegu probnego 2 (docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md) czesc progow
+                    etapow 5, 7 i 8 ma nowa miare albo okno; aktualny prog stoi w wierszu raportu i w komentarzu "narzedzie progow p2" przy wierszu
+                    w kodzie - opisy nizej sa sprzed tej zmiany tam, gdzie sie roznia.]
+                    (E8/0, paczka 242) szkielet etapu 8 (projekt etapu 8 v2 rozdz. 3 i 4), okno dob kampanii 1-120 (--do-doby); blok etap8_t0: T0 etapu -
                     ERROR w logu Armoury 0, w logu sesji CS bloki "# ERROR IN A MOD" i powtorki Armoury / RealisticCaptivity / GrandTourney 0, wyjatki BK
                     CorrectPlayerEducation 0 (zamyka E8/M); blok etap8_0: E80-1 linia "Profil doby (E8/0)" w kazdej dobie okna (bez pierwszej i ostatniej),
                     E80-2 "nasze razem" >= 80% sumy Koszt 171-174 (nasze 171-174b + ceny) srednio, E80-3 koszt profilu <= 1 ms/dobe, E80-4 INFO takt doby
@@ -205,7 +208,7 @@ Uzycie (Python 3, tylko odczyt):
                     "sufit 2.0 zablokowalby", dodatnie stany kupione (stan "przed" dla E8/W, E8/Z, E8/L, E8/R).
                     Blok etap8_x (E8/X, paczka 248): doswiadczenie za skutek - linia doby "Doswiadczenie (E8/X)" (gra / po zmianie w tym samym biegu):
                     X-1 XP ze strzalu poza bitwa (arena, turniej, cwiczenia) = 0 i ksiega P1 "strzal RBM" gracza <= zaplacone w bitwach (bieg bez misji:
-                    INFO - sprawdza Jeff), X-2 Steward z jedzenia partii lordow AI 300+ po/gra 0.4-0.6, X-3 Scouting z marszu partii lordow AI 300+
+                    INFO - sprawdza Jeff), X-2 Steward z jedzenia partii lordow AI 300+ sam pierwiastek/gra 0.4-0.6 poza zima (TRIAZ-2), X-3 Scouting z marszu partii lordow AI 300+
                     po/gra 0.4-0.6, X-4 "latki wpiete 6/6" przy kazdym starcie (strzal RBM, jedzenie, zwiad 2, RBL 2), wyplaty RBL 3/3, potkniecia 0
                     i prefiksy naprawde biegna (okno >= 3 doby ze stanem [wl]: jedzenie > 0 partii, zwiad > 0 godzin, ksiega P1 "marsz premia AI" lordow = 0);
                     INFO jedzenie i zwiad wedlug partii, rodzaje jedzenia gra / po, zima, postoj, paser, samonaprawa, RBL, koszt wlasny, ksiega P1 po zmianie.
@@ -382,7 +385,8 @@ Uzycie (Python 3, tylko odczyt):
 --zapisz-baze P   : zapisuje plik bazowy z TEGO logu (bieg bazowy kroku A: autotest 120 dob na sklad8 + 10 + 11 + 169c) - srednie ostatnich 28 dob
                     na krolestwo i swiat; od niego licza sie progi "wobec dzis" (rozdz. 1, "Progi dodatkowe").
 --baza P          : plik bazowy do progow "wobec dzis"; bez niego te progi sa INFO.
---csv P           : budzet-rodow.csv tego biegu (zalogi na krolestwo); domyslnie <katalog logu>/<znacznik czasu logu>/budzet-rodow.csv.
+--csv P           : budzet-rodow.csv tego biegu (zalogi na krolestwo); domyslnie <katalog logu>/<znacznik czasu logu>/budzet-rodow.csv, a gdy go tam
+                    nie ma - <katalog logu>/Logs/<znacznik czasu logu>/budzet-rodow.csv (uklad katalogu gry; narzedzie progow p2, TRIAZ-2 O2-2).
 --start-kampanii N: doba gry startu kampanii (dzien z linii); domyslnie z linii "Pomiary 169c: ... start kampanii dzien N", a bez niej
                     pierwsza doba w logu (wtedy log kontynuacji z zapisu liczy doby od siebie - podaj N).
 --koniec-etapu    : test konca etapu 2 (rozdz. E): warunki etapu (glowy < 5 000, bankruci, wojsko 95-115 tys., krolestwa i zalogi na
@@ -467,10 +471,17 @@ def run_day(day, start):
 
 
 def csv_path_of(logp):
-    """<katalog>/Armoury-<znacznik>.log -> <katalog>/<znacznik>/budzet-rodow.csv (Log.Csv: katalog tematyczny sesji)."""
+    """<katalog>/Armoury-<znacznik>.log -> <katalog>/<znacznik>/budzet-rodow.csv (Log.Csv: katalog tematyczny sesji; uklad archiwum).
+    Narzedzie progow p2 (TRIAZ-2 O2-2 pkt 4c, g-INFO etap5): gdy pliku tam nie ma, a jest w ukladzie gry <katalog>/Logs/<znacznik>/budzet-rodow.csv
+    (Log.cs: glowny log w katalogu modulu, CSV w Logs/<sesja>/) - zwraca te sciezke; inaczej sciezke ukladu archiwum (do komunikatu "brak").
+    Dotad kazdy wiersz z CSV dawal "brak CSV", gdy narzedzie czytalo log prosto z katalogu gry."""
     d, f = os.path.split(logp)
     stem = os.path.splitext(f)[0].replace("Armoury-", "")
-    return os.path.join(d, stem, "budzet-rodow.csv")
+    p = os.path.join(d, stem, "budzet-rodow.csv")
+    if os.path.isfile(p):
+        return p
+    q = os.path.join(d, "Logs", stem, "budzet-rodow.csv")
+    return q if os.path.isfile(q) else p
 
 
 def read_csv(path):
@@ -3595,7 +3606,7 @@ def etap5_main(logp, start_arg, until=120, csvp=None, csp=None):
         rep.add("blok etap5_a8", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/C1 (202, PLAN 5.8): kasy miast bez dosypki = tryb 2 A1 - kontrola zbioru C (plon w zaulkach, kasy < 1 000, zloto swiata 28 dob); log sprzed C1 - C1-2 INFO
     try:
-        etap5_c1(rep, lines, start, until)
+        etap5_c1(rep, lines, start, until, logp)
     except Exception as e:
         rep.add("blok etap5_c1", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
     # E5/C2 (203, PLAN 5.9): glod ma skutki - galaz jedzenia R14 tylko przy glodzie z braku pieniedzy (Hunger.Of); log sprzed C2 - INFO
@@ -4269,13 +4280,26 @@ def etap5_r1_stock(rep, lines, start, until, rows, ref=False):
         return None if ref else v
     days = sorted(rows)
     w61 = [x for x in days if x >= 61]
+    # narzedzie progow p2 (TRIAZ-2 d-R1-8): prog <= 30 liczony z d91-until - doby 61-90 to jeszcze dochodzenie po starcie (liczba miast bez zelaza
+    # schodzi przez caly bieg: bieg 2 zbior-e8 d61-120 33.4, d91-120 30.9; wzorzec W33 ta sama miara 29.4 i 26.7). Okno krotsze niz d91 - INFO ze srednia
+    # d61-until. Bieg 2 zostaje NIE (30.9) - objaw prawdziwy: przewoznik kontraktu surowca (174.2) to karawana STOJACA w zrodle, a po E8/G1 stoi ich
+    # kilka razy mniej (G1-6b).
+    w91 = [x for x in days if x >= 91]
     if w61:
         empty = [num(r"miast bez towaru (\d+) z", rows[x], int, 0) or 0 for x in w61]
-        avg = sum(empty) / len(empty)
-        rep.add("R1-8: miasta bez zelaza (srednio d61-until)" + tag, f"{avg:.1f} (d{w61[0]}-d{w61[-1]})",
-                "<= 30 (nie gorzej niz wzorzec W33 29.4)" if not ref else "INFO (prog biegu z dymarka: <= 30)", okv(avg <= 30.0))
+        avg61 = sum(empty) / len(empty)
+        if w91:
+            e91 = [num(r"miast bez towaru (\d+) z", rows[x], int, 0) or 0 for x in w91]
+            avg = sum(e91) / len(e91)
+            rep.add("R1-8: miasta bez zelaza (srednio d91-until)" + tag, f"{avg:.1f} (d{w91[0]}-d{w91[-1]}; d61-until {avg61:.1f})",
+                    "<= 30 w d91-until (d61-90 to dochodzenie po starcie; wzorzec W33 d91-120: 26.7, d61-120: 29.4)" if not ref
+                    else "INFO (prog biegu z dymarka: <= 30 w d91-until)", okv(avg <= 30.0))
+        else:
+            avg = avg61
+            rep.add("R1-8: miasta bez zelaza (srednio d91-until)" + tag, f"okno nie siega d91 (srednio d{w61[0]}-d{w61[-1]}: {avg61:.1f})",
+                    "INFO (prog <= 30 liczony z d91-until)", None)
         if not ref:
-            rep.add("R1-8b: miasta bez zelaza wobec celu projektu (srednio d61-until)", f"{avg:.1f}",
+            rep.add("R1-8b: miasta bez zelaza wobec celu projektu (srednio d91-until)", f"{avg:.1f}",
                     "INFO (cel projektu <= 15 - do oceny po dowozie drewna do dymarek i E8/G1; wzorzec nie zszedl ponizej 19)", None)
     wood, flow = {}, {}
     for d, s in by_day(lines, "Drewno: dzien").items():
@@ -5078,7 +5102,8 @@ def etap5_k3(rep, lines, start, until, logp=None):
     1-until jak etap5_main). Progi po triazu zb58 (miara = to, czym K3 steruje - konni wsrod ludzi t3+): wykonanie celu szablonow (t3+ % / cel %) srednio
     >= 80% w d91-until (bieg roczny >= 90%) i nie spada wobec d61-90 (tolerancja 2 pp), Dothrakowie (khuzait) t3+ >= 90% celu i czekajacy na konia
     <= 10% ludzi (konie-krolestwa.csv), Zelazne Wyspy (sturgia) <= 5%, Wolni Ludzie (freefolk) t3+ <= cel szablonow + 3 pp, czeka na konia swojej
-    kategorii maleje w d91-until (srednia 5 ostatnich dob < srednia 5 pierwszych - F5) i nie przekracza polowy braku do celu t3+ (bez khuzait),
+    kategorii - mediana dziennej zmiany w d91-until <= +30/d (TRIAZ-2 K3-8; poziom wobec braku do celu t3+ bez khuzait - INFO), K3-4b jezdzcy z para
+    (spis E8/H) d91-until >= d61-90,
     przerwa "zostaje (K3 bez K2)" 0 przy czynnej sprzedazy K2(b), potkniecia 0; jazda wszystkich ludzi z sufitem (12% / 60% wiazace tylko w biegu
     rocznym), decyzje sterowania przy rozwidleniu z awansami wykonanymi (linia "Konie AI (175)"), konie rycerzy (stada, targ, zloto, budzet sprzetu) -
     INFO. Pompa koni - K2-5, wojsko lordow i bankruci - progi E2/E5."""
@@ -5146,20 +5171,44 @@ def etap5_k3(rep, lines, start, until, logp=None):
     else:
         e91, e61 = done(w91), done(w61)
         cl = ceil_of(w91)
+        # narzedzie progow p2 (TRIAZ-2 K3-3 / K3-4 "Poprawka ostateczna" pkt 4): spis par E8/H (jezdziec = kon + uprzaz) w tych samych oknach - K3-3 i K3-4
+        # licza TYP jednostki (CavalryTemplate, IsMounted), a przy bramie uprzezy awans na jezdnego czeka na siodlo; prog K3-3 zostaje, dopisek mowi, na co czeka
+        h_pair = {}
+        for d, s in by_day(lines, E8_H_LINE).items():
+            rd = run_day(d, start)
+            if 61 <= rd <= until and "| regula [WL]" in s:
+                g = e8h_group(s, "partie rodow AI")
+                if g:
+                    h_pair[rd] = g["para"]
         if e91:
+            ok3 = e91[0] >= (90.0 if year else 80.0)
             rep.add(f"K3-3: jazda t3+ wobec celu szablonow srednio w d91-{until} (wykonanie celu K3)",
-                    f"{e91[0]:.0f}% (t3+ {e91[1]:.1f}% przy celu {e91[2]:.1f}%)", (">= 90% celu (bieg roczny)" if year else ">= 80% celu [S] (bieg roczny >= 90%)"),
-                    e91[0] >= (90.0 if year else 80.0))
+                    f"{e91[0]:.0f}% (t3+ {e91[1]:.1f}% przy celu {e91[2]:.1f}%)"
+                    + (" - przy bramie uprzezy E8/H awanse na jezdnego czekaja na podaz siodel (H-1 / H-3); nie regresja K3" if (not ok3 and h_pair) else ""),
+                    (">= 90% celu (bieg roczny)" if year else ">= 80% celu [S] (bieg roczny >= 90%)"), ok3)
         else:
             rep.add(f"K3-3: jazda t3+ wobec celu szablonow srednio w d91-{until}", "brak udzialu t3+ i celu w linii", ">= 80% celu [S]", None)
         rep.add(f"K3-3b: jazda partii AI (wszyscy ludzie, z rekrutami t1-t2) srednio w d91-{until}",
                 f"{a91:.1f}%" + (f"; sufit przy pelnym celu t3+ {cl:.1f}%" if cl is not None else ""),
                 ">= 12% [S] (bieg roczny 18-22%)" if year else "INFO (12% i 18-22% to progi biegu rocznego; wzorzec W33 7.4%)", (a91 >= 12.0) if year else None)
         if e91 and e61:
-            rep.add("K3-4: wykonanie celu K3 nie spada (d61-90 -> d91-until)", f"{e61[0]:.0f}% -> {e91[0]:.0f}% (jazda partii {a61:.1f}% -> {a91:.1f}%)",
+            def t3n(ds):
+                tt = [t for t in (tmpl(seg[x]) for x in ds) if t]
+                return mean([t[3] for t in tt]) or 0.0, mean([t[2] / 100.0 * t[3] for t in tt]) or 0.0
+            (m61, c61), (m91, c91) = t3n(w61), t3n(w91)
+            rep.add("K3-4: wykonanie celu K3 nie spada (d61-90 -> d91-until)", f"{e61[0]:.0f}% -> {e91[0]:.0f}% (jazda partii {a61:.1f}% -> {a91:.1f}%; "
+                    f"ludzi t3+ {m61:.0f} -> {m91:.0f}, konnych t3+ wedlug typu {c61:.0f} -> {c91:.0f})",
                     "nie mniej niz d61-90 - 2 pp", e91[0] >= e61[0] - 2.0)
         elif a61 is not None:
             rep.add("K3-4: jazda partii nie spada (d61-90 -> d91-until)", f"{a61:.1f}% -> {a91:.1f}%", "nie mniej niz d61-90 - 0.3 pp", a91 >= a61 - 0.3)
+        # narzedzie progow p2 (TRIAZ-2 K3-4 pkt 4b): K3-4 liczy TYP jednostki - spadek moze znaczyc "mniej konnych wedlug typu bez konia", a nie mniej jazdy.
+        # K3-4b: jezdzcy z para (kon + uprzaz) partii rodow AI ze spisu E8/H, srednia d91-until >= srednia d61-90; tylko doby z regula [WL] (log bez linii
+        # E8/H albo bez reguly - bez wiersza). K3-4 NIE przy K3-4b TAK czytac: maleje kolejka wedlug typu, prawdziwa jazda rosnie.
+        p61, p91 = [v for rd, v in h_pair.items() if rd <= 90], [v for rd, v in h_pair.items() if rd >= 91]
+        if p61 and p91:
+            rep.add(f"K3-4b: prawdziwa jazda partii rodow AI - jezdzcy z para (kon + uprzaz) d61-90 -> d91-{until} (linia Jezdzcy i uprzaz (E8/H))",
+                    f"{mean(p61):.0f} -> {mean(p91):.0f} ({len(p61)} i {len(p91)} dob z regula)",
+                    ">= srednia d61-90 (K3-4 NIE przy K3-4b TAK = maleje kolejka wedlug typu, prawdziwa jazda rosnie)", mean(p91) >= mean(p61))
         rr = [r for r in (realm(seg[x], "khuzait") for x in w91) if r]
         if not rr:
             rep.add(f"K3-5: jazda partii - Dothrakowie (khuzait) d91-{until}", "brak krainy w linii", "t3+ >= 90% celu; czeka <= 10% ludzi", None)
@@ -5193,25 +5242,41 @@ def etap5_k3(rep, lines, start, until, logp=None):
             rep.add(f"K3-7: Wolni Ludzie (freefolk) t3+ wobec celu szablonow d91-{until}", f"{t3:.1f}% przy celu {tg:.1f}%", "<= cel + 3 pp", t3 <= tg + 3.0)
         else:
             rep.add(f"K3-7: Wolni Ludzie (freefolk) t3+ wobec celu szablonow d91-{until}", "brak krainy w linii", "<= cel + 3 pp", None)
-        wv = [(x, num(r"\| czeka (\d+)", seg[x])) for x in w91]
-        wv = [v for x, v in wv if v is not None]
+        wd = {x: num(r"\| czeka (\d+)", seg[x]) for x in days}
+        wd = {x: v for x, v in wd.items() if v is not None}
+        wv = [wd[x] for x in w91 if x in wd]
         if len(wv) >= 10:
             f5, l5 = mean(wv[:5]), mean(wv[-5:])
-            # narzedzie progow F9b (F5, K3-8): po F5 (konie lordow z przydzialu sprzetu rodu) kolejka ma malec, nie tylko "nie rosnac"
-            rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until} (lordowie i zalogi AI)", f"5 pierwszych dob {f5:.0f}, 5 ostatnich {l5:.0f}",
-                    "maleje: 5 ostatnich dob < 5 pierwszych [S] (a589def 4465 -> 4176 przy poziomie 2.2 x W33)", l5 < f5)
+            # narzedzie progow p2 (TRIAZ-2 K3-8 "Poprawka ostateczna" pkt 1): miare "5 ostatnich dob < 5 pierwszych" rozstrzygala jedna przegrana bitwa
+            # (a589def: Dothrakowie d100 -> d101 czeka -511 przy stracie 504 ludzi - stad jedyne TAK; bez dni strat kolejka rosla w kazdym biegu:
+            # a589def +36/d, W33 +18/d, bieg 2 zbior-e8 +55/d). Wiazaca jest MEDIANA dziennej zmiany w d91-until (odporna na pojedyncza bitwe):
+            # <= +30/d = 1.25 x baza a589def (+24; W33 +22). Cel "maleje" (<= 0) - INFO do czasu paczki limitu polki koni (AiMountMarketSharePercent).
+            dif = sorted(wd[x] - wd[x - 1] for x in w91 if x in wd and (x - 1) in wd)
+            if len(dif) >= 10:
+                med = dif[len(dif) // 2] if len(dif) % 2 else 0.5 * (dif[len(dif) // 2 - 1] + dif[len(dif) // 2])
+                up, dn = sum(1 for v in dif if v > 0), [v for v in dif if v < 0]
+                rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until} (lordowie i zalogi AI) - mediana dziennej zmiany",
+                        f"{med:+.0f}/d ({len(dif)} zmian dobowych: rosnie w {up}, spada w {len(dn)} - suma spadkow {sum(dn)}); 5 pierwszych dob {f5:.0f}, 5 ostatnich {l5:.0f}",
+                        "<= +30/d (1.25 x baza a589def +24, W33 +22; miara odporna na jedna bitwe); cel <= 0 - INFO; NIE = znane, czeka na poprawke uprzezy "
+                        "i limit polki koni (TRIAZ-2 K3-8)", med <= 30.0)
+            else:
+                rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until} - mediana dziennej zmiany", f"{len(dif)} zmian dobowych (doby nie po kolei)",
+                        "<= +30/d - potrzeba >= 10 zmian dobowych", None)
             # narzedzie progow zb58 (TRIAZ "K3-3 / K3-5 / K3-8 - miara", pkt 3): sam trend przechodzil przy poziomie 2.2 x wzorca i rownym brakowi do celu -
             # dochodzi poziom: czekajacy (bez Dothrakow - ich rekruci t1 to osobny wiersz K3-5) <= 0.5 x brak konnych do celu t3+ partii rodow
             gap = [t[3] * max(0.0, t[4] - t[2]) / 100.0 for t in (tmpl(seg[x]) for x in w91) if t]
             kwt = [khz[x][0] for x in w91 if x in khz]
+            # narzedzie progow p2 (TRIAZ-2 K3-8 pkt 6 i "Poprawka ostateczna" pkt 1): prog 0.5 nie byl spelniony w zadnym biegu z K3 (a589def 2839 / ok. 3750
+            # = 0.76; sterowanie liczy kazdy stos osobno - CavalryTemplate.WantRider / Steer), wiec nie odroznia biegow - wiersz INFO z baza
             if gap and kwt:
                 wl, gp = mean(wv) - mean(kwt), mean(gap)
                 rep.add(f"K3-8b: czeka na konia - poziom wobec braku do celu t3+ d91-{until} (bez khuzait)",
-                        f"czeka srednio {wl:.0f} (wszyscy {mean(wv):.0f}, khuzait {mean(kwt):.0f}) wobec braku do celu t3+ {gp:.0f}",
-                        "<= 0.5 x brak do celu t3+ (wzorzec W33: czeka 1949 razem z khuzait)", wl <= 0.5 * gp)
+                        f"czeka srednio {wl:.0f} (wszyscy {mean(wv):.0f}, khuzait {mean(kwt):.0f}) wobec braku do celu t3+ {gp:.0f}"
+                        + (f" = {wl / gp:.2f}" if gp > 0 else ""),
+                        "INFO (baza a589def 0.76; stary prog 0.5 niespelniony w zadnym biegu z K3 - TRIAZ-2 K3-8)", None)
             else:
                 rep.add(f"K3-8b: czeka na konia - poziom wobec braku do celu t3+ d91-{until} (bez khuzait)",
-                        "brak konie-krolestwa.csv (czekajacy khuzait) albo udzialu t3+ w linii", "<= 0.5 x brak do celu t3+", None)
+                        "brak konie-krolestwa.csv (czekajacy khuzait) albo udzialu t3+ w linii", "INFO (baza a589def 0.76)", None)
         else:
             rep.add(f"K3-8: czeka na konia swojej kategorii d91-{until}", f"{len(wv)} dob z pomiarem (Army175Measure)", "nie rosnie - potrzeba >= 10 dob", None)
     rows = [seg[x] for x in days]
@@ -5299,8 +5364,12 @@ def _k3_f5(rep, lines, start, until, seg, days):
     buy = [v for v in (num(r"\| zakupy lordow: (\d+) koni", x, int) for x in kr) if v is not None]
     if buy:
         avg = sum(buy) / float(len(buy))
-        rep.add(f"F5-2: zakupy koni lordow srednio d91-{until} (linia Konie AI 175)", f"{avg:.1f}/d ({len(buy)} dob)",
-                ">= 80/d [S] (a589def 50.8 w tym oknie, w TRIAZ 49.6; prognoza po F5 80-95)", avg >= 80.0)
+        # narzedzie progow p2 (TRIAZ-2 F5-2): 80/d bylo prognoza [S] przy zalozeniu, ze jedynym gardlem jest budzet postoju. Pomiar biegu 2: F5 dziala
+        # (2.67 konia na zakup wobec 2.48, przydzial sprzetu wydany w 47% wobec 23%), a zakupy trzymaja nastepne gardla - pusta polka 37% wizyt z potrzeba
+        # i limit 25% polki (AiMountMarketSharePercent). Wiazace: >= 1.15 x bieg bez F5 (a589def 50.8/d w tym oknie = 58.4/d); 80/d - cel INFO do biegu
+        # po poprawce siodel i limitu polki.
+        rep.add(f"F5-2: zakupy koni lordow srednio d91-{until} (linia Konie AI 175)", f"{avg:.1f}/d ({len(buy)} dob; cel prognozy F5 80-95/d - INFO)",
+                ">= 58.4/d = 1.15 x bieg bez F5 (a589def 50.8 w tym oknie); prognoza 80/d [S] czeka na polki koni i siodla (TRIAZ-2 F5-2)", avg >= 58.4)
         vis = sum(num(r"; wizyt z potrzeba (\d+),", x, int, 0) or 0 for x in kr)
         dear = sum(num(r"brak koni \d+ \(pusto \d+, za drogie (\d+)", x, int, 0) or 0 for x in kr)
         nog = sum(num(r"nieudane: brak zlota (\d+)", x, int, 0) or 0 for x in kr)
@@ -5689,7 +5758,7 @@ def etap5_a8(rep, lines, start, until):
     rep.add("E5/A8-7: kontrola (stos paktow, otwarte okna na koniec doby, potkniecia, ERROR BkDipGold.*)", f"{ov} / {op_} / {sm} / {errs}", "0 / 0 / 0 / 0",
             ov == 0 and op_ == 0 and sm == 0 and errs == 0)
 
-def etap5_c1(rep, lines, start, until):
+def etap5_c1(rep, lines, start, until, logp=None):
     """E5/C1 (202, PLAN 5.8 - kasy miast bez dosypki; projekt etapu 5 rozdz. 3 "E5/C1" Test). Regulator bez dosypki to tryb 2 klucza Town Purse Regulator
     (E5/A1, decyzja Jeffa 11.10 16:10 - osobnego klucza TownPurseNoTopUp nie ma); tu kontrola zbioru C. C1-1 tryb 2 kazdej doby i dosypka kas miast
     i zamkow 0; C1-2 zakup plonu w miastach-zaulkach >= 98% (dopisek "plon w zaulkach (E5/C1)" w linii "Kasy miast (169c)" - kasa ponizej zapasu kupcow
@@ -5749,10 +5818,36 @@ def etap5_c1(rep, lines, start, until):
         v = num(r"zaulki: kas ponizej zapasu \d+, ponizej 1000 (\d+)", seg[d])
         if v is not None:
             b1k[d] = v
-    if b1k:
+    # narzedzie progow p2 (TRIAZ-2 b-E5/C1-3): dopisek linii "Kasy miast" powstaje w innej chwili doby niz stan zapisany w kasy-miast.csv - w biegu 2 linia
+    # widziala 1 dobe, a kolumna "kasa" 16 dob (Karhold, minimum 31 zl). Gdy plik sesji jest - liczy sie kolumna "kasa" (dzien ksiegi); bez pliku - dopisek linii.
+    csv_k, csv_min = {}, None
+    cp = session_file_find(logp, "kasy-miast.csv") if logp else None
+    if cp and os.path.exists(cp):
+        try:
+            with open(cp, encoding="utf-8", errors="replace", newline="") as fh:
+                for r in csv.DictReader(fh, delimiter=";"):
+                    d, k = int(r["dzien"]), int(float(r["kasa"]))
+                    if 2 <= run_day(d, start) <= until:
+                        csv_k.setdefault(d, 0)
+                        if k < 1000:
+                            csv_k[d] += 1
+                            if csv_min is None or k < csv_min[0]:
+                                csv_min = (k, r.get("miasto", "?"), d)
+        except (KeyError, ValueError, OSError):
+            csv_k, csv_min = {}, None
+    if csv_k:
+        bad = sorted(d for d, v in csv_k.items() if v > 0)
+        lb = sorted(d for d, v in b1k.items() if v > 0)
+        rep.add("E5/C1-3: miasta z kasa ponizej 1 000 - kazda doba okna",
+                f"niezerowe w {len(bad)} z {len(csv_k)} dob (kasy-miast.csv, kolumna kasa)"
+                + (f" - najwiecej {max(csv_k[d] for d in bad)} miast, pierwsza d{run_day(bad[0], start)}, minimum {csv_min[0]} zl ({csv_min[1]}, d{run_day(csv_min[2], start)})" if bad else "")
+                + f"; dopisek linii Kasy miast: niezerowe w {len(lb)} z {len(b1k)} dob",
+                "0 kazdej doby (projekt E5/C1; stan z pliku kasy-miast.csv)", len(bad) == 0)
+    elif b1k:
         bad = sorted(d for d, v in b1k.items() if v > 0)
         rep.add("E5/C1-3: miasta z kasa ponizej 1 000 - kazda doba okna",
-                f"niezerowe w {len(bad)} z {len(b1k)} dob" + (f" (najwiecej {max(b1k[d] for d in bad)}, pierwsza d{run_day(bad[0], start)})" if bad else ""),
+                f"niezerowe w {len(bad)} z {len(b1k)} dob" + (f" (najwiecej {max(b1k[d] for d in bad)}, pierwsza d{run_day(bad[0], start)})" if bad else "")
+                + " - z dopisku linii (brak kasy-miast.csv; dopisek zaniza liczbe dob)",
                 "0 kazdej doby (projekt E5/C1)", len(bad) == 0)
     else:
         rep.add("E5/C1-3: miasta z kasa ponizej 1 000", "brak liczb (dopisek zaulkow A1)", "0 kazdej doby", None)
@@ -7626,6 +7721,14 @@ def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
             f"niezgodnych {len(bad4)} z {len(ds)} dob (porownanych z 180: {n180})" + (f" (pierwsza {bad4[0]})" if bad4 else "")
             + f"; ostatnia doba: panu {last['lord']:.1f}%, wagi {last['w'][0]:g} / {last['w'][1]:g} / {last['w'][2]:g} ({'z wyrownaniem' if last['live'] else 'bez wyrownania'})",
             "0 (czynne: 50% i 2 / 1.5 / 0.25 przy domyslnych; nieczynne: 67% i 3 / 1 / 0.25)", len(bad4) == 0)
+    # narzedzie progow p2 (TRIAZ-2 O2-2 "Poprawka ostateczna" pkt 4a): rody z lennem bez warunku renty korony (pole "bez warunku N (P%)" linii 180),
+    # srednia d31-until <= 20% - prog projektu etapu 2 (C1-POSTEP: "bez warunku < 20%"), dotad bez wiersza. Niespelniony w zadnym biegu (a589def 32.4%,
+    # W33 27.7%, bieg 2 zbior-e8 35.8% - Polnoc: renta u 2 z 20 rodow przez 80 dob) - NIE do czasu poprawki warunku sluzby (CrownRents.Daily).
+    nc = [fnum(r"z warunkiem \d+, bez warunku \d+ \(([0-9.]+)%\)", s) for d, s in r180.items() if 31 <= run_day(d, start) <= until]
+    nc = [v for v in nc if v is not None]
+    if nc:
+        rep.add(f"180: rody z lennem bez warunku renty korony, srednia d31-{until}", f"{sum(nc) / len(nc):.1f}% ({len(nc)} dob, najwiecej {max(nc):.1f}%)",
+                "<= 20% (prog projektu etapu 2; a589def 32.4%, W33 27.7% - NIE = czeka na poprawke warunku sluzby, TRIAZ-2 O2-2)", sum(nc) / len(nc) <= 20.0)
     # B3-5..B3-7: panowie samych zamkow (budzet-rodow.csv; rodzaj "zamek" = rod z zamkami bez miasta, gracz poza)
     csvp = csvp or (csv_path_of(logp) if logp else None)
     crow = read_csv(csvp) if csvp else []
@@ -8735,8 +8838,13 @@ def etap7_t(rep, lines, start, until, logp=None, csp=None):
 
 
 # E7/C (227): wyjatki od R4 "kazda decyzja gry na zegarze gry" - plik -> (dozwolonych trafien, powod). Liczba to gorna granica: nowe trafienie w pliku = NIE
+# Narzedzie progow p2 (TRIAZ-2 f-E7/C T1): HideoutPurge.cs 2 -> 4 - E8/S (246) dopisal dwa odczyty DateTime.UtcNow w OnTick: po wyjatku przy otwieraniu
+# menu przeszukania kryjowki GRACZA kolejna proba najwczesniej po 1 s realnej, najwyzej 3 proby. To odstep ponownej proby okna gracza (jak dlawienie
+# komunikatow w Wayfinder / QuartermasterLaw), nie prawo swiata: nie dotyka partii AI, zlota ani czasu gry. Limit trzymany OSOBNO na metode (_E7C_ONLY_IN),
+# zeby stara regula "3 s realne" nie mogla wrocic do OnTick pod tym samym licznikiem. Log.cs 4 -> 5: E8/O6 (270) dopisal piaty znacznik czasu linii logu
+# (wspolny rdzen zapisu Log.Append) - wszystkie 5 trafien to "[HH:mm:ss]" / naglowek / nazwa pliku logu, zadnej decyzji gry.
 _E7C_ALLOWED = {
-    "Log.cs": (4, "znaczniki czasu logu"),
+    "Log.cs": (5, "znaczniki czasu logu (piaty od E8/O6: wspolny rdzen zapisu)"),
     "GoodsLedger.cs": (1, "godzina w linii logu"),
     "NightRest.cs": (4, "widok: namiot gracza (ReassertPlayerTent, co 5 s) i namioty mijanych obozow (co 2 s)"),
     "Wayfinder.cs": (2, "dlawienie komunikatu drogi"),
@@ -8744,11 +8852,12 @@ _E7C_ALLOWED = {
     "MapVillagesView.cs": (2, "widok mapy wsi (OnVisualTick realDt)"),
     "MapRoadsProbe.cs": (3, "widok proby drog E7/D0 (OnVisualTick realDt: czas klatki do histogramu, dlawienie 4 x na sekunde, podsumowanie; klucz MapRoadsProbeEnabled domyslnie false)"),
     "CrossingLaw.cs": (3, "etap 8 (rozdz. 7): komunikat co 5 s i akumulator _acc"),
-    "HideoutPurge.cs": (2, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne"),
+    "HideoutPurge.cs": (4, "wylacznik HideoutPursuitHours 0 = stara regula 3 s realne (PursuitDue, 2) i E8/S: odstep ponownej proby otwarcia menu gracza (OnTick, 2)"),
 }
 _E7C_PAT = re.compile(r"DateTime\.(?:Now|UtcNow)\b|Environment\.TickCount|ApplicationTime|\+=\s*realDt\b")
 _E7C_ACC = re.compile(r"\b_acc\w*\s*\+=\s*dt\b")
-_E7C_ONLY_IN = {"HideoutPurge.cs": "bool PursuitDue()"}   # wylacznik: zegar realny tylko w galezi klucza 0 tej metody
+# plik -> ((naglowek metody, najwyzej trafien w jej ciele), ...): zegar realny tylko w tych metodach i najwyzej w tej liczbie; trafienie poza nimi = NIE
+_E7C_ONLY_IN = {"HideoutPurge.cs": (("bool PursuitDue()", 2), ("void OnTick(float dt)", 2))}
 
 
 def etap7_c(rep, lines, start, until, logp=None, csp=None):
@@ -8773,29 +8882,39 @@ def etap7_c(rep, lines, start, until, logp=None, csp=None):
             mission = "OnMissionTick" in txt
             # plik z wyjatkiem w jednej metodzie (wylacznik): trafienia poza jej cialem sa zawsze NIE (stara regula w OnTick dawala tyle samo trafien)
             only_in = _E7C_ONLY_IN.get(fn)
-            span = None
-            if only_in:
-                a = txt.find(only_in)
+            spans = []
+            for sig, cap in (only_in or ()):
+                a = txt.find(sig)
                 b = txt.find("\n        }", a) if a >= 0 else -1
-                span = (txt.count("\n", 0, a), txt.count("\n", 0, b)) if a >= 0 and b >= 0 else (-1, -1)
+                spans.append((sig, cap, (txt.count("\n", 0, a), txt.count("\n", 0, b)) if a >= 0 and b >= 0 else (-1, -1)))
+            per = [0] * len(spans)
             n = 0
             outside = 0
             for i, ln in enumerate(txt.splitlines()):
                 code = ln.split("//", 1)[0]
                 k = len(_E7C_PAT.findall(code)) + (0 if mission else len(_E7C_ACC.findall(code)))
                 n += k
-                if span is not None and k and not (span[0] <= i <= span[1]):
-                    outside += k
+                if spans and k:
+                    for j, (_, _, sp) in enumerate(spans):
+                        if sp[0] <= i <= sp[1]:
+                            per[j] += k
+                            break
+                    else:
+                        outside += k
+            over_m = [f"{sig}: {per[j]}/{cap}" for j, (sig, cap, _) in enumerate(spans) if per[j] > cap]
             if n:
                 hits[fn] = n
                 lim = _E7C_ALLOWED.get(fn, (0, ""))[0]
-                if n > lim or outside:
-                    over.append(f"{fn} {n}/{lim}" + (f" (poza {only_in}: {outside})" if outside else ""))
+                if n > lim or outside or over_m:
+                    over.append(f"{fn} {n}/{lim}" + (f" (poza {' / '.join(sig for sig, _, _ in spans)}: {outside})" if outside else "")
+                                + (f" (ponad limit metody - {', '.join(over_m)})" if over_m else ""))
         hp = hits.get("HideoutPurge.cs", 0)
         rep.add("E7/C T1: zegar realny i akumulatory klatek w logice gry (grep kodu Armoury/src)",
                 f"poza lista wyjatkow: {', '.join(over) if over else '0'}; w wyjatkach: "
-                + ", ".join(f"{k} {v}" for k, v in sorted(hits.items()) if k in _E7C_ALLOWED) + f" (HideoutPurge {hp} - tylko wylacznik)",
-                "0 poza lista (widok, komunikaty, log, wylacznik HideoutPursuitHours 0, CrossingLaw - etap 8)", not over)
+                + ", ".join(f"{k} {v}" for k, v in sorted(hits.items()) if k in _E7C_ALLOWED)
+                + f" (HideoutPurge {hp} - wylacznik w PursuitDue i odstep ponownej proby okna gracza w OnTick, E8/S)",
+                "0 poza lista (widok, komunikaty, log, wylacznik HideoutPursuitHours 0 i ponowna proba okna gracza E8/S - po 2 w swojej metodzie, CrossingLaw - etap 8)",
+                not over)
         bad = []
         for fn in ("Settings.cs", "McmSettings.cs"):
             try:
@@ -9148,9 +9267,14 @@ def etap7_b(rep, lines, start, win, until=120, **kw):
                 "0 (wynik > 0: os nie pasuje do rzeki albo cieciwa dlugiego skoku - zglosic, nie zaliczac)", (offb == 0) if f8 else None)
         ls = [x for x in f8 if ", zmiana strony poza strefa " in x]
         lost = sum(num(r"zmiana strony poza strefa (\d+)", x, int, 0) or 0 for x in ls)
-        rep.add("E7/B F8-2: zmiana strony rzeki poza strefa (suma okna)", f"{lost} w {len(ls)} dobach",
-                "0 (wynik > 0 przy partiach wolniejszych niz 7.5 jedn./h: rozjazd osi z rzeka ok. 4.5+ jedn. od mostu albo inna przeprawa - rozstrzyga F8-1)",
-                (lost == 0) if ls else None)
+        # narzedzie progow p2 (TRIAZ-2 f-E7/B F8-2): licznik lapie partie zapamietana w strefie r 8, ktora godzine pozniej jest poza strefa po drugiej
+        # stronie PROSTEJ osi - bieg 2: 12 zdarzen w 119 dobach (po 1 na dobe) przy 1096 przejsciach mostem i F8-1 = 0 (najdalej 1.8 jedn.). Prosta os
+        # zmierzono do ok. 5 jedn. od mostu; dalej rozjezdza sie z rzeka (partia idaca brzegiem "zmienia strone" bez przeprawy) albo jest druga przeprawa
+        # 8-16 jedn. od mostu - log tego nie rozroznia (licznik nie zapisuje pozycji). Dla licznika myta to najwyzej 12 / 1096 = 1.1% zanizenia, wiec
+        # prog: <= 2% przejsc mostem zamiast 0; F8-1 (przejscia poza mostem = 0) bez zmian.
+        rep.add("E7/B F8-2: zmiana strony rzeki poza strefa (suma okna)", f"{lost} w {len(ls)} dobach" + (f" = {100.0 * lost / n:.1f}% z {n} przejsc mostem" if n else ""),
+                "<= 2% przejsc mostem (tyle najwyzej zaniza licznik przejsc i myta; wiecej = rozjazd osi z rzeka albo inna przeprawa - rozstrzyga F8-1 i pozycje zdarzen)",
+                (lost <= 0.02 * n) if (ls and n) else ((lost == 0) if ls else None))
         mb = re.search(r"most na osi (-?[\d.]+)/(-?[\d.]+)", a8)
         gd = num(r"\), ([\d.]+) jedn\. od mostu", a8, float)
         zone = "strefa r 8 od mostu" in a8
@@ -9805,18 +9929,29 @@ def etap8_t0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         blk, pm, pu = crashscribe_mod_errors(path, mod)
         rep.add(f"E8 T0: bloki ERROR IN A MOD [{mod}] (CS)", f"bloki {len(blk)}, powtorki {len(pm)} | {os.path.basename(path)} ({how})", "0 i 0",
                 len(blk) == 0 and len(pm) == 0)
-    n_cpe, cur = 0, []
+    # narzedzie progow p2 (TRIAZ-2 a "E8 T0"): blok raportu CS konczy sie na linii "####" po tresci (trzecia linia krat) albo na pierwszej zwyklej linii logu
+    # "[HH:MM:SS] ..." (blok bez stosu nie ma kraty zamykajacej). Dotad po "# ...ERROR" doklejane byly WSZYSTKIE nastepne linie az do kolejnego bloku, wiec
+    # zwykle linie "Quiet (E8/M): znany wyjatek BK CorrectPlayerEducation ... odfiltrowany" i "Mends: edukacja BK gracza (E8/M) ..." liczyly sie jako
+    # wyjatek w cudzym bloku (bieg 2: 2 przy 0 blokow ze sladem tej metody; filtr E8/M zlapal jedyny wyjatek).
+    n_cpe, n_quiet, cur = 0, 0, None
+
+    def cpe_close(blk):
+        return 1 if blk and any("CorrectPlayerEducation" in x for x in blk) else 0
     with open(path, encoding="utf-8-sig", errors="replace") as f:
         for ln in f:
             if ln.startswith("# ") and "ERROR" in ln:
-                if any("CorrectPlayerEducation" in x for x in cur):
-                    n_cpe += 1
+                n_cpe += cpe_close(cur)
                 cur = [ln]
-            elif cur:
+            elif cur is not None and (TS.match(ln) or (ln.startswith("####") and len(cur) >= 3)):
+                n_cpe += cpe_close(cur)
+                cur = None
+            elif cur is not None:
                 cur.append(ln)
-    if any("CorrectPlayerEducation" in x for x in cur):
-        n_cpe += 1
-    rep.add("E8 T0: wyjatki BK CorrectPlayerEducation (bloki CS)", f"{n_cpe}", "0 (zamyka E8/M)", n_cpe == 0)
+            if cur is None and "Quiet (E8/M): znany wyjatek BK CorrectPlayerEducation" in ln:
+                n_quiet += 1
+    n_cpe += cpe_close(cur)
+    rep.add("E8 T0: wyjatki BK CorrectPlayerEducation (bloki CS)", f"{n_cpe} (bloki ze sladem metody w tresci; odfiltrowane przez Quiet E8/M: {n_quiet} linii)",
+            "0 (zamyka E8/M)", n_cpe == 0)
     rep.add("E8 T0: ERROR w logach RealisticCaptivity / GrandTourney", "poza narzedziem (wlasne pliki logu)", "0 - sprawdzic recznie", None)
 
 
@@ -9824,7 +9959,7 @@ def etap8_0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/0 (242, projekt etapu 8 v2 rozdz. 3 "E8/0" Test): linia "Profil doby (E8/0)" (DayProfile.cs).
     E80-1 linia w kazdej dobie okna (bez pierwszej i ostatniej - linia doby N powstaje w takcie doby N+1); E80-2 pokrycie: "nasze razem (dolna granica)"
     >= 80% sumy z linii "Koszt 171-174 (doba)" tej doby ("nasze 171-174b" + "ceny sprzetu (PricePostfix)" - ceny zachodza czesciowo na pozycje sumy, wiec
-    wzorzec jest raczej zawyzony) - srednio w oknie; E80-3 koszt samego profilu <= 1 ms/dobe srednio; E80-4 INFO - takt doby (mediana, maks.) i udzial dob
+    wzorzec jest raczej zawyzony) - srednio w oknie; E80-3 koszt samego profilu <= 15 ms/dobe srednio (TRIAZ-2: 126 tys. opakowan zdarzen); E80-4 INFO - takt doby (mediana, maks.) i udzial dob
     ze sprzataniem pamieci gen2 w szczytach taktu (10% najdluzszych) wobec wszystkich dob. INFO: nasze mody s/dobe, najdrozsze wywolania taktu, zapis logu,
     linia "Profil CS (E8/0)" z logu sesji CrashScribe (bledy pierwszej szansy, czas Blame.Culprits)."""
     prof = {d: s for d, s in by_day(lines, E8_PROF).items() if 1 <= run_day(d, start) <= until}
@@ -9861,9 +9996,13 @@ def etap8_0(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     if cost:
         m = sum(c for c, _ in cost) / len(cost)
         mx = max(cost)
-        rep.add("E80-3: koszt samego profilu", f"srednio {m:.2f} ms/dobe, najwiecej {mx[0]:.2f} ms (d{run_day(mx[1], start)})", "<= 1 ms/dobe srednio", m <= 1.0)
+        # narzedzie progow p2 (TRIAZ-2 E80-3): prog 1 ms zakladal ok. 13 tys. opakowan zdarzen na dobe; pomiar: 126 tys./d (8 sluchaczy wejscia do osady
+        # x 9.3 tys. wejsc + 5 sluchaczy doby partii x 5.8 tys. partii) x 73.6 ns = 9.3 ms + linia 0.3 ms. Koszt staly w calym biegu (0.04% doby), wiec
+        # prog <= 15 ms/dobe; klucz Stage8ProfileLog = false zdejmuje calosc po zakonczeniu optymalizacji.
+        rep.add("E80-3: koszt samego profilu", f"srednio {m:.2f} ms/dobe, najwiecej {mx[0]:.2f} ms (d{run_day(mx[1], start)})",
+                "<= 15 ms/dobe srednio (126 tys. opakowan zdarzen x 74 ns; szacunek projektu 1 ms liczyl 13 tys.)", m <= 15.0)
     else:
-        rep.add("E80-3: koszt samego profilu", "brak liczby w linii", "<= 1 ms/dobe", None)
+        rep.add("E80-3: koszt samego profilu", "brak liczby w linii", "<= 15 ms/dobe", None)
     tick = [(fnum(r"\| takt doby ([0-9.]+) ms", prof[d]), d) for d in days]
     tick = [(t, d) for t, d in tick if t is not None]
     if tick:
@@ -9940,7 +10079,7 @@ def e8p1_sources(seg):
 def etap8_p1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/P1 (243, projekt etapu 8 v2 rozdz. 3 "E8/P1" Test): linie "Umiejetnosci (E8/P1)", "XP wojska (E8/P1)", "Poziomy lordow (E8/P1)" (SkillLedger.cs).
     P1-1 obie linie doby w kazdej dobie okna (bez pierwszej i ostatniej - linia doby N powstaje w takcie doby N+1, pierwszy takt sesji bez linii);
-    P1-2 koszt ksiegi <= 30 ms/dobe srednio (stopery probkowane 1/64 + znaczniki + probki stosu + linie); P1-3 zrodlo "inne" <= 20% surowego XP lordow AI
+    P1-2 koszt ksiegi <= 40 ms/dobe srednio (TRIAZ-2: w tym znaczniki zrodel; stopery probkowane 1/64 + znaczniki + probki stosu + linie); P1-3 zrodlo "inne" <= 20% surowego XP lordow AI
     w oknie (pokrycie znacznikow; XP wprost z ChangeSkillLevel jest poza suma); P1-4 latki wpiete N/N przy kazdym starcie sesji, potkniecia 0 (R11).
     INFO: XP lordow i gracza wedlug zrodla (stan "przed" dla E8/X: jedzenie, marsz, marsz premia AI, strzal RBM), kto wola "inne" (probka stosu),
     XP wojska wedlug zrodla (zadane / przyjete), znaczniki zerwane, poziomy lordow - pierwsza i ostatnia linia okna."""
@@ -9965,9 +10104,13 @@ def etap8_p1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     if cost:
         m = sum(c for c, _ in cost) / len(cost)
         mx = max(cost)
-        rep.add("P1-2: koszt ksiegi umiejetnosci", f"srednio {m:.1f} ms/dobe, najwiecej {mx[0]:.1f} ms (d{run_day(mx[1], start)}; {len(cost)} dob)", "<= 30 ms/dobe srednio", m <= 30.0)
+        # narzedzie progow p2 (TRIAZ-2 P1-2): ponad polowe kosztu daja znaczniki zrodel (ok. 83 tys./d x 215 ns = 18 ms), ktorych szacunek projektu
+        # (30 ms) nie liczyl; koszt plaski w calym biegu (d30 33.4, d90 34.0 ms; nie rosnie z karawanami), sam pomiar - prog <= 40 ms/dobe.
+        # Klucz SkillLedgerLog = false zdejmuje calosc po zebraniu pomiarow E8/P1.
+        rep.add("P1-2: koszt ksiegi umiejetnosci", f"srednio {m:.1f} ms/dobe, najwiecej {mx[0]:.1f} ms (d{run_day(mx[1], start)}; {len(cost)} dob)",
+                "<= 40 ms/dobe srednio (w tym znaczniki zrodel ok. 18 ms, poza szacunkiem projektu 30 ms)", m <= 40.0)
     else:
-        rep.add("P1-2: koszt ksiegi umiejetnosci", "brak liczby w linii", "<= 30 ms/dobe", None)
+        rep.add("P1-2: koszt ksiegi umiejetnosci", "brak liczby w linii", "<= 40 ms/dobe", None)
     lords, player = {}, {}
     for d in days:
         ml = re.search(r"\| zrodla lordow AI: (.*?) \| zrodla gracza: (.*?) \| umiejetnosci lordow AI:", um[d])
@@ -10230,7 +10373,7 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/X (248, projekt etapu 8 v2 rozdz. 3 "E8/X" Test, regula R10): linia doby "Doswiadczenie (E8/X)" (XpFair.cs) podaje dla kazdej sprawy
     "gra X / po Y" z tego samego biegu (gra = ile zaplacilaby regula gry / RBM / RBL dla tych samych wywolan).
     X-1 strzal poza bitwa (arena, turniej, cwiczenia): po = 0, a ksiega E8/P1 nie pokazuje u gracza wiecej XP "strzal RBM" niz zaplacono w bitwach
-    (bieg bez misji - autotest - nie ma strzalow: INFO, sprawdza Jeff w grze, 8.16); X-2 Steward z jedzenia partii lordow AI 300+: po/gra 0.4-0.6;
+    (bieg bez misji - autotest - nie ma strzalow: INFO, sprawdza Jeff w grze, 8.16); X-2 Steward z jedzenia partii lordow AI 300+: sam pierwiastek/gra 0.4-0.6 w dobach bez zimy (TRIAZ-2; po/gra i rodzaje od pol dnia - INFO);
     X-3 Scouting z marszu partii lordow AI 300+: po/gra 0.4-0.6 (gra = marsz + premia tylko-AI); X-4 kazdy start sesji "latki wpiete 6/6"
     (strzal RBM, jedzenie, zwiad 2, RBL 2 - RBL potwierdzony w dekompilacji), wyplaty RBL 3/3, bez "nie znaleziono", potkniecia 0; do tego
     (recenzja E8/X) dowod, ze prefiksy BIEGNA, nie tylko sa wpiete: przy stanie [wl] w calym oknie (>= 3 doby) jedzenie ma > 0 partii, zwiad > 0 godzin,
@@ -10249,6 +10392,8 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     scout = {r: [0, 0, 0, 0] for r in E8_X_ROWS}    # godzin, gra (z premia AI), premia AI, po
     small = [0, 0, 0, 0, 0, 0, 0, 0]                # paser: n, gra, po; samonaprawa: n, gra, po; RBL: n, gra
     kinds_g, kinds_p, winter, idle, root = [], [], 0, 0, 0
+    # narzedzie progow p2 (TRIAZ-2 c "X-2"): partie lordow 300+ osobno dla dob bez zimy ("zima 0 partii") i zimowych - doba kampanii -> (gra, po, pierwiastek)
+    big_day, big_win = {}, {}
     states = {}
     for d in days:
         s = xl[d]
@@ -10273,8 +10418,13 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 if m:
                     kinds_g.append(float(m.group(1)))
                     kinds_p.append(float(m.group(2)))
-                winter += num(r"; zima (\d+) partii", seg, default=0)
-                root += num(r"; lordowie AI 300\+ sam pierwiastek (-?\d+)", seg, default=0)
+                wn = num(r"; zima (\d+) partii", seg, default=0)
+                rt = num(r"; lordowie AI 300\+ sam pierwiastek (-?\d+)", seg, default=0)
+                winter += wn
+                root += rt
+                mb = re.search(r"(?:^|, )lordowie AI 300\+ (\d+) partii gra (-?\d+) / po (-?\d+)", seg)
+                if mb:
+                    (big_win if wn > 0 else big_day)[run_day(d, start)] = (int(mb.group(2)), int(mb.group(3)), rt)
             elif name == "zwiad":
                 for r in E8_X_ROWS:
                     m = re.search(r"(?:^|, )" + re.escape(r) + r" (\d+) godzin gra (-?\d+) \(w tym premia AI (-?\d+)\) / po (-?\d+)", seg)
@@ -10321,11 +10471,31 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     # X-2, X-3
     big = "lordowie AI 300+"
     fg, fp = food[big][1], food[big][2]
-    rep.add("X-2: Steward z jedzenia partii lordow AI 300+, po/gra",
-            (f"{fp / fg:.2f} (gra {fg / nd:.0f} -> po {fp / nd:.0f} XP/dobe, {food[big][0] / nd:.1f} partii/dobe, {len(days)} dob"
-             + (f"; rozklad: sam pierwiastek x{root / fg:.2f}, rodzaje od pol dnia i zima x{fp / root:.2f}" if root > 0 else "") + ")" if fg > 0
-             else f"brak partii lordow 300+ z kwatermistrzem i ponad 3 rodzajami jedzenia ({len(days)} dob)") + state("jedzenie"),
-            "0.4-0.6", (0.4 <= fp / fg <= 0.6) if fg > 0 else None)
+    # narzedzie progow p2 (TRIAZ-2 c "X-2", "Poprawka ostateczna"): pasmo 0.4-0.6 policzono w projekcie dla SAMEGO pierwiastka (stosunek = 10 / pierwiastek
+    # z ludzi: 300 ludzi 0.577, 350 ludzi 0.535 = "-47%" z RA8 1.3, 625 ludzi 0.40), a wiersz mierzyl zlozenie z druga regula ("rodzaj od pol dnia zapasu"),
+    # ktorej wielkosc byla jawnie nieznana (audyt: "nie wiem, ile rodzajow jedzenia wioza lordowie AI"). Bieg 2: po/gra 0.315 = pierwiastek 0.503 x
+    # rodzaje 0.626; sam pierwiastek w pasmie w kazdej ze 119 dob (0.472-0.537). Wiazace: sam pierwiastek / gra w dobach BEZ zimy (zima placi x1.25 i
+    # podnosi prog pol dnia - osobny pomiar); po/gra i czynnik rodzajow zostaja w opisie. Stawka FoodBase 50 bez zmian (decyzja rozpoznania).
+    dg, dp, dr = (sum(v[i] for v in big_day.values()) for i in range(3))
+    rep.add("X-2: Steward z jedzenia partii lordow AI 300+, sam pierwiastek/gra (doby bez zimy)",
+            (f"{dr / dg:.2f} ({len(big_day)} dob bez zimy; po/gra w tych dobach {dp / dg:.2f}, czynnik rodzajow od pol dnia x{dp / dr:.2f})" if (dg > 0 and dr > 0)
+             else (f"brak dob bez zimy z liczba 'sam pierwiastek' ({len(big_day)} dob bez zimy, {len(big_win)} zimowych)" if fg > 0
+                   else f"brak partii lordow 300+ z kwatermistrzem i ponad 3 rodzajami jedzenia ({len(days)} dob)"))
+            + (f" | cale okno: po/gra {fp / fg:.2f} (gra {fg / nd:.0f} -> po {fp / nd:.0f} XP/dobe, {food[big][0] / nd:.1f} partii/dobe, {len(days)} dob"
+               + (f"; sam pierwiastek x{root / fg:.2f}, rodzaje od pol dnia i zima x{fp / root:.2f}" if root > 0 else "") + ")" if fg > 0 else "") + state("jedzenie"),
+            "0.4-0.6 dla samego pierwiastka poza zima (projekt: ok. -47% przy 350 ludziach); rodzaje od pol dnia i zima - INFO",
+            (0.4 <= dr / dg <= 0.6) if (dg > 0 and dr > 0) else None)
+
+    def kinds_part(sel):
+        p, r = sum(v[1] for v in sel), sum(v[2] for v in sel)
+        return f"{p / r:.2f}" if r > 0 else "-"
+    if big_day or big_win:
+        ks = sorted(big_day)
+        half = len(ks) // 2
+        rep.add("E8/X: rodzaje od pol dnia - po/pierwiastek partii lordow AI 300+ (pierwsza / druga polowa dob bez zimy; doby zimowe)",
+                (f"{kinds_part([big_day[k] for k in ks[:half]])} / {kinds_part([big_day[k] for k in ks[half:]])} ({len(ks)} dob bez zimy)" if len(ks) >= 2 else f"dob bez zimy {len(ks)}")
+                + f"; doby zimowe: {kinds_part(list(big_win.values()))} ({len(big_win)} dob)",
+                "INFO (trend zapasow jedzenia lordow i skutek zimy - druga regula E8/X, zamierzona)", None)
     sg, sp = scout[big][1], scout[big][3]
     rep.add("X-3: Scouting z marszu partii lordow AI 300+, po/gra",
             (f"{sp / sg:.2f} (gra {sg / nd:.0f} w tym premia AI {scout[big][2] / nd:.0f} -> po {sp / nd:.0f} XP/dobe, {scout[big][0] / nd:.0f} godzin marszu/dobe, {len(days)} dob)"
@@ -10375,9 +10545,12 @@ def etap8_x(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             rows(food, "partii/d", 1, 2) + (f" | rodzaje na partie gra {sum(kinds_g) / len(kinds_g):.1f} / po {sum(kinds_p) / len(kinds_p):.1f}" if kinds_g else "")
             + f" | zima (premia) {winter} partio-dob" + state("jedzenie"),
             "INFO (100 ludzi bez zmian; mala druzyna wiecej, duza mniej; rodzaj od pol dnia zapasu)", None)
+    # narzedzie progow p2 (TRIAZ-2 X-3 pkt 3): stawka zwiadu z linii startu sesji ("zwiad A/B na godzine marszu"), nie z literalu w narzedziu
+    mr = re.search(r"zwiad (\d+)/(\d+) na godzine marszu", st[-1]) if st else None
+    rate = f"{mr.group(1)} / {mr.group(2)}" if mr else "stawka z linii startu sesji"
     rep.add("E8/X: Scouting z marszu wedlug partii (XP na dobe)",
             rows(scout, "godzin/d", 1, 3, lambda a: f", premia AI gry {a[2] / nd:.0f}") + f" | stoi (predkosc <= 1) {idle / nd:.0f} godzin/d" + state("zwiad"),
-            "INFO (15 / 25 na godzine marszu, karawany polowa, premia tylko-AI 0)", None)
+            f"INFO ({rate} na godzine marszu, karawany polowa, premia tylko-AI 0)", None)
     rep.add("E8/X: drobne w oknie - paser, samonaprawa, RBL (gra -> po)",
             f"paser {small[0]} sprzedazy {small[1]} -> {small[2]}; samonaprawa {small[3]} sztuk {small[4]} -> {small[5]}; RBL {small[6]} wyplat {small[7]} -> 0"
             + state("drobne") + state("RBL"), "INFO (autotest bez gracza przy kowadle i w rozmowach - sprawdza Jeff, 8.16)", None)
@@ -10419,6 +10592,17 @@ E8_W_Z33 = {
     120: (1636, 519, 1083),
 }
 E8_W_Z33_ARROWS_D120 = 2853   # "Rynek broni: na polkach ... Arrows 2853" (L:35865)
+# Narzedzie progow p2 (TRIAZ-2 d "W-1 / W-2"): baza W-1 = bieg zb58 (a589def, Armoury-2026-10-12_15-33-44.log, 120 dob nowej kampanii) - ma juz E6/N1
+# (lup nienoszony nie jest naprawiany - decyzja), a nie ma E8/W; ta sama linia "Zuzycie AI", doby 91-120 (okno rozpoznania): doba kampanii -> (lup obity, zuzyte w bitwach,
+# naprawione w miastach); suma okna 33 314 / (14 673 + 118 498) = 0.250. W krotszym biegu wiersz jest INFO: stosunek zalezy od liczby bitew (doby 31-60: bieg 2 0.294 wobec 0.303 = x0.97 przy tych samych regulach), a dowod rozpoznania dotyczy tylko dob 91-120. Z33 jest sprzed E6/N1 (naprawial tez lup nienoszony), wiec prog ">= 1.2 x Z33" mierzyl skutek
+# E6/N1, nie kolejki E8/W; mnoznik 1.2 zdjety, bo sakiewka zatrzymuje ponizej 1% sztuk u kowala (linia E8/P2: 16 z 2258 na dobe) - kolejka nie ma czego poprawiac.
+E8_W_ZB58 = {
+    91: (4339, 366, 874), 92: (924, 183, 755), 93: (1459, 255, 1056), 94: (5018, 1310, 1131), 95: (9647, 838, 911), 96: (3107, 462, 1218),
+    97: (3949, 506, 1416), 98: (2980, 600, 1765), 99: (4314, 1169, 545), 100: (6171, 442, 1069), 101: (6754, 602, 770), 102: (4297, 376, 1218),
+    103: (4283, 359, 1089), 104: (4240, 222, 856), 105: (1860, 446, 1249), 106: (1104, 714, 977), 107: (3092, 438, 1314), 108: (3627, 233, 781),
+    109: (4319, 627, 2221), 110: (1821, 207, 976), 111: (9512, 408, 738), 112: (7909, 498, 2047), 113: (1677, 500, 1743), 114: (4809, 314, 972),
+    115: (1554, 250, 470), 116: (3113, 407, 1455), 117: (3249, 406, 1360), 118: (225, 426, 815), 119: (5006, 610, 487), 120: (4139, 499, 1036),
+}
 
 
 def e8w_corr(xs, ys):
@@ -10450,9 +10634,9 @@ def e8w_arrows(lines):
 
 def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/W (249, projekt etapu 8 v2 rozdz. 3 "E8/W" Test, progi wzgledne): linia "Zuzycie AI (E8/W)" (AiWear.cs; etykieta = doba zdarzen, jak "Zuzycie AI").
-    W-1 kolejka napraw: naprawione / (zuzyte w bitwach + lup obity) w ostatnich 30 dobach okna (doby 91-120) >= 1.2 x Z33 w tych samych dobach;
-    W-2 linia "stare zuzycie N% zuzyloby" w tym samym biegu: stosunek nowe / stare INFO, naprawy na sztuke zuzyta w bitwie WEDLUG STAREJ REGULY >= Z33
-    (rozdziela skutek kolejki od innej liczby obic); W-3 INFO: zuzycie a straty (korelacja dob > 0); W-4 amunicja AI: W CIENIU - INFO, po wlaczeniu
+    W-1 kolejka napraw: naprawione / (zuzyte w bitwach + lup obity) w ostatnich 30 dobach okna (doby 91-120) >= baza zb58 w tych samych dobach (TRIAZ-2; Z33 w tresci);
+    W-2 linia "stare zuzycie N% zuzyloby" w tym samym biegu: stosunek nowe / stare INFO, naprawy na sztuke zuzyta w bitwie WEDLUG STAREJ REGULY wobec Z33
+    - INFO (TRIAZ-2: licznik to glownie naprawy lupu, nie mierzy kolejki); W-3 INFO: zuzycie a straty (korelacja dob > 0); W-4 amunicja AI: W CIENIU - INFO, po wlaczeniu
     zeszlo > 0 i strzaly na polkach w ostatniej dobie okna >= 50% Z33 doby 120 (2 853); W-5 potkniecia 0, koszt dopasowania INFO (projekt: < 5 ms/d)."""
     wl = {d: s for d, s in by_day(lines, E8_W_LINE).items() if 1 <= run_day(d, start) <= until}
     if not wl:
@@ -10495,12 +10679,28 @@ def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         z = [sum(E8_W_Z33[rd][i] for rd in both) for i in range(3)]
         r1, z1 = a[2] / max(1, a[0] + a[1]), z[2] / max(1, z[0] + z[1])
         sk = [skip[rd] for rd in both if skip.get(rd) is not None]
+        # narzedzie progow p2 (TRIAZ-2 d): W-1 wobec bazy zb58 (E6/N1 jest, E8/W nie ma) w tych samych dobach - opis przy E8_W_ZB58; Z33 zostaje w tresci.
+        # Do tego z linii E8/P2 tych samych dob: ile sztuk u kowala stoi przez sakiewke (to jedyne, co kolejka E8/W moze poprawic).
+        bb = [rd for rd in both if rd in E8_W_ZB58]
+        rb = b1 = None
+        if len(bb) >= 10:
+            ab = [sum(tri[rd][i] for rd in bb) for i in range(3)]
+            bz = [sum(E8_W_ZB58[rd][i] for rd in bb) for i in range(3)]
+            rb, b1 = ab[2] / max(1, ab[0] + ab[1]), bz[2] / max(1, bz[0] + bz[1])
+        p2 = [s for d, s in by_day(lines, E8_P2_WEAR).items() if run_day(d, start) in both]
+        todo = sum(num(r"sztuk do naprawy (\d+)", s, default=0) for s in p2)
+        purse = sum(num(r"stoja - sakiewka \d+ partii / (\d+) szt", s, default=0) for s in p2)
         rep.add(f"W-1: kolejka napraw - naprawione / (zuzyte w bitwach + lup obity), doby {both[0]}-{both[-1]}",
-                (f"{r1:.3f} ({a[2]} / ({a[1]} + {a[0]}), {len(both)} dob) wobec Z33 w tych samych dobach {z1:.3f} ({z[2]} / ({z[1]} + {z[0]})) = x{r1 / z1 if z1 > 0 else 0:.2f}"
+                (f"{r1:.3f} ({a[2]} / ({a[1]} + {a[0]}), {len(both)} dob)"
+                 + (f" wobec bazy zb58 (E6/N1 jest, E8/W nie ma) w dobach {bb[0]}-{bb[-1]} {b1:.3f} ({bz[2]} / ({bz[1]} + {bz[0]})) = x{rb / b1 if b1 > 0 else 0:.2f}" if b1 is not None
+                    else " - baza zb58 tylko dla dob 91-120 (krotszy bieg - INFO)")
+                 + f"; Z33 (sprzed E6/N1) w tych samych dobach {z1:.3f} ({z[2]} / ({z[1]} + {z[0]})) = x{r1 / z1 if z1 > 0 else 0:.2f}"
                  + (f"; E6/N1: w zleceniach pominieto {sum(sk)} szt. lupu nienoszonego ({len(sk)} dob, liczone przy kazdej wizycie) - tego lupu kowale juz nie naprawiaja, a jest w mianowniku" if sk else "")
+                 + (f"; u kowala (E8/P2, {len(p2)} dob): sztuk do naprawy {todo}, z tego stoi przez sakiewke {purse} ({100.0 * purse / todo:.1f}%)" if todo > 0 else "")
                  + ("" if q_off == 0 else f"; klucz AiMendQueueContinue wylaczony w {q_off} dobach")),
-                ">= 1.2 x Z33 w tych samych dobach (projekt podaje dla przykladu dobe 120 Z33: 0.50; Z33 jest sprzed E6/N1 - naprawial tez lup nienoszony)",
-                (r1 >= 1.2 * z1) if (q_off == 0 and z1 > 0) else None)
+                ">= baza zb58 w tych samych dobach (bieg z E6/N1 bez E8/W: 0.250 w dobach 91-120); stary prog 1.2 x Z33 mierzyl skutek E6/N1 (Z33 naprawial tez "
+                "lup nienoszony), a sakiewka zatrzymuje < 1% sztuk - TRIAZ-2",
+                (rb >= b1) if (q_off == 0 and b1) else None)
         wdays = [d for d in days if run_day(d, start) in both]
         olds = [old_exp[d] for d in wdays if old_exp[d] is not None]
         if wdays and len(olds) == len(wdays) and sum(olds) > 0:
@@ -10513,8 +10713,10 @@ def etap8_w(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             rep.add(f"W-2: stara regula w tym samym biegu - naprawy na sztuke zuzyta w bitwie wedlug starej reguly, doby {both[0]}-{both[-1]}",
                     (f"{r2:.2f} ({rn} naprawionych / {so:.0f} 'stare zuzycie zuzyloby') wobec Z33 {z2:.2f} ({zn} / {zz}) | nowa regula: {sn} trafien "
                      f"(sprawne -> obite {ws}, o stopien nizej {sn - ws}) = x{sn / so:.2f} starej; naprawy na sztuke 'sprawne -> obite' {rn / max(1, ws):.2f} ({len(wdays)} dob)"),
-                    ">= Z33 w tych samych dobach (projekt podaje dobe 120 Z33: 2.09); stosunek nowe / stare - INFO",
-                    (r2 >= z2) if q_off == 0 else None)
+                    # narzedzie progow p2 (TRIAZ-2 d): licznik to glownie naprawy LUPU, a mianownik to tylko zuzycie w bitwach - gdy lupu obitego jest
+                    # mniej (bieg 2: 95 768 wobec 118 498 w zb58 i 113 177 w Z33), stosunek spada bez zwiazku z kolejka (zb58 bez E8/W mial 2.27) - INFO
+                    "INFO (Z33 w tych samych dobach i zb58 2.27: licznik to glownie naprawy lupu, ktorego jest mniej - nie mierzy kolejki E8/W; TRIAZ-2)",
+                    None)
         else:
             rep.add("W-2: stara regula w tym samym biegu", "linia nie ma liczby 'stare zuzycie zuzyloby' (Stage8MeasureLog wylaczony?) albo brak bitew w oknie",
                     "INFO (liczba oczekiwana starej reguly jest liczona tylko przy Stage8MeasureLog)", None)
@@ -10976,6 +11178,7 @@ E8_C_MED = "Cennik (E8/C): mediany"
 # Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log, doba 120): polki z linii "Rynek broni" (L:35865), kasy miast z "Nadwyzka kas (E5/0)" (L:36070),
 # rody na minusie = suma "na minusie N" linii "Skarbce" ostatniej doby (projekt etapu 8 v2 rozdz. 4 pkt 5), polki koni z "Konie (E6/0)" (zwykly / bojowy)
 E8_C_Z33_SHELF = {"Bow": 2995, "HeadArmor": 945, "Thrown": 373, "HorseHarness": 1253}
+E8_C_Z33_RANGED_BUY = 348.5     # Z33: zakupy broni strzeleckiej AI (lordowie, zalogi miast, zamowienia zamkow, notable; linia "ZakupyAI wedlug kupujacego (174b)") szt./d w dobach 91-120; zb58: 375.8
 E8_C_Z33_TOWN_GOLD = 10264881
 E8_C_Z33_CLANS_MINUS = 197
 E8_C_Z33_HORSES = (3599, 1737)
@@ -11014,7 +11217,7 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     po HistoricalPrices.Apply): "HistoricalPrices: uprzaz z wagi prawdziwej N szt., helmy t4-6 N, luki N, oszczepy N, konie N (E8/C) | ..." i
     "Cennik (E8/C): mediany wartosci sztuk na handel bez unikatow ...". Brana ostatnia para linii w logu (ostatnie wczytanie sesji).
     C-0 linie sa, klucze, potkniecia 0; C-1 mediany (progi projektu; reguly z wylaczonym kluczem - INFO); C-2 kwit kuzni uprzezy metalowej < wartosc;
-    C-3 polki lukow w ostatniej dobie okna <= 2 x Z33; C-4 kasy miast i rody na minusie wobec Z33 (wspolne progi rozdz. 4 pkt 5, tu dla zmiany cen helmow i lukow);
+    C-3 polki lukow: ostatnia doba <= 1.1 x stan sprzed 30 dob i zakupy broni strzeleckiej AI >= Z33 (TRIAZ-2; poziom wobec Z33 - INFO); C-4 kasy miast i rody na minusie wobec Z33 (wspolne progi rozdz. 4 pkt 5, tu dla zmiany cen helmow i lukow);
     C-5 INFO (reczne 8.16); C-6 INFO konie."""
     st = [s for s in lines if s.startswith(E8_C_START)]
     md = [s for s in lines if s.startswith(E8_C_MED)]
@@ -11113,8 +11316,24 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         cur = sh[last]
         bows = cur.get("Bow", 0)
         full = run_day(last, start) >= until
-        rep.add(f"C-3a: polki lukow (doba {run_day(last, start)})", f"{bows} szt. wobec Z33 doba 120: {E8_C_Z33_SHELF['Bow']} (x{bows / E8_C_Z33_SHELF['Bow']:.2f})",
-                f"<= 2 x Z33 ({2 * E8_C_Z33_SHELF['Bow']})" + ("" if (full and until == 120) else " - INFO poza doba 120"), (bows <= 2 * E8_C_Z33_SHELF["Bow"]) if (full and until == 120) else None)
+        # narzedzie progow p2 (TRIAZ-2 e "C-3a"): poziom wobec Z33 nie mierzy tego, przed czym prog chronil (luki, ktorych nikt nie kupuje). Nadmiar powstal
+        # w dobach 1-30 (po E8/C luk to 1.5-2.5 dnia pracy - wiecej sztuk z roboczodnia, a po E8/T cech lucznikow zuzywa caly budzet startowy) i od doby 60
+        # stoi (bieg 2: d30 11381, d60 7334, d90 7247, d120 7176), a AI kupuje tyle samo sztuk co w Z33, tylko taniej (357 wobec 349 szt./d w dobach 91-120).
+        # Wiazace: trend (ostatnia doba <= 1.1 x stan sprzed 30 dob) i zakupy broni strzeleckiej AI w ostatnich 30 dobach >= Z33; poziom wobec Z33 - INFO.
+        rdl = run_day(last, start)
+        ref30 = [d for d in days if run_day(d, start) == rdl - 30]
+        b30 = sh[ref30[0]].get("Bow", 0) if ref30 else 0
+        rb = []
+        for d, s in by_day(lines, "ZakupyAI wedlug kupujacego (174b): dzien").items():
+            if rdl - 29 <= run_day(d, start) <= rdl:
+                rb.append(sum(int(x) for x in re.findall(r"bron strzelecka (\d+)/", s.split("; nadwyzki sprzedane")[0])))
+        pb = (sum(rb) / len(rb)) if rb else None
+        rep.add(f"C-3a: polki lukow (doba {rdl}) - trend 30 dob i zakupy broni strzeleckiej AI",
+                (f"{bows} szt. wobec doby {rdl - 30}: {b30} (x{bows / b30:.2f})" if b30 > 0 else f"{bows} szt. (brak stanu sprzed 30 dob)")
+                + (f"; zakupy broni strzeleckiej AI {pb:.1f} szt./d ({len(rb)} dob; Z33 doby 91-120: {E8_C_Z33_RANGED_BUY})" if pb is not None else "; brak linii ZakupyAI wedlug kupujacego (174b)")
+                + f"; poziom wobec Z33 doba 120: {E8_C_Z33_SHELF['Bow']} (x{bows / E8_C_Z33_SHELF['Bow']:.2f}) - INFO",
+                f"polki <= 1.1 x stan sprzed 30 dob i zakupy >= Z33 ({E8_C_Z33_RANGED_BUY} szt./d)" + ("" if (full and until == 120) else " - INFO poza doba 120"),
+                (bows <= 1.1 * b30 and pb >= E8_C_Z33_RANGED_BUY) if (full and until == 120 and b30 > 0 and pb is not None) else None)
         rep.add(f"C-3b: polki helmow, broni miotanej i uprzezy (doba {run_day(last, start)})",
                 ", ".join(f"{k} {cur.get(k, 0)} (Z33 {E8_C_Z33_SHELF[k]})" for k in ("HeadArmor", "Thrown", "HorseHarness")),
                 "INFO (warsztaty robia wiecej helmow i lukow na roboczodzien; bron miotana bez mnoznika snopa)", None)
@@ -11176,7 +11395,7 @@ E8_P3 = (("owce", "Owce (E8/P3): dzien"), ("postoj karawan", "Postoj karawan (E8
 def etap8_p3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/P3 (245, projekt etapu 8 v2 rozdz. 3 "E8/P3" Test): pomiary swiata (Stage8World.cs) - sam log, stan "przed" dla E8/G1 i E8/G2.
     P3-0 latki pomiaru wpiete N/N (R11); P3-1 linie obecne: szesc linii doby w kazdej dobie okna (bez pierwszej i ostatniej), dopisek "pomiar E8/P3" w linii
-    "BK i Diplomacy (E5/A8)" i linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob = 0 w kazdej dobie okna
+    "BK i Diplomacy (E5/A8)" i linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob - zadna 3 doby z rzedu (TRIAZ-2)
     (zamyka 8.12c); P3-3 INFO - pozostale liczby (model pod NavalDLC, postoj karawan, zamiana BK najemnikow, zrodla i ujscia BK, owce, rozkazy morskie,
     kara Underequipped po bitwach gracza, koszt); P3-K potkniecia i linie "ERROR in Stage8World.*" 0."""
     books = {k: {d: s for d, s in by_day(lines, p).items() if 1 <= run_day(d, start) <= until} for k, p in E8_P3}
@@ -11219,10 +11438,20 @@ def etap8_p3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         last = cart[max(cart)]
         a_none = num(r"wszystkie wsie bez wozu (\d+)", last, int, 0)
         a_norm = num(r"gra wystawia woz dopiero przy pelnym magazynie\) (\d+)", last, int, 0)
+        # narzedzie progow p2 (TRIAZ-2 f "P3-2"): licznik "bez wozu" biegnie od utraty wozu, takze gdy wies byla spladrowana; gra wystawia nowy woz tylko
+        # wsi Normal z pelnym magazynem, losem 15% na godzine (VillagerCampaignBehavior), wiec wies wpada w wiersz w dniu powrotu do Normal i znika po
+        # wystawieniu wozu (bieg 2: po 1 wsi w dobach 32, 62-63, 106, 119, nastepnego dnia 0). Zatkana naprawde = stoi w wierszu doby z rzedu. Linia nie
+        # podaje nazw wsi, wiec liczony jest najdluzszy ciag kolejnych dob z liczba > 0 (gorna granica postoju jednej wsi): NIE od 3 dob z rzedu.
+        streak = best = 0
+        prev = None
+        for v, d in vals:
+            streak = (streak + 1 if (prev is not None and d == prev + 1 and streak > 0) else 1) if v > 0 else 0
+            best = max(best, streak)
+            prev = d
         rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob (zamyka 8.12c)",
-                f"najwiecej {mx[0]} (d{run_day(mx[1], start)}), dob z > 0: {sum(1 for v, _ in vals if v > 0)} z {len(vals)}; w tym hearth ponizej progu wozu najwyzej {low}"
-                f"; ostatnia doba: wszystkie wsie bez wozu {a_none}, Normal > 7 dob (tez niezatkane) {a_norm}",
-                "0 w kazdej dobie okna", mx[0] == 0)
+                f"najwiecej {mx[0]} (d{run_day(mx[1], start)}), dob z > 0: {sum(1 for v, _ in vals if v > 0)} z {len(vals)}, najdluzszy ciag dob z > 0: {best}"
+                f"; w tym hearth ponizej progu wozu najwyzej {low}; ostatnia doba: wszystkie wsie bez wozu {a_none}, Normal > 7 dob (tez niezatkane) {a_norm}",
+                "zadna wies w wierszu 3 doby z rzedu (ciag kolejnych dob z > 0 najwyzej 2; 1-2 doby = wies wrocila do Normal i czeka na los wozu)", best < 3)
     else:
         rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob", "brak linii Wsie bez wozu (E8/P3) - diagnoza zatkanych wsi wylaczona?", "0", None)
 
@@ -11487,6 +11716,7 @@ def etap8_q(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 E8_G1_DAY = "Karawany (E8/G1): dzien"
 E8_G1_Z33_TOWNS = 10264881      # suma kas miast w dobie 120 biegu Z33 (WGRANIE 33, linia "Nadwyzka kas (E5/0)")
 E8_G1_Z33_CARAVANS = 4076294    # kiesy karawan w dobie 120 biegu Z33 (linia "Pieniadz swiata": partie bez wodza - karawany; 902 karawany notabli i 57 lordow)
+E8_G1_Z33_CARAVAN_COUNT = 962   # karawany w dobie 120 biegu Z33 (linia "Karawany (stan): dzien 108955 - miast 97, karawan 962", L:35944) - mianownik G1-5c
 # recenzja E8/G1: dowoz surowca kontraktami (174.2) bierze przewoznika sposrod karawan STOJACYCH w miescie-zrodle - przy postoju ok. 3 h stoi ich kilkanascie razy mniej
 E8_G1_Z33_ORE_TOWNS = 25.8      # miasta bez rudy w biegu Z33, srednia probek dob 91-120 (linia "Miasta bez rudy i strzal (174b)" co 5 dob: 29, 31, 29, 19, 25, 22)
 E8_G1_Z33_CONTRACTS = 12.7      # kontrakty surowca zawarte na dobe w biegu Z33 (linia "Kontrakty surowca (174)", doby 1-120)
@@ -11501,8 +11731,8 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     G1-1 karawany bez statkow 7+ dob w tym samym miescie <= 10 w ostatniej dobie okna (linia "Wyspy i drogi"; Z33: 29);
     G1-2 sredni postoj karawan AI w miescie <= 12 h (linia "Postoj karawan (E8/P3)", srednia wazona wyjazdami okna);
     G1-3 karawany bez drogi na koniec biegu 0 ("zostalo" w ostatniej linii), ponowne rozwiazania u tego samego wlasciciela 0, nieudane 0;
-    G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe (srednio; czas brutto tikow, ktore otworzylismy);
-    G1-5 (prog, nie INFO): suma kas miast w dobie 120 w +-10% Z33, kasy ponizej zapasu przez nasza wyplate 0, kiesy karawan w dobie 120 w +-20% Z33
+    G1-4 koszt dodatkowych tikow BK srednio <= 2.2 ms x nowy cel + 150 ms/dobe (TRIAZ-2: czas brutto otwartych tikow zawiera nieunikniona decyzje wyjazdu BK);
+    G1-5 (prog, nie INFO): suma kas miast w dobie 120 >= 80% i <= 110% Z33 (TRIAZ-2: prog projektu, jak C-4a), kasy ponizej zapasu przez nasza wyplate 0, kiesy karawan NA KARAWANE w dobie 120 w +-20% Z33 (TRIAZ-2)
     (bieg krotszy niz 120 dob - INFO); wizyty i zakupy karawan - INFO;
     G1-6 (recenzja - regresja dowozu surowca 174.2: przewoznikiem kontraktu jest karawana STOJACA w miescie-zrodle, a po E8/G1 stoi ich wielokrotnie mniej):
     G1-6a miasta bez rudy, srednia probek dob 91-120 <= 1.25 x Z33 (bieg krotszy - INFO); G1-6b INFO kontrakty zawarte i "brak karawany w zrodle" na dobe
@@ -11603,13 +11833,32 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     cm = _mean(cost)
     cx = max([c for c in cost if c is not None] or [0.0])
     opened, ran, orders = tot(r" - otwarte (\d+) u "), tot(r"po otwarciu: tiki BK (\d+)"), tot(r"nowy cel karawany (\d+)")
-    lng, lngc = tot(r"w tym samym postoju: (\d+) tikow"), _mean([num(r"tikow u (\d+) karawan \(bez celu", x) for x in w])
+    # narzedzie progow p2 (TRIAZ-2 "G1-4 prog" i G1-4 "Poprawka ostateczna" pkt 4): stoper mierzy czas BRUTTO otwartych tikow, a w nim nieunikniona
+    # decyzje BK przy kazdym wyjezdzie (zakup + wybor celu: 1.73 ms na nowy cel, regresja 118 dob R2 0.98; biegi bez E8/G1 placily to samo za swoje
+    # 123-135 wyjazdow/d, tylko nikt tego nie mierzyl). "<= 5 ms/d" to 3 wyjazdy na dobe - prog zakladal, ze tik BK w miescie jest darmowy.
+    # Nowy prog: srednio <= 2.2 ms x nowy cel + 150 ms/dobe (przy 304 wyjazdach ok. 820 ms). Bieg 2: 1411 ms wobec 820 = NIE - objaw prawdziwy:
+    # 62% kosztu to tiki karawan, ktore i tak nie wyjezdzaja (704/d ponad 24 tiki w postoju) - czeka na limit otwartych tikow na postoj (G1b).
+    lim4 = 2.2 * orders / n + 150.0
     rep.add("G1-4: koszt dodatkowych tikow BK karawan w miescie (czas brutto otwartych tikow)",
             (f"srednio {cm:.2f} ms/dobe, najdrozsza doba {cx:.2f} ms" if cm is not None else "brak liczby w linii")
-            + f"; otwarte {opened / n:.0f}/dobe, nowy cel {orders / n:.1f}/dobe", "<= 5 ms/dobe srednio", (cm <= 5.0) if cm is not None else None)
-    rep.add("G1-4b: otwarte tiki bez skutku - ponad 24 tiki w tym samym postoju (karawany bez celu albo ranni)",
-            f"{lng / n:.0f} tikow/dobe" + (f" u srednio {lngc:.1f} karawan" if lngc is not None else "") + f"; tiki BK po otwarciu {ran / n:.0f}/dobe",
-            "INFO (duzo = rozwazyc przerwe w otwieraniu dla karawany, ktora nie wyjezdza)", None)
+            + f"; otwarte {opened / n:.0f}/dobe, nowy cel {orders / n:.1f}/dobe"
+            + (f" = {cm * n / orders:.2f} ms na nowy cel (sama decyzja wyjazdu BK ok. 1.7 ms)" if (cm is not None and orders > 0) else ""),
+            f"srednio <= 2.2 ms x nowy cel + 150 ms/dobe = {lim4:.0f} ms (decyzja wyjazdu BK jest nieunikniona; NIE = tiki karawan, ktore nie wyjezdzaja - "
+            "limit otwartych tikow na postoj, TRIAZ-2 G1-4)", (cm <= lim4) if cm is not None else None)
+    # G1-4b czyta opis sprzed limitu postoju ("w tym ponad 24 tiki w tym samym postoju: N tikow u M karawan (bez celu albo ranni)"); po poprawce G1b linia
+    # ma inny opis (tiki zamkniete po limicie) - wtedy wiersz mowi to wprost, zamiast liczyc cudze pole jako "otwarte bez skutku"
+    old4 = [x for x in w if "ponad 24 tiki w tym samym postoju" in x]
+    if old4:
+        lng = sum(num(r"ponad 24 tiki w tym samym postoju: (\d+) tikow", x, int, 0) or 0 for x in old4)
+        lngc = _mean([num(r"tikow u (\d+) karawan \(bez celu", x) for x in old4])
+        rep.add("G1-4b: otwarte tiki bez skutku - ponad 24 tiki w tym samym postoju (karawany bez celu albo ranni)",
+                f"{lng / len(old4):.0f} tikow/dobe" + (f" u srednio {lngc:.1f} karawan" if lngc is not None else "") + f"; tiki BK po otwarciu {ran / n:.0f}/dobe"
+                + (f" ({len(old4)} z {n} dob z tym opisem)" if len(old4) < n else ""),
+                "INFO (cel po limicie otwartych tikow na postoj: 0 - TRIAZ-2 G1-4)", None)
+    else:
+        rep.add("G1-4b: otwarte tiki bez skutku - ponad 24 tiki w tym samym postoju",
+                f"brak opisu 'ponad 24 tiki w tym samym postoju' w linii doby (linia po limicie postoju G1b ma inny opis); tiki BK po otwarciu {ran / n:.0f}/dobe",
+                "INFO (wiersz do dopasowania do nowego opisu linii po scaleniu poprawki G1b)", None)
     # ---------------- G1-5: ekonomia (prog)
     full = bool(win) and run_day(win[-1], start) >= 120
     nk = {d: s for d, s in by_day(lines, "Nadwyzka kas (E5/0): dzien").items() if 1 <= run_day(d, start) <= until}
@@ -11617,8 +11866,10 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         tg = num(r"\| miasta \d+: kasy (-?\d+)", nk[max(nk)])
         if tg is not None:
             dev = 100.0 * (tg - E8_G1_Z33_TOWNS) / E8_G1_Z33_TOWNS
+            # narzedzie progow p2 (TRIAZ-2 h "G1-5a"): wlasne +-10% bylo ciasniejsze niz prog projektu etapu 8 (rozdz. 4 pkt 5: kasy miast >= 80% i <= 110%
+            # Z33 - ten sam, ktory na tej samej liczbie stosuje C-4a). Bieg 2: 84.4% - kasy nie leca bez dna (dno d60 8.10 mln, potem +5..+18 tys./d).
             rep.add("G1-5a: suma kas miast w ostatniej dobie okna wobec Z33", f"{tg} ({dev:+.1f}% wobec {E8_G1_Z33_TOWNS}; doba {run_day(max(nk), start)})",
-                    "+-10% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 10.0) if full else None)
+                    ">= 80% i <= 110% Z33 w dobie 120 (prog projektu etapu 8 rozdz. 4 pkt 5, jak C-4a; bieg krotszy - INFO)", (-20.0 <= dev <= 10.0) if full else None)
     below = tot(r"kasy ponizej zapasu przez nasza wyplate (\d+)")
     rep.add("G1-5b: kasy miast ponizej zapasu przez nasza wyplate za towar rozwiazanej karawany", f"{below}", "0", below == 0)
     pw = {d: s for d, s in by_day(lines, "Pieniadz swiata: dzien").items() if 1 <= run_day(d, start) <= until}
@@ -11626,8 +11877,23 @@ def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         cg = num(r"partie bez wodza: tabory wsi -?\d+ \([^)]*\), karawany (-?\d+)", pw[max(pw)])
         if cg is not None:
             dev = 100.0 * (cg - E8_G1_Z33_CARAVANS) / E8_G1_Z33_CARAVANS
-            rep.add("G1-5c: kiesy karawan w ostatniej dobie okna wobec Z33", f"{cg} ({dev:+.1f}% wobec {E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)})",
-                    "+-20% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 20.0) if full else None)
+            # narzedzie progow p2 (TRIAZ-2 S1 pkt C, S2 pkt 3, "POZA LISTA" pkt 3): suma kies zalezy od LICZBY karawan (bieg 2: 1594 wobec 962 w Z33 -
+            # stary przeciek "spiaca karawana nie liczy sie jako karawana", potrojony przez E8/G1), wiec +-20% sumy przechodzilo przy kiesie na karawane
+            # o polowe chudszej (niedoplata zoldu karawan 107 tys. zl/d wobec 20-25 tys.). Wiazace: kiesa NA KARAWANE +-20% Z33 (liczba karawan z linii
+            # "Karawany (stan)" tej samej doby); suma zostaje w tresci. Bez linii stanu - stara miara (suma).
+            ks = {d: s for d, s in by_day(lines, "Karawany (stan): dzien").items() if 1 <= run_day(d, start) <= until}
+            cn = num(r"miast \d+, karawan (\d+)", ks[max(ks)]) if ks else None
+            if cn:
+                per, zper = cg / cn, E8_G1_Z33_CARAVANS / E8_G1_Z33_CARAVAN_COUNT
+                devp = 100.0 * (per - zper) / zper
+                rep.add("G1-5c: kiesy karawan na karawane w ostatniej dobie okna wobec Z33",
+                        f"{per:.0f} zl na karawane ({devp:+.1f}% wobec {zper:.0f}); karawan {cn} (Z33 {E8_G1_Z33_CARAVAN_COUNT}), suma kies {cg} ({dev:+.1f}% wobec "
+                        f"{E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)})",
+                        "+-20% na karawane w dobie 120 (bieg krotszy - INFO; NIE przy nadmiarze karawan = czeka na limit karawan kupca, TRIAZ-2)",
+                        (abs(devp) <= 20.0) if full else None)
+            else:
+                rep.add("G1-5c: kiesy karawan w ostatniej dobie okna wobec Z33", f"{cg} ({dev:+.1f}% wobec {E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)}; brak linii Karawany (stan))",
+                        "+-20% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 20.0) if full else None)
     vis = {d: s for d, s in by_day(lines, "Karawany: dzien").items() if 1 <= run_day(d, start) <= until}
     why2 = {d: s for d, s in by_day(lines, "Karawany (przyczyny): dzien").items() if 1 <= run_day(d, start) <= until}
     info = []
@@ -11782,6 +12048,7 @@ def etap8_g2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 E8_T_LATE = "Dorobek startowy (E8/T): dzien"
 E8_T_PLAYER = "Rekrut gracza (E8/T): dzien"
 E8_T_Z33_BUYS = (2451, 6123, 5037)   # zakupy AI (szt.) w dobach 1-3 biegu Z33 (WGRANIE 33, linie "ZakupyAI: dzien" L:337, L:653, L:942)
+E8_T_Z33_LORD_KIT = (2229, 5267)     # Z33: lordowie - korpus i bron biala (szt.) w trzech pierwszych liniach "ZakupyAI wedlug kupujacego (174b)" (L:578, L:867, L:1159)
 E8_T_Z33_NEW_D1 = 541                # nowe partie AI bez darmowego kompletu DTE w dobie 1 biegu Z33 (linia "Werbunek: dzien", L:341)
 E8_T_Z33_LORDS_D1 = 276              # z tego partie lordow (linia "dziura werbunku ... nowe partie z szablonu klanu ... (276 partii)" tej samej doby)
 
@@ -11798,7 +12065,7 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     gospodarka - recenzja E8/T) albo rod gracza = 0; T-3b INFO wszystkie nowe
     partie AI bez kompletu w dobie 1 wobec Z33 (541, z czego 276 lordow) i progu projektu 100 - reszta to wozy wsi, bandy i karawany, ktore dorobku
     z projektu nie dostaja;
-    T-4 zakupy AI (szt.) w dobach 1-3 <= 50% Z33 (2 451 / 6 123 / 5 037);
+    T-4 komplet (korpus + bron biala) kupiony przez partie lordow w pierwszych trzech dobach <= 50% Z33 (TRIAZ-2; cala linia ZakupyAI - INFO);
     T-5 rekrut gracza (gdy gracz werbowal): ludzi tieru 2+ = komplety DTE zablokowane i tier 1 = komplety DTE dane; bez werbunku gracza - INFO
     (sprawdzenie reczne 8.16 p. 2 i 19);
     T-K potkniecia 0 i linie "ERROR in ColdStart.*", "ERROR in PlayerRecruit.*", "ERROR in LevyGold.*" 0."""
@@ -11885,10 +12152,29 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     for k in (1, 2, 3):
         dd = [d for d in buys if run_day(d, start) == k]
         got.append(num(r"wizyt, (\d+) szt\. kupionych", buys[dd[0]]) if dd else None)
-    if arm and all(x is not None for x in got):
+    # narzedzie progow p2 (TRIAZ-2 i "T-4"): linia "ZakupyAI" liczy tez kupujacych, ktorych dorobek nie obejmuje (zalogi: 12 / 48 / 45 zakupow jak w Z33)
+    # i kategorie, ktorych dorobek nie pokrywa albo ktore doszly pozniej (reszta zbroi, helmy, bron strzelecka, konie i rzedy z E8/H i F5). Dorobek daje
+    # partiom lordow KOMPLET - korpus i bron biala; miara: te dwie kategorie u lordow w trzech pierwszych liniach "ZakupyAI wedlug kupujacego (174b)"
+    # kampanii (etykiety dob 2-4 = zakupy pierwszych trzech dob) razem <= 50% Z33 (korpus 787 + 926 + 516, bron biala 1594 + 2300 + 1373).
+    # Prog "kazda doba <= 50%" calej linii ZakupyAI zdjety - liczby zostaja w tresci.
+    kb = by_day(lines, "ZakupyAI wedlug kupujacego (174b): dzien")
+    kit = []
+    for k in (2, 3, 4):
+        dd = [d for d in kb if run_day(d, start) == k]
+        ml = re.search(r"- lordowie \[([^\]]*)\]", kb[dd[0]]) if dd else None
+        kit.append((num(r"korpus (\d+)/", ml.group(1), int, 0) or 0, num(r"bron biala (\d+)/", ml.group(1), int, 0) or 0) if ml else None)
+    if arm and all(x is not None for x in got) and all(x is not None for x in kit):
+        kc, km = sum(x[0] for x in kit), sum(x[1] for x in kit)
+        zk = E8_T_Z33_LORD_KIT[0] + E8_T_Z33_LORD_KIT[1]
+        rep.add("T-4: zakupy kompletu (korpus + bron biala) partii lordow AI w pierwszych trzech dobach wobec Z33",
+                f"{kc + km} szt. ({100.0 * (kc + km) / zk:.0f}% z {zk}; korpus {kc} wobec {E8_T_Z33_LORD_KIT[0]}, bron biala {km} wobec {E8_T_Z33_LORD_KIT[1]})"
+                + " | cala linia ZakupyAI (z zalogami i kategoriami spoza dorobku): "
+                + " / ".join(f"{x} ({100.0 * x / z:.0f}% z {z})" for x, z in zip(got, E8_T_Z33_BUYS)),
+                "komplet u lordow <= 50% Z33 (dorobek daje korpus i bron biala partiom lordow; zalogi i pozostale kategorie - INFO)", 2 * (kc + km) <= zk)
+    elif arm and all(x is not None for x in got):
         rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33",
-                " / ".join(f"{x} ({100.0 * x / z:.0f}% z {z})" for x, z in zip(got, E8_T_Z33_BUYS)), "kazda doba <= 50% Z33 (2 451 / 6 123 / 5 037)",
-                all(2 * x <= z for x, z in zip(got, E8_T_Z33_BUYS)))
+                " / ".join(f"{x} ({100.0 * x / z:.0f}% z {z})" for x, z in zip(got, E8_T_Z33_BUYS)) + " | brak trzech linii ZakupyAI wedlug kupujacego (174b) z lordami",
+                "INFO (prog liczony z linii 174b: komplet u lordow <= 50% Z33)", None)
     else:
         rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33", "brak linii ZakupyAI w dobach 1-3 albo log nie zaczyna nowej kampanii: " + str(got),
                 "INFO (prog tylko w nowej kampanii)", None)
@@ -12082,7 +12368,7 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     i zalog w ostatniej dobie okna wobec Z33 "z koniem" 4.60% (>= TAK, ponizej 80% tej liczby NIE); H-3 uprzaz wykonana >= 40 szt. na dobe w dobach 31-until;
     H-4 nic z niczego, nic w nicosc: rzad najemnika ze wzorca 0 w dobach z regula, reszta uprzezy w ksiedze uzbrojenia |suma okna| <= 10% zrodel; H-5 awanse AI
     na jezdnego >= 50% Z33 i "wstrzymane z braku uprzezy" nie rosnie w dobach 91-until wobec 61-90; H-6 polki uprzezy w ostatniej dobie 300-2500 i kupno siodla
-    w 7 dob po sprzedazy uprzezy tej samej partii = 0; H-7 koszt <= 5 ms na dobe, potkniecia i linie ERROR 0. Reczne (8.16): awans piechura na jezdzca u gracza
+    w 7 dob po sprzedazy uprzezy tej samej partii = 0; H-7 koszt zdarzen <= 5 i razem ze spisem <= 15 ms na dobe, potkniecia i linie ERROR 0 (TRIAZ-2: H-3 TAK takze przy H-1 <= 10%, H-4a po siewie puli weteranow, H-5b INFO przy H-1 NIE, H-6b <= 1% kupionych siodel). Reczne (8.16): awans piechura na jezdzca u gracza
     bez siodla - komunikat; bitwa z jezdzcami bez siodla - ida pieszo, komunikat "riders no saddle"; wczytanie zapisu sprzed E8/H bez bledu."""
     hl = {d: s for d, s in by_day(lines, E8_H_LINE).items() if 1 <= run_day(d, start) <= until}
     if not hl:
@@ -12125,8 +12411,10 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     p_x, p_y, p_p = share("rod gracza", rng(61, until), "bez_uprzezy", "kon")
     info = (f"doby 1-30: {e_p:.1f}% ({e_x} z {e_y} jezdzco-dob); zalogi doby 61-{until}: {g_p:.1f}% ({g_x} z {g_y}; nie kupuja uprzezy); "
             f"rod gracza: {p_p:.1f}% ({p_x} z {p_y})")
+    h1_ok = None   # werdykt H-1 (None = brak dob 61+ z regula) - od niego zaleza H-3 i H-5b (narzedzie progow p2, TRIAZ-2 GLOWNE pkt 4 i H-5b pkt 3a)
     if late:
         l_x, l_y, l_p = share("partie rodow AI", late, "bez_uprzezy", "kon")
+        h1_ok = l_p <= 10.0
         peak = max(days, key=lambda d: grp["partie rodow AI"][d]["bez_uprzezy"])
         rep.add(f"H-1: jezdzcy z koniem bez uprzezy - partie rodow AI, doby 61-{until}",
                 f"{l_p:.1f}% ({l_x} z {l_y} jezdzco-dob w {len(late)} dobach z regula); szczyt okna: doba {run_day(peak, start)} = "
@@ -12155,17 +12443,34 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     w31 = [v for rd, v in ws.items() if 31 <= rd <= until]
     if w31:
         avg = sum(w31) / len(w31)
-        rep.add(f"H-3: uprzaz wykonana przez warsztaty (srednio doby 31-{until})", f"{avg:.1f} szt./d ({len(w31)} dob; Z33: {E8_H_Z33_MADE})",
-                ">= 40 szt./d (druga droga progu - linie siodel z pustym rankingiem <= 10 miast - w warsztaty.log, poza tym narzedziem)", avg >= 40.0)
+        # narzedzie progow p2 (TRIAZ-2 GLOWNE "Poprawka ostateczna" pkt 4, H-3 pkt 3d): prog 40 szt./d zostaje (odpowiada popytowi); po zdjeciu zaleglosci
+        # siodel produkcje ogranicza POPYT (ok. 33-45 siodel/d), wiec H-3 czyta sie razem z H-1: przy H-1 <= 10% wiersz jest TAK takze ponizej 40.
+        rep.add(f"H-3: uprzaz wykonana przez warsztaty (srednio doby 31-{until})", f"{avg:.1f} szt./d ({len(w31)} dob; Z33: {E8_H_Z33_MADE})"
+                + ("; H-1 <= 10% - produkcje ogranicza popyt" if (avg < 40.0 and h1_ok) else ("; NIE = czeka na podaz siodel (zwykle siodlo w kazdej krainie, TRIAZ-2)" if avg < 40.0 else "")),
+                ">= 40 szt./d albo H-1 <= 10% (wtedy produkcje ogranicza popyt); druga droga progu - linie siodel t1 z pustym rankingiem <= 10 miast - w warsztaty.log, "
+                "poza tym narzedziem", avg >= 40.0 or bool(h1_ok))
     else:
         rep.add("H-3: uprzaz wykonana przez warsztaty", "brak linii Warsztaty w dobach 31+", "INFO", None)
     # H-4: nic z niczego, nic w nicosc
     tpl, loose, refd = col(r"rzad ze wzorca \(z niczego\) (\d+)"), col(r"w tym do zbrojowni nietrwalej (\d+)"), col(r"DTE nie przyjal (\d+)\)")
     spoil = col(r"dobytek rozbitych: uprzaz zbrojowni (\d+)")
-    rep.add("H-4a: uprzaz z niczego - rzad najemnika ze wzorca",
-            f"doby z regula: {tot(tpl, on)} szt." + (f"; doby bez reguly: {tot(tpl, [d for d in days if d not in on])} szt." if len(on) < len(days) else "")
+    # narzedzie progow p2 (TRIAZ-2 "H-4a"; ta sama rzecz co K1-4 / K1-4a po triazu zb58): kon i rzad z puli weteranow dzialaja dopiero po siewie puli
+    # (RecruitKit: vetHorse = HorseFate.VetHorseOn && troop.IsMounted; VetHorseOn wymaga PeopleBook.VetLive, a siew jest w pierwszym ticku doby kampanii -
+    # linia "Weterani (E4/10): siew dnia N"). Najem z karczm przed siewem idzie sciezka gry - dorobek startowy (bieg 2: 30 szt. tylko w pierwszej linii
+    # kampanii, ci sami najemnicy co "kon z wzorca 30" w K1-4a; potem z para z puli 247, rzad ze wzorca 0). Prog 0 dotyczy dob po siewie (linie z dniem
+    # > N); doby do siewu wlacznie - INFO. Log bez linii siewu (wczytany zapis) - liczy sie cale okno.
+    sow = None
+    for x in lines:
+        if x.startswith("Weterani (E4/10): siew dnia "):
+            sow = num(r"siew dnia (\d+)", x)
+            break
+    on_post = [d for d in on if sow is None or d > sow]
+    pre_n = tot(tpl, [d for d in on if d not in on_post])
+    rep.add("H-4a: uprzaz z niczego - rzad najemnika ze wzorca (doby z regula po siewie puli weteranow)",
+            f"{tot(tpl, on_post)} szt." + (f"; przed siewem puli weteranow (siew dnia {sow}, linii do siewu {len(on) - len(on_post)}): {pre_n} szt. - INFO (karczmy jak w grze, dorobek startowy)" if sow is not None else "")
+            + (f"; doby bez reguly: {tot(tpl, [d for d in days if d not in on])} szt." if len(on) < len(days) else "")
             + f"; uprzaz zbrojowni rozbitych partii przeniesiona {tot(spoil)} szt.; z taboru do zbrojowni nietrwalej {tot(loose)} szt., DTE nie przyjal {tot(refd)}",
-            "rzad ze wzorca = 0 w dobach z regula (reszta - INFO)", (tot(tpl, on) == 0) if on else None)
+            "rzad ze wzorca = 0 w dobach z regula po siewie puli weteranow (doby do siewu i reszta - INFO)", (tot(tpl, on_post) == 0) if on_post else None)
     bk = {d: s for d, s in by_day(lines, E8_H_BOOK).items() if d in hl}
     src = rest = 0
     nb = 0
@@ -12193,10 +12498,30 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     a1, a2 = [d for d in rng(61, 90) if d in on], [d for d in rng(91, until) if d in on]
     if a1 and a2:
         m1, m2 = tot(ref, a1) / len(a1), tot(ref, a2) / len(a2)
-        rep.add(f"H-5b: wstrzymane z braku uprzezy (ludzi na dobe) - doby 91-{until} wobec 61-90", f"{m1:.1f}/d -> {m2:.1f}/d; w oknie: cele odrzucone {tot(ref)} ludzi, "
-                f"przyciete {tot(trim)}, przy zaplacie {tot(payr)}", "nie rosnie (<= 1.1 x + 5)", m2 <= 1.1 * m1 + 5.0)
+        # narzedzie progow p2 (TRIAZ-2 "H-5b", "Poprawka ostateczna" pkt 3): licznik to OSOBO-PROBY, nie ludzie - ci sami gotowi z koniem bez wolnej uprzezy
+        # sa liczeni co dobe i po kazdej bitwie, w kazdym oddziale partii (bieg 2: 54 666 w oknie przy ok. 1 233 naprawde wstrzymanych awansach), wiec
+        # liczba rosnie, dopoki siodel brakuje - pochodna H-1 / H-3 (podaz siodel), nie osobny blad; brama dziala zgodnie z decyzja Jeffa. Prog "nie
+        # rosnie" liczony dopiero, gdy H-1 jest TAK; przy H-1 NIE - INFO. Odniesienia w tresci: awanse z para na dobe w obu oknach wobec biegu z K3 bez
+        # bramy (zb58: 25.4/d) i wzrost kolejki do KONIA w tych samych oknach (linia "Konie AI (175)": ta sama miara rosnie we wszystkich biegach -
+        # W33 x1.45, zb58 x1.22).
+        u1, u2 = tot(up, a1) / len(a1), tot(up, a2) / len(a2)
+        kq = {}
+        for d, s in by_day(lines, "Konie AI (175): dzien").items():
+            v = num(r"czeka na konia swojej kategorii[^0-9|]*(\d+)", s)
+            if v is not None:
+                kq[run_day(d, start)] = v
+        q1, q2 = [v for rd, v in kq.items() if 61 <= rd <= 90], [v for rd, v in kq.items() if 91 <= rd <= until]
+        qtxt = (f"; kolejka do konia w tych samych oknach (Konie AI 175) {sum(q1) / len(q1):.0f} -> {sum(q2) / len(q2):.0f} (x{(sum(q2) / len(q2)) / (sum(q1) / len(q1)):.2f})"
+                if (q1 and q2 and sum(q1) > 0) else "")
+        rep.add(f"H-5b: wstrzymane z braku uprzezy (osobo-proby na dobe) - doby 91-{until} wobec 61-90",
+                f"{m1:.1f}/d -> {m2:.1f}/d (x{m2 / m1 if m1 > 0 else 0:.2f}; kolejka: gotowi z koniem bez wolnej uprzezy, liczeni co dobe i po bitwie, w kazdym oddziale partii)"
+                f"; w oknie: cele odrzucone {tot(ref)} osobo-prob, przyciete {tot(trim)}, przy zaplacie {tot(payr)}; awanse z para {u1:.1f}/d -> {u2:.1f}/d "
+                f"(bieg z K3 bez bramy uprzezy: {E8_H_ZB58_UPGRADES / 120.0:.1f}/d)" + qtxt
+                + ("" if h1_ok else " | pochodna H-1 / H-3 - podaz siodel (brama uprzezy bez zmian)"),
+                "nie rosnie (<= 1.1 x + 5), liczone gdy H-1 jest TAK; przy H-1 NIE - INFO (kolejka rosnie, dopoki brakuje siodel - TRIAZ-2 H-5b)",
+                (m2 <= 1.1 * m1 + 5.0) if h1_ok else None)
     else:
-        rep.add("H-5b: wstrzymane z braku uprzezy", f"cele odrzucone {tot(ref)} ludzi, przyciete {tot(trim)}, przy zaplacie {tot(payr)} (brak dob 61-90 i 91+ z regula)", "INFO", None)
+        rep.add("H-5b: wstrzymane z braku uprzezy", f"cele odrzucone {tot(ref)} osobo-prob, przyciete {tot(trim)}, przy zaplacie {tot(payr)} (brak dob 61-90 i 91+ z regula)", "INFO", None)
     # H-6: polki i kupno po sprzedazy
     shelf = col(r"polki miast i zamkow: uprzaz (\d+)")
     rebuy, held = col(r"dob po sprzedazy uprzezy (\d+) szt"), col(r"zatrzymane pod zapas przy sprzedazy nadwyzek (\d+)")
@@ -12206,8 +12531,14 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "300 - 2500 szt." + ("" if full else " - INFO poza doba 120"), (300 <= shelf[last] <= 2500) if (full and has_shelf) else None)
     bp, bn, bpc, bg, bs, bo, rs = col(r"partie z brakiem (\d+)"), col(r"brak przed zakupem (\d+)"), col(r", kupione (\d+) szt\. za \d+ zl, brak po zakupach"), \
         col(r", kupione \d+ szt\. za (\d+) zl, brak po zakupach"), col(r"brak po zakupach (\d+)"), col(r"zamowienia dla siodlarzy (\d+)"), col(r"z taboru do zbrojowni przy postoju (\d+)")
-    rep.add("H-6b: kupno siodla w 7 dob po sprzedazy uprzezy tej samej partii", f"{tot(rebuy)} szt. (zatrzymane pod zapas przy sprzedazy nadwyzek {tot(held)} szt.)",
-            "0 (petla kup-sprzedaj)", (tot(rebuy) == 0) if on else None)
+    # narzedzie progow p2 (TRIAZ-2 "H-6b"): licznik lapie KAZDE kupno partii, ktora w 7 dobach sprzedala nadwyzke E8/Z - wystarczy, ze po sprzedazy doszedl
+    # jej kon (bieg 2: 1 sztuka na 3120 kupionych siodel, jedna doba; sprzedaz nadwyzek mala - 19 szt. w 7 partiach w dobie 119, petli nie ma).
+    # Prog "0" nie zostawial miejsca na jeden zbieg okolicznosci w 120 dobach: kupno po sprzedazy <= 1% kupionych siodel w oknie (petla dalaby kilkanascie %).
+    rb_n, bought_n = tot(rebuy), tot(bpc)
+    rep.add("H-6b: kupno siodla w 7 dob po sprzedazy uprzezy tej samej partii",
+            (f"{rb_n} szt. z {bought_n} kupionych siodel ({100.0 * rb_n / bought_n:.2f}%)" if bought_n else f"{rb_n} szt. (kupionych siodel 0)")
+            + f" (zatrzymane pod zapas przy sprzedazy nadwyzek {tot(held)} szt.)",
+            "<= 1% kupionych siodel w oknie (petla kup-sprzedaj; pojedynczy zbieg okolicznosci to nie petla)", (rb_n <= 0.01 * bought_n) if on else None)
     rep.add("E8/H: zakupy siodel lordow AI (okno)",
             (f"kupione {tot(bpc)} szt. za {tot(bg)} zl ({tot(bpc) / nd:.1f} szt./d, {tot(bg) / nd:.0f} zl/d, srednio {tot(bg) / max(1, tot(bpc)):.0f} zl za sztuke); wizyty z brakiem "
              f"{tot(bp)}, brak przed zakupem {tot(bn)}, po zakupach {tot(bs)}; zamowienia dla siodlarzy {tot(bo)}; z taboru do zbrojowni przy postoju {tot(rs)} szt."),
@@ -12228,9 +12559,15 @@ def etap8_h(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     cost = [c1[d] + c2[d] for d in days]
     stum = max([num(r"potkniecia dzis \d+ \(sesja (\d+)\)", hl[d], default=0) for d in days] + [0])
     errs = sum(1 for s in lines if s.startswith("ERROR in SaddleLaw.") or s.startswith("ERROR in GarrisonKit.SaddleGuard"))
+    # narzedzie progow p2 (TRIAZ-2 "H-7" - dwa wpisy): prog 5 ms pochodzil z szacunku [S] "1-2 ms na 850 partii". Mechanika (zdarzenia bramy i zakupow)
+    # miesci sie w nim (2.5 ms/d); ponad prog jest tylko SPIS par do linii logu - co dobe wszystkie partie rodow i zalogi (SaddleLaw.CensusOne): 8.3 ms/d,
+    # d120 10.0 ms przy 661 partiach + 227 zalogach = 0.05% doby. Prog: zdarzenia <= 5 ms/d (jak dotad dla mechaniki) i razem ze spisem <= 15 ms/d.
+    # Optymalizacja spisu - na koniec projektu (decyzja Jeffa 08.10); wiersze H czytaja spis dobowy.
+    ev_ms, all_ms = sum(c2.values()) / nd, sum(cost) / nd
     rep.add("H-7: koszt E8/H na dobe (spis par + zdarzenia), potkniecia, linie ERROR in SaddleLaw.*",
-            f"srednio {sum(cost) / nd:.1f} ms/d (spis {sum(c1.values()) / nd:.1f}, zdarzenia {sum(c2.values()) / nd:.1f}), najwiecej {max(cost):.1f} ms; potkniecia (sesja) {stum}; ERROR {errs}",
-            "<= 5 ms/d srednio, potkniecia 0, ERROR 0 (wczytanie zapisu sprzed E8/H - procedura 'zapis 9 dob', recznie)", sum(cost) / nd <= 5.0 and stum == 0 and errs == 0)
+            f"srednio {all_ms:.1f} ms/d (spis {sum(c1.values()) / nd:.1f}, zdarzenia {ev_ms:.1f}), najwiecej {max(cost):.1f} ms; potkniecia (sesja) {stum}; ERROR {errs}",
+            "zdarzenia <= 5 ms/d i razem ze spisem <= 15 ms/d srednio, potkniecia 0, ERROR 0 (wczytanie zapisu sprzed E8/H - procedura 'zapis 9 dob', recznie)",
+            ev_ms <= 5.0 and all_ms <= 15.0 and stum == 0 and errs == 0)
 # E8/D1 (256): blok etap8_d1 - nagrody i wyplaty w zadaniach (QuestPay8.cs, GiverPay.cs)
 E8_D1_DAY = "Nagrody zadan (E8/D1): dzien"
 E8_D1_MIN = 40   # projekt: linia startu, N >= 40 (skan zywych bibliotek 1.4.8: 91 metod - gra 76, SandBox 13, ROT 1, NavalDLC 1)
@@ -12781,14 +13118,14 @@ def etap8_b(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 E8_O1_LINE = "Polka i delegaty (E8/O1): dzien"
 # Progi projektu etapu 8 v2 rozdz. 3 "E8/O1" i rozdz. 4 pkt 4 (wzor Z33: przebudowy pamieci polki ok. 13.8 tys./dobe, ceny sprzetu 617 ms/dobe)
 E8_O1_BUILDS_MAX = 9000
-E8_O1_PRICE_MS_MAX = 450.0
+E8_O1_PRICE_US_MAX = 11.5   # us na wywolanie PricePostfix (TRIAZ-2 O1-3; stary prog 450 ms/d liczony od Z33 z zapisu)
 
 
 def etap8_o1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     """E8/O1 (265, projekt etapu 8 v2 rozdz. 3 "E8/O1" Test, R9): linia doby "Polka i delegaty (E8/O1)" (ShelfIndex.DailyOwn) + "Koszt 171-174 (doba)"
     (przebudowy, samokontrola, ceny sprzetu) + "Profil doby (E8/0)" (przebudowy wlasne / reszta). O1-0 linia w kazdej dobie okna i stan kluczy;
     O1-1 rozjazdy 0 - probka 1/64 poprawki po wlasnej zmianie (stara i nowa droga), samokontrola odczytow, potkniecia 0 (bez probek - INFO);
-    O1-2 przebudowy pamieci polki <= 9 000/dobe srednio w dobach z kluczem [WL] i poprawione w pamieci > 0; O1-3 ceny sprzetu <= 450 ms/dobe srednio;
+    O1-2 przebudowy pamieci polki <= 9 000/dobe srednio w dobach z kluczem [WL] i poprawione w pamieci > 0; O1-3 ceny sprzetu <= 11.5 us na wywolanie (TRIAZ-2);
     O1-4 delegaty: zbudowane N/N (ostatnia doba), wywolan przez Invoke przy kluczu [WL] 0; INFO: sredni czas poprawki i przebudowy z probek."""
     ol = {d: s for d, s in by_day(lines, E8_O1_LINE).items() if 1 <= run_day(d, start) <= until}
     if not ol:
@@ -12846,14 +13183,24 @@ def etap8_o1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 f"<= {E8_O1_BUILDS_MAX}/d srednio przy kluczu [WL]", None)
 
     # O1-3: ceny sprzetu
-    pr = [fnum(r"ceny sprzetu \(PricePostfix\) ([0-9.]+) ms/", kos[d]) for d in kon]
-    pr = [x for x in pr if x is not None]
-    if pr:
+    # narzedzie progow p2 (TRIAZ-2 "O1-3"): 450 ms/d policzono od Z33 617 ms (bieg z zapisu) minus oczekiwany zysk, a bieg bez E8/O1 (zb58) mial juz
+    # 525 ms/d; ms na dobe zaleza od LICZBY wywolan (bieg 2 ma ich o 11% wiecej niz zb58). Miara skutku O1 = koszt na wywolanie: w calym oknie Z33 13.75 us,
+    # zb58 12.39 us, bieg 2 zbior-e8 10.71 us (doby 31-120: 13.1 / 11.7 / 10.4). Prog: <= 11.5 us na wywolanie (srednio w dobach z kluczem [WL]).
+    pm = [re.search(r"ceny sprzetu \(PricePostfix\) ([0-9.]+) ms/(\d+)", kos[d]) for d in kon]
+    pm = [(float(m.group(1)), int(m.group(2))) for m in pm if m]
+    pr = [x for x, _ in pm]
+    calls = sum(c for _, c in pm)
+    if pr and calls > 0:
         avg = sum(pr) / len(pr)
-        rep.add("O1-3: ceny sprzetu (PricePostfix) na dobe przy kluczu [WL]", f"srednio {avg:.0f} ms/d ({len(pr)} dob, najwiecej {max(pr):.0f}; Z33 617)",
-                f"<= {E8_O1_PRICE_MS_MAX:.0f} ms/d srednio", avg <= E8_O1_PRICE_MS_MAX)
+        us = 1000.0 * sum(pr) / calls
+        rep.add("O1-3: ceny sprzetu (PricePostfix) - koszt na wywolanie przy kluczu [WL]",
+                f"{us:.2f} us na wywolanie; srednio {avg:.0f} ms/d przy {calls / len(pr):.0f} wywolaniach/d ({len(pr)} dob, najwiecej {max(pr):.0f} ms; Z33 617 ms/d = 13.75 us, "
+                f"zb58 525 ms/d = 12.39 us)",
+                f"<= {E8_O1_PRICE_US_MAX:.1f} us na wywolanie (ms/d zaleza od liczby wywolan; stary prog 450 ms/d liczony od Z33 z zapisu - TRIAZ-2 O1-3)",
+                us <= E8_O1_PRICE_US_MAX)
     else:
-        rep.add("O1-3: ceny sprzetu (PricePostfix) na dobe", "brak dob z kluczem [WL] i linia Koszt 171-174 (doba)", f"<= {E8_O1_PRICE_MS_MAX:.0f} ms/d srednio", None)
+        rep.add("O1-3: ceny sprzetu (PricePostfix) - koszt na wywolanie", "brak dob z kluczem [WL] i linia Koszt 171-174 (doba)",
+                f"<= {E8_O1_PRICE_US_MAX:.1f} us na wywolanie", None)
 
     # O1-4: delegaty
     last = ol[days[-1]]
