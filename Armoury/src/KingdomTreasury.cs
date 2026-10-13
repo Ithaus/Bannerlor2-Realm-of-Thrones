@@ -130,7 +130,7 @@ namespace Armoury
         private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due; public long PaidSum, Want, Have, Lent; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
 
-        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera
+        internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); NeedAidReset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera
 
         // 169c (tylko log): niedoplata korony na krolestwo z 28 dob (1 - zwrot dany / nalezny) - miara progu etapu 2 i wejscia E1b; tylko pamiec sesji
         private sealed class ArrearRing { public readonly long[] Due = new long[28], Given = new long[28]; public int Head, Filled; }
@@ -244,6 +244,8 @@ namespace Armoury
                     if (k == null || k.IsEliminated) { noKingdom += kv.Value; continue; }
                     if (c.IsUnderMercenaryService) { merc += kv.Value; continue; }
                     int v = kv.Value;
+                    // W5: zold oplacony wczorajsza doplata korony wedlug potrzeby nie jest podstawa zwrotu (korona nie placi za tego samego czlowieka 100% i 70%)
+                    if (cur) { long cutN = NeedAidRefundCut(c, v); if (cutN > 0) { v -= (int)cutN; if (v <= 0) continue; } }
                     long own;
                     // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownPurse.LordShare: TownRentLordShare, z wyrownaniem
                     // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz

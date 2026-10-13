@@ -566,7 +566,9 @@ namespace Armoury
               .Append(", wplywy spoza rodu poza rozliczeniem ").Append(cib ? evt.ToString(Inv) : "-")
               .Append(" (z niczego ").Append(cib ? ClanIncomeBook.LastEvtNone.ToString(Inv) : "-").Append(", od osad ").Append(cib ? ClanIncomeBook.LastEvtSettl.ToString(Inv) : "-")
               .Append(", od innych ").Append(cib ? ClanIncomeBook.LastEvtOther.ToString(Inv) : "-").Append(')')
-              .Append(", renty od korony (180) ").Append(CrownRents.LastPaid).Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
+              .Append(", renty od korony (180) ").Append(CrownRents.LastPaid)
+              .Append(", gotowka korony na zold druzyn (W5) ").Append(KingdomTreasury.LastNeedAid)   // recenzja W5: ta sama kwota co po stronie korony (skarbce -> glowy rodow)
+              .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
               .Append(", wydaly w miastach na zycie ").Append(life).Append(", naprawy ").Append(repair)
@@ -622,6 +624,7 @@ namespace Armoury
               .Append(", dochod za tier najemnikow (dzis z niczego) ").Append(ml ? M[CW.MTierMerc].ToString(Inv) : "-")
               .Append(", renty wedlug lenn (180) skarbce -> glowy rodow ").Append(CrownRents.LastPaid).Append(" (z reszty wplywow dnia ").Append(CrownRents.LastPool)
               .Append("; wstrzymane w skarbcach ").Append(CrownRents.LastHeld).Append(")")
+              .Append(", doplata do zoldu wedlug potrzeby (W5) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAid)   // W5: z daniny P1 tej doby, przed rentami 180
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)

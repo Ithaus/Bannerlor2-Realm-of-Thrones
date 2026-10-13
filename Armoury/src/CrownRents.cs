@@ -524,8 +524,6 @@ namespace Armoury
                         if (list.Count == 0 || sum <= 0) continue;               // nie ma komu dac - reszta zostaje w skarbcu (jak przed 180)
                         // recenzja C2: warunki liczone u wszystkich rodow z lennem, takze gdy krolestwo nie ma dzis reszty po zwrocie (zwykle w wojnie) - miara
                         // "bez warunku" nie zalezy od tego, czy korona ma z czego placic, a gracz widzi powod wstrzymania renty takze w takie doby
-                        bool pay = pool > 0;
-                        if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         string normKey = s.CrownRentGarrisonNormKingdom ? k.StringId : "*";
                         double normT = -1, normC = -1; Norm nn;
                         if (_norm.TryGetValue(normKey + "/T", out nn)) normT = nn.Avg();
@@ -572,6 +570,17 @@ namespace Armoury
                             rowsK[i] = row;
                             if (row.GarOk && row.SvcOk) sumOk += wts[i];
                         }
+                        // W5 (KingdomTreasury.NeedAid.cs): doplata do zoldu wedlug potrzeby - PO warunkach rodow (ten sam wynik zalogi i sluzby), PRZED podzialem rent.
+                        // Schodzi z reszty wplywow dnia (najwyzej danina P1 tej doby); renty dziela to, co zostalo. Klucz wylaczony = 0 i pula bez zmian.
+                        try
+                        {
+                            var okW5 = new bool[list.Count];
+                            for (int i = 0; i < list.Count; i++) okW5[i] = rowsK[i].GarOk && rowsK[i].SvcOk;
+                            if (KingdomTreasury.NeedAidKingdom(k, list, okW5) > 0) pool = CrownIncome.LeftFor(k);
+                        }
+                        catch (Exception e) { Stumble("Daily(W5)", e); }
+                        bool pay = pool > 0;
+                        if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         bool toServing = pay && s.CrownRentHeldToServing && sumOk > 0 && sumOk < sum - 1e-9;
                         double div = toServing ? sumOk : sum;
                         for (int i = 0; i < list.Count; i++)
