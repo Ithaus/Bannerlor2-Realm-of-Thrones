@@ -14256,6 +14256,71 @@ def etap8_p3_zelazo(rep, lines, start, win, until=120, logp=None, csp=None, **kw
                 f">= {lim:.0f} (roczny prog -150 przeliczony na okno, najmniej -50); wozy kupcow nie moga dawac nowej pozycji", un >= lim)
 
 
+# ============================================================ N3 (poprawka 3 po biegu rocznym 13.10): pobity oblegajacy uchodzi - blok etap8_n3
+# Linia doby "Przegrani pod murami (N3): dzien" (LosersFlee.WallsLine, klucz LosersFleeBesiegers); liczby tej linii sa tez wliczone w "Przegrani (H3)".
+N3_SEG = r"\| %s: bitew (\d+), przegrani (\d+) ludzi: zabici (\d+) \([^;]*; gra dalaby (\d+)\), jency (\d+) \([^;]*; gra ok\. (\d+)\), rozbici (\d+) \("
+N3_CLS = (("wypad", "wypad - pobity oblegajacy"), ("mury", "pod murami - pobity oblegajacy"), ("odsiecz", "pod murami - pobita odsiecz albo inna strona w polu"))
+
+
+def etap8_n3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """N3 (decyzja Jeffa 13.10 "pobity oblegajacy ma uchodzic jak przegrany w polu"; LosersFlee.cs - WallsClass, klucz LosersFleeBesiegers). Bieg roczny
+    przed paczka: 38 wypadow - oblegajacy stracili 55 018 ludzi (100%: 19 328 zabitych, 35 687 do niewoli); pod murami 6 bitew z pobitym oblegajacym
+    (8 824 ludzi, 100%) i 10 z pobita odsiecza (6 052 ludzi, 100%). Linia doby "Przegrani pod murami (N3): dzien D" ma numer dnia gry (bitwy doby D-1,
+    jak "Przegrani (H3)"). Brak linii = INFO (log sprzed paczki), WYLACZONE = INFO, nigdy wyjatek."""
+    rows = {d: s for d, s in by_day(lines, "Przegrani pod murami (N3): dzien").items() if 1 <= run_day(d - 1, start) <= until}
+    if not rows:
+        rep.add("N3: linia Przegrani pod murami (N3)", "brak w logu", "jest od wgrania N3 (log sprzed paczki - INFO)", None)
+        return
+    on = [rows[d] for d in sorted(rows) if " - WYLACZONE" not in rows[d]]
+    if not on:
+        rep.add("N3: pobity oblegajacy uchodzi", f"WYLACZONE w {len(rows)} dobach", "INFO (klucz LosersFleeBesiegers wylaczony - jak przed paczka)", None)
+        return
+
+    def isum(pat, grp=1):
+        return sum(int(m.group(grp)) for m in (re.search(pat, s) for s in on) if m)
+
+    def pc(x, of):
+        return f"{100.0 * x / of:.1f}%" if of > 0 else "-"
+
+    tot = {}
+    for key, name in N3_CLS:
+        pat = re.compile(N3_SEG % re.escape(name))
+        a = [0] * 7      # bitew, przegrani, zabici, gra dalaby zabitych, jency, gra ok. jencow, rozbici
+        for s in on:
+            m = pat.search(s)
+            if m:
+                for i in range(7):
+                    a[i] += int(m.group(i + 1))
+        tot[key] = a
+    sa, wa, ra = tot["wypad"], tot["mury"], tot["odsiecz"]
+    b = [sa[i] + wa[i] for i in range(7)]
+    off = len(rows) - len(on)
+    rep.add("N3-1: pobity oblegajacy - zabici i jency (wypad + pod murami, suma okna)",
+            f"bitew {b[0]} (wypad {sa[0]}, pod murami {wa[0]}), przegrani {b[1]}: zabici {b[2]} ({pc(b[2], b[1])}), jency {b[4]} ({pc(b[4], b[1])}), razem {pc(b[2] + b[4], b[1])}, "
+            f"rozbici {b[6]} ({pc(b[6], b[1])}); gra dalaby {b[3]} zabitych i ok. {b[5]} jencow; dob z linia {len(on)}" + (f", WYLACZONE {off}" if off else ""),
+            "zabici + jency <= 45% przegranych (bieg roczny przed paczka 100%: 55 018 ludzi w 38 wypadach i 8 824 w 6 bitwach pod murami)",
+            ((b[2] + b[4]) <= 0.45 * b[1]) if b[1] > 0 else None)
+    ctl = isum(r"sprawdzenia: kontrola kodu k \+ j \+ f - n = (-?\d+),")
+    odd = isum(r", listy gry inne niz plan (\d+) ludzi,")
+    lost = isum(r", jency zgubieni przez gre (-?\d+),")
+    unc = isum(r", bitew bez sprawdzenia jencow (\d+)")
+    gap = sum(a[1] - a[2] - a[4] - a[6] for a in (sa, wa, ra))
+    rep.add("N3-2: ksiega bitew pod murami (zabici + jency + rozbici = przegrani; listy gry = plan)",
+            f"kontrola kodu {ctl}, listy gry inne niz plan {odd} ludzi, przegrani - (zabici + jency + rozbici) = {gap}; jency zgubieni przez gre {lost}, bitew bez sprawdzenia jencow {unc} (INFO)",
+            "kontrola kodu 0, listy 0, roznica 0", ctl == 0 and odd == 0 and gap == 0)
+    st_ = [isum(r"potkniecia H3 tej doby \(wszystkie bitwy\): liczenie (\d+), zastosowanie (\d+), pomiar (\d+)", g) for g in (1, 2, 3)]
+    rep.add("N3-3: potkniecia H3 (wszystkie bitwy, suma okna)", f"liczenie {st_[0]}, zastosowanie {st_[1]}, pomiar {st_[2]}", "0 / 0 / 0", sum(st_) == 0)
+    wm = isum(r"\| zwyciezcy tych bitew (\d+) ludzi: zabici (\d+) \(", 1)
+    wd = isum(r"\| zwyciezcy tych bitew (\d+) ludzi: zabici (\d+) \(", 2)
+    wr = isum(r"\), z poleglych ranni \+(\d+) \| poza regula")
+    fs = isum(r"przegrany wypad (\d+) \(twierdza pada\), pod murami (\d+)", 1)
+    fw = isum(r"przegrany wypad (\d+) \(twierdza pada\), pod murami (\d+)", 2)
+    rep.add("N3-4: pobita odsiecz, zwyciezcy, strona twierdzy (suma okna; INFO)",
+            f"pobita odsiecz albo inna strona w polu: bitew {ra[0]}, przegrani {ra[1]}: zabici {ra[2]} ({pc(ra[2], ra[1])}), jency {ra[4]} ({pc(ra[4], ra[1])}), rozbici {ra[6]} ({pc(ra[6], ra[1])}); "
+            f"zwyciezcy bitew pod murami {wm} ludzi: zabici {wd} ({pc(wd, wm)}), z poleglych ranni +{wr}; poza regula - pobita strona twierdzy: przegrany wypad {fs}, pod murami {fw}",
+            "INFO (bieg roczny przed paczka: odsiecz 10 bitew / 6 052 ludzi - 100% strat; zwyciezcy wypadow 11.5% zabitych; strona twierdzy: wypad 0, pod murami 5 bitew / 3 604 ludzi)", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -14303,6 +14368,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_o6)   # E8/O6 (270): zapis logu otwartym plikiem - czas zapisu, proba 3 dob (bajty i linie), wpis kontrolny drogi bledu
     blocks.append(etap8_p3woj)   # P3/WOJSKO (TRIAZ-3): sluzba na miare srodkow, zwolnienia wedlug tieru, zadatek BK i kontrakt najemnikow, zerwane wezwania 168
     blocks.append(etap8_p3_zelazo)   # P3/ZELAZO (TRIAZ-3 bieg roczny): kontrakt wozem, bezpiecznik regulatora, zamki, towar kasowany lordom
+    blocks.append(etap8_n3)   # N3 (poprawka 3 po biegu rocznym): pobity oblegajacy i pobita odsiecz uchodza - zabici + jency <= 45%, ksiega bitew pod murami
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

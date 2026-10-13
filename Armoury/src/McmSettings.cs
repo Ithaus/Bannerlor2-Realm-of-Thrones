@@ -2520,6 +2520,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool LosersFleePlayerAuto { get; set; } = true;
 
+        [SettingPropertyBool("Losers Flee Besiegers", HintText = "the same rule under the walls, in battles fought without you: a besieging host beaten by a sally from the fortress, or beaten in the open under the walls by the defenders and a relief force, and a relief force beaten by the besiegers' camp, mostly flees like a host beaten in the field instead of being slain or taken to the last man. The siege still ends and the beaten host is still scattered; the men who flee go home or to the woods. Storming the walls, the defenders of a fortress when they are beaten, and battles at sea are not touched (needs Losers Flee Enabled; off = as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool LosersFleeBesiegers { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
         [SettingPropertyGroup("Iron Bank")]
         public float WinnerDeathCapPercent { get; set; } = 5f;
@@ -5901,6 +5905,7 @@ namespace Armoury
             s.OutlawNoUndead = OutlawNoUndead;
             s.LosersFleeEnabled = LosersFleeEnabled;
             s.LosersFleePlayerAuto = LosersFleePlayerAuto;
+            s.LosersFleeBesiegers = LosersFleeBesiegers;
             s.WinnerDeathCapPercent = WinnerDeathCapPercent;
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;

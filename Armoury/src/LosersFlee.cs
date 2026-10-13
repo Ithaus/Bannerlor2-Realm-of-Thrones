@@ -29,10 +29,14 @@ namespace Armoury
     /// Kod: prefiks na MapEvent.CalculateAndCommitMapEventResults (PRZED lupem z cial, pojmaniem i MapEventEnded - wszyscy pozniejsi
     /// czytelnicy widza jeden, poprawiony podzial) - dwie fazy: plan i sprawdzenie, dopiero potem same AddToCounts (zmiany zerowe
     /// pomijane). Postfiks na tej samej metodzie tylko mierzy (jency wzieci = j, przegrani bez szeregowych). Bitwy gracza w polu (walka
-    /// reczna), oblezenia, rabunki, morze, odwrot, poddanie i Inni - bez zmian (licznik). Bohaterowie - jak w grze. Zapisu nie ma (liczniki dnia).
+    /// reczna), szturmy (i reszta oblezen poza N3 nizej), rabunki, morze, odwrot, poddanie i Inni - bez zmian (licznik). Bohaterowie - jak w grze. Zapisu nie ma (liczniki dnia).
     /// F1 (decyzja Jeffa 09.10 "F"): bitwa gracza rozstrzygnieta symulacja (wyslij wojsko / autobitwa) - ten sam plan co bitwa AI
     /// (przegrani gracza albo wroga, zwyciezca z limitem zabitych), wylacznik LosersFleePlayerAuto; rozpoznanie - PlayerAuto; bitwa,
     /// w ktorej gracz walczyl w polu (misja), a potem dal "wyslij wojsko" - jak walka w polu (NoteMission, licznik "mieszane").
+    /// N3 (decyzja Jeffa 13.10, poprawka 3 po biegu rocznym - w roku 38 wypadow zabralo oblegajacym 55 018 ludzi, za kazdym razem 100%): ta sama regula
+    /// takze pod murami - pobity oblegajacy (wypad z twierdzy, bitwa pod murami w otwartym terenie) i pobita odsiecz uchodza jak przegrani w polu;
+    /// wylacznik LosersFleeBesiegers, rozpoznanie - WallsClass. Pobita strona twierdzy (przegrany wypad - twierdza pada; obroncy pobici pod murami),
+    /// szturm na mury i morze - jak w grze. Oblezenie konczy sie jak dotad (partie pobitych bez ludzi gra usuwa). Liczniki: linia "Przegrani pod murami (N3)".
     ///
     /// SendHome - jedna funkcja pochodzenia: tabor wsi / rybacy -> hearth swojej wsi (odwrotnosc VillagerCampaignBehavior:179);
     /// karawany, zalogi, milicje, patrole i straz karawan -> "z szablonu" (gra tworzy ich z niczego - licznik do E7 / 108);
@@ -45,6 +49,7 @@ namespace Armoury
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.LosersFleeEnabled; } }
         internal static bool PlayerAutoOn { get { var s = Settings.Current; return s != null && s.LosersFleePlayerAuto; } }
+        internal static bool BesiegersOn { get { var s = Settings.Current; return s != null && s.LosersFleeBesiegers; } }
 
         // rodzaje partii
         internal const int KArmy = 0, KBand = 1, KVillager = 2, KCaravan = 3, KGarrison = 4, Kinds = 5;
@@ -137,6 +142,14 @@ namespace Armoury
         private static int _autoCovered, _autoSkip, _autoMixed;
         private static MapEvent _lastAutoMe;          // ostatnia objeta autobitwa gracza - naglowek linii rozbitych przy MapEventEnded
         private static MapEvent _fieldMe;             // ostatnia bitwa gracza, w ktorej byla misja (walka w polu) - NoteMission
+        // N3 (decyzja Jeffa 13.10): rodzaj bitwy objetej - pole i trzy rodzaje spod murow; liczniki dnia na rodzaj (linia "Przegrani pod murami (N3)").
+        // Te same zdarzenia sa tez w licznikach ogolnych nizej - linia "Przegrani (H3)" liczy wszystkie bitwy objete razem, jak dotad
+        internal const int ClsField = 0, ClsSally = 1, ClsWalls = 2, ClsRelief = 3, Classes = 4;
+        private static readonly string[] ClsName = { "pole", "wypad - pobity oblegajacy", "pod murami - pobity oblegajacy", "pod murami - pobita odsiecz albo inna strona w polu" };
+        private const int CBat = 0, CMen = 1, CDead = 2, CDead0 = 3, CCapt = 4, CRouted = 5, CWMen = 6, CWDead0 = 7, CWRev = 8, CCtl = 9, COdd = 10, CLost = 11, CUnchk = 12, CCols = 13;
+        private static readonly int[,] _c = new int[Classes, CCols];
+        private static readonly double[] _cCapt0 = new double[Classes];
+        private static int _fortSally, _fortWalls;    // pobita strona twierdzy (przegrany wypad, obroncy pobici pod murami) - poza regula, jak w grze
         private static readonly int[] _kMen = new int[Kinds], _kDead = new int[Kinds], _kCapt = new int[Kinds], _kRouted = new int[Kinds], _kDead0 = new int[Kinds];
         private static int _lMen, _lDead, _lDead0, _lCapt, _lRouted; private static double _lCapt0;
         private static int _wMen, _wDead, _wDead0, _wRevived;
@@ -195,6 +208,7 @@ namespace Armoury
         {
             _battles = _skipPlayer = _skipNotField = _skipRetreat = _skipSurr = _skipUndead = 0;
             _autoCovered = _autoSkip = _autoMixed = 0;
+            Array.Clear(_c, 0, _c.Length); Array.Clear(_cCapt0, 0, Classes); _fortSally = _fortWalls = 0;
             Array.Clear(_kMen, 0, Kinds); Array.Clear(_kDead, 0, Kinds); Array.Clear(_kCapt, 0, Kinds); Array.Clear(_kRouted, 0, Kinds); Array.Clear(_kDead0, 0, Kinds);
             _lMen = _lDead = _lDead0 = _lCapt = _lRouted = 0; _lCapt0 = 0;
             _wMen = _wDead = _wDead0 = _wRevived = 0;
@@ -711,6 +725,7 @@ namespace Armoury
             // lochow zwyciezcow = suma j (inaczej gra bierze jencow z partii spoza planu po staremu i "zgubieni" wychodza falszywie)
             public bool Covered = true;
             public bool Auto;                      // F1: autobitwa gracza (komunikat w grze, osobny naglowek linii)
+            public int Cls;                        // N3: rodzaj bitwy (ClsField / ClsSally / ClsWalls / ClsRelief) - liczniki na rodzaj i naglowek linii
         }
 
         private static BP _cur;
@@ -907,6 +922,61 @@ namespace Armoury
             return s + ".";
         }
 
+        // ------------------------------------------------------------ N3: bitwy pod murami
+        /// <summary>Strona twierdzy: w skladzie jest osada, jej zaloga albo milicja.</summary>
+        private static bool FortressSide(MapEventSide side)
+        {
+            for (int i = 0; i < side.Parties.Count; i++)
+            {
+                var pb = side.Parties[i] != null ? side.Parties[i].Party : null;
+                if (pb == null) continue;
+                if (pb.IsSettlement) return true;
+                var mp = pb.MobileParty;
+                if (mp != null && (mp.IsGarrison || mp.IsMilitia)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Strona oblegajacych: choc jedna partia stoi w obozie oblezniczym (oboz gra zdejmuje dopiero przy koncu bitwy - FinalizeEventAux).</summary>
+        private static bool BesiegerSide(MapEventSide side)
+        {
+            for (int i = 0; i < side.Parties.Count; i++)
+            {
+                var mp = side.Parties[i] != null && side.Parties[i].Party != null ? side.Parties[i].Party.MobileParty : null;
+                try { if (mp != null && mp.BesiegedSettlement != null) return true; } catch { }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// N3 (decyzja Jeffa 13.10 "pobity oblegajacy ma uchodzic jak przegrany w polu"): bitwa ladowa przy oblezeniu rozstrzygana w otwartym terenie
+        /// (dekompilacja gry 1.4.8 - MapEvent.cs, StartBattleAction.cs, KingdomManager.cs):
+        /// - SallyOut: atakuje zaloga twierdzy z tymi, ktorzy stali w srodku (i z odsiecza, gdy zaloga dolaczyla do jej bitwy - AddInvolvedPartyInternal :655),
+        ///   broni sie oboz oblegajacych. Wygrana wychodzacych zdejmuje oblezenie (FinalizeEventAux :2118), wygrana oblegajacych od razu oddaje im twierdze
+        ///   (KingdomManager.SiegeCompleted: SallyOut i isWin) - "powrotu za mury" po przegranym wypadzie w grze nie ma.
+        /// - SiegeOutside bez osady bitwy: odsiecz albo inna partia i oboz oblegajacych w polu (StartBattleAction.Apply :65-77) - twierdza nie walczy.
+        /// - SiegeOutside z osada bitwy: szturm, do ktorego po stronie obroncow doszla partia spoza murow (AddInvolvedPartyInternal :651). Gra liczy go juz jak
+        ///   bitwe w polu (kontekst symulacji polowy, misja gracza polowa - MenuHelper :275), a wygrana oblegajacych NIE zdobywa twierdzy (SiegeCompleted
+        ///   pomija SiegeOutside) - pada dopiero w nastepnym szturmie.
+        /// Regula pola obejmuje strone pobita, ktora nie jest strona twierdzy: pobitego oblegajacego i pobita odsiecz. Pobita strona twierdzy (przegrany wypad,
+        /// obroncy pobici pod murami) - jak w grze, tylko licznik. Szturm (Siege; odparty konczy sie bez zwyciezcy), blokada i wypad na blokade (morze), rabunek
+        /// - bez zmian. Zwraca rodzaj bitwy (ClsSally / ClsWalls / ClsRelief) albo -1 = poza regula (takze przy wylaczonym LosersFleeBesiegers).
+        /// </summary>
+        private static int WallsClass(MapEvent me)
+        {
+            if (!BesiegersOn || me.IsNavalMapEvent || !(me.IsSallyOut || me.IsSiegeOutside)) return -1;
+            var ds = me.DefeatedSide;
+            if (ds != BattleSideEnum.Attacker && ds != BattleSideEnum.Defender) return -1;      // bez zwyciezcy (prefiks tu nie dochodzi - zabezpieczenie)
+            var lose = me.GetMapEventSide(ds);
+            if (lose == null) return -1;
+            // strona twierdzy z ukladu gry (wypad - atakujacy; bitwa pod murami z osada - obronca) i ze skladu (osada, zaloga, milicja)
+            bool fort = me.IsSallyOut ? lose == me.AttackerSide : (me.MapEventSettlement != null && lose == me.DefenderSide);
+            if (!fort) fort = FortressSide(lose);
+            if (fort) { if (me.IsSallyOut) _fortSally++; else _fortWalls++; return -1; }
+            if (me.IsSallyOut) return ClsSally;
+            return BesiegerSide(lose) ? ClsWalls : ClsRelief;
+        }
+
         // ------------------------------------------------------------ prefiks / postfiks
         public static void ResultsPrefix(MapEvent __instance)
         {
@@ -931,7 +1001,13 @@ namespace Armoury
                     if (!sim) { _skipPlayer++; return; }
                     auto = true;
                 }
-                if (!me.IsFieldBattle || me.IsNavalMapEvent) { SkipOut(me, auto, ref _skipNotField); return; }
+                // N3: wypad i bitwa pod murami na ladzie z pobita strona spoza twierdzy - regula pola; reszta bitew nie w polu jak dotad
+                int cls = ClsField;
+                if (!me.IsFieldBattle || me.IsNavalMapEvent)
+                {
+                    cls = WallsClass(me);
+                    if (cls < 0) { SkipOut(me, auto, ref _skipNotField); return; }
+                }
                 if (me.RetreatingSide != BattleSideEnum.None) { SkipOut(me, auto, ref _skipRetreat); return; }
                 var lose = me.GetMapEventSide(me.DefeatedSide); var win = me.GetMapEventSide(me.WinningSide);
                 if (lose == null || win == null) return;
@@ -943,6 +1019,7 @@ namespace Armoury
                 var plan = Plan(me, win, lose);           // faza 1: policz i sprawdz
                 if (plan == null) return;
                 plan.Auto = auto;
+                plan.Cls = cls;
                 Apply(plan);                              // faza 2: same AddToCounts na sprawdzonych liczbach
                 if (auto) { _autoCovered++; _lastAutoMe = me; }
                 // migawka lochow zwyciezcow dla postfiksu (zaloga i milicja tej samej osady maja wspolny loch - bez dubli)
@@ -1121,6 +1198,7 @@ namespace Armoury
         {
             var me = bp.Me;
             var pos = me.Position.ToVec2();
+            int c = bp.Cls >= 0 && bp.Cls < Classes ? bp.Cls : ClsField;      // N3: liczniki na rodzaj bitwy
             // przegrani: w partii zostaje dokladnie j rannych (gra wezmie ich do niewoli), reszta - zabici albo rozbici
             foreach (var lp in bp.Losers)
             {
@@ -1149,12 +1227,13 @@ namespace Armoury
                         int mNow = idx >= 0 ? member.GetElementNumber(idx) : 0, wNow = idx >= 0 ? member.GetElementWoundedNumber(idx) : 0;
                         int bad = Math.Abs(mep.DiedInBattle.GetTroopCount(tp.T) - tp.K) + Math.Abs(mep.WoundedInBattle.GetTroopCount(tp.T) - tp.J)
                                   + Math.Abs(mep.RoutedInBattle.GetTroopCount(tp.T) - tp.F) + Math.Abs(mNow - tp.J) + Math.Abs(wNow - tp.J);
-                        if (bad != 0) { _oddApplyTypes++; _oddApplyMen += bad; }
+                        if (bad != 0) { _oddApplyTypes++; _oddApplyMen += bad; _c[c, COdd] += bad; }
                     }
                     bp.SumJ += lp.J;
                     bp.LoseDeadAll += lp.K - lp.D0;
                     _kMen[lp.Kind] += lp.N; _kDead[lp.Kind] += lp.K; _kCapt[lp.Kind] += lp.J; _kRouted[lp.Kind] += lp.F; _kDead0[lp.Kind] += lp.D0;
                     _lMen += lp.N; _lDead += lp.K; _lDead0 += lp.D0; _lCapt += lp.J; _lRouted += lp.F; _lCapt0 += lp.J0;
+                    _c[c, CMen] += lp.N; _c[c, CDead] += lp.K; _c[c, CDead0] += lp.D0; _c[c, CCapt] += lp.J; _c[c, CRouted] += lp.F; _c[c, CCtl] += lp.K + lp.J + lp.F - lp.N; _cCapt0[c] += lp.J0;
                     lp.Applied = true;                                     // komunikat w grze liczy tylko partie zastosowane bez bledu
                 }
                 catch (Exception e)
@@ -1219,6 +1298,7 @@ namespace Armoury
             // liczniki bitwy
             _wMen += bp.WinN; _wDead0 += bp.WinD0; _wDead += bp.WinD0 - bp.WinRev; _wRevived += bp.WinRev;
             _battles++;
+            _c[c, CBat]++; _c[c, CWMen] += bp.WinN; _c[c, CWDead0] += bp.WinD0; _c[c, CWRev] += bp.WinRev;
             _sumP += bp.P; _sumC += bp.C; _sumT += bp.T; _sumO += bp.O; _sumQ += bp.Q; _sumF += bp.F;
             if (bp.T > 0.5f) _trapBattles++;
             int minSide = Math.Max(1, Settings.Current.BattleRealMinSide);
@@ -1244,8 +1324,9 @@ namespace Armoury
                 int after = 0;
                 foreach (var r in bp.Prisons) after += r.TotalRegulars;
                 int got = after - bp.PrisonBefore;
-                if (bp.Covered) { _taken += got; _sumJChk += bp.SumJ; _lostByGame += bp.SumJ - got; _checked++; }
-                else _unchecked++;
+                int c = bp.Cls >= 0 && bp.Cls < Classes ? bp.Cls : ClsField;      // N3: liczniki na rodzaj bitwy
+                if (bp.Covered) { _taken += got; _sumJChk += bp.SumJ; _lostByGame += bp.SumJ - got; _checked++; _c[c, CLost] += bp.SumJ - got; }
+                else { _unchecked++; _c[c, CUnchk]++; }
                 // listy zabitych i rozbitych po wyniku gry dalej = plan (gra ich w tej metodzie nie zmienia - zmiana tu to cudza latka)
                 foreach (var lp in bp.Losers)
                 {
@@ -1253,7 +1334,7 @@ namespace Armoury
                     {
                         var tp = lp.Types[t];
                         int bad = Math.Abs(lp.Mep.DiedInBattle.GetTroopCount(tp.T) - tp.K) + Math.Abs(lp.Mep.RoutedInBattle.GetTroopCount(tp.T) - tp.F);
-                        if (bad != 0) { _oddPostTypes++; _oddPostMen += bad; }
+                        if (bad != 0) { _oddPostTypes++; _oddPostMen += bad; _c[c, COdd] += bad; }
                     }
                 }
                 string msg = null;
@@ -1380,8 +1461,9 @@ namespace Armoury
                 try { lost = bp.Me.DefeatedSide == bp.Me.PlayerSide; } catch { }
                 sb.Append("Bitwa: H3 autobitwa gracza (").Append(lost ? "gracz przegral" : "gracz wygral").Append(") dzien ");
             }
-            else sb.Append("Bitwa: H3 dzien ");
-            sb.Append((int)CampaignTime.Now.ToDays).Append(" - ").Append(bp.Me.EventType).Append(Where(bp.Me)).Append(": przegrany ")
+            else sb.Append(bp.Cls != ClsField ? "Bitwa: H3 pod murami (N3) dzien " : "Bitwa: H3 dzien ");
+            string cn = bp.Cls > ClsField && bp.Cls < Classes ? " [" + ClsName[bp.Cls] + "]" : "";      // N3: rodzaj bitwy spod murow (pole - linia jak dotad)
+            sb.Append((int)CampaignTime.Now.ToDays).Append(" - ").Append(bp.Me.EventType).Append(Where(bp.Me)).Append(cn).Append(": przegrany ")
               .Append(Who(bp.Lose)).Append(' ').Append(bp.LMen).Append(" ludzi (konni ").Append(Pc(bp.LMount, 1)).Append(", tier ").Append(bp.LTier.ToString("0.0", CultureInfo.InvariantCulture))
               .Append(") vs zwyciezca ").Append(Who(bp.Win)).Append(' ').Append(bp.WMen).Append(" ludzi (konni ").Append(Pc(bp.WMount, 1)).Append(", tier ")
               .Append(bp.WTier.ToString("0.0", CultureInfo.InvariantCulture)).Append(") | p = 0.15 + 0.35xC ").Append(F2(bp.C)).Append(" + 0.15xT ").Append(bp.T > 0.5f ? "1" : "0")
@@ -1513,7 +1595,7 @@ namespace Armoury
                     return;
                 }
                 sb.Append(" - bitew objetych ").Append(_battles).Append(" (pominiete: z graczem ").Append(_skipPlayer).Append(", nie w polu ").Append(_skipNotField)
-                  .Append(" [oblezenie, rabunek, wypad, morze], odwrot ").Append(_skipRetreat).Append(", poddanie ").Append(_skipSurr).Append(", z Innymi ").Append(_skipUndead).Append(')');
+                  .Append(BesiegersOn ? " [szturm, rabunek, pobita strona twierdzy, morze; wypad i bitwa pod murami - linia \"Przegrani pod murami (N3)\"], odwrot " : " [oblezenie, rabunek, wypad, morze], odwrot ").Append(_skipRetreat).Append(", poddanie ").Append(_skipSurr).Append(", z Innymi ").Append(_skipUndead).Append(')');
                 sb.Append(" | autobitwy gracza (F1): ");
                 if (PlayerAutoOn) sb.Append("objete ").Append(_autoCovered).Append(" (wliczone w objete i liczby nizej), pominiete ").Append(_autoSkip).Append(" (nie w polu - takze szturm wyslanym wojskiem, odwrot, Inni), mieszane ")
                                     .Append(_autoMixed).Append(" (najpierw walka w polu, potem wyslij wojsko - jak walka w polu, w \"z graczem\")");
@@ -1562,6 +1644,7 @@ namespace Armoury
                 sb.Append(" | potkniecia: liczenie ").Append(_stumbleCalc).Append(", zastosowanie ").Append(_stumbleApply).Append(", dom ").Append(_stumbleHome).Append(", pomiar ").Append(_stumblePost);
                 sb.Append(TimeText(sw.ElapsedTicks)).Append('.');
                 Log.Info(sb.ToString());
+                try { WallsLine(day); } catch (Exception e) { Log.Error("LosersFlee.WallsLine", e); }
                 WriteCsv(day - 1);
             }
             catch (Exception e) { Log.Error("LosersFlee.Daily", e); }
@@ -1569,6 +1652,48 @@ namespace Armoury
             {
                 ClearDay();   // E4/3: hearth powrotow czyta linia "Hearth (E4/0)" wprost z ksiegi ludzi (PeopleBook) - dawne przekazanie TakeFlee zdjete
             }
+        }
+
+        /// <summary>
+        /// N3: linia doby bitew spod murow - te same liczby co w "Przegrani (H3)" (tam wliczone), osobno na rodzaj bitwy: wypad - pobity oblegajacy, pod murami
+        /// - pobity oblegajacy, pod murami - pobita odsiecz albo inna strona w polu. Prog narzedzia (tools/sprawdz_logi.py, blok etap8_n3): u pobitego
+        /// oblegajacego zabici i jency razem najwyzej 45% (przed paczka 100%), sprawdzenia = 0.
+        /// </summary>
+        private static void WallsLine(int day)
+        {
+            var sb = new StringBuilder();
+            sb.Append("Przegrani pod murami (N3): dzien ").Append(day);
+            if (!BesiegersOn)
+            {
+                sb.Append(" - WYLACZONE (Losers Flee Besiegers; wypad i bitwa pod murami jak w grze - w \"nie w polu\" linii \"Przegrani (H3)\").");
+                Log.Info(sb.ToString());
+                return;
+            }
+            int bat = 0, wm = 0, wd0 = 0, wrev = 0, ctl = 0, odd = 0, lost = 0, unchk = 0;
+            for (int i = ClsSally; i < Classes; i++)
+            {
+                bat += _c[i, CBat]; wm += _c[i, CWMen]; wd0 += _c[i, CWDead0]; wrev += _c[i, CWRev];
+                ctl += _c[i, CCtl]; odd += _c[i, COdd]; lost += _c[i, CLost]; unchk += _c[i, CUnchk];
+            }
+            sb.Append(" - bitew objetych ").Append(bat).Append(" (wliczone w linie \"Przegrani (H3)\" tej doby)");
+            for (int i = ClsSally; i < Classes; i++)
+            {
+                int n = _c[i, CMen];
+                sb.Append(" | ").Append(ClsName[i]).Append(": bitew ").Append(_c[i, CBat]).Append(", przegrani ").Append(n).Append(" ludzi: zabici ").Append(_c[i, CDead])
+                  .Append(" (").Append(Pc(_c[i, CDead], n)).Append("; gra dalaby ").Append(_c[i, CDead0]).Append("), jency ").Append(_c[i, CCapt]).Append(" (").Append(Pc(_c[i, CCapt], n))
+                  .Append("; gra ok. ").Append((int)Math.Round(_cCapt0[i])).Append("), rozbici ").Append(_c[i, CRouted]).Append(" (").Append(Pc(_c[i, CRouted], n)).Append(')');
+            }
+            int bn = _c[ClsSally, CMen] + _c[ClsWalls, CMen], bf = _c[ClsSally, CRouted] + _c[ClsWalls, CRouted];
+            int bkj = _c[ClsSally, CDead] + _c[ClsWalls, CDead] + _c[ClsSally, CCapt] + _c[ClsWalls, CCapt];
+            sb.Append(" | pobity oblegajacy razem: ").Append(bn).Append(" ludzi, zabici i jency ").Append(bkj).Append(" (").Append(Pc(bkj, bn)).Append("), rozbici ").Append(bf)
+              .Append(" (").Append(Pc(bf, bn)).Append(')');
+            sb.Append(" | zwyciezcy tych bitew ").Append(wm).Append(" ludzi: zabici ").Append(wd0 - wrev).Append(" (").Append(Pc(wd0 - wrev, wm)).Append("; gra ").Append(Pc(wd0, wm))
+              .Append("), z poleglych ranni +").Append(wrev);
+            sb.Append(" | poza regula - pobita strona twierdzy (jak w grze): przegrany wypad ").Append(_fortSally).Append(" (twierdza pada), pod murami ").Append(_fortWalls);
+            sb.Append(" | sprawdzenia: kontrola kodu k + j + f - n = ").Append(ctl).Append(", listy gry inne niz plan ").Append(odd).Append(" ludzi, jency zgubieni przez gre ").Append(lost)
+              .Append(", bitew bez sprawdzenia jencow ").Append(unchk);
+            sb.Append(" | potkniecia H3 tej doby (wszystkie bitwy): liczenie ").Append(_stumbleCalc).Append(", zastosowanie ").Append(_stumbleApply).Append(", pomiar ").Append(_stumblePost).Append('.');
+            Log.Info(sb.ToString());
         }
 
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "" : s.Replace(';', ',').Replace('\n', ' ').Replace('\r', ' '); }
