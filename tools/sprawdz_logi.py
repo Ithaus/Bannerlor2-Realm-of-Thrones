@@ -13885,13 +13885,24 @@ def etap8_p3woj(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             g = [sum(int(m.group(i)) for m in ms) / len(ms) for i in (1, 2, 3, 4)]
             rep.add("P3W1-4: na miare srodkow (sr28): rodow w wojnie / z nich sluzylo i tak / doba zaliczona / wymog zdjety (rody z lennem)",
                     f"{g[0]:.0f} / {g[1]:.0f} / {g[2]:.0f} / {g[3]:.0f}", "INFO (rachunek triazu: 51 rodow z lennem w d84, 118 w d364 przy progu 0.6; wymog zdjety - ok. 48)", None)
+            # recenzja P3: skutek w zlocie i ludziach - rody z lennem "na miare", ile z nich z renta, ich renty i ludzie w ich druzynach
+            rf = re.compile(r"rody z lennem na miare (\d+) \(z renta dzis (\d+)\), ich renty dzis (\d+) zl, w ich druzynach (\d+) ludzi")
+            fs = [rf.search(r180[d]) for d in t if d in p1]
+            fs = [m for m in fs if m]
+            if fs:
+                h = [sum(int(m.group(i)) for m in fs) / len(fs) for i in (1, 2, 3, 4)]
+                rep.add("P3W1-4b: rody z lennem na miare srodkow (sr28): rodow / z renta / ich renty zl na dobe / ludzi w ich druzynach",
+                        f"{h[0]:.0f} / {h[1]:.0f} / {h[2]:.0f} / {h[3]:.0f}",
+                        "INFO (przed paczka 57 rodow bez renty mialo w druzynach 5 785 ludzi w d337-364, 24 264 w d57-84; utracona renta 73.9 tys. zl/d)", None)
         rs = re.compile(r"P3/W1 styk krolestw w wojnie wedlug zrodla \(krolestw w wojnie (\d+)\): armia w polu (\d+), oblezenie (\d+), napad na wlasna osade (\d+), tylko rajdy i bitwy wlasnych lordow (\d+)")
         ss = [rs.search(r180[d]) for d in t if d in p1]
         ss = [m for m in ss if m]
         if ss:
             g = [sum(int(m.group(i)) for m in ss) / len(ss) for i in (1, 2, 3, 4, 5)]
+            lc = avg([num(r"tylko rajdy i bitwy wlasnych lordow \d+, w nich rodow (\d+)", r180[d]) for d in t if d in p1])   # recenzja P3
             rep.add("P3W1-5: styk krolestw w wojnie wedlug zrodla (sr28 krolestw na dobe): w wojnie / armia w polu / oblezenie / napad na wlasna osade / tylko rajdy",
-                    f"{g[0]:.1f} / {g[1]:.1f} / {g[2]:.1f} / {g[3]:.1f} / {g[4]:.1f}", "INFO (brakujacy pomiar triazu: ile krolestw ma dobe wojny tylko z rajdow wlasnych lordow)", None)
+                    f"{g[0]:.1f} / {g[1]:.1f} / {g[2]:.1f} / {g[3]:.1f} / {g[4]:.1f}" + (f" (w nich rodow {lc:.0f})" if lc is not None else ""),
+                    "INFO (brakujacy pomiar triazu: ile krolestw ma dobe wojny tylko z rajdow wlasnych lordow)", None)
 
     # ---- W2: budzet rodow (166)
     p2 = [d for d in b166 if "P3/W2 zwolnieni wedlug tieru" in b166[d]]

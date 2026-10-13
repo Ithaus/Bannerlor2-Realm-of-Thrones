@@ -52,7 +52,10 @@ namespace Armoury
     ///    Polnoc od d141 bez jednej armii, doby wojny nabijaly rajdy 2-5 bogatych rodow - 18 rodow z pelnymi druzynami stracilo rente w d241-250).
     ///    Uczestnicy dalej maja sluzbe 3/4/6/7 w dobach ze stykiem. Klucz wylaczony = oba krolestwa kazdego zdarzenia, jak dotad.
     ///    POMIAR (C): zrodla styku krolestw (armia w polu / oblezenie / napad na wlasna osade / tylko rajdy i bitwy wlasnych lordow), w CSV sluzba rodu
-    ///    dzis (0-8), najwyzsze wypelnienie druzyny i znacznik "na miare".
+    ///    dzis (0-8), najwyzsze wypelnienie druzyny i znacznik "na miare". Recenzja P3: skutek w linii doby takze w zlocie i ludziach - rody z lennem
+    ///    "na miare" (ile, ile z renta, ich renty dnia, ludzie w ich druzynach) i rody krolestw, ktorych dobe wojny dawaly tylko rajdy wlasnych lordow.
+    ///    Uwaga do odczytu: "wymog zdjety u N" liczy tylko rody z niedoborem dob - w kampanii zaczetej z paczka doby "na miare" sa zaliczane od poczatku
+    ///    (rodzaj 8), wiec N bywa bliskie 0, a skutek widac w "doba zaliczona" i w rentach rodow "na miare".
     /// Kolejnosc (2.0b): po zwrocie zoldu (KingdomTreasury.WageRefund), przed CrownIncome.End; kazde krolestwo i kazdy rod we wlasnym try.
     /// Platnik -> odbiorca: skarbiec (reszta wplywow dnia) -> glowa rodu (GiveGold w parze: skarbiec - x, glowa + x). Zapis: SaveText "arm_rent180"
     /// (sluzba rodow, normy zalog, doby przejecia twierdz, rody na miare srodkow).
@@ -252,6 +255,24 @@ namespace Armoury
             return gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalRegulars : 0;
         }
 
+        /// <summary>Recenzja P3 (pomiar skutku W1-A w linii doby): zwykli ludzie w czynnych druzynach lordow rodu. Tylko odczyt.</summary>
+        private static int PartyMen(Clan c)
+        {
+            int n = 0;
+            try
+            {
+                var wps = c != null ? c.WarPartyComponents : null;
+                if (wps == null) return 0;
+                for (int i = 0; i < wps.Count; i++)
+                {
+                    var mp = wps[i] != null ? wps[i].MobileParty : null;
+                    if (mp != null && mp.IsActive && mp.IsLordParty && mp.MemberRoster != null) n += mp.MemberRoster.TotalRegulars;
+                }
+            }
+            catch (Exception e) { Stumble("PartyMen", e); }
+            return n;
+        }
+
         private static Norm NormOf(string key)
         {
             Norm n;
@@ -382,7 +403,7 @@ namespace Armoury
                 // w tej sesji (pierwsza doba po wczytaniu) - stan z zapisu, bez tego kazde wczytanie zabieraloby rodom "na miare" jedna dobe renty
                 bool meansOn = s.CrownRentServiceAtMeans, budgetPending = ClanBudget.Pending;
                 if (!meansOn && _means.Count > 0) _means.Clear();
-                int meansN = 0, meansServed = 0, srvMeans = 0, meansWaived = 0;
+                int meansN = 0, meansServed = 0, srvMeans = 0, meansWaived = 0, meansFief = 0, meansFiefPaid = 0, meansMen = 0; long meansRent = 0;   // recenzja P3: skutek w zlocie i ludziach (rody z lennem "na miare")
                 var armyK = new HashSet<Kingdom>(); var siegeK = new HashSet<Kingdom>();   // P3/W1 C: zrodla styku (pomiar)
                 // P3/W1 B: przy kluczu zobowiazuja tylko zdarzenia przy WLASNEJ osadzie krolestwa (napad na jego ziemie); bitwy w polu i rajdy wlasnych
                 // lordow - nie. Armia w polu i oblezenie (nizej) bez zmian. Klucz wylaczony = oba krolestwa kazdego zdarzenia (stan sprzed)
@@ -464,7 +485,7 @@ namespace Armoury
                 }
                 // P3/W1 C (pomiar): krolestwa w wojnie wedlug zrodla styku tej doby - armia w polu, oblezenie, napad na wlasna osade (zdarzenia od wczoraj);
                 // "tylko rajdy" - krolestwo mialo zdarzenie z wrogiem, ale ani armii, ani oblezenia, ani napadu na wlasna osade (rajdy i bitwy wlasnych lordow)
-                int srcArmy = 0, srcSiege = 0, srcOwn = 0, srcLone = 0, warKingdoms = 0;
+                int srcArmy = 0, srcSiege = 0, srcOwn = 0, srcLone = 0, warKingdoms = 0, srcLoneClans = 0; var loneK = new HashSet<Kingdom>();   // recenzja P3: rody krolestw "tylko rajdy"
                 foreach (var kk in warK)
                 {
                     if (!kk.Value) continue;
@@ -473,8 +494,9 @@ namespace Armoury
                     if (sa) srcArmy++;
                     if (ss) srcSiege++;
                     if (so) srcOwn++;
-                    if (!sa && !ss && !so && _contact.Contains(kk.Key)) srcLone++;
+                    if (!sa && !ss && !so && _contact.Contains(kk.Key)) { srcLone++; loneK.Add(kk.Key); }
                 }
+                if (loneK.Count > 0) for (int i = 0; i < pendK.Count; i++) if (loneK.Contains(pendK[i])) srcLoneClans++;
                 int evtN = _evtN; _battleClans.Clear(); _contact.Clear(); _contactOwn.Clear(); _evtN = 0;
                 var gone = new List<string>();
                 foreach (var kv in _svc) if (!seen.Contains(kv.Key)) gone.Add(kv.Key);
@@ -583,6 +605,8 @@ namespace Armoury
                             if (!row.GarOk && !row.SvcOk) LastFailBoth++; else if (!row.GarOk) LastFailGar++; else if (!row.SvcOk) LastFailSvc++;
                             if (ok) LastOk++;
                             LastClans++;
+                            // recenzja P3 (pomiar skutku W1-A): rody z lennem "na miare srodkow" - ile ich, ile z renta, ile renty i ilu ludzi w druzynach
+                            if (_means.Count > 0 && _means.Contains(c.StringId)) { meansFief++; if (row.Paid > 0) meansFiefPaid++; meansRent += row.Paid; meansMen += PartyMen(c); }
                             _rows[c] = row;
                             if (c == Clan.PlayerClan)
                             {
@@ -659,10 +683,11 @@ namespace Armoury
                       .Append("; doba wojny bez styku z wrogiem (nie liczy sie) ").Append(needContact ? noContactK.Count + " krolestw, " + noContactClans + " rodow" : "wylaczone")
                       .Append(" | P3/W1 styk krolestw w wojnie wedlug zrodla (krolestw w wojnie ").Append(warKingdoms).Append("): armia w polu ").Append(needContact ? srcArmy.ToString(Inv) : "-")
                       .Append(", oblezenie ").Append(needContact ? srcSiege.ToString(Inv) : "-").Append(", napad na wlasna osade ").Append(srcOwn)
-                      .Append(", tylko rajdy i bitwy wlasnych lordow ").Append(needContact ? srcLone.ToString(Inv) : "-")
+                      .Append(", tylko rajdy i bitwy wlasnych lordow ").Append(needContact ? srcLone.ToString(Inv) + ", w nich rodow " + srcLoneClans.ToString(Inv) : "-")
                       .Append(!needContact ? "" : onlyCalled ? " (nie zobowiazuja - Crown Rent Contact Only When Called)" : " (zobowiazuja jak dotad - Crown Rent Contact Only When Called wylaczone)")
                       .Append(" | P3/W1 sluzba na miare srodkow (Crown Rent Service At Means): ")
                       .Append(meansOn ? "rodow w wojnie " + meansN + " (z nich sluzylo i tak " + meansServed + ", doba zaliczona " + srvMeans + "), wymog sluzby zdjety u " + meansWaived + " rodow z lennem"
+                                        + "; rody z lennem na miare " + meansFief + " (z renta dzis " + meansFiefPaid + "), ich renty dzis " + meansRent + " zl, w ich druzynach " + meansMen + " ludzi"
                                         + (budgetPending ? "; budzet 166 jeszcze nie policzony w tej sesji - stan z zapisu" : "")
                                       : "wylaczone")
                       .Append(" | normy zalog (srednio na krolestwo, 28 dob): miasto ").Append(kT > 0 ? (nT28 / kT).ToString("0", Inv) : "-")

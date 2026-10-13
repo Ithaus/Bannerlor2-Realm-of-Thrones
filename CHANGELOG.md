@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO - recenzja z poprawka) - 6 poprawek paczki sprawdzone niezaleznie; dopisany pomiar skutku W1 w zlocie i ludziach
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/CrownRents.cs` (sama linia doby 180 - liczniki i tekst), `tools/sprawdz_logi.py` (tylko blok `etap8_p3woj`), `CHANGELOG.md`. Zachowanie gry bez zmian (sam log i narzedzie).
+
+**Co sprawdzone (kod wobec "Poprawki ostatecznej" TRIAZ-3 z uwagami podwazenia; log i CSV biegu rocznego 364 doby):**
+- **W1-A** zgodne. Kryterium przeliczone wlasnym skryptem na `budzet-rodow.csv`: w d364 z 54 rodow bez sluzby lapie 48 (poza nim 3 rody z druzyna ponad 60% i 3 z luzem - prawdziwy brak sluzby); rodow z lennem "na miare" ok. 36 (d84), 92 (d196), 112 (d364) - przyblizenie z CSV (wypelnienie calego rodu zamiast najwiekszej druzyny; podwazenie triazu: 51 / 94 / 118). Po zdjeciu wymogu w d364 zostaje bez renty 16 z 198 (8.1%; 10 przez zaloge) - prog 10% trzyma z malym zapasem. Gracz nigdy (brak budzetu 166), zapis: 5. pole `arm_rent180`, zapis bez niego wczytuje sie (pusty zbior), Reset czysci.
+- **W1-B** zgodne: armia w polu i obie strony oblezenia jak dotad, zdarzenia tylko przy WLASNEJ osadzie; klucz wylaczony = oba krolestwa kazdego zdarzenia.
+- **W2** zgodne (losowanie czlowieka, bez `ceil` na stos, najemnicy z karczmy dalej pierwsi, to samo cialo petli). Uwaga do opisu: pojedyncze losowanie trafia srednio dokladnie w kwote, ale `Releases` ponawia niedobor w drugiej petli (nadmiaru nie cofa), wiec rod zwalnia srednio ok. 1/6 zoldu jednego czlowieka ponad kwote dnia (ok. 1.3 zl przy medianie 60 zl, ok. 2%) - mniej niz stare zaokraglenie w gore; bez zmiany kodu.
+- **W3-A** zgodne. `AddDownPayment` w zainstalowanym BannerKings.dll: 148 bajtow IL (ilspycmd) - nie do wklejenia w wolajacego; pomijany jest tylko przelew krol -> kompania i komunikat gracza-najemnika, `AddCareer` biegnie dalej.
+- **W3-B** zgodne: zmieniona tylko wyplata dnia (min z kontraktem; w pokoju z jego polowa), umowa, podloga 0.5, przeglad i `CapOf` nietkniete. Liczba "kompanii AI w sluzbie" w linii 185 nie liczy juz kompanii bez ludzi w polu (osobne pole).
+- **W4** zgodne i potwierdzone drugim dowodem: w dobach zerwan licznik pomiaru 3.1 "portfele wezwan ... koniec (N)" ma 0, a w 7 dobach konca porozumienia przez gre 1 - w NASZYM wywolaniu `EndCallToWarAgreement` nie odpala zadna latka Harmony (ani `EndPostfix`, ani okno `Measure31`), w wywolaniach gry odpalaja obie. To jest fakt z logu; PRZYCZYNA ("kompilator wkleja krotka metode w nasz Daily") pozostaje hipoteza, nie rozstrzygnieta (latki sa wpinane przy starcie sesji, przed pierwsza doba). Poprawka nie zalezy od przyczyny (warunek "wpis dalej na liscie"). Wezwania gra proponuje tylko przy nowej wojnie albo nowym sojuszu, wiec zdjecie falszywego dlugu nie daje petli wezwanie - zerwanie; krolestwo po zerwaniu znow moze wzywac (dotad falszywy dlug ponizej -100 tys. blokowal je na miesiace - `DefaultAllianceModel.GetScoreOfCallingToWar`).
+- Zamknieta ekonomia: zadna poprawka nie tworzy ani nie niszczy zlota i ludzi (W1 - ten sam przelew skarbiec -> glowa, inny odbiorca; W3 - przelew nie nastepuje / mniejszy; W4 - koniec ujscia w nicosc; W2 - te same drogi ludzi i sakiewki). Wylaczniki: 6 kluczy, kazdy wylaczony = kod sprzed. Kluczy nie ma w `Armoury.json` Jeffa. `gen_mcm.py` bez rozjazdu, opisy po angielsku, build kod 0.
+- Narzedzie: wobec 74a3645 same dopisane linie (0 usunietych), `py_compile` poza repo, bieg na logu rocznym (okna 364 i 120) bez wyjatku - nowe wiersze INFO, pozostale wiersze bez zmian. Koszt doby: `AtMeans` to jeden odczyt zoldu na druzyne rodu w wojnie (caly `ClanBudget.Daily` z kilkoma takimi odczytami na partie kosztuje 12 ms) - ponizej 2 ms.
+
+**Poprawione w recenzji:**
+1. **Linia 180 nie pokazywala skutku W1 w zlocie i ludziach** (wymog zadania: ile rodow, ile zlota, ile ludzi). Dopisane: `rody z lennem na miare F (z renta dzis R), ich renty dzis X zl, w ich druzynach Y ludzi` oraz przy zrodlach styku `tylko rajdy i bitwy wlasnych lordow K, w nich rodow M`. Powod dodatkowy: pole "wymog sluzby zdjety u N" liczy tylko rody z niedoborem dob, a w kampanii zaczetej z paczka doby "na miare" sa zaliczane od pierwszej doby (rodzaj 8) - N bedzie bliskie 0 i samo nie pokaze nic. Narzedzie: wiersz P3W1-4b i dopisek w P3W1-5.
+
+**Odrzucone po sprawdzeniu (nie sa bledami):** podejrzenie petli wojna - pokoj po W4 (gra nie ponawia wezwan co dobe); rozjazd konca linii w `sprawdz_logi.py` (w repo LF, CRLF tylko w kopii roboczej); koszt `AtMeans`; brak zwolnienia rodow "oba" (zgodnie z poprawka ostateczna - drugi krok do decyzji).
+
+**Ryzyko / co sprawdzic:**
+- Sztuczny log 4 dob z polami po recenzji: wszystkie pola czytane.
+- Stary zapis zrobiony wersja z bledem W4, w ktorym zerwanie wypadlo w ostatniej dobie przed zapisem: portfel wzywajacego zostaje na minusie bez wpisu (szukanie dlugu juz nie biega) - przy minusie ponizej 100 tys. to krolestwo nie wezwie sojusznika. Dotyczy tylko starych zapisow; nowa kampania tego nie ma.
+- Do audytu calosci (poza paczka): inne miejsca, w ktorych nasz kod wola wprost krotka metode gry i liczy na wlasna latke na niej - ten sam wzor bledu co W4.
+- W2 dalej wymaga testu 120 dob przed biegiem rocznym (zmiana skladu wojsk AI).
+
+**Build:** Armoury kod 0. Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (P3/WOJSKO - narzedzie) - BLOK PROGOW `etap8_p3woj` w `tools/sprawdz_logi.py` (sam log, gra bez zmian)
 **Mod:** narzedzie | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `tools/sprawdz_logi.py` (nowa funkcja `etap8_p3woj` na koncu blokow + 1 linia `blocks.append` w `etap8_main`; istniejace wiersze bez zmian), `CHANGELOG.md`.
 
