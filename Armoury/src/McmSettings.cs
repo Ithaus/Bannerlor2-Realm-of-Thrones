@@ -5056,6 +5056,14 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float CrownWarAidRecruitStep { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Scutage", HintText = "shield money: in war a house of the realm that holds fiefs, keeps coin above its war reserve and could pay for more field troops than it keeps (more than Crown War Aid Fill Target of its companies' size) pays the crown Scutage Rate of the wages it spares that way. The crown takes only as much as its war aid by need still lacks after the people's war aid, and pays it out the same day to the houses whose companies it helps - coin goes from rich houses that field little to the houses that fight. Never more a day than one part in War Chest Days of the coin above the war reserve, never from the reserve itself. A house that takes the crown's help pays nothing, and a house rebuilding its companies up to the fill target is not charged for the men it has yet to recruit. Not the Night's Watch, not hired companies, not houses in debt, not you - your house neither pays nor is paid. A realm that takes no war aid from its people still fills the pot from scutage alone. Needs Crown War Aid By Need. Off = no scutage, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool Scutage { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Scutage Rate", 0.00f, 1.00f, "0.00", HintText = "with Scutage: the part of its spare wage ceiling a house pays the crown each day of war (0.25 = a quarter of the wages its lands could carry beyond its companies at the fill target and does not pay)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float ScutageRate { get; set; } = 0.25f;
+
         [SettingPropertyBool("People Menu Shows Savings", HintText = "'People of this land' also tells for how many days of living the people of the town, castle or village you are in hold coin, how much of it lies above their reserve for hard times and how much war aid they gave the crown at the last dawn (off = no such line, as before)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool PeopleMenuShowsSavings { get; set; } = true;
@@ -6567,6 +6575,8 @@ namespace Armoury
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
+            s.Scutage = Scutage;
+            s.ScutageRate = ScutageRate;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
             s.Stage6MeasureLog = Stage6MeasureLog;

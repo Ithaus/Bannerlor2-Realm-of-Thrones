@@ -413,6 +413,13 @@ Uzycie (Python 3, tylko odczyt):
                     z doplata od >= 28 dob rosnie, zold oplacony doplata poza podstawa zwrotu, potkniecia, druzyny lordow w wojnie (INFO z celem
                     85 tys. w biegu rocznym), liczby paczki i krolestwa bez garnka (INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W5-9 (INFO, z CSV) zold na czlowieka i wypelnienie rodow z doplata wobec pozostalych rodow z lennem w wojnie.
+--grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
+                    zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
+                    python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
+                    Wiersze W6-0..W6-7: linia i klucz, zamkniecie (pobrane = dopisane do garnka = wyplacone przez W5 ponad danine co do zlotowki;
+                    suma krolestw; te same kwoty w liniach 165 i Obieg; W6-1b z CSV: suma kolumn rodow = linia), pobrane <= nalezne i <= niepokryta
+                    potrzeba (W6-2), platnik nie jest odbiorca i nie placi ponizej rezerwy (W6-3 linia, W6-3b CSV), potkniecia (W6-4), liczby
+                    paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -15110,6 +15117,9 @@ def w5_main(logp, start_arg, until=120, csvp=None):
     if tot:
         cut_bad, cut_sum, paid_sum = [], 0, 0
         ds = sorted(tot)
+        w6paid = {}   # W6: gotowka W5 ze szczebla tarczowego (linia "Tarczowe (W6)"; log bez W6 - pusto)
+        for d6, s6 in e4_series(lines, "Tarczowe (W6): dzien", 1).items():
+            w6paid[d6] = num(r"wyplacone przez W5 ponad danine (\d+)", s6) or 0
         for i, d in enumerate(ds):
             c = num(r"zold oplacony wczorajsza doplata poza podstawa zwrotu 70% \(dzis\) (\d+)", w5[d])
             if c is None:
@@ -15117,6 +15127,9 @@ def w5_main(logp, start_arg, until=120, csvp=None):
             cut_sum += c
             paid_sum += tot[d][6]
             prev = tot[ds[i - 1]][6] if i > 0 and ds[i - 1] == d - 1 else None
+            paid_sum += w6paid.get(d, 0)
+            if prev is not None:
+                prev += w6paid.get(ds[i - 1], 0)
             if prev is not None and c > prev:
                 cut_bad.append(run_day(d, start))
         rep.add("W5-5: zold oplacony doplata poza podstawa zwrotu 70% - najwyzej wczorajsza doplata",
@@ -15160,6 +15173,220 @@ def w5_main(logp, start_arg, until=120, csvp=None):
         rep.add("W5-8b: krolestwa w wojnie z potrzeba i bez garnka w ostatniej dobie okna (lud bez nadwyzki albo s = 0 - regula tam nie dziala; INFO)",
                 (", ".join(f"{nm} {v / 1e3:.1f} tys." for v, nm in dry[:8]) if dry else "brak") + f"; z garnkiem mniejszym niz potrzeba: {short}",
                 "INFO - w biegu rocznym: Iron Islands, Free Folk, Ibben, Qohor, Pentos (potrzeba razem ok. 59 tys. zl/d, garnek 0)", None)
+    rep.show()
+    return 0
+
+
+def _w6_kingdoms(s):
+    """Linia "Tarczowe (W6)": odcinek "| na krolestwo: ..." -> lista slownikow (nazwa, platnikow, nalezne, niepokryta potrzeba, rodow z potrzeba,
+    pobrane, wyplacone, rodow z wyplata, poziom przed i po w % albo None); wiersz nie do odczytania -> {"bad": ...}."""
+    i = s.find("| na krolestwo: ")
+    if i < 0:
+        return []
+    seg = s[i + len("| na krolestwo: "):]
+    j = seg.rfind(" | potkniecia ")
+    seg = seg[:j] if j >= 0 else seg
+    if seg.strip() in ("-", ""):
+        return []
+    kre = re.compile(r"^(.*?): platnikow (\d+), nalezne (\d+), niepokryta potrzeba (\d+) u (\d+) rodow, pobrane (\d+), wyplacone (\d+) \(rodow (\d+)\)"
+                     r", poziom ([\d.]+%|-) -> ([\d.]+%|-)$")
+    out = []
+    for part in seg.split(" ; "):
+        m = kre.match(part)
+        if not m:
+            out.append({"bad": part[:80]})
+            continue
+        out.append({"name": m.group(1), "payn": int(m.group(2)), "due": int(m.group(3)), "unc": int(m.group(4)), "needn": int(m.group(5)),
+                    "got": int(m.group(6)), "paid": int(m.group(7)), "paidn": int(m.group(8)),
+                    "l0": (float(m.group(9)[:-1]) if m.group(9) != "-" else None), "l1": (float(m.group(10)[:-1]) if m.group(10) != "-" else None)})
+    return out
+
+
+def w6_main(logp, start_arg, until=120, csvp=None):
+    """W6 (decyzja Jeffa 13.10, kierunek 2 "TARCZOWE") - rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc zaoszczedzonego zoldu,
+    korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5 (Armoury/src/KingdomTreasury.Scutage.cs). Okno: doby kampanii 2-until (--do-doby).
+    Wiersze W6-0..W6-7: linia i klucz, ZAMKNIECIE (pobrane = dopisane do garnka = wyplacone przez W5 ponad danine, co do zlotowki; suma krolestw = razem; te
+    same kwoty w liniach "Korona: wplywy dnia (165)" i "Obieg"; z budzet-rodow.csv niezaleznie: suma kolumn rodow = linia), pobrane <= nalezne i <= niepokryta
+    potrzeba (krolestwo po krolestwie), kontrole linii (platnik nie jest odbiorca, nikt nie placi ponizej rezerwy, gotowka tylko rodom na pulapie; z CSV
+    niezaleznie), potkniecia 0, liczby paczki (INFO), zloto rodow z luzem pulapu i zbiornik platnikow (INFO), krolestwa bez pomocy (INFO).
+    Log bez paczki (bez linii albo klucz wylaczony): wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    w6 = e4_series(lines, "Tarczowe (W6): dzien", 1)
+    kor = e4_series(lines, "Korona: wplywy dnia (165): dzien", 1)
+    obg = by_day(lines, "Obieg: dzien")
+    ps = by_day(lines, "Pieniadz swiata: dzien")
+    alld = sorted(set(ps) | set(kor) | set(w6))
+    if start is None:
+        start = alld[0] if alld else 0
+    win = [d for d in sorted(w6) if 2 <= run_day(d, start) <= until]
+    on = [d for d in win if "wylacznik Scutage tak" in w6[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia W6 {len(win)} (klucz tak w {len(on)})")
+    tre = re.compile(r"\| platnikow (\d+) z (\d+) ocenianych rodow z lennem .*?podstawa \(wolny pulap ponad cel\) (\d+), nadwyzka kies platnikow ponad rezerwe (\d+)"
+                     r", nalezne (\d+) .*?\| niepokryta potrzeba W5 po daninie (\d+), do pobrania \([^)]*\) (\d+) \| pobrane (\d+) od (\d+) rodow = dopisane do garnka W5 (\d+)"
+                     r", wyplacone przez W5 ponad danine (\d+) \(rodow (\d+), w tym bez gotowki z daniny (\d+)\), zostalo w skarbcach (-?\d+)")
+    tot = {}
+    for d in on:
+        m = tre.search(w6[d])
+        if m:
+            # 0 platnikow, 1 ocenianych, 2 podstawa, 3 nadwyzka, 4 nalezne, 5 niepokryta, 6 do pobrania, 7 pobrane, 8 rodow, 9 dopisane, 10 wyplacone, 11 rodow, 12 nowych, 13 zostalo
+            tot[d] = [int(x) for x in m.groups()]
+    # ---- W6-0 linia i klucz
+    if not win:
+        rep.add("W6-0: linia Tarczowe (W6)", "brak w logu", "jest od wgrania W6 (LogEnabled); bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+    else:
+        offc = [d for d in on if "doplata wedlug potrzeby W5 (Crown War Aid By Need, renty 180, budzet 166) tak" not in w6[d]]
+        unread = [d for d in on if d not in tot]
+        m = re.search(r"\| stawka (\d+)% podstawy .*?celu W5 (\d+)% limitu\), najwyzej 1/(\d+) nadwyzki", w6[win[-1]])
+        rep.add("W6-0: linia W6 kazdej doby, klucz i warunek (doplata W5 czynna)",
+                f"dob z linia {len(win)}, klucz tak w {len(on)}, W5 nieczynne w {len(offc)}, pola nieodczytane w {len(unread)}"
+                + (f"; stawka {m.group(1)}%, cel W5 {m.group(2)}%, rytm 1/{m.group(3)}" if m else ""),
+                "klucz i W5 tak przez caly bieg W6, wszystkie pola odczytane", (len(on) == len(win) and not offc and not unread) if on else None)
+    # ---- W6-1 zamkniecie
+    if tot:
+        bad_sum = [run_day(d, start) for d, t in tot.items() if not (t[7] == t[9] == t[10]) or t[13] != 0]
+        bad_k, bad_row, bad_165, bad_obg, n165, nobg = [], 0, [], [], 0, 0
+        for d, t in tot.items():
+            ks = _w6_kingdoms(w6[d])
+            bad_row += sum(1 for k in ks if "bad" in k)
+            ks = [k for k in ks if "bad" not in k]
+            if sum(k["got"] for k in ks) != t[7] or sum(k["paid"] for k in ks) != t[10] or sum(k["due"] for k in ks) != t[4] or any(k["got"] != k["paid"] for k in ks):
+                bad_k.append(run_day(d, start))
+            if d in kor:
+                mm = re.search(r"tarczowe \(W6, poza wplywami dnia\): pobrane od rodow do skarbcow (\d+), wyplacone tej samej doby rodom z doplata W5 (\d+)", kor[d])
+                if mm:
+                    n165 += 1
+                    if int(mm.group(1)) != t[7] or int(mm.group(2)) != t[10]:
+                        bad_165.append(run_day(d, start))
+            if d in obg:
+                a = num(r"tarczowe do korony \(W6\) (\d+)", obg[d])
+                b = num(r"gotowka korony na zold druzyn z tarczowego \(W6\) (\d+)", obg[d])
+                mm = re.search(r"tarczowe \(W6\) glowy rodow -> skarbce (\d+) i skarbce -> glowy rodow z doplata W5 (\d+)", obg[d])
+                if a is not None and b is not None and mm:
+                    nobg += 1
+                    if a != t[7] or b != t[10] or int(mm.group(1)) != t[7] or int(mm.group(2)) != t[10]:
+                        bad_obg.append(run_day(d, start))
+        ok1 = not bad_sum and not bad_k and not bad_165 and not bad_obg and bad_row == 0 and n165 > 0
+        rep.add("W6-1: zamkniecie - pobrane = dopisane do garnka = wyplacone przez W5 ponad danine, zostalo 0; suma krolestw = razem; te same kwoty w liniach 165 i Obieg",
+                f"dob {len(tot)}: rozjazd w {len(bad_sum)}, krolestw w {len(bad_k)} (wiersze nieodczytane {bad_row}), wobec linii 165 w {len(bad_165)} z {n165}"
+                f", wobec Obieg w {len(bad_obg)} z {nobg}; pobrane razem {sum(t[7] for t in tot.values())} zl"
+                + (f"; pierwsze doby: {(bad_sum + bad_k + bad_165 + bad_obg)[:5]}" if not ok1 and (bad_sum or bad_k or bad_165 or bad_obg) else ""),
+                "0 rozjazdow, co do zlotowki (nic z niczego, nic w nicosc, nic nie zalega w skarbcu)", ok1)
+        # ---- W6-2 korona bierze tyle, ile potrzeba
+        over, over_k, idle = [], [], 0
+        for d, t in tot.items():
+            if t[7] > t[4] or t[7] > t[6] or t[6] > t[5] or t[6] > t[4]:
+                over.append(run_day(d, start))
+            for k in _w6_kingdoms(w6[d]):
+                if "bad" in k:
+                    continue
+                if k["got"] > k["due"] or k["got"] > k["unc"]:
+                    over_k.append(run_day(d, start))
+                if k["unc"] == 0 and k["got"] > 0:
+                    idle += 1
+        rep.add("W6-2: pobrane <= nalezne i <= niepokryta potrzeba W5 po daninie (razem i krolestwo po krolestwie); bez potrzeby - tarczowe 0",
+                f"dob z przekroczeniem {len(over)} z {len(tot)}, krolestwo-dob z przekroczeniem {len(over_k)}, pobor bez niepokrytej potrzeby {idle}"
+                + (f" (doby {(over + over_k)[:5]})" if over or over_k else ""),
+                "0 (korona bierze tyle, ile potrzeba - nic nie zalega w skarbcu i nie rosna renty)", not over and not over_k and idle == 0)
+        # ---- W6-3 kontrole linii
+        cre = re.compile(r"\| kontrola: platnik z doplata W5 (\d+), platnik ponizej rezerwy po poborze (\d+), gotowka rodom z zoldem druzyn w pulapie wlasnym (\d+)")
+        c3 = [cre.search(w6[d]) for d in on]
+        c3 = [[int(x) for x in m.groups()] for m in c3 if m]
+        rep.add("W6-3: kontrole linii - platnik nie jest odbiorca, nikt nie placi ponizej rezerwy, gotowka tylko rodom na pulapie",
+                f"platnik z doplata {sum(x[0] for x in c3)}, ponizej rezerwy {sum(x[1] for x in c3)}, gotowka w pulapie wlasnym {sum(x[2] for x in c3)} (w {len(c3)} dobach)",
+                "0 / 0 / 0", (sum(sum(x) for x in c3) == 0) if c3 else None)
+    else:
+        rep.add("W6-1: zamkniecie tarczowego", "brak linii W6 z kluczem tak", "pobrane = dopisane = wyplacone co do zlotowki", None)
+    # ---- W6-1b / W6-3b z budzet-rodow.csv (niezaleznie od linii)
+    if csvp is None:
+        csvp = csv_path_of(logp)
+    rows = read_csv(csvp)
+
+    def fv(r, k):
+        try:
+            return float(r.get(k) or 0)
+        except ValueError:
+            return 0.0
+    has_col = bool(rows) and "tarczowe_w6" in rows[0]
+    payers = [r for r in rows if has_col and fv(r, "tarczowe_w6") > 0]
+    if payers and tot:
+        pd_, rd_ = {}, {}
+        for r in rows:
+            try:
+                d = int(r.get("dzien") or 0)
+            except ValueError:
+                continue
+            pd_[d] = pd_.get(d, 0.0) + fv(r, "tarczowe_w6")
+            rd_[d] = rd_.get(d, 0.0) + fv(r, "doplata_z_tarczowego_w6")
+        cmpd = [d for d in tot if d in pd_]
+        badc = [run_day(d, start) for d in cmpd if int(round(pd_[d])) != tot[d][7] or int(round(rd_.get(d, 0.0))) != tot[d][10]]
+        rep.add("W6-1b: suma kolumn rodow w budzet-rodow.csv (tarczowe_w6, doplata_z_tarczowego_w6) = pobrane i wyplacone z linii, doba po dobie",
+                f"dob porownanych {len(cmpd)}, z rozjazdem {len(badc)}" + (f" (doby {badc[:5]})" if badc else ""),
+                "0 rozjazdow (platnik -> skarbiec -> odbiorca, ta sama kwota po obu stronach)", (not badc) if cmpd else None)
+        both = sum(1 for r in payers if fv(r, "doplata_w5") > 0 or fv(r, "podniesienie_pulapu_w5") > 0)
+        below = sum(1 for r in payers if fv(r, "G") < fv(r, "R"))
+        overb = sum(1 for r in payers if fv(r, "tarczowe_w6") > fv(r, "podstawa_tarczowego_w6") + 1)
+        rep.add("W6-3b: rodo-doby platnikow w budzet-rodow.csv - z doplata W5 tej samej doby / z kiesa rodziny na koniec doby ponizej rezerwy / z tarczowym ponad podstawe",
+                f"{both} / {below} ({100.0 * below / len(payers):.1f}%) / {overb} z {len(payers)} rodo-dob; tarczowe w CSV razem {sum(fv(r, 'tarczowe_w6') for r in payers):.0f} zl",
+                "0 / <= 2% (kiesa w CSV jest z konca doby - po dworze i zoldzie; pobor zostawia co najmniej 44/45 nadwyzki) / 0", both == 0 and overb == 0 and below <= 0.02 * len(payers))
+    else:
+        rep.add("W6-1b / W6-3b: platnicy w budzet-rodow.csv", ("brak kolumny tarczowe_w6 (CSV sprzed paczki)" if rows and not has_col else "brak wierszy z tarczowym" if rows else f"brak CSV ({csvp})"),
+                "suma kolumn = linia; platnik bez doplaty W5 i nie ponizej rezerwy", None)
+    # ---- W6-4 potkniecia
+    if on:
+        st = [num(r"\| potkniecia (\d+)\.", w6[d]) for d in on]
+        st = [x for x in st if x is not None]
+        rep.add("W6-4: potkniecia kroku W6", f"razem {sum(st)} w {len(st)} dobach", "0", sum(st) == 0)
+    else:
+        rep.add("W6-4: potkniecia kroku W6", "brak linii W6 z kluczem tak", "0", None)
+    # ---- W6-5 liczby paczki (INFO)
+    if tot:
+        ds = sorted(tot)[-28:]
+        n = len(ds)
+
+        def av(i):
+            return sum(tot[d][i] for d in ds) / n
+        w5 = e4_series(lines, "Doplata wedlug potrzeby (W5): dzien", 1)
+        w5p = [num(r", wyplacono (\d+) \(rodow \d+\), reszta do rent", w5[d]) for d in ds if d in w5]
+        w5p = [x for x in w5p if x is not None]
+        rep.add(f"W6-5: liczby paczki (srednia ostatnich {n} dob okna; INFO)",
+                f"platnikow {av(0):.0f} z {av(1):.0f} ocenianych, podstawa {av(2) / 1e3:.1f} tys. zl/d, nalezne {av(4) / 1e3:.1f} tys., niepokryta potrzeba po daninie {av(5) / 1e3:.1f} tys."
+                f", do pobrania {av(6) / 1e3:.1f} tys., pobrane = wyplacone {av(7) / 1e3:.1f} tys. zl/d ({av(11):.0f} rodow, {(100.0 * av(7) / av(4) if av(4) else 0):.0f}% naleznego)"
+                + (f"; doplata W5 z daniny {sum(w5p) / len(w5p) / 1e3:.1f} tys. zl/d" if w5p else ""),
+                "INFO - szacunek: bieg 120 dob (d93-120) nalezne ok. 80 tys., pobrane do ok. 9 tys. zl/d (potrzeba mala, danina duza); koniec roku nalezne ok. 60 tys., pobrane 19-27 tys. zl/d", None)
+        # ---- W6-7 krolestwa bez pomocy (INFO)
+        last = [k for k in _w6_kingdoms(w6[ds[-1]]) if "bad" not in k]
+        nopay = sorted(((k["unc"], k["name"]) for k in last if k["unc"] > 0 and k["payn"] == 0), reverse=True)
+        short = sorted(((k["unc"] - k["due"], k["name"]) for k in last if k["payn"] > 0 and k["unc"] > k["due"]), reverse=True)
+        rep.add("W6-7: krolestwa z niepokryta potrzeba W5 po daninie w ostatniej dobie okna - bez platnikow ; z naleznym mniejszym niz potrzeba (brak; INFO)",
+                (", ".join(f"{nm} {v / 1e3:.1f} tys." for v, nm in nopay[:8]) or "brak") + " ; " + (", ".join(f"{nm} {v / 1e3:.1f} tys." for v, nm in short[:8]) or "brak"),
+                "INFO - w biegu rocznym bez platnikow: Iron Islands, Free Folk, Ibben, Qohor (wszystkie rody na pulapie) - tam pomoze dopiero trzeci kierunek", None)
+    else:
+        rep.add("W6-5: liczby paczki", "brak linii W6 z kluczem tak", "INFO", None)
+    # ---- W6-6 zloto rodow z luzem pulapu (linia P1) i zbiornik platnikow (INFO)
+    sl = by_day(lines, "Rody z luzem pulapu (P1): dzien")
+    sv = {d: (num(r"\| z luzem (\d+) rodow, zloto glow", sl[d]), num(r"\| z luzem \d+ rodow, zloto glow (-?\d+)", sl[d])) for d in sl if 2 <= run_day(d, start) <= until}
+    sv = {d: v for d, v in sv.items() if v[0] is not None and v[1] is not None}
+    d6 = sorted(sv)
+    if len(d6) >= 2:
+        a6, b6 = d6[0], d6[-1]
+        g6 = sv[b6][1] - sv[a6][1]
+        res = ""
+        if tot:
+            dd = sorted(tot)
+            res = f"; nadwyzka kies platnikow ponad rezerwe {tot[dd[0]][3] / 1e6:.2f} -> {tot[dd[-1]][3] / 1e6:.2f} mln (platnikow {tot[dd[0]][0]} -> {tot[dd[-1]][0]})"
+        rep.add("W6-6: zloto rodow z luzem pulapu zoldu - przyrost w oknie (INFO)",
+                f"{g6 / 1e6:+.2f} mln w {b6 - a6} dobach = {g6 / max(1, b6 - a6) / 1e3:+.1f} tys. zl/d ({sv[a6][1] / 1e6:.2f} -> {sv[b6][1] / 1e6:.2f} mln; rodow z luzem {sv[a6][0]} -> {sv[b6][0]})" + res,
+                "INFO - bieg 120 dob z danina P1 bez W5 i W6: +59 tys. zl/d (31.35 -> 38.36 mln w 118 dobach); z tarczowym przyrost ma malec o to, co pobrane", None)
+    else:
+        rep.add("W6-6: zloto rodow z luzem pulapu zoldu (INFO)", "brak linii Rody z luzem pulapu (P1) w oknie", "INFO - przyrost ma malec o to, co pobrane", None)
     rep.show()
     return 0
 
@@ -15208,6 +15435,8 @@ def main(argv):
         return etap8_main(logp, start_arg, until_arg, csp)   # E8/0 (242): szkielet etapu 8 + bloki T0 i E8/0; kolejne paczki dopisuja bloki
     if group == "w5" and logp:
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
+    if group == "w6" and logp:
+        return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

@@ -11,6 +11,9 @@ namespace Armoury
     /// "KORONA PLACI WEDLUG POTRZEBY - pieniadze wojenne najpierw dopelniaja zold rodom, ktore stoja w polu i nie maja z czego placic; dopiero reszta idzie wedlug
     /// wielkosci ziem") - DOPLATA DO ZOLDU WEDLUG POTRZEBY. Wylacznik CrownWarAidByNeed (wylaczony = stan sprzed paczki co do monety), cel CrownWarAidFillTarget
     /// (0.60 limitu druzyn), krok werbunku CrownWarAidRecruitStep (0.10 limitu na dobe).
+    ///  - W6 (KingdomTreasury.Scutage.cs, klucz Scutage): DRUGIE ZRODLO GARNKA - tarczowe rodow z wolnym pulapem i kiesa ponad rezerwe. Szczebel daniny nizej
+    ///    liczony i wyplacany jak dotad (co do zlotowki); po nim szczebel tarczowego podnosi poziom wyrownania ta sama regula, a pobor = gotowka wyplacona
+    ///    ponad szczebel daniny. Bez daniny garnek jest z samego tarczowego; klucz Scutage wylaczony = wszystko nizej bez zmian.
     ///  - GARNEK krolestwa = danina z oszczednosci ludu P1 tej doby (CrownIncome.KDay.WarAid), najwyzej reszta wplywow dnia po zwrocie zoldu (CrownIncome.LeftFor).
     ///    Bez daniny (P1 wylaczone, pokoj, s = 0, lud bez nadwyzki) garnek = 0 i regula nie robi nic. Nigdy z zapasu skarbca, nigdy z kredytu.
     ///  - KOLEJNOSC DOBY: danina wplywa (TownFolk.Daily) -> ... -> zwrot zoldu (WageRefund) -> DOPLATA (z CrownRents.Daily, po warunkach rodow) -> renty 180
@@ -71,6 +74,7 @@ namespace Armoury
             _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naFirst.Clear(); _naRows.Clear(); _naGone.Clear(); _naErr.Clear();
             _naDay = int.MinValue; _naStumbles = 0; _naCut = 0; _naCutN = 0; _naNotAtCap = 0; LastNeedAid = 0;
             NaClearMeasure();
+            ScutageReset();   // W6: stan doby tarczowego (drugie zrodlo garnka) czyszczony razem z W5
         }
 
         private static void NaClearMeasure()
@@ -91,6 +95,7 @@ namespace Armoury
             _naDay = today;
             _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naRows.Clear(); _naNotAtCap = 0;
             NaClearMeasure();
+            ScClearDay();     // W6: platnicy, podstawy i gotowka tarczowego poprzedniej doby
         }
 
         private static double NaTarget(Settings s) { return WtClamp(s.CrownWarAidFillTarget, 0, 1); }
@@ -175,7 +180,11 @@ namespace Armoury
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(rod)", e); }
                 }
-                if (cand.Count == 0 || row.Pot <= 0) return 0;
+                // W6 (KingdomTreasury.Scutage.cs): platnicy tarczowego i nalezne - PO potrzebie W5, PRZED jakimkolwiek zlotem (sam rachunek; null przy wylaczonym
+                // kluczu Scutage). Bez daniny garnek moze byc z samego tarczowego; bez daniny i bez naleznego regula nie robi nic - jak przed W6.
+                ScK sc = ScutagePlan(k, list, s, target, avgWage);
+                if (sc != null) { sc.NeedN = cand.Count; sc.Uncovered = Math.Max(0, row.Need - row.Pot); }
+                if (cand.Count == 0 || (row.Pot <= 0 && (sc == null || sc.Due <= 0))) return 0;
                 // poziom wyrownania: najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku (koszt rosnie z f; przy f = 0 jest 0)
                 double level = target;
                 if (row.Need > row.Pot)
@@ -223,16 +232,14 @@ namespace Armoury
                         if (boost > 0)
                         {
                             _naBoost[x.C] = boost; row.Boost += boost; row.BoostN++;
-                            // pomiar: stan druzyn w dniu pierwszej doplaty (przerwa ponad 28 dob = nowy poczatek)
-                            NaFirst f0;
-                            if (!_naFirst.TryGetValue(x.C, out f0) || today - f0.Last > 28) { f0 = new NaFirst { Day = today, Men = x.M, Limit = x.L }; _naFirst[x.C] = f0; }
-                            f0.Last = today;
-                            _naAidN++; _naMenNow += x.M; _naLimNow += x.L; _naMen0 += f0.Men; _naLim0 += f0.Limit;
-                            if (today - f0.Day >= 28) { _naOldN++; _naOldMenNow += x.M; _naOldLimNow += x.L; _naOldMen0 += f0.Men; _naOldLim0 += f0.Limit; }
+                            NaMeasure(x, today);                          // pomiar: stan druzyn w dniu pierwszej doplaty (W6: ta sama miara dla szczebla tarczowego)
                         }
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(wyplata)", e); }
                 }
+                // W6: szczebel tarczowego - PO szczeblu daniny (ten zostaje co do zlotowki jak bez tarczowego): pobor od platnikow dokladnie tej gotowki,
+                // ktora W5 wyplaca przy poziomie z garnkiem danina + tarczowe ponad szczebel daniny; wlasny try i wlasne ksiegowanie (nie wchodzi do wplywow dnia)
+                if (sc != null && sc.Due > 0) ScutageStep(k, cand, row, sc, level, target, step, today);
             }
             catch (Exception e) { NaStumble("NeedAidKingdom", e); }
             finally
@@ -251,6 +258,17 @@ namespace Armoury
                 }
             }
             return paidK;
+        }
+
+        /// <summary>Pomiar linii W5: stan druzyn rodu w dniu pierwszej doplaty (przerwa ponad 28 dob = nowy poczatek) i dzis - rod z przydzialem tej doby
+        /// (szczebel daniny albo, W6, szczebel tarczowego). Raz na rod na dobe.</summary>
+        private static void NaMeasure(NaClan x, int today)
+        {
+            NaFirst f0;
+            if (!_naFirst.TryGetValue(x.C, out f0) || today - f0.Last > 28) { f0 = new NaFirst { Day = today, Men = x.M, Limit = x.L }; _naFirst[x.C] = f0; }
+            f0.Last = today;
+            _naAidN++; _naMenNow += x.M; _naLimNow += x.L; _naMen0 += f0.Men; _naLim0 += f0.Limit;
+            if (today - f0.Day >= 28) { _naOldN++; _naOldMenNow += x.M; _naOldLimNow += x.L; _naOldMen0 += f0.Men; _naOldLim0 += f0.Limit; }
         }
 
         /// <summary>ClanBudget.Daily: przydzial korony dla rodu z dzisiejszego kroku W5 (gotowka + miejsce na werbunek) - podnosi pulap partii i pulap rodu;
