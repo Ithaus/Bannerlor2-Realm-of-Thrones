@@ -48,6 +48,11 @@ namespace Armoury
         /// przy nieudanej dostawie wolajacy oddaje je przez PutBack. tally = false (sklad8-p: wywoz kupcow SupplyDemand.DailyTrade) - bez licznikow
         /// linii "Ceny hurtu" (ta linia mierzy zakupy AI, Stajni i budow; wywoz ma swoja linie "PodazPopyt"). cap &gt; 0 (E8/Z, 251: sufit ceny zakupow
         /// brakow AI - AiBuyRules.CapPrice) - sztuka drozsza niz cap konczy partie tak jak brak budzetu (takze pierwsza, z ceny known); 0 - bez sufitu.
+        /// E8/O1 (265) i szew z E8/H (271): pamiec polki po zdjeciu sztuki poprawia sie TUTAJ i w PutBack (ShelfIndex.OwnBefore / OwnAfter wokol AddToCounts),
+        /// wiec kazde miejsce, ktore zdejmuje sztuke przez Take, jest objete bez wlasnego kodu. Miejsc wywolan Take jest 10: AiGear x3 (braki - BuyLoop, sztuki
+        /// zastepcze - BuySubstitutes, siodla E8/H - BuySaddles; te trzy oddaja tez przez PutBack), wywoz kupcow SupplyDemand.DailyTradeCore, Stables x2
+        /// (OnSettlementEntered, KnightBuy), HorseFate.SeatGifts, PackMarket.Buy, BuildFunding.BuyMaterials, BkSupplyMarket.Buy. Nowe zdjecie sztuki z polki osady,
+        /// po ktorym liczona jest nastepna cena, ma isc przez Take - wlasny AddToCounts na polce to "reszta" (pelna przebudowa pamieci przy najblizszej wycenie).
         /// </summary>
         internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0, bool tally = true, int cap = 0)
         {

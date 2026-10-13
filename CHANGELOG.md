@@ -1,5 +1,52 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-12 (etap 8, szew po scaleniu: E8/H - E8/O1) - ZAKUP SIODEL (E8/H) JEST DZIESIATYM MIEJSCEM `ShelfBuy.Take` I DOSTAJE POPRAWKE PAMIECI POLKI TA SAMA DROGA CO POZOSTALE DZIEWIEC; INNE ZMIANY POLEK Z PACZEK DRZEWA C I Z E8/H SWIADOMIE ZOSTAJA "RESZTA" (PRZEBUDOWA); KOD GRY BEZ ZMIAN - SAME KOMENTARZE
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` (po 0641a9c) | **Pliki:** `Armoury/src/ShelfBuy.cs` (opis `Take`: lista 10 miejsc i regula dla nowych), `Armoury/src/AiGear.cs` (opis `BuySaddles`), `CHANGELOG.md`. `tools/sprawdz_logi.py` bez zmian.
+
+**Pytanie szwu:** E8/O1 (pamiec polki poprawiana o jedna sztuke po wlasnym zdjeciu) powstalo w drzewie bez E8/H, a E8/H dodalo nowe zdjecie sztuki z polki - zakup siodla przez lorda AI (`AiGear.BuySaddles`). Czy to miejsce jest objete poprawka, czy po kazdym siodle pamiec polki liczy sie od nowa?
+
+**Odpowiedz (sprawdzone w kodzie scalonego drzewa):** jest objete, bez dopisywania czegokolwiek.
+- **Jak O1 obejmuje miejsca.** Nie ma listy miejsc ani w kodzie, ani w narzedziu. Poprawka siedzi w dwoch jedynych `AddToCounts` klasy `ShelfBuy`: `Take` (:75-76) i `PutBack` (:104-107) - `ShelfIndex.OwnBefore` przed zmiana, `OwnAfter` po niej. W tym samym miejscu jest znacznik "wlasne zdjecie" (`ShelfIndex.NoteOwn` - licznik "przebudowy wlasne / reszta" linii "Profil doby (E8/0)") i probka R9 (co 64. poprawka liczona tez pelna przebudowa, `OwnMismatch`). Wiersz O1-1 narzedzia czyta jeden licznik rozjazdow z linii "Polka i delegaty (E8/O1)" - wspolny dla wszystkich miejsc. Kto zdejmuje przez `Take`, ten jest objety.
+- **Zakup siodel.** `BuySaddles` (:726) zdejmuje przez `ShelfBuy.Take`, a sztuke odrzucona przez DTE oddaje przez `ShelfBuy.PutBack` (:729) - to dziesiate miejsce `Take` (lista w opisie `Take`: AiGear x3, wywoz kupcow, Stables x2, HorseFate, PackMarket, BuildFunding, BkSupplyMarket). Przebieg: przeglad polki wycenia kazdego kandydata (`MarketData.GetPrice` -> nasz postfiks cen -> `SupplyDemand.Stock` -> `ShelfIndex.Count`; uprzaz jest w prawie podazy - `SupplyDemand.Equipmentish`), wiec pamiec tej polki jest aktualna; `Take` z cena pierwszej sztuki z przegladu -> `OwnBefore` oddaje aktualny indeks -> `AddToCounts(-1)` (wersja polki +1) -> `OwnAfter` robi poprawke -1 w koszyku uprzaz x tier; nastepna cena czyta pamiec bez przebudowy. Miedzy zdjeciem a nastepna cena nikt nie rusza polki: dostawa `here` to zbrojownia DTE, sakiewka, kiesa pana, kasa miasta i liczniki. Poprawka nie zalezy od rodzaju sztuki (koszyk z `ItemType` x tier, unikaty jak w `Build`).
+- **Delegaty DTE (druga czesc O1).** `BuySaddles` pyta czarna liste przez `DteTakes` (-> `BlTest`, delegat), dostawa i `SaddleLaw.MoveFromBag` (uprzaz z taboru do zbrojowni partii AI) ida przez `AiGear.AddToArmory` (delegat). E8/H nie wola dwoch metod DTE z listy O1 (`AddItemToPartyArmory`, `ItemBlackList.Test`) zadna inna droga; jej pozostale `Invoke` (`GarrisonKit.SaddleMissing` / `SaddleGuard` - `Assignment` DTE przy wystawianiu ludzi w bitwie gracza, `SaddleLaw.FilterTargets` - konstruktor struktury gry) sa poza lista O1, jak ok. 210 innych w Armoury.
+- **Scalenie nie uszkodzilo plikow:** `ShelfBuy.cs`, `ShelfIndex.cs`, `FastCall.cs` sa bajt w bajt jak w 25b351e (O1 po recenzji); `AiGear.cs` ma komplet obu paczek (roznica wobec cf59001 = same linie O1, wobec 25b351e = same linie E8/H).
+
+**Pozostale zmiany polek osad z paczek dodanych po powstaniu O1 (grep `ShelfBuy.Take` i `AddToCounts` w plikach E8/G1, G2, T, K, D1, D2, H) - kazda albo objeta, albo swiadomie "reszta":**
+
+| Paczka | Miejsce | Co robi z polka osady | Status |
+|---|---|---|---|
+| E8/H | `AiGear.BuySaddles` | zdjecie siodla, sztuka po sztuce z cena po kazdej | **objete** (`Take` / `PutBack`) |
+| E8/H | `SaddleLaw.cs` :439, :559-560 | nic - tabor partii i zbrojownia (takze gracza) | nie dotyczy |
+| E8/H | `HorseFate.Put` (uprzaz zbrojowni rozbitej partii), nadwyzka uprzezy puli weteranow (:1107) | +n na polke, raz na zdarzenie; miejsca istnialy przed O1 (konie), E8/H puszcza nimi takze uprzaz | reszta |
+| E8/H | `MenPurse` - sprzedaz nadwyzki uprzezy (miejsce E8/Z) | E8/H tylko wstrzymuje sztuki (zmian polki mniej, nie wiecej) | reszta (bez zmiany) |
+| E8/G1 | `CaravanFlow.cs` | wlasnej zmiany polki brak; karawany BK handluja w miastach czesciej (handel gry) | reszta - po stronie gry |
+| E8/G2 | `MercFeast.FeastAfter` (:300) | zdejmuje z rynku to, co BK dopisal przy uczcie | reszta |
+| E8/T | `PlayerRecruit.AddToStores` (:218) | nic - zbrojownia druzyny gracza DTE; `ColdStart` :238 i `RecruitKit` :393, :437 sa starsze niz etap 8 | nie dotyczy |
+| E8/K | `CraftOrders8.CompletePostfix` (:217) | wykuta bron zlecenia: +1 na polke miasta, gdy zleceniodawca nie ma taboru | reszta |
+| E8/K | `CraftOrders8.BookBuyPrefix` (:478) | nic - roster ksiegarza BK, nie polka miasta | nie dotyczy |
+| E8/D1 | `QuestPay8` :717, :753, :798 | towar zadania z polki osady i na nia | reszta |
+| E8/D2 | `PlayerFees8.SettlePrize` (:535, :547) | nagroda turnieju gracza: -1 z polki miasta-gospodarza | reszta |
+
+**Dlaczego "reszta" zostaje reszta (uzasadnienie):**
+1. Poprawka O1 daje zysk tylko tam, gdzie po KAZDEJ zdjetej sztuce liczona jest nastepna cena tej samej polki (petla zakupu). Wszystkie miejsca "reszta" zmieniaja polke raz na zdarzenie (bitwa, uczta, oddane zlecenie, zadanie, turniej gracza) - koszt to jedna przebudowa przy najblizszej wycenie w tej osadzie, kilka do kilkudziesieciu na dobe wobec ok. 8 tys. przebudow po handlu gry.
+2. `MercFeast.FeastAfter` poprawia polke, ktora BK zmienil chwile wczesniej w tym samym oknie - pamiec jest juz nieaktualna, `OwnBefore` oddalby null (przebudowa i tak).
+3. Dokladanie na polke (+n, zwykle nowy stos) to skok wersji o 2 (`AddNewElement` + `UpdateVersion`) - `OwnAfter` z zasady nie poprawia, tylko zostawia przebudowe.
+4. Objecie wszystkich naszych `AddToCounts` (RD8 O1 b) nie jest w projekcie E8/O1 ("Poza zakresem" pkt 1 jego wpisu) - nie dopisuje tego przy szwie.
+
+**Co Jeff zobaczy w grze:** nic - nie zmienila sie ani jedna linia dzialajacego kodu (dwa komentarze).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- **O1-1 musi byc 0 takze z zakupami siodel.** Rozjazd z siodlem pokaze linia "Polka i delegaty (E8/O1): ROZJAZD" (podaje sztuke i koszyk `HorseHarness`). Dowod tego szwu jest z kodu - proby poza gra nie powtarzalem (ta sama para `AddToCounts` co w dziewieciu miejscach z proby autora O1); pierwszy pomiar w grze da probka 1/64.
+- **Prog O1-2 (przebudowy <= 9 000/d) dostal po scaleniu nowe zrodla "reszty":** E8/G1 (karawany wyjezdzaja z miast po godzinach zamiast po dobach - wiecej handlu gry na polkach), wyroby uboczne E8/B, miejsca z tabeli. Zakup siodel przebudow NIE doklada. Jesli O1-2 nie przejdzie, patrzec na "przebudowy wlasne" w linii "Profil doby (E8/0)" (powinny spasc prawie do zera) i "poprawione w pamieci" - to one mowia, czy poprawka dziala.
+- **"bez poprawki" przy siodlach** moze sie zdarzyc tylko, gdy cena nie czytala pamieci tej polki (prawo podazy wylaczone) - wtedy przebudowy tez nie bylo.
+- **Kolizje:** brak - komentarze w dwoch plikach, zadnego klucza, nic w zapisie, bez NK, `gen_mcm` nie dotyczy.
+
+**Poza zakresem (zauwazone, nic nie zmienione):** `PlayerRecruit.AddToStores` (E8/T) wola DTE `ArmyArmory.AddItemToArmory` przez `MethodInfo.Invoke` - to inna metoda DTE niz dwie z listy delegatow O1 (projekt wymienia AiGear i MaterialOrders); wiersz O1-4 liczy tylko miejsca `FastCall`, wiec jej nie widzi i nie psuje.
+
+**Build:** Armoury kod 0 (drzewo `zb/int`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (etap 8, RECENZJA paczki E8/H - 271, commit 0e7a7f7) - brama uprzezy nie zamykala sie u gracza: jedno siodlo w sakwach przepuszczalo dowolnie wiele awansow na jezdzca; wolna uprzaz liczona teraz razem (zbrojownia + tabor) ponad jezdzcow z koniem - u gracza i u AI
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-e8` (po 0e7a7f7) | **Pliki:** `Armoury/src/SaddleLaw.cs` (`Avail`, `PlayerAvail`, `ValidatePostfix`), `tools/sprawdz_logi.py` (wiersz H-5a), `CHANGELOG.md`
 

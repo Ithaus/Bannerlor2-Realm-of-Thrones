@@ -682,6 +682,8 @@ namespace Armoury
         /// (ShelfBuy.Take), dostawa i zaplata ta sama (deliver = here: zbrojownia partii, sakiewka ludzi, potem kiesa pana -> kasa miasta). Ostatnie
         /// AiMountShelfFloor sztuk pasujacej uprzezy zostaja na polce dla innych kupcow (jak konie). Polka bez sztuki dla AI = zamowienie dla siodlarzy
         /// (SupplyDemand.NoteUnmetOnce, koszyk uprzaz t1); "za drogie na reszte budzetu" to nie brak towaru. Zwraca wydane zloto.
+        /// Szew z E8/O1 (265): zdjecie i zwrot ida przez ShelfBuy.Take / PutBack, wiec pamiec polki dostaje poprawke o jedna sztuke jak przy brakach (dziesiate
+        /// miejsce Take; uprzaz jest w prawie podazy, przeglad polki wycenia kandydatow i zostawia pamiec aktualna przed pierwszym zdjeciem) - bez wlasnego kodu.
         /// </summary>
         private static int BuySaddles(Settlement market, MobileParty buyer, int budget, int maxPieces, ref int pieces, List<string> bought, Deliver deliver)
         {
