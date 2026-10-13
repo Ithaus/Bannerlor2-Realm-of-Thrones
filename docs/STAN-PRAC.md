@@ -1529,3 +1529,8 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   cudzy kod (ROT malzenstwa 9.4% klatki itd.) -> docs/zakonczenie/ROZPOZNANIE-Z3-CUDZY-KOD-2026-10-13.md; (4) GRA: PROBA ZIMY 120 dob na WGRANIU 35 (plik-przelacznik
   Documents\...\CrashScribe\armoury-proba-zimy.flag kladziony i usuwany przez tools/wgranie/bieg-zima.ps1; wynik test\at-w35-zima120.out.txt).
   KOLEJKA GRY po zimie: test K1-3a (120 dob + zapis) -> wgranie; potem bieg 2-letni.
+- (11:35 UTC 13.10) **Jeff - zgloszenie (drobny szczegol):** "jak mamy 23:59 i 2 day of XYZ i godzina przejdzie 00:01, powinien byc pokazywany nastepny dzien, a teraz dopiero okolo 10-12
+  w poludnie zmienia sie dzien; plus dalbym 8 rok i 256 dzien autumn etc., bo 3659 dzien ciezko sie czyta". -> **wf_f008eb9b-7f9** (docs/przekazanie/wf-kalendarz-data.js; autor + recenzent)
+  w drzewie zb\kal, galaz `w-toku/kalendarz-data` od ca4aa87: (1) dzien w dacie dla gracza zmienia sie o polnocy (tylko wyswietlanie - bieg czasu i tiki dobowe bez zmian), (2) czytelna data
+  "Year N, Day N, pora roku" zamiast surowego numeru dnia, jedna funkcja formatujaca; dowod do autotestu: linia "Data na pasku (kalendarz)" co godzine przez 3 doby.
+  DO POTWIERDZENIA U JEFFA: rok w dacie = rok swiata ROT (jak gra pokazuje dzis) czy rok kampanii (1, 2, 3...).
