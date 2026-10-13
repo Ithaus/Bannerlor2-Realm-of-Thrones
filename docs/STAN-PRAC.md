@@ -1849,3 +1849,4 @@ Armoury b2423a38 z kopii albo klucz CrownWarAidByNeed = false.
   skora - zwierzeta rzezne pod regulator; rece 1.3 czy 1.5; warunek luzu zoldu zdejmuje 49-78 osad z budow; pasmo drewna 30-60 dni; sol stoi na suficie jak len (regula A jej nie
   obejmuje); regula A daje drewnu i zelazu ten sam sufit 4.0 (projekt budow zakladal 1.8).** Ryzyka: budowy kupia 2-3 x wiecej drewna; nowy strumien zlota od panow do miast
   (+16-21 tys. zl/d do kies ludu); pamiec frontu tylko w sesji. KOLEJKA GRY: test 120 dob W6 (w toku) -> WGRANIE 42 -> test 120 dob N5 (fin11) -> WGRANIE 43.
+- (19:45 UTC 13.10) Bieg kontrolny PO WGRANIU 41 (10 dob nowej kampanii): 10/10, pliki w grze zatwierdzone (Armoury a5e2fbf9). Test 120 dob W6 w toku.
