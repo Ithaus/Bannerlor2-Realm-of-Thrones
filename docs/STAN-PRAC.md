@@ -1598,3 +1598,12 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   ponizej podlogi 85 tys.)**, kasy miast 83.1% Z33 wobec 91.4%, zawor panow z miast 148 tys./d; zakupy koni lordow 62.4/d (55.6), jazda t3+ 19.0% (17.5%; 69% celu K3 wobec 65%), jazda
   z para 5.86% ludzi (5.29%), jezdzcy z koniem bez uprzezy 13.3% (10.7%). WNIOSEK: regula daje troche wiecej jazdy, ale zabiera panom ok. 15 tys. ludzi, bo zloto za konie zostaje
   w kiesach ludu - **NIE WGRYWAC przed paczka obiegu kiesy ludu (wf_d4abe57d-6c8); kod czeka na galezi `w-toku/k13a-konie-robocze` 137dbc3.** Jeff powiadomiony.
+- (14:50 UTC 13.10) **RUNDA 3 GOTOWA I SCALONA: `w-toku/zbior-e8` = b9e4d36** (WGRANIE 36 + `w-toku/p3-wojsko` a025d82 + `w-toku/p3-zelazo` 301b98a + `w-toku/z3-pomiary` 0e6bd4c; konflikty
+  tylko CHANGELOG i sprawdz_logi - suma; gen_mcm Armoury 1315; build kod 0; NIEWGRANE). WOJSKO (6 kluczy): CrownRentServiceAtMeans (rod bez srodkow na druzyne do progu wezwania ma
+  sluzbe zaliczona - lapie 48 z 54 rodow bez sluzby), CrownRentContactOnlyWhenCalled (doba wojny tylko przy armii w polu / oblezeniu / napadzie na wlasna osade - przyczyna Polnocy),
+  ReleaseAcrossTiers (zwolnienia losowo z calej partii), MercBkDownPaymentAiOff (zadatek BK dla kompanii AI wylaczony - 12 mln/rok), MercContractPaysMenUnderArms (wyplata <= 1.3 x zold dnia),
+  CallToWarBreakRestoresWallet (2.0 mln/rok przestaje isc w nicosc). Oczekiwane w biegu rocznym: partie rodow 72-80 tys. (bylo 63). DO DECYZJI JEFFA (CHANGELOG W4): danina wojenna
+  z kies ludu, min. czas sluzby kompanii 28 dob, prog wojska 85 tys. nie wyjdzie bez doplat. ZELAZO (klucze): TownMaterialOrderByCart (miasto bez surowca kupuje wozem z miasta / zamku
+  z nadwyzka: lad do 600, morze port-port, kasa -> kasa; MaterialCarts.cs, zapis arm_matorders), ValveHoldWhileShort + ValveShortTowns 15 (regulator nie tnie towaru, ktorego brak
+  w > 15 miastach), CastleCartFoodOnly (woz w zamku sprzedaje tylko brakujace jedzenie), SpoilsNonFoodToTown, LordDiscardToShelf. Progi: bloki etap8_p3woj, etap8_p3_zelazo.
+  **W TOKU: test 120 dob na b9e4d36** (test\fin4, test\at-fin4-120.out.txt), potem bieg roczny i wgranie. Czeka: z3-swaty-rot (po paczce slubow NPC wf_16d6890e-484) - bieg cienia.
