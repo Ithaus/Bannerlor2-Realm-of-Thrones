@@ -738,6 +738,8 @@ namespace Armoury
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("StartKit.Hourly", delegate { try { StartKit.Hourly(); } catch { } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MapClock.ApplySpeed", delegate { MapClock.ApplySpeed(); }));   // gra wraca do x4 przy wczytaniu
+            // 13.10 (czytelna data): dowod do autotestu - przez pierwsze 3 doby kampanii w sesji co godzine gry linia "Data na pasku (kalendarz)" (tylko log, wylacznik WorldMeasureLog)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CalendarText.Hourly", delegate { try { CalendarText.Hourly(); } catch (Exception e) { Log.Error("CalendarText.Hourly", e); } }));
             // prawo wyrzutkow (Jeff 04.10): pula ludzi wyjetych spod prawa
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, OutlawLaw.OnTroopsDeserted);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("OutlawLaw.OnMapEventEnded", OutlawLaw.OnMapEventEnded));

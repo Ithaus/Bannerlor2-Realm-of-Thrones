@@ -274,7 +274,7 @@ namespace Armoury
             if (l != null && l.Seized) { why = "Your creditors hold the income of your villages until your debts are paid. The Bank will not lend to you now. "; return false; }
             if (l != null && l.Missed > 0) { why = "You are behind on your instalments. The Bank lends nothing more until you have paid what is due. "; return false; }
             if (l != null && l.FreeDay >= 0 && today - l.FreeDay < Math.Max(0, s.CreditAfterSeizureDays))
-            { why = "Your lands were in the hands of your creditors not long ago. The Bank will lend to you again after day " + (l.FreeDay + s.CreditAfterSeizureDays) + ". "; return false; }
+            { why = "Your lands were in the hands of your creditors not long ago. The Bank will lend to you again after " + CalendarText.DayStamp(l.FreeDay + s.CreditAfterSeizureDays) + ". "; return false; }   // 13.10: "Year 299, Day 183" zamiast "day 109018"
             if (d != null && d.Defaulted) { why = "Your name is written in the book of those who did not pay. "; return false; }
             if (CrownBorrow.CrownInArrears(c)) { why = "Your crown has not paid what it owes the Bank. The Bank lends nothing to the crown or to its houses until it does. "; return false; }   // 186
             if (IronBank.FreeCapital < Math.Max(0, s.BankFreeCapitalFloor)) { why = "The Bank's vaults run low and it lends to no one now. "; return false; }

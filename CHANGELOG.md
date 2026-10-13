@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (zgloszenie Jeffa, tor S) - CZYTELNA DATA "Year 299, Day 256, Autumn" + DZIEN ZMIENIA SIE O POLNOCY (klucz ReadableDateEnabled)
+**Mod:** Armoury | **Galaz:** `w-toku/kalendarz-data` (od ca4aa87 = WGRANIE 35) | **Pliki:** `Armoury/src/Calendar.cs` (nowa klasa `CalendarText`), `WesterosClimate.cs` (ToStringPrefix, TextSeason, OldTextDay, latka powiadomien), `MapClock.cs` (BarText), `IronBank.cs` i `DebtLadder.cs` (po 1 linii tekstu), `ArmouryBehavior.cs` (1 nasluch godzinny), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (Jeff 13.10, doslownie):** "jak mamy 23:59 i mamy 2 day of XYZ i godzina przejdzie 00:01 powinien byc pokazywany nastepny dzien, 3 days, a teraz dopiero okolo 10-12 w poludnie zmienia sie dzien; plus dalbym 8 rok i 256 dzien autumn etc. bo 3659 dzien ciezko sie czyta". Pasek mapy pokazywal "Day 3659 of Summer, 299 AC - 11:30": numer dnia zmienial sie w srodku dnia, a "3659" to dni lata, nie data.
+
+**Przyczyna (kod + dekompilacja):**
+- Pasek sklada `MapClock.TickPostfix` (MapClock.cs:33 przed zmiana): `CampaignTime.Now.ToString() + " - HH:MM"`, godzina z `ToHours % 24` - czyli z tickow zegara. Gra robi to samo (`MapTimeControlVM.Tick`: `Date = CampaignTime.Now.ToString()`, `Time = ToHours % HoursInDay`).
+- `CampaignTime.ToString` jest latany przez NAS: `WesterosClimate.ToStringPrefix` (WesterosClimate.cs:316-335 przed zmiana) liczyl `day = floor(d - g.Start) + 1`, a `g.Start = now - ClimateSummerDaysSoFar` z chwili pierwszego odczytu klimatu (`Ready`, :102-105) - z ULAMKIEM doby rownym godzinie tamtej chwili. Numer rosl wiec co 24 h liczone od tamtej godziny, a nie o 0:00 zegara.
+- Nowa kampania: ROT `ROTCampaignTimeModel.CampaignStartTime = CampaignTime.Years(299f) + CampaignTime.Hours(6f)` (dekompilacja ROT.dll); `Years(float)` mnozy we float i gubi 8 minut (94 034 299 191 296 tickow zamiast 94 034 304 000 000), wiec kampania startuje o 05:51:59 doby 108836 (= 299 x 364; log: "Klimat: start ... (dzien kampanii 108836)"). Stary numer zmienial sie tam o 05:52 (symulacja wzoru na tickach, nie pomiar w grze). W zapisie Jeffa godzina zmiany = godzina pierwszego odczytu klimatu w tamtej kampanii; log podaje tylko pelna dobe ("teraz Summer od dnia 105196"), wiec "10-12" z logu NIE jest potwierdzone - wzor i poprawka sa te same przy kazdej godzinie.
+- "3659" = 3640 dni lata sprzed kampanii (`ClimateSummerDaysSoFar`) + dni kampanii.
+- Cudzy kod: date lata tylko Armoury. Skan DLL modow: `MapTimeControlVM` czyta tylko DTE (mixin, odczyt), `str_date_format` nikt, ROT ma tylko model czasu (start 299 + 6 h), BK / AIInfluence czytaja gettery dla siebie (nie tekst paska).
+- W tym samym miejscu drugi surowy numer: powiadomienia ze scena (slub, smierc, nowe krolestwo - do tej samej metody odwoluja sie BannerKings.dll i ROT.dll) skladaja "the {DAY_ORDINAL} day of {SEASON_NAME}" z `str_ordinal_number`, ktorych gra ma 0..31 (Native module_strings.xml), a nasz transpiler podaje tam dzien pory (tysiace) - `GameTextManager.FindText` zwraca wtedy "ERROR: Text with id str_ordinal_number doesn't exist! Variation: 3660" (wniosek z kodu, w grze nie ogladane).
+- Zelazny Bank pokazywal terminy numerem doby kampanii: "due by day 109018" (IronBank.cs:544), "again after day 108900" (DebtLadder.cs:277).
+
+**Zmiana:**
+1. `CalendarText` (Calendar.cs) - JEDNA funkcja tekstu daty: `"Year " + GetYear + ", Day " + (GetDayOfYear + 1) + ", " + pora`. Rok = rok swiata jak dotad (ROT: 299), dzien roku 1..364 z tickow zegara (ta sama doba, z ktorej gra liczy godzine i odswieza pasek - zmiana dokladnie o 0:00), pora = klimat Westeros (`WesterosClimate.TextSeason`; data sprzed znanej historii por - bez pory; klimat wylaczony - pora kalendarza gry).
+2. `WesterosClimate.ToStringPrefix`: klucz wlaczony -> `CalendarText.Date`. Klucz wylaczony -> stary tekst "Day N of Summer, 299 AC", ale N liczy juz polnoce zegara (`floor(d) - floor(g.Start) + 1`) - poprawka polnocy BEZ klucza (sam tekst, blad wzoru).
+3. Powiadomienia ze scena: prefiks `CalendarText.FormalPrefix` na `CampaignSceneNotificationHelper.GetFormalDayAndSeasonText` -> "the 256th day of the year (Autumn)" (zdanie gry: "On {DAY_OF_YEAR}, {YEAR}, ..."). Klucz off = oryginal jak dotad.
+4. Zelazny Bank: `CalendarText.DayStamp(numer doby)` -> "due by Year 299, Day 183", "again after Year 299, Day 65" (liczone z samej liczby: `CampaignTime.Days(float)` trafia w sasiednia dobe w ok. polowie przypadkow - symulacja 1557/3000). Klucz off = "day N".
+5. Dowod do autotestu (tylko log, `WorldMeasureLog`): `CalendarText.Hourly` - przez pierwsze 72 godziny gry kazdej kampanii w sesji linia `Data na pasku (kalendarz): godzina H - '<tekst paska>' | dzien roku N | stary wzor dawal M`, potem cisza. Tekst sklada ta sama `MapClock.BarText`, ktora wpisuje pasek.
+6. Klucz `ReadableDateEnabled` (domyslnie wlaczony, grupa MCM "A night's rest" obok `MapClockEnabled`); opisy `MapClockEnabled` i `ClimateEnabled` z nowym przykladem daty. Klucza nie ma w Armoury.json Jeffa - dziala domyslna.
+
+**Co Jeff zobaczy w grze:** pasek "Year 299, Day 1, Summer - 05:51" w pierwszej chwili nowej kampanii (rok 299, dzien 1); o 0:00 dzien rosnie o 1; po 364 dniach "Year 300, Day 1". Ta sama data w encyklopedii (historia), dzienniku wojen i wszedzie, gdzie gra wola `CampaignTime.ToString`. W banku termin jako "Year 299, Day 183".
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- To TYLKO tekst. Bez zmian: bieg czasu, tiki dobowe (zold, produkcja, ksiegi), `WesterosClimate.Day/Season/Seasons` czytane przez pogode, RBL, BEE, SCA (dzien pory dalej liczony od poczatku odcinka), `Daily`, `Export/Import` (stary zapis wczytuje sie tak samo), wiek bohaterow, turnieje, dlugosc roku. Gettery `GetYear` / `GetDayOfYear` / `GetHourOfDay` nie sa przez nas latane ani podmieniane (nasz transpiler rusza tylko GetSeasonOfYear / GetDayOfSeason / ToSeasons / DaysInSeason w wybranych typach).
+- Klucz wlaczony przy WYLACZONYM klimacie: data tez w nowym formacie (dotad szla wtedy data gry "Summer 12, 1084") - z pora kalendarza gry. U Jeffa klimat jest wlaczony.
+- 3 linie logu CrashScribe drukuja tekst daty gry (`CampaignTime.Now.ToString()`: KRONIKA WOJEN, armia gracza, kolumna daty w economy-*.csv) - pojda nowym formatem; zadne narzedzie w `tools/` ich nie parsuje (grep). Cudze mody wolajace `CampaignTime.ToString` dostana nowy tekst tak samo, jak dotad dostawaly nasz stary (nie sprawdzano, czy ktorys opiera na tym tekscie logike).
+- Pora w dacie zmienia sie w chwili zmiany odcinka pory (bialy kruk), nie o polnocy - tak jak dotad.
+- NIE RUSZONE, a zauwazone: dymek pamieci wojny wioski (`VillageNews.MemoryText` :245) bierze pore z kwartalu kalendarza gry (`GetSeasonOfYear`), nie z klimatu - "Plundered ... in the Spring of 299 AC" przy lecie na pasku. Bez numeru dnia, wiec poza zakresem; poprawka to jedna linia (`CalendarText.SeasonName`).
+- Odczytanie slow Jeffa: przyjeto "rok swiata, dzien roku, pora". Jesli "8 rok i 256 dzien autumn" znaczylo ROK PORY ("osmy rok jesieni, dzien 256"), wystarczy zmienic `CalendarText.Date`.
+- Czas: tekst skladany jak dotad raz na minute gry na pasku; nasluch godzinny po 72 liniach konczy sie na trzech porownaniach.
+
+**Build:** Armoury kod 0 (drzewo `zb/kal`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - autotest (72 linie "Data na pasku (kalendarz)": "dzien roku" i tekst zmieniaja sie miedzy godzina 23 a 0, "stary wzor dawal" o innej godzinie - w nowej kampanii miedzy 4 a 6; start "Year 299, Day 1, Summer"; linia startu "Data (kalendarz): latka daty w powiadomieniach ze scena wpieta"; brak "ERROR in CalendarText.Hourly") + oko Jeffa (pasek, bank, powiadomienie ze scena).
+
 ## 2026-10-13 (po WGRANIU 34, decyzja Jeffa) - LIMIT KARAWAN KUPCA 2 -> 3 (NotableCaravanCap)
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Pliki:** `Armoury/src/Settings.cs` (domyslna), `McmSettings.cs` (gen_mcm)
 

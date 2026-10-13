@@ -13,7 +13,7 @@ namespace Armoury
     /// <summary>
     /// KLIMAT WESTEROS (Jeff 04.10): w Westeros nie ma miesiecy ani obrotu roku - jest jedna
     /// pora roku, ktora trwa latami ("lato, ktore trwalo dziesiec lat"), a Cytadela oglasza
-    /// jej koniec bialym krukiem. Data to "Day N of Summer, 299 AC".
+    /// jej koniec bialym krukiem. Data to "Year 299, Day 256, Summer" (13.10, CalendarText; dawniej "Day N of Summer, 299 AC").
     ///
     /// Decyzje Jeffa: start w lecie (trwa juz ~10 lat, konczy sie w 299 AC), potem jesien
     /// (~rok), pierwsza zima LOSOWO 3-5 lat, dalej pory losowe, wieloletnie.
@@ -313,10 +313,44 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ data
+        /// <summary>
+        /// Pora roku do TEKSTU daty (CalendarText): klimat Westeros, gdy czynny (-1 = data sprzed pierwszego odcinka pory - tekst bez pory);
+        /// klimat nieczynny albo bez stanu = pora kalendarza gry. Sam odczyt (start klimatu przez Ready - jak dotad w ToStringPrefix).
+        /// </summary>
+        internal static int TextSeason(ref CampaignTime t)
+        {
+            try
+            {
+                if (!Live(false)) return (int)VanillaSeason(ref t);
+                double d = t.ToDays;
+                if (d < _segs[0].Start) return -1;
+                return SegAt(d).Season;
+            }
+            catch { return (int)VanillaSeason(ref t); }
+        }
+
+        /// <summary>
+        /// Numer dnia pory wedle wzoru SPRZED 13.10 (pelne doby od poczatku odcinka pory: floor(d - Start) + 1) - tylko do linii dowodu
+        /// "Data na pasku (kalendarz) ... stary wzor dawal M". 0 = klimat bez stanu albo data sprzed historii. Niczego nie inicjuje.
+        /// </summary>
+        internal static int OldTextDay(ref CampaignTime t)
+        {
+            try
+            {
+                if (_segs.Count == 0) return 0;
+                double d = t.ToDays;
+                if (d < _segs[0].Start) return 0;
+                return (int)Math.Floor(d - SegAt(d).Start) + 1;
+            }
+            catch { return 0; }
+        }
+
         public static bool ToStringPrefix(ref CampaignTime __instance, ref string __result)
         {
             try
             {
+                // 13.10 (Jeff): czytelna data "Year 299, Day 256, Autumn" - rok, dzien roku z tickow zegara (zmiana o 0:00) i pora klimatu
+                if (CalendarText.On) { __result = CalendarText.Date(__instance, true); return false; }
                 if (!Live(false)) return true;
                 double d = __instance.ToDays;
                 int year = __instance.GetYear;
@@ -326,7 +360,10 @@ namespace Armoury
                     return false;
                 }
                 var g = SegAt(d);
-                int day = (int)Math.Floor(d - g.Start) + 1;
+                // 13.10 (Jeff: "dzien zmienia sie dopiero kolo 10-12"): g.Start ma ulamek doby = godzine pierwszego odczytu klimatu (nowa kampania
+                // ROT: ok. 5:52), wiec floor(d - g.Start) zmienial numer o tej godzinie. Liczymy polnoce zegara: doba kalendarza daty minus
+                // doba kalendarza poczatku pory. O godzinie startu pory numer jak dotad; od polnocy do tamtej godziny o 1 wiekszy niz dawal stary wzor.
+                int day = (int)(Math.Floor(d) - Math.Floor(g.Start)) + 1;
                 string season = GameTexts.FindText("str_season_" + (CampaignTime.Seasons)g.Season).ToString();
                 __result = "Day " + day + " of " + season + ", " + year + " AC";
                 return false;
@@ -419,6 +456,17 @@ namespace Armoury
 
                 int sky = PatchTypes(h, SkyTypes, nameof(SkyTranspiler), out var skyMiss);
                 int econ = PatchTypes(h, EconTypes, nameof(EconTranspiler), out var econMiss);
+                // 13.10: data w powiadomieniach ze scena - prefiks CalendarText.FormalPrefix (wylacznik off = oryginal z transpilerem jak dotad)
+                MethodInfo formal = null;
+                try
+                {
+                    var nh = AccessTools.TypeByName("TaleWorlds.CampaignSystem.SceneInformationPopupTypes.CampaignSceneNotificationHelper");
+                    formal = nh != null ? AccessTools.Method(nh, "GetFormalDayAndSeasonText", new[] { typeof(CampaignTime) }) : null;
+                    if (formal != null) h.Patch(formal, prefix: new HarmonyMethod(typeof(CalendarText), nameof(CalendarText.FormalPrefix)));
+                }
+                catch (Exception e) { formal = null; Log.Error("WesterosClimate.ApplyAll (data w powiadomieniach)", e); }
+                Log.Info("Data (kalendarz): latka daty w powiadomieniach ze scena " + (formal != null ? "wpieta" : "BRAK GetFormalDayAndSeasonText")
+                         + " (wylacznik ReadableDateEnabled czytany przy kazdym tekscie).");
                 Log.Info("WesterosClimate: data " + (ts != null ? "wpieta" : "BRAK ToString")
                          + ", niebo (pogoda/dzwiek/powiadomienia) metod " + sky
                          + ", gospodarka (RBL/SCA/BEE/zdarzenia) metod " + econ

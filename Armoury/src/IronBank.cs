@@ -541,7 +541,7 @@ namespace Armoury
                 sb.Append(" at " + (RateFor(c, d) * 100).ToString("0") + "% a year, to be repaid within half a year.");
             }
             if (d != null && d.Principal >= 1)
-                sb.Append("\n\nYou owe " + (int)d.Principal + " gold at " + (d.Rate * 100).ToString("0") + "% a year, due by day " + d.DueDay
+                sb.Append("\n\nYou owe " + (int)d.Principal + " gold at " + (d.Rate * 100).ToString("0") + "% a year, due by " + CalendarText.DayStamp(d.DueDay)   // 13.10: "Year 299, Day 183" zamiast "day 109018" (wylacznik off = jak dotad)
                           + (d.Missed > 0 ? " (missed instalments: " + d.Missed + "/3)" : "") + ". The Bank takes its instalment every day.");
             return sb.ToString();
         }
