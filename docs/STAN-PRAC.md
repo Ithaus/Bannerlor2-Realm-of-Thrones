@@ -1552,3 +1552,18 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
 - (12:40 UTC 13.10) **PROFIL KLATKI na WGRANIU 35 (10 dob od doby 120; SCRATCH(dbc3d3d1)\test\profil-w35.txt):** klatka srednio 59.3 ms (przed runda poprawek 2: 163.7 ms). Wedlug modow:
   Native 35%, silnik 22%, ROT-Core 15%, **Armoury 11% (6.0 ms; bylo 27.7 ms = 18%)**, BannerKings 9%, StrategicCampaignAI 2%, CrashScribe 1%. Najdrozszy sluchacz: swaty ROT
   CheckNPCMarriages 7.98 ms/klatke = 14.4% klatki (cel latki Z.3 - w toku), potem AiMilitaryBehavior 5.4%, takt doby Armoury 3.4%.
+- (13:10 UTC 13.10) **TRIAZ 3 GOTOWY (wf_b57efd4d-9ac): `docs/test-zbiorczy/TRIAZ-3-bieg-roczny-2026-10-13.md`** (streszczenia prostym jezykiem na gorze kazdego obszaru).
+  WOJSKO (62 tys. po roku): topnieje przez PIENIADZ (pulap zoldu 166), nie przez ksiege ludzi (ludzi ubylo 0.27%, ochotnicy stoja u notabli). Przyczyny: weteran drozszy o 1/3; wojna
+  nie konczy sie, oszczednosci rodow wypalone w pierwszych miesiacach; budzet odprawia najtanszych (O1-3 STROJENIE, broni sie); pulapka: biedny rod < 60% druzyny nie jest wzywany do
+  armii -> brak sluzby -> renta korony przepada bogatym -> druzyna 0 (O1-2 BLAD - podwazenie: stan prawdziwy, ale przyczyna i poprawka do korekty - brac "Poprawka ostateczna");
+  kompanie najemne zbieraja zloto bez wydatku 2.9 -> 20.6 mln (O1-4 BLAD, broni sie); zloto odplywa do kies ludu +29 mln/rok (O1-7 STROJENIE). Bez zmian swiat zejdzie do ok. 50 tys.;
+  po poprawkach szac. 72-82 tys. (stare 120 tys. trzymalo ok. 0.6 mln zl/d z niczego). ZELAZO (41-45 miast bez): zelaza nie brakuje (14.5 tys. ladunkow lezy), brak ogniwa
+  miasto z nadwyzka -> miasto bez (kontrakty 174.2 martwe od krotkiego postoju karawan, zasieg, wyspy nigdy nie dostawaly - O2-1 BLAD, poprawka do korekty wedlug podwazenia);
+  regulator wsi przykreca kopalnie, bo liczy martwy zapas (O2-2, broni sie); zamki = studnia (woz uciekajacy sprzedaje caly ladunek - O2-3, broni sie); 1 474 lupy znikaja z taborow (O2-7).
+  **PLAN: dwie paczki poprawek rownolegle (wojsko: ClanBudget/CrownRents/kompanie; zelazo: zamowienie wozem kupcow z miasta z nadwyzka, regulator, zamki) - autor + recenzent, potem bieg roczny.**
+- (13:10 UTC 13.10) **K1-3a krok 2 ZAKODOWANE I ZRECENZOWANE, NIE WGRYWAC BEZ SLOWA JEFFA:** `w-toku/k13a-konie-robocze` 137dbc3 (zb\k13a). Pomiar: mieszczanie zdejmuja 343 konie/d (100 zwyklych,
+  36 bojowych, 4.6 szlachetnego, 203 juczne) za 194 tys. zl/d (miasta 153, zamki 42) - 2.6-3.2x wiecej niz liczby, na ktore Jeff sie zgodzil (150 koni, 60-75 tys.). Po regule: kasy miast
+  -41% wplywu od ludu, zamkow -80%, zawor panow i koron -100..170 tys./d, utarg stadnin do -200 tys./d, hodowla do ok. 1/4; JUCZNE bez rownowagi (naplyw z niczego 105-156/d z taborow wsi,
+  odbior 24/d) - potrzebna paczka "juczne z niczego". Jeff powiadomiony, zapytany o paczke jucznych; plan: bieg 120 dob na probnym DLL (zb\k13a\Armoury\bin\Release) dla zmierzonych skutkow.
+- (13:10 UTC 13.10) **Kalendarz GOTOWY:** `w-toku/kalendarz-data` 7392436 scalone do zbior-e8 74a3645 (Armoury 65868156; klucz ReadableDateEnabled; "Year 299, Day 19, Summer - 11:30";
+  dzien zmienia sie o 0:00; przyczyna: WesterosClimate.ToStringPrefix liczyl doby od startu pory). Test 40 dob + zapis w toku (test\at-fin3-40.out.txt) -> WGRANIE 36.
