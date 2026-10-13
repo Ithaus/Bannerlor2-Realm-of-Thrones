@@ -265,6 +265,7 @@ namespace Armoury
         protected override void OnSubModuleUnloaded()
         {
             try { TipUnregister(); } catch { }
+            Log.Close();   // E8/O6 (270): pisarze logu zamykani przy wyjsciu z gry (kazda linia jest juz w pliku - flush po linii; wlasny try w srodku)
             base.OnSubModuleUnloaded();
         }
 

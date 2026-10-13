@@ -261,6 +261,13 @@ Uzycie (Python 3, tylko odczyt):
                     tygodni przy kluczu [WL] - to zmiana kolejnosci w dobie, poza R9; doba 1 kampanii liczona do 1. tygodnia - po godzinach
                     czesc zalog sprzedaje przed pierwszym taktem doby); O5-3 INFO ksiega kas: "skup nadwyzek zbrojowni" (poza
                     taktem doby) wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0.
+                    Blok etap8_o6 (E8/O6, paczka 270): zapis logu otwartym plikiem (jeden slownik pisarzy dla Info, Error i Csv) - linia doby
+                    "Log (E8/O6)" (Log.DailyO6), wpisy "Log (E8/O6) wpis kontrolny drogi bledu" oraz "Profil doby (E8/0)": O6-0 linia w kazdej
+                    dobie okna, stan klucza; O6-1 czas zapisu logu <= 20 ms/dobe srednio w dobach z kluczem [WL] ("log zapis" z linii
+                    profilu; bieg 9 dob z 12.10 23:35 przed paczka: 71-87 ms); O6-2 proba 3 dob sesji: bajty wyslane do kazdego pliku = rozmiar pliku
+                    (rozjazd 0, plikow z rozjazdem 0) i numer linii doby w glownym pliku = liczba linii wyslanych (liczy narzedzie w pliku
+                    logu) - tak samo przy kluczu wlaczonym i wylaczonym; O6-3 wpisy kontrolne drogi Log.Error sa w pliku (tyle, ile
+                    wyslano, >= 1); O6-4 zapisy stracone, potkniecia pisarza i linie bledu Log.DailyO6 0, zapisy stara droga przy [WL] 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -10453,6 +10460,122 @@ def etap8_o5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "0 i 0 (wyjatek jednej zalogi nie gasi kolejki - liczony)", stum == 0 and errs == 0)
 
 
+# ============================================================ ETAP 8 (E8/O6, paczka 270): zapis logu otwartym plikiem - blok etap8_o6
+E8_O6_LINE = "Log (E8/O6): dzien"
+E8_O6_CTL = "Log (E8/O6) wpis kontrolny drogi bledu"
+E8_O6_WRITE_MS = 20.0   # O6-1: czas zapisu logu na dobe przy kluczu [WL] (projekt etapu 8 v2 rozdz. 3 "E8/O6"; linia "Profil doby (E8/0)": "log zapis X ms / N linii")
+E8_O6_SAMPLE = re.compile(r"\| proba (\d)/(\d): plikow (\d+), bajtow wyslanych (\d+), w plikach (\d+), rozjazd (\d+) \(plikow z rozjazdem (\d+)\), "
+                          r"glowny plik linii wyslanych (\d+) \(z ta linia\)")
+
+
+def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/O6 (270, projekt etapu 8 v2 rozdz. 3 "E8/O6" Test, regula R9, krytyka K2-5): linia doby "Log (E8/O6)" (Log.DailyO6 - dzien linii = dzien gry - 1),
+    wpisy "Log (E8/O6) wpis kontrolny drogi bledu" i "Profil doby (E8/0)". O6-0 linia w kazdej dobie okna, stan klucza; O6-1 "log zapis" <= 20 ms/dobe
+    srednio w dobach z kluczem [WL] bez zapisow stara droga; O6-2 proba 3 dob sesji - bajty wyslane do kazdego pliku = rozmiar pliku i numer linii doby
+    w glownym pliku = liczba linii wyslanych (narzedzie liczy linie w pliku logu); O6-3 wpisy kontrolne drogi Log.Error w pliku = wyslane, >= 1;
+    O6-4 zapisy stracone, potkniecia pisarza, linie bledu Log.DailyO6 0 i zapisy stara droga w dobach [WL] 0."""
+    allo = [s for s in lines if s.startswith(E8_O6_LINE)]
+    if not allo:
+        rep.add("E8/O6: linia Log (E8/O6)", "brak w logu", "jest od wgrania E8/O6", None)
+        return
+    ol = {d: s for d, s in by_day(lines, E8_O6_LINE).items() if 1 <= run_day(d, start) <= until}
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in ol]
+    days = sorted(ol)
+    on = [d for d in days if "LogKeepOpen [WL]" in ol[d]]
+    on_set = set(on)
+    off = [d for d in days if d not in on_set]
+    wr = max((num(r"pisarze otwarci (\d+)", ol[d], default=0) for d in days), default=0)
+    rep.add("O6-0: linia Log (E8/O6) w kazdej dobie okna; stan klucza",
+            f"dob z linia {len(days)}, brak w {len(miss)} z {len(inner)}" + (f" (doby {miss[:5]})" if miss else "")
+            + f"; LogKeepOpen wl {len(on)} / wyl {len(off)} dob; najwiecej otwartych pisarzy {wr}",
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    # O6-1: czas zapisu logu. Linia profilu "dzien D" i linia E8/O6 "dzien D" powstaja w tym samym takcie doby (okres od poprzedniego taktu)
+    prof = by_day(lines, E8_PROF)
+    wms, wn, wms_off = {}, {}, {}
+    for d in days:
+        if d not in prof:
+            continue
+        v, n = fnum(r"\| log zapis ([0-9.]+) ms", prof[d]), num(r"\| log zapis [0-9.]+ ms / (\d+) linii", prof[d])
+        if v is None:
+            continue
+        if d in on_set and num(r"stara droga (\d+)", ol[d], default=0) == 0:
+            wms[d] = v
+            wn[d] = n or 0
+        elif d not in on_set:
+            wms_off[d] = v
+    rule1 = f"<= {E8_O6_WRITE_MS:.0f} ms/dobe srednio w dobach z kluczem [WL] (projekt rozdz. 3 \"E8/O6\"; bez linii Profil doby - INFO)"
+    if wms:
+        avg = sum(wms.values()) / len(wms)
+        dmax = max(wms, key=lambda d: wms[d])
+        tot_n = sum(wn.values())
+        txt = (f"srednio {avg:.1f} ms/dobe w {len(wms)} dobach, najwiecej {wms[dmax]:.1f} ms (d{run_day(dmax, start)}); zapisow srednio {tot_n / len(wms):.0f}/d"
+               + (f", {1000.0 * sum(wms.values()) / tot_n:.1f} us na zapis" if tot_n else ""))
+        if wms_off:
+            txt += f"; klucz wylaczony {len(wms_off)} dob: srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe"
+        rep.add("O6-1: czas zapisu logu przy kluczu [WL]", txt, rule1, avg <= E8_O6_WRITE_MS)
+    else:
+        why = "brak linii Profil doby (E8/0) - Stage8ProfileLog wylaczony?" if not any(d in prof for d in days) else "klucz LogKeepOpen wylaczony w calym oknie"
+        rep.add("O6-1: czas zapisu logu", why + (f"; przy wylaczonym kluczu srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe" if wms_off else ""), rule1, None)
+
+    # O6-2: proba 3 dob sesji (cala sesja, nie tylko okno): bajty i numer linii doby w glownym pliku
+    samp = [(s, E8_O6_SAMPLE.search(s)) for s in allo]
+    samp = [(s, m) for s, m in samp if m]
+    rule2 = ("rozjazd bajtow 0 i plikow z rozjazdem 0 w kazdej probie; numer linii doby w glownym pliku = liczba linii wyslanych "
+             "(R9 - tak samo przy kluczu wlaczonym i wylaczonym; bez prob w logu - INFO)")
+    if samp:
+        gap = sum(int(m.group(6)) for _, m in samp)
+        gapf = sum(int(m.group(7)) for _, m in samp)
+        last = samp[-1][1]
+        want = {int(m.group(8)) for _, m in samp}
+        pos, bad_pos, how = {}, [], ""
+        if logp and os.path.isfile(logp):
+            mark = (E8_O6_LINE).encode("utf-8")
+            with open(logp, "rb") as f:
+                for i, ln in enumerate(f, 1):
+                    if mark in ln and b"glowny plik linii wyslanych " in ln:
+                        k = num(r"glowny plik linii wyslanych (\d+)", ln.decode("utf-8", errors="replace"))
+                        if k is not None:
+                            pos[k] = i
+            bad_pos = sorted(k for k in want if pos.get(k) != k)
+            how = (f"; numer linii w pliku zgodny w {len(want) - len(bad_pos)} z {len(want)} prob"
+                   + (f" (niezgodne: " + ", ".join(f"wyslanych {k} / linia {pos.get(k, '?')}" for k in bad_pos[:3]) + ")" if bad_pos else ""))
+        else:
+            how = "; numer linii w pliku - brak pliku logu (INFO)"
+        keys = "".join("W" if "LogKeepOpen [WL]" in s else "w" for s, _ in samp)
+        ctrl_ms = [fnum(r"sprawdzenie ([0-9.]+) ms", s, 0.0) for s, _ in samp]
+        worst = [s.split("[najwiekszy rozjazd: ", 1)[1].rstrip("]") for s, _ in samp if "[najwiekszy rozjazd: " in s]
+        rep.add("O6-2: proba 3 dob - wyslane do plikow wobec plikow (bajty wszystkich plikow, linie glownego)",
+                f"prob {len(samp)} z {last.group(2)} (klucz w probach: {keys}; W = wlaczony); ostatnia: plikow {last.group(3)}, bajtow wyslanych {last.group(4)} / "
+                f"w plikach {last.group(5)}; rozjazd bajtow lacznie {gap}, plikow z rozjazdem {gapf}" + how
+                + (f"; najwiekszy: {worst[0]}" if worst else "") + f"; koszt sprawdzenia najwiecej {max(ctrl_ms):.2f} ms",
+                rule2, gap == 0 and gapf == 0 and not bad_pos)
+    else:
+        rep.add("O6-2: proba 3 dob - wyslane do plikow wobec plikow", "brak linii z proba (sesja bez pierwszych trzech taktow doby w logu?)", rule2, None)
+
+    # O6-3: wpisy kontrolne drogi Log.Error (K2-5) - sa w pliku logu, bo narzedzie czyta je z pliku
+    n_ctl = sum(1 for s in lines if s.startswith(E8_O6_CTL))
+    tried = max((num(r"wpisow kontrolnych drogi bledu (\d+)", s, default=0) for s in allo), default=0)
+    key3 = [s for s, _ in samp]
+    rep.add("O6-3: wpisy kontrolne drogi Log.Error w pliku logu",
+            f"w pliku {n_ctl}, wyslanych {tried}" + (f"; klucz [WL] w {sum(1 for s in key3 if 'LogKeepOpen [WL]' in s)} z {len(key3)} prob" if key3 else ""),
+            "w pliku = wyslanych i >= 1 (wpis idzie droga Log.Error - plik glowny, ten sam pisarz; bez slow 'ERROR in', zeby T0 go nie liczyl)",
+            (n_ctl == tried and tried >= 1) if (tried or n_ctl) else None)
+
+    # O6-4: zapisy stracone i potkniecia pisarza (liczniki sesji - ostatnia linia), zapisy stara droga w dobach [WL], linie bledu
+    lost = num(r"straconych (\d+)", allo[-1], default=0)
+    stum = num(r"potkniecia pisarza (\d+)", allo[-1], default=0)
+    old_on = sum(num(r"stara droga (\d+)", ol[d], default=0) for d in on)
+    errs = sum(1 for s in lines if s.startswith("ERROR in Log.DailyO6"))
+    first = allo[-1].split("[pierwsze: ", 1)[1].split("]", 1)[0] if "[pierwsze: " in allo[-1] else ""
+    opened, closed = num(r"od startu sesji otwarc (\d+)", allo[-1], default=0), num(r"zamkniec (\d+)\)", allo[-1], default=0)
+    rep.add("O6-4: zapisy stracone, potkniecia pisarza, zapisy stara droga przy [WL], linie bledu Log.DailyO6",
+            f"{lost} / {stum} / {old_on} / {errs}" + (f" (pierwsze potkniecie: {first})" if first else "") + f"; od startu sesji otwarc pisarzy {opened}, zamkniec {closed}",
+            "0 / 0 / 0 / 0 (blad pisarza = potkniecie, linia idzie stara droga - liczony, bez wylacznika na sesje)",
+            lost == 0 and stum == 0 and old_on == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -10487,6 +10610,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_o2)   # E8/O2 (266): WorkshopLaw bez refleksji i powtorzen - klucze, pamieci nazw linii i zakazanych, mnoznik polki raz na koszyk
     blocks.append(etap8_o3)   # E8/O3 (267): wywoz kupcow - cele w zasiegu z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku
     blocks.append(etap8_o5)   # E8/O5 (269): nadwyzki zalog po godzinach - maks. taktu doby, sztuki i utarg zalog tygodniowo wobec Z33, ksiega kas
+    blocks.append(etap8_o6)   # E8/O6 (270): zapis logu otwartym plikiem - czas zapisu, proba 3 dob (bajty i linie), wpis kontrolny drogi bledu
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

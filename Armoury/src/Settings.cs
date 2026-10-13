@@ -1320,6 +1320,10 @@ namespace Armoury
         public int BanditCheerRelation = 2;                // relation gained with each notable of those villages
 
         public bool LogEnabled = true;                     // write a log file in the module folder
+        // E8/O6 (270, PLAN 8.17; RD8 O5 bez utraty linii; krytyka K2-5): pliki logu otwarte na czas sesji - jeden slownik pisarzy dla Info (glowny i tematyczne),
+        // Error i Csv (Log.Append), flush po kazdej linii (przy CTD nic nie ginie), FileShare.ReadWrite (log mozna czytac w trakcie gry). Linia doby "Log (E8/O6)"
+        // i proba 3 dob (linie wyslane wobec linii w plikach, wpis kontrolny droga Log.Error); czytany przy kazdym zapisie; off = File.AppendAllText na linie jak dotad
+        public bool LogKeepOpen = true;                    // keep the log files open while the game runs instead of opening and closing a file for every line - the same lines, each written out at once (nothing is lost if the game crashes), and the log can still be read during play; saves a little time every day. Off: a file is opened and closed for every line, as before
 
         // --- Armies of the realms (175) ---
         // paczka 175 (decyzje Jeffa 09.10): klucze czyta CrashScribe (Mends.ArmouryFloat - sprzet wedlug tieru, sklad, NorthHardy, DothrakiRiders)

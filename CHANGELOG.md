@@ -1,5 +1,63 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (etap 8, paczka E8/O6 - 270, PLAN 8.17; RD8 O5 bez utraty linii) - ZAPIS LOGU: pliki logu otwarte na czas gry zamiast otwierania i zamykania pliku przy kazdej linii; te same linie, nic nie ginie przy wywrotce
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/e8-a` (po d82855d) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/O6" (cala paczka TERAZ, klucz wlaczony), regula R9 ("te same liczby" - O6 objete), rozdz. 5.1 (`Log.cs`: E8/0 -> O6, jeden slownik pisarzy dla trzech drog), rozdz. 6 (odpowiedz Jeffa 10: "lzejsze logi nie teraz", a "szybszy zapis bez utraty linii (E8/O6) robimy od razu"), `KRYTYKA-E8.md` K2-5 | **Pliki:** `Armoury/src/Log.cs`, `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `gen_mcm`), `Armoury/src/SubModuleMain.cs` (1 linia), `Armoury/src/ArmouryBehavior.cs` (1 linia w takcie doby), `tools/sprawdz_logi.py` (blok `etap8_o6`), `CHANGELOG.md`
+
+**Problem (prostym jezykiem):** Kazda linia logu otwierala plik, dopisywala sie i zamykala plik. Gra pisze ok. 700 razy na dobe gry (glowny log, 11 plikow tematycznych, 11 plikow CSV), wiec samo otwieranie i zamykanie kosztowalo 71-87 ms na dobe (bieg 9 dob z 12.10 23:35, linia "Profil doby (E8/0)": "log zapis 87.2 ms / 725 linii", 73.8 / 664, 71.3 / 670 ...). To kawalek krotkiego przyciecia raz na dobe i drobnych przyciec w ciagu doby.
+
+**Przyczyna:** `Log.Info`, `Log.Csv` i `Log.Error` wolaly `File.AppendAllText` (otwarcie, dopisanie, zamkniecie) przy kazdym zapisie - ok. 0.11 ms na zapis.
+
+**Zmiana:**
+- **Jeden slownik pisarzy dla wszystkich drog zapisu.** `Info` (glowny plik i pliki tematyczne), `Error` i `Csv` ida przez wspolny rdzen `Log.Append` pod ta sama blokada `Gate` (slownik bez rozrozniania wielkosci liter w sciezce: jeden plik = jeden pisarz). Plik otwiera sie przy pierwszej linii i zostaje otwarty (`FileMode.Append`, `FileShare.ReadWrite`, UTF-8 bez BOM - te same bajty co `File.AppendAllText`). Dlaczego wszystkie trzy drogi naraz (krytyka K2-5): gdyby otwarty byl tylko glowny plik `Info`, `File.AppendAllText` w `Log.Error` dostawalby odmowe dostepu polykana przez `catch` - linie bledow znikalyby bez sladu, a prog "0 bledow" przechodzilby falszywie.
+- **Kazda linia od razu w pliku.** Pisarz ma `AutoFlush` - po kazdym zapisie dane sa u systemu, wiec przy wywrotce gry nic nie ginie (tak jak dotad). Log mozna czytac w trakcie gry.
+- **Blad pisarza nie gasi logu.** Gdy otwarcie albo zapis pisarzem sie nie uda, pisarz jest zamykany, ta linia idzie stara droga (`File.AppendAllText`), a nastepna otworzy plik od nowa. Liczone: potkniecia pisarza (otwarcie / zapis, z trescia pierwszego) i zapisy stracone (gdy zawiodla tez stara droga) - dotad utracona linia nie zostawiala zadnego sladu.
+- **Zamkniecie.** Przy nowej sesji (`Log.Init`) i przy wyjsciu z gry (`SubModuleMain.OnSubModuleUnloaded` -> `Log.Close`). Linia zapisana po zamknieciu otwiera plik od nowa.
+- **Klucz `LogKeepOpen` (domyslnie wlaczony), czytany przy kazdym zapisie.** Wylaczony = te same wywolania `File.*` co przed paczka (otwarci pisarze sa najpierw zamykani); mozna przelaczac w trakcie gry.
+- **Linia doby "Log (E8/O6)"** (`Log.DailyO6`, w takcie doby po linii E8/O2): stan klucza, ilu pisarzy otwartych, zapisy pisarzem / stara droga w dobie, zapisy stracone i potkniecia od startu sesji.
+- **Proba 3 dob (regula R9, prog O6-2).** W pierwszych trzech taktach doby kazdej sesji, przy kluczu wlaczonym i wylaczonym tak samo: bajty wyslane do kazdego pliku wobec rozmiaru pliku wedlug systemu plikow (bez otwierania pliku) oraz liczba linii wyslanych do glownego pliku (narzedzie porownuje ja z numerem tej linii w pliku logu). Po trzeciej dobie liczenie gasnie - potem zero kosztu.
+- **Wpis kontrolny drogi bledu (prog O6-3).** W kazdej z trzech dob proby jedna linia "Log (E8/O6) wpis kontrolny drogi bledu k/3 (to nie blad ...)" zapisana ta sama metoda co `Log.Error` (`Log.ErrorText`: plik glowny, bez bramki `LogEnabled`, ten sam pisarz).
+- **Narzedzie, blok `etap8_o6` (`--grupa etap8`):** O6-0 linia w kazdej dobie okna i stan klucza; O6-1 "log zapis" z linii profilu <= 20 ms/dobe srednio w dobach z kluczem [WL]; O6-2 rozjazd bajtow 0 we wszystkich plikach i numer linii doby w glownym pliku = liczba linii wyslanych; O6-3 wpisy kontrolne w pliku = wyslane, >= 1; O6-4 zapisy stracone, potkniecia pisarza, zapisy stara droga przy [WL] i linie bledu `Log.DailyO6` = 0.
+
+**Sprawdzone przed kodem (zasada 0):**
+- **Narzedzia autotestu (wymog projektu):** `tools/autotest.ps1` (galaz `at1-autotest`, 486008e) w trakcie gry czyta tylko `autotest-*.log` CrashScribe (`[IO.File]::ReadAllText` i strumien z `FileShare 'ReadWrite, Delete'`); `Armoury-*.log` bierze dopiero po wyjsciu gry przez `Get-ChildItem` (nazwa i `LastWriteTime`, bez czytania tresci). Kod autotestu w CrashScribe nie czyta logu Armoury (grep `Armoury-`: tylko nazwy zestawow w `Mends.cs`). `sprawdz_logi.py` i pozostale skrypty Pythona czytaja przez `open()` (dzieli odczyt i zapis). `diag-start-crash.ps1` - `Get-Content` (dzieli). Skrypty `docs/przekazanie/wf-*.js` nie kopiuja logow Armoury.
+- **Kto jeszcze dotyka plikow logu:** `_path` i `_topicDir` tylko w `Log.cs`; `Log.Csv` ma 12 wywolan (11 plikow), wolajacy uzywaja tylko "null / nie null" i sciezki do linii logu - bez zmian. CrashScribe, RealisticCaptivity, GrandTourney, ForgeView nie siegaja do `Armoury.Log` (refleksja tylko do `Settings`, `ArmouryBehavior`, `RangedLore`, `TownWage`, `FixedSums38`).
+- **Gra 1.4.8 (ilspycmd, `TaleWorlds.MountAndBlade.Module`):** `FinalizeModule` -> `FinalizeSubModulesBases` wola `OnSubModuleUnloaded` kazdego modulu w petli BEZ try - dlatego `Log.Close` ma wlasny try i nie rzuca.
+- **Klucz:** `LogKeepOpen` nie istnieje w `Armoury.json` Jeffa (grep, plik tylko czytany); `LogEnabled` tam jest (true) - nie ruszany.
+- **Inne galezie:** `Log.cs` zmienia tylko `e8-a` (w `e8-c` ten sam blob co przed paczka, `e8-b` / `zbior-5-8` / `a8-gentry0` maja wersje sprzed E8/0); miejsca wstawek (po `LogEnabled`, w `OnSubModuleUnloaded`, przed `MountedWage.Daily`) w tamtych galeziach nietkniete.
+
+**Proba poza gra (stanowisko net472 x64: `Log.cs` z drzewa + atrapy `Settings` i `TaleWorlds.Library`; 5 dob po ok. 686 zapisow - 300 linii glownych z liniami 2.5 i 9 KB, 380 tematycznych w 11 plikach, 4 pliki CSV, blad z wyjatkiem):**
+- czas zapisu: stara droga 47-62 ms/dobe, pisarze 1.3-3.9 ms/dobe (w grze stara droga 71-87 ms);
+- 15 plikow: liczba linii i tresc linia po linii identyczne w obu trybach (bez znacznika czasu), bez BOM, pliki tematyczne i CSV co do bajta tej samej wielkosci;
+- czytanie przy otwartych pisarzach: strumien z `FileShare.ReadWrite` - dziala, `File.Copy` - dziala, `File.ReadAllText` - odmowa, `File.Delete` - odmowa;
+- `Log.Error` przy otwartym glownym pliku trafia do pliku (scenariusz K2-5);
+- przelaczenie klucza w trakcie, `Close` i ponowne otwarcie: kolejnosc linii zachowana, naglowek CSV raz;
+- plik zajety przez kogos na wylacznosc: linia stracona (tak samo jak dotad), ale policzona - potkniecie 1, stracony 1, proba pokazuje rozjazd bajtow, narzedzie niezgodny numer linii; nastepna linia zapisana;
+- nowa sesja (`Init`) zwalnia pliki poprzedniej; `LogEnabled` wylaczony: `Info` nic, `Error` pisze, linii doby nie ma;
+- narzedzie: `py_compile` kopii poza repo OK; log z kluczem wylaczonym - O6-0 TAK, O6-1 INFO, O6-2 / 3 / 4 TAK; z wlaczonym - wszystkie TAK (1.8 ms/dobe); z dwiema straconymi liniami - O6-2 NIE i O6-4 NIE; dwa prawdziwe logi (9 dob z 12.10 23:35 i 120 dob z 12.10 22:38) - cala grupa `etap8` bez zmian poza nowym wierszem INFO "brak w logu".
+
+**Odstepstwa od projektu (do recenzji):**
+1. **O6-2 "liczba linii taka sama jak przy wylaczonym kluczu (probka 3 dob)"** - zrobione jako proba w grze dzialajaca w obu stanach klucza: bajty kazdego pliku (rozmiar od systemu plikow) i numer linii glownego pliku (liczy narzedzie). Plikow w grze nie czytam: pierwsze otwarcie do odczytu po zmianie kosztuje ok. 3 ms na plik niezaleznie od rozmiaru (pomiar: 15 plikow = 40-60 ms w takcie doby, w grze byloby ok. 23 plikow) - zjadloby zysk paczki w pierwszych dobach i podnioslo najdluzszy takt doby (prog O5-1). Rozmiar od systemu plikow kosztuje 0.05-0.07 ms na plik i przy otwartym pisarzu zgadza sie co do bajta (pomiar 1.5-6 MB); gdy sie nie zgadza, plik jest sprawdzany drugi raz osobnym uchwytem. Porownanie dwoch calych biegow (klucz wlaczony / wylaczony) - patrz proba poza gra.
+2. **O6-3 "wymuszony `Log.Error`"** - wpis kontrolny idzie ta sama metoda co `Log.Error`, ale bez slow "ERROR in". Prawdziwa linia "ERROR in" trzy razy na sesje wywracalaby prog "0 bledow w logu Armoury" we wszystkich grupach narzedzia (etap2-etap8) i mylila kazdego, kto czyta log.
+3. **Jedna linia doby wiecej** ("Log (E8/O6)") i trzy wpisy kontrolne na sesje - projekt ich nie wymienial, potrzebne progom O6-2 - O6-4.
+4. **Stara droga jako zapas** przy bledzie pisarza i liczniki potkniec / zapisow straconych - projekt tego nie opisywal (pulapka "globalne wylaczniki": licz potkniecia, nie gas funkcji).
+5. **Bufor pisarza 4096 znakow** (`File.AppendAllText` ma 1024) - dluga linia idzie do systemu w mniejszej liczbie kawalkow; tresc ta sama.
+6. **Klucz w grupie MCM "Grateful villages"** - tam `gen_mcm` umieszcza tez `LogEnabled` (pole stoi za ta grupa w `Settings.cs`); nowy klucz zaraz za nim.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- **W grze nie uruchamiane** - build kod 0 i proba poza gra. W tescie zbiorczym: O6-1 (oczekiwane kilka ms na dobe), O6-2 rozjazd 0, O6-3 trzy wpisy kontrolne, O6-4 zera.
+- **Programy czytajace na wylacznosc** (`File.ReadAllText` / `ReadAllLines`, `[IO.File]::OpenRead`, `Get-FileHash`) dostana odmowe na logu Armoury w trakcie gry; `Get-Content`, `Select-String`, `Copy-Item`, Python, notatnik dzialaja. Narzedzia autotestu sprawdzone (wyzej) - po wyjsciu gry bez roznicy.
+- **Otwartego logu nie da sie skasowac ani przeniesc w trakcie gry** (dotad dalo sie miedzy liniami). Eksplorator moze do zamkniecia gry pokazywac stary rozmiar i date pliku - tresc po otwarciu jest aktualna.
+- **Zasoby:** ok. 23 otwarte pliki i ok. 0.6 MB buforow na sesje.
+- **Zamknieta ekonomia:** nie dotyczy - zadnego zlota ani sztuki, tylko zapis logu.
+- **Regresje:** klucz wylaczony = te same wywolania `File.*` (naglowek CSV przez `File.Exists` + `File.WriteAllText`, potem `File.AppendAllText`); stoper E8/0 nadal dwa odczyty zegara na zapis (koszt profilu E80-3 liczony jak dotad); `Log.Csv` zwraca sciezke / null jak dotad; `Log.Error` nadal nie rzuca (skladanie tekstu wyjatku zostalo w try).
+- **Zapis / Reset / NK:** nic w zapisie; stan logu nalezy do procesu (`Log.Init`), nie do kampanii - `Reset` niepotrzebny; stary zapis wczytuje sie bez zmian; NK niepotrzebna.
+- **Pulapki CLAUDE.md 7:** zadnej latki; brak wylacznika na sesje (potkniecie = zapas i ponowne otwarcie); nic martwego nie ozywa; `SwitchToMenu`, wizerunki, `DefaultClanFinanceModel` - nie dotyczy; nowy klucz, wiec zapis w `Armoury.json` niczego nie nadpisze.
+- **Watki:** wszystko pod `Gate` (jak dotad); linia doby pisana pod ta sama blokada co liczenie proby.
+
+**Poza zakresem (zauwazone, nie ruszane):** `RealisticCaptivity`, `GrandTourney` i `ForgeView` maja wlasne `Log.cs` z `File.AppendAllText` na linie (projekt wymienia tylko log Armoury); `Log.Info` przy kazdej linii sklada sciezke pliku tematycznego i sprawdza ok. 20 prefiksow (`TopicOf`) - poza stoperem zapisu; `CLAUDE.md` rozdz. 5 podaje stara nazwe `Modules\Armoury\Armoury.log` (od 13.09 sa pliki `Armoury-<data>.log` i `Logs\<sesja>\`).
+
+**Status:** DO SPRAWDZENIA - test zbiorczy etapow 5-8.
+
 ## 2026-10-12 (etap 8, recenzja paczki E8/O5 = 269) - BEZ ZMIAN W DZIALANIU: paczka zgodna z projektem, 7 odstepstw autora przyjetych; jedna poprawka w narzedziu - prog O5-2 liczy tez dobe 1 kampanii
 **Mod:** narzedzie (kod Armoury bez zmian) | **Galaz:** `w-toku/e8-a` (po af86b41) | **Projekt:** `docs/etap8/PROJEKT-ETAP8-DROBNE-BLEDY-OPTYMALIZACJA-2026-10-12.md` rozdz. 3 "E8/O5", regula R9 (O5 poza R9 - krytyka D5), rozdz. 4 pkt 4, rozdz. 5.1 i 5.2, rozdz. 6 (zadna z 11 odpowiedzi Jeffa nie dotyczy tej paczki; odpowiedz 10 "lzejsze logi nie teraz" - jedna linia doby zostaje) | **Pliki:** `tools/sprawdz_logi.py` (blok `etap8_o5`, wiersz O5-2), `CHANGELOG.md` (ten wpis)
 

@@ -4240,6 +4240,10 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public bool LogEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Log Keep Open", HintText = "keep the log files open while the game runs instead of opening and closing a file for every line - the same lines, each written out at once (nothing is lost if the game crashes), and the log can still be read during play; saves a little time every day. Off: a file is opened and closed for every line, as before")]
+        [SettingPropertyGroup("Grateful villages")]
+        public bool LogKeepOpen { get; set; } = true;
+
         [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175Measure { get; set; } = true;
@@ -6123,6 +6127,7 @@ namespace Armoury
             s.BanditCheerRadius = BanditCheerRadius;
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
+            s.LogKeepOpen = LogKeepOpen;
             s.Army175Measure = Army175Measure;
             s.NorthHomeEdgePercent = NorthHomeEdgePercent;
             s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;
