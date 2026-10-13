@@ -1760,3 +1760,6 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
   wiecej (bandy; pula wyrzutkow juz 11.9 tys.), rozbici NIE wracaja do druzyny (las 30 / 120 dob, ludnosc, karczmy) - wiec wiecej zdobytych twierdz paczka nie obiecuje; zaloga po
   wygranym wypadzie mocniejsza (limit 5% zabitych zwyciezcy); jencow szeregowych ok. 39 tys. rocznie mniej (sprzedaz jencow ok. -0.8 mln zl/rok).
   **W GRZE: test 120 dob** (test\at-n3-120.out.txt; start 19:33 UTC). Po czystym tescie: zapis 9 dob -> WGRANIE 40.
+- (19:50 UTC 13.10) **POPRAWKA 5 (TOWARY) - W TOKU:** workflow wf_8e1aa5c4-418 (docs/przekazanie/wf-n5-towary.js), galaz `w-toku/n5-towary` od 8639c21, drzewo SC\zb\tw: piec spraw -
+  plotno / len, skora wyprawiona, zbroja t3-4, zalew drewna, budowy cywilne z dala od frontu; autor ma znalezc PRZYCZYNE kazdej i nie kodowac na sile ("do decyzji" dla Jeffa).
+  Rownolegle w toku: wf_c5c3b7ac-88c (korona wedlug potrzeby, zb\wn od 55b59d7) i test 120 dob poprawki 3 w grze. Limity 19:45 UTC: 5 h 58%, tydzien 86%.
