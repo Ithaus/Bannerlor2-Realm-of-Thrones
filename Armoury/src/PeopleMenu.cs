@@ -90,6 +90,7 @@ namespace Armoury
                     sb.Append("Outlaws from this land: ").Append(N(v.Wy)).Append('\n');
                     if (v.Carts > 0) sb.Append("On the roads with the village carts and boats: ").Append(N(v.Carts)).Append('\n');
                     if (v.Road >= 1.0) sb.Append("Travelling with Banner Kings travellers and convoys: ").Append(N(v.Road)).Append('\n');     // E4/8 (R19)
+                    if (v.Rally >= 1.0) sb.Append("Stragglers waiting to rejoin their lords: ").Append(N(v.Rally)).Append('\n');     // N7 (recenzja K3)
                     if (v.U > 0 || Devastation.On) sb.Append("Refugees: ").Append(N(v.U)).Append('\n');
                     // E4/9 (5.6): niewolni trzymani w tej krainie i ludzie stad w niewoli (konto NIEWOLNI ksiegi)
                     if (ThrallLaw.On)

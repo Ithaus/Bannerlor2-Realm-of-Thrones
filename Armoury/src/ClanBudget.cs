@@ -1325,6 +1325,19 @@ namespace Armoury
             return u;
         }
 
+        /// <summary>N7 (StragglersRally): wolne miejsce puli Strazy bez zoldu w ludziach (pulap calej Strazy - zywi - nowe partie tej doby; ta sama miara co
+        /// werbunek Strazy, RecruitPrefix); -1 - rod nie jest Straza bez zoldu albo pula nieznana (wtedy wiaze limit zoldu druzyny). Tylko odczyt.</summary>
+        internal static int WatchRoom(Clan c)
+        {
+            try
+            {
+                var b = Of(c);
+                if (b == null || !b.Zero || _watchPoolCap < 0) return -1;
+                return Math.Max(0, (int)Math.Floor(_watchPoolCap - WatchLiveMen() - WatchUsed()));
+            }
+            catch (Exception e) { Stumble("WatchRoom", e); return -1; }
+        }
+
         /// <summary>Straz bez zoldu: werbunek partii staje na pulapie w ludziach (limit w zlocie przy zoldzie 0 nie wiaze).</summary>
         public static bool RecruitPrefix(MobileParty __0)
         {
