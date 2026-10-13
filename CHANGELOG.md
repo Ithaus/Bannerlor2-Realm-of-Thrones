@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (P3/WOJSKO W3-A, TRIAZ-3 O1-4 A) - ZADATEK BANNERKINGS DLA KOMPANII AI WYLACZONY: jedna zaplata za jedna sluzbe (klucz MercBkDownPaymentAiOff)
+**Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/MercContract.cs` (prefiks `BkDownPaymentPrefix`, `EnsureHooks`, linia 185), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian.
+
+**Problem (bieg roczny 364 doby, `budzet-rodow.csv`):** kiesy 11 kompanii najemnych 2.87 mln (d1) -> 20.60 mln (d364), +17.73 mln = 48.7 tys. zl/d, rowno caly rok (bez stabilizacji); to 33% zlota wszystkich rodow przy 2 494 ludziach. Po drugiej stronie krolowie: z kiesa ponizej 20 tys. bylo ich 0 (d30), 4 (d120), 15 (d300), 11 z 31 (d364); 21 krolow konczacych rok ponizej rezerwy zaplacilo 8.70 mln, ich wlasne druzyny 9 461 (d60) -> 3 736 ludzi (d364) przy limicie 16 tys. (Qarth: kiesa 519 775 -> 1 745, druzyna 708 -> 26; Dragonstone/Stannis 347 572 -> 1 383, 557 -> 0).
+
+**Przyczyna (dekompilacja BannerKings.dll):** `BKMercenaryCareerBehavior.OnClanChangedKingdom` przy kazdym najmie (`JoinAsMercenary`) wola `AddDownPayment`: kwota = min(`BKDiplomacyModel.GetMercenaryDownPayment`, kiesa rodu krola), `kingdom.RulingClan.Leader.ChangeHeroGold(-kwota)`, `mercenaryClan.Leader.ChangeHeroGold(+kwota)`. Wzor: (5% zlota rodu krola + sila kompanii x MercenaryAwardMultiplier / 2) x reputacja. `ChangeHeroGold` bez zdarzenia gry - ksiega rodow tego nie widziala. Paczka 185 zalozyla "gra dla AI w sluzbie nie placi nic z siebie" i wylaczyla dwie wyplaty gry, tej trzeciej nie znala. Najmow w roku 681 (nowe umowy w linii 185: 678), bo kompanie skacza od krola do krola (mediana sluzby 4 doby); przyrost kies kompanii ponad ksiege w dobach najmu = 12.09 mln (33.2 tys. zl/d; srednio 17.7 tys. na najem, najwiecej 182 920 - doba 334, Bright Banners do Targaryena: 40% kiesy krola). Pierwotny wniosek podejrzewal barter gry (`ExecuteAiBarter`) - obalone: barter szedlby przez `GiveGoldAction` i bylby w ksiedze.
+
+**Zmiana (klucz `MercBkDownPaymentAiOff`, domyslnie wlaczony; wylaczony = BK placi zadatek jak dotad):** prefiks Harmony na `BannerKings.Behaviours.Mercenary.BKMercenaryCareerBehavior.AddDownPayment(Clan, Kingdom)`, wpinany w kampanii (`MercContract.EnsureHooks`, obok dwoch latek 185): przy czynnej 185 i kompanii AI zwraca false (BK nic nie przelewa) i liczy najem oraz kwote, ktora BK by przelal (ten sam wzor BK przez refleksje, sam odczyt). Brak BK albo metody - "BRAK" w linii startowej 185, nic sie nie dzieje. Linia doby 185: `P3/W3 zadatek BK wstrzymany: N najmow, M zl zostalo w kiesach krolow`.
+
+**Zloto / ludzie:** nic nie powstaje i nic nie znika - przelew krol -> kompania po prostu nie nastepuje; kompania dalej dostaje kontrakt 185 ze skarbca (wplywy dnia). W kiesach krolow zostaje ok. 33 tys. zl/d (12.09 mln w roku), u 21 zubozalych krolow 23.9 tys. zl/d. Oczekiwane dla wojska: +3 do +4 tys. ludzi po roku (wlasne druzyny krolow malych krolestw) - ok. 10% rocznego spadku, nie wiecej.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Gracz: jako najemnik dostaje zadatek BK jak dotad (prefiks go przepuszcza). Jako KROL najmujacy kompanie AI nie placi zadatku z wlasnej kiesy (placi skarbiec kontraktem 185) - zmiana na korzysc gracza, do wiadomosci Jeffa.
+- Skakanie kompanii miedzy krolami NIE zmaleje (ocena najmu nie zawiera zadatku; 221 / 219 / 255 zmian na 120 dob w trzech biegach) - osobna poprawka "minimalny czas sluzby 28 dob" jest DO DECYZJI (zmienia zachowanie na mapie).
+- Bogatsi krolowie podnosza mnoznik nagrody gry (`DefaultMinorFactionsModel` liczy zloto wodzow) - kompanie chetniej ida do tych samych krolestw; na zloto bez wplywu.
+- Nagromadzone 20.6 mln zostaje u kompanii w starej kampanii (Jeff gra nowa - wystarczy zamknac doplyw).
+- Latka w kampanii, nie w SubModuleMain (pulapka konstruktorow statycznych). `AddDownPayment` ma 148 bajtow IL - gra nie wkleja jej w wolajacego (prog 100), wiec prefiks jest wolany (inaczej niz krotkie `EndCallToWarAgreement` - patrz W4).
+- Czynne tylko z 185 (`MercContractEnabled` i 165). Klucza nie ma w `Armoury.json` Jeffa (grep).
+- Sprawdzic w biegu: linia 185 "zadatek BK wstrzymany" ok. 1.9 najmu na dobe; kiesy kompanii (csv, rodzaj najemnik) w d120 ok. 3-4 mln (bylo 7.97 mln); krolow z kiesa ponizej 20 tys. w d120 najwyzej 1 (bylo 4); wlasne druzyny krolow w d120 nie mniejsze niz w d60.
+
+**Build:** Armoury kod 0. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny.
+
 ## 2026-10-13 (P3/WOJSKO W2, TRIAZ-3 O1-3) - ZWOLNIENIA Z BRAKU BUDZETU LOSOWO Z CALEJ PARTII, NIE OD NAJNIZSZEGO TIERU (klucz ReleaseAcrossTiers)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-wojsko` | **Pliki:** `Armoury/src/ClanBudget.cs` (nowe `DrawAcross`, `ReleaseFrom`, liczniki i linia 166), `Settings.cs` + `McmSettings.cs` (gen_mcm), `CHANGELOG.md`. Zapis bez zmian (zadnego nowego stanu).
 

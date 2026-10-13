@@ -3492,6 +3492,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool MercGameContractAiOff { get; set; } = true;
 
+        [SettingPropertyBool("Merc Bk Down Payment Ai Off", HintText = "with Merc Contract Enabled: an AI mercenary company no longer takes BannerKings' earnest-money out of the hiring king's own purse each time it changes its master - the crown's daily contract is its one pay for the service (companies changed masters every few days and drained the purses of the small kings). You still get your earnest-money when you hire out as a mercenary; when you are the king, you pay none to an AI company. Off = BannerKings pays the earnest-money, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool MercBkDownPaymentAiOff { get; set; } = true;
+
         [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
@@ -6108,6 +6112,7 @@ namespace Armoury
             s.MercHireFloorShare = MercHireFloorShare;
             s.MercUnpaidLeaveDays = MercUnpaidLeaveDays;
             s.MercGameContractAiOff = MercGameContractAiOff;
+            s.MercBkDownPaymentAiOff = MercBkDownPaymentAiOff;
             s.CrownGifts = CrownGifts;
             s.GiftWatchNorth = GiftWatchNorth;
             s.GiftWatchIronThrone = GiftWatchIronThrone;

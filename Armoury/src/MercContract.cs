@@ -24,6 +24,12 @@ namespace Armoury
     ///  - Gra dla AI w sluzbie nie placi nic z siebie (MercGameContractAiOff): "za tier" (Tier x 120 z niczego) = 0 i kontrakt gry (AddMercenaryIncome:
     ///    wplyw x mnoznik z MercenaryWallet, ktory splacaja wasale) = 0 - bez dopisku do MercenaryWallet, wiec wasale placa tylko za kontrakt gracza.
     ///    GRACZ-najemnik zostaje na kontrakcie gry (prawdziwy platnik - wasale).
+    ///  - P3/W3-A (bieg roczny 364 doby, TRIAZ-3 O1-4 A; klucz MercBkDownPaymentAiOff): ZADATEK BANNERKINGS dla kompanii AI wylaczony - "jedna zaplata za
+    ///    jedna sluzbe". BK przy kazdym najmie (BKMercenaryCareerBehavior.OnClanChangedKingdom -> AddDownPayment) przelewa z kiesy KROLA do glowy kompanii
+    ///    (5% zlota rodu krola + sila kompanii x MercenaryAwardMultiplier / 2) x reputacja, najwyzej cala kiese (ChangeHeroGold bez zdarzenia gry - ksiega
+    ///    tego nie widziala). Paczka 185 zalozyla "gra dla AI w sluzbie nie placi nic z siebie" i nie znala tej trzeciej wyplaty: 681 najmow w roku =
+    ///    12.09 mln zl od krolow do kompanii (kompanie 2.9 -> 20.6 mln, krolowie malych krolestw bez wlasnych druzyn). Prefiks zwraca false dla kompanii AI
+    ///    przy czynnej 185; gracz-najemnik bez zmian (zadatek BK jak dotad), gracz-krol najmujacy kompanie AI tez zadatku nie placi (placi skarbiec kontraktem).
     /// Platnik -> odbiorca: skarbiec pracodawcy -> glowa rodu najemnego (D: czesc "kontrakt"). Zapis umow: SaveText "arm_merc185".
     /// </summary>
     internal static class MercContract
@@ -49,10 +55,15 @@ namespace Armoury
         internal static long LastDue, LastPaid, LastTierOff, LastGameOff;
         internal static int LastClans, LastNew, LastCut, LastLeft;
         private static long _dTierOff, _dGameOff;
+        // P3/W3-A: zadatek BK wstrzymany - najmy i kwota, ktora BK przelalby z kiesy krola (od poprzedniej linii doby)
+        private static int _dBkDownN; private static long _dBkDownGold;
+        private static string _bkDownWire = "BRAK";
+        private static System.Reflection.PropertyInfo _bkCfgInst, _bkDipModel;
+        private static System.Reflection.MethodInfo _bkDownAmount;
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
-        internal static void Reset() { _deals.Clear(); ZeroLast(); _dTierOff = _dGameOff = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; }
+        internal static void Reset() { _deals.Clear(); ZeroLast(); _dTierOff = _dGameOff = 0; _dBkDownN = 0; _dBkDownGold = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; }
         internal static void ZeroLast() { LastDue = LastPaid = LastTierOff = LastGameOff = 0; LastClans = LastNew = LastCut = LastLeft = 0; }
 
         private static void Stumble(string where, Exception e)
@@ -251,6 +262,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Daily(odejscie)", e); }
                 }
                 LastTierOff = _dTierOff; LastGameOff = _dGameOff; _dTierOff = 0; _dGameOff = 0;
+                int bkDownN = _dBkDownN; long bkDownGold = _dBkDownGold; _dBkDownN = 0; _dBkDownGold = 0;   // P3/W3-A
                 long wallet = 0; foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated) wallet += k.MercenaryWallet;
                 if (s.LogEnabled)
                     Log.Info("Kontrakty najemnikow (185): dzien " + today + " | kompanii AI w sluzbie " + LastClans + " (nowe umowy " + LastNew + ", przeglad w dol " + LastCut + ", odeszly po niedoplacie " + LastLeft + ")"
@@ -258,6 +270,9 @@ namespace Armoury
                              + " | ludzie najemnikow AI " + menNow + " / z umowy (w pokoju polowa) " + menDeal
                              + " | gra dla AI w sluzbie: \"za tier\" wylaczone " + LastTierOff + " zl, kontrakt gry wylaczony " + LastGameOff + " zl (od wczoraj; AI dostaje 0 z gry)"
                              + " | MercenaryWallet krolestw razem " + wallet + " (zmienia sie tylko o kontrakt gracza)"
+                             + " | P3/W3 zadatek BK wstrzymany (Merc Bk Down Payment Ai Off): " + (s.MercBkDownPaymentAiOff
+                                 ? bkDownN + " najmow, " + bkDownGold + " zl zostalo w kiesach krolow (od wczoraj; latka " + _bkDownWire + ")"
+                                 : "wylaczone - BK placi zadatek z kiesy krola jak dotad")
                              + (_stumbles > 0 ? " | potkniecia " + _stumbles : "")
                              + (_importN >= 0 ? " | wczytano umow " + _importN + " (bledne " + _importBad + ")" : "") + ".");
                 _importN = -1;
@@ -314,6 +329,37 @@ namespace Armoury
             catch (Exception e) { Stumble("TierPostfix", e); }
         }
 
+        /// <summary>P3/W3-A: prefiks BannerKings BKMercenaryCareerBehavior.AddDownPayment(Clan mercenaryClan, Kingdom kingdom) - kompania AI przy czynnej 185
+        /// nie dostaje zadatku z kiesy krola (false = BK nic nie przelewa; metoda robi tylko ten przelew i komunikat dla gracza-najemnika). Gracz-najemnik -
+        /// BK jak dotad. Licznik: najmy i kwota, ktora BK by przelal (ten sam wzor BK, min z kiesa krola - sam odczyt). Wyjatek = potkniecie, BK jak dotad.</summary>
+        public static bool BkDownPaymentPrefix(Clan __0, Kingdom __1)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.MercBkDownPaymentAiOff || !On || __0 == null || __0 == Clan.PlayerClan) return true;
+                _dBkDownN++;
+                try
+                {
+                    if (__1 != null && __1.RulingClan != null && _bkCfgInst != null && _bkDipModel != null)
+                    {
+                        var inst = _bkCfgInst.GetValue(null, null);
+                        var model = inst != null ? _bkDipModel.GetValue(inst, null) : null;
+                        if (model != null && _bkDownAmount == null)
+                            _bkDownAmount = AccessTools.Method(model.GetType(), "GetMercenaryDownPayment", new[] { typeof(Clan), typeof(Kingdom), typeof(bool) });
+                        if (model != null && _bkDownAmount != null)
+                        {
+                            var en = (ExplainedNumber)_bkDownAmount.Invoke(model, new object[] { __0, __1, false });
+                            _dBkDownGold += Math.Max(0, Math.Min((int)en.ResultNumber, __1.RulingClan.Gold));
+                        }
+                    }
+                }
+                catch (Exception e) { Stumble("BkDownPaymentPrefix(kwota)", e); }   // sama kwota do linii - zadatek i tak wstrzymany
+                return false;
+            }
+            catch (Exception e) { Stumble("BkDownPaymentPrefix", e); return true; }
+        }
+
         private static bool _hooksTried;
         private static Harmony _harmony;
         internal static void SetHarmony(Harmony h) { _harmony = h; }
@@ -335,8 +381,21 @@ namespace Armoury
                 if (m != null) { _harmony.Patch(m, postfix: new HarmonyMethod(typeof(MercContract), nameof(TierPostfix))); b = "wpiety"; _tierWired = true; }
             }
             catch (Exception e) { Log.Error("MercContract.EnsureHooks(CalculateClanIncomeInternal)", e); }
+            // P3/W3-A: zadatek BK przy najmie (BK wczytany - typ jest; bez BK "BRAK" i nic sie nie dzieje). Metoda ma 148 bajtow IL - gra jej nie wkleja
+            // w wolajacego (prog 100), wiec prefiks jest wolany
+            try
+            {
+                var bt = AccessTools.TypeByName("BannerKings.Behaviours.Mercenary.BKMercenaryCareerBehavior");
+                var m = bt != null ? AccessTools.Method(bt, "AddDownPayment", new[] { typeof(Clan), typeof(Kingdom) }) : null;
+                if (m != null) { _harmony.Patch(m, prefix: new HarmonyMethod(typeof(MercContract), nameof(BkDownPaymentPrefix))); _bkDownWire = "wpiety"; }
+                var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                _bkCfgInst = cfgT != null ? AccessTools.Property(cfgT, "Instance") : null;
+                _bkDipModel = cfgT != null ? AccessTools.Property(cfgT, "DiplomacyModel") : null;
+            }
+            catch (Exception e) { Log.Error("MercContract.EnsureHooks(BK AddDownPayment)", e); }
             Log.Info("Kontrakty najemnikow (185): kontrakt gry dla AI (AddMercenaryIncome) " + a + ", \"za tier\" AI (CalculateClanIncomeInternal) " + b
-                     + "; wylaczniki Merc Contract Enabled (czynny z Crown Current Income) i Merc Game Contract Ai Off.");
+                     + ", zadatek BK przy najmie (BKMercenaryCareerBehavior.AddDownPayment) " + _bkDownWire
+                     + "; wylaczniki Merc Contract Enabled (czynny z Crown Current Income), Merc Game Contract Ai Off i Merc Bk Down Payment Ai Off.");
         }
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_merc185")
