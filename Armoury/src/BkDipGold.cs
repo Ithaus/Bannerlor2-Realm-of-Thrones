@@ -60,7 +60,7 @@ namespace Armoury
         internal sealed class GentryCtx { public Settlement S; public object Estate; public Hero Owner0; public bool Off; }
         internal sealed class HeroCtx { public Hero H; public int G0; }
         internal sealed class PackCtx { public List<KeyValuePair<EquipmentElement, int>> Stash; public int G0; public bool Off; }
-        internal sealed class FeastCtx { public Hero H; public Town T; public long H0, T0; }
+        internal sealed class FeastCtx { public Hero H; public Town T; public long H0, T0; public MercFeast.Snap G; }   // G - E8/G2 (261): stan rynku i spizarni sprzed zakupow
 
         // okna paktow Diplomacy: druga strona traktatu
         private static readonly Kingdom[] _pact = new Kingdom[4];
@@ -285,13 +285,21 @@ namespace Armoury
                 var t = _feastTown.GetValue(__instance, null) as Town;
                 if (h == null || t == null) return;
                 __state = new FeastCtx { H = h, T = t, H0 = h.Gold, T0 = t.Gold };
+                __state.G = MercFeast.FeastBefore(t);   // E8/G2 (261): stan rynku i spizarni uczty (zywnosc, wino, piwo) - sam odczyt, wlasny licznik potkniec
             }
             catch (Exception e) { __state = null; Stumble("FeastPre", e); }
+        }
+
+        /// <summary>E8/G2 (261): czy okno uczty (prefiks i finalizer na BK Feast.Automanage) jest wpiete - MercFeast poprawia w nim towar rynku.</summary>
+        internal static bool FeastWired
+        {
+            get { foreach (var w in _wired) if (w != null && w.StartsWith("uczta", StringComparison.Ordinal)) return true; return false; }
         }
 
         public static void FeastFin(FeastCtx __state)
         {
             if (__state == null) return;
+            MercFeast.FeastAfter(__state.G);            // E8/G2 (261): zakup schodzi z rynku miasta (BK dopisywal rynkowi +n); przed rozliczeniem zlota - niezalezne od niego
             try
             {
                 long paid = Math.Max(0L, __state.H0 - __state.H.Gold);
@@ -450,6 +458,7 @@ namespace Armoury
                 if (_kOffN > 0) sb.Append("; w nicosc jak dotad ").Append(_kOff).Append(" (").Append(_kOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
+                Stage8World.BkSegment(sb);   // E8/P3 (245): dopisek pomiaru - zywnosc BK dla band hersztow i ujscia BK bez odbiorcy (tylko log; klucz Stage8WorldLog wylaczony = linia jak dotad)
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

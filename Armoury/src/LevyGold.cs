@@ -20,6 +20,7 @@ namespace Armoury
     internal static class LevyGold
     {
         private static int _toNotables, _toTowns, _skippedKits, _dayStamp = -1;
+        private static int _skippedLords;   // E8/T (263): z _skippedKits - partie lordow (linia "Dorobek startowy (E8/T)")
         private static long _toPurses;      // E5/B6 (201): oplata za najem z karczmy do sakiewek najetych (lordowie AI i karawany)
         // 3.1 (31, E3/6 - paczka 164a-5): zwrot = dokladnie to, co gra zdjela z kiesy wodza (zdarzenie GiveGoldAction wodz -> nic, po obcieciu do kiesy),
         // nie koszt liczony od nowa po werbunku (gra liczy go PRZED dodaniem rekruta - RecruitmentCampaignBehavior.cs:608 - i obcina do kiesy :625);
@@ -29,7 +30,7 @@ namespace Armoury
         private static Hero _rcLeader;
         private static long _rcTaken;
 
-        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _dayStamp = -1; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0; _rcOpen = false; _rcLeader = null; _rcTaken = 0; }
+        internal static void Reset() { _toNotables = _toTowns = _skippedKits = 0; _skippedLords = 0; _dayStamp = -1; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0; _rcOpen = false; _rcLeader = null; _rcTaken = 0; }
 
         public struct RcState { public bool Prev; public Hero PrevLeader; public long PrevTaken; public int Car0; }
 
@@ -177,7 +178,11 @@ namespace Armoury
                 if (Campaign.Current == null || !Campaign.Current.GameStarted) return true;   // start gry - swiat dostaje sprzet
                 if (__0 == MobileParty.MainParty) return true;
                 Tick();
+                // E8/T (263, PLAN 8.10c): partia lorda AI z pierwszych dob nowej kampanii dostaje dorobek stuleci jak partie sprzed startu (ColdStart.LateLord) -
+                // zamiast kompletu DTE, ktory dalej jest zablokowany; po oknie nowej gry i dla kazdej innej partii - jak dotad
+                if (ColdStart.LateLord(__0)) return false;
                 _skippedKits++;
+                try { if (__0.IsLordParty) _skippedLords++; } catch { }
                 return false;
             }
             catch { return true; }
@@ -194,7 +199,8 @@ namespace Armoury
                          // 3.1 (E3/6): zwrot = dokladnie zdjete z kiesy; rozjazd z kosztem liczonym od nowa (stara regula) - informacja
                          + " 3.1 (E3/6): notabl brak/zmarly - do kas osad " + _toSettl + ", ochotnicy z mapy - do kies wsi " + _toVillages + ", bez odbiorcy (prog 0) " + _unrouted
                          + "; ochotnicy od notabli: zdjete z kies wodzow " + _newWay + " (koszt liczony od nowa po werbunku dalby " + _oldWay + ").");
-            _toNotables = _toTowns = _skippedKits = 0; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0;
+            if (_dayStamp >= 0) ColdStart.LateFlush(_dayStamp, _skippedKits, _skippedLords);   // E8/T (263): linia doby dorobku partii lordow (te same liczniki, przed zerowaniem)
+            _toNotables = _toTowns = _skippedKits = 0; _toSettl = _toVillages = _unrouted = _oldWay = _newWay = 0; _toPurses = 0; _skippedLords = 0;
             _dayStamp = day;
         }
 
@@ -221,6 +227,8 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("LevyGold.PartyCreated", e); }
             Log.Info("LevyGold: zloto za werbunek AI do sprzedajacego " + a + "; koniec darmowego kompletu nowej partii AI (DTE) " + b + ".");
+            // E8/T (263, PLAN 1.12): rekrut gracza ta sama sciezka co AI - latki na DTE i oknach werbunku gracza (we wlasnym try; SubModuleMain bez zmian)
+            try { PlayerRecruit.ApplyAll(h); } catch (Exception e) { Log.Error("PlayerRecruit.ApplyAll", e); }
         }
     }
 }

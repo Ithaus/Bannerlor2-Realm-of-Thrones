@@ -530,6 +530,7 @@ namespace Armoury
                         var mp = f.B as MobileParty;
                         long gold = mp != null ? (long)mp.PartyTradeGold - f.Gold0 : 0;
                         if (gold > 0) { _wagonGold += gold; _wagonSales++; }
+                        bool p3 = Stage8World.WagonSale(mp, gold);   // E8/P3 (245): utarg wozow wsi owczych - tylko licznik (linia "Owce (E8/P3)")
                         // waga podzialu: sztuki x cena pierwszej sztuki; gdy ceny nie bylo (wyjatek wyceny) - same sztuki
                         double weight = 0, units = 0;
                         foreach (var i in f.Touched) if (f.InA[i] > 0) { units += f.InA[i]; if (f.Price[i] > 0) weight += (double)f.InA[i] * f.Price[i]; }
@@ -543,6 +544,7 @@ namespace Armoury
                                 a.WagonUnits += sold;
                                 if (gold > 0 && weight > 0 && f.Price[i] > 0) a.WagonGold += (long)Math.Round(gold * ((double)sold * f.Price[i] / weight));
                                 else if (gold > 0 && weight <= 0 && units > 0) a.WagonGold += (long)Math.Round(gold * (sold / units));
+                                if (p3) Stage8World.WagonItem(_items[i], sold, f.Price[i], gold, weight, units);   // E8/P3: ten sam podzial utargu, osobny licznik wsi owczych
                             }
                             Book(i, GRest, "wozy", f.Net[i]);
                         }

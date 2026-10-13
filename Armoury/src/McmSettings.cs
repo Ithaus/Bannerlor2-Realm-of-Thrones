@@ -536,6 +536,10 @@ namespace Armoury
         [SettingPropertyGroup("The crossing law")]
         public float CrossingRadius { get; set; } = 3f;
 
+        [SettingPropertyBool("Crossing Law Ai Clock", HintText = "the bridge watch turns hostile AI lord parties back once every game hour, wherever you are (before, it only did so while you yourself were being turned back at a crossing). Sleeping parties and armies marching to besiege the crossing are left alone. Off = as before")]
+        [SettingPropertyGroup("The crossing law")]
+        public bool CrossingLawAiClock { get; set; } = true;
+
         [SettingPropertyInteger("Volunteer Regen Percent", 0, 400, "0", HintText = "notables refill their volunteer slots at this percent of the normal daily chance - losses should STING, for lords and player alike (100 = vanilla, 0 = off; Jeff 30.08: halved again, the towns still teemed with recruits)")]
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 100;
@@ -1011,6 +1015,14 @@ namespace Armoury
         [SettingPropertyBool("Pact Cost To Other Realm", HintText = "the gold a ruler (or you) pays in Diplomacy for a non-aggression pact or for peace goes to the treasury of the other realm in the treaty instead of vanishing; if that realm is gone or falls with this very peace, nothing is taken. Off = the gold vanishes, as before")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PactCostToOtherRealm { get; set; } = true;
+
+        [SettingPropertyBool("Merc Clans Real Soldiers", HintText = "the sellsword clans of the world keep their captains and get no men out of thin air from Banner Kings: every day Banner Kings threw each hero of a hired mercenary clan out of his own warband and put a soldier made from nothing in his place, and it would hand a clan without a contract 3 to 5 free men per warband. With this on the heroes stay, hired men of other stock are still turned one for one into the clan's own troops as Banner Kings does, and Banner Kings adds nobody from nothing. The few recruits a clan without a contract picks up and pays for on the road are the game's own rule and are left as they are. Your Spoils of War company has its own switch. Off = as Banner Kings does")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool MercClansRealSoldiers { get; set; } = true;
+
+        [SettingPropertyBool("Feast No Free Goods", HintText = "the food and drink a Banner Kings feast buys really leave the town market: Banner Kings put the bought goods into the feast's larder and then added the same amount to the market stalls again instead of taking it off, so every purchase made goods out of thin air twice over. Off = as before")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool FeastNoFreeGoods { get; set; } = true;
 
         [SettingPropertyBool("Field Craft Enabled", HintText = "battlefield body rules: sprint fatigue, wounded penalties, bleeding, arrows that barely scratched fall off")]
         [SettingPropertyGroup("Flesh and wind")]
@@ -1808,6 +1820,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool KitFromNotable { get; set; } = true;
 
+        [SettingPropertyBool("Player Recruit No Free Kit", HintText = "your recruits come as an AI lord's do, with no full free kit from Dynamic Troop Equipment: a volunteer above the first rank brings what his notable bought for him and what he owns, a first-rank man brings his own belongings as before, and a tavern hireling brings what he owns plus, if he rides, his own horse and its harness. The rest you buy or loot. Off = as before (every recruit brings a full kit)")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PlayerRecruitNoFreeKit { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ai Gear Budget Percent", 0.00f, 100.00f, "0.00", HintText = "share of a lord's gold (above the reserve) he is willing to spend on gear in one visit to a town")]
         [SettingPropertyGroup("Army purchases")]
         public float AiGearBudgetPercent { get; set; } = 25f;
@@ -2040,6 +2056,14 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool IslandRoadsFix { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Town Hourly", HintText = "a Banner Kings caravan standing in a town decides every hour again whether to buy and move on, as Banner Kings meant it - the Realm of Thrones patch let it decide only once a day, so caravans stood about three days in every town instead of about three hours. On the road the once-a-day limit stays. Expect more trade between towns. Off = as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool CaravanTownHourly { get; set; } = true;
+
+        [SettingPropertyBool("Island Caravan Fix", HintText = "a caravan without ships is no longer left stranded where it cannot trade: a lord does not buy one (Banner Kings) in a town, castle or village that has no road to two towns - his gold stays with him - and a caravan already standing in a town with no other town in reach by land is wound up: the town buys its goods out of its spare money, the purse goes to the owner, the men go home. Your own caravans are never touched. Off = as before")]
+        [SettingPropertyGroup("The road to market")]
+        public bool IslandCaravanFix { get; set; } = true;
+
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)")]
         [SettingPropertyGroup("The road to market")]
         public bool VillageClogDiagnostics { get; set; } = true;
@@ -2119,6 +2143,14 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Cold Start Market Days", 0.00f, 240.00f, "0.00", HintText = "new campaign only: how many days of the town craftsmen's work lie on the stalls at the start (mostly common gear of the town's culture); two months of stock, because recruits no longer bring a second kit from thin air")]
         [SettingPropertyGroup("Iron Bank")]
         public float ColdStartMarketDays { get; set; } = 60f;
+
+        [SettingPropertyBool("Cold Start Tier Up", HintText = "new campaign only: when the craftsmen's starting stock is laid out and a guild makes nothing as plain as the piece that was drawn, it lays out its next better piece instead of losing the rest of its share - armourers and shield makers no longer start with half-empty stalls. Off = as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ColdStartTierUp { get; set; } = true;
+
+        [SettingPropertyBool("Cold Start Late Lord Parties", HintText = "new campaign only: an AI lord's warband raised in the first three days of the campaign starts with the kit its men already wear lying in its stores, like the warbands that stood on the map at the very start - once for each lord, so the first days are no longer one great rush on the markets. Off = as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool ColdStartLateLordParties { get; set; } = true;
 
         [SettingPropertyBool("Historical Prices Enabled", HintText = "the whole world in historical prices (1 coin = 1 medieval penny): arms and armour priced from their real making cost, smithing materials at medieval prices - wages and incomes already sit at this scale")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4164,9 +4196,21 @@ namespace Armoury
         [SettingPropertyGroup("Companion at the bellows")]
         public int HelperSkillForFullRelief { get; set; } = 150;
 
-        [SettingPropertyInteger("Forge Parts Free Below Tier", 0, 10, "0", HintText = "only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A safety floor always keeps one band of parts per required slot, so the Craft button never dies. Applied when a session loads")]
+        [SettingPropertyInteger("Forge Parts Free Below Tier", 0, 10, "0", HintText = "only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A weapon class in which some required slot has no part below this tier stays closed - its Craft button is dead - until you unlock a part for that slot by smelting such a weapon; the CrashScribe log lists these classes at session start. Applied when a session loads")]
         [SettingPropertyGroup("The forge gate")]
         public int ForgePartsFreeBelowTier { get; set; } = 2;
+
+        [SettingPropertyBool("Book Price Fix", HintText = "Banner Kings books are worth what a manuscript was worth (700 or 1,000 instead of 7 or 10 - a Realm of Thrones patch had divided their worth by 100), and buying one from a Banner Kings bookseller is a real trade: you pay the price shown in the list (Banner Kings took a thousand times that), the coin goes to the bookseller's purse instead of vanishing, and the book leaves his collection instead of appearing out of thin air - a bookseller who has sold all his books has none left. Off = as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool BookPriceFix { get; set; } = true;
+
+        [SettingPropertyBool("Craft Orders Historical", HintText = "the smithing orders of lords and notables are a real trade in the world's coin: the reward is reckoned from the historical worth of the ordered weapon (tens or hundreds, not thousands), the client pays it from his own purse instead of out of thin air (a client short of coin pays what he has and you are told), the weapon you forged goes to the lord's baggage or onto the town's stalls instead of vanishing, and a lord no longer gets a free soldier with it. The smithing experience for an order is unchanged. Orders already waiting in a save are repriced once on load. Off = as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrdersHistorical { get; set; } = true;
+
+        [SettingPropertyBool("Craft Orders Opened Only", HintText = "new smithing orders ask only for weapon classes you can actually forge - every slot of the class must have a part you have unlocked - and for parts at most one tier above your best unlocked part of that class, so no order is impossible because of the forge gate. In a new campaign the starting orders are redrawn once on the first day by the same rule. Off = any class and tier, as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrdersOpenedOnly { get; set; } = true;
 
         [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
         [SettingPropertyGroup("Hideout spotted")]
@@ -5004,6 +5048,10 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
+        [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
+        public bool StateHygieneEnabled { get; set; } = true;
+
         [SettingPropertyBool("Stage8 Measure Log", HintText = "Writes daily lines that measure the AI's gear for stage 8: wear and repairs of garrisons and lords' parties and why repairs wait, arrows the AI would have used up, the prices the AI pays against the worth of the piece, loot copied to victors while the beaten keep it, and the crown's workshop monopolies (diagnostics only; nothing in the game changes).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8MeasureLog { get; set; } = true;
@@ -5011,6 +5059,10 @@ namespace Armoury
         [SettingPropertyBool("Stage8 Profile Log", HintText = "Writes one daily line with the time each part of the mod takes (diagnostics only).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8ProfileLog { get; set; } = true;
+
+        [SettingPropertyBool("Stage8 World Log", HintText = "Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).")]
+        [SettingPropertyGroup("Diagnostics (stage 8)")]
+        public bool Stage8WorldLog { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -5145,6 +5197,7 @@ namespace Armoury
             s.CrossingLawEnabled = CrossingLawEnabled;
             s.CrossingLawAi = CrossingLawAi;
             s.CrossingRadius = CrossingRadius;
+            s.CrossingLawAiClock = CrossingLawAiClock;
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
@@ -5264,6 +5317,8 @@ namespace Armoury
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
             s.FeastTownGetsPaid = FeastTownGetsPaid;
             s.PactCostToOtherRealm = PactCostToOtherRealm;
+            s.MercClansRealSoldiers = MercClansRealSoldiers;
+            s.FeastNoFreeGoods = FeastNoFreeGoods;
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
@@ -5463,6 +5518,7 @@ namespace Armoury
             s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
+            s.PlayerRecruitNoFreeKit = PlayerRecruitNoFreeKit;
             s.AiGearBudgetPercent = AiGearBudgetPercent;
             s.AiGearGoldReserve = AiGearGoldReserve;
             s.AiGearMaxPiecesPerVisit = AiGearMaxPiecesPerVisit;
@@ -5521,6 +5577,8 @@ namespace Armoury
             s.VillageCartLeaveTown = VillageCartLeaveTown;
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
             s.IslandRoadsFix = IslandRoadsFix;
+            s.CaravanTownHourly = CaravanTownHourly;
+            s.IslandCaravanFix = IslandCaravanFix;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
@@ -5541,6 +5599,8 @@ namespace Armoury
             s.VolunteerKitKeyOnly = VolunteerKitKeyOnly;
             s.ColdStartEnabled = ColdStartEnabled;
             s.ColdStartMarketDays = ColdStartMarketDays;
+            s.ColdStartTierUp = ColdStartTierUp;
+            s.ColdStartLateLordParties = ColdStartLateLordParties;
             s.HistoricalPricesEnabled = HistoricalPricesEnabled;
             s.HistIronOrePerKg = HistIronOrePerKg;
             s.HistWoodPerKg = HistWoodPerKg;
@@ -6053,6 +6113,9 @@ namespace Armoury
             s.HelperTimeRelief = HelperTimeRelief;
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
+            s.BookPriceFix = BookPriceFix;
+            s.CraftOrdersHistorical = CraftOrdersHistorical;
+            s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
@@ -6262,8 +6325,10 @@ namespace Armoury
             s.DistrictMenuEnabled = DistrictMenuEnabled;
             s.VillagePennants = VillagePennants;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.StateHygieneEnabled = StateHygieneEnabled;
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
+            s.Stage8WorldLog = Stage8WorldLog;
         }
 
         internal static void Apply()

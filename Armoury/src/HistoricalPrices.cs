@@ -381,6 +381,32 @@ namespace Armoury
         internal static int HorseCount { get { return _e8cHorses.Count; } }
         internal static int HorseStumbles { get { return _e8cHorseSt; } }
 
+        /// <summary>E8/K (255): PROJEKT ZLECENIA KOWALSKIEGO (CraftingOrder.PreCraftedWeaponDesignItem) w nowej monecie - ta sama wycena co PriceOne,
+        /// ale bez wpisu do _target / _orig i bez linii w logu: projektow przybywa kilkanascie na dobe (zlecenia miast), a znikaja razem ze zleceniem -
+        /// slowniki roslyby do wczytania. Zwraca wartosc sprzed przeliczenia (od niej CraftOrders8 liczy nagrode i doswiadczenie zlecenia); 0 = bez zmiany
+        /// (ceny wylaczone albo jeszcze nie przeliczone, nie bron, nie umiemy policzyc). Projekt przeliczony juz przez Apply (przedmiot z zapisu jest na
+        /// liscie przedmiotow gry) - zwraca jego wartosc sprzed przeliczenia z _orig.</summary>
+        internal static int PriceDesign(ItemObject it)
+        {
+            try
+            {
+                if (!On || !_applied || it == null || !IsArms(it) || it.Value <= 0) return 0;
+                int o;
+                if (_target.ContainsKey(it)) return _orig.TryGetValue(it, out o) ? o : 0;
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Value");
+                if (setter == null) return 0;
+                float hc = HistCost(it);
+                bool unique = ArmsPricing.IsUnique(it);
+                ArmsPricing.Forget(it);   // pamiec kosztu i unikatow nie trzyma projektu przy zyciu
+                if (hc <= 0f) return 0;
+                if (unique) hc *= Math.Max(1f, Settings.Current.HistUniquePrestige);
+                int was = it.Value;
+                _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(hc)) }); } finally { _ourSet = false; }
+                return was;
+            }
+            catch (Exception e) { Log.Error("HistoricalPrices.PriceDesign", e); return 0; }
+        }
+
         private static bool IsArms(ItemObject it)
         {
             switch (it.ItemType)
@@ -622,6 +648,40 @@ namespace Armoury
                     Log.Info("HistoricalPrices: stal valyrianska - " + _vsShelf + " wzorow wyceniona jako skonczony zasob (" + s.HistValyrianPerMeasure.ToString("0", CultureInfo.InvariantCulture)
                              + " d za miare; na polce wazy koszt wykonania): " + string.Join(", ", vs.ToArray()) + (rebuilt > 0 ? "; dane rynku przeliczone w " + rebuilt + " miastach z klinga na polce" : "") + ".");
                 }
+                // E8/K (255, PLAN 8.3; rozpoznanie B 1.1): KSIAZKI BK. BK definiuje 24 ksiazki po 750 (opowiesci) i 1000 (umiejetnosci) przez BKItems.InitializeTradeGood,
+                // a prefiks BKROTPatch (BKItemsInitializePatch) dzieli wartosc kazdego towaru BK przez 100 (liczby calkowite) - ksiazki maja 7 i 10, obok 36 ksiazek
+                // ROT po 1000 i 1500 w TEJ SAMEJ kategorii "book" (BKROT definiuje swoje wlasna metoda, bez dzielenia). Regula: ksiazka kategorii "book" warta mniej
+                // niz 100 -> x100 (700 / 1000 - rekopis XIV w. to kilka szylingow do kilku funtow); warunek "ponizej 100" = bez podwojenia, przy kazdym wczytaniu
+                // BKROT znow daje 7 / 10, a my znow x100. PO przeliczniku popytu (krok 3) i wagach polki: kategoria jest mieszana (ksiazki ROT maja cene
+                // nieprzeliczona), wiec jej popyt i wagi zostaja, jak je zaprojektowal BK dla ksiazek po 750-1000 - zmienia sie tylko wartosc sztuki. Blokada cen
+                // (_target) trzyma wynik; dane rynku miast z ksiazka na polce przebudowane od razu (inaczej zdjecie ksiazki odjeloby 700 od polki liczonej po 7).
+                if (s.BookPriceFix)
+                {
+                    var books = new HashSet<ItemObject>(); var bl = new List<string>();
+                    foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                    {
+                        if (it == null || it.ItemCategory == null || it.ItemCategory.StringId != "book" || it.Value <= 0 || it.Value >= 100 || _target.ContainsKey(it)) continue;
+                        int was = it.Value;
+                        set(it, was * 100f);
+                        _target[it] = it.Value;
+                        books.Add(it);
+                        if (bl.Count < 4) bl.Add(it.StringId + " " + was + " -> " + it.Value);
+                    }
+                    int rebuiltB = 0;
+                    if (books.Count > 0)
+                        foreach (var t in Town.AllTowns)
+                        {
+                            var r = t != null && t.Owner != null ? t.Owner.ItemRoster : null;
+                            if (r == null || t.MarketData == null) continue;
+                            bool has = false;
+                            for (int i = 0; i < r.Count && !has; i++) { var e = r.GetElementCopyAtIndex(i); has = e.Amount > 0 && e.EquipmentElement.Item != null && books.Contains(e.EquipmentElement.Item); }
+                            if (!has) continue;
+                            try { t.MarketData.UpdateStores(); rebuiltB++; } catch { }
+                        }
+                    Log.Info("HistoricalPrices: ksiazek BK przeliczonych " + books.Count + " (Book Price Fix CZYNNE: ksiazka kategorii book warta mniej niz 100 x100 - BKROTPatch dzieli wartosci towarow BK przez 100"
+                             + (bl.Count > 0 ? "; przyklady: " + string.Join(", ", bl.ToArray()) : "") + "; dane rynku przeliczone w " + rebuiltB + " miastach z ksiazka na polce).");
+                }
+                else Log.Info("HistoricalPrices: ksiazek BK przeliczonych 0 (Book Price Fix WYLACZONE - wartosci po BKROTPatch, jak dotad).");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.Apply", e); }
         }
@@ -1034,6 +1094,8 @@ namespace Armoury
 
         // BK BKEducationBehavior.OnBuyBookConsequence: cena ksiazki = Value x 1000 (0.75-1.5 mln) - blad BK; wartosc ksiazki
         // (750-1500 d = 3-6 L) jest historyczna dla rekopisu. Stala 1000 stojaca zaraz po get_Value -> 1.
+        // E8/K (255): ta podmiana siega tylko ceny NA LISCIE (get_Value, ldc.i4 1000). Lambda kupna ma w IL "get_Value, neg, ldc.i4 1000, mul" - stala nie stoi
+        // zaraz po get_Value, wiec kupno dalej bralo Value x 1000 (log: "w 1 metodach (stalych 1)"). Kupno robi teraz CraftOrders8.BookBuyPrefix (klucz BookPriceFix).
         private static int _bookSwaps;
         public static System.Collections.Generic.IEnumerable<CodeInstruction> BookTranspiler(System.Collections.Generic.IEnumerable<CodeInstruction> instructions)
         {

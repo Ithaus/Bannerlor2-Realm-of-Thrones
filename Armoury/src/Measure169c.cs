@@ -899,7 +899,11 @@ namespace Armoury
                 if (!_twinsLooked)
                 {
                     _twinsLooked = true;
-                    foreach (var s in Settlement.All) { if (s != null && s.Name != null && s.Name.ToString().IndexOf("Twins", StringComparison.OrdinalIgnoreCase) >= 0) { _twins = s; break; } }
+                    // E8/Q (262; rozpoznanie C poz. 9): Bliznaki po id jak CrossingLaw i E7/B (dotad pierwsza osada z "Twins" w nazwie - mogla to byc wies albo inna osada);
+                    // nazwa zostaje tylko jako wyjscie, gdy osady o tym id nie ma
+                    _twins = Settlement.Find("ROT_town3");
+                    if (_twins == null)
+                        foreach (var s in Settlement.All) { if (s != null && s.Name != null && s.Name.ToString().IndexOf("Twins", StringComparison.OrdinalIgnoreCase) >= 0) { _twins = s; break; } }
                 }
                 if (_twins == null || st != _twins) return;
                 string k = mp.IsMainParty ? "gracz" : mp.IsCaravan ? "karawany" : mp.IsVillager ? "wiesniacy" : mp.IsLordParty ? "lordowie" : mp.IsBandit ? "bandy" : "inne";

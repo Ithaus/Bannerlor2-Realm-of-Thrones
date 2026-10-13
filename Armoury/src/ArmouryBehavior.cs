@@ -531,6 +531,10 @@ namespace Armoury
                 string cold = ColdStart.Export();
                 SaveText.Sync(dataStore, "arm_coldstart", ref cold);
                 if (dataStore.IsLoading) ColdStart.Import(cold);
+                // E8/T (263): wodzowie partii z dorobkiem startowym pierwszych dob nowej kampanii (po 3. dobie pusty; stary zapis bez sekcji = pusty zbior)
+                string coldLate = ColdStart.ExportLate();
+                SaveText.Sync(dataStore, "arm_e8_coldlate", ref coldLate);
+                if (dataStore.IsLoading) ColdStart.ImportLate(coldLate);
                 string climate = WesterosClimate.Export();
                 SaveText.Sync(dataStore, "arm_climate", ref climate);
                 if (dataStore.IsLoading) WesterosClimate.Import(climate);
@@ -826,8 +830,14 @@ namespace Armoury
             CampaignEvents.GameMenuOpened.AddNonSerializedListener(this, OnGameMenuOpened);
             // T6 (noc 08/09.10): miara marszu - pozycje partii lordow co godzine (tylko log, wylacznik WorldMeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("WorldMeasure.Hourly", delegate { try { WorldMeasure.Hourly(); } catch (Exception e) { Log.Error("WorldMeasure.Hourly", e); } }));
+            // E8/P3 (245): postoj karawan AI w miastach - godzina wjazdu i wyjazdu (tylko pamiec i licznik, wylacznik Stage8WorldLog; kolejnosc wobec innych nasluchow bez znaczenia)
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Stage8World.OnEntered", Stage8World.OnEntered));
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, Stage8World.OnLeft);
             // E7/T (225): probka kar terenu - partie AI w ruchu w lesie / na pustyni / na rowninie i do 8 rozpisek gry na godzine (tylko log, Stage7MeasureLog)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TerrainEase.Hourly", delegate { try { TerrainEase.Hourly(); } catch (Exception e) { Log.Error("TerrainEase.Hourly", e); } }));
+            // E8/Q (262): straz przeprawy zawraca wrogie partie lordow AI raz na godzine gry, niezaleznie od gracza (wylacznik CrossingLawAiClock). Rejestracja PRZED
+            // probka E7/B = wolanie PO niej (gra dopisuje sluchacza na poczatek listy - MbEvent): licznik przejsc widzi przerwy sprzed rozkazu tej godziny
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CrossingLaw.AiHourly", delegate { try { CrossingLaw.AiHourly(); } catch (Exception e) { Log.Error("CrossingLaw.AiHourly", e); } }));
             // E7/B (231): licznik przejsc przez Bliznaki - lokator mapy wokol bramy raz na godzine (tylko log, wylacznik TwinsCrossingCount)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TwinsCrossing.Hourly", delegate { try { TwinsCrossing.Hourly(); } catch (Exception e) { Log.Error("TwinsCrossing.Hourly", e); } }));
             // E7/W1 (232): wiesci z wiosek - zdarzenie gry tylko kolejkuje (odczyt ksiegi), komunikaty w ticku godzinnym (wylacznik VillageRaidMessages = 0)
@@ -1245,6 +1255,7 @@ namespace Armoury
             try { LootPrices.Apply(); } catch (Exception e) { Log.Error("LootPrices", e); }   // wpis 97: cena lupu = stan
             try { McmSettings.Apply(); MaterialLaw.Apply(); ArmsPricing.Build(); HistoricalPrices.Apply(); WorkshopRecipes.Apply(); StartStock.Run(); ArmsPricing.ClearCostCache(); MapClock.ApplySpeed(); UniqueSpoils.OnSessionLaunched(); ColdStart.Run(); } catch (Exception e) { Log.Error("MaterialLaw/ArmsPricing", e); }   // surowce PRZED wycena uzbrojenia; StartStock zaraz PO Apply (przelicznik ladunku juz obowiazuje)
             try { FixedSums38.SessionStart(); } catch (Exception e) { Log.Error("FixedSums38.SessionStart", e); }   // 3.8: TXP (drugi raz) i linia "Stale kwoty (3.8)" - PO HistoricalPrices.Apply
+            try { CraftOrders8.SessionStart(); } catch (Exception e) { Log.Error("CraftOrders8.SessionStart", e); }   // E8/K (255): zlecenia kowalskie sprzed sesji (zapis, start nowej kampanii) - projekt i nagroda w nowej monecie; PO HistoricalPrices.Apply
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
@@ -1268,6 +1279,7 @@ namespace Armoury
             try { CrownCallToWar.EnsureHooks(); } catch (Exception e) { Log.Error("CrownCallToWar.EnsureHooks", e); }   // 168 dodatek: wezwanie do wojny placi korona - latki modelu finansow i sojuszy w kampanii
             try { WorldTime7.EnsureHooks(); } catch (Exception e) { Log.Error("WorldTime7.EnsureHooks", e); }   // E7/K (226): turnieje co 3. tydzien, sojusz 364 / wezwanie 182, rozejm gry ok. 87 dni - latki w kampanii (raz na proces), linia "Czas swiata (E7/K)"
             try { CampScene.StartLine(); } catch (Exception e) { Log.Error("CampScene.StartLine", e); }   // E7/O2 (229): linia startowa "CampScene (E7/O2)" - prefaby obozu sprawdzone raz na proces (PrefabExists), tylko przy CampBattlePropsEnabled
+            try { StateHygiene.SessionStart(); } catch (Exception e) { Log.Error("StateHygiene.SessionStart", e); }   // E8/S (246): linia startowa "Porzadek stanu (E8/S)" - ile klas wyzerowal konstruktor tej kampanii i co zostalo w pamieci po poprzedniej (tylko log)
             try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercContract.EnsureHooks(); } catch (Exception e) { Log.Error("MercContract.EnsureHooks", e); }   // 185: kontrakt gry i "za tier" AI = 0 (latki modelu finansow - w kampanii)   // 166: limity partii i zalog, dezercja z limitu, nowe partie, werbunek Strazy (latki w kampanii)   // 165: splata dlugu wobec korony do skarbca (latka modelu finansow - w kampanii)   // 169c: okna pomiaru etapu 2 (okupy, zalogi, rycerze, dezercja, konsumpcja, Inni) - latki w kampanii, tylko log
@@ -1525,10 +1537,15 @@ namespace Armoury
             // wchodzilo o poziom glebiej i rozpiska pokazywala gole liczby vanilli
             try { TerrainEase.DailyAudit(); } catch (Exception e) { Log.Error("SpeedAudit", e); } DayProfile.Lap("TerrainEase.DailyAudit");
             try { WorldMeasure.Daily(); } catch (Exception e) { Log.Error("WorldMeasure.Daily", e); } DayProfile.Lap("WorldMeasure.Daily");   // T6: linia "Miara: marsz" (tylko log)
+            try { Stage8World.Daily(); } catch (Exception e) { Log.Error("Stage8World.Daily", e); } DayProfile.Lap("Stage8World.Daily");   // E8/P3 (245): linie pomiarow swiata (owce, postoj karawan, najemnicy BK, rozkazy morskie; raz na sesje model produkcji wsi) - tylko log
+            try { CaravanFlow.Daily(); } catch (Exception e) { Log.Error("CaravanFlow.Daily", e); } DayProfile.Lap("CaravanFlow.Daily");   // E8/G1 (260): karawany bez drogi (wyspa z jednym miastem) - towar miastu z nadwyzki kasy i rozwiazanie; linia "Karawany (E8/G1)"; PO pomiarze postoju E8/P3, PRZED MoneyLedger.BlockOpen
+            try { MercFeast.Daily(); } catch (Exception e) { Log.Error("MercFeast.Daily", e); } DayProfile.Lap("MercFeast.Daily");   // E8/G2 (261): linia "Najemnicy i uczta BK (E8/G2)" - zamiana BK u klanow najemnikow bez bohaterow, zakupy uczt BK zdjete z rynku; tylko log
+            try { CraftOrders8.Daily(); } catch (Exception e) { Log.Error("CraftOrders8.Daily", e); } DayProfile.Lap("CraftOrders8.Daily");   // E8/K (255): linia "Kuznia (E8/K)" - zlecenia kowalskie i ksiegarz BK; w nowej kampanii raz wymiana zlecen startowych
             try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); } DayProfile.Lap("WesterosClimate.Daily");   // biale kruki: koniec pory roku
+            try { StateHygiene.Daily(); } catch (Exception e) { Log.Error("StateHygiene.Daily", e); } DayProfile.Lap("StateHygiene.Daily");   // E8/S (246): linia "Porzadek stanu (E8/S)" - PO WesterosClimate.Daily (stan klimatu po ponowieniu tej doby); tylko log
             try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
@@ -1687,6 +1704,7 @@ namespace Armoury
             try { WorldClock7.Daily(); } catch (Exception e) { Log.Error("WorldClock7.Daily", e); } DayProfile.Lap("WorldClock7.Daily");   // E7/0 (224): linie "Wojna i pokoj (E7/0)" i "Turnieje (E7/0)" (tylko log) - po ksiedze pieniadza
             try { TerrainEase.Stage7Daily(); } catch (Exception e) { Log.Error("TerrainEase.Stage7Daily", e); } DayProfile.Lap("TerrainEase.Stage7Daily");   // E7/T (225): linia "Kary terenu (E7/T)" i zerowanie probki doby (tylko log) - po E7/0
             try { TwinsCrossing.Daily(); } catch (Exception e) { Log.Error("TwinsCrossing.Daily", e); } DayProfile.Lap("TwinsCrossing.Daily");   // E7/B (231): linia "Przeprawa Bliznaki (E7/B)" i zerowanie licznikow doby (tylko log)
+            try { CrossingLaw.Daily(); } catch (Exception e) { Log.Error("CrossingLaw.Daily", e); } DayProfile.Lap("CrossingLaw.Daily");   // E8/Q (262): linia "Straz przeprawy (E8/Q)" i zerowanie licznikow doby - PO linii E7/B (jej dopisek czyta te same liczniki)
             try { VillageNews.Daily(); } catch (Exception e) { Log.Error("VillageNews.Daily", e); } DayProfile.Lap("VillageNews.Daily");   // E7/W1 (232): linia "Wioski - wiesci (E7/W1)" - PO VillageBook.Daily (spalone w ksiedze tej doby, T5) i zerowanie licznikow
             try { MapVillageLore.Daily(); } catch (Exception e) { Log.Error("MapVillageLore.Daily", e); } DayProfile.Lap("MapVillageLore.Daily");   // E7/W2 (233): linia "Dymek wioski (E7/W2)" (dymki i potkniecia doby), w pierwszej dobie sesji probka wiary BK 20 wiosek (T4)
             try { DistrictMenu.Daily(); } catch (Exception e) { Log.Error("DistrictMenu.Daily", e); } DayProfile.Lap("DistrictMenu.Daily");   // E7/W3 (234): w pierwszej dobie sesji linia startowa "Menu okregu (E7/W3): start" (index pozycji po wszystkich modach), potem linia doby tylko przy uzyciu

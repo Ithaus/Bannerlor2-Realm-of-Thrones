@@ -390,6 +390,13 @@ namespace Armoury
             return v;
         }
 
+        /// <summary>E8/G1 (260, CaravanFlow): miasto bez innego miasta w zasiegu ladu - ta sama pamiec co linia "Wyspy i drogi" (tylko odczyt, pod ta sama blokada).</summary>
+        internal static bool LonelyTown(Settlement town)
+        {
+            if (town == null || !town.IsTown) return false;
+            lock (_lock) { return Lonely(town); }
+        }
+
         /// <summary>Raz na dobe (z CartTownExit.Daily): linia "Wyspy i drogi:" - co latka zrobila z rozkazami BK bez drogi ladowej, kto dalej stoi.</summary>
         internal static void Daily()
         {

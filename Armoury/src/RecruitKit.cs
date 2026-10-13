@@ -25,7 +25,8 @@ namespace Armoury
     ///    jeniec - nic (Z4); echo ROT - nic (ten sam czlowiek, Z1).
     ///  - HouseLevies (OnSwap): komplet X przechodzi na Y; swiezy ochotnik tieru 2+ (OnFresh): zapis z kupionymi czesciami kluczowymi;
     ///    autowerbunek zalogi (OnGarrisonTook): komplet do zbrojowni zalogi zamiast sieroty.
-    /// Gracz: bez zmian (DTE), zdejmujemy tylko zapisy.
+    /// Gracz: bez zmian (DTE), zdejmujemy tylko zapisy. E8/T (263, PLAN 1.12): przy PlayerRecruitNoFreeKit gracz ta sama sciezka co AI - PlayerRecruit.cs
+    /// (okno werbunku i najmu gracza) bierze rzeczy z PlayerVolunteer / PlayerMerc ponizej, komplet DTE dla tieru 2+ zablokowany.
     /// </summary>
     internal static class RecruitKit
     {
@@ -64,6 +65,7 @@ namespace Armoury
             _kits.Clear(); _pending = null; _dayKits = _dayLegacy = _dayTier1 = _daySold = 0; _dayStamp = -1;
             ClearDay171(); _stumbles = 0; _errDay = -1; _errWhere.Clear();
             _parents = null; _root.Clear(); SeedConverted = 0; _gap.Clear(); _paidItems.Clear();
+            PlayerRecruit.Reset();   // E8/T (263): okno i liczniki rekruta gracza - ta sama chwila
         }
 
         private static void ClearDay171()
@@ -502,20 +504,7 @@ namespace Armoury
                     else if (settlement != null)                                                                              // 7: najemnik z karczmy
                     {
                         _dOwnMerc++;
-                        // E6/K1 (211, VeteranKeepsHorse): kon najemnika z puli koni weteranow tej karczmy (kon zwolnionego konnego), nie z wzorca; brak konia - bez konia
-                        // i bez rzedu (karczma pokazuje typ konny tylko do liczby koni w puli - Veterans.Sync); rzad nadal z wzorca (poza zakresem K1)
-                        bool vetHorse = HorseFate.VetHorseOn && troop.IsMounted;
-                        ItemObject vh = vetHorse ? HorseFate.VetHireHorse(settlement, troop) : null;
-                        if (vh != null) { items.Add(new EquipmentElement(vh)); _dMercHorsePcs++; }
-                        int tplHorse = 0;
-                        foreach (var e in TemplateItems(troop))
-                            if (MenPurse.HorseKind(e.Item))
-                            {
-                                if (vetHorse && (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse || vh == null)) continue;
-                                items.Add(e); _dMercHorsePcs++;
-                                if (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse) tplHorse++;
-                            }   // 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana; E6/K1: przy kluczu kon z puli (wyzej)
-                        HorseFate.NoteMercTemplateHorse(tplHorse);
+                        _dMercHorsePcs += MercHorseKit(settlement, troop, items);   // E8/T (263): ta sama regula konia i rzedu dla AI i gracza (wydzielone bez zmian)
                     }
                     else { _dOwnNoSource++; if (troop.IsMounted) _dMountedNoHorse++; }                                        // 8: bez zrodla (ochotnik z mapy, inne mody)
                     _dOwnPcs += items.Count; _tOwn[TierIdx(troop)]++;
@@ -527,6 +516,60 @@ namespace Armoury
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Kon i rzad najemnika z karczmy - wspolne dla AI (OnRecruited, przypadek 7) i gracza (E8/T). Zwraca liczbe dolozonych sztuk.
+        /// 160: kon najemnika z wzorca; E4/10 (167): typ konny tylko z konnego weterana; E6/K1 (211, VeteranKeepsHorse): kon z puli koni weteranow tej karczmy
+        /// (kon zwolnionego konnego), nie z wzorca; brak konia w puli - bez konia i bez rzedu (karczma pokazuje typ konny tylko do liczby koni w puli -
+        /// Veterans.Sync); rzad nadal z wzorca (poza zakresem K1).
+        /// </summary>
+        private static int MercHorseKit(Settlement settlement, CharacterObject troop, List<EquipmentElement> items)
+        {
+            int added = 0;
+            bool vetHorse = HorseFate.VetHorseOn && troop.IsMounted;
+            ItemObject vh = vetHorse ? HorseFate.VetHireHorse(settlement, troop) : null;
+            if (vh != null) { items.Add(new EquipmentElement(vh)); added++; }
+            int tplHorse = 0;
+            foreach (var e in TemplateItems(troop))
+                if (MenPurse.HorseKind(e.Item))
+                {
+                    if (vetHorse && (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse || vh == null)) continue;
+                    items.Add(e); added++;
+                    if (e.Item.ItemType == ItemObject.ItemTypeEnum.Horse) tplHorse++;
+                }
+            HorseFate.NoteMercTemplateHorse(tplHorse);
+            return added;
+        }
+
+        // ------------------------------------------------------------ E8/T (263, PLAN 1.12): rekrut gracza ta sama sciezka co AI
+        internal const int PlRecord = 0, PlTemplate = 1, PlOwn = 2, PlMerc = 3;
+
+        /// <summary>
+        /// E8/T: rzeczy ochotnika tieru 2+ zwerbowanego przez gracza u notabla - te same przypadki co OnRecruited dla AI: 5 zapis notabla (kupione + dobytek
+        /// + dorobek stuleci; zapis zdjety z puli - bez sieroty, ktora notabl sprzedalby na targu), wylacznik RecruitBringsWhatHeHas - wzorzec jak dotad,
+        /// 6 ochotnik bez zapisu - dobytek. Tier 1 tu nie trafia (komplet DTE = wlasny dobytek, jak u AI).
+        /// </summary>
+        internal static List<EquipmentElement> PlayerVolunteer(Hero notable, CharacterObject troop, out int kind)
+        {
+            var s = Settings.Current;
+            var k = Pop(notable, troop);
+            if (k != null) { kind = PlRecord; return Materialize(k); }
+            if (s != null && !s.RecruitBringsWhatHeHas) { kind = PlTemplate; return TemplateItems(troop); }
+            kind = PlOwn;
+            return OwnOf(troop);
+        }
+
+        /// <summary>E8/T: rzeczy najemnika z karczmy najetego przez gracza - przypadek 7 OnRecruited: dobytek oraz kon i rzad (MercHorseKit); wylacznik - wzorzec.</summary>
+        internal static List<EquipmentElement> PlayerMerc(Settlement town, CharacterObject troop, out int kind, out int horsePcs)
+        {
+            var s = Settings.Current;
+            horsePcs = 0;
+            if (s != null && !s.RecruitBringsWhatHeHas) { kind = PlTemplate; return TemplateItems(troop); }
+            kind = PlMerc;
+            var items = OwnOf(troop);
+            horsePcs = MercHorseKit(town, troop, items);
+            return items;
         }
 
         /// <summary>Dorobek stuleci: ochotnicy tieru 2+ w pulach na starcie kampanii maja komplet wzorca (171 B5: tyle zapisow, ilu ochotnikow).</summary>

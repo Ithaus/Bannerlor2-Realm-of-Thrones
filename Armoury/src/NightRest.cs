@@ -272,6 +272,19 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>E8/S (246, PLAN 8.11; recenzja T1 juz to wskazala): reszta stanu obozu GRACZA, ktorej ResetWorld nie obejmowal - nowa kampania albo
+        /// wczytanie (konstruktor ArmouryBehavior przez StateHygiene.ResetAll; osobno od ResetWorld - pod kluczem StateHygieneEnabled). Dotad do konca
+        /// procesu zyly: licznik potkniec namiotu (3 wywrotki w jednej kampanii gasily namioty takze w nastepnej), odcisk wizerunku z namiotem,
+        /// dzien pytania o nocleg (ten sam numer dnia w drugiej kampanii = tego zmierzchu bez pytania) i flaga "gracz stoi obozem"
+        /// (CampScene: bitwa w obozie). Stan jak po uruchomieniu gry: namiot stawia pierwsza godzina nocnego postoju (OnHourly) albo menu snu.
+        /// Wizerunkow nie rusza (mapa nowej kampanii buduje je od nowa). Zwraca, ile z tych rzeczy zostalo w pamieci (do linii startu).</summary>
+        internal static int ResetCamp()
+        {
+            int had = (PlayerCamped ? 1 : 0) + (_tentStrikes > 0 ? 1 : 0) + (_tentChildren >= 0 ? 1 : 0) + (_promptDay >= 0 ? 1 : 0);
+            _tentStrikes = 0; _tentChildren = -1; _promptDay = -1; PlayerCamped = false;
+            return had;
+        }
+
         private static void ResetHourCounters()
         {
             _wokenHour = 0; _wokenDriftSum = 0f; _wokenDriftMax = 0f; _wokenHold = 0; _wokenOurOrder = 0; _wokenOther = 0;
@@ -647,6 +660,7 @@ namespace Armoury
                     Settlement = mp.TargetSettlement,
                     Party = mp.TargetParty
                 };
+                Stage8World.NoteSleepOrder(mp);   // E8/P3 (245): tylko licznik - partia ze statkami, ktorej rozkaz przed snem mial inna droge albo port niz ten oddawany o swicie
             }
             catch { }
         }

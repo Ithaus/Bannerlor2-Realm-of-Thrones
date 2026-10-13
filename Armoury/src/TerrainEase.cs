@@ -256,6 +256,16 @@ namespace Armoury
             _stumbles = 0; _probeParty = null; _pGot = false; _gForest = null;
         }
 
+        /// <summary>E8/S (246, PLAN 8.11): dzien ostatniego audytu predkosci gracza od zera przy nowej kampanii albo wczytaniu (konstruktor ArmouryBehavior
+        /// przez StateHygiene.ResetAll; osobno od Reset - pod kluczem StateHygieneEnabled). Dotad DailyAudit pomijal pierwsza dobe drugiej kampanii,
+        /// gdy miala ten sam numer dnia co ostatni audyt poprzedniej (kazda nowa gra startuje w tym samym dniu). Zwraca 1, gdy znacznik byl ustawiony.</summary>
+        internal static int ResetAudit()
+        {
+            int had = _lastAuditDay >= 0 ? 1 : 0;
+            _lastAuditDay = -1;
+            return had;
+        }
+
         private static void ZeroSample()
         {
             _hF = _hFFeat = _hFKin = _hD = _hDFeat = 0;

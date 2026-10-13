@@ -222,6 +222,45 @@ Uzycie (Python 3, tylko odczyt):
                     w ostatniej dobie okna <= 2 x Z33 (2 995), helmy, bron miotana i uprzaz INFO; C-4 suma kas miast w dobie 120 >= 80% Z33
                     (10 264 881), kasy ponizej zapasu przez nasze sciezki 0, rody na minusie <= Z33 + 10% (197); C-5 INFO (obity oszczep przez
                     zapis - 8.16); C-6 INFO konie: przelicznik popytu kategorii horse / war_horse, polki koni wobec Z33.
+                    Blok etap8_p3 (E8/P3, paczka 245 - pomiary swiata, Stage8World.cs): P3-0 latki pomiaru wpiete N/N; P3-1 linie obecne - "Owce", "Postoj karawan",
+                    "Najemnicy BK", "Rozkazy morskie", "Wsie bez wozu", "Pomiary swiata" (E8/P3) w kazdej dobie okna, dopisek "pomiar E8/P3" w linii
+                    "BK i Diplomacy (E5/A8)", linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob = 0 (zamyka 8.12c);
+                    P3-3 INFO: lancuch modeli produkcji wsi i iloraz czynny / pod nim, sredni postoj karawan AI w miastach (stan przed E8/G1), zamiana BK
+                    u klanow najemnikow (przed E8/G2), zrodla i ujscia BK bez platnika, owce, rozkazy partii ze statkami po switcie, kara Underequipped
+                    po bitwach gracza, koszt; P3-K potkniecia i linie "ERROR in Stage8World.*" 0.
+                    Blok etap8_s (E8/S, paczka 246 - porzadek stanu, StateHygiene.cs; bieg "nowa kampania -> zapis -> wczytanie innego zapisu w tej samej
+                    sesji" - jeden log z >= 2 liniami startu, czytany po kolei, bez okna dob): S-1 stajnie AI kupuja w pierwszej dobie po wczytaniu -
+                    "znacznik z przyszlosci" 0 w kazdej linii doby i zakupy > 0 w dwoch pierwszych liniach doby po ostatnim starcie (jeden start - INFO);
+                    S-2 linia startu "Porzadek stanu (E8/S)" przy kazdym starcie sesji: wyzerowane 5 klas, potkniecia zerowania 0; S-3 klimat - linii
+                    "ERROR in WesterosClimate.Init" 0 albo po ponowieniu "czynny tak"; S-K linie "ERROR in StateHygiene*" i potkniecia linii 0.
+                    Blok etap8_q (E8/Q, paczka 262 - straz przeprawy na zegarze gry, CrossingLaw.cs): Q-0 linia "Straz przeprawy (E8/Q)" z licznikiem
+                    (zegar gry TAK, przebiegi > 0) w kazdej dobie okna, WYLACZONE 0; Q-1 INFO zawrocone partie lordow wedlug przeprawy (> 0 dopiero przy
+                    wojnie z panem przeprawy); Q-2 koszt <= 5 ms/dobe; Q-3 zadna partia zawracana ponad 3 razy na dobe (zakleszczenie); Q-4 INFO
+                    szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen; Q-5 INFO partie w strefie bez rozkazu (spiacy,
+                    przerwa 3 h, oblezenie, eskorty, woda, AI wylaczone, brak punktu na ladzie) i punkt odwrotu; Q-K potkniecia i linie "ERROR in CrossingLaw.*" 0.
+                    Blok etap8_g1 (E8/G1, paczka 260 - karawany BK w miescie co godzine i wyspy bez drogi, CaravanFlow.cs): G1-0 latki wpiete N/N, linia
+                    "Karawany (E8/G1)" w kazdej dobie okna, oba klucze czynne, spis slepych zaulkow mapy <= 25% osad; G1-1 karawany bez statkow 7+ dob
+                    w tym samym miescie <= 10 (Z33: 29); G1-2 sredni postoj karawan AI w miescie <= 12 h (linia E8/P3); G1-3 karawany bez drogi na koniec
+                    biegu 0, ponowne i nieudane rozwiazania 0, zamiary zakupu BK widziane przez latke >= zakupy z ksiegi obiegu; G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe; G1-5 suma kas miast d120 +-10% Z33, kasy
+                    ponizej zapasu przez nasza wyplate 0, kiesy karawan d120 +-20% Z33, wizyty i zakupy INFO; G1-6 (recenzja) miasta bez rudy w dobach
+                    91-120 <= 1.25 x Z33 (dowoz kontraktami 174.2 bierze karawane stojaca w zrodle), kontrakty i "brak karawany w zrodle" INFO;
+                    G1-K potkniecia i "ERROR in CaravanFlow.*" 0.
+                    Blok etap8_g2 (E8/G2, paczka 261 - najemnicy i uczta BK, MercFeast.cs): G2-0 latki wpiete N/N i tresc metody BK zgodna ze sprawdzona,
+                    linia "Najemnicy i uczta BK (E8/G2)" w kazdej dobie okna, oba klucze czynne; G2-1 bohaterowie zamienieni 0 i ludzie dosypani 0
+                    (pomiar E8/P3), rozjazd liczby ludzi 0, cien 0; G2-1b wywolania klanow w sluzbie >= 50% klano-dob; G2-2 INFO wielkosc druzyn,
+                    zamiana 1:1, ochotnicy z mapy gry; G2-3 uczta: towar z niczego 0, rynek nie traci ponad zakup; G2-K potkniecia i "ERROR in MercFeast.*" 0.
+                    Blok etap8_t (E8/T, paczka 263 - start kampanii i rekrut gracza jak u AI; NOWA KAMPANIA; ColdStart.cs, LevyGold.cs, PlayerRecruit.cs):
+                    T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w linii sesji; T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob
+                    1-3) >= 280; T-2 budzet cechow przepadly 0, T-2b INFO cechy; T-3 nowe partie lordow w dobach 1-3 bez dorobku bez powodu 0 (powody: drugi
+                    raz ten sam wodz, bez ludzi, umarli - sprzet poza gospodarka, rod gracza), T-3b INFO
+                    wszystkie nowe partie AI w dobie 1 wobec Z33; T-4 zakupy AI w dobach 1-3 <= 50% Z33; T-5 rekrut gracza: tier 2+ = zablokowane komplety
+                    DTE, tier 1 = komplety DTE (bez werbunku gracza - INFO, sprawdzenie reczne 8.16 p. 2 i 19); T-K potkniecia i linie ERROR 0.
+                    Blok etap8_k (E8/K, paczka 255 - kuznia: ksiazki BK, zlecenia kowalskie gry, ksiegarz BK; CraftOrders8.cs, GiverPay.cs, HistoricalPrices.cs):
+                    K-0 latki wpiete N/N i kazda podmiana wywolania w kodzie gry znaleziona raz; K-0b linia "Kuznia (E8/K)" w kazdej dobie okna, trzy klucze
+                    czynne; K-1 ksiazek BK przeliczonych 24; K-2 zlecenia sprzed sesji: po przeliczeniu zadna nagroda ponad 3 x nowa; K-3 okno "zlecenia
+                    kowalskie": zloto z niczego 0, zolnierz z niczego 0, bron w nicosc 0 (bez oddanego zlecenia - INFO, 8.16 p. 6); K-4 okno "ksiegarz":
+                    zloto w nicosc 0, ksiazka z niczego 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia tylko z dozwolonych klas, srednia nagroda
+                    <= 1000; K-5b / K-6 / K-7 INFO (klasy, wymiana zlecen startowych nowej kampanii, doswiadczenie, koszt); K-K potkniecia i linie ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9590,6 +9629,894 @@ def etap8_c(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             None if not (k_hor and hist) else bool(r1 and r2 and 2.3 <= r1 <= 2.7 and 0.6 <= r2 <= 0.75))
 
 
+# E8/P3 (245): blok etap8_p3 - pomiary swiata (Stage8World.cs)
+E8_P3 = (("owce", "Owce (E8/P3): dzien"), ("postoj karawan", "Postoj karawan (E8/P3): dzien"), ("najemnicy BK", "Najemnicy BK (E8/P3): dzien"),
+         ("rozkazy morskie", "Rozkazy morskie (E8/P3): dzien"), ("wsie bez wozu", "Wsie bez wozu (E8/P3): dzien"), ("koszt", "Pomiary swiata (E8/P3): dzien"))
+
+
+def etap8_p3(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/P3 (245, projekt etapu 8 v2 rozdz. 3 "E8/P3" Test): pomiary swiata (Stage8World.cs) - sam log, stan "przed" dla E8/G1 i E8/G2.
+    P3-0 latki pomiaru wpiete N/N (R11); P3-1 linie obecne: szesc linii doby w kazdej dobie okna (bez pierwszej i ostatniej), dopisek "pomiar E8/P3" w linii
+    "BK i Diplomacy (E5/A8)" i linia "Produkcja wsi - model (E8/P3)" raz na sesje; P3-2 zatkane wsie Normal bez wozu ponad 7 dob = 0 w kazdej dobie okna
+    (zamyka 8.12c); P3-3 INFO - pozostale liczby (model pod NavalDLC, postoj karawan, zamiana BK najemnikow, zrodla i ujscia BK, owce, rozkazy morskie,
+    kara Underequipped po bitwach gracza, koszt); P3-K potkniecia i linie "ERROR in Stage8World.*" 0."""
+    books = {k: {d: s for d, s in by_day(lines, p).items() if 1 <= run_day(d, start) <= until} for k, p in E8_P3}
+    wire = [x for x in lines if x.startswith("Pomiary swiata (E8/P3): latki przy starcie gry")]
+    model = [x for x in lines if x.startswith("Produkcja wsi - model (E8/P3): dzien")]
+    if not wire and not model and not any(books.values()):
+        rep.add("E8/P3: linie pomiarow swiata (E8/P3)", "brak w logu", "sa od wgrania E8/P3 (Stage8WorldLog)", None)
+        return
+    # ---------------- P3-0: latki
+    if wire:
+        w = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w), num(r"wpiete \d+/(\d+)", w)
+        rep.add("P3-0: latki pomiaru (DTE wystawiony z przydzialem i koniec misji; BK GiveFood, FinancialCompromise, DrainGold, BuyGoods)", w[:200],
+                "wpiete N/N, BRAK: -", a is not None and b is not None and a == b and "; BRAK: - |" in w)
+    else:
+        rep.add("P3-0: latki pomiaru", "brak linii startowej", "wpiete N/N", False)
+    # ---------------- P3-1: linie obecne
+    inner = win[1:-1] if len(win) > 2 else []
+    gaps = []
+    for k, _ in E8_P3:
+        miss = [run_day(d, start) for d in inner if d not in books[k]]
+        if miss:
+            gaps.append(f"{k} brak w {len(miss)} (doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") + ")")
+    a8 = by_day(lines, "BK i Diplomacy (E5/A8): dzien")
+    seg = {d: s[s.find("| pomiar E8/P3"):] for d, s in a8.items() if "| pomiar E8/P3" in s and 1 <= run_day(d, start) <= until}
+    miss_seg = [run_day(d, start) for d in inner if d not in seg]
+    if miss_seg:
+        gaps.append(f"dopisek w linii BK i Diplomacy brak w {len(miss_seg)}" + (" (brak samej linii BK i Diplomacy)" if not a8 else ""))
+    if not model:
+        gaps.append("brak linii Produkcja wsi - model")
+    rep.add("P3-1: linie pomiarow obecne (6 linii doby, dopisek BK i Diplomacy, model produkcji wsi raz na sesje)",
+            (f"dob okna {len(inner)}: " + ("komplet" if not gaps else "; ".join(gaps))) + f"; linii modelu {len(model)}, dob z dopiskiem BK {len(seg)}",
+            "komplet w kazdej dobie okna (bez pierwszej i ostatniej)", (not gaps) if inner else None)
+    # ---------------- P3-2: zatkane wsie Normal bez wozu ponad 7 dob
+    cart = books["wsie bez wozu"]
+    if cart:
+        vals = [(num(r"zatkane Normal bez wozu > 7 dob: (\d+)", cart[d], int, 0) or 0, d) for d in sorted(cart)]
+        mx = max(vals)
+        low = max(num(r"gra nie wystawi nowego: (\d+)", cart[d], int, 0) or 0 for d in cart)
+        last = cart[max(cart)]
+        a_none = num(r"wszystkie wsie bez wozu (\d+)", last, int, 0)
+        a_norm = num(r"gra wystawia woz dopiero przy pelnym magazynie\) (\d+)", last, int, 0)
+        rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob (zamyka 8.12c)",
+                f"najwiecej {mx[0]} (d{run_day(mx[1], start)}), dob z > 0: {sum(1 for v, _ in vals if v > 0)} z {len(vals)}; w tym hearth ponizej progu wozu najwyzej {low}"
+                f"; ostatnia doba: wszystkie wsie bez wozu {a_none}, Normal > 7 dob (tez niezatkane) {a_norm}",
+                "0 w kazdej dobie okna", mx[0] == 0)
+    else:
+        rep.add("P3-2: zatkane wsie Normal bez wozu ponad 7 dob", "brak linii Wsie bez wozu (E8/P3) - diagnoza zatkanych wsi wylaczona?", "0", None)
+
+    # ---------------- P3-3: INFO
+    def tot(book, rx):
+        return sum(num(rx, s, int, 0) or 0 for s in book.values())
+
+    def lastn(book, rx):
+        return num(rx, book[max(book)], int, 0)
+    if model:
+        m = model[-1]
+        ch = re.search(r"lancuch modeli \(czynny -> pod nim\): (.*?) \| pod czynnym", m)
+        r_avg, r_n = fnum(r"iloraz sredni ([0-9.]+)", m), num(r"iloraz sredni [0-9.-]+ z (\d+) typow", m)
+        rep.add("P3-3: produkcja wsi - lancuch modeli i iloraz czynny / pod nim (10 typow wsi, bez mnoznikow Armoury)",
+                (ch.group(1) if ch else "?") + f"; iloraz sredni {r_avg} z {r_n} typow", "INFO (1.00 = czynny model nic nie doklada ponad model pod nim)", None)
+    car = books["postoj karawan"]
+    if car:
+        n = len(car)
+        left = tot(car, r"wyjazdy z miast tej doby (\d+):")
+        hrs = sum((num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0) * (fnum(r"postoj srednio ([0-9.]+) h", s) or 0.0) for s in car.values())
+        rep.add("P3-3: postoj karawan AI w miastach (stan przed E8/G1)",
+                (f"sredni postoj {hrs / left:.1f} h z {left} wyjazdow" if left else "brak wyjazdow z wjazdem w pamieci"), "INFO (prog G1-2 po E8/G1: <= 12 h)", None)
+        enter, long7, unk = tot(car, r"wjazdy do miast tej doby (\d+)"), tot(car, r", 7\+ dob (\d+) \|"), tot(car, r"nowa karawana\) (\d+)")
+        c_town, c_all, c_idle = lastn(car, r"w miastach teraz (\d+)"), lastn(car, r"karawany AI swiata (\d+)"), lastn(car, r"h, 7\+ dob (\d+)\)")
+        rep.add("P3-3: karawany AI - wyjazdy i stojace",
+                f"wyjazdy {left / n:.1f}/dobe, wjazdy {enter / n:.1f}/dobe; wyjazdy po 7+ dobach {long7}; ostatnia doba: w miastach "
+                f"{c_town} z {c_all}, stoja 7+ dob {c_idle}; wyjazdy bez wjazdu w pamieci {unk}", "INFO (Z33: 29 karawan bez statkow 7+ dob w tym samym miescie)", None)
+    mer = books["najemnicy BK"]
+    if mer:
+        n = len(mer)
+        h, a = tot(mer, r"bohaterow zamienionych na zolnierza z niczego (\d+)"), tot(mer, r"ludzi dosypanych z niczego (\d+)")
+        calls = tot(mer, r"wywolan (\d+) \(w sluzbie")
+        wired = "wpieta" if "prefiks SpoilsCompany): wpieta" in mer[max(mer)] else "BRAK"
+        m_cl, m_in, m_men = lastn(mer, r"bez klanu Spoils\) (\d+)"), lastn(mer, r"w sluzbie krolestwa (\d+)"), lastn(mer, r"druzyn \d+, ludzi (\d+)")
+        rep.add("P3-3: zamiana BK u klanow najemnikow (stan przed E8/G2)",
+                f"bohaterow zamienionych {h} ({h / n:.2f}/dobe), ludzi dosypanych {a} ({a / n:.2f}/dobe), wywolan {calls / n:.1f}/dobe; ostatnia doba: klanow "
+                f"{m_cl} (w sluzbie {m_in}), ludzi {m_men}; latka {wired}", "INFO (prog G2-1 po E8/G2: 0 i 0)", None)
+    if seg:
+        n = len(seg)
+        fu, fv = tot(seg, r"razy, (\d+) szt\. zywnosci"), tot(seg, r"zywnosci wartej (\d+)")
+        fc, dr, bg = tot(seg, r"\(FinancialCompromise\) \d+ razy / (\d+) zl"), tot(seg, r"\(DrainGold\) \d+ razy / (\d+) zl"), tot(seg, r"\(BuyGoods\) \d+ razy / (\d+) zl")
+        fn = tot(seg, r"\(GiveFood\) (\d+) razy")
+        rep.add("P3-3: zrodla i ujscia BK bez platnika (suma okna; na dobe)",
+                f"zywnosc band hersztow {fn} razy / {fu} szt. warte {fv} ({fv / n:.0f}/d); ugoda z grupa interesu {fc} zl"
+                f"; zloto dworzan {dr} zl ({dr / n:.0f}/d); zakupy laski dworu {bg} zl ({bg / n:.0f}/d)", "INFO (kod po liczbach - decyzja po tescie)", None)
+    sh = books["owce"]
+    if sh:
+        n = len(sh)
+        wool = sum(fnum(r"szt\./d, welna ([0-9.]+) szt\./d", s) or 0.0 for s in sh.values()) / n
+        gw, uw = tot(sh, r"welna \d+ szt\. / (\d+) zl"), tot(sh, r"zl; welna (\d+) szt\.")
+        gs, gm, go = tot(sh, r"owce \d+ szt\. / (\d+) zl"), tot(sh, r"mieso \d+ szt\. / (\d+) zl"), tot(sh, r"inne towary \d+ szt\. / (\d+) zl")
+        s_vil, s_herd, s_wool = lastn(sh, r"wsi owczych \(sheep_farm\) (\d+)"), lastn(sh, r"owiec w magazynach wsi (\d+)"), lastn(sh, r"welna: w magazynach wsi (\d+)")
+        rep.add("P3-3: owce - wsie owcze, stada, welna, utarg wozow",
+                f"wsi {s_vil}, owiec w magazynach {s_herd}, welny w magazynach "
+                f"{s_wool} (ostatnia doba); welna wedlug modelu {wool:.1f} szt./d; utarg wozow na dobe: welna {gw / n:.0f} zl"
+                f" ({uw / n:.1f} szt.), owce {gs / n:.0f} zl, mieso {gm / n:.0f} zl, inne {go / n:.0f} zl", "INFO (stan przed welna z uboju E8/B)", None)
+    od = books["rozkazy morskie"]
+    if od:
+        g, dif = tot(od, r"rozkaz oddawany o swicie (\d+)"), tot(od, r"INNA niz przed snem (\d+)")
+        rep.add("P3-3: rozkazy partii ze statkami - po switcie inna droga niz przed snem (RememberOrder bez drogi i portu)",
+                (f"{dif} z {g} oddawanych ({100.0 * dif / g:.1f}%)" if g else "brak rozkazow partii ze statkami"), "INFO (kod tylko przy rozjezdzie)", None)
+    ue = [x for x in lines if x.startswith("Underequipped (E8/P3): dzien")]
+    if ue:
+        def us(rx):
+            return sum(num(rx, s, int, 0) or 0 for s in ue)
+        p0, p1, p2 = us(r"druzyna gracza [^|]*kara 0: (\d+)"), us(r"druzyna gracza [^|]*2-10: (\d+)"), us(r"druzyna gracza [^|]*12-20: (\d+)")
+        e0, e1, e2 = us(r"przeciwnik [^|]*kara 0: (\d+)"), us(r"przeciwnik [^|]*2-10: (\d+)"), us(r"przeciwnik [^|]*12-20: (\d+)")
+        rep.add("P3-3: kara Underequipped DTE po bitwach gracza (kara 0 / 2-10 / 12-20)",
+                f"misji {len(ue)}: druzyna gracza {p0} / {p1} / {p2}; przeciwnik (tylko oznaczeni) {e0} / {e1} / {e2}", "INFO (8.16 - bitwa gracza)", None)
+    else:
+        rep.add("P3-3: kara Underequipped DTE po bitwach gracza", "brak linii (autotest nie gra bitew gracza)", "INFO (8.16 - bitwa gracza)", None)
+    ks = books["koszt"]
+    if ks:
+        cs = [fnum(r"koszt linii ([0-9.]+) ms", s) for s in ks.values()]
+        cs = [c for c in cs if c is not None]
+        if cs:
+            rep.add("P3-3: koszt linii pomiarow swiata", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO (cel projektu < 10 ms/dobe)", None)
+        sm = tot(ks, r"potkniecia dzis (\d+)")
+        errs = sum(1 for x in lines if x.startswith("ERROR in Stage8World."))
+        rep.add("P3-K: kontrola (potkniecia pomiarow, linie ERROR in Stage8World.*)", f"{sm} / {errs}", "0 / 0", sm == 0 and errs == 0)
+
+
+# E8/S (246): blok etap8_s - porzadek stanu (StateHygiene.cs)
+E8_S = "Porzadek stanu (E8/S): "
+E8_S_DAY = "Porzadek stanu (E8/S): dzien"
+
+
+def etap8_s(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/S (246, projekt etapu 8 v2 rozdz. 3 "E8/S" Test): porzadek stanu (StateHygiene.cs). Bieg "nowa kampania -> zapis -> wczytanie innego zapisu
+    w tej samej sesji" (procedura "zapis 9 dob") daje w JEDNYM logu co najmniej dwie linie startu - blok czyta log po kolei, nie po numerach dob
+    (druga kampania moze miec te same doby), i nie uzywa okna --do-doby.
+    S-1 stajnie AI kupuja w pierwszej dobie po wczytaniu: "znacznik z przyszlosci" 0 w kazdej linii doby calego logu, a po OSTATNIEJ linii startu
+    (przy >= 2 startach) zakupy > 0 w pierwszych dwoch liniach doby (pierwsza obejmuje niepelna dobe); jeden start w logu albo zero zakupow - INFO;
+    S-2 linia startu przy kazdym starcie sesji (tyle, ile linii "Jedna skala czasu (E7/C): odwet kryjowek"): "wyzerowane 5 klas", potkniecia
+    zerowania 0; WYLACZONE albo UWAGA = NIE;
+    S-3 klimat: potkniecia 0 (brak linii "ERROR in WesterosClimate.Init") albo ponowione i czynne (w kazdej sesji z potknieciem ostatnia linia doby
+    ma "czynny tak");
+    S-K linie "ERROR in StateHygiene*" 0 i potkniecia linii 0; INFO - co bylo w pamieci przy kazdym starcie, kryjowka, martwe wpisy obozu, stajnie."""
+    idx = [i for i, s in enumerate(lines) if s.startswith(E8_S) and not s.startswith(E8_S_DAY)]
+    days = [(i, s) for i, s in enumerate(lines) if s.startswith(E8_S_DAY)]
+    if not idx and not days:
+        rep.add("E8/S: linie Porzadek stanu (E8/S)", "brak w logu", "sa od wgrania E8/S (StateHygieneEnabled)", None)
+        return
+
+    def tot(rows, rx):
+        return sum(num(rx, s, int, 0) or 0 for s in rows)
+    all_days = [s for _, s in days]
+    # ---------------- S-2: linia startu
+    ref = sum(1 for s in lines if s.startswith("Jedna skala czasu (E7/C): odwet kryjowek"))
+    bad = []
+    for i in idx:
+        s = lines[i]
+        if "WYLACZONE" in s or "UWAGA" in s or num(r"wyzerowane (\d+) klas", s) != 5 or num(r"potkniecia zerowania (\d+)", s) != 0:
+            bad.append(s[len(E8_S):len(E8_S) + 90])
+    ok2 = bool(idx) and not bad and (ref == 0 or len(idx) == ref)
+    rep.add("S-2: linia startu przy kazdym starcie sesji (wyzerowane 5 klas, potkniecia zerowania 0)",
+            f"linii startu {len(idx)}, startow sesji wedlug linii E7/C {ref if ref else '?'}" + (f"; zle: {bad[:2]}" if bad else ""),
+            "kazdy start: wyzerowane 5 klas, potkniecia zerowania 0", ok2)
+    # ---------------- S-1: stajnie AI po wczytaniu
+    fut = tot(all_days, r"znacznik z przyszlosci (\d+)")
+    if len(idx) >= 2:
+        after = [s for i, s in days if i > idx[-1]]
+        buys2 = tot(after[:2], r"stajnie AI: zakupy (\d+)")
+        had = num(r"stajnie AI \(wpisy\) (\d+)", lines[idx[-1]])
+        val = (f"startow {len(idx)}; przy ostatnim starcie w pamieci {had if had is not None else '?'} wpisow stajni; po nim linii doby {len(after)}, zakupy w pierwszych dwoch {buys2}"
+               f"; znacznik z przyszlosci w calym logu {fut}")
+        ok1 = False if fut > 0 else (True if buys2 > 0 else None)
+        if not after:
+            val += " (brak linii doby po ostatnim starcie - bieg za krotki)"
+    else:
+        val = f"jeden start sesji w logu - bieg \"nowa kampania -> zapis -> wczytanie innego zapisu\" nie byl grany; znacznik z przyszlosci {fut}"
+        ok1 = False if fut > 0 else None
+    rep.add("S-1: stajnie AI kupuja w pierwszej dobie po wczytaniu (bez znacznika zakupu z innej kampanii)", val,
+            "znacznik z przyszlosci 0 i zakupy > 0 po ostatnim starcie (>= 2 starty w logu)", ok1)
+    # ---------------- S-3: klimat - potkniecia 0 albo ponowione i czynne (osobno w kazdej sesji logu)
+    cuts = idx + [len(lines)]
+    segs = [(cuts[k], cuts[k + 1]) for k in range(len(idx))] or [(0, len(lines))]
+    n_err, dead = 0, 0
+    for a, b in segs:
+        e = sum(1 for s in lines[a:b] if s.startswith("ERROR in WesterosClimate.Init"))
+        if e == 0:
+            continue
+        n_err += e
+        seg_days = [s for i, s in days if a <= i < b]
+        if not seg_days or "czynny tak" not in seg_days[-1]:
+            dead += 1
+    last = all_days[-1] if all_days else ""
+    st = re.search(r"klimat: (potkniecia \d+/3, ponowien \d+, czynny \w+)", last)
+    rep.add("S-3: klimat - potkniecia startu 0 albo ponowione i czynne",
+            f"linii ERROR in WesterosClimate.Init {n_err}, sesji z potknieciem bez czynnego klimatu na koncu {dead}; ostatnia doba: {st.group(1) if st else '?'}",
+            "0 potkniec albo po ponowieniu \"czynny tak\"", (dead == 0) if (all_days or n_err == 0) else None)
+    # ---------------- S-K i INFO
+    errs = sum(1 for s in lines if s.startswith("ERROR in StateHygiene"))
+    sm = max([num(r"potkniecia linii (\d+)", s, int, 0) or 0 for s in all_days] or [0])
+    rep.add("S-K: kontrola (linie ERROR in StateHygiene*, potkniecia linii doby)", f"{errs} / {sm}", "0 / 0", errs == 0 and sm == 0)
+    mem = []
+    for i in idx:
+        m = re.search(r"bylo: (.*?) \| potkniecia zerowania", lines[i])
+        mem.append(m.group(1) if m else "?")
+    rep.add("E8/S: w pamieci po poprzedniej kampanii przy kolejnych startach sesji", " || ".join(mem[:4]) if mem else "-",
+            "INFO (pierwszy start po uruchomieniu gry: same 0; po wczytaniu w tej samej sesji zwykle > 0 - to zostalo wyzerowane)", None)
+    if all_days:
+        b_all, h_all = tot(all_days, r"stajnie AI: zakupy (\d+)"), tot(all_days, r"wizyty w przerwie zakupow (\d+)")
+        hs, hg, do = tot(all_days, r"potkniecia przeszukania (\d+)"), tot(all_days, r"porzucone (\d+)"), tot(all_days, r"dluznikom w osadzie (\d+)")
+        rep.add("E8/S: stajnie AI, kryjowka, oboz (suma linii doby)",
+                f"zakupy stajni {b_all}, wizyty w przerwie zakupow {h_all}; kryjowka: potkniecia przeszukania {hs}, porzucone {hg}"
+                f"; martwe wpisy obozu zdjete dluznikom w osadzie {do}", "INFO", None)
+
+
+# E8/Q (262): blok etap8_q - straz przeprawy na zegarze gry (CrossingLaw.cs)
+E8_Q_DAY = "Straz przeprawy (E8/Q): dzien"
+
+
+def etap8_q(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/Q (262, projekt etapu 8 v2 rozdz. 3 "E8/Q" Test): petla AI strazy przeprawy na zegarze gry (CrossingLaw.AiHourly). Linia doby
+    "Straz przeprawy (E8/Q): dzien N" (dzien = doba gry, jak "Przeprawa Bliznaki (E7/B)"; "Pieniadz swiata" nosi dzien ksiegi = doba gry - 1).
+    Q-0 linia z licznikiem (zegar gry TAK, przebiegi > 0) w kazdej dobie okna - WYLACZONE albo doba bez przebiegow = NIE;
+    Q-1 INFO: zawrocone N (N/d) wedlug przeprawy, wrogie partio-godziny przy przeprawach i w strefie (> 0 zawrocen dopiero przy wojnie z panem przeprawy);
+    Q-2 koszt <= 5 ms/dobe (srednio i najdrozsza doba);
+    Q-3 zadna partia zawracana > 3 razy na dobe (suma "partii zawroconych ponad 3 razy" w oknie = 0; zakleszczenie);
+    Q-4 INFO: szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen przy ROT_town3, w tym w ciagu 3 h po zawroceniu;
+    Q-5 INFO: partie w strefie bez rozkazu (spiacy, przerwa 3 h, oblezenie, eskorty, osada / bitwa, woda, AI wylaczone, brak punktu na ladzie), punkt odwrotu;
+    Q-K potkniecia 0 i linie "ERROR in CrossingLaw.*" 0."""
+    rows = {}
+    for d, s in by_day(lines, E8_Q_DAY).items():
+        rd = run_day(d, start)
+        if 1 <= rd <= until:
+            rows[rd] = s
+    if not rows:
+        rep.add("E8/Q: linie Straz przeprawy (E8/Q)", "brak w logu", "sa od wgrania E8/Q (CrossingLawAiClock, LogEnabled)", None)
+        return
+    days = sorted(rows)
+    off = [x for x in days if "WYLACZONE" in rows[x]]
+    live = [x for x in days if "| zegar gry TAK" in rows[x] and (num(r"\| przebiegi (\d+),", rows[x], int, 0) or 0) > 0]
+    need = max(0, len(win) - 1)
+    val = f"{len(live)} dob z przebiegami (wszystkich linii {len(days)}; dob okna {len(win)})"
+    if off:
+        why = re.search(r"WYLACZONE \((.*?)\)", rows[off[0]])
+        val += f"; WYLACZONE w {len(off)} dobach ({why.group(1)[:60] if why else '?'})"
+    rep.add("Q-0: linia Straz przeprawy z licznikiem (zegar gry TAK, przebiegi > 0)", val,
+            f">= {need} (codziennie w oknie; dzien gry = dzien ksiegi + 1), WYLACZONE 0", (not off and len(live) >= need and need > 0) if win else None)
+    if not live:
+        return
+    w = [rows[x] for x in live]
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    # ---------------- Q-1: zawrocone (INFO)
+    turned = tot(r"\| zawrocone (\d+) \(")
+    per = {}
+    for x in w:
+        m = re.search(r"\| zawrocone \d+ \((.*?); punkt odwrotu", x)
+        if m:
+            for name, v in re.findall(r"(\S+) (\d+)", m.group(1)):
+                per[name] = per.get(name, 0) + int(v)
+    near, zone = tot(r", wrogich przy przeprawach (\d+) partio-godzin"), tot(r"partio-godzin, w strefie (\d+)")
+    seen = _mean([num(r"\(srednio (\d+) na przebieg\)", x) for x in w])
+    miss = [x for x in live if num(r"; przeprawy (\d+)/", rows[x]) != num(r"; przeprawy \d+/(\d+)\)", rows[x])]
+    v1 = f"{turned} ({turned / len(w):.2f}/d): " + (", ".join(f"{k} {v}" for k, v in per.items()) if per else "-")
+    v1 += f"; wrogich przy przeprawach {near} partio-godzin, w strefie {zone}"
+    if seen is not None:
+        v1 += f"; partii lordow na przebieg srednio {seen:.0f}"
+    rep.add("Q-1: zawrocone partie lordow (suma okna)", v1,
+            "INFO (> 0 dopiero przy wojnie z panem przeprawy - np. z Freyami; 0 wrogich w strefie = nie bylo kogo zawracac)", None)
+    if miss:
+        rep.add("Q-1b: przeprawy znalezione po id (ROT_town3, castle_B1, castle_EN2)", f"brak osady w {len(miss)} dobach (pierwsza d{miss[0]})", "3/3", False)
+    # ---------------- Q-2: koszt
+    cost = [num(r"\| koszt ([\d.]+) ms/dobe", x, float) for x in w]
+    cm = _mean(cost)
+    cx = max([c for c in cost if c is not None] or [0.0])
+    rep.add("Q-2: koszt petli godzinnej", f"srednio {cm:.3f} ms/dobe, najdrozsza doba {cx:.3f} ms" if cm is not None else "brak liczby w linii",
+            "<= 5 ms/dobe (srednio i najdrozsza doba)", (cm <= 5.0 and cx <= 5.0) if cm is not None else None)
+    # ---------------- Q-3: zakleszczenie
+    over = tot(r"partii zawroconych ponad 3 razy (\d+)")
+    worst, who, wd = 0, "-", None
+    for x in live:
+        m = re.search(r"najwiecej zawrocen jednej partii (\d+) \((.*?)\)", rows[x])
+        if m and int(m.group(1)) > worst:
+            worst, who, wd = int(m.group(1)), m.group(2), x
+    rep.add("Q-3: zadna partia zawracana ponad 3 razy na dobe (zakleszczenie)",
+            f"partio-dob ponad 3 zawrocenia: {over}; najwiecej {worst}" + (f" ({who}, d{wd})" if wd is not None else ""), "0", over == 0)
+    # ---------------- Q-4, Q-5: INFO
+    cross, cool = tot(r"wrogich lordow przez most (\d+) \("), tot(r"\(w ciagu 3 h po zawroceniu (\d+)\)")
+    tw = per.get("ROT_town3", 0)
+    dead = sum(1 for x in w if "(licznik E7/B): nieczynny" in x)
+    rep.add("Q-4: szczelnosc przy Bliznakach - wrogich lordow przez most (licznik E7/B) wobec zawrocen",
+            f"przez most {cross} (w ciagu 3 h po zawroceniu {cool}), zawrocone przy ROT_town3 {tw}" + (f"; licznik E7/B nieczynny w {dead} z {len(w)} dob" if dead else ""),
+            "INFO (przejscia mimo strazy: przerwa 3 h po zawroceniu, armie w drodze na oblezenie, eskorty; decyzja po tescie)", None)
+    skip = (("spiacy", r"spiacy (\d+),"), ("w przerwie 3 h", r"w przerwie 3 h (\d+),"), ("oblezenie przeprawy", r"oblezenie przeprawy (\d+),"),
+            ("eskorty armii", r"eskorty armii (\d+),"), ("w osadzie albo bitwie", r"w osadzie albo bitwie (\d+),"), ("na wodzie", r"na wodzie (\d+),"),
+            ("AI wylaczone", r"AI wylaczone (\d+),"), ("bez punktu na ladzie", r"bez punktu na ladzie (\d+) "))
+    back = (("skad przyszla", r"skad przyszla (\d+) /"), ("prosto od zamku", r"prosto od zamku (\d+)\)"))
+    rep.add("Q-5: partie w strefie bez rozkazu i punkt odwrotu (suma okna, partio-godziny)",
+            ", ".join(f"{k} {tot(p)}" for k, p in skip) + "; punkt odwrotu: " + ", ".join(f"{k} {tot(p)}" for k, p in back), "INFO", None)
+    # ---------------- Q-K
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in CrossingLaw."))
+    rep.add("Q-K: kontrola (potkniecia petli, linie ERROR in CrossingLaw.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
+# E8/G1 (260): blok etap8_g1 - karawany: BK w miescie co godzine i wyspy bez drogi (CaravanFlow.cs)
+E8_G1_DAY = "Karawany (E8/G1): dzien"
+E8_G1_Z33_TOWNS = 10264881      # suma kas miast w dobie 120 biegu Z33 (WGRANIE 33, linia "Nadwyzka kas (E5/0)")
+E8_G1_Z33_CARAVANS = 4076294    # kiesy karawan w dobie 120 biegu Z33 (linia "Pieniadz swiata": partie bez wodza - karawany; 902 karawany notabli i 57 lordow)
+# recenzja E8/G1: dowoz surowca kontraktami (174.2) bierze przewoznika sposrod karawan STOJACYCH w miescie-zrodle - przy postoju ok. 3 h stoi ich kilkanascie razy mniej
+E8_G1_Z33_ORE_TOWNS = 25.8      # miasta bez rudy w biegu Z33, srednia probek dob 91-120 (linia "Miasta bez rudy i strzal (174b)" co 5 dob: 29, 31, 29, 19, 25, 22)
+E8_G1_Z33_CONTRACTS = 12.7      # kontrakty surowca zawarte na dobe w biegu Z33 (linia "Kontrakty surowca (174)", doby 1-120)
+E8_G1_Z33_NOCAR = 74.0          # zamowienia bez kontraktu z powodu "brak karawany w zrodle" na dobe w biegu Z33 (ta sama linia)
+
+
+def etap8_g1(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/G1 (260, projekt etapu 8 v2 rozdz. 3 "E8/G1" Test; odpowiedz Jeffa 3: TAK): karawany BK w miescie co godzine (postfiks na prefiksie BKROT) i wyspy
+    bez drogi (zakup lorda pominiety, karawana bez drogi rozwiazana). Linia doby "Karawany (E8/G1): dzien N" (dzien ksiegi, jak "Postoj karawan (E8/P3)").
+    G1-0 latki wpiete N/N, linia w kazdej dobie okna (bez pierwszej i ostatniej), oba klucze czynne, spis slepych zaulkow mapy najwyzej 25% osad (kontrola
+    reguly - pamiec drog zna pary wies - miasto);
+    G1-1 karawany bez statkow 7+ dob w tym samym miescie <= 10 w ostatniej dobie okna (linia "Wyspy i drogi"; Z33: 29);
+    G1-2 sredni postoj karawan AI w miescie <= 12 h (linia "Postoj karawan (E8/P3)", srednia wazona wyjazdami okna);
+    G1-3 karawany bez drogi na koniec biegu 0 ("zostalo" w ostatniej linii), ponowne rozwiazania u tego samego wlasciciela 0, nieudane 0;
+    G1-4 koszt dodatkowych tikow BK <= 5 ms/dobe (srednio; czas brutto tikow, ktore otworzylismy);
+    G1-5 (prog, nie INFO): suma kas miast w dobie 120 w +-10% Z33, kasy ponizej zapasu przez nasza wyplate 0, kiesy karawan w dobie 120 w +-20% Z33
+    (bieg krotszy niz 120 dob - INFO); wizyty i zakupy karawan - INFO;
+    G1-6 (recenzja - regresja dowozu surowca 174.2: przewoznikiem kontraktu jest karawana STOJACA w miescie-zrodle, a po E8/G1 stoi ich wielokrotnie mniej):
+    G1-6a miasta bez rudy, srednia probek dob 91-120 <= 1.25 x Z33 (bieg krotszy - INFO); G1-6b INFO kontrakty zawarte i "brak karawany w zrodle" na dobe
+    wobec Z33, karawany stojace w miastach;
+    G1-K potkniecia i linie "ERROR in CaravanFlow.*" 0."""
+    rows = {d: s for d, s in by_day(lines, E8_G1_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Karawany (E8/G1): latki przy starcie gry")]
+    if not rows and not wire:
+        rep.add("E8/G1: linie Karawany (E8/G1)", "brak w logu", "sa od wgrania E8/G1 (CaravanFlow.cs)", None)
+        return
+    # ---------------- G1-0: latki, linia, klucze, spis slepych zaulkow
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("G1-0: latki (postfiks na prefiksie BKROT, pomiar tiku BK, zakup karawany lorda BK)", w0[:200],
+                "wpiete N/N, BRAK: -", a is not None and b is not None and a == b and "; BRAK: - |" in w0)
+    else:
+        rep.add("G1-0: latki", "brak linii startowej", "wpiete N/N", False)
+    if not rows:
+        rep.add("G1-0b: linia Karawany (E8/G1)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    last = rows[days[-1]]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_h = [d for d in days if "(Caravan Town Hourly WYLACZONE)" in rows[d]]
+    off_i = [d for d in days if "(Island Caravan Fix WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    if off_h:
+        val += f"; Caravan Town Hourly WYLACZONE w {len(off_h)} dobach"
+    if off_i:
+        val += f"; Island Caravan Fix WYLACZONE w {len(off_i)} dobach"
+    rep.add("G1-0b: linia Karawany (E8/G1) w kazdej dobie okna, oba klucze czynne", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_h and not off_i) if inner else None)
+    cen = re.search(r"slepe zaulki mapy dla karawany bez statkow \(raz na sesje\): miasta (\d+), zamki (\d+), wsie (\d+) z (\d+) osad", last)
+    if cen:
+        ct, cc, cv, ca = (int(x) for x in cen.groups())
+        share = 100.0 * (ct + cc + cv) / ca if ca else 0.0
+        rep.add("G1-0c: slepe zaulki mapy (osady bez drogi ladowej do dwoch miast) - kontrola reguly zakupu",
+                f"miasta {ct}, zamki {cc}, wsie {cv} z {ca} osad ({share:.1f}%)", "<= 25% osad (wiecej = pamiec drog nie zna par osad - zakup lordow blokowany na ladzie)",
+                share <= 25.0)
+    else:
+        bad = re.search(r"slepe zaulki mapy dla karawany bez statkow \(raz na sesje\): (.*?) \| latki", last)
+        rep.add("G1-0c: slepe zaulki mapy - kontrola reguly zakupu", bad.group(1)[:120] if bad else "brak w linii", "spis pelny, <= 25% osad", False)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- G1-1: karawany 7+ dob w tym samym miescie
+    isl = {d: s for d, s in by_day(lines, "Wyspy i drogi (").items() if 1 <= run_day(d, start) <= until}
+    p3 = {d: s for d, s in by_day(lines, "Postoj karawan (E8/P3): dzien").items() if 1 <= run_day(d, start) <= until}
+    if isl:
+        li = isl[max(isl)]
+        idle = num(r"w tym samym miescie od 7\+ dob \(kazde miasto, probka dobowa\): (\d+)", li)
+        where = re.search(r"probka dobowa\): \d+( \[.*?\])", li)
+        p3idle = num(r"h, 7\+ dob (\d+)\)", p3[max(p3)], int, None) if p3 else None
+        rep.add("G1-1: karawany bez statkow 7+ dob w tym samym miescie (ostatnia doba okna, linia Wyspy i drogi)",
+                ((f"{idle}" + (where.group(1) if where else "")) if idle is not None else "brak liczby w linii")
+                + (f"; wszystkie karawany AI z wjazdem w pamieci (E8/P3) 7+ dob: {p3idle}" if p3idle is not None else ""),
+                "<= 10 (Z33: 29; licznik postoju zeruje sie przy wczytaniu - bieg bez wczytania w ostatnich 7 dobach)", (idle <= 10) if idle is not None else None)
+    else:
+        rep.add("G1-1: karawany bez statkow 7+ dob w tym samym miescie", "brak linii Wyspy i drogi", "<= 10", None)
+    # ---------------- G1-2: sredni postoj w miescie
+    if p3:
+        left = sum(num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0 for s in p3.values())
+        hrs = sum((num(r"wyjazdy z miast tej doby (\d+):", s, int, 0) or 0) * (fnum(r"postoj srednio ([0-9.]+) h", s) or 0.0) for s in p3.values())
+        rep.add("G1-2: sredni postoj karawan AI w miescie (linia Postoj karawan (E8/P3), srednia wazona wyjazdami)",
+                (f"{hrs / left:.1f} h z {left} wyjazdow ({left / len(p3):.1f}/dobe)" if left else "brak wyjazdow z wjazdem w pamieci"),
+                "<= 12 h (przed E8/G1 ok. 3 doby)", (hrs / left <= 12.0) if left else None)
+    else:
+        rep.add("G1-2: sredni postoj karawan AI w miescie", "brak linii Postoj karawan (E8/P3) - Stage8WorldLog wylaczony?", "<= 12 h", None)
+    # ---------------- G1-3: karawany bez drogi
+    left_now = num(r", zostalo (\d+) \(w cieniu", last)
+    done, again, fail = tot(r", rozwiazane (\d+)"), tot(r"ponowne u tego samego wlasciciela (\d+)"), tot(r"nie zniknely mimo rozkazu (\d+)")
+    skip, ask = tot(r"zakup pominiety (\d+)"), tot(r"BK chcial kupic karawane lordowi (\d+) razy")
+    why = re.search(r"; powody( \[.*?\]| -)\), ponowne", last)
+    rep.add("G1-3: karawany bez drogi na koniec biegu (bez statkow w miescie bez innego miasta w zasiegu ladu)",
+            (f"zostalo {left_now}" if left_now is not None else "brak liczby") + (f" (powody{why.group(1)})" if why and left_now else "")
+            + f"; w oknie rozwiazane {done}, ponowne u tego samego wlasciciela {again}, nieudane {fail}; zakup karawany lorda pominiety {skip} z {ask} zamiarow BK",
+            "zostalo 0, ponowne 0, nieudane 0", (left_now == 0 and again == 0 and fail == 0) if left_now is not None else None)
+    ob = {d: s for d, s in by_day(lines, "Obieg: notable i karawany: dzien").items() if 1 <= run_day(d, start) <= until}
+    if ob:
+        bought = sum(num(r"kupione przez lordow BK (\d+)", s, int, 0) or 0 for s in ob.values())
+        rep.add("G1-3c: postfiks zakupu biegnie - zamiary BK widziane przez latke wobec karawan kupionych przez lordow (ksiega obiegu)",
+                f"zamiary {ask}, pominiete {skip}, kupione wedlug ksiegi {bought}", "zamiary - pominiete >= kupione (0 zamiarow przy zakupach = latka omijana)",
+                (ask - skip >= bought) if (ask or bought) else None)
+    if done:
+        sold_u, sold_g = tot(r"towar sprzedany miastu (\d+) szt\."), tot(r"szt\. za (\d+) zl z nadwyzki kasy")
+        uns_u, uns_v = tot(r"niesprzedane (\d+) szt\."), tot(r"szt\. warte (\d+) zl")
+        purse, got = tot(r"kiesa z utargiem (\d+) zl"), tot(r"wlascicielom przybylo (\d+)\)")
+        men, mp = tot(r"\), ludzie (\d+) \(do domu"), tot(r"sakiewki ludzi (\d+) zl")
+        rep.add("G1-3b: rozwiazane karawany - dokad poszedl dobytek (suma okna)",
+                f"towar miastu {sold_u} szt. za {sold_g} zl, niesprzedane na polke {uns_u} szt. warte {uns_v} zl; kiesa z utargiem {purse} zl (wlascicielom przybylo {got})"
+                f"; ludzie do domu {men}; sakiewki ludzi do kas miast {mp} zl", "INFO (kiesa = przybylo, gdy wlasciciel zyje)", None)
+    # ---------------- G1-4: koszt dodatkowych tikow
+    cost = [fnum(r"koszt dodatkowych tikow ([0-9.]+) ms/dobe", x) for x in w]
+    cm = _mean(cost)
+    cx = max([c for c in cost if c is not None] or [0.0])
+    opened, ran, orders = tot(r" - otwarte (\d+) u "), tot(r"po otwarciu: tiki BK (\d+)"), tot(r"nowy cel karawany (\d+)")
+    lng, lngc = tot(r"w tym samym postoju: (\d+) tikow"), _mean([num(r"tikow u (\d+) karawan \(bez celu", x) for x in w])
+    rep.add("G1-4: koszt dodatkowych tikow BK karawan w miescie (czas brutto otwartych tikow)",
+            (f"srednio {cm:.2f} ms/dobe, najdrozsza doba {cx:.2f} ms" if cm is not None else "brak liczby w linii")
+            + f"; otwarte {opened / n:.0f}/dobe, nowy cel {orders / n:.1f}/dobe", "<= 5 ms/dobe srednio", (cm <= 5.0) if cm is not None else None)
+    rep.add("G1-4b: otwarte tiki bez skutku - ponad 24 tiki w tym samym postoju (karawany bez celu albo ranni)",
+            f"{lng / n:.0f} tikow/dobe" + (f" u srednio {lngc:.1f} karawan" if lngc is not None else "") + f"; tiki BK po otwarciu {ran / n:.0f}/dobe",
+            "INFO (duzo = rozwazyc przerwe w otwieraniu dla karawany, ktora nie wyjezdza)", None)
+    # ---------------- G1-5: ekonomia (prog)
+    full = bool(win) and run_day(win[-1], start) >= 120
+    nk = {d: s for d, s in by_day(lines, "Nadwyzka kas (E5/0): dzien").items() if 1 <= run_day(d, start) <= until}
+    if nk:
+        tg = num(r"\| miasta \d+: kasy (-?\d+)", nk[max(nk)])
+        if tg is not None:
+            dev = 100.0 * (tg - E8_G1_Z33_TOWNS) / E8_G1_Z33_TOWNS
+            rep.add("G1-5a: suma kas miast w ostatniej dobie okna wobec Z33", f"{tg} ({dev:+.1f}% wobec {E8_G1_Z33_TOWNS}; doba {run_day(max(nk), start)})",
+                    "+-10% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 10.0) if full else None)
+    below = tot(r"kasy ponizej zapasu przez nasza wyplate (\d+)")
+    rep.add("G1-5b: kasy miast ponizej zapasu przez nasza wyplate za towar rozwiazanej karawany", f"{below}", "0", below == 0)
+    pw = {d: s for d, s in by_day(lines, "Pieniadz swiata: dzien").items() if 1 <= run_day(d, start) <= until}
+    if pw:
+        cg = num(r"partie bez wodza: tabory wsi -?\d+ \([^)]*\), karawany (-?\d+)", pw[max(pw)])
+        if cg is not None:
+            dev = 100.0 * (cg - E8_G1_Z33_CARAVANS) / E8_G1_Z33_CARAVANS
+            rep.add("G1-5c: kiesy karawan w ostatniej dobie okna wobec Z33", f"{cg} ({dev:+.1f}% wobec {E8_G1_Z33_CARAVANS}; doba {run_day(max(pw), start)})",
+                    "+-20% w dobie 120 (bieg krotszy - INFO)", (abs(dev) <= 20.0) if full else None)
+    vis = {d: s for d, s in by_day(lines, "Karawany: dzien").items() if 1 <= run_day(d, start) <= until}
+    why2 = {d: s for d, s in by_day(lines, "Karawany (przyczyny): dzien").items() if 1 <= run_day(d, start) <= until}
+    info = []
+    if vis:
+        v_in = sum(num(r"wjazdy karawan do miast (\d+)", s, int, 0) or 0 for s in vis.values())
+        info.append(f"wjazdy do miast {v_in / len(vis):.0f}/dobe (Z33 doba 120: 138)")
+    if why2:
+        v_buy = sum(num(r"zakup surowcow przed wyborem celu (\d+) wizyt", s, int, 0) or 0 for s in why2.values())
+        info.append(f"zakup surowcow przed wyborem celu {v_buy / len(why2):.0f} wizyt/dobe (Z33 doba 120: 115)")
+    if info:
+        rep.add("G1-5d: wiecej handlu karawan - wizyty i zakupy (CaravanBulk)", "; ".join(info), "INFO", None)
+    # ---------------- G1-6 (recenzja): dowoz surowca kontraktami (174.2) - przewoznik to karawana stojaca w zrodle
+    ore = {d: s for d, s in by_day(lines, "Miasta bez rudy i strzal (174b): dzien").items() if 91 <= run_day(d, start) <= until}
+    if ore:
+        ov = [num(r"miast \d+; bez rudy (\d+)", ore[d]) for d in sorted(ore)]
+        om = _mean(ov)
+        lim = 1.25 * E8_G1_Z33_ORE_TOWNS
+        rep.add("G1-6a: miasta bez rudy w dobach 91-120 (dowoz kontraktami 174.2 przy krotkim postoju karawan)",
+                (f"srednio {om:.1f} z {len([x for x in ov if x is not None])} probek {[x for x in ov if x is not None]}" if om is not None else "brak liczby w linii")
+                + f" (Z33: {E8_G1_Z33_ORE_TOWNS})", f"<= {lim:.1f} (1.25 x Z33; bieg krotszy niz 120 dob - INFO)",
+                (om <= lim) if (full and om is not None) else None)
+    mo = {d: s for d, s in by_day(lines, "Kontrakty surowca (174): dzien").items() if 1 <= run_day(d, start) <= until}
+    if mo:
+        made = sum(num(r" - zawarto (\d+) \[", s, int, 0) or 0 for s in mo.values())
+        nocar = sum(num(r"brak karawany w zrodle (\d+)", s, int, 0) or 0 for s in mo.values())
+        stand = _mean([num(r"w miastach teraz (\d+)", s) for s in p3.values()]) if p3 else None
+        rep.add("G1-6b: kontrakty surowca (174.2) - przewoznikiem jest karawana stojaca w miescie-zrodle",
+                f"zawarto {made / len(mo):.1f}/dobe (Z33: {E8_G1_Z33_CONTRACTS}), bez kontraktu z braku karawany w zrodle {nocar / len(mo):.1f}/dobe (Z33: {E8_G1_Z33_NOCAR})"
+                + (f"; karawany AI stojace w miastach srednio {stand:.0f} (Z33 doba 120: 355)" if stand is not None else ""),
+                "INFO (duzo mniej kontraktow przy G1-6a NIE = decyzja: przewoznik takze z karawan wjezdzajacych albo Caravan Town Hourly wylaczone)", None)
+    # ---------------- G1-K
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in CaravanFlow."))
+    rep.add("G1-K: kontrola (potkniecia, linie ERROR in CaravanFlow.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
+# E8/G2 (261): blok etap8_g2 - najemnicy i uczta BK (MercFeast.cs)
+E8_G2_DAY = "Najemnicy i uczta BK (E8/G2): dzien"
+
+
+def etap8_g2(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/G2 (261, projekt etapu 8 v2 rozdz. 3 "E8/G2" Test; odpowiedz Jeffa 4: TAK): klany najemnikow bez ludzi z niczego i bez wyrzucania wodza (zamiana
+    BK ConvertTroopsMercenaries robiona u nas, bez bohaterow) i uczta BK bez towaru z niczego (zakup schodzi z rynku). Linia doby "Najemnicy i uczta BK
+    (E8/G2): dzien N" (dzien ksiegi, jak "Najemnicy BK (E8/P3)").
+    G2-0 latki wpiete N/N i tresc metody BK zgodna ze sprawdzona (dlugosc IL), linia w kazdej dobie okna (bez pierwszej i ostatniej), oba klucze czynne;
+    G2-1 bohaterowie zamienieni 0 i ludzie dosypani 0 (pomiar E8/P3 - linia "Najemnicy BK (E8/P3)", suma okna), rozjazd liczby ludzi przy zamianie 1:1 = 0,
+    wywolania w cieniu 0; G2-1b zamiana czynna: wywolania klanow w sluzbie >= polowa klano-dob w sluzbie (0 przy klanach w sluzbie = latka omijana);
+    G2-2 INFO wielkosc druzyn klanow (pierwsza i ostatnia doba), zolnierze zamienieni 1:1, bohaterowie zostawieni, ochotnicy z mapy gry (poza paczka);
+    G2-3 uczta: towar z niczego po calosci 0 i rynek nie stracil ponad zakup (suma okna; bez zakupow w oknie - INFO); G2-3b INFO zakupy uczt;
+    G2-K potkniecia i linie "ERROR in MercFeast.*" 0."""
+    rows = {d: s for d, s in by_day(lines, E8_G2_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Najemnicy i uczta BK (E8/G2): latki przy starcie gry")]
+    if not rows and not wire:
+        rep.add("E8/G2: linie Najemnicy i uczta BK (E8/G2)", "brak w logu", "sa od wgrania E8/G2 (MercFeast.cs)", None)
+        return
+    # ---------------- G2-0: latki, tresc metody BK, linia, klucze
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("G2-0: latki (prefiks na BK ConvertTroopsMercenaries, metoda szansy BK, okno uczty na Feast.Automanage) i tresc metody BK", w0[:260],
+                "wpiete N/N, BRAK: -, tresc BK zgodna ze sprawdzona",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0 and "zgodna ze sprawdzona" in w0)
+    else:
+        rep.add("G2-0: latki", "brak linii startowej", "wpiete N/N", False)
+    if not rows:
+        rep.add("G2-0b: linia Najemnicy i uczta BK (E8/G2)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    first, last = rows[days[0]], rows[days[-1]]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_m = [d for d in days if "(Merc Clans Real Soldiers WYLACZONE)" in rows[d]]
+    off_f = [d for d in days if "(Feast No Free Goods WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    if off_m:
+        val += f"; Merc Clans Real Soldiers WYLACZONE w {len(off_m)} dobach"
+    if off_f:
+        val += f"; Feast No Free Goods WYLACZONE w {len(off_f)} dobach"
+    rep.add("G2-0b: linia Najemnicy i uczta BK (E8/G2) w kazdej dobie okna, oba klucze czynne", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_m and not off_f) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- G2-1: bohaterowie zamienieni 0, dosypani 0
+    p3 = {d: s for d, s in by_day(lines, "Najemnicy BK (E8/P3): dzien").items() if 1 <= run_day(d, start) <= until}
+    drift, sh_calls, sh_her = tot(r"rozjazd liczby ludzi (\d+)"), tot(r"BK jak dotad\): wywolan (\d+)"), tot(r"bohaterow do zamiany (\d+)")
+    own = f"linia E8/G2: rozjazd liczby ludzi przy zamianie 1:1 {drift}, w cieniu wywolan {sh_calls} (bohaterow do zamiany {sh_her})"
+    if p3:
+        h3 = sum(num(r"bohaterow zamienionych na zolnierza z niczego (\d+)", s, int, 0) or 0 for s in p3.values())
+        a3 = sum(num(r"ludzi dosypanych z niczego (\d+)", s, int, 0) or 0 for s in p3.values())
+        c3 = sum(num(r"wywolan (\d+) \(w sluzbie", s, int, 0) or 0 for s in p3.values())
+        rep.add("G2-1: klany najemnikow - bohaterowie zamienieni na zolnierza z niczego i ludzie dosypani z niczego (pomiar E8/P3, suma okna)",
+                f"bohaterow zamienionych {h3}, ludzi dosypanych {a3} (wywolan zmierzonych {c3}, linii {len(p3)}); " + own,
+                "0 i 0; rozjazd 0; w cieniu 0", h3 == 0 and a3 == 0 and drift == 0 and sh_calls == 0)
+    else:
+        rep.add("G2-1: klany najemnikow - bohaterowie zamienieni i ludzie dosypani z niczego",
+                "brak linii Najemnicy BK (E8/P3) - pomiar wylaczony (Stage8WorldLog); " + own,
+                "0 i 0 w pomiarze E8/P3; rozjazd 0; w cieniu 0", False if (drift or sh_calls) else None)
+    calls, c_k = tot(r"nasza zamiast BK (\d+) razy"), tot(r"nasza zamiast BK \d+ razy \(w sluzbie (\d+)")
+    c_f = tot(r"nasza zamiast BK \d+ razy \(w sluzbie \d+, bez sluzby (\d+)\)")
+    svc_days = tot(r"w sluzbie krolestwa (\d+)")
+    if svc_days > 0:
+        rep.add("G2-1b: zamiana czynna - wywolania klanow najemnikow w sluzbie wobec klano-dob w sluzbie",
+                f"wywolan w sluzbie {c_k} przy {svc_days} klano-dobach w sluzbie ({100.0 * c_k / svc_days:.0f}%); bez sluzby {c_f} (galaz BK martwa - oczekiwane 0)",
+                ">= 50% klano-dob (BK wola metode raz na dobe dla klanu w krolestwie z wodzem; 0 = latka omijana)", c_k * 2 >= svc_days)
+    else:
+        rep.add("G2-1b: zamiana czynna", f"brak klanow najemnikow w sluzbie w calym oknie (wywolan {calls}) - zamiana nie miala okazji", "INFO", None)
+
+    # ---------------- G2-2: INFO wielkosc druzyn
+    def state(s):
+        g = re.search(r"bez klanu Spoils\) (\d+), w sluzbie krolestwa (\d+), bez sluzby \d+; druzyn (\d+) \(w sluzbie (\d+)\), ludzi (\d+), bohaterow w druzynach (\d+)"
+                      r" \(w sluzbie (\d+)\), wodzow prowadzacych druzyne (\d+) z \d+ \(w sluzbie (\d+) z \d+\)", s)
+        if not g:
+            return "brak stanu w linii"
+        c, k, p, pk, m, h, hk, ld, ldk = (int(x) for x in g.groups())
+        return f"klanow {c} (w sluzbie {k}), druzyn {p} (w sluzbie {pk}), ludzi {m}, bohaterow {h} (w sluzbie {hk}), wodz prowadzi {ld} (w sluzbie {ldk})"
+    rep.add("G2-2: wielkosc druzyn klanow najemnikow (pierwsza -> ostatnia doba okna)",
+            f"d{run_day(days[0], start)}: {state(first)} -> d{run_day(days[-1], start)}: {state(last)}",
+            "INFO (mniejsze druzyny bez sluzby sa zamierzone - bez doplat)", None)
+    sw, kept = tot(r"zolnierzy zamienionych 1:1 na szablon klanu (\d+)"), tot(r"bohaterow zostawionych w druzynach (\d+)")
+    free_p, no_tpl, no_to, no_luck = tot(r"niezaszla w (\d+) druzynach"), tot(r"bez szablonu (\d+)"), tot(r"bez wzorca zamiany (\d+)"), tot(r"pominiete (\d+)")
+    v_t, v_m = tot(r"tylko licznik\): (\d+) razy"), tot(r"tylko licznik\): \d+ razy / (\d+) ludzi")
+    rep.add("G2-2b: zamiana 1:1 i bohaterowie (suma okna; na dobe)",
+            f"zolnierzy zamienionych 1:1 {sw} ({sw / n:.1f}/d), bohaterow zostawionych {kept} ({kept / n:.1f}/d - tylu BK zamienialby co dobe na zolnierza z niczego)"
+            f"; dosypka BK bez sluzby niezaszla w {free_p} druzynach; bez szablonu {no_tpl}, bez wzorca {no_to}, szansa BK ponizej 1: {no_luck}",
+            "INFO", None)
+    rep.add("G2-2c: ochotnicy z mapy gry u klanow najemnikow (poza paczka - ludzie bez pochodzenia u klanu bez sluzby)",
+            f"{v_t} razy / {v_m} ludzi ({v_m / n:.1f}/d)", "INFO (do decyzji: ta sama blokada co klan Spoils)", None)
+    # ---------------- G2-3: uczta
+    g_calls, g_buys = tot(r"zakupy BK Automanage (\d+) razy"), tot(r"razy \(z towarem (\d+)\)")
+    g_in, g_bk, g_out = tot(r"do spizarni (\d+) szt\."), tot(r"BK dopisal rynkowi (\d+) szt\."), tot(r"zdjete z rynku (\d+) szt\.")
+    g_free, g_lost = tot(r"towar z niczego po calosci (\d+) szt\."), tot(r"rynek stracil ponad zakup (\d+) szt\.")
+    g_odd, g_short, g_nor = tot(r"rynek zmieniony bez zakupu (\d+)"), tot(r"rynek mial mniej niz kupiono (\d+)"), tot(r"bez rynku albo spizarni (\d+)")
+    rep.add("G2-3: uczta BK - towar z niczego po calosci i rynek ponad zakup (suma okna)",
+            f"z niczego {g_free} szt., rynek stracil ponad zakup {g_lost} szt.; zakupow z towarem {g_buys} z {g_calls} wywolan, do spizarni {g_in} szt.",
+            "0 i 0 (bez zakupow uczt w oknie - INFO)", (g_free == 0 and g_lost == 0) if g_buys > 0 else (None if g_free == 0 and g_lost == 0 else False))
+    rep.add("G2-3b: uczta BK - zakupy (suma okna; na dobe)",
+            f"do spizarni {g_in} szt. ({g_in / n:.1f}/d), BK dopisal rynkowi z niczego {g_bk} szt., zdjete z rynku {g_out} szt. (zakup + dopisek BK)"
+            f"; rynek zmieniony bez zakupu {g_odd}, rynek mial mniej niz kupiono {g_short}, bez rynku albo spizarni {g_nor}",
+            "INFO (zdjete = do spizarni + dopisek BK)", None)
+    # ---------------- G2-4 / G2-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("G2-4: koszt (zamiana, okno uczty, linia)", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    errs = sum(1 for s in lines if s.startswith("ERROR in MercFeast."))
+    rep.add("G2-K: kontrola (potkniecia, linie ERROR in MercFeast.*)", f"{stu} / {errs}", "0 / 0", stu == 0 and errs == 0)
+
+
+E8_T_LATE = "Dorobek startowy (E8/T): dzien"
+E8_T_PLAYER = "Rekrut gracza (E8/T): dzien"
+E8_T_Z33_BUYS = (2451, 6123, 5037)   # zakupy AI (szt.) w dobach 1-3 biegu Z33 (WGRANIE 33, linie "ZakupyAI: dzien" L:337, L:653, L:942)
+E8_T_Z33_NEW_D1 = 541                # nowe partie AI bez darmowego kompletu DTE w dobie 1 biegu Z33 (linia "Werbunek: dzien", L:341)
+E8_T_Z33_LORDS_D1 = 276              # z tego partie lordow (linia "dziura werbunku ... nowe partie z szablonu klanu ... (276 partii)" tej samej doby)
+
+
+def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/T (263, projekt etapu 8 v2 rozdz. 3 "E8/T" Test; NOWA KAMPANIA): start kampanii i rekruci gracza (ColdStart.cs, LevyGold.cs, RecruitKit.cs,
+    PlayerRecruit.cs). Linie: "Start kampanii (E8/T): sesja" (klucze, przy kazdym starcie sesji), "Rekrut gracza (E8/T): latki przy starcie gry",
+    "ColdStart: zbrojownie" i "ColdStart: budzet cechow (E8/T)" (raz, nowa gra), "Dorobek startowy (E8/T): dzien N" (doby 1-4 kampanii),
+    "Rekrut gracza (E8/T): dzien N" (kazdy werbunek / najem gracza).
+    T-0 latki rekruta gracza wpiete N/N; T-K0 trzy klucze czynne w ostatniej linii sesji;
+    T-1 partie lordow z dorobkiem (sprzed startu + nowe z dob 1-3) >= 280 (projekt: ok. 280-300; Z33 mial 34 sprzed startu i 276 + 23 + 38 nowych);
+    T-2 budzet cechow przepadly 0 (roboczodni, po zaokragleniu); T-2b INFO podzial na cechy i sztuki z wyzszego tieru;
+    T-3 nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz "drugi raz ten sam wodz", "bez ludzi", umarli (sprzet umarlych poza
+    gospodarka - recenzja E8/T) albo rod gracza = 0; T-3b INFO wszystkie nowe
+    partie AI bez kompletu w dobie 1 wobec Z33 (541, z czego 276 lordow) i progu projektu 100 - reszta to wozy wsi, bandy i karawany, ktore dorobku
+    z projektu nie dostaja;
+    T-4 zakupy AI (szt.) w dobach 1-3 <= 50% Z33 (2 451 / 6 123 / 5 037);
+    T-5 rekrut gracza (gdy gracz werbowal): ludzi tieru 2+ = komplety DTE zablokowane i tier 1 = komplety DTE dane; bez werbunku gracza - INFO
+    (sprawdzenie reczne 8.16 p. 2 i 19);
+    T-K potkniecia 0 i linie "ERROR in ColdStart.*", "ERROR in PlayerRecruit.*", "ERROR in LevyGold.*" 0."""
+    ses = [s for s in lines if s.startswith("Start kampanii (E8/T): sesja")]
+    wire = [s for s in lines if s.startswith("Rekrut gracza (E8/T): latki przy starcie gry")]
+    bud = [s for s in lines if s.startswith("ColdStart: budzet cechow (E8/T)")]
+    late = {d: s for d, s in by_day(lines, E8_T_LATE).items() if 1 <= run_day(d, start) <= until}
+    pl = [s for s in lines if s.startswith(E8_T_PLAYER)]
+    if not ses and not wire and not bud and not late and not pl:
+        rep.add("E8/T: linie Start kampanii (E8/T) / Dorobek startowy (E8/T) / Rekrut gracza (E8/T)", "brak w logu", "sa od wgrania E8/T", None)
+        return
+    # ---------------- T-0 / T-K0: latki i klucze
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        rep.add("T-0: latki rekruta gracza (komplet DTE, okno werbunku, najem w rozmowie i w menu)", w0[:150], "wpiete N/N, BRAK: -",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0)
+    else:
+        rep.add("T-0: latki rekruta gracza", "brak linii startowej", "wpiete N/N", False)
+    if ses:
+        s0 = ses[-1]
+        keys = ("Cold Start Tier Up", "Cold Start Late Lord Parties", "Player Recruit No Free Kit")
+        off = [k for k in keys if (k + " CZYNNE") not in s0]
+        path = "sciezka czynna" in s0
+        rep.add("T-K0: klucze paczki w ostatniej linii sesji (sesji w logu %d)" % len(ses),
+                ("wszystkie CZYNNE" if not off else "WYLACZONE: " + ", ".join(off)) + ("; rekrut gracza: sciezka czynna" if path else "; rekrut gracza: sciezka NIECZYNNA"),
+                "trzy klucze CZYNNE, sciezka rekruta gracza czynna", not off and path)
+    else:
+        rep.add("T-K0: klucze paczki", "brak linii \"Start kampanii (E8/T): sesja\"", "linia przy kazdym starcie sesji", False)
+
+    def tot(rows, pat):
+        return sum(num(pat, x, int, 0) or 0 for x in rows)
+    d13 = [late[d] for d in sorted(late) if 1 <= run_day(d, start) <= 3]
+    # ---------------- T-1: partie lordow z dorobkiem
+    arm = [s for s in lines if s.startswith("ColdStart: zbrojownie - ")]
+    if arm:
+        a0 = arm[-1]
+        allp, gar = num(r"zbrojownie - (\d+) partii", a0, int, 0) or 0, num(r"w tym garnizonow (\d+)", a0, int, 0) or 0
+        lp = tot(d13, r"nowe partie lordow AI z dorobkiem (\d+)")
+        pcs = tot(d13, r"nowe partie lordow AI z dorobkiem \d+ \(szt\. (\d+)\)")
+        rep.add("T-1: partie lordow z dorobkiem stuleci (sprzed startu + nowe z dob 1-3 kampanii)",
+                f"{allp - gar} sprzed startu + {lp} nowych = {allp - gar + lp} (nowe dostaly {pcs} szt.; linii doby {len(d13)} z 3)",
+                ">= 280 (projekt ok. 280-300; Z33: 34 sprzed startu, nowych 276 + 23 + 38)", (allp - gar + lp) >= 280 if d13 else False)
+    else:
+        rep.add("T-1: partie lordow z dorobkiem stuleci", "brak linii \"ColdStart: zbrojownie\" - log nie zaczyna nowej kampanii", "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-2: budzet cechow
+    if bud:
+        b0 = bud[-1]
+        giv, used, lost = num(r"dany (\d+) roboczodni", b0), num(r"zuzyty (\d+), przepadly", b0), num(r", przepadly (\d+) \(los tieru", b0)
+        draw, none, guard = num(r"stara regula (\d+) w", b0, int, 0), num(r"cech bez zadnej sztuki (\d+) w", b0, int, 0), num(r"straznik petli (\d+) w", b0, int, 0)
+        up = num(r"\): (\d+) szt\.; cechy", b0, int, 0)
+        rep.add("T-2: budzet cechow na starcie - przepadly (roboczodni)",
+                f"dany {giv}, zuzyty {used}, przepadly {lost} (los tieru - stara regula {draw}, cech bez zadnej sztuki {none}, straznik petli {guard}); z wyzszego tieru {up} szt.",
+                "przepadly 0", lost == 0 if lost is not None else False)
+        g = re.search(r"cechy \[(.*)\]\.", b0)
+        rep.add("T-2b: budzet wedlug cechu", g.group(1)[:420] if g else "brak podzialu w linii", "INFO", None)
+    else:
+        rep.add("T-2: budzet cechow na starcie", "brak linii \"ColdStart: budzet cechow (E8/T)\" - log nie zaczyna nowej kampanii albo zapas kupiecki wylaczony",
+                "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-3: nowe partie lordow bez dorobku
+    if d13:
+        lords = tot(d13, r"w tym partie lordow (\d+)\)")
+        empty, again = tot(d13, r"bez ludzi albo bez brakow (\d+)"), tot(d13, r"drugi raz ten sam wodz (\d+)")
+        nolead, keyoff = tot(d13, r"bez wodza (\d+)"), tot(d13, r"klucz wylaczony (\d+)")
+        # recenzja E8/T: umarli (sprzet umarlych poza gospodarka) i rod gracza - celowo bez dorobku; log sprzed recenzji nie ma tych pol (0)
+        undead, pclan = tot(d13, r"umarli \(sprzet poza gospodarka\) (\d+)"), tot(d13, r"rod gracza (\d+); nowe partie AI")
+        bad = lords - empty - again - undead - pclan
+        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku z innego powodu niz \"drugi raz ten sam wodz\", \"bez ludzi\", umarli albo rod gracza",
+                f"{bad} (bez dorobku razem {lords}: bez ludzi albo bez brakow {empty}, drugi raz ten sam wodz {again}, umarli {undead}, rod gracza {pclan}, "
+                f"bez wodza {nolead}, klucz wylaczony {keyoff})",
+                "0", bad == 0)
+        first = [late[d] for d in sorted(late) if run_day(d, start) == 1]
+        if first:
+            n1, l1 = num(r"bez kompletu DTE i bez dorobku (\d+)", first[0], int, 0), num(r"w tym partie lordow (\d+)\)", first[0], int, 0)
+            rep.add("T-3b: wszystkie nowe partie AI bez kompletu w dobie 1",
+                    f"{n1} (w tym partie lordow {l1}); Z33 {E8_T_Z33_NEW_D1}, z czego {E8_T_Z33_LORDS_D1} partii lordow - reszta ({E8_T_Z33_NEW_D1 - E8_T_Z33_LORDS_D1}) to wozy wsi, bandy, karawany",
+                    "INFO (prog projektu <= 100 liczyl wszystkie rodzaje partii; dorobek z projektu dostaja tylko partie lordow - patrz T-3)", None)
+    else:
+        rep.add("T-3: nowe partie lordow AI w dobach 1-3 bez dorobku", "brak linii \"Dorobek startowy (E8/T)\" w dobach 1-3", "linia co dobe w dobach 1-3 nowej kampanii",
+                False if arm else None)
+    # ---------------- T-4: zakupy AI w dobach 1-3
+    buys = by_day(lines, "ZakupyAI: dzien")
+    got = []
+    for k in (1, 2, 3):
+        dd = [d for d in buys if run_day(d, start) == k]
+        got.append(num(r"wizyt, (\d+) szt\. kupionych", buys[dd[0]]) if dd else None)
+    if arm and all(x is not None for x in got):
+        rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33",
+                " / ".join(f"{x} ({100.0 * x / z:.0f}% z {z})" for x, z in zip(got, E8_T_Z33_BUYS)), "kazda doba <= 50% Z33 (2 451 / 6 123 / 5 037)",
+                all(2 * x <= z for x, z in zip(got, E8_T_Z33_BUYS)))
+    else:
+        rep.add("T-4: zakupy AI w dobach 1-3 (szt.) wobec Z33", "brak linii ZakupyAI w dobach 1-3 albo log nie zaczyna nowej kampanii: " + str(got),
+                "INFO (prog tylko w nowej kampanii)", None)
+    # ---------------- T-5: rekrut gracza
+    if pl:
+        men, blocked = tot(pl, r"ludzi tieru 2\+ (\d+)"), tot(pl, r"komplet DTE zablokowany dla (\d+) ludzi")
+        rec, own, tpl = tot(pl, r"z zapisu notabla (\d+)"), tot(pl, r"z tym co ma (\d+)"), tot(pl, r"wzorzec - wylacznik (\d+)")
+        pcs, hp, ref = tot(pl, r"do zbrojowni druzyny (\d+) szt\."), tot(pl, r"konie i rzedy najemnikow (\d+)"), tot(pl, r"nieprzyjete przez DTE (\d+)")
+        t1, t1d, noc = tot(pl, r"tier 1 z wlasnym dobytkiem (\d+)"), tot(pl, r"\(komplet DTE dla (\d+)\)"), tot(pl, r"ochotnik spoza koszyka (\d+)")
+        mer = sum(1 for s in pl if "najemnicy z karczmy" in s)
+        rep.add("T-5: rekrut gracza - ludzi tieru 2+ wobec zablokowanych kompletow DTE; tier 1 wobec kompletow DTE",
+                f"tier 2+: {men} ludzi / {blocked} zablokowanych kompletow; tier 1: {t1} ludzi / {t1d} kompletow DTE (werbunkow {len(pl)}, w tym najem z karczmy {mer})",
+                "rowne (kazdy rekrut tieru 2+ bez kompletu DTE, kazdy tieru 1 z kompletem DTE)", men == blocked and t1 == t1d)
+        rep.add("T-5b: rekrut gracza - skad rzeczy (suma logu)",
+                f"z zapisu notabla {rec}, z tym co ma {own}, wzorzec (wylacznik) {tpl}; do zbrojowni druzyny {pcs} szt. (konie i rzedy najemnikow {hp}, nieprzyjete przez DTE {ref})"
+                f"; ochotnik spoza koszyka {noc}", "INFO", None)
+    else:
+        rep.add("T-5: rekrut gracza", "gracz nie werbowal w tym logu (autotest)", "INFO - sprawdzenie reczne 8.16 p. 2 (rekrut u notabla) i p. 19 (najemnik z karczmy)", None)
+    # ---------------- T-K: kontrola
+    stu_l = max([num(r"; potkniecia (\d+) \(Cold Start Late", s, int, 0) or 0 for s in late.values()] or [0])
+    stu_p = max([num(r"; potkniecia (\d+)\.$", s, int, 0) or 0 for s in pl] or [0])
+    stu_s = max([num(r"sciezka (?:czynna|nieczynna), potkniecia (\d+)\)", s, int, 0) or 0 for s in ses] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in ColdStart.") or s.startswith("ERROR in PlayerRecruit.") or s.startswith("ERROR in LevyGold."))
+    rep.add("T-K: kontrola (potkniecia dorobku / rekruta gracza / w linii sesji, linie ERROR in ColdStart.*, PlayerRecruit.*, LevyGold.*)",
+            f"{stu_l} / {stu_p} / {stu_s} / {errs}", "0 / 0 / 0 / 0", stu_l == 0 and stu_p == 0 and stu_s == 0 and errs == 0)
+
+
+# E8/K (255): blok etap8_k - kuznia: zlecenia kowalskie gry i ksiegarz BK (CraftOrders8.cs, GiverPay.cs, HistoricalPrices.cs)
+E8_K_DAY = "Kuznia (E8/K): dzien"
+E8_K_BOOKS = 24   # ksiazki BK (BKItems: 6 opowiesci po 750, 18 ksiazek umiejetnosci po 1000 - po BKROTPatch 7 i 10)
+
+
+def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/K (255, projekt etapu 8 v2 rozdz. 3 "E8/K" Test): ksiazki BK, zlecenia kowalskie gry (CraftingOrder), kupno u ksiegarza BK. Linie: start gry
+    "Kuznia (E8/K): latki przy starcie gry", start sesji "HistoricalPrices: ksiazek BK przeliczonych N" i "Kuznia (E8/K): sesja", doba "Kuznia (E8/K): dzien N".
+    K-0 latki wpiete N/N, kazda podmiana wywolania w kodzie gry znaleziona dokladnie raz, lambda kupna BK jedna; K-0b linia doby w kazdej dobie okna (bez
+    pierwszej i ostatniej), trzy klucze czynne; K-1 ksiazek BK przeliczonych 24; K-2 zlecenia sprzed sesji (zapis albo start nowej kampanii): po przeliczeniu
+    zadna nagroda ponad 3 x nowa, INFO ile przeliczono; K-3 okno "zlecenia kowalskie" (suma okna): zloto z niczego 0, zolnierz z niczego dany 0, bron w nicosc 0
+    (gracz nie oddal zlecenia - INFO, sprawdzenie reczne 8.16 p. 6), K-3b INFO obiecane / zaplacone / niedoplata; K-4 okno "ksiegarz": zloto w nicosc 0, ksiazka
+    z niczego 0, stara droga BK mimo klucza 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia: los gry spoza dozwolonych klas 0 i srednia nagroda w nowej
+    monecie <= 1000 ("w setkach, nie w tysiacach"), K-5b INFO klasy dozwolone, tier przyciety, wymiana zlecen startowych nowej kampanii; K-6 INFO doswiadczenie
+    zlecen; K-K potkniecia i linie ERROR in CraftOrders8.* / GiverPay.* / HistoricalPrices.PriceDesign 0."""
+    rows = {d: s for d, s in by_day(lines, E8_K_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Kuznia (E8/K): latki przy starcie gry")]
+    ses = [x for x in lines if x.startswith("Kuznia (E8/K): sesja")]
+    books = [x for x in lines if x.startswith("HistoricalPrices: ksiazek BK przeliczonych")]
+    if not rows and not wire and not ses:
+        rep.add("E8/K: linie Kuznia (E8/K)", "brak w logu", "sa od wgrania E8/K (CraftOrders8.cs)", None)
+        return
+    # ---------------- K-0: latki i podmiany wywolan
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        calls = "CompleteOrder wyplata 1, zolnierz 1; CreateTownOrder szablon 1, czesci 1; CreateCustomOrderForHero szablon 1, czesci 1" in w0
+        lam = num(r"\(pasujacych (\d+)\)", w0)
+        rep.add("K-0: latki (konstruktor CraftingOrder, GetOrderExperience, CompleteOrder, CreateTownOrder, CreateCustomOrderForHero, ksiegarz BK) i podmiany wywolan",
+                f"wpiete {a}/{b}; podmiany po 1: {'tak' if calls else 'NIE'}; lambda kupna BK pasujacych {lam if lam is not None else 'brak BK'} | " + w0[:200],
+                "wpiete N/N, BRAK: -, kazde wywolanie znalezione dokladnie raz, lambda kupna BK 1",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0 and calls and lam == 1)
+    else:
+        rep.add("K-0: latki", "brak linii startowej", "wpiete N/N", False)
+    # ---------------- K-1: ksiazki BK
+    if books:
+        nb = num(r"ksiazek BK przeliczonych (\d+)", books[-1], int, 0)
+        off = "WYLACZONE" in books[-1]
+        rep.add("K-1: ksiazki BK przeliczone (x100, kategoria book, wartosc ponizej 100)", f"{nb}" + (" (Book Price Fix WYLACZONE)" if off else "") + f"; linii {len(books)}",
+                f"{E8_K_BOOKS} przy kazdym starcie sesji", (not off) and all(num(r"ksiazek BK przeliczonych (\d+)", x, int, 0) == E8_K_BOOKS for x in books))
+    else:
+        rep.add("K-1: ksiazki BK przeliczone", "brak linii HistoricalPrices: ksiazek BK przeliczonych (ceny historyczne wylaczone albo log sprzed E8/K)", f"{E8_K_BOOKS}", False)
+    # ---------------- K-2: zlecenia sprzed sesji
+    if ses:
+        s0 = ses[-1]
+        n_all, n_q = num(r"w miastach (\d+)", s0, int, 0), num(r"w tym zlecen zadan (\d+)", s0, int, 0)
+        priced, nopr = num(r"projekt w cenach historycznych (\d+)", s0, int, 0), num(r"bez wyceny (\d+)", s0, int, 0)
+        conv, kept, high = num(r"nagroda z zapisu przeliczona (\d+)", s0, int, 0), num(r"najwyzej 3 x nowa\) (\d+)", s0, int, 0), num(r"ponad 3 x nowa (\d+)", s0, int, 0)
+        g = re.search(r"przeliczona \d+ \(suma (\d+) -> (\d+)\)", s0)
+        early = num(r"start nowej kampanii\) (\d+)", s0, int, 0)
+        on = "Craft Orders Historical CZYNNE" in s0
+        rep.add("K-2: zlecenia kowalskie sprzed sesji (zapis albo start nowej kampanii) - nagroda w nowej monecie (ostatni start sesji; sesji w logu " + str(len(ses)) + ")",
+                f"zlecen {n_all} (zadan {n_q}), projekt wyceniony {priced}, bez wyceny {nopr}; nagroda przeliczona {conv}"
+                + (f" (suma {g.group(1)} -> {g.group(2)})" if g else "") + f", bez zmiany {kept}, po przeliczeniu ponad 3 x nowa {high}; zalozone przed przeliczeniem cen {early}"
+                + ("" if on else "; Craft Orders Historical WYLACZONE"),
+                "po przeliczeniu ponad 3 x nowa 0, klucz czynny (bieg zapisu: przeliczona > 0 przy pierwszym wczytaniu, 0 przy nastepnych)", on and high == 0)
+    else:
+        rep.add("K-2: zlecenia kowalskie sprzed sesji", "brak linii Kuznia (E8/K): sesja", "linia przy kazdym starcie sesji", False)
+    if not rows:
+        rep.add("K-0b: linia Kuznia (E8/K)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_h = [d for d in days if "(Craft Orders Historical WYLACZONE" in rows[d]]
+    off_o = [d for d in days if "Craft Orders Opened Only WYLACZONE" in rows[d]]
+    off_b = [d for d in days if "(Book Price Fix WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    for nm, off in (("Craft Orders Historical", off_h), ("Craft Orders Opened Only", off_o), ("Book Price Fix", off_b)):
+        if off:
+            val += f"; {nm} WYLACZONE w {len(off)} dobach"
+    wired = [(num(r"latki wpiete (\d+)/\d+", x), num(r"latki wpiete \d+/(\d+)", x)) for x in w]
+    bad_w = sum(1 for a, b in wired if a is None or a != b)
+    if bad_w:
+        val += f"; latki niekompletne w {bad_w} liniach"
+    rep.add("K-0b: linia Kuznia (E8/K) w kazdej dobie okna, trzy klucze czynne, latki komplet", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_h and not off_o and not off_b and not bad_w) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- K-3: okno "zlecenia kowalskie"
+    done, quest = tot(r"oddanych (\d+) \(w tym"), tot(r"w tym zlecen zadan (\d+)\)")
+    due, paid, short_n = tot(r"obiecane (\d+)"), tot(r"zaplacone przez zleceniodawce (\d+)"), tot(r"niedoplata przy pustej kiesie -?\d+ w (\d+) zleceniach")
+    nothing, t_cut, t_given = tot(r"zloto z niczego (\d+)"), tot(r"zolnierz z niczego: wyciety (\d+)"), tot(r"wyciety \d+, dany (\d+)")
+    hand, tabor, shelf, lost = tot(r"lord wzial do reki (\d+)"), tot(r"do taboru lorda (\d+)"), tot(r"na polke miasta (\d+)"), tot(r"bron w nicosc (\d+)")
+    if done > 0:
+        rep.add("K-3: okno \"zlecenia kowalskie\" (suma okna) - zloto z niczego, zolnierz z niczego, bron w nicosc",
+                f"z niczego {nothing}, zolnierz dany {t_given} (wyciety {t_cut}), bron w nicosc {lost}; oddanych {done} (zadan {quest}): lord do reki {hand}, tabor lorda {tabor}, polka miasta {shelf}",
+                "0 / 0 / 0; oddanych = do reki + tabor + polka", nothing == 0 and t_given == 0 and lost == 0 and done == hand + tabor + shelf)
+        rep.add("K-3b: zlecenia kowalskie - obiecane i zaplacone przez zleceniodawcow (suma okna)",
+                f"obiecane {due}, zaplacone {paid}, niedoplata {due - paid} w {short_n} zleceniach (pusta kiesa zleceniodawcy - bez doplat)", "INFO", None)
+    else:
+        rep.add("K-3: okno \"zlecenia kowalskie\"", "gracz nie oddal zadnego zlecenia w oknie (autotest)" + (f"; UWAGA liczniki bez oddania: z niczego {nothing}, w nicosc {lost}" if nothing or lost else ""),
+                "INFO - sprawdzenie reczne 8.16 p. 6 (nagroda w setkach, zloto od zleceniodawcy, komunikat przy pustej kiesie)", None if not (nothing or lost) else False)
+    # ---------------- K-4: okno "ksiegarz"
+    talks, empty, sold, b_gold = tot(r"rozmow o kupnie (\d+)"), tot(r"pusta oferta (\d+)"), tot(r"sprzedanych (\d+)"), tot(r"zaplacone ksiegarzowi (\d+)")
+    poor, gone, old, void, free = tot(r"brak zlota (\d+)"), tot(r"brak ksiazki (\d+)"), tot(r"stara droga BK mimo klucza (\d+)"), tot(r"zloto w nicosc (\d+)"), tot(r"ksiazka z niczego (\d+)")
+    if talks > 0 or sold > 0 or free > 0:
+        rep.add("K-4: okno \"ksiegarz\" (suma okna) - zloto w nicosc, ksiazka z niczego, stara droga BK mimo klucza",
+                f"w nicosc {void}, z niczego {free}, stara droga {old}; rozmow {talks}, sprzedanych {sold} za {b_gold} (srednio {b_gold / sold:.0f})" if sold else
+                f"w nicosc {void}, z niczego {free}, stara droga {old}; rozmow {talks}, sprzedanych 0 (pusta oferta {empty}, brak zlota {poor}, brak ksiazki {gone})",
+                "0 / 0 / 0", void == 0 and free == 0 and old == 0)
+    else:
+        rep.add("K-4: okno \"ksiegarz\"", "gracz nie kupowal ksiazek w oknie (autotest)", "INFO - sprawdzenie reczne 8.16 p. 7 (cena 700-1 000, ksiazka znika z oferty, kiesa ksiegarza rosnie)", None)
+    # ---------------- K-5: nowe zlecenia
+    new, priced = tot(r"\): nowych (\d+) \(nagroda"), tot(r"nagroda przeliczona w (\d+):")
+    r_game, r_hist = tot(r"przeliczona w \d+: gra (\d+) ->"), tot(r"-> historyczna (\d+)\)")
+    picks, fall, cut = tot(r"szablon z dozwolonych klas (\d+) razy"), tot(r"brak dozwolonej klasy - los gry (\d+)"), tot(r"tier czesci przyciety (\d+) razy")
+    sh, sh_closed = tot(r"wylaczony\): los gry (\d+) razy"), tot(r"z klasy zamknietej (\d+)")
+    avg = r_hist / priced if priced else None
+    rep.add("K-5: nowe zlecenia (suma okna) - los gry spoza dozwolonych klas i srednia nagroda w nowej monecie",
+            f"nowych {new} ({new / n:.1f}/d), nagroda przeliczona w {priced}: gra {r_game} -> historyczna {r_hist}"
+            + (f" (srednio {r_game / priced:.0f} -> {avg:.0f})" if priced else "") + f"; szablon z dozwolonych klas {picks} razy, los gry bez dozwolonej klasy {fall}"
+            + (f"; w cieniu los gry {sh} razy, z klasy zamknietej {sh_closed}" if sh else ""),
+            "los gry spoza dozwolonych klas 0; srednia nagroda <= 1000 (w setkach, nie w tysiacach); bez nowych zlecen - INFO",
+            (fall == 0 and sh == 0 and avg is not None and avg <= 1000.0) if (new > 0 and priced > 0) else (None if fall == 0 and sh == 0 else False))
+    last = rows[days[-1]]
+    cls = re.search(r"klasy broni dozwolone (\d+) z (\d+)( \[zamkniete: [^\]]*\])?", last)
+    nk = [(run_day(d, start), num(r"zlecenia startowe nowej kampanii wymienione (\d+)", rows[d])) for d in days]
+    nk = [(d, v) for d, v in nk if v is not None]
+    rep.add("K-5b: klasy broni dozwolone (ostatnia doba), tier czesci przyciety, wymiana zlecen startowych nowej kampanii",
+            (f"dozwolone {cls.group(1)} z {cls.group(2)}{cls.group(3) or ''}" if cls else "brak stanu klas w linii") + f"; tier przyciety {cut} razy"
+            + ("; wymiana startowa: " + ", ".join(f"d{d}: {v}" for d, v in nk) if nk else "; wymiana startowa nie biegla (stary zapis albo klucz wylaczony)"),
+            "INFO (nowa kampania: wymiana raz w pierwszej dobie, liczba = zlecenia startowe)", None)
+    # ---------------- K-6: doswiadczenie zlecen
+    xp, xps = tot(r"doswiadczenie zlecen: odczytow (\d+)"), tot(r"od wartosci sprzed przeliczenia (\d+)")
+    rep.add("K-6: doswiadczenie zlecen (suma okna)", f"odczytow {xp}, policzonych od wartosci sprzed przeliczenia {xps}", "INFO (bez zmian wobec gry - liczone od dawnej wartosci projektu)", None)
+    # ---------------- K-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("K-7: koszt (nowe zlecenia, linia)", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    stu_s = max([num(r"potkniecia (\d+)\.$", x, int, 0) or 0 for x in ses] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in CraftOrders8.") or s.startswith("ERROR in GiverPay.") or s.startswith("ERROR in HistoricalPrices.PriceDesign"))
+    rep.add("K-K: kontrola (potkniecia doby / przy starcie sesji, linie ERROR in CraftOrders8.*, GiverPay.*, HistoricalPrices.PriceDesign)",
+            f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9618,6 +10545,13 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_z)    # E8/Z (251): zakupy i nadwyzki AI - bez dodatnich stanow, sufit ceny (W CIENIU), uprzaz ponad zapas
     blocks.append(etap8_l)    # E8/L (252): lup to przeniesienie, Send troops - jedna droga, dar dla miasta do zalogi bez milicji, trofea zostawione na polke
     blocks.append(etap8_c)    # E8/C (253): cennik - rzad konski z wagi prawdziwej, helmy t4-6, luki, bron miotana, konie wedlug kategorii
+    blocks.append(etap8_p3)   # E8/P3 (245): pomiary swiata (scalenie etapu 8: osobna linia - na galezi e8-c blok stal w liscie startowej)
+    blocks.append(etap8_s)   # E8/S (246): porzadek stanu (osobna linia - czyste scalenie z lista drugiej galezi)
+    blocks.append(etap8_q)   # E8/Q (262): straz przeprawy na zegarze gry
+    blocks.append(etap8_g1)   # E8/G1 (260): karawany BK w miescie co godzine, wyspy bez drogi
+    blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
+    blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
+    blocks.append(etap8_k)   # E8/K (255): ksiazki BK, zlecenia kowalskie gry (nagroda, platnik, bron, szablon), kupno u ksiegarza BK
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

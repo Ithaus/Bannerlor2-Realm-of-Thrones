@@ -50,6 +50,30 @@ namespace Armoury
         private static int _pursuitRenewals;
         // lup przedmiotowy - ekran jak po bitwie, otwierany na czystej mapie
         private static ItemRoster _lootRoster;
+        // E8/S (246, rozpoznanie C poz. 11): potkniecia OnTick Z RZEDU przy czekajacym przeszukaniu. Dotad jeden wyjatek gasil _pending
+        // (przeszukanie przepadalo); teraz _pending zostaje, kolejna proba najwczesniej po PendingRetrySeconds, najwyzej PendingStrikesMax
+        // prob - dopiero wtedy jak dotad (_pending gasnie; kasa zostaje w kryjowce - schodzi dopiero w DoSearch). Udane otwarcie menu zeruje licznik
+        private static int _pendingStrikes;
+        private static DateTime _pendingRetryAt = DateTime.MinValue;
+        private const int PendingStrikesMax = 3;
+        private const double PendingRetrySeconds = 1.0;
+
+        /// <summary>E8/S (246, PLAN 8.11): nowa kampania albo wczytanie (konstruktor ArmouryBehavior przez StateHygiene.ResetAll - PRZED SyncData,
+        /// ktory tu nic nie zapisuje). Dotad pola zyly do konca procesu: po wczytaniu innego zapisu w tej samej sesji menu przeszukania wracalo
+        /// z kryjowka POPRZEDNIEJ kampanii (obiekt osady, ktorej juz nie ma), a odwet odnawial rozkaz partiom starej gry. Tylko pola statyczne -
+        /// sluchacze i menu (AddMenus na OnSessionLaunched) zostaja. _reprisalPack bez SetInitiative: partie poprzedniej kampanii juz nie istnieja.
+        /// _lootRoster tez: bez tego po zgaszeniu _pending ekran lupow otwieralby sie w nowej kampanii ze sztukami ze starej (sztuki z niczego).
+        /// Zwraca, ile rzeczy zostalo w pamieci (do linii startu "Porzadek stanu (E8/S)").</summary>
+        internal static int Reset()
+        {
+            int had = (_pending ? 1 : 0) + _reprisalPack.Count + (_lootRoster != null && _lootRoster.Count > 0 ? 1 : 0) + (_searchLeave ? 1 : 0);
+            _pending = false; _pendingGold = 0; _pendingBands = 0; _pendingName = ""; _pendingPos = default(CampaignVec2); _pendingHasPos = false; _pendingHideout = null;
+            _reprisalPack.Clear();
+            _searchLeave = false;
+            _lootRoster = null;
+            _pendingStrikes = 0; _pendingRetryAt = DateTime.MinValue;
+            return had;
+        }
 
         public override void RegisterEvents()
         {
@@ -98,6 +122,7 @@ namespace Armoury
                 _pendingHideout = sett;
                 _pendingGold = 0;
                 try { if (sett != null && sett.SettlementComponent != null) _pendingGold = Math.Max(0, sett.SettlementComponent.Gold); } catch { }
+                _pendingStrikes = 0; _pendingRetryAt = DateTime.MinValue;   // E8/S (246): nowe przeszukanie - licznik potkniec od zera
                 _pending = true;
                 BuildLoot(sett);
                 Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + ", band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
@@ -160,14 +185,36 @@ namespace Armoury
                 }
 
                 if (!_pending || !cleanMap) return;
+                // E8/S (246): po potknieciu kolejna proba otwarcia menu dopiero po PendingRetrySeconds (bez tego 3 proby = 3 klatki)
+                if (_pendingStrikes > 0 && DateTime.UtcNow < _pendingRetryAt) return;
                 // menu dopiero na CZYSTEJ mapie - nigdy w srodku cudzego menu
                 // ani rozliczania bitwy (lekcja z klawisza O w NightRest).
                 // _pending NIE gasnie tutaj: gdy odwet przerwie przeszukanie
                 // walka konczy sie na mapie i menu wraca samo - do lupu wraca
                 // sie po bitwie (Jeff). Gasi je dopiero DoSearch albo Leave.
                 GameMenu.ActivateGameMenu("arm_hideout_search");
+                _pendingStrikes = 0;   // E8/S (246): menu otwarte - licznik potkniec z rzedu od zera
             }
-            catch (Exception e) { Log.Error("HideoutPurge.OnTick", e); _pending = false; }
+            catch (Exception e)
+            {
+                Log.Error("HideoutPurge.OnTick", e);
+                // E8/S (246; CLAUDE.md 7 "licz potkniecia, nie gas funkcji"): czekajace przeszukanie nie przepada po jednej wywrotce - _pending
+                // zostaje do PendingStrikesMax potkniec z rzedu (kolejna proba po PendingRetrySeconds). Potem jak dotad: _pending gasnie, kasa zostaje
+                // w kryjowce (schodzi dopiero w DoSearch), zelastwo z _lootRoster pokaze ekran lupow. Klucz StateHygieneEnabled off = od razu jak dotad
+                if (_pending && StateHygiene.On)
+                {
+                    _pendingStrikes++;
+                    if (_pendingStrikes < PendingStrikesMax)
+                    {
+                        _pendingRetryAt = DateTime.UtcNow.AddSeconds(PendingRetrySeconds);
+                        StateHygiene.NoteHideout(false);
+                        return;
+                    }
+                    StateHygiene.NoteHideout(true);
+                    Log.Info("HideoutPurge (E8/S): " + _pendingStrikes + " potkniecia z rzedu przy otwieraniu przeszukania " + _pendingName + " - przeszukanie porzucone (kasa zostaje w kryjowce).");
+                }
+                _pending = false;
+            }
         }
 
         /// <summary>E7/C (227): czy pora odnowic rozkaz pogoni. Zegar gry - co HideoutPursuitHours h gry

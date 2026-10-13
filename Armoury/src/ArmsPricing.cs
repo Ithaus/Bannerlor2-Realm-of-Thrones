@@ -39,6 +39,8 @@ namespace Armoury
     internal static class ArmsPricing
     {
         internal static void ClearCostCache() { _cost.Clear(); }   // wpis 87 (audyt pkt 11c): przyklady z Build liczone przed cenami historycznymi
+        /// <summary>E8/K (255): projekt zlecenia kowalskiego wyceniony raz (HistoricalPrices.PriceDesign) nie zostaje w pamieci kosztu i unikatow - zlecen przybywa kilkanascie na dobe.</summary>
+        internal static void Forget(ItemObject it) { if (it == null) return; _cost.Remove(it); _unique.Remove(it); }
 
         internal static void Reset() { _cost.Clear(); _effMedian.Clear(); _idx.Clear(); _nearestTown.Clear(); _war.Clear(); _unique.Clear(); _built = false; _ore = _wood = _leather = _linen = null; }
         internal sealed class Cost
