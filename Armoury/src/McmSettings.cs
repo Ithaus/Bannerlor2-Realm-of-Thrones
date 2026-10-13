@@ -1176,6 +1176,10 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float AiMountPurseShare { get; set; } = 0.15f;
 
+        [SettingPropertyFloatingInteger("Ai Mount Gear Purse Share", 0.00f, 1.00f, "0.00", HintText = "a lord whose house has an arms share (Gear Share Peace / War) buys his horses out of that share, like his arms and armour: at one stop he spends on horses at most this part of what his purse holds above Ai Gear Gold Reserve and never more than the unspent arms share of his house, and what he pays comes off that share. The horses a house buys for its knights leave the same reserve in his purse. Houses without a budget, your own house and mercenary companies go by Ai Mount Purse Share as before (0 = off: every lord goes by Ai Mount Purse Share and knights' horses are bought without the reserve, as before)")]
+        [SettingPropertyGroup("A knight needs a horse")]
+        public float AiMountGearPurseShare { get; set; } = 0.75f;
+
         [SettingPropertyInteger("Ai Mount Max Per Visit", 0, 40, "0", HintText = "and never buys more than this many head at one stop - a stable is topped up, not a herd bought")]
         [SettingPropertyGroup("A knight needs a horse")]
         public int AiMountMaxPerVisit { get; set; } = 10;
@@ -5217,6 +5221,7 @@ namespace Armoury
             s.AiBuysMounts = AiBuysMounts;
             s.AiMountSpareBuffer = AiMountSpareBuffer;
             s.AiMountPurseShare = AiMountPurseShare;
+            s.AiMountGearPurseShare = AiMountGearPurseShare;
             s.AiMountMaxPerVisit = AiMountMaxPerVisit;
             s.AiMountBuyCooldownDays = AiMountBuyCooldownDays;
             s.AiMountBreederFallback = AiMountBreederFallback;
