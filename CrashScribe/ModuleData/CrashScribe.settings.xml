@@ -245,7 +245,7 @@
        With Banner Kings that list also holds heroes who are already married and heroes Banner Kings will never
        accept for that lord (chance 0), so more than half of the daily attempts are wasted and AI weddings are rarer
        than Realm of Thrones intended. With this on, an unmarried lord draws only among candidates whose marriage
-       chance is above zero; the chance itself and every other rule (age, clan, culture, distance, war, race) stay
+       chance is above zero; this rule does not change the chance or any other rule (age, clan, culture, distance, war, race) - they stay
        as they are. On its own this rule about doubles AI weddings: a one-year test campaign (364 days) had 215 of
        them, against about 113 before the rule. Side effect: unmarried nobles, including the ones the player could
        marry, are then taken about twice as fast. That is why the brake below (MarriageChanceScale) slows the

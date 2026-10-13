@@ -41,7 +41,7 @@ namespace CrashScribe
     ///      generatora, gdy jest ktokolwiek), liczy szanse 0 i idzie dalej BEZ RandomFloat. My szukamy tylko pierwszego trafienia i
     ///      zuzywamy jeden krok (MBRandom.RandomInt(1); MBFastRandom.Next(int) to zawsze dokladnie jeden XorShift, bez wzgledu na argument).
     ///      W grze ocena szansy BK, ktorej tu nie wolamy, sama potrafi zuzyc krok generatora - stad inny stan losowy niz w oryginale (wyzej).
-    /// Reszta (szansa, RandomFloat, kontrola zalotow, MarriageAction.Apply, break) - przepisana 1:1.
+    /// Reszta (szansa, RandomFloat, kontrola zalotow, MarriageAction.Apply, break) - przepisana 1:1 (jedyny wyjatek: prog rzutu wolnego lorda przy czynnej regule mnozy HAMULEC - nizej).
     ///
     /// Dlaczego warunek pary mozna liczyc rzadziej (sprawdzone w dekompilacji gry 1.4.8, ROT, BK Redux, BKROTPatch):
     ///  - nie losuje (w grze 13.10: 0 krokow generatora w ok. 880 tys. ocen na dobe) i nie zmienia stanu gry: ROTMarriageModel (rody, wojna, wiek, wielkie rody, kultura, odleglosc domow, Mur) ->
@@ -83,7 +83,7 @@ namespace CrashScribe
     /// listy kandydatow co dotad losujemy bez zwracania, az trafi sie pierwszy z szansa > 0 (ta sama metoda modelu, ktora oryginal pyta po
     /// losowaniu; zonaty i zalotnik odpadaja bez pytania modelu) - rozklad rowny po kandydatach z szansa, a szanse liczymy tylko dla
     /// wylosowanych (srednio 1-2 na lorda zamiast calej listy). Pierwsze losowanie to dokladnie losowanie starej reguly - stad licznik
-    /// "stara regula trafilaby w kandydata bez szans". Dalej bez zmian: RandomFloat &lt; szansa, kontrola zalotow, MarriageAction.Apply, break.
+    /// "stara regula trafilaby w kandydata bez szans". Dalej: RandomFloat &lt; szansa x mnoznik HAMULCA (nizej; 1.0 = sama szansa), kontrola zalotow, MarriageAction.Apply, break.
     /// Lord z zyjacym malzonkiem - jak dotad (skrot (c)). Wolny lord sam w zalotach stanu >= 3 nie losuje (i tak nie moglby sie ozenic).
     /// Ciag losowy i pary sa wtedy INNE niz w oryginale (zamierzone). Regula dziala tylko przy znanym lancuchu szansy bez obcych latek
     /// (ten sam warunek co skrot dla zonatych) i NIE dziala w biegu cienia (tam decyduje oryginal ROT, a nasza droga liczy stara regula,

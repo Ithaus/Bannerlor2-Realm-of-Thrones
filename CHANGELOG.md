@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (Z.3 SWATY ROT - HAMULEC - recenzja z poprawka) - kod hamulca bez zarzutu (bez zmian); poprawione dwa zdania naglowka i jedno zdanie opisu ustawien, ktore po hamulcu przestaly byc prawdziwe; szacunek "ok. 150 na rok" przeliczony i utrzymany
+**Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-hamulec` | **Pliki:** `CrashScribe/src/MarriageFast.cs` (same komentarze naglowka), `CrashScribe/ModuleData/CrashScribe.settings.xml` (jedno zdanie opisu), `CHANGELOG.md`. Logika i teksty logu jak w fa078bf.
+
+**Co sprawdzone niezaleznie (kod wobec 6d91156 = WGRANIE 37):**
+- Mnoznik siega tylko rzutu wolnego lorda przy czynnej regule: `viable = _viableOn && free`, a `viable` zawsze konczy sie w `PickViable` (lord z zyjacym malzonkiem ma `free` = false). Jedyna zmieniona linia logiki to `roll = viable && _scale < 1f ? num * _scale : num`; przy 1.0 `roll` = `num` - te same wywolania `MBRandom` w tej samej kolejnosci i to samo porownanie co w WGRANIU 37.
+- Klucz `MarriageOnlyViableCandidates` = false, bieg cienia, regula stojaca (obca latka) i rod oddany ROT po potknieciu: `_viableOn` = false albo liczy oryginal - mnoznik nie jest czytany.
+- Wczytanie: brak klucza = 0.7 (wartosc w kodzie); liczba czytana z kropka niezaleznie od ustawien systemu (`InvariantCulture`), tekst nieczytelny (takze "0,7" z przecinkiem) = po cichu 0.7, jak sasiednie klucze; poza zakresem = przyciecie z linia w logu; wartosc w biegu zawsze widac w linii startu i doby. `Config.Load` biegnie przed `Scribe.Init` - stad kontrola zakresu w `OnSession`.
+- Log: `; sluby dzis N, od wczytania M` i `slubow N` nietkniete; nowe pole stoi tuz przed nimi. W repo zadne narzedzie tych linii nie czyta (`tools/sprawdz_logi.py` nie ma wzorca "Swaty ROT").
+- XML poprawny (51 kluczy, bez powtorek), build kod 0, 0 ostrzezen; pliki CRLF, bez polskich znakow.
+
+**Poprawione (same slowa):** naglowek `MarriageFast.cs` mowil w dwoch miejscach, ze rzut jest "przepisany 1:1" / "bez zmian: RandomFloat < szansa" - po hamulcu prog wolnego lorda to szansa x mnoznik; opis `MarriageOnlyViableCandidates` mowil "the chance itself ... stay as they are" - teraz "this rule does not change the chance" (zmienia ja hamulec opisany nizej).
+
+**Szacunek przeliczony z danych tempa (22 / 37 / 50 / 78 / 113 / 175 / 215):** liniowo 0.7 x 215 = 150; z poprawka na wolniejsze ubywanie puli (tempo drugiego polrocza to ok. 90% pierwszego; krzywa nasycenia dopasowana do pomiaru) **153-160 na rok, srodek ok. 155** - 3% ponad 150, wiec "ok. 150" zostaje. **Bieg 120 dob: 52-58, srodek ok. 55** (bylo 78). 0.5 daje 108-119 (srodek 113 = tyle co przed regula). Sam rozrzut losowy to ok. +-7 slubow w 120 dobach i +-12 w roku, wiec progi z wpisu nizej (120 dob: ponizej 40 albo powyzej 70 = zle) sa wlasciwe. Liniowosc trzyma, bo szansa na pojedynczy rzut jest mala (pomiar: 0.59 slubu na 350-590 rzutow dziennie = ok. 0.001-0.002); rozkladu szans par w grze nie mierzono - to dalej szacunek, nie pomiar.
+
+**Status:** DO SPRAWDZENIA w grze (jak wpis nizej); nic nie wgrane, gry nie uruchamiano.
+
 ## 2026-10-13 (Z.3 SWATY ROT - HAMULEC, decyzja Jeffa) - SLUBY AI RZADZIEJ: mnoznik szansy slubu wolnego lorda (klucz MarriageChanceScale, domyslnie 0.7 - cel ok. 150 slubow na rok zamiast 215) + poprawione nieprawdziwe komentarze o "tych samych parach" - ZMIANA ROZGRYWKI
 **Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-hamulec` (od `w-toku/zbior-e8` 6d91156 = WGRANIE 37) | **Pliki:** `CrashScribe/src/MarriageFast.cs`, `CrashScribe/src/Config.cs`, `CrashScribe/ModuleData/CrashScribe.settings.xml`, `CHANGELOG.md`. Bez zmian zapisu. Nowy klucz: `MarriageChanceScale` (domyslnie 0.7).
 
