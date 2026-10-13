@@ -40,7 +40,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
-        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); }
+        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); }   // E8/Z (251): liczniki regul zakupow AI
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
@@ -114,9 +114,11 @@ namespace Armoury
                     if (el.Amount <= 0 || it == null || ArmsPricing.IsUnique(it) || !DteTakes(it)) continue;
                     bool isM = melee && gapMelee > 0 && Melee((int)it.ItemType), isB = body && gapBody > 0 && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor;
                     if (!isM && !isB) continue;
+                    if (AiBuyRules.Barred(el.EquipmentElement)) continue;   // E8/Z (251): dodatni stan i stroj mieszczan bez zolnierza - nie dla AI
                     if (isB && ShopReserve.Free(market, it) <= 0) { subHeld = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
                     int price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party);
                     if (price <= 0) continue;
+                    if (AiBuyRules.OverCap(el.EquipmentElement, price)) continue;   // E8/Z (251): cena ponad sufit (AiGearMaxPriceFactor; 0 = wylaczony)
                     bool cloth = isB && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Cloth;
                     cands.Add(new SubCand { El = el.EquipmentElement, Left = el.Amount, Tier = TierOf(it), Price = price, Gen = 1, Melee = isM, Cloth = cloth,
                                             Score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price });
@@ -144,6 +146,7 @@ namespace Armoury
                         if (c.Gen == gen) price = c.Price;
                         else { price = market.Town.MarketData.GetPrice(c.El, buyer, false, market.Party); c.Price = price; c.Gen = gen; cands[ci] = c; }
                         if (price <= 0 || price > budget - spent) continue;
+                        if (AiBuyRules.OverCap(c.El, price, false)) continue;   // E8/Z (251): cena po zmianie polki ponad sufit (licznik - przy przegladzie kandydatow)
                         int maxN = Math.Min(Math.Min(deficit, c.Left), Math.Min(maxPieces - pieces, isMelee ? gapMelee : gapBody));
                         // 174b.4: rezerwa kramu ogranicza partie; licznik "zatrzymane" jak w 174b - szacunek po cenie pierwszej sztuki (tylko licznik)
                         if (!isMelee && maxN > 0) { int fr = ShopReserve.Free(market, c.El.Item); if (fr < maxN) { Measure174b.NoteHeld(who, Math.Min(maxN, (budget - spent) / price) - Math.Max(0, fr)); maxN = Math.Max(0, fr); } }
@@ -151,7 +154,7 @@ namespace Armoury
                         // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - wycena od nowa po zdjeciu poprzedniej (ShelfBuy); dotad cena pierwszej x n
                         var cel = c.El;
                         int cost, first, last;
-                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last, price);
+                        int n = ShelfBuy.Take(shelf, cel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(cel, buyer, false, market.Party), out cost, out first, out last, price, cap: AiBuyRules.CapPrice(cel));   // E8/Z: sufit takze dla kolejnych sztuk partii
                         if (n <= 0) continue;
                         gen++;   // 174b.5 F2(b): polka sie zmienila - ceny kandydatow od nowa
                         if (!deliver(cel, n, k, cost)) { ShelfBuy.PutBack(shelf, cel, n, cost, first); c.Left = 0; cands[ci] = c; continue; }   // K1: DTE odrzucil - wraca na polke
@@ -387,6 +390,7 @@ namespace Armoury
         /// (spis SupplyDemand.DailyTrade; -1 = spisu nie bylo).</summary>
         internal static void BardingDaily()
         {
+            AiBuyRules.Daily();   // E8/Z (251): linia doby "Zakupy i nadwyzki AI (E8/Z)" - ten sam takt co linia "Uprzaz (215)" (ma wlasny try)
             try
             {
                 int shelf = SupplyDemand.HarnessOnShelves;
@@ -565,6 +569,8 @@ namespace Armoury
         /// najlepsza skutecznosc do ceny; limit sztuk (pieces - licznik wspolny dla wywolan) i budzetu. Zwraca wydane zloto; need - co zostalo.
         /// K1 (przeglad): tylko sztuka, ktora udzwignie ktos z oddzialow koszyka (ItemReq - jak braki gracza i MenUpgrade); nadwyzki (MenPurse) oddaja
         /// najpierw sztuki, ktorych nikt nie udzwignie - bez tego warunku zaloga kupowala ciezka zbroje ponad swoja atletyke, a nazajutrz ja sprzedawala.
+        /// E8/Z (251): bez sztuk z dodatnim stanem i stroju mieszczan (AiBuyRules.Barred); sufit ceny AiGearMaxPriceFactor x wartosc sztuki ze stanem
+        /// (AiBuyRules.OverCap przy wyborze, cap w ShelfBuy.Take dla kolejnych sztuk partii) - W CIENIU, dopoki klucz ma 0.
         /// </summary>
         private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces,
                                    ref int pieces, List<string> bought, Deliver deliver, int who)
@@ -591,6 +597,7 @@ namespace Armoury
                     {
                         int bestI = -1; float bestScore = 0f; int bestPrice = 0;
                         bool resHit = false;   // 174b.4: kandydat pominiety, bo zostala sama rezerwa kramu
+                        int zFine = 0, zDress = 0, zCap = 0; bool zBudget = false;   // E8/Z (251): sztuki nie dla AI w tym przegladzie (tylko licznik "nie kupione przez regule")
                         for (int i = 0; i < shelf.Count; i++)
                         {
                             var el = shelf.GetElementCopyAtIndex(i);
@@ -603,16 +610,24 @@ namespace Armoury
                             if (!DteTakes(it)) continue;   // poprawki sklad7: takze zamowienie wozem (tam sztuka idzie do DTE dopiero przy dostawie)
                             if (!Lift(lift, it)) continue;
                             if (ShopReserve.Free(market, it) <= 0) { resHit = true; continue; }   // 174b.4: ostatnia sztuka pasma zostaje na straganie
+                            // E8/Z (251): dodatni stan (zostaje dla gracza i bohaterow) i stroj mieszczan bez zolnierza - nie dla AI (przed wycena)
+                            if (AiBuyRules.Barred(el.EquipmentElement)) { if (AiBuyRules.LastFine) zFine += el.Amount; else zDress += el.Amount; continue; }
                             int price;
                             if (i < memo.Length && memoGen[i] == gen) price = memo[i];
                             else { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; } }
                             if (price <= 0) continue;
-                            if (price > budget - spent) { _lastBudgetStop = true; continue; }
+                            if (AiBuyRules.OverCap(el.EquipmentElement, price)) { zCap += el.Amount; continue; }   // E8/Z (251): cena ponad sufit - to nie "za malo budzetu" (bez _lastBudgetStop)
+                            if (price > budget - spent) { _lastBudgetStop = true; zBudget = true; continue; }
                             float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
                             float score = eff / price;
                             if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
                         }
-                        if (bestI < 0) { if (resHit) Measure174b.NoteHeld(who, 1); break; }
+                        if (bestI < 0)
+                        {
+                            if (resHit) Measure174b.NoteHeld(who, 1);
+                            if (!zBudget) AiBuyRules.NoteUnbought(Math.Min(deficit, maxPieces - pieces), zFine, zDress, zCap);   // E8/Z: brak zostal, a na polce lezala sztuka nie dla AI (tylko licznik)
+                            break;
+                        }
                         var pick = shelf.GetElementCopyAtIndex(bestI);
                         var pel = pick.EquipmentElement;
                         int maxN = Math.Min(Math.Min(deficit, pick.Amount), maxPieces - pieces);
@@ -621,7 +636,7 @@ namespace Armoury
                         // ceny hurtu (Jeff 09.10 08:00): kazda sztuka po swojej cenie - po zdjeciu sztuki z polki nastepna wyceniana od nowa (ShelfBuy, jak
                         // gra w SellItemsAction); dotad cena pierwszej sztuki x n. Pierwsza - cena z przegladu polki (ta sama polka, bez drugiej wyceny).
                         int cost, first, last;
-                        int n = ShelfBuy.Take(shelf, pel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(pel, buyer, false, market.Party), out cost, out first, out last, bestPrice);
+                        int n = ShelfBuy.Take(shelf, pel, maxN, budget - spent, () => market.Town.MarketData.GetPrice(pel, buyer, false, market.Party), out cost, out first, out last, bestPrice, cap: AiBuyRules.CapPrice(pel));   // E8/Z: sufit takze dla kolejnych sztuk partii
                         if (n <= 0) break;
                         gen++;   // 174b.5 F2: polka sie zmienila - pamiec cen od nowa
                         if (!deliver(pel, n, k, cost))
@@ -651,15 +666,32 @@ namespace Armoury
         }
 
         /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81). 174b.4: tylko sztuki PONAD
-        /// rezerwe kramu - gdy zostala sama rezerwa, zamowienie dla kowali idzie jak przy pustej polce.</summary>
-        private static bool OnShelf(Settlement market, ItemObject.ItemTypeEnum ty, int tr)
+        /// rezerwe kramu - gdy zostala sama rezerwa, zamowienie dla kowali idzie jak przy pustej polce. E8/Z (251): sztuka, ktorej AI nie wezmie (dodatni
+        /// stan, stroj mieszczan bez zolnierza, cena ponad sufit - AiBuyRules), tez nie liczy sie jako "jest na polce" - brak idzie jako zamowienie.</summary>
+        private static bool OnShelf(Settlement market, ItemObject.ItemTypeEnum ty, int tr, MobileParty buyer)
         {
             var shelf = market.ItemRoster;
+            bool barred = false;
             for (int i = 0; i < shelf.Count; i++)
             {
                 var el = shelf.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item;
-                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it)) { int ti = TierOf(it); if ((ti == tr || ti == tr - 1) && ShopReserve.Free(market, it) > 0) return true; }
+                if (el.Amount > 0 && it != null && it.ItemType == ty && !ArmsPricing.IsUnique(it))
+                {
+                    int ti = TierOf(it);
+                    if ((ti == tr || ti == tr - 1) && ShopReserve.Free(market, it) > 0)
+                    {
+                        if (AiBuyRules.Barred(el.EquipmentElement, false)) { barred = true; continue; }
+                        if (AiBuyRules.CapOn)
+                        {
+                            int price = 0;
+                            try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, buyer, false, market.Party); } catch { }
+                            if (AiBuyRules.OverCap(el.EquipmentElement, price, false)) { barred = true; continue; }
+                        }
+                        return true;
+                    }
+                }
             }
+            if (barred) AiBuyRules.NoteOrder();   // tylko licznik linii "Zakupy i nadwyzki AI (E8/Z)"
             return false;
         }
 
@@ -805,6 +837,7 @@ namespace Armoury
                     if (!AddToArmory(mp, el.Item, n)) return false;   // K1 (przeglad): DTE odrzucil - nikt nie placi
                     Measure174b.NoteBuySum(who, el.Item, n, cost);   // 174b.0 M2 (tylko licznik); ceny hurtu: suma cen sztuk
                     Measure174b.NoteBatch(Measure174b.PathGaps, who, el, n, cost);   // E8/P2 (244): cena do wartosci sztuki ze stanem - ceny sztuk ze sladu ShelfBuy.Take tej partii (tylko licznik)
+                    AiBuyRules.NoteBought(el, n, cost);   // E8/Z (251): dodatnie stany, stroj mieszczan i sztuki ponad sufit w kupionych (tylko licznik; slad tej samej partii)
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
                     MenUpgrade.NoteChurn(mp, el.Item, true);
                     pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
@@ -815,6 +848,7 @@ namespace Armoury
                     if (el.Item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { _dBardPcs += n; _dBardGold += cost; }   // E6/R3 (215): linia "Uprzaz" (tylko licznik)
                     return true;
                 };
+                AiBuyRules.NewVisit();   // E8/Z (251): licznik "w ilu wizytach" (tylko log)
                 long tl = Cost174.Begin(Cost174.SBuyLoop);
                 int spent = BuyLoop(st, mp, need, lifters, budget, maxPieces, ref pieces, bought, here, who);
                 Cost174.End(Cost174.SBuyLoop, tl);
@@ -855,6 +889,7 @@ namespace Armoury
                                         int fromPurse = pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy)
                                         Measure174b.NoteBuySum(Measure174b.BCastleOrder, el.Item, n, cost);   // 174b.0 M2 (tylko licznik)
                                         Measure174b.NoteBatch(Measure174b.PathGaps, Measure174b.BCastleOrder, el, n, cost);   // E8/P2 (244): cena do wartosci (tylko licznik)
+                                        AiBuyRules.NoteBought(el, n, cost);   // E8/Z (251): tylko licznik
                                         market.Town.ChangeGold(cost);
                                         MoneyLedger.Note(MoneyLedger.NGear, market, cost);
                                         try { TownFolk.Sale(market, cost, TownFolk.MixGear); } catch { }   // E5/0 (195): zamowienia zamkow (tylko licznik)
@@ -876,7 +911,7 @@ namespace Armoury
                             {
                                 if (kv.Value <= 0) continue;
                                 var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                                if (!OnShelf(market, ty, tr)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
+                                if (!OnShelf(market, ty, tr, mp)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
                             }
                             if (unmet > 0) GarrisonCarts.NoteUnmet(unmet);
                         }
@@ -892,7 +927,7 @@ namespace Armoury
                     {
                         if (kv.Value <= 0) continue;
                         var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                        if (!OnShelf(st, ty, tr)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                        if (!OnShelf(st, ty, tr, mp)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
                     }
                 }
                 if (pieces <= 0) return;

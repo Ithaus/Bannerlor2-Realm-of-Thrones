@@ -46,9 +46,10 @@ namespace Armoury
         /// przy tej samej polce (przeglad kandydatow), bez drugiej wyceny. Zwraca liczbe zdjetych sztuk; cost - ich suma, first i last -
         /// cena pierwszej i ostatniej. Wyjatek w wycenie konczy partie na sztukach juz zdjetych (wolajacy je oplaca). Sztuki zostaja zdjete -
         /// przy nieudanej dostawie wolajacy oddaje je przez PutBack. tally = false (sklad8-p: wywoz kupcow SupplyDemand.DailyTrade) - bez licznikow
-        /// linii "Ceny hurtu" (ta linia mierzy zakupy AI, Stajni i budow; wywoz ma swoja linie "PodazPopyt").
+        /// linii "Ceny hurtu" (ta linia mierzy zakupy AI, Stajni i budow; wywoz ma swoja linie "PodazPopyt"). cap &gt; 0 (E8/Z, 251: sufit ceny zakupow
+        /// brakow AI - AiBuyRules.CapPrice) - sztuka drozsza niz cap konczy partie tak jak brak budzetu (takze pierwsza, z ceny known); 0 - bez sufitu.
         /// </summary>
-        internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0, bool tally = true)
+        internal static int Take(ItemRoster shelf, EquipmentElement el, int maxN, int budget, Func<int> price, out int cost, out int first, out int last, int known = 0, bool tally = true, int cap = 0)
         {
             cost = 0; first = 0; last = 0;
             _traceN = 0; _traceSum = 0;   // E8/P2: slad cen tej partii (tylko pomiar)
@@ -69,7 +70,7 @@ namespace Armoury
                         try { p = price(); } catch { break; }
                         if (n > 0 && tally) _dEvals++;   // wycena po zdjeciu sztuki - tej dawna regula (cena pierwszej x n) nie robila
                     }
-                    if (p <= 0 || p > budget - cost) break;
+                    if (p <= 0 || p > budget - cost || (cap > 0 && p > cap)) break;   // E8/Z (251): cap - sufit ceny sztuki (0 = bez sufitu)
                     bool gone = true;
                     try { shelf.AddToCounts(el, -1); ShelfIndex.NoteOwn(shelf); }   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
                     catch

@@ -139,6 +139,8 @@ RANGES = {
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)
     'AiSpareHorseShare': (0.0, 1.0, "0.00"),
+    # E8/Z (251): sufit ceny zakupow brakow AI jako mnoznik wartosci sztuki (0 = wylaczony; kod liczy wartosci miedzy 0 a 1 jako 1 - AiBuyRules.CapFactor)
+    'AiGearMaxPriceFactor': (0.0, 5.0, "0.0"),
     # E6/K5 (213): udzwig luzaka pod jukami w kg (20 = jak w grze - dopisek 0; PackMarket.CapPostfix)
     'SpareHorseCarryKg': (20, 100, "0"),
     # E6/W3 (221): regulator wsi - sufit kroku x1.3 (kod przycina do 1..2), progi stosu w dniach zuzycia (kod: niski >= 1, wysoki > niski)

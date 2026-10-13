@@ -4064,6 +4064,22 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoUse { get; set; } = false;
 
+        [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiSkipFineGoods { get; set; } = true;
+
+        [SettingPropertyBool("Ai Skip Townsfolk Dress", HintText = "the lords' men and the garrisons, buying the kit they lack, do not buy clothing marked as civilian wear that no soldier of any land has in his kit - gowns, court dress, lordly finery (the same list by which the town workshops do not make such pieces as army kit); the boots, gloves, hoods and tunics that soldiers do wear are bought as before, and so are weapons, arrows and horse harness (off = as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiSkipTownsfolkDress { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Gear Max Price Factor", 0.00f, 5.00f, "0.0", HintText = "TEST (0 = off): the most the lords' men and the garrisons pay for a piece of kit they lack, as a multiple of what that very piece is worth in its condition (2 = at most twice its worth; a value below 1 counts as 1); a dearer piece stays on the shelf and the want goes to the town's workshops as an order. While off, the daily log line counts what a ceiling of 2 would have stopped")]
+        [SettingPropertyGroup("Time at the forge")]
+        public float AiGearMaxPriceFactor { get; set; } = 0f;
+
+        [SettingPropertyBool("Ai Harness Surplus Sell", HintText = "horse harness lying in a lord's or a garrison's armoury beyond what its riders need - the riders, the men ready to be raised to horse and a tenth to spare, then half as much again - is sold to the merchants of the town or castle like other spare kit: the merchants pay from their coffer, the lord takes his third and the rest goes to the men's purse; the cheapest pieces go first (off = as before: the harness of fallen riders lies in the armoury for ever)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiHarnessSurplusSell { get; set; } = true;
+
         [SettingPropertyBool("Mend Fraction Memory", HintText = "with Self Repair Same Rule on: the bit of each material that a repair at your own anvil uses but that does not make a whole piece is not lost - it is tallied (one tally per material in your bags, kept in the save) and a whole piece comes off your bags once the tally reaches one (several at once if more); when the pieces due are not in your bags the repair waits, as for any missing material (off = as before: each material rounded to whole pieces per repair, a light repair may take none at all)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendFractionMemory { get; set; } = true;
@@ -5967,6 +5983,10 @@ namespace Armoury
             s.AiWearByIntensity = AiWearByIntensity;
             s.AiMendQueueContinue = AiMendQueueContinue;
             s.AiAmmoUse = AiAmmoUse;
+            s.AiSkipFineGoods = AiSkipFineGoods;
+            s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
+            s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
+            s.AiHarnessSurplusSell = AiHarnessSurplusSell;
             s.MendFractionMemory = MendFractionMemory;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;

@@ -199,6 +199,12 @@ Uzycie (Python 3, tylko odczyt):
                     przeciwnik Y z M, bez rozstrzygniecia Z z K" = linia "wrocilo / przepadlo", latka wpieta, potkniecia 0; A-3 INFO "Zuzycie (E8/A)"
                     (ciosy poza bitwa pominiete, ksiega ciosow wyzerowana na poczatku bitwy i po klesce); A-4 "BattlefieldLaw (E8/A): lup cialo po
                     ciele" - sztuki z wlasnych zabojstw w calosci, dzialka wobec sredniej z puli, potkniecia 0.
+                    Blok etap8_z (E8/Z, paczka 251): zakupy i nadwyzki AI - linia doby "Zakupy i nadwyzki AI (E8/Z)" (stan czterech kluczy): Z-0 linia
+                    w kazdej dobie okna, Z-1 kupione dodatnie stany = 0 w dobach z kluczem [WL] (linia E8/Z i wiersze zakupow brakow AiGear linii
+                    E8/P2), Z-1b kupiony stroj mieszczan bez zolnierza = 0, Z-2 sufit ceny (W CIENIU: INFO "sufit 2.0 zablokowalby"; wlaczony: kupione
+                    ponad sufit 0, p90 cena / wartosc <= sufit, pokrycie korpusu zalog w ostatniej dobie okna >= Z33 doby 120 = 90%), Z-3 uprzaz
+                    w zbrojowniach AI w dobie 120 <= 1.2 x doba 60 (z --do-doby N: doba N wobec N/2), Z-4 potkniecia 0 i koszt spisu INFO; INFO
+                    zamowienia dla warsztatow z powodu reguly, sprzedaz uprzezy (sztuki, zloto, zalogi, trzecia panom, brak kupca).
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9092,6 +9098,154 @@ def etap8_a(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                 stum == 0 and new >= h and not (k >= 5 and h == 0))
 
 
+# ============================================================ ETAP 8 (E8/Z, paczka 251): zakupy i nadwyzki AI - blok etap8_z
+E8_Z_LINE = "Zakupy i nadwyzki AI (E8/Z): dzien"
+E8_Z_COVER = "Pokrycie zbrojowni AI (171): dzien"
+E8_Z_Z33_GARR_BODY_D120 = 90   # Z33 doba 120: "zalogi AI (77310 ludzi): korpus 90%" (L:35726)
+E8_Z_AIGEAR_ROWS = ("lordowie", "zalogi miast", "zalogi zamkow (wlasna polka)", "zamowienia zamkow (w miescie)")   # wiersze linii E8/P2 z zakupow brakow AiGear
+
+
+def etap8_z(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/Z (251, projekt etapu 8 v2 rozdz. 3 "E8/Z" Test): linia doby "Zakupy i nadwyzki AI (E8/Z)" (AiBuyRules.cs; ten sam takt doby i ta sama etykieta
+    co "ZakupyAI cena do wartosci (E8/P2)"). Z-0 linia w kazdej dobie okna i stan czterech kluczy; Z-1 kupione dodatnie stany = 0 w dobach z kluczem [WL]
+    (linia E8/Z i - gdy jest - wiersze zakupow brakow AiGear linii E8/P2 tych samych dob), stroj mieszczan kupiony = 0 tak samo; Z-2 sufit ceny: W CIENIU -
+    INFO "tyle zablokowalby sufit 2.0"; po wlaczeniu - sztuki kupione ponad sufit 0, p90 cena / wartosc wierszy AiGear linii E8/P2 <= sufit i pokrycie
+    korpusu zalog w ostatniej dobie okna >= Z33 doby 120 (90%); Z-3 uprzaz w zbrojowniach AI: doba `until` <= 1.2 x doba until/2 (projekt: d120 <= d60 x 1.2);
+    Z-4 potkniecia 0, koszt spisu INFO."""
+    zl = {d: s for d, s in by_day(lines, E8_Z_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not zl:
+        rep.add("E8/Z: linia Zakupy i nadwyzki AI (E8/Z)", "brak w logu", "jest od wgrania E8/Z", None)
+        return
+    days = sorted(zl)
+    nd = max(1, len(days))
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in zl]
+
+    def on_days(tag):
+        return [d for d in days if tag in zl[d]]
+    fine_on, dress_on = on_days("| dodatnie stany [WL]"), on_days("| stroj mieszczan bez zolnierza [WL]")
+    cap_on, har_on = on_days("| sufit ceny [WL x"), on_days("| uprzaz ponad zapas [WL]")
+    rep.add("Z-0: linia Zakupy i nadwyzki AI (E8/Z) w kazdej dobie okna; stan kluczy",
+            (f"{len(days)} dob (brak {len(miss)}" + (f": doby {miss[:5]}" + (" ..." if len(miss) > 5 else "") if miss else "") + f" z {len(inner)}); "
+             f"AiSkipFineGoods wl {len(fine_on)} / wyl {len(days) - len(fine_on)} dob, AiSkipTownsfolkDress wl {len(dress_on)} / wyl {len(days) - len(dress_on)}, "
+             f"AiGearMaxPriceFactor wl {len(cap_on)} / w cieniu {len(days) - len(cap_on)}, AiHarnessSurplusSell wl {len(har_on)} / wyl {len(days) - len(har_on)}"),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss) if inner else None)
+
+    def col(pat, cast=int):
+        return {d: num(pat, zl[d], cast=cast, default=0) for d in days}
+
+    def tot(c, sel=None):
+        return sum(c[d] for d in (days if sel is None else sel))
+    # wiersze linii E8/P2 tych samych dob: dodatnie stany i p90 wedlug kupujacego
+    p2 = {d: s for d, s in by_day(lines, E8_P2_BUY).items() if d in zl}
+
+    def p2_rows(sel):
+        fa, fo, p90 = 0, 0, []
+        for d in sel:
+            s = p2.get(d)
+            if s is None:
+                continue
+            for seg in s.split(" | ")[1:]:
+                m = E8_P2_ROW.match(seg.strip())
+                if not m:
+                    continue
+                if m.group(1) in E8_Z_AIGEAR_ROWS:
+                    fa += int(m.group(14))
+                    p90.append(float(m.group(6)))
+                else:
+                    fo += int(m.group(14))
+        return fa, fo, p90
+    # Z-1: dodatnie stany
+    f_skip, f_vis, f_buy, f_gold = col(r"dodatnie stany \[[^\]]*\]: odrzucenia kandydatow (\d+)"), col(r"dodatnie stany \[[^\]]*\]: odrzucenia kandydatow \d+ w (\d+) wizytach"), \
+        col(r"kupione dodatnie stany (\d+) szt"), col(r"kupione dodatnie stany \d+ szt\. \(doplata (-?\d+) zl")
+    p2n = sum(1 for d in fine_on if d in p2)
+    fa, fo, _ = p2_rows(fine_on)
+    off_days = [d for d in days if d not in fine_on]
+    txt = (f"klucz [WL] {len(fine_on)} dob: kupione {tot(f_buy, fine_on)} szt. (doplata {tot(f_gold, fine_on)} zl), odrzucenia kandydatow {tot(f_skip, fine_on)} w "
+           f"{tot(f_vis, fine_on)} wizytach (ta sama sztuka liczona przy kazdym przegladzie polki)"
+           + (f"; linia E8/P2 w {p2n} z tych dob: zakupy brakow AiGear {fa} szt., pozostali kupujacy (notable, lepsze za swoje, ludzie gracza) {fo} szt." if p2n else "; linii E8/P2 brak")
+           + (f" | klucz wylaczony {len(off_days)} dob: kupione {tot(f_buy, off_days)} szt., doplata {tot(f_gold, off_days)} zl" if off_days else ""))
+    rep.add("Z-1: AI nie kupuje dodatnich stanow (zakupy brakow lordow i zalog, zamowienia zamkow)", txt,
+            "kupione dodatnie stany = 0 w dobach z kluczem [WL] (linia E8/Z i wiersze AiGear linii E8/P2); notable i ludzie gracza - INFO (stan zostaje przy sztuce)",
+            (tot(f_buy, fine_on) == 0 and fa == 0) if fine_on else None)
+    d_skip, d_vis, d_buy = col(r"stroj mieszczan bez zolnierza \[[^\]]*\]: odrzucenia kandydatow (\d+)"), \
+        col(r"stroj mieszczan bez zolnierza \[[^\]]*\]: odrzucenia kandydatow \d+ w (\d+) wizytach"), col(r"kupiony stroj mieszczan (\d+) szt")
+    off_days = [d for d in days if d not in dress_on]
+    rep.add("Z-1b: AI nie kupuje stroju mieszczan, ktorego nie nosi zaden zolnierz",
+            (f"klucz [WL] {len(dress_on)} dob: kupione {tot(d_buy, dress_on)} szt., odrzucenia kandydatow {tot(d_skip, dress_on)} w {tot(d_vis, dress_on)} wizytach"
+             + (f" | klucz wylaczony {len(off_days)} dob: kupione {tot(d_buy, off_days)} szt." if off_days else "")),
+            "kupiony stroj mieszczan = 0 w dobach z kluczem [WL]", (tot(d_buy, dress_on) == 0) if dress_on else None)
+    # Z-2: sufit ceny
+    c_skip, c_vis, c_n, c_g, c_all = col(r"sufit ceny \[[^\]]*\]: odrzucenia kandydatow (\d+)"), col(r"sufit ceny \[[^\]]*\]: odrzucenia kandydatow \d+ w (\d+) wizytach"), \
+        col(r"kupione ponad sufit (\d+) szt"), col(r"kupione ponad sufit \d+ szt\. / (\d+) zl"), col(r"zl z (\d+) kupionych sztuk")
+    cov = {d: s for d, s in by_day(lines, E8_Z_COVER).items() if 1 <= run_day(d, start) <= until}
+    cv = None
+    for d in sorted(cov, reverse=True):
+        v = num(r"zalogi AI \(\d+ ludzi\): korpus (\d+)%", cov[d])
+        if v is not None:
+            cv = (run_day(d, start), v)
+            break
+    ctxt = f"pokrycie korpusu zalog doba {cv[0]}: {cv[1]}% (Z33 doba 120: {E8_Z_Z33_GARR_BODY_D120}%)" if cv else "brak linii Pokrycie zbrojowni AI (171)"
+    sh_days = [d for d in days if d not in cap_on]
+    if not cap_on:
+        allp = tot(c_all)
+        rep.add("Z-2: sufit ceny zakupow brakow AI (W CIENIU)",
+                (f"klucz AiGearMaxPriceFactor = 0 - sufit 2.0 zablokowalby {tot(c_n)} szt. / {tot(c_g)} zl z {allp} kupionych sztuk "
+                 f"({100.0 * tot(c_n) / max(1, allp):.1f}% sztuk; {tot(c_n) / nd:.1f} szt. i {tot(c_g) / nd:.0f} zl na dobe); {ctxt}"),
+                "INFO (wlaczenie w fazie poprawek; wtedy: kupione ponad sufit 0, p90 cena / wartosc <= sufit, pokrycie korpusu zalog >= Z33)", None)
+    else:
+        fac = [num(r"sufit ceny \[WL x([0-9.]+)\]", zl[d], cast=float) for d in cap_on]
+        fac = [x for x in fac if x is not None]
+        fmax = max(fac) if fac else 0.0
+        _, _, p90 = p2_rows(cap_on)
+        p90m = max(p90) if p90 else None
+        ok = tot(c_n, cap_on) == 0 and (p90m is None or p90m <= fmax + 0.005) and cv is not None and cv[1] >= E8_Z_Z33_GARR_BODY_D120
+        rep.add("Z-2: sufit ceny zakupow brakow AI wlaczony",
+                (f"klucz [WL x{fmax:.2f}] {len(cap_on)} dob: kupione ponad sufit {tot(c_n, cap_on)} szt. / {tot(c_g, cap_on)} zl, odrzucenia kandydatow {tot(c_skip, cap_on)} w "
+                 f"{tot(c_vis, cap_on)} wizytach; p90 cena / wartosc wierszy AiGear linii E8/P2 najwyzej " + (f"{p90m:.2f}" if p90m is not None else "- (brak linii E8/P2)")
+                 + f"; {ctxt}" + (f" | w cieniu {len(sh_days)} dob: sufit 2.0 zablokowalby {tot(c_n, sh_days)} szt. / {tot(c_g, sh_days)} zl" if sh_days else "")),
+                f"kupione ponad sufit 0, p90 cena / wartosc <= sufit, pokrycie korpusu zalog w ostatniej dobie okna >= Z33 doby 120 ({E8_Z_Z33_GARR_BODY_D120}%)", ok)
+    orders = col(r"na polce lezala tylko sztuka nie dla AI: (\d+)")
+    l_fine, l_dress, l_cap = col(r"nie kupiono przez regule\): dodatni stan (\d+) szt"), col(r"nie kupiono przez regule\): dodatni stan \d+ szt\., stroj mieszczan (\d+) szt"), \
+        col(r"stroj mieszczan \d+ szt\., ponad sufit (\d+) szt")
+    allb = tot(c_all)
+    rep.add("E8/Z: brak zostal przy polce ze sztuka nie dla AI (najwyzej tyle AI nie kupilo przez regule)",
+            (f"dodatni stan {tot(l_fine)} szt. ({tot(l_fine) / nd:.0f}/d = {100.0 * tot(l_fine) / max(1, allb + tot(l_fine)):.1f}% wobec kupionych {allb} + tych sztuk), "
+             f"stroj mieszczan {tot(l_dress)} szt. ({tot(l_dress) / nd:.1f}/d), ponad sufit {tot(l_cap)} szt. ({tot(l_cap) / nd:.1f}/d); zamowienia dla warsztatow z tego powodu "
+             f"{tot(orders)} ({tot(orders) / nd:.1f}/d); {ctxt}"),
+            "INFO - koszt reguly dla zbrojowni AI (warsztaty daja dodatni stan ok. 26% wyrobow - wagi modyfikatorow gry i RBM); granica: pokrycie zbrojowni wobec Z33", None)
+    # Z-3: uprzaz w zbrojowniach AI
+    h_all, h_lord, h_gar = col(r"uprzaz w zbrojowniach AI (\d+) szt"), col(r"uprzaz w zbrojowniach AI \d+ szt\. \(lordowie (\d+)"), col(r"uprzaz w zbrojowniach AI \d+ szt\. \(lordowie \d+, zalogi (\d+)\)")
+    riders, over, overp = col(r"przy jezdzcach (\d+)"), col(r"zostaje (\d+) szt\. w \d+ partiach"), col(r"zostaje \d+ szt\. w (\d+) partiach")
+    sold, gold, sold_g, third, parts, nob = col(r"uprzaz ponad zapas \[[^\]]*\]: sprzedana (\d+) szt"), col(r"sprzedana \d+ szt\. za (\d+) zl \(w tym zalogi"), \
+        col(r"\(w tym zalogi (\d+) szt"), col(r"trzecia panom (\d+) zl"), col(r"zl\) w (\d+) partiach, zabraklo kupca"), col(r"zabraklo kupca (\d+) razy")
+    cens = {run_day(d, start): d for d in days if "uprzaz w zbrojowniach AI: brak spisu" not in zl[d] and "uprzaz w zbrojowniach AI " in zl[d]}
+    half = until // 2
+    last = days[-1]
+    info = (f"sprzedana w oknie {tot(sold)} szt. za {tot(gold)} zl ({tot(sold) / nd:.1f} szt./d; w tym zalogi {tot(sold_g)} szt.; trzecia panom {tot(third)} zl) w {tot(parts)} wizytach, "
+            f"zabraklo kupca {tot(nob)} razy; ostatnia doba: ponad 1.5 x (jezdzcy + luz) zostaje {over[last]} szt. w {overp[last]} partiach")
+    if not har_on:
+        rep.add("Z-3: uprzaz w zbrojowniach AI", "klucz AiHarnessSurplusSell wylaczony w calym oknie; " + info, "INFO (prog liczony przy wlaczonym kluczu)", None)
+    elif half in cens and until in cens:
+        a, b = cens[half], cens[until]
+
+        def per(d):
+            return f"{h_all[d]} szt. (lordowie {h_lord[d]}, zalogi {h_gar[d]}) przy {riders[d]} jezdzcach = {h_all[d] / max(1, riders[d]):.2f} na jezdzca"
+        rep.add(f"Z-3: uprzaz w zbrojowniach AI - doba {until} wobec doby {half}",
+                f"doba {half}: {per(a)}; doba {until}: {per(b)} = x{h_all[b] / max(1, h_all[a]):.2f} | " + info
+                + ("" if len(har_on) == len(days) else f" | klucz wylaczony w {len(days) - len(har_on)} dobach"),
+                f"uprzaz w zbrojowniach AI w dobie {until} <= 1.2 x doba {half} (projekt: d120 <= d60 x 1.2; po E8/H prog do przeliczenia - H celowo podnosi stan uprzezy)",
+                h_all[b] <= 1.2 * h_all[a])
+    else:
+        rep.add("Z-3: uprzaz w zbrojowniach AI", f"brak spisu w dobie {half} albo {until} (spis w {len(cens)} dobach); " + info,
+                f"potrzebne doby kampanii {half} i {until} z linia E8/Z", None)
+    # Z-4: potkniecia i koszt spisu
+    stum = max([num(r"potkniecia \(sesja\) (\d+)", zl[d], default=0) for d in days] + [0])
+    cost = col(r"koszt spisu ([0-9.]+) ms", cast=float)
+    rep.add("Z-4: potkniecia E8/Z i koszt spisu uprzezy", f"potkniecia (sesja) {stum}; koszt spisu srednio {sum(cost.values()) / nd:.1f} ms/d, najwiecej {max(cost.values()) if cost else 0.0:.1f} ms",
+            "potkniecia 0 (koszt - INFO; projekt: koszt paczki ok. 0)", stum == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9117,6 +9271,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_x)    # E8/X (248): doswiadczenie za skutek
     blocks.append(etap8_w)    # E8/W (249): zuzycie i naprawy AI
     blocks.append(etap8_a)    # E8/A (250): misja gracza - odzysk wedlug strony, arena nie obija, lup z wlasnych zabojstw
+    blocks.append(etap8_z)    # E8/Z (251): zakupy i nadwyzki AI - bez dodatnich stanow, sufit ceny (W CIENIU), uprzaz ponad zapas
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

@@ -647,11 +647,82 @@ namespace Armoury
                 }
                 if (grp) meleeLeft -= planned;
             }
+            // E8/Z (251, RC8 poz. 28): uprzaz ponad 1.5 x zapas (AiBuyRules.HarnessKeep) - na polke tej osady jak reszta nadwyzek sprzetu (lordowie i zalogi;
+            // sztuki i zloto w licznikach nadwyzek tej wizyty, trzecia od sumy wizyty); kasa pusta przy sprzecie - uprzezy tez nie dzis. Przed galezia koni
+            if (!stop && AiBuyRules.HarnessOn) SellSpareHarness(mp, st, third, pct, arm, roster, garrison, ref sold, ref gold, ref cutSum, ref stop);
             // E6/K2 (212): osobna galaz koni (AiSurplusPlan dalej bez koni) - tylko partie lordow; konie i ich zloto poza licznikami nadwyzek sprzetu tej linii
             // (segment E6/K2 linii "Konie AI (175)"); kasa pusta przy sprzecie - koni tez nie dzis
             if (!garrison && !stop && SpareHorses.SellOn) SellSpareHorses(mp, st, third, pct, arm, gold, ref cutSum);
             if (sold > 0) { _daySold += sold; _dayGold += gold; if (garrison) { _dayGarSold += sold; _dayGarGold += gold; } }
             return sold;
+        }
+
+        /// <summary>
+        /// E8/Z (251, PLAN 8.8; RC8 poz. 28): uprzaz zbrojowni partii AI ponad 1.5 x zapas (AiBuyRules.HarnessKeep - konni szeregowi + gotowi do awansu na
+        /// jezdnego + luz, histereza jak konie E6/K2) na polke tej osady. Dotad uprzaz po poleglych jezdzcach lezala w zbrojowni na zawsze (AiSurplusPlan
+        /// pomija konie i rzedy, a Stajnia uprzezy nie sprzedaje). Od najnizszego tieru i najtanszej (zostaja sztuki, ktore pokrywaja koszyki zakupu uprzezy
+        /// E6/R3 - bez petli kup-sprzedaj); bez unikatow; sztuka bez stanu (ksiega zuzycia AiWear nie prowadzi koni i rzedow). Zaplata jak za reszte nadwyzek:
+        /// cena skupu tej polki liczona przy kazdej sztuce, kasa osady tylko z nadwyzki ponad zapas kupcow (CastlePurse.Spendable), trzecia panu od sumy
+        /// wizyty (Drobne39.ThirdCut), reszta do sakiewki ludzi. Brak kupca konczy sprzedaz tej wizyty (stop - koni tez nie dzis).
+        /// </summary>
+        private static void SellSpareHarness(MobileParty mp, Settlement st, Hero third, float pct, Dictionary<ItemObject, int> arm, TroopRoster roster, bool garrison,
+                                             ref int sold, ref int gold, ref int cutSum, ref bool stop)
+        {
+            int hSold = 0, hGold = 0, hThird = 0;
+            bool noBuyer = false;
+            try
+            {
+                List<ItemObject> items = null;
+                int have = 0;
+                foreach (var kv in arm)
+                {
+                    if (kv.Value <= 0 || !AiBuyRules.SpareHarness(kv.Key)) continue;
+                    have += kv.Value;
+                    if (items == null) items = new List<ItemObject>();
+                    items.Add(kv.Key);
+                }
+                if (items == null) return;
+                int riders;
+                int over = have - AiBuyRules.HarnessKeep(mp, roster, garrison, out riders);
+                if (over <= 0) return;
+                items.Sort((a, b) =>
+                {
+                    int d = AiGear.TierOf(a).CompareTo(AiGear.TierOf(b)); if (d != 0) return d;
+                    d = a.Value.CompareTo(b.Value); if (d != 0) return d;
+                    return string.CompareOrdinal(a.StringId, b.StringId);
+                });
+                foreach (var it in items)
+                {
+                    if (over <= 0 || noBuyer) break;
+                    var el = new EquipmentElement(it);
+                    while (over > 0)
+                    {
+                        int cnt;
+                        if (!arm.TryGetValue(it, out cnt) || cnt <= 0) break;
+                        int unit = SellPriceHere(el, st, mp);
+                        if (CastlePurse.Spendable(st.Town) < unit) { noBuyer = true; stop = true; break; }   // kasa pusta - koniec na dzis
+                        if (cnt > 1) arm[it] = cnt - 1; else arm.Remove(it);
+                        st.ItemRoster.AddToCounts(el, 1);
+                        Measure174b.NoteSurplusSale(it, 1, unit);                          // 174b.0 M3 (tylko licznik)
+                        Measure174b.NoteArrival(st, it, 1, garrison ? Measure174b.ArrGarrison : Measure174b.ArrPurse);   // ksiega uzbrojenia E6/0: przeniesienie (tylko licznik)
+                        st.Town.ChangeGold(-unit);
+                        MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -unit);   // paczka 169: linia kas (tylko licznik)
+                        int cut = third != null && third.IsAlive ? Drobne39.ThirdCut(unit, gold, cutSum, pct) : 0;
+                        if (cut > 0)
+                        {
+                            third.ChangeHeroGold(cut);
+                            if (third != Hero.MainHero) ClanIncomeBook.NoteInflow(third, cut, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
+                        }
+                        Add(mp, unit - cut);
+                        sold++; gold += unit; _dayLord += cut; cutSum += cut;
+                        hSold++; hGold += unit; hThird += cut; over--;
+                        SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
+                        MenUpgrade.NoteChurn(mp, it, false);                           // kupione i sprzedane tej samej doby (linia "Dozbrajanie"; autotest: 0)
+                    }
+                }
+            }
+            catch (Exception e) { AiBuyRules.Stumble("SellSpareHarness", e); }
+            AiBuyRules.NoteHarness(garrison, hSold, hGold, hThird, noBuyer);
         }
 
         /// <summary>
