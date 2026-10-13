@@ -112,6 +112,7 @@ namespace Armoury
         private static long _dBkPcs, _dBkHorses;
         private static long _dVetIn, _dVetNoHorse, _dVetPlayer, _dVetHire, _dVetHireNone, _dVetOut, _dVetFootShown, _dMercTemplate;
         private static long _dGiftHorses, _dGiftFood, _dGiftNoHorse, _dGiftNoFood, _dGiftGold, _dGiftParties, _dGiftNoSeat;
+        private static long _dGiftHadHorse, _dGiftSaddles, _dGiftNoSaddle, _dGiftSaddleGold;   // P2/C3: konie, ktore partia juz miala (bez zakupu), siodla z polki siedziby / brak, zloto za siodla
         private static long _dRotHorse, _dRotFoot, _dRotKeep;
         private static int _stumbles, _dStumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
@@ -137,6 +138,7 @@ namespace Armoury
             _dBkPcs = _dBkHorses = 0;
             _dVetIn = _dVetNoHorse = _dVetPlayer = _dVetHire = _dVetHireNone = _dVetOut = _dVetFootShown = _dMercTemplate = 0;
             _dGiftHorses = _dGiftFood = _dGiftNoHorse = _dGiftNoFood = _dGiftGold = _dGiftParties = _dGiftNoSeat = 0;
+            _dGiftHadHorse = _dGiftSaddles = _dGiftNoSaddle = _dGiftSaddleGold = 0;
             _dRotHorse = _dRotFoot = _dRotKeep = 0;
             _dStumbles = 0;
             Array.Clear(_dP2Kept, 0, P2Kinds); Array.Clear(_dP2Moved, 0, P2Kinds);   // E8/P2 (244)
@@ -903,7 +905,11 @@ namespace Armoury
                 var arm = (fromBattle && (b.SimWin || !DieOn)) ? null : ArmOf(mp);
                 var armMoves = new List<KeyValuePair<ItemObject, int>>();
                 // E8/H (271, RiderNeedsHarness): uprzaz zbrojowni rozbitej partii idzie razem z konmi (dotad znikala ze zbrojownia) - jezdziec = kon + uprzaz
-                bool withHarness = SaddleLaw.KeyOn;
+                // P2/C3 (audyt zbior-e8 [ustawienia]): przy LootIsTransfer WYLACZONYM okno DTE tej bitwy sledzi same konie (LootSnap rest = false) - DTE skopiowal
+                // uprzaz zwyciezcom, a LootMove jej u pokonanego nie zdjal, wiec przeniesienie tutaj dawaloby DRUGA sztuke. Uprzaz z lupu bitwy tylko wtedy, gdy
+                // okno DTE zdjelo juz kopie (TransferOn); inaczej znika ze zbrojownia jak przed E8/H. Ten sam wzor co straz koni wyzej (!DieOn -> arm = null).
+                // Rozwiazanie partii (nie lup bitwy) - bez zmian.
+                bool withHarness = SaddleLaw.KeyOn && (!fromBattle || TransferOn);
                 if (arm != null)
                     foreach (var kv in arm)
                         if (kv.Value > 0 && kv.Key != null && (IsHorse(kv.Key) || (withHarness && kv.Key.ItemType == ItemObject.ItemTypeEnum.HorseHarness)))
@@ -1189,6 +1195,14 @@ namespace Armoury
             if (capped) budget = Math.Min(budget, cap);
             int paid = 0;
             var shelf = seat.ItemRoster;
+            // P2/C3 (audyt zbior-e8 [zderzenia] + TRIAZ-2 H-1 Poprawka 2): JEDNA regula daru koni - partia kupuje przy siedzibie tylko te konie, ktorych jeszcze
+            // nie ma, i do kupionego konia bierze siodlo. (1) Konie pod siodlo, ktore partia juz ma (zbrojownia DTE + tabor - w dobach 1-3 nowej kampanii
+            // dorobek startowy E8/T daje konia i rzad kazdemu jezdzcy przed tym darem), schodza z potrzeby z wzoru gry: bez drugiego zaopatrzenia.
+            // (2) Po koniach i zywnosci: siodlo do kazdego kupionego konia pod siodlo, najwyzej tylu jezdzcom objetym regula, ilu nie ma jeszcze uprzezy.
+            SaddleLaw.PairState ps = null;
+            int haveMounts = 0, boughtPlain = 0;
+            try { ps = SaddleLaw.Pairs(party); haveMounts = ps.Horses + Stables.CountAnyMounts(party.Party); }
+            catch (Exception e) { Stumble("SeatGifts(stan)", e); ps = null; haveMounts = 0; }
             // konie najpierw, potem zywnosc
             var order = new List<KeyValuePair<ItemObject, int>>(want);
             order.Sort((a, b) => (IsHorse(b.Key) ? 1 : 0).CompareTo(IsHorse(a.Key) ? 1 : 0));
@@ -1196,6 +1210,11 @@ namespace Armoury
             {
                 bool horse = IsHorse(kv.Key);
                 int need = kv.Value;
+                if (horse && haveMounts > 0 && Stables.IsPlainMount(kv.Key))
+                {
+                    int cut = Math.Min(need, haveMounts);
+                    need -= cut; haveMounts -= cut; _dGiftHadHorse += cut;
+                }
                 // ta sama sztuka, potem ta sama kategoria (kon pod siodlo tej samej kategorii; zywnosc tej samej kategorii)
                 for (int pass = 0; pass < 2 && need > 0; pass++)
                 {
@@ -1215,18 +1234,76 @@ namespace Armoury
                         if (took <= 0) continue;
                         party.ItemRoster.AddToCounts(cel, took);
                         paid += cost; need -= took;
-                        if (horse) _dGiftHorses += took; else _dGiftFood += took;
+                        if (horse) { _dGiftHorses += took; if (Stables.IsPlainMount(cel.Item)) boughtPlain += took; } else _dGiftFood += took;
                         i = -1;   // polka sie zmienila (usuniety wiersz) - od nowa
                     }
                 }
                 if (need > 0) { if (horse) _dGiftNoHorse += need; else _dGiftNoFood += need; }
             }
+            if (boughtPlain > 0 && ps != null) paid += SeatSaddles(party, seat, ps, boughtPlain, budget - paid);
             if (paid > 0)
             {
                 GiveGoldAction.ApplyForCharacterToSettlement(lord, seat, paid);
                 if (capped && lord.Clan != null) ClanBudget.GearSpent(lord.Clan, paid);
                 _dGiftGold += paid;
             }
+        }
+
+        /// <summary>
+        /// P2/C3 (TRIAZ-2 H-1 Poprawka 2; bieg 2: wojny fabuly ROT w dobie 22 - 291 nowych partii i 739 koni z polek siedzib w 2 doby, "z koniem bez uprzezy"
+        /// 116 -> 567): nowa druzyna kupuje przy siedzibie siodlo do kazdego konia kupionego w tym darze - PARY, nie "mniej koni". Tylko partie pod regula E8/H
+        /// (SaddleLaw.Ruled). Ile: min(kupione konie pod siodlo, jezdzcy objeci regula bez uprzezy w zbrojowni i taborze). Sztuki najtansze najpierw, filtry
+        /// jak AiGear.BuySaddles (rodzina konia, bez unikatow, czarnej listy DTE, dodatnich stanow i ponad sufit ceny - AiBuyRules bez licznikow wizyty AI),
+        /// kazda po swojej cenie (ShelfBuy.Take), bez podlogi polki - jak konie w tym darze. Sztuka do taboru jak kon (SaddleLaw.Avail liczy tabor, postoj
+        /// przenosi do zbrojowni przed zakupem AiGear - bez podwojnego kupna). Platnik i budzet te same co konie: reszta "budget - paid" (kiesa wodza,
+        /// przydzial sprzetu rodu), zaplata razem z konmi jednym przelewem do siedziby (wolajacy). Zwraca koszt.
+        /// </summary>
+        private static int SeatSaddles(MobileParty party, Settlement seat, SaddleLaw.PairState ps, int boughtPlain, int budget)
+        {
+            int spent = 0;
+            try
+            {
+                if (party == null || seat == null || seat.Town == null || seat.ItemRoster == null || budget <= 0 || !SaddleLaw.Ruled(party.Party)) return 0;
+                int want = Math.Min(boughtPlain, Math.Max(0, ps.Riders - ps.Harness - SaddleLaw.BagFit(party.ItemRoster)));
+                if (want <= 0) return 0;
+                var shelf = seat.ItemRoster;
+                var cands = new List<KeyValuePair<EquipmentElement, int>>();   // sztuka -> cena z przegladu
+                var stock = new List<int>();
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || !SaddleLaw.Fits(it)) continue;
+                    if (ArmsPricing.IsUnique(it) || !AiGear.DteTakes(it) || AiBuyRules.Barred(el.EquipmentElement, false)) continue;
+                    int price = seat.Town.MarketData.GetPrice(el.EquipmentElement, party, false, seat.Party);
+                    if (price <= 0 || AiBuyRules.OverCap(el.EquipmentElement, price, false)) continue;
+                    cands.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, price));
+                    stock.Add(el.Amount);
+                }
+                var ord = new int[cands.Count];
+                for (int i = 0; i < ord.Length; i++) ord[i] = i;
+                Array.Sort(ord, (x, y) => cands[x].Value != cands[y].Value ? cands[x].Value.CompareTo(cands[y].Value) : x.CompareTo(y));
+                bool fresh = true;   // cena z przegladu wazna do pierwszego zakupu (polka ta sama), potem liczona od nowa
+                int left = want;
+                for (int oi = 0; oi < ord.Length && left > 0 && spent < budget; oi++)
+                {
+                    var cel = cands[ord[oi]].Key;
+                    int price = fresh ? cands[ord[oi]].Value : seat.Town.MarketData.GetPrice(cel, party, false, seat.Party);
+                    if (price <= 0 || price > budget - spent) continue;
+                    if (AiBuyRules.OverCap(cel, price, false)) continue;
+                    int cost, first, last;
+                    int took = ShelfBuy.Take(shelf, cel, Math.Min(left, stock[ord[oi]]), budget - spent, () => seat.Town.MarketData.GetPrice(cel, party, false, seat.Party), out cost, out first, out last, price, cap: AiBuyRules.CapPrice(cel));
+                    if (took <= 0) continue;
+                    fresh = false;
+                    party.ItemRoster.AddToCounts(cel, took);
+                    spent += cost; left -= took;
+                    _dGiftSaddles += took;
+                }
+                if (left > 0) _dGiftNoSaddle += left;
+                _dGiftSaddleGold += spent;
+            }
+            catch (Exception e) { Stumble("SeatSaddles", e); }   // wyjatek - w strone braku; sztuki juz zdjete sa w taborze i w koszcie (spent)
+            return spent;
         }
 
         // ================================================================ (5) ZAMIANY ROT (liczniki - RotHorseGuard)
@@ -1292,6 +1369,8 @@ namespace Armoury
                   .Append(" | dary startowe (partii ").Append(_dGiftParties).Append("): z polki konie ").Append(_dGiftHorses).Append(", zywnosc ").Append(_dGiftFood)
                   .Append(", brak koni ").Append(_dGiftNoHorse).Append(", brak zywnosci ").Append(_dGiftNoFood).Append(", bez siedziby ").Append(_dGiftNoSeat)
                   .Append(", zloto do siedzib ").Append(_dGiftGold).Append(", z niczego 0")
+                  .Append("; siodla z polki siedziby (P2/C3) ").Append(_dGiftSaddles).Append(" / brak ").Append(_dGiftNoSaddle).Append(", w tym zloto za siodla ").Append(_dGiftSaddleGold)
+                  .Append(", konie nie kupione - partia juz je miala ").Append(_dGiftHadHorse)
                   .Append(" | zamiany ROT na konnego: z koniem ").Append(_dRotHorse).Append(", na pieszego ").Append(_dRotFoot).Append(", zostal konny bez konia ").Append(_dRotKeep)
                   .Append(" | wpiecie: misja ").Append(_wMission).Append(", okno DTE ").Append(_wDte).Append(", BK karawany ").Append(_wBk).Append(", rozliczenie DTE ").Append(_wFin).Append(", dary ").Append(_wGift)
                   .Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (razem ").Append(_stumbles).Append(").");
