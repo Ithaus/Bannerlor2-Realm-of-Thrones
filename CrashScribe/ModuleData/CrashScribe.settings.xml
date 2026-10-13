@@ -236,4 +236,17 @@
        the two (a difference count of 0 means identical results). Slower than either search alone - keep it off for
        normal play. -->
   <MarriageFastShadow>false</MarriageFastShadow>
+  <!-- Gameplay change, not a speed-up: AI lords only pick marriage candidates they can actually marry. Realm of
+       Thrones picks one random candidate a day for every unmarried lord and only then asks for the marriage chance.
+       With Banner Kings that list also holds heroes who are already married and heroes Banner Kings will never
+       accept for that lord (chance 0), so more than half of the daily attempts are wasted and AI weddings are rarer
+       than Realm of Thrones intended. With this on, an unmarried lord draws only among candidates whose marriage
+       chance is above zero; the chance itself and every other rule (age, clan, culture, distance, war, race) stay
+       as they are. Expect roughly twice as many AI weddings in the first year of a campaign (estimate from a model
+       of the starting world: 1.6 to 2.3 times). Needs MarriageFast above; it is paused while MarriageFastShadow is
+       on (the original decides then) and when another mod changes the marriage chance (one line in the CrashScribe
+       log says so). The daily "Swaty ROT (Z.3)" log line ends with the attempts of unmarried lords, how many of
+       them the old rule would have wasted, and the weddings of the day and since loading.
+       Set MarriageOnlyViableCandidates to false to draw from the whole list as Realm of Thrones does (old behaviour). -->
+  <MarriageOnlyViableCandidates>true</MarriageOnlyViableCandidates>
 </CrashScribe>

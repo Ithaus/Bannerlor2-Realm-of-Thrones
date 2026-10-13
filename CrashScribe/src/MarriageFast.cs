@@ -62,8 +62,28 @@ namespace CrashScribe
     /// oryginal ROT. Porownanie: para (albo brak) i stan generatora w chwili decyzji - u oryginalu lapany na wejsciu
     /// MarriageAction.ApplyInternal (albo na koncu metody, gdy slubu nie ma). Ten sam stan po tym samym starcie = ta sama liczba krokow.
     /// Linia doby: "Swaty ROT (Z.3): klanow N, par stara droga A, nowa B, roznic R, czas stara X ms, nowa Y ms; ...".
-    /// Wylaczniki: MarriageFast (true; false = oryginal ROT bez latki), MarriageFastShadow (false) w ModuleData/CrashScribe.settings.xml.
-    /// Bez zapisu w grze.
+    ///
+    /// TYLKO KANDYDACI Z SZANSA (MarriageOnlyViableCandidates, prosba Jeffa 13.10) - ZMIANA ROZGRYWKI, nie przyspieszenie.
+    /// Oryginal losuje kandydata z calej listy "pasujacych" i dopiero potem pyta o szanse. Z BK na liscie sa tez bohaterowie, z ktorymi
+    /// slubu byc nie moze: (1) kandydat z zyjacym malzonkiem (BKMarriageModel.IsSuitableForMarriage nie pyta o malzonka, a
+    /// IsMarriageAdequate daje -10000 za secondHero.HasPrimarySpouse -> szansa 0), (2) kandydat wolny, ale odrzucony wynikiem BK
+    /// (IsMarriageAdequate: 1.1 x wynik swata - wynik kandydata +/- kultura +/- wiara nie wieksze od 0 -> szansa 0), (3) kandydat w zalotach
+    /// stanu >= 3 (kontrola ROT po udanym rzucie). Trafienie w takiego = dzienna proba wolnego lorda przepada. ROT bez BK tych strat nie
+    /// ma (model gry nie wpuszcza zonatych na liste, szansa pary pasujacej jest zawsze > 0).
+    /// Przy wlaczonym kluczu WOLNY lord (bez zyjacego malzonka) losuje tylko sposrod kandydatow, z ktorymi slub jest mozliwy: z tej samej
+    /// listy kandydatow co dotad losujemy bez zwracania, az trafi sie pierwszy z szansa > 0 (ta sama metoda modelu, ktora oryginal pyta po
+    /// losowaniu; zonaty i zalotnik odpadaja bez pytania modelu) - rozklad rowny po kandydatach z szansa, a szanse liczymy tylko dla
+    /// wylosowanych (srednio 1-2 na lorda zamiast calej listy). Pierwsze losowanie to dokladnie losowanie starej reguly - stad licznik
+    /// "stara regula trafilaby w kandydata bez szans". Dalej bez zmian: RandomFloat &lt; szansa, kontrola zalotow, MarriageAction.Apply, break.
+    /// Lord z zyjacym malzonkiem - jak dotad (skrot (c)). Wolny lord sam w zalotach stanu >= 3 nie losuje (i tak nie moglby sie ozenic).
+    /// Ciag losowy i pary sa wtedy INNE niz w oryginale (zamierzone). Regula dziala tylko przy znanym lancuchu szansy bez obcych latek
+    /// (ten sam warunek co skrot dla zonatych) i NIE dziala w biegu cienia (tam decyduje oryginal ROT, a nasza droga liczy stara regula,
+    /// zeby porownanie "roznic 0" mialo sens) - w obu razach losowanie jak w oryginale i slowo w linii startu i w linii doby.
+    /// Klucz wylaczony = droga dokladnie rownowazna oryginalowi (jak przed ta zmiana); liczniki prob i trafien bez szans sa wtedy
+    /// zwyklym odczytem tego, co wylosowal oryginalny ciag (zadnych dodatkowych pytan do modelu).
+    ///
+    /// Wylaczniki: MarriageFast (true; false = oryginal ROT bez latki - wtedy nie dziala tez regula wyzej), MarriageFastShadow (false),
+    /// MarriageOnlyViableCandidates (true) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
     /// </summary>
     internal static class MarriageFast
     {
@@ -103,6 +123,8 @@ namespace CrashScribe
         private static string _standWhy;
         private static bool _patchCheckDue;
         private static MethodBase[] _chainCouple, _chainChance;
+        private static bool _viableCfg;        // klucz MarriageOnlyViableCandidates wlaczony i sesja nie jest biegiem cienia
+        private static bool _viableOn;         // regula "tylko kandydaci z szansa" czynna teraz (_viableCfg i skrot dla zonatych czynny)
 
         // ---- bufory (jeden watek kampanii; _busy pilnuje ponownego wejscia) ----
         private static bool _busy;
@@ -111,6 +133,8 @@ namespace CrashScribe
         private static readonly List<Hero> _females = new List<Hero>(1024);
         private static readonly List<Hero> _nullHomes = new List<Hero>();
         private static readonly List<Hero> _cand = new List<Hero>(512);
+        private static readonly HashSet<Hero> _court = new HashSet<Hero>();   // bohaterowie w zalotach stanu >= 3 (na czas wywolania rodu)
+        private static bool _courtBuilt;
 
         // ---- liczniki doby i sesji ----
         private static int _dayClans, _dayNewPairs, _dayOldPairs, _dayDiff, _dayBothThrew;
@@ -118,6 +142,10 @@ namespace CrashScribe
         private static long _dayEvals, _dayNewTicks, _dayOldTicks;
         private static int _totClans, _totDiff, _diffLines;
         private static int _stumbles, _stumblesDay;
+        // proby wolnych lordow (bez zyjacego malzonka, z co najmniej jednym kandydatem): ile, w ilu losowanie starej reguly trafilo w kandydata
+        // bez szans, ilu nie mialo zadnego kandydata z szansa i ile razy pytalismy model o szanse (dwa ostatnie tylko przy nowej regule)
+        private static int _dayFree, _dayOldDead, _dayNoViable, _dayChanceEvals;
+        private static int _totPairs;
 
         private struct Rng
         {
@@ -374,8 +402,20 @@ namespace CrashScribe
             if (sp != _spouseOk)
             {
                 _spouseOk = sp;
-                Scribe.Line(Tag + ": skrot dla zonatych " + (sp ? "znow czynny." : "wylaczony - obca latka - " + spouse + " - reszta drogi bez zmian."));
+                _viableOn = _viableCfg && sp;   // nowa regula pyta model o szanse czesciej niz oryginal - tylko przy znanym lancuchu bez obcych latek
+                Scribe.Line(Tag + ": skrot dla zonatych " + (sp ? "znow czynny" : "wylaczony - obca latka - " + spouse)
+                            + (_viableCfg ? (sp ? "; regula 'tylko kandydaci z szansa' znow czynna." : "; regula 'tylko kandydaci z szansa' stoi - losowanie jak w oryginale ROT; reszta drogi bez zmian.")
+                                          : (sp ? "." : " - reszta drogi bez zmian.")));
             }
+        }
+
+        /// <summary>Stan reguly "tylko kandydaci z szansa" slowami - do linii startu i linii doby.</summary>
+        private static string ViableState()
+        {
+            if (_viableOn) return "CZYNNE";
+            if (!Config.MarriageOnlyViableCandidates) return "WYLACZONE (klucz = false) - losowanie jak w oryginale ROT";
+            if (_shadow) return "NIE DZIALA w biegu cienia (decyduje oryginal ROT, nasza droga liczy stara regula)";
+            return "STOI (lancuch szansy inny niz znany albo obca latka - jak skrot dla zonatych) - losowanie jak w oryginale ROT";
         }
 
         /// <summary>Start sesji kampanii (OnSessionLaunched - modele juz sa): straze, latka (raz na proces), linia startu.</summary>
@@ -384,6 +424,7 @@ namespace CrashScribe
             try
             {
                 _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
+                _viableCfg = false; _viableOn = false;
                 bool fast = Config.MarriageFast, shadow = Config.MarriageFastShadow;
                 if (!fast && !shadow) { Say(false, "MarriageFast = false"); return; }
                 if (!_resolved) { _resolved = true; _resolveFail = Resolve(); }
@@ -409,11 +450,15 @@ namespace CrashScribe
                 _shadow = shadow;
                 _spouseModelOk = spouseWhy == null;
                 _spouseOk = _spouseModelOk;
+                _viableCfg = Config.MarriageOnlyViableCandidates && !shadow;
+                _viableOn = _viableCfg && _spouseOk;
                 _ready = true;
                 Say(true, "ROT ROTRelationshipsBehavior.CheckNPCMarriages; model " + desc + "; "
                           + (shadow ? "BIEG CIENIA - decyduje oryginal ROT, nasza droga tylko liczy; linia doby '" + Tag + ": klanow ..., roznic ...'"
-                                    : "decyduje nasza droga: te same pary i ten sam ciag losowy, jedno przejscie po kandydatach przeciwnej plci")
-                          + "; skrot dla zonatych: " + (spouseWhy == null ? "tak" : "nie - " + spouseWhy));
+                                    : _viableOn ? "decyduje nasza droga: jedno przejscie po kandydatach przeciwnej plci; wolny lord losuje tylko sposrod kandydatow z szansa > 0 (pary i ciag losowy INNE niz w oryginale - zamierzone)"
+                                                : "decyduje nasza droga: te same pary i ten sam ciag losowy, jedno przejscie po kandydatach przeciwnej plci")
+                          + "; skrot dla zonatych: " + (spouseWhy == null ? "tak" : "nie - " + spouseWhy)
+                          + "; tylko kandydaci z szansa (MarriageOnlyViableCandidates): " + ViableState());
             }
             catch (Exception e)
             {
@@ -425,7 +470,12 @@ namespace CrashScribe
 
         private static void Say(bool ok, string what)
         {
-            try { Scribe.Line("Mends: swaty ROT (Z.3): " + (ok ? "PODPIETY (" + what + ")" : "BRAK (" + what + ") - zostaje oryginal ROT")); } catch { }
+            try
+            {
+                Scribe.Line("Mends: swaty ROT (Z.3): " + (ok ? "PODPIETY (" + what + ")" : "BRAK (" + what + ") - zostaje oryginal ROT"
+                            + (Config.MarriageOnlyViableCandidates ? "; regula 'tylko kandydaci z szansa' (MarriageOnlyViableCandidates) tez nie dziala - potrzebuje naszej drogi" : "")));
+            }
+            catch { }
         }
 
         // ------------------------------------------------------------ nasza droga
@@ -460,6 +510,7 @@ namespace CrashScribe
                 _busy = false;
                 // bufory nie trzymaja bohaterow miedzy wywolaniami (po wyjsciu do menu przypinalyby stara kampanie do nastepnego wczytania)
                 _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear();
+                _court.Clear(); _courtBuilt = false;
             }
             long dt = Stopwatch.GetTimestamp() - t0;
 
@@ -489,8 +540,9 @@ namespace CrashScribe
         }
 
         /// <summary>
-        /// Decyzja rodu bez slubu: kto z kim (albo nikt). Zuzywa generator dokladnie jak oryginal - te same wywolania MBRandom,
-        /// w tej samej kolejnosci, z tymi samymi argumentami (wyjatek: krok zonatego, gdzie argument nie ma znaczenia dla stanu).
+        /// Decyzja rodu bez slubu: kto z kim (albo nikt). Bez reguly "tylko kandydaci z szansa" zuzywa generator dokladnie jak oryginal -
+        /// te same wywolania MBRandom, w tej samej kolejnosci, z tymi samymi argumentami (wyjatek: krok zonatego, gdzie argument nie ma
+        /// znaczenia dla stanu). Z ta regula wolny lord losuje inaczej (PickViable) - reszta bez zmian.
         /// </summary>
         private static bool Decide(MarriageModel model, List<Hero> list, Clan clan, out Hero h1, out Hero pick)
         {
@@ -505,9 +557,17 @@ namespace CrashScribe
                 if (!hero1.CanMarry()) continue;
                 if (!split) { Split(list); split = true; }
                 _dayLords++;
-                Hero x;
-                if (!Scan(model, list, hero1, out x)) continue;
-                float num = model.NpcCoupleMarriageChance(hero1, x);
+                Hero sp1 = hero1.Spouse;
+                bool free = sp1 == null || !sp1.IsAlive;   // wolny = bez zyjacego malzonka (pierwszy warunek BK HasPrimarySpouse; sam odczyt)
+                bool viable = _viableOn && free;
+                Hero x; float num;
+                if (!Scan(model, list, hero1, viable, out x, out num)) continue;
+                if (!viable)
+                {
+                    num = model.NpcCoupleMarriageChance(hero1, x);
+                    // licznik bez wplywu na bieg: wolny lord wylosowal kandydata jak w oryginale - czy z szansa
+                    if (free) { _dayFree++; if (!(num > 0f)) _dayOldDead++; }
+                }
                 if (!(num > 0f) || !(MBRandom.RandomFloat < num)) continue;
                 bool courting = false;
                 List<Romance.RomanticState> states = Romance.RomanticStateList;
@@ -541,10 +601,12 @@ namespace CrashScribe
         /// Kandydat dla lorda. true = x wylosowany jak w oryginale (ten sam krok generatora, ten sam element); false = dalej bez
         /// liczenia szansy: nie ma kandydata (bez losowania, jak w oryginale) albo lord ma zyjacego malzonka (jeden krok generatora
         /// zuzyty, szansa i tak wynosi 0, wiec oryginal tez nie robi nic wiecej).
+        /// viable (tylko wolny lord przy regule "tylko kandydaci z szansa"): lista kandydatow ta sama, ale wybor przez PickViable -
+        /// true = x ma szanse num > 0 (juz policzona), false = nikt z listy nie ma szansy.
         /// </summary>
-        private static bool Scan(MarriageModel model, List<Hero> list, Hero hero1, out Hero x)
+        private static bool Scan(MarriageModel model, List<Hero> list, Hero hero1, bool viable, out Hero x, out float num)
         {
-            x = null;
+            x = null; num = 0f;
             _cand.Clear();
             if (_home(hero1) == null)
             {
@@ -603,8 +665,61 @@ namespace CrashScribe
                 }
             }
             if (_cand.Count == 0) return false;
+            if (viable) return PickViable(model, hero1, out x, out num);
             x = _cand[MBRandom.RandomInt(_cand.Count)];
             return true;
+        }
+
+        /// <summary>
+        /// Regula "tylko kandydaci z szansa" dla wolnego lorda: z listy kandydatow oryginalu (_cand, niepusta) losowanie bez zwracania,
+        /// az trafi sie pierwszy, z ktorym slub jest mozliwy - rozklad rowny po takich kandydatach. Slub niemozliwy = kandydat ma zyjacego
+        /// malzonka (BK: szansa 0; przy czynnym skrocie dla zonatych pewne bez pytania modelu), jest w zalotach stanu >= 3 (ROT odrzuca
+        /// po rzucie) albo model nie daje szansy wiekszej od 0 (ta sama metoda, ktora oryginal pyta po losowaniu). Pierwsze losowanie = losowanie
+        /// starej reguly (ta sama lista, RandomInt(liczba)) - trafienie bez szans liczone do linii doby. Lista _cand jest przy tym zuzywana.
+        /// </summary>
+        private static bool PickViable(MarriageModel model, Hero hero1, out Hero x, out float num)
+        {
+            x = null; num = 0f;
+            if (!_courtBuilt) BuildCourt();
+            if (_court.Contains(hero1)) return false;   // sam w zalotach stanu >= 3: ROT i tak odrzucilby kazdy jego slub
+            _dayFree++;
+            bool first = true;
+            while (_cand.Count > 0)
+            {
+                int i = MBRandom.RandomInt(_cand.Count);
+                Hero h = _cand[i];
+                Hero sp = h.Spouse;
+                float c = 0f;
+                if ((sp == null || !sp.IsAlive) && !_court.Contains(h))
+                {
+                    _dayChanceEvals++;
+                    c = model.NpcCoupleMarriageChance(hero1, h);
+                }
+                if (c > 0f) { x = h; num = c; return true; }
+                if (first) { _dayOldDead++; first = false; }
+                int last = _cand.Count - 1;
+                _cand[i] = _cand[last];
+                _cand.RemoveAt(last);
+            }
+            _dayNoViable++;
+            return false;
+        }
+
+        /// <summary>Bohaterowie w zalotach stanu >= 3 (MatchMadeByFamily i wyzej, takze Marriage) - ten sam warunek co kontrola ROT po rzucie,
+        /// zebrany raz na wywolanie rodu (lista gry: sluby z tej kampanii i zaloty gracza).</summary>
+        private static void BuildCourt()
+        {
+            _court.Clear();
+            List<Romance.RomanticState> states = Romance.RomanticStateList;
+            if (states != null)
+                for (int i = 0; i < states.Count; i++)
+                {
+                    Romance.RomanticState rs = states[i];
+                    if (rs == null || (int)rs.Level < 3) continue;
+                    if (rs.Person1 != null) _court.Add(rs.Person1);
+                    if (rs.Person2 != null) _court.Add(rs.Person2);
+                }
+            _courtBuilt = true;
         }
 
         // ------------------------------------------------------------ bieg cienia
@@ -717,20 +832,30 @@ namespace CrashScribe
                     string work = "lordow szukajacych " + _dayLords + " (z zyjacym malzonkiem - skrot " + _daySpouse + ", cala lista " + _dayFull
                                   + "), ocen pary " + _dayEvals + ", bohaterow bez pamieci domu najwyzej " + _dayNullMax
                                   + (_stumblesDay > 0 ? ", POTKNIECIA " + _stumblesDay + " (razem " + _stumbles + ", pierwsze w raporcie; rod z potknieciem liczy oryginal ROT od tego samego stanu losowego)" : "");
+                    // koniec linii: regula "tylko kandydaci z szansa" - proby wolnych lordow (bez zyjacego malzonka, z kandydatem) i sluby
+                    int wed = _shadow ? _dayOldPairs : _dayNewPairs;   // w biegu cienia decyduje oryginal ROT
+                    _totPairs += wed;
+                    string pct = _dayFree > 0 ? " (" + (100.0 * _dayOldDead / _dayFree).ToString("0", ci) + "%)" : "";
+                    string tail = "; tylko kandydaci z szansa (MarriageOnlyViableCandidates) " + ViableState() + ": proby wolnych lordow " + _dayFree
+                                  + (_viableOn ? ", w tym stara regula trafilaby w kandydata bez szans " + _dayOldDead + pct + ", bez zadnego kandydata z szansa " + _dayNoViable
+                                                 + ", pytan o szanse " + _dayChanceEvals
+                                               : ", w tym trafienie w kandydata bez szans " + _dayOldDead + pct)
+                                  + "; sluby dzis " + wed + ", od wczytania " + _totPairs;
                     if (_shadow)
                         Scribe.Line(Tag + ": klanow " + _dayClans + ", par stara droga " + _dayOldPairs + ", nowa " + _dayNewPairs + ", roznic " + _dayDiff
                                     + ", czas stara " + (_dayOldTicks * ms).ToString("0.0", ci) + " ms, nowa " + (_dayNewTicks * ms).ToString("0.0", ci) + " ms"
                                     + "; dzien " + Day() + ", " + work + (_dayBothThrew > 0 ? ", wyjatek w obu drogach " + _dayBothThrew : "")
-                                    + "; od wczytania: klanow " + _totClans + ", roznic " + _totDiff + ".");
+                                    + "; od wczytania: klanow " + _totClans + ", roznic " + _totDiff + tail + ".");
                     else
                         Scribe.Line(Tag + ": dzien " + Day() + " - klanow " + _dayClans + ", slubow " + _dayNewPairs + ", czas " + (_dayNewTicks * ms).ToString("0.0", ci)
-                                    + " ms; " + work + ".");
+                                    + " ms; " + work + tail + ".");
                 }
             }
             catch (Exception e) { Stumble("MarriageFast.DailyLine", e); }
             _dayClans = _dayNewPairs = _dayOldPairs = _dayDiff = _dayBothThrew = 0;
             _dayLords = _daySpouse = _dayFull = _dayNullMax = 0;
             _dayEvals = _dayNewTicks = _dayOldTicks = 0;
+            _dayFree = _dayOldDead = _dayNoViable = _dayChanceEvals = 0;
             _stumblesDay = 0;
         }
 
@@ -738,13 +863,16 @@ namespace CrashScribe
         internal static void ResetSession()
         {
             _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
+            _viableCfg = false; _viableOn = false;
             _busy = false;
             ShadowClose();
             _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear();
+            _court.Clear(); _courtBuilt = false;
             _dayClans = _dayNewPairs = _dayOldPairs = _dayDiff = _dayBothThrew = 0;
             _dayLords = _daySpouse = _dayFull = _dayNullMax = 0;
             _dayEvals = _dayNewTicks = _dayOldTicks = 0;
-            _totClans = _totDiff = _diffLines = 0;
+            _dayFree = _dayOldDead = _dayNoViable = _dayChanceEvals = 0;
+            _totClans = _totDiff = _diffLines = _totPairs = 0;
             _stumblesDay = 0;
         }
     }
