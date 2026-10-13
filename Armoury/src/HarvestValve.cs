@@ -400,6 +400,27 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
         }
 
+        /// <summary>
+        /// GL-1 (P1, projekt "gospodarka od ludzi" 3.5 i ryzyko 5): plon wsi od ludzi wlaczony, wylaczony albo z g typow policzonym od nowa - okna 56 dob
+        /// porownywalyby nowa produkcje ze starym zuzyciem. Stan czyszczony tak samo jak przy wylaczeniu klucza (mnozniki 1, gnicie BK jak 174.3, konie
+        /// razem z regulatorem), start pomiaru w nastepnej dobie (Daily -> Begin). false = regulator bez stanu albo z pomiarem zaczetym w tej dobie (nic do czyszczenia). Watek glowny.
+        /// </summary>
+        internal static bool RestartMeasurement(string why)
+        {
+            try
+            {
+                if (_start < 0 && _goods.Count == 0) return false;
+                int today = (int)CampaignTime.Now.ToDays, day = today - 1;
+                if (_start >= today && _decisions == 0) return false;      // pomiar zaczety w tej dobie (nowa kampania: Begin przed kalibracja reguly) - nic do czyszczenia
+                int dec = _decisions, from = _start;
+                Clear();
+                Log.Info("Regulator wsi (221): dzien " + day + " - POMIAR OD NOWA (" + why + "): stan wyczyszczony (pomiar od dnia " + from + ", decyzji " + dec
+                         + "), mnozniki 1, gnicie BK jak 174.3; start pomiaru w nastepnej dobie, pierwsza decyzja po " + (2 * Bucket) + " dobach.");
+                return true;
+            }
+            catch (Exception e) { Stumble("RestartMeasurement", e); return false; }
+        }
+
         private static void Begin(int today)
         {
             _start = today; _bucketStart = today; _buckets = 0; _decisions = 0; _firstDecisionDay = -1;

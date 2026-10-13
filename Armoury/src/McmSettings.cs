@@ -5372,6 +5372,14 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool WatchKeepsFlatOutput { get; set; } = true;
 
+        [SettingPropertyBool("Village Output By People", HintText = "Each village on the map stands for all the villages of its district: its fields, herds, mines and woods yield by the number of people living there - a village of a crowded land brings forth several times what a village of an empty land does, while the world as a whole makes as much of every good as before (the hearth no longer sets the yield; winter, raids, war and the world's demand still do). The village tooltip shows 'People of this land' and the village's 'People of this land' window tells why it yields more or less. Off = village output follows the hearth thresholds, as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool VillageOutputByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Sarnor People Raised", HintText = "Sarnor counts a quarter of a million people instead of a hundred thousand - as thickly settled as the Iron Islands - so its villages and towns are not left almost empty once goods follow the people. Takes effect in a new campaign only (a campaign already begun keeps the people it was reckoned with). Off = a hundred thousand, as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool SarnorPeopleRaised { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6714,6 +6722,8 @@ namespace Armoury
             s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
+            s.VillageOutputByPeople = VillageOutputByPeople;
+            s.SarnorPeopleRaised = SarnorPeopleRaised;
         }
 
         internal static void Apply()
