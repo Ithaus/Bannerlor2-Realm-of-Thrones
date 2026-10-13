@@ -44,6 +44,7 @@ namespace Armoury
         private static int _skill, _before;
         private static float _crack = -1f;
         private static ItemModifier _mod;
+        private static Dictionary<EquipmentElement, int> _bag0;   // E8/B: surowce kuzni w sakwach przed zdjeciem kwitu (tylko przy ArmourBotchHalfBack)
 
         /// <summary>Nasza brama odmowila (za malo Smithing) - BK nie kuje; postfiks FletchForge nie uczy wzorow i nie pokazuje okna.</summary>
         internal static bool Refused;
@@ -79,6 +80,7 @@ namespace Armoury
         {
             _active = false; _rolled = false; _postRan = false; _success = false;
             _item = null; _smith = null; _r = default(Recipes.Recipe); _skill = 0; _before = 0; _crack = -1f; _mod = null;
+            _bag0 = null;
         }
 
         /// <summary>Potkniecie na jednej sztuce: licznik, do logu tylko pierwsze 5 (dymek i lista kowadla wolaja co klatke).</summary>
@@ -151,6 +153,7 @@ namespace Armoury
                 }
                 _active = true; _item = item; _smith = hero; _r = r; _skill = skill;
                 _before = TotalOf(item);
+                _bag0 = BotchBackOn ? ForgeBag() : null;   // E8/B: stan surowcow przed SpendMaterials (BK albo FletchForge) - do zwrotu przy peknieciu
                 return true;
             }
             catch (Exception e) { Stumble("ArmourQuality.Begin", e); Clear(); return true; }   // ta jedna sztuka idzie droga BK
@@ -173,7 +176,7 @@ namespace Armoury
                 {
                     string res;
                     if (!_postRan) res = "przerwane (wyjatek w BK)";
-                    else if (!_success) { _cracked++; res = "PEKLA (material przepadl, pol staminy - jak u BK)"; }
+                    else if (!_success) { _cracked++; res = "PEKLA (" + BotchBack() + ", pol staminy - jak u BK)"; }
                     else
                     {
                         _made++;
@@ -190,6 +193,87 @@ namespace Armoury
             catch (Exception e) { Stumble("ArmourQuality.CraftFinalizer", e); }
             Clear(); Refused = false;
             return __exception;
+        }
+
+        // ---------------------------------------------------------------- E8/B (258, PLAN 8.9; TOWARY 3 Z3): pekniecie oddaje czesc wsadu
+        // Dwie reguly jednego zjawiska: pekniety luk albo kusza (Forge.Smith) traci MaterialLossOnFailure kazdej czesci receptury (co najmniej
+        // 1 sztuke - Recipes.TakePartial), a peknieta zbroja z zakladki CRAFT tracila caly kwit (BK zdejmuje go przed rzutem i nic nie oddaje).
+        // Teraz (ArmourBotchHalfBack): po peknieciu do sakw wraca to, czego regula luku by nie zabrala - z TEGO, co naprawde zeszlo w tym
+        // kliknieciu (roznica sakw przed i po, po grupach kwitu: 9 surowcow kuzni, skora, plotno), do tych samych stosow, z ktorych zeszlo.
+        // Nic ponad to, co zdjeto; stamina i XP - droga BK jak dotad.
+        internal static bool BotchBackOn { get { var s = Settings.Current; return s != null && s.ArmourBotchHalfBack && s.ArmourCraftLikeWeapons && s.CraftingEnabled; } }
+
+        /// <summary>Grupa kwitu BK, do ktorej nalezy przedmiot z sakw: 0-8 surowiec kuzni (CraftingMaterials), 9 skora i 10 plotno - cala kategoria
+        /// handlowa (jak Recipes.Take i licznik zakladki); -1 = nie surowiec kuzni.</summary>
+        private static int BillGroup(ItemObject it)
+        {
+            if (it == null) return -1;
+            for (int l = 0; l < 9; l++) if (ReferenceEquals(Recipes.MaterialItem((CraftingMaterials)l), it)) return l;
+            var lea = Recipes.SoftLeather; var lin = Recipes.SoftLinen;
+            if (lea != null && (ReferenceEquals(it, lea) || (lea.ItemCategory != null && it.ItemCategory == lea.ItemCategory))) return 9;
+            if (lin != null && (ReferenceEquals(it, lin) || (lin.ItemCategory != null && it.ItemCategory == lin.ItemCategory))) return 10;
+            return -1;
+        }
+
+        /// <summary>Surowce kuzni w sakwach gracza: stos (przedmiot + stan) -> sztuki (takze ujemne wpisy po zdjeciu BK sztywnym przedmiotem).</summary>
+        private static Dictionary<EquipmentElement, int> ForgeBag()
+        {
+            var d = new Dictionary<EquipmentElement, int>();
+            var r = MobileParty.MainParty.ItemRoster;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.Amount == 0 || BillGroup(el.EquipmentElement.Item) < 0) continue;
+                int n; d.TryGetValue(el.EquipmentElement, out n); d[el.EquipmentElement] = n + el.Amount;
+            }
+            return d;
+        }
+
+        /// <summary>Zwrot po peknieciu (wolane z finalizera, raz na klikniecie). Zwraca opis do linii logu; przy wylaczonym kluczu - tekst sprzed paczki.</summary>
+        private static string BotchBack()
+        {
+            if (_bag0 == null) return "material przepadl";
+            try
+            {
+                var roster = MobileParty.MainParty.ItemRoster;
+                var now = ForgeBag();
+                var keys = new HashSet<EquipmentElement>(_bag0.Keys);
+                foreach (var k in now.Keys) keys.Add(k);
+                var taken = new List<KeyValuePair<EquipmentElement, int>>[11];
+                var total = new int[11];
+                foreach (var k in keys)
+                {
+                    int a, b; _bag0.TryGetValue(k, out a); now.TryGetValue(k, out b);
+                    int g = BillGroup(k.Item);
+                    if (a - b <= 0 || g < 0) continue;
+                    if (taken[g] == null) taken[g] = new List<KeyValuePair<EquipmentElement, int>>();
+                    taken[g].Add(new KeyValuePair<EquipmentElement, int>(k, a - b));
+                    total[g] += a - b;
+                }
+                var s = Settings.Current;
+                float share = Math.Max(0f, Math.Min(1f, s != null ? s.MaterialLossOnFailure : 0.5f));
+                int backAll = 0, lostAll = 0;
+                var names = new List<string>(); var ids = new List<string>();
+                for (int g = 0; g < 11; g++)
+                {
+                    if (total[g] <= 0) continue;
+                    int lost = Math.Min(total[g], Math.Max(1, (int)(total[g] * share)));   // jak Recipes.TakePartial: co najmniej 1 sztuka kazdego surowca
+                    int back = total[g] - lost;
+                    lostAll += lost;
+                    foreach (var kv in taken[g])
+                    {
+                        if (back <= 0) break;
+                        int n = Math.Min(back, kv.Value);
+                        roster.AddToCounts(kv.Key, n);
+                        back -= n; backAll += n;
+                        names.Add(n + " x " + kv.Key.Item.Name); ids.Add(kv.Key.Item.StringId + " " + n);
+                    }
+                }
+                SmallFixes8.NoteBotch(backAll, lostAll);
+                if (backAll > 0) Log.Player("Not all is lost - back in your bags: " + string.Join(", ", names) + ".");
+                return "zwrot do sakw " + backAll + " szt." + (ids.Count > 0 ? " [" + string.Join(", ", ids) + "]" : "") + ", przepadlo " + lostAll + " szt. (ArmourBotchHalfBack)";
+            }
+            catch (Exception e) { Stumble("ArmourQuality.BotchBack", e); return "material przepadl (blad zwrotu - potkniecie)"; }
         }
 
         /// <summary>Wszystkie sztuki tej zbroi w sakwach, we wszystkich stanach (GetItemNumber gry liczy tylko pierwszy stos).</summary>

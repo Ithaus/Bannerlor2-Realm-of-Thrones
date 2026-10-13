@@ -36,6 +36,10 @@ namespace Armoury
         [SettingPropertyGroup("Forging armour")]
         public bool ArmourCraftLikeWeapons { get; set; } = true;
 
+        [SettingPropertyBool("Armour Botch Half Back", HintText = "when a piece of armour cracks on the anvil in the Banner Kings CRAFT tab, you lose only the share of each material set by Material Loss On Failure (at least one piece of each) and the rest goes back into your bags - the same rule as a cracked bow or crossbow (needs Armour Craft Like Weapons on; off = the whole bill of materials is lost, as before)")]
+        [SettingPropertyGroup("Forging armour")]
+        public bool ArmourBotchHalfBack { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Iron Per Weight Unit", 0.00f, 5.60f, "0.00", HintText = "refined iron per pound of the finished piece")]
         [SettingPropertyGroup("Forging armour")]
         public float IronPerWeightUnit { get; set; } = 1.4f;
@@ -1963,6 +1967,14 @@ namespace Armoury
         [SettingPropertyBool("Artisan Own Inputs", HintText = "every loaf from its own grain: Banner Kings lets the hidden craftsmen of a town make several pieces from one piece of material - with today's prices about 5 loaves or 9 jugs of beer from one sack of grain, 4 pots from one load of clay, three times the meat and hides from one beast - and the town pays them for every piece. On: that number stays as the work the craftsmen can do that day, but every extra batch takes its own grain, clay or beast from the town market at the town's price, paid from the craftsmen's till, and only when the batch is worth more than its material (the game's own rule for their first batch); where the market has none or it does not pay, the extra pieces are not made and the town gets back what it paid for them. A slaughter yields one beast's meat, hides and wool per batch. Quality, the lines without any material and the arms lines stay as they are (off = Banner Kings as before)")]
         [SettingPropertyGroup("Workshops")]
         public bool ArtisanOwnInputs { get; set; } = true;
+
+        [SettingPropertyBool("Artisan Byproducts Full", HintText = "with Artisan Own Inputs on: every extra beast the town's craftsmen slaughter in a day yields its hides and its other by-products too - until now only the first cow, sheep or hog of a line gave them and the rest were lost. The town's merchants pay the craftsmen for these pieces only out of the coin they hold above their reserve; what they cannot pay for is not made. Wool from slaughter follows Artisan Wool Per Sheep (off = the by-products of the extra beasts are lost, as before)")]
+        [SettingPropertyGroup("Workshops")]
+        public bool ArtisanByproductsFull { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Artisan Wool Per Sheep", 0.00f, 1.00f, "0.00", HintText = "with Artisan Byproducts Full on: how much of a bale of wool the fleece of one slaughtered sheep is worth, for every sheep beyond the first of a line (the first gives a whole bale, as the recipe says). The share is tallied town by town and kept in the save; a whole bale reaches the market each time a town's tally fills up (0 = no wool from the extra sheep, 1 = a whole bale from each)")]
+        [SettingPropertyGroup("Workshops")]
+        public float ArtisanWoolPerSheep { get; set; } = 0.15f;
 
         [SettingPropertyBool("Workshop Trade Fair Price", HintText = "the just price of the towns (assize of bread, guild prices): for each batch of trade goods the town pays a workshop at most what the batch cost - its materials at the town's price and its wages - plus the master's profit (Smith Profit Percent, the same margin as in the price of arms); whatever an empty stall would pay above that stays in the town purse. Bakers, weavers and silversmiths earn a craftsman's living instead of a lord's rent, so a workshop costs what such a living is worth. Your own workshops too; arms lines keep their own price (off = a workshop gets the town's full price for every piece)")]
         [SettingPropertyGroup("Workshops")]
@@ -4136,6 +4148,14 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool MendFractionMemory { get; set; } = true;
 
+        [SettingPropertyBool("Mend Take By Kind", HintText = "mending a single piece with your own hands takes leather, linen and velvet the way they are counted - from any goods of that kind in your bags (furs and hides for leather, and so on), never below zero; until now only the exact item came off, so with nothing but its varieties in the bags the repair cost no leather at all or left a stack below zero (off = as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool MendTakeByKind { get; set; } = true;
+
+        [SettingPropertyBool("Small Fixes8", HintText = "five small corrections at the smith's: the work part of what you pay the town smiths for mending goes on to the townsfolk's purse as craft wages, like the repairs of your men and the lords' men (needs Mend Pay To Folk on); a worn piece on your back has one smith's price whether you pick it from the list or mend everything you wear; the clan screen shows a workshop's daily keep at its town's wage level - what it really pays; an order off the stalls cut short by your purse still sends word to the workshops of the pieces the stalls lacked; and the smiths' cheapest-first estimate no longer miscounts very light bars (off = all five as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool SmallFixes8 { get; set; } = true;
+
         [SettingPropertyBool("Take Apart Enabled", HintText = "rozlozenie gotowej rzeczy na czesci, zeby zdjac z niej wzor")]
         [SettingPropertyGroup("Time at the forge")]
         public bool TakeApartEnabled { get; set; } = true;
@@ -4612,6 +4632,10 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public bool PlayerWorkshopsSameRule { get; set; } = true;
 
+        [SettingPropertyBool("Player Mine Bulk Skip", HintText = "a mining enterprise you own yields as much metal by weight as one owned by a notable: with loads ten times heavier than the old pieces only every tenth cycle brings a load. Until now your own mine skipped this rule and made ten times the metal (off = every cycle yields, as before)")]
+        [SettingPropertyGroup("Arms production")]
+        public bool PlayerMineBulkSkip { get; set; } = true;
+
         [SettingPropertyBool("Hist Worth Windows Old Coin", HintText = "tournament prizes (the game's own and Tournaments XPanded's), the modest local prize of Grand Tourney and the cap on lords' armour orders are reckoned from fixed sums of the old coin (a prize worth 1600 to 5000, an order piece worth at most 12000). With historical prices they are compared with what a piece was worth before the repricing, so prizes and orders are again the kinds of goods their makers meant - good swords, helmets, mail and horses, not only the heaviest plate and warhorses - while the piece keeps its historical worth on the market. With RBM's tournament module on, RBM itself picks the main prize by the town's culture and your tier, and the game's and Tournaments XPanded's ranges serve only when its list is empty (needs Historical Prices; off = compared with today's worth, the game's prize range divided by Hist Tournament Scale)")]
         [SettingPropertyGroup("Worth windows in the old coin (3.8)")]
         public bool HistWorthWindowsOldCoin { get; set; } = true;
@@ -5028,6 +5052,7 @@ namespace Armoury
             s.SmithingSkillPerTier = SmithingSkillPerTier;
             s.SmithingDifficultyPerTier = SmithingDifficultyPerTier;
             s.ArmourCraftLikeWeapons = ArmourCraftLikeWeapons;
+            s.ArmourBotchHalfBack = ArmourBotchHalfBack;
             s.IronPerWeightUnit = IronPerWeightUnit;
             s.ClassCostBody = ClassCostBody;
             s.ClassCostLeg = ClassCostLeg;
@@ -5510,6 +5535,8 @@ namespace Armoury
             s.WorkshopTradeProfitDays = WorkshopTradeProfitDays;
             s.WorkshopTradeResaleShare = WorkshopTradeResaleShare;
             s.ArtisanOwnInputs = ArtisanOwnInputs;
+            s.ArtisanByproductsFull = ArtisanByproductsFull;
+            s.ArtisanWoolPerSheep = ArtisanWoolPerSheep;
             s.WorkshopTradeFairPrice = WorkshopTradeFairPrice;
             s.CastleVillagesSellInTown = CastleVillagesSellInTown;
             s.MarketMaxDistance = MarketMaxDistance;
@@ -6053,6 +6080,8 @@ namespace Armoury
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
             s.AiHarnessSurplusSell = AiHarnessSurplusSell;
             s.MendFractionMemory = MendFractionMemory;
+            s.MendTakeByKind = MendTakeByKind;
+            s.SmallFixes8 = SmallFixes8;
             s.TakeApartEnabled = TakeApartEnabled;
             s.TakeApartBaseChance = TakeApartBaseChance;
             s.TakeApartSkillSpan = TakeApartSkillSpan;
@@ -6172,6 +6201,7 @@ namespace Armoury
             s.ShopKeepsLastArmour = ShopKeepsLastArmour;
             s.ShopKeepPieces = ShopKeepPieces;
             s.PlayerWorkshopsSameRule = PlayerWorkshopsSameRule;
+            s.PlayerMineBulkSkip = PlayerMineBulkSkip;
             s.HistWorthWindowsOldCoin = HistWorthWindowsOldCoin;
             s.BkSupplyBuyByPartyStock = BkSupplyBuyByPartyStock;
             s.BkVillageMarketPaysWhatItHas = BkVillageMarketPaysWhatItHas;

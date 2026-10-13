@@ -219,7 +219,7 @@ namespace Armoury
             Array.Clear(_fromNothing, 0, Classes); Array.Clear(_toNothing, 0, Classes);
             _worldFromNothing = _worldToNothing = _levyBack = 0; _garFee = 0;
             Array.Clear(_shopWage, 0, Classes); Array.Clear(_shopKeep, 0, Classes); Array.Clear(_shopFair, 0, Classes);
-            Array.Clear(_artIn, 0, Classes); Array.Clear(_artBack, 0, Classes);
+            Array.Clear(_artIn, 0, Classes); Array.Clear(_artBack, 0, Classes); Array.Clear(_artBy, 0, Classes);
             Array.Clear(_noteIn, 0, _noteIn.Length); Array.Clear(_noteOut, 0, _noteOut.Length);
             Array.Clear(_mark, 0, _mark.Length);
             Array.Clear(_wage, 0, Wages); Array.Clear(_wageN, 0, Wages); Array.Clear(_wageShort, 0, Wages);
@@ -536,6 +536,22 @@ namespace Armoury
                 if (c < 0) return;
                 if (inputs > 0) _artIn[c] += inputs;
                 if (refund > 0) _artBack[c] += refund;
+            }
+            catch { _stumbles++; }
+        }
+
+        // E8/B (258): kasa miasta -> kapital rzemieslnikow BK za dopisane wyroby uboczne (ArtisanInputs.Byproduct; z nadwyzki ponad zapas kupcow,
+        // te same dwie kasy co prefiks BK - zlota swiata nie zmienia). Poza oknem O35 (jak zwroty 147), wiec linia kas zna te kwote stad.
+        private static readonly long[] _artBy = new long[Classes];
+
+        /// <summary>E8/B: kasa miasta zaplacila rzemieslnikom BK za wyroby uboczne dodatkowych cykli. Tylko licznik.</summary>
+        internal static void NoteArtisanByproducts(Settlement st, int paid)
+        {
+            try
+            {
+                if (_inBlock || paid <= 0) return;
+                int c = ClassOf(st);
+                if (c >= 0) _artBy[c] += paid;
             }
             catch { _stumbles++; }
         }
@@ -1042,6 +1058,11 @@ namespace Armoury
             {
                 known += _artIn[c] + _artBack[c];
                 parts.Add("rzemieslnicy BK (147) - z ich kapitalu " + S(_artIn[c] + _artBack[c]) + " [P] (wsad dodatkowych cykli +" + _artIn[c] + ", zwrot zaplaty BK za sztuki bez wsadu +" + _artBack[c] + ")");
+            }
+            if (_artBy[c] != 0)   // E8/B (258): osobna pozycja - pozycja 147 bez zmian
+            {
+                known -= _artBy[c];
+                parts.Add("rzemieslnicy BK - wyroby uboczne dodatkowych cykli (E8/B), z kasy do ich kapitalu " + S(-_artBy[c]) + " [P]");
             }
             long marks = 0; det = new List<string>();
             for (int k = 0; k < Marks; k++)

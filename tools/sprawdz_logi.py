@@ -228,6 +228,13 @@ Uzycie (Python 3, tylko odczyt):
                     w jednym miescie: w dobach z kluczem [WL] zysk najwyzszy nowa droga <= 0 i 0 prob z zyskiem (stara droga INFO), wyceny
                     sprzedazy koni nowa / stara droga INFO; R-3 monopole: wzieto <= 1/20 dziennej wyplaty wlascicielom tych warsztatow i <= stary
                     wzor (pobor 0 w calym oknie - INFO z przyczyna z linii E8/P2); R-4 potkniecia 0, koszt proby INFO.
+                    Blok etap8_b (E8/B, paczka 258): warsztaty i kowadlo - linie doby "Wyroby uboczne (E8/B)" (ArtisanInputs.cs) i "Kowadlo i drobne
+                    (E8/B)" (SmallFixes8.cs): B-0 obie linie w kazdej dobie okna, stan kluczy; B-1 wyroby uboczne: przy kluczu [WL] dopisane > 0,
+                    gdy stara regula cos gubila, kasy ponizej zapasu przez nasza wyplate 0, potkniecia 0 (zaplata kas, sztuki bez zaplaty
+                    i niesprzedane - INFO); B-2 welna (INFO): zapas w ostatniej dobie okna wobec Z33 (8 737), sztuki z licznikow na dobe;
+                    B-3 ksiega licznikow welny zamknieta: liczniki dzis = wczoraj + dopisane - pelne sztuki (+-0.05 szt. na dobe);
+                    B-4 linia startu "ekran rodu ... (wpiete 1/1)", potkniecia 0, robocizna gracza do ludu <= robocizna; liczby kowadla - INFO
+                    (sprawdzenia reczne 8.16 pkt 2-4).
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9731,6 +9738,134 @@ def etap8_r(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             "potkniecia 0 (koszt - INFO; projekt: koszt paczki ok. 0)", stum == 0)
 
 
+# ============================================================ ETAP 8 (E8/B, paczka 258): warsztaty i kowadlo - blok etap8_b
+E8_B_BY_LINE = "Wyroby uboczne (E8/B): dzien"
+E8_B_FIX_LINE = "Kowadlo i drobne (E8/B): dzien"
+# Wzor Z33 (WGRANIE 33, Armoury-2026-10-12_02-44-09.log): "Towary: dzien 108955 - wool (83 d): zapas 8737" (doba 120; doba 1: 2175)
+E8_B_Z33_WOOL_D120 = 8737
+
+
+def etap8_b(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/B (258, projekt etapu 8 v2 rozdz. 3 "E8/B" Test; odpowiedz Jeffa 12.10 nr 5): linie doby "Wyroby uboczne (E8/B)" (ArtisanInputs.cs) i "Kowadlo
+    i drobne (E8/B)" (SmallFixes8.cs). B-0 obie linie w kazdej dobie okna i stan kluczy; B-1 wyroby uboczne: przy kluczu [WL] dopisane > 0, gdy stara
+    regula cos gubila, kasy ponizej zapasu przez nasza wyplate 0 w kazdej dobie, potkniecia 0 (zaplata kas miast, sztuki bez zaplaty, niesprzedane - INFO);
+    B-2 welna (INFO): zapas welny w ostatniej dobie okna wobec Z33, pelne sztuki z licznikow i zdjete ponad regule; B-3 ksiega licznikow welny zamknieta:
+    liczniki dzis = wczoraj + dopisane - pelne sztuki (+-0.05 szt. na dobe; liczby linii maja 2 miejsca); B-4 linia startu ekranu rodu (wpiete 1/1),
+    potkniecia 0, robocizna gracza do ludu <= robocizna; liczby kowadla INFO (gracz w autotescie nie kuje i nie naprawia - sprawdzenia reczne 8.16)."""
+    bl = {d: s for d, s in by_day(lines, E8_B_BY_LINE).items() if 1 <= run_day(d, start) <= until}
+    fl = {d: s for d, s in by_day(lines, E8_B_FIX_LINE).items() if 1 <= run_day(d, start) <= until}
+    if not bl and not fl:
+        rep.add("E8/B: linie Wyroby uboczne (E8/B) i Kowadlo i drobne (E8/B)", "brak w logu", "sa od wgrania E8/B", None)
+        return
+    inner = win[1:-1] if len(win) > 2 else []
+    miss_b = [run_day(d, start) for d in inner if d not in bl]
+    miss_f = [run_day(d, start) for d in inner if d not in fl]
+    bdays, fdays = sorted(bl), sorted(fl)
+    nb = max(1, len(bdays))
+    by_on = [d for d in bdays if "ArtisanByproductsFull [WL]" in bl[d]]
+
+    def keys_of(tag):
+        return sum(1 for d in fdays if (tag + " [WL]") in fl[d])
+    rep.add("B-0: linie Wyroby uboczne (E8/B) i Kowadlo i drobne (E8/B) w kazdej dobie okna; stan kluczy",
+            (f"wyroby uboczne {len(bdays)} dob (brak {len(miss_b)}" + (f": doby {miss_b[:5]}" if miss_b else "") + f"), kowadlo {len(fdays)} dob (brak {len(miss_f)}"
+             + (f": doby {miss_f[:5]}" if miss_f else "") + f") z {len(inner)}; ArtisanByproductsFull wl {len(by_on)} / wyl {len(bdays) - len(by_on)} dob; "
+             f"z {len(fdays)} dob kowadla: ArmourBotchHalfBack wl {keys_of('ArmourBotchHalfBack')}, MendTakeByKind wl {keys_of('MendTakeByKind')}, "
+             f"PlayerMineBulkSkip wl {keys_of('PlayerMineBulkSkip')}, SmallFixes8 wl {keys_of('SmallFixes8')}, robocizna gracza do ludu wl {keys_of('robocizna gracza do ludu')}"),
+            "0 brakow (bez pierwszej i ostatniej doby okna)", (not miss_b and not miss_f) if inner else None)
+
+    def col(pat, src, days, cast=int, default=0):
+        return {d: num(pat, src[d], cast=cast, default=default) for d in days}
+
+    def tot(c, sel):
+        return sum(c[d] for d in sel)
+
+    # B-1: wyroby uboczne z kazdego cyklu
+    if bdays:
+        lost = col(r"bez wyrobu zostawalo (\d+) szt\.", bl, bdays)
+        added = col(r"\| dopisane (\d+) szt\.", bl, bdays)
+        paid = col(r"zaplacone przez kasy miast (\d+) zl", bl, bdays)
+        below = col(r"kasy ponizej zapasu przez nasza wyplate (\d+)\)", bl, bdays)
+        free = col(r"bez zaplaty \(start gry albo linia bez zlota\) (\d+) szt\.", bl, bdays)
+        unsold = col(r"niesprzedane (\d+) szt\.", bl, bdays)
+        unsold_v = col(r"niesprzedane \d+ szt\. warte (\d+) zl", bl, bdays)
+        stum = col(r"\| potkniecia (\d+)\.", bl, bdays)
+        kinds = {}
+        for d in by_on:
+            m = re.search(r"\| dopisane \d+ szt\. \[([^\]]*)\]", bl[d])
+            if m and m.group(1) != "nic":
+                for part in m.group(1).split(", "):
+                    k, _, v = part.rpartition(" ")
+                    if v.isdigit():
+                        kinds[k] = kinds.get(k, 0) + int(v)
+        off = [d for d in bdays if d not in by_on]
+        below_days = [run_day(d, start) for d in bdays if below[d] > 0]
+        ok = None
+        if by_on:
+            ok = (tot(added, by_on) > 0 or tot(lost, by_on) == 0) and not below_days and tot(stum, bdays) == 0
+        txt = (f"klucz [WL] {len(by_on)} dob: stara regula zostawilaby bez wyrobu {tot(lost, by_on)} szt. ({tot(lost, by_on) / max(1, len(by_on)):.0f}/d), dopisane "
+               f"{tot(added, by_on)} szt. ({tot(added, by_on) / max(1, len(by_on)):.0f}/d)"
+               + (" [" + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items(), key=lambda kv: -kv[1])) + "]" if kinds else "")
+               + f", zaplacone przez kasy miast {tot(paid, by_on)} zl z nadwyzki, bez zaplaty {tot(free, by_on)} szt., niesprzedane {tot(unsold, by_on)} szt. warte "
+               f"{tot(unsold_v, by_on)} zl; kasy ponizej zapasu przez nasza wyplate {tot(below, bdays)}" + (f" (doby {below_days[:5]})" if below_days else "")
+               + f"; potkniecia {tot(stum, bdays)}" + (f" | klucz wylaczony {len(off)} dob: stara regula zostawila bez wyrobu {tot(lost, off)} szt., dopisane {tot(added, off)}" if off else ""))
+        rep.add("B-1: wyroby uboczne rzemieslnikow z kazdego cyklu, zaplacone przez kasy miast z nadwyzki", txt,
+                "przy kluczu [WL]: dopisane > 0, gdy stara regula cos gubila; kasy ponizej zapasu przez nasza wyplate 0; potkniecia 0 (zaplata, bez zaplaty, niesprzedane - INFO)", ok)
+
+        # B-2: welna (INFO)
+        sheep = col(r"owce dodatkowych cykli (\d+) x", bl, bdays)
+        inc = col(r"= \+([0-9.]+) szt\. do licznikow", bl, bdays, cast=float, default=0.0)
+        whole = col(r"pelne sztuki z licznikow (\d+)", bl, bdays)
+        cut = col(r"zdjete ponad regule (\d+)", bl, bdays)
+        mem = col(r"osadach razem ([0-9.]+) szt\.", bl, bdays, cast=float, default=0.0)
+        towns = col(r"liczniki w (\d+) osadach", bl, bdays)
+        stock = {}
+        for s in lines:
+            if s.startswith("Towary: dzien "):
+                m = re.match(r"Towary: dzien (\d+) - wool \([^)]*\): zapas (-?\d+)", s)
+                if m and 1 <= run_day(int(m.group(1)), start) <= until:
+                    stock[run_day(int(m.group(1)), start)] = int(m.group(2))
+        last = max(stock) if stock else None
+        rep.add("B-2: welna z uboju przez pamiec ulamkow; zapas welny wobec Z33",
+                (f"owce dodatkowych cykli {tot(sheep, by_on)} ({tot(sheep, by_on) / max(1, len(by_on)):.0f}/d), do licznikow +{tot(inc, by_on):.1f} szt., pelne sztuki z licznikow "
+                 f"{tot(whole, by_on)} ({tot(whole, by_on) / max(1, len(by_on)):.1f}/d), zdjete ponad regule {tot(cut, by_on)}, liczniki w ostatniej dobie: "
+                 f"{towns[bdays[-1]]} osad, {mem[bdays[-1]]:.2f} szt.; zapas welny "
+                 + (f"w dobie {last}: {stock[last]} (Z33 doba 120: {E8_B_Z33_WOOL_D120}" + (f", x{stock[last] / E8_B_Z33_WOOL_D120:.2f}" if last >= 120 else ", okno krotsze niz 120 dob") + ")"
+                    if last is not None else "brak linii Towary - wool")),
+                "INFO (projekt: indeks welny bez zalegania ponad Z33)", None)
+
+        # B-3: ksiega licznikow welny zamknieta
+        bad, pairs = [], 0
+        for a, b in zip(bdays, bdays[1:]):
+            if b != a + 1 or a not in by_on or b not in by_on:
+                continue
+            pairs += 1
+            if abs(mem[b] - (mem[a] + inc[b] - whole[b])) > 0.05:
+                bad.append(run_day(b, start))
+        rep.add("B-3: liczniki welny - nic nie znika i nic nie powstaje (dzis = wczoraj + dopisane - pelne sztuki)",
+                f"par kolejnych dob {pairs}, rozjazd > 0.05 szt. w {len(bad)}" + (f" (doby {bad[:5]})" if bad else ""),
+                "0 rozjazdow (wczytanie zapisu w oknie moze dac jeden: ulamek przyciety do 0.999)", (not bad) if pairs else None)
+    else:
+        rep.add("B-1: wyroby uboczne rzemieslnikow z kazdego cyklu", "brak linii Wyroby uboczne (E8/B) - ArtisanOwnInputs wylaczone albo latki nie wpiete", "linia w kazdej dobie", None)
+
+    # B-4: kowadlo i drobne
+    wired = [s for s in lines if s.startswith("Kowadlo i drobne (E8/B): ekran rodu")]
+    wired_ok = any("(wpiete 1/1)" in s for s in wired)
+    if fdays:
+        fstum = max([num(r"\| potkniecia (\d+)\.", fl[d], default=0) for d in fdays] + [0])
+        last = fl[fdays[-1]]
+        labor, folk = col(r"robocizna (\d+) zl, z kasy do kiesy ludu", fl, fdays), col(r"z kasy do kiesy ludu (\d+) zl", fl, fdays)
+        over = [run_day(d, start) for d in fdays if folk[d] > labor[d]]
+        m = re.search(r"\| od wczytania: (.*?) \| potkniecia", last)
+        rep.add("B-4: kowadlo i drobne - latka ekranu rodu, potkniecia, robocizna gracza do kiesy ludu",
+                (f"linia startu ekranu rodu: {'wpiete 1/1' if wired_ok else ('nie znaleziono celu' if wired else 'brak linii')}; potkniecia {fstum}; zaplaty gracza kowalom w oknie: "
+                 f"robocizna {tot(labor, fdays)} zl, do kiesy ludu {tot(folk, fdays)} zl" + (f" (ponad robocizne w dobach {over[:5]})" if over else "")
+                 + (f"; od wczytania: {m.group(1)[:260]}" if m else "")),
+                "wpiete 1/1, potkniecia 0, do ludu <= robocizna (pekniecia, material, kopalnia, zamowienia, wyceny - INFO; sprawdzenia reczne 8.16 pkt 2-4)",
+                wired_ok and fstum == 0 and not over)
+    else:
+        rep.add("B-4: kowadlo i drobne", "brak linii Kowadlo i drobne (E8/B)", "linia w kazdej dobie", None)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9760,6 +9895,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_l)    # E8/L (252): lup to przeniesienie, Send troops - jedna droga, dar dla miasta do zalogi bez milicji, trofea zostawione na polke
     blocks.append(etap8_c)    # E8/C (253): cennik - rzad konski z wagi prawdziwej, helmy t4-6, luki, bron miotana, konie wedlug kategorii
     blocks.append(etap8_r)    # E8/R (254): rynek i korona - bez premii wojennej, kon przy sprzedazy liczony raz, monopole od dziennej wyplaty
+    blocks.append(etap8_b)    # E8/B (258): warsztaty i kowadlo - wyroby uboczne z kazdego cyklu, welna z uboju przez pamiec ulamkow, drobne poprawki kowadla
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)

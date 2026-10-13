@@ -2776,6 +2776,33 @@ namespace Armoury
             catch (Exception e) { Log.Error("SlotWreck", e); return false; }
         }
 
+        /// <summary>
+        /// E8/B (258, LAWA 3): cena kowala za JEDNA zalozona sztuke wedlug ksiegi zuzycia - ta sama robocizna (HarnessLabor) i ten sam material
+        /// (MendMaterial.NeedsFor), co "Mend everything you wear" (PlanRepair / RepairCost); dla SmithMenu "Pick a piece" (jedna cena tej samej
+        /// naprawy). false = wycena wedlug modyfikatora jak dotad: ksiega nie zna zuzycia tej sztuki (stan 100 - np. obity lup zalozony przed
+        /// chwila) albo sztuka weszla na grzbiet juz zuzyta (oryginalny stan ponizej pelnego - lawka "Pick a piece" oddaje ja czysta, a "Mend
+        /// everything you wear" w stanie lupu: to dwie rozne uslugi, kazda ze swoja cena). Sam odczyt.
+        /// </summary>
+        internal bool SlotSmithQuote(int slot, out int labor, out float[] need)
+        {
+            labor = 0; need = null;
+            try
+            {
+                if (slot < 0 || slot >= 12) return false;
+                var el = Hero.MainHero.BattleEquipment[slot];
+                if (el.Item == null) return false;
+                float cond = GetConditionQuiet(slot);
+                if (cond >= 100f) return false;
+                var origId = OriginalModifier(slot);
+                ItemModifier orig = string.IsNullOrEmpty(origId) ? null : MBObjectManager.Instance.GetObject<ItemModifier>(origId);
+                if (orig != null && orig.PriceMultiplier < 0.999f) return false;
+                labor = HarnessLabor(el.Item, cond);
+                need = MendMaterial.NeedsFor(el.Item, (100f - cond) / 100f);
+                return true;
+            }
+            catch (Exception e) { Log.Error("SlotSmithQuote", e); labor = 0; need = null; return false; }
+        }
+
         /// <summary>Ile czesci na grzbiecie wymaga naprawy.</summary>
         internal int WornPieces()
         {
@@ -2950,7 +2977,9 @@ namespace Armoury
                     if (cost <= 0) { Log.Player("Your gear is sound. Nothing to mend."); return; }
                     if (Hero.MainHero.Gold < cost) { Log.Player("You cannot pay the smith's price.", true); return; }
                 }
+                int coffer = MendMaterial.CofferNow(here);
                 Pay.ToSettlement(cost);   // wpis 90 (audyt): zaplata kowalowi do kasy miasta, nie w nicosc
+                if (order != null) MendMaterial.PlayerLaborToFolk(here, coffer, order.Labor);   // E8/B (258, R5): robocizna z kasy do kiesy ludu (jak N1), material zostaje w kasie
 
                 var eq = Hero.MainHero.BattleEquipment;
                 for (int slot = 0; slot < 12; slot++)

@@ -414,6 +414,41 @@ namespace Armoury
             return MarketRule ? MendMaterial.Labor(el.Item, MendMaterial.Share(el), Settlement.CurrentSettlement, old) : old;
         }
 
+        // E8/B (258, LAWA 3): JEDNA CENA KOWALA ZA ZALOZONA SZTUKE. "Pick a piece" liczyl robote i material z modyfikatora (stopnie zuzycia),
+        // a "Mend everything you wear" tej samej sztuki - ze stanu w ksiedze zuzycia (procenty): dwie ceny jednej naprawy. Przy SmallFixes8 sztuka
+        // na grzbiecie, ktorej zuzycie zna ksiega, ma wszedzie wycene ksiegi (ArmouryBehavior.SlotSmithQuote = HarnessLabor + MendMaterial.NeedsFor);
+        // sztuka z sakw i z magazynu (slot < 0) oraz zalozona, ktorej ksiega nie zna albo ktora weszla na grzbiet juz zuzyta - jak dotad.
+        // Tylko przy regule kowali miasta (MarketRule): bez niej obie drogi licza starym wzorem, a "Pick a piece" ma tam pol ceny z zyczenia Jeffa.
+        private static bool SlotQuote(int slot, out int labor, out float[] need)
+        {
+            labor = 0; need = null;
+            return slot >= 0 && SmallFixes8.On && MarketRule && ArmouryBehavior.Instance != null && ArmouryBehavior.Instance.SlotSmithQuote(slot, out labor, out need);
+        }
+
+        private static int PieceCostAt(EquipmentElement ee, int slot)
+        {
+            int labor; float[] need;
+            return SlotQuote(slot, out labor, out need) ? labor : PieceCost(ee);
+        }
+
+        private static float[] NeedsAt(EquipmentElement ee, int slot)
+        {
+            int labor; float[] need;
+            return SlotQuote(slot, out labor, out need) ? need : MendMaterial.Needs(ee);
+        }
+
+        /// <summary>E8/B (258, RC8 poz. 20): material naprawy wlasnymi rekami schodzi tak, jak jest liczony. Sprawdzenie (Recipes.CountInInventory)
+        /// liczy miekki surowiec cala kategoria handlowa (skora = takze futra i skory ROT), a zdjecie szlo dokladnym przedmiotem: przy samych
+        /// odmianach nic nie schodzilo albo stos szedl pod zero. Przy MendTakeByKind - Recipes.Take (kategoria, nigdy ponizej zera), jak Forge.SelfRepair.</summary>
+        private static void TakeMendPart(TaleWorlds.CampaignSystem.Roster.ItemRoster roster, Recipes.Part p)
+        {
+            if (p.Item == null || p.Count <= 0) return;
+            var s = Settings.Current;
+            if (s == null || !s.MendTakeByKind) { roster.AddToCounts(p.Item, -p.Count); return; }
+            SmallFixes8.NoteMendTake(p.Count, Math.Max(0, p.Count - Math.Max(0, roster.GetItemNumber(p.Item))));
+            Recipes.Take(roster, p.Item, p.Count);
+        }
+
         /// <summary>Ile sztuk (najtansze najpierw) i za ile zmiesci sie w sakwie.</summary>
         private static void AffordableBattleWorn(out int pieces, out int cost, out int totalPieces, out int totalCost)
         {
@@ -523,7 +558,9 @@ namespace Armoury
             {
                 if (done == o.Pieces) mat = o.Mat;   // cala robota: ta sama suma co w planie (podpowiedz opcji) - co do pensa
                 paid = labor + MendMaterial.Gold(mat);
+                int coffer = MendMaterial.CofferNow(Settlement.CurrentSettlement);
                 Pay.ToSettlement(paid);
+                MendMaterial.PlayerLaborToFolk(Settlement.CurrentSettlement, coffer, labor);   // E8/B (R5): robocizna z kasy do kiesy ludu, material zostaje w kasie
             }
         }
 
@@ -543,10 +580,10 @@ namespace Armoury
             string hrs = Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";
             const string scrap = "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
             if (SmithRefusesHere(ee, slot)) return scrap;   // recenzja 158: na grzbiecie takze stan w ksiedze
-            int labor = PieceCost(ee);
+            int labor = PieceCostAt(ee, slot);   // E8/B: zalozona sztuka - wycena ksiegi (jedna cena z "Mend everything you wear")
             if (q == null) return "Smith: " + labor + " gold, " + hrs;
             int total, miss; float mat;
-            int r = q.Quote(ee, MendMaterial.Needs(ee), labor, out total, out mat, out miss);
+            int r = q.Quote(ee, NeedsAt(ee, slot), labor, out total, out mat, out miss);
             if (r == MendMaterial.Wreck) return "Smith: not for coin - a wreck is mended only with your own materials (or melted down)";
             if (r == MendMaterial.NoRecipe) return "Smith: no smith's work";
             if (!q.Ok) return "Smith: no town smiths here";
@@ -942,7 +979,7 @@ namespace Armoury
         {
             try
             {
-                int smith = PieceCost(ee);
+                int smith = PieceCostAt(ee, slot);   // E8/B: zalozona sztuka - wycena ksiegi (jedna cena z "Mend everything you wear")
                 var mats = SelfMendParts(ee);
                 int stam = SelfMendStamina(ee);
                 int skillNeed = SelfMendSkill(ee);
@@ -976,7 +1013,7 @@ namespace Armoury
                     // kowale miasta: robota + material z targu wedle stanu; wrak tylko wlasnymi rekami albo przetop
                     var q = new MendMaterial.Order(Settlement.CurrentSettlement);
                     int total, miss; float mat;
-                    int r = q.Quote(ee, MendMaterial.Needs(ee), smith, out total, out mat, out miss);
+                    int r = q.Quote(ee, NeedsAt(ee, slot), smith, out total, out mat, out miss);
                     string town = TownName();
                     smithOk = false;
                     if (r == MendMaterial.Wreck)
@@ -1038,12 +1075,12 @@ namespace Armoury
         /// <summary>Kowale miasta robia JEDNA sztuke (SmithMendFromMarket): plan od nowa przy koncu roboty (robocizna PieceCost + material
         /// z polki / zapasu kowali), material z polki, zaplata do kasy miasta. false = nic nie zrobiono i nic nie zaplacono (wrak, nie robota
         /// kowala, brak materialu, za malo zlota) - komunikat juz pokazany.</summary>
-        private static bool SmithTakesOne(EquipmentElement ee, out int paid, out MendMaterial.Order o)
+        private static bool SmithTakesOne(EquipmentElement ee, int slot, out int paid, out MendMaterial.Order o)
         {
             paid = 0;
             o = new MendMaterial.Order(Settlement.CurrentSettlement);
             string town = TownName();
-            if (o.AddLot(ee, MendMaterial.Needs(ee), PieceCost(ee), 1, Hero.MainHero.Gold, 1) <= 0)
+            if (o.AddLot(ee, NeedsAt(ee, slot), PieceCostAt(ee, slot), 1, Hero.MainHero.Gold, 1) <= 0)
             {
                 string why = !o.Ok ? "There are no town smiths here - nothing was mended."
                            : o.Wrecks > 0 ? (LootPrices.ScrapRule ? "A" + LootPrices.WreckWhatEn(1)
@@ -1057,7 +1094,9 @@ namespace Armoury
             }
             o.Bench.Commit();
             paid = o.Total;
+            int coffer = MendMaterial.CofferNow(Settlement.CurrentSettlement);
             Pay.ToSettlement(paid);
+            MendMaterial.PlayerLaborToFolk(Settlement.CurrentSettlement, coffer, o.Labor);   // E8/B (R5): robocizna z kasy do kiesy ludu, material zostaje w kasie
             return true;
         }
 
@@ -1077,7 +1116,7 @@ namespace Armoury
                     { Log.Player("The piece is no longer in the stores.", true); return; }
                     if (bySmith)
                     {
-                        if (MarketRule) { if (!SmithTakesOne(ee, out gold, out order)) return; }
+                        if (MarketRule) { if (!SmithTakesOne(ee, slot, out gold, out order)) return; }
                         else
                         {
                             if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
@@ -1090,7 +1129,7 @@ namespace Armoury
                             if (p.Item != null && Recipes.CountInInventory(p.Item) < p.Count)
                             { Log.Player("Your materials ran short before the work was done.", true); return; }
                         foreach (var p in mats)
-                            if (p.Item != null) MobileParty.MainParty.ItemRoster.AddToCounts(p.Item, -p.Count);
+                            if (p.Item != null) TakeMendPart(MobileParty.MainParty.ItemRoster, p);   // E8/B: MendTakeByKind - miekki surowiec kategoria
                         if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                         Forge.SpendStamina(stamina);
                         Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, XpFair.SelfMendXp(30 + 20 * Recipes.Grade(ee.Item), XpFair.Restored(ee)));   // E8/X (248): XP x przywrocony stan, min. 25% (SmallXpFair)
@@ -1111,9 +1150,12 @@ namespace Armoury
                     var cur = Hero.MainHero.BattleEquipment[slot];
                     if (cur.Item != ee.Item) { Log.Player("You no longer wear that piece.", true); return; }
                 }
+                // E8/B (LAWA 3): dwie drogi do linii logu - robocizna z ksiegi (czynna) i z modyfikatora (stara); sam odczyt
+                int bookLabor = -1, modLabor = -1; float[] bookNeed;
+                if (bySmith && SlotQuote(slot, out bookLabor, out bookNeed)) modLabor = PieceCost(ee); else bookLabor = -1;
                 if (bySmith)
                 {
-                    if (MarketRule) { if (!SmithTakesOne(ee, out gold, out order)) return; }
+                    if (MarketRule) { if (!SmithTakesOne(ee, slot, out gold, out order)) return; }
                     else
                     {
                         if (Hero.MainHero.Gold < gold) { Log.Player("Your purse came up short.", true); return; }
@@ -1126,7 +1168,7 @@ namespace Armoury
                         if (p.Item != null && Recipes.CountInInventory(p.Item) < p.Count)
                         { Log.Player("Your materials ran short before the work was done.", true); return; }
                     foreach (var p in mats)
-                        if (p.Item != null) roster.AddToCounts(p.Item, -p.Count);
+                        if (p.Item != null) TakeMendPart(roster, p);   // E8/B: MendTakeByKind - miekki surowiec kategoria
                     if (MendMaterial.SelfSameRuleOn) MendMaterial.SelfMendDoneOf(ee, mats);   // E6/N1b: ulamek tej naprawy do pamieci (mats z SelfPartsOf)
                     Forge.SpendStamina(stamina);
                     Hero.MainHero.AddSkillXp(DefaultSkills.Crafting, XpFair.SelfMendXp(30 + 20 * Recipes.Grade(ee.Item), XpFair.Restored(ee)));   // E8/X (248): XP x przywrocony stan, min. 25% (SmallXpFair)
@@ -1146,8 +1188,10 @@ namespace Armoury
                 Log.Player(ee.Item.Name + " is whole again" + (order != null
                     ? " - " + gold + " gold into the coffers of " + TownName() + " (" + order.Labor + " for the work, " + order.MatGold + " for materials)."
                     : bySmith ? " - " + gold + " gold well spent." : " - your own work."));
+                if (bookLabor >= 0) SmallFixes8.NoteOnePrice(bookLabor, modLabor);
                 Log.Info("Naprawa sztuki: " + ee.Item.StringId + (bySmith ? " kowal " + gold : " wlasna" + MendMaterial.FracNote())
-                         + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : ""));
+                         + (order != null ? " | lawa naprawcza - kowale " + TownName() + ": " + order.LogPl() : "")
+                         + (bookLabor >= 0 ? " | E8/B jedna cena zalozonej sztuki: robocizna z ksiegi zuzycia " + bookLabor + " zl, z modyfikatora byloby " + modLabor + " zl" : ""));
             }
             catch (Exception e) { Log.Error("DoMendOne", e); }
         }
@@ -1958,10 +2002,22 @@ namespace Armoury
                 var picks = ShelfPlan(st, type, tier, n, Hero.MainHero.Gold, out shortPurse);
                 int k = picks.Count;
                 if (k == 0 && !shortPurse) { OrderNoGoods(st, type, tier, n); return; }
+                // E8/B (258, LAWA 14): wpis popytu nie zalezy od kiesy. Dotad przerwanie przez kiese (shortPurse) zerowalo "niezaspokojone" takze
+                // wtedy, gdy samej polce brakowalo sztuk. Przy SmallFixes8: brak = zamowione - sprawne sztuki NA POLCE (plan bez limitu kiesy, przed
+                // zdjeciem czegokolwiek); sztuka, ktora lezy na polce, a na ktora nie starczylo zlota, dalej nie jest brakiem towaru (wpis 81).
+                int lackOnShelf = 0;
+                if (shortPurse && SmallFixes8.On)
+                {
+                    bool sp0;
+                    lackOnShelf = Math.Max(0, n - ShelfPlan(st, type, tier, n, -1, out sp0).Count);
+                }
                 if (k == 0)
                 {
-                    Log.Player("Your purse came up short - the smith could not buy even one piece.", true);
-                    LogShelfOrder(st, type, tier, n, picks, 0, 0, 0, true);
+                    NoteOrderUnmet(st, type, tier, lackOnShelf);
+                    if (lackOnShelf > 0) SmallFixes8.NoteOrderLack(lackOnShelf);
+                    Log.Player("Your purse came up short - the smith could not buy even one piece."
+                               + (lackOnShelf > 0 ? " The stalls of " + st.Name + " are " + lackOnShelf + " short of your order besides: word of that goes to the workshops." : ""), true);
+                    LogShelfOrder(st, type, tier, n, picks, 0, 0, lackOnShelf, true);
                     return;
                 }
                 int goods = PickGoods(picks, k), fee = OrderLegwork(st, k), total = goods + fee;
@@ -1969,11 +2025,13 @@ namespace Armoury
                 foreach (var p in picks) { st.ItemRoster.AddToCounts(p.El, -1); armory.AddToCounts(p.El, 1); }   // dostawa: dopiero teraz z polki na regaly
                 bool yours = false;
                 foreach (var p in picks) if (p.El.Item != null && OrderIsYours(p.El.Item.StringId, 1)) yours = true;   // K1 (B4)
-                int unmet = shortPurse ? 0 : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81)
+                int unmet = shortPurse ? lackOnShelf : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81); E8/B: brak na polce liczy sie takze przy pustej kiesie
+                if (shortPurse && unmet > 0) SmallFixes8.NoteOrderLack(unmet);
                 NoteOrderUnmet(st, type, tier, unmet);
                 Log.Player(Pieces(k) + " of " + type + " (tier " + tier + ") delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + total + " gold - " + goods
                            + " for the goods off the stall and " + fee + " for the smith's legwork."
-                           + (unmet > 0 ? " The stalls of " + st.Name + " had no more: word of the other " + unmet + " goes to the workshops." : "")
+                           + (unmet > 0 ? (shortPurse ? " The stalls of " + st.Name + " hold " + unmet + " fewer than you asked for: word of those goes to the workshops."   // E8/B: brak na polce przy pustej kiesie
+                                                      : " The stalls of " + st.Name + " had no more: word of the other " + unmet + " goes to the workshops.") : "")
                            + (shortPurse ? " Your purse would stretch no further." : "") + (yours ? OrderYoursNote : ""));
                 if (yours)   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja), raz na przedmiot
                 {

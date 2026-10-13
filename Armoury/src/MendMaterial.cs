@@ -409,6 +409,34 @@ namespace Armoury
             return folk;
         }
 
+        /// <summary>E8/B (258): stan kasy osady tuz przed przelewem gracza (do PlayerLaborToFolk); 0 poza osada z kasa.</summary>
+        internal static int CofferNow(Settlement st) { return st != null && st.Town != null ? st.Town.Gold : 0; }
+
+        /// <summary>
+        /// E8/B (258, R5; RC8 poz. 22): ta sama regula co PaySmiths dla zaplaty GRACZA kowalom miasta (lawa naprawcza: "Have the smith mend...",
+        /// "Pick a piece", uprzaz "Mend everything you wear", zbrojownia wojska; kwatermistrz Spoils). Gracz placi przelewem gry do kasy miasta
+        /// (Pay.ToSettlement / GiveGoldAction - jak dotad, ksiega widzi przelew), a potem robocizna idzie z kasy do kiesy ludu jako place rzemiosla
+        /// (TownFolk.EarnFromTown - ta sama droga co place warsztatu gracza placone z jego kiesy; ksiega N9). Material zostaje w kasie (zdjety
+        /// z polki / zapasu kowali tego miasta). Najwyzej tyle, ile z przelewu gracza naprawde doszlo do kasy (cofferBefore = kasa przed przelewem):
+        /// kasa nie doklada do robocizny wlasnego zlota. Wlaczniki: MendPayToFolk (regula N1) i SmallFixes8; B1 wylaczone - EarnFromTown nic nie robi.
+        /// Zwraca zloto przeniesione do kiesy ludu.
+        /// </summary>
+        internal static int PlayerLaborToFolk(Settlement st, int cofferBefore, int labor)
+        {
+            try
+            {
+                if (!PayToFolkOn || !SmallFixes8.On || labor <= 0 || st == null || st.Town == null) return 0;
+                int x = Math.Min(labor, st.Town.Gold - cofferBefore);
+                if (x <= 0) return 0;
+                int had = st.Town.Gold;
+                TownFolk.EarnFromTown(st, x, TownFolk.KCraftPaid);
+                int moved = Math.Max(0, had - st.Town.Gold);
+                SmallFixes8.NoteBenchFolk(labor, moved);
+                return moved;
+            }
+            catch (Exception e) { Log.Error("MendMaterial.PlayerLaborToFolk", e); return 0; }
+        }
+
         // ------------------------------------------------------------ robota kowali miasta: dniowka historyczna x dobrobyt miasta
         // Jeff 07.10: "stawka robocizny ma byc zalezna od dobrobytu miasta ... na stawkach w naszej grze - nasze stawki sa oparte
         // o stawki historyczne - wszystko, co dotyczy placenia, musi byc spojne". Naprawa = ulamek wykonania sztuki, liczony tak samo
@@ -756,7 +784,13 @@ namespace Armoury
                 {
                     int a = Units(c, took);
                     if (a <= 0 || c.Kg <= Eps) continue;
-                    int u = (int)Math.Ceiling((r - Eps) / c.Kg);
+                    // E8/B (258, LAWA 2): Estimate pyta o brak 1e9 kg ("nic nie pokryje - daj najtansze za kg"); przy lekkim zrodle (sztaba
+                    // ponizej ok. 0.47 kg) liczba sztuk nie miescila sie w int, rzutowanie dawalo liczbe ujemna, a ta stawala sie "1 sztuka pokrywa
+                    // brak" - szacunek bral wtedy zrodlo o najnizszej cenie SZTUKI zamiast najtanszego za kg (kolejnosc "najtansze najpierw").
+                    double uu = Math.Ceiling((r - Eps) / c.Kg);
+                    int u;
+                    if (uu > int.MaxValue && SmallFixes8.On) { u = int.MaxValue; SmallFixes8.NoteEstimateClamp(); }
+                    else u = (int)uu;
                     if (u < 1) u = 1;
                     if (u > a) continue;
                     float total = u * c.Price;
