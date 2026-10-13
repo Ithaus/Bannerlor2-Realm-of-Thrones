@@ -1572,3 +1572,9 @@ ZATWIERDZONE: Armoury 527a9d2b, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   (Z1 zamowienie zelaza przewozem z miasta z nadwyzka, Z2 regulator wsi a martwy zapas, Z3 zamki-studnia, Z4 licznik lup znikajacych z taborow); kazda autor + recenzent.
   Test daty: 40 dob OK (0 ERROR, 10.9 s/dobe; dowod: 23:23 "Year 299, Day 1", 00:21 "Year 299, Day 2", stary wzor stal na 3641), zapis w toku. Rownolegle wf_4901dbf6-079 (swaty ROT + pomiary).
   KOLEJKA: WGRANIE 36 (data) -> bieg 120 dob K1-3a na probnym DLL (pomiar skutkow dla Jeffa) -> po rundzie 3: scalenie, bieg roczny.
+
+**WGRANIE 36 (13.10 ok. 13:30 UTC; zgloszenie Jeffa - data na pasku):** Armoury 65868156 (galaz `noc/wgranie-36` = `w-toku/zbior-e8` 74a3645 = WGRANIE 35 + `w-toku/kalendarz-data`): dzien
+w dacie dla gracza zmienia sie o 0:00; format "Year 299, Day 19, Summer - 11:30" (rok swiata - decyzja Jeffa; klucz ReadableDateEnabled), powiadomienia "the 256th day of the year (Autumn)",
+Zelazny Bank "due by Year 299, Day 183". Reszta bez zmian (CrashScribe 142fdd4a, RC f9a944c1, GT 035878c4, ForgeView e17e0233). Testy: 40 dob nowej kampanii 40/40, 0 ERROR, 10.9 s/dobe
+(Armoury-2026-10-13_04-30-18.log; dowod: 23:23 "Year 299, Day 1", 00:21 "Year 299, Day 2"), zapis 9 dob 129/129, 0 ERROR. Kopia: `Armoury.dll.bak-2026-10-13-noc36-przed` + D:.
+ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
