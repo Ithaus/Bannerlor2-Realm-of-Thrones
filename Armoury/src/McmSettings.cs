@@ -4088,9 +4088,21 @@ namespace Armoury
         [SettingPropertyGroup("Companion at the bellows")]
         public int HelperSkillForFullRelief { get; set; } = 150;
 
-        [SettingPropertyInteger("Forge Parts Free Below Tier", 0, 10, "0", HintText = "only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A safety floor always keeps one band of parts per required slot, so the Craft button never dies. Applied when a session loads")]
+        [SettingPropertyInteger("Forge Parts Free Below Tier", 0, 10, "0", HintText = "only crafting parts BELOW this tier are free at the forge from the start; everything above is unlocked by forging and smelting, lowest tier first (2 = only tier 1 free, 5 = named lore blades locked only, 7 = gate off). A weapon class in which some required slot has no part below this tier stays closed - its Craft button is dead - until you unlock a part for that slot by smelting such a weapon; the CrashScribe log lists these classes at session start. Applied when a session loads")]
         [SettingPropertyGroup("The forge gate")]
         public int ForgePartsFreeBelowTier { get; set; } = 2;
+
+        [SettingPropertyBool("Book Price Fix", HintText = "Banner Kings books are worth what a manuscript was worth (700 or 1,000 instead of 7 or 10 - a Realm of Thrones patch had divided their worth by 100), and buying one from a Banner Kings bookseller is a real trade: you pay the price shown in the list (Banner Kings took a thousand times that), the coin goes to the bookseller's purse instead of vanishing, and the book leaves his collection instead of appearing out of thin air - a bookseller who has sold all his books has none left. Off = as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool BookPriceFix { get; set; } = true;
+
+        [SettingPropertyBool("Craft Orders Historical", HintText = "the smithing orders of lords and notables are a real trade in the world's coin: the reward is reckoned from the historical worth of the ordered weapon (tens or hundreds, not thousands), the client pays it from his own purse instead of out of thin air (a client short of coin pays what he has and you are told), the weapon you forged goes to the lord's baggage or onto the town's stalls instead of vanishing, and a lord no longer gets a free soldier with it. The smithing experience for an order is unchanged. Orders already waiting in a save are repriced once on load. Off = as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrdersHistorical { get; set; } = true;
+
+        [SettingPropertyBool("Craft Orders Opened Only", HintText = "new smithing orders ask only for weapon classes you can actually forge - every slot of the class must have a part you have unlocked - and for parts at most one tier above your best unlocked part of that class, so no order is impossible because of the forge gate. In a new campaign the starting orders are redrawn once on the first day by the same rule. Off = any class and tier, as before")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrdersOpenedOnly { get; set; } = true;
 
         [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
         [SettingPropertyGroup("Hideout spotted")]
@@ -5962,6 +5974,9 @@ namespace Armoury
             s.HelperTimeRelief = HelperTimeRelief;
             s.HelperSkillForFullRelief = HelperSkillForFullRelief;
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
+            s.BookPriceFix = BookPriceFix;
+            s.CraftOrdersHistorical = CraftOrdersHistorical;
+            s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;

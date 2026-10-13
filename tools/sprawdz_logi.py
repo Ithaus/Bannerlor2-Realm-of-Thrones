@@ -206,6 +206,12 @@ Uzycie (Python 3, tylko odczyt):
                     raz ten sam wodz, bez ludzi, umarli - sprzet poza gospodarka, rod gracza), T-3b INFO
                     wszystkie nowe partie AI w dobie 1 wobec Z33; T-4 zakupy AI w dobach 1-3 <= 50% Z33; T-5 rekrut gracza: tier 2+ = zablokowane komplety
                     DTE, tier 1 = komplety DTE (bez werbunku gracza - INFO, sprawdzenie reczne 8.16 p. 2 i 19); T-K potkniecia i linie ERROR 0.
+                    Blok etap8_k (E8/K, paczka 255 - kuznia: ksiazki BK, zlecenia kowalskie gry, ksiegarz BK; CraftOrders8.cs, GiverPay.cs, HistoricalPrices.cs):
+                    K-0 latki wpiete N/N i kazda podmiana wywolania w kodzie gry znaleziona raz; K-0b linia "Kuznia (E8/K)" w kazdej dobie okna, trzy klucze
+                    czynne; K-1 ksiazek BK przeliczonych 24; K-2 zlecenia sprzed sesji: po przeliczeniu zadna nagroda ponad 3 x nowa; K-3 okno "zlecenia
+                    kowalskie": zloto z niczego 0, zolnierz z niczego 0, bron w nicosc 0 (bez oddanego zlecenia - INFO, 8.16 p. 6); K-4 okno "ksiegarz":
+                    zloto w nicosc 0, ksiazka z niczego 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia tylko z dozwolonych klas, srednia nagroda
+                    <= 1000; K-5b / K-6 / K-7 INFO (klasy, wymiana zlecen startowych nowej kampanii, doswiadczenie, koszt); K-K potkniecia i linie ERROR 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
 --crashscribe P   : (etap4 T1, etap5 E50-T1, etap7 T0/T1, etap8 T0 i E8/0) log sesji CrashScribe (session-*.log) - bloki "# ERROR IN A MOD" z WHERE "[Armoury]" (wyjatki polkniete na granicy
@@ -9064,6 +9070,146 @@ def etap8_t(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             f"{stu_l} / {stu_p} / {stu_s} / {errs}", "0 / 0 / 0 / 0", stu_l == 0 and stu_p == 0 and stu_s == 0 and errs == 0)
 
 
+# E8/K (255): blok etap8_k - kuznia: zlecenia kowalskie gry i ksiegarz BK (CraftOrders8.cs, GiverPay.cs, HistoricalPrices.cs)
+E8_K_DAY = "Kuznia (E8/K): dzien"
+E8_K_BOOKS = 24   # ksiazki BK (BKItems: 6 opowiesci po 750, 18 ksiazek umiejetnosci po 1000 - po BKROTPatch 7 i 10)
+
+
+def etap8_k(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
+    """E8/K (255, projekt etapu 8 v2 rozdz. 3 "E8/K" Test): ksiazki BK, zlecenia kowalskie gry (CraftingOrder), kupno u ksiegarza BK. Linie: start gry
+    "Kuznia (E8/K): latki przy starcie gry", start sesji "HistoricalPrices: ksiazek BK przeliczonych N" i "Kuznia (E8/K): sesja", doba "Kuznia (E8/K): dzien N".
+    K-0 latki wpiete N/N, kazda podmiana wywolania w kodzie gry znaleziona dokladnie raz, lambda kupna BK jedna; K-0b linia doby w kazdej dobie okna (bez
+    pierwszej i ostatniej), trzy klucze czynne; K-1 ksiazek BK przeliczonych 24; K-2 zlecenia sprzed sesji (zapis albo start nowej kampanii): po przeliczeniu
+    zadna nagroda ponad 3 x nowa, INFO ile przeliczono; K-3 okno "zlecenia kowalskie" (suma okna): zloto z niczego 0, zolnierz z niczego dany 0, bron w nicosc 0
+    (gracz nie oddal zlecenia - INFO, sprawdzenie reczne 8.16 p. 6), K-3b INFO obiecane / zaplacone / niedoplata; K-4 okno "ksiegarz": zloto w nicosc 0, ksiazka
+    z niczego 0, stara droga BK mimo klucza 0 (bez kupna - INFO, 8.16 p. 7); K-5 nowe zlecenia: los gry spoza dozwolonych klas 0 i srednia nagroda w nowej
+    monecie <= 1000 ("w setkach, nie w tysiacach"), K-5b INFO klasy dozwolone, tier przyciety, wymiana zlecen startowych nowej kampanii; K-6 INFO doswiadczenie
+    zlecen; K-K potkniecia i linie ERROR in CraftOrders8.* / GiverPay.* / HistoricalPrices.PriceDesign 0."""
+    rows = {d: s for d, s in by_day(lines, E8_K_DAY).items() if 1 <= run_day(d, start) <= until}
+    wire = [x for x in lines if x.startswith("Kuznia (E8/K): latki przy starcie gry")]
+    ses = [x for x in lines if x.startswith("Kuznia (E8/K): sesja")]
+    books = [x for x in lines if x.startswith("HistoricalPrices: ksiazek BK przeliczonych")]
+    if not rows and not wire and not ses:
+        rep.add("E8/K: linie Kuznia (E8/K)", "brak w logu", "sa od wgrania E8/K (CraftOrders8.cs)", None)
+        return
+    # ---------------- K-0: latki i podmiany wywolan
+    if wire:
+        w0 = wire[-1]
+        a, b = num(r"wpiete (\d+)/\d+", w0), num(r"wpiete \d+/(\d+)", w0)
+        calls = "CompleteOrder wyplata 1, zolnierz 1; CreateTownOrder szablon 1, czesci 1; CreateCustomOrderForHero szablon 1, czesci 1" in w0
+        lam = num(r"\(pasujacych (\d+)\)", w0)
+        rep.add("K-0: latki (konstruktor CraftingOrder, GetOrderExperience, CompleteOrder, CreateTownOrder, CreateCustomOrderForHero, ksiegarz BK) i podmiany wywolan",
+                f"wpiete {a}/{b}; podmiany po 1: {'tak' if calls else 'NIE'}; lambda kupna BK pasujacych {lam if lam is not None else 'brak BK'} | " + w0[:200],
+                "wpiete N/N, BRAK: -, kazde wywolanie znalezione dokladnie raz, lambda kupna BK 1",
+                a is not None and b is not None and a == b and "; BRAK: - |" in w0 and calls and lam == 1)
+    else:
+        rep.add("K-0: latki", "brak linii startowej", "wpiete N/N", False)
+    # ---------------- K-1: ksiazki BK
+    if books:
+        nb = num(r"ksiazek BK przeliczonych (\d+)", books[-1], int, 0)
+        off = "WYLACZONE" in books[-1]
+        rep.add("K-1: ksiazki BK przeliczone (x100, kategoria book, wartosc ponizej 100)", f"{nb}" + (" (Book Price Fix WYLACZONE)" if off else "") + f"; linii {len(books)}",
+                f"{E8_K_BOOKS} przy kazdym starcie sesji", (not off) and all(num(r"ksiazek BK przeliczonych (\d+)", x, int, 0) == E8_K_BOOKS for x in books))
+    else:
+        rep.add("K-1: ksiazki BK przeliczone", "brak linii HistoricalPrices: ksiazek BK przeliczonych (ceny historyczne wylaczone albo log sprzed E8/K)", f"{E8_K_BOOKS}", False)
+    # ---------------- K-2: zlecenia sprzed sesji
+    if ses:
+        s0 = ses[-1]
+        n_all, n_q = num(r"w miastach (\d+)", s0, int, 0), num(r"w tym zlecen zadan (\d+)", s0, int, 0)
+        priced, nopr = num(r"projekt w cenach historycznych (\d+)", s0, int, 0), num(r"bez wyceny (\d+)", s0, int, 0)
+        conv, kept, high = num(r"nagroda z zapisu przeliczona (\d+)", s0, int, 0), num(r"najwyzej 3 x nowa\) (\d+)", s0, int, 0), num(r"ponad 3 x nowa (\d+)", s0, int, 0)
+        g = re.search(r"przeliczona \d+ \(suma (\d+) -> (\d+)\)", s0)
+        early = num(r"start nowej kampanii\) (\d+)", s0, int, 0)
+        on = "Craft Orders Historical CZYNNE" in s0
+        rep.add("K-2: zlecenia kowalskie sprzed sesji (zapis albo start nowej kampanii) - nagroda w nowej monecie (ostatni start sesji; sesji w logu " + str(len(ses)) + ")",
+                f"zlecen {n_all} (zadan {n_q}), projekt wyceniony {priced}, bez wyceny {nopr}; nagroda przeliczona {conv}"
+                + (f" (suma {g.group(1)} -> {g.group(2)})" if g else "") + f", bez zmiany {kept}, po przeliczeniu ponad 3 x nowa {high}; zalozone przed przeliczeniem cen {early}"
+                + ("" if on else "; Craft Orders Historical WYLACZONE"),
+                "po przeliczeniu ponad 3 x nowa 0, klucz czynny (bieg zapisu: przeliczona > 0 przy pierwszym wczytaniu, 0 przy nastepnych)", on and high == 0)
+    else:
+        rep.add("K-2: zlecenia kowalskie sprzed sesji", "brak linii Kuznia (E8/K): sesja", "linia przy kazdym starcie sesji", False)
+    if not rows:
+        rep.add("K-0b: linia Kuznia (E8/K)", "brak linii doby", "codziennie w oknie", False)
+        return
+    days = sorted(rows)
+    w = [rows[d] for d in days]
+    inner = win[1:-1] if len(win) > 2 else []
+    miss = [run_day(d, start) for d in inner if d not in rows]
+    off_h = [d for d in days if "(Craft Orders Historical WYLACZONE" in rows[d]]
+    off_o = [d for d in days if "Craft Orders Opened Only WYLACZONE" in rows[d]]
+    off_b = [d for d in days if "(Book Price Fix WYLACZONE)" in rows[d]]
+    val = f"linii {len(days)}, dob okna {len(inner)}" + (f", brak w {len(miss)} (doby {miss[:5]})" if miss else ", komplet")
+    for nm, off in (("Craft Orders Historical", off_h), ("Craft Orders Opened Only", off_o), ("Book Price Fix", off_b)):
+        if off:
+            val += f"; {nm} WYLACZONE w {len(off)} dobach"
+    wired = [(num(r"latki wpiete (\d+)/\d+", x), num(r"latki wpiete \d+/(\d+)", x)) for x in w]
+    bad_w = sum(1 for a, b in wired if a is None or a != b)
+    if bad_w:
+        val += f"; latki niekompletne w {bad_w} liniach"
+    rep.add("K-0b: linia Kuznia (E8/K) w kazdej dobie okna, trzy klucze czynne, latki komplet", val,
+            "komplet (bez pierwszej i ostatniej doby), WYLACZONE 0", (not miss and not off_h and not off_o and not off_b and not bad_w) if inner else None)
+
+    def tot(pat):
+        return sum(num(pat, x, int, 0) or 0 for x in w)
+    n = len(w)
+    # ---------------- K-3: okno "zlecenia kowalskie"
+    done, quest = tot(r"oddanych (\d+) \(w tym"), tot(r"w tym zlecen zadan (\d+)\)")
+    due, paid, short_n = tot(r"obiecane (\d+)"), tot(r"zaplacone przez zleceniodawce (\d+)"), tot(r"niedoplata przy pustej kiesie -?\d+ w (\d+) zleceniach")
+    nothing, t_cut, t_given = tot(r"zloto z niczego (\d+)"), tot(r"zolnierz z niczego: wyciety (\d+)"), tot(r"wyciety \d+, dany (\d+)")
+    hand, tabor, shelf, lost = tot(r"lord wzial do reki (\d+)"), tot(r"do taboru lorda (\d+)"), tot(r"na polke miasta (\d+)"), tot(r"bron w nicosc (\d+)")
+    if done > 0:
+        rep.add("K-3: okno \"zlecenia kowalskie\" (suma okna) - zloto z niczego, zolnierz z niczego, bron w nicosc",
+                f"z niczego {nothing}, zolnierz dany {t_given} (wyciety {t_cut}), bron w nicosc {lost}; oddanych {done} (zadan {quest}): lord do reki {hand}, tabor lorda {tabor}, polka miasta {shelf}",
+                "0 / 0 / 0; oddanych = do reki + tabor + polka", nothing == 0 and t_given == 0 and lost == 0 and done == hand + tabor + shelf)
+        rep.add("K-3b: zlecenia kowalskie - obiecane i zaplacone przez zleceniodawcow (suma okna)",
+                f"obiecane {due}, zaplacone {paid}, niedoplata {due - paid} w {short_n} zleceniach (pusta kiesa zleceniodawcy - bez doplat)", "INFO", None)
+    else:
+        rep.add("K-3: okno \"zlecenia kowalskie\"", "gracz nie oddal zadnego zlecenia w oknie (autotest)" + (f"; UWAGA liczniki bez oddania: z niczego {nothing}, w nicosc {lost}" if nothing or lost else ""),
+                "INFO - sprawdzenie reczne 8.16 p. 6 (nagroda w setkach, zloto od zleceniodawcy, komunikat przy pustej kiesie)", None if not (nothing or lost) else False)
+    # ---------------- K-4: okno "ksiegarz"
+    talks, empty, sold, b_gold = tot(r"rozmow o kupnie (\d+)"), tot(r"pusta oferta (\d+)"), tot(r"sprzedanych (\d+)"), tot(r"zaplacone ksiegarzowi (\d+)")
+    poor, gone, old, void, free = tot(r"brak zlota (\d+)"), tot(r"brak ksiazki (\d+)"), tot(r"stara droga BK mimo klucza (\d+)"), tot(r"zloto w nicosc (\d+)"), tot(r"ksiazka z niczego (\d+)")
+    if talks > 0 or sold > 0 or free > 0:
+        rep.add("K-4: okno \"ksiegarz\" (suma okna) - zloto w nicosc, ksiazka z niczego, stara droga BK mimo klucza",
+                f"w nicosc {void}, z niczego {free}, stara droga {old}; rozmow {talks}, sprzedanych {sold} za {b_gold} (srednio {b_gold / sold:.0f})" if sold else
+                f"w nicosc {void}, z niczego {free}, stara droga {old}; rozmow {talks}, sprzedanych 0 (pusta oferta {empty}, brak zlota {poor}, brak ksiazki {gone})",
+                "0 / 0 / 0", void == 0 and free == 0 and old == 0)
+    else:
+        rep.add("K-4: okno \"ksiegarz\"", "gracz nie kupowal ksiazek w oknie (autotest)", "INFO - sprawdzenie reczne 8.16 p. 7 (cena 700-1 000, ksiazka znika z oferty, kiesa ksiegarza rosnie)", None)
+    # ---------------- K-5: nowe zlecenia
+    new, priced = tot(r"\): nowych (\d+) \(nagroda"), tot(r"nagroda przeliczona w (\d+):")
+    r_game, r_hist = tot(r"przeliczona w \d+: gra (\d+) ->"), tot(r"-> historyczna (\d+)\)")
+    picks, fall, cut = tot(r"szablon z dozwolonych klas (\d+) razy"), tot(r"brak dozwolonej klasy - los gry (\d+)"), tot(r"tier czesci przyciety (\d+) razy")
+    sh, sh_closed = tot(r"wylaczony\): los gry (\d+) razy"), tot(r"z klasy zamknietej (\d+)")
+    avg = r_hist / priced if priced else None
+    rep.add("K-5: nowe zlecenia (suma okna) - los gry spoza dozwolonych klas i srednia nagroda w nowej monecie",
+            f"nowych {new} ({new / n:.1f}/d), nagroda przeliczona w {priced}: gra {r_game} -> historyczna {r_hist}"
+            + (f" (srednio {r_game / priced:.0f} -> {avg:.0f})" if priced else "") + f"; szablon z dozwolonych klas {picks} razy, los gry bez dozwolonej klasy {fall}"
+            + (f"; w cieniu los gry {sh} razy, z klasy zamknietej {sh_closed}" if sh else ""),
+            "los gry spoza dozwolonych klas 0; srednia nagroda <= 1000 (w setkach, nie w tysiacach); bez nowych zlecen - INFO",
+            (fall == 0 and sh == 0 and avg is not None and avg <= 1000.0) if (new > 0 and priced > 0) else (None if fall == 0 and sh == 0 else False))
+    last = rows[days[-1]]
+    cls = re.search(r"klasy broni dozwolone (\d+) z (\d+)( \[zamkniete: [^\]]*\])?", last)
+    nk = [(run_day(d, start), num(r"zlecenia startowe nowej kampanii wymienione (\d+)", rows[d])) for d in days]
+    nk = [(d, v) for d, v in nk if v is not None]
+    rep.add("K-5b: klasy broni dozwolone (ostatnia doba), tier czesci przyciety, wymiana zlecen startowych nowej kampanii",
+            (f"dozwolone {cls.group(1)} z {cls.group(2)}{cls.group(3) or ''}" if cls else "brak stanu klas w linii") + f"; tier przyciety {cut} razy"
+            + ("; wymiana startowa: " + ", ".join(f"d{d}: {v}" for d, v in nk) if nk else "; wymiana startowa nie biegla (stary zapis albo klucz wylaczony)"),
+            "INFO (nowa kampania: wymiana raz w pierwszej dobie, liczba = zlecenia startowe)", None)
+    # ---------------- K-6: doswiadczenie zlecen
+    xp, xps = tot(r"doswiadczenie zlecen: odczytow (\d+)"), tot(r"od wartosci sprzed przeliczenia (\d+)")
+    rep.add("K-6: doswiadczenie zlecen (suma okna)", f"odczytow {xp}, policzonych od wartosci sprzed przeliczenia {xps}", "INFO (bez zmian wobec gry - liczone od dawnej wartosci projektu)", None)
+    # ---------------- K-K: koszt i kontrola
+    cs = [c for c in (fnum(r"koszt ([0-9.]+) ms/dobe", x) for x in w) if c is not None]
+    if cs:
+        rep.add("K-7: koszt (nowe zlecenia, linia)", f"srednio {sum(cs) / len(cs):.2f} ms/dobe, najwiecej {max(cs):.2f} ms", "INFO", None)
+    stu = tot(r"potkniecia dzis (\d+)")
+    stu_s = max([num(r"potkniecia (\d+)\.$", x, int, 0) or 0 for x in ses] or [0])
+    errs = sum(1 for s in lines if s.startswith("ERROR in CraftOrders8.") or s.startswith("ERROR in GiverPay.") or s.startswith("ERROR in HistoricalPrices.PriceDesign"))
+    rep.add("K-K: kontrola (potkniecia doby / przy starcie sesji, linie ERROR in CraftOrders8.*, GiverPay.*, HistoricalPrices.PriceDesign)",
+            f"{stu} / {stu_s} / {errs}", "0 / 0 / 0", stu == 0 and stu_s == 0 and errs == 0)
+
+
 def etap8_main(logp, start_arg, until=120, csp=None):
     """E8/0 (242): grupa --grupa etap8 (projekt etapu 8 v2 rozdz. 3 i 4). Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap7_main.
     Kolejne paczki dopisuja WLASNE bloki etap8_<paczka>(rep, lines, start, win, until=, logp=, csp=) do listy `blocks` (wedlug numeru paczki);
@@ -9089,6 +9235,7 @@ def etap8_main(logp, start_arg, until=120, csp=None):
     blocks.append(etap8_g1)   # E8/G1 (260): karawany BK w miescie co godzine, wyspy bez drogi
     blocks.append(etap8_g2)   # E8/G2 (261): klany najemnikow bez bohaterow w zamianie BK, uczta BK bez towaru z niczego
     blocks.append(etap8_t)   # E8/T (263): start kampanii (budzet cechow, dorobek partii lordow z dob 1-3) i rekrut gracza jak u AI
+    blocks.append(etap8_k)   # E8/K (255): ksiazki BK, zlecenia kowalskie gry (nagroda, platnik, bron, szablon), kupno u ksiegarza BK
     for blk in blocks:
         try:
             blk(rep, lines, start, win, until=until, logp=logp, csp=csp)
