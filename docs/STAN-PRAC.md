@@ -1450,3 +1450,14 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   A karawany (NotableCaravanCap, CaravanTownHourlyMaxTicks, juczne karawan morskich), B siec CrashScribe (Net.cs bez __originalMethod, z testem poza gra), C siodla/konie/renty korony
   (PlainSaddleEveryRealm, zamowienia siodel, AiSaddleShelfFloor, HorseFate :906 i dorobek startowy, CrownRentServiceAfterFullDays), D drobne z audytu + skan IL QuestPay8 + stale zwiadu,
   E narzedzie progow. Rownolegle BIEG 3 (120 dob na e9dfa7f, komplet bez poprawek rundy 2). Potem: scalenie p2-a..e do zbior-e8, test koncowy, wgranie.
+- (08:10 UTC 13.10) **BIEG 3 (komplet e9dfa7f z O2-O6, bez poprawek rundy 2): 120/120, Armoury 0 ERROR.** Optymalizacje dzialaja i nie zmieniaja liczb: rozjazdy R9 = 0 (warsztaty 647 tys.
+  probek, wywoz 10.7 tys.), zapis logu 74.6 -> 5.0 ms/dobe, wywoz kupcow 235 -> 128 ms, WorkshopLaw.CyclePrefix 806 (Z33) -> 601 ms/dobe (prog 500 - NIE), takt doby mediana 1138 -> 875 ms
+  (maks. 1081; prog 1000 - 5 dob ponad), nasze mody razem 4.37 -> 3.92 s/dobe. Log Armoury-2026-10-13_00-22-02.log; progi test\progi-e8r2\.
+  **RUNDA POPRAWEK 2 SKONCZONA I SCALONA: `w-toku/zbior-e8` = 8547369** (wf_521dc7fa-0d5; 5 grup, kazda autor + recenzent - wszystkie przyjete): A `p2-a` 007512e (NotableCaravanCap = 2 -
+  postfiks DefaultCaravanModel.CanHeroCreateCaravan w kampanii; CaravanTownHourlyMaxTicks = 12; juczne karawan morskich; licznik tikow BK), B `p2-b` 1cea414 (CrashScribe Net.cs: finalizery
+  bez __originalMethod - proba poza gra: 70-390 ns i 240 B na wywolanie -> 1.4 ns i 0 B, metoda przy wyjatku wlasciwa 63/63 + 55/55), C `p2-c` 6e03880 (PlainSaddleEveryRealm, zamowienie
+  siodel + AiSaddleShelfFloor = 1, HorseFate uprzaz/konie bez dubla + siodla z siedziby, CrownRentServiceAfterFullDays), D `p2-d` 1b9d0d3 (kopalnia BK gracza z drewnem, ksiega towarow
+  a rabunek, Reset SaddleLaw/CrossingLaw, flaga dymarek nk1/nk0, opisy MCM, napisy W4, praca RC we wsi, skan IL QuestPay8 bez wyjatkow, zwiad 10/16), E `p2-e` 7153204 (narzedzie progow:
+  16 x NIE -> TAK z uzasadnieniem, 3 -> INFO, 1 nowy wiersz renty). Scalenie: konflikt tylko CHANGELOG (783 naglowki), gen_mcm Armoury 1302 / RC 111 / GT 40, build 5 modow kod 0,
+  weryfikacja mechaniczna 0 niezgodnosci. **W TOKU: TEST KONCOWY** - 120 dob nowej kampanii na 8547369 (Armoury e69adbd3, CrashScribe 142fdd4a [test: CS-at 8c13a935], RC f9a944c1,
+  GT 035878c4, ForgeView e17e0233; test\at-fin1-120.out.txt), potem zapis 9 dob; wgranie - jesli 0 bledow i czas doby nie gorszy niz W33.
