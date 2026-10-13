@@ -725,6 +725,17 @@ namespace Armoury
                         if (el.Amount > 0 && Is(el.EquipmentElement.Item)) add(el.EquipmentElement.Item.StringId, "targ " + st.Name + (el.Amount > 1 ? " x" + el.Amount : ""));
                     }
                 }
+                // F1 (test zbiorczy 5-8): unikaty w wozach kupcow (TradeCarts, 215) - sztuka zeszla z polki zrodla, na polke celu wejdzie po czasie
+                // drogi; bez tego kronika pisala "nigdzie (zniszczony/stracony z bohaterem?)" przez cala droge (ramsay_shoulders 6 dob, darksister 4).
+                // Napis staly (bez liczby dob). Stal valyrianska nie dubluje sie - spis ponizej dopisuje tylko brakujace id.
+                try
+                {
+                    TradeCarts.ForEachCartLine((src, dst, el, n) =>
+                    {
+                        if (Is(el.Item)) add(el.Item.StringId, TradeCarts.RoadLabel(src, dst) + (n > 1 ? " x" + n : ""));
+                    });
+                }
+                catch (Exception e) { if (_stumbles++ < 3) Log.Error("UniqueSpoils.Carts", e); }
                 // 177-2: stal valyrianska takze w miejscach, ktorych powyzszy spis nie widzi (cywilny zestaw, nieaktywni, schowki, magazyny) -
                 // z ostatniego spisu ValyrianBlades; zamiast "nigdzie" - prawdziwe miejsce
                 foreach (var kv in ValyrianBlades.ElsewhereFromCensus())

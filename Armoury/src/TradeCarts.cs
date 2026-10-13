@@ -88,6 +88,22 @@ namespace Armoury
             foreach (var c in _carts) foreach (var l in c.Lines) if (l.El.Item != null && l.N > 0) f(l.El.Item, l.N);
         }
 
+        /// <summary>F1 (test zbiorczy 5-8, 120 dob): spisy unikatow (ValyrianBlades.Gather, kronika UniqueSpoils.Daily) - kazda linia wozu w drodze ze
+        /// zrodlem i celem (zrodlo, cel, sztuka, ile). Tylko odczyt. Najpierw rozwiazanie zapisu (jak Export): spis startowy stali biegnie w
+        /// OnSessionLaunched LegendaryLaw, a tego sluchacza gra wola PRZED ArmouryBehavior (MbEvent dopisuje sluchaczy na poczatek listy) - bez tego
+        /// wozy z zapisu bylyby jeszcze napisem i klinga w wozie wygladalaby po wczytaniu na brak.</summary>
+        internal static void ForEachCartLine(Action<Settlement, Settlement, EquipmentElement, int> f)
+        {
+            if (_pending != null) ResolvePending("spis unikatow");
+            foreach (var c in _carts) foreach (var l in c.Lines) if (l.El.Item != null && l.N > 0) f(c.Src, c.Dst, l.El, l.N);
+        }
+
+        /// <summary>Napis miejsca sztuki w wozie - STALY w czasie (bez liczby dob do przyjazdu; inaczej spisy pisalyby "zmiane" co dobe).</summary>
+        internal static string RoadLabel(Settlement src, Settlement dst)
+        {
+            return "w drodze wozem " + (src != null && src.Name != null ? src.Name.ToString() : "?") + " -> " + (dst != null && dst.Name != null ? dst.Name.ToString() : "?");
+        }
+
         private static void AddIncoming(Cart c, Line l, int sign)
         {
             if (c == null || c.Dst == null || l == null || l.El.Item == null) return;

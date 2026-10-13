@@ -434,7 +434,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ spis
-        private enum K { Hero, Roster, Armory, Stock, Fixed }
+        private enum K { Hero, Roster, Armory, Stock, Fixed, Cart }
         private sealed class Copy
         {
             public string Id; public K Kind; public int Pri; public string Where; public string PlayerWhere;
@@ -467,6 +467,19 @@ namespace Armoury
             StockpileCopies(add);
             // 177-3: klingi u mistrzow (wejscie do wydania) - nie do zmiany; przyjete dopiero po straznika dla tego wzoru (GuardNow)
             QohorMasters.AddCensus((id, where) => add(new Copy { Id = id, Kind = K.Fixed, Pri = 4, Where = where }));
+            // F1 (test zbiorczy 5-8): klingi w wozach kupcow (TradeCarts, 215) - sztuka zeszla z polki zrodla, na polke celu wejdzie po czasie drogi;
+            // bez tego spis widzial "ubytek" przez cala droge (ERROR Census, darksister 4 doby). Miejsce nie do zmiany (Surplus - tylko notka),
+            // kolejnosc zostawiania jak polka (Pri 6). Napis staly (bez liczby dob) - linia "zmiany" raz przy wyjezdzie i raz przy dojechaniu.
+            try
+            {
+                TradeCarts.ForEachCartLine((src, dst, el, n) =>
+                {
+                    if (!Is(el.Item)) return;
+                    string w = TradeCarts.RoadLabel(src, dst);
+                    for (int k = 0; k < n; k++) add(new Copy { Id = el.Item.StringId, Kind = K.Cart, Pri = 6, El = el, Where = w });
+                });
+            }
+            catch (Exception ex) { if (_stumbles++ < 2) Log.Error("ValyrianBlades.Carts", ex); }
             return map;
         }
 
@@ -666,7 +679,8 @@ namespace Armoury
             for (int i = allowed; i < order.Count; i++)
             {
                 var c = order[i];
-                if (c.Kind == K.Fixed) { notes.Add(id + " nadwyzka w miejscu nie do zmiany (" + c.Where + ")"); continue; }
+                // F1: sztuka w wozie kupcow (K.Cart) - tez tylko notka; kopie zamieni spis po dojechaniu na polke (wtedy jest K.Roster)
+                if (c.Kind == K.Fixed || c.Kind == K.Cart) { notes.Add(id + " nadwyzka w miejscu nie do zmiany (" + c.Where + ")"); continue; }
                 var repl = Forge(id, c);
                 n++;
                 notes.Add("Z NICZEGO +1 " + id + " " + c.Where + " -> " + (repl != null ? repl.StringId : "nic"));
@@ -835,7 +849,7 @@ namespace Armoury
         /// do nastepnej zmiany).</summary>
         private static void Summary(Dictionary<string, List<Copy>> copies, bool start)
         {
-            int blades = 0, measures = 0, onHeroes = 0, bags = 0, shelves = 0, stash = 0, dte = 0, stock = 0, qohor = 0;
+            int blades = 0, measures = 0, onHeroes = 0, bags = 0, shelves = 0, stash = 0, dte = 0, stock = 0, qohor = 0, carts = 0;
             var where = new Dictionary<string, string>();
             var changes = new List<string>();
             foreach (var id in AllIds)
@@ -853,6 +867,7 @@ namespace Armoury
                         else if (c.Where.StartsWith("schowek")) stash++;
                         else if (c.Where.StartsWith("magazyn wojenny")) stock++;
                         else if (c.Where.StartsWith("u mistrzow")) qohor++;
+                        else if (c.Kind == K.Cart) carts++;   // F1: po rodzaju, nie po napisie - inaczej klinga w wozie wpadalaby do "tabory"
                         else bags++;
                     }
                 string w = l != null && l.Count > 0 ? string.Join("; ", l.Select(c => c.Where).ToArray()) : "";
@@ -872,7 +887,7 @@ namespace Armoury
             _where = where;
             string sum = "Stal valyrianska: dzien " + (int)CampaignTime.Now.ToDays + " - " + blades + " klng, " + measures + " miar (rejestr " + (_reg != null ? _reg.Values.Sum() : 0)
                          + " klng, baza " + BaseMeasures() + " miar): na bohaterach " + onHeroes + ", tabory " + bags + ", targi " + shelves + ", schowki gracza " + stash
-                         + ", magazyny DTE " + dte + ", magazyn wojenny " + stock + ", u mistrzow Qohoru " + qohor;
+                         + ", magazyny DTE " + dte + ", magazyn wojenny " + stock + ", u mistrzow Qohoru " + qohor + ", w drodze wozem " + carts;
             if (start || changes.Count > 0 || sum != _lastSummary)
                 Log.Info(sum + (changes.Count > 0 ? "; zmiany: " + string.Join(" | ", changes.ToArray()) : "") + ".");
             _lastSummary = sum;
