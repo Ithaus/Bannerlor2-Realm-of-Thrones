@@ -7742,6 +7742,24 @@ def etap5_b3(rep, lines, start, until, eq, logp=None, csvp=None):
             except ValueError:
                 continue
         cd = sorted(d for d in byd if 1 <= run_day(d, start) <= until)
+        # narzedzie progow p2 - recenzja (TRIAZ-2 O2-2 "Poprawka ostateczna" pkt 4b i O2-1 pkt 1 "Sprawdzic"): kolumna "warunek_180" pliku budzet-rodow.csv
+        # ("<status> S/N" = rod sluzyl S z wymaganych N dob). Status "sluzba" albo "zaloga+sluzba" przy N < 7 = rod traci rente za sluzbe w wojnie, ktora
+        # krolestwo widzialo krocej niz CrownRentServiceDays (20) dob: regula proporcjonalna ponizej 60 dob styku daje wtedy wymog 1-6 dob (bieg 2 zbior-e8:
+        # doba 60 - 41 rodow, Polnoc bez renty u 18 z 20 rodow przez 80 dob). Po poprawce warunku sluzby pierwszy wymog to 7 z 20 (przy 20 dobach styku),
+        # wiec takich rodo-dob ma byc 0 w calym oknie. Kolumna istnieje od paczki 180 - wiersz czyta stan dzisiejszy; CSV bez kolumny - bez wiersza.
+        w180 = [(d, (r.get("warunek_180") or "").strip()) for d in cd for r in byd[d]]
+        if any(v for _, v in w180):
+            low = {}
+            for d, v in w180:
+                m = re.match(r"(\S+) (\d+)/(\d+)", v)
+                if m and "sluzba" in m.group(1) and int(m.group(3)) < 7:
+                    low[d] = low.get(d, 0) + 1
+            top = max(low, key=lambda d: (low[d], -d)) if low else None
+            rep.add("180 (CSV): rody bez renty za sluzbe przy wymogu ponizej 7 dob (warunek_180: sluzba / zaloga+sluzba S/N, N < 7) - rodo-doby okna",
+                    f"{sum(low.values())} rodo-dob w {len(low)} z {len(cd)} dob"
+                    + (f"; najwiecej {low[top]} rodow (d{run_day(top, start)}), ostatnia doba {low.get(cd[-1], 0)}" if low else ""),
+                    "0 (wymog sluzby dopiero od 20 dob wojny ze stykiem - pierwszy wymog 7 z 20, przy domyslnym Crown Rent Service Days; NIE = czeka na "
+                    "poprawke warunku sluzby, TRIAZ-2 O2-2 pkt 4b)", not low)
         wd = [d for d in cd if 252 <= run_day(d, start) <= 364]
         # werdykt TAK/NIE tylko przy calym oknie d252-364 (113 dob CSV; luz na kilka brakujacych dob i koniec biegu tuz przed d364); okno niepelne
         # (bieg przerwany, --do-doby < 364) = odczyt INFO z dob okna, a bez 28 dob okna - z ostatnich 28 dob biegu

@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (RECENZJA grupy E - narzedzie progow p2 = fb6111c) - PRZYJETE Z JEDNA POPRAWKA: dopisany pominiety wiersz CSV "180 (CSV): rody bez renty za sluzbe przy wymogu ponizej 7 dob" (TRIAZ-2 O2-2 pkt 4b); KOD GRY BEZ ZMIAN
+**Mod:** narzedzie progow (wszystkie mody) | **Galaz:** `w-toku/p2-e` (po fb6111c) | **Pliki:** `tools/sprawdz_logi.py` (blok `etap5_b3`, 18 linii), `CHANGELOG.md`. Kod C# bez zmian.
+
+**Problem (dowod z logu):** fb6111c pominal wiersz z "Poprawki ostatecznej" O2-2 pkt 4b (ten sam sprawdzian stoi w O2-1 pkt 1: "liczba rodow 'sluzba x/N' przy N < 7 = 0") jako "wiersz dla nowej linii". To nie jest nowa linia: kolumna `warunek_180` pliku `budzet-rodow.csv` istnieje od paczki 180 (`CrownRents.cs:606`: `<status> Served/Need`; "sluzba" = zaloga jest, sluzby brak; "zaloga+sluzba" = brak obu). `Logs/2026-10-12_22-38-57/budzet-rodow.csv`, doba 60: 41 rodow ze statusem "sluzba S/N" przy N < 7 - dokladnie liczba z rozpoznania ("B2 d60: 41 z 80"); w calym oknie 4578 rodo-dob.
+
+**Przyczyna:** wiersz uznany za zalezny od poprawki warunku sluzby; czyta jednak stan dzisiejszy, a sciezke CSV (`Logs/<sesja>/`) naprawil ten sam commit.
+
+**Zmiana:** `etap5_b3`, zaraz po wczytaniu CSV: wiersz "180 (CSV): rody bez renty za sluzbe przy wymogu ponizej 7 dob (warunek_180: sluzba / zaloga+sluzba S/N, N < 7) - rodo-doby okna", prog 0. Bieg 2: NIE (4578 rodo-dob w 119 z 120 dob, najwiecej 108 rodow w dobie 39, ostatnia doba 24); bieg 1: NIE 4324; W33: NIE 3038; okna 30 / 60 / 95 dob: 773 / 3029 / 3954. Objaw prawdziwy - czeka na poprawke warunku sluzby (po niej pierwszy wymog to 7 z 20 przy 20 dobach styku, wiec 0). CSV bez kolumny - bez wiersza. Na biegu 2 po recenzji NIE: etap5 17 (16 z fb6111c + ten wiersz), etap7 1, etap8 8.
+
+**Sprawdzone niezaleznie i potwierdzone (bez zmian):**
+- Narzedzie przed (e9dfa7f) i po (fb6111c) puszczone od nowa na biegu 2, szesc grup, ze zrodlami drzewa obok narzedzia: 0 wierszy "wyjatek narzedzia", stderr pusty; porownanie po PELNEJ nazwie wiersza - zmiany werdyktu dokladnie jak w tabeli fb6111c (16 x NIE -> TAK, 3 x NIE -> INFO, G1-5c TAK -> NIE), etap2 / etap3 / etap4 bez zmian, zaden inny wiersz nie zmienil werdyktu. Kazda zmiana ma w rozpoznaniu werdykt PROG_DO_POPRAWY albo punkt "NARZEDZIE" sekcji STROJENIE / BLOKUJE; zadna nie jest luzowaniem ponad to, co rozpoznanie podaje liczba.
+- Stale bazowe policzone od nowa z logow: `E8_W_ZB58` (30 trojek, 33 314 / (14 673 + 118 498) = 0.250) i `E8_W_Z33` dob 91-120 zgodne co do sztuki; zakupy broni strzeleckiej Z33 348.5 (bieg 1 375.8, bieg 2 357.3); komplet lordow Z33 2229 + 5267 (bieg 2 714 + 1360); karawany Z33 962 i kiesy 4 076 294; ceny sprzetu 13.75 / 12.39 / 10.71 us; "bez warunku" 27.7% / 32.4% / 35.8%.
+- E8 T0: blok CS w logu sesji to krata, naglowek, krata, tresc bez znacznikow czasu, krata - nowe zamkniecie bloku jest poprawne; W33 z prawdziwym sladem `CorrectPlayerEducation_Patch1` w stosie dalej daje 1.
+- E7/C T1: `Log.cs` 5 trafien = nazwa pliku, naglowek i trzy znaczniki "[HH:mm:ss]" (linie 73, 74, 117, 292, 366); `HideoutPurge.cs` 189 i 209 w `OnTick`, 229-230 w `PursuitDue`.
+- Etykiety dob: linia "ZakupyAI wedlug kupujacego (174b)" pierwszej doby ma etykiete doby 2 (T-4 czyta etykiety 2-4 - dobrze); `kasy-miast.csv` kolumna `dzien` = etykieta linii (C1-3: 16 dob, minimum 31 zl Karhold); "siew dnia 108837" = etykieta pierwszej linii E8/H (H-4a: 30 szt. tylko tam).
+- `git diff e9dfa7f..fb6111c --stat`: tylko `tools/sprawdz_logi.py` (LF w commicie) i `CHANGELOG.md`. `py_compile` kopii poza repo: OK.
+
+**Ryzyko / co sprawdzic:**
+- Liczba 7 w nowym wierszu zaklada Crown Rent Service Days = 20 i okno 60 dob (klucza nie ma w `Armoury.json` Jeffa) oraz poprawke "wymog dopiero od 20 dob styku". Gdyby poprawka warunku sluzby weszla z innym progiem - zmienic stala razem z nia.
+- Wyniki pomocnicze autora dla biegu 1, W33 i okien skroconych pochodzily z wersji posredniej narzedzia (W-1 w oknie 60 dob liczony wobec bazy dob 31-60, ktorej commit nie ma). Powtorzone commitowanym narzedziem, stare i nowe: 60 biegow, 0 wyjatkow, stderr pusty; wnioski wpisu nizej zostaja (bieg 1: zmienia sie tylko E8 T0 i K3-8b; W33: nic; W-1 w oknach 30 / 60 / 95 dob = INFO; C1-3 w oknach 60 i 95 TAK -> NIE).
+- Nie ruszone, do decyzji prowadzacego (rozpoznanie podaje sprzeczne liczby albo zalezy od wybranego limitu karawan): H-3 40 czy 45 szt./d; H-5a >= 20/d czy >= 30/d; G1-5d jako pasmo 100-200 wjazdow/d (przy limicie 1 karawany na kupca rozpoznanie przewiduje ok. 94/d - pasmo daloby NIE z samej decyzji).
+- Progi, ktore w biegu koncowym moga dac NIE z szumu albo ze skutku poprawek tej rundy, nie z bledu: C-3a (zakupy 357.3 wobec 348.5), W-1 (x1.09), G1-5c (kiesa na karawane przy mniejszej liczbie karawan moze wyjsc ponad +20%), O1-3 w oknie 30 dob (11.61 us wobec 11.5 - pierwsze doby sa drozsze).
+
+**Status:** DO SPRAWDZENIA - test koncowy.
+
 ## 2026-10-13 (runda poprawek S przed testem koncowym, grupa E - NARZEDZIE PROGOW p2) - `tools/sprawdz_logi.py` PO ROZPOZNANIU BIEGU PROBNEGO 2: 16 falszywych NIE zdjetych, 3 wiersze na INFO, 1 wiersz zaostrzony (TAK -> NIE), 3 nowe wiersze; wiersze z prawdziwym objawem zostaja NIE z dopiskiem; KOD GRY BEZ ZMIAN
 **Mod:** narzedzie progow (wszystkie mody) | **Galaz:** `w-toku/p2-e` (z e9dfa7f) | **Pliki:** `tools/sprawdz_logi.py`, `CHANGELOG.md`. Kod C#, `Settings.cs`, `McmSettings.cs` bez zmian (build Armoury na tym drzewie: kod 0).
 
@@ -45,7 +70,7 @@ Razem NIE na biegu 2: etap5 17 -> 16, etap7 3 -> 1, etap8 22 -> 8. Zostaja NIE t
 - `py_compile` kopii poza repo: OK. Szesc grup (etap2-5, 7, 8) na logu biegu 2: 0 wierszy "wyjatek narzedzia", stderr pusty. Porownanie wiersz po wierszu z wynikami sprzed zmian: poza tabela zaden wiersz nie zmienil werdyktu (etap2, etap3, etap4: 0 zmian). Cztery wiersze INFO "E8/O2, O3, O5, O6: brak w logu" wobec zapisanych wynikow to bloki narzedzia z e9dfa7f, ktorych tamto wydanie narzedzia nie mialo.
 - Regresja na innych logach: W33 i bieg 1 (stare i nowe narzedzie, 6 grup): 0 wyjatkow; zmiany werdyktu tylko w biegu 1: E8 T0 (NIE 2 -> TAK 0) i K3-8b (NIE -> INFO); nowy wiersz "180" jest NIE w obu (27.7% i 32.4%); F5-2 w biegu 1 zostaje NIE, K3-8 w biegu 1 zostaje TAK. Okna skrocone (`--do-doby` 30 / 60 / 95): 0 wyjatkow.
 - Straznik E7/C sprawdzony na trzech zepsutych kopiach `HideoutPurge.cs`: trzeci odczyt w `OnTick` -> NIE; odczyt w innej metodzie -> NIE; stara regula przeniesiona do `OnTick` (dalej 4 trafienia razem) -> NIE. Samo "2 -> 4" tego trzeciego by nie zlapalo.
-- Do decyzji prowadzacego (nie ruszone, bo rozpoznanie podaje sprzeczne liczby albo zalezy od poprawek tej rundy): prog H-3 40 czy 45 szt./d; odbior poprawki siodel na H-5a (>= 20/d w dobach 91-120 czy >= 30/d); G1-5d wjazdy do miast jako pasmo 100-200 (zalezy od wybranego limitu karawan); wiersze dla nowych linii (limit karawan, limit tikow, wiersz CSV "sluzba przy Need < 7").
+- Do decyzji prowadzacego (nie ruszone, bo rozpoznanie podaje sprzeczne liczby albo zalezy od poprawek tej rundy): prog H-3 40 czy 45 szt./d; odbior poprawki siodel na H-5a (>= 20/d w dobach 91-120 czy >= 30/d); G1-5d wjazdy do miast jako pasmo 100-200 (zalezy od wybranego limitu karawan); wiersze dla nowych linii (limit karawan, limit tikow). Wiersz CSV "sluzba przy Need < 7" czyta istniejaca kolumne - dopisany w recenzji (wpis wyzej).
 - Cienkie marginesy, ktore moga dac NIE z samego szumu: C-3a zakupy 357.3 wobec 348.5 (biegi bez E8/C roznia sie o 8%); W-1 x1.09 w dobach 91-120 (w dobach 31-60 ten sam stosunek to x0.97).
 - G1-5c po limicie karawan: przy mniejszej liczbie karawan kiesa na karawane moze wyjsc ponad +20% - ocenic po biegu.
 - G1-4b po scaleniu poprawki limitu tikow trzeba dopasowac do nowego opisu linii (dzis mowi "brak opisu").
