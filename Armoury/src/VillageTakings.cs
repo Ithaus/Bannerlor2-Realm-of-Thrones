@@ -28,6 +28,8 @@ namespace Armoury
     ///    podwoimy. Podatek, majatki i licznik pana zostaja takie, jak je policzyl BK. Gdy BK nie dopisal podatku nigdzie
     ///    (osada bez danych BK), brakujaca czesc podatku idzie na licznik pana, nie do kiesy.
     ///    Dwa sufity: pan nigdy ponad podatek z modelu, wies nigdy ponad (utarg - podatek).
+    ///    F4b (klucz BloomeryCoalBeforeLordShare, tylko przy lupie - Bloomery.On): po tym kroku rachunek za drewno dymarki ma pierwszenstwo w utargu
+    ///    wsi gorniczej - pan dostaje podatek od (utarg - rachunek), roznica wraca z licznika podatku wsi do jej kiesy (CoalFirst; osobny krok i licznik).
     /// 2. TOWAR KUPIONY WE WSI (VillageFoodSalesKept). SellItemsAction.ApplyInternal dopisuje wsi cene, po czym zdejmuje
     ///    cena x GetVillageTaxRatio (1.0; 0.95 z polityka) i - inaczej niz w miescie - nie dopisuje tego do zadnego licznika.
     ///    Kupcy to partie lordow (vanilla PartiesBuyFoodCampaignBehavior i BK BKPartyBehavior - glownie zywnosc). Para na tej
@@ -85,6 +87,9 @@ namespace Armoury
         private static int _tReturns, _tNoLoss, _tOver, _tStale, _tAddTaxN;
         private static long _tHanded, _tKept, _tTax, _tEstates, _tGone, _tAddPurse, _tAddTax, _tLeft;
         private static readonly List<string> _tNoBk = new List<string>();
+        // F4b: rachunek za drewno kopaln przed dzialka pana - powroty ze zwrotem, zloto z licznikow panow do kies wsi, utarg zaliczony na rachunek
+        private static int _tCoalN;
+        private static long _tCoalBack, _tCoalBill;
         private static int _fN, _fShort;
         private static long _fPaid, _fGone, _fAddPurse;
         private static int _cFoughtN, _cDisbandN, _cToHeroN, _cToBandN, _cSpareN;
@@ -114,6 +119,7 @@ namespace Armoury
             _tReturns = _tNoLoss = _tOver = _tStale = _tAddTaxN = 0;
             _tHanded = _tKept = _tTax = _tEstates = _tGone = _tAddPurse = _tAddTax = _tLeft = 0;
             _tNoBk.Clear();
+            _tCoalN = 0; _tCoalBack = _tCoalBill = 0;
             _fN = _fShort = 0; _fPaid = _fGone = _fAddPurse = 0;
             _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = _cSpareN = 0;
             _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cSpare = _cLost = 0;
@@ -191,19 +197,30 @@ namespace Armoury
             catch (Exception e) { __state = null; _open = null; Stumble("VillageTakings.EnterPrefix", e); }
         }
 
-        /// <summary>Po latce BK i po cudzych postfiksach (Priority.Last): dopisuje wsi to, co z oddanej gotowki nie trafilo nigdzie.</summary>
+        /// <summary>Po latce BK i po cudzych postfiksach (Priority.Last): dopisuje wsi to, co z oddanej gotowki nie trafilo nigdzie (Whole112),
+        /// a na samym koncu - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst).</summary>
         public static void EnterPostfix(Entry __state)
         {
             if (__state == null) return;
+            long estates;
+            if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
+            CoalFirst(__state, estates);
+        }
+
+        /// <summary>112 pkt 1 (bez zmian): reszta utargu do kiesy wsi. Zwraca true, gdy okno bylo nasze i krok przeszedl bez wyjatku; estates = wyplaty
+        /// majatkow BK w tym oknie.</summary>
+        private static bool Whole112(Entry __state, out long estates)
+        {
+            estates = 0;
             try
             {
                 bool mine = ReferenceEquals(_open, __state) && _openTime == CampaignTime.Now;
-                long estates = _openEstates;
+                estates = _openEstates;
                 if (ReferenceEquals(_open, __state)) _open = null;
-                if (!mine) { _tStale++; return; }            // okno nadpisane - bez pomiaru wyplat majatkow niczego nie dopisujemy
+                if (!mine) { _tStale++; return false; }      // okno nadpisane - bez pomiaru wyplat majatkow niczego nie dopisujemy
                 var home = __state.Home; var here = __state.Here;
                 int handed = __state.Gold - __state.Party.PartyTradeGold;
-                if (handed <= 0) return;                     // tabor niczego nie oddal
+                if (handed <= 0) return true;                // tabor niczego nie oddal
                 long kept = (long)home.Gold - __state.HomeGold;
                 long tax = (long)home.TradeTaxAccumulated - __state.HomeTax;
                 if (here != null)                            // tabor w obcej wsi: BK dopisuje podatek na licznik wsi wejscia
@@ -213,14 +230,14 @@ namespace Armoury
                 }
                 long gone = handed - kept - tax - estates;
                 _tReturns++; _tHanded += handed; _tKept += kept; _tTax += tax; _tEstates += estates;
-                if (gone <= 0) { if (gone < 0) _tOver++; else _tNoLoss++; return; }
+                if (gone <= 0) { if (gone < 0) _tOver++; else _tNoLoss++; return true; }
                 _tGone += gone;
                 // oddajemy tylko to, co wyszlo z sakwy taboru i nie ma odbiorcy; ubytek kiesy albo licznika zrobiony w tym oknie
                 // przez kogos innego (ujemna zmiana) to nie nasz utarg - zostaje w liczniku "nieprzypisane"
                 long owned = Math.Max(0L, kept) + Math.Max(0L, tax + estates);
                 long cap = Math.Max(0L, handed - owned);
                 if (gone > cap) { _tLeft += gone - cap; gone = cap; }
-                if (gone <= 0) return;
+                if (gone <= 0) return true;
                 // podatek nalezny z tego samego modelu; to, czego BK nie dopisal nigdzie (brak danych BK osady), idzie na licznik pana.
                 // Ujemna zmiana licznika w tym oknie (cudza latka) liczy sie jak zero - tak samo jak ubytek kiesy wyzej: inaczej pan
                 // dostalby z sakwy taboru wiecej niz podatek z modelu
@@ -240,8 +257,54 @@ namespace Armoury
                     try { string n = home.Name != null ? home.Name.ToString() : "?"; if (!_tNoBk.Contains(n)) _tNoBk.Add(n); }
                     catch (Exception e) { Stumble("VillageTakings.EnterPostfix(nazwa)", e); }
                 }
+                return true;
             }
-            catch (Exception e) { Stumble("VillageTakings.EnterPostfix", e); }
+            catch (Exception e) { Stumble("VillageTakings.EnterPostfix", e); return false; }
+        }
+
+        /// <summary>
+        /// F4b (test zbiorczy 5-8, R1-12 P3; klucz BloomeryCoalBeforeLordShare): RACHUNEK ZA DREWNO MA PIERWSZENSTWO W UTARGU. OSTATNI krok okna, po
+        /// latce BK i po dopisku 112, tylko gdy woz wszedl do wsi MACIERZYSTEJ (BK dopisuje podatek na licznik wsi wejscia) i ta wies ma otwarty rachunek
+        /// za drewno dymarki (Bloomery.BillOf):
+        ///   d = min(rachunek, utarg); nalezne panu = podatek z czynnego modelu od (utarg - d) - ten sam model, ktorym licza BK i 112 (TaxOf);
+        ///   zwrot = min(przyrost licznika podatku wsi w tym oknie, przyrost licznika + majatki BK - nalezne panu), nie mniej niz 0;
+        ///   licznik podatku wsi -= zwrot, kiesa wsi += zwrot, rachunek -= d.
+        /// Zloto idzie z licznika pana do kiesy wsi i nigdy ponad to, co licznik dostal w tym oknie - nic z niczego, nic w nicosc; pan dostaje mniej
+        /// dokladnie o zwrot. Majatki BK zostaja, jak wyplacil je BK (roznice ponosi pan). Osobny krok i osobny licznik: sufit 112 "wies nigdy ponad
+        /// (utarg - podatek)" zwrotu nie obejmuje. Modelu podatku nie ruszamy (czytaja go BK, 112, renty, prognozy rodow). Woz zniszczony albo oddajacy
+        /// utarg w obcej wsi - rachunek czeka na nastepny powrot. Gracz-pan kopalni: ta sama regula co AI.
+        /// </summary>
+        private static void CoalFirst(Entry st, long estates)
+        {
+            try
+            {
+                if (st.Here != null) return;
+                var home = st.Home;
+                int handed = st.Gold - st.Party.PartyTradeGold;
+                if (handed <= 0) return;
+                int bill = Bloomery.BillOf(home, handed);
+                if (bill <= 0) return;
+                int d = Math.Min(bill, handed);
+                long got = (long)home.TradeTaxAccumulated - st.HomeTax;   // licznik pana w tym oknie: BK + dopisek 112 (osada bez danych BK)
+                long back = 0;
+                if (got > 0)
+                {
+                    int due = TaxOf(home, handed - d);
+                    back = Math.Min(got, got + Math.Max(0L, estates) - due);
+                    if (back < 0) back = 0;
+                }
+                if (back > 0)
+                {
+                    int had = home.Gold;
+                    home.ChangeGold((int)back);
+                    long put = Math.Max(0L, (long)home.Gold - had);
+                    if (put < back) back = put;                           // z licznika schodzi najwyzej tyle, ile kiesa przyjela
+                    if (back > 0) { home.TradeTaxAccumulated -= (int)back; _tCoalBack += back; _tCoalN++; }
+                }
+                _tCoalBill += d;
+                Bloomery.BillSettled(home, d, back);
+            }
+            catch (Exception e) { Stumble("VillageTakings.CoalFirst", e); }
         }
 
         /// <summary>Nasluch HeroOrPartyTradedGold: wyplata "nic -> bohater" w oknie powrotu taboru to udzial wlasciciela majatku BK w podatku.</summary>
@@ -528,13 +591,18 @@ namespace Armoury
                 else if (!s.VillageTakingsWhole) sb.Append("- WYLACZONE w ustawieniach (podzial utargu mierzy linia \"Przeplywy osad:\")");
                 else
                 {
-                    sb.Append(_tReturns).Append(": oddane ").Append(_tHanded).Append(" = pan (licznik podatku) ").Append(_tTax).Append(" (").Append(Pct(_tTax + _tAddTax, _tHanded))
+                    // F4b: zwrot za drewno kopaln (licznik pana -> kiesa wsi) jest juz odjety od "pan" i doliczony do "wies razem" - prog W12-5 czyta "pan";
+                    // z F4b: oddane = pan + majatki + kiesa od BK + bez odbiorcy + zwrot za drewno
+                    sb.Append(_tReturns).Append(": oddane ").Append(_tHanded).Append(" = pan (licznik podatku) ").Append(Math.Max(0L, _tTax - _tCoalBack)).Append(" (").Append(Pct(_tTax + _tAddTax - _tCoalBack, _tHanded))
                       .Append(" po dopisaniu) + wlasciciele majatkow BK ").Append(_tEstates).Append(" + kiesa wsi od BK ").Append(_tKept).Append(" + bez odbiorcy ").Append(_tGone)
-                      .Append("; z tego dopisane kiesom wsi ").Append(_tAddPurse).Append(" (wies razem ").Append(Pct(_tKept + _tAddPurse, _tHanded)).Append(" utargu)")
+                      .Append("; z tego dopisane kiesom wsi ").Append(_tAddPurse).Append(" (wies razem ").Append(Pct(_tKept + _tAddPurse + _tCoalBack, _tHanded)).Append(" utargu)")
                       .Append(", licznikom panow ").Append(_tAddTax).Append(" (").Append(_tAddTaxN).Append(" powrotow bez podatku BK")
                       .Append(_tNoBk.Count > 0 ? ": " + string.Join(", ", _tNoBk.ToArray()) : "").Append("), nieprzypisane ").Append(_tLeft)
                       .Append("; powroty, w ktorych nic nie zniklo ").Append(_tNoLoss).Append(", z nadwyzka rozliczona przez BK ").Append(_tOver)
-                      .Append(", okna niedomkniete ").Append(_tStale);
+                      .Append(", okna niedomkniete ").Append(_tStale)
+                      .Append("; rachunek za drewno kopaln (F4b): ").Append(Bloomery.CoalFirst ? "CZYNNE" : "nieczynne").Append(", powroty ze zwrotem ").Append(_tCoalN)
+                      .Append(", utarg zaliczony na rachunek ").Append(_tCoalBill).Append(", z licznikow panow do kies wsi ").Append(_tCoalBack)
+                      .Append(" (odjete od \"pan\", doliczone do \"wies razem\")");
                 }
                 sb.Append(" | towar kupiony we wsiach ");
                 if (!_saleHooked) sb.Append("- latka nie jest wpieta");

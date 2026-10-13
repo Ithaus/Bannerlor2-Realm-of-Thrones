@@ -4816,6 +4816,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool BloomeryWoodDemand { get; set; } = true;
 
+        [SettingPropertyBool("Bloomery Coal Before Lord Share", HintText = "with Bloomery At Mine: what a mining village paid for the wood of its bloomery comes out of its cart's market takings first, and the lord takes his share only of what is left - the difference moves from the lord's tax on those takings to the village's purse when the cart comes home, so no gold is made; the owners of Banner Kings estates keep their part (needs Village Takings Whole; off = the lord's share is counted on the whole takings, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool BloomeryCoalBeforeLordShare { get; set; } = true;
+
         [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ToolsByUse { get; set; } = true;
@@ -6139,6 +6143,7 @@ namespace Armoury
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;
             s.BloomeryWoodDemand = BloomeryWoodDemand;
+            s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;

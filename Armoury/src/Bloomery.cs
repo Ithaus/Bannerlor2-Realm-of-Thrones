@@ -49,6 +49,13 @@ namespace Armoury
     /// Zapis: po rekordach kopalni znacznik "@w" i rekordy wozow (zrodlo:kopalnia:dobaZakupu:dobaPrzyjazdu:ile:zaplacone); brak sekcji = brak wozow.
     /// R1-7b: ShelfUse - srednia ok. 14 dob drewna kupionego przez dymarki z polki miasta handlowego kopalni (krok b i kopalnia BK w miescie) - popyt
     /// drewna miasta w CaravanBulk (cel zapasu, prog nadwyzki, cena) przy kluczu BloomeryWoodDemand; nie w zapisie (liczy sie od pierwszej pelnej doby).
+    /// F4b (test zbiorczy 5-8, R1-12 P3; klucz BloomeryCoalBeforeLordShare): RACHUNEK ZA DREWNO MA PIERWSZENSTWO W UTARGU. Pan bral dzialke (45%) takze
+    /// od tej czesci ceny lupy, ktora wies wydala na drewno - kopalnia na drewnie z targu nie zarabiala nic i "brak zlota wsi" rosl do 166 ladunkow/d.
+    /// Mine.Bill = zloto wsi wydane na drewno (wlasna polka i woz), jeszcze nie odliczone od utargu; rosnie przy zaplacie, maleje o zwrot zawroconego wozu,
+    /// nie wiekszy niz zakupy drewna z ostatnich 14 dob (BillDays - woz, ktory nie wraca, nie odklada rachunku bez konca). Rozliczenie robi
+    /// VillageTakings.EnterPostfix przy powrocie wozu do wsi macierzystej (BillOf / BillSettled): pan dostaje podatek od (utarg - rachunek), roznica
+    /// przechodzi z licznika podatku wsi do jej kiesy - zloto nie powstaje ani nie znika. Zapis: sekcja "@b" (wies:rachunek) po wozach; rekord kopalni
+    /// zostaje 3-polowy (starsza wersja pominie sekcje, dymarek nie straci). Pomiar w linii: wstawka "rachunek za drewno (F4b)" z kontrola rachunku.
     /// Koszt: ticki O(1) na wies, zakup raz na dobe po kopalniach (ok. 26), okregi z cache przebudowywanym raz na dobe; wozy - kopalnie z niedoborem x
     /// miasta z nadwyzka w zasiegu raz na dobe (drogi z pamieci), czas w linii.
     /// Wyjatki liczone per miejsce (pierwsze 3 do logu) - bez globalnych wylacznikow (CLAUDE.md 7).
@@ -64,9 +71,28 @@ namespace Armoury
         private static int _wpb = -1;
 
         private const int Window = 7;          // F4a: doby sredniej "drewno na miejscu" (las okregu + wlasna polka)
+        private const int BillDays = 14;       // F4b [S]: rachunek za drewno najwyzej tyle, ile wies wydala na drewno w ostatnich 14 dobach
+        private const string BillMark = "@b";
         private sealed class Mine
         {
             public int Bank, Want;
+            // F4b: rachunek za drewno - zloto wsi wydane na drewno, jeszcze nie odliczone od utargu przed dzialka pana (w zapisie, sekcja "@b").
+            // Nie w zapisie: zakupy doby i ich pierscien 14 dob (sufit rachunku), pomiar doby do linii
+            public int Bill, BuyDay, BuyAt, BuyN;
+            public readonly int[] Buys = new int[BillDays];
+            public int Asked, Got, NoGold, Price;   // doba: ladunki chciane z wlasnej polki, kupione (polka + woz), nie kupione z braku zlota, cena drewna w miescie handlowym
+            /// <summary>F4b: koniec doby zakupow - probka pierscienia; rachunek ponad zakupy ostatnich 14 dob wygasa (dopiero przy pelnym pierscieniu: po
+            /// wczytaniu jest pusty, rachunek z zapisu zyje wiec co najmniej 14 dob). Klucz wylaczony - rachunku nie prowadzimy. Zwraca, ile wygaslo.</summary>
+            public int RollBill(bool on)
+            {
+                Buys[BuyAt] = BuyDay; BuyAt = (BuyAt + 1) % BillDays; if (BuyN < BillDays) BuyN++; BuyDay = 0;
+                int cut = 0;
+                if (!on) { cut = Bill; Bill = 0; return cut; }
+                if (BuyN < BillDays) return 0;
+                long cap = 0; for (int i = 0; i < BillDays; i++) cap += Buys[i];
+                if (Bill > cap) { cut = Bill - (int)cap; Bill = (int)cap; }
+                return cut;
+            }
             // F4a (nie w zapisie - od pierwszej pelnej doby po wczytaniu): drewno na miejscu od ostatniego Daily i z ostatnich 7 dob
             public float LocDay, ForDay;       // las okregu (przyjety + odeslany przez pelna dymarke) + zakup z wlasnej polki; sam las
             public readonly float[] Loc = new float[Window], For = new float[Window];
@@ -105,6 +131,9 @@ namespace Armoury
         private static int _dTownMine, _dTownMineWood, _dTownMineSkip;
         private static float _dUnwon;
         private static int _stumbles, _stumblesDay;
+        // F4b: liczniki doby rachunku za drewno (tylko log) i stan "otwarty wczoraj" do kontroli (-1 = pierwsza linia sesji)
+        private static int _bReturns, _bBackN;
+        private static long _bHanded, _bSettled, _bBack, _bAdded, _bCut, _bRefund, _bPrev = -1;
 
         [ThreadStatic] private static Village _tv;
         // recenzja R1: kopalnia BK w miescie - drewno z polki dopiero po cyklu, ktory naprawde dal lupy (postfiks cyklu; gra moze odrzucic cykl PO prefiksie)
@@ -121,7 +150,7 @@ namespace Armoury
             NewCampaign = false; _iron = null; _wood = null; _applied = false; _scale = 1f; _wpb = -1; _pw = null;
             _mines.Clear(); _byMarket = null; _pending = null;
             _carts.Clear(); _roads.Clear(); _dayOne = true; _shelfUse = null; _shelfDay.Clear(); _shelfN = 0;
-            NewDay(); _stumbles = 0; _cPrev = -1;
+            NewDay(); _stumbles = 0; _cPrev = -1; _bPrev = -1;
         }
 
         internal static void OnNewGame() { NewCampaign = true; }
@@ -217,13 +246,22 @@ namespace Armoury
                       .Append(':').Append(c.N).Append(':').Append(c.Paid);
                 }
             }
+            // F4b: rachunki za drewno - osobna sekcja po znaczniku (wies:rachunek), tylko otwarte; rekord kopalni zostaje 3-polowy
+            bool bills = false;
+            foreach (var kv in _mines)
+            {
+                var st = kv.Key != null ? kv.Key.Settlement : null;
+                if (st == null || st.StringId == null || kv.Value.Bill <= 0) continue;
+                if (!bills) { sb.Append('|').Append(BillMark); bills = true; }
+                sb.Append('|').Append(st.StringId).Append(':').Append(kv.Value.Bill);
+            }
             return sb.ToString();
         }
 
         internal static void Import(string s)
         {
             NewCampaign = s != null && s.StartsWith("nk", StringComparison.Ordinal);
-            _mines.Clear(); _byMarket = null; _carts.Clear(); _cPrev = -1;
+            _mines.Clear(); _byMarket = null; _carts.Clear(); _cPrev = -1; _bPrev = -1;
             _pending = NewCampaign && s.Length > 3 ? s.Substring(3) : null;
         }
 
@@ -232,15 +270,27 @@ namespace Armoury
             var p = _pending;
             if (p == null) return;
             _pending = null;
-            int ok = 0, bad = 0, cOk = 0, cBad = 0, cPcs = 0;
+            int ok = 0, bad = 0, cOk = 0, cBad = 0, cPcs = 0, bOk = 0, bBad = 0;
+            long bSum = 0;
             bool carts = false;   // F4a: po znaczniku - rekordy wozow (6 pol); brak znacznika = brak wozow
+            bool bills = false;   // F4b: po znaczniku - rachunki za drewno (2 pola: wies, rachunek) kopaln wczytanych wyzej; brak znacznika = brak rachunkow
             var inv = CultureInfo.InvariantCulture;
             foreach (var rec in p.Split('|'))
             {
                 try
                 {
-                    if (rec == CartMark) { carts = true; continue; }
+                    if (rec == CartMark) { carts = true; bills = false; continue; }
+                    if (rec == BillMark) { bills = true; carts = false; continue; }
                     var f = rec.Split(':');
+                    if (bills)
+                    {
+                        Mine bm;
+                        var bs = f.Length == 2 ? Settlement.Find(f[0]) : null;
+                        if (bs == null || bs.Village == null || !_mines.TryGetValue(bs.Village, out bm)) { bBad++; continue; }
+                        bm.Bill = Math.Max(0, int.Parse(f[1], inv));
+                        bOk++; bSum += bm.Bill;
+                        continue;
+                    }
                     if (carts)
                     {
                         if (f.Length != 6) { cBad++; continue; }
@@ -257,11 +307,12 @@ namespace Armoury
                     _mines[st.Village] = new Mine { Bank = Math.Max(0, int.Parse(f[1], CultureInfo.InvariantCulture)), Want = Math.Max(0, int.Parse(f[2], CultureInfo.InvariantCulture)) };
                     ok++;
                 }
-                catch { if (carts) cBad++; else bad++; }
+                catch { if (bills) bBad++; else if (carts) cBad++; else bad++; }
             }
             _byMarket = null;
             Log.Info("Bloomery (E6/R1, 214): z zapisu " + ok + " kopalni (drewno w dymarkach, potrzeba doby)" + (bad > 0 ? ", nieczytelnych " + bad : "")
-                     + "; wozy z drewnem w drodze (F4a) " + cOk + " (" + cPcs + " ladunkow)" + (cBad > 0 ? ", nieczytelnych " + cBad : "") + ".");
+                     + "; wozy z drewnem w drodze (F4a) " + cOk + " (" + cPcs + " ladunkow)" + (cBad > 0 ? ", nieczytelnych " + cBad : "")
+                     + "; rachunki za drewno (F4b) " + bOk + " (" + bSum + " zl)" + (bBad > 0 ? ", nieczytelnych " + bBad : "") + ".");
         }
 
         // ------------------------------------------------------------ tick produkcji wsi
@@ -423,6 +474,7 @@ namespace Armoury
                 if (wood == null) return;
                 var el = new EquipmentElement(wood);
                 int today = (int)CampaignTime.Now.ToDays;
+                bool coal = CoalFirst;   // F4b: zaplata za drewno dopisuje sie do rachunku kopalni
                 long t0 = Stopwatch.GetTimestamp();
                 try { CartArrivals(wood, today); } catch (Exception e) { Stumble("Daily(przyjazdy wozow)", e); }   // (a) dziala takze przy zasiegu 0 (oplacone wozy dojezdzaja)
                 _cTicks += Stopwatch.GetTimestamp() - t0;
@@ -433,6 +485,7 @@ namespace Armoury
                         var v = kv.Key; var m = kv.Value;
                         int want = m.Want - m.Bank;
                         if (want <= 0 || v == null) continue;
+                        m.Asked = want;           // F4b: pomiar doby (linia)
                         var mk = v.TradeBound;
                         var town = mk != null ? mk.Town : null;
                         var shelf = mk != null ? mk.ItemRoster : null;
@@ -441,10 +494,11 @@ namespace Armoury
                         if (n < want) _dShortShelf += want - Math.Max(0, n);
                         if (n <= 0) continue;
                         int price = Math.Max(0, town.MarketData.GetPrice(el));
+                        m.Price = price;
                         if (price > 0)
                         {
                             int afford = Math.Max(0, v.Gold) / price;
-                            if (afford < n) { _dShortGold += n - afford; n = afford; }
+                            if (afford < n) { _dShortGold += n - afford; m.NoGold += n - afford; n = afford; }
                         }
                         if (n <= 0) continue;
                         int paid = 0;
@@ -465,6 +519,8 @@ namespace Armoury
                         m.LocDay += n;            // F4a: drewno na miejscu (wlasna polka)
                         NoteShelf(town, n);       // F4a (R1-7b): popyt drewna miasta handlowego - to, co dymarka naprawde kupila
                         _dBought += n; _dGold += paid;
+                        m.Got += n; m.BuyDay += paid;
+                        if (coal && paid > 0) { m.Bill += paid; _bAdded += paid; }   // F4b: rachunek za drewno - do odliczenia od utargu przed dzialka pana
                         OreLedger.NoteBloomeryWood(wood, n);
                         if (paid > 0) { try { TownFolk.Sale(mk, paid, TownFolk.MixGoods); } catch { } }   // drewno kupione od kupcow miasta (tylko licznik)
                     }
@@ -477,6 +533,8 @@ namespace Armoury
                 t0 = Stopwatch.GetTimestamp();
                 try { if (full) CartOrders(wood, el, today); } catch (Exception e) { Stumble("Daily(zamowienia wozow)", e); }   // (c)
                 _cTicks += Stopwatch.GetTimestamp() - t0;
+                // F4b: koniec doby zakupow drewna (kroki b i c) - rachunek ponad zakupy ostatnich 14 dob wygasa; klucz wylaczony - rachunki do zera
+                foreach (var m in _mines.Values) _bCut += m.RollBill(coal);
                 try { RollShelfUse(full); } catch (Exception e) { Stumble("Daily(ShelfUse)", e); }
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -532,6 +590,9 @@ namespace Armoury
                 town.ChangeGold(-r);
                 c.Mine.ChangeGold(r);
                 _cRefund += r;
+                // F4b: zwrocone zloto nie jest juz kosztem drewna - rachunek kopalni maleje o zwrot (inaczej wies mialaby zwrot i mniejsza dzialke pana)
+                Mine bm;
+                if (_mines.TryGetValue(c.Mine, out bm) && bm.Bill > 0) { int x = Math.Min(bm.Bill, r); bm.Bill -= x; _bRefund += x; }
             }
             c.Paid = 0;
         }
@@ -615,6 +676,7 @@ namespace Armoury
             if (!(range > 0f)) return;
             int wpb = WoodPerBloom();
             if (wpb <= 0) return;
+            bool coal = CoalFirst;   // F4b
             List<Source> srcs = null;
             var cands = new List<Cand>();
             var mine = new List<Cart>();
@@ -689,6 +751,8 @@ namespace Armoury
                                 var cart = new Cart { Src = c.St, Mine = v, DayBought = today, DayDue = due, N = got, Paid = paid };
                                 _carts.Add(cart); mine.Add(cart);
                                 _cCarts++; _cBought += got; _cGold += paid; _cDaysSum += c.Days;
+                                m.Got += got; m.BuyDay += paid;
+                                if (coal && paid > 0) { m.Bill += paid; _bAdded += paid; }   // F4b: rachunek obejmuje takze zakupy wozem
                                 OreLedger.NoteBloomeryWood(wood, got);
                             }
                         }
@@ -710,10 +774,108 @@ namespace Armoury
                     if (rest < 0) rest = (int)Math.Ceiling(x * (far - today + 1) - 1e-3f) - all;   // zadnego zrodla z nadwyzka w zasiegu
                     if (rest >= wpb && !roomFull)
                     {
-                        if (noGold) _cNoGold += Math.Min(cx, rest); else _cNoSurplus += Math.Min(cx, rest);
+                        if (noGold) { _cNoGold += Math.Min(cx, rest); m.NoGold += Math.Min(cx, rest); } else _cNoSurplus += Math.Min(cx, rest);
                     }
                 }
                 catch (Exception e) { Stumble("Daily(zamowienie wozu)", e); }
+            }
+        }
+
+        // ------------------------------------------------------------ F4b: rachunek za drewno przed dzialka pana
+        /// <summary>F4b: rachunek za drewno jest prowadzony i rozliczany (lupa czynna i klucz BloomeryCoalBeforeLordShare).</summary>
+        internal static bool CoalFirst { get { var s = Settings.Current; return _applied && s != null && s.BloomeryCoalBeforeLordShare; } }
+
+        /// <summary>VillageTakings.EnterPostfix (woz wsi oddal utarg we wsi macierzystej): otwarty rachunek za drewno tej kopalni; 0 - wies bez dymarki,
+        /// klucz wylaczony albo nic do odliczenia. Utarg wozow kopaln liczony do linii takze przy wylaczonym kluczu.</summary>
+        internal static int BillOf(Village v, int handed)
+        {
+            if (!_applied || v == null || handed <= 0) return 0;
+            try
+            {
+                if (_pending != null) ResolvePending();
+                Mine m;
+                if (!_mines.TryGetValue(v, out m)) return 0;
+                _bReturns++; _bHanded += handed;
+                return CoalFirst ? Math.Max(0, m.Bill) : 0;
+            }
+            catch (Exception e) { Stumble("BillOf", e); return 0; }
+        }
+
+        /// <summary>VillageTakings.EnterPostfix po rozliczeniu: `d` utargu pokrylo rachunek (maleje o d), `back` zlota przeszlo z licznika podatku wsi
+        /// do jej kiesy (pan dostal mniej dokladnie o tyle). Zlota tu nie ruszamy - tylko rachunek i liczniki linii.</summary>
+        internal static void BillSettled(Village v, int d, long back)
+        {
+            Mine m;
+            if (v == null || d <= 0 || !_mines.TryGetValue(v, out m)) return;
+            if (d > m.Bill) d = m.Bill;
+            m.Bill -= d;
+            _bSettled += d; _bBack += back;
+            if (back > 0) _bBackN++;
+        }
+
+        private static long BillsOpen() { long n = 0; foreach (var m in _mines.Values) n += m.Bill; return n; }
+
+        /// <summary>F4b: wstawka "rachunek za drewno (F4b)" linii "Zelazo (lupy) (214)" - utarg oddany przez wozy kopaln (dokladny, z powrotow do wsi),
+        /// ile z niego pokrylo rachunek, ile zlota przeszlo z licznikow panow do kies, rachunek otwarty i jego kontrola (reszta 0), kiesy kopaln
+        /// (min / mediana / suma; ile ponizej kosztu drewna doby = potrzeba ponad las okregu x cena w miescie handlowym) i 3 kopalnie z najwiekszym
+        /// brakiem zlota tej doby. Tylko log.</summary>
+        private static void CoalSegment(StringBuilder line)
+        {
+            try { var sb = new StringBuilder(512); CoalSegment2(sb); line.Append(sb); }   // cala wstawka albo nic
+            catch (Exception e) { Stumble("IronSegment(F4b)", e); }
+        }
+
+        private static void CoalSegment2(StringBuilder sb)
+        {
+            var s = Settings.Current;
+            bool key = s != null && s.BloomeryCoalBeforeLordShare, whole = s != null && s.VillageTakingsWhole;
+            long open = 0, gsum = 0; int openN = 0, below = 0, needy = 0;
+            var golds = new List<int>();
+            var top = new List<KeyValuePair<Village, Mine>>();
+            var wood = Wood();
+            foreach (var kv in _mines)
+            {
+                var v = kv.Key; var m = kv.Value;
+                if (m.Bill > 0) { open += m.Bill; openN++; }
+                if (v == null) continue;
+                int g = v.Gold;
+                golds.Add(g); gsum += g;
+                if (m.NoGold > 0) top.Add(kv);
+                float need = m.Want - Math.Min(m.ForAvg, m.Want);
+                if (!(need > 0f)) continue;
+                int price = m.Price;
+                if (price <= 0 && wood != null)   // tej doby kopalnia nie pytala o cene (dymarka pelna albo pusta polka) - cena z targu teraz
+                {
+                    var mk = v.TradeBound; var town = mk != null ? mk.Town : null;
+                    if (town != null) price = Math.Max(0, town.MarketData.GetPrice(new EquipmentElement(wood)));
+                    m.Price = price;
+                }
+                needy++;
+                if (g < need * price) below++;
+            }
+            golds.Sort();
+            int cnt = golds.Count;
+            long med = cnt == 0 ? 0 : (cnt % 2 == 1 ? golds[cnt / 2] : ((long)golds[cnt / 2 - 1] + golds[cnt / 2]) / 2);
+            sb.Append("; rachunek za drewno (F4b): ").Append(!key ? "WYLACZONE (Bloomery Coal Before Lord Share)" : (whole ? "CZYNNE" : "NIECZYNNE (Village Takings Whole wylaczone - bez okna powrotu wozu)"))
+              .Append(", powroty wozow kopaln ").Append(_bReturns).Append(" z utargiem ").Append(_bHanded).Append(" zl, z tego na rachunek ").Append(_bSettled)
+              .Append(" zl, z licznikow panow do kies wsi ").Append(_bBack).Append(" zl (").Append(_bBackN).Append(" powrotow), rachunek otwarty ").Append(open)
+              .Append(" zl w ").Append(openN).Append(" kopalniach");
+            if (_bPrev >= 0)
+                sb.Append("; kontrola rachunku: otwarty wczoraj ").Append(_bPrev).Append(" + drewno kupione ").Append(_bAdded).Append(" - na rachunek ").Append(_bSettled)
+                  .Append(" - wygasle ponad ").Append(BillDays).Append(" dob zakupow ").Append(_bCut).Append(" - zwrot zawroconych wozow ").Append(_bRefund)
+                  .Append(" - otwarty dzis = reszta ").Append(_bPrev + _bAdded - _bSettled - _bCut - _bRefund - open);
+            else sb.Append("; kontrola rachunku od nastepnej doby");
+            sb.Append("; kiesy kopaln: min ").Append(cnt > 0 ? golds[0] : 0).Append(" / mediana ").Append(med).Append(" / suma ").Append(gsum).Append(" zl w ").Append(cnt)
+              .Append(" kopalniach, ponizej kosztu drewna doby ").Append(below).Append(" z ").Append(needy).Append(" (potrzeba ponad las okregu po cenie miasta handlowego)");
+            top.Sort((a, b) => b.Value.NoGold.CompareTo(a.Value.NoGold));
+            sb.Append("; najwiecej bez zlota: ");
+            if (top.Count == 0) sb.Append("-");
+            for (int i = 0; i < top.Count && i < 3; i++)
+            {
+                var v = top[i].Key; var m = top[i].Value;
+                if (i > 0) sb.Append(", ");
+                sb.Append(v.Name != null ? v.Name.ToString() : "?").Append(" (kiesa ").Append(v.Gold).Append(", drewno w miescie handlowym po ").Append(m.Price)
+                  .Append(" zl, chciane z jego polki ").Append(m.Asked).Append(", kupione z polki i wozem ").Append(m.Got).Append(", bez zlota ").Append(m.NoGold).Append(")");
             }
         }
 
@@ -851,7 +1013,8 @@ namespace Armoury
               .Append(", lupy bez drewna ").Append(_dOver)
               .Append("; w dymarkach ").Append(bank).Append(" ladunkow przy potrzebie doby ").Append(want).Append(" (kopalni ponizej potrzeby ").Append(empty).Append(")")
               .Append("; kopalnie BK w miastach: lupy ").Append(_dTownMine).Append(", drewno ").Append(_dTownMineWood).Append(", bez drewna/kapitalu ").Append(_dTownMineSkip).Append(", cykl odrzucony przez gre ").Append(_dTownMineRej);
-            try { CartSegment(sb); MineSegment(sb); } catch (Exception e) { Stumble("IronSegment(F4a)", e); }
+            // F4b: wstawka rachunku PRZED wstawka kopaln (koniec tamtej czyta narzedzie progow); wlasny try - jej wyjatek nie gasi reszty linii
+            try { CartSegment(sb); CoalSegment(sb); MineSegment(sb); } catch (Exception e) { Stumble("IronSegment(F4a)", e); }
             sb.Append("; potkniecia dzis ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(") |");
             return sb.ToString();
         }
@@ -932,8 +1095,11 @@ namespace Armoury
             // F4a: liczniki wozow i lupy niewytopione per kopalnia; stan "w drodze" do kontroli nastepnej doby
             _cCarts = 0; _cBought = 0; _cGold = 0; _cDaysSum = 0; _cArrCarts = 0; _cArr = 0; _cArrDays = 0; _cWait = 0; _cBack = 0; _cBackPcs = 0; _cRefund = 0; _cLost = 0;
             _cNoSurplus = 0; _cNoGold = 0; _cTicks = 0;
-            foreach (var m in _mines.Values) m.Unwon = 0f;
+            foreach (var m in _mines.Values) { m.Unwon = 0f; m.Asked = 0; m.Got = 0; m.NoGold = 0; m.Price = 0; }
             _cPrev = InTransit();
+            // F4b: liczniki doby rachunku za drewno; stan "otwarty" do kontroli nastepnej doby
+            _bReturns = 0; _bBackN = 0; _bHanded = 0; _bSettled = 0; _bBack = 0; _bAdded = 0; _bCut = 0; _bRefund = 0;
+            _bPrev = BillsOpen();
         }
 
         // ------------------------------------------------------------ wpiecie
