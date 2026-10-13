@@ -1413,3 +1413,12 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   (2) PELNY AUDYT wf_512814c1-89f (docs/przekazanie/wf-pelny-audyt-zbior-e8.js): 8 przegladow tylko odczyt (zloto, sztuki, latki, zapis, ustawienia, zderzenia paczek, wydajnosc, sciezki gracza)
   + niezalezne sprawdzenie kazdego znaleziska krytycznego/waznego; (3) drzewo A: O2 zakodowane (2a7ee78), zostaje O3, O5, O6.
   DALEJ: ogon e8-a -> poprawki z audytu i z biegu 2 -> test zbiorczy (120 + zapis + bieg dlugi + zdjecia drog + -Profile) -> wgranie.
+- (06:45 UTC 13.10) **BIEG PROBNY 2 (zbior-e8 e60928a, 120 dob nowej kampanii): 120/120, Armoury 0 ERROR, CS 0 blokow naszych modow; ALE 21.2 s/dobe (bieg 1: 17.6, W33: 17.5).**
+  Log Armoury-2026-10-12_22-38-57.log, CS session-2026-10-12_22-38-56.log, zapis autotest-2026-10-12-2322.sav; progi: SCRATCH(dbc3d3d1)\test\progi-e8r1\. Najwazniejsze:
+  (1) SZYBKOSC: E8/G1 karawany BK w miescie co godzine = 1411 ms/dobe (prog 5 ms) - glowny skladnik wzrostu; profil E8/0 9.7 ms, ksiega umiejetnosci 34 ms, E8/H 10.8 ms; "nasze mody razem" 4.37 s/dobe;
+  (2) WOJSKO lordow w wojnie 84 241 (bieg 1: 90 269, W33: 87 027) - ponizej twardej podlogi 85 tys.; (3) E8/H: jezdzcy z koniem bez uprzezy 20.5% (prog 10%), uprzaz wykonana 25.7/d (Z33 13.4;
+  prog 40), wstrzymane z braku uprzezy rosnie; jazda t3+ 16.7% przy celu 26.6%; (4) kasy miast d120 8.67 mln (-15.6% wobec Z33); (5) 3 nowe wyjatki pierwszej szansy "Token 0x.. is not valid"
+  (nasz skan IL), 2 bloki BK CorrectPlayerEducation mimo E8/M. POPRAWILO SIE po F: R1-7 dymarki TAK, miasta bez zelaza 45 -> 33.4 (prog 30), juczne z niczego 13 622 -> 325 (morskie),
+  koszt markietanow w progu, czeka na skore 1632 -> 654/d. Progi: etap2 1 NIE, etap3 2, etap4 3, etap5 17, etap7 3, etap8 22 (pierwszy bieg etapu 8).
+  **W TOKU:** triaz biegu 2 wf_48305665-088 (5 obszarow: szybkosc, wojsko, konie/uprzaz, etap 8 reszta, etapy 3-7 reszta; BLOKUJE / STROJENIE / PROG; z podwazeniem), pelny audyt wf_512814c1-89f,
+  zapis 9 dob (autotest-2026-10-12-2322), drzewo A (O3, O5, O6). Potem: jedna runda poprawek (audyt + triaz), ogon e8-a, test koncowy, wgranie.
