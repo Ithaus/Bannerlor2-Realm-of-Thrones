@@ -1592,3 +1592,9 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   najpierw dowod, gdzie proby przepadaja (uwaga: zonaty lord SZUKAJACY ma szanse 0 - to nie strata; pytanie, czy przepadaja proby WOLNYCH przez kandydatow bez szans), potem klucz
   MarriageOnlyViableCandidates = true; jesli twierdzenie rozpoznania falszywe - "pominieta" z dowodem i powiedziec Jeffowi.
   KOLEJKA TESTOW W GRZE: bieg pomiarowy K1-3a (w toku) -> bieg cienia swatow (CS probna) -> po rundzie 3 (wojsko, zelazo): scalenie p3 + z3 + pm do zbior-e8, bieg roczny, wgranie.
+- (14:25 UTC 13.10) **BIEG POMIAROWY K1-3a (120 dob, probny Armoury 967904a5 z zb\k13a = WGRANIE 35 + regula koni roboczych; NIEWGRANE): 120/120, 0 ERROR, 12.1 s/dobe**
+  (Armoury-2026-10-13_04-46-00.log; progi test\progi-k13a\; porownanie z biegiem limitu 3 bez reguly test\progi-cap3\). Regula dziala: mieszczanie kupuja 12.3 konia/d (prawie same juczne),
+  koszyk BK koni 0, ksiega koni zgodna, ciecie hodowli czynne (d57: zwykly x0.50, bojowy x0.51), koszt 0.10 ms/d. SKUTKI: **wojsko lordow w wojnie 73 555 wobec 88 171 bez reguly (-14.6 tys.,
+  ponizej podlogi 85 tys.)**, kasy miast 83.1% Z33 wobec 91.4%, zawor panow z miast 148 tys./d; zakupy koni lordow 62.4/d (55.6), jazda t3+ 19.0% (17.5%; 69% celu K3 wobec 65%), jazda
+  z para 5.86% ludzi (5.29%), jezdzcy z koniem bez uprzezy 13.3% (10.7%). WNIOSEK: regula daje troche wiecej jazdy, ale zabiera panom ok. 15 tys. ludzi, bo zloto za konie zostaje
+  w kiesach ludu - **NIE WGRYWAC przed paczka obiegu kiesy ludu (wf_d4abe57d-6c8); kod czeka na galezi `w-toku/k13a-konie-robocze` 137dbc3.** Jeff powiadomiony.
