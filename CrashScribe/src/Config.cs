@@ -87,9 +87,13 @@ namespace CrashScribe
         public static bool QuietBkEducation = true;          // znany wyjatek BK CorrectPlayerEducation (finalizer BKROT go polyka): jedna linia zamiast bloku ERROR + raz na gre linia jezyka gracza w BK; false = blok ERROR jak dotad, bez linii
 
         // --- Z.3 (13.10): swaty lordow ROT szybciej (patrz MarriageFast.cs) ---
-        public static bool MarriageFast = true;              // ROT CheckNPCMarriages liczone nasza droga: te same pary, ta sama doba, ten sam ciag losowy - jedno przejscie po kandydatach przeciwnej plci, lord z zyjacym malzonkiem tylko "czy jest ktokolwiek"; false = oryginal ROT bez latki
-        public static bool MarriageFastShadow = false;       // bieg cienia: decyduje oryginal ROT, nasza droga tylko liczy na tym samym stanie losowym; linia doby "Swaty ROT (Z.3): klanow N, par stara droga A, nowa B, roznic R, czas stara X ms, nowa Y ms" (roznic ma byc 0); wolniej niz kazda z drog osobno - tylko do testu
-        public static bool MarriageOnlyViableCandidates = true;   // ZMIANA ROZGRYWKI (Jeff 13.10): wolny lord losuje tylko sposrod kandydatow, z ktorymi slub jest mozliwy (bez zyjacego malzonka, poza zalotami stanu >= 3, szansa modelu > 0) - dotad ok. polowa dziennych prob trafiala w kandydata bez szans; potrzebuje MarriageFast, nie dziala w biegu cienia; false = losowanie ROT jak dotad (droga dokladnie rownowazna oryginalowi)
+        // Pomiar w grze 13.10 (CHANGELOG "Z.3 SWATY ROT - pomiar w grze"): poza gra (sam ROT + BK na danych testu) nasza droga daje te same pary
+        // i ten sam ciag losowy co oryginal; W GRZE NIE - model BK sam zuzywa generator gry w ocenie szansy (NpcCoupleMarriageChance), a my
+        // pytamy o szanse rzadziej, wiec pary danego dnia sa inne, niz wylosowalby sam ROT (jak w dwoch rozgrywkach). Regula i szanse te same.
+        public static bool MarriageFast = true;              // ROT CheckNPCMarriages liczone nasza droga: ta sama regula i te same szanse, ta sama doba - jedno przejscie po kandydatach przeciwnej plci, lord z zyjacym malzonkiem tylko "czy jest ktokolwiek"; pary w grze inne niz w samym ROT (wyzej); false = oryginal ROT bez latki
+        public static bool MarriageFastShadow = false;       // bieg cienia: decyduje oryginal ROT, nasza droga tylko liczy od tego samego stanu generatora; linia doby "Swaty ROT (Z.3): klanow N, par stara droga A, nowa B, roznic R, czas stara X ms, nowa Y ms" - NARZEDZIE POMIARU, nie prog "0": w grze roznic stanu losowego jest ok. 85 rodow z 330 na dobe (BK losuje w ocenie szansy); wolniej niz kazda z drog osobno - tylko do testu
+        public static bool MarriageOnlyViableCandidates = true;   // ZMIANA ROZGRYWKI (Jeff 13.10): wolny lord losuje tylko sposrod kandydatow, z ktorymi slub jest mozliwy (bez zyjacego malzonka, poza zalotami stanu >= 3, szansa modelu > 0) - dotad ponad polowa dziennych prob trafiala w kandydata bez szans; potrzebuje MarriageFast, nie dziala w biegu cienia; false = losowanie ROT jak dotad (ta sama regula co oryginal; poza gra takze te same pary, w grze nie - wyzej)
+        public static float MarriageChanceScale = 0.7f;      // HAMULEC (Jeff 13.10: "Przyhamuj, aby sluby zawieraly sie rzadziej"): mnoznik szansy slubu w rzucie wolnego lorda - TYLKO przy czynnej regule MarriageOnlyViableCandidates (kandydat wybierany jak dotad, nizszy jest sam prog rzutu); pomiar roczny: 113 slubow AI-AI przed regula, 215 z regula bez hamulca; 0.7 = cel ok. 150 na rok, 0.5 = mniej wiecej jak przed regula, 1.0 = bez hamulca; zakres 0.1-1.0 (poza nim przyciecie z linia w logu - MarriageFast.OnSession); bez reguly i w biegu cienia nie dziala
 
         internal static void Load(string moduleDataDir)
         {
@@ -161,6 +165,7 @@ namespace CrashScribe
                         case "MarriageFast": MarriageFast = B(v); break;
                         case "MarriageFastShadow": MarriageFastShadow = B(v); break;
                         case "MarriageOnlyViableCandidates": MarriageOnlyViableCandidates = B(v); break;
+                        case "MarriageChanceScale": MarriageChanceScale = F(v, MarriageChanceScale); break;   // zakres pilnuje MarriageFast.OnSession (tu log jeszcze nie jest otwarty)
                     }
                 }
             }

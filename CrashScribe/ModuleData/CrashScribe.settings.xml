@@ -246,14 +246,31 @@
        accept for that lord (chance 0), so more than half of the daily attempts are wasted and AI weddings are rarer
        than Realm of Thrones intended. With this on, an unmarried lord draws only among candidates whose marriage
        chance is above zero; the chance itself and every other rule (age, clan, culture, distance, war, race) stay
-       as they are. Expect roughly twice as many AI weddings a day at the start of a campaign (estimate from a
-       model of the starting world: 1.6 to 2.3 times). Side effect: unmarried nobles, including the ones the player
-       could marry, are taken about twice as fast (in the model most of them are married within the first year);
-       once they run out, the yearly number of weddings is the same as before.
+       as they are. On its own this rule about doubles AI weddings: a one-year test campaign (364 days) had 215 of
+       them, against about 113 before the rule. Side effect: unmarried nobles, including the ones the player could
+       marry, are then taken about twice as fast. That is why the brake below (MarriageChanceScale) slows the
+       weddings down again: with its default of 0.7 expect about 150 AI weddings in the first year - more than
+       before the rule, fewer than with the rule alone.
        Needs MarriageFast above; it is paused while MarriageFastShadow is
        on (the original decides then) and when another mod changes the marriage chance (one line in the CrashScribe
        log says so). The daily "Swaty ROT (Z.3)" log line ends with the attempts of unmarried lords, how many of
-       them the old rule would have wasted, and the weddings of the day and since loading.
+       them the old rule would have wasted, the brake value in use, and the weddings of the day and since loading.
        Set MarriageOnlyViableCandidates to false to draw from the whole list as Realm of Thrones does (old behaviour). -->
   <MarriageOnlyViableCandidates>true</MarriageOnlyViableCandidates>
+  <!-- Brake on AI weddings: how often an unmarried AI lord's daily marriage attempt succeeds. The rule above
+       (MarriageOnlyViableCandidates) on its own made weddings about twice as frequent, so unmarried nobles -
+       also the ones the player could marry - were running out about twice as fast. This number multiplies the
+       marriage chance in the daily roll of an unmarried lord; the candidate is still picked exactly as above.
+       AI weddings in the first year of a campaign (364 days):
+         before the rule above     - about 113 (measured)
+         1.0 = no brake            - 215 (measured)
+         0.7 = default             - about 150 (expected)
+         0.5                       - about as many as before the rule (expected)
+       Allowed values: 0.1 to 1.0. A value outside that range is cut to the nearest limit, and the CrashScribe
+       log says so in one line. The brake works only while MarriageOnlyViableCandidates is on and active; when
+       that rule is off or paused, and in the MarriageFastShadow test, the marriage chance is not changed at all.
+       The start-up line "Mends: swaty ROT (Z.3)" and the daily "Swaty ROT (Z.3)" line in the CrashScribe log show
+       the value in use ("mnoznik szansy 0.7").
+       Set MarriageChanceScale to 1.0 to switch the brake off. -->
+  <MarriageChanceScale>0.7</MarriageChanceScale>
 </CrashScribe>

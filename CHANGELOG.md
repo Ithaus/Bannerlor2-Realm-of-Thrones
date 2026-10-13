@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (Z.3 SWATY ROT - HAMULEC, decyzja Jeffa) - SLUBY AI RZADZIEJ: mnoznik szansy slubu wolnego lorda (klucz MarriageChanceScale, domyslnie 0.7 - cel ok. 150 slubow na rok zamiast 215) + poprawione nieprawdziwe komentarze o "tych samych parach" - ZMIANA ROZGRYWKI
+**Mod:** CrashScribe | **Galaz:** `w-toku/z3-swaty-hamulec` (od `w-toku/zbior-e8` 6d91156 = WGRANIE 37) | **Pliki:** `CrashScribe/src/MarriageFast.cs`, `CrashScribe/src/Config.cs`, `CrashScribe/ModuleData/CrashScribe.settings.xml`, `CHANGELOG.md`. Bez zmian zapisu. Nowy klucz: `MarriageChanceScale` (domyslnie 0.7).
+
+**Dla gracza:** po poprzedniej zmianie (lordowie AI wybieraja tylko osoby, ktore naprawde moga poslubic) slubow AI zrobilo sie prawie dwa razy wiecej i wolni szlachcice - takze kandydatki i kandydaci dla gracza - zaczeli sie konczyc ok. 2 razy szybciej. Hamulec obniza szanse powodzenia codziennej proby wolnego lorda: slubow ma byc ok. 150 na rok - wiecej niz dawniej (113), mniej niz bez hamulca (215). Malzenstwa samego gracza i jego rodu sa nietkniete (rod gracza nie bierze udzialu w tych swatach).
+
+**Problem (pomiar, bieg roczny 364 doby, regula `MarriageOnlyViableCandidates` czynna):** slubow AI-AI od startu - doba 30: 22, 60: 37, 91: 50, 120: 78, 182: 113, 273: 175, 364: **215** (prawie liniowo, ok. 0.59 na dobe). Przed regula (ROT + BK): **113** na rok. Pula sie przez rok nie wyczerpala, ale ubywa: wolnych lordow szukajacych 685 -> 576, w tym bez zadnego kandydata z szansa 93 -> 229.
+
+**Decyzja Jeffa (13.10), po tej informacji:** "Przyhamuj, aby sluby zawieraly sie rzadziej."
+
+**Zmiana:**
+1. **Klucz `MarriageChanceScale`** (float, domyslnie 0.7, zakres 0.1-1.0): mnoznik progu w rzucie `MBRandom.RandomFloat < szansa` - TYLKO dla wolnego lorda przy CZYNNEJ regule `MarriageOnlyViableCandidates` (sciezka `PickViable` -> rzut w `Decide`). Kandydat jest wybierany jak dotad (sposrod tych z szansa > 0, bez mnoznika), rzut zuzywa ten sam jeden krok generatora, reszta (kontrola zalotow, `MarriageAction.Apply`, najwyzej jeden slub rodu na dobe) bez zmian. NIE dziala: lord z zyjacym malzonkiem, regula wylaczona (`MarriageOnlyViableCandidates` = false) albo stojaca (obca latka na lancuchu szansy), bieg cienia, rod oddany oryginalowi ROT po potknieciu - tam droga ROT bez zmian. Mnoznik 1.0 = prog nietkniety (dokladnie zachowanie WGRANIA 37).
+2. Wartosc spoza zakresu jest przycinana do 0.1 albo 1.0 (nie-liczba = 0.7) z jedna linia w logu, raz na proces: `Swaty ROT (Z.3): MarriageChanceScale = 1.5 poza zakresem 0.1-1.0 - przyciete do 1.0.` Kontrola jest w `MarriageFast.OnSession`, bo ustawienia czytane sa przed otwarciem logu.
+3. Linia startu `Mends: swaty ROT (Z.3): PODPIETY (...)` i linia doby `Swaty ROT (Z.3)` dostaly pole `mnoznik szansy 0.7 (MarriageChanceScale)`; gdy regula nie jest czynna: `mnoznik szansy NIE DZIALA - regula nieczynna (ustawiony 0.7)`. W linii doby pole stoi tuz przed `; sluby dzis N, od wczytania M` - te pola i `slubow N` bez zmian (narzedzia je czytaja).
+4. Opis w `CrashScribe.settings.xml` (po angielsku, z liczbami: 113 przed regula, 215 bez hamulca, ok. 150 przy 0.7, 0.5 = mniej wiecej jak przed regula, 1.0 = bez hamulca) + wpis klucza 0.7; w opisie `MarriageOnlyViableCandidates` zdanie o "dwa razy wiecej slubow" zastapione pomiarem i odeslaniem do hamulca.
+5. **Poprawione nieprawdziwe komentarze** (wpis nizej je zapowiadal): `Config.cs` (opis `MarriageFast`, `MarriageFastShadow`, `MarriageOnlyViableCandidates`), naglowek i komentarze `MarriageFast.cs`, tekst linii startu. Prawda: "te same pary i ten sam ciag losowy" tylko POZA gra; w grze model BK sam losuje w ocenie szansy, wiec pary danego dnia sa inne, niz wylosowalby sam ROT - regula i szanse te same; bieg cienia to narzedzie pomiaru, nie prog "roznic 0". Linia startu bez reguly mowi teraz "ta sama regula i te same szanse co w ROT ... (pary w grze inne, niz wylosowalby sam ROT - BK losuje w ocenie szansy)" zamiast "te same pary i ten sam ciag losowy". Logika poza punktem 1 bez zmian.
+
+**Liczby oczekiwane (szacunek, NIE pomiar):** szansa pary to ok. 0.001-0.002 na probe (0.59 slubu na dobe z 350-590 prob z kandydatem), wiec liczba slubow idzie w przyblizeniu wprost za mnoznikiem: 0.7 x 215 = **ok. 150 slubow na rok** (ok. 0.41 na dobe; raczej odrobine wiecej, bo pula wolnych ubywa wolniej); **w biegu 120 dob ok. 50-58 zamiast 78**. 0.5 = ok. 108 (mniej wiecej jak przed regula), 1.0 = 215.
+
+**Dowod (prawdziwy kod z DLL, poza gra):** `scratchpad\tmp\z3h\dlltest4` (sesja dbc3d3d1; test `z3v\dlltest2` z dopisanym mnoznikiem we wzorcu nowej reguly: prog = szansa x mnoznik) - prawdziwa `MarriageFast.Decide` ze zbudowanej `CrashScribe.dll` przeciw wzorcom napisanym osobno:
+- mnoznik domyslny pola w DLL (1.0): klucz wylaczony przeciw ROT 1:1 - 56 992 wywolania rodu, par 15 957 / 15 957, roznic par 0, stanu generatora 0, pamieci domu 0; klucz wlaczony przeciw wzorcowi reguly bez mnoznika - 56 095 wywolan, par 26 647 / 26 647, roznic 0 / 0 / 0, cztery liczniki zgodne. Czyli 1.0 = zachowanie sprzed hamulca.
+- mnoznik 0.7: klucz WYLACZONY przeciw ROT 1:1 - par 15 883 / 15 883, roznic 0 / 0 / 0 (bez reguly mnoznik nie dziala); klucz WLACZONY przeciw wzorcowi z progiem x 0.7 - par 21 260 / 21 260, roznic 0 / 0 / 0, par niemozliwych 0, liczniki zgodne; rozklad (1 wolny lord, 12 mozliwych kandydatek z szansa 1, 240 000 losowan): slub w 69.94% prob (oczekiwane 70%), wybor rowny po 12 mozliwych (chi2 14.0 przy 11 stopniach swobody), niemozliwa wybrana 0 razy; ten sam swiat przy kluczu wylaczonym: 29.90% (oczekiwane 30% - bez mnoznika).
+- Uwaga: w swiecie testu szanse sa duze (5-53%), wiec par ubywa tam mniej niz o 30% (kolejny lord rodu probuje po nieudanym rzucie poprzedniego); w grze szansa jest rzedu 0.1% i zaleznosc jest prawie liniowa.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: jedyna zmiana logiki to prog rzutu wolnego lorda przy czynnej regule; przy mnozniku 1.0, przy regule wylaczonej / stojacej i w biegu cienia rzut liczony z nietknietej szansy (test wyzej: 0 roznic). Pole `_scale` czyta tylko `Decide`, linia startu i linia doby; zerowane przy nowej grze / wczytaniu, ustawiane przed wlaczeniem prefiksu.
+- Kolizje: nikt inny nie czyta klucza. Licznik Armoury `Measure169c` ("Sluby AI (169c)") pokaze mniej slubow - sam pomiar. `RaceLaw` bez zmian (pary roznych ras nie trafiaja na liste kandydatow). Zlota slub AI-AI nie przenosi.
+- Spojnosc: hamulec nie zmienia tego, KTO z kim moze sie pobrac ani rozkladu wyboru kandydata - tylko czestosc. Gracz: rod gracza jest poza tymi swatami (lista ROT bez rodu gracza, `clan == Clan.PlayerClan` konczy metode) - szansa oswiadczyn gracza bez zmian.
+- Format logu: w linii doby doszlo jedno pole miedzy `pytan o szanse E` (albo `trafienie w kandydata bez szans N (P%)`) a `; sluby dzis` - narzedzie dopasowujace caly koniec linii jednym wzorcem trzeba poprawic; wzorce na `sluby dzis N, od wczytania M` i `slubow N` dzialaja. `tools/sprawdz_logi.py` tej linii nie czyta (grep).
+- Wgranie: domyslne 0.7 jest w kodzie - hamulec dziala takze wtedy, gdy w grze zostanie stary plik ustawien bez klucza (CrashScribe nie uzywa MCM).
+- Mnoznik to szacunek liniowy: jesli bieg roczny da wyraznie inna liczbe niz ok. 150 (np. ponizej 130 albo powyzej 170), poprawic sama wartosc klucza - kod bez zmian.
+- NIE sprawdzone w grze (gry nie uruchamiano, w katalogu gry nic nie zapisano).
+
+**Jak sprawdzic w logu (sesja CrashScribe):**
+- start: `Mends: swaty ROT (Z.3): PODPIETY (... tylko kandydaci z szansa (MarriageOnlyViableCandidates): CZYNNE; mnoznik szansy 0.7 (MarriageChanceScale))`;
+- co dobe: `Swaty ROT (Z.3): dzien D - klanow N, slubow S, ... pytan o szanse E; mnoznik szansy 0.7 (MarriageChanceScale); sluby dzis S, od wczytania T.` - `od wczytania` w dobie 120 ok. 50-58 (bylo 78), w dobie 364 ok. 150 (bylo 215); powyzej 70 w dobie 120 = hamulec nie dziala, ponizej 40 = hamuje za mocno;
+- potkniecia 0, brak linii "obca latka" i "przyciete do"; "proby wolnych lordow" spada wolniej niz w biegu bez hamulca (685 -> 576 przez rok).
+
+**Build:** CrashScribe kod 0, 0 ostrzezen; XML ustawien sprawdzony parserem (`xml.dom.minidom`).
+
+**Status:** DO SPRAWDZENIA - autotest 120 dob (ok. 50-58 slubow), potem bieg roczny (ok. 150).
+
 ## 2026-10-13 (Z.3 SWATY ROT - pomiar w grze) - bieg cienia NIE daje 0 roznic: przyczyna zmierzona (BK zuzywa losowanie w ocenie szansy), opis w ustawieniach poprawiony; kod bez zmian
 **Mod:** CrashScribe (sam plik danych) | **Galaz:** `w-toku/zbior-e8` | **Pliki:** `CrashScribe/ModuleData/CrashScribe.settings.xml` (same komentarze przy `MarriageFast` i `MarriageFastShadow`), `CHANGELOG.md`. DLL bez zmian (CrashScribe 3ca8aa08).
 
