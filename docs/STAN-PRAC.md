@@ -1404,3 +1404,12 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   **Etap 8 drzewo C SKONCZONE** (`e8-c` 136216e: P3, S, Q, G1, G2, T, E, K, D1, D2). Drzewo A: zostaje O2, O3, O5, O6 (wf_1db23a93-783). Poprawki zbior-5-8: F4a 81f81e3, F4b 25d2fbf, F3 3c47f2a
   (recenzja w toku), potem zlozenie F9b. **W TOKU wf_88688069-5bf (szwy w zbior-e8):** E8/H - E8/O1 (zakup siodel w pamieci polki) i F6 pkt 2 (pamiec AiWear.UsedByMen).
   DALEJ: scalenie zbior-5-8 (po F9b) do zbior-e8 -> bieg probny 120 dob -> ogon e8-a (O2-O6) -> przeglad kolizji + pelny audyt -> test zbiorczy -> wgranie.
+- (06:00 UTC 13.10) **`w-toku/zbior-e8` = e60928a - PRAWIE CALOSC (brak tylko E8/O2, O3, O5, O6 z drzewa A):** szwy 14563c4 (E8/H - E8/O1: zakup siodel juz objety pamiecia polki) + 1a15da2
+  (F6 pkt 2-3: pamiec AiWear.UsedByMen 5-8 dob, linia "Rezerwa napraw AI - pamiec dopasowania (F6)" - do obserwacji "netto pamiec - swieza") + recenzja ce6524b; **scalenie zbior-5-8 6c2c453 = e60928a**
+  (poprawki F1-F8 + F9a/F9b narzedzie; konflikty: ArmouryBehavior konstruktor i takt doby - DistrictRaid.Reset/Daily ze stoperem profilu, CS SubModuleMain - liczniki E8/0 + filtr E8/M,
+  sprawdz_logi opis, CHANGELOG 760 naglowkow; weryfikacja mechaniczna 139 plikow - 0 brakow, 0 dubli poza 4 liniami zlozonymi recznie; gen_mcm Armoury 1293 / RC 111 / GT 40; build 5 modow 0).
+  Poprawki zbior-5-8 SKONCZONE (wf_3c309990-051): F1 b762fe4, F2 7d8d0cd, F6 cd06bcd, F7 a11e2e7, F8 38cb329, F5 57819b1, F4a 81f81e3 (+04a0968), F4b 25d2fbf, F3 3c47f2a, F9a b5509fe, F9b 3a80dd1 (+6c2c453).
+  **W TOKU:** (1) BIEG PROBNY 2: 120 dob nowej kampanii na zbior-e8 e60928a (Armoury 359e8b37, RC 8bb3de5c, GT 778e4aac, ForgeView 9b14f90f, CS-at 952de067; test\at-e8r1-120.out.txt);
+  (2) PELNY AUDYT wf_512814c1-89f (docs/przekazanie/wf-pelny-audyt-zbior-e8.js): 8 przegladow tylko odczyt (zloto, sztuki, latki, zapis, ustawienia, zderzenia paczek, wydajnosc, sciezki gracza)
+  + niezalezne sprawdzenie kazdego znaleziska krytycznego/waznego; (3) drzewo A: O2 zakodowane (2a7ee78), zostaje O3, O5, O6.
+  DALEJ: ogon e8-a -> poprawki z audytu i z biegu 2 -> test zbiorczy (120 + zapis + bieg dlugi + zdjecia drog + -Profile) -> wgranie.
