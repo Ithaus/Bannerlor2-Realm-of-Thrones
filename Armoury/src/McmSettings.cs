@@ -2084,6 +2084,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool CaravanTownHourly { get; set; } = true;
 
+        [SettingPropertyInteger("Caravan Town Hourly Max Ticks", 0, 48, "0", HintText = "a caravan still standing in the same town after this many hourly looks goes back to one look a day until it leaves - a caravan with nowhere to go no longer costs time every hour. A healthy caravan with somewhere to go leaves within a few hours anyway. 0 = no limit")]
+        [SettingPropertyGroup("The road to market")]
+        public int CaravanTownHourlyMaxTicks { get; set; } = 12;
+
         [SettingPropertyBool("Island Caravan Fix", HintText = "a caravan without ships is no longer left stranded where it cannot trade: a lord does not buy one (Banner Kings) in a town, castle or village that has no road to two towns - his gold stays with him - and a caravan already standing in a town with no other town in reach by land is wound up: the town buys its goods out of its spare money, the purse goes to the owner, the men go home. Your own caravans are never touched. Off = as before")]
         [SettingPropertyGroup("The road to market")]
         public bool IslandCaravanFix { get; set; } = true;
@@ -5724,6 +5728,7 @@ namespace Armoury
             s.VillageCartTownMaxDays = VillageCartTownMaxDays;
             s.IslandRoadsFix = IslandRoadsFix;
             s.CaravanTownHourly = CaravanTownHourly;
+            s.CaravanTownHourlyMaxTicks = CaravanTownHourlyMaxTicks;
             s.IslandCaravanFix = IslandCaravanFix;
             s.NotableCaravanCap = NotableCaravanCap;
             s.VillageClogDiagnostics = VillageClogDiagnostics;

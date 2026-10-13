@@ -25,6 +25,9 @@ namespace Armoury
     ///     PREFIKSU BKROT (krytyka K2-1: prefiks o wyzszym priorytecie nie pomoze - Harmony przed prefiksem z wynikiem bool sprawdza runOriginal, a wynik BKROT
     ///     i tak go nadpisze): gdy BKROT zwrocil false, a karawana stoi w miescie albo zamku (Town != null) bez oblezenia - wynik true. W drodze i we wsi
     ///     wynik BKROT bez zmian. Postfiks na BK HourlyTickParty tylko mierzy: czas tikow, ktore otworzylismy, i ile z nich dalo karawanie nowy cel.
+    ///     LIMIT NA POSTOJ (poprawka A2 po biegu probnym 2, TRIAZ-2 G1-4 "G1b"; klucz CaravanTownHourlyMaxTicks, 0 = bez limitu): po tylu otwartych tikach w tym
+    ///     samym postoju karawana wraca do tiku BKROT raz na dobe (jak przed E8/G1). Karawana bez celu powtarzala pelna decyzje BK (zakup + dwa przebiegi po
+    ///     miastach) co trzeci tik bez konca - 62% kosztu otwartych tikow (1.4-1.7 s na dobe) szlo na karawany, ktore i tak nie wyjezdzaja. Tylko bramka tiku.
     ///  2. ZAKUP KARAWANY LORDA BK W SLEPYM ZAULKU (klucz IslandCaravanFix): BKLordPropertyBehavior.OnSettlementEntered kupuje lordowi karawane w osadzie,
     ///     do ktorej wjechal (takze we wsi i zamku), z szablonem ladowym poza portem. Na wyspie z jednym miastem taka karawana nie ma dokad jechac
     ///     (Z33: 2 karawany lordow stoja 118 dob). Postfiks na ShouldHaveCaravan(Hero, int): osada bez drogi ladowej do dwoch miast (miasto - do zadnego
@@ -87,11 +90,18 @@ namespace Armoury
         private static readonly HashSet<MobileParty> _dCars = new HashSet<MobileParty>();
         // pomiar (tylko licznik): otwarte tiki ponad LongStayTicks w tym samym postoju - karawana, ktora mimo tiku co godzine nie wyjezdza (brak celu, ranni);
         // przy szansie 1/3 na tik karawana z celem zostaje tak dlugo raz na ok. 17 000 postojow
-        private sealed class Stay { public Settlement At; public int N; public double Last; }
+        private sealed class Stay { public Settlement At; public int N; public double Last; public bool Shut; }
         private static readonly Dictionary<MobileParty, Stay> _stay = new Dictionary<MobileParty, Stay>();
         private const int LongStayTicks = 24;
         private static int _dLongTicks;
         private static readonly HashSet<MobileParty> _dLongCars = new HashSet<MobileParty>();
+        // A2 (G1b): tiki zamkniete po limicie otwartych tikow na postoj (CaravanTownHourlyMaxTicks) i stan karawany przy pierwszym zamknieciu postoju
+        private static int _dShut, _dShutNew;
+        private static readonly HashSet<MobileParty> _dShutCars = new HashSet<MobileParty>();
+        private static readonly Dictionary<string, int> _dShutWhy = new Dictionary<string, int>();
+        // audyt [latki]: otwarty tik, w ktorym cialo BK nie pobieglo (inny prefiks po BKROT zwrocil false - kontrakt surowca 174)
+        private static int _dBlocked;
+        private static long _dBlockedTicks;
 
         // ------------------------------------------------------------ 2. zakup karawany lorda BK
         private static int _dBuyAsk, _dBuyShips, _dBuySkip, _dBuyShadow;
@@ -127,6 +137,8 @@ namespace Armoury
             _stumblesDay = 0;
             _dRoad = _dSiege = _dTown = _dOpened = _dRan = _dOrders = 0; _dTicks = 0; _dCars.Clear();
             _dLongTicks = 0; _dLongCars.Clear();
+            _dShut = _dShutNew = 0; _dShutCars.Clear(); _dShutWhy.Clear();
+            _dBlocked = 0; _dBlockedTicks = 0;
             _dBuyAsk = _dBuyShips = _dBuySkip = _dBuyShadow = 0; _dBuyAt.Clear();
             _dStuck = _dDone = _dLeft = _dGoneShadow = _dFail = _dAgain = _dBelow = _dMen = 0;
             _dSoldU = _dSoldG = _dUnsoldU = _dUnsoldV = _dPurse = _dOwnerGot = _dMenPurse = 0;
@@ -151,22 +163,54 @@ namespace Armoury
                 if (at.IsUnderSiege) { _dSiege++; return; }                     // oblezone miasto: BK i tak nic nie robi (karawana czeka na koniec oblezenia)
                 _dTown++;
                 if (!s.CaravanTownHourly) return;                               // w cieniu: tylko licznik
-                __result = true;
-                _dOpened++; _dCars.Add(__0);
+                // ksiegowanie postoju PRZED otwarciem (A2/G1b)
                 Stay st;
                 if (!_stay.TryGetValue(__0, out st)) { st = new Stay(); _stay[__0] = st; }
                 double now = CampaignTime.Now.ToHours;
-                if (st.At != at || now - st.Last > 2.5) { st.At = at; st.N = 0; }   // inne miasto albo przerwa w tikach (wyjazd i powrot, oblezenie) = nowy postoj
-                st.Last = now;
-                if (++st.N > LongStayTicks) { _dLongTicks++; _dLongCars.Add(__0); }
+                if (st.At != at || now - st.Last > 2.5) { st.At = at; st.N = 0; st.Shut = false; }   // inne miasto albo przerwa w tikach (wyjazd i powrot, oblezenie) = nowy postoj
+                st.Last = now;                                                  // takze przy zamknietym tiku - inaczej "przerwa" otworzylaby te sama karawane od nowa
+                int lim = s.CaravanTownHourlyMaxTicks;
+                if (lim > 0 && st.N >= lim)                                     // limit postoju: wynik BKROT zostaje (false) - tik BK raz na dobe, jak przed E8/G1
+                {
+                    _dShut++; _dShutCars.Add(__0);
+                    if (!st.Shut) { st.Shut = true; _dShutNew++; Classify(__0, at); }
+                    return;
+                }
+                st.N++;
+                __result = true;
+                _dOpened++; _dCars.Add(__0);
+                if (st.N > LongStayTicks) { _dLongTicks++; _dLongCars.Add(__0); }
                 _fAt = at; _fTarget = __0.TargetSettlement; _fT0 = Stopwatch.GetTimestamp(); _fParty = __0;
             }
             catch (Exception e) { Stumble("ThrottlePostfix", e); }
         }
 
+        /// <summary>Raz na postoj, przy pierwszym tiku zamknietym po limicie: stan karawany z tanich pol (cechy sie nie wykluczaja). Bez ThinkNextDestination BK
+        /// do pomiaru "cel null" - to pelna decyzja (ok. 3.7 ms) i dotyka slownikow BK. Progi rannych jak w BK HourlyTickPartyImpl (2.5% - mniejsza szansa
+        /// wyjazdu, ponad 40% - zadna).</summary>
+        private static void Classify(MobileParty c, Settlement at)
+        {
+            try
+            {
+                bool any = false;
+                if (c.DefaultBehavior == AiBehavior.Hold || c.ShortTermBehavior == AiBehavior.Hold) { Bump(_dShutWhy, "Hold"); any = true; }
+                var mr = c.MemberRoster;
+                int men = mr != null ? mr.TotalManCount : 0, wnd = mr != null ? mr.TotalWounded : 0;
+                if (men > 0 && wnd > 0.4f * men) { Bump(_dShutWhy, "ranni ponad 40%"); any = true; }
+                else if (men > 0 && wnd > 0.025f * men) { Bump(_dShutWhy, "ranni 2.5-40%"); any = true; }
+                if (c.PartyTradeGold < 100) { Bump(_dShutWhy, "kiesa ponizej 100"); any = true; }
+                if (c.ItemRoster == null || c.ItemRoster.Count == 0) { Bump(_dShutWhy, "juki puste"); any = true; }
+                if (c.HasNavalNavigationCapability) { Bump(_dShutWhy, "ze statkami"); any = true; }
+                if (c.HomeSettlement == at) { Bump(_dShutWhy, "dom tutaj"); any = true; }
+                if (!any) Bump(_dShutWhy, "bez cechy");
+            }
+            catch (Exception e) { Stumble("Classify", e); }
+        }
+
         /// <summary>Postfiks BK BKCaravansBehavior.HourlyTickParty(MobileParty) - tylko pomiar tiku otwartego wyzej: czas (z prefiksami po BKROT i cialem BK)
-        /// i czy karawana dostala nowy cel poza miastem postoju.</summary>
-        public static void BkHourlyPostfix(MobileParty __0)
+        /// i czy karawana dostala nowy cel poza miastem postoju. Audyt [latki]: postfiks biegnie takze, gdy cialo BK zostalo pominiete przez inny prefiks
+        /// (MaterialOrders.HourlyPrefix - karawana z kontraktem 174) - taki przebieg nie jest tikiem BK: osobny licznik, poza "tiki BK" i kosztem.</summary>
+        public static void BkHourlyPostfix(MobileParty __0, bool __runOriginal)
         {
             var p = _fParty;
             if (p == null) return;
@@ -174,7 +218,15 @@ namespace Armoury
             try
             {
                 if (!ReferenceEquals(p, __0)) return;
-                _dTicks += Stopwatch.GetTimestamp() - _fT0;
+                long dt = Stopwatch.GetTimestamp() - _fT0;
+                if (!__runOriginal)
+                {
+                    _dBlocked++; _dBlockedTicks += dt;
+                    Stay st;                                                    // BK nie mogl zdecydowac - ten tik nie zuzywa limitu postoju
+                    if (_stay.TryGetValue(p, out st) && st.N > 0) st.N--;
+                    return;
+                }
+                _dTicks += dt;
                 _dRan++;
                 var t = __0.TargetSettlement;
                 if (t != null && t != _fAt && t != _fTarget) _dOrders++;
@@ -536,7 +588,7 @@ namespace Armoury
                 sb.Append("Karawany (E8/G1): dzien ").Append(day)
                   .Append(" | dlawik BKROT (Caravan Town Hourly ").Append(s.CaravanTownHourly ? "CZYNNE" : "WYLACZONE").Append("): tiki BK zamkniete karawanom AI - w drodze ").Append(_dRoad)
                   .Append(" (zostaje raz na dobe), w oblezonym miescie ").Append(_dSiege).Append(", w miescie ").Append(_dTown).Append(" - otwarte ").Append(_dOpened)
-                  .Append(" u ").Append(_dCars.Count).Append(" karawan (w cieniu ").Append(_dTown - _dOpened).Append("), w tym ponad ").Append(LongStayTicks)
+                  .Append(" u ").Append(_dCars.Count).Append(" karawan (w cieniu ").Append(_dTown - _dOpened - _dShut).Append("), w tym ponad ").Append(LongStayTicks)
                   .Append(" tiki w tym samym postoju: ").Append(_dLongTicks).Append(" tikow u ").Append(_dLongCars.Count).Append(" karawan (bez celu albo ranni)")
                   .Append(" | po otwarciu: tiki BK ").Append(_dRan).Append(", nowy cel karawany ").Append(_dOrders)
                   .Append(", koszt dodatkowych tikow ").Append(tickMs.ToString("0.00", Inv)).Append(" ms/dobe")
@@ -562,6 +614,11 @@ namespace Armoury
                   .Append(" razy, wstrzymane limitem ").Append(_dCapHeld).Append(" u ").Append(_dCapWho.Count).Append(" kupcow")
                   .Append(" | karawany notabli (wszystkie, takze spiace): kupcow z 1 karawana ").Append(cap1).Append(", z 2 ").Append(cap2).Append(", z 3 i wiecej ").Append(cap3)
                   .Append(" (najwiecej ").Append(capMax).Append("), razem karawan notabli ").Append(capAll);
+                sb.Append(" | limit postoju (Caravan Town Hourly Max Ticks ").Append(s.CaravanTownHourlyMaxTicks).Append(s.CaravanTownHourlyMaxTicks > 0 ? "" : " - bez limitu")
+                  .Append("): zamkniete po limicie ").Append(s.CaravanTownHourlyMaxTicks).Append(" tikow w tym samym postoju: ").Append(_dShut).Append(" tikow u ").Append(_dShutCars.Count)
+                  .Append(" karawan (wracaja do tiku BKROT raz na dobe; nowe postoje po limicie dzis ").Append(_dShutNew).Append(", wedlug stanu").Append(_dShutWhy.Count > 0 ? Top(_dShutWhy, 8) : " -")
+                  .Append(") | po otwarciu cialo tiku BK pominiete przez inny prefiks (kontrakt 174): ").Append(_dBlocked).Append(" tikow, ")
+                  .Append((_dBlockedTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms (poza 'tiki BK' i kosztem dodatkowych tikow)");
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

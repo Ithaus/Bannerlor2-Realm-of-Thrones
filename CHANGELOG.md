@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (POPRAWKA A2 po biegu probnym 2 - BLOKUJE) - E8/G1: LIMIT OTWARTYCH TIKOW BK NA POSTOJ W MIESCIE (Caravan Town Hourly Max Ticks = 12) - karawana bez celu wraca do jednego spojrzenia na dobe; licznik "tiki BK" liczy tylko przebiegi z cialem BK
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 031c41a) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1299 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "G1-4" (poprawka ostateczna "G1b") i `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md` "[latki] Karawany (E8/G1): 'po otwarciu: tiki BK' liczy takze przebiegi...".
+
+**Problem (dowod z logu biegu 2):** linia "Karawany (E8/G1)" dzien 108955 (d120): "w miescie 2400 - otwarte 2400 u 390 karawan, w tym ponad 24 tiki w tym samym postoju: 1154 tikow u 54 karawan | po otwarciu: tiki BK 2400, nowy cel karawany 326, koszt dodatkowych tikow 2174.17 ms/dobe". Srednio 120 dob 1411 ms/d, d31-120 1725 ms/d (prog projektu 5 ms). Regresja 117 dob: koszt = 1.25 ms x dlugie tiki + 1.73 ms x nowy cel (R2 0.98) - 62% kosztu to karawany, ktore i tak nie wyjezdzaja.
+
+**Przyczyna:** `CaravanFlow.ThrottlePostfix` otwieral tik BK kazdej karawanie AI w miescie bez limitu, a licznik postoju tylko liczyl. BK (`BKCaravansBehavior.HourlyTickPartyImpl` :858-911) przy losie < 1/3 robi pelna decyzje: `BuyGoods` + `ThinkNextDestination` (dwa przebiegi po wszystkich miastach, gdy pierwszy nie znalazl celu). Karawana bez celu powtarza to co trzeci tik bez konca (ok. 3.7-4.0 ms na decyzje); przed E8/G1 te same karawany tykaly raz na dobe (ok. 45 ms/d razem).
+
+**Zmiana:**
+- Klucz `CaravanTownHourlyMaxTicks = 12` (int; 0 = bez limitu; suwak 0-48). W `Armoury.json` Jeffa klucza nie ma - dziala domyslna. `CaravanTownHourly` zostaje wlaczone.
+- `ThrottlePostfix`: ksiegowanie postoju (karawana -> miasto, liczba otwartych tikow, godzina ostatniego tiku) przeniesione PRZED otwarcie. Gdy postoj ma juz limit otwartych tikow: wynik BKROT zostaje (false) - karawana wraca do tiku BKROT raz na dobe, jak przed E8/G1. Godzina ostatniego tiku jest odswiezana takze przy zamknietym tiku (inaczej "przerwa ponad 2.5 h" otworzylaby te sama karawane od nowa). Nowy postoj = inne miasto albo przerwa w tikach ponad 2.5 h (wyjazd i powrot, oblezenie) - jak dotad.
+- Raz na postoj, przy pierwszym zamknietym tiku: stan karawany z tanich pol (Hold, ranni ponad 40% / 2.5-40% - progi BK, kiesa ponizej 100, juki puste, ze statkami, dom tutaj, bez cechy) - dane do G1-1 (dlaczego ok. 45 karawan nie ma celu). Bez wolania `ThinkNextDestination` do pomiaru.
+- Audyt [latki]: `BkHourlyPostfix` dostal `bool __runOriginal` - "po otwarciu: tiki BK", "nowy cel" i "koszt dodatkowych tikow" licza tylko przebiegi, w ktorych cialo BK pobieglo; otwarty tik pominiety przez inny prefiks (`MaterialOrders.HourlyPrefix` - karawana z kontraktem 174) ma osobny licznik i nie zuzywa limitu postoju (BK nie mogl zdecydowac).
+- Linia doby "Karawany (E8/G1)": istniejace pola na miejscu (pole "w tym ponad 24 tiki ..." zostaje - czyta je G1-4b; przy limicie <= 24 pokazuje 0); "(w cieniu X)" = w miescie - otwarte - zamkniete po limicie (zamkniete tiki nie udaja trybu cienia). Dopiski NA KONCU: "limit postoju (Caravan Town Hourly Max Ticks L): zamkniete po limicie L tikow w tym samym postoju: N tikow u M karawan (wracaja do tiku BKROT raz na dobe; nowe postoje po limicie dzis K, wedlug stanu [...]) | po otwarciu cialo tiku BK pominiete przez inny prefiks (kontrakt 174): B tikow, X ms (poza 'tiki BK' i kosztem dodatkowych tikow)".
+
+**Co Jeff zobaczy w grze:** nic poza szybsza doba (ok. 1 s na dobe mniej w dobach 31-120). Zdrowa karawana z celem wyjezdza jak dotad (mediana postoju ok. 2 h); karawana, ktora po 12 godzinach dalej stoi, sprawdza wyjazd raz na dobe zamiast co godzine.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: tylko bramka tiku - zadnego zlota ani sztuk. Zapis: nic (pamiec postojow tylko w pamieci, czyszczona w Reset; po wczytaniu kazda stojaca karawana dostaje 12 tikow od nowa - jednorazowo ok. 0.7 s rozlozone na 12 h gry).
+- Liczba 12: zdrowa karawana z celem wyjezdza w 12 tikach z pewnoscia 99.2% (1 - (2/3)^12); ok. 2.7 karawany na dobe trafi na limit mimo celu i poczeka 1-3 doby na tik dobowy (ok. 0.5-0.8% kursow). Lekko ranna karawana po 12 tikach czeka na tik dobowy (leczy sie w miescie). Limit 16 = +25 ms/d i 0.5 pomylki na dobe - strojenie kluczem.
+- Kolizje: `MaterialOrders` ma wlasny prefiks na tym samym tiku BK i wlasny rozkaz jazdy - nie zalezy od otwarcia; `CaravanBulk` kupuje raz na wizyte; `IslandRoads` i linia "Postoj karawan (E8/P3)" nie czytaja bramki. Karawana, ktora wyjedzie i wroci do tego samego miasta w ciagu 2.5 h, zachowuje licznik postoju.
+- Sredni postoj wzrosnie z ok. 4.7 h do ok. 5-6 h (prog G1-2: 12 h); karawany 7+ dob w tym samym miescie bez skoku (ok. 40-45) - poprawka NIE rozwiazuje G1-1, daje do niej dane.
+- Oczekiwane d31-120 (sama A2, bez A1): otwarte ok. 1150-1250/d (bylo 2058), zamkniete po limicie ok. 900-1050 tikow/d u 45-55 karawan, koszt dodatkowych tikow ok. 0.55-0.75 s/d (bylo 1.72 s). Razem z A1 (mniej karawan i wyjazdow) mniej. Prog narzedzia G1-4 "<= 5 ms/d" jest do poprawy (kazdy wyjazd to decyzja BK za 1.3-2.0 ms).
+- Cofniecie: `CaravanTownHourlyMaxTicks = 0`.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy ("zamkniete po limicie" > 0, "w tym ponad 24 tiki" = 0, "(w cieniu 0)", koszt dodatkowych tikow na nowy cel <= 2.5 ms, sredni postoj <= 12 h, potkniecia 0).
+
 ## 2026-10-13 (POPRAWKA A1 po biegu probnym 2 - BLOKUJE) - KARAWANY NOTABLI MNOZYLY SIE BEZ GRANICY: limit karawan kupca (Notable Caravan Cap = 2), karawany spiace w polu tez sie licza
 **Mod:** Armoury | **Galaz:** `w-toku/p2-a` (z e9dfa7f) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Seal31.cs` (1 linia wpiecia), `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1298 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcje S1, S2, O2-3, "POZA LISTA (zrodlo g, h i czasu doby)", "X-karawany-liczba" + decyzja prowadzacego (jeden klucz, limit 2, postfiks na modelu gry).
 
