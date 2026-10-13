@@ -1,5 +1,83 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (POPRAWKA A3 po biegu probnym 2 - S) - E6/K5 KROK 2: JUCZNE KARAWANY MORSKIEJ ZDEJMOWANE OD RAZU (InitPost) - koniec 325 jucznych z niczego na polkach miast portowych
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 503c7e0) | **Pliki:** `Armoury/src/PackMarket.cs`, `CHANGELOG.md`. Bez nowego klucza (ten sam `PackAnimalsFromMarket`), bez zmian zapisu. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "K5-4" (poprawka ostateczna, krok 2).
+
+**Problem (dowod z logu biegu 2):** linia "Juczne (213)" - w 120 dobach "z niczego" razem 325 sztuk (gra dala 14 351, zdjete 14 026), wylacznie w dobach z karawana morska: 44 doby z morskimi (57 karawan) - z niczego 325 w 43 z nich; 75 dob bez morskich - 0 w kazdej. Przyklad dzien 108952: "nowe karawany 3 ... z niczego 10 (gra dala 45, zdjete 35; poza CreateCaravanParty 0 partii, 0 sztuk) | morskie 1 (zdjete 31 bez zakupu)". F2 zamknal 96% przecieku (13 622 -> 325); to jest reszta.
+
+**Przyczyna:** gra dodaje nowej karawanie juczne w `InitializeCaravanOnCreation` (wewnatrz `MobileParty.CreateParty`), a zaraz potem, jeszcze w `CreateCaravanParty`, wprowadza ja do miasta startu (`EnterSettlementAction` -> `CaravansCampaignBehavior.OnSettlementEntered` :691-719 -> `SellGoodsInternal` :1147): partia BEZ drogi ladowej sprzedaje juczne miastu bez progu 0.6 x ludzie (karawana ladowa ma 0.5 x ludzie, wiec nie sprzedaje nic). Nasz postfiks `CreatePost` biegnie po tym i zdejmowal tylko to, co zostalo (`take = min(dane, ma)`) - srednio 5.7 sztuki na karawane morska zostawalo na polce miasta startu jako sztuki z niczego (zloto to przelew kasa miasta -> kiesa konwoju, ok. 220 zl/d, nie zloto z niczego).
+
+**Zmiana:** `PackMarket.InitPost` - po zebraniu listy jucznych dodanych przez gre: gdy kampania trwa (`Live`), klucz czynny, partia bez drogi ladowej (`!HasLandNavigationCapability` - gra ustawia to PRZED dodaniem jucznych, CaravanPartyComponent.cs:54 wobec :83) i nie konwoj DTE (`CaravanCapital.InDteConvoy`) - juczne zdjete od razu po liscie (nie w petli po indeksach rostera), liczniki `_calls`, `_new`, `_given`, `_removed`, `_naval`, `_navalN` jak w `CreatePost` (morskie sa czescia "nowe karawany" - prog K5-5 sie nie rozjezdza), partia nie idzie do `_pend`. Reszta bez zmian: karawany startowe (przed GameStarted), wylaczony klucz i konwoje DTE ida do `_pend` i rozlicza je `CreatePost`; galaz morska w `CreatePost` zostaje jako bezpiecznik (nie powinna sie juz wykonywac). Tekst linii "Juczne (213)" bez zmian.
+
+**Co Jeff zobaczy w grze:** nic. Z targow miast portowych znika 2.7 jucznych na dobe, ktore powstawaly z niczego; kasy tych miast nie placa za nie konwojom.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: po poprawce miasto nie placi za sztuki z niczego - nic nie powstaje i nic nie ginie (juczne gry sa zdejmowane w tej samej chwili, w ktorej gra je dodala; konwoj morski startuje bez jucznych - jak dotad po postfiksie; gra i tak nie kupuje im jucznych).
+- Zdjecie przed nadaniem Id partii: `ItemRoster.AddToCounts` zmienia tylko liczniki rostera; `HorseState.RosterPostfix` pracuje na instancji rostera (bez slownika po partii). Miedzy InitPost a koncem CreateCaravanParty nic nie potrzebuje jucznych konwoju (InitializePartyTrade, AdjustConvoyShips, RefillConvoyTroops, E4/8 CaravanPost, finalizery CaravanCapital / O17). Linia O17 "w kasach zaraz po wejsciu" spadnie o utarg ze sprzedazy (tylko informacja).
+- `InDteConvoy()` dziala juz w InitPost (kontekst DTE i `_createDepth` sa podniesione przed wywolaniem CreateCaravanParty) - konwoj DTE dalej idzie galezia "konwoje DTE" (1 385 jucznych z niczego w 120 dob po stronie DTE - swiadomie poza K5).
+- Zapis: nic; nowa kampania niepotrzebna. Po wczytaniu zapisu przeciek dzialal od pierwszej doby - poprawka tez.
+- Czas doby: jeden warunek na nowa karawane.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy (K5-4 "z niczego" = 0 we wszystkich dobach, takze z "morskie" > 0; "gra dala" = "zdjete"; K5-5 rowne; K5-4b 0/0; potkniecia 0; brak "ERROR in PackMarket.InitPost").
+
+## 2026-10-13 (POPRAWKA A2 po biegu probnym 2 - BLOKUJE) - E8/G1: LIMIT OTWARTYCH TIKOW BK NA POSTOJ W MIESCIE (Caravan Town Hourly Max Ticks = 12) - karawana bez celu wraca do jednego spojrzenia na dobe; licznik "tiki BK" liczy tylko przebiegi z cialem BK
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (po 031c41a) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1299 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcja "G1-4" (poprawka ostateczna "G1b") i `docs/test-zbiorczy/AUDYT-zbior-e8-2026-10-13.md` "[latki] Karawany (E8/G1): 'po otwarciu: tiki BK' liczy takze przebiegi...".
+
+**Problem (dowod z logu biegu 2):** linia "Karawany (E8/G1)" dzien 108955 (d120): "w miescie 2400 - otwarte 2400 u 390 karawan, w tym ponad 24 tiki w tym samym postoju: 1154 tikow u 54 karawan | po otwarciu: tiki BK 2400, nowy cel karawany 326, koszt dodatkowych tikow 2174.17 ms/dobe". Srednio 120 dob 1411 ms/d, d31-120 1725 ms/d (prog projektu 5 ms). Regresja 117 dob: koszt = 1.25 ms x dlugie tiki + 1.73 ms x nowy cel (R2 0.98) - 62% kosztu to karawany, ktore i tak nie wyjezdzaja.
+
+**Przyczyna:** `CaravanFlow.ThrottlePostfix` otwieral tik BK kazdej karawanie AI w miescie bez limitu, a licznik postoju tylko liczyl. BK (`BKCaravansBehavior.HourlyTickPartyImpl` :858-911) przy losie < 1/3 robi pelna decyzje: `BuyGoods` + `ThinkNextDestination` (dwa przebiegi po wszystkich miastach, gdy pierwszy nie znalazl celu). Karawana bez celu powtarza to co trzeci tik bez konca (ok. 3.7-4.0 ms na decyzje); przed E8/G1 te same karawany tykaly raz na dobe (ok. 45 ms/d razem).
+
+**Zmiana:**
+- Klucz `CaravanTownHourlyMaxTicks = 12` (int; 0 = bez limitu; suwak 0-48). W `Armoury.json` Jeffa klucza nie ma - dziala domyslna. `CaravanTownHourly` zostaje wlaczone.
+- `ThrottlePostfix`: ksiegowanie postoju (karawana -> miasto, liczba otwartych tikow, godzina ostatniego tiku) przeniesione PRZED otwarcie. Gdy postoj ma juz limit otwartych tikow: wynik BKROT zostaje (false) - karawana wraca do tiku BKROT raz na dobe, jak przed E8/G1. Godzina ostatniego tiku jest odswiezana takze przy zamknietym tiku (inaczej "przerwa ponad 2.5 h" otworzylaby te sama karawane od nowa). Nowy postoj = inne miasto albo przerwa w tikach ponad 2.5 h (wyjazd i powrot, oblezenie) - jak dotad.
+- Raz na postoj, przy pierwszym zamknietym tiku: stan karawany z tanich pol (Hold, ranni ponad 40% / 2.5-40% - progi BK, kiesa ponizej 100, juki puste, ze statkami, dom tutaj, bez cechy) - dane do G1-1 (dlaczego ok. 45 karawan nie ma celu). Bez wolania `ThinkNextDestination` do pomiaru.
+- Audyt [latki]: `BkHourlyPostfix` dostal `bool __runOriginal` - "po otwarciu: tiki BK", "nowy cel" i "koszt dodatkowych tikow" licza tylko przebiegi, w ktorych cialo BK pobieglo; otwarty tik pominiety przez inny prefiks (`MaterialOrders.HourlyPrefix` - karawana z kontraktem 174) ma osobny licznik i nie zuzywa limitu postoju (BK nie mogl zdecydowac).
+- Linia doby "Karawany (E8/G1)": istniejace pola na miejscu (pole "w tym ponad 24 tiki ..." zostaje - czyta je G1-4b; przy limicie <= 24 pokazuje 0); "(w cieniu X)" = w miescie - otwarte - zamkniete po limicie (zamkniete tiki nie udaja trybu cienia). Dopiski NA KONCU: "limit postoju (Caravan Town Hourly Max Ticks L): zamkniete po limicie L tikow w tym samym postoju: N tikow u M karawan (wracaja do tiku BKROT raz na dobe; nowe postoje po limicie dzis K, wedlug stanu [...]) | po otwarciu cialo tiku BK pominiete przez inny prefiks (kontrakt 174): B tikow, X ms (poza 'tiki BK' i kosztem dodatkowych tikow)".
+
+**Co Jeff zobaczy w grze:** nic poza szybsza doba (ok. 1 s na dobe mniej w dobach 31-120). Zdrowa karawana z celem wyjezdza jak dotad (mediana postoju ok. 2 h); karawana, ktora po 12 godzinach dalej stoi, sprawdza wyjazd raz na dobe zamiast co godzine.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: tylko bramka tiku - zadnego zlota ani sztuk. Zapis: nic (pamiec postojow tylko w pamieci, czyszczona w Reset; po wczytaniu kazda stojaca karawana dostaje 12 tikow od nowa - jednorazowo ok. 0.7 s rozlozone na 12 h gry).
+- Liczba 12: zdrowa karawana z celem wyjezdza w 12 tikach z pewnoscia 99.2% (1 - (2/3)^12); ok. 2.7 karawany na dobe trafi na limit mimo celu i poczeka 1-3 doby na tik dobowy (ok. 0.5-0.8% kursow). Lekko ranna karawana po 12 tikach czeka na tik dobowy (leczy sie w miescie). Limit 16 = +25 ms/d i 0.5 pomylki na dobe - strojenie kluczem.
+- Kolizje: `MaterialOrders` ma wlasny prefiks na tym samym tiku BK i wlasny rozkaz jazdy - nie zalezy od otwarcia; `CaravanBulk` kupuje raz na wizyte; `IslandRoads` i linia "Postoj karawan (E8/P3)" nie czytaja bramki. Karawana, ktora wyjedzie i wroci do tego samego miasta w ciagu 2.5 h, zachowuje licznik postoju.
+- Sredni postoj wzrosnie z ok. 4.7 h do ok. 5-6 h (prog G1-2: 12 h); karawany 7+ dob w tym samym miescie bez skoku (ok. 40-45) - poprawka NIE rozwiazuje G1-1, daje do niej dane.
+- Oczekiwane d31-120 (sama A2, bez A1): otwarte ok. 1150-1250/d (bylo 2058), zamkniete po limicie ok. 900-1050 tikow/d u 45-55 karawan, koszt dodatkowych tikow ok. 0.55-0.75 s/d (bylo 1.72 s). Razem z A1 (mniej karawan i wyjazdow) mniej. Prog narzedzia G1-4 "<= 5 ms/d" jest do poprawy (kazdy wyjazd to decyzja BK za 1.3-2.0 ms).
+- Cofniecie: `CaravanTownHourlyMaxTicks = 0`.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy ("zamkniete po limicie" > 0, "w tym ponad 24 tiki" = 0, "(w cieniu 0)", koszt dodatkowych tikow na nowy cel <= 2.5 ms, sredni postoj <= 12 h, potkniecia 0).
+
+## 2026-10-13 (POPRAWKA A1 po biegu probnym 2 - BLOKUJE) - KARAWANY NOTABLI MNOZYLY SIE BEZ GRANICY: limit karawan kupca (Notable Caravan Cap = 2), karawany spiace w polu tez sie licza
+**Mod:** Armoury | **Galaz:** `w-toku/p2-a` (z e9dfa7f) | **Pliki:** `Armoury/src/CaravanFlow.cs`, `Armoury/src/Seal31.cs` (1 linia wpiecia), `Armoury/src/Settings.cs` (+ `McmSettings.cs` z `tools/gen_mcm.py`, 1298 ustawien), `CHANGELOG.md`. Specyfikacja: `docs/test-zbiorczy/TRIAZ-2-zbior-e8-120-2026-10-13.md` sekcje S1, S2, O2-3, "POZA LISTA (zrodlo g, h i czasu doby)", "X-karawany-liczba" + decyzja prowadzacego (jeden klucz, limit 2, postfiks na modelu gry).
+
+**Problem (dowod z logu biegu 2, `Armoury-2026-10-12_22-38-57.log`):** w dobie 120 jest 1570 karawan zamiast ok. 350-400. Linia "Obieg: notable i karawany" d120: 1532 karawany u 323 notabli = 4.7 na notabla i dalej rosnie (W33: 902 u 322 = 2.8; bieg 1: 838 u 320 = 2.6); suma "nowe karawany (notable)" w 120 dob: 1555 (bieg 1: 743, W33: 863), lordowie bez zmian (204 / 208 / 187). Skutki: czas doby 21.2 s wobec 17.6 (ok. 6-8 s na 1000 karawan), kapital nowych karawan z kas miast 11.19 mln w 120 dob (bieg 1: 7.04 mln) - renty panow i korony o polowe nizsze, wojsko lordow ponizej 85 tys.; zold karawan nalezny 277 tys./d wobec 180 tys.
+
+**Przyczyna:** kod GRY, odsloniety przez nasz nocny oboz. `CaravansCampaignBehavior.DailyTickHero` (dekompilacja :578-584) daje kupcowi karawane z szansa 0.75 na dobe, gdy `CaravanModel.CanHeroCreateCaravan`; czynny `NavalDLCCaravanModel.CanHeroCreateCaravan` oddaje do `BaseModel` (ilspycmd NavalDLC.dll - sprawdzone), a `DefaultCaravanModel` (:34-41) liczy tylko karawany z WLACZONYM AI (`OwnedCaravans.Count(x => !x.MobileParty.Ai.IsDisabled) == 0`). `NightRest` wylacza AI karawanom spiacym w polu (`Ai.DisableForHours`), tik dobowy bohaterow jest rozlozony na cala dobe - kupiec z tikiem w nocy, ktorego wszystkie karawany spia w polu, wyglada dla gry jak kupiec bez karawany i dostaje nastepna. Bylo to juz w W33 (2.8 na notabla), ale E8/G1 wyprowadzil karawany z miast (w miescie AI zostaje wlaczone): w polu noca spi 74% karawan zamiast 42%.
+
+**Zmiana:**
+- Klucz `NotableCaravanCap = 2` (int; 0 = regula gry bez limitu; suwak 0-10). W `Armoury.json` Jeffa klucza nie ma (grep) - dziala domyslna.
+- `CaravanFlow.NotableCapPostfix` - postfiks na `TaleWorlds.CampaignSystem.GameComponents.DefaultCaravanModel.CanHeroCreateCaravan(Hero)`: TYLKO zmienia true na false, gdy bohater ma juz >= limit karawan liczonych WSZYSTKICH (`OwnedCaravans` z `MobileParty != null` - spiace, w osadzie, na morzu). Bohater bez karawany - regula gry (pierwsza karawana jak dotad). Gracz i bohaterowie rodu gracza - bez limitu. try/catch z licznikiem potkniec, bez globalnego wylacznika.
+- Wpiecie W KAMPANII, raz na proces: `CaravanFlow.EnsureHooks()` wolane z `Seal31.EnsureHooks` (ArmouryBehavior.OnSessionLaunched; wzor CaravanCapital.EnsureHooks, CLAUDE.md 7). Linia w logu przy starcie kampanii: "Karawany (E8/G1): latka w kampanii - limit karawan kupca wpieta 1/1 (DefaultCaravanModel.CanHeroCreateCaravan, czynny model NavalDLCCaravanModel)". Linia startowa "latki przy starcie gry - wpiete 3/3" BEZ zmian (czyta ja G1-0).
+- Linia doby "Karawany (E8/G1)" - dopiski NA KONCU (istniejace pola bez zmian): "limit karawan kupca (Notable Caravan Cap N; latka ...): gra chciala dac kolejna karawane kupcowi, ktory juz ma karawany, A razy, wstrzymane limitem B u C kupcow | karawany notabli (wszystkie, takze spiace): kupcow z 1 karawana X, z 2 Y, z 3 i wiecej Z (najwiecej M), razem karawan notabli T". Rozklad raz na dobe po `MobileParty.AllCaravanParties` (wlasciciele-notable, ta sama liczba, ktora czyta limit). Kropka konca linii przeszla za dopiski.
+
+**Co Jeff zobaczy w grze:** kupiec ma najwyzej 2 karawany. Karawan na mapie ok. 500-700 zamiast 1500 i liczba przestaje rosnac - doba gry krotsza o ok. 2.5 s i nie wydluza sie w dlugiej kampanii. Handel miedzy miastami zostaje (oczekiwane 120-170 wjazdow na dobe, wzorzec 135).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Zamknieta ekonomia: latka blokuje decyzje PRZED utworzeniem partii - wszystkie nasze latki siedza na `CreateCaravanParty` (ArmsFromPeople, CaravanCapital, CirculationWindows O17, PackMarket), czyli ZA miejscem blokady; nic nie jest pobrane w polowie (kapital, ludzie, juczne). `AddPower(-30)` gry tez sie nie wykona. Nic nie powstaje i nic nie ginie.
+- Kolizje: `CanHeroCreateCaravan` wolaja tylko gra (:348 start nowej kampanii - bohaterowie maja 0 karawan, postfiks nic nie zmienia; :580 tik dobowy) i NavalDLC (przekazanie); skan DLL modulow - nikt inny jej nie nadpisuje ani nie lata. `DefaultCaravanModel` nie ma konstruktora statycznego (latka i tak w kampanii). BK tworzy karawany wlasna droga (lordowie, start gry) - bez zmian; kupno karawany z licytacji dlugu (DebtLadder) moze dac kupcowi wiecej niz limit - limit dotyczy tylko tworzenia.
+- Zapis: nic. Stary zapis wczyta sie bez zmian; nadmiar karawan ze starego zapisu ubywa sam (zgony notabli, rozbicia) - "z 3 i wiecej" > 0 w starym zapisie to nie blad. W NOWEJ kampanii "z 3 i wiecej" ma byc 0 (poza licytacja dlugu).
+- Twarda granica: 2 x 323 kupcow = 646 karawan notabli (+ ok. 55 lordow). W 120 dob oczekiwane 450-550 (drugi egzemplarz dostaje tylko kupiec, ktorego tik dobowy trafil w noc), w dlugiej kampanii dojdzie do granicy.
+- Mniej przewoznikow surowcow: patrzec na G1-6a (miasta bez rudy, dzis 30.2 przy progu 32.2), R1-8 (miasta bez zelaza), wjazdy do miast na dobe. Progi liczone wobec 902 karawan Z33 (G1-5c suma kies karawan) trzeba liczyc na karawane. Strojenie jedna liczba w MCM: 1 = ok. 380 karawan i ok. 105 wjazdow/d (najszybsza gra, handel -22%), 3 = ok. 560-680.
+- Czas: sam limit nie cofa calego wzrostu doby - koszt tikow BK w miescie to osobna poprawka A2 (nastepny wpis).
+- Cofniecie: `NotableCaravanCap = 0`.
+
+**Build:** Armoury kod 0 (drzewo `zb/pa`). Gry nie uruchamiano, w katalogu gry nic nie zapisano.
+
+**Status:** DO SPRAWDZENIA - test koncowy (nowa kampania: "wstrzymane limitem" > 0, "najwiecej" <= 2, "razem karawan notabli" <= 2 x liczba kupcow i krzywa sie wyplaszcza, "nowe karawany (notable)" spada do 0-3/d po ok. 30 dobach, czas doby d31-60).
+
 ## 2026-10-12 (RECENZJA: szew E8/H - E8/O1 = 14563c4 i poprawka F6 punkty 2-3 = 1a15da2) - OBIE PRZYJETE, KOD GRY BEZ ZMIAN; DOPISANE: W KTORA STRONE MYLI SIE REZERWA NAPRAW Z PAMIECI (NIE ZAWSZE W BEZPIECZNA) I CO ZROBIC, GDY PROBKA TO POTWIERDZI; sprostowane numery linii w obu wpisach
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` (po 1a15da2) | **Pliki:** `CHANGELOG.md` (ten wpis i numery linii w dwoch wpisach nizej). Kod i `tools/sprawdz_logi.py` bez zmian.
 
