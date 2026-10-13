@@ -2972,7 +2972,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawLifeSpendShare { get; set; } = 0.1f;
 
-        [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read 'Day N of Summer, 299 AC'")]
+        [SettingPropertyBool("Climate Enabled", HintText = "the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ('Year 299, Day 256, Autumn')")]
         [SettingPropertyGroup("Iron Bank")]
         public bool ClimateEnabled { get; set; } = true;
 
@@ -3872,9 +3872,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public int CampBackground { get; set; } = 1;
 
-        [SettingPropertyBool("Map Clock Enabled", HintText = "the hour of the day next to the date on the map bar ('Day 12 of Summer, 299 AC - 14:30')")]
+        [SettingPropertyBool("Map Clock Enabled", HintText = "the hour of the day next to the date on the map bar ('Year 299, Day 256, Autumn - 14:30')")]
         [SettingPropertyGroup("A night's rest")]
         public bool MapClockEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Readable Date Enabled", HintText = "dates read 'Year 299, Day 256, Autumn': the year, the day of that year (1 to 364) and the season - on the map bar, in the encyclopedia and war logs, in the notices with a scene and in the Iron Bank's terms; the day turns at midnight sharp; off = the old 'Day 3659 of Summer, 299 AC' (which now turns at midnight too)")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool ReadableDateEnabled { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Fast Forward Multiplier", 0.00f, 32.00f, "0.00", HintText = "how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock")]
         [SettingPropertyGroup("A night's rest")]
@@ -6188,6 +6192,7 @@ namespace Armoury
             s.NightRestEveryModel = NightRestEveryModel;
             s.CampBackground = CampBackground;
             s.MapClockEnabled = MapClockEnabled;
+            s.ReadableDateEnabled = ReadableDateEnabled;
             s.FastForwardMultiplier = FastForwardMultiplier;
             s.SleepHoursNeeded = SleepHoursNeeded;
             s.DayRestFactor = DayRestFactor;

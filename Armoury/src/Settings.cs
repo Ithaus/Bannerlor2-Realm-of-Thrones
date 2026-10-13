@@ -924,7 +924,7 @@ namespace Armoury
         public float OutlawHideoutStashShare = 0.25f;      // share of its own purse a band leaves in the hideout's hoard each time it comes home - real coin, found by whoever clears and searches the hideout (0 = nothing is put by)
         public bool OutlawHoardCirculates = true;          // a hideout's hoard is spent, not only heaped: whatever lies above the kept hoard hands new bands their first coins, tops up its bands when they are short at the fence, and goes on their living in town
         public float OutlawLifeSpendShare = 0.1f;          // share of its purse a band spends each day on food, drink and company in the nearest open town - and the share of a hoard's surplus its hideout spends the same way (0 = nothing is spent)
-        public bool ClimateEnabled = true;                 // the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates read "Day N of Summer, 299 AC"
+        public bool ClimateEnabled = true;                 // the seasons of Westeros: one season at a time lasting for years, its end proclaimed by a white raven from the Citadel; dates name the season of the day ("Year 299, Day 256, Autumn")
         public bool ClimateDrivesEconomy = true;           // food, harvests, sickness, travel and the AI's winter caution (RealisticBannerlord, BetterEconomy, StrategicCampaignAI) follow the long seasons too - a winter of years is a hungry one
         public int ClimateSummerDaysSoFar = 3640;          // how long the summer has already lasted when the campaign begins (the summer that lasted ten years)
         public int ClimateSummerDaysLeftMin = 120;         // fewest days the long summer still lasts after the campaign begins
@@ -1202,7 +1202,8 @@ namespace Armoury
         public bool NightRestEnabled = true;               // the men must sleep: quiet night hours in camp or under a roof, or the column grows weary
         public bool NightRestEveryModel = true;            // the sleep penalties (speed and morale) also work in party models that name the party differently in their code (today: the War Sails morale model, left out before with an error at game start) - still counted once per party; off = those models skip the penalty, as before
         public int CampBackground = 1;                     // picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like
-        public bool MapClockEnabled = true;                // the hour of the day next to the date on the map bar ("Day 12 of Summer, 299 AC - 14:30")
+        public bool MapClockEnabled = true;                // the hour of the day next to the date on the map bar ("Year 299, Day 256, Autumn - 14:30")
+        public bool ReadableDateEnabled = true;            // dates read "Year 299, Day 256, Autumn": the year, the day of that year (1 to 364) and the season - on the map bar, in the encyclopedia and war logs, in the notices with a scene and in the Iron Bank's terms; the day turns at midnight sharp; off = the old "Day 3659 of Summer, 299 AC" (which now turns at midnight too)
         public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock
         public float SleepHoursNeeded = 6f;                // base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it
         public float DayRestFactor = 0.6f;                 // sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full

@@ -8,7 +8,8 @@ namespace Armoury
     /// ZEGAR I BIEG CZASU (Jeff 04.10: "czy mozna dodac szybszy uplyw czasu plus ktora jest
     /// dokladnie godzina").
     /// 1. Pasek mapy (MapTimeControlVM.Tick) odswieza date raz na dzien - doklejamy godzine
-    ///    "Day N of Summer, 299 AC - 14:30", odswiezana, gdy zmieni sie minuta.
+    ///    "Year 299, Day 256, Autumn - 14:30" (13.10: format daty z CalendarText; dawniej "Day N of Summer, 299 AC - 14:30"),
+    ///    odswiezana, gdy zmieni sie minuta.
     /// 2. Przyspieszenie: Campaign.SpeedUpMultiplier (vanilla 4, gra przywraca 4 przy kazdym
     ///    wczytaniu) - ustawiamy z MCM co godzine gry i przy starcie sesji.
     /// </summary>
@@ -24,16 +25,29 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.MapClockEnabled || Campaign.Current == null) return;
                 var now = CampaignTime.Now;
-                double hours = now.ToHours;
-                int minuteOfDay = (int)Math.Floor((hours % 24.0) * 60.0);
+                int minuteOfDay = MinuteOfDay(now);
                 if (minuteOfDay == _lastMinute) return;
                 _lastMinute = minuteOfDay;
                 if (_date == null) _date = AccessTools.Property(__instance.GetType(), "Date");
                 if (_date == null) return;
-                _date.SetValue(__instance, now.ToString() + " - " + (minuteOfDay / 60).ToString("00") + ":" + (minuteOfDay % 60).ToString("00"), null);
+                _date.SetValue(__instance, BarText(now, minuteOfDay), null);
             }
             catch { }
         }
+
+        private static int MinuteOfDay(CampaignTime now) { return (int)Math.Floor((now.ToHours % 24.0) * 60.0); }
+
+        private static string BarText(CampaignTime now, int minuteOfDay)
+        {
+            return now.ToString() + " - " + (minuteOfDay / 60).ToString("00") + ":" + (minuteOfDay % 60).ToString("00");
+        }
+
+        /// <summary>
+        /// Tekst daty na pasku mapy dla chwili 'now': data gry (CampaignTime.ToString - latka WesterosClimate.ToStringPrefix: "Year 299,
+        /// Day 256, Autumn" z CalendarText albo stary format) i godzina "HH:MM". Dzien i godzina z tych samych tickow zegara kampanii.
+        /// Ta sama funkcja sklada pasek i linie dowodu "Data na pasku (kalendarz)" (CalendarText.Hourly).
+        /// </summary>
+        internal static string BarText(CampaignTime now) { return BarText(now, MinuteOfDay(now)); }
 
         public static void RefreshPostfix(object __instance) { _lastMinute = -1; TickPostfix(__instance); }
 
