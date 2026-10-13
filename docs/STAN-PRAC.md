@@ -1763,3 +1763,15 @@ i `D:\Backup-Bannerlord\wgrane\2026-10-13-noc38-przed`; md5 po wgraniu OK. Cofni
 - (19:50 UTC 13.10) **POPRAWKA 5 (TOWARY) - W TOKU:** workflow wf_8e1aa5c4-418 (docs/przekazanie/wf-n5-towary.js), galaz `w-toku/n5-towary` od 8639c21, drzewo SC\zb\tw: piec spraw -
   plotno / len, skora wyprawiona, zbroja t3-4, zalew drewna, budowy cywilne z dala od frontu; autor ma znalezc PRZYCZYNE kazdej i nie kodowac na sile ("do decyzji" dla Jeffa).
   Rownolegle w toku: wf_c5c3b7ac-88c (korona wedlug potrzeby, zb\wn od 55b59d7) i test 120 dob poprawki 3 w grze. Limity 19:45 UTC: 5 h 58%, tydzien 86%.
+- (18:40 UTC 13.10; UWAGA: godziny wpisow od "WGRANIE 39" do "19:50 UTC" powyzej sa zawyzone o ok. 1 h - WGRANIE 39 bylo ok. 18:00 UTC, kolejnosc wpisow dobra)
+  **POPRAWKA 1b "KORONA PLACI WEDLUG POTRZEBY" (W5) - KOD GOTOWY I SCALONY (NIEWGRANE, BEZ TESTU W GRZE):** `w-toku/w5-korona-wg-potrzeby` ad9023d -> `w-toku/zbior-e8` **00a6496**
+  (CHANGELOG - suma, gen_mcm 1323; Armoury a5e2fbf9 = test\fin9: P1 + N3 + W5). Regula: garnek krolestwa = danina P1 tej doby (najwyzej reszta wplywow dnia po zwrocie zoldu);
+  dostaja rody AI w wojnie ze spelnionym warunkiem rent 180 i budzetem 166, ktorych druzyny sa ponizej 60% limitu z powodu pulapu; "od najslabszych" (poziom wyrownania); gotowka
+  tylko za ludzi juz bedacych w druzynie ponad pulap wlasny, na brakujacych samo miejsce w pulapie (krok werbunku 10% limitu/d); przydzial podnosi pulap druzyn, nie wchodzi do D
+  i nie jest podstawa zwrotu 70%; reszta garnka w renty. Klucze: CrownWarAidByNeed (true), CrownWarAidFillTarget 0.60, CrownWarAidRecruitStep 0.10. Linia "Doplata wedlug potrzeby
+  (W5): dzien "; progi `--grupa w5`. Rachunek (szacunek): rok +3 do +6.5 tys. ludzi (79.4 -> 82.5-86 tys.; 85 tys. tylko przy gornym koncu); 120 dob: wyplacone 8-25 tys. zl/d
+  u 20-34 rodow w d93-120. **DO JEFFA: Zelazne Wyspy, Wolni Ludzie, Ibben, Qohor, Pentos nie maja garnka (39% potrzeby) - pomoze dopiero tarczowe albo "wedlug potrzeby" z calej
+  reszty po zwrocie (zabiera renty wszystkim).** Ryzyka: cel 60% = prog wezwania do armii w grze; falowanie werbunek / zwolnienia; awanse zamiast ludzi (W5-9).
+  **POPRAWKA 2 TARCZOWE (W6) - W TOKU:** wf_99079863-f58 (docs/przekazanie/wf-w6-tarczowe.js), galaz `w-toku/w6-tarczowe` od 00a6496, drzewo SC\zb\tc: placi rod AI z wolnym pulapem
+  wlasnym i zlotem ponad rezerwe (stawka 25% wolnego pulapu, najwyzej 1/45 nadwyzki dziennie), korona bierze tylko tyle, ile wynosi niepokryta potrzeba W5, i wydaje tej samej doby
+  przez garnek W5. Kolejka gry: test 120 dob poprawki 3 (konczy sie) -> zapis -> WGRANIE 40 -> test 120 dob W5 (fin9) -> WGRANIE 41 -> tarczowe -> towary (wf_8e1aa5c4-418 w toku).
