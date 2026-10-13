@@ -12,7 +12,8 @@ namespace Armoury
     /// do monety), stawka ScutageRate (0.25 podstawy). Czynne tylko z W5 (CrownWarAidByNeed, renty 180, budzet 166); danina P1 NIE jest potrzebna - krolestwo
     /// bez daniny (s = 0, P1 wylaczone) ma garnek z samego tarczowego.
     ///  - KTO PLACI: rod AI krolestwa w wojnie z lennem (wiersz rent 180 - warunek rent NIE jest wymagany: rod, ktory nie sluzy, placi tym bardziej), z budzetem
-    ///    166 w wojnie i czynna druzyna, z kiesa rodziny ponad rezerwe wojenna. Bez rodu gracza (gracz nie placi i nie dostaje - osobna decyzja), bez Nocnej
+    ///    166 w wojnie i czynna druzyna, z kiesa rodziny ponad rezerwe wojenna. Rod gracza tylko z W6b (klucz ScutagePlayerClan: miasto albo zamek, wasal -
+    ///    nie wladca i nie najemnik; pulap tym samym wzorem - ClanBudget.PlayerCaps; KingdomTreasury.ScutagePlayer.cs), bez Nocnej
     ///    Strazy (sluzy bez zoldu), bez kompanii najemnych, bez rodow rycerzy 179 (sluza osobiscie w druzynie pana), bez dluznikow i rodow w zajeciu (168).
     ///  - PODSTAWA (lustro potrzeby W5): pulap WLASNY druzyn z wczorajszego budzetu - bez udzialu dworu (rod z luzem placi dwor w calosci, to nie jest
     ///    zaoszczedzony zold), bez kredytu wojennego i bez przydzialu korony (ClanBudget.ScutageCap) - PONAD zold druzyn doprowadzonych do celu W5
@@ -70,11 +71,13 @@ namespace Armoury
         private static void ScutageReset()
         {
             ScClearDay(); _scErr.Clear(); _scStumbles = 0; LastScutageIn = LastScutageOut = 0;
+            PlReset();   // W6b: stan rodu gracza i tydzien komunikatow (pamiec sesji)
         }
 
         /// <summary>Nowa doba kroku W5 (NaRoll): stan doby tarczowego znika razem z przydzialami W5.</summary>
         private static void ScClearDay()
         {
+            PlClearDay();   // W6b: stan doby rodu gracza (warunki, pulap, podstawa) - z ta sama doba
             _scPaid.Clear(); _scBase.Clear(); _scSur.Clear(); _scCash.Clear(); _scRows.Clear();
             _scSeen = _scNoBudget = _scNoParty = _scNoBase = _scNeed = _scNoSurplus = _scNoDue = _scCapSur = _scCapHead = _scCapCeil = 0;
             _scPayerAided = _scBelowReserve = _scNotAtCap = 0;
@@ -92,7 +95,7 @@ namespace Armoury
             alloc = NaCost(x, f); boost = 0; cash = 0;
             if (!(alloc > 0)) return;
             double funded = NaFunded(x, f);
-            double room = x.M < f * x.L ? Math.Min(step * x.L, f * x.L - x.M) * x.P : 0;
+            double room = !x.Pl && x.M < f * x.L ? Math.Min(step * x.L, f * x.L - x.M) * x.P : 0;   // W6b: rod gracza bez miejsca w pulapie (sama gotowka)
             boost = Math.Min(alloc, Math.Max(0, funded + room - x.Pc0));
             cash = (long)Math.Floor(Math.Max(0, funded - x.Pc0));
         }
@@ -117,25 +120,33 @@ namespace Armoury
                     var c = list[i];
                     try
                     {
-                        if (c == null || c == Clan.PlayerClan || c.Leader == null || !c.Leader.IsAlive) continue;
+                        if (c == null || c.Leader == null || !c.Leader.IsAlive) continue;
+                        // W6b (decyzja Jeffa 13.10): rod gracza tylko z kluczem ScutagePlayerClan, z miastem albo zamkiem i jako wasal (nie wladca, nie najemnik);
+                        // bez tego - pominiety jak przed W6b. Warunek rent NIE jest wymagany (jak u AI)
+                        bool pl = c == Clan.PlayerClan;
+                        if (pl && !PlW6Gate(k)) continue;
                         _scSeen++;
                         double pc, reserve;
-                        if (!ClanBudget.ScutageCap(c, out pc, out reserve)) { _scNoBudget++; continue; }   // bez budzetu 166 w wojnie, Straz bez zoldu, najemnik, dluznik, zajecie
+                        if (pl) { if (!PlCapW6(out pc, out reserve)) { _scNoBudget++; continue; } }        // W6b: pulap gracza bez dworu tym samym wzorem; dluznik i zajecie - nie placi
+                        else if (!ClanBudget.ScutageCap(c, out pc, out reserve)) { _scNoBudget++; continue; }   // bez budzetu 166 w wojnie, Straz bez zoldu, najemnik, dluznik, zajecie
                         int limit, men; long wage;
-                        if (!NaParties(c, out limit, out men, out wage)) { _scNoParty++; continue; }       // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
+                        if (!NaParties(c, out limit, out men, out wage)) { _scNoParty++; if (pl) _plWhy6 = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
                         double perMan = men >= 20 && wage > 0 ? (double)wage / men : avgWage;
                         // zold druzyn doprowadzonych do celu W5: ludzie, ktorzy dzis sa, + brakujacy do celu po stawce rodu (ponad cel - sam zold dzisiejszy)
                         double goal = wage + Math.Max(0, target * limit - men) * perMan;
                         double bas = pc - goal;
+                        if (pl) _plBase = bas;                                                               // W6b: do linii
                         if (!(bas > 0))
                         {
                             _scNoBase++;
+                            if (pl) _plWhy6 = "pulap bez dworu nie ponad zold druzyn przy celu";
                             double pc0;   // pomiar: ile z nich ma potrzebe W5 (ten sam rachunek co kandydat W5, bez warunku rent)
-                            if (ClanBudget.PartyCapOwn(c, out pc0) && NaCost(new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = perMan }, target) > 0) _scNeed++;
+                            if ((pl ? PlCapW5(out pc0) : ClanBudget.PartyCapOwn(c, out pc0)) && NaCost(new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = perMan, Pl = pl }, target) > 0) _scNeed++;
                             continue;
                         }
                         double sur = ClanIncomeBook.FamilyGoldOf(c) - reserve;
-                        if (!(sur > 0)) { _scNoSurplus++; continue; }                                        // kiesa rodziny nie ponad rezerwe wojenna - nie placi
+                        if (pl) _plSur = sur;
+                        if (!(sur > 0)) { _scNoSurplus++; if (pl) _plWhy6 = "kiesa rodziny nie ponad rezerwe wojenna"; continue; }   // kiesa rodziny nie ponad rezerwe wojenna - nie placi
                         double due = rate * bas;
                         double capSur = sur / chestDays;                                                     // rytm, ktorym budzet sam uwalnia nadwyzke - nigdy ponizej rezerwy
                         if (due > capSur) { due = capSur; _scCapSur++; }
@@ -147,7 +158,8 @@ namespace Armoury
                         long head = Math.Max(0, (long)c.Leader.Gold - floor);                                // kiesa glowy nie ponizej podlogi rodziny (jak dwor)
                         if (due > head) { due = head; _scCapHead++; }
                         long d = (long)Math.Floor(due);
-                        if (d <= 0) { _scNoDue++; continue; }
+                        if (pl) _plDue = Math.Max(0, d);
+                        if (d <= 0) { _scNoDue++; if (pl) _plWhy6 = "nalezne ponizej 1 zl"; continue; }
                         sc.P.Add(new ScP { C = c, Base = bas, Sur = sur, Reserve = reserve, Due = d });
                         sc.Due += d; sc.Base += bas; sc.Sur += sur; sc.PayN++;
                         _scBase[c] = bas; _scSur[c] = sur;
@@ -339,6 +351,7 @@ namespace Armoury
                               + "), poziom " + ScPct(r.Level0) + " -> " + ScPct(r.Level1)));
                 }
                 LastScutageIn = got; LastScutageOut = paid;
+                PlWeek(today);   // W6b: komunikaty dla gracza (wyjasnienie raz na sesje, sumy raz na 7 dob) - niezaleznie od LogEnabled
                 if (s.LogEnabled)
                 {
                     parts.Sort((x, y) => y.Key.CompareTo(x.Key));
@@ -369,6 +382,7 @@ namespace Armoury
                       .Append(" (w tym miejsce na krok werbunku bez gotowki ").Append(Math.Round(Math.Max(0, boost - paid)).ToString("0", WtInv)).Append(')')
                       .Append(" | kontrola: platnik z doplata W5 ").Append(_scPayerAided).Append(", platnik ponizej rezerwy po poborze ").Append(_scBelowReserve)
                       .Append(", gotowka rodom z zoldem druzyn w pulapie wlasnym ").Append(_scNotAtCap).Append(" (oczekiwane 0)")
+                      .Append(PlSeg(today, true))                                       // W6b: " | gracz: ..." (warunki 1-3, pulap wlasny, podstawa, dostal / zaplacil)
                       .Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")
                       .Append(" | potkniecia ").Append(_scStumbles).Append('.');
                     Log.Info(sb.ToString());
