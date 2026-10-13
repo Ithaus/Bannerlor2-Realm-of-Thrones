@@ -1676,3 +1676,9 @@ Cofniecie do WGRANIA 36: Armoury 65868156 + CrashScribe 142fdd4a + settings cb8d
   rody na pulapie (111) trzymaja 38% limitu, z wolnym miejscem (85) 64% = rownowaga AI; sufit swiata ok. 100 tys.; **do 85 tys. trzeba 30-45 tys. zl/d CELOWANE (do rodow na
   pulapie) albo 60-190 tys. dzisiejsza droga; do 95 tys. 80-115 tys. celowane.** Moje wczesniejsze zdanie Jeffowi "164 rodom podatki nic nie dadza" bylo za mocne - poprawione.
   Limity: 5 h 24%, TYDZIEN 77% (zeruje sie 19.10) - przy 99% przekazanie na drugie konto.
+- (17:10 UTC 13.10) **JEFF: budowa przez lud - TAK** (z doprecyzowaniem: lud placi tylko za budowle sluzace miastu - mury, spichlerz, targ, port, warsztaty i podobne; budowle
+  wojskowe placi pan jak dzis; gdy pierwsza w kolejce jest wojskowa, lud doklada do najblizszej "swojej"; BEZ "trzeciej czesci w gotowce" dla pana). To paczka P2 projektu obiegu
+  kiesy (tor M) - kodowac PO scaleniu P1 (oba ruszaja TownFolk.Live.cs). **Hamulec slubow gotowy:** `w-toku/z3-swaty-hamulec` cd675b6 (klucz MarriageChanceScale 0.7; test poza gra
+  na prawdziwej DLL: 1.0 = WGRANIE 37 co do kroku generatora, 0.7 = 69.94% prob przy szansie 1); **W TOKU W GRZE: test 120 dob** (Armoury W37 + CrashScribe-at-hamulec ef7ee537,
+  drzewo SC\zb\sh; test\at-hamulec-120.out.txt) - oczekiwane 52-58 slubow do d120 (bylo 78; < 40 albo > 70 = zle); po czystym wyniku WGRANIE 38 (sam CrashScribe + settings.xml;
+  DLL do wgrania zbudowac z cd675b6 BEZ at1-cs.diff).
