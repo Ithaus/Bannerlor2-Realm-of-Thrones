@@ -262,6 +262,9 @@ namespace Armoury
             else if (it.StringId == "hardwood") { if (castle) _dShWoodCastle += k; else _dShWoodTown += k; }
         }
 
+        /// <summary>P3/Z4 (LordDiscard): najblizsze miasto wedlug reguly NearestMarket - polka dla towaru, ktory gra kasuje lordowi ponad udzwig.</summary>
+        internal static Settlement NearestTown(Vec2 pos, IFaction f) { return NearestMarket(pos, f, true); }
+
         /// <summary>Najblizsza warownia (miasto, zamek) tej samej frakcji, nieoblegana; dalej niewroga; na koniec dowolna. townsOnly (P3/Z3-B) - tylko miasta.</summary>
         private static Settlement NearestMarket(Vec2 pos, IFaction f, bool townsOnly = false)
         {
@@ -1422,6 +1425,7 @@ namespace Armoury
                   .Append(", polki wedlug osady (P3/Z3-B, klucz ").Append(yn(s != null && s.SpoilsNonFoodToTown)).Append("): zamki ").Append(_dShCastle).Append(", miasta ").Append(_dShTown)
                   .Append(", towar nie-zywnosciowy z zamku do miasta ").Append(_dShToTown).Append(", bez miasta ").Append(_dShNoTown)
                   .Append("; zelazo zamki/miasta ").Append(_dShIronCastle).Append('/').Append(_dShIronTown).Append(", drewno zamki/miasta ").Append(_dShWoodCastle).Append('/').Append(_dShWoodTown)
+                  .Append(LordDiscard.Segment())   // P3/Z4: towar kasowany lordom przez gre (ponad udzwig) - liczniki doby
                   .Append(" | pula weteranow: +").Append(_dVetIn).Append(" (bez konia ").Append(_dVetNoHorse).Append(", gracz bez zmian ").Append(_dVetPlayer).Append(") / -")
                   .Append(_dVetHire + _dVetOut).Append(" (najem ").Append(_dVetHire).Append(", na polki ").Append(_dVetOut).Append("), stan ").Append(pool)
                   .Append(", karczma z typem pieszym zamiast konnego ").Append(_dVetFootShown).Append(" | najemnik: kon z puli ").Append(_dVetHire)

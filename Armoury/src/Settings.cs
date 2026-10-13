@@ -1662,6 +1662,11 @@ namespace Armoury
         // trafia na targ najblizszego MIASTA zamiast do zamku (HorseFate.NearestMarket tylko miasta); jedzenie, konie, uprzaz i uzbrojenie jak dotad; brak miasta -
         // jak dotad. Dziala tylko z SpoilsOfBrokenParties; wylaczony = najblizsza warownia jak dotad
         public bool SpoilsNonFoodToTown = true;            // goods other than food left behind by a broken party - iron, timber, wool, hides and the like - go to the market of the nearest friendly town instead of the nearest castle, where nobody uses them and no trader calls (food, horses, harness and arms go where they went before; needs Spoils Of Broken Parties)
+        // P3/Z4 (TRIAZ-3 bieg roczny 13.10, O2-7 z podwazeniem): towar ksiegi towarow (towar handlowy z zywnoscia, zywy inwentarz), ktory gra kasuje partii lorda AI
+        // ponad udzwig albo jako stado ponad ludzi (DiscardItemsCampaignBehavior, co godzine), idzie na polke najblizszego przyjaznego miasta (regula jak R14,
+        // bez zaplaty) zamiast znikac; konie i uzbrojenie bez zmian. Postfiks przenosi dokladnie to, co gra zdjela. Wylaczony = sztuki znikaja jak w grze, ale
+        // ksiega towarow liczy je jako ujscie "porzucone przez lordow (gra)" (LordDiscard.cs)
+        public bool LordDiscardToShelf = true;             // goods a lord's party throws away because it carries more than it can - most often loot taken from a broken cart or caravan - are left at the market of the nearest friendly town instead of vanishing (food and livestock too; horses and arms are not touched). The lord loses exactly what he lost before. Off = the goods vanish, as in the base game
         public bool SpoilsOfBrokenParties = true;          // what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes
         public bool VeteranKeepsHorse = true;              // a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman
         public bool NewPartyHorsesFromSeat = true;         // a new lord's party gets its first horses and food from the shelves of its seat, paid by the house - or none

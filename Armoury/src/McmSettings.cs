@@ -5052,6 +5052,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsNonFoodToTown { get; set; } = true;
 
+        [SettingPropertyBool("Lord Discard To Shelf", HintText = "goods a lord's party throws away because it carries more than it can - most often loot taken from a broken cart or caravan - are left at the market of the nearest friendly town instead of vanishing (food and livestock too; horses and arms are not touched). The lord loses exactly what he lost before. Off = the goods vanish, as in the base game")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool LordDiscardToShelf { get; set; } = true;
+
         [SettingPropertyBool("Spoils Of Broken Parties", HintText = "what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsOfBrokenParties { get; set; } = true;
@@ -6506,6 +6510,7 @@ namespace Armoury
             s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
             s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;
             s.SpoilsNonFoodToTown = SpoilsNonFoodToTown;
+            s.LordDiscardToShelf = LordDiscardToShelf;
             s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;

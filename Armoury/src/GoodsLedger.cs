@@ -67,16 +67,18 @@ namespace Armoury
         private static readonly string[] HolderName = { "miasta", "zamki", "wsie", "schowki osad", "inne osady", "wozy", "karawany", "lordowie", "gracz", "inne partie", "wozy surowcow" };
 
         // ------------------------------------------------------------ przewoz (handel miedzy osada a partia)
-        private const int TWagon = 0, TCarBuy = 1, TCarSell = 2, TLordBuy = 3, TLordSell = 4, TOthBuy = 5, TOthSell = 6, TSupplyBuy = 7, Transfers = 8;
+        // P3/Z4 (TRIAZ-3 O2-7): TDiscard - towar skasowany lordowi przez gre ponad udzwig i polozony na polce miasta (LordDiscard; przewoz, nie ujscie)
+        private const int TWagon = 0, TCarBuy = 1, TCarSell = 2, TLordBuy = 3, TLordSell = 4, TOthBuy = 5, TOthSell = 6, TSupplyBuy = 7, TDiscard = 8, Transfers = 9;
 
         // ------------------------------------------------------------ grupy zrodel i ujsc (kolejnosc w linii)
         private const string GVil = "wsie", GWoodlot = "las wsi (126)", GShop = "warsztaty", GArt = "rzemieslnicy BK", GTanW = "garbowanie i tkanie 1:1 (TanOrWeave)", GCraft = "rzemioslo miasta (148)",
                              GShopIn = "linie warsztatow", GArms = "warsztaty zbrojne", GBuild = "budowy", GTown = "mieszczanie", GCastle = "zamki",
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
+                             GDiscard = "porzucone przez lordow (gra)",
                              GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)";
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GShop, GArt, GTanW, GCraft, GScrap, GDrill, GSlaughter, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GNoBuyer, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GDiscard, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -307,6 +309,23 @@ namespace Armoury
                 f.Arms[i] += n;
             }
             catch (Exception e) { Stumble("NoteArms", e); }
+        }
+
+        /// <summary>P3/Z4 (TRIAZ-3 O2-7; LordDiscard): gra skasowala lordowi AI n sztuk towaru ponad udzwig (godzinowy DiscardItemsCampaignBehavior - poza
+        /// ramkami ksiegi, dotad "bez wyjasnienia"). toShelf: sztuki polozone na polce miasta - przewoz "lordowie porzucili na polki miast" (zapas swiata bez
+        /// zmian); inaczej (klucz wylaczony, brak miasta) - ujscie "porzucone przez lordow (gra)". W otwartej ramce ubytek ksieguje sama ramka - bez drugiego wpisu.</summary>
+        internal static void NoteDiscard(ItemObject item, int n, bool toShelf)
+        {
+            try
+            {
+                if (n <= 0 || item == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(item, out i)) return;
+                if (toShelf) { _acc[i].Tr[TDiscard] += n; return; }
+                if (_top != null && Environment.CurrentManagedThreadId == _main) return;
+                Book(i, GDiscard, null, -n);
+            }
+            catch (Exception e) { Stumble("NoteDiscard", e); }
         }
 
         // ------------------------------------------------------------ podsluch (ItemRoster.AddToCounts)
@@ -970,6 +989,7 @@ namespace Armoury
                     if (a.Tr[TLordBuy] != 0 || a.Tr[TLordSell] != 0) sb.Append(sb.Length > tl ? "; " : "").Append("lordowie kupili ").Append(a.Tr[TLordBuy]).Append(", sprzedali ").Append(a.Tr[TLordSell]);
                     if (a.Tr[TOthBuy] != 0 || a.Tr[TOthSell] != 0) sb.Append(sb.Length > tl ? "; " : "").Append("inne partie kupily ").Append(a.Tr[TOthBuy]).Append(", sprzedaly ").Append(a.Tr[TOthSell]);
                     if (a.Tr[TSupplyBuy] != 0) sb.Append(sb.Length > tl ? "; " : "").Append("zaopatrzenie BK kupilo ").Append(a.Tr[TSupplyBuy]);
+                    if (a.Tr[TDiscard] != 0) sb.Append(sb.Length > tl ? "; " : "").Append("lordowie porzucili na polki miast ").Append(a.Tr[TDiscard]);   // P3/Z4
                     if (sb.Length == tl) sb.Append('-');
                     sb.Append(']');
                     sb.Append(" | posiadacze [");
@@ -1159,6 +1179,7 @@ namespace Armoury
                 else { h.Patch(add, postfix: new HarmonyMethod(typeof(GoodsLedger), nameof(Tap))); _tapWired = true; }
             }
             catch (Exception e) { _missing.Add("podsluch (" + e.Message + ")"); Log.Error("GoodsLedger.ApplyAll(podsluch)", e); }
+            try { LordDiscard.ApplyAll(h); } catch (Exception e) { Log.Error("GoodsLedger.ApplyAll(LordDiscard)", e); }   // P3/Z4: towar kasowany lordom przez gre - licznik ksiegi i polka miasta
             Log.Info("GoodsLedger: ksiega towarow (146) " + (!_tapWired ? "NIECZYNNA - brak podsluchu ItemRoster.AddToCounts" : On ? "CZYNNA" : "wylaczona w MCM (Goods Ledger Enabled)")
                      + " - tylko log, niczego nie zmienia; ramki wpiete (" + _wired.Count + "): " + string.Join(", ", new List<string>(_wired).ToArray())
                      + (_missing.Count > 0 ? "; BRAK: " + string.Join(", ", new List<string>(_missing).ToArray()) : "")

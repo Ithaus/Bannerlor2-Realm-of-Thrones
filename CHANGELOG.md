@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z4, tor M) - TOWAR KASOWANY LORDOM PRZEZ GRE: LICZNIK W KSIEDZE TOWAROW I POLKA NAJBLIZSZEGO MIASTA (klucz LordDiscardToShelf); konie i uzbrojenie DO DECYZJI
+**Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/LordDiscard.cs` (nowy), `GoodsLedger.cs` (`NoteDiscard`, przewoz `TDiscard`, ujscie, wpiecie latki), `HorseFate.cs` (`NearestTown`, wstawka linii K1), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
+
+**Problem (bieg roczny, ksiega "Towary: iron"; TRIAZ-3 O2-7 z podwazeniem):** 54 doby z ujemnym "bez wyjasnienia", razem -1 474 lupy w roku (1,85% podazy, 4,1/d; nigdy na plus; kwartaly -252 / -654 / -304 / -264). Najwieksze doby: 109000 -207, 109186 -174, 108888 -101. 86% ubytku siedzi u lordow (1 266 z 1 474); lordowie z ok. 3 390 zdobytych lup sprzedali 1 807, maja 110, zgubili 1 474. W czterech biegach po 119 dob to samo, zawsze tylko na minus (-46, -180, -357, -80). Korelacja dzienna koni "ponad udzwig" (linia K0) z suma "bez wyjasnienia" 25 towarow nie-zywnosciowych: r = 0,61.
+
+**Przyczyna (kod gry - pewna co do drogi, ilosc dotad niemierzona):** `DiscardItemsCampaignBehavior.OnHourlyTickParty` (tylko partia lorda AI z wodzem) kasuje nadbagaz (`DiscardNecessaryAmountOfItems`: od konca taboru, z pominieciem 20 dob jedzenia) i stado ponad ludzi (`DiscardAnimal`) - `AddToCounts(-n)` bez odbiorcy. Gra rozdaje lup pokonanego bez sprawdzania udzwigu (`MapEvent`, `DefaultBattleRewardModel`), wiec lord, ktory wzial zelazo z wozu albo karawany (lupa 15 kg, woz 1,5-3,7 t), traci je w najblizszej godzinie. Kasowanie jest godzinowe, ramki ksiegi towarow obejmuja tylko dyspozytory dobowe - dlatego ladowalo w "bez wyjasnienia". Nasz kod liczyl te droge tylko dla koni (prefiksy K0, `HorseBook.NoteDiscard`).
+
+**Zmiana:**
+1. `LordDiscard` - postfiks na obu metodach gry liczy dokladnie to, co zeszlo (stan stosu sprzed wywolania minus stan po) - to jest pomiar, ktorego brakowalo.
+2. Towar ksiegi towarow (towar handlowy z zywnoscia, zywy inwentarz): przy `LordDiscardToShelf` na polke najblizszego przyjaznego MIASTA (`HorseFate.NearestTown` - kolejnosc jak R14: wlasna frakcja nieoblegana, niewroga, dowolna), bez zaplaty (porzucony dobytek, jak dobytek ponad udzwig zwyciezcy). Klucz wylaczony albo brak miasta - sztuki znikaja jak w grze.
+3. Ksiega towarow: polozone na polce = przewoz "lordowie porzucili na polki miast N" (zapas swiata bez zmian); znikajace = ujscie "porzucone przez lordow (gra)". W obu przypadkach ta droga schodzi z "bez wyjasnienia" (takze przy wylaczonym kluczu).
+4. Linia "Konie - smierc, lup, dobytek (E6/K1)": wstawka "porzucone przez lordow (gra, P3/Z4): latka, na polke miasta TAK/NIE - kasowan N, towar X (w tym zelazo), zywnosc Y, zywy inwentarz L, konie H (ksiega koni - bez zmian), uzbrojenie i inne G (bez zmian); na polki miast S (zelazo), bez polki B, przepadlo przy wylaczonym kluczu K; czas, potkniecia".
+
+**ODLOZONE - DO DECYZJI (poprawka ostateczna triazu chciala wiecej; tu zrobiona czesc pewna):**
+- KONIE (ok. 34/d: 8 830 "ponad udzwig" + 3 468 "nadmiar stada" w roku) - zostaja jak dotad (znikaja, liczy je ksiega koni). Przeniesienie ich na targ zmienia bilans hodowli E6 (regulator K4), a rownolegla paczka koni wlasnie zmienia hodowle i zakupy mieszczan - wlasciciel obszaru koni powinien zdecydowac po swoim biegu. Kod przeniesienia jest ten sam (jedna galaz w `LordDiscard.Handle`) + rozdzial "przeniesione / ujscie" w `HorseBook.NoteDiscard`.
+- UZBROJENIE i inne nie-towary z taboru lorda - znikaja jak dotad, teraz policzone ("uzbrojenie i inne"); ksiega uzbrojenia ma wlasne pozycje, a unikaty (stal valyrianska w taborze przeladowanego lorda) wymagaja osobnej reguly "zostaje w taborze" - liczba z biegu powie, czy to problem.
+- Samo przeladowanie lorda lupem gry zostaje (latka nie zmienia rozdania lupu).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Nic z niczego: przenosi sie tylko sztuke, ktora gra wlasnie zdjela (roznica stanu stosu), bez zlota; lord traci to samo co dotad (tempo marszu i AI bez zmian); gracz nietkniety (gra kasuje tylko lordom AI, dodatkowo straz `IsMainParty`).
+- Zywnosc: jesli duza czesc "bez wyjasnienia" zywnosci (w biegu rocznym do ok. 815 szt./d) to ta droga, miasta przy teatrach wojny dostana darmowa zywnosc - pierwsza linia pomiaru rozstrzygnie; klucz pozwala wrocic.
+- Kolizje sprawdzone: te same dwie metody gry lataja prefiksy `HorseState` (same liczniki koni) - postfiks ich nie rusza; `HorseBook.NoteDiscard` bez zmian (konie dalej ujscie); w otwartej ramce ksiegi (nie powinno sie zdarzyc - tick godzinowy) ubytek ksieguje ramka, `NoteDiscard` nie dubluje. Skan triazu: zaden mod poza Armoury nie dotyka `DiscardItemsCampaignBehavior`.
+- Czas: postfiks tylko przy faktycznym kasowaniu (50-150 razy na dobe), kazde to jedno przejscie po 227 warowniach - ponizej 1 ms/d (liczba w linii).
+- Pulapka dat: linia K1 ma numer dnia o 1 wiekszy niz "Towary" z tego samego ticku. Klucza nie ma w Armoury.json Jeffa (grep 0).
+
+**Build:** Armoury kod 0 (drzewo `zb/zel`). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA - bieg roczny. Oczekiwane: zelazo "bez wyjasnienia" w roku powyzej -150 (dzis -1 474), "na polki miast (zelazo)" ok. 4/d (1 200-1 500 w roku), "bez polki" 0; 25 towarow nie-zywnosciowych "bez wyjasnienia" wyraznie mniej niz -20 136 (dolna granica poprawy 9 824 - spadki widoczne u lordow); liczby miast bez zelaza to nie zmienia (4 lupy/d).
+
 ## 2026-10-13 (TRIAZ-3 bieg roczny, P3/ZELAZO Z3 zmiana B, tor S) - PORZUCONY DOBYTEK NIE-ZYWNOSCIOWY NA TARG MIASTA, NIE DO ZAMKU (klucz SpoilsNonFoodToTown)
 **Mod:** Armoury | **Galaz:** `w-toku/p3-zelazo` | **Pliki:** `Armoury/src/HorseFate.cs` (`NearestMarket` z parametrem "tylko miasta", `Put`, `BkPostfix`, linia doby), `Settings.cs` + `McmSettings.cs` (gen_mcm). Zapis bez zmian.
 
