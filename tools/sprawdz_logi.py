@@ -10493,7 +10493,7 @@ def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
 
     # O6-1: czas zapisu logu. Linia profilu "dzien D" i linia E8/O6 "dzien D" powstaja w tym samym takcie doby (okres od poprzedniego taktu)
     prof = by_day(lines, E8_PROF)
-    wms, wn, wms_off = {}, {}, {}
+    wms, wn, wms_off, wms_mix = {}, {}, {}, {}
     for d in days:
         if d not in prof:
             continue
@@ -10505,6 +10505,8 @@ def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             wn[d] = n or 0
         elif d not in on_set:
             wms_off[d] = v
+        else:
+            wms_mix[d] = v   # klucz [WL], ale czesc zapisow doby poszla stara droga (przelaczenie w trakcie doby albo potkniecie pisarza) - poza srednia, liczone w O6-4
     rule1 = f"<= {E8_O6_WRITE_MS:.0f} ms/dobe srednio w dobach z kluczem [WL] (projekt rozdz. 3 \"E8/O6\"; bez linii Profil doby - INFO)"
     if wms:
         avg = sum(wms.values()) / len(wms)
@@ -10514,9 +10516,20 @@ def etap8_o6(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
                + (f", {1000.0 * sum(wms.values()) / tot_n:.1f} us na zapis" if tot_n else ""))
         if wms_off:
             txt += f"; klucz wylaczony {len(wms_off)} dob: srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe"
+        if wms_mix:
+            txt += f"; poza srednia {len(wms_mix)} dob [WL] z zapisami stara droga (patrz O6-4): srednio {sum(wms_mix.values()) / len(wms_mix):.1f} ms/dobe"
         rep.add("O6-1: czas zapisu logu przy kluczu [WL]", txt, rule1, avg <= E8_O6_WRITE_MS)
     else:
-        why = "brak linii Profil doby (E8/0) - Stage8ProfileLog wylaczony?" if not any(d in prof for d in days) else "klucz LogKeepOpen wylaczony w calym oknie"
+        # recenzja E8/O6: prawdziwy powod werdyktu INFO (bylo "klucz wylaczony w calym oknie" takze wtedy, gdy klucz byl wlaczony, a doby wypadly ze sredniej)
+        if not any(d in prof for d in days):
+            why = "brak linii Profil doby (E8/0) - Stage8ProfileLog wylaczony?"
+        elif not on:
+            why = "klucz LogKeepOpen wylaczony w calym oknie"
+        elif wms_mix:
+            why = (f"klucz [WL] w {len(on)} dobach, zadna nie wchodzi do sredniej: w {len(wms_mix)} byly zapisy stara droga (klucz przelaczany w trakcie doby "
+                   f"albo potkniecia pisarza - patrz O6-4; srednio {sum(wms_mix.values()) / len(wms_mix):.1f} ms/dobe)")
+        else:
+            why = f"klucz [WL] w {len(on)} dobach, zadna z nich nie ma linii Profil doby (E8/0) z czasem zapisu"
         rep.add("O6-1: czas zapisu logu", why + (f"; przy wylaczonym kluczu srednio {sum(wms_off.values()) / len(wms_off):.1f} ms/dobe" if wms_off else ""), rule1, None)
 
     # O6-2: proba 3 dob sesji (cala sesja, nie tylko okno): bajty i numer linii doby w glownym pliku
