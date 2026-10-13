@@ -258,7 +258,8 @@ Uzycie (Python 3, tylko odczyt):
                     "Zakupy i nadwyzki AI (E8/Z)" i "Przeplywy osad": O5-0 linia w kazdej dobie okna, stan klucza; O5-1 maks. taktu doby
                     <= 1 000 ms w dobach z kluczem [WL] (czas i najdluzsza godzina sprzedazy po godzinach - INFO); O5-2 sztuki i utarg zalog
                     w pelnych tygodniach okna w +-15% Z33 w tych samych dobach (tabela Z33 w narzedziu; bez uprzezy E8/Z; wiaze od 8 pelnych
-                    tygodni przy kluczu [WL] - to zmiana kolejnosci w dobie, poza R9); O5-3 INFO ksiega kas: "skup nadwyzek zbrojowni" (poza
+                    tygodni przy kluczu [WL] - to zmiana kolejnosci w dobie, poza R9; doba 1 kampanii liczona do 1. tygodnia - po godzinach
+                    czesc zalog sprzedaje przed pierwszym taktem doby); O5-3 INFO ksiega kas: "skup nadwyzek zbrojowni" (poza
                     taktem doby) wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0.
                     E8/0 w grupie etap2: "bitwy" w wojennych zrodlach z niczego (wiersz B: pieniadz swiata bez wojny) NETTO - ZRODLA "bitwy" - UJSCIA "bitwy"
                     + N4 (para jak E5/A6); baza zapisana przed E8/0 (bez klucza bitwy_brutto) - obie strony brutto, jak dotad.
@@ -10287,8 +10288,8 @@ def etap8_o5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
     GarrisonArmory.Daily; dzien linii = dzien gry - 1) + "Profil doby (E8/0)", "Sakiewka ludzi", "Zakupy i nadwyzki AI (E8/Z)", "Przeplywy osad".
     O5-0 linia w kazdej dobie okna, stan klucza; O5-1 maks. taktu doby <= 1.0 s w dobach z kluczem [WL] (Profil doby; czas i najdluzsza godzina sprzedazy
     po godzinach - INFO); O5-2 sztuki i utarg zalog w pelnych tygodniach okna w +-15% Z33 w tych samych dobach (bez uprzezy E8/Z, ktorej Z33 nie
-    sprzedawal; wiaze od 8 pelnych tygodni przy kluczu [WL], krotsze okno - INFO); O5-3 INFO ksiega kas: "skup nadwyzek zbrojowni" (poza taktem doby)
-    wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0."""
+    sprzedawal; wiaze od 8 pelnych tygodni przy kluczu [WL], krotsze okno - INFO; doba 1 kampanii w 1. tygodniu); O5-3 INFO ksiega kas: "skup nadwyzek
+    zbrojowni" (poza taktem doby) wobec "pozostale moduly ticku"; O5-4 potkniecia i linie bledu GarrisonArmory 0."""
     ol = {d: s for d, s in by_day(lines, E8_O5_LINE).items() if 1 <= run_day(d, start) <= until}
     if not ol:
         rep.add("E8/O5: linia Nadwyzki zalog po godzinach (E8/O5)", "brak w logu", "jest od wgrania E8/O5", None)
@@ -10376,12 +10377,16 @@ def etap8_o5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
             har[run_day(d, start)] = (int(m.group(3)), int(m.group(2)) * int(m.group(3)) / int(m.group(1)))
     rule2 = (f"sztuki i utarg zalog w pelnych tygodniach okna w +-{100 * E8_O5_BAND:.0f}% Z33 w tych samych dobach (bez uprzezy E8/Z; wiaze od {E8_O5_MIN_WEEKS} pelnych "
              "tygodni przy kluczu [WL]). Wzor Z33 jest sprzed etapow 5-8 (ceny E8/C, naprawy E8/W, lup E8/L tez zmieniaja nadwyzki) - poza pasmem przy "
-             "czystych O5-0 i O5-4 rozstrzyga bieg kontrolny z kluczem wylaczonym")
+             "czystych O5-0 i O5-4 rozstrzyga bieg kontrolny z kluczem wylaczonym. Doba 1 kampanii liczona do 1. tygodnia: po godzinach czesc zalog "
+             "sprzedaje juz przed pierwszym taktem doby, w Z33 (kolejka w takcie doby) doba 1 to zero")
     last_rd = min(max(cur) if cur else 0, until, len(E8_O5_Z33_PCS))
     weeks = max(0, (last_rd - 1) // 7)
     if weeks >= 1:
-        def wk(k):   # doby kampanii tygodnia k (1..): 2 + 7(k-1) .. 1 + 7k
-            return range(2 + 7 * (k - 1), 2 + 7 * k)
+        # doby kampanii tygodnia k (1..): 2 + 7(k-1) .. 1 + 7k. Recenzja E8/O5: 1. tydzien bierze tez dobe 1 - po godzinach ok. 26 ze 168 terminow tygodnia
+        # (24 godziny doby 1 i dwie nadrabiane przy starcie sesji) wypada przed pierwszym taktem doby, a kolejka w takcie doby (Z33, klucz wylaczony)
+        # rusza od doby 2 (wzor ma w dobie 1 zero). Bez doby 1 pierwsza sprzedaz tych zalog wypadala z porownania (ok. -3% sztuk przy pasmie +-15%)
+        def wk(k):
+            return range(1 if k == 1 else 2 + 7 * (k - 1), 2 + 7 * k)
 
         rows = []
         for k in range(1, weeks + 1):
@@ -10399,9 +10404,11 @@ def etap8_o5(rep, lines, start, win, until=120, logp=None, csp=None, **kw):
         span_all = {run_day(d, start) for d in days}
         key_off = sorted(rd for rd in range(1, 2 + 7 * weeks) if rd in span_all and rd not in span_on)
         wr = [r[0] / r[2] for r in rows if r[2] > 0]
-        txt = (f"{weeks} pelnych tygodni (doby 2-{1 + 7 * weeks}): sztuki {sum(r[0] for r in rows):.0f} wobec Z33 {sum(r[2] for r in rows)}"
+        d1 = cur.get(1, (0, 0))
+        txt = (f"{weeks} pelnych tygodni (doby 1-{1 + 7 * weeks}, doba 1 w 1. tygodniu): sztuki {sum(r[0] for r in rows):.0f} wobec Z33 {sum(r[2] for r in rows)}"
                + (f" (x{rp:.2f})" if rp is not None else "") + f", utarg {sum(r[1] for r in rows):.0f} zl wobec {sum(r[3] for r in rows)}"
-               + (f" (x{rg:.2f})" if rg is not None else "") + f"; odjeta uprzaz E8/Z zalog {sum(r[4] for r in rows):.0f} szt. / ok. {sum(r[5] for r in rows):.0f} zl")
+               + (f" (x{rg:.2f})" if rg is not None else "") + f"; w tym doba 1 (przed pierwszym taktem doby) {d1[0]} szt. / {d1[1]} zl"
+               + f"; odjeta uprzaz E8/Z zalog {sum(r[4] for r in rows):.0f} szt. / ok. {sum(r[5] for r in rows):.0f} zl")
         if weeks > 4:
             sp, sg = ratio(rows[4:], 0), ratio(rows[4:], 1)
             txt += f"; tygodnie 5-{weeks}: sztuki " + (f"x{sp:.2f}" if sp is not None else "-") + ", utarg " + (f"x{sg:.2f}" if sg is not None else "-")
