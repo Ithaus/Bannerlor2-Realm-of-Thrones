@@ -668,7 +668,7 @@ namespace Armoury
 
         /// <summary>Nadwyzka ponad rejestr -> zwykly odpowiednik w tym samym miejscu. Kolejnosc zostawiania: u mistrzow Qohoru (nie do zmiany - klinga
         /// wchodzi tam dopiero po straznika dla swojego wzoru, GuardNow, wiec to prawdziwa stal), potem wedlug Pri: wlasciciel startowy 0, gracz i glowy
-        /// rodow 1, inni bohaterowie 2, rzeczy gracza 3 (tabor, schowki, magazyn DTE gracza, magazyn wojenny Spoils), tabory AI 5, targi 6, magazyny
+        /// rodow 1, inni bohaterowie 2, rzeczy gracza 3 (tabor, schowki, magazyn DTE gracza, magazyn wojenny Spoils), tabory AI 5, targi 6, wozy kupcow 6 (F1: po targach - Gather dopisuje je na koncu; nie do zmiany, tylko notka), magazyny
         /// DTE AI 7. Zamienione sztuki schodza z listy l.</summary>
         private static int Surplus(string id, List<Copy> l, List<string> notes)
         {
