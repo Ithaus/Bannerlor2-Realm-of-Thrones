@@ -1614,3 +1614,11 @@ ZATWIERDZONE: Armoury 65868156, CrashScribe 142fdd4a, RealisticCaptivity f9a944c
   (takze kandydatki dla gracza) koncza sie ok. 2x szybciej - po roku zostaje ok. 30-40 wolnych kobiet zamiast ok. 110; wylacznik = MarriageOnlyViableCandidates false.**
   Probne DLL do testu: SCRATCH(dbc3d3d1)\test\CrashScribe-at-swaty-cien.dll (a38b68ab: bieg cienia - decyduje ROT, linia "Swaty ROT (Z.3) ... roznic R" ma dac 0) i
   CrashScribe-at-swaty.dll (3da55349: reguly czynne). KOLEJKA GRY: fin4 120 dob (w toku) -> cien swatow 40 dob -> swaty czynne 120 dob -> scalenie z3 do zbior-e8 -> bieg roczny calosci -> wgranie.
+- (15:45 UTC 13.10) **TEST 120 dob RUNDY 3 (zbior-e8 b9e4d36, Armoury f2afb329, NIEWGRANE): 120/120, 0 ERROR, 11.9 s/dobe** (Armoury-2026-10-13_05-47-42.log; progi test\progi-fin4\).
+  **WOJSKO lordow w wojnie 101 144 (bez rundy 3: 88 171) - W PASMIE 95-115 tys., etap2 0 NIE; kasy miast 97.8% Z33; rody na minusie 180; MIASTA BEZ ZELAZA 25.9 (bylo 45.1),
+  BEZ RUDY 19.3 (bylo 43.3) - lepiej niz W33.** Rody z lennem bez renty 7.2%, z 0 ludzi 7 z 214, zadatek BK wstrzymany 250 najmow (4.3 mln zostalo u krolow), kiesy kompanii +7.7 tys./d,
+  dlug 168 w nicosc 0, wozy surowcow: kontrola 0, 1.4 ms/d. NIE: P3W1-2 (bez warunku przez sluzbe 17, prog 8), P3W2-1 (zold zwalnianego 4.47, prog 5.0) - do obejrzenia po biegu rocznym.
+  **`w-toku/zbior-e8` = 9e2e0e6** (+ scalone `w-toku/z3-swaty-rot` e7d8391; CrashScribe do wgrania 3ca8aa08 = test\fin5). **W TOKU W GRZE (lancuch): bieg cienia swatow 40 dob
+  (test\at-fin5-cien40.out.txt; pliki danych z MarriageFastShadow = true w SCRATCH\tmp\tree-cien) -> BIEG ROCZNY 364 doby calosci z regulami czynnymi (test\at-fin5-rok364.out.txt;
+  Armoury f2afb329 + CS-at-swaty 3da55349).** Po nim: progi (wojsko d337-364 cel 72-80 tys., zelazo, sluby/rok), zapis 9 dob, WGRANIE 37 (Armoury f2afb329 + CrashScribe 3ca8aa08 +
+  CrashScribe.settings.xml), jesli 0 bledow i liczby nie gorsze.
