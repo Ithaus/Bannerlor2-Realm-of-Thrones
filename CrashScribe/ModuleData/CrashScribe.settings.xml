@@ -222,4 +222,34 @@
        single line instead of an error block, and once per game the log states the player's BK languages.
        Set QuietBkEducation to false to get the full error block back (old behaviour). -->
   <QuietBkEducation>true</QuietBkEducation>
+
+  <!-- Faster marriage search for AI lords (needs Realm of Thrones together with Banner Kings). Once a day Realm of
+       Thrones looks for a match for every lord, and its code walks the whole list of adult heroes almost twice per
+       lord - about one second of every in-game day. With this on, CrashScribe runs the same search in a single pass:
+       the same couples marry on the same day and the game's random numbers are used in exactly the same order, it
+       only takes less time. If the marriage rules in the game are not the known Realm of Thrones + Banner Kings ones,
+       or another mod changes them, the fast search stands aside and the original runs (one line in the CrashScribe log).
+       Set MarriageFast to false to leave the search to Realm of Thrones (old behaviour). -->
+  <MarriageFast>true</MarriageFast>
+  <!-- Test switch for the search above. With this on, Realm of Thrones decides as before and the fast search only
+       works out what it would have chosen from the same random state; one line a day in the CrashScribe log compares
+       the two (a difference count of 0 means identical results). Slower than either search alone - keep it off for
+       normal play. -->
+  <MarriageFastShadow>false</MarriageFastShadow>
+  <!-- Gameplay change, not a speed-up: AI lords only pick marriage candidates they can actually marry. Realm of
+       Thrones picks one random candidate a day for every unmarried lord and only then asks for the marriage chance.
+       With Banner Kings that list also holds heroes who are already married and heroes Banner Kings will never
+       accept for that lord (chance 0), so more than half of the daily attempts are wasted and AI weddings are rarer
+       than Realm of Thrones intended. With this on, an unmarried lord draws only among candidates whose marriage
+       chance is above zero; the chance itself and every other rule (age, clan, culture, distance, war, race) stay
+       as they are. Expect roughly twice as many AI weddings a day at the start of a campaign (estimate from a
+       model of the starting world: 1.6 to 2.3 times). Side effect: unmarried nobles, including the ones the player
+       could marry, are taken about twice as fast (in the model most of them are married within the first year);
+       once they run out, the yearly number of weddings is the same as before.
+       Needs MarriageFast above; it is paused while MarriageFastShadow is
+       on (the original decides then) and when another mod changes the marriage chance (one line in the CrashScribe
+       log says so). The daily "Swaty ROT (Z.3)" log line ends with the attempts of unmarried lords, how many of
+       them the old rule would have wasted, and the weddings of the day and since loading.
+       Set MarriageOnlyViableCandidates to false to draw from the whole list as Realm of Thrones does (old behaviour). -->
+  <MarriageOnlyViableCandidates>true</MarriageOnlyViableCandidates>
 </CrashScribe>
