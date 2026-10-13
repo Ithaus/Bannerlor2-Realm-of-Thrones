@@ -1089,7 +1089,9 @@ woza unikaty; K1-3a krok 2 (mieszczanie tylko konie robocze); ile drog (po zdjec
 Jeff 13.10: "Rob dalej - rozpoznanie, zmiany - i zapisuj do przekazania; jak dojdzie do 100%, tyle, ile uda sie zrobic, przekazujemy drugiemu kontu na nocna prace."
 Szczegoly kazdego kroku: `docs/STAN-PRAC.md` od wpisu "WGRANIE 37" do konca (godziny wpisow z 13.10 po 18:40 sa przyblizone, do +-40 min; kolejnosc dobra).
 
-**W GRZE: WGRANIE 42** - Armoury 772918be, CrashScribe 04f44a0e, CrashScribe.settings.xml 3e31434f, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
+**AKTUALIZACJA 13.10 ok. 21:00 UTC (tydzien 97%): W GRZE JEST JUZ WGRANIE 43** - Armoury 959d544d, galaz `noc/wgranie-43` = `w-toku/zbior-e8` 4d33042 = WGRANIE 42 + towary N5 (regula A wylaczona domyslnie) + poprawka daniny W5b; test laczny 120 dob 0 ERROR, zapis OK, bieg kontrolny - patrz STAN-PRAC "WGRANIE 43". Punkty "KOD GOTOWY, NIEWGRANY" o N5 i W5b ponizej sa juz WYKONANE. Z listy poprawek 1-6 zostaly: 6 (male) i 4 (bieg dwuletni na koncu). Projekt gospodarki od ludzi: workflow wf_fb11d85b-5e0 w toku; gotowe pliki rozpoznan kopiowane do `docs/gospodarka-od-ludzi/robocze/` - jesli brak pliku projektu, dokonczyc z nich (skrypt `docs/przekazanie/wf-gospodarka-od-ludzi.js`: brakujace etapy uruchomic ponownie).
+
+**(stan sprzed aktualizacji) W GRZE: WGRANIE 42** - Armoury 772918be, CrashScribe 04f44a0e, CrashScribe.settings.xml 3e31434f, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
 Galaz `noc/wgranie-42` = 0a387b5. Dzisiejsze wgrania (kazde po tescie 120 dob + zapis 9 dob + bieg kontrolny, kopie `*.bak-2026-10-13-nocNN-przed` obok plikow i w
 `D:\Backup-Bannerlord\wgrane\`): 37 runda 3 wojsko + zelazo + sluby NPC; 38 hamulec slubow (MarriageChanceScale 0.7); 39 danina wojenna z oszczednosci ludu (P1, FolkWarAid);
 40 pobity oblegajacy uchodzi (N3, LosersFleeBesiegers); 41 korona placi wedlug potrzeby (W5, CrownWarAidByNeed); 42 tarczowe (W6, Scutage).
