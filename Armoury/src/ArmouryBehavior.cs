@@ -721,6 +721,10 @@ namespace Armoury
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
+            // E8/O5 (269): nadwyzki zalog po godzinach - kazda zaloga w swojej godzinie tygodnia (Id % 168) zamiast ok. 32 zalog w takcie doby; wylacznik GarrisonSellHourly
+            // na zywo (wylaczony = sluchacz nic nie robi, kolejka w GarrisonArmory.Daily jak dotad). Rejestracja PRZED ArmoryFit.HourlyOnce = wolanie PO nim (gra dopisuje
+            // sluchacza na poczatek listy - MbEvent): przeglad zbrojowni pierwszej godziny sesji widzi stan sprzed sprzedazy, jak dotad
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("GarrisonArmory.Hourly", delegate { try { GarrisonArmory.Hourly(); } catch (Exception e) { Log.Error("GarrisonArmory.Hourly", e); } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmoryFit.HourlyOnce", delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } }));
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled

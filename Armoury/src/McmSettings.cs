@@ -4404,6 +4404,10 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonSellsSurplus { get; set; } = true;
 
+        [SettingPropertyBool("Garrison Sell Hourly", HintText = "garrisons take their weekly turn at selling spare arms one or two at a time through the hours of the week, instead of some thirty garrisons all at once at the turn of every day - the same rule and one turn a week for each garrison as before, without that short freeze once a day. Off: all at the turn of the day, as before")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GarrisonSellHourly { get; set; } = true;
+
         [SettingPropertyBool("Garrison Drill Needs Arms", HintText = "a garrison's daily drill (training fields, drills) teaches only the men who have a weapon of their kind and grade in the armoury - the experience is scaled by the share of armed men (AI garrisons; yours when they keep a purse or with Garrison Buys Gear Player; only while AI lords and garrisons buy their gear)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GarrisonDrillNeedsArms { get; set; } = true;
@@ -6160,6 +6164,7 @@ namespace Armoury
             s.GarrisonArmoryRestoreOldSave = GarrisonArmoryRestoreOldSave;
             s.KitMovesWithMen = KitMovesWithMen;
             s.GarrisonSellsSurplus = GarrisonSellsSurplus;
+            s.GarrisonSellHourly = GarrisonSellHourly;
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;
