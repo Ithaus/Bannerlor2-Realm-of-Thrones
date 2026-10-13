@@ -1461,3 +1461,14 @@ BKCampaignStartBehavior.OnCharacterCreationOver, UIExtenderEx BaseViewModelMixin
   16 x NIE -> TAK z uzasadnieniem, 3 -> INFO, 1 nowy wiersz renty). Scalenie: konflikt tylko CHANGELOG (783 naglowki), gen_mcm Armoury 1302 / RC 111 / GT 40, build 5 modow kod 0,
   weryfikacja mechaniczna 0 niezgodnosci. **W TOKU: TEST KONCOWY** - 120 dob nowej kampanii na 8547369 (Armoury e69adbd3, CrashScribe 142fdd4a [test: CS-at 8c13a935], RC f9a944c1,
   GT 035878c4, ForgeView e17e0233; test\at-fin1-120.out.txt), potem zapis 9 dob; wgranie - jesli 0 bledow i czas doby nie gorszy niz W33.
+- (08:45 UTC 13.10) **TEST KONCOWY (zbior-e8 8547369, 120 dob nowej kampanii): 120/120, Armoury 0 ERROR, CS 0 blokow naszych modow, 23 znane wyjatki startowe cudzych modow (3 wyjatki skanu IL
+  znikly). CZAS DOBY 11.8 s (W33 17.5; bieg 2 21.2; bieg 3 20.2) - gra o 1/3 SZYBSZA niz WGRANIE 33.** Nasze mody razem 1.17 s/dobe (bylo 4.37), takt doby mediana 316 ms (bylo 1138).
+  Log Armoury-2026-10-13_01-06-48.log, CS session-2026-10-13_01-06-46.log, zapis autotest-2026-10-13-0131.sav; progi test\progi-fin1\ (NIE: etap2 1, etap3 1, etap4 1, etap5 17, etap7 2, etap8 7).
+  POPRAWILO SIE: wojsko lordow w wojnie 86 917 (nad podloga; W33 87 027), T9 91 113 (W33 90 326), kasy miast 9.70 mln (94.5% Z33), rody na minusie 191 (Z33 197), renty korony 0 rodo-dob
+  bez renty, zwiad AI 0.52, siodla z warsztatow 46.5/d (bylo 25.7; Z33 13.4), jezdzcy z koniem bez uprzezy 11.9% (bylo 20.5; prog 10), jazda z para 5.18% ludzi (Z33 z koniem 4.60%),
+  koszt tikow BK karawan 47 ms/dobe (bylo 1411), sredni postoj karawan w miescie 3.1 h (przed E8/G1 ok. 3 doby), juczne z niczego 0.
+  **POGORSZYLO SIE (skutek limitu karawan 2 - 500 karawan zamiast 962 w Z33, wjazdy do miast 98/d zamiast 138):** miasta bez zelaza 44.3 (bieg 2: 33.4; W33 26.7), miasta bez rudy 43
+  (Z33 25.8), dymarki bez wegla 7.0% (prog 5), cykle warsztatow "brak drewna" 229/d (prog 177). Zostaja znane: jazda t3+ 64% celu K3 (czeka na siodla), Dothrakowie czekajacy na konia
+  29.6%, kolejka odziezy wojska i skory, sakiewki 22 dni zoldu, reszta koni w ksiedze (K1-3), port Saath 37 dob bez nadwyzki, F8-2 2.8%.
+  **W TOKU:** zapis 9 dob na 8547369; potem BIEG PORownawczy z NotableCaravanCap = 3 (wariant probny Armoury d8a50add, drzewo SCRATCH(dbc3d3d1)\cap3, bez commita) - czy trzecia karawana
+  kupca przywraca dowoz zelaza i rudy do poziomu W33 i ile kosztuje czasu; potem wybor limitu i wgranie.
