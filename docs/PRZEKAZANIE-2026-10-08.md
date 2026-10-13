@@ -1083,3 +1083,58 @@ Drzewa robocze: SCRATCH(ae222cb7)\zb\int (zbior-e8, glowne), zb\58, zb\58t, zb\p
 
 **Nastepne kroki:** lista "OTWARTE PO WGRANIU 34" w STAN-PRAC (11 punktow; pierwszy: zelazo w miastach). Decyzje czekajace na Jeffa: limit karawan 2 czy 3; zalozenia E8/H; czy kupcy
 woza unikaty; K1-3a krok 2 (mieszczanie tylko konie robocze); ile drog (po zdjeciach); myto na Bliznakach (po liczniku).
+
+## 29. KONIEC KONTA DRUGIEGO (sesja dbc3d3d1; 13.10 ok. 20:15 UTC; tydzien 94%, reset 19.10 17:00 UTC) - START TUTAJ DLA NASTEPNEGO KONTA
+
+Jeff 13.10: "Rob dalej - rozpoznanie, zmiany - i zapisuj do przekazania; jak dojdzie do 100%, tyle, ile uda sie zrobic, przekazujemy drugiemu kontu na nocna prace."
+Szczegoly kazdego kroku: `docs/STAN-PRAC.md` od wpisu "WGRANIE 37" do konca (godziny wpisow z 13.10 po 18:40 sa przyblizone, do +-40 min; kolejnosc dobra).
+
+**W GRZE: WGRANIE 42** - Armoury 772918be, CrashScribe 04f44a0e, CrashScribe.settings.xml 3e31434f, RealisticCaptivity f9a944c1, GrandTourney 035878c4, ForgeView e17e0233.
+Galaz `noc/wgranie-42` = 0a387b5. Dzisiejsze wgrania (kazde po tescie 120 dob + zapis 9 dob + bieg kontrolny, kopie `*.bak-2026-10-13-nocNN-przed` obok plikow i w
+`D:\Backup-Bannerlord\wgrane\`): 37 runda 3 wojsko + zelazo + sluby NPC; 38 hamulec slubow (MarriageChanceScale 0.7); 39 danina wojenna z oszczednosci ludu (P1, FolkWarAid);
+40 pobity oblegajacy uchodzi (N3, LosersFleeBesiegers); 41 korona placi wedlug potrzeby (W5, CrownWarAidByNeed); 42 tarczowe (W6, Scutage).
+
+**KOD GOTOWY, NIEWGRANY:**
+- `w-toku/zbior-e8` = **d527d18** = WGRANIE 42 + N5 towary (`w-toku/n5-towary` 71249d4). DLL do testu: SCRATCH(dbc3d3d1)\test\fin11 (Armoury 4b45b8f1). **Test 120 dob N5 trwal w chwili
+  pisania** (test\at-n5-120.out.txt; lancuch w tle sam przywraca pliki gry). Po nim: progi `python -I tools/sprawdz_logi.py --grupa etap8 --do-doby 120 <log>` (wiersze N5-0..N5-5),
+  kopia logu na D:, zapis 9 dob. **PRZED WGRANIEM N5: ustawic `ValveRaiseWhileShort` domyslnie false** (regula "sufit 4.0 bez kosztu" to towar z niczego - Jeff: produkcja ma isc
+  za ludzmi), przebudowac, bieg 10 dob, dopiero wgrac jako WGRANIE 43 (skora z uboju, rece platnerzy x1.3, drewno, budowy cywilne z dala od frontu zostaja wlaczone).
+- `w-toku/w5b-potrzeba-korony` (drzewo SCRATCH(ae222cb7)\zb\w5b, od 0a387b5): autor 3e94e39, **recenzja w toku** (wf_370f605f-283) - poprawka daniny: potrzeba korony widzi brak
+  wojska u panow + skarbiec ponad zapas wojny zasila doplate W5. Po recenzji: scalic do zbior-e8 (konflikty: CHANGELOG -> union_changelog.py, sprawdz_logi -> union_plik.py,
+  McmSettings -> gen_mcm), test 120 dob, wgrac.
+- `w-toku/k13a-konie-robocze` 137dbc3 (od ca4aa87, stare): mieszczanie tylko konie robocze - Jeff TAK razem z danina po biegu 120 dob z obiema; wymaga scalenia z dzisiejszym zbior-e8.
+
+**PROJEKT W TOKU (NAJWAZNIEJSZE ZADANIE - Jeff: "tak, rob taki projekt, myslalem, ze tak to projektujemy"): GOSPODARKA OD LUDZI.** Workflow wf_fb11d85b-5e0
+(`docs/przekazanie/wf-gospodarka-od-ludzi.js`): 3 rozpoznania -> projekt -> recenzja; wynik: `docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md`, robocze
+SCRATCH(dbc3d3d1)\gosp-ludzie\ (rozpoznanie-kod.md, rozpoznanie-dane.md, rozpoznanie-towary.md). Jesli workflow padl razem z kontem: uruchomic ponownie ten sam skrypt (albo
+dokonczyc brakujace etapy recznie z plikow rozpoznania). ZASADA JEFFA: wies na mapie to SYMBOL wielu wsi - okreg produkuje tyle, ilu ma ludzi (wies zbozowa na Polnocy z 100 tys.
+ludzi daje 10, taka sama w Reach z 370 tys. daje 37); tabela dla KAZDEGO surowca (dzis na 1000 ludzi / wzorzec sredniowieczny / po zmianie); poprawki wydajnosci: klimat,
+dobrobyt, technologia - tylko z prawdziwa miara. Fakt wyjsciowy (skrypt `docs/ludnosc/kr-ludnosc-a-zarobek.py`): zarobek idzie dzis za liczba osad - Polnoc 3.2 mln ludzi,
+109 tys. zl/d wplywu rodow (33.8 zl / 1000 ludzi), Reach 8.3 mln i 83 tys. (9.9), Dorne 1.1 mln i 103 tys. (92.4); hearth na wies i dobrobyt na miasto sa wszedzie prawie
+takie same. Po projekcie: rozdz. 0 i pytania o kierunek do Jeffa; KOD DOPIERO PO JEGO "tak". Do czasu projektu WSTRZYMANE: poprawka lnu, sol, stawka wojenna podatku pana,
+dalsze strojenie podatkow.
+
+**ZATWIERDZONE PRZEZ JEFFA, NIE ZACZETE (kolejnosc proponowana):**
+1. N7 rozbici wracaja pod choragiew (pole + pod murami): z tych, ktorzy uszli - 55% pod choragiew, 30% do domu, 15% do lasu; weterani 70 / rekruci 45; -10 pkt za tydzien zaleglego
+   zoldu (min. 20); wlasny / obcy kraj; Nocna Straz 80 / 0; zbiorka 3-10 dob w twierdzy rodu, czekanie 30 dob, pan przyjmuje w granicach miejsca i budzetu; gracz z komunikatem.
+   Tor M/L; potrzebne pole zapisu (SaveText.Sync, limit 32 KB). Powod: po N3 pula wyrzutkow d120 6.2 tys. zamiast 2.7 tys., armia po bitwie nie wraca.
+2. W6b: rod gracza placi tarczowe i dostaje doplate W5 - "pod warunkiem, ze mam ziemie i sluze jakiemus krolowi" (komunikaty po angielsku).
+3. W7 stawka wojenna podatku pana (kierunek TAK) - PO projekcie gospodarki od ludzi.
+4. Poprawka 6 (male): najkrotsza sluzba kompanii najemnych (764 zmiany pana / rok), przerwa po wykupie z niewoli (ta sama osoba do 11 x), 440 jencow-lordow za darmo przy
+   "pokoju na zero dni", 56 tys. koni jucznych z niczego, 125 tys. szt. zboza i ryb bez zrodla, Thenn pol roku bez pieniedzy.
+5. Obieg kiesy ludu: P1b kara lojalnosci (po pomiarze - lojalnosc miast srednio 93, wiec jest zapas), P2 lud buduje miasto (tylko budowle sluzace miastu, bez "trzeciej" dla pana),
+   P3-P5 zbytki (`docs/kiesa-ludu/PROJEKT-OBIEG-KIESY-LUDU-2026-10-13.md`).
+6. Lup zdobytego miasta (`docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md`): Jeff 5 x TAK + budowle plona przy spustoszeniu, odbudowa mozliwa, ale wolna. Tor L.
+7. BIEG DWULETNI - na samym koncu, po wszystkich poprawkach (decyzja Jeffa). Potem zakonczenie z PLAN-DO-KONCA-MODA (strojenie, wydajnosc, 29 testow recznych Jeffa, drogi).
+
+**JAK PRACOWAC (sprawdzone 13.10):** kod w drzewach SCRATCH(ae222cb7)\zb\<nazwa> (git worktree klonu "lancuch"; nowe: `git -C <lancuch> worktree add <sciezka> -b <galaz> w-toku/zbior-e8`);
+paczka = workflow autor + recenzent z poprawka (wzory w `docs/przekazanie/wf-*.js` z 13.10 - kazdy ma pelny opis srodowiska dla agentow); scalenie do zb\int `git merge --no-ff
+--no-commit`, build Armoury, kopia DLL do SCRATCH(dbc3d3d1)\test\finNN; test `bieg.ps1 -DllDir finNN -CsAt test\CrashScribe-at-hamulec.dll -Tree zb\int -Out ... -Days 120` (25 min),
+progi, zapis `-LoadSave autotest-dlugi -Days 9`, `wgraj.ps1 -DllDir finNN -Tree zb\int -Tag 2026-10-NN-nocNN` (najpierw -DryRun), bieg kontrolny 10 dob, galaz `noc/wgranie-NN`
+na hash, push dwoma krokami, wpis w STAN-PRAC. Kopie logow i tabel biegow: `D:\Backup-Bannerlord\logs\2026-10-13-noc34-35\` (gra trzyma tylko 12 ostatnich logow).
+PULAPKI Z 13.10: `python -I` ignoruje PYTHONIOENCODING - w skrypcie `sys.stdout.reconfigure(encoding='utf-8')`; bieg cienia swatow nie da "0 roznic" (BK losuje w ocenie szansy);
+trzy rozne kampanie 120 dob roznia sie wojskiem o +-5 tys. - nie wyciagac wnioskow z jednej roznicy; raport roczny i jego rozdzialy: `docs/test-zbiorczy/RAPORT-ROCZNY-2026-10-13.md`
+i `docs/test-zbiorczy/raport-roczny-2026-10-13/`.
+
+**DECYZJE JEFFA Z 13.10 (wszystkie w STAN-PRAC):** prog wojska 85 tys. NIE obnizac - pieniadz z podatkow wojennych; danina tylko tam, gdzie korona ma potrzebe (zmieniane przez W5b);
+tarczowe jako zapas; budowy: kto nie ma pieniedzy, nie buduje; sluby przyhamowane; lup miast z kazdej monety; rozbici wracaja; gospodarka od ludzi.
