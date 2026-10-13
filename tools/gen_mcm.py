@@ -174,6 +174,9 @@ RANGES = {
     # E7/R1 (235): oddzial rabunku osada po osadzie i najdluzsza czujnosc - zgodnie z przycieciem w DistrictRaid.Start / EndFin
     'RaidDetachmentMen': (20, 2000, "0"),
     'RaidAlertMaxDays': (1, 60, "0"),
+    # N7 (rozbici pod choragiew): czas czekania w osadzie zbiorki i zasieg odbioru w dobach marszu (StragglersRally.Daily)
+    'StragglersRallyWaitDays': (5, 90, "0"),
+    'StragglersRallyReachDays': (0.5, 15.0, "0.0"),
 }
 
 def gen(module_dir, ns, display):

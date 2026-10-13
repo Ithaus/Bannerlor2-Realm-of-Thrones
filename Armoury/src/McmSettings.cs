@@ -2524,6 +2524,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool LosersFleeBesiegers { get; set; } = true;
 
+        [SettingPropertyBool("Stragglers Rally", HintText = "of the men who flee when a lord's host is beaten (in battles where the beaten mostly flee, and your own host beaten in the field), most fear being hanged as deserters and come back: 55% go back to the banner, 30% go home, 15% take to the woods (seasoned men of tier 4 and up 70% back, tier 3 55%, green levies 45%; beaten in their own land more go home, in a foreign land more stay with the banner or turn outlaw; each week of unpaid wages sends 10 points of them to the woods instead, never below 20% back; the Night's Watch 80% back, none home). Those coming back gather at the nearest castle or town of their house (else of their realm) after 3-10 days and wait there for their lord or any host of the house that comes near; a host takes only as many as it has room for in its size limit and its wage limit. Waiting men draw no pay. Those not taken after the waiting time scatter, half home and half to the woods. Off = as before: the men who flee go home or to the woods")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool StragglersRally { get; set; } = true;
+
+        [SettingPropertyInteger("Stragglers Rally Wait Days", 5, 90, "0", HintText = "days the gathered stragglers wait at their castle or town for a host of their house before they scatter (half home, half to the woods)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int StragglersRallyWaitDays { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Stragglers Rally Reach Days", 0.50f, 15.00f, "0.0", HintText = "the gathered stragglers go to a host of their house when it is within this many days of march of the place where they gathered")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float StragglersRallyReachDays { get; set; } = 5f;
+
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
         [SettingPropertyGroup("Iron Bank")]
         public float WinnerDeathCapPercent { get; set; } = 5f;
@@ -5994,6 +6006,9 @@ namespace Armoury
             s.LosersFleeEnabled = LosersFleeEnabled;
             s.LosersFleePlayerAuto = LosersFleePlayerAuto;
             s.LosersFleeBesiegers = LosersFleeBesiegers;
+            s.StragglersRally = StragglersRally;
+            s.StragglersRallyWaitDays = StragglersRallyWaitDays;
+            s.StragglersRallyReachDays = StragglersRallyReachDays;
             s.WinnerDeathCapPercent = WinnerDeathCapPercent;
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;

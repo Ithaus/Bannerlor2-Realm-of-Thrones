@@ -1235,6 +1235,8 @@ namespace Armoury
                     _lMen += lp.N; _lDead += lp.K; _lDead0 += lp.D0; _lCapt += lp.J; _lRouted += lp.F; _lCapt0 += lp.J0;
                     _c[c, CMen] += lp.N; _c[c, CDead] += lp.K; _c[c, CDead0] += lp.D0; _c[c, CCapt] += lp.J; _c[c, CRouted] += lp.F; _c[c, CCtl] += lp.K + lp.J + lp.F - lp.N; _cCapt0[c] += lp.J0;
                     lp.Applied = true;                                     // komunikat w grze liczy tylko partie zastosowane bez bledu
+                    // N7 (decyzja Jeffa 13.10): pobita druzyna lorda z rozbitymi - znacznik dla podzialu rozbitych przy MapEventEnded (OutlawLaw.RoutedH3Body); nie rzuca
+                    if (lp.Kind == KArmy && lp.F > 0) StragglersRally.MarkBeaten(lp.Mp, me, pos);
                 }
                 catch (Exception e)
                 {

@@ -34,6 +34,13 @@ namespace Armoury
         internal static int LastGoneAi, LastGoneClan;   // 169c (tylko log): zdjeci dzis za zalegly zold - partie AI / gracza i jego rodu
         private static int _floorAiN, _floorAiMen, _floorClanN, _floorClanMen, _goneAiN;   // 183: podloga 30 ludzi - partie i ludzie zatrzymani (doba)
 
+        /// <summary>N7 (StragglersRally - rozbici wracaja pod choragiew): doby zaleglego zoldu druzyny wedlug tego prawa (0 - placona albo prawo wylaczone). Tylko odczyt.</summary>
+        internal static int UnpaidDays(MobileParty mp)
+        {
+            int d;
+            return mp != null && _unpaidDays.TryGetValue(mp, out d) ? d : 0;
+        }
+
         internal static void OnDaily()
         {
             LastGoneAi = 0; LastGoneClan = 0;
