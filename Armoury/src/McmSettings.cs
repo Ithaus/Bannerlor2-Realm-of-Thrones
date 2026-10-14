@@ -5812,6 +5812,10 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float ReaverWaterfrontShare { get; set; } = 0.10f;
 
+        [SettingPropertyBool("Reaver Loot To Crews", HintText = "the iron price pays the crews: the gold an Ironborn house takes as the iron price beyond the share of the people struck, from the waterfronts and as the corsairs' tithe raises, coin for coin, what the house may spend on the wages of its companies in the field - spread over 28 days - and goes neither to its garrisons nor to its court, equipment or buildings, so the crown's war aid for that house falls by as much. The Free Folk take no wages (Free Folk Unpaid), so it does not touch them. Your house as their vassal is measured the same way for the crown's war aid. Needs Reaver Iron Price and Clan Budget Enabled. Off = the iron price counts like any other loot in the house's income, as before")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool ReaverLootToCrews { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7264,6 +7268,7 @@ namespace Armoury
             s.ReaverIronPrice = ReaverIronPrice;
             s.ReaverIronPriceShare = ReaverIronPriceShare;
             s.ReaverWaterfrontShare = ReaverWaterfrontShare;
+            s.ReaverLootToCrews = ReaverLootToCrews;
         }
 
         internal static void Apply()

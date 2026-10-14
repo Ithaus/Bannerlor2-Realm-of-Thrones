@@ -67,6 +67,7 @@ namespace Armoury
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
+            public double Loot;     // WW2 (wyspy-wolni): lup na zalogi - okno 28 dob zelaznej ceny i dziesieciny korsarzy (zl/d), JUZ doliczony do Cap i PartyCap (po zalogach i karawanach)
             public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja); W7 - razem z gotowka poboru pana
         }
 
@@ -92,6 +93,8 @@ namespace Armoury
         private static long _dPzCap, _dPzChest, _dPzWage; private static int _dPzN, _dPzChestN, _dPzMenPar, _dPzMenGar;
         // B4 (pomiar, pieniadze roku 2): zalogi z celem pokojowym - ile, na celu (zold >= 95% celu) / ponizej, zold wobec celu, rody z celem przycietym do limitu pulapu
         private static long _dB4Wage, _dB4Tgt; private static int _dB4N, _dB4At, _dB4Below, _dB4Scaled;
+        // WW2 (wyspy-wolni): rody z lupem na zalogi - okno lupu (zl/d), zold druzyn tych rodow i ich pulap druzyn z lupem
+        private static double _dLoot; private static long _dLootWage, _dLootCap; private static int _dLootN;
         // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
         // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
         private static readonly int[] _dRelTier = new int[3];
@@ -150,6 +153,7 @@ namespace Armoury
             _dRelTavern = 0; _dRelPurseVet = 0;
             _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
             _dB4Wage = _dB4Tgt = 0; _dB4N = _dB4At = _dB4Below = _dB4Scaled = 0;                     // B4
+            _dLoot = 0; _dLootWage = _dLootCap = 0; _dLootN = 0;                                       // WW2
             for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
             _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
@@ -403,8 +407,10 @@ namespace Armoury
                     if (mp == null || !mp.IsActive || !mp.IsCaravan || mp.IsMainParty || OwnerOf(mp) != c) continue;
                     car += Math.Max(0, mp.TotalWage);
                 }
-                capW6 = Math.Max(0, cap - gar - car);
-                capW5 = Math.Max(0, cap + court - gar - car);
+                // WW2 (ta sama regula co AI): lup na zalogi gracza-najezdzcy podnosi jego pulap druzyn w mierze W5 / W6 (zold z lupu nie jest brakiem)
+                double loot = ReaverLaw.LootToCrewsOn && ReaverLaw.IsReaver(c.Kingdom) ? ReaverLaw.Window(c) : 0;
+                capW6 = Math.Max(0, cap - gar - car) + loot;
+                capW5 = Math.Max(0, cap + court - gar - car) + loot;
                 reserve = R;
                 return true;
             }
@@ -587,6 +593,8 @@ namespace Armoury
                         else b.MenCap = -1;
                         // 168: KREDYT WOJENNY wpiety w pulap - w wojnie rod z G < R (bez zaleglosci, zajecia, z wolnym kapitalem Banku) moze isc ponad pulap o najwyzej
                         // 0.40 D dziennie w granicy limitu; Bank wyplaca dzis do kiesy glowy brak do zoldu naliczonego ponad pulap bez kredytu (kapital Banku -> glowa)
+                        // WW2 (wyspy-wolni): lup na zalogi tej doby liczony przed kredytem wojennym - zold, ktory pokrywa lup, nie jest brakiem do pozyczki
+                        double lootNow = !b.Zero && !merc && ReaverLaw.LootToCrewsOn && ReaverLaw.IsReaver(c.Kingdom) ? Math.Max(0, ReaverLaw.Window(c)) : 0;
                         b.CapNoKw = b.Cap; b.KwRoom = 0; b.KwLent = 0;
                         if (DebtLadder.On && !merc && !b.Zero)
                         {
@@ -596,7 +604,7 @@ namespace Armoury
                                 if (kw > 0)
                                 {
                                     b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
-                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw;
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad)
                                     if (gap >= 1)
                                     {
                                         int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));
@@ -608,6 +616,11 @@ namespace Armoury
                         }
                         Garrisons(c, b, s);
                         b.PartyCap = Math.Max(0, b.Cap - (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) - b.WCar);
+                        // WW2 (wyspy-wolni, projekt 2.2): lup na zalogi okretow - zelazna cena ponad s, nabrzeze i dziesiecina korsarzy rodu z 28 dob / 28 podnosi pulap rodu
+                        // i pulap DRUZYN 1:1 PO odjeciu zalog i karawan (lup nie dopelnia zalog), bez wejscia do D (dwor, sprzet, budowy, limit Banku go nie widza).
+                        // PartyCapOwn / AtMeans / ScutageCap licza go jako pieniadze rodu - potrzeba W5 spada o lup. Straz i Wolni Ludzie bez zoldu (b.Zero) i najemnicy - poza.
+                        b.Loot = 0;
+                        if (lootNow > 0) { b.Loot = lootNow; b.Cap += lootNow; b.PartyCap += lootNow; _dLoot += lootNow; _dLootN++; _dLootWage += b.WPar; _dLootCap += (long)b.PartyCap; }
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
                         // P3/W2 (pomiar): rod w wojnie, ktoremu zalogi i karawany zajely caly pulap - partie zwalniane do zera, kolejnosc zwolnien nic tu nie zmienia
                         if (!b.Zero && !merc && b.War && b.PartyCap <= 0) { _dGarEatsCap++; if (b.MenPar <= 0) _dGarEatsCapEmpty++; }
@@ -864,7 +877,7 @@ namespace Armoury
             if (b.CourtRoom > 0 && share > 0)
             {
                 // recenzja W5: zold, ktory rod placi SAM - bez czesci oplaconej dzis gotowka korony (b.AidCash; 0 bez doplaty i przy wylaczonym kluczu)
-                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash;
+                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash - b.Loot;   // WW2: zold z lupu nie zajmuje dworu
                 double used = Math.Min(share, Math.Max(0, wageNow - b.CapBase));
                 if (used > 0) { share -= used; _dCourtYield += (long)used; _dCourtYieldN++; }
             }
@@ -903,7 +916,8 @@ namespace Armoury
             // zwalnia ludzi oplaconych przez korone: pulap do zwolnien = pulap partii z przydzialem + zalogi i karawany liczone jak w pulapie partii. U rodu,
             // ktorego zalogi mieszcza sie w pulapie, to ta sama liczba co b.Cap; bez przydzialu (b.Aid = 0) regula bez zmian.
             double capRel = b.Cap;
-            if (b.Aid > 0 && !b.Zero) capRel = Math.Max(capRel, b.PartyCap + (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) + b.WCar);
+            // WW2 (wyspy-wolni): lup na zalogi - ta sama regula co przydzial korony (lup jest znaczony na druzyny; zalogi ponad pulap wlasny nie zwalniaja ludzi z lupu)
+            if ((b.Aid > 0 || b.Loot > 0) && !b.Zero) capRel = Math.Max(capRel, b.PartyCap + (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) + b.WCar);
             bool over = b.Zero ? _watchPoolCap >= 0 && _watchPoolMen > hyst * _watchPoolCap : wage > hyst * capRel;
             b.Streak = over ? b.Streak + 1 : 0;
             if (over) _dOver++;
@@ -1273,6 +1287,18 @@ namespace Armoury
             B b; return c != null && On && _b.TryGetValue(c, out b) && b.D0 >= 0 ? b.D : -1;
         }
 
+        /// <summary>WW2: lup na zalogi w dzisiejszym pulapie rodu (zl/d; 0 - bez lupu albo bez budzetu) - kolumna lup_na_zaloge_ww2.</summary>
+        internal static double LootOf(Clan c) { var b = Of(c); return b != null ? b.Loot : 0; }
+
+        /// <summary>WW2: lup na zalogi w budzetach rodow krolestwa z ostatniego rozliczenia (krok W5 biegnie przed budzetem - wczoraj). Tylko odczyt.</summary>
+        internal static double LootOfKingdom(Kingdom k)
+        {
+            double x = 0;
+            if (k == null) return 0;
+            foreach (var kv in _b) if (kv.Key != null && kv.Value != null && kv.Value.Today && kv.Key.Kingdom == k) x += kv.Value.Loot;
+            return x;
+        }
+
         /// <summary>168: miejsce kredytu wojennego w dzisiejszym pulapie rodu (0 - bez KW albo bez budzetu) - kolumna kandydat_pozyczki.</summary>
         internal static double KwRoomOf(Clan c) { var b = Of(c); return b != null ? b.KwRoom : 0; }
 
@@ -1519,6 +1545,10 @@ namespace Armoury
               .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej, zalog z celem ").Append(_dB4N)
               .Append(", na celu (zold >= 95% celu) ").Append(_dB4At).Append(", ponizej celu ").Append(_dB4Below).Append("; zold zalog ").Append(_dB4Wage).Append(" wobec celu ").Append(_dB4Tgt)
               .Append("; rodow z celem przycietym do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu ").Append(_dB4Scaled)
+              .Append(" | lup na zalogi (WW2, Reaver Loot To Crews ").Append(ReaverLaw.LootToCrewsOn ? "tak" : "nie").Append("): rodow ").Append(_dLootN)
+              .Append(", w oknie 28 dob ").Append(_dLoot.ToString("0", Inv)).Append(" zl/d, podniesienie pulapu druzyn ").Append(_dLoot.ToString("0", Inv))
+              .Append(", zold druzyn tych rodow ").Append(_dLootWage).Append(" (wobec pulapu druzyn z lupem ").Append(_dLootCap).Append(")")
+              .Append(", lup do kosza wczoraj ").Append(ReaverLaw.LastLootIn)
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")

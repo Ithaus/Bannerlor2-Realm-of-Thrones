@@ -23,6 +23,7 @@ namespace Armoury
         internal const int KRefund = 0, KCrownLevies = 1, KThird = 2, KContract = 3;   // 185: kontrakt najemnika od korony (czesc "kontrakt" D stalego)
         internal const int KRent = 4;                                                  // 180: renta korony wedlug lenn (czesc "korona" D stalego, nie jednorazowe)
         internal const int KRansom = 5;                                                // 178: okup otrzymany (gotowka i raty) - jednorazowe od prawdziwego platnika
+        internal const int KReaver = 6;                                                // WW2 (wyspy-wolni): zelazna cena z nabrzeza i dziesiecina korsarzy - kosz lupu na zalogi (w Today; z jednorazowych odejmowany przy kluczu WW2)
         private const int Days = 28;
 
         // 6.4 projektu, przebieg na sucho - 166: udzialy pulapu przeszly do Settings (ClanBudget.Ceiling - jedna formula dla logu i gry); tu zostaje reszta przebiegu na sucho
@@ -42,6 +43,7 @@ namespace Armoury
             public long TodayRent;                                     // 180: renta korony (w Today; czesc "korona" D stalego, nie jednorazowe)
             public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
             public long TodayShips;                                    // 3.1/3.3 (33) 181: wyplaty portow za statki (czesc TodayEvtSettl) - poza limitem KW (E2 R16 "limit bez statkow")
+            public long TodayReaver;                                   // WW2 (wyspy-wolni): zelazna cena ponad s (czesc TodayEvtSettl), nabrzeze i dziesiecina korsarzy (KReaver) - kosz lupu na zalogi
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -130,8 +132,24 @@ namespace Armoury
                 else if (kind == KContract) { r.TodayContract += amount; }
                 else if (kind == KRent) { r.TodayRent += amount; DayCrownRent += amount; }
                 else if (kind == KRansom) { r.TodayRansom += amount; }
+                else if (kind == KReaver) { r.TodayReaver += amount; }   // WW2: kosz lupu na zalogi (przelew bez zdarzenia gry - nabrzeze, dziesiecina)
             }
             catch (Exception e) { Stumble("NoteInflow", e); }
+        }
+
+        /// <summary>WW2 (wyspy-wolni): czesc wplywu, ktory ksiega juz zobaczyla jako zdarzenie gry (przyrost zelaznej ceny ponad s - przelew kiesa wsi -> wodz,
+        /// OnEvent "od osad"), idzie do kosza lupu na zalogi - tylko znacznik (Today bez zmian; kosz ograniczony do jednorazowych w StableClan).</summary>
+        internal static void NoteReaverEvt(Hero h, long amount)
+        {
+            try
+            {
+                if (!On || h == null || amount <= 0) return;
+                var c = h.Clan;
+                if (c == null || c.IsBanditFaction) return;
+                var r = Of(c);
+                if (r != null) r.TodayReaver += amount;
+            }
+            catch (Exception e) { Stumble("NoteReaverEvt", e); }
         }
 
         /// <summary>168: jednorazowe wplywy rodu od ostatniej doby ksiegi (Bank biegnie przed ksiega - to wplywy jednej doby): all - wszystkie (lup, okupy,
@@ -145,6 +163,7 @@ namespace Armoury
                 Rec r;
                 if (!On || c == null || c.StringId == null || !_book.TryGetValue(c.StringId, out r)) return false;
                 all = Math.Max(0L, r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent - r.TodayEstates);
+                if (ReaverLaw.LootToCrewsOn) all = Math.Max(0L, all - r.TodayReaver);   // WW2: lup na zalogi nie jest jednorazowym (kredyt wojenny 168 go nie widzi)
                 real = Math.Max(0L, Math.Min(all, r.TodayEvtSettl + r.TodayEvtOther + r.TodayThird + r.TodayRansom));
                 real = Math.Max(0L, real - r.TodayShips);   // 3.1/3.3 (33) 181: statki sprzedane portom (E3/10-E3/12) nie wchodza do limitu KW - jak dotad, gdy szly z niczego
                 return true;
@@ -348,6 +367,7 @@ namespace Armoury
                         r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = r.TodayRent = 0;
                         r.TodayRansom = 0;   // 178
                         r.TodayShips = 0;   // 3.1/3.3 (33) 181
+                        r.TodayReaver = 0;  // WW2 (wyspy-wolni)
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);
@@ -634,6 +654,7 @@ namespace Armoury
                     csv.Append(KingdomTreasury.CrownSurplusCsv(c));   // W5b regula 2: czesc gotowki W5 ze skarbca ponad zapas wojny (za kolumnami W6)
                     csv.Append(KingdomTreasury.LordLevyCsv(c));       // W7: pobor stawki wojennej pana tej doby i podniesienie pulapu ponad W5 (za kolumna W5b)
                     csv.Append(KingdomTreasury.RentAidCsv(c));        // M1 (recenzja): czesc gotowki W5 z reszty wplywow dnia przed rentami (za kolumnami W7)
+                    csv.Append(ReaverLaw.LootCsv(c));                 // WW2 (wyspy-wolni): lup na zalogi w pulapie rodu tej doby (za kolumna M1)
                     csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
@@ -644,7 +665,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader + KingdomTreasury.LordLevyCsvHeader + KingdomTreasury.RentAidCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader + KingdomTreasury.LordLevyCsvHeader + KingdomTreasury.RentAidCsvHeader + ReaverLaw.LootCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);

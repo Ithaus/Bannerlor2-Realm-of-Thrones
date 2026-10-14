@@ -77,6 +77,7 @@ namespace Armoury
         internal static void Reset()
         {
             for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); }
+            _loot.Clear(); _dLootIn = 0; _lastLootIn = 0;   // WW2: okno lupu tylko w pamieci sesji
             _rangeLogged = false; _stumbles = 0;
             lock (_err) _err.Clear();
         }
@@ -120,9 +121,76 @@ namespace Armoury
         }
 
         /// <summary>WW1: przyrost zelaznej ceny ponad s z kiesy wsi zaplacony wodzowi (przelew gry - ksiega dochodu widzi go jako zdarzenie od osady).
-        /// Miejsce na kosz lupu na zalogi (WW2).</summary>
+        /// WW2: do kosza lupu na zalogi rodu wodza (znacznik w ksiedze dochodu - przy kluczu WW2 poza jednorazowymi i D) i do okna 28 dob.</summary>
         internal static void NoteIronGold(Hero leader, long amount)
         {
+            if (leader == null || amount <= 0) return;
+            try { ClanIncomeBook.NoteReaverEvt(leader, amount); NoteLoot(leader.Clan, amount); }
+            catch (Exception e) { Stumble("NoteIronGold", e); }
+        }
+
+        // ---------------------------------------------------------------- WW2: lup na zalogi okretow (okno 28 dob na rod, tylko w pamieci sesji)
+        /// <summary>WW2 czynne: klucz ReaverLootToCrews, wymaga WW1 (zelazna cena) i budzetu rodow 166.</summary>
+        internal static bool LootToCrewsOn { get { var s = S; return s != null && s.ReaverLootToCrews && s.ReaverIronPrice && s.ClanBudgetEnabled; } }
+        private const int LootDays = 28;   // to samo okno co D staly 169c: lup jednym kawalkiem rozlozony na miesiac zoldu
+
+        private sealed class LootRing
+        {
+            public readonly long[] V = new long[LootDays];
+            public int Head; public long Today, Sum;
+            public void Push() { Sum += Today - V[Head]; V[Head] = Today; Head = (Head + 1) % LootDays; Today = 0; }
+        }
+        private static readonly Dictionary<Clan, LootRing> _loot = new Dictionary<Clan, LootRing>();
+        private static long _dLootIn;           // lup do kosza WW2 od ostatniego Roll (linia 166)
+
+        /// <summary>WW2: zloto lupu do kosza rodu (zelazna cena ponad s, nabrzeze, dziesiecina korsarzy) - okno 28 dob.</summary>
+        internal static void NoteLoot(Clan c, long amount)
+        {
+            if (c == null || amount <= 0) return;
+            try
+            {
+                LootRing r;
+                if (!_loot.TryGetValue(c, out r)) { r = new LootRing(); _loot[c] = r; }
+                r.Today += amount; _dLootIn += amount;
+            }
+            catch (Exception e) { Stumble("NoteLoot", e); }
+        }
+
+        /// <summary>WW2: koniec doby kosza (ArmouryBehavior - przed ClanBudget.Daily): dzisiejszy lup do pierscienia; pierscienie bez lupu przez 28 dob znikaja.</summary>
+        internal static long Roll()
+        {
+            long d = _dLootIn; _dLootIn = 0;
+            try
+            {
+                List<Clan> drop = null;
+                foreach (var kv in _loot)
+                {
+                    kv.Value.Push();
+                    if (kv.Value.Sum <= 0 || kv.Key == null || kv.Key.IsEliminated) (drop ?? (drop = new List<Clan>())).Add(kv.Key);
+                }
+                if (drop != null) foreach (var c in drop) _loot.Remove(c);
+            }
+            catch (Exception e) { Stumble("Roll", e); }
+            _lastLootIn = d;
+            return d;
+        }
+        private static long _lastLootIn;
+        /// <summary>WW2: lup do kosza w dobie przed ostatnim Roll (linia 166).</summary>
+        internal static long LastLootIn { get { return _lastLootIn; } }
+
+        /// <summary>WW2: kolumna budzet-rodow.csv (ostatnia - czytniki po nazwach): lup na zalogi w pulapie rodu tej doby (zl/d, 0 - bez lupu albo bez budzetu).</summary>
+        internal const string LootCsvHeader = ";lup_na_zaloge_ww2";
+        internal static string LootCsv(Clan c)
+        {
+            try { return ";" + Math.Round(ClanBudget.LootOf(c)).ToString("0", Inv); }
+            catch { return ";"; }
+        }
+
+        /// <summary>WW2: lup rodu na dobe - suma 28 dob / 28 (po wczytaniu okno rosnie od 0 - bez pola zapisu). 0 - brak lupu.</summary>
+        internal static double Window(Clan c)
+        {
+            LootRing r;
+            return c != null && _loot.TryGetValue(c, out r) ? Math.Max(0L, r.Sum) / (double)LootDays : 0.0;
         }
 
         /// <summary>WW1: krok rabunku najezdzcy z morza (zdarzenie morskie).</summary>
@@ -158,6 +226,9 @@ namespace Armoury
                 try { leader.ChangeHeroGold((int)took); }
                 catch { TownFolk.LevyBack(port, 0, took); throw; }
                 CirculationWindows.NoteHeroGold(leader, (int)took);   // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
+                // WW2: wplyw rodu wodza bez zdarzenia gry - do ksiegi dochodu (kosz KReaver: przy kluczu WW2 poza D, bez klucza - jednorazowe jak caly lup) i okna
+                ClanIncomeBook.NoteInflow(leader, (int)took, ClanIncomeBook.KReaver);
+                NoteLoot(leader.Clan, took);
                 var x = _iron[group];
                 x.Folk += took; x.Ports.Add(port); x.FolkPorts++;
                 x.Bal += (leader.Gold - h0) - took;

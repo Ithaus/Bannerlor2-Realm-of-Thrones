@@ -182,7 +182,7 @@ namespace Armoury
                     double court0 = Math.Max(0, b.Household - b.Food);
                     // recenzja W5: zold, ktory rod placi SAM (bez gotowki korony tej doby - b.AidCash): zold oplacony przez korone nie zwalnia rodu z wplaty
                     // niewydanego sprzetu do dworu (bez doplaty i przy wylaczonym kluczu AidCash = 0 - regula co do zlotowki jak dotad)
-                    double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash;
+                    double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash - b.Loot;   // WW2: zold z lupu nie zajmuje sprzetu dworu
                     double over = Math.Max(0, wageNow - b.CapBase) - court0;   // zold ponad pulap razem z calym udzialem dworu
                     if (over > 0) { double used = Math.Min(x, over); x -= used; _dYield += used; }
                 }

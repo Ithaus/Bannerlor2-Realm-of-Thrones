@@ -1813,6 +1813,7 @@ namespace Armoury
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane
             try { VetPurse.Daily(); } catch (Exception e) { Log.Error("VetPurse.Daily", e); } DayProfile.Lap("VetPurse.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MVetPurse); } catch { }
+            try { ReaverLaw.Roll(); } catch (Exception e) { Log.Error("ReaverLaw.Roll", e); }   // WW2 (wyspy-wolni): lup doby (rabunki, dziesiecina korsarzy z OutlawLaw.Daily) do okna 28 dob - przed budzetem rodow
             try { ClanBudget.Daily(); } catch (Exception e) { Log.Error("ClanBudget.Daily", e); } DayProfile.Lap("ClanBudget.Daily");   // linia "Budzet rodow (166)"
             try { VetPurse.Line(); } catch (Exception e) { Log.Error("VetPurse.Line", e); } DayProfile.Lap("VetPurse.Line");   // E5/B6 (201): linia "Weterani - pieniadze (E5/B6)" - ta sama doba co 166 (zloto nie rusza)
             try { DebtLadder.Report(); } catch (Exception e) { Log.Error("DebtLadder.Report", e); } DayProfile.Lap("DebtLadder.Report");   // 168: linia "Dlugi (168)" - po budzecie (kredyt wojenny dnia); zloto nie rusza
