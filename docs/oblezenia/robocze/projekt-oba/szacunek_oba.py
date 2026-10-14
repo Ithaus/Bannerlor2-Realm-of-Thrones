@@ -38,18 +38,19 @@ for r in rows:
         if r['wynik'] in ('wypad - pobity oblegajacy', 'odstapione bez bitwy', 'pod murami - pobity oblegajacy'): events += 1
 H = events / exp_days
 
-# --- powrot: oblezenie przegrane sila (wypad / pod murami / szturm bez zdobycia), a ta sama twierdza zdobyta pozniej w biegu [P]
+# --- powrot: oblezenie przegrane sila albo okupem (wypad / pod murami / szturm bez zdobycia / okup), a ta sama twierdza zdobyta
+#     60-180 dob po koncu (po rozejmie 60 dob, ktory OB2 nadaje frakcji odpartej - jak po okupie) [P]
 by = {}
 for r in rows: by.setdefault(r['nazwa'], []).append(r)
 fail, back = 0, 0
 for name, eps in by.items():
     eps.sort(key=lambda x: int(x['start_doba_biegu']))
     for i, r in enumerate(eps):
-        if r['wynik'] in ('wypad - pobity oblegajacy', 'pod murami - pobity oblegajacy', 'szturm bez zdobycia, potem odstapione'):
+        if r['wynik'] in ('wypad - pobity oblegajacy', 'pod murami - pobity oblegajacy', 'szturm bez zdobycia, potem odstapione', 'okup (O1)'):
             if int(r['start_doba_biegu']) > 600: continue      # za malo czasu do konca biegu
             fail += 1
-            later = [x for x in eps[i+1:] if int(x['start_doba_biegu']) - int(r['koniec_dzien']) + 108835 <= 120]
-            if any(x['wynik'].startswith('zdobyte') for x in later): back += 1
+            end = int(r['koniec_dzien']) - 108835
+            if any(x['wynik'].startswith('zdobyte') and 60 <= int(x['start_doba_biegu']) - end <= 180 for x in eps[i+1:]): back += 1
 REB = back / fail if fail else 0.0
 
 def r1_wait(o0):
@@ -123,16 +124,16 @@ with open(os.path.join(out, 'oba-zdobycia.tsv'), 'w', encoding='utf-8', newline=
                     'nigdy' if x['wait'] is None else round(x['wait'], 1), round(x['fA'], 3), '' if x['s1'] is None else round(x['s1'], 3)])
 
 print('zdobycia fin30', len(res), '| wymiana E (mediana obl./obronce)', round(E, 2), 'z', len(ex), '| hazard konca bez szturmu', round(H, 4), '/dobe',
-      '| powrot po porazce sila (<=120 dob)', back, '/', fail, '=', round(REB, 2))
+      '| powrot po porazce/okupie (60-180 dob)', back, '/', fail, '=', round(REB, 2))
 print('stolice zdobyte', sum(x['cap'] for x in res), '| S1 (zaloga >= 50% obrony w bitwie ze szturmu)', sum(x['s1'] is not None for x in res))
 print('fA zdobyc: kwartyle', [round(q, 3) for q in st.quantiles([x['fA'] for x in res if not x['story']], n=4)])
 for L in L_LIST:
     kept, rep, r1s, r1l, back, times = scen(L)
-    kT = kept * math.exp(-H * T1_DAYS); bT = REB * (len(res) - kT) * (kT / len(res))
-    print(f'   wariant +T1: zdobyc {kT:.1f} + powrot {bT:.1f} = {kT+bT:.1f}, czas zdobycia mediana {st.median(times)+T1_DAYS:.1f}')
     increp = sum(1 for f in inc if f >= L)
     print(f'L={L:.2f}: zdobyc zostaje {kept:.1f} (+ powrot {back:.1f} = {kept+back:.1f}) | odparte zdobycia {rep} + bez rozstrzygniecia -> odparte {increp}/{len(inc)}'
           f' | R1 zatrzymuje {r1s:.1f} (pozniej {r1l}) | czas zdobycia mediana {st.median(times):.1f} p90 {st.quantiles(times, n=10)[-1]:.1f}')
+    kT = kept * math.exp(-H * T1_DAYS); bT = REB * (len(res) - kT) * (kT / len(res))
+    print(f'   wariant +T1: zdobyc {kT:.1f} + powrot {bT:.1f} = {kT+bT:.1f}, czas zdobycia mediana {st.median(times)+T1_DAYS:.1f}')
 caps = [x for x in res if x['cap']]
 for L in L_LIST:
     keep = [x['name'] for x in caps if not ((x['mury'] is not None and x['mury'] <= 1) or (x['s1'] is not None and x['s1'] >= L) or x['fA'] >= L)]
