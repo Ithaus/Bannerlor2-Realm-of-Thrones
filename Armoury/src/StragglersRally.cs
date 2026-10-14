@@ -331,7 +331,8 @@ namespace Armoury
                 if (x.Day == day && x.Ready == ready && x.Watch == m.Watch && ReferenceEquals(x.Clan, m.Clan) && ReferenceEquals(x.Rally, m.Rally)) { g = x; break; }
             }
             bool newG = g == null;
-            if (newG) g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = ready, Watch = m.Watch };
+            if (newG) g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = ready, Watch = m.Watch,
+                                  RallyF = m.Rally.MapFaction };   // recenzja drobne14: frakcja osady zbiorki od powstania grupy (zdobycie przed pierwszym przegladem doby - nadal "has fallen")
             TN tn = null;
             for (int i = 0; i < g.T.Count; i++) if (ReferenceEquals(g.T[i].C, t)) { tn = g.T[i]; break; }
             bool newT = tn == null;

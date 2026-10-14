@@ -472,7 +472,8 @@ namespace Armoury
         private const int C4Max = 8;
         private static int _c4Lines;
 
-        private static void C4Probe(string path, Settlement st, int amount)
+        // recenzja: nazwa sciezki skladana dopiero przy linii (wolane przy kazdej ujemnej kwocie miasta - bez napisu na kazde wywolanie)
+        private static void C4Probe(bool n169, int kind, Settlement st, int amount)
         {
             try
             {
@@ -481,6 +482,8 @@ namespace Armoury
                 long below = Math.Max(0L, Math.Min(-(long)amount, r - g));
                 if (below <= 0) return;
                 _c4Lines++;
+                string path = n169 ? (kind >= 0 && kind < N169 ? "169: " + N169Name[kind] : "Note169 " + kind)
+                                   : (kind >= 0 && kind < Notes ? NName[kind] : "Note " + kind);
                 Log.Info("Kasa miasta ponizej zapasu (C-4b, diagnoza): dzien " + (int)CampaignTime.Now.ToDays + " | sciezka " + path + " | " + (st.Name != null ? st.Name.ToString() : "-")
                          + " (" + st.StringId + ") zaplacila " + (-(long)amount) + ", ponizej zapasu " + below + " (kasa po przelewie " + g + ", zapas kupcow " + r + ")"
                          + " | linia " + _c4Lines + "/" + C4Max + " na sesje | stos: " + EnemyCaravans.StackText(2) + ".");
@@ -495,7 +498,7 @@ namespace Armoury
             try
             {
                 TownFolk.OnTownCoin(st, amount, src);   // E5/0 (195): nasze sciezki zakupu kas miast (src: BOurs, zwroty i likwidacje - BBack) - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
-                if (amount < 0 && src == TownFolk.BOurs) C4Probe(kind >= 0 && kind < Notes ? NName[kind] : "Note " + kind, st, amount);
+                if (amount < 0 && src == TownFolk.BOurs) C4Probe(false, kind, st, amount);
                 if (_inBlock || amount == 0 || kind < 0 || kind >= Notes) return;
                 int c = ClassOf(st);
                 if (c < 0) return;

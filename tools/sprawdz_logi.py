@@ -16396,8 +16396,9 @@ def drobne14_main(logp):
     if diag:
         rep.add("D14-1: L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu",
                 f"zdobyc {len(ev)} (z diagnoza {diag}, bez spisu {nosp}); na poczatku {st0}: w murach przy zdobyciu {st_in}, poza murami {st_out}, zniknely {st_gone}; zajete {seized}",
-                "przy karawanach w murach na poczatku oblezenia (> 0): w murach przy zdobyciu > 0 (inaczej droga zajecia martwa - patrz D14-2)",
-                (st_in > 0) if st0 > 0 else None)
+                "przy karawanach w murach na poczatku oblezenia (> 0): w murach przy zdobyciu > 0 (inaczej droga zajecia martwa - patrz D14-2;"
+                " DECYZJA, nie NIE: drobne14 to tylko diagnoza, naprawa po stosie D14-2)",
+                (st_in > 0) if st0 > 0 else None, decide=True)
     else:
         rep.add("D14-1: L5b-2 karawany na poczatku oblezenia", f"linii L5b-2 {len(ev)}, bez dopisku diagnozy" if ev else "brak linii L5b-2", "INFO (wersja sprzed drobne14 albo brak zdobyc)", None)
     if left:
@@ -16406,8 +16407,6 @@ def drobne14_main(logp):
         rep.add("D14-2: wyjazdy karawan z oblezanych osad (kto je wyprowadza)", f"linii {len(left)}; pierwszy stos: {stack[:400]}", "INFO (sciezka do naprawy L5b-2)", None)
     else:
         rep.add("D14-2: wyjazdy karawan z oblezanych osad", "0 linii", "INFO", None)
-    rep.add("D14-3: C-4b kasa miasta ponizej zapasu przez nasza sciezke (diagnoza)",
-            f"{len(c4)} linii" + (f"; pierwsza: {c4[0][:300]}" if c4 else ""), "0 (jeden wzor zapasu: Seal31.TownReserve = TownPurse.Reserve)", len(c4) == 0)
     names = {}
     for s in lines:
         if s.startswith("Wsie bez wozu (E8/P3): dzien"):
@@ -16415,6 +16414,17 @@ def drobne14_main(logp):
             if m:
                 k = m.group(1).split(" (")[0]
                 names[k] = names.get(k, 0) + 1
+    # recenzja: D14-3 mierzy tez sam C-4b (linia "Nadwyzka kas (E5/0)": "nasze sciezki N z") - same linie diagnozy pojawiaja sie tylko przy bledzie, wiec
+    # na logu sprzed drobne14 dawaly "TAK" bez pomiaru; znacznik wersji: dopisek L5b-2, nazwa wsi P3-2 albo linia diagnozy (bez znacznika - INFO)
+    ours = [num(r"nasze sciezki (\d+) z", s, default=None) for s in lines if s.startswith("Nadwyzka kas (E5/0): dzien")]
+    ours = [v for v in ours if v is not None]
+    c4sum = sum(ours)
+    marker = diag > 0 or bool(names) or bool(left) or bool(c4)
+    rep.add("D14-3: C-4b kasa miasta ponizej zapasu przez nasza sciezke (E5/0 + diagnoza)",
+            f"C-4b suma {c4sum} w {len(ours)} dobach (niezerowe {sum(1 for v in ours if v)}); linii diagnozy {len(c4)}" + (f"; pierwsza: {c4[0][:300]}" if c4 else "")
+            + ("" if marker else " (bez znacznika wersji drobne14)"),
+            "0 i 0 linii (jeden wzor zapasu: Seal31.TownReserve = TownPurse.Reserve)" + ("" if marker else " - INFO: log sprzed drobne14"),
+            (c4sum == 0 and len(c4) == 0) if (marker and ours) else None)
     rep.add("D14-4: P3-2 najdluzej zatkana wies Normal bez wozu (doby w wierszu)",
             ", ".join(f"{k} {v}" for k, v in sorted(names.items(), key=lambda x: -x[1])[:6]) if names else "brak nazw (wersja sprzed drobne14 albo 0 zatkanych)",
             "INFO (ta sama wies wiele dob z rzedu = do rozpoznania)", None)
