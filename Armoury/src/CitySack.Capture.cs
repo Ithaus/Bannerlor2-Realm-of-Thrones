@@ -75,7 +75,7 @@ namespace Armoury
                         int moved = g - mp.PartyTradeGold;
                         _dGLord += moved;
                         Ransom178.NoteBeatenGold(hero, moved);                              // korona 1/9 od wodza-wasala (jak BeatenPurse pkt 4)
-                        if (hero == Hero.MainHero && moved > 0) { _dGPlayer += moved; Log.Player("The broken garrison's chest is yours: " + moved + " denars."); }
+                        if (hero == Hero.MainHero && moved > 0) { _dGPlayer += moved; Log.Player("The broken garrison's chest is yours: " + N(moved) + " denars."); }
                     }
                     else if (hero == null && win.IsPartyTradeActive)
                     {

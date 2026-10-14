@@ -19,7 +19,8 @@ namespace Armoury
     ///    (CLAUDE.md 7: nigdy GameMenu.SwitchToMenu z naszego kodu) - przelacza gra, my zmieniamy tylko tekst.
     ///  - D9: pole gry _settlementProsperityCache ustawione na -1 przy otwarciu menu gracza-wodza (prefiks menu_settlement_taken_player_leader_on_init) - linia
     ///    "Prosperity Lost" liczy od tej osady, nie od ostatniej zlupionej gdziekolwiek na swiecie.
-    ///  - Okno mieszkancow ("People of this land", PeopleMenu): przez 30 dob po lupie zdanie "Sacked N days ago: the merchants lost X coins, the townsfolk Y."
+    ///  - Okno mieszkancow ("People of this land", PeopleMenu): przez 30 dob po lupie zdanie "Sacked N days ago: the merchants lost X denars, the townsfolk Y."
+    ///  - Po audycie integracji (13/14.10): zamek opisany jako zamek ("Castle treasury", "Castle folk's coin"), pieniadz w napisach lupu zawsze "denars" (N0).
     /// Napisy po angielsku. Wyjatek - tekst gry bez zmian (licznik potkniec). Linia logu "Lup miast (L5)" przy kazdej zmianie liczb (bez powtorzen co klatke).
     /// </summary>
     internal static partial class CitySack
@@ -117,24 +118,25 @@ namespace Armoury
                 int ago = (int)Math.Floor(Now - t.Day0);
                 sb.Append(Dot).Append("Little is left here: ").Append(town).Append(" was sacked ").Append(ago <= 0 ? "today" : ago == 1 ? "yesterday" : ago + " days ago").Append('.');
             }
+            bool castle = k.Castle;                     // poprawka po audycie (gracz 8): zamek - skarbiec zamku i ludzie podzamcza, nie kupcy i mieszczanie
             if (kind == KMercy)
             {
-                sb.Append(Dot).Append("No sack: the merchants keep ").Append(N(k.Kasa));
-                if (k.FolkLive) sb.Append(" and the townsfolk ").Append(N(k.FolkSum));
-                sb.Append(". Your men get nothing from the town - they will spend their pay here as in any town.");
+                sb.Append(Dot).Append(castle ? "No sack: the castle treasury keeps " : "No sack: the merchants keep ").Append(N(k.Kasa));
+                if (k.FolkLive) sb.Append(castle ? " and the castle folk " : " and the townsfolk ").Append(N(k.FolkSum));
+                sb.Append(castle ? ". Your men get nothing from the castle." : ". Your men get nothing from the town - they will spend their pay here as in any town.");
             }
             else
             {
-                sb.Append(Dot).Append("The sack: ").Append(ShareWords(share)).Append(" of all coin in ").Append(town).Append('.');
-                sb.Append(Dot).Append("Merchants' coin: ").Append(N(k.Kasa)).Append(" - the army takes ").Append(N(m)).Append('.');
-                if (k.FolkLive) sb.Append(Dot).Append("Townsfolk's coin: ").Append(N(k.FolkSum)).Append(" - the army takes ").Append(N(f)).Append('.');
+                sb.Append(Dot).Append("The sack: ").Append(ShareWords(share)).Append(" of all the denars in ").Append(town).Append('.');
+                sb.Append(Dot).Append(castle ? "Castle treasury: " : "Merchants' coin: ").Append(N(k.Kasa)).Append(" - the army takes ").Append(N(m)).Append('.');
+                if (k.FolkLive) sb.Append(Dot).Append(castle ? "Castle folk's coin: " : "Townsfolk's coin: ").Append(N(k.FolkSum)).Append(" - the army takes ").Append(N(f)).Append('.');
                 sb.Append(Dot).Append("Your party (").Append(N(me != null ? me.Men : 0)).Append(" of ").Append(N(men)).Append(" men): ").Append(N(pShare));
                 if (MenPurse.On) sb.Append(" - your men ").Append(N(pMen)).Append(", you ").Append(N(pLead));
                 else sb.Append(" - all of it yours");
                 if (pCrown > 0) sb.Append(" (the crown will claim ").Append(N(pCrown)).Append(" of your part)");
                 sb.Append('.');
-                sb.Append(Dot).Append("Afterwards: the merchants keep ").Append(N(k.Kasa - m));
-                if (k.FolkLive) sb.Append(", the townsfolk ").Append(N(k.FolkSum - f));
+                sb.Append(Dot).Append(castle ? "Afterwards: the castle treasury keeps " : "Afterwards: the merchants keep ").Append(N(k.Kasa - m));
+                if (k.FolkLive) sb.Append(castle ? ", the castle folk " : ", the townsfolk ").Append(N(k.FolkSum - f));
                 sb.Append('.');
                 if (NoSpendOn && WindowDays > 0) sb.Append(" For ").Append(DaysWords(WindowDays)).Append(" your men will take what they want here and pay for nothing.");
             }
@@ -147,16 +149,19 @@ namespace Armoury
         private static string Summary(Settlement st, int kind, string town)
         {
             var r = Last;
+            bool castle = !st.IsTown;
             if (kind == KMercy)
             {
                 var k = Read(st);
                 L5Log("podsumowanie - laska " + st.StringId + ": kupcy " + k.Kasa + ", lud " + k.FolkSum);
+                if (castle) return Dot + "No sack: the castle treasury keeps " + N(k.Kasa) + (k.FolkLive ? " and the castle folk " + N(k.FolkSum) : "") + ".";
                 return Dot + "No sack: the merchants keep " + N(k.Kasa) + (k.FolkLive ? " and the townsfolk " + N(k.FolkSum) : "") + ". Your men will spend their pay here as in any town.";
             }
             if (r == null || r.St != st || r.Kind != kind) return null;            // brak wyniku L2 tej osady - tekst gry bez zmian
             L5Log("podsumowanie - " + KName[kind] + " " + st.StringId + ": wziete " + r.Pool + " (kupcy " + r.Merch + ", lud " + r.Folk + "), ludzie gracza " + r.PlayerMen + ", gracz " + r.PlayerLead
                   + ", korona " + r.PlayerCrown);
-            return Dot + "Your army took " + N(r.Pool) + " coins from " + town + ": " + N(r.Merch) + " from its merchants, " + N(r.Folk) + " from its townsfolk. "
+            return Dot + "Your army took " + N(r.Pool) + " denars from " + town + ": " + N(r.Merch) + (castle ? " from its treasury, " : " from its merchants, ") + N(r.Folk)
+                   + (castle ? " from its castle folk. " : " from its townsfolk. ")
                    + "Your men's purses grew by " + N(r.PlayerMen) + "; your own part is " + N(r.PlayerLead) + (r.PlayerCrown > 0 ? " (the crown will claim " + N(r.PlayerCrown) + " of it)" : "") + ".";
         }
 
@@ -179,7 +184,9 @@ namespace Armoury
                 if (!_track.TryGetValue(st, out t) || t == null || t.Kind == KMercy || t.Merch + t.FolkTaken <= 0) return null;
                 int ago = (int)Math.Floor(Now - t.Day0);
                 if (ago > TrackDays) return null;
-                return "Sacked " + (ago <= 0 ? "today" : ago == 1 ? "yesterday" : ago + " days ago") + ": the merchants lost " + N(t.Merch) + " coins, the townsfolk " + N(t.FolkTaken) + ".";
+                bool castle = !st.IsTown;
+                return "Sacked " + (ago <= 0 ? "today" : ago == 1 ? "yesterday" : ago + " days ago") + (castle ? ": the castle treasury lost " : ": the merchants lost ") + N(t.Merch)
+                       + (castle ? " denars, the castle folk " : " denars, the townsfolk ") + N(t.FolkTaken) + ".";
             }
             catch (Exception e) { Stumble("MenuLine", e); return null; }
         }
