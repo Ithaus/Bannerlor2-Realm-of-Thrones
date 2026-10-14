@@ -23,7 +23,7 @@ namespace Armoury
     ///     ExplainedNumber czynnego modelu po miastach i zamkach (dodatki przed mnoznikiem, mnozniki jako baza x czynnik - suma = wynik modelu);
     ///  poz. 8 linia "A16 Bohaterowie" - zgony wedlug przyczyny, porody, dorastanie, nowi dorosli lordowie AI wedlug zrodla z kontrola zbiorow;
     ///  poz. 9 linia "A16 Ludnosc BK" - kazda zmiana ludnosci BK (PopulationData.UpdatePopType) wedlug rodzaju osady i kontekstu (pobor BK DeduceManpower,
-    ///     powroty AddManpowerFromSoldiers naszej reki i BK, wzrost BK UpdatePopulation, inne), reszta = zmiana sumy - przeplywy; lustro powrotow
+    ///     powroty AddManpowerFromSoldiers naszej reki i BK, jency BK UpdatePopulation, inne), reszta = zmiana sumy - przeplywy (wzrost klas z BetterEconomy); lustro powrotow
     ///     (BkReturnsToOriginVillage - LosersFlee.BkAddPlaces / ClanBudget.ToVillage) liczone wedlug rodzaju osady docelowej.
     /// Latki pomiaru wpinane zawsze (tylko licza), linie przy LogEnabled + A16SignalsLog. Potkniecia liczone, nic sie nie wylacza.
     /// </summary>
@@ -51,7 +51,7 @@ namespace Armoury
             _peaceCalls = _peaceQuiet = 0;
             _lordsY = null; _deathBy.Clear(); _deadIds.Clear(); _agedIds.Clear(); _createdIds.Clear();
             _births = _stillborn = _birthsLord = _deadAll = _deadLord = _deadLordChild = 0;
-            Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length);
+            Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _mirLost = 0;
             _bkTotY = null; _w5Y = null;
             BkFlow.Clear();
         }
@@ -334,7 +334,8 @@ namespace Armoury
                 _deadLord++;
                 string k = detail.ToString();
                 int v; _deathBy.TryGetValue(k, out v); _deathBy[k] = v + 1;
-                if (victim.StringId != null) _deadIds.Add(victim.StringId);
+                // recenzja A16: tylko lordowie AI (zbior dnia jest bez rodu gracza) - kontrola zgonow porownuje wydarzenie ze zbiorem
+                if (victim.StringId != null && victim.Clan != Clan.PlayerClan) _deadIds.Add(victim.StringId);
             }
             catch (Exception e) { Stumble("OnHeroKilled", e); }
         }
@@ -391,10 +392,15 @@ namespace Armoury
                     if (_deadIds.Contains(id)) gDead++; else gOther++;
                 }
                 int nNew = nAged + nCreated + nOther, nGone = gDead + gOther;
+                // recenzja A16: "wczoraj + nowi - ubyli - dzis" bylo zawsze 0 z budowy zbiorow (tozsamosc, nie kontrola). Kontrola zgonow: zgony lordow AI z wydarzenia
+                // HeroKilledEvent, ktorych nie bylo we wczorajszym zbiorze (doroslosc albo stworzenie i smierc tej samej doby) - gdy duzo, "ubyli przez zgon" zaniza zgony
+                int deadNotY = 0;
+                foreach (var id in _deadIds) if (!_lordsY.Contains(id)) deadNotY++;
                 sb.Append(" = wczoraj ").Append(_lordsY.Count).Append(" + nowi ").Append(nNew).Append(" (dorosli z dzieci ").Append(nAged).Append(", stworzeni doroslymi ").Append(nCreated)
                   .Append(", inna droga - zawod, rod, z rodu gracza ").Append(nOther).Append(") - ubyli ").Append(nGone).Append(" (zgon ").Append(gDead)
                   .Append(", inna droga - do rodu gracza, utrata zawodu ").Append(gOther).Append(")")
-                  .Append(" | kontrola ").Append(_lordsY.Count + nNew - nGone - now.Count);
+                  .Append(" | kontrola zgonow: z wydarzenia lordow AI ").Append(_deadIds.Count).Append(" = ubyli przez zgon ").Append(gDead)
+                  .Append(" + bez wczorajszego wpisu ").Append(deadNotY);
             }
             sb.Append(" | zgony lordow doroslych ").Append(_deadLord).Append(" (");
             bool first = true;
@@ -432,6 +438,11 @@ namespace Armoury
             if (ok > 0) _mir[k * 2] += ok;
             if (miss > 0) _mir[k * 2 + 1] += miss;
         }
+
+        // recenzja A16: ludzie z lustra, ktorych ksiega juz oddala do DOM, a ludnosc BK nie dostala nigdzie (osada pochodzenia bez danych BK i brak osady
+        // zastepczej FindHome / wies rodu bez danych BK albo BK nie przyjal) - rozjazd obu ksiag; oczekiwane 0, prog A16-9c
+        private static long _mirLost;
+        internal static void NoteMirrorLost(int n) { if (n > 0) _mirLost += n; }
 
         private static class BkFlow
         {
@@ -525,7 +536,9 @@ namespace Armoury
         }
 
         private static readonly string[] KName = { "wsie", "zamki", "miasta", "inne" };
-        private static readonly string[] CName = { "pobor BK", "powroty naszej reki", "powroty BK", "wzrost BK", "nasze inne (niewolni, chlopi zastepczo)", "inne BK" };
+        // recenzja A16: BK w tej wersji nie rosnie przez UpdatePopulation (jedyne wywolanie - BKPartyBehavior: jency partii BK do osady jako niewolni); wzrost
+        // i spadek klas idzie z BetterEconomy (PopulationData.Update -> SyncClassesFromBetterEconomy -> MirrorClassCount ustawia liczby) - to jest w "reszcie"
+        private static readonly string[] CName = { "pobor BK", "powroty naszej reki", "powroty BK", "jency BK do osady (UpdatePopulation)", "nasze inne (niewolni, chlopi zastepczo)", "inne BK" };
 
         private static void BkLine(int day)
         {
@@ -572,10 +585,11 @@ namespace Armoury
                 sb.Append("; lustro A16 do tej osady: BK przyjal ").Append(_mir[k * 2]).Append(", nie przyjal ").Append(_mir[k * 2 + 1]);
             }
             sb.Append(" | powrot do ludnosci BK osady pochodzenia (BkReturnsToOriginVillage) ").Append(ReturnsToOrigin ? "TAK" : "NIE")
-              .Append(" | reszta = zmiany poza UpdatePopType (lustro klas BetterEconomy, przyciecie do 0) | potkniecia A16 dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(')');
+              .Append(" | lustro A16 - BK nie dostal nigdzie (ksiega liczy ich jako powrot) ").Append(_mirLost)
+              .Append(" | reszta = zmiany poza UpdatePopType (wzrost i spadek klas z BetterEconomy - SyncClassesFromBetterEconomy, przyciecie do 0) | potkniecia A16 dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(')');
             Log.Info(sb.ToString());
             _bkTotY = ok ? tot : null;
-            Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length);
+            Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _mirLost = 0;
         }
 
         // ================================================================ poz. 10: W5 - wykorzystanie miejsca na werbunek
@@ -654,7 +668,7 @@ namespace Armoury
         // ================================================================ doba
         internal static void Daily()
         {
-            if (!LogOn || Campaign.Current == null) { Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _lordsY = null; _bkTotY = null; _w5Y = null; return; }
+            if (!LogOn || Campaign.Current == null) { Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _mirLost = 0; _lordsY = null; _bkTotY = null; _w5Y = null; return; }
             int day = (int)CampaignTime.Now.ToDays;
             try { ProsperityLine(day); } catch (Exception e) { Stumble("ProsperityLine", e); }
             try { HeroesLine(day); } catch (Exception e) { Stumble("HeroesLine", e); }

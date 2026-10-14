@@ -666,8 +666,18 @@ namespace Armoury
                 where = PosKey(pos);
             }
             var home = FindHome(pos, fac, troop.Culture, cache, where);
-            if (home == null) return pre;           // A16: umieszczeni w DOM pochodzenia zostaja (pre); reszta wraca do wolajacego (pula) jak dotad
-            if (preMiss > 0) AddBk(home, troop, preMiss, src);   // A16: w DOM juz sa, osada pochodzenia bez danych BK - BK dostaje ich tu, jak dotad (bez drugiego zapisu w ksiedze)
+            if (home == null)
+            {
+                // A16: umieszczeni w DOM pochodzenia zostaja (pre); reszta wraca do wolajacego (pula) jak dotad. Recenzja: preMiss (osada pochodzenia bez danych BK)
+                // przy braku osady zastepczej - ksiega ma ich w DOM, ludnosc BK nigdzie: licznik rozjazdu (linia "A16 Ludnosc BK", prog A16-9c)
+                A16Signals.NoteMirrorLost(preMiss);
+                return pre;
+            }
+            if (preMiss > 0)
+            {
+                int gotMiss = AddBk(home, troop, preMiss, src);  // A16: w DOM juz sa, osada pochodzenia bez danych BK - BK dostaje ich tu, jak dotad (bez drugiego zapisu w ksiedze)
+                A16Signals.NoteMirrorLost(preMiss - gotMiss);    // recenzja: BK nie przyjal i tu - rozjazd ksiag (licznik)
+            }
             int rest = n - pre;
             if (rest <= 0) return pre;
             int got = AddBk(home, troop, rest, src);

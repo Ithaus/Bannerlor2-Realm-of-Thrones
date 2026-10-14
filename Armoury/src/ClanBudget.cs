@@ -1171,12 +1171,14 @@ namespace Armoury
                 int restBk = home - ok;
                 if (restBk > 0)
                 {
+                    bool given = false;
                     try
                     {
                         if (pdv == null) pdv = _getPopData.Invoke(_popMgr, new object[] { v });
-                        if (pdv != null) { A16Signals.Ours++; try { _fromSoldiers.Invoke(pdv, new object[] { ch, restBk }); } finally { A16Signals.Ours--; } }
+                        if (pdv != null) { A16Signals.Ours++; try { _fromSoldiers.Invoke(pdv, new object[] { ch, restBk }); given = true; } finally { A16Signals.Ours--; } }
                     }
                     catch (Exception e) { Stumble("ToVillage(A16 reszta)", e); }
+                    if (!given) A16Signals.NoteMirrorLost(restBk);    // recenzja A16: ludnosc BK nie dostala reszty - licznik rozjazdu ksiag (prog A16-9c)
                 }
                 return true;
             }

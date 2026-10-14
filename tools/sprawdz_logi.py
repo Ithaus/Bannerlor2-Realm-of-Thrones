@@ -583,9 +583,9 @@ Uzycie (Python 3, tylko odczyt):
 --grupa a16       : (A16, 14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A16.md) 13 sygnalow z logow + 2 alarmy fin28 - progi po rozpoznaniu (log strumieniowo, noc.log
                     wpleciony): A16-1 dobrobyt miast wobec ludzi miast (+-5 pkt na 364 doby), premia pokoju RBL, skladniki; A16-2 uchodzcy <= 0.5% ludzi wsi;
                     A16-3 bandy <= 1 600 / 26 tys., pula <= 10 tys., bandyci + las +-10% w oknach 182 dob od d364; A16-4 dlug koron <= 40% kapitalu Banku, kapital
-                    >= 60%; A16-5 notable < 4 500 <= 12%, spadek kies <= 15 tys./d; A16-7 ruch noca <= 2.5 / 2.0; A16-8 bohaterowie (kontrola); A16-9 BK wsi
-                    wobec ksiegi +-3 pkt na 364 doby; A16-10 W5 >= 0.9 x min(f, 60%); A16-11 karawany bez jucznych <= 25%; A16-12 Straz (+ bunt Strazy);
-                    A16-14 F9 mediana <= 18% rent; A16-15 najemnicy >= 1 600 i kiesy kompanii >= 1 mln. python -I tools/sprawdz_logi.py --grupa a16 [--do-doby N] [--csv <budzet-rodow.csv>] <Armoury-*.log>
+                    >= 60%; A16-5 notable < 4 500 <= 12%, spadek kies <= 15 tys./d; A16-7 ruch noca <= 2.5 / 2.0; A16-8 bohaterowie (kontrola zgonow); A16-9 BK wsi
+                    wobec ksiegi +-3 pkt na 364 doby, rozjazd lustra <= 1%; A16-10 W5 >= 0.9 x min(f, 60%); A16-11 karawany bez jucznych <= 25%; A16-12 Straz (+ bunt Strazy);
+                    A16-14 F9 mediana <= 22% rent; A16-15 najemnicy >= 1 600 i kiesy kompanii >= 1 mln. python -I tools/sprawdz_logi.py --grupa a16 [--do-doby N] [--csv <budzet-rodow.csv>] <Armoury-*.log>
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -21095,9 +21095,11 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
     nt = win(S["not"])
     if len(nt) >= 2:
         ks = sorted(nt)
-        low = max(ks, key=lambda d: int(nt[d][3]) / max(1, int(nt[d][1])))
-        rep.add("A16-5a: notable ponizej 4 500 - najwiekszy udzial", f"{nt[low][3]} z {nt[low][1]} ({100.0 * int(nt[low][3]) / max(1, int(nt[low][1])):.1f}%, d{rd(low)})",
-                "<= 12% (dzis 6.5-9.8%)", int(nt[low][3]) <= 0.12 * int(nt[low][1]))
+        # recenzja A16: bez doby 1 - stan startowy gry przed pierwsza doba kies (11.0-11.2% w kazdym biegu, d2 ok. 0.5%) zaslanial dynamike
+        k2 = [d for d in ks if rd(d) >= 2] or ks
+        low = max(k2, key=lambda d: int(nt[d][3]) / max(1, int(nt[d][1])))
+        rep.add("A16-5a: notable ponizej 4 500 - najwiekszy udzial (od d2)", f"{nt[low][3]} z {nt[low][1]} ({100.0 * int(nt[low][3]) / max(1, int(nt[low][1])):.1f}%, d{rd(low)})",
+                "<= 12% (bez stanu startowego d1 ok. 11%: 120 dob 7.4%, roczny 8.3%, dwuletni 10.5%)", int(nt[low][3]) <= 0.12 * int(nt[low][1]))
         segs, a = [], ks[0]
         for d in ks:
             if d - a >= 182 or d == ks[-1]:
@@ -21177,25 +21179,28 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
     hr = win(S["aHer"])
     if hr:
         ks = sorted(hr)
-        ctl = []
+        ev = gd = notY = 0
         dead = birth = aged = made = other = gone_o = 0
         for d in ks:
             tail_s = hr[d][2]
-            c = num(r"\| kontrola (-?\d+)", tail_s)
-            if c is not None and c != 0:
-                ctl.append(d)
+            mk = re.search(r"\| kontrola zgonow: z wydarzenia lordow AI (\d+) = ubyli przez zgon (\d+) \+ bez wczorajszego wpisu (\d+)", tail_s)
+            if mk:
+                ev += int(mk.group(1)); gd += int(mk.group(2)); notY += int(mk.group(3))
             dead += num(r"zgony lordow doroslych (\d+)", tail_s, default=0) or 0
             birth += num(r"porody: dzieci (\d+)", tail_s, default=0) or 0
             aged += num(r"dorosli z dzieci (\d+)", tail_s, default=0) or 0
             made += num(r"stworzeni doroslymi (\d+)", tail_s, default=0) or 0
             other += num(r"inna droga - zawod, rod, z rodu gracza (\d+)", tail_s, default=0) or 0
             gone_o += num(r"inna droga - do rodu gracza, utrata zawodu (\d+)", tail_s, default=0) or 0
-        rep.add("A16-8a: bohaterowie - kontrola zbiorow (wczoraj + nowi - ubyli = dzis)", f"doby z roznica {len(ctl)} z {len(ks)}", "0 dob", not ctl)
+        # recenzja A16: dawna "kontrola" (wczoraj + nowi - ubyli - dzis) byla zawsze 0 z budowy zbiorow; teraz zgony z wydarzenia wobec ubylych przez zgon
+        rep.add("A16-8a: bohaterowie - kontrola zgonow (zgony lordow AI z wydarzenia wobec ubylych ze zbioru przez zgon)",
+                f"z wydarzenia {ev} = ubyli przez zgon {gd} + bez wczorajszego wpisu {notY} ({len(ks)} dob)",
+                "bez wczorajszego wpisu <= 2% zgonow z wydarzenia (najmniej 1) - inaczej 'ubyli przez zgon' zaniza zgony", notY <= max(1, 0.02 * ev) if ev or notY else None)
         rep.add(f"A16-8b: lordowie AI d{rd(ks[0])}->d{rd(ks[-1])}: dorosli {hr[ks[0]][1]} -> {hr[ks[-1]][1]}",
                 f"zgony doroslych {dead}, porody {birth}, dorosli z dzieci {aged}, stworzeni doroslymi {made}, inna droga +{other} / -{gone_o}",
                 "INFO - prog po pomiarze (rozpoznanie: smierc ze starosci jak w ROT, dorosli w 2 latach +-15% od samego dorastania)", None)
     else:
-        rep.add("A16-8: bohaterowie", "brak linii A16 Bohaterowie", "kontrola 0", None)
+        rep.add("A16-8: bohaterowie", "brak linii A16 Bohaterowie", "kontrola zgonow (bez wczorajszego wpisu <= 2%)", None)
     # ---- A16-9 ludnosc BK wsi wobec ksiegi wsi
     bkl = win(S["aBk"])
     vil = {}
@@ -21238,7 +21243,7 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
                 kind = seg.group(1)
                 body = seg.group(0)
                 a = acc.setdefault(kind, {})
-                for nm in ("pobor BK", "powroty naszej reki", "powroty BK", "wzrost BK", "nasze inne (niewolni, chlopi zastepczo)", "inne BK"):
+                for nm in ("pobor BK", "powroty naszej reki", "powroty BK", "jency BK do osady (UpdatePopulation)", "nasze inne (niewolni, chlopi zastepczo)", "inne BK"):
                     mm9 = re.search(r", " + re.escape(nm) + r" \+(\d+)/-(\d+)", body)
                     if mm9:
                         v = a.setdefault(nm, [0, 0])
@@ -21255,7 +21260,11 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
             txt.append(kind + ": " + ", ".join(f"{k} +{v[0]}/-{v[1]}" for k, v in a.items() if k not in ("reszta", "lustro"))
                        + f", reszta {a.get('reszta', [0])[0]:+d}, lustro {a.get('lustro', [0, 0])[0]}/{a.get('lustro', [0, 0])[1]}")
         rep.add(f"A16-9b: przeplywy ludnosci BK wedlug rodzaju osady (suma {len(bkl)} dob)", " | ".join(txt)[:900],
-                "INFO - skad ubytek BK wsi (pobor, powroty, wzrost BK, reszta) i dokad wracaja nasi (powroty naszej reki wsie / zamki / miasta)", None)
+                "INFO - skad ubytek BK wsi (pobor, powroty, reszta = wzrost i spadek klas z BetterEconomy) i dokad wracaja nasi (powroty naszej reki wsie / zamki / miasta)", None)
+        lost = sum(num(r"\| lustro A16 - BK nie dostal nigdzie \(ksiega liczy ich jako powrot\) (\d+)", s, default=0) or 0 for s in bkl.values())
+        mir_ok = sum(v.get("lustro", [0, 0])[0] for v in acc.values())
+        rep.add("A16-9c: lustro A16 - ludzie, ktorych ludnosc BK nie dostala nigdzie (rozjazd ksiag)", f"{lost} wobec przyjetych przez lustro {mir_ok}",
+                "<= 1% przyjetych przez lustro (najmniej 10) - osada pochodzenia bez danych BK i brak osady zastepczej", lost <= max(10, 0.01 * mir_ok))
     # ---- A16-10 rody z doplata W5
     w5, w5k = win(S["w5"]), win(S["w5k"])
     if w5:
@@ -21327,7 +21336,8 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
         if shs:
             med = st.median(shs)
             rep.add("A16-14: udzial F9 (renty trzymane i oddane sluzacym) w rentach - mediana dob (28 ostatnich dob okna)",
-                    f"{med:.1f}% (srednia F9 {sum(int(r180[d][2]) for d in k28) / len(k28):.0f} zl/d)", "<= 18% (13 biegow 120 dob: najwiecej 16.1%; mediana odporna na dobe wielkiego okupu)", med <= 18.0)
+                    f"{med:.1f}% (srednia F9 {sum(int(r180[d][2]) for d in k28) / len(k28):.0f} zl/d)",
+                    "<= 22% (biegi 120 dob 13-14.10: 2.0-17.7%, najwiecej 13.10 16:58; fin29 z drobne-2 7.9%; +25% rozrzutu jak A16-7; mediana odporna na dobe wielkiego okupu)", med <= 22.0)
     else:
         rep.add("A16-14: udzial F9 w rentach", "brak linii Renty korony (180)", "<= 18%", None)
     # ---- A16-15 najemnicy AI

@@ -217,8 +217,10 @@ namespace Armoury
                     pay = paid * price;
                     if (paid < sold)
                     {
+                        A16Signals.Ours++;                      // recenzja A16: pomiar ludnosci BK - zwrot niewolnikow naszej reki ("nasze inne"), nie "inne BK"
                         try { _updatePopType.Invoke(__state.Pd, new object[] { _slavesType, sold - paid, false }); back = sold - paid; }
                         catch (Exception e) { Stumble("SlavesBack", e); paid = sold; pay = Math.Min(gain, spend); }   // zwrot sie nie udal - jak przed poprawka
+                        finally { A16Signals.Ours--; }
                     }
                 }
                 else { _sOdd++; paid = sold; pay = Math.Min(gain, spend); }   // liczby sprzedanych nie da sie ustalic (np. GetTypeCount obciety do 50 000) - jak przed poprawka
