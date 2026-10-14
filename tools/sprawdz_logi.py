@@ -625,6 +625,11 @@ Uzycie (Python 3, tylko odczyt):
                     WL-1 zold WL <= 1.1 / 0.6 zl na czlowieka, zalegly zold 0, WL-2 ludzie <= 1.05 x pula, pula = udzial x ludzie +-1, zalogi <= max(start,
                     0.5 x pula), druzyny >= 2 x baza (T1), WL-3 glod druzyn WL <= baza, WL-4 Straz +-2% (pula, dary), twierdze Strazy (DECYZJA przy stracie),
                     WL-5 Inni (INFO). Rok 1 bez pogorszenia: --grupa rok2 --do-doby 120 (R2-T2-1/2). Log bez paczki: INFO, bez wyjatku.
+                    Recenzja (wyspy-wolni): WW-1b z morza > 0 przy >= 5 krokach Wysp przy wsiach portow; WW-2 przy 0 mysli Wysp z opcja rabunku - INFO
+                    "WW1-3 niezmierzone, przyczyna z WW0"; WW-5 takze kiesy wsi Daru >= 0.5 x baza; WL-2c drogi przyrostu WL (INFO: netto, werbunek, jency,
+                    zalogi, nowe partie, netto ponad znane drogi; jency wstrzymani); WL-4b twierdze Strazy < baza = NIE; WL-4c ludzie regionow Strazy i ludzie
+                    Strazy >= 0.9 x baza; WL-5 trupy Innych <= 1.2 x baza (--crashscribe-baza <session-*.log bazy>); WL-6 lud WL: ludzie regionow WL >= 0.98 x
+                    baza (okno >= 60 dob), miasta WL bez pieniedzy na jedzenie (kiesa-ludu.csv stac_jedzenie < 0.95, sr. 28 dob) <= baza, z_wojska WL (INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -22194,15 +22199,17 @@ WW_DAY = ("Najezdzcy - decyzje AI (WW0): dzien", "Zelazna cena (WW1): dzien", "B
 WW_ONCE = ("Najezdzcy - zasieg (WW0)", "Najezdzcy (WW0): postfiks", "Pomiary 169c: okna")
 WW_ERR = ("ReaverLaw.", "ClanBudget.", "DistrictRaid.", "OutlawLaw.", "TownFolk.WaterfrontRoom", "ClanIncomeBook.NoteReaverEvt", "ClanIncomeBook.NoteInflow",
           "CrownGifts.", "MountedWage", "GentryService.")
-WW_IRON = re.compile(r"\| Iron Islands: krokow rabunku z lupem (\d+) \(z morza (\d+)\), zloto z kies wsi (\d+) \(w tym ponad s: (\d+)\), z nabrzeza (\d+) \(wyplat (\d+), portow (\d+)\), towar (\d+) szt\. \((\d+) zl\)")
-WW_FREE = re.compile(r"\| Free Folk: krokow rabunku z lupem (\d+) \(z morza (\d+)\), zloto z kies wsi (\d+) \(w tym ponad s: (\d+)\), z nabrzeza (\d+)")
+WW_IRON = re.compile(r"\| Iron Islands: krokow rabunku z lupem (\d+) \(z morza (\d+)(?:, przy wsi portu \d+)?\), zloto z kies wsi (\d+) \(w tym ponad s: (\d+)\), z nabrzeza (\d+) \(wyplat (\d+), portow (\d+)\), towar (\d+) szt\. \((\d+) zl\)")
+WW_PORT = re.compile(r"\| Iron Islands: krokow rabunku z lupem \d+ \(z morza (\d+), przy wsi portu (\d+)\)")   # recenzja R1-1: kontrolka wykrycia morza
+WW_FREE = re.compile(r"\| Free Folk: krokow rabunku z lupem (\d+) \(z morza (\d+)(?:, przy wsi portu \d+)?\), zloto z kies wsi (\d+) \(w tym ponad s: (\d+)\), z nabrzeza (\d+)")
 WW_CTL = re.compile(r"kontrolki: kiesa wsi < 0 po wyplacie (\d+), nabrzeze ponizej zapasu (\d+), bilans v2 \(zloto wodza - kiesa wsi - kiesa nabrzeza\) (-?\d+)")
 WW_PURSE = re.compile(r"Zachod \(vlandia\) (-?\d+)/(\d+), Polnoc \(battania\) (-?\d+)/(\d+), Dar \(nightswatch\) (-?\d+)/(\d+)")
 WW_WAR = re.compile(r"\| (Iron Islands|Free Folk): partii (\d+) .*?; wrogow w wojnie (\d+)")
 WW_W3 = re.compile(r"\| WW3 \(Iron Islands, Reaver Raid By Profit (tak|nie)\): mnoznik mediana ([\d.-]+), x3 (\d+), opcji pomnozonych (\d+) z (\d+)")
 WW_TOP = re.compile(r"\| Iron Islands: .*?z opcja rabunku (\d+) \(partii (\d+), opcji (\d+), wsi (\d+)\), wynik rabunku/innej \(mediana\) ([\d.-]+)/([\d.-]+), rabunek na gorze (\d+) \(przed WW3 (\d+)\)")
 WW_STUMB = re.compile(r"\| potkniecia (\d+)\.$")
-WW_W2 = re.compile(r"\| lup na zalogi \(WW2, Reaver Loot To Crews (tak|nie)\): rodow (\d+), w oknie 28 dob (\d+) zl/d, podniesienie pulapu druzyn \d+, zold druzyn tych rodow (\d+) \(wobec pulapu druzyn z lupem (\d+)\)")
+# recenzja R1-3 / R1-11: pulap koncowy (z W5/W7), bez drugiego "podniesienie"; stary format linii tez czytany
+WW_W2 = re.compile(r"\| lup na zalogi \(WW2, Reaver Loot To Crews (tak|nie)\): rodow (\d+), w oknie 28 dob (?:\(= podniesienie pulapu druzyn\) )?(\d+) zl/d(?:, podniesienie pulapu druzyn \d+)?, zold druzyn tych rodow (\d+) \(wobec (?:koncowego )?pulapu druzyn z lupem(?: i W5/W7)? (\d+)\)")
 WW_W5IRON = re.compile(r"Iron Islands: garnek [^;|]*?niepokryte (\d+)")
 WW_W4 = re.compile(r"\| korsarze Wysp \(WW4, Sea Raiders Iron Harbour (tak|nie), dziesiecina [\d.]+\): band Sea Raiders z ladunkiem (\d+), sprzedaly w portach Wysp (\d+) szt\. za (\d+) zl \(dzialka w kasach portow (-?\d+) zl\), dziesiecina (\d+) zl do panow portow \(rodow (\d+)\), zycie w portach Wysp (\d+) zl; band z ladunkiem poza \d+ od portu Wysp (\d+)")
 WW_FENCE = re.compile(r"sprzedalo \d+ w \d+ miastach - \d+ szt\. .*?\) za (\d+) zl;")
@@ -22210,7 +22217,8 @@ WW_SEA = re.compile(r"northern_pirates (\d+)/(\d+)")
 WW_WL1 = re.compile(r"\| WL bez zoldu \(WL1, Free Folk Unpaid (tak|nie)\): zold druzyn (\d+) \(ludzi (\d+), ([\d.-]+) zl/czl\), zalog (\d+) \(ludzi (\d+), ([\d.-]+) zl/czl\), zalegly zold \(przyciety\) (\d+), druzyny z zaleglym zoldem (\d+)")
 WW_WL3 = re.compile(r"druzyny WL (\d+): w glodzie (\d+), jedzenie ponizej progu najazdu (\d+)")
 WW_FFSTATE = re.compile(r"\| Wolni Ludzie: stan (\d+) \(partie (\d+), zalogi (\d+)\)")
-WW_WL2 = re.compile(r"\| Wolni Ludzie bez zoldu \(WL1, Free Folk Unpaid (tak|nie)\): w ludziach (\d+) \(zalogi (\d+)\) / pula (-|\d+) \((?:z ludu \(WL2, Free Folk Men From People tak\): ([\d.]+)% x ludzie (\d+); )?(?:WL2 nie; )?ze zlota (-|\d+)\)")
+WW_WL2 = re.compile(r"\| Wolni Ludzie bez zoldu \(WL1, Free Folk Unpaid (tak|nie)\): w ludziach (\d+) \(zalogi (\d+)\) / pula (-|\d+) \((?:z ludu \(WL2, Free Folk Men From People tak\): ([\d.]+)% x ludzie (\d+); )?(?:WL2 [^;]*; )?ze zlota (-|\d+)\)")
+WW_WL2C = re.compile(r"przyrost WL \(doba\): netto (-?\d+), drogi: werbunek (\d+), jency (\d+), zalogi (\d+), nowe partie (\d+), netto ponad znane drogi (\d+); jency AI wstrzymani pula (\d+), WL3 przepuscil i po werbunku jedzenie ponizej progu (\d+)")
 WW_WL2B = re.compile(r"werbunek wstrzymany: pula (\d+), jedzenie \(WL3\) (\d+); przyrost zalog wstrzymany: pula (\d+), zalogi ponad udzial puli \(WL2\) (\d+); nowe partie wstrzymane (\d+)")
 WW_WATCH = re.compile(r"\| Straz w ludziach (\d+) / pulap w ludziach (-|\d+)")
 WW_GIFT = re.compile(r"Westeros -> Straz (\d+) zl")
@@ -22311,6 +22319,9 @@ def ww_measures(path, start_arg, until, lo_arg=None):
     m["steps"] = sum(int(x.group(1)) for x in it) if it else None
     m["warsteps"] = sum(int(WW_IRON.search(w1[d]).group(1)) for d in w1 if WW_IRON.search(w1[d]) and d in war) if it else None
     m["seasteps"] = sum(int(x.group(2)) for x in it) if it else None
+    pt = [WW_PORT.search(s) for s in w1.values()]
+    pt = [x for x in pt if x]
+    m["portsteps"] = sum(int(x.group(2)) for x in pt) if pt else None   # recenzja R1-1
     m["gold"] = sum(int(x.group(3)) for x in it) if it else None
     m["extra"] = sum(int(x.group(4)) for x in it) if it else None
     m["folk"] = sum(int(x.group(5)) for x in it) if it else None
@@ -22381,6 +22392,16 @@ def ww_measures(path, start_arg, until, lo_arg=None):
     bl = [WW_WL2B.search(s) for s in b166.values()]
     bl = [x for x in bl if x]
     m["wl2block"] = tuple(sum(int(x.group(i)) for x in bl) for i in range(1, 6)) if bl else None
+    # recenzja R1-2: drogi przyrostu WL (sumy okna) i doby z ludzmi ponad 1.05 x pula, w ktorych netto przekroczylo znane drogi
+    gc = {d: WW_WL2C.search(s) for d, s in b166.items()}
+    gc = {d: x for d, x in gc.items() if x}
+    m["wl2c"] = tuple(sum(int(x.group(i)) for x in gc.values()) for i in range(1, 9)) if gc else None
+    over = 0
+    for d, x in gc.items():
+        y = wl2.get(d)
+        if y and y.group(4) != "-" and int(y.group(4)) > 0 and int(y.group(2)) > 1.05 * int(y.group(4)) and int(x.group(6)) > 0:
+            over += 1
+    m["wl2c_over"] = over
     # WL-4: Straz
     wa = {d: WW_WATCH.search(s) for d, s in b166.items()}
     wa = {d: x for d, x in wa.items() if x and x.group(2) != "-"}
@@ -22406,7 +22427,9 @@ def ww_csv(logp, until, start):
         return None
     G = {}; cut = {}; lw = 0.0; ffp = {}; ffg = {}
     with open(p, encoding="utf-8", errors="replace", newline="") as f:
-        for r in csv.DictReader(f, delimiter=";"):
+        rd = csv.DictReader(f, delimiter=";")
+        haslw = "lup_na_zaloge_ww2" in (rd.fieldnames or [])   # recenzja R1-11: CSV bez kolumny - "brak kolumny", nie "razem 0"
+        for r in rd:
             kr = r.get("krolestwo") or ""
             if kr not in ("Iron Islands", "Free Folk") or r.get("rodzaj") in ("gracz", "najemnik"):
                 continue
@@ -22432,20 +22455,29 @@ def ww_csv(logp, until, start):
         return None
     t = sorted(cut)[-28:]
     tf = sorted(ffp)[-28:]
-    return {"G": G[max(G)] if G else None, "cut": sum(cut[d] for d in t) / len(t) if t else None, "lw": lw,
+    return {"G": G[max(G)] if G else None, "cut": sum(cut[d] for d in t) / len(t) if t else None, "lw": lw if haslw else None,
             "ffpar": sum(ffp[d] for d in tf) / len(tf) if tf else None, "ffgar": sum(ffg[d] for d in tf) / len(tf) if tf else None}
 
 
-def ww_watch_forts(logp, until, start):
-    """ludzie-regiony.csv: twierdze Strazy (krolestwo Nights Watch) na ostatnia dobe okna. Brak pliku - None."""
+def ww_csv_find(logp, name):
+    """CSV sesji: <katalog>/<znacznik>/<name> albo <katalog>/Logs/<znacznik>/<name>; brak - None."""
+    if not logp:
+        return None
     d0, f0 = os.path.split(logp)
     stem = os.path.splitext(f0)[0].replace("Armoury-", "")
-    for p in (os.path.join(d0, stem, "ludzie-regiony.csv"), os.path.join(d0, "Logs", stem, "ludzie-regiony.csv")):
+    for p in (os.path.join(d0, stem, name), os.path.join(d0, "Logs", stem, name)):
         if os.path.isfile(p):
-            break
-    else:
+            return p
+    return None
+
+
+def ww_regions(logp, until, start):
+    """ludzie-regiony.csv na ostatnia dobe okna: twierdze Strazy (krolestwo Nights Watch), ludzie regionow Strazy i Wolnych Ludzi (recenzja R2-4 / R2-5);
+    pierwsza doba w pliku (dlugosc okna). Brak pliku - None."""
+    p = ww_csv_find(logp, "ludzie-regiony.csv")
+    if not p:
         return None
-    last, n = None, 0
+    last, first, n, wp, fp = None, None, 0, 0.0, 0.0
     with open(p, encoding="utf-8", errors="replace", newline="") as f:
         for r in csv.DictReader(f, delimiter=";"):
             try:
@@ -22454,14 +22486,75 @@ def ww_watch_forts(logp, until, start):
                 continue
             if run_day(d + 1, start) > until:
                 continue
+            if first is None or d < first:
+                first = d
             if last is None or d > last:
-                last, n = d, 0
-            if d == last and (r.get("krolestwo") or "").startswith("Nights Watch"):
+                last, n, wp, fp = d, 0, 0.0, 0.0
+            if d != last:
+                continue
+            kr = r.get("krolestwo") or ""
+            try:
+                lp = float(r.get("ludzie") or 0)
+            except ValueError:
+                lp = 0.0
+            if kr.startswith("Nights Watch"):
                 n += 1
-    return n if last is not None else None
+                wp += lp
+            elif kr == "Free Folk":
+                fp += lp
+    if last is None:
+        return None
+    return {"forts": n, "watchpeople": wp, "ffpeople": fp, "days": last - first + 1}
 
 
-def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
+def ww_watch_forts(logp, until, start):
+    """ludzie-regiony.csv: twierdze Strazy (krolestwo Nights Watch) na ostatnia dobe okna. Brak pliku - None."""
+    r = ww_regions(logp, until, start)
+    return r["forts"] if r else None
+
+
+def ww_ffolk(logp, until, start):
+    """Recenzja R2-5: lud Wolnych Ludzi - kiesa-ludu.csv: miasta WL ze stac_jedzenie < 0.95; kiesa-obieg.csv: z_wojska miast WL na dobe (z_wojska / dob_okna).
+    Oba pliki maja wiersze co kilka dob (okno tygodniowe) - srednia z wierszy ostatnich 28 dob okna. Brak plikow - None w polu."""
+    out = {"hungry": None, "army": None}
+    p = ww_csv_find(logp, "kiesa-ludu.csv")
+    if p:
+        hd = {}
+        with open(p, encoding="utf-8", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                if (r.get("krolestwo") or "") != "Free Folk":
+                    continue
+                try:
+                    d = int(r.get("dzien_gry") or 0)
+                    a = float(r.get("stac_jedzenie") or 1)
+                except ValueError:
+                    continue
+                if run_day(d, start) > until:
+                    continue
+                hd[d] = hd.get(d, 0) + (1 if a < 0.95 else 0)
+        t = [d for d in hd if d >= max(hd) - 27] if hd else []
+        out["hungry"] = sum(hd[d] for d in t) / len(t) if t else None
+    p = ww_csv_find(logp, "kiesa-obieg.csv")
+    if p:
+        za = {}
+        with open(p, encoding="utf-8", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                if (r.get("krolestwo") or "") != "Free Folk":
+                    continue
+                try:
+                    d = int(r.get("dzien_gry") or 0)
+                    z = float(r.get("z_wojska") or 0) / max(1.0, float(r.get("dob_okna") or 1))
+                except ValueError:
+                    continue
+                if run_day(d, start) > until:
+                    continue
+                za[d] = za.get(d, 0.0) + z
+        t = [d for d in za if d >= max(za) - 27] if za else []
+        out["army"] = sum(za[d] for d in t) / len(t) if t else None
+    return out
+
+
+def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None):
     """Grupa wyspywolni (PROJEKT-WYSPY-WOLNI rozdz. 4): WW-0..WW-6, WL-1..WL-5. T1 (okno > 240 dob): zapis d780 + 60 dob, baza - ten sam zapis na 63aaaedf
     albo na tej DLL z kluczami off (linie WW0/WW1 pisane zawsze); T2: nowa kampania 120 dob. Log bez paczki - INFO, nigdy wyjatek."""
     t1 = until > 240
@@ -22491,6 +22584,14 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
     c = m["ctl"]
     rep.add("WW-1 kontrolki zelaznej ceny", "brak linii" if c is None else f"kiesa wsi < 0: {c[0]}, nabrzeze ponizej zapasu: {c[1]}, |bilans v2|: {c[2]}",
             "0 / 0 / 0", None if c is None else (c[0] == 0 and c[1] == 0 and c[2] == 0))
+    # WW-1b (recenzja R1-1): wykrycie rabunku z morza - przy >= 5 krokach Wysp przy wsiach portow choc jeden z morza (inaczej nabrzeze WW1 martwe albo Wyspy
+    # rabuja tylko z ladu - sprawdzic B175 "NavalRaid")
+    ps, ss_ = m["portsteps"], m["seasteps"]
+    if ps is None:
+        rep.add("WW-1b rabunek z morza wykryty (Wyspy, WW1)", "brak licznika krokow przy wsiach portow", "z morza > 0 przy >= 5 krokach przy porcie", None)
+    else:
+        rep.add("WW-1b rabunek z morza wykryty (Wyspy, WW1)", f"z morza {ss_}, krokow przy wsiach portow {ps}, z nabrzeza {m['folk']} zl",
+                "z morza > 0 przy >= 5 krokach przy porcie (mniej - INFO)", None if ps < 5 else (ss_ or 0) > 0)
     # WW-2 cel: brak Wysp po M1
     u, ub = m["unc"], (b["unc"] if b else None)
     if u is None:
@@ -22499,6 +22600,10 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)})", "T2: INFO (Wyspy bez wroga w zasiegu)", None)
     elif u <= 8000:
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)})", "<= 8.0 tys.", True)
+    elif m["withraid"] == 0:
+        # recenzja R2-1: bez opcji rabunku (WW0) WW1-WW3 nic nie daja - wynik nie mowi nic o regulach, przyczyna jest w WW0 (osobny krok); WW-J do Jeffa
+        rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - WW1-WW3 niezmierzone: 0 mysli Wysp z opcja rabunku w oknie (WW0) - przyczyna z WW0, osobny krok; WW-J do Jeffa",
+                "<= 8.0 TAK; bez opcji rabunku - INFO", None)
     elif ub is None or u <= ub:
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - cel nieosiagniety -> pytanie WW-J do Jeffa (zaloga okretow 0.5 zoldu)",
                 "<= 8.0 TAK; 8.0 - baza INFO; > baza NIE", None)
@@ -22529,7 +22634,7 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
     if cs is None or cs["G"] is None:
         rep.add("WW-4 kiesy rodow Wysp z lennem i zold przyciety (CSV)", "brak budzet-rodow.csv (albo rodow Wysp)", "G >= 0.9 x baza, przyciety <= baza + 1 tys.", None)
     else:
-        txt = f"G na koniec {k(cs['G'], '.2f', 1e6, ' mln')}, zold przyciety {k(cs['cut'])}/d, lup_na_zaloge_ww2 razem {cs['lw']:.0f}"
+        txt = f"G na koniec {k(cs['G'], '.2f', 1e6, ' mln')}, zold przyciety {k(cs['cut'])}/d, lup_na_zaloge_ww2 " + ("brak kolumny" if cs['lw'] is None else f"razem {cs['lw']:.0f}")
         if cb is None or cb["G"] is None or not t1:
             rep.add("WW-4 kiesy rodow Wysp z lennem i zold przyciety (CSV)", txt + (f"; baza G {k(cb['G'], '.2f', 1e6, ' mln')}, przyciety {k(cb['cut'])}" if cb else "; bez bazy"),
                     "G >= 0.9 x baza, przyciety <= baza + 1 tys. (T2 / bez bazy INFO)", None)
@@ -22546,8 +22651,9 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
             rep.add("WW-5 kiesy wsi Zachodu i Polnocy (koniec okna)", txt + ("; baza bez linii WW1" if pb is None else f"; baza Zachod {k(pb[0], '.2f', 1e6, ' mln')}, Polnoc {k(pb[1], '.2f', 1e6, ' mln')}"),
                     ">= 0.5 x baza (T2 / bez bazy INFO)", None)
         else:
-            rep.add("WW-5 kiesy wsi Zachodu i Polnocy (koniec okna)", txt + f"; baza Zachod {k(pb[0], '.2f', 1e6, ' mln')}, Polnoc {k(pb[1], '.2f', 1e6, ' mln')}",
-                    ">= 0.5 x baza", p[0] >= 0.5 * pb[0] and p[1] >= 0.5 * pb[1])
+            # recenzja R2-4: takze kiesy wsi Daru (najazdy WL - WW1/WW3)
+            rep.add("WW-5 kiesy wsi Zachodu, Polnocy i Daru (koniec okna)", txt + f"; baza Zachod {k(pb[0], '.2f', 1e6, ' mln')}, Polnoc {k(pb[1], '.2f', 1e6, ' mln')}, Dar {k(pb[2], '.0f', 1, ' zl')}",
+                    ">= 0.5 x baza (Dar - gdy baza > 0)", p[0] >= 0.5 * pb[0] and p[1] >= 0.5 * pb[1] and (pb[2] <= 0 or p[2] >= 0.5 * pb[2]))
     hb = b["hung"] if b else None
     hv = "-" if m["hung"] is None else "%.1f" % m["hung"]
     hbv = "-" if hb is None else "%.1f" % hb
@@ -22590,9 +22696,17 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
     fbv = "-" if fb is None else "%.0f" % fb
     rep.add("WL-2b druzyny lordow Wolnych Ludzi w polu (CSV ludzi_partie, sr. 28 dob)", f"{fpv} (zalogi {fgv}; baza {fbv}); stan 4.15 partie/zalogi " + ("-" if m["ffparties"] is None else "%.0f/%.0f" % (m["ffparties"], m["ffgarr"] or 0)),
             ">= 2 x baza (T1 przy WL2; T2 / bez bazy INFO)", None if (fp is None or fb is None or not t1 or not on2) else fp >= 2 * fb)
+    # WL-2c (recenzja R1-2): drogi przyrostu WL - INFO (netto ponad znane drogi > 0 w dobach ponad pula = inna droga, do zamkniecia)
+    g2 = m["wl2c"]
+    if g2 is None:
+        rep.add("WL-2c drogi przyrostu ludzi WL (166, sumy okna)", "brak odcinka drog", "INFO", None)
+    else:
+        rep.add("WL-2c drogi przyrostu ludzi WL (166, sumy okna)", f"netto {g2[0]}; werbunek {g2[1]}, jency {g2[2]}, zalogi {g2[3]}, nowe partie {g2[4]}; netto ponad znane drogi {g2[5]} "
+                f"(dob ponad 1.05 x pula z doplywem inna droga: {m['wl2c_over']}); jency AI wstrzymani pula {g2[6]}", "INFO (doby ponad pula z doplywem inna droga - szukac drogi)", None)
     # WL-3
     sv, sb = m["starve"], (b["starve"] if b else None)
-    rep.add("WL-3 druzyny WL w glodzie (4.15, sr. 28 dob)", f"{'-' if sv is None else f'{sv:.1f}'} (baza {'-' if sb is None else f'{sb:.1f}'}); werbunek wstrzymany z braku jedzenia (wywolan) {m['wl2block'][1] if m['wl2block'] else '-'}",
+    rep.add("WL-3 druzyny WL w glodzie (4.15, sr. 28 dob)", f"{'-' if sv is None else f'{sv:.1f}'} (baza {'-' if sb is None else f'{sb:.1f}'}); werbunek wstrzymany z braku jedzenia (wywolan) {m['wl2block'][1] if m['wl2block'] else '-'}"
+            + (f"; WL3 przepuscil, a po werbunku jedzenie ponizej progu {g2[7]}" if g2 else ""),
             "<= baza (bez bazy INFO)", None if (sv is None or sb is None or not has) else sv <= sb + 1e-9)
     # WL-4 Straz bez zmian
     wc, wcb = m["watchcap"], (b["watchcap"] if b else None)
@@ -22604,12 +22718,24 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
         d2 = abs((gf or 0) - (gfb or 0)) / gfb if gfb else 0.0
         rep.add("WL-4 Straz bez zmian: pula w ludziach i dary (sr. 28 dob)", f"pula {wc:.0f} (baza {wcb:.0f}, {100 * d1:+.1f}%), dary {gf or 0:.0f} (baza {gfb or 0:.0f}, {100 * d2:.1f}%); ludzie {m['watchmen']:.0f} (baza {b['watchmen'] or 0:.0f}, INFO)",
                 "+-2% (log bez paczki - INFO)", (d1 <= 0.02 and d2 <= 0.02) if has else None)
-    fo = ww_watch_forts(logp, until, m["start"])
-    fob = ww_watch_forts(basep, until, b["start"]) if b else None
+    rg = ww_regions(logp, until, m["start"])
+    rgb = ww_regions(basep, until, b["start"]) if b else None
+    fo = rg["forts"] if rg else None
+    fob = rgb["forts"] if rgb else None
     if fo is None or fob is None:
         rep.add("WL-4b twierdze Strazy na koniec (ludzie-regiony.csv)", f"{fo} (baza {fob})", "nie mniej niz baza (bez bazy INFO)", None)
     else:
-        rep.add("WL-4b twierdze Strazy na koniec (ludzie-regiony.csv)", f"{fo} (baza {fob})", "nie mniej niz baza (DECYZJA przy stracie)", (fo >= fob) if has else None, decide=True)
+        # recenzja R2-4: utrata twierdzy Strazy (Castle Black, Eastwatch) zmienia fabule ROT - NIE, nie DECYZJA
+        rep.add("WL-4b twierdze Strazy na koniec (ludzie-regiony.csv)", f"{fo} (baza {fob})", "nie mniej niz baza (log bez paczki - INFO)", (fo >= fob) if has else None)
+    # WL-4c (recenzja R2-4): ludzie regionow Strazy (ludzie-regiony.csv) i ludzie Strazy (166, sr. 28 dob) >= 0.9 x baza
+    wpp, wppb = (rg["watchpeople"] if rg else None), (rgb["watchpeople"] if rgb else None)
+    wm, wmb = m["watchmen"], (b["watchmen"] if b else None)
+    if wpp is None or wppb is None or wm is None or wmb is None:
+        rep.add("WL-4c ludzie regionow Strazy i ludzie Strazy", f"regiony {'-' if wpp is None else '%.0f' % wpp} (baza {'-' if wppb is None else '%.0f' % wppb}), Straz {'-' if wm is None else '%.0f' % wm} (baza {'-' if wmb is None else '%.0f' % wmb})",
+                ">= 0.9 x baza (bez bazy INFO)", None)
+    else:
+        rep.add("WL-4c ludzie regionow Strazy i ludzie Strazy", f"regiony {wpp:.0f} (baza {wppb:.0f}), Straz {wm:.0f} (baza {wmb:.0f})", ">= 0.9 x baza (log bez paczki - INFO)",
+                (wpp >= 0.9 * wppb and wm >= 0.9 * wmb) if has else None)
     # WL-5 Inni (CrashScribe)
     undead = None
     if csp and os.path.isfile(csp):
@@ -22618,7 +22744,34 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None):
                 x = re.search(r"UMARLI: .*?(\d+) trupow w polu", ln)
                 if x:
                     undead = int(x.group(1))
-    rep.add("WL-5 Inni: trupy w polu na koniec (CrashScribe)", "brak --crashscribe" if undead is None else f"{undead}", "<= 1.2 x baza (INFO; DECYZJA powyzej - baza z osobnego czytania)", None)
+    undeadb = None
+    if cspb and os.path.isfile(cspb):
+        with open(cspb, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                x = re.search(r"UMARLI: .*?(\d+) trupow w polu", ln)
+                if x:
+                    undeadb = int(x.group(1))
+    # recenzja R2-4: z baza (--crashscribe-baza) - powyzej 1.2 x baza NIE
+    if undead is None or undeadb is None:
+        rep.add("WL-5 Inni: trupy w polu na koniec (CrashScribe)", ("brak --crashscribe" if undead is None else f"{undead}") + f" (baza {'brak --crashscribe-baza' if undeadb is None else undeadb})",
+                "<= 1.2 x baza (bez bazy INFO)", None)
+    else:
+        rep.add("WL-5 Inni: trupy w polu na koniec (CrashScribe)", f"{undead} (baza {undeadb})", "<= 1.2 x baza", undead <= 1.2 * undeadb if undeadb > 0 else undead <= 0)
+    # WL-6 (recenzja R2-5): lud Wolnych Ludzi - WL1 zabiera mu zarobek "z wojska"; ludzie WL i glod miast WL wobec bazy, z_wojska INFO
+    fpp, fppb = (rg["ffpeople"] if rg else None), (rgb["ffpeople"] if rgb else None)
+    win = rg["days"] if rg else 0
+    if fpp is None or fppb is None or win < 60:
+        rep.add("WL-6 ludzie regionow Wolnych Ludzi na koniec (ludzie-regiony.csv)", f"{'-' if fpp is None else '%.0f' % fpp} (baza {'-' if fppb is None else '%.0f' % fppb}; dob w pliku {win})",
+                ">= 0.98 x baza po >= 60 dobach (krocej / bez bazy INFO)", None)
+    else:
+        rep.add("WL-6 ludzie regionow Wolnych Ludzi na koniec (ludzie-regiony.csv)", f"{fpp:.0f} (baza {fppb:.0f})", ">= 0.98 x baza (log bez paczki - INFO)", (fpp >= 0.98 * fppb) if has else None)
+    fl = ww_ffolk(logp, until, m["start"])
+    flb = ww_ffolk(basep, until, b["start"]) if b else None
+    h6, h6b = fl["hungry"], (flb["hungry"] if flb else None)
+    rep.add("WL-6b miasta WL bez pieniedzy na jedzenie (kiesa-ludu.csv stac_jedzenie < 0.95, wiersze 28 dob)", f"{'-' if h6 is None else '%.1f' % h6} (baza {'-' if h6b is None else '%.1f' % h6b})",
+            "<= baza (bez bazy INFO)", None if (h6 is None or h6b is None or not has) else h6 <= h6b + 1e-9)
+    a6, a6b = fl["army"], (flb["army"] if flb else None)
+    rep.add("WL-6c lud WL: zarobek z wojska (kiesa-obieg.csv z_wojska / dob_okna, wiersze 28 dob)", f"{'-' if a6 is None else '%.0f' % a6} zl/d (baza {'-' if a6b is None else '%.0f' % a6b})", "INFO", None)
     rep.show()
     return 0
 
@@ -22627,6 +22780,7 @@ def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
     csp = None      # poprawki po tescie koncowym etapu 4 (P11-progi-T1): log sesji CrashScribe do T1 / E50-T1
+    cspb = None     # wyspywolni (recenzja R2-4): log CrashScribe bazy do WL-5
     bdp = None      # recenzja fixC (4): log Armoury biegu bazowego do wiersza "doba wobec biegu bazowego" (T8)
     until_arg = 120
     final = False
@@ -22652,6 +22806,8 @@ def main(argv):
             until_arg = int(args[i + 1]); i += 2; continue
         if a == "--crashscribe":
             csp = args[i + 1]; i += 2; continue
+        if a == "--crashscribe-baza":
+            cspb = args[i + 1]; i += 2; continue   # wyspywolni WL-5 (recenzja R2-4): log CrashScribe biegu bazowego
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
@@ -22726,7 +22882,7 @@ def main(argv):
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "wyspywolni" and logp:
-        return wyspywolni_main(logp, start_arg, until_arg, bdp, csp)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
+        return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
     if group != "etap2" or not logp:

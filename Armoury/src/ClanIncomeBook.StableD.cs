@@ -580,7 +580,8 @@ namespace Armoury
             {
                 StableParts p;
                 if (!StableDOn || !TryStable(c, out p)) return false;
-                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double - (ReaverLaw.LootToCrewsOn ? p.Reaver : 0));   // WW2: lup na zalogi poza D (kosz WW2)
+                // WW2: lup na zalogi poza D (kosz WW2) - recenzja R1-5 / R2-6: tylko u rodow z oknem (WindowClan); Wolni Ludzie przy WL1 i najemnicy Wysp - lup w D (W-1)
+                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double - (ReaverLaw.WindowClan(c) ? p.Reaver : 0));
                 return true;
             }
             catch { return false; }

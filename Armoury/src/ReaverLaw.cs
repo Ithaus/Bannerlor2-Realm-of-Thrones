@@ -53,12 +53,12 @@ namespace Armoury
         // ---------------------------------------------------------------- WW0: liczniki decyzji AI (od ostatniej linii doby)
         private sealed class Think
         {
-            public int Thinks, WithRaid, Options, RaidTop, RaidTop0, Multiplied, X3;   // RaidTop0 - rabunek na gorze przed WW3 (wyniki gry)
+            public int Thinks, WithRaid, Options, RaidTop, RaidTop0, Multiplied, X3, Burned;   // RaidTop0 - rabunek na gorze przed WW3 (wyniki gry); Burned - opcje z okregiem wypalonym (E = 0)
             public readonly List<float> Mult = new List<float>();                       // WW3: mnozniki opcji
             public readonly HashSet<MobileParty> PartiesWithRaid = new HashSet<MobileParty>();
             public readonly HashSet<Settlement> Villages = new HashSet<Settlement>();
             public readonly List<float> RaidBest = new List<float>(), OtherBest = new List<float>();
-            public void Clear() { Thinks = WithRaid = Options = RaidTop = RaidTop0 = Multiplied = X3 = 0; PartiesWithRaid.Clear(); Villages.Clear(); RaidBest.Clear(); OtherBest.Clear(); Mult.Clear(); }
+            public void Clear() { Thinks = WithRaid = Options = RaidTop = RaidTop0 = Multiplied = X3 = Burned = 0; PartiesWithRaid.Clear(); Villages.Clear(); RaidBest.Clear(); OtherBest.Clear(); Mult.Clear(); }
         }
         private static readonly Think[] _think = { new Think(), new Think() };
         private const int MaxSamples = 4096;
@@ -72,12 +72,12 @@ namespace Armoury
         // ---------------------------------------------------------------- WW1: zelazna cena (liczniki od ostatniej linii doby; licza zawsze - takze przy kluczu off)
         private sealed class Iron
         {
-            public int Steps, Sea;                          // kroki rabunku (u AI krok = sesja) z lupem i z nich z morza
+            public int Steps, Sea, Port;                    // kroki rabunku (u AI krok = sesja) z lupem, z nich z morza i przy wsi portu (recenzja R1-1: kontrolka wykrycia morza)
             public long GoldS, GoldExtra, Folk, Goods, GoodsValue;
             public int FolkPorts, FolkBelow, VillageNeg; public double Bal, Captives;
             public readonly HashSet<Settlement> Ports = new HashSet<Settlement>();
             public readonly Dictionary<string, long[]> Victims = new Dictionary<string, long[]>();   // krolestwo ofiary -> [krokow, zloto]
-            public void Clear() { Steps = Sea = 0; GoldS = GoldExtra = Folk = Goods = GoodsValue = 0; FolkPorts = FolkBelow = VillageNeg = 0; Bal = Captives = 0; Ports.Clear(); Victims.Clear(); }
+            public void Clear() { Steps = Sea = Port = 0; GoldS = GoldExtra = Folk = Goods = GoodsValue = 0; FolkPorts = FolkBelow = VillageNeg = 0; Bal = Captives = 0; Ports.Clear(); Victims.Clear(); }
         }
         private static readonly Iron[] _iron = { new Iron(), new Iron() };
         /// <summary>WW1 (Obieg): kiesy ludu nabrzeza -> wodzowie najezdzcow od ostatniej linii doby (MoneyLedger.Daily biegnie przed ReaverLaw.Daily).</summary>
@@ -141,9 +141,35 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- WW2: lup na zalogi okretow (okno 28 dob na rod, tylko w pamieci sesji)
-        /// <summary>WW2 czynne: klucz ReaverLootToCrews, wymaga WW1 (zelazna cena) i budzetu rodow 166.</summary>
-        internal static bool LootToCrewsOn { get { var s = S; return s != null && s.ReaverLootToCrews && s.ReaverIronPrice && s.ClanBudgetEnabled; } }
+        /// <summary>WW2 czynne: klucz ReaverLootToCrews, wymaga WW1 (zelazna cena), budzetu rodow 166 i D stalego (recenzja R1-8: ClanBudgetStableD i ksiega
+        /// StableDOn - bez nich D budzetu to srednia CALEGO wplywu ksiegi razem z lupem, a okno dodaloby go drugi raz).</summary>
+        internal static bool LootToCrewsOn { get { var s = S; return s != null && s.ReaverLootToCrews && s.ReaverIronPrice && s.ClanBudgetEnabled && s.ClanBudgetStableD && ClanIncomeBook.StableDOn; } }
         private const int LootDays = 28;   // to samo okno co D staly 169c: lup jednym kawalkiem rozlozony na miesiac zoldu
+
+        /// <summary>WW2 (recenzja R1-5 / R2-6): rod, ktorego lup idzie do okna na zalogi - najezdzca regul WW (Wyspy, Wolni Ludzie), nie kompania najemna i nie rod
+        /// bez zoldu (b.Zero: Wolni Ludzie przy WL1). Ta sama miara w budzecie (lootNow, gracz W5/W6), w ksiedze (StableDWithDays, OnceToday) i w NoteLoot -
+        /// lup pozostalych rodow (WL przy WL1, najemnicy Wysp) zostaje w jednorazowych i idzie do D jak w 63aaaedf (W-1 "najezdzcy - lup w D").</summary>
+        internal static bool WindowClan(Clan c)
+        {
+            try
+            {
+                var s = S;
+                if (c == null || !LootToCrewsOn || !IsReaver(c.Kingdom) || c.IsUnderMercenaryService) return false;
+                return !(s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c));
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Recenzja R1-7: lup okna rodu jeszcze nierozpisany na zold (wpis sprzed j dob rozpisany w j/28 - zostaje (28 - j)/28; najnowszy wpis j = 1).
+        /// ClanBudget odejmuje go od G w pulapie (skrzynia wojenna, f biedy), w skrzyni sprzetu i nadwyzce pokoju - ten sam denar nie podnosi pulapu dwa razy.</summary>
+        internal static double Unreleased(Clan c)
+        {
+            LootRing r;
+            if (c == null || !_loot.TryGetValue(c, out r)) return 0.0;
+            double u = 0;
+            for (int k = 1; k < LootDays; k++) u += Math.Max(0L, r.V[(r.Head + k) % LootDays]) * (double)k / LootDays;   // k = 0 - najstarszy (rozpisany do konca)
+            return u;
+        }
 
         private sealed class LootRing
         {
@@ -157,7 +183,7 @@ namespace Armoury
         /// <summary>WW2: zloto lupu do kosza rodu (zelazna cena ponad s, nabrzeze, dziesiecina korsarzy) - okno 28 dob.</summary>
         internal static void NoteLoot(Clan c, long amount)
         {
-            if (c == null || amount <= 0) return;
+            if (c == null || amount <= 0 || !WindowClan(c)) return;   // recenzja: tylko rody z oknem (reszta - jednorazowe, D)
             try
             {
                 LootRing r;
@@ -207,6 +233,28 @@ namespace Armoury
         /// <summary>WW1: krok rabunku najezdzcy z morza (zdarzenie morskie).</summary>
         internal static void NoteSea(int group) { if (group >= 0) _iron[group].Sea++; }
 
+        /// <summary>Recenzja R1-1: pierwszy krok sesji najezdzcy na wies, ktorej osada macierzysta ma port (mianownik kontrolki "z morza").</summary>
+        internal static void NotePort(int group) { if (group >= 0) _iron[group].Port++; }
+
+        /// <summary>Recenzja R1-1: rabunek z morza - tak jak gra i NavalDLC (MapEventHelper.GetRaidContext "raiderHasSeaPresence", NavalDLCRaidModel): choc jedna
+        /// partia strony napastnika ze zdrowymi ludzmi jest na morzu (MobileParty.IsCurrentlyAtSea). MapEvent.IsNavalMapEvent dla rabunku jest zawsze false
+        /// (pozycja zdarzenia = pozycja wsi, a ta jest na ladzie - Settlement.Deserialize isOnLand: true).</summary>
+        internal static bool RaiderAtSea(TaleWorlds.CampaignSystem.MapEvents.MapEventSide att)
+        {
+            try
+            {
+                if (att == null || att.Parties == null) return false;
+                foreach (var mep in att.Parties)
+                {
+                    var pb = mep != null ? mep.Party : null;
+                    var mp = pb != null ? pb.MobileParty : null;
+                    if (mp != null && mp.IsCurrentlyAtSea && pb.NumberOfHealthyMembers > 0) return true;
+                }
+            }
+            catch (Exception e) { Stumble("RaiderAtSea", e); }
+            return false;
+        }
+
         /// <summary>WW1: towar z magazynu wsi w kroku najezdzcy (sztuki i wartosc wedlug cen bazowych).</summary>
         internal static void NoteGoods(int group, long pieces, long value) { if (group >= 0) { _iron[group].Goods += pieces; _iron[group].GoodsValue += value; } }
 
@@ -214,7 +262,7 @@ namespace Armoury
         internal static void NoteCaptives(int group, double n) { if (group >= 0 && n > 0) _iron[group].Captives += n; }
 
         /// <summary>
-        /// WW1 - nabrzeze: rabunek z morza wsi, ktorej osada macierzysta ma port - Qw x u kiesy klasy W tej osady ponad zapas dni i oferte na jutro
+        /// WW1 - nabrzeze: rabunek z morza (RaiderAtSea - pierwszy krok sesji; recenzja R2-3: raz na sesje, jak zelazna cena) wsi, ktorej osada macierzysta ma port - Qw x u kiesy klasy W tej osady ponad zapas dni i oferte na jutro
         /// (TownFolk.WaterfrontRoom) do wodza najezdzcy: kiesa ludu -> glowa (TownFolk.LevyTake - ksiega kies _ctlOut; ChangeHeroGold, wyjatek - zloto wraca do kiesy).
         /// Zwraca wziete (0 - nic). Tylko przy kluczu WW1, dla najezdzcow, z wodzem.
         /// </summary>
@@ -307,7 +355,7 @@ namespace Armoury
                 if (t.RaidBest.Count < MaxSamples) { t.RaidBest.Add(bestRaid); t.OtherBest.Add(bestOther == float.MinValue ? -1f : bestOther); }
                 if (bestRaid > bestOther) t.RaidTop0++;
                 // WW3: opcje rabunku z rachunku (po pomiarze WW0 - wyniki gry wyzej sa surowe); "rabunek na gorze" - po mnozniku (to wybiera petla gry)
-                if (ProfitOn) bestRaid = Profit(party, partyThinkParams, t, bestRaid);
+                if (ProfitOn && (g != GFree || ProfitFreeOn)) bestRaid = Profit(party, partyThinkParams, t, bestRaid);
                 if (bestRaid > bestOther) t.RaidTop++;
             }
             catch (Exception e) { Stumble("AiTickPostfix", e); }
@@ -384,16 +432,18 @@ namespace Armoury
         // ---------------------------------------------------------------- WW3: najazd z rachunku (AI z biezacego zysku)
         /// <summary>WW3 czynne: klucz ReaverRaidByProfit, wymaga WW1 (E = lup zelaznej ceny).</summary>
         internal static bool ProfitOn { get { var s = S; return s != null && s.ReaverRaidByProfit && s.ReaverIronPrice; } }
+        /// <summary>Recenzja R2-4: WW3 takze dla Wolnych Ludzi (klucz ReaverRaidByProfitFreeFolk; off = pierwszy krok wycofania przy Darze - WW3 tylko dla Wysp).</summary>
+        internal static bool ProfitFreeOn { get { var s = S; return s != null && s.ReaverRaidByProfitFreeFolk; } }
         private static double PayDays { get { var s = S; return s == null ? 4.0 : Math.Max(1f, Math.Min(28f, s.ReaverRaidPayDays)); } }
         private const double MaxExtra = 2.0;   // M = 1 + min(2, E / (C x T)): najwyzej x3 - AI nie porzuca obrony wlasnych twierdz dla bogatej wsi
 
-        private struct ECache { public int Hour; public double Base; }
+        private struct ECache { public int Hour; public double Base; public bool Burned; }
         private static readonly Dictionary<Settlement, ECache> _eCache = new Dictionary<Settlement, ECache>();
         private static readonly HashSet<AIBehaviorData> _done = new HashSet<AIBehaviorData>();
         private static readonly List<(AIBehaviorData, float)> _copy = new List<(AIBehaviorData, float)>(64);
 
         /// <summary>WW3: kazda opcja RaidSettlement z wynikiem > 0 dostaje wynik x M = 1 + min(2, E / (C x T)); E - lup, ktory WW1 dalby dzis z tej wsi (Q x kiesa
-        /// wsi + Q x wartosc magazynu; partia na morzu przy wsi portu - + Qw x nadwyzka nabrzeza), C - koszt dnia partii (zold z rycerzami 179 + jedzenie: zuzycie
+        /// wsi + Q x wartosc magazynu; opcja morzem (NavigationType.Naval) na wies portu - + Qw x nadwyzka nabrzeza; okreg wypalony - 0), C - koszt dnia partii (zold z rycerzami 179 + jedzenie: zuzycie
         /// x cena zboza najblizszego miasta), T = ReaverRaidPayDays. Opcji nie dodaje (wojna, zasieg, 8 dni jedzenia, prog sily - z gry); M >= 1 (nigdy kara);
         /// raz na opcje (lista swieza co mysl - mnoznik nie narasta). Zwraca najlepszy wynik rabunku po mnozniku.</summary>
         private static float Profit(MobileParty party, PartyThinkParams p, Think t, float bestRaid)
@@ -414,7 +464,9 @@ namespace Armoury
                     if (sc > 0f && _done.Add(it.Item1))
                     {
                         var st = it.Item1.Party as Settlement;
-                        double e = LootEstimate(st, party);
+                        bool burned;
+                        double e = LootEstimate(st, it.Item1.NavigationType, out burned);
+                        if (burned) t.Burned++;
                         double m = 1.0 + Math.Min(MaxExtra, Math.Max(0.0, e) / cost);
                         if (m > 1.0 + 1e-6)
                         {
@@ -434,9 +486,13 @@ namespace Armoury
             return best == float.MinValue ? bestRaid : best;
         }
 
-        /// <summary>WW3: lup zelaznej ceny z wsi teraz (E). Kiesa i magazyn wsi - pamiec na godzine gry (wiele partii mysli o tych samych wsiach).</summary>
-        private static double LootEstimate(Settlement st, MobileParty party)
+        /// <summary>WW3: lup zelaznej ceny z wsi teraz (E). Kiesa i magazyn wsi - pamiec na godzine gry (wiele partii mysli o tych samych wsiach).
+        /// Recenzja R2-7: okreg wypalony (DistrictRaid.BurnedOutNow - ta sama arytmetyka co Plan kroku: Z = 0 osad w zasiegu) - E = 0, bo krok nic nie spali (u = 0,
+        /// lup 0). Recenzja R1-1: nabrzeze tylko dla opcji, ktora prowadzi morzem (NavigationType.Naval - partia dotrze i rabuje z morza), nie wedlug tego, czy
+        /// partia jest na morzu w chwili mysli.</summary>
+        private static double LootEstimate(Settlement st, MobileParty.NavigationType nav, out bool burned)
         {
+            burned = false;
             var v = st != null ? st.Village : null;
             if (v == null) return 0.0;
             int hour = (int)CampaignTime.Now.ToHours;
@@ -451,14 +507,17 @@ namespace Armoury
                         var el = r.GetElementCopyAtIndex(i);
                         if (el.Amount > 0 && el.EquipmentElement.Item != null) stock += (double)el.Amount * el.EquipmentElement.Item.Value;
                     }
-                c = new ECache { Hour = hour, Base = Math.Max(0, v.Gold) + stock };
+                bool bo = false;
+                try { bo = DistrictRaid.BurnedOutNow(v); } catch (Exception ex) { Stumble("LootEstimate(okreg)", ex); }
+                c = new ECache { Hour = hour, Base = Math.Max(0, v.Gold) + stock, Burned = bo };
                 _eCache[st] = c;
             }
+            if (c.Burned) { burned = true; return 0.0; }
             double e = Q * c.Base;
             try
             {
                 var port = v.Bound;
-                if (party != null && party.IsCurrentlyAtSea && port != null && port.HasPort)
+                if (nav == MobileParty.NavigationType.Naval && port != null && port.HasPort)
                 {
                     long room = TownFolk.WaterfrontRoom(port);
                     if (room > 0) e += Qw * room;
@@ -570,7 +629,7 @@ namespace Armoury
             {
                 var x = _iron[g];
                 neg += x.VillageNeg; below += x.FolkBelow; bal += x.Bal;
-                sb.Append(" | ").Append(GName[g]).Append(": krokow rabunku z lupem ").Append(x.Steps).Append(" (z morza ").Append(x.Sea).Append(')')
+                sb.Append(" | ").Append(GName[g]).Append(": krokow rabunku z lupem ").Append(x.Steps).Append(" (z morza ").Append(x.Sea).Append(", przy wsi portu ").Append(x.Port).Append(')')
                   .Append(", zloto z kies wsi ").Append(x.GoldS + x.GoldExtra).Append(" (w tym ponad s: ").Append(x.GoldExtra).Append(')')
                   .Append(", z nabrzeza ").Append(x.Folk).Append(" (wyplat ").Append(x.FolkPorts).Append(", portow ").Append(x.Ports.Count).Append(')')
                   .Append(", towar ").Append(x.Goods).Append(" szt. (").Append(x.GoodsValue).Append(" zl)")
@@ -641,8 +700,8 @@ namespace Armoury
                   .Append(", rabunek na gorze ").Append(t.RaidTop).Append(" (przed WW3 ").Append(t.RaidTop0).Append(')')
                   .Append("; wrogow w wojnie ").Append(enemies);
                 double mm = Median(t.Mult);
-                sb.Append(" | WW3 (").Append(GName[g]).Append(", Reaver Raid By Profit ").Append(ProfitOn ? "tak" : "nie").Append("): mnoznik mediana ").Append(double.IsNaN(mm) ? "-" : F(mm, "0.00"))
-                  .Append(", x3 ").Append(t.X3).Append(", opcji pomnozonych ").Append(t.Multiplied).Append(" z ").Append(t.Mult.Count);
+                sb.Append(" | WW3 (").Append(GName[g]).Append(", Reaver Raid By Profit ").Append(ProfitOn && (g != GFree || ProfitFreeOn) ? "tak" : "nie").Append("): mnoznik mediana ").Append(double.IsNaN(mm) ? "-" : F(mm, "0.00"))
+                  .Append(", x3 ").Append(t.X3).Append(", opcji pomnozonych ").Append(t.Multiplied).Append(" z ").Append(t.Mult.Count).Append(", okreg wypalony (E 0) ").Append(t.Burned);
             }
             sb.Append(" | postfiks ").Append(_patched ? "wpiety" : "BRAK").Append(" | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());

@@ -1708,7 +1708,7 @@ namespace Armoury
             if (Undead.Party(p)) return null;
             var s = Settings.Current;
             float radius = Math.Max(1f, s.OutlawFenceRadius);
-            if (reach == null) { bool beyond; reach = Reach(p, radius, out beyond); }
+            if (reach == null) { bool beyond; reach = Reach(p, radius, out beyond, false); }   // recenzja R2-8: zakup sprzetu - bez portow Wysp jako "domu" (WW4 tylko sprzedaz)
             float near = Math.Max(0f, s.OutlawFenceMarkup), far = Math.Max(near, s.OutlawFenceMarkupFar);
             ItemObject best = null;
             foreach (var b in reach)
@@ -1825,7 +1825,7 @@ namespace Armoury
         /// zadnego, banda i tak ma pasera - najblizsze otwarte miasto swiata, na warunkach z granicy promienia (`beyond`).
         /// Pusta lista tylko wtedy, gdy na mapie nie ma ani jednego nieoblezonego miasta.
         /// </summary>
-        private static List<Bid> Reach(MobileParty p, float radius, out bool beyond)
+        private static List<Bid> Reach(MobileParty p, float radius, out bool beyond, bool sell)
         {
             beyond = false;
             var list = new List<Bid>();
@@ -1845,9 +1845,10 @@ namespace Armoury
                 beyond = true;
                 list.Add(new Bid { St = nearest, Town = nearest.Town, Dist = radius, Real = (float)Math.Sqrt(nd) });
             }
-            // WW4 (wyspy-wolni): banda Sea Raiders ma porty Zelaznych Wysp do 600 jako "dom" - warunki przy miescie (Dist 0), w obie strony pasera (sprzedaz lupu
-            // i zakup sprzetu); bandy wybieraja najlepsza oferte jak dotad. Klucz off albo inna banda - lista jak dotad
-            if (ReaverLaw.HarbourOn && ReaverLaw.IsSeaRaider(p))
+            // WW4 (wyspy-wolni): banda Sea Raiders ma porty Zelaznych Wysp do 600 jako "dom" - warunki przy miescie (Dist 0) przy SPRZEDAZY lupu (projekt 2.4);
+            // bandy wybieraja najlepsza oferte jak dotad. Recenzja R2-8: zakup sprzetu u pasera (FindAtFence) - lista jak w 63aaaedf (polki portow Wysp to zapasy
+            // lordow Wysp; zakup "u bram" do 600 byl poza decyzja Jeffa). Klucz off albo inna banda - lista jak dotad
+            if (sell && ReaverLaw.HarbourOn && ReaverLaw.IsSeaRaider(p))
             {
                 try
                 {
@@ -2046,7 +2047,7 @@ namespace Armoury
             }
             float radius = Math.Max(1f, s.OutlawFenceRadius);
             bool beyond;
-            var bids = Reach(p, radius, out beyond);
+            var bids = Reach(p, radius, out beyond, true);
             if (bids.Count == 0)
             {
                 if (cargo) { _leftBands++; _leftNoTown++; _leftUnits += CargoUnits(pack, food); }

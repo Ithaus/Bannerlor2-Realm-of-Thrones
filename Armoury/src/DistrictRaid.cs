@@ -322,6 +322,15 @@ namespace Armoury
             return p;
         }
 
+        /// <summary>Recenzja wyspy-wolni R2-7 (WW3 ReaverLaw.LootEstimate): okreg wsi wypalony TERAZ (Plan: Z = 0 osad w zasiegu - krok nic nie spali, lup 0).
+        /// false - regula E7/R1 nieczynna albo wies poza spustoszeniem (rabunek gry). Tylko odczyt, bez kalibracji ludnosci.</summary>
+        internal static bool BurnedOutNow(Village v)
+        {
+            if (!On || v == null || !Devastation.CoversQuiet(v)) return false;
+            try { return Plan(v, 0).BurnedOut; }
+            catch (Exception e) { Stumble("BurnedOutNow", e); return false; }
+        }
+
         /// <summary>Poczatek kroku: plan (Plan) do sesji i punkty startu.</summary>
         private static void Start(Sess ss, RaidEventComponent comp, int men)
         {
@@ -476,12 +485,16 @@ namespace Armoury
             var lp = att != null ? att.LeaderParty : null;
             // wyspy-wolni WW1 (zelazna cena): wodz z krolestwa najezdzcow (Zelazne Wyspy, Wolni Ludzie; AI i gracz-wasal) bierze udzial max(s, Q x u), u = postep
             // kroku (1 po pelnym kroku, przerwany - zrobiona czesc); ten sam udzial z kiesy wsi i z magazynu wsi. Inni (Dothrakowie) i klucz off - s jak dotad.
+            // Recenzja R2-3: zelazna cena i nabrzeze RAZ NA SESJE (pierwszy krok - ss.Steps 0; u AI krok = sesja) - kolejne kroki gracza biora s (trafieni kroku /
+            // ludzie w domu) z tego, co zostalo, jak w 63aaaedf; inaczej gracz w jednej sesji bralby 50/75/87.5/94% kiesy za kilka spalonych osad.
             int rg = ReaverLaw.RaidGroup(lp);
+            bool first = ss.Steps == 0;
             double u = ss.Work > 0.0 ? Clamp01(Math.Min(ss.Prog, ss.Work) / ss.Work) : 0.0;
-            double s = ReaverLaw.IronShare(rg, s0, u);
+            double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;
             if (!(s > 0.0)) return;
-            bool sea = false;
-            try { sea = rg >= 0 && comp.MapEvent != null && comp.MapEvent.IsNavalMapEvent; } catch { sea = false; }
+            // Recenzja R1-1: rabunek z morza jak w grze i NavalDLC - napastnik na morzu (MapEvent.IsNavalMapEvent dla rabunku jest zawsze false: pozycja wsi na ladzie)
+            bool sea = rg >= 0 && first && ReaverLaw.RaiderAtSea(att);
+            if (rg >= 0 && first) { try { var bnd = v.Bound; if (bnd != null && bnd.HasPort) ReaverLaw.NotePort(rg); } catch { } }
             if (sea) ReaverLaw.NoteSea(rg);
             // zloto - jeden platnik (kiesa wsi), wodz napastnika; bez wodza nic (jak gra G :177)
             try
@@ -505,7 +518,7 @@ namespace Armoury
                     _dGold += paid + extra;
                     _dBal1 += (g1 - g0) - (v0 - v1);                          // niezalezny bilans: przyrost kiesy wodza - ubytek kiesy wsi
                     ReaverLaw.NoteVillageGold(rg, leader, v, paid, extra, (g1 - g0) - (v0 - v1));
-                    // WW1 nabrzeze: rabunek z morza wsi portu - Qw x u kiesy W portu ponad zapas dni (kiesa ludu -> wodz)
+                    // WW1 nabrzeze: rabunek z morza wsi portu - Qw x u kiesy W portu ponad zapas dni (kiesa ludu -> wodz); raz na sesje (sea tylko w pierwszym kroku)
                     if (sea) ss.SGold += ReaverLaw.Waterfront(rg, leader, v, u);
                 }
             }

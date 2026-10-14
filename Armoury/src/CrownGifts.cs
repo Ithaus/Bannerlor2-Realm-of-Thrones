@@ -77,10 +77,38 @@ namespace Armoury
         /// <summary>Krolestwo, ktorego wojsko sluzy bez zoldu: Straz przy WatchUnpaid, Wolni Ludzie przy FreeFolkUnpaid (jedna regula 182 / WL1). Dary koron - tylko Straz (IsWatch).</summary>
         internal static bool IsUnpaidRealm(IFaction f) { return (WatchUnpaidOn && IsWatch(f)) || (FreeFolkUnpaidOn && IsFreeFolk(f)); }
 
-        /// <summary>Partia bez zoldu: partia lorda, zaloga albo gracz krolestwa bez zoldu (IsUnpaidRealm).</summary>
+        /// <summary>Rod bez zoldu (b.Zero budzetu 166, miara W5/W6 gracza): rod Strazy przy WatchUnpaid (182 bez zmian); rod Wolnych Ludzi przy FreeFolkUnpaid, ale
+        /// NIE kompania najemna w ich sluzbie (recenzja wyspy-wolni R1-9 / R2-2: najemnik bierze zold z umowy 185, nie walczy "za sprawe").</summary>
+        internal static bool IsUnpaidClan(Clan c)
+        {
+            if (c == null) return false;
+            return (WatchUnpaidOn && IsWatch(c.Kingdom)) || (FreeFolkUnpaidOn && IsFreeFolk(c.Kingdom) && !c.IsUnderMercenaryService);
+        }
+
+        /// <summary>Recenzja wyspy-wolni (R1-4 / R2-2): rod gracza jest wasalem Wolnych Ludzi bez zoldu (WL1; nie najemnik) - jego druzyny i zalogi licza sie do puli WL.</summary>
+        internal static bool PlayerFreeFolkVassal
+        {
+            get { try { var pc = Clan.PlayerClan; return FreeFolkUnpaidOn && pc != null && IsFreeFolk(pc.Kingdom) && !pc.IsUnderMercenaryService; } catch { return false; } }
+        }
+
+        /// <summary>Partia bez zoldu: partia lorda, zaloga albo gracz krolestwa bez zoldu (IsUnpaidRealm). Straz - jak 182 (bez zmian). Wolni Ludzie (recenzja):
+        /// kompania najemna w ich sluzbie bierze zold (umowa 185); partie i zalogi gracza-wasala - bez zoldu tylko, dopoki cala armia WL z graczem miesci sie
+        /// w puli (ClanBudget.FfPlayerUnpaid, liczone raz na dobe) - ekran werbunku gracza nie ma bramki puli, wiec ludzie ponad pule kosztuja zwykly zold.</summary>
         internal static bool IsUnpaidParty(MobileParty mp)
         {
-            try { return mp != null && (mp.IsLordParty || mp.IsGarrison || mp.IsMainParty) && IsUnpaidRealm(mp.MapFaction); }
+            try
+            {
+                if (mp == null || !(mp.IsLordParty || mp.IsGarrison || mp.IsMainParty)) return false;
+                var f = mp.MapFaction;
+                if (WatchUnpaidOn && IsWatch(f)) return true;                       // 182 - bez zmian
+                if (!FreeFolkUnpaidOn || !IsFreeFolk(f)) return false;
+                Clan c;
+                if (mp.IsGarrison) { var st = mp.CurrentSettlement ?? mp.HomeSettlement; c = st != null ? st.OwnerClan : null; }
+                else c = mp.ActualClan;
+                if (c != null && c.IsUnderMercenaryService) return false;           // najemnik w sluzbie WL - zold z umowy
+                if (c != null && c == Clan.PlayerClan) return ClanBudget.FfPlayerUnpaid;   // gracz-wasal - w granicach puli
+                return true;
+            }
             catch { return false; }
         }
 

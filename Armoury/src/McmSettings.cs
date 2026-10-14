@@ -5800,19 +5800,19 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
 
-        [SettingPropertyBool("Reaver Iron Price", HintText = "the iron price: when the Ironborn or the Free Folk raid a village (the AI lords and you as their vassal alike), they carry off at least Reaver Iron Price Share of the village's purse and of its storehouse for a full raid of a district (a raid broken off takes its part), not only the share of the people they struck. A raid from the sea on a village of a port also takes Reaver Waterfront Share of what the labourers of that port hold above their reserve for hard times (Town Folk Reserve Days of their needs). Every coin comes from the village and the waterfront - nothing from nowhere. The Dothraki are not touched. Off = the raiders take only the share of the people they struck, as before")]
+        [SettingPropertyBool("Reaver Iron Price", HintText = "the iron price: when the Ironborn or the Free Folk raid a village (the AI lords and you as their vassal alike), they carry off at least Reaver Iron Price Share of the village's purse and of its storehouse for a full raid of a district (a raid broken off takes its part), not only the share of the people they struck - once per raid: further steps of your own raid take the share of the people struck, from what is left. A raid from the sea (a raiding party at sea) on a village of a port also takes, once per raid, Reaver Waterfront Share of what the labourers of that port hold above their reserve for hard times (Town Folk Reserve Days of their needs). Every coin comes from the village and the waterfront - nothing from nowhere. The Dothraki are not touched. Off = the raiders take only the share of the people they struck, as before")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool ReaverIronPrice { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Reaver Iron Price Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the least share of a village's purse and storehouse that a full raid by the Ironborn or the Free Folk carries off (0.50 = half; each further step of your own raid takes this share of what is left)")]
+        [SettingPropertyFloatingInteger("Reaver Iron Price Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the least share of a village's purse and storehouse that a full raid by the Ironborn or the Free Folk carries off (0.50 = half; taken once per raid - further steps of your own raid take only the share of the people struck)")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float ReaverIronPriceShare { get; set; } = 0.50f;
 
-        [SettingPropertyFloatingInteger("Reaver Waterfront Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the share of the port labourers' coin above their reserve that a raid from the sea on one of the port's villages takes (0.10 = a tenth; the reserve itself is never touched)")]
+        [SettingPropertyFloatingInteger("Reaver Waterfront Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the share of the port labourers' coin above their reserve that a raid from the sea on one of the port's villages takes, once per raid (0.10 = a tenth; the reserve itself is never touched)")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float ReaverWaterfrontShare { get; set; } = 0.10f;
 
-        [SettingPropertyBool("Reaver Loot To Crews", HintText = "the iron price pays the crews: the gold an Ironborn house takes as the iron price beyond the share of the people struck, from the waterfronts and as the corsairs' tithe raises, coin for coin, what the house may spend on the wages of its companies in the field - spread over 28 days - and goes neither to its garrisons nor to its court, equipment or buildings, so the crown's war aid for that house falls by as much. The Free Folk take no wages (Free Folk Unpaid), so it does not touch them. Your house as their vassal is measured the same way for the crown's war aid. Needs Reaver Iron Price and Clan Budget Enabled. Off = the iron price counts like any other loot in the house's income, as before")]
+        [SettingPropertyBool("Reaver Loot To Crews", HintText = "the iron price pays the crews: the gold an Ironborn house takes as the iron price beyond the share of the people struck, from the waterfronts and as the corsairs' tithe raises, coin for coin, what the house may spend on the wages of its companies in the field - spread over 28 days - and goes neither to its garrisons nor to its court, equipment or buildings, so the crown's war aid for that house falls by as much. The Free Folk take no wages (Free Folk Unpaid) and sellswords are paid by contract, so for them the iron price counts as income of the house, as before. Your house as an Ironborn vassal is measured the same way for the crown's war aid. Needs Reaver Iron Price, Clan Budget Enabled, Clan Budget Stable D and Clan Income Book Stable D. Off = the iron price counts like any other loot in the house's income, as before")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool ReaverLootToCrews { get; set; } = true;
 
@@ -5824,7 +5824,11 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float ReaverRaidPayDays { get; set; } = 4f;
 
-        [SettingPropertyBool("Sea Raiders Iron Harbour", HintText = "the Sea Raiders find a harbour on the Iron Islands: a band of the Sea Raiders within 600 of an Ironborn port deals with its fence as with the town at its gates (the best terms, for selling loot and for buying gear) and spends its coin there, and gives the lord of that port Sea Raiders Harbour Tithe of what the fence pays it - in peace too, and the same for you if you hold the port. Off = the Sea Raiders deal with the nearest towns, as before")]
+        [SettingPropertyBool("Reaver Raid By Profit Free Folk", HintText = "with Reaver Raid By Profit: the chiefs of the Free Folk weigh a raid by its gain as well, not only the Ironborn lords. Off = only the Ironborn lords do; the Free Folk weigh raids as before (the first step back if the Gift or the Night's Watch suffer too much)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool ReaverRaidByProfitFreeFolk { get; set; } = true;
+
+        [SettingPropertyBool("Sea Raiders Iron Harbour", HintText = "the Sea Raiders find a harbour on the Iron Islands: a band of the Sea Raiders within 600 of an Ironborn port sells its loot to the fence there as to the town at its gates (the best terms; buying gear goes on as before, at the nearest towns) and spends its coin there, and gives the lord of that port Sea Raiders Harbour Tithe of what the fence pays it - in peace too, and the same for you if you hold the port. Off = the Sea Raiders deal with the nearest towns, as before")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool SeaRaidersIronHarbour { get; set; } = true;
 
@@ -5832,7 +5836,7 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float SeaRaidersHarbourTithe { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Free Folk Unpaid", HintText = "the Free Folk fight for their people, not for coin: troops in the parties and garrisons of the Free Folk take no wages, as the brothers of the Night's Watch (only Banner Kings' least upkeep remains), and the knights who ride with their companies serve unpaid too. The crown pays them no war aid and the house budget holds their numbers in men instead of gold (one host for all the Free Folk, apart from the Watch), and nobody is sent home - the limit only stops recruiting. The same for you if you serve the Free Folk. Needs Clan Budget Enabled. Off = the Free Folk are paid like everyone else")]
+        [SettingPropertyBool("Free Folk Unpaid", HintText = "the Free Folk fight for their people, not for coin: troops in the parties and garrisons of the Free Folk take no wages, as the brothers of the Night's Watch (only Banner Kings' least upkeep remains), and the knights who ride with their companies serve unpaid too. The crown pays them no war aid and the house budget holds their numbers in men instead of gold (one host for all the Free Folk, apart from the Watch), and nobody is sent home - the limit only stops recruiting (volunteers, prisoners taken into the ranks, new companies). Sellswords in their pay are paid by their contract, as before. The same for you as their vassal: your companies and garrisons count in their host and serve unpaid while the whole host stays within what their people can field; while it is more than that by a twentieth (your recruiting has no such limit), your men take ordinary wages. Needs Clan Budget Enabled. Off = the Free Folk are paid like everyone else")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkUnpaid { get; set; } = true;
 
@@ -5848,7 +5852,7 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float FreeFolkGarrisonPoolShare { get; set; } = 0.50f;
 
-        [SettingPropertyBool("Free Folk Recruit Needs Food", HintText = "a chief of the Free Folk leads only as many as he can feed: an AI company of the Free Folk takes on new men only while its food would last, with one more mouth, the days the game asks for before a raid. Food and coin come from raids, battles and the granaries of the lands they burn. Needs Free Folk Unpaid. Off = they recruit without regard to food, as before")]
+        [SettingPropertyBool("Free Folk Recruit Needs Food", HintText = "a chief of the Free Folk leads only as many as he can feed: an AI company of the Free Folk takes on new men only while its food would last, with all the men it could take on at that place, the days the game asks for before a raid. Food and coin come from raids, battles and the granaries of the lands they burn. Needs Free Folk Unpaid. Off = they recruit without regard to food, as before")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkRecruitNeedsFood { get; set; } = true;
 
@@ -7307,6 +7311,7 @@ namespace Armoury
             s.ReaverLootToCrews = ReaverLootToCrews;
             s.ReaverRaidByProfit = ReaverRaidByProfit;
             s.ReaverRaidPayDays = ReaverRaidPayDays;
+            s.ReaverRaidByProfitFreeFolk = ReaverRaidByProfitFreeFolk;
             s.SeaRaidersIronHarbour = SeaRaidersIronHarbour;
             s.SeaRaidersHarbourTithe = SeaRaidersHarbourTithe;
             s.FreeFolkUnpaid = FreeFolkUnpaid;

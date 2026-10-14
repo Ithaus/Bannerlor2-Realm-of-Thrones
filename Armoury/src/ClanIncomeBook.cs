@@ -163,7 +163,7 @@ namespace Armoury
                 Rec r;
                 if (!On || c == null || c.StringId == null || !_book.TryGetValue(c.StringId, out r)) return false;
                 all = Math.Max(0L, r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent - r.TodayEstates);
-                if (ReaverLaw.LootToCrewsOn) all = Math.Max(0L, all - r.TodayReaver);   // WW2: lup na zalogi nie jest jednorazowym (kredyt wojenny 168 go nie widzi)
+                if (ReaverLaw.WindowClan(c)) all = Math.Max(0L, all - r.TodayReaver);   // WW2: lup na zalogi nie jest jednorazowym (kredyt wojenny 168 go nie widzi); recenzja - tylko rody z oknem
                 real = Math.Max(0L, Math.Min(all, r.TodayEvtSettl + r.TodayEvtOther + r.TodayThird + r.TodayRansom));
                 real = Math.Max(0L, real - r.TodayShips);   // 3.1/3.3 (33) 181: statki sprzedane portom (E3/10-E3/12) nie wchodza do limitu KW - jak dotad, gdy szly z niczego
                 return true;

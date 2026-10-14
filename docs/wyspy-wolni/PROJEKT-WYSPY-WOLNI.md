@@ -20,7 +20,7 @@ Doba = dzien gry - 108836 + 1; rok 2 = d365-728. Kwoty: tys. zl na dobe, chyba z
    co dostana od pasera, oddaja panu portu za schronienie. To dziala takze w pokoju.
 5. **Ile to da.** Wyspom brakuje dzis 23.9 tys. zl dziennie na zold (po regulach roku 2 ok. 20 tys.). Lup da 1-6 tys. dziennie, zaleznie od tego, ile razy AI wyplynie
    (dzis ok. 10 najazdow rocznie). Celu "brak najwyzej 8 tys." sam lup nie osiagnie: skrzynie wsi Zachodu i zachodniej Polnocy zarabiaja razem ok. 6-8 tys. dziennie -
-   wiecej tam po prostu nie ma.
+   wiecej tam po prostu nie ma. **[Recenzja 14.10: 3 z 4 najazdow sa przerywane - realnie lup 0-3.8 tys., a dopoki AI Wysp nie dostaje opcji najazdu, brak zostaje ok. 19-20 tys. - rozdz. 8.3]**
 6. **Pytanie do Ciebie (kodu nie pisze):** czy zalogi okretow Wysp maja brac polowe zoldu "w lupie" (Zelazny Czlowiek nie bierze zoldu, bierze zelazna cene)? Wtedy brak spada do ok. 4-8 tys.
 7. **Koszt dla swiata:** skrzynie wsi Zachodu i Polnocy na wybrzezu chudna (30-80% w rok), korona Krolewskiej Przystani bierze z nich mniej; na Wyspach przybywa thralli.
 8. **Wolni Ludzie nie biora zoldu - jak Nocna Straz.** BK i tak liczy 1 zl dziennie na czlowieka (w zalodze pol) - zold spada z 11 do ok. 3.6 tys. zl dziennie,
@@ -28,7 +28,7 @@ Doba = dzien gry - 108836 + 1; rok 2 = d365-728. Kwoty: tys. zl na dobe, chyba z
 9. **Ich wojsko trzyma lud, nie zloto:** najwyzej 1.8% ludzi krainy (ok. 5 tys.; tyle mieli w pierwszym polroczu, gdy pieniadze ich jeszcze nie hamowaly - dzis 3.6 tys.).
    Zalogi najwyzej polowa tego, reszta w polu: druzyny z 0.7 do ok. 2.1 tys.
 10. **Jedzenie z lupu:** wodz Wolnych Ludzi werbuje tylko, gdy ma jedzenie na 8 dni (tyle gra wymaga do najazdu); jedzenie i zloto biora z najazdow na Dar, bitew i spichlerzy.
-11. **Nocna Straz bez zmian.** Ryzyko: wiecej Wolnych Ludzi w polu = wiecej bitew ze Straza (ma 2.5 tys. ludzi) i wiecej trupow dla Innych - test to mierzy.
+11. **Nocna Straz bez zmian.** Ciala: Wolni Ludzie i Straz pala poleglych - regula E4/2 (Jeff 07.10 "0% cial niespalonych", OthersRise.cs): w bitwie bez Innych wszystkie ciala sa palone; wstaja tylko polegli strony pokonanej przez Innych za Murem / przy Murze. Wiecej bitew Wolnych Ludzi ze Straza NIE daje Innym trupow; test mierzy tylko, czy Wolnych Ludzi nie ubywa za szybko w walkach z Innymi (wtedy ich polegli wstaja - jak w lore). [poprawka 14.10 po pytaniu Jeffa]
 12. **Najpierw dowod:** po dobie 405 Wyspy nie zrobily ani jednego najazdu, choc byly w wojnie. Nowa linia pokaze dlaczego (sila, jedzenie, armie, zasieg);
     poprawka na przyczyne - dopiero po tescie, nie na zapas.
 
@@ -76,8 +76,10 @@ Kolejnosc w dobie: najazd (WW1 - koniec kroku rabunku, w ticku) -> ksiega dochod
 - **Klucz:** `ReaverIronPrice` (bool, **on**), `ReaverIronPriceShare` (**0.50**), `ReaverWaterfrontShare` (**0.10**). Off = E7/R1 jak w 63aaaedf (udzial s = trafieni / ludzie w domu).
 - **Regula.** Gdy wodz rabunku (AI albo gracz, E7/R1 i E7/R2) nalezy do krolestwa z `ReaverRealms`, udzial lupu kroku = **max(s, Q x u)**, gdzie Q = 0.50, u = postep kroku
   (1 po pelnym kroku; przerwany - czesc zrobiona, jak dzis [K DistrictRaid.cs:465-493]). Ten sam udzial z kiesy wsi i z magazynu wsi. Gracz (E7/R2) - kazdy pelny krok bierze
-  Q z tego, co ZOSTALO (nic dwa razy): krok 1 - 50%, krok 2 - kolejne 25% skrzyni.
-  **Nabrzeze (tylko najazd z morza):** gdy zdarzenie rabunku jest morskie (`MapEvent.IsNavalMapEvent` - ta sama miara co kontekst "NavalRaid" w B175 [K KingdomBalance.cs:234, 276])
+  Q z tego, co ZOSTALO (nic dwa razy): krok 1 - 50%, krok 2 - kolejne 25% skrzyni. **[Recenzja R2-3: zelazna cena i nabrzeze RAZ NA SESJE - okreg placi, zeby go
+  oszczedzono; dalsze kroki gracza biora s (trafieni / ludzie w domu) z tego, co zostalo, jak AI i 63aaaedf - rozdz. 8.2]**
+  **Nabrzeze (tylko najazd z morza):** gdy zdarzenie rabunku jest morskie (`MapEvent.IsNavalMapEvent` - ta sama miara co kontekst "NavalRaid" w B175 [K KingdomBalance.cs:234, 276];
+  **[recenzja R1-1: dla rabunku zawsze false - pozycja zdarzenia to pozycja wsi na ladzie; morze = rabujacy na morzu, jak `MapEventHelper.GetRaidContext` - rozdz. 8.2]**)
   i osada macierzysta wsi (`Village.Bound`) ma port - dodatkowo Qw x u = 10% kiesy klasy W (robotnicy, rybacy, dokerzy) tej osady **ponad zapas `TownFolkReserveDays` (10) dni**
   potrzeby - ta sama podloga, ktorej uzywa danina P1 [K TownFolk.Live.cs:860-862]. Klasy R i P (mieszczanie za murem) - nie.
 - **Kto -> komu:** kiesa wsi -> wodz napastnika (ta sama funkcja platnika `SmallGold.PayRaidLoot` -> `LootPayer` [K SmallGold.cs:366-384]); towar z magazynu wsi -> napastnicy
@@ -205,6 +207,8 @@ Kolejnosc w dobie: najazd (WW1 - koniec kroku rabunku, w ticku) -> ksiega dochod
 | 0.6 | 3.6 | 1.0 | ok. 15.8 | 66% |
 | 1.0 (sufit kies wsi) | 6.0 | 1.3 | ok. 13.1 | 55% |
 
+**[Recenzja R2-1: tabela liczy u = 1; tylko 25.5% sesji roku 2 to pelne kroki - poprawiona tabela w rozdz. 8.3: przy 0 opcjach rabunku (WW0) ok. 19-20 tys.]**
+
 **Wniosek:** cel 1/3 (<= 8.0) z samego lupu jest **nieosiagalny w obiegu zamknietym** - nawet przy najazdzie co dobe brakuje ok. 5 tys. zl/d, bo na wybrzezu w zasiegu
 nie ma wiecej zlota (skrzynie wsi Zachodu i zachodniej Polnocy: doplyw ok. 6-8 tys./d [S]). Wieksze Q albo wiecej platnikow (lud miast za murami, kasy kupcow) zabieraloby
 Zachodowi, ktory juz dzis ma dochod ludu 29 tys. zl/d (z 109 [P RW 7]), wiecej niz polowe - tego nie projektuje bez Twojej zgody.
@@ -251,7 +255,7 @@ tys. zl/d -> brak ok. 4-8 tys. (cel osiagniety bez wzgledu na liczbe najazdow). 
 - **Skutek [S z P]:** pula 1.8% x 279-286 tys. = 5.0-5.15 tys. (rok 2; dzis WL maja 3.6-3.8 tys.); zalogi 3.0 tys. (ponad 50% - stoja), druzyny 0.7-0.84 -> ok. 2.0-2.2 tys.
   Bieg 120 dob: pula 1.8% x ok. 300 tys. = 5.4 tys. od startu (dzis Q1 4.7 tys.).
 - **Kontrola calosci:** pula Strazy liczona dalej ze zlota (jedna pula na krolestwo - osobna dla Strazy i dla WL; kod puli Strazy `_watchPoolCap` nie zmienia liczby); gracz w WL -
-  bez budzetu 166, wiec bez puli (jak gracz w Strazy - tylko limit druzyny gry); `MinNewPartyMen` (30) z puli WL; "na sucho" linia 166 pokazuje pule WL.
+  bez budzetu 166, wiec bez puli (jak gracz w Strazy - tylko limit druzyny gry) **[recenzja R1-4 / R2-2: gracz-wasal WL jest w puli, a jego zold zalezy od puli - rozdz. 8.1 pkt 5]**; `MinNewPartyMen` (30) z puli WL; "na sucho" linia 166 pokazuje pule WL.
 - **Linia:** w "Budzet rodow (166)" odcinek `| Wolni Ludzie w ludziach (WL2): pula P = 1.8% x ludzie L; ludzie M (druzyny D, zalogi Z = z% puli); werbunek wstrzymany: pula a, zalogi 50% b, jedzenie (WL3) c; nowe partie wstrzymane d`.
 - **Prog:** WL-2.
 - **Ryzyko dla swiata:** druzyny WL x3 w polu - wiecej bitew ze Straza (Straz 2.5 tys. po buncie d512 [P RWL 1.2]); Castle Black i Eastwatch moga byc oblegane (dzis WL nie oblegaja);
@@ -349,7 +353,122 @@ Klucze (wszystkie nowe, w `Armoury.json` Jeffa ich nie ma - domyslne zadzialaja)
 Odstepstwa od tekstu projektu (z powodem):
 1. Nabrzeze WW1: zdjecie z kiesy ludu ksiegowane w `_ctlOut` (wydatek kies - jak lup L2 i pobor W7), nie `_ctlIn`; miara zapasu takze bez oferty nadwyzki na jutro (jak `LevyRoom` W7 - najazd nie bierze tego, co lud juz postanowil wydac).
 2. WW2 wymaga WW1, WW3 wymaga WW1 (E i kosz to zelazna cena). Kredyt wojenny 168 pozycza tylko brak ponad pulap i lup; `OnceToday` (168) bez kosza WW2; gracz-wasal (W6b) - pulap W5/W6 z jego oknem lupu (ta sama regula). Dwor i niewydany sprzet licza zold bez czesci z lupu (dwor jak bez lupu).
-3. WW4: porty Wysp sa "domem" korsarza w obie strony pasera (sprzedaz lupu i zakup sprzetu - `Reach` jest wspolny). Rozbicie band na klan bandycki - w linii "Paser:" (nie "Wyrzutki:").
-4. WL3: "po werbunku" = z kolejnym czlowiekiem (gra nie mowi z gory, ilu dobierze; jedno wywolanie moze dobrac kilku, nastepne widzi ich zuzycie).
+3. WW4: ~~porty Wysp sa "domem" korsarza w obie strony pasera (sprzedaz lupu i zakup sprzetu - `Reach` jest wspolny)~~ - COFNIETE po recenzji (R2-8): tylko sprzedaz lupu, jak tekst 2.4. Rozbicie band na klan bandycki - w linii "Paser:" (nie "Wyrzutki:").
+4. WL3: ~~"po werbunku" = z kolejnym czlowiekiem~~ - COFNIETE po recenzji (R1-6): z cala partia, ktora gra moze dobrac w tym wywolaniu (najemnicy karczmy + po jednym od notabla, do miejsca w druzynie).
 5. WW0 "w zasiegu" = rozne wsie w opcjach rabunku (gra daje opcje tylko w zasiegu 5x).
 6. Narzedzie: WW-5 glod E5/C2 - liczba miast swiata (linia nie ma rozbicia na krainy); WL-2b - ludzie w druzynach lordow WL z `budzet-rodow.csv` (`ludzi_partie` - jest tez w 63aaaedf); WL-5 - tylko INFO z `--crashscribe`.
+
+---
+
+## 8. Recenzja i poprawki (14.10, po ac50cf44)
+
+Dwie recenzje galezi `w-toku/wyspy-wolni` (ac50cf44 wobec 63aaaedf): **R1** "obieg i kod" (R1-1..R1-11) i **R2** "skutek, gra i lore" (R2-1..R2-8). Kazdy zarzut sprawdzony
+w kodzie gry (dekompilacja 1.4.8), NavalDLC, ROT, naszym kodzie albo w logu dwuletnim. Poprawki w jednym commicie na galezi (wpis CHANGELOG "recenzja w-toku/wyspy-wolni").
+Status: **DO SPRAWDZENIA** - build kod 0, gen_mcm, narzedzie na logach bez paczki i liniach syntetycznych; gry nie uruchamialem, nic nie wgrane.
+
+### 8.1 Dla Jeffa - prosto
+
+1. **Rabunek z morza naprawde dziala.** Dotad kod pytal gre "czy to bitwa morska", a dla rabunku gra zawsze mowi "nie" (wies stoi na ladzie) - nabrzeze nie dzialalo nigdy,
+   a lordowie Wysp liczyli lup, ktorego nikt by nie zaplacil. Teraz: rabunek jest "z morza", gdy rabujacy stoi na morzu - tak samo liczy to gra i NavalDLC.
+2. **Zelazna cena raz na najazd.** Okreg placi polowe skrzyni, zeby reszte oszczedzono. Gdy Ty (wasal Wysp) palisz dalej osade po osadzie, kolejne kroki biora juz tylko
+   to, co zabierzesz z palonych domow (jak przed paczka) - tak samo jak AI, ktora robi jeden krok.
+3. **Wolni Ludzie zyja z lupu.** Lup ponad zwykly udzial idzie u nich do dochodu rodu (dwor, sprzet, budowy) - tak jak przed paczka. Dotad przez blad znikal z rachunku.
+4. **Najemnicy w sluzbie Wolnych Ludzi biora zold** z umowy, jak kazda kompania najemna - "za sprawe" walcza tylko Wolni Ludzie.
+5. **Ty jako wasal Wolnych Ludzi:** Twoje druzyny i zalogi licza sie do armii Wolnych Ludzi (lud wystawia najwyzej 1.8% ludzi). Twoi ludzie sluza bez zoldu, dopoki cala
+   armia WL z Toba miesci sie w tym, co ich lud moze wystawic (z zapasem 5%). Gdy ja przekroczysz (Twoj ekran werbunku nie ma tej granicy, AI ja ma) - Twoi ludzie biora
+   zwykly zold, az armia wroci do granicy. Druzyny Twoich towarzyszy i Twoje zalogi rosna tylko do granicy, jak u AI.
+6. **Jency nie omijaja granicy.** Wodz Wolnych Ludzi przy pelnej armii nie wciela jencow (dotad wcielal - to byla furtka obok granicy).
+7. **Ile to da Wyspom - uczciwie:** 3 z 4 najazdow sa przerywane (rok 2: 578 z 776), a przerwany bierze tylko czesc. Dopoki AI Wysp w ogole nie dostaje opcji najazdu
+   (po dobie 405 nie rabowaly ani razu - linia WW0 pokaze dlaczego), lup daje prawie nic: brak zostaje ok. **19-20 tys. zl dziennie**. Pytanie WW-J (zalogi okretow - pol zoldu
+   "w lupie") jest wiec do Ciebie juz teraz, nie po tescie.
+8. **Pilnujemy Daru, Strazy i ludu Wolnych Ludzi:** test powie NIE, gdy kiesy wsi Daru spadna o polowe, Straz straci twierdze albo 10% ludzi, Inni urosna o 20%, albo lud
+   Wolnych Ludzi skurczy sie o wiecej niz 2%. Pierwszy krok wycofania przy Darze: nowy klucz - Wolni Ludzie przestaja "liczyc zysk" z najazdu (Wyspy dalej licza).
+
+### 8.2 Poprawione (zarzut - dowod - zmiana)
+
+| zarzut | dowod | zmiana |
+|---|---|---|
+| R1-1 [WYSOKI] nabrzeze WW1 martwe, WW3 liczy lup bez platnika | [K] `MapEvent.cs:247` `IsNavalMapEvent => !Position.IsOnLand`; `:783` rabunek: `Position = defenderParty.Position`; `Settlement.cs:950` `isOnLand: true`; gra i NavalDLC: `MapEventHelper.GetRaidContext` / `NavalDLCRaidModel` - `IsCurrentlyAtSea` napastnika | `ReaverLaw.RaiderAtSea` (partia strony napastnika ze zdrowymi ludzmi na morzu); WW3: nabrzeze w E tylko dla opcji `NavigationType.Naval`; licznik "przy wsi portu" w linii WW1 + prog WW-1b |
+| R2-3 [SREDNI] zelazna cena i nabrzeze co krok gracza (50/75/87.5/94%) | [K] `NextStep` zeruje `LootGiven` i postep; `Loot` liczyl `IronShare` i `Waterfront` w kazdym kroku | raz na sesje (`ss.Steps == 0`; u AI krok = sesja); kolejne kroki - s jak w 63aaaedf. Zmienia tekst 2.1 ("krok 2 - kolejne 25%"): okreg zaplacil, zeby go oszczedzono - dalsze palenie to tylko lup s |
+| R1-5 / R2-6 lup ponad s WL i najemnikow Wysp znika z budzetu | [K] `StableDWithDays` odejmowal kosz WW2 wszystkim; `lootNow` 0 dla `b.Zero` i najemnikow | `ReaverLaw.WindowClan` - jedna miara (budzet, ksiega, `NoteLoot`); reszta rodow - lup w D (W-1) jak w 63aaaedf |
+| R1-8 (uspiony) lup dwa razy przy `ClanBudgetStableD` off | [K] `ClanBudget.DOf` -> `StableIncome` = srednia calego Today | `LootToCrewsOn` wymaga `ClanBudgetStableD` i `ClanIncomeBook.StableDOn` |
+| R1-7 (uspiony) lup w G podnosi pulap drugi raz | [K] `Ceiling` (skrzynia, f), skrzynia sprzetu, nadwyzka pokoju licza G | `LootFreeG`: G bez lupu okna jeszcze nierozpisanego (wpis sprzed j dob - zostaje (28 - j)/28) |
+| R1-3 miara WW-4 "lup wydany" = 100% zawsze | [K] `_dLootCap` przed W5/W7 | pulap druzyn koncowy (po W5/W7); linia 166 bez drugiego "podniesienie" |
+| R1-9 / R2-2 najemnicy WL bez zoldu i w puli | [K] `IsUnpaidParty` (MapFaction), `b.Zero` (Kingdom); [P] 28 dob "Free Folk;najemnik" w budzet-rodow.csv | `CrownGifts.IsUnpaidClan` / `IsUnpaidParty`: najemnik WL (takze gracz-najemnik) bierze zold z umowy 185, poza pula; pomiar zoldu WL bez najemnikow |
+| R1-4 / R2-2 gracz-wasal WL bez puli i bez bramek | [K] `Eligible` wyklucza `PlayerClan`; `Of(PlayerClan)` null w bramkach; ROT `OathPatch` "freefolk" | gracz w `PoolLiveMen(true)` i udziale zalog; druzyny towarzyszy, jency i zalogi gracza - ta sama bramka; zold gracza 0 tylko przy armii WL <= 1.05 x pula (`FfPlayerUnpaid`, raz na dobe) |
+| R1-2 pula WL2 nie trzyma liczebnosci | [P] Straz > 1.05 x pula w 321 z 728 dob (najwiecej 1.71 x); w 112 z 595 dob ponad pula ludzie Strazy rosli (+4 777); [K] `DailyTickAIMobileParty` bez bramki puli, limit zoldu przy zoldzie 0 nie wiaze; ROT zastepuje te metode prefiksem `false` | prefiks `FfPrisonPrefix` (Priority.First - przed ROT) z bramka puli dla WL; pomiar drog przyrostu WL w linii 166 (netto, werbunek, jency, zalogi, nowe partie, "netto ponad znane drogi") + prog WL-2c |
+| R1-6 WL3 na +1 czlowieka | [K] `CheckRecruiting` :478-500 - najemnicy do miejsca w druzynie + po jednym od notabla | `RecruitBatch`: jedzenie z cala mozliwa partia (projekt 3.3 "po werbunku"); licznik pomylek WL3 |
+| R1-10 `GarRecruitPrefix` na dwoch metodach | [K] przyrost z modelu WL = 0 (ArmsFromPeople K1); nasz false pomijal dalszy prefiks bool ArmsFromPeople | osobny `GarGrowthPrefix`; liczniki WL tylko z werbunku zalog; Straz - bez zmian |
+| R1-11 teksty | [K] "WL2 nie;" przy WL2 wlaczonym; `_dLoot` dwa razy; "razem 0" bez kolumny | "WL2 tak, ludzi jeszcze nie policzono"; jedna liczba; "brak kolumny" |
+| R2-7 WW3 nie widzi okregu wypalonego | [K] `Plan`: Z = 0 -> Work 0 -> lup 0, a E = Q x (kiesa + magazyn) | `DistrictRaid.BurnedOutNow` -> E = 0; licznik w WW3 |
+| R2-8 korsarze kupuja sprzet w portach Wysp | [K] `Reach` wspolny dla `FenceSell` i `FindAtFence` | `Reach(..., sell)`: port Wysp jako "dom" tylko przy sprzedazy lupu (jak tekst 2.4) |
+| R2-4 / R2-5 brak progow Daru, Strazy, Innych, ludu WL | [K] narzedzie; [P] z_wojska WL ok. 1.3 tys. zl/d (kiesa-obieg.csv d701-728) | WW-5 + Dar; WL-4b NIE (nie DECYZJA); WL-4c; WL-5 z `--crashscribe-baza`; WL-6 (ludzie WL, glod miast WL, z_wojska); klucz `ReaverRaidByProfitFreeFolk` |
+| R2-1 zawyzony skutek dla Wysp | [P] rok 2: 776 sesji, 198 pelnych krokow (25.5%), 578 przerwanych, 23 446 zl z kies wsi (linia E7/R1, skrypt strumieniowy) | 8.3; WW-2 przy 0 opcjach rabunku (WW0) - INFO "niezmierzone, przyczyna z WW0" |
+
+### 8.3 Realny zakres dla Wysp (R2-1) - tabele 2.1 i 2.6 po poprawce
+
+Najazd z walka: tylko 25.5% sesji to pelne kroki, przerwane biora Q x u. Udzial lupu na sesje = 0.255 + 0.745 x u_sr (u_sr - postep przerwanych; linia E7/R1 go nie
+podaje - nie mierzone). Dla u_sr 0-0.5: 0.25-0.63, czyli zamiast 6.7 tys. na najazd [S] ok. **1.7-4.2 tys.** Nabrzeze dziala tylko przy rabujacym na morzu i raz na sesje.
+
+| scenariusz (sesji na dobe wojny) | lup WW1 w 2.6 (u = 1) | lup WW1 x udzial dokonczonych [S] | WW4 | brak rok 2 z ok. 20.4 [S] |
+|---|---:|---:|---:|---:|
+| WW0: 0 opcji rabunku (jak d405-728 w biegu dwuletnim) | - | 0 | 0.1-1.3 | **ok. 19.1-20.3** |
+| 0.1 (WW3 nie dziala) | 0.6 | 0.15-0.4 | 0.3 | ok. 19.7-20.0 |
+| 0.3 (srodek) | 1.8 | 0.45-1.1 | 0.7 | ok. 18.6-19.3 |
+| 0.6 | 3.6 | 0.9-2.3 | 1.0 | ok. 17.1-18.5 |
+| 1.0 (sufit) | 6.0 | 1.5-3.8 | 1.3 | ok. 15.3-17.6 |
+
+Wniosek: **dopoki WW0 nie pokaze opcji rabunku Wysp, brak zostaje ok. 19-20 tys. zl/d** (pakiet pokrywa 2-7% luki); nawet przy najezdzie co dobe ok. 15-18 tys. Cel <= 8 tys.
+bez WW-J jest nieosiagalny w obiegu zamknietym (2.6). **WW-J idzie do Jeffa teraz** (sesja glowna), nie po tescie. Dla odniesienia [P]: bieg dwuletni (DLL bez paczki),
+"niepokryte" W5 Wysp d701-728 sr. 18.0 tys. zl/d.
+
+### 8.4 Odrzucone albo przyjete czesciowo
+
+- **R1-4 (czesc) - bramka WL3 na ekranie werbunku gracza:** nie robiona, wyjatek do decyzji Jeffa. Ekran werbunku gracza nie ma punktu, w ktorym bramka nie ruszalaby UI
+  (CLAUDE.md 7 - wywrotki menu); gracz widzi swoje jedzenie. WL3 jest dla AI, ktora jedzenia nie planuje. Pula i zold gracza - zrobione (8.2).
+- **R1-2 (czesc) - "obietnica 5.0-5.15 tys. bez pokrycia":** dowod jest ze Strazy, ktorej pula idzie ze zlota i spadala (czesc nadwyzki to spadek puli bez zwolnien -
+  zamierzone); pula WL2 idzie za ludem (279-300 tys., zmiana powolna). Przyjete: doplyw obok bramek jest - zamknieta znana droga (jency AI) i pomiar drog; inne drogi
+  (BK, ROT, oddania do zalog, rody zmieniajace krolestwo) - po tescie z WL-2c. Przyczyn nie zakladam.
+- **R2-1 (czesc) - "pakiet pokryje 2-7% luki":** przyjete jako zakres "dopoki WW0 nie pokaze opcji rabunku" (8.3); liczby zaleza od u_sr i od WW0 - test je da.
+- **R2-4 (czesc) - "UMARLI ponad 1.2 x baza = NIE":** przyjete z zastrzezeniem - polegli w bitwach bez Innych sa paleni (E4/2, pkt 11 rozdz. 0), wiec bitwy WL ze Straza
+  nie daja Innym trupow; prog lapie tylko szybsze ginienie WL z rak Innych.
+
+### 8.5 Progi dopisane (grupa `wyspywolni`) i plan testu
+
+| prog | co | T1 | T2 |
+|---|---|---|---|
+| WW-1b | rabunek z morza wykryty: z morza > 0 przy >= 5 krokach Wysp przy wsiach portow | TAK (mniej krokow - INFO) | INFO |
+| WW-2 | przy 0 mysli Wysp z opcja rabunku (WW0) - INFO "WW1-WW3 niezmierzone, przyczyna z WW0; WW-J do Jeffa" | INFO | INFO |
+| WW-5 | + kiesy wsi Daru >= 0.5 x baza | TAK | INFO |
+| WL-2c | drogi przyrostu WL (netto, werbunek, jency, zalogi, nowe partie, netto ponad znane drogi; doby ponad 1.05 x pula z doplywem inna droga) | INFO | INFO |
+| WL-3 | + "WL3 przepuscil, a po werbunku jedzenie ponizej progu" | INFO | INFO |
+| WL-4b | twierdze Strazy < baza | NIE (bylo DECYZJA) | NIE |
+| WL-4c | ludzie regionow Strazy i ludzie Strazy >= 0.9 x baza | TAK | TAK |
+| WL-5 | trupy Innych <= 1.2 x baza (`--crashscribe-baza`) | TAK | TAK |
+| WL-6 | ludzie regionow WL >= 0.98 x baza (okno >= 60 dob); miasta WL ze `stac_jedzenie` < 0.95 <= baza; `z_wojska` WL - INFO | TAK / TAK / INFO | TAK / TAK / INFO |
+
+Plan testu (bez zmian co do zapisow): **T2** - nowa kampania 120 dob na tej galezi + baza (63aaaedf albo ta DLL z kluczami off) na tej samej kampanii; **T1** - zapis
+`autotest-rok2-d780-fin24` + 60 dob (781-840) + baza na tym samym zapisie. Polecenia:
+```
+python -I tools/sprawdz_logi.py --grupa wyspywolni --start-kampanii 108836 --do-doby 840 --baza-doby <log bazy na zapisie d780> --crashscribe <session T1> --crashscribe-baza <session bazy> <log T1>
+python -I tools/sprawdz_logi.py --grupa wyspywolni --do-doby 120 --baza-doby <log bazy 120 dob> --crashscribe <session T2> --crashscribe-baza <session bazy> <log T2>
+python -I tools/sprawdz_logi.py --grupa rok2 --do-doby 120 <log T2>
+```
+Co obejrzec najpierw: WW0 (czy Wyspy maja opcje rabunku - od tego zalezy WW-2), WW-1b (morze), WL-2 / WL-2c (pula WL i drogi przyrostu), WL-4b/4c (Straz), WL-6 (lud WL).
+
+### 8.6 Wycofanie (uzupelnienie rozdz. 5)
+
+- **NIE w WW-5 Dar / WL-4b / WL-4c / WL-5:** najpierw `ReaverRaidByProfitFreeFolk` off (WW3 tylko Wysp), potem `FreeFolkLevyShare` 0.018 -> 0.014, potem `FreeFolkMenFromPeople`
+  off razem z `FreeFolkUnpaid`.
+- **NIE w WL-6 (lud WL):** `FreeFolkLevyShare` 0.018 -> 0.014 (mniej wojska z ludu), potem WL1-WL3 off.
+- **WW-1b NIE:** nabrzeze bez platnika nie powstaje (przelew tylko przy rabujacym na morzu) - sprawdzic w B175 "NavalRaid", czy Wyspy rabuja z morza; nic do wylaczania.
+- Gracz-wasal WL ponad pula placi zold - regula; bez klucza (wylaczenie = `FreeFolkUnpaid` off).
+
+### 8.7 Ryzyka po poprawkach
+
+1. Wyspy rabuja z ladu przy portach - wtedy nabrzeze 0 (tak ma byc), a WW3 nie dolicza go do E (opcje Default/All).
+2. Gracz-wasal WL: zold wraca od nastepnej doby po przekroczeniu puli o 5% - komunikat tylko w linii 166 (bez okienka).
+3. Przy pelnej puli jency druzyn WL nie nabieraja gotowosci (cala metoda dobowa jest pomijana) - wcielenie i tak stoi.
+4. WL3 z cala partia jest ostrozniejsze - druzyny WL rosna wolniej; licznik pomylek WL3 pokaze, czy dawne +1 wystarczalo.
+5. Wolni Ludzie: lup ponad s w D - dwor, sprzet i budowy WL troche wieksze niz w ac50cf44 (jak w 63aaaedf).
+6. WL-2c "netto ponad znane drogi" > 0 w dobach ponad pula - jest jeszcze inna droga doplywu; nastepny krok po tescie.
