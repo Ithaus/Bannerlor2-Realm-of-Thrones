@@ -140,6 +140,8 @@ namespace Armoury
         // liczniki doby (bez zapisu; zeruje Daily)
         private static double _dRaidW, _dRaidMain, _dForW, _dForMain, _dFam, _dUp, _dZast, _dOver, _dOverPeople, _dSetS, _dHitSkip;
         private static int _dStrikes, _dD0, _dSess, _dFamSkip, _dLate;       // _dLate - konto znane umieszczone po zwolnieniu pulapu (R1-4)
+        // drobne2 (G5): Devastation.HitAll przy ostatnim zerowaniu licznikow doby tej ksiegi - trafieni do r3 licza sie od tej chwili (to samo okno co _dSetS)
+        private static double _hitMark;
         private static readonly int[] _dZastWhy = new int[4];
         private static readonly List<string> _dBurnedList = new List<string>(), _dRebuiltList = new List<string>();
         private static int _dBurnedN, _dRebuiltN, _dAbandonedN;
@@ -208,6 +210,7 @@ namespace Armoury
         {
             _dRaidW = _dRaidMain = _dForW = _dForMain = _dFam = _dUp = _dZast = _dOver = _dOverPeople = _dSetS = _dHitSkip = 0.0;
             _dStrikes = _dD0 = _dSess = _dFamSkip = _dLate = 0;
+            _hitMark = Devastation.HitAll;
             Array.Clear(_dZastWhy, 0, _dZastWhy.Length);
             _dBurnedList.Clear(); _dRebuiltList.Clear();
             _dBurnedN = _dRebuiltN = _dAbandonedN = 0;
@@ -1509,7 +1512,10 @@ namespace Armoury
                 int towns = 0, g1 = 0, g2 = 0, lootAll = 0, lootExp = 0; double fAll = 0.0, f1 = 0.0, f2 = 0.0;
                 bool foodOn = s.TownFoodByVillagePeople && _townPatched;
                 if (foodOn) TownFoodToday(out towns, out fAll, out f1, out g1, out f2, out g2, out lootAll, out lootExp);
-                double hitDev = Devastation.HitToday;
+                // drobne2 (G5, oczywisty blad pomiaru - bez klucza): trafieni od zerowania TEJ ksiegi (HitToday zeruje dopiero Devastation.DayLine pozniej w dobie, wiec
+                // uderzenie miedzy VillageBook.Daily a DayLine bylo w HitToday poprzedniej doby, a w _dSetS tej - r3 = +5.0063 w d286 biegu dwuletniego)
+                double hitDev = Devastation.HitAll - _hitMark;
+                double hitLate = Math.Max(0.0, Devastation.HitAtDayLine - _hitMark);     // z tego po linii ksiegi poprzedniej doby, przed jej zamknieciem w Devastation
                 double r3 = _dSetS - hitDev;
                 bool firstLine = first;
                 _firstDay = false;
@@ -1536,7 +1542,8 @@ namespace Armoury
                   .Append(", puste osady przy pustym koncie k1 ").Append(k1).Append(", konto bez pustych osad k2 ").Append(k2).Append(", ponad pulap k3 ").Append(k3)
                   .Append(", konto bez miejsca (okreg na pulapie) kp ").Append(kFull)
                   .Append(", osady dzis x S - trafieni dzis r3 ").Append(F(r3, "0.####")).Append(" (trafieni ").Append(F(hitDev, "0.##")).Append(", nadmiar ludzi ").Append(F(_dOverPeople, "0.##"))
-                  .Append(", bez ksiegi ").Append(F(_dHitSkip, "0.##")).Append("), doplyw bez zrodla d0 ").Append(_dD0);
+                  .Append(", bez ksiegi ").Append(F(_dHitSkip, "0.##")).Append(", w tym po linii ksiegi poprzedniej doby (drobne2) ").Append(F(hitLate, "0.##"))
+                  .Append("), doplyw bez zrodla d0 ").Append(_dD0);
                 if (_dFamSkip > 0) sb.Append(", ucieczki z glodu bez okregu ").Append(_dFamSkip);
                 sb.Append(" | rok po najezdzie (").Append(D).Append(" dob): okregow ").Append(yearN).Append(" (TAK ").Append(yearYes).Append(", NIE ").Append(yearN - yearYes)
                   .Append(": oblezenie regionu ").Append(ySiege).Append(", pobyt oblezony ").Append(yStay).Append(", brama E4/6 ").Append(yGate)
@@ -1563,7 +1570,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("VillageBook.Daily", e); }
-            finally { NewDay(); }
+            finally { NewDay(); Devastation.BookClosed(); }     // drobne2 (G5): od teraz do Devastation.DayLine - diagnoza spoznionych uderzen
         }
 
         private static void CsvRow(StringBuilder csv, Dist d, Snap sn, Settlement region, bool clock, int last, int today, int day, bool year, string yr,

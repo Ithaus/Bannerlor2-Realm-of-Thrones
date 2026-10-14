@@ -43,9 +43,13 @@ namespace Armoury
         private static int _homeGar, _homePar, _homePlayer, _noVillage, _stumbles;
         // E4/9 DLUG 4: dluznicy do domu - z limitu zoldu (model gry), z zaleglego zoldu (WarLedger), bez wsi z danymi BK (do lasu); migawka doby dla "Dlugi (168)"
         private static int _debtLimit, _debtArrears, _debtNoVillage;
+        // drobne2 (K20, klucz DebtorHomeNearestVillage): z tego do najblizszej wsi swiata (rod bez twierdzy, wsi i krolestwa) - czesc "odeszli do domu"
+        private static int _debtNearest;
+        internal static int LastDebtNearest;
         private static readonly HashSet<Clan> _debtClans = new HashSet<Clan>();
         internal static int LastDebtLimit, LastDebtArrears, LastDebtNoVillage, LastDebtClans;
         private static bool DebtOn { get { var s = Settings.Current; return s != null && s.DebtorDisbandsHome; } }
+        private static bool NearestOn { get { var s = Settings.Current; return s != null && s.DebtorHomeNearestVillage; } }
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         private static Harmony _harmony;
@@ -53,13 +57,13 @@ namespace Armoury
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
 
-        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); LastDebtLimit = LastDebtArrears = LastDebtNoVillage = LastDebtClans = 0; _err.Clear(); }
+        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); LastDebtLimit = LastDebtArrears = LastDebtNoVillage = LastDebtClans = LastDebtNearest = 0; _err.Clear(); }
 
         internal static void NewDay()
         {
-            LastDebtLimit = _debtLimit; LastDebtArrears = _debtArrears; LastDebtNoVillage = _debtNoVillage; LastDebtClans = _debtClans.Count;
+            LastDebtLimit = _debtLimit; LastDebtArrears = _debtArrears; LastDebtNoVillage = _debtNoVillage; LastDebtClans = _debtClans.Count; LastDebtNearest = _debtNearest;
             _homeGar = _homePar = _homePlayer = _noVillage = _stumbles = 0;
-            _debtLimit = _debtArrears = _debtNoVillage = 0; _debtClans.Clear();
+            _debtLimit = _debtArrears = _debtNoVillage = _debtNearest = 0; _debtClans.Clear();
         }
 
         private static void Stumble(string where, Exception e)
@@ -177,6 +181,10 @@ namespace Armoury
             try
             {
                 var village = ClanBudget.OverflowVillage(party);
+                // drobne2 (K20): rod w zajeciu bez twierdzy, wsi i krolestwa (najemnik miedzy kontraktami - bieg dwuletni: Bright Banners d261-265, 47 ludzi do lasu)
+                // nie ma "swoich ziem" - dluznicy ida do najblizszej wsi z danymi BK (ta sama droga ToVillagePop, ta sama przyczyna MDebt); przepelnienie W4c bez zmian
+                bool nearest = false;
+                if (village == null && note.Debt && DebtOn && NearestOn) { village = ClanBudget.NearestPopVillage(party); nearest = village != null; }
                 foreach (var kv in note.Stacks)
                 {
                     var ch = kv.Key;
@@ -191,7 +199,7 @@ namespace Armoury
                     {
                         if (sent == null) sent = new Dictionary<CharacterObject, int>();
                         int v; sent.TryGetValue(ch, out v); sent[ch] = v + n;
-                        if (note.Debt) { if (note.Arrears) _debtArrears += n; else _debtLimit += n; }
+                        if (note.Debt) { if (note.Arrears) _debtArrears += n; else _debtLimit += n; if (nearest) _debtNearest += n; }
                         else
                         {
                             if (party.IsGarrison) _homeGar += n; else _homePar += n;

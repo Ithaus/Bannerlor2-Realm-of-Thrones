@@ -195,6 +195,7 @@ namespace Armoury
         // ---- E8/Q (262): petla AI na zegarze gry (klucz CrossingLawAiClock; wylaczony = AiTick wyzej, jak dotad) ----
         private const float OuterRing = 8f;        // pas pamieci drogi wokol strefy: partia nie przejdzie go miedzy dwiema probkami godzinnymi (jak strefa E7/B)
         private const int EventLinesMax = 30;      // linie "CrossingLaw: AI ... zawrocone" na dobe (reszta tylko w liczniku linii doby)
+        private const int RepeatLinesMax = 10;     // drobne2 (Q-3, diagnoza): linie zawrocenia nr 3+ tej doby z celem AI - osobny limit na dobe
         private static readonly float[] RadialSteps = { 2f, 1f, 3f, 4f };   // punkt odwrotu prosto od zamku: promien strefy + tyle (pierwszy wazny; 2 = jak dotad)
 
         private struct Outside { public Vec2 Pos; public Settlement At; public int Stamp; }
@@ -210,7 +211,7 @@ namespace Armoury
         private static int _stamp, _stumbles, _stumblesDay;
         // liczniki doby (zerowane z linia "Straz przeprawy (E8/Q)")
         private static int _dPasses, _dNear, _dZone, _dTurned, _dFromMemory, _dBadPoint, _dBusy, _dSea, _dEscort, _dSiege, _dSleep, _dAiOff, _dCool;
-        private static int _dCross, _dCrossCool, _dEventLines, _dMissing;
+        private static int _dCross, _dCrossCool, _dEventLines, _dMissing, _dRepeatLines;
         private static long _dSeen, _ticks;
 
         private static bool ClockOn(Settings s) { return s != null && s.CrossingLawEnabled && s.CrossingLawAi && s.CrossingLawAiClock; }
@@ -224,7 +225,7 @@ namespace Armoury
         private static void DayReset()
         {
             _dPasses = _dNear = _dZone = _dTurned = _dFromMemory = _dBadPoint = _dBusy = _dSea = _dEscort = _dSiege = _dSleep = _dAiOff = _dCool = 0;
-            _dCross = _dCrossCool = _dEventLines = _dMissing = 0;
+            _dCross = _dCrossCool = _dEventLines = _dMissing = _dRepeatLines = 0;
             _dSeen = 0; _ticks = 0; _stumblesDay = 0;
             Array.Clear(_dTurnedAt, 0, _dTurnedAt.Length);
             _dayTurns.Clear();
@@ -337,6 +338,9 @@ namespace Armoury
             }
             if (!ok) { _dBadPoint++; return; }   // brak punktu na ladzie po tej stronie - bez rozkazu i bez przerwy (liczone)
             if (fromMem) _dFromMemory++;
+            // drobne2 (Q-3, diagnoza): cel AI przy 3. i kolejnym zawroceniu tej doby - odczyt PRZED rozkazem odwrotu (SetMoveGoToPoint zmienia zachowanie)
+            int c0; _dayTurns.TryGetValue(mp, out c0);
+            string aim = c0 + 1 >= 3 ? AiAim(mp) : null;
             mp.SetMoveGoToPoint(point, MobileParty.NavigationType.Default);
             _aiCooldown[mp] = CampaignTime.HoursFromNow(3f);
             _dTurned++; _dTurnedAt[k]++;
@@ -348,12 +352,28 @@ namespace Armoury
                 _aiShoutStock--;
                 Log.Player("The watch at " + st.Name + " turns back " + mp.Name + " - the crossing is barred to enemies.", false);
             }
-            if (_dEventLines < EventLinesMax)
+            bool rep = aim != null && _dRepeatLines < RepeatLinesMax;
+            if (rep || _dEventLines < EventLinesMax)
             {
-                _dEventLines++;
+                if (rep) _dRepeatLines++; else _dEventLines++;
                 Log.Info("CrossingLaw: AI " + mp.StringId + " zawrocone od " + st.StringId + " (E8/Q, zegar gry; " + (fromMem ? "tam, skad przyszla" : "prosto od zamku")
-                         + ", " + Math.Sqrt(d2).ToString("0.0", Inv) + " jedn. od przeprawy, zawrocenie nr " + (c + 1) + " tej doby, cooldown 3h).");
+                         + ", " + Math.Sqrt(d2).ToString("0.0", Inv) + " jedn. od przeprawy, zawrocenie nr " + (c + 1) + " tej doby, cooldown 3h" + (aim ?? "") + ").");
             }
+        }
+
+        /// <summary>drobne2 (Q-3, diagnoza): dokad AI prowadzi partie zawracana trzeci raz w dobie - zachowanie, osada celu (z frakcja), partia celu, armia.
+        /// Bieg dwuletni: lord_5_16_party_1 3-4 zawrocenia na dobe przez 6 dob (d514-519) i znow d529-530; po przerwie 3 h AI wybiera ten sam cel za mostem.</summary>
+        private static string AiAim(MobileParty mp)
+        {
+            try
+            {
+                var ts = mp.TargetSettlement; var tp = mp.TargetParty; var army = mp.Army;
+                string tsf = "-";
+                try { tsf = ts != null && ts.MapFaction != null && ts.MapFaction.Name != null ? ts.MapFaction.Name.ToString() : "-"; } catch { tsf = "?"; }
+                return "; cel AI (Q-3, diagnoza drobne2): zachowanie " + mp.DefaultBehavior + ", osada " + (ts != null ? ts.StringId + " (" + tsf + ")" : "-")
+                       + ", partia " + (tp != null ? tp.StringId : "-") + ", armia " + (army != null && army.LeaderParty != null ? army.LeaderParty.StringId + (army.LeaderParty == mp ? " (wodz)" : "") : "-");
+            }
+            catch { return "; cel AI: ?"; }
         }
 
         /// <summary>Partia idaca oblegac albo szturmowac TE przeprawe, albo idaca do wodza armii, ktory ja oblega lub idzie oblegac ("Oblezenie przeprawy jest

@@ -1168,6 +1168,27 @@ namespace Armoury
             catch (Exception e) { Stumble("OverflowVillage", e); return null; }
         }
 
+        /// <summary>drobne2 (K20, klucz DebtorHomeNearestVillage; tylko OverflowHome.SendHome dla dluznikow, gdy OverflowVillage nie dal wsi - rod bez twierdzy,
+        /// wsi i krolestwa): najblizsza wies swiata z danymi BK od pozycji partii. null - brak BK albo wyjatek (wtedy jak dotad: do puli).</summary>
+        internal static Settlement NearestPopVillage(MobileParty mp)
+        {
+            if (mp == null || !BkResolve()) return null;
+            try
+            {
+                var pos = mp.GetPosition2D;
+                Settlement best = null; float bd = float.MaxValue;
+                foreach (var vg in Village.All)
+                {
+                    var st = vg != null ? vg.Settlement : null;
+                    if (st == null || !HasPop(st)) continue;
+                    float d = pos.DistanceSquared(st.GetPosition2D);
+                    if (d < bd) { bd = d; best = st; }
+                }
+                return best;
+            }
+            catch (Exception e) { Stumble("NearestPopVillage", e); return null; }
+        }
+
         /// <summary>Wies, do ktorej wracaja zwolnieni: zaloga - wsie tej twierdzy; partia - najblizsza wies rodu; potem najblizsza wies krolestwa. Tylko z danymi BK.</summary>
         private static Settlement VillageFor(MobileParty mp, Settlement fortress, Clan c)
         {

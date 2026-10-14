@@ -87,6 +87,13 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki doby (zeruje DayLine)
         private static readonly double[] _dHit = new double[3], _dDays = new double[3];
+        // drobne2 (G5): trafieni od startu procesu (bez zerowania) i ich stan przy ostatniej linii doby - VillageBook liczy swoje okno od wlasnego zerowania
+        // (VillageBook.Daily biegnie w dobie PRZED Devastation.DayLine; uderzenie miedzy nimi szlo do dwoch roznych dob - bieg dwuletni d285/d286: 5.0 ludzi)
+        private static double _hitAll, _hitAtDayLine;
+        // drobne2 (G5, diagnoza): ksiega wiosek zamknela dobe (VillageBook.Daily), a DayLine jeszcze nie - kto wtedy uderza (najwyzej 3 linie ze stosem na sesje)
+        private static bool _bookClosed;
+        private static int _lateLines, _lateN;
+        private const int LateLinesMax = 3;
         private static readonly int[] _dFull = new int[3];
         private static readonly HashSet<string>[] _dVillages = { new HashSet<string>(), new HashSet<string>(), new HashSet<string>() };
         private static double _dDead, _dFled, _dAway, _dCapWould, _dSlaverHit, _dSlaverDead, _dGameHearth, _dGamePeople;
@@ -121,6 +128,8 @@ namespace Armoury
             _stumblesAll = 0; _abandonLogged = false;
             _stopOf.Clear();
             NewDay();
+            _hitAtDayLine = _hitAll;      // drobne2 (G5): nowa sesja - okno od teraz
+            _bookClosed = false; _lateLines = _lateN = 0;
         }
 
         internal static void NewDay()
@@ -323,7 +332,7 @@ namespace Armoury
             // pojmani przy uderzeniu = 0 na stale (E4/9: z konta UCHODZCY przy koncu rabunku); CapWould - plan pojmanych calego rabunku
             double h = hit * f;
             if (rs != null) { rs.Hit += h; rs.Dead += dead * f; rs.CapWould += h * capW; }
-            _dHit[kind] += h; _dDead += dead * f; _dFled += fled * f; _dAway += refugees * f; _dCapWould += h * capW;
+            _dHit[kind] += h; _hitAll += h; if (_bookClosed) NoteLate(v, h, kind); _dDead += dead * f; _dFled += fled * f; _dAway += refugees * f; _dCapWould += h * capW;
             if (slaver) { _dSlaverHit += h; _dSlaverDead += dead * f; }
             if (v.Settlement.StringId != null) _dVillages[kind].Add(v.Settlement.StringId);
             oDead = dead * f; oFled = fled * f; oRef = refugees * f;
@@ -826,6 +835,29 @@ namespace Armoury
 
         /// <summary>E4/11 (G5): trafieni rabunkiem i zerowaniem od ostatniej linii doby (zeruje DayLine; VillageBook.Daily czyta przed nia - to samo okno).</summary>
         internal static double HitToday { get { return _dHit[KRaid] + _dHit[KForage] + _dHit[KDist]; } }   // E7/R1: + rabunek osada po osadzie (ten sam VillageBook.OnStrike)
+        /// <summary>drobne2 (G5): trafieni od startu procesu (rosnie razem z HitToday, nie zeruje sie) - VillageBook odejmuje stan ze swojego zerowania.</summary>
+        internal static double HitAll { get { return _hitAll; } }
+        /// <summary>drobne2 (G5): HitAll w chwili ostatniego zerowania licznikow doby (DayLine) - uderzenia po linii ksiegi wiosek, a przed nim, to "spoznione".</summary>
+        internal static double HitAtDayLine { get { return _hitAtDayLine; } }
+        /// <summary>drobne2 (G5): VillageBook.Daily po swojej linii - od teraz do DayLine uderzenie trafia juz do nastepnej doby ksiegi wiosek (diagnoza: kto uderza).</summary>
+        internal static void BookClosed() { _bookClosed = true; }
+
+        /// <summary>drobne2 (G5, diagnoza): uderzenie miedzy linia ksiegi wiosek a linia spustoszenia tej samej doby - licznik i 3 linie ze stosem na sesje.</summary>
+        private static void NoteLate(Village v, double h, int kind)
+        {
+            try
+            {
+                _lateN++;
+                if (_lateLines >= LateLinesMax) return;
+                _lateLines++;
+                string nm = "?";
+                try { nm = v != null && v.Settlement != null ? v.Settlement.Name + " (" + v.Settlement.StringId + ")" : "-"; } catch { nm = "?"; }
+                Log.Info("Ludzie (spustoszenie): uderzenie po linii ksiegi wiosek, przed linia spustoszenia (G5, diagnoza drobne2) - wies " + nm + ", trafieni " + F(h, "0.##")
+                         + ", rodzaj " + (kind == KRaid ? "rabunek" : kind == KForage ? "zerowanie" : "rabunek osada po osadzie") + " | takich uderzen od wczytania " + _lateN
+                         + " (linia " + _lateLines + "/" + LateLinesMax + ") | stos: " + EnemyCaravans.StackText(3) + ".");
+            }
+            catch (Exception e) { Stumble("Devastation.NoteLate", e); }
+        }
 
         /// <summary>
         /// Spustoszenie wylaczone (MCM albo brak jednostki ludzi / przyrostu naturalnego / latek rabunku), a w ksiedze sa uchodzcy: wracaja do swoich wsi od razu
@@ -1054,7 +1086,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Devastation.DayLine", e); }
-            finally { NewDay(); }
+            finally { NewDay(); _hitAtDayLine = _hitAll; _bookClosed = false; }
         }
 
         // ------------------------------------------------------------ latki
