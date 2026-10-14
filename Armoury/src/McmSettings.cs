@@ -5648,6 +5648,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
 
+        [SettingPropertyBool("Flax Villages Without Climate Fix", HintText = "in a campaign begun with Goods Rates By Pattern, the flax villages stay flax villages even when Village Climate Fix is turned off: five of them (Berrybush, Lanthas, Sagora, Shirosi, Port Yhos) were cotton growers only because of that fix, and with it off they used to fall back to cattle, sheep and woodcutting for good - while the harvest of the world was still reckoned with them growing flax. Takes effect the next time a save is loaded. Off = as before (with Village Climate Fix off those five go back to the map's trade)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool FlaxVillagesWithoutClimateFix { get; set; } = true;
+
         [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
@@ -7063,6 +7067,7 @@ namespace Armoury
             s.LevyByPeople = LevyByPeople;
             s.MilitiaByPeople = MilitiaByPeople;
             s.GoodsRatesByPattern = GoodsRatesByPattern;
+            s.FlaxVillagesWithoutClimateFix = FlaxVillagesWithoutClimateFix;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
         }
 

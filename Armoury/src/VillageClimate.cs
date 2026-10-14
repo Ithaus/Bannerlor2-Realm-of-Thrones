@@ -356,6 +356,14 @@ namespace Armoury
             return "wycofane z tabeli (typ z mapy ROT): " + string.Join(", ", names.ToArray()) + " - " + bk.Summary();
         }
 
+        /// <summary>A14 / G22 (drobne2): typ z mapy ROT wsi, ktora T8 przestawia na `t8Type` (wiersz tabeli: id, typ z mapy, typ T8) - null, gdy wies nie jest w tabeli
+        /// albo T8 daje jej inny typ. Tylko odczyt tabeli (GoodsRates.Apply przy wylaczonym VillageClimateFix).</summary>
+        internal static string MapTypeBefore(string villageId, string t8Type)
+        {
+            foreach (var row in Table) if (row[0] == villageId && row[2] == t8Type) return row[1];
+            return null;
+        }
+
         private static VillageType Type(string id)
         {
             return MBObjectManager.Instance != null ? MBObjectManager.Instance.GetObject<VillageType>(id) : null;

@@ -151,6 +151,9 @@ namespace Armoury
                 var missing = new List<string>();
                 var delta = new SortedDictionary<string, int>(StringComparer.Ordinal);
                 var swapped = new Dictionary<string, string>(StringComparer.Ordinal);
+                var fromMap = new List<string>();   // G22: wsie z typem z mapy (T8 wylaczone) podmienione na len
+                var s0 = Settings.Current;
+                bool mapOk = s0 != null && s0.FlaxVillagesWithoutClimateFix && !s0.VillageClimateFix;
                 int n = 0;
                 if (swap)
                 {
@@ -165,12 +168,20 @@ namespace Armoury
                             var from = Type(row[1]);
                             if (from == null || flax == null) { missing.Add("typ " + row[1]); continue; }
                             if (curId == Flax) { already.Add(row[3]); bk.Align(st, row[3], from, cur); swapped[row[0]] = row[1]; n++; continue; }
-                            if (curId != row[1]) { other.Add(row[3] + " ma " + curId); continue; }   // ktos inny zmienil typ (albo T8 wylaczone) - nie ruszamy
+                            string fromId = row[1];
+                            if (curId != row[1])
+                            {
+                                // G22 (drobne2): T8 wylaczone - wies ma typ z mapy, z ktorego T8 robi typ tabeli; kampania zaczeta z kluczem trzyma len (P1 liczy g z lnem)
+                                string map = mapOk ? VillageClimate.MapTypeBefore(row[0], row[1]) : null;
+                                if (map == null || curId != map) { other.Add(row[3] + " ma " + curId); continue; }   // ktos inny zmienil typ (albo T8 wylaczone, G22 off) - nie ruszamy
+                                fromId = curId;
+                                fromMap.Add(row[3] + " " + curId);
+                            }
                             st.Village.VillageType = flax;
                             bk.Align(st, row[3], cur, flax);
-                            swapped[row[0]] = row[1];
-                            done.Add(row[3] + " (" + row[0] + ", " + row[2] + "): " + row[1] + " -> " + Flax);
-                            int v; delta.TryGetValue(row[1], out v); delta[row[1]] = v - 1;
+                            swapped[row[0]] = fromId;
+                            done.Add(row[3] + " (" + row[0] + ", " + row[2] + "): " + fromId + " -> " + Flax);
+                            int v; delta.TryGetValue(fromId, out v); delta[fromId] = v - 1;
                             n++;
                         }
                         catch (Exception e) { _stumbles++; if (_stumbles <= 3) Log.Error("GoodsRates.Apply(" + row[0] + ")", e); }
@@ -188,6 +199,8 @@ namespace Armoury
                          + " (stawka wsi solnych, kazda kampania, " + (KeyOn ? "czynna" : "wylaczona") + "); len - nowe wsie lniane: " + StateText() + "; "
                          + (swap ? "podmienione teraz " + done.Count + (done.Count > 0 ? " - " + string.Join("; ", done.ToArray()) : "") + (already.Count > 0 ? "; juz z lnem: " + string.Join(", ", already.ToArray()) : "")
                                  + (other.Count > 0 ? "; inny typ niz w tabeli (NIE ruszane): " + string.Join(", ", other.ToArray()) : "")
+                                 + "; z typu mapy (G22, Village Climate Fix wylaczone): " + fromMap.Count + (fromMap.Count > 0 ? " (" + string.Join(", ", fromMap.ToArray()) + ")" : "")
+                                 + (s0 != null && !s0.VillageClimateFix && !s0.FlaxVillagesWithoutClimateFix ? " [Flax Villages Without Climate Fix wylaczone - jak dotad]" : "")
                                  + "; bilans typow (dzis podmienione): " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "bez zmian")
                                : "bez podmian (typy z mapy)")
                          + (missing.Count > 0 ? "; brak w tej kampanii: " + string.Join(", ", missing.ToArray()) : "")
