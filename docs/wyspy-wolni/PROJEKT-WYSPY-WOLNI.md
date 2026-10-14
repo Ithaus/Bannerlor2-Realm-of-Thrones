@@ -28,7 +28,7 @@ Doba = dzien gry - 108836 + 1; rok 2 = d365-728. Kwoty: tys. zl na dobe, chyba z
 9. **Ich wojsko trzyma lud, nie zloto:** najwyzej 1.8% ludzi krainy (ok. 5 tys.; tyle mieli w pierwszym polroczu, gdy pieniadze ich jeszcze nie hamowaly - dzis 3.6 tys.).
    Zalogi najwyzej polowa tego, reszta w polu: druzyny z 0.7 do ok. 2.1 tys.
 10. **Jedzenie z lupu:** wodz Wolnych Ludzi werbuje tylko, gdy ma jedzenie na 8 dni (tyle gra wymaga do najazdu); jedzenie i zloto biora z najazdow na Dar, bitew i spichlerzy.
-11. **Nocna Straz bez zmian.** Ryzyko: wiecej Wolnych Ludzi w polu = wiecej bitew ze Straza (ma 2.5 tys. ludzi) i wiecej trupow dla Innych - test to mierzy.
+11. **Nocna Straz bez zmian.** Ciala: Wolni Ludzie i Straz pala poleglych - regula E4/2 (Jeff 07.10 "0% cial niespalonych", OthersRise.cs): w bitwie bez Innych wszystkie ciala sa palone; wstaja tylko polegli strony pokonanej przez Innych za Murem / przy Murze. Wiecej bitew Wolnych Ludzi ze Straza NIE daje Innym trupow; test mierzy tylko, czy Wolnych Ludzi nie ubywa za szybko w walkach z Innymi (wtedy ich polegli wstaja - jak w lore). [poprawka 14.10 po pytaniu Jeffa]
 12. **Najpierw dowod:** po dobie 405 Wyspy nie zrobily ani jednego najazdu, choc byly w wojnie. Nowa linia pokaze dlaczego (sila, jedzenie, armie, zasieg);
     poprawka na przyczyne - dopiero po tescie, nie na zapas.
 
