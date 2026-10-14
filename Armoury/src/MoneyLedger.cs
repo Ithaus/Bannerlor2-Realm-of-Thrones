@@ -81,13 +81,15 @@ namespace Armoury
         internal const int NTravel = 8;     // 36b: wedrowcy BK - kasa celu placi za towar, utarg do kasy pochodzenia
         internal const int NFolk = 9;       // E5/B1: kasy osad -> kiesy ludu poza tickiem dobowym (place warsztatu gracza z jego kiesy)
         internal const int NSack = 10;      // poprawka po audycie (obieg Z3): lup miast L2 - kasa kupcow (miasto, zamek) -> sakiewki ludzi i wodzowie zdobywcow (CitySack.Coin)
-        private const int Notes = 11;
+        internal const int NRansom = 11;    // okup zamiast szturmu (P10): kasa kupcow oblezonej osady -> sakiewki ludzi i wodzowie oblegajacych (SiegeRansom) - osobno od lupu
+        private const int Notes = 12;
         private static readonly string[] NName = { "zakupy sprzetu AI", "najemnicy z karczmy", "warsztaty zbrojne", "paser band (sprzet dla band)", "zold garnizonow", "sakiewki ludzi - zycie w miastach",
                                                    "odziez wojska",     // 150: sakiewki ludzi i kasy zamkow -> kasy miast
                                                    "zaopatrzenie BK z sakiewek ludzi (D11-4)",
                                                    "wedrowcy BK (36b): towar u celu, utarg do kasy pochodzenia",
                                                    "kiesy ludu poza tickiem dobowym (E5/B1): place warsztatu gracza z kiesy do ludu",
-                                                   "lup miast (L2): kasa kupcow -> sakiewki ludzi i wodzowie zdobywcow" };
+                                                   "lup miast (L2): kasa kupcow -> sakiewki ludzi i wodzowie zdobywcow",
+                                                   "okup oblezenia (O1): kasa kupcow -> sakiewki ludzi i wodzowie oblegajacych" };
 
         // nasz tick dobowy (Mark)
         internal const int MRent = 0, MBuild = 1, MCrown = 2, MRest = 3, MFence = 4, MLife = 5, MOrders = 6;   // MOrders: 174.2 kontrakty surowca (zakup karawan w zrodlach)

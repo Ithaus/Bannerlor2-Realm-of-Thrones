@@ -201,6 +201,7 @@ namespace Armoury
             try { CaravanFlow.EnsureHooks(); } catch (Exception e) { Stumble("CaravanFlow.EnsureHooks", e); }   // A1: limit karawan kupca (DefaultCaravanModel.CanHeroCreateCaravan)
             try { CapitalTreasury.EnsureHooks(); } catch (Exception e) { Stumble("CapitalTreasury.EnsureHooks", e); }   // L5b-1: okno szturmu (KingdomManager.SiegeCompleted) dla blizniakow ROT
             try { EnemyCaravans.EnsureHooks(); } catch (Exception e) { Stumble("EnemyCaravans.EnsureHooks", e); }       // L5b-2: karawany wroga w zdobytym miescie (KingdomManager.SiegeCompleted)
+            try { SiegeRansom.EnsureHooks(); } catch (Exception e) { Stumble("SiegeRansom.EnsureHooks", e); }           // okup zamiast szturmu: decyzja gry o szturmie (BesiegerCamp) i reszta latek okupu
             var s = Settings.Current;
             Log.Info("Szczelnosc (164a): latki w kampanii - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-")

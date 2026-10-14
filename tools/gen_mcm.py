@@ -215,6 +215,10 @@ RANGES = {
     # RP (decyzja Jeffa 14.10): co ile poziomow punkt cechy (0 = gra) i dodatkowe skupienie (0 = wylaczone); kod przycina do 0..62 (LevelPoints.Every)
     'AttributePointEveryLevels': (0, 12, "0"),
     'ExtraFocusEveryLevels': (0, 12, "0"),
+    # okup zamiast szturmu (SiegeRansom): czesc monety przycinana do 0..1 (SiegeRansom.Share), prog krwawego szturmu >= 0 (BloodyRatio; 0 = powod wylaczony)
+    'SiegeRansomShare': (0.0, 1.0, "0.000"),
+    'SiegeRansomBloodyRatio': (0.0, 5.0, "0.00"),
+    'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
 }
 
 def gen(module_dir, ns, display):

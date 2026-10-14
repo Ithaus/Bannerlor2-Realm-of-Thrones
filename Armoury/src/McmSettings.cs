@@ -5684,6 +5684,34 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SiegeCaravansStayInWalls { get; set; } = true;
 
+        [SettingPropertyBool("Siege Ransom Measure Log", HintText = "Writes a log line each time a besieging lord decides to storm a town or castle: the coin lying in it, the ransom it could pay, his army's daily pay, the besiegers' strength against what the walls make of the defenders, whether his army is short of pay, and whether the town would pay and the lord would take it. Log only - nothing in the game changes")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomMeasureLog { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Ransom Share", 0.000f, 1.000f, "0.000", HintText = "the ransom a besieged town or castle pays to see the besiegers gone: this part of every coin lying in it - the merchants' coin and the townsfolk's purses alike (a quarter; a sack takes a third or two thirds). No ransom when it would be less than one day's pay of the besieging army")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SiegeRansomShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Siege Ransom Bloody Ratio", 0.00f, 5.00f, "0.00", HintText = "a besieging lord takes a ransom instead of storming when the assault would be bloody: his strength is less than this many times what the walls make of the defenders (the game's own reckoning, without its dice; 0 = this reason never counts). He also takes it when his army is short of pay or an assault on these walls has already failed")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SiegeRansomBloodyRatio { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Siege Ransom Ai", HintText = "a town or castle about to be stormed may buy the besiegers off: when the walls will not hold and a quarter of all its coin (Siege Ransom Share) is worth at least a day's pay of the besieging army, the town offers it, and a lord takes it when his army is short of pay, when an assault on these walls has already failed, or when the assault would be bloody (Siege Ransom Bloody Ratio). The ransom is shared like plunder - two thirds to the soldiers' purses, a third to the captains, of which the crown claims its third - and the besiegers leave and do not besiege that place again for Siege Ransom Truce Days. Never at a realm's capital, at the places of the great sieges of the story, by or against the Others. Off = every assault goes ahead as before")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomAi { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Ransom Truce Days", 0, 364, "0", HintText = "with Siege Ransom Ai: the days a realm whose army took a ransom will not besiege that town or castle again (0-364)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SiegeRansomTruceDays { get; set; } = 60;
+
+        [SettingPropertyBool("Siege Ransom Player Defender", HintText = "when besiegers are about to storm a town or castle of yours, or one you are in, and would take a ransom, you are asked first: pay them a quarter of the town's coin (its merchants' and townsfolk's, not yours) to lift the siege for Siege Ransom Truce Days, or refuse and face the assault. If you cannot answer within a day (in battle, in a conversation, in captivity), the town decides as any other would and you get word of it. Off = your towns decide like the others and you only get word")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomPlayerDefender { get; set; } = true;
+
+        [SettingPropertyBool("Siege Ransom Player Besieger", HintText = "when you command a siege and your engines are ready, you may demand a ransom instead of storming: if the walls would not hold against you and a quarter of the town's coin is worth at least a day's pay of your army, its people offer it - your men put two thirds in their purses, you take a third (the crown claims its third of yours) - and you lift the siege and may not besiege that place again for Siege Ransom Truce Days. Never at a realm's capital or the places of the great sieges of the story. Off = no such option")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomPlayerBesieger { get; set; } = true;
+
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool PeopleScaleDryRun { get; set; } = true;
@@ -7156,6 +7184,13 @@ namespace Armoury
             s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.EnemyCaravansSiegeTrapped = EnemyCaravansSiegeTrapped;
             s.SiegeCaravansStayInWalls = SiegeCaravansStayInWalls;
+            s.SiegeRansomMeasureLog = SiegeRansomMeasureLog;
+            s.SiegeRansomShare = SiegeRansomShare;
+            s.SiegeRansomBloodyRatio = SiegeRansomBloodyRatio;
+            s.SiegeRansomAi = SiegeRansomAi;
+            s.SiegeRansomTruceDays = SiegeRansomTruceDays;
+            s.SiegeRansomPlayerDefender = SiegeRansomPlayerDefender;
+            s.SiegeRansomPlayerBesieger = SiegeRansomPlayerBesieger;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;

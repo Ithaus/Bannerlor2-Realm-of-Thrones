@@ -190,6 +190,21 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>Okup zamiast szturmu (SiegeRansom, P7): osada jest TERAZ stolica krolestwa swojego pana (ta sama stolica co L5b-1: BK, bez BK poczatkowa siedziba).
+        /// Tylko odczyt; wyjatek = false (licznik potkniec L5b-1).</summary>
+        internal static bool IsCapital(Settlement st)
+        {
+            try
+            {
+                var k = st != null ? st.MapFaction as Kingdom : null;
+                if (k == null || k.IsEliminated) return false;
+                string src;
+                var cap = CapitalOf(k, out src);
+                return cap != null && ReferenceEquals(cap, st);
+            }
+            catch (Exception e) { Stumble("IsCapital", e); return false; }
+        }
+
         // ------------------------------------------------------------ zdarzenie: zmiana pana
         /// <summary>Nasluch OnSettlementOwnerChangedEvent (ArmouryBehavior.RegisterEvents, po KingdomBalance). Nie rzuca.</summary>
         internal static void OnOwnerChanged(Settlement st, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturer,
