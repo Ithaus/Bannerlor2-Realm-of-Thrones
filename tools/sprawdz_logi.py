@@ -572,6 +572,14 @@ Uzycie (Python 3, tylko odczyt):
                     SZ-A9b-0 klucz [WL x3.00] w linii E8/Z, SZ-A9b-1 kupione ponad sufit 0 i p90 cena / wartosc (wiersze AiGear E8/P2) <= sufit,
                     SZ-A9b-2 pokrycie korpusu zalog (171) w ostatniej dobie okna >= baza - 3 pkt, SZ-A9b-3 INFO (zloto zakupow brakow, zamowienia, siodla/d).
                     Log sprzed wlaczenia: wiersze kluczy NIE / INFO, bez wyjatku.
+--grupa tb        : (galaz w-toku/strzaly-myto 14.10) python -I tools/sprawdz_logi.py --grupa tb [--do-doby 120] <Armoury-*.log>
+                    Strzaly AI (AiAmmoOrderFull, AmmoOrders.cs): TB-A-0 linia 'Amunicja AI - zamowienia (tb)' z [WL] w kazdej dobie, TB-A-1 pokrycie strzal
+                    partii rodow AI (171) w ostatniej linii okna >= W50 - 15 pkt (59%), TB-A-2 INFO zakupy amunicji lordow i zuzycie wobec fin27 / W53,
+                    TB-A-3 mediana indeksu ceny strzal srednio <= 1.5 i najwyzej <= 2.5, TB-A-4 strzaly na polkach >= 50% W50 i miasta bez strzal <= 5,
+                    TB-A-5 zamowienia ponad dawne 10 > 0, TB-A-6 INFO rece strzelarzy, TB-A-7 potkniecia 0, TB-A-8 INFO amunicja weteranow C3 wobec zuzycia AI.
+                    Myto B3 (TwinsToll, TwinsCrossing.cs): TB-B3-0 linia 'Myto Bliznakow (B3)' z [WL] w kazdej dobie licznika E7/B, TB-B3-1 roznica obiegu 0
+                    w kazdej dobie, TB-B3-2 zaplacone > 0 i <= 1.05 x 'myto gdyby bylo', TB-B3-3 INFO kto placi / Frey % D (budzet-rodow.csv),
+                    TB-B3-4 INFO przejsc na dobe, TB-B3-5 potkniecia 0, TB-B3-6 INFO komunikaty gracza (reczny). Log bez galezi: INFO, bez wyjatku.
 --grupa plotno    : (plotno 14.10, docs/pytania-2026-10-14/RAPORT-plotno.md poprawki 1 i 2; klucze FolkClothAboveReserve, WeaverExportPrice) zbytki ludu nie kupuja
                     plotna ani skory ponizej zapasu polki, tkacz tka tez na wywoz. python -I tools/sprawdz_logi.py --grupa plotno [--do-doby 120] <Armoury-*.log>
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
@@ -22175,6 +22183,185 @@ def rok2_main(logp, start_arg, until=120, basep=None):
     return 0
 
 
+# ---- grupa tb (galaz w-toku/strzaly-myto 14.10: strzaly AI - zamowienie amunicji na caly brak (AiAmmoOrderFull), B3 myto na Bliznakach (TwinsToll))
+TB_AMMO_LINE = "Amunicja AI - zamowienia (tb): dzien"
+TB_TOLL_LINE = "Myto Bliznakow (B3): dzien"
+TB_TWINS_LINE = "Przeprawa Bliznaki (E7/B): dzien"
+# odniesienia 120 dob (logi D:\Backup-Bannerlord\logs\2026-10-14-noc): pokrycie strzal lordow AI d120, zakupy amunicji lordow (174b) i zeszlo (E8/W) na dobe,
+# rece strzelarzy zajete (srednia d1-120) - fin27 (W53 + C3-C5, Armoury-2026-10-14_03-56-00.log) i W53 fin26 (Armoury-2026-10-14_03-24-46.log)
+TB_REF = {"fin27": {"cov": 52, "buy": 268, "used": 172, "busy": 23.1}, "W53": {"cov": 59, "buy": 249, "used": 154, "busy": 26.3}}
+
+
+def tb_main(logp, start_arg, until=120):
+    """Grupa tb (galaz w-toku/strzaly-myto): TB-A-* strzaly AI (AmmoOrders.cs, klucz AiAmmoOrderFull), TB-B3-* myto na Bliznakach (TwinsCrossing.cs, klucz
+    TwinsToll). Okno: doby kampanii 1-until (--do-doby), start kampanii jak szybkie_main. Brak linii = INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    bk = 120 if until <= 240 else 364
+    base = SZ_BASE[bk]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 1-{until} | baza W50 1-{bk} (SZ_BASE), odniesienia fin27 / W53 (120 dob)")
+
+    def win(prefix):
+        return {d: s for d, s in by_day(lines, prefix).items() if 1 <= run_day(d, start) <= until}
+
+    def mean(v):
+        return sum(v) / len(v) if v else 0.0
+
+    # ---------------- A: strzaly AI
+    try:
+        al = win(TB_AMMO_LINE)
+        on = sorted(d for d in al if "[WL caly brak" in al[d])
+        if not al:
+            rep.add("TB-A-0: linia 'Amunicja AI - zamowienia (tb)' z kluczem AiAmmoOrderFull", "brak linii w oknie (log sprzed tb)", "INFO", None)
+        else:
+            rep.add("TB-A-0: linia 'Amunicja AI - zamowienia (tb)' z kluczem AiAmmoOrderFull", f"[WL caly brak] {len(on)} z {len(al)} dob",
+                    "[WL] w kazdej dobie okna (W CIENIU = klucz wylaczony)", len(on) == len(al))
+        cvl = win(E8_Z_COVER)
+        ac = None
+        for d in sorted(cvl, reverse=True):
+            m = re.search(r"partie rodow AI \(\d+ ludzi\):.*?strzaly (\d+)%, belty (\d+)%", cvl[d])
+            if m:
+                ac = (run_day(d, start), int(m.group(1)), int(m.group(2)))
+                break
+        if ac:
+            rep.add("TB-A-1: pokrycie strzal partii rodow AI (Pokrycie zbrojowni AI 171) w ostatniej linii okna; belty INFO",
+                    f"strzaly {ac[1]}%, belty {ac[2]}% (doba {ac[0]}); W50 {base['arr_cov']}% / {base['bolt_cov']}%, W53 {TB_REF['W53']['cov']}%, fin27 {TB_REF['fin27']['cov']}%",
+                    f"strzaly >= W50 - 15 pkt ({base['arr_cov'] - 15}%) - prog SZ-A9a-4", ac[1] >= base["arr_cov"] - 15)
+        else:
+            rep.add("TB-A-1: pokrycie strzal partii rodow AI", "brak linii Pokrycie zbrojowni AI (171) w oknie", "INFO", None)
+        buys = {}
+        for d, s in win("ZakupyAI wedlug kupujacego (174b): dzien").items():
+            buys[d] = num(r"- lordowie \[[^\]]*?amunicja (\d+)/\d+ zl", s, default=0)
+        wl = win(E8_W_LINE)
+        used = {d: num(r"amunicja AI \[[^\]]*\]: zeszlo (\d+) szt", s, default=0) for d, s in wl.items()}
+        rep.add("TB-A-2: amunicja - zakupy lordow AI (174b) i zuzycie AI po bitwach (E8/W) na dobe, srednia okna",
+                (f"zakupy {mean(list(buys.values())):.0f}/d, zeszlo {mean(list(used.values())):.0f}/d (stosunek "
+                 + (f"{mean(list(buys.values())) / mean(list(used.values())):.2f}" if used and mean(list(used.values())) > 0 else "-")
+                 + f"); fin27 {TB_REF['fin27']['buy']} / {TB_REF['fin27']['used']}, W53 {TB_REF['W53']['buy']} / {TB_REF['W53']['used']}"),
+                "INFO (oczekiwane: zakupy rosna wobec fin27 przy podobnym zuzyciu)", None)
+        fl = win("Strzelarze (172): dzien")
+        idx = [v for v in (num(r"mediana indeksu ceny strzal ([0-9.]+)", s, cast=float) for s in fl.values()) if v is not None]
+        if idx:
+            rep.add("TB-A-3: cena strzal - mediana indeksu ceny strzal (Strzelarze 172), srednia i najwyzej w oknie",
+                    f"srednio {mean(idx):.2f}, najwyzej {max(idx):.2f} ({len(idx)} dob); fin27 srednio 1.1, W53 1.2 (najwyzej 1.52)",
+                    "srednio <= 1.5 i najwyzej <= 2.5 (zamowienia nie rozkrecaja ceny)", mean(idx) <= 1.5 and max(idx) <= 2.5)
+        else:
+            rep.add("TB-A-3: cena strzal", "brak linii Strzelarze (172) w oknie", "INFO", None)
+        aw = {d: v for d, v in e8w_arrows(lines).items() if 1 <= run_day(d, start) <= until}
+        oa = win("Miasta bez rudy i strzal (174b): dzien")
+        noarr = num(r"bez strzal (\d+) \[", oa[max(oa)]) if oa else None
+        if aw:
+            d = max(aw)
+            rep.add("TB-A-4: strzaly na polkach miast (Rynek broni) w ostatniej dobie okna; miasta bez strzal (174b)",
+                    f"strzaly {aw[d]} (doba {run_day(d, start)}) wobec W50 {base['arrows']}; miasta bez strzal " + ("-" if noarr is None else str(noarr)),
+                    f"strzaly >= 50% W50 ({int(0.5 * base['arrows'])}) i miasta bez strzal <= 5 (armie nie wykupuja polek do zera)",
+                    aw[d] >= 0.5 * base["arrows"] and (noarr is None or noarr <= 5))
+        else:
+            rep.add("TB-A-4: strzaly na polkach", "brak linii Rynek broni w oknie", "INFO", None)
+        if on:
+            over = sum(num(r"lordowie AI: [^|]*?ponad dawne 10: (\d+)\)", al[d], default=0) for d in on)
+            vs = sum(num(r"lordowie AI: wizyt \d+, z brakiem amunicji po zakupach (\d+)", al[d], default=0) for d in on)
+            vv = sum(num(r"lordowie AI: wizyt (\d+)", al[d], default=0) for d in on)
+            emp = sum(num(r"lordowie AI: [^|]*?polka bez tego tieru i nizszego (\d+) koszykow", al[d], default=0) for d in on)
+            left = sum(num(r"lordowie AI: [^|]*?na polce zostala sztuka \(budzet albo limit sztuk wizyty\) (\d+) koszykow", al[d], default=0) for d in on)
+            opn = num(r"otwarte zamowienia w osadach: strzaly (\d+) szt", al[max(on)])
+            rep.add("TB-A-5: zamowienia amunicji ponad dawne 10 szt. (lordowie AI, suma okna) - regula dziala",
+                    (f"ponad 10: {over} szt.; wizyt lordow {vv}, z brakiem amunicji po zakupach {vs}; koszyki z pusta polka {emp}, z sztuka na polce (budzet / limit) {left}; "
+                     f"otwarte zamowienia strzal w ostatniej dobie {opn} szt."),
+                    "ponad 10 > 0 (koszyki 'sztuka na polce' - INFO: braki z budzetu albo limitu sztuk, nie z polki)", over > 0)
+            st = num(r"\| potkniecia (\d+)\.", al[max(on)], default=0)
+            rep.add("TB-A-7: potkniecia AmmoOrders (ostatnia linia okna)", str(st), "0", st == 0)
+        else:
+            rep.add("TB-A-5: zamowienia amunicji ponad 10", "klucz w cieniu albo brak linii", "INFO", None)
+        # recenzja tb: TB-A-8 INFO - amunicja w kompletach weteranow C3 (linia tb, "weterani C3"): wzieta ze zbrojowni partii rodow AI na dobe wobec zuzycia AI (E8/W)
+        vet = [d for d in al if "weterani C3 (tylko licznik)" in al[d]]
+        if vet:
+            vl = mean([num(r"weterani C3 \(tylko licznik\): amunicja ze zbrojowni partii rodow AI (\d+) szt", al[d], default=0) for d in vet])
+            vh = mean([num(r"najem z puli (\d+) szt", al[d], default=0) for d in vet])
+            vm = mean([num(r"z puli na polki (\d+) szt", al[d], default=0) for d in vet])
+            vp = num(r"w pulach karczm teraz (\d+) szt", al[max(vet)], default=0)
+            um = mean([used[d] for d in vet if d in used]) if used else 0.0
+            rep.add("TB-A-8: weterani C3 - strzaly i belty ze zbrojowni partii rodow AI na dobe (linia tb) wobec zuzycia AI po bitwach (E8/W)",
+                    f"wzieli {vl:.1f}/d, najem z puli {vh:.1f}/d, z puli na polki {vm:.1f}/d, w pulach karczm na koniec {vp}; zuzycie AI {um:.0f}/d"
+                    + (f" (C3 = {100.0 * vl / um:.0f}% zuzycia)" if um > 0 else ""),
+                    "INFO (autor tb szacowal ok. 15/d = ok. 1/10 zuzycia; powyzej 1/3 zuzycia - C3 do rozpatrzenia: amunicja jako zapas pana)", None)
+        else:
+            rep.add("TB-A-8: weterani C3 - amunicja", "brak licznika w linii tb (log sprzed recenzji tb)", "INFO", None)
+        busy = [v for v in (num(r"rece: zajete [0-9.]+ z [0-9.]+ roboczodni \((\d+)%\)", s) for s in fl.values()) if v is not None]
+        rep.add("TB-A-6: rece strzelarzy zajete (Strzelarze 172), srednia okna", f"{mean(busy):.1f}% ({len(busy)} dob); fin27 {TB_REF['fin27']['busy']}%, W53 {TB_REF['W53']['busy']}%",
+                "INFO (oczekiwane: wiecej niz fin27 - strzelarze robia na zamowienia armii)", None)
+    except Exception as e:
+        rep.add("blok TB-A", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+
+    # ---------------- B3: myto na Bliznakach
+    try:
+        tl = win(TB_TOLL_LINE)
+        tw = win(TB_TWINS_LINE)
+        twc = {d: s for d, s in tw.items() if "| przejsc " in s}
+        on = sorted(d for d in tl if "| [WL]" in tl[d])
+        if not tl:
+            rep.add("TB-B3-0: linia 'Myto Bliznakow (B3)' z kluczem TwinsToll", "brak linii w oknie (log sprzed B3)", "INFO", None)
+        else:
+            rep.add("TB-B3-0: linia 'Myto Bliznakow (B3)' z kluczem TwinsToll w dobach licznika E7/B", f"[WL] {len(on)} z {len(twc)} dob licznika (linii B3 {len(tl)})",
+                    "[WL] w kazdej dobie z linia przejsc E7/B", len(on) == len(twc) and len(on) > 0)
+        if on:
+            diff = [num(r"roznica (-?\d+) \|", tl[d], default=0) for d in on]
+            bad = sum(1 for v in diff if v != 0)
+            rep.add("TB-B3-1: kontrola obiegu myta - z kies platnikow = do kiesy pana (roznica w kazdej dobie)",
+                    f"dob z roznica != 0: {bad} z {len(on)} (suma {sum(diff)} zl)", "0 (przelew, nic z niczego)", bad == 0)
+            paid = sum(num(r"\| zaplacilo \d+ partii: (\d+) zl", tl[d], default=0) for d in on)
+            npay = sum(num(r"\| zaplacilo (\d+) partii", tl[d], default=0) for d in on)
+            would = sum(num(r"myto gdyby bylo (\d+) zl", twc[d], default=0) for d in on if d in twc)
+            rep.add("TB-B3-2: myto zaplacone w oknie wobec 'myto gdyby bylo' (E7/B, te same doby)",
+                    f"zaplacone {paid} zl od {npay} partii ({paid / max(1, len(on)):.0f} zl/d); gdyby bylo {would} zl",
+                    "zaplacone > 0 i <= 1.05 x gdyby bylo (zwolnieni i sufit dnia kosztu tylko obnizaja; 5% - przejscia miedzy probkami)",
+                    paid > 0 and paid <= 1.05 * would)
+            kinds = {}
+            for kname in ("karawany", "wozy wsi", "obce rody", "gracz", "inne"):
+                kinds[kname] = (sum(num(kname + r" (\d+)/\d+ zl", tl[d], default=0) for d in on), sum(num(kname + r" \d+/(\d+) zl", tl[d], default=0) for d in on))
+            cut = sum(num(r"uciete do dnia kosztu (\d+) razy", tl[d], default=0) for d in on)
+            short = sum(num(r"nie stac na cale (\d+) razy", tl[d], default=0) for d in on)
+            ex = [sum(num(p, tl[d], default=0) for d in on) for p in (r"rody krolestwa pana (\d+)", r"karawany i wozy rodu pana (\d+)", r"bandy i umarli (\d+)[ ,]",
+                                                                  r"w wojnie z panem (\d+)")]
+            lost = sum(num(r"w tym przejscia miedzy probkami (\d+)", tl[d], default=0) for d in on)
+            frey = ""
+            try:
+                rows = read_csv(csv_path_of(logp))
+                fr = [r for r in rows if r.get("rod_id") == "clan_empire_north_3" or r.get("rod") == "Frey"]
+                if fr:
+                    dval = float(fr[-1].get("D") or 0)
+                    frey = f"; rod Frey D {dval:.0f} zl/d -> myto {100.0 * paid / max(1, len(on)) / dval:.1f}% D" if dval > 0 else ""
+            except Exception:
+                frey = ""
+            rep.add("TB-B3-3: kto placi (partii / zl w oknie), ucinanie do dnia kosztu, puste kiesy, zwolnieni",
+                    ("; ".join(f"{k} {v[0]}/{v[1]} zl" for k, v in kinds.items()) + f" | uciete {cut}, nie stac {short}, przejscia miedzy probkami {lost}"
+                     + f" | zwolnieni: krolestwo pana {ex[0]}, karawany i wozy pana {ex[1]}, bandy i umarli {ex[2]}, w wojnie z panem {ex[3]} (recenzja tb)" + frey),
+                    "INFO (projekt: karawany ok. 60-80 zl za przejscie, wozy wsi ok. 1 zl od czlowieka, obce rody rzadko)", None)
+        else:
+            rep.add("TB-B3-1: kontrola obiegu myta", "klucz w cieniu albo brak linii", "INFO", None)
+        n = [num(r"\| przejsc (\d+)", twc[d], default=0) for d in twc]
+        rep.add("TB-B3-4: przejsc mostem na dobe (E7/B), srednia okna", f"{mean(n):.2f}/d ({len(n)} dob); fin27 4.22, fin29 4.98, dwuletni W50 5.45",
+                "INFO (myto nikogo nie zawraca - ruch jak bez myta, rozrzut kampanii)", None)
+        stum = sum(num(r"\| potkniecia dzis (\d+)", tw[d], default=0) for d in tw)
+        rep.add("TB-B3-5: potkniecia licznika i myta (E7/B, suma okna)", str(stum), "0", stum == 0)
+        rep.add("TB-B3-6: komunikaty gracza przy przejsciu (myto, zwolnienie) i dobowy dla pana Bliznakow", "autotest nie przechodzi mostem graczem",
+                "INFO (reczny test Jeffa: przejsc mostem obcym oddzialem - komunikat 'Toll at the Twins: ...')", None)
+    except Exception as e:
+        rep.add("blok TB-B3", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -22273,6 +22460,8 @@ def main(argv):
         return zbytki_main(logp, start_arg, until_arg, bdp)   # P3-P5: lista dostatku, targ widzi sakiewke, podzamcza i wsie na targu miasta (--baza-doby: bieg bez P4 do progu 18)
     if group == "szybkie" and logp:
         return szybkie_main(logp, start_arg, until_arg)   # szybkie wlaczenia 14.10: A8 udzial polki koni 40%, A9 amunicja AI i sufit ceny 3.0
+    if group == "tb" and logp:
+        return tb_main(logp, start_arg, until_arg)   # tb (w-toku/strzaly-myto): strzaly AI - zamowienie amunicji na caly brak (AiAmmoOrderFull), B3 myto na Bliznakach (TwinsToll)
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group == "rok2" and logp:

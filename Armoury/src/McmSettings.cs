@@ -4332,6 +4332,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoUse { get; set; } = true;
 
+        [SettingPropertyBool("Ai Ammo Order Full", HintText = "when a lord's men, a garrison or your own smith leave a market still short of arrows or bolts and none of the right kind is left on the stall, the order they leave with the town's fletchers is for all they still lack (up to Supply Demand Order Cap), not just 10 - the fletchers see what the armies really need and work their idle hands while it pays (off = at most 10 of a kind from one visit, as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiAmmoOrderFull { get; set; } = true;
+
         [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool AiSkipFineGoods { get; set; } = true;
@@ -5531,6 +5535,10 @@ namespace Armoury
         [SettingPropertyBool("Twins Crossing Count", HintText = "counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
+
+        [SettingPropertyBool("Twins Toll", HintText = "the lord of the Twins takes a toll at his bridge: 2 denars a man (prisoners too) and 1 a beast, never more than one day of that party's wages - what the long way round would cost it; merchants, village carts, lords of other realms and you pay it into his purse, while lords of his own realm, his own caravans and carts and outlaws cross free, and no toll is asked of those at war with him. Needs Twins Crossing Count (off = nobody pays, the toll is only counted)")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool TwinsToll { get; set; } = true;
 
         [SettingPropertyInteger("Village Raid Messages", 0, 2, "0", HintText = "who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
@@ -6882,6 +6890,7 @@ namespace Armoury
             s.AiWearByIntensity = AiWearByIntensity;
             s.AiMendQueueContinue = AiMendQueueContinue;
             s.AiAmmoUse = AiAmmoUse;
+            s.AiAmmoOrderFull = AiAmmoOrderFull;
             s.AiSkipFineGoods = AiSkipFineGoods;
             s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
@@ -7182,6 +7191,7 @@ namespace Armoury
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
             s.TwinsCrossingCount = TwinsCrossingCount;
+            s.TwinsToll = TwinsToll;
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;
             s.VillageTipLore = VillageTipLore;

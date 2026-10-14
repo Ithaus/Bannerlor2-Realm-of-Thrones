@@ -167,16 +167,35 @@ namespace Armoury
         // do sufitu 60, a cena polki szla na x4. Teraz jeden kupiec zamawia dany rodzaj (miasto x typ x tier) raz na
         // SupplyDemandOrderRepeatDays dni - zamowienie to potrzeba, nie licznik prob.
         private static readonly Dictionary<string, int> _onceSeen = new Dictionary<string, int>();
-        internal static void NoteUnmetOnce(object who, Settlement market, ItemObject.ItemTypeEnum type, int tier, float n)
+        // tb (AmmoOrders): zwraca, czy zamowienie weszlo (false - ten kupiec zamowil ten rodzaj w tym miescie w ostatnich SupplyDemandOrderRepeatDays dobach) - tylko licznik
+        internal static bool NoteUnmetOnce(object who, Settlement market, ItemObject.ItemTypeEnum type, int tier, float n)
         {
-            if (who == null || market == null || n <= 0f) return;
+            if (who == null || market == null || n <= 0f) return false;
             int day = (int)CampaignTime.Now.ToDays, last;
             string k = who.GetHashCode() + "|" + Key(market, type, Math.Max(1, Math.Min(6, tier)));
-            if (_onceSeen.TryGetValue(k, out last) && day - last < Math.Max(1, Settings.Current.SupplyDemandOrderRepeatDays)) return;
+            if (_onceSeen.TryGetValue(k, out last) && day - last < Math.Max(1, Settings.Current.SupplyDemandOrderRepeatDays)) return false;
             _onceSeen[k] = day;
             if (_onceSeen.Count > 20000) _onceSeen.Clear();
             NoteUnmet(market, type, tier, n);
             if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteUnmet(type);   // 172: "AI bez towaru" (tylko licznik)
+            return true;
+        }
+
+        /// <summary>tb (AmmoOrders, tylko log): otwarte zamowienia jednego typu we wszystkich osadach (sztuk i koszykow) - klucz "osada|typ|tier".</summary>
+        internal static float OpenOrders(ItemObject.ItemTypeEnum type, out int baskets)
+        {
+            baskets = 0;
+            float sum = 0f;
+            string ty = "|" + ((int)type).ToString(System.Globalization.CultureInfo.InvariantCulture) + "|";
+            foreach (var kv in _unmet)
+            {
+                int a = kv.Key.LastIndexOf('|');
+                if (a <= 0) continue;
+                int b = kv.Key.LastIndexOf('|', a - 1);
+                if (b < 0 || string.CompareOrdinal(kv.Key, b, ty, 0, ty.Length) != 0) continue;
+                sum += kv.Value; baskets++;
+            }
+            return sum;
         }
 
         internal static float Demand(Settlement st, ItemObject it)

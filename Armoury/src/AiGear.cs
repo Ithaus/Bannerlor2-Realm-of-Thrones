@@ -40,7 +40,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
-        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); }   // E8/Z (251): liczniki regul zakupow AI
+        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); AmmoOrders.Reset(); }   // E8/Z (251): liczniki regul zakupow AI; tb: liczniki zamowien amunicji
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
@@ -397,6 +397,7 @@ namespace Armoury
         internal static void BardingDaily()
         {
             AiBuyRules.Daily();   // E8/Z (251): linia doby "Zakupy i nadwyzki AI (E8/Z)" - ten sam takt co linia "Uprzaz (215)" (ma wlasny try)
+            AmmoOrders.Daily();   // tb: linia doby "Amunicja AI - zamowienia (tb)" - ten sam takt (ma wlasny try)
             try
             {
                 int shelf = SupplyDemand.HarnessOnShelves;
@@ -1018,12 +1019,18 @@ namespace Armoury
                                 if (lines.Count > 0) { GarrisonCarts.Place(st, market, st.OwnerClan, lines, paid, dist, pieces >= maxPieces, budgetStop, pursePaid); where += " i zamowienie z " + market.Name; }
                             }
                             int unmet = 0;
+                            bool ammoShort = false;   // tb (AmmoOrders): tylko licznik
                             foreach (var kv in need)
                             {
                                 if (kv.Value <= 0) continue;
                                 var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                                if (!OnShelf(market, ty, tr, mp)) { SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, Math.Min(10, kv.Value)); unmet++; }
+                                bool onShelf = OnShelf(market, ty, tr, mp), ordered = false;
+                                float amt = 0f;
+                                // tb (AiAmmoOrderFull): strzaly i belty - zamowienie na caly brak (najwyzej SupplyDemandOrderCap); reszta i klucz wylaczony - 10 jak dotad
+                                if (!onShelf) { amt = AmmoOrders.Amount(ty, kv.Value); ordered = SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, amt); unmet++; }
+                                if (AmmoOrders.IsAmmo(ty)) { ammoShort = true; AmmoOrders.NoteBasket(AmmoOrders.WCastle, kv.Value, onShelf, ordered, amt); }
                             }
+                            AmmoOrders.NoteVisit(AmmoOrders.WCastle, ammoShort);
                             if (unmet > 0) GarrisonCarts.NoteUnmet(unmet);
                         }
                     }
@@ -1034,12 +1041,19 @@ namespace Armoury
                     // wpis 81: tylko gdy na polce NIE MA zadnej sztuki tego typu i tieru (t albo t-1) - "za drogie" to nie brak
                     // towaru, tylko brak zlota kupca; i jeden kupiec raz na SupplyDemandOrderRepeatDays (garnizon liczy co dzien)
                     var shelf = st.ItemRoster;
+                    int aw = garrison ? AmmoOrders.WGarrison : AmmoOrders.WLord;   // tb (AmmoOrders): tylko licznik
+                    bool ammoShort = false;
                     foreach (var kv in need)
                     {
                         if (kv.Value <= 0) continue;
                         var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
-                        if (!OnShelf(st, ty, tr, mp)) SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, Math.Min(10, kv.Value));
+                        bool onShelf = OnShelf(st, ty, tr, mp), ordered = false;
+                        float amt = 0f;
+                        // tb (AiAmmoOrderFull): strzaly i belty - zamowienie na caly brak (najwyzej SupplyDemandOrderCap); reszta i klucz wylaczony - 10 jak dotad
+                        if (!onShelf) { amt = AmmoOrders.Amount(ty, kv.Value); ordered = SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, amt); }
+                        if (AmmoOrders.IsAmmo(ty)) { ammoShort = true; AmmoOrders.NoteBasket(aw, kv.Value, onShelf, ordered, amt); }
                     }
+                    AmmoOrders.NoteVisit(aw, ammoShort);
                 }
                 if (pieces <= 0) return;
                 // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa - tylko gdy Twoja kiesa doplacila (GarrisonBuysGearPlayer); raz na dobe na zaloge (stempel _lastDay)

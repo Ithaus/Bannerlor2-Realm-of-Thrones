@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -38,6 +39,16 @@ namespace Armoury
     ///    E8/Q (262): przejscie partii lordow zglaszane do CrossingLaw.NoteBridgeCrossed (licznik wrogow pana przeprawy, ktorzy przeszli most), a linia doby
     ///    dostaje dopisek "straz przeprawy (E8/Q)" - zawrocone przy Bliznakach i wrogie przejscia (CrossingLaw.TwinsSuffix).
     /// Linia doby "Przeprawa Bliznaki (E7/B)" po ksiedze pieniadza; w pierwszych 3 dobach sesji z licznikiem - pozycje przejsc (punkt na osi miedzy probkami).
+    /// B3 (PLAN 7.12; Jeff 12.10 "chce, ale policz"; liczby i stawki: docs/reszta-2026-10-14/MYTO-BLIZNAKI.md) - MYTO. Klucz TwinsToll (wymaga TwinsCrossingCount):
+    /// przy kazdym przejsciu mostem (takze "zmiana strony poza strefa" - partia przeszla mostem miedzy probkami, A17 poz. 5) kiesa partii placi do kiesy pana
+    /// Bliznakow (glowa rodu wlasciciela; bez zywej glowy - kasa miasta) GiveGoldAction - przelew, nic z niczego; kto nie ma, placi, ile ma (bez dlugu).
+    /// Stawka: 2 zl od czlowieka (z jencami) + 1 zl od zwierzecia (te same, co w "myto gdyby bylo"; 4 x pontage Hulbrigge 1397 - "ciezkie myto" Freyow),
+    /// NAJWYZEJ dzien kosztu partii = zold dnia (PartyWageModel), a bez zoldu 1 zl od czlowieka (dniowka wyrobnika). Decyzja z biezacego zysku: Bliznaki to
+    /// jedyna przeprawa przez Zielone Widly na wiele mil, droga okrezna to co najmniej dzien marszu wiecej - partia placi, gdy myto <= tego dnia (zawsze, bo
+    /// pan bierze najwyzej tyle - wiecej, a kupiec poszedlby dookola); nikt nie jest zawracany (bez ruszania sciezek AI). Zwolnieni: rody krolestwa pana
+    /// (powinnosc lenna - jak dotad w porownaniu), karawany i wozy wsi rodu samego pana (swoich nie myci), bandy i Inni (nie staja przy bramce), a od recenzji tb
+    /// takze partie w wojnie z frakcja Bliznakow (wrog przechodzi sila albo oblega - przelewu do wroga nie ma; dwuletni W50: 23 wrogich lordow przez most). Gracz: komunikat przy
+    /// przejsciu; gracz panem Bliznakow - komunikat dobowy z mytem. Linia doby "Myto Bliznakow (B3)" (zaraz po E7/B) z kontrola obiegu (kiesy platnikow = kiesa pana).
     /// </summary>
     internal static class TwinsCrossing
     {
@@ -48,7 +59,8 @@ namespace Armoury
         private const float DeadBand = 0.5f;   // pas przy osi (most, wieza) - strona sie nie zmienia
         private const float OffBridgeR = 2f;   // F8: punkt przejscia dalej od mostu = licznik "przejsc poza mostem" (sam licznik - przejscie zostaje policzone)
         private const float LostR = 16f;       // F8: do tej odleglosci od mostu sprawdzamy strone partii, ktora wypadla z pamieci ("zmiana strony poza strefa")
-        private const int TollMan = 2, TollAnimal = 1;   // ES:215 - tylko do porownania
+        private const int TollMan = 2, TollAnimal = 1;   // ES:215 - porownanie "gdyby bylo" i od B3 stawka myta (TwinsToll)
+        private const int DayPerMan = 1;                 // B3: dzien kosztu partii bez zoldu - 1 zl od czlowieka (dniowka wyrobnika, 1 zl = 1 d)
         private const int PosDays = 3, PosMax = 30;      // pozycje przejsc: pierwsze 3 doby sesji z licznikiem, najwyzej 30 na dobe
 
         private struct Seen { public sbyte Side; public Vec2 Pos; public int Stamp; }
@@ -73,6 +85,13 @@ namespace Armoury
         private static long _carGold, _carMen, _carAnimals, _tollCar, _tollVil, _tollClan, _tollBand, _tollOther, _tollPlayer;
         private static int _offBridge, _lostSide;   // F8: liczniki kontrolne doby (nie zmieniaja liczby przejsc ani myta)
         private static float _farMax;               // F8: najdalszy dzis punkt przejscia od mostu
+        // B3 (TwinsToll): liczniki doby myta i suma sesji
+        private const int KCar = 0, KVil = 1, KClan = 2, KPlayer = 3, KOther = 4, Kinds = 5;
+        private static readonly string[] KName = { "karawany", "wozy wsi", "obce rody", "gracz", "inne" };
+        private static readonly int[] _tN = new int[Kinds];
+        private static readonly long[] _tPaid = new long[Kinds];
+        private static int _tRealm, _tOwn, _tBand, _tWar, _tCut, _tShort, _tLost, _tZero;   // _tWar - recenzja tb: w wojnie z panem Bliznakow
+        private static long _tAsk, _tCutFrom, _tCutTo, _tShortBy, _tOut, _tIn, _tSession;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TwinsCrossingCount; } }
 
@@ -81,6 +100,7 @@ namespace Armoury
 
         internal static void Reset()
         {
+            _tSession = 0;   // B3: suma myta sesji
             _seen.Clear(); _drop.Clear();
             _state = 0; _why = null; _twins = null;
             _stamp = _inZone = _activeLines = _stumbles = 0;
@@ -96,6 +116,9 @@ namespace Armoury
             _stumblesDay = _samples = 0;
             _offBridge = _lostSide = 0; _farMax = 0f;
             _ticks = 0;
+            Array.Clear(_tN, 0, Kinds); Array.Clear(_tPaid, 0, Kinds);
+            _tRealm = _tOwn = _tBand = _tWar = _tCut = _tShort = _tLost = _tZero = 0;
+            _tAsk = _tCutFrom = _tCutTo = _tShortBy = _tOut = _tIn = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -282,7 +305,11 @@ namespace Armoury
                                 if (q.Distance(_bridge) <= LostR)
                                 {
                                     float qd = SD(q);
-                                    if ((qd > DeadBand && kv.Value.Side < 0) || (qd < -DeadBand && kv.Value.Side > 0)) _lostSide++;
+                                    if ((qd > DeadBand && kv.Value.Side < 0) || (qd < -DeadBand && kv.Value.Side > 0))
+                                    {
+                                        _lostSide++;
+                                        Toll(p, Men(p), Animals(p), true);   // B3 (A17 poz. 5): przeszla mostem miedzy probkami - myto jak przy kazdym przejsciu (licznik przejsc bez zmian)
+                                    }
                                 }
                             }
                         }
@@ -308,9 +335,8 @@ namespace Armoury
             float bd = x.Distance(_bridge);
             if (bd > _farMax) _farMax = bd;
             if (bd > OffBridgeR) _offBridge++;   // sam licznik w linii doby - przejscie i myto licza sie jak kazde inne
-            int men = mp.MemberRoster.TotalManCount + mp.PrisonRoster.TotalManCount;
-            var ir = mp.ItemRoster;
-            int animals = mp.Party.NumberOfMenWithHorse + ir.NumberOfMounts + ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals;
+            int men = Men(mp);
+            int animals = Animals(mp);
             long toll = (long)TollMan * men + (long)TollAnimal * animals;
             if (mp.IsMainParty) { _player++; if (!OwnRealm(mp.ActualClan)) _tollPlayer += toll; }   // gracz w krolestwie pana - bez myta, jak inne rody tego krolestwa
             else if (mp.IsCaravan) { _car++; _carGold += mp.PartyTradeGold; _carMen += men; _carAnimals += animals; _tollCar += toll; }
@@ -324,6 +350,133 @@ namespace Armoury
             else { _other++; _tollOther += toll; }
             if (_activeLines < PosDays && _pos.Count < PosMax)
                 _pos.Add(P(x) + " (" + bd.ToString("0.0", Inv) + ")");   // F8: odleglosc od mostu (przedtem od bramy)
+            Toll(mp, men, animals, false);   // B3: myto (klucz TwinsToll; wlasny try)
+        }
+
+        /// <summary>Ludzie partii z jencami (stawka od czlowieka - jak "myto gdyby bylo").</summary>
+        private static int Men(MobileParty mp) { return mp.MemberRoster.TotalManCount + mp.PrisonRoster.TotalManCount; }
+
+        /// <summary>Zwierzeta partii: konie pod jezdzcami, luzaki, juczne, bydlo (jak "myto gdyby bylo").</summary>
+        private static int Animals(MobileParty mp)
+        {
+            var ir = mp.ItemRoster;
+            return mp.Party.NumberOfMenWithHorse + ir.NumberOfMounts + ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals;
+        }
+
+        // ------------------------------------------------------------ B3: myto (klucz TwinsToll)
+
+        internal static bool TollOn { get { var s = Settings.Current; return s != null && s.TwinsToll && s.TwinsCrossingCount; } }
+
+        /// <summary>B3: myto za jedno przejscie mostem - kiesa partii (lord i gracz: kiesa glowy partii - PartyTradeGold partii lorda to zloto wodza; karawana
+        /// i woz: kiesa kupiecka) -> kiesa pana Bliznakow. lost - przejscie miedzy probkami (partia wypadla z pamieci strefy i stoi na drugim brzegu).</summary>
+        private static void Toll(MobileParty mp, int men, int animals, bool lost)
+        {
+            if (!TollOn || mp == null || _twins == null || mp.Party == null) return;
+            try
+            {
+                var oc = _twins.OwnerClan;
+                if (mp.IsBandit || Undead.Party(mp)) { _tBand++; return; }   // banda i umarli (Inni) nie staja przy bramce myta
+                // recenzja tb: wrog pana Bliznakow (wojna frakcji) tez nie staje przy bramce - przechodzi sila albo stoi pod murami (oblezenie wolno - CrossingLaw);
+                // CrossingLaw zawraca tylko czesc wrogow (dwuletni W50: "wrogich lordow przez most" 23 w 728 dobach) - bez tego wrog placilby myto panu,
+                // z ktorym walczy (przelew do wroga, takze od oblegajacych Bliznaki)
+                if (AtWar(mp))
+                {
+                    _tWar++;
+                    if (mp.IsMainParty) Log.Player("Toll at the Twins: none - you are at war with " + PayeeName(oc) + ", and no toll-keeper stops an enemy host.");
+                    return;
+                }
+                if (mp.IsCaravan || mp.IsVillager)
+                {
+                    // karawana rodu pana albo woz jego wsi - swoich pan nie myci
+                    Clan own = mp.IsVillager ? (mp.HomeSettlement != null ? mp.HomeSettlement.OwnerClan : null) : (mp.Owner != null && mp.Owner.Clan != null ? mp.Owner.Clan : mp.ActualClan);
+                    if (oc != null && own == oc) { _tOwn++; return; }
+                }
+                else if (OwnRealm(mp.ActualClan))
+                {
+                    // rod krolestwa pana (takze sam pan i gracz - wasal tego krolestwa) - powinnosc lenna, bez myta
+                    _tRealm++;
+                    if (mp.IsMainParty)
+                        Log.Player("Toll at the Twins: " + PayeeName(oc) + " lets you cross free - you ride for the same realm.");
+                    return;
+                }
+                int k = mp.IsMainParty ? KPlayer : mp.IsCaravan ? KCar : mp.IsVillager ? KVil : mp.IsLordParty ? KClan : KOther;
+                long ask = (long)TollMan * Math.Max(0, men) + (long)TollAnimal * Math.Max(0, animals);
+                if (ask <= 0) return;
+                // dzien kosztu partii = cena drogi okreznej (co najmniej dzien marszu wiecej): zold dnia, a bez zoldu 1 zl od czlowieka
+                int wage = 0;
+                try { wage = mp.TotalWage; } catch { wage = 0; }
+                long dayCost = Math.Max((long)Math.Max(0, wage), (long)DayPerMan * Math.Max(0, mp.MemberRoster.TotalManCount));
+                long due = ask;
+                bool cut = dayCost > 0 && due > dayCost;
+                if (cut) { due = dayCost; _tCut++; _tCutFrom += ask; _tCutTo += dayCost; }
+                Hero payee = oc != null && oc.Leader != null && oc.Leader.IsAlive ? oc.Leader : null;
+                int purse0 = mp.PartyTradeGold;
+                long in0 = payee != null ? payee.Gold : (_twins.Town != null ? _twins.Town.Gold : 0);
+                int amt = (int)Math.Min(int.MaxValue, due);
+                if (payee != null) GiveGoldAction.ApplyForPartyToCharacter(mp.Party, payee, amt, true);
+                else GiveGoldAction.ApplyForPartyToSettlement(mp.Party, _twins, amt, true);
+                long paid = Math.Max(0, purse0 - mp.PartyTradeGold);
+                long got = (payee != null ? payee.Gold : (_twins.Town != null ? _twins.Town.Gold : 0)) - in0;
+                _tAsk += due; _tOut += paid; _tIn += got;
+                if (paid < due) { _tShort++; _tShortBy += due - paid; }
+                if (paid <= 0) _tZero++;
+                _tN[k]++; _tPaid[k] += paid; _tSession += paid;
+                if (lost) _tLost++;
+                if (mp.IsMainParty)
+                    Log.Player("Toll at the Twins: " + paid + " denars to " + PayeeName(oc) + " for " + Math.Max(0, men) + " men and " + Math.Max(0, animals) + " beasts"
+                               + (cut ? " - no more than a day of your wages, what the long way round would cost" : "")
+                               + (paid < due ? " - all the coin you had" : "") + ".");
+            }
+            catch (Exception e) { Stumble("Toll", e); }
+        }
+
+        /// <summary>Recenzja tb: frakcja partii w wojnie z frakcja Bliznakow (bandy liczone osobno, wczesniej).</summary>
+        private static bool AtWar(MobileParty mp)
+        {
+            var of = _twins != null ? _twins.MapFaction : null;
+            var f = mp.MapFaction;
+            return of != null && f != null && f != of && FactionManager.IsAtWarAgainstFaction(f, of);
+        }
+
+        private static string PayeeName(Clan oc)
+        {
+            try
+            {
+                if (oc != null && oc.Leader != null && oc.Leader.IsAlive) return oc.Leader.Name.ToString();
+            }
+            catch { }
+            return "the holders of the Twins";
+        }
+
+        /// <summary>B3: linia doby "Myto Bliznakow (B3)" (zaraz po linii E7/B; zerowanie w DayReset). Gracz panem Bliznakow - komunikat z mytem doby.</summary>
+        private static void TollLine(int day)
+        {
+            try
+            {
+                string head = "Myto Bliznakow (B3): dzien " + day;
+                if (!TollOn) { Log.Info(head + " | W CIENIU (TwinsToll) - nikt nie placi; porownanie \"myto gdyby bylo\" w linii E7/B."); return; }
+                long paid = 0; int n = 0;
+                for (int k = 0; k < Kinds; k++) { paid += _tPaid[k]; n += _tN[k]; }
+                var oc = _twins != null ? _twins.OwnerClan : null;
+                Hero payee = oc != null && oc.Leader != null && oc.Leader.IsAlive ? oc.Leader : null;
+                var sb = new StringBuilder(700);
+                sb.Append(head).Append(" | [WL] stawka ").Append(TollMan).Append(" zl od czlowieka (z jencami) i ").Append(TollAnimal)
+                  .Append(" zl od zwierzecia, najwyzej dzien kosztu partii (zold dnia, bez zoldu ").Append(DayPerMan).Append(" zl od czlowieka - cena drogi okreznej)")
+                  .Append(" | zaplacilo ").Append(n).Append(" partii: ").Append(paid.ToString(Inv)).Append(" zl (");
+                for (int k = 0; k < Kinds; k++) { if (k > 0) sb.Append(", "); sb.Append(KName[k]).Append(' ').Append(_tN[k]).Append('/').Append(_tPaid[k].ToString(Inv)).Append(" zl"); }
+                sb.Append("); w tym przejscia miedzy probkami ").Append(_tLost)
+                  .Append(" | zwolnieni: rody krolestwa pana ").Append(_tRealm).Append(", karawany i wozy rodu pana ").Append(_tOwn).Append(", bandy i umarli ").Append(_tBand).Append(", w wojnie z panem ").Append(_tWar)
+                  .Append(" | uciete do dnia kosztu ").Append(_tCut).Append(" razy (z ").Append(_tCutFrom.ToString(Inv)).Append(" do ").Append(_tCutTo.ToString(Inv)).Append(" zl)")
+                  .Append(" | nie stac na cale ").Append(_tShort).Append(" razy (brakowalo ").Append(_tShortBy.ToString(Inv)).Append(" zl; pusta kiesa ").Append(_tZero).Append(")")
+                  .Append(" | kontrola obiegu: z kies platnikow ").Append(_tOut.ToString(Inv)).Append(" zl, do ").Append(payee != null ? "kiesy pana" : "kasy miasta (pan bez zywej glowy)")
+                  .Append(' ').Append(_tIn.ToString(Inv)).Append(" zl, roznica ").Append((_tIn - _tOut).ToString(Inv))
+                  .Append(" | pan Bliznakow ").Append(payee != null ? payee.Name.ToString() + " (" + (oc != null ? oc.Name.ToString() : "-") + ", kiesa " + payee.Gold.ToString(Inv) + " zl)" : "-")
+                  .Append(" | myto od poczatku sesji ").Append(_tSession.ToString(Inv)).Append(" zl | potkniecia dzis ").Append(_stumblesDay).Append('.');
+                Log.Info(sb.ToString());
+                if (payee != null && payee == Hero.MainHero && paid > 0)
+                    Log.Player("The toll at the Twins brought you " + paid + " denars today (" + n + (n == 1 ? " party" : " parties") + " crossed).");
+            }
+            catch (Exception e) { Stumble("TollLine", e); }
         }
 
         /// <summary>Rod krolestwa pana Bliznakow (pan bez krolestwa - tylko jego rod).</summary>
@@ -381,6 +534,7 @@ namespace Armoury
                 sb.Append('.');
                 Log.Info(sb.ToString());
                 _activeLines++;
+                TollLine(day);   // B3: linia "Myto Bliznakow (B3)" - liczniki zeruje DayReset ponizej
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { DayReset(); }
