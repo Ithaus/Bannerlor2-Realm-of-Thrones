@@ -241,7 +241,7 @@ namespace Armoury
                     int m = mr != null ? mr.TotalManCount : 0;
                     int mp0 = 0;
                     try { mp0 = MenPurse.Get(c); } catch { mp0 = 0; }
-                    DestroyPartyAction.Apply(null, c);
+                    if (c.IsActive) DestroyPartyAction.Apply(null, c);   // recenzja: partia usunieta przez cudzy nasluch (np. przy niewoli przewodnika) - bez drugiego zdarzenia zniszczenia
                     if (c.IsActive) { survived++; continue; }
                     seized++; men += m; menPurse += mp0;
                     if (player) { playerN++; playerGold += g; playerUnits += u; }

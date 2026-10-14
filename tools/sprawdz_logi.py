@@ -16254,11 +16254,15 @@ def lup5b_main(logp, start_arg, until=364):
         rep.add("L5B-0: linie lupu 5b (L5b-1, L5b-2) i latki", "brak linii w oknie" + (f"; latki wpiete: okno {wired[0]}, karawany {wired[1]}" if wired else "; brak linii Szczelnosc (164a) w kampanii"),
                 "INFO (log bez paczki albo bez zdobycia twierdzy)", None)
     else:
+        # recenzja L5b: pary liczone na calym logu, nie w oknie - zdobycie z doby d raportuje linia doby d+1 (na koncu okna para by sie rozjechala);
+        # "Pieniadz swiata: dzien P" w ostatnim ticku nosi doba poprzednia, wiec zdobycia z dob <= P sa juz w liniach doby (dawne "< P" gubilo ostatnia dobe)
         last_tick = max(alld) if alld else None
-        n_siege = sum(int(m.group(5)) for m in day1)
-        n_ev2 = sum(1 for m in ev2 if last_tick is None or int(m.group(1)) < last_tick)
+        day1all = [m for m in (L5B1_DAY.match(s) for s in lines if s.startswith("Skarbce stolic (L5b-1): dzien")) if m]
+        ev2all = [m for m in (L5B2_EV.match(s) for s in lines if s.startswith("Karawany w zdobytym miescie (L5b-2): dzien")) if m]
+        n_siege = sum(int(m.group(5)) for m in day1all)
+        n_ev2 = sum(1 for m in ev2all if last_tick is None or int(m.group(1)) <= last_tick)
         ok0 = bad_parse == 0 and n_siege == n_ev2 and (wired is None or all(wired))
-        rep.add("L5B-0: linie, pola, latki; zdobycia szturmem (linia doby L5b-1) = linie L5b-2 (doby przed ostatnim tickiem)",
+        rep.add("L5B-0: linie, pola, latki; zdobycia szturmem (linie doby L5b-1, caly log) = linie L5b-2 (doby do ostatniego ticku)",
                 f"zdobycia szturmem {n_siege}, linii L5b-2 {n_ev2}, pola nieodczytane {bad_parse}" + (f", latki wpiete: okno {wired[0]}, karawany {wired[1]}" if wired else ", brak linii Szczelnosc (164a)"),
                 "rowne; pola wszystkie; obie latki wpiete", ok0)
     # ---- L5B-1 obieg skarbca
@@ -16327,7 +16331,7 @@ def lup5b_main(logp, start_arg, until=364):
         tot = sum(int(m.group(16)) for m in ev1)
         lst = "; ".join(f"d{run_day(int(m.group(1)), start)} {m.group(2)} ({m.group(4)} -> {m.group(8)}): {int(m.group(16))} z nadwyzki {int(m.group(14))}" for m in ev1[:6])
         rep.add("L5B-7a: upadki stolic i zabrane ze skarbcow (INFO)", f"{len(ev1)} upadkow, razem {tot} zl; {lst}",
-                "INFO - rachunek z biegu kodu 43: 1-3 upadki/rok, 0.2-0.6 mln zl (Mantarys 213 tys. z nadwyzki 639 tys.)", None)
+                "INFO - rachunek z biegu kodu 43: 2-3 upadki/rok, 0.30-0.39 mln zl (Mantarys 212 tys. z nadwyzki 638 tys.); 120 dob - 0-1", None)
     else:
         rep.add("L5B-7a: upadki stolic (INFO)", "0", "INFO", None)
     if ev2:
