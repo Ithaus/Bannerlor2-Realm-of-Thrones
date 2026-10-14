@@ -76,6 +76,9 @@ namespace Armoury
                 int had = town.Gold;
                 if (want[0] > 0) town.ChangeGold(-(int)Math.Min(int.MaxValue, want[0]));
                 took[0] = Math.Max(0, had - town.Gold);
+                // poprawka po audycie (obieg Z3): nazwana pozycja "Przeplywy osad" (bez niej lup ladowal w "reszta - inne niezmierzone"); src -1 - to nie zakup
+                // kas (licznik zakupow ponizej zapasu kupcow TownFolk.OnTownCoin bez zmian)
+                if (took[0] > 0) MoneyLedger.Note(MoneyLedger.NSack, st, -(int)Math.Min(int.MaxValue, took[0]), -1);
                 for (int c = 0; c < 4; c++) took[c + 1] = want[c + 1] > 0 ? TownFolk.SackTake(st, c, want[c + 1]) : 0;
                 for (int i = 0; i < 5; i++) pool += took[i];
                 // ---- podzial wedlug ludzi; reszta z zaokraglen do najwiekszej druzyny
@@ -129,7 +132,7 @@ namespace Armoury
                             long x = Math.Min(rest, Math.Min(took[c], pool > 0 ? (long)Math.Floor((double)back * took[c] / pool) : 0));
                             if (x > 0) { TownFolk.SackBack(st, c - 1, x); rest -= x; }
                         }
-                        if (rest > 0) town.ChangeGold((int)Math.Min(int.MaxValue, rest));
+                        if (rest > 0) { int g0 = town.Gold; town.ChangeGold((int)Math.Min(int.MaxValue, rest)); MoneyLedger.Note(MoneyLedger.NSack, st, town.Gold - g0, -1); }
                         given += back;
                     }
                 }
