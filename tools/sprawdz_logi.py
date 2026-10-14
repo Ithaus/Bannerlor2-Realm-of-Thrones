@@ -527,7 +527,8 @@ Uzycie (Python 3, tylko odczyt):
                     SZ-A8-0 klucz 40 w linii startu sesji, SZ-A8-1 jazda t3+ (srednia ostatnich 30 dob okna) >= baza - 1 pkt, SZ-A8-2 polki koni miast i zamkow
                     w ostatniej dobie okna >= 70% bazy, SZ-A8-3 INFO (konie kupione lordow/d, polka zarezerwowana, Dothrakowie % konnych);
                     SZ-A9a-0 klucz [WL] w linii E8/W, SZ-A9a-1 zeszlo > 0 i zeszlo / zeszloby (linia E8/P2) 0.8-1.2, SZ-A9a-2 strzaly na polkach >= 50% bazy
-                    i miasta bez strzal (174b) <= 5, SZ-A9a-3 INFO (zakupy i zrodla amunicji/d wobec bazy, partie bitew gracza z misja);
+                    i miasta bez strzal (174b) <= 5, SZ-A9a-3 INFO (zakupy i zrodla amunicji/d wobec bazy, partie bitew gracza z misja),
+                    SZ-A9a-4 pokrycie strzal partii rodow AI (171) w ostatniej linii okna >= baza - 15 pkt (belty INFO);
                     SZ-A9b-0 klucz [WL x3.00] w linii E8/Z, SZ-A9b-1 kupione ponad sufit 0 i p90 cena / wartosc (wiersze AiGear E8/P2) <= sufit,
                     SZ-A9b-2 pokrycie korpusu zalog (171) w ostatniej dobie okna >= baza - 3 pkt, SZ-A9b-3 INFO (zloto zakupow brakow, zamowienia, siodla/d).
                     Log sprzed wlaczenia: wiersze kluczy NIE / INFO, bez wyjatku.
@@ -19208,12 +19209,13 @@ def lup_main(logp, start_arg, until=364):
 # baza: bieg dwuletni W50 (Armoury-2026-10-13_21-14-13.log; AiMountMarketSharePercent 25, AiAmmoUse w cieniu, AiGearMaxPriceFactor 0), okno dob kampanii 1-N:
 # cav - jazda t3+ srednia ostatnich 30 dob (%), shelf - konie na polkach (zw+boj+szl) ostatniej doby, bought - konie kupione lordow/d, arrows - strzaly na
 # polkach ostatniej doby, cover - pokrycie korpusu zalog (171) ostatniej doby (%), saddles - siodla kupione lordow/d (E8/H), gapgold - zloto zakupow brakow
-# AiGear/d (E8/P2), cap3 - z tego ponad 3.0 x wartosc (zl/d), ammo_buy / ammo_src - zakupy amunicji AI (174b) i zrodla amunicji (E6/0) na dobe
+# AiGear/d (E8/P2), cap3 - z tego ponad 3.0 x wartosc (zl/d), ammo_buy / ammo_src - zakupy amunicji AI (174b) i zrodla amunicji (E6/0) na dobe;
+# arr_cov / bolt_cov (recenzja 14.10) - pokrycie strzal / beltow partii rodow AI (171) w ostatniej linii okna (linia co 5 dob: d120, d360)
 SZ_BASE = {
     120: {"cav": 18.2, "shelf": 9603, "bought": 65.6, "arrows": 4129, "cover": 91, "saddles": 37.8, "gapgold": 79265, "cap3": 25060,
-          "ammo_buy": 432, "ammo_src": 407},
+          "ammo_buy": 432, "ammo_src": 407, "arr_cov": 74, "bolt_cov": 79},
     364: {"cav": 16.4, "shelf": 11460, "bought": 62.1, "arrows": 4453, "cover": 84, "saddles": 32.5, "gapgold": 74340, "cap3": 22831,
-          "ammo_buy": 363, "ammo_src": 329},
+          "ammo_buy": 363, "ammo_src": 329, "arr_cov": 78, "bolt_cov": 71},
 }
 SZ_HORSE_START = "Armie 175 (Armoury) - wylaczniki przy starcie sesji"
 
@@ -19343,6 +19345,23 @@ def szybkie_main(logp, start_arg, until=120):
         rep.add("SZ-A9a-3: amunicja - zakupy AI (174b) i zrodla (E6/0) na dobe",
                 f"zakupy {mean(buys):.0f}/d wobec {btxt} {base['ammo_buy']}/d; zrodla {mean(src):.0f}/d wobec {base['ammo_src']}/d ({len(buys)} / {len(src)} dob)",
                 "INFO (oczekiwane: oba rosna o ok. 'zeszlo' na dobe; strzelarze W50 zajeci w 9% rak)", None)
+        # recenzja 14.10 (ryzyko b wpisu A9: lucznik AI bez strzal): polki (A9a-2) nie mowia, czy partie dokupuja - pokrycie strzal partii rodow (171).
+        # Oczekiwany spadek ok. 7 pkt (W50 d1-120: 269 strzal/d "zeszloby" x ok. 6 dob do uzupelnienia / ok. 17 tys. kolczanow w uzyciu - 653 partie x 27),
+        # rozrzut biegow 5 pkt (d120: W50 74%, bieg 120 dob 69%) - prog baza - 15 pkt lapie zapasc zaopatrzenia, nie oczekiwany spadek
+        cvl = win(E8_Z_COVER)
+        ac = None
+        for d in sorted(cvl, reverse=True):
+            m = re.search(r"partie rodow AI \(\d+ ludzi\):.*?strzaly (\d+)%, belty (\d+)%", cvl[d])
+            if m:
+                ac = (run_day(d, start), int(m.group(1)), int(m.group(2)))
+                break
+        if ac:
+            rep.add("SZ-A9a-4: pokrycie strzal partii rodow AI (Pokrycie zbrojowni AI 171) w ostatniej linii okna; belty INFO",
+                    f"strzaly {ac[1]}%, belty {ac[2]}% (doba {ac[0]}) wobec {btxt} {base['arr_cov']}% / {base['bolt_cov']}%",
+                    f"strzaly >= baza - 15 pkt ({base['arr_cov'] - 15}%; oczekiwany spadek ok. 7 pkt - kolczany dokupowane przy postojach)",
+                    ac[1] >= base["arr_cov"] - 15)
+        else:
+            rep.add("SZ-A9a-4: pokrycie strzal partii rodow AI", "brak linii Pokrycie zbrojowni AI (171) w oknie", "INFO", None)
     except Exception as e:
         rep.add("blok SZ-A9a", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
 

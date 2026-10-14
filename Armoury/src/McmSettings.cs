@@ -4264,7 +4264,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiMendQueueContinue { get; set; } = true;
 
-        [SettingPropertyBool("Ai Ammo Use", HintText = "after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. In a battle fought on the field with you the arrows are already counted shot by shot, as for your own men, and are not taken a second time (off = as before: the AI never runs short of arrows; the daily log only counts what would have been used up)")]
+        [SettingPropertyBool("Ai Ammo Use", HintText = "after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. In a battle fought on the field with you the arrows are already counted shot by shot, as for your own men, and are not taken a second time (off = as before: the lords and the garrisons lose arrows only in battles fought on the field with you; the daily log only counts what would have been used up)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoUse { get; set; } = true;
 
