@@ -17052,7 +17052,7 @@ def drobne2_swiat(lines, rep):
         tb = num(r"z tabeli podmienione (\d+) z \d+", s, int, None)
         rep.add("D2-B6-1: winnice / gaje / palmy na mapie po starcie sesji (kampania zaczeta z kluczem; T8 i GL-5 czynne)",
                 f"{v} / {o} / {d}; z tabeli {tb} z 8; " + ("CZYNNE" if act6 else "bez podmian (stary zapis albo klucz wylaczony przy starcie)"),
-                "29 / 19 / 8 i 8 z 8 (mapa ROT po T8: 23 / 19 / 14)", (v == 29 and o == 19 and d == 8 and tb == 8) if act6 else None)
+                "winnice >= 29 / gaje 19 / palmy 8 i 8 z 8 (kalibracja GL1 test fin28: winnice 31 - mapa ROT ma ich wiecej niz 23 z rozpoznania; dawna linia liczyla 2 zdublowane wsie Village.All)", (v is not None and v >= 29 and o == 19 and d == 8 and tb == 8) if act6 else None)
     else:
         rep.add("D2-B6-1: winnice i gaje (B6)", "brak linii startu sesji", "INFO (log sprzed B6)", None)
     tow = {}

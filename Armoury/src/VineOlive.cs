@@ -167,12 +167,14 @@ namespace Armoury
         {
             int vine = 0, olive = 0, date = 0;
             var by = new SortedDictionary<string, int[]>(StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);   // Village.All ma 2 wsie dwa razy (PeopleMarket, 14.10) - kazda wies raz
             try
             {
                 foreach (var v in Village.All)
                 {
                     var t = v != null ? v.VillageType : null;
                     if (t == null) continue;
+                    if (v.Settlement != null && !seen.Add(v.Settlement.StringId)) continue;
                     int k = t.StringId == Vine ? 0 : t.StringId == Olive ? 1 : t.StringId == Date ? 2 : -1;
                     if (k < 0) continue;
                     if (k == 0) vine++; else if (k == 1) olive++; else date++;

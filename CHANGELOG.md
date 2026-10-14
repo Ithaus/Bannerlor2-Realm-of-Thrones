@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (B6 - pomiar po tescie fin28) - linia "Winnice i gaje (B6)" liczy kazda wies raz; prog D2-B6-1 winnice >= 29
+
+**Mod:** Armoury (+ `tools/sprawdz_logi.py`) | **Tor:** S | **Klucze:** bez zmian | **Pliki:** `Armoury/src/VineOlive.cs` (MapText), `tools/sprawdz_logi.py` (D2-B6-1)
+
+**Problem:** test fin28 (Armoury-2026-10-14_04-21-58.log): D2-B6-1 NIE - "na mapie winnice 33, gaje 19, palmy 8" przy progu 29 / 19 / 8. Kalibracja GL1 tej samej kampanii liczy winnice 31, gaje 19, palmy 8. **Przyczyna:** (1) `MapText` liczyl `Village.All` bez odsiania dwoch wsi, ktore wystepuja tam dwa razy (to samo co w PeopleMarket 14.10) - +2; (2) baza 23 z rozpoznania byla za niska - mapa ROT ma w tej kampanii 25 winnic przed B6 (31 - 6). Podmiany B6: 8 z 8 zgodne z tabela, gaje 19 i palmy 8 - jak w projekcie.
+**Zmiana:** `MapText` - kazda wies raz (StringId osady); prog D2-B6-1: winnice >= 29, gaje 19, palmy 8, 8 z 8. Bez zmiany zachowania.
+**Status:** DO SPRAWDZENIA (nastepny test 120 dob).
+
 ## 2026-10-14 (C5 - decyzja Jeffa po liczbach) - KUZNIA GRACZA SZYBKO JAK DAWNIEJ: `ForgeLikeTownSmith` domyslnie false
 
 **Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** `ForgeLikeTownSmith` true -> false (w Armoury.json Jeffa klucza nie ma - zadziala domyslna) | **Pliki:** `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen_mcm)
