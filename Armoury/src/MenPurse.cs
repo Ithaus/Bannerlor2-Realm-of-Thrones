@@ -245,7 +245,9 @@ namespace Armoury
                 var st = mp.CurrentSettlement;
                 if (st == null || !st.IsTown || st.Town == null || QuartermasterEscrow.Active) return;
                 Day();
-                SettlePlayerBook(); BuyPlayerGaps(st); MenUpgrade.ForPlayer(st);
+                SettlePlayerBook();
+                if (CitySack.NoSpendStay(st, mp)) return;   // lup miast L3 (poprawka po audycie): w oknie lupu ludzie gracza nie kupuja z polki lupionej osady (wlasny try)
+                BuyPlayerGaps(st); MenUpgrade.ForPlayer(st);
             }
             catch (Exception e) { Log.Error("MenPurse.OnDailyTickParty", e); }
         }
