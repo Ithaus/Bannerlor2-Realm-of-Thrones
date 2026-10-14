@@ -2114,6 +2114,7 @@ namespace Armoury
                 var r = Recipes.For(item);
                 var s = Settings.Current;
                 float baseDays = r.Tier * s.DaysPerTier;
+                if (ForgeClock.LikeTown) baseDays = ForgeClock.WorkHours(item, 1, baseDays * 24f) / 24f;   // C5: dni kowala z warsztatu AI (Forge.Begin liczy tak samo)
 
                 var opts = new List<InquiryElement>
                 {
@@ -2127,7 +2128,8 @@ namespace Armoury
 
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "How will you work?",
-                    item.Name + (Settings.Current.ForgeHireHistorical ? ". Forge hire " + Forge.ForgeFee(r) + " gold for every day of work. " : ". Forge fee " + Forge.ForgeFee(r) + " gold. ") + "Materials and stamina are spent now; " +
+                    item.Name + (Settings.Current.ForgeHireHistorical ? ". Forge hire " + Forge.ForgeFee(r) + " gold for every day of work. " : ". Forge fee " + Forge.ForgeFee(r) + " gold. ") +
+                    (ForgeClock.LikeTown ? "It takes you as long as it takes a town smith: " + Project.TimeLabel(baseDays) + " of work at a steady pace. " : "") + "Materials and stamina are spent now; " +
                     "the piece is finished only when the work is done - and only while you remain in this settlement.",
                     opts, true, 1, 1, "Set to work", "Step back",
                     delegate (List<InquiryElement> sel)

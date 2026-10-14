@@ -504,6 +504,7 @@ namespace Armoury
                     else if (settlement != null)                                                                              // 7: najemnik z karczmy
                     {
                         _dOwnMerc++;
+                        VetKit.Hire(settlement, troop, items);   // C3: komplet weterana z puli karczmy zastepuje dobytek z domu tych rodzajow
                         _dMercHorsePcs += MercHorseKit(settlement, troop, items);   // E8/T (263): ta sama regula konia i rzedu dla AI i gracza (wydzielone bez zmian)
                     }
                     else { _dOwnNoSource++; if (troop.IsMounted) _dMountedNoHorse++; }                                        // 8: bez zrodla (ochotnik z mapy, inne mody)
@@ -578,6 +579,7 @@ namespace Armoury
             if (s != null && !s.RecruitBringsWhatHeHas) { kind = PlTemplate; return TemplateItems(troop); }
             kind = PlMerc;
             var items = OwnOf(troop);
+            VetKit.Hire(town, troop, items);   // C3: komplet weterana z puli karczmy - ta sama regula co u AI (przypadek 7)
             horsePcs = MercHorseKit(town, troop, items);
             return items;
         }

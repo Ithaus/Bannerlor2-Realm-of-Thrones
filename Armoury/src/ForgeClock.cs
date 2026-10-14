@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -26,6 +27,85 @@ namespace Armoury
 
         /// <summary>BK: "Hours spent for all actions" = zuzyta stamina / 6.</summary>
         internal static float HoursOf(int stamina) { return Math.Max(0.25f, stamina / 6f); }
+
+        // ------------------------------------------------------------ C5 (Jeff 14.10 "jak u kowali AI"): czas kucia gracza = praca kowala w warsztacie AI
+        // Bylo (audyt 05.10 produkcja/W8): gracz kul kolczuge t3 w 12.5 h (stamina / 6), warsztat AI te sama sztuke w 51 roboczodniach. Teraz jedna regula:
+        // sztuka gracza trwa tyle dni pracy kowala, ile liczy warsztat AI (WorkshopLaw.Needs - HistDays przy cenach historycznych, inaczej dni receptury),
+        // a dzien pracy kowala to WorkHoursPerManDay godzin przy kowadle (ta sama zamiana co SmithHours). Zaplata (zamowienia, dniowka kuzni) bez zmian.
+        private static int _c5Pieces; private static double _c5Hours, _c5OldHours;   // liczniki sesji (linia przy kazdej sztuce, bez zapisu)
+
+        internal static bool LikeTown { get { var s = Settings.Current; return s != null && s.ForgeLikeTownSmith; } }
+
+        /// <summary>C5: dni pracy kowala nad ta sztuka - te same, ktore liczy warsztat AI. 0 - brak receptury (nie bron ani zbroja).</summary>
+        internal static float SmithDays(ItemObject item)
+        {
+            if (item == null) return 0f;
+            try
+            {
+                var c = ArmsPricing.CostOf(item);
+                if (c == null) return 0f;
+                return Math.Max(0.05f, HistoricalPrices.On ? HistoricalPrices.HistDays(item, c) : c.Days);
+            }
+            catch { return 0f; }
+        }
+
+        /// <summary>C5: godziny przy kowadle dla count sztuk (seria amunicji). Klucz wylaczony albo brak receptury - fallback (jak dotad).</summary>
+        internal static float WorkHours(ItemObject item, int count, float fallback)
+        {
+            if (!LikeTown) return fallback;
+            float d = SmithDays(item);
+            if (d <= 0f) return fallback;
+            return Math.Max(0.25f, d * Math.Max(1f, Settings.Current.WorkHoursPerManDay) * Math.Max(1, count));
+        }
+
+        /// <summary>C5: godziny pracy na dobe przy kowadle (przerwa nocna 23-5 przy WorkshopNightRest - AdvanceProjects).</summary>
+        internal static float BenchHoursPerDay { get { var s = Settings.Current; return s != null && s.WorkshopNightRest ? 18f : 24f; } }
+
+        /// <summary>C5: termin zamowienia lorda - dotychczasowe OrderDeadlineDays plus doby pracy przy kowadle nad ta sztuka (bez tego zamowienie
+        /// zbroi bylo nie do wykonania: kolczuga 45 dob wobec 12 dob terminu). Zaplata zamowienia bez zmian.</summary>
+        internal static float OrderDays(ItemObject item)
+        {
+            var s = Settings.Current;
+            float d = s != null ? s.OrderDeadlineDays : 12f;
+            if (!LikeTown || item == null) return d;
+            return d + WorkHours(item, 1, 0f) / BenchHoursPerDay;
+        }
+
+        /// <summary>C5: napis dla gracza przy odlozeniu sztuki na lawe (po angielsku) i linia logu; oldHours - czas wedlug dawnej reguly (ekran BK).</summary>
+        internal static void NoteQueued(ItemObject item, int count, float hours, float oldHours)
+        {
+            if (!LikeTown || item == null || TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement == null || ArmouryBehavior.Instance == null) return;   // bez osady Queue daje sztuke od razu
+            try
+            {
+                float per = Math.Max(1f, Settings.Current.WorkHoursPerManDay);
+                _c5Pieces += Math.Max(1, count); _c5Hours += hours; _c5OldHours += oldHours;
+                Log.Player("A town smith gives " + (hours / per).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " days of work to "
+                           + (count > 1 ? count + " x " : "") + item.Name + ", and so must you: " + (int)Math.Ceiling(hours) + " hours at the anvil, about "
+                           + (hours / BenchHoursPerDay).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " days here. The pay stays as it was.");
+                Log.Info("Kuznia jak u kowali (C5): " + item.StringId + " x" + Math.Max(1, count) + " - dni kowala " + (hours / per).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                         + ", godzin " + hours.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " (dawniej " + oldHours.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)
+                         + "), dob przy kowadle " + (hours / BenchHoursPerDay).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " | w tej sesji sztuk " + _c5Pieces
+                         + ", godzin " + _c5Hours.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " (dawniej " + _c5OldHours.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + ").");
+            }
+            catch (Exception e) { Log.Error("ForgeClock.NoteQueued", e); }
+        }
+
+        /// <summary>C5: przyklady do logu przy wycenie uzbrojenia (ArmsPricing.Build) - te same sztuki co jej linia.</summary>
+        internal static string Examples(IEnumerable<ItemObject> items)
+        {
+            var l = new List<string>();
+            float per = Math.Max(1f, Settings.Current.WorkHoursPerManDay);
+            foreach (var it in items)
+            {
+                if (it == null) continue;
+                float d = SmithDays(it);
+                if (d <= 0f) continue;
+                l.Add(it.StringId + " " + d.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " d = " + (int)Math.Ceiling(d * per) + " h ("
+                      + (d * per / BenchHoursPerDay).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " dob)");
+            }
+            return "Kuznia jak u kowali (C5): " + (LikeTown ? "CZYNNA" : "wylaczona (ForgeLikeTownSmith)") + " - dzien kowala " + per + " h, przy kowadle "
+                   + BenchHoursPerDay + " h na dobe; przyklady: " + (l.Count > 0 ? string.Join("; ", l.ToArray()) : "-") + ".";
+        }
 
         // ------------------------------------------------------------ zakladka CRAFT (BK ExecuteMainActionBK)
         private static Hero _hero; private static int _stam; private static ItemObject _item; private static int _count;
@@ -80,7 +160,9 @@ namespace Armoury
                 if (!found) return;
                 int spent = Math.Max(0, _stam - Forge.Stamina(_hero));
                 bag.AddToCounts(fresh, -1);
-                Queue(_item, fresh.ItemModifier, 1, HoursOf(spent));
+                float h = WorkHours(_item, 1, HoursOf(spent));   // C5: dni kowala z warsztatu AI (wylaczone - godziny z ekranu BK)
+                Queue(_item, fresh.ItemModifier, 1, h);
+                NoteQueued(_item, 1, h, HoursOf(spent));
             }
             catch (Exception e) { Log.Error("ForgeClock.CraftPost", e); }
             finally { _item = null; }

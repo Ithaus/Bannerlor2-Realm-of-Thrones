@@ -261,6 +261,32 @@ namespace Armoury
             return taken;
         }
 
+        /// <summary>C3 (VetKit): komplet n ludzi typu troop z puli (przedmiot -> sztuk; konie i rzedy odsiewa wolajacy) - ta sama regula A7 co ludzie przenoszeni
+        /// miedzy partia a zaloga (PlanKits). needLeft - potrzeba po typach ludzi, ktorzy zostaja u dawcy (null - nikt nie zostaje: pula karczmy).</summary>
+        internal static Dictionary<ItemObject, int> KitFor(Dictionary<ItemObject, int> pool, CharacterObject troop, int n, Dictionary<int, int> needLeft)
+        {
+            if (troop == null || n <= 0) return new Dictionary<ItemObject, int>();
+            return PlanKits(pool, new Dictionary<CharacterObject, int> { { troop, n } }, needLeft);
+        }
+
+        /// <summary>C3 (VetKit): potrzeba po typach ludzi partii bez n odchodzacych typu troop (gdy sa jeszcze w rosterze - zwolnienie 166 liczy sie przed zdjeciem;
+        /// rozbici H3 juz zdjeci - wtedy roster bez zmian).</summary>
+        internal static Dictionary<int, int> NeedLeftWithout(MobileParty mp, CharacterObject troop, int n)
+        {
+            var need = NeedByType(mp);
+            try
+            {
+                if (mp != null && troop != null && n > 0 && mp.MemberRoster != null && mp.MemberRoster.GetTroopCount(troop) >= n)
+                {
+                    var sub = new Dictionary<int, int>();
+                    AddNeed(sub, troop, n);
+                    foreach (var kv in sub) { int v; need.TryGetValue(kv.Key, out v); need[kv.Key] = Math.Max(0, v - kv.Value); }
+                }
+            }
+            catch (Exception e) { Stumble("NeedLeftWithout", e); }
+            return need;
+        }
+
         /// <summary>Sztuka dla przedmiotu wzorca: dokladnie ten, potem ten sam tier, wyzsze rosnaco, nizsze malejaco.</summary>
         private static ItemObject Pick(Dictionary<ItemObject, int> avail, List<ItemObject> cands, ItemObject want)
         {

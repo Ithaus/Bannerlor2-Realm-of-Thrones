@@ -100,6 +100,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
 
+        [SettingPropertyBool("Forge Like Town Smith", HintText = "your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeLikeTownSmith { get; set; } = true;
+
         [SettingPropertyBool("Forge Takes Time", HintText = "armour is not finished the moment you order it")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeTakesTime { get; set; } = true;
@@ -4952,6 +4956,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public float StragglersRallyReachDays { get; set; } = 5f;
 
+        [SettingPropertyBool("Player Armory Like Ai Lord", HintText = "when you are taken captive your company's armoury (Dynamic Troop Equipment) goes to your captor, as a beaten lord's armoury goes to his victors: a lord's company takes it into its own armoury, a settlement's men into their garrison's armoury or the settlement's stores, a band into its packs; the rest of what you lose is set in Realistic Captivity (Player Loses Like Ai Lord) (off = the armoury stays yours, as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool PlayerArmoryLikeAiLord { get; set; } = true;
+
         [SettingPropertyBool("War Tax From Folk", HintText = "in war the crown also taxes the townsfolk's and castle folk's earnings, on top of the war subsidy from the merchants' and villages' spare coin - up to 3%, up to 6% under the War Tax policy, raised each week while the crown has to borrow or spend its old hoard to repay the war wages, lowered when it no longer has to; the higher it is, the less the people buy and the slower prosperity grows. Labourers pay half the rate, craftsmen the full rate, patricians one and a half; a besieged town or castle pays nothing. In peace nothing is taken and the rate falls back to nothing within four weeks. Only while the townsfolk's purse is live and the crown pays from its current income. You and the AI alike. Off = no war tax on the people, as before")]
         [SettingPropertyGroup("The war tax on the people (stage 5)")]
         public bool WarTaxFromFolk { get; set; } = true;
@@ -5279,6 +5287,10 @@ namespace Armoury
         [SettingPropertyBool("Spoils Of Broken Parties", HintText = "what a broken or disbanded party carried - goods and horses - goes to the victors by their share in the battle (over their carrying limit, and with no victor, to the market of the nearest friendly town or castle); it no longer vanishes")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsOfBrokenParties { get; set; } = true;
+
+        [SettingPropertyBool("Veteran Takes Kit", HintText = "a soldier who leaves service for a tavern takes his own arms and armour from his lord's armoury, as he takes his horse; a mercenary hired at that tavern brings that kit to his new master in place of what he owns at home, and the kit of a veteran who gave up and went home is left at the town's market; your own armoury is not touched (off = the kit stays in the lord's armoury and a hireling brings only his home gear, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool VeteranTakesKit { get; set; } = true;
 
         [SettingPropertyBool("Veteran Keeps Horse", HintText = "a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -5672,6 +5684,7 @@ namespace Armoury
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
+            s.ForgeLikeTownSmith = ForgeLikeTownSmith;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
             s.TempoHastyTime = TempoHastyTime;
@@ -6885,6 +6898,7 @@ namespace Armoury
             s.StragglersRally = StragglersRally;
             s.StragglersRallyWaitDays = StragglersRallyWaitDays;
             s.StragglersRallyReachDays = StragglersRallyReachDays;
+            s.PlayerArmoryLikeAiLord = PlayerArmoryLikeAiLord;
             s.WarTaxFromFolk = WarTaxFromFolk;
             s.WarTaxMax = WarTaxMax;
             s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
@@ -6967,6 +6981,7 @@ namespace Armoury
             s.SpoilsNonFoodToTown = SpoilsNonFoodToTown;
             s.LordDiscardToShelf = LordDiscardToShelf;
             s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
+            s.VeteranTakesKit = VeteranTakesKit;
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
             s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;

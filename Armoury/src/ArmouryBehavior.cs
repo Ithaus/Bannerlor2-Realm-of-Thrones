@@ -392,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); }
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -463,6 +463,9 @@ namespace Armoury
             // E6/K1 (211): obserwacje W (zgony koni / zgony jezdzcow w misjach) i pula koni weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu)
             try { string hf = dataStore.IsSaving ? HorseFate.Export() : null; SaveText.Sync(dataStore, "arm_horsefate", ref hf); if (dataStore.IsLoading) HorseFate.Import(hf); }
             catch (Exception e) { Log.Error("SyncData.arm_horsefate", e); }
+            // C3 (Jeff 14.10): pula kompletow weteranow w karczmach (Import odklada napis - przedmioty przy pierwszym uzyciu); stary zapis bez klucza = pusta pula
+            try { string vk = dataStore.IsSaving ? VetKit.Export() : null; SaveText.Sync(dataStore, "arm_vetkit", ref vk); if (dataStore.IsLoading) VetKit.Import(vk); }
+            catch (Exception e) { Log.Error("SyncData.arm_vetkit", e); }
             // GL-0: odniesienia skal "ludzie okregu" (srednia wies, sredni rynek, srednie podzamcze) i zamrozone przypisanie wsi do targu (format "1|"); wlasny try;
             // brak klucza (stary zapis), inny format albo blad = kalibracja przy pierwszym spisie po wczytaniu (PeopleScale.Import)
             try { string ps = dataStore.IsSaving ? PeopleScale.Export() : null; SaveText.Sync(dataStore, "arm_peoplescale", ref ps); if (dataStore.IsLoading) PeopleScale.Import(ps); }
@@ -858,6 +861,7 @@ namespace Armoury
             // jeniec wziety po bitwie zostaje obszukany - jego rynsztunek idzie do sakw
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
+            CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, CaptiveArmory.OnPrisonerTaken);   // C4 (Jeff 14.10): pojmany gracz - zbrojownia DTE do zdobywcy, jak u lorda AI
             CrownRents.RegisterEvents(this);    // 180 (C3): bitwy, rabunki i szturmy z wrogiem o kazdej porze doby - pomiar sluzby (tylko liczniki do ticku)
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
@@ -1476,7 +1480,7 @@ namespace Armoury
                 for (int i = 0; i < _projects.Count; i++)
                 {
                     var q = Project.Parse(_projects[i]);
-                    if (q.Item == null || q.Kind != "van" || ForgeClock.On) continue;   // wpis 83: godziny z ekranu BK, bez przycinania
+                    if (q.Item == null || q.Kind != "van" || ForgeClock.On || ForgeClock.LikeTown) continue;   // wpis 83: godziny z ekranu BK, bez przycinania; C5: dni kowala, bez przycinania
                     float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier);
                     if (q.DaysLeft > cap) { q.DaysLeft = cap; _projects[i] = q.Serialize(); capped++; }
                 }
@@ -1559,6 +1563,9 @@ namespace Armoury
                     float totalDays = p.Kind == "van"
                         ? MathF.Max(0.1f, Recipes.Grade(p.Item) * Settings.Current.WeaponDaysPerTier)
                         : MathF.Max(1f, rr.Tier * Settings.Current.DaysPerTier * Project.TimeFactor(p.Tempo));
+                    // C5: XP rozlozone na prawdziwa dlugosc roboty (dni kowala) - suma XP projektu bez zmian (inaczej 45 dob kolczugi dawaloby XP x 15)
+                    if (ForgeClock.LikeTown && p.Kind != "bk")
+                        totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy
@@ -1823,6 +1830,7 @@ namespace Armoury
             try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); } DayProfile.Lap("WorkshopInputs.Daily");   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
             try { CamelLaw.Daily(); } catch (Exception e) { Log.Error("CamelLaw.Daily", e); } DayProfile.Lap("CamelLaw.Daily");   // E6/M2 (208): linia "Wierzchowce kanonu (208)" (tylko log)
             try { HorseState.Daily(); } catch (Exception e) { Log.Error("HorseState.Daily", e); } DayProfile.Lap("HorseState.Daily");   // E6/K0 (209): stan koni partii od nowa (po ksiegach dnia, PO Stage6Measure) i linia "Marsz - konie partii (E6/K0)"
+            try { VetKit.Daily(); } catch (Exception e) { Log.Error("VetKit.Daily", e); } DayProfile.Lap("VetKit.Daily");   // C3 (Jeff 14.10): komplety weteranow - nadmiar puli na polki (do domu) i linia "Komplet weterana (C3)" - PO Stage6Measure, jak pula koni
             try { HorseFate.Daily(); } catch (Exception e) { Log.Error("HorseFate.Daily", e); } DayProfile.Lap("HorseFate.Daily");   // E6/K1 (211): pula koni weteranow (nadmiar na polki), linia "Konie - smierc, lup, dobytek (E6/K1)" i zerowanie dnia - PO Stage6Measure (HorseBook czyta liczniki K1)
             try { PackMarket.Daily(); } catch (Exception e) { Log.Error("PackMarket.Daily", e); } DayProfile.Lap("PackMarket.Daily");   // E6/K5 (213): linia "Juczne (213)" - nowe karawany z doby i luzaki pod jukami (spis partii na ladzie)
             try { PackSources.Daily(); } catch (Exception e) { Log.Error("PackSources.Daily", e); } DayProfile.Lap("PackSources.Daily");   // m6b (4): linia "Juczne z niczego (m6b)"
@@ -1913,6 +1921,9 @@ namespace Armoury
                 // wpis 83: godziny z ekranu BK - koszt staminy tej sztuki / 6
                 if (ForgeClock.On)
                     try { days = ForgeClock.HoursOf(Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(item, Hero.MainHero)) / 24f; } catch { }
+                // C5 (Jeff 14.10 "jak u kowali AI"): bron kuta po vanillowemu - tyle dni pracy kowala, ile liczy warsztat AI (wylaczone - jak wyzej)
+                float oldDays = days;
+                days = ForgeClock.WorkHours(item, 1, days * 24f) / 24f;
 
                 var roster = MobileParty.MainParty.ItemRoster;
                 var el = new EquipmentElement(item, modifier);   // takim lezy w sakwach
@@ -1938,6 +1949,7 @@ namespace Armoury
                 // po czasie ma NIE rzucac drugi raz (Jeff: "wykulem, a potem fail
                 // i miecza nie ma"). Modyfikator jedzie z projektem i wraca.
                 StartProject(item, 1, days, here, "van", modifier != null ? modifier.StringId : "");
+                ForgeClock.NoteQueued(item, 1, days * 24f, oldDays * 24f);
                 Log.Player("The blade is roughed out. " + Project.TimeLabel(days) + " of finishing work remain at "
                            + here.Name + (ForgeClock.On ? " - the work goes on only while you stay here." : " - he works it himself, wherever you ride."));
                 // gra przed chwila POKAZALA "dodano do ekwipunku" - bez glosnego

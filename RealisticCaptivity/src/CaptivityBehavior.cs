@@ -142,7 +142,8 @@ namespace RealisticCaptivity
             {
                 if (prisoner != Hero.MainHero)
                 {
-                    if (Settings.Current.StripCompanions && prisoner != null && prisoner.Clan == Clan.PlayerClan)
+                    // C4: pojmany bohater AI zostaje w swoim rynsztunku - towarzysz gracza tez (PlayerLosesLikeAiLord)
+                    if (Settings.Current.StripCompanions && !Settings.Current.PlayerLosesLikeAiLord && prisoner != null && prisoner.Clan == Clan.PlayerClan)
                         StripCompanionGear(prisoner);
                     return;
                 }
@@ -153,7 +154,9 @@ namespace RealisticCaptivity
                 NoteCaptorHome(capturer);   // E8/RC
 
                 _lowborn = !HasNobleStanding();
-                if (Settings.Current.StripEquipment || Settings.Current.CaptorTakesAllFromPlayer) StripGear();   // E5 decyzja 9: caly rynsztunek
+                // C4 (Jeff 14.10): jak pokonany lord AI - rynsztunek zostaje na graczu (unikaty bierze zdobywca w Armoury UniqueSpoils, jak u AI)
+                if (Settings.Current.PlayerLosesLikeAiLord) Log.Info("Pojmanie gracza (C4, jak lord AI): rynsztunek zostaje na graczu (unikaty - zwyczaj wojny Armoury), zloto - tylko lup bitwy (5%, najwyzej 10 000), tabor caly do zdobywcy, zbrojownia DTE - Armoury.");
+                else if (Settings.Current.StripEquipment || Settings.Current.CaptorTakesAllFromPlayer) StripGear();   // E5 decyzja 9: caly rynsztunek
                 LootBaggage(capturer);
                 StartRescueMission();
 
@@ -543,13 +546,16 @@ namespace RealisticCaptivity
             try
             {
                 var s = Settings.Current;
-                bool all = s.CaptorTakesAllFromPlayer;
+                // C4 (Jeff 14.10): jak pokonany lord AI - tabor caly (rozbita druzyna lorda traci go zwyciezcom: gra pol, reszta Armoury R14), zloto RC nie bierze
+                // (lup bitwy: GoldLost 5% kiesy, najwyzej 10 000 - gra, Armoury A6 sciaga z kiesy wodza, takze gracza w niewoli)
+                bool likeAi = s.PlayerLosesLikeAiLord;
+                bool all = s.CaptorTakesAllFromPlayer || likeAi;
                 var party = MobileParty.MainParty;
                 int itemsTaken = 0;
                 // E5 decyzja 9: ladunek do pojmujacego - partia w polu albo osada (zapas osady); bez pojmujacego nic nie zabieramy
                 ItemRoster dest = capturer != null && capturer.ItemRoster != null && (capturer.IsMobile || (all && capturer.IsSettlement)) ? capturer.ItemRoster : null;
                 // Jeff 12.10 (pytanie 3): cale juki, odbiorca jak zlota - milicja i zaloga bez bohatera oddaja ladunek do zapasu swojej osady (jak zloto do jej kasy)
-                bool allBag = all && s.CaptorTakesAllBaggage;
+                bool allBag = (all && s.CaptorTakesAllBaggage) || likeAi;
                 Settlement bagHome = allBag ? CaptorHome(capturer) : null;
                 if (bagHome != null && bagHome.ItemRoster != null) dest = bagHome.ItemRoster;
                 int pct = allBag ? 100 : s.LootPartyInventoryPercent;
@@ -572,7 +578,8 @@ namespace RealisticCaptivity
 
                 int goldTaken = 0;
                 string to = "";
-                if (all)
+                if (likeAi) to = "nikt - jak lord AI: zloto tylko przez lup bitwy (5%, najwyzej 10 000; A6)";
+                else if (all)
                 {
                     int g = Hero.MainHero.Gold;
                     if (g > 0)
@@ -593,9 +600,12 @@ namespace RealisticCaptivity
                 }
 
                 Log.Info("Przetrzasnieto juki: " + itemsTaken + " przedmiotow, " + goldTaken + " zlota."
-                         + (all ? " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> " + to + "; ladunek " + pct + "%" + (allBag ? " (cale juki, CaptorTakesAllBaggage)" : "") + " -> "
+                         + (all ? (likeAi ? " C4 (PlayerLosesLikeAiLord): zloto -> " : " E5 (decyzja 9, CaptorTakesAllFromPlayer): cale zloto -> ") + to + "; ladunek " + pct + "%" + (allBag ? (likeAi ? " (caly tabor, jak lord AI)" : " (cale juki, CaptorTakesAllBaggage)") : "") + " -> "
                                 + (dest != null ? (bagHome != null && dest == bagHome.ItemRoster ? "zapas osady " + bagHome.Name : (capturer.IsSettlement ? "zapas osady " : "juki partii ") + capturer.Name) : "nikt (nic nie zabrano)") : ""));
-                if (all && goldTaken > 0)
+                if (likeAi)
+                    Log.Player((itemsTaken > 0 ? "Your captors take your whole baggage train (" + itemsTaken + " items), as from any beaten lord. " : "")
+                               + "You keep your arms and your purse - your purse pays only the battle's toll, as any lord's does.", true);
+                else if (all && goldTaken > 0)
                     Log.Player("They emptied your purse - every one of your " + goldTaken + " gold is theirs now" + (itemsTaken > 0 ? (allBag ? ", and your whole baggage train with it (" + itemsTaken + " items)." : ", and " + itemsTaken + " items from your baggage with it.") : "."), true);
                 else if (itemsTaken > 0 || goldTaken > 0)
                     Log.Player("They went through your baggage: " + itemsTaken + " items and " + goldTaken + " gold are gone.", true);

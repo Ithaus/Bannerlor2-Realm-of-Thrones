@@ -294,6 +294,8 @@ namespace Armoury
                 Recipes.TakeMaterials(r);
                 SpendStamina(MathF.Max(1, (int)(r.Stamina * (1f - relief * s.HelperStaminaRelief))));
                 days = s.ForgeTakesTime ? MathF.Max(0.5f, r.Tier * s.DaysPerTier * Project.TimeFactor(tempo)) : 0f;
+                // C5 (Jeff 14.10 "jak u kowali AI"): podstawa = dni kowala z warsztatu AI x godziny dnia kowala (tempo i pomocnik jak dotad)
+                if (s.ForgeTakesTime && ForgeClock.LikeTown) days = MathF.Max(0.25f / 24f, ForgeClock.WorkHours(item, 1, 24f * r.Tier * s.DaysPerTier) / 24f * Project.TimeFactor(tempo));
                 days *= (1f - relief * s.HelperTimeRelief);
                 if (helper != null)
                 {
@@ -618,7 +620,9 @@ namespace Armoury
                 if (ForgeClock.On && TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement != null)
                 {
                     // wpis 83: na lawe kowala, wydanie po godzinach z ekranu BK (stamina / 6)
-                    ForgeClock.Queue(item, quality, made, ForgeClock.HoursOf(r.Stamina));
+                    float fh = ForgeClock.WorkHours(item, made, ForgeClock.HoursOf(r.Stamina));   // C5: dni kowala z warsztatu AI x sztuk serii (wylaczone - stamina / 6)
+                    ForgeClock.Queue(item, quality, made, fh);
+                    ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(r.Stamina));
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
                     RangedLore.OnCrafted(item);
                     hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);

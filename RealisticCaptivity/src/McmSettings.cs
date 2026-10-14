@@ -36,6 +36,10 @@ namespace RealisticCaptivity
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllFromPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Player Loses Like Ai Lord", HintText = "when you are taken captive you lose what a beaten AI lord loses, no more and no less: your captors keep you in your own arms and clothes (a lord's renowned arms still go by the custom of war), your purse pays only the battle's toll as any lord's does (a twentieth, at most 10000), and your whole baggage train is theirs as a broken lord's company is; your companions keep their gear too (overrides Captor Takes All From Player, Strip Equipment, Strip Companions and Loot Gold Percent; off = as before)")]
+        [SettingPropertyGroup("Gear and plunder")]
+        public bool PlayerLosesLikeAiLord { get; set; } = true;
+
         [SettingPropertyBool("Captor Takes All Baggage", HintText = "with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before)")]
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllBaggage { get; set; } = true;
@@ -464,6 +468,7 @@ namespace RealisticCaptivity
             s.LootPartyInventoryPercent = LootPartyInventoryPercent;
             s.LootGoldPercent = LootGoldPercent;
             s.CaptorTakesAllFromPlayer = CaptorTakesAllFromPlayer;
+            s.PlayerLosesLikeAiLord = PlayerLosesLikeAiLord;
             s.CaptorTakesAllBaggage = CaptorTakesAllBaggage;
             s.BuybackEnabled = BuybackEnabled;
             s.BuybackPriceMultiplier = BuybackPriceMultiplier;
