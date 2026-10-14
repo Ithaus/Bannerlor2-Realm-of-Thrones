@@ -83,8 +83,8 @@ namespace CrashScribe
         // --- Atuty BK z nagrody za bitwe (decyzja Jeffa 4, 12.10; patrz Mends.BkRewardPerks) ---
         public static bool BkBattleRewardPerks = true;       // latka BK BKBattleRewardTweakPatches nie wchodzi w 1.4.8 (nazwy parametrow) - nasze postfiksy z ta sama logika (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), kazdy tylko gdy BK go nie ma; false = bez tych atutow
 
-        // --- S9 (projekt oblezen 14.10, rozdz. 2): BK bez krolestw z rodow buntownikow (patrz Mends.BkRebelKingdoms) ---
-        public static bool BkRebelKingdoms = false;          // false (S9): przy starcie i wczytaniu kampanii BKClanBehavior._disableRebelKingdom = true - rod buntownikow z lennem po 30 dobach (RebellionsCampaignBehavior) zostaje rodem bez krolestwa (obsluga gry), BK nie robi z niego krolestwa "County / Barony of"; pliki BK nietkniete; true = jak dotad (BK robi krolestwo)
+        // --- S9 (projekt oblezen 14.10, rozdz. 2; recenzja 14.10): BK bez nowych krolestw z rodow odchodzacych z lennem (patrz Mends.BkRebelKingdoms) ---
+        public static bool BkRebelKingdoms = false;          // false (S9): secesja grupy radykalnej BK (RadicalGroup.TriggerRevolt / RebellionActions.CreateRebelKingdom - droga wszystkich panstw "County / Barony / Kingdom of" w fin30) - rody wychodza z lennem jako rody bez krolestwa (droga gry LeaveWithRebellion; po ustapieniu wladcy pokoj ze starym); bunt chlopski - BKClanBehavior._disableRebelKingdom = true (rod buntownikow po 30 dobach zostaje bez krolestwa); pliki BK nietkniete; true = jak dotad (BK robi krolestwa, latki secesji nie wpiete)
 
         // --- E8/M (247): edukacja BK gracza (patrz Quiet.KnownBkEducation, Mends.BkEducationCheck) ---
         public static bool QuietBkEducation = true;          // znany wyjatek BK CorrectPlayerEducation (finalizer BKROT go polyka): jedna linia zamiast bloku ERROR + raz na gre linia jezyka gracza w BK; false = blok ERROR jak dotad, bez linii

@@ -647,7 +647,8 @@ Uzycie (Python 3, tylko odczyt):
                     zebrana >= wymagana albo w odsieczy >= 80% druzyn w zasiegu w >= 80% takich oblezen, OD-3 armie wladcy (INFO), OD-4 stolice zdobyte <= 1 na
                     364 doby (W-5), OD-5 oblezenia wedlug klasy i bitwy pod murami (INFO), OD-6 podbite -> w odsieczy (INFO); S11: OD-7 linie rodow z lennem
                     (INFO wedlug przyczyny); S9: OD-8 krolestwa BK z buntu 0 i nowe panstwa <= 1 na 364 doby (W-13; werdykt tylko z --crashscribe i linia S9),
-                    OD-9 linia "Mends: BK rebel kingdoms off" i rody buntownikow bez krolestwa BK. Log bez paczki: INFO, bez wyjatku.
+                    OD-9 linia "Mends: BK rebel kingdoms off" z latkami secesji BK "wpieta TAK", secesje przejete (rody niezalezne z lennem, potkniecia 0)
+                    i rody buntownikow bez krolestwa BK (recenzja 14.10: panstwa fin30 to secesje grup radykalnych BK, nie bunty). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -23521,6 +23522,8 @@ OD_ARMY = re.compile(r"^Odsiecz \(OB5\) armia krola: dzien (\d+) \| (.+?) \((sto
 OD_S11 = re.compile(r"^Rod z lennem zmienia krolestwo \(S11\): dzien (\d+) \| rod (.+?) \((\S+)\), glowa .*? \| (.+?) -> (.+?) \| przyczyna (\w+)")
 OD_NEWK = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?) - (.+?): WOJNA \(przyczyna CausedByKingdomCreation\)")
 OD_KLIST = re.compile(r"^KingdomBalance \(175\.0\): krolestwa id=nazwa: (.*)$")
+OD_OWN = re.compile(r"odsiecz zamku pominieta przy wlasnym oblezeniu druzyny (\d+)")
+OD_SEC = re.compile(r"Mends: S9 secesja BK bez nowego krolestwa: dzien (\d+) \| krolestwo (.+?) \| (.+?) \| rody niezalezne z lennem: (\d+).*?\| potkniecia (\d+)\.")
 # pola OD_END (indeksy grup od 0): 0 dzien, 1 osada, 2 id, 3 klasa, 4 krolestwo, 5 oblegajacy, 6 wodz, 7 sila start, 8 sila max, 9 dob, 10 wymagana, 11 zebrana max,
 # 12 % wymaganej, 13 w zasiegu, 14 w odsieczy, 15 podbitych, 16 potem w odsieczy, 17 podbic, 18 armie krola, 19 bitwy, 20 wygrane, 21 wynik, 22 jak
 
@@ -23534,11 +23537,14 @@ def odsiecz_main(logp, csp=None, until=100000):
     >= 80% oblezen; OD-3 armie wladcy (INFO); OD-4 stolice zdobyte <= 1 na 364 doby (prog W-5 projektu); OD-5 oblezenia wedlug klasy, bitwy pod murami
     poza szturmem i wygrane strony krolestwa (INFO); OD-6 druzyny podbite przez OB5, ktore potem byly w odsieczy (INFO).
     S11: OD-7 linie rodow z lennem wedlug przyczyny (INFO). S9: OD-8 nowe panstwa z linii E7/0 (CausedByKingdomCreation): BK (nazwa bez "Rebels)") 0 i
-    razem <= 1 na 364 doby (W-13) - werdykt tylko, gdy log CrashScribe ma linie "Mends: BK rebel kingdoms off"; OD-9 ta linia i rody buntownikow po 30
+    razem <= 1 na 364 doby (W-13) - werdykt tylko, gdy log CrashScribe ma linie "Mends: BK rebel kingdoms off" z "wpieta TAK"; OD-9 ta linia (latki secesji
+    BK RadicalGroup.TriggerRevolt / RebellionActions.CreateRebelKingdom wpiete - recenzja 14.10), secesje przejete (linie "Mends: S9 secesja BK", potkniecia 0)
+    i rody buntownikow po 30
     dobach bez krolestwa BK (linie "Mends: S9 rod buntownikow").
     Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     start, days, ends, armies, s11, newk = [], {}, [], [], [], []
+    owns = {}   # doba -> odsiecz zamku pominieta przy wlasnym oblezeniu druzyny (recenzja 14.10)
     keys = ("Odsiecz (OB5)", "Rod z lennem zmienia krolestwo (S11)", "CausedByKingdomCreation", "krolestwa id=nazwa")
     known = set()   # nazwy krolestw z linii startu sesji KingdomBalance; nowe panstwo = strona linii E7/0 spoza znanych (strona bywa pierwsza albo druga)
     with open(logp, encoding="utf-8", errors="replace") as f:
@@ -23553,6 +23559,8 @@ def odsiecz_main(logp, csp=None, until=100000):
             m = OD_DAY.match(s)
             if m:
                 days[int(m.group(1))] = [int(x) for x in m.groups()[1:]]
+                mo = OD_OWN.search(s)
+                owns[int(m.group(1))] = int(mo.group(1)) if mo else 0
                 continue
             m = OD_END.match(s)
             if m:
@@ -23582,6 +23590,7 @@ def odsiecz_main(logp, csp=None, until=100000):
     d0 = min(days) if days else None
     if d0 is not None:
         days = {d: v for d, v in days.items() if d - d0 + 1 <= until}
+        owns = {d: v for d, v in owns.items() if d - d0 + 1 <= until}
         ends = [e for e in ends if int(e[0]) - d0 + 1 <= until]
         armies = [a for a in armies if int(a[0]) - d0 + 1 <= until]
         s11 = [x for x in s11 if int(x[0]) - d0 + 1 <= until]
@@ -23622,8 +23631,9 @@ def odsiecz_main(logp, csp=None, until=100000):
         for a in armies:
             bycls[a[2]] = bycls.get(a[2], 0) + 1
         offers = sum(v[9] for v in days.values())
+        ownsg = sum(owns.values())   # recenzja 14.10: odsiecz zamku nie zwija wlasnego oblezenia druzyny (licznik w linii doby)
         nocall = sum(v[10] for v in days.values())
-        rep.add("OD-3: armie wladcy na odsiecz (INFO)", f"zalozone {len(armies)} ({', '.join(f'{k} {v}' for k, v in sorted(bycls.items())) or '-'}); opcje {offers}, wladca bez druzyn do wezwania {nocall}",
+        rep.add("OD-3: armie wladcy na odsiecz (INFO)", f"zalozone {len(armies)} ({', '.join(f'{k} {v}' for k, v in sorted(bycls.items())) or '-'}); opcje {offers}, wladca bez druzyn do wezwania {nocall}; odsiecz zamku pominieta przy wlasnym oblezeniu {ownsg}",
                 "INFO (armia tylko, gdy wladca wolny, w zasiegu i ma kogo wezwac)", None)
     # OD-4 .. OD-6
     if ends:
@@ -23657,6 +23667,7 @@ def odsiecz_main(logp, csp=None, until=100000):
         rep.add("OD-7: linie S11", "brak linii", "linia przy kazdej zmianie krolestwa rodu z lennem", None)
     # S9 - log CrashScribe
     s9on, s9warn, s9clans, s9bk = None, 0, 0, 0
+    s9hook, s9sec, s9secclans, s9secst = None, 0, 0, 0   # recenzja 14.10: latki secesji BK i secesje przejete
     if csp:
         try:
             with open(csp, encoding="utf-8", errors="replace") as f:
@@ -23664,11 +23675,21 @@ def odsiecz_main(logp, csp=None, until=100000):
                     if "Mends: BK rebel kingdoms" in ln:
                         if "rebel kingdoms off (S9)" in ln:
                             s9on = True if s9on is None else s9on
+                            hk = "wpieta TAK" in ln
+                            s9hook = hk if s9hook is None else (s9hook and hk)
                         elif "OSTRZEZENIE" in ln:
                             s9warn += 1
                             s9on = False
                         elif "rebel kingdoms on" in ln:
                             s9on = False
+                    elif "Mends: S9 secesja BK" in ln:
+                        ms = OD_SEC.search(ln)
+                        if ms:
+                            s9sec += 1
+                            s9secclans += int(ms.group(4))
+                            s9secst += int(ms.group(5))
+                        else:
+                            s9secst += 1   # "grupa bez lidera albo krolestwa"
                     elif "Mends: S9 rod buntownikow" in ln:
                         s9clans += 1
                         if "BK zrobi krolestwo" in ln:
@@ -23680,14 +23701,16 @@ def odsiecz_main(logp, csp=None, until=100000):
         if s9on is None:
             rep.add("OD-9: S9 - linia 'Mends: BK rebel kingdoms off'", "brak linii", "linia przy starcie / wczytaniu", None)
         else:
-            rep.add("OD-9: S9 - linia 'Mends: BK rebel kingdoms off', rody buntownikow bez krolestwa BK",
-                    f"{'off' if s9on else 'NIE czynne'} (ostrzezen {s9warn}); rodow buntownikow po 30 dobach {s9clans}, z krolestwem BK {s9bk}", "off, 0 z krolestwem BK", bool(s9on) and s9bk == 0)
+            rep.add("OD-9: S9 - linia 'Mends: BK rebel kingdoms off' (secesja BK wpieta), secesje przejete, rody buntownikow bez krolestwa BK",
+                    f"{'off' if s9on else 'NIE czynne'} (ostrzezen {s9warn}), latki secesji {'TAK' if s9hook else 'NIE'}; secesji przejetych {s9sec} (rodow niezaleznych {s9secclans}, potkniec {s9secst});"
+                    f" rodow buntownikow po 30 dobach {s9clans}, z krolestwem BK {s9bk}", "off, latki TAK, potkniecia 0, 0 z krolestwem BK",
+                    bool(s9on) and bool(s9hook) and s9secst == 0 and s9bk == 0)
     bk = set(x[1] for x in newk if "Rebels)" not in x[1])
     names = sorted(set(x[1] for x in newk))
     span_all = (max(days) - min(days) + 1) if days else None
     lim_k = max(1, -(-span_all // 364)) if span_all else 1
     val = f"nowe panstwa {len(names)}" + (f" ({', '.join(names[:6])})" if names else "") + f"; z BK (nazwa bez 'Rebels)') {len(bk)}"
-    if csp and s9on:
+    if csp and s9on and s9hook:
         rep.add("OD-8: nowe panstwa (S9, W-13)", val, f"BK 0, razem <= {lim_k} (1 na 364 doby)", len(bk) == 0 and len(names) <= lim_k)
     else:
         rep.add("OD-8: nowe panstwa (S9, W-13)", val, "BK 0, razem <= 1 na 364 doby (werdykt z --crashscribe i linia S9)", None)

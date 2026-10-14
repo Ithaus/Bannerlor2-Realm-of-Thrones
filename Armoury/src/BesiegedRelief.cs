@@ -44,6 +44,9 @@ namespace Armoury
     ///    miasto 1.3, zamek 1.1 - kazda > 1, wiec obrona wygrywa z kazdym innym celem (najazd, lupienie, oblezenie gdzie indziej, poscig, patrol, wizyta),
     ///    a stolica z miastem i zamkiem. 0.5 - prog gry na zmiane celu (0.1, 6 rzutow na godzine mysli) przechodzi wtedy z pewnoscia 1 - 0.5^6 = 98%.
     ///    Druzyna, bez ktorej zebrana odsiecz i tak >= R, nie jest podbijana (bez nadmiaru i bez przeskokow).
+    ///  - Recenzja 14.10: druzyna (wodz armii), ktora sama oblega twierdze wroga, nie jest podbijana do odsieczy ZAMKU - tylko stolicy i miasta (decyzja
+    ///    Jeffa wymienia "oblezenia gdzie indziej" przy stolicy i miescie); inaczej dwa krolestwa oblegajace nawzajem swoje zamki w zasiegu zwijalyby
+    ///    oba obozy co kilka godzin (petla odsieczy). Najazdy, poscigi, patrole i wizyty ustepuja takze odsieczy zamku.
     ///  - Nie podbijamy: druzyny glodujacej (PartyBase.IsStarving - najpierw jedzenie, droga gry), druzyny w bitwie innej niz rabunek, czlonka cudzej armii,
     ///    wodza armii czekajacej na czlonkow (DoNotChangeBehavior), druzyn w oblezonej osadzie (gra ich nie pyta).
     ///  - Wladca krolestwa (wolny, poza armia, ze swoja druzyna w zasiegu i z druzynami do wezwania - CanLordCreateArmy przeszlo w tej mysli) dostaje dodatkowa
@@ -94,7 +97,7 @@ namespace Armoury
         private static readonly List<Siege> _tmpSg = new List<Siege>();
         private static readonly HashSet<MobileParty> _dParties = new HashSet<MobileParty>();
         private static double _hour = -1.0;
-        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles;
+        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege;
         private static bool _patched; private static string _missing; private static MethodBase _target;
 
         private static Settings S { get { return Settings.Current; } }
@@ -104,7 +107,7 @@ namespace Armoury
         internal static void Reset()
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0;
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = 0;
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = 0;
         }
 
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -352,10 +355,14 @@ namespace Armoury
                 if (party.Party.IsStarving) { _dStarve++; return; }   // najpierw jedzenie - droga gry
 
                 float b = Math.Max(Math.Max(other, FloorBase), dMax);
+                bool ownSiege = party.BesiegedSettlement != null;   // druzyna (wodz armii) sama oblega twierdze wroga
                 Siege top = null; float topScore = -1f; AIBehaviorData topData = default(AIBehaviorData);
                 for (int j = 0; j < _tmpIdx.Count; j++)
                 {
                     var sg = _tmpSg[j];
+                    // recenzja 14.10: odsiecz ZAMKU nie zdejmuje wlasnego oblezenia (decyzja Jeffa wymienia "oblezenia gdzie indziej" przy stolicy i miescie);
+                    // bez tego dwa krolestwa oblegajace nawzajem swoje zamki w zasiegu zwijalyby oba obozy co kilka godzin (petla odsieczy)
+                    if (ownSiege && sg.Cls == CCastle) { _dOwnSiege++; continue; }
                     float rest = sg.Committed - (sg.In.Contains(party) ? Contrib(party) : 0f);
                     if (rest >= sg.Need) continue;   // odsiecz wystarczy bez tej druzyny
                     var e = scores[_tmpIdx[j]];
@@ -422,6 +429,13 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("OnArmyCreated", e); }
+        }
+
+        /// <summary>Armia rozwiazana - wpis "armia OB5 -> osada odsieczy" usuwany (slownik nie rosnie przez kampanie). Nie rzuca.</summary>
+        internal static void OnArmyDispersed(Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
+        {
+            try { if (army != null) _armyFor.Remove(army); }
+            catch (Exception e) { Stumble("OnArmyDispersed", e); }
         }
 
         internal static void OnOwnerChanged(Settlement st, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturer, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
@@ -551,6 +565,7 @@ namespace Armoury
                   .Append(" | dzis: oblezen nowych ").Append(_dStarted).Append(", skonczonych ").Append(_dEnded).Append(" (zdobytych ").Append(_dCaptured).Append(")")
                   .Append(", oceny obrony podbite ").Append(_dRaised).Append(" razy u ").Append(_dParties.Count).Append(" druzyn, pominiete z glodu ").Append(_dStarve)
                   .Append(", opcje armii wladcy ").Append(_dKingOffer).Append(" (wladca bez druzyn do wezwania ").Append(_dKingNoCall).Append("), armie wladcy zalozone ").Append(_dArmies)
+                  .Append(" (odsiecz zamku pominieta przy wlasnym oblezeniu druzyny ").Append(_dOwnSiege).Append(")")
                   .Append(" | trwajace oblezenia: podbite druzyny potem w odsieczy ").Append(redir)
                   .Append(" | ").Append(shown > 0 ? rows.ToString() : "-")
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
@@ -562,7 +577,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = 0;
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = 0;
             _dParties.Clear();
         }
     }
@@ -577,6 +592,7 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s) { BesiegedRelief.SessionStart(); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, BesiegedRelief.Daily);
             CampaignEvents.ArmyCreated.AddNonSerializedListener(this, BesiegedRelief.OnArmyCreated);
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, BesiegedRelief.OnArmyDispersed);
             CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, BesiegedRelief.OnSiegeEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BesiegedRelief.OnMapEventEnded);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, BesiegedRelief.OnOwnerChanged);
