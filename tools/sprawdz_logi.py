@@ -688,7 +688,8 @@ Uzycie (Python 3, tylko odczyt):
                     siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0), AUD-P3-01a..d (AM-01, BKROT EarlyHeal: zdjety 3/3
                     i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO); z logiem Armoury (Armoury-*.log jako log,
                     --crashscribe <session-*.log>): AUD-P3-30a..d (AM-30, warsztaty bez wsadu: regula A na wszystkie typy z rzeznikiem na liscie,
-                    cykle rzeznika zablokowane > 0, (B) BK Workshop Inputs Fix NIE albo 4 dopisane linie, suma wedlug typu INFO).
+                    cykle rzeznika zablokowane > 0, (B) BK Workshop Inputs Fix NIE albo 4 dopisane linie, suma wedlug typu INFO); AUD-P3-28a..c (AM-28,
+                    wiara Lorath: postfiks IsCultureEssosi wpiety, wiara pattern z kultura nord, po >= 7 dobach osady i lordowie nord z wiara > 0).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25124,6 +25125,10 @@ AU3_T_SESS = re.compile(r"Mends: wzorce kultur \(AM-29\) - start sesji: wzorcow 
 AU3_P_START = re.compile(r"Mends: dobrobyt \(AM-01\) - (?:BKROTPatch bez latek EarlyHeal \(nic do zdjecia\), )?BKROT EarlyHeal zdjety (\d+)/(\d+) \((.*?)\);"
                          r" straz NaN/Inf na Town\.set_Prosperity (wpieta|NIE wpieta)")
 AU3_P_SESS = re.compile(r"Mends: dobrobyt \(AM-01\) - start sesji: twierdz (\d+), NaN/Inf w zapisie -> 0: (\d+), ponizej 100: (\d+)")
+AU3_L_START = re.compile(r"Mends: wiara Lorath \(AM-28\) - postfiks BKROT CultureHelpers\.IsCultureEssosi \(nord -> Essos\) (wpiety|NIE wpiety[^.]*)")
+AU3_L_SESS = re.compile(r"Mends: wiara Lorath \(AM-28\) - start sesji: wiara pattern \(Lorath\) kultury ulubione (\[[^\]]*\]|\?) \(null -> nord: (\d+)\),"
+                        r" bohaterow nord z wiara (\d+), bez wiary (\d+) \| jednorazowe nadanie wiary jak BK: (.*?), trafien postfiksu w procesie (\d+)\.")
+AU3_L_DAY = re.compile(r"Mends: wiara Lorath \(AM-28\) doba: osady nord z wiara BK (\d+)/(\d+), lordowie nord z wiara (\d+)/(\d+), trafien postfiksu (\d+)\.")
 AU3_P_DAY = re.compile(r"Mends: dobrobyt \(AM-01\) doba: NaN/Inf zablokowanych (\d+) \(lacznie (\d+)\), prefiks EarlyHeal BKROT (brak|WROCIL: .*?),"
                        r" twierdz ponizej 100: (\d+)\.")
 
@@ -25131,7 +25136,7 @@ AU3_P_DAY = re.compile(r"Mends: dobrobyt \(AM-01\) doba: NaN/Inf zablokowanych (
 def audyta_p3_cs(csp):
     """Jedno przejscie po logu sesji CrashScribe: linie paczki P3 wedlug pozycji."""
     d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0,
-         "p_start": [], "p_off": 0, "p_sess": [], "p_day": []}
+         "p_start": [], "p_off": 0, "p_sess": [], "p_day": [], "l_start": [], "l_off": 0, "l_sess": [], "l_day": []}
     with open(csp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             if "Mends: " not in ln and "AuditP3." not in ln:
@@ -25163,6 +25168,21 @@ def audyta_p3_cs(csp):
                     if m:
                         d["t_sess"].append(m.groups())
                 continue
+            if "(AM-28)" in s:
+                m = AU3_L_START.search(s)
+                if m:
+                    d["l_start"].append(m.group(1))
+                elif "wiara Lorath (AM-28) wylaczone" in s:
+                    d["l_off"] += 1
+                else:
+                    m = AU3_L_SESS.search(s)
+                    if m:
+                        d["l_sess"].append(m.groups())
+                    else:
+                        m = AU3_L_DAY.search(s)
+                        if m:
+                            d["l_day"].append(m.groups())
+                continue
             if "(AM-01)" in s:
                 m = AU3_P_START.search(s)
                 if m:
@@ -25192,6 +25212,8 @@ def audyta_p3(rep, csp, armp):
     AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
     (usuniete z jakich kultur - w wierszu); AUD-P3-29c siatka bez zastepcy 0 (podmiany INFO).
     AM-30 (Armoury; audyta_p3_arm): AUD-P3-30a..d.
+    AM-28 (LorathFaithFix): AUD-P3-28a postfiks IsCultureEssosi wpiety; AUD-P3-28b wiara pattern z kultura nord (bez null); AUD-P3-28c po >= 7 dobach
+    lordowie nord z wiara > 0 i osady nord z wiara BK > 0 (ostatnia doba); nadanie jednorazowe INFO.
     AM-01 (StopBkrotProsperityReset): AUD-P3-01a linia startu 'BKROT EarlyHeal zdjety 3/3' i straz NaN wpieta; AUD-P3-01b kazda doba: prefiks
     EarlyHeal BKROT brak (GetPatchInfo); AUD-P3-01c INFO NaN/Inf zablokowanych (lacznie) i w zapisie; AUD-P3-01d INFO twierdz ponizej 100 (najwiecej).
     Brak linii = INFO."""
@@ -25261,6 +25283,22 @@ def audyta_p3(rep, csp, armp):
                     "INFO (dotad BKROT dawal im 2000 / 4000; teraz moga zostac ponizej 100)", None)
         elif d["p_start"]:
             rep.add("AUD-P3-01b (AM-01): linia doby dobrobytu", "brak (czas gry nie ruszyl)", "INFO", None)
+        # AM-28
+        if d["l_off"] and not d["l_start"]:
+            rep.add("AUD-P3-28a (AM-28): wiara Lorath", "wylaczone (LorathFaithFix=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["l_start"]:
+            rep.add("AUD-P3-28a (AM-28): postfiks BKROT IsCultureEssosi (nord -> Essos)", d["l_start"][-1], "wpiety", d["l_start"][-1] == "wpiety")
+        else:
+            rep.add("AUD-P3-28a (AM-28): linia startu wiary Lorath", "brak", "INFO (log bez paczki P3)", None)
+        if d["l_sess"]:
+            fav, nfix, wth, wout, give, hits = d["l_sess"][-1]
+            rep.add("AUD-P3-28b (AM-28): wiara pattern (Lorath) z kultura nord", f"kultury ulubione {fav} (null -> nord {nfix}); bohaterow nord z wiara {wth}, bez {wout}; nadanie: {give[:120]}",
+                    "nord w liscie, bez null", "nord" in fav and "null" not in fav)
+        if d["l_day"]:
+            sf, st_, lf, lt, _h = (int(v) for v in d["l_day"][-1])
+            ok = None if len(d["l_day"]) < 7 else (sf > 0 and lf > 0)
+            rep.add("AUD-P3-28c (AM-28): osady i lordowie nord z wiara BK (ostatnia doba)", f"osady {sf}/{st_}, lordowie {lf}/{lt} (dob {len(d['l_day'])})",
+                    "> 0 i > 0 po >= 7 dobach (dotad 0 - BKROT nie znal kultury nord)", ok)
         if d["errs"]:
             rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
     audyta_p3_arm(rep, armp)   # AM-30: log Armoury

@@ -108,6 +108,7 @@ namespace CrashScribe
         public static bool LocalLeviesPreachersOnly = true;   // AM-20 (tylko z LocalRecruits): krok 1 LocalLevies (kultura osady dla notabla) tylko dla kaplanow i bez kaplana z kultura glowy rodu pana - rzemieslnicy i kupcy podbitego miasta raz przyjmuja kulture pana jak w BK (dotad CrashScribe cofal to nazajutrz: 675 Artisan + 24 Merchant w 2 lata, pan placil wplywem za nic); obcy ochotnicy do kosza dalej u wszystkich; false = kazdy notabl dostaje kulture osady (b47fecc3)
         public static bool CultureTemplateRepair = true;      // AM-29: przy kazdym starcie sesji z list wzorcow kultur (lord / notable / rebel) wylatuja wpisy niegotowe z ROT-Content (np. spc_brotherhood_2 w lord_templates Westerlands - ok. 16% szansy na wywrotke przy zakladaniu rodu towarzysza) + siatka na CreateNewHeroForNewCompanionClan; false = listy jak dotad (b47fecc3)
         public static bool StopBkrotProsperityReset = true;   // AM-01: zdjete 3 prefiksy BKROT EarlyHeal (getter Town.Prosperity, CalculateLoyaltyChange, CalculateSecurityChange) - twierdza ponizej 100 dobrobytu nie dostaje juz 2000 / 4000 z niczego; w zamian straz NaN / Inf na Town.set_Prosperity, NaN w zapisie -> 0 przy starcie sesji; linia doby (NaN, czy prefiks BKROT wrocil); false = BKROT EarlyHeal jak dotad (b47fecc3)
+        public static bool LorathFaithFix = true;             // AM-28: postfiks BKROT CultureHelpers.IsCultureEssosi - kultura nord (Lorath w ROT 8.1.8; BKROT zna stara 'lorathi') jest kultura Essos dla wiar BKROT; null w kulturach ulubionych wiary Pattern -> nord; w kampanii sprzed naprawy (zaden bohater nord bez wiary) jednorazowe nadanie wiary jak BK przy starcie gry; false = Lorath bez wiary BK (b47fecc3)
 
         internal static void Load(string moduleDataDir)
         {
@@ -188,6 +189,7 @@ namespace CrashScribe
                         case "LocalLeviesPreachersOnly": LocalLeviesPreachersOnly = B(v); break;
                         case "CultureTemplateRepair": CultureTemplateRepair = B(v); break;
                         case "StopBkrotProsperityReset": StopBkrotProsperityReset = B(v); break;
+                        case "LorathFaithFix": LorathFaithFix = B(v); break;
                     }
                 }
             }

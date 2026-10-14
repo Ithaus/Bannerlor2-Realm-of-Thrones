@@ -358,4 +358,12 @@
        found in a save is set to 0 when the campaign is loaded. BKROTPatch's fixes for broken loyalty and security stay.
        Files of BKROTPatch are not changed. Set to false to keep the BKROTPatch reset. -->
   <StopBkrotProsperityReset>true</StopBkrotProsperityReset>
+  <!-- Faith of Lorath (mod audit 14.10, AM-28). BKROTPatch still knows Lorath by its old culture name from Realm of Thrones 6
+       ('lorathi'); in Realm of Thrones 8.1.8 the Lorathi culture is called 'nord'. Because of that no Essos faith of BKROTPatch
+       counted Lorath as its own: the lords of Lorath got no Banner Kings faith, and the towns and villages of Lorath had no faith
+       and no priests. With this on, CrashScribe tells BKROTPatch that the Lorathi are a culture of Essos (as BKROTPatch meant),
+       makes Lorath the home culture of the Pattern faith, and - only in a campaign started before this fix, where no Lorathi
+       character has a faith yet - hands out faiths to Lorathi characters once, the same way Banner Kings does at the start of
+       a campaign. Files of BKROTPatch are not changed. Set to false to leave Lorath without a faith. -->
+  <LorathFaithFix>true</LorathFaithFix>
 </CrashScribe>

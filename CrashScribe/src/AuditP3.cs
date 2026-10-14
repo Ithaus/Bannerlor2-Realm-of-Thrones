@@ -22,7 +22,9 @@ namespace CrashScribe
     /// prywatny setter; lista, z ktorej nic by nie zostalo - bez zmian + linia). Siatka: prefiks na CreateNewHeroForNewCompanionClan podmienia
     /// zepsuty wzorzec na gotowy wzorzec lorda tej samej kultury (gdy filtr nie zadzialal).
     /// AM-01 (StopBkrotProsperityReset): 3 prefiksy BKROT EarlyHeal zdjete (dobrobyt twierdzy &lt; 100 -> 2000 / 4000 z niczego), straz NaN / Inf
-    /// na Town.set_Prosperity - opis przy ProsperityInstall.</summary>
+    /// na Town.set_Prosperity - opis przy ProsperityInstall.
+    /// AM-28 (LorathFaithFix): BKROT zna stara kulture 'lorathi' (w ROT 8.1.8 Lorath = 'nord') - postfiks IsCultureEssosi, kultura ulubiona wiary Pattern,
+    /// jednorazowe nadanie wiary jak BK - opis przy LorathInstall.</summary>
     internal static class AuditP3
     {
         /// <summary>Start procesu (OnBeforeInitialModuleScreenSetAsRoot, po Mends.Install i BkTitles.Install). Nie rzuca.</summary>
@@ -30,6 +32,7 @@ namespace CrashScribe
         {
             TemplatesInstall(harmony);
             ProsperityInstall(harmony);
+            LorathInstall(harmony);
         }
 
         /// <summary>OnSessionLaunched (nowa gra i kazde wczytanie). Nie rzuca.</summary>
@@ -37,12 +40,205 @@ namespace CrashScribe
         {
             TemplatesRepair();
             ProsperitySession();
+            _lorathSessionDone = false;
+            _relMgr = null; _popMgr = null;   // AM-28: menedzery BK tej kampanii pobrane od nowa w pierwszej godzinie sesji
+        }
+
+        /// <summary>Pierwsza godzina sesji (HourlyTick) - po inicjalizacji wiar BK (OnGameLoaded / nowa gra). Nie rzuca.</summary>
+        internal static void OnHourly()
+        {
+            if (!_lorathSessionDone) { _lorathSessionDone = true; LorathSession(); }
         }
 
         /// <summary>Koniec doby (DailyTick). Nie rzuca.</summary>
         internal static void OnDaily()
         {
             ProsperityDaily();
+            LorathDaily();
+        }
+
+        // ------------------------------------------------------------------ AM-28: wiara Lorath (BKROT zna kulture 'lorathi', w ROT 8.1.8 Lorath to 'nord')
+        // ROT-Content spcultures.xml: id="nord" name="Lorathi"; kultury 'lorathi' nie ma (RGL 'Null object reference found with ID: lorathi').
+        // BKROTPatch.Helpers.CultureHelpers.IsCultureEssosi zna 'lorathi', nie 'nord' - wiary Essos (Pattern, R'hllor, Boash, Black Goat, Many-Faced God,
+        // Josimakazma: IsCultureNaturalFaith -> IsCultureEssosi) nie uznaja Lorath za swoja, wiec BK (ReligionsManager.GetIdealReligion / InitializeFaithfulHeroes)
+        // nie daje wiary bohaterom nord, a osady Lorath (wiara osady z wiary pana i notabli - ReligionData) zostaja bez wiary i kaplanow. ROTReligions.Initialize:
+        // Pattern.Initialize(..., { GetObject("lorathi") }) = { null } - wiara Lorath bez kultury ulubionej (FavoredCultures, MainCulture).
+        // Klucz LorathFaithFix: postfiks IsCultureEssosi (nord -> true, jak BKROT chcial dla 'lorathi'); w pierwszej godzinie sesji null w FavoredCultures
+        // wiary 'pattern' -> nord i - tylko gdy zaden bohater nord nie ma jeszcze wiary (kampania sprzed naprawy) - jednorazowe nadanie wiary tak jak BK
+        // przy starcie gry (InitializeFaithfulHeroes: kazda wiara po kolei, bohater bez wiary, Faith.IsHeroNaturalFaith - losowanie BKROT, InitializeHeroFaith).
+        // Wzorce wedrowcow BK craftsman_nord / noble_nord NIE (wymagalyby nowego pliku danych w folderze gry albo rejestracji postaci w kodzie przed
+        // wczytaniem zapisu - partie wedrowcow w zapisie trzymaja id postaci).
+        private static bool _lorathOn, _lorathSessionDone;
+        private static int _lorathHits;
+
+        private static void LorathInstall(Harmony harmony)
+        {
+            try
+            {
+                if (!Config.LorathFaithFix)
+                {
+                    Scribe.Line("Mends: wiara Lorath (AM-28) wylaczone (LorathFaithFix=false) - BKROT nie uznaje kultury nord (Lorath) za Essos, Lorath bez wiary BK.");
+                    return;
+                }
+                var t = FindType("BKROTPatch.Helpers.CultureHelpers", "BKROTPatch");
+                var m = t != null ? AccessTools.Method(t, "IsCultureEssosi", new[] { typeof(CultureObject) }) : null;
+                if (m != null && m.ReturnType == typeof(bool))
+                {
+                    harmony.Patch(m, postfix: new HarmonyMethod(typeof(AuditP3), nameof(LorathEssosi)));
+                    _lorathOn = true;
+                }
+                Scribe.Line("Mends: wiara Lorath (AM-28) - postfiks BKROT CultureHelpers.IsCultureEssosi (nord -> Essos) "
+                            + (_lorathOn ? "wpiety" : "NIE wpiety (" + (t == null ? "brak BKROTPatch" : "brak metody") + ")") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.LorathInstall", null); } catch { } }
+        }
+
+        /// <summary>Postfiks AM-28: kultura nord (Lorath w ROT 8.1.8) jest kultura Essos dla BKROT (jak 'lorathi' z ROT 6.x).</summary>
+        public static void LorathEssosi(CultureObject __0, ref bool __result)
+        {
+            try
+            {
+                if (__result || __0 == null || __0.StringId != "nord") return;
+                __result = true;
+                _lorathHits++;
+            }
+            catch { }
+        }
+
+        private static object _relMgr;
+        private static MethodInfo _mGetHeroRel, _mInitHeroFaith, _mRefresh, _mGetPop;
+
+        /// <summary>ReligionsManager BK (odbicie - CrashScribe nie wiaze sie z BannerKings.dll) i jego slownik wiar (klucze = Religion).</summary>
+        private static System.Collections.IDictionary BkReligions()
+        {
+            _relMgr = null;
+            var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+            var pInst = tCfg != null ? AccessTools.Property(tCfg, "Instance") : null;
+            object cfg = pInst != null ? pInst.GetValue(null, null) : null;
+            if (cfg == null) return null;
+            var pMgr = AccessTools.Property(cfg.GetType(), "ReligionsManager");
+            _relMgr = pMgr != null ? pMgr.GetValue(cfg, null) : null;
+            if (_relMgr == null) return null;
+            var tm = _relMgr.GetType();
+            _mGetHeroRel = AccessTools.Method(tm, "GetHeroReligion", new[] { typeof(Hero) });
+            _mInitHeroFaith = AccessTools.Method(tm, "InitializeHeroFaith");
+            _mRefresh = AccessTools.Method(tm, "RefreshCaches");
+            var pPop = AccessTools.Property(cfg.GetType(), "PopulationManager");
+            object pop = pPop != null ? pPop.GetValue(cfg, null) : null;
+            _mGetPop = pop != null ? AccessTools.Method(pop.GetType(), "GetPopData", new[] { typeof(Settlement) }) : null;
+            _popMgr = pop;
+            var pRel = AccessTools.Property(tm, "Religions");
+            return pRel != null ? pRel.GetValue(_relMgr, null) as System.Collections.IDictionary : null;
+        }
+        private static object _popMgr;
+
+        private static object HeroReligion(Hero h)
+        {
+            try { return _mGetHeroRel != null && _relMgr != null ? _mGetHeroRel.Invoke(_relMgr, new object[] { h }) : null; }
+            catch { return null; }
+        }
+
+        private static bool IsNord(Hero h) { return h != null && h.Culture != null && h.Culture.StringId == "nord"; }
+
+        /// <summary>Pierwsza godzina sesji AM-28: kultura ulubiona wiary Pattern i jednorazowe nadanie wiary bohaterom nord (kampania sprzed naprawy).</summary>
+        private static void LorathSession()
+        {
+            if (!_lorathOn) return;
+            try
+            {
+                var rels = BkReligions();
+                if (rels == null) { Scribe.Line("Mends: wiara Lorath (AM-28) - start sesji: brak ReligionsManager BK - nic do zrobienia."); return; }
+                var nord = MBObjectManager.Instance.GetObject<CultureObject>("nord");
+                int fav = 0;
+                string favNow = "?";
+                var keys = new List<object>();
+                foreach (var k in rels.Keys) keys.Add(k);
+                foreach (var rel in keys)
+                {
+                    var mb = rel as MBObjectBase;
+                    if (mb == null || mb.StringId != "pattern") continue;
+                    var list = AccessTools.Property(rel.GetType(), "FavoredCultures")?.GetValue(rel, null) as List<CultureObject>;
+                    if (list == null) continue;
+                    if (nord != null) for (int i = 0; i < list.Count; i++) if (list[i] == null) { list[i] = nord; fav++; }
+                    var names = new List<string>();
+                    foreach (var c in list) names.Add(c != null ? c.StringId : "null");
+                    favNow = "[" + string.Join(", ", names.ToArray()) + "]";
+                }
+                int with = 0, without = 0, given = 0;
+                var heroes = new List<Hero>();
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    if (!IsNord(h) || h == Hero.MainHero || h.IsChild) continue;
+                    if (HeroReligion(h) != null) with++; else { without++; heroes.Add(h); }
+                }
+                var byRel = new SortedDictionary<string, int>(StringComparer.Ordinal);
+                bool run = with == 0 && heroes.Count > 0 && _mInitHeroFaith != null;
+                if (run)
+                {
+                    foreach (var rel in keys)
+                    {
+                        object faith = null;
+                        try { faith = AccessTools.Property(rel.GetType(), "Faith")?.GetValue(rel, null); } catch { }
+                        var mNat = faith != null ? AccessTools.Method(faith.GetType(), "IsHeroNaturalFaith", new[] { typeof(Hero) }) : null;
+                        if (mNat == null) continue;
+                        string rid = rel is MBObjectBase ? ((MBObjectBase)rel).StringId : "?";
+                        foreach (var h in heroes)
+                        {
+                            try
+                            {
+                                if (HeroReligion(h) != null) continue;
+                                if (!(bool)mNat.Invoke(faith, new object[] { h })) continue;
+                                var ps = _mInitHeroFaith.GetParameters();
+                                _mInitHeroFaith.Invoke(_relMgr, ps.Length >= 2 ? new object[] { h, rel } : new object[] { h });
+                                given++;
+                                int n; byRel.TryGetValue(rid, out n); byRel[rid] = n + 1;
+                            }
+                            catch { }
+                        }
+                    }
+                    try { if (_mRefresh != null) _mRefresh.Invoke(_relMgr, null); } catch { }
+                }
+                var br = new List<string>();
+                foreach (var kv in byRel) br.Add(kv.Key + " " + kv.Value);
+                Scribe.Line("Mends: wiara Lorath (AM-28) - start sesji: wiara pattern (Lorath) kultury ulubione " + favNow + " (null -> nord: " + fav + ")"
+                            + ", bohaterow nord z wiara " + with + ", bez wiary " + without + " | jednorazowe nadanie wiary jak BK: "
+                            + (run ? given + " [" + string.Join(", ", br.ToArray()) + "]" : "pominiete (" + (with > 0 ? "bohaterowie nord juz maja wiare" : "brak bohaterow albo metody BK") + ")")
+                            + ", trafien postfiksu w procesie " + _lorathHits + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.LorathSession", null); } catch { } }
+        }
+
+        /// <summary>Koniec doby AM-28: osady i lordowie kultury nord z wiara BK (sam odczyt).</summary>
+        private static void LorathDaily()
+        {
+            if (!_lorathOn) return;
+            try
+            {
+                if (_relMgr == null && BkReligions() == null) return;
+                int st = 0, stFaith = 0, lords = 0, lordsFaith = 0;
+                foreach (var s in Settlement.All)
+                {
+                    if (s == null || s.Culture == null || s.Culture.StringId != "nord" || s.IsHideout) continue;
+                    st++;
+                    try
+                    {
+                        object pd = _mGetPop != null ? _mGetPop.Invoke(_popMgr, new object[] { s }) : null;
+                        object rd = pd != null ? AccessTools.Property(pd.GetType(), "ReligionData")?.GetValue(pd, null) : null;
+                        object dom = rd != null ? AccessTools.Property(rd.GetType(), "DominantReligion")?.GetValue(rd, null) : null;
+                        if (dom != null) stFaith++;
+                    }
+                    catch { }
+                }
+                foreach (var h in Hero.AllAliveHeroes)
+                {
+                    if (!IsNord(h) || !h.IsLord || h.IsChild) continue;
+                    lords++;
+                    if (HeroReligion(h) != null) lordsFaith++;
+                }
+                Scribe.Line("Mends: wiara Lorath (AM-28) doba: osady nord z wiara BK " + stFaith + "/" + st + ", lordowie nord z wiara " + lordsFaith + "/" + lords
+                            + ", trafien postfiksu " + _lorathHits + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.LorathDaily", null); } catch { } }
         }
 
         /// <summary>Typ po pelnej nazwie: najpierw w assembly BKROTPatch, potem wszedzie (AccessTools).</summary>
@@ -385,6 +581,7 @@ namespace CrashScribe
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s) { AuditP3.OnSession(); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { AuditP3.OnDaily(); });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { AuditP3.OnHourly(); });
         }
 
         public override void SyncData(IDataStore dataStore) { }
