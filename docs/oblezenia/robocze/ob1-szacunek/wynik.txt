@@ -1,0 +1,187 @@
+# python -I szac_ob1.py <O0 z fin30> fin30-decyzje-szturmu-O0-wynik.csv <stolica> <machiny obroncow>
+=== stolica / machiny obroncow: 1.0 1.0
+decyzji 113 | CAP 1.0
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 22 z 113
+   w tym stolice 3 z 10
+   wedlug wyniku fin30: {'inne': 15, 'okup': 0, 'zdobyte': 7}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 0
+   wedlug wyniku fin30: {'inne': 0, 'okup': 0, 'zdobyte': 0}
+   miasta / zamki 0 / 0 ; stolice 0
+   s_rt tych:  []
+   ludzie obozu tych (mediana) -
+   stolica Lorath miasto L 2 s_now 1.93 s_rt 2.01 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 1.27 s_rt 1.78 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.96 s_rt 1.00 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 1.03 s_rt 1.45 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 1.14 s_rt 1.60 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 1.17 s_rt 1.22 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.99 s_rt 1.03 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.50 s_rt 1.56 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 3.20 s_rt 3.22 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.85 s_rt 1.29 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3
+=== stolica / machiny obroncow: 1.25 1.0
+decyzji 113 | CAP 1.25
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 25 z 113
+   w tym stolice 6 z 10
+   wedlug wyniku fin30: {'inne': 16, 'okup': 0, 'zdobyte': 9}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 2
+   wedlug wyniku fin30: {'inne': 1, 'okup': 0, 'zdobyte': 1}
+   miasta / zamki 2 / 0 ; stolice 2
+   s_rt tych:  [0.84, 0.86]
+   ludzie obozu tych (mediana) 2395.0
+   stolica Lorath miasto L 2 s_now 1.61 s_rt 1.68 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 1.01 s_rt 1.49 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.81 s_rt 0.84 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 0.83 s_rt 1.21 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 0.91 s_rt 1.34 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 0.98 s_rt 1.02 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.83 s_rt 0.86 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.25 s_rt 1.30 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 2.68 s_rt 2.70 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.68 s_rt 1.08 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3
+=== stolica / machiny obroncow: 1.5 1.0
+decyzji 113 | CAP 1.5
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 26 z 113
+   w tym stolice 7 z 10
+   wedlug wyniku fin30: {'inne': 16, 'okup': 0, 'zdobyte': 10}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 4
+   wedlug wyniku fin30: {'inne': 3, 'okup': 0, 'zdobyte': 1}
+   miasta / zamki 3 / 1 ; stolice 4
+   s_rt tych:  [0.73, 0.75, 0.88, 0.93]
+   ludzie obozu tych (mediana) 2395.0
+   stolica Lorath miasto L 2 s_now 1.40 s_rt 1.45 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 0.84 s_rt 1.28 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.70 s_rt 0.73 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 0.69 s_rt 1.05 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 0.76 s_rt 1.16 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 0.85 s_rt 0.88 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.72 s_rt 0.75 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.08 s_rt 1.13 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 2.31 s_rt 2.33 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.57 s_rt 0.93 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3
+=== stolica / machiny obroncow: 1.25 1.08
+decyzji 113 | CAP 1.25
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 34 z 113
+   w tym stolice 7 z 10
+   wedlug wyniku fin30: {'inne': 16, 'okup': 8, 'zdobyte': 10}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 4
+   wedlug wyniku fin30: {'inne': 3, 'okup': 0, 'zdobyte': 1}
+   miasta / zamki 4 / 0 ; stolice 3
+   s_rt tych:  [0.79, 0.81, 0.96, 0.96]
+   ludzie obozu tych (mediana) 2447.0
+   stolica Lorath miasto L 2 s_now 1.52 s_rt 1.58 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 0.94 s_rt 1.40 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.76 s_rt 0.79 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 0.76 s_rt 1.14 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 0.84 s_rt 1.26 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 0.92 s_rt 0.96 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.78 s_rt 0.81 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.18 s_rt 1.22 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 2.52 s_rt 2.53 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.63 s_rt 1.01 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3
+=== stolica / machiny obroncow: 1.25 1.16
+decyzji 113 | CAP 1.25
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 38 z 113
+   w tym stolice 7 z 10
+   wedlug wyniku fin30: {'inne': 16, 'okup': 12, 'zdobyte': 10}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 7
+   wedlug wyniku fin30: {'inne': 5, 'okup': 1, 'zdobyte': 1}
+   miasta / zamki 5 / 2 ; stolice 4
+   s_rt tych:  [0.75, 0.77, 0.91, 0.91, 0.95, 0.96, 0.99]
+   ludzie obozu tych (mediana) 2204
+   stolica Lorath miasto L 2 s_now 1.43 s_rt 1.49 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 0.87 s_rt 1.32 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.72 s_rt 0.75 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 0.71 s_rt 1.07 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 0.79 s_rt 1.19 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 0.87 s_rt 0.91 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.74 s_rt 0.77 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.11 s_rt 1.16 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 2.38 s_rt 2.39 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.59 s_rt 0.96 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3
+=== stolica / machiny obroncow: 1.25 1.32
+decyzji 113 | CAP 1.25
+poziom murow (wywnioskowany): {1: 40, 2: 68, 3: 5}
+taran 110 wieza 23 dystansowe (sr.) 1.08
+A) OB1 w chwili decyzji fin30 (HP 1, machiny jak w logu): wstrzymane 49 z 113
+   w tym stolice 7 z 10
+   wedlug wyniku fin30: {'inne': 18, 'okup': 21, 'zdobyte': 10}
+B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu murow) 14
+   wedlug wyniku fin30: {'inne': 8, 'okup': 3, 'zdobyte': 3}
+   miasta / zamki 9 / 5 ; stolice 5
+   s_rt tych:  [0.67, 0.69, 0.82, 0.82, 0.86, 0.86, 0.89, 0.91, 0.91, 0.93, 0.97, 0.97, 0.98, 0.98]
+   ludzie obozu tych (mediana) 2124.0
+   stolica Lorath miasto L 2 s_now 1.29 s_rt 1.35 mury_fin30 1.93 wynik zdobyte
+   stolica Totava zamek L 1 s_now 0.77 s_rt 1.19 mury_fin30 1.27 wynik zdobyte
+   stolica Vaes Dothrak miasto L 2 s_now 0.65 s_rt 0.67 mury_fin30 0.96 wynik inne
+   stolica Iksa Calo zamek L 1 s_now 0.63 s_rt 0.97 mury_fin30 1.03 wynik zdobyte
+   stolica Iksa Keria zamek L 1 s_now 0.69 s_rt 1.07 mury_fin30 1.14 wynik zdobyte
+   stolica Mantarys miasto L 2 s_now 0.79 s_rt 0.82 mury_fin30 1.18 wynik inne
+   stolica Vaes Dothrak miasto L 2 s_now 0.66 s_rt 0.69 mury_fin30 0.99 wynik zdobyte
+   stolica King's Landing miasto L 3 s_now 1.00 s_rt 1.04 mury_fin30 1.50 wynik zdobyte
+   stolica Silverhill zamek L 1 s_now 2.14 s_rt 2.16 mury_fin30 3.20 wynik zdobyte
+   stolica Tolerrol zamek L 2 s_now 0.51 s_rt 0.86 mury_fin30 0.85 wynik inne
+ludzi 1350 zamek: przygotowania 5.2 d, taran+wieza gotowe 11.3 d, trebusz co 8.7 d, mury 0 przy: L1 25.0, L2 28.4, L3 30.0
+ludzi 1350 miasto: przygotowania 7.8 d, taran+wieza gotowe 17.0 d, trebusz co 13.1 d, mury 0 przy: L1 35.1, L2 38.4, L3 41.2
+ludzi 1350 stolica: przygotowania 13.1 d, taran+wieza gotowe 28.3 d, trebusz co 21.8 d, mury 0 przy: L1 55.1, L2 58.4, L3 61.3
+ludzi 2352 zamek: przygotowania 4.0 d, taran+wieza gotowe 8.6 d, trebusz co 6.6 d, mury 0 przy: L1 20.2, L2 22.6, L3 24.1
+ludzi 2352 miasto: przygotowania 5.9 d, taran+wieza gotowe 12.9 d, trebusz co 9.9 d, mury 0 przy: L1 27.8, L2 31.1, L3 33.3
+ludzi 2352 stolica: przygotowania 9.9 d, taran+wieza gotowe 21.4 d, trebusz co 16.5 d, mury 0 przy: L1 42.9, L2 46.3, L3 49.1
+ludzi 4589 zamek: przygotowania 2.8 d, taran+wieza gotowe 6.1 d, trebusz co 4.7 d, mury 0 przy: L1 15.7, L2 17.4, L3 18.8
+ludzi 4589 miasto: przygotowania 4.3 d, taran+wieza gotowe 9.2 d, trebusz co 7.1 d, mury 0 przy: L1 21.3, L2 24.0, L3 25.4
+ludzi 4589 stolica: przygotowania 7.1 d, taran+wieza gotowe 15.4 d, trebusz co 11.8 d, mury 0 przy: L1 32.2, L2 35.5, L3 38.3

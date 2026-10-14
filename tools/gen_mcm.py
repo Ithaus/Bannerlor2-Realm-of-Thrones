@@ -219,6 +219,15 @@ RANGES = {
     'SiegeRansomShare': (0.0, 1.0, "0.000"),
     'SiegeRansomBloodyRatio': (0.0, 5.0, "0.00"),
     'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
+    # mury oblezen OB1-OB4 (SiegeWalls): zakresy zgodne z przycieciem w kodzie
+    'SiegeCapitalWallsFactor': (1.0, 2.0, "0.00"),
+    'SiegeAssaultRepelLoss': (0.0, 0.5, "0.00"),
+    'SiegeAssaultRepelSpread': (0.0, 0.1, "0.00"),
+    'SiegeRepelPauseDays': (1.0, 28.0, "0.0"),
+    'SiegeReliefWallsShare': (0.0, 1.0, "0.00"),
+    'SiegeBesiegerPrepPercent': (10, 100, "0"),
+    'SiegeTownPrepFactor': (1.0, 4.0, "0.00"),
+    'SiegeCapitalPrepFactor': (1.0, 4.0, "0.00"),
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
 }

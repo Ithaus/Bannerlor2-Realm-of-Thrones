@@ -714,6 +714,10 @@ namespace Armoury
             // odrzuca nieznana wersje w calosci); wersja formatu "1"; brak klucza (zapis sprzed paczki) = bez rozejmow
             try { string sr = dataStore.IsSaving ? SiegeRansom.Export() : null; SaveText.Sync(dataStore, "arm_siege_ransom", ref sr); if (dataStore.IsLoading) SiegeRansom.Import(sr); }
             catch (Exception e) { Log.Error("SyncData.arm_siege_ransom", e); }
+            // mury oblezen OB2 (SiegeWalls.cs): przerwy po odparciu szturmu trwajacych oblezen (osada, poczatek oblezenia, doba konca, odparcia) - wlasny klucz, wersja "1";
+            // brak klucza (zapis sprzed paczki) = bez przerw
+            try { string sw = dataStore.IsSaving ? SiegeWalls.Export() : null; SaveText.Sync(dataStore, "arm_siege_walls", ref sw); if (dataStore.IsLoading) SiegeWalls.Import(sw); }
+            catch (Exception e) { Log.Error("SyncData.arm_siege_walls", e); }
             // lup miast L3: osady po nastepstwach oblezen z ostatnich 30 dob (okno lupu, pomiar, napisy) - wlasny try; wersja formatu "1"; brak klucza = pusto
             try { string sk = dataStore.IsSaving ? CitySack.Export() : null; SaveText.Sync(dataStore, "arm_sack", ref sk); if (dataStore.IsLoading) CitySack.Import(sk); }
             catch (Exception e) { Log.Error("SyncData.arm_sack", e); }
@@ -801,6 +805,15 @@ namespace Armoury
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
+            // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
+            // pomiary do linii OB0 (armie rozwiazane przy oblezeniu, machiny AI, trafienia w mury, nowe oblezenia) - tylko pamiec i log poza OB2/OB3
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, SiegeWalls.OnMapEventStarted);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeWalls.OnMapEventEnded", SiegeWalls.OnMapEventEnded));
+            CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, SiegeWalls.OnSiegeEnded);
+            CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, SiegeWalls.OnSiegeStarted);
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, SiegeWalls.OnArmyDispersed);
+            CampaignEvents.SiegeEngineBuiltEvent.AddNonSerializedListener(this, SiegeWalls.OnEngineBuilt);
+            CampaignEvents.OnSiegeBombardmentWallHitEvent.AddNonSerializedListener(this, SiegeWalls.OnWallHit);
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
@@ -1396,6 +1409,7 @@ namespace Armoury
             try { CampScene.StartLine(); } catch (Exception e) { Log.Error("CampScene.StartLine", e); }   // E7/O2 (229): linia startowa "CampScene (E7/O2)" - prefaby obozu sprawdzone raz na proces (PrefabExists), tylko przy CampBattlePropsEnabled
             try { StateHygiene.SessionStart(); } catch (Exception e) { Log.Error("StateHygiene.SessionStart", e); }   // E8/S (246): linia startowa "Porzadek stanu (E8/S)" - ile klas wyzerowal konstruktor tej kampanii i co zostalo w pamieci po poprzedniej (tylko log)
             try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
+            try { SiegeWalls.SessionStart(); } catch (Exception e) { Log.Error("SiegeWalls.SessionStart", e); }   // mury oblezen: linia startowa (modele, latki, wlasciciele latek Harmony) - PO Seal31.EnsureHooks
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercTenure.EnsureHooks(); } catch (Exception e) { Log.Error("MercTenure.EnsureHooks", e); }   // M6a-1: najem gry i zwolnienie / przejscie BK (latki w kampanii)
             try { PeaceHold.EnsureHooks(); } catch (Exception e) { Log.Error("PeaceHold.EnsureHooks", e); }   // M6a-3: uwolnienie jencow przy pokoju krolestw po 24 h (latka w kampanii)
@@ -1700,6 +1714,7 @@ namespace Armoury
             try { BattleChronicle.Daily(); } catch (Exception e) { Log.Error("BattleChronicle.Daily", e); } DayProfile.Lap("BattleChronicle.Daily");
             try { CitySack.Daily(); } catch (Exception e) { Log.Error("CitySack.Daily", e); } DayProfile.Lap("CitySack.Daily");   // lup miast (L0-L4): linia doby i osady 30 dob po nastepstwach oblezen
             try { SiegeRansom.Daily(); } catch (Exception e) { Log.Error("SiegeRansom.Daily", e); } DayProfile.Lap("SiegeRansom.Daily");   // okup zamiast szturmu: linia doby, porzadek pamieci, rozejmy
+            try { SiegeWalls.Daily(); } catch (Exception e) { Log.Error("SiegeWalls.Daily", e); } DayProfile.Lap("SiegeWalls.Daily");   // mury oblezen OB0: linia doby, porzadek pamieci
             // N7 (decyzja Jeffa 13.10): rozbici pod choragiew - gotowosc, odbior przez druzyny rodu (limit i zold z budzetu wczoraj, jak W5), rozejscie po czasie czekania;
             // PRZED H3 i wyrzutkami: ci, ktorzy sie rozeszli, wchodza do linii "Przegrani (H3)" (domy) i "Pula wyrzutkow (E4/3)" (naplyw) tej samej doby
             try { StragglersRally.Daily(); } catch (Exception e) { Log.Error("StragglersRally.Daily", e); } DayProfile.Lap("StragglersRally.Daily");

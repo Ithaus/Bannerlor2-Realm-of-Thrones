@@ -237,7 +237,7 @@ namespace Armoury
             double h0 = CampaignTime.HoursInDay * 4.0;
             double el = ev.SiegeStartTime.ElapsedHoursUntilNow;
             double w = 0.8 - (el > h0 ? (el - h0) * 0.02 : 0.0);
-            double w0 = 0.8;
+            double w0 = SiegeWalls.Ob1On ? 0.8 * SiegeWalls.WallHp(st) : 0.8;   // OB1: mury licza sie w pelni, dopoki nie rozbite (srednie HP odcinkow)
             if (!ram) { w *= 1.25; w0 *= 1.25; }
             if (!tower) { w *= 1.25; w0 *= 1.25; }
             j.Def = def; j.Def0 = def0; j.Att = att; j.Adv = adv; j.W = w; j.W0 = w0; j.Ram = ram; j.Tower = tower; j.Engines = built;
@@ -268,6 +268,7 @@ namespace Armoury
             if (!__result) return;
             try
             {
+                if (SiegeWalls.Veto(__instance)) { __result = false; return; }   // OB1 / przerwa OB2 (SiegeWalls.cs) - PRZED okupem: okup liczy tylko po naszym "tak"
                 if (!Live || !AnyKey) return;
                 var ev = __instance != null ? __instance.SiegeEvent : null;
                 if (ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.Town == null) return;
@@ -320,7 +321,8 @@ namespace Armoury
               .Append(", bunt ").Append(j.Rebel ? "tak" : "nie").Append(", gracz ").Append(j.Player)
               .Append(" | obronca zaplacilby ").Append(j.DefPays ? "tak" : "nie").Append(" (").Append(j.DefWhy).Append(')')
               .Append(" | AI przyjalby ").Append(j.AiAccepts ? "tak" : "nie").Append(" (").Append(j.AccWhy).Append(')')
-              .Append(" | wynik ").Append(outcome).Append('.');
+              .Append(" | wynik ").Append(outcome)
+              .Append(SiegeWalls.O0Part(j.Camp)).Append('.');                 // OB1: HP murow, taran / wieza, w, skladniki przewagi, obrona
             Log.Info(sb.ToString());
             _dLines++;
         }
@@ -417,6 +419,7 @@ namespace Armoury
             ZeroDay();
             _stumbles = 0; _err.Clear();
             ResetMore();
+            SiegeWalls.Reset();                                            // OB1-OB4: pamiec szturmow, przerw i licznikow od zera
         }
 
         // ------------------------------------------------------------ latki w kampanii (Seal31.EnsureHooks, raz na proces)
@@ -439,6 +442,7 @@ namespace Armoury
             }
             catch (Exception e) { _hookAssault = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks", e); }
             EnsureHooksMore();
+            try { SiegeWalls.EnsureHooks(); } catch (Exception e) { Stumble("SiegeWalls.EnsureHooks", e); }   // OB1-OB3: przewaga osady, odparcie szturmu, bitwa z murow
         }
     }
 }
