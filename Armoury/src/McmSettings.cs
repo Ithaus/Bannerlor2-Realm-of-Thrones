@@ -1408,7 +1408,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeAssaultRepelLoss { get; set; } = 0.22f;
 
-        [SettingPropertyFloatingInteger("Siege Assault Repel Spread", 0.00f, 0.10f, "0.00", HintText = "each assault's breaking point lies up to this far either side of Siege Assault Repel Loss (0.22 +- 0.05 = 17 to 27% of the men) - every army has its own endurance")]
+        [SettingPropertyFloatingInteger("Siege Assault Repel Spread", 0.00f, 0.10f, "0.00", HintText = "each assault's breaking point lies up to this far either side of Siege Assault Repel Loss (0.22 +- 0.05 = 17 to 27% of the men) - every army has its own endurance; with Siege Attacker Morale its morale decides where")]
         [SettingPropertyGroup("The marching column")]
         public float SiegeAssaultRepelSpread { get; set; } = 0.05f;
 
@@ -1435,6 +1435,34 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Siege Capital Prep Factor", 1.00f, 4.00f, "0.00", HintText = "preparing the siege of a realm's capital takes this many times longer than of a castle")]
         [SettingPropertyGroup("The marching column")]
         public float SiegeCapitalPrepFactor { get; set; } = 2.5f;
+
+        [SettingPropertyBool("Siege Walls Any Garrison", HintText = "the walls fight for any garrison, however small: in every assault - AI lords' and your own auto-resolved ones - a handful of men on the walls fights from them, where the game let only more than 100 men in a town or 30 in a castle do so and below that fought the assault as a battle in the open field. Also counts for breaking off an AI assault (Siege Assault Repel Loss) and for a relief force fighting from the walls. Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeWallsAnyGarrison { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Ladder Walls Factor", 1.00f, 4.00f, "0.00", HintText = "an assault with ladders alone on whole walls - no battering ram, no siege tower, no breach - meets walls this many times stronger and the stormers pay dearly for every rung; with one of the two engines, half of it. A ram and a tower bring the walls back to what they are, a breach brings them down. 1 = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeLadderWallsFactor { get; set; } = 2f;
+
+        [SettingPropertyBool("Siege Breach One Section", HintText = "one wall section battered down is a breach: the walls count for a quarter of their level, as the game does only once every section is down - in assaults, in AI lords' decisions to storm and in the renown of the battle. Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeBreachOneSection { get; set; } = true;
+
+        [SettingPropertyBool("Siege Defender Morale", HintText = "the defenders' will to hold multiplies the strength of their walls in an assault: starving -25, food for under a week down to -10, for four weeks or more +10; the town's loyalty -20 to +20; unpaid garrison wages down to -20; a relief force on its way +7 (+15 when it has half the besiegers' strength); battered walls down to -15. Morale starts at 50: at 50 the walls count as they are, at 100 they count 1.67 times, at 0 a third. Off = the walls alone")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeDefenderMorale { get; set; } = true;
+
+        [SettingPropertyBool("Siege Attacker Morale", HintText = "the stormers' state tells in an assault: a camp short of food (down to -10), the sick and wounded lying in camp - camp fever and earlier assaults (down to -15) - and assaults already repelled at these walls (-8 each, down to -24) cut their blows by as many percent; with their morale they set where within Siege Assault Repel Spread an AI assault breaks off - low morale gives up early, high morale holds on longer. Off = only the game's own morale and a random breaking point")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAttackerMorale { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Machines Front", 0.00f, 1.00f, "0.00", HintText = "a battering ram and a siege tower open a gate and a bridge: this share of the assault is fought as in the open field, where the numbers of both sides count (half of it with one of the two engines). 0 = through the walls only, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeMachinesFront { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Siege Breach Front", 0.00f, 1.00f, "0.00", HintText = "a breach lets the stormers run in: this share of the assault is fought as in the open field, where numbers count and the defenders keep only what a breach leaves of their walls - the walls' advantage all but vanishes and men and morale decide. 0 = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeBreachFront { get; set; } = 0.75f;
 
         [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
         [SettingPropertyGroup("The marching column")]
@@ -6354,6 +6382,13 @@ namespace Armoury
             s.SiegeBesiegerPrepPercent = SiegeBesiegerPrepPercent;
             s.SiegeTownPrepFactor = SiegeTownPrepFactor;
             s.SiegeCapitalPrepFactor = SiegeCapitalPrepFactor;
+            s.SiegeWallsAnyGarrison = SiegeWallsAnyGarrison;
+            s.SiegeLadderWallsFactor = SiegeLadderWallsFactor;
+            s.SiegeBreachOneSection = SiegeBreachOneSection;
+            s.SiegeDefenderMorale = SiegeDefenderMorale;
+            s.SiegeAttackerMorale = SiegeAttackerMorale;
+            s.SiegeMachinesFront = SiegeMachinesFront;
+            s.SiegeBreachFront = SiegeBreachFront;
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;

@@ -58,7 +58,23 @@ namespace Armoury
     /// OB4 - budowa obozu i machin strony OBLEGAJACEJ (WorldPace.SiegePostfix, raz na lancuch): x SiegeBesiegerPrepPercent (50) / klasa (zamek 1,
     ///   miasto 1.5, stolica 2.5). Jeff 14.10: "realistyczne oblezenia takze dla mnie i czas budowy tez realistyczny" - takze oboz gracza. Bez Innych
     ///   i bez obozow skryptu fabuly ROT (szturm fabuly czeka tylko na przygotowania - ApplyStartAssaultAgainstWalls po IsPreparationComplete).
-    /// Wyjatek per obiekt = licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7). Kazdy klucz wylaczony = zachowanie 7bc5dd0b.
+    /// BITWA SZTURMU SZ1-SZ4 (decyzje Jeffa 14.10 o samej bitwie; postfiks GetSimulationTicksForBattleRound - szturm AI i autobitwa gracza, ta sama regula;
+    ///   bez Innych, skryptu fabuly i morza). Gra (DefaultCombatSimulationModel.cs:251-256) liczy tury rundy szturmu "z murow" tylko przy obroncach > 100
+    ///   (miasto) / > 30 (zamek): obrona 2 x round(0.5 + max(1 + D^0.3 x 0.7 x przewaga, (D+1)/(A+1))), atak 2 x round(1.5 + D^0.3) - waski front, ciosy
+    ///   szturmujacych rosna tylko z liczba obroncow; ponizej progu - wzor bitwy w polu (D^0.6 wobec A^0.6), mala zaloga traci mury.
+    ///   SZ1 (SiegeWallsAnyGarrison): wzor murow dla kazdej zalogi (D >= 1), takze warunek "mury pracuja" OB2 i OB3.
+    ///   SZ2 kolejnosc przewagi: drabiny przy calych murach x SiegeLadderWallsFactor (2; z jedna machina z dwoch polowa); taran i wieza x1 (dzielnik gry 1.57);
+    ///   wyrwa - jeden rozbity odcinek liczy sie jak wyrwa gry (SiegeBreachOneSection: baza murow x0.25 w GetSettlementAdvantage - decyzja, bitwa, slawa).
+    ///   SZ3 morale: obroncy Md = 50 + jedzenie (glod -25, < 7 dob do -10, >= 28 dob albo bez ubytku +10) + lojalnosc (L - 50) x 0.4 + zold zalogi
+    ///   (-20 x HasUnpaidWages) + odsiecz w drodze (+7, +15 gdy >= polowy sily obozu) + mury (-15 x (1 - HP)) -> przewaga murow x (Md + 25) / 75 w [0.33, 1.67];
+    ///   atakujacy: minusy oblezenia - jedzenie obozu (< 3 dob do -10), chorzy i ranni w obozie (goraczka obozowa kladzie w rannych; -30 x udzial, do -15),
+    ///   odparcia w tym oblezeniu (-8 kazde, do -24) -> ciosy szturmujacych x (1 - minusy / 100) >= 0.6; Ma = morale druzyn (gra) - minusy ustawia prog
+    ///   odwrotu OB2 w pasmie L +- r: 0.7 x (Ma - 70) / 30 + 0.3 x los (morale druzyn w samym ciosie liczy gra - CalculateSimulationMoraleEffects).
+    ///   SZ4 front: taran i wieza otwieraja brame i most - SiegeMachinesFront (0.1) rundy to bitwa w polu (liczba ludzi obu stron), wyrwa - SiegeBreachFront
+    ///   (0.75); w czesci "w polu" obronca ma tylko to, co zostaje z murow w wyrwie (0.7 x przewaga przy wyrwie x morale).
+    ///   Przyklady (symulacja rund gry, rowne wojska, OB2 0.22): zamek 30 vs 600 - drabiny: odparte 78% (wysokie morale obroncow 99%, niskie 0%), taran
+    ///   i wieza: zdobyty, straty 7%, wyrwa 1%; miasto 300 vs 3000 - drabiny odparte 100%, taran i wieza zdobyte przy stratach 13%, wyrwa 2%.
+    /// Wyjatek per obiekt = licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7). Kazdy klucz wylaczony = zachowanie 7bc5dd0b (SZ: b47fecc3).
     /// </summary>
     internal static class SiegeWalls
     {
@@ -82,6 +98,22 @@ namespace Armoury
         private static bool FromWallsOn { get { var s = Settings.Current; return s != null && s.SiegeReliefFromWalls; } }
         private static double WallsShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeReliefWallsShare) ? 0.5 : Clamp(s.SiegeReliefWallsShare, 0.0, 1.0); } }
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SiegeWallsLog && s.LogEnabled; } }
+        // bitwa szturmu SZ1-SZ4 (decyzje Jeffa 14.10 o samej bitwie)
+        private static bool AnyGarrisonOn { get { var s = Settings.Current; return s != null && s.SiegeWallsAnyGarrison; } }
+        private static double LadderK { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderWallsFactor) ? 1.0 : Clamp(s.SiegeLadderWallsFactor, 1.0, 4.0); } }
+        private static bool BreachOneOn { get { var s = Settings.Current; return s != null && s.SiegeBreachOneSection; } }
+        private static bool DefMorOn { get { var s = Settings.Current; return s != null && s.SiegeDefenderMorale; } }
+        private static bool AttMorOn { get { var s = Settings.Current; return s != null && s.SiegeAttackerMorale; } }
+        private static double MachFront { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeMachinesFront) ? 0.0 : Clamp(s.SiegeMachinesFront, 0.0, 1.0); } }
+        private static double BreachFront { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeBreachFront) ? 0.0 : Clamp(s.SiegeBreachFront, 0.0, 1.0); } }
+        /// <summary>Ktorykolwiek klucz bitwy szturmu wlaczony (wszystkie wylaczone = tury rundy gry, b47fecc3).</summary>
+        private static bool SzAny { get { return AnyGarrisonOn || LadderK > 1.0 || DefMorOn || AttMorOn || MachFront > 0.0 || BreachFront > 0.0; } }
+        /// <summary>Sufit przewagi murow w turach rundy: wymiana najwyzej ok. 10 : 1 (drabiny na cale mury, wysokie morale - Eger 1552, Koszeg 1532); bez niego
+        /// stolica x machiny obroncow x drabiny x morale dawalaby 30-40, a gracz w autobitwie tracilby cala armie na kazdej drabinie.</summary>
+        private const double WCap = 20.0;
+        /// <summary>Morale armii AI, przy ktorym prog odwrotu OB2 lezy w srodku pasma: srednie morale druzyn lordow AI 69.7-72.0 [P log 14.10 "Morale AI (183d)"],
+        /// zarazem "wysokie morale" gry (DefaultPartyMoraleModel.HighMoraleValue = 70).</summary>
+        private const double MoraleMid = 70.0;
 
         // ------------------------------------------------------------ potkniecia
         private static int _stumbles, _dStumbles;
@@ -142,6 +174,24 @@ namespace Armoury
             catch { return 1.0; }
         }
 
+        /// <summary>Wyrwa gry dla bazy murow: (1 + 0.25 b) / (1 + b), b = 4 + poziom - 1 (DefaultCombatSimulationModel.cs:209-214 - gra mnozy baze x0.25
+        /// dopiero, gdy WSZYSTKIE odcinki maja HP 0).</summary>
+        private static double BreachBase(Settlement st)
+        {
+            int lvl = 1;
+            try { if (st.Town != null) lvl = st.Town.GetWallLevel(); } catch { }
+            double b = 4.0 + (lvl - 1);
+            return (1.0 + 0.25 * b) / (1.0 + b);
+        }
+
+        /// <summary>SZ2: mnoznik przewagi przy jednym rozbitym odcinku (wyrwa - jak OB1 i bitwa gry: PlayerSiege.cs:172), gdy gra jeszcze nie liczy wyrwy
+        /// (suma HP murow > 0); inaczej 1.</summary>
+        private static double BreachOneFactor(Settlement st)
+        {
+            if (st == null || st.SettlementTotalWallHitPoints < 1E-05f || WallHpMin(st) > 0.0) return 1.0;
+            return BreachBase(st);
+        }
+
         /// <summary>Machiny dystansowe obroncow (zbudowane, jak gra liczy machiny oblegajacych): x(1 + 0.08 n + 0.12 n_ogniowe).</summary>
         private static float EnginesFactor(Settlement st, out int n, out int nf)
         {
@@ -170,6 +220,7 @@ namespace Armoury
                 float f = 1f, cf = CapitalFactor;
                 if (cf > 1f && IsCapital(settlement)) f *= cf;
                 if (s.SiegeDefenderEnginesOnWalls) { int n, nf; f *= EnginesFactor(settlement, out n, out nf); }
+                if (s.SiegeBreachOneSection) f *= (float)BreachOneFactor(settlement);   // SZ2: jeden rozbity odcinek = wyrwa (gra: dopiero wszystkie)
                 if (f != 1f) { __result *= f; _dAdv++; }
             }
             catch (Exception e) { Stumble("AdvPost", e); }
@@ -231,7 +282,7 @@ namespace Armoury
             try
             {
                 m.Level = st.Town != null ? st.Town.GetWallLevel() : 0;
-                m.Breach = st.SettlementTotalWallHitPoints < 1E-05f;
+                m.Breach = st.SettlementTotalWallHitPoints < 1E-05f || (BreachOneOn && m.Gap);   // SZ2: jeden rozbity odcinek - ta sama baza x0.25 (AdvPost)
                 m.Base = 1.0 + (4.0 + (m.Level - 1)) * (m.Breach ? 0.25 : 1.0);
                 m.Div = 1.0 + ((m.Ram || towers > 0) ? 0.25 : 0.0) + (impRam ? 0.24 : (m.Ram ? 0.16 : 0.0)) + (towers > 1 ? 0.24 : (towers == 1 ? 0.16 : 0.0)) + ranged * 0.08 + fire * 0.12;
                 m.Capital = IsCapital(st);
@@ -436,7 +487,7 @@ namespace Armoury
         // ------------------------------------------------------------ OB2/OB3: rejestr szturmow AI
         private sealed class Assault
         {
-            public Settlement St; public float Start; public float Thr; public int Men0, Def0, LastCas = -1; public double Loss;
+            public Settlement St; public float Start; public float Thr, U; public bool ThrMorale; public int Men0, Def0, LastCas = -1; public double Loss;   // U - los progu (SZ3: morale ustawia prog w pasmie)
             public string Fac, Leader; public bool Capital, Repelled, Outside, FromWalls, Off; public int WallRounds, FieldRounds; public int Fort = -1, Side = -1;   // Off - odparcie nie wyszlo (wyjatek), dalej jak w grze
         }
         private static readonly Dictionary<MapEvent, Assault> _assaults = new Dictionary<MapEvent, Assault>();
@@ -457,10 +508,10 @@ namespace Armoury
                 if (lp == null || lp.IsMainParty) return;
                 if (Scripted(lp)) { _dScripted++; return; }
                 if (Und(lp, st)) return;
-                float l = RepelLoss, r = RepelSpread;
+                float l = RepelLoss, r = RepelSpread, u = MBRandom.RandomFloat;
                 var a = new Assault
                 {
-                    St = st, Start = Now, Thr = l > 0f ? (float)Clamp(l + r * (2.0 * MBRandom.RandomFloat - 1.0), 0.01, 0.95) : 0f,
+                    St = st, Start = Now, U = u, Thr = l > 0f ? (float)Clamp(l + r * (2.0 * u - 1.0), 0.01, 0.95) : 0f,
                     Men0 = me.AttackerSide.TroopCount, Def0 = me.DefenderSide != null ? me.DefenderSide.TroopCount : 0,
                     Fac = lp.MapFaction != null ? lp.MapFaction.StringId : "-", Leader = Hn(lp), Capital = IsCapital(st)
                 };
@@ -491,7 +542,7 @@ namespace Armoury
                 var st = a.St;
                 if (st == null || st.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall) return;
                 int dmen = def.TroopCount;
-                if (dmen <= (st.IsTown ? 100 : 30)) return;                 // mury pracuja tylko z obsada (ten sam prog, co gra)
+                if (dmen <= 0 || (!AnyGarrisonOn && dmen <= (st.IsTown ? 100 : 30))) return;   // mury pracuja z obsada: gra > 100 / > 30, SZ1 - kazda zaloga
                 if (__instance.IsSiegeOutside && !a.FromWalls) return;        // bitwa w polu (odsiecz wieksza od twierdzy) - zwykla bitwa
                 if (!__instance.IsSiegeAssault && !__instance.IsSiegeOutside) return;
                 var lpb = att.LeaderParty;
@@ -549,7 +600,7 @@ namespace Armoury
                       .Append(", stolica ").Append(a.Capital ? "tak" : "nie").Append(") | frakcja ").Append(a.Fac).Append(", wodz ").Append(a.Leader)
                       .Append(" | ludzi na starcie ").Append(a.Men0).Append(", zostalo ").Append(left).Append("; obroncow bylo ").Append(a.Def0).Append(", zostalo ").Append(dmen)
                       .Append(" | prog armii ").Append(F(a.Thr * 100.0, "0.0")).Append("%, straty ").Append(F(a.Loss * 100.0, "0.0")).Append('%')
-                      .Append(" | godzin szturmu ").Append(F((Now - a.Start) * 24.0, "0")).Append(" | bitwa ").Append(me.IsSiegeOutside ? "z murow (OB3)" : "szturm")
+                      .Append(" | godzin szturmu ").Append(F((Now - a.Start) * 24.0, "0")).Append(MoralePart(me, a)).Append(" | bitwa ").Append(me.IsSiegeOutside ? "z murow (OB3)" : "szturm")
                       .Append(" | przerwa ").Append(F(T, "0.0")).Append(" dob do dnia ").Append(F(Now + T, "0.0")).Append(" (podstawa ").Append(F(b, "0.0"))
                       .Append(" x morale ").Append(F(morale, "0")).Append(" -> ").Append(F(fM, "0.00"))
                       .Append(" x ludzie ").Append(left).Append('/').Append(dmen).Append(" = ").Append(F(ratio, "0.00")).Append(" -> ").Append(F(fL, "0.00"))
@@ -562,10 +613,31 @@ namespace Armoury
             me.FinishBattleAndKeepSiegeEvent();                                 // droga gry: bitwa bez zwyciezcy, oblezenie trwa (PlayerEncounter.ContinueBattle)
         }
 
-        /// <summary>Postfiks DefaultCombatSimulationModel.GetSimulationTicksForBattleRound (OB3). Wyjscie po typie bitwy i rejestrze.</summary>
+        // ------------------------------------------------------------ SZ1-SZ4: bitwa szturmu (tury rundy, morale obu stron)
+        /// <summary>Bitwa szturmu (AI i gracz): morale z pierwszej rundy i przebieg do linii "Bitwa szturmu (SZ)".</summary>
+        private sealed class Bat
+        {
+            public Settlement St; public bool Excl, Player, Small; public string Why = "-"; public float Start; public int D0, A0;
+            public double Md = 50, FD = 1, MFood, MLoy, MPay, MRelief, MWalls, Loy = -1, Unpaid, ReliefStr, BesStr, Hp = 1; public string FoodTxt = "-";
+            public double Pm = 50, Ma = 50, FA = 1, AFood, ASick, ARep, CampDays = -1, WoundShare; public int Repels;
+            public int Rounds, FieldRounds, Mode0 = -1, ModeL = -1; public long DefT, AttT, GDefT, GAttT; public double W0, K0, O0, Adv0, Mf0; public float Thr0 = -1f;
+        }
+        private static readonly Dictionary<MapEvent, Bat> _bats = new Dictionary<MapEvent, Bat>();
+        private static readonly string[] ModeName = { "drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa" };
+        // licznik doby: bitwy, tryb pierwszej rundy, wynik i straty wedlug trybu, mala zaloga, morale srednio, tury SZ wobec gry
+        private static int _dSz, _dSzPlayer, _dSzExcl, _dSzSmall, _dSzSmallHeld, _dSzEnded;
+        private static readonly int[] _dSzMode = new int[4], _dSzWon = new int[4], _dSzRep = new int[4], _dSzDef = new int[4], _dSzNone = new int[4];
+        private static readonly long[] _dSzCasA = new long[4], _dSzCasD = new long[4];
+        private static double _dSzMd, _dSzMa; private static long _dSzDefT, _dSzAttT, _dSzGDefT, _dSzGAttT;
+
+        /// <summary>Postfiks DefaultCombatSimulationModel.GetSimulationTicksForBattleRound: szturm (SZ1-SZ4) i bitwa ze szturmu z odsiecza (OB3).
+        /// Inne bitwy - wyjscie po typie.</summary>
         public static void TicksPost(MapEvent mapEvent, ref ValueTuple<int, int> __result)
         {
-            if (_assaults.Count == 0 || mapEvent == null || mapEvent.EventType != MapEvent.BattleTypes.SiegeOutside) return;
+            if (mapEvent == null) return;
+            var et = mapEvent.EventType;
+            if (et == MapEvent.BattleTypes.Siege) { AssaultTicks(mapEvent, ref __result); return; }
+            if (et != MapEvent.BattleTypes.SiegeOutside || _assaults.Count == 0) return;
             Assault a;
             if (!_assaults.TryGetValue(mapEvent, out a)) return;
             try
@@ -575,7 +647,8 @@ namespace Armoury
                 var st = mapEvent.MapEventSettlement;
                 if (st == null || !st.IsFortification || st.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall) return;
                 int D = mapEvent.DefenderSide.NumRemainingSimulationTroops, A = mapEvent.AttackerSide.NumRemainingSimulationTroops;
-                if ((st.IsTown && D <= 100) || (st.IsCastle && D <= 30)) { a.FieldRounds++; return; }
+                if (D <= 0 || A <= 0) return;
+                if (!AnyGarrisonOn && ((st.IsTown && D <= 100) || (st.IsCastle && D <= 30))) { a.FieldRounds++; return; }   // SZ1 wylaczony: prog gry
                 int fort = 0, tot = 0;
                 foreach (var mep in mapEvent.DefenderSide.Parties)
                 {
@@ -588,10 +661,20 @@ namespace Armoury
                 }
                 a.Fort = fort; a.Side = tot;
                 if (tot <= 0 || fort / (double)tot < WallsShare) { a.FieldRounds++; return; }
-                // wzor szturmu gry (DefaultCombatSimulationModel.cs:251-256), te same liczby
-                float adv = Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(st) * 0.7f;
-                int atk = TaleWorlds.Library.MathF.Round(1.5f + TaleWorlds.Library.MathF.Pow(D, 0.3f)) * 2;
-                int dfn = TaleWorlds.Library.MathF.Round(0.5f + TaleWorlds.Library.MathF.Max(1f + TaleWorlds.Library.MathF.Pow(D, 0.3f) * adv, (float)((D + 1) / (A + 1)))) * 2;
+                int atk, dfn;
+                Bat b = SzAny && st.Town != null ? BatOf(mapEvent, st) : null;
+                if (b != null && !b.Excl)
+                {
+                    SzTicks(b, st, D, A, out dfn, out atk);                       // ta sama regula co szturm (SZ1-SZ4)
+                    b.GDefT += __result.Item1; b.GAttT += __result.Item2; b.DefT += dfn; b.AttT += atk; b.Rounds++;
+                }
+                else
+                {
+                    // wzor szturmu gry (DefaultCombatSimulationModel.cs:251-256), te same liczby
+                    float adv = Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(st) * 0.7f;
+                    atk = TaleWorlds.Library.MathF.Round(1.5f + TaleWorlds.Library.MathF.Pow(D, 0.3f)) * 2;
+                    dfn = TaleWorlds.Library.MathF.Round(0.5f + TaleWorlds.Library.MathF.Max(1f + TaleWorlds.Library.MathF.Pow(D, 0.3f) * adv, (float)((D + 1) / (A + 1)))) * 2;
+                }
                 __result = new ValueTuple<int, int>(dfn, atk);
                 a.WallRounds++;
                 if (!a.FromWalls) { a.FromWalls = true; _dFromWalls++; }
@@ -599,15 +682,310 @@ namespace Armoury
             catch (Exception e) { Stumble("TicksPost", e); }
         }
 
+        /// <summary>Szturm (bitwa Siege, AI albo gracz w autobitwie): tury rundy wedlug SZ1-SZ4. Klucze wylaczone - wynik gry bez zmian.</summary>
+        private static void AssaultTicks(MapEvent me, ref ValueTuple<int, int> __result)
+        {
+            if (!SzAny) return;
+            try
+            {
+                if (me.IsInvulnerable || me.RetreatingSide != BattleSideEnum.None) return;   // odwrot: gra zeruje tury strony - bez zmian
+                var st = me.MapEventSettlement;
+                if (st == null || !st.IsFortification || st.Town == null || st.CurrentSiegeState == Settlement.SiegeState.InTheLordsHall) return;
+                int D = me.DefenderSide.NumRemainingSimulationTroops, A = me.AttackerSide.NumRemainingSimulationTroops;
+                if (D <= 0 || A <= 0) return;
+                var b = BatOf(me, st);
+                if (b == null || b.Excl) return;
+                if (!AnyGarrisonOn && D <= (st.IsTown ? 100 : 30)) { b.FieldRounds++; return; }   // SZ1 wylaczony: mala zaloga w polu, jak gra
+                int dfn, atk;
+                SzTicks(b, st, D, A, out dfn, out atk);
+                b.GDefT += __result.Item1; b.GAttT += __result.Item2; b.DefT += dfn; b.AttT += atk; b.Rounds++;
+                __result = new ValueTuple<int, int>(dfn, atk);
+            }
+            catch (Exception e) { Stumble("AssaultTicks", e); }
+        }
+
+        /// <summary>Tury rundy SZ: waski front murow (wzor gry z przewaga W = przewaga x drabiny x morale obroncow, sufit WCap) zmieszany z bitwa w polu
+        /// w udziale frontu o (taran i wieza / wyrwa); ciosy szturmujacych x minusy oblezenia. Bez kluczy (k 1, o 0, morale 1) = wzor murow gry.</summary>
+        private static void SzTicks(Bat b, Settlement st, int D, int A, out int dfn, out int atk)
+        {
+            double adv = Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(st);   // gra + AdvPost (stolica, machiny obroncow, wyrwa SZ2)
+            bool ram = false, tower = false;
+            var ev = st.SiegeEvent;
+            var side = ev != null ? ev.GetSiegeEventSide(BattleSideEnum.Attacker) : null;
+            if (side != null && side.SiegeEngines != null)
+                foreach (var x in side.SiegeEngines.AllSiegeEngines())
+                {
+                    if (x == null || !x.IsConstructed) continue;
+                    var t = x.SiegeEngine;
+                    if (t == DefaultSiegeEngineTypes.Ram || t == DefaultSiegeEngineTypes.ImprovedRam) ram = true;
+                    else if (t == DefaultSiegeEngineTypes.SiegeTower) tower = true;
+                }
+            bool breached = st.SettlementTotalWallHitPoints < 1E-05f || (BreachOneOn && WallHpMin(st) <= 0.0);
+            double k = 1.0, o;
+            int mode;
+            if (breached) { o = BreachFront; mode = 3; }
+            else
+            {
+                int m = (ram ? 1 : 0) + (tower ? 1 : 0);
+                k = 1.0 + (LadderK - 1.0) * (1.0 - m / 2.0);                  // SZ2: drabiny przy calych murach; z jedna machina z dwoch polowa
+                o = MachFront * m / 2.0;                                        // SZ4: brama i most
+                mode = m;
+            }
+            double fD = DefMorOn ? b.FD : 1.0, fA = AttMorOn ? b.FA : 1.0;
+            double W = Math.Min(WCap, adv * k * fD);
+            double mf = 0.7 * adv * (breached ? 1.0 : BreachBase(st)) * fD;     // w polu po bramie / wyrwie: tylko to, co zostaje z murow w wyrwie
+            float p3 = TaleWorlds.Library.MathF.Pow(D, 0.3f);
+            int attS = TaleWorlds.Library.MathF.Round(1.5f + p3) * 2;
+            double attF = Math.Min(2.0 * D, Math.Pow(A, 0.6));
+            atk = Math.Max(1, TaleWorlds.Library.MathF.Round((float)(((1.0 - o) * attS + o * attF) * fA)));
+            int defS = TaleWorlds.Library.MathF.Round(0.5f + TaleWorlds.Library.MathF.Max(1f + p3 * (float)W * 0.7f, (float)((D + 1) / (A + 1)))) * 2;
+            double defF = Math.Min(2.0 * A, Math.Pow(D, 0.6)) * mf;
+            dfn = Math.Max(1, TaleWorlds.Library.MathF.Round((float)((1.0 - o) * defS + o * defF)));
+            if (b.Mode0 < 0) { b.Mode0 = mode; b.W0 = W; b.K0 = k; b.O0 = o; b.Adv0 = adv; b.Mf0 = mf; }
+            b.ModeL = mode;
+        }
+
+        /// <summary>Rekord bitwy szturmu (raz na bitwe, w pierwszej rundzie): wykluczenia, morale obu stron, prog OB2 wedlug morale. Wyjatek - bitwa wykluczona
+        /// (tury gry), licznik potkniec.</summary>
+        private static Bat BatOf(MapEvent me, Settlement st)
+        {
+            Bat b;
+            if (_bats.TryGetValue(me, out b)) return b;
+            b = new Bat { St = st, Start = Now };
+            _bats[me] = b;
+            try
+            {
+                var lpb = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null;
+                var lp = lpb != null && lpb.IsMobile ? lpb.MobileParty : null;
+                b.Player = me.IsPlayerMapEvent;
+                if (me.IsNavalMapEvent) b.Why = "morze";
+                else if (lp == null) b.Why = "wodz nie druzyna";
+                else if (Scripted(lp)) b.Why = "skrypt fabuly";
+                else if (Und(lp, st)) b.Why = "Inni";
+                else b.Why = null;
+                if (b.Why != null) { b.Excl = true; _dSzExcl++; return b; }
+                b.Why = "-";
+                b.D0 = me.DefenderSide.NumRemainingSimulationTroops; b.A0 = me.AttackerSide.NumRemainingSimulationTroops;
+                b.Small = b.D0 <= (st.IsTown ? 100 : 30);
+                DefMorale(b, me, st);
+                AttMorale(b, me, st);
+                Assault a;
+                if (_assaults.TryGetValue(me, out a))
+                {
+                    float l = RepelLoss, r = RepelSpread;
+                    if (AttMorOn && l > 0f && a.Thr > 0f)
+                    {
+                        double p = 0.7 * Clamp((b.Ma - MoraleMid) / 30.0, -1.0, 1.0) + 0.3 * (2.0 * a.U - 1.0);
+                        a.Thr = (float)Clamp(l + r * p, 0.01, 0.95);
+                        a.ThrMorale = true;
+                    }
+                    b.Thr0 = a.Thr;
+                }
+                _dSz++;
+                if (b.Player) _dSzPlayer++;
+                if (b.Small) _dSzSmall++;
+                _dSzMd += b.Md; _dSzMa += b.Ma;
+            }
+            catch (Exception e) { Stumble("BatOf", e); b.Excl = true; b.Why = "potkniecie"; }
+            return b;
+        }
+
+        /// <summary>SZ3 obroncy: Md = 50 + jedzenie + lojalnosc + zold zalogi + odsiecz w drodze + mury (0..100) -> fD = (Md + 25) / 75 w [0.33, 1.67].</summary>
+        private static void DefMorale(Bat b, MapEvent me, Settlement st)
+        {
+            var t = st.Town;
+            try
+            {
+                if (t.FoodStocks <= 0f) { b.MFood = -25; b.FoodTxt = "glod"; }
+                else
+                {
+                    float ch = t.FoodChange;
+                    if (ch >= 0f) { b.MFood = 10; b.FoodTxt = "bez ubytku"; }
+                    else
+                    {
+                        double days = t.FoodStocks / -ch;
+                        b.FoodTxt = F(days, "0") + " dob";
+                        b.MFood = days >= 28.0 ? 10.0 : days < 7.0 ? -10.0 * (7.0 - days) / 7.0 : 0.0;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("DefMorale.food", e); }
+            try { b.Loy = t.Loyalty; b.MLoy = (Clamp(b.Loy, 0.0, 100.0) - 50.0) * 0.4; } catch (Exception e) { Stumble("DefMorale.loyalty", e); }
+            try { var g = t.GarrisonParty; b.Unpaid = g != null ? Clamp(g.HasUnpaidWages, 0.0, 1.0) : 0.0; b.MPay = -20.0 * b.Unpaid; } catch (Exception e) { Stumble("DefMorale.pay", e); }
+            try
+            {
+                double bes;
+                b.ReliefStr = ReliefStrength(st, me, out bes);
+                b.BesStr = bes;
+                b.MRelief = b.ReliefStr <= 0.0 ? 0.0 : (bes > 0.0 && b.ReliefStr >= 0.5 * bes) ? 15.0 : 7.0;
+            }
+            catch (Exception e) { Stumble("DefMorale.relief", e); }
+            b.Hp = WallHp(st);
+            b.MWalls = -15.0 * (1.0 - b.Hp);
+            b.Md = Clamp(50.0 + b.MFood + b.MLoy + b.MPay + b.MRelief + b.MWalls, 0.0, 100.0);
+            b.FD = Clamp((b.Md + 25.0) / 75.0, 0.33, 1.67);
+        }
+
+        /// <summary>Odsiecz w drodze: druzyny / armie frakcji osady z celem DefendSettlement tej osady (ta sama miara co OB5 i ocena obrony gry), poza osada
+        /// i poza ta bitwa; sila obozu - druzyny oblegajace (EstimatedStrength).</summary>
+        private static double ReliefStrength(Settlement st, MapEvent me, out double bes)
+        {
+            bes = 0.0;
+            var ev = st.SiegeEvent;
+            var camp = ev != null ? ev.BesiegerCamp : null;
+            if (camp != null)
+                foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) bes += pb.EstimatedStrength;
+            double rel = 0.0;
+            var f = st.MapFaction;
+            var w = f != null ? f.WarPartyComponents : null;
+            if (w == null) return 0.0;
+            for (int i = 0; i < w.Count; i++)
+            {
+                var mp = w[i] != null ? w[i].MobileParty : null;
+                if (mp == null || !mp.IsActive || mp.CurrentSettlement == st || mp.MapEvent == me) continue;
+                if (mp.DefaultBehavior != AiBehavior.DefendSettlement || mp.TargetSettlement != st) continue;
+                if (mp.Army != null) { if (mp.Army.LeaderParty == mp) rel += mp.Army.EstimatedStrength; }
+                else if (mp.AttachedTo == null) rel += mp.Party.EstimatedStrength;
+            }
+            return rel;
+        }
+
+        /// <summary>SZ3 atakujacy: morale druzyn (gra, wazone ludzmi) i minusy oblezenia - jedzenie obozu, chorzy i ranni, odparcia w tym oblezeniu.</summary>
+        private static void AttMorale(Bat b, MapEvent me, Settlement st)
+        {
+            double mor = 0.0, food = 0.0, need = 0.0; long men = 0, wounded = 0, total = 0;
+            foreach (var mep in me.AttackerSide.Parties)
+            {
+                var pb = mep != null ? mep.Party : null;
+                if (pb == null || !pb.IsMobile || pb.MobileParty == null) continue;
+                var mp = pb.MobileParty;
+                try
+                {
+                    int n = pb.NumberOfHealthyMembers;
+                    if (n > 0) { mor += mp.Morale * n; men += n; }
+                    food += Math.Max(0f, mp.Food);
+                    float fc = mp.FoodChange;
+                    if (fc < 0f) need += -fc;
+                    var r = mp.MemberRoster;
+                    if (r != null) { wounded += r.TotalWounded; total += r.TotalManCount; }
+                }
+                catch (Exception e) { Stumble("AttMorale.party", e); }
+            }
+            b.Pm = men > 0 ? mor / men : 50.0;
+            b.CampDays = need > 0.0 ? food / need : 99.0;
+            b.AFood = b.CampDays >= 3.0 ? 0.0 : -10.0 * (3.0 - b.CampDays) / 3.0;
+            b.WoundShare = total > 0 ? wounded / (double)total : 0.0;
+            b.ASick = -Math.Min(15.0, 30.0 * b.WoundShare);
+            try { var ev = st.SiegeEvent; var pz = ev != null ? PauseOf(ev, false) : null; b.Repels = pz != null ? pz.Repels : 0; } catch { }
+            b.ARep = -Math.Min(24.0, 8.0 * b.Repels);
+            double minus = -(b.AFood + b.ASick + b.ARep);
+            b.Ma = Clamp(b.Pm - minus, 0.0, 100.0);
+            b.FA = Clamp(1.0 - minus / 100.0, 0.6, 1.0);
+        }
+
+        /// <summary>Pole morale do linii OB2 (po "godzin szturmu"): morale szturmu i skad prog.</summary>
+        private static string MoralePart(MapEvent me, Assault a)
+        {
+            try
+            {
+                Bat b;
+                if (!_bats.TryGetValue(me, out b) || b.Excl) return " | morale szturmu - (prog losowy)";
+                return " | morale szturmu " + F(b.Ma, "0") + " (druzyny " + F(b.Pm, "0") + ", jedzenie obozu " + F(b.AFood, "0") + ", chorzy i ranni " + F(b.ASick, "0")
+                       + ", odparcia " + F(b.ARep, "0") + ") - prog " + (a.ThrMorale ? "wedlug morale" : "losowy");
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>Linia konca bitwy szturmu (z OnMapEventEnded) i liczniki doby.</summary>
+        private static void SzEnd(MapEvent me, Bat b, Assault a)
+        {
+            try
+            {
+                int casA = 0, casD = 0;
+                try { casA = me.AttackerSide.TroopCasualties; casD = me.DefenderSide.TroopCasualties; } catch { }
+                var w = me.WinningSide;
+                int res = a != null && a.Repelled ? 1 : w == BattleSideEnum.Attacker ? 0 : w == BattleSideEnum.Defender ? 2 : 3;
+                int md = b.Mode0 >= 0 && b.Mode0 < 4 ? b.Mode0 : 0;
+                _dSzEnded++;
+                if (b.Rounds > 0)
+                {
+                    _dSzMode[md]++;
+                    if (res == 0) _dSzWon[md]++; else if (res == 1) _dSzRep[md]++; else if (res == 2) _dSzDef[md]++; else _dSzNone[md]++;
+                    _dSzCasA[md] += casA; _dSzCasD[md] += casD;
+                    _dSzDefT += b.DefT; _dSzAttT += b.AttT; _dSzGDefT += b.GDefT; _dSzGAttT += b.GAttT;
+                }
+                if (b.Small && res != 0 && b.Rounds > 0) _dSzSmallHeld++;
+                if (!LogOn || b.Rounds <= 0) return;
+                var st = b.St;
+                string resTxt = res == 0 ? "zdobyte" : res == 1 ? "odparty (OB2)" : res == 2 ? "obronca wygral" : "bez rozstrzygniecia";
+                var sb = new StringBuilder(1100);
+                sb.Append("Bitwa szturmu (SZ): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(st.IsTown ? "miasto" : "zamek")
+                  .Append(", poziom murow ");
+                try { sb.Append(st.Town.GetWallLevel()); } catch { sb.Append('-'); }
+                sb.Append(", stolica ").Append(IsCapital(st) ? "tak" : "nie").Append(") | gracz ").Append(b.Player ? "tak" : "nie")
+                  .Append(" | tryb ").Append(ModeName[md]).Append(b.ModeL >= 0 && b.ModeL != b.Mode0 ? " -> " + ModeName[b.ModeL] : "")
+                  .Append(" | obroncow ").Append(b.D0).Append(" (mala zaloga ").Append(b.Small ? "tak" : "nie").Append("), atakujacych ").Append(b.A0)
+                  .Append(" | przewaga murow ").Append(F(b.Adv0, "0.00")).Append(" x drabiny ").Append(F(b.K0, "0.00")).Append(" x morale obroncow ").Append(F(DefMorOn ? b.FD : 1.0, "0.00"))
+                  .Append(" = W ").Append(F(b.W0, "0.00")).Append(" (sufit ").Append(F(WCap, "0")).Append("), front ").Append(F(b.O0, "0.00")).Append(", w polu x").Append(F(b.Mf0, "0.00"))
+                  .Append(" | morale obroncow ").Append(F(b.Md, "0")).Append(" (jedzenie ").Append(F(b.MFood, "0")).Append(" - ").Append(b.FoodTxt)
+                  .Append(", lojalnosc ").Append(F(b.MLoy, "0")).Append(" - ").Append(b.Loy < 0 ? "-" : F(b.Loy, "0"))
+                  .Append(", zold zalogi ").Append(F(b.MPay, "0")).Append(" - zaleglosc ").Append(F(b.Unpaid, "0.00"))
+                  .Append(", odsiecz ").Append(F(b.MRelief, "0")).Append(" - ").Append(F(b.ReliefStr, "0")).Append(" / oboz ").Append(F(b.BesStr, "0"))
+                  .Append(", mury ").Append(F(b.MWalls, "0")).Append(" - HP ").Append(F(b.Hp * 100.0, "0")).Append("%) -> x").Append(F(b.FD, "0.00")).Append(DefMorOn ? "" : " (klucz wylaczony)")
+                  .Append(" | morale atakujacych ").Append(F(b.Ma, "0")).Append(" (druzyny ").Append(F(b.Pm, "0")).Append(", jedzenie obozu ").Append(F(b.AFood, "0"))
+                  .Append(" - ").Append(b.CampDays >= 99.0 ? "bez ubytku" : F(b.CampDays, "0.0") + " dob").Append(", chorzy i ranni ").Append(F(b.ASick, "0")).Append(" - ")
+                  .Append(F(b.WoundShare * 100.0, "0")).Append("%, odparcia ").Append(F(b.ARep, "0")).Append(" - ").Append(b.Repels).Append(") -> ciosy x").Append(F(b.FA, "0.00"))
+                  .Append(AttMorOn ? "" : " (klucz wylaczony)").Append(", prog OB2 ").Append(b.Thr0 < 0f ? "-" : F(b.Thr0 * 100.0, "0.0") + "%" + (a != null && a.ThrMorale ? " wedlug morale" : " losowy"))
+                  .Append(" | rund ").Append(b.Rounds).Append(b.FieldRounds > 0 ? " (w polu - prog gry " + b.FieldRounds + ")" : "")
+                  .Append(", ciosy obrony / ataku ").Append(b.DefT).Append(" / ").Append(b.AttT).Append(" (gra ").Append(b.GDefT).Append(" / ").Append(b.GAttT).Append(')')
+                  .Append(" | straty: atakujacy ").Append(casA).Append(" (").Append(F(b.A0 > 0 ? casA * 100.0 / b.A0 : 0.0, "0")).Append("%), obroncy ").Append(casD)
+                  .Append(" (").Append(F(b.D0 > 0 ? casD * 100.0 / b.D0 : 0.0, "0")).Append("%), wymiana ").Append(F(casA / (double)Math.Max(1, casD), "0.00"))
+                  .Append(" | wynik ").Append(resTxt).Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("SzEnd", e); }
+        }
+
+        /// <summary>Linia doby bitwy szturmu (z Daily, przed ZeroDay).</summary>
+        private static void SzDaily()
+        {
+            try
+            {
+                var sb = new StringBuilder(900);
+                sb.Append("Bitwa szturmu (SZ doba): dzien ").Append(Today).Append(" | klucze: ").Append(SzKeys())
+                  .Append(" | bitwy szturmu ").Append(_dSz).Append(" (gracz ").Append(_dSzPlayer).Append(", wykluczone ").Append(_dSzExcl).Append("), skonczone ").Append(_dSzEnded)
+                  .Append(", mala zaloga ").Append(_dSzSmall).Append(" (utrzymana ").Append(_dSzSmallHeld).Append(')');
+                for (int i = 0; i < 4; i++)
+                    sb.Append(" | ").Append(ModeName[i]).Append(": bitew ").Append(_dSzMode[i]).Append(" (zdobyte ").Append(_dSzWon[i]).Append(", odparte ").Append(_dSzRep[i])
+                      .Append(", obronca wygral ").Append(_dSzDef[i]).Append(", bez rozstrzygniecia ").Append(_dSzNone[i]).Append("), straty atak / obrona ").Append(_dSzCasA[i])
+                      .Append(" / ").Append(_dSzCasD[i]);
+                sb.Append(" | ciosy obrony / ataku SZ ").Append(_dSzDefT).Append(" / ").Append(_dSzAttT).Append(" (gra ").Append(_dSzGDefT).Append(" / ").Append(_dSzGAttT).Append(')')
+                  .Append(" | morale srednio: obroncy ").Append(_dSz > 0 ? F(_dSzMd / _dSz, "0") : "-").Append(", atakujacy ").Append(_dSz > 0 ? F(_dSzMa / _dSz, "0") : "-")
+                  .Append(" | w pamieci ").Append(_bats.Count).Append(" | potkniecia ").Append(_dStumbles).Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("SzDaily", e); }
+        }
+
+        private static string SzKeys()
+        {
+            return "mury dla kazdej zalogi " + (AnyGarrisonOn ? "tak" : "nie") + ", drabiny x" + F(LadderK, "0.00") + ", wyrwa z jednego odcinka " + (BreachOneOn ? "tak" : "nie")
+                 + ", morale obroncow " + (DefMorOn ? "tak" : "nie") + ", morale atakujacych " + (AttMorOn ? "tak" : "nie") + ", front taran i wieza " + F(MachFront, "0.00")
+                 + ", front wyrwy " + F(BreachFront, "0.00") + ", sufit przewagi " + F(WCap, "0") + ", srodek morale " + F(MoraleMid, "0");
+        }
+
         /// <summary>Nasluch MapEventEnded: wynik szturmu AI (zdobyty / odparty / obronca wygral / bez rozstrzygniecia) i linia OB3. Nie rzuca.</summary>
         internal static void OnMapEventEnded(MapEvent me)
         {
             try
             {
-                if (me == null || _assaults.Count == 0) return;
-                Assault a;
-                if (!_assaults.TryGetValue(me, out a)) return;
-                _assaults.Remove(me);
+                if (me == null || (_assaults.Count == 0 && _bats.Count == 0)) return;
+                Assault a = null;
+                if (_assaults.Count > 0 && _assaults.TryGetValue(me, out a)) _assaults.Remove(me);
+                Bat bt = null;
+                if (_bats.Count > 0 && _bats.TryGetValue(me, out bt)) _bats.Remove(me);
+                if (bt != null && !bt.Excl) SzEnd(me, bt, a);                  // SZ: linia bitwy szturmu (AI i gracz)
+                if (a == null) return;
                 var w = me.WinningSide;
                 if (a.Repelled) { }
                 else if (w == BattleSideEnum.Attacker) _dWon++;
@@ -747,6 +1125,9 @@ namespace Armoury
                 List<MapEvent> deadMe = null;
                 foreach (var kv in _assaults) if (kv.Key == null || kv.Key.IsFinalized) { if (deadMe == null) deadMe = new List<MapEvent>(); deadMe.Add(kv.Key); }
                 if (deadMe != null) foreach (var me in deadMe) _assaults.Remove(me);
+                deadMe = null;
+                foreach (var kv in _bats) if (kv.Key == null || kv.Key.IsFinalized) { if (deadMe == null) deadMe = new List<MapEvent>(); deadMe.Add(kv.Key); }
+                if (deadMe != null) foreach (var me in deadMe) _bats.Remove(me);   // SZ: bitwy bez MapEventEnded (np. przerwane)
                 List<SiegeEvent> dead = null;
                 foreach (var kv in _pauses) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _pauses.Remove(ev);
@@ -793,6 +1174,7 @@ namespace Armoury
                   .Append(" | w pamieci: szturmy ").Append(_assaults.Count).Append(", przerwy ").Append(_pauses.Count + _pendingPauses.Count)
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (od wczytania ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
+                SzDaily();                                                       // SZ: linia doby bitwy szturmu
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
@@ -805,12 +1187,14 @@ namespace Armoury
             _dLossSum = _dThrSum = _dPauseSum = 0;
             _dEngWall = _dEngAnti = _dEngRam = _dEngTower = _dEngPlayer = _dWallHits = _dWallBroken = _dSiegesNew = 0;
             _dDispersed.Clear(); _dPrepAi.Clear(); _dPrepPlayer.Clear(); _dPrepExcl.Clear(); _vetoLogged.Clear(); _dStumbles = 0;
+            _dSz = _dSzPlayer = _dSzExcl = _dSzSmall = _dSzSmallHeld = _dSzEnded = 0; _dSzMd = _dSzMa = 0; _dSzDefT = _dSzAttT = _dSzGDefT = _dSzGAttT = 0;
+            for (int i = 0; i < 4; i++) { _dSzMode[i] = _dSzWon[i] = _dSzRep[i] = _dSzDef[i] = _dSzNone[i] = 0; _dSzCasA[i] = _dSzCasD[i] = 0; }
         }
 
         /// <summary>Z SiegeRansom.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
         internal static void Reset()
         {
-            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear();   // zapis (Import) przychodzi PO konstruktorze
+            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear();   // zapis (Import) przychodzi PO konstruktorze
             _lastCamp = null; _last = null; _lastAt = -1f;
             ZeroDay();
             _stumbles = 0; _err.Clear();
@@ -940,6 +1324,8 @@ namespace Armoury
                          + (BreachOn ? "tak" : "nie") + ", OB2 prog " + F(RepelLoss, "0.00") + " +- " + F(RepelSpread, "0.00") + ", przerwa " + F(PauseDays, "0.0") + " dob, OB3 "
                          + (FromWallsOn ? "tak" : "nie") + " (udzial " + F(WallsShare, "0.00") + "), OB4 " + (s != null ? s.SiegeBesiegerPrepPercent : 100) + "% (miasto x"
                          + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), log " + (LogOn ? "tak" : "nie") + ".");
+                Log.Info("Bitwa szturmu (SZ start): latka tur rundy (GetSimulationTicksForBattleRound) " + _hookTicks + ", przewaga osady " + _hookAdv + " | klucze: " + SzKeys()
+                         + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }

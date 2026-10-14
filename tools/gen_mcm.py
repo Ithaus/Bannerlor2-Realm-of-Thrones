@@ -228,6 +228,10 @@ RANGES = {
     'SiegeBesiegerPrepPercent': (10, 100, "0"),
     'SiegeTownPrepFactor': (1.0, 4.0, "0.00"),
     'SiegeCapitalPrepFactor': (1.0, 4.0, "0.00"),
+    # bitwa szturmu SZ2/SZ4 (SiegeWalls): drabiny przycinane w kodzie do 1..4, front do 0..1
+    'SiegeLadderWallsFactor': (1.0, 4.0, "0.00"),
+    'SiegeMachinesFront': (0.0, 1.0, "0.00"),
+    'SiegeBreachFront': (0.0, 1.0, "0.00"),
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
     # wyspy-wolni (decyzja Jeffa 14.10): udzialy przycinane w kodzie do 0..1 (ReaverLaw.Q / Qw), doby zaplaty 1..28 (ReaverLaw.PayDays), dziesiecina 0..1,

@@ -659,6 +659,10 @@ Uzycie (Python 3, tylko odczyt):
                     ostatnich 28 dob wojny), Z1-2 rody w pokoju z linii 166 (pulap, skrzynia pokoju, zold, ludzie - INFO), Z1-3 miara W5-7 (INFO, 85 tys.),
                     Z1-4 bledy ClanBudget 0. Log bez paczki: INFO, bez wyjatku. Domyslne okno 728 dob; --do-doby N zmienia. Log po wczytaniu zapisu
                     (bez dob wojny krolestw w pokoju): --baza-doby <log biegu, z ktorego jest zapis> - baza wojenna z niego (Z1-1).
+--grupa szturm    : (14.10, decyzje Jeffa o samej bitwie szturmu; galaz w-toku/bitwa-szturmu) python -I tools/sprawdz_logi.py --grupa szturm <Armoury-*.log>
+                    (log czytany strumieniowo). SZ-0 linia startowa (latki wpiete), SZ-1 linia doby, SZ-2 skladniki bitwy (morale obu stron, W, drabiny, front -
+                    konstrukcyjne), SZ-3 mala zaloga bije sie z murow, SZ-4 kolejnosc przewagi drabiny > taran i wieza > wyrwa, SZ-5 brak absurdow, SZ-6 prog OB2
+                    wedlug morale, SZ-7 wyniki (INFO), SZ-8 potkniecia i bledy. Log bez paczki: INFO, bez wyjatku.
 --grupa a17       : (A17, 14.10 - stare zaleglosci; docs/reszta-2026-10-14/ROZPOZNANIE-A17.md) python -I tools/sprawdz_logi.py --grupa a17 <Armoury-*.log>
                     (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
                     przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
@@ -24958,6 +24962,176 @@ def odsiecz_main(logp, csp=None, until=100000):
     return 0
 
 
+# ------------------------------------------------------------ szturm (14.10, decyzje Jeffa o samej bitwie szturmu SZ1-SZ4; galaz w-toku/bitwa-szturmu)
+SZ_START = re.compile(r"^Bitwa szturmu \(SZ start\): latka tur rundy \(GetSimulationTicksForBattleRound\) (.*?), przewaga osady (.*?) \| klucze: (.*?) \| regula: (czynna|wylaczona)")
+SZ_KEYS = re.compile(r"mury dla kazdej zalogi (tak|nie), drabiny x([\d.]+), wyrwa z jednego odcinka (tak|nie), morale obroncow (tak|nie), morale atakujacych (tak|nie),"
+                     r" front taran i wieza ([\d.]+), front wyrwy ([\d.]+), sufit przewagi ([\d.]+)")
+SZ_DAY = re.compile(r"^Bitwa szturmu \(SZ doba\): dzien (\d+) \|.*?\| bitwy szturmu (\d+) \(gracz (\d+), wykluczone (\d+)\), skonczone (\d+), mala zaloga (\d+) \(utrzymana (\d+)\)"
+                    r".*?\| potkniecia (\d+)\.")
+SZ_BAT = re.compile(r"^Bitwa szturmu \(SZ\): dzien (?P<d>\d+) \| osada (?P<st>\S+) \((?P<name>.*?), (?P<kind>zamek|miasto), poziom murow (?P<lvl>\S+), stolica (?P<cap>tak|nie)\)"
+                    r" \| gracz (?P<pl>tak|nie) \| tryb (?P<mode>.*?)(?: -> (?P<mode2>.*?))? \| obroncow (?P<D>\d+) \(mala zaloga (?P<small>tak|nie)\), atakujacych (?P<A>\d+)"
+                    r" \| przewaga murow (?P<adv>[\d.]+) x drabiny (?P<k>[\d.]+) x morale obroncow (?P<fdw>[\d.]+) = W (?P<W>[\d.]+) \(sufit (?P<cap20>[\d.]+)\), front (?P<o>[\d.]+), w polu x(?P<mf>[\d.]+)"
+                    r" \| morale obroncow (?P<Md>-?[\d.]+) \(jedzenie (?P<mfood>-?[\d.]+) - .*?, lojalnosc (?P<mloy>-?[\d.]+) - .*?, zold zalogi (?P<mpay>-?[\d.]+) - zaleglosc [\d.]+,"
+                    r" odsiecz (?P<mrel>-?[\d.]+) - .*?, mury (?P<mwall>-?[\d.]+) - HP (?P<hp>\d+)%\) -> x(?P<fD>[\d.]+)(?P<dkoff> \(klucz wylaczony\))?"
+                    r" \| morale atakujacych (?P<Ma>-?[\d.]+) \(druzyny (?P<Pm>-?[\d.]+), jedzenie obozu (?P<afood>-?[\d.]+) - .*?, chorzy i ranni (?P<asick>-?[\d.]+) - \d+%,"
+                    r" odparcia (?P<arep>-?[\d.]+) - \d+\) -> ciosy x(?P<fA>[\d.]+)(?P<akoff> \(klucz wylaczony\))?, prog OB2 (?P<thr>-|[\d.]+%)(?: (?:wedlug morale|losowy))?"
+                    r" \| rund (?P<R>\d+)(?P<field> \(w polu - prog gry \d+\))?, ciosy obrony / ataku (?P<dt>\d+) / (?P<at>\d+) \(gra (?P<gdt>\d+) / (?P<gat>\d+)\)"
+                    r" \| straty: atakujacy (?P<ca>\d+) \(\d+%\), obroncy (?P<cd>\d+) \(\d+%\), wymiana [\d.]+ \| wynik (?P<res>zdobyte|odparty \(OB2\)|obronca wygral|bez rozstrzygniecia)\.")
+SZ_OB2 = re.compile(r"^Szturm odparty \(OB2\): dzien (\d+) \|.*?\| prog armii ([\d.]+)%, straty ([\d.]+)%.*?\| morale szturmu (-?[\d.]+) \(.*?\) - prog (wedlug morale|losowy)")
+SZ_MODES = ("drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa")
+
+
+def szturm_main(logp):
+    """szturm (14.10, decyzje Jeffa o samej bitwie szturmu; galaz w-toku/bitwa-szturmu; SiegeWalls.TicksPost / BatOf / SzEnd). Log Armoury strumieniowo.
+    SZ-0 linia startowa (latka tur rundy i przewagi wpiete, regula czynna); SZ-1 linia doby kazdej doby; SZ-2 (konstrukcyjne, kazda linia "Bitwa szturmu (SZ)"):
+    morale obroncow = 50 + skladniki (+- 2.5 z zaokraglen, 0..100), fD = (Md + 25) / 75 w [0.33, 1.67], fA = 1 - minusy / 100 w [0.6, 1], W = min(20, przewaga x
+    drabiny x fD) (+- 2%), drabiny / front zgodne z trybem i kluczami (drabiny k = kL, o 0; jedna machina (1 + kL) / 2, oM / 2; taran i wieza 1, oM; wyrwa 1, oB);
+    SZ-3 mala zaloga (obroncow <= 100 miasto / <= 30 zamek) bije sie z murow: przy SZ1 tak - zadnej rundy "w polu - prog gry", stosunek ciosow obrona / atak
+    SZ wobec gry > 1 (mediana, >= 3 bitwy przy calych murach; mniej - INFO); SZ-4 kolejnosc przewagi: wymiana (straty atak / obrona) drabiny > taran i wieza >
+    wyrwa (tryby z >= 3 bitwami; mniej - INFO); SZ-5 brak absurdow: rund > 200 = 0, atakujacy >= 50% strat przy 0 strat obroncow = 0, ciosy ataku 0 przy rundach = 0;
+    SZ-6 prog OB2 wedlug morale: sredni prog armii przy morale szturmu < 60 <= przy > 75 (po >= 3 linie OB2; mniej - INFO); SZ-7 wyniki wedlug trybu, gracz,
+    mala zaloga utrzymana (INFO); SZ-8 potkniecia z linii doby 0 i ERROR in SiegeWalls. 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    starts, days, bats, ob2 = [], {}, [], []
+    errs = 0
+    keys = ("Bitwa szturmu (", "Szturm odparty (OB2)", "ERROR in SiegeWalls.")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if not any(k in ln for k in keys):
+                continue
+            s = OB_TS.sub("", ln.rstrip("\r\n"))
+            if s.startswith("ERROR in SiegeWalls."):
+                errs += 1
+                continue
+            m = SZ_START.match(s)
+            if m:
+                starts.append((m, s))
+                continue
+            m = SZ_DAY.match(s)
+            if m:
+                days[int(m.group(1))] = m
+                continue
+            m = SZ_BAT.match(s)
+            if m:
+                bats.append(m.groupdict())
+                continue
+            if s.startswith("Bitwa szturmu (SZ):"):
+                bats.append(None)          # linia, ktorej regex nie czyta - blad formatu (SZ-2)
+                continue
+            m = SZ_OB2.match(s)
+            if m:
+                ob2.append(dict(d=int(m.group(1)), thr=float(m.group(2)) / 100.0, loss=float(m.group(3)) / 100.0, ma=float(m.group(4)), src=m.group(5)))
+    if not starts and not days:
+        rep.add("SZ-0: linie bitwy szturmu (SZ start / SZ doba)", "brak linii", "INFO (log sprzed paczki bitwa-szturmu albo SiegeWallsLog wylaczony)", None)
+        rep.show()
+        return 0
+    # SZ-0
+    kL, oM, oB, cap, on1, ondm, onam = 1.0, 0.0, 0.0, 20.0, None, None, None
+    if starts:
+        m0, s0 = starts[-1]
+        wired = m0.group(1).startswith("wpieta") and m0.group(2).startswith("wpieta")
+        km = SZ_KEYS.search(m0.group(3))
+        if km:
+            on1, kL, ondm, onam = km.group(1) == "tak", float(km.group(2)), km.group(4) == "tak", km.group(5) == "tak"
+            oM, oB, cap = float(km.group(6)), float(km.group(7)), float(km.group(8))
+        rep.add("SZ-0: linia startowa - latka tur rundy i przewagi wpiete", f"linii {len(starts)}; regula {m0.group(4)}; {s0[:200]}", "wpieta x2 (regula czynna - INFO, gdy wylaczona)",
+                wired if m0.group(4) == "czynna" else None)
+    else:
+        rep.add("SZ-0: linia startowa", "brak linii 'Bitwa szturmu (SZ start)'", "jest", False)
+    dd = sorted(days)
+    span = (dd[-1] - dd[0] + 1) if dd else 0
+    rep.add("SZ-1: linia doby kazdej doby", f"{len(dd)} linii na {span} dob", "kazda doba (+- 1)", len(dd) >= span - 1 if span else None)
+    # SZ-2
+    bad_fmt = sum(1 for b in bats if b is None)
+    good = [b for b in bats if b is not None]
+    bad = []
+    for b in good:
+        md, fd, fa, W = float(b["Md"]), float(b["fD"]), float(b["fA"]), float(b["W"])
+        comp = 50.0 + sum(float(b[x]) for x in ("mfood", "mloy", "mpay", "mrel", "mwall"))
+        why = []
+        if not (0.0 <= md <= 100.0) or abs(min(100.0, max(0.0, comp)) - md) > 2.6:
+            why.append(f"Md {md} wobec 50 + skladniki {comp:.1f}")
+        if not (0.33 - 1e-3 <= fd <= 1.67 + 1e-3) or abs(min(1.67, max(0.33, (md + 25.0) / 75.0)) - fd) > 0.02:
+            why.append(f"fD {fd} wobec Md {md}")
+        minus = -(float(b["afood"]) + float(b["asick"]) + float(b["arep"]))
+        if not (0.6 - 1e-3 <= fa <= 1.0 + 1e-3) or abs(min(1.0, max(0.6, 1.0 - minus / 100.0)) - fa) > 0.03:
+            why.append(f"fA {fa} wobec minusow {minus:.1f}")
+        fdw = float(b["fdw"])
+        exp_w = min(cap, float(b["adv"]) * float(b["k"]) * fdw)
+        if W > cap + 0.01 or abs(exp_w - W) > max(0.02, 0.02 * exp_w):
+            why.append(f"W {W} wobec min({cap:.0f}, {b['adv']} x {b['k']} x {fdw}) = {exp_w:.2f}")
+        mode = b["mode"]
+        k, o = float(b["k"]), float(b["o"])
+        if mode in SZ_MODES:
+            i = SZ_MODES.index(mode)
+            ek, eo = [(kL, 0.0), ((1.0 + kL) / 2.0, oM / 2.0), (1.0, oM), (1.0, oB)][i]
+            if abs(ek - k) > 0.011 or abs(eo - o) > 0.011:
+                why.append(f"tryb {mode}: drabiny {k} / front {o} wobec {ek:.2f} / {eo:.2f}")
+        else:
+            why.append(f"nieznany tryb {mode}")
+        if why:
+            bad.append((b["st"], b["d"], "; ".join(why)))
+    rep.add("SZ-2: skladniki bitwy szturmu (morale, W, drabiny, front)", f"linii {len(good)}, zle {len(bad)}, nieczytelne {bad_fmt}" + (f"; np. {bad[0]}" if bad else ""),
+            "0 i 0 (konstrukcyjne)", (not bad and bad_fmt == 0) if bats else None)
+    # SZ-3
+    small = [b for b in good if b["small"] == "tak"]
+    sm_field = [b for b in small if b["field"]]
+    sm_walls = [b for b in small if b["mode"] != "wyrwa" and int(b["at"]) > 0 and int(b["gat"]) > 0 and int(b["gdt"]) > 0]
+    rel = [(int(b["dt"]) / int(b["at"])) / (int(b["gdt"]) / int(b["gat"])) for b in sm_walls]
+    held = sum(1 for b in small if b["res"] != "zdobyte")
+    if on1:
+        ok3 = (not sm_field) and (st.median(rel) > 1.0 if len(rel) >= 3 else True)
+        rep.add("SZ-3: mala zaloga bije sie z murow (SZ1)", f"bitew malej zalogi {len(small)} (utrzymane {held}), rundy w polu {len(sm_field)}; stosunek ciosow obrona / atak SZ wobec gry"
+                f" przy calych murach: " + (f"mediana {st.median(rel):.2f} ({len(rel)})" if rel else "-"), "rundy w polu 0; mediana > 1 (>= 3 bitwy)",
+                ok3 if small else None)
+    else:
+        rep.add("SZ-3: mala zaloga (INFO - SZ1 wylaczony)", f"bitew {len(small)}, rundy w polu {len(sm_field)}, utrzymane {held}", "INFO", None)
+    # SZ-4
+    ex = {}
+    for b in good:
+        ex.setdefault(b["mode"], [0, 0, 0])
+        ex[b["mode"]][0] += int(b["ca"]); ex[b["mode"]][1] += int(b["cd"]); ex[b["mode"]][2] += 1
+    def exch(mn):
+        v = ex.get(mn)
+        return (v[0] / max(1, v[1]), v[2]) if v else (None, 0)
+    order = [(mn, exch(mn)) for mn in ("drabiny", "taran i wieza", "wyrwa")]
+    have = [(mn, e) for mn, (e, n) in order if n >= 3]
+    txt = ", ".join(f"{mn} {e:.2f} ({n})" if e is not None else f"{mn} - (0)" for mn, (e, n) in order)
+    if len(have) >= 2:
+        ok4 = all(have[i][1] > have[i + 1][1] for i in range(len(have) - 1))
+        rep.add("SZ-4: kolejnosc przewagi - wymiana straty atak / obrona", txt, "drabiny > taran i wieza > wyrwa (tryby z >= 3 bitwami)", ok4)
+    else:
+        rep.add("SZ-4: kolejnosc przewagi (INFO)", txt, "INFO (mniej niz 2 tryby z >= 3 bitwami)", None)
+    # SZ-5
+    long_r = [b for b in good if int(b["R"]) > 200]
+    zero = [b for b in good if int(b["A"]) > 0 and int(b["ca"]) >= 0.5 * int(b["A"]) and int(b["cd"]) == 0]
+    noatk = [b for b in good if int(b["R"]) > 0 and int(b["at"]) == 0]
+    rep.add("SZ-5: brak absurdow (rund > 200 / atak >= 50% strat przy 0 obroncow / ciosy ataku 0)", f"{len(long_r)} / {len(zero)} / {len(noatk)}"
+            + (f"; np. {(long_r + zero + noatk)[0]['st']}" if (long_r or zero or noatk) else ""), "0 / 0 / 0", not (long_r or zero or noatk) if good else None)
+    # SZ-6
+    lo = [r["thr"] for r in ob2 if r["src"] == "wedlug morale" and r["ma"] < 60]
+    hi = [r["thr"] for r in ob2 if r["src"] == "wedlug morale" and r["ma"] > 75]
+    nm = sum(1 for r in ob2 if r["src"] == "wedlug morale")
+    if len(lo) >= 3 and len(hi) >= 3:
+        rep.add("SZ-6: prog OB2 wedlug morale", f"sredni prog przy morale < 60: {st.mean(lo):.3f} ({len(lo)}), > 75: {st.mean(hi):.3f} ({len(hi)}); linii OB2 z morale {nm} z {len(ob2)}",
+                "niskie <= wysokie", st.mean(lo) <= st.mean(hi))
+    else:
+        rep.add("SZ-6: prog OB2 wedlug morale (INFO)", f"linii OB2 z morale {nm} z {len(ob2)}; < 60: {len(lo)}, > 75: {len(hi)}", "INFO (po >= 3 linie)", None)
+    # SZ-7
+    res = {}
+    for b in good:
+        res.setdefault(b["mode"], {}).setdefault(b["res"], 0)
+        res[b["mode"]][b["res"]] += 1
+    rep.add("SZ-7: wyniki wedlug trybu (INFO)", "; ".join(f"{mn}: {v}" for mn, v in res.items()) + f" | gracz {sum(1 for b in good if b['pl'] == 'tak')},"
+            f" mala zaloga {len(small)} (utrzymana {held}); morale srednio: obroncy {st.mean(float(b['Md']) for b in good):.0f}, atakujacy {st.mean(float(b['Ma']) for b in good):.0f}"
+            if good else "brak bitew", "INFO", None)
+    # SZ-8
+    stum = sum(int(m.group(8)) for m in days.values())
+    rep.add("SZ-8: potkniecia (linie doby) / ERROR in SiegeWalls.", f"{stum} / {errs}", "0 / 0", stum == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -25038,6 +25212,8 @@ def main(argv):
         return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
     if group == "oblezenia" and logp:
         return oblezenia_main(logp)   # 14.10 oblezenia OB1-OB4 (SiegeWalls): mury w pelni, odparcie z przerwa, bitwa z murow, budowa oblegajacych
+    if group == "szturm" and logp:
+        return szturm_main(logp)   # 14.10 bitwa szturmu SZ1-SZ4 (SiegeWalls): mury dla malej zalogi, drabiny > taran i wieza > wyrwa, morale obu stron, front
     if group == "odsiecz" and logp:
         return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
     if group == "drobne14" and logp:
