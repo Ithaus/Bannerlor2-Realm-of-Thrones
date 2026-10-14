@@ -12,15 +12,20 @@ namespace Armoury
     /// nie stac na jedzenie (Highgarden, Oldtown, Braavos ...), chleb swiata 89.7% przy celu 98% i spada co kwartal (BD 4.3). Regula leczy skutek tym samym wzorem
     /// w kazdej osadzie, bez zakladania przyczyny biedy.
     ///  - WEJSCIE (jedna definicja glodu - zasada 0): osada z glodem z braku pieniedzy wedlug Hunger.Of / MoneyHungry (Afford jedzenia na jutro &lt; 0.95 przez 7 dob
-    ///    z rzedu, kampania &gt;= 120 dob). WYJSCIE (histereza): 7 kotwic z rzedu, w ktorych lud sam ma na BreadDays dni jedzenia. Stan - pamiec sesji (bez pola zapisu).
+    ///    z rzedu, kampania &gt;= 120 dob). Licznik dob glodu biegnie od startu kampanii (prog wieku jest tylko w MoneyHungry), wiec osada glodna od tygodnia wchodzi
+    ///    juz w pierwszej kotwicy z wiekiem 120 (recenzja - nie "120 + 7"; ta sama chwila, w ktorej zaczyna sie kara zadowolenia E5/C2).
+    ///    WYJSCIE (histereza): 7 kotwic z rzedu, w ktorych lud sam ma na BreadDays dni jedzenia. Stan - pamiec sesji (bez pola zapisu).
     ///  - LUKA (w kotwicy doby, TownLive / CastleLiveDay po NoteHungerDay): miasto - klasy W/R/P: max(0, BreadDays x potrzeba dzienna klasy x udzial jedzenia - kiesa
     ///    klasy); podzamcze - max(0, BreadDays x potrzeba x udzial jedzenia - (kiesa + kredyt dworu)). BreadDays = 2: chleb wplywa w kroku korony PO kotwicy, wiec
     ///    trafia do kotwicy nastepnej doby - z celem 1 dnia osada skakalaby co drugi dzien (pelna / glodna); drugi dzien to zapas na to opoznienie (w rownowadze
     ///    koszt = dzienny brak, jednorazowo +1 dzien jedzenia na osade - zostaje w kiesie ludu).
     ///  - PLATNIK: (1) korona krolestwa osady z reszty wplywow dnia PO zwrocie zoldu i po W5 / M1, PRZED rentami 180 (BreadCrown z CrownRents.Daily; krolestwa bez
     ///    kroku rent - BreadRest zaraz po rentach) - nigdy z zapasu skarbca, nigdy z kredytu (wydatek przed zwrotem pchalby korone w wojnie do Banku); (2) zastepczo pan
-    ///    osady (glowa rodu wlasciciela) - tylko ponad rezerwe wojny R budzetu 166 i najwyzej (G - R) / WarChestDays na dobe (tempo skrzyni wojennej); NIGDY gracz;
-    ///    (3) nikt - luka zostaje (licznik). Tylko jedzenie - reszta koszyka zostaje sprawa zarobku.
+    ///    osady (glowa rodu wlasciciela) - tylko ponad rezerwe wojny R budzetu 166 i tylko z tej czesci tempa skrzyni (G - R) / WarChestDays, ktorej nie bierze zold
+    ///    (recenzja: w sumie nie szybciej niz skrzynia) - w wojnie 1 - WarChestToWages (0.2, i o tyle mniej skrzyni sprzetu tej doby - ClanBudget), w pokoju
+    ///    1 - PeaceChestShare x WarChestToWages (0.68); NIGDY gracz; dluznik i rod w zajeciu - nie (kiese bierze wierzyciel); (3) nikt - luka zostaje (licznik).
+    ///    Kiesa klasy jest jedna (recenzja): lud wydaje ja jak zawsze - najpierw jedzenie, potem reszta koszyka (Anchor) - wiec chleb w rownowadze pokrywa caly dzienny
+    ///    brak koszyka (potrzeba - zarobek), nie sam brak jedzenia. Wydzielonej "kiesy chleba" nie ma (drugi stan i druga regula na te sama kiese - zasada 0).
     ///  - KSIEGA: skarbiec (glowa) -> kiesy ludu osady: kontrola zamknieta kies (_ctlIn, linia "Kiesa ludu" r = 0), 165 (KDay.Bread), "Obieg". Przelew miedzy
     ///    posiadaczami ksiegi pieniadza - nie zrodlo.
     /// Linia doby "Chleb biedoty (M3): dzien N". Wyjatek per osada - licznik potkniec TownFolk (CLAUDE.md 7). Watek glowny (blok doby).
@@ -37,6 +42,10 @@ namespace Armoury
         private static readonly HashSet<Kingdom> _brDone = new HashSet<Kingdom>();
         private static readonly Dictionary<Hero, long> _brLordToday = new Dictionary<Hero, long>();
         private static readonly Dictionary<Kingdom, long[]> _brByK = new Dictionary<Kingdom, long[]>();   // [korona, pan, nie stac nikogo]
+        // recenzja: chleb pana tej doby wedlug rodu (ClanBudget zdejmuje go ze skrzyni sprzetu tej doby w wojnie) i podzial pan w wojnie / w pokoju (linia)
+        private static readonly Dictionary<Clan, long> _brClanToday = new Dictionary<Clan, long>();
+        private static int _brClanDay = int.MinValue;
+        private static long _brLordWar, _brLordPeace;
         // liczniki doby (linia) i dnia ksiegi ("Obieg")
         private static int _brIn, _brOutN, _brLordN, _brNoneN, _brBelowR, _brPlayerPurse, _brCrownK;
         private static long _brCrown, _brLord, _brNone;
@@ -52,6 +61,7 @@ namespace Armoury
         private static void ResetBread()
         {
             _brIdxDay = int.MinValue; _brIdx.Clear(); _brNoK.Clear(); _brDone.Clear(); _brLordToday.Clear(); _brByK.Clear();
+            _brClanToday.Clear(); _brClanDay = int.MinValue; _brLordWar = _brLordPeace = 0;
             _brIn = _brOutN = _brLordN = _brNoneN = _brBelowR = _brPlayerPurse = _brCrownK = 0; _brCrown = _brLord = _brNone = 0; _brMinGR = double.NaN;
             LastBreadCrown = LastBreadLord = 0;
             _brPlWeek = -1; _brPlFief = _brPlFiefCrown = _brPlKingBread = _brPlKingRent = 0; _brPlNames.Clear();
@@ -122,7 +132,7 @@ namespace Armoury
             if (_brIdxDay == _liveDay) return;
             _brIdxDay = _liveDay;
             _brIdx.Clear(); _brNoK.Clear(); _brDone.Clear(); _brLordToday.Clear(); _brByK.Clear();
-            _brLordN = _brNoneN = _brBelowR = _brPlayerPurse = _brCrownK = 0; _brCrown = _brLord = _brNone = 0; _brMinGR = double.NaN;
+            _brLordN = _brNoneN = _brBelowR = _brPlayerPurse = _brCrownK = 0; _brCrown = _brLord = _brNone = 0; _brMinGR = double.NaN; _brLordWar = _brLordPeace = 0;
             if (!BreadKey || !Live) return;
             foreach (var f in _f.Values)
             {
@@ -135,6 +145,23 @@ namespace Armoury
                 l.Add(f);
             }
             foreach (var l in _brIdx.Values) l.Sort((a, b) => b.BreadGap.CompareTo(a.BreadGap));   // najwieksza luka pierwsza (wieksze miasto)
+        }
+
+        /// <summary>Recenzja M3 (ClanBudget.Daily - po kroku korony tej samej doby): chleb, ktory glowa rodu `c` zaplacila dzis za glodne osady rodu. 0 - nic, inna doba
+        /// albo klucz wylaczony. Tylko odczyt.</summary>
+        internal static long BreadLordToday(Clan c)
+        {
+            long v;
+            return c != null && Campaign.Current != null && _brClanDay == (int)CampaignTime.Now.ToDays && _brClanToday.TryGetValue(c, out v) ? Math.Max(0, v) : 0;
+        }
+
+        /// <summary>Recenzja M3: czesc tempa skrzyni (G - R) / WarChestDays, ktorej nie bierze zold - z niej (i tylko z niej) pan placi chleb. W wojnie 1 - WarChestToWages
+        /// (reszta to skrzynia sprzetu 0.2 - ClanBudget zdejmuje z niej zaplacony chleb), w pokoju 1 - PeaceChestShare x WarChestToWages.</summary>
+        private static double BreadLordShare(Settings s, bool war)
+        {
+            double w = Math.Max(0f, Math.Min(1f, s.WarChestToWages));
+            double used = war ? w : Math.Max(0f, Math.Min(1f, s.PeaceChestShare)) * w;
+            return Math.Max(0, 1 - used);
         }
 
         private static long[] BreadRow(Kingdom k)
@@ -208,12 +235,13 @@ namespace Armoury
                         if (need <= 0) continue;
                         var c = f.St.OwnerClan;
                         var h = c != null ? c.Leader : null;
-                        double G, R;
-                        if (c != null && c != Clan.PlayerClan && h != null && h.IsAlive && h != Hero.MainHero && ClanBudget.ChestOf(c, out G, out R))
+                        double G, R; bool war;
+                        if (c != null && c != Clan.PlayerClan && h != null && h.IsAlive && h != Hero.MainHero && ClanBudget.ChestOf(c, out G, out R, out war))
                         {
                             long gNow = ClanIncomeBook.FamilyGoldOf(c);
                             long done; _brLordToday.TryGetValue(h, out done);
-                            double rate = Math.Max(0, gNow - R) / wcd - done;          // tempo skrzyni wojennej: (G - R) / WarChestDays na dobe
+                            // recenzja: pan w sumie nie szybciej niz skrzynia - chleb tylko z czesci tempa skrzyni (G - R) / WarChestDays, ktorej nie bierze zold (wojna 0.2, pokoj 0.68)
+                            double rate = BreadLordShare(s, war) * Math.Max(0, gNow - R) / wcd - done;
                             long x = (long)Math.Floor(Math.Min(Math.Min((double)need, rate), Math.Min((double)h.Gold, gNow - R)));
                             if (x > 0)
                             {
@@ -223,6 +251,10 @@ namespace Armoury
                                 BreadCredit(f, ix);
                                 CirculationWindows.NoteHeroGold(h, -ix);  // paczka 169b: glowa poza swiatem (Disabled) - tylko licznik
                                 _brLordToday[h] = done + ix; _brLord += ix; f.BreadLord += ix; need -= ix;
+                                int today0 = (int)CampaignTime.Now.ToDays;
+                                if (_brClanDay != today0) { _brClanToday.Clear(); _brClanDay = today0; }
+                                long cd; _brClanToday.TryGetValue(c, out cd); _brClanToday[c] = cd + ix;   // ClanBudget: o tyle mniej skrzyni sprzetu tej doby (wojna)
+                                if (war) _brLordWar += ix; else _brLordPeace += ix;
                                 if (c.Kingdom != null) BreadRow(c.Kingdom)[1] += ix;
                                 if (ClanIncomeBook.FamilyGoldOf(c) < R) _brBelowR++;   // kontrola: pan po wyplacie nie ponizej rezerwy wojny (oczekiwane 0)
                             }
@@ -301,6 +333,9 @@ namespace Armoury
               .Append(", pan zastepczo ").Append(_brLord).Append(" (panow ").Append(_brLordN).Append("; najnizsze G/R placacego pana ")
               .Append(double.IsNaN(_brMinGR) ? "-" : _brMinGR.ToString("0.00", BrInv)).Append("), nie stac nikogo ").Append(_brNone).Append(" zl w ").Append(_brNoneN).Append(" osadach")
               .Append(" | kontrola: pan po wyplacie ponizej rezerwy wojny ").Append(_brBelowR).Append(" (oczekiwane 0), kiesa gracza ").Append(_brPlayerPurse).Append(" (oczekiwane 0)")
+              // recenzja: pan w wojnie placi z czesci tempa skrzyni bez zoldu (o tyle mniej skrzyni sprzetu tej doby), w pokoju - z czesci bez skrzyni pokoju Z.1
+              .Append(" | pan w wojnie ").Append(_brLordWar).Append(" zl (do ").Append(BreadLordShare(s, true).ToString("0.00", BrInv)).Append(" tempa skrzyni - ze skrzyni sprzetu)")
+              .Append(", w pokoju ").Append(_brLordPeace).Append(" zl (do ").Append(BreadLordShare(s, false).ToString("0.00", BrInv)).Append(" tempa skrzyni)")
               .Append(" | top: ").Append(top.Count > 0 ? string.Join(", ", top.ToArray()) : "-")
               .Append(" | na krolestwo (korona/pan/nie stac nikogo): ").Append(rt.Count > 0 ? string.Join(", ", rt.ToArray()) : "-").Append('.');
             Log.Info(sb.ToString());

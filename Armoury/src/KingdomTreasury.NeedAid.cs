@@ -67,6 +67,9 @@ namespace Armoury
             // M1 (KingdomTreasury.RentAid.cs): brak SPRZED M1 (W5b regula 1, rezerwa wezwan M2b), pula z reszty wplywow dnia, gotowka, reszta wplywow w chwili
             // rachunku, poziom po M1; RentAll - cala reszta wplywow poszla do puli (brak po M1 = "bez platnika" w krolestwie)
             public double UncovPre; public long Rent, RentPaid, RentAvail; public int RentN; public double LevelR = -1, RentBoost; public bool RentAll;
+            // recenzja M1: skad gotowka M1 - gdyby nie M1, poszlaby w renty 180 tej doby: rodom z potrzeba W5 (ta sama kiesa - zmiana etykiety), rodom bez potrzeby
+            // (prawdziwy przelew miedzy rodami), udzialy rodow bez warunku rent (zostalyby w skarbcu) - wagi lenn z CrownRents (RentAidSplit)
+            public long RentFromNeed, RentFromNo, RentFromHeld;
         }
         private sealed class NaFirst { public int Day, Men, Limit, Last; }
 
@@ -88,7 +91,7 @@ namespace Armoury
         private static void NeedAidReset()
         {
             _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naFirst.Clear(); _naRows.Clear(); _naGone.Clear(); _naErr.Clear();
-            _naDay = int.MinValue; _naStumbles = 0; _naCut = 0; _naCutN = 0; _naNotAtCap = 0; LastNeedAid = 0; LastNeedAidRent = 0; _raNotAtCap = 0;
+            _naDay = int.MinValue; _naStumbles = 0; _naCut = 0; _naCutN = 0; _naNotAtCap = 0; LastNeedAid = 0; LastNeedAidRent = 0; _raNotAtCap = 0; _raPaid.Clear(); _raNeed.Clear();
             NaClearMeasure();
             ScutageReset();   // W6: stan doby tarczowego (drugie zrodlo garnka) czyszczony razem z W5
             CrownSurplusReset();   // W5b regula 2: stan doby skarbca ponad zapas wojny czyszczony razem z W5
@@ -111,7 +114,7 @@ namespace Armoury
         {
             if (_naDay == today) return;
             _naDay = today;
-            _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naRows.Clear(); _naNotAtCap = 0; _raNotAtCap = 0;
+            _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naRows.Clear(); _naNotAtCap = 0; _raNotAtCap = 0; _raPaid.Clear(); _raNeed.Clear();
             NaClearMeasure();
             ScClearDay();     // W6: platnicy, podstawy i gotowka tarczowego poprzedniej doby
             CsClearDay();     // W5b regula 2: gotowka ze skarbca ponad zapas wojny i kontrole poprzedniej doby
@@ -205,6 +208,7 @@ namespace Armoury
                         if (!(need > 0)) continue;                                               // rod stac na cel z wlasnego pulapu - bez doplaty
                         row.NeedN++; row.Need += need; row.NeedMen += men; row.NeedLimit += limit;
                         cand.Add(x);
+                        _raNeed.Add(c);   // recenzja M1: rody z potrzeba tej doby - skad gotowka M1 (RentAidSplit: renty tych samych rodow / rodow bez potrzeby)
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(rod)", e); }
                 }
@@ -220,6 +224,9 @@ namespace Armoury
                 LvPlan(k, row.Name, cand, 0);   // W7 (KingdomTreasury.LordLevy.cs): rody z potrzeba tej doby - poziom 0, dopoki szczeble W5 nizej go nie podniosa (bez zlota)
                 // M1: bez daniny, skarbca i tarczowego krok biegnie dalej, gdy jest reszta wplywow dnia (szczeble nizej przy garnku 0 nic nie wyplacaja - poziom 0)
                 bool m1 = RentAidOn && CrownIncome.LeftFor(k) > 0;
+                // recenzja (blad 3): bez reszty wplywow (LeftFor = 0 - zwrot zjadl wplywy, kredyt 186) RentAidStep nie biegnie - brak po W6 jest "bez platnika";
+                // dotad RentAll zostawalo false i linia liczyla go do "z platnikiem" (falszywe NIE w R2-1b). RentAidStep ustawia je na nowo, gdy biegnie.
+                row.RentAll = RentAidOn && !m1;
                 if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0) && !m1)) return 0;
                 // poziom wyrownania: najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku (koszt rosnie z f; przy f = 0 jest 0)
                 double level = target;
@@ -371,17 +378,18 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>M2b (CrownCallToWar.Daily - przed krokiem W5 tej doby, wiersze to jeszcze wczoraj): niepokryta potrzeba W5 krolestwa z wczorajszego kroku
-        /// (po danine, W5b i W6, przed M1) - czesc rezerwy wezwan 168. 0 - brak wczorajszego wiersza (pokoj, W5 nieczynne, pierwsza doba sesji). Tylko odczyt.</summary>
-        internal static long NeedAidUncovYesterday(Kingdom k)
+        /// <summary>M2b (CrownCallToWar.Daily - przed krokiem W5 tej doby, wiersze to jeszcze wczoraj): wszystko, czego W5 krolestwa wczoraj potrzebowalo z wplywow
+        /// dnia - garnek daniny (danina siedzi w tej samej reszcie wplywow: rata 168 przed W5 zmniejszala garnek - recenzja) + niepokryta potrzeba po danine, W5b i W6
+        /// (przed M1) - czesc rezerwy wezwan 168. 0 - brak wczorajszego wiersza (pokoj, W5 nieczynne, pierwsza doba sesji). Tylko odczyt.</summary>
+        internal static long NeedAidFromIncomeYesterday(Kingdom k)
         {
             try
             {
                 if (k == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays - 1) return 0;
-                for (int i = 0; i < _naRows.Count; i++) { var r = _naRows[i]; if (r.K == k) return r.Known ? (long)Math.Floor(Math.Max(0, r.UncovPre)) : 0; }
+                for (int i = 0; i < _naRows.Count; i++) { var r = _naRows[i]; if (r.K == k) return r.Known ? (long)Math.Floor(Math.Max(0, r.Pot) + Math.Max(0, r.UncovPre)) : 0; }
                 return 0;
             }
-            catch (Exception e) { NaStumble("NeedAidUncovYesterday", e); return 0; }
+            catch (Exception e) { NaStumble("NeedAidFromIncomeYesterday", e); return 0; }
         }
 
         /// <summary>WageRefund (przed krokiem W5 tej doby): ile z zoldu `paid` zaplaconego przez rod od poprzedniego zwrotu oplacila wczorajsza doplata - ta czesc
@@ -434,7 +442,7 @@ namespace Armoury
                 // W5b: regula 2 (skarbiec ponad zapas wojny) i brak po wszystkich zrodlach (regula 1); dopisek wiersza krolestwa tylko przy czynnej paczce
                 long cPool = 0, cPaid = 0, cSur = 0; double cBoost = 0, uncAll = 0; int cSurK = 0, cPoolK = 0, cN = 0, uncK = 0;
                 // M1: pula i gotowka z reszty wplywow dnia, brak przed M1, brak po M1 "z platnikiem" (M1 nie wzial calej reszty - kontrola, oczekiwane 0) i "bez platnika"
-                long rPool = 0, rPaid = 0; double rBoost = 0, uncPre = 0, uncPay = 0, uncNoPay = 0; int rK = 0, rN = 0, uncPayK = 0; var noPay = new List<string>();
+                long rPool = 0, rPaid = 0, rNeed = 0, rNo = 0, rHeld = 0; double rBoost = 0, uncPre = 0, uncPay = 0, uncNoPay = 0; int rK = 0, rN = 0, uncPayK = 0; var noPay = new List<string>();
                 bool w5b = CrownSurplusOn || LnOn;
                 var parts = new List<KeyValuePair<double, string>>();
                 for (int i = 0; i < _naRows.Count; i++)
@@ -446,7 +454,7 @@ namespace Armoury
                     if (r.CrownSur > 0) { cSurK++; cSur += r.CrownSur; }
                     if (r.Crown > 0) cPoolK++;
                     if (r.Uncov >= 1) uncK++;
-                    rPool += r.Rent; rPaid += r.RentPaid; rN += r.RentN; rBoost += r.RentBoost; uncPre += Math.Floor(r.UncovPre);
+                    rPool += r.Rent; rPaid += r.RentPaid; rN += r.RentN; rBoost += r.RentBoost; uncPre += Math.Floor(r.UncovPre); rNeed += r.RentFromNeed; rNo += r.RentFromNo; rHeld += r.RentFromHeld;
                     if (r.Rent > 0) rK++;
                     if (r.Uncov >= 1)
                     {
@@ -507,6 +515,9 @@ namespace Armoury
                       .Append(" - z platnikiem (M1 nie wzial calej reszty wplywow; oczekiwane 0) ").Append(Math.Round(uncPay).ToString("0", WtInv)).Append(" w ").Append(uncPayK)
                       .Append(" krolestwach, bez platnika (cala reszta wplywow w puli) ").Append(Math.Round(uncNoPay).ToString("0", WtInv)).Append(" [").Append(noPay.Count > 0 ? string.Join(", ", noPay.ToArray()) : "-").Append(']')
                       .Append("; kontrola: gotowka M1 przy zoldzie w pulapie wlasnym ").Append(_raNotAtCap).Append(" (oczekiwane 0)")
+                      // recenzja M1: skad wyplacona gotowka M1 (wagi lenn rent 180 tej doby) - tylko "bez potrzeby" to nowy pieniadz dla rodow z potrzeba
+                      .Append("; skad (bez M1 poszloby w renty): rodom z potrzeba W5 ").Append(rNeed).Append(" (ta sama kiesa - zmiana etykiety), rodom bez potrzeby ").Append(rNo)
+                      .Append(" (przelew miedzy rodami), udzialy rodow bez warunku rent ").Append(rHeld).Append(" (zostalyby w skarbcu)")
                       .Append(" | kontrola: gotowka rodom, ktorych zold druzyn miesci sie w pulapie wlasnym ").Append(_naNotAtCap).Append(" (oczekiwane 0)")
                       .Append(" | podniesienie pulapu druzyn ").Append(Math.Round(boost).ToString("0", WtInv)).Append(" u ").Append(boostN)
                       .Append(" rodow (gotowka + miejsce na krok werbunku ").Append(Math.Round(Math.Max(0, boost - paid)).ToString("0", WtInv)).Append(')')

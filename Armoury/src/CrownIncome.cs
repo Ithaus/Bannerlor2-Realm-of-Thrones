@@ -101,6 +101,7 @@ namespace Armoury
         {
             _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
             _refDueY.Clear(); _refDueYDay = -1;   // M2b
+            _dNewKing = 0; _dNewKingN = 0;        // L1 (recenzja): nowe dlugi okupow krolow - licznik linii 165 czyszczony miedzy kampaniami
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
             KingdomTreasury.WarTaxReset();   // E5/B2 (184): stawki podatku wojennego ludu - zapisane w szostym polu tego klucza, czyszczone razem z nim

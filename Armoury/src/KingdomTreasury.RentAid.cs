@@ -9,7 +9,7 @@ namespace Armoury
     /// szczebel garnka W5 (KingdomTreasury.NeedAid.cs) PO danine, skarbcu ponad zapas wojny (W5b regula 2) i tarczowym (W6). Dotad reszta wplywow dnia szla tej samej
     /// doby w renty 180 wedlug lenn (CrownRents.Daily), choc panowie tego krolestwa nie mieli na zold (rok 2 biegu dwuletniego: renty krolestw z brakiem ok. 18%
     /// ich wplywow; Z.1 d754-781: 11.4 tys. zl/d przy braku 37.1 tys.).
-    ///  - ILE: pula M1 = mniejsze z (niepokryta potrzeba po W5/W5b/W6, reszta wplywow dnia po zwrocie zoldu i po wyplacie szczebla daniny). Poziom wyrownania ta sama
+    ///  - ILE: pula M1 = mniejsze z (niepokryta potrzeba po W5/W5b/W6, reszta wplywow dnia po zwrocie zoldu i po CALYM garnku daniny, najwyzej skarbiec). Poziom wyrownania ta sama
     ///    regula co W5 (garnek = danina + W5b + W6 + M1, od najslabszych, najwyzej do celu).
     ///  - GOTOWKA: zold ludzi, ktorzy dzis SA w druzynach, przy nowym poziomie, ponad gotowke, ktora rod juz dostal tej doby z nizszych szczebli (_naPaid); reszta
     ///    puli to miejsce w pulapie na krok werbunku (bez gotowki, jak W5). Gotowka schodzi z reszty wplywow dnia (CrownIncome.Spent) - renty dziela to, co zostanie.
@@ -23,6 +23,9 @@ namespace Armoury
     internal static partial class KingdomTreasury
     {
         private static int _raNotAtCap;
+        // recenzja: gotowka M1 rodu tej doby (kolumna budzet-rodow.csv doplata_m1 - czesc doplata_w5) i rody z potrzeba W5 tej doby (RentAidSplit); czyszczone z NaRoll
+        private static readonly Dictionary<Clan, long> _raPaid = new Dictionary<Clan, long>();
+        private static readonly HashSet<Clan> _raNeed = new HashSet<Clan>();
         /// <summary>"Obieg" i linia 165: gotowka M1 wyplacona tej doby (skarbce -> glowy rodow, z reszty wplywow dnia przed rentami).</summary>
         internal static long LastNeedAidRent;
 
@@ -40,9 +43,13 @@ namespace Armoury
             try
             {
                 if (cand.Count == 0 || !(row.UncovPre >= 1)) return level0;
-                long avail = Math.Max(0, CrownIncome.LeftFor(k) - aidPaid);              // reszta wplywow dnia po zwrocie i po szczeblu daniny
-                long wallet0 = Math.Max(0, (long)k.KingdomBudgetWallet);
-                if (avail > wallet0) avail = wallet0;
+                // recenzja (rachunek dostepnych pieniedzy): (a) reszta wplywow dnia BEZ CALEGO garnka daniny - niewyplacona reszta garnka jest juz w row.Pot, wiec w pot1
+                // liczylaby sie drugi raz (zawyzony poziom dla W7); wyplacona czesc garnka (aidPaid) jest jeszcze w d.Left (Spent w finally kroku W5). (b) skarbiec po wyplacie
+                // szczebla daniny bez niewyplaconej reszty garnka - aidPaid zeszlo juz ze skarbca (LeftFor - aidPaid odejmowalo je drugi raz, gdy wiazal skarbiec).
+                var dk0 = CrownIncome.DayOf(k);
+                long incLeft = dk0 != null ? Math.Max(0, dk0.Left - Math.Max(0, row.Pot)) : 0;
+                long walLeft = Math.Max(0, (long)k.KingdomBudgetWallet - Math.Max(0, row.Pot - aidPaid));
+                long avail = Math.Min(incLeft, walLeft);                                  // reszta wplywow dnia po zwrocie i po calym garnku daniny
                 row.RentAvail = avail;
                 long room = (long)Math.Floor(Math.Min((double)avail, row.UncovPre));
                 row.RentAll = room >= avail;                                              // cala reszta wplywow poszla do puli - dalszego platnika w krolestwie nie ma
@@ -93,6 +100,7 @@ namespace Armoury
                             paid += ip; row.RentPaid += ip; row.RentN++;
                             long cc; _naCash.TryGetValue(x.C, out cc); _naCash[x.C] = cc + ip;   // gotowka W5: nastepny zwrot 70% zdejmuje ja z podstawy
                             _naPaid[x.C] = had + ip;                                             // gotowka korony tej doby razem (ClanBudget.AidCash, CSV doplata_w5)
+                            long rp; _raPaid.TryGetValue(x.C, out rp); _raPaid[x.C] = rp + ip;   // recenzja: czesc M1 (CSV doplata_m1)
                             if (x.W <= x.Pc0) _raNotAtCap++;              // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
@@ -123,6 +131,49 @@ namespace Armoury
                 }
             }
             return level1;
+        }
+
+        /// <summary>
+        /// Recenzja M1 (CrownRents.Daily, zaraz po kroku W5 krolestwa, przed podzialem rent): skad gotowka M1 tej doby - gdyby nie M1, ta kwota poszlaby w renty 180
+        /// wedlug wag lenn: rodom z potrzeba W5 (ta sama kiesa - zmiana etykiety renta -> doplata), rodom bez potrzeby (prawdziwy przelew miedzy rodami), udzialy rodow
+        /// bez warunku rent (zostalyby w skarbcu; przy Crown Rent Held To Serving - do rodow z warunkiem). Tylko pomiar linii W5. Nie rzuca.
+        /// </summary>
+        internal static void RentAidSplit(Kingdom k, List<Clan> list, List<double> wts, bool[] ok, double sum, double sumOk, bool heldToServing)
+        {
+            try
+            {
+                if (k == null || list == null || wts == null || ok == null || !RentAidOn) return;
+                NaK row = null;
+                for (int i = _naRows.Count - 1; i >= 0; i--) if (_naRows[i].K == k) { row = _naRows[i]; break; }
+                if (row == null || row.RentPaid <= 0) return;
+                bool toServing = heldToServing && sumOk > 0 && sumOk < sum - 1e-9;   // ta sama regula co podzial rent (CrownRents.Daily)
+                double div = toServing ? sumOk : sum, wNeed = 0, wNo = 0;
+                if (!(div > 0)) { row.RentFromHeld = row.RentPaid; return; }
+                for (int i = 0; i < list.Count && i < wts.Count && i < ok.Length; i++)
+                {
+                    if (!ok[i] || list[i] == null) continue;
+                    if (_raNeed.Contains(list[i])) wNeed += wts[i]; else wNo += wts[i];
+                }
+                row.RentFromNeed = (long)Math.Round(row.RentPaid * Math.Min(1.0, wNeed / div));
+                row.RentFromNo = (long)Math.Round(row.RentPaid * Math.Min(1.0, wNo / div));
+                row.RentFromHeld = Math.Max(0, row.RentPaid - row.RentFromNeed - row.RentFromNo);
+            }
+            catch (Exception e) { NaStumble("RentAidSplit", e); }
+        }
+
+        /// <summary>Kolumna budzet-rodow.csv (ostatnia - czytniki po nazwach): czesc gotowki W5 rodu (kolumna doplata_w5), ktora tej doby przyszla z reszty wplywow
+        /// dnia (M1) - suma kolumny = "wyplacono" odcinka M1 linii W5 (recenzja: W6b-1 dolicza ja do sumy doplata_w5).</summary>
+        internal const string RentAidCsvHeader = ";doplata_m1";
+
+        internal static string RentAidCsv(Clan c)
+        {
+            try
+            {
+                long p;
+                if (c == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays || !_raPaid.TryGetValue(c, out p)) return ";";
+                return ";" + p.ToString(WtInv);
+            }
+            catch { return ";"; }
         }
     }
 }

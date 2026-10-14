@@ -308,26 +308,27 @@ namespace Armoury
             catch (Exception e) { Stumble("PartyCapOwn", e); return false; }
         }
 
-        /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
-        /// tarczowego = pulap partii z ostatniego budzetu bez przydzialu korony (W5), bez udzialu dworu dopisanego do pulapu w wojnie (rod z luzem placi dwor
-        /// w calosci - to nie jest zaoszczedzony zold) i bez miejsca kredytu wojennego; reserve = rezerwa wojenna R z tego samego budzetu. false: rod bez
-        /// budzetu policzonego (gracz, 166 wylaczone, pierwsza doba sesji), Straz bez zoldu, kompania najemna, rod w pokoju, dluznik albo rod w zajeciu
-        /// (168 - jego kiese bierze wierzyciel). Tylko odczyt.</summary>
-        /// <summary>M3 (chleb biedoty, TownFolk.BreadRest): zloto rodziny G i rezerwa wojny R z budzetu 166 (krok korony biegnie przed budzetem doby - budzet z wczoraj,
-        /// jak ScutageCap). false - rod bez budzetu, Straz bez zoldu. Tylko odczyt.</summary>
-        internal static bool ChestOf(Clan c, out double G, out double R)
+        /// <summary>M3 (chleb biedoty, TownFolk.BreadRest): zloto rodziny G, rezerwa wojny R i stan wojny z budzetu 166 (krok korony biegnie przed budzetem doby - budzet
+        /// z wczoraj, jak ScutageCap). false - rod bez budzetu, Straz bez zoldu, kompania najemna (pulap z umowy 185, bez skrzyni), dluznik albo rod w zajeciu (168 - jego
+        /// kiese bierze wierzyciel; recenzja - jak ScutageCap i W5). Tylko odczyt.</summary>
+        internal static bool ChestOf(Clan c, out double G, out double R, out bool war)
         {
-            G = 0; R = 0;
+            G = 0; R = 0; war = false;
             try
             {
                 var b = Of(c);
-                if (b == null || b.Zero) return false;
-                G = b.G; R = b.R;
+                if (b == null || b.Zero || b.Debtor || b.Seized || c.IsUnderMercenaryService) return false;
+                G = b.G; R = b.R; war = b.War;
                 return true;
             }
             catch (Exception e) { Stumble("ChestOf", e); return false; }
         }
 
+        /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
+        /// tarczowego = pulap partii z ostatniego budzetu bez przydzialu korony (W5), bez udzialu dworu dopisanego do pulapu w wojnie (rod z luzem placi dwor
+        /// w calosci - to nie jest zaoszczedzony zold) i bez miejsca kredytu wojennego; reserve = rezerwa wojenna R z tego samego budzetu. false: rod bez
+        /// budzetu policzonego (gracz, 166 wylaczone, pierwsza doba sesji), Straz bez zoldu, kompania najemna, rod w pokoju, dluznik albo rod w zajeciu
+        /// (168 - jego kiese bierze wierzyciel). Tylko odczyt.</summary>
         internal static bool ScutageCap(Clan c, out double partyCap, out double reserve)
         {
             partyCap = 0; reserve = 0;
@@ -518,7 +519,9 @@ namespace Armoury
                         if (merc && !MercContract.CapOf(c, b.War, out mcap)) { b.Today = false; continue; }   // najemnik bez umowy (185) - bez budzetu
                         double shareF = f;   // te same mnozniki biedy dla wszystkich udzialow
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
-                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) : 0);
+                        // recenzja M3: chleb, ktory pan zaplacil dzis za swoje glodne miasto (TownFolk.BreadRest - przed budzetem doby), schodzi ze skrzyni sprzetu tej doby -
+                        // w wojnie pan w sumie nie szybciej niz skrzynia (G - R) / WarChestDays (0.8 zold + 0.2 sprzet); klucz BreadForThePoor wylaczony - 0, jak dotad
+                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? Math.Max(0, 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c)) : 0);
                         // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
                         // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
                         b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;

@@ -577,6 +577,7 @@ namespace Armoury
                             var okW5 = new bool[list.Count];
                             for (int i = 0; i < list.Count; i++) okW5[i] = rowsK[i].GarOk && rowsK[i].SvcOk;
                             if (KingdomTreasury.NeedAidKingdom(k, list, okW5) > 0) pool = CrownIncome.LeftFor(k);   // M1: zwraca tez gotowke z reszty wplywow (RentAidStep)
+                            KingdomTreasury.RentAidSplit(k, list, wts, okW5, sum, sumOk, s.CrownRentHeldToServing);   // recenzja M1: skad gotowka M1 (wagi lenn tych rent) - tylko linia W5
                         }
                         catch (Exception e) { Stumble("Daily(W5)", e); }
                         // M3 (BreadForThePoor): chleb dla glodnych osad krolestwa z reszty wplywow dnia - po W5 / M1, PRZED podzialem rent (klucz wylaczony = 0)
