@@ -22,7 +22,7 @@ namespace Armoury
     /// materialow nie ma za co pracowac (najwyzej 3 pensy pracy na pens materialu). Punkty budowy = zaplacone / cena punktu
     /// (wojskowe 48 d, cywilne 24 d). Moc budowy gry (BK, vanilla) zastapiona oplacona praca; materialy BK wylaczone.
     /// </summary>
-    internal static class BuildFunding
+    internal static partial class BuildFunding
     {
         private static readonly Dictionary<Town, float> _funded = new Dictionary<Town, float>();
         private static readonly TextObject _txt = new TextObject("{=!}Paid works (wages and materials from the owner's purse)");
@@ -61,21 +61,29 @@ namespace Armoury
 
         public static void PowerPostfix(Town town, bool includeDescriptions, ref ExplainedNumber __result)
         {
-            if (_depth > 1 || !On || town == null || !Covered(town)) return;
+            if (_depth > 1 || !On || town == null) return;
             try
             {
+                // P2 (BuildFunding.Folk.cs): punkty robot ludu na czolo kolejki tej doby - druga pozycja dymku; lenno gracza bez PaidConstructionPlayer - dopisane
+                // do mocy gry (projekt B rozdz. 6), reszta jak dotad
+                float fl; _folk.TryGetValue(town, out fl);
+                if (fl > 0f && _folkTxt == null) _folkTxt = new TextObject("{=!}Town works (paid by the townsfolk)");
+                if (!Covered(town)) { if (fl > 0f) __result.Add(fl, _folkTxt); return; }
                 float f; _funded.TryGetValue(town, out f);
                 var r = new ExplainedNumber(f, includeDescriptions, _txt);
                 float b = Boost(town);
                 if (b > 0f) r.Add(b, _boostTxt);
+                if (fl > 0f) r.Add(fl, _folkTxt);
                 __result = r;
             }
             catch { }
         }
         public static void PowerIntPostfix(Town town, ref int __result)
         {
-            if (_depth > 1 || !On || town == null || !Covered(town)) return;
-            float f; _funded.TryGetValue(town, out f); __result = (int)f;
+            if (_depth > 1 || !On || town == null) return;
+            float fl; _folk.TryGetValue(town, out fl);   // P2: punkty robot ludu (jak wyzej)
+            if (!Covered(town)) { if (fl > 0f) __result += (int)fl; return; }
+            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl);
         }
 
         // ------------------------------------------------------------ materialy BK wylaczone
@@ -220,6 +228,8 @@ namespace Armoury
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
                      + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + WarFront.LineTail());
+            // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
+            try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
         }
 
         /// <summary>
@@ -249,6 +259,8 @@ namespace Armoury
                 var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                 if (it == null || market.ItemRoster.GetItemNumber(it) <= 0) continue;
                 int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
+                int cap = CapOf(it);   // P2: sufit ceny materialu takze dla pana (klucz FolkBuildsTown; wylaczony - 0)
+                if (cap > 0 && price > cap) continue;
                 if (price < bp) { bp = price; best = it; }
             }
             if (best == null || bp > purse) return 0;
@@ -270,6 +282,8 @@ namespace Armoury
                     int have = roster.GetItemNumber(it);
                     if (have <= 0) continue;
                     int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
+                    int cap = CapOf(it);   // P2: sztuka najwyzej BuildMaterialPriceCap x wartosc (obaj platnicy; klucz FolkBuildsTown wylaczony - 0, bez sufitu)
+                    if (cap > 0 && price > cap) { if (pass == 0) _capLord++; continue; }
                     int n = Math.Min(have, (int)((budget - spent) / price / (3 - pass)) + (pass == 2 ? 0 : 1));
                     n = Math.Min(n, (int)((budget - spent) / price));
                     if (n <= 0) continue;
@@ -277,7 +291,7 @@ namespace Armoury
                     // cenie - wycena od nowa po zdjeciu poprzedniej (ShelfBuy); partia konczy sie, gdy kolejna sztuka nie miesci sie w budzecie
                     var mel = new EquipmentElement(it);
                     int cost, first, last;
-                    n = ShelfBuy.Take(roster, mel, n, (int)(budget - spent), () => Math.Max(1, market.Town.GetItemPrice(mel, null, false)), out cost, out first, out last, price);
+                    n = ShelfBuy.Take(roster, mel, n, (int)(budget - spent), () => Math.Max(1, market.Town.GetItemPrice(mel, null, false)), out cost, out first, out last, price, true, cap);
                     if (n <= 0) continue;
                     OreLedger.NoteBuild(it, n);   // ksiega rudy i drewna: pozycja "budowy" (tylko licznik)
                     spent += cost;

@@ -1828,6 +1828,22 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildPencePerPointCivil { get; set; } = 24f;
 
+        [SettingPropertyBool("Folk Builds Town", HintText = "the townsfolk (and castle folk) pay for the works of their own town each day, beside the lord: only buildings that serve the town - walls, granary, marketplace, harbour and port, warehouse, mason, waterworks, roads, mines, courthouse, theatre and the like; barracks, training fields, guard houses, siege workshops, the tax office and other military works stay the lord's. When the lord's military works are first in line, they pay into their own next building. The money comes first from the town's common purse (its works budget from the market dues), then from what the people hold above their reserve after the war aid. They buy timber, stone and tools from the market (never above Building Material Price Cap times their worth) and pay their own masons and labourers; wages return to the town's labourers and craftsmen. War does not stop them, a siege does. Needs Paid Construction. Off = the common purse pays its public works as before, without buildings")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool FolkBuildsTown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Works Share", 0.000f, 0.200f, "0.000", HintText = "with Folk Builds Town: the part of the coin they hold above their reserve that each class of townsfolk offers the town's works each day (0.02 = one part in fifty a day); the market, the hands and the cost of the present stage usually limit the works long before this")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksShare { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Folk Works Hands", 0.000f, 0.200f, "0.000", HintText = "with Folk Builds Town: the share of the town's labourers (castle folk) that can work on the townsfolk's own works at once, at Workshop Wage Per Day each (0.03 = three in a hundred, about the most the great works of the Middle Ages took) - this keeps the rebuilding of a sacked town slow")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksHands { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Build Material Price Cap", 0.00f, 5.00f, "0.0", HintText = "with Folk Builds Town: neither the lord nor the townsfolk buy a piece of building material dearer than this many times its worth (0 = no limit)")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildMaterialPriceCap { get; set; } = 2.0f;
+
         [SettingPropertyBool("Build Wages By Town", HintText = "the masons and labourers are paid the day wage of the market town they come from: a penny of wages buys less work in a rich town and more in a poor one (materials at the market price either way; off = a penny of wages is a penny of work everywhere)")]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
@@ -5956,6 +5972,10 @@ namespace Armoury
             s.BuildMaterialShare = BuildMaterialShare;
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;
+            s.FolkBuildsTown = FolkBuildsTown;
+            s.FolkWorksShare = FolkWorksShare;
+            s.FolkWorksHands = FolkWorksHands;
+            s.BuildMaterialPriceCap = BuildMaterialPriceCap;
             s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;

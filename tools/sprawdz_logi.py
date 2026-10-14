@@ -482,6 +482,10 @@ Uzycie (Python 3, tylko odczyt):
                     podloga wspolna z W7 (60), prog poboru (30). python -I tools/sprawdz_logi.py --grupa p1b [--do-doby 120] <Armoury-*.log>
                     Wiersze P1B-0..P1B-7: linia i latka, kara w granicach, kontrola progu poboru, latka liczy (wywolania doby), lojalnosc placacych
                     (projekt prog 12 + rownowaga: srednia >= 70, najnizsza >= 50), W7 i podloga (INFO), czas i potkniecia. Log bez paczki: INFO.
+--grupa p2bud     : (P2, decyzja Jeffa 13.10 "lud buduje miasto - tylko budowle sluzace miastu, wojskowe placi pan") drugi platnik budow: gmina i lud
+                    z nadwyzki, material z polki (sufit 2 x wartosc), pulap rak, reszta poziomu. python -I tools/sprawdz_logi.py --grupa p2bud [--do-doby 120] <Armoury-*.log>
+                    Wiersze P2-0..P2-8: linia i klucz, material bez zaplaty 0, roboty d91+ >= 8 tys. zl/d, poziomy ukonczone na rok >= 110, budowy stojace
+                    <= 175, cena / wartosc <= sufit, drewno i narzedzia (INFO), czas i potkniecia, liczby paczki (INFO). Log bez paczki: INFO.
 --grupa w7        : (W7, decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana") rod, ktorego druzynom W5 nie pokrylo potrzeby, bierze najwyzej 3%/d
                     nadwyzki ludu i wsi wlasnych lenn (po daninie P1 i danine wsi) na zold ludzi, ktorzy sa; koszt: lojalnosc i dobrobyt osady.
                     python -I tools/sprawdz_logi.py --grupa w7 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -17873,6 +17877,112 @@ def p1b_main(logp, start_arg, until=120):
     return 0
 
 
+def p2bud_main(logp, start_arg, until=120):
+    """P2 (obieg kiesy ludu, projekt rozdz. 3, 8 wiersz P2, 9 progi 13-15; decyzja Jeffa 13.10 "lud buduje miasto - tylko budowle sluzace miastu"; Armoury/src/
+    BuildFunding.Folk.cs, TownFolk.Works.cs, klucz FolkBuildsTown): drugi platnik budow. Okno: doby kampanii 2-until (--do-doby). Wiersze P2-0..P2-9: linia i klucz,
+    material bez zaplaty 0, roboty ludu (zaplacone) w d91-until >= 8 tys. zl/d, poziomy ukonczone (linia Budowy gry + ukonczone wprost) w przeliczeniu na rok
+    >= 110, budowy stojace w ostatniej dobie <= 175, cena / wartosc materialu ludu <= sufit, drewno (stos w dniach zuzycia) i narzedzia (zakupy wsi) - INFO
+    z progiem projektu, czas i potkniecia, liczby paczki (INFO). Log bez paczki: INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    rows = by_day(lines, "Roboty ludu (P2): dzien")
+    bud = by_day(lines, "Budowy: dzien")
+    if start is None:
+        alld = sorted(set(rows) | set(bud))
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return 2 <= run_day(d, start) <= until
+    win = [d for d in sorted(rows) if inwin(d)]
+    on = [d for d in win if "| wylacznik Folk Builds Town tak, Paid Construction tak" in rows[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia P2 {len(win)} (klucz czynny w {len(on)})")
+    if not win:
+        rep.add("P2-0: linia Roboty ludu (P2)", "brak linii w oknie (log sprzed P2)", "codziennie od wgrania P2", None)
+    else:
+        rep.add("P2-0: linia codziennie, klucz Folk Builds Town i Paid Construction", f"dob z linia {len(win)}, klucz czynny {len(on)}",
+                "klucz czynny w kazdej dobie okna", len(on) == len(win))
+    t = {}
+    for d in on:
+        s = rows[d]
+        t[d] = {"n": num(r"\| osad z robota (\d+)", s, int, 0), "paid": num(r"\| zaplacone (\d+) \(", s, int, 0),
+                "g": num(r"\(z gmin (\d+),", s, int, 0), "c": num(r"z kies klas i podzamczy (\d+)\)", s, int, 0),
+                "mat": num(r"\| material (\d+) zl za", s, int, 0), "wage": num(r"\| place (\d+) \|", s, int, 0),
+                "pts": num(r"\| punkty (\d+),", s, int, 0), "done": num(r"poziomy ukonczone wprost \(poza czolem\) (\d+)", s, int, 0),
+                "ratio": num(r"cena / wartosc ([\d.]+)", s, float), "unpaid": num(r"material bez zaplaty (\d+)", s, int, 0),
+                "nomat": num(r"bez materialu (\d+)", s, int, 0), "hands": num(r"na pulapie rak (\d+)", s, int, 0),
+                "gm": num(r"place robot publicznych (\d+) w", s, int, 0), "capL": num(r"towar pominiety: pan (\d+)", s, int, 0),
+                "capF": num(r"towar pominiety: pan \d+, lud (\d+)", s, int, 0), "ms": num(r"\| czas ([\d.]+) ms", s, float, 0.0),
+                "st": num(r"potkniecia (\d+)\.", s, int, 0), "cap": num(r"sufit ceny materialu x([\d.]+)", s, float, 2.0)}
+    if t:
+        ds = sorted(t)
+        bad = [d for d in ds if t[d]["unpaid"] > 0]
+        rep.add("P2-1: material bez zaplaty (kontrola w linii; projekt prog 14)", f"{sum(t[d]['unpaid'] for d in ds)} zl w {len(bad)} dobach", "0 (kazda sztuka zdjeta z polki i zaplacona)", not bad)
+        late = [d for d in ds if run_day(d, start) >= 91]
+        if late:
+            v = sum(t[d]["paid"] for d in late) / len(late)
+            rep.add(f"P2-2: roboty ludu zaplacone, srednia d91-{until} (projekt prog 13)", f"{v / 1e3:.1f} tys. zl/d (material {sum(t[d]['mat'] for d in late) / len(late) / 1e3:.1f}, place {sum(t[d]['wage'] for d in late) / len(late) / 1e3:.1f}; z gmin {sum(t[d]['g'] for d in late) / len(late) / 1e3:.1f})",
+                    ">= 8 tys. zl/d (rachunek: 10-20 tys. zl/d przy materiale z biezacej produkcji)", v >= 8000)
+        else:
+            rep.add("P2-2: roboty ludu d91+", "okno krotsze niz 91 dob", "INFO", None)
+        rat = [t[d]["ratio"] for d in ds if t[d]["ratio"] is not None]
+        over = [r for r in rat if r > (t[ds[-1]]["cap"] or 2.0) + 1e-6]
+        rep.add("P2-6: cena / wartosc materialu kupionego przez lud (kazda doba) - najwyzej sufit", (f"srednio {sum(rat) / len(rat):.2f}, najwiecej {max(rat):.2f}; dob ponad sufit {len(over)}" if rat else "brak zakupow"),
+                "<= sufit ceny (2.0) - kazda sztuka najwyzej 2 x wartosc", (not over) if rat else None)
+        ms = [t[d]["ms"] for d in ds]
+        stu = sum(t[d]["st"] for d in ds)
+        err = [s for s in lines if s.startswith("ERROR in ") and ("FolkWorks" in s or "BuildFunding.Folk" in s or "Works" in s)]
+        rep.add("P2-7: czas robot ludu (srednio) i potkniecia", f"{sum(ms) / len(ms):.2f} ms/dobe (najwiecej {max(ms):.2f}); potkniecia {stu}, ERROR {len(err)}",
+                "<= 3 ms/dobe srednio (projekt: +0.5 ms; budowy razem <= 11 ms), potkniecia 0", sum(ms) / len(ms) <= 3.0 and stu == 0 and not err)
+        lw = ds[-28:]
+        k = float(len(lw))
+        rep.add(f"P2-8: liczby paczki (srednio na dobe, ostatnie {len(lw)} dob okna; INFO)",
+                f"osad z robota {sum(t[d]['n'] for d in lw) / k:.0f}, punkty {sum(t[d]['pts'] for d in lw) / k:.0f}, bez materialu {sum(t[d]['nomat'] for d in lw) / k:.0f}, na pulapie rak {sum(t[d]['hands'] for d in lw) / k:.0f}, "
+                f"gmina na place robot publicznych {sum(t[d]['gm'] for d in lw) / k / 1e3:.1f} tys., sufit ceny pominiety pan / lud {sum(t[d]['capL'] for d in lw) / k:.1f} / {sum(t[d]['capF'] for d in lw) / k:.1f}",
+                "INFO - rachunek CHANGELOG", None)
+    # ---- P2-3 / P2-4 poziomy ukonczone i budowy stojace (linia Budowy gry, dzien gry)
+    bw = [d for d in sorted(bud) if inwin(d)]
+    if bw:
+        game_done = sum(num(r"ukonczonych poziomow (\d+)", bud[d], int, 0) or 0 for d in bw)
+        own = sum(t[d]["done"] for d in t) if t else 0
+        per_year = (game_done + own) * 364.0 / max(1, len(bw))
+        rep.add("P2-3: poziomy budowli ukonczone (czolo kolejki - linia Budowy; poza czolem - linia P2) w przeliczeniu na rok (projekt prog 13)",
+                f"{game_done} + {own} w {len(bw)} dobach = {per_year:.0f} na rok", ">= 110 (projekt; bieg roczny kodu 43 bez P2: 131, bieg 120 dob 16-58 bez P2: 46 - rachunek P2: +50 do +80 na rok)" + ("" if t else " - log bez P2: INFO"),
+                (per_year >= 110) if t else None)
+        lastb = bud[bw[-1]]
+        stuck = num(r"stoi (\d+)", lastb, int)
+        allb = num(r"osad (\d+):", lastb, int)
+        rep.add("P2-4: budowy stojace w ostatniej dobie okna (projekt prog 13)", f"{stuck} z {allb}", "<= 175 z 227 (projekt; bez P2: bieg roczny kodu 43 156, bieg 120 dob 130)" + ("" if t else " - log bez P2: INFO"),
+                (stuck is not None and stuck <= 175) if t else None)
+    else:
+        rep.add("P2-3: poziomy ukonczone", "brak linii Budowy w oknie", "INFO (BuildDiaryEnabled)", None)
+    # ---- P2-5 drewno i narzedzia (linia Towary, INFO z progiem projektu 15)
+    hw = [s for s in lines if s.startswith("Towary: dzien ") and " - hardwood (" in s]
+    tl = [s for s in lines if s.startswith("Towary: dzien ") and " - tools (" in s]
+    if hw:
+        sh = hw[-1]
+        stock = num(r"zapas (\d+)", sh, int)
+        use = num(r"\| zuzycie (\d+)", sh, int)
+        bld = num(r"budowy (\d+)", sh, int)
+        tv = ""
+        if tl:
+            tvil = num(r"wsie \(zakupy w miescie, E5/B1\) (\d+)", tl[-1], int)
+            tbld = num(r"budowy (\d+)", tl[-1], int)
+            tst = num(r"zapas (\d+)", tl[-1], int)
+            tv = f"; narzedzia: zakupy wsi {tvil}/d, budowy {tbld}/d, zapas {tst}"
+        rep.add("P2-5: drewno - stos w dniach zuzycia, budowy (ostatnia linia Towary); narzedzia (INFO z progiem projektu 15)",
+                f"drewno: zapas {stock}, zuzycie {use}/d ({(stock / use if use else 0):.0f} dni), w tym budowy {bld}/d" + tv,
+                "INFO - projekt: drewno 30-60 dni zuzycia, zakupy narzedzi przez wsie >= 42 szt./d (lud zostawia na polce 5 narzedzi)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -17937,6 +18047,8 @@ def main(argv):
         return k13a_main(logp, start_arg, until_arg)   # K1-3a krok 2: konie robocze mieszczan (blok etap5_k13a) + KR-12 stado swiata po paczce A
     if group == "p1b" and logp:
         return p1b_main(logp, start_arg, until_arg)   # P1b: kara lojalnosci za danine P1 - podloga wspolna z W7, prog poboru, lojalnosc osad placacych
+    if group == "p2bud" and logp:
+        return p2bud_main(logp, start_arg, until_arg)   # P2: lud buduje miasto - drugi platnik budow, material z polki, sufit ceny, poziomy i budowy stojace
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

@@ -141,6 +141,10 @@ RANGES = {
     'FolkWarAidLoyaltyCost': (0.0, 5.0, "0.00"),
     'FolkWarAidLoyaltyFloor': (0.0, 100.0, "0"),
     'FolkWarAidMinLoyalty': (0, 100, "0"),
+    # P2: lud buduje miasto - udzialy przycinane w kodzie do 0..1; sufit ceny materialu 0..5 (0 = bez sufitu)
+    'FolkWorksShare': (0.0, 0.2, "0.000"),
+    'FolkWorksHands': (0.0, 0.2, "0.000"),
+    'BuildMaterialPriceCap': (0.0, 5.0, "0.0"),
     # W5 (doplata korony do zoldu wedlug potrzeby): cel wypelnienia i krok werbunku jako czesc limitu druzyn - kod przycina do 0..1 (KingdomTreasury.NeedAid)
     'CrownWarAidFillTarget': (0.0, 1.0, "0.00"),
     'CrownWarAidRecruitStep': (0.0, 1.0, "0.00"),

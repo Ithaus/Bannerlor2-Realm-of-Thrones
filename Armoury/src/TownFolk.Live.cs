@@ -815,11 +815,16 @@ namespace Armoury
             Array.Clear(f.PaidG, 0, 3);
             // ---- 4. gmina: 7% stanu - 1/3 farma panu, 2/3 roboty: 75% place W/R po polowie, 25% material do kasy (podstawa robocizny jutro)
             long gx = (long)Math.Round(GminaOut * Math.Max(0, f.KG));
+            f.GmWorks = 0;                                             // P2: budzet robot gminy tej doby (TownFolk.Works.cs)
             if (gx > 0)
             {
                 long farm = (long)Math.Round(gx * GFarm);
                 d.Farm += PayLord(f, 3, farm, d);
                 long pub = gx - farm, wages = (long)Math.Round(GLab * pub), mat = pub - wages;
+                // P2 (lud buduje miasto, klucz FolkBuildsTown): roboty gminy jako prawdziwe punkty budowy i material zdjety z polki - budzet zostaje w kiesie gminy
+                // do BuildFunding.FolkWorks (ta sama doba, po budowach pana); czego budowa nie wezmie, idzie tam na place robot publicznych (W/R po polowie, bez
+                // materialu bez sztuki). Klucz wylaczony - krok co do monety jak dotad
+                if (WorksRoute) { f.GmWorks = pub; wages = 0; mat = 0; }
                 long w1 = wages / 2;
                 d.GmWage += Move(f, 3, 0, wages - w1) + Move(f, 3, 1, w1);
                 mat = Math.Min(mat, Math.Max(0, f.KG));
