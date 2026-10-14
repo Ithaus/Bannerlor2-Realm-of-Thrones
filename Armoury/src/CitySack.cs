@@ -356,6 +356,7 @@ namespace Armoury
             int kind = KindOf(__2);
             Stock k = null;
             bool captured = false;
+            try { _bSt = __1; _bLv0 = Levels(__1, out _bZero0); } catch (Exception e) { _bSt = null; Stumble("AftermathPre.Buildings", e); }
             try
             {
                 k = Read(__1);                              // stan PRZED kara gry i PRZED lupem (prefiks)
@@ -426,6 +427,42 @@ namespace Armoury
               .Append(" | gracz ").Append(player).Append('.');
             Log.Info(sb.ToString());
             _dLines++;
+        }
+
+        // ------------------------------------------------------------ budowle: poziomy przed i po nastepstwach (pomiar dla kierunku Jeffa "budynki tez maja byc niszczone")
+        private static Settlement _bSt;
+        private static int _bLv0, _bZero0;
+
+        /// <summary>Suma poziomow budowli osady bez projektow dziennych (te, ktore gra zdejmuje - G SiegeAftermathCampaignBehavior.cs:136-139) i liczba budowli na poziomie 0.</summary>
+        private static int Levels(Settlement st, out int zero)
+        {
+            zero = 0;
+            int sum = 0;
+            var b = st != null && st.Town != null ? st.Town.Buildings : null;
+            if (b == null) return 0;
+            foreach (var x in b)
+            {
+                if (x == null || x.BuildingType == null || x.BuildingType.IsDailyProject) continue;
+                sum += x.CurrentLevel;
+                if (x.CurrentLevel <= 0) zero++;
+            }
+            return sum;
+        }
+
+        /// <summary>Postfiks OnSiegeAftermathApplied (Last): ile poziomow budowli zdjela gra (linia L0 budowle). Tylko odczyt.</summary>
+        public static void MeasurePost(Settlement __1, SiegeAftermathAction.SiegeAftermath __2)
+        {
+            try
+            {
+                var st = _bSt; _bSt = null;
+                if (!MeasureOn || st == null || !ReferenceEquals(st, __1)) return;
+                int z1, l1 = Levels(st, out z1);
+                int q = st.Town != null && st.Town.BuildingsInProgress != null ? st.Town.BuildingsInProgress.Count : 0;
+                Log.Info("Lup miast (L0 budowle): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + st.StringId + " | wybor " + KName[KindOf(__2)] + " | poziomy budowli (bez projektow dziennych) "
+                         + _bLv0 + " -> " + l1 + " (gra zdjela " + (_bLv0 - l1) + "), budowli na poziomie 0: " + _bZero0 + " -> " + z1 + " | kolejka budow " + q
+                         + " | dobrobyt po karze gry " + (st.Town != null ? (int)st.Town.Prosperity : 0) + ".");
+            }
+            catch (Exception e) { Stumble("MeasurePost", e); }
         }
 
         // ------------------------------------------------------------ raz na dobe (ArmouryBehavior, po kronice bitew)
@@ -504,7 +541,7 @@ namespace Armoury
             _pending = null;
             Last = null;
             _l5Last = null;
-            _me = null; _wsSt = null; _wsOwners = null;
+            _me = null; _wsSt = null; _wsOwners = null; _bSt = null;
             _stumbles = 0; _err.Clear();
         }
 
@@ -515,7 +552,7 @@ namespace Armoury
             Seal31.Patch("lup miast L0/L1: migawka bitwy i bez zdobycia bez nastepstw (SiegeAftermath OnMapEventEnded)", AccessTools.Method(t, "OnMapEventEnded"), typeof(CitySack),
                          nameof(MapEndPre), null, nameof(MapEndFin), Priority.High, Priority.Normal, Priority.Low);
             Seal31.Patch("lup miast L0: nastepstwa (OnSiegeAftermathApplied)", AccessTools.Method(t, "OnSiegeAftermathApplied"), typeof(CitySack),
-                         nameof(AftermathPre), null, null, Priority.High);
+                         nameof(AftermathPre), nameof(MeasurePost), null, Priority.High, Priority.Last);
             Seal31.Patch("lup miast L0: warsztaty przy zmianie pana (ChangeOwnerOfSettlementAction.ApplyInternal)", AccessTools.Method(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal"),
                          typeof(CitySack), nameof(OwnerPre), null, nameof(OwnerFin), Priority.High, Priority.Normal, Priority.Low);
             L2Patch();

@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (L0 dopisek - lup miast) - pomiar budowli przy nastepstwach (dla kierunku Jeffa "budynki tez maja byc niszczone")
+
+**Mod:** Armoury | **Galaz:** `w-toku/lup-miast` | **Tor:** S (sam log) | **Klucz:** `SackMeasureLog` | **Pliki:** `Armoury/src/CitySack.cs`.
+**Problem:** kierunek Jeffa 13.10 ("przy spustoszeniu masa budynkow splonie i trzeba budowac od nowa; sprawdz, co juz robi gra i BK z poziomami budowli") - w logu nie ma, ile poziomow budowli zdejmuje gra przy nastepstwach.
+**Przyczyna / stan dzis (dekompilacja):** gra zdejmuje losowym budowlom (bez projektow dziennych) k = floor(log2(n x 0.02 + 2)) poziomow przy grabiezy i ceil(1.5 k) przy spustoszeniu, laska 0 (G `SiegeAftermathCampaignBehavior.cs:133-139`, :670-689; n = zdrowi armii): 300 ludzi - 2 / 3, 1 000 - 4 / 6, 5 000 - 6 / 9, 10 000 - 7 / 11 poziomow. BK budowli przy nastepstwach nie rusza (BKSettlementBehavior - ludnosc i stabilnosc, BKReligionsBehavior - poboznosc przy lasce). Kolejke budow czysci gra przy zmianie pana na AI (G `BuildingsCampaignBehavior.cs:23-29`).
+**Zmiana:** prefiks nastepstw zapamietuje sume poziomow budowli (bez projektow dziennych) i liczbe budowli na poziomie 0; postfiks (Last) - linia `Lup miast (L0 budowle): dzien D | osada | wybor | poziomy budowli A -> B (gra zdjela C), budowli na poziomie 0: x -> y | kolejka budow q | dobrobyt po karze gry P`. Tylko odczyt.
+**Ryzyko:** brak (sam odczyt, wlasny try). **Status:** DO SPRAWDZENIA (build kod 0).
+
 ## 2026-10-13 (lup miast - progi) - grupa `lup` w tools/sprawdz_logi.py (progi 1-19 tabeli rozdz. 6 projektu)
 
 **Mod:** narzedzie | **Galaz:** `w-toku/lup-miast` | **Pliki:** `tools/sprawdz_logi.py` (`lup_main`, regexy `LUP_L0` / `LUP_L2` / `LUP_TRACK`, opis w naglowku).
