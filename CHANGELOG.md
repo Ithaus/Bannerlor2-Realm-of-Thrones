@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (okup zamiast szturmu - poprawki O1 i O2 z przegladu autora) - zwiniecie obozu we wlasnym try; w autotescie gracz-obronca bez pytania (od razu regula AI)
+
+**Mod:** Armoury | **Galaz:** `w-toku/okup` (na O2) | **Tor:** S | **Klucze:** bez nowych | **Pliki:** `SiegeRansom.Act.cs`, `SiegeRansom.Player.cs`
+
+**Problem / Przyczyna / Zmiana:** (1) O1 `Execute`: wyjatek w `BesiegerCamp.RemoveAllSiegeParties` (kod gry) przerywal wykonanie juz po zaplacie - umowa znikala, a oboz, ktory by zostal, mogl przy nastepnej decyzji wziac okup drugi raz. Teraz zwiniecie we wlasnym try (licznik potkniec "Execute.Lift"): zaplata i rozejm zostaja, a oboz frakcji z rozejmem ma wynik celu 0 i odchodzi z mysli AI. (2) O2: w autotescie (`CrashScribe.Autotest.Active`) okna z pauza i tak nikt nie widzi - dotad szturm czekal 24 h na odpowiedz, teraz od razu regula AI (linia O1 "AI z AI"), bez sztucznego przedluzania oblezenia.
+**Ryzyko / co sprawdzic (8.0):** (1) tylko sciezka wyjatku; (2) tylko autotest - w grze Jeffa bez zmian.
+**Status:** DO SPRAWDZENIA (build Armoury kod 0; bez testu w grze; nie wgrane).
+
 ## 2026-10-14 (okup zamiast szturmu O2 - gracz-obronca) - GDY OBLEGAJACY CHCA OKUPU OD TWOJEJ OSADY (albo tej, w ktorej jestes), PYTAJA CIEBIE: okno "Pay / Refuse"; 24 h bez odpowiedzi - osada decyduje jak kazda inna
 
 **Mod:** Armoury (+ `tools/sprawdz_logi.py` grupa `okup`) | **Galaz:** `w-toku/okup` (na O1) | **Tor:** L (paczka O2 projektu, tor M) | **Klucze:** nowy `SiegeRansomPlayerDefender` (wlaczony; off = regula AI i wiadomosc - stan O1); w `Armoury.json` Jeffa go nie ma | **Zapis:** bez nowych pol (pytanie w toku nie idzie do zapisu - po wczytaniu AI pyta znowu przy nastepnej decyzji) | **Pliki:** `SiegeRansom.Player.cs` (O2 zamiast pustych miejsc), `SiegeRansom.Besieger.cs` (nowy - w O2 puste miejsca O3), `SiegeRansom.Act.cs` (klucze przeniesione, wiadomosc takze po "Pay"), `Settings.cs`, `McmSettings.cs` (gen_mcm 1415), `tools/sprawdz_logi.py`

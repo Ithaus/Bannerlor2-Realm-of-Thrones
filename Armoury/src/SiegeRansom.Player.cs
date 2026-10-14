@@ -44,6 +44,7 @@ namespace Armoury
             if (old != null && old.Choice == 2) return "szturm (gracz-obronca odmowil w tym oblezeniu)";
             if (j.Player != "w osadzie" && j.Player != "pan osady") return null;
             if (!PlayerDefOn) return null;                                          // regula AI i wiadomosc (jak O1)
+            if (AutotestActive()) return null;                                      // autotest: nikt nie odpowie na okno z pauza - od razu regula AI (bez doby zwloki)
             var d = NewDeal(s, j, KDefPaid, 0);
             d.Deadline = Now + 1f;
             _dAsk++;

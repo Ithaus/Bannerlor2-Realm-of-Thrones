@@ -204,7 +204,8 @@ namespace Armoury
             var playerRec = (CitySack.Rec)null;
             foreach (var r in live) if (r.Mp == MobileParty.MainParty) playerRec = r;
             bool playerInCamp = MobileParty.MainParty != null && contrib.ContainsKey(MobileParty.MainParty);
-            camp.RemoveAllSiegeParties();
+            try { camp.RemoveAllSiegeParties(); }
+            catch (Exception e) { Stumble("Execute.Lift", e); }          // zaplacone i rozejm zapisany - oboz, ktory by zostal, traci cel (wynik 0) i odchodzi z mysli AI
             int left = 0;
             try { if (st.SiegeEvent == d.Ev && d.Ev.BesiegerCamp != null) foreach (var pb in d.Ev.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) left++; } catch { left = -1; }
             bool ended = st.SiegeEvent != d.Ev;
