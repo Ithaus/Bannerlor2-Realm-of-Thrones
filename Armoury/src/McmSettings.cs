@@ -1900,6 +1900,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public bool TownCraftsEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Weaver Export Price", HintText = "the town's weavers also weave for the towns that lack linen: while their own stall holds less linen than the town keeps for itself and for carrying out (what it will not sell to other towns, and as much again - at least one cart load), a bolt is worth to them what the best town short of linen within reach of a hired caravan or a merchants' cart (Town Material Order Range, by road or by sea) pays for it, less the carriage - not only what their own market pays. The linen then leaves by the existing caravan contracts and merchants' carts. Off = they weave only as much as their own market pays for, as before")]
+        [SettingPropertyGroup("Workshops")]
+        public bool WeaverExportPrice { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Town Craft Hands Per Arms Hand", 0.00f, 8.00f, "0.00", HintText = "hands of a town's cloth and leather trades for each hand of its arms craftsmen (Workshop Prosperity Per Hand), so they grow with the town's prosperity - weaving, fulling and tanning kept about twice as many people as the arms guilds (Paris 1292, Ghent 1356, estimate); 0 = town crafts off, the one-for-one tanning and weaving as before")]
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
@@ -5220,6 +5224,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool WardsAndVillagesShop { get; set; } = true;
 
+        [SettingPropertyBool("Folk Cloth Above Reserve", HintText = "linen and leather are what the soldiers' clothing and the armourers' workshops use, so the townsfolk (and the castle folk and villagers who shop in town) buy them from their savings only from what lies on the stall above what the town keeps for itself and for towns that lack it (what the town will not sell to other towns, and as much again - at least one cart load - for carrying out), and never above Folk Ladder Price Ceiling times the usual price, like the other fine goods; and the part of the cloth meant for velvet, cotton, fur or felt that are too dear does not go to linen and leather. What they do not buy stays in their purses. Their everyday buying for their homes is not touched. Off = they buy linen and leather from their savings down to the last pieces on the stall, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkClothAboveReserve { get; set; } = true;
+
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool Stage6MeasureLog { get; set; } = true;
@@ -6114,6 +6122,7 @@ namespace Armoury
             s.WorkshopArtisansMax = WorkshopArtisansMax;
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.TownCraftsEnabled = TownCraftsEnabled;
+            s.WeaverExportPrice = WeaverExportPrice;
             s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
             s.TownFletchersEnabled = TownFletchersEnabled;
             s.TownFletcherHandsPerArmsHand = TownFletcherHandsPerArmsHand;
@@ -6944,6 +6953,7 @@ namespace Armoury
             s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
             s.FolkPredictBought = FolkPredictBought;
             s.WardsAndVillagesShop = WardsAndVillagesShop;
+            s.FolkClothAboveReserve = FolkClothAboveReserve;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;

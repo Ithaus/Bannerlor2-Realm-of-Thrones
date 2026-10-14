@@ -290,6 +290,19 @@ namespace Armoury
             catch (Exception e) { Stumble("TownPurse.BuyFloor", e); return legacy; }
         }
 
+        /// <summary>Plotno 14.10 (recenzja, klucz WeaverExportPrice): ten sam prog co BuyFloor (ten sam warunek), ale bez licznika zapytan linii "Kasy miast (169c)" -
+        /// ocena celow wywozu tkacza (MaterialOrders.ExpDests) raz na dobe na miasto nie jest zakupem i nie moze zmieniac pomiaru 169c.</summary>
+        internal static int BuyFloorPeek(Town t, int legacy)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (t == null || !t.IsTown || s == null || !s.TownPaysFromSurplus || !On) return legacy;
+                return Reserve(t);
+            }
+            catch (Exception e) { Stumble("TownPurse.BuyFloorPeek", e); return legacy; }
+        }
+
         /// <summary>CastlePurse.Spendable dla miasta: ile kasa moze wydac na zakup (przy A1 i TownPaysFromSurplus - nadwyzka; inaczej cala kasa).</summary>
         internal static int SpendableTown(Town t)
         {
