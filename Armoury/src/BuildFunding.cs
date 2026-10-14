@@ -39,8 +39,9 @@ namespace Armoury
         private static readonly HashSet<Settlement> _woodHeldLord = new HashSet<Settlement>(), _woodHeldFolk = new HashSet<Settlement>();
         private static long _woodHeldLordPcs, _woodHeldFolkPcs;
         private static ItemObject _woodIt;
+        private static bool _woodErr; private static int _woodErrN;
         internal static bool WoodHoldOn { get { var s = Settings.Current; return s != null && s.BuildWoodAboveCraftStock; } }
-        private static void WoodReset() { _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodIt = null; }
+        private static void WoodReset() { _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodIt = null; _woodErr = false; _woodErrN = 0; }
 
         /// <summary>K1: ile sztuk materialu budowa zostawia na polce targu dla rzemiosla miasta - dla drewna zapas rzemiosla (CaravanBulk.TargetFor), dla reszty 0;
         /// klucz wylaczony albo blad - 0 (jak dotad). folk - licznik robot ludu (P2), inaczej pana. Licznik: raz na targ i dobe, sztuki zostawione = min(polka, zapas).</summary>
@@ -59,7 +60,7 @@ namespace Armoury
                 }
                 return keep;
             }
-            catch (Exception e) { Log.Error("BuildFunding.WoodHold", e); return 0; }
+            catch (Exception e) { _woodErrN++; if (!_woodErr) { _woodErr = true; Log.Error("BuildFunding.WoodHold", e); } return 0; }   // licznik potkniec, blad raz na sesje (CLAUDE.md 7)
         }
 
         /// <summary>K1: dopisek linii "Roboty ludu (P2)" - po zakupach pana i ludu tej doby: targi, na ktorych budowy zostawily drewno rzemioslu (sztuki zostawione
@@ -84,10 +85,10 @@ namespace Armoury
                 sb.Append(" | drewno budow ponad zapas rzemiosla (BuildWoodAboveCraftStock) ").Append(WoodHoldOn ? "tak" : "nie").Append(": budowy zostawily drewno rzemioslu - pan na ")
                   .Append(_woodHeldLord.Count).Append(" targach (").Append(_woodHeldLordPcs).Append(" szt.), lud na ").Append(_woodHeldFolk.Count).Append(" targach (").Append(_woodHeldFolkPcs)
                   .Append(" szt.); zapas rzemiosla miast razem ").Append(target).Append(" szt. (srednio ").Append(towns > 0 ? ((double)target / towns).ToString("0.0", inv) : "-")
-                  .Append("), drewno na polkach miast ").Append(shelf).Append(" szt., miast ponizej zapasu rzemiosla ").Append(below).Append(", bez drewna ").Append(none).Append(" z ").Append(towns);
+                  .Append("), drewno na polkach miast ").Append(shelf).Append(" szt., miast ponizej zapasu rzemiosla ").Append(below).Append(", bez drewna ").Append(none).Append(" z ").Append(towns).Append(_woodErrN > 0 ? ", potkniecia " + _woodErrN : "");
             }
             catch (Exception e) { Log.Error("BuildFunding.WoodTail", e); }
-            _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0;
+            _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodErrN = 0;
             return sb.ToString();
         }
 
