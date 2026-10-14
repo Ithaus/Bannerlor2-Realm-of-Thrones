@@ -8,7 +8,7 @@ namespace Armoury
     /// pieniedzy mieszczan zdobytej osady (CitySack.cs). Plik osobny, zeby nie ruszac TownFolk.Live.cs (rownolegle prace nad kiesa ludu).
     ///  - Odczyt (L0, L4, L5): stan kies W / R / P i gminy (miasto) albo podzamcza (zamek, KW) TERAZ - CALE kiesy, takze zapas na chleb (decyzja 1:
     ///    "lup z kazdej monety"). Kiesa nieczynna albo zamek przy wylaczonym zaworze zamkow - false (lup tylko z kasy kupcow).
-    ///  - Zdjecie (L2): kiesa klasy -> wolajacy (pula lupu), ksiega kies: _ctlOut (kontrola zamknieta kies "wydatki" - r = 0, jak W7 LevyTake).
+    ///  - Zdjecie (L2): kiesa klasy -> wolajacy (pula lupu), ksiega kies: _ctlOut (kontrola zamknieta kies "wydatki" - r = 0, jak W7 LevyTake) i LDayOut (CSV).
     ///    Zwrot (wyjatek przy podziale) - _ctlOut z powrotem. Bez nowych pol zapisu.
     ///  - Pomiar 30 dob po zdobyciu (L0): "stac na jedzenie" (DAffF) i pobor pana i korony z kasy (DTake) z ostatniej doby ludu - tylko odczyt.
     /// Klasy: 0 = W (zamek: podzamcze), 1 = R, 2 = P, 3 = gmina. Nie rzuca.
@@ -45,7 +45,7 @@ namespace Armoury
                 long x = Math.Min(amount, Math.Max(0, PurseOf(f, c)));
                 if (x <= 0) return 0;
                 AddPurse(f, c, -x);
-                _ctlOut += x;
+                _ctlOut += x; f.LDayOut += x;   // recenzja: wiersz osady w kiesa-ludu.csv (kolumna wydatkow) bilansuje sie takze w dobie lupu
                 return x;
             }
             catch (Exception e) { Stumble("SackTake", e); return 0; }
@@ -59,7 +59,7 @@ namespace Armoury
                 Folk f;
                 if (st == null || amount <= 0 || c < 0 || c > 3 || !_f.TryGetValue(st, out f) || f == null || f.Kind > 1) return;
                 AddPurse(f, c, amount);
-                _ctlOut -= amount;
+                _ctlOut -= amount; f.LDayOut -= amount;
             }
             catch (Exception e) { Stumble("SackBack", e); }
         }

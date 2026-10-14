@@ -130,7 +130,7 @@ namespace Armoury
         // ------------------------------------------------------------ armia: zold i potrzeba (rozdz. 3.4 pkt 3-4)
         internal sealed class Need
         {
-            public long ArmyWage, LeadWage, LeadGold; public int Unpaid, Parties; public bool InNeed; public double LeadDays;
+            public long ArmyWage, LeadWage, LeadGold, ClanWage; public int Unpaid, Parties; public bool InNeed; public double LeadDays;   // LeadGold - kiesa rodu wodza, ClanWage - zold druzyn rodu
         }
 
         internal static Need NeedOf(MobileParty a)
@@ -157,13 +157,33 @@ namespace Armoury
                 }
                 catch { }
             }
-            n.LeadGold = a.LeaderHero != null ? Math.Max(0, a.LeaderHero.Gold) : 0;
-            n.LeadDays = n.LeadWage > 0 ? (double)n.LeadGold / n.LeadWage : 999.0;
-            n.InNeed = n.Unpaid > 0 || (a.LeaderHero != null && n.LeadDays < NeedDays);
+            // recenzja (obieg 4, kod W1): zold placi ROD (kiesa glowy rodu - Clan.Gold), nie kiesa wodza armii - wodz, ktory nie jest glowa rodu, ma zwykle kilka
+            // tysiecy i wychodzil "w potrzebie" prawie zawsze. Miara: kiesa rodu wodza wobec 14 dob zoldu wszystkich druzyn rodu (te same, za ktore placi)
+            var lc = a.ActualClan ?? (a.LeaderHero != null ? a.LeaderHero.Clan : null);
+            if (lc != null)
+            {
+                n.LeadGold = Math.Max(0, lc.Gold);
+                long cw = 0;
+                try
+                {
+                    var wps = lc.WarPartyComponents;
+                    if (wps != null)
+                        for (int i = 0; i < wps.Count; i++)
+                        {
+                            var mp = wps[i] != null ? wps[i].MobileParty : null;
+                            if (mp == null || !mp.IsActive) continue;
+                            try { cw += Math.Max(0, mp.TotalWage); } catch { }
+                        }
+                }
+                catch { cw = 0; }
+                n.ClanWage = cw > 0 ? cw : n.LeadWage;
+            }
+            n.LeadDays = n.ClanWage > 0 ? (double)n.LeadGold / n.ClanWage : 999.0;
+            n.InNeed = n.Unpaid > 0 || (lc != null && n.LeadDays < NeedDays);
             return n;
         }
 
-        private const double NeedDays = 14.0;   // rozdz. 3.4 pkt 4: kiesa wodza ponizej 14 dob zoldu jego druzyny
+        private const double NeedDays = 14.0;   // rozdz. 3.4 pkt 4 (po recenzji): kiesa rodu wodza ponizej 14 dob zoldu druzyn rodu
 
         // ------------------------------------------------------------ wybor wedlug rozdz. 3.4 (L0 - pomiar; L4 - regula)
         private static MethodInfo _miInfl, _miAlive;
@@ -207,9 +227,10 @@ namespace Armoury
             if (m + f < Math.Max(1L, n.ArmyWage))
             {
                 // granica gry (IsSiegeAftermathPossible): laska wobec obcej kultury kosztuje wplywy za okrutnych lordow armii - bez nich wybor gry
+                // recenzja (kod, drobne): ta sama granica co laska AI w grze (DetermineAISiegeAftermath: wplywy > 2 x koszt) - AI nie wydaje calego zapasu wplywow na pusta osade
                 float cost = InfluenceCost(inst, a, st, SiegeAftermathAction.SiegeAftermath.ShowMercy);
                 float have = a.ActualClan != null ? a.ActualClan.Influence : 0f;
-                if (cost > 0f && have < cost) { why = "nie ma czego brac, laska ponad wplywy - gra"; return -1; }
+                if (cost > 0f && !(have > 2f * cost)) { why = "nie ma czego brac, laska ponad wplywy - gra"; return -1; }
                 why = "nie ma czego brac (" + (m + f) + " < doba zoldu " + n.ArmyWage + ")";
                 return KMercy;
             }
@@ -279,7 +300,7 @@ namespace Armoury
                 if (_track.Count == 0) return;
                 Track t;
                 if (!_track.TryGetValue(st, out t)) return;
-                bool sacker = mp != null && mp.MapFaction != null && mp.MapFaction.StringId == t.Faction;
+                bool sacker = Sacker(t, mp);
                 bool inWin = Now - t.Day0 < WindowDays;
                 if (inWin) { if (sacker) t.InWinSacker += amount; else t.InWinOther += amount; }
                 else { if (sacker) t.AfterSacker += amount; else t.AfterOther += amount; }
@@ -365,16 +386,21 @@ namespace Armoury
                 if (MeasureOn) MeasureLine(__instance, __0, __1, kind, __4, k, captured);
             }
             catch (Exception e) { Stumble("AftermathPre", e); }
-            // osada po nastepstwach (pomiar 30 dob, okno lupu L3, napisy L5) - ostatnie nastepstwa nadpisuja
+            // osada po nastepstwach (pomiar 30 dob, okno lupu L3, napisy L5) - ostatnie nastepstwa nadpisuja. Recenzja (kod, drobne): tylko gdy czyta ja ktoras
+            // paczka (pomiar, L2 - wynik, L3, L5), takze blizna przy wyborze (L1 wylaczone - osada niezdobyta) - przy wszystkich kluczach off zapis bez arm_sack
             Track t = null;
-            try
-            {
-                Ensure();
-                t = new Track { St = __1, Day0 = Now, Faction = __0 != null && __0.MapFaction != null ? __0.MapFaction.StringId : "", Kind = kind, Captured = captured,
-                                Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0 };
-                _track[__1] = t;
-            }
-            catch (Exception e) { Stumble("AftermathPre.Track", e); }
+            if (MeasureOn || CoinOn || NoSpendOn || WindowOn || ScarAtChoice)
+                try
+                {
+                    Ensure();
+                    // recenzja (obieg 11): "Right of Pillage" (gracz lupi WLASNE miasto - lista udzialow pusta, IncidentsCampaignBehaviour) - okno lupu L3 tylko dla druzyny
+                    // gracza ("@" + id druzyny), nie dla calego jego krolestwa
+                    bool own = __4 != null && __4.Count == 0 && __0 != null && __0 == MobileParty.MainParty;
+                    t = new Track { St = __1, Day0 = Now, Faction = own ? "@" + __0.StringId : (__0 != null && __0.MapFaction != null ? __0.MapFaction.StringId : ""), Kind = kind,
+                                    Captured = captured, Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0 };
+                    _track[__1] = t;
+                }
+                catch (Exception e) { Stumble("AftermathPre.Track", e); }
             AftermathCoin(__instance, __0, __1, kind, __3, __4, k, t);
             AftermathGoods(__0, __1, kind, __4);         // L7: towar, konie, zywnosc, uzbrojenie i unikaty z polek (CitySack.Goods.cs)
         }
@@ -423,7 +449,8 @@ namespace Armoury
               .Append(" | druzyny ").Append(recs.Count).Append(" (ludzie ").Append(men).Append(", Inni ").Append(uMen).Append("), zold armii ").Append(need.ArmyWage).Append("/d")
               .Append(", grabiez = ").Append(need.ArmyWage > 0 ? ((double)(pm + pf) / need.ArmyWage).ToString("0.0", Inv) : "-").Append(" dob zoldu")
               .Append(" | armia w potrzebie ").Append(need.InNeed ? "tak" : "nie").Append(" (niezaplacony zold ").Append(need.Unpaid).Append(" z ").Append(need.Parties)
-              .Append(" druzyn, kiesa wodza ").Append(need.LeadGold).Append(" = ").Append(need.LeadDays >= 999 ? "-" : need.LeadDays.ToString("0.0", Inv)).Append(" dob zoldu jego druzyny)")
+              .Append(" druzyn, kiesa rodu wodza ").Append(need.LeadGold).Append(" = ").Append(need.LeadDays >= 999 ? "-" : need.LeadDays.ToString("0.0", Inv))
+              .Append(" dob zoldu druzyn rodu ").Append(need.ClanWage).Append("/d)")
               .Append(" | wodz ").Append(a != null && a.LeaderHero != null ? a.LeaderHero.Name.ToString() : "-").Append(" (Mercy ").Append(mercyT).Append(')')
               .Append(" | gracz ").Append(player).Append('.');
             Log.Info(sb.ToString());

@@ -211,6 +211,21 @@ namespace Armoury
             catch (Exception e) { Stumble("CivilAllowed", e); _heldFront++; return false; }
         }
 
+        /// <summary>Lup miast LB (CitySack.Prioritize - zgliszcza na czele kolejki): ta sama bramka co CivilAllowed, TYLKO ODCZYT - bez licznikow doby linii
+        /// "Budowy oplacone" (te liczy wylacznie BuildFunding). Nie rzuca (wyjatek = false, jak CivilAllowed).</summary>
+        internal static bool CivilAllowedPeek(Settlement st)
+        {
+            if (!On || st == null) return false;
+            try
+            {
+                if (!Calm(st, (int)CampaignTime.Now.ToDays)) return false;
+                var s = Settings.Current;
+                var clan = st.OwnerClan;
+                return !(s.CivilWorksNeedWageRoom && clan != Clan.PlayerClan && !ClanBudget.WageRoom(clan));
+            }
+            catch { return false; }
+        }
+
         /// <summary>BuildFunding.Daily: budowla cywilna dopuszczona, ale rod ma budowe wojskowa w toku - mury pierwsze (dzialka murow bez zmian).</summary>
         internal static void NoteWallsFirst() { _heldWalls++; }
         /// <summary>BuildFunding.Daily: budowla cywilna w wojnie weszla do rozliczenia doby.</summary>

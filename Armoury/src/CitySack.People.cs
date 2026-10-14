@@ -106,7 +106,8 @@ namespace Armoury
                         if (PeopleOn && killed > 0) got = PeopleBook.TownSackKilled(st, f * p);
                         float p1; book1 = PeopleBook.TryTown(st, out p1) ? p1 : book0;
                         _d6BookKilled += got;
-                        double gap = book0 > 0 ? Math.Abs(100.0 * f - 100.0 * got / book0) : 0.0;
+                        // recenzja (kod, drobne): roznica z FAKTYCZNEJ zmiany stanu ksiegi (przed - po), nie z kwoty, ktora sami podalismy - niezalezna kontrola LUP-17
+                        double gap = book0 > 0 ? Math.Abs(100.0 * f - 100.0 * (book0 - book1) / book0) : 0.0;
                         if (PeopleOn && gap > _d6MaxGap) _d6MaxGap = gap;
                         what = PeopleOn ? "zdjete ze stanu miasta (zabici przy zdobyciu)" : "WYLACZONE (Sack Killed In People Book) - ksiega bez zmian";
                     }
@@ -118,7 +119,7 @@ namespace Armoury
                       .Append(") | wybor ").Append(KName[KindOf(__1)])
                       .Append(" | BK ludnosc ").Append(pop0).Append(" -> ").Append(pop1).Append(" (zabici ").Append(killed).Append(" = ").Append((100.0 * f).ToString("0.00", Inv)).Append("%)")
                       .Append(" | ksiega ludzi miasta ").Append(book0.ToString("0", Inv)).Append(" -> ").Append(book1.ToString("0", Inv))
-                      .Append(" (zabici ").Append(got.ToString("0.0", Inv)).Append(" = ").Append(book0 > 0 ? (100.0 * got / book0).ToString("0.00", Inv) : "-").Append("%)")
+                      .Append(" (zabici ").Append(got.ToString("0.0", Inv)).Append(" = ").Append(book0 > 0 ? (100.0 * (book0 - book1) / book0).ToString("0.00", Inv) : "-").Append("%)")
                       .Append(" | ").Append(what).Append('.');
                     Log.Info(sb.ToString());
                 }

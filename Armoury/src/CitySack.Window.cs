@@ -13,6 +13,8 @@ namespace Armoury
     ///  - Przez SackNoSpendingDays dob od grabiezy albo spustoszenia druzyny krolestwa zdobywcy (MapFaction w chwili lupu) nie zostawiaja w tej osadzie zoldu:
     ///    przy wyjezdzie z miasta "zycie" (MenPurse.OnLeft) nie schodzi z sakiewki, markietani (Sutlers.One) nie kieruja do niej pieniadza - pieniadz zostaje
     ///    w sakiewce i schodzi pozniej wedlug zwyklych regul (inne miasto, markietani po oknie). Przy lasce wojsko placi jak zwykle. Inne krolestwa - jak zwykle.
+    ///    Po recenzji: markietani - wstrzymana tylko czesc miejska (czesc wsi idzie jak zwykle); odziez wojska z polki lupionej osady nie kupiona (NoSpendCloth);
+    ///    "Right of Pillage" (gracz lupi wlasne miasto) - okno tylko dla druzyny gracza, nie dla calego krolestwa.
     ///    Zamek: "zycie" i markietani i tak nie ida do zamkow (MenPurse.cs:279, Sutlers - tylko miasta).
     ///  - Jedno pole zapisu (SaveText.Sync "arm_sack"): osady po nastepstwach z ostatnich 30 dob (doba, krolestwo zdobywcy, wybor, ile zabrano, liczniki pomiaru L0) -
     ///    okno lupu, "Little is left here" i linia w oknie mieszkancow (L5) przezywaja zapis. Brak klucza (zapis sprzed paczki) - pusto.
@@ -36,7 +38,7 @@ namespace Armoury
                 Track t;
                 if (!_track.TryGetValue(st, out t) || t == null || t.Kind == KMercy) return false;
                 if (Now - t.Day0 >= WindowDays) return false;
-                if (mp.MapFaction == null || mp.MapFaction.StringId != t.Faction) return false;
+                if (!Sacker(t, mp)) return false;
                 if (sutler) { _dBlockCampN++; _dBlockCamp += amount; }
                 else
                 {
@@ -48,6 +50,33 @@ namespace Armoury
             catch (Exception e) { Stumble("NoSpend", e); return false; }
         }
 
+        /// <summary>Zdobywca osady z wpisu: druzyna krolestwa zdobywcy; "Right of Pillage" (Faction "@" + id druzyny gracza - wlasne miasto) - tylko ta druzyna.</summary>
+        private static bool Sacker(Track t, MobileParty mp)
+        {
+            if (t == null || mp == null || string.IsNullOrEmpty(t.Faction)) return false;
+            if (t.Faction[0] == '@') return mp.StringId != null && t.Faction.Length == mp.StringId.Length + 1 && t.Faction.EndsWith(mp.StringId, StringComparison.Ordinal);
+            return mp.MapFaction != null && mp.MapFaction.StringId == t.Faction;
+        }
+
+        /// <summary>L3 (recenzja obieg 7): odziez wojska (ArmyClothing w MenPurse.OnLeft) - w oknie lupu druzyna zdobywcy nie kupuje z polki lupionej osady
+        /// (decyzja 3: zero zoldu wydanego tam przez 3 doby; pieniadz zostaje w sakiewce, odziez kupi w innym miescie). Tylko licznik. Nie rzuca (wyjatek = false).</summary>
+        internal static bool NoSpendCloth(Settlement st, MobileParty mp)
+        {
+            try
+            {
+                if (!NoSpendOn || st == null || mp == null) return false;
+                Ensure();
+                if (_track.Count == 0) return false;
+                Track t;
+                if (!_track.TryGetValue(st, out t) || t == null || t.Kind == KMercy || Now - t.Day0 >= WindowDays || !Sacker(t, mp)) return false;
+                _dBlockClothN++;
+                return true;
+            }
+            catch (Exception e) { Stumble("NoSpendCloth", e); return false; }
+        }
+
+        private static int _dBlockClothN;
+
         private static void L3Part(StringBuilder sb)
         {
             int open = 0;
@@ -55,12 +84,13 @@ namespace Armoury
             sb.Append(" | L3: okna lupu czynne ").Append(open).Append(" (").Append(WindowDays).Append(" dob)");
             if (!NoSpendOn) sb.Append(" [WYLACZONE Sack No Spending / Men Purse Enabled]");
             sb.Append(", wstrzymane (zostaje w sakiewkach): zycie ").Append(_dBlockLifeN).Append(" wyjazdow za ").Append(_dBlockLife)
-              .Append(", markietani ").Append(_dBlockCampN).Append(" druzyn za ").Append(_dBlockCamp);
+              .Append(", markietani ").Append(_dBlockCampN).Append(" druzyn za ").Append(_dBlockCamp).Append(" (tylko czesc miejska)")
+              .Append(", odziez z polki nie kupiona ").Append(_dBlockClothN).Append(" wyjazdow");
         }
 
-        private static void L3Clear() { _dBlockLifeN = _dBlockCampN = 0; _dBlockLife = _dBlockCamp = 0; }
+        private static void L3Clear() { _dBlockLifeN = _dBlockCampN = _dBlockClothN = 0; _dBlockLife = _dBlockCamp = 0; }
 
-        private static bool L3Any { get { return _dBlockLifeN > 0 || _dBlockCampN > 0; } }
+        private static bool L3Any { get { return _dBlockLifeN > 0 || _dBlockCampN > 0 || _dBlockClothN > 0; } }
 
         // ------------------------------------------------------------ zapis (arm_sack) - wersja 1
         private static string _pending;                       // zapis wczytany - osady rozwiazywane przy pierwszym uzyciu (Ensure)

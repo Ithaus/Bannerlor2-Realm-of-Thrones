@@ -16,7 +16,8 @@ namespace Armoury
     /// (Recipients: druzyny z listy udzialow gry, bez Innych), podzial wedlug ludzi:
     ///  1. UNIKATY (UniqueSpoils.Is - spis ROT i stal valyrianska): ceil(czesc x sztuki) do taboru druzyny wodza armii - najcenniejsze rzeczy w miescie bierze sie
     ///     najpierw; nie plona (kronika unikatow widzi je w taborze; lord zaklada je zwykla droga UniqueSpoils).
-    ///  2. KONIE I ZYWY INWENTARZ (HasHorseComponent, IsAnimal): ida same - bez udzwigu, wedlug ludzi (reszta z zaokraglen do najwiekszej druzyny).
+    ///  2. KONIE I ZYWY INWENTARZ (HasHorseComponent, IsAnimal): ida same - bez udzwigu, wedlug ludzi, najwyzej do granicy stada bez kary "Herding" gry
+    ///     (po recenzji); czego nie poprowadza - zostaje na polce (konie nie plona).
     ///  3. ZYWNOSC (IsFood): najwyzej do 10 dob racji kazdej druzyny (1 sztuka = 20 czlowieko-dni, jak DistrictRaid; liczone z tym, co juz wiezie), w udzwigu;
     ///     reszta czesci zostaje na polce - jedzenie nigdy nie plonie (spalenie to glod bez odbiorcy, rozdz. 3.1).
     ///  4. UZBROJENIE I TOWAR (reszta): najcenniejsze na kilogram najpierw, wedlug ludzi do wolnego udzwigu druzyny, potem reszta do kazdej, ktora ma miejsce.
@@ -41,6 +42,19 @@ namespace Armoury
         private static double PerKg7(ItemObject it) { return it == null ? 0.0 : it.Value / Math.Max(0.1, (double)it.Weight); }
         private static long Pieces7(ItemRoster r) { long n = 0; if (r == null) return 0; for (int i = 0; i < r.Count; i++) { int a = r.GetElementCopyAtIndex(i).Amount; if (a > 0) n += a; } return n; }
         private static double FreeKg(MobileParty mp) { try { return Math.Max(0.0, mp.InventoryCapacity - mp.TotalWeightCarried); } catch { return 0.0; } }
+
+        /// <summary>Ile zwierzat druzyna jeszcze poprowadzi bez kary "Herding" gry: ludzie - (juczne + zywiec + wierzchowce ponad pieszych); 0 przy bledzie.</summary>
+        private static int HerdRoom(MobileParty mp)
+        {
+            try
+            {
+                var r = mp.ItemRoster;
+                int men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
+                int herd = r.NumberOfPackAnimals + r.NumberOfLivestockAnimals + Math.Max(0, r.NumberOfMounts - mp.Party.NumberOfMenWithoutHorse);
+                return Math.Max(0, men - herd);
+            }
+            catch { return 0; }
+        }
 
         private static double FoodHave(MobileParty mp)
         {
@@ -107,19 +121,30 @@ namespace Armoury
                     lead.Mp.ItemRoster.AddToCounts(l.El, l.Want);
                     uniqN += l.Want; took += l.Want; tookV += (long)l.El.Item.Value * l.Want;
                 }
-                // 2. konie i zywy inwentarz - same ida, wedlug ludzi
+                // 2. konie i zywy inwentarz - same ida, wedlug ludzi; recenzja (kod, drobne): najwyzej tyle, ile druzyna prowadzi bez kary "Herding" gry
+                //    (stado = juczne + zywiec + konie ponad pieszych <= ludzie: DefaultPartySpeedCalculatingModel.GetHerdingModifier); reszta zostaje na polce (nie plonie)
+                var room = new int[live.Count];
+                for (int p = 0; p < live.Count; p++) room[p] = HerdRoom(live[p].Mp);
                 foreach (var l in walk)
                 {
-                    roster.AddToCounts(l.El, -l.Want);
                     int given = 0;
-                    foreach (var r in live)
+                    var gv = new int[live.Count];
+                    for (int p = 0; p < live.Count; p++)
                     {
-                        int q = (int)((long)l.Want * r.Men / men);
+                        int q = Math.Min((int)((long)l.Want * live[p].Men / men), room[p]);
                         if (q <= 0) continue;
-                        r.Mp.ItemRoster.AddToCounts(l.El, q); given += q;
+                        gv[p] += q; room[p] -= q; given += q;
                     }
-                    if (l.Want - given > 0) live[0].Mp.ItemRoster.AddToCounts(l.El, l.Want - given);
-                    horses += l.Want; took += l.Want; tookV += (long)l.El.Item.Value * l.Want;
+                    for (int p = 0; p < live.Count && given < l.Want; p++)
+                    {
+                        int q = Math.Min(l.Want - given, room[p]);
+                        if (q <= 0) continue;
+                        gv[p] += q; room[p] -= q; given += q;
+                    }
+                    if (given > 0) roster.AddToCounts(l.El, -given);
+                    for (int p = 0; p < live.Count; p++) if (gv[p] > 0) live[p].Mp.ItemRoster.AddToCounts(l.El, gv[p]);
+                    horses += given; took += given; tookV += (long)l.El.Item.Value * given;
+                    left += l.Want - given;                                         // konie nie plona - czego nie poprowadza, zostaje
                 }
                 // wolny udzwig PO koniach (juczne niosa)
                 var free = new double[live.Count];

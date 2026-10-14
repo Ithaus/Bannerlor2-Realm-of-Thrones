@@ -20,11 +20,11 @@ namespace Armoury
     ///  - Kto dostaje: druzyny z listy udzialow gry (strona zwycieska; lista pusta - druzyna, ktora lupi), wedlug ludzi (zdrowi i ranni), reszta z zaokraglen
     ///    do najwiekszej - nic nie przepada. W druzynie prawo trzecich (MenPurse 2/3 / 1/3): 2/3 do sakiewki ludzi, 1/3 wodzowi (druzyna bez wodza - jej kiesa);
     ///    sakiewki wylaczone (MenPurseEnabled) - calosc wodzowi. Korona: trzecia wodza do podstawy prawa trzecich (ClanIncomeBook KThird -> Ransom178.NoteThird,
-    ///    gracz - Ransom178.NoteThird wprost) - korona krolestwa w wojnie bierze jej 1/3 nastepnego ranka (1/9 calosci; bez najemnikow i krola-gracza).
+    ///    gracz i AI przy wylaczonej ksiedze - Ransom178.NoteThird wprost) - korona krolestwa w wojnie bierze jej 1/3 nastepnego ranka (1/9 calosci; bez najemnikow i krola-gracza).
     ///    Inni (Undead) nie biora monety - ich ludzie bez udzialu; same Inni - lupu nie ma, moneta zostaje.
     ///  - Obieg: kasa osady (ChangeGold) i kiesy ludu (TownFolk.SackTake - ksiega kies _ctlOut) -> pula -> sakiewki ludzi (MenPurse.Add), kiesy wodzow
     ///    (ChangeHeroGold), kiesy druzyn bez wodza (PartyTradeGold) - same posiadacze "Pieniadz swiata", suma swiata bez zmian. Bez GiveGoldAction - prefiks
-    ///    RealPayer (kontekst "lup z oblezen" na tej samej metodzie) nie ma czego przycinac. Wyjatek przy podziale - niepodzielona reszta wraca do kasy osady.
+    ///    RealPayer (kontekst "lup z oblezen" na tej samej metodzie) nie ma czego przycinac. Wyjatek przy podziale - niepodzielona reszta wraca do zbiornikow, z ktorych zeszla (kiesy ludu wedlug udzialu, reszta - kasa).
     ///  - Blizna (klucz SackScarOnlyWhenSacked, przy SackScarEnabled): -SackProsperityCutPercent dobrobytu reszty i -SackLoyaltyHit lojalnosci tylko przy grabiezy
     ///    i spustoszeniu, w chwili wyboru (postfiks - po karze gry, ta sama kolejnosc u AI i gracza; D5, D6). WarLedger.OnOwnerChanged wtedy blizny nie naklada.
     ///  - Wiadomosci (po angielsku): gracz-wodz (gdy L5 wylaczone albo "Right of Pillage" bez menu), gracz w cudzej armii, gracz-pan zlupionej osady.
@@ -66,7 +66,7 @@ namespace Armoury
             var k = Read(st);                                              // stan TERAZ (po migawce L0 nic sie nie zmienilo - prefiks)
             long[] want = new long[5];                                     // 0 kupcy, 1-4 lud W, R, P, gmina
             long[] took = new long[5];
-            long pool = 0, given = 0;
+            long pool = 0, given = 0, crownBase = 0;
             Rec big = null;
             if (share > 0 && men > 0)
             {
@@ -102,10 +102,11 @@ namespace Armoury
                             {
                                 r.Lead.ChangeHeroGold(lead);
                                 given += lead; _dToLead += lead;
-                                // prawo trzecich (decyzja 2): trzecia wodza w podstawie - korona w wojnie bierze jej 1/3 jutro
-                                if (r.Lead == Hero.MainHero) Ransom178.NoteThird(r.Lead, lead);
+                                // prawo trzecich (decyzja 2): trzecia wodza w podstawie - korona w wojnie bierze jej 1/3 jutro. Recenzja (obieg 9): przy wylaczonej
+                                // ksiedze dochodow rodow (ClanIncomeBook) AI tez wprost (dotad tylko gracz); licznik podstawy - tylko obciazeni (bez najemnikow, krola-gracza)
+                                if (r.Lead == Hero.MainHero || !ClanIncomeBook.On) Ransom178.NoteThird(r.Lead, lead);
                                 else ClanIncomeBook.NoteInflow(r.Lead, lead, ClanIncomeBook.KThird);
-                                _dCrownBase += lead;
+                                if (Ransom178.WouldTax(r.Lead)) { _dCrownBase += lead; crownBase += lead; }
                             }
                             else
                             {
@@ -118,8 +119,19 @@ namespace Armoury
                 catch (Exception e)
                 {
                     Stumble("Sack.Split", e);
-                    long back = pool - given;                                  // czego nie podzielono - wraca do kasy osady (nic nie znika)
-                    if (back > 0) { town.ChangeGold((int)Math.Min(int.MaxValue, back)); given += back; }
+                    // czego nie podzielono - wraca tam, skad zeszlo (recenzja: kazda klasa ludu swoja czesc, wedlug udzialu w puli; reszta - kasa kupcow); nic nie znika
+                    long back = pool - given;
+                    if (back > 0)
+                    {
+                        long rest = back;
+                        for (int c = 1; c <= 4 && rest > 0; c++)
+                        {
+                            long x = Math.Min(rest, Math.Min(took[c], pool > 0 ? (long)Math.Floor((double)back * took[c] / pool) : 0));
+                            if (x > 0) { TownFolk.SackBack(st, c - 1, x); rest -= x; }
+                        }
+                        if (rest > 0) town.ChangeGold((int)Math.Min(int.MaxValue, rest));
+                        given += back;
+                    }
                 }
             }
             else if (share > 0 && uMen > 0) _dNoTaker++;
@@ -149,7 +161,7 @@ namespace Armoury
                 foreach (var r in live) { tm += r.ToMen; if (r.Lead != null) tl += r.ToLead; else tp += r.ToLead; if (r.Mp == MobileParty.MainParty) pl = r.ToMen + r.ToLead; }
                 sb.Append(" | zolnierze ").Append(tm).Append(", wodzowie ").Append(tl).Append(" (gracz razem ").Append(pl).Append("), kiesy druzyn bez wodza ").Append(tp)
                   .Append(", reszta zaokraglen do ").Append(big != null ? big.Mp.StringId : "-")
-                  .Append(" | korona: trzecie wodzow w podstawie prawa trzecich ").Append(tl)
+                  .Append(" | korona: trzecie wodzow w podstawie prawa trzecich ").Append(crownBase)
                   .Append(" | dopisane ").Append(given).Append(" - zdjete ").Append(pool).Append(" = ").Append(diff).Append('.');
                 Log.Info(sb.ToString());
             }
@@ -211,6 +223,13 @@ namespace Armoury
             try
             {
                 if (!Live || !ScarAtChoice || __1 == null || __1.Town == null) return;
+                // recenzja (kod, drobne): osada niezdobyta (L1 wylaczone - nastepstwa po bitwie pod murami) - blizny nie ma, jak przed paczka (blizna szla przy zmianie pana)
+                Track tr;
+                if (_track.TryGetValue(__1, out tr) && tr != null && !tr.Captured && Now - tr.Day0 < 0.01f)
+                {
+                    if (MeasureOn) Log.Info("Lup miast (L2 blizna): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + __1.StringId + " | bez zdobycia - bez blizny.");
+                    return;
+                }
                 int kind = KindOf(__2);
                 var town = __1.Town;
                 var s = Settings.Current;
@@ -237,6 +256,7 @@ namespace Armoury
         {
             try
             {
+                Ensure();
                 Track t;
                 bool sacked = st != null && _track.TryGetValue(st, out t) && t != null && t.Kind != KMercy && Now - t.Day0 < 1f;
                 Log.Info("WarLedger: " + (st != null ? st.StringId : "?") + " wziete obleczeniem - blizna w chwili wyboru zdobywcy (Sack Scar Only When Sacked): "

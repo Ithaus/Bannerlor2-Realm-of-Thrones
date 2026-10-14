@@ -17583,8 +17583,9 @@ def lup_main(logp, start_arg, until=364):
                 "INFO - log sprzed paczki L0", None)
     else:
         bad = len(l0raw) - len(l0)
-        rep.add("LUP-1 (L0): linie Lup miast (L0) = wywolania okna O10", f"linii {len(l0raw)} (nieodczytane {bad}), wywolan O10 {o10n}",
-                "rowne; wszystkie odczytane", len(l0raw) == o10n and bad == 0)
+        o10off = not o10 or (o10n == 0 and len(l0raw) > 0)   # recenzja: okno O10 wylaczone - nie ma czym porownac (INFO), odczyt linii nadal wiazacy
+        rep.add("LUP-1 (L0): linie Lup miast (L0) = wywolania okna O10", f"linii {len(l0raw)} (nieodczytane {bad}), wywolan O10 {o10n}" + (" - okno O10 wylaczone albo bez linii" if o10off else ""),
+                "rowne; wszystkie odczytane" + (" - bez O10: INFO" if o10off else ""), (False if bad else None) if o10off else (len(l0raw) == o10n and bad == 0))
     rep.add("LUP-1b: ERROR in CitySack / potkniecia w linii doby", f"ERROR {len(errs)}, potkniecia {stum}", "0 / 0", (len(errs) == 0 and stum == 0) if on else None)
 
     # ---- progi 2-3 (L1): nastepstwa po bitwie pod murami / bez zdobycia = 0
@@ -17679,8 +17680,10 @@ def lup_main(logp, start_arg, until=364):
                 below[sid] = below.get(sid, 0) + 1
             win3[sid] = int(m.group(12))
     fl = [v for x in food.values() for v in x.values()]
-    rep.add("LUP-11 (L2): stac na jedzenie w zlupionej osadzie d+7 i d+14", f"pomiarow {len(fl)}, min {min(fl):.2f}" if fl else "brak osad zlupionych z pomiarem",
-            ">= 0.95 (INFO w pierwszym biegu; ponizej - zmniejszyc czesc spustoszenia)", None)
+    low = sorted(sid for sid, x in food.items() if any(v < 0.95 for v in x.values()))
+    rep.add("LUP-11 (L2): stac na jedzenie w zlupionej osadzie d+7 i d+14", (f"pomiarow {len(fl)}, min {min(fl):.2f}; osad ponizej 0.95: {len(low)} z {len(food)}"
+            + (f" ({', '.join(low[:4])})" if low else "")) if fl else "brak osad zlupionych z pomiarem",
+            ">= 0.95 (INFO; oczekiwane ok. 1 osada na 7 ponizej - wyssana oblezeniem, recenzja na danych kodu 43; wiecej niz 1 na 4 - zmniejszyc czesc spustoszenia)", None)
     rep.add("LUP-12 (L2/L3): kasa kupcow zlupionej osady ponizej zapasu", (f"osad {len(below)}, najdluzej {max(below.values())} dob ({max(below, key=below.get)})" if below else "0 osad"),
             "INFO; cel <= 30 dob", None)
     # ---- prog 13 (L3): zycie i markietani od zdobywcy w oknie lupu = 0
@@ -17752,6 +17755,19 @@ def lup_main(logp, start_arg, until=364):
     else:
         rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"linii L6 {len(l6)} (odczytane {l6n}), miast z ubytkiem w ksiedze 0" + ("; L6 wylaczone" if l6off else ""),
                 "+-1 pkt proc." + (" - INFO (brak grabiezy miasta albo L6 wylaczone / log bez paczki)"), None)
+    l6got = sum(float(m.group(1)) for s in dayw.values() for m in [re.search(r"zdjete z ksiegi ludzi miast ([\d.]+)", s)] if m)
+    towns_mv = 0.0
+    for s in lines:
+        if s.startswith("Miasta (E4/8 R2): dzien") and inwin(dayof(s)):
+            m = re.search(r"zdobycie \(L6\) ([+-][\d.]+)", s)
+            if m:
+                towns_mv += float(m.group(1))
+    if l6got > 0 or towns_mv != 0:
+        tol = max(2.0, 0.01 * l6got)
+        rep.add("LUP-17b (L6): ksiega ludzi - ruch 'zdobycie (L6)' w linii Miasta wobec zdjetych w linii doby L6", f"{-towns_mv:.1f} / {l6got:.1f} ludzi",
+                f"rowne (+-{tol:.0f}; brzegi okna)", abs(-towns_mv - l6got) <= tol)
+    else:
+        rep.add("LUP-17b (L6): ksiega ludzi - ruch 'zdobycie (L6)' wobec linii doby L6", "0 / 0", "rowne - INFO bez zabitych w ksiedze", None)
     # ---- LB (kierunek Jeffa - budowle plona): plan = floor(czesc x poziomy palne), laska 0, mury bez zmian; L0 budowle = LB; zgliszcza (INFO)
     lb = [s for s in lines if s.startswith("Lup miast (LB budowle): dzien") and inwin(dayof(s))]
     lboff = any("WYLACZONE (Sack Burns Buildings)" in s for s in dayw.values())
@@ -17794,8 +17810,11 @@ def lup_main(logp, start_arg, until=364):
     last = dayw[max(dayw)] if dayw else ""
     rl = num(r"zgliszcza: osad \d+, budowli \d+, poziomow (\d+)", last)
     qd = sum(num(r"zgliszcza na czele (\d+)", s) or 0 for s in dayw.values())
-    rep.add("LUP-B3 (LB): zgliszcza - spalone / odbudowane / zostalo na koniec okna; postep dany; kolejka AI", f"{burnt} / {rb} / {rl if rl is not None else '-'} poziomow; {gr} pkt; ustawien kolejki {qd}",
-            "INFO (rachunek CHANGELOG LB: miasto spustoszone ok. 590 dob, zlupione ok. 300 przy mocy 5 pkt/d)", None)
+    pl = sum(num(r"postep w toku spalony (\d+) pkt\)", s) or 0 for s in dayw.values())
+    fr = sum(num(r"przy froncie wojskowa przed cywilnym zgliszczem (\d+)", s) or 0 for s in dayw.values())
+    rep.add("LUP-B3 (LB): zgliszcza - spalone / odbudowane / zostalo na koniec okna; postep dany; postep w toku spalony; kolejka AI (na czele / front)",
+            f"{burnt} / {rb} / {rl if rl is not None else '-'} poziomow; {gr} pkt; {pl} pkt; ustawien kolejki {qd} / {fr}",
+            "INFO (rachunek CHANGELOG LB po recenzji, x1/4: miasto spustoszone ok. 1 185 dob w pokoju, zlupione ok. 590 przy mocy 5 pkt/d; w wojnie cywilne czekaja z dala od frontu)", None)
     # ---- prog 18 (L7): polki - zdjete = do taborow + spalone; spalone tylko przy spustoszeniu; ksiega towarow: lup miast (L7) tylko jako ujscie "spalone"
     l7 = [s for s in lines if s.startswith("Lup miast (L7): dzien") and inwin(dayof(s))]
     l7off = any("WYLACZONE (Sack Takes Goods)" in s for s in dayw.values())

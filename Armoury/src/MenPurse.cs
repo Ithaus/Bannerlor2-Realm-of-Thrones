@@ -285,7 +285,7 @@ namespace Armoury
                 int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost(st) : AiWear.OutstandingCost(mp, st);   // przy naprawach z materialem: z szacunkiem materialu z polki tego miasta
                 // 150: odziez, buty i plotno wojska - z polki miasta po cenie targu, z tej samej sakiewki PRZED wydatkiem "na zycie"
                 // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
-                int cloth = ArmyClothing.BuyForParty(mp, st, purse - reserve);
+                int cloth = CitySack.NoSpendCloth(st, mp) ? 0 : ArmyClothing.BuyForParty(mp, st, purse - reserve);   // lup miast L3: w oknie lupu bez zakupu z polki lupionej osady
                 if (cloth > 0) { _dayCloth += cloth; purse = Get(mp); }
                 int avail = Math.Max(0, purse - reserve);
                 // K1 (A3): MenGearSavePercent ludzie odkladaja na lepszy sprzet - nie wiecej niz MenGearSaveDays dni zoldu partii (z rezerwa

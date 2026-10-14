@@ -5508,11 +5508,11 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackWindowRealCoin { get; set; } = true;
 
-        [SettingPropertyBool("Ai Sacks From Need", HintText = "how a lord who storms a town chooses its fate: a town of his own realm's culture is spared as before; a town with less to take than one day's pay of his army is spared too (nobody burns a place for nothing); a lord whose army has wages owed that his house cannot meet, or whose purse holds less than two weeks' pay for his party, pillages it - a cruel one devastates it when he can; any other lord chooses by his nature, as before (off = the game's choice by the lord's nature only)")]
+        [SettingPropertyBool("Ai Sacks From Need", HintText = "how a lord who storms a town chooses its fate: a town of his own realm's culture is spared as before; a town with less to take than one day's pay of his army is spared too (nobody burns a place for nothing); a lord whose army has wages owed that his house cannot meet, or whose house's purse holds less than two weeks' pay for all its parties, pillages it - a cruel one devastates it when he can; any other lord chooses by his nature, as before (off = the game's choice by the lord's nature only)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool AiSacksFromNeed { get; set; } = true;
 
-        [SettingPropertyBool("Sack No Spending", HintText = "after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)")]
+        [SettingPropertyBool("Sack No Spending", HintText = "after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there, nor do they buy clothing from its shelves. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackNoSpending { get; set; } = true;
 
@@ -5524,15 +5524,15 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackKilledInPeopleBook { get; set; } = true;
 
-        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war only the military ones). Off = the game's random razing, which grows with the army")]
+        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war its civil ruins only away from the front, as for any civil work). Off = the game's random razing, which grows with the army")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackBurnsBuildings { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Sack Ruin Rebuild Share", 0.000f, 1.000f, "0.000", HintText = "with Sack Burns Buildings: the part of a level's cost that rebuilding it from the ruins costs (an eighth - a devastated town of today's typical size stands again in about a year and a half, a pillaged one in about nine months; a town sacked every half year never recovers)")]
+        [SettingPropertyFloatingInteger("Sack Ruin Rebuild Share", 0.000f, 1.000f, "0.000", HintText = "with Sack Burns Buildings: the part of a level's cost that rebuilding it from the ruins costs (a quarter - in peace a devastated town of today's typical size stands again in about three years, two with its townsfolk building, a pillaged one in half that; in war its civil works wait away from the front; a town sacked every half year never recovers)")]
         [SettingPropertyGroup("The sack of towns and castles")]
-        public float SackRuinRebuildShare { get; set; } = 0.125f;
+        public float SackRuinRebuildShare { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Sack Takes Goods", HintText = "the sack empties the shelves too: the same part as the coin (a third under pillage, two thirds under devastation, nothing under mercy) of every stack of goods, horses and arms in the market of a stormed town or castle. Unique pieces go to the army's leader, horses and beasts walk off with the parties, food only up to ten days of rations for each party, the rest as far as the wagons can carry - most valuable by weight first; what they cannot carry stays under pillage and burns under devastation (food never burns). Lords put the arms they took in their armouries (off = the shelves are left untouched)")]
+        [SettingPropertyBool("Sack Takes Goods", HintText = "the sack empties the shelves too: the same part as the coin (a third under pillage, two thirds under devastation, nothing under mercy) of every stack of goods, horses and arms in the market of a stormed town or castle. Unique pieces go to the army's leader, horses and beasts walk off with the parties (as many as their men can herd), food only up to ten days of rations for each party, the rest as far as the wagons can carry - most valuable by weight first; what they cannot carry stays under pillage and burns under devastation (food never burns). Lords put the arms they took in their armouries (off = the shelves are left untouched)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackTakesGoods { get; set; } = true;
 

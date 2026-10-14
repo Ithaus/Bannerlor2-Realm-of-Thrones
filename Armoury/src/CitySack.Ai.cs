@@ -16,8 +16,8 @@ namespace Armoury
     ///  2. wodz zabity albo ranny w bitwie -> wybor gry (DetermineSiegeAftermathOnEncounterLeaderDeath);
     ///  3. "nie ma czego brac": lup z grabiezy wedlug reguly L2 mniejszy niz jedna doba zoldu armii -> laska (gdy laska kosztuje wplywy za okrutnych lordow armii,
     ///     a rod ich nie ma - wybor gry);
-    ///  4. "armia w potrzebie": ktoras druzyna armii ma zalegly zold, ktorego jej rod nie pokryje (ta sama regula co WarLedger), albo kiesa wodza nie starcza na
-    ///     14 dob zoldu jego druzyny -> grabiez; wodz z ujemna cecha Mercy, gdy gra pozwala na spustoszenie (wplywy > 2 x koszt, morale < 90) -> spustoszenie;
+    ///  4. "armia w potrzebie": ktoras druzyna armii ma zalegly zold, ktorego jej rod nie pokryje (ta sama regula co WarLedger), albo kiesa RODU wodza (placi zold) nie
+    ///     starcza na 14 dob zoldu druzyn rodu (po recenzji; dotad kiesa samego wodza) -> grabiez; wodz z ujemna cecha Mercy, gdy gra pozwala na spustoszenie (wplywy > 2 x koszt, morale < 90) -> spustoszenie;
     ///  5. reszta -> wybor gry (cecha Mercy, wplywy, morale - losowanie gry).
     /// Wyjatek - wybor gry (licznik potkniec). Liczniki doby w linii "Lup miast" (czesc L4); powod kazdego wyboru w linii L0 ("regula 3.4").
     /// </summary>

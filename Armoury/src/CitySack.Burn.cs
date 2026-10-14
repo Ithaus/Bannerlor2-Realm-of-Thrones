@@ -15,7 +15,7 @@ namespace Armoury
     /// <summary>
     /// LB - BUDOWLE PLONA, ZGLISZCZA SIE ODBUDOWUJE (kierunek Jeffa 13.10: "lupienie miasta to straszna rzecz ... budynki tez maja byc niszczone - przy spustoszeniu
     /// masa budynkow splonie i trzeba budowac od nowa"; "miasto musi potrafic sie odbudowac - nie za szybko, rozsadnie; ciagle lupione miasto nigdy sie nie odbuduje").
-    /// Klucz SackBurnsBuildings, parametr SackRuinRebuildShare (0.125).
+    /// Klucz SackBurnsBuildings, parametr SackRuinRebuildShare (0.25 - po recenzji; bylo 0.125).
     /// GRA DZIS (G SiegeAftermathCampaignBehavior.cs:133-139, :670-689): k = floor(log2(0.02 n + 2)) razy LevelDown losowej budowli bez projektow dziennych (takze murow) -
     ///    grabiez k, spustoszenie ceil(1.5 k), laska 0; losowanie trafia tez budowle na poziomie startowym (LevelDown nic nie robi). Typowe miasto ROT (97 miast:
     ///    17.5 budowli z BK, 14.3 poziomu palnego) traci srednio 2.2-3.6 poziomu przy grabiezy i 3.2-5.3 przy spustoszeniu (armia 1-10 tys.). BK budowli nie rusza.
@@ -27,25 +27,29 @@ namespace Armoury
     ///    menu gracza - nasze n dla tej osady ("Building Levels Reduced").
     ///  - MURY STOJA: kamien nie plonie; zdobywca zostaje panem i bedzie tych murow bronil; oblezenie juz je obilo (punkty budowli gry - HitPointChanged); poziom murow
     ///    miasta to 6 000-12 000 pkt - jeden spalony poziom murow kosztowalby wiecej niz odbudowa wszystkich zgliszcz typowego miasta i otwieralby odbicie miasta od reki.
-    ///  - ZGLISZCZA: spalony poziom zostawia fundamenty, kamien i plan - jego odbudowa kosztuje SackRuinRebuildShare (1/8) kosztu poziomu. Budowla ze zgliszczami dostaje
-    ///    postep (1 - 1/8) x koszt biezacego poziomu (gra przy LevelDown zeruje postep); po kazdym odbudowanym poziomie - nastepny ze zgliszcz (raz na poziom). Zloto:
+    ///  - ZGLISZCZA: spalony poziom zostawia fundamenty, kamien i plan - jego odbudowa kosztuje SackRuinRebuildShare (1/4) kosztu poziomu. Budowla ze zgliszczami dostaje
+    ///    postep (1 - 1/4) x koszt biezacego poziomu (gra przy LevelDown zeruje postep); po kazdym odbudowanym poziomie - nastepny ze zgliszcz (raz na poziom). Zloto:
     ///    nic z niczego - punkty budowy dalej kupuje pan (BuildFunding) i lud (P2), tylko mniej ich trzeba; postep to pamiec tego, co juz raz zbudowano.
-    ///  - KOLEJKA AI: osada AI ze zgliszczami ma na czele kolejki budowle ze zgliszczami (najmniejsza reszta kosztu); gdy krolestwo pana jest w wojnie - tylko wojskowa
-    ///    (cywilna czeka, jak w BuildFunding "w wojnie tylko mury"). Gracz uklada kolejke sam - widzi postep zgliszcz w oknie budow.
+    ///    Postep budowy W TOKU na spalonym poziomie plonie razem z nim (LevelDown gry zeruje postep; zloto za te punkty juz poszlo do robotnikow i na targ -
+    ///    BuildFunding) - jawnie w linii LB i w linii doby ("postep w toku spalony").
+    ///  - KOLEJKA AI: osada AI ze zgliszczami ma na czele kolejki budowle ze zgliszczami (najmniejsza reszta kosztu); gdy krolestwo pana jest w wojnie - cywilna tylko
+    ///    tam, gdzie BuildFunding ja dopuszcza (WarFront.CivilAllowedPeek - spokoj wokol warowni i luz zoldu pana; odczyt bez licznikow), inaczej wojskowa; przy froncie
+    ///    cywilne zgliszcze z czola ustepuje pierwszej budowli wojskowej z kolejki (BuildFunding cywilnej przy froncie nie placi - nie blokujemy murow).
+    ///    Gracz uklada kolejke sam - widzi postep zgliszcz w oknie budow. Klucz wylaczony - zgliszcza nie dostaja postepu ani kolejki (czekaja w zapisie).
     /// Zapis: SaveText.Sync "arm_ruins" (osada|budowla|zgliszcza|poziom z postepem|doba). Wyjatek per osada - licznik potkniec, bez globalnego wylacznika.
     /// </summary>
     internal static partial class CitySack
     {
         internal static bool BurnOn { get { var s = Settings.Current; return s != null && s.SackBurnsBuildings; } }
 
-        /// <summary>Czesc kosztu poziomu, ktora kosztuje odbudowa ze zgliszcz (0..1; domyslnie 1/8).</summary>
+        /// <summary>Czesc kosztu poziomu, ktora kosztuje odbudowa ze zgliszcz (0..1; domyslnie 1/4).</summary>
         internal static double RuinShare
         {
             get
             {
                 var s = Settings.Current;
-                float v = s != null ? s.SackRuinRebuildShare : 0.125f;
-                if (float.IsNaN(v)) return 0.125;
+                float v = s != null ? s.SackRuinRebuildShare : 0.25f;
+                if (float.IsNaN(v)) return 0.25;
                 return v < 0f ? 0.0 : v > 1f ? 1.0 : v;
             }
         }
@@ -84,8 +88,8 @@ namespace Armoury
         private static string _ruinPending;
 
         // liczniki doby
-        private static int _dbSacks, _dbLevels, _dbRebuilt, _dbQueued, _dbWarWait;
-        private static long _dbPts, _dbGrant;
+        private static int _dbSacks, _dbLevels, _dbRebuilt, _dbQueued, _dbWarWait, _dbFront;
+        private static long _dbPts, _dbGrant, _dbProgLost;
 
         private static void Grant(Ruin r)
         {
@@ -130,7 +134,7 @@ namespace Armoury
                 double share = ShareOf(kind);
                 int a0 = BurnableLevels(t), w0 = WallLevels(t);
                 int plan = (int)Math.Floor(share * a0);
-                int done = 0; long pts = 0;
+                int done = 0; long pts = 0; double progLost = 0;
                 var lost = new Dictionary<Building, int>();
                 for (int i = 0; i < plan; i++)
                 {
@@ -148,9 +152,11 @@ namespace Armoury
                     }
                     if (pick == null) break;
                     int lv = pick.CurrentLevel;
+                    float prog = pick.BuildingProgress;
                     pick.LevelDown();
                     if (pick.CurrentLevel >= lv) break;                     // nie zeszlo (poziom startowy) - koniec
                     done++;
+                    if (prog > 0f) progLost += prog;                         // postep w toku plonie z poziomem (LevelDown gry zeruje) - recenzja: jawnie w linii
                     pts += pick.GetConstructionCost();                       // koszt odbudowy tego poziomu od nowa
                     int c; lost.TryGetValue(pick, out c); lost[pick] = c + 1;
                     Ruin r;
@@ -159,7 +165,7 @@ namespace Armoury
                 }
                 foreach (var kv in lost) Grant(_ruins[kv.Key]);
                 if (kind != KMercy) _dbSacks++;
-                _dbLevels += done; _dbPts += pts;
+                _dbLevels += done; _dbPts += pts; _dbProgLost += (long)progLost;
                 if (MeasureOn)
                 {
                     int rb = 0, rl = 0;
@@ -170,7 +176,8 @@ namespace Armoury
                       .Append(" | poziomy palne (bez murow i projektow dziennych) ").Append(a0).Append(" -> ").Append(BurnableLevels(t))
                       .Append(" (splonelo ").Append(done).Append(" z planu ").Append(plan).Append(" = floor(czesc x ").Append(a0).Append(")) | mury ").Append(w0).Append(" -> ").Append(WallLevels(t))
                       .Append(" | koszt spalonych poziomow ").Append(pts).Append(" pkt, odbudowa ze zgliszcz ").Append((long)Math.Ceiling(pts * RuinShare)).Append(" pkt (x").Append(RuinShare.ToString("0.000", Inv)).Append(')')
-                      .Append(" | zgliszcza osady: budowli ").Append(rb).Append(", poziomow ").Append(rl);
+                      .Append(" | zgliszcza osady: budowli ").Append(rb).Append(", poziomow ").Append(rl)
+                      .Append(" | postep w toku spalony ").Append((long)progLost).Append(" pkt");
                     if (lost.Count > 0)
                     {
                         sb.Append(" | spalone:");
@@ -186,6 +193,7 @@ namespace Armoury
         // ------------------------------------------------------------ raz na dobe: odbudowane poziomy, postep ze zgliszcz, kolejka AI
         private static void RuinsDaily()
         {
+            if (!BurnOn) return;                                             // recenzja (kod W3, obieg 10): klucz off = stan 2c0a225 - zgliszcza czekaja w zapisie
             EnsureRuins();
             if (_ruins.Count == 0) return;
             var drop = new List<Building>();
@@ -223,34 +231,56 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Osada AI: na czele kolejki budowla ze zgliszczami (najmniejsza reszta kosztu); w wojnie tylko wojskowa. Gracz - bez zmian.</summary>
+        /// <summary>Osada AI: na czele kolejki budowla ze zgliszczami (najmniejsza reszta kosztu); w wojnie cywilna tylko z dala od frontu (bramka BuildFunding). Gracz - bez zmian.</summary>
         private static void Prioritize(Settlement st, List<Ruin> rs)
         {
             if (st.OwnerClan == null || st.OwnerClan == Clan.PlayerClan || st.IsUnderSiege) return;
             var t = st.Town;
             var q = t.BuildingsInProgress;
             if (q == null) return;
+            // recenzja (obieg 3, kod W2): w wojnie cywilne wedlug tej samej bramki co BuildFunding (WarFront - z dala od frontu i z luzem zoldu pana), nie samej flagi wojny
             bool war = AtWar(st.OwnerClan);
+            bool civilOk = !war || WarFront.CivilAllowedPeek(st);
             if (q.Count > 0)
             {
                 Ruin hr; var head = q.Peek();
-                if (head != null && _ruins.TryGetValue(head, out hr) && hr.R > 0 && (!war || head.BuildingType.IsMilitaryProject)) return;   // czolo juz ze zgliszcz (w wojnie - wojskowe)
+                if (head != null && _ruins.TryGetValue(head, out hr) && hr.R > 0 && (civilOk || head.BuildingType.IsMilitaryProject)) return;   // czolo juz ze zgliszcz (przy froncie - wojskowe)
             }
             Ruin best = null; float bestRest = float.MaxValue; bool civilWaits = false;
             foreach (var r in rs)
             {
                 if (r.R <= 0 || r.B.CurrentLevel >= 3) continue;
-                if (war && !r.B.BuildingType.IsMilitaryProject) { civilWaits = true; continue; }
+                if (!civilOk && !r.B.BuildingType.IsMilitaryProject) { civilWaits = true; continue; }
                 float rest = r.B.GetConstructionCost() - r.B.BuildingProgress;
                 if (rest < bestRest) { bestRest = rest; best = r; }
             }
-            if (best == null) { if (civilWaits) _dbWarWait++; return; }
-            var keep = new List<Building>();
-            foreach (var b in q) if (b != null && b != best.B && !keep.Contains(b)) keep.Add(b);
-            q.Clear();
-            q.Enqueue(best.B);
-            foreach (var b in keep) q.Enqueue(b);
+            if (best == null)
+            {
+                if (civilWaits) _dbWarWait++;
+                // przy froncie cywilne zgliszcze na czele (postawione w spokoju) blokowaloby budowy: BuildFunding cywilnej przy froncie nie placi - pierwsza wojskowa z kolejki
+                if (!civilOk && q.Count > 0)
+                {
+                    Ruin hr; var head = q.Peek();
+                    if (head != null && head.BuildingType != null && !head.BuildingType.IsMilitaryProject && _ruins.TryGetValue(head, out hr))
+                    {
+                        Building mil = null;
+                        foreach (var b in q) if (b != null && b.BuildingType != null && b.BuildingType.IsMilitaryProject && !b.BuildingType.IsDailyProject) { mil = b; break; }
+                        if (mil != null) { ToHead(q, mil); _dbFront++; }
+                    }
+                }
+                return;
+            }
+            ToHead(q, best.B);
             _dbQueued++;
+        }
+
+        private static void ToHead(Queue<Building> q, Building first)
+        {
+            var keep = new List<Building>();
+            foreach (var b in q) if (b != null && b != first && !keep.Contains(b)) keep.Add(b);
+            q.Clear();
+            q.Enqueue(first);
+            foreach (var b in keep) q.Enqueue(b);
         }
 
         private static void LBPart(StringBuilder sb)
@@ -259,13 +289,14 @@ namespace Armoury
             foreach (var kv in _ruins) if (kv.Value.R > 0) { rb++; rl += kv.Value.R; if (seen.Add(kv.Value.St)) rs++; }
             sb.Append(" | LB: ");
             if (!BurnOn) sb.Append("WYLACZONE (Sack Burns Buildings) - budowle zdejmuje gra; ");
-            sb.Append("lupow z pozarem ").Append(_dbSacks).Append(", spalone poziomy ").Append(_dbLevels).Append(" (koszt ").Append(_dbPts).Append(" pkt)")
+            sb.Append("lupow z pozarem ").Append(_dbSacks).Append(", spalone poziomy ").Append(_dbLevels).Append(" (koszt ").Append(_dbPts).Append(" pkt, postep w toku spalony ").Append(_dbProgLost).Append(" pkt)")
               .Append("; zgliszcza: osad ").Append(rs).Append(", budowli ").Append(rb).Append(", poziomow ").Append(rl)
               .Append("; odbudowane ze zgliszcz dzis ").Append(_dbRebuilt).Append(", postep ze zgliszcz dany ").Append(_dbGrant).Append(" pkt")
-              .Append("; kolejka AI: zgliszcza na czele ").Append(_dbQueued).Append(", cywilne czekaja na pokoj ").Append(_dbWarWait);
+              .Append("; kolejka AI: zgliszcza na czele ").Append(_dbQueued).Append(", cywilne czekaja (front albo pan bez luzu zoldu) ").Append(_dbWarWait)
+              .Append(", przy froncie wojskowa przed cywilnym zgliszczem ").Append(_dbFront);
         }
 
-        private static void LBClear() { _dbSacks = _dbLevels = _dbRebuilt = _dbQueued = _dbWarWait = 0; _dbPts = _dbGrant = 0; }
+        private static void LBClear() { _dbSacks = _dbLevels = _dbRebuilt = _dbQueued = _dbWarWait = _dbFront = 0; _dbPts = _dbGrant = _dbProgLost = 0; }
 
         private static bool LBAny { get { return _dbSacks > 0 || _dbLevels > 0 || _dbRebuilt > 0 || _dbQueued > 0 || _ruins.Count > 0; } }
 
