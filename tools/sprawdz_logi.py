@@ -467,7 +467,8 @@ Uzycie (Python 3, tylko odczyt):
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa jeff14    : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
                     pokrycie lukow), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
-                    jedza owce (24c, DragonsEatHerds: linia "Smoki (24c)" = ujscie ksiegi towarow doba po dobie, smok syty, potkniecia).
+                    jedza owce (24c, DragonsEatHerds: linia "Smoki (24c)" = ujscie ksiegi towarow doba po dobie, smok syty, potkniecia), JK-QS wlasny
+                    miecz z Qohoru (177-2 B, QohorOwnDesign: miary 1 -> 1, zlecenia bez wykucia 0, baza miar stali valyrianskiej stala, bledy).
                     Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
@@ -16461,7 +16462,7 @@ def drobne14_main(logp):
 
 def jeff14_main(logp):
     """jeff14 (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa bez kodu): JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, GoldenKits), JK-CR zloto Casterly Rock
-    wyczerpane (24d, RockGold; CSV plon-wsi.csv obok logu). Caly log (bez okna dob). Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    wyczerpane (24d, RockGold; CSV plon-wsi.csv obok logu), JK-SM smoki jedza owce (24c, DragonFeed), JK-QS wlasny miecz z Qohoru (177-2 B). Caly log (bez okna dob). Log bez paczki: wiersze INFO, nigdy wyjatek."""
     lines = read(logp)
     rep = Report()
     errs = {}
@@ -16589,6 +16590,30 @@ def jeff14_main(logp):
                 (st_sm or 0) == 0 and nerr("DragonFeed") == 0)
     else:
         rep.add("JK-SM-0..3: linia \"Smoki (24c)\"", "brak linii", "INFO (klucz DragonsEatHerds wylaczony albo log sprzed paczki)", None)
+
+    # ---- JK-QS: wlasny miecz z Qohoru (177-2 wariant B, QohorMasters.Own)
+    menu = [s for s in lines if s.startswith("QohorMasters: menu w ")]
+    own_on = None
+    if menu:
+        own_on = "wlasny projekt gracza (177-2 B) TAK" in menu[-1] if "wlasny projekt gracza" in menu[-1] else None
+    rep.add("JK-QS-0: klucz QohorOwnDesign (linia menu Qohoru)", "brak linii menu" if not menu else ("brak znacznika (log sprzed paczki)" if own_on is None else ("TAK" if own_on else "NIE")),
+            "INFO (TAK = paczka wlaczona)", None)
+    made = [s for s in lines if s.startswith("Kronika unikatow: Qohor - ") and "przekuty na wlasny projekt gracza" in s]
+    placed = failed = 0
+    for s in lines:
+        if s.startswith("QohorMasters: dzien ") and "wlasne projekty gracza:" in s:
+            placed += num(r"wlasne projekty gracza: zlecone (\d+)", s) or 0
+            failed += num(r"oddane bez wykucia (\d+)", s) or 0
+    bad_m = [s for s in made if not re.search(r"miary 1 -> 1,", s)]
+    rep.add("JK-QS-1: wlasne miecze - miary wejscia = wyniku (1 -> 1)", f"wykutych {len(made)}, z inna miara {len(bad_m)}" + (f"; pierwszy: {made[0][:220]}" if made else ""),
+            "kazdy wykuty: miary 1 -> 1 (stal ani nie przybywa, ani nie ubywa); bez zlecen (autotest nie gra w Qohorze) - INFO", (len(bad_m) == 0) if made else None)
+    rep.add("JK-QS-2: zlecenia wlasnego projektu oddane bez wykucia", f"zlecone {placed}, oddane bez wykucia {failed}",
+            "0 (przy zleceniach); bez zlecen - INFO", (failed == 0) if (placed + len(made)) > 0 else None)
+    base = sorted(set(num(r"baza (\d+) miar", s) for s in lines if s.startswith("Stal valyrianska: dzien") and "baza " in s) - {None})
+    rep.add("JK-QS-3: stal valyrianska - baza miar stala przez caly log", ", ".join(str(b) for b in base) or "brak linii spisu",
+            "jedna wartosc (przekucie, takze we wlasny projekt, nie zmienia sumy miar)", (len(base) == 1) if base else None)
+    rep.add("JK-QS-4: bledy ValyrianBlades / QohorMasters", f"ERROR in ValyrianBlades.* {nerr('ValyrianBlades')}, QohorMasters.* {nerr('QohorMasters')}", "0 i 0",
+            nerr("ValyrianBlades") == 0 and nerr("QohorMasters") == 0)
     rep.show()
     return 0
 
@@ -19924,7 +19949,7 @@ def main(argv):
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group in ("jeff14", "jeff14s") and logp:
-        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM)
+        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:

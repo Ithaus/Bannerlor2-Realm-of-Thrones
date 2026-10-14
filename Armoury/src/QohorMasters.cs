@@ -49,7 +49,7 @@ namespace Armoury
     ///    rejestr zamienia wejscie na wynik (ValyrianBlades.RegistryMove).
     ///  - ZAPIS: arm_qohor_orders (SaveText, wlasny try). Przed cofnieciem DLL odebrac zlecenia (inaczej klingi zostaja tylko w napisie).
     /// </summary>
-    internal static class QohorMasters
+    internal static partial class QohorMasters
     {
         internal const string Menu = "arm_qohor_masters";
         internal const string WaitMenu = "arm_qohor_wait";
@@ -64,6 +64,7 @@ namespace Armoury
             public int DaysLeft, DaysTotal, Fee, Placed;
             public float Hours;                                         // godziny kowali zebrane na biezacy dzien pracy (gdy rak brakuje - praca idzie wolniej, nie stoi)
             public string Town = "";
+            public string Own = "";                                     // wariant B (QohorMasters.Own): spec projektu gracza; "" = przekucie we wzor seryjny
             public bool Coal;
             public bool Ready { get { return DaysLeft <= 0; } }
             public bool IsPlayer { get { return Owner == PlayerOwner; } }
@@ -146,6 +147,9 @@ namespace Armoury
                 starter.AddGameMenuOption(Menu, "arm_qohor_two", "{=!}Have a greatsword reforged into two blades",
                     delegate (MenuCallbackArgs a) { return OrderCondition(a, 2); },
                     delegate { ChooseBlade(2); }, false, 1);
+                starter.AddGameMenuOption(Menu, "arm_qohor_own", "{=!}Have a blade forged to your own design and name",
+                    delegate (MenuCallbackArgs a) { return OwnCondition(a); },
+                    delegate { OwnChooseBlade(); }, false, 1);
                 starter.AddGameMenuOption(Menu, "arm_qohor_waitopt", "{=!}Wait in Qohor until the masters are done",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Wait; return PlayerOrders().Any(o => !o.Ready); },
                     delegate { GameMenu.SwitchToMenu(WaitMenu); }, false, 2);
@@ -177,7 +181,7 @@ namespace Armoury
                         try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
                     }, true, 9);
                 Log.Info("QohorMasters: menu w " + (Qohor() != null ? Qohor().StringId + " (" + Qohor().Name + ")" : "BRAK " + Settings.Current.QohorTownId + " - przekucie spi")
-                         + " wpiete; zlecen w toku " + _orders.Count + "; oplata za klinge 1 miary " + Fee(1) + " d, 2 miar " + Fee(2) + " d; wzorow wyniku " + ResultPatterns().Count + ".");
+                         + " wpiete; zlecen w toku " + _orders.Count + "; oplata za klinge 1 miary " + Fee(1) + " d, 2 miar " + Fee(2) + " d; wzorow wyniku " + ResultPatterns().Count + "; wlasny projekt gracza (177-2 B) " + (OwnOn ? "TAK" : "NIE") + ", wlasnych mieczy w rejestrze " + ValyrianBlades.OwnCount + ".");
             }
             catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }
         }
@@ -188,6 +192,7 @@ namespace Armoury
         {
             var sb = new StringBuilder("Beneath the temple of the Black Goat the smiths of Qohor keep the last secret of Valyria. No one has made Valyrian steel since the Doom - but these masters can melt it and forge it anew, and nothing of it is lost.");
             sb.Append("\n\nBring a blade in your baggage (not on your back). A blade of one measure becomes one new sword; a greatsword of two measures, such as Ice, becomes two. ");
+            if (OwnOn) sb.Append("A blade of one measure can also be forged to a design of your own from the forge - your guard, grip and pommel - and bear the name you give it. ");
             sb.Append("The work takes " + Math.Max(1, Settings.Current.QohorDays) + " days of their hands (longer when the smiths of Qohor are busy). Their fee for one measure: " + FeeText(1) + "; for two: " + Fee(2) + " gold.");
             foreach (var o in PlayerOrders())
                 sb.Append("\n\n" + Describe(o) + (o.Ready ? " - READY." : " - " + o.DaysLeft + " day(s) of work left" + (o.Coal ? "" : ", waiting for charcoal") + "."));
@@ -196,7 +201,13 @@ namespace Armoury
 
         private static string Describe(Order o)
         {
-            return string.Join(" and ", o.InIds.Select(id => NameOf(id)).ToArray()) + " into " + string.Join(" and ", o.OutIds.Select(id => NameOf(id)).ToArray());
+            return string.Join(" and ", o.InIds.Select(id => NameOf(id)).ToArray()) + " into " + OutNames(o);
+        }
+
+        /// <summary>Nazwy wyniku zlecenia; wlasny projekt (wariant B) - nadana nazwa.</summary>
+        private static string OutNames(Order o)
+        {
+            return string.Join(" and ", o.OutIds.Select(id => id == OwnOut ? SpecName(o.Own) + " (your own design)" : NameOf(id)).ToArray());
         }
 
         private static string NameOf(string id) { var it = ValyrianBlades.Item(id); return it != null ? it.Name.ToString() : id; }
@@ -299,7 +310,7 @@ namespace Armoury
                 delegate { }), true);
         }
 
-        private static void Place(EquipmentElement blade, List<ItemObject> outs, int measures, int fee, int days)
+        private static void Place(EquipmentElement blade, List<ItemObject> outs, int measures, int fee, int days, string own = null)
         {
             try
             {
@@ -323,8 +334,9 @@ namespace Armoury
                 };
                 o.InIds.Add(blade.Item.StringId); o.InMods.Add(blade.ItemModifier != null ? blade.ItemModifier.StringId : "");
                 foreach (var it in outs) o.OutIds.Add(it.StringId);
+                if (!string.IsNullOrEmpty(own)) { o.Own = own; o.OutIds.Add(OwnOut); _dOwnPlaced++; }   // wariant B: wlasny projekt gracza
                 _orders.Add(o);
-                Log.Info("QohorMasters: gracz zleca " + Describe(o) + " - oplata " + fee + " d do kasy " + q.Name + ", " + days + " dni pracy (miary " + measures + " -> " + outs.Count + ").");
+                Log.Info("QohorMasters: gracz zleca " + Describe(o) + " - oplata " + fee + " d do kasy " + q.Name + ", " + days + " dni pracy (miary " + measures + " -> " + o.OutIds.Count + (string.IsNullOrEmpty(own) ? "" : ", wlasny projekt gracza") + ").");
                 Log.Player("The masters of Qohor take " + blade.Item.Name + " into their forge. Come back in " + days + " days, or wait here.");
                 GameMenu.SwitchToMenu(Menu);
             }
@@ -346,6 +358,7 @@ namespace Armoury
         /// kazda sztuka wydawana osobno, przy bledzie na polke Qohoru). Brak przedmiotu wyniku po aktualizacji ROT - mistrzowie oddaja wejscie.</summary>
         private static void Deliver(Order o)
         {
+            if (!string.IsNullOrEmpty(o.Own)) { DeliverOwn(o); return; }   // wariant B: wlasny projekt gracza (QohorMasters.Own)
             var outs = o.OutIds.Select(ValyrianBlades.Item).ToList();
             if (outs.Any(x => x == null))
             {
@@ -518,7 +531,7 @@ namespace Armoury
                     if (o.Ready)
                     {
                         Log.Info("QohorMasters: gotowe - " + Describe(o) + " (" + (o.IsPlayer ? "gracz" : o.Owner) + ").");
-                        if (o.IsPlayer) Log.Player("The masters of Qohor have finished " + string.Join(" and ", o.OutIds.Select(NameOf).ToArray()) + ".");
+                        if (o.IsPlayer) Log.Player("The masters of Qohor have finished " + OutNames(o) + ".");
                     }
                 }
                 // recenzja 177: gotowe zlecenia AI mistrzowie odsylaja od razu (wlasciciel, dziedzic albo polka Qohoru) - lord AI do Qohoru sam nie
@@ -535,9 +548,9 @@ namespace Armoury
 
         private static void Line(int worked, int noHands, int noCoal)
         {
-            if (_orders.Count == 0 && _dAiOrders + _dAiDelivered == 0) return;
+            if (_orders.Count == 0 && _dAiOrders + _dAiDelivered + _dOwnPlaced + _dOwnMade + _dOwnFailed == 0) return;
             Log.Info("QohorMasters: dzien " + (int)CampaignTime.Now.ToDays + " - zlecen " + _orders.Count + " (gotowe " + _orders.Count(o => o.Ready) + ", AI " + _orders.Count(o => !o.IsPlayer)
-                     + "); dzien pracy dostalo " + worked + ", bez wolnych rak kowali " + noHands + ", bez wegla " + noCoal + "; nowe zlecenia AI " + _dAiOrders + ", wydane AI " + _dAiDelivered + ".");
+                     + "); dzien pracy dostalo " + worked + ", bez wolnych rak kowali " + noHands + ", bez wegla " + noCoal + "; nowe zlecenia AI " + _dAiOrders + ", wydane AI " + _dAiDelivered + OwnLine() + ".");
             _dAiOrders = _dAiDelivered = 0;
         }
 
@@ -618,7 +631,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis
-        /// <summary>"v1" + rekordy "#wlasciciel;wej1,wej2;mod1,mod2;wyn1,wyn2;zostalo;razem;oplata;miasto;wegiel;dzien;godziny".</summary>
+        /// <summary>"v1" + rekordy "#wlasciciel;wej1,wej2;mod1,mod2;wyn1,wyn2;zostalo;razem;oplata;miasto;wegiel;dzien;godziny;spec" (spec - wariant B, "" = brak).</summary>
         internal static string Export()
         {
             var sb = new StringBuilder("v1");
@@ -627,7 +640,7 @@ namespace Armoury
                 sb.Append('#').Append(o.Owner).Append(';').Append(string.Join(",", o.InIds.ToArray())).Append(';').Append(string.Join(",", o.InMods.ToArray()))
                   .Append(';').Append(string.Join(",", o.OutIds.ToArray())).Append(';').Append(o.DaysLeft.ToString(inv)).Append(';').Append(o.DaysTotal.ToString(inv))
                   .Append(';').Append(o.Fee.ToString(inv)).Append(';').Append(o.Town).Append(';').Append(o.Coal ? "1" : "0").Append(';').Append(o.Placed.ToString(inv))
-                  .Append(';').Append(o.Hours.ToString("0.##", inv));
+                  .Append(';').Append(o.Hours.ToString("0.##", inv)).Append(';').Append(o.Own ?? "");
             return sb.ToString();
         }
 
@@ -650,6 +663,7 @@ namespace Armoury
                 int.TryParse(f[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out o.Fee);
                 int.TryParse(f[9], NumberStyles.Integer, CultureInfo.InvariantCulture, out o.Placed);
                 if (f.Length > 10) float.TryParse(f[10], NumberStyles.Float, CultureInfo.InvariantCulture, out o.Hours);
+                if (f.Length > 11) o.Own = f[11];   // wariant B: spec wlasnego projektu (starszy zapis - brak pola)
                 while (o.InMods.Count < o.InIds.Count) o.InMods.Add("");
                 if (o.InIds.Count == 0 || o.OutIds.Count == 0) { bad++; continue; }
                 _orders.Add(o);

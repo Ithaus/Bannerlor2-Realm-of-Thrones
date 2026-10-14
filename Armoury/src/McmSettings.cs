@@ -1728,6 +1728,10 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorReworkEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Qohor Own Design", HintText = "the masters of Qohor can also forge a Valyrian blade of one measure to a design of your own: pick one of your forge designs (or a sword you forged and carry) - they keep its guard, grip and pommel, make the blade of Valyrian steel close to its length - and give it the name you choose. The same fee, days and charcoal as any reforging; the new sword is Valyrian steel of one measure and the only one of its kind. Off: only the patterns of the realm")]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool QohorOwnDesign { get; set; } = true;
+
         [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice); the masters send the finished swords to him, or to his heir; lords of your own house never order it on their own")]
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorAiRework { get; set; } = true;
@@ -6087,6 +6091,7 @@ namespace Armoury
             s.NoConjuredLegends = NoConjuredLegends;
             s.HistValyrianPerMeasure = HistValyrianPerMeasure;
             s.QohorReworkEnabled = QohorReworkEnabled;
+            s.QohorOwnDesign = QohorOwnDesign;
             s.QohorAiRework = QohorAiRework;
             s.QohorDays = QohorDays;
             s.QohorCrew = QohorCrew;

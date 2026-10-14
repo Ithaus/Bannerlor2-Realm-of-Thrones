@@ -63,9 +63,25 @@ namespace Armoury
         private static readonly HashSet<string> NamedSet = new HashSet<string>(Named);
         private static readonly HashSet<string> AllSet = new HashSet<string>(Named.Concat(Serial));
 
-        internal static IEnumerable<string> AllIds { get { return Named.Concat(Serial); } }
+        // wariant B 177-2 (QohorMasters.Own): miecze wykute przez mistrzow Qohoru wedlug projektu gracza - id wyrobu kuzni (crafted_item_N), zawsze
+        // 1 miara i 1 sztuka w rejestrze; lista w zapisie rejestru (czesc 4). Jedna definicja "to jest VS" - spis, straznik, przetop, cena, unikat.
+        private static readonly HashSet<string> _own = new HashSet<string>();
+        internal static int OwnCount { get { return _own.Count; } }
+        internal static bool IsOwn(string id) { return id != null && _own.Contains(id); }
+
+        internal static IEnumerable<string> AllIds { get { return Named.Concat(Serial).Concat(_own.ToList()); } }
         internal static IEnumerable<string> SerialIds { get { return Serial; } }
-        internal static bool IsId(string id) { return id != null && AllSet.Contains(id); }
+        internal static bool IsId(string id) { return id != null && (AllSet.Contains(id) || _own.Contains(id)); }
+
+        /// <summary>Wariant B: nowy miecz wlasnego projektu gracza - id do spisu (wlasciciel ze "stanu startowego" = gracz); rejestr +1 robi RegistryMove.</summary>
+        internal static void AddOwn(string id, string ownerHeroId)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            _own.Add(id);
+            _measure.Clear();
+            if (!string.IsNullOrEmpty(ownerHeroId)) _owner[id] = ownerHeroId;
+            if (_reg != null && !_reg.ContainsKey(id)) _reg[id] = 0;
+        }
         internal static bool Is(ItemObject it) { return it != null && IsId(it.StringId); }
         internal static bool IsNamed(string id) { return id != null && NamedSet.Contains(id); }
 
@@ -91,6 +107,7 @@ namespace Armoury
         internal static int Measures(ItemObject it)
         {
             if (!Is(it)) return 0;
+            if (_own.Contains(it.StringId)) return 1;   // wariant B: wlasny projekt - zawsze 1 miara (wejscie 1 miary, klinga ponizej progu)
             int m;
             if (_measure.TryGetValue(it, out m)) return m;
             float min = Settings.Current != null ? Settings.Current.ValyrianGreatswordMinCm : 105f;
@@ -120,7 +137,7 @@ namespace Armoury
         {
             _reg = null; _owner = new Dictionary<string, string>(); _markLoaded = false; _recoverPending = false; _guardOffLogged = false; _smeltId = null;
             _tplCount = null; _tplHeroes = null; _where = new Dictionary<string, string>(); _lastCount = new Dictionary<string, int>();
-            _lossLogged.Clear(); _lastSummary = ""; _stumbles = 0; _measure.Clear(); _dteGone = 0; _dteWeapon = 0; _dteOther = 0; _prizeSwaps = 0; _smeltBlocked = 0;
+            _lossLogged.Clear(); _lastSummary = ""; _stumbles = 0; _measure.Clear(); _own.Clear(); _dteGone = 0; _dteWeapon = 0; _dteOther = 0; _prizeSwaps = 0; _smeltBlocked = 0;
         }
 
         /// <summary>"v1|R|id:liczba:wlasciciel;..." (R = odzysk po pierwszym wczytaniu jeszcze czeka). Pusto - rejestru brak.</summary>
@@ -133,6 +150,7 @@ namespace Armoury
                 string o; _owner.TryGetValue(kv.Key, out o);
                 sb.Append(kv.Key).Append(':').Append(kv.Value.ToString(CultureInfo.InvariantCulture)).Append(':').Append(o ?? "").Append(';');
             }
+            if (_own.Count > 0) sb.Append('|').Append(string.Join(",", _own.ToArray()));   // wariant B: czesc 4 - wlasne projekty gracza
             return sb.ToString();
         }
 
@@ -143,6 +161,8 @@ namespace Armoury
             var parts = s.Split('|');
             if (parts.Length < 3) return;
             _recoverPending = parts[1] == "R";
+            _own.Clear();
+            if (parts.Length > 3) foreach (var id in parts[3].Split(',')) if (id.Length > 0) _own.Add(id);   // wariant B: najpierw lista wlasnych (IsId ponizej)
             var reg = new Dictionary<string, int>();
             foreach (var rec in parts[2].Split(';'))
             {
@@ -153,7 +173,7 @@ namespace Armoury
                 reg[f[0]] = Math.Max(0, n);
                 if (f.Length > 2 && f[2].Length > 0) _owner[f[0]] = f[2];
             }
-            foreach (var id in AllIds) if (!reg.ContainsKey(id)) reg[id] = 0;
+            foreach (var id in AllIds) if (!reg.ContainsKey(id)) reg[id] = IsOwn(id) ? 1 : 0;   // wariant B: wlasny projekt - zawsze jedna sztuka
             _reg = reg;
         }
 
@@ -259,7 +279,7 @@ namespace Armoury
             {
                 int n = 0;
                 if (_tplCount != null) _tplCount.TryGetValue(id, out n);
-                reg[id] = IsNamed(id) ? Math.Min(1, n) : n;
+                reg[id] = IsOwn(id) ? 1 : IsNamed(id) ? Math.Min(1, n) : n;   // wariant B: wlasny projekt nie ma szablonu - jedna sztuka
             }
             return reg;
         }
@@ -407,7 +427,7 @@ namespace Armoury
                         // zgubiony klucz rejestru przy obecnym znaczniku 177: bezpieczny domysl - nic nie zamieniamy
                         var now = Gather();
                         var reg = new Dictionary<string, int>();
-                        foreach (var id in AllIds) { List<Copy> l; int have = now.TryGetValue(id, out l) ? l.Count : 0; reg[id] = Math.Max(tpl[id], have); }
+                        foreach (var id in AllIds) { List<Copy> l; int have = now.TryGetValue(id, out l) ? l.Count : 0; int t0; tpl.TryGetValue(id, out t0); reg[id] = Math.Max(t0, have); }
                         _reg = reg; _recoverPending = false;
                         Log.Info("Stal valyrianska: UWAGA - zapis ma znacznik 177, ale rejestru nie wczytano; bezpieczny domysl (wiecej ze stanu startowego i obecnego), nic nie zamieniane.");
                     }
