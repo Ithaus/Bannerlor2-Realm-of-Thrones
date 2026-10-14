@@ -61,6 +61,7 @@ namespace Armoury
         private static int _lvOverAid, _lvBelowRes, _lvAtLowLoy, _lvSlack, _lvOverNeed, _lvInPeace, _lvMen, _lvLim, _lvSlackSkip, _lvShortN;
         private const double LvAtCap = 0.95;   // recenzja W7: rod "na pulapie" - zold druzyn co najmniej 95% pulapu wlasnego druzyn (ta sama granica co ClanBudget.SlackGold)
         private static readonly HashSet<Settlement> _lvPlaces = new HashSet<Settlement>();
+        private static readonly Dictionary<Settlement, double> _lvLoyAt = new Dictionary<Settlement, double>();   // P1b: koszt lojalnosci W7 tej doby na miasto / zamek (odczyt FolkAidLoyalty)
         // tydzien na krolestwo (linia co 7 dob) i gracz (komunikat)
         private static readonly Dictionary<string, LvWk> _lvWeek = new Dictionary<string, LvWk>();
         private static int _lvWeekStart = -1, _lvPlWeekStart = -1;
@@ -88,7 +89,7 @@ namespace Armoury
             _lvFolk = _lvVill = _lvHeads = 0; _lvUnc = _lvBoostSum = _lvLoy = _lvPros = _lvLoySum = 0; _lvLoyMin = double.NaN;
             _lvNeedN = _lvPaidN = _lvRoomN = _lvNoSrcN = _lvPlOff = _lvPlanK = _lvPeaceK = _lvLowLoy = _lvRebel = _lvSiege = _lvLooted = _lvLoyN = 0;
             _lvOverAid = _lvBelowRes = _lvAtLowLoy = _lvSlack = _lvOverNeed = _lvInPeace = _lvMen = _lvLim = _lvSlackSkip = _lvShortN = 0;
-            _lvPlaces.Clear();
+            _lvPlaces.Clear(); _lvLoyAt.Clear();
         }
 
         private static void LvStumble(string where, Exception e)
@@ -345,10 +346,12 @@ namespace Armoury
                 {
                     double q = Math.Min(1.0, f.Took / (rate * f.Room));
                     float l0 = f.T.Loyalty, p0 = f.T.Prosperity;
-                    if (lc > 0) f.T.Loyalty = Math.Max(0f, l0 - (float)(lc * q));
+                    // P1b recenzja (9): przy kluczu FolkWarAidLoyalty koszt W7 tez najwyzej 0.1 x (lojalnosc - podloga 60) - wspolna podloga obu kar (klucz wylaczony - jak dotad)
+                    if (lc > 0) f.T.Loyalty = Math.Max(0f, l0 - (float)FolkAidLoyalty.W7Cost(f.T, lc * q));
                     if (pc > 0) f.T.Prosperity = Math.Max(0f, p0 - (float)(pc * q));
                     double dl = l0 - f.T.Loyalty, dp = p0 - f.T.Prosperity;
                     _lvLoy += dl; _lvPros += dp;
+                    if (dl > 0 && f.St != null) { double o; _lvLoyAt.TryGetValue(f.St, out o); _lvLoyAt[f.St] = o + dl; }   // P1b: wspolna podloga lojalnosci z danina
                     if (wk != null) { wk.Loy += dl; wk.Pros += dp; }
                     _lvLoySum += f.T.Loyalty; _lvLoyN++;
                     if (double.IsNaN(_lvLoyMin) || f.T.Loyalty < _lvLoyMin) _lvLoyMin = f.T.Loyalty;
@@ -356,6 +359,13 @@ namespace Armoury
                 catch (Exception e) { LvStumble("LvCollect(koszt)", e); }
             }
             return sum;
+        }
+
+        /// <summary>P1b (FolkAidLoyalty): lojalnosc, ktora W7 zdjal tej osadzie w ostatnim kroku doby (0 - bez poboru albo krok nie biegl). Tylko odczyt.</summary>
+        internal static double LordLevyLoyaltyAt(Settlement st)
+        {
+            double x;
+            return st != null && _lvLoyAt.TryGetValue(st, out x) ? x : 0;
         }
 
         /// <summary>ClanBudget.Daily: podniesienie pulapu z dzisiejszego kroku W7 (gotowka + miejsce na werbunek ponad przydzial W5); 0 - bez poboru, klucz

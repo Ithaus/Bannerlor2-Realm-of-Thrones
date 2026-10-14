@@ -1334,6 +1334,7 @@ namespace Armoury
             try { Leaks310.EnsureHooks(); } catch (Exception e) { Log.Error("Leaks310.EnsureHooks", e); }   // 3.10: zold zaciagu ROT od pana (latka modelu finansow ROT - w kampanii)
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)
+            try { FolkAidLoyalty.EnsureHooks(); } catch (Exception e) { Log.Error("FolkAidLoyalty.EnsureHooks", e); }   // P1b: kara lojalnosci za danine - postfiks na czynny model lojalnosci (BK ma pola statyczne z GameTexts - tylko w kampanii)
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { RotLeaks37.EnsureHooks(); } catch (Exception e) { Log.Error("RotLeaks37.EnsureHooks", e); }   // 3.7: podmiana rekruta ROT i rebelia bez zlota z niczego (transpilery raz na proces)
@@ -1664,6 +1665,9 @@ namespace Armoury
             var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
             try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
             finally { GoodsLedger.End(gfFolk); } DayProfile.Lap("TownFolk.Daily");
+            // K1-3a krok 2: wymiana padlych koni roboczych miast i zamkow z polki osady za zloto kiesy ludu - PO kotwicy doby (pieniadze ponad jutrzejszy koszyk),
+            // w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa osady); poza ramka zakupow wsi ksiegi towarow (kon nie jest towarem tej ksiegi)
+            try { TownFolk.WorkHorsesDaily(); } catch (Exception e) { Log.Error("TownFolk.WorkHorsesDaily", e); } DayProfile.Lap("TownFolk.WorkHorsesDaily");
             // E6/R1 (214): woz kopalni kupuje drewno dymarki z polki miasta handlowego za zloto wsi (na nastepna dobe) - zakup wsi w miescie jak E5/B1
             // (pozycja MFolk ksiegi pieniadza, wlasna ramka ksiegi towarow FBloom), PRZED ksiega zelaza i drewna (OreLedger.Daily)
             try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
@@ -1725,6 +1729,9 @@ namespace Armoury
             // W7: stawka wojenna pana - rody, ktorym W5 (danina, skarbiec, tarczowe) nie pokrylo potrzeby, biora z nadwyzki ludu i wsi wlasnych lenn (po P1 i danine wsi);
             // po bloku korony (plan z kroku W5 w CrownRents.Daily; poza pozycja "korona" ksiegi osad), przed budzetem rodow 166 (podniesienie pulapu tej doby)
             try { KingdomTreasury.LordLevyDay(); } catch (Exception e) { Log.Error("KingdomTreasury.LordLevyDay", e); } DayProfile.Lap("KingdomTreasury.LordLevyDay");
+            // P1b: migawka kary lojalnosci za danine P1 tej doby (czesc kiesy ludu zabrana) i kosztu W7 tej doby (wspolna podloga) - po W7; czyta ja model lojalnosci
+            // w Town.DailyTick osad do nastepnego bloku doby; linia "Lojalnosc za danine (P1b)" i komunikat gracza (poborcy wyszli)
+            try { FolkAidLoyalty.Daily(); } catch (Exception e) { Log.Error("FolkAidLoyalty.Daily", e); } DayProfile.Lap("FolkAidLoyalty.Daily");
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); } DayProfile.Lap("SoldierPay.Daily");   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
             try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); } DayProfile.Lap("ArmyClothing.Daily");   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band

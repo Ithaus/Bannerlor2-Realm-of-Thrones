@@ -138,6 +138,19 @@ RANGES = {
     'FolkSurplusSpendShare': (0.0, 1.0, "0.00"),
     # P1 (obieg kiesy ludu): danina z oszczednosci - kod przycina do 0..0.2 (KingdomTreasury.WarAid); suwak 0..0.1 z trzema miejscami (regula ogolna pokazalaby 0.025 jako 0.03)
     'FolkWarAidShare': (0.0, 0.1, "0.000"),
+    # P1b: kara lojalnosci za danine (kod przycina koszt do 0..5, podloge i prog do 0..100)
+    'FolkWarAidLoyaltyCost': (0.0, 5.0, "0.00"),
+    'FolkWarAidLoyaltyFloor': (0.0, 100.0, "0"),
+    'FolkWarAidMinLoyalty': (0, 100, "0"),
+    # P2: lud buduje miasto - udzialy przycinane w kodzie do 0..1; sufit ceny materialu 0..5 (0 = bez sufitu)
+    'FolkWorksShare': (0.0, 0.2, "0.000"),
+    'FolkWorksHands': (0.0, 0.2, "0.000"),
+    'BuildMaterialPriceCap': (0.0, 5.0, "0.0"),
+    # P2 recenzja: najmniej dob na poziom budowli z robot ludu - kod przycina do 0..3650 (0 = bez limitu)
+    'FolkWorksLevelDays': (0.0, 365.0, "0"),
+    # P3-P5 (zbytki): tempo listy dostatku w dniach - kod przycina do 1..3650; cena graniczna jako wielokrotnosc ceny zwyklej - kod przycina do 1..10
+    'FolkSurplusSpendDays': (10.0, 365.0, "0"),
+    'FolkLadderPriceCeiling': (1.0, 5.0, "0.00"),
     # W5 (doplata korony do zoldu wedlug potrzeby): cel wypelnienia i krok werbunku jako czesc limitu druzyn - kod przycina do 0..1 (KingdomTreasury.NeedAid)
     'CrownWarAidFillTarget': (0.0, 1.0, "0.00"),
     'CrownWarAidRecruitStep': (0.0, 1.0, "0.00"),

@@ -1828,6 +1828,26 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildPencePerPointCivil { get; set; } = 24f;
 
+        [SettingPropertyBool("Folk Builds Town", HintText = "the townsfolk (and castle folk) pay for the works of their own town each day, beside the lord: only buildings that serve the town - walls, granary, marketplace, harbour and port, warehouse, mason, waterworks, roads, mines, courthouse, theatre and the like; barracks, training fields, guard houses, siege workshops, the tax office and other military works stay the lord's. When the lord's military works are first in line, they pay into their own next building. The money comes first from the town's common purse (its works budget from the market dues), then from what the people hold above their reserve after the war aid. They buy timber, stone and tools from the market (never above Building Material Price Cap times their worth) and pay their own masons and labourers; wages return to the town's labourers and craftsmen. War does not stop them, a siege does. Needs Paid Construction. Off = the common purse pays its public works as before, without buildings")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool FolkBuildsTown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Works Share", 0.000f, 0.200f, "0.000", HintText = "with Folk Builds Town: the part of the coin they hold above their reserve that each class of townsfolk offers the town's works each day (0.02 = one part in fifty a day); the market, the hands and the cost of the present stage usually limit the works long before this")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksShare { get; set; } = 0.02f;
+
+        [SettingPropertyFloatingInteger("Folk Works Hands", 0.000f, 0.200f, "0.000", HintText = "with Folk Builds Town: the share of the town's labourers (castle folk) that can work on the townsfolk's own works at once, at Workshop Wage Per Day each (0.03 = three in a hundred, about the most the great works of the Middle Ages took) - this keeps the rebuilding of a sacked town slow")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksHands { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Build Material Price Cap", 0.00f, 5.00f, "0.0", HintText = "with Folk Builds Town: neither the lord nor the townsfolk buy a piece of building material dearer than this many times its worth (0 = no limit)")]
+        [SettingPropertyGroup("Army purchases")]
+        public float BuildMaterialPriceCap { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Folk Works Level Days", 0.00f, 365.00f, "0", HintText = "with Folk Builds Town: the townsfolk's own works never raise a stage of a building faster than in this many days (each day they put in at most the cost of the stage divided by this; 60 = at most about six stages a year in any town or castle, so a sacked town rebuilds slowly; 0 = no limit); the lord's works are not limited by this")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksLevelDays { get; set; } = 60f;
+
         [SettingPropertyBool("Build Wages By Town", HintText = "the masons and labourers are paid the day wage of the market town they come from: a penny of wages buys less work in a rich town and more in a poor one (materials at the market price either way; off = a penny of wages is a penny of work everywhere)")]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
@@ -5084,7 +5104,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TitheVillageShare { get; set; } = 0.05f;
 
-        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before)")]
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before). With Folk Luxury List on, only the wages of craftsmen and merchant families and the villages' spending on their usual goods follow this share (with Wards And Villages Shop on, the villages spend it only on salt and tools)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
@@ -5095,6 +5115,22 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Folk War Aid Share", 0.000f, 0.100f, "0.000", HintText = "part of their coin above the reserve that townsfolk and castle folk give the crown each day of war at the full war tax (0.025 = one part in forty a day; scaled by the realm's current war tax against War Tax Max, so twice as much at the top rate under the War Tax policy)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkWarAidShare { get; set; } = 0.025f;
+
+        [SettingPropertyBool("Folk War Aid Loyalty", HintText = "with Folk War Aid: a town or castle whose people gave the crown war aid at dawn grows less loyal to its lord that day - up to Folk War Aid Loyalty Cost a day, in proportion to how much of all the people's coin the aid took (the full cost when it took one part in forty of it). The loss never draws loyalty below Folk War Aid Loyalty Floor: it shrinks as loyalty nears the floor and stops there, and what the lord's own war levy (Lord War Levy) cost the town that day counts against the same limit. A town or castle with loyalty at or below Folk War Aid Min Loyalty pays no war aid at all - the tax gatherers leave a town so close to revolt. You see the loss as 'War aid from the people's savings' in the loyalty tooltip. Off = no loss of loyalty and no such limit, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkWarAidLoyalty { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk War Aid Loyalty Cost", 0.00f, 5.00f, "0.00", HintText = "with Folk War Aid Loyalty: loyalty a town or castle loses in a day when the war aid took one part in forty of all the coin its people hold (1 = about ten points lower in the long run, since the game draws loyalty back towards 50 by a tenth of the distance each day); less in proportion when the aid took less, never more")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkWarAidLoyaltyCost { get; set; } = 1.0f;
+
+        [SettingPropertyFloatingInteger("Folk War Aid Loyalty Floor", 0.00f, 100.00f, "0", HintText = "with Folk War Aid Loyalty: the war aid never draws a town's loyalty below this - it may cost at most a tenth of a point a day for each point the town stands above this floor, less what the lord's war levy cost it that day, so it stops at the floor (60 keeps towns clear of 50, below which the lord's taxes begin to slip)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkWarAidLoyaltyFloor { get; set; } = 60f;
+
+        [SettingPropertyInteger("Folk War Aid Min Loyalty", 0, 100, "0", HintText = "with Folk War Aid Loyalty: a town or castle with loyalty at or below this pays no war aid (the game's unrest begins at 25)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int FolkWarAidMinLoyalty { get; set; } = 30;
 
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -5167,6 +5203,30 @@ namespace Armoury
         [SettingPropertyBool("Folk Ladder Measure Log", HintText = "writes daily and weekly lines that measure where the people's savings could go - the loyalty of towns and castles, what the townsfolk bought with their spare coin and what found no goods, what luxuries would cost if the market saw their purses, the merchants' margin on goods brought by caravans, towns with luxury workshops, the savings of towns that have something to build, the gold of houses with room under their wage ceiling and what each town earns from - to the log only, changes nothing in the game")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkLadderMeasureLog { get; set; } = true;
+
+        [SettingPropertyBool("Folk Luxury List", HintText = "townsfolk live better from what they hold above their reserve for hard times: each day they offer one part in Folk Surplus Spend Days of it (labourers all of it, craftsmen and merchant families the three tenths they do not pay out as wages, which they still pay at Folk Surplus Spend Share) for goods from their own town's market at market prices - cloth and clothes 55%, silver, jewels and spices 25%, a better table 12%, household goods 8%; castle folk the same with their own coin above 10 days. What is not on the shelves is not bought and the coin stays in their purses. Off = the old offer of Folk Surplus Spend Share a day on eight kinds of food, ale, linen, velvet and pots, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkLuxuryList { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Days", 10.00f, 365.00f, "0", HintText = "with Folk Luxury List: the townsfolk spread what they hold above their reserve over this many days of better living (60 = one part in sixty a day)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkSurplusSpendDays { get; set; } = 60f;
+
+        [SettingPropertyBool("Market Sees Purse", HintText = "with Folk Luxury List: the market sees the people's purses - what the townsfolk (and with Wards And Villages Shop the castle folk and villagers who shop there) offer each day for cloth, clothes, silver, jewels, spices and household goods counts in the town's demand, so these goods grow dearer where the people have coin and caravans may sell more there. Their offer never lifts a price above Folk Ladder Price Ceiling times the usual one, and they do not buy such goods from their savings while the price stands higher. Food, ale, linen and leather are not touched. Off = demand from the number of people only, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool MarketSeesPurse { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Ladder Price Ceiling", 1.00f, 5.00f, "0.00", HintText = "with Market Sees Purse: the highest price, as a multiple of the usual one, the people's offer may lift fine goods to and that they will pay from their savings (1.5 = half again the usual price)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLadderPriceCeiling { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Folk Predict Bought", HintText = "with Folk Luxury List: the townsfolk reckon their reserve for hard times from what their spare coin actually bought the day before, not from what they offered (an offer that found no goods is not part of their living) - so towns whose people live well keep a full reserve; their share of the bill likewise counts only the part of the offer that found goods. Off = the reserve and the share count the whole offer, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkPredictBought { get; set; } = true;
+
+        [SettingPropertyBool("Wards And Villages Shop", HintText = "with Folk Luxury List: castle folk (in the nearest town) and villagers (in their market town) spend what they hold above their reserve (10 days of needs for castle folk, 15 days of purchases for a village) the same way - one part in Folk Surplus Spend Days a day on the same goods, from the shelves of that town, leaving the last five pieces of each for its people. A village keeps buying its salt, tools, linen, pots and ale for its daily needs as before, and still spends Folk Surplus Spend Share of its spare coin a day on salt and tools. Off = castle folk spend their share in the castle itself and villages spend Folk Surplus Spend Share a day on all their usual goods, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool WardsAndVillagesShop { get; set; } = true;
 
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -5312,9 +5372,17 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int ValveStockDaysHigh { get; set; } = 60;
 
-        [SettingPropertyBool("Horse Breeding By Demand", HintText = "every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal is only reported for now; works only with Harvest Valve on (off = stud farms breed what the game says)")]
+        [SettingPropertyBool("Horse Breeding By Demand", HintText = "every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal needs Horse Breeding Cut Live; works only with Harvest Valve on (off = stud farms breed what the game says)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HorseBreedingByDemand { get; set; } = true;
+
+        [SettingPropertyBool("Townsfolk Buy Only Work Horses", HintText = "townsfolk and castle folk no longer buy horses of every kind out of their daily basket: a town or castle keeps one work horse for every 25 people, a work horse lives about 15 years, and its people buy only the cheapest pack horse on their own market (a plain riding horse when there is none) to replace one that died; war horses and noble horses stay on the market for the armies; needs the live townsfolk purse; turn on together with Horse Breeding Cut Live (off = the people buy horses of every kind as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool TownsfolkBuyOnlyWorkHorses { get; set; } = true;
+
+        [SettingPropertyBool("Horse Breeding Cut Live", HintText = "the stud farms also breed fewer horses of a kind the world does not use up (down to a tenth of normal, at most halved every four weeks) instead of only reporting it; works only with Horse Breeding By Demand and Harvest Valve on (off = breeding never falls below what the game says)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseBreedingCutLive { get; set; } = true;
 
         [SettingPropertyBool("Cavalry Share By Template", HintText = "an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -5952,6 +6020,11 @@ namespace Armoury
             s.BuildMaterialShare = BuildMaterialShare;
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;
+            s.FolkBuildsTown = FolkBuildsTown;
+            s.FolkWorksShare = FolkWorksShare;
+            s.FolkWorksHands = FolkWorksHands;
+            s.BuildMaterialPriceCap = BuildMaterialPriceCap;
+            s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
@@ -6769,6 +6842,10 @@ namespace Armoury
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.FolkWarAid = FolkWarAid;
             s.FolkWarAidShare = FolkWarAidShare;
+            s.FolkWarAidLoyalty = FolkWarAidLoyalty;
+            s.FolkWarAidLoyaltyCost = FolkWarAidLoyaltyCost;
+            s.FolkWarAidLoyaltyFloor = FolkWarAidLoyaltyFloor;
+            s.FolkWarAidMinLoyalty = FolkWarAidMinLoyalty;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
@@ -6787,6 +6864,12 @@ namespace Armoury
             s.LordWarLevyMinLoyalty = LordWarLevyMinLoyalty;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
+            s.FolkLuxuryList = FolkLuxuryList;
+            s.FolkSurplusSpendDays = FolkSurplusSpendDays;
+            s.MarketSeesPurse = MarketSeesPurse;
+            s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
+            s.FolkPredictBought = FolkPredictBought;
+            s.WardsAndVillagesShop = WardsAndVillagesShop;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;
@@ -6824,6 +6907,8 @@ namespace Armoury
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;
             s.HorseBreedingByDemand = HorseBreedingByDemand;
+            s.TownsfolkBuyOnlyWorkHorses = TownsfolkBuyOnlyWorkHorses;
+            s.HorseBreedingCutLive = HorseBreedingCutLive;
             s.CavalryShareByTemplate = CavalryShareByTemplate;
             s.KnightHorseFromHouse = KnightHorseFromHouse;
             s.KnightHorseMarketShare = KnightHorseMarketShare;

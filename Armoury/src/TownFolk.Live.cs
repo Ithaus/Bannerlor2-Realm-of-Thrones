@@ -117,6 +117,8 @@ namespace Armoury
             _sW = _sR = _sP = _sC = _sV = _sGift = 0; _sTowns = _sCastles = _sVills = _sShort = _sNoBk = 0;
             ResetTithe();
             ResetP1();   // P1: danina z oszczednosci i pomiary obiegu kiesy (pamiec sesji)
+            ResetHorses();   // K1-3a krok 2: liczniki linii koni roboczych (licznik osady jest w Folk - czysci go Reset)
+            ResetLadder();   // P3-P5 (zbytki): kategorie listy dostatku, liczniki linii (podzial osady jest w Folk - czysci go Reset)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -363,7 +365,7 @@ namespace Armoury
                 }
             }
             long off = f.Offer[0] + f.Offer[1] + f.Offer[2];
-            if (off > 0) after += AddOffer(f, town, dict, off);
+            if (off > 0 || LadderOn) after += AddOffer(f, town, dict, off);   // P3: przy liscie dostatku takze oferta 0 - podzial targu na jutro (sygnal P4, zakupy P5)
             f.G0a += after;
             _brFacFood = ff; _brFacRest = fr; _brAnchor = ff < 1 || fr < 1;
         }
@@ -387,6 +389,7 @@ namespace Armoury
         /// / indeks^0.15 i / czesc domowa HistoricalPrices). Brak kategorii - pieniadz zostaje w kiesie. Zwraca dopisany popyt (do G0a).</summary>
         private static double AddOffer(Folk f, Town town, Dictionary<ItemCategory, float> dict, long off)
         {
+            if (LadderOn) return LadderOffer(f, town, dict, off);       // P3 (zbytki, klucz FolkLuxuryList): lista dostatku z wagami grup (TownFolk.Luxury.cs)
             if (_better == null) _better = CatsOf(BetterIds, out _betterText);
             double sum = 0;
             foreach (var c in _better) { float v; if (dict.TryGetValue(c, out v) && v > 0) sum += v; }
@@ -662,6 +665,7 @@ namespace Armoury
             try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
+            LadderBegin();                                             // P3-P5: liczniki doby zakupow podzamczy i wsi z listy dostatku, oferta kupujacych z zewnatrz (P4) od zera
             for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var f in _f.Values)
@@ -672,6 +676,7 @@ namespace Armoury
                 }
             }
             try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
+            try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             // kontrola zamknieta (kiesy miast, podzamczy, gminy): zmiana stanu = wplywy - wydatki
             long stock = TotalTown() + TotalCastle() + TotalGmina();
@@ -703,7 +708,8 @@ namespace Armoury
         {
             wf = f.PredFood; wr = f.PredRest;
             if (!(f.G0 > 0)) return;                                   // nawias nie biegl w tym oknie - przewidywanie z wczoraj
-            double sf = Math.Max(0, f.SpendFood - f.OfferFood), sr = Math.Max(0, (f.SpendGame - f.SpendFood) - f.OfferRest);
+            double ofF, ofR; OfferSpent(f, out ofF, out ofR);         // P3 (poprawka Predict, A 9.9): przy liscie dostatku oferta KUPIONA, inaczej oferowana (jak dotad)
+            double sf = Math.Max(0, f.SpendFood - ofF), sr = Math.Max(0, (f.SpendGame - f.SpendFood) - ofR);
             wf = sf / Math.Max(0.05, f.FacFoodUsed); wr = sr / Math.Max(0.05, f.FacRestUsed);
             double cap = f.G0;
             if (wf + wr > cap && wf + wr > 0) { double k = cap / (wf + wr); wf *= k; wr *= k; }
@@ -756,7 +762,7 @@ namespace Armoury
                 double sc = sumN > 0 ? N / sumN : 0;
                 af2 += sc * ffc; ar2 += sc * frc;
                 f.AffFC[c] = ffc; f.AffC[c] = N > 0 ? Math.Min(1.0, L / N) : 1.0;
-                f.Share[c] = N * keep * f.AffC[c] + f.Offer[c];        // towar klasy, za ktory jutro zaplaci, + oferta nadwyzki
+                f.Share[c] = N * keep * f.AffC[c] + f.Offer[c] * OfferPayPart(f);   // towar klasy, za ktory jutro zaplaci, + oferta nadwyzki (P3: x czesc kupiona ostatnio)
             }
             if (!(sumN > 0)) { af2 = ar2 = 1; }
             f.AffFood = af2; f.AffRest = ar2; f.MAnc = mm;
@@ -820,11 +826,16 @@ namespace Armoury
             Array.Clear(f.PaidG, 0, 3);
             // ---- 4. gmina: 7% stanu - 1/3 farma panu, 2/3 roboty: 75% place W/R po polowie, 25% material do kasy (podstawa robocizny jutro)
             long gx = (long)Math.Round(GminaOut * Math.Max(0, f.KG));
+            f.GmWorks = 0;                                             // P2: budzet robot gminy tej doby (TownFolk.Works.cs)
             if (gx > 0)
             {
                 long farm = (long)Math.Round(gx * GFarm);
                 d.Farm += PayLord(f, 3, farm, d);
                 long pub = gx - farm, wages = (long)Math.Round(GLab * pub), mat = pub - wages;
+                // P2 (lud buduje miasto, klucz FolkBuildsTown): roboty gminy jako prawdziwe punkty budowy i material zdjety z polki - budzet zostaje w kiesie gminy
+                // do BuildFunding.FolkWorks (ta sama doba, po budowach pana); czego budowa nie wezmie, idzie tam na place robot publicznych (W/R po polowie, bez
+                // materialu bez sztuki). Klucz wylaczony - krok co do monety jak dotad
+                if (WorksRoute) { f.GmWorks = pub; wages = 0; mat = 0; }
                 long w1 = wages / 2;
                 d.GmWage += Move(f, 3, 0, wages - w1) + Move(f, 3, 1, w1);
                 mat = Math.Min(mat, Math.Max(0, f.KG));
@@ -858,6 +869,7 @@ namespace Armoury
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
                 }
             }
+            LadderOffers(f);                                           // P3 (zbytki): oferta na liste dostatku 1/60 nadwyzki po daninie; place R/P wyzej bez zmian
             for (int c = 0; c < 3; c++) d.OffT += f.Offer[c];
             // ---- 6. kotwica na jutro
             double wf, wr; Predict(f, out wf, out wr);
@@ -924,6 +936,7 @@ namespace Armoury
             f.Offer[0] = 0;
             f.DAid = 0; f.DOver = 0; f.DOvC[0] = 0;                    // P1: danina podzamcza z kiesy ponad 10 dni potrzeby - przed oferta (jak w miescie)
             if (f.Need[0] > 0) { double ov = f.KW - RdC * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtCastle, ov, d); f.Offer[0] = (long)(SurplusRate * ov); } }
+            CastleLadder(f, d);                                        // P3/P5 (zbytki): podzamcze 1/60 nadwyzki - oferta w konsumpcji zamku albo zakup w miescie najblizszym
             d.OffC += f.Offer[0];
             // ---- 6. kotwica (z kredytem dworu)
             double wf, wr; Predict(f, out wf, out wr);
@@ -967,6 +980,7 @@ namespace Armoury
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
                     double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double wx = VillWorkOnly() ? extra : 0;            // P5 (zbytki, recenzja WAZNE 2): nadwyzka na koszyk tylko dla soli i narzedzi (len, garnki, piwo - lista)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
                     f.DVNeed = nv; f.ADay = _liveDay;                  // E5/C4
@@ -975,8 +989,9 @@ namespace Armoury
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
-                    long spent = BuyGoods(vil, mk, list, want, d);
+                    long spent = BuyGoods(vil, mk, list, want - wx, d, wx);
                     f.DVBuy = Math.Max(0, spent);                      // E5/C4
+                    VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
                     if (spent <= 0) { d.VNoGoods++; continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
@@ -1001,17 +1016,18 @@ namespace Armoury
         }
 
         /// <summary>Zakup wsi w miescie targowym: budzet po rowno na kategorie obecne, cena targu, najwyzej sztuki ponad 5; najpierw zloto (wies -> kasa), potem towar z polki.</summary>
-        private static long BuyGoods(Village vil, Settlement mk, List<EquipmentElement> list, double want, LDay d)
+        private static long BuyGoods(Village vil, Settlement mk, List<EquipmentElement> list, double want, LDay d, double workExtra = 0)
         {
             if (list.Count == 0) return 0;
             var town = mk.Town; var roster = mk.ItemRoster;
             var cats = new List<ItemCategory>();
             foreach (var e in list) { var c = e.Item.ItemCategory; if (!cats.Contains(c)) cats.Add(c); }
             double per = want / cats.Count;
+            double perW = workExtra > 0 ? workExtra / cats.Count : 0;  // P5 (recenzja WAZNE 2): nadwyzka wsi - sol i narzedzia tyle samo zl na kategorie co bez P5
             long spent = 0;
             foreach (var c in cats)
             {
-                double left = per;
+                double left = per + (perW > 0 && VillWorkCat(c) ? perW : 0);
                 foreach (var e in list)
                 {
                     if (left < 1) break;
@@ -1290,7 +1306,7 @@ namespace Armoury
 
         private static string D(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : v.ToString("R", Inv); }
 
-        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest,HungerDays" (|; pole 17 - E5/C2, starszy zapis bez niego = 0, starsze DLL je pomijaja). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
+        /// <summary>Zapis arm_townfolk: "v1;seed=TC" + na osade "id,rodzaj,cal,HW,HR,HP,HS,PeopleCal,sl,KW,KR,KP,KG,CourtCr,Idx,PredFood,PredRest,HungerDays" (|; pole 17 - E5/C2, starszy zapis bez niego = 0, starsze DLL je pomijaja; pole 18 - K1-3a krok 2: licznik koni roboczych HorseOwed, starszy zapis bez niego = 0). Pusty przy kiesie wylaczonej i pustych kiesach.</summary>
         internal static string Export()
         {
             try
@@ -1307,7 +1323,8 @@ namespace Armoury
                     sb.Append('|').Append(f.St.StringId.Replace("|", "").Replace(",", "")).Append(',').Append(f.Kind).Append(',').Append(f.Cal ? 1 : 0).Append(',')
                       .Append(D(f.HW)).Append(',').Append(D(f.HR)).Append(',').Append(D(f.HP)).Append(',').Append(D(f.HS)).Append(',').Append(D(f.PeopleCal)).Append(',').Append(f.Slave ? 1 : 0).Append(',')
                       .Append(f.KW).Append(',').Append(f.KR).Append(',').Append(f.KP).Append(',').Append(f.KG).Append(',').Append(f.CourtCr).Append(',')
-                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest)).Append(',').Append(f.HungerDays);
+                      .Append(D(f.Idx)).Append(',').Append(D(f.PredFood)).Append(',').Append(D(f.PredRest)).Append(',').Append(f.HungerDays)
+                      .Append(',').Append(Math.Max(0, Math.Min(WhMax, f.HorseOwed)).ToString("0.####", Inv));   // K1-3a krok 2: pole 18
                 }
                 return sb.ToString();
             }
@@ -1356,6 +1373,7 @@ namespace Armoury
                         double idx = Dd(a[14]); if (idx > 0) f.Idx = idx;
                         f.PredFood = Math.Max(0, Dd(a[15])); f.PredRest = Math.Max(0, Dd(a[16]));
                         f.HungerDays = a.Length > 17 ? (int)Math.Max(0, Math.Min(100000, L(a[17]))) : 0;   // E5/C2: zapis sprzed C2 - licznik od zera
+                        f.HorseOwed = a.Length > 18 ? Math.Max(0, Math.Min(WhMax, Dd(a[18]))) : 0;   // K1-3a krok 2: zapis sprzed paczki - licznik koni roboczych od zera
                         f.FacOk = false;
                     }
                     catch (Exception e) { Stumble("Import(osada)", e); }
@@ -1445,13 +1463,13 @@ namespace Armoury
               .Append(", 5% zaworu ").Append(w.ValveT).Append(", w tym praca niewolnych do wlascicieli ").Append(w.SlaveW)
               .Append("; dzis z kas: robocizna ").Append(d.LabT).Append(SkupText(d.LabS, d.Skup)).Append(", obrot P ").Append(d.TurnT).Append(", doplata do 35% ").Append(d.TopT).Append(" (miast przycietych do stanu kasy ").Append(d.Cut).Append(")")
               .Append(" | wewnatrz ludu: czynsz ").Append(d.Rent).Append(", leczenie ").Append(d.Heal).Append(", sluzba ").Append(d.Serv).Append(", place z nadwyzki R/P ").Append(d.SurpWage)
-              .Append(", roboty gminy (place) ").Append(d.GmWage)
+              .Append(", roboty gminy (place) ").Append(d.GmWage).Append(WorksRoute ? " (P2: place robot gminy w linii Roboty ludu)" : "")
               .Append(" | podatki panu: W ").Append(d.TaxW).Append(" / R ").Append(d.TaxR).Append(" / P ").Append(d.TaxP).Append(", cech ").Append(d.Guild).Append(", farma gmin ").Append(d.Farm)
               .Append(", wstrzymane w oblezeniu ").Append(d.Held).Append(", bez zywego pana (do gminy) ").Append(d.NoLord)
               .Append(" | kiesy ").Append(d.KW + d.KR + d.KP).Append(" (W ").Append(d.KW).Append(" / R ").Append(d.KR).Append(" / P ").Append(d.KP).Append("), gminy ").Append(d.KG)
               .Append(", zapas dni W ").Append(F1(d.NW > 0 ? d.KW / d.NW : double.NaN)).Append(" / R ").Append(F1(d.NR > 0 ? d.KR / d.NR : double.NaN)).Append(" / P ").Append(F1(d.NP > 0 ? d.KP / d.NP : double.NaN))
               .Append(", lokata (kiesa W ponad zapas dni) ").Append(N0(d.Lokata)).Append(", oferta nadwyzki na jutro ").Append(d.OffT)
-              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)")
+              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)").Append(LadderOn ? " (P3: oferta W 1/60, R i P 0.3/60 - linia Zbytki)" : "")
               .Append(" | stac jedzenie W/R/P ").Append(Pct(d.AFW, d.NFW)).Append(" / ").Append(Pct(d.AFR, d.NFR)).Append(" / ").Append(Pct(d.AFP, d.NFP))
               .Append(", pelny W/R/P ").Append(Pct(d.AW, d.NW)).Append(" / ").Append(Pct(d.AR, d.NR)).Append(" / ").Append(Pct(d.AP, d.NP))
               .Append(" (swiat ").Append(Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP)).Append(")")   // recenzja B1 (1-6): prog B1-T8 "swiat >= 98%" (waga potrzeb)

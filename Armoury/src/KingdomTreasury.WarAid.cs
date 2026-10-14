@@ -36,8 +36,8 @@ namespace Armoury
     internal static partial class KingdomTreasury
     {
         /// <summary>Powod, dla ktorego klasa z nadwyzka dzis (nie) placi daniny - liczniki linii i zdanie "Savings" w oknie mieszkancow.</summary>
-        internal const int WaPaid = 0, WaOff = 1, WaNoRealm = 2, WaNoNeed = 3, WaSiege = 4, WaWait = 5;
-        private const int WaWhyN = 6;
+        internal const int WaPaid = 0, WaOff = 1, WaNoRealm = 2, WaNoNeed = 3, WaSiege = 4, WaWait = 5, WaLowLoy = 6;   // WaLowLoy - P1b: lojalnosc <= FolkWarAidMinLoyalty
+        private const int WaWhyN = 7;
 
         private sealed class WarAidK { public long Taken, Held; public readonly long[] Cls = new long[WtClasses]; public int Places; public double Lords; }   // Lords - W5b: czesc daniny ze stawki ponad s korony (brak wojska u panow)
 
@@ -68,6 +68,7 @@ namespace Armoury
             _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waStumbles = 0; _waErr.Clear(); _waLords = 0;
             _waPlayer.Clear(); _waGone.Clear(); _waTell.Clear(); _waTellRate = 0; _waTellTop = 0; _waDawns = 0; _waKingDays = 0; _waKingSum = 0;
             LastFolkWarAid = 0;
+            FolkAidLoyalty.Reset();   // P1b: migawka kary lojalnosci, liczniki i stan komunikatu gracza - razem z danina
         }
 
         private static void WaClearDay()
@@ -117,6 +118,9 @@ namespace Armoury
             if (w == null || sv <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;
             double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(sv, WtCap(k, s)) / WaBaseCap(s);
             if (!(rate > 0)) return 0;
+            // P1b (FolkAidLoyalty, klucz FolkWarAidLoyalty): osada na skraju buntu (lojalnosc <= FolkWarAidMinLoyalty) nie placi - poborcy wychodza; klucz
+            // wylaczony = bez progu (stan sprzed P1b)
+            if (FolkAidLoyalty.GateHolds(st, s)) { why = WaLowLoy; return 0; }
             why = WaPaid;
             return rate > 1 ? 1 : rate;
         }
@@ -131,7 +135,8 @@ namespace Armoury
         /// <summary>
         /// Stawka dnia daniny tej osady dzis (ulamek nadwyzki ponad zapas) - TYLKO ODCZYT (bez licznikow, bez zlota i bez zapisu pamieci stanu wojny doby -
         /// WaAtWarPeek): okno mieszkancow i pomiary.
-        /// 0 i powod: wylaczone / kiesa nieczynna / bez 165 (WaOff), rod bez krolestwa (WaNoRealm), pokoj albo s = 0 (WaNoNeed), osada oblezona (WaSiege).
+        /// 0 i powod: wylaczone / kiesa nieczynna / bez 165 (WaOff), rod bez krolestwa (WaNoRealm), pokoj albo s = 0 (WaNoNeed), osada oblezona (WaSiege),
+        /// lojalnosc na progu P1b (WaLowLoy).
         /// </summary>
         internal static double FolkWarAidRate(Settlement st, out int why)
         {
@@ -165,7 +170,7 @@ namespace Armoury
                 double rate = WaRate(st, s, false, out k, out why);
                 bool mine = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
                 // stan komunikatu gracza NIE jest tu zerowany: s = 0 w trwajacej wojnie to nie nowa wojna (recenzja P1) - zeruje pokoj (WaPlayerSweep, raz na dobe)
-                if (!(rate > 0)) { _waWhy[why]++; return 0; }
+                if (!(rate > 0)) { _waWhy[why]++; if (why == WaLowLoy) FolkAidLoyalty.NoteGate(st); return 0; }
                 _waCalls++;
                 double owed = excess * rate;
                 double[] cr;
