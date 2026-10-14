@@ -121,6 +121,7 @@ namespace Armoury
                 try { PeopleUnit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleUnit.ApplyAll", e); }
                 MapClock.ApplyAll(_harmony);
                 Levy.ApplyAll(_harmony);
+                try { PeopleLevy.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleLevy.ApplyAll", e); }   // GL-4 (P4): przyrost milicji gry i limit milicji BK x czynnik ludzi (klucz MilitiaByPeople czytany na zywo)
                 VolunteerKit.ApplyAll(_harmony);
                 LevyGold.ApplyAll(_harmony);
                 try { GarrisonRecruitFee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll", e); }   // E5 decyzja 9: oplata za werbunek zalog do sprzedajacego

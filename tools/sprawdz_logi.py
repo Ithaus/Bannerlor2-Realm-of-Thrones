@@ -424,6 +424,10 @@ Uzycie (Python 3, tylko odczyt):
                     Wiersze GL2-0..GL2-11 (kazdy, P1 + P2, [R] P1 + P2 dopisane; GL2-11 wyroby linii towarowych w miastach m_t > 1.5), GL3-1..3 (P3),
                     GL2-S1 (zloto startowe: suma kazdej puli przed = po, takze kiesy podzamczy); GL2-8/8b/11 wobec biegu bazowego z --baza-doby (bez - INFO
                     albo prog projektu). Log bez paczki: INFO, bez wyjatku.
+--grupa glb       : (GL-B, projekt docs/gospodarka-od-ludzi rozdz. 8 progi P4 i P5, rozdz. 9 ryzyko 11 lekarstwo c) pobor i milicja od ludzi (LevyByPeople,
+                    MilitiaByPeople), stawki towarow - sol x2 i wsie lniane (GoodsRatesByPattern), lud zarabia od skupu plonu wsi (FolkEarnFromVillageBuys).
+                    python -I tools/sprawdz_logi.py --grupa glb [--do-doby 120] [--baza-doby <log biegu bazowego z kluczami GL-B wylaczonymi>] <Armoury-*.log>
+                    Wiersze GLB-P4-*, GLB-P5-*, GLB-11c-* (ludzie-regiony.csv i kasy-miast.csv z katalogu sesji). Log bez paczki: INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
                     python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -17310,6 +17314,167 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
     return 0
 
 
+# ============================================================ GL-B (P4 pobor i milicja od ludzi, P5 stawki towarow, 11c lud od skupu plonu wsi): grupa --grupa glb
+
+
+def _glb_start(lines, start_arg, prefixes):
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    if start is None:
+        alld = set()
+        for p in prefixes:
+            alld |= set(by_day(lines, p))
+        start = min(alld) if alld else 0
+    return start
+
+
+def _glb_mean(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / float(len(xs)) if xs else None
+
+
+def _glb_q(xs, p):
+    xs = sorted(xs)
+    return xs[int(round(p * (len(xs) - 1)))] if xs else None
+
+
+def _glb_regions(logp, start, d0, d1):
+    """ludzie-regiony.csv: na krolestwo srednia dobowa ludzi i zwerbowanych w dobach kampanii d0-d1 -> {krolestwo: (ludzie, zwerbowani/d)}; brak pliku = {}."""
+    p = os.path.join(os.path.dirname(csv_path_of(logp)), "ludzie-regiony.csv")
+    if not os.path.isfile(p):
+        return {}
+    L, R, days = {}, {}, set()
+    with open(p, encoding="utf-8-sig", errors="replace", newline="") as f:
+        for r in csv.DictReader(f, delimiter=";"):
+            try:
+                d = int(r["dzien"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            if not (d0 <= run_day(d, start) <= d1):
+                continue
+            k = r.get("krolestwo") or "-"
+            try:
+                L[k] = L.get(k, 0.0) + float(r.get("ludzie") or 0)
+                R[k] = R.get(k, 0.0) + float(r.get("zwerbowani_dzis") or 0)
+            except ValueError:
+                continue
+            days.add(d)
+    n = max(1, len(days))
+    return {k: (L[k] / n, R.get(k, 0.0) / n) for k in L}
+
+
+def _glb_p4_series(lines, start, d0, d1):
+    """Seria biegu: milicja swiata (linia Zalogi 169c) i odmowy hamulca wolnych rak (linia Pobor) w dobach kampanii d0-d1 -> (milicja sr., odmowy sr., dob)."""
+    mil = [num(r"\| milicja (\d+)", s) for d, s in by_day(lines, "Zalogi: przyrost bez werbunku (169c): dzien").items() if d0 <= run_day(d, start) <= d1]
+    ref = [num(r"odmowione przez ksiege \(a >= f\) (\d+) losowan", s, int, 0) for d, s in by_day(lines, "Pobor: dzien").items() if d0 <= run_day(d, start) <= d1]
+    return _glb_mean(mil), _glb_mean(ref), len(mil)
+
+
+def glb_p4(rep, lines, start, until, logp, base):
+    """P4 (projekt rozdz. 8 progi P4): pobor i milicja od ludzi - klucze LevyByPeople, MilitiaByPeople (Armoury/src/PeopleLevy.cs)."""
+    gl = {d: s for d, s in by_day(lines, "Pobor i milicja od ludzi (GL4): dzien").items() if 1 <= run_day(d, start) <= until}
+    on = [d for d, s in gl.items() if ("Levy By People tak" in s or "Militia By People tak" in s) and "czekam na usluge" not in s]
+    last30 = (max(2, until - 29), until)
+    if not on:
+        rep.add("GLB-P4-0: linia pobor i milicja od ludzi (GL4)", f"linii {len(gl)}, z regula {len(on)} - log bez paczki albo klucze wylaczone", "INFO", None)
+    else:
+        s = gl[max(on)]
+        rep.add("GLB-P4-0: linia pobor i milicja od ludzi (GL4)", f"linii {len(gl)}, z regula {len(on)}; ostatnia: " + (s.split(" | ", 1)[1][:400] if " | " in s else s[:400]),
+                "linia w kazdej dobie z regula, normy rodzajow i srednie wazone czynnika 1.000", None)
+        bad = [d for d in on if num(r"potkniecia (\d+)\.", gl[d]) not in (0, None)]
+        rep.add("GLB-P4-1: potkniecia P4", f"dob z potknieciem {len(bad)} z {len(on)}", "0", not bad)
+        mw = []
+        for d in on:
+            for a, b in re.findall(r"srednia wazona czynnika: pobor ([\d.]+), milicja ([\d.]+)", gl[d]):
+                mw += [float(a), float(b)]
+        dev = max([abs(x - 1.0) for x in mw]) if mw else None
+        rep.add("GLB-P4-1b: norma - srednia wazona czynnika w kazdym rodzaju osad", f"najwieksze odchylenie od 1: {dev:.4f}" if dev is not None else "brak",
+                "<= 0.01 (granice 0.1-3 licza sie w sredniej; suma swiata ochotnikow i przyrostu milicji jak bez reguly)", None if dev is None else dev <= 0.01)
+    # ---- rekruci na 1000 ludzi (ludzie-regiony.csv)
+    kr = _glb_regions(logp, start, *last30)
+    big = [(k, v[1] / v[0] * 1000.0) for k, v in kr.items() if v[0] > 400000 and v[1] > 0]
+    ratio = None
+    if len(big) >= 3:
+        xs = [x for _, x in big]
+        ratio = _glb_q(xs, 0.9) / _glb_q(xs, 0.1)
+    bratio = None
+    if base:
+        bk = _glb_regions(base[0], base[1], *last30)
+        bb = [v[1] / v[0] * 1000.0 for v in bk.values() if v[0] > 400000 and v[1] > 0]
+        if len(bb) >= 3:
+            bratio = _glb_q(bb, 0.9) / _glb_q(bb, 0.1)
+    val = (f"krolestw > 400 tys. ludzi z werbunkiem {len(big)}; p90/p10 rekrutow na 1000 ludzi d{last30[0]}-{last30[1]} {ratio:.2f}" if ratio is not None
+           else "brak ludzie-regiony.csv albo krolestw")
+    val += f"; bieg bazowy {bratio:.2f}" if bratio is not None else ""
+    if not on:
+        rep.add("GLB-P4-2: rekruci na 1000 ludzi - p90/p10 krolestw > 400 tys.", val, "<= 3 (INFO - log bez paczki)", None)
+    else:
+        ok = None if ratio is None else ratio <= 3.0
+        # rachunek P4 (sucho85/pobor RAPORT pkt 3; rachunek GL-4): werbunek wiaze pieniadz (pulap zoldu) albo limit druzyn, nie podaz ochotnikow - P4 zbliza
+        # podaz, nie wydatki rodow; ponad 3 przy spadku wobec biegu bazowego = DECYZJA (przyczyna poza krokiem)
+        rep.add("GLB-P4-2: rekruci na 1000 ludzi - p90/p10 krolestw > 400 tys.", val,
+                "<= 3 (projekt); ponad 3, ale mniej niz bieg bazowy = DECYZJA - werbunek wiaze pieniadz, nie ochotnicy (rachunek: podaz za ludzmi ok. 4.1 z 8.5)",
+                ok, decide=(ok is False and bratio is not None and ratio < bratio))
+    # ---- odmowy hamulca i milicja swiata
+    mil, ref, _n = _glb_p4_series(lines, start, *last30)
+    bmil = bref = None
+    if base:
+        bmil, bref, _bn = _glb_p4_series(base[2], base[1], *last30)
+    first = min(on) if on else None
+    if bref is None and first is not None:
+        bl = [num(r"odmowione przez ksiege \(a >= f\) (\d+) losowan", s, int, 0) for d, s in sorted(by_day(lines, "Pobor: dzien").items()) if d <= first]
+        bref = bl[-1] if bl else None
+    val = f"odmowy hamulca wolnych rak d{last30[0]}-{last30[1]} srednio {ref:.1f}/d" if ref is not None else "brak linii Pobor"
+    val += f"; baza {bref:.1f}/d" if bref is not None else ""
+    ok = None if (not on or ref is None or bref is None) else ref <= max(bref * 1.2, bref + 5)
+    rep.add("GLB-P4-3: odmowy hamulca wolnych rak", val, "<= baza x 1.2 (+5 dla malych liczb; baza = bieg bazowy --baza-doby albo doba wlaczenia reguly)", ok)
+    btxt = "bieg bazowy"
+    if bmil is None and first is not None:
+        fm = [num(r"\| milicja (\d+)", s) for d, s in by_day(lines, "Zalogi: przyrost bez werbunku (169c): dzien").items() if d == first]
+        bmil = fm[0] if fm and fm[0] else None
+        btxt = f"doba wlaczenia reguly (d{run_day(first, start)})"
+    val = f"milicja swiata d{last30[0]}-{last30[1]} srednio {mil:.0f}" if mil is not None else "brak linii Zalogi (169c)"
+    val += f"; {btxt} {bmil:.0f} (x{mil / bmil:.3f})" if (bmil and mil is not None) else ""
+    ok = None if (not on or mil is None or not bmil) else 0.9 <= mil / bmil <= 1.1
+    rep.add("GLB-P4-4: milicja swiata wobec bazy", val, "0.9-1.1 (rachunek: x0.99 przy limicie BK x czynnik)", ok)
+    if on:
+        wk = by_day(lines, "Pobor i milicja od ludzi wedlug krolestw (GL4): dzien")
+        ds = [d for d in sorted(wk) if run_day(d, start) <= until]
+        if ds:
+            s = wk[ds[-1]]
+            segs = s.split(" - ", 1)[1].split(" | ")[:8] if " - " in s else []
+            rep.add("GLB-P4-5: tabela krolestw (ostatnia)", "; ".join(x.strip()[:120] for x in segs), "INFO (czynnik poboru / milicji, milicja, ochotnicy oczekiwani)", None)
+
+
+def glb_main(logp, start_arg, until=120, bdp=None):
+    """GL-B (projekt docs/gospodarka-od-ludzi rozdz. 8, progi P4 i P5, ryzyko 11 lekarstwo c): pobor i milicja od ludzi (PeopleLevy.cs), stawki towarow -
+    sol x2 i wsie lniane (GoodsRates.cs), lud zarabia od skupu plonu wsi (TownFolk.Skup.cs). Okno: doby kampanii 1-until (--do-doby); "d91-120" = ostatnie 30 dob
+    okna. --baza-doby <log biegu bazowego tego samego kodu z kluczami GL-B wylaczonymi> - progi wobec bazy. Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = _glb_start(lines, start_arg, ("Pobor i milicja od ludzi (GL4): dzien", "Pieniadz swiata: dzien", "Pobor: dzien"))
+    base = None
+    if bdp and os.path.isfile(bdp):
+        bl = read(bdp)
+        base = (bdp, _glb_start(bl, None, ("Pieniadz swiata: dzien", "Pobor: dzien")), bl)
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until}" + (f" | bieg bazowy: {bdp} (start {base[1]})" if base else " | bez biegu bazowego"))
+    for blk in GLB_BLOCKS:
+        try:
+            blk(rep, lines, start, until, logp, base)
+        except Exception as e:   # narzedzie progow nie moze sie wywrocic na nietypowym logu
+            rep.add("GLB-blad: " + blk.__name__, repr(e)[:200], "INFO - blad narzedzia", None)
+    rep.show()
+    return 0
+
+
+GLB_BLOCKS = [glb_p4]
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -17360,6 +17525,8 @@ def main(argv):
         return gl1_main(logp, start_arg, until_arg, bdp)   # GL-1: plon wsi od ludzi (P1) + krainy szczegolne (P6) - progi rozdz. 8 projektu "gospodarka od ludzi"
     if group == "gl2" and logp:
         return gl2_main(logp, start_arg, until_arg, csvp, bdp)   # GL-2/GL-3: rynek miasta od ludzi, glowy wsi i podzamcza, zloto startowe wedlug ludzi (--baza-doby: GL2-8/8b/11 wobec bazy)
+    if group == "glb" and logp:
+        return glb_main(logp, start_arg, until_arg, bdp)   # GL-B: pobor i milicja od ludzi (P4), stawki towarow - sol x2 i wsie lniane (P5), lud od skupu plonu wsi (11c)
     if group == "m6b" and logp:
         return m6b_main(logp, start_arg, until_arg)   # m6b (poprawka 6): konie juczne z niczego, zboze i ryby bez zrodla, kasy zaulkow i karawana bez zysku
     if group == "m6a" and logp:

@@ -124,7 +124,24 @@ namespace Armoury
             if (realm == "freefolk") { brake = false; return 1.0; }
             if (realm == "nightswatch") { brake = false; yieldOnly = true; return share; }
             if (realm == "sturgia") return Math.Min(1.0, _ironF);
+            // GL-4 / P4 (decyzja Jeffa pyt. 2 "lup i milicja bez wyjatku" - ludy walczace z wiekszym udzialem zbrojnych; DECYZJA (pelne uprawnienia), projekt 3.3):
+            // Dothrakowie - lud zbrojny, prog wolnych rak 3 x zwykly (60%), czyli udzial zbrojnych 3 w poborze i milicji; tylko przy kluczu LevyByPeople albo
+            // MilitiaByPeople (oba wylaczone - 20%, stan 97dd474). Ten sam prog dla hamulca, plonu i checi - jedna zasada, jak Zelazne Wyspy (40%)
+            if (realm == "khuzait" && PeopleLevy.DothrakiArmed) return Math.Min(1.0, 3.0 * share);
             return share;
+        }
+
+        /// <summary>GL-4 / P4: udzial zbrojnych ludu krainy = prog wolnych rak krainy (bez okna zniw) / FreeHandsShare - zwykla kraina 1, Zelazne Wyspy 2 (40%),
+        /// Wolni Ludzie 5 (bez hamulca), Dothrakowie 3 (przy kluczach P4). Nocna Straz - wolajacy pomija (WatchLaw). Watek glowny.</summary>
+        internal static double ArmedShare(string realm)
+        {
+            var s = S;
+            double share = s != null ? Math.Max(0.0, Math.Min(1.0, s.FreeHandsShare)) : 0.2;
+            if (!(share > 0.0)) return 1.0;
+            bool brake, yieldOnly;
+            double f = FOf(realm, out brake, out yieldOnly);
+            double a = f / share;
+            return double.IsNaN(a) || double.IsInfinity(a) || a <= 0.0 ? 1.0 : a;
         }
 
         // ------------------------------------------------------------ doba (PeopleBook.OriginDaily, po uzgodnieniu)

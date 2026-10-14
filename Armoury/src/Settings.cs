@@ -1936,6 +1936,12 @@ namespace Armoury
         // GL-2 (decyzja Jeffa 13.10, pyt. 7): TYLKO nowa kampania - po darach startowych (TownPurse.TrimStartGift z kiesami ludu i wsi) zloto kas kupcow miast, kies ludu, kies wsi
         // i skarbcow koron przelane wedlug ludzi przy tej samej sumie swiata (podloga skarbca 1.0 mln); flaga w zapisie (arm_peoplemarket) - nigdy na starym zapisie
         public bool StartGoldByPeople = true;              // New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched
+        // GL-4 / P4 (projekt rozdz. 3.3, 8 P4; PeopleLevy.cs): szansa pustego miejsca u notabla (Levy.ProbabilityPostfix) x czynnik osady = min(3, max(0.1, skala ludzi
+        // x udzial zbrojnych / norma rodzaju)); norma tak, ze srednia czynnika wazona liczba notabli = 1 (suma swiata ochotnikow jak dzis). Off = stan 97dd474
+        public bool LevyByPeople = true;                   // Volunteers come forward by the number of people: an empty place at a notable fills faster in a crowded land and slower in an empty one (from a tenth to three times, never above certain), and warrior peoples - the ironborn, the Free Folk and the Dothraki - send more of their men; the world as a whole gets as many volunteers as before. Off = every notable's empty places fill as before
+        // GL-4 / P4: przyrost milicji gry (DefaultSettlementMilitiaModel :104-120) i limit milicji BK x ten sam czynnik (norma wazona przyrostem gry); ubytek 2.5% bez zmian.
+        // Dothrakowie: prog wolnych rak 60% (udzial zbrojnych 3) przy ktoryms z kluczy P4. Off = stan 97dd474
+        public bool MilitiaByPeople = true;                // The militia of a village, town or castle grows, and is capped, by the number of people of its land and by how many of them bear arms - more defenders in crowded lands and among the warrior peoples, fewer in empty ones; the world keeps as many militiamen as before. Off = every settlement raises its militia as before
 
         public static void Load(string moduleDataDir)
         {

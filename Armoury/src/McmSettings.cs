@@ -5452,6 +5452,14 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool StartGoldByPeople { get; set; } = true;
 
+        [SettingPropertyBool("Levy By People", HintText = "Volunteers come forward by the number of people: an empty place at a notable fills faster in a crowded land and slower in an empty one (from a tenth to three times, never above certain), and warrior peoples - the ironborn, the Free Folk and the Dothraki - send more of their men; the world as a whole gets as many volunteers as before. Off = every notable's empty places fill as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool LevyByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Militia By People", HintText = "The militia of a village, town or castle grows, and is capped, by the number of people of its land and by how many of them bear arms - more defenders in crowded lands and among the warrior peoples, fewer in empty ones; the world keeps as many militiamen as before. Off = every settlement raises its militia as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool MilitiaByPeople { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6814,6 +6822,8 @@ namespace Armoury
             s.MarketByPeople = MarketByPeople;
             s.VillageHeadsByPeople = VillageHeadsByPeople;
             s.StartGoldByPeople = StartGoldByPeople;
+            s.LevyByPeople = LevyByPeople;
+            s.MilitiaByPeople = MilitiaByPeople;
         }
 
         internal static void Apply()
