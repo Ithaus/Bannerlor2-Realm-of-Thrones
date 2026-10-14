@@ -3656,6 +3656,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CallToWarBreakRestoresWallet { get; set; } = true;
 
+        [SettingPropertyBool("Call To War Pays For War", HintText = "with Crown Pays Call To War: the calling crown pays an ally's daily part only for days the ally is really at war with the enemy it was called against. An ally that has not been at war with that enemy for seven days in a row (after three days' grace from the agreement) is released: the agreement ends without any peace and the rest of the price is struck off. Off = the crown pays every day's part while it can, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarPaysForWar { get; set; } = true;
+
         [SettingPropertyBool("Crown Borrows", HintText = "with Crown Current Income and Iron Bank Enabled: a crown at war whose day's income cannot cover the wage refunds it owes its houses borrows the missing part from the Iron Bank - only for the refunds, never for gifts or rents; no new loans in peace. The crown owes at most Crown Loan Limit Days of its average taxes and pays the Bank first each day, before any other expense: one part in Crown Loan Repay Days of its largest debt, at most Crown Loan Max Income Share of its taxes, at the Bank's usual interest (like a king: 20% a year, 30% on a running debt, 2% fee). A crown that pays less than half of its instalments over 28 days falls into arrears: the Bank lends nothing more to it or to its houses and lends more to the houses of the realms at war with it, until it has paid in full for 28 days. The debt of a realm that is destroyed is lost to the Bank. You as king borrow by the same rule. Off = no crown borrows, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownBorrows { get; set; } = true;
@@ -6561,6 +6565,7 @@ namespace Armoury
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
+            s.CallToWarPaysForWar = CallToWarPaysForWar;
             s.CrownBorrows = CrownBorrows;
             s.CrownLoanLimitDays = CrownLoanLimitDays;
             s.CrownLoanRepayDays = CrownLoanRepayDays;

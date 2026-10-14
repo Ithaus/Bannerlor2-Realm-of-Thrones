@@ -38,7 +38,11 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private sealed class Agr { public string Calling = "", Called = "", Against = ""; public long Total, Daily, Left; public int Day; }
+        private sealed class Agr { public string Calling = "", Called = "", Against = ""; public long Total, Daily, Left; public int Day; public int NoWar; }   // M2a: NoWar - doby bez wojny z rzedu (pamiec sesji, bez zapisu)
+
+        // M2a (CallToWarPaysForWar): doby laski od porozumienia (spoznione wypowiedzenie, blokady ROT) i doby bez wojny z rzedu, po ktorych porozumienie wygasa
+        private const int NoWarGraceDays = 3, NoWarEndDays = 7;
+        private static long _dExpired, _dPaidNoWar; private static int _dNoWarN, _dExpiredN;
         private static readonly List<Agr> _agr = new List<Agr>();
 
         internal static long LastPaid, LastEnded, LastUnpaid, LastLegacyPaid; internal static int LastEndedN;
@@ -54,7 +58,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
         internal static void Reset() { _agr.Clear(); ZeroDay(); ZeroEvents(); _legacyScan = false; LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = 0; _dNoWarN = _dExpiredN = 0; }
         /// <summary>P3/W4: liczniki zdarzen miedzy dobami (nowe porozumienia - StartPostfix, skreslenia przez gre - EndPostfix) zerowane PO linii doby.
         /// Dotad zerowal je poczatek Daily, zanim linia je wypisala - "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0.</summary>
         private static void ZeroEvents() { _dCancelled = 0; _dNewN = 0; }
@@ -223,9 +227,21 @@ namespace Armoury
                         if (due <= 0) { _agr.Remove(a); continue; }
                         var kd = CrownIncome.DayOf(calling);
                         if (kd == null) continue;
+                        // M2a (CallToWarPaysForWar): rata tylko za dobe wojny wezwanego z celem; po laskie liczone doby bez wojny z rzedu - po NoWarEndDays porozumienie
+                        // konczy gra (EndCallToWarAgreement), reszta ceny skreslona tym samym wyrownaniem co zerwanie P3/W4, BEZ MakePeaceAction (nie ma wojny do konczenia)
+                        bool atWar = called.IsAtWarWith(against);
+                        if (atWar) a.NoWar = 0;
+                        else if (s0 != null && s0.CallToWarPaysForWar)
+                        {
+                            _dNoWarN++;
+                            if (today - a.Day >= NoWarGraceDays) a.NoWar++;
+                            if (a.NoWar >= NoWarEndDays && beh != null) ExpireNoWar(beh, calling, called, against, a);
+                            continue;   // dzis bez raty - zloto zostaje w skarbcu wzywajacego (zwrot, W5, renty tej doby)
+                        }
                         long avail = CrownIncome.LeftFor(calling);
                         if (avail >= due)
                         {
+                            if (!atWar) _dPaidNoWar += Math.Min(due, Math.Max(0L, (long)calling.KingdomBudgetWallet));   // M2a: kontrolka (klucz wylaczony - rata za dobe bez wojny jak dotad)
                             Pay(calling, called, a, due, kd);
                             if (a.Left <= 0) _agr.Remove(a);
                             continue;
@@ -296,11 +312,34 @@ namespace Armoury
             Measure31.CtwPay(calling, wc0, called, wd0, ix);   // 3.1 (31, E3/0): wplata do ujemnego portfela - ujscie, reszta to przelew (portfel jest posiadaczem)
         }
 
+        /// <summary>M2a: wezwany nie byl w wojnie z celem przez NoWarEndDays dob z rzedu (po lasce) - porozumienie konczy gra, reszta ceny skreslona z portfela
+        /// wzywajacego (wyrownanie P3/W4 zawsze: postfiks EndPostfix w naszym wywolaniu nie jest wolany - patrz naglowek). Bez MakePeaceAction.</summary>
+        private static void ExpireNoWar(AllianceCampaignBehavior beh, Kingdom calling, Kingdom called, Kingdom against, Agr a)
+        {
+            long left = a.Left;
+            _ending = true;
+            try { beh.EndCallToWarAgreement(calling, called, against); }
+            finally { _ending = false; }
+            if (a.Left > 0 && _agr.Contains(a))
+            {
+                int rw0 = calling.CallToWarWallet;
+                calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left);
+                _dRestored += a.Left;
+                Measure31.CtwOther(calling, rw0);   // 3.1 (31, E3/0): skreslenie reszty ceny (bez platnika), jak przy zerwaniu
+            }
+            _agr.Remove(a);
+            _dExpired += left; _dExpiredN++;
+            Log.Info("Wezwania do wojny (168): " + called.Name + " nie walczy z " + against.Name + " od " + a.NoWar + " dob (M2a) - porozumienie z " + calling.Name
+                     + " wygaslo bez pokoju, reszta ceny " + left + " skreslona.");
+            if (Clan.PlayerClan != null && (Clan.PlayerClan.Kingdom == calling || Clan.PlayerClan.Kingdom == called))
+                Log.Player(called.Name + " has not taken the field against " + against.Name + ". " + calling.Name + " stops paying for the war and the agreement is ended.", true);
+        }
+
         private static void Line()
         {
             var s = Settings.Current;
             if (s == null || !s.LogEnabled || !On) return;
-            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone == 0 && _dNewN == 0 && _importN < 0) return;
+            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone + _dExpired == 0 && _dNewN == 0 && _dExpiredN == 0 && _importN < 0) return;
             long left = 0; foreach (var a in _agr) left += a.Left;
             var sb = new StringBuilder(400);
             sb.Append("Wezwania do wojny (168): dzien ").Append((int)CampaignTime.Now.ToDays)
@@ -309,6 +348,10 @@ namespace Armoury
               .Append(" | zerwane z braku wplywow dnia ").Append(_dEndedN).Append(" (reszta ceny skreslona ").Append(_dEnded).Append(", pokoj sojusznika ").Append(_dPeaceN).Append(")")
               .Append(", niedoplata (bez zachowania gry) ").Append(_dUnpaid)
               .Append(" | skreslone: koniec porozumienia przez gre ").Append(_dCancelled)
+              // M2a (pieniadze roku 2): rata tylko za dobe wojny wezwanego z celem; kontrolka "rata w dobie bez wojny" (klucz wylaczony - jak dotad, wiecej niz 0)
+              .Append(" | M2a za wojne (Call To War Pays For War ").Append(s.CallToWarPaysForWar ? "tak" : "nie").Append("): porozumien bez wojny wezwanego dzis ").Append(_dNoWarN)
+              .Append(", wygasle bez wojny (").Append(NoWarGraceDays).Append(" doby laski + ").Append(NoWarEndDays).Append(" dob bez wojny) ").Append(_dExpiredN)
+              .Append(" (reszta ceny skreslona ").Append(_dExpired).Append("), rata zaplacona w dobie bez wojny ").Append(_dPaidNoWar)
               .Append(" | dlug portfela sprzed paczki (wezwany dostal od gry z niczego): nowy ").Append(_dLegacy).Append(", splacone dzis ze skarbcow w nicosc (rownowazy) ").Append(_dLegacyPaid)
               .Append(" | P3/W4 po zerwaniu reszta ceny zdjeta z portfela wzywajacego przez nas (latka konca porozumienia nie zadzialala) ").Append(_dRestored)
               .Append(s.CallToWarBreakRestoresWallet ? "; dlug sprzed paczki szukany tylko raz po wczytaniu zapisu bez klucza 168 (Call To War Break Restores Wallet)"
