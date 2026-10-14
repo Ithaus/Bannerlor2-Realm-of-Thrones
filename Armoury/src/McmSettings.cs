@@ -2525,31 +2525,31 @@ namespace Armoury
         public bool OutlawNoUndead { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleeEnabled { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner, you too, loses at most a few slain. Battles you fight on the field yourself, even in part, are not touched (needs Losers Flee Enabled)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleePlayerAuto { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Besiegers", HintText = "the same rule under the walls, in battles fought without you: a besieging host beaten by a sally from the fortress, or beaten in the open under the walls by the defenders and a relief force, and a relief force beaten by the besiegers' camp, mostly flees like a host beaten in the field instead of being slain or taken to the last man; the winner there, a garrison too, loses at most a few slain. The siege still ends and the beaten host is still scattered; the men who flee go home or to the woods. Storming the walls, the defenders of a fortress when they are beaten, and battles at sea are not touched. Your own battles under the walls: fought on the field - not touched; auto-resolved - as Losers Flee Player Auto says (needs Losers Flee Enabled; off = as before)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleeBesiegers { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float WinnerDeathCapPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Loser Captive Veteran Percent", 0.00f, 120.00f, "0.00", HintText = "of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float LoserCaptiveVeteranPercent { get; set; } = 30f;
 
         [SettingPropertyFloatingInteger("Loser Captive Common Percent", 0.00f, 20.00f, "0.00", HintText = "of the beaten men who live, this share of the rest is taken")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float LoserCaptiveCommonPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Non Combatant Death Percent", 0.00f, 20.00f, "0.00", HintText = "villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
