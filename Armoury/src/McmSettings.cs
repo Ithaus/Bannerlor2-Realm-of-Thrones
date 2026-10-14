@@ -1596,6 +1596,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public bool CasterlyGoldExhausted { get; set; } = true;
 
+        [SettingPropertyBool("Dragons Eat Herds", HintText = "dragons are not free: every dragon eats two sheep a day (a hog counts as two, a cow as four) - first from the herd its rider's party drives, and with none there it takes the animals the nearest villages (within a day's flight) are sending to market; the village loses them and gets nothing. A burning or looted village is spared. With nothing within reach the dragon goes hungry. Applies to Daenerys and to you alike. Off: dragons eat nothing")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool DragonsEatHerds { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)")]
         [SettingPropertyGroup("Smithing materials")]
         public float LumberOutputMultiplier { get; set; } = 3f;
@@ -6050,6 +6054,7 @@ namespace Armoury
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
             s.CasterlyGoldExhausted = CasterlyGoldExhausted;
+            s.DragonsEatHerds = DragonsEatHerds;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.NoFreeTimberAndTools = NoFreeTimberAndTools;
             s.VillageWoodlotLoads = VillageWoodlotLoads;

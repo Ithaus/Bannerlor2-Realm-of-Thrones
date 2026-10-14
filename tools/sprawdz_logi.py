@@ -466,7 +466,8 @@ Uzycie (Python 3, tylko odczyt):
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa jeff14    : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
-                    pokrycie lukow), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu).
+                    pokrycie lukow), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
+                    jedza owce (24c, DragonsEatHerds: linia "Smoki (24c)" = ujscie ksiegi towarow doba po dobie, smok syty, potkniecia).
                     Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
@@ -16546,6 +16547,48 @@ def jeff14_main(logp):
     if gold:
         rep.add("JK-CR-4: ruda zlota swiata (ostatnia linia Towary)",
                 "produkcja " + str(num(r"\| produkcja (\d+)", gold[-1])) + "/d, zapas " + str(num(r"zapas (\d+)", gold[-1])), "INFO", None)
+
+    # ---- JK-SM: smoki jedza owce (24c, DragonFeed)
+    sm = by_day(lines, "Smoki (24c): dzien")
+    if sm:
+        led = {}
+        for s in lines:
+            if not s.startswith("Towary: dzien"):
+                continue
+            m = re.match(r"Towary: dzien (\d+) - (sheep|hog|cow) ", s)
+            if not m:
+                continue
+            v = num(r"zjedzone przez smoka \(24c\) (\d+)", s) or 0
+            led.setdefault(int(m.group(1)), {})[m.group(2)] = v
+        bad, tot_line, tot_led, dd, hungry, idle = [], 0, 0, 0, 0, 0
+        for d in sorted(sm):
+            s = sm[d]
+            mh = re.search(r"z taborow: owce (\d+), swinie (\d+), krowy (\d+)", s)
+            mv = re.search(r"ze stad wsi: owce (\d+), swinie (\d+), krowy (\d+)", s)
+            if not mh or not mv:
+                continue
+            eat = [int(mh.group(k)) + int(mv.group(k)) for k in (1, 2, 3)]
+            tot_line += sum(eat)
+            dd += num(r"smokow jedzacych (\d+)", s) or 0
+            hungry += num(r"glodne smokodoby (\d+)", s) or 0
+            idle += num(r"bez partii albo w niewoli (\d+)", s) or 0
+            if d in led:
+                lv = [led[d].get(a, 0) for a in ("sheep", "hog", "cow")]
+                tot_led += sum(lv)
+                if lv != eat:
+                    bad.append(f"d{d} linia {eat} ksiega {lv}")
+        last = sm[max(sm)]
+        rep.add("JK-SM-0: smoki na mapie (ostatnia linia)", (num(r"smokow jedzacych (\d+[^|]*)", last, str) or "?").strip(), "INFO", None)
+        rep.add("JK-SM-1: ksiega towarow - zjedzone przez smoka = linia 24c (owce, swinie, krowy, doba po dobie)",
+                f"dob {len(sm)}, zjedzone wedlug linii {tot_line}, wedlug ksiegi {tot_led}; niezgodnych dob {len(bad)}" + (f" (pierwsza: {bad[0]})" if bad else ""),
+                "0 niezgodnych dob (obieg: kazde zjedzone zwierze jawnie w ujsciu ksiegi)", len(bad) == 0 if dd > 0 else None)
+        rep.add("JK-SM-2: smok syty (smokodoby glodne / jedzace)", f"glodne {hungry} z {dd} smokodob; bez partii albo w niewoli {idle}",
+                "<= 50% (wiecej: wokol jezdzca brak stad - stan swiata, DECYZJA, nie blad)", (hungry <= 0.5 * dd) if dd > 0 else None, decide=True)
+        st_sm = num(r"potkniecia (\d+)\.", last)
+        rep.add("JK-SM-3: potkniecia DragonFeed", f"potkniecia ostatniej linii {st_sm}, ERROR in DragonFeed.* {nerr('DragonFeed')}", "0 i 0",
+                (st_sm or 0) == 0 and nerr("DragonFeed") == 0)
+    else:
+        rep.add("JK-SM-0..3: linia \"Smoki (24c)\"", "brak linii", "INFO (klucz DragonsEatHerds wylaczony albo log sprzed paczki)", None)
     rep.show()
     return 0
 
@@ -19881,7 +19924,7 @@ def main(argv):
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group in ("jeff14", "jeff14s") and logp:
-        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR)
+        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:
