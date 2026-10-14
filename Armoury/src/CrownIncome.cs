@@ -52,6 +52,7 @@ namespace Armoury
             public long NeedAid;          // W5: doplata do zoldu wedlug potrzeby wyplacona tej doby (skarbiec -> glowy rodow; po zwrocie zoldu, przed rentami 180)
             public long CrownAid;         // W5b regula 2: doplata W5 wyplacona tej doby ze skarbca PONAD ZAPAS WOJNY (skarbiec -> glowy rodow; po szczeblu daniny, przed tarczowym); POZA wplywami dnia (Spend / Left) - z zapasu
             public long Bread;            // M3 (pieniadze roku 2): chleb dla glodnych osad krolestwa z reszty wplywow dnia przed rentami (TownFolk.BreadCrown; skarbiec -> kiesy ludu)
+            public long KingOut;          // L1 (pieniadze roku 2): czesc RepOut - raty okupow krolow (178, dlug Kind 'k'); reszta RepOut to reparacje
             public long NeedAidRent;      // M1 (pieniadze roku 2): czesc NeedAid wyplacona z reszty wplywow dnia przed rentami (KingdomTreasury.RentAid.cs)
             public long ScutIn, ScutOut;  // W6: tarczowe tej doby - pobrane (glowy platnikow -> skarbiec) i wyplacone przez W5 ponad danine (skarbiec -> glowy rodow); POZA wplywami dnia (Spend / Left)
             public bool Snap;
@@ -90,6 +91,7 @@ namespace Armoury
         internal static long LastLoanIn, LastLoanOut;  // 186: kredyt korony z Banku i raty
         internal static long LastDebtRepaid, LastOwnCut, LastNewDebt; internal static int LastNewDebtN;
         private static long _dDebtRepaid, _dNewDebt, _dDropped; private static int _dNewDebtN, _dDroppedN;
+        private static long _dNewKing; private static int _dNewKingN;   // L1: nowe dlugi koron z okupow krolow (178) od wczorajszej linii
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _repWired, _debtWired;
@@ -256,7 +258,7 @@ namespace Armoury
                         a.KingdomBudgetWallet -= ip;                     // najpierw placacy, potem odbiorca: odbiorca dostaje dokladnie rate
                         debt.Left -= ip; paidBy[a] = p0 + ip;
                         da.Left -= ip; da.RepOut += ip;
-                        if (debt.Kind == 'k') _dKingRansomPaid += ip;
+                        if (debt.Kind == 'k') { _dKingRansomPaid += ip; da.KingOut += ip; }   // L1: raty okupow krolow osobno w linii 165
                         if (b != null)
                         {
                             b.KingdomBudgetWallet += ip;
@@ -285,6 +287,7 @@ namespace Armoury
             {
                 if (payer == null || payer.StringId == null || string.IsNullOrEmpty(receiver) || amount <= 0) return;
                 _debts.Add(new Debt { Payer = payer.StringId, Receiver = receiver, Left = amount, Total = amount, Day = (int)CampaignTime.Now.ToDays, Kind = 'k' });
+                _dNewKing += amount; _dNewKingN++;   // L1: nowe dlugi z okupow krolow (linia 165)
             }
             catch (Exception e) { Stumble("AddCrownDebt", e); }
         }
@@ -326,6 +329,7 @@ namespace Armoury
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0, loanIn = 0, loanOut = 0; int noSnap = 0;
                 long wtax = 0;   // E5/B2 (184)
                 long waid = 0;   // P1: danina z oszczednosci ludu
+                long kingO = 0;    // L1: raty okupow krolow (178) w racie dlugow koron
                 long naRent = 0;   // M1: czesc doplaty W5 z reszty wplywow dnia
                 long bread = 0;    // M3: chleb dla glodnych osad z reszty wplywow dnia
                 long naid = 0;   // W5: doplata do zoldu wedlug potrzeby
@@ -337,7 +341,7 @@ namespace Armoury
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
                     if (!d.Snap) noSnap++;
                     if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0 && d.ScutIn <= 0 && d.CrownAid <= 0) continue;
                     parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "") + (d.WarAid > 0 ? " (danina P1 " + d.WarAid + ")" : "")
@@ -369,7 +373,7 @@ namespace Armoury
                       .Append(" = do wydania ").Append(spend)
                       .Append(" | wydane z wplywow: rata kredytu Banku (186) ").Append(loanOut).Append(CrownBorrow.On ? "" : " (186 wylaczone)")
                       .Append(", dary (182) ").Append(gift).Append(" (przeszly do rodow odbiorcow ").Append(giftIn).Append(")")
-                      .Append(", raty reparacji ").Append(repO).Append(" (przyjete ").Append(repI).Append(")")
+                      .Append(", raty reparacji ").Append(repO).Append(" (przyjete ").Append(repI).Append("; L1 rozbicie: okupy krolow (178) ").Append(kingO).Append(", reparacje ").Append(repO - kingO).Append(")")
                       .Append(", kontrakty najemnikow (185) ").Append(con)
                       .Append(", wezwania sojusznikow do wojny (168) ").Append(ctw).Append(" (porozumien zerwanych z braku wplywow ").Append(CrownCallToWar.LastEndedN)
                       .Append(", niedoplata ").Append(CrownCallToWar.LastUnpaid).Append(CrownCallToWar.On ? ")" : "; wylaczone - placa rody jak w grze)")
@@ -384,6 +388,7 @@ namespace Armoury
                       .Append(" do skarbcow zdobywcow ").Append(CapitalTreasury.LastToCrowns).Append(" i kies glow rodow bez krolestwa ").Append(CapitalTreasury.LastToHeads)
                       .Append(" | zostalo z wplywow dnia w skarbcach ").Append(left)
                       .Append(" | dlugi reparacji: ").Append(_debts.Count).Append(" na ").Append(debtSum).Append(" zl, nowe dzis ").Append(LastNewDebtN).Append(" na ").Append(LastNewDebt)
+                      .Append(" (L1: w tym okupy krolow (178) - reszta ").Append(KingRansomDebtLeft()).Append(" zl, nowe dzis ").Append(_dNewKingN).Append(" na ").Append(_dNewKing).Append(")")
                       .Append(", przepadly (krolestwa nie ma) ").Append(_dDroppedN).Append(" na ").Append(_dDropped)
                       .Append(" | splata dlugu wobec korony do skarbcow (stary zapis) ").Append(LastDebtRepaid).Append(" (niezaplacone mimo wpisu w saldzie - nie do skarbca ").Append(_dDebtUnpaid).Append(')')
                       .Append(", splata zaliczki gry (portfel uznany z niczego) - w nicosc ").Append(LastAdvanceRepaid).Append(" (nowe zaliczki gry od wczoraj ").Append(LastAdvanceNew)
@@ -395,7 +400,7 @@ namespace Armoury
                     if (_importN >= 0) { sb.Append(" Wczytano z zapisu: dlugow reparacji ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
                     Log.Info(sb.ToString());
                 }
-                _dDropped = 0; _dDroppedN = 0; _dDebtUnpaid = 0;
+                _dDropped = 0; _dDroppedN = 0; _dDebtUnpaid = 0; _dNewKing = 0; _dNewKingN = 0;
             }
             catch (Exception e) { Stumble("End", e); }
             finally { _open = false; }

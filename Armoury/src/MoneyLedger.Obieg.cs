@@ -442,6 +442,10 @@ namespace Armoury
               .Append(" | dlug wobec korony w trakcie rozliczen: nowy +").Append(_debtNew).Append(" (").Append(_debtNewN).Append(" rodow), splacony ").Append(Neg(_debtPaid))
               .Append(" (").Append(_debtPaidN).Append(" rodow), razem u ").Append(debtClans).Append(" rodow ").Append(debtAll)
               .Append(" | skarbce krolestw w trakcie rozliczen ").Append(S(_walletInClan)).Append(" (podatek BK minus zapomoga i inne)")
+              // L2 (pieniadze roku 2, A15-5): zmiana zlota swiata rozbita - rody, ktorych glowa skonczyla rozliczenie z pusta kiesa (zold naliczony, ktorego kiesa nie
+              // oddala), i pozostale; kiesy glow przeniesione w rozliczeniach netto obok kwot naliczonych wyzej (tylko pomiar)
+              .Append(" | L2 rozbicie zmiany zlota swiata: rozliczenia z pusta kiesa glowy po rozliczeniu ").Append(S(_clanEmptyD)).Append(" (").Append(_clanEmptyN)
+              .Append(" rozliczen), pozostale ").Append(S(_clanRestD)).Append("; kiesy glow przeniesione w rozliczeniach netto ").Append(S(_clanHeadMoved))
               .Append(" | kontrola: model=").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-").Append(" rozliczenia=").Append(settled).Append('.');
             return sb.ToString();
         }

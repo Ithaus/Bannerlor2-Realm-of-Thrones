@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (pieniadze roku 2, L1 + L2) - SAME LINIE: raty okupow krolow osobno od reparacji (165); zmiana zlota swiata w rozliczeniach rodow rozbita (A15-5 "+373 tys.")
+
+**Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** brak (tylko log, zachowanie bez zmian) | **Pliki:** `CrownIncome.cs` (`KDay.KingOut`, licznik nowych dlugow okupow, linia 165), `MoneyLedger.cs` (kiesa glowy przed / po rozliczeniu rodu), `MoneyLedger.Obieg.cs` (linia "Pieniadz swiata (rody - przyczyny)") | **Projekt:** `PROJEKT-WYBRANY.md` 3.7 (L1 z MINIMUM; L2 - przeszczep PZ-7 / BUDZET rozdz. 4, sedziowie 1 i 3)
+
+**Problem:** (L1) w linii 165 "raty reparacji" i "dlugi reparacji" to w ok. 90% raty okupow krolow (178) - `CrownIncome.AddCrownDebt` dopisuje je do tej samej listy (rok 2: 16.3 mln rat przy 1.9 mln reparacji) [P ROZP-RODY 5.3] - linia wprowadzala w blad. (L2) inwentarz A15-5 / raport roczny nr 36: "+373 tys." z rozliczen rodow w ksiedze pieniadza (rok 2 biegu dwuletniego netto +0.65 mln); ksiega ma 0 zrodel bez platnika [P], ale linia "przyczyny" podaje kwoty NALICZONE modelu, nie przeniesione - nie wiadomo, ktora czesc daje netto (ROZP-RODY 7 pkt 3).
+**Zmiana:** (L1) linia 165 - po "raty reparacji X (przyjete Y" dopisek `; L1 rozbicie: okupy krolow (178) K, reparacje R)`; po "dlugi reparacji ... nowe dzis" dopisek `(L1: w tym okupy krolow (178) - reszta Z zl, nowe dzis N na M)`; stare napisy bez zmian (czytniki). (L2) `MoneyLedger.ClanTickPrefix/Postfix`: kiesa glowy przed i po rozliczeniu rodu; linia "Pieniadz swiata (rody - przyczyny)": `| L2 rozbicie zmiany zlota swiata: rozliczenia z pusta kiesa glowy po rozliczeniu +X (N rozliczen), pozostale +Y; kiesy glow przeniesione w rozliczeniach netto Z` - obok kwot naliczonych wyzej w tej samej linii.
+**Ryzyko / co sprawdzic (zasada 0):** tylko odczyt i liczniki (wyjatek przy L2 - licznik potkniec ksiegi, pomiar nie gasnie); `WorldTotal` bez zmian; L1 - `Reparations` placi tak samo, `KingOut` to czesc `RepOut`. Jesli drobne-2 tez bierze napis 165 - dopiski sa addytywne (scalenie `patch --fuzz`). Prog: R2-8 (INFO - X "z pusta kiesa" ma tlumaczyc wieksza czesc dodatniej zmiany; zrodla bez platnika 0).
+**Status:** DO SPRAWDZENIA (zbudowane, rc=0; nie wgrane).
+
 ## 2026-10-14 (pieniadze roku 2, B4) - ZALOGI W POKOJU NA 70% ZALOGI WOJENNEJ (GarrisonPeaceShare 0.50 -> 0.70; placi pulap rodu, korona nic)
 
 **Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** istniejacy `GarrisonPeaceShare` domyslna **0.50 -> 0.70** (0.50 = 449d453). W `Armoury.json` Jeffa klucza NIE ma (grep 14.10) - nowa domyslna zadziala; gdyby Jeff zapisal ustawienia MCM, zostanie zapisana wartosc (CLAUDE.md 7) | **Pliki:** `Settings.cs`, `McmSettings.cs`, `ClanBudget.cs` (licznik i dopisek linii 166) | **Projekt:** `PROJEKT-WYBRANY.md` 3.6 (przeszczep B4 z PROJEKT-BUDZET - wszyscy trzej sedziowie)

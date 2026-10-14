@@ -197,6 +197,9 @@ namespace Armoury
         private static long _clanBefore;                   // suma wszystkich posiadaczy tuz przed rozliczeniem
         private static long _clanUp, _clanDown;            // rozliczenia, ktore dodaly zlota swiatu / ktore je skasowaly (suma zmian)
         private static int _clanUpN, _clanDownN, _clanFlatN, _clanStale;
+        // L2 (pieniadze roku 2, A15-5 "+373 tys."): kiesa glowy przed rozliczeniem; zmiana zlota swiata w rozliczeniach rodow, ktorych glowa skonczyla z pusta kiesa
+        // (zold naliczony, ktorego kiesa nie oddala) i w pozostalych; kiesy glow przeniesione w rozliczeniach (netto) - obok kwot naliczonych modelu
+        private static long _clanHead0, _clanEmptyD, _clanRestD, _clanHeadMoved; private static int _clanEmptyN;
         private static long _netUp, _netDown;              // saldo modelu finansow dopisane glowom rodow (kwota ze zdarzenia gry)
         private static int _netUpN, _netDownN;
         private static long _clanClsFrom, _clanClsTo;      // GiveGoldAction nic <-> osada w trakcie rozliczenia (sa tez w licznikach kas osad)
@@ -225,6 +228,7 @@ namespace Armoury
             _vTownBrought = _vAlleyBrought = _vAlleyUnsold = 0; _vAlleyVisits = 0; _vAlleyShort.Clear();   // E5/C1
             _clanUp = _clanDown = _netUp = _netDown = _clanClsFrom = _clanClsTo = _clanOthFrom = _clanOthTo = 0;
             _clanUpN = _clanDownN = _clanFlatN = _clanStale = _netUpN = _netDownN = 0;
+            _clanEmptyD = _clanRestD = _clanHeadMoved = 0; _clanEmptyN = 0;   // L2
             Array.Clear(_cons, 0, Classes); Array.Clear(_regIn, 0, Classes); Array.Clear(_regOut, 0, Classes); Array.Clear(_consFolk, 0, Classes);
             Array.Clear(_consTicks, 0, Classes); Array.Clear(_regTicks, 0, Classes);
             _consMissed = 0; _regStray = 0;
@@ -432,6 +436,7 @@ namespace Armoury
                 if (_clanNow != null) { _clanStale++; _clanNow = null; }   // poprzednie rozliczenie nie doszlo do postfiksu (wyjatek w cudzym kodzie) - liczymy
                 if (__0 == null || __0.IsBanditFaction || !Live) return;
                 _clanBefore = WorldTotal();
+                _clanHead0 = __0.Leader != null ? __0.Leader.Gold : 0;   // L2: kiesa glowy przed rozliczeniem
                 _clanTime = CampaignTime.Now; _clanNow = __0;
                 ClanTickOpen169(__0);                       // paczka 169: dlug wobec korony i skarbiec przed (O41), D rodu - wlasny try
             }
@@ -451,6 +456,14 @@ namespace Armoury
                 if (d > 0) { _clanUp += d; _clanUpN++; }
                 else if (d < 0) { _clanDown -= d; _clanDownN++; }
                 else _clanFlatN++;
+                try
+                {
+                    // L2: zmiana zlota swiata tego rozliczenia - osobno rody z pusta kiesa glowy po rozliczeniu; kiesa glowy przeniesiona (netto)
+                    long g1 = c.Leader != null ? c.Leader.Gold : 0;
+                    _clanHeadMoved += g1 - _clanHead0;
+                    if (g1 <= 0) { _clanEmptyD += d; _clanEmptyN++; } else _clanRestD += d;
+                }
+                catch { _stumbles++; }
                 ClanTickClose169(c);                        // paczka 169: dlug nowy / splacony, skarbiec w rozliczeniu (O41), zold rodu do D - wlasny try
             }
             catch (Exception e) { ClanStumble("MoneyLedger.ClanTickPostfix", e); }
