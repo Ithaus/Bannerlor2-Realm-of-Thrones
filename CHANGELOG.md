@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (Towary 2 / K5 - zwierzeta na rzez pod regulator, wiecej lnu "z rak") - NIE zrobione: warunkowo, dopiero po tescie zimy z K1-K3
+
+**Mod:** - | **Galaz:** `w-toku/towary2` | **Klucze:** brak (proponowany `AnimalsUnderValve`) | **Pliki:** tylko ten wpis
+
+**Dlaczego nie teraz:** rozpoznanie (`docs/towary-2/ROZPOZNANIE-TOWARY-2.md` A6-5, rozdz. 2 pkt 5) wiaze K5 z pomiarem zimy NOWEJ wersji, ktorego nie ma: w lecie skor surowych jest za duzo (7 471, +17/d, garbarze "bez zysku" w 77 miastach - to naprawia K3), a zime mierzyl tylko bieg dwuletni sprzed plotna (zwierzeta na rzez -37%, wieprze 200 -> 127/d, skory surowe 491 -> 305/d; D:177023 ciecie plonu wsi 40.8%). Szacunek [S]: nowa wersja z K3 zje zapas skor surowych w zimie w ok. 60 dob. Zmiana teraz ruszalaby plon wsi (regulator `HarvestValve`) bez dowodu potrzeby.
+**Kiedy i jak (gotowy opis do kodu):** bieg z zima (od ok. d459 dwuletniego, albo zapis z zimy) z K1-K3; jesli garbarze koncza "brak surowca" w > 30 miastach (linia "Rzemioslo miasta (148)", koniec przerobu skory -> skora: drugie pole) przez >= 28 dob zimy - `HarvestValve.Eligible` (`HarvestValve.cs:173`, dzis `!IsAnimal`) dopuszcza wieprze, krowy i owce pod ten sam regulator (krok x1.3 przy zuzyciu >= 98% produkcji i stosie < 30 dni), klucz `AnimalsUnderValve`, prog w `--grupa towary2`. Potem, jesli kolejka plotna wojska (T2-K2-3) dalej rosnie - wiecej wsi lnianych w ludnych krainach bez lnu (Polnoc, Dolina, Dorzecze, Dorne; [S] +15-25% lnu wobec 945/d) - osobny wpis.
+**Status:** NIE zrobione (warunkowo).
+
 ## 2026-10-14 (Towary 2 / K4 - narzedzie i diagnoza, bez zmiany gry) - PL-3 LICZY TEZ KARAWANY; KSIEGA TOWAROW ROZBIJA "INNE TICKI DOBOWE" OSAD I MIAST NA ZACHOWANIE, KTORE DOPISALO TOWAR (`GoodsLedgerTickAuthors`)
 
 **Mod:** Armoury (tylko log) + narzedzie | **Galaz:** `w-toku/towary2` (od `w-toku/zbior-e8` 449d453; po K1-K3) | **Tor:** S (sam log i narzedzie) | **Klucz NOWY (wlaczony; off = 449d453; w `Armoury.json` Jeffa go nie ma):** `GoodsLedgerTickAuthors`; nowych pol zapisu brak | **Pliki:** `GoodsLedger.cs` (NoteAuthor, AuthorOf, Classify, AuthorsLine, TapIn, Daily, Reset), `Settings.cs`, `McmSettings.cs` (gen_mcm 1413), `tools/sprawdz_logi.py` (PL-3 w `--grupa plotno`, T2-K4-1 w `--grupa towary2`)
