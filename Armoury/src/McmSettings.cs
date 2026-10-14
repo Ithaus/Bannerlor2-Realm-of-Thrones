@@ -5608,6 +5608,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float CapitalTreasuryShare { get; set; } = 0.333f;
 
+        [SettingPropertyBool("Fallen Crown Treasury", HintText = "when a realm falls and is no more, its royal treasury does not vanish with it: first the crown's debt to the Iron Bank is paid out of it, then what is left goes to whoever brought the realm down by storming its last stronghold (to their realm's treasury, or to the head of their house if they have no realm), or - when the realm ended at the peace table, with its ruler's death or in some other way - to the head of the house that ruled it, which carries the treasury away into exile. If no one is left to take it, it goes to the Iron Bank. Off = as before: the treasury of a fallen realm is lost and its debt to the Bank written off")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool FallenCrownTreasury { get; set; } = true;
+
         [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool EnemyCaravansSeized { get; set; } = true;
@@ -7061,6 +7065,7 @@ namespace Armoury
             s.SackTakesGoods = SackTakesGoods;
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
+            s.FallenCrownTreasury = FallenCrownTreasury;
             s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
