@@ -16658,7 +16658,7 @@ def unikaty_main(logp):
             "ostatnia doba <= pierwsza", last["nowhere"] <= first["nowhere"])
     moved = sum(d["moved"] for d in days)
     span = max(1, last["d"] - first["d"] + 1)
-    rep.add("UN-8: przeprowadzki zamiast usuniecia (TryKillCompanion)", f"{moved} w {span} dob ({moved / span:.3f} na dobe)",
+    rep.add("UN-8: przeprowadzki zamiast usuniecia (TryKillCompanion, zwolnienie towarzysza)", f"{moved} w {span} dob ({moved / span:.3f} na dobe)",
             "INFO (gra losuje 10% na dobe jeden wzor z zywych wedrowcow - w dlugim biegu > 0)", None)
     kn = max(d["kidsnamed"] for d in days)
     rep.add("UN-9: dzieci unikatow z imieniem wzoru (np. syn 'Tyrion Lannister')",

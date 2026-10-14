@@ -32,8 +32,11 @@ namespace CrashScribe
     ///  (2) UniqueCompanionsMove - TryKillCompanion gry wybiera jak dotad (ten sam rzut i ten sam wzor), ale wolnego unikatu (bez rodu,
     ///      bez druzyny, nie jeniec, stan Active / Fugitive / Released) nie usuwa, tylko PRZENOSI do losowego miasta jego kultury (bez miasta
     ///      gracza, oblezonych i miast Innych; brak - dowolne takie miasto): ta sama osoba, nie znika z karczm na zawsze, nie ma nowego
-    ///      stworzenia. Zwolniony towarzysz (gra robi go zbiegiem bez miejsca) wraca tak do karczmy. Unikat nie do przeniesienia i dziecko
-    ///      unikatu - gra jak dotad (Lost; po wymazaniu ROT go odtworzy, bo Lost to nie smierc - punkt 1 go nie blokuje).
+    ///      stworzenia. Zwolnienie towarzysza z rozmowy (CompanionRolesCampaignBehavior.companion_fire_on_consequence) to w grze ApplyByFire
+    ///      i zaraz ApplyByRemove (Lost) - recenzja 14.10: ten sam znacznik, zwolniony unikat (wolny po ApplyByFire) przenosi sie tak samo.
+    ///      Unikat nie do przeniesienia, dziecko unikatu i inne usuniecia (np. odejscie towarzysza po klotni - CompanionRolesCampaignBehavior
+    ///      .OnHeroRelationChanged, jeszcze w rodzie gracza) - gra jak dotad (Lost; po wymazaniu ROT go odtworzy, bo Lost to nie smierc -
+    ///      punkt 1 go nie blokuje).
     ///  (3) UniqueCompanionsDuplicateGuard - raz na dobe: dwa zywe unikaty (bez rodzicow) z tym samym wzorem - zostaje jeden (rod gracza,
     ///      potem rod / towarzysz, druzyna, poznany, najstarszy wpis), wolnego drugiego (bez rodu, druzyny, niewoli, nie w miescie gracza)
     ///      usuwamy jak gra (ApplyByRemove, Lost). Nie do usuniecia - tylko log. Oczekiwane 0 (z kodu duplikatow nie ma).
@@ -61,9 +64,10 @@ namespace CrashScribe
         private static readonly Dictionary<string, string> _deadInfo = new Dictionary<string, string>(StringComparer.Ordinal);   // wzor -> "dzien|rodzaj|imie" (ostatni)
 
         // --- latki (raz na proces) ---
-        private static bool _installed, _pUnreg, _pSpawn, _pTryKill, _pKill, _pChild;
+        private static bool _installed, _pUnreg, _pSpawn, _pTryKill, _pKill, _pChild, _pFire;
         private static string _patchLine = "";
         private static int _inTryKill;   // > 0: trwa TryKillCompanion gry (watek kampanii)
+        private static int _inFire;      // > 0: trwa zwolnienie towarzysza z rozmowy (CompanionRolesCampaignBehavior.companion_fire_on_consequence: ApplyByFire, zaraz potem ApplyByRemove)
 
         // --- sesja ---
         private static bool _live;       // po OnSessionLaunched (nowa gra: ROT tworzy unikaty w OnNewGameCreated, czyli wczesniej) - odrodzenie = nowy unikat potem
@@ -145,7 +149,7 @@ namespace CrashScribe
             _deadHeroes.Clear(); _deadTemplates.Clear(); _deadInfo.Clear();
             _spawnBlockSaid.Clear(); _blockSaid.Clear();
             _templates = null;
-            _live = false; _inTryKill = 0; _inGuard = false;
+            _live = false; _inTryKill = 0; _inFire = 0; _inGuard = false;
             _tMoved = _tRespawn = 0;
             ClearDay();
         }
@@ -202,6 +206,22 @@ namespace CrashScribe
                         catch (Exception e) { Stumble("UniqueCompanions.Install(TryKillCompanion)", e); }
                     }
                     parts.Add("przeprowadzki " + (_pTryKill && _pKill ? "PODPIETE" : "BRAK (" + (mTry == null ? "CompanionsCampaignBehavior.TryKillCompanion" : mKill == null ? "KillCharacterAction.ApplyInternal" : "wyjatek") + ")"));
+                    // recenzja 14.10: zwolnienie z rozmowy ("I no longer have need of your services") to w grze ApplyByFire i ZARAZ ApplyByRemove (Lost) -
+                    // zwolniony unikat nie byl zbiegiem, tylko znikal (po 40-46 dobach wymazany, ROT robil nowego). Ten sam znacznik co TryKillCompanion:
+                    // wolny po ApplyByFire (bez rodu, druzyny, niewoli; zbieg) przenosi sie do miasta swojej kultury. BK ma tu prefiks (rycerz z majatkiem
+                    // nie do zwolnienia) - finalizer zawsze zdejmuje znacznik, wiec kolejnosc prefiksow nie ma znaczenia.
+                    var mFire = AccessTools.Method(typeof(CompanionRolesCampaignBehavior), "companion_fire_on_consequence");
+                    if (mFire != null && _pKill)
+                    {
+                        try
+                        {
+                            harmony.Patch(mFire, prefix: new HarmonyMethod(typeof(UniqueCompanions), nameof(FirePrefix)),
+                                          finalizer: new HarmonyMethod(typeof(UniqueCompanions), nameof(FireFinalizer)));
+                            _pFire = true;
+                        }
+                        catch (Exception e) { Stumble("UniqueCompanions.Install(companion_fire_on_consequence)", e); }
+                    }
+                    parts.Add("zwolnienia " + (_pFire ? "PODPIETE" : "BRAK (" + (mFire == null ? "CompanionRolesCampaignBehavior.companion_fire_on_consequence" : !_pKill ? "KillCharacterAction.ApplyInternal" : "wyjatek") + ")"));
                 }
                 else parts.Add("przeprowadzki WYLACZONE (UniqueCompanionsMove = false)");
 
@@ -282,23 +302,34 @@ namespace CrashScribe
             return __exception;
         }
 
-        /// <summary>Prefiks KillCharacterAction.ApplyInternal: w TryKillCompanion gry (Lost) wolny unikat przenosi sie do innego miasta zamiast usuniecia.</summary>
+        public static void FirePrefix() { _inFire++; }
+
+        public static Exception FireFinalizer(Exception __exception)
+        {
+            if (_inFire > 0) _inFire--;
+            return __exception;
+        }
+
+        /// <summary>Prefiks KillCharacterAction.ApplyInternal: w TryKillCompanion gry albo przy zwolnieniu towarzysza z rozmowy (Lost) wolny unikat
+        /// przenosi sie do innego miasta zamiast usuniecia.</summary>
         public static bool KillPrefix(Hero __0, KillCharacterAction.KillCharacterActionDetail __2)
         {
-            if (_inTryKill <= 0 || __2 != KillCharacterAction.KillCharacterActionDetail.Lost) return true;
+            if ((_inTryKill <= 0 && _inFire <= 0) || __2 != KillCharacterAction.KillCharacterActionDetail.Lost) return true;
             try
             {
                 if (!Config.UniqueCompanionsMove || !IsOriginal(__0)) return true;
                 if (!Movable(__0)) return true;   // gra jak dotad (licznik w OnHeroKilled)
                 var dest = PickTown(__0);
                 if (dest == null) return true;
+                bool fired = _inFire > 0;
                 string from = Where(__0);
                 if (__0.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(__0);
                 if (__0.HeroState != Hero.CharacterStates.Active) __0.ChangeState(Hero.CharacterStates.Active);
                 EnterSettlementAction.ApplyForCharacterOnly(__0, dest);
                 _dMoved++; _tMoved++;
                 Scribe.Line(Tag + ": przeprowadzka - " + NameOf(__0) + " [" + __0.Template.StringId + "] " + from + " -> " + dest.Name
-                            + " (gra usunelaby wolnego wedrowca; " + (__0.HasMet ? "poznany" : "niepoznany") + ").");
+                            + (fired ? " (zwolniony towarzysz - gra usunelaby go od razu; " : " (gra usunelaby wolnego wedrowca; ")
+                            + (__0.HasMet ? "poznany" : "niepoznany") + ").");
                 return false;
             }
             catch (Exception e) { Stumble("UniqueCompanions.KillPrefix", e); return true; }
@@ -340,8 +371,8 @@ namespace CrashScribe
                 if (!IsOriginal(victim)) return;
                 if (detail == KillCharacterAction.KillCharacterActionDetail.Lost)
                 {
-                    if (_inTryKill > 0) _dLostGame++; else _dLostOther++;
-                    string by = _inTryKill > 0 ? "gre (TryKillCompanion; nie do przeniesienia: rod " + ClanName(victim) + ", druzyna " + (victim.PartyBelongedTo != null ? "tak" : "nie")
+                    if (_inTryKill > 0 || _inFire > 0) _dLostGame++; else _dLostOther++;
+                    string by = (_inTryKill > 0 || _inFire > 0) ? "gre (" + (_inFire > 0 ? "zwolnienie towarzysza" : "TryKillCompanion") + "; nie do przeniesienia: rod " + ClanName(victim) + ", druzyna " + (victim.PartyBelongedTo != null ? "tak" : "nie")
                                                  + ", jeniec " + (victim.PartyBelongedToAsPrisoner != null ? "tak" : "nie") + ", stan " + victim.HeroState + ")"
                               : _inGuard ? "straznika duplikatow CS"
                               : (Config.UniqueCompanionsMove ? "inny kod (BK, inny mod)" : "gre (TryKillCompanion, UniqueCompanionsMove = false) albo inny kod");
