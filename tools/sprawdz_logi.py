@@ -18944,7 +18944,8 @@ def plotno_main(logp, start_arg, until=120):
     rep.add("PL-3: plotno wywiezione (kontrakty 174 + wozy kupcow P3/Z1, srednia)", f"{v:.1f} szt./d ({len(ex)} dob)" if v is not None else "brak linii",
             ">= 30 szt./d (bez paczki 0)" + tail, gate(v >= 30) if v is not None else None)
     rk = [k for k in sorted(rg) if inwin(k)]
-    fx = num(r"flax: x([\d.]+)", rg[rk[-1]], float) if rk else None
+    # recenzja: linia decyzji pisze "flax: x1.00 -> x1.30" (stary -> nowy) albo "flax: x1.30" (bez zmian) - bierzemy mnoznik PO decyzji
+    fx = num(r"flax: (?:x[\d.]+ -> )?x([\d.]+)", rg[rk[-1]], float) if rk else None
     rep.add("PL-4: regulator lnu (ostatnia doba okna)", f"x{fx:.2f}" if fx is not None else "brak linii", ">= 1.20 (len nie ciety po zmianie kupujacego)" + tail,
             gate(fx >= 1.2) if fx is not None else None)
     st_ = 0
@@ -19376,9 +19377,9 @@ def main(argv):
     if group == "w7" and logp:
         return w7_main(logp, start_arg, until_arg, csvp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
     if group == "lup" and logp:
-        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)
+        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
     if group == "plotno" and logp:
-        return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
+        return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:

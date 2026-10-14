@@ -989,7 +989,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ plotno 14.10 (docs/pytania-2026-10-14/RAPORT-plotno.md, poprawki 1 i 2)
-        private sealed class ExpDest { public Settlement St; public int Price; }
+        private sealed class ExpDest { public Settlement St; public int Price, Spare; }
         private static int _expDay = int.MinValue, _expMat = -1;
         private static readonly List<ExpDest> _expDest = new List<ExpDest>();
 
@@ -1020,7 +1020,8 @@ namespace Armoury
         /// Plotno 14.10 (poprawka 2, klucz WeaverExportPrice): ile warta jest sztuka wyrobu z miasta src na wywoz - najwyzsza cena po miastach, ktore przy dzisiejszej
         /// polce zamowilyby ten surowiec (zapas na max(10, D + 4) dob zuzycia celu minus polka minus w drodze > 0 - ta sama ilosc co Order / OrderByCart),
         /// niewrogich, nieoblezonych, w zasiegu kontraktu i wozu (TownMaterialOrderRange: droga ladem; bez niej ladem i morzem jak woz; rejs port-port x SeaFreightShare):
-        /// cena srodkowej sztuki braku celu (PriceAt - ta sama co marza kontraktu) minus droga sztuki (CarterPencePerKgPer100 x kg x odleglosc / 100, morze x udzial).
+        /// cena srodkowej sztuki braku celu (PriceAt - ta sama co marza kontraktu) minus droga sztuki (CarterPencePerKgPer100 x kg x odleglosc / 100, morze x udzial);
+        /// recenzja: tylko cel, ktorego kasa ponad zapas kupcow (TownPurse.BuyFloorPeek) starcza na ladunek minimalny po tej cenie netto (jak OrderByCart).
         /// Droga liczona tylko tu - koszt wsadu i pracy liczy tkacz, kontrakt i woz sprawdzaja swoja marze od ceny zrodla jak dotad. Cele z cenami raz na dobe
         /// (ExpDests), drogi par z pamieci kampanii (CartRoads, CartRoadMixed - te same co wozy). 0 = kontrakty wylaczone (TownMaterialOrders), brak celu albo blad.
         /// dests - celow w zasiegu.
@@ -1040,6 +1041,7 @@ namespace Armoury
                 float range = Math.Max(1f, s.TownMaterialOrderRange);
                 float carter = Math.Max(0f, s.CarterPencePerKgPer100), sea = MBMath.ClampFloat(s.SeaFreightShare, 0f, 1f);
                 float kg = Kg(item);
+                int minPcs = Math.Max(1, (int)Math.Ceiling(Math.Max(0f, s.TownMaterialOrderMinLoadKg) / kg));   // ladunek minimalny w sztukach (jak OrderByCart)
                 bool seaAll = s.TownMaterialOrderBySea;
                 float seaMax = Math.Max(1f, s.TownMaterialOrderSeaMaxRoute);
                 float seaLine = sea > 0f ? Math.Min(seaMax, range / sea) : seaMax;   // rejs >= linia prosta
@@ -1059,8 +1061,9 @@ namespace Armoury
                     bool landOk = dL > 0f && dL <= range, seaOk = dS > 0f && dS <= seaMax && dS * sea <= range;
                     if (!landOk && !seaOk) continue;
                     float d = seaOk && (!landOk || dS * sea < dL) ? dS * sea : dL;   // tansza droga, jak kontrakt i woz
-                    dests++;
                     int net = e.Price - (int)Math.Ceiling(carter * kg * d / 100f);
+                    if (net <= 0 || (long)net * minPcs > e.Spare) continue;   // recenzja: kasa celu nie starcza na ladunek minimalny (jak OrderByCart: kasa ponad zapas kupcow)
+                    dests++;
                     if (net > best) best = net;
                 }
                 return best;
@@ -1086,7 +1089,10 @@ namespace Armoury
                     int want = (int)Math.Ceiling(Math.Max(10f, TravelDays(t, m) + 4f) * use) - t.Owner.ItemRoster.GetItemNumber(item) - InTransit(st, m);
                     if (want <= 0) continue;
                     int p = PriceAt(t, item, true, Math.Max(0, want - 1) / 2);
-                    if (p > 0) _expDest.Add(new ExpDest { St = st, Price = p });
+                    // recenzja: kasa celu ponad zapas kupcow (TownPurse.BuyFloor bez licznika 169c) - woz kupcow placi z niej zrodlu, karawana kontraktu dostaje z niej
+                    // przy dostawie; cel bez kasy nie kupi i nie moze podnosic ceny wywozu tkacza (ExportNet sprawdza ladunek minimalny po cenie netto)
+                    int spare = Math.Max(0, t.Gold - TownPurse.BuyFloorPeek(t, (int)Math.Max(0f, Settings.Current.TownRentFloorGold)));
+                    if (p > 0 && spare > 0) _expDest.Add(new ExpDest { St = st, Price = p, Spare = spare });
                 }
                 catch (Exception e) { Stumble("ExpDests", e); }
             }
