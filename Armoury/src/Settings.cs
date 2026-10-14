@@ -1966,6 +1966,8 @@ namespace Armoury
         // L3 (rozdz. 3.2): w lupionym miescie wojsko krolestwa zdobywcy przez SackNoSpendingDays dob nie zostawia zoldu ("zycie", markietani). Off = placi jak zwykle (2c0a225)
         public bool SackNoSpending = true;                 // after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)
         public int SackNoSpendingDays = 3;                 // with Sack No Spending: the days the victors spend nothing in the town they sacked (also the window the sack log measures)
+        // L6 (rozdz. 1.7 D4): zabici przez BK przy zdobyciu miasta schodza z ksiegi ludzi miasta tym samym ulamkiem (CitySack.People.cs). Off = ksiega bez zmian (2c0a225)
+        public bool SackKilledInPeopleBook = true;         // the townsfolk Banner Kings kills when a town is pillaged or devastated are gone from the town's own count of people as well (the same share), so they no longer eat, earn and pay as if alive (off = only Banner Kings' population loses them)
 
         public static void Load(string moduleDataDir)
         {

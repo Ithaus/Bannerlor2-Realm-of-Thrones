@@ -5520,6 +5520,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public int SackNoSpendingDays { get; set; } = 3;
 
+        [SettingPropertyBool("Sack Killed In People Book", HintText = "the townsfolk Banner Kings kills when a town is pillaged or devastated are gone from the town's own count of people as well (the same share), so they no longer eat, earn and pay as if alive (off = only Banner Kings' population loses them)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackKilledInPeopleBook { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6899,6 +6903,7 @@ namespace Armoury
             s.AiSacksFromNeed = AiSacksFromNeed;
             s.SackNoSpending = SackNoSpending;
             s.SackNoSpendingDays = SackNoSpendingDays;
+            s.SackKilledInPeopleBook = SackKilledInPeopleBook;
         }
 
         internal static void Apply()

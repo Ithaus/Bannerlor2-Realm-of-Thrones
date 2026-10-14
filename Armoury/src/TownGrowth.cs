@@ -165,8 +165,9 @@ namespace Armoury
                 double w1 = mv[PeopleBook.MRoadOut], w2 = mv[PeopleBook.MRoadIn] + mv[PeopleBook.MRoadBack];
                 double l1 = mv[PeopleBook.MLevyMilitia], l2 = mv[PeopleBook.MBackMilitia], sp = mv[PeopleBook.MLevySpawn], f = mv[PeopleBook.MFamineTown];
                 double vs = mv[PeopleBook.MVetStart];      // scalenie calosci etapu 4: siew weteranow E4/10 ze stanu miast (raz na kampanie)
+                double sk = mv[PeopleBook.MSackTown];      // L6 lupu miast: zabici przez BK przy zdobyciu (CitySack.People.cs)
                 double all = 0; foreach (var v in mv) all += v;
-                double other = all - (n + m + p + pb + c + w1 + w2 + l1 + l2 + sp + f + vs);
+                double other = all - (n + m + p + pb + c + w1 + w2 + l1 + l2 + sp + f + vs + sk);
                 double world = 0; int towns = PeopleBook.TownCount;
                 double vill = 0;
                 foreach (var v in Village.All) { try { if (v != null && v.Settlement != null) vill += PopulationLaw.PeopleOf(v.Settlement); } catch { } }
@@ -185,7 +186,7 @@ namespace Armoury
                   .Append(" (brakowalo ").Append(_shortMen.ToString("0.#", Inv)).Append("), jednostka ludzi wylaczona ").Append(_hUnit)
                   .Append(" | inne ruchy stanu miast: pobor i karczmy (E4/7) ").Append(Sg(p)).Append(" / powroty z poboru ").Append(Sg(pb)).Append(", karawany ").Append(Sg(c))
                   .Append(", wedrowcy BK ").Append(Sg(w1)).Append(" / ").Append(Sg(w2)).Append(", milicja ").Append(Sg(l1)).Append(" / ").Append(Sg(l2)).Append(", nowe druzyny ").Append(Sg(sp))
-                  .Append(", glod (E4/6) ").Append(Sg(f)).Append(vs != 0 ? ", siew weteranow (E4/10) " + Sg(vs) : "").Append(", inne powroty (R6) ").Append(Sg(other)).Append(", zalozenie/porzucenie stanu ").Append(Sg(set))
+                  .Append(", glod (E4/6) ").Append(Sg(f)).Append(vs != 0 ? ", siew weteranow (E4/10) " + Sg(vs) : "").Append(sk != 0 ? ", zdobycie (L6) " + Sg(sk) : "").Append(", inne powroty (R6) ").Append(Sg(other)).Append(", zalozenie/porzucenie stanu ").Append(Sg(set))
                   .Append(", miasto na zerze ").Append(zero).Append(zero > 0 ? " (" + zeroMen.ToString("0.#", Inv) + " ludzi)" : "");
                 sb.Append(" | kontrola: X - Y - (wszystkie ruchy + zalozenie) = ").Append(double.IsNaN(y) ? "-" : (x - y - all - set).ToString("0.00", Inv));
                 double u = world > 0 ? 100.0 * x / world : 0, u0 = refP + refV > 0 ? 100.0 * refP / (refP + refV) : 0;

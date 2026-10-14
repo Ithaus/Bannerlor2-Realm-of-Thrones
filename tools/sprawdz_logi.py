@@ -482,7 +482,8 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa lup [--do-doby 364] <Armoury-*.log>
                     LUP-1 linie L0 = wywolania okna O10, LUP-2/3 nastepstwa bez zdobycia 0, LUP-4 ujscie garnizony 0, LUP-5/6 lup: zdjete = dopisane i <= czesc x stan,
                     LUP-7 lup z niczego / trafienia O10 / kwota gry 0, LUP-8 arytmetyka i kiesy r = 0, LUP-10 blizna przy lasce 0, LUP-11/12 chleb i zapas kupcow (INFO),
-                    LUP-13 zycie i markietani w oknie lupu 0, LUP-14 sakiewki, LUP-15 wybor AI wedlug 3.4, LUP-16 okno gracza (reczny), LUP-19 wojsko (INFO, prog 85 tys.).
+                    LUP-13 zycie i markietani w oknie lupu 0, LUP-14 sakiewki, LUP-15 wybor AI wedlug 3.4, LUP-16 okno gracza (reczny), LUP-19 wojsko (INFO, prog 85 tys.),
+                    LUP-17 (L6) ubytek ludnosci BK = ubytek ksiegi ludzi miasta +-1 pkt proc.
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -17731,6 +17732,24 @@ def lup_main(logp, start_arg, until=364):
             + ", ".join(f"{k} {sum(1 for m, s in l0 if m.group(5) == k)}" for k in ("laska", "grabiez", "spustoszenie")), "INFO (rozklad wyborow)", None)
     # ---- prog 16 (L5): napisy okna = kwoty w logu (test reczny)
     rep.add("LUP-16 (L5): napisy okna gracza", f"linii L5 {len(l5)}", "test reczny: zdobyc zamek, napisy = linia L5 i L2 (roznica 0)", None)
+    # ---- prog 17 (L6): ubytek ludnosci BK w dobie zdobycia wobec ubytku ksiegi ludzi miasta (pkt proc.)
+    l6 = [s for s in lines if s.startswith("Lup miast (L6): dzien") and inwin(dayof(s))]
+    l6off = any("WYLACZONE (Sack Killed In People Book)" in s for s in dayw.values())
+    gaps, l6n = [], 0
+    for s in l6:
+        m = re.search(r"\| BK ludnosc (\d+) -> (\d+) \(zabici (\d+) = ([\d.]+)%\) \| ksiega ludzi miasta (\d+) -> (\d+) \(zabici ([\d.]+) = ([\d.]+|-)%\) \| (.*)\.$", s)
+        if not m:
+            continue
+        l6n += 1
+        if "zdjete ze stanu miasta" in m.group(9) and m.group(8) != "-":
+            gaps.append((abs(float(m.group(4)) - float(m.group(8))), s.split(" | ")[1]))
+    if gaps:
+        worst = max(gaps)
+        rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"miast {len(gaps)} (linii L6 {len(l6)}, odczytane {l6n}); najwieksza roznica {worst[0]:.2f} pkt proc. ({worst[1]})",
+                "+-1 pkt proc.", worst[0] <= 1.0 and l6n == len(l6))
+    else:
+        rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"linii L6 {len(l6)} (odczytane {l6n}), miast z ubytkiem w ksiedze 0" + ("; L6 wylaczone" if l6off else ""),
+                "+-1 pkt proc." + (" - INFO (brak grabiezy miasta albo L6 wylaczone / log bez paczki)"), None)
     # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc
     army = {}
     for kname, ser in kingdom_war_series(lines).items():
