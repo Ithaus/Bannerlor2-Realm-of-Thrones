@@ -1260,9 +1260,9 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float MountedWageFactor { get; set; } = 1.5f;
 
-        [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
+        [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere); the last few head always stay (Ai Mount Shelf Floor). Was 25 until 14.10")]
         [SettingPropertyGroup("A knight needs a horse")]
-        public int AiMountMarketSharePercent { get; set; } = 25;
+        public int AiMountMarketSharePercent { get; set; } = 40;
 
         [SettingPropertyInteger("Ai Mount Shelf Floor", 0, 16, "0", HintText = "and never buys the last few: this many head always stay on the shelf for other buyers")]
         [SettingPropertyGroup("A knight needs a horse")]
@@ -4272,9 +4272,9 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiMendQueueContinue { get; set; } = true;
 
-        [SettingPropertyBool("Ai Ammo Use", HintText = "TEST (off by default): after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. While off the daily log only counts what would have been used up")]
+        [SettingPropertyBool("Ai Ammo Use", HintText = "after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. In a battle fought on the field with you the arrows are already counted shot by shot, as for your own men, and are not taken a second time (off = as before: the lords and the garrisons lose arrows only in battles fought on the field with you; the daily log only counts what would have been used up)")]
         [SettingPropertyGroup("Time at the forge")]
-        public bool AiAmmoUse { get; set; } = false;
+        public bool AiAmmoUse { get; set; } = true;
 
         [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)")]
         [SettingPropertyGroup("Time at the forge")]
@@ -4284,9 +4284,9 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiSkipTownsfolkDress { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Gear Max Price Factor", 0.00f, 5.00f, "0.0", HintText = "TEST (0 = off): the most the lords' men and the garrisons pay for a piece of kit they lack, as a multiple of what that very piece is worth in its condition (2 = at most twice its worth; a value below 1 counts as 1); a dearer piece stays on the shelf and the want goes to the town's workshops as an order. While off, the daily log line counts what a ceiling of 2 would have stopped")]
+        [SettingPropertyFloatingInteger("Ai Gear Max Price Factor", 0.00f, 5.00f, "0.0", HintText = "the most the lords' men and the garrisons pay for a piece of kit they lack, as a multiple of what that very piece is worth in its condition (3 = at most three times its worth; a value below 1 counts as 1); a dearer piece stays on the shelf and the want goes to the town's workshops as an order. Saddles for riders follow the same ceiling (0 = off, as before: they pay whatever the shelf asks; the daily log line counts what a ceiling of 2 would have stopped)")]
         [SettingPropertyGroup("Time at the forge")]
-        public float AiGearMaxPriceFactor { get; set; } = 0f;
+        public float AiGearMaxPriceFactor { get; set; } = 3f;
 
         [SettingPropertyBool("Ai Harness Surplus Sell", HintText = "horse harness lying in a lord's or a garrison's armoury beyond what its riders need - the riders, the men ready to be raised to horse and a tenth to spare, then half as much again - is sold to the merchants of the town or castle like other spare kit: the merchants pay from their coffer, the lord takes his third and the rest goes to the men's purse; the cheapest pieces go first (off = as before: the harness of fallen riders lies in the armoury for ever)")]
         [SettingPropertyGroup("Time at the forge")]

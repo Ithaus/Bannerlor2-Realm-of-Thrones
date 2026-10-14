@@ -95,13 +95,14 @@ namespace Armoury
         private static int _wPoorP, _wPoorN, _wAfterPoor;                                                // naprawy: partie i sztuki czekajace na sakiewke, naprawione po pierwszej bez pieniedzy
         private static int _wBuys, _wBuyShiftN; private static long _wBuyShift;                          // zakupy brakow: zaplaty, ile kiesa pana zaplacila zamiast rezerwy napraw
         private static readonly int[] _wAmmo = new int[3]; private static int _wAmmoParties;             // amunicja zdjeta (strzaly, belty, miotane)
+        private static int _wAmmoField;                                                                  // A9 (14.10): partie bitwy gracza z misja - pociski zuzyl DTE w misji, AmmoUse pominiete
         private static long _wTicks; private static int _wStumbles;                                      // czas dopasowania "co nosza ludzie" po bitwie; potkniecia sesji
 
         private static void WClear()
         {
             _wParties = _wLost = _wHealthy = _wUsed = _wStep = _wWreck = _wBottom = _wFallback = 0; _wIntSum = _wOldExp = _wNewExp = 0f;
             _wPoorP = _wPoorN = _wAfterPoor = 0; _wBuys = _wBuyShiftN = 0; _wBuyShift = 0;
-            Array.Clear(_wAmmo, 0, 3); _wAmmoParties = 0; _wTicks = 0;
+            Array.Clear(_wAmmo, 0, 3); _wAmmoParties = 0; _wAmmoField = 0; _wTicks = 0;
         }
 
         private static void WStumble(string where, Exception e) { if (++_wStumbles <= 3) Log.Error("AiWear." + where + " (potkniecie " + _wStumbles + ")", e); }   // per partia, bez wylacznika (CLAUDE.md 7)
@@ -321,6 +322,10 @@ namespace Armoury
                 float share = MBMath.ClampFloat(s.TroopWearPercent, 0f, 100f) / 100f;
                 bool p2 = P2On;   // E8/P2 (244): pomiar "Amunicja AI: zeszloby" (tylko licznik)
                 bool byInt = ByIntensityOn, ammo = AmmoOn;   // E8/W (249)
+                // A9 (14.10, wlaczenie AiAmmoUse): w bitwie gracza z misja (walka w polu) pociski partii AI zuzyl juz DTE strzal po strzale - DTE wola
+                // IsAmmoAndEmpty (AmmoRecovery, odzysk wedlug strony E8/A) dla agentow WSZYSTKICH partii bitwy gracza; drugi rachunek wedlug natezenia
+                // zdejmowalby te kolczany drugi raz. "Wyslij wojsko" bez misji (symulacja) i bitwy samego AI - jak w E8/W. Bron miotana dalej sie nie obija (ammo).
+                bool ammoUse = ammo && !LosersFlee.FieldFought(me);
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
                 {
                     if (side == null) continue;
@@ -334,7 +339,8 @@ namespace Armoury
                         DropUsed(mp.StringId);           // F6 pkt 2: po bitwie inni ludzie i inna zbrojownia (polegli, lup, pociski) - rezerwa napraw liczy dopasowanie od nowa
                         if (p2) P2Ammo(me, side, mep, mp);   // E8/P2 (244, PLAN 8.4a): ile pociskow zeszloby tej partii - nic nie zdejmuje, bez losowania
                         float intensity = WBattle(mep, mp, s);   // E8/W (249, R4): natezenie bitwy tej partii i straty do linii (tylko licznik)
-                        if (ammo) AmmoUse(me, side, mp, intensity);   // E8/W (PLAN 8.4a): pociski schodza ze zbrojowni - tylko przy AiAmmoUse (W CIENIU: domyslnie wylaczone)
+                        if (ammoUse) AmmoUse(me, side, mp, intensity);   // E8/W (PLAN 8.4a): pociski schodza ze zbrojowni - tylko przy AiAmmoUse (A9 14.10: domyslnie wlaczone)
+                        else if (ammo) _wAmmoField++;                    // A9: bitwa gracza z misja - zuzyl DTE w misji (tylko licznik)
                         if (share <= 0f) continue;
                         // zuzycie walki: czesc sztuk W UZYCIU (do liczby ludzi) - sprawne staja sie obite
                         var arm = Armory(mp); if (arm == null) continue;
@@ -1154,7 +1160,9 @@ namespace Armoury
                          + (q ? "zaplacila " : "zaplacilaby ") + _wBuyShift.ToString(ci) + " zl w " + _wBuyShiftN + " zaplatach"
                          + " | amunicja AI " + (ammo ? "[WL]" : "[CIEN - wylaczone]") + ": zeszlo " + (_wAmmo[0] + _wAmmo[1] + _wAmmo[2]) + " szt. (strzaly " + _wAmmo[0] + ", belty " + _wAmmo[1]
                          + ", miotane " + _wAmmo[2] + ") w " + _wAmmoParties + " partiach"
-                         + " | wrakow w ksiedze " + wrecks + " | koszt dopasowania " + ms.ToString("0.0", ci) + " ms | potkniecia (sesja) " + _wStumbles + ".");
+                         + " | wrakow w ksiedze " + wrecks
+                         + " | amunicja AI pominieta w bitwach gracza z misja (zuzyl DTE w misji) " + _wAmmoField + " partii"   // A9 (14.10)
+                         + " | koszt dopasowania " + ms.ToString("0.0", ci) + " ms | potkniecia (sesja) " + _wStumbles + ".");
             }
             catch (Exception e) { WStumble("WLine", e); }
         }
