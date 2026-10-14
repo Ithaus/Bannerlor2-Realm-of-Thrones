@@ -5608,9 +5608,13 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool EnemyCaravansSeized { get; set; } = true;
 
-        [SettingPropertyBool("Enemy Caravans Siege Trapped", HintText = "with Enemy Caravans Seized: an enemy caravan that was shut inside the besieged walls and was pushed out of the town during the last day of the siege - the storming - is taken as well, as long as it has not reached another town, castle or village; off = only caravans still inside the walls at the moment of capture are taken")]
+        [SettingPropertyBool("Enemy Caravans Siege Trapped", HintText = "with Enemy Caravans Seized: an enemy caravan that left the besieged walls during the last day of the siege and has not reached another town, castle or village is taken as well, as if it were still inside; off (the default, since caravans now stay inside the walls until their siege ends - Siege Caravans Stay In Walls) = only caravans inside the walls at the moment of capture are taken")]
         [SettingPropertyGroup("The sack of towns and castles")]
-        public bool EnemyCaravansSiegeTrapped { get; set; } = true;
+        public bool EnemyCaravansSiegeTrapped { get; set; } = false;
+
+        [SettingPropertyBool("Siege Caravans Stay In Walls", HintText = "caravans shut inside a besieged town or castle stay there until that place's own siege ends; Banner Kings let every caravan held in any besieged place ride out whenever any siege anywhere ended, so caravans slipped out of places still under siege and enemy caravans were never inside when a town fell; off = as before")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeCaravansStayInWalls { get; set; } = true;
 
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
@@ -7062,6 +7066,7 @@ namespace Armoury
             s.CapitalTreasuryShare = CapitalTreasuryShare;
             s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.EnemyCaravansSiegeTrapped = EnemyCaravansSiegeTrapped;
+            s.SiegeCaravansStayInWalls = SiegeCaravansStayInWalls;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;

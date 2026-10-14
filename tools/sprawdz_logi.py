@@ -16507,15 +16507,30 @@ def drobne2_swiat(lines, rep):
             if z + p > c or (z > 0 and (gd != 0 or ud != 0 or sv != 0)):
                 bad.append("d%s kand %d zaj %d pom %d zl %d szt %d ost %d" % (num(r"dzien (\d+)", s, int, 0), c, z, p, gd, ud, sv))
         first = next((s.split("(pierwsza: ", 1)[1].split(")", 1)[0] for s in a11 if "(pierwsza: " in s), "-")
+        # recenzja drobne2: bez kandydatow i bez niezgodnosci - INFO (nie TAK bez pomiaru); klucz EnemyCaravansSiegeTrapped domyslnie wylaczony - "W CIENIU"
         rep.add("D2-A11-1: L5b-2 karawany wyprowadzone z murow w ostatniej dobie oblezenia - zajete jawnie (kiesy i ladunek zdjete = dopisane, nie zniknely 0)",
                 f"zdobyc {len(a11)} (czynne {len(act)}); wyjsc z murow w oblezeniu {exits}: kandydatow {cand}, zajete {tseiz}, pominiete {tskip}, starszych niz doba {old}, "
                 f"w innej osadzie {oth}; niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
-                "zajete + pominiete <= kandydaci (reszta: poddani nowego pana); przy zajeciu roznica kies 0, sztuk 0, nie zniknely 0", len(bad) == 0)
+                "zajete + pominiete <= kandydaci (reszta: poddani nowego pana); przy zajeciu roznica kies 0, sztuk 0, nie zniknely 0; bez kandydatow - INFO",
+                (len(bad) == 0) if (cand > 0 or bad) else None)
         rep.add("D2-A11-2: L5b-2 pierwsza wyprowadzona karawana (godziny przed zdobyciem, odleglosc od murow, bitwa osady, zachowanie AI)", first[:300],
                 "INFO - bieg dwuletni 21-14-13: 0 karawan w murach w 39 zdobyciach; zajete wyprowadzone przy zdobyciu z karawanami na poczatku oblezenia"
                 " (D14-1) = naprawa dziala; odleglosc duza (> 30 jedn.) = karawany odjezdzaja - zawezic okno", None)
     else:
         rep.add("D2-A11-1: L5b-2 karawany wyprowadzone z murow", f"linii L5b-2 {len(ev)}, bez dopisku A11", "INFO (log sprzed A11 albo brak zdobyc)", None)
+    # ---- A11b (recenzja drobne2): BK przy koncu oblezenia zwalnia karawany z murow INNYCH oblezonych osad (przyczyna 0 w 39) - linia przy kluczu i bez klucza
+    bk = [s for s in lines if s.startswith("Karawany BK przy koncu oblezenia (A11b)")]
+    if bk:
+        stay = [s for s in bk if "| zostaja w murach do konca wlasnego oblezenia" in s]
+        bko = sum(num(r"w murach INNYCH oblezonych osad (\d+)", s, int, 0) or 0 for s in bk)
+        bkf = sum(num(r"w murach INNYCH oblezonych osad \d+ \(wrogowie oblegajacych (\d+)", s, int, 0) or 0 for s in bk)
+        bkex = next((s.split("pierwsza: ", 1)[1].split(") |", 1)[0] for s in bk if "pierwsza: " in s), "-")
+        rep.add("D2-A11-3: przyczyna A11 w logu - BK przy koncu oblezenia zwalnia karawany z murow INNYCH, dalej oblezonych osad",
+                f"linii {len(bk)} (zostaja {len(stay)}, w cieniu {len(bk) - len(stay)}); karawan w murach innych oblezen {bko} (wrogowie oblegajacych {bkf}); pierwsza: {bkex[:160]}",
+                "> 0 = przyczyna potwierdzona (BKCaravansBehavior.OnSiegeEventEnded zwalnia caly zbior); przy kluczu SiegeCaravansStayInWalls zostaja - przy zdobyciu"
+                " w murach (D14-1 TAK, zajete w linii L5b-2)", bko > 0)
+    else:
+        rep.add("D2-A11-3: BK przy koncu oblezenia (A11b)", "brak linii", "INFO (log sprzed A11b albo zaden koniec oblezenia przy karawanach w murach innych oblezen)", None)
     # ---- B6: linia startu sesji i Towary (winogrona, oliwki, daktyle)
     st = [s for s in lines if s.startswith("Winnice i gaje (B6): start sesji")]
     act6 = bool(st) and "CZYNNE na stale" in st[-1]

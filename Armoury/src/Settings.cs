@@ -2013,10 +2013,17 @@ namespace Armoury
         // L5b-2 (ta sama decyzja - karawany wroga w murach; EnemyCaravans.cs): karawany wrogow zdobywcy stojace w zdobytej twierdzy sa zajete - kiesa do wodza (regula 3.2,
         // korona 1/9), ladunek do jego taborow, przewodnik do niewoli, eskorta do domu. Off = stan a913a58 (wyjezdzaja z wszystkim, jak w grze)
         public bool EnemyCaravansSeized = true;            // caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game
-        // A11 (naprawa L5b-2; EnemyCaravans.cs): w 39 zdobyciach biegu dwuletniego w murach przy zdobyciu 0 karawan - karawany trzymane w oblezonym miescie
-        // wychodza z murow w ostatnich godzinach oblezenia (szturm), zanim gra zmieni pana. Karawana wroga, ktora wyszla z murow oblezonej twierdzy w ostatniej
-        // dobie przed jej zdobyciem i nie dotarla do innej osady, jest zajeta jak stojaca w murach (ta sama regula). Off = tylko karawany w murach (stan 449d453)
-        public bool EnemyCaravansSiegeTrapped = true;     // with Enemy Caravans Seized: an enemy caravan that was shut inside the besieged walls and was pushed out of the town during the last day of the siege - the storming - is taken as well, as long as it has not reached another town, castle or village; off = only caravans still inside the walls at the moment of capture are taken
+        // A11 (naprawa L5b-2; EnemyCaravans.cs): w 39 zdobyciach biegu dwuletniego w murach przy zdobyciu 0 karawan. Karawana wroga, ktora wyszla z murow oblezonej
+        // twierdzy w ostatniej dobie przed jej zdobyciem i nie dotarla do innej osady, jest zajeta jak stojaca w murach (ta sama regula). Recenzja drobne2: przyczyna
+        // jest w kodzie BK (BKCaravansBehavior.OnSiegeEventEnded zwalnia karawany WSZYSTKICH oblezonych osad przy koncu kazdego oblezenia) - naprawa u zrodla to
+        // klucz SiegeCaravansStayInWalls nizej. Po niej ta regula wzielaby tylko karawany wyprowadzone INNA droga (nieznana, moze legalna - DECYZJA drobne14 "bez
+        // naprawy na slepo"), wiec domyslnie WYLACZONA; linia L5b-2 pokazuje "W CIENIU", co by zajela. Off = tylko karawany w murach (stan 449d453)
+        public bool EnemyCaravansSiegeTrapped = false;    // with Enemy Caravans Seized: an enemy caravan that left the besieged walls during the last day of the siege and has not reached another town, castle or village is taken as well, as if it were still inside; off (the default, since caravans now stay inside the walls until their siege ends - Siege Caravans Stay In Walls) = only caravans inside the walls at the moment of capture are taken
+        // A11b (recenzja drobne2; EnemyCaravans.BkSiegeEndPre/Post): BK trzyma karawany oblezonej osady w JEDNYM zbiorze (_siegeHeldCaravans) i przy koncu
+        // DOWOLNEGO oblezenia na mapie zwalnia caly zbior (ReleaseCaravanFromHold -> SetMoveGoToSettlement) - gra wyprowadza je w najblizszym ticku takze z murow
+        // osad oblezonych dalej, wiec przy zdobyciu w murach nie ma zadnej. Przy koncu oblezenia karawana w murach INNEJ, dalej oblezonej osady zostaje w zbiorze
+        // i w murach - BK zwolni ja przy koncu jej wlasnego oblezenia, a przy zdobyciu zajmie ja regula L5b-2. Off = BK zwalnia wszystkie (stan 449d453)
+        public bool SiegeCaravansStayInWalls = true;      // caravans shut inside a besieged town or castle stay there until that place's own siege ends; Banner Kings let every caravan held in any besieged place ride out whenever any siege anywhere ended, so caravans slipped out of places still under siege and enemy caravans were never inside when a town fell; off = as before
 
         // --- Goods follow the people (GL) ---
         // GL-0 (projekt docs/gospodarka-od-ludzi, P0): wspolna usluga skal "ludzie okregu" (PeopleScale.cs) - skala wsi u_v, skala rynku miasta m_t, skala podzamcza;
