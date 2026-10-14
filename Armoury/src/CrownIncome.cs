@@ -59,6 +59,8 @@ namespace Armoury
         private static readonly Dictionary<string, long> _wEnd = new Dictionary<string, long>();   // id krolestwa -> skarbiec przy zamknieciu korony
         private static int _wEndDay = -1;                                                         // doba gry tej migawki
         private static bool _open;                                                                // Begin bylo dzis, End jeszcze nie
+        // M2b (CallToWarAfterOwnWages): zwrot zoldu nalezny wczoraj na krolestwo (migawka przy End) - rezerwa wezwan 168 nastepnej doby (pamiec sesji)
+        private static readonly Dictionary<string, long> _refDueY = new Dictionary<string, long>(); private static int _refDueYDay = -1;
 
         // dlugi reparacji (korona -> korona)
         // 178: Kind 'k' - okup krola placony przez skarbiec (Receiver: id krolestwa albo "h:" + id bohatera porywacza bez krolestwa); 'r' - reparacje
@@ -94,6 +96,7 @@ namespace Armoury
         internal static void Reset()
         {
             _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
+            _refDueY.Clear(); _refDueYDay = -1;   // M2b
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
             KingdomTreasury.WarTaxReset();   // E5/B2 (184): stawki podatku wojennego ludu - zapisane w szostym polu tego klucza, czyszczone razem z nim
@@ -117,6 +120,13 @@ namespace Armoury
         {
             KDay d;
             return k != null && _open && _day.TryGetValue(k, out d) ? d : null;
+        }
+
+        /// <summary>M2b (CallToWarAfterOwnWages): zwrot zoldu nalezny krolestwu wczoraj (KDay.RefundDue przy wczorajszym End); 0 - brak migawki (pierwsza doba sesji, 165 wylaczone).</summary>
+        internal static long RefundDueYesterday(Kingdom k)
+        {
+            long v;
+            return k != null && k.StringId != null && Campaign.Current != null && _refDueYDay == (int)CampaignTime.Now.ToDays - 1 && _refDueY.TryGetValue(k.StringId, out v) ? Math.Max(0, v) : 0;
         }
 
         /// <summary>Ile z wplywow dnia krolestwo moze jeszcze wydac (0 poza 165).</summary>
@@ -308,6 +318,8 @@ namespace Armoury
                 KingdomTreasury.FolkWarTaxWindowClear();   // E5/B2 (184): okno wplywow dnia zamkniete razem z migawka (pobor po Begin jest juz w migawce - zapas)
                 LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
                 LastKingRansomPaid = _dKingRansomPaid; _dKingRansomPaid = 0;   // 178: raty okupu krola ze skarbca (licznik doby)
+                _refDueY.Clear(); _refDueYDay = _open ? today : -1;   // M2b: migawka zwrotu naleznego (wezwania 168 jutro czytaja ja przed zwrotem)
+                foreach (var kv in _day) if (kv.Key != null && kv.Key.StringId != null && kv.Value.RefundDue > 0) _refDueY[kv.Key.StringId] = kv.Value.RefundDue;
                 if (!_open) { LastDebtRepaid = _dDebtRepaid; _dDebtRepaid = 0; LastNewDebt = _dNewDebt; LastNewDebtN = _dNewDebtN; _dNewDebt = 0; _dNewDebtN = 0; return; }
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0, loanIn = 0, loanOut = 0; int noSnap = 0;
                 long wtax = 0;   // E5/B2 (184)

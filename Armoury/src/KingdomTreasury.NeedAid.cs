@@ -355,6 +355,19 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>M2b (CrownCallToWar.Daily - przed krokiem W5 tej doby, wiersze to jeszcze wczoraj): niepokryta potrzeba W5 krolestwa z wczorajszego kroku
+        /// (po danine, W5b i W6, przed M1) - czesc rezerwy wezwan 168. 0 - brak wczorajszego wiersza (pokoj, W5 nieczynne, pierwsza doba sesji). Tylko odczyt.</summary>
+        internal static long NeedAidUncovYesterday(Kingdom k)
+        {
+            try
+            {
+                if (k == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays - 1) return 0;
+                for (int i = 0; i < _naRows.Count; i++) { var r = _naRows[i]; if (r.K == k) return r.Known ? (long)Math.Floor(Math.Max(0, r.Uncov)) : 0; }
+                return 0;
+            }
+            catch (Exception e) { NaStumble("NeedAidUncovYesterday", e); return 0; }
+        }
+
         /// <summary>WageRefund (przed krokiem W5 tej doby): ile z zoldu `paid` zaplaconego przez rod od poprzedniego zwrotu oplacila wczorajsza doplata - ta czesc
         /// nie jest podstawa zwrotu. Zdejmuje wykorzystana czesc z pamieci (rod moze miec kilku platnikow). 0 przy wylaczonym kluczu albo bez wczorajszej doplaty.</summary>
         internal static long NeedAidRefundCut(Clan c, long paid)

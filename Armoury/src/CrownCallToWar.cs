@@ -43,6 +43,8 @@ namespace Armoury
         // M2a (CallToWarPaysForWar): doby laski od porozumienia (spoznione wypowiedzenie, blokady ROT) i doby bez wojny z rzedu, po ktorych porozumienie wygasa
         private const int NoWarGraceDays = 3, NoWarEndDays = 7;
         private static long _dExpired, _dPaidNoWar; private static int _dNoWarN, _dExpiredN;
+        // M2b (CallToWarAfterOwnWages): wstrzymane dzis po rezerwie wlasnych zolnierzy, korony z wstrzymaniem, kontrolka "rata ponad reszte minus rezerwe"
+        private static long _dHeld, _dOverRes; private static int _dHeldN; private static readonly HashSet<string> _dHeldK = new HashSet<string>();
         private static readonly List<Agr> _agr = new List<Agr>();
 
         internal static long LastPaid, LastEnded, LastUnpaid, LastLegacyPaid; internal static int LastEndedN;
@@ -58,7 +60,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
         internal static void Reset() { _agr.Clear(); ZeroDay(); ZeroEvents(); _legacyScan = false; LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = 0; _dNoWarN = _dExpiredN = 0; }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = 0; _dNoWarN = _dExpiredN = 0; _dHeld = _dOverRes = 0; _dHeldN = 0; _dHeldK.Clear(); }
         /// <summary>P3/W4: liczniki zdarzen miedzy dobami (nowe porozumienia - StartPostfix, skreslenia przez gre - EndPostfix) zerowane PO linii doby.
         /// Dotad zerowal je poczatek Daily, zanim linia je wypisala - "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0.</summary>
         private static void ZeroEvents() { _dCancelled = 0; _dNewN = 0; }
@@ -194,6 +196,8 @@ namespace Armoury
                     }
                 }
                 var beh = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
+                bool m2b = s0 != null && s0.CallToWarAfterOwnWages;
+                var resv = new Dictionary<Kingdom, long>();   // M2b: rezerwa wzywajacego - liczona zawsze (kontrolka przy kluczu wylaczonym)
                 foreach (var a in _agr.ToArray())
                 {
                     try
@@ -239,11 +243,21 @@ namespace Armoury
                             continue;   // dzis bez raty - zloto zostaje w skarbcu wzywajacego (zwrot, W5, renty tej doby)
                         }
                         long avail = CrownIncome.LeftFor(calling);
-                        if (avail >= due)
+                        // M2b (CallToWarAfterOwnWages): najpierw wlasni zolnierze - rezerwa = wczorajszy zwrot nalezny + wczorajsza niepokryta potrzeba W5 (przed M1)
+                        long res;
+                        if (!resv.TryGetValue(calling, out res)) { res = CrownIncome.RefundDueYesterday(calling) + KingdomTreasury.NeedAidUncovYesterday(calling); resv[calling] = res; }
+                        if (avail >= due && (!m2b || avail - res >= due))
                         {
                             if (!atWar) _dPaidNoWar += Math.Min(due, Math.Max(0L, (long)calling.KingdomBudgetWallet));   // M2a: kontrolka (klucz wylaczony - rata za dobe bez wojny jak dotad)
+                            if (avail - res < due) _dOverRes += due;                                                      // M2b: kontrolka (klucz wylaczony - rata kosztem wlasnych zolnierzy)
                             Pay(calling, called, a, due, kd);
                             if (a.Left <= 0) _agr.Remove(a);
+                            continue;
+                        }
+                        if (m2b && avail >= due)
+                        {
+                            // po rezerwie nie starcza - dzis bez raty, porozumienie trwa; czesc dnia nie przechodzi na jutro (reszte ceny skresla gra na koncu porozumienia)
+                            _dHeld += due; _dHeldN++; _dHeldK.Add(calling.StringId ?? "?");
                             continue;
                         }
                         // skarbca nie stac na czesc dnia - porozumienie konczy sie, sojusznik wychodzi z wojny
@@ -339,7 +353,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !s.LogEnabled || !On) return;
-            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone + _dExpired == 0 && _dNewN == 0 && _dExpiredN == 0 && _importN < 0) return;
+            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone + _dExpired + _dHeld == 0 && _dNewN == 0 && _dExpiredN == 0 && _importN < 0) return;
             long left = 0; foreach (var a in _agr) left += a.Left;
             var sb = new StringBuilder(400);
             sb.Append("Wezwania do wojny (168): dzien ").Append((int)CampaignTime.Now.ToDays)
@@ -352,6 +366,10 @@ namespace Armoury
               .Append(" | M2a za wojne (Call To War Pays For War ").Append(s.CallToWarPaysForWar ? "tak" : "nie").Append("): porozumien bez wojny wezwanego dzis ").Append(_dNoWarN)
               .Append(", wygasle bez wojny (").Append(NoWarGraceDays).Append(" doby laski + ").Append(NoWarEndDays).Append(" dob bez wojny) ").Append(_dExpiredN)
               .Append(" (reszta ceny skreslona ").Append(_dExpired).Append("), rata zaplacona w dobie bez wojny ").Append(_dPaidNoWar)
+              // M2b (pieniadze roku 2): rata dopiero po rezerwie wlasnych zolnierzy wzywajacego; kontrolka "rata ponad reszte wplywow minus rezerwe" (klucz wylaczony - wiecej niz 0)
+              .Append(" | M2b po wlasnych zolnierzach (Call To War After Own Wages ").Append(s.CallToWarAfterOwnWages ? "tak" : "nie").Append("): wstrzymane dzis ").Append(_dHeld)
+              .Append(" zl (czesci ").Append(_dHeldN).Append(") u ").Append(_dHeldK.Count).Append(" koron (rezerwa: zwrot nalezny wczoraj + niepokryta potrzeba W5 wczoraj)")
+              .Append(", rata ponad reszte wplywow minus rezerwe ").Append(_dOverRes)
               .Append(" | dlug portfela sprzed paczki (wezwany dostal od gry z niczego): nowy ").Append(_dLegacy).Append(", splacone dzis ze skarbcow w nicosc (rownowazy) ").Append(_dLegacyPaid)
               .Append(" | P3/W4 po zerwaniu reszta ceny zdjeta z portfela wzywajacego przez nas (latka konca porozumienia nie zadzialala) ").Append(_dRestored)
               .Append(s.CallToWarBreakRestoresWallet ? "; dlug sprzed paczki szukany tylko raz po wczytaniu zapisu bez klucza 168 (Call To War Break Restores Wallet)"
