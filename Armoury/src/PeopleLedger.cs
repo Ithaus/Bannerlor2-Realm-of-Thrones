@@ -772,6 +772,7 @@ namespace Armoury
             wb.Append(" | Straz z Westeros (E4/9): ").Append(WatchLaw.Live ? "" : "prawo nieczynne; ").Append("z Muru ").Append(WatchLaw.LastWall.ToString("0", ci)).Append(", z pul ").Append(WatchLaw.LastPool.ToString("0", ci))
               .Append(", z ludnosci ").Append(WatchLaw.LastPeople.ToString("0", ci)).Append(", bez pokrycia ").Append(WatchLaw.LastNone.ToString("0", ci))
               .Append("; zwolnieni 166: ").Append(WatchLaw.LastReleased).Append("; rabunki Strazy: ").Append(WatchLaw.LastRaids);
+            try { wb.Append(ClanBudget.FreeFolkNote()); } catch { }   // WL1 (wyspy-wolni): zold Wolnych Ludzi na czlowieka, zalegly zold
             wb.Append(" | czas linii Krainy i Straz ").Append(((System.Diagnostics.Stopwatch.GetTimestamp() - t1) * f).ToString("0.0", ci)).Append(" ms.");
             Log.Info(wb.ToString());
         }

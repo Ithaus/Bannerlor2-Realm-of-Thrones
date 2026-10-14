@@ -67,6 +67,7 @@ namespace Armoury
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
+            public double Loot;     // WW2 (wyspy-wolni): lup na zalogi - okno 28 dob zelaznej ceny i dziesieciny korsarzy (zl/d), JUZ doliczony do Cap i PartyCap (po zalogach i karawanach)
             public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja); W7 - razem z gotowka poboru pana
         }
 
@@ -92,6 +93,8 @@ namespace Armoury
         private static long _dPzCap, _dPzChest, _dPzWage; private static int _dPzN, _dPzChestN, _dPzMenPar, _dPzMenGar;
         // B4 (pomiar, pieniadze roku 2): zalogi z celem pokojowym - ile, na celu (zold >= 95% celu) / ponizej, zold wobec celu, rody z celem przycietym do limitu pulapu
         private static long _dB4Wage, _dB4Tgt; private static int _dB4N, _dB4At, _dB4Below, _dB4Scaled;
+        // WW2 (wyspy-wolni): rody z lupem na zalogi - okno lupu (zl/d), zold druzyn tych rodow i ich pulap druzyn z lupem
+        private static double _dLoot; private static long _dLootWage, _dLootCap; private static int _dLootN;
         // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
         // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
         private static readonly int[] _dRelTier = new int[3];
@@ -110,6 +113,39 @@ namespace Armoury
         private static readonly Dictionary<Clan, int> _watchRel = new Dictionary<Clan, int>();
         private static int _watchRelSum;
         private static int _watchPoolCap = -1, _watchPoolMen;
+        // WL1 (wyspy-wolni): DRUGA pula bez zoldu - Wolni Ludzie (osobna od Strazy: jedna pula na krolestwo). Bez WL2 - ze zlota jak u Strazy (suma pulapow rodow
+        // w ludziach), z WL2 - z ludu. Wolni Ludzie nie sa zwalniani (jak Straz przy WatchNoReleases). Liczniki z linii do linii; zold i ludzie dla linii 4.15.
+        private sealed class FfPool
+        {
+            public readonly List<Clan> Clans = new List<Clan>();
+            public int Cap = -1, Men, Gar, DMen, DGar, DCap = -1;
+            public int RecruitBlock, GarBlock, SpawnBlock, FoodBlock, GarShareBlock;
+            // recenzja (R1-2 / R1-6 / R1-4 / R2-2): werbunek jencow AI wstrzymany pula; przyrost ludzi WL wedlug drogi od linii do linii (werbunek CheckRecruiting,
+            // jency AI, zalogi z werbunku, nowe partie); werbunek przepuszczony przez WL3, po ktorym druzyna ma jedzenie ponizej progu; gracz-wasal (ludzie, zalogi)
+            public int PrisonBlock, FoodMiss; public long InRecruit, InPrison, InGar, InSpawn;
+            public int PlayerMen, PlayerGar, PrevMen = -1, Net;
+            public long WagePar, WageGar; public int MenPar, MenGar, DueParties; public long Cut;
+            public int Parties, Starving, ShortFood;   // WL3 (pomiar): druzyny lordow WL, w glodzie (Party.IsStarving), z jedzeniem ponizej progu najazdu
+            public double People = -1;
+            public string Detail = "";
+            public void NewDay() { DMen = DGar = 0; DCap = -1; WagePar = WageGar = 0; MenPar = MenGar = DueParties = 0; Cut = 0; Parties = Starving = ShortFood = 0; }
+        }
+        private static readonly FfPool _ff = new FfPool();
+        private static bool IsFf(Clan c) { return c != null && CrownGifts.IsFreeFolk(c.Kingdom); }
+
+        /// <summary>Recenzja (R1-4 / R2-2): partie i zalogi gracza-wasala Wolnych Ludzi sa bez zoldu tylko, dopoki cala armia WL z graczem (AI + gracz) nie
+        /// przekracza puli o wiecej niz FfPlayerSlack (ta sama tolerancja co prog WL-2); liczone raz na dobe w Daily. Ekran werbunku gracza nie ma bramki puli
+        /// (AI ja ma - RecruitPrefix), wiec ludzie ponad pule kosztuja graczowi zwykly zold, az armia wroci do puli. Poza WL / bez puli - true.</summary>
+        internal static bool FfPlayerUnpaid { get { return _ffPlayerUnpaid; } }
+        private static bool _ffPlayerUnpaid = true;
+        private const double FfPlayerSlack = 1.05;
+
+        /// <summary>Recenzja R1-7: kiesa rodu do pulapu bez lupu okna WW2 jeszcze nierozpisanego (ReaverLaw.Unreleased) - rod bez okna: G bez zmian.</summary>
+        private static long LootFreeG(Clan c, long G)
+        {
+            try { return ReaverLaw.WindowClan(c) ? Math.Max(0L, G - (long)Math.Round(ReaverLaw.Unreleased(c))) : G; }
+            catch { return G; }
+        }
         private static string _watchDetail = "";
         // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
         private static long _dCourtRoom, _dCourtYield; private static int _dCourtRoomN, _dCourtYieldN, _dPartyOverCap;
@@ -132,6 +168,10 @@ namespace Armoury
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _populated = null;
             _grain = null; _grainTried = false; _spawnUsed.Clear(); _spawnDay = -1;
             _watchClans.Clear(); _watchPoolCap = -1; _watchPoolMen = 0; _watchDetail = ""; _watchRel.Clear(); _watchRelSum = 0;   // 2: pula Strazy
+            _ff.Clans.Clear(); _ff.Cap = -1; _ff.Men = _ff.Gar = 0; _ff.People = -1; _ff.Detail = ""; _ff.NewDay();             // WL1: pula Wolnych Ludzi
+            _ff.RecruitBlock = _ff.GarBlock = _ff.SpawnBlock = _ff.FoodBlock = _ff.GarShareBlock = 0;
+            _ff.PrisonBlock = _ff.FoodMiss = 0; _ff.InRecruit = _ff.InPrison = _ff.InGar = _ff.InSpawn = 0;          // recenzja: drogi przyrostu WL
+            _ff.PlayerMen = _ff.PlayerGar = 0; _ff.PrevMen = -1; _ff.Net = 0; _ffPlayerUnpaid = true;
         }
 
         internal static void ZeroLast()
@@ -150,9 +190,11 @@ namespace Armoury
             _dRelTavern = 0; _dRelPurseVet = 0;
             _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
             _dB4Wage = _dB4Tgt = 0; _dB4N = _dB4At = _dB4Below = _dB4Scaled = 0;                     // B4
+            _dLoot = 0; _dLootWage = _dLootCap = 0; _dLootN = 0;                                       // WW2
             for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
             _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
+            _ff.NewDay();   // WL1
             _dCourtRoom = _dCourtYield = 0; _dCourtRoomN = _dCourtYieldN = _dPartyOverCap = 0;
             _dKwRoom = _dKwLent = _dSeizedLand = 0; _dKwRoomN = _dKwLentN = _dDebtorN = _dSeizedN = 0;
             CourtFull.ClearDay();   // E5/A2: liczniki doby sprzetu niewydanego -> dwor (takze Reset miedzy kampaniami)
@@ -285,7 +327,7 @@ namespace Armoury
                 if (b == null || b.Zero || c.IsUnderMercenaryService) return false;
                 float gate = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
                 if (fillMax > gate) return false;                       // gra moze te druzyne wezwac - zwykly wymog sluzby
-                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage);
+                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage) * CrownGifts.GoldWageShare(c);   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                 double need = parties > 0 ? (double)gate * limit * perMan : Math.Max(0, s.MinNewPartyMen) * perMan;
                 return b.PartyCap - b.Aid < need;   // W5: pulap WLASNY (bez doplaty korony) - rod z doplata zostaje "na miare srodkow" tak, jak bylby bez niej
             }
@@ -357,7 +399,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || c == null || c != Clan.PlayerClan || !On || Pending || c.Leader == null || c.Kingdom == null || !AtWar(c)) return false;
-                if (CrownGifts.WatchUnpaidOn && s.UnpaidTroopsCapInMen && CrownGifts.IsWatch(c.Kingdom)) return false;   // Straz bez zoldu - jak b.Zero u AI
+                if (s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c)) return false;   // Straz (182) i Wolni Ludzie (WL1) bez zoldu - jak b.Zero u AI (najemnik WL - z miara)
                 long G = ClanIncomeBook.FamilyGoldOf(c);
                 int adults = AdultsOf(c);
                 // D: ta sama droga co DOf rodu AI; "D z zapisu" (D0) = D169 ksiegi dochodu (zapisana), bez niej G/60 (start 166)
@@ -375,7 +417,7 @@ namespace Armoury
                 // 168: rod w zajeciu - D bez dochodu wsi (jak AI; W5 i W6 i tak go pomijaja)
                 if (DebtLadder.On && DebtLadder.IsSeized(c)) D = Math.Max(0, D - Math.Min(D, ClanIncomeBook.VillageIncomeOf(c)));
                 double R, f, chest;
-                double cap = Ceiling(D, G, true, adults, out R, out f, out chest);
+                double cap = Ceiling(D, LootFreeG(c, G), true, adults, out R, out f, out chest);   // recenzja R1-7: G bez lupu okna jeszcze nierozpisanego (jak AI)
                 // udzial dworu ustepujacy zoldowi (jak AI w wojnie): dwor i wyzywienie minus jedzenie partii, gdy jest siedziba z kasa
                 double court = 0;
                 if (s.HouseholdMinimal && s.WarCourtYieldsToWages)
@@ -403,8 +445,10 @@ namespace Armoury
                     if (mp == null || !mp.IsActive || !mp.IsCaravan || mp.IsMainParty || OwnerOf(mp) != c) continue;
                     car += Math.Max(0, mp.TotalWage);
                 }
-                capW6 = Math.Max(0, cap - gar - car);
-                capW5 = Math.Max(0, cap + court - gar - car);
+                // WW2 (ta sama regula co AI): lup na zalogi gracza-najezdzcy podnosi jego pulap druzyn w mierze W5 / W6 (zold z lupu nie jest brakiem)
+                double loot = ReaverLaw.WindowClan(c) ? ReaverLaw.Window(c) : 0;   // recenzja: ta sama miara rodu z oknem co AI (najemnik - bez okna)
+                capW6 = Math.Max(0, cap - gar - car) + loot;
+                capW5 = Math.Max(0, cap + court - gar - car) + loot;
                 reserve = R;
                 return true;
             }
@@ -471,7 +515,7 @@ namespace Armoury
                         var dw = mp.IsGarrison ? wGar : wPar; var dm = mp.IsGarrison ? mGar : mPar;
                         long w0; dw.TryGetValue(c, out w0); dw[c] = w0 + wage;
                         int m0; dm.TryGetValue(c, out m0); dm[c] = m0 + men;
-                        if (CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(mp) && mp.MemberRoster != null)
+                        if (CrownGifts.IsUnpaidParty(mp) && mp.MemberRoster != null)   // Straz (182) i Wolni Ludzie (WL1): nominal do pulapu w ludziach
                         {
                             long ns = 0; var r = mp.MemberRoster;
                             for (int i = 0; i < r.Count; i++)
@@ -488,7 +532,9 @@ namespace Armoury
                 }
                 var drop = new List<Clan>();
                 var watchToday = new List<Clan>();   // 2: rody Strazy rozliczone dzis (pula)
+                var ffToday = new List<Clan>();      // WL1: rody Wolnych Ludzi bez zoldu rozliczone dzis (pula Wolnych Ludzi)
                 double watchNomAvg = -1;             // recenzja 2 (R2a): sredni nominal calej Strazy, liczony raz, gdy potrzebny
+                double ffNomAvg = -1;                // WL1: to samo dla Wolnych Ludzi (osobno - nominal Strazy bez zmian)
                 foreach (var c in Clan.All)
                 {
                     try
@@ -512,7 +558,10 @@ namespace Armoury
                             catch (Exception e) { Stumble("Ladder", e); }
                         }
                         double R, f, chest;
-                        b.Cap = Ceiling(b.D, G, b.War, b.Adults, out R, out f, out chest);
+                        // recenzja R1-7: lup okna WW2 jeszcze nierozpisany podnosi juz pulap druzyn 1:1 (b.Loot) - w skrzyni wojennej, f biedy, skrzyni sprzetu i nadwyzce
+                        // pokoju liczy sie G bez niego (ten sam denar nie otwiera zoldu drugi raz); rod bez okna - G jak dotad
+                        long Gc = LootFreeG(c, G);
+                        b.Cap = Ceiling(b.D, Gc, b.War, b.Adults, out R, out f, out chest);
                         b.R = R; b.F = f;
                         bool merc = c.IsUnderMercenaryService;
                         double mcap = 0;
@@ -521,7 +570,7 @@ namespace Armoury
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
                         // recenzja M3: chleb, ktory pan zaplacil dzis za swoje glodne miasto (TownFolk.BreadRest - przed budzetem doby), schodzi ze skrzyni sprzetu tej doby -
                         // w wojnie pan w sumie nie szybciej niz skrzynia (G - R) / WarChestDays (0.8 zold + 0.2 sprzet); klucz BreadForThePoor wylaczony - 0, jak dotad
-                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? Math.Max(0, 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c)) : 0);
+                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && Gc > R ? Math.Max(0, 0.2 * (Gc - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c)) : 0);
                         // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
                         // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
                         b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
@@ -530,7 +579,7 @@ namespace Armoury
                         {
                             // reszta ponad 120 D + 50 000 po 1/180 na dwor i budowy (polowa na polowe)
                             double cap = Math.Max(0f, s.ReserveCapDays) * b.D + 50000;
-                            if (G > cap) { double x = (G - cap) / 180.0; b.Household += x / 2; b.Build += x / 2; }
+                            if (Gc > cap) { double x = (Gc - cap) / 180.0; b.Household += x / 2; b.Build += x / 2; }
                         }
                         // 168 (166 "Dluznik"): rod w dlugu - budowy 0, dwor -50%; sprzet i tak tylko braki (pan placi tylko TryBuyCore - braki, lepsze tylko z sakiewki ludzi)
                         if (b.Debtor && !merc) { b.Household *= 0.5; b.Build = 0; _dDebtorN++; }
@@ -558,7 +607,33 @@ namespace Armoury
                         wPar.TryGetValue(c, out v); b.WPar = v; wGar.TryGetValue(c, out v); b.WGar = v; wCar.TryGetValue(c, out v); b.WCar = v;
                         int m; mPar.TryGetValue(c, out m); b.MenPar = m; mGar.TryGetValue(c, out m); b.MenGar = m;
                         // Straz bez zoldu: pulap w ludziach (pulap zoldu / nominalny zold czlowieka)
-                        b.Zero = CrownGifts.WatchUnpaidOn && s.UnpaidTroopsCapInMen && CrownGifts.IsWatch(c.Kingdom);
+                        // WL1 (wyspy-wolni): Wolni Ludzie bez zoldu (FreeFolkUnpaid) - ta sama regula co Straz (182), WLASNA pula (ffc)
+                        // recenzja R1-9 / R2-2: kompania najemna w sluzbie WL nie jest "bez zoldu" (IsUnpaidClan) - bierze zold z umowy 185 i nie zajmuje puli ludu WL
+                        b.Zero = s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c);
+                        bool ffc = b.Zero && CrownGifts.IsFreeFolk(c.Kingdom);
+                        if (CrownGifts.IsFreeFolk(c.Kingdom) && !merc)   // WL1 (pomiar linii 4.15, takze przy kluczu off - baza tej samej DLL): zold i ludzie Wolnych Ludzi (bez najemnikow), zalegly zold
+                        {
+                            _ff.WagePar += b.WPar; _ff.WageGar += b.WGar; _ff.MenPar += b.MenPar; _ff.MenGar += b.MenGar;
+                            try
+                            {
+                                _ff.Cut += ClanIncomeBook.CutTodayOf(c);
+                                var wpf = c.WarPartyComponents;
+                                float needF = 8f;
+                                try { needF = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { needF = 8f; }
+                                if (wpf != null)
+                                    for (int i = 0; i < wpf.Count; i++)
+                                    {
+                                        var mp = wpf[i] != null ? wpf[i].MobileParty : null;
+                                        if (mp == null || !mp.IsActive) continue;
+                                        if (WarLedger.UnpaidDays(mp) > 0) _ff.DueParties++;
+                                        if (!mp.IsLordParty || mp.IsMainParty) continue;
+                                        _ff.Parties++;
+                                        if (mp.Party != null && mp.Party.IsStarving) _ff.Starving++;   // WL3 (pomiar): glod druzyn WL (RWL "nie wiem" 3)
+                                        if (ReaverLaw.FoodDays(mp, 0) < needF) _ff.ShortFood++;
+                                    }
+                            }
+                            catch (Exception e) { Stumble("FreeFolk(pomiar)", e); }
+                        }
                         if (b.Zero)
                         {
                             long ns; nomSum.TryGetValue(c, out ns);
@@ -567,26 +642,34 @@ namespace Armoury
                             if (men > 0 && ns > 0) b.Nominal = (double)ns / men;
                             else
                             {
-                                if (watchNomAvg < 0)
+                                double avg = ffc ? ffNomAvg : watchNomAvg;
+                                if (avg < 0)
                                 {
                                     long nsAll = 0; int menAll = 0;
                                     foreach (var kv in nomSum)
                                     {
-                                        if (kv.Key == null || kv.Value <= 0) continue;
+                                        if (kv.Key == null || kv.Value <= 0 || CrownGifts.IsFreeFolk(kv.Key.Kingdom) != ffc) continue;   // WL1: kazda pula ze swoich rodow
                                         nsAll += kv.Value; int m1; mPar.TryGetValue(kv.Key, out m1); int m2; mGar.TryGetValue(kv.Key, out m2); menAll += m1 + m2;
                                     }
-                                    watchNomAvg = menAll > 0 && nsAll > 0 ? (double)nsAll / menAll : 0;
+                                    avg = menAll > 0 && nsAll > 0 ? (double)nsAll / menAll : 0;
+                                    if (ffc) ffNomAvg = avg; else watchNomAvg = avg;
                                 }
-                                b.Nominal = watchNomAvg > 0 ? watchNomAvg : Math.Max(1f, Campaign.Current.AverageWage);
+                                b.Nominal = avg > 0 ? avg : Math.Max(1f, Campaign.Current.AverageWage);
                             }
                             // recenzja 2 (R2b): bez udzialu dworu w wojnie - Straz nie ma zoldu, wiec "dwor ustepuje zoldowi" nigdy nie zachodzi i rod placi dwor w calosci;
                             // ta sama kwota nie moze byc jeszcze miejscem dla ludzi w puli
                             b.MenCap = (int)(Math.Max(0, b.Cap - b.CourtRoom) / Math.Max(0.5, b.Nominal));
-                            _dWatchMen += men; _dWatchCap = Math.Max(0, _dWatchCap) + b.MenCap;
+                            if (ffc)
+                            {
+                                _ff.DMen += men; _ff.DGar += b.MenGar; _ff.DCap = Math.Max(0, _ff.DCap) + b.MenCap;   // WL1: pula Wolnych Ludzi (ze zlota - bez WL2)
+                            }
+                            else { _dWatchMen += men; _dWatchCap = Math.Max(0, _dWatchCap) + b.MenCap; }
                         }
                         else b.MenCap = -1;
                         // 168: KREDYT WOJENNY wpiety w pulap - w wojnie rod z G < R (bez zaleglosci, zajecia, z wolnym kapitalem Banku) moze isc ponad pulap o najwyzej
                         // 0.40 D dziennie w granicy limitu; Bank wyplaca dzis do kiesy glowy brak do zoldu naliczonego ponad pulap bez kredytu (kapital Banku -> glowa)
+                        // WW2 (wyspy-wolni): lup na zalogi tej doby liczony przed kredytem wojennym - zold, ktory pokrywa lup, nie jest brakiem do pozyczki
+                        double lootNow = !b.Zero && !merc && ReaverLaw.WindowClan(c) ? Math.Max(0, ReaverLaw.Window(c)) : 0;
                         b.CapNoKw = b.Cap; b.KwRoom = 0; b.KwLent = 0;
                         if (DebtLadder.On && !merc && !b.Zero)
                         {
@@ -596,7 +679,7 @@ namespace Armoury
                                 if (kw > 0)
                                 {
                                     b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
-                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw;
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad)
                                     if (gap >= 1)
                                     {
                                         int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));
@@ -608,6 +691,11 @@ namespace Armoury
                         }
                         Garrisons(c, b, s);
                         b.PartyCap = Math.Max(0, b.Cap - (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) - b.WCar);
+                        // WW2 (wyspy-wolni, projekt 2.2): lup na zalogi okretow - zelazna cena ponad s, nabrzeze i dziesiecina korsarzy rodu z 28 dob / 28 podnosi pulap rodu
+                        // i pulap DRUZYN 1:1 PO odjeciu zalog i karawan (lup nie dopelnia zalog), bez wejscia do D (dwor, sprzet, budowy, limit Banku go nie widza).
+                        // PartyCapOwn / AtMeans / ScutageCap licza go jako pieniadze rodu - potrzeba W5 spada o lup. Straz i Wolni Ludzie bez zoldu (b.Zero) i najemnicy - poza.
+                        b.Loot = 0;
+                        if (lootNow > 0) { b.Loot = lootNow; b.Cap += lootNow; b.PartyCap += lootNow; _dLoot += lootNow; _dLootN++; _dLootWage += b.WPar; }
                         if (!b.Zero && b.WPar > b.PartyCap) _dPartyOverCap++;   // rody ponad pulapem partii (limity proporcjonalnie do zoldu)
                         // P3/W2 (pomiar): rod w wojnie, ktoremu zalogi i karawany zajely caly pulap - partie zwalniane do zera, kolejnosc zwolnien nic tu nie zmienia
                         if (!b.Zero && !merc && b.War && b.PartyCap <= 0) { _dGarEatsCap++; if (b.MenPar <= 0) _dGarEatsCapEmpty++; }
@@ -624,6 +712,9 @@ namespace Armoury
                             double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c);
                             if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)(KingdomTreasury.NeedAidCashOf(c) + KingdomTreasury.LordLevyCashOf(c)))); }
                         }
+                        // recenzja R1-3 (miara WW-4 "lup wydany"): pulap druzyn KONCOWY (z lupem i z W5/W7) - narzedzie liczy wydany lup jako zold ponad (pulap - lup);
+                        // pulap przed W5/W7 dawal "wydany" 100% zawsze (zold Wysp oplacony z W5/W7 lezal ponad nim)
+                        if (b.Loot > 0) _dLootCap += (long)b.PartyCap;
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni
                         CourtFull.Lapse(b, s, merc);   // E5/A2 (R8): przydzial przeterminowany dzis -> dwor (b.Lapsed; wlasny try, GearLeft bez zmian)
@@ -641,7 +732,7 @@ namespace Armoury
                         try { Court(c, b, s); } catch (Exception e) { Stumble("Court", e); }
                         // recenzja C1 (W3): limity przed zwolnieniami - zwolnienia dziela kwote wedlug nadwyzki partii ponad jej dzisiejszy limit
                         try { ApplyPartyLimits(c, b); ApplyGarrisonLimits(c, b); } catch (Exception e) { Stumble("Limits", e); }
-                        if (b.Zero) watchToday.Add(c);   // 2: Straz - zwolnienia po petli, wedlug puli calej Strazy
+                        if (b.Zero) { if (ffc) { ffToday.Add(c); b.Streak = 0; } else watchToday.Add(c); }   // 2: Straz - zwolnienia po petli, wedlug puli calej Strazy; WL1: Wolni Ludzie bez zwolnien
                         else { try { Releases(c, b, s); } catch (Exception e) { Stumble("Releases", e); } }
                         if (c.Leader.Gold < 5000) _dPoor++;
                     }
@@ -665,6 +756,27 @@ namespace Armoury
                     _watchDetail = wd.ToString();
                 }
                 catch (Exception e) { Stumble("WatchPool", e); }
+                // WL1: pula Wolnych Ludzi (suma pulapow w ludziach rodow WL - ze zlota; WL2 - z ludu), bez zwolnien; druzyny z zaleglym zoldem (WarLedger) do linii 4.15
+                try
+                {
+                    _ff.Clans.Clear(); _ff.Clans.AddRange(ffToday);
+                    _ff.Cap = ffToday.Count > 0 ? FfPoolCap(s) : -1;
+                    // recenzja R1-4 / R2-2: gracz-wasal WL w puli (jego druzyny, druzyny towarzyszy i zalogi) - AI ustepuje mu miejsca, a jego zold zalezy od puli
+                    _ff.PlayerMen = 0; _ff.PlayerGar = 0;
+                    if (CrownGifts.PlayerFreeFolkVassal) { _ff.PlayerMen = LiveMen(Clan.PlayerClan); _ff.PlayerGar = GarMen(Clan.PlayerClan); }
+                    _ff.Men = _ff.DMen + _ff.PlayerMen; _ff.Gar = _ff.DGar + _ff.PlayerGar;
+                    _ffPlayerUnpaid = _ff.PlayerMen <= 0 || _ff.Cap < 0 || _ff.Men <= FfPlayerSlack * _ff.Cap;
+                    _ff.Net = _ff.PrevMen >= 0 ? _ff.Men - _ff.PrevMen : 0; _ff.PrevMen = _ff.Men;   // R1-2: przyrost netto doby (wobec drog w FfSegment)
+                    var fd = new System.Text.StringBuilder();
+                    foreach (var fc in ffToday)
+                    {
+                        B fb; if (!_b.TryGetValue(fc, out fb)) continue;
+                        if (fd.Length > 0) fd.Append(", ");
+                        fd.Append(fc.Name).Append(' ').Append(fb.MenPar + fb.MenGar).Append('/').Append(fb.MenCap);
+                    }
+                    _ff.Detail = fd.ToString();
+                }
+                catch (Exception e) { Stumble("FreeFolkPool", e); }
                 foreach (var kv in _b) if (!kv.Value.Today && (kv.Key == null || kv.Key.IsEliminated)) drop.Add(kv.Key);
                 foreach (var c in drop) _b.Remove(c);
                 Report(s, today);
@@ -864,7 +976,7 @@ namespace Armoury
             if (b.CourtRoom > 0 && share > 0)
             {
                 // recenzja W5: zold, ktory rod placi SAM - bez czesci oplaconej dzis gotowka korony (b.AidCash; 0 bez doplaty i przy wylaczonym kluczu)
-                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash;
+                double wageNow = b.Zero ? b.Nominal * (b.MenPar + b.MenGar) + b.WCar : b.WPar + b.WGar + b.WCar - b.AidCash - b.Loot;   // WW2: zold z lupu nie zajmuje dworu
                 double used = Math.Min(share, Math.Max(0, wageNow - b.CapBase));
                 if (used > 0) { share -= used; _dCourtYield += (long)used; _dCourtYieldN++; }
             }
@@ -895,6 +1007,7 @@ namespace Armoury
             // (pulap pokojowy 0.28 D zamiast wojennego z zapasem) zbil pulap puli z ok. 20 tys. do 1.4 tys. i zwolnienia odeslaly do domu ok. 5 tys. ludzi Strazy
             // w kilka dni (7.2 -> 1.2 tys.). Pulap Strazy tylko zatrzymuje werbunek (RecruitPrefix/GarRecruitPrefix/SpawnPrefix); ubytek - bitwy i zgony.
             if (b.Zero && s.WatchNoReleases) { b.Streak = 0; return; }
+            if (b.Zero && IsFf(c)) { b.Streak = 0; return; }   // WL1: Wolni Ludzie bez zwolnien (pula tylko zatrzymuje werbunek); pula Strazy nizej ich nie liczy
             double hyst = Math.Max(1f, s.BudgetHysteresis);
             long wage = b.WPar + b.WGar + b.WCar;
             int men = b.MenPar + b.MenGar;
@@ -903,7 +1016,8 @@ namespace Armoury
             // zwalnia ludzi oplaconych przez korone: pulap do zwolnien = pulap partii z przydzialem + zalogi i karawany liczone jak w pulapie partii. U rodu,
             // ktorego zalogi mieszcza sie w pulapie, to ta sama liczba co b.Cap; bez przydzialu (b.Aid = 0) regula bez zmian.
             double capRel = b.Cap;
-            if (b.Aid > 0 && !b.Zero) capRel = Math.Max(capRel, b.PartyCap + (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) + b.WCar);
+            // WW2 (wyspy-wolni): lup na zalogi - ta sama regula co przydzial korony (lup jest znaczony na druzyny; zalogi ponad pulap wlasny nie zwalniaja ludzi z lupu)
+            if ((b.Aid > 0 || b.Loot > 0) && !b.Zero) capRel = Math.Max(capRel, b.PartyCap + (GarFull(b, s) ? b.WGar : Math.Min(b.WGar, b.GarTarget)) + b.WCar);
             bool over = b.Zero ? _watchPoolCap >= 0 && _watchPoolMen > hyst * _watchPoolCap : wage > hyst * capRel;
             b.Streak = over ? b.Streak + 1 : 0;
             if (over) _dOver++;
@@ -1014,6 +1128,10 @@ namespace Armoury
             var r = mp.MemberRoster;
             if (r == null || amount <= 0) return 0;
             var wageModel = Campaign.Current.Models.PartyWageModel;
+            // WW-J: kwota jest w zoldzie partii (TotalWage), a ludzi liczymy stawka jednostki z modelu - zaloga okretu Wysp placi w zlocie polowe (CrownGifts.GoldWageShare),
+            // wiec za kwote odchodzi tylu ludzi, ile zdejmuje ja z zoldu partii (kwota / udzial), a zwracamy zdjety zold partii (zrobione x udzial); reszta partii - 1
+            double gold = menUnit ? 1.0 : CrownGifts.GoldWageShare(mp);
+            if (gold < 1.0) amount /= gold;
             var stacks = new List<TroopRosterElement>();
             for (int i = 0; i < r.Count; i++)
             {
@@ -1079,7 +1197,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("ReleaseFrom(sakiewka)", e); }
-            return done;
+            return done * gold;   // WW-J: zold partii zdjety zwolnieniem (bez zalog okretow Wysp gold = 1 - jak dotad)
         }
 
         // ------------------------------------------------------------ ludnosc BK (refleksja - wzor LosersFlee/Levy; tylko osady z danymi BK)
@@ -1310,6 +1428,18 @@ namespace Armoury
             B b; return c != null && On && _b.TryGetValue(c, out b) && b.D0 >= 0 ? b.D : -1;
         }
 
+        /// <summary>WW2: lup na zalogi w dzisiejszym pulapie rodu (zl/d; 0 - bez lupu albo bez budzetu) - kolumna lup_na_zaloge_ww2.</summary>
+        internal static double LootOf(Clan c) { var b = Of(c); return b != null ? b.Loot : 0; }
+
+        /// <summary>WW2: lup na zalogi w budzetach rodow krolestwa z ostatniego rozliczenia (krok W5 biegnie przed budzetem - wczoraj). Tylko odczyt.</summary>
+        internal static double LootOfKingdom(Kingdom k)
+        {
+            double x = 0;
+            if (k == null) return 0;
+            foreach (var kv in _b) if (kv.Key != null && kv.Value != null && kv.Value.Today && kv.Key.Kingdom == k) x += kv.Value.Loot;
+            return x;
+        }
+
         /// <summary>168: miejsce kredytu wojennego w dzisiejszym pulapie rodu (0 - bez KW albo bez budzetu) - kolumna kandydat_pozyczki.</summary>
         internal static double KwRoomOf(Clan c) { var b = Of(c); return b != null ? b.KwRoom : 0; }
 
@@ -1352,18 +1482,23 @@ namespace Armoury
             Wire("limit zalog (UpdateClanSettlementsPaymentLimit)", AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "UpdateClanSettlementsPaymentLimit", new[] { typeof(Clan) }), null, nameof(GarLimitPostfix), null);
             Wire("dezercja z limitu zoldu (GetTroopsToDesertDueToWageAndPartySize)", AccessTools.Method(typeof(DefaultPartyDesertionModel), "GetTroopsToDesertDueToWageAndPartySize", new[] { typeof(MobileParty), typeof(TroopRoster) }), nameof(DesertPrefix), null, nameof(DesertFinalizer));
             Wire("nowa partia (SpawnLordParty)", AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "SpawnLordParty", new[] { typeof(Hero), typeof(bool) }), nameof(SpawnPrefix), nameof(SpawnPostfix), null);
-            Wire("werbunek Strazy (CheckRecruiting)", AccessTools.Method(typeof(RecruitmentCampaignBehavior), "CheckRecruiting", new[] { typeof(MobileParty), typeof(Settlement) }), nameof(RecruitPrefix), null, null);
-            Wire("zaloga Strazy: werbunek (TickAutoRecruitmentGarrisonChange)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }), nameof(GarRecruitPrefix), null, null);
-            Wire("zaloga Strazy: przyrost (TickGarrisonChangeForTown)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickGarrisonChangeForTown", new[] { typeof(Town) }), nameof(GarRecruitPrefix), null, null);
+            Wire("werbunek Strazy (CheckRecruiting)", AccessTools.Method(typeof(RecruitmentCampaignBehavior), "CheckRecruiting", new[] { typeof(MobileParty), typeof(Settlement) }), nameof(RecruitPrefix), nameof(RecruitPostfix), null);
+            Wire("zaloga Strazy: werbunek (TickAutoRecruitmentGarrisonChange)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }), nameof(GarRecruitPrefix), nameof(GarRecruitPostfix), null);
+            Wire("zaloga Strazy: przyrost (TickGarrisonChangeForTown)", AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickGarrisonChangeForTown", new[] { typeof(Town) }), nameof(GarGrowthPrefix), null, null);
+            // Priority.First: ROT (SubModule.RecruitPrisonersCampaignBehaviorPatch) zastepuje te metode prefiksem bool, ktory ZAWSZE zwraca false - po nim dalsze
+            // prefiksy bool nie biegna, wiec bramka puli musi byc przed nim (nasz false pomija i ROT, i oryginal; true - ROT robi werbunek jak dotad)
+            Wire("WL: werbunek jencow AI (DailyTickAIMobileParty)", AccessTools.Method(typeof(RecruitPrisonersCampaignBehavior), "DailyTickAIMobileParty", new[] { typeof(MobileParty) }), nameof(FfPrisonPrefix), nameof(FfPrisonPostfix), null, Priority.First);
             Log.Info("Budzet rodow (166): latki gry - " + (_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-") + "; BRAK: " + (_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-") + ".");
         }
 
-        private static void Wire(string label, MethodBase m, string pre, string post, string fin)
+        private static void Wire(string label, MethodBase m, string pre, string post, string fin, int prePriority = -1)
         {
             try
             {
                 if (m == null) { _missing.Add(label); return; }
-                _harmony.Patch(m, prefix: pre != null ? new HarmonyMethod(typeof(ClanBudget), pre) : null,
+                HarmonyMethod hp = null;
+                if (pre != null) { hp = new HarmonyMethod(typeof(ClanBudget), pre); if (prePriority >= 0) hp.priority = prePriority; }
+                _harmony.Patch(m, prefix: hp,
                                   postfix: post != null ? new HarmonyMethod(typeof(ClanBudget), post) { priority = Priority.Last } : null,
                                   finalizer: fin != null ? new HarmonyMethod(typeof(ClanBudget), fin) : null);
                 _wired.Add(label);
@@ -1431,10 +1566,15 @@ namespace Armoury
                 int need = Math.Max(0, s.MinNewPartyMen);
                 double cost;
                 bool room;
-                if (b.Zero) { cost = need; room = _watchPoolCap < 0 || _watchPoolCap - WatchLiveMen() - WatchUsed() >= need; }   // 2: pula calej Strazy
+                if (b.Zero)
+                {
+                    bool ff = IsFf(c); int cap = PoolCap(ff);   // 2: pula calej Strazy; WL1: pula Wolnych Ludzi
+                    cost = need; room = cap < 0 || cap - PoolLiveMen(ff) - PoolUsed(ff) >= need;
+                    if (!room && ff) _ff.SpawnBlock++;
+                }
                 else
                 {
-                    double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage);
+                    double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage) * CrownGifts.GoldWageShare(c);   // WW-J: jak AtMeans
                     cost = need * avg;
                     room = b.PartyCap - b.Aid - b.WPar - used >= cost;   // W5: przydzial korony nie otwiera nowych druzyn (miejsce liczone od pulapu wlasnego)
                 }
@@ -1449,6 +1589,12 @@ namespace Armoury
         {
             try { var c = __0 != null ? __0.Clan : null; var b = Of(c); if (b != null && __result != null) ApplyPartyLimits(c, b); }
             catch (Exception e) { Stumble("SpawnPostfix", e); }
+            try   // recenzja R1-2: ludzie nowej partii WL bez zoldu (droga przyrostu "nowe partie")
+            {
+                var c = __0 != null ? __0.Clan : null; var b = Of(c);
+                if (__result != null && __result.MemberRoster != null && b != null && b.Zero && IsFf(c)) _ff.InSpawn += __result.MemberRoster.TotalRegulars;
+            }
+            catch (Exception e) { Stumble("SpawnPostfix(WL)", e); }
         }
 
         /// <summary>Przeglad C1 (uwaga 6): ludzie rodu teraz (partie i zalogi) - pulap Strazy w ludziach liczony od biezacego stanu, nie od porannego.</summary>
@@ -1479,19 +1625,90 @@ namespace Armoury
         }
 
         /// <summary>2: ludzie calej Strazy teraz (partie i zalogi rodow Strazy z dzisiejszej puli).</summary>
-        private static int WatchLiveMen()
+        private static int WatchLiveMen() { return PoolLiveMen(false); }
+
+        /// <summary>WL1: ludzie puli teraz - Straz (ff false) albo Wolni Ludzie (ff true); partie i zalogi rodow z dzisiejszej puli.</summary>
+        private static int PoolLiveMen(bool ff)
+        {
+            var list = ff ? _ff.Clans : _watchClans;
+            int n = 0;
+            for (int i = 0; i < list.Count; i++) { var c = list[i]; if (c != null && !c.IsEliminated) n += LiveMen(c); }
+            if (ff && CrownGifts.PlayerFreeFolkVassal) n += LiveMen(Clan.PlayerClan);   // recenzja R1-4 / R2-2: gracz-wasal WL w tej samej puli
+            return n;
+        }
+
+        /// <summary>Ludzie w zalogach lenn rodu teraz.</summary>
+        private static int GarMen(Clan c)
         {
             int n = 0;
-            for (int i = 0; i < _watchClans.Count; i++) { var c = _watchClans[i]; if (c != null && !c.IsEliminated) n += LiveMen(c); }
+            var fiefs = c != null && !c.IsEliminated ? c.Fiefs : null;
+            if (fiefs != null) for (int k = 0; k < fiefs.Count; k++) { var gp = fiefs[k] != null ? fiefs[k].GarrisonParty : null; if (gp != null && gp.IsActive && gp.MemberRoster != null) n += gp.MemberRoster.TotalRegulars; }
             return n;
+        }
+
+        /// <summary>WL2: ludzie w zalogach Wolnych Ludzi teraz (rody z dzisiejszej puli).</summary>
+        private static int FfLiveGarrisons()
+        {
+            int n = 0;
+            for (int i = 0; i < _ff.Clans.Count; i++) n += GarMen(_ff.Clans[i]);
+            if (CrownGifts.PlayerFreeFolkVassal) n += GarMen(Clan.PlayerClan);   // recenzja: zalogi gracza-wasala WL w udziale zalog puli
+            return n;
+        }
+
+        private static int PoolCap(bool ff) { return ff ? _ff.Cap : _watchPoolCap; }
+
+        /// <summary>WL3 czynne: klucz FreeFolkRecruitNeedsFood przy WL1.</summary>
+        internal static bool FfFoodGateOn { get { var s = Settings.Current; return s != null && s.FreeFolkRecruitNeedsFood && CrownGifts.FreeFolkUnpaidOn; } }
+
+        /// <summary>WL2 czynne: klucz FreeFolkMenFromPeople przy WL1.</summary>
+        internal static bool FfFromPeopleOn { get { var s = Settings.Current; return s != null && s.FreeFolkMenFromPeople && CrownGifts.FreeFolkUnpaidOn; } }
+        private static double FfLevyShare(Settings s) { return Math.Max(0f, Math.Min(0.05f, s.FreeFolkLevyShare)); }
+        private static double FfGarShare(Settings s) { return Math.Max(0f, Math.Min(1f, s.FreeFolkGarrisonPoolShare)); }
+
+        /// <summary>WL2: ludzie regionow krolestwa Wolnych Ludzi (warownia + jej wsie, region nalezy do krolestwa freefolk - ta sama liczba co "ludzie" w
+        /// ludzie-regiony.csv: PopulationLaw.PeopleOf); -1 przed kalibracja ludnosci (sami jej nie wolamy) albo bez regionow.</summary>
+        private static double FfPeople()
+        {
+            if (!PopulationLaw.Calibrated) return -1;
+            double p = 0; int n = 0;
+            foreach (var st in OutlawLaw.RegionNodes())
+            {
+                try
+                {
+                    if (st == null || !CrownGifts.IsFreeFolk(st.MapFaction)) continue;
+                    n++;
+                    p += PopulationLaw.PeopleOf(st);
+                    if (st.BoundVillages != null) foreach (var v in st.BoundVillages) if (v != null && v.Settlement != null) p += PopulationLaw.PeopleOf(v.Settlement);
+                }
+                catch (Exception e) { Stumble("FfPeople", e); }
+            }
+            return n > 0 ? p : -1;
+        }
+
+        /// <summary>WL1/WL2: pula Wolnych Ludzi w ludziach na dzis - WL2: FreeFolkLevyShare x ludzie regionow WL (pula idzie za ludem); bez WL2 albo bez liczby ludzi -
+        /// ze zlota (suma pulapow rodow w ludziach, jak Straz).</summary>
+        private static int FfPoolCap(Settings s)
+        {
+            _ff.People = -1;
+            if (FfFromPeopleOn)
+            {
+                double people = FfPeople();
+                _ff.People = people;
+                if (people > 0) return (int)Math.Round(FfLevyShare(s) * people);
+            }
+            return Math.Max(0, _ff.DCap);
         }
 
         /// <summary>2: miejsce w puli Strazy zajete dzis przez nowe partie tej doby (zabezpieczenie: gra moze wystawic kilka partii w jednym wywolaniu;
         /// sklad z szablonu nowej partii jest juz w WatchLiveMen, wiec liczenie dziala w bezpieczna strone - blokuje kolejne partie tej doby).</summary>
-        private static double WatchUsed()
+        private static double WatchUsed() { return PoolUsed(false); }
+
+        /// <summary>WL1: miejsce w puli zajete dzis przez nowe partie tej doby - Straz albo Wolni Ludzie.</summary>
+        private static double PoolUsed(bool ff)
         {
+            var list = ff ? _ff.Clans : _watchClans;
             double u = 0;
-            for (int i = 0; i < _watchClans.Count; i++) { double v; if (_watchClans[i] != null && _spawnUsed.TryGetValue(_watchClans[i], out v)) u += v; }
+            for (int i = 0; i < list.Count; i++) { double v; if (list[i] != null && _spawnUsed.TryGetValue(list[i], out v)) u += v; }
             return u;
         }
 
@@ -1502,41 +1719,235 @@ namespace Armoury
             try
             {
                 var b = Of(c);
-                if (b == null || !b.Zero || _watchPoolCap < 0) return -1;
-                return Math.Max(0, (int)Math.Floor(_watchPoolCap - WatchLiveMen() - WatchUsed()));
+                if (b == null || !b.Zero) return -1;
+                bool ff = IsFf(c); int cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
+                if (cap < 0) return -1;
+                return Math.Max(0, (int)Math.Floor(cap - PoolLiveMen(ff) - PoolUsed(ff)));
             }
             catch (Exception e) { Stumble("WatchRoom", e); return -1; }
         }
 
-        /// <summary>Straz bez zoldu: werbunek partii staje na pulapie w ludziach (limit w zlocie przy zoldzie 0 nie wiaze).</summary>
-        public static bool RecruitPrefix(MobileParty __0)
+        /// <summary>Straz bez zoldu: werbunek partii staje na pulapie w ludziach (limit w zlocie przy zoldzie 0 nie wiaze). Recenzja wyspy-wolni: druzyny towarzyszy
+        /// gracza-wasala WL (AI gry, CheckRecruiting) - ta sama pula WL (R1-4 / R2-2); WL3 sprawdza jedzenie dla calej partii, ktora gra moze dobrac w tym wywolaniu
+        /// (R1-6); __state - ludzie druzyny WL przed werbunkiem (RecruitPostfix: droga "werbunek" i kontrolka WL3). Straz - bez zmian.</summary>
+        public static bool RecruitPrefix(MobileParty __0, Settlement __1, RecruitmentCampaignBehavior __instance, out int __state)
         {
+            __state = -1;
             try
             {
-                if (__0 == null || !CrownGifts.IsWatchParty(__0)) return true;
+                if (__0 == null) return true;
                 var c = OwnerOf(__0);
-                var b = Of(c);
-                if (b == null || !b.Zero || _watchPoolCap < 0) return true;
-                if (WatchLiveMen() < _watchPoolCap) return true;   // 2: pula calej Strazy
-                _dRecruitBlock++;
-                return false;
+                bool playerFf = c != null && c == Clan.PlayerClan && !__0.IsMainParty && CrownGifts.PlayerFreeFolkVassal;
+                if (!playerFf && !CrownGifts.IsUnpaidParty(__0)) return true;
+                bool ffParty = playerFf || (IsFf(c) && CrownGifts.IsUnpaidClan(c));
+                // WL3 (wyspy-wolni): druzyna lorda AI Wolnych Ludzi werbuje tylko, gdy po werbunku ma jedzenie na tyle dni, ile gra wymaga do najazdu
+                // (NeededFoodsInDaysThresholdForRaid - z modelu). Recenzja R1-6: "po werbunku" = z cala partia, ktora gra moze dobrac w tym wywolaniu (najemnicy
+                // z karczmy do miejsca w druzynie + po jednym od kazdego notabla - RecruitmentCampaignBehavior.CheckRecruiting / RecruitVolunteersFromNotable). Gracz - poza
+                if (FfFoodGateOn && ffParty && __0.IsLordParty && !__0.IsMainParty)
+                {
+                    float need = 8f;
+                    try { need = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { need = 8f; }
+                    if (ReaverLaw.FoodDays(__0, RecruitBatch(__0, __1, __instance)) < need) { _ff.FoodBlock++; return false; }
+                }
+                bool ff; int cap;
+                if (playerFf) ff = true;
+                else
+                {
+                    var b = Of(c);
+                    if (b == null || !b.Zero) return true;
+                    ff = IsFf(c);
+                }
+                cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
+                if (cap >= 0 && PoolLiveMen(ff) >= cap)   // 2: pula calej Strazy
+                {
+                    if (ff) _ff.RecruitBlock++; else _dRecruitBlock++;
+                    return false;
+                }
+                if (ffParty && __0.IsLordParty && __0.MemberRoster != null) __state = __0.MemberRoster.TotalRegulars + 1;   // + 1: 0 = prefiks nie biegl
+                return true;
             }
             catch (Exception e) { Stumble("RecruitPrefix", e); return true; }
         }
 
-        public static bool GarRecruitPrefix(Town __0)
+        /// <summary>Recenzja R1-6: najwieksza partia, jaka gra moze dobrac jednym CheckRecruiting - najemnicy z karczmy miasta (TownMercenaryData.Number) i po jednym
+        /// ochotniku od kazdego zywego notabla, nie wiecej niz wolne miejsce w druzynie; najmniej 1.</summary>
+        private static int RecruitBatch(MobileParty mp, Settlement st, RecruitmentCampaignBehavior rcb)
+        {
+            try
+            {
+                int room = mp.Party != null ? mp.Party.PartySizeLimit - mp.Party.NumberOfAllMembers : 1;
+                int n = 0;
+                if (st != null)
+                {
+                    var ns = st.Notables;
+                    if (ns != null) for (int i = 0; i < ns.Count; i++) if (ns[i] != null && ns[i].IsAlive) n++;
+                    if (st.IsTown && st.Town != null && rcb != null)
+                    {
+                        var md = rcb.GetMercenaryData(st.Town);
+                        if (md != null && md.TroopType != null) n += Math.Max(0, md.Number);
+                    }
+                }
+                return Math.Max(1, Math.Min(room, n));
+            }
+            catch { return 1; }
+        }
+
+        /// <summary>Recenzja R1-2 / R1-6 (pomiar): przyrost druzyny WL z werbunku gry (droga "werbunek") i werbunek przepuszczony przez WL3, po ktorym druzyna ma
+        /// jedzenie ponizej progu (ile razy bramka sie pomylila).</summary>
+        public static void RecruitPostfix(MobileParty __0, int __state)
+        {
+            if (__state <= 0 || __0 == null || __0.MemberRoster == null) return;   // 0 - nasz prefiks nie biegl (wczesniejszy prefiks bool zwrocil false)
+            try
+            {
+                int d = __0.MemberRoster.TotalRegulars - (__state - 1);
+                if (d <= 0) return;
+                _ff.InRecruit += d;
+                if (FfFoodGateOn && !__0.IsMainParty)
+                {
+                    float need = 8f;
+                    try { need = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { need = 8f; }
+                    if (ReaverLaw.FoodDays(__0, 0) < need) _ff.FoodMiss++;
+                }
+            }
+            catch (Exception e) { Stumble("RecruitPostfix", e); }
+        }
+
+        /// <summary>Recenzja R1-2: werbunek jencow AI (RecruitPrisonersCampaignBehavior.DailyTickAIMobileParty, raz na dobe) - druzyna lorda WL bez zoldu (i druzyna
+        /// towarzysza gracza-wasala) przy pelnej puli nie wciela jencow; ta sama bramka puli co CheckRecruiting (jency juz jedza z druzyna - bez bramki WL3). Calej
+        /// metody, nie RecruitPrisonersAi - postfiksy ksiag na RecruitPrisonersAi (PeopleBook, LosersFlee) biegna takze po false i ksiegowalyby wcielenie, ktorego
+        /// nie bylo. Skutek uboczny: przy pelnej puli jency tej druzyny nie nabieraja gotowosci (conformity) - wcielenie i tak stoi. Straz - bez zmian.</summary>
+        public static bool FfPrisonPrefix(MobileParty __0, out int __state)
+        {
+            __state = -1;
+            try
+            {
+                if (__0 == null || !__0.IsLordParty || __0.IsMainParty || __0.PrisonRoster == null || __0.PrisonRoster.TotalRegulars <= 0 || __0.MemberRoster == null) return true;
+                var c = OwnerOf(__0);
+                bool ff = c != null && c == Clan.PlayerClan ? CrownGifts.PlayerFreeFolkVassal : (IsFf(c) && Of(c) != null && Of(c).Zero);
+                if (!ff) return true;
+                int cap = PoolCap(true);
+                if (cap >= 0 && PoolLiveMen(true) >= cap) { _ff.PrisonBlock++; return false; }
+                __state = __0.MemberRoster.TotalRegulars + 1;
+                return true;
+            }
+            catch (Exception e) { Stumble("FfPrisonPrefix", e); return true; }
+        }
+
+        public static void FfPrisonPostfix(MobileParty __0, int __state)
+        {
+            if (__state <= 0 || __0 == null || __0.MemberRoster == null) return;
+            try { int d = __0.MemberRoster.TotalRegulars - (__state - 1); if (d > 0) _ff.InPrison += d; }
+            catch (Exception e) { Stumble("FfPrisonPostfix", e); }
+        }
+
+        /// <summary>Przyrost zalogi z werbunku od notabli (TickAutoRecruitmentGarrisonChange): bramka puli (GarGate, liczniki WL tylko tutaj - recenzja R1-10);
+        /// __state - ludzie zalogi WL przed (GarRecruitPostfix: droga "zalogi").</summary>
+        public static bool GarRecruitPrefix(Town __0, out int __state)
+        {
+            __state = -1;
+            bool go = GarGate(__0, true);
+            try
+            {
+                var st = __0 != null ? __0.Settlement : null;
+                var g = __0 != null ? __0.GarrisonParty : null;
+                if (go && st != null && g != null && g.MemberRoster != null && CrownGifts.IsFreeFolk(st.MapFaction)) __state = g.MemberRoster.TotalRegulars + 1;
+            }
+            catch { __state = -1; }
+            return go;
+        }
+
+        public static void GarRecruitPostfix(Town __0, int __state)
+        {
+            if (__state <= 0 || __0 == null) return;
+            try { var g = __0.GarrisonParty; if (g != null && g.MemberRoster != null) { int d = g.MemberRoster.TotalRegulars - (__state - 1); if (d > 0) _ff.InGar += d; } }
+            catch (Exception e) { Stumble("GarRecruitPostfix", e); }
+        }
+
+        /// <summary>Recenzja R1-10: przyrost zalogi z modelu (TickGarrisonChangeForTown). Straz - ta sama bramka i ten sam licznik co dotad. Wolni Ludzie: przy K1
+        /// ArmsFromPeople (GarrisonGrowthOnlyRecruits) przyrost z modelu i tak 0 - przepuszczamy (nasz false pomijal dalszy prefiks bool ArmsFromPeople, a ten gubil
+        /// miasta WL w "przyrost z modelu zablokowany"); bez K1 - bramka puli bez licznikow WL (liczy tylko werbunek).</summary>
+        public static bool GarGrowthPrefix(Town __0)
         {
             try
             {
                 var st = __0 != null ? __0.Settlement : null;
-                if (st == null || !CrownGifts.IsWatch(st.MapFaction)) return true;
-                var b = Of(st.OwnerClan);
-                if (b == null || !b.Zero || _watchPoolCap < 0) return true;
-                if (WatchLiveMen() < _watchPoolCap) return true;   // 2: pula calej Strazy
-                _dGarBlock++;
+                if (st != null && CrownGifts.IsFreeFolk(st.MapFaction) && ArmsFromPeople.GarrisonOn) return true;
+            }
+            catch { }
+            return GarGate(__0, false);
+        }
+
+        /// <summary>Bramka puli zalogi (Straz 182 i Wolni Ludzie WL1/WL2; zaloga gracza-wasala WL - ta sama pula, recenzja R1-4). countFf - liczniki WL.</summary>
+        private static bool GarGate(Town t, bool countFf)
+        {
+            try
+            {
+                var st = t != null ? t.Settlement : null;
+                if (st == null || !CrownGifts.IsUnpaidRealm(st.MapFaction)) return true;
+                var oc = st.OwnerClan;
+                bool playerFf = oc != null && oc == Clan.PlayerClan && CrownGifts.IsFreeFolk(st.MapFaction) && CrownGifts.PlayerFreeFolkVassal;
+                bool ff;
+                if (playerFf) ff = true;
+                else
+                {
+                    var b = Of(oc);
+                    if (b == null || !b.Zero) return true;
+                    ff = IsFf(oc);
+                }
+                int cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
+                if (cap < 0) return true;
+                if (PoolLiveMen(ff) < cap)   // 2: pula calej Strazy
+                {
+                    // WL2: zalogi Wolnych Ludzi rosna tylko, dopoki wszystkie razem < FreeFolkGarrisonPoolShare puli ([L] walcza w polu, nie w murach); ponad - stoja (bez zwolnien)
+                    if (!ff || !FfFromPeopleOn) return true;
+                    var s = Settings.Current;
+                    if (s == null || FfLiveGarrisons() < FfGarShare(s) * cap) return true;
+                    if (countFf) _ff.GarShareBlock++;
+                    return false;
+                }
+                if (ff) { if (countFf) _ff.GarBlock++; } else _dGarBlock++;
                 return false;
             }
             catch (Exception e) { Stumble("GarRecruitPrefix", e); return true; }
+        }
+
+        /// <summary>WL1/WL2: odcinek linii 166 - pula Wolnych Ludzi (z ludu albo ze zlota), ludzie, wstrzymania; liczniki wstrzyman zerowane po linii.</summary>
+        private static string FfSegment(Settings s)
+        {
+            var sb = new StringBuilder(400);
+            sb.Append(" | Wolni Ludzie bez zoldu (WL1, Free Folk Unpaid ").Append(CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie").Append("): w ludziach ").Append(_ff.Men)
+              .Append(" (zalogi ").Append(_ff.Gar).Append(") / pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv))
+              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfLevyShare(s)).ToString("0.0", Inv) + "% x ludzie "
+                      + Math.Round(_ff.People).ToString("0", Inv) + "; " : (FfFromPeopleOn ? "WL2 tak, ludzi jeszcze nie policzono - pula ze zlota; " : "WL2 nie; "))
+              .Append("ze zlota ").Append(_ff.DCap < 0 ? "-" : _ff.DCap.ToString(Inv)).Append(')')
+              .Append(", zalogi ").Append(_ff.Cap > 0 ? (100.0 * _ff.Gar / _ff.Cap).ToString("0", Inv) + "% puli" : "-").Append(" (rosna do ").Append((100.0 * FfGarShare(s)).ToString("0", Inv)).Append("%)")
+              .Append("; werbunek wstrzymany: pula ").Append(_ff.RecruitBlock).Append(", jedzenie (WL3) ").Append(_ff.FoodBlock)
+              .Append("; przyrost zalog wstrzymany: pula ").Append(_ff.GarBlock).Append(", zalogi ponad udzial puli (WL2) ").Append(_ff.GarShareBlock)
+              .Append("; nowe partie wstrzymane ").Append(_ff.SpawnBlock)
+              .Append("; rody ludzie/udzial: ").Append(_ff.Detail.Length > 0 ? _ff.Detail : "-");
+            // recenzja R1-2: drogi przyrostu ludzi WL od poprzedniej linii (netto ponad znane drogi = dolna granica doplywu inna droga - straty nie sa liczone);
+            // R1-6: werbunek przepuszczony przez WL3 z jedzeniem po nim ponizej progu; R1-4: gracz-wasal w puli
+            long known = _ff.InRecruit + _ff.InPrison + _ff.InGar + _ff.InSpawn;
+            sb.Append("; przyrost WL (doba): netto ").Append(_ff.Net).Append(", drogi: werbunek ").Append(_ff.InRecruit).Append(", jency ").Append(_ff.InPrison)
+              .Append(", zalogi ").Append(_ff.InGar).Append(", nowe partie ").Append(_ff.InSpawn).Append(", netto ponad znane drogi ").Append(Math.Max(0L, _ff.Net - known))
+              .Append("; jency AI wstrzymani pula ").Append(_ff.PrisonBlock).Append(", WL3 przepuscil i po werbunku jedzenie ponizej progu ").Append(_ff.FoodMiss)
+              .Append("; gracz-wasal WL: ").Append(CrownGifts.PlayerFreeFolkVassal ? "ludzi " + _ff.PlayerMen.ToString(Inv) + " (zalogi " + _ff.PlayerGar.ToString(Inv) + "), zold " + (_ffPlayerUnpaid ? "0 (w puli)" : "zwykly (armia WL ponad 1.05 x pula)") : "nie");
+            _ff.RecruitBlock = _ff.GarBlock = _ff.SpawnBlock = _ff.FoodBlock = _ff.GarShareBlock = 0;
+            _ff.PrisonBlock = _ff.FoodMiss = 0; _ff.InRecruit = _ff.InPrison = _ff.InGar = _ff.InSpawn = 0;
+            return sb.ToString();
+        }
+
+        /// <summary>WL1: odcinek linii "Straz i Wolni Ludzie (4.15)" - zold Wolnych Ludzi na czlowieka (druzyny, zalogi), zold przyciety z braku w kiesie (SoldierPay,
+        /// wczoraj), druzyny z zaleglym zoldem (WarLedger) - z rozliczenia budzetu tej doby. Tylko odczyt.</summary>
+        internal static string FreeFolkNote()
+        {
+            var inv = Inv;
+            return " | WL bez zoldu (WL1, Free Folk Unpaid " + (CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie") + "): zold druzyn " + _ff.WagePar + " (ludzi " + _ff.MenPar + ", "
+                   + (_ff.MenPar > 0 ? ((double)_ff.WagePar / _ff.MenPar).ToString("0.00", inv) : "-") + " zl/czl), zalog " + _ff.WageGar + " (ludzi " + _ff.MenGar + ", "
+                   + (_ff.MenGar > 0 ? ((double)_ff.WageGar / _ff.MenGar).ToString("0.00", inv) : "-") + " zl/czl), zalegly zold (przyciety) " + _ff.Cut
+                   + ", druzyny z zaleglym zoldem " + _ff.DueParties + " (rody bez zoldu w puli " + _ff.Clans.Count + ")"
+                   + "; druzyny WL " + _ff.Parties + ": w glodzie " + _ff.Starving + ", jedzenie ponizej progu najazdu " + _ff.ShortFood
+                   + " (WL3 Free Folk Recruit Needs Food " + (FfFoodGateOn ? "tak" : "nie") + ")";
         }
 
         // ------------------------------------------------------------ linia "Budzet rodow (166)"
@@ -1556,6 +1967,10 @@ namespace Armoury
               .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej, zalog z celem ").Append(_dB4N)
               .Append(", na celu (zold >= 95% celu) ").Append(_dB4At).Append(", ponizej celu ").Append(_dB4Below).Append("; zold zalog ").Append(_dB4Wage).Append(" wobec celu ").Append(_dB4Tgt)
               .Append("; rodow z celem przycietym do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu ").Append(_dB4Scaled)
+              .Append(" | lup na zalogi (WW2, Reaver Loot To Crews ").Append(ReaverLaw.LootToCrewsOn ? "tak" : "nie").Append("): rodow ").Append(_dLootN)
+              .Append(", w oknie 28 dob (= podniesienie pulapu druzyn) ").Append(_dLoot.ToString("0", Inv)).Append(" zl/d")
+              .Append(", zold druzyn tych rodow ").Append(_dLootWage).Append(" (wobec koncowego pulapu druzyn z lupem i W5/W7 ").Append(_dLootCap).Append(")")
+              .Append(", lup do kosza wczoraj ").Append(ReaverLaw.LastLootIn)
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")
@@ -1585,6 +2000,7 @@ namespace Armoury
               .Append(" | Straz w ludziach ").Append(_dWatchMen).Append(" / pulap w ludziach ").Append(_dWatchCap < 0 ? "-" : _dWatchCap.ToString(Inv))
               .Append(" (werbunek wstrzymany ").Append(_dRecruitBlock).Append(", przyrost zalog wstrzymany ").Append(_dGarBlock)
               .Append("; jeden pulap calej Strazy (2), rody ludzie/udzial w pulapie: ").Append(_watchDetail.Length > 0 ? _watchDetail : "-").Append(")")
+              .Append(FfSegment(s))   // WL1/WL2: pula Wolnych Ludzi
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             if (_importN >= 0) { sb.Append(" Wczytano z zapisu: rodow ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
             Log.Info(sb.ToString());

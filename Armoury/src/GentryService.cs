@@ -166,7 +166,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (!On || s == null || mp == null || !mp.IsLordParty || mp.MemberRoster == null || mp.MemberRoster.TotalHeroes <= 1) return 0;
-                if (CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(mp)) return 0;
+                if (CrownGifts.IsUnpaidParty(mp)) return 0;   // Straz (182) i Wolni Ludzie (WL1) bez zoldu
                 return KnightCount(mp) * Math.Max(0, s.GentryKnightWage);
             }
             catch (Exception e) { Stumble("KnightWage", e); return 0; }
@@ -325,7 +325,7 @@ namespace Armoury
         {
             int wage = Math.Max(0, s.GentryKnightWage);
             if (wage <= 0) return;
-            if (CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(mp)) { _dWatch++; return; }   // Straz bez zoldu (182)
+            if (CrownGifts.IsUnpaidParty(mp)) { if (CrownGifts.IsWatchParty(mp)) _dWatch++; return; }   // Straz bez zoldu (182; licznik tylko Strazy), Wolni Ludzie (WL1)
             var pc = mp.ActualClan;
             Hero payer = mp.IsMainParty ? Hero.MainHero : (pc != null ? pc.Leader : null);
             if (payer == null || !payer.IsAlive || payer == h) return;

@@ -197,6 +197,8 @@ namespace Armoury
                 // PO prefiksie okna W11 Measure40 (ten sam priorytet, wpiety wczesniej; W11 przy czynnym prawie nie liczy - BkCapPre), PRZED O12 CirculationWindows i RealPayer
                 // (prefiksy void z parametrem referencyjnym - po naszym false pominiete, ich finalizery obsluguja stan domyslny); wpiete zawsze (U26), dzialaja przy kluczach; kazde we wlasnym try
                 try { WatchLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WatchLaw.ApplyAll", e); }
+                // WW0/WW3 (wyspy-wolni): decyzje AI najezdzcow (Zelazne Wyspy, Wolni Ludzie) - postfiks Low na tym samym AiHourlyTick co H1 (inna frakcja); wpiety zawsze, liczy zawsze, mnozy przy kluczu
+                try { ReaverLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReaverLaw.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);

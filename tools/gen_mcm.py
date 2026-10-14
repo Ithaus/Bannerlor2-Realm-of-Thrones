@@ -221,6 +221,14 @@ RANGES = {
     'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
+    # wyspy-wolni (decyzja Jeffa 14.10): udzialy przycinane w kodzie do 0..1 (ReaverLaw.Q / Qw), doby zaplaty 1..28 (ReaverLaw.PayDays), dziesiecina 0..1,
+    # pula Wolnych Ludzi 0..0.05 ludzi krainy (trzy miejsca - 0.018), udzial zalog 0..1 (ClanBudget.FfPool)
+    'ReaverIronPriceShare': (0.0, 1.0, "0.00"),
+    'ReaverWaterfrontShare': (0.0, 1.0, "0.00"),
+    'ReaverRaidPayDays': (1.0, 28.0, "0"),
+    'SeaRaidersHarbourTithe': (0.0, 1.0, "0.00"),
+    'FreeFolkLevyShare': (0.0, 0.05, "0.000"),
+    'FreeFolkGarrisonPoolShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

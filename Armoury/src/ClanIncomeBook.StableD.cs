@@ -33,7 +33,7 @@ namespace Armoury
         internal static bool StableDOn { get { var s = Settings.Current; return s != null && s.ClanIncomeBookEnabled && s.ClanIncomeBookStableD; } }
 
         // czesci wplywu doby rodu; QDouble jest "w tym" jednorazowych (poza suma)
-        private const int QLand = 0, QOwn = 1, QCrown = 2, QContract = 3, QAssets = 4, QOnce = 5, QOther = 6, QFamily = 7, QInflow = 8, QDouble = 9, Q = 10;
+        private const int QLand = 0, QOwn = 1, QCrown = 2, QContract = 3, QAssets = 4, QOnce = 5, QOther = 6, QFamily = 7, QInflow = 8, QDouble = 9, QReaver = 10, Q = 11;   // WW2: QReaver "w tym" jednorazowych (jak QDouble), poza suma
 
         private sealed class Ring
         {
@@ -149,6 +149,9 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("NoteWageCut", e); }
         }
+
+        /// <summary>WL1 (wyspy-wolni): zold rodu przyciety z braku w kiesie od ostatniej doby ksiegi (SoldierPay - K39; ClanBudget.Daily biegnie przed ksiega). Tylko odczyt.</summary>
+        internal static long CutTodayOf(Clan c) { int v; return c != null && _cutToday.TryGetValue(c, out v) ? v : 0; }
 
         /// <summary>169c: odczyty dla linii pomiaru (Measure169c) - kiesy rodziny, wplyw ostatniej doby D169, zold ostatniego rozliczenia.</summary>
         internal static long FamilyGoldOf(Clan c) { try { return c == null ? 0 : FamilyGold(c); } catch { return 0; } }
@@ -452,6 +455,7 @@ namespace Armoury
             _t[QFamily] = family;
             _t[QInflow] = a + rent + r.Today;
             _t[QDouble] = Math.Min(Math.Max(0L, once), r.TodayEstates);
+            _t[QReaver] = Math.Min(Math.Max(0L, once - _t[QDouble]), Math.Max(0L, r.TodayReaver));   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (nigdy wiecej niz one)
             PartRing pr;
             if (!_parts.TryGetValue(c, out pr)) { pr = new PartRing(); _parts[c] = pr; }
             pr.Push(_t);
@@ -500,6 +504,7 @@ namespace Armoury
         {
             public double D, Land, LandVTax, LandRent, LandTown, LandCastle, LandLoose, Crown, Contract, Assets;
             public double Own, Once, Double, Other, Family, Inflow, SumParts; public int Days;
+            public double Reaver;   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (srednia jak Once)
         }
 
         private static bool TryStable(Clan c, out StableParts p)
@@ -524,6 +529,7 @@ namespace Armoury
             p.Crown = pr.Avg(QCrown); p.Contract = pr.Avg(QContract); p.Assets = pr.Avg(QAssets);
             p.D = p.Land + p.Crown + p.Contract + p.Assets;
             p.Own = pr.Avg(QOwn); p.Once = pr.Avg(QOnce); p.Double = pr.Avg(QDouble); p.Other = pr.Avg(QOther); p.Family = pr.Avg(QFamily); p.Inflow = pr.Avg(QInflow);
+            p.Reaver = pr.Avg(QReaver);
             p.SumParts = pr.Avg(QLand) + p.Own + p.Crown + p.Contract + p.Assets + p.Once + p.Other + p.Family;
             p.Days = pr.Filled;
             return true;
@@ -574,7 +580,8 @@ namespace Armoury
             {
                 StableParts p;
                 if (!StableDOn || !TryStable(c, out p)) return false;
-                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double);
+                // WW2: lup na zalogi poza D (kosz WW2) - recenzja R1-5 / R2-6: tylko u rodow z oknem (WindowClan); Wolni Ludzie przy WL1 i najemnicy Wysp - lup w D (W-1)
+                d = Math.Max(0, p.D); days = p.Days; once = Math.Max(0, p.Once - p.Double - (ReaverLaw.WindowClan(c) ? p.Reaver : 0));
                 return true;
             }
             catch { return false; }

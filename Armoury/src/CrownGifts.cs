@@ -68,6 +68,76 @@ namespace Armoury
         }
 
 
+        /// <summary>WL1 (wyspy-wolni, decyzja Jeffa 14.10 "Wolni Ludzie nie pobierali kasy jak Nocna Straz"): Wolni Ludzie bez zoldu - klucz FreeFolkUnpaid, jak
+        /// WatchUnpaid tylko z budzetem rodow 166 (pulap w ludziach trzyma liczebnosc).</summary>
+        internal const string FreeFolkId = "freefolk";
+        internal static bool FreeFolkUnpaidOn { get { var s = Settings.Current; return s != null && s.FreeFolkUnpaid && s.ClanBudgetEnabled; } }
+        internal static bool IsFreeFolk(IFaction f) { return f != null && f.StringId == FreeFolkId; }
+
+        /// <summary>Krolestwo, ktorego wojsko sluzy bez zoldu: Straz przy WatchUnpaid, Wolni Ludzie przy FreeFolkUnpaid (jedna regula 182 / WL1). Dary koron - tylko Straz (IsWatch).</summary>
+        internal static bool IsUnpaidRealm(IFaction f) { return (WatchUnpaidOn && IsWatch(f)) || (FreeFolkUnpaidOn && IsFreeFolk(f)); }
+
+        /// <summary>Rod bez zoldu (b.Zero budzetu 166, miara W5/W6 gracza): rod Strazy przy WatchUnpaid (182 bez zmian); rod Wolnych Ludzi przy FreeFolkUnpaid, ale
+        /// NIE kompania najemna w ich sluzbie (recenzja wyspy-wolni R1-9 / R2-2: najemnik bierze zold z umowy 185, nie walczy "za sprawe").</summary>
+        internal static bool IsUnpaidClan(Clan c)
+        {
+            if (c == null) return false;
+            return (WatchUnpaidOn && IsWatch(c.Kingdom)) || (FreeFolkUnpaidOn && IsFreeFolk(c.Kingdom) && !c.IsUnderMercenaryService);
+        }
+
+        /// <summary>Recenzja wyspy-wolni (R1-4 / R2-2): rod gracza jest wasalem Wolnych Ludzi bez zoldu (WL1; nie najemnik) - jego druzyny i zalogi licza sie do puli WL.</summary>
+        internal static bool PlayerFreeFolkVassal
+        {
+            get { try { var pc = Clan.PlayerClan; return FreeFolkUnpaidOn && pc != null && IsFreeFolk(pc.Kingdom) && !pc.IsUnderMercenaryService; } catch { return false; } }
+        }
+
+        /// <summary>Partia bez zoldu: partia lorda, zaloga albo gracz krolestwa bez zoldu (IsUnpaidRealm). Straz - jak 182 (bez zmian). Wolni Ludzie (recenzja):
+        /// kompania najemna w ich sluzbie bierze zold (umowa 185); partie i zalogi gracza-wasala - bez zoldu tylko, dopoki cala armia WL z graczem miesci sie
+        /// w puli (ClanBudget.FfPlayerUnpaid, liczone raz na dobe) - ekran werbunku gracza nie ma bramki puli, wiec ludzie ponad pule kosztuja zwykly zold.</summary>
+        internal static bool IsUnpaidParty(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || !(mp.IsLordParty || mp.IsGarrison || mp.IsMainParty)) return false;
+                var f = mp.MapFaction;
+                if (WatchUnpaidOn && IsWatch(f)) return true;                       // 182 - bez zmian
+                if (!FreeFolkUnpaidOn || !IsFreeFolk(f)) return false;
+                Clan c;
+                if (mp.IsGarrison) { var st = mp.CurrentSettlement ?? mp.HomeSettlement; c = st != null ? st.OwnerClan : null; }
+                else c = mp.ActualClan;
+                if (c != null && c.IsUnderMercenaryService) return false;           // najemnik w sluzbie WL - zold z umowy
+                if (c != null && c == Clan.PlayerClan) return ClanBudget.FfPlayerUnpaid;   // gracz-wasal - w granicach puli
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>WW-J (wyspy-wolni, decyzja Jeffa 14.10 "Tak, polowa w lupie" - Zelazny Czlowiek bierze zelazna cene): ta sama regula "sluzby bez zoldu
+        /// w zlocie" co Straz (182) i Wolni Ludzie (WL1) - Straz i WL: zold jednostki 0 (IsUnpaidParty, MountedWage.WagePostfix); zalogi okretow Wysp: w zlocie
+        /// IronbornGoldWageShare zoldu partii (MountedWage.TotalPostfix - dokladnie polowa wyniku modelu zoldu, z linia w podpowiedzi zoldu). Klucz
+        /// IronbornHalfWageInPlunder (bez wymogu budzetu 166 - pulap w zlocie dalej trzyma liczebnosc).</summary>
+        internal const float IronbornGoldWageShare = 0.5f;
+        internal static bool IronbornHalfOn { get { var s = Settings.Current; return s != null && s.IronbornHalfWageInPlunder; } }
+
+        /// <summary>WW-J: rod krolestwa Zelaznych Wysp (takze rod gracza-wasala), nie kompania najemna w ich sluzbie (zold z umowy 185, jak najemnicy WL).</summary>
+        internal static bool IsIronbornCrewClan(Clan c)
+        {
+            try { return IronbornHalfOn && c != null && !c.IsUnderMercenaryService && c.Kingdom != null && c.Kingdom.StringId == ReaverLaw.IronId; }
+            catch { return false; }
+        }
+
+        /// <summary>WW-J: zaloga okretu - druzyna w polu (partia lorda, druzyna gracza i jego towarzyszy) rodu IsIronbornCrewClan; zalogi twierdz i karawany - nie.</summary>
+        internal static bool IsIronbornCrew(MobileParty mp)
+        {
+            try { return mp != null && (mp.IsLordParty || mp.IsMainParty) && !mp.IsGarrison && !mp.IsCaravan && IsIronbornCrewClan(mp.ActualClan); }
+            catch { return false; }
+        }
+
+        /// <summary>WW-J: czesc zoldu partii w zlocie (zaloga okretu Wysp 0.5, reszta 1) - przelicznik zlota na ludzi tam, gdzie kod liczy zold czlowieka z modelu
+        /// jednostki (zwolnienia 166) albo ze sredniej gry (rod bez ludzi: W5, W6, nowa partia, "na miare srodkow"). Straz i WL bez zoldu - 1 (pulap w ludziach).</summary>
+        internal static double GoldWageShare(MobileParty mp) { return IsIronbornCrew(mp) ? IronbornGoldWageShare : 1.0; }
+        internal static double GoldWageShare(Clan c) { return IsIronbornCrewClan(c) ? IronbornGoldWageShare : 1.0; }
+
         /// <summary>Partia Strazy (partia lorda rodu Strazy, zaloga osady Strazy, takze gracz w Strazy).</summary>
         internal static bool IsWatchParty(MobileParty mp)
         {

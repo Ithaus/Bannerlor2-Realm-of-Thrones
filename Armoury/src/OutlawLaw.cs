@@ -103,6 +103,12 @@ namespace Armoury
         private static int _sellBands, _sellFenced, _sellBeyond, _sellSellers, _sellSpareBands, _sellUnits, _sellIron, _sellWood, _sellFood, _sellAnimals, _sellStumbles;
         private static int _leftBands, _leftUnits, _leftPoor, _leftNoTown, _leftBattle, _leftNoPurse, _leftQuest, _leftUndead;
         private static long _sellPaid, _sellWorth;
+        // WW4 (wyspy-wolni, port korsarzy): bandy Sea Raiders z ladunkiem, sprzedaz w portach Wysp (zaplata bandom, dzialka pasera), dziesiecina do panow portow,
+        // zycie w portach Wysp, bandy z ladunkiem poza 600 od portu Wysp (licznik dnia - linia "Paser:")
+        private static int _ww4Bands, _ww4Far, _ww4Units; private static long _ww4Paid, _ww4Worth, _ww4Tithe, _ww4Life;
+        private static readonly HashSet<Clan> _ww4Clans = new HashSet<Clan>();
+        /// <summary>WW4: dziesiecina korsarzy ostatniej doby band (kiesy band -> glowy rodow panow portow Wysp) - pozycja Obiegu (OutlawLaw.Daily biegnie przed ksiega).</summary>
+        internal static long LastHarbourTithe;
         // sprzedaz wedlug odleglosci bandy od miasta, ktore kupilo: do 50, 50-100, dalej (Jeff 06.10: "promien 50 ... to moze i 100, sprawdz")
         private const float ZoneNear = 50f, ZoneMid = 100f;
         private static readonly int[] _zoneUnits = new int[3];
@@ -126,7 +132,7 @@ namespace Armoury
         internal static void Reset()
         {
             _pool.Clear(); _seeded = false; _nodes = null; _near.Clear(); _regionOf.Clear(); _commonerOf.Clear(); _empty.Clear(); _refusedHour.Clear();
-            FenceNewDay(); _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
+            FenceNewDay(); LastHarbourTithe = 0; _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
             _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
             _hearthRegion.Clear(); H3NewDay(); _errH3 = false;        // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii
@@ -152,6 +158,8 @@ namespace Armoury
             _sellBands = _sellFenced = _sellBeyond = _sellSellers = _sellSpareBands = _sellUnits = _sellIron = _sellWood = _sellFood = _sellAnimals = _sellStumbles = 0;
             _leftBands = _leftUnits = _leftPoor = _leftNoTown = _leftBattle = _leftNoPurse = _leftQuest = _leftUndead = 0;
             _sellPaid = _sellWorth = 0; _sellTowns.Clear();
+            LastHarbourTithe = _ww4Tithe;
+            _ww4Bands = _ww4Far = _ww4Units = 0; _ww4Paid = _ww4Worth = _ww4Tithe = _ww4Life = 0; _ww4Clans.Clear();   // WW4
             Array.Clear(_zoneUnits, 0, _zoneUnits.Length); Array.Clear(_zonePaid, 0, _zonePaid.Length);
             _hideEntries = _hideStumbles = 0; _hideBand = _hideHoard = _hideStash = 0;
             _hoardStart = _hoardStartWant = _startNothing = _hoardGear = _lifeBands = _lifeHoards = _goneFought = _goneDisbanded = 0; _lifeStumbles = _upStumbles = 0;
@@ -1703,7 +1711,7 @@ namespace Armoury
             if (Undead.Party(p)) return null;
             var s = Settings.Current;
             float radius = Math.Max(1f, s.OutlawFenceRadius);
-            if (reach == null) { bool beyond; reach = Reach(p, radius, out beyond); }
+            if (reach == null) { bool beyond; reach = Reach(p, radius, out beyond, false); }   // recenzja R2-8: zakup sprzetu - bez portow Wysp jako "domu" (WW4 tylko sprzedaz)
             float near = Math.Max(0f, s.OutlawFenceMarkup), far = Math.Max(near, s.OutlawFenceMarkupFar);
             ItemObject best = null;
             foreach (var b in reach)
@@ -1806,6 +1814,7 @@ namespace Armoury
             public float Share;         // udzial bandy w cenie skupu tego miasta
             public bool Skip;           // na ten stos to miasto odpada (nie stac go, zerowy udzial, zwierze nie z tej krainy)
             public int Price; public double Net, Due; public long Worth; public int Moved;
+            public bool Harbour;        // WW4: port Zelaznych Wysp jako "dom" bandy Sea Raiders (warunki przy miescie, dziesiecina panu portu)
         }
 
         /// <summary>Warunki pasera zmieniaja sie rowno z odlegloscia: `near` przy miescie, `far` na granicy promienia (i dalej).</summary>
@@ -1819,7 +1828,7 @@ namespace Armoury
         /// zadnego, banda i tak ma pasera - najblizsze otwarte miasto swiata, na warunkach z granicy promienia (`beyond`).
         /// Pusta lista tylko wtedy, gdy na mapie nie ma ani jednego nieoblezonego miasta.
         /// </summary>
-        private static List<Bid> Reach(MobileParty p, float radius, out bool beyond)
+        private static List<Bid> Reach(MobileParty p, float radius, out bool beyond, bool sell)
         {
             beyond = false;
             var list = new List<Bid>();
@@ -1838,6 +1847,34 @@ namespace Armoury
             {
                 beyond = true;
                 list.Add(new Bid { St = nearest, Town = nearest.Town, Dist = radius, Real = (float)Math.Sqrt(nd) });
+            }
+            // WW4 (wyspy-wolni): banda Sea Raiders ma porty Zelaznych Wysp do 600 jako "dom" - warunki przy miescie (Dist 0) przy SPRZEDAZY lupu (projekt 2.4);
+            // bandy wybieraja najlepsza oferte jak dotad. Recenzja R2-8: zakup sprzetu u pasera (FindAtFence) - lista jak w 63aaaedf (polki portow Wysp to zapasy
+            // lordow Wysp; zakup "u bram" do 600 byl poza decyzja Jeffa). Klucz off albo inna banda - lista jak dotad
+            if (sell && ReaverLaw.HarbourOn && ReaverLaw.IsSeaRaider(p))
+            {
+                try
+                {
+                    bool any = false;
+                    foreach (var h in ReaverLaw.Harbours())
+                    {
+                        if (h == null || h.Town == null || h.ItemRoster == null || h.IsUnderSiege) continue;
+                        float d = ReferenceEquals(h, cur) ? 0f : (float)Math.Sqrt(pos.DistanceSquared(h.GetPosition2D));
+                        if (d > ReaverLaw.HarbourRadius) continue;
+                        any = true;
+                        Bid b = null;
+                        foreach (var x in list) if (ReferenceEquals(x.St, h)) { b = x; break; }
+                        if (b == null) { b = new Bid { St = h, Town = h.Town, Real = d }; list.Add(b); }
+                        b.Dist = 0f; b.Harbour = true;
+                    }
+                    if (any && beyond)
+                    {
+                        // dom korsarza w zasiegu: miasto "poza promieniem" na warunkach granicy zostaje tylko, gdy samo nie jest portem Wysp
+                        beyond = false;
+                        list.RemoveAll(x => !x.Harbour && x.Dist >= radius);
+                    }
+                }
+                catch (Exception e) { _sellStumbles++; if (!_errSell) { _errSell = true; Log.Error("OutlawLaw.Reach(WW4)", e); } }
             }
             return list;
         }
@@ -1898,7 +1935,15 @@ namespace Armoury
                     if (purse <= 0) continue;
                     int spend = Math.Min(purse, Math.Max(1, (int)(purse * share)));      // co najmniej moneta - drobna kiesa tez sie rozchodzi
                     var town = ReferenceEquals(p.CurrentSettlement, null) || !p.CurrentSettlement.IsTown ? NearestOpenTown(p.Position.ToVec2()) : p.CurrentSettlement;
+                    // WW4 (wyspy-wolni): banda Sea Raiders poza miastem wydaje w najblizszym porcie Wysp do 600 (dom korsarza) zamiast w najblizszym miescie
+                    bool harb = false;
+                    if (ReaverLaw.HarbourOn && ReferenceEquals(town, p.CurrentSettlement) == false && ReaverLaw.IsSeaRaider(p))
+                    {
+                        float hd; var h = ReaverLaw.NearestHarbour(p.Position.ToVec2(), out hd);
+                        if (h != null) { town = h; harb = true; }
+                    }
                     if (town == null || town.Town == null || spend <= 0) continue;
+                    if (harb || (ReaverLaw.IsSeaRaider(p) && town.MapFaction != null && town.MapFaction.StringId == ReaverLaw.IronId)) _ww4Life += spend;
                     p.PartyTradeGold = purse - spend;
                     int folk = TownFolk.EarnService(town, spend, TownFolk.KLifeBand);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca)
                     town.Town.ChangeGold(spend - folk);
@@ -1998,9 +2043,14 @@ namespace Armoury
             }
             if (!cargo && !(spare && beasts)) return;
             if (cargo) _sellBands++;
+            if (cargo && ReaverLaw.IsSeaRaider(p))   // WW4 (pomiar): bandy Sea Raiders z ladunkiem i te poza 600 od portu Wysp
+            {
+                _ww4Bands++;
+                float hd; if (ReaverLaw.NearestHarbour(p.Position.ToVec2(), out hd) == null) _ww4Far++;
+            }
             float radius = Math.Max(1f, s.OutlawFenceRadius);
             bool beyond;
-            var bids = Reach(p, radius, out beyond);
+            var bids = Reach(p, radius, out beyond, true);
             if (bids.Count == 0)
             {
                 if (cargo) { _leftBands++; _leftNoTown++; _leftUnits += CargoUnits(pack, food); }
@@ -2087,7 +2137,16 @@ namespace Armoury
                 {
                     if (b.Moved <= 0) continue;
                     int pay = (int)b.Due;                                   // ulamek monety zostaje u pasera
-                    if (pay > 0) { b.Town.ChangeGold(-pay); p.PartyTradeGold += pay; }
+                    // WW4: z zaplaty pasera portu Wysp dla bandy Sea Raiders dziesiecina do glowy rodu pana portu (reszta - bandzie); inne - cala bandzie jak dotad
+                    int tithe = b.Harbour && pay > 0 ? ReaverLaw.HarbourTitheOf(b.St, pay) : 0;
+                    if (pay > 0) { b.Town.ChangeGold(-pay); p.PartyTradeGold += pay - tithe; }
+                    if (tithe > 0)
+                    {
+                        try { ReaverLaw.PayHarbourTithe(b.St, tithe); }
+                        catch { p.PartyTradeGold += tithe; tithe = 0; }    // wyjatek przy przelewie - dziesiecina zostaje u bandy (nic w nicosc)
+                        _ww4Tithe += tithe; var oc = b.St.OwnerClan; if (oc != null && tithe > 0) _ww4Clans.Add(oc);
+                    }
+                    if (b.Harbour) { _ww4Paid += pay; _ww4Worth += b.Worth; _ww4Units += b.Moved; }
                     if (pay > 0) MoneyLedger.Note169(MoneyLedger.N169Other, b.St, -pay);   // paczka 169: linia kas (tylko licznik; w bloku wraca sam)
                     _sellUnits += b.Moved; _sellPaid += pay; _sellWorth += b.Worth;
                     int zone = b.Real <= ZoneNear ? 0 : (b.Real <= ZoneMid ? 1 : 2);
@@ -2152,6 +2211,26 @@ namespace Armoury
             return sold;
         }
 
+        /// <summary>WW4 (pomiar, RW "nie wiem" 4): bandy i ludzie wedlug klanu bandyckiego (StringId klanu bandy).</summary>
+        private static string BandsByClan()
+        {
+            try
+            {
+                var n = new Dictionary<string, int[]>();
+                foreach (var p in MobileParty.AllBanditParties)
+                {
+                    if (p == null || !p.IsActive) continue;
+                    var c = p.ActualClan;
+                    string k = c != null && c.StringId != null ? c.StringId : "-";
+                    int[] a; if (!n.TryGetValue(k, out a)) { a = new int[2]; n[k] = a; }
+                    a[0]++; a[1] += p.MemberRoster != null ? p.MemberRoster.TotalManCount : 0;
+                }
+                if (n.Count == 0) return "-";
+                return string.Join(", ", n.OrderByDescending(kv => kv.Value[1]).Select(kv => kv.Key + " " + kv.Value[0] + "/" + kv.Value[1]).ToArray());
+            }
+            catch { return "?"; }
+        }
+
         /// <summary>Linia "Paser:" - raz na dobe, zaraz po linii "Wyrzutki:". Zeruje liczniki pasera, kryjowek i zywnosci.</summary>
         private static void FenceLog(Settings s, int boughtUnits, int boughtGold)
         {
@@ -2211,6 +2290,13 @@ namespace Armoury
                 }
                 else
                     sb.Append(" | skup lupu WYLACZONY w ustawieniach (bandy niczego nie sprzedaja)");
+                // WW4 (wyspy-wolni): port korsarzy - sprzedaz, dziesiecina i zycie band Sea Raiders w portach Wysp; bandy i ludzie wedlug klanu bandyckiego
+                sb.Append(" | korsarze Wysp (WW4, Sea Raiders Iron Harbour ").Append(ReaverLaw.HarbourOn ? "tak" : "nie").Append(", dziesiecina ")
+                  .Append(ReaverLaw.HarbourTithe.ToString("0.00", inv)).Append("): band Sea Raiders z ladunkiem ").Append(_ww4Bands)
+                  .Append(", sprzedaly w portach Wysp ").Append(_ww4Units).Append(" szt. za ").Append(_ww4Paid).Append(" zl (dzialka w kasach portow ").Append(_ww4Worth - _ww4Paid)
+                  .Append(" zl), dziesiecina ").Append(_ww4Tithe).Append(" zl do panow portow (rodow ").Append(_ww4Clans.Count).Append("), zycie w portach Wysp ").Append(_ww4Life)
+                  .Append(" zl; band z ladunkiem poza ").Append(((int)ReaverLaw.HarbourRadius).ToString(inv)).Append(" od portu Wysp ").Append(_ww4Far)
+                  .Append(" | bandy wedlug klanu (band/ludzi): ").Append(BandsByClan());
                 sb.Append(" | kupno sprzetu u pasera: ").Append(boughtUnits).Append(" awansow za ").Append(boughtGold).Append(" zl (w tym z kas kryjowek ").Append(_hoardGear).Append(" zl)")
                   .Append(" | zycie w miastach: bandy wydaly ").Append(_lifeBands).Append(" zl, kryjowki z nadwyzki ").Append(_lifeHoards).Append(" zl")
                   .Append(" | kryjowki: wejsc band ").Append(_hideEntries);

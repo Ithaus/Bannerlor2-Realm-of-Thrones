@@ -201,7 +201,7 @@ namespace Armoury
                         else if (!ClanBudget.PartyCapOwn(c, out pc0)) { row.NoBudget++; continue; }   // Straz bez zoldu, najemnik, rod bez budzetu 166 (pierwsza doba sesji)
                         int limit, men; long wage;
                         if (!NaParties(c, out limit, out men, out wage)) { if (pl) _plWhy = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
-                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage, Pl = pl };
+                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage * CrownGifts.GoldWageShare(c), Pl = pl };   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                         row.Cand++;
                         double need = NaCost(x, target);
                         if (pl) PlNote(x, need);                                                 // W6b: do linii - zold, ludzie, limit i potrzeba gracza
@@ -468,6 +468,7 @@ namespace Armoury
                     parts.Add(new KeyValuePair<double, string>(r.Need, r.Name + ": garnek " + r.Pot + " (danina " + r.Aid + "), potrzeba " + Math.Round(r.Need).ToString("0", WtInv) + " u " + r.NeedN
                               + " rodow, poziom " + (r.Pot > 0 && r.NeedN > 0 ? (100 * r.Level).ToString("0.0", WtInv) + "%" : "-") + ", wyplacono " + r.Paid + " (rodow " + r.PaidN
                               + "), reszta " + (r.Pot - r.Paid)
+                              + (ClanBudget.LootOfKingdom(r.K) >= 1 ? ", lup WW2 " + Math.Round(ClanBudget.LootOfKingdom(r.K)).ToString("0", WtInv) : "")   // WW2: lup na zalogi w pulapie wlasnym rodow (wczoraj)
                               + (w5b ? ", ze skarbca ponad zapas " + r.CrownPaid + " z puli " + r.Crown + " (nadwyzka " + r.CrownSur + ", zapas wojny " + r.CrownRes + "), niepokryte "
                                        + Math.Floor(r.Uncov).ToString("0", WtInv) : "")
                               + (r.Rent > 0 || r.UncovPre >= 1 ? ", z rent M1 " + r.RentPaid + " (pula " + r.Rent + ", reszta wplywow " + r.RentAvail + ", przed M1 niepokryte "
