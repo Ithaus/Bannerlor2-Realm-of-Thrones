@@ -191,7 +191,7 @@ namespace Armoury
                 long pay = (long)Math.Floor(due);
                 long room = Math.Min((long)Math.Floor(excess), Math.Max(0, avail));   // zapas dni zostaje caly; najwyzej stan kiesy
                 if (pay > room) { pay = room; due = pay; }
-                if (peace) { long left = PtLeft(k); if (pay > left) { pay = left; due = pay; _ptCut++; } }   // M4: suma krolestwa najwyzej wczorajszy chleb korony
+                if (peace) { long left = PtLeft(k); if (pay > left) { pay = left; due = pay; _ptCut++; } }   // M4: suma krolestwa najwyzej budzet (wczorajszy chleb korony, najwyzej 0.5% lokaty)
                 if (pay > int.MaxValue) { pay = int.MaxValue; due = pay; }
                 // R22: oblezona osada nie placi (zostaje w kiesie ludu); niezaplacona reszta czeka jak byla
                 if (BesiegedPay.Holds(st, BesiegedPay.KFolkAid, pay, true))

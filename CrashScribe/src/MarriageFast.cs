@@ -41,7 +41,7 @@ namespace CrashScribe
     ///      generatora, gdy jest ktokolwiek), liczy szanse 0 i idzie dalej BEZ RandomFloat. My szukamy tylko pierwszego trafienia i
     ///      zuzywamy jeden krok (MBRandom.RandomInt(1); MBFastRandom.Next(int) to zawsze dokladnie jeden XorShift, bez wzgledu na argument).
     ///      W grze ocena szansy BK, ktorej tu nie wolamy, sama potrafi zuzyc krok generatora - stad inny stan losowy niz w oryginale (wyzej).
-    /// Reszta (szansa, RandomFloat, kontrola zalotow, MarriageAction.Apply, break) - przepisana 1:1 (jedyny wyjatek: prog rzutu wolnego lorda przy czynnej regule mnozy HAMULEC - nizej).
+    /// Reszta (szansa, RandomFloat, kontrola zalotow, MarriageAction.Apply, break) - przepisana 1:1 (jedyny wyjatek: prog rzutu wolnego lorda mnozy HAMULEC - nizej; staly mnoznik tylko przy czynnej regule, regulator zawsze).
     ///
     /// Dlaczego warunek pary mozna liczyc rzadziej (sprawdzone w dekompilacji gry 1.4.8, ROT, BK Redux, BKROTPatch):
     ///  - nie losuje (w grze 13.10: 0 krokow generatora w ok. 880 tys. ocen na dobe) i nie zmienia stanu gry: ROTMarriageModel (rody, wojna, wiek, wielkie rody, kultura, odleglosc domow, Mur) ->
@@ -94,7 +94,7 @@ namespace CrashScribe
     /// HAMULEC (MarriageChanceScale, decyzja Jeffa 13.10: "Przyhamuj, aby sluby zawieraly sie rzadziej") - ZMIANA ROZGRYWKI.
     /// Pomiar roczny (364 doby): 113 slubow AI-AI przed regula "tylko kandydaci z szansa", 215 z nia (ok. 0.59 na dobe, prawie liniowo) -
     /// wolni szlachcice, takze kandydatki dla gracza, koncza sie ok. 2 razy szybciej. Mnoznik (13.10 domyslnie 0.7, od 14.10 0.17 - nizej; zakres 0.1-1.0) obniza prog
-    /// rzutu "RandomFloat &lt; szansa" - TYLKO dla wolnego lorda przy CZYNNEJ regule (sciezka PickViable -> rzut w Decide). Kandydat jest
+    /// rzutu "RandomFloat &lt; szansa" - staly mnoznik (MarriageTargetPerYear = 0) TYLKO dla wolnego lorda przy CZYNNEJ regule (sciezka PickViable -> rzut w Decide; regulator - nizej). Kandydat jest
     /// wybierany jak dotad (sposrod tych z szansa > 0, bez mnoznika), rzut zuzywa ten sam jeden krok generatora. Szansa pary jest rzedu
     /// 0.001 na probe, wiec liczba slubow idzie w przyblizeniu wprost za mnoznikiem: 0.7 = ok. 150 na rok (szacunek, nie pomiar),
     /// 0.5 = mniej wiecej jak przed regula, 1.0 = prog bez zmian (dokladnie zachowanie sprzed hamulca). Lord z zyjacym malzonkiem, regula
@@ -106,10 +106,24 @@ namespace CrashScribe
     /// innej drogi slubow AI-AI w tym zestawie modow nie ma; BK x1.25 siedzi w szansie, ktora hamulec mnozy). Liniowo 0.7 x 48 / 146 = 0.23 (= 84 / 364),
     /// ale przy rzadszych slubach pula wolnych lordow rosnie (kazdy niezawarty slub = 2 wolnych, ktorzy dalej probuja) - model z dob biegu dwuletniego
     /// (ten sam model przewiduje dla 1.0 212-220 slubow w roku 1, pomiar 13.10: 215) daje przy 0.23 55-66 na rok, przy 0.17 42-52 (rok 1 i 2) - stad 0.17.
-    /// Oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) - osobno, mnoznik kalendarza 84 / rok (MarriageOfferYear.cs).
+    /// Oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) - osobno, caly proces x 84 / rok (MarriageOfferYear.cs).
+    ///
+    /// REGULATOR (recenzja 14.10, klucz MarriageTargetPerYear = 48; 0 = staly mnoznik jak wyzej). Staly mnoznik trzyma ok. 48 tylko w roku 1-2: w biegu
+    /// dwuletnim wolnych lordow z proba bylo stale 650-700 przy 291 slubach (582 osoby) - doplyw ok. 300 wolnych na rok (dorastajacy, wdowcy); przy ok. 48 slubach
+    /// (96 osob) pula rosnie ok. 200 na rok, a z nia sluby (model recenzji: rok 3 51-62, rok 6 64-86). Dlatego mnoznik liczony co dobe z celu:
+    ///  - kazdy rzut wolnego lorda NASZEJ drogi (bez biegu cienia; takze gdy regula "tylko kandydaci z szansa" stoi - wtedy rzut z kandydatem jak w ROT)
+    ///    dodaje do sumy doby szanse modelu num = oczekiwana liczbe slubow przy mnozniku 1.0 (rzuty sa niezalezne, wiec suma szans = oczekiwana liczba slubow);
+    ///  - srednia tej sumy z ostatnich 28 dob (pierwsze doby - srednia z tylu, ile jest; doba z rodami liczonymi przez oryginal ROT - stoi albo potkniecie - i
+    ///    pierwsza linia po wczytaniu, ktora obejmuje tylko czesc rodow, pominiete);
+    ///  - mnoznik nastepnej doby = (cel / CampaignTime.DaysInYear) / srednia, najwyzej 1.0 (nie szybciej niz ROT z regula), najmniej 0.02. Zanim jest srednia
+    ///    (1-2 doby po wczytaniu) - MarriageChanceScale (0.17).
+    /// Oczekiwana liczba slubow przy mnozniku dnia = cel na dobe (z dokladnoscia zmiany puli w 28 dobach) - bez modelu puli, przy kazdym r, dlugosci roku i
+    /// wzroscie puli. Pamiec sesji (bez zapisu). Linia doby Z.3: mnoznik dnia, oczekiwane przy 1.0 i przy mnozniku, srednia, mnoznik na jutro.
+    /// Nie dziala tylko, gdy liczy oryginal ROT (MarriageFast = false, obca latka na lancuchu oceny pary albo prefiks na CheckNPCMarriages, bieg cienia).
     ///
     /// Wylaczniki: MarriageFast (true; false = oryginal ROT bez latki - wtedy nie dziala tez regula wyzej), MarriageFastShadow (false),
-    /// MarriageOnlyViableCandidates (true), MarriageChanceScale (0.17; 1.0 = bez hamulca) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
+    /// MarriageOnlyViableCandidates (true), MarriageTargetPerYear (48; 0 = staly MarriageChanceScale), MarriageChanceScale (0.17 - start regulatora albo
+    /// staly hamulec; 1.0 = bez hamulca) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
     /// </summary>
     internal static class MarriageFast
     {
@@ -151,11 +165,23 @@ namespace CrashScribe
         private static MethodBase[] _chainCouple, _chainChance;
         private static bool _viableCfg;        // klucz MarriageOnlyViableCandidates wlaczony i sesja nie jest biegiem cienia
         private static bool _viableOn;         // regula "tylko kandydaci z szansa" czynna teraz (_viableCfg i skrot dla zonatych czynny)
-        private static float _scale = 1f;      // hamulec: mnoznik szansy w rzucie wolnego lorda (MarriageChanceScale po przycieciu); dziala tylko przy _viableOn
+        private static float _scale = 1f;      // hamulec: mnoznik szansy w rzucie wolnego lorda tej doby (staly: MarriageChanceScale; regulator: liczony co dobe); dziala przy BrakeOn()
         private static bool _scaleWarned;      // linia o przycieciu juz wypisana (raz na proces - ustawienia czytane raz na proces)
+        // regulator (MarriageTargetPerYear > 0): cel, rok, mnoznik startowy, suma szans doby przy 1.0 i przy mnozniku, srednia 28 dob, liczniki
+        private static int _target;            // slubow na rok (0 = staly MarriageChanceScale)
+        private static bool _regOn;            // regulator czynny w tej sesji (cel > 0, nie bieg cienia)
+        private static int _year = 364;        // CampaignTime.DaysInYear tej sesji
+        private static float _scaleCfg = 1f;   // MarriageChanceScale po przycieciu (start regulatora albo staly hamulec)
+        private static double _dayExp, _dayExpS;   // doba: suma szans rzutow wolnych lordow z hamulcem przy 1.0 i przy mnozniku dnia
+        private static int _dayRolls, _dayOrig;    // doba: rzuty z hamulcem; wywolania rodu oddane oryginalowi (stoi / potkniecie) - doba bez wpisu do sredniej
+        private static double _avg;            // srednia sumy szans przy 1.0 (ostatnie RegWindow dob)
+        private static int _avgN, _regLines;   // dob w sredniej; linii doby od wczytania (pierwsza obejmuje tylko czesc rodow)
 
         // hamulec: dozwolony zakres MarriageChanceScale i wartosc, gdy w pliku stoi cos, co nie jest liczba (NaN)
-        private const float ScaleMin = 0.1f, ScaleMax = 1f, ScaleDefault = 0.17f;   // domyslna jak w Config.cs (decyzja Jeffa 14.10 - ok. 48 slubow AI na rok)
+        private const float ScaleMin = 0.1f, ScaleMax = 1f, ScaleDefault = 0.17f;   // domyslna jak w Config.cs (decyzja Jeffa 14.10 - ok. 48 slubow AI na rok w roku 1-2)
+        private const float RegMin = 0.02f;    // regulator: najnizszy mnoznik (pula wolnych ok. 7 x wieksza niz w roku 1 - daleko poza horyzontem gry)
+        private const int RegWindow = 28;      // regulator: srednia z 28 dob (zmiana puli wolnych to miesiace)
+        private const int TargetMax = 2000;    // regulator: cel ponad tym - przyciecie (blad w pliku ustawien)
 
         // ---- bufory (jeden watek kampanii; _busy pilnuje ponownego wejscia) ----
         private static bool _busy;
@@ -472,11 +498,28 @@ namespace CrashScribe
             return v;
         }
 
+        /// <summary>Hamulec dziala w rzucie wolnego lorda naszej drogi: regulator - zawsze (poza biegiem cienia); staly mnoznik - tylko przy czynnej regule (jak 13.10).</summary>
+        private static bool BrakeOn() { return !_shadow && (_regOn || _viableOn); }
+
+        private static string N3(double v) { return v.ToString("0.000", CultureInfo.InvariantCulture); }
+
         /// <summary>Hamulec slowami - do linii startu i linii doby: wartosc, z ktora biegnie rzut wolnego lorda, albo ze nie dziala.</summary>
         private static string ScaleState()
         {
-            return _viableOn ? "mnoznik szansy " + Num(_scale) + " (MarriageChanceScale)"
-                             : "mnoznik szansy NIE DZIALA - regula nieczynna (ustawiony " + Num(_scale) + ")";
+            if (!BrakeOn())
+                return "mnoznik szansy NIE DZIALA - " + (_shadow ? "bieg cienia" : "regula nieczynna") + " (ustawiony " + Num(_scaleCfg) + ")";
+            if (!_regOn) return "mnoznik szansy " + Num(_scale) + " (MarriageChanceScale)";
+            return "mnoznik szansy " + N3(_scale) + " (regulator MarriageTargetPerYear " + _target + " na rok = " + N3((double)_target / _year) + " na dobe przy roku " + _year
+                   + (_avgN > 0 ? ", srednia oczekiwanych slubow przy 1.0 " + N3(_avg) + " na dobe z " + _avgN + " dob)"
+                                : " - bez sredniej, start MarriageChanceScale)");
+        }
+
+        /// <summary>Regulator: mnoznik z celu i sredniej (bez sredniej - mnoznik startowy).</summary>
+        private static float RegScale()
+        {
+            if (_avgN <= 0 || !(_avg > 0)) return _scaleCfg;
+            double v = (double)_target / Math.Max(1, _year) / _avg;
+            return v >= 1 ? 1f : v <= RegMin ? RegMin : (float)v;
         }
 
         /// <summary>Start sesji kampanii (OnSessionLaunched - modele juz sa): straze, latka (raz na proces), linia startu.</summary>
@@ -485,7 +528,8 @@ namespace CrashScribe
             try
             {
                 _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
-                _viableCfg = false; _viableOn = false; _scale = 1f;
+                _viableCfg = false; _viableOn = false; _scale = 1f; _scaleCfg = 1f; _regOn = false; _target = 0;
+                RegReset();
                 bool fast = Config.MarriageFast, shadow = Config.MarriageFastShadow;
                 if (!fast && !shadow) { Say(false, "MarriageFast = false"); return; }
                 if (!_resolved) { _resolved = true; _resolveFail = Resolve(); }
@@ -513,7 +557,14 @@ namespace CrashScribe
                 _spouseOk = _spouseModelOk;
                 _viableCfg = Config.MarriageOnlyViableCandidates && !shadow;
                 _viableOn = _viableCfg && _spouseOk;
-                _scale = ScaleFromConfig();   // hamulec: dziala tylko przy _viableOn (rzut wolnego lorda w Decide)
+                _scaleCfg = ScaleFromConfig();   // hamulec: staly mnoznik (tylko przy _viableOn) albo start regulatora
+                int tg = Config.MarriageTargetPerYear;
+                _target = tg < 0 ? 0 : tg > TargetMax ? TargetMax : tg;
+                if (_target != tg) Scribe.Line(Tag + ": MarriageTargetPerYear = " + tg + " poza zakresem 0-" + TargetMax + " - przyciete do " + _target + ".");
+                try { _year = CampaignTime.DaysInYear; } catch { _year = 0; }
+                if (_year < 1) _year = 364;
+                _regOn = _target > 0 && !shadow;   // regulator: kazdy rzut wolnego lorda naszej drogi (BrakeOn)
+                _scale = _scaleCfg;                // do pierwszej sredniej (RegScale w DailyLine)
                 _ready = true;
                 Say(true, "ROT ROTRelationshipsBehavior.CheckNPCMarriages; model " + desc + "; "
                           + (shadow ? "BIEG CIENIA - decyduje oryginal ROT, nasza droga tylko liczy; linia doby '" + Tag + ": klanow ..., roznic ...' (narzedzie pomiaru, nie prog 0 - w grze BK losuje w ocenie szansy)"
@@ -551,16 +602,16 @@ namespace CrashScribe
             try
             {
                 if (_patchCheckDue) { _patchCheckDue = false; CheckForeign(); }
-                if (_standDown) return true;
+                if (_standDown) { _dayOrig++; return true; }   // regulator: doba z rodem liczonym przez oryginal - bez wpisu do sredniej
                 if (_shOpen) ShadowOrphan();
                 var game = Game.Current;
                 rng = game != null ? _getRng(game) : null;
                 list = _fList.GetValue(__instance) as List<Hero>;
                 model = Campaign.Current.Models.MarriageModel;
-                if (rng == null || list == null || model == null) { _stumbles++; _stumblesDay++; return true; }
+                if (rng == null || list == null || model == null) { _stumbles++; _stumblesDay++; _dayOrig++; return true; }
                 s0 = Snap(rng);
             }
-            catch (Exception e) { Stumble("MarriageFast.Prefix (wejscie)", e); return true; }
+            catch (Exception e) { Stumble("MarriageFast.Prefix (wejscie)", e); _dayOrig++; return true; }
 
             Hero h1 = null, pick = null;
             bool decided = false;
@@ -584,6 +635,7 @@ namespace CrashScribe
                 // samego stanu generatora, stara regula i bez hamulca
                 try { Restore(rng, s0); } catch { }
                 Stumble("MarriageFast.Decide", err);
+                _dayOrig++;   // regulator: ten rod liczy oryginal - doba bez wpisu do sredniej
                 if (_shadow) ShadowOpen(__0, null, null, default(Rng), true);
                 return true;
             }
@@ -634,9 +686,12 @@ namespace CrashScribe
                     // licznik bez wplywu na bieg: wolny lord wylosowal kandydata jak w oryginale - czy z szansa
                     if (free) { _dayFree++; if (!(num > 0f)) _dayOldDead++; }
                 }
-                // hamulec (MarriageChanceScale): tylko wolny lord przy czynnej regule - kandydat wybrany jak dotad (szansa > 0, bez mnoznika),
-                // nizszy jest sam prog rzutu; ten sam jeden krok generatora. Mnoznik 1.0 = prog bez zmian (num nietkniete).
-                float roll = viable && _scale < 1f ? num * _scale : num;
+                // hamulec: wolny lord - kandydat wybrany jak dotad (szansa > 0, bez mnoznika), nizszy jest sam prog rzutu; ten sam jeden krok generatora.
+                // Staly mnoznik (MarriageTargetPerYear = 0) - tylko przy czynnej regule (jak 13.10); regulator - kazdy rzut wolnego lorda naszej drogi
+                // (recenzja 14.10: takze gdy regula stoi), a szansa przy 1.0 idzie do sumy doby (oczekiwane sluby - srednia regulatora). Mnoznik 1.0 = prog bez zmian.
+                bool brake = free && (_regOn || viable);   // _regOn i viable sa false w biegu cienia
+                float roll = brake && _scale < 1f ? num * _scale : num;
+                if (brake && num > 0f) { _dayRolls++; _dayExp += num; _dayExpS += roll; }
                 if (!(num > 0f) || !(MBRandom.RandomFloat < roll)) continue;
                 bool courting = false;
                 List<Romance.RomanticState> states = Romance.RomanticStateList;
@@ -895,6 +950,22 @@ namespace CrashScribe
             {
                 _patchCheckDue = true;
                 if (_shOpen) ShadowOrphan();
+                // regulator: srednia sumy szans przy 1.0 (pierwsza linia po wczytaniu obejmuje tylko czesc rodow - rody tykaja rozlozone na dobe; doba z rodem
+                // liczonym przez oryginal ROT - bez wpisu) i mnoznik nastepnej doby
+                float next = _scale;
+                bool fed = false;
+                if (_ready && _regOn)
+                {
+                    _regLines++;
+                    if (_regLines >= 2 && _dayOrig == 0 && _dayClans > 0)
+                    {
+                        int n = _avgN < RegWindow ? _avgN + 1 : RegWindow;
+                        _avg += (_dayExp - _avg) / n;
+                        if (_avgN < RegWindow) _avgN++;
+                        fed = true;
+                    }
+                    next = RegScale();
+                }
                 if (_ready && (_dayClans > 0 || _stumblesDay > 0))
                 {
                     var ci = CultureInfo.InvariantCulture;
@@ -911,6 +982,10 @@ namespace CrashScribe
                                                  + ", pytan o szanse " + _dayChanceEvals
                                                : ", w tym trafienie w kandydata bez szans " + _dayOldDead + pct)
                                   + "; " + ScaleState()   // hamulec: z jaka wartoscia biegla ta doba (albo ze nie dzialal)
+                                  + (BrakeOn() ? ", oczekiwane slubow dzis przy 1.0 " + N3(_dayExp) + ", przy mnozniku " + N3(_dayExpS) + " (rzutow wolnych lordow z hamulcem " + _dayRolls + ")"
+                                                 + (_regOn ? ", jutro mnoznik " + N3(next) + (fed ? "" : _dayOrig > 0 ? " (doba bez wpisu do sredniej - rody liczone przez oryginal ROT " + _dayOrig + ")"
+                                                                                                         : " (doba bez wpisu do sredniej - pierwsza po wczytaniu)") : "")
+                                               : "")
                                   + "; sluby dzis " + wed + ", od wczytania " + _totPairs;
                     if (_shadow)
                         Scribe.Line(Tag + ": klanow " + _dayClans + ", par stara droga " + _dayOldPairs + ", nowa " + _dayNewPairs + ", roznic " + _dayDiff
@@ -921,20 +996,30 @@ namespace CrashScribe
                         Scribe.Line(Tag + ": dzien " + Day() + " - klanow " + _dayClans + ", slubow " + _dayNewPairs + ", czas " + (_dayNewTicks * ms).ToString("0.0", ci)
                                     + " ms; " + work + tail + ".");
                 }
+                _scale = next;   // regulator: mnoznik nastepnej doby (staly mnoznik - bez zmian)
             }
             catch (Exception e) { Stumble("MarriageFast.DailyLine", e); }
             _dayClans = _dayNewPairs = _dayOldPairs = _dayDiff = _dayBothThrew = 0;
             _dayLords = _daySpouse = _dayFull = _dayNullMax = 0;
             _dayEvals = _dayNewTicks = _dayOldTicks = 0;
             _dayFree = _dayOldDead = _dayNoViable = _dayChanceEvals = 0;
+            _dayExp = _dayExpS = 0; _dayRolls = _dayOrig = 0;
             _stumblesDay = 0;
+        }
+
+        /// <summary>Regulator: srednia i liczniki od zera (nowa sesja - pamiec sesji, bez zapisu).</summary>
+        private static void RegReset()
+        {
+            _dayExp = _dayExpS = 0; _dayRolls = _dayOrig = 0;
+            _avg = 0; _avgN = 0; _regLines = 0;
         }
 
         /// <summary>Nowa gra / wczytanie: prefiks stoi do OnSessionLaunched, liczniki od zera (latka Harmony zostaje - raz na proces).</summary>
         internal static void ResetSession()
         {
             _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
-            _viableCfg = false; _viableOn = false; _scale = 1f;
+            _viableCfg = false; _viableOn = false; _scale = 1f; _scaleCfg = 1f; _regOn = false; _target = 0;
+            RegReset();
             _busy = false;
             ShadowClose();
             _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear();
