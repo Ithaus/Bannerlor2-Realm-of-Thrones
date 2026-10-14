@@ -4208,6 +4208,14 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool RblPaidXpFair { get; set; } = true;
 
+        [SettingPropertyInteger("Attribute Point Every Levels", 0, 12, "0", HintText = "Every this many character levels a hero gains one attribute point - you, your companions and every lord alike, when they level up and when the game creates them at a higher level (3 = levels 3, 6, 9 ... 60, twenty points by level 62; 0 or 4 = as in the game: levels 4, 8 ... 60, fifteen points).")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public int AttributePointEveryLevels { get; set; } = 3;
+
+        [SettingPropertyInteger("Extra Focus Every Levels", 0, 12, "0", HintText = "Every this many character levels a hero gains one more focus point on top of the game's one per level and Banner Kings' one every fifth level - you, your companions and every lord alike, also when the game creates a lord at a higher level (4 = levels 4, 8 ... 60, fifteen more by level 62; 0 = off).")]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public int ExtraFocusEveryLevels { get; set; } = 4;
+
         [SettingPropertyBool("Troop Mend Enabled", HintText = "the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate")]
         [SettingPropertyGroup("The men's gear")]
         public bool TroopMendEnabled { get; set; } = true;
@@ -6763,6 +6771,8 @@ namespace Armoury
             s.ScoutXpFair = ScoutXpFair;
             s.SmallXpFair = SmallXpFair;
             s.RblPaidXpFair = RblPaidXpFair;
+            s.AttributePointEveryLevels = AttributePointEveryLevels;
+            s.ExtraFocusEveryLevels = ExtraFocusEveryLevels;
             s.TroopMendEnabled = TroopMendEnabled;
             s.TroopMendWreckShare = TroopMendWreckShare;
             s.TroopMendBulkDiscountPP = TroopMendBulkDiscountPP;

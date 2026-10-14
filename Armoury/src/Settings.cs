@@ -1337,6 +1337,10 @@ namespace Armoury
         public bool ScoutXpFair = true;                    // Scouting experience from marching is a flat 10 an hour (16 in forest, desert, dunes or snow; caravans half) for every party on the move - no longer more for a longer column, nothing extra for AI parties, and small parties learn too.
         public bool SmallXpFair = true;                    // The fence teaches a flat 25 Roguery per deal instead of 5% of the coin paid; mending a piece with your own hands teaches in proportion to the condition you restore (at least a quarter).
         public bool RblPaidXpFair = true;                  // Realistic Bannerlord no longer gives Charm or Roguery experience for coin handed over (a bought council vote, a planted spy, hired saboteurs); the relation you gain still teaches Charm.
+        // RP (decyzja Jeffa 14.10, LevelPoints.cs): punkt cechy co N poziomow (postfiks gettera LevelsPerAttributePoint modelu gry - awans HeroDeveloper.OnGainLevel
+        // i pula NPC przy tworzeniu SetupDefaultPoints, jedna regula dla gracza i AI) oraz dodatkowy punkt skupienia co M poziomow (awans + pula NPC: poziom / M)
+        public int AttributePointEveryLevels = 3;          // Every this many character levels a hero gains one attribute point - you, your companions and every lord alike, when they level up and when the game creates them at a higher level (3 = levels 3, 6, 9 ... 60, twenty points by level 62; 0 or 4 = as in the game: levels 4, 8 ... 60, fifteen points).
+        public int ExtraFocusEveryLevels = 4;              // Every this many character levels a hero gains one more focus point on top of the game's one per level and Banner Kings' one every fifth level - you, your companions and every lord alike, also when the game creates a lord at a higher level (4 = levels 4, 8 ... 60, fifteen more by level 62; 0 = off).
 
         // --- The men's gear ---
         public bool TroopMendEnabled = true;               // the town smith mends the worn gear on the troop armoury's racks - his apprentices work at a bulk rate

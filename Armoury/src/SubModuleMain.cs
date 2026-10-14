@@ -59,6 +59,9 @@ namespace Armoury
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
                 DonationXpLaw.ApplyAll(_harmony);   // audyt 13 Z1 (Jeff 09.10): oddany sprzet nie uczy - XP perkow Giving Hands / Paid in Promise = 0, migawka handlu BK przy kazdym otwarciu handlu
+                // RP (decyzja Jeffa 14.10): punkt cechy co AttributePointEveryLevels, dodatkowe skupienie co ExtraFocusEveryLevels - getter modelu rozwoju,
+                // HeroDeveloper.OnGainLevel i SetupDefaultPoints (prywatne - TU, w menu glownym, zanim JIT skompiluje wolajacych); klucze na zywo; wlasny try
+                try { LevelPoints.ApplyAll(_harmony); } catch (Exception e) { Log.Error("LevelPoints.ApplyAll", e); }
                 ChargeTemperPatch.ApplyAll(_harmony);
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
                 CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
