@@ -14,7 +14,7 @@ namespace Armoury
     ///  - GOTOWKA: zold ludzi, ktorzy dzis SA w druzynach, przy nowym poziomie, ponad gotowke, ktora rod juz dostal tej doby z nizszych szczebli (_naPaid); reszta
     ///    puli to miejsce w pulapie na krok werbunku (bez gotowki, jak W5). Gotowka schodzi z reszty wplywow dnia (CrownIncome.Spent) - renty dziela to, co zostanie.
     ///  - KSIEGA: gotowka M1 jest gotowka W5 (_naCash - poza podstawa zwrotu 70% nastepnej doby; _naPaid - dwor i sprzet ustepuja zoldowi; _naBoost - pulap 166);
-    ///    w 165 osobna pozycja (KDay.NeedAidRent, w doplacie W5).
+    ///    w 165 osobna pozycja (KDay.NeedAidRent - obok doplaty W5, nie w niej: linia W5 "wyplacono" i 165 "doplata W5" to dalej szczebel daniny).
     ///  - W5b regula 1 (WarTaxDaily) i rezerwa wezwan 168 (M2b) czytaja brak SPRZED M1 (NaK.UncovPre) - danina z ludu i wezwania licza jak bez M1; W7 (LvPlan) dostaje
     ///    poziom PO M1 (pan bierze od ludu tylko to, czego korona nie pokryla).
     /// Platnik -> odbiorca: Kingdom.KingdomBudgetWallet -> kiesa glowy rodu z potrzeba W5 (najpierw skarbiec, potem glowa; wyjatek = zloto wraca). Zapis gry: nic nowego.
@@ -117,7 +117,7 @@ namespace Armoury
                     {
                         CrownIncome.Spent(k, paid);                       // z reszty wplywow dnia - renty 180 dziela to, co zostanie
                         var dk = CrownIncome.DayOf(k);
-                        if (dk != null) { dk.NeedAid += paid; dk.NeedAidRent += paid; }
+                        if (dk != null) dk.NeedAidRent += paid;          // osobna pozycja 165 (NeedAid = szczebel daniny - linia W5 "wyplacono", zamkniecie W5-1)
                     }
                     catch (Exception e) { NaStumble("RentAidStep(ksiega)", e); }
                 }

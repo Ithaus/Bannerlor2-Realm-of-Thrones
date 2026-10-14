@@ -345,8 +345,7 @@ namespace Armoury
             if (a.Left > 0 && _agr.Contains(a))
             {
                 int rw0 = calling.CallToWarWallet;
-                calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left);
-                _dRestored += a.Left;
+                calling.CallToWarWallet += (int)Math.Min(int.MaxValue, a.Left);   // bez _dRestored: ta pozycja linii (P3W4-2) liczy tylko zerwania z braku wplywow
                 Measure31.CtwOther(calling, rw0);   // 3.1 (31, E3/0): skreslenie reszty ceny (bez platnika), jak przy zerwaniu
             }
             _agr.Remove(a);

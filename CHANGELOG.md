@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (pieniadze roku 2, kontrola calosci M1 / M2a) - istniejace progi W5-1 i P3W4-2 bez falszywego NIE
+
+**Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** brak (poprawka ksiegowania linii M1 i M2a) | **Pliki:** `KingdomTreasury.RentAid.cs`, `CrownIncome.cs`, `CrownCallToWar.cs`
+
+**Problem (kontrola calosci przed testem, zasada 0 - przeglad czytnikow linii w `tools/sprawdz_logi.py`):** (1) W5-1 (`--grupa w5`) porownuje "doplata do zoldu wedlug potrzeby (W5, przed rentami)" z linii 165 z "wyplacono" linii W5 co do zlotowki - M1 dopisywal swoja gotowke do `KDay.NeedAid`, wiec przy kluczu `NeedAidFromRents` kazda doba z M1 dalaby rozjazd; (2) P3W4-2 (`--grupa p3`) porownuje "reszta ceny skreslona" zerwan z "(latka konca porozumienia nie zadzialala)" - wygasniecie M2a dopisywalo sie do drugiej liczby.
+**Zmiana:** (1) gotowka M1 tylko w `KDay.NeedAidRent`; linia 165: `, doplata do zoldu wedlug potrzeby (W5, przed rentami) X, doplata z reszty wplywow dnia przed rentami (M1) Y`, na krolestwo `doplata W5 X z rent M1 Y` (linia W5 i "Obieg" bez zmian - M1 ma tam osobne pozycje); (2) skreslenie przy wygasnieciu M2a nie wchodzi do licznika P3/W4 (jest w "wygasle bez wojny ... reszta ceny skreslona").
+**Ryzyko / co sprawdzic:** tylko liczniki linii; zloto bez zmian. Regex wiersza krolestwa W5 (`_w5_kingdoms`) przyjmuje dopisek M1 - nastepny commit (narzedzie).
+**Status:** DO SPRAWDZENIA (zbudowane, rc=0; nie wgrane).
+
 ## 2026-10-14 (pieniadze roku 2, L1 + L2) - SAME LINIE: raty okupow krolow osobno od reparacji (165); zmiana zlota swiata w rozliczeniach rodow rozbita (A15-5 "+373 tys.")
 
 **Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** brak (tylko log, zachowanie bez zmian) | **Pliki:** `CrownIncome.cs` (`KDay.KingOut`, licznik nowych dlugow okupow, linia 165), `MoneyLedger.cs` (kiesa glowy przed / po rozliczeniu rodu), `MoneyLedger.Obieg.cs` (linia "Pieniadz swiata (rody - przyczyny)") | **Projekt:** `PROJEKT-WYBRANY.md` 3.7 (L1 z MINIMUM; L2 - przeszczep PZ-7 / BUDZET rozdz. 4, sedziowie 1 i 3)
