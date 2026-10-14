@@ -16645,6 +16645,23 @@ def okup_main(logp, start_arg, until=364, bdp=None):
                 "INFO - prog Jeffa 85 tys. w biegu rocznym (okup to zold dla oblegajacych - wojska nie ubywa)", None)
     else:
         rep.add("OKP-11 (O-5): druzyny lordow w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- OKP-12 sciezki gracza (O2 obronca, O3 oblegajacy): okna i wybory - kazdy "zaplac" / "przyjmij" ma okup O1 albo linie "przepadl" (INFO bez wyboru)
+    pl = [s2 for s2 in lines if s2.startswith("Okup oblezenia (gracz): dzien") and inwin(num(r"dzien (\d+)", s2))]
+    if pl:
+        def cnt(side, w):
+            return sum(1 for s2 in pl if f"| strona {side} |" in s2 and f"| wybor {w}" in s2)
+        paid_ch, late, refused = cnt("obronca", "zaplac"), cnt("obronca", "bez odpowiedzi"), cnt("obronca", "odmowa")
+        acc, refb = cnt("oblegajacy", "przyjmij"), cnt("oblegajacy", "odmowa")
+        o1_def = sum(1 for m in o1 if m.group("rodzaj") == "gracz-obronca zaplacil")
+        o1_late = sum(1 for m in o1 if m.group("rodzaj").startswith("gracz-obronca bez odpowiedzi"))
+        o1_bes = sum(1 for m in o1 if m.group("rodzaj") == "gracz-oblegajacy")
+        lost_pl = sum(1 for s2 in lost if "rodzaj gracz-" in s2)
+        ok12 = paid_ch + late + acc <= o1_def + o1_late + o1_bes + lost_pl and o1_def + o1_late + o1_bes <= paid_ch + late + acc
+        rep.add("OKP-12: sciezki gracza - wybory w oknach (O2 obronca: zaplac / odmowa / bez odpowiedzi 24 h; O3 oblegajacy: przyjmij / odmowa) = okupy O1 gracza (+ przepadle)",
+                f"obronca: zaplac {paid_ch}, odmowa {refused}, bez odpowiedzi {late}; oblegajacy: przyjmij {acc}, odmowa {refb}; okupy O1: obronca {o1_def}, obronca bez odpowiedzi {o1_late}, "
+                f"oblegajacy {o1_bes}; przepadle gracza {lost_pl}", "zgodne (autotest nie gra oblezen gracza - sciezki gracza w recznym tescie Jeffa)", ok12)
+    else:
+        rep.add("OKP-12: sciezki gracza (O2, O3)", "brak linii 'Okup oblezenia (gracz)'", "INFO (autotest: gracz bez ziemi i bez oblezen - test reczny)", None)
     # ---- OKP-9 potkniecia i bledy
     st_sum = sum(num(r"\| potkniecia (\d+) \(od wczytania", s) or 0 for s in dayraw)
     rep.add("OKP-9: potkniecia SiegeRansom (suma okna) i ERROR in SiegeRansom", f"potkniecia {st_sum}, ERROR {len(errs)}" + (f" ({errs[0][:120]})" if errs else ""),

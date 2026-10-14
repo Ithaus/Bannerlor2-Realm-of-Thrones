@@ -5624,6 +5624,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public int SiegeRansomTruceDays { get; set; } = 60;
 
+        [SettingPropertyBool("Siege Ransom Player Defender", HintText = "when besiegers are about to storm a town or castle of yours, or one you are in, and would take a ransom, you are asked first: pay them a quarter of the town's coin (its merchants' and townsfolk's, not yours) to lift the siege for Siege Ransom Truce Days, or refuse and face the assault. If you cannot answer within a day (in battle, in a conversation, in captivity), the town decides as any other would and you get word of it. Off = your towns decide like the others and you only get word")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomPlayerDefender { get; set; } = true;
+
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool PeopleScaleDryRun { get; set; } = true;
@@ -7073,6 +7077,7 @@ namespace Armoury
             s.SiegeRansomBloodyRatio = SiegeRansomBloodyRatio;
             s.SiegeRansomAi = SiegeRansomAi;
             s.SiegeRansomTruceDays = SiegeRansomTruceDays;
+            s.SiegeRansomPlayerDefender = SiegeRansomPlayerDefender;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;

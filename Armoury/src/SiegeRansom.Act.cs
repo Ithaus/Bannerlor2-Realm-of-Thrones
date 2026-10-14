@@ -41,8 +41,6 @@ namespace Armoury
     internal static partial class SiegeRansom
     {
         internal static bool AiOn { get { var s = Settings.Current; return s != null && s.SiegeRansomAi; } }
-        internal static bool PlayerDefOn { get { return false; } }
-        internal static bool PlayerBesOn { get { return false; } }
         private static bool ActOn { get { return AiOn || PlayerDefOn || PlayerBesOn; } }
         internal static int TruceDays { get { var s = Settings.Current; return s != null ? Math.Max(0, Math.Min(364, s.SiegeRansomTruceDays)) : 60; } }
 
@@ -269,7 +267,6 @@ namespace Armoury
                 }
                 bool own = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
                 bool realm = !own && Clan.PlayerClan != null && Clan.PlayerClan.Kingdom != null && ReferenceEquals(Clan.PlayerClan.Kingdom, st.MapFaction);
-                if (d.Kind == KDefPaid) return;                                 // O2: gracz sam zaplacil - napis z okna
                 if (own || realm || (MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == st))
                 {
                     string head = d.Kind == KDefLate ? town + " could not wait for your word: it" : town;
