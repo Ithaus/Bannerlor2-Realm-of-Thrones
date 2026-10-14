@@ -507,6 +507,15 @@ Uzycie (Python 3, tylko odczyt):
                     kiesy ludu r = 0), P1 i W7 bez podwojnego poboru, bez poboru w osadzie z lojalnoscia < 40, rody z luzem 0 (bez poboru i bez miejsca W7),
                     pokoj 0, potkniecia (i przelew ponizej planu),
                     zold poza podstawa zwrotu <= wczorajszy pobor, wojsko (INFO z miara W5-7), liczby paczki i krolestwa (INFO). Log bez paczki: INFO.
+--grupa lup       : (lup miast L0-L5, docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md rozdz. 6; Armoury/src/CitySack*.cs) progi 1-19 tabeli projektu:
+                    python -I tools/sprawdz_logi.py --grupa lup [--do-doby 364] <Armoury-*.log>
+                    LUP-1 linie L0 = wywolania okna O10, LUP-2/3 nastepstwa bez zdobycia 0, LUP-4 ujscie garnizony 0, LUP-5/6 lup: zdjete = dopisane i <= czesc x stan,
+                    LUP-7 lup z niczego / trafienia O10 / kwota gry 0, LUP-8 arytmetyka i kiesy r = 0, LUP-10 blizna przy lasce 0, LUP-11/12 chleb i zapas kupcow (INFO),
+                    LUP-13 zycie i markietani w oknie lupu 0, LUP-14 sakiewki, LUP-15 wybor AI wedlug 3.4, LUP-16 okno gracza (reczny), LUP-19 wojsko (INFO, prog 85 tys.),
+                    LUP-17 (L6) ubytek ludnosci BK = ubytek ksiegi ludzi miasta +-1 pkt proc., LUP-B1 (LB) splonelo = floor(czesc x poziomy palne), laska 0, mury bez zmian,
+                    LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO),
+                    LUP-18 (L7) polki: zdjete = do taborow + spalone (0 szt.), spalone tylko przy spustoszeniu; LUP-18b ksiega towarow lup miast (L7) tylko ujscie.
+                    Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -18672,6 +18681,346 @@ def zbytki_main(logp, start_arg, until=120, basep=None):
     return 0
 
 
+# ------------------------------------------------------------ lup miast (L0-L5, CitySack) - progi rozdz. 6 projektu docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md
+LUP_L0 = re.compile(r"^Lup miast \(L0\): dzien (\d+) \| osada (\S+) .*?\| bitwa (\S+) \| zdobycie (tak|nie) \| wybor gry (\S+) \| regula 3\.4 (\S+) \(([^)]*)\)"
+                    r".*?\| gracz (wodz|w armii|-)\.$")
+LUP_L2 = re.compile(r"^Lup miast \(L2\): dzien (\d+) \| osada (\S+) \| wybor (\S+) \| czesc ([\d.]+) \| zdjete: kupcy (\d+) z (\d+), W (\d+) z (\d+), R (\d+) z (\d+), "
+                    r"P (\d+) z (\d+), gmina (\d+) z (\d+) \(kiesa (\S+)\) \| razem (\d+) .*?\| zolnierze (\d+), wodzowie (\d+) \(gracz razem (\d+)\), kiesy druzyn bez wodza (\d+)"
+                    r".*?\| dopisane (\d+) - zdjete (\d+) = (-?\d+)\.$")
+LUP_TRACK = re.compile(r" \| (\S+) d\+(\d+) (\S+)( \(bez zdobycia\))?: kasa (\d+) \(zapas (\d+), przy nastepstwach (\d+)\), lud (\d+) \(przy nastepstwach (\d+)\), "
+                       r"stac jedzenie ([\d.]+|-), pobor pana i korony (-?\d+|-), zycie i markietani w oknie: zdobywca (\d+) / inni (\d+), po oknie: zdobywca (\d+) / inni (\d+), "
+                       r"jency kupione (\d+)")
+
+
+def lup_main(logp, start_arg, until=364):
+    """Lup miast (L0-L5). Wiersze LUP-1..LUP-19 wedlug tabeli progow rozdz. 6 projektu (numer progu projektu w nazwie). Okno: doby kampanii 1-until.
+    Log bez paczki (brak linii "Lup miast") - wiersze INFO z liczbami tego, co juz jest (okno O10, lup gry, garnizony), nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return d is not None and 1 <= run_day(d, start) <= until
+
+    def dayof(s):
+        return num(r"dzien (\d+)", s)
+
+    l0 = [(m, s) for s in lines for m in [LUP_L0.match(s)] if m and inwin(int(m.group(1)))]
+    l0raw = [s for s in lines if s.startswith("Lup miast (L0): dzien") and inwin(dayof(s))]
+    l1 = [s for s in lines if s.startswith("Lup miast (L1): dzien") and inwin(dayof(s))]
+    l2 = [(m, s) for s in lines for m in [LUP_L2.match(s)] if m and inwin(int(m.group(1)))]
+    l2raw = [s for s in lines if s.startswith("Lup miast (L2): dzien") and inwin(dayof(s))]
+    scar = [s for s in lines if s.startswith("Lup miast (L2 blizna): dzien") and inwin(dayof(s))]
+    l5 = [s for s in lines if s.startswith("Lup miast (L5): dzien") and inwin(dayof(s))]
+    dayw = {d: s for d, s in by_day(lines, "Lup miast: dzien").items() if inwin(d)}
+    trkw = {d: s for d, s in by_day(lines, "Lup miast (L0 po nastepstwach): dzien").items() if inwin(d)}
+    errs = [s for s in lines if s.startswith("ERROR in CitySack.")]
+    # okno O10 (kontrolka okien ksiegi obiegu): wywolan / trafien
+    o10 = {}
+    for s in lines:
+        if s.startswith("Obieg: okna (kontrolka): dzien"):
+            d = dayof(s)
+            m = re.search(r"oblezenie (\d+)/(\d+)", s)
+            if m and inwin(d):
+                o10[d] = (int(m.group(1)), int(m.group(2)))
+    o10n = sum(v[0] for v in o10.values())
+    o10h = sum(v[1] for v in o10.values())
+    on = bool(l0raw or dayw)
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} | linii L0 {len(l0raw)} (odczytane {len(l0)}), L1 {len(l1)}, L2 {len(l2raw)} "
+          f"(odczytane {len(l2)}), blizna {len(scar)}, L5 {len(l5)}, doby z linia Lup miast {len(dayw)}, z linia 30 dob {len(trkw)}; okno O10: wywolan {o10n}, trafien {o10h}")
+
+    # ---- prog 1 (L0): linia przy kazdych nastepstwach; liczba linii = liczba wywolan okna O10; 0 ERROR
+    stum = sum(num(r"\| potkniecia (\d+)\.", s) or 0 for s in dayw.values())
+    if not on:
+        rep.add("LUP-1 (L0): linie Lup miast (L0) = wywolania okna O10", f"brak linii Lup miast (log bez paczki); okno O10: wywolan {o10n}, trafien {o10h}",
+                "INFO - log sprzed paczki L0", None)
+    else:
+        bad = len(l0raw) - len(l0)
+        o10off = not o10 or (o10n == 0 and len(l0raw) > 0)   # recenzja: okno O10 wylaczone - nie ma czym porownac (INFO), odczyt linii nadal wiazacy
+        rep.add("LUP-1 (L0): linie Lup miast (L0) = wywolania okna O10", f"linii {len(l0raw)} (nieodczytane {bad}), wywolan O10 {o10n}" + (" - okno O10 wylaczone albo bez linii" if o10off else ""),
+                "rowne; wszystkie odczytane" + (" - bez O10: INFO" if o10off else ""), (False if bad else None) if o10off else (len(l0raw) == o10n and bad == 0))
+    rep.add("LUP-1b: ERROR in CitySack / potkniecia w linii doby", f"ERROR {len(errs)}, potkniecia {stum}", "0 / 0", (len(errs) == 0 and stum == 0) if on else None)
+
+    # ---- progi 2-3 (L1): nastepstwa po bitwie pod murami / bez zdobycia = 0
+    outside = [m for m, s in l0 if m.group(3) == "pod-murami"]
+    nocap = [m for m, s in l0 if m.group(4) == "nie"]
+    l1off = [d for d, s in dayw.items() if "[WYLACZONE No Sack Without Capture]" in s]
+    rep.add("LUP-2 (L1): nastepstwa po bitwie pod murami (linie L0 bitwa pod-murami)",
+            (f"{len(outside)} (pominiete przez L1: {len(l1)}; dob z L1 wylaczonym {len(l1off)})" if on else f"brak linii L0 (pominiete L1: {len(l1)})"),
+            "0 (bieg W37: 5 w roku)" + (" - L1 wylaczone: INFO" if l1off else ""), (len(outside) == 0) if on and not l1off else None)
+    rep.add("LUP-3 (L1): nastepstwa bez zdobycia (linie L0 zdobycie nie)",
+            (f"{len(nocap)}" + (f" ({', '.join(m.group(2) for m in nocap[:5])})" if nocap else "")) if on else "brak linii L0",
+            "0 (bez nastepstw = bez spadku dobrobytu i ludnosci BK w osadzie niezdobytej)", (len(nocap) == 0) if on and not l1off else None)
+    # ---- prog 4 (L1): ujscie "garnizony" w ksiedze pieniadza
+    gar = []
+    for d, s in by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien").items():
+        g = num(r"\(karawany \d+, tabory \d+, bandy \d+, garnizony (\d+),", s)
+        if inwin(d) and g is not None:
+            gar.append((d, g))
+    gsum = sum(g for d, g in gar)
+    l1goff = any("[WYLACZONE Beaten Garrison Purse To Victor]" in s for s in dayw.values())
+    gpaid = sum(num(r"kiesy zalog rozbitych przez wroga \d+: wodzom (\d+)", s) or 0 for s in dayw.values())
+    rep.add("LUP-4 (L1): kiesy zalog, ktore zniknely z mapy (ujscie garnizony)", f"{gsum} zl w {sum(1 for d, g in gar if g)} dobach; do zwyciezcow (L1) {gpaid}",
+            "0 zl (bieg W37: 16 249; bieg kodu 43: 6 300)" + (" - INFO bez paczki" if not on or l1goff else ""), (gsum == 0) if on and not l1goff else None)
+
+    # ---- progi 5-6 (L2): zdjete = dopisane; zdjete <= czesc x stan; laska 0
+    l2off = any("WYLACZONE (Sack Takes Real Coin)" in s for s in dayw.values())
+    if l2:
+        diff = [m for m, s in l2 if int(m.group(23)) != 0]
+        over, mercy_bad = [], []
+        for m, s in l2:
+            sh = float(m.group(4))
+            pairs = [(int(m.group(i)), int(m.group(i + 1))) for i in (5, 7, 9, 11, 13)]
+            if m.group(3) == "laska" and (any(a for a, b in pairs) or int(m.group(16))):
+                mercy_bad.append(m.group(2))
+            # czesc wypisana z dokladnoscia 0.001 - granica floor((czesc + 0.0005) x stan)
+            if any(a > int((sh + 0.0005) * b) for a, b in pairs):
+                over.append(m.group(2))
+        rep.add("LUP-5 (L2): kazdy lup - dopisane odbiorcom - zdjete osadzie", f"nastepstw z linia L2 {len(l2)}, z roznica {len(diff)}"
+                + (f" ({diff[0].group(2)} {diff[0].group(23)})" if diff else ""), "roznica 0 zl", not diff)
+        rep.add("LUP-6 (L2): zdjete z kazdego zbiornika <= czesc x stan; laska 0", f"ponad czesc {len(over)}, laska z lupem {len(mercy_bad)}", "bez wyjatku", not over and not mercy_bad)
+        tot = sum(int(m.group(16)) for m, s in l2)
+        merch = sum(int(m.group(5)) for m, s in l2)
+        men = sum(int(m.group(17)) for m, s in l2)
+        lords = sum(int(m.group(18)) for m, s in l2)
+        party = sum(int(m.group(20)) for m, s in l2)
+        kinds = {}
+        for m, s in l2:
+            kinds[m.group(3)] = kinds.get(m.group(3), 0) + 1
+        rep.add("LUP-5b (L2): lup okna razem / kupcy / lud; zolnierze / wodzowie / druzyny bez wodza; korona (1/3 trzeciej wodzow)",
+                f"{tot} / {merch} / {tot - merch}; {men} / {lords} / {party}; korona ok. {lords // 3}; wybory {kinds}", "INFO (rachunek CHANGELOG L2: rok kodu 43 ok. 0.5-1.0 mln)", None)
+    else:
+        rep.add("LUP-5 (L2): kazdy lup - dopisane = zdjete", "brak linii L2" + (" (L2 wylaczone)" if l2off else ""), "roznica 0 zl", None)
+        rep.add("LUP-6 (L2): zdjete <= czesc x stan; laska 0", "brak linii L2", "bez wyjatku", None)
+    # ---- prog 7 (L2): lup z oblezen z niczego 0; okno O10 trafien 0; wyplaty gry 0
+    src = [num(r"lup z oblezen (\d+)", s) or 0 for d, s in by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien").items() if inwin(d)]
+    gave = [num(r"lup z oblezen: gra chciala (\d+)", s) or 0 for d, s in by_day(lines, "Szczelnosc (164a): dzien").items() if inwin(d)]
+    l2on = bool(l2raw) and not l2off
+    rep.add("LUP-7 (L2): lup z oblezen z niczego / trafienia O10 / kwota gry 15 x dobrobyt", f"{sum(src)} / {o10h} / {sum(gave)} zl",
+            "0 / 0 / 0" + ("" if l2on else " - bez L2: INFO (kwota gry przez RealPayer)"), (sum(src) == 0 and o10h == 0 and sum(gave) == 0) if l2on else None)
+    # ---- prog 8 (L2): arytmetyka pieniadza swiata i kontrola kies ludu w dobach lupu (+-1)
+    lupd = sorted({int(m.group(1)) for m, s in l2 if int(m.group(16)) > 0})
+    ps = by_day(lines, "Pieniadz swiata (bilans - przyczyny): dzien")
+    kl = by_day(lines, "Kiesa ludu: dzien")
+    bad_ar, bad_r = set(), set()
+    for d in lupd:
+        for dd in (d - 1, d, d + 1):
+            if dd in ps and "ARYTMETYKA OK" not in ps[dd]:
+                bad_ar.add(dd)
+            r = num(r"kontrola: zmiana kies -?\d+ = wplywy \d+ - wydatki \d+, r = (-?\d+)", kl.get(dd, ""))
+            if r not in (None, 0):
+                bad_r.add((dd, r))
+    rep.add("LUP-8 (L2): arytmetyka Pieniadz swiata i kontrola kies ludu r (doby lupu +-1)", f"dob lupu {len(lupd)}; arytmetyka zle {len(bad_ar)}, r != 0 {len(bad_r)}"
+            + (f" ({sorted(bad_r)[:3]})" if bad_r else ""), "OK / 0", (not bad_ar and not bad_r) if lupd else None)
+    rep.add("LUP-9 (L2): ten sam stan osady - kwoty u AI i u gracza", "test reczny (autotest nie widzi gracza)", "te same kwoty i dobrobyt koncowy", None)
+    # ---- prog 10 (L2): blizna przy lasce 0; stara blizna przy zmianie pana 0 przy kluczu
+    scar_mercy = [s for s in scar if " laska " in s and "bez blizny" not in s]
+    old_scar = [s for s in lines if s.startswith("WarLedger: ") and "wziete obleczeniem - prosperity" in s and inwin(dayof(s) or start)]
+    new_scar = [s for s in lines if s.startswith("WarLedger: ") and "blizna w chwili wyboru zdobywcy" in s]
+    rep.add("LUP-10 (L2): blizna przy lasce; blizna przy zmianie pana (stara droga)",
+            f"przy lasce {len(scar_mercy)}; stara droga {len(old_scar)}, przy wyborze {len(new_scar)} zdobyc; blizn L2 {sum(1 for s in scar if 'dobrobyt' in s)}",
+            "0; przy kluczu Sack Scar Only When Sacked stara droga 0", (not scar_mercy and not old_scar) if new_scar else None)
+    # ---- progi 11-12 (L2/L3): chleb w zlupionej osadzie d+7 i d+14; kasa kupcow ponizej zapasu; zycie w oknie lupu
+    food, below, win3 = {}, {}, {}
+    for d, s in sorted(trkw.items()):
+        for m in LUP_TRACK.finditer(s):
+            sid, age, kind = m.group(1), int(m.group(2)), m.group(3)
+            if kind == "laska":
+                continue
+            if age in (7, 14) and m.group(10) != "-":
+                food.setdefault(sid, {})[age] = float(m.group(10))
+            if int(m.group(5)) < int(m.group(6)):
+                below[sid] = below.get(sid, 0) + 1
+            win3[sid] = int(m.group(12))
+    fl = [v for x in food.values() for v in x.values()]
+    low = sorted(sid for sid, x in food.items() if any(v < 0.95 for v in x.values()))
+    rep.add("LUP-11 (L2): stac na jedzenie w zlupionej osadzie d+7 i d+14", (f"pomiarow {len(fl)}, min {min(fl):.2f}; osad ponizej 0.95: {len(low)} z {len(food)}"
+            + (f" ({', '.join(low[:4])})" if low else "")) if fl else "brak osad zlupionych z pomiarem",
+            ">= 0.95 (INFO; oczekiwane ok. 1 osada na 7 ponizej - wyssana oblezeniem, recenzja na danych kodu 43; wiecej niz 1 na 4 - zmniejszyc czesc spustoszenia)", None)
+    rep.add("LUP-12 (L2/L3): kasa kupcow zlupionej osady ponizej zapasu", (f"osad {len(below)}, najdluzej {max(below.values())} dob ({max(below, key=below.get)})" if below else "0 osad"),
+            "INFO; cel <= 30 dob", None)
+    # ---- prog 13 (L3): zycie i markietani od zdobywcy w oknie lupu = 0
+    l3off = any("[WYLACZONE Sack No Spending" in s for s in dayw.values())
+    w3 = sum(win3.values())
+    blk = sum((num(r"wstrzymane \(zostaje w sakiewkach\): zycie \d+ wyjazdow za (\d+)", s) or 0) + (num(r", markietani \d+ druzyn za (\d+)", s) or 0) for s in dayw.values())
+    rep.add("LUP-13 (L3): zycie i markietani do osady lupionej w oknie lupu od wojska zdobywcy", f"{w3} zl w {len(win3)} osadach; wstrzymane (zostalo w sakiewkach) {blk} zl",
+            "0 zl" + (" - L3 wylaczone: INFO" if l3off else ""), (w3 == 0) if win3 and not l3off else None)
+    # ---- prog 14 (L3): sakiewki ludzi - wplynelo - wyszlo = zmiana stanu
+    sk = {}
+    for s in lines:
+        if s.startswith("Sakiewka ludzi: dzien"):
+            d = dayof(s)
+            a, b, t = num(r"wplynelo (\d+)", s), num(r"wyszlo (\d+)", s), num(r"w sakiewkach razem (\d+)", s)
+            if None not in (d, a, b, t):
+                sk[d] = (a, b, t)
+    bad14 = []
+    ds = sorted(sk)
+    for i in range(1, len(ds)):
+        d0, d1 = ds[i - 1], ds[i]
+        if d1 != d0 + 1 or not inwin(d1):
+            continue
+        a, b, t = sk[d1]
+        if t - sk[d0][2] != a - b:
+            bad14.append((d1, t - sk[d0][2] - (a - b)))
+    rep.add("LUP-14 (L3): sakiewki ludzi - wplynelo - wyszlo = zmiana stanu", f"dob {len(ds)}, rozjazdow {len(bad14)}" + (f" ({bad14[:3]})" if bad14 else ""),
+            "roznica 0" + ("" if lupd else " (INFO bez lupu w biegu)"), (not bad14) if lupd else None)
+    # ---- prog 15 (L4): ta sama kultura - laska; nie ma czego brac - laska; potrzeba - grabiez / spustoszenie (nastepstwa AI)
+    l4off = any("WYLACZONE (AI Sacks From Need)" in s for s in dayw.values())
+    ai = [m for m, s in l0 if m.group(8) != "wodz" and m.group(3) not in ("menu-gracza", "bez-bitwy")]
+    cat = {"kultura": [0, 0], "pusta": [0, 0], "potrzeba": [0, 0]}
+    for m in ai:
+        why, got = m.group(7), m.group(5)
+        if why.startswith("ta sama kultura"):
+            k = "kultura"
+        elif why.startswith("nie ma czego brac ("):
+            k = "pusta"
+        elif why.startswith("potrzeba"):
+            k = "potrzeba"
+        else:
+            continue
+        cat[k][1] += 1
+        if (k == "potrzeba" and got in ("grabiez", "spustoszenie")) or (k != "potrzeba" and got == "laska"):
+            cat[k][0] += 1
+    txt = ", ".join(f"{k} {v[0]}/{v[1]}" for k, v in cat.items())
+    okall = all(v[0] == v[1] for v in cat.values())
+    rep.add("LUP-15 (L4): wybor AI wedlug rozdz. 3.4 (zgodne / wszystkie)", f"{txt}; nastepstw AI {len(ai)}" + ("; L4 wylaczone" if l4off else ""),
+            "100% / 100% / 100%" + (" - L4 wylaczone: INFO" if l4off else ""), okall if ai and not l4off else None)
+    need = sum(1 for m, s in l0 if "| armia w potrzebie tak" in s)
+    rep.add("LUP-15b (L4): armie w potrzebie / wybory", f"w potrzebie {need} z {len(l0)}; wybory: "
+            + ", ".join(f"{k} {sum(1 for m, s in l0 if m.group(5) == k)}" for k in ("laska", "grabiez", "spustoszenie")), "INFO (rozklad wyborow)", None)
+    # ---- prog 16 (L5): napisy okna = kwoty w logu (test reczny)
+    rep.add("LUP-16 (L5): napisy okna gracza", f"linii L5 {len(l5)}", "test reczny: zdobyc zamek, napisy = linia L5 i L2 (roznica 0)", None)
+    # ---- prog 17 (L6): ubytek ludnosci BK w dobie zdobycia wobec ubytku ksiegi ludzi miasta (pkt proc.)
+    l6 = [s for s in lines if s.startswith("Lup miast (L6): dzien") and inwin(dayof(s))]
+    l6off = any("WYLACZONE (Sack Killed In People Book)" in s for s in dayw.values())
+    gaps, l6n = [], 0
+    for s in l6:
+        m = re.search(r"\| BK ludnosc (\d+) -> (\d+) \(zabici (\d+) = ([\d.]+)%\) \| ksiega ludzi miasta (\d+) -> (\d+) \(zabici ([\d.]+) = ([\d.]+|-)%\) \| (.*)\.$", s)
+        if not m:
+            continue
+        l6n += 1
+        if "zdjete ze stanu miasta" in m.group(9) and m.group(8) != "-":
+            gaps.append((abs(float(m.group(4)) - float(m.group(8))), s.split(" | ")[1]))
+    if gaps:
+        worst = max(gaps)
+        rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"miast {len(gaps)} (linii L6 {len(l6)}, odczytane {l6n}); najwieksza roznica {worst[0]:.2f} pkt proc. ({worst[1]})",
+                "+-1 pkt proc.", worst[0] <= 1.0 and l6n == len(l6))
+    else:
+        rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"linii L6 {len(l6)} (odczytane {l6n}), miast z ubytkiem w ksiedze 0" + ("; L6 wylaczone" if l6off else ""),
+                "+-1 pkt proc." + (" - INFO (brak grabiezy miasta albo L6 wylaczone / log bez paczki)"), None)
+    l6got = sum(float(m.group(1)) for s in dayw.values() for m in [re.search(r"zdjete z ksiegi ludzi miast ([\d.]+)", s)] if m)
+    towns_mv = 0.0
+    for s in lines:
+        if s.startswith("Miasta (E4/8 R2): dzien") and inwin(dayof(s)):
+            m = re.search(r"zdobycie \(L6\) ([+-][\d.]+)", s)
+            if m:
+                towns_mv += float(m.group(1))
+    if l6got > 0 or towns_mv != 0:
+        tol = max(2.0, 0.01 * l6got)
+        rep.add("LUP-17b (L6): ksiega ludzi - ruch 'zdobycie (L6)' w linii Miasta wobec zdjetych w linii doby L6", f"{-towns_mv:.1f} / {l6got:.1f} ludzi",
+                f"rowne (+-{tol:.0f}; brzegi okna)", abs(-towns_mv - l6got) <= tol)
+    else:
+        rep.add("LUP-17b (L6): ksiega ludzi - ruch 'zdobycie (L6)' wobec linii doby L6", "0 / 0", "rowne - INFO bez zabitych w ksiedze", None)
+    # ---- LB (kierunek Jeffa - budowle plona): plan = floor(czesc x poziomy palne), laska 0, mury bez zmian; L0 budowle = LB; zgliszcza (INFO)
+    lb = [s for s in lines if s.startswith("Lup miast (LB budowle): dzien") and inwin(dayof(s))]
+    lboff = any("WYLACZONE (Sack Burns Buildings)" in s for s in dayw.values())
+    rxb = re.compile(r"Lup miast \(LB budowle\): dzien (\d+) \| osada (\S+) \((miasto|zamek)\) \| wybor (\S+) \| czesc ([\d.]+) \| poziomy palne \(bez murow i projektow dziennych\) (\d+) -> (\d+) "
+                     r"\(splonelo (\d+) z planu (\d+) = floor\(czesc x (\d+)\)\) \| mury (\d+) -> (\d+) \| koszt spalonych poziomow (\d+) pkt, odbudowa ze zgliszcz (\d+) pkt")
+    bad_b, mercy_b, wall_b, lbm = [], [], [], {}
+    for s in lb:
+        m = rxb.search(s)
+        if not m:
+            bad_b.append("nieodczytana")
+            continue
+        sh, a0, a1, n, plan = float(m.group(5)), int(m.group(6)), int(m.group(7)), int(m.group(8)), int(m.group(9))
+        lbm[(int(m.group(1)), m.group(2))] = n
+        lo, hi = int((sh - 0.0005) * a0), int((sh + 0.0005) * a0)
+        if not (lo <= plan <= hi) or n != plan or a0 - a1 != n:
+            bad_b.append(m.group(2))
+        if m.group(4) == "laska" and n:
+            mercy_b.append(m.group(2))
+        if m.group(11) != m.group(12):
+            wall_b.append(m.group(2))
+    if lb:
+        rep.add("LUP-B1 (LB): splonelo = floor(czesc x poziomy palne); laska 0; mury bez zmian", f"linii {len(lb)}; zle {len(bad_b)}, laska z pozarem {len(mercy_b)}, mury ruszone {len(wall_b)}"
+                + (f" ({(bad_b + mercy_b + wall_b)[:3]})" if bad_b or mercy_b or wall_b else ""), "bez wyjatku", not bad_b and not mercy_b and not wall_b)
+    else:
+        rep.add("LUP-B1 (LB): splonelo = floor(czesc x poziomy palne); laska 0; mury bez zmian", "brak linii LB" + (" (LB wylaczone)" if lboff else ""), "bez wyjatku - INFO bez linii", None)
+    l0b = [s for s in lines if s.startswith("Lup miast (L0 budowle): dzien") and inwin(dayof(s))]
+    mis = []
+    for s in l0b:
+        m = re.search(r"dzien (\d+) \| osada (\S+) \| wybor \S+ \| poziomy budowli \(bez projektow dziennych\) (\d+) -> (\d+) \(gra zdjela (-?\d+)\)", s)
+        if not m:
+            continue
+        k = (int(m.group(1)), m.group(2))
+        if k in lbm and int(m.group(5)) != lbm[k]:
+            mis.append((m.group(2), int(m.group(5)), lbm[k]))
+    rep.add("LUP-B2 (LB): linia L0 budowle - zdjete przy nastepstwach = splonelo LB (nikt inny nie zdejmuje poziomow)", f"par {sum(1 for s in l0b)} / LB {len(lbm)}, rozne {len(mis)}" + (f" ({mis[:3]})" if mis else ""),
+            "0 roznic", (not mis) if lbm and l0b else None)
+    rb = sum(num(r"odbudowane ze zgliszcz dzis (\d+)", s) or 0 for s in dayw.values())
+    gr = sum(num(r"postep ze zgliszcz dany (\d+) pkt", s) or 0 for s in dayw.values())
+    burnt = sum(num(r"\| LB: (?:WYLACZONE[^;]*; )?lupow z pozarem \d+, spalone poziomy (\d+)", s) or 0 for s in dayw.values())
+    last = dayw[max(dayw)] if dayw else ""
+    rl = num(r"zgliszcza: osad \d+, budowli \d+, poziomow (\d+)", last)
+    qd = sum(num(r"zgliszcza na czele (\d+)", s) or 0 for s in dayw.values())
+    pl = sum(num(r"postep w toku spalony (\d+) pkt\)", s) or 0 for s in dayw.values())
+    fr = sum(num(r"przy froncie wojskowa przed cywilnym zgliszczem (\d+)", s) or 0 for s in dayw.values())
+    rep.add("LUP-B3 (LB): zgliszcza - spalone / odbudowane / zostalo na koniec okna; postep dany; postep w toku spalony; kolejka AI (na czele / front)",
+            f"{burnt} / {rb} / {rl if rl is not None else '-'} poziomow; {gr} pkt; {pl} pkt; ustawien kolejki {qd} / {fr}",
+            "INFO (rachunek CHANGELOG LB po recenzji, x1/4: miasto spustoszone ok. 1 185 dob w pokoju, zlupione ok. 590 przy mocy 5 pkt/d; w wojnie cywilne czekaja z dala od frontu)", None)
+    # ---- prog 18 (L7): polki - zdjete = do taborow + spalone; spalone tylko przy spustoszeniu; ksiega towarow: lup miast (L7) tylko jako ujscie "spalone"
+    l7 = [s for s in lines if s.startswith("Lup miast (L7): dzien") and inwin(dayof(s))]
+    l7off = any("WYLACZONE (Sack Takes Goods)" in s for s in dayw.values())
+    rx7 = re.compile(r"\| osada (\S+) \| wybor (\S+) \| czesc [\d.]+ \| polka (\d+) -> (\d+) szt\. \| do taborow (\d+) szt\. za (\d+) .*?\| spalone (\d+) szt\. za (\d+) .*?"
+                     r"\| bilans sztuk: zdjete (-?\d+) - do taborow (-?\d+) - spalone (\d+) = (-?\d+)\.")
+    b7, fire_bad, n7, t7, v7, s7, sv7 = [], [], 0, 0, 0, 0, 0
+    for s in l7:
+        m = rx7.search(s)
+        if not m:
+            continue
+        n7 += 1
+        if int(m.group(12)) != 0:
+            b7.append((m.group(1), int(m.group(12))))
+        if m.group(2) != "spustoszenie" and int(m.group(7)) > 0:
+            fire_bad.append(m.group(1))
+        t7 += int(m.group(5)); v7 += int(m.group(6)); s7 += int(m.group(7)); sv7 += int(m.group(8))
+    if n7:
+        rep.add("LUP-18 (L7): polki - zdjete = do taborow + spalone; spalone tylko przy spustoszeniu", f"lupow polek {n7} (linii {len(l7)}); rozjazdow {len(b7)}, spalone poza spustoszeniem {len(fire_bad)}"
+                + (f" ({(b7 + fire_bad)[:3]})" if b7 or fire_bad else "") + f"; do taborow {t7} szt. za {v7}, spalone {s7} szt. za {sv7}", "roznica 0 szt.; bez wyjatku",
+                not b7 and not fire_bad and n7 == len([x for x in l7 if "bilans sztuk" in x]))
+    else:
+        rep.add("LUP-18 (L7): polki - zdjete = do taborow + spalone", f"linii L7 z lupem 0 (linii {len(l7)})" + ("; L7 wylaczone" if l7off else ""), "roznica 0 szt. - INFO bez lupu / log bez paczki", None)
+    tw_bad = [s for s in lines if s.startswith("Towary: dzien") and "przybylo w ramce lupu" in s and inwin(dayof(s))]
+    tw_burn = sum(1 for s in lines if s.startswith("Towary: dzien") and "spalone przy spustoszeniu miasta" in s and inwin(dayof(s)))
+    rep.add("LUP-18b (L7): ksiega towarow - lup miast (L7) tylko jako ujscie (spalone przy spustoszeniu)", f"wierszy z przybytkiem w ramce lupu {len(tw_bad)}; wierszy ze spalonym {tw_burn}",
+            "0 przybytkow", (not tw_bad) if l7 else None)
+    # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, menn in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + menn
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[d] for d in ds) / len(ds)
+        caps = sum(1 for s in lines if s.startswith("WarLedger: ") and "wziete obleczeniem" in s)
+        rep.add(f"LUP-19: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})",
+                f"{v / 1e3:.1f} tys. ludzi; zdobyc w logu {caps}", "INFO - prog Jeffa 85 tys. w biegu rocznym (bieg kodu 43 bez paczki: 101.4 tys. d337-364)", None)
+    else:
+        rep.add("LUP-19: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -18732,6 +19081,8 @@ def main(argv):
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:
         return w7_main(logp, start_arg, until_arg, csvp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
+    if group == "lup" and logp:
+        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:

@@ -201,6 +201,11 @@ RANGES = {
     # N7 (rozbici pod choragiew): czas czekania w osadzie zbiorki i zasieg odbioru w dobach marszu (StragglersRally.Daily)
     'StragglersRallyWaitDays': (5, 90, "0"),
     'StragglersRallyReachDays': (0.5, 15.0, "0.0"),
+    # lup miast (L0-L3, CitySack): czesci monety przycinane w kodzie do 0..1, okno lupu do 0..30 dob (CitySack.ShareOf / WindowDays)
+    'SackSharePillage': (0.0, 1.0, "0.000"),
+    'SackShareDevastate': (0.0, 1.0, "0.000"),
+    'SackNoSpendingDays': (0, 30, "0"),
+    'SackRuinRebuildShare': (0.0, 1.0, "0.000"),   # LB: odbudowa ze zgliszcz - czesc kosztu poziomu (CitySack.RuinShare przycina do 0..1)
 }
 
 def gen(module_dir, ns, display):

@@ -5500,24 +5500,84 @@ namespace Armoury
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool SlaughterKeepsHides { get; set; } = true;
 
+        [SettingPropertyBool("Sack Measure Log", HintText = "Writes a log line each time a siege ends in mercy, pillage or devastation: what lay in the town (the merchants' coin and their reserve, the townsfolk's purses, goods and horses on the shelves), what the sack would take under each choice, how many men won it, whether their army was short of pay, and for thirty days after: the town's coin, its people's bread, the pay and camp followers' coin it received and the prisoners it bought. Log only - nothing in the game changes")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackMeasureLog { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sack Share Pillage", 0.000f, 1.000f, "0.000", HintText = "the part of all coin in a stormed town or castle that the victors take when they pillage it - from the merchants' coin and from the townsfolk's purses alike, their reserves included (a third; mercy takes nothing)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackSharePillage { get; set; } = 0.333f;
+
+        [SettingPropertyFloatingInteger("Sack Share Devastate", 0.000f, 1.000f, "0.000", HintText = "the part of all coin in a stormed town or castle that the victors take when they devastate it (two thirds)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackShareDevastate { get; set; } = 0.667f;
+
+        [SettingPropertyBool("No Sack Without Capture", HintText = "a battle won by the besiegers outside the walls, after which the town or castle does not fall, brings no sack: the game no longer burns its prosperity, buildings and loyalty, nobody is paid plunder and Banner Kings kills nobody there - only a stormed town is sacked (off = the game's rule: such a battle sacks the place it did not take)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool NoSackWithoutCapture { get; set; } = true;
+
+        [SettingPropertyBool("Beaten Garrison Purse To Victor", HintText = "a garrison broken in battle - outside the walls, in a sally or on the walls - leaves its pay chest to the victor, as any beaten party without a lord does: to the victorious lord (a vassal at war owes his crown a ninth of it), or to a victorious party without a lord; when no victor can carry it (the Others, a militia) the chest stays in the garrison's own town (off = the chest vanished with the garrison)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool BeatenGarrisonPurseToVictor { get; set; } = true;
+
+        [SettingPropertyBool("Sack Takes Real Coin", HintText = "the sack takes what really lies in a stormed town or castle: under pillage a third, under devastation two thirds of every coin there - the merchants' coin and the townsfolk's purses alike, their reserves included (Sack Share Pillage / Devastate); mercy takes nothing. The plunder is shared among the victorious parties by their men; in each party the soldiers put two thirds in their purses and the captain takes one third, of which a crown at war claims a third the next morning. The game's sum of 15 coins per point of burnt prosperity is gone, and so is all gold from nowhere (off = the game's sum, paid by the town from what it holds above its reserve)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackTakesRealCoin { get; set; } = true;
+
+        [SettingPropertyBool("Sack Scar Only When Sacked", HintText = "with Sack Scar Enabled: the scar of the sack (Sack Prosperity Cut Percent of the prosperity left and Sack Loyalty Hit loyalty) falls only on a town that is pillaged or devastated, at the moment of that choice - mercy is mercy, the town keeps only the game's own loss (off = the scar falls on every town taken by siege, also when spared, when its lord changes)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackScarOnlyWhenSacked { get; set; } = true;
+
+        [SettingPropertyBool("Sack Window Real Coin", HintText = "with Sack Takes Real Coin: when you take a town or castle, the hints of Devastate, Pillage and Show Mercy show the real coin - what the merchants and the townsfolk hold, what the army takes, your party's part (your men's, yours and the crown's) and what is left - and after your choice the summary says what was taken; 'Prosperity Lost' counts from this town; for thirty days 'People of this land' says how much a sacked town lost (off = the game's lines)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackWindowRealCoin { get; set; } = true;
+
+        [SettingPropertyBool("Ai Sacks From Need", HintText = "how a lord who storms a town chooses its fate: a town of his own realm's culture is spared as before; a town with less to take than one day's pay of his army is spared too (nobody burns a place for nothing); a lord whose army has wages owed that his house cannot meet, or whose house's purse holds less than two weeks' pay for all its parties, pillages it - a cruel one devastates it when he can; any other lord chooses by his nature, as before (off = the game's choice by the lord's nature only)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool AiSacksFromNeed { get; set; } = true;
+
+        [SettingPropertyBool("Sack No Spending", HintText = "after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there, nor do they buy clothing from its shelves. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackNoSpending { get; set; } = true;
+
+        [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "with Sack No Spending: the days the victors spend nothing in the town they sacked (also the window the sack log measures)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SackNoSpendingDays { get; set; } = 3;
+
+        [SettingPropertyBool("Sack Killed In People Book", HintText = "the townsfolk Banner Kings kills when a town is pillaged or devastated are gone from the town's own count of people as well (the same share), so they no longer eat, earn and pay as if alive (off = only Banner Kings' population loses them)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackKilledInPeopleBook { get; set; } = true;
+
+        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war its civil ruins only away from the front, as for any civil work). Off = the game's random razing, which grows with the army")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackBurnsBuildings { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sack Ruin Rebuild Share", 0.000f, 1.000f, "0.000", HintText = "with Sack Burns Buildings: the part of a level's cost that rebuilding it from the ruins costs (a quarter - in peace a devastated town of today's typical size stands again in about three years, two with its townsfolk building, a pillaged one in half that; in war its civil works wait away from the front; a town sacked every half year never recovers)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackRuinRebuildShare { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Sack Takes Goods", HintText = "the sack empties the shelves too: the same part as the coin (a third under pillage, two thirds under devastation, nothing under mercy) of every stack of goods, horses and arms in the market of a stormed town or castle. Unique pieces go to the army's leader, horses and beasts walk off with the parties (as many as their men can herd), food only up to ten days of rations for each party, the rest as far as the wagons can carry - most valuable by weight first; what they cannot carry stays under pillage and burns under devastation (food never burns). Lords put the arms they took in their armouries (off = the shelves are left untouched)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackTakesGoods { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Workshop Hands Step", 1.00f, 3.00f, "0.00", HintText = "further step of arms craftsmen on top of Workshop Hands Per 1000 People, now that ore and timber are plentiful: every town has this many times the armourers, weaponsmiths, bowyers and saddlers (and with them its weavers, tanners and fletchers) - still below medieval Europe. Needs Workshop Hands By People. 1 = off, as before")]
-        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
         public float WorkshopHandsStep { get; set; } = 1.3f;
 
         [SettingPropertyBool("Civil Works Away From Front", HintText = "in a kingdom at war, civil buildings are built again in towns and castles the war does not reach: no siege, no enemy lord's party, no battle between lords and no raid within Civil Works Front Range, and none of its own villages raided or burned, for Civil Works Calm Days. Near the front only walls, barracks and other military works go on, as before, and a house with a military work in hand finishes it first. The lord pays from his building allowance as always. Off = no civil building anywhere in a kingdom at war, as before")]
-        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
         public bool CivilWorksAwayFromFront { get; set; } = true;
 
         [SettingPropertyInteger("Civil Works Calm Days", 1, 60, "0", HintText = "days without any sign of war near a town or castle before civil building may go on there (needs Civil Works Away From Front)")]
-        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
         public int CivilWorksCalmDays { get; set; } = 14;
 
         [SettingPropertyFloatingInteger("Civil Works Front Range", 10.00f, 300.00f, "0", HintText = "how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours")]
-        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
         public float CivilWorksFrontRange { get; set; } = 60f;
 
         [SettingPropertyBool("Civil Works Need Wage Room", HintText = "with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds")]
-        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
         public bool CivilWorksNeedWageRoom { get; set; } = true;
 
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
@@ -6938,6 +6998,21 @@ namespace Armoury
             s.ValveShortCeiling = ValveShortCeiling;
             s.ValveStepFollowsUse = ValveStepFollowsUse;
             s.SlaughterKeepsHides = SlaughterKeepsHides;
+            s.SackMeasureLog = SackMeasureLog;
+            s.SackSharePillage = SackSharePillage;
+            s.SackShareDevastate = SackShareDevastate;
+            s.NoSackWithoutCapture = NoSackWithoutCapture;
+            s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
+            s.SackTakesRealCoin = SackTakesRealCoin;
+            s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
+            s.SackWindowRealCoin = SackWindowRealCoin;
+            s.AiSacksFromNeed = AiSacksFromNeed;
+            s.SackNoSpending = SackNoSpending;
+            s.SackNoSpendingDays = SackNoSpendingDays;
+            s.SackKilledInPeopleBook = SackKilledInPeopleBook;
+            s.SackBurnsBuildings = SackBurnsBuildings;
+            s.SackRuinRebuildShare = SackRuinRebuildShare;
+            s.SackTakesGoods = SackTakesGoods;
             s.WorkshopHandsStep = WorkshopHandsStep;
             s.CivilWorksAwayFromFront = CivilWorksAwayFromFront;
             s.CivilWorksCalmDays = CivilWorksCalmDays;

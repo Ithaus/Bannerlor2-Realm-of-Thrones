@@ -285,7 +285,7 @@ namespace Armoury
                 int reserve = mp.IsMainParty ? TroopSelfMend.OutstandingCost(st) : AiWear.OutstandingCost(mp, st);   // przy naprawach z materialem: z szacunkiem materialu z polki tego miasta
                 // 150: odziez, buty i plotno wojska - z polki miasta po cenie targu, z tej samej sakiewki PRZED wydatkiem "na zycie"
                 // (to samo zloto: mniej idzie "na zycie"); rezerwa na zalegle naprawy nietknieta, jak przy brakach w kompletach
-                int cloth = ArmyClothing.BuyForParty(mp, st, purse - reserve);
+                int cloth = CitySack.NoSpendCloth(st, mp) ? 0 : ArmyClothing.BuyForParty(mp, st, purse - reserve);   // lup miast L3: w oknie lupu bez zakupu z polki lupionej osady
                 if (cloth > 0) { _dayCloth += cloth; purse = Get(mp); }
                 int avail = Math.Max(0, purse - reserve);
                 // K1 (A3): MenGearSavePercent ludzie odkladaja na lepszy sprzet - nie wiecej niz MenGearSaveDays dni zoldu partii (z rezerwa
@@ -312,6 +312,7 @@ namespace Armoury
                     if (mp.IsMainParty && saved > 0) Log.Player("Your men put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ").");
                     return;
                 }
+                if (CitySack.NoSpend(st, mp, life)) return;   // lup miast L3: w lupionym miescie wojsko krolestwa zdobywcy nie placi - zold zostaje w sakiewce (wlasny try)
                 Take(mp, life);
                 int folk = TownFolk.EarnService(st, life, TownFolk.KLife);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca); kupcy reszte
                 st.Town.ChangeGold(life - folk);    // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
@@ -322,6 +323,7 @@ namespace Armoury
                 try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - okno kiesy ludu (calosc; E5/B1: podstawa robocizny 75%)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;
+                CitySack.NoteSpend(st, mp, life);   // lup miast (L0): zycie zostawione w osadzie po nastepstwach oblezenia (tylko licznik, wlasny try)
                 if (mp.IsMainParty)
                     Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : "")
                                + (saved > 0 ? " They put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ")." : ""));

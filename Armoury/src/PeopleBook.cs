@@ -99,7 +99,9 @@ namespace Armoury
                            MBackPress = 48,
                            // E4/9 (192): pobor do Strazy z ludnosci Westeros (WatchLaw.Levy - wies -1/k, MHearth); DLUG 4 - odchodzacy z rodu w zajeciu z braku pieniedzy
                            // do domu (ClanBudget.ToVillage: MDebt - czesc bez pochodzenia, tylko licznik; MBackDebt - z pochodzeniem, z hearth). Pierwsze wolne numery
-                           MWatchLevy = 49, MDebt = 50, MBackDebt = 51, MKinds = 52;
+                           MWatchLevy = 49, MDebt = 50, MBackDebt = 51,
+                           // L6 lupu miast (CitySack.People.cs): zabici przez BK przy zdobyciu miasta - stan miasta "t:" (TownSackKilled), bez hearth wsi; pierwszy wolny numer
+                           MSackTown = 52, MKinds = 53;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -121,7 +123,7 @@ namespace Armoury
             "weterani niewynajeci po czasie czekania do domu (E4/10)", "starzy zolnierze z ludzi miast do karczm (siew E4/10, stan miasta E4/4)",
             "powrot z pochodzeniem: niewzieci z poboru wymuszonego gracza do swojej wsi (E4/7b)",
             "pobor do Strazy z ludnosci Westeros (E4/9)", "dluznicy: odeszli z braku pieniedzy do domu (E4/9 DLUG 4, ClanBudget.ToVillage)",
-            "powrot z pochodzeniem: dluznicy do domu (E4/9 DLUG 4)" };
+            "powrot z pochodzeniem: dluznicy do domu (E4/9 DLUG 4)", "zdobycie: zabici mieszczanie (L6 lupu miast, BK - stan miasta)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
         // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
@@ -134,7 +136,8 @@ namespace Armoury
                                                    true, true, false, true, true, true, true, true, true, false, true, false,
                                                    true, false,                                                              // E4/10: MBackVeteran (hearth), MVetStart (stan miasta)
                                                    true,                                                                     // E4/7b: MBackPress (hearth wsi zdjecia)
-                                                   true, false, true };                                                      // E4/9: MWatchLevy (hearth), MDebt (licznik), MBackDebt (hearth)
+                                                   true, false, true,                                                        // E4/9: MWatchLevy (hearth), MDebt (licznik), MBackDebt (hearth)
+                                                   false };                                                                  // L6 lupu miast: MSackTown (stan miasta)
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)
@@ -690,6 +693,33 @@ namespace Armoury
             return got;
         }
 
+        /// <summary>
+        /// L6 lupu miast (CitySack.People.cs): mieszczanie zabici przez Banner Kings przy zdobyciu (BKSettlementBehavior.SiegeConsequences) - stan miasta (E4/4 "t:")
+        /// w dol o min(n, stan), przyczyna MSackTown (linia "Miasta (E4/8 R2)" - "zdobycie (L6)"), zgony cywilow regionu jak TownDie. Zwraca, ilu faktycznie zeszlo;
+        /// 0 = miasto bez stanu. Nie rzuca.
+        /// </summary>
+        internal static double TownSackKilled(Settlement s, double n)
+        {
+            if (s == null || s.StringId == null || !(n > 0.0) || double.IsInfinity(n)) return 0.0;
+            double got = 0.0;
+            try
+            {
+                lock (Gate)
+                {
+                    float p;
+                    if (!_town.TryGetValue(s.StringId, out p) || !(p > 0f)) return 0.0;
+                    float left = (float)Math.Max(0.0, (double)p - n);
+                    _town[s.StringId] = left;
+                    got = (double)p - left;
+                    _townMv[MSackTown] -= got;
+                }
+            }
+            catch (Exception e) { Stumble("TownSackKilled", e); return 0.0; }
+            if (got > 0.0) Count(got, MSackTown, 0.0);
+            if (got > 0.0) NoteCivilDead(s, got);
+            return got;
+        }
+
         /// <summary>Uchodzcy umieraja w drodze (1.3%/rok, bez narodzin): zdejmuje min(men, poza domem), Died += n; hearth bez zmian (sa poza wsia). Zwraca n.</summary>
         internal static double RefugeesDie(Village v, double men)
         {
@@ -1128,7 +1158,7 @@ namespace Armoury
             for (int i = 0; i < MKinds; i++)
             {
                 if (men[i] == 0 && hh[i] == 0) continue;
-                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown || i == MTownNatural || i == MVetStart ? "stan miasta" : "bez hearth (bez pochodzenia)")));
+                sb.Append(any ? "; " : " ").Append(MName[i]).Append(' ').Append(M0(men[i])).Append(" / ").Append(MHearth[i] ? H3d(hh[i]) : (i == MIncident || i == MFloor || i == MRefugeeFloor ? "gra " + H3d(hh[i]) : (i == MFamineTown || i == MLevyTown || i == MBackTown || i == MTownNatural || i == MVetStart || i == MSackTown ? "stan miasta" : "bez hearth (bez pochodzenia)")));
                 any = true;
             }
             if (!any) sb.Append(" brak");

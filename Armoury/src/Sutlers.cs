@@ -220,9 +220,13 @@ namespace Armoury
             _planned = true; _dLordSaved += kept;
             _dParties++; _dReserve += reserve; _dKept += kept;
             if (want <= 0) return;
+            // lup miast L3: markietani nie kieruja pieniadza do lupionej osady - wstrzymana tylko czesc miejska (zostaje w sakiewce; wlasny try), czesc wsi jak zwykle
+            bool sackHold = CitySack.NoSpend(town, mp, (long)(want * (double)townShare), true);
+            if (sackHold) { want = (int)(want * (double)(1f - townShare)); townShare = 0f; if (want <= 0) return; }
             bool wantVill = (int)(want * (double)(1f - townShare)) > 0;
             var vill = wantVill ? NearestVillage(p, f) : null;              // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie)
             if (vill != null && vill.SettlementComponent == null) vill = null;
+            if (sackHold && vill == null) return;                            // bez wsi cala kwota szlaby do lupionej osady - zostaje w sakiewce
             // ---- od zdjecia do obu wplat tylko arytmetyka i ChangeGold
             int x = MenPurse.CampTake(mp, want);
             if (x <= 0) return;
@@ -238,6 +242,7 @@ namespace Armoury
             if (noTown) { _dNoTown++; _dNoTownGold += x; }
             if (mp.IsMainParty) _dPlayer += x;
             Pay(mp, town, vill, townPart, villPart);
+            CitySack.NoteSpend(town, mp, townPart);   // lup miast (L0): markietani do osady po nastepstwach oblezenia (tylko licznik, wlasny try)
         }
 
         /// <summary>Liczniki przelewu sakiewka -> kasa miasta / kiesa wsi (zloto juz zdjete z sakiewki w CampTake i wplacone w One) - te same co MenPurse.OnLeft.
