@@ -2560,6 +2560,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool WorkshopNoFreeRaw { get; set; } = true;
 
+        [SettingPropertyBool("Workshop No Free Raw All Types", HintText = "with Workshop No Free Raw: the same rule for every workshop, not only the hidden town artisans - a workshop line left with no input at all (the Banner Kings butcher's chicken and goose lines, whose input the game cannot read: about 33 meat a day out of nothing) no longer makes meat, hides, timber, ore, leather or linen; mines still dig ore. Off = only the hidden artisans, as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WorkshopNoFreeRawAllTypes { get; set; } = true;
+
+        [SettingPropertyBool("Bk Workshop Inputs Fix", HintText = "TEST FIRST: the Banner Kings workshop lines whose second input the game cannot read get a real one - the bakery's grain-and-carrot and grain-and-orange pies take fruit (the apple goods) besides the grain, and the butcher's chicken and goose lines take two small animals (the animal goods) for one meat. Fewer pies until fruit reaches the towns (about 59% of all pies are made from grain alone today). Takes effect at the next load. Off = the lines as the game reads them")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BkWorkshopInputsFix { get; set; } = false;
+
         [SettingPropertyBool("Historical Recruit Cost", HintText = "a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level")]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalRecruitCost { get; set; } = true;
@@ -6663,6 +6671,8 @@ namespace Armoury
             s.CouncilWagesRealBase = CouncilWagesRealBase;
             s.CouncilWagesPaidToAll = CouncilWagesPaidToAll;
             s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
+            s.WorkshopNoFreeRawAllTypes = WorkshopNoFreeRawAllTypes;
+            s.BkWorkshopInputsFix = BkWorkshopInputsFix;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;

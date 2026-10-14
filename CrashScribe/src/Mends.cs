@@ -5637,7 +5637,19 @@ namespace CrashScribe
             try
             {
                 if (!Config.LocalRecruits) return;
-                int slots = 0, people = 0, cultures = 0;
+                // AM-20 (audyt modow 14.10, P3a): jedynym miejscem, ktore daje notablowi kulture pana, jest BK BKNotableBehavior.ApplyNotableCultureConversion
+                // (co dobe HandleCultureConversions, rada PromoteCulture, rozmowa gracza; pan placi wplywem, relacja -8). Krok 1 ponizej cofal to
+                // nazajutrz u WSZYSTKICH notabli (bieg dwuletni 06:01: 675 Artisan + 24 Merchant, pan placil za nic).
+                // Droga B (domyslna, decyzja Jeffa 14.10 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture, AuditP3.TwentyInstall): BK juz
+                // nie nawraca (prefiks blokuje cala akcje, bez kosztu), a krok 1 dalej prostuje WSZYSTKICH notabli - jak b47fecc3 (kaplani z presetu wiary,
+                // notable osady, ktora zmienila kulture przez asymilacje BK).
+                // Droga A (alternatywa, LocalLeviesPreachersOnly - tylko przy wylaczonej B, nigdy obie naraz): krok 1 prostuje tylko kaplanow (BK robi ich
+                // z presetu wiary) i pomija kaplana z kultura glowy rodu pana; rzemieslnicy i kupcy raz nawroceni przez BK zostaja.
+                // Krok 2 (obcy ochotnicy do kosza) bez zmian dla wszystkich; werbunek i tak idzie wedlug kultury osady (LocalRecruitsPrefix).
+                bool preachersOnly = Config.LocalLeviesPreachersOnly && !Config.NotablesKeepSettlementCulture;
+                int slots = 0, people = 0, cultures = 0, ownerSkip = 0, leftBk = 0;
+                var fixedByOcc = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.Ordinal);
+                var leftByOcc = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.Ordinal);
                 var all = only != null
                     ? (System.Collections.Generic.IEnumerable<Settlement>)new Settlement[] { only }
                     : Settlement.All;
@@ -5646,23 +5658,44 @@ namespace CrashScribe
                     if (st == null || st.Culture == null || st.IsHideout) continue;
                     var list = st.Notables;
                     if (list == null) continue;
+                    CultureObject ownerCulture = null;
+                    try { ownerCulture = st.OwnerClan != null && st.OwnerClan.Leader != null ? st.OwnerClan.Leader.Culture : null; } catch { }
                     foreach (var h in list)
                     {
                         if (h == null) continue;
 
-                        // 1. obcy kaplan (albo inny notabl) dostaje kulture osady
+                        // 1. obcy kaplan (albo - przy LocalLeviesPreachersOnly false - inny notabl) dostaje kulture osady
                         if (h.Culture != st.Culture)
                         {
-                            var was = h.Culture != null ? h.Culture.StringId : "?";
-                            h.Culture = st.Culture;
-                            cultures++;
-                            try
+                            string occ = "?";
+                            try { occ = h.CharacterObject != null ? h.CharacterObject.Occupation.ToString() : "?"; } catch { }
+                            bool fix = true;
+                            if (preachersOnly)
                             {
-                                Scribe.Line("Mends: " + h.Name + " w " + st.Name + " byl "
-                                            + was + ", jest " + st.Culture.StringId
-                                            + " (" + (h.CharacterObject != null ? h.CharacterObject.Occupation.ToString() : "?") + ").");
+                                if (!h.IsPreacher)
+                                {
+                                    fix = false; leftBk++;
+                                    int n0; leftByOcc.TryGetValue(occ, out n0); leftByOcc[occ] = n0 + 1;
+                                }
+                                else if (ownerCulture != null && h.Culture == ownerCulture)
+                                {
+                                    fix = false; ownerSkip++;
+                                }
                             }
-                            catch { }
+                            if (fix)
+                            {
+                                var was = h.Culture != null ? h.Culture.StringId : "?";
+                                h.Culture = st.Culture;
+                                cultures++;
+                                int n1; fixedByOcc.TryGetValue(occ, out n1); fixedByOcc[occ] = n1 + 1;
+                                try
+                                {
+                                    Scribe.Line("Mends: " + h.Name + " w " + st.Name + " byl "
+                                                + was + ", jest " + st.Culture.StringId
+                                                + " (" + occ + ").");
+                                }
+                                catch { }
+                            }
                         }
 
                         // 2. obce oddzialy juz mu wpisane - do kosza, BK dobierze miejscowych
@@ -5681,9 +5714,29 @@ namespace CrashScribe
                 }
                 if (only == null || slots > 0 || cultures > 0)
                     Scribe.Line("Mends: werbunek miejscowy - poprawionych notabli " + cultures
-                                + ", wyrzuconych obcych ochotnikow " + slots + " u " + people + " ludzi.");
+                                + ", wyrzuconych obcych ochotnikow " + slots + " u " + people + " ludzi."
+                                + (only != null ? "" : AuditP3.TwentyDayTail() + AmTwentyTail(preachersOnly, fixedByOcc, ownerSkip, leftBk, leftByOcc)));
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.LocalLevies", null); } catch { } }
+        }
+
+        /// <summary>AM-20: ogon linii dobowej "werbunek miejscowy" - kogo krok 1 prostowal (wedlug zawodu) i kogo zostawil BK.</summary>
+        private static string AmTwentyTail(bool preachersOnly, System.Collections.Generic.SortedDictionary<string, int> fixedByOcc, int ownerSkip,
+                                           int leftBk, System.Collections.Generic.SortedDictionary<string, int> leftByOcc)
+        {
+            try
+            {
+                var fx = new System.Collections.Generic.List<string>();
+                foreach (var kv in fixedByOcc) fx.Add(kv.Key + " " + kv.Value);
+                var lf = new System.Collections.Generic.List<string>();
+                foreach (var kv in leftByOcc) lf.Add(kv.Key + " " + kv.Value);
+                return " | AM-20 tylko kaplani " + (preachersOnly ? "TAK" : (Config.NotablesKeepSettlementCulture ? "NIE (wszyscy notable - droga B" + (Config.LocalLeviesPreachersOnly ? ", LocalLeviesPreachersOnly pominiete" : "") + ")" : "NIE (wszyscy notable, b47fecc3)"))
+                       + ": prostowani wedlug zawodu [" + string.Join(", ", fx.ToArray()) + "]"
+                       + ", kaplani pominieci (kultura pana) " + ownerSkip
+                       + ", inni notable z kultura inna niz osady (nawroceni przez BK, zostawieni) " + leftBk
+                       + " [" + string.Join(", ", lf.ToArray()) + "].";
+            }
+            catch { return " | AM-20 ?"; }
         }
 
         /// <summary>

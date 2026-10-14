@@ -106,6 +106,17 @@ namespace CrashScribe
         public static bool UniqueCompanionsLog = true;             // (5) linia doby "Unikaty ROT (UC)" - kazdy wzor: zywy / martwy / gdzie / rod / zawod, dzieci, liczniki; false = bez linii doby
         public static bool MarriageOffersPerYear = true;     // 14.10 (ta sama decyzja): oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) na rok jak w roku gry 84 dni - caly proces rozciagniety x DaysInYear / 84: doba rodu AI przechodzi do rzutow gry z prawdopodobienstwem 84 / CampaignTime.DaysInYear (rok 364 = 0.231) i przerwa miedzy ofertami 7 x DaysInYear / 84 dob (30.3; gra 7 - recenzja 14.10); patrz MarriageOfferYear.cs; false = oferty jak w grze
 
+        // --- P1 audytu modow 14.10: tytuly BannerKings na mapie ROT (patrz BkTitles.cs) ---
+        public static bool BkTitlesUseRotFile = true;   // AM-26: sciezka pliku tytulow ROT ustawiana przed KAZDYM odczytem BK (InitializeTitles nowej gry i RetrofitOrphanedTitles kazdego wczytania) - dotad BKROTPatch ustawial ja tylko dla nowej gry, a wczytanie w nowym procesie bralo kalradyjski titles.xml BK (30 ksiestw Calradii w kampanii); false = jak dotad (b47fecc3)
+        public static bool BkTitlesRot818 = true;       // AM-27 (tylko z BkTitlesUseRotFile): nasz plik tytulow dla mapy ROT 8.1.8 (zasob DLL, zapisywany do Documents\...\CrashScribe\bk_titles_rot818.xml) zamiast titles_6_3.xml BKROT z ROT 6.x - kazde z 97 miast i 130 zamkow z tytulem (dotad 25 bez), Lorath / Ibben / Qarth z tytulem krolewskim; false = titles_6_3 BKROT
+
+        // --- P3 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md rozdz. 3 i 5; kazdy klucz false = zachowanie b47fecc3) ---
+        public static bool NotablesKeepSettlementCulture = true;   // AM-20 droga B (decyzja Jeffa 14.10, docs/STAN-PRAC.md 19:20 UTC): notable ZAWSZE w kulturze swojej osady - BK BKNotableBehavior.ApplyNotableCultureConversion zablokowane w calosci (bez zmiany kultury, bez kosztu wplywu, bez relacji -8; wszystkie drogi: doba HandleCultureConversions, rada PromoteCulture, rozmowa gracza), opcja rozmowy 'convert to my culture' wylaczona z opisem, zadanie rady PromoteCulture nic nie losuje; LocalLevies dalej prostuje WSZYSTKICH notabli do kultury osady (b47fecc3) - kultura calej osady zmienia sie dalej przez asymilacje BK, notable ida za nia; false = BK nawraca jak dotad (b47fecc3)
+        public static bool LocalLeviesPreachersOnly = false;  // AM-20 droga A (alternatywa, NIE domyslnie; dziala tylko przy NotablesKeepSettlementCulture=false - nigdy obie naraz; tylko z LocalRecruits): krok 1 LocalLevies (kultura osady dla notabla) tylko dla kaplanow i bez kaplana z kultura glowy rodu pana - rzemieslnicy i kupcy podbitego miasta raz przyjmuja kulture pana jak w BK; obcy ochotnicy do kosza dalej u wszystkich; false = kazdy notabl dostaje kulture osady (b47fecc3)
+        public static bool CultureTemplateRepair = true;      // AM-29: przy kazdym starcie sesji z list wzorcow kultur (lord / notable / rebel) wylatuja wpisy niegotowe z ROT-Content (np. spc_brotherhood_2 w lord_templates Westerlands - ok. 16% szansy na wywrotke przy zakladaniu rodu towarzysza) + siatka na CreateNewHeroForNewCompanionClan; false = listy jak dotad (b47fecc3)
+        public static bool StopBkrotProsperityReset = true;   // AM-01: zdjete 3 prefiksy BKROT EarlyHeal (getter Town.Prosperity, CalculateLoyaltyChange, CalculateSecurityChange) - twierdza ponizej 100 dobrobytu nie dostaje juz 2000 / 4000 z niczego; w zamian straz NaN / Inf na Town.set_Prosperity, NaN w zapisie -> 0 przy starcie sesji; linia doby (NaN, czy prefiks BKROT wrocil); false = BKROT EarlyHeal jak dotad (b47fecc3)
+        public static bool LorathFaithFix = true;             // AM-28: postfiks BKROT CultureHelpers.IsCultureEssosi - kultura nord (Lorath w ROT 8.1.8; BKROT zna stara 'lorathi') jest kultura Essos dla wiar BKROT; null w kulturach ulubionych wiary Pattern -> nord; w kampanii sprzed naprawy (zaden bohater nord bez wiary) jednorazowe nadanie wiary jak BK przy starcie gry; false = Lorath bez wiary BK (b47fecc3)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -185,6 +196,13 @@ namespace CrashScribe
                         case "UniqueCompanionsDuplicateGuard": UniqueCompanionsDuplicateGuard = B(v); break;
                         case "UniqueCompanionsChildren": UniqueCompanionsChildren = B(v); break;
                         case "UniqueCompanionsLog": UniqueCompanionsLog = B(v); break;
+                        case "BkTitlesUseRotFile": BkTitlesUseRotFile = B(v); break;
+                        case "BkTitlesRot818": BkTitlesRot818 = B(v); break;
+                        case "NotablesKeepSettlementCulture": NotablesKeepSettlementCulture = B(v); break;
+                        case "LocalLeviesPreachersOnly": LocalLeviesPreachersOnly = B(v); break;
+                        case "CultureTemplateRepair": CultureTemplateRepair = B(v); break;
+                        case "StopBkrotProsperityReset": StopBkrotProsperityReset = B(v); break;
+                        case "LorathFaithFix": LorathFaithFix = B(v); break;
                     }
                 }
             }

@@ -677,6 +677,20 @@ Uzycie (Python 3, tylko odczyt):
                     oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
                     pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
 --grupa lenna     : (PROJEKT-LENNA 14.10, docs/lenna/PROJEKT-LENNA.md rozdz. 6; Armoury/src/FiefGrants.cs) python -I tools/sprawdz_logi.py --grupa lenna
+--grupa audyta    : (audyt modow 14.10, RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs) python -I tools/sprawdz_logi.py --grupa audyta
+                    <session-*.log CrashScribe> (strumieniowo). Tytuly BK na mapie ROT: AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany),
+                    AUD-P1-1 (AM-26) kazde ustawienie sciezki = plik ROT 8.1.8, AUD-P1-2 retrofit BK przy wczytaniu z plikiem ROT 8.1.8 i 0 przepietych
+                    (test: nowa kampania -> zapis -> NOWY proces -> wczytanie), linia pierwszej godziny sesji: AUD-P1-3 twierdz bez tytulu 0, AUD-P1-4
+                    krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
+                    i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
+                    P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, droga B domyslna:
+                    wpiete 3/3 i ogon doby 'kultura osady TAK', od 4. doby 0 prostowanych Artisan / Merchant, 0 petli >= 2 razy, zablokowane BK INFO;
+                    przy B wylaczonej i LocalLeviesPreachersOnly - wiersze drogi A: tylko kaplani TAK, 0 prostowanych poza kaplanami, 0 petli >= 3 razy), AUD-P3-29a..c (AM-29, wzorce kultur:
+                    siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0), AUD-P3-01a..d (AM-01, BKROT EarlyHeal: zdjety 3/3
+                    i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO); z logiem Armoury (Armoury-*.log jako log,
+                    --crashscribe <session-*.log>): AUD-P3-30a..d (AM-30, warsztaty bez wsadu: regula A na wszystkie typy z rzeznikiem na liscie,
+                    cykle rzeznika zablokowane > 0, (B) BK Workshop Inputs Fix NIE albo 4 dopisane linie, suma wedlug typu INFO); AUD-P3-28a..c (AM-28,
+                    wiara Lorath: postfiks IsCultureEssosi wpiety, wiara pattern z kultura nord, po >= 7 dobach osady i lordowie nord z wiara > 0).
                     [--tabele <katalog tabel biegu>] <Armoury-*.log> (log strumieniowo). Regula N nadan zdobytych twierdz: LN-0 linia startu, LN-1 decyzje =
                     linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
                     (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
@@ -25242,6 +25256,516 @@ def szturm_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ audyta (audyt modow 14.10, pakiet P1: AM-26 / AM-27 / AM-04; CrashScribe BkTitles)
+AU_START = re.compile(r"Mends: tytuly BK \(AM-26\) - latki sciezki wpiete (TAK|NIE[^(]*)\s*\(.*plik ROT 8\.1\.8 \(AM-27, BkTitlesRot818=(true|false)\): (.*)$")
+AU_APPLY = re.compile(r"Mends: tytuly BK \(AM-26\) - (InitializeTitles|RetrofitOrphanedTitles) \([^)]*\): (.*)$")
+AU_RETRO = re.compile(r"Mends: tytuly BK \(AM-26\) - retrofit BK przy wczytaniu: przepietych powiazan (\d+) \(plik (.*?)\);")
+AU_SESS = re.compile(r"Mends: tytuly BK \(AM-26/AM-27\) - pierwsza godzina sesji: plik (.*?) \| twierdz bez tytulu (\d+) z (\d+)(.*?) \| wsi bez tytulu przy twierdzach"
+                     r" z tytulem (\d+) z (\d+) \| krolestw bez tytulu krolewskiego (\d+) z (\d+)(.*?) \| (?:ksiestw (\d+), spoza pliku (\d+)(.*?)|ksiestw \?[^|]*)"
+                     r" \| retrofit przy wczytaniu: (.*?) \| potkniec (\d+)\.")
+AU_ROT = "ROT 8.1.8 (CrashScribe)"
+AU_FC_MARK = re.compile(r"=== BK FirstChance logger installed at (\d{4}-\d\d-\d\d)T(\d\d:\d\d:\d\d)")
+AU_LOG_T0 = re.compile(r"session-(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)-(\d\d)\.log$", re.I)
+
+
+def audyta_bkfc(rep, logp, active=False):
+    """AUD-P1-8 (AM-04): wpisy 'GetIdealCapital' (NRE BKCapitalBehavior - miasto rodu panujacego bez tytulu) w Configs/ModLogs/bk-firstchance.log
+    obok katalogu logu CrashScribe. Recenzja P1: BK dopisuje ten plik przez WSZYSTKIE procesy (BKDiagnostics: AppendAllText, przy 4 MB zostaje
+    ostatni 1 MB), a kazdy proces zaczyna linia '=== BK FirstChance logger installed at <czas startu> ===' - czas jak w nazwie session-*.log
+    (06:01:14 / 09:07:14 co do sekundy). Liczone w odcinku procesu tej sesji (znacznik od -2 do +15 min od startu logu, najblizszy); caly plik
+    tylko informacyjnie (przed P1: 13 903 linii w calym pliku, 528 w procesie 06:01, 89 w 09:07). Prog 0 tylko przy czynnej paczce P1 (active),
+    inaczej INFO."""
+    import datetime
+    fc = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(logp)), "..", "Configs", "ModLogs", "bk-firstchance.log"))
+    if not os.path.isfile(fc):
+        rep.add("AUD-P1-8 (AM-04): bk-firstchance.log", f"brak pliku ({fc})", "INFO", None)
+        return
+    t0 = None
+    m = AU_LOG_T0.search(os.path.basename(logp))
+    if m:
+        try:
+            t0 = datetime.datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4)}", "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            t0 = None
+    segs, total = [], 0   # odcinki procesow: [czas startu, linie GetIdealCapital]
+    with open(fc, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            mm = AU_FC_MARK.search(ln)
+            if mm:
+                try:
+                    ts = datetime.datetime.strptime(f"{mm.group(1)} {mm.group(2)}", "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    ts = None
+                segs.append([ts, 0])
+                continue
+            if "GetIdealCapital" in ln:
+                total += 1
+                if segs:
+                    segs[-1][1] += 1
+    best, bestd = None, None
+    if t0 is not None:
+        for sg in segs:
+            if sg[0] is None:
+                continue
+            d = (sg[0] - t0).total_seconds()
+            if -120 <= d <= 900 and (bestd is None or abs(d) < bestd):
+                best, bestd = sg, abs(d)
+    if best is None:
+        rep.add("AUD-P1-8 (AM-04): GetIdealCapital w bk-firstchance.log - proces tej sesji",
+                f"brak odcinka procesu tej sesji (start logu {t0 if t0 else '? (nazwa logu nie session-*.log)'}, odcinkow {len(segs)});"
+                f" caly plik {total} ({fc})", "INFO (plik BK z innego biegu albo log skopiowany)", None)
+        return
+    rep.add("AUD-P1-8 (AM-04): GetIdealCapital w bk-firstchance.log - proces tej sesji",
+            f"{best[1]} (odcinek od {best[0]}; caly plik {total}, odcinkow {len(segs)}; {fc})",
+            "0 (przed P1: 528 w procesie 06:01, 89 w 09:07)" if active else "INFO (paczka P1 nieczynna w tym logu)",
+            (best[1] == 0) if active else None)
+
+
+def audyta_main(logp, csp=None):
+    """audyta (audyt modow 14.10, docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs). Log sesji
+    CrashScribe (session-*.log), czytany strumieniowo. AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany); AUD-P1-1 (AM-26)
+    kazde ustawienie sciezki przed odczytem BK (InitializeTitles / RetrofitOrphanedTitles) = plik ROT 8.1.8; AUD-P1-2 (AM-26, wczytanie) retrofit BK
+    z plikiem ROT 8.1.8 i 0 przepietych (kampania zaczeta z P1; stary zapis z ksiestwami Calradii daje wiecej - wtedy NIE z opisem); linia pierwszej
+    godziny sesji: AUD-P1-3 (AM-27) twierdz bez tytulu 0, AUD-P1-4 krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu przy twierdzach
+    z tytulem 0, AUD-P1-6 (AM-26 w grze, zamiast savescan3) ksiestw spoza pliku 0, AUD-P1-7 potkniecia i bledy BkTitles 0; AUD-P1-8 (AM-04, INFO)
+    wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu (plik BK bez dat - porownac z biegiem sprzed P1).
+    Test AM-26: nowa kampania -> zapis -> wyjscie -> NOWY proces gry -> wczytanie -> log tej drugiej sesji (AUD-P1-2 i AUD-P1-6).
+    Log bez paczki: INFO, bez wyjatku.
+    P3 (audyta_p3): log Armoury (Armoury-*.log) jako log + --crashscribe <session-*.log>, albo sam log sesji (wtedy wiersze Armoury INFO)."""
+    armp = None
+    if logp and os.path.basename(logp).lower().startswith("armoury"):
+        armp, logp = logp, csp   # P3: Armoury-*.log jako log, log sesji CrashScribe z --crashscribe
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AUD-P1: log sesji CrashScribe", f"brak ({logp})", "INFO (--crashscribe <session-*.log>)", None)
+        audyta_p3(rep, None, armp)
+        rep.show()
+        return 0
+    start, off, warn, apply, retro, sess, errs = [], 0, [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "tytuly BK" not in ln and "BkTitles." not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            if "BkTitles." in s and "tytuly BK" not in s:
+                errs += 1
+                continue
+            m = AU_START.search(s)
+            if m:
+                start.append(m.groups())
+                continue
+            if "Mends: tytuly BK (AM-26) wylaczone" in s:
+                off += 1
+                continue
+            if "Mends: tytuly BK (AM-26) - OSTRZEZENIE" in s or "nieobecny" in s:
+                warn.append(s)
+                continue
+            m = AU_APPLY.search(s)
+            if m:
+                apply.append((m.group(1), m.group(2)))
+                continue
+            m = AU_RETRO.search(s)
+            if m:
+                retro.append((int(m.group(1)), m.group(2)))
+                continue
+            m = AU_SESS.search(s)
+            if m:
+                sess.append(m.groups())
+    print(f"plik: {logp} | linie P1: start {len(start)}, sciezka {len(apply)}, retrofit {len(retro)}, sesja {len(sess)}, wylaczone {off}, ostrzezen {len(warn)}")
+    if not (start or apply or retro or sess or off or warn):
+        rep.add("AUD-P1: linie tytulow BK (CrashScribe BkTitles)", "brak linii (log bez paczki P1)", "INFO", None)
+        audyta_bkfc(rep, logp)
+        audyta_p3(rep, logp, armp)
+        rep.show()
+        return 0
+    if off and not start:
+        rep.add("AUD-P1-0: latki sciezki tytulow BK", f"wylaczone (BkTitlesUseRotFile=false) w {off} liniach", "INFO (klucz off = zachowanie b47fecc3)", None)
+    elif start:
+        hook, rot818, note = start[-1]
+        ok = hook == "TAK" and rot818 == "true" and note.startswith("plik ")
+        rep.add("AUD-P1-0: linia startu - latki sciezki wpiete, plik ROT 8.1.8 zapisany",
+                f"wpiete {hook.strip()}, BkTitlesRot818={rot818}, {note[:160]}" + (f"; ostrzezen {len(warn)}" if warn else ""),
+                "TAK i 'plik <sciezka> (...)'", ok)
+    else:
+        rep.add("AUD-P1-0: linia startu", f"brak; ostrzezenia: {' / '.join(w[:120] for w in warn[:2])}", "linia 'latki sciezki wpiete TAK'", False)
+    if apply:
+        bad = [a for a in apply if not a[1].startswith("plik " + AU_ROT)]
+        rep.add("AUD-P1-1 (AM-26): sciezka przed odczytem BK = plik ROT 8.1.8",
+                f"ustawien {len(apply)} (InitializeTitles {sum(1 for a in apply if a[0] == 'InitializeTitles')}, RetrofitOrphanedTitles "
+                f"{sum(1 for a in apply if a[0] == 'RetrofitOrphanedTitles')}), inny plik {len(bad)}" + (f": {bad[0][1][:140]}" if bad else ""),
+                "kazde 'plik ROT 8.1.8 (CrashScribe)'", len(bad) == 0)
+    else:
+        rep.add("AUD-P1-1 (AM-26): sciezka przed odczytem BK", "brak linii ustawienia", "INFO (BK nie czytal tytulow albo latka nie wpieta)", None)
+    if retro:
+        badf = [r for r in retro if not r[1].startswith(AU_ROT)]
+        moved = [r[0] for r in retro]
+        rep.add("AUD-P1-2 (AM-26): retrofit BK przy wczytaniu - plik ROT 8.1.8, przepietych 0",
+                f"wczytan {len(retro)}, przepietych {moved}, inny plik {len(badf)}" + (f" ({badf[0][1]})" if badf else ""),
+                "plik ROT 8.1.8 i 0 (kampania zaczeta z P1; stary zapis z ksiestwami Calradii daje wiecej - nie naprawiamy)",
+                len(badf) == 0 and all(x == 0 for x in moved))
+    else:
+        rep.add("AUD-P1-2 (AM-26): retrofit BK przy wczytaniu", "brak wczytania w tym logu",
+                "INFO (test: nowa kampania -> zapis -> NOWY proces -> wczytanie; log drugiej sesji)", None)
+    if sess:
+        kinds = [x[0] for x in sess]
+        nt = [int(x[1]) for x in sess]
+        nk = [int(x[6]) for x in sess]
+        nv = [int(x[4]) for x in sess]
+        nd = [int(x[10]) if x[10] is not None else None for x in sess]
+        st_ = [int(x[13]) for x in sess]
+        notrot = [k for k in kinds if not k.startswith(AU_ROT)]
+        rep.add("AUD-P1-3 (AM-27): twierdz bez tytulu BK", f"{nt} z {[int(x[2]) for x in sess]}" + (f"; np.{sess[0][3][:160]}" if nt[0] else "")
+                + (f"; plik inny niz ROT 8.1.8 w {len(notrot)} liniach" if notrot else ""), "0 (plik ROT 8.1.8)", not notrot and all(v == 0 for v in nt))
+        rep.add("AUD-P1-4 (AM-27): krolestw bez tytulu krolewskiego", f"{nk} z {[int(x[7]) for x in sess]}" + (f"; {sess[0][8][:160]}" if nk[0] else ""),
+                "0 (w dlugiej kampanii nowe krolestwa z buntow moga byc bez tytulu - patrz nazwy)", all(v == 0 for v in nk))
+        rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem", f"{nv} z {[int(x[5]) for x in sess]}", "0", all(v == 0 for v in nv))
+        if any(v is None for v in nd):
+            rep.add("AUD-P1-6 (AM-26): ksiestwa spoza pliku tytulow", "brak liczby (BK bez AllTitles albo pliku)", "INFO", None)
+        else:
+            rep.add("AUD-P1-6 (AM-26): ksiestwa spoza pliku tytulow (w grze zamiast savescan3)",
+                    f"{nd} (ksiestw razem {[int(x[9]) for x in sess]})" + (f"; {sess[0][11][:160]}" if nd[0] else ""),
+                    "0 (stary zapis: ksiestwa Calradii zostaja - opcja B nie robiona)", all(v == 0 for v in nd))
+        rep.add("AUD-P1-7: potkniecia linii sesji i bledy BkTitles", f"potkniec {st_}, raportow bledow BkTitles {errs}", "0", all(v == 0 for v in st_) and errs == 0)
+    else:
+        rep.add("AUD-P1-3..7: linia pierwszej godziny sesji", "brak (czas gry nie ruszyl albo latka nie wpieta)" + (f"; bledy BkTitles {errs}" if errs else ""),
+                "INFO", None if errs == 0 else False)
+    # AM-04: prog tylko przy czynnej paczce P1 (latki wpiete i nasz plik ROT 8.1.8) - recenzja P1
+    audyta_bkfc(rep, logp, active=bool(start) and start[-1][0].strip() == "TAK" and start[-1][1] == "true")
+    audyta_p3(rep, logp, armp)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ audyta, pakiet P3 (audyt modow 14.10, RAPORT-AUDYT-MODOW.md rozdz. 3 i 5: AM-20, AM-29, AM-01, AM-30, AM-28)
+AU3_LEVY = re.compile(r"Mends: werbunek miejscowy - poprawionych notabli (\d+), wyrzuconych obcych ochotnikow (\d+) u (\d+) ludzi\.(.*)$")
+AU3_LEVY20 = re.compile(r"\| AM-20 tylko kaplani (TAK|NIE[^:]*): prostowani wedlug zawodu \[(.*?)\], kaplani pominieci \(kultura pana\) (\d+),"
+                        r" inni notable z kultura inna niz osady \(nawroceni przez BK, zostawieni\) (\d+) \[(.*?)\]\.")
+AU3_FIX = re.compile(r"Mends: (.*) w (.*) byl (\S+), jest (\S+) \(([^)]*)\)\.$")
+# AM-20 droga B (recenzja P3, decyzja Jeffa 14.10 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture)
+AU3_B_START = re.compile(r"Mends: kultura notabli \(AM-20\) - notable w kulturze osady \(droga B\) wpiete (\d+)/3: (.*)$")
+AU3_LEVYB = re.compile(r"\| AM-20 kultura osady (TAK|NIE[^:]*): zablokowane nawrocenia BK (\d+) \(gracz (\d+)\), zadanie rady PromoteCulture pominiete (\d+),"
+                       r" w procesie (\d+)")
+AU3_T_START = re.compile(r"Mends: wzorce kultur \(AM-29\) - siatka na rod towarzysza \(CreateNewHeroForNewCompanionClan\) (wpieta|NIE wpieta[^;]*);")
+AU3_T_SESS = re.compile(r"Mends: wzorce kultur \(AM-29\) - start sesji: wzorcow sprawdzonych (\d+), usunietych (\d+)(.*?); list zostawionych bez zmian"
+                        r" \(same zepsute\) (\d+), pozostalo zepsutych (\d+), siatka rodu towarzysza (wpieta|NIE) \(podmian w procesie (\d+), bez zastepcy (\d+)\),"
+                        r" potkniec (\d+)\.")
+AU3_P_START = re.compile(r"Mends: dobrobyt \(AM-01\) - (?:BKROTPatch bez latek EarlyHeal \(nic do zdjecia\), )?BKROT EarlyHeal zdjety (\d+)/(\d+) \((.*?)\);"
+                         r" straz NaN/Inf na Town\.set_Prosperity (wpieta|NIE wpieta)")
+AU3_P_SESS = re.compile(r"Mends: dobrobyt \(AM-01\) - start sesji: twierdz (\d+), NaN/Inf w zapisie -> 0: (\d+), ponizej 100: (\d+)")
+AU3_L_START = re.compile(r"Mends: wiara Lorath \(AM-28\) - postfiks BKROT CultureHelpers\.IsCultureEssosi \(nord -> Essos\) (wpiety|NIE wpiety[^.]*)")
+AU3_L_SESS = re.compile(r"Mends: wiara Lorath \(AM-28\) - start sesji: wiara pattern \(Lorath\) kultury ulubione (\[[^\]]*\]|\?) \(null -> nord: (\d+)\),"
+                        r" bohaterow nord z wiara (\d+), bez wiary (\d+) \| jednorazowe nadanie wiary jak BK: (.*?), trafien postfiksu w procesie (\d+)\.")
+AU3_L_DAY = re.compile(r"Mends: wiara Lorath \(AM-28\) doba: osady nord z wiara BK (\d+)/(\d+), lordowie nord z wiara (\d+)/(\d+), trafien postfiksu (\d+)\.")
+AU3_P_DAY = re.compile(r"Mends: dobrobyt \(AM-01\) doba: NaN/Inf zablokowanych (\d+) \(lacznie (\d+)\), prefiks EarlyHeal BKROT (brak|WROCIL: .*?),"
+                       r" twierdz ponizej 100: (\d+)\.")
+
+
+def audyta_p3_cs(csp):
+    """Jedno przejscie po logu sesji CrashScribe: linie paczki P3 wedlug pozycji."""
+    d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0,
+         "p_start": [], "p_off": 0, "p_sess": [], "p_day": [], "l_start": [], "l_off": 0, "l_sess": [], "l_day": [],
+         "b_start": [], "b_off": 0, "levyb": [], "fix_day": []}
+    with open(csp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "Mends: " not in ln and "AuditP3." not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            if "AuditP3." in s and "Mends: " not in s:
+                d["errs"] += 1
+                continue
+            m = AU3_LEVY.search(s)
+            if m:
+                d["levy"].append(m.groups())
+                m2 = AU3_LEVY20.search(m.group(4))
+                if m2:
+                    d["levy20"].append(m2.groups())
+                m3 = AU3_LEVYB.search(m.group(4))
+                if m3:
+                    d["levyb"].append(m3.groups())
+                continue
+            if "(AM-20)" in s:
+                m = AU3_B_START.search(s)
+                if m:
+                    d["b_start"].append(m.groups())
+                elif "kultura notabli (AM-20) wylaczone" in s:
+                    d["b_off"] += 1
+                continue
+            if "(AM-29)" in s:
+                m = AU3_T_START.search(s)
+                if m:
+                    d["t_start"].append(m.group(1))
+                elif "wzorce kultur (AM-29) wylaczone" in s:
+                    d["t_off"] += 1
+                elif "- siatka: zepsuty wzorzec" in s:
+                    d["t_net"] += 1
+                else:
+                    m = AU3_T_SESS.search(s)
+                    if m:
+                        d["t_sess"].append(m.groups())
+                continue
+            if "(AM-28)" in s:
+                m = AU3_L_START.search(s)
+                if m:
+                    d["l_start"].append(m.group(1))
+                elif "wiara Lorath (AM-28) wylaczone" in s:
+                    d["l_off"] += 1
+                else:
+                    m = AU3_L_SESS.search(s)
+                    if m:
+                        d["l_sess"].append(m.groups())
+                    else:
+                        m = AU3_L_DAY.search(s)
+                        if m:
+                            d["l_day"].append(m.groups())
+                continue
+            if "(AM-01)" in s:
+                m = AU3_P_START.search(s)
+                if m:
+                    d["p_start"].append(m.groups())
+                elif "dobrobyt (AM-01) wylaczone" in s:
+                    d["p_off"] += 1
+                else:
+                    m = AU3_P_SESS.search(s)
+                    if m:
+                        d["p_sess"].append(m.groups())
+                    else:
+                        m = AU3_P_DAY.search(s)
+                        if m:
+                            d["p_day"].append(m.groups())
+                continue
+            m = AU3_FIX.search(s)
+            if m and " w " in s and ", jest " in s:
+                d["fixes"].append(m.groups())
+                d["fix_day"].append(len(d["levyb"]))   # AM-20 B: ile linii doby z ogonem B bylo przed ta linia prostowania
+    return d
+
+
+def audyta_p3(rep, csp, armp):
+    """Pakiet P3 audytu modow 14.10 (wiersze AUD-P3-*). csp = log sesji CrashScribe (session-*.log), armp = log Armoury (Armoury-*.log) albo None.
+    AM-20 droga B (NotablesKeepSettlementCulture, domyslna): audyta_p3_b. Droga A (LocalLeviesPreachersOnly, tylko przy B wylaczonej): AUD-P3-20a linia doby 'werbunek miejscowy' z ogonem 'AM-20 tylko kaplani TAK'; AUD-P3-20b 0 linii 'Mends: X w Y
+    byl A, jest B (zawod)' dla notabli innych niz kaplani (Artisan, Merchant, ...); AUD-P3-20c 0 notabli prostowanych 3 i wiecej razy (petla);
+    AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba).
+    AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
+    (usuniete z jakich kultur - w wierszu); AUD-P3-29c siatka bez zastepcy 0 (podmiany INFO).
+    AM-30 (Armoury; audyta_p3_arm): AUD-P3-30a..d.
+    AM-28 (LorathFaithFix): AUD-P3-28a postfiks IsCultureEssosi wpiety; AUD-P3-28b wiara pattern z kultura nord (bez null); AUD-P3-28c po >= 7 dobach
+    lordowie nord z wiara > 0 i osady nord z wiara BK > 0 (ostatnia doba); nadanie jednorazowe INFO.
+    AM-01 (StopBkrotProsperityReset): AUD-P3-01a linia startu 'BKROT EarlyHeal zdjety 3/3' i straz NaN wpieta; AUD-P3-01b kazda doba: prefiks
+    EarlyHeal BKROT brak (GetPatchInfo); AUD-P3-01c INFO NaN/Inf zablokowanych (lacznie) i w zapisie; AUD-P3-01d INFO twierdz ponizej 100 (najwiecej).
+    Brak linii = INFO."""
+    from collections import Counter
+    if not csp or not os.path.isfile(csp):
+        rep.add("AUD-P3 (CrashScribe): log sesji", f"brak ({csp})", "INFO (podaj session-*.log jako log albo --crashscribe)", None)
+    else:
+        d = audyta_p3_cs(csp)
+        levy, levy20, fixes = d["levy"], d["levy20"], d["fixes"]
+        on = [x for x in levy20 if x[0] == "TAK"]
+        b_on = audyta_p3_b(rep, d)   # AM-20 droga B (domyslna): wiersze AUD-P3-20a..d; False = B wylaczona albo log bez niej - wtedy wiersze drogi A ponizej
+        if b_on:
+            pass
+        elif not levy20:
+            rep.add("AUD-P3-20a (AM-20): linia doby 'werbunek miejscowy' z ogonem AM-20", f"linii doby {len(levy)}, z ogonem AM-20 0",
+                    "INFO (log bez paczki P3 albo LocalRecruits wylaczone)", None)
+        else:
+            rep.add("AUD-P3-20a (AM-20): tylko kaplani (LocalLeviesPreachersOnly)", f"linii z ogonem {len(levy20)}, TAK {len(on)}",
+                    "wszystkie TAK; zadna TAK = droga A wylaczona (domyslnie, b47fecc3) - INFO", (len(on) == len(levy20)) if on else None)
+        if on:
+            other = [x for x in fixes if x[4] != "Preacher"]
+            occ = Counter(x[4] for x in other)
+            rep.add("AUD-P3-20b (AM-20): prostowani notable inni niz kaplani", f"{len(other)} {dict(occ)}" + (f"; np. {other[0][0]} w {other[0][1]}" if other else ""),
+                    "0 (Artisan / Merchant zostaja przy kulturze nadanej przez BK)", len(other) == 0)
+            per = Counter((x[0], x[1]) for x in fixes)
+            loop = [(k, v) for k, v in per.items() if v >= 3]
+            rep.add("AUD-P3-20c (AM-20): ten sam notabl prostowany >= 3 razy (petla z BK)", f"{len(loop)}" + (f"; np. {loop[0][0][0]} w {loop[0][0][1]} x{loop[0][1]}" if loop else ""),
+                    "0", len(loop) == 0)
+            last = on[-1]
+            rep.add("AUD-P3-20d (AM-20): ostatnia doba - prostowani / pominieci kaplani / zostawieni BK",
+                    f"prostowani [{last[1]}], kaplani pominieci {last[2]}, zostawieni {last[3]} [{last[4]}]", "INFO", None)
+        # AM-29
+        if d["t_off"] and not d["t_start"]:
+            rep.add("AUD-P3-29a (AM-29): wzorce kultur", "wylaczone (CultureTemplateRepair=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["t_start"]:
+            rep.add("AUD-P3-29a (AM-29): siatka rodu towarzysza wpieta", d["t_start"][-1], "wpieta", d["t_start"][-1] == "wpieta")
+        else:
+            rep.add("AUD-P3-29a (AM-29): linia startu wzorcow kultur", "brak", "INFO (log bez paczki P3)", None)
+        if d["t_sess"]:
+            left = [int(x[4]) for x in d["t_sess"]]
+            st_ = [int(x[8]) for x in d["t_sess"]]
+            last = d["t_sess"][-1]
+            rep.add("AUD-P3-29b (AM-29): start sesji - pozostalo zepsutych wzorcow / potkniecia",
+                    f"startow {len(d['t_sess'])}, pozostalo {left}, potkniec {st_}; ostatni: sprawdzonych {last[0]}, usunietych {last[1]}{last[2][:300]}",
+                    "0 i 0 (usuniete: ROT 8.1.8 m.in. vlandia lord 12->11 spc_brotherhood_2)", all(v == 0 for v in left) and all(v == 0 for v in st_))
+            miss = int(last[7])
+            rep.add("AUD-P3-29c (AM-29): siatka rodu towarzysza - bez zastepcy", f"podmian {last[6]} (linii {d['t_net']}), bez zastepcy {miss}",
+                    "0 bez zastepcy (podmiany INFO - po filtrze zwykle 0)", miss == 0)
+        elif d["t_start"]:
+            rep.add("AUD-P3-29b (AM-29): linia startu sesji", "brak (kampania nie wystartowala)", "INFO", None)
+        # AM-01
+        if d["p_off"] and not d["p_start"]:
+            rep.add("AUD-P3-01a (AM-01): BKROT EarlyHeal", "wylaczone (StopBkrotProsperityReset=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["p_start"]:
+            n, tot, parts, guard = d["p_start"][-1]
+            rep.add("AUD-P3-01a (AM-01): BKROT EarlyHeal zdjety, straz NaN na Town.set_Prosperity", f"zdjety {n}/{tot} ({parts}); straz {guard}",
+                    "3/3 i straz wpieta", n == tot == "3" and guard == "wpieta")
+        else:
+            rep.add("AUD-P3-01a (AM-01): linia startu dobrobytu", "brak", "INFO (log bez paczki P3)", None)
+        if d["p_day"]:
+            back = [x for x in d["p_day"] if x[2] != "brak"]
+            rep.add("AUD-P3-01b (AM-01): koniec doby - prefiks EarlyHeal BKROT nie wrocil", f"dob {len(d['p_day'])}, wrocil {len(back)}" + (f" ({back[0][2][:120]})" if back else ""),
+                    "0 dob z WROCIL", len(back) == 0)
+            nan = int(d["p_day"][-1][1])
+            nsave = sum(int(x[1]) for x in d["p_sess"])
+            rep.add("AUD-P3-01c (AM-01): NaN/Inf dobrobytu - zablokowane na setterze / w zapisie (-> 0)", f"setter {nan}, zapis {nsave}",
+                    "INFO (oczekiwane 0; > 0 = jakis model daje NaN)", None)
+            low = [int(x[3]) for x in d["p_day"]]
+            rep.add("AUD-P3-01d (AM-01): twierdz ponizej 100 dobrobytu (doba)", f"najwiecej {max(low)}, ostatnia doba {low[-1]}",
+                    "INFO (dotad BKROT dawal im 2000 / 4000; teraz moga zostac ponizej 100)", None)
+        elif d["p_start"]:
+            rep.add("AUD-P3-01b (AM-01): linia doby dobrobytu", "brak (czas gry nie ruszyl)", "INFO", None)
+        # AM-28
+        if d["l_off"] and not d["l_start"]:
+            rep.add("AUD-P3-28a (AM-28): wiara Lorath", "wylaczone (LorathFaithFix=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["l_start"]:
+            rep.add("AUD-P3-28a (AM-28): postfiks BKROT IsCultureEssosi (nord -> Essos)", d["l_start"][-1], "wpiety", d["l_start"][-1] == "wpiety")
+        else:
+            rep.add("AUD-P3-28a (AM-28): linia startu wiary Lorath", "brak", "INFO (log bez paczki P3)", None)
+        if d["l_sess"]:
+            fav, nfix, wth, wout, give, hits = d["l_sess"][-1]
+            rep.add("AUD-P3-28b (AM-28): wiara pattern (Lorath) z kultura nord", f"kultury ulubione {fav} (null -> nord {nfix}); bohaterow nord z wiara {wth}, bez {wout}; nadanie: {give[:120]}",
+                    "nord w liscie, bez null", "nord" in fav and "null" not in fav)
+        if d["l_day"]:
+            sf, st_, lf, lt, _h = (int(v) for v in d["l_day"][-1])
+            ok = None if len(d["l_day"]) < 7 else (sf > 0 and lf > 0)
+            rep.add("AUD-P3-28c (AM-28): osady i lordowie nord z wiara BK (ostatnia doba)", f"osady {sf}/{st_}, lordowie {lf}/{lt} (dob {len(d['l_day'])})",
+                    "> 0 i > 0 po >= 7 dobach (dotad 0 - BKROT nie znal kultury nord)", ok)
+        if d["errs"]:
+            rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
+    audyta_p3_arm(rep, armp)   # AM-30: log Armoury
+
+
+def audyta_p3_b(rep, d):
+    """AM-20 droga B (recenzja P3; decyzja Jeffa 14.10, STAN-PRAC 19:20 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture):
+    AUD-P3-20a linia startu 'wpiete 3/3' (prefiks BK ApplyNotableCultureConversion, rozmowa, zadanie rady) i ogon 'AM-20 kultura osady TAK'
+    w kazdej linii doby; AUD-P3-20b od 4. linii doby 0 prostowan Artisan / Merchant przez LocalLevies (BK juz ich nie nawraca; wyjatek:
+    osada zmienila kulture przez asymilacje BK - wtedy jej notable raz, patrz nazwy); AUD-P3-20c ten sam notabl (poza kaplanami) prostowany
+    >= 2 razy = 0 (petla BK / CrashScribe); AUD-P3-20d INFO zablokowane nawrocenia BK (gracz), zadanie rady pominiete, ostatnia doba.
+    Zwraca True, gdy wiersze drogi B zostaly dodane (B czynna albo jej linia startu jest w logu)."""
+    from collections import Counter
+    tails = d["levyb"]
+    on = [x for x in tails if x[0] == "TAK"]
+    if not d["b_start"]:
+        # klucz off: linia startu 'wylaczone' albo same ogony 'kultura osady NIE' (TwentyDayTail pisze ogon zawsze)
+        if d["b_off"] or (tails and all(x[0] == "NIE" for x in tails)):
+            rep.add("AUD-P3-20 (AM-20): droga B 'notable w kulturze osady'", "wylaczona (NotablesKeepSettlementCulture=false)",
+                    "INFO (klucz off = b47fecc3; ponizej wiersze drogi A)", None)
+            return False
+        if not tails:
+            return False
+    if d["b_start"]:
+        n, desc = d["b_start"][-1]
+        rep.add("AUD-P3-20a (AM-20): droga B wpieta 3/3, ogon doby 'kultura osady TAK'",
+                f"wpiete {n}/3 ({desc[:150]}); linie doby z ogonem {len(tails)}, TAK {len(on)}",
+                "3/3 i wszystkie TAK", n == "3" and len(on) == len(tails))
+    else:
+        rep.add("AUD-P3-20a (AM-20): droga B - linia startu", f"brak; linie doby z ogonem {len(tails)}, TAK {len(on)}",
+                "linia 'wpiete 3/3'", False)
+    if not on:
+        return True
+    late = [x for x, k in zip(d["fixes"], d["fix_day"]) if k >= 3 and x[4] != "Preacher"]
+    am = [x for x in late if x[4] in ("Artisan", "Merchant")]
+    occ = Counter(x[4] for x in late)
+    if len(tails) < 4:
+        rep.add("AUD-P3-20b (AM-20): prostowani Artisan / Merchant od 4. doby", f"za malo dob ({len(tails)} linii doby)", "INFO (>= 4 doby)", None)
+    else:
+        rep.add("AUD-P3-20b (AM-20): prostowani Artisan / Merchant od 4. doby (BK juz nie nawraca)",
+                f"{len(am)}; inni poza kaplanami {dict(occ)}" + (f"; np. {am[0][0]} w {am[0][1]} {am[0][2]}->{am[0][3]}" if am else ""),
+                "0 (wyjatek: osada zmienila kulture - asymilacja BK, wtedy jej notable raz)", len(am) == 0)
+    per = Counter((x[0], x[1]) for x in d["fixes"] if x[4] != "Preacher")
+    loop = [(k, v) for k, v in per.items() if v >= 2]
+    rep.add("AUD-P3-20c (AM-20): ten sam notabl (poza kaplanami) prostowany >= 2 razy (petla BK / CrashScribe)",
+            f"{len(loop)}" + (f"; np. {loop[0][0][0]} w {loop[0][0][1]} x{loop[0][1]}" if loop else ""), "0", len(loop) == 0)
+    blocked = sum(int(x[1]) for x in tails)
+    player = sum(int(x[2]) for x in tails)
+    council = sum(int(x[3]) for x in tails)
+    last = d["levy20"][-1] if d["levy20"] else None
+    rep.add("AUD-P3-20d (AM-20): zablokowane nawrocenia BK / zadanie rady pominiete / ostatnia doba",
+            f"zablokowane {blocked} (gracz {player}), rada pominieta {council}, w procesie {tails[-1][4]}"
+            + (f"; ostatnia doba prostowani [{last[1]}]" if last else ""),
+            "INFO (dotad ok. 1 nawrocenie na dobe w swiecie, bez kosztu wplywu)", None)
+    return True
+
+
+AU3_W_START = re.compile(r"Warsztaty bez wsadu \(AM-30\): \(A\) Workshop No Free Raw (TAK|NIE), wszystkie typy \(Workshop No Free Raw All Types\) (TAK|NIE)"
+                         r" - linie bez wsadu zablokowane (\d+) \[(.*?)\], bez wsadu poza ta regula .*? \| \(B\) BK Workshop Inputs Fix"
+                         r" (TAK - dopisane (\d+) \[(.*?)\]|NIE[^;]*); potkniecia (\d+)\.")
+AU3_W_DAY = re.compile(r"Warsztaty bez wsadu \(AM-30\): dzien (\d+) - zablokowane cykle linii bez wsadu wedlug typu \[(.*?)\] \(wszystkie typy (TAK|NIE[^)]*)\)\.")
+
+
+def audyta_p3_arm(rep, armp):
+    """AM-30 (log Armoury): AUD-P3-30a linia startu sesji - regula A na wszystkie typy TAK i rzeznik (butcher) na liscie zablokowanych linii;
+    AUD-P3-30b cykle rzeznika bez wsadu zablokowane > 0 (po >= 7 dobach linii); AUD-P3-30c (B) BK Workshop Inputs Fix - NIE (domyslnie) albo
+    TAK z 4 dopisanymi liniami (2 piekarni + 2 rzeznika); AUD-P3-30d INFO suma zablokowanych cykli wedlug typu."""
+    if not armp or not os.path.isfile(armp):
+        rep.add("AUD-P3-30 (AM-30, Armoury)", "brak logu Armoury", "INFO (Armoury-*.log jako log + --crashscribe <session-*.log>)", None)
+        return
+    start, days, errs = [], [], 0
+    with open(armp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "AM-30" not in ln and "WorkshopInputsFix" not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            m = AU3_W_START.search(s)
+            if m:
+                start.append(m.groups())
+                continue
+            m = AU3_W_DAY.search(s)
+            if m:
+                days.append(m.groups())
+                continue
+            if "WorkshopInputsFix" in s:
+                errs += 1
+    if not start:
+        rep.add("AUD-P3-30a (AM-30): linia startu 'Warsztaty bez wsadu'", "brak", "INFO (log bez paczki P3)", None)
+    else:
+        a_on, all_on, nb, lst, b, nadd, padd, stum = start[-1]
+        if a_on != "TAK" or all_on != "TAK":
+            rep.add("AUD-P3-30a (AM-30): regula A na wszystkie typy", f"Workshop No Free Raw {a_on}, All Types {all_on}", "INFO (klucz off = b47fecc3)", None)
+        else:
+            but = [x for x in lst.split("; ") if x.startswith("butcher:")]
+            rep.add("AUD-P3-30a (AM-30): regula A na wszystkie typy - rzeznik bez wsadu na liscie", f"zablokowanych linii {nb}, rzeznika {len(but)} ({'; '.join(but)[:160]}); potkniec {stum}",
+                    ">= 1 linia butcher i 0 potkniec", len(but) >= 1 and stum == "0")
+        if b.startswith("TAK"):
+            rep.add("AUD-P3-30c (AM-30): (B) BK Workshop Inputs Fix", f"TAK, dopisane {nadd} [{(padd or '')[:200]}]", "4 (2 piekarni + 2 rzeznika)", nadd == "4")
+        else:
+            rep.add("AUD-P3-30c (AM-30): (B) BK Workshop Inputs Fix", "NIE (domyslnie)", "INFO (do testu z bilansem ciast)", None)
+    if days:
+        from collections import Counter
+        tot = Counter()
+        for x in days:
+            for part in x[1].split(", "):
+                k, _, v = part.rpartition(" ")
+                if k and v.isdigit():
+                    tot[k] += int(v)
+        bt = tot.get("butcher", 0) + tot.get("gracz:butcher", 0)
+        if start and start[-1][0] == "TAK" and start[-1][1] == "TAK":
+            rep.add("AUD-P3-30b (AM-30): cykle rzeznika bez wsadu zablokowane", f"{bt} w {len(days)} liniach doby",
+                    "> 0 (dotad ok. 33 miesa dziennie z niczego)", bt > 0 if len(days) >= 7 else (True if bt > 0 else None))
+        rep.add("AUD-P3-30d (AM-30): zablokowane cykle wedlug typu (suma)", ", ".join(f"{k} {v}" for k, v in sorted(tot.items())), "INFO", None)
+    elif start:
+        rep.add("AUD-P3-30b (AM-30): linie doby 'Warsztaty bez wsadu'", "brak", "INFO (0 zablokowanych cykli albo czas gry nie ruszyl)", None)
+    if errs:
+        rep.add("AUD-P3-30: bledy WorkshopInputsFix w logu", f"{errs}", "0", False)
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -25282,6 +25806,8 @@ def main(argv):
         logp = a; i += 1
     if group == "lenna" and logp:
         return lenna_main(logp, tabp)   # PROJEKT-LENNA (14.10): regula N - komu krol daje zdobyty zamek / miasto (FiefGrants), progi LN-0..LN-13
+    if group == "audyta" and logp:
+        return audyta_main(logp, csp)   # audyt modow 14.10, pakiet P1 (AM-26 / AM-27 / AM-04): log sesji CrashScribe, tytuly BK; P3 (AM-20/29/01/30/28): + log Armoury
     if group == "sludan" and logp:
         return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:

@@ -345,4 +345,61 @@
   <UniqueCompanionsDuplicateGuard>true</UniqueCompanionsDuplicateGuard>
   <UniqueCompanionsChildren>true</UniqueCompanionsChildren>
   <UniqueCompanionsLog>true</UniqueCompanionsLog>
+  <!-- BannerKings titles on the Realm of Thrones map (mod audit 14.10, AM-26). BannerKings reads its title file (kingdoms,
+       duchies, counties, baronies) when a new campaign starts AND again every time a save is loaded. BKROTPatch points it
+       to the Realm of Thrones file only for a new campaign, so a save loaded after a game restart was read against the
+       Calradian title file: 30 Calradian duchies were added to Westeros and Essos, and counties were pulled out of their
+       own duchies (a dying house's castle could then pass to a "duke" from another realm). With this on, the Realm of
+       Thrones title file is used every time BannerKings reads titles. Files of BannerKings and BKROTPatch are not changed.
+       Set to false for the old behaviour. -->
+  <BkTitlesUseRotFile>true</BkTitlesUseRotFile>
+  <!-- A full title file for the Realm of Thrones 8.1.8 map (mod audit 14.10, AM-27; works only with BkTitlesUseRotFile).
+       The file BKROTPatch uses is from Realm of Thrones 6: 14 towns and 11 castles had no title at all (Harrenhal, Seagard,
+       Lordsport, Mormont Keep, Widow's Watch, Driftwood Hall and others), and Lorath, Ibben and Qarth had no royal title.
+       CrashScribe carries its own file in which every town is a county and every castle a barony (each with its villages);
+       the missing ones are placed in the duchy and realm of their starting owner, castles numbered wrongly in the old file
+       go to the nearest county of their realm, and rightful holders are the lords of Realm of Thrones 8.1.8. It is written at
+       start-up to Documents\Mount and Blade II Bannerlord\CrashScribe\bk_titles_rot818.xml. Takes effect for a new
+       campaign; set to false to use the BKROTPatch file. -->
+  <BkTitlesRot818>true</BkTitlesRot818>
+  <!-- Notables keep the culture of their settlement (mod audit 14.10, AM-20). BannerKings lets a lord win the artisans and
+       merchants of his towns over to his own culture: he pays influence for it and the notable likes him a little less.
+       CrashScribe turns every notable back to the culture of the settlement the next morning (volunteers come from the
+       notable's culture), so the lord paid for nothing and the same notable was won over again and again (about 700 times in
+       two years). With this on, BannerKings no longer converts notables at all: no lord pays influence or loses the notable's
+       favour for it, the "convert to my culture" option in a conversation with your own notable is greyed out ("Notables keep
+       the culture of their settlement"), and the council task Promote Culture no longer converts anyone. The culture of a whole
+       town or village still changes slowly through BannerKings assimilation, and its notables follow it. Set to false to let
+       BannerKings convert notables as before. -->
+  <NotablesKeepSettlementCulture>true</NotablesKeepSettlementCulture>
+  <!-- The other way for AM-20, off by default; it works only when NotablesKeepSettlementCulture is false (never both). With this
+       on, CrashScribe sets the culture of the settlement only for priests (BannerKings creates them with the culture of their
+       faith) and leaves a priest alone once he has taken the culture of the settlement's lord, so artisans and merchants of a
+       conquered town can take the new lord's culture once, as BannerKings intends. Volunteers still come from the settlement's
+       own culture. Set to false to give every notable the culture of the settlement each day. -->
+  <LocalLeviesPreachersOnly>false</LocalLeviesPreachersOnly>
+  <!-- Broken character templates of Realm of Thrones (mod audit 14.10, AM-29). Some cultures of Realm of Thrones list lord, notable
+       or rebel templates that do not exist (the game log says 'Null object reference found', e.g. spc_brotherhood_2 among the
+       Westerlands lords). The game keeps an empty stand-in in the list, and when such a stand-in is drawn - for example when you,
+       as a ruler, give a fief to a companion from the Westerlands and the game creates the members of the new clan (about one
+       time in six) - the game crashes or leaves a half-made clan in the save. With this on, CrashScribe removes the broken
+       entries from these lists every time a campaign starts or a save is loaded, and replaces a broken template with a working
+       lord template of the same culture when a companion's clan is created. Set to false to leave the lists as they are. -->
+  <CultureTemplateRepair>true</CultureTemplateRepair>
+  <!-- BKROTPatch prosperity reset (mod audit 14.10, AM-01). BKROTPatch resets the prosperity of any town or castle that falls below
+       100 to 2000 (castle) or 4000 (town), out of nothing - a castle that is really falling apart (famine, siege, scorched earth)
+       suddenly becomes an average castle, and one that keeps losing goes round in circles (2000, down to 100, back to 2000).
+       With this on, CrashScribe removes those three BKROTPatch fixes when the game starts; a settlement may now stay below 100.
+       Instead, prosperity can no longer be set to a broken number (NaN or infinity) - the old value is kept - and a broken value
+       found in a save is set to 0 when the campaign is loaded. BKROTPatch's fixes for broken loyalty and security stay.
+       Files of BKROTPatch are not changed. Set to false to keep the BKROTPatch reset. -->
+  <StopBkrotProsperityReset>true</StopBkrotProsperityReset>
+  <!-- Faith of Lorath (mod audit 14.10, AM-28). BKROTPatch still knows Lorath by its old culture name from Realm of Thrones 6
+       ('lorathi'); in Realm of Thrones 8.1.8 the Lorathi culture is called 'nord'. Because of that no Essos faith of BKROTPatch
+       counted Lorath as its own: the lords of Lorath got no Banner Kings faith, and the towns and villages of Lorath had no faith
+       and no priests. With this on, CrashScribe tells BKROTPatch that the Lorathi are a culture of Essos (as BKROTPatch meant),
+       makes Lorath the home culture of the Pattern faith, and - only in a campaign started before this fix, where no Lorathi
+       character has a faith yet - hands out faiths to Lorathi characters once, the same way Banner Kings does at the start of
+       a campaign. Files of BKROTPatch are not changed. Set to false to leave Lorath without a faith. -->
+  <LorathFaithFix>true</LorathFaithFix>
 </CrashScribe>
