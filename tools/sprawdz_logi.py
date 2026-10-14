@@ -539,6 +539,11 @@ Uzycie (Python 3, tylko odczyt):
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
                     PL-3 plotno wywiezione kontraktami 174 i wozami kupcow >= 30 szt./d, PL-4 regulator lnu >= 1.2, PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
                     mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
+--grupa towary2   : (Towary 2, docs/towary-2/ROZPOZNANIE-TOWARY-2.md rozdz. 2, pozycje K1-K4) python -I tools/sprawdz_logi.py --grupa towary2 [--do-doby 120] <Armoury-*.log>
+                    Srednie z ostatnich 30 dob okna (domyslnie d91-120). K1 (BuildWoodAboveCraftStock - budowy biora drewno tylko ponad zapas rzemiosla):
+                    T2-K1-0 dopisek w "Roboty ludu (P2)", T2-K1-1 cykle warsztatow bez drewna <= 100/d, T2-K1-2 miast bez drewna <= 20, T2-K1-3 budowa idzie
+                    >= 80 osad, T2-K1-4 zbroja korpusu t3+t4 >= 27.6/d (warsztaty.log), T2-K1-5 INFO, T2-K1-6 straz narzedzi (budowy <= 41.6/d, wsie >= 66.7/d).
+                    Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
                     Z1-0 dopisek "pokoj (Z.1)" w linii "Budzet rodow (166)", Z1-1 druzyny lordow krolestw w pokoju (linie Skarbce bez "(WOJNA)", srednia
@@ -19067,6 +19072,111 @@ def plotno_main(logp, start_arg, until=120):
     return 0
 
 
+def towary2_main(logp, start_arg, until=120):
+    """Towary 2 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md rozdz. 2, pozycje do kodu K1-K4). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby,
+    domyslnie d91-120 - to samo okno co rozpoznanie; "N" w progach = bieg Armoury-2026-10-14_02-50-28.log, ta sama doba). Wiersz wiaze tylko przy wlaczonym
+    kluczu swojej pozycji (dopisek "tak" w logu); log bez dopiskow albo z kluczem wylaczonym - INFO z liczbami, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for x in lines:
+            if x.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", x)
+                if start is not None:
+                    break
+    ws = by_day(lines, "Warsztaty: dzien")
+    dr = by_day(lines, "Drewno: dzien")
+    bd = by_day(lines, "Budowy: dzien")
+    bo = by_day(lines, "Budowy oplacone: dzien")
+    rl = by_day(lines, "Roboty ludu (P2): dzien")
+    rg = by_day(lines, "Regulator wsi (221): dzien")
+    if start is None:
+        alld = sorted(set(ws) | set(dr) | set(rl))
+        start = alld[0] if alld else 0
+    lo = max(2, until - 29)
+
+    def inwin(d):
+        return lo <= run_day(d, start) <= until
+
+    def avg(d, pat, cast=float):
+        v = [num(pat, d[k], cast) for k in sorted(d) if inwin(k)]
+        v = [a for a in v if a is not None]
+        return (sum(v) / len(v), len(v)) if v else (None, 0)
+
+    def fx_(x, k=1):
+        return "-" if x is None else f"{x:.{k}f}"
+
+    print(f"plik: {logp} | start kampanii {start} | okno srednich: doby kampanii {lo}-{until}")
+
+    # ---- K1: drewno najpierw dla rzemiosla (BuildWoodAboveCraftStock; BuildFunding.WoodHold, dopisek linii "Roboty ludu (P2)")
+    k1n = [k for k in rl if inwin(k) and "drewno budow ponad zapas rzemiosla (BuildWoodAboveCraftStock)" in rl[k]]
+    k1on = [k for k in k1n if "(BuildWoodAboveCraftStock) tak:" in rl[k]]
+    on1 = bool(k1on)
+    tail1 = "" if on1 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g1(ok):
+        return ok if on1 else None
+    rep.add("T2-K1-0: dopisek drewna budow (Roboty ludu P2)", f"dob z dopiskiem {len(k1n)}, klucz tak {len(k1on)}", "codziennie, klucz tak" + tail1,
+            (len(k1on) > 0) if k1n else None)
+    v, n = avg(ws, r"brak surowca \d+ \[ruda \d+, drewno (\d+)")
+    rep.add("T2-K1-1: warsztaty - cykle bez drewna (Warsztaty, srednia)", f"{fx_(v)}/d ({n} dob)", "<= 100/d (N 303.6, B 434.1)" + tail1,
+            g1(v <= 100) if v is not None else None)
+    v, n = avg(dr, r"miast bez towaru (\d+) z")
+    rep.add("T2-K1-2: miast bez drewna (Drewno, koniec doby, srednia)", f"{fx_(v)} ({n} dob)", "<= 20 z 97 (N 29.4, B 39.3)" + tail1, g1(v <= 20) if v is not None else None)
+    v, n = avg(bd, r"\(idzie (\d+), stoi")
+    v2, _ = avg(bo, r"wstrzymane: brak materialow (\d+)")
+    rep.add("T2-K1-3: budowa idzie (Budowy, srednia)", f"idzie {fx_(v)} osad ({n} dob), wstrzymane brakiem materialow {fx_(v2)}",
+            ">= 80 osad (N 98.1, brak materialow 24.7; prog N5-5)" + tail1, g1(v >= 80) if v is not None else None)
+    made34 = None
+    try:
+        wp = session_file_find(logp, "warsztaty.log")
+        if wp and os.path.isfile(wp):
+            rows = [x for x in read(wp) if "najwiekszy brak - [" in x]
+            if rows:
+                last = min(len(rows), until)
+                vals = [sum(int(q) for q in re.findall(r"BodyArmor t[34]: popyt \d+, polka \d+, w toku \d+, brak \d+ w \d+ miastach, zrobiono dzis (\d+)", x))
+                        for x in rows[max(0, last - 28):last]]
+                made34 = sum(vals) / float(len(vals)) if vals else None
+    except Exception:
+        made34 = None
+    rep.add("T2-K1-4: zbroja korpusu t3+t4 zrobiona (warsztaty.log, ostatnie 28 dob)", f"{fx_(made34)}/d" if made34 is not None else "brak pliku warsztaty.log",
+            ">= 27.6/d - nie gorzej niz N 29.1 (5% na los kampanii; N5-3 w --grupa etap8)" + tail1, g1(made34 >= 27.6) if made34 is not None else None)
+    a1, _ = avg(rl, r"pan na (\d+) targach \(\d+ szt\.\)")
+    a2, _ = avg(rl, r"pan na \d+ targach \((\d+) szt\.\)")
+    a3, _ = avg(rl, r"lud na (\d+) targach \(\d+ szt\.\); zapas rzemiosla")
+    a4, _ = avg(rl, r"zapas rzemiosla miast razem (\d+) szt\.")
+    a5, _ = avg(rl, r"drewno na polkach miast (\d+) szt\.")
+    a6, _ = avg(rl, r"miast ponizej zapasu rzemiosla (\d+)")
+    b1, _ = avg(dr, r"budowy (\d+)")
+    b2, _ = avg(dr, r"warsztaty zbrojne (\d+)")
+    b3, _ = avg(dr, r"dymarki przy kopalniach \(214\) (\d+)")
+    rk = [k for k in sorted(rg) if inwin(k) and " - CZYNNY, decyzja " in rg[k]]
+    hm = re.search(r"hardwood: (?:x[\d.]+ -> )?x([\d.]+), zuzycie/produkcja ([\d.]+) \(\d+/\d+\), stos -?\d+ = (-?\d+) dni zuzycia", rg[rk[-1]]) if rk else None
+    rep.add("T2-K1-5: drewno - kto bierze, zapas rzemiosla, regulator",
+            f"budowy zostawily drewno rzemioslu: pan na {fx_(a1)} targach ({fx_(a2, 0)} szt.), lud na {fx_(a3)}; zapas rzemiosla miast {fx_(a4, 0)} szt., na polkach {fx_(a5, 0)} szt., "
+            f"miast ponizej zapasu {fx_(a6)}; Drewno: budowy {fx_(b1, 0)}/d, warsztaty zbrojne {fx_(b2, 0)}/d, dymarki {fx_(b3, 0)}/d; regulator "
+            + (f"x{hm.group(1)}, zuzycie/produkcja {hm.group(2)}, stos {hm.group(3)} dni" if hm else "bez decyzji w oknie"),
+            "INFO (N: budowy 1346/d, warsztaty zbrojne 199, dymarki 402, polki miast 2235, regulator x1.30 0.97 5 dni; K1b - sufit drewna 1.8 - tylko gdy po K1 stos < 30 dni "
+            "i T2-K1-1 > 100/d)", None)
+    # zasada 0 (regresja K1): budzet materialow pana, ktory nie znajdzie drewna ponad zapas, idzie na wapien, gline, narzedzia, marmur, deski - narzedzia (40 d)
+    # kupuja tez wsie (koszyk dnia); straz: budowy nie biora wiecej niz 2 x N narzedzi, wsie dostaja nie mniej niz 80% N
+    tw = {}
+    for x in lines:
+        if x.startswith("Towary: dzien") and " - tools (" in x:
+            k = num(r"dzien (\d+)", x)
+            if k is not None:
+                tw[k] = x
+    t1, n = avg(tw, r"\bbudowy (\d+)")
+    t2, _ = avg(tw, r"wsie \(zakupy w miescie, E5/B1\) (\d+)")
+    t3, _ = avg(rl, r"narzedzia na polkach miast: ponizej \d+ szt\. w (\d+) z")
+    rep.add("T2-K1-6: narzedzia - budowy i wsie (Towary tools, srednia)", f"budowy {fx_(t1)}/d, wsie {fx_(t2)}/d ({n} dob); miast z < 5 narzedziami {fx_(t3)}",
+            "budowy <= 41.6/d i wsie >= 66.7/d (N: budowy 20.8, wsie 83.3, miast z < 5 narzedziami 81.5)" + tail1,
+            g1((t1 is None or t1 <= 41.6) and (t2 is None or t2 >= 66.7)) if (t1 is not None or t2 is not None) else None)
+    rep.show()
+    return 0
+
+
 def lup_main(logp, start_arg, until=364):
     """Lup miast (L0-L5). Wiersze LUP-1..LUP-19 wedlug tabeli progow rozdz. 6 projektu (numer progu projektu w nazwie). Okno: doby kampanii 1-until.
     Log bez paczki (brak linii "Lup miast") - wiersze INFO z liczbami tego, co juz jest (okno O10, lup gry, garnizony), nigdy wyjatek."""
@@ -19795,6 +19905,8 @@ def main(argv):
         return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
     if group == "plotno" and logp:
         return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)
+    if group == "towary2" and logp:
+        return towary2_main(logp, start_arg, until_arg)   # Towary 2 (K1-K4): drewno dla rzemiosla, plotno wsi ponad zapas, garbarz na wywoz, narzedzie
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:

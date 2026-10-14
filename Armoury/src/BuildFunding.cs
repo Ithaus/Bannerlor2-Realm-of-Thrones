@@ -29,7 +29,67 @@ namespace Armoury
         private static readonly string[] MatIds = { "limestone", "hardwood", "clay", "tools", "marble", "planks" };
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
-        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs)
+        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
+
+        // ------------------------------------------------------------ Towary 2 / K1 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-10, klucz BuildWoodAboveCraftStock)
+        // Budowy braly 65% drewna swiata (1 350 ladunkow/d, linia "Drewno") i kupowaly je do 0 sztuk na polce w ticku dobowym, przed rzemioslem miasta - warsztaty
+        // zbrojne tracily 304 rozpoczecia/d na drewno, 29 miast bez drewna. Regula: budowa (pan i lud) bierze drewno z polki targu tylko ponad zapas rzemiosla miasta
+        // = CaravanBulk.TargetFor (ten sam zapas, ktory dopelniaja karawany: CaravanBulkStockDays dob zuzycia kuzni, dymarek, strzelarzy, linii towarowych i domow,
+        // bez budow; nie mniej niz 40 ladunkow). Ponizej - budzet materialow idzie na wapien, gline, narzedzia, marmur, deski albo zostaje w kiesie (budowa czeka).
+        private static readonly HashSet<Settlement> _woodHeldLord = new HashSet<Settlement>(), _woodHeldFolk = new HashSet<Settlement>();
+        private static long _woodHeldLordPcs, _woodHeldFolkPcs;
+        private static ItemObject _woodIt;
+        internal static bool WoodHoldOn { get { var s = Settings.Current; return s != null && s.BuildWoodAboveCraftStock; } }
+        private static void WoodReset() { _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodIt = null; }
+
+        /// <summary>K1: ile sztuk materialu budowa zostawia na polce targu dla rzemiosla miasta - dla drewna zapas rzemiosla (CaravanBulk.TargetFor), dla reszty 0;
+        /// klucz wylaczony albo blad - 0 (jak dotad). folk - licznik robot ludu (P2), inaczej pana. Licznik: raz na targ i dobe, sztuki zostawione = min(polka, zapas).</summary>
+        internal static int WoodHold(Settlement market, ItemObject it, bool folk)
+        {
+            try
+            {
+                if (!WoodHoldOn || market == null || market.Town == null || it == null || it.StringId != "hardwood") return 0;
+                int keep = CaravanBulk.TargetFor(market.Town, it);
+                if (keep <= 0) return 0;
+                int shelf = market.ItemRoster != null ? market.ItemRoster.GetItemNumber(it) : 0;
+                if (shelf > 0)
+                {
+                    if (folk) { if (_woodHeldFolk.Add(market)) _woodHeldFolkPcs += Math.Min(shelf, keep); }
+                    else if (_woodHeldLord.Add(market)) _woodHeldLordPcs += Math.Min(shelf, keep);
+                }
+                return keep;
+            }
+            catch (Exception e) { Log.Error("BuildFunding.WoodHold", e); return 0; }
+        }
+
+        /// <summary>K1: dopisek linii "Roboty ludu (P2)" - po zakupach pana i ludu tej doby: targi, na ktorych budowy zostawily drewno rzemioslu (sztuki zostawione
+        /// przy pierwszym zakupie doby), zapas rzemiosla miast razem i srednio, drewno na polkach miast, miasta ponizej zapasu i bez drewna. Liczniki doby zerowane tu.</summary>
+        internal static string WoodTail()
+        {
+            var sb = new System.Text.StringBuilder(320);
+            try
+            {
+                if (_woodIt == null) _woodIt = MBObjectManager.Instance.GetObject<ItemObject>("hardwood");
+                long target = 0, shelf = 0; int towns = 0, below = 0, none = 0;
+                if (_woodIt != null)
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                        int tg = CaravanBulk.TargetFor(t, _woodIt), n = t.Owner.ItemRoster.GetItemNumber(_woodIt);
+                        towns++; target += tg; shelf += n;
+                        if (n < tg) below++;
+                        if (n <= 0) none++;
+                    }
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                sb.Append(" | drewno budow ponad zapas rzemiosla (BuildWoodAboveCraftStock) ").Append(WoodHoldOn ? "tak" : "nie").Append(": budowy zostawily drewno rzemioslu - pan na ")
+                  .Append(_woodHeldLord.Count).Append(" targach (").Append(_woodHeldLordPcs).Append(" szt.), lud na ").Append(_woodHeldFolk.Count).Append(" targach (").Append(_woodHeldFolkPcs)
+                  .Append(" szt.); zapas rzemiosla miast razem ").Append(target).Append(" szt. (srednio ").Append(towns > 0 ? ((double)target / towns).ToString("0.0", inv) : "-")
+                  .Append("), drewno na polkach miast ").Append(shelf).Append(" szt., miast ponizej zapasu rzemiosla ").Append(below).Append(", bez drewna ").Append(none).Append(" z ").Append(towns);
+            }
+            catch (Exception e) { Log.Error("BuildFunding.WoodTail", e); }
+            _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0;
+            return sb.ToString();
+        }
 
         // ------------------------------------------------------------ moc budowy = oplacona praca
         [ThreadStatic] private static int _depth;
@@ -257,7 +317,7 @@ namespace Armoury
             foreach (var id in MatIds)
             {
                 var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
-                if (it == null || market.ItemRoster.GetItemNumber(it) <= 0) continue;
+                if (it == null || market.ItemRoster.GetItemNumber(it) - WoodHold(market, it, false) <= 0) continue;   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0)
                 int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
                 int cap = CapOf(it);   // P2: sufit ceny materialu takze dla pana (klucz FolkBuildsTown; wylaczony - 0)
                 if (cap > 0 && price > cap) continue;
@@ -279,7 +339,7 @@ namespace Armoury
                 {
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                     if (it == null) continue;
-                    int have = roster.GetItemNumber(it);
+                    int have = roster.GetItemNumber(it) - WoodHold(market, it, false);   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0)
                     if (have <= 0) continue;
                     int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
                     int cap = CapOf(it);   // P2: sztuka najwyzej BuildMaterialPriceCap x wartosc (obaj platnicy; klucz FolkBuildsTown wylaczony - 0, bez sufitu)

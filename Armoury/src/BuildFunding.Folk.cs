@@ -219,7 +219,7 @@ namespace Armoury
                     if (it == null) continue;
                     int have = roster.GetItemNumber(it);
                     if (MatIds[k] == "tools") have -= ToolsKeep;   // narzedzia: lud zostawia na polce 5 sztuk (projekt B rozdz. 8 - wsie i warsztaty)
-                    else if (MatIds[k] == "hardwood") have -= WoodKeep;   // drewno: lud zostawia na polce 50 sztuk - dymarki (zelazo) i warsztaty kupuja po nim (bieg 120 dob: stos swiata 9 dni zuzycia)
+                    else if (MatIds[k] == "hardwood") have -= Math.Max(WoodKeep, WoodHold(market, it, true));   // drewno: lud zostawia na polce 50 sztuk - dymarki (zelazo) i warsztaty kupuja po nim (bieg 120 dob: stos swiata 9 dni zuzycia); K1 (BuildWoodAboveCraftStock): nie mniej niz zapas rzemiosla miasta - ta sama regula co pan
                     if (have <= 0) continue;
                     int price = Math.Max(1, market.Town.GetItemPrice(it, null, false));
                     int cap = CapOf(it);
@@ -415,6 +415,7 @@ namespace Armoury
                   .Append(" (").Append((lvlMax * yr).ToString("0.0", Inv)).Append(" na rok, ").Append(lvlName).Append(')')
                   .Append(" | kontrola: punkty ponad reszte poziomu ").Append(overN).Append(" (").Append(overPts.ToString("0.0", Inv)).Append(" pkt)")
                   .Append(" | narzedzia na polkach miast: ponizej ").Append(ToolsKeep).Append(" szt. w ").Append(toolsLow).Append(" z ").Append(townsN).Append(" miast")
+                  .Append(WoodTail())   // K1 (Towary 2): drewno budow ponad zapas rzemiosla - dopisek po zakupach pana i ludu tej doby
                   .Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
