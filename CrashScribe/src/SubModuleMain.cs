@@ -154,7 +154,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new MarriageFastBehavior());   // Z.3: swaty ROT szybciej (straze i latka przy starcie sesji, linia doby "Swaty ROT (Z.3)")
                 if (cgs != null) cgs.AddBehavior(new MarriageOfferYearBehavior());   // 14.10: oferty slubu dla rodu gracza na rok (84 / rok; linia doby "Oferty slubu (rok)")
                 if (cgs != null) cgs.AddBehavior(new BkTitlesBehavior());   // P1 (AM-26/AM-27): linia kontrolna tytulow BK w pierwszej godzinie sesji
-                if (cgs != null) cgs.AddBehavior(new AuditP3Behavior());   // P3 audytu 14.10: start sesji (wzorce kultur AM-29)
+                if (cgs != null) cgs.AddBehavior(new AuditP3Behavior());   // P3 audytu 14.10: start sesji i doba (AM-29 wzorce kultur, AM-01 dobrobyt, AM-28 wiara Lorath)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }

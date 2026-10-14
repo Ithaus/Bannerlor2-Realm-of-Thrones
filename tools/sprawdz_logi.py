@@ -685,7 +685,8 @@ Uzycie (Python 3, tylko odczyt):
                     i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
                     P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, tylko kaplani:
                     linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO), AUD-P3-29a..c (AM-29, wzorce kultur:
-                    siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0).
+                    siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0), AUD-P3-01a..d (AM-01, BKROT EarlyHeal: zdjety 3/3
+                    i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25118,11 +25119,17 @@ AU3_T_START = re.compile(r"Mends: wzorce kultur \(AM-29\) - siatka na rod towarz
 AU3_T_SESS = re.compile(r"Mends: wzorce kultur \(AM-29\) - start sesji: wzorcow sprawdzonych (\d+), usunietych (\d+)(.*?); list zostawionych bez zmian"
                         r" \(same zepsute\) (\d+), pozostalo zepsutych (\d+), siatka rodu towarzysza (wpieta|NIE) \(podmian w procesie (\d+), bez zastepcy (\d+)\),"
                         r" potkniec (\d+)\.")
+AU3_P_START = re.compile(r"Mends: dobrobyt \(AM-01\) - (?:BKROTPatch bez latek EarlyHeal \(nic do zdjecia\), )?BKROT EarlyHeal zdjety (\d+)/(\d+) \((.*?)\);"
+                         r" straz NaN/Inf na Town\.set_Prosperity (wpieta|NIE wpieta)")
+AU3_P_SESS = re.compile(r"Mends: dobrobyt \(AM-01\) - start sesji: twierdz (\d+), NaN/Inf w zapisie -> 0: (\d+), ponizej 100: (\d+)")
+AU3_P_DAY = re.compile(r"Mends: dobrobyt \(AM-01\) doba: NaN/Inf zablokowanych (\d+) \(lacznie (\d+)\), prefiks EarlyHeal BKROT (brak|WROCIL: .*?),"
+                       r" twierdz ponizej 100: (\d+)\.")
 
 
 def audyta_p3_cs(csp):
     """Jedno przejscie po logu sesji CrashScribe: linie paczki P3 wedlug pozycji."""
-    d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0}
+    d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0,
+         "p_start": [], "p_off": 0, "p_sess": [], "p_day": []}
     with open(csp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             if "Mends: " not in ln and "AuditP3." not in ln:
@@ -25154,6 +25161,21 @@ def audyta_p3_cs(csp):
                     if m:
                         d["t_sess"].append(m.groups())
                 continue
+            if "(AM-01)" in s:
+                m = AU3_P_START.search(s)
+                if m:
+                    d["p_start"].append(m.groups())
+                elif "dobrobyt (AM-01) wylaczone" in s:
+                    d["p_off"] += 1
+                else:
+                    m = AU3_P_SESS.search(s)
+                    if m:
+                        d["p_sess"].append(m.groups())
+                    else:
+                        m = AU3_P_DAY.search(s)
+                        if m:
+                            d["p_day"].append(m.groups())
+                continue
             m = AU3_FIX.search(s)
             if m and " w " in s and ", jest " in s:
                 d["fixes"].append(m.groups())
@@ -25167,6 +25189,8 @@ def audyta_p3(rep, csp, armp):
     AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba).
     AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
     (usuniete z jakich kultur - w wierszu); AUD-P3-29c siatka bez zastepcy 0 (podmiany INFO).
+    AM-01 (StopBkrotProsperityReset): AUD-P3-01a linia startu 'BKROT EarlyHeal zdjety 3/3' i straz NaN wpieta; AUD-P3-01b kazda doba: prefiks
+    EarlyHeal BKROT brak (GetPatchInfo); AUD-P3-01c INFO NaN/Inf zablokowanych (lacznie) i w zapisie; AUD-P3-01d INFO twierdz ponizej 100 (najwiecej).
     Brak linii = INFO."""
     from collections import Counter
     if not csp or not os.path.isfile(csp):
@@ -25212,6 +25236,28 @@ def audyta_p3(rep, csp, armp):
                     "0 bez zastepcy (podmiany INFO - po filtrze zwykle 0)", miss == 0)
         elif d["t_start"]:
             rep.add("AUD-P3-29b (AM-29): linia startu sesji", "brak (kampania nie wystartowala)", "INFO", None)
+        # AM-01
+        if d["p_off"] and not d["p_start"]:
+            rep.add("AUD-P3-01a (AM-01): BKROT EarlyHeal", "wylaczone (StopBkrotProsperityReset=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["p_start"]:
+            n, tot, parts, guard = d["p_start"][-1]
+            rep.add("AUD-P3-01a (AM-01): BKROT EarlyHeal zdjety, straz NaN na Town.set_Prosperity", f"zdjety {n}/{tot} ({parts}); straz {guard}",
+                    "3/3 i straz wpieta", n == tot == "3" and guard == "wpieta")
+        else:
+            rep.add("AUD-P3-01a (AM-01): linia startu dobrobytu", "brak", "INFO (log bez paczki P3)", None)
+        if d["p_day"]:
+            back = [x for x in d["p_day"] if x[2] != "brak"]
+            rep.add("AUD-P3-01b (AM-01): koniec doby - prefiks EarlyHeal BKROT nie wrocil", f"dob {len(d['p_day'])}, wrocil {len(back)}" + (f" ({back[0][2][:120]})" if back else ""),
+                    "0 dob z WROCIL", len(back) == 0)
+            nan = int(d["p_day"][-1][1])
+            nsave = sum(int(x[1]) for x in d["p_sess"])
+            rep.add("AUD-P3-01c (AM-01): NaN/Inf dobrobytu - zablokowane na setterze / w zapisie (-> 0)", f"setter {nan}, zapis {nsave}",
+                    "INFO (oczekiwane 0; > 0 = jakis model daje NaN)", None)
+            low = [int(x[3]) for x in d["p_day"]]
+            rep.add("AUD-P3-01d (AM-01): twierdz ponizej 100 dobrobytu (doba)", f"najwiecej {max(low)}, ostatnia doba {low[-1]}",
+                    "INFO (dotad BKROT dawal im 2000 / 4000; teraz moga zostac ponizej 100)", None)
+        elif d["p_start"]:
+            rep.add("AUD-P3-01b (AM-01): linia doby dobrobytu", "brak (czas gry nie ruszyl)", "INFO", None)
         if d["errs"]:
             rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
 
