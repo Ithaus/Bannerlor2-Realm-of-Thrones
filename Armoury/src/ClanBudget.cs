@@ -310,6 +310,21 @@ namespace Armoury
         /// w calosci - to nie jest zaoszczedzony zold) i bez miejsca kredytu wojennego; reserve = rezerwa wojenna R z tego samego budzetu. false: rod bez
         /// budzetu policzonego (gracz, 166 wylaczone, pierwsza doba sesji), Straz bez zoldu, kompania najemna, rod w pokoju, dluznik albo rod w zajeciu
         /// (168 - jego kiese bierze wierzyciel). Tylko odczyt.</summary>
+        /// <summary>M3 (chleb biedoty, TownFolk.BreadRest): zloto rodziny G i rezerwa wojny R z budzetu 166 (krok korony biegnie przed budzetem doby - budzet z wczoraj,
+        /// jak ScutageCap). false - rod bez budzetu, Straz bez zoldu. Tylko odczyt.</summary>
+        internal static bool ChestOf(Clan c, out double G, out double R)
+        {
+            G = 0; R = 0;
+            try
+            {
+                var b = Of(c);
+                if (b == null || b.Zero) return false;
+                G = b.G; R = b.R;
+                return true;
+            }
+            catch (Exception e) { Stumble("ChestOf", e); return false; }
+        }
+
         internal static bool ScutageCap(Clan c, out double partyCap, out double reserve)
         {
             partyCap = 0; reserve = 0;

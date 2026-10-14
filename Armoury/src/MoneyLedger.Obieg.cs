@@ -639,6 +639,7 @@ namespace Armoury
               .Append(" i skarbce -> glowy rodow z doplata W5 ").Append(KingdomTreasury.LastScutageOut)
               .Append(", doplata ze skarbcow ponad zapas wojny (W5b) skarbce -> glowy rodow ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: z zapasu skarbca, poza wplywami dnia
               .Append(", doplata z reszty wplywow dnia przed rentami (M1) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAidRent)   // M1: z wplywow dnia, przed rentami 180
+              .Append(", chleb biedoty (M3) skarbce -> kiesy ludu ").Append(TownFolk.LastBreadCrown).Append(" i glowy rodow -> kiesy ludu ").Append(TownFolk.LastBreadLord)   // M3: przelew miedzy posiadaczami
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)

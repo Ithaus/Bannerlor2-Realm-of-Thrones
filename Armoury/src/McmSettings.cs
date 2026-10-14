@@ -5080,6 +5080,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkSatisfactionFromBasket { get; set; } = true;
 
+        [SettingPropertyBool("Bread For The Poor", HintText = "when the townsfolk or castle folk have been unable to afford their food for a week (the same hunger that hurts their contentment, never in the first 120 days), the realm's crown pays into their purse what they lack for two days of food, out of the rest of its daily income after the wage refunds and before the rents; if the crown has nothing left, the lord of the place pays from his gold above his war reserve, no faster than his war chest is spent. Only food, never the rest of the basket; your own purse is never used. A place leaves the bread after a week of affording two days of food on its own. Off = the poor buy only what their purse allows, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool BreadForThePoor { get; set; } = true;
+
         [SettingPropertyBool("Town Folk Hunger Hurts", HintText = "when the townsfolk cannot afford their bread for a week, their contentment with food falls - not in the first 120 days of a campaign and only while there is food in the market; a town with no food at all is already punished by its empty granary, so its contentment is not cut twice. Off = as before: contentment with food follows what they could buy every day (needs Town Folk Satisfaction From Basket)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkHungerHurts { get; set; } = true;
@@ -6933,6 +6937,7 @@ namespace Armoury
             s.TownFolkAnchorBasket = TownFolkAnchorBasket;
             s.TownFolkCastleCourtFeeds = TownFolkCastleCourtFeeds;
             s.TownFolkSatisfactionFromBasket = TownFolkSatisfactionFromBasket;
+            s.BreadForThePoor = BreadForThePoor;
             s.TownFolkHungerHurts = TownFolkHungerHurts;
             s.TownFolkStartReserves = TownFolkStartReserves;
             s.VillageLordScale = VillageLordScale;

@@ -579,6 +579,9 @@ namespace Armoury
                             if (KingdomTreasury.NeedAidKingdom(k, list, okW5) > 0) pool = CrownIncome.LeftFor(k);   // M1: zwraca tez gotowke z reszty wplywow (RentAidStep)
                         }
                         catch (Exception e) { Stumble("Daily(W5)", e); }
+                        // M3 (BreadForThePoor): chleb dla glodnych osad krolestwa z reszty wplywow dnia - po W5 / M1, PRZED podzialem rent (klucz wylaczony = 0)
+                        try { if (TownFolk.BreadCrown(k) > 0) pool = CrownIncome.LeftFor(k); }
+                        catch (Exception e) { Stumble("Daily(M3)", e); }
                         bool pay = pool > 0;
                         if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         bool toServing = pay && s.CrownRentHeldToServing && sumOk > 0 && sumOk < sum - 1e-9;

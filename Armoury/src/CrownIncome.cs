@@ -51,6 +51,7 @@ namespace Armoury
             public long WarAid;           // P1 (obieg kiesy ludu): danina z oszczednosci ludu od wczorajszego zamkniecia korony (kiesy ludu -> skarbiec) - w Own
             public long NeedAid;          // W5: doplata do zoldu wedlug potrzeby wyplacona tej doby (skarbiec -> glowy rodow; po zwrocie zoldu, przed rentami 180)
             public long CrownAid;         // W5b regula 2: doplata W5 wyplacona tej doby ze skarbca PONAD ZAPAS WOJNY (skarbiec -> glowy rodow; po szczeblu daniny, przed tarczowym); POZA wplywami dnia (Spend / Left) - z zapasu
+            public long Bread;            // M3 (pieniadze roku 2): chleb dla glodnych osad krolestwa z reszty wplywow dnia przed rentami (TownFolk.BreadCrown; skarbiec -> kiesy ludu)
             public long NeedAidRent;      // M1 (pieniadze roku 2): czesc NeedAid wyplacona z reszty wplywow dnia przed rentami (KingdomTreasury.RentAid.cs)
             public long ScutIn, ScutOut;  // W6: tarczowe tej doby - pobrane (glowy platnikow -> skarbiec) i wyplacone przez W5 ponad danine (skarbiec -> glowy rodow); POZA wplywami dnia (Spend / Left)
             public bool Snap;
@@ -326,6 +327,7 @@ namespace Armoury
                 long wtax = 0;   // E5/B2 (184)
                 long waid = 0;   // P1: danina z oszczednosci ludu
                 long naRent = 0;   // M1: czesc doplaty W5 z reszty wplywow dnia
+                long bread = 0;    // M3: chleb dla glodnych osad z reszty wplywow dnia
                 long naid = 0;   // W5: doplata do zoldu wedlug potrzeby
                 long scIn = 0, scOut = 0;   // W6: tarczowe (pobrane i wyplacone tej samej doby)
                 long cAid = 0;   // W5b regula 2: doplata W5 ze skarbcow ponad zapas wojny (poza wplywami dnia)
@@ -335,7 +337,7 @@ namespace Armoury
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
                     if (!d.Snap) noSnap++;
                     if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0 && d.ScutIn <= 0 && d.CrownAid <= 0) continue;
                     parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "") + (d.WarAid > 0 ? " (danina P1 " + d.WarAid + ")" : "")
@@ -344,6 +346,7 @@ namespace Armoury
                               + (d.Contract > 0 ? " kontr. " + d.Contract : "") + (d.CallToWar > 0 ? " wezw. " + d.CallToWar : "") + (d.RefundDue > 0 ? " zwrot " + d.RefundGiven + "/" + d.RefundDue : "")
                               + (d.Rent > 0 || d.RentHeld > 0 ? " renty " + d.Rent + " wstrz. " + d.RentHeld : "")
                               + (d.NeedAid > 0 ? " doplata W5 " + d.NeedAid + (d.NeedAidRent > 0 ? " (z rent M1 " + d.NeedAidRent + ")" : "") : "")
+                              + (d.Bread > 0 ? " chleb M3 " + d.Bread : "")
                               + (d.ScutIn > 0 || d.ScutOut > 0 ? " tarczowe W6 +" + d.ScutIn + " -" + d.ScutOut : "")
                               + (d.CrownAid > 0 ? " ze skarbca W5b -" + d.CrownAid : "")));
                 }
@@ -374,6 +377,7 @@ namespace Armoury
                       .Append("; w tym z kredytu Banku (186) ").Append(loanIn).Append(")")
                       .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.On ? ")" : "; renty wylaczone)")
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid).Append(" (w tym z reszty wplywow przed rentami M1 ").Append(naRent).Append(')')
+                      .Append(", chleb dla glodnych osad (M3, z reszty wplywow przed rentami) ").Append(bread)
                       .Append(", tarczowe (W6, poza wplywami dnia): pobrane od rodow do skarbcow ").Append(scIn).Append(", wyplacone tej samej doby rodom z doplata W5 ").Append(scOut)
                       .Append(", doplata ze skarbcow ponad zapas wojny (W5b, poza wplywami dnia - z zapasu) ").Append(cAid)
                       .Append(", skarbce zdobytych stolic (L5b-1, poza wplywami dnia - migawka przesunieta): ze skarbcow przegranych ").Append(CapitalTreasury.LastTaken)
