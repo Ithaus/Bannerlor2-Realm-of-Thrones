@@ -627,6 +627,9 @@ namespace Armoury
             try
             {
                 if (me == null) return;
+                // A17 (poz. 11, DestroyedPartyMenRouted): ludzie partii, ktora gra skasuje po tej bitwie (HandleMapEventEnd biegnie po nasluchach) - jency zwyciezcow
+                // albo rozbici tej bitwy (RoutedInBattle), PRZED podzialem rozbitych H3; bez H3 tylko pomiar (nie rzuca)
+                DoomedPartyMen.Before(me, LosersFlee.On);
                 if (LosersFlee.On) { RoutedH3(me); return; }      // H3: jeden podzial rozbitych - las albo dom, nikt w nicosc
                 if (!On) return;
                 float share = Settings.Current.OutlawRoutedShare;

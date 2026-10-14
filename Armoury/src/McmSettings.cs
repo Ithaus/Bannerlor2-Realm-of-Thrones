@@ -1724,6 +1724,10 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool UniqueNeverLost { get; set; } = true;
 
+        [SettingPropertyBool("Uniques Not Folk Goods", HintText = "a renowned piece lying on a market (Cersei's red dress, Renly's armour, a Valyrian blade...) is not used up by the townsfolk's daily wants nor cleared away by the game with the market's worn stock - it leaves the shelf only when someone buys it or a merchant's cart takes it. Off = the townsfolk wear it out like any garment, as before")]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool UniquesNotFolkGoods { get; set; } = true;
+
         [SettingPropertyBool("No Conjured Legends", HintText = "reinforcement caravans of Dynamic Troop Equipment and tournament prizes (also Tournaments XPanded) no longer conjure legendary or named pieces: each becomes an ordinary piece of the same kind")]
         [SettingPropertyGroup("Valyrian steel")]
         public bool NoConjuredLegends { get; set; } = true;
@@ -1795,6 +1799,10 @@ namespace Armoury
         [SettingPropertyBool("Goods Ledger Tick Authors", HintText = "with the goods ledger: for goods that appear or vanish in the daily ticks of villages, castles and towns without a known cause, also write which game or mod behaviour did it (read from the call stack, at most 1,500 times a day) - written to the log only, changes nothing in the game; off = not traced")]
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerTickAuthors { get; set; } = true;
+
+        [SettingPropertyBool("A17 Diagnostic Lines", HintText = "with the goods ledger: also write where horses and fish change hands outside the known flows (by flow and by holder, a few call stacks a session) and every unique piece leaving a market (at most 20 a session) - written to the log only, changes nothing in the game; off = not traced")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool A17DiagnosticLines { get; set; } = true;
 
         [SettingPropertyBool("Goods Ledger Enabled", HintText = "write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game")]
         [SettingPropertyGroup("Army purchases")]
@@ -2583,6 +2591,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Non Combatant Death Percent", 0.00f, 20.00f, "0.00", HintText = "villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers")]
         [SettingPropertyGroup("The law of the battlefield")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
+
+        [SettingPropertyBool("Destroyed Party Men Routed", HintText = "when the game strikes off a beaten host that still has men in it - caught while fleeing, left with only its wounded when the enemy broke off the fight, or a beaten besieger the victors did not take - those men no longer vanish with it: the victors take the same few as from any beaten host (seasoned men first), the rest scatter like any routed men (back to their lord's banner, home or to the woods), and the captives it held go free. Off = they vanish with the host, as before (needs Losers Flee Enabled)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool DestroyedPartyMenRouted { get; set; } = true;
 
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4576,6 +4588,10 @@ namespace Armoury
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRiseOnlyFromFallen { get; set; } = true;
 
+        [SettingPropertyBool("Others Duel From Fallen", HintText = "when you beat the Night King's host and then fail to slay him in the duel, he raises only the dead of that battle - yours and his - instead of standing his whole host up again from nothing; the duel and the battle that follows stay as in Realm of Thrones. Off = his whole host stands up again, as before")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersDuelFromFallen { get; set; } = true;
+
         [SettingPropertyBool("Others Raid Wights", HintText = "a village raided by the Others gives them wights out of thin air (half its hearths, as Realm of Thrones does). Off (default) = a raid raises only the villagers killed in it, and only beyond the Wall or at it (needs Devastation Enabled; without it nobody rises). Works only with Others Rise Only From Fallen on; with it off, raids work as in Realm of Thrones")]
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRaidWights { get; set; } = false;
@@ -5083,6 +5099,10 @@ namespace Armoury
         [SettingPropertyBool("Ship Prizes To Port", HintText = "After a sea battle, the beaten fleet's ships the victors do not keep are sold to a port (the same choice of port and price as lost fleets) and the port's payment is shared among the victors by their part in the battle, instead of the game paying their full worth out of thin air; no buyer - the ship sinks. Off = as before")]
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipPrizesToPort { get; set; } = true;
+
+        [SettingPropertyBool("Ship Ports Buy To Ideal", HintText = "a port buys ships only while its shipyard keeps fewer than it wants (two below its limit) - beyond that the shipyard breaks up the extra hulls the next day, so the port no longer pays for ships it will scrap: an AI captain keeps the ship he wanted to sell, the ships of a beaten or disbanded host go to another port with room or are lost, and you too cannot sell to a full port. Off = ports buy up to the shipyard's limit, as before")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public bool ShipPortsBuyToIdeal { get; set; } = true;
 
         [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game unless Town Folk Live is on (then the purse is real coin); 0 also turns the live purse off")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -6238,6 +6258,7 @@ namespace Armoury
             s.ValyrianNoSmelt = ValyrianNoSmelt;
             s.UniqueInheritance = UniqueInheritance;
             s.UniqueNeverLost = UniqueNeverLost;
+            s.UniquesNotFolkGoods = UniquesNotFolkGoods;
             s.NoConjuredLegends = NoConjuredLegends;
             s.HistValyrianPerMeasure = HistValyrianPerMeasure;
             s.QohorReworkEnabled = QohorReworkEnabled;
@@ -6256,6 +6277,7 @@ namespace Armoury
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
             s.GoodsLedgerTickAuthors = GoodsLedgerTickAuthors;
+            s.A17DiagnosticLines = A17DiagnosticLines;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
@@ -6453,6 +6475,7 @@ namespace Armoury
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
+            s.DestroyedPartyMenRouted = DestroyedPartyMenRouted;
             s.PrisonerLawEnabled = PrisonerLawEnabled;
             s.PlayerRansomToCaptor = PlayerRansomToCaptor;
             s.RansomCourierNoTopUp = RansomCourierNoTopUp;
@@ -6951,6 +6974,7 @@ namespace Armoury
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;
             s.OthersRiseOnlyFromFallen = OthersRiseOnlyFromFallen;
+            s.OthersDuelFromFallen = OthersDuelFromFallen;
             s.OthersRaidWights = OthersRaidWights;
             s.OthersBandFromCorpsePool = OthersBandFromCorpsePool;
             s.NightKingCallMaxHost = NightKingCallMaxHost;
@@ -7078,6 +7102,7 @@ namespace Armoury
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;
             s.ShipPrizesToPort = ShipPrizesToPort;
+            s.ShipPortsBuyToIdeal = ShipPortsBuyToIdeal;
             s.TownFolkMode = TownFolkMode;
             s.TownFolkLive = TownFolkLive;
             s.TownFolkServiceShare = TownFolkServiceShare;

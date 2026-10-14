@@ -56,6 +56,8 @@ namespace Armoury
     ///    E5/B5 (recenzja 1): stocznia NavalDLC trzyma liczbe idealna (limit - 2) i nastepnej doby kasuje nadmiar (ShipProductionCampaignBehavior
     ///    .DailyTickTown -> TryRemoveExcessShipsFromTown), a do limitu dorabia statki za darmo - zakup ponad liczbe idealna tylko mierzony w linii
     ///    (OverIdeal); miejsce w Gather do limitu stoczni (wiazace), zmiana na liczbe idealna czeka na decyzje Jeffa.
+    ///    A17 (poz. 6, decyzja Claude 14.10 - Jeff: ekonomie projektuje Claude): przy ShipPortsBuyToIdeal port kupuje tylko do liczby idealnej
+    ///    (Gather pomija port pelny; TradePrefix: port pelny nie kupuje od AI ani od gracza) - B5-14: 37-40% wydatkow portow szlo na statki kasowane.
     ///  - E3/10: statki przechodza do portu (ApplyByTransferring - ten sam wzor co DistributeShips), port placi glowie rodu; drugie wywolanie
     ///    tej samej druzyny w dobie nic nie placi (W6); zlom zostaje przy druzynie i ginie z nia (jak dzis).
     ///  - E3/11: kupno od portu - zaplata do kasy portu; sprzedaz portowi - port placi z nadwyzki; AI nie sprzedaje, gdy port nie ma calej ceny
@@ -75,6 +77,8 @@ namespace Armoury
         internal static bool LostOn { get { var s = Settings.Current; return s != null && s.ShipsToPort; } }
         internal static bool TradeOn { get { var s = Settings.Current; return s != null && s.ShipTradeThroughPort; } }
         internal static bool PrizeOn { get { var s = Settings.Current; return s != null && s.ShipPrizesToPort; } }
+        /// <summary>A17 (poz. 6, B5-14): port kupuje tylko do liczby idealnej stoczni (limit - 2) - Gather (rozbite druzyny, pryzy) i bramka kupna od partii (TradePrefix).</summary>
+        internal static bool IdealOn { get { var s = Settings.Current; return s != null && s.ShipPortsBuyToIdeal; } }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         /// <summary>KW 168 (E2 R16): trwa wyplata portu za statek - ClanIncomeBook.OnEvent dopisuje ja do TodayShips (poza limitem KW).</summary>
@@ -132,6 +136,9 @@ namespace Armoury
         // E5/B5 (recenzja 2): gracz bez calej ceny kupna w kiesie (kupno przed sprzedaza w jednym potwierdzeniu ekranu portu) - kupno pominiete
         private static int _playerShortBuyN;
         private static long _playerShortBuyGold;
+        // A17 (poz. 6): port pelny (liczba idealna stoczni) - pominiety przy wyborze portu (Gather) i odmowy kupna od partii (AI / gracz)
+        private static int _idealSkip, _idealGateN, _idealPlayerN;
+        private static long _idealGateGold;
         // razem (naprawde dzis, niezaleznie od przelaczenia w ciagu dnia) i kontrolki
         private static long _fromNothing, _toNothing;
         private static int _overSpare, _freeShips;
@@ -209,6 +216,7 @@ namespace Armoury
             _p4Game = _p4GamePlayer = _p4Removed = _p4ToLeaders = _p4ToParties = _p4NoRecipient = _p4Ninth = 0;
             Array.Clear(_ovN, 0, Ovs); Array.Clear(_ovSimN, 0, Ovs); Array.Clear(_ovGold, 0, Ovs); Array.Clear(_ovSimGold, 0, Ovs);
             _playerShortBuyN = 0; _playerShortBuyGold = 0;
+            _idealSkip = _idealGateN = _idealPlayerN = 0; _idealGateGold = 0;
             _fromNothing = _toNothing = 0; _overSpare = _freeShips = 0; _stumbles = 0;
             _r1Sim.Clear(); _r1Real.Clear(); _r4Sim.Clear(); _r4Real.Clear();
         }
@@ -357,7 +365,11 @@ namespace Armoury
                     if (ShipyardLevel(t) <= 0) continue;
                     int have = t.AvailableShips != null ? t.AvailableShips.Count : 0;
                     if (sim) { int x; if (_simShips.TryGetValue(t.Settlement, out x)) have += x; }
-                    if (have >= MaxShips(t)) continue;
+                    int lim = MaxShips(t);
+                    if (have >= lim) continue;
+                    // A17 (poz. 6): przy ShipPortsBuyToIdeal miejsce tylko do liczby idealnej stoczni (NavalDLC GetIdealShipCountForTown = max(limit - 2, 0));
+                    // statek ponad nia stocznia kasuje nastepnej doby (TryRemoveExcessShipsFromTown) - port zaplacilby za nic
+                    if (IdealOn && have >= Math.Max(0, lim - 2)) { _idealSkip++; continue; }
                     var f = t.MapFaction;
                     if (f == null) continue;
                     bool isOwn = own != null && f == own;
@@ -604,6 +616,12 @@ namespace Armoury
                 {
                     long spare = Spare(c.Port);
                     c.Over = OverIdeal(c.Port.Town, false);
+                    // A17 (poz. 6): port pelny (liczba idealna stoczni) nie kupuje - statek zostaje u sprzedajacego; AI i gracz ta sama regula
+                    if (on && IdealOn && c.Over)
+                    {
+                        if (c.Who != WPlayer) { _idealGateN++; _idealGateGold += c.Price; if (_swap) _swapRejected = true; return false; }
+                        _idealPlayerN++; MessageFull(c.Port); return false;
+                    }
                     c.SimOk = c.Who != WPlayer ? spare >= c.Price : spare > 0;
                     if (c.Who != WPlayer)
                     {
@@ -639,6 +657,11 @@ namespace Armoury
 
         public static void SwapPre(out bool __state) { __state = _swap; _swap = true; _swapRejected = false; }
         public static void SwapFin(bool __state) { _swap = __state; _swapRejected = false; }
+
+        private static void MessageFull(Settlement port)
+        {
+            try { MBInformationManager.AddQuickInformation(new TextObject("{=!}The shipyard of " + port.Name + " already keeps all the ships it can use - the port buys none today.")); } catch { }
+        }
 
         private static void MessageNoCoin(Settlement port)
         {
@@ -1188,6 +1211,10 @@ namespace Armoury
                       .Append(" - rozbite druzyny ").Append(_ovSimN[OvLost]).Append(" / ").Append(_ovSimGold[OvLost]).Append(", sprzedaz portom ").Append(_ovSimN[OvTrade]).Append(" / ").Append(_ovSimGold[OvTrade])
                       .Append(", pryzy ").Append(_ovSimN[OvPrize]).Append(" / ").Append(_ovSimGold[OvPrize]);
                 // E5/B5: kasy portow (miasta z portem i stocznia - te, ktore Gather pyta) - bez nadwyzki dzis i serie dob z rzedu (prog projektu: <= 28 dob)
+                // A17 (poz. 6): port kupuje do liczby idealnej stoczni - ile razy port pelny zostal pominiety albo odmowil
+                sb.Append(" | kupno do liczby idealnej stoczni (A17, Ship Ports Buy To Ideal): ").Append(IdealOn ? "TAK" : "NIE")
+                  .Append(" - porty pelne pominiete przy wyborze portu ").Append(_idealSkip).Append(", odmowy kupna od AI ").Append(_idealGateN).Append(" (").Append(_idealGateGold).Append(" zl)")
+                  .Append(", od gracza ").Append(_idealPlayerN);
                 PortPurses(sb);
                 if (_stumbles > 0) sb.Append(" | wyjatki zlapane ").Append(_stumbles).Append(" (pierwszy z kazdego miejsca w logu jako ERROR)");
                 sb.Append('.');

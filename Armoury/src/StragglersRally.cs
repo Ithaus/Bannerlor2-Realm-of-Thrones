@@ -158,6 +158,14 @@ namespace Armoury
             return m;
         }
 
+        /// <summary>A17 (DoomedPartyMen): czy H3 juz oznaczyl te druzyne w tej bitwie (bez drugiego znacznika - For zdejmuje tylko pierwszy). Nie zdejmuje znacznika.</summary>
+        internal static bool Marked(MobileParty mp, MapEvent me)
+        {
+            if (mp == null || me == null) return false;
+            for (int i = 0; i < _marks.Count; i++) if (ReferenceEquals(_marks[i].Mp, mp) && ReferenceEquals(_marks[i].Me, me)) return true;
+            return false;
+        }
+
         /// <summary>Znacznik dla rozbitych tej partii w tej bitwie (zdejmowany przy uzyciu); walka gracza w polu (misja; H3 jej nie rusza) - liczony tu dla
         /// druzyny gracza i druzyn lordow pobitej strony (recenzja O2). null - jak dotad.</summary>
         internal static Mark For(MapEvent me, MobileParty mp, BattleSideEnum side)

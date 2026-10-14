@@ -622,6 +622,14 @@ Uzycie (Python 3, tylko odczyt):
                     ostatnich 28 dob wojny), Z1-2 rody w pokoju z linii 166 (pulap, skrzynia pokoju, zold, ludzie - INFO), Z1-3 miara W5-7 (INFO, 85 tys.),
                     Z1-4 bledy ClanBudget 0. Log bez paczki: INFO, bez wyjatku. Domyslne okno 728 dob; --do-doby N zmienia. Log po wczytaniu zapisu
                     (bez dob wojny krolestw w pokoju): --baza-doby <log biegu, z ktorego jest zapis> - baza wojenna z niego (Z1-1).
+--grupa a17       : (A17, 14.10 - stare zaleglosci; docs/reszta-2026-10-14/ROZPOZNANIE-A17.md) python -I tools/sprawdz_logi.py --grupa a17 <Armoury-*.log>
+                    (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
+                    przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
+                    A17-6 statki do liczby idealnej stoczni (ShipPortsBuyToIdeal): dopisek TAK, zakupy ponad liczbe idealna (B5-14) <= 0.1/d, B5-5 0.
+                    A17-4 unikaty nie sa towarem mieszczan (UniquesNotFolkGoods): linia CZYNNE, zdjete = odlozone, F1-3 na calym logu 0 (unikaty.log), D3 (INFO).
+                    A17-10 pojedynek z Nocnym Krolem (OthersDuelFromFallen): latka wpieta, pozycja (g) linii E4/2, wstalo <= polegli.
+                    A17-D1 / D2 (INFO): konie wedlug ramek i posiadaczy (juczne, K1-3), ryby poza ramkami (M6b-5a); D3 unikat z polki - w A17-4d.
+                    Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -22362,6 +22370,272 @@ def tb_main(logp, start_arg, until=120):
     return 0
 
 
+# ======================================================================== A17 (14.10): stare zaleglosci - progi grupy a17 (tylko ta grupa)
+A17_PRE = {
+    "dpm": "Ludzie kasowanych partii (A17): dzien",
+    "d4": "Partia kasowana z ludzmi (A17 diagnoza D4)",
+    "poc": "Pochodzenie (E4/7): dzien",
+    "ship": "Statki (181): dzien",
+    "ush": "Unikaty na polkach (A17): dzien",
+    "d3": "Unikat z polki (A17 diagnoza D3)",
+    "inni": "Inni z poleglych (E4/2): dzien",
+    "odw": "OthersDuel (A17):",
+    "nkd": "Pojedynek z Nocnym Krolem (A17)",
+    "d1": "Konie wedlug ramek (A17 diagnoza): dzien",
+    "d1s": "Konie poza ramkami (A17 diagnoza D1",
+    "d2": "Ryby poza ramkami (A17 diagnoza): dzien",
+    "d2s": "Ryby poza ramkami (A17 diagnoza D2",
+    "err": "ERROR in ",
+}
+A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
+
+
+def _a17_11(rep, got):
+    """A17-11 (poz. 11, DestroyedPartyMenRouted): ludzie partii kasowanej przez gre po bitwie - do niewoli zwyciezcow albo droga rozbitych H3."""
+    dl = got["dpm"]
+    on = sum(1 for s in dl if "| CZYNNE |" in s)
+    if not dl:
+        rep.add("A17-11a: ludzie kasowanych partii (linia doby A17)", "brak linii", "INFO (log sprzed A17)", None)
+    else:
+        rep.add("A17-11a: ludzie kasowanych partii (linia doby A17)", f"linii {len(dl)}, CZYNNE {on}",
+                "CZYNNE kazdej doby (klucz Destroyed Party Men Routed + Losers Flee Enabled)", on == len(dl))
+    ctl = [num(r"kontrola: szeregowi - do niewoli - rozbici = (-?\d+)", s) for s in dl]
+    bad = [c for c in ctl if c]
+    rep.add("A17-11b: kontrola przeniesionych (szeregowi = do niewoli + rozbici)", f"dob z roznica {len(bad)} z {len(ctl)}" + (f" (suma {sum(bad)})" if bad else ""),
+            "0 kazdej doby", (len(bad) == 0) if dl else None)
+    tot = {k: 0 for k in ("p", "m", "k", "r", "b", "n", "u", "off")}
+    for s in dl:
+        tot["p"] += num(r"\| partii (\d+), szeregowych", s, int, 0) or 0
+        tot["m"] += num(r"szeregowych (\d+): do niewoli", s, int, 0) or 0
+        tot["k"] += num(r": do niewoli (\d+) \(A", s, int, 0) or 0
+        tot["r"] += num(r", rozbici (\d+) \(bez zwyciezcy", s, int, 0) or 0
+        tot["b"] += num(r"\(bez zwyciezcy (\d+);", s, int, 0) or 0
+        tot["n"] += num(r"zwyciezca bez lochu (\d+)\)", s, int, 0) or 0
+        tot["u"] += num(r"jency skasowanych partii uwolnieni (\d+)", s, int, 0) or 0
+        tot["off"] += num(r"przy regule nieczynnej w nicosc (\d+)", s, int, 0) or 0
+    days = max(1, len(dl))
+    rep.add("A17-11c: przeniesieni z kasowanych partii (INFO)",
+            f"partii {tot['p']}, szeregowych {tot['m']} ({tot['m'] / days:.1f}/d): do niewoli {tot['k']}, rozbici {tot['r']} (bez zwyciezcy {tot['b']}, zwyciezca bez lochu {tot['n']}),"
+            f" jency uwolnieni {tot['u']}" if dl else "brak linii", "INFO (fin29 przed A17: 344 ludzi w nicosc / 120 dob; rok 2 + 60: 739)", None)
+    rep.add("A17-11d: w nicosc przy regule nieczynnej (linia A17)", f"{tot['off']}" if dl else "brak linii", "0 przy CZYNNE kazdej doby",
+            (tot["off"] == 0) if (dl and on == len(dl)) else None)
+    gm = 0.0
+    for s in dl:
+        gm += num(r"przy zniknieciu partii\) ([\d.]+) w \d+ rosterach", s, float, 0.0) or 0.0
+    moved = tot["k"] + tot["r"] + tot["u"]
+    own_ok = None
+    if dl:
+        sh = gm / (gm + moved) if gm + moved > 0 else 0.0
+        own_ok = sh <= 0.05
+        rep.add("A17-11e: w nicosc mimo reguly - resztka slownika partii skasowanych po bitwie",
+                f"{gm:.1f} ludzi ({gm / days:.2f}/d) wobec przeniesionych {moved} ({100.0 * sh:.1f}%)",
+                "<= 5% przeniesionych przy CZYNNE (ulamki slownika); przy kluczu wylaczonym - caly udzial bitew (INFO)",
+                own_ok if on == len(dl) else None)
+    gone = []
+    for s in got["poc"]:
+        g = num(r"przy zniknieciu partii ([\d.]+)\)", s, float)
+        if g is not None:
+            gone.append((num(r"dzien (\d+)", s), g))
+    if gone:
+        sg = sum(g for _, g in gone)
+        per = sg / len(gone)
+        worst = max(gone, key=lambda x: x[1])
+        ok = (per <= 0.1 * A17_FIN29_GONE) if (dl and on == len(dl)) else None
+        rep.add("A17-11h: ludzie \"przy zniknieciu partii\" (linia Pochodzenie E4/7, wszystkie drogi) na dobe",
+                f"{per:.2f}/d ({sg:.0f} w {len(gone)} dobach; najgorsza doba {worst[0]}: {worst[1]:.0f})" + (f"; z tego partie skasowane po bitwie {gm:.0f}" if dl else ""),
+                f"<= 10% fin29 ({A17_FIN29_GONE:.2f}/d -> <= {0.1 * A17_FIN29_GONE:.2f}/d); DECYZJA, gdy A17-11e TAK (reszta z innej drogi - do rozpoznania); log bez linii A17 - INFO",
+                ok, decide=bool(own_ok))
+    else:
+        rep.add("A17-11h: ludzie \"przy zniknieciu partii\" (linia Pochodzenie E4/7)", "brak linii Pochodzenie", "INFO", None)
+    d4 = got["d4"]
+    paths = {}
+    for s in d4:
+        m = re.search(r"\| droga ([A-Z]|inna)", s)
+        k = m.group(1) if m else "?"
+        paths[k] = paths.get(k, 0) + 1
+    rep.add("A17-11f: diagnoza D4 (kasowane partie z ludzmi - drogi)", (f"linii {len(d4)}: " + ", ".join(f"{k} {v}" for k, v in sorted(paths.items()))
+            + (f"; pierwsza C: {next((s for s in d4 if '| droga C' in s), '-')[:300]}" if "C" in paths else "")) if d4 else "0 linii",
+            "INFO (droga C - warunek gry do ustalenia z pola BattleState / H3)", None)
+    errs = [s for s in got["err"] if "DoomedPartyMen" in s]
+    rep.add("A17-11g: bledy DoomedPartyMen (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def _a17_6(rep, got):
+    """A17-6 (poz. 6, B5-14, ShipPortsBuyToIdeal): port kupuje statki tylko do liczby idealnej stoczni NavalDLC (limit - 2)."""
+    sl = got["ship"]
+    if not sl:
+        rep.add("A17-6a: kupno statkow do liczby idealnej stoczni (linia Statki 181)", "brak linii", "INFO", None)
+        return
+    mk = [s for s in sl if "kupno do liczby idealnej stoczni (A17" in s]
+    on = [s for s in mk if "Ship Ports Buy To Ideal): TAK" in s]
+    rep.add("A17-6a: kupno statkow do liczby idealnej stoczni (dopisek A17 w linii Statki 181)", f"linii {len(sl)}, z dopiskiem {len(mk)}, TAK {len(on)}",
+            "TAK kazdej doby (klucz Ship Ports Buy To Ideal); log sprzed A17 - INFO", (len(on) == len(sl)) if mk else None)
+    ov = [(num(r"liczbe idealna stoczni .*?: naprawde (\d+) / (\d+)", s), num(r"liczbe idealna stoczni .*?: naprawde \d+ / (\d+)", s)) for s in sl]
+    ov = [x for x in ov if x[0] is not None]
+    if ov:
+        n = sum(x[0] for x in ov); g = sum(x[1] or 0 for x in ov)
+        rep.add("A17-6b: zakupy portow ponad liczbe idealna stoczni (B5-14, statki kasowane nastepnej doby)", f"{n / len(ov):.2f} statku / {g / len(ov):.0f} zl na dobe ({n} / {g} w {len(ov)} dobach)",
+                "<= 0.1 statku na dobe przy TAK (fin29 przed A17: 4.2 / 33 186 zl na dobe w ostatnich 28, srednio 2.7 / 21 921)", (n / len(ov) <= 0.1) if (mk and len(on) == len(sl)) else None)
+    sk = sum(num(r"porty pelne pominiete przy wyborze portu (\d+)", s, int, 0) or 0 for s in mk)
+    ga = sum(num(r"odmowy kupna od AI (\d+)", s, int, 0) or 0 for s in mk)
+    gg = sum(num(r"odmowy kupna od AI \d+ \((\d+) zl\)", s, int, 0) or 0 for s in mk)
+    gp = sum(num(r"od gracza (\d+)", s.split("kupno do liczby idealnej stoczni (A17")[-1], int, 0) or 0 for s in mk)
+    sp = [num(r"kasy portow wydaly \(181\) (\d+)", s) for s in sl]
+    sp = [x for x in sp if x is not None]
+    rp = [num(r"w \d+ portach, przyjely (\d+)", s) for s in sl]
+    rp = [x for x in rp if x is not None]
+    rep.add("A17-6c: porty pelne - pominiete i odmowy kupna; wydatki i przychody portow (INFO)",
+            (f"pominiete {sk}, odmowy AI {ga} ({gg} zl), gracz {gp}; " if mk else "") + (f"porty wydaly {sum(sp) / len(sp):.0f}/d, przyjely {sum(rp) / max(1, len(rp)):.0f}/d" if sp else "brak liczb"),
+            "INFO (fin29 przed A17: wydaly 72 101/d, przyjely 12 642/d; zmiana wyplat do panow - przekazac pracy 'pieniadze w roku 2')", None)
+    ovs = [num(r"wyplaty ponad nadwyzke (\d+)", s) for s in sl]
+    ovs = [x for x in ovs if x is not None]
+    rep.add("A17-6d: wyplaty portow ponad nadwyzke (B5-5)", f"{sum(ovs)} w {len(ovs)} dobach" if ovs else "brak liczb", "0 (regula 181 bez zmian)", (sum(ovs) == 0) if ovs else None)
+    errs = [s for s in got["err"] if "ShipsToPort181" in s]
+    rep.add("A17-6e: bledy ShipsToPort181 (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def _a17_4(rep, got, logp):
+    """A17-4 (poz. 4, F1-3, UniquesNotFolkGoods): unikat nie jest towarem mieszczan - zdjety z polki na czas konsumpcji osady; F1-3 na calym logu (unikaty.log)."""
+    ul = got["ush"]
+    on = [s for s in ul if "| CZYNNE |" in s]
+    rep.add("A17-4a: unikaty zdejmowane z polki na czas konsumpcji osad (linia doby A17)", f"linii {len(ul)}, CZYNNE {len(on)}" if ul else "brak linii",
+            "CZYNNE kazdej doby (klucz Uniques Not Folk Goods); log sprzed A17 - INFO", (len(on) == len(ul)) if ul else None)
+    bad = [s for s in ul if (num(r"zdjete - odlozone = (-?\d+)", s, int, 0) or 0) != 0]
+    hid = sum(num(r"zdjete na czas konsumpcji osad (\d+) szt", s, int, 0) or 0 for s in ul)
+    rep.add("A17-4b: kontrola zdjete = odlozone (kazda doba)", f"dob z roznica {len(bad)} z {len(ul)}; zdjete razem {hid} szt. ({hid / max(1, len(ul)):.1f}/d)" if ul else "brak linii",
+            "0 dob z roznica", (len(bad) == 0) if ul else None)
+    up = session_file_find(logp, "unikaty.log") if logp else None
+    if not up or not os.path.exists(up):
+        rep.add("A17-4c: F1-3 unikat z targu albo z wozu bez nowego miejsca (kronika unikatow, caly log)", f"brak pliku unikaty.log ({up or '-'})", "0 przy CZYNNE", None)
+    else:
+        kre = re.compile(r"^Kronika unikatow: dzien (\d+) - (stan swiata \(\d+ unikatow w obiegu\): |zmiany: )(.*)$")
+        state, hits, nl = {}, [], 0
+        with open(up, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                m0 = TS.match(ln.rstrip("\n"))
+                x = m0.group(2) if m0 else ln.rstrip("\n")
+                m = kre.match(x)
+                if not m:
+                    continue
+                nl += 1
+                first = m.group(2).startswith("stan")
+                txt = m.group(3)[:-1] if m.group(3).endswith(".") else m.group(3)
+                if first:
+                    state = {}
+                for ent in txt.split(" | "):
+                    if ": " not in ent:
+                        continue
+                    uid, place = ent.split(": ", 1)
+                    comp = set() if place.startswith("nigdzie") else set(place.split("; "))
+                    old = state.get(uid)
+                    if not first and old:
+                        lost = [c for c in old - comp if c.startswith("targ ") or c.startswith("w drodze wozem ")]
+                        if lost and not (comp - old):
+                            hits.append(f"dzien {m.group(1)} {uid}: {sorted(lost)[0]} -> " + ("nigdzie" if not comp else "ubylo"))
+                    state[uid] = comp
+        rep.add("A17-4c: F1-3 unikat z targu albo z wozu bez nowego miejsca (kronika unikatow, caly log)",
+                f"{len(hits)} w {nl} liniach kroniki" + (" [" + "; ".join(hits[:5]) + "]" if hits else ""),
+                "0 przy CZYNNE (fin27 / fin28 / W53 przed A17: 1 - cersei_red_dress; inna droga niz konsumpcja - linia D3)", (len(hits) == 0) if (nl and ul and len(on) == len(ul)) else None)
+    d3 = got["d3"]
+    rep.add("A17-4d: diagnoza D3 - unikat schodzi z polki (ramka / stos)", (f"linii {len(d3)}; pierwsza: {d3[0][:300]}" if d3 else "0 linii"),
+            "INFO (renly_armor w biegu dwuletnim - droga do ustalenia)", None)
+    errs = [s for s in got["err"] if "UniqueShelf" in s]
+    rep.add("A17-4e: bledy UniqueShelf (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def _a17_10(rep, got):
+    """A17-10 (poz. 10, OthersDuelFromFallen): pojedynek z Nocnym Krolem - ROT wskrzesza tylko poleglych tej bitwy (pozycja (g) linii E4/2)."""
+    st = got["odw"]
+    wired = any("latka wpieta" in s for s in st)
+    rep.add("A17-10a: latka pojedynku z Nocnym Krolem (linia startowa OthersDuel)", (st[-1][:200] if st else "brak linii"),
+            "\"latka wpieta\" (ROT ROTDuelsBehavior i MapEvent.FinalizeEventAux znalezione); log sprzed A17 - INFO", wired if st else None)
+    il = [s for s in got["inni"] if "(g) pojedynek z Nocnym Krolem (A17)" in s]
+    on = [s for s in il if "(A17): z poleglych" in s]
+    if not il:
+        rep.add("A17-10b: pozycja (g) linii \"Inni z poleglych (E4/2)\"", "brak pozycji (g)" if got["inni"] else "brak linii E4/2", "INFO (log sprzed A17)", None)
+        return
+    rep.add("A17-10b: pozycja (g) linii \"Inni z poleglych (E4/2)\" - z poleglych", f"linii {len(il)}, z poleglych {len(on)}", "kazdej doby (klucz Others Duel From Fallen)", len(on) == len(il))
+    n = sum(num(r"pojedynkow przegranych przez gracza (\d+)", s, int, 0) or 0 for s in il)
+    fa = sum(num(r"polegli tej bitwy (\d+) -> wstalo", s, int, 0) or 0 for s in il)
+    ri = sum(num(r"-> wstalo (\d+) \(kopia ROT", s, int, 0) or 0 for s in il)
+    ha = sum(num(r"\(kopia ROT (\d+),", s, int, 0) or 0 for s in il)
+    rep.add("A17-10c: wstali po pojedynku <= polegli tej bitwy", f"pojedynkow {n}: polegli {fa}, wstalo {ri}, kopia ROT {ha}" + (f"; pierwsza linia: {got['nkd'][0][:220]}" if got["nkd"] else ""),
+            "wstalo <= polegli (autotest nie walczy z Nocnym Krolem - zwykle 0 pojedynkow, INFO)", (ri <= fa) if n > 0 else None)
+    errs = [s for s in got["err"] if "OthersDuel" in s]
+    rep.add("A17-10d: bledy OthersDuel (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def _a17_diag(rep, got):
+    """A17-D1 / D2 (rozpoznanie A17 rozdz. 3, tylko INFO): konie wedlug ramek ksiegi towarow i posiadaczy (juczne - K1-3), ryby poza ramkami wedlug posiadacza (M6b-5a)."""
+    d1 = got["d1"]
+    if not d1:
+        rep.add("A17-D1: konie wedlug ramek i posiadaczy (diagnoza K1-3)", "brak linii", "INFO (log sprzed A17 albo klucz A17DiagnosticLines wylaczony)", None)
+    else:
+        rx = re.compile(r"([^;|]+?) (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)")
+        agg = {}
+        for s in d1:
+            parts = s.split(" | ")
+            for part in parts:
+                if part.startswith("w ramkach ksiegi towarow: "):
+                    pre, body = "ramka ", part[len("w ramkach ksiegi towarow: "):]
+                elif part.startswith("poza ramkami wedlug posiadacza: "):
+                    pre, body = "poza ramkami ", part[len("poza ramkami wedlug posiadacza: "):]
+                else:
+                    continue
+                for m in rx.finditer(body):
+                    k = pre + m.group(1).strip()
+                    v = agg.setdefault(k, [0, 0, 0, 0, 0])
+                    for c in range(5):
+                        v[c] += int(m.group(c + 2))
+        days = len(d1)
+        worst = sorted(agg.items(), key=lambda kv: kv[1][3])[:6]
+        rep.add("A17-D1: konie wedlug ramek i posiadaczy - juczne (najwiekszy ubytek na dobe)",
+                "; ".join(f"{k} {v[3] / days:+.1f}/d (wszystkie {sum(v) / days:+.1f}/d)" for k, v in worst) + f" | dob {days}, stosow {len(got['d1s'])}"
+                + (f"; pierwszy stos: {got['d1s'][0][:260]}" if got["d1s"] else ""),
+                "INFO - sprawca ok. -40 jucznych/d (K1-3: reszta ksiegi koni -52/d, 3/4 juczne); zakup do zbrojowni DTE / na bohatera to ubytek z rosteru bez przybytku", None)
+    d2 = got["d2"]
+    if not d2:
+        rep.add("A17-D2: ryby poza ramkami wedlug posiadacza (diagnoza M6b-5a)", "brak linii", "INFO (log sprzed A17 albo klucz wylaczony)", None)
+    else:
+        agg = {}
+        rx = re.compile(r"([^;|]+?) \+(\d+) / -(\d+)")
+        for s in d2:
+            seg = s.split("wedlug posiadacza (+ / -): ", 1)[-1].split(" | ", 1)[0]
+            for m in rx.finditer(seg):
+                v = agg.setdefault(m.group(1).strip(), [0, 0])
+                v[0] += int(m.group(2)); v[1] += int(m.group(3))
+        days = len(d2)
+        rep.add("A17-D2: ryby poza ramkami wedlug posiadacza (+ / - na dobe)",
+                "; ".join(f"{k} +{v[0] / days:.1f}/-{v[1] / days:.1f}" for k, v in sorted(agg.items(), key=lambda kv: -(kv[1][0] - kv[1][1]))[:6]) + f" | dob {days}, stosow {len(got['d2s'])}"
+                + (f"; pierwszy stos: {got['d2s'][0][:260]}" if got["d2s"] else ""),
+                "INFO - zrodlo ok. +34..100 ryb/d bez wyjasnienia (M6b-5a)", None)
+    errs = [s for s in got["err"] if "A17Diag" in s]
+    rep.add("A17-D9: bledy A17Diag (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def a17_main(logp):
+    """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    got = {k: [] for k in A17_PRE}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            for k, p in A17_PRE.items():
+                if s.startswith(p):
+                    got[k].append(s)
+                    break
+    print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
+    _a17_11(rep, got)
+    _a17_6(rep, got)
+    _a17_4(rep, got, logp)
+    _a17_10(rep, got)
+    _a17_diag(rep, got)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -22394,6 +22668,8 @@ def main(argv):
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "a17" and logp:
+        return a17_main(logp)   # A17 (14.10): stare zaleglosci - ludzie kasowanych partii (11), statki do liczby idealnej (6), unikaty (4), Nocny Krol (10), diagnozy D1-D4
     if group == "etap3" and logp:
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:

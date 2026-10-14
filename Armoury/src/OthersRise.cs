@@ -595,12 +595,13 @@ namespace Armoury
                     sb.Append(" | (d) przejecie osady: ").Append(_milN).Append(" milicji, zywi polegli ").Append(_milDead).Append(" -> wstalo ").Append(_milRisen)
                       .Append(", spalone ").Append(_milBurnt).Append("; odbicie osady (ROT: wighty milicji -> zywi, z niczego) ").Append(_milRevertN).Append(" (").Append(S(_milRevertLiving)).Append(" zywych)");
                     sb.Append(" | (e) wighty rozwiazanych band - do niczego, nie do puli wyrzutkow ").Append(disb);
+                    sb.Append(" | (g) ").Append(OthersDuel.DayText());     // A17 (poz. 10): pojedynek z Nocnym Krolem - polegli tej bitwy -> wstali
                     sb.Append(" | pula CIALA ").Append(PeopleBook.Bodies).Append(" (linia \"Ludzie (ksiega)\")");
                     if (_stumblesDay > 0) sb.Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(", pierwszy blad kazdego miejsca w logu)");
                     sb.Append('.');
                     Log.Info(sb.ToString());
                 }
-                else OutlawLaw.TakeDisbandUndead();
+                else { OutlawLaw.TakeDisbandUndead(); OthersDuel.DayText(); }
             }
             catch (Exception e) { Stumble("Daily", e); }
             try { PeopleBook.Daily(day, log); } catch (Exception e) { Stumble("PeopleBook.Daily", e); }

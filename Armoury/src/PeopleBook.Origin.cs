@@ -1253,9 +1253,10 @@ namespace Armoury
             {
                 if (o != null && o.Sum >= GoneDiagMen) { try { GoneDiag(pb, o, destroyed); } catch (Exception e) { OStumble("OriginPartyGone(diagnoza)", e); } }
                 _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _mem.Remove(pb);
+                try { DoomedPartyMen.NoteGone(pb, o.Sum); } catch { }      // A17 (poz. 11): resztka slownika partii skasowanej po bitwie - linia "Ludzie kasowanych partii (A17)"
                 try { if (pb.IsMobile && pb.MobileParty != null && KindOf(pb.MobileParty) == KWatch) _wGone += o.Sum; } catch (Exception e) { OStumble("OriginPartyGone(E4/9)", e); }
             }
-            if (_pris.TryGetValue(pb, out o)) { _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _pris.Remove(pb); }
+            if (_pris.TryGetValue(pb, out o)) { _gone += o.Sum; _fOut[FGone] += o.Sum; _tAll += o.Sum; _pris.Remove(pb); try { DoomedPartyMen.NoteGone(pb, o.Sum); } catch { } }
             var mp = pb.MobileParty;
             Shares p;
             if (mp != null && _pending.TryGetValue(mp, out p)) { _pendLost += p.Total; _pending.Remove(mp); }
