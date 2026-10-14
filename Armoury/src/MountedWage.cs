@@ -76,7 +76,8 @@ namespace Armoury
             {
                 // 182 (WatchUnpaid, [D] 07.10): bracia Strazy nie biora zoldu - w partiach i zalogach Strazy zold jednostki 0 (tylko zold partii; cena
                 // werbunku i stawka nominalna - jak dotad); liczebnosc trzyma pulap 166 w ludziach (ClanBudget), dlatego tylko z ClanBudgetEnabled
-                if (_total && _party != null && __0 != null && !__0.IsHero && __result > 0 && CrownGifts.WatchUnpaidOn && CrownGifts.IsWatchParty(_party)) { __result = 0; return; }
+                // WL1 (wyspy-wolni): ta sama regula dla Wolnych Ludzi (FreeFolkUnpaid) - CrownGifts.IsUnpaidParty
+                if (_total && _party != null && __0 != null && !__0.IsHero && __result > 0 && CrownGifts.IsUnpaidParty(_party)) { __result = 0; return; }
                 __result = Apply(__result, __0, _party);
             }
             catch { }

@@ -5832,6 +5832,10 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float SeaRaidersHarbourTithe { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Free Folk Unpaid", HintText = "the Free Folk fight for their people, not for coin: troops in the parties and garrisons of the Free Folk take no wages, as the brothers of the Night's Watch (only Banner Kings' least upkeep remains), and the knights who ride with their companies serve unpaid too. The crown pays them no war aid and the house budget holds their numbers in men instead of gold (one host for all the Free Folk, apart from the Watch), and nobody is sent home - the limit only stops recruiting. The same for you if you serve the Free Folk. Needs Clan Budget Enabled. Off = the Free Folk are paid like everyone else")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool FreeFolkUnpaid { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7289,6 +7293,7 @@ namespace Armoury
             s.ReaverRaidPayDays = ReaverRaidPayDays;
             s.SeaRaidersIronHarbour = SeaRaidersIronHarbour;
             s.SeaRaidersHarbourTithe = SeaRaidersHarbourTithe;
+            s.FreeFolkUnpaid = FreeFolkUnpaid;
         }
 
         internal static void Apply()

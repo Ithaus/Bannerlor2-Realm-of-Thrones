@@ -68,6 +68,22 @@ namespace Armoury
         }
 
 
+        /// <summary>WL1 (wyspy-wolni, decyzja Jeffa 14.10 "Wolni Ludzie nie pobierali kasy jak Nocna Straz"): Wolni Ludzie bez zoldu - klucz FreeFolkUnpaid, jak
+        /// WatchUnpaid tylko z budzetem rodow 166 (pulap w ludziach trzyma liczebnosc).</summary>
+        internal const string FreeFolkId = "freefolk";
+        internal static bool FreeFolkUnpaidOn { get { var s = Settings.Current; return s != null && s.FreeFolkUnpaid && s.ClanBudgetEnabled; } }
+        internal static bool IsFreeFolk(IFaction f) { return f != null && f.StringId == FreeFolkId; }
+
+        /// <summary>Krolestwo, ktorego wojsko sluzy bez zoldu: Straz przy WatchUnpaid, Wolni Ludzie przy FreeFolkUnpaid (jedna regula 182 / WL1). Dary koron - tylko Straz (IsWatch).</summary>
+        internal static bool IsUnpaidRealm(IFaction f) { return (WatchUnpaidOn && IsWatch(f)) || (FreeFolkUnpaidOn && IsFreeFolk(f)); }
+
+        /// <summary>Partia bez zoldu: partia lorda, zaloga albo gracz krolestwa bez zoldu (IsUnpaidRealm).</summary>
+        internal static bool IsUnpaidParty(MobileParty mp)
+        {
+            try { return mp != null && (mp.IsLordParty || mp.IsGarrison || mp.IsMainParty) && IsUnpaidRealm(mp.MapFaction); }
+            catch { return false; }
+        }
+
         /// <summary>Partia Strazy (partia lorda rodu Strazy, zaloga osady Strazy, takze gracz w Strazy).</summary>
         internal static bool IsWatchParty(MobileParty mp)
         {

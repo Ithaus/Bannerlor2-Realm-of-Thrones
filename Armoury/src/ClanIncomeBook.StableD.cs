@@ -150,6 +150,9 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteWageCut", e); }
         }
 
+        /// <summary>WL1 (wyspy-wolni): zold rodu przyciety z braku w kiesie od ostatniej doby ksiegi (SoldierPay - K39; ClanBudget.Daily biegnie przed ksiega). Tylko odczyt.</summary>
+        internal static long CutTodayOf(Clan c) { int v; return c != null && _cutToday.TryGetValue(c, out v) ? v : 0; }
+
         /// <summary>169c: odczyty dla linii pomiaru (Measure169c) - kiesy rodziny, wplyw ostatniej doby D169, zold ostatniego rozliczenia.</summary>
         internal static long FamilyGoldOf(Clan c) { try { return c == null ? 0 : FamilyGold(c); } catch { return 0; } }
         internal static long InflowOf(Clan c) { try { Rec r; return c != null && c.StringId != null && _book.TryGetValue(c.StringId, out r) ? r.Inflow : 0; } catch { return 0; } }
