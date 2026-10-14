@@ -83,6 +83,9 @@ namespace CrashScribe
         // --- Atuty BK z nagrody za bitwe (decyzja Jeffa 4, 12.10; patrz Mends.BkRewardPerks) ---
         public static bool BkBattleRewardPerks = true;       // latka BK BKBattleRewardTweakPatches nie wchodzi w 1.4.8 (nazwy parametrow) - nasze postfiksy z ta sama logika (CommanderWarband +25% wplywu, MercenaryFamousSellswords +20% i styl Cataphract +12% slawy), kazdy tylko gdy BK go nie ma; false = bez tych atutow
 
+        // --- S9 (projekt oblezen 14.10, rozdz. 2): BK bez krolestw z rodow buntownikow (patrz Mends.BkRebelKingdoms) ---
+        public static bool BkRebelKingdoms = false;          // false (S9): przy starcie i wczytaniu kampanii BKClanBehavior._disableRebelKingdom = true - rod buntownikow z lennem po 30 dobach (RebellionsCampaignBehavior) zostaje rodem bez krolestwa (obsluga gry), BK nie robi z niego krolestwa "County / Barony of"; pliki BK nietkniete; true = jak dotad (BK robi krolestwo)
+
         // --- E8/M (247): edukacja BK gracza (patrz Quiet.KnownBkEducation, Mends.BkEducationCheck) ---
         public static bool QuietBkEducation = true;          // znany wyjatek BK CorrectPlayerEducation (finalizer BKROT go polyka): jedna linia zamiast bloku ERROR + raz na gre linia jezyka gracza w BK; false = blok ERROR jak dotad, bez linii
 
@@ -163,6 +166,7 @@ namespace CrashScribe
                         case "WallReleaseCommander": WallReleaseCommander = B(v); break;
                         case "WallOldSaveFix": WallOldSaveFix = B(v); break;
                         case "BkBattleRewardPerks": BkBattleRewardPerks = B(v); break;
+                        case "BkRebelKingdoms": BkRebelKingdoms = B(v); break;
                         case "QuietBkEducation": QuietBkEducation = B(v); break;
                         case "MarriageFast": MarriageFast = B(v); break;
                         case "MarriageFastShadow": MarriageFastShadow = B(v); break;

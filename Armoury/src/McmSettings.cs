@@ -5848,6 +5848,30 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
 
+        [SettingPropertyBool("Besieged Relief First", HintText = "When an enemy army besieges a town or castle of a realm, the lords of that realm within the game's own reach of it (about eight days' march) put its relief above every other aim - raiding, plundering, besieging elsewhere, chasing parties, patrolling, visiting towns - until the lords and armies already marching to its relief are strong enough (Besieged Relief Capital, Town or Castle Force times the besiegers' strength). The capital comes first, then the towns, then the castles. They gather near the walls and fall on the siege camp once together they are stronger than it, as the game does. A lord whose men are starving goes for food first. The same rule for every realm, yours included; your own party is never moved. Off = the game's own judgement, in which a lone lord rarely rides against a large army")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool BesiegedReliefFirst { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Besieged Relief Capital Force", 0.00f, 8.00f, "0.00", HintText = "with Besieged Relief First: the relief a besieged capital calls for, as a multiple of the besiegers' strength (2 = twice their strength, the most the game's own reckoning of a fight rewards); 0 = capitals are left to the game")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public float BesiegedReliefCapitalForce { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Besieged Relief Town Force", 0.00f, 6.00f, "0.00", HintText = "with Besieged Relief First: the relief a besieged town calls for, as a multiple of the besiegers' strength; 0 = towns are left to the game")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public float BesiegedReliefTownForce { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Besieged Relief Castle Force", 0.00f, 4.80f, "0.00", HintText = "with Besieged Relief First: the relief a besieged castle calls for, as a multiple of the besiegers' strength (1.2 = just enough for the relief to attack the siege camp, by the game's own rule); 0 = castles are left to the game")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public float BesiegedReliefCastleForce { get; set; } = 1.2f;
+
+        [SettingPropertyBool("Besieged Relief Kings Army", HintText = "with Besieged Relief First: the ruler of a realm whose town or castle is besieged, when he is free, within reach and has lords he can call, raises an army to relieve it - the same call to arms as for a siege, at the same cost of influence - unless an army of the realm is already gathering for it or marching to it. Off = only the armies the game and Banner Kings raise on their own")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool BesiegedReliefKingsArmy { get; set; } = true;
+
+        [SettingPropertyBool("Clan Leave Log", HintText = "Writes a log line each time a clan holding a town or castle leaves or joins a realm: the clan, the old and the new realm, the reason the game gives, its leader's relation with both rulers, its coin and its fiefs. Log only - nothing in the game changes")]
+        [SettingPropertyGroup("Clans changing realms")]
+        public bool ClanLeaveLog { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7309,6 +7333,12 @@ namespace Armoury
             s.FlaxVillagesWithoutClimateFix = FlaxVillagesWithoutClimateFix;
             s.VineOliveByClimate = VineOliveByClimate;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
+            s.BesiegedReliefFirst = BesiegedReliefFirst;
+            s.BesiegedReliefCapitalForce = BesiegedReliefCapitalForce;
+            s.BesiegedReliefTownForce = BesiegedReliefTownForce;
+            s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
+            s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
+            s.ClanLeaveLog = ClanLeaveLog;
         }
 
         internal static void Apply()

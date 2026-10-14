@@ -641,6 +641,13 @@ Uzycie (Python 3, tylko odczyt):
                     przerwa 30.3 doby), SD-A1 sluby AI-AI na 364 doby 38-58 (linia Sluby AI (169c); 91-299 dob - 2.6 sigma), SD-A2 Z.3 = 169c, sluby =
                     oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
                     pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
+--grupa odsiecz   : (14.10, decyzja Jeffa "stolicy i miast trzeba bronic za wszelka cene"; galaz w-toku/odsiecz-bunty) python -I tools/sprawdz_logi.py --grupa odsiecz
+                    [--crashscribe <session-*.log>] [--do-doby N] <Armoury-*.log> (log czytany strumieniowo). OB5 odsiecz z pierwszenstwem: OD-0 linia startu
+                    (CZYNNE, latka TAK), OD-1 linie doby i potkniecia 0, OD-2a oblezenia stolic i miast (>= 2 doby, druzyny w zasiegu) z odsiecza >= 95%, OD-2b
+                    zebrana >= wymagana albo w odsieczy >= 80% druzyn w zasiegu w >= 80% takich oblezen, OD-3 armie wladcy (INFO), OD-4 stolice zdobyte <= 1 na
+                    364 doby (W-5), OD-5 oblezenia wedlug klasy i bitwy pod murami (INFO), OD-6 podbite -> w odsieczy (INFO); S11: OD-7 linie rodow z lennem
+                    (INFO wedlug przyczyny); S9: OD-8 krolestwa BK z buntu 0 i nowe panstwa <= 1 na 364 doby (W-13; werdykt tylko z --crashscribe i linia S9),
+                    OD-9 linia "Mends: BK rebel kingdoms off" i rody buntownikow bez krolestwa BK. Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -23500,6 +23507,194 @@ def sludan_main(logp, csp=None):
     return 0
 
 
+# ------------------------------------------------------------ odsiecz (14.10, OB5 + S9 + S11; galaz w-toku/odsiecz-bunty)
+OD_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+OD_START = re.compile(r"^Odsiecz \(OB5\): start sesji \| (CZYNNE|WYLACZONE[^|]*) \| latka CampaignEventDispatcher\.AiHourlyTick \(postfiks Low\) (TAK|BRAK[^;]*);")
+OD_DAY = re.compile(r"^Odsiecz \(OB5\): dzien (\d+) \| CZYNNE \| oblezone twierdze krolestw teraz: stolice (\d+), miasta (\d+), zamki (\d+) .*?\| dzis: oblezen nowych (\d+),"
+                    r" skonczonych (\d+) \(zdobytych (\d+)\), oceny obrony podbite (\d+) razy u (\d+) druzyn, pominiete z glodu (\d+), opcje armii wladcy (\d+)"
+                    r" \(wladca bez druzyn do wezwania (\d+)\), armie wladcy zalozone (\d+) .*?\| potkniecia (\d+) \(sesja (\d+)\)")
+OD_END = re.compile(r"^Odsiecz \(OB5\) koniec: dzien (\d+) \| (.+?) \((\S+), (stolica|miasto|zamek)\) krolestwa (.+?) \| oblegajacy (.+?), wodz (.+?), sila na starcie (\d+),"
+                    r" najwiecej (\d+) \| dob od wykrycia (\d+) \| odsiecz: wymagana (\d+), najwiecej zebrana (\d+) \((\d+)% wymaganej\), druzyn w zasiegu \(z ocena obrony\) (\d+),"
+                    r" druzyn w odsieczy (\d+), podbitych przez OB5 (\d+) \(potem w odsieczy (\d+)\), podbic (\d+), armie krola (\d+) \| bitwy pod murami \(poza szturmem\) (\d+),"
+                    r" wygrala strona krolestwa (\d+) \| wynik: (ZDOBYTE|utrzymane) \((.+?)\)\.")
+OD_ARMY = re.compile(r"^Odsiecz \(OB5\) armia krola: dzien (\d+) \| (.+?) \((stolica|miasto|zamek)\) krolestwa (.+?) \| wodz (.+?) \| druzyn wezwanych (\d+)")
+OD_S11 = re.compile(r"^Rod z lennem zmienia krolestwo \(S11\): dzien (\d+) \| rod (.+?) \((\S+)\), glowa .*? \| (.+?) -> (.+?) \| przyczyna (\w+)")
+OD_NEWK = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?) - (.+?): WOJNA \(przyczyna CausedByKingdomCreation\)")
+OD_KLIST = re.compile(r"^KingdomBalance \(175\.0\): krolestwa id=nazwa: (.*)$")
+# pola OD_END (indeksy grup od 0): 0 dzien, 1 osada, 2 id, 3 klasa, 4 krolestwo, 5 oblegajacy, 6 wodz, 7 sila start, 8 sila max, 9 dob, 10 wymagana, 11 zebrana max,
+# 12 % wymaganej, 13 w zasiegu, 14 w odsieczy, 15 podbitych, 16 potem w odsieczy, 17 podbic, 18 armie krola, 19 bitwy, 20 wygrane, 21 wynik, 22 jak
+
+
+def odsiecz_main(logp, csp=None, until=100000):
+    """odsiecz (14.10, decyzja Jeffa "jesli oblezona jest stolica ... stolicy i miast trzeba bronic za wszelka cene, jak idzie obca armia"; projekt
+    docs/oblezenia/PROJEKT-WYBRANY.md z decyzjami 14.10; galaz w-toku/odsiecz-bunty). Log Armoury czytany strumieniowo; --crashscribe - linie S9.
+    OB5: OD-0 start (CZYNNE, latka TAK); OD-1 linie doby (kazda doba okna) i potkniecia 0; OD-2a oblezenia stolic i miast trwajace >= 2 doby, przy ktorych
+    gra widziala druzyny krolestwa w zasiegu obrony: odsiecz (>= 1 druzyna) >= 95% (regula ma objac kazde - margines na oblezenia zdjete w pierwszych
+    godzinach); OD-2b w tych oblezeniach zebrana >= wymagana albo w odsieczy >= 80% druzyn z ocena obrony (krolestwo dalo tyle, ile mialo w zasiegu) w
+    >= 80% oblezen; OD-3 armie wladcy (INFO); OD-4 stolice zdobyte <= 1 na 364 doby (prog W-5 projektu); OD-5 oblezenia wedlug klasy, bitwy pod murami
+    poza szturmem i wygrane strony krolestwa (INFO); OD-6 druzyny podbite przez OB5, ktore potem byly w odsieczy (INFO).
+    S11: OD-7 linie rodow z lennem wedlug przyczyny (INFO). S9: OD-8 nowe panstwa z linii E7/0 (CausedByKingdomCreation): BK (nazwa bez "Rebels)") 0 i
+    razem <= 1 na 364 doby (W-13) - werdykt tylko, gdy log CrashScribe ma linie "Mends: BK rebel kingdoms off"; OD-9 ta linia i rody buntownikow po 30
+    dobach bez krolestwa BK (linie "Mends: S9 rod buntownikow").
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    start, days, ends, armies, s11, newk = [], {}, [], [], [], []
+    keys = ("Odsiecz (OB5)", "Rod z lennem zmienia krolestwo (S11)", "CausedByKingdomCreation", "krolestwa id=nazwa")
+    known = set()   # nazwy krolestw z linii startu sesji KingdomBalance; nowe panstwo = strona linii E7/0 spoza znanych (strona bywa pierwsza albo druga)
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if not any(k in ln for k in keys):
+                continue
+            s = OD_TS.sub("", ln.rstrip("\r\n"))
+            m = OD_START.match(s)
+            if m:
+                start.append((m.group(1), m.group(2)))
+                continue
+            m = OD_DAY.match(s)
+            if m:
+                days[int(m.group(1))] = [int(x) for x in m.groups()[1:]]
+                continue
+            m = OD_END.match(s)
+            if m:
+                ends.append(m.groups())
+                continue
+            m = OD_ARMY.match(s)
+            if m:
+                armies.append(m.groups())
+                continue
+            m = OD_S11.match(s)
+            if m:
+                s11.append(m.groups())
+                continue
+            m = OD_KLIST.match(s)
+            if m:
+                for part in m.group(1).split("; "):
+                    if "=" in part:
+                        known.add(part.split("=", 1)[1].strip())
+                continue
+            m = OD_NEWK.match(s)
+            if m:
+                d, a, b = int(m.group(1)), m.group(2), m.group(3)
+                for nm in (a, b):
+                    if nm not in known:
+                        known.add(nm)
+                        newk.append((d, nm, a + " - " + b))
+    d0 = min(days) if days else None
+    if d0 is not None:
+        days = {d: v for d, v in days.items() if d - d0 + 1 <= until}
+        ends = [e for e in ends if int(e[0]) - d0 + 1 <= until]
+        armies = [a for a in armies if int(a[0]) - d0 + 1 <= until]
+        s11 = [x for x in s11 if int(x[0]) - d0 + 1 <= until]
+        newk = [x for x in newk if x[0] - d0 + 1 <= until]
+    print(f"plik: {logp} | start {len(start)}, doby {len(days)}, konce oblezen {len(ends)}, armie krola {len(armies)}, S11 {len(s11)}, nowe panstwa (E7/0) {len(newk)}")
+    pkg = bool(start or days or ends)
+    # OD-0
+    if start:
+        bad = [x for x in start if not x[0].startswith("CZYNNE") or x[1] != "TAK"]
+        rep.add("OD-0: start sesji OB5 - CZYNNE, latka AiHourlyTick TAK", f"linii {len(start)}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else ""), "0 zlych", not bad)
+    else:
+        rep.add("OD-0: start sesji OB5", "brak linii", "linia przy kazdym starcie sesji", None)
+    # OD-1 (pola linii doby od 0: 0 stolice, 1 miasta, 2 zamki, 3 nowe, 4 skonczone, 5 zdobyte, 6 podbite, 7 druzyn, 8 glod, 9 opcje, 10 bez wezwania, 11 armie, 12 potkniecia, 13 sesja)
+    if days:
+        span = max(days) - min(days) + 1
+        stum = sum(v[12] for v in days.values())
+        rep.add("OD-1: linie doby OB5 i potkniecia", f"dob z linia {len(days)} z {span}; potkniecia {stum}", "kazda doba, potkniecia 0", len(days) >= span - 1 and stum == 0)
+    else:
+        rep.add("OD-1: linie doby OB5", "brak linii", "kazda doba", None)
+    # OD-2
+    ct = [e for e in ends if e[3] in ("stolica", "miasto") and int(e[9]) >= 2 and int(e[13]) >= 1]
+    if ct:
+        no = [e for e in ct if int(e[14]) < 1]
+        share = 1 - len(no) / len(ct)
+        rep.add("OD-2a: oblezenia stolic i miast (>= 2 doby, druzyny w zasiegu) z odsiecza >= 1 druzyna",
+                f"{len(ct) - len(no)} z {len(ct)} ({100 * share:.0f}%)" + (f"; bez odsieczy np. {no[0][1]} dzien {no[0][0]} (w zasiegu {no[0][13]})" if no else ""), ">= 95%", share >= 0.95)
+        ok2 = [e for e in ct if int(e[12]) >= 100 or int(e[14]) >= 0.8 * int(e[13])]
+        sh2 = len(ok2) / len(ct)
+        bad2 = [e for e in ct if e not in ok2]
+        rep.add("OD-2b: zebrana >= wymagana albo w odsieczy >= 80% druzyn w zasiegu",
+                f"{len(ok2)} z {len(ct)} ({100 * sh2:.0f}%)" + (f"; np. {bad2[0][1]} dzien {bad2[0][0]}: zebrana {bad2[0][11]} / wymagana {bad2[0][10]}, w odsieczy {bad2[0][14]} z {bad2[0][13]}" if bad2 else ""),
+                ">= 80% oblezen", sh2 >= 0.8)
+    else:
+        rep.add("OD-2: oblezenia stolic i miast z odsiecza", "brak oblezen stolic i miast >= 2 doby z druzynami w zasiegu" if pkg else "brak linii", ">= 95% / >= 80%", None)
+    # OD-3
+    if pkg:
+        bycls = {}
+        for a in armies:
+            bycls[a[2]] = bycls.get(a[2], 0) + 1
+        offers = sum(v[9] for v in days.values())
+        nocall = sum(v[10] for v in days.values())
+        rep.add("OD-3: armie wladcy na odsiecz (INFO)", f"zalozone {len(armies)} ({', '.join(f'{k} {v}' for k, v in sorted(bycls.items())) or '-'}); opcje {offers}, wladca bez druzyn do wezwania {nocall}",
+                "INFO (armia tylko, gdy wladca wolny, w zasiegu i ma kogo wezwac)", None)
+    # OD-4 .. OD-6
+    if ends:
+        caps = [e for e in ends if e[3] == "stolica" and e[21] == "ZDOBYTE"]
+        span = (max(days) - min(days) + 1) if days else max(1, max(int(e[0]) for e in ends) - min(int(e[0]) for e in ends) + 1)
+        lim = max(1, -(-span // 364))
+        rep.add("OD-4: stolice zdobyte (W-5)", f"{len(caps)} w {span} dobach" + (f" ({', '.join(e[1] + ' d' + e[0] for e in caps[:4])})" if caps else ""), f"<= {lim} (1 na 364 doby)", len(caps) <= lim)
+        cls = {}
+        for e in ends:
+            c = cls.setdefault(e[3], [0, 0, 0, 0])
+            c[0] += 1
+            c[1] += e[21] == "ZDOBYTE"
+            c[2] += int(e[19])
+            c[3] += int(e[20])
+        rep.add("OD-5: oblezenia wedlug klasy - zdobyte, bitwy pod murami poza szturmem, wygrane krolestwa (INFO)",
+                "; ".join(f"{k}: oblezen {v[0]}, zdobytych {v[1]}, bitew {v[2]}, wygranych {v[3]}" for k, v in sorted(cls.items())), "INFO", None)
+        pul = sum(int(e[15]) for e in ends)
+        red = sum(int(e[16]) for e in ends)
+        rep.add("OD-6: druzyny podbite przez OB5 -> potem w odsieczy (INFO)", f"podbitych {pul}, potem w odsieczy {red}" + (f" ({100 * red / pul:.0f}%)" if pul else ""),
+                "INFO (podbicie to ocena; gra wybiera cel z progiem 0.1 i rzutami)", None)
+    elif pkg:
+        rep.add("OD-4: stolice zdobyte (W-5)", "brak linii konca oblezen", "<= 1 na 364 doby", None)
+    # OD-7 (S11)
+    if s11:
+        det = {}
+        for x in s11:
+            det[x[5]] = det.get(x[5], 0) + 1
+        rep.add("OD-7: rody z lennem zmieniajace krolestwo (S11, INFO)", f"linii {len(s11)}: " + ", ".join(f"{k} {v}" for k, v in sorted(det.items(), key=lambda kv: -kv[1])),
+                "INFO (pomiar przyczyn; przyczyn nie zakladamy)", None)
+    else:
+        rep.add("OD-7: linie S11", "brak linii", "linia przy kazdej zmianie krolestwa rodu z lennem", None)
+    # S9 - log CrashScribe
+    s9on, s9warn, s9clans, s9bk = None, 0, 0, 0
+    if csp:
+        try:
+            with open(csp, encoding="utf-8", errors="replace") as f:
+                for ln in f:
+                    if "Mends: BK rebel kingdoms" in ln:
+                        if "rebel kingdoms off (S9)" in ln:
+                            s9on = True if s9on is None else s9on
+                        elif "OSTRZEZENIE" in ln:
+                            s9warn += 1
+                            s9on = False
+                        elif "rebel kingdoms on" in ln:
+                            s9on = False
+                    elif "Mends: S9 rod buntownikow" in ln:
+                        s9clans += 1
+                        if "BK zrobi krolestwo" in ln:
+                            s9bk += 1
+        except OSError as e:
+            rep.add("OD-9: log CrashScribe", f"nie da sie czytac ({e})", "-", None)
+            csp = None
+    if csp:
+        if s9on is None:
+            rep.add("OD-9: S9 - linia 'Mends: BK rebel kingdoms off'", "brak linii", "linia przy starcie / wczytaniu", None)
+        else:
+            rep.add("OD-9: S9 - linia 'Mends: BK rebel kingdoms off', rody buntownikow bez krolestwa BK",
+                    f"{'off' if s9on else 'NIE czynne'} (ostrzezen {s9warn}); rodow buntownikow po 30 dobach {s9clans}, z krolestwem BK {s9bk}", "off, 0 z krolestwem BK", bool(s9on) and s9bk == 0)
+    bk = set(x[1] for x in newk if "Rebels)" not in x[1])
+    names = sorted(set(x[1] for x in newk))
+    span_all = (max(days) - min(days) + 1) if days else None
+    lim_k = max(1, -(-span_all // 364)) if span_all else 1
+    val = f"nowe panstwa {len(names)}" + (f" ({', '.join(names[:6])})" if names else "") + f"; z BK (nazwa bez 'Rebels)') {len(bk)}"
+    if csp and s9on:
+        rep.add("OD-8: nowe panstwa (S9, W-13)", val, f"BK 0, razem <= {lim_k} (1 na 364 doby)", len(bk) == 0 and len(names) <= lim_k)
+    else:
+        rep.add("OD-8: nowe panstwa (S9, W-13)", val, "BK 0, razem <= 1 na 364 doby (werdykt z --crashscribe i linia S9)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -23532,6 +23727,8 @@ def main(argv):
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "odsiecz" and logp:
+        return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
     if group == "sludan" and logp:
         return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:

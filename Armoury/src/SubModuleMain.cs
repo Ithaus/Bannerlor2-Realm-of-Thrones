@@ -197,6 +197,9 @@ namespace Armoury
                 // PO prefiksie okna W11 Measure40 (ten sam priorytet, wpiety wczesniej; W11 przy czynnym prawie nie liczy - BkCapPre), PRZED O12 CirculationWindows i RealPayer
                 // (prefiksy void z parametrem referencyjnym - po naszym false pominiete, ich finalizery obsluguja stan domyslny); wpiete zawsze (U26), dzialaja przy kluczach; kazde we wlasnym try
                 try { WatchLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WatchLaw.ApplyAll", e); }
+                // OB5 (decyzja Jeffa 14.10, odsiecz z pierwszenstwem): postfiks Low na CampaignEventDispatcher.AiHourlyTick PO WatchLaw (widzi rabunek Strazy z wynikiem -1);
+                // wpiety zawsze, dziala przy kluczu BesiegedReliefFirst
+                try { BesiegedRelief.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BesiegedRelief.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
@@ -408,6 +411,7 @@ namespace Armoury
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
                 starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
+                starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

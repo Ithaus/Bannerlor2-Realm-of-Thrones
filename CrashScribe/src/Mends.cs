@@ -2762,6 +2762,64 @@ namespace CrashScribe
         private static MethodInfo _bkGetEdu, _bkHasPerk;
         private static int _bkRewardStumbles;         // potkniecia per wywolanie (bez globalnego wylacznika)
 
+        // ------------------------------------------------------------ S9 (projekt oblezen 14.10, rozdz. 2): BK bez krolestw z rodow buntownikow
+        // BK (BKClanBehavior, dekompilacja e4toolskfull): nasluch RebelliousClanDisbandedAtSettlement (gra: rod buntownikow z lennem po 30 dobach,
+        // RebellionsCampaignBehavior.DailyTickClan) wola MakeRebelKingdom -> KingdomManager.CreateKingdom ("County / Barony of X") i wojny z wrogami
+        // starego krolestwa. Bramka na poczatku MakeRebelKingdom: public static bool _disableRebelKingdom (BK przelacza je tylko cheatem
+        // bannerkings.disable_rebel_kingdom). Druga droga do MakeRebelKingdom (DailyClanTickImpl) jest martwa: wychodzi przy Kingdom == null, a
+        // MakeRebelKingdom przy Kingdom != null. Pole statyczne = na caly proces; ustawiamy przy kazdym starcie / wczytaniu kampanii (po OnGameStart BK).
+        // Rod zostaje rodem bez krolestwa z lennem - obsluga gry (jak bez BK). Brak pola = linia ostrzezenia, nic wiecej.
+        private static FieldInfo _bkRebelField;
+        private static bool _bkRebelResolved;
+        private static int _bkRebelClans;
+
+        /// <summary>S9: przelacznik BK przy OnSessionLaunched (nowa gra i wczytanie). Nie rzuca.</summary>
+        internal static void BkRebelKingdoms()
+        {
+            try
+            {
+                if (!_bkRebelResolved)
+                {
+                    _bkRebelResolved = true;
+                    var t = AccessTools.TypeByName("BannerKings.Behaviours.BKClanBehavior");
+                    _bkRebelField = t != null ? AccessTools.Field(t, "_disableRebelKingdom") : null;
+                    if (_bkRebelField != null && (!_bkRebelField.IsStatic || _bkRebelField.FieldType != typeof(bool))) _bkRebelField = null;
+                }
+                if (Config.BkRebelKingdoms)
+                {
+                    Scribe.Line("Mends: BK rebel kingdoms on (S9 wylaczone, BkRebelKingdoms=true) - BK robi krolestwa z rodow buntownikow jak dotad; pole _disableRebelKingdom = "
+                                + (_bkRebelField != null ? Convert.ToString(_bkRebelField.GetValue(null)) : "brak") + ".");
+                    return;
+                }
+                if (_bkRebelField == null)
+                {
+                    Scribe.Line("Mends: BK rebel kingdoms - OSTRZEZENIE: brak pola BannerKings.Behaviours.BKClanBehavior._disableRebelKingdom (BK nieobecny albo inna wersja) - S9 nie dziala, nic nie zmienione.");
+                    return;
+                }
+                object was = _bkRebelField.GetValue(null);
+                _bkRebelField.SetValue(null, true);
+                Scribe.Line("Mends: BK rebel kingdoms off (S9) - BKClanBehavior._disableRebelKingdom " + Convert.ToString(was) + " -> " + Convert.ToString(_bkRebelField.GetValue(null))
+                            + "; rod buntownikow z lennem po 30 dobach zostaje rodem bez krolestwa (obsluga gry), pliki BK nietkniete; rodow buntownikow od startu procesu: " + _bkRebelClans + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRebelKingdoms", null); } catch { } }
+        }
+
+        /// <summary>S9 (pomiar): nasluch RebelliousClanDisbandedAtSettlement - rod buntownikow staje sie zwyklym rodem z lennem; linia, czy BK zrobi z niego krolestwo. Nie rzuca.</summary>
+        internal static void BkRebelClanDisbanded(Settlement st, Clan clan)
+        {
+            try
+            {
+                _bkRebelClans++;
+                bool gate = false;
+                try { gate = _bkRebelField != null && (bool)_bkRebelField.GetValue(null); } catch { }
+                Scribe.Line("Mends: S9 rod buntownikow po 30 dobach: " + (clan != null && clan.Name != null ? clan.Name.ToString() : "?") + " (" + (clan != null ? clan.StringId : "?")
+                            + "), osada " + (st != null && st.Name != null ? st.Name.ToString() : "?") + " (" + (st != null ? st.StringId : "?") + "), lenn " + (clan != null ? clan.Settlements.Count : 0)
+                            + ", krolestwo rodu " + (clan != null && clan.Kingdom != null ? clan.Kingdom.Name.ToString() : "brak")
+                            + " | " + (gate ? "krolestwo BK NIE powstaje (S9, _disableRebelKingdom = true) - rod zostaje bez krolestwa" : "BK zrobi krolestwo (S9 nieczynne: BkRebelKingdoms=true albo brak pola BK)") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRebelClanDisbanded", null); } catch { } }
+        }
+
         /// <summary>Decyzja 4: sprawdzenie latek BK na nagrodzie za bitwe i wpiecie brakujacych postfiksow (OnSessionLaunched).</summary>
         internal static void BkRewardPerks()
         {
@@ -6009,7 +6067,9 @@ namespace CrashScribe
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); });   // decyzja 4: atuty BK po OnGameStart BK
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); Mends.BkRebelKingdoms(); });   // decyzja 4: atuty BK po OnGameStart BK; S9: BK bez krolestw z buntu
+            // S9 (pomiar): rod buntownikow po 30 dobach - linia (BK MakeRebelKingdom slucha tego samego zdarzenia)
+            CampaignEvents.RebelliousClanDisbandedAtSettlement.AddNonSerializedListener(this, delegate (Settlement st, Clan c) { Mends.BkRebelClanDisbanded(st, c); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {

@@ -216,6 +216,16 @@
        never counted twice). Set BkBattleRewardPerks to false to leave these perks without effect (old behaviour). -->
   <BkBattleRewardPerks>true</BkBattleRewardPerks>
 
+  <!-- New realms from rebel clans (needs Banner Kings). When a town or castle rises in revolt, the rebels hold it as a clan of
+       their own; 30 days later the base game makes them an ordinary clan, still holding the place, and Banner Kings then
+       turns that clan into a new realm ("County of ...", "Barony of ...") at war with all the old realm's enemies - most of
+       the dozen new realms of a two-year campaign in Essos came that way. With false (the default), Banner Kings does not:
+       the clan keeps its town or castle as a clan of no realm, as in the base game. Banner Kings' own files are not touched -
+       CrashScribe sets Banner Kings' own switch for this each time a campaign is started or loaded, and the start-up line
+       "Mends: BK rebel kingdoms off" in the CrashScribe log says it is done. Set BkRebelKingdoms to true for new realms
+       from rebel clans as before. -->
+  <BkRebelKingdoms>false</BkRebelKingdoms>
+
   <!-- Banner Kings player education: BK's CorrectPlayerEducation throws once at character creation
        (a BK language without cultures); BKROTPatch already swallows it and BK gives the player the
        language of their culture on the first daily tick. With this on, that one known error becomes a
