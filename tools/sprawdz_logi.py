@@ -16505,16 +16505,59 @@ def _j14_c4(lines, rep):
             "0 przy PlayerLosesLikeAiLord (gracz placi tylko lup bitwy, jak lord AI); bez pojmania - INFO", (pre == 0) if (a6 and ev) else None)
 
 
+def _j14_c3(lines, rep):
+    """J3 (C3, VeteranTakesKit): linia doby "Komplet weterana (C3)" - CZYNNE (J3-0), kontrola puli co do sztuki kazdej doby (J3-1: wczoraj + weszlo - najem
+    - do domu = teraz), komplety naprawde wchodza do karczm (J3-2: suma sztuk > 0 przy wejsciach weteranow), najem z kompletem z puli (J3-3: udzial >= 50%
+    najmow lordow przez okno kompletu, INFO przy braku najmow), pula na czlowieka w karczmie <= 9 sztuk (J3-4: 5 rodzajow pancerza + 4 sloty broni - regula
+    "do domu"; pula weteranow z linii "Weterani (E4/10)" tej samej doby), potkniecia 0 (J3-5)."""
+    days = by_day(lines, "Komplet weterana (C3): dzien")
+    if not days:
+        rep.add("J3-0: komplet weterana (C3) - linia doby", "brak", "INFO (wersja sprzed C3)", None)
+        return
+    on = sum(1 for s in days.values() if "| CZYNNE |" in s)
+    rep.add("J3-0: komplet weterana (C3) - linia doby", f"dob {len(days)}, CZYNNE {on}", "kazda doba CZYNNE (klucz VeteranTakesKit, weterani)", on == len(days))
+    bad = [d for d, s in days.items() if "roznica" in s and (num(r"roznica (-?\d+)\)", s, int, 0) or 0) != 0]
+    rep.add("J3-1: kontrola puli kompletow co do sztuki", f"dob z kontrola {sum(1 for s in days.values() if 'roznica' in s)}, z roznica != 0: {len(bad)}" + (f" (pierwsza d{min(bad)})" if bad else ""),
+            "0 dob", len(bad) == 0)
+    pin = sum(num(r"ludzi z kompletem \d+, sztuk (\d+);", s, int, 0) or 0 for s in days.values())
+    men = sum(num(r"weszlo do karczm: ludzi z kompletem (\d+)", s, int, 0) or 0 for s in days.values())
+    nokit = sum(num(r"bez kompletu - zbrojownia bez ich rodzajow (\d+)", s, int, 0) or 0 for s in days.values())
+    rep.add("J3-2: komplety wchodza do karczm", f"ludzi z kompletem {men} (sztuk {pin}, {pin / men:.1f} na czlowieka)" if men else f"ludzi z kompletem 0, bez kompletu {nokit}",
+            "sztuk > 0 (gdy weterani wchodza)", (pin > 0) if (men + nokit) > 0 else None)
+    hm = sum(num(r"najem: ludzi z kompletem z puli (\d+)", s, int, 0) or 0 for s in days.values())
+    hn = sum(num(r"bez kompletu w puli (\d+)", s, int, 0) or 0 for s in days.values())
+    hp = sum(num(r"z puli \d+, sztuk (\d+)", s, int, 0) or 0 for s in days.values())
+    sw = sum(num(r"zastapiony dobytek z domu (\d+)", s, int, 0) or 0 for s in days.values())
+    home = sum(num(r"do domu \(na polki miast\): (\d+) szt\.", s, int, 0) or 0 for s in days.values())
+    rep.add("J3-3: najem z kompletem z puli", f"z kompletem {hm} ({hp} szt., zastapiony dobytek {sw}), bez kompletu {hn}; do domu na polki {home} szt.",
+            ">= 50% najmow przez okno kompletu (INFO bez najmow)", (hm >= 0.5 * (hm + hn)) if (hm + hn) > 0 else None)
+    vet = by_day(lines, "Weterani (E4/10): dzien")
+    worst = None
+    for d, s in days.items():
+        pool = num(r"\| pula (\d+) szt\. w", s, int)
+        v = num(r"\| pula (\d+) w \d+ z \d+ miast", vet.get(d, ""), int)
+        if pool is None or not v:
+            continue
+        r = pool / v
+        if worst is None or r > worst[0]:
+            worst = (r, d, pool, v)
+    rep.add("J3-4: pula kompletow na weterana w karczmach", f"najwiecej {worst[0]:.2f} szt./czl. (d{worst[1]}: {worst[2]} szt. / {worst[3]} ludzi)" if worst else "-",
+            "<= 9 (regula do domu: 5 rodzajow pancerza + 4 sloty broni)", (worst[0] <= 9.0) if worst else None)
+    st = sum(num(r"\| potkniecia (\d+) \(razem", s, int, 0) or 0 for s in days.values())
+    rep.add("J3-5: potkniecia VetKit", f"{st}", "0", st == 0)
+
+
 def jeff14_main(logp):
-    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5), J4 strata gracza po pojmaniu jak lorda AI (C4).
-    Caly log (bez okna dob)."""
+    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5), J4 strata gracza po pojmaniu jak lorda AI (C4),
+    J3 komplet weterana (C3). Caly log (bez okna dob)."""
     lines = read(logp)
     rep = Report()
     print(f"plik: {logp}")
     _j14_c5(lines, rep)
     _j14_c4(lines, rep)
-    bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s or "CaptiveArmory" in s)]
-    rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5), CaptiveArmory)", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
+    _j14_c3(lines, rep)
+    bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s or "CaptiveArmory" in s or "VetKit" in s)]
+    rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5), CaptiveArmory, VetKit)", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
     rep.show()
     return 0
 

@@ -5288,6 +5288,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool SpoilsOfBrokenParties { get; set; } = true;
 
+        [SettingPropertyBool("Veteran Takes Kit", HintText = "a soldier who leaves service for a tavern takes his own arms and armour from his lord's armoury, as he takes his horse; a mercenary hired at that tavern brings that kit to his new master in place of what he owns at home, and the kit of a veteran who gave up and went home is left at the town's market; your own armoury is not touched (off = the kit stays in the lord's armoury and a hireling brings only his home gear, as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool VeteranTakesKit { get; set; } = true;
+
         [SettingPropertyBool("Veteran Keeps Horse", HintText = "a mounted soldier who leaves service for a tavern takes his own horse along; a mounted mercenary hired there rides that horse - with no horse left in the tavern he is offered as a footman")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool VeteranKeepsHorse { get; set; } = true;
@@ -6977,6 +6981,7 @@ namespace Armoury
             s.SpoilsNonFoodToTown = SpoilsNonFoodToTown;
             s.LordDiscardToShelf = LordDiscardToShelf;
             s.SpoilsOfBrokenParties = SpoilsOfBrokenParties;
+            s.VeteranTakesKit = VeteranTakesKit;
             s.VeteranKeepsHorse = VeteranKeepsHorse;
             s.NewPartyHorsesFromSeat = NewPartyHorsesFromSeat;
             s.TroopSwapNeedsHorse = TroopSwapNeedsHorse;

@@ -396,6 +396,8 @@ namespace Armoury
                 catch { }
                 // E6/K1 (211, VeteranKeepsHorse): konny bierze swojego konia ze zbrojowni partii do puli koni miasta (po zapisie do klasy; nie rzuca)
                 if (tk.Horse) HorseFate.VetTakeHorses(tk.Party, tk.Troop, tk.Town.Settlement, t);
+                // C3 (Jeff 14.10, VeteranTakesKit): w tych samych strumieniach (odchodzi ze swoim dobytkiem) bierze tez swoj komplet ze zbrojowni partii (bez koni i rzedow)
+                if (VSrcHorse(tk.Src)) VetKit.Take(tk.Party, tk.Troop, tk.Town.Settlement, t);
                 return t;
             }
             catch (Exception e) { VStumble("VetCommit", e); return 0; }
