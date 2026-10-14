@@ -204,7 +204,15 @@ namespace Armoury
             if (!LeaderStands(inst, a)) { why = "wodz poza bitwa - gra"; return -1; }
             long m, f;
             RuleTake(k, ShareOf(KPillage), out m, out f);
-            if (m + f < Math.Max(1L, n.ArmyWage)) { why = "nie ma czego brac (" + (m + f) + " < doba zoldu " + n.ArmyWage + ")"; return KMercy; }
+            if (m + f < Math.Max(1L, n.ArmyWage))
+            {
+                // granica gry (IsSiegeAftermathPossible): laska wobec obcej kultury kosztuje wplywy za okrutnych lordow armii - bez nich wybor gry
+                float cost = InfluenceCost(inst, a, st, SiegeAftermathAction.SiegeAftermath.ShowMercy);
+                float have = a.ActualClan != null ? a.ActualClan.Influence : 0f;
+                if (cost > 0f && have < cost) { why = "nie ma czego brac, laska ponad wplywy - gra"; return -1; }
+                why = "nie ma czego brac (" + (m + f) + " < doba zoldu " + n.ArmyWage + ")";
+                return KMercy;
+            }
             if (!n.InNeed) return -1;
             int mercy = 0;
             try { mercy = a.LeaderHero != null ? a.LeaderHero.GetTraitLevel(DefaultTraits.Mercy) : 0; } catch { mercy = 0; }
@@ -428,7 +436,7 @@ namespace Armoury
                 if (Campaign.Current == null) return;
                 Ensure();
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -438,6 +446,7 @@ namespace Armoury
                     L1Part(sb);
                     L2Part(sb);
                     L3Part(sb);
+                    L4Part(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -482,6 +491,7 @@ namespace Armoury
             L1Clear();
             L2Clear();
             L3Clear();
+            L4Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -506,6 +516,7 @@ namespace Armoury
             Seal31.Patch("lup miast L0: warsztaty przy zmianie pana (ChangeOwnerOfSettlementAction.ApplyInternal)", AccessTools.Method(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal"),
                          typeof(CitySack), nameof(OwnerPre), null, nameof(OwnerFin), Priority.High, Priority.Normal, Priority.Low);
             L2Patch();
+            L4Patch();
         }
     }
 }

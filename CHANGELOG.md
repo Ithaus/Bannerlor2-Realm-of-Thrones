@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (L4 - lup miast) - AI lupi z potrzeby: swoich oszczedza, pustej nie lupi, armia bez zoldu lupi; reszta - wybor gry
+
+**Mod:** Armoury | **Galaz:** `w-toku/lup-miast` | **Tor:** S | **Klucz:** `AiSacksFromNeed` (wlaczony; off = stan 2c0a225) | **Pliki:** `Armoury/src/CitySack.Ai.cs` (nowy), `CitySack.cs` (Rule34: granica gry przy lasce "nie ma czego brac", czesc L4 linii doby), `Settings.cs`, `McmSettings.cs` (gen_mcm 1376).
+
+**Problem (projekt rozdz. 1.2, 3.4; decyzja Jeffa 13.10 pkt 4):** AI wybiera tylko wedlug cechy Mercy, kultury, wplywow i morale - nie patrzy na swoje finanse ani na to, czy w osadzie jest co brac (W37: 7 lask, 6 z losu).
+**Przyczyna:** G `SiegeAftermathCampaignBehavior.cs:205-270` (DetermineAISiegeAftermath).
+**Zmiana:** prefiks `DetermineAISiegeAftermath` (postfiks - licznik wyboru gry): 1) ta sama kultura - laska; 2) wodz zabity / ranny - gra; 3) lup z grabiezy wedlug L2 < doba zoldu armii - laska (gdy laska kosztowalaby wplywy za okrutnych lordow armii, ktorych rod nie ma - gra); 4) zalegly zold, ktorego rod nie pokryje (regula WarLedger), w ktorejkolwiek druzynie armii albo kiesa wodza < 14 dob zoldu jego druzyny - grabiez, wodz z Mercy < 0 przy wplywach > 2 x koszt i morale < 90 - spustoszenie; 5) wybor gry. Powod kazdego wyboru w linii L0 ("regula 3.4 X (powod)"), liczniki w czesci `L4:` linii doby.
+**DECYZJA (pelne uprawnienia) 1:** "nie ma czego brac" mierzone lupem z grabiezy wedlug reguly L2 (1/3 kasy i kies) wobec 1 doby zoldu calej armii (rozdz. 3.4 pkt 3) - takze przy wylaczonym L2. **2:** "granice gry zostaja" = laska tylko, gdy rod ma wplywy na jej koszt (ta sama granica co menu gracza `IsSiegeAftermathPossible`), spustoszenie tylko przy warunku AI gry (wplywy > 2 x koszt, morale < 90); morale ponizej 60 nie blokuje laski przy pustej osadzie (wojsko i tak nic by nie wzielo).
+**Rachunek:** gorna granica przy wszystkich 18 zdobyciach biegu kodu 43 jako grabiez: 1.09 mln zl (moneta 3.27 mln / 3); osady tej samej kultury zostaja laska. Ile wodzow armii obleznicznych jest "w potrzebie" - nie wiem (L0 mierzy: "armia w potrzebie tak/nie" w kazdej linii).
+**Ryzyko / co sprawdzic (8.0):** wiecej lupien = wiecej zabitych BK (10-24%) i dluzsza odbudowa na zdobytych ziemiach (rozdz. 7 ryzyko 4). Gracz bez zmian (wybiera w menu). Gracz w cudzej armii - wybiera AI wedlug tej reguly. Wyjatek - wybor gry. Prog L4-15: ta sama kultura - laska 100%, nie ma czego brac - laska 100%, potrzeba wobec obcej kultury - grabiez albo spustoszenie 100% (z linii L0: "wybor gry" = "regula 3.4" w nastepstwach AI).
+**Status:** DO SPRAWDZENIA (build kod 0).
+
 ## 2026-10-13 (L3 - lup miast) - w lupionym miescie wojsko zdobywcy przez 3 doby nie placi ("zycie" i markietani wstrzymani, zold zostaje w sakiewkach)
 
 **Mod:** Armoury | **Galaz:** `w-toku/lup-miast` | **Tor:** S | **Klucz:** `SackNoSpending` (wlaczony; off = stan 2c0a225), doby `SackNoSpendingDays` 3 (z L0) | **Pliki:** `Armoury/src/CitySack.Window.cs` (nowy: okno lupu, zapis), `CitySack.cs` (czesc L3 linii doby, wpisy z zapisu przy pierwszym uzyciu), `MenPurse.cs` (OnLeft: jedna linia przed zdjeciem "zycia"), `Sutlers.cs` (One: jedna linia przed zdjeciem), `ArmouryBehavior.cs` (SyncData `arm_sack`), `Settings.cs`, `McmSettings.cs` (gen_mcm 1375).

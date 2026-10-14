@@ -5504,6 +5504,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackScarOnlyWhenSacked { get; set; } = true;
 
+        [SettingPropertyBool("Ai Sacks From Need", HintText = "how a lord who storms a town chooses its fate: a town of his own realm's culture is spared as before; a town with less to take than one day's pay of his army is spared too (nobody burns a place for nothing); a lord whose army has wages owed that his house cannot meet, or whose purse holds less than two weeks' pay for his party, pillages it - a cruel one devastates it when he can; any other lord chooses by his nature, as before (off = the game's choice by the lord's nature only)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool AiSacksFromNeed { get; set; } = true;
+
         [SettingPropertyBool("Sack No Spending", HintText = "after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackNoSpending { get; set; } = true;
@@ -6887,6 +6891,7 @@ namespace Armoury
             s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
             s.SackTakesRealCoin = SackTakesRealCoin;
             s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
+            s.AiSacksFromNeed = AiSacksFromNeed;
             s.SackNoSpending = SackNoSpending;
             s.SackNoSpendingDays = SackNoSpendingDays;
         }
