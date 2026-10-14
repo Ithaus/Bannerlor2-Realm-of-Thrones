@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-13 (lup miast - progi) - grupa `lup` w tools/sprawdz_logi.py (progi 1-19 tabeli rozdz. 6 projektu)
+
+**Mod:** narzedzie | **Galaz:** `w-toku/lup-miast` | **Pliki:** `tools/sprawdz_logi.py` (`lup_main`, regexy `LUP_L0` / `LUP_L2` / `LUP_TRACK`, opis w naglowku).
+**Zmiana:** `python -I tools/sprawdz_logi.py --grupa lup [--do-doby 364] <Armoury-*.log>` - LUP-1 linie L0 = wywolania okna O10 (+ ERROR CitySack i potkniecia 0), LUP-2/3 nastepstwa po bitwie pod murami / bez zdobycia 0, LUP-4 ujscie "garnizony" 0, LUP-5 zdjete = dopisane w kazdej linii L2, LUP-6 kazdy zbiornik <= czesc x stan i laska 0, LUP-5b sumy (INFO), LUP-7 "lup z oblezen" z niczego / trafienia O10 / kwota gry 0, LUP-8 arytmetyka i kiesy r = 0 w dobach lupu +-1, LUP-9 reczny, LUP-10 blizna przy lasce 0 i stara droga blizny 0, LUP-11 chleb d+7/d+14 (INFO), LUP-12 kasa ponizej zapasu (INFO), LUP-13 zycie i markietani od zdobywcy w oknie lupu 0, LUP-14 sakiewki ludzi, LUP-15 wybor AI wedlug 3.4 (100% w trzech kategoriach), LUP-15b rozklad (INFO), LUP-16 okno gracza (reczny), LUP-19 wojsko lordow w wojnie (miara W5-7, INFO wobec progu 85 tys.).
+**Sprawdzone:** py_compile na kopii poza repo; log kodu 43 (bez paczki): 19 wierszy, wszystkie INFO, bez wyjatku (O10 19/0, lup gry 60 461, garnizony 6 300, wojsko 101.3 tys. d337-364); log W37: garnizony 16 249, lup gry 65 280 (jak projekt); log syntetyczny z liniami w formacie kodu L0-L5: wszystkie progi odczytane (TAK).
+**Status:** DO SPRAWDZENIA (na pierwszym biegu z paczka).
+
 ## 2026-10-13 (L5 - lup miast) - okno gracza: podpowiedzi trzech opcji i podsumowanie z prawdziwymi kwotami, poprawka D9, zdanie w oknie mieszkancow
 
 **Mod:** Armoury | **Galaz:** `w-toku/lup-miast` | **Tor:** M (menu gry - ostroznie) | **Klucz:** `SackWindowRealCoin` (wlaczony; dziala z `SackTakesRealCoin`; off = napisy gry, stan 2c0a225) | **Pliki:** `Armoury/src/CitySack.Menu.cs` (nowy), `CitySack.cs` (wpiecia, czesc L5 linii doby), `CitySack.Coin.cs` (wiadomosc gracza-wodza tylko bez menu), `PeopleMenu.cs` (jedno zdanie), `Settings.cs`, `McmSettings.cs` (gen_mcm 1377).
