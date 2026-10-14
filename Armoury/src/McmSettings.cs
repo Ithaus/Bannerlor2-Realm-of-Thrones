@@ -4524,6 +4524,10 @@ namespace Armoury
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersBandFromCorpsePool { get; set; } = true;
 
+        [SettingPropertyInteger("Night King Call Max Host", 0, 6000, "0", HintText = "the Call of the Night King (from day 728) gathers the Others into one host and makes room in it for the slain it raises; it never makes room for a host larger than this many men - about 1,140: a host of 520 able to take a castle of 450 men, with room to grow. Room that Realm of Thrones itself gives its hosts as the days pass (Others Party Size Limit Growth) is not taken away, so a host that has already grown past this is not cut down - the Call only stops adding. 0 = no limit, as before (the Call keeps every victorious host 15% short of full, so it grows without end). Applied by CrashScribe, takes effect the next day")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public int NightKingCallMaxHost { get; set; } = 1140;
+
         [SettingPropertyBool("Others Rescued Are Fallen", HintText = "captives the Others free from a beaten party do not join the host as living men: each one is slain - he rises as a wight beyond or at the Wall (up to the room in the host, the rest wait as bodies), elsewhere he is burnt. Off = freed captives march with the Others alive, as before")]
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRescuedAreFallen { get; set; } = true;
@@ -6778,6 +6782,7 @@ namespace Armoury
             s.OthersRiseOnlyFromFallen = OthersRiseOnlyFromFallen;
             s.OthersRaidWights = OthersRaidWights;
             s.OthersBandFromCorpsePool = OthersBandFromCorpsePool;
+            s.NightKingCallMaxHost = NightKingCallMaxHost;
             s.OthersRescuedAreFallen = OthersRescuedAreFallen;
             s.SameRaceOnly = SameRaceOnly;
             s.MapVillagesEnabled = MapVillagesEnabled;
