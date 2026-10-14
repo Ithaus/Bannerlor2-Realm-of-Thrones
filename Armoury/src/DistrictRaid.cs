@@ -470,11 +470,19 @@ namespace Armoury
         {
             if (ss.LootGiven) return;
             ss.LootGiven = true;
-            double s = ss.Home0 > 0.0 ? Clamp01(ss.SHit / ss.Home0) : 0.0;
-            if (!(s > 0.0)) return;
+            double s0 = ss.Home0 > 0.0 ? Clamp01(ss.SHit / ss.Home0) : 0.0;
             var v = ss.V; var st = v.Settlement;
             var att = comp.AttackerSide;
             var lp = att != null ? att.LeaderParty : null;
+            // wyspy-wolni WW1 (zelazna cena): wodz z krolestwa najezdzcow (Zelazne Wyspy, Wolni Ludzie; AI i gracz-wasal) bierze udzial max(s, Q x u), u = postep
+            // kroku (1 po pelnym kroku, przerwany - zrobiona czesc); ten sam udzial z kiesy wsi i z magazynu wsi. Inni (Dothrakowie) i klucz off - s jak dotad.
+            int rg = ReaverLaw.RaidGroup(lp);
+            double u = ss.Work > 0.0 ? Clamp01(Math.Min(ss.Prog, ss.Work) / ss.Work) : 0.0;
+            double s = ReaverLaw.IronShare(rg, s0, u);
+            if (!(s > 0.0)) return;
+            bool sea = false;
+            try { sea = rg >= 0 && comp.MapEvent != null && comp.MapEvent.IsNavalMapEvent; } catch { sea = false; }
+            if (sea) ReaverLaw.NoteSea(rg);
             // zloto - jeden platnik (kiesa wsi), wodz napastnika; bez wodza nic (jak gra G :177)
             try
             {
@@ -482,12 +490,23 @@ namespace Armoury
                 if (leader != null)
                 {
                     long g0 = leader.Gold, v0 = v.Gold;
-                    long due = (long)Math.Round(s * Math.Max(0, v.Gold));
+                    long due = (long)Math.Round(s0 * Math.Max(0, v.Gold));
                     long paid = SmallGold.PayRaidLoot(v, leader, due);
+                    // WW1: przyrost zelaznej ceny ponad s - OSOBNY przelew tym samym platnikiem (kiesa wsi -> wodz), do kosza WW2 (ReaverLaw.NoteIronGold)
+                    long extra = 0;
+                    if (s > s0)
+                    {
+                        long dueI = (long)Math.Round(s * Math.Max(0L, v0)) - paid;
+                        if (dueI > 0) extra = SmallGold.PayRaidLoot(v, leader, dueI);
+                        if (extra > 0) ReaverLaw.NoteIronGold(leader, extra);
+                    }
                     long g1 = leader.Gold, v1 = v.Gold;
-                    ss.SGold += paid;
-                    _dGold += paid;
+                    ss.SGold += paid + extra;
+                    _dGold += paid + extra;
                     _dBal1 += (g1 - g0) - (v0 - v1);                          // niezalezny bilans: przyrost kiesy wodza - ubytek kiesy wsi
+                    ReaverLaw.NoteVillageGold(rg, leader, v, paid, extra, (g1 - g0) - (v0 - v1));
+                    // WW1 nabrzeze: rabunek z morza wsi portu - Qw x u kiesy W portu ponad zapas dni (kiesa ludu -> wodz)
+                    if (sea) ss.SGold += ReaverLaw.Waterfront(rg, leader, v, u);
                 }
             }
             catch (Exception e) { Stumble("Loot(zloto)", e); }
@@ -569,6 +588,7 @@ namespace Armoury
                 finally { GoodsLedger.End(gf); }
                 long v1 = Pieces(roster), p1 = 0;
                 foreach (var mp in parties) p1 += Pieces(mp.ItemRoster);
+                if (rg >= 0) { long tv = 0; for (int k = 0; k < mvP.Count; k++) tv += (long)mvEl[k].Item.Value * mvN[k]; ReaverLaw.NoteGoods(rg, take, tv); }   // WW1: towar najezdzcow
                 _dTake += take; _dBurn += burn;
                 ss.STake += take; ss.SBurn += burn;
                 _dBal2 += (p1 - p0) + burn - (v0 - v1);                          // niezalezny bilans: towar napastnika + spalone - ubytek magazynu
@@ -624,6 +644,7 @@ namespace Armoury
                     if (ss.Player) _dPEnded++;
                     _dRaidDead += __state.RaidDead; _dCheckDead += ss.Dead;
                     _dCap += Devastation.CapTakenAll - __state.Cap0;              // jency E4/9 z tej sesji (BK ExecuteCapture na RaidCompleted -> ThrallLaw)
+                    try { ReaverLaw.NoteCaptives(ReaverLaw.RaidGroup(__instance.AttackerSide != null ? __instance.AttackerSide.LeaderParty : null), Devastation.CapTakenAll - __state.Cap0); } catch { }   // WW1: thralle najezdzcow (tylko licznik)
                     if (ss.Done)
                     {
                         if (ss.Player) _dPWon++;                                  // E7/R2: kroki gracza policzone przy kazdym pelnym kroku (PlayerStepDone); mediana lordow - tylko AI

@@ -60,11 +60,111 @@ namespace Armoury
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
+        // ---------------------------------------------------------------- WW1: zelazna cena (liczniki od ostatniej linii doby; licza zawsze - takze przy kluczu off)
+        private sealed class Iron
+        {
+            public int Steps, Sea;                          // kroki rabunku (u AI krok = sesja) z lupem i z nich z morza
+            public long GoldS, GoldExtra, Folk, Goods, GoodsValue;
+            public int FolkPorts, FolkBelow, VillageNeg; public double Bal, Captives;
+            public readonly HashSet<Settlement> Ports = new HashSet<Settlement>();
+            public readonly Dictionary<string, long[]> Victims = new Dictionary<string, long[]>();   // krolestwo ofiary -> [krokow, zloto]
+            public void Clear() { Steps = Sea = 0; GoldS = GoldExtra = Folk = Goods = GoodsValue = 0; FolkPorts = FolkBelow = VillageNeg = 0; Bal = Captives = 0; Ports.Clear(); Victims.Clear(); }
+        }
+        private static readonly Iron[] _iron = { new Iron(), new Iron() };
+        /// <summary>WW1 (Obieg): kiesy ludu nabrzeza -> wodzowie najezdzcow od ostatniej linii doby (MoneyLedger.Daily biegnie przed ReaverLaw.Daily).</summary>
+        internal static long DayWaterfront { get { return _iron[GIron].Folk + _iron[GFree].Folk; } }
+
         internal static void Reset()
         {
-            for (int g = 0; g < Groups; g++) _think[g].Clear();
+            for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); }
             _rangeLogged = false; _stumbles = 0;
             lock (_err) _err.Clear();
+        }
+
+        // ---------------------------------------------------------------- WW1: zelazna cena (DistrictRaid.Loot)
+        private static Settings S { get { return Settings.Current; } }
+        /// <summary>WW1 czynne (klucz ReaverIronPrice).</summary>
+        internal static bool IronPriceOn { get { var s = S; return s != null && s.ReaverIronPrice; } }
+        internal static double Q { get { var s = S; return s == null ? 0.0 : Math.Max(0f, Math.Min(1f, s.ReaverIronPriceShare)); } }
+        internal static double Qw { get { var s = S; return s == null ? 0.0 : Math.Max(0f, Math.Min(1f, s.ReaverWaterfrontShare)); } }
+
+        /// <summary>Grupa najezdzcow wodza rabunku (strona napastnika: partia wodza - AI albo gracz jako wasal); -1 - nie najezdzca regul WW.</summary>
+        internal static int RaidGroup(PartyBase leaderParty)
+        {
+            try { return leaderParty != null ? GroupOf(leaderParty.MapFaction) : -1; }
+            catch { return -1; }
+        }
+
+        /// <summary>WW1: udzial lupu kroku - max(s, Q x u) dla najezdzcow przy kluczu; inaczej s (stan 63aaaedf). u - postep kroku (1 po pelnym kroku).</summary>
+        internal static double IronShare(int group, double s, double u)
+        {
+            if (group < 0 || !IronPriceOn) return s;
+            double q = Q * Math.Max(0.0, Math.Min(1.0, u));
+            return q > s ? q : s;
+        }
+
+        /// <summary>WW1: lup zlota kroku z kiesy wsi (paid - udzial s, extra - przyrost zelaznej ceny ponad s; bal - bilans v2 tej wyplaty: zloto wodza - kiesa wsi).</summary>
+        internal static void NoteVillageGold(int group, Hero leader, Village v, long paid, long extra, double bal)
+        {
+            try
+            {
+                if (group < 0) return;
+                var x = _iron[group];
+                x.Steps++; x.GoldS += paid; x.GoldExtra += extra; x.Bal += bal;
+                if (v != null && v.Gold < 0) x.VillageNeg++;
+                string vk = v != null && v.Settlement != null && v.Settlement.MapFaction != null ? v.Settlement.MapFaction.Name.ToString() : "-";
+                long[] a; if (!x.Victims.TryGetValue(vk, out a)) { a = new long[2]; x.Victims[vk] = a; }
+                a[0]++; a[1] += paid + extra;
+            }
+            catch (Exception e) { Stumble("NoteVillageGold", e); }
+        }
+
+        /// <summary>WW1: przyrost zelaznej ceny ponad s z kiesy wsi zaplacony wodzowi (przelew gry - ksiega dochodu widzi go jako zdarzenie od osady).
+        /// Miejsce na kosz lupu na zalogi (WW2).</summary>
+        internal static void NoteIronGold(Hero leader, long amount)
+        {
+        }
+
+        /// <summary>WW1: krok rabunku najezdzcy z morza (zdarzenie morskie).</summary>
+        internal static void NoteSea(int group) { if (group >= 0) _iron[group].Sea++; }
+
+        /// <summary>WW1: towar z magazynu wsi w kroku najezdzcy (sztuki i wartosc wedlug cen bazowych).</summary>
+        internal static void NoteGoods(int group, long pieces, long value) { if (group >= 0) { _iron[group].Goods += pieces; _iron[group].GoodsValue += value; } }
+
+        /// <summary>WW1: jency z sesji najezdzcy (DistrictRaid.EndFin - jency E4/9 przy koncu rabunku).</summary>
+        internal static void NoteCaptives(int group, double n) { if (group >= 0 && n > 0) _iron[group].Captives += n; }
+
+        /// <summary>
+        /// WW1 - nabrzeze: rabunek z morza wsi, ktorej osada macierzysta ma port - Qw x u kiesy klasy W tej osady ponad zapas dni i oferte na jutro
+        /// (TownFolk.WaterfrontRoom) do wodza najezdzcy: kiesa ludu -> glowa (TownFolk.LevyTake - ksiega kies _ctlOut; ChangeHeroGold, wyjatek - zloto wraca do kiesy).
+        /// Zwraca wziete (0 - nic). Tylko przy kluczu WW1, dla najezdzcow, z wodzem.
+        /// </summary>
+        internal static long Waterfront(int group, Hero leader, Village v, double u)
+        {
+            if (group < 0 || leader == null || v == null || !IronPriceOn) return 0;
+            try
+            {
+                var port = v.Bound;
+                if (port == null || !port.HasPort) return 0;
+                double qw = Qw * Math.Max(0.0, Math.Min(1.0, u));
+                if (!(qw > 0.0)) return 0;
+                long room = TownFolk.WaterfrontRoom(port);
+                if (room <= 0) return 0;
+                long want = (long)Math.Floor(qw * room);
+                if (want <= 0) return 0;
+                long took = TownFolk.LevyTake(port, 0, Math.Min(want, int.MaxValue));
+                if (took <= 0) return 0;
+                long h0 = leader.Gold;
+                try { leader.ChangeHeroGold((int)took); }
+                catch { TownFolk.LevyBack(port, 0, took); throw; }
+                CirculationWindows.NoteHeroGold(leader, (int)took);   // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
+                var x = _iron[group];
+                x.Folk += took; x.Ports.Add(port); x.FolkPorts++;
+                x.Bal += (leader.Gold - h0) - took;
+                if (TownFolk.LevyBelowReserve(port, 0)) x.FolkBelow++;
+                return took;
+            }
+            catch (Exception e) { Stumble("Waterfront", e); return 0; }
         }
 
         private static void Stumble(string where, Exception e)
@@ -163,10 +263,64 @@ namespace Armoury
             {
                 if (s == null || Campaign.Current == null || !s.LogEnabled) return;
                 if (!_rangeLogged) { _rangeLogged = true; try { RangeLine(); } catch (Exception e) { Stumble("RangeLine", e); } }
-                DecisionLine();
+                try { DecisionLine(); } catch (Exception e) { Stumble("DecisionLine", e); }
+                try { IronLine(); } catch (Exception e) { Stumble("IronLine", e); }
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { for (int g = 0; g < Groups; g++) _think[g].Clear(); }
+            finally { for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); } }
+        }
+
+        // krainy wsi do odcinka "kiesy wsi wedlug krainy" (kultura wsi ROT - CLAUDE.md 2: vlandia = Zachod, battania = Polnoc, nightswatch = Dar)
+        private static readonly string[] PurseCultures = { "vlandia", "battania", "nightswatch", "river", "reach" };
+        private static readonly string[] PurseNames = { "Zachod", "Polnoc", "Dar", "Dorzecze", "Reach" };
+
+        private static void IronLine()
+        {
+            var s = S;
+            int day = (int)CampaignTime.Now.ToDays - 1;
+            var sum = new long[PurseCultures.Length]; var cnt = new int[PurseCultures.Length];
+            long all = 0; int allN = 0;
+            var seen = new HashSet<Village>();   // Village.All ma duble (B6 pomiar) - kazda wies raz
+            foreach (var v in Village.All)
+            {
+                try
+                {
+                    var st = v != null ? v.Settlement : null;
+                    if (st == null || !seen.Add(v)) continue;
+                    long g = v.Gold; all += g; allN++;
+                    string c = st.Culture != null ? st.Culture.StringId : null;
+                    int i = c != null ? Array.IndexOf(PurseCultures, c) : -1;
+                    if (i >= 0) { sum[i] += g; cnt[i]++; }
+                }
+                catch (Exception e) { Stumble("IronLine(wies)", e); }
+            }
+            var sb = new StringBuilder(1400);
+            sb.Append("Zelazna cena (WW1): dzien ").Append(day).Append(" | klucz Reaver Iron Price ").Append(s != null && s.ReaverIronPrice ? "tak" : "nie (udzial s jak dotad)")
+              .Append(", Q ").Append(F(Q, "0.00")).Append(", nabrzeze Qw ").Append(F(Qw, "0.00"));
+            long neg = 0, below = 0; double bal = 0;
+            for (int g = 0; g < Groups; g++)
+            {
+                var x = _iron[g];
+                neg += x.VillageNeg; below += x.FolkBelow; bal += x.Bal;
+                sb.Append(" | ").Append(GName[g]).Append(": krokow rabunku z lupem ").Append(x.Steps).Append(" (z morza ").Append(x.Sea).Append(')')
+                  .Append(", zloto z kies wsi ").Append(x.GoldS + x.GoldExtra).Append(" (w tym ponad s: ").Append(x.GoldExtra).Append(')')
+                  .Append(", z nabrzeza ").Append(x.Folk).Append(" (wyplat ").Append(x.FolkPorts).Append(", portow ").Append(x.Ports.Count).Append(')')
+                  .Append(", towar ").Append(x.Goods).Append(" szt. (").Append(x.GoodsValue).Append(" zl)")
+                  .Append(", jency (thralle) ").Append(F(x.Captives, "0.#"))
+                  .Append(", ofiary wedlug krolestwa: ");
+                if (x.Victims.Count == 0) sb.Append('-');
+                else
+                {
+                    bool first = true;
+                    foreach (var kv in x.Victims) { if (!first) sb.Append(", "); first = false; sb.Append(kv.Key).Append(' ').Append(kv.Value[0]).Append('/').Append(kv.Value[1]).Append(" zl"); }
+                }
+            }
+            sb.Append(" | kiesy wsi wedlug krainy (stan, zl / wsi): ");
+            for (int i = 0; i < PurseCultures.Length; i++) sb.Append(i > 0 ? ", " : "").Append(PurseNames[i]).Append(" (").Append(PurseCultures[i]).Append(") ").Append(sum[i]).Append('/').Append(cnt[i]);
+            sb.Append(", swiat ").Append(all).Append('/').Append(allN)
+              .Append(" | kontrolki: kiesa wsi < 0 po wyplacie ").Append(neg).Append(", nabrzeze ponizej zapasu ").Append(below).Append(", bilans v2 (zloto wodza - kiesa wsi - kiesa nabrzeza) ").Append(F(bal, "0"))
+              .Append(" | potkniecia ").Append(_stumbles).Append('.');
+            Log.Info(sb.ToString());
         }
 
         private static void DecisionLine()

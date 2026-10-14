@@ -5800,6 +5800,18 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
 
+        [SettingPropertyBool("Reaver Iron Price", HintText = "the iron price: when the Ironborn or the Free Folk raid a village (the AI lords and you as their vassal alike), they carry off at least Reaver Iron Price Share of the village's purse and of its storehouse for a full raid of a district (a raid broken off takes its part), not only the share of the people they struck. A raid from the sea on a village of a port also takes Reaver Waterfront Share of what the labourers of that port hold above their reserve for hard times (Town Folk Reserve Days of their needs). Every coin comes from the village and the waterfront - nothing from nowhere. The Dothraki are not touched. Off = the raiders take only the share of the people they struck, as before")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool ReaverIronPrice { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Reaver Iron Price Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the least share of a village's purse and storehouse that a full raid by the Ironborn or the Free Folk carries off (0.50 = half; each further step of your own raid takes this share of what is left)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float ReaverIronPriceShare { get; set; } = 0.50f;
+
+        [SettingPropertyFloatingInteger("Reaver Waterfront Share", 0.00f, 1.00f, "0.00", HintText = "with Reaver Iron Price: the share of the port labourers' coin above their reserve that a raid from the sea on one of the port's villages takes (0.10 = a tenth; the reserve itself is never touched)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float ReaverWaterfrontShare { get; set; } = 0.10f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7249,6 +7261,9 @@ namespace Armoury
             s.FlaxVillagesWithoutClimateFix = FlaxVillagesWithoutClimateFix;
             s.VineOliveByClimate = VineOliveByClimate;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
+            s.ReaverIronPrice = ReaverIronPrice;
+            s.ReaverIronPriceShare = ReaverIronPriceShare;
+            s.ReaverWaterfrontShare = ReaverWaterfrontShare;
         }
 
         internal static void Apply()

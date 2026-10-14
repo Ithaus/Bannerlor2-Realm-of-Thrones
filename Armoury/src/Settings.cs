@@ -2171,6 +2171,11 @@ namespace Armoury
         // WW4 port korsarzy), Wolni Ludzie walcza bez zoldu (WL1), wojsko z ludu (WL2), werbunek z jedzeniem (WL3); ReaverLaw.cs, FreeFolkLaw w ClanBudget.cs.
         // WW0 (linie "Najezdzcy - decyzje AI (WW0)" i "Najezdzcy - zasieg (WW0)") bez klucza - sam pomiar. Klucze NOWE - w Armoury.json Jeffa ich nie ma
         // (pulapka MCM z CLAUDE.md 7 nie dotyczy); wszystkie wylaczone = stan 63aaaedf.
+        // WW1 (zelazna cena, projekt rozdz. 2.1): udzial lupu najezdzcow max(s, Q x postep kroku) z kiesy i magazynu wsi (DistrictRaid.Loot, platnik SmallGold.PayRaidLoot);
+        // najazd z morza na wies portu - Qw kiesy W portu ponad zapas dni (TownFolk.WaterfrontRoom). Off = udzial s jak w 63aaaedf
+        public bool ReaverIronPrice = true;                // the iron price: when the Ironborn or the Free Folk raid a village (the AI lords and you as their vassal alike), they carry off at least Reaver Iron Price Share of the village's purse and of its storehouse for a full raid of a district (a raid broken off takes its part), not only the share of the people they struck. A raid from the sea on a village of a port also takes Reaver Waterfront Share of what the labourers of that port hold above their reserve for hard times (Town Folk Reserve Days of their needs). Every coin comes from the village and the waterfront - nothing from nowhere. The Dothraki are not touched. Off = the raiders take only the share of the people they struck, as before
+        public float ReaverIronPriceShare = 0.50f;         // with Reaver Iron Price: the least share of a village's purse and storehouse that a full raid by the Ironborn or the Free Folk carries off (0.50 = half; each further step of your own raid takes this share of what is left)
+        public float ReaverWaterfrontShare = 0.10f;        // with Reaver Iron Price: the share of the port labourers' coin above their reserve that a raid from the sea on one of the port's villages takes (0.10 = a tenth; the reserve itself is never touched)
 
         public static void Load(string moduleDataDir)
         {

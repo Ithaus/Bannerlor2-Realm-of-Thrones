@@ -580,6 +580,7 @@ namespace Armoury
               .Append(", gotowka korony na zold druzyn z reszty wplywow przed rentami (M1) ").Append(KingdomTreasury.LastNeedAidRent)   // M1: czwarty szczebel W5 (skarbce -> glowy rodow)
               .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
               .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
+              .Append(", zelazna cena z nabrzeza (WW1) kiesy ludu -> wodzowie najezdzcow ").Append(ReaverLaw.DayWaterfront)   // WW1: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)
