@@ -50,7 +50,11 @@ namespace CrashScribe
     /// Harpy: wagi +25 / +25 / +50, akceptacja +0.04 / +0.04 / +0.08) do KAZDEJ kultury osady, co rozmywa premie kultury pana; z kluczem prefiks
     /// oddaje dla kultury innej niz kultura pana sam wynik modelu BK (to samo, co BKROT liczy przed doklejeniem), a dla kultury pana kod BKROT
     /// biegnie bez zmian. Blogoslawienstwa ma w praktyce tylko gracz (AddBlessing w rozmowie z kaplanem - raport AM-14).
-    /// Linia startu sesji "BKROT self call fix: n/8 metod ..." (stan kazdej metody, GetPatchInfo).
+    /// Linia startu sesji "BKROT self call fix: n/8 metod ..." (stan kazdej metody, GetPatchInfo). Linia doby "BKROT self call (P2): dzien N"
+    /// (tylko odczyt): prawowitosc 3 najwiekszych krolestw (L, cel modelu, cel BK), wplyw ich rodow panujacych (limit i zmiana modelu / BK, koszt
+    /// wniosku pokoju i wojny), pakty handlowe BK, koszt Call Banners krol <- wasal, kultura 3 miast (asymilacja i akceptacja kultury pana, zysk
+    /// akceptacji model / BK, liczba kultur i suma asymilacji) i calego swiata (twierdze z >= 2 kulturami, wszystkie 1.0 = znak bledu; srednia
+    /// asymilacja pana; lojalnosc srednia i < 25; zmiany kultury osad), ocena malzonka gracza, dochod z karawany, wyniki "poza kultura pana".
     /// </summary>
     internal static class BkrotSelfCall
     {
@@ -350,6 +354,300 @@ namespace CrashScribe
             return list;
         }
 
+        // ------------------------------------------------------------ probka doby (tylko odczyt; linia "BKROT self call (P2): dzien N")
+        // Wartosc modelu = metoda wolana wirtualnie na obiekcie z BannerKingsConfig (BKROT - z naprawa albo bez); "BK" = ta sama metoda modelu BK
+        // wolana niewirtualnie na tym samym obiekcie (to, co BKROT powinien dostac od base). Bez naprawy: model 0, BK > 0.
+        private static bool _smpTried, _smpOk;
+        private static string _smpWhy = "-";
+        private static PropertyInfo _pCfg, _pLegitM, _pInflM, _pArmyM, _pCultM, _pMarM, _pFinM, _pPopMgr, _pPopCulture, _pCultures, _pKdLegit;
+        private static PropertyInfo _pCdcAssim, _pCdcAccept, _pCdcCult;
+        private static MethodInfo _mGetPop, _mGetKd, _mPacts;
+        private static Type _tDipBeh;
+        private static Func<object, object, bool, float> _legitBase;
+        private static Func<object, Clan, bool, ExplainedNumber> _capBase, _changeBase;
+        private static Func<object, MobileParty, MobileParty, int> _armyBase;
+        private static Func<object, object, ExplainedNumber> _acceptBaseS;
+        private static Func<object, Hero, bool, ExplainedNumber> _spouseBase;
+        private static Func<object, MobileParty, int> _caravanBase;
+        // stan sesji (ResetSession z konstruktora zachowania - kazda nowa gra i wczytanie)
+        private static object _dipBeh; private static bool _dipTried;
+        private static Dictionary<Settlement, CultureObject> _cultSnap = new Dictionary<Settlement, CultureObject>();
+        private static int _sCultChanges, _dSmpErr, _sSmpErr;
+
+        internal static void ResetSession()
+        {
+            _dipBeh = null; _dipTried = false;
+            _cultSnap = new Dictionary<Settlement, CultureObject>();
+            _sCultChanges = 0; _dSmpErr = 0; _sSmpErr = 0;
+            Interlocked.Exchange(ref _dOwnerOnly, 0); _sOwnerOnly = 0;
+        }
+
+        private static bool ResolveSample()
+        {
+            if (_smpTried) return _smpOk;
+            _smpTried = true;
+            var miss = new List<string>();
+            var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+            if (tCfg == null) { _smpWhy = "BK nieobecny"; return false; }
+            _pCfg = AccessTools.Property(tCfg, "Instance");
+            _pLegitM = AccessTools.Property(tCfg, "LegitimacyModel");
+            _pInflM = AccessTools.Property(tCfg, "InfluenceModel");
+            _pArmyM = AccessTools.Property(tCfg, "ArmyManagementModel");
+            _pCultM = AccessTools.Property(tCfg, "CultureModel");
+            _pMarM = AccessTools.Property(tCfg, "MarriageModel");
+            _pFinM = AccessTools.Property(tCfg, "ClanFinanceModel");
+            _pPopMgr = AccessTools.Property(tCfg, "PopulationManager");
+            _mGetPop = _pPopMgr != null ? AccessTools.Method(_pPopMgr.PropertyType, "GetPopData", new[] { typeof(Settlement) }) : null;
+            _pPopCulture = _mGetPop != null ? AccessTools.Property(_mGetPop.ReturnType, "CultureData") : null;
+            _pCultures = _pPopCulture != null ? AccessTools.Property(_pPopCulture.PropertyType, "Cultures") : null;
+            var fa = FixByName("CalculateAcceptanceGain");
+            var tCdc = fa != null && fa.Target != null ? fa.Target.GetParameters()[0].ParameterType : AccessTools.TypeByName("BannerKings.Managers.Populations.CultureDataClass");
+            _pCdcAssim = tCdc != null ? AccessTools.Property(tCdc, "Assimilation") : null;
+            _pCdcAccept = tCdc != null ? AccessTools.Property(tCdc, "Acceptance") : null;
+            _pCdcCult = tCdc != null ? AccessTools.Property(tCdc, "Culture") : null;
+            _tDipBeh = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.BKDiplomacyBehavior");
+            _mGetKd = _tDipBeh != null ? AccessTools.Method(_tDipBeh, "GetKingdomDiplomacy", new[] { typeof(Kingdom) }) : null;
+            _pKdLegit = _mGetKd != null ? AccessTools.Property(_mGetKd.ReturnType, "Legitimacy") : null;
+            _mPacts = _mGetKd != null ? AccessTools.Method(_mGetKd.ReturnType, "GetTradePactsSnapshot") : null;
+            _legitBase = Caller(Base("CalculateKingdomLegitimacy"), typeof(Func<object, object, bool, float>)) as Func<object, object, bool, float>;
+            _capBase = Caller(Base("CalculateInfluenceCap"), typeof(Func<object, Clan, bool, ExplainedNumber>)) as Func<object, Clan, bool, ExplainedNumber>;
+            _changeBase = Caller(Base("CalculateInfluenceChange"), typeof(Func<object, Clan, bool, ExplainedNumber>)) as Func<object, Clan, bool, ExplainedNumber>;
+            _armyBase = Caller(Base("CalculatePartyInfluenceCost"), typeof(Func<object, MobileParty, MobileParty, int>)) as Func<object, MobileParty, MobileParty, int>;
+            _acceptBaseS = Caller(Base("CalculateAcceptanceGain"), typeof(Func<object, object, ExplainedNumber>)) as Func<object, object, ExplainedNumber>;
+            _spouseBase = Caller(Base("GetSpouseScore"), typeof(Func<object, Hero, bool, ExplainedNumber>)) as Func<object, Hero, bool, ExplainedNumber>;
+            _caravanBase = Caller(Base("CalculateOwnerIncomeFromCaravan"), typeof(Func<object, MobileParty, int>)) as Func<object, MobileParty, int>;
+            if (_pCfg == null) miss.Add("BannerKingsConfig.Instance");
+            if (_mGetPop == null || _pCultures == null || _pCdcAssim == null || _pCdcAccept == null || _pCdcCult == null) miss.Add("dane kultury BK");
+            if (_mGetKd == null || _pKdLegit == null) miss.Add("KingdomDiplomacy.Legitimacy");
+            _smpWhy = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
+            _smpOk = _pCfg != null;   // reszta - "-" w swoim kawalku linii
+            return _smpOk;
+        }
+
+        private static MethodInfo Base(string name) { var f = FixByName(name); return f != null ? f.Base : null; }
+
+        private static object KdOf(Kingdom k)
+        {
+            if (_mGetKd == null || k == null) return null;
+            if (!_dipTried)
+            {
+                _dipTried = true;
+                var get = typeof(Campaign).GetMethod("GetCampaignBehavior", Type.EmptyTypes);
+                _dipBeh = get != null && Campaign.Current != null ? get.MakeGenericMethod(_tDipBeh).Invoke(Campaign.Current, null) : null;
+            }
+            return _dipBeh != null ? _mGetKd.Invoke(_dipBeh, new object[] { k }) : null;
+        }
+
+        private static void SmpErr(string where, Exception e)
+        {
+            var ie = e is TargetInvocationException && e.InnerException != null ? e.InnerException : e;
+            _dSmpErr++;
+            if (++_sSmpErr <= 3) { try { Scribe.Report("CrashScribe", ie, "BkrotSelfCall.probka(" + where + ")", null); } catch { } }
+        }
+
+        /// <summary>Wynik metody modelu wolanej WIRTUALNIE (jak BK: BannerKingsConfig.Instance.XModel.M) - NaN, gdy sie nie da.</summary>
+        private static float ModelF(string name, object model, params object[] args)
+        {
+            var m = Base(name);
+            if (m == null || model == null || !m.DeclaringType.IsInstanceOfType(model)) return float.NaN;
+            try { return ToF(m.Invoke(model, args)); }
+            catch (Exception e) { SmpErr(name, e); return float.NaN; }
+        }
+
+        private static float ToF(object o)
+        {
+            if (o is ExplainedNumber) return ((ExplainedNumber)o).ResultNumber;
+            if (o is int) return (int)o;
+            if (o is float) return (float)o;
+            var p = o != null ? o.GetType().GetProperty("ResultNumber") : null;
+            return p != null ? Convert.ToSingle(p.GetValue(o, null), Inv) : float.NaN;
+        }
+
+        private static float BkF(string name, Func<float> f)
+        {
+            if (f == null) return float.NaN;
+            try { return f(); }
+            catch (Exception e) { SmpErr(name + "(BK)", e); return float.NaN; }
+        }
+
+        private static string N(float v, string fmt) { return float.IsNaN(v) ? "-" : v.ToString(fmt, Inv); }
+        private static string Nm(object o) { return o == null ? "-" : o.ToString().Replace("|", "/").Replace(";", ","); }
+
+        /// <summary>Linia doby: prawowitosc 3 krolestw, wplyw 3 rodow panujacych (limit, zmiana, koszt wnioskow), Call Banners, kultura 3 miast
+        /// i calego swiata, malzonek gracza, karawana, licznik blogoslawienstw poza kultura pana. Tylko odczyt. Nie rzuca.</summary>
+        internal static void Daily()
+        {
+            try
+            {
+                if (Campaign.Current == null || !ResolveSample()) return;
+                var cfg = _pCfg.GetValue(null, null);
+                if (cfg == null) return;
+                var sb = new StringBuilder("BKROT self call (P2): dzien ").Append((int)CampaignTime.Now.ToDays);
+                var ks = Kingdom.All.Where(k => k != null && !k.IsEliminated && k.Leader != null && k.RulingClan != null)
+                                    .OrderByDescending(k => k.Fiefs.Count).ThenBy(k => k.StringId, StringComparer.Ordinal).Take(3).ToList();
+                // AM-10 prawowitosc
+                sb.Append(" | prawowitosc: ");
+                var lm = _pLegitM != null ? _pLegitM.GetValue(cfg, null) : null;
+                for (int i = 0; i < ks.Count; i++)
+                {
+                    var k = ks[i];
+                    object kd = null;
+                    try { kd = KdOf(k); } catch (Exception e) { SmpErr("KingdomDiplomacy", e); }
+                    if (i > 0) sb.Append("; ");
+                    if (kd == null) { sb.Append(Nm(k.Name)).Append(" brak KD"); continue; }
+                    float l = float.NaN;
+                    try { l = Convert.ToSingle(_pKdLegit.GetValue(kd, null), Inv); } catch (Exception e) { SmpErr("Legitimacy", e); }
+                    float m = ModelF("CalculateKingdomLegitimacy", lm, kd, false);
+                    float b = BkF("CalculateKingdomLegitimacy", _legitBase == null || lm == null ? (Func<float>)null : () => _legitBase(lm, kd, false));
+                    sb.Append(Nm(k.Name)).Append(" L ").Append(N(l, "0.000")).Append(" cel ").Append(N(m, "0.000")).Append(" (BK ").Append(N(b, "0.000")).Append(')');
+                }
+                // AM-11 wplyw rodow panujacych + koszt wnioskow (model dyplomacji gry - u Jeffa BKDiplomacyModel, czyta limit z BannerKingsConfig)
+                sb.Append(" | wplyw: ");
+                var im = _pInflM != null ? _pInflM.GetValue(cfg, null) : null;
+                var dm = Campaign.Current.Models != null ? Campaign.Current.Models.DiplomacyModel : null;
+                for (int i = 0; i < ks.Count; i++)
+                {
+                    var c = ks[i].RulingClan;
+                    if (i > 0) sb.Append("; ");
+                    float cap = ModelF("CalculateInfluenceCap", im, c, false);
+                    float capB = BkF("CalculateInfluenceCap", _capBase == null || im == null ? (Func<float>)null : () => _capBase(im, c, false).ResultNumber);
+                    float ch = ModelF("CalculateInfluenceChange", im, c, false);
+                    float chB = BkF("CalculateInfluenceChange", _changeBase == null || im == null ? (Func<float>)null : () => _changeBase(im, c, false).ResultNumber);
+                    float peace = BkF("GetInfluenceCostOfProposingPeace", dm == null ? (Func<float>)null : () => dm.GetInfluenceCostOfProposingPeace(c));
+                    float war = BkF("GetInfluenceCostOfProposingWar", dm == null ? (Func<float>)null : () => dm.GetInfluenceCostOfProposingWar(c));
+                    sb.Append(Nm(c.Name)).Append(" limit ").Append(N(cap, "0")).Append(" (BK ").Append(N(capB, "0")).Append(") zmiana ").Append(N(ch, "0.00"))
+                      .Append(" (BK ").Append(N(chB, "0.00")).Append(") wplyw ").Append(N(c.Influence, "0")).Append(" koszt pokoju ").Append(N(peace, "0"))
+                      .Append(" wojny ").Append(N(war, "0"));
+                }
+                int pacts = 0;
+                if (_mPacts != null)
+                    foreach (var k in Kingdom.All)
+                    {
+                        if (k == null || k.IsEliminated) continue;
+                        try { var kd = KdOf(k); var en = kd != null ? _mPacts.Invoke(kd, null) as System.Collections.IEnumerable : null; if (en != null) foreach (var x in en) pacts++; }
+                        catch (Exception e) { SmpErr("GetTradePactsSnapshot", e); break; }
+                    }
+                sb.Append("; pakty handlowe (wpisy krolestw) ").Append(_mPacts != null ? pacts.ToString(Inv) : "-");
+                // AM-12 Call Banners: krol (ze swoja druzyna) <- glowa innego rodu krolestwa z druzyna
+                sb.Append(" | call banners: ");
+                var am = _pArmyM != null ? _pArmyM.GetValue(cfg, null) : null;
+                MobileParty lp = null, vp = null;
+                foreach (var k in ks)
+                {
+                    var kp = k.Leader.PartyBelongedTo;
+                    if (kp == null || kp.LeaderHero != k.Leader) continue;
+                    var vc = k.Clans.Where(c => c != null && c != k.RulingClan && !c.IsEliminated && !c.IsUnderMercenaryService && c.Leader != null
+                                                && c.Leader.PartyBelongedTo != null && c.Leader.PartyBelongedTo.LeaderHero == c.Leader)
+                                    .OrderBy(c => c.StringId, StringComparer.Ordinal).FirstOrDefault();
+                    if (vc == null) continue;
+                    lp = kp; vp = vc.Leader.PartyBelongedTo;
+                    break;
+                }
+                if (lp == null) sb.Append("brak pary krol - wasal z druzynami");
+                else
+                {
+                    float m = ModelF("CalculatePartyInfluenceCost", am, lp, vp);
+                    float b = BkF("CalculatePartyInfluenceCost", _armyBase == null || am == null ? (Func<float>)null : () => _armyBase(am, lp, vp));
+                    sb.Append(Nm(lp.LeaderHero.Name)).Append(" <- ").Append(Nm(vp.LeaderHero.Name)).Append(" koszt ").Append(N(m, "0")).Append(" (BK ").Append(N(b, "0")).Append(')');
+                }
+                // AM-15 kultura: 3 miasta (2 z obca kultura pana, 1 swoja) i caly swiat
+                var cm = _pCultM != null ? _pCultM.GetValue(cfg, null) : null;
+                var pm = _pPopMgr != null ? _pPopMgr.GetValue(cfg, null) : null;
+                sb.Append(" | osady: ");
+                var towns = Town.AllTowns.Where(t => t != null && t.Settlement != null && t.OwnerClan != null && t.OwnerClan.Leader != null)
+                                         .OrderBy(t => t.Settlement.StringId, StringComparer.Ordinal).ToList();
+                var pick = towns.Where(t => t.OwnerClan.Leader.Culture != t.Settlement.Culture).Take(2).ToList();
+                pick.AddRange(towns.Where(t => t.OwnerClan.Leader.Culture == t.Settlement.Culture).Take(3 - pick.Count));
+                for (int i = 0; i < pick.Count; i++)
+                {
+                    var st = pick[i].Settlement;
+                    var oc = st.OwnerClan.Leader.Culture;
+                    if (i > 0) sb.Append("; ");
+                    sb.Append(Nm(st.Name)).Append(" [").Append(st.Culture != null ? st.Culture.StringId : "-").Append('/').Append(oc != null ? oc.StringId : "-").Append(']');
+                    var cl = Cultures(pm, st);
+                    if (cl == null) { sb.Append(" brak danych BK"); continue; }
+                    float sum = 0f, oa = 0f, oac = 0f; object own = null;
+                    foreach (var cdc in cl)
+                    {
+                        float a = Convert.ToSingle(_pCdcAssim.GetValue(cdc, null), Inv);
+                        sum += a;
+                        if (_pCdcCult.GetValue(cdc, null) as CultureObject == oc) { own = cdc; oa = a; oac = Convert.ToSingle(_pCdcAccept.GetValue(cdc, null), Inv); }
+                    }
+                    float g = own != null ? ModelF("CalculateAcceptanceGain", cm, own) : float.NaN;
+                    float gb = own != null ? BkF("CalculateAcceptanceGain", _acceptBaseS == null || cm == null ? (Func<float>)null : () => _acceptBaseS(cm, own).ResultNumber) : float.NaN;
+                    sb.Append(" asym. pana ").Append(N(oa, "0.00")).Append(" akcept. pana ").Append(N(oac, "0.00")).Append(" zysk akcept. ").Append(N(g, "+0.000;-0.000;0.000"))
+                      .Append(" (BK ").Append(N(gb, "+0.000;-0.000;0.000")).Append(") kultur ").Append(cl.Count).Append(" suma ").Append(N(sum, "0.00"));
+                }
+                int fiefs = 0, allOne = 0, multi = 0, below = 0, riot = 0, changes = 0;
+                double oaSum = 0, loySum = 0;
+                foreach (var t in Town.AllFiefs)
+                {
+                    if (t == null || t.Settlement == null) continue;
+                    var cl = Cultures(pm, t.Settlement);
+                    if (cl == null) continue;
+                    fiefs++;
+                    loySum += t.Loyalty;
+                    if (t.Loyalty < 25f) riot++;
+                    var oc = t.OwnerClan != null && t.OwnerClan.Leader != null ? t.OwnerClan.Leader.Culture : null;
+                    int n = 0, one = 0; float oa = 0f;
+                    foreach (var cdc in cl)
+                    {
+                        float a = Convert.ToSingle(_pCdcAssim.GetValue(cdc, null), Inv);
+                        n++;
+                        if (a >= 0.99f) one++;
+                        if (oc != null && _pCdcCult.GetValue(cdc, null) as CultureObject == oc) oa = a;
+                    }
+                    if (n >= 2) { multi++; if (one == n) allOne++; }
+                    oaSum += oa;
+                    if (oa < 0.5f) below++;
+                }
+                bool first = _cultSnap.Count == 0;
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
+                    CultureObject was;
+                    if (_cultSnap.TryGetValue(st, out was) && was != st.Culture) changes++;
+                    _cultSnap[st] = st.Culture;
+                }
+                _sCultChanges += changes;
+                sb.Append(" | swiat: twierdz ").Append(fiefs).Append(" wszystkie kultury 1.0 ").Append(allOne).Append(" z ").Append(multi)
+                  .Append(" asym. pana sr. ").Append(fiefs > 0 ? (oaSum / fiefs).ToString("0.00", Inv) : "-").Append(" <0.5 ").Append(below)
+                  .Append(" lojalnosc sr. ").Append(fiefs > 0 ? (loySum / fiefs).ToString("0.0", Inv) : "-").Append(" <25 ").Append(riot)
+                  .Append(" zmiany kultury osad ").Append(first ? "-" : changes.ToString(Inv)).Append(" (sesja ").Append(_sCultChanges).Append(')');
+                // AM-18 malzonek gracza, karawana
+                var mm = _pMarM != null ? _pMarM.GetValue(cfg, null) : null;
+                var me = Hero.MainHero;
+                float sp = me != null && me.IsAlive ? ModelF("GetSpouseScore", mm, me, false) : float.NaN;
+                float spB = me != null && me.IsAlive ? BkF("GetSpouseScore", _spouseBase == null || mm == null ? (Func<float>)null : () => _spouseBase(mm, me, false).ResultNumber) : float.NaN;
+                sb.Append(" | malzonek gracza ").Append(N(sp, "0")).Append(" (BK ").Append(N(spB, "0")).Append(')');
+                var fm = _pFinM != null ? _pFinM.GetValue(cfg, null) : null;
+                var car = MobileParty.AllCaravanParties.FirstOrDefault(x => x != null && x.IsActive && x.Owner != null);
+                float cv = car != null ? ModelF("CalculateOwnerIncomeFromCaravan", fm, car) : float.NaN;
+                float cvB = car != null ? BkF("CalculateOwnerIncomeFromCaravan", _caravanBase == null || fm == null ? (Func<float>)null : () => _caravanBase(fm, car)) : float.NaN;
+                sb.Append(" | karawana ").Append(N(cv, "0")).Append(" (BK ").Append(N(cvB, "0")).Append(')');
+                int oo = Interlocked.Exchange(ref _dOwnerOnly, 0);
+                _sOwnerOnly += oo;
+                sb.Append(" | poza kultura pana ").Append(oo).Append(" (sesja ").Append(_sOwnerOnly).Append(')');
+                sb.Append(" | bledy probki ").Append(_dSmpErr).Append(" (sesja ").Append(_sSmpErr).Append(") | potkniecia od startu gry ").Append(_sStumbles).Append('.');
+                _dSmpErr = 0;
+                Scribe.Line(sb.ToString());
+            }
+            catch (Exception e) { Stumble("Daily", e); }
+        }
+
+        /// <summary>Lista CultureDataClass osady z BK (PopulationManager.GetPopData -> CultureData.Cultures) albo null.</summary>
+        private static List<object> Cultures(object pm, Settlement st)
+        {
+            if (pm == null || _mGetPop == null || _pPopCulture == null || _pCultures == null || _pCdcAssim == null || _pCdcCult == null || _pCdcAccept == null) return null;
+            var pop = _mGetPop.Invoke(pm, new object[] { st });
+            var cd = pop != null ? _pPopCulture.GetValue(pop, null) : null;
+            var en = cd != null ? _pCultures.GetValue(cd, null) as System.Collections.IEnumerable : null;
+            if (en == null) return null;
+            var res = new List<object>();
+            foreach (var x in en) if (x != null) res.Add(x);
+            return res;
+        }
+
         // ------------------------------------------------------------ linia startu sesji
 
         private static string StartLine()
@@ -369,12 +667,16 @@ namespace CrashScribe
         }
     }
 
-    /// <summary>P2 (audyt 14.10): linia startu sesji samowywolan BKROT.</summary>
+    /// <summary>P2 (audyt 14.10): wpiecie i linia startu sesji samowywolan BKROT, probka doby. Bez zapisu; stan sesji od zera przy kazdej
+    /// nowej grze i wczytaniu (zachowanie tworzone w OnGameStart).</summary>
     internal sealed class BkrotSelfCallBehavior : CampaignBehaviorBase
     {
+        public BkrotSelfCallBehavior() { BkrotSelfCall.ResetSession(); }
+
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s) { BkrotSelfCall.OnSession(); });
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { BkrotSelfCall.Daily(); });
         }
 
         public override void SyncData(IDataStore dataStore) { }
