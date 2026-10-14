@@ -817,6 +817,8 @@ namespace Armoury
         public float LoserCaptiveVeteranPercent = 30f;     // of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom
         public float LoserCaptiveCommonPercent = 5f;       // of the beaten men who live, this share of the rest is taken
         public float NonCombatantDeathPercent = 5f;        // villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers
+        // A17 (poz. 11, A12 valyrian, 14.10): partia kasowana przez gre po bitwie (MapEventSide.HandleMapEventEndForPartyInternal) z ludzmi w skladzie - DoomedPartyMen.cs
+        public bool DestroyedPartyMenRouted = true;        // when the game strikes off a beaten host that still has men in it - caught while fleeing, left with only its wounded when the enemy broke off the fight, or a beaten besieger the victors did not take - those men no longer vanish with it: the victors take the same few as from any beaten host (seasoned men first), the rest scatter like any routed men (back to their lord's banner, home or to the woods), and the captives it held go free. Off = they vanish with the host, as before (needs Losers Flee Enabled)
         // --- Iron Bank ---
         // poprawka po audycie (gracz 3, drobne2): dalej zbiorcza grupa jak dotad (klucze ponizej bez zmiany grupy)
         // I1 (noc 09/10.10): prawo jenca wedlug krainy - PrisonerLaw.cs

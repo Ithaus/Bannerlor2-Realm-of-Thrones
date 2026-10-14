@@ -580,6 +580,10 @@ Uzycie (Python 3, tylko odczyt):
                     ostatnich 28 dob wojny), Z1-2 rody w pokoju z linii 166 (pulap, skrzynia pokoju, zold, ludzie - INFO), Z1-3 miara W5-7 (INFO, 85 tys.),
                     Z1-4 bledy ClanBudget 0. Log bez paczki: INFO, bez wyjatku. Domyslne okno 728 dob; --do-doby N zmienia. Log po wczytaniu zapisu
                     (bez dob wojny krolestw w pokoju): --baza-doby <log biegu, z ktorego jest zapis> - baza wojenna z niego (Z1-1).
+--grupa a17       : (A17, 14.10 - stare zaleglosci; docs/reszta-2026-10-14/ROZPOZNANIE-A17.md) python -I tools/sprawdz_logi.py --grupa a17 <Armoury-*.log>
+                    (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
+                    przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
+                    Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -20850,6 +20854,105 @@ def szybkie_main(logp, start_arg, until=120):
     return 0
 
 
+# ======================================================================== A17 (14.10): stare zaleglosci - progi grupy a17 (tylko ta grupa)
+A17_PRE = {
+    "dpm": "Ludzie kasowanych partii (A17): dzien",
+    "d4": "Partia kasowana z ludzmi (A17 diagnoza D4)",
+    "poc": "Pochodzenie (E4/7): dzien",
+    "err": "ERROR in ",
+}
+A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
+
+
+def _a17_11(rep, got):
+    """A17-11 (poz. 11, DestroyedPartyMenRouted): ludzie partii kasowanej przez gre po bitwie - do niewoli zwyciezcow albo droga rozbitych H3."""
+    dl = got["dpm"]
+    on = sum(1 for s in dl if "| CZYNNE |" in s)
+    if not dl:
+        rep.add("A17-11a: ludzie kasowanych partii (linia doby A17)", "brak linii", "INFO (log sprzed A17)", None)
+    else:
+        rep.add("A17-11a: ludzie kasowanych partii (linia doby A17)", f"linii {len(dl)}, CZYNNE {on}",
+                "CZYNNE kazdej doby (klucz Destroyed Party Men Routed + Losers Flee Enabled)", on == len(dl))
+    ctl = [num(r"kontrola: szeregowi - do niewoli - rozbici = (-?\d+)", s) for s in dl]
+    bad = [c for c in ctl if c]
+    rep.add("A17-11b: kontrola przeniesionych (szeregowi = do niewoli + rozbici)", f"dob z roznica {len(bad)} z {len(ctl)}" + (f" (suma {sum(bad)})" if bad else ""),
+            "0 kazdej doby", (len(bad) == 0) if dl else None)
+    tot = {k: 0 for k in ("p", "m", "k", "r", "b", "n", "u", "off")}
+    for s in dl:
+        tot["p"] += num(r"\| partii (\d+), szeregowych", s, int, 0) or 0
+        tot["m"] += num(r"szeregowych (\d+): do niewoli", s, int, 0) or 0
+        tot["k"] += num(r": do niewoli (\d+) \(A", s, int, 0) or 0
+        tot["r"] += num(r", rozbici (\d+) \(bez zwyciezcy", s, int, 0) or 0
+        tot["b"] += num(r"\(bez zwyciezcy (\d+);", s, int, 0) or 0
+        tot["n"] += num(r"zwyciezca bez lochu (\d+)\)", s, int, 0) or 0
+        tot["u"] += num(r"jency skasowanych partii uwolnieni (\d+)", s, int, 0) or 0
+        tot["off"] += num(r"przy regule nieczynnej w nicosc (\d+)", s, int, 0) or 0
+    days = max(1, len(dl))
+    rep.add("A17-11c: przeniesieni z kasowanych partii (INFO)",
+            f"partii {tot['p']}, szeregowych {tot['m']} ({tot['m'] / days:.1f}/d): do niewoli {tot['k']}, rozbici {tot['r']} (bez zwyciezcy {tot['b']}, zwyciezca bez lochu {tot['n']}),"
+            f" jency uwolnieni {tot['u']}" if dl else "brak linii", "INFO (fin29 przed A17: 344 ludzi w nicosc / 120 dob; rok 2 + 60: 739)", None)
+    rep.add("A17-11d: w nicosc przy regule nieczynnej (linia A17)", f"{tot['off']}" if dl else "brak linii", "0 przy CZYNNE kazdej doby",
+            (tot["off"] == 0) if (dl and on == len(dl)) else None)
+    gm = 0.0
+    for s in dl:
+        gm += num(r"przy zniknieciu partii\) ([\d.]+) w \d+ rosterach", s, float, 0.0) or 0.0
+    moved = tot["k"] + tot["r"] + tot["u"]
+    own_ok = None
+    if dl:
+        sh = gm / (gm + moved) if gm + moved > 0 else 0.0
+        own_ok = sh <= 0.05
+        rep.add("A17-11e: w nicosc mimo reguly - resztka slownika partii skasowanych po bitwie",
+                f"{gm:.1f} ludzi ({gm / days:.2f}/d) wobec przeniesionych {moved} ({100.0 * sh:.1f}%)",
+                "<= 5% przeniesionych przy CZYNNE (ulamki slownika); przy kluczu wylaczonym - caly udzial bitew (INFO)",
+                own_ok if on == len(dl) else None)
+    gone = []
+    for s in got["poc"]:
+        g = num(r"przy zniknieciu partii ([\d.]+)\)", s, float)
+        if g is not None:
+            gone.append((num(r"dzien (\d+)", s), g))
+    if gone:
+        sg = sum(g for _, g in gone)
+        per = sg / len(gone)
+        worst = max(gone, key=lambda x: x[1])
+        ok = (per <= 0.1 * A17_FIN29_GONE) if (dl and on == len(dl)) else None
+        rep.add("A17-11h: ludzie \"przy zniknieciu partii\" (linia Pochodzenie E4/7, wszystkie drogi) na dobe",
+                f"{per:.2f}/d ({sg:.0f} w {len(gone)} dobach; najgorsza doba {worst[0]}: {worst[1]:.0f})" + (f"; z tego partie skasowane po bitwie {gm:.0f}" if dl else ""),
+                f"<= 10% fin29 ({A17_FIN29_GONE:.2f}/d -> <= {0.1 * A17_FIN29_GONE:.2f}/d); DECYZJA, gdy A17-11e TAK (reszta z innej drogi - do rozpoznania); log bez linii A17 - INFO",
+                ok, decide=bool(own_ok))
+    else:
+        rep.add("A17-11h: ludzie \"przy zniknieciu partii\" (linia Pochodzenie E4/7)", "brak linii Pochodzenie", "INFO", None)
+    d4 = got["d4"]
+    paths = {}
+    for s in d4:
+        m = re.search(r"\| droga ([A-Z]|inna)", s)
+        k = m.group(1) if m else "?"
+        paths[k] = paths.get(k, 0) + 1
+    rep.add("A17-11f: diagnoza D4 (kasowane partie z ludzmi - drogi)", (f"linii {len(d4)}: " + ", ".join(f"{k} {v}" for k, v in sorted(paths.items()))
+            + (f"; pierwsza C: {next((s for s in d4 if '| droga C' in s), '-')[:300]}" if "C" in paths else "")) if d4 else "0 linii",
+            "INFO (droga C - warunek gry do ustalenia z pola BattleState / H3)", None)
+    errs = [s for s in got["err"] if "DoomedPartyMen" in s]
+    rep.add("A17-11g: bledy DoomedPartyMen (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
+def a17_main(logp):
+    """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    got = {k: [] for k in A17_PRE}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            for k, p in A17_PRE.items():
+                if s.startswith(p):
+                    got[k].append(s)
+                    break
+    print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
+    _a17_11(rep, got)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -20882,6 +20985,8 @@ def main(argv):
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "a17" and logp:
+        return a17_main(logp)   # A17 (14.10): stare zaleglosci - ludzie kasowanych partii (11), statki do liczby idealnej (6), unikaty (4), Nocny Krol (10), diagnozy D1-D4
     if group == "etap3" and logp:
         return etap3_main(logp, start_arg)   # 3.1 (31, E3/0)
     if group == "etap4" and logp:

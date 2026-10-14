@@ -202,6 +202,7 @@ namespace Armoury
             _bkTried = false; _popMgr = null; _getPopData = null; _fromSoldiers = null; _updateType = null; _typeCount = null; _isRetinue = null; _totalPop = null; _serfs = null; _nobles = null; _slavesT = null;
             _lastWorldPop = -1; _ownersLogged = false; _csvPath = null; _cur = null; _lastAutoMe = null; _fieldMe = null;
             _errCalc = _errApply = _errHome = _errPost = false;
+            _a17Note.Clear(); _a17Left.Clear();
         }
 
         private static void ClearDay()
@@ -999,10 +1000,10 @@ namespace Armoury
                 {
                     bool sim = PlayerAutoOn && PlayerAuto(me);
                     // mieszana: najpierw walka w polu (misja), potem wyslij wojsko - jak walka w polu
-                    if (sim && me == _fieldMe) { _skipPlayer++; _autoMixed++; return; }
+                    if (sim && me == _fieldMe) { _skipPlayer++; _autoMixed++; A17Note(me, "pominal (gracz - walka w polu i wyslij wojsko)"); return; }
                     // szturm / morze wyslanym wojskiem: DoWait przy IsSiegeAssault sam ustawia CampaignBattleResult - poza H3, licznik F1 "nie w polu"
-                    if (!sim && PlayerAutoOn && me.IsPlayerSimulation && me != _fieldMe && (!me.IsFieldBattle || me.IsNavalMapEvent)) { _autoSkip++; return; }
-                    if (!sim) { _skipPlayer++; return; }
+                    if (!sim && PlayerAutoOn && me.IsPlayerSimulation && me != _fieldMe && (!me.IsFieldBattle || me.IsNavalMapEvent)) { _autoSkip++; A17Note(me, "pominal (gracz - szturm albo morze)"); return; }
+                    if (!sim) { _skipPlayer++; A17Note(me, "pominal (gracz - walka w polu)"); return; }
                     auto = true;
                 }
                 // N3: wypad i bitwa pod murami na ladzie z pobita strona spoza twierdzy - regula pola; reszta bitew nie w polu jak dotad
@@ -1010,21 +1011,22 @@ namespace Armoury
                 if (!me.IsFieldBattle || me.IsNavalMapEvent)
                 {
                     cls = WallsClass(me);
-                    if (cls < 0) { SkipOut(me, auto, ref _skipNotField); return; }
+                    if (cls < 0) { SkipOut(me, auto, ref _skipNotField); A17Note(me, "pominal (nie w polu)"); return; }
                 }
-                if (me.RetreatingSide != BattleSideEnum.None) { SkipOut(me, auto, ref _skipRetreat); return; }
+                if (me.RetreatingSide != BattleSideEnum.None) { SkipOut(me, auto, ref _skipRetreat); A17Note(me, "pominal (odwrot)"); return; }
                 var lose = me.GetMapEventSide(me.DefeatedSide); var win = me.GetMapEventSide(me.WinningSide);
                 if (lose == null || win == null) return;
                 // poddanie: w autobitwie gracza to ksiegowosc gry PO walce - PlayerEncounter.DoWait po wyniku symulacji wola EnemySurrender
                 // (gracz wygral, brak odwrotu) albo PlayerSurrender (gracz przegral, zero zdrowych); poddanie przed walka konczy bitwe bez symulacji
-                if (!auto && _surrRef(lose)) { _skipSurr++; CountFreedOutside(me); return; }
-                if (AnyUndead(me)) { SkipOut(me, auto, ref _skipUndead); return; }
+                if (!auto && _surrRef(lose)) { _skipSurr++; CountFreedOutside(me); A17Note(me, "pominal (poddanie)"); return; }
+                if (AnyUndead(me)) { SkipOut(me, auto, ref _skipUndead); A17Note(me, "pominal (Inni)"); return; }
 
                 var plan = Plan(me, win, lose);           // faza 1: policz i sprawdz
                 if (plan == null) return;
                 plan.Auto = auto;
                 plan.Cls = cls;
                 Apply(plan);                              // faza 2: same AddToCounts na sprawdzonych liczbach
+                A17Note(me, plan.Covered ? "objal" : "objal czesciowo (partia po staremu)");
                 if (auto) { _autoCovered++; _lastAutoMe = me; }
                 // migawka lochow zwyciezcow dla postfiksu (zaloga i milicja tej samej osady maja wspolny loch - bez dubli)
                 int pb = 0;
@@ -1241,6 +1243,7 @@ namespace Armoury
                     lp.Applied = true;                                     // komunikat w grze liczy tylko partie zastosowane bez bledu
                     // N7 (decyzja Jeffa 13.10): pobita druzyna lorda z rozbitymi - znacznik dla podzialu rozbitych przy MapEventEnded (OutlawLaw.RoutedH3Body); nie rzuca
                     if (lp.Kind == KArmy && lp.F > 0) StragglersRally.MarkBeaten(lp.Mp, me, pos);
+                    if (lp.J > 0) A17Left(mep.Party, me);       // A17 (DoomedPartyMen): H3 zostawil tu j rannych do pojmania - gdy gra ich nie wezmie, a skasuje partie, ida do niewoli
                 }
                 catch (Exception e)
                 {
@@ -1792,5 +1795,47 @@ namespace Armoury
         }
 
         internal static bool Patched { get { return _patched; } }
+
+        // ------------------------------------------------------------ A17 (DoomedPartyMen, poz. 11): co H3 zrobil z bitwa i gdzie zostawil rannych do pojmania
+        // Notatka bitwy (powod pominiecia albo "objal") - linia diagnozy D4; partie, w ktorych H3 zostawil j rannych dla gry (droga C: gra ich nie wziela, a partie
+        // skasowala). Wpisy zdejmuje DoomedPartyMen.Before przy MapEventEnded tej bitwy; bitwa bez konca (zapis, wyjatek gry) - limit 512 i Reset.
+        private static readonly Dictionary<MapEvent, string> _a17Note = new Dictionary<MapEvent, string>();
+        private static readonly Dictionary<PartyBase, MapEvent> _a17Left = new Dictionary<PartyBase, MapEvent>();
+
+        private static void A17Note(MapEvent me, string why)
+        {
+            if (me == null) return;
+            if (_a17Note.Count >= 512) _a17Note.Clear();
+            _a17Note[me] = why;
+        }
+
+        private static void A17Left(PartyBase pb, MapEvent me)
+        {
+            if (pb == null || me == null) return;
+            if (_a17Left.Count >= 512) _a17Left.Clear();
+            _a17Left[pb] = me;
+        }
+
+        internal static string A17NoteOf(MapEvent me)
+        {
+            string s;
+            return me != null && _a17Note.TryGetValue(me, out s) ? s : (On ? "brak wpisu (bez wyniku bitwy albo poza H3)" : "H3 wylaczone");
+        }
+
+        internal static bool A17LeftFor(PartyBase pb, MapEvent me)
+        {
+            MapEvent m;
+            return pb != null && me != null && _a17Left.TryGetValue(pb, out m) && ReferenceEquals(m, me);
+        }
+
+        internal static void A17Forget(MapEvent me)
+        {
+            if (me == null) return;
+            _a17Note.Remove(me);
+            if (_a17Left.Count == 0) return;
+            List<PartyBase> drop = null;
+            foreach (var kv in _a17Left) if (ReferenceEquals(kv.Value, me)) (drop ?? (drop = new List<PartyBase>())).Add(kv.Key);
+            if (drop != null) foreach (var pb in drop) _a17Left.Remove(pb);
+        }
     }
 }

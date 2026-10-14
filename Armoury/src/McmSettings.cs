@@ -2580,6 +2580,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
+        [SettingPropertyBool("Destroyed Party Men Routed", HintText = "when the game strikes off a beaten host that still has men in it - caught while fleeing, left with only its wounded when the enemy broke off the fight, or a beaten besieger the victors did not take - those men no longer vanish with it: the victors take the same few as from any beaten host (seasoned men first), the rest scatter like any routed men (back to their lord's banner, home or to the woods), and the captives it held go free. Off = they vanish with the host, as before (needs Losers Flee Enabled)")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool DestroyedPartyMenRouted { get; set; } = true;
+
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PrisonerLawEnabled { get; set; } = true;
@@ -6372,6 +6376,7 @@ namespace Armoury
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
             s.NonCombatantDeathPercent = NonCombatantDeathPercent;
+            s.DestroyedPartyMenRouted = DestroyedPartyMenRouted;
             s.PrisonerLawEnabled = PrisonerLawEnabled;
             s.PlayerRansomToCaptor = PlayerRansomToCaptor;
             s.RansomCourierNoTopUp = RansomCourierNoTopUp;
