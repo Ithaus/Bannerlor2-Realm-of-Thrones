@@ -3660,6 +3660,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CallToWarPaysForWar { get; set; } = true;
 
+        [SettingPropertyBool("Call To War No Break", HintText = "with Crown Pays Call To War: when the calling crown has too little of the day's income left for an ally's daily part, that part is simply lost - the agreement goes on and the ally stays in the war; it is never broken off and the ally never makes peace because of it. A crown that keeps missing its parts cannot call new allies until its call-to-war purse recovers. Off = the agreement is broken and the ally leaves that war, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarNoBreak { get; set; } = true;
+
         [SettingPropertyBool("Call To War After Own Wages", HintText = "with Crown Pays Call To War: the calling crown pays an ally's daily part only from what is left of the day's income after it has set aside yesterday's wage refund due to its own houses and yesterday's wages its own field companies still lacked. A day the crown cannot afford it this way, the ally gets no part, the agreement goes on and the unpaid part is not carried over. Off = the crown pays the ally first while the day's income allows, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CallToWarAfterOwnWages { get; set; } = true;
@@ -6570,6 +6574,7 @@ namespace Armoury
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CallToWarPaysForWar = CallToWarPaysForWar;
+            s.CallToWarNoBreak = CallToWarNoBreak;
             s.CallToWarAfterOwnWages = CallToWarAfterOwnWages;
             s.CrownBorrows = CrownBorrows;
             s.CrownLoanLimitDays = CrownLoanLimitDays;

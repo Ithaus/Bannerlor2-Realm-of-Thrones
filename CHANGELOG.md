@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (pieniadze roku 2, M2c) - WEZWANIE 168 BEZ ZERWAN Z BRAKU WPLYWOW: czesc dnia przepada, sojusznik zostaje w wojnie (koniec "wojen jednodniowych")
+
+**Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** nowy `CallToWarNoBreak` (bool, on; off = 449d453; w `Armoury.json` Jeffa go nie ma) | **Pliki:** `CrownCallToWar.cs`, `Settings.cs`, `McmSettings.cs` | **Projekt:** `PROJEKT-WYBRANY.md` 3.4 (przeszczep B2 z PROJEKT-BUDZET, sedziowie 2 i 3)
+
+**Problem:** raport roczny nr 20 / A15-2: gdy korona nie ma z wplywow dnia na czesc dnia ceny, porozumienie bylo zrywane i sojusznik zawieral pokoj (`MakePeaceAction`) - rok 1 biegu dwuletniego 6 takich zerwan z pokojem sojusznika ("wojny jednodniowe"); mniej krolestw w wojnie wbrew celowi 85 tys. i /4.33 [P PROJEKT-BUDZET B2]. Z.1 d721-781: 1 zerwanie, 1 pokoj [P log Z.1].
+**Przyczyna:** `CrownCallToWar.Daily` galaz `avail < due` - `EndCallToWarAgreement` + `MakePeaceAction.Apply(called, against)`.
+**Zmiana:** przy kluczu: zamiast zerwania czesc dnia przepada (licznik), porozumienie trwa do terminu gry albo do konca z M2a; bez pokoju. Linia 168: `| M2c bez zerwan (...): przepadlo dzis z braku wplywow X zl (czesci N)`; pozycja "zerwane z braku wplywow dnia" przy kluczu = 0. Naglowek klasy opisuje M2a-M2c.
+**Sprawdzenie warunku sedziow (dekompilacja przed wlaczeniem):** `Bannerlord.Diplomacy.1.4.5.dll` i `1.4.7.dll` nie zawieraja zadnej nazwy z "CallToWar" (grep metadanych) [P]; gra czyta `CallToWarWallet` tylko w `DefaultAllianceModel.GetScoreOfCallingToWar` (:380 - portfel < -100 000 blokuje NOWE wezwania) i w `DefaultClanFinanceModel` (dochod i wydatek rodow z portfela - zalatane przez 168) [P `dec32/cs_full`]. Niedoplacony sojusznik nie wychodzi wiec z wojny przez portfel.
+**Ryzyko / co sprawdzic (zasada 0):** (1) wezwany walczy dalej za mniej (raty przepadaja) - sprawdzi KRONIKA WOJEN dla par z "przepadlo"; (2) wzywajacy z niezaplacona cena trzyma ujemny portfel do konca porozumienia (EndPostfix skresla reszte) - nie wezwie nowych sojusznikow, dopoki portfel < -100 000 (zamierzone); (3) gracz jako wezwany: nie dostaje czesci dnia, porozumienie trwa (przedtem dostawal komunikat o zerwaniu); (4) mapa roku 1: 6 pokojow sojusznika mniej w 364 dobach [P BUDZET]. Kolejnosc wycofania przy NIE w roku 1: najpierw ten klucz. Prog: R2-3 (zerwania 0, pokoj sojusznika z 168 0).
+**Status:** DO SPRAWDZENIA (zbudowane, rc=0; nie wgrane).
+
 ## 2026-10-14 (pieniadze roku 2, M2b) - RATA WEZWANIA 168 DOPIERO PO WLASNYCH ZOLNIERZACH (rezerwa: wczorajszy zwrot + wczorajszy brak W5)
 
 **Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** nowy `CallToWarAfterOwnWages` (bool, on; off = 449d453; w `Armoury.json` Jeffa go nie ma) ; nowych pol zapisu brak (migawka zwrotu - pamiec sesji, pierwsza doba po wczytaniu rezerwa 0) | **Pliki:** `CrownCallToWar.cs`, `CrownIncome.cs` (`RefundDueYesterday`, migawka w `End`), `KingdomTreasury.NeedAid.cs` (`NeedAidUncovYesterday`), `Settings.cs`, `McmSettings.cs` | **Projekt:** `PROJEKT-WYBRANY.md` 3.3

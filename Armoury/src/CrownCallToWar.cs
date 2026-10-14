@@ -33,6 +33,10 @@ namespace Armoury
     /// jest na liscie - sami zdejmujemy reszte z portfela (ta sama arytmetyka co EndPostfix; warunek "wpis dalej na liscie" chroni przed podwojnym
     /// zdjeciem). Szukanie dlugu sprzed paczki - tylko raz: w pierwszej dobie po wczytaniu zapisu bez klucza 168 albo po ponownym wlaczeniu paczki;
     /// w kampanii zaczetej z paczka nigdy. Klucz wylaczony = stan sprzed (szukanie co dobe, bez wyrownania).
+    /// PIENIADZE ROKU 2 (docs/pieniadze-rok-2/PROJEKT-WYBRANY.md 3.2-3.4), trzy osobne klucze: M2a CallToWarPaysForWar - rata tylko za dobe wojny wezwanego
+    /// z celem, po 3 dobach laski i 7 dobach bez wojny porozumienie wygasa bez pokoju; M2b CallToWarAfterOwnWages - rata dopiero po rezerwie wlasnych zolnierzy
+    /// (wczorajszy zwrot nalezny + wczorajszy brak W5), po rezerwie nie starcza - dzis bez raty; M2c CallToWarNoBreak - brak wplywow na rate nie zrywa porozumienia
+    /// (czesc dnia przepada, bez MakePeaceAction). Gra i Diplomacy nie czytaja portfela wezwan przy decyzji o pokoju; ponizej -100 000 gra blokuje NOWE wezwania.
     /// </summary>
     internal static class CrownCallToWar
     {
@@ -45,6 +49,8 @@ namespace Armoury
         private static long _dExpired, _dPaidNoWar; private static int _dNoWarN, _dExpiredN;
         // M2b (CallToWarAfterOwnWages): wstrzymane dzis po rezerwie wlasnych zolnierzy, korony z wstrzymaniem, kontrolka "rata ponad reszte minus rezerwe"
         private static long _dHeld, _dOverRes; private static int _dHeldN; private static readonly HashSet<string> _dHeldK = new HashSet<string>();
+        // M2c (CallToWarNoBreak): czesci dnia, ktore przepadly z braku wplywow (zamiast zerwania)
+        private static long _dLapsed; private static int _dLapsedN;
         private static readonly List<Agr> _agr = new List<Agr>();
 
         internal static long LastPaid, LastEnded, LastUnpaid, LastLegacyPaid; internal static int LastEndedN;
@@ -60,7 +66,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.CrownPaysCallToWar && CrownIncome.On; } }
 
         internal static void Reset() { _agr.Clear(); ZeroDay(); ZeroEvents(); _legacyScan = false; LastPaid = LastEnded = LastUnpaid = 0; LastEndedN = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _ending = false; }
-        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = 0; _dNoWarN = _dExpiredN = 0; _dHeld = _dOverRes = 0; _dHeldN = 0; _dHeldK.Clear(); }
+        private static void ZeroDay() { _dPaid = _dEnded = _dUnpaid = _dLegacy = _dLegacyPaid = _dUndone = _dRestored = 0; _dEndedN = _dPaidN = _dPeaceN = 0; _dExpired = _dPaidNoWar = 0; _dNoWarN = _dExpiredN = 0; _dHeld = _dOverRes = 0; _dHeldN = 0; _dHeldK.Clear(); _dLapsed = 0; _dLapsedN = 0; }
         /// <summary>P3/W4: liczniki zdarzen miedzy dobami (nowe porozumienia - StartPostfix, skreslenia przez gre - EndPostfix) zerowane PO linii doby.
         /// Dotad zerowal je poczatek Daily, zanim linia je wypisala - "nowe dzis" i "skreslone: koniec porozumienia przez gre" pokazywaly zawsze 0.</summary>
         private static void ZeroEvents() { _dCancelled = 0; _dNewN = 0; }
@@ -260,6 +266,8 @@ namespace Armoury
                             _dHeld += due; _dHeldN++; _dHeldK.Add(calling.StringId ?? "?");
                             continue;
                         }
+                        // M2c (CallToWarNoBreak): skarbca nie stac na czesc dnia - czesc dnia przepada, porozumienie trwa (bez zerwania i bez pokoju sojusznika)
+                        if (s0 != null && s0.CallToWarNoBreak) { _dLapsed += due; _dLapsedN++; continue; }
                         // skarbca nie stac na czesc dnia - porozumienie konczy sie, sojusznik wychodzi z wojny
                         if (beh != null)
                         {
@@ -353,7 +361,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !s.LogEnabled || !On) return;
-            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone + _dExpired + _dHeld == 0 && _dNewN == 0 && _dExpiredN == 0 && _importN < 0) return;
+            if (_agr.Count == 0 && _dPaid + _dEnded + _dCancelled + _dLegacy + _dLegacyPaid + _dUndone + _dExpired + _dHeld + _dLapsed == 0 && _dNewN == 0 && _dExpiredN == 0 && _importN < 0) return;
             long left = 0; foreach (var a in _agr) left += a.Left;
             var sb = new StringBuilder(400);
             sb.Append("Wezwania do wojny (168): dzien ").Append((int)CampaignTime.Now.ToDays)
@@ -370,6 +378,9 @@ namespace Armoury
               .Append(" | M2b po wlasnych zolnierzach (Call To War After Own Wages ").Append(s.CallToWarAfterOwnWages ? "tak" : "nie").Append("): wstrzymane dzis ").Append(_dHeld)
               .Append(" zl (czesci ").Append(_dHeldN).Append(") u ").Append(_dHeldK.Count).Append(" koron (rezerwa: zwrot nalezny wczoraj + niepokryta potrzeba W5 wczoraj)")
               .Append(", rata ponad reszte wplywow minus rezerwe ").Append(_dOverRes)
+              // M2c (pieniadze roku 2): bez zerwan - czesc dnia przepada (przy kluczu "tak" pozycja "zerwane z braku wplywow dnia" = 0)
+              .Append(" | M2c bez zerwan (Call To War No Break ").Append(s.CallToWarNoBreak ? "tak" : "nie").Append("): przepadlo dzis z braku wplywow ").Append(_dLapsed)
+              .Append(" zl (czesci ").Append(_dLapsedN).Append(")")
               .Append(" | dlug portfela sprzed paczki (wezwany dostal od gry z niczego): nowy ").Append(_dLegacy).Append(", splacone dzis ze skarbcow w nicosc (rownowazy) ").Append(_dLegacyPaid)
               .Append(" | P3/W4 po zerwaniu reszta ceny zdjeta z portfela wzywajacego przez nas (latka konca porozumienia nie zadzialala) ").Append(_dRestored)
               .Append(s.CallToWarBreakRestoresWallet ? "; dlug sprzed paczki szukany tylko raz po wczytaniu zapisu bez klucza 168 (Call To War Break Restores Wallet)"
