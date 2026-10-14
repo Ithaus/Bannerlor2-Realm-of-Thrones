@@ -1929,6 +1929,9 @@ namespace Armoury
         // klimatu do konca sesji (ponowna proba w kolejnej dobie, najwyzej 3) ani czekajacego przeszukania kryjowki (najwyzej 3 proby); sen dlugu w osadzie zdejmuje
         // martwy wpis obozu swiata. Linie "Porzadek stanu (E8/S)" przy starcie sesji i co dobe. Off = wszystko jak przed E8/S
         public bool StateHygieneEnabled = true;            // starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before
+        // A14 / G20 (audyt zapis 2, drobne2; DayHeld.cs): doba, ktora blok dobowy juz rozliczyl, po wczytaniu zapisu z srodka tej doby - punkty budow pana i ludu
+        // (BuildFunding _funded / _folk, czytane przez rozlozony ticker osad gry) i gotowka W5 / W7 wczorajszego kroku (zwrot 70% jej nie liczy) z klucza zapisu arm_dayheld
+        public bool MidDayLoadKeepsDay = true;             // a save loaded in the middle of a day keeps what that day already paid for: the building work lords and townsfolk paid for this morning still goes up in the towns and castles that have not yet built today, and the crown still leaves out of tomorrow's wage refund the wages it already helped to pay (war aid, scutage, war levy). Off = as before: after loading, the rest of the day builds nothing that was paid for, and the next refund counts that aid a second time
         // --- Diagnostics (stage 8) ---
         // E8/P2 (244, PLAN 8.4a, 8.6b, 8.7a-b, 8.8a-c): pomiary sprzetu AI, lupu i korony - tylko log, gra bez zmian: "Zuzycie AI - pomiary (E8/P2)" (zalogi osobno,
         // powody stania napraw, "Amunicja AI: zeszloby N" - AiWear.cs), "ZakupyAI cena do wartosci (E8/P2)" (mediana i p90 wedlug kupujacego, dodatnie stany,

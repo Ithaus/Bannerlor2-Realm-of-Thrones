@@ -5476,6 +5476,10 @@ namespace Armoury
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
         public bool StateHygieneEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Mid Day Load Keeps Day", HintText = "a save loaded in the middle of a day keeps what that day already paid for: the building work lords and townsfolk paid for this morning still goes up in the towns and castles that have not yet built today, and the crown still leaves out of tomorrow's wage refund the wages it already helped to pay (war aid, scutage, war levy). Off = as before: after loading, the rest of the day builds nothing that was paid for, and the next refund counts that aid a second time")]
+        [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
+        public bool MidDayLoadKeepsDay { get; set; } = true;
+
         [SettingPropertyBool("Stage8 Measure Log", HintText = "Writes daily lines that measure the AI's gear for stage 8: wear and repairs of garrisons and lords' parties and why repairs wait, arrows the AI would have used up, the prices the AI pays against the worth of the piece, loot copied to victors while the beaten keep it, and the crown's workshop monopolies (diagnostics only; nothing in the game changes).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8MeasureLog { get; set; } = true;
@@ -7024,6 +7028,7 @@ namespace Armoury
             s.BurnedVillageLabels = BurnedVillageLabels;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;
+            s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
