@@ -1388,6 +1388,58 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessMedicineMax { get; set; } = 50;
 
+        [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords never storm a town or castle with ladders alone: first a battering ram and a siege tower must stand ready, or their engines must batter a breach in the walls - and even then only when their strength beats what the walls make of the defenders. The walls count in full however long the siege lasts and weaken only as engines batter them down (the game let them count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeWallsHoldUntilBreached { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Capital Walls Factor", 1.00f, 2.00f, "0.00", HintText = "the walls of a realm's capital count this many times more in every assault and in the decision to storm them - the king's guard and his keep within the walls (one step of wall level is worth 17-20% in the game). The same for AI lords and for you, attacking or defending. 1 = like any other town")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeCapitalWallsFactor { get; set; } = 1.25f;
+
+        [SettingPropertyBool("Siege Defender Engines On Walls", HintText = "the defenders' ballistas and catapults on the walls (from the siege workshop or built during the siege) make the walls stronger in an assault just as the besiegers' engines make them weaker (+8% each, +12% for a fire engine) - until the besiegers' engines smash them. Off = only the besiegers' engines count, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeDefenderEnginesOnWalls { get; set; } = true;
+
+        [SettingPropertyBool("Siege Ai Breach When Walls Hold", HintText = "an AI siege camp that has its ram and siege tower ready and still cannot hope to take the walls turns to battering them down with trebuchets (with Realistic Battle Mod only trebuchets strike walls - catapults and onagers hit engines and men). Off = the AI keeps the plan it drew at the start of the siege")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAiBreachWhenWallsHold { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Assault Repel Loss", 0.00f, 0.50f, "0.00", HintText = "an AI assault on manned walls breaks off when the stormers have lost this share of their men (wounded, killed and routed) - each assault draws its own breaking point within Siege Assault Repel Spread of it. The besiegers fall back to their camp and the siege goes on. 0 = assaults go on until one side is gone, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeAssaultRepelLoss { get; set; } = 0.22f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Repel Spread", 0.00f, 0.10f, "0.00", HintText = "each assault's breaking point lies up to this far either side of Siege Assault Repel Loss (0.22 +- 0.05 = 17 to 27% of the men) - every army has its own endurance")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeAssaultRepelSpread { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Pause Days", 1.00f, 28.00f, "0.0", HintText = "after a repelled assault the besiegers wait about this many days before trying again - longer when their morale is low, when few of them are left against the defenders and when the place is worth little against the army's pay; shorter otherwise (from 3/7 to 4 times this)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeRepelPauseDays { get; set; } = 7f;
+
+        [SettingPropertyBool("Siege Relief From Walls", HintText = "when a relief force joins the defence of a town or castle under assault, the defenders keep fighting from the walls as long as the men of the fortress are most of the defence (Siege Relief Walls Share) - the game turned such a battle into a fight in the open field. Your own fortresses too. Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeReliefFromWalls { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Relief Walls Share", 0.00f, 1.00f, "0.00", HintText = "with Siege Relief From Walls: the share of the defence that must be men of the fortress (garrison, militia, lords inside the walls) for the battle to be fought from the walls")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeReliefWallsShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Siege Besieger Prep Percent", 10, 100, "0", HintText = "besiegers - AI lords and you alike - build their siege camp and engines at this percent of the speed set by Siege Pace Percent: preparing a siege takes weeks (100 = as fast as before)")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeBesiegerPrepPercent { get; set; } = 50;
+
+        [SettingPropertyFloatingInteger("Siege Town Prep Factor", 1.00f, 4.00f, "0.00", HintText = "preparing the siege of a town takes this many times longer than of a castle")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeTownPrepFactor { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Siege Capital Prep Factor", 1.00f, 4.00f, "0.00", HintText = "preparing the siege of a realm's capital takes this many times longer than of a castle")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeCapitalPrepFactor { get; set; } = 2.5f;
+
+        [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeWallsLog { get; set; } = true;
+
         [SettingPropertyBool("Single Winter Source", HintText = "one source of winter: our Winter Bite alone cuts harvests and feeds armies more; Better Economy seasons no longer cut harvests, raise food prices or slow caravans on top of it")]
         [SettingPropertyGroup("The marching column")]
         public bool SingleWinterSource { get; set; } = true;
@@ -6266,6 +6318,19 @@ namespace Armoury
             s.SiegeSicknessDefenderFactor = SiegeSicknessDefenderFactor;
             s.SiegeSicknessDeathShare = SiegeSicknessDeathShare;
             s.SiegeSicknessMedicineMax = SiegeSicknessMedicineMax;
+            s.SiegeWallsHoldUntilBreached = SiegeWallsHoldUntilBreached;
+            s.SiegeCapitalWallsFactor = SiegeCapitalWallsFactor;
+            s.SiegeDefenderEnginesOnWalls = SiegeDefenderEnginesOnWalls;
+            s.SiegeAiBreachWhenWallsHold = SiegeAiBreachWhenWallsHold;
+            s.SiegeAssaultRepelLoss = SiegeAssaultRepelLoss;
+            s.SiegeAssaultRepelSpread = SiegeAssaultRepelSpread;
+            s.SiegeRepelPauseDays = SiegeRepelPauseDays;
+            s.SiegeReliefFromWalls = SiegeReliefFromWalls;
+            s.SiegeReliefWallsShare = SiegeReliefWallsShare;
+            s.SiegeBesiegerPrepPercent = SiegeBesiegerPrepPercent;
+            s.SiegeTownPrepFactor = SiegeTownPrepFactor;
+            s.SiegeCapitalPrepFactor = SiegeCapitalPrepFactor;
+            s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;
             s.WinterPartyFoodBonusPercent = WinterPartyFoodBonusPercent;

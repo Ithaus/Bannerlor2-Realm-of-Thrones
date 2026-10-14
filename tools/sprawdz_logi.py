@@ -641,6 +641,11 @@ Uzycie (Python 3, tylko odczyt):
                     ponad limit hordy (B5; log CrashScribe przez --crashscribe). Log bez paczki: INFO, bez wyjatku.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
+--grupa oblezenia : (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia) python -I tools/sprawdz_logi.py --grupa oblezenia <Armoury-*.log>
+                    (log czytany strumieniowo). OB-0 linia startowa i OB0 kazdej doby, OB-1a decyzja AI przy s OB1 <= 1 = 0, OB-1d decyzja AI bez taranu
+                    i wiezy i bez wyrwy = 0 (brama), OB-1b weta (INFO), OB-1c AI bije
+                    mury (trebusze, trafienia), OB-2a odparte (W-2), OB-2b przerwa / prog (konstrukcyjne), OB-2c brak decyzji w przerwie, OB-3 bitwy z murow
+                    (W-6), OB-4 obozy spowolnione (AI i gracz), W-1 zdobycia, W-3 czas zdobycia, W-5 stolice, W-8 blokada, W-9 rozwiazane armie, W-16 bledy.
                     Z1-0 dopisek "pokoj (Z.1)" w linii "Budzet rodow (166)", Z1-1 druzyny lordow krolestw w pokoju (linie Skarbce bez "(WOJNA)", srednia
                     ostatnich 28 dob okna; INFO z celem: 30-40 tys. swiata w pokoju wobec 85-100 tys. w wojnie = 0.30-0.47 wojska tych krolestw z ich
                     ostatnich 28 dob wojny), Z1-2 rody w pokoju z linii 166 (pulap, skrzynia pokoju, zold, ludzie - INFO), Z1-3 miara W5-7 (INFO, 85 tys.),
@@ -24477,6 +24482,264 @@ def lenna_main(logp, tabp=None):
     return 0
 
 
+OB_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+OB_DAY = re.compile(r"dzien (\d+)")
+OB0_KEYS = re.compile(r"OB2 prog ([\d.]+) \+- ([\d.]+), przerwa ([\d.]+) dob")
+OB0_NUMS = {
+    "true": re.compile(r"decyzje AI: gra true (\d+), przepuszczone (\d+)"),
+    "walls": re.compile(r"OB1 wstrzymane: mury (\d+), losowanie (\d+), przerwa po odparciu (\d+)"),
+    "gate": re.compile(r"bez taranu i wiezy \(brama\) (\d+)"),
+    "breach": re.compile(r"zmiana strategii na lamanie murow (\d+)"),
+    "prep": re.compile(r"OB4: obozy AI (\d+), z graczem (\d+), bez zmian (\d+)"),
+    "ass": re.compile(r"szturmy AI: rozpoczete (\d+) \(skrypt fabuly (\d+)\), zdobyte (\d+), odparte (\d+)"),
+    "res": re.compile(r"obronca wygral (\d+), bez rozstrzygniecia (\d+)"),
+    "out": re.compile(r"\(SiegeOutside\) (\d+), z murow (\d+) \(twierdza utrzymana (\d+)\)"),
+    "eng": re.compile(r"machiny AI zbudowane: na mury \(trebusze\) (\d+), przeciw machinom (\d+), tarany (\d+), wieze (\d+); gracz (\d+)"),
+    "hits": re.compile(r"trafienia w mury (\d+), odcinki rozbite (\d+)"),
+    "sieges": re.compile(r"oblezenia: nowe (\d+), trwajace (\d+), najdluzsze ([\d.]+) dob"),
+    "stum": re.compile(r"\| potkniecia (\d+) \(od wczytania"),
+}
+OB0_DISP = re.compile(r"armie rozwiazane przy oblezeniu: (.*?) \| machiny AI")
+OB0_O45 = re.compile(r"ponad 45 dob: (.*?) \| w pamieci")
+OB2_RE = re.compile(r"^Szturm odparty \(OB2\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|zamek), stolica (tak|nie)\) .*?\| prog armii ([\d.]+)%, straty ([\d.]+)%"
+                    r".*?\| przerwa ([\d.]+) dob do dnia ([\d.]+) \(podstawa ([\d.]+)")
+OB3_RE = re.compile(r"^Bitwa ze szturmu \(OB3\): dzien (\d+) \| osada (\S+) .*?\| rundy z murow (\d+), w polu (\d+) \| wynik (.*?), twierdza (utrzymana|nie)\.")
+OB4_RE = re.compile(r"^Mury oblezen \(OB4\): dzien (\d+) \| osada (\S+) \(.*?, (zamek|miasto|stolica)\) .*?\| gracz (tak|nie) \| tempo budowy obozu i machin oblegajacych x([\d.]+)( \(wykluczone)?")
+OB1_RE = re.compile(r"^Mury oblezen \(OB1\): dzien (\d+) \| osada (\S+) .*?\| powod: (mury trzymaja|przerwa po odparciu|bez taranu i wiezy)(?:.*?\| HP murow (\d+)%)?")
+O0_RE = re.compile(r"^Okup oblezenia \(O0\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|zamek),.*?oblezenie ([\d.]+) dob.*?\| stolica (tak|nie)")
+O0_OB1 = re.compile(r"\| OB1 (tak|nie|wykluczone): HP murow (\d+)%, taran (tak|nie), wieza (tak|nie), w ([\d.]+) \(gra (-?[\d.]+)\), s OB1 (pusta warownia|[\d.]+)")
+O0_GAP = re.compile(r"\), wyrwa (tak|nie) \(najslabszy odcinek (\d+)%\)")
+L5B2_RE = re.compile(r"^Karawany w zdobytym miescie \(L5b-2\): dzien (\d+) \| osada .*? \((\S+)\) zdobyta")
+
+
+def oblezenia_main(logp):
+    """oblezenia (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia; SiegeWalls.cs). Log Armoury czytany strumieniowo.
+    OB-0 linia startowa (latki: przewaga osady, MapEvent.Update, bitwa z murow - wpiete) i linia OB0 kazdej doby; OB-1a decyzje AI przepuszczone przy
+    s OB1 <= 1 = 0 (linie O0 z "OB1 tak", konstrukcyjne); OB-1d decyzje AI przepuszczone bez taranu i wiezy i bez wyrwy = 0 (brama, recenzja 14.10);
+    OB-1b weta OB1 (brama / mury / losowanie / przerwa) i HP murow przy wecie (INFO); OB-1c AI bije mury: zmiany strategii na
+    trebusze, trebusze AI zbudowane, trafienia w mury (INFO; > 0 przy wetach murow w biegu >= 120 dob); OB-2a odparte szturmy AI (W-2 projektu:
+    >= 8 na 364 doby, udzial 35-70% - bieg >= 300 dob; krocej INFO); OB-2b przerwa w [3/7, 4] x podstawa, straty >= prog, prog w L +- r
+    (konstrukcyjne); OB-2c zadnej decyzji AI (O0) o szturmie tej osady przed koncem przerwy; OB-3 (W-6) bitwy ze szturmu z murow >= 1 i twierdza
+    utrzymana >= 50% (bieg >= 300 dob); OB-4 obozy AI spowolnione (> 0), obozy gracza i wykluczone (INFO); W-1 zdobycia (L5b-2) na 364 doby 11-17
+    (alarm < 8 / > 21; dwuletni 20-32, alarm < 15 / > 38); W-3 mediana zdobycia od startu oblezenia (start = doba ostatniej O0 - wiek oblezenia):
+    zamek >= 14, miasto >= 18 dob; W-5 stolice zdobyte <= 1 na rok (<= 2 dwuletni); W-8 najdluzsze oblezenie <= 100 dob, poza stolicami > 45 dob
+    <= 2 (<= 3); W-9 armie rozwiazane przy oblezeniu (CohesionDepleted + FoodProblem) <= 10% nowych oblezen; W-16 potkniecia SiegeWalls 0 i ERROR 0.
+    Progi W-* to szacunek projektu sprzed zmian Jeffa 14.10 (OB2 bez rozejmu, OB1 bez czasu) - poza zakresem, ale w alarmie = ETAP. Log bez paczki:
+    INFO, bez wyjatku."""
+    rep = Report()
+    starts, ob0, ob1, ob2, ob3, ob4, o0, caps = [], {}, [], [], [], [], [], []
+    errs, daily_ok = 0, 0
+    keys = ("Mury oblezen (", "Szturm odparty (OB2)", "Bitwa ze szturmu (OB3)", "Okup oblezenia (O0)", "Okup oblezenia (doba)",
+            "Karawany w zdobytym miescie (L5b-2)", "ERROR in SiegeWalls.")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if not any(k in ln for k in keys):
+                continue
+            s = OB_TS.sub("", ln.rstrip("\r\n"))
+            if s.startswith("ERROR in SiegeWalls."):
+                errs += 1
+                continue
+            if s.startswith("Mury oblezen (OB start)"):
+                starts.append(s)
+                continue
+            if s.startswith("Mury oblezen (OB0)"):
+                m = OB_DAY.search(s)
+                if m:
+                    ob0[int(m.group(1))] = s
+                continue
+            if s.startswith("Okup oblezenia (doba)"):
+                if "latka decyzji: wpieta" in s:
+                    daily_ok += 1
+                continue
+            m = OB1_RE.match(s)
+            if m:
+                ob1.append((int(m.group(1)), m.group(2), m.group(3), int(m.group(4)) if m.group(4) else None, s))
+                continue
+            m = OB2_RE.match(s)
+            if m:
+                ob2.append(dict(d=int(m.group(1)), st=m.group(2), kind=m.group(3), cap=m.group(4) == "tak", thr=float(m.group(5)) / 100.0,
+                                loss=float(m.group(6)) / 100.0, pause=float(m.group(7)), until=float(m.group(8)), base=float(m.group(9))))
+                continue
+            m = OB3_RE.match(s)
+            if m:
+                ob3.append(dict(d=int(m.group(1)), st=m.group(2), wall=int(m.group(3)), field=int(m.group(4)), res=m.group(5), held=m.group(6) == "utrzymana"))
+                continue
+            m = OB4_RE.match(s)
+            if m:
+                ob4.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), player=m.group(4) == "tak", f=float(m.group(5)), excl=bool(m.group(6))))
+                continue
+            m = O0_RE.match(s)
+            if m:
+                mo = O0_OB1.search(s)
+                mg = O0_GAP.search(s)
+                o0.append(dict(d=int(m.group(1)), st=m.group(2), kind=m.group(3), age=float(m.group(4)), cap=m.group(5) == "tak",
+                               on=(mo.group(1) == "tak") if mo else None, hp=int(mo.group(2)) if mo else None,
+                               ready=((mo.group(3) == "tak" and mo.group(4) == "tak") or (mg is not None and mg.group(1) == "tak")) if mo else None,
+                               s1=(None if not mo or mo.group(7) == "pusta warownia" else float(mo.group(7)))))
+                continue
+            m = L5B2_RE.match(s)
+            if m:
+                caps.append((int(m.group(1)), m.group(2)))
+    if not ob0 and not starts:
+        rep.add("OB-0: linie mur oblezen (OB start / OB0)", "brak linii", "INFO (log sprzed paczki oblezenia albo SiegeWallsLog wylaczony)", None)
+        rep.show()
+        return 0
+    days = sorted(ob0)
+    span = (days[-1] - days[0] + 1) if days else 0
+    yr = span / 364.0 if span else 0.0
+    # OB-0
+    if starts:
+        st0 = starts[-1]
+        wired = all(x in st0 for x in ("przewaga osady wpieta", "odparcie szturmu (MapEvent.Update) wpieta", "bitwa z murow wpieta"))
+        rep.add("OB-0a: linia startowa - latki OB wpiete", f"linii {len(starts)}; ostatnia: {st0[:220]}", "3 x wpieta", wired)
+    else:
+        rep.add("OB-0a: linia startowa", "brak linii 'Mury oblezen (OB start)'", "jest", False)
+    rep.add("OB-0b: linia OB0 kazdej doby", f"{len(days)} linii na {span} dob", "linia kazdej doby (+- 1)", len(days) >= span - 1 if span else None)
+    rep.add("OB-0c: latka decyzji gry o szturmie (linia okupu doby)", f"doby z 'latka decyzji: wpieta' {daily_ok}", "> 0 (okup O0 czynny)", daily_ok > 0 if daily_ok else None)
+
+    def tot(key, idx):
+        t = 0
+        for d in days:
+            m = OB0_NUMS[key].search(ob0[d])
+            if m:
+                t += int(m.group(idx))
+        return t
+    trues, passed = tot("true", 1), tot("true", 2)
+    vw, vr, vp = tot("walls", 1), tot("walls", 2), tot("walls", 3)
+    # OB-1
+    # OB-1a/1d: tylko linie O0 z "OB1 tak" (decyzje skryptu fabuly i Innych Veto przepuszcza bez OB1 - "OB1 wykluczone")
+    bad = [r for r in o0 if r["on"] and r["s1"] is not None and r["s1"] <= 1.0]
+    rep.add("OB-1a: decyzja AI przepuszczona przy s OB1 <= 1 (linie O0)", f"{len(bad)} z {sum(1 for r in o0 if r['on'])} linii O0 z OB1"
+            + (f"; np. {bad[0]['st']} dzien {bad[0]['d']} s {bad[0]['s1']}" if bad else ""), "0 (konstrukcyjne: weto przed okupem)", not bad if o0 else None)
+    badg = [r for r in o0 if r["on"] and r["s1"] is not None and r["ready"] is False]
+    rep.add("OB-1d: decyzja AI przepuszczona bez taranu i wiezy i bez wyrwy (linie O0, brama)", f"{len(badg)} z {sum(1 for r in o0 if r['on'])} linii O0 z OB1"
+            + (f"; np. {badg[0]['st']} dzien {badg[0]['d']}" if badg else ""), "0 (konstrukcyjne: brama przed stosunkiem)", not badg if o0 else None)
+    vg = tot("gate", 1)
+    hp = [x[3] for x in ob1 if x[2] == "mury trzymaja" and x[3] is not None]
+    rep.add("OB-1b: weta OB1 (INFO)", f"decyzje gry true {trues}, przepuszczone {passed}; wstrzymane: brama (bez taranu i wiezy, bez wyrwy) {vg}, mury {vw}, losowanie {vr},"
+            f" przerwa po odparciu {vp}; linii OB1 {len(ob1)} (brama {sum(1 for x in ob1 if x[2] == 'bez taranu i wiezy')}, mury {sum(1 for x in ob1 if x[2] == 'mury trzymaja')},"
+            f" przerwa {sum(1 for x in ob1 if x[2] == 'przerwa po odparciu')}); HP murow przy wecie murow: "
+            + (f"mediana {st.median(hp):.0f}%, min {min(hp)}%, 0% w {sum(1 for h in hp if h == 0)}" if hp else "-"), "INFO", None)
+    br, ew, ea, er, et, ep = tot("breach", 1), tot("eng", 1), tot("eng", 2), tot("eng", 3), tot("eng", 4), tot("eng", 5)
+    hits, broken = tot("hits", 1), tot("hits", 2)
+    ok1c = None
+    if span >= 120 and br > 0:
+        ok1c = ew > 0 and hits > 0
+    rep.add("OB-1c: AI bije mury (zmiana na trebusze -> trebusze -> trafienia)", f"zmian strategii {br}; machiny AI: trebusze {ew}, przeciw machinom {ea}, tarany {er}, wieze {et};"
+            f" gracz {ep}; trafienia w mury {hits}, odcinki rozbite {broken}", "przy zmianach strategii w biegu >= 120 dob: trebusze > 0 i trafienia > 0 (inaczej OB1 mrozi oblezenia)", ok1c)
+    # OB-2
+    ass, won, rep_n = tot("ass", 1), tot("ass", 3), tot("ass", 4)
+    defw, none_ = tot("res", 1), tot("res", 2)
+    ended = rep_n + won + defw + none_
+    share = rep_n / ended if ended else 0.0
+    if span >= 300:
+        per = rep_n / yr
+        rep.add("OB-2a (W-2): szturmy AI odparte", f"{rep_n} ({per:.1f} na 364 doby), udzial {share:.0%} z {ended} zakonczonych (zdobyte {won}, obronca wygral {defw}, bez rozstrzygniecia {none_})",
+                ">= 8 na 364 doby, udzial 35-70% (projekt przed zmiana OB2 - ponowne szturmy podnosza mianownik)", per >= 8 and 0.35 <= share <= 0.70,
+                etap=per >= 4 and 0.2 <= share <= 0.85)
+    else:
+        rep.add("OB-2a: szturmy AI odparte (INFO)", f"{rep_n}, udzial {share:.0%} z {ended} zakonczonych (zdobyte {won}, obronca wygral {defw}, bez rozstrzygniecia {none_}); rozpoczete {ass}",
+                "INFO (bieg < 300 dob)", None)
+    kb = None
+    for d in days:
+        m = OB0_KEYS.search(ob0[d])
+        if m:
+            kb = (float(m.group(1)), float(m.group(2)), float(m.group(3)))
+    badp = []
+    for r in ob2:
+        b = r["base"]
+        if not (b * 3.0 / 7.0 - 0.06 <= r["pause"] <= b * 4.0 + 0.06) or r["loss"] + 1e-3 < r["thr"]:
+            badp.append(r)
+        elif kb and kb[0] > 0 and not (kb[0] - kb[1] - 1e-3 <= r["thr"] <= kb[0] + kb[1] + 1e-3):
+            badp.append(r)
+    rep.add("OB-2b: odparcie - przerwa w [3/7, 4] x podstawa, straty >= prog, prog w L +- r", f"zle {len(badp)} z {len(ob2)}" + (f"; np. {badp[0]}" if badp else "")
+            + (f"; przerwa mediana {st.median([r['pause'] for r in ob2]):.1f} dob (min {min(r['pause'] for r in ob2):.1f}, max {max(r['pause'] for r in ob2):.1f})" if ob2 else ""),
+            "0 (konstrukcyjne)", not badp if ob2 else None)
+    viol = []
+    for r in ob2:
+        for q in o0:
+            if q["st"] == r["st"] and r["d"] < q["d"] <= r["until"] - 1.0:
+                viol.append((r["st"], r["d"], q["d"], r["until"]))
+                break
+    rep.add("OB-2c: decyzja AI (O0) o szturmie tej osady przed koncem przerwy", f"{len(viol)}" + (f"; np. {viol[0]}" if viol else ""), "0", not viol if ob2 else None)
+    # OB-3
+    fw = [r for r in ob3 if r["wall"] > 0]
+    held = sum(1 for r in fw if r["held"])
+    if span >= 300:
+        rep.add("OB-3 (W-6): bitwy ze szturmu z murow", f"z murow {len(fw)} z {len(ob3)} bitew ze szturmu z odsiecza; twierdza utrzymana {held}",
+                ">= 1 na 364 doby i utrzymana >= 50%", len(fw) >= yr and (held >= 0.5 * len(fw) if fw else False))
+    else:
+        rep.add("OB-3: bitwy ze szturmu z odsiecza (INFO)", f"{len(ob3)}, z murow {len(fw)}, twierdza utrzymana {held}", "INFO (bieg < 300 dob)", None)
+    # OB-4
+    ai4 = [r for r in ob4 if not r["player"] and not r["excl"]]
+    pl4 = [r for r in ob4 if r["player"]]
+    ex4 = [r for r in ob4 if r["excl"]]
+    badf = [r for r in ai4 if not (0.0 < r["f"] < 1.0)]
+    rep.add("OB-4: obozy oblegajacych spowolnione", f"AI {len(ai4)} (klasy: zamek {sum(1 for r in ai4 if r['cls'] == 'zamek')}, miasto {sum(1 for r in ai4 if r['cls'] == 'miasto')},"
+            f" stolica {sum(1 for r in ai4 if r['cls'] == 'stolica')}), mnoznik poza (0, 1) {len(badf)}; gracz {len(pl4)} (x{', x'.join(str(r['f']) for r in pl4[:5]) if pl4 else '-'}); wykluczone {len(ex4)}",
+            "AI > 0, mnoznik w (0, 1); gracz INFO (Jeff 14.10: takze gracz)", (len(ai4) > 0 and not badf) if ob4 else None)
+    # W-1, W-3, W-5
+    lo, hi, alo, ahi = (20, 32, 15, 38) if span >= 600 else (11, 17, 8, 21)
+    ncap = len(caps)
+    if span >= 300:
+        norm = ncap * (728.0 if span >= 600 else 364.0) / span
+        rep.add("W-1: zdobycia oblezeniem (L5b-2)", f"{ncap} w {span} dobach = {norm:.1f} na {'728' if span >= 600 else '364'}", f"{lo}-{hi} (alarm < {alo} albo > {ahi})",
+                lo <= norm <= hi, etap=alo <= norm <= ahi)
+    else:
+        rep.add("W-1: zdobycia oblezeniem (INFO)", f"{ncap} w {span} dobach", "INFO (bieg < 300 dob)", None)
+    durs = {"zamek": [], "miasto": []}
+    capt = 0
+    for d, sid in caps:
+        last = None
+        for q in o0:
+            if q["st"] == sid and q["d"] <= d:
+                last = q
+        if last is None:
+            continue
+        durs[last["kind"]].append(d - (last["d"] - last["age"]))
+        if last["cap"]:
+            capt += 1
+    if span >= 300:
+        mz = st.median(durs["zamek"]) if durs["zamek"] else None
+        mm = st.median(durs["miasto"]) if durs["miasto"] else None
+        rep.add("W-3: zdobycie od startu oblezenia - mediana", f"zamek {mz if mz is None else round(mz, 1)} ({len(durs['zamek'])}), miasto {mm if mm is None else round(mm, 1)} ({len(durs['miasto'])})",
+                "zamek >= 14, miasto >= 18 dob (fin30: 12 / 14)", (mz is None or mz >= 14) and (mm is None or mm >= 18))
+        rep.add("W-5: stolice zdobyte (ostatnia O0 'stolica tak')", f"{capt}", f"<= {2 if span >= 600 else 1}", capt <= (2 if span >= 600 else 1))
+    else:
+        rep.add("W-3/W-5: czas zdobycia i stolice (INFO)", f"zamek {[round(x, 1) for x in durs['zamek']]}, miasto {[round(x, 1) for x in durs['miasto']]}; stolice {capt}", "INFO (bieg < 300 dob)", None)
+    # W-8, W-9
+    longest = 0.0
+    o45 = set()
+    for d in days:
+        m = OB0_NUMS["sieges"].search(ob0[d])
+        if m:
+            longest = max(longest, float(m.group(3)))
+        m = OB0_O45.search(ob0[d])
+        if m and m.group(1).strip() != "-":
+            for part in m.group(1).split(", "):
+                if "(stolica)" not in part:
+                    o45.add(part.split(" ")[0])
+    lim45 = 3 if span >= 600 else 2
+    rep.add("W-8: blokada AI - najdluzsze oblezenie / poza stolicami > 45 dob", f"{longest:.1f} dob / {len(o45)} ({', '.join(sorted(o45)[:8])})", f"<= 100 / <= {lim45}",
+            longest <= 100.0 and len(o45) <= lim45 if span >= 120 else None)
+    disp = {}
+    for d in days:
+        m = OB0_DISP.search(ob0[d])
+        if m and m.group(1).strip() != "0":
+            for part in m.group(1).split(", "):
+                kv = part.rsplit(" ", 1)
+                if len(kv) == 2 and kv[1].isdigit():
+                    disp[kv[0]] = disp.get(kv[0], 0) + int(kv[1])
+    new_s = tot("sieges", 1)
+    bad_d = disp.get("CohesionDepleted", 0) + disp.get("FoodProblem", 0)
+    rep.add("W-9: armie rozwiazane przy oblezeniu (CohesionDepleted + FoodProblem)", f"{bad_d} na {new_s} nowych oblezen ({(bad_d / new_s if new_s else 0):.0%}); wszystkie: {disp}",
+            "<= 10% nowych oblezen", (bad_d <= 0.10 * new_s) if new_s >= 10 else None)
+    stum = tot("stum", 1)
+    rep.add("W-16: potkniecia SiegeWalls / ERROR", f"potkniecia {stum}, ERROR in SiegeWalls. {errs}", "0 / 0", stum == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -24555,6 +24818,8 @@ def main(argv):
         return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
     if group == "okup" and logp:
         return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
+    if group == "oblezenia" and logp:
+        return oblezenia_main(logp)   # 14.10 oblezenia OB1-OB4 (SiegeWalls): mury w pelni, odparcie z przerwa, bitwa z murow, budowa oblegajacych
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "rozwoj" and logp:

@@ -134,6 +134,10 @@ namespace Armoury
                 int p = s != null ? s.SiegePacePercent : 100;
                 float before = __result;
                 if (p < 100 && p >= 5) __result *= p / 100f;
+                // OB4 (Jeff 14.10: "realistyczne oblezenia takze dla mnie i czas budowy tez realistyczny"): strona OBLEGAJACA - AI i gracz - x SiegeBesiegerPrepPercent
+                // / klasa twierdzy (miasto 1.5, stolica 2.5); bez Innych i obozow skryptu fabuly; raz na lancuch (tu, po OutermostSiege)
+                float ob4 = SiegeWalls.PrepFactor(siegeEvent, side);
+                if (ob4 > 0f && ob4 < 1f) __result *= ob4;
                 // slad w logu: tylko oblezenie gracza, raz na typ machiny
                 try
                 {
@@ -146,7 +150,7 @@ namespace Armoury
                     try { men = MobileParty.MainParty != null ? MobileParty.MainParty.MemberRoster.TotalHealthyCount : 0; } catch { }
                     float hoursNow = __result > 0f ? 1f / __result : 0f;
                     Log.Info("WorldPace: budowa " + type.StringId + " (" + type.ManDayCost + " osobodni, strona " + side.BattleSide + ", zdrowych " + men
-                             + "): gra (z innymi modami) " + (before * 100f).ToString("0.00") + "%/h -> po suwaku " + p + "% " + (__result * 100f).ToString("0.00")
+                             + "): gra (z innymi modami) " + (before * 100f).ToString("0.00") + "%/h -> po suwaku " + p + "% i OB4 x" + ob4.ToString("0.000") + " " + (__result * 100f).ToString("0.00")
                              + "%/h = ~" + hoursNow.ToString("0") + " h (" + (hoursNow / 24f).ToString("0.0") + " dnia) od zera.");
                 }
                 catch { }
