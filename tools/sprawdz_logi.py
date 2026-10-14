@@ -16545,6 +16545,12 @@ def _j14_c3(lines, rep):
             "<= 9 (regula do domu: 5 rodzajow pancerza + 4 sloty broni)", (worst[0] <= 9.0) if worst else None)
     st = sum(num(r"\| potkniecia (\d+) \(razem", s, int, 0) or 0 for s in days.values())
     rep.add("J3-5: potkniecia VetKit", f"{st}", "0", st == 0)
+    # recenzja C3: zolnierze druzyny gracza (rozbici H3) biora komplet z czesci ludzi zbrojowni druzyny - tylko INFO (autotest nie walczy w misji)
+    pm = sum(num(r"z druzyny gracza ludzi (\d+)", s, int, 0) or 0 for s in days.values())
+    pp = sum(num(r"z druzyny gracza ludzi \d+, sztuk (\d+)", s, int, 0) or 0 for s in days.values())
+    pl = sum(num(r"stan na plus zostal w druzynie (\d+)", s, int, 0) or 0 for s in days.values())
+    rep.add("J3-6: komplety zolnierzy gracza (rozbici H3)", f"ludzi {pm}, sztuk {pp}, stan na plus zostal w druzynie {pl}",
+            "INFO (zbiegli z bitew gracza; po pojmaniu 0 - zbrojownia u zdobywcy, C4)", None)
 
 
 def jeff14_main(logp):

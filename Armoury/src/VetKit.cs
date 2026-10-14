@@ -19,7 +19,10 @@ namespace Armoury
     /// Teraz ta sama droga co kon (jedna regula):
     ///  - WEJSCIE (PeopleBook.VetCommit): t ludzi typu X bierze ze zbrojowni DTE partii swoje komplety bez koni i rzedow - regula A7 (GarrisonArmory.KitFor:
     ///    udzial wedlug typu, gdy zbrojownia ma braki - proporcjonalnie do ludzi, ktorzy zostaja; sztuka wzorca, potem ten sam tier, wyzsze, nizsze; bez unikatow)
-    ///    - do puli kompletow miasta karczmy razem ze stanem sztuk (zapis obitych AiWear.TakeWornShare). Zbrojownia gracza nietknieta - jak przy koniu.
+    ///    - do puli kompletow miasta karczmy razem ze stanem sztuk (zapis obitych AiWear.TakeWornShare). Recenzja C3 (Jeff "tak" - takze u AI, jedna regula):
+    ///    zolnierze druzyny gracza (do karczmy trafiaja jako rozbici H3 - takze z WYGRANEJ bitwy, bo gra zdejmuje uciekajacych z rosteru) biora swoje komplety
+    ///    z czesci LUDZI zbrojowni druzyny DTE tak samo jak przy przeniesieniu ludzi do zalogi (GarrisonArmory.KitsToGarrison: Twoja ksiega nietknieta,
+    ///    bez stanow na plus - zostaja w druzynie); kon gracza - bez zmian (HorseFate: zbrojownia gracza nietknieta przy koniu, osobna regula E6/K1).
     ///  - NAJEM (RecruitKit przypadek 7 - AI i gracz, PlayerMerc): najemnik bierze komplet swojego typu z puli tej karczmy; rodzaje, ktore dostal z puli,
     ///    zastepuja dobytek z domu (OwnOf) - nie dwa razy; reszta dobytku jak dotad. Sztuki ze stanem (obite) ida obite.
     ///  - DO DOMU (raz na dobe): sztuki ponad tych, ktorzy dalej czekaja w karczmie (na rodzaj pancerza i tarcze najwyzej 1 na czlowieka, bron i pociski najwyzej
@@ -38,7 +41,7 @@ namespace Armoury
 
         // liczniki doby
         private static int _dMen, _dMenNoKit, _dPlayer, _dNoArm, _dHireMen, _dHireNoKit, _dTowns, _stumbles, _dStumbles;
-        private static long _dIn, _dOut, _dOwnSwapped, _dHome;
+        private static long _dIn, _dOut, _dOwnSwapped, _dHome, _dPlayerPcs, _dPlayerPlus;
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
 
         internal static void Reset()
@@ -50,7 +53,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dMen = _dMenNoKit = _dPlayer = _dNoArm = _dHireMen = _dHireNoKit = _dTowns = _dStumbles = 0;
-            _dIn = _dOut = _dOwnSwapped = _dHome = 0;
+            _dIn = _dOut = _dOwnSwapped = _dHome = _dPlayerPcs = _dPlayerPlus = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -105,20 +108,21 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wejscie (PeopleBook.VetCommit)
-        /// <summary>t ludzi typu troop odchodzi z partii do karczmy miasta town - bierze swoje komplety ze zbrojowni DTE partii (bez koni i rzedow - HorseFate).</summary>
-        internal static void Take(MobileParty party, CharacterObject troop, Settlement town, int n)
+        /// <summary>t ludzi typu troop odchodzi z partii do karczmy miasta town - bierze swoje komplety ze zbrojowni DTE partii (bez koni i rzedow - HorseFate).
+        /// inRoster - odchodzacy sa jeszcze w rosterze partii (166, W4c, 179, rozwiazane); false - juz zeszli (rozbici H3).</summary>
+        internal static void Take(MobileParty party, CharacterObject troop, Settlement town, int n, bool inRoster)
         {
             if (n <= 0 || troop == null || town == null || town.StringId == null || !On) return;
             try
             {
                 if (party == null) { _dNoArm += n; return; }
-                if (party.IsMainParty) { _dPlayer += n; return; }   // zbrojownia gracza nietknieta - jak kon weterana (HorseFate.VetTakeHorses)
+                if (party.IsMainParty) { TakePlayer(party, troop, town, n, inRoster); return; }   // recenzja C3: ta sama regula z czesci ludzi zbrojowni druzyny
                 var all = AiGear.Armories();
                 Dictionary<ItemObject, int> arm;
                 if (all == null || !all.TryGetValue(party.Id, out arm) || arm == null || arm.Count == 0) { _dNoArm += n; return; }
                 var avail = new Dictionary<ItemObject, int>();
                 foreach (var kv in arm) if (kv.Value > 0 && Kit(kv.Key)) avail[kv.Key] = kv.Value;
-                var taken = GarrisonArmory.KitFor(avail, troop, n, GarrisonArmory.NeedLeftWithout(party, troop, n));
+                var taken = GarrisonArmory.KitFor(avail, troop, n, GarrisonArmory.NeedLeftWithout(party, troop, inRoster ? n : 0));
                 var p = PoolOf(town.StringId, true);
                 long pcs = 0; bool synced = false;
                 foreach (var kv in taken)
@@ -139,6 +143,53 @@ namespace Armoury
                 if (pcs > 0) _dMen += n; else _dMenNoKit += n;
             }
             catch (Exception e) { Stumble("Take", e); }
+        }
+
+        /// <summary>Recenzja C3: zolnierze druzyny gracza (rozbici H3) - komplety z czesci LUDZI zbrojowni druzyny DTE (ArmyArmory), ta sama droga co ludzie
+        /// przenoszeni ekranem do zalogi (GarrisonArmory.KitsToGarrison): Twoja ksiega na najgorszych egzemplarzach nietknieta, ludzie biora najlepsze;
+        /// bez koni, rzedow i unikatow; sztuki ze stanem na plus zostaja w druzynie (zbrojownia AI ich nie zna - stracilyby wartosc u nowego pana);
+        /// obita sztuka idzie do puli ze swoim stanem. Przy pojmaniu (C4) zbrojownia jest juz u zdobywcy - wtedy nic do wziecia.</summary>
+        private static void TakePlayer(MobileParty main, CharacterObject troop, Settlement town, int n, bool inRoster)
+        {
+            var armory = QuartermasterLaw.DteArmory();
+            if (armory == null || QuartermasterEscrow.Active) { _dNoArm += n; return; }
+            var avail = new Dictionary<ItemObject, int>();
+            var copies = new Dictionary<ItemObject, List<SwapMath.Piece>>();
+            foreach (var type in QuartermasterLaw.KitTypes)
+            {
+                if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) continue;   // kon i rzad - HorseFate (gracz bez zmian)
+                foreach (var pc in QuartermasterLaw.KitPieces(armory, type, true))   // own = Twoja ksiega na najgorszych egzemplarzach id
+                {
+                    var el = QuartermasterLaw.ElOf(pc); var it = el.Item; var m = el.ItemModifier;
+                    if (it == null || pc.MenTotal <= 0 || !Kit(it)) continue;
+                    if (m != null && m.PriceMultiplier > 1f) { _dPlayerPlus += pc.MenTotal; continue; }
+                    int v; avail.TryGetValue(it, out v); avail[it] = v + pc.MenTotal;
+                    List<SwapMath.Piece> l; if (!copies.TryGetValue(it, out l)) copies[it] = l = new List<SwapMath.Piece>(); l.Add(pc);
+                }
+            }
+            var taken = GarrisonArmory.KitFor(avail, troop, n, GarrisonArmory.NeedLeftWithout(main, troop, inRoster ? n : 0));
+            var p = PoolOf(town.StringId, true);
+            long pcs = 0;
+            foreach (var kv in taken)
+            {
+                List<SwapMath.Piece> l;
+                if (kv.Key == null || kv.Value <= 0 || !copies.TryGetValue(kv.Key, out l)) continue;
+                l.Sort((a, b) => SwapMath.WorseFirst(b, a));   // najlepsze egzemplarze ludzi najpierw (Twoja czesc to najgorsze) - jak KitsToGarrison
+                int left = kv.Value;
+                foreach (var pc in l)
+                {
+                    if (left <= 0) break;
+                    int k = Math.Min(left, pc.MenTotal);
+                    if (k <= 0) continue;
+                    var el = QuartermasterLaw.ElOf(pc);
+                    armory.AddToCounts(el, -k);
+                    Put(p, kv.Key, el.ItemModifier != null ? el.ItemModifier.StringId : "", k);
+                    left -= k; pcs += k;
+                }
+            }
+            if (p.Count == 0) _pool.Remove(town.StringId);
+            _dIn += pcs; _dPlayer += n; _dPlayerPcs += pcs;
+            if (pcs > 0) _dMen += n; else _dMenNoKit += n;
         }
 
         // ------------------------------------------------------------ najem (RecruitKit przypadek 7, PlayerMerc)
@@ -240,7 +291,8 @@ namespace Armoury
                           + " (teraz " + now + ", roznica " + (now - (_poolPrev + _dIn - _dOut - _dHome)) + ")";
                     Log.Info("Komplet weterana (C3): dzien " + day + " | " + (on ? "CZYNNE" : "wylaczone (VeteranTakesKit / weterani) - pula na polki")
                              + " | weszlo do karczm: ludzi z kompletem " + _dMen + ", sztuk " + _dIn + "; bez kompletu - zbrojownia bez ich rodzajow " + _dMenNoKit
-                             + ", bez zbrojowni (jency, rozbici bez partii) " + _dNoArm + ", gracz (zbrojownia nietknieta) " + _dPlayer
+                             + ", bez zbrojowni (jency, rozbici bez partii) " + _dNoArm + "; z druzyny gracza ludzi " + _dPlayer + ", sztuk " + _dPlayerPcs
+                             + " (stan na plus zostal w druzynie " + _dPlayerPlus + ")"
                              + " | najem: ludzi z kompletem z puli " + _dHireMen + ", sztuk " + _dOut + " (zastapiony dobytek z domu " + _dOwnSwapped + "), bez kompletu w puli " + _dHireNoKit
                              + " | do domu (na polki miast): " + _dHome + " szt. z " + _dTowns + " miast | pula " + now + " szt. w " + towns + " miastach | " + ctl
                              + " | potkniecia " + _dStumbles + " (razem " + _stumbles + ").");
