@@ -5496,6 +5496,10 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
 
+        [SettingPropertyBool("Twins Toll", HintText = "the lord of the Twins takes a toll at his bridge: 2 denars a man (prisoners too) and 1 a beast, never more than one day of that party's wages - what the long way round would cost it; merchants, village carts, lords of other realms and you pay it into his purse, while lords of his own realm, his own caravans and carts and outlaws cross free. Needs Twins Crossing Count (off = nobody pays, the toll is only counted)")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool TwinsToll { get; set; } = true;
+
         [SettingPropertyInteger("Village Raid Messages", 0, 2, "0", HintText = "who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public int VillageRaidMessages { get; set; } = 1;
@@ -7105,6 +7109,7 @@ namespace Armoury
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
             s.TwinsCrossingCount = TwinsCrossingCount;
+            s.TwinsToll = TwinsToll;
             s.VillageRaidMessages = VillageRaidMessages;
             s.VillageWarMemory = VillageWarMemory;
             s.VillageTipLore = VillageTipLore;

@@ -1945,6 +1945,11 @@ namespace Armoury
         // --- The map and its crossings (stage 7) ---
         // E7/B (231, PLAN 7.12, R16): licznik przejsc mostem Bliznakow (TwinsCrossing) - tylko log; myto "gdyby bylo" do porownania, nikt nic nie placi
         public bool TwinsCrossingCount = true;             // counts the parties crossing the bridge at the Twins each day and what a toll would have brought - log only, nobody pays anything
+        // B3 (PLAN 7.12; Jeff 12.10 "chce, ale policz"): myto na Bliznakach (TwinsCrossing.Toll) - przy przejsciu mostem kiesa partii placi do kiesy pana Bliznakow
+        // 2 zl od czlowieka (z jencami) i 1 zl od zwierzecia, najwyzej dzien kosztu partii (zold, a bez zoldu 1 zl od czlowieka) = cena drogi okreznej, wiec
+        // AI zawsze woli zaplacic; zwolnieni: rody krolestwa pana, karawany i wozy wsi samego pana, bandy. Wymaga TwinsCrossingCount. Linia "Myto Bliznakow (B3)".
+        // Off = nikt nie placi (licznik i "myto gdyby bylo" jak dotad)
+        public bool TwinsToll = true;                      // the lord of the Twins takes a toll at his bridge: 2 denars a man (prisoners too) and 1 a beast, never more than one day of that party's wages - what the long way round would cost it; merchants, village carts, lords of other realms and you pay it into his purse, while lords of his own realm, his own caravans and carts and outlaws cross free. Needs Twins Crossing Count (off = nobody pays, the toll is only counted)
         // E7/W1 (232, PLAN 7.10 a, R10/R14): komunikat "plonie / spalona / splondrowana" (VillageNews) wedlug stanu ksiegi wiosek i pamiec wojny wioski (sekcja m: klucza arm_district)
         public int VillageRaidMessages = 1;                // who hears that a village is burning, has been burned or plundered: 0 nobody, 1 your own fiefs (and your own raids), 2 your whole kingdom
         public bool VillageWarMemory = true;               // a village remembers who burned or plundered it, when, and how many fled and died
