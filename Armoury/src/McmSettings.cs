@@ -1520,6 +1520,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float CapitalTreasuryShare { get; set; } = 0.333f;
 
+        [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool EnemyCaravansSeized { get; set; } = true;
+
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -5951,6 +5955,7 @@ namespace Armoury
             s.SackLoyaltyHit = SackLoyaltyHit;
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
+            s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;
