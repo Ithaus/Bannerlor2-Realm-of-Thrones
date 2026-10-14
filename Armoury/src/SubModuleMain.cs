@@ -53,6 +53,7 @@ namespace Armoury
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
+                try { A16Signals.ApplyAll(_harmony); } catch (Exception e) { Log.Error("A16Signals.ApplyAll", e); }   // A16: premia pokoju RBL po 30 dobach spokoju, dubel warstwy dobrobytu BK, pomiar ludnosci BK (latki pomiaru zawsze)
                 SellByCondition.ApplyAll(_harmony);  // cena sprzedazy sprzetu (B): ksiega skupu (tylko log) - kto sprzedaje: ekran handlu gracza, SellItemsAction
                 TrueArmourCost.ApplyAll(_harmony);
                 ThrownWobblePatch.ApplyAll(_harmony);
@@ -398,6 +399,7 @@ namespace Armoury
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
                 starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
+                starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

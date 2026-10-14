@@ -97,6 +97,10 @@ namespace Armoury
         private sealed class AlarmInfo { public double AtH; public Vec2 Pos; public bool DebtPath; public NightOrder Order; }
 
         private static readonly Dictionary<MobileParty, AiSleep> _ai = new Dictionary<MobileParty, AiSleep>();
+        // A16 (ROZPOZNANIE-A16 poz. 7, tylko pomiar): samotny lord w ruchu bez wpisu powodu w godzinie obozu - numer taktu, w ktorym go zapisano; w nastepnym
+        // takcie: postoj (oboz, osada, sen dlugu) albo dalej w ruchu. Wynik w linii "AiNightCamp: ruch" nastepnej godziny obozu (po swicie - w pierwszej linii nocy)
+        private static readonly Dictionary<MobileParty, long> _a16Watch = new Dictionary<MobileParty, long>();
+        private static int _a16Rest, _a16Again, _a16Gone;
         // kary AI czytane rownolegle (predkosc) - tylko podmiana calego obiektu, nigdy zmiana w miejscu
         private static volatile Dictionary<MobileParty, int> _aiPenalty = new Dictionary<MobileParty, int>();
         private static readonly Dictionary<MobileParty, DebtSleeper> _debtSleep = new Dictionary<MobileParty, DebtSleeper>();
@@ -173,6 +177,7 @@ namespace Armoury
         {
             public int Lone, Reason, AlarmFled, AlarmStay, Woken, DebtWoken, Exit, OldLot, OldOther, Other, NoEntry, Lead, LeadReason;
             public int Sea;   // poprawka recenzji: zeglujacy (wyjatek W2, legalny) osobno - nie wchodza do "BEZ WPISU POWODU" (P2)
+            public int A16N; public readonly List<string> A16Names = new List<string>(5);   // A16 (poz. 7, tylko pomiar): samotni bez powodu - przyklady
             public int NoReason { get { return Lone - Reason - AlarmFled; } }
 
             public void Add(AiSleep e, bool leader, long prevStamp)
@@ -656,6 +661,7 @@ namespace Armoury
         private static void ResetAi()
         {
             _ai.Clear(); _aiPenalty = new Dictionary<MobileParty, int>(); _debtSleep.Clear(); _alarmed.Clear(); _townHold.Clear();
+            _a16Watch.Clear(); _a16Rest = _a16Again = _a16Gone = 0;     // A16 (poz. 7): obserwacja nastepnego taktu od zera
             _prevPos = new Dictionary<MobileParty, Vec2>();
             _aiPending = null; _aiImportFresh = false; _debtWasOn = null; _ledgerStamp = -1;
             _lastDebtSweep = CampaignTime.Zero; _lastAlarmSweep = CampaignTime.Zero; _debtDhMax = 0; _alarmDhMax = 0;
@@ -1035,12 +1041,20 @@ namespace Armoury
                             e.Rest += inc;
                             if (e.Acc >= 0f) e.Acc += inc;
                         }
+                        // A16 (poz. 7): los w tym takcie lorda zapisanego w poprzednim jako "bez powodu"
+                        long a16w;
+                        if (_a16Watch.Count > 0 && _a16Watch.TryGetValue(mp, out a16w))
+                        {
+                            _a16Watch.Remove(mp);
+                            if (a16w == stamp - 1) { if (resting || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp)) _a16Rest++; else _a16Again++; }
+                        }
                         if (mt != null && known && moved && mp.IsActive && mp.AttachedTo == null && mp.CurrentSettlement == null && mp.MapEvent == null)
                         {
                             if (mp.IsCurrentlyAtSea) mt.Sea++;   // zeglujacy (W2) - osobno, poza "bez wpisu powodu"
                             else
                             {
                                 mt.Add(e, IsLeader(mp), stamp - 1);
+                                if (!IsLeader(mp)) A16NoReason(mp, e, stamp, mt);
                                 // E7/0 (224): czlonek armii niedoczepiony ruszyl sie w minionej godzinie obozu bez wpisu powodu - ta sama miara co MoveTally.Add
                                 if (mp.Army != null && !IsLeader(mp))
                                 {
@@ -1176,16 +1190,48 @@ namespace Armoury
             Log.Info("NocnyMarsz: " + why + ".");
         }
 
+        private static readonly string[] A16StName = { "bez wpisu", "wyjazd lub bitwa", "obudzony", "z powodem", "alarm bez ucieczki", "dlug", "los", "stare T1", "Inni/doczepieni" };
+
+        /// <summary>A16 (poz. 7, tylko pomiar): samotny lord w ruchu w minionej godzinie obozu bez wpisu powodu - przyklad do linii i obserwacja nastepnego taktu.</summary>
+        private static void A16NoReason(MobileParty mp, AiSleep e, long stamp, MoveTally mt)
+        {
+            try
+            {
+                byte st = e.StateStamp == stamp - 1 ? e.State : StNone;
+                if (st == StReason || (st == StAlarm && e.AlarmEnd == 1) || st == StOther) return;   // z powodem / ucieczka / Inni i doczepieni - poza miara T3
+                mt.A16N++;
+                _a16Watch[mp] = stamp;
+                if (mt.A16Names.Count < 5)
+                {
+                    string nm = mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : (mp.Name != null ? mp.Name.ToString() : "?");
+                    mt.A16Names.Add(nm.Replace('|', '/').Replace(';', ',') + " [" + (st < A16StName.Length ? A16StName[st] : "?") + "]");
+                }
+            }
+            catch { }
+        }
+
         private static void LogMove(int h, MoveTally m)
         {
             int ph = Mod24(h - 1);
+            // A16 (poz. 7): wpisy obserwacji starsze niz 2 takty (partia zniknela, nie byla w liscie lordow) - liczone osobno i zdjete
+            if (_a16Watch.Count > 0)
+            {
+                long now = long.MinValue;
+                foreach (var v in _a16Watch.Values) if (v > now) now = v;
+                var old = new List<MobileParty>();
+                foreach (var kv in _a16Watch) if (kv.Value < now - 1) old.Add(kv.Key);
+                foreach (var k in old) { _a16Watch.Remove(k); _a16Gone++; }
+            }
             Log.Info("AiNightCamp: ruch " + ph + ":00-" + h + ":00 (pomiar z pozycji, > " + RestMoveLimit.ToString("0.00", CultureInfo.InvariantCulture)
                      + " jedn. w godzinie obozu, poza osada i bitwa) - samotni lordowie w ruchu " + m.Lone + ": z powodem " + m.Reason
                      + ", alarm -> ucieczka " + m.AlarmFled + " | BEZ WPISU POWODU " + m.NoReason + ": alarm bez ucieczki " + m.AlarmStay
                      + ", obudzeni cudza reka " + m.Woken + ", dluznicy obudzeni " + m.DebtWoken + ", wyjazd z osady / po bitwie " + m.Exit
                      + ", los (stare reguly) " + m.OldLot + ", stare wyjatki T1 " + m.OldOther + ", Inni/doczepieni " + m.Other
                      + ", bez wpisu " + m.NoEntry + "; wodzowie armii w ruchu " + m.Lead + " (z powodem " + m.LeadReason + ")"
-                     + "; na morzu (W2, poza progiem P2) " + m.Sea + ".");
+                     + "; na morzu (W2, poza progiem P2) " + m.Sea
+                     + " | A16 samotni bez powodu (bez Inni/doczepieni) " + m.A16N + (m.A16Names.Count > 0 ? ": " + string.Join("; ", m.A16Names.ToArray()) : "")
+                     + "; zapisani w poprzednim takcie: w nastepnym postoj (oboz, osada, sen dlugu) " + _a16Rest + ", dalej w ruchu " + _a16Again + ", znikneli z listy " + _a16Gone + ".");
+            _a16Rest = _a16Again = _a16Gone = 0;
             _day.SeaMove += m.Sea;
             _day.MoveHours++; _day.MoveLone += m.Lone; _day.MoveNoReason += m.NoReason; _day.MoveExit += m.Exit;
             _day.MoveWoken += m.Woken; _day.MoveAlarmStay += m.AlarmStay; _day.MoveDebtWoken += m.DebtWoken;

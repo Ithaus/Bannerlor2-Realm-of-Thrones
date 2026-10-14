@@ -5544,6 +5544,22 @@ namespace Armoury
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8WorldLog { get; set; } = true;
 
+        [SettingPropertyBool("Rbl Peace Needs Quiet", HintText = "Realistic Bannerlord's 'Extended Peace' prosperity bonus goes only to a town or castle that has seen no attack on itself or on any of its villages for 30 days (as Realistic Bannerlord means it); off = as before, when it reached almost every town and castle all through a war, because the game forgets the last attacker a day after the attack")]
+        [SettingPropertyGroup("Signals from the long runs (A16)")]
+        public bool RblPeaceNeedsQuiet { get; set; } = true;
+
+        [SettingPropertyBool("Bk Prosperity Layer Once", HintText = "Banner Kings' prosperity layer (its population, stability and food deltas and its prosperity growth multiplier) counts once instead of twice when Realistic Bannerlord's prosperity model is in play (off = as before: twice, which slows prosperity growth more than Banner Kings means)")]
+        [SettingPropertyGroup("Signals from the long runs (A16)")]
+        public bool BkProsperityLayerOnce { get; set; } = false;
+
+        [SettingPropertyBool("Bk Returns To Origin Village", HintText = "A soldier of known origin who comes home - fled from a lost battle, freed, or dismissed for want of pay - goes back to the same village (or town) in Banner Kings' population that he returns to in the mod's own count of people; off = as before: in Banner Kings he joined the nearest settlement of his realm and culture to the battle, a castle or town among them, or a village of his lord's house")]
+        [SettingPropertyGroup("Signals from the long runs (A16)")]
+        public bool BkReturnsToOriginVillage { get; set; } = true;
+
+        [SettingPropertyBool("A16 Signals Log", HintText = "Writes daily lines that measure what drives town and castle prosperity, the births, deaths and coming of age of lords, and every change of Banner Kings' population by kind of settlement (diagnostics only)")]
+        [SettingPropertyGroup("Signals from the long runs (A16)")]
+        public bool A16SignalsLog { get; set; } = true;
+
         [SettingPropertyBool("Valve Raise While Short", HintText = "a raw material that more than Valve Short Towns towns have none of may be raised by the village regulator above Village Output Step - step by step every four weeks, up to Valve Short Ceiling - as long as the world uses up all that is made and the stock stays low: the same villages put more of their work into it (flax for the weavers stood at the ordinary ceiling all year while nine towns in ten had no linen). Off = the ordinary ceiling holds, and a good already above it returns to it at the next decision")]
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool ValveRaiseWhileShort { get; set; } = false;
@@ -7113,6 +7129,10 @@ namespace Armoury
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
+            s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
+            s.BkProsperityLayerOnce = BkProsperityLayerOnce;
+            s.BkReturnsToOriginVillage = BkReturnsToOriginVillage;
+            s.A16SignalsLog = A16SignalsLog;
             s.ValveRaiseWhileShort = ValveRaiseWhileShort;
             s.ValveShortCeiling = ValveShortCeiling;
             s.ValveStepFollowsUse = ValveStepFollowsUse;

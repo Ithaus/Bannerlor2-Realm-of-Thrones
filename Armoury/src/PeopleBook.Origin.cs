@@ -863,12 +863,13 @@ namespace Armoury
                     var node = Node(k);
                     double tm = 0.0;
                     try { tm = BackToTown(node, k, m); } catch (Exception e) { OStumble("HomeKnown(miasto)", e); tm = 0.0; }
-                    if (tm > 0.0) { placed += tm; _homeBy[cause] += tm; _homeTown += tm; m -= tm; }
+                    if (tm > 0.0) { placed += tm; _homeBy[cause] += tm; _homeTown += tm; m -= tm; if (_bkMirror != null) _bkMirror.Add(new KeyValuePair<Settlement, double>(node, tm)); }
                     if (!(m > Eps)) { s.M.Remove(k); continue; }
                     var v = OutlawLaw.WeakestVillage(node);
                     if (v == null) { _homeNoVillage += m; s.M[k] = m; continue; }
                     Move(v, AService, ADom, m, cause, PeopleUnit.GamePerMan);
                     placed += m; _homeBy[cause] += m;
+                    if (_bkMirror != null) _bkMirror.Add(new KeyValuePair<Settlement, double>(v.Settlement, m));   // A16: ta sama osada dla ludnosci BK
                     s.M.Remove(k);
                 }
                 s.Total = 0.0; foreach (var x in s.M.Values) s.Total += x;
@@ -898,6 +899,29 @@ namespace Armoury
             Count(done, MBackTown, 0.0);
             r.TownBack += done;
             return done;
+        }
+
+        // A16 (BkReturnsToOriginVillage, ROZPOZNANIE-A16 poz. 9): lustro umieszczen HomeKnownBody - lista (osada, ludzie) wsi i miast, do ktorych ksiega oddala
+        // ludzi z pochodzeniem; wolajacy (LosersFlee.ToBk, ClanBudget.ToVillage) dopisuje TYCH SAMYCH ludzi do ludnosci BK tych samych osad. null - bez lustra (jak dotad).
+        // Mur (WatchHome) nie trafia do listy - wolajacy z udzialem Strazy (W > 0) idzie droga sprzed A16.
+        [ThreadStatic] private static List<KeyValuePair<Settlement, double>> _bkMirror;
+
+        /// <summary>A16: HomeKnown z lustrem umieszczen (places - wies albo miasto, ludzie).</summary>
+        internal static double HomeKnownMirror(Shares s, int cause, List<KeyValuePair<Settlement, double>> places)
+        {
+            var prev = _bkMirror;
+            _bkMirror = places;
+            try { return HomeKnown(s, cause); }
+            finally { _bkMirror = prev; }
+        }
+
+        /// <summary>A16: HomeOrNote z lustrem umieszczen czesci znanej (places); reszta - Note(causeLegacy) jak dotad.</summary>
+        internal static void HomeOrNoteMirror(Shares s, double n, int causeKnown, int causeLegacy, List<KeyValuePair<Settlement, double>> places)
+        {
+            var prev = _bkMirror;
+            _bkMirror = places;
+            try { HomeOrNote(s, n, causeKnown, causeLegacy); }
+            finally { _bkMirror = prev; }
         }
 
         /// <summary>Znana czesc -> HomeKnown (z hearth), reszta n -> Note(causeLegacy) jak w E4/3 (causeLegacy &lt; 0 - bez Note). Udzialy `s` zuzyte.</summary>
