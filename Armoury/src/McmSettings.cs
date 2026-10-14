@@ -1844,7 +1844,7 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
 
-        [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, fletchers and households (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before")]
+        [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, workshops and households, never less than 40 loads (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before")]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWoodAboveCraftStock { get; set; } = true;
 

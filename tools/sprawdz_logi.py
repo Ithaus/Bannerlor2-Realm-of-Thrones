@@ -543,9 +543,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa towary2   : (Towary 2, docs/towary-2/ROZPOZNANIE-TOWARY-2.md rozdz. 2, pozycje K1-K4) python -I tools/sprawdz_logi.py --grupa towary2 [--do-doby 120] <Armoury-*.log>
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). K1 (BuildWoodAboveCraftStock - budowy biora drewno tylko ponad zapas rzemiosla):
                     T2-K1-0 dopisek w "Roboty ludu (P2)", T2-K1-1 cykle warsztatow bez drewna <= 100/d, T2-K1-2 miast bez drewna <= 20, T2-K1-3 budowa idzie
-                    >= 80 osad, T2-K1-4 zbroja korpusu t3+t4 >= 27.6/d (warsztaty.log), T2-K1-5 INFO, T2-K1-6 straz narzedzi (budowy <= 41.6/d, wsie >= 66.7/d).
+                    >= 80 osad, T2-K1-4 zbroja korpusu t3+t4 >= 27.6/d (warsztaty.log), T2-K1-5 INFO, T2-K1-6 straz narzedzi (budowy <= 41.6/d, wsie >= 66.7/d),
+                    T2-K1-7 straz tempa budow (punkty budowy pana + ludu >= 636/d = 75% N; recenzja).
                     K2 (VillageClothAboveReserve - koszyk dnia wsi bierze plotno tylko ponad prog polki): T2-K2-0 dopisek w "Kiesa ludu", T2-K2-1 wsie <= 60 szt./d,
-                    T2-K2-2 plotno do wojska >= 75 szt./d, T2-K2-3 kolejka plotna wojska d90 -> until bez wzrostu, T2-K2-4 miast bez plotna <= 50, T2-K2-5 regulator
+                    T2-K2-2 plotno do wojska >= 75 szt./d, T2-K2-3 kolejka plotna wojska od poczatku okna (d90 przy --do-doby 120) do until bez wzrostu, T2-K2-4 miast bez plotna <= 50, T2-K2-5 regulator
                     lnu >= 1.2, T2-K2-6 INFO. K3 (TannerExportPrice - garbarz garbuje tez na wywoz): T2-K3-0 dopisek w "Rzemioslo miasta (148)", T2-K3-1 miast
                     bez skory <= 20, T2-K3-2 skora do wojska >= 75 szt./d, T2-K3-3 cykle warsztatow bez skory <= 50/d, T2-K3-4 garbarze "bez zysku" <= 50 miast,
                     T2-K3-5 INFO. K4 (GoodsLedgerTickAuthors - sama diagnoza): T2-K4-1 INFO - kto dopisuje piwo, chleb, mieso, ser, maslo w tickach osad i miast
@@ -19190,6 +19191,14 @@ def towary2_main(logp, start_arg, until=120):
     rep.add("T2-K1-6: narzedzia - budowy i wsie (Towary tools, srednia)", f"budowy {fx_(t1)}/d, wsie {fx_(t2)}/d ({n} dob); miast z < 5 narzedziami {fx_(t3)}",
             "budowy <= 41.6/d i wsie >= 66.7/d (N: budowy 20.8, wsie 83.3, miast z < 5 narzedziami 81.5)" + tail1,
             g1((t1 is None or t1 <= 41.6) and (t2 is None or t2 >= 66.7)) if (t1 is not None or t2 is not None) else None)
+    # recenzja K1 (zasada 0, regresja): material budow kupuje robote (robota najwyzej 3 x material) - drewno zatrzymane dla rzemiosla to tez mniej punktow budowy;
+    # T2-K1-3 liczy tylko osady z postepem, nie tempo. Straz: punkty budowy pana + ludu >= 75% N (rachunek autora: budowy zachowuja 80-93% drewna, 5% na los kampanii)
+    p1_, n = avg(bo, r"punktow budowy (\d+)")
+    p2_, _ = avg(rl, r"\| punkty (\d+),")
+    pt = (p1_ or 0) + (p2_ or 0) if (p1_ is not None or p2_ is not None) else None
+    rep.add("T2-K1-7: straz tempa budow - punkty budowy pana + ludu (Budowy oplacone, Roboty ludu P2, srednia)",
+            f"{fx_(pt, 0)} pkt/d (pan {fx_(p1_, 0)}, lud {fx_(p2_, 0)}; {n} dob)",
+            ">= 636 pkt/d = 75% N (N 848 = pan 562 + lud 286)" + tail1, g1(pt >= 636) if pt is not None else None)
 
     # ---- K2: wies kupuje plotno dopiero ponad zapas polki (VillageClothAboveReserve; TownFolk.Live.cs BuyGoods, dopisek linii "Kiesa ludu")
     kl = by_day(lines, "Kiesa ludu: dzien")
@@ -19219,13 +19228,14 @@ def towary2_main(logp, start_arg, until=120):
         q = num(r"plotno (\d+(?:\.\d+)?)", w, float)
         if q is not None:
             od[run_day(d, start)] = q
-    wd = sorted(k for k in od if 90 <= k <= until)
-    if len(wd) >= 2 and wd[-1] >= 92:
+    # recenzja: poczatek okna z --do-doby (lo - 1), nie stale d90 - przy --do-doby 728 porownywalo d90 z d728
+    wd = sorted(k for k in od if lo - 1 <= k <= until)
+    if len(wd) >= 2 and wd[-1] >= lo + 1:
         a, b2 = od[wd[0]], od[wd[-1]]
         rep.add("T2-K2-3: kolejka plotna wojska (Odziez wojska 150, czeka)", f"d{wd[0]} {a:.0f} -> d{wd[-1]} {b2:.0f}", "bez wzrostu (<= +2%; N d90 3109 -> d120 3720, +20/d)" + tail2,
                 g2(b2 <= a * 1.02 + 0.5))
     else:
-        rep.add("T2-K2-3: kolejka plotna wojska (Odziez wojska 150, czeka)", "za krotkie okno albo brak linii", "bez wzrostu d90 -> until (gdy okno siega d92)", None)
+        rep.add("T2-K2-3: kolejka plotna wojska (Odziez wojska 150, czeka)", "za krotkie okno albo brak linii", f"bez wzrostu d{lo - 1} -> until (gdy okno siega d{lo + 1})", None)
     v, n = avg(ce, r"plotno \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
     rep.add("T2-K2-4: miast bez plotna (Ceny surowcow, srednia)", f"{fx_(v)} ({n} dob)", "<= 50 z 97 (N 50.2, B 88.0)" + tail2, g2(v <= 50) if v is not None else None)
     rk2 = [k for k in sorted(rg) if inwin(k)]

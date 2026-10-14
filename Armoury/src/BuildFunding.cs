@@ -34,8 +34,8 @@ namespace Armoury
         // ------------------------------------------------------------ Towary 2 / K1 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-10, klucz BuildWoodAboveCraftStock)
         // Budowy braly 65% drewna swiata (1 350 ladunkow/d, linia "Drewno") i kupowaly je do 0 sztuk na polce w ticku dobowym, przed rzemioslem miasta - warsztaty
         // zbrojne tracily 304 rozpoczecia/d na drewno, 29 miast bez drewna. Regula: budowa (pan i lud) bierze drewno z polki targu tylko ponad zapas rzemiosla miasta
-        // = CaravanBulk.TargetFor (ten sam zapas, ktory dopelniaja karawany: CaravanBulkStockDays dob zuzycia kuzni, dymarek, strzelarzy, linii towarowych i domow,
-        // bez budow; nie mniej niz 40 ladunkow). Ponizej - budzet materialow idzie na wapien, gline, narzedzia, marmur, deski albo zostaje w kiesie (budowa czeka).
+        // = CaravanBulk.TargetFor (ten sam zapas, ktory dopelniaja karawany: CaravanBulkStockDays dob zuzycia kuzni, dymarek, linii towarowych i domow,
+        // bez budow; nie mniej niz 40 ladunkow - strzelarzy Target nie liczy, ich ok. 4 ladunki na miasto na 10 dob miesci podloga). Ponizej - budzet materialow idzie na wapien, gline, narzedzia, marmur, deski albo zostaje w kiesie (budowa czeka).
         private static readonly HashSet<Settlement> _woodHeldLord = new HashSet<Settlement>(), _woodHeldFolk = new HashSet<Settlement>();
         private static long _woodHeldLordPcs, _woodHeldFolkPcs;
         private static ItemObject _woodIt;
