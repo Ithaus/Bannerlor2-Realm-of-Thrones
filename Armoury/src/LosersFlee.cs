@@ -899,6 +899,10 @@ namespace Armoury
             try { var me = MapEvent.PlayerMapEvent; if (me != null) _fieldMe = me; } catch { }
         }
 
+        /// <summary>A9 (14.10): czy w tej bitwie gracza byla misja (walka w polu, takze bitwa mieszana) - AiWear.AmmoUse: pociski partii AI zuzyl wtedy
+        /// juz DTE w misji (AmmoRecovery). Przy MapEventEnded _fieldMe jest jeszcze ta bitwa (nowa misja = nowa bitwa gracza).</summary>
+        internal static bool FieldFought(MapEvent me) { return me != null && ReferenceEquals(me, _fieldMe); }
+
         /// <summary>Bitwa poza H3: AI - licznik powodu i uwolnieni jency (tylko licznik); autobitwa gracza - tylko licznik F1 (jak dotad bitwa gracza).</summary>
         private static void SkipOut(MapEvent me, bool auto, ref int counter)
         {

@@ -4264,9 +4264,9 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiMendQueueContinue { get; set; } = true;
 
-        [SettingPropertyBool("Ai Ammo Use", HintText = "TEST (off by default): after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. While off the daily log only counts what would have been used up")]
+        [SettingPropertyBool("Ai Ammo Use", HintText = "after a battle the lords' parties and the garrisons use up arrows, bolts and throwing weapons from their armoury - the pieces in use times how hard the party fought; the beaten lose them all, the victors pick most of theirs up again (Ammo Recover Percent + Ammo Repair Percent); they buy more at the markets like any missing kit. In a battle fought on the field with you the arrows are already counted shot by shot, as for your own men, and are not taken a second time (off = as before: the AI never runs short of arrows; the daily log only counts what would have been used up)")]
         [SettingPropertyGroup("Time at the forge")]
-        public bool AiAmmoUse { get; set; } = false;
+        public bool AiAmmoUse { get; set; } = true;
 
         [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)")]
         [SettingPropertyGroup("Time at the forge")]
