@@ -658,13 +658,13 @@ namespace Armoury
 
         /// <summary>Z VillageClogDiag.Daily po linii "Zatkane wsie (diagnoza)": prog P3-2 - zatkane wsie Normal bez wozu ponad 7 dob. Tylko log.</summary>
         internal static void CartLine(int day, int clog, int clogNormal, int clogNoCart, int clogNormNoCart7, int clogNormNoCart7Low, double clogNormNoCart7Max,
-                                      int allNoCart, int allNormNoCart7, int minMen)
+                                      int allNoCart, int allNormNoCart7, int minMen, string longestWho = null)
         {
             if (!On) return;
             try
             {
                 Log.Info("Wsie bez wozu (E8/P3): dzien " + day + " | zatkane Normal bez wozu > " + CartDays.ToString("0", Inv) + " dob: " + clogNormNoCart7
-                         + " (w tym hearth <= " + minMen + " - gra nie wystawi nowego: " + clogNormNoCart7Low + "), najdluzej " + (clogNormNoCart7 > 0 ? F1(clogNormNoCart7Max) : "-") + " dob"
+                         + " (w tym hearth <= " + minMen + " - gra nie wystawi nowego: " + clogNormNoCart7Low + "), najdluzej " + (clogNormNoCart7 > 0 ? F1(clogNormNoCart7Max) + (longestWho != null ? " (" + longestWho + ")" : "") : "-") + " dob"
                          + " | zatkane wsie " + clog + " (Normal " + clogNormal + "), z nich bez wozu " + clogNoCart
                          + " | wszystkie wsie bez wozu " + allNoCart + ", z nich Normal bez wozu > " + CartDays.ToString("0", Inv) + " dob (tez niezatkane - gra wystawia woz dopiero przy pelnym magazynie) "
                          + allNormNoCart7 + ".");

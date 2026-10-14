@@ -75,6 +75,7 @@ namespace Armoury
             public string ClanId, RallyId; public Clan Clan; public Settlement Rally;
             public int Day, Ready; public bool Watch, Announced;
             public int Arrive;                      // recenzja K8: doba dojscia do druzyny rodu (0 - w osadzie zbiorki; > dzis - w marszu)
+            public IFaction RallyF;                 // drobne14 (audyt gracz 4): frakcja osady zbiorki przy ostatnim przegladzie doby - tylko pamiec (po wczytaniu z pierwszego przegladu)
             public readonly List<TN> T = new List<TN>();
             public PeopleBook.Shares O = new PeopleBook.Shares();
             public int Men { get { int n = 0; for (int i = 0; i < T.Count; i++) n += Math.Max(0, T[i].N); return n; } }
@@ -330,7 +331,8 @@ namespace Armoury
                 if (x.Day == day && x.Ready == ready && x.Watch == m.Watch && ReferenceEquals(x.Clan, m.Clan) && ReferenceEquals(x.Rally, m.Rally)) { g = x; break; }
             }
             bool newG = g == null;
-            if (newG) g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = ready, Watch = m.Watch };
+            if (newG) g = new G { Clan = m.Clan, ClanId = m.Clan.StringId, Rally = m.Rally, RallyId = m.Rally.StringId, Day = day, Ready = ready, Watch = m.Watch,
+                                  RallyF = m.Rally.MapFaction };   // recenzja drobne14: frakcja osady zbiorki od powstania grupy (zdobycie przed pierwszym przegladem doby - nadal "has fallen")
             TN tn = null;
             for (int i = 0; i < g.T.Count; i++) if (ReferenceEquals(g.T[i].C, t)) { tn = g.T[i]; break; }
             bool newT = tn == null;
@@ -414,7 +416,9 @@ namespace Armoury
                             if (!on) { _dOff += Disperse(g); continue; }
                             if (g.Clan == null || g.Clan.IsEliminated) { _dNoClan += Disperse(g); continue; }
                             // recenzja K2: osada zbiorki zdobyta przez wroga rodu (albo rod zmienil strone) - nowa osada zbiorki od tej; brak - rozejscie stad
+                            if (g.Rally != null && g.RallyF == null) g.RallyF = g.Rally.MapFaction;   // drobne14: nowa grupa albo pierwszy przeglad po wczytaniu
                             if (g.Rally != null && Hostile(g.Rally, g.Clan) && !Move(g, day, per)) { _dLostRally += Disperse(g); continue; }
+                            if (g.Rally != null) g.RallyF = g.Rally.MapFaction;
                             if (day < g.Ready) continue;
                             if (!g.Announced)
                             {
@@ -479,9 +483,14 @@ namespace Armoury
             if (nr == null || ReferenceEquals(nr, old) || Bad(nr.StringId)) return false;
             int men = g.Men;
             int dd = Math.Max(1, Math.Min(GatherMax, (int)Math.Ceiling(op.Distance(nr.GetPosition2D) / per)));
-            g.Rally = nr; g.RallyId = nr.StringId; g.Ready = Math.Max(g.Ready, day + dd); g.Arrive = 0; g.Announced = false;
+            // drobne14 (audyt gracz 4): "has fallen" tylko, gdy osada zmienila frakcje od ostatniego przegladu; gdy to rod gracza zmienil strone (koniec
+            // kontraktu najemnika, zmiana krolestwa, wojna) - osada nie padla, tylko nie jest juz bezpieczna
+            bool fell = g.RallyF != null && old.MapFaction != g.RallyF;
+            g.Rally = nr; g.RallyId = nr.StringId; g.Ready = Math.Max(g.Ready, day + dd); g.Arrive = 0; g.Announced = false; g.RallyF = nr.MapFaction;
             _dMoved += men;
-            if (g.Clan == Clan.PlayerClan) Log.Player("Stragglers: " + old.Name + " has fallen to the enemy - " + men + " of your men are making for " + nr.Name + ".");
+            if (g.Clan == Clan.PlayerClan)
+                Log.Player(fell ? "Stragglers: " + old.Name + " has fallen to the enemy - " + men + " of your men are making for " + nr.Name + "."
+                                : "Stragglers: " + old.Name + " is no longer safe for your men - " + men + " of them are making for " + nr.Name + ".");
             return true;
         }
 

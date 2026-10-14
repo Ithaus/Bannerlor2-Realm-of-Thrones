@@ -770,6 +770,10 @@ namespace Armoury
             // stan doby obu regul L5b od zera przy nowej kampanii / wczytaniu (nic w zapisie)
             CapitalTreasury.Reset(); EnemyCaravans.Reset();
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, CapitalTreasury.OnOwnerChanged);
+            // drobne14: diagnoza L5b-2 (0 karawan w murach w 39 zdobyciach) - spis karawan przy poczatku oblezenia i wyjazdy z oblezanych osad (tylko pamiec i log)
+            CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, EnemyCaravans.OnSiegeStarted);
+            CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, EnemyCaravans.OnSiegeEnded);
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, EnemyCaravans.OnLeft);
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
