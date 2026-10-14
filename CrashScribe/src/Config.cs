@@ -98,6 +98,12 @@ namespace CrashScribe
         public static bool MarriageOnlyViableCandidates = true;   // ZMIANA ROZGRYWKI (Jeff 13.10): wolny lord losuje tylko sposrod kandydatow, z ktorymi slub jest mozliwy (bez zyjacego malzonka, poza zalotami stanu >= 3, szansa modelu > 0) - dotad ponad polowa dziennych prob trafiala w kandydata bez szans; potrzebuje MarriageFast, nie dziala w biegu cienia; false = losowanie ROT jak dotad (ta sama regula co oryginal; poza gra takze te same pary, w grze nie - wyzej)
         public static float MarriageChanceScale = 0.17f;     // HAMULEC (Jeff 13.10: "Przyhamuj, aby sluby zawieraly sie rzadziej"; Jeff 14.10: "sluby - 48 slubow" na rok, zasada "1 dzien = 1 dzien"): mnoznik szansy slubu w rzucie wolnego lorda; pomiar: 113 slubow AI-AI na rok przed regula, 215 z regula bez hamulca, przy 0.7 291 w 728 dob (bieg dwuletni 13/14.10: 159 + 132). Od recenzji 14.10: przy MarriageTargetPerYear > 0 (domyslnie) to tylko mnoznik STARTOWY (pierwsze 1-2 doby po wczytaniu, zanim regulator ma srednia; 0.17 = model biegu dwuletniego dla roku 1-2); przy MarriageTargetPerYear = 0 - staly hamulec jak 13.10, TYLKO przy czynnej regule MarriageOnlyViableCandidates; zakres 0.1-1.0 (poza nim przyciecie z linia w logu - MarriageFast.OnSession); w biegu cienia nie dziala
         public static int MarriageTargetPerYear = 48;        // recenzja 14.10 (decyzja Jeffa "sluby - 48 slubow" na rok): REGULATOR - mnoznik doby = cel / CampaignTime.DaysInYear / srednia (28 dob) oczekiwanej liczby slubow przy mnozniku 1.0 (suma szans rzutow wolnych lordow naszej drogi), najwyzej 1.0, najmniej 0.02; staly mnoznik trzymal 48 tylko w roku 1-2 (pula wolnych lordow rosnie ok. 200 na rok - linia Z.3); dziala na kazdy rzut wolnego lorda naszej drogi (takze gdy regula MarriageOnlyViableCandidates stoi); 0 = staly MarriageChanceScale jak 13.10 (off); klucz NOWY - stary plik ustawien go nie ma, wiec dziala domyslna 48
+        // --- Unikaty ROT - towarzysze (decyzja Jeffa 14.10 "jak jest martwy companion, to jest martwy"; patrz UniqueCompanions.cs) ---
+        public static bool UniqueCompanionsStayDead = true;        // (1) unikat ROT, ktory naprawde zginal, zostaje na liscie zmarlych gry (UnregisterDeadHero) i ROT nie robi nowego (straz SpawnHero, lista zmarlych w zapisie); false = gra wymazuje, ROT odtwarza
+        public static bool UniqueCompanionsMove = true;            // (2) TryKillCompanion gry: wolnego unikatu nie usuwa, tylko przenosi do miasta jego kultury (ta sama osoba); false = usuwa jak dotad (ROT robi nowego po wymazaniu)
+        public static bool UniqueCompanionsDuplicateGuard = true;  // (3) raz na dobe: dwa zywe unikaty (bez rodzicow) z jednym wzorem - wolny drugi usuniety (Lost); false = bez straznika
+        public static bool UniqueCompanionsChildren = true;        // (4) dziecko unikatu: zwykle imie (nie nazwa wzoru) i bez rzeczy wzoru rodzica przy narodzinach; false = jak w grze
+        public static bool UniqueCompanionsLog = true;             // (5) linia doby "Unikaty ROT (UC)" - kazdy wzor: zywy / martwy / gdzie / rod / zawod, dzieci, liczniki; false = bez linii doby
         public static bool MarriageOffersPerYear = true;     // 14.10 (ta sama decyzja): oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) na rok jak w roku gry 84 dni - caly proces rozciagniety x DaysInYear / 84: doba rodu AI przechodzi do rzutow gry z prawdopodobienstwem 84 / CampaignTime.DaysInYear (rok 364 = 0.231) i przerwa miedzy ofertami 7 x DaysInYear / 84 dob (30.3; gra 7 - recenzja 14.10); patrz MarriageOfferYear.cs; false = oferty jak w grze
 
         internal static void Load(string moduleDataDir)
@@ -174,6 +180,11 @@ namespace CrashScribe
                         case "MarriageChanceScale": MarriageChanceScale = F(v, MarriageChanceScale); break;   // zakres pilnuje MarriageFast.OnSession (tu log jeszcze nie jest otwarty)
                         case "MarriageTargetPerYear": MarriageTargetPerYear = I(v, MarriageTargetPerYear); break;   // zakres pilnuje MarriageFast.OnSession
                         case "MarriageOffersPerYear": MarriageOffersPerYear = B(v); break;
+                        case "UniqueCompanionsStayDead": UniqueCompanionsStayDead = B(v); break;
+                        case "UniqueCompanionsMove": UniqueCompanionsMove = B(v); break;
+                        case "UniqueCompanionsDuplicateGuard": UniqueCompanionsDuplicateGuard = B(v); break;
+                        case "UniqueCompanionsChildren": UniqueCompanionsChildren = B(v); break;
+                        case "UniqueCompanionsLog": UniqueCompanionsLog = B(v); break;
                     }
                 }
             }

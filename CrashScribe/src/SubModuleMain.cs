@@ -98,6 +98,7 @@ namespace CrashScribe
                 StorylineReparations.Install(_harmony);  // T9: pokoj w wojnie fabularnej ROT bez reparacji Diplomacy
                 PovertyPeace.Install(_harmony);  // E1: pokoj z biedy (glos rodu o pokoj + ocena wojny BK)
                 Army175.Install(_harmony);       // 175: dopisek pieszych Dothrakow do puli ROT (postfiks ROTTroopRecruiter.Settings)
+                UniqueCompanions.Install(_harmony);   // 14.10: unikaty ROT - zmarly zostaje martwy, przeprowadzki zamiast usuniecia, dzieci
                 Scribe.Line("Net ready.");
                 Watchdog.Start();
                 // Sampler WYLACZONY 29.08: Suspend+StackTrace co 0.5 s na FF potrafi
@@ -151,6 +152,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new PovertyPeaceBehavior());   // E1: linie "Pokoj z biedy (E1)" (decyzje + doba)
                 if (cgs != null) cgs.AddBehavior(new MarriageFastBehavior());   // Z.3: swaty ROT szybciej (straze i latka przy starcie sesji, linia doby "Swaty ROT (Z.3)")
                 if (cgs != null) cgs.AddBehavior(new MarriageOfferYearBehavior());   // 14.10: oferty slubu dla rodu gracza na rok (84 / rok; linia doby "Oferty slubu (rok)")
+                if (cgs != null) cgs.AddBehavior(new UniqueCompanionsBehavior());   // 14.10: unikaty ROT (lista zmarlych w zapisie, straznik duplikatow, linia doby "Unikaty ROT (UC)")
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
