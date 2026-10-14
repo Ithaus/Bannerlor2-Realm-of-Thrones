@@ -14,16 +14,17 @@ namespace Armoury
     /// DOWOD: gra konczy krolestwo bez osad w tym samym zdarzeniu zmiany pana ostatniej twierdzy (FactionDiscontinuationCampaignBehavior.OnSettlementOwnerChanged ->
     /// DiscontinueKingdom: rody wychodza, DestroyKingdomAction) albo Diplomacy przy pokoju (SoftlyDestroyKingdomAction); KingdomBudgetWallet zostaje na martwym
     /// krolestwie, ksiega liczy go jako ujscie ("skarbce upadlych krolestw", CirculationWindows.OnKingdomDestroyed), dlug Banku przepada (CrownBorrow, "Bank stracil").
-    /// Bieg dwuletni W50: House Targaryen, Aegon d109294 (pokoj z Volantis) -682 021, Stormlands d109371 -575 987, dlug 90 826; razem 7 upadkow, 1.27 mln zl
-    /// i 107 929 dlugu. Nasluchy gry biegna od OSTATNIO dopisanego (MbEvent), wiec przy szturmie ostatniej twierdzy-stolicy nasz L5b-1 (CapitalTreasury) bierze
+    /// Bieg dwuletni W50: House Targaryen, Aegon d109294 (pokoj z Volantis) -682 021, Stormlands d109371 -575 987, dlug 90 826; razem 7 upadkow, 1.26 mln zl
+    /// i 107 929 dlugu; 6 z 7 upadkow tuz po pokoju (linia E7/0 "POKOJ" w tej samej sekundzie co "KROLESTWO ZNISZCZONE" - Diplomacy, krolestwo bez lenn). Nasluchy gry biegna od OSTATNIO dopisanego (MbEvent), wiec przy szturmie ostatniej twierdzy-stolicy nasz L5b-1 (CapitalTreasury) bierze
     /// 1/3 nadwyzki, a zapas wojny i reszta i tak przepadaja chwile pozniej.
     ///
     /// REGULA (nasluch KingdomDestroyedEvent dopisany PO ksiedze obiegu - biegnie PRZED nia, ksiega widzi skarbiec juz pusty):
     ///  1. dlug korony w Banku pierwszy (CrownBorrow.RepayOnFall: skarbiec -> kapital Banku, do wysokosci skarbca);
     ///  2. reszta - komu: (a) krolestwo upada w oknie szturmu swojej twierdzy (CapitalTreasury.SiegeWinnerOf) - do zdobywcy: skarbiec jego krolestwa (migawka 165
-    ///     przesunieta jak L5b-1), zdobywca bez krolestwa - kiesa glowy jego rodu; Inni - nie (trup monety nie bierze, idzie (b)); (b) inaczej (pokoj Diplomacy,
-    ///     smierc wladcy, bunt, upadek bez szturmu) - do kiesy glowy rodu panujacego (rod wychodzi z krolestwa zywy - dwor wywozi skarbiec); (c) brak zywego
-    ///     odbiorcy - do kapitalu Banku (nic nie znika).
+    ///     przesunieta jak L5b-1), zdobywca bez krolestwa - kiesa glowy jego rodu; Inni - nie (trup monety nie bierze, dalej (b)); (b) upadek przy stole pokoju
+    ///     (pokoj z krolestwem k w tej samej godzinie - Diplomacy konczy krolestwo bez lenn przy pokoju) - do skarbca drugiej strony tego pokoju (zwyciezca wojny);
+    ///     (c) inaczej (smierc wladcy, bunt, upadek bez szturmu i pokoju) - do kiesy glowy rodu panujacego (rod wychodzi z krolestwa zywy - dwor wywozi skarbiec);
+    ///     (d) brak zywego odbiorcy - do kapitalu Banku (nic nie znika).
     /// OBIEG: skarbiec -> Bank / skarbiec / kiesa w jednej chwili, zdjete = dopisane (kontrola w linii); "Pieniadz swiata" bez zmiany (odbiorcy sa w swiecie, skarbiec
     /// wypada pusty). Linia "Skarbiec upadlego krolestwa (G14)" przy kazdym upadku z niepustym skarbcem. Stan: pamiec rodow panujacych (pamiec sesji, bez zapisu).
     /// Wyjatek per zdarzenie - licznik potkniec w linii, bez globalnego wylacznika.
@@ -32,12 +33,26 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly Dictionary<string, Clan> _ruler = new Dictionary<string, Clan>(StringComparer.Ordinal);   // id krolestwa -> rod panujacy w chwili wyjscia
+        private static readonly Dictionary<string, KeyValuePair<IFaction, double>> _peace = new Dictionary<string, KeyValuePair<IFaction, double>>(StringComparer.Ordinal);   // id krolestwa -> druga strona ostatniego pokoju, godzina
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.FallenCrownTreasury; } }
 
-        internal static void Reset() { _ruler.Clear(); _stumbles = 0; _err.Clear(); }
+        internal static void Reset() { _ruler.Clear(); _peace.Clear(); _stumbles = 0; _err.Clear(); }
+
+        /// <summary>Nasluch MakePeace: ostatni pokoj kazdego krolestwa (druga strona i godzina) - upadek przy stole pokoju (b). Tylko pamiec.</summary>
+        internal static void OnMakePeace(IFaction a, IFaction b, MakePeaceAction.MakePeaceDetail detail)
+        {
+            try
+            {
+                double h = CampaignTime.Now.ToHours;
+                var ka = a as Kingdom; var kb = b as Kingdom;
+                if (ka != null && ka.StringId != null) _peace[ka.StringId] = new KeyValuePair<IFaction, double>(b, h);
+                if (kb != null && kb.StringId != null) _peace[kb.StringId] = new KeyValuePair<IFaction, double>(a, h);
+            }
+            catch (Exception e) { Stumble("OnMakePeace", e); }
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -79,6 +94,13 @@ namespace Armoury
                 Clan mem;
                 if ((royal == null || royal.IsEliminated) && k.StringId != null && _ruler.TryGetValue(k.StringId, out mem)) royal = mem;
                 IFaction wf = CapitalTreasury.SiegeWinnerOf(k);
+                bool atPeace = false;
+                if (wf == null && k.StringId != null)
+                {
+                    KeyValuePair<IFaction, double> pz;
+                    var pk = _peace.TryGetValue(k.StringId, out pz) ? pz.Key as Kingdom : null;
+                    if (pk != null && !pk.IsEliminated && !ReferenceEquals(pk, k) && CampaignTime.Now.ToHours - pz.Value < 1.0) { wf = pk; atPeace = true; }
+                }
                 bool undead = false;
                 try { var wc = wf as Clan; undead = wc != null && ClanIncomeBook.IsUndeadClan(wc); } catch { undead = false; }
                 var wk = wf as Kingdom;
@@ -88,11 +110,12 @@ namespace Armoury
                 double debt = CrownBorrow.DebtOf(k);
                 // komu reszta (ten sam wybor przy kluczu i w cieniu)
                 string to;
-                if (wk != null) to = "zdobywca - skarbiec krolestwa " + Nm(wk);
+                if (wk != null) to = (atPeace ? "druga strona pokoju" : "zdobywca") + " - skarbiec krolestwa " + Nm(wk);
                 else if (wHead != null) to = "zdobywca bez krolestwa - kiesa glowy rodu " + wHead.Name;
                 else if (rHead != null) to = "dwor - kiesa glowy rodu panujacego " + Nm(royal) + " (" + rHead.Name + ")";
                 else to = "kapital Banku (brak zywego odbiorcy)";
-                string why = wf != null ? "szturm ostatniej twierdzy (zdobywca " + Nm(wf) + (undead ? ", Inni - monety nie biora" : "") + ")" : "upadek bez szturmu (pokoj, smierc wladcy, bunt)";
+                string why = atPeace ? "upadek przy stole pokoju (pokoj z " + Nm(wf) + " w tej godzinie)"
+                             : wf != null ? "szturm ostatniej twierdzy (zdobywca " + Nm(wf) + (undead ? ", Inni - monety nie biora" : "") + ")" : "upadek bez szturmu i bez pokoju (smierc wladcy, bunt, inne)";
                 var sb = new StringBuilder(600);
                 sb.Append("Skarbiec upadlego krolestwa (G14): dzien ").Append(day).Append(" | ").Append(Nm(k)).Append(" (").Append(k.StringId).Append(") | ").Append(why)
                   .Append(" | skarbiec ").Append(w0).Append(", dlug Banku ").Append((long)Math.Ceiling(debt));

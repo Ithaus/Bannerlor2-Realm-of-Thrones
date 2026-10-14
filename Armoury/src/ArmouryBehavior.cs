@@ -830,6 +830,7 @@ namespace Armoury
             // (MbEvent: od ostatnio dopisanego) - ksiega widzi skarbiec juz oprozniony. Rod panujacy zapamietany przy wyjsciu rodow z krolestwa (DiscontinueKingdom)
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, FallenCrown.OnKingdomDestroyed);
             CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this, FallenCrown.OnClanChangedKingdom);
+            CampaignEvents.MakePeace.AddNonSerializedListener(this, FallenCrown.OnMakePeace);   // G14: druga strona ostatniego pokoju (upadek przy stole pokoju)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, SellByCondition.OnPlayerExchange);   // cena sprzedazy sprzetu: kazda sprzedaz gracza do handel.log (tylko log)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("PeopleLedger.OnMapEventEnded", PeopleLedger.OnMapEventEnded));
             CampaignEvents.OnTroopRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopRecruited);
