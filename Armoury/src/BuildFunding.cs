@@ -322,7 +322,7 @@ namespace Armoury
         }
 
         private static readonly Dictionary<Settlement, Settlement> _near = new Dictionary<Settlement, Settlement>();
-        private static Settlement NearestTown(Settlement st)
+        internal static Settlement NearestTown(Settlement st)   // P5 (TownFolk.CastleLadder): podzamcze kupuje z listy dostatku w tym samym miescie co material budow zamku
         {
             Settlement m;
             if (_near.TryGetValue(st, out m)) return m;

@@ -145,6 +145,9 @@ RANGES = {
     'FolkWorksShare': (0.0, 0.2, "0.000"),
     'FolkWorksHands': (0.0, 0.2, "0.000"),
     'BuildMaterialPriceCap': (0.0, 5.0, "0.0"),
+    # P3-P5 (zbytki): tempo listy dostatku w dniach - kod przycina do 1..3650; cena graniczna jako wielokrotnosc ceny zwyklej - kod przycina do 1..10
+    'FolkSurplusSpendDays': (10.0, 365.0, "0"),
+    'FolkLadderPriceCeiling': (1.0, 5.0, "0.00"),
     # W5 (doplata korony do zoldu wedlug potrzeby): cel wypelnienia i krok werbunku jako czesc limitu druzyn - kod przycina do 0..1 (KingdomTreasury.NeedAid)
     'CrownWarAidFillTarget': (0.0, 1.0, "0.00"),
     'CrownWarAidRecruitStep': (0.0, 1.0, "0.00"),

@@ -164,6 +164,15 @@ namespace Armoury
                 {
                     try { string wk = BuildFunding.WorksLine(st); if (!string.IsNullOrEmpty(wk)) sb.Append(wk).Append('\n'); }
                     catch (Exception e) { Log.Error("PeopleMenu.Works", e); }
+                    // P3/P5 (zbytki): oferta z oszczednosci na liste dostatku w ostatniej konsumpcji (miasto) albo zakupy na targu (zamek, wies) - tylko odczyt
+                    try
+                    {
+                        string llog;
+                        string lx = TownFolk.LuxuryLine(st, out llog);
+                        if (llog != null) Log.Info(llog);
+                        if (!string.IsNullOrEmpty(lx)) sb.Append(lx).Append('\n');
+                    }
+                    catch (Exception e) { Log.Error("PeopleMenu.Luxury", e); }
                 }
                 string body = sb.ToString().TrimEnd('\n');
                 // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu

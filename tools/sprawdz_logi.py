@@ -486,6 +486,11 @@ Uzycie (Python 3, tylko odczyt):
                     z nadwyzki, material z polki (sufit 2 x wartosc), pulap rak, reszta poziomu. python -I tools/sprawdz_logi.py --grupa p2bud [--do-doby 120] <Armoury-*.log>
                     Wiersze P2-0..P2-8: linia i klucz, material bez zaplaty 0, roboty d91+ >= 8 tys. zl/d, poziomy ukonczone na rok >= 110, budowy stojace
                     <= 175, cena / wartosc <= sufit, drewno i narzedzia (INFO), czas i potkniecia, liczby paczki (INFO). Log bez paczki: INFO.
+--grupa zbytki    : (P3-P5, decyzja Jeffa 13.10 "zbytki P3-P5 TAK") lista dostatku z wagami w tempie 1/60 i poprawka Predict / Share, targ widzi sakiewke
+                    (oferta ludu w szacunku popytu targu, cena graniczna 1.5), podzamcza i wsie na targu miasta. python -I tools/sprawdz_logi.py --grupa zbytki [--do-doby 120] <Armoury-*.log>
+                    Wiersze ZB-0..ZB-12: linia, klucze i latka, zamkniecie (r = 0, zaplata P5), kupione / oferta >= 50% (bieg roczny), place R/P >= 120 tys.,
+                    sygnal nie ponad cene graniczna, indeksy (INFO), marza z karawan >= -10% i kasy ponizej zapasu <= 4, juki karawan (bieg roczny),
+                    P5 i narzedzia wsi (INFO), jedzenie <= 10 miast, kiesy 31 najbiedniejszych >= 0.53 mln, czas i potkniecia, liczby (INFO). Log bez paczki: INFO.
 --grupa w7        : (W7, decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana") rod, ktorego druzynom W5 nie pokrylo potrzeby, bierze najwyzej 3%/d
                     nadwyzki ludu i wsi wlasnych lenn (po daninie P1 i danine wsi) na zold ludzi, ktorzy sa; koszt: lojalnosc i dobrobyt osady.
                     python -I tools/sprawdz_logi.py --grupa w7 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -17983,6 +17988,173 @@ def p2bud_main(logp, start_arg, until=120):
     return 0
 
 
+def zbytki_main(logp, start_arg, until=120):
+    """P3-P5 (obieg kiesy ludu, projekt rozdz. 3.1 szczebel 2, 8 wiersze P3-P5, 9 progi 5, 6, 10, 16-21; decyzja Jeffa 13.10 "zbytki P3-P5 TAK"; Armoury/src/
+    TownFolk.Luxury.cs, klucze FolkLuxuryList, MarketSeesPurse, WardsAndVillagesShop): lista dostatku, targ widzi sakiewke, podzamcza i wsie na targu miasta.
+    Okno: doby kampanii 2-until (--do-doby). Wiersze ZB-0..ZB-12. Log bez paczki (brak linii "Zbytki ludu (P3-P5)" albo klucz P3 wylaczony): INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    rows = by_day(lines, "Zbytki ludu (P3-P5): dzien")
+    folk = by_day(lines, "Kiesa ludu: dzien")
+    car = by_day(lines, "Marza kupcow z karawan (P1): dzien")
+    kasy = by_day(lines, "Kasy miast (169c): dzien")
+    if start is None:
+        alld = sorted(set(rows) | set(folk))
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return 2 <= run_day(d, start) <= until
+    win = [d for d in sorted(rows) if inwin(d)]
+    on = [d for d in win if "| lista dostatku (P3) tak," in rows[d]]
+    pkg = bool(on)
+    tail = "" if pkg else " - log bez paczki: INFO"
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia P3-P5 {len(win)} (lista dostatku czynna w {len(on)})")
+    if not win:
+        rep.add("ZB-0: linia Zbytki ludu (P3-P5)", "brak linii w oknie (log sprzed P3-P5)", "codziennie od wgrania P3-P5", None)
+    else:
+        sig = sum(1 for d in on if "| targ widzi sakiewke (P4) tak," in rows[d])
+        p5 = sum(1 for d in on if "| podzamcza i wsie na targu (P5) tak" in rows[d])
+        hook = [num(r"latka szacunku popytu: wpieta w (\d+)", rows[d], int, 0) or 0 for d in win]
+        rep.add("ZB-0: linia codziennie, klucze P3 / P4 / P5 i latka szacunku popytu (P4)", f"dob z linia {len(win)}, P3 {len(on)}, P4 {sig}, P5 {p5}; latka wpieta w {min(hook)}-{max(hook)} modelach",
+                "klucze czynne w kazdej dobie okna, latka w >= 1 modelu" + tail, (len(on) == len(win) and sig == len(on) and p5 == len(on) and min(hook) >= 1) if pkg else None)
+    t = {}
+    for d in on:
+        s = rows[d]
+        t[d] = {"off": num(r"\| miasta: oferta (\d+) zl w", s, int, 0), "buy": num(r", kupione z oferty (\d+) zl \(", s, int, 0),
+                "nocat": num(r"zostaje w kiesie (\d+)\)", s, int, 0), "over": num(r"lud nie kupuje\) (\d+)", s, int, 0),
+                "phi": num(r"kupione / oferta srednio ([\d.]+)", s, float), "sign": num(r"par z sygnalem (\d+)", s, int, 0),
+                "sigoff": num(r"oferta do sygnalu (\d+) zl/d", s, int, 0), "sigadd": num(r"dopisane do szacunku popytu (\d+)", s, int, 0),
+                "sigcut": num(r"obciete cena graniczna (\d+)", s, int, 0), "sigroom": num(r"indeks juz >= cena graniczna\) (\d+)", s, int, 0),
+                "sigover": num(r"kontrola: sygnal ponad cene graniczna (\d+)", s, int, 0), "isig": num(r"indeks kategorii z sygnalem srednio ([\d.]+)", s, float),
+                "iover": num(r"\(ponad cena graniczna (\d+) z", s, int), "inall": num(r"\(ponad cena graniczna \d+ z (\d+)\)", s, int),
+                "ifood": num(r"indeks lepszego stolu srednio ([\d.]+)", s, float),
+                "cwant": num(r"podzamcza \(P5\): z nadwyzka \d+, chciane (\d+)", s, int, 0), "cbuy": num(r"podzamcza \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione (\d+)", s, int, 0),
+                "vwant": num(r"wsie \(P5\): z nadwyzka \d+, chciane (\d+)", s, int, 0), "vbuy": num(r"wsie \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione (\d+)", s, int, 0),
+                "vpcs": num(r"wsie \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione \d+ zl \(sztuk (\d+)\)", s, int, 0),
+                "cpcs": num(r"podzamcza \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione \d+ zl \(sztuk (\d+)\)", s, int, 0),
+                "poor": num(r"kiesy 31 najbiedniejszych miast (\d+)", s, int), "mis": num(r"zaplata rozna od ceny x sztuk (\d+)", s, int, 0),
+                "ms": (num(r"\| czas: doba ([\d.]+) ms", s, float, 0.0) or 0.0) + (num(r"konsumpcja i sygnal ([\d.]+) ms", s, float, 0.0) or 0.0),
+                "st": num(r"potkniecia (\d+)\.", s, int, 0)}
+    # ---- ZB-1 zamkniecie: kontrola kies r = 0 (linia Kiesa ludu) i zaplata P5 = cena x sztuk
+    fw = [d for d in sorted(folk) if inwin(d)]
+    badr = [d for d in fw if num(r"wydatki -?\d+, r = (-?[\d.]+)", folk[d], float, None) not in (0.0, None)]
+    mis = sum(t[d]["mis"] for d in t)
+    rep.add("ZB-1: zamkniecie - kontrola kies r = 0 kazdej doby (linia Kiesa ludu); zaplata P5 rozna od ceny x sztuk (projekt prog 5)",
+            f"dob z r != 0: {len(badr)} z {len(fw)}; zaplata rozna {mis}", "0; 0" + tail, (not badr and mis == 0) if pkg else None)
+    ds = sorted(t)
+    # ---- ZB-2 kupione z oferty / oferta (projekt prog 16: d120-364 >= 50%)
+    if ds:
+        late = [d for d in ds if run_day(d, start) >= 120] if until >= 150 else ds[-28:]
+        so, sb2 = sum(t[d]["off"] for d in late), sum(t[d]["buy"] for d in late)
+        r = sb2 / so if so > 0 else None
+        judged = until >= 150 and bool(late)
+        rep.add("ZB-2: kupione z oferty listy / oferta miast (" + (f"d120-{until}" if until >= 150 else f"ostatnie {len(late)} dob okna") + "; projekt prog 16)",
+                f"{(100 * r):.1f}% ({sb2 / max(1, len(late)) / 1e3:.1f} z {so / max(1, len(late)) / 1e3:.1f} tys. zl/d)" if r is not None else "brak oferty",
+                ">= 50% w biegu rocznym (d120-364); bieg krotszy niz 150 dob - INFO", (r is not None and r >= 0.5) if judged else None)
+    else:
+        rep.add("ZB-2: kupione z oferty / oferta", "brak dob z lista dostatku", "INFO", None)
+    # ---- ZB-3 place z nadwyzki R/P (projekt prog 17)
+    pw = [num(r"place z nadwyzki R/P (\d+)", folk[d], int) for d in fw[-28:]]
+    pw = [x for x in pw if x is not None]
+    if pw:
+        v = sum(pw) / len(pw)
+        rep.add(f"ZB-3: place z nadwyzki R/P dla wyrobnikow, ostatnie {len(pw)} dob okna (projekt prog 17 - poprawka tempa poz. 11)", f"{v / 1e3:.1f} tys. zl/d",
+                ">= 120 tys. zl/d (biegi bez P3: 137-160 tys.)" + tail, (v >= 120000) if pkg else None)
+    else:
+        rep.add("ZB-3: place z nadwyzki R/P", "brak linii Kiesa ludu", "INFO", None)
+    # ---- ZB-4 sygnal popytu: kontrola ceny granicznej; ZB-5 indeksy (INFO)
+    if ds:
+        over = sum(t[d]["sigover"] for d in ds)
+        lw = ds[-28:]
+        k = float(len(lw))
+        rep.add("ZB-4: sygnal popytu (P4) - dopisek nie podnosi indeksu ponad cene graniczna (kontrola w linii; projekt prog 18 / A prog 5)",
+                f"przypadkow ponad: {over}; srednio (ostatnie {len(lw)} dob): par z sygnalem {sum(t[d]['sign'] for d in lw) / k:.0f}, oferta do sygnalu {sum(t[d]['sigoff'] for d in lw) / k / 1e3:.1f} tys., "
+                f"dopisane {sum(t[d]['sigadd'] for d in lw) / k / 1e3:.1f} tys., obciete {sum(t[d]['sigcut'] for d in lw) / k / 1e3:.1f} tys., par bez miejsca {sum(t[d]['sigroom'] for d in lw) / k:.0f}",
+                "0 (lud nie podnosi ceny zbytkow ponad 1.5 ceny zwyklej)", over == 0)
+        isg = [(t[d]["isig"], t[d]["iover"], t[d]["inall"], t[d]["ifood"]) for d in lw if t[d]["isig"] is not None]
+        if isg:
+            rep.add("ZB-5: indeks kategorii z sygnalem w 20 miastach z najwieksza oferta; indeks lepszego stolu tamze (projekt prog 18; INFO)",
+                    f"srednio {sum(x[0] for x in isg) / len(isg):.2f} (ponad cene graniczna {sum(x[1] or 0 for x in isg) / len(isg):.0f} z {sum(x[2] or 0 for x in isg) / len(isg):.0f} par); stol {sum((x[3] or 0) for x in isg) / len(isg):.2f}",
+                    "INFO - indeks ponad 1.5 bez oferty ludu to pusta polka (pomiar P1: srednio 5.1 w 20 miastach); ceny zywnosci +-5% wobec biegu bez P4 - porownac recznie", None)
+    # ---- ZB-6 marza kupcow z karawan (zbytki i sukno z listy) i kasy ponizej zapasu >= 7 dob (projekt prog 19)
+    cw = [d for d in sorted(car) if inwin(d)][-28:]
+    if cw:
+        pay = val = 0.0
+        for d in cw:
+            for g in (r"zbytki \(silver, velvet, jewelry, spice, fur\) (\d+) / (\d+) / ", r"sukno i dom z listy dostatku (\d+) / (\d+) / "):
+                m = re.search(g, car[d])
+                if m:
+                    pay += int(m.group(1)); val += int(m.group(2))
+        mg = (val / pay - 1.0) * 100.0 if pay > 0 else None
+        kw = [d for d in sorted(kasy) if inwin(d)]
+        s7 = num(r"miast >= 7 dob (\d+)", kasy[kw[-1]], int) if kw else None
+        rep.add(f"ZB-6: marza kupcow na zbytkach i suknie z karawan (ostatnie {len(cw)} dob); miast z kasa ponizej zapasu >= 7 dob (projekt prog 19)",
+                (f"{mg:+.1f}%" if mg is not None else "-") + f"; {s7 if s7 is not None else '-'} miast",
+                ">= -10%; <= 4" + tail, ((mg is None or mg >= -10) and (s7 is None or s7 <= 4)) if pkg else None)
+    else:
+        rep.add("ZB-6: marza kupcow z karawan", "brak linii Marza kupcow z karawan (P1) - FolkLadderMeasureLog", "INFO", None)
+    # ---- ZB-7 zbytki w jukach karawan (projekt prog 20) - ostatnia doba okna
+    lastg = max([d for d in by_day(lines, "Towary: dzien") if inwin(d)] or [0])
+    car_n = {}
+    if lastg:
+        for s in lines:
+            if not s.startswith(f"Towary: dzien {lastg} - "):
+                continue
+            for gid in ("jewelry", "cotton", "felt"):
+                if s.startswith(f"Towary: dzien {lastg} - {gid} ("):
+                    car_n[gid] = num(r"posiadacze \[[^\]]*karawany (\d+)", s, int, 0)
+    if car_n:
+        ok7 = car_n.get("jewelry", 0) <= 400 and car_n.get("cotton", 0) <= 2000 and car_n.get("felt", 0) <= 5000
+        rep.add("ZB-7: zbytki w jukach karawan w ostatniej dobie okna (projekt prog 20)", f"klejnoty {car_n.get('jewelry')}, bawelna {car_n.get('cotton')}, filc {car_n.get('felt')}",
+                "klejnoty <= 400, bawelna <= 2 000, filc <= 5 000 w d364 (bieg roczny kodu 43 bez P4: 1 057 / 4 559 / 4 878; projekt z 13.10: 747 / 4 151 / 9 286); bieg krotszy niz 300 dob - INFO" + tail,
+                ok7 if (pkg and until >= 300) else None)
+    else:
+        rep.add("ZB-7: zbytki w jukach karawan", "brak linii Towary w oknie", "INFO", None)
+    # ---- ZB-8 P5 i narzedzia wsi (INFO)
+    if ds:
+        lw = ds[-28:]
+        k = float(len(lw))
+        tl = [s for s in lines if s.startswith("Towary: dzien ") and " - tools (" in s and inwin(num(r"dzien (\d+)", s) or 0)]
+        tv = num(r"wsie \(zakupy w miescie, E5/B1\) (\d+)", tl[-1], int) if tl else None
+        rep.add(f"ZB-8: podzamcza i wsie na targu (P5), srednio ostatnie {len(lw)} dob; narzedzia kupione przez wsie (INFO)",
+                f"podzamcza chciane {sum(t[d]['cwant'] for d in lw) / k / 1e3:.1f} tys., kupione {sum(t[d]['cbuy'] for d in lw) / k / 1e3:.1f} tys. ({sum(t[d]['cpcs'] for d in lw) / k:.0f} szt.); "
+                f"wsie chciane {sum(t[d]['vwant'] for d in lw) / k / 1e3:.1f} tys., kupione {sum(t[d]['vbuy'] for d in lw) / k / 1e3:.1f} tys. ({sum(t[d]['vpcs'] for d in lw) / k:.0f} szt.); narzedzia wsi {tv}/d",
+                "INFO - narzedzia wsi spadna (nadwyzka wsi idzie na liste dostatku, nie na koszyk 15%/d; biegi bez P5: 49-67/d) - patrz CHANGELOG", None)
+    # ---- ZB-9 jedzenie (projekt prog 6) i ZB-10 kiesy 31 najbiedniejszych miast (projekt prog 10)
+    fl = [num(r"miast ze stac jedzenie < 95%: (\d+)", folk[d], int) for d in fw[-28:]]
+    fl = [x for x in fl if x is not None]
+    if fl:
+        v = sum(fl) / len(fl)
+        rep.add(f"ZB-9: miast ze stac jedzenie < 95%, srednio ostatnie {len(fl)} dob okna (projekt prog 6)", f"{v:.1f} (najwiecej {max(fl)})",
+                "<= 10 (bieg roczny kodu 43 bez P3: 11, bieg 120 dob: 2-3)" + tail, (v <= 10) if pkg else None)
+    if ds and t[ds[-1]]["poor"] is not None:
+        v = t[ds[-1]]["poor"]
+        rep.add("ZB-10: kiesy ludu 31 najbiedniejszych miast w ostatniej dobie okna (projekt prog 10)", f"{v / 1e6:.2f} mln", ">= 0.53 mln", v >= 530000)
+    # ---- ZB-11 czas i potkniecia; ZB-12 liczby (INFO)
+    if ds:
+        ms = [t[d]["ms"] for d in ds]
+        stu = sum(t[d]["st"] for d in ds)
+        err = [s for s in lines if s.startswith("ERROR in ") and ("Ladder" in s or "LxEst" in s or "EnsureLx" in s or "PeopleMenu.Luxury" in s)]
+        rep.add("ZB-11: czas P3-P5 (doba + konsumpcja i sygnal, srednio) i potkniecia", f"{sum(ms) / len(ms):.3f} ms/dobe (najwiecej {max(ms):.3f}); potkniecia {stu}, ERROR {len(err)}",
+                "<= 1.0 ms/dobe (projekt: P3 < 0.2, P4 < 0.3 ms), potkniecia 0", sum(ms) / len(ms) <= 1.0 and stu == 0 and not err)
+        lw = ds[-28:]
+        k = float(len(lw))
+        ph = [t[d]["phi"] for d in lw if t[d]["phi"] is not None]
+        rep.add(f"ZB-12: liczby paczki (srednio na dobe, ostatnie {len(lw)} dob okna; INFO)",
+                f"oferta miast {sum(t[d]['off'] for d in lw) / k / 1e3:.1f} tys., kupione {sum(t[d]['buy'] for d in lw) / k / 1e3:.1f} tys., grupa bez kategorii {sum(t[d]['nocat'] for d in lw) / k / 1e3:.1f} tys., "
+                f"par ponad cene graniczna {sum(t[d]['over'] for d in lw) / k:.0f}, kupione / oferta w miastach (Share) {(sum(ph) / len(ph)) if ph else 0:.2f}",
+                "INFO - rachunek CHANGELOG", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -18049,6 +18221,8 @@ def main(argv):
         return p1b_main(logp, start_arg, until_arg)   # P1b: kara lojalnosci za danine P1 - podloga wspolna z W7, prog poboru, lojalnosc osad placacych
     if group == "p2bud" and logp:
         return p2bud_main(logp, start_arg, until_arg)   # P2: lud buduje miasto - drugi platnik budow, material z polki, sufit ceny, poziomy i budowy stojace
+    if group == "zbytki" and logp:
+        return zbytki_main(logp, start_arg, until_arg)   # P3-P5: lista dostatku, targ widzi sakiewke, podzamcza i wsie na targu miasta
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

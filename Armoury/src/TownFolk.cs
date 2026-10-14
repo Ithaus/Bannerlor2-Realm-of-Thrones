@@ -129,6 +129,12 @@ namespace Armoury
             public readonly long[] EarnK = new long[16];              // okno pomiaru: zarobek ludu osady wedlug rodzaju (Credit; K* 0-10, E* 11-15)
             public int BQ, BMat, LuxShops;                            // pomiar tygodnia: czolo kolejki budow (0 brak, 1 cywilna, 2 wojskowa), sztuki materialu na polce targu, warsztaty zbytkow
             public double HorseOwed;                                  // K1-3a krok 2: licznik koni roboczych do wymiany (ulamek; miasto i zamek; zapis arm_townfolk, pole 18; sufit WhMax)
+            // ---- P3-P5 (zbytki, TownFolk.Luxury.cs): pamiec sesji, bez zapisu
+            public double[] LxFrac; public int LxFracDay = -1;        // podzial oferty na liste dostatku z ostatniej konsumpcji (miasto: takze sygnal popytu P4 i zakupy podzamczy i wsi P5)
+            public double LxBF, LxBR;                                 // okno: kupione z oferty listy - jedzenie / reszta (poprawka Predict)
+            public double LxPhi = -1;                                 // ostatnia konsumpcja: kupione z oferty / oferta (poprawka Share); -1 nieznane
+            public double LxOut;                                      // miasto targowe: oferta podzamczy i wsi z listy ostatniej doby ludu (sygnal popytu P4)
+            public double DLxOff, DLxBuy; public int LxSeen = -1;     // ostatnia oferta i zakup z listy (okno People of this land) i jej doba
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();

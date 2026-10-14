@@ -118,6 +118,7 @@ namespace Armoury
             ResetTithe();
             ResetP1();   // P1: danina z oszczednosci i pomiary obiegu kiesy (pamiec sesji)
             ResetHorses();   // K1-3a krok 2: liczniki linii koni roboczych (licznik osady jest w Folk - czysci go Reset)
+            ResetLadder();   // P3-P5 (zbytki): kategorie listy dostatku, liczniki linii (podzial osady jest w Folk - czysci go Reset)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -364,7 +365,7 @@ namespace Armoury
                 }
             }
             long off = f.Offer[0] + f.Offer[1] + f.Offer[2];
-            if (off > 0) after += AddOffer(f, town, dict, off);
+            if (off > 0 || LadderOn) after += AddOffer(f, town, dict, off);   // P3: przy liscie dostatku takze oferta 0 - podzial targu na jutro (sygnal P4, zakupy P5)
             f.G0a += after;
             _brFacFood = ff; _brFacRest = fr; _brAnchor = ff < 1 || fr < 1;
         }
@@ -388,6 +389,7 @@ namespace Armoury
         /// / indeks^0.15 i / czesc domowa HistoricalPrices). Brak kategorii - pieniadz zostaje w kiesie. Zwraca dopisany popyt (do G0a).</summary>
         private static double AddOffer(Folk f, Town town, Dictionary<ItemCategory, float> dict, long off)
         {
+            if (LadderOn) return LadderOffer(f, town, dict, off);       // P3 (zbytki, klucz FolkLuxuryList): lista dostatku z wagami grup (TownFolk.Luxury.cs)
             if (_better == null) _better = CatsOf(BetterIds, out _betterText);
             double sum = 0;
             foreach (var c in _better) { float v; if (dict.TryGetValue(c, out v) && v > 0) sum += v; }
@@ -663,6 +665,7 @@ namespace Armoury
             try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
+            LadderBegin();                                             // P3-P5: liczniki doby zakupow podzamczy i wsi z listy dostatku, oferta kupujacych z zewnatrz (P4) od zera
             for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var f in _f.Values)
@@ -673,6 +676,7 @@ namespace Armoury
                 }
             }
             try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
+            try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             // kontrola zamknieta (kiesy miast, podzamczy, gminy): zmiana stanu = wplywy - wydatki
             long stock = TotalTown() + TotalCastle() + TotalGmina();
@@ -704,7 +708,8 @@ namespace Armoury
         {
             wf = f.PredFood; wr = f.PredRest;
             if (!(f.G0 > 0)) return;                                   // nawias nie biegl w tym oknie - przewidywanie z wczoraj
-            double sf = Math.Max(0, f.SpendFood - f.OfferFood), sr = Math.Max(0, (f.SpendGame - f.SpendFood) - f.OfferRest);
+            double ofF, ofR; OfferSpent(f, out ofF, out ofR);         // P3 (poprawka Predict, A 9.9): przy liscie dostatku oferta KUPIONA, inaczej oferowana (jak dotad)
+            double sf = Math.Max(0, f.SpendFood - ofF), sr = Math.Max(0, (f.SpendGame - f.SpendFood) - ofR);
             wf = sf / Math.Max(0.05, f.FacFoodUsed); wr = sr / Math.Max(0.05, f.FacRestUsed);
             double cap = f.G0;
             if (wf + wr > cap && wf + wr > 0) { double k = cap / (wf + wr); wf *= k; wr *= k; }
@@ -757,7 +762,7 @@ namespace Armoury
                 double sc = sumN > 0 ? N / sumN : 0;
                 af2 += sc * ffc; ar2 += sc * frc;
                 f.AffFC[c] = ffc; f.AffC[c] = N > 0 ? Math.Min(1.0, L / N) : 1.0;
-                f.Share[c] = N * keep * f.AffC[c] + f.Offer[c];        // towar klasy, za ktory jutro zaplaci, + oferta nadwyzki
+                f.Share[c] = N * keep * f.AffC[c] + f.Offer[c] * OfferPayPart(f);   // towar klasy, za ktory jutro zaplaci, + oferta nadwyzki (P3: x czesc kupiona ostatnio)
             }
             if (!(sumN > 0)) { af2 = ar2 = 1; }
             f.AffFood = af2; f.AffRest = ar2; f.MAnc = mm;
@@ -858,6 +863,7 @@ namespace Armoury
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
                 }
             }
+            LadderOffers(f);                                           // P3 (zbytki): oferta na liste dostatku 1/60 nadwyzki po daninie; place R/P wyzej bez zmian
             for (int c = 0; c < 3; c++) d.OffT += f.Offer[c];
             // ---- 6. kotwica na jutro
             double wf, wr; Predict(f, out wf, out wr);
@@ -924,6 +930,7 @@ namespace Armoury
             f.Offer[0] = 0;
             f.DAid = 0; f.DOver = 0; f.DOvC[0] = 0;                    // P1: danina podzamcza z kiesy ponad 10 dni potrzeby - przed oferta (jak w miescie)
             if (f.Need[0] > 0) { double ov = f.KW - RdC * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtCastle, ov, d); f.Offer[0] = (long)(SurplusRate * ov); } }
+            CastleLadder(f, d);                                        // P3/P5 (zbytki): podzamcze 1/60 nadwyzki - oferta w konsumpcji zamku albo zakup w miescie najblizszym
             d.OffC += f.Offer[0];
             // ---- 6. kotwica (z kredytem dworu)
             double wf, wr; Predict(f, out wf, out wr);
@@ -966,7 +973,7 @@ namespace Armoury
                     double nv = pph * VillHeads(f, true);
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
-                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double extra = VillExtraRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
                     f.DVNeed = nv; f.ADay = _liveDay;                  // E5/C4
@@ -977,6 +984,7 @@ namespace Armoury
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
                     long spent = BuyGoods(vil, mk, list, want, d);
                     f.DVBuy = Math.Max(0, spent);                      // E5/C4
+                    VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
                     if (spent <= 0) { d.VNoGoods++; continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }

@@ -5096,7 +5096,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TitheVillageShare { get; set; } = 0.05f;
 
-        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before)")]
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before). With Folk Luxury List on, only the wages of craftsmen and merchant families follow this share (and with Wards And Villages Shop off, the villages' spending)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
@@ -5195,6 +5195,26 @@ namespace Armoury
         [SettingPropertyBool("Folk Ladder Measure Log", HintText = "writes daily and weekly lines that measure where the people's savings could go - the loyalty of towns and castles, what the townsfolk bought with their spare coin and what found no goods, what luxuries would cost if the market saw their purses, the merchants' margin on goods brought by caravans, towns with luxury workshops, the savings of towns that have something to build, the gold of houses with room under their wage ceiling and what each town earns from - to the log only, changes nothing in the game")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkLadderMeasureLog { get; set; } = true;
+
+        [SettingPropertyBool("Folk Luxury List", HintText = "townsfolk live better from what they hold above their reserve for hard times: each day they offer one part in Folk Surplus Spend Days of it (labourers all of it, craftsmen and merchant families the three tenths they do not pay out as wages, which they still pay at Folk Surplus Spend Share) for goods from their own town's market at market prices - cloth and clothes 55%, silver, jewels and spices 25%, a better table 12%, household goods 8%; castle folk the same with their own coin above 10 days. What is not on the shelves is not bought and the coin stays in their purses. Off = the old offer of Folk Surplus Spend Share a day on eight kinds of food, ale, linen, velvet and pots, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkLuxuryList { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Days", 10.00f, 365.00f, "0", HintText = "with Folk Luxury List: the townsfolk spread what they hold above their reserve over this many days of better living (60 = one part in sixty a day)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkSurplusSpendDays { get; set; } = 60f;
+
+        [SettingPropertyBool("Market Sees Purse", HintText = "with Folk Luxury List: the market sees the people's purses - what the townsfolk (and with Wards And Villages Shop the castle folk and villagers who shop there) offer each day for cloth, clothes, silver, jewels, spices and household goods counts in the town's demand, so these goods grow dearer where the people have coin and caravans may sell more there. Their offer never lifts a price above Folk Ladder Price Ceiling times the usual one, and they do not buy such goods from their savings while the price stands higher. Food, ale, linen and leather are not touched. Off = demand from the number of people only, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool MarketSeesPurse { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Ladder Price Ceiling", 1.00f, 5.00f, "0.00", HintText = "with Market Sees Purse: the highest price, as a multiple of the usual one, the people's offer may lift fine goods to and that they will pay from their savings (1.5 = half again the usual price)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLadderPriceCeiling { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Wards And Villages Shop", HintText = "with Folk Luxury List: castle folk (in the nearest town) and villagers (in their market town) spend what they hold above their reserve (10 days of needs for castle folk, 15 days of purchases for a village) the same way - one part in Folk Surplus Spend Days a day on the same goods, from the shelves of that town, leaving the last five pieces of each for its people. A village keeps buying its salt, tools, linen, pots and ale for its daily needs as before. Off = castle folk spend their share in the castle itself and villages spend Folk Surplus Spend Share a day on their usual goods, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool WardsAndVillagesShop { get; set; } = true;
 
         [SettingPropertyBool("Stage6 Measure Log", HintText = "counts every piece of arms and every horse from where it came to where it went, and what each realm's smiths would make - written to the log only, changes nothing in the game")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -6814,6 +6834,11 @@ namespace Armoury
             s.LordWarLevyMinLoyalty = LordWarLevyMinLoyalty;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
+            s.FolkLuxuryList = FolkLuxuryList;
+            s.FolkSurplusSpendDays = FolkSurplusSpendDays;
+            s.MarketSeesPurse = MarketSeesPurse;
+            s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
+            s.WardsAndVillagesShop = WardsAndVillagesShop;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
             s.PlainSaddleEveryRealm = PlainSaddleEveryRealm;

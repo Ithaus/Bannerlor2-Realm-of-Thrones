@@ -22,7 +22,7 @@ namespace Armoury
     /// </summary>
     internal static partial class TownFolk
     {
-        private const int OfMax = 8;                          // kategorie "lepsze" (BetterIds) - rozmiar licznikow oferty
+        private const int OfMax = 32;                         // liczniki oferty: 0-7 kategorie "lepsze" (BetterIds), od 8 lista dostatku P3 (TownFolk.Luxury.cs, 22 kategorie)
         private const int CvGroups = 4;                       // marza z karawan: 0 zywnosc, 1 zbytki BK (LuxIds), 2 sukno i dom z listy dostatku, 3 reszta
         private const double DrySpendDays = 60, DryCeiling = 1.5, DryRpGoods = 0.3;   // regula "na sucho" z projektu (szczebel 2): 1/60 nadwyzki, cena graniczna 1.5, R i P 30% na towar
         private static readonly double[] DryWeight = { 0.55, 0.25, 0.08 };            // sukno i odzienie / srebro, klejnoty, korzenie / dom (lepszy stol 12% - zywnosc, bez sygnalu)
@@ -208,7 +208,7 @@ namespace Armoury
 
         // ============================================================ C1. kupione z oferty nadwyzki (nawias konsumpcji)
         /// <summary>DemandPostfix (otwarcie nawiasu konsumpcji osady): oferta tego nawiasu od zera.</summary>
-        private static void OfferOpen() { _ofN = 0; _ofOn = MeasureP1; }
+        private static void OfferOpen() { _ofN = 0; _ofOn = MeasureP1 || LadderOn; }   // P3: licznik kupionego z oferty takze bez pomiaru (poprawka Predict / Share)
 
         /// <summary>AddOffer: oferta `x` zl dopisana do budzetu kategorii "lepszej" nr `bi` jako `add` jednostek budzetu przy budzecie gry `v` (tylko licznik).</summary>
         private static void OfferNote(int bi, ItemCategory c, double x, double add, double v)
@@ -236,7 +236,7 @@ namespace Armoury
             if (_ofN <= 0) return;
             try
             {
-                double sx = 0, sb = 0;
+                double sx = 0, sb = 0, lsx = 0, lsb = 0;
                 for (int i = 0; i < _ofN; i++)
                 {
                     double x = _ofX[i], eff = _ofEff[i], bought = 0; int bi = _ofIdx[i];
@@ -250,8 +250,10 @@ namespace Armoury
                     }
                     _win.OfX[bi] += x; _win.OfBought[bi] += bought; _win.OfN[bi]++;
                     sx += x; sb += bought;
+                    if (bi >= OfLx) { lsx += x; lsb += bought; LxBought(f, bi - OfLx, _ofCat[i], bought); }   // P3: lista dostatku (TownFolk.Luxury.cs)
                 }
                 _win.OfPlaces++;
+                if (lsx > 0) LxClose(f, lsx, lsb);
                 if (f != null) { f.Of7X += sx; f.Of7B += sb; }
             }
             catch (Exception e) { Stumble("OfferClose", e); }
@@ -264,12 +266,12 @@ namespace Armoury
             double x = 0, b = 0, nr = 0;
             var sb = new StringBuilder(640);
             var parts = new StringBuilder(320);
-            for (int i = 0; i < OfMax && i < _better.Count; i++)
+            for (int i = 0; i < OfMax; i++)
             {
                 x += w.OfX[i]; b += w.OfBought[i]; nr += w.OfNoRow[i];
                 if (w.OfN[i] == 0) continue;
                 if (parts.Length > 0) parts.Append(" ; ");
-                parts.Append(_better[i].StringId).Append(' ').Append(N0(w.OfX[i])).Append(" / ").Append(N0(w.OfBought[i])).Append(" / ").Append(N0(w.OfNoRow[i]))
+                parts.Append(OfName(i)).Append(' ').Append(N0(w.OfX[i])).Append(" / ").Append(N0(w.OfBought[i])).Append(" / ").Append(N0(w.OfNoRow[i]))
                      .Append("; ").Append(w.OfN[i]).Append(" (").Append(w.OfNoRowN[i]).Append(')');
             }
             sb.Append("Kupione z oferty (P1): dzien ").Append(day)

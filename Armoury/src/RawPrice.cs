@@ -399,7 +399,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wpiecie
-        private static List<Type> ModelsDeclaring(Type baseType, string method)
+        internal static List<Type> ModelsDeclaring(Type baseType, string method)   // P4 (TownFolk.LadderApplyAll) - te same modele szacunku popytu
         {
             var found = new List<Type>();
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
